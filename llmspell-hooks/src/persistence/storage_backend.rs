@@ -19,7 +19,7 @@ use uuid::Uuid;
 
 /// Storage backend trait for hook persistence
 #[async_trait]
-pub trait StorageBackend: Send + Sync {
+pub trait StorageBackend: Send + Sync + std::fmt::Debug {
     /// Store a hook execution
     async fn store_execution(
         &self,
@@ -65,6 +65,7 @@ pub struct StorageStats {
 type ExecutionEntry = (SerializedHookExecution, HookMetadata, Bytes);
 
 /// In-memory storage backend (for testing and development)
+#[derive(Debug)]
 pub struct InMemoryStorageBackend {
     executions: Arc<RwLock<HashMap<Uuid, ExecutionEntry>>>,
     correlation_index: Arc<RwLock<HashMap<Uuid, Vec<Uuid>>>>,
@@ -346,6 +347,7 @@ impl StorageBackend for InMemoryStorageBackend {
 }
 
 /// File-based storage backend
+#[derive(Debug)]
 pub struct FileStorageBackend {
     root_path: PathBuf,
     compression_enabled: bool,

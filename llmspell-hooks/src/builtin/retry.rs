@@ -153,6 +153,7 @@ struct RetryState {
 }
 
 /// Built-in retry hook with exponential backoff
+#[derive(Debug)]
 pub struct RetryHook {
     config: RetryConfig,
     attempt_tracker: Arc<parking_lot::RwLock<HashMap<String, RetryState>>>,
@@ -414,8 +415,7 @@ impl Hook for RetryHook {
         if state.attempts >= self.config.max_attempts {
             warn!(
                 "RetryHook: Max attempts ({}) reached for {}",
-                self.config.max_attempts,
-                retry_key
+                self.config.max_attempts, retry_key
             );
 
             {
@@ -464,10 +464,7 @@ impl Hook for RetryHook {
 
         info!(
             "RetryHook: Retrying {} (attempt {}/{}) with {:?} delay",
-            retry_key,
-            state.attempts,
-            self.config.max_attempts,
-            delay
+            retry_key, state.attempts, self.config.max_attempts, delay
         );
 
         // Return retry result

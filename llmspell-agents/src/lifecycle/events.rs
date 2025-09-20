@@ -11,6 +11,7 @@ use std::collections::HashMap;
 use std::sync::Arc;
 use std::time::{Duration, Instant, SystemTime};
 use tokio::sync::{broadcast, Mutex, RwLock};
+use tracing::instrument;
 use tracing::{debug, error, info, warn};
 use uuid::Uuid;
 
@@ -289,6 +290,7 @@ impl LifecycleEventSystem {
     }
 
     /// Subscribe to specific event types with a closure
+    #[instrument(skip(self, handler))]
     pub async fn subscribe_filtered<F>(
         &self,
         _name: &str,
@@ -496,6 +498,7 @@ impl LifecycleEventSystem {
     /// # Errors
     ///
     /// Returns an error if event emission fails
+    #[instrument(skip(self))]
     pub async fn emit_state_transition(
         &self,
         agent_id: String,
@@ -521,6 +524,7 @@ impl LifecycleEventSystem {
     /// # Errors
     ///
     /// Returns an error if event emission fails
+    #[instrument(skip(self))]
     pub async fn emit_error(
         &self,
         agent_id: String,
@@ -547,6 +551,7 @@ impl LifecycleEventSystem {
     /// # Errors
     ///
     /// Returns an error if event emission fails
+    #[instrument(skip(self))]
     pub async fn emit_health_check(
         &self,
         agent_id: String,
@@ -655,6 +660,7 @@ impl LifecycleEventListener for LoggingEventListener {
     /// # Errors
     ///
     /// Returns an error if logging fails
+    #[instrument(skip(self))]
     async fn handle_event(&self, event: &LifecycleEvent) -> Result<()> {
         let message = match &event.data {
             LifecycleEventData::StateTransition { from, to, .. } => {

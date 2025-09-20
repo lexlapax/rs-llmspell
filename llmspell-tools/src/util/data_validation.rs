@@ -19,7 +19,7 @@ use serde::{Deserialize, Serialize};
 use serde_json::{json, Value};
 use std::collections::HashMap;
 use std::time::Instant;
-use tracing::{debug, error, info, trace};
+use tracing::{debug, error, info, instrument, trace};
 
 /// Validation rule types
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
@@ -602,6 +602,13 @@ impl DataValidationTool {
 
 impl Default for DataValidationTool {
     fn default() -> Self {
+        info!(
+            tool_name = "data-validation",
+            category = "Tool",
+            phase = "Phase 3 (comprehensive instrumentation)",
+            "Creating DataValidationTool"
+        );
+
         Self::new()
     }
 }
@@ -613,6 +620,7 @@ impl BaseAgent for DataValidationTool {
     }
 
     #[allow(clippy::too_many_lines)]
+    #[instrument(skip(_context, input, self), fields(tool = %self.metadata().name))]
     async fn execute_impl(
         &self,
         input: AgentInput,
@@ -801,6 +809,7 @@ impl BaseAgent for DataValidationTool {
         Ok(AgentOutput::text(serde_json::to_string_pretty(&response)?))
     }
 
+    #[instrument(skip(self))]
     async fn validate_input(&self, input: &AgentInput) -> Result<()> {
         if input.parameters.is_empty() {
             return Err(validation_error(
@@ -811,6 +820,7 @@ impl BaseAgent for DataValidationTool {
         Ok(())
     }
 
+    #[instrument(skip(self))]
     async fn handle_error(&self, error: LLMSpellError) -> Result<AgentOutput> {
         Ok(AgentOutput::text(format!("Validation error: {error}")))
     }

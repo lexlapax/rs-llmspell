@@ -9,6 +9,7 @@ use llmspell_core::{BaseAgent, LLMSpellError, Result};
 use std::collections::HashMap;
 use std::sync::Arc;
 use tokio::sync::RwLock;
+use tracing::instrument;
 
 /// Lifecycle state of a composite agent
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -184,6 +185,7 @@ impl CompositeLifecycleManager {
     /// - Component initialization fails
     /// - Initialization timeout is exceeded
     /// - Event emission fails
+    #[instrument(skip(self, agent))]
     pub async fn initialize_composite(&self, agent: &dyn CompositeAgent) -> Result<()> {
         // Set state to initializing
         *self.state.write().await = LifecycleState::Initializing;
@@ -238,6 +240,7 @@ impl CompositeLifecycleManager {
     }
 
     /// Initialize all components
+    #[instrument(skip(self))]
     async fn initialize_all_components(&self) -> Result<()> {
         let mut components = self.components.write().await;
 
@@ -262,6 +265,7 @@ impl CompositeLifecycleManager {
     /// # Errors
     ///
     /// Returns an error if state transition fails
+    #[instrument(skip(self))]
     pub async fn activate(&self) -> Result<()> {
         self.transition_state(LifecycleState::Active).await
     }
@@ -271,6 +275,7 @@ impl CompositeLifecycleManager {
     /// # Errors
     ///
     /// Returns an error if state transition fails
+    #[instrument(skip(self))]
     pub async fn pause(&self) -> Result<()> {
         self.transition_state(LifecycleState::Paused).await
     }
@@ -282,6 +287,7 @@ impl CompositeLifecycleManager {
     /// Returns an error if:
     /// - The agent is not currently paused
     /// - State transition fails
+    #[instrument(skip(self))]
     pub async fn resume(&self) -> Result<()> {
         let current = self.state.read().await.clone();
         if current != LifecycleState::Paused {
@@ -300,6 +306,7 @@ impl CompositeLifecycleManager {
     /// Returns an error if:
     /// - Component shutdown fails
     /// - Shutdown timeout is exceeded (results in forced termination)
+    #[instrument(skip(self))]
     pub async fn shutdown(&self) -> Result<()> {
         *self.state.write().await = LifecycleState::ShuttingDown;
 
@@ -323,6 +330,7 @@ impl CompositeLifecycleManager {
     }
 
     /// Shutdown all components
+    #[instrument(skip(self))]
     async fn shutdown_all_components(&self) -> Result<()> {
         let mut components = self.components.write().await;
 
@@ -342,6 +350,7 @@ impl CompositeLifecycleManager {
     }
 
     /// Transition to a new state
+    #[instrument(skip(self))]
     async fn transition_state(&self, new_state: LifecycleState) -> Result<()> {
         let current = self.state.read().await.clone();
 
@@ -397,6 +406,7 @@ impl CompositeLifecycleManager {
     /// # Errors
     ///
     /// Returns an error if event emission fails
+    #[instrument(skip(component, self))]
     pub async fn add_component(&self, component: Arc<dyn BaseAgent>) -> Result<()> {
         let component_id = component.metadata().id.to_string();
 
@@ -426,6 +436,7 @@ impl CompositeLifecycleManager {
     /// # Errors
     ///
     /// Returns an error if event emission fails
+    #[instrument(skip(self))]
     pub async fn remove_component(&self, component_id: &str, reason: &str) -> Result<()> {
         self.components.write().await.remove(component_id);
 
@@ -437,11 +448,13 @@ impl CompositeLifecycleManager {
     }
 
     /// Register an event handler
+    #[instrument(skip(handler, self))]
     pub async fn register_handler(&self, handler: Box<dyn LifecycleEventHandler>) {
         self.event_handlers.write().await.push(handler);
     }
 
     /// Emit a lifecycle event
+    #[instrument(skip(self))]
     async fn emit_event(&self, event: LifecycleEvent) -> Result<()> {
         let handlers = self.event_handlers.read().await;
         for handler in handlers.iter() {
@@ -451,11 +464,13 @@ impl CompositeLifecycleManager {
     }
 
     /// Get current state
+    #[instrument(skip(self))]
     pub async fn state(&self) -> LifecycleState {
         self.state.read().await.clone()
     }
 
     /// Get component states
+    #[instrument(skip(self))]
     pub async fn component_states(&self) -> HashMap<String, LifecycleState> {
         self.components
             .read()
@@ -470,6 +485,7 @@ impl CompositeLifecycleManager {
     /// # Errors
     ///
     /// Returns an error if event emission fails
+    #[instrument(skip(self))]
     pub async fn health_check(&self) -> Result<HealthCheckResult> {
         let state = self.state.read().await.clone();
         let components = self.components.read().await;
@@ -518,6 +534,7 @@ impl CompositeLifecycleManager {
     /// # Errors
     ///
     /// Returns an error if component is not found
+    #[instrument(skip(self))]
     pub async fn update_activity(&self, component_id: &str) -> Result<()> {
         if let Some(lifecycle) = self.components.write().await.get_mut(component_id) {
             lifecycle.last_active = Some(chrono::Utc::now());
@@ -530,6 +547,7 @@ impl CompositeLifecycleManager {
     /// # Errors
     ///
     /// Returns an error if event emission fails
+    #[instrument(skip(self))]
     pub async fn record_error(
         &self,
         component_id: &str,
@@ -600,6 +618,7 @@ impl HierarchicalLifecycleManager {
     /// Returns an error if:
     /// - Base initialization fails
     /// - Hierarchy building fails
+    #[instrument(skip(self, agent))]
     pub async fn initialize_hierarchical(&self, agent: &dyn HierarchicalAgent) -> Result<()> {
         // Initialize base
         self.base.initialize_composite(agent).await?;
@@ -626,6 +645,7 @@ impl HierarchicalLifecycleManager {
     /// Returns an error if:
     /// - Event processing fails
     /// - Recursive cascading fails
+    #[instrument(skip(self))]
     pub async fn cascade_event(
         &self,
         from_id: &str,
@@ -663,6 +683,7 @@ impl HierarchicalLifecycleManager {
     }
 
     /// Process a hierarchy event for a component
+    #[instrument(skip(self))]
     async fn process_hierarchy_event(
         &self,
         component_id: &str,
@@ -736,6 +757,7 @@ mod tests {
             &self.metadata
         }
 
+        #[instrument(skip(self))]
         async fn execute_impl(
             &self,
             _input: AgentInput,
@@ -744,10 +766,12 @@ mod tests {
             Ok(AgentOutput::text("Mock response"))
         }
 
+        #[instrument(skip(self))]
         async fn validate_input(&self, _input: &AgentInput) -> Result<()> {
             Ok(())
         }
 
+        #[instrument(skip(self))]
         async fn handle_error(&self, error: LLMSpellError) -> Result<AgentOutput> {
             Ok(AgentOutput::text(format!("Error: {error}")))
         }
@@ -755,11 +779,13 @@ mod tests {
 
     #[async_trait]
     impl CompositeAgent for MockCompositeAgent {
+        #[instrument(skip(component, self))]
         async fn add_component(&mut self, component: Arc<dyn BaseAgent>) -> Result<()> {
             self.components.push(component);
             Ok(())
         }
 
+        #[instrument(skip(self))]
         async fn remove_component(&mut self, _component_id: &str) -> Result<()> {
             Ok(())
         }
@@ -772,6 +798,7 @@ mod tests {
             None
         }
 
+        #[instrument(skip(_context, _input, self))]
         async fn delegate_to(
             &self,
             _component_id: &str,
@@ -781,6 +808,7 @@ mod tests {
             Ok(serde_json::json!({}))
         }
 
+        #[instrument(skip(_context, _input, self))]
         async fn execute_pattern(
             &self,
             _pattern: super::super::traits::ExecutionPattern,
@@ -793,6 +821,7 @@ mod tests {
 
     #[async_trait]
     impl llmspell_core::ToolCapable for MockCompositeAgent {
+        #[instrument(skip(_input, self))]
         async fn discover_tools(
             &self,
             _query: &llmspell_core::traits::tool_capable::ToolQuery,
@@ -800,6 +829,7 @@ mod tests {
             Ok(Vec::new())
         }
 
+        #[instrument(skip(self))]
         async fn invoke_tool(
             &self,
             _tool_name: &str,

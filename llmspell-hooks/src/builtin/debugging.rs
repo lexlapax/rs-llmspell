@@ -253,6 +253,7 @@ impl TraceStorage {
 }
 
 /// Built-in debugging hook for comprehensive trace capture
+#[derive(Debug)]
 pub struct DebuggingHook {
     storage: Arc<TraceStorage>,
     metadata: HookMetadata,

@@ -25,7 +25,7 @@ use serde_json::{json, Value};
 use std::collections::HashMap;
 use std::sync::Arc;
 use tokio::sync::RwLock;
-use tracing::{debug, info};
+use tracing::{debug, info, instrument};
 
 /// GraphQL operation types
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -202,6 +202,7 @@ impl GraphQLQueryTool {
     }
 
     /// Execute GraphQL request
+    #[instrument(skip(headers, self))]
     async fn execute_graphql(
         &self,
         endpoint: &str,
@@ -254,6 +255,7 @@ impl GraphQLQueryTool {
     }
 
     /// Get or fetch schema with caching
+    #[instrument(skip(headers, self))]
     async fn get_schema(
         &self,
         endpoint: &str,
@@ -294,6 +296,7 @@ impl GraphQLQueryTool {
     }
 
     /// Fetch schema from endpoint
+    #[instrument(skip(headers, self))]
     async fn fetch_schema(
         &self,
         endpoint: &str,
@@ -470,6 +473,13 @@ struct GraphQLParameters {
 
 impl Default for GraphQLQueryTool {
     fn default() -> Self {
+        info!(
+            tool_name = "graph-q-l-query",
+            category = "Tool",
+            phase = "Phase 3 (comprehensive instrumentation)",
+            "Creating GraphQLQueryTool"
+        );
+
         Self::new(GraphQLConfig::default()).expect("Default config should be valid")
     }
 }
@@ -480,6 +490,7 @@ impl BaseAgent for GraphQLQueryTool {
         &self.metadata
     }
 
+    #[instrument(skip(_context, input, self), fields(tool = %self.metadata().name))]
     async fn execute_impl(
         &self,
         input: AgentInput,
@@ -573,6 +584,7 @@ impl BaseAgent for GraphQLQueryTool {
         Ok(AgentOutput::text(serde_json::to_string_pretty(&response)?))
     }
 
+    #[instrument(skip(self))]
     async fn validate_input(&self, input: &AgentInput) -> Result<()> {
         if input.parameters.is_empty() {
             return Err(LLMSpellError::Validation {
@@ -606,6 +618,7 @@ impl BaseAgent for GraphQLQueryTool {
         Ok(())
     }
 
+    #[instrument(skip(self))]
     async fn handle_error(&self, error: LLMSpellError) -> Result<AgentOutput> {
         Ok(AgentOutput::text(format!("GraphQL query error: {error}")))
     }

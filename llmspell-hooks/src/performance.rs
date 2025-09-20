@@ -46,6 +46,7 @@ struct PerformanceSample {
 }
 
 /// Performance monitor for hook execution
+#[derive(Debug)]
 pub struct PerformanceMonitor {
     samples: Arc<RwLock<HashMap<String, Vec<PerformanceSample>>>>,
     counters: Arc<RwLock<HashMap<String, AtomicU64>>>,

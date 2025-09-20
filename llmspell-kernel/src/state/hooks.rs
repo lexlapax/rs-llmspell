@@ -29,6 +29,7 @@ pub enum StateOperation {
 }
 
 /// Built-in state validation hook
+#[derive(Debug)]
 pub struct StateValidationHook;
 
 #[async_trait]
@@ -66,6 +67,7 @@ impl Hook for StateValidationHook {
 }
 
 /// Built-in state audit hook
+#[derive(Debug)]
 pub struct StateAuditHook;
 
 #[async_trait]
@@ -101,6 +103,7 @@ impl Hook for StateAuditHook {
 }
 
 /// Built-in state cache invalidation hook
+#[derive(Debug)]
 pub struct StateCacheHook;
 
 #[async_trait]

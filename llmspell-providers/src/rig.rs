@@ -219,7 +219,7 @@ impl RigProvider {
         self.total_requests.load(Ordering::SeqCst)
     }
 
-    #[instrument(level = "debug", skip(self, prompt), fields(
+    #[instrument(level = "debug", skip(prompt, self), fields(
         prompt_length = prompt.len(),
         provider = %self.config.provider_type,
         model = %self.config.model
@@ -300,7 +300,7 @@ impl ProviderInstance for RigProvider {
         &self.capabilities
     }
 
-    #[instrument(level = "info", skip(self, input), fields(
+    #[instrument(level = "info", skip(input, self), fields(
         provider_type = %self.config.provider_type,
         model = %self.config.model,
         input_length = tracing::field::Empty,
@@ -423,7 +423,7 @@ impl ProviderInstance for RigProvider {
         Ok(output)
     }
 
-    #[instrument(level = "debug", skip(self, _input), fields(
+    #[instrument(level = "debug", skip(_input, self), fields(
         provider_type = %self.config.provider_type,
         model = %self.config.model,
         streaming_support = false

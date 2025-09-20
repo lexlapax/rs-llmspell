@@ -120,6 +120,7 @@ impl RateLimitMetrics {
 }
 
 /// Built-in rate limiting hook for API quota management
+#[derive(Debug)]
 pub struct RateLimitHook {
     rate_limiter: Arc<RateLimiter>,
     config: RateLimitConfig,
@@ -405,8 +406,7 @@ impl Hook for RateLimitHook {
             // Log if debug level
             debug!(
                 "RateLimitHook: Allowed request for key '{}', {} tokens remaining",
-                key,
-                tokens_remaining
+                key, tokens_remaining
             );
 
             Ok(HookResult::Continue)
@@ -423,8 +423,7 @@ impl Hook for RateLimitHook {
             // Log rate limiting
             warn!(
                 "RateLimitHook: Rate limited request for key '{}', action: {:?}",
-                key,
-                self.config.rate_limited_action
+                key, self.config.rate_limited_action
             );
 
             // Take configured action

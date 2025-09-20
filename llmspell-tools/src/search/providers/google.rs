@@ -1,5 +1,6 @@
 //! ABOUTME: Google Custom Search API provider implementation
 //! ABOUTME: Requires API key and Search Engine ID from Google Cloud Console
+use tracing::instrument;
 
 use super::{ProviderConfig, SearchOptions, SearchProvider, SearchResult, SearchType};
 use async_trait::async_trait;
@@ -73,6 +74,7 @@ impl SearchProvider for GoogleSearchProvider {
         Some(100) // 100 queries per day for free tier
     }
 
+    #[instrument(skip(self))]
     async fn search(&self, query: &str, options: &SearchOptions) -> Result<Vec<SearchResult>> {
         let api_key = self
             .api_key

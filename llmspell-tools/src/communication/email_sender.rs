@@ -22,7 +22,7 @@ use llmspell_utils::{
 };
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
-use tracing::{debug, error, info, warn};
+use tracing::{debug, error, info, instrument, warn};
 
 use crate::api_key_integration::{get_api_key, ApiKeyConfig, RequiresApiKey};
 
@@ -219,6 +219,7 @@ impl EmailSenderTool {
     /// - The specified provider is not configured
     /// - The provider type is unsupported
     /// - Email sending fails
+    #[instrument(skip(self))]
     async fn send_email(
         &self,
         provider: &str,
@@ -274,6 +275,7 @@ impl EmailSenderTool {
     /// - Failed to create SMTP transport
     /// - Failed to send email
     #[allow(clippy::unused_async)]
+    #[instrument(skip(self))]
     async fn send_via_smtp(
         &self,
         #[allow(unused_variables)] config: &EmailProviderConfig,
@@ -380,6 +382,7 @@ impl EmailSenderTool {
     ///
     /// Returns an error if `SendGrid` API call fails (currently returns mock success)
     #[allow(clippy::unused_async)]
+    #[instrument(skip(self))]
     async fn send_via_sendgrid(
         &self,
         _config: &EmailProviderConfig,
@@ -409,6 +412,7 @@ impl EmailSenderTool {
     /// - Failed to build email content
     /// - AWS SES API call fails
     #[allow(clippy::unused_async)]
+    #[instrument(skip(self))]
     async fn send_via_ses(
         &self,
         #[allow(unused_variables)] config: &EmailProviderConfig,
@@ -518,6 +522,7 @@ impl BaseAgent for EmailSenderTool {
         &self.metadata
     }
 
+    #[instrument(skip(_context, input, self), fields(tool = %self.metadata().name))]
     async fn execute_impl(
         &self,
         input: AgentInput,
@@ -578,6 +583,7 @@ impl BaseAgent for EmailSenderTool {
         }
     }
 
+    #[instrument(skip(self))]
     async fn validate_input(&self, input: &AgentInput) -> Result<()> {
         let params = extract_parameters(input)?;
 
@@ -608,6 +614,7 @@ impl BaseAgent for EmailSenderTool {
         Ok(())
     }
 
+    #[instrument(skip(self))]
     async fn handle_error(&self, error: LLMSpellError) -> Result<AgentOutput> {
         // Use SafeErrorHandler to sanitize error messages
         let context = ErrorContext::new()

@@ -38,7 +38,7 @@ use llmspell_utils::{
 };
 use serde_json::{json, Value};
 use std::time::Instant;
-use tracing::{debug, error, info, trace};
+use tracing::{debug, error, info, instrument, trace};
 
 /// Date/time handler tool
 #[derive(Debug, Clone)]
@@ -578,6 +578,7 @@ impl DateTimeHandlerTool {
     }
 
     #[allow(clippy::unused_async)]
+    #[instrument(skip(self))]
     async fn process_operation(&self, params: &Value) -> Result<Value> {
         let operation_start = Instant::now();
         let operation = extract_string_with_default(params, "operation", "parse");
@@ -623,6 +624,7 @@ impl BaseAgent for DateTimeHandlerTool {
         &self.metadata
     }
 
+    #[instrument(skip(_context, input, self), fields(tool = %self.metadata().name))]
     async fn execute_impl(
         &self,
         input: AgentInput,
@@ -654,6 +656,7 @@ impl BaseAgent for DateTimeHandlerTool {
         ))
     }
 
+    #[instrument(skip(self))]
     async fn validate_input(&self, input: &AgentInput) -> Result<()> {
         if input.text.is_empty() {
             return Err(validation_error(
@@ -664,6 +667,7 @@ impl BaseAgent for DateTimeHandlerTool {
         Ok(())
     }
 
+    #[instrument(skip(self))]
     async fn handle_error(&self, error: LLMSpellError) -> Result<AgentOutput> {
         Ok(AgentOutput::text(format!(
             "Date/time operation error: {error}"

@@ -8,6 +8,7 @@ use anyhow::Result;
 use async_trait::async_trait;
 use llmspell_core::traits::agent::Agent;
 use std::sync::Arc;
+use tracing::instrument;
 use tracing::{debug, info, warn};
 
 /// Validation hook that validates agent configuration
@@ -64,6 +65,7 @@ impl Default for ValidationHook {
 
 #[async_trait]
 impl CreationHook for ValidationHook {
+    #[instrument(skip(self))]
     async fn before_create(&self, config: &AgentConfig) -> Result<()> {
         debug!("Validating agent configuration for: {}", config.name);
 
@@ -101,6 +103,7 @@ impl CreationHook for ValidationHook {
         Ok(())
     }
 
+    #[instrument(skip(agent, self))]
     async fn after_create(&self, agent: &Arc<dyn Agent>) -> Result<()> {
         debug!("Agent '{}' created successfully", agent.metadata().name);
         Ok(())
@@ -135,6 +138,7 @@ impl Default for LoggingHook {
 
 #[async_trait]
 impl CreationHook for LoggingHook {
+    #[instrument(skip(self))]
     async fn before_create(&self, config: &AgentConfig) -> Result<()> {
         match self.log_level {
             tracing::Level::DEBUG => debug!(
@@ -150,6 +154,7 @@ impl CreationHook for LoggingHook {
         Ok(())
     }
 
+    #[instrument(skip(agent, self))]
     async fn after_create(&self, agent: &Arc<dyn Agent>) -> Result<()> {
         let metadata = agent.metadata();
         match self.log_level {
@@ -191,12 +196,14 @@ impl Default for MetricsHook {
 
 #[async_trait]
 impl CreationHook for MetricsHook {
+    #[instrument(skip(self))]
     async fn before_create(&self, config: &AgentConfig) -> Result<()> {
         let mut times = self.start_times.lock().await;
         times.insert(config.name.clone(), std::time::Instant::now());
         Ok(())
     }
 
+    #[instrument(skip(agent, self))]
     async fn after_create(&self, agent: &Arc<dyn Agent>) -> Result<()> {
         let name = agent.metadata().name.clone();
         let mut times = self.start_times.lock().await;
@@ -250,6 +257,7 @@ impl Default for SecurityHook {
 
 #[async_trait]
 impl CreationHook for SecurityHook {
+    #[instrument(skip(self))]
     async fn before_create(&self, config: &AgentConfig) -> Result<()> {
         // Check resource limits
         if self.require_resource_limits {
@@ -285,6 +293,7 @@ impl CreationHook for SecurityHook {
         Ok(())
     }
 
+    #[instrument(skip(_agent, self))]
     async fn after_create(&self, _agent: &Arc<dyn Agent>) -> Result<()> {
         Ok(())
     }
@@ -316,6 +325,7 @@ impl Default for CompositeHook {
 
 #[async_trait]
 impl CreationHook for CompositeHook {
+    #[instrument(skip(self))]
     async fn before_create(&self, config: &AgentConfig) -> Result<()> {
         for hook in &self.hooks {
             hook.before_create(config).await?;
@@ -323,6 +333,7 @@ impl CreationHook for CompositeHook {
         Ok(())
     }
 
+    #[instrument(skip(agent, self))]
     async fn after_create(&self, agent: &Arc<dyn Agent>) -> Result<()> {
         for hook in &self.hooks {
             hook.after_create(agent).await?;
@@ -427,6 +438,7 @@ mod tests {
                 Ok(())
             }
 
+            #[instrument(skip(_agent, self))]
             async fn after_create(&self, _agent: &Arc<dyn Agent>) -> Result<()> {
                 self.count.fetch_add(1, Ordering::SeqCst);
                 Ok(())

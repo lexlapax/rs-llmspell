@@ -10,6 +10,7 @@ use serde_json::json;
 use tracing::warn;
 
 /// Collector for tool execution results
+#[derive(Debug)]
 pub struct ToolResultCollector {
     config: CollectionConfig,
 }

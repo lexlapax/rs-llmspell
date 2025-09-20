@@ -233,7 +233,7 @@ impl StateContext {
 
 /// Trait for handling state transitions
 #[async_trait]
-pub trait StateHandler: Send + Sync {
+pub trait StateHandler: Send + Sync + std::fmt::Debug {
     /// Enter the state
     async fn enter(&self, context: &StateContext) -> Result<()>;
 
@@ -253,6 +253,7 @@ pub trait StateHandler: Send + Sync {
 }
 
 /// Default state handlers
+#[derive(Debug)]
 pub struct DefaultStateHandler {
     state: AgentState,
 }
@@ -266,21 +267,25 @@ impl DefaultStateHandler {
 
 #[async_trait]
 impl StateHandler for DefaultStateHandler {
+    #[instrument(skip(self))]
     async fn enter(&self, context: &StateContext) -> Result<()> {
         debug!("Agent {} entering state {:?}", context.agent_id, self.state);
         Ok(())
     }
 
+    #[instrument(skip(self))]
     async fn exit(&self, context: &StateContext) -> Result<()> {
         debug!("Agent {} exiting state {:?}", context.agent_id, self.state);
         Ok(())
     }
 
+    #[instrument(skip(self))]
     async fn handle(&self, _context: &StateContext) -> Result<()> {
         // Default handler does nothing
         Ok(())
     }
 
+    #[instrument(skip(self))]
     async fn can_transition_to(&self, target: AgentState) -> bool {
         use AgentState::{
             Error, Initializing, Paused, Ready, Recovering, Running, Terminated, Terminating,
@@ -306,6 +311,7 @@ impl StateHandler for DefaultStateHandler {
 }
 
 /// Agent state machine
+#[derive(Debug)]
 pub struct AgentStateMachine {
     agent_id: String,
     current_state: Arc<RwLock<AgentState>>,
@@ -421,11 +427,13 @@ impl AgentStateMachine {
     }
 
     /// Get current state
+    #[instrument(skip(self))]
     pub async fn current_state(&self) -> AgentState {
         *self.current_state.read().await
     }
 
     /// Check if agent is in specific state
+    #[instrument(skip(self))]
     pub async fn is_state(&self, state: AgentState) -> bool {
         *self.current_state.read().await == state
     }
@@ -437,6 +445,7 @@ impl AgentStateMachine {
 
     /// Execute hooks for a state transition phase
     #[allow(clippy::cognitive_complexity)]
+    #[instrument(skip(self))]
     async fn execute_transition_hooks(
         &self,
         state: AgentState,
@@ -559,6 +568,7 @@ impl AgentStateMachine {
     }
 
     /// Cancel an ongoing state transition
+    #[instrument(skip(self))]
     pub async fn cancel_transition(&self, from_state: AgentState, to_state: AgentState) -> bool {
         let transition_id = format!("{}-{:?}-{:?}", self.agent_id, from_state, to_state);
 
@@ -574,6 +584,7 @@ impl AgentStateMachine {
     /// # Errors
     ///
     /// Returns an error if state transition fails
+    #[instrument(skip(self))]
     pub async fn transition_to(&self, target_state: AgentState) -> Result<()> {
         self.transition_to_with_reason(target_state, None).await
     }
@@ -588,6 +599,7 @@ impl AgentStateMachine {
     /// - Hook execution prevents the transition
     /// - Validation fails
     /// - Timeout occurs
+    #[instrument(skip(self))]
     pub async fn transition_to_with_reason(
         &self,
         target_state: AgentState,
@@ -671,6 +683,7 @@ impl AgentStateMachine {
 
     /// Internal method to execute the actual state transition
     #[allow(clippy::too_many_lines)]
+    #[instrument(skip(self))]
     async fn execute_state_transition(
         &self,
         current: AgentState,
@@ -1062,24 +1075,28 @@ impl AgentStateMachine {
     }
 
     /// Get transition history
+    #[instrument(skip(self))]
     pub async fn get_transition_history(&self) -> Vec<StateTransition> {
         let history = self.transition_history.lock().await;
         history.clone()
     }
 
     /// Get last error message
+    #[instrument(skip(self))]
     pub async fn get_last_error(&self) -> Option<String> {
         let last_error = self.last_error.lock().await;
         last_error.clone()
     }
 
     /// Get recovery attempt count
+    #[instrument(skip(self))]
     pub async fn get_recovery_attempts(&self) -> usize {
         let attempts = self.recovery_attempts.lock().await;
         *attempts
     }
 
     /// Check if agent is healthy
+    #[instrument(skip(self))]
     pub async fn is_healthy(&self) -> bool {
         self.current_state().await.is_healthy()
     }
@@ -1099,6 +1116,7 @@ impl AgentStateMachine {
     }
 
     /// Get state machine metrics
+    #[instrument(skip(self))]
     pub async fn get_metrics(&self) -> StateMachineMetrics {
         let current_state = self.current_state().await;
         let history = self.transition_history.lock().await;

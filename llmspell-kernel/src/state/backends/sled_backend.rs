@@ -10,6 +10,7 @@ use std::path::Path;
 use std::sync::Arc;
 
 /// Sled storage backend
+#[derive(Debug)]
 pub struct SledBackend {
     db: Arc<Db>,
 }

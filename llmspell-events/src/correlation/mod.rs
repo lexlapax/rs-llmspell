@@ -181,6 +181,7 @@ pub struct CorrelationStats {
 }
 
 /// Event correlation tracker
+#[derive(Debug)]
 pub struct EventCorrelationTracker {
     /// Configuration for correlation tracking
     config: CorrelationConfig,

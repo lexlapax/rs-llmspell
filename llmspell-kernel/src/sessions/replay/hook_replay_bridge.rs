@@ -11,6 +11,7 @@ use std::time::Duration;
 use uuid::Uuid;
 
 /// Bridge adapter that implements `hooks::HookReplayManager` using `state-persistence::HookReplayManager`
+#[derive(Debug)]
 pub struct HookReplayBridge {
     state_replay_manager: Arc<StateHookReplayManager>,
 }

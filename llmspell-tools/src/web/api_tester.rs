@@ -25,7 +25,7 @@ use serde::{Deserialize, Serialize};
 use serde_json::{json, Value};
 use std::collections::HashMap;
 use std::time::{Duration, Instant};
-use tracing::{debug, error, info, trace};
+use tracing::{debug, error, info, instrument, trace};
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ApiTesterTool {
@@ -119,6 +119,7 @@ impl BaseAgent for ApiTesterTool {
     }
 
     #[allow(clippy::too_many_lines)]
+    #[instrument(skip(self, input, _context), fields(tool = %self.metadata().name))]
     async fn execute_impl(
         &self,
         input: AgentInput,

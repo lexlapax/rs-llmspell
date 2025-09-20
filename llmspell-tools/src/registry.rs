@@ -14,7 +14,7 @@ use std::collections::HashMap;
 use std::sync::Arc;
 use std::time::Instant;
 use tokio::sync::RwLock;
-use tracing::{debug, error, info, trace};
+use tracing::{debug, error, info, instrument, trace};
 
 // Type alias to simplify the complex tool storage type
 type ToolStorage = Arc<RwLock<HashMap<String, Arc<Box<dyn Tool>>>>>;
@@ -196,6 +196,7 @@ impl ToolRegistry {
     /// # Errors
     ///
     /// Returns an error if tool validation fails or if a tool with the same name already exists
+    #[instrument(skip(self, tool))]
     pub async fn register<T>(&self, name: String, tool: T) -> Result<()>
     where
         T: Tool + 'static,
@@ -251,6 +252,7 @@ impl ToolRegistry {
 
     /// Validate a tool before registration
     #[allow(clippy::unused_async)]
+    #[instrument(skip(self, tool))]
     async fn validate_tool(&self, tool: &dyn Tool) -> Result<()> {
         debug!(
             tool_name = %tool.metadata().name,
@@ -296,6 +298,7 @@ impl ToolRegistry {
     }
 
     /// Get a tool by name
+    #[instrument(skip(self))]
     pub async fn get_tool(&self, name: &str) -> Option<Arc<Box<dyn Tool>>> {
         debug!(
             tool_name = %name,
@@ -306,6 +309,7 @@ impl ToolRegistry {
     }
 
     /// Get tool metadata by name
+    #[instrument(skip_all)]
     pub async fn get_tool_info(&self, name: &str) -> Option<ToolInfo> {
         trace!(
             tool_name = %name,
@@ -316,6 +320,7 @@ impl ToolRegistry {
     }
 
     /// List all registered tools
+    #[instrument(skip(self))]
     pub async fn list_tools(&self) -> Vec<String> {
         trace!("Listing all registered tools");
         let tools = self.tools.read().await;
@@ -323,6 +328,7 @@ impl ToolRegistry {
     }
 
     /// Get tools by category
+    #[instrument(skip(self))]
     pub async fn get_tools_by_category(&self, category: &ToolCategory) -> Vec<String> {
         debug!(
             category = ?category,
@@ -333,6 +339,7 @@ impl ToolRegistry {
     }
 
     /// Discover tools by capabilities
+    #[instrument(skip_all)]
     pub async fn discover_tools(&self, matcher: &CapabilityMatcher) -> Vec<ToolInfo> {
         debug!(
             categories = ?matcher.categories,
@@ -348,6 +355,7 @@ impl ToolRegistry {
     }
 
     /// Get tools compatible with a security level
+    #[instrument(skip_all)]
     pub async fn get_tools_for_security_level(&self, level: SecurityLevel) -> Vec<ToolInfo> {
         debug!(
             security_level = ?level,
@@ -358,6 +366,7 @@ impl ToolRegistry {
     }
 
     /// Check if a tool is registered
+    #[instrument(skip(self))]
     pub async fn contains_tool(&self, name: &str) -> bool {
         trace!(
             tool_name = %name,
@@ -372,6 +381,7 @@ impl ToolRegistry {
     /// # Errors
     ///
     /// Returns an error if the tool is not found in the registry
+    #[instrument(skip(self))]
     pub async fn unregister_tool(&self, name: &str) -> Result<()> {
         info!(
             tool_name = %name,
@@ -410,6 +420,7 @@ impl ToolRegistry {
     }
 
     /// Get registry statistics
+    #[instrument(skip(self))]
     pub async fn get_statistics(&self) -> RegistryStatistics {
         trace!("Getting registry statistics");
         let tools = self.tools.read().await;
@@ -439,6 +450,7 @@ impl ToolRegistry {
     }
 
     /// Get tool from registry with error handling
+    #[instrument(skip(self))]
     async fn get_tool_or_error(&self, tool_name: &str) -> Result<Arc<Box<dyn Tool>>> {
         self.get_tool(tool_name)
             .await
@@ -449,6 +461,7 @@ impl ToolRegistry {
     }
 
     /// Execute tool with or without hooks based on configuration
+    #[instrument(skip(self, tool))]
     async fn execute_with_optional_hooks(
         &self,
         tool: Arc<Box<dyn Tool>>,
@@ -503,6 +516,7 @@ impl ToolRegistry {
     /// - Tool not found in registry
     /// - Hook execution fails
     /// - Tool execution fails
+    #[instrument(skip(self))]
     pub async fn execute_tool_with_hooks(
         &self,
         tool_name: &str,
@@ -536,6 +550,7 @@ impl ToolRegistry {
     /// - Tool not found in registry
     /// - Tool execution fails
     /// - Hook execution fails (if hooks are enabled)
+    #[instrument(skip(self))]
     pub async fn execute_tool(
         &self,
         tool_name: &str,
@@ -580,6 +595,7 @@ impl ToolRegistry {
     }
 
     /// Get resource usage statistics for all tool executions
+    #[instrument(skip(self))]
     pub async fn get_resource_usage_stats(&self) -> ResourceUsageStats {
         trace!("Getting resource usage statistics");
         let stats = self.get_statistics().await;
@@ -603,6 +619,11 @@ impl ToolRegistry {
 
 impl Default for ToolRegistry {
     fn default() -> Self {
+        info!(
+            tool_name = "tool-registry",
+            category = "Tool",
+            "Initializing ToolRegistry"
+        );
         Self::new()
     }
 }
@@ -678,6 +699,7 @@ mod tests {
             &self.metadata
         }
 
+        #[instrument(skip(self))]
         async fn execute_impl(
             &self,
             _input: AgentInput,
@@ -686,10 +708,12 @@ mod tests {
             Ok(AgentOutput::text(format!("Executed {}", self.name)))
         }
 
+        #[instrument(skip(self))]
         async fn validate_input(&self, _input: &AgentInput) -> Result<()> {
             Ok(())
         }
 
+        #[instrument(skip(self))]
         async fn handle_error(&self, error: LLMSpellError) -> Result<AgentOutput> {
             Ok(AgentOutput::text(format!("Error: {error}")))
         }
@@ -815,6 +839,7 @@ mod tests {
                 &self.metadata
             }
 
+            #[instrument(skip(self))]
             async fn execute_impl(
                 &self,
                 _input: AgentInput,
@@ -823,10 +848,12 @@ mod tests {
                 Ok(AgentOutput::text("test".to_string()))
             }
 
+            #[instrument(skip(self))]
             async fn validate_input(&self, _input: &AgentInput) -> Result<()> {
                 Ok(())
             }
 
+            #[instrument(skip(self))]
             async fn handle_error(&self, error: LLMSpellError) -> Result<AgentOutput> {
                 Ok(AgentOutput::text(format!("Error: {error}")))
             }

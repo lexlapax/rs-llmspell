@@ -95,6 +95,7 @@ impl BasicAgent {
     /// # Errors
     ///
     /// Returns an error if state machine initialization fails
+    #[instrument(skip(self))]
     pub async fn initialize(&self) -> Result<()> {
         info!("Initializing BasicAgent '{}'", self.metadata.name);
         self.state_machine.initialize().await?;
@@ -110,6 +111,7 @@ impl BasicAgent {
     /// # Errors
     ///
     /// Returns an error if the state machine cannot transition to the Running state
+    #[instrument(skip(self))]
     pub async fn start(&self) -> Result<()> {
         info!("Starting BasicAgent '{}'", self.metadata.name);
 
@@ -130,6 +132,7 @@ impl BasicAgent {
     ///
     /// Returns an error if the state machine cannot transition to the Paused state
     #[allow(clippy::cognitive_complexity)]
+    #[instrument(skip(self))]
     pub async fn pause(&self) -> Result<()> {
         info!("Pausing BasicAgent '{}'", self.metadata.name);
         self.state_machine.pause().await?;
@@ -158,6 +161,7 @@ impl BasicAgent {
     /// # Errors
     ///
     /// Returns an error if the state machine cannot transition from Paused to Running state
+    #[instrument(skip(self))]
     pub async fn resume(&self) -> Result<()> {
         info!("Resuming BasicAgent '{}'", self.metadata.name);
 
@@ -178,6 +182,7 @@ impl BasicAgent {
     ///
     /// Returns an error if the state machine cannot transition to the Stopped state
     #[allow(clippy::cognitive_complexity)]
+    #[instrument(skip(self))]
     pub async fn stop(&self) -> Result<()> {
         info!("Stopping BasicAgent '{}'", self.metadata.name);
 
@@ -206,6 +211,7 @@ impl BasicAgent {
     /// # Errors
     ///
     /// Returns an error if the state machine cannot transition to the Terminated state
+    #[instrument(skip(self))]
     pub async fn terminate(&self) -> Result<()> {
         info!("Terminating BasicAgent '{}'", self.metadata.name);
         self.state_machine.terminate().await?;
@@ -214,6 +220,7 @@ impl BasicAgent {
     }
 
     /// Check if agent is healthy
+    #[instrument(skip(self))]
     pub async fn is_healthy(&self) -> bool {
         self.state_machine.is_healthy().await
     }
@@ -226,8 +233,8 @@ impl BaseAgent for BasicAgent {
     }
 
     #[instrument(
-        level = "debug",
         skip(self, _context),
+        level = "debug",
         fields(
             agent_name = %self.metadata.name,
             input_size = input.text.len(),
@@ -328,6 +335,7 @@ impl BaseAgent for BasicAgent {
         Ok(output)
     }
 
+    #[instrument(skip(self))]
     async fn validate_input(&self, input: &AgentInput) -> Result<(), LLMSpellError> {
         if input.text.is_empty() {
             return Err(LLMSpellError::Validation {
@@ -350,6 +358,7 @@ impl BaseAgent for BasicAgent {
         Ok(())
     }
 
+    #[instrument(skip(self))]
     async fn handle_error(&self, error: LLMSpellError) -> Result<AgentOutput, LLMSpellError> {
         error!(
             "BasicAgent '{}' encountered error: {}",
@@ -389,6 +398,7 @@ impl Agent for BasicAgent {
         &self.core_config
     }
 
+    #[instrument(skip(self))]
     async fn get_conversation(&self) -> Result<Vec<ConversationMessage>, LLMSpellError> {
         self.conversation
             .lock()
@@ -399,6 +409,7 @@ impl Agent for BasicAgent {
             })
     }
 
+    #[instrument(skip(self))]
     async fn add_message(&self, message: ConversationMessage) -> Result<(), LLMSpellError> {
         self.conversation
             .lock()
@@ -409,6 +420,7 @@ impl Agent for BasicAgent {
             })
     }
 
+    #[instrument(skip(self))]
     async fn clear_conversation(&self) -> Result<(), LLMSpellError> {
         self.conversation
             .lock()

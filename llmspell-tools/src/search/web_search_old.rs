@@ -22,7 +22,7 @@ use llmspell_utils::{
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::time::Instant;
-use tracing::{debug, error, info, trace, warn};
+use tracing::{instrument, debug, error, info, trace, warn};
 
 /// Search provider types
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
@@ -161,6 +161,7 @@ impl WebSearchTool {
     }
 
     /// Perform search with a specific provider
+    #[instrument(skip(self))]
     async fn search_with_provider(
         &self,
         query: &str,
@@ -186,6 +187,7 @@ impl WebSearchTool {
     }
 
     /// Search using Google (requires API key)
+    #[instrument(skip(self))]
     async fn search_google(&self, query: &str, _num_results: usize) -> Result<Vec<SearchResult>> {
         let _api_key =
             self.config
@@ -208,6 +210,7 @@ impl WebSearchTool {
     }
 
     /// Search using Bing (requires API key)
+    #[instrument(skip(self))]
     async fn search_bing(&self, query: &str, _num_results: usize) -> Result<Vec<SearchResult>> {
         let _api_key =
             self.config
@@ -230,6 +233,7 @@ impl WebSearchTool {
     }
 
     /// Search using DuckDuckGo (no API key required)
+    #[instrument(skip(self))]
     async fn search_duckduckgo(
         &self,
         query: &str,
@@ -321,6 +325,7 @@ impl BaseAgent for WebSearchTool {
         &self.metadata
     }
 
+    #[instrument(skip(_context, input, self), fields(tool = %self.metadata().name))]
     async fn execute_impl(&self, input: AgentInput, _context: ExecutionContext) -> Result<AgentOutput> {
         let execute_start = Instant::now();
         info!(
@@ -457,6 +462,7 @@ impl BaseAgent for WebSearchTool {
         Ok(AgentOutput::text(serde_json::to_string_pretty(&response)?))
     }
 
+    #[instrument(skip(self))]
     async fn validate_input(&self, input: &AgentInput) -> Result<()> {
         if input.parameters.is_empty() {
             return Err(LLMSpellError::Validation {
@@ -467,6 +473,7 @@ impl BaseAgent for WebSearchTool {
         Ok(())
     }
 
+    #[instrument(skip(self))]
     async fn handle_error(&self, error: LLMSpellError) -> Result<AgentOutput> {
         Ok(AgentOutput::text(format!("Web search error: {}", error)))
     }

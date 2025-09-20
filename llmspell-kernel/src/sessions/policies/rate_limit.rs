@@ -57,6 +57,7 @@ impl Default for RateLimitConfig {
 }
 
 /// Session rate limit policy
+#[derive(Debug)]
 pub struct SessionRateLimitPolicy {
     /// Rate limit configuration
     config: RateLimitConfig,

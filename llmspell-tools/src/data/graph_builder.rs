@@ -39,7 +39,7 @@ use serde::{Deserialize, Serialize};
 use serde_json::{json, Value as JsonValue};
 use std::collections::HashMap;
 use std::time::Instant;
-use tracing::{debug, error, info, warn};
+use tracing::{debug, error, info, instrument, warn};
 
 /// Graph types supported by the tool
 #[derive(Debug, Clone)]
@@ -463,6 +463,7 @@ impl GraphBuilderTool {
     }
 
     /// Import graph from JSON
+    #[instrument(skip(self))]
     async fn import_graph_from_json(&self, json_str: &str) -> Result<SerializableGraph> {
         let import_start = Instant::now();
         debug!(
@@ -529,6 +530,13 @@ impl GraphBuilderTool {
 
 impl Default for GraphBuilderTool {
     fn default() -> Self {
+        info!(
+            tool_name = "graph-builder",
+            category = "Tool",
+            phase = "Phase 3 (comprehensive instrumentation)",
+            "Creating GraphBuilderTool"
+        );
+
         Self::new()
     }
 }
@@ -540,6 +548,7 @@ impl BaseAgent for GraphBuilderTool {
     }
 
     #[allow(clippy::too_many_lines)]
+    #[instrument(skip(_context, input, self), fields(tool = %self.metadata().name))]
     async fn execute_impl(
         &self,
         input: AgentInput,
@@ -727,6 +736,7 @@ impl BaseAgent for GraphBuilderTool {
         Ok(AgentOutput::text(serde_json::to_string_pretty(&response)?))
     }
 
+    #[instrument(skip(self))]
     async fn validate_input(&self, input: &AgentInput) -> Result<()> {
         let params = extract_parameters(input)?;
 
@@ -769,6 +779,7 @@ impl BaseAgent for GraphBuilderTool {
         Ok(())
     }
 
+    #[instrument(skip(self))]
     async fn handle_error(&self, error: LLMSpellError) -> Result<AgentOutput> {
         let error_response = json!({
             "operation": "error",

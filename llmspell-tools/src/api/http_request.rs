@@ -27,7 +27,7 @@ use serde::{Deserialize, Serialize};
 use serde_json::{json, Value};
 use std::collections::HashMap;
 use std::time::{Duration, Instant};
-use tracing::{debug, error, info, trace};
+use tracing::{debug, error, info, instrument, trace};
 
 /// HTTP method types
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -304,6 +304,7 @@ impl HttpRequestTool {
     }
 
     /// Apply rate limiting if configured
+    #[instrument(skip(self))]
     async fn apply_rate_limiting(&self) -> Result<()> {
         if let Some(limiter) = &self.rate_limiter {
             trace!("Applying rate limiting");
@@ -319,6 +320,7 @@ impl HttpRequestTool {
     }
 
     /// Execute the actual HTTP request
+    #[instrument(skip(headers, self))]
     async fn do_request(
         &self,
         method: Method,
@@ -371,6 +373,7 @@ impl HttpRequestTool {
     /// Returns an error if:
     /// - Rate limit is exceeded
     /// - HTTP request fails after all retries
+    #[instrument(skip(headers, self))]
     async fn execute_with_retry(
         &self,
         method: Method,
@@ -416,6 +419,7 @@ impl HttpRequestTool {
     /// # Errors
     ///
     /// Returns an error if response parsing fails
+    #[instrument(skip(self))]
     async fn parse_response(&self, response: Response) -> Result<HttpResponse> {
         trace!(status = response.status().as_u16(), "Parsing HTTP response");
         let status = response.status();
@@ -620,6 +624,7 @@ impl HttpRequestTool {
     /// - The HTTP request fails
     /// - Hook execution fails
     /// - Response parsing fails
+    #[instrument(skip(headers, self, tool_executor))]
     pub async fn demonstrate_hook_integration(
         &self,
         tool_executor: &crate::lifecycle::ToolExecutor,
@@ -659,6 +664,7 @@ impl BaseAgent for HttpRequestTool {
         &self.metadata
     }
 
+    #[instrument(skip(_context, input, self), fields(tool = "http_request"))]
     async fn execute_impl(
         &self,
         input: AgentInput,
@@ -731,6 +737,7 @@ impl BaseAgent for HttpRequestTool {
         Ok(AgentOutput::text(serde_json::to_string_pretty(&response)?))
     }
 
+    #[instrument(skip(self))]
     async fn validate_input(&self, input: &AgentInput) -> Result<()> {
         trace!("Validating HTTP request input");
         if input.text.is_empty() {
@@ -742,6 +749,7 @@ impl BaseAgent for HttpRequestTool {
         Ok(())
     }
 
+    #[instrument(skip(self))]
     async fn handle_error(&self, error: LLMSpellError) -> Result<AgentOutput> {
         error!(
             error = %error,

@@ -27,7 +27,7 @@ use serde_json::json;
 use std::path::Path;
 use std::sync::Arc;
 use std::time::Instant;
-use tracing::{debug, error, info};
+use tracing::{debug, error, info, instrument};
 
 /// Audio format types
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
@@ -151,6 +151,7 @@ impl AudioProcessorTool {
 
     /// Detect audio format from file
     #[allow(clippy::unused_async)]
+    #[instrument(skip_all)]
     async fn detect_format(&self, file_path: &Path) -> LLMResult<AudioFormat> {
         // First try extension-based detection
         let format = AudioFormat::from_extension(file_path);
@@ -167,6 +168,7 @@ impl AudioProcessorTool {
     }
 
     /// Extract metadata from audio file
+    #[instrument(skip(sandbox, self))]
     async fn extract_metadata(
         &self,
         file_path: &Path,
@@ -242,6 +244,7 @@ impl AudioProcessorTool {
 
     /// Analyze WAV file structure
     #[allow(clippy::unused_async)]
+    #[instrument(skip(sandbox, self))]
     async fn analyze_wav_file(
         &self,
         file_path: &Path,
@@ -374,6 +377,7 @@ impl AudioProcessorTool {
     }
 
     /// Convert audio file to another format
+    #[instrument(skip_all)]
     async fn convert_audio(
         &self,
         source_path: &Path,
@@ -426,6 +430,7 @@ impl AudioProcessorTool {
 
     /// Validate processing parameters
     #[allow(clippy::unused_async)]
+    #[instrument(skip_all)]
     async fn validate_parameters(&self, params: &serde_json::Value) -> LLMResult<()> {
         // Validate operation
         if let Some(operation) = extract_optional_string(params, "operation") {
@@ -495,6 +500,7 @@ impl BaseAgent for AudioProcessorTool {
     }
 
     #[allow(clippy::too_many_lines)]
+    #[instrument(skip(_context, input, self), fields(tool = %self.metadata().name))]
     async fn execute_impl(
         &self,
         input: AgentInput,
@@ -645,6 +651,7 @@ impl BaseAgent for AudioProcessorTool {
         }
     }
 
+    #[instrument(skip_all)]
     async fn validate_input(&self, input: &AgentInput) -> LLMResult<()> {
         if input.text.is_empty() {
             return Err(LLMSpellError::Validation {
@@ -655,6 +662,7 @@ impl BaseAgent for AudioProcessorTool {
         Ok(())
     }
 
+    #[instrument(skip_all)]
     async fn handle_error(&self, error: LLMSpellError) -> LLMResult<AgentOutput> {
         Ok(AgentOutput::text(format!("Audio processor error: {error}")))
     }

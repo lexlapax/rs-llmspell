@@ -1,5 +1,6 @@
 //! ABOUTME: Serper.dev search provider implementation
 //! ABOUTME: Modern Google Search API with excellent free tier (2,500 searches/month)
+use tracing::instrument;
 
 use super::{ProviderConfig, SearchOptions, SearchProvider, SearchResult, SearchType};
 use async_trait::async_trait;
@@ -147,6 +148,7 @@ impl SearchProvider for SerperDevProvider {
     }
 
     #[allow(clippy::too_many_lines)]
+    #[instrument(skip(self))]
     async fn search(&self, query: &str, options: &SearchOptions) -> Result<Vec<SearchResult>> {
         let api_key = self
             .api_key

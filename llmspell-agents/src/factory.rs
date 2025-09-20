@@ -37,7 +37,7 @@ pub struct AgentConfig {
 
 impl AgentConfig {
     /// Create a new builder for `AgentConfig`
-    pub fn builder(name: impl Into<String>) -> AgentConfigBuilder {
+    pub fn builder(name: impl Into<String> + std::fmt::Debug) -> AgentConfigBuilder {
         AgentConfigBuilder::new(name)
     }
 }
@@ -102,7 +102,7 @@ pub struct AgentConfigBuilder {
 
 impl AgentConfigBuilder {
     /// Create a new builder with required name
-    pub fn new(name: impl Into<String>) -> Self {
+    pub fn new(name: impl Into<String> + std::fmt::Debug) -> Self {
         Self {
             name: name.into(),
             description: String::new(),
@@ -116,14 +116,14 @@ impl AgentConfigBuilder {
 
     /// Set the agent's description
     #[must_use]
-    pub fn description(mut self, description: impl Into<String>) -> Self {
+    pub fn description(mut self, description: impl Into<String> + std::fmt::Debug) -> Self {
         self.description = description.into();
         self
     }
 
     /// Set the agent type
     #[must_use]
-    pub fn agent_type(mut self, agent_type: impl Into<String>) -> Self {
+    pub fn agent_type(mut self, agent_type: impl Into<String> + std::fmt::Debug) -> Self {
         self.agent_type = agent_type.into();
         self
     }
@@ -137,7 +137,7 @@ impl AgentConfigBuilder {
 
     /// Add an allowed tool
     #[must_use]
-    pub fn allow_tool(mut self, tool_id: impl Into<String>) -> Self {
+    pub fn allow_tool(mut self, tool_id: impl Into<String> + std::fmt::Debug) -> Self {
         self.allowed_tools.push(tool_id.into());
         self
     }
@@ -151,7 +151,11 @@ impl AgentConfigBuilder {
 
     /// Add a custom configuration parameter
     #[must_use]
-    pub fn custom_param(mut self, key: impl Into<String>, value: serde_json::Value) -> Self {
+    pub fn custom_param(
+        mut self,
+        key: impl Into<String> + std::fmt::Debug,
+        value: serde_json::Value,
+    ) -> Self {
         self.custom_config.insert(key.into(), value);
         self
     }
@@ -375,6 +379,7 @@ impl DefaultAgentFactory {
     }
 
     /// Run creation hooks before creating agent
+    #[instrument(skip(self))]
     async fn run_before_hooks(&self, config: &AgentConfig) -> Result<()> {
         for hook in &self.creation_hooks {
             hook.before_create(config).await?;
@@ -383,6 +388,7 @@ impl DefaultAgentFactory {
     }
 
     /// Run creation hooks after creating agent
+    #[instrument(skip_all)]
     async fn run_after_hooks(&self, agent: &Arc<dyn Agent>) -> Result<()> {
         for hook in &self.creation_hooks {
             hook.after_create(agent).await?;
@@ -406,7 +412,7 @@ impl DefaultAgentFactory {
 
 #[async_trait]
 impl AgentFactory for DefaultAgentFactory {
-    #[instrument(level = "debug", skip(self, config), fields(agent_name = %config.name, agent_type = %config.agent_type))]
+    #[instrument(level = "debug", skip(config, self), fields(agent_name = %config.name, agent_type = %config.agent_type))]
     async fn create_agent(&self, config: AgentConfig) -> Result<Arc<dyn Agent>> {
         debug!(
             config = ?config,
@@ -637,11 +643,13 @@ mod tests {
 
         #[async_trait]
         impl CreationHook for TestHook {
+            #[instrument(skip(self))]
             async fn before_create(&self, _config: &AgentConfig) -> Result<()> {
                 self.before_called.store(true, Ordering::SeqCst);
                 Ok(())
             }
 
+            #[instrument(skip_all)]
             async fn after_create(&self, _agent: &Arc<dyn Agent>) -> Result<()> {
                 self.after_called.store(true, Ordering::SeqCst);
                 Ok(())

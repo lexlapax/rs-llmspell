@@ -24,7 +24,7 @@ use serde_json::{json, Value};
 use std::collections::HashSet;
 use std::pin::Pin;
 use std::time::{Duration, Instant};
-use tracing::{debug, error, info, trace, warn};
+use tracing::{debug, error, info, instrument, trace, warn};
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct SitemapCrawlerTool {
@@ -33,6 +33,13 @@ pub struct SitemapCrawlerTool {
 
 impl Default for SitemapCrawlerTool {
     fn default() -> Self {
+        info!(
+            tool_name = "sitemap-crawler",
+            category = "Tool",
+            phase = "Phase 3 (comprehensive instrumentation)",
+            "Creating SitemapCrawlerTool"
+        );
+
         Self::new()
     }
 }
@@ -102,14 +109,17 @@ impl BaseAgent for SitemapCrawlerTool {
         &self.metadata
     }
 
+    #[instrument(skip(self))]
     async fn validate_input(&self, _input: &AgentInput) -> Result<()> {
         Ok(())
     }
 
+    #[instrument(skip(self))]
     async fn handle_error(&self, error: llmspell_core::LLMSpellError) -> Result<AgentOutput> {
         Ok(AgentOutput::text(format!("SitemapCrawler error: {error}")))
     }
 
+    #[instrument(skip(_context, input, self), fields(tool = %self.metadata().name))]
     async fn execute_impl(
         &self,
         input: AgentInput,

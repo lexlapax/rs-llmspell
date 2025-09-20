@@ -27,7 +27,7 @@ use serde::{Deserialize, Serialize};
 use serde_json::{json, Value};
 use std::collections::HashMap;
 use std::time::{Duration, Instant};
-use tracing::{debug, error, info, trace, warn};
+use tracing::{debug, error, info, instrument, trace, warn};
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct WebScraperConfig {
@@ -58,10 +58,18 @@ pub struct WebScraperTool {
 
 impl Default for WebScraperTool {
     fn default() -> Self {
+        info!(
+            tool_name = "web-scraper",
+            category = "Tool",
+            phase = "Phase 3 (comprehensive instrumentation)",
+            "Creating WebScraperTool"
+        );
+
         Self::new(WebScraperConfig::default())
     }
 }
 
+#[derive(Debug)]
 struct ScrapeOptions {
     timeout_secs: u64,
     extract_links: bool,
@@ -94,6 +102,7 @@ impl WebScraperTool {
         }
     }
 
+    // #[instrument(skip(self))] // Disabled - method not found
     async fn fetch_page(url: &str, timeout_secs: u64) -> Result<String> {
         let client = create_io_bound_resource(move || {
             Client::builder()
@@ -356,6 +365,7 @@ impl WebScraperTool {
         }
     }
 
+    #[instrument(skip(options, selectors, self))]
     async fn scrape_page(
         &self,
         url: &str,
@@ -392,6 +402,7 @@ impl WebScraperTool {
         Ok(json!(result))
     }
 
+    // #[instrument(skip(self))] // Disabled - method not found
     async fn fetch_and_parse_page(&self, url: &str, timeout_secs: u64) -> Result<Html> {
         let html_content = Self::fetch_page(url, timeout_secs).await?;
 
@@ -665,11 +676,13 @@ impl BaseAgent for WebScraperTool {
         &self.metadata
     }
 
+    // #[instrument(skip(self))] // Disabled - method not found
     async fn validate_input(&self, _input: &AgentInput) -> Result<()> {
         // Validation is done in execute method when extracting parameters
         Ok(())
     }
 
+    // #[instrument(skip(self))] // Disabled - method not found
     async fn handle_error(&self, error: llmspell_core::LLMSpellError) -> Result<AgentOutput> {
         // In production, we would use SafeErrorHandler to sanitize the error
         // For now, we'll keep the existing behavior but add a comment
@@ -681,6 +694,7 @@ impl BaseAgent for WebScraperTool {
         Ok(AgentOutput::text(format!("WebScraper error: {error}")))
     }
 
+    #[instrument(skip(_context, input, self), fields(tool = %self.metadata().name))]
     async fn execute_impl(
         &self,
         input: AgentInput,

@@ -31,7 +31,7 @@ use std::fs::{self, File};
 use std::io;
 use std::path::{Path, PathBuf};
 use tar::{Archive, Builder};
-use tracing::{debug, warn};
+use tracing::{debug, info, instrument, warn};
 use zip::write::{FileOptions, ZipWriter};
 use zip::{CompressionMethod, ZipArchive};
 
@@ -182,6 +182,7 @@ impl ArchiveHandlerTool {
 
     /// Extract archive
     #[allow(clippy::unused_async)]
+    #[instrument(skip(self))]
     async fn extract_archive(&self, params: &Value) -> Result<Value> {
         let archive_path = params.get("path").and_then(|v| v.as_str()).ok_or_else(|| {
             LLMSpellError::Validation {
@@ -568,6 +569,7 @@ impl ArchiveHandlerTool {
 
     /// Create archive
     #[allow(clippy::unused_async)]
+    #[instrument(skip(self))]
     async fn create_archive(&self, params: &Value) -> Result<Value> {
         debug!("create_archive: params = {params:?}");
         let archive_path = params.get("path").and_then(|v| v.as_str()).ok_or_else(|| {
@@ -918,6 +920,7 @@ impl ArchiveHandlerTool {
     /// List archive contents
     #[allow(clippy::unused_async)]
     #[allow(clippy::too_many_lines)]
+    #[instrument(skip(self))]
     async fn list_archive(&self, params: &Value) -> Result<Value> {
         let archive_path = params.get("path").and_then(|v| v.as_str()).ok_or_else(|| {
             LLMSpellError::Validation {
@@ -1094,6 +1097,7 @@ impl BaseAgent for ArchiveHandlerTool {
         &self.metadata
     }
 
+    #[instrument(skip(_context, input, self), fields(tool = %self.metadata().name))]
     async fn execute_impl(
         &self,
         input: AgentInput,
@@ -1132,6 +1136,7 @@ impl BaseAgent for ArchiveHandlerTool {
         Ok(AgentOutput::text(output_text).with_metadata(metadata))
     }
 
+    #[instrument(skip(self))]
     async fn validate_input(&self, input: &AgentInput) -> llmspell_core::Result<()> {
         if input.parameters.is_empty() {
             return Err(LLMSpellError::Validation {
@@ -1142,6 +1147,7 @@ impl BaseAgent for ArchiveHandlerTool {
         Ok(())
     }
 
+    #[instrument(skip(self))]
     async fn handle_error(&self, error: LLMSpellError) -> llmspell_core::Result<AgentOutput> {
         Ok(AgentOutput::text(format!("Archive handler error: {error}")))
     }
@@ -1198,6 +1204,13 @@ impl Tool for ArchiveHandlerTool {
 
 impl Default for ArchiveHandlerTool {
     fn default() -> Self {
+        info!(
+            tool_name = "archive-handler",
+            category = "Tool",
+            phase = "Phase 3 (comprehensive instrumentation)",
+            "Creating ArchiveHandlerTool"
+        );
+
         Self::new()
     }
 }

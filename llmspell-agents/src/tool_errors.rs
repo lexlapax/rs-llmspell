@@ -8,6 +8,7 @@ use serde_json::Value as JsonValue;
 use std::collections::HashMap;
 use std::fmt;
 use std::time::Duration;
+use tracing::instrument;
 use tracing::{info, warn};
 
 /// Comprehensive error type for tool integration operations
@@ -491,7 +492,10 @@ impl std::error::Error for ToolIntegrationError {}
 
 impl ErrorContext {
     /// Create new error context
-    pub fn new(operation: impl Into<String>, component: impl Into<String>) -> Self {
+    pub fn new(
+        operation: impl Into<String> + std::fmt::Debug,
+        component: impl Into<String> + std::fmt::Debug,
+    ) -> Self {
         Self {
             operation: operation.into(),
             component: component.into(),
@@ -511,7 +515,7 @@ impl ErrorContext {
 
     /// Add context data
     #[must_use]
-    pub fn with_data(mut self, key: impl Into<String>, value: JsonValue) -> Self {
+    pub fn with_data(mut self, key: impl Into<String> + std::fmt::Debug, value: JsonValue) -> Self {
         self.context_data.insert(key.into(), value);
         self
     }
@@ -570,7 +574,7 @@ impl ToolErrorHandler {
     #[must_use]
     pub fn with_tool_strategy(
         mut self,
-        tool_name: impl Into<String>,
+        tool_name: impl Into<String> + std::fmt::Debug,
         strategy: ErrorRecoveryStrategy,
     ) -> Self {
         self.tool_strategies.insert(tool_name.into(), strategy);
@@ -582,6 +586,7 @@ impl ToolErrorHandler {
     /// # Errors
     ///
     /// Returns an error if the error handler fails or if the error is unrecoverable
+    #[instrument(skip(self))]
     pub async fn handle_error(
         &self,
         error: ToolIntegrationError,
@@ -628,6 +633,7 @@ impl ToolErrorHandler {
 
     /// Attempt recovery from an error
     #[allow(clippy::cognitive_complexity)]
+    #[instrument(skip(context, self))]
     async fn attempt_recovery(
         &self,
         error: ToolIntegrationError,
@@ -672,6 +678,7 @@ impl ToolErrorHandler {
     }
 
     /// Execute a specific recovery action
+    #[instrument(skip(self, _context))]
     async fn execute_recovery_action(
         &self,
         action: &RecoveryAction,

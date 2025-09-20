@@ -84,6 +84,7 @@ pub struct BucketState {
 }
 
 /// Thread-safe rate limiter with multiple buckets
+#[derive(Debug)]
 pub struct RateLimiter {
     /// Token buckets keyed by identifier
     buckets: Arc<RwLock<HashMap<String, Arc<RwLock<TokenBucket>>>>>,

@@ -39,6 +39,7 @@ impl Default for FastPathConfig {
 }
 
 /// Fast-path state manager for performance-critical operations
+#[derive(Debug)]
 pub struct FastPathManager {
     config: FastPathConfig,
     ephemeral_cache: parking_lot::RwLock<HashMap<String, Value>>,

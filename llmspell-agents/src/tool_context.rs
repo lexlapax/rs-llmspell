@@ -8,6 +8,7 @@ use serde_json::Value as JsonValue;
 use std::collections::HashMap;
 use std::sync::Arc;
 use tokio::sync::RwLock;
+use tracing::instrument;
 
 /// Enhanced execution context for tool operations that provides
 /// additional tool-specific context, inheritance, and state management.
@@ -154,36 +155,50 @@ impl ToolExecutionContext {
     }
 
     /// Set tool-specific data
-    pub async fn set_tool_data(&self, key: impl Into<String>, value: JsonValue) {
+    #[instrument(skip(self))]
+    pub async fn set_tool_data(&self, key: impl Into<String> + std::fmt::Debug, value: JsonValue) {
         let mut data = self.tool_data.write().await;
         data.insert(key.into(), value);
     }
 
     /// Get tool-specific data
+    #[instrument(skip(self))]
     pub async fn get_tool_data(&self, key: &str) -> Option<JsonValue> {
         let data = self.tool_data.read().await;
         data.get(key).cloned()
     }
 
     /// Set shared data that can be accessed by all tools
-    pub async fn set_shared_data(&self, key: impl Into<String>, value: JsonValue) {
+    #[instrument(skip(self))]
+    pub async fn set_shared_data(
+        &self,
+        key: impl Into<String> + std::fmt::Debug,
+        value: JsonValue,
+    ) {
         let mut data = self.shared_data.write().await;
         data.insert(key.into(), value);
     }
 
     /// Get shared data
+    #[instrument(skip(self))]
     pub async fn get_shared_data(&self, key: &str) -> Option<JsonValue> {
         let data = self.shared_data.read().await;
         data.get(key).cloned()
     }
 
     /// Set inheritance rule for a data key
-    pub async fn set_inheritance_rule(&self, key: impl Into<String>, rule: ContextInheritanceRule) {
+    #[instrument(skip(self))]
+    pub async fn set_inheritance_rule(
+        &self,
+        key: impl Into<String> + std::fmt::Debug,
+        rule: ContextInheritanceRule,
+    ) {
         let mut rules = self.inheritance_rules.write().await;
         rules.insert(key.into(), rule);
     }
 
     /// Get inheritance rule for a data key
+    #[instrument(skip(self))]
     pub async fn get_inheritance_rule(&self, key: &str) -> ContextInheritanceRule {
         let rules = self.inheritance_rules.read().await;
         rules
@@ -197,7 +212,11 @@ impl ToolExecutionContext {
     /// # Errors
     ///
     /// Returns an error if context creation fails
-    pub async fn create_child_context(&self, child_id: impl Into<String>) -> Result<Self> {
+    #[instrument(skip(self))]
+    pub async fn create_child_context(
+        &self,
+        child_id: impl Into<String> + std::fmt::Debug,
+    ) -> Result<Self> {
         // Collect inheritance data first
         let parent_data = self.tool_data.read().await;
         let parent_rules = self.inheritance_rules.read().await;
@@ -244,12 +263,13 @@ impl ToolExecutionContext {
     }
 
     /// Record tool execution
+    #[instrument(skip(self))]
     pub async fn record_execution(
         &self,
-        tool_name: impl Into<String>,
+        tool_name: impl Into<String> + std::fmt::Debug,
         parameters: JsonValue,
         success: bool,
-        result: impl Into<String>,
+        result: impl Into<String> + std::fmt::Debug,
         duration: Option<std::time::Duration>,
     ) {
         let record = ToolExecutionRecord {
@@ -272,24 +292,28 @@ impl ToolExecutionContext {
     }
 
     /// Get execution history
+    #[instrument(skip(self))]
     pub async fn get_execution_history(&self) -> Vec<ToolExecutionRecord> {
         let history = self.execution_history.read().await;
         history.clone()
     }
 
     /// Get the last executed tool
+    #[instrument(skip(self))]
     pub async fn get_last_execution(&self) -> Option<ToolExecutionRecord> {
         let history = self.execution_history.read().await;
         history.last().cloned()
     }
 
     /// Check if a tool has been executed in this context
+    #[instrument(skip(self))]
     pub async fn has_executed_tool(&self, tool_name: &str) -> bool {
         let history = self.execution_history.read().await;
         history.iter().any(|record| record.tool_name == tool_name)
     }
 
     /// Get all data as a combined view
+    #[instrument(skip(self))]
     pub async fn get_all_data(&self) -> HashMap<String, JsonValue> {
         let mut all_data = HashMap::new();
 
@@ -307,6 +331,7 @@ impl ToolExecutionContext {
     }
 
     /// Export context state for serialization
+    #[instrument(skip(self))]
     pub async fn export_state(&self) -> ContextState {
         ContextState {
             context_id: self.context_id.clone(),
@@ -322,6 +347,7 @@ impl ToolExecutionContext {
     /// # Errors
     ///
     /// Returns an error if state import fails
+    #[instrument(skip(self))]
     pub async fn import_state(&self, state: ContextState) -> Result<()> {
         {
             let mut tool_data = self.tool_data.write().await;
@@ -403,9 +429,10 @@ impl ToolContextManager {
     }
 
     /// Create and register a new context
+    #[instrument(skip(self))]
     pub async fn create_context(
         &self,
-        context_id: impl Into<String>,
+        context_id: impl Into<String> + std::fmt::Debug,
         base_context: ExecutionContext,
     ) -> Arc<ToolExecutionContext> {
         let context_id = context_id.into();
@@ -421,24 +448,28 @@ impl ToolContextManager {
     }
 
     /// Get an existing context
+    #[instrument(skip(self))]
     pub async fn get_context(&self, context_id: &str) -> Option<Arc<ToolExecutionContext>> {
         let contexts = self.contexts.read().await;
         contexts.get(context_id).cloned()
     }
 
     /// Remove a context
+    #[instrument(skip(self))]
     pub async fn remove_context(&self, context_id: &str) -> bool {
         let mut contexts = self.contexts.write().await;
         contexts.remove(context_id).is_some()
     }
 
     /// List all context IDs
+    #[instrument(skip(self))]
     pub async fn list_contexts(&self) -> Vec<String> {
         let contexts = self.contexts.read().await;
         contexts.keys().cloned().collect()
     }
 
     /// Get context count
+    #[instrument(skip(self))]
     pub async fn context_count(&self) -> usize {
         let contexts = self.contexts.read().await;
         contexts.len()

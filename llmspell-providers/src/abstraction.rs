@@ -271,6 +271,7 @@ impl ProviderManager {
     }
 
     /// Register a provider factory
+    #[instrument(skip_all)]
     pub async fn register_provider<F>(&self, name: impl Into<String>, factory: F)
     where
         F: Fn(ProviderConfig) -> Result<Box<dyn ProviderInstance>, LLMSpellError>
@@ -283,7 +284,7 @@ impl ProviderManager {
     }
 
     /// Initialize a provider instance
-    #[instrument(level = "info", skip(self, config), fields(
+    #[instrument(level = "info", skip(self), fields(
         provider_name = %config.name,
         provider_type = %config.provider_type,
         model = %config.model
@@ -379,7 +380,7 @@ impl ProviderManager {
     /// # Ok(())
     /// # }
     /// ```
-    #[instrument(level = "info", skip(self, api_key), fields(
+    #[instrument(level = "info", skip(api_key, self), fields(
         model = %spec.model,
         provider = ?spec.provider,
         base_url = ?base_url_override
@@ -485,6 +486,7 @@ impl ProviderManager {
     }
 
     /// Get the default provider instance
+    #[instrument(skip(self))]
     pub async fn get_default_provider(
         &self,
     ) -> Result<Arc<Box<dyn ProviderInstance>>, LLMSpellError> {
@@ -492,6 +494,7 @@ impl ProviderManager {
     }
 
     /// Set the default provider
+    #[instrument(skip_all)]
     pub async fn set_default_provider(&self, name: impl Into<String>) -> Result<(), LLMSpellError> {
         let name = name.into();
         let instances = self.instances.read().await;
@@ -509,6 +512,7 @@ impl ProviderManager {
     }
 
     /// Query capabilities of a provider
+    #[instrument(skip(self))]
     pub async fn query_capabilities(
         &self,
         name: Option<&str>,
@@ -538,12 +542,14 @@ impl ProviderManager {
     }
 
     /// List all initialized providers
+    #[instrument(skip(self))]
     pub async fn list_providers(&self) -> Vec<String> {
         let instances = self.instances.read().await;
         instances.keys().cloned().collect()
     }
 
     /// List all available provider types
+    #[instrument(skip(self))]
     pub async fn available_provider_types(&self) -> Vec<String> {
         let registry = self.registry.read().await;
         registry

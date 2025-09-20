@@ -38,7 +38,7 @@ use llmspell_utils::{
 };
 use serde_json::{json, Value as JsonValue};
 use std::time::Instant;
-use tracing::{debug, error, info, warn};
+use tracing::{debug, error, info, instrument, warn};
 
 /// Citation Formatter tool for academic bibliography management
 #[derive(Debug, Clone)]
@@ -93,6 +93,7 @@ impl CitationFormatterTool {
     /// Parse YAML bibliography (Phase 7 basic validation)
     #[allow(clippy::unused_async)]
     #[allow(clippy::cognitive_complexity)]
+    #[instrument(skip(self))]
     async fn parse_yaml_bibliography(&self, yaml_content: &str) -> Result<String> {
         let parse_start = Instant::now();
         debug!(
@@ -156,6 +157,7 @@ impl CitationFormatterTool {
 
     /// Parse BibTeX bibliography (Phase 7 basic validation)
     #[allow(clippy::unused_async)]
+    #[instrument(skip(self))]
     async fn parse_bibtex_bibliography(&self, bibtex_content: &str) -> Result<String> {
         let parse_start = Instant::now();
         debug!(
@@ -228,6 +230,7 @@ impl CitationFormatterTool {
     }
 
     /// Format citation in specified style
+    #[instrument(skip(self))]
     async fn format_citation(
         &self,
         bibliography: &str,
@@ -308,6 +311,7 @@ impl CitationFormatterTool {
     // Removed format_entry_basic for Phase 7 simplification
 
     /// Validate bibliography format and entries
+    #[instrument(skip(self))]
     async fn validate_bibliography(&self, bibliography: &str, format: &str) -> Result<JsonValue> {
         let validation_start = Instant::now();
         debug!(
@@ -382,6 +386,13 @@ impl CitationFormatterTool {
 
 impl Default for CitationFormatterTool {
     fn default() -> Self {
+        info!(
+            tool_name = "citation-formatter",
+            category = "Tool",
+            phase = "Phase 3 (comprehensive instrumentation)",
+            "Creating CitationFormatterTool"
+        );
+
         Self::new()
     }
 }
@@ -392,6 +403,7 @@ impl BaseAgent for CitationFormatterTool {
         &self.metadata
     }
 
+    #[instrument(skip(_context, input, self), fields(tool = %self.metadata().name))]
     async fn execute_impl(
         &self,
         input: AgentInput,
@@ -507,6 +519,7 @@ impl BaseAgent for CitationFormatterTool {
         Ok(AgentOutput::text(serde_json::to_string_pretty(&response)?))
     }
 
+    #[instrument(skip(self))]
     async fn validate_input(&self, input: &AgentInput) -> Result<()> {
         let params = extract_parameters(input)?;
 
@@ -554,6 +567,7 @@ impl BaseAgent for CitationFormatterTool {
         Ok(())
     }
 
+    #[instrument(skip(self))]
     async fn handle_error(&self, error: LLMSpellError) -> Result<AgentOutput> {
         let error_response = json!({
             "operation": "error",

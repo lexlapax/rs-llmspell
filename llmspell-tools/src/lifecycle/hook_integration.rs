@@ -16,7 +16,7 @@ use serde_json::Value as JsonValue;
 use std::collections::HashMap;
 use std::sync::Arc;
 use std::time::{Duration, Instant};
-use tracing::{debug, error, info, warn};
+use tracing::{debug, error, info, instrument, warn};
 
 /// Hook execution features configuration
 #[derive(Debug, Clone, Default)]
@@ -58,6 +58,11 @@ pub struct ToolLifecycleConfig {
 
 impl Default for ToolLifecycleConfig {
     fn default() -> Self {
+        info!(
+            tool_name = "tool-lifecycle-config",
+            category = "Tool",
+            "Initializing ToolLifecycleConfig"
+        );
         Self {
             features: HookFeatures {
                 hooks_enabled: true,
@@ -285,6 +290,7 @@ impl ToolExecutor {
     /// - Circuit breaker trips due to repeated failures
     #[allow(clippy::too_many_lines)]
     #[allow(clippy::cognitive_complexity)]
+    #[instrument(skip(self, tool))]
     pub async fn execute_tool_with_hooks(
         &self,
         tool: &dyn Tool,
@@ -466,6 +472,7 @@ impl ToolExecutor {
 
     /// Execute hooks for a specific phase
     #[allow(clippy::cognitive_complexity)]
+    #[instrument(skip_all)]
     async fn execute_hook_phase<T: Clone>(
         &self,
         tool_context: &ToolHookContext,
@@ -734,6 +741,7 @@ pub trait HookableToolExecution: Tool {
 // Blanket implementation for all tools
 #[async_trait]
 impl<T: Tool> HookableToolExecution for T {
+    #[instrument(skip(self, tool_executor))]
     async fn execute_with_hooks(
         &self,
         input: AgentInput,
@@ -774,6 +782,7 @@ mod tests {
             &self.metadata
         }
 
+        #[instrument(skip(_context, input, self), fields(tool = %self.metadata().name))]
         async fn execute_impl(
             &self,
             input: AgentInput,
@@ -782,10 +791,12 @@ mod tests {
             Ok(AgentOutput::text(format!("Processed: {}", input.text)))
         }
 
+        #[instrument(skip(context, input, self))]
         async fn validate_input(&self, _input: &AgentInput) -> Result<(), LLMSpellError> {
             Ok(())
         }
 
+        #[instrument(skip(self))]
         async fn handle_error(&self, error: LLMSpellError) -> Result<AgentOutput, LLMSpellError> {
             Ok(AgentOutput::text(format!("Error handled: {error}")))
         }
@@ -1025,6 +1036,7 @@ mod tests {
                 &self.metadata
             }
 
+            #[instrument(skip(_context, input, self), fields(tool = %self.metadata().name))]
             async fn execute_impl(
                 &self,
                 input: AgentInput,
@@ -1033,10 +1045,12 @@ mod tests {
                 Ok(AgentOutput::text(format!("Processed: {}", input.text)))
             }
 
+            #[instrument(skip(self))]
             async fn validate_input(&self, _input: &AgentInput) -> Result<(), LLMSpellError> {
                 Ok(())
             }
 
+            #[instrument(skip(self))]
             async fn handle_error(
                 &self,
                 error: LLMSpellError,
@@ -1160,6 +1174,7 @@ mod tests {
                 &self.metadata
             }
 
+            #[instrument(skip(_context, input, self), fields(tool = %self.metadata().name))]
             async fn execute_impl(
                 &self,
                 input: AgentInput,
@@ -1168,10 +1183,12 @@ mod tests {
                 Ok(AgentOutput::text(format!("Processed: {}", input.text)))
             }
 
+            #[instrument(skip(self))]
             async fn validate_input(&self, _input: &AgentInput) -> Result<(), LLMSpellError> {
                 Ok(())
             }
 
+            #[instrument(skip(self))]
             async fn handle_error(
                 &self,
                 error: LLMSpellError,

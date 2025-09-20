@@ -12,6 +12,7 @@ use llmspell_tools::registry::{CapabilityMatcher, ToolRegistry};
 use serde_json::Value as JsonValue;
 use std::collections::HashMap;
 use std::sync::Arc;
+use tracing::instrument;
 
 /// High-level tool discovery that provides convenient APIs
 /// for finding and filtering tools based on various criteria.
@@ -57,6 +58,7 @@ impl ToolDiscovery {
     /// # Errors
     ///
     /// Returns an error if tool discovery fails
+    #[instrument(skip(self))]
     pub async fn find_by_category(&self, category: &str) -> Result<Vec<ToolInfo>> {
         let query = ToolQuery::new().with_category(category);
         self.discover_tools(&query).await
@@ -67,6 +69,7 @@ impl ToolDiscovery {
     /// # Errors
     ///
     /// Returns an error if tool discovery fails
+    #[instrument(skip(self))]
     pub async fn find_by_security_level(&self, level: &str) -> Result<Vec<ToolInfo>> {
         let query = ToolQuery::new().with_max_security_level(level);
         self.discover_tools(&query).await
@@ -77,6 +80,7 @@ impl ToolDiscovery {
     /// # Errors
     ///
     /// Returns an error if tool discovery fails
+    #[instrument(skip(self))]
     pub async fn find_with_capability(&self, capability: &str) -> Result<Vec<ToolInfo>> {
         let query = ToolQuery::new().with_capability(capability);
         self.discover_tools(&query).await
@@ -87,6 +91,7 @@ impl ToolDiscovery {
     /// # Errors
     ///
     /// Returns an error if tool discovery fails
+    #[instrument(skip(self))]
     pub async fn find_by_text(&self, search_text: &str) -> Result<Vec<ToolInfo>> {
         let query = ToolQuery::new().with_text_search(search_text);
         self.discover_tools(&query).await
@@ -97,6 +102,7 @@ impl ToolDiscovery {
     /// # Errors
     ///
     /// Returns an error if tool discovery fails
+    #[instrument(skip(self))]
     pub async fn find_by_criteria(&self, criteria: &ToolSearchCriteria) -> Result<Vec<ToolInfo>> {
         let mut query = ToolQuery::new();
 
@@ -137,6 +143,7 @@ impl ToolDiscovery {
     /// # Errors
     ///
     /// Returns an error if tool discovery fails
+    #[instrument(skip(self))]
     pub async fn get_all_tools(&self) -> Result<Vec<ToolInfo>> {
         let query = ToolQuery::new();
         self.discover_tools(&query).await
@@ -147,6 +154,7 @@ impl ToolDiscovery {
     /// # Errors
     ///
     /// Returns an error if registry access fails
+    #[instrument(skip(self))]
     pub async fn get_tool_info(&self, name: &str) -> Result<Option<ToolInfo>> {
         Ok(self
             .registry
@@ -156,6 +164,7 @@ impl ToolDiscovery {
     }
 
     /// Check if a tool exists
+    #[instrument(skip(self))]
     pub async fn tool_exists(&self, name: &str) -> bool {
         self.registry.get_tool(name).await.is_some()
     }
@@ -165,6 +174,7 @@ impl ToolDiscovery {
     /// # Errors
     ///
     /// Returns an error if tool discovery fails
+    #[instrument(skip(self))]
     pub async fn find_by_categories(&self, categories: &[&str]) -> Result<Vec<ToolInfo>> {
         let mut query = ToolQuery::new();
         for category in categories {
@@ -180,6 +190,7 @@ impl ToolDiscovery {
     /// Returns an error if:
     /// - Tool discovery fails
     /// - Recommendation processing fails
+    #[instrument(skip(self))]
     pub async fn get_recommended_tools(
         &self,
         context: &RecommendationContext,
@@ -228,6 +239,7 @@ impl ToolDiscovery {
     }
 
     /// Internal method to discover tools using `ToolQuery`
+    #[instrument(skip(self))]
     async fn discover_tools(&self, query: &ToolQuery) -> Result<Vec<ToolInfo>> {
         // Convert ToolQuery to CapabilityMatcher
         let mut matcher = CapabilityMatcher::new();
@@ -362,42 +374,46 @@ impl ToolSearchCriteria {
 
     /// Add a category filter
     #[must_use]
-    pub fn with_category(mut self, category: impl Into<String>) -> Self {
+    pub fn with_category(mut self, category: impl Into<String> + std::fmt::Debug) -> Self {
         self.categories.push(category.into());
         self
     }
 
     /// Add a capability filter
     #[must_use]
-    pub fn with_capability(mut self, capability: impl Into<String>) -> Self {
+    pub fn with_capability(mut self, capability: impl Into<String> + std::fmt::Debug) -> Self {
         self.capabilities.push(capability.into());
         self
     }
 
     /// Set maximum security level
     #[must_use]
-    pub fn with_max_security_level(mut self, level: impl Into<String>) -> Self {
+    pub fn with_max_security_level(mut self, level: impl Into<String> + std::fmt::Debug) -> Self {
         self.max_security_level = Some(level.into());
         self
     }
 
     /// Set minimum security level
     #[must_use]
-    pub fn with_min_security_level(mut self, level: impl Into<String>) -> Self {
+    pub fn with_min_security_level(mut self, level: impl Into<String> + std::fmt::Debug) -> Self {
         self.min_security_level = Some(level.into());
         self
     }
 
     /// Add text search filter
     #[must_use]
-    pub fn with_text_search(mut self, text: impl Into<String>) -> Self {
+    pub fn with_text_search(mut self, text: impl Into<String> + std::fmt::Debug) -> Self {
         self.text_search = Some(text.into());
         self
     }
 
     /// Add custom filter
     #[must_use]
-    pub fn with_custom_filter(mut self, key: impl Into<String>, value: JsonValue) -> Self {
+    pub fn with_custom_filter(
+        mut self,
+        key: impl Into<String> + std::fmt::Debug,
+        value: JsonValue,
+    ) -> Self {
         self.custom_filters.insert(key.into(), value);
         self
     }
@@ -433,14 +449,14 @@ impl RecommendationContext {
 
     /// Set task type
     #[must_use]
-    pub fn with_task_type(mut self, task_type: impl Into<String>) -> Self {
+    pub fn with_task_type(mut self, task_type: impl Into<String> + std::fmt::Debug) -> Self {
         self.task_type = Some(task_type.into());
         self
     }
 
     /// Set maximum security level
     #[must_use]
-    pub fn with_max_security_level(mut self, level: impl Into<String>) -> Self {
+    pub fn with_max_security_level(mut self, level: impl Into<String> + std::fmt::Debug) -> Self {
         self.max_security_level = Some(level.into());
         self
     }
@@ -454,7 +470,11 @@ impl RecommendationContext {
 
     /// Add user preference
     #[must_use]
-    pub fn with_preference(mut self, key: impl Into<String>, value: JsonValue) -> Self {
+    pub fn with_preference(
+        mut self,
+        key: impl Into<String> + std::fmt::Debug,
+        value: JsonValue,
+    ) -> Self {
         self.user_preferences.insert(key.into(), value);
         self
     }

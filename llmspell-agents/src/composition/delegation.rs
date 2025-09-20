@@ -14,6 +14,7 @@ use serde_json::Value;
 use std::collections::HashMap;
 use std::sync::{Arc, RwLock};
 use tokio::sync::RwLock as TokioRwLock;
+use tracing::instrument;
 
 /// Strategy for selecting which agent to delegate to
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -147,6 +148,7 @@ impl DelegatingAgent {
     /// # Errors
     ///
     /// Returns an error if agent registration fails
+    #[instrument(skip(agent, self))]
     pub async fn register_agent(&self, agent: Arc<dyn BaseAgent>) -> Result<()> {
         let agent_id = agent.metadata().id.to_string();
 
@@ -168,6 +170,7 @@ impl DelegatingAgent {
     /// # Errors
     ///
     /// Returns an error if agent unregistration fails
+    #[instrument(skip(self))]
     pub async fn unregister_agent(&self, agent_id: &str) -> Result<()> {
         let mut agents = self.agents.write().await;
         agents.remove(agent_id);
@@ -184,6 +187,7 @@ impl DelegatingAgent {
     }
 
     /// Index an agent's capabilities
+    #[instrument(skip(_agent, self))]
     async fn index_agent_capabilities(
         &self,
         agent_id: &str,
@@ -212,6 +216,7 @@ impl DelegatingAgent {
     }
 
     /// Find agents matching required capabilities
+    #[instrument(skip(self))]
     async fn find_matching_agents(&self, capabilities: &[Capability]) -> Vec<String> {
         if self.config.cache_capabilities {
             let index = self.capabilities_index.read().await;
@@ -299,6 +304,7 @@ impl DelegatingAgent {
     /// # Panics
     ///
     /// Panics if a `RwLock` is poisoned
+    #[instrument(skip(self))]
     pub async fn delegate(&self, request: DelegationRequest) -> Result<DelegationResult> {
         let start_time = std::time::Instant::now();
 
@@ -418,6 +424,7 @@ impl BaseAgent for DelegatingAgent {
         &self.metadata
     }
 
+    #[instrument(skip(self))]
     async fn execute_impl(
         &self,
         input: AgentInput,
@@ -433,12 +440,14 @@ impl BaseAgent for DelegatingAgent {
         Ok(AgentOutput::text(serde_json::to_string(&result)?))
     }
 
+    #[instrument(skip(self))]
     async fn validate_input(&self, input: &AgentInput) -> Result<()> {
         // Validate that input can be parsed as DelegationRequest
         let _: DelegationRequest = serde_json::from_str(&input.text)?;
         Ok(())
     }
 
+    #[instrument(skip(self))]
     async fn handle_error(&self, error: LLMSpellError) -> Result<AgentOutput> {
         Ok(AgentOutput::text(format!("Delegation error: {error}")))
     }
@@ -543,6 +552,7 @@ impl DelegatingAgentBuilder {
     /// # Errors
     ///
     /// Returns an error if agent building fails
+    #[instrument(skip(self))]
     pub async fn build(self) -> Result<DelegatingAgent> {
         let agent = DelegatingAgent::new(self.name, self.config);
         agent.set_strategy(self.strategy);
@@ -580,6 +590,7 @@ mod tests {
                 &self.metadata
             }
 
+            #[instrument(skip(self))]
             async fn execute_impl(
                 &self,
                 _input: AgentInput,
@@ -588,10 +599,12 @@ mod tests {
                 Ok(AgentOutput::text("Mock response"))
             }
 
+            #[instrument(skip(self))]
             async fn validate_input(&self, _input: &AgentInput) -> Result<()> {
                 Ok(())
             }
 
+            #[instrument(skip(self))]
             async fn handle_error(&self, error: LLMSpellError) -> Result<AgentOutput> {
                 Ok(AgentOutput::text(format!("Error: {error}")))
             }

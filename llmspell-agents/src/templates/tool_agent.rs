@@ -14,6 +14,7 @@ use llmspell_core::{
 };
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
+use tracing::instrument;
 
 /// Tool Agent configuration
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -392,6 +393,7 @@ impl AgentTemplate for ToolAgentTemplate {
         &self.schema
     }
 
+    #[instrument(skip(self))]
     async fn instantiate(
         &self,
         mut params: TemplateInstantiationParams,
@@ -468,6 +470,7 @@ impl AgentTemplate for ToolAgentTemplate {
         })
     }
 
+    #[instrument(skip(self))]
     async fn validate_custom_constraint(
         &self,
         parameter_name: &str,
@@ -553,6 +556,7 @@ impl BaseAgent for MockToolAgent {
         &self.metadata
     }
 
+    #[instrument(skip(self))]
     async fn execute_impl(
         &self,
         _input: AgentInput,
@@ -567,10 +571,12 @@ impl BaseAgent for MockToolAgent {
         })
     }
 
+    #[instrument(skip(self))]
     async fn validate_input(&self, _input: &AgentInput) -> Result<(), LLMSpellError> {
         Ok(())
     }
 
+    #[instrument(skip(self))]
     async fn handle_error(&self, error: LLMSpellError) -> Result<AgentOutput, LLMSpellError> {
         Ok(AgentOutput {
             text: format!("Error handled by mock agent: {error}"),

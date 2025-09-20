@@ -38,6 +38,7 @@ pub async fn create_storage_backend(
 }
 
 /// Wrapper for state-specific storage operations
+#[derive(Debug)]
 pub struct StateStorageAdapter {
     backend: Arc<dyn StorageBackend>,
     namespace: String,

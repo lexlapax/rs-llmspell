@@ -30,7 +30,7 @@ use serde_json::{json, Value};
 use similar::{ChangeTag, DiffTag, TextDiff};
 use std::fs;
 use std::time::Instant;
-use tracing::{debug, error, info, trace};
+use tracing::{debug, error, info, instrument, trace};
 
 /// Diff output format
 #[derive(Debug, Clone)]
@@ -661,6 +661,7 @@ impl DiffCalculatorTool {
     }
 
     #[allow(clippy::unused_async)]
+    #[instrument(skip(self))]
     async fn process_operation(&self, params: &Value) -> Result<Value> {
         let operation_start = Instant::now();
         let diff_type = extract_string_with_default(params, "type", "text");
@@ -701,6 +702,7 @@ impl BaseAgent for DiffCalculatorTool {
         &self.metadata
     }
 
+    #[instrument(skip(_context, input, self), fields(tool = %self.metadata().name))]
     async fn execute_impl(
         &self,
         input: AgentInput,
@@ -732,6 +734,7 @@ impl BaseAgent for DiffCalculatorTool {
         ))
     }
 
+    #[instrument(skip(self))]
     async fn validate_input(&self, input: &AgentInput) -> Result<()> {
         if input.text.is_empty() {
             return Err(validation_error(
@@ -742,6 +745,7 @@ impl BaseAgent for DiffCalculatorTool {
         Ok(())
     }
 
+    #[instrument(skip(self))]
     async fn handle_error(&self, error: LLMSpellError) -> Result<AgentOutput> {
         Ok(AgentOutput::text(format!(
             "Diff calculation error: {error}"

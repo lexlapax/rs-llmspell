@@ -21,7 +21,7 @@ use serde_json::json;
 use std::collections::HashMap;
 use std::sync::Arc;
 use std::time::Instant;
-use tracing::{debug, info, warn};
+use tracing::{debug, info, instrument, warn};
 
 /// Environment reader tool configuration
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -97,6 +97,7 @@ pub struct EnvironmentReaderTool {
 }
 
 impl EnvironmentReaderTool {
+    #[instrument(skip(self))]
     async fn handle_get_operation(&self, params: &serde_json::Value) -> LLMResult<AgentOutput> {
         let var_name = extract_required_string(params, "variable_name")?;
 
@@ -123,6 +124,7 @@ impl EnvironmentReaderTool {
         }
     }
 
+    #[instrument(skip(self))]
     async fn handle_list_operation(&self) -> LLMResult<AgentOutput> {
         let vars = self.get_all_vars().await?;
         let response = ResponseBuilder::success("list")
@@ -138,6 +140,7 @@ impl EnvironmentReaderTool {
         Ok(AgentOutput::text(serde_json::to_string_pretty(&response)?))
     }
 
+    #[instrument(skip(self))]
     async fn handle_pattern_operation(&self, params: &serde_json::Value) -> LLMResult<AgentOutput> {
         let pattern = extract_required_string(params, "pattern")?;
         let vars = self.get_vars_by_pattern(pattern).await?;
@@ -285,6 +288,7 @@ impl EnvironmentReaderTool {
 
     /// Get a single environment variable
     #[allow(clippy::unused_async)]
+    #[instrument(skip(self))]
     async fn get_single_var(&self, var_name: &str) -> LLMResult<Option<String>> {
         if !self.is_var_allowed(var_name) {
             return Err(LLMSpellError::Security {
@@ -305,6 +309,7 @@ impl EnvironmentReaderTool {
 
     /// Get all allowed environment variables
     #[allow(clippy::unused_async)]
+    #[instrument(skip(self))]
     async fn get_all_vars(&self) -> LLMResult<HashMap<String, String>> {
         let all_vars = get_all_env_vars();
         let mut allowed_vars = HashMap::new();
@@ -334,6 +339,7 @@ impl EnvironmentReaderTool {
 
     /// Get environment variables matching a pattern
     #[allow(clippy::unused_async)]
+    #[instrument(skip(self))]
     async fn get_vars_by_pattern(&self, pattern: &str) -> LLMResult<HashMap<String, String>> {
         let all_vars = get_all_env_vars();
         let mut matching_vars = HashMap::new();
@@ -364,6 +370,7 @@ impl EnvironmentReaderTool {
 
     /// Set an environment variable (if allowed)
     #[allow(clippy::unused_async)]
+    #[instrument(skip(self))]
     async fn set_var(&self, var_name: &str, value: &str) -> LLMResult<()> {
         if !self.config.allow_set_variables {
             return Err(LLMSpellError::Security {
@@ -400,6 +407,7 @@ impl BaseAgent for EnvironmentReaderTool {
         &self.metadata
     }
 
+    #[instrument(skip(_context, input, self), fields(tool = %self.metadata().name))]
     async fn execute_impl(
         &self,
         input: AgentInput,
@@ -459,6 +467,7 @@ impl BaseAgent for EnvironmentReaderTool {
         Ok(result)
     }
 
+    #[instrument(skip(self))]
     async fn validate_input(&self, input: &AgentInput) -> LLMResult<()> {
         if input.text.is_empty() {
             return Err(LLMSpellError::Validation {
@@ -469,6 +478,7 @@ impl BaseAgent for EnvironmentReaderTool {
         Ok(())
     }
 
+    #[instrument(skip(self))]
     async fn handle_error(&self, error: LLMSpellError) -> LLMResult<AgentOutput> {
         Ok(AgentOutput::text(format!(
             "Environment reader error: {error}"

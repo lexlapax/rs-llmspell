@@ -35,7 +35,7 @@ use serde::{Deserialize, Serialize};
 use serde_json::json;
 use std::path::Path;
 use std::time::Instant;
-use tracing::{debug, error, info, trace};
+use tracing::{debug, error, info, instrument, trace};
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct HashCalculatorConfig {
@@ -117,6 +117,7 @@ impl HashCalculatorTool {
         }
     }
 
+    #[instrument(skip(self))]
     async fn check_file_size(&self, path: &Path) -> Result<u64> {
         let check_start = Instant::now();
         debug!(
@@ -159,6 +160,7 @@ impl HashCalculatorTool {
         Ok(file_size)
     }
 
+    #[instrument(skip(self))]
     async fn execute_hash_operation(&self, params: &serde_json::Value) -> Result<AgentOutput> {
         let hash_op_start = Instant::now();
         let input_type = extract_string_with_default(params, "input_type", "string");
@@ -221,6 +223,7 @@ impl HashCalculatorTool {
     }
 
     #[allow(clippy::cognitive_complexity)]
+    #[instrument(skip(self))]
     async fn execute_verify_operation(&self, params: &serde_json::Value) -> Result<AgentOutput> {
         let verify_op_start = Instant::now();
         let input_type = extract_string_with_default(params, "input_type", "string");
@@ -296,6 +299,7 @@ impl HashCalculatorTool {
         Ok(AgentOutput::text(serde_json::to_string_pretty(&response)?))
     }
 
+    #[instrument(skip(self))]
     async fn compute_hash(
         &self,
         params: &serde_json::Value,
@@ -351,6 +355,7 @@ impl HashCalculatorTool {
         Ok(hash)
     }
 
+    #[instrument(skip(self))]
     async fn compute_file_hash(
         &self,
         params: &serde_json::Value,
@@ -423,6 +428,7 @@ impl BaseAgent for HashCalculatorTool {
         &self.metadata
     }
 
+    #[instrument(skip(_context, input, self), fields(tool = %self.metadata().name))]
     async fn execute_impl(
         &self,
         input: AgentInput,
@@ -478,6 +484,7 @@ impl BaseAgent for HashCalculatorTool {
         result
     }
 
+    #[instrument(skip(self))]
     async fn validate_input(&self, input: &AgentInput) -> Result<()> {
         if input.text.is_empty() {
             return Err(validation_error(
@@ -488,6 +495,7 @@ impl BaseAgent for HashCalculatorTool {
         Ok(())
     }
 
+    #[instrument(skip(self))]
     async fn handle_error(&self, error: llmspell_core::LLMSpellError) -> Result<AgentOutput> {
         Ok(AgentOutput::text(format!("Hash calculator error: {error}")))
     }

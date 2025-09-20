@@ -344,6 +344,7 @@ impl SecurityStorage {
 }
 
 /// Built-in security hook for comprehensive security monitoring
+#[derive(Debug)]
 pub struct SecurityHook {
     storage: Arc<SecurityStorage>,
     metadata: HookMetadata,

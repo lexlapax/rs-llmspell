@@ -20,7 +20,7 @@ use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use std::time::Instant;
 use tokio::io::{AsyncBufReadExt, AsyncRead, BufReader};
-use tracing::{debug, error, info, trace};
+use tracing::{debug, error, info, instrument, trace};
 
 /// JSON processing operation types
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -234,6 +234,7 @@ impl JsonProcessorTool {
 
     /// Validate JSON against a schema
     #[allow(clippy::unused_async)]
+    #[instrument(skip(self))]
     async fn validate_json(&self, input: &Value, schema: &Value) -> Result<ValidationResult> {
         debug!("Validating JSON against schema");
 
@@ -281,6 +282,7 @@ impl JsonProcessorTool {
     /// - The JQ query is invalid or contains security risks
     /// - JSON parsing fails for any line
     /// - I/O errors occur while reading from the stream
+    #[instrument(skip(self, reader))]
     pub async fn process_json_stream<R: AsyncRead + Unpin>(
         &self,
         reader: R,
@@ -350,6 +352,13 @@ impl JsonProcessorTool {
 
 impl Default for JsonProcessorTool {
     fn default() -> Self {
+        info!(
+            tool_name = "json-processor",
+            category = "Tool",
+            phase = "Phase 3 (comprehensive instrumentation)",
+            "Creating JsonProcessorTool"
+        );
+
         Self::new(JsonProcessorConfig::default())
     }
 }
@@ -374,6 +383,7 @@ impl BaseAgent for JsonProcessorTool {
     }
 
     #[allow(clippy::too_many_lines)]
+    #[instrument(skip(_context, input, self), fields(tool = %self.metadata().name))]
     async fn execute_impl(
         &self,
         input: AgentInput,
@@ -626,6 +636,7 @@ impl BaseAgent for JsonProcessorTool {
         Ok(AgentOutput::text(output_text).with_metadata(metadata))
     }
 
+    #[instrument(skip(self))]
     async fn validate_input(&self, input: &AgentInput) -> Result<()> {
         if input.parameters.is_empty() {
             return Err(LLMSpellError::Validation {
@@ -651,6 +662,7 @@ impl BaseAgent for JsonProcessorTool {
         Ok(())
     }
 
+    #[instrument(skip(self))]
     async fn handle_error(&self, error: LLMSpellError) -> Result<AgentOutput> {
         Ok(AgentOutput::text(format!("JSON processing error: {error}")))
     }
@@ -779,6 +791,7 @@ impl JsonProcessorTool {
     /// - Tool execution fails
     /// - Hook execution fails
     /// - JSON parsing or processing fails
+    #[instrument(skip(self, tool_executor))]
     pub async fn demonstrate_hook_integration(
         &self,
         tool_executor: &crate::lifecycle::ToolExecutor,

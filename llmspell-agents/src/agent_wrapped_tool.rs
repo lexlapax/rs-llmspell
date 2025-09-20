@@ -12,6 +12,7 @@ use llmspell_core::{
 };
 use serde_json::{Map, Value as JsonValue};
 use std::sync::Arc;
+use tracing::instrument;
 use tracing::warn;
 
 /// Wrapper that allows any `BaseAgent` to be used as a `Tool`.
@@ -466,6 +467,7 @@ impl BaseAgent for AgentWrappedTool {
         self.agent.metadata()
     }
 
+    #[instrument(skip(self))]
     async fn execute_impl(
         &self,
         input: AgentInput,
@@ -499,10 +501,12 @@ impl BaseAgent for AgentWrappedTool {
         }
     }
 
+    #[instrument(skip(self))]
     async fn validate_input(&self, input: &AgentInput) -> Result<()> {
         self.agent.validate_input(input).await
     }
 
+    #[instrument(skip(self))]
     async fn handle_error(&self, error: LLMSpellError) -> Result<AgentOutput> {
         self.agent.handle_error(error).await
     }
@@ -585,6 +589,7 @@ mod tests {
             &self.metadata
         }
 
+        #[instrument(skip(self))]
         async fn execute_impl(
             &self,
             input: AgentInput,
@@ -602,10 +607,12 @@ mod tests {
             )))
         }
 
+        #[instrument(skip(self))]
         async fn validate_input(&self, _input: &AgentInput) -> Result<()> {
             Ok(())
         }
 
+        #[instrument(skip(self))]
         async fn handle_error(&self, error: LLMSpellError) -> Result<AgentOutput> {
             Ok(AgentOutput::text(format!("Error handled: {error}")))
         }

@@ -3,6 +3,8 @@
 
 #![allow(clippy::significant_drop_tightening)]
 
+use tracing::instrument;
+
 use anyhow::Result;
 use serde::{Deserialize, Serialize};
 use std::sync::Arc;
@@ -85,11 +87,13 @@ impl ToolStateMachine {
     }
 
     /// Get current state
+    #[instrument(skip(self))]
     pub async fn current_state(&self) -> ToolExecutionState {
         *self.state.read().await
     }
 
     /// Check if tool is in a specific state
+    #[instrument(skip(self))]
     pub async fn is_state(&self, expected_state: ToolExecutionState) -> bool {
         *self.state.read().await == expected_state
     }
@@ -100,6 +104,7 @@ impl ToolStateMachine {
     ///
     /// Returns an error if the requested state transition is invalid
     /// according to the state machine rules
+    #[instrument(skip(self))]
     pub async fn transition_to(&self, new_state: ToolExecutionState) -> Result<()> {
         let mut state_guard = self.state.write().await;
         let current_state = *state_guard;
@@ -144,6 +149,7 @@ impl ToolStateMachine {
     /// # Errors
     ///
     /// Returns an error if the state transition is invalid
+    #[instrument(skip(self))]
     pub async fn initialize(&self) -> Result<()> {
         self.transition_to(ToolExecutionState::Initializing).await?;
         // Simulate initialization time
@@ -156,6 +162,7 @@ impl ToolStateMachine {
     /// # Errors
     ///
     /// Returns an error if the state transition is invalid
+    #[instrument(skip(self))]
     pub async fn start_execution(&self) -> Result<()> {
         self.transition_to(ToolExecutionState::Executing).await
     }
@@ -165,6 +172,7 @@ impl ToolStateMachine {
     /// # Errors
     ///
     /// Returns an error if the state transition is invalid
+    #[instrument(skip(self))]
     pub async fn complete_execution(&self) -> Result<()> {
         self.transition_to(ToolExecutionState::Completed).await
     }
@@ -174,6 +182,7 @@ impl ToolStateMachine {
     /// # Errors
     ///
     /// Returns an error if the state transition is invalid
+    #[instrument(skip(self))]
     pub async fn fail_execution(&self) -> Result<()> {
         self.transition_to(ToolExecutionState::Failed).await
     }
@@ -183,6 +192,7 @@ impl ToolStateMachine {
     /// # Errors
     ///
     /// Returns an error if the state transition is invalid
+    #[instrument(skip(self))]
     pub async fn start_cleanup(&self) -> Result<()> {
         self.transition_to(ToolExecutionState::CleaningUp).await
     }
@@ -193,16 +203,19 @@ impl ToolStateMachine {
     ///
     /// Returns an error if the state transition to Terminated is invalid
     /// from the current state
+    #[instrument(skip(self))]
     pub async fn terminate(&self) -> Result<()> {
         self.transition_to(ToolExecutionState::Terminated).await
     }
 
     /// Get state transition history
+    #[instrument(skip(self))]
     pub async fn get_transition_history(&self) -> Vec<StateTransition> {
         self.transition_history.read().await.clone()
     }
 
     /// Get execution statistics
+    #[instrument(skip(self))]
     pub async fn get_execution_stats(&self) -> ExecutionStats {
         let history = self.transition_history.read().await;
         let current_state = *self.state.read().await;

@@ -10,6 +10,7 @@ use llmspell_core::traits::agent::Agent;
 use llmspell_storage::{StorageBackend, StorageSerialize};
 use std::{collections::HashMap, sync::Arc};
 use tokio::sync::RwLock;
+use tracing::instrument;
 
 /// Key prefix for agent metadata
 const AGENT_METADATA_PREFIX: &str = "agent:metadata:";
@@ -35,6 +36,7 @@ impl PersistentAgentRegistry {
     /// # Errors
     ///
     /// Returns an error if loading metadata from storage fails
+    #[instrument(skip(storage))]
     pub async fn new(storage: Arc<dyn StorageBackend>) -> Result<Self> {
         // Load existing metadata from storage
         let metadata = Self::load_all_metadata(&storage).await?;
@@ -47,6 +49,7 @@ impl PersistentAgentRegistry {
     }
 
     /// Load all agent metadata from storage
+    #[instrument(skip(storage))]
     async fn load_all_metadata(
         storage: &Arc<dyn StorageBackend>,
     ) -> Result<HashMap<String, AgentMetadata>> {
@@ -81,6 +84,7 @@ impl PersistentAgentRegistry {
     /// - Metadata serialization fails
     /// - Storage write operations fail
     /// - Snapshot creation fails
+    #[instrument(skip(self))]
     pub async fn persist(&self) -> Result<()> {
         let cache = self.metadata_cache.read().await;
 
@@ -107,6 +111,7 @@ impl PersistentAgentRegistry {
     /// Returns an error if:
     /// - Storage read fails
     /// - Snapshot deserialization fails
+    #[instrument(skip(self))]
     pub async fn load_from_snapshot(&mut self) -> Result<()> {
         if let Some(data) = self.storage.get(REGISTRY_SNAPSHOT_KEY).await? {
             if let Ok(metadata) = HashMap::<String, AgentMetadata>::from_storage_bytes(&data) {
@@ -120,6 +125,7 @@ impl PersistentAgentRegistry {
 
 #[async_trait]
 impl AgentRegistry for PersistentAgentRegistry {
+    #[instrument(skip(agent, self))]
     async fn register_agent(
         &self,
         id: String,
@@ -141,6 +147,7 @@ impl AgentRegistry for PersistentAgentRegistry {
         Ok(())
     }
 
+    #[instrument(skip(self))]
     async fn unregister_agent(&self, id: &str) -> Result<()> {
         // Remove from storage
         let key = Self::metadata_key(id);
@@ -156,11 +163,13 @@ impl AgentRegistry for PersistentAgentRegistry {
         Ok(())
     }
 
+    #[instrument(skip(self))]
     async fn get_agent(&self, id: &str) -> Result<Option<Arc<dyn Agent>>> {
         let agents = self.runtime_agents.read().await;
         Ok(agents.get(id).cloned())
     }
 
+    #[instrument(skip(self))]
     async fn get_metadata(&self, id: &str) -> Result<Option<AgentMetadata>> {
         let cache = self.metadata_cache.read().await;
 
@@ -179,6 +188,7 @@ impl AgentRegistry for PersistentAgentRegistry {
         Ok(None)
     }
 
+    #[instrument(skip(self))]
     async fn update_metadata(&self, id: &str, metadata: AgentMetadata) -> Result<()> {
         // Save to storage
         let key = Self::metadata_key(id);
@@ -192,6 +202,7 @@ impl AgentRegistry for PersistentAgentRegistry {
         Ok(())
     }
 
+    #[instrument(skip(self))]
     async fn update_status(&self, id: &str, status: AgentStatus) -> Result<()> {
         let mut cache = self.metadata_cache.write().await;
 
@@ -210,6 +221,7 @@ impl AgentRegistry for PersistentAgentRegistry {
         Ok(())
     }
 
+    #[instrument(skip(self))]
     async fn query_agents(&self, query: &AgentQuery) -> Result<Vec<AgentMetadata>> {
         let cache = self.metadata_cache.read().await;
         let mut results = Vec::new();
@@ -259,16 +271,19 @@ impl AgentRegistry for PersistentAgentRegistry {
         Ok(results)
     }
 
+    #[instrument(skip(self))]
     async fn list_agent_ids(&self) -> Result<Vec<String>> {
         let cache = self.metadata_cache.read().await;
         Ok(cache.keys().cloned().collect())
     }
 
+    #[instrument(skip(self))]
     async fn count_agents(&self) -> Result<usize> {
         let cache = self.metadata_cache.read().await;
         Ok(cache.len())
     }
 
+    #[instrument(skip(self))]
     async fn update_metrics(&self, id: &str, metrics: super::AgentMetrics) -> Result<()> {
         let mut cache = self.metadata_cache.write().await;
 
@@ -287,6 +302,7 @@ impl AgentRegistry for PersistentAgentRegistry {
         Ok(())
     }
 
+    #[instrument(skip(self))]
     async fn heartbeat(&self, id: &str) -> Result<()> {
         let cache = self.metadata_cache.read().await;
 
@@ -297,6 +313,7 @@ impl AgentRegistry for PersistentAgentRegistry {
         }
     }
 
+    #[instrument(skip(self))]
     async fn exists(&self, id: &str) -> Result<bool> {
         let cache = self.metadata_cache.read().await;
 
@@ -343,6 +360,7 @@ mod tests {
                 panic!("Not implemented for test")
             }
 
+            #[instrument(skip(self))]
             async fn validate_input(
                 &self,
                 _input: &llmspell_core::types::AgentInput,
@@ -350,6 +368,7 @@ mod tests {
                 Ok(())
             }
 
+            #[instrument(skip(self))]
             async fn execute_impl(
                 &self,
                 _input: llmspell_core::types::AgentInput,
@@ -359,6 +378,7 @@ mod tests {
             }
 
             #[allow(clippy::items_after_statements)] // Inner items for test organization
+            #[instrument(skip(self))]
             async fn handle_error(
                 &self,
                 _error: llmspell_core::LLMSpellError,
@@ -373,6 +393,7 @@ mod tests {
                 panic!("Not implemented for test")
             }
 
+            #[instrument(skip(self))]
             async fn get_conversation(
                 &self,
             ) -> llmspell_core::Result<Vec<llmspell_core::traits::agent::ConversationMessage>>
@@ -380,6 +401,7 @@ mod tests {
                 panic!("Not implemented for test")
             }
 
+            #[instrument(skip(self))]
             async fn add_message(
                 &self,
                 _message: llmspell_core::traits::agent::ConversationMessage,
@@ -387,6 +409,7 @@ mod tests {
                 panic!("Not implemented for test")
             }
 
+            #[instrument(skip(self))]
             async fn clear_conversation(&self) -> llmspell_core::Result<()> {
                 panic!("Not implemented for test")
             }
@@ -457,6 +480,7 @@ mod tests {
                     panic!("Not implemented for test")
                 }
 
+                #[instrument(skip(self))]
                 async fn validate_input(
                     &self,
                     _input: &llmspell_core::types::AgentInput,
@@ -464,6 +488,7 @@ mod tests {
                     Ok(())
                 }
 
+                #[instrument(skip(self))]
                 async fn execute_impl(
                     &self,
                     _input: llmspell_core::types::AgentInput,
@@ -473,6 +498,7 @@ mod tests {
                 }
 
                 #[allow(clippy::items_after_statements)] // Inner items for test organization
+                #[instrument(skip(self))]
                 async fn handle_error(
                     &self,
                     _error: llmspell_core::LLMSpellError,
@@ -487,6 +513,7 @@ mod tests {
                     panic!("Not implemented for test")
                 }
 
+                #[instrument(skip(self))]
                 async fn get_conversation(
                     &self,
                 ) -> llmspell_core::Result<Vec<llmspell_core::traits::agent::ConversationMessage>>
@@ -494,6 +521,7 @@ mod tests {
                     panic!("Not implemented for test")
                 }
 
+                #[instrument(skip(self))]
                 async fn add_message(
                     &self,
                     _message: llmspell_core::traits::agent::ConversationMessage,
@@ -501,6 +529,7 @@ mod tests {
                     panic!("Not implemented for test")
                 }
 
+                #[instrument(skip(self))]
                 async fn clear_conversation(&self) -> llmspell_core::Result<()> {
                     panic!("Not implemented for test")
                 }

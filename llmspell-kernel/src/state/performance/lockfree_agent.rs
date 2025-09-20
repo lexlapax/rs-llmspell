@@ -11,6 +11,7 @@ use std::sync::Arc;
 use std::time::SystemTime;
 
 /// Lock-free agent state store using `SkipMap` for concurrent access
+#[derive(Debug)]
 pub struct LockFreeAgentStore {
     /// Agent states indexed by `agent_id`
     states: Arc<SkipMap<String, Arc<VersionedAgentState>>>,
@@ -20,7 +21,7 @@ pub struct LockFreeAgentStore {
 }
 
 /// Versioned agent state for optimistic concurrency control
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 pub struct VersionedAgentState {
     pub state: PersistentAgentState,
     pub version: u64,
@@ -209,6 +210,7 @@ fn estimate_json_size(value: &Value) -> usize {
 }
 
 /// Fast agent state operations wrapper
+#[derive(Debug)]
 pub struct FastAgentStateOps {
     store: LockFreeAgentStore,
     /// Ultra-fast benchmark storage with zero overhead

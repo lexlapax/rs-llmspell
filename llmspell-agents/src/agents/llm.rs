@@ -175,6 +175,7 @@ impl LLMAgent {
     /// # Errors
     ///
     /// Returns an error if state machine initialization fails
+    #[instrument(skip(self))]
     pub async fn initialize(&self) -> Result<()> {
         info!("Initializing LLMAgent '{}'", self.metadata.name);
         self.state_machine.initialize().await?;
@@ -187,6 +188,7 @@ impl LLMAgent {
     /// # Errors
     ///
     /// Returns an error if state machine start fails
+    #[instrument(skip(self))]
     pub async fn start(&self) -> Result<()> {
         info!("Starting LLMAgent '{}'", self.metadata.name);
 
@@ -207,6 +209,7 @@ impl LLMAgent {
     ///
     /// Returns an error if state machine pause fails
     #[allow(clippy::cognitive_complexity)]
+    #[instrument(skip(self))]
     pub async fn pause(&self) -> Result<()> {
         info!("Pausing LLMAgent '{}'", self.metadata.name);
         self.state_machine.pause().await?;
@@ -235,6 +238,7 @@ impl LLMAgent {
     /// # Errors
     ///
     /// Returns an error if state machine resume fails
+    #[instrument(skip(self))]
     pub async fn resume(&self) -> Result<()> {
         info!("Resuming LLMAgent '{}'", self.metadata.name);
 
@@ -255,6 +259,7 @@ impl LLMAgent {
     ///
     /// Returns an error if state machine stop fails
     #[allow(clippy::cognitive_complexity)]
+    #[instrument(skip(self))]
     pub async fn stop(&self) -> Result<()> {
         info!("Stopping LLMAgent '{}'", self.metadata.name);
 
@@ -283,6 +288,7 @@ impl LLMAgent {
     /// # Errors
     ///
     /// Returns an error if state machine termination fails
+    #[instrument(skip(self))]
     pub async fn terminate(&self) -> Result<()> {
         info!("Terminating LLMAgent '{}'", self.metadata.name);
         self.state_machine.terminate().await?;
@@ -291,6 +297,7 @@ impl LLMAgent {
     }
 
     /// Check if agent is healthy
+    #[instrument(skip(self))]
     pub async fn is_healthy(&self) -> bool {
         self.state_machine.is_healthy().await
     }
@@ -303,8 +310,8 @@ impl BaseAgent for LLMAgent {
     }
 
     #[instrument(
-        level = "debug",
         skip(self, _context),
+        level = "debug",
         fields(
             agent_name = %self.metadata.name,
             input_size = input.text.len(),
@@ -440,6 +447,7 @@ impl BaseAgent for LLMAgent {
         Ok(response)
     }
 
+    #[instrument(skip(self))]
     async fn validate_input(&self, input: &AgentInput) -> Result<(), LLMSpellError> {
         if input.text.is_empty() {
             return Err(LLMSpellError::Validation {
@@ -465,6 +473,7 @@ impl BaseAgent for LLMAgent {
         Ok(())
     }
 
+    #[instrument(skip(self))]
     async fn handle_error(&self, error: LLMSpellError) -> Result<AgentOutput, LLMSpellError> {
         error!(
             "LLMAgent '{}' encountered error: {}",
@@ -505,6 +514,7 @@ impl Agent for LLMAgent {
         &self.core_config
     }
 
+    #[instrument(skip(self))]
     async fn get_conversation(&self) -> Result<Vec<ConversationMessage>, LLMSpellError> {
         self.conversation
             .lock()
@@ -515,6 +525,7 @@ impl Agent for LLMAgent {
             })
     }
 
+    #[instrument(skip(self))]
     async fn add_message(&self, message: ConversationMessage) -> Result<(), LLMSpellError> {
         self.conversation
             .lock()
@@ -525,6 +536,7 @@ impl Agent for LLMAgent {
             })
     }
 
+    #[instrument(skip(self))]
     async fn clear_conversation(&self) -> Result<(), LLMSpellError> {
         self.conversation
             .lock()

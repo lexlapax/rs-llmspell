@@ -24,7 +24,7 @@ use std::collections::HashMap;
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
 use std::time::Instant;
-use tracing::{debug, error, info, trace, warn};
+use tracing::{debug, error, info, instrument, trace, warn};
 
 /// File operation types
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -150,6 +150,7 @@ impl FileOperationsTool {
 
     /// Perform read operation
     #[allow(clippy::unused_async)]
+    #[instrument(skip(sandbox, self))]
     async fn read_file(&self, path: &Path, sandbox: &FileSandbox) -> Result<String> {
         let start = Instant::now();
         info!(
@@ -224,6 +225,7 @@ impl FileOperationsTool {
 
     /// Perform write operation with optional atomic write
     #[allow(clippy::unused_async)]
+    #[instrument(skip(sandbox, self))]
     async fn write_file(&self, path: &Path, content: &str, sandbox: &FileSandbox) -> Result<()> {
         let start = Instant::now();
         info!(
@@ -285,6 +287,7 @@ impl FileOperationsTool {
 
     /// Perform append operation
     #[allow(clippy::unused_async)]
+    #[instrument(skip(sandbox, self))]
     async fn append_file(&self, path: &Path, content: &str, sandbox: &FileSandbox) -> Result<()> {
         info!(
             path = ?path,
@@ -331,6 +334,7 @@ impl FileOperationsTool {
 
     /// Delete file
     #[allow(clippy::unused_async)]
+    #[instrument(skip(sandbox, self))]
     async fn delete_file(&self, path: &Path, sandbox: &FileSandbox) -> Result<()> {
         info!(
             path = ?path,
@@ -373,6 +377,7 @@ impl FileOperationsTool {
 
     /// Create directory
     #[allow(clippy::unused_async)]
+    #[instrument(skip(sandbox, self))]
     async fn create_dir(&self, path: &Path, recursive: bool, sandbox: &FileSandbox) -> Result<()> {
         info!(
             path = ?path,
@@ -449,6 +454,7 @@ impl FileOperationsTool {
 
     /// List directory contents
     #[allow(clippy::unused_async)]
+    #[instrument(skip(sandbox, self))]
     async fn list_dir(&self, path: &Path, sandbox: &FileSandbox) -> Result<Vec<Value>> {
         let start = Instant::now();
         info!(
@@ -491,6 +497,7 @@ impl FileOperationsTool {
 
     /// Copy file
     #[allow(clippy::unused_async)]
+    #[instrument(skip(sandbox, self))]
     async fn copy_file(&self, from: &Path, to: &Path, sandbox: &FileSandbox) -> Result<()> {
         let start = Instant::now();
         info!(
@@ -548,6 +555,7 @@ impl FileOperationsTool {
 
     /// Move/rename file
     #[allow(clippy::unused_async)]
+    #[instrument(skip(sandbox, self))]
     async fn move_file(&self, from: &Path, to: &Path, sandbox: &FileSandbox) -> Result<()> {
         info!(
             source = ?from,
@@ -694,6 +702,7 @@ impl BaseAgent for FileOperationsTool {
     }
 
     #[allow(clippy::too_many_lines)]
+    #[instrument(skip(_context, input, self), fields(tool = %self.metadata().name))]
     async fn execute_impl(
         &self,
         input: AgentInput,
@@ -929,6 +938,7 @@ impl BaseAgent for FileOperationsTool {
         Ok(AgentOutput::text(output_text).with_metadata(metadata))
     }
 
+    #[instrument(skip_all)]
     async fn validate_input(&self, input: &AgentInput) -> Result<()> {
         trace!("Validating file operation input");
         if input.parameters.is_empty() {
@@ -951,6 +961,7 @@ impl BaseAgent for FileOperationsTool {
         Ok(())
     }
 
+    #[instrument(skip_all)]
     async fn handle_error(&self, error: LLMSpellError) -> Result<AgentOutput> {
         Ok(AgentOutput::text(format!("File operation error: {error}")))
     }
@@ -1091,6 +1102,7 @@ impl FileOperationsTool {
     /// - File path is invalid or inaccessible
     /// - Hook execution fails
     /// - Tool execution fails
+    #[instrument(skip(self, tool_executor))]
     pub async fn demonstrate_hook_integration(
         &self,
         tool_executor: &crate::lifecycle::ToolExecutor,

@@ -57,6 +57,7 @@ pub struct StorageStats {
 }
 
 /// Event storage adapter that uses any StorageBackend
+#[derive(Debug)]
 pub struct EventStorageAdapter<B: StorageBackend> {
     backend: Arc<B>,
 }
@@ -364,6 +365,7 @@ impl Default for PersistenceConfig {
 }
 
 /// Event persistence manager using storage adapter
+#[derive(Debug)]
 pub struct EventPersistenceManager<B: StorageBackend> {
     storage: Arc<EventStorageAdapter<B>>,
     config: PersistenceConfig,

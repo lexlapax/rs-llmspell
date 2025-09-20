@@ -24,7 +24,7 @@ use reqwest::Client;
 use serde::{Deserialize, Serialize};
 use serde_json::{json, Value};
 use std::time::{Duration, Instant};
-use tracing::{debug, error, info, trace, warn};
+use tracing::{debug, error, info, instrument, trace, warn};
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct WebhookCallerTool {
@@ -33,6 +33,13 @@ pub struct WebhookCallerTool {
 
 impl Default for WebhookCallerTool {
     fn default() -> Self {
+        info!(
+            tool_name = "webhook-caller",
+            category = "Tool",
+            phase = "Phase 3 (comprehensive instrumentation)",
+            "Creating WebhookCallerTool"
+        );
+
         Self::new()
     }
 }
@@ -116,15 +123,18 @@ impl BaseAgent for WebhookCallerTool {
         &self.metadata
     }
 
+    #[instrument(skip(self))]
     async fn validate_input(&self, _input: &AgentInput) -> Result<()> {
         Ok(())
     }
 
+    #[instrument(skip(self))]
     async fn handle_error(&self, error: llmspell_core::LLMSpellError) -> Result<AgentOutput> {
         Ok(AgentOutput::text(format!("WebhookCaller error: {error}")))
     }
 
     #[allow(clippy::too_many_lines)]
+    #[instrument(skip(_context, input, self), fields(tool = %self.metadata().name))]
     async fn execute_impl(
         &self,
         input: AgentInput,

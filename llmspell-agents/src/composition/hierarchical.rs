@@ -166,6 +166,7 @@ impl HierarchicalCompositeAgent {
 
     /// Aggregate capabilities from all children and components
     #[allow(dead_code)]
+    #[instrument(skip(self))]
     async fn aggregate_capabilities(&self) -> Vec<Capability> {
         let mut capabilities = self.capabilities.read().unwrap().clone();
 
@@ -206,8 +207,8 @@ impl BaseAgent for HierarchicalCompositeAgent {
     }
 
     #[instrument(
-        level = "debug",
         skip(self, context),
+        level = "debug",
         fields(
             agent_name = %self.metadata.name,
             input_size = input.text.len(),
@@ -225,6 +226,7 @@ impl BaseAgent for HierarchicalCompositeAgent {
         Ok(AgentOutput::text(result.to_string()))
     }
 
+    #[instrument(skip(self))]
     async fn validate_input(&self, input: &AgentInput) -> Result<()> {
         // Basic validation - can be extended
         if input.text.is_empty() {
@@ -236,6 +238,7 @@ impl BaseAgent for HierarchicalCompositeAgent {
         Ok(())
     }
 
+    #[instrument(skip(self))]
     async fn handle_error(&self, error: LLMSpellError) -> Result<AgentOutput> {
         Ok(AgentOutput::text(format!(
             "Hierarchical agent error: {error}"
@@ -245,6 +248,7 @@ impl BaseAgent for HierarchicalCompositeAgent {
 
 #[async_trait]
 impl ToolCapable for HierarchicalCompositeAgent {
+    #[instrument(skip(self))]
     async fn discover_tools(&self, query: &ToolQuery) -> Result<Vec<ToolInfo>> {
         let tools = self.tools.read().await;
         let mut infos = Vec::new();
@@ -271,6 +275,7 @@ impl ToolCapable for HierarchicalCompositeAgent {
         Ok(infos)
     }
 
+    #[instrument(skip(self, context))]
     async fn invoke_tool(
         &self,
         tool_name: &str,
@@ -290,11 +295,13 @@ impl ToolCapable for HierarchicalCompositeAgent {
         }
     }
 
+    #[instrument(skip(self))]
     async fn list_available_tools(&self) -> Result<Vec<String>> {
         let tools = self.tools.read().await;
         Ok(tools.keys().cloned().collect())
     }
 
+    #[instrument(skip(self))]
     async fn tool_available(&self, tool_name: &str) -> bool {
         let tools = self.tools.read().await;
         tools.contains_key(tool_name)
@@ -331,12 +338,14 @@ impl Composable for HierarchicalCompositeAgent {
 
 #[async_trait]
 impl CompositeAgent for HierarchicalCompositeAgent {
+    #[instrument(skip(component, self))]
     async fn add_component(&mut self, component: Arc<dyn BaseAgent>) -> Result<()> {
         let mut components = self.components.write().await;
         components.insert(component.metadata().id.to_string(), component);
         Ok(())
     }
 
+    #[instrument(skip(self))]
     async fn remove_component(&mut self, component_id: &str) -> Result<()> {
         let mut components = self.components.write().await;
         components
@@ -358,6 +367,7 @@ impl CompositeAgent for HierarchicalCompositeAgent {
         None
     }
 
+    #[instrument(skip(self))]
     async fn delegate_to(
         &self,
         component_id: &str,
@@ -399,6 +409,7 @@ impl CompositeAgent for HierarchicalCompositeAgent {
         }
     }
 
+    #[instrument(skip(context, input, self))]
     async fn execute_pattern(
         &self,
         pattern: ExecutionPattern,
@@ -464,6 +475,7 @@ impl HierarchicalAgent for HierarchicalCompositeAgent {
         Vec::new()
     }
 
+    #[instrument(skip(child, self))]
     async fn add_child(&mut self, child: Arc<dyn HierarchicalAgent>) -> Result<()> {
         // Check max children limit
         if let Some(max) = self.config.max_children {
@@ -491,6 +503,7 @@ impl HierarchicalAgent for HierarchicalCompositeAgent {
         Ok(())
     }
 
+    #[instrument(skip(self))]
     async fn remove_child(&mut self, _child_id: &str) -> Result<()> {
         let mut children = self.children.write().await;
         // Remove child by comparing against child_id
@@ -505,6 +518,7 @@ impl HierarchicalAgent for HierarchicalCompositeAgent {
         self.calculate_depth()
     }
 
+    #[instrument(skip(self))]
     async fn propagate_down(&self, event: HierarchyEvent) -> Result<()> {
         if !self.config.propagate_down {
             return Ok(());
@@ -523,6 +537,7 @@ impl HierarchicalAgent for HierarchicalCompositeAgent {
         Ok(())
     }
 
+    #[instrument(skip(self))]
     async fn propagate_up(&self, event: HierarchyEvent) -> Result<()> {
         if !self.config.propagate_up {
             return Ok(());
@@ -641,6 +656,7 @@ mod tests {
                 &self.metadata
             }
 
+            #[instrument(skip(self))]
             async fn execute_impl(
                 &self,
                 input: AgentInput,
@@ -649,10 +665,12 @@ mod tests {
                 Ok(AgentOutput::text(format!("Processed: {}", input.text)))
             }
 
+            #[instrument(skip(self))]
             async fn validate_input(&self, _input: &AgentInput) -> Result<()> {
                 Ok(())
             }
 
+            #[instrument(skip(self))]
             async fn handle_error(&self, error: LLMSpellError) -> Result<AgentOutput> {
                 Ok(AgentOutput::text(format!("Error: {error}")))
             }

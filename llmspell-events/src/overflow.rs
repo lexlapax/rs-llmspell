@@ -53,7 +53,7 @@ impl OverflowResult {
 
 /// Trait for handling overflow situations
 #[async_trait]
-pub trait OverflowHandler: Send + Sync {
+pub trait OverflowHandler: Send + Sync + std::fmt::Debug {
     /// Handle an overflow situation
     async fn handle_overflow(
         &self,

@@ -23,7 +23,7 @@ use serde::{Deserialize, Serialize};
 use serde_json::{json, Value};
 use std::time::Instant;
 use tera::{Context as TeraContext, Tera};
-use tracing::{debug, info, trace};
+use tracing::{debug, info, instrument, trace};
 
 /// Supported template engines
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
@@ -334,6 +334,13 @@ impl TemplateEngineTool {
 
 impl Default for TemplateEngineTool {
     fn default() -> Self {
+        info!(
+            tool_name = "template-engine",
+            category = "Tool",
+            phase = "Phase 3 (comprehensive instrumentation)",
+            "Creating TemplateEngineTool"
+        );
+
         Self::new()
     }
 }
@@ -561,6 +568,7 @@ impl BaseAgent for TemplateEngineTool {
         &self.metadata
     }
 
+    #[instrument(skip(_context, input, self), fields(tool = %self.metadata().name))]
     async fn execute_impl(
         &self,
         input: AgentInput,
@@ -618,6 +626,7 @@ impl BaseAgent for TemplateEngineTool {
         Ok(AgentOutput::text(serde_json::to_string_pretty(&response)?))
     }
 
+    #[instrument(skip(self))]
     async fn validate_input(&self, input: &AgentInput) -> Result<()> {
         if input.parameters.is_empty() {
             return Err(validation_error(
@@ -628,6 +637,7 @@ impl BaseAgent for TemplateEngineTool {
         Ok(())
     }
 
+    #[instrument(skip(self))]
     async fn handle_error(&self, error: LLMSpellError) -> Result<AgentOutput> {
         Ok(AgentOutput::text(format!(
             "Template rendering error: {error}"

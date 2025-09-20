@@ -11,7 +11,7 @@ use serde_json::Value;
 use std::collections::HashMap;
 use std::sync::Arc;
 use std::time::{Duration, SystemTime};
-use tracing::{debug, info, warn};
+use tracing::{debug, info, instrument, warn};
 
 /// Tool execution state for persistence
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -229,6 +229,7 @@ pub trait ToolStatePersistence: Tool {
     }
 
     /// Load the tool's state from storage
+    #[instrument(skip(self))]
     async fn load_state(&self) -> Result<bool> {
         if let Some(state_manager) = self.state_manager() {
             let tool_id = self.metadata().id.to_string();
@@ -254,6 +255,7 @@ pub trait ToolStatePersistence: Tool {
     }
 
     /// Create a tool state representation from current tool state
+    #[instrument(skip(self))]
     async fn create_tool_state(&self) -> Result<ToolState> {
         let mut tool_state =
             ToolState::new(self.metadata().id.to_string(), self.metadata().clone());
@@ -277,6 +279,7 @@ pub trait ToolStatePersistence: Tool {
     }
 
     /// Restore tool state from saved state
+    #[instrument(skip(self))]
     async fn restore_from_tool_state(&self, state: ToolState) -> Result<()> {
         let cache_count = state.result_cache.len();
         let tool_id = state.tool_id.clone();
@@ -366,6 +369,7 @@ impl ToolStateRegistry {
     /// # Errors
     ///
     /// Returns an error if tool registration fails
+    #[instrument(skip(self, tool))]
     pub async fn register_tool<T: ToolStatePersistence>(&mut self, tool: T) -> Result<T> {
         tool.set_state_manager(self.state_manager.clone());
 
@@ -387,6 +391,7 @@ impl ToolStateRegistry {
     /// # Errors
     ///
     /// Returns an error if saving any tool state fails
+    #[instrument(skip(self))]
     pub async fn save_all_states(&self) -> Result<()> {
         for (tool_id, tool_state) in &self.tool_states {
             let state_scope = StateScope::Custom(format!("tool_{tool_id}"));
@@ -405,6 +410,7 @@ impl ToolStateRegistry {
     /// Returns an error if:
     /// - State loading fails
     /// - State deserialization fails
+    #[instrument(skip(self))]
     pub async fn load_tool_state(&self, tool_id: &str) -> Result<Option<ToolState>> {
         let state_scope = StateScope::Custom(format!("tool_{tool_id}"));
 
@@ -421,6 +427,7 @@ impl ToolStateRegistry {
 
     /// Get registry statistics
     #[allow(clippy::unused_async)]
+    #[instrument(skip(self))]
     pub async fn get_registry_stats(&self) -> RegistryStatistics {
         let total_tools = self.tool_states.len();
         let total_cached_results: usize = self
@@ -512,6 +519,7 @@ mod tests {
             &self.metadata
         }
 
+        #[instrument(skip(_context, input, self), fields(tool = %self.metadata().name))]
         async fn execute_impl(
             &self,
             _input: AgentInput,
@@ -520,10 +528,12 @@ mod tests {
             Ok(AgentOutput::text("Mock output"))
         }
 
+        #[instrument(skip(self))]
         async fn validate_input(&self, _input: &AgentInput) -> llmspell_core::Result<()> {
             Ok(())
         }
 
+        #[instrument(skip(self))]
         async fn handle_error(&self, error: LLMSpellError) -> llmspell_core::Result<AgentOutput> {
             Ok(AgentOutput::text(format!("Error: {error}")))
         }
@@ -602,6 +612,7 @@ mod tests {
         }
     }
 
+    #[instrument(skip(self))]
     async fn create_test_state_manager() -> Arc<dyn StateManager> {
         let config = PersistenceConfig {
             enabled: true,

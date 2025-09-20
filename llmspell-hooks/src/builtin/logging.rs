@@ -58,6 +58,7 @@ pub enum LogLevel {
 }
 
 /// Built-in logging hook for comprehensive hook execution logging
+#[derive(Debug)]
 pub struct LoggingHook {
     config: LoggingConfig,
     metadata: HookMetadata,

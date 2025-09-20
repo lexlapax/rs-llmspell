@@ -34,7 +34,7 @@ use serde_json::{json, Value};
 use std::collections::HashMap;
 use std::fs;
 use std::time::Instant;
-use tracing::{debug, error, info};
+use tracing::{debug, error, info, instrument};
 
 /// Base64 encoding/decoding tool
 #[derive(Debug, Clone)]
@@ -223,6 +223,7 @@ impl Base64EncoderTool {
 
     /// Process Base64 operation
     #[allow(clippy::unused_async)]
+    #[instrument(skip(self))]
     async fn process_operation(&self, params: &Value) -> Result<Value> {
         let operation = Self::validate_operation(params)?;
         let variant = Self::validate_variant(params)?;
@@ -254,6 +255,7 @@ impl BaseAgent for Base64EncoderTool {
         &self.metadata
     }
 
+    #[instrument(skip(_context, input, self), fields(tool = %self.metadata().name))]
     async fn execute_impl(
         &self,
         input: AgentInput,
@@ -293,11 +295,13 @@ impl BaseAgent for Base64EncoderTool {
         ))
     }
 
+    #[instrument(skip(self))]
     async fn validate_input(&self, _input: &AgentInput) -> Result<()> {
         // Validation is performed in process_operation
         Ok(())
     }
 
+    #[instrument(skip(self))]
     async fn handle_error(&self, error: LLMSpellError) -> Result<AgentOutput> {
         error!(
             tool_name = %self.metadata().name,

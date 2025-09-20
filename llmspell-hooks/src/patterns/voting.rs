@@ -13,6 +13,7 @@ use std::sync::Arc;
 use tracing::{debug, info};
 
 /// A voting hook that uses majority consensus
+#[derive(Debug)]
 pub struct VotingHook {
     inner: CompositeHook,
     threshold: f64,

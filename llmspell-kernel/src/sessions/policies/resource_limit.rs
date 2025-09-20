@@ -48,7 +48,7 @@ impl Default for ResourceConfig {
 }
 
 /// Session resource limit policy
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 pub struct SessionResourcePolicy {
     /// Resource configuration
     config: ResourceConfig,

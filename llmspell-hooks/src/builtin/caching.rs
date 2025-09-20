@@ -118,6 +118,7 @@ impl CachingMetrics {
 }
 
 /// Built-in caching hook for automatic result caching
+#[derive(Debug)]
 pub struct CachingHook {
     cache: Arc<Cache>,
     config: CachingConfig,

@@ -123,6 +123,7 @@ impl ToolManager {
     /// # Errors
     ///
     /// Returns an error if tool discovery fails
+    #[instrument(skip(self))]
     pub async fn discover_tools(&self, query: &ToolQuery) -> Result<Vec<ToolInfo>> {
         // Convert ToolQuery to CapabilityMatcher
         let mut matcher = CapabilityMatcher::new();
@@ -198,8 +199,8 @@ impl ToolManager {
     /// - Tool execution times out
     /// - Tool execution fails
     #[instrument(
-        level = "debug",
         skip(self, parameters, context),
+        level = "debug",
         fields(
             tool_name = %tool_name,
             execution_id = %uuid::Uuid::new_v4()
@@ -270,12 +271,14 @@ impl ToolManager {
     /// # Errors
     ///
     /// Returns an error if tool listing fails
+    #[instrument(skip(self))]
     pub async fn list_available_tools(&self) -> Result<Vec<String>> {
         let all_tools = self.registry.list_tools().await;
         Ok(all_tools)
     }
 
     /// Check if a specific tool is available
+    #[instrument(skip(self))]
     pub async fn tool_available(&self, tool_name: &str) -> bool {
         // Check cache first if enabled
         if self.config.enable_availability_cache {
@@ -302,6 +305,7 @@ impl ToolManager {
     /// # Errors
     ///
     /// Returns an error if tool information retrieval fails
+    #[instrument(skip(self))]
     pub async fn get_tool_info(&self, tool_name: &str) -> Result<Option<ToolInfo>> {
         // Check cache first if enabled
         if self.config.enable_metadata_cache {
@@ -336,6 +340,7 @@ impl ToolManager {
     /// - Tool composition execution fails
     /// - Any step fails with `ErrorStrategy::Fail`
     /// - Retry attempts are exhausted
+    #[instrument(skip(self))]
     pub async fn compose_tools(
         &self,
         composition: &ToolComposition,
@@ -418,6 +423,7 @@ impl ToolManager {
     }
 
     /// Execute a single composition step
+    #[instrument(skip(self))]
     async fn execute_composition_step(
         &self,
         step: &ToolCompositionStep,
@@ -527,6 +533,7 @@ impl ToolManager {
     }
 
     /// Clear caches
+    #[instrument(skip(self))]
     pub async fn clear_caches(&self) {
         if self.config.enable_metadata_cache {
             self.metadata_cache.write().await.clear();

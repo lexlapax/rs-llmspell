@@ -52,7 +52,7 @@ pub struct SerializedHookExecution {
 
 /// Interface for hook replay management
 #[async_trait::async_trait]
-pub trait HookReplayManager: Send + Sync {
+pub trait HookReplayManager: Send + Sync + std::fmt::Debug {
     /// Persist a hook execution
     async fn persist_hook_execution(
         &self,
@@ -70,6 +70,7 @@ pub trait HookReplayManager: Send + Sync {
 }
 
 /// Enhanced hook persistence manager
+#[derive(Debug)]
 pub struct HookPersistenceManager {
     /// Underlying replay manager implementation
     #[allow(dead_code)]

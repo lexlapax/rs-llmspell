@@ -13,7 +13,7 @@ use tracing::debug;
 
 /// Dynamic condition evaluation for conditional hooks
 #[async_trait]
-pub trait Condition: Send + Sync {
+pub trait Condition: Send + Sync + std::fmt::Debug {
     /// Evaluate the condition against the current context
     async fn evaluate(&self, context: &HookContext) -> Result<bool>;
 
@@ -154,6 +154,7 @@ impl BuiltinCondition {
 }
 
 /// Logical operators for combining conditions
+#[derive(Debug)]
 pub enum LogicalCondition {
     /// Logical AND - both conditions must be true
     And(Box<dyn Condition>, Box<dyn Condition>),
@@ -308,6 +309,7 @@ impl Default for ConditionBuilder {
 }
 
 /// Conditional hook that executes based on dynamic conditions
+#[derive(Debug)]
 pub struct ConditionalHook {
     condition: Box<dyn Condition>,
     hook: Arc<dyn Hook>,

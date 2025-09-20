@@ -10,6 +10,7 @@ use serde_json::json;
 use tracing::warn;
 
 /// Collector for agent execution outputs
+#[derive(Debug)]
 pub struct AgentOutputCollector {
     config: CollectionConfig,
 }

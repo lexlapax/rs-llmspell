@@ -40,6 +40,7 @@ use llmspell_utils::{
 use serde_json::{json, Value as JsonValue};
 use std::collections::BTreeMap;
 use tracing::info;
+use tracing::instrument;
 
 /// Calculator tool for mathematical expressions
 #[derive(Debug, Clone)]
@@ -177,6 +178,7 @@ impl CalculatorTool {
         })
     }
 
+    #[instrument(skip(self))]
     async fn evaluate_with_timeout(
         &self,
         expression: &str,
@@ -201,6 +203,7 @@ impl CalculatorTool {
     }
 
     /// Evaluate expression with custom functions and variables
+    #[instrument(skip(self))]
     async fn evaluate_expression(
         &self,
         expression: &str,
@@ -261,6 +264,7 @@ impl CalculatorTool {
         }
     }
 
+    #[instrument(skip(self))]
     async fn process_evaluate(&self, params: &JsonValue) -> Result<JsonValue> {
         let expression = extract_required_string(params, "input")?;
         let variables = extract_optional_object(params, "variables")
@@ -281,6 +285,7 @@ impl CalculatorTool {
             .build())
     }
 
+    #[instrument(skip(self))]
     async fn process_validate(&self, params: &JsonValue) -> Result<JsonValue> {
         let expression = extract_required_string(params, "input")?;
         let empty_vars = serde_json::Map::new();
@@ -330,6 +335,7 @@ impl CalculatorTool {
     }
 
     /// Process calculator operation
+    #[instrument(skip(self))]
     async fn process_operation(&self, params: &JsonValue) -> Result<JsonValue> {
         let operation = extract_string_with_default(params, "operation", "evaluate");
 
@@ -351,6 +357,7 @@ impl BaseAgent for CalculatorTool {
         &self.metadata
     }
 
+    #[instrument(skip(_context, input, self), fields(tool = %self.metadata().name))]
     async fn execute_impl(
         &self,
         input: AgentInput,
@@ -375,6 +382,7 @@ impl BaseAgent for CalculatorTool {
         }
     }
 
+    #[instrument(skip(self))]
     async fn validate_input(&self, input: &AgentInput) -> Result<()> {
         if input.text.is_empty() {
             return Err(validation_error(
@@ -385,6 +393,7 @@ impl BaseAgent for CalculatorTool {
         Ok(())
     }
 
+    #[instrument(skip(self))]
     async fn handle_error(&self, error: LLMSpellError) -> Result<AgentOutput> {
         Ok(AgentOutput::text(format!("Calculator error: {error}")))
     }
@@ -503,6 +512,7 @@ impl CalculatorTool {
     /// Returns an error if:
     /// - Tool execution fails
     /// - Hook integration fails
+    #[instrument(skip(self, tool_executor))]
     pub async fn demonstrate_hook_integration(
         &self,
         tool_executor: &crate::lifecycle::ToolExecutor,

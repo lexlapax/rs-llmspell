@@ -10,6 +10,7 @@ use std::collections::HashSet;
 use std::io::Write;
 
 /// Unified serializer that performs all operations in a single pass
+#[derive(Debug)]
 pub struct UnifiedSerializer {
     /// Configuration for sensitive data handling
     sensitive_config: SensitiveDataConfig,

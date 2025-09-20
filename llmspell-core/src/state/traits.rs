@@ -13,7 +13,7 @@ use std::collections::HashMap;
 /// across all components in the rs-llmspell system. It supports hierarchical
 /// scoping and type-safe serialization.
 #[async_trait]
-pub trait StateManager: Send + Sync {
+pub trait StateManager: Send + Sync + std::fmt::Debug {
     /// Store a value in the specified scope with the given key
     async fn set(&self, scope: StateScope, key: &str, value: Value) -> StateResult<()>;
 

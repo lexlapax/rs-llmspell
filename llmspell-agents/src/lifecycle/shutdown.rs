@@ -14,6 +14,7 @@ use std::sync::Arc;
 use std::time::{Duration, Instant};
 use tokio::sync::{broadcast, Mutex, RwLock};
 use tokio::time::timeout;
+use tracing::instrument;
 use tracing::{debug, error, info, warn};
 use uuid::Uuid;
 
@@ -216,6 +217,7 @@ impl ShutdownCoordinator {
     /// # Panics
     ///
     /// Panics if the `RwLock` is poisoned.
+    #[instrument(skip(hook, self))]
     pub async fn add_hook(&self, hook: Arc<dyn ShutdownHook>) {
         let mut hooks = self.hooks.write().await;
         hooks.push(hook);
@@ -239,6 +241,7 @@ impl ShutdownCoordinator {
     /// - Agent is already shutting down
     /// - Shutdown process fails
     /// - Timeout occurs and force shutdown is disabled
+    #[instrument(skip(self))]
     pub async fn shutdown_agent(
         &self,
         request: ShutdownRequest,
@@ -300,6 +303,7 @@ impl ShutdownCoordinator {
     }
 
     /// Perform graceful shutdown
+    #[instrument(skip(self))]
     async fn perform_shutdown(
         &self,
         request: &ShutdownRequest,
@@ -360,6 +364,7 @@ impl ShutdownCoordinator {
     }
 
     /// Force shutdown (emergency)
+    #[instrument(skip(self))]
     async fn force_shutdown(
         &self,
         request: &ShutdownRequest,
@@ -390,6 +395,7 @@ impl ShutdownCoordinator {
     /// Returns an error if:
     /// - State machine lookup fails
     /// - Any agent shutdown fails
+    #[instrument(skip(self, state_machines))]
     pub async fn shutdown_agents_by_priority(
         &self,
         requests: Vec<ShutdownRequest>,
@@ -427,6 +433,7 @@ impl ShutdownCoordinator {
     }
 
     /// Shutdown a batch of agents concurrently
+    #[instrument(skip(self, state_machines))]
     async fn shutdown_batch(
         &self,
         requests: Vec<ShutdownRequest>,
@@ -474,6 +481,7 @@ impl ShutdownCoordinator {
     /// # Errors
     ///
     /// Returns an error if emergency broadcast fails
+    #[instrument(skip(self))]
     pub async fn emergency_shutdown(&self) -> Result<()> {
         warn!("Emergency shutdown initiated");
 
@@ -502,18 +510,21 @@ impl ShutdownCoordinator {
     }
 
     /// Get shutdown history
+    #[instrument(skip(self))]
     pub async fn get_shutdown_history(&self) -> Vec<ShutdownResult> {
         let history = self.shutdown_history.lock().await;
         history.clone()
     }
 
     /// Get active shutdowns
+    #[instrument(skip(self))]
     pub async fn get_active_shutdowns(&self) -> HashMap<String, ShutdownRequest> {
         let active = self.active_shutdowns.read().await;
         active.clone()
     }
 
     /// Helper: Check and register shutdown
+    #[instrument(skip(self))]
     async fn check_and_register_shutdown(
         &self,
         agent_id: &str,
@@ -537,6 +548,7 @@ impl ShutdownCoordinator {
     }
 
     /// Helper: Emit shutdown started event
+    #[instrument(skip(self))]
     async fn emit_shutdown_started_event(&self, agent_id: &str, request: &ShutdownRequest) {
         let event = LifecycleEvent::new(
             LifecycleEventType::TerminationStarted,
@@ -554,6 +566,7 @@ impl ShutdownCoordinator {
     }
 
     /// Helper: Execute shutdown with timeout
+    #[instrument(skip(self))]
     async fn execute_shutdown_with_timeout(
         &self,
         request: &ShutdownRequest,
@@ -580,6 +593,7 @@ impl ShutdownCoordinator {
     }
 
     /// Helper: Create shutdown result
+    #[instrument(skip(self))]
     async fn create_shutdown_result(
         &self,
         request_id: &str,
@@ -615,6 +629,7 @@ impl ShutdownCoordinator {
     }
 
     /// Helper: Execute shutdown hooks
+    #[instrument(skip(self))]
     async fn execute_shutdown_hooks(&self, result: &ShutdownResult) {
         let hooks = self.hooks.read().await;
         for hook in hooks.iter() {
@@ -625,6 +640,7 @@ impl ShutdownCoordinator {
     }
 
     /// Helper: Record shutdown history
+    #[instrument(skip(self))]
     async fn record_shutdown_history(&self, result: &ShutdownResult) {
         let mut history = self.shutdown_history.lock().await;
         history.push(result.clone());
@@ -636,6 +652,7 @@ impl ShutdownCoordinator {
     }
 
     /// Helper: Emit shutdown completed event
+    #[instrument(skip(self))]
     async fn emit_shutdown_completed_event(&self, agent_id: &str, result: &ShutdownResult) {
         let event_type = if result.success {
             LifecycleEventType::TerminationCompleted
@@ -695,6 +712,7 @@ impl ShutdownCoordinator {
     }
 
     /// Check if agent is shutting down
+    #[instrument(skip(self))]
     pub async fn is_shutting_down(&self, agent_id: &str) -> bool {
         let active = self.active_shutdowns.read().await;
         active.contains_key(agent_id)
@@ -715,10 +733,12 @@ impl ResourceCleanupHook {
 
 #[async_trait]
 impl ShutdownHook for ResourceCleanupHook {
+    #[instrument(skip(self))]
     async fn before_shutdown(&self, _request: &ShutdownRequest) -> Result<()> {
         Ok(())
     }
 
+    #[instrument(skip(self))]
     async fn on_shutdown(&self, request: &ShutdownRequest) -> Result<()> {
         debug!("Cleaning up resources for agent {}", request.agent_id);
         self.resource_manager
@@ -727,6 +747,7 @@ impl ShutdownHook for ResourceCleanupHook {
         Ok(())
     }
 
+    #[instrument(skip(self))]
     async fn after_shutdown(&self, result: &ShutdownResult) -> Result<()> {
         if result.success {
             debug!("Resource cleanup completed for agent {}", result.agent_id);
@@ -749,6 +770,7 @@ pub struct LoggingShutdownHook;
 
 #[async_trait]
 impl ShutdownHook for LoggingShutdownHook {
+    #[instrument(skip(self))]
     async fn before_shutdown(&self, request: &ShutdownRequest) -> Result<()> {
         info!(
             "Beginning shutdown for agent {} (priority: {:?})",
@@ -757,11 +779,13 @@ impl ShutdownHook for LoggingShutdownHook {
         Ok(())
     }
 
+    #[instrument(skip(self))]
     async fn on_shutdown(&self, request: &ShutdownRequest) -> Result<()> {
         debug!("Processing shutdown for agent {}", request.agent_id);
         Ok(())
     }
 
+    #[instrument(skip(self))]
     async fn after_shutdown(&self, result: &ShutdownResult) -> Result<()> {
         if result.success {
             info!(
@@ -879,15 +903,18 @@ mod tests {
 
         #[async_trait]
         impl ShutdownHook for SlowShutdownHook {
+            #[instrument(skip(self))]
             async fn before_shutdown(&self, _request: &ShutdownRequest) -> Result<()> {
                 Ok(())
             }
 
+            #[instrument(skip(self))]
             async fn on_shutdown(&self, _request: &ShutdownRequest) -> Result<()> {
                 sleep(Duration::from_millis(100)).await; // Takes longer than timeout
                 Ok(())
             }
 
+            #[instrument(skip(self))]
             async fn after_shutdown(&self, _result: &ShutdownResult) -> Result<()> {
                 Ok(())
             }

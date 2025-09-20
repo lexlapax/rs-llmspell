@@ -50,6 +50,7 @@ pub struct SerializableState {
 }
 
 /// Hook replay manager for state persistence
+#[derive(Debug)]
 pub struct HookReplayManager {
     storage_adapter: Arc<StateStorageAdapter>,
 }
@@ -131,6 +132,7 @@ impl HookReplayManager {
 }
 
 /// Enhanced `StateManager` with persistent backend
+#[derive(Debug)]
 pub struct StateManager {
     // In-memory cache for fast access
     in_memory: Arc<RwLock<HashMap<String, Value>>>,

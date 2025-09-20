@@ -374,6 +374,7 @@ pub fn create_operation_middleware(
 }
 
 /// Sequential middleware implementation
+#[derive(Debug)]
 pub struct SequentialMiddleware {
     #[allow(dead_code)]
     name: String,
@@ -447,6 +448,7 @@ impl Hook for SequentialMiddleware {
 }
 
 /// Parallel middleware implementation
+#[derive(Debug)]
 pub struct ParallelMiddleware {
     #[allow(dead_code)]
     name: String,
@@ -538,6 +540,7 @@ impl Hook for ParallelMiddleware {
 }
 
 /// Voting middleware implementation
+#[derive(Debug)]
 pub struct VotingMiddleware {
     #[allow(dead_code)]
     name: String,

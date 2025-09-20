@@ -20,7 +20,7 @@ use std::collections::HashMap;
 use std::sync::Arc;
 use std::time::Duration;
 use tokio::sync::Mutex;
-use tracing::{debug, error, info, warn};
+use tracing::{debug, error, info, instrument, warn};
 
 use crate::api_key_integration::{get_api_key, ApiKeyConfig, RequiresApiKey};
 
@@ -305,6 +305,7 @@ impl WebSearchTool {
 
     /// Perform search with fallback support
     #[allow(clippy::cognitive_complexity)]
+    #[instrument(skip(self))]
     async fn search_with_fallback(
         &self,
         query: &str,
@@ -462,6 +463,7 @@ impl BaseAgent for WebSearchTool {
         &self.metadata
     }
 
+    #[instrument(skip(_context, input, self), fields(tool = %self.metadata().name))]
     async fn execute_impl(
         &self,
         input: AgentInput,
@@ -531,6 +533,7 @@ impl BaseAgent for WebSearchTool {
         Ok(AgentOutput::text(serde_json::to_string_pretty(&response)?))
     }
 
+    #[instrument(skip(self))]
     async fn validate_input(&self, input: &AgentInput) -> Result<()> {
         if input.parameters.is_empty() {
             return Err(LLMSpellError::Validation {
@@ -541,6 +544,7 @@ impl BaseAgent for WebSearchTool {
         Ok(())
     }
 
+    #[instrument(skip(self))]
     async fn handle_error(&self, error: LLMSpellError) -> Result<AgentOutput> {
         let response = ResponseBuilder::error("search", error.to_string()).build();
         Ok(AgentOutput::text(serde_json::to_string_pretty(&response)?))

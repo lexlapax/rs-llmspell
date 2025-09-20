@@ -1,5 +1,6 @@
 //! ABOUTME: `SerpApi` search provider implementation
 //! ABOUTME: Supports multiple search engines through a unified API (Google, Bing, `DuckDuckGo`, etc.)
+use tracing::instrument;
 
 use super::{ProviderConfig, SearchOptions, SearchProvider, SearchResult, SearchType};
 use async_trait::async_trait;
@@ -129,6 +130,7 @@ impl SearchProvider for SerpApiProvider {
     }
 
     #[allow(clippy::too_many_lines)]
+    #[instrument(skip(self))]
     async fn search(&self, query: &str, options: &SearchOptions) -> Result<Vec<SearchResult>> {
         let api_key = self
             .api_key

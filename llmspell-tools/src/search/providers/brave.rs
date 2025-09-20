@@ -1,5 +1,6 @@
 //! ABOUTME: Brave Search API provider implementation
 //! ABOUTME: Requires API key from <https://brave.com/search/api/>
+use tracing::instrument;
 
 use super::{ProviderConfig, SearchOptions, SearchProvider, SearchResult, SearchType};
 use async_trait::async_trait;
@@ -133,6 +134,7 @@ impl SearchProvider for BraveSearchProvider {
     }
 
     #[allow(clippy::too_many_lines)]
+    #[instrument(skip(self))]
     async fn search(&self, query: &str, options: &SearchOptions) -> Result<Vec<SearchResult>> {
         let api_key = self
             .api_key

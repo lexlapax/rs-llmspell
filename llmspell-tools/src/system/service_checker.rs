@@ -23,7 +23,7 @@ use std::sync::Arc;
 use std::time::{Duration, Instant};
 use tokio::net::TcpStream;
 use tokio::time::timeout;
-use tracing::{debug, info, warn};
+use tracing::{debug, info, instrument, warn};
 
 /// Service check result
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -215,6 +215,7 @@ impl ServiceCheckerTool {
     /// Check TCP port connectivity
     #[allow(clippy::too_many_lines)]
     #[allow(clippy::cognitive_complexity)]
+    #[instrument(skip(self))]
     async fn check_tcp_port(
         &self,
         host: &str,
@@ -345,6 +346,7 @@ impl ServiceCheckerTool {
     /// Check HTTP/HTTPS service health
     #[allow(clippy::too_many_lines)]
     #[allow(clippy::cognitive_complexity)]
+    #[instrument(skip(self))]
     async fn check_http_service(
         &self,
         url: &str,
@@ -498,6 +500,7 @@ impl BaseAgent for ServiceCheckerTool {
     }
 
     #[allow(clippy::too_many_lines)]
+    #[instrument(skip(_context, input, self), fields(tool = %self.metadata().name))]
     async fn execute_impl(
         &self,
         input: AgentInput,
@@ -662,6 +665,7 @@ impl BaseAgent for ServiceCheckerTool {
         Ok(AgentOutput::text(serde_json::to_string_pretty(&response)?))
     }
 
+    #[instrument(skip(self))]
     async fn validate_input(&self, input: &AgentInput) -> LLMResult<()> {
         if input.text.is_empty() {
             return Err(LLMSpellError::Validation {
@@ -672,6 +676,7 @@ impl BaseAgent for ServiceCheckerTool {
         Ok(())
     }
 
+    #[instrument(skip(self))]
     async fn handle_error(&self, error: LLMSpellError) -> LLMResult<AgentOutput> {
         Ok(AgentOutput::text(format!("Service checker error: {error}")))
     }

@@ -23,7 +23,7 @@ use serde_json::json;
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
 use std::time::Instant;
-use tracing::{debug, error, info, trace, warn};
+use tracing::{debug, error, info, instrument, trace, warn};
 
 /// File search tool configuration
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -125,6 +125,7 @@ impl FileSearchTool {
 
     /// Search within a single file
     #[allow(clippy::unused_async)]
+    #[instrument(skip(self))]
     async fn search_file(
         &self,
         file_path: &Path,
@@ -174,6 +175,7 @@ impl FileSearchTool {
 
     /// Search within a directory
     #[allow(clippy::unused_async)]
+    #[instrument(skip(self))]
     async fn search_directory(
         &self,
         directory: &Path,
@@ -355,6 +357,7 @@ impl FileSearchTool {
 
     /// Validate search parameters
     #[allow(clippy::unused_async)]
+    #[instrument(skip(self))]
     async fn validate_search_parameters(&self, params: &serde_json::Value) -> LLMResult<()> {
         trace!("Validating search parameters");
         // Required parameters are already validated by extract_required_string
@@ -397,6 +400,7 @@ impl BaseAgent for FileSearchTool {
         &self.metadata
     }
 
+    #[instrument(skip(_context, input, self), fields(tool = %self.metadata().name))]
     async fn execute_impl(
         &self,
         input: AgentInput,
@@ -501,6 +505,7 @@ impl BaseAgent for FileSearchTool {
         Ok(AgentOutput::text(output_text).with_metadata(metadata))
     }
 
+    #[instrument(skip(self))]
     async fn validate_input(&self, input: &AgentInput) -> LLMResult<()> {
         trace!("Validating file search input");
         if input.text.is_empty() {
@@ -512,6 +517,7 @@ impl BaseAgent for FileSearchTool {
         Ok(())
     }
 
+    #[instrument(skip(self))]
     async fn handle_error(&self, error: LLMSpellError) -> LLMResult<AgentOutput> {
         error!(
             error = %error,

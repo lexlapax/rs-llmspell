@@ -13,6 +13,7 @@ use std::time::Duration;
 use tracing::{debug, warn};
 
 /// A parallel hook that executes hooks concurrently
+#[derive(Debug)]
 pub struct ParallelHook {
     inner: CompositeHook,
     timeout: Option<Duration>,

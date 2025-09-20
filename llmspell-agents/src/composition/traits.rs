@@ -6,6 +6,7 @@ use llmspell_core::{BaseAgent, ExecutionContext, LLMSpellError, Result, ToolCapa
 use serde_json::Value;
 use std::collections::HashMap;
 use std::sync::Arc;
+use tracing::instrument;
 
 /// Trait for components that can be composed into higher-level structures
 #[async_trait]

@@ -10,7 +10,7 @@ use std::sync::Arc;
 
 /// Base hook trait for all hooks in the system
 #[async_trait]
-pub trait Hook: Send + Sync {
+pub trait Hook: Send + Sync + std::fmt::Debug {
     /// Execute the hook with the given context
     async fn execute(&self, context: &mut HookContext) -> Result<HookResult>;
 
@@ -108,6 +108,14 @@ pub trait MetricHook: Hook {
 pub struct FnHook<F> {
     func: F,
     metadata: HookMetadata,
+}
+
+impl<F> std::fmt::Debug for FnHook<F> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("FnHook")
+            .field("metadata", &self.metadata)
+            .finish()
+    }
 }
 
 impl<F> FnHook<F>

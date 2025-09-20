@@ -80,7 +80,7 @@ impl Default for HookRegistryConfigBuilder {
 }
 
 /// Hook entry with metadata
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 struct HookEntry {
     hook: ArcHook,
     metadata: HookMetadata,
@@ -88,6 +88,7 @@ struct HookEntry {
 }
 
 /// Hook registry for managing hooks by point
+#[derive(Debug)]
 pub struct HookRegistry {
     /// Registry configuration
     config: HookRegistryConfig,

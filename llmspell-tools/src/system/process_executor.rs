@@ -34,7 +34,7 @@ use std::process::Stdio;
 use std::sync::Arc;
 use std::time::Duration;
 use tokio::process::Command;
-use tracing::{debug, error, info, trace, warn};
+use tracing::{debug, error, info, instrument, trace, warn};
 
 /// Process execution result
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -230,6 +230,7 @@ impl ProcessExecutorTool {
 
     /// Resolve executable path
     #[allow(clippy::unused_async)]
+    #[instrument(skip(self))]
     async fn resolve_executable(&self, executable: &str) -> LLMResult<PathBuf> {
         trace!(
             executable = %executable,
@@ -268,6 +269,7 @@ impl ProcessExecutorTool {
     /// Execute a process with the given arguments
     #[allow(clippy::too_many_lines)]
     #[allow(clippy::cognitive_complexity)]
+    #[instrument(skip(env_vars, self))]
     async fn execute_process(
         &self,
         executable: &str,
@@ -437,6 +439,7 @@ impl ProcessExecutorTool {
 
     /// Validate execution parameters
     #[allow(clippy::unused_async)]
+    #[instrument(skip(params, self))]
     async fn validate_execution_parameters(
         &self,
         params: &HashMap<String, serde_json::Value>,
@@ -510,6 +513,7 @@ impl BaseAgent for ProcessExecutorTool {
         &self.metadata
     }
 
+    #[instrument(skip(_context, input, self), fields(tool = %self.metadata().name))]
     async fn execute_impl(
         &self,
         input: AgentInput,
@@ -631,6 +635,7 @@ impl BaseAgent for ProcessExecutorTool {
         Ok(AgentOutput::text(serde_json::to_string_pretty(&response)?))
     }
 
+    #[instrument(skip(self))]
     async fn validate_input(&self, input: &AgentInput) -> LLMResult<()> {
         if input.text.is_empty() {
             return Err(LLMSpellError::Validation {
@@ -641,6 +646,7 @@ impl BaseAgent for ProcessExecutorTool {
         Ok(())
     }
 
+    #[instrument(skip(self))]
     async fn handle_error(&self, error: LLMSpellError) -> LLMResult<AgentOutput> {
         // Use SafeErrorHandler to sanitize error messages
         let context = ErrorContext::new()
@@ -764,6 +770,7 @@ impl ProcessExecutorTool {
     /// # Errors
     ///
     /// Returns an error if the process execution fails or hook execution fails
+    #[instrument(skip(self, tool_executor))]
     pub async fn demonstrate_hook_integration(
         &self,
         tool_executor: &crate::lifecycle::ToolExecutor,

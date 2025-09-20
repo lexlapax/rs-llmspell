@@ -17,6 +17,7 @@ use llmspell_core::{
 };
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
+use tracing::instrument;
 
 /// Monitoring scope types
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -631,6 +632,7 @@ impl AgentTemplate for MonitorAgentTemplate {
         &self.schema
     }
 
+    #[instrument(skip(self))]
     async fn instantiate(
         &self,
         mut params: TemplateInstantiationParams,
@@ -772,6 +774,7 @@ impl BaseAgent for MockMonitorAgent {
         &self.metadata
     }
 
+    #[instrument(skip(self))]
     async fn execute_impl(
         &self,
         _input: AgentInput,
@@ -786,10 +789,12 @@ impl BaseAgent for MockMonitorAgent {
         })
     }
 
+    #[instrument(skip(self))]
     async fn validate_input(&self, _input: &AgentInput) -> Result<(), LLMSpellError> {
         Ok(())
     }
 
+    #[instrument(skip(self))]
     async fn handle_error(&self, error: LLMSpellError) -> Result<AgentOutput, LLMSpellError> {
         Ok(AgentOutput {
             text: format!("Monitor error handled: {error}"),

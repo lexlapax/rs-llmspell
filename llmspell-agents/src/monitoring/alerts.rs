@@ -11,6 +11,7 @@ use serde::{Deserialize, Serialize};
 use std::collections::{HashMap, VecDeque};
 use std::sync::{Arc, RwLock};
 use std::time::Duration;
+use tracing::instrument;
 use tracing::{error, warn};
 
 /// Alert severity levels
@@ -455,6 +456,7 @@ impl AlertManager {
     }
 
     /// Trigger an alert
+    #[instrument(skip(self))]
     async fn trigger_alert(&self, rule: AlertRule, agent_id: &str) -> Result<()> {
         // Create alert
         let alert = Alert::new(
@@ -488,6 +490,7 @@ impl AlertManager {
     }
 
     /// Send notifications for an alert
+    #[instrument(skip(self))]
     async fn send_notifications(&self, alert: &Alert, channel_names: &[String]) -> Result<()> {
         for channel_name in channel_names {
             // Get the channel Arc, if it exists
@@ -677,6 +680,7 @@ pub struct ConsoleNotificationChannel;
 
 #[async_trait]
 impl NotificationChannel for ConsoleNotificationChannel {
+    #[instrument(skip(self))]
     async fn notify(&self, alert: &Alert) -> Result<()> {
         println!(
             "{} ALERT [{}]: {} - {}",

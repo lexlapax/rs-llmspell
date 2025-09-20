@@ -22,7 +22,7 @@ use serde::{Deserialize, Serialize};
 use serde_json::{json, Value};
 use similar::{DiffTag, TextDiff};
 use std::time::{Duration, Instant};
-use tracing::{debug, error, info, trace};
+use tracing::{debug, error, info, instrument, trace};
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct WebpageMonitorTool {
@@ -31,6 +31,13 @@ pub struct WebpageMonitorTool {
 
 impl Default for WebpageMonitorTool {
     fn default() -> Self {
+        info!(
+            tool_name = "webpage-monitor",
+            category = "Tool",
+            phase = "Phase 3 (comprehensive instrumentation)",
+            "Creating WebpageMonitorTool"
+        );
+
         Self::new()
     }
 }
@@ -182,14 +189,17 @@ impl BaseAgent for WebpageMonitorTool {
         &self.metadata
     }
 
+    // #[instrument(skip(self))] // Disabled - method not found
     async fn validate_input(&self, _input: &AgentInput) -> Result<()> {
         Ok(())
     }
 
+    // #[instrument(skip(self))] // Disabled - method not found
     async fn handle_error(&self, error: llmspell_core::LLMSpellError) -> Result<AgentOutput> {
         Ok(AgentOutput::text(format!("WebpageMonitor error: {error}")))
     }
 
+    #[instrument(skip(_context, input, self), fields(tool = %self.metadata().name))]
     async fn execute_impl(
         &self,
         input: AgentInput,
@@ -294,6 +304,7 @@ impl BaseAgent for WebpageMonitorTool {
 }
 
 impl WebpageMonitorTool {
+    // #[instrument(skip(self))] // Disabled - method not found
     async fn fetch_page(url: &str, timeout_secs: u64) -> Result<String> {
         let client = Self::create_http_client(timeout_secs);
         let response = Self::send_http_request(&client, url).await?;
@@ -318,6 +329,7 @@ impl WebpageMonitorTool {
         })
     }
 
+    // #[instrument(skip(self))] // Disabled - method not found
     async fn send_http_request(client: &Client, url: &str) -> Result<reqwest::Response> {
         let request_start = Instant::now();
         trace!(url = %url, "Sending HTTP GET request");
@@ -343,6 +355,7 @@ impl WebpageMonitorTool {
         Ok(response)
     }
 
+    // #[instrument(skip(self))] // Disabled - method not found
     async fn process_http_response(response: reqwest::Response, url: &str) -> Result<String> {
         let status = response.status();
 
@@ -454,6 +467,7 @@ impl WebpageMonitorTool {
         )
     }
 
+    // #[instrument(skip(self))] // Disabled - method not found
     async fn fetch_content(
         &self,
         url: &str,

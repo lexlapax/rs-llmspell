@@ -12,6 +12,7 @@ use std::collections::HashMap;
 use std::sync::Arc;
 use std::time::{Duration, Instant};
 use tokio::sync::{mpsc, RwLock};
+use tracing::instrument;
 use tracing::{error, info};
 
 /// Node information in distributed system
@@ -244,6 +245,7 @@ impl DistributedContext {
     /// Returns an error if:
     /// - Node registration fails
     /// - Initial node refresh fails
+    #[instrument(skip(self))]
     pub async fn initialize(&self) -> Result<()> {
         // Register with discovery service
         self.discovery.register(self.local_node.clone()).await?;
@@ -262,6 +264,7 @@ impl DistributedContext {
     /// # Errors
     ///
     /// Returns an error if node discovery fails
+    #[instrument(skip(self))]
     pub async fn refresh_nodes(&self) -> Result<()> {
         let discovered = self.discovery.discover().await?;
         let mut nodes = self.nodes.write().await;
@@ -281,6 +284,7 @@ impl DistributedContext {
     /// # Errors
     ///
     /// Returns an error if replication to any node fails
+    #[instrument(skip(self))]
     pub async fn replicate(&self, context: &ExecutionContext) -> Result<()> {
         let replication = self.replication.read().await;
 
@@ -333,6 +337,7 @@ impl DistributedContext {
     /// Returns an error if:
     /// - Node communication fails
     /// - Context synchronization fails
+    #[instrument(skip(self))]
     pub async fn sync_from(&self, context_id: &str, node_id: &str) -> Result<ExecutionContext> {
         self.send_to_node(
             node_id,
@@ -355,6 +360,7 @@ impl DistributedContext {
     /// # Errors
     ///
     /// Returns an error if message handling fails
+    #[instrument(skip(self))]
     pub async fn handle_sync_message(&self, message: SyncMessage) -> Result<()> {
         match message {
             SyncMessage::SyncRequest {
@@ -423,6 +429,7 @@ impl DistributedContext {
     }
 
     /// Get nodes for a specific scope
+    #[instrument(skip(self))]
     async fn get_nodes_for_scope(&self, scope: &ContextScope) -> Vec<String> {
         let nodes = self.nodes.read().await;
 
@@ -442,6 +449,7 @@ impl DistributedContext {
     }
 
     /// Send message to specific node
+    #[instrument(skip(self))]
     async fn send_to_node(&self, node_id: &str, _message: SyncMessage) -> Result<()> {
         let nodes = self.nodes.read().await;
 
@@ -482,6 +490,7 @@ impl DistributedContext {
     }
 
     /// Get cluster statistics
+    #[instrument(skip(self))]
     pub async fn stats(&self) -> ClusterStats {
         let nodes = self.nodes.read().await;
         let replication = self.replication.read().await;
@@ -531,6 +540,7 @@ impl ContextSync {
     }
 
     /// Run sync service
+    #[instrument(skip(self))]
     pub async fn run(&mut self) {
         while let Some(message) = self.sync_rx.recv().await {
             if let Err(e) = self.distributed.handle_sync_message(message).await {
@@ -562,23 +572,27 @@ impl Default for MockNodeDiscovery {
 
 #[async_trait]
 impl NodeDiscovery for MockNodeDiscovery {
+    #[instrument(skip(self))]
     async fn discover(&self) -> Result<Vec<NodeInfo>> {
         let nodes = self.nodes.read().await;
         Ok(nodes.clone())
     }
 
+    #[instrument(skip(self))]
     async fn register(&self, node: NodeInfo) -> Result<()> {
         let mut nodes = self.nodes.write().await;
         nodes.push(node);
         Ok(())
     }
 
+    #[instrument(skip(self))]
     async fn unregister(&self, node_id: &str) -> Result<()> {
         let mut nodes = self.nodes.write().await;
         nodes.retain(|n| n.id != node_id);
         Ok(())
     }
 
+    #[instrument(skip(self))]
     async fn heartbeat(&self, node_id: &str) -> Result<()> {
         let mut nodes = self.nodes.write().await;
         if let Some(node) = nodes.iter_mut().find(|n| n.id == node_id) {

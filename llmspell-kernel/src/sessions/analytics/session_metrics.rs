@@ -65,6 +65,7 @@ impl Default for SessionAnalyticsConfig {
 }
 
 /// Session metrics collector
+#[derive(Debug)]
 pub struct SessionMetricsCollector {
     /// Base metrics hook
     metrics_hook: Arc<MetricsHook>,

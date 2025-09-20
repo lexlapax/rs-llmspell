@@ -192,6 +192,7 @@ impl Default for BreakerStats {
 }
 
 /// Circuit breaker for hook execution
+#[derive(Debug)]
 pub struct CircuitBreaker {
     config: BreakerConfig,
     state: Arc<RwLock<BreakerState>>,
@@ -352,6 +353,7 @@ pub struct CircuitBreakerStats {
 }
 
 /// Circuit breaker manager for multiple breakers
+#[derive(Debug)]
 pub struct CircuitBreakerManager {
     breakers: Arc<DashMap<String, Arc<CircuitBreaker>>>,
     default_config: BreakerConfig,

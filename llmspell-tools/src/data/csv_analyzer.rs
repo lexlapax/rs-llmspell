@@ -28,7 +28,7 @@ use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use std::collections::HashMap;
 use std::sync::Arc;
-use tracing::{debug, info};
+use tracing::{debug, info, instrument};
 use xlsxwriter::Workbook;
 
 /// CSV analysis operation types
@@ -414,6 +414,7 @@ impl CsvAnalyzerTool {
 
     /// Analyze CSV content with streaming
     #[allow(clippy::unused_async)]
+    #[instrument(skip(self))]
     async fn analyze_csv_streaming(&self, content: &str) -> Result<CsvAnalysisResult> {
         debug!("Analyzing CSV content with streaming");
 
@@ -512,6 +513,7 @@ impl CsvAnalyzerTool {
 
     /// Convert CSV to Parquet format
     #[allow(clippy::unused_async)]
+    #[instrument(skip(self))]
     async fn convert_to_parquet(&self, content: &str) -> Result<Vec<u8>> {
         debug!("Converting CSV to Parquet");
 
@@ -610,6 +612,7 @@ impl CsvAnalyzerTool {
     }
 
     /// Convert CSV to Excel format
+    #[instrument(skip(self))]
     async fn convert_to_excel(&self, content: &str) -> Result<Vec<u8>> {
         debug!("Converting CSV to Excel");
 
@@ -729,6 +732,7 @@ impl CsvAnalyzerTool {
     }
 
     /// Convert CSV to another format with streaming support
+    #[instrument(skip(self))]
     async fn convert_csv_streaming(&self, content: &str, format: ExportFormat) -> Result<Vec<u8>> {
         match format {
             ExportFormat::Parquet => self.convert_to_parquet(content).await,
@@ -743,6 +747,7 @@ impl CsvAnalyzerTool {
 
     /// Convert CSV to text-based formats
     #[allow(clippy::unused_async)]
+    #[instrument(skip(self))]
     async fn convert_csv_text_format(&self, content: &str, format: ExportFormat) -> Result<String> {
         debug!("Converting CSV to {:?}", format);
 
@@ -853,6 +858,7 @@ impl CsvAnalyzerTool {
 
     /// Filter CSV rows with streaming
     #[allow(clippy::unused_async)]
+    #[instrument(skip(self))]
     async fn filter_csv_streaming(&self, content: &str, filter_expr: &str) -> Result<String> {
         debug!("Filtering CSV with expression: {}", filter_expr);
 
@@ -956,6 +962,7 @@ impl CsvAnalyzerTool {
 
     /// Sample CSV rows
     #[allow(clippy::unused_async)]
+    #[instrument(skip(self))]
     async fn sample_csv(&self, content: &str, sample_size: usize) -> Result<String> {
         debug!("Sampling {} rows from CSV", sample_size);
 
@@ -991,6 +998,7 @@ impl CsvAnalyzerTool {
 
     /// Transform CSV data based on transformation rules
     #[allow(clippy::unused_async)]
+    #[instrument(skip(self))]
     async fn transform_csv(&self, content: &str, options: &Value) -> Result<String> {
         info!("Transforming CSV data");
 
@@ -1125,6 +1133,7 @@ impl CsvAnalyzerTool {
 
     /// Validate CSV data against rules
     #[allow(clippy::unused_async)]
+    #[instrument(skip(self))]
     async fn validate_csv(&self, content: &str, options: &Value) -> Result<Value> {
         info!("Validating CSV data");
 
@@ -1291,6 +1300,13 @@ fn write_parquet_chunk(
 
 impl Default for CsvAnalyzerTool {
     fn default() -> Self {
+        info!(
+            tool_name = "csv-analyzer",
+            category = "Tool",
+            phase = "Phase 3 (comprehensive instrumentation)",
+            "Creating CsvAnalyzerTool"
+        );
+
         Self::new(CsvAnalyzerConfig::default())
     }
 }
@@ -1302,6 +1318,7 @@ impl BaseAgent for CsvAnalyzerTool {
     }
 
     #[allow(clippy::too_many_lines)] // This function handles multiple CSV operations and needs comprehensive logic
+    #[instrument(skip(_context, input, self), fields(tool = %self.metadata().name))]
     async fn execute_impl(
         &self,
         input: AgentInput,
@@ -1460,6 +1477,7 @@ impl BaseAgent for CsvAnalyzerTool {
         Ok(AgentOutput::text(output_text).with_metadata(metadata))
     }
 
+    #[instrument(skip(self))]
     async fn validate_input(&self, input: &AgentInput) -> Result<()> {
         if input.parameters.is_empty() {
             return Err(LLMSpellError::Validation {
@@ -1487,6 +1505,7 @@ impl BaseAgent for CsvAnalyzerTool {
         Ok(())
     }
 
+    #[instrument(skip(self))]
     async fn handle_error(&self, error: LLMSpellError) -> Result<AgentOutput> {
         Ok(AgentOutput::text(format!("CSV processing error: {error}")))
     }

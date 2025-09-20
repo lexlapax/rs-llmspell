@@ -83,6 +83,7 @@ impl RetentionPolicy {
 }
 
 /// Manages retention policies for different hook types
+#[derive(Debug)]
 pub struct RetentionManager {
     /// Per-hook-type retention policies
     policies: RwLock<HashMap<String, RetentionPolicy>>,

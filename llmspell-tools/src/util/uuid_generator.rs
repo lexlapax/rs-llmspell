@@ -38,7 +38,7 @@ use llmspell_utils::{
 use serde::{Deserialize, Serialize};
 use serde_json::json;
 use std::time::Instant;
-use tracing::{debug, error, info, trace};
+use tracing::{debug, error, info, instrument, trace};
 use uuid::Uuid;
 
 #[derive(Debug, Clone, Copy, Serialize, Deserialize)]
@@ -185,6 +185,7 @@ impl UuidGeneratorTool {
     }
 
     #[allow(clippy::unused_async)]
+    #[instrument(skip(self))]
     async fn validate_parameters(&self, params: &serde_json::Value) -> Result<()> {
         let validation_start = Instant::now();
         trace!("Starting parameter validation for UUID generator");
@@ -249,6 +250,13 @@ impl UuidGeneratorTool {
 
 impl Default for UuidGeneratorTool {
     fn default() -> Self {
+        info!(
+            tool_name = "uuid-generator",
+            category = "Tool",
+            phase = "Phase 3 (comprehensive instrumentation)",
+            "Creating UuidGeneratorTool"
+        );
+
         Self::new(UuidGeneratorConfig::default())
     }
 }
@@ -260,6 +268,7 @@ impl BaseAgent for UuidGeneratorTool {
     }
 
     #[allow(clippy::too_many_lines)]
+    #[instrument(skip(_context, input, self), fields(tool = %self.metadata().name))]
     async fn execute_impl(
         &self,
         input: AgentInput,
@@ -466,6 +475,7 @@ impl BaseAgent for UuidGeneratorTool {
         result
     }
 
+    #[instrument(skip(self))]
     async fn validate_input(&self, input: &AgentInput) -> Result<()> {
         if input.text.is_empty() {
             return Err(validation_error(
@@ -476,6 +486,7 @@ impl BaseAgent for UuidGeneratorTool {
         Ok(())
     }
 
+    #[instrument(skip(self))]
     async fn handle_error(&self, error: LLMSpellError) -> Result<AgentOutput> {
         Ok(AgentOutput::text(format!("UUID generation error: {error}")))
     }

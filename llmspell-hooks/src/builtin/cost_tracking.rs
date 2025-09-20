@@ -330,6 +330,7 @@ impl CostAggregator {
 }
 
 /// Built-in cost tracking hook for AI/ML operations
+#[derive(Debug)]
 pub struct CostTrackingHook {
     config: CostTrackingConfig,
     aggregator: Arc<CostAggregator>,

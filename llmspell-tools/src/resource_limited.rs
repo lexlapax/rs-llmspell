@@ -17,7 +17,7 @@ use llmspell_utils::resource_limits::{MemoryGuard, ResourceLimits, ResourceTrack
 use serde_json::json;
 use std::fs;
 use std::time::Instant;
-use tracing::{debug, error, info, trace, warn};
+use tracing::{debug, error, info, instrument, trace, warn};
 
 /// Trait for tools that support resource limiting
 #[async_trait]
@@ -77,6 +77,7 @@ impl<T: Tool + Send + Sync> BaseAgent for ResourceLimitedTool<T> {
         self.inner.metadata()
     }
 
+    #[instrument(skip(self))]
     async fn execute_impl(
         &self,
         input: AgentInput,
@@ -176,10 +177,12 @@ impl<T: Tool + Send + Sync> BaseAgent for ResourceLimitedTool<T> {
         }
     }
 
+    #[instrument(skip(self))]
     async fn validate_input(&self, input: &AgentInput) -> LLMResult<()> {
         self.inner.validate_input(input).await
     }
 
+    #[instrument(skip(self))]
     async fn handle_error(&self, error: LLMSpellError) -> LLMResult<AgentOutput> {
         self.inner.handle_error(error).await
     }
@@ -243,6 +246,7 @@ impl<T: Tool> ResourceLimitExt for T {}
 /// - File size exceeds configured limits
 #[allow(clippy::unused_async)]
 #[allow(clippy::cognitive_complexity)]
+#[instrument(skip(tracker))]
 pub async fn check_file_operation(
     tracker: &ResourceTracker,
     path: &std::path::Path,
@@ -448,6 +452,7 @@ mod tests {
             &self.metadata
         }
 
+        #[instrument(skip(self))]
         async fn execute_impl(
             &self,
             _input: AgentInput,
@@ -457,10 +462,12 @@ mod tests {
             Ok(AgentOutput::text("Success"))
         }
 
+        #[instrument(skip(self))]
         async fn validate_input(&self, _input: &AgentInput) -> LLMResult<()> {
             Ok(())
         }
 
+        #[instrument(skip(self))]
         async fn handle_error(&self, error: LLMSpellError) -> LLMResult<AgentOutput> {
             Ok(AgentOutput::text(format!("Error: {error}")))
         }

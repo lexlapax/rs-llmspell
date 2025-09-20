@@ -29,6 +29,7 @@ use serde_json::json;
 use std::path::Path;
 use std::sync::Arc;
 use tracing::debug;
+use tracing::instrument;
 
 /// Video format types
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
@@ -193,6 +194,7 @@ impl VideoProcessorTool {
 
     /// Detect video format from file
     #[allow(clippy::unused_async)]
+    #[instrument(skip_all)]
     async fn detect_format(&self, file_path: &Path) -> LLMResult<VideoFormat> {
         // First try extension-based detection
         let format = VideoFormat::from_extension(file_path);
@@ -209,6 +211,7 @@ impl VideoProcessorTool {
     }
 
     /// Extract metadata from video file
+    #[instrument(skip(sandbox, self))]
     async fn extract_metadata(
         &self,
         file_path: &Path,
@@ -266,6 +269,7 @@ impl VideoProcessorTool {
 
     /// Generate thumbnail from video
     #[allow(clippy::unused_async)]
+    #[instrument(skip_all)]
     async fn generate_thumbnail(
         &self,
         _video_path: &Path,
@@ -285,6 +289,7 @@ impl VideoProcessorTool {
 
     /// Extract frame at specific timestamp
     #[allow(clippy::unused_async)]
+    #[instrument(skip_all)]
     async fn extract_frame(
         &self,
         _video_path: &Path,
@@ -306,6 +311,7 @@ impl VideoProcessorTool {
 
     /// Validate processing parameters
     #[allow(clippy::unused_async)]
+    #[instrument(skip_all)]
     async fn validate_parameters(&self, params: &serde_json::Value) -> LLMResult<()> {
         // Validate operation
         if let Some(operation) = extract_optional_string(params, "operation") {
@@ -355,6 +361,7 @@ impl BaseAgent for VideoProcessorTool {
         &self.metadata
     }
 
+    #[instrument(skip(_context, input, self), fields(tool = %self.metadata().name))]
     async fn execute_impl(
         &self,
         input: AgentInput,
@@ -480,6 +487,7 @@ impl BaseAgent for VideoProcessorTool {
         }
     }
 
+    #[instrument(skip_all)]
     async fn validate_input(&self, input: &AgentInput) -> LLMResult<()> {
         if input.text.is_empty() {
             return Err(LLMSpellError::Validation {
@@ -490,6 +498,7 @@ impl BaseAgent for VideoProcessorTool {
         Ok(())
     }
 
+    #[instrument(skip_all)]
     async fn handle_error(&self, error: LLMSpellError) -> LLMResult<AgentOutput> {
         Ok(AgentOutput::text(format!("Video processor error: {error}")))
     }

@@ -21,7 +21,7 @@ use serde_json::json;
 use std::collections::HashMap;
 use std::sync::Arc;
 use std::time::Instant;
-use tracing::{debug, info, trace};
+use tracing::{debug, info, instrument, trace};
 
 /// System resource statistics
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -244,6 +244,7 @@ impl SystemMonitorTool {
     ///
     /// Returns an error if system information cannot be retrieved
     #[allow(clippy::unused_async)]
+    #[instrument(skip_all)]
     async fn get_basic_system_info(&self) -> LLMResult<SystemStats> {
         trace!("Getting basic system information");
         let system_info = get_system_info().map_err(|e| LLMSpellError::Tool {
@@ -287,6 +288,7 @@ impl SystemMonitorTool {
 
     /// Get CPU usage (simplified version without external dependencies)
     #[allow(clippy::unused_async)]
+    #[instrument(skip_all)]
     async fn get_cpu_usage(&self) -> f64 {
         if !self.config.collect.is_enabled(StatType::Cpu) {
             return 0.0;
@@ -340,6 +342,7 @@ impl SystemMonitorTool {
 
     /// Get disk usage statistics
     #[allow(clippy::unused_async)]
+    #[instrument(skip_all)]
     async fn get_disk_usage(&self) -> HashMap<String, DiskStats> {
         if !self.config.collect.is_enabled(StatType::Disk) {
             return HashMap::new();
@@ -540,6 +543,7 @@ impl SystemMonitorTool {
 
     /// Get process count (simplified implementation)
     #[allow(clippy::unused_async)]
+    #[instrument(skip(sandbox, self))]
     async fn get_process_count(&self, sandbox: &FileSandbox) -> Option<u32> {
         if !self.config.collect.is_enabled(StatType::Process) {
             return None;
@@ -577,6 +581,7 @@ impl SystemMonitorTool {
 
     /// Get system uptime (simplified implementation)
     #[allow(clippy::unused_async)]
+    #[instrument(skip(sandbox, self))]
     async fn get_uptime(&self, sandbox: &FileSandbox) -> Option<u64> {
         #[cfg(unix)]
         {
@@ -602,6 +607,7 @@ impl SystemMonitorTool {
     ///
     /// Returns an error if system information cannot be retrieved
     #[allow(clippy::cognitive_complexity)]
+    #[instrument(skip_all)]
     async fn collect_system_stats(&self) -> LLMResult<SystemStats> {
         let start_time = Instant::now();
 
@@ -657,6 +663,7 @@ impl SystemMonitorTool {
     /// Returns an error if:
     /// - An invalid operation is specified
     #[allow(clippy::unused_async)]
+    #[instrument(skip_all)]
     async fn validate_monitoring_parameters(&self, params: &serde_json::Value) -> LLMResult<()> {
         // Validate operation if provided
         if let Some(operation) = extract_optional_string(params, "operation") {
@@ -683,6 +690,7 @@ impl BaseAgent for SystemMonitorTool {
         &self.metadata
     }
 
+    #[instrument(skip(_context, input, self), fields(tool = %self.metadata().name))]
     async fn execute_impl(
         &self,
         input: AgentInput,
@@ -723,6 +731,7 @@ impl BaseAgent for SystemMonitorTool {
         Ok(AgentOutput::text(serde_json::to_string_pretty(&response)?))
     }
 
+    #[instrument(skip(self))]
     async fn validate_input(&self, input: &AgentInput) -> LLMResult<()> {
         if input.text.is_empty() {
             return Err(LLMSpellError::Validation {
@@ -733,6 +742,7 @@ impl BaseAgent for SystemMonitorTool {
         Ok(())
     }
 
+    #[instrument(skip(self))]
     async fn handle_error(&self, error: LLMSpellError) -> LLMResult<AgentOutput> {
         Ok(AgentOutput::text(format!("System monitor error: {error}")))
     }

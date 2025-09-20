@@ -77,6 +77,7 @@ impl HookMetadata {
 }
 
 /// Hook storage adapter for metadata persistence
+#[derive(Debug)]
 pub struct HookStorageAdapter {
     /// In-memory cache for fast access
     metadata_cache: Arc<RwLock<HashMap<String, HookMetadata>>>,

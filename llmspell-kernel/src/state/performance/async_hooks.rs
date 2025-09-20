@@ -34,6 +34,7 @@ pub enum HookEventType {
 }
 
 /// Async hook processor that runs hooks in background
+#[derive(Debug)]
 pub struct AsyncHookProcessor {
     /// Lock-free queue for hook events
     event_queue: Arc<SegQueue<HookEvent>>,
@@ -55,6 +56,7 @@ pub struct AsyncHookProcessor {
 }
 
 /// Hook processing statistics
+#[derive(Debug)]
 pub struct HookProcessorStats {
     pub events_queued: AtomicU64,
     pub events_processed: AtomicU64,
