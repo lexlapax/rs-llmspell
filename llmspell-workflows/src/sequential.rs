@@ -412,7 +412,6 @@ impl BaseAgent for SequentialWorkflow {
                             warn!("All retries exhausted for step {}, continuing", step.name);
                             steps_skipped += 1;
                             self.state_manager.advance_step().await?;
-                            continue;
                         } else {
                             warn!(
                                 "All retries exhausted for step {}, stopping workflow",

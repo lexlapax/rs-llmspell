@@ -13,9 +13,9 @@ use crate::types::{WorkflowInput, WorkflowOutput};
 pub struct WorkflowInputAdapter;
 
 impl WorkflowInputAdapter {
-    /// Convert AgentInput to WorkflowInput
+    /// Convert `AgentInput` to `WorkflowInput`
     ///
-    /// Extracts workflow-specific parameters from AgentInput:
+    /// Extracts workflow-specific parameters from `AgentInput`:
     /// - Main text becomes the primary input
     /// - Parameters are mapped to context
     /// - Special handling for timeout parameter
@@ -24,13 +24,13 @@ impl WorkflowInputAdapter {
         let timeout = input
             .parameters
             .get("timeout_ms")
-            .and_then(|v| v.as_u64())
+            .and_then(serde_json::Value::as_u64)
             .map(Duration::from_millis)
             .or_else(|| {
                 input
                     .parameters
                     .get("timeout_secs")
-                    .and_then(|v| v.as_u64())
+                    .and_then(serde_json::Value::as_u64)
                     .map(Duration::from_secs)
             });
 
@@ -67,7 +67,7 @@ impl WorkflowInputAdapter {
         }
     }
 
-    /// Convert WorkflowInput back to AgentInput
+    /// Convert `WorkflowInput` back to `AgentInput`
     ///
     /// Useful for workflow composition where workflows call other agents
     pub fn to_agent_input(workflow_input: WorkflowInput) -> AgentInput {
@@ -76,11 +76,13 @@ impl WorkflowInputAdapter {
             .input
             .get("text")
             .and_then(|v| v.as_str())
-            .map(|s| s.to_string())
-            .unwrap_or_else(|| {
-                // Fallback: serialize entire input as text
-                workflow_input.input.to_string()
-            });
+            .map_or_else(
+                || {
+                    // Fallback: serialize entire input as text
+                    workflow_input.input.to_string()
+                },
+                std::string::ToString::to_string,
+            );
 
         // Convert context back to parameters
         let mut parameters = HashMap::new();
@@ -113,9 +115,10 @@ impl WorkflowInputAdapter {
 pub struct WorkflowOutputAdapter;
 
 impl WorkflowOutputAdapter {
-    /// Convert WorkflowOutput to AgentOutput
+    /// Convert `WorkflowOutput` to `AgentOutput`
     ///
     /// Preserves workflow execution metadata and results
+    #[must_use]
     pub fn to_agent_output(workflow_output: WorkflowOutput) -> AgentOutput {
         // Create output text based on success/failure
         let text = if workflow_output.success {
@@ -137,7 +140,7 @@ impl WorkflowOutputAdapter {
 
         // Build metadata from workflow execution details
         let mut metadata = OutputMetadata {
-            execution_time_ms: Some(workflow_output.duration.as_millis() as u64),
+            execution_time_ms: Some(workflow_output.duration.as_millis().min(u64::MAX as u128) as u64),
             ..Default::default()
         };
 
@@ -182,7 +185,7 @@ impl WorkflowOutputAdapter {
         agent_output
     }
 
-    /// Convert AgentOutput back to WorkflowOutput
+    /// Convert `AgentOutput` back to `WorkflowOutput`
     ///
     /// Useful when agents are used as workflow steps
     pub fn from_agent_output(agent_output: AgentOutput, duration: Duration) -> WorkflowOutput {
@@ -235,22 +238,22 @@ impl WorkflowOutputAdapter {
 pub mod prelude {
     use super::*;
 
-    /// Convert AgentInput to WorkflowInput
+    /// Convert `AgentInput` to `WorkflowInput`
     pub fn agent_to_workflow_input(input: AgentInput) -> WorkflowInput {
         WorkflowInputAdapter::from_agent_input(input)
     }
 
-    /// Convert WorkflowInput to AgentInput
+    /// Convert `WorkflowInput` to `AgentInput`
     pub fn workflow_to_agent_input(input: WorkflowInput) -> AgentInput {
         WorkflowInputAdapter::to_agent_input(input)
     }
 
-    /// Convert WorkflowOutput to AgentOutput
+    /// Convert `WorkflowOutput` to `AgentOutput`
     pub fn workflow_to_agent_output(output: WorkflowOutput) -> AgentOutput {
         WorkflowOutputAdapter::to_agent_output(output)
     }
 
-    /// Convert AgentOutput to WorkflowOutput
+    /// Convert `AgentOutput` to `WorkflowOutput`
     pub fn agent_to_workflow_output(output: AgentOutput, duration: Duration) -> WorkflowOutput {
         WorkflowOutputAdapter::from_agent_output(output, duration)
     }

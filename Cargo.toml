@@ -85,6 +85,7 @@ mockall = "0.13"
 proptest = "1.4"
 criterion = { version = "0.5", features = ["html_reports", "async_tokio"] }
 serial_test = "3.1"
+tracing-test = "0.2"
 
 # Storage backends
 sled = "0.34"
