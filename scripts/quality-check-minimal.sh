@@ -49,6 +49,30 @@ else
     OVERALL_SUCCESS=1
 fi
 
+# 4. Check tracing patterns
+echo ""
+echo "4. Checking tracing patterns..."
+TRACING_ISSUES=0
+
+# Check for direct tracing:: macro calls (anti-pattern)
+if grep -r "tracing::\(info\|debug\|warn\|error\|trace\|instrument\)!" --include="*.rs" . 2>/dev/null | grep -v "target/\|tests/\|examples/" > /dev/null; then
+    echo -e "${RED}❌ Found direct 'tracing::' macro calls (use imports instead)${NC}"
+    TRACING_ISSUES=1
+fi
+
+# Check for log:: usage (should use tracing instead)
+if grep -r "log::" --include="*.rs" . 2>/dev/null | grep -v "target/\|tests/\|examples/" > /dev/null; then
+    echo -e "${RED}❌ Found 'log::' usage (use tracing instead)${NC}"
+    TRACING_ISSUES=1
+fi
+
+if [ $TRACING_ISSUES -eq 0 ]; then
+    echo -e "${GREEN}✅ Tracing patterns check passed${NC}"
+else
+    echo "   Fix: Import tracing macros directly, don't use prefixes"
+    OVERALL_SUCCESS=1
+fi
+
 # Summary
 echo ""
 echo "===================================="

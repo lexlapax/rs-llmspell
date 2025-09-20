@@ -13,6 +13,7 @@ use serde::{Deserialize, Serialize};
 use std::collections::HashSet;
 use std::sync::Arc;
 use std::time::Duration;
+use tracing::{trace, warn};
 
 /// Caching strategy configuration
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]
@@ -362,7 +363,7 @@ impl CachingHook {
             Err(e) => {
                 let mut metrics = self.metrics.write().unwrap();
                 metrics.cache_errors += 1;
-                log::warn!("Failed to cache result: {}", e);
+                warn!("Failed to cache result: {}", e);
             }
         }
 
@@ -425,7 +426,7 @@ impl MetricHook for CachingHook {
         // Pre-execution happens in the main execute method
         // This is called by the hook executor for the actual operation being cached
         if self.should_cache_hook_point(&context.point) {
-            log::trace!(
+            trace!(
                 "CachingHook: Checking cache for hook point {:?}",
                 context.point
             );
@@ -442,7 +443,7 @@ impl MetricHook for CachingHook {
         // This is where we cache the result after the actual operation
         self.try_cache_result(context, result, duration)?;
 
-        log::trace!(
+        trace!(
             "CachingHook: Post-execution for hook point {:?}, duration: {:?}, cached: {}",
             context.point,
             duration,

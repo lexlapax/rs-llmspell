@@ -11,6 +11,7 @@ use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::sync::{Arc, RwLock};
+use tracing::{debug, trace};
 
 /// Debug trace entry
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -94,12 +95,9 @@ impl TraceStorage {
 
         // Log to console if enabled
         if self.config.log_to_console {
-            log::debug!(
+            debug!(
                 "DEBUG TRACE: {:?} at {:?} ({}:{})",
-                trace.hook_point,
-                trace.timestamp,
-                trace.component_type,
-                trace.component_name
+                trace.hook_point, trace.timestamp, trace.component_type, trace.component_name
             );
         }
     }
@@ -435,7 +433,7 @@ impl MetricHook for DebuggingHook {
         let trace = self.create_trace(context, None);
         self.storage.add_trace(trace);
 
-        log::trace!("DebuggingHook: Starting trace for {:?}", context.point);
+        trace!("DebuggingHook: Starting trace for {:?}", context.point);
         Ok(())
     }
 
@@ -465,7 +463,7 @@ impl MetricHook for DebuggingHook {
 
         self.storage.add_trace(trace);
 
-        log::trace!(
+        trace!(
             "DebuggingHook: Completed trace for {:?} in {:?}",
             context.point,
             duration

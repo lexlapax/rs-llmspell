@@ -101,6 +101,74 @@ cargo clippy -p llmspell-core
 ./scripts/list-tests-by-tag.sh all
 ```
 
+## Tracing Patterns
+
+### Standard Instrumentation
+
+All async functions that perform significant work should be instrumented:
+
+```rust
+use tracing::{info, debug, instrument, warn, error};
+
+// Instrument public APIs
+#[instrument(skip(self), fields(component_id = %self.id()))]
+pub async fn execute(&self, input: Input) -> Result<Output> {
+    info!("Starting execution");
+    // Implementation...
+}
+
+// Skip large parameters
+#[instrument(skip(self, data), fields(data_size = data.len()))]
+async fn process_data(&self, data: Vec<u8>) -> Result<()> {
+    debug!("Processing {} bytes", data.len());
+    // Implementation...
+}
+
+// Capture errors automatically
+#[instrument(err)]
+async fn validate(&self) -> Result<()> {
+    // Validation logic...
+}
+```
+
+### Tracing Levels
+
+- **ERROR**: Unrecoverable errors that require attention
+- **WARN**: Recoverable issues or unexpected conditions
+- **INFO**: High-level operations and state changes
+- **DEBUG**: Detailed execution flow and intermediate states
+- **TRACE**: Very detailed debugging information
+
+### Required Tracing Points
+
+1. **Component Initialization**: Log when components are created
+2. **Operation Start/End**: Mark boundaries of significant operations
+3. **Error Paths**: Capture context when errors occur
+4. **Performance Metrics**: Record timing for expensive operations
+5. **State Changes**: Log important state transitions
+
+### Context Fields
+
+Always include relevant context in spans:
+
+```rust
+#[instrument(fields(
+    request_id = %request_id,
+    user_id = %user_id,
+    operation = "data_processing"
+))]
+async fn process_request(&self, request: Request) -> Result<Response> {
+    // Processing...
+}
+```
+
+### Performance Considerations
+
+- Use `skip` for large parameters to avoid serialization overhead
+- Use appropriate levels (avoid TRACE in hot paths)
+- Batch related log statements when possible
+- Consider sampling for high-frequency operations
+
 ## Code Style
 
 - Follow Rust standard formatting (`cargo fmt`)

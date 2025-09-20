@@ -140,7 +140,9 @@ impl WorkflowOutputAdapter {
 
         // Build metadata from workflow execution details
         let mut metadata = OutputMetadata {
-            execution_time_ms: Some(workflow_output.duration.as_millis().min(u64::MAX as u128) as u64),
+            execution_time_ms: Some(
+                workflow_output.duration.as_millis().min(u64::MAX as u128) as u64
+            ),
             ..Default::default()
         };
 

@@ -93,6 +93,58 @@ log_execution_start!(component, input);
 log_execution_end!(component, duration, true);
 ```
 
+### Tracing
+
+```rust
+use tracing::{info, debug, instrument, warn};
+use llmspell_core::traits::base_agent::BaseAgent;
+
+// Instrument async functions for automatic span creation
+#[instrument(skip(self), fields(component_id = %self.id()))]
+async fn execute(&self, input: AgentInput) -> Result<AgentOutput> {
+    info!("Starting component execution");
+    debug!(?input, "Processing input");
+
+    // Spans automatically track execution flow
+    let result = self.process_internal(input).await?;
+
+    info!(output_size = result.text.len(), "Execution complete");
+    Ok(result)
+}
+
+// Error context is automatically captured
+#[instrument(err)]
+async fn validate_input(&self, input: &AgentInput) -> Result<()> {
+    if input.text.is_empty() {
+        warn!("Empty input received");
+        return Err(validation_error!("Input cannot be empty"));
+    }
+    Ok(())
+}
+
+// Performance metrics are automatically collected
+#[instrument(skip(self, data), fields(data_size = data.len()))]
+async fn process_data(&self, data: Vec<u8>) -> Result<ProcessedData> {
+    debug!("Processing {} bytes", data.len());
+    // Processing logic...
+}
+```
+
+### Tracing Configuration
+
+Set the `RUST_LOG` environment variable to control tracing verbosity:
+
+```bash
+# Enable INFO level for all crates
+RUST_LOG=info cargo run
+
+# Enable DEBUG for specific crates
+RUST_LOG=llmspell_core=debug,llmspell_agents=trace cargo run
+
+# Enable structured JSON output for production
+RUST_LOG=info RUST_LOG_FORMAT=json cargo run
+```
+
 ## Usage
 
 Add to your `Cargo.toml`:
