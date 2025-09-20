@@ -142,6 +142,7 @@ pretty_assertions = "1.4"
 # Dependencies for benchmarks
 base64 = "0.22"
 rand = "0.8"
+tracing-subscriber = "0.3"
 
 # Benchmark configurations
 [[bench]]
@@ -186,4 +187,12 @@ harness = false
 
 [[bench]]
 name = "integrated_overhead"
+harness = false
+
+[[bench]]
+name = "tracing_overhead"
+harness = false
+
+[[bench]]
+name = "tracing_overhead_simple"
 harness = false

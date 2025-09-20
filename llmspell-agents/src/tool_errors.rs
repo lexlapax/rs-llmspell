@@ -9,7 +9,7 @@ use std::collections::HashMap;
 use std::fmt;
 use std::time::Duration;
 use tracing::instrument;
-use tracing::{info, warn};
+use tracing::{debug, info, warn};
 
 /// Comprehensive error type for tool integration operations
 #[derive(Debug, Clone)]
@@ -683,11 +683,15 @@ impl ToolErrorHandler {
         &self,
         action: &RecoveryAction,
         _context: &ErrorContext,
-        _timeout: Duration,
+        timeout: Duration,
     ) -> Result<JsonValue> {
+        debug!("Executing recovery action with timeout: {:?}", timeout);
+
         match action {
             RecoveryAction::Retry { delay, .. } => {
-                tokio::time::sleep(*delay).await;
+                // Ensure retry delay doesn't exceed timeout
+                let actual_delay = (*delay).min(timeout);
+                tokio::time::sleep(actual_delay).await;
                 // Return indication that retry should be attempted
                 Ok(JsonValue::String("retry".to_string()))
             }

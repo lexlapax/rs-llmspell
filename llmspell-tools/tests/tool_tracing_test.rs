@@ -319,9 +319,8 @@ async fn test_tool_execution_with_hooks_tracing() {
         }),
     );
 
-    let _result = registry
-        .execute_tool("calculator", input, ExecutionContext::default())
-        .await;
+    let _result =
+        Box::pin(registry.execute_tool("calculator", input, ExecutionContext::default())).await;
 
     // Verify tracing output
     let logs = capture.get_logs();

@@ -1026,9 +1026,7 @@ mod tests {
         assert!(output.text.contains("Executed hook_test_tool"));
 
         // Test direct execute_tool method as well
-        let result = registry
-            .execute_tool("hook_test_tool", input, context)
-            .await;
+        let result = Box::pin(registry.execute_tool("hook_test_tool", input, context)).await;
         assert!(result.is_ok());
     }
     #[tokio::test]
@@ -1053,7 +1051,7 @@ mod tests {
         // Execute tool without hooks
         let input = AgentInput::text("test input");
         let context = ExecutionContext::default();
-        let result = registry.execute_tool("no_hook_tool", input, context).await;
+        let result = Box::pin(registry.execute_tool("no_hook_tool", input, context)).await;
 
         assert!(result.is_ok());
         let output = result.unwrap();
@@ -1067,9 +1065,7 @@ mod tests {
         let context = ExecutionContext::default();
 
         // Try to execute non-existent tool
-        let result = registry
-            .execute_tool("nonexistent_tool", input, context)
-            .await;
+        let result = Box::pin(registry.execute_tool("nonexistent_tool", input, context)).await;
 
         assert!(result.is_err());
         if let Err(LLMSpellError::Component { message, .. }) = result {

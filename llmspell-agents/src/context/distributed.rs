@@ -449,8 +449,8 @@ impl DistributedContext {
     }
 
     /// Send message to specific node
-    #[instrument(skip(self))]
-    async fn send_to_node(&self, node_id: &str, _message: SyncMessage) -> Result<()> {
+    #[instrument(skip(self, message))]
+    async fn send_to_node(&self, node_id: &str, message: SyncMessage) -> Result<()> {
         let nodes = self.nodes.read().await;
 
         nodes.get(node_id).map_or_else(
@@ -465,6 +465,7 @@ impl DistributedContext {
                 info!(
                     target_node = %node_id,
                     address = %node.address,
+                    message = ?message,
                     "Sending sync message"
                 );
                 Ok(())

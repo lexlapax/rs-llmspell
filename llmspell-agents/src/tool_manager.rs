@@ -427,10 +427,15 @@ impl ToolManager {
     async fn execute_composition_step(
         &self,
         step: &ToolCompositionStep,
-        _step_index: usize,
+        step_index: usize,
         context: &ExecutionContext,
         previous_output: Option<&AgentOutput>,
     ) -> Result<AgentOutput> {
+        debug!(
+            "Executing composition step {} - tool: {}",
+            step_index, step.tool_name
+        );
+
         // Prepare parameters for this step
         let parameters = Self::prepare_step_parameters(
             &step.parameters,

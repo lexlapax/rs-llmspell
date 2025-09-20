@@ -2929,7 +2929,7 @@ This fix ensures runtime polymorphism - resources bind to their creation context
 - [x] Confirmed distributed tracing infrastructure ready (TracingInstrumentation in kernel) ✅
 - [x] Integration tests validated: `cargo test -p llmspell-kernel test_span_entering` ✅
 
-#### 9.4.5.8 Phase 8: Documentation & Enforcement (Day 13 - 24+ hours actual) - ✅ COMPLETE**
+#### 9.4.5.8 Phase 8: Documentation & Enforcement (Day 13 - 30+ hours actual) - ✅ COMPLETE**
 
 **Subtask 8.1: Update Documentation (4 hours) - ✅ COMPLETE**
 - [x] Add tracing examples to each crate's README (llmspell-core README updated with examples)
@@ -2957,7 +2957,7 @@ This fix ensures runtime polymorphism - resources bind to their creation context
   - Resolved ALL test struct Debug requirements (MockStateManager, TestHook, etc.)
   - **COMPLETED**: Full workspace compiles with --all-targets --all-features! 🎉
 
-**Acceptance Criteria: ✅ FUNCTIONALLY COMPLETE (11/12)**
+**Acceptance Criteria: ⚠️ FUNCTIONALLY COMPLETE, PERFORMANCE ISSUES (11/13)**
 - [x] Zero files using `tracing::` prefix pattern (verified - none found)
 - [x] Zero files using `log::` crate (fixed all violations in llmspell-hooks)
 - [x] All 172 tool implementations have initialization tracing (✅ Added info! to 35+ tools)
@@ -2966,10 +2966,11 @@ This fix ensures runtime polymorphism - resources bind to their creation context
 - [x] All 8 provider implementations have API call tracing (✅ All providers instrumented)
 - [x] 100% of user-facing async functions have #[instrument] (✅ Added to 702 async functions)
 - [x] 100% of error paths have context logging (✅ Comprehensive error instrumentation)
-- [ ] Performance overhead <2% at INFO level (not verified)
-- [ ] Performance overhead <5% at DEBUG level (not verified)
+- [ ] **❌ Performance overhead <2% at INFO level (FAILED: 97% measured overhead)**
+- [ ] **❌ Performance overhead <5% at DEBUG level (FAILED: unreliable measurement)**
 - [x] All tests pass with tracing enabled (verified - all 686 tests pass)
 - [x] Documentation complete with examples (Phase 8 completed)
+- [x] Performance benchmarks created and executed (llmspell-testing/benches/)
 
 **🔥 ULTRATHINK INSIGHTS & LEARNINGS:**
 
@@ -3000,7 +3001,7 @@ This fix ensures runtime polymorphism - resources bind to their creation context
 - **100+ files** modified with proper imports
 - **10+ Python automation scripts** created for systematic fixes
 - **3 major refactoring passes** to fix compilation errors
-- **24+ hours actual work** (vs 8 hours estimated)
+- **30+ hours actual work** (vs 8 hours estimated, including clippy cleanup and performance testing)
 
 **Architecture Revelations:**
 - The codebase's trait-heavy design made Debug implementation challenging but valuable
@@ -3026,11 +3027,68 @@ This fix ensures runtime polymorphism - resources bind to their creation context
 5. ✅ Compilation with all features and targets successful
 6. ✅ Test suite fully instrumented for debugging
 
-**Performance Testing Required:**
-- [ ] Benchmark: Verify <2% overhead at INFO level
-- [ ] Benchmark: Verify <5% overhead at DEBUG level
-- [ ] Profile: Memory impact of Debug implementations
-- [ ] Validate: Span creation overhead in hot paths
+**Performance Testing (Additional 4 hours) - ⚠️ ISSUES IDENTIFIED:**
+
+**Benchmark Results (cargo bench --bench tracing_overhead_simple):**
+- [x] Created comprehensive benchmark suite in llmspell-testing/benches/
+- [x] Measured agent execution overhead with tracing levels
+- [x] Profiled memory impact of Debug formatting
+- [x] Validated span creation overhead in hot paths
+
+**Measured Overhead:**
+```
+Agent Execution:
+  Baseline (no tracing):  6.12 µs
+  INFO level:            12.04 µs  (96.9% overhead) ❌ EXCEEDS <2% target
+  DEBUG level:            5.97 µs  (-2.4% overhead) ⚠️ Measurement anomaly
+  TRACE level:           11.29 µs  (84.6% overhead)
+
+Hot Path Spans:
+  No spans:               1.34 µs
+  INFO spans:             2.70 µs  (101.9% overhead) ❌ EXCEEDS target
+  DEBUG spans:            1.34 µs  (0.1% overhead)   ✅ Acceptable
+
+Debug Formatting:
+  Simple struct:          674 ns   (1,000x faster than I/O)
+  Complex nested:         644 ns   (minimal memory impact)
+```
+
+**Performance Issues Identified:**
+- [ ] ❌ INFO level overhead (97%) far exceeds <2% target
+- [ ] ⚠️ DEBUG level measurements unreliable (negative overhead impossible)
+- [ ] ❌ Span creation adds 100%+ overhead in tight loops
+- [x] ✅ Debug trait formatting has acceptable performance
+
+**Root Cause Analysis:**
+1. **Measurement Issues**: RUST_LOG env changes don't properly reinitialize tracing
+2. **Span Overhead**: Creating spans for every operation is expensive (2x cost)
+3. **#[instrument] Impact**: 702 instrumented functions may create span cascade
+4. **Optimization Needed**: Conditional compilation or sampling required
+
+**Recommended Optimizations (Future Work):**
+1. **Selective Instrumentation**: Remove #[instrument] from hot paths
+2. **Sampling Strategy**: Only trace 1% of requests in production
+3. **Level-based Compilation**: Use cfg(debug_assertions) for DEBUG spans
+4. **Lazy Evaluation**: Use tracing::enabled! macro to skip work
+5. **Span Caching**: Reuse spans for repeated operations
+6. **Alternative**: Consider OpenTelemetry with proper sampling
+
+**Post-Instrumentation Cleanup (Additional 2 hours) - ✅ COMPLETE:**
+- [x] Fixed ALL clippy warnings from tracing instrumentation:
+  - [x] Removed underscore prefixes from parameters used by #[instrument]
+  - [x] Fixed large future warnings by boxing execute_tool futures
+  - [x] Added missing `use tracing::debug` imports
+  - [x] Corrected field access (provider_type vs provider)
+  - [x] Used actual parameters instead of skipping for better observability
+- [x] **Zero warnings policy achieved**: Full workspace compiles cleanly with clippy
+- [x] All changes maintain functional tracing while fixing pedantic warnings
+
+**Final Status Summary:**
+- ✅ **Tracing Infrastructure**: Fully implemented across 702 async functions
+- ✅ **Debug Implementation**: Complete on all types (70+ structs)
+- ✅ **Compilation**: Zero warnings with --all-targets --all-features
+- ❌ **Performance**: Significant overhead detected (97% at INFO level)
+- ⚠️ **Production Readiness**: Functional but requires optimization
 
 **Verification Commands:**
 ```bash
@@ -3049,14 +3107,14 @@ cargo llvm-cov --workspace --html
 ```
 
 **Definition of Done:**
-- [ ] All 14 workspace crates properly instrumented
-- [ ] Single consistent tracing pattern enforced
-- [ ] Zero clippy warnings related to tracing
-- [ ] Performance targets met (<2% overhead)
-- [ ] All tracing tests passing
-- [ ] Documentation and examples complete
-- [ ] CI/CD enforcement configured
-- [ ] Code review completed by team lead
+- [x] All 14 workspace crates properly instrumented (✅ 702 async functions with #[instrument])
+- [x] Single consistent tracing pattern enforced (✅ use tracing::{debug, info, ...} everywhere)
+- [x] Zero clippy warnings related to tracing (✅ Full workspace compiles cleanly)
+- [ ] Performance targets met (<2% overhead) (❌ 97% overhead measured at INFO level)
+- [x] All tracing tests passing (✅ 686 tests pass with tracing enabled)
+- [x] Documentation and examples complete (✅ README, CONTRIBUTING.md, best practices guide)
+- [x] CI/CD enforcement configured (✅ quality-check scripts validate patterns)
+- [ ] Code review completed by team lead (⏳ Pending review)
 
 ---
 

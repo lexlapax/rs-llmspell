@@ -293,13 +293,18 @@ impl LifecycleEventSystem {
     #[instrument(skip(self, handler))]
     pub async fn subscribe_filtered<F>(
         &self,
-        _name: &str,
+        name: &str,
         handler: F,
         event_types: Vec<LifecycleEventType>,
     ) -> String
     where
         F: Fn(&LifecycleEvent) + Send + Sync + 'static,
     {
+        debug!(
+            "Creating filtered subscription '{}' for event types: {:?}",
+            name, event_types
+        );
+
         struct ClosureListener<F> {
             handler: F,
             event_types: Vec<LifecycleEventType>,

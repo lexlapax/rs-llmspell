@@ -454,12 +454,15 @@ impl DatabaseConnectorTool {
     #[instrument(skip(self))]
     async fn execute_mysql_query(
         &self,
-        _config: &DatabaseConfig,
+        config: &DatabaseConfig,
         query: &str,
     ) -> Result<serde_json::Value> {
         // Note: MySQL implementation would require sqlx or mysql_async
         // For now, return a mock response
-        warn!("MySQL query execution not fully implemented - returning mock response");
+        warn!(
+            "MySQL query execution not fully implemented - returning mock response for {}",
+            config.database_type
+        );
 
         Ok(serde_json::json!({
             "database_type": "mysql",
@@ -481,12 +484,15 @@ impl DatabaseConnectorTool {
     #[instrument(skip(self))]
     async fn execute_sqlite_query(
         &self,
-        _config: &DatabaseConfig,
+        config: &DatabaseConfig,
         query: &str,
     ) -> Result<serde_json::Value> {
         // Note: SQLite implementation would require sqlx or rusqlite
         // For now, return a mock response
-        warn!("SQLite query execution not fully implemented - returning mock response");
+        warn!(
+            "SQLite query execution not fully implemented - returning mock response for {}",
+            config.database_type
+        );
 
         Ok(serde_json::json!({
             "database_type": "sqlite",

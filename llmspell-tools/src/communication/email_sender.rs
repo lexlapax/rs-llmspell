@@ -382,23 +382,35 @@ impl EmailSenderTool {
     ///
     /// Returns an error if `SendGrid` API call fails (currently returns mock success)
     #[allow(clippy::unused_async)]
-    #[instrument(skip(self))]
+    #[instrument(skip(self, body))]
     async fn send_via_sendgrid(
         &self,
-        _config: &EmailProviderConfig,
-        _from: &str,
-        _to: &str,
-        _subject: &str,
-        _body: &str,
-        _html: bool,
+        config: &EmailProviderConfig,
+        from: &str,
+        to: &str,
+        subject: &str,
+        body: &str,
+        html: bool,
     ) -> Result<serde_json::Value> {
         // Note: SendGrid implementation would require HTTP client and API calls
         // For now, return a mock success response
-        warn!("SendGrid email sending not fully implemented - returning mock response");
+        warn!(
+            "SendGrid email sending not fully implemented - returning mock response for {} -> {}",
+            from, to
+        );
+        debug!(
+            "Mock email: subject='{}', html={}, provider={:?}",
+            subject, html, config.provider_type
+        );
 
         Ok(serde_json::json!({
             "provider": "sendgrid",
             "status": "mock_sent",
+            "from": from,
+            "to": to,
+            "subject": subject,
+            "html": html,
+            "body_length": body.len(),
             "message_id": format!("mock-sg-{}", uuid::Uuid::new_v4()),
             "timestamp": chrono::Utc::now().to_rfc3339()
         }))
