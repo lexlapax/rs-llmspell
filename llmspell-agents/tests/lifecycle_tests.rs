@@ -647,6 +647,7 @@ async fn test_performance_requirements() {
 }
 
 /// Custom middleware for testing middleware chain
+#[derive(Debug)]
 struct TestMiddleware {
     name: String,
     should_fail: bool,

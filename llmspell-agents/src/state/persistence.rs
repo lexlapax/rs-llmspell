@@ -252,7 +252,7 @@ mod tests {
                 })
         }
 
-        #[instrument(skip(_context, _input, self))]
+        #[instrument(skip(self))]
         async fn clear_conversation(&self) -> llmspell_core::Result<()> {
             self.conversation
                 .lock()

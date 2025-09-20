@@ -510,6 +510,7 @@ mod tests {
     use serde_json::json;
 
     // Mock implementation for testing
+    #[derive(Debug)]
     struct MockStateManager {
         data: std::sync::Arc<tokio::sync::RwLock<HashMap<String, Value>>>,
     }

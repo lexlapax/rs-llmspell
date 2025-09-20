@@ -791,7 +791,7 @@ mod tests {
             Ok(AgentOutput::text(format!("Processed: {}", input.text)))
         }
 
-        #[instrument(skip(context, input, self))]
+        #[instrument(skip(self, _input))]
         async fn validate_input(&self, _input: &AgentInput) -> Result<(), LLMSpellError> {
             Ok(())
         }

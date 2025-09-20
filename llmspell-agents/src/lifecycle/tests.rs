@@ -11,6 +11,7 @@ mod integration_tests {
     use tokio::time::{sleep, Duration};
 
     /// Test hook that tracks execution
+    #[derive(Debug)]
     struct TestHook {
         call_count: Arc<Mutex<usize>>,
         hook_points: Arc<Mutex<Vec<HookPoint>>>,
@@ -272,6 +273,7 @@ mod integration_tests {
     #[tokio::test]
     async fn test_hook_context_metadata() {
         // Hook that verifies context metadata
+        #[derive(Debug)]
         struct MetadataVerifyHook {
             verified: Arc<Mutex<bool>>,
         }
@@ -341,6 +343,7 @@ mod integration_tests {
         use std::time::Instant;
 
         /// Production-style hook that does minimal work
+        #[derive(Debug)]
         struct FastHook;
 
         #[async_trait]

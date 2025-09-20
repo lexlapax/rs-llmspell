@@ -519,7 +519,7 @@ mod tests {
             &self.metadata
         }
 
-        #[instrument(skip(_context, input, self), fields(tool = %self.metadata().name))]
+        #[instrument(skip(self, _input, _context), fields(tool = %self.metadata().name))]
         async fn execute_impl(
             &self,
             _input: AgentInput,
@@ -612,7 +612,7 @@ mod tests {
         }
     }
 
-    #[instrument(skip(self))]
+    #[instrument]
     async fn create_test_state_manager() -> Arc<dyn StateManager> {
         let config = PersistenceConfig {
             enabled: true,

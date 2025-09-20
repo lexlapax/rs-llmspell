@@ -821,7 +821,7 @@ mod tests {
 
     #[async_trait]
     impl llmspell_core::ToolCapable for MockCompositeAgent {
-        #[instrument(skip(_input, self))]
+        #[instrument(skip(self))]
         async fn discover_tools(
             &self,
             _query: &llmspell_core::traits::tool_capable::ToolQuery,

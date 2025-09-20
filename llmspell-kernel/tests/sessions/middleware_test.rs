@@ -312,6 +312,7 @@ async fn test_middleware_error_handling() -> Result<()> {
     use async_trait::async_trait;
     use llmspell_hooks::traits::Hook;
 
+    #[derive(Debug)]
     struct FailingHook;
 
     #[async_trait]

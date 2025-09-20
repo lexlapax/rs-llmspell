@@ -188,6 +188,7 @@ mod tests {
     use super::*;
     use crate::types::{ComponentId, ComponentType, HookPoint};
 
+    #[derive(Debug)]
     struct TestHook {
         name: String,
     }
@@ -271,6 +272,7 @@ mod tests {
         assert!(matches!(result2, HookResult::Cancel(_)));
     }
 
+    #[derive(Debug)]
     struct TestReplayableHook;
 
     #[async_trait]
