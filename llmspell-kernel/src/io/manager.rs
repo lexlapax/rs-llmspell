@@ -380,6 +380,46 @@ impl EnhancedIOManager {
         Ok(())
     }
 
+    /// Publish display data to IOPub channel
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if publishing fails
+    #[instrument(level = "debug", skip(self, data))]
+    pub async fn publish_display_data(&self, data: HashMap<String, serde_json::Value>) -> Result<()> {
+        let Some(ref sender) = self.iopub_sender else {
+            return Ok(());
+        };
+
+        let header = MessageHeader::new("display_data", &self.session_id);
+        let parent_header = self.current_parent.read().clone();
+
+        let mut content = HashMap::new();
+        content.insert(
+            "data".to_string(),
+            serde_json::Value::Object(data.into_iter().collect()),
+        );
+        content.insert(
+            "metadata".to_string(),
+            serde_json::Value::Object(serde_json::Map::new()),
+        );
+
+        let message = IOPubMessage {
+            parent_header,
+            header,
+            metadata: HashMap::new(),
+            content,
+        };
+
+        sender
+            .send(message)
+            .await
+            .map_err(|e| anyhow::anyhow!("Failed to send display data: {}", e))?;
+
+        debug!("Published display data");
+        Ok(())
+    }
+
     /// Create an `IOPub` channel
     pub fn create_iopub_channel(&mut self) -> mpsc::Receiver<IOPubMessage> {
         let (tx, rx) = mpsc::channel(100);

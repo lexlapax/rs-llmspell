@@ -139,7 +139,42 @@ impl<P: Protocol + 'static> IntegratedKernel<P> {
             flush_interval_ms: config.io_config.flush_interval_ms,
             track_parent_headers: config.io_config.track_parent_headers,
         };
-        let io_manager = Arc::new(EnhancedIOManager::new(io_config, session_id.clone()));
+        let mut io_manager = EnhancedIOManager::new(io_config, session_id.clone());
+
+        // Create IOPub channel for output streaming
+        let (iopub_sender, mut iopub_receiver) = mpsc::channel::<crate::io::manager::IOPubMessage>(100);
+        io_manager.set_iopub_sender(iopub_sender);
+
+        // Spawn task to route IOPub messages to stdout/stderr
+        // This will be properly connected to transport in subtask 9.4.6.4
+        tokio::spawn(async move {
+            while let Some(msg) = iopub_receiver.recv().await {
+                // For now, just log the messages - will be sent through transport later
+                match msg.header.msg_type.as_str() {
+                    "stream" => {
+                        if let Some(stream_type) = msg.content.get("name").and_then(|v| v.as_str()) {
+                            if let Some(text) = msg.content.get("text").and_then(|v| v.as_str()) {
+                                match stream_type {
+                                    "stdout" => print!("{}", text),
+                                    "stderr" => eprint!("{}", text),
+                                    _ => {}
+                                }
+                            }
+                        }
+                    }
+                    "execute_result" | "display_data" => {
+                        if let Some(data) = msg.content.get("data") {
+                            if let Some(text) = data.get("text/plain").and_then(|v| v.as_str()) {
+                                println!("{}", text);
+                            }
+                        }
+                    }
+                    _ => {}
+                }
+            }
+        });
+
+        let io_manager = Arc::new(io_manager);
 
         // Create message router
         let message_router = Arc::new(MessageRouter::new(config.max_history));
@@ -657,10 +692,27 @@ impl<P: Protocol + 'static> IntegratedKernel<P> {
             self.io_manager.write_stdout(line).await?;
         }
 
-        // Route result if available
+        // Send result as display_data if available
         if script_output.output != serde_json::Value::Null {
-            let display_data = format!("{}", script_output.output);
-            self.io_manager.write_stdout(&display_data).await?;
+            // Prepare data for display
+            let mut display_data = HashMap::new();
+
+            // Always include plain text representation
+            display_data.insert(
+                "text/plain".to_string(),
+                serde_json::Value::String(script_output.output.to_string())
+            );
+
+            // If the output is already JSON, include it as application/json
+            if script_output.output.is_object() || script_output.output.is_array() {
+                display_data.insert(
+                    "application/json".to_string(),
+                    script_output.output.clone()
+                );
+            }
+
+            // Publish display data through IOPub channel
+            self.io_manager.publish_display_data(display_data).await?;
         }
 
         // Return the script result

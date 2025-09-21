@@ -3179,14 +3179,16 @@ CLI (run command)
 - [x] Results published with `publish_execute_result()`
 - [x] Added proper execute_reply messages for ok/error/aborted states
 - [x] Updated kernel_info_request to report language from script_executor
-- [ ] Send execution results through IOPub channel for display
+- [x] Send execution results through IOPub channel for display
 
-#### Subtask 9.4.6.3: Connect Jupyter Channels to stdout/stderr (2 hours)**
-- [ ] In `IOManager::route_output()`, handle "stream" messages from IOPub
-- [ ] Route stream messages with name="stdout" to stdout
-- [ ] Route stream messages with name="stderr" to stderr
-- [ ] Connect Lua print() output through ConsoleCapture to IOPub channel
-- [ ] Ensure error messages are routed to stderr properly
+#### Subtask 9.4.6.3: Connect Jupyter Channels to stdout/stderr (2 hours) ✓**
+- [x] Created IOPub channel in IntegratedKernel with mpsc::channel
+- [x] Connected IOPub sender to EnhancedIOManager via `set_iopub_sender()`
+- [x] Spawned task to route IOPub messages to stdout/stderr
+- [x] Stream messages route to appropriate outputs (stdout/stderr)
+- [x] Execute results and display_data published through IOPub
+- [x] Added `publish_display_data()` method for rich output formatting
+- [x] Script output now sent as display_data with text/plain and application/json
 
 #### Subtask 9.4.6.4: Fix CLI's execute_script_embedded() (1 hour)**
 - [ ] Remove placeholder implementation in `llmspell-cli/src/commands/run.rs`
