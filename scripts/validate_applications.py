@@ -121,26 +121,26 @@ class ApplicationValidator:
         self.verbose = verbose
         self.results: List[TestResult] = []
 
-        # Application metadata
+        # Application metadata with realistic timeouts for API calls
         self.applications = {
-            # Layer 1: Universal (2-3 agents)
-            "file-organizer": {"layer": 1, "agents": 3, "runtime": 30},
-            "research-collector": {"layer": 1, "agents": 2, "runtime": 30},
+            # Layer 1: Universal (2-3 agents) - simple API calls
+            "file-organizer": {"layer": 1, "agents": 3, "runtime": 60, "config": "file-organizer/config.toml"},
+            "research-collector": {"layer": 1, "agents": 2, "runtime": 60, "config": "research-collector/config.toml"},
 
-            # Layer 2: Power User (4 agents)
-            "content-creator": {"layer": 2, "agents": 4, "runtime": 22},
+            # Layer 2: Power User (4 agents) - moderate complexity
+            "content-creator": {"layer": 2, "agents": 4, "runtime": 90, "config": "content-creator/config.toml"},
 
-            # Layer 3: Business (5-7 agents)
-            "personal-assistant": {"layer": 3, "agents": 5, "runtime": 45},
-            "communication-manager": {"layer": 3, "agents": 5, "runtime": 45},
-            "code-review-assistant": {"layer": 3, "agents": 7, "runtime": 60},
+            # Layer 3: Business (5-7 agents) - higher complexity
+            "personal-assistant": {"layer": 3, "agents": 5, "runtime": 120, "config": "personal-assistant/config.toml"},
+            "communication-manager": {"layer": 3, "agents": 5, "runtime": 120, "config": "communication-manager/config.toml"},
+            "code-review-assistant": {"layer": 3, "agents": 7, "runtime": 150, "config": "code-review-assistant/config.toml"},
 
-            # Layer 4: Professional (8 agents)
-            "process-orchestrator": {"layer": 4, "agents": 8, "runtime": 75},
-            "knowledge-base": {"layer": 4, "agents": 8, "runtime": 75},
+            # Layer 4: Professional (8 agents) - complex workflows
+            "process-orchestrator": {"layer": 4, "agents": 8, "runtime": 180, "config": "process-orchestrator/config.toml"},
+            "knowledge-base": {"layer": 4, "agents": 8, "runtime": 180, "config": "knowledge-base/config.toml"},
 
-            # Layer 5: Expert (21 agents)
-            "webapp-creator": {"layer": 5, "agents": 21, "runtime": 150},
+            # Layer 5: Expert (21 agents) - very complex
+            "webapp-creator": {"layer": 5, "agents": 21, "runtime": 300, "config": "webapp-creator/config.toml"},
         }
 
     def _cleanup_temp_files(self):
@@ -252,8 +252,12 @@ class ApplicationValidator:
         # Clean up before test
         self._cleanup_temp_files()
 
-        # Run application
-        result, runtime = self.run_application(app_name)
+        # Get config for this app
+        app_info = self.applications[app_name]
+        config_file = f"applications/{app_info['config']}"
+
+        # Run application with config
+        result, runtime = self.run_application(app_name, config=config_file, timeout=app_info['runtime'])
 
         # Initialize test result
         errors = []
@@ -261,18 +265,24 @@ class ApplicationValidator:
         files_created = []
 
         # Check for successful execution
-        validations["script_executed"] = (
-            "Script executed successfully" in result.stdout or
-            "Script execution completed" in result.stdout
+        validations["application_completed"] = (
+            "File Organizer Complete!" in result.stdout or
+            "Organization Status: COMPLETED" in result.stdout
         )
 
-        # Check for script loading
-        validations["script_loaded"] = (
-            "Executing script" in result.stdout or
-            "Script length" in result.stdout
+        # Check for agents created
+        validations["agents_created"] = (
+            "Agent created" in result.stdout or
+            "3 simple agents" in result.stdout
         )
 
-        # Since print output is not captured, check for file artifacts instead
+        # Check for workflow execution
+        validations["workflow_executed"] = (
+            "Workflow created" in result.stdout or
+            "organization completed" in result.stdout
+        )
+
+        # Check for file artifacts created by the application
         # The file-organizer should create these files
         if os.path.exists("/tmp/organization-plan.txt"):
             files_created.append("/tmp/organization-plan.txt")

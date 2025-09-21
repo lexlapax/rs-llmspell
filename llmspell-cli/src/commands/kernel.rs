@@ -39,10 +39,12 @@ pub async fn handle_kernel_command(
                 info!("Starting embedded kernel");
 
                 // Create real ScriptExecutor from llmspell-bridge
-                let script_executor = llmspell_bridge::create_script_executor(runtime_config.clone()).await?;
+                let script_executor =
+                    llmspell_bridge::create_script_executor(runtime_config.clone()).await?;
 
                 // Create kernel with real executor
-                let kernel = start_embedded_kernel_with_executor(runtime_config, script_executor).await?;
+                let kernel =
+                    start_embedded_kernel_with_executor(runtime_config, script_executor).await?;
                 info!("Kernel {} started", kernel.kernel_id());
                 kernel.run().await
             }

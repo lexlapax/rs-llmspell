@@ -441,7 +441,7 @@ impl ScriptExecutor for ScriptRuntime {
     fn language(&self) -> &'static str {
         // Return the configured engine type
         // TODO: Add a method to get current engine language
-        "lua"  // Default for now since we use Lua primarily
+        "lua" // Default for now since we use Lua primarily
     }
 
     async fn is_ready(&self) -> bool {

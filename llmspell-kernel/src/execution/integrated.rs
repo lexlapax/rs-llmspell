@@ -139,7 +139,8 @@ impl<P: Protocol + 'static> IntegratedKernel<P> {
         let mut io_manager = EnhancedIOManager::new(io_config, session_id.clone());
 
         // Create IOPub channel for output streaming
-        let (iopub_sender, mut iopub_receiver) = mpsc::channel::<crate::io::manager::IOPubMessage>(100);
+        let (iopub_sender, mut iopub_receiver) =
+            mpsc::channel::<crate::io::manager::IOPubMessage>(100);
         io_manager.set_iopub_sender(iopub_sender);
 
         // Spawn task to route IOPub messages to stdout/stderr
@@ -149,7 +150,8 @@ impl<P: Protocol + 'static> IntegratedKernel<P> {
                 // For now, just log the messages - will be sent through transport later
                 match msg.header.msg_type.as_str() {
                     "stream" => {
-                        if let Some(stream_type) = msg.content.get("name").and_then(|v| v.as_str()) {
+                        if let Some(stream_type) = msg.content.get("name").and_then(|v| v.as_str())
+                        {
                             if let Some(text) = msg.content.get("text").and_then(|v| v.as_str()) {
                                 match stream_type {
                                     "stdout" => print!("{text}"),
@@ -681,7 +683,10 @@ impl<P: Protocol + 'static> IntegratedKernel<P> {
         trace!("Executing code in current context (no spawn)");
 
         // Execute script using the script executor
-        let script_output = self.script_executor.execute_script(code).await
+        let script_output = self
+            .script_executor
+            .execute_script(code)
+            .await
             .map_err(|e| anyhow::anyhow!("Script execution failed: {}", e))?;
 
         // Route console output through I/O manager
@@ -697,15 +702,12 @@ impl<P: Protocol + 'static> IntegratedKernel<P> {
             // Always include plain text representation
             display_data.insert(
                 "text/plain".to_string(),
-                serde_json::Value::String(script_output.output.to_string())
+                serde_json::Value::String(script_output.output.to_string()),
             );
 
             // If the output is already JSON, include it as application/json
             if script_output.output.is_object() || script_output.output.is_array() {
-                display_data.insert(
-                    "application/json".to_string(),
-                    script_output.output.clone()
-                );
+                display_data.insert("application/json".to_string(), script_output.output.clone());
             }
 
             // Publish display data through IOPub channel
@@ -863,17 +865,25 @@ mod tests {
 
     #[async_trait::async_trait]
     impl ScriptExecutor for MockScriptExecutor {
-        async fn execute_script(&self, _script: &str) -> Result<llmspell_core::traits::script_executor::ScriptExecutionOutput, llmspell_core::error::LLMSpellError> {
-            Ok(llmspell_core::traits::script_executor::ScriptExecutionOutput {
-                output: serde_json::json!("test output"),
-                console_output: vec!["test console output".to_string()],
-                metadata: llmspell_core::traits::script_executor::ScriptExecutionMetadata {
-                    duration: std::time::Duration::from_millis(10),
-                    language: "test".to_string(),
-                    exit_code: Some(0),
-                    warnings: vec![],
+        async fn execute_script(
+            &self,
+            _script: &str,
+        ) -> Result<
+            llmspell_core::traits::script_executor::ScriptExecutionOutput,
+            llmspell_core::error::LLMSpellError,
+        > {
+            Ok(
+                llmspell_core::traits::script_executor::ScriptExecutionOutput {
+                    output: serde_json::json!("test output"),
+                    console_output: vec!["test console output".to_string()],
+                    metadata: llmspell_core::traits::script_executor::ScriptExecutionMetadata {
+                        duration: std::time::Duration::from_millis(10),
+                        language: "test".to_string(),
+                        exit_code: Some(0),
+                        warnings: vec![],
+                    },
                 },
-            })
+            )
         }
 
         fn language(&self) -> &'static str {
@@ -904,12 +914,8 @@ mod tests {
         let config = ExecutionConfig::default();
         let executor = Arc::new(MockScriptExecutor) as Arc<dyn ScriptExecutor>;
 
-        let kernel = IntegratedKernel::new(
-            protocol,
-            config,
-            "test-session".to_string(),
-            executor,
-        ).await;
+        let kernel =
+            IntegratedKernel::new(protocol, config, "test-session".to_string(), executor).await;
 
         assert!(kernel.is_ok());
     }
@@ -923,14 +929,10 @@ mod tests {
         let config = ExecutionConfig::default();
         let executor = Arc::new(MockScriptExecutor) as Arc<dyn ScriptExecutor>;
 
-        let mut kernel = IntegratedKernel::new(
-            protocol,
-            config,
-            "test-session".to_string(),
-            executor,
-        )
-        .await
-        .unwrap();
+        let mut kernel =
+            IntegratedKernel::new(protocol, config, "test-session".to_string(), executor)
+                .await
+                .unwrap();
 
         // Set up shutdown signal
         let (shutdown_tx, shutdown_rx) = mpsc::channel(1);

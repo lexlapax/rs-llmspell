@@ -386,7 +386,10 @@ impl EnhancedIOManager {
     ///
     /// Returns an error if publishing fails
     #[instrument(level = "debug", skip(self, data))]
-    pub async fn publish_display_data(&self, data: HashMap<String, serde_json::Value>) -> Result<()> {
+    pub async fn publish_display_data(
+        &self,
+        data: HashMap<String, serde_json::Value>,
+    ) -> Result<()> {
         let Some(ref sender) = self.iopub_sender else {
             return Ok(());
         };

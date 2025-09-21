@@ -229,7 +229,8 @@ pub async fn start_embedded_kernel_with_executor(
 
     // Use the provided script executor
     // Create integrated kernel with the provided executor
-    let kernel = IntegratedKernel::new(protocol.clone(), exec_config, session_id, script_executor).await?;
+    let kernel =
+        IntegratedKernel::new(protocol.clone(), exec_config, session_id, script_executor).await?;
 
     Ok(KernelHandle {
         kernel,
@@ -253,9 +254,14 @@ pub async fn start_embedded_kernel(config: LLMSpellConfig) -> Result<KernelHandl
 
     #[async_trait]
     impl ScriptExecutor for DefaultExecutor {
-        async fn execute_script(&self, _script: &str) -> Result<ScriptExecutionOutput, llmspell_core::error::LLMSpellError> {
+        async fn execute_script(
+            &self,
+            _script: &str,
+        ) -> Result<ScriptExecutionOutput, llmspell_core::error::LLMSpellError> {
             Ok(ScriptExecutionOutput {
-                output: serde_json::json!("Default executor - use start_embedded_kernel_with_executor for real execution"),
+                output: serde_json::json!(
+                    "Default executor - use start_embedded_kernel_with_executor for real execution"
+                ),
                 console_output: vec![],
                 metadata: ScriptExecutionMetadata {
                     duration: std::time::Duration::from_millis(0),
@@ -400,7 +406,10 @@ pub async fn start_kernel_service(port: u16, config: LLMSpellConfig) -> Result<S
 
     #[async_trait]
     impl ScriptExecutor for ServiceStubExecutor {
-        async fn execute_script(&self, _script: &str) -> Result<ScriptExecutionOutput, llmspell_core::error::LLMSpellError> {
+        async fn execute_script(
+            &self,
+            _script: &str,
+        ) -> Result<ScriptExecutionOutput, llmspell_core::error::LLMSpellError> {
             Ok(ScriptExecutionOutput {
                 output: serde_json::json!("Service stub executor - will be replaced in 9.4.6.4"),
                 console_output: vec![],

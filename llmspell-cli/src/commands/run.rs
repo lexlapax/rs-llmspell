@@ -113,7 +113,10 @@ async fn execute_script_embedded(
     // Pass script arguments to the execution context
     // TODO: Add support for passing args to the script context
     if !args.is_empty() {
-        debug!("Script arguments will be available in script context: {:?}", args);
+        debug!(
+            "Script arguments will be available in script context: {:?}",
+            args
+        );
     }
 
     // For embedded mode, we need to directly execute using the kernel
