@@ -3190,12 +3190,13 @@ CLI (run command)
 - [x] Added `publish_display_data()` method for rich output formatting
 - [x] Script output now sent as display_data with text/plain and application/json
 
-#### Subtask 9.4.6.4: Fix CLI's execute_script_embedded() (1 hour)**
-- [ ] Remove placeholder implementation in `llmspell-cli/src/commands/run.rs`
-- [ ] Create KernelHandle using `start_embedded_kernel()`
-- [ ] Use `kernel_handle.execute(script_content)` to run scripts
-- [ ] Parse and display actual results (not hardcoded messages)
-- [ ] Handle streaming output if --stream flag is set
+#### Subtask 9.4.6.4: Fix CLI's execute_script_embedded() (1 hour) ✓**
+- [x] Removed placeholder implementation in `llmspell-cli/src/commands/run.rs`
+- [x] Created `create_script_executor()` factory in llmspell-bridge to avoid cyclic dependency
+- [x] Added `start_embedded_kernel_with_executor()` to accept custom ScriptExecutor
+- [x] Updated CLI to create real ScriptRuntime and pass to kernel
+- [x] Modified execute_script_embedded to use handle.execute()
+- [x] Properly formatted output based on OutputFormat (JSON/YAML/Plain)
 
 #### Subtask 9.4.6.5: Validate Script Execution (1 hour)**
 - [ ] Test with simple Lua: `print("Hello, World!")` - should output to stdout

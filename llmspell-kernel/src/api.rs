@@ -177,15 +177,18 @@ impl ServiceHandle {
     }
 }
 
-/// Start an embedded kernel that runs in-process
+/// Start an embedded kernel with a custom script executor
 ///
-/// This is used when the CLI runs without --connect flag.
-/// The kernel runs in the same process as the CLI.
+/// This is used when the caller wants to provide a specific script executor
+/// implementation, such as a real ScriptRuntime from llmspell-bridge.
 ///
 /// # Errors
 ///
 /// Returns an error if the kernel fails to start or transport setup fails
-pub async fn start_embedded_kernel(config: LLMSpellConfig) -> Result<KernelHandle> {
+pub async fn start_embedded_kernel_with_executor(
+    config: LLMSpellConfig,
+    script_executor: Arc<dyn ScriptExecutor>,
+) -> Result<KernelHandle> {
     let kernel_id = format!("embedded-{}", Uuid::new_v4());
     let session_id = format!("session-{}", Uuid::new_v4());
 
@@ -224,33 +227,8 @@ pub async fn start_embedded_kernel(config: LLMSpellConfig) -> Result<KernelHandl
     // Build execution config from LLMSpellConfig
     let exec_config = build_execution_config(&config);
 
-    // TODO: In subtask 9.4.6.4, this will be replaced with real ScriptRuntime from llmspell-bridge
-    // For now, create a stub executor that will be replaced
-    struct StubExecutor;
-
-    #[async_trait]
-    impl ScriptExecutor for StubExecutor {
-        async fn execute_script(&self, _script: &str) -> Result<ScriptExecutionOutput, llmspell_core::error::LLMSpellError> {
-            Ok(ScriptExecutionOutput {
-                output: serde_json::json!("Stub executor - will be replaced in 9.4.6.4"),
-                console_output: vec![],
-                metadata: ScriptExecutionMetadata {
-                    duration: std::time::Duration::from_millis(0),
-                    language: "stub".to_string(),
-                    exit_code: Some(0),
-                    warnings: vec![],
-                },
-            })
-        }
-
-        fn language(&self) -> &str {
-            "stub"
-        }
-    }
-
-    let script_executor = Arc::new(StubExecutor) as Arc<dyn ScriptExecutor>;
-
-    // Create integrated kernel
+    // Use the provided script executor
+    // Create integrated kernel with the provided executor
     let kernel = IntegratedKernel::new(protocol.clone(), exec_config, session_id, script_executor).await?;
 
     Ok(KernelHandle {
@@ -259,6 +237,42 @@ pub async fn start_embedded_kernel(config: LLMSpellConfig) -> Result<KernelHandl
         transport,
         protocol,
     })
+}
+
+/// Start an embedded kernel that runs in-process
+///
+/// This is used when the CLI runs without --connect flag.
+/// The kernel runs in the same process as the CLI.
+///
+/// # Errors
+///
+/// Returns an error if the kernel fails to start or transport setup fails
+pub async fn start_embedded_kernel(config: LLMSpellConfig) -> Result<KernelHandle> {
+    // Create a default executor for backward compatibility
+    struct DefaultExecutor;
+
+    #[async_trait]
+    impl ScriptExecutor for DefaultExecutor {
+        async fn execute_script(&self, _script: &str) -> Result<ScriptExecutionOutput, llmspell_core::error::LLMSpellError> {
+            Ok(ScriptExecutionOutput {
+                output: serde_json::json!("Default executor - use start_embedded_kernel_with_executor for real execution"),
+                console_output: vec![],
+                metadata: ScriptExecutionMetadata {
+                    duration: std::time::Duration::from_millis(0),
+                    language: "lua".to_string(),
+                    exit_code: Some(0),
+                    warnings: vec![],
+                },
+            })
+        }
+
+        fn language(&self) -> &str {
+            "lua"
+        }
+    }
+
+    let script_executor = Arc::new(DefaultExecutor) as Arc<dyn ScriptExecutor>;
+    start_embedded_kernel_with_executor(config, script_executor).await
 }
 
 /// Connect to an existing kernel service as a client

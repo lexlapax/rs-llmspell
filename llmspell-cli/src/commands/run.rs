@@ -104,50 +104,54 @@ pub async fn execute_script_file(
 
 /// Execute script using embedded kernel
 async fn execute_script_embedded(
-    _handle: KernelHandle,
+    mut handle: KernelHandle,
     script_content: &str,
     args: HashMap<String, String>,
     stream: bool,
     output_format: OutputFormat,
 ) -> Result<()> {
-    // For now, just show that we're executing in embedded mode
+    // Pass script arguments to the execution context
+    // TODO: Add support for passing args to the script context
+    if !args.is_empty() {
+        debug!("Script arguments will be available in script context: {:?}", args);
+    }
+
+    // Execute the script through the kernel
+    let result = handle.execute(script_content).await?;
+
+    // Format and display the output based on the requested format
     match output_format {
         OutputFormat::Json => {
             println!(
                 "{}",
                 serde_json::json!({
-                    "status": "executed",
+                    "status": "success",
                     "mode": "embedded",
                     "script_length": script_content.len(),
                     "args_count": args.len(),
                     "streaming": stream,
-                    "result": "Script execution completed successfully in embedded mode"
+                    "result": result
                 })
             );
         }
         OutputFormat::Yaml => {
             let data = serde_json::json!({
-                "status": "executed",
+                "status": "success",
                 "mode": "embedded",
                 "script_length": script_content.len(),
                 "args_count": args.len(),
                 "streaming": stream,
-                "result": "Script execution completed successfully in embedded mode"
+                "result": result
             });
             println!("{}", serde_yaml::to_string(&data)?);
         }
         _ => {
-            println!("Executing script in embedded mode...");
-            println!("Script length: {} characters", script_content.len());
-            if !args.is_empty() {
-                println!("Arguments: {} provided", args.len());
-            }
+            // For plain text output, the result is already printed via IOPub
+            // Just show completion status
             if stream {
-                println!("🔄 Streaming execution...");
-                println!("Output: Script execution completed successfully");
+                debug!("Script execution completed with streaming");
             } else {
-                println!("✓ Script executed successfully");
-                println!("Result: Script execution completed successfully");
+                debug!("Script execution completed");
             }
         }
     }
