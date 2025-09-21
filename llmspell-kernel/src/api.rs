@@ -180,7 +180,7 @@ impl ServiceHandle {
 /// Start an embedded kernel with a custom script executor
 ///
 /// This is used when the caller wants to provide a specific script executor
-/// implementation, such as a real ScriptRuntime from llmspell-bridge.
+/// implementation, such as a real `ScriptRuntime` from llmspell-bridge.
 ///
 /// # Errors
 ///
@@ -266,7 +266,7 @@ pub async fn start_embedded_kernel(config: LLMSpellConfig) -> Result<KernelHandl
             })
         }
 
-        fn language(&self) -> &str {
+        fn language(&self) -> &'static str {
             "lua"
         }
     }
@@ -394,17 +394,6 @@ pub async fn connect_to_kernel(connection_string: &str) -> Result<ClientHandle> 
 ///
 /// Returns an error if the kernel service fails to start or bind to the port
 pub async fn start_kernel_service(port: u16, config: LLMSpellConfig) -> Result<ServiceHandle> {
-    let kernel_id = format!("service-{}", Uuid::new_v4());
-    let session_id = format!("session-{}", Uuid::new_v4());
-
-    info!("Starting kernel service {} on port {}", kernel_id, port);
-
-    // Create Jupyter protocol
-    let protocol = JupyterProtocol::new(session_id.clone(), kernel_id.clone());
-
-    // Build execution config
-    let exec_config = build_execution_config(&config);
-
     // TODO: In subtask 9.4.6.4, this will be replaced with real ScriptRuntime from llmspell-bridge
     // For now, create a stub executor that will be replaced (same as in start_embedded_kernel)
     struct ServiceStubExecutor;
@@ -424,10 +413,21 @@ pub async fn start_kernel_service(port: u16, config: LLMSpellConfig) -> Result<S
             })
         }
 
-        fn language(&self) -> &str {
+        fn language(&self) -> &'static str {
             "stub"
         }
     }
+
+    let kernel_id = format!("service-{}", Uuid::new_v4());
+    let session_id = format!("session-{}", Uuid::new_v4());
+
+    info!("Starting kernel service {} on port {}", kernel_id, port);
+
+    // Create Jupyter protocol
+    let protocol = JupyterProtocol::new(session_id.clone(), kernel_id.clone());
+
+    // Build execution config
+    let exec_config = build_execution_config(&config);
 
     let script_executor = Arc::new(ServiceStubExecutor) as Arc<dyn ScriptExecutor>;
 

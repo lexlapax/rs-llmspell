@@ -406,7 +406,7 @@ impl From<llmspell_config::SecurityConfig> for crate::engine::SecurityContext {
     }
 }
 
-/// Implementation of ScriptExecutor trait for ScriptRuntime
+/// Implementation of `ScriptExecutor` trait for `ScriptRuntime`
 ///
 /// This allows the kernel to execute scripts without directly depending on
 /// the bridge crate, avoiding cyclic dependencies.
@@ -438,7 +438,7 @@ impl ScriptExecutor for ScriptRuntime {
         self.engine.supports_streaming()
     }
 
-    fn language(&self) -> &str {
+    fn language(&self) -> &'static str {
         // Return the configured engine type
         // TODO: Add a method to get current engine language
         "lua"  // Default for now since we use Lua primarily

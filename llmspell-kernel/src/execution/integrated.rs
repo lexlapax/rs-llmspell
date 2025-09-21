@@ -15,9 +15,6 @@ use std::time::Duration;
 use tokio::sync::mpsc;
 use tracing::{debug, error, info, instrument, trace, warn};
 
-/// Type alias for I/O handler functions
-type IOHandler = Box<dyn Fn(&str) + Send + Sync>;
-
 use crate::events::correlation::{ExecutionState, ExecutionStatus};
 use crate::events::{KernelEvent, KernelEventCorrelator};
 use crate::io::manager::EnhancedIOManager;
@@ -155,8 +152,8 @@ impl<P: Protocol + 'static> IntegratedKernel<P> {
                         if let Some(stream_type) = msg.content.get("name").and_then(|v| v.as_str()) {
                             if let Some(text) = msg.content.get("text").and_then(|v| v.as_str()) {
                                 match stream_type {
-                                    "stdout" => print!("{}", text),
-                                    "stderr" => eprint!("{}", text),
+                                    "stdout" => print!("{text}"),
+                                    "stderr" => eprint!("{text}"),
                                     _ => {}
                                 }
                             }
@@ -165,7 +162,7 @@ impl<P: Protocol + 'static> IntegratedKernel<P> {
                     "execute_result" | "display_data" => {
                         if let Some(data) = msg.content.get("data") {
                             if let Some(text) = data.get("text/plain").and_then(|v| v.as_str()) {
-                                println!("{}", text);
+                                println!("{text}");
                             }
                         }
                     }
@@ -716,16 +713,54 @@ impl<P: Protocol + 'static> IntegratedKernel<P> {
         }
 
         // Return the script result
-        let result = if script_output.output != serde_json::Value::Null {
-            script_output.output.to_string()
-        } else {
+        let result = if script_output.output == serde_json::Value::Null {
             "null".to_string()
+        } else {
+            script_output.output.to_string()
         };
 
         // Flush I/O buffers
         self.io_manager.flush_all().await?;
 
         Ok(result)
+    }
+
+    /// Execute code directly without message loop
+    /// Used for embedded mode when kernel is not running
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if code execution fails
+    pub async fn execute_direct(&mut self, code: &str) -> Result<String> {
+        // Generate execution ID
+        let exec_id = format!("exec-{}", uuid::Uuid::new_v4());
+
+        // Update state for tracking
+        self.state.update_execution(|exec| {
+            exec.start_execution(exec_id, code.to_string());
+            Ok(())
+        })?;
+
+        // Execute code using the internal method
+        let result = self.execute_code_in_context(code).await;
+
+        // Update state based on result
+        match &result {
+            Ok(output) => {
+                self.state.update_execution(|exec| {
+                    exec.complete_execution(Some(output.clone()), None);
+                    Ok(())
+                })?;
+            }
+            Err(e) => {
+                self.state.update_execution(|exec| {
+                    exec.complete_execution(None, Some(e.to_string()));
+                    Ok(())
+                })?;
+            }
+        }
+
+        result
     }
 
     /// Handle `kernel_info_request`
@@ -822,18 +857,17 @@ impl<P: Protocol + 'static> IntegratedKernel<P> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use llmspell_core::traits::script_executor::{ScriptExecutionMetadata, ScriptExecutionOutput};
 
     // Mock script executor for testing
     struct MockScriptExecutor;
 
     #[async_trait::async_trait]
     impl ScriptExecutor for MockScriptExecutor {
-        async fn execute_script(&self, _script: &str) -> Result<ScriptExecutionOutput> {
-            Ok(ScriptExecutionOutput {
+        async fn execute_script(&self, _script: &str) -> Result<llmspell_core::traits::script_executor::ScriptExecutionOutput, llmspell_core::error::LLMSpellError> {
+            Ok(llmspell_core::traits::script_executor::ScriptExecutionOutput {
                 output: serde_json::json!("test output"),
                 console_output: vec!["test console output".to_string()],
-                metadata: ScriptExecutionMetadata {
+                metadata: llmspell_core::traits::script_executor::ScriptExecutionMetadata {
                     duration: std::time::Duration::from_millis(10),
                     language: "test".to_string(),
                     exit_code: Some(0),
@@ -842,7 +876,7 @@ mod tests {
             })
         }
 
-        fn language(&self) -> &str {
+        fn language(&self) -> &'static str {
             "test"
         }
     }
@@ -912,8 +946,6 @@ mod tests {
 
     #[tokio::test]
     async fn test_script_executor_in_context() {
-        use llmspell_core::traits::script_executor::{ScriptExecutionMetadata, ScriptExecutionOutput};
-
         // Test script executor directly
         let executor = Arc::new(MockScriptExecutor) as Arc<dyn ScriptExecutor>;
         let result = executor.execute_script("return 'test output'").await;

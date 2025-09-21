@@ -104,7 +104,7 @@ pub async fn execute_script_file(
 
 /// Execute script using embedded kernel
 async fn execute_script_embedded(
-    mut handle: KernelHandle,
+    handle: KernelHandle,
     script_content: &str,
     args: HashMap<String, String>,
     stream: bool,
@@ -116,8 +116,13 @@ async fn execute_script_embedded(
         debug!("Script arguments will be available in script context: {:?}", args);
     }
 
-    // Execute the script through the kernel
-    let result = handle.execute(script_content).await?;
+    // For embedded mode, we need to directly execute using the kernel
+    // The KernelHandle.execute() method requires the kernel to be running,
+    // which would cause a deadlock. Instead, we'll get the kernel and execute directly.
+    let mut kernel = handle.into_kernel();
+
+    // Execute the script directly without the message loop
+    let result = kernel.execute_direct(script_content).await?;
 
     // Format and display the output based on the requested format
     match output_format {

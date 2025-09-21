@@ -53,7 +53,7 @@ pub trait ScriptExecutor: Send + Sync {
     }
 
     /// Get the supported language for this executor
-    fn language(&self) -> &str;
+    fn language(&self) -> &'static str;
 
     /// Check if the executor is ready
     async fn is_ready(&self) -> bool {

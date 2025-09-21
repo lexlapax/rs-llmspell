@@ -299,8 +299,12 @@ use std::sync::Arc;
 
 /// Create a script executor for the given configuration
 ///
-/// This factory function creates a ScriptExecutor without exposing
-/// the concrete ScriptRuntime type, avoiding cyclic dependencies.
+/// This factory function creates a `ScriptExecutor` without exposing
+/// the concrete `ScriptRuntime` type, avoiding cyclic dependencies.
+///
+/// # Errors
+///
+/// Returns an error if the script runtime fails to initialize with the given configuration.
 pub async fn create_script_executor(
     config: LLMSpellConfig,
 ) -> Result<Arc<dyn ScriptExecutor>, llmspell_core::error::LLMSpellError> {

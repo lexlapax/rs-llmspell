@@ -380,7 +380,7 @@ impl EnhancedIOManager {
         Ok(())
     }
 
-    /// Publish display data to IOPub channel
+    /// Publish display data to `IOPub` channel
     ///
     /// # Errors
     ///
