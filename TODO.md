@@ -3462,6 +3462,37 @@ RUN_EXPENSIVE_TESTS=0 python scripts/validate_applications.py
 - Automatic issue creation on test failures
 - Test reports uploaded as artifacts
 
+**Script Arguments Implementation (2025-09-21):**
+**Problem Discovered:** webapp-creator and other applications weren't receiving CLI arguments passed after `--` separator.
+The arguments were parsed but not injected into the Lua runtime as the ARGS global variable.
+
+**Solution Implemented:**
+1. **ScriptExecutor Trait Extension**: Added `execute_script_with_args` method to pass arguments without mutation
+2. **Preamble Injection Pattern**: Arguments injected as Lua code preamble before script execution:
+   ```lua
+   -- Injected script arguments
+   ARGS = {}
+   ARGS["output"] = "/tmp/my-app"
+   ARGS["template"] = "vue"
+
+   -- Original script
+   ```
+3. **Dependency Inversion**: Avoided cyclic dependencies by not modifying executor state
+4. **Universal Support**: Works for both integrated and daemon mode kernels
+
+**Files Modified:**
+- `llmspell-core/src/traits/script_executor.rs`: Added execute_script_with_args to trait
+- `llmspell-bridge/src/runtime.rs`: Implemented preamble injection for ARGS
+- `llmspell-kernel/src/execution/integrated.rs`: Added execute_direct_with_args method
+- `llmspell-cli/src/commands/run.rs`: Passes parsed args to kernel execution
+- `scripts/validate_applications.py`: Updated to test script arguments with webapp-creator
+
+**Key Insights:**
+- **Interior Mutability Challenge**: Arc<dyn ScriptExecutor> prevented mutation, solved with immutable approach
+- **Preamble Pattern**: Injecting globals as script preamble is clean and language-agnostic
+- **Testing Critical**: webapp-creator now validates with custom --output directory
+- **Documentation Updated**: CLI docs and scripts/README.md now document script argument passing
+
 ### Task 9.5.2: Implement Future-Proofing Infrastructure
 **Priority**: HIGH
 **Estimated Time**: 4 hours

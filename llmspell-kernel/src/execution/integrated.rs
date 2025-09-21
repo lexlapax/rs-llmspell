@@ -734,6 +734,20 @@ impl<P: Protocol + 'static> IntegratedKernel<P> {
     ///
     /// Returns an error if code execution fails
     pub async fn execute_direct(&mut self, code: &str) -> Result<String> {
+        self.execute_direct_with_args(code, HashMap::new()).await
+    }
+
+    /// Execute code directly with script arguments
+    /// Used for embedded mode when kernel is not running
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if code execution fails
+    pub async fn execute_direct_with_args(
+        &mut self,
+        code: &str,
+        args: HashMap<String, String>,
+    ) -> Result<String> {
         // Generate execution ID
         let exec_id = format!("exec-{}", uuid::Uuid::new_v4());
 
@@ -743,8 +757,32 @@ impl<P: Protocol + 'static> IntegratedKernel<P> {
             Ok(())
         })?;
 
-        // Execute code using the internal method
-        let result = self.execute_code_in_context(code).await;
+        // Execute code with arguments if provided
+        let result = if args.is_empty() {
+            // Execute code using the internal method as before
+            self.execute_code_in_context(code).await
+        } else {
+            debug!("Executing script with {} arguments", args.len());
+            // Use the new execute_script_with_args method
+            match self
+                .script_executor
+                .execute_script_with_args(code, args)
+                .await
+            {
+                Ok(output) => {
+                    // Convert ScriptExecutionOutput to String
+                    // Combine console output and result
+                    let mut result = String::new();
+                    if !output.console_output.is_empty() {
+                        result.push_str(&output.console_output.join("\n"));
+                        result.push('\n');
+                    }
+                    result.push_str(&serde_json::to_string(&output.output).unwrap_or_default());
+                    Ok(result)
+                }
+                Err(e) => Err(anyhow::anyhow!("Script execution failed: {}", e)),
+            }
+        };
 
         // Update state based on result
         match &result {

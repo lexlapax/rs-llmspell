@@ -610,11 +610,20 @@ class ApplicationValidator:
         # Clean up before test
         self._cleanup_temp_files()
 
-        # Run application with extended timeout
+        # Test with custom output directory using script arguments
+        custom_output = "/tmp/test-webapp-output"
+        if os.path.exists(custom_output):
+            shutil.rmtree(custom_output, ignore_errors=True)
+
+        # Get config for this app
+        app_info = self.applications[app_name]
+
+        # Run application with custom arguments to test script arg passing
         result, runtime = self.run_application(
             app_name,
-            config="applications.toml",
-            timeout=300
+            config=app_info['config'],
+            args=["--output", custom_output],  # Test script argument passing
+            timeout=app_info['runtime']
         )
 
         # Initialize test result
@@ -644,15 +653,28 @@ class ApplicationValidator:
             "Executing Main Workflow" in result.stdout
         )
 
-        # Check if TaskFlow directory was created
-        if os.path.exists("/tmp/taskflow"):
-            files_created.append("/tmp/taskflow")
+        # Check if custom output directory was created (tests script arg passing)
+        # webapp-creator should create the project in the custom output directory
+        expected_project_path = os.path.join(custom_output, "taskflow")
+        if os.path.exists(expected_project_path):
+            files_created.append(expected_project_path)
             # Count files in the generated project
             import glob
-            taskflow_files = glob.glob("/tmp/taskflow/**/*", recursive=True)
+            taskflow_files = glob.glob(f"{expected_project_path}/**/*", recursive=True)
             validations["project_files_created"] = len(taskflow_files) > 20
+            validations["custom_output_respected"] = True
         else:
-            validations["project_files_created"] = False
+            # Check if it was created in default location (arg passing failed)
+            if os.path.exists("/tmp/taskflow"):
+                files_created.append("/tmp/taskflow")
+                errors.append("Script arguments not respected - project created in default location")
+                validations["custom_output_respected"] = False
+                # Still count files
+                taskflow_files = glob.glob("/tmp/taskflow/**/*", recursive=True)
+                validations["project_files_created"] = len(taskflow_files) > 20
+            else:
+                validations["project_files_created"] = False
+                validations["custom_output_respected"] = False
 
         # Status determination
         if result.returncode == -1:  # Timeout

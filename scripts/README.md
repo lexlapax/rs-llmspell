@@ -64,6 +64,7 @@ Features:
 - File creation verification
 - Performance tracking and reporting
 - HTML/JSON report generation
+- **Script argument testing** - Validates that applications respect CLI arguments
 
 ```bash
 # Run standard tests (excludes webapp-creator)
@@ -78,6 +79,11 @@ python3 scripts/validate_applications.py --html report.html --json report.json
 # Verbose output for debugging
 python3 scripts/validate_applications.py --verbose
 ```
+
+**Script Arguments Support:**
+The validation suite tests that applications properly handle script arguments passed via the CLI.
+For example, webapp-creator is tested with `--output /tmp/test-webapp-output` to verify that
+the ARGS global is properly injected into the Lua runtime.
 
 **Application Test Matrix:**
 

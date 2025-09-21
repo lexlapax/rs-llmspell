@@ -14,6 +14,7 @@ use llmspell_core::traits::script_executor::{
     ScriptExecutionMetadata, ScriptExecutionOutput, ScriptExecutor,
 };
 use std::collections::HashMap;
+use std::fmt::Write;
 use std::sync::{Arc, RwLock};
 use std::time::Instant;
 use tracing::{debug, info, instrument};
@@ -427,6 +428,51 @@ impl ScriptExecutor for ScriptRuntime {
                 duration: start.elapsed(),
                 language: engine_output.metadata.engine.clone(),
                 exit_code: None, // ScriptMetadata doesn't have exit_code
+                warnings: engine_output.metadata.warnings,
+            },
+        };
+
+        Ok(output)
+    }
+
+    async fn execute_script_with_args(
+        &self,
+        script: &str,
+        args: std::collections::HashMap<String, String>,
+    ) -> Result<ScriptExecutionOutput, LLMSpellError> {
+        let start = Instant::now();
+
+        debug!("Executing script with {} arguments", args.len());
+
+        // We need to temporarily set the args and then execute
+        // Since we can't mutate self, we need to use a different approach
+        // Create a new script with args injected as a preamble
+        let script_with_args = if args.is_empty() {
+            script.to_string()
+        } else {
+            let mut preamble = String::from("-- Injected script arguments\nARGS = {}\n");
+            for (key, value) in &args {
+                // Escape the value for Lua string
+                let escaped_value = value.replace('\\', "\\\\").replace('"', "\\\"");
+                writeln!(preamble, "ARGS[\"{key}\"] = \"{escaped_value}\"")
+                    .expect("String write should never fail");
+            }
+            preamble.push_str("\n-- Original script\n");
+            preamble.push_str(script);
+            preamble
+        };
+
+        // Execute using the underlying engine
+        let engine_output = self.engine.execute_script(&script_with_args).await?;
+
+        // Convert ScriptOutput to ScriptExecutionOutput
+        let output = ScriptExecutionOutput {
+            output: engine_output.output,
+            console_output: engine_output.console_output,
+            metadata: ScriptExecutionMetadata {
+                duration: start.elapsed(),
+                language: engine_output.metadata.engine.clone(),
+                exit_code: None,
                 warnings: engine_output.metadata.warnings,
             },
         };

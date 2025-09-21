@@ -111,7 +111,6 @@ async fn execute_script_embedded(
     output_format: OutputFormat,
 ) -> Result<()> {
     // Pass script arguments to the execution context
-    // TODO: Add support for passing args to the script context
     if !args.is_empty() {
         debug!(
             "Script arguments will be available in script context: {:?}",
@@ -124,8 +123,10 @@ async fn execute_script_embedded(
     // which would cause a deadlock. Instead, we'll get the kernel and execute directly.
     let mut kernel = handle.into_kernel();
 
-    // Execute the script directly without the message loop
-    let result = kernel.execute_direct(script_content).await?;
+    // Execute the script with arguments
+    let result = kernel
+        .execute_direct_with_args(script_content, args.clone())
+        .await?;
 
     // Format and display the output based on the requested format
     match output_format {

@@ -47,6 +47,24 @@ pub trait ScriptExecutor: Send + Sync {
     /// The execution output including return value and console output
     async fn execute_script(&self, script: &str) -> Result<ScriptExecutionOutput, LLMSpellError>;
 
+    /// Execute a script with arguments and return the output
+    ///
+    /// # Arguments
+    /// * `script` - The script source code to execute
+    /// * `args` - HashMap of argument name to value that will be available as ARGS global
+    ///
+    /// # Returns
+    /// The execution output including return value and console output
+    async fn execute_script_with_args(
+        &self,
+        script: &str,
+        _args: std::collections::HashMap<String, String>,
+    ) -> Result<ScriptExecutionOutput, LLMSpellError> {
+        // Default implementation just calls execute_script
+        // Implementations should override this to properly inject args
+        self.execute_script(script).await
+    }
+
     /// Check if streaming execution is supported
     fn supports_streaming(&self) -> bool {
         false

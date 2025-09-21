@@ -154,11 +154,17 @@ OPTIONS:
     --stream              Enable streaming output
     --rag-profile <NAME>   RAG configuration profile
 
+SCRIPT ARGUMENTS:
+    Arguments after -- are passed to the script as ARGS global variable
+    Format: -- --key value --flag
+    Access in Lua: ARGS["key"], ARGS["flag"]
+
 EXAMPLES:
     llmspell run script.lua
     llmspell run script.lua -- arg1 arg2
     llmspell run script.js --engine javascript
-    llmspell run ml_task.lua --rag-profile production
+    llmspell run webapp-creator.lua -- --output /tmp/my-app --input spec.lua
+    llmspell run ml_task.lua --rag-profile production -- --model gpt-4
 ```
 
 ### 3.2 exec - Execute Inline Code
@@ -208,10 +214,14 @@ OPTIONS:
     --kernel <ADDRESS>     Kernel connection [default: auto]
     --port <PORT>          DAP server port for IDE attachment
 
+SCRIPT ARGUMENTS:
+    Arguments after -- are passed to the script as ARGS global variable
+    Available during debugging for testing different parameters
+
 EXAMPLES:
     llmspell debug script.lua --break-at main.lua:10
-    llmspell debug app.lua --watch "state.counter" --step
-    llmspell debug test.lua --break-at test.lua:5 --break-at lib.lua:20
+    llmspell debug app.lua --watch "state.counter" --step -- --verbose
+    llmspell debug test.lua --break-at test.lua:5 -- --test-mode
     llmspell debug remote.lua --port 9555  # For VS Code attachment
 ```
 
@@ -660,6 +670,8 @@ async fn main() -> Result<()> {
 
 ### 8.3 Script Argument Handling
 
+#### Parsing and Passing Arguments
+
 ```rust
 // Properly separate CLI args from script args
 fn parse_args(raw_args: Vec<String>) -> (Vec<String>, Vec<String>) {
@@ -672,8 +684,79 @@ fn parse_args(raw_args: Vec<String>) -> (Vec<String>, Vec<String>) {
     }
 }
 
-// Pass script args to runtime
-runtime.set_script_args(script_args)?;
+// Convert script args to HashMap for script injection
+fn parse_script_args(args: &[String]) -> HashMap<String, String> {
+    let mut result = HashMap::new();
+    let mut i = 0;
+
+    while i < args.len() {
+        let arg = &args[i];
+        if arg.starts_with("--") {
+            let key = arg.trim_start_matches("--").to_string();
+            if i + 1 < args.len() && !args[i + 1].starts_with("--") {
+                // Key-value pair
+                result.insert(key, args[i + 1].clone());
+                i += 2;
+            } else {
+                // Flag
+                result.insert(key, "true".to_string());
+                i += 1;
+            }
+        } else {
+            // Positional argument
+            result.insert(i.to_string(), arg.clone());
+            i += 1;
+        }
+    }
+    result
+}
+```
+
+#### Script Executor Implementation
+
+```rust
+// ScriptExecutor trait extension
+async fn execute_script_with_args(
+    &self,
+    script: &str,
+    args: HashMap<String, String>,
+) -> Result<ScriptExecutionOutput, LLMSpellError> {
+    // Inject ARGS global into script preamble
+    let script_with_args = if !args.is_empty() {
+        let mut preamble = String::from("-- Injected script arguments\nARGS = {}\n");
+        for (key, value) in &args {
+            let escaped_value = value.replace('\\', "\\\\").replace('"', "\\\"");
+            preamble.push_str(&format!("ARGS[\"{}\"] = \"{}\"\n", key, escaped_value));
+        }
+        preamble.push_str("\n-- Original script\n");
+        preamble.push_str(script);
+        preamble
+    } else {
+        script.to_string()
+    };
+
+    self.execute_script(&script_with_args).await
+}
+```
+
+#### Usage in Scripts
+
+```lua
+-- Example: webapp-creator using script arguments
+-- Run: llmspell run webapp-creator.lua -- --output /tmp/my-app --template vue
+
+local output_dir = ARGS and ARGS["output"] or "./output"
+local template = ARGS and ARGS["template"] or "react"
+
+print("Creating app in: " .. output_dir)
+print("Using template: " .. template)
+
+-- Use the arguments
+local file_writer = get_tool("file_writer")
+file_writer:write({
+    path = output_dir .. "/package.json",
+    content = generate_package_json(template)
+})
 ```
 
 ---
