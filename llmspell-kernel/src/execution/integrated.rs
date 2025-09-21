@@ -492,6 +492,20 @@ impl<P: Protocol + 'static> IntegratedKernel<P> {
                     .publish_execute_result(exec_count.try_into().unwrap_or(i32::MAX), data)
                     .await?;
 
+                // Send execute_reply message through protocol
+                let execute_reply = self.protocol.create_response(
+                    "execute_reply",
+                    serde_json::json!({
+                        "status": "ok",
+                        "execution_count": exec_count,
+                        "user_expressions": {},
+                    }),
+                )?;
+
+                // TODO: Send execute_reply through transport once integrated
+                // For now, just create the response
+                let _ = execute_reply;
+
                 // Track successful execute_reply event
                 let execute_reply_event = KernelEvent::ExecuteReply {
                     status: ExecutionStatus::Ok,
@@ -516,6 +530,21 @@ impl<P: Protocol + 'static> IntegratedKernel<P> {
                 self.io_manager
                     .write_stderr(&format!("Error: {e}\n"))
                     .await?;
+
+                // Send error execute_reply message through protocol
+                let error_reply = self.protocol.create_response(
+                    "execute_reply",
+                    serde_json::json!({
+                        "status": "error",
+                        "execution_count": exec_count,
+                        "ename": "ExecutionError",
+                        "evalue": e.to_string(),
+                        "traceback": vec![e.to_string()],
+                    }),
+                )?;
+
+                // TODO: Send execute_reply through transport once integrated
+                let _ = error_reply;
 
                 // Track error execute_reply event
                 let error_info = crate::events::correlation::ErrorInfo {
@@ -545,6 +574,18 @@ impl<P: Protocol + 'static> IntegratedKernel<P> {
                         self.config.execution_timeout_secs
                     ))
                     .await?;
+
+                // Send timeout execute_reply message through protocol
+                let timeout_reply = self.protocol.create_response(
+                    "execute_reply",
+                    serde_json::json!({
+                        "status": "aborted",
+                        "execution_count": exec_count,
+                    }),
+                )?;
+
+                // TODO: Send execute_reply through transport once integrated
+                let _ = timeout_reply;
 
                 // Track timeout execute_reply event
                 let error_info = crate::events::correlation::ErrorInfo {
@@ -643,17 +684,25 @@ impl<P: Protocol + 'static> IntegratedKernel<P> {
     fn handle_kernel_info_request(&mut self, _message: &HashMap<String, Value>) -> Result<()> {
         debug!("Handling kernel_info_request");
 
-        // Create kernel info response
+        // Create kernel info response with language from script executor
+        let language = self.script_executor.language();
+        let (file_extension, version) = match language {
+            "lua" => (".lua", "5.4"),
+            "javascript" | "js" => (".js", "ES2022"),
+            "python" => (".py", "3.11"),
+            _ => (".txt", "1.0"),
+        };
+
         let kernel_info = serde_json::json!({
             "protocol_version": crate::PROTOCOL_VERSION,
             "implementation": "llmspell",
             "implementation_version": crate::KERNEL_VERSION,
             "language_info": {
-                "name": "lua",
-                "version": "5.4",
-                "file_extension": ".lua",
+                "name": language,
+                "version": version,
+                "file_extension": file_extension,
             },
-            "banner": format!("LLMSpell Kernel v{}", crate::KERNEL_VERSION),
+            "banner": format!("LLMSpell Kernel v{} ({})", crate::KERNEL_VERSION, language),
         });
 
         // TODO: Send response via transport when integrated

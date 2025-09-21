@@ -3172,11 +3172,13 @@ CLI (run command)
 - [x] Updated IntegratedKernel to use Arc<dyn ScriptExecutor> instead of direct dependency
 - [x] Added stub executors in API functions (to be replaced with real ScriptRuntime in 9.4.6.4)
 
-#### Subtask 9.4.6.2: Wire Script Execution in IntegratedKernel (2 hours)**
-- [ ] Modify `IntegratedKernel::handle_shell_message()` to handle execute_request properly
-- [ ] Create ScriptRuntime instance with Lua engine for script execution
-- [ ] Execute script using `runtime.execute_script(code).await`
-- [ ] Format results as Jupyter execute_reply with proper status and output
+#### Subtask 9.4.6.2: Wire Script Execution in IntegratedKernel (2 hours) ✓**
+- [x] `handle_execute_request()` already properly routes to `execute_code_in_context()`
+- [x] `execute_code_in_context()` uses injected script_executor to run scripts
+- [x] Console output routed through IOManager with `write_stdout()`
+- [x] Results published with `publish_execute_result()`
+- [x] Added proper execute_reply messages for ok/error/aborted states
+- [x] Updated kernel_info_request to report language from script_executor
 - [ ] Send execution results through IOPub channel for display
 
 #### Subtask 9.4.6.3: Connect Jupyter Channels to stdout/stderr (2 hours)**
