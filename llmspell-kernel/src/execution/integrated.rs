@@ -22,7 +22,8 @@ use crate::io::router::MessageRouter;
 use crate::runtime::tracing::{OperationCategory, TracingInstrumentation};
 use crate::sessions::{CreateSessionOptions, SessionManager, SessionManagerConfig};
 use crate::state::{KernelState, StorageBackend};
-use crate::traits::Protocol;
+use crate::traits::{Protocol, Transport};
+use crate::debug::{DAPBridge, ExecutionManager};
 
 // Session dependencies
 use crate::state::StateManager;
@@ -90,6 +91,8 @@ pub struct IntegratedKernel<P: Protocol> {
     script_executor: Arc<dyn ScriptExecutor>,
     /// Protocol handler
     protocol: P,
+    /// Transport for message communication
+    transport: Option<Box<dyn Transport>>,
     /// I/O manager
     io_manager: Arc<EnhancedIOManager>,
     /// Message router for multi-client support
@@ -109,6 +112,10 @@ pub struct IntegratedKernel<P: Protocol> {
     /// Session manager
     #[allow(dead_code)] // Will be used when session integration is fully implemented
     session_manager: SessionManager,
+    /// Execution manager for debugging
+    execution_manager: Arc<ExecutionManager>,
+    /// DAP bridge for IDE debugging
+    dap_bridge: Arc<parking_lot::Mutex<DAPBridge>>,
     /// Shutdown signal receiver
     shutdown_rx: Option<mpsc::Receiver<()>>,
 }
@@ -225,9 +232,18 @@ impl<P: Protocol + 'static> IntegratedKernel<P> {
             Ok(())
         })?;
 
+        // Create ExecutionManager and DAPBridge
+        let execution_manager = Arc::new(ExecutionManager::new(session_id.clone()));
+        let mut dap_bridge = DAPBridge::new(session_id.clone());
+
+        // Connect DAP bridge to execution manager
+        dap_bridge.connect_execution_manager(execution_manager.clone());
+        let dap_bridge = Arc::new(parking_lot::Mutex::new(dap_bridge));
+
         Ok(Self {
             script_executor,
             protocol,
+            transport: None,
             io_manager,
             message_router,
             event_correlator,
@@ -237,6 +253,8 @@ impl<P: Protocol + 'static> IntegratedKernel<P> {
             execution_count: Arc::new(RwLock::new(0)),
             state,
             session_manager,
+            execution_manager,
+            dap_bridge,
             shutdown_rx: None,
         })
     }
@@ -244,6 +262,21 @@ impl<P: Protocol + 'static> IntegratedKernel<P> {
     /// Set shutdown signal receiver
     pub fn set_shutdown_receiver(&mut self, rx: mpsc::Receiver<()>) {
         self.shutdown_rx = Some(rx);
+    }
+
+    /// Set transport for message communication
+    pub fn set_transport(&mut self, transport: Box<dyn Transport>) {
+        self.transport = Some(transport);
+    }
+
+    /// Get the execution manager for debugging
+    pub fn execution_manager(&self) -> Arc<ExecutionManager> {
+        self.execution_manager.clone()
+    }
+
+    /// Get the DAP bridge for IDE debugging
+    pub fn dap_bridge(&self) -> Arc<parking_lot::Mutex<DAPBridge>> {
+        self.dap_bridge.clone()
     }
 
     /// Get the kernel state
@@ -303,6 +336,9 @@ impl<P: Protocol + 'static> IntegratedKernel<P> {
         self.event_correlator.track_event(status_event).await?;
 
         // Main execution loop - runs in current context
+        // Publish idle status to indicate kernel is ready
+        self.io_manager.publish_status("idle").await?;
+
         loop {
             // Check for shutdown signal
             if let Some(ref mut shutdown_rx) = self.shutdown_rx {
@@ -312,11 +348,79 @@ impl<P: Protocol + 'static> IntegratedKernel<P> {
                 }
             }
 
-            // Simulate message reception (will be replaced with actual transport)
-            // For now, just check for shutdown
-            tokio::time::sleep(Duration::from_millis(100)).await;
+            // Process messages from transport if available
+            let has_transport = self.transport.is_some();
 
-            // TODO: Process actual messages when transport is integrated
+            if has_transport {
+                // Collect messages from all channels first
+                let mut messages_to_process = Vec::new();
+
+                if let Some(ref mut transport) = self.transport {
+                    // Poll multiple channels for messages
+                    let channels = vec!["shell", "control", "stdin"];
+
+                    for channel in channels {
+                        // Try to receive a message from this channel (non-blocking)
+                        match transport.recv(channel).await {
+                            Ok(Some(message_parts)) => {
+                                if let Some(first_part) = message_parts.first() {
+                                    // Parse the message using protocol
+                                    match self.protocol.parse_message(first_part) {
+                                        Ok(parsed_msg) => {
+                                            trace!("Received message on {}: {:?}", channel,
+                                                parsed_msg.get("msg_type"));
+                                            messages_to_process.push(parsed_msg);
+                                        }
+                                        Err(e) => {
+                                            warn!("Failed to parse message on {}: {}", channel, e);
+                                        }
+                                    }
+                                }
+                            }
+                            Ok(None) => {
+                                // No message available, continue
+                            }
+                            Err(e) => {
+                                error!("Error receiving from {}: {}", channel, e);
+                            }
+                        }
+                    }
+
+                    // Process heartbeat separately (simple echo)
+                    if let Ok(Some(hb_data)) = transport.recv("heartbeat").await {
+                        // Echo heartbeat immediately
+                        if let Err(e) = transport.send("heartbeat", hb_data).await {
+                            warn!("Failed to send heartbeat response: {}", e);
+                        }
+                    }
+                }
+
+                // Now process collected messages (transport no longer borrowed)
+                for parsed_msg in messages_to_process {
+                    // Start measuring message handling time
+                    let start_time = std::time::Instant::now();
+
+                    // Handle the message
+                    if let Err(e) = self.handle_message(parsed_msg).await {
+                        error!("Error handling message: {}", e);
+                    }
+
+                    // Log message handling time for performance analysis
+                    let elapsed = start_time.elapsed();
+                    if elapsed.as_millis() > 5 {
+                        warn!("Message handling took {}ms (target: <5ms)",
+                            elapsed.as_millis());
+                    } else {
+                        trace!("Message handled in {}μs", elapsed.as_micros());
+                    }
+                }
+
+                // Small yield to prevent busy-waiting
+                tokio::time::sleep(Duration::from_millis(1)).await;
+            } else {
+                // No transport configured, sleep longer
+                tokio::time::sleep(Duration::from_millis(100)).await;
+            }
         }
 
         // Cleanup
@@ -994,5 +1098,58 @@ mod tests {
         let output = result.unwrap();
         // Check that we got some output
         assert!(output.output != serde_json::Value::Null || !output.console_output.is_empty());
+    }
+
+    #[tokio::test]
+    async fn test_message_handling_performance() -> Result<()> {
+        use std::collections::HashMap;
+        use std::time::Instant;
+
+        // Create test kernel
+        let protocol = crate::protocols::jupyter::JupyterProtocol::new(
+            "test-session".to_string(),
+            "test-kernel".to_string()
+        );
+        let config = ExecutionConfig::default();
+        let session_id = "test-session".to_string();
+        let script_executor = Arc::new(MockScriptExecutor) as Arc<dyn ScriptExecutor>;
+
+        let mut kernel = IntegratedKernel::new(protocol, config, session_id, script_executor).await?;
+
+        // Create a simple kernel_info_request message (faster than execute_request)
+        let mut message = HashMap::new();
+        message.insert("msg_type".to_string(), serde_json::Value::String("kernel_info_request".to_string()));
+
+        // Test single message handling performance
+        let start_time = Instant::now();
+        kernel.handle_message(message.clone()).await?;
+        let elapsed = start_time.elapsed();
+
+        println!("Single kernel_info message handling took: {}μs ({}ms)",
+                elapsed.as_micros(), elapsed.as_millis());
+
+        // Note: We expect this to be very fast since kernel_info_request is lightweight
+        assert!(elapsed.as_millis() < 5,
+                "Message handling took {}ms, target is <5ms", elapsed.as_millis());
+
+        // Test multiple messages for consistency
+        let iterations = 20;
+        let mut total_time = std::time::Duration::ZERO;
+
+        for _i in 0..iterations {
+            let start = Instant::now();
+            kernel.handle_message(message.clone()).await?;
+            total_time += start.elapsed();
+        }
+
+        let avg_time = total_time / iterations;
+        println!("Average message handling time over {} iterations: {}μs ({}ms)",
+                iterations, avg_time.as_micros(), avg_time.as_millis());
+
+        assert!(avg_time.as_millis() < 5,
+                "Average message handling took {}ms, target is <5ms", avg_time.as_millis());
+
+        println!("✅ Message handling performance test passed - meeting <5ms target");
+        Ok(())
     }
 }

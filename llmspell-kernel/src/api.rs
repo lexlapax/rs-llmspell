@@ -229,8 +229,11 @@ pub async fn start_embedded_kernel_with_executor(
 
     // Use the provided script executor
     // Create integrated kernel with the provided executor
-    let kernel =
+    let mut kernel =
         IntegratedKernel::new(protocol.clone(), exec_config, session_id, script_executor).await?;
+
+    // Set transport for message processing
+    kernel.set_transport(Box::new(transport_mut));
 
     Ok(KernelHandle {
         kernel,
@@ -442,6 +445,7 @@ pub async fn start_kernel_service(port: u16, config: LLMSpellConfig) -> Result<S
 
     // Create integrated kernel
     let kernel = IntegratedKernel::new(protocol, exec_config, session_id, script_executor).await?;
+    // Note: Service kernels don't need transport set here as they use external connections
 
     // Write connection file for clients
     let connection_file = write_connection_file(port, &kernel_id)?;

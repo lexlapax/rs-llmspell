@@ -33,6 +33,10 @@ parking_lot.workspace = true
 regex = "1.11"
 rand = "0.8"
 
+[features]
+default = ["hooks"]
+hooks = []
+
 [dev-dependencies]
 tracing-subscriber.workspace = true
 tempfile = "3.8"

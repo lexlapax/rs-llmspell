@@ -452,33 +452,68 @@ impl AgentStateMachine {
         is_entering: bool,
         context: &StateContext,
     ) -> Result<()> {
-        // Only execute hooks if enabled and components are available
-        if !self.config.feature_flags.enable_hooks {
+        // Compile-time optimization: if hooks feature is disabled, this becomes a no-op
+        #[cfg(not(feature = "hooks"))]
+        {
+            let _ = (state, is_entering, context);
             return Ok(());
         }
 
-        let Some((hook_executor, hook_registry)) =
-            self.hook_executor.as_ref().zip(self.hook_registry.as_ref())
-        else {
-            return Ok(()); // No hooks configured
-        };
+        #[cfg(feature = "hooks")]
+        {
+            // Fast path: check if hooks are disabled or not configured
+            if !self.config.feature_flags.enable_hooks {
+                return Ok(());
+            }
+
+            let Some((hook_executor, hook_registry)) =
+                self.hook_executor.as_ref().zip(self.hook_registry.as_ref())
+            else {
+                return Ok(()); // No hooks configured
+            };
 
         let hook_point = state_to_hook_point(state, is_entering);
+
+        // Early exit: check if any hooks are registered for this point before building context
+        let hooks = hook_registry.get_hooks(&hook_point);
+        if hooks.is_empty() {
+            return Ok(());
+        }
+
+        // Only build context if we actually have hooks to execute
         let component_id = ComponentId::new(ComponentType::Agent, self.agent_id.clone());
+        let mut hook_context = HookContext::new(hook_point, component_id);
 
-        // Build hook context with full state information
-        let mut hook_context = HookContext::new(hook_point.clone(), component_id);
-
-        // Add metadata about the transition
+        // Optimized metadata building - avoid string formatting where possible
         hook_context.insert_metadata("agent_id".to_string(), self.agent_id.clone());
-        hook_context.insert_metadata(
-            "from_state".to_string(),
-            format!("{:?}", context.current_state),
-        );
-        hook_context.insert_metadata(
-            "to_state".to_string(),
-            format!("{:?}", context.target_state),
-        );
+
+        // Use static strings for common state names to avoid allocations
+        let from_state_str = match context.current_state {
+            AgentState::Uninitialized => "Uninitialized",
+            AgentState::Initializing => "Initializing",
+            AgentState::Ready => "Ready",
+            AgentState::Running => "Running",
+            AgentState::Paused => "Paused",
+            AgentState::Terminated => "Terminated",
+            AgentState::Terminating => "Terminating",
+            AgentState::Error => "Error",
+            AgentState::Recovering => "Recovering",
+        };
+
+        let to_state_str = match context.target_state {
+            AgentState::Uninitialized => "Uninitialized",
+            AgentState::Initializing => "Initializing",
+            AgentState::Ready => "Ready",
+            AgentState::Running => "Running",
+            AgentState::Paused => "Paused",
+            AgentState::Terminated => "Terminated",
+            AgentState::Terminating => "Terminating",
+            AgentState::Error => "Error",
+            AgentState::Recovering => "Recovering",
+        };
+
+        hook_context.insert_metadata("from_state".to_string(), from_state_str.to_string());
+        hook_context.insert_metadata("to_state".to_string(), to_state_str.to_string());
         hook_context.insert_metadata(
             "transition_phase".to_string(),
             if is_entering {
@@ -488,16 +523,11 @@ impl AgentStateMachine {
             },
         );
 
-        // Add any additional metadata from the context
-        for (key, value) in &context.metadata {
-            hook_context.insert_metadata(key.clone(), value.clone());
-        }
-
-        // Get hooks for this point
-        let hooks = hook_registry.get_hooks(&hook_point);
-
-        if hooks.is_empty() {
-            return Ok(());
+        // Only add context metadata if it's non-empty
+        if !context.metadata.is_empty() {
+            for (key, value) in &context.metadata {
+                hook_context.insert_metadata(key.clone(), value.clone());
+            }
         }
 
         // Execute hooks
@@ -565,6 +595,7 @@ impl AgentStateMachine {
                 Ok(())
             }
         }
+        } // End of hooks feature block
     }
 
     /// Cancel an ongoing state transition

@@ -5,7 +5,7 @@
 mod tests {
     #[test]
     fn test_placeholder() {
-        // Placeholder test - actual storage tests are in llmspell-sessions/src/
+        // Placeholder test - actual storage tests are in llmspell-kernel/src/sessions/
         assert_eq!(8 * 8, 64, "Basic placeholder test");
     }
 }
