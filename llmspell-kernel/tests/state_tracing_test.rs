@@ -247,7 +247,7 @@ async fn test_agent_state_operations_tracing() -> Result<()> {
     use std::collections::HashMap;
 
     let agent_state = llmspell_kernel::state::agent_state::PersistentAgentState {
-        agent_id: "test_agent".to_string(),
+        agent_id: "test:tracing_agent".to_string(),
         agent_type: "assistant".to_string(),
         state: AgentStateData {
             conversation_history: vec![],
@@ -282,7 +282,10 @@ async fn test_agent_state_operations_tracing() -> Result<()> {
     // Test load_agent_state tracing
     tracing::info_span!("test_load_agent_state")
         .in_scope(|| async {
-            let loaded = state_manager.load_agent_state("test_agent").await.unwrap();
+            let loaded = state_manager
+                .load_agent_state("test:tracing_agent")
+                .await
+                .unwrap();
             assert!(loaded.is_some());
         })
         .await;
@@ -291,10 +294,11 @@ async fn test_agent_state_operations_tracing() -> Result<()> {
     tracing::info_span!("test_load_agent_state_fast")
         .in_scope(|| async {
             let loaded = state_manager
-                .load_agent_state_fast("test_agent")
+                .load_agent_state_fast("test:tracing_agent")
                 .await
                 .unwrap();
             assert!(loaded.is_some());
+            assert_eq!(loaded.unwrap().agent_id, "test:tracing_agent");
         })
         .await;
 
@@ -302,7 +306,7 @@ async fn test_agent_state_operations_tracing() -> Result<()> {
     tracing::info_span!("test_get_agent_metadata")
         .in_scope(|| async {
             let metadata = state_manager
-                .get_agent_metadata("test_agent")
+                .get_agent_metadata("test:tracing_agent")
                 .await
                 .unwrap();
             assert!(metadata.is_some());
@@ -313,7 +317,7 @@ async fn test_agent_state_operations_tracing() -> Result<()> {
     tracing::info_span!("test_list_agent_states")
         .in_scope(|| async {
             let agents = state_manager.list_agent_states().await.unwrap();
-            assert!(agents.contains(&"test_agent".to_string()));
+            assert!(agents.contains(&"test:tracing_agent".to_string()));
         })
         .await;
 
@@ -321,7 +325,7 @@ async fn test_agent_state_operations_tracing() -> Result<()> {
     tracing::info_span!("test_delete_agent_state")
         .in_scope(|| async {
             let deleted = state_manager
-                .delete_agent_state("test_agent")
+                .delete_agent_state("test:tracing_agent")
                 .await
                 .unwrap();
             assert!(deleted);
