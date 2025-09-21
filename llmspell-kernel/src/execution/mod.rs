@@ -6,4 +6,4 @@
 
 pub mod integrated;
 
-pub use integrated::{ExecutionConfig, IOConfig, IntegratedKernel, ScriptRuntime};
+pub use integrated::{ExecutionConfig, IOConfig, IntegratedKernel};

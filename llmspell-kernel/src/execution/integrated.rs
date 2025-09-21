@@ -5,6 +5,7 @@
 //! the same runtime context.
 
 use anyhow::Result;
+use llmspell_core::traits::script_executor::ScriptExecutor;
 use parking_lot::RwLock;
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
@@ -31,67 +32,6 @@ use crate::state::StateManager;
 use llmspell_events::bus::EventBus;
 use llmspell_hooks::{HookExecutor, HookRegistry};
 use llmspell_storage::MemoryBackend as SessionMemoryBackend;
-
-/// Simplified `ScriptRuntime` stub for Phase 9.2
-/// Will be replaced with `llmspell-bridge::ScriptRuntime` in later phases
-pub struct ScriptRuntime {
-    _config: HashMap<String, Value>,
-    stdout_handler: Option<IOHandler>,
-    stderr_handler: Option<IOHandler>,
-    interrupted: Arc<RwLock<bool>>,
-}
-
-impl ScriptRuntime {
-    /// Create a new script runtime
-    ///
-    /// # Errors
-    ///
-    /// Returns an error if runtime creation fails
-    pub fn new(config: HashMap<String, Value>) -> Result<Self> {
-        Ok(Self {
-            _config: config,
-            stdout_handler: None,
-            stderr_handler: None,
-            interrupted: Arc::new(RwLock::new(false)),
-        })
-    }
-
-    /// Set stdout handler
-    pub fn set_stdout_handler(&mut self, handler: IOHandler) {
-        self.stdout_handler = Some(handler);
-    }
-
-    /// Set stderr handler
-    pub fn set_stderr_handler(&mut self, handler: IOHandler) {
-        self.stderr_handler = Some(handler);
-    }
-
-    /// Execute code
-    ///
-    /// # Errors
-    ///
-    /// Returns an error if execution is interrupted
-    pub fn execute(&mut self, code: &str) -> Result<String> {
-        // Check if interrupted
-        if *self.interrupted.read() {
-            *self.interrupted.write() = false;
-            return Err(anyhow::anyhow!("Execution interrupted"));
-        }
-
-        // Simulate execution
-        if let Some(ref handler) = self.stdout_handler {
-            handler(&format!("Executing: {code}\n"));
-        }
-
-        // Return a simple result
-        Ok(format!("Result of: {code}"))
-    }
-
-    /// Interrupt the current execution
-    pub fn interrupt(&mut self) {
-        *self.interrupted.write() = true;
-    }
-}
 
 /// I/O configuration
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -149,8 +89,8 @@ impl Default for ExecutionConfig {
 
 /// Integrated kernel that runs `ScriptRuntime` without spawning
 pub struct IntegratedKernel<P: Protocol> {
-    /// Script runtime for execution
-    runtime: ScriptRuntime,
+    /// Script executor for execution
+    script_executor: Arc<dyn ScriptExecutor>,
     /// Protocol handler
     protocol: P,
     /// I/O manager
@@ -184,11 +124,13 @@ impl<P: Protocol + 'static> IntegratedKernel<P> {
     ///
     /// Returns an error if the script runtime cannot be created
     #[instrument(level = "info", skip_all)]
-    pub async fn new(protocol: P, config: ExecutionConfig, session_id: String) -> Result<Self> {
+    pub async fn new(
+        protocol: P,
+        config: ExecutionConfig,
+        session_id: String,
+        script_executor: Arc<dyn ScriptExecutor>,
+    ) -> Result<Self> {
         info!("Creating IntegratedKernel for session {}", session_id);
-
-        // Create script runtime with configuration
-        let runtime = ScriptRuntime::new(config.runtime_config.clone())?;
 
         // Create I/O manager
         let io_config = crate::io::manager::IOConfig {
@@ -250,7 +192,7 @@ impl<P: Protocol + 'static> IntegratedKernel<P> {
         })?;
 
         Ok(Self {
-            runtime,
+            script_executor,
             protocol,
             io_manager,
             message_router,
@@ -665,13 +607,27 @@ impl<P: Protocol + 'static> IntegratedKernel<P> {
         // The ScriptRuntime now shares the same runtime context as transport
         trace!("Executing code in current context (no spawn)");
 
-        // Connect I/O streams to runtime
-        // Set up I/O handlers
-        // Note: In a real implementation, these would write directly to the I/O manager
-        // For now, we just capture the output
+        // Execute script using the script executor
+        let script_output = self.script_executor.execute_script(code).await
+            .map_err(|e| anyhow::anyhow!("Script execution failed: {}", e))?;
 
-        // Execute code - this now happens in the same runtime context
-        let result = self.runtime.execute(code)?;
+        // Route console output through I/O manager
+        for line in &script_output.console_output {
+            self.io_manager.write_stdout(line).await?;
+        }
+
+        // Route result if available
+        if script_output.output != serde_json::Value::Null {
+            let display_data = format!("{}", script_output.output);
+            self.io_manager.write_stdout(&display_data).await?;
+        }
+
+        // Return the script result
+        let result = if script_output.output != serde_json::Value::Null {
+            script_output.output.to_string()
+        } else {
+            "null".to_string()
+        };
 
         // Flush I/O buffers
         self.io_manager.flush_all().await?;
@@ -744,8 +700,8 @@ impl<P: Protocol + 'static> IntegratedKernel<P> {
     fn handle_interrupt_request(&mut self, _message: &HashMap<String, Value>) -> Result<()> {
         info!("Handling interrupt_request");
 
-        // Interrupt the runtime
-        self.runtime.interrupt();
+        // TODO: Add interrupt support to ScriptExecutor trait if needed
+        // For now, interrupts are handled at the protocol level only
 
         // Update execution state to paused
         self.state.update_execution(|exec| {
@@ -765,6 +721,30 @@ impl<P: Protocol + 'static> IntegratedKernel<P> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use llmspell_core::traits::script_executor::{ScriptExecutionMetadata, ScriptExecutionOutput};
+
+    // Mock script executor for testing
+    struct MockScriptExecutor;
+
+    #[async_trait::async_trait]
+    impl ScriptExecutor for MockScriptExecutor {
+        async fn execute_script(&self, _script: &str) -> Result<ScriptExecutionOutput> {
+            Ok(ScriptExecutionOutput {
+                output: serde_json::json!("test output"),
+                console_output: vec!["test console output".to_string()],
+                metadata: ScriptExecutionMetadata {
+                    duration: std::time::Duration::from_millis(10),
+                    language: "test".to_string(),
+                    exit_code: Some(0),
+                    warnings: vec![],
+                },
+            })
+        }
+
+        fn language(&self) -> &str {
+            "test"
+        }
+    }
 
     // Mock protocol for testing
     struct MockProtocol;
@@ -787,8 +767,14 @@ mod tests {
     async fn test_integrated_kernel_creation() {
         let protocol = MockProtocol;
         let config = ExecutionConfig::default();
+        let executor = Arc::new(MockScriptExecutor) as Arc<dyn ScriptExecutor>;
 
-        let kernel = IntegratedKernel::new(protocol, config, "test-session".to_string()).await;
+        let kernel = IntegratedKernel::new(
+            protocol,
+            config,
+            "test-session".to_string(),
+            executor,
+        ).await;
 
         assert!(kernel.is_ok());
     }
@@ -800,10 +786,16 @@ mod tests {
 
         let protocol = MockProtocol;
         let config = ExecutionConfig::default();
+        let executor = Arc::new(MockScriptExecutor) as Arc<dyn ScriptExecutor>;
 
-        let mut kernel = IntegratedKernel::new(protocol, config, "test-session".to_string())
-            .await
-            .unwrap();
+        let mut kernel = IntegratedKernel::new(
+            protocol,
+            config,
+            "test-session".to_string(),
+            executor,
+        )
+        .await
+        .unwrap();
 
         // Set up shutdown signal
         let (shutdown_tx, shutdown_rx) = mpsc::channel(1);
@@ -818,23 +810,16 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn test_script_runtime_in_context() {
-        // Test that ScriptRuntime executes in the same context
-        let mut runtime = ScriptRuntime::new(HashMap::new()).unwrap();
+    async fn test_script_executor_in_context() {
+        use llmspell_core::traits::script_executor::{ScriptExecutionMetadata, ScriptExecutionOutput};
 
-        // Set up output handlers
-        let output = Arc::new(RwLock::new(String::new()));
-        let output_clone = output.clone();
-
-        runtime.set_stdout_handler(Box::new(move |s| {
-            output_clone.write().push_str(s);
-        }));
-
-        // Execute code
-        let result = runtime.execute("test code");
+        // Test script executor directly
+        let executor = Arc::new(MockScriptExecutor) as Arc<dyn ScriptExecutor>;
+        let result = executor.execute_script("return 'test output'").await;
         assert!(result.is_ok());
 
-        // Check output was captured
-        assert!(output.read().contains("Executing: test code"));
+        let output = result.unwrap();
+        // Check that we got some output
+        assert!(output.output != serde_json::Value::Null || !output.console_output.is_empty());
     }
 }

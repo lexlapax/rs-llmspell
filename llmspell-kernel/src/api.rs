@@ -9,7 +9,11 @@ use crate::traits::protocol::Protocol;
 use crate::traits::{ChannelConfig, Transport, TransportConfig};
 use crate::transport::inprocess::InProcessTransport;
 use anyhow::Result;
+use async_trait::async_trait;
 use llmspell_config::LLMSpellConfig;
+use llmspell_core::traits::script_executor::{
+    ScriptExecutionMetadata, ScriptExecutionOutput, ScriptExecutor,
+};
 use std::collections::HashMap;
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
@@ -220,8 +224,34 @@ pub async fn start_embedded_kernel(config: LLMSpellConfig) -> Result<KernelHandl
     // Build execution config from LLMSpellConfig
     let exec_config = build_execution_config(&config);
 
+    // TODO: In subtask 9.4.6.4, this will be replaced with real ScriptRuntime from llmspell-bridge
+    // For now, create a stub executor that will be replaced
+    struct StubExecutor;
+
+    #[async_trait]
+    impl ScriptExecutor for StubExecutor {
+        async fn execute_script(&self, _script: &str) -> Result<ScriptExecutionOutput, llmspell_core::error::LLMSpellError> {
+            Ok(ScriptExecutionOutput {
+                output: serde_json::json!("Stub executor - will be replaced in 9.4.6.4"),
+                console_output: vec![],
+                metadata: ScriptExecutionMetadata {
+                    duration: std::time::Duration::from_millis(0),
+                    language: "stub".to_string(),
+                    exit_code: Some(0),
+                    warnings: vec![],
+                },
+            })
+        }
+
+        fn language(&self) -> &str {
+            "stub"
+        }
+    }
+
+    let script_executor = Arc::new(StubExecutor) as Arc<dyn ScriptExecutor>;
+
     // Create integrated kernel
-    let kernel = IntegratedKernel::new(protocol.clone(), exec_config, session_id).await?;
+    let kernel = IntegratedKernel::new(protocol.clone(), exec_config, session_id, script_executor).await?;
 
     Ok(KernelHandle {
         kernel,
@@ -361,8 +391,34 @@ pub async fn start_kernel_service(port: u16, config: LLMSpellConfig) -> Result<S
     // Build execution config
     let exec_config = build_execution_config(&config);
 
+    // TODO: In subtask 9.4.6.4, this will be replaced with real ScriptRuntime from llmspell-bridge
+    // For now, create a stub executor that will be replaced (same as in start_embedded_kernel)
+    struct ServiceStubExecutor;
+
+    #[async_trait]
+    impl ScriptExecutor for ServiceStubExecutor {
+        async fn execute_script(&self, _script: &str) -> Result<ScriptExecutionOutput, llmspell_core::error::LLMSpellError> {
+            Ok(ScriptExecutionOutput {
+                output: serde_json::json!("Service stub executor - will be replaced in 9.4.6.4"),
+                console_output: vec![],
+                metadata: ScriptExecutionMetadata {
+                    duration: std::time::Duration::from_millis(0),
+                    language: "stub".to_string(),
+                    exit_code: Some(0),
+                    warnings: vec![],
+                },
+            })
+        }
+
+        fn language(&self) -> &str {
+            "stub"
+        }
+    }
+
+    let script_executor = Arc::new(ServiceStubExecutor) as Arc<dyn ScriptExecutor>;
+
     // Create integrated kernel
-    let kernel = IntegratedKernel::new(protocol, exec_config, session_id).await?;
+    let kernel = IntegratedKernel::new(protocol, exec_config, session_id, script_executor).await?;
 
     // Write connection file for clients
     let connection_file = write_connection_file(port, &kernel_id)?;

@@ -7,10 +7,15 @@ use crate::{
     registry::ComponentRegistry,
     tools::register_all_tools,
 };
+use async_trait::async_trait;
 use llmspell_config::LLMSpellConfig;
 use llmspell_core::error::LLMSpellError;
+use llmspell_core::traits::script_executor::{
+    ScriptExecutionMetadata, ScriptExecutionOutput, ScriptExecutor,
+};
 use std::collections::HashMap;
 use std::sync::{Arc, RwLock};
+use std::time::Instant;
 use tracing::{debug, info, instrument};
 
 /// Central script runtime that uses `ScriptEngineBridge` abstraction
@@ -398,6 +403,51 @@ impl From<llmspell_config::SecurityConfig> for crate::engine::SecurityContext {
             max_memory_bytes: config.max_memory_bytes,
             max_execution_time_ms: config.max_execution_time_ms,
         }
+    }
+}
+
+/// Implementation of ScriptExecutor trait for ScriptRuntime
+///
+/// This allows the kernel to execute scripts without directly depending on
+/// the bridge crate, avoiding cyclic dependencies.
+#[async_trait]
+impl ScriptExecutor for ScriptRuntime {
+    #[instrument(skip(self, script))]
+    async fn execute_script(&self, script: &str) -> Result<ScriptExecutionOutput, LLMSpellError> {
+        let start = Instant::now();
+
+        // Execute using the underlying engine
+        let engine_output = self.engine.execute_script(script).await?;
+
+        // Convert ScriptOutput to ScriptExecutionOutput
+        let output = ScriptExecutionOutput {
+            output: engine_output.output,
+            console_output: engine_output.console_output,
+            metadata: ScriptExecutionMetadata {
+                duration: start.elapsed(),
+                language: engine_output.metadata.engine.clone(),
+                exit_code: None, // ScriptMetadata doesn't have exit_code
+                warnings: engine_output.metadata.warnings,
+            },
+        };
+
+        Ok(output)
+    }
+
+    fn supports_streaming(&self) -> bool {
+        self.engine.supports_streaming()
+    }
+
+    fn language(&self) -> &str {
+        // Return the configured engine type
+        // TODO: Add a method to get current engine language
+        "lua"  // Default for now since we use Lua primarily
+    }
+
+    async fn is_ready(&self) -> bool {
+        // Engine is ready if it's been initialized
+        // TODO: Add proper readiness check to ScriptEngineBridge trait
+        true
     }
 }
 

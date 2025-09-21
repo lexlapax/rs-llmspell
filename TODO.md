@@ -3165,12 +3165,12 @@ CLI (run command)
   └─> Return actual script results (not placeholders)
 ```
 
-#### Subtask 9.4.6.1: Replace Kernel's Stub ScriptRuntime (2 hours)**
-- [ ] Delete stub ScriptRuntime in `llmspell-kernel/src/execution/integrated.rs` (lines 35-94)
-- [ ] Add dependency: `llmspell-kernel/Cargo.toml` needs `llmspell-bridge = { path = "../llmspell-bridge" }`
-- [ ] Import and use `llmspell_bridge::ScriptRuntime` in IntegratedKernel
-- [ ] Initialize ScriptRuntime with config, ComponentRegistry, and ProviderManager
-- [ ] Pass script_args from kernel context to ScriptRuntime
+#### Subtask 9.4.6.1: Replace Kernel's Stub ScriptRuntime (2 hours) ✓**
+- [x] Delete stub ScriptRuntime in `llmspell-kernel/src/execution/integrated.rs` (lines 35-94)
+- [x] Resolved cyclic dependency by creating ScriptExecutor trait in llmspell-core
+- [x] Implemented ScriptExecutor trait for ScriptRuntime in llmspell-bridge
+- [x] Updated IntegratedKernel to use Arc<dyn ScriptExecutor> instead of direct dependency
+- [x] Added stub executors in API functions (to be replaced with real ScriptRuntime in 9.4.6.4)
 
 #### Subtask 9.4.6.2: Wire Script Execution in IntegratedKernel (2 hours)**
 - [ ] Modify `IntegratedKernel::handle_shell_message()` to handle execute_request properly

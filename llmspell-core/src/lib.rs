@@ -123,6 +123,7 @@ pub mod traits {
     pub mod base_agent;
     pub mod component_lookup;
     pub mod event;
+    pub mod script_executor;
     pub mod state;
     pub mod tool;
     pub mod tool_capable;
