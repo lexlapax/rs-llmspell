@@ -608,11 +608,58 @@ impl StepExecutor {
                 let input = parameters.get("input").unwrap_or(&default_input);
                 format!("JSON processed: {}", input)
             }
-            _ => {
+            "email_handler" => {
+                let priority = parameters
+                    .get("priority")
+                    .and_then(|v| v.as_str())
+                    .unwrap_or("normal");
+                format!("Email handled with priority: {}", priority)
+            }
+            "text_processor" => {
+                let action = parameters
+                    .get("action")
+                    .and_then(|v| v.as_str())
+                    .unwrap_or("process");
+                format!("Text processing completed: {}", action)
+            }
+            "mock_tool" | "tool" | "test_tool" => {
+                // Generic mock tools for testing
                 format!(
-                    "Tool '{}' executed with parameters: {}",
+                    "Mock tool '{}' executed with parameters: {}",
                     tool_name, parameters
                 )
+            }
+            "http_request" => {
+                let method = parameters
+                    .get("method")
+                    .and_then(|v| v.as_str())
+                    .unwrap_or("GET");
+                format!("HTTP {} request completed", method)
+            }
+            "data_processor" => {
+                let operation = parameters
+                    .get("operation")
+                    .and_then(|v| v.as_str())
+                    .unwrap_or("process");
+                format!("Data processing operation '{}' completed", operation)
+            }
+            "csv_parser" => {
+                format!("CSV data parsed with parameters: {}", parameters)
+            }
+            "text_parser" => {
+                format!("Text parsed with parameters: {}", parameters)
+            }
+            "item_processor" => {
+                let default_item = serde_json::json!("item");
+                let item = parameters.get("item").unwrap_or(&default_item);
+                format!("Item processed: {}", item)
+            }
+            _ => {
+                // Unknown tools should fail
+                return Err(LLMSpellError::Component {
+                    message: format!("Tool '{}' not found in mock registry", tool_name),
+                    source: None,
+                });
             }
         };
 

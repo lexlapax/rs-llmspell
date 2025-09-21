@@ -289,14 +289,16 @@ fn bench_tool_system_overhead(c: &mut Criterion) {
                 // Create and use tools without state
                 for i in 0..10 {
                     let tool = CalculatorTool::new();
-                    let input = serde_json::json!({
-                        "operation": "add",
-                        "a": i,
-                        "b": i + 1
-                    });
+                    let input = AgentInput::text("calculate").with_parameter(
+                        "parameters",
+                        serde_json::json!({
+                            "operation": "add",
+                            "a": i,
+                            "b": i + 1
+                        }),
+                    );
                     let ctx = ExecutionContext::default();
-                    let text = serde_json::to_string(&input).unwrap();
-                    let _ = tool.execute(AgentInput::text(text), ctx).await;
+                    let _ = tool.execute(input, ctx).await;
                 }
 
                 start.elapsed()
@@ -328,14 +330,16 @@ fn bench_tool_system_overhead(c: &mut Criterion) {
                         .await
                         .unwrap();
 
-                    let input = serde_json::json!({
-                        "operation": "add",
-                        "a": i,
-                        "b": i + 1
-                    });
+                    let input = AgentInput::text("calculate").with_parameter(
+                        "parameters",
+                        serde_json::json!({
+                            "operation": "add",
+                            "a": i,
+                            "b": i + 1
+                        }),
+                    );
                     let ctx = ExecutionContext::default();
-                    let text = serde_json::to_string(&input).unwrap();
-                    let result = tool.execute(AgentInput::text(text), ctx).await.unwrap();
+                    let result = tool.execute(input, ctx).await.unwrap();
 
                     // Save tool result
                     state_manager

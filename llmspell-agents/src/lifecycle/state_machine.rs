@@ -267,25 +267,25 @@ impl DefaultStateHandler {
 
 #[async_trait]
 impl StateHandler for DefaultStateHandler {
-    #[instrument(skip(self))]
+    #[instrument(level = "trace", skip(self))]
     async fn enter(&self, context: &StateContext) -> Result<()> {
         debug!("Agent {} entering state {:?}", context.agent_id, self.state);
         Ok(())
     }
 
-    #[instrument(skip(self))]
+    #[instrument(level = "trace", skip(self))]
     async fn exit(&self, context: &StateContext) -> Result<()> {
         debug!("Agent {} exiting state {:?}", context.agent_id, self.state);
         Ok(())
     }
 
-    #[instrument(skip(self))]
+    #[instrument(level = "trace", skip(self))]
     async fn handle(&self, _context: &StateContext) -> Result<()> {
         // Default handler does nothing
         Ok(())
     }
 
-    #[instrument(skip(self))]
+    #[instrument(level = "trace", skip(self))]
     async fn can_transition_to(&self, target: AgentState) -> bool {
         use AgentState::{
             Error, Initializing, Paused, Ready, Recovering, Running, Terminated, Terminating,
@@ -427,13 +427,13 @@ impl AgentStateMachine {
     }
 
     /// Get current state
-    #[instrument(skip(self))]
+    #[instrument(level = "trace", skip(self))]
     pub async fn current_state(&self) -> AgentState {
         *self.current_state.read().await
     }
 
     /// Check if agent is in specific state
-    #[instrument(skip(self))]
+    #[instrument(level = "trace", skip(self))]
     pub async fn is_state(&self, state: AgentState) -> bool {
         *self.current_state.read().await == state
     }
@@ -445,7 +445,7 @@ impl AgentStateMachine {
 
     /// Execute hooks for a state transition phase
     #[allow(clippy::cognitive_complexity)]
-    #[instrument(skip(self))]
+    #[instrument(level = "trace", skip(self))]
     async fn execute_transition_hooks(
         &self,
         state: AgentState,
@@ -584,7 +584,7 @@ impl AgentStateMachine {
     /// # Errors
     ///
     /// Returns an error if state transition fails
-    #[instrument(skip(self))]
+    #[instrument(level = "trace", skip(self))]
     pub async fn transition_to(&self, target_state: AgentState) -> Result<()> {
         self.transition_to_with_reason(target_state, None).await
     }
@@ -599,7 +599,7 @@ impl AgentStateMachine {
     /// - Hook execution prevents the transition
     /// - Validation fails
     /// - Timeout occurs
-    #[instrument(skip(self))]
+    #[instrument(level = "trace", skip(self))]
     pub async fn transition_to_with_reason(
         &self,
         target_state: AgentState,
@@ -862,7 +862,7 @@ impl AgentStateMachine {
     /// Returns an error if:
     /// - Agent is not in Uninitialized state
     /// - State transition fails
-    #[instrument(level = "debug", skip(self), fields(agent_name = %self.agent_id, state_transition = "initialize"))]
+    #[instrument(level = "trace", skip(self), fields(agent_name = %self.agent_id, state_transition = "initialize"))]
     pub async fn initialize(&self) -> Result<()> {
         if !self.is_state(AgentState::Uninitialized).await {
             return Err(anyhow!(
@@ -897,7 +897,7 @@ impl AgentStateMachine {
     /// Returns an error if:
     /// - Agent is not in Ready or Paused state
     /// - State transition fails
-    #[instrument(level = "debug", skip(self), fields(agent_name = %self.agent_id, state_transition = "start"))]
+    #[instrument(level = "trace", skip(self), fields(agent_name = %self.agent_id, state_transition = "start"))]
     pub async fn start(&self) -> Result<()> {
         let current = self.current_state().await;
         if !matches!(current, AgentState::Ready | AgentState::Paused) {
@@ -952,7 +952,7 @@ impl AgentStateMachine {
     /// Returns an error if:
     /// - Agent is not in Running state
     /// - State transition fails
-    #[instrument(level = "debug", skip(self), fields(agent_name = %self.agent_id, state_transition = "stop"))]
+    #[instrument(level = "trace", skip(self), fields(agent_name = %self.agent_id, state_transition = "stop"))]
     pub async fn stop(&self) -> Result<()> {
         if !self.is_state(AgentState::Running).await {
             return Err(anyhow!("Agent can only be stopped from Running state"));
@@ -967,7 +967,7 @@ impl AgentStateMachine {
     /// # Errors
     ///
     /// Returns an error if agent cannot be terminated from current state
-    #[instrument(level = "debug", skip(self), fields(agent_name = %self.agent_id, state_transition = "terminate"))]
+    #[instrument(level = "trace", skip(self), fields(agent_name = %self.agent_id, state_transition = "terminate"))]
     pub async fn terminate(&self) -> Result<()> {
         let current = self.current_state().await;
         if !current.can_terminate() {
