@@ -265,7 +265,7 @@ mod tests {
         // PID 0 is special and might exist
         // PID 1 (init) should exist on Unix systems
         // Use a very high PID that's unlikely to exist
-        assert!(!PidFile::process_exists(999999));
+        assert!(!PidFile::process_exists(999_999));
     }
 
     #[test]

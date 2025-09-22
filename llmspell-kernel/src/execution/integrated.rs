@@ -300,6 +300,7 @@ impl<P: Protocol + 'static> IntegratedKernel<P> {
     ///
     /// Returns an error if I/O operations fail
     #[instrument(level = "info", skip(self))]
+    #[allow(clippy::too_many_lines)]
     pub async fn run(mut self) -> Result<()> {
         info!("Starting IntegratedKernel in current context (no spawning)");
 

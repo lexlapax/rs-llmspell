@@ -338,7 +338,7 @@ mod tests {
         rotator.open().unwrap();
 
         let mut writer = DaemonLogWriter::new(rotator.clone(), "TEST");
-        writer.write(b"Log message").unwrap();
+        writer.write_all(b"Log message").unwrap();
         writer.flush().unwrap();
 
         // Verify the log file exists and contains data
@@ -413,7 +413,11 @@ mod tests {
                 entry
                     .file_name()
                     .to_str()
-                    .map_or(false, |name| name.ends_with(".gz"))
+                    .is_some_and(|name| {
+                        std::path::Path::new(name)
+                            .extension()
+                            .is_some_and(|ext| ext.eq_ignore_ascii_case("gz"))
+                    })
             });
 
         // If rotation occurred with compression, verify the compressed file
@@ -443,7 +447,7 @@ mod tests {
 
         // Trigger multiple rotations
         for i in 0..5 {
-            let data = format!("Log entry number {}\n", i);
+            let data = format!("Log entry number {i}\n");
             rotator.write(data.as_bytes()).unwrap();
         }
 
@@ -456,7 +460,7 @@ mod tests {
                 entry
                     .file_name()
                     .to_str()
-                    .map_or(false, |name| name.contains("test.log"))
+                    .is_some_and(|name| name.contains("test.log"))
             })
             .collect();
 
@@ -482,8 +486,8 @@ mod tests {
         let mut stderr_writer = DaemonLogWriter::new(rotator.clone(), "STDERR");
 
         // Write to both streams
-        stdout_writer.write(b"Standard output message\n").unwrap();
-        stderr_writer.write(b"Standard error message\n").unwrap();
+        stdout_writer.write_all(b"Standard output message\n").unwrap();
+        stderr_writer.write_all(b"Standard error message\n").unwrap();
 
         // Verify both messages are in the log
         let log_path = temp_dir.path().join("daemon.log");
