@@ -139,99 +139,127 @@ pub trait Protocol: Send + Sync + 'static {
 }
 ```
 
-#### Transport Trait
-Handles network communication without protocol knowledge:
+### 2.2 Transport Trait
+
+Generic transport abstraction supporting multiple channels:
 
 ```rust
-pub trait Transport: Send + Sync + 'static {
+// llmspell-kernel/src/traits/transport.rs
+#[async_trait]
+pub trait Transport: Send + Sync {
+    /// Bind to specified addresses (server mode)
     async fn bind(&mut self, config: &TransportConfig) -> Result<()>;
+
+    /// Connect to specified addresses (client mode)
     async fn connect(&mut self, config: &TransportConfig) -> Result<()>;
-    async fn send(&self, channel: &str, parts: Vec<Vec<u8>>) -> Result<()>;
+
+    /// Receive multipart message from a channel
     async fn recv(&self, channel: &str) -> Result<Option<Vec<Vec<u8>>>>;
-    async fn close(&mut self) -> Result<()>;
+
+    /// Send multipart message to a channel
+    async fn send(&self, channel: &str, parts: Vec<Vec<u8>>) -> Result<()>;
+
+    /// Handle heartbeat if required
+    async fn heartbeat(&self) -> Result<bool>;
+
+    /// Check if channel exists
+    fn has_channel(&self, channel: &str) -> bool;
+
+    /// Get list of available channels
+    fn channels(&self) -> Vec<String>;
+
+    /// Shutdown gracefully
+    async fn shutdown(&mut self) -> Result<()>;
 }
 ```
 
-#### OutputCapture Trait
-Bridges script runtime output to protocol messages:
+### 2.3 Transport Implementations
+
+**Available Transports**:
 
 ```rust
-pub trait OutputCapture: Send {
-    fn capture_stdout(&mut self, text: &str);
-    fn capture_stderr(&mut self, text: &str);
-    fn capture_result(&mut self, value: Value);
-    fn capture_error(&mut self, error: ExecutionError);
-    fn flush(&mut self);
+// llmspell-kernel/src/transport/
+pub fn create_transport(transport_type: &str) -> Result<BoxedTransport> {
+    match transport_type {
+        "inprocess" | "embedded" => {
+            Ok(Box::new(InProcessTransport::new()))
+        }
+        "zeromq" | "zmq" => {
+            #[cfg(feature = "zeromq")]
+            Ok(Box::new(ZmqTransport::new()?))
+        }
+        "websocket" | "ws" => {
+            Err(anyhow::anyhow!("WebSocket support not yet implemented"))
+        }
+        _ => Err(anyhow::anyhow!("Unknown transport type"))
+    }
 }
 ```
 
-### 2.2 ExecutionFlow Structure
+**Transport Configuration**:
+```rust
+pub struct TransportConfig {
+    pub transport_type: String,
+    pub base_address: String,
+    pub channels: HashMap<String, ChannelConfig>,
+    pub auth_key: Option<String>,
+}
 
-Defines the complete message sequence for handling a request:
+pub struct ChannelConfig {
+    pub endpoint: String,  // Port for TCP, suffix for IPC
+    pub pattern: String,   // "router", "pub", "rep", etc.
+    pub options: HashMap<String, String>,
+}
+```
+
+## 3. Global IO Runtime
+
+### 3.1 Runtime Management
+
+Single shared Tokio runtime for all IO operations:
 
 ```rust
-pub struct ExecutionFlow<M: KernelMessage> {
-    /// Messages to send before execution
-    pub pre_execution: Vec<(String, M)>,
-    
-    /// Whether to capture output during execution
-    pub capture_output: bool,
-    
-    /// Messages to send after execution
-    pub post_execution: Vec<(String, M)>,
+// llmspell-kernel/src/runtime/io_runtime.rs
+static GLOBAL_RUNTIME: LazyLock<Runtime> = LazyLock::new(|| {
+    tokio::runtime::Builder::new_multi_thread()
+        .worker_threads(4)
+        .enable_all()
+        .thread_name("llmspell-io")
+        .build()
+        .expect("Failed to create global IO runtime")
+});
+
+pub fn global_io_runtime() -> &'static Runtime {
+    &GLOBAL_RUNTIME
+}
+
+pub fn ensure_runtime_initialized() {
+    let _ = global_io_runtime();
+}
+
+pub async fn spawn_global<F>(future: F) -> JoinHandle<F::Output>
+where
+    F: Future + Send + 'static,
+    F::Output: Send + 'static,
+{
+    global_io_runtime().spawn(future)
 }
 ```
 
----
+### 3.2 Why Global Runtime?
 
-## 3. Communication Flow
+**Problem Solved**: "dispatch task is gone" errors in HTTP clients
 
-### 3.1 Message Flow Diagram
+```rust
+// BEFORE (Phase 8): Runtime isolation caused failures
+tokio::spawn(async {
+    // Different runtime context
+    reqwest::get(url).await  // FAILS: dispatch task is gone
+});
 
-```mermaid
-sequenceDiagram
-    participant C as Client
-    participant K as Kernel
-    participant P as Protocol
-    participant R as Runtime
-    
-    C->>K: execute_request
-    K->>P: create_execution_flow()
-    P-->>K: ExecutionFlow
-    
-    Note over K: Pre-execution messages
-    K->>C: status(busy) [iopub]
-    K->>C: execute_input [iopub]
-    
-    K->>P: create_output_context()
-    P-->>K: OutputContext
-    
-    K->>R: execute_with_capture()
-    R->>P: capture_stdout("output")
-    R->>P: capture_result(value)
-    R-->>K: ExecutionResult
-    
-    K->>P: flush_output()
-    P-->>K: [(channel, message)]
-    
-    Note over K: Output messages
-    K->>C: stream(stdout) [iopub]
-    K->>C: execute_result [iopub]
-    
-    Note over K: Post-execution messages
-    K->>C: execute_reply [shell]
-    K->>C: status(idle) [iopub]
-```
-
-### 3.2 Output Routing
-
-Script output routes through the protocol layer:
-
-```
-Script Runtime           OutputCapture           Protocol              Messages
-├── print/stdout    →    capture_stdout()   →    handle_output()  →   Stream Message
-├── error/stderr    →    capture_stderr()   →    handle_output()  →   Stream Message
-└── return value    →    capture_result()   →    flush_output()   →   Execute Result
+// AFTER (Phase 9): Shared runtime works
+IntegratedKernel::run(self).await  // Same runtime context
+    reqwest::get(url).await         // SUCCESS: shared runtime
 ```
 
 ---

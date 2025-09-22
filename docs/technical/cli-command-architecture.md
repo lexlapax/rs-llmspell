@@ -1,15 +1,17 @@
 # CLI Command Architecture
 
-**Version**: v0.9.0  
-**Status**: Production Implementation - Breaking Changes  
-**Last Updated**: December 2025  
-**Phase**: 9 (REPL, Debugging, and Kernel Architecture)  
+**Version**: v0.9.0 (Phase 9 Complete) → v0.10.0 (Phase 10 Preview)
+**Status**: Production Implementation with Service Integration
+**Last Updated**: December 2024
+**Phase**: 9 Complete (Integrated Kernel) + Phase 10 Design (Daemon Mode)
 
 ## Executive Summary
 
-This document describes the CLI command architecture implemented in LLMSpell v0.9.0. The restructure addresses critical usability issues discovered during Phase 9.8 testing, implementing a clean subcommand organization with proper separation of concerns. **All changes are breaking** - no backward compatibility maintained as we're pre-1.0.
+This document describes the CLI command architecture implemented in LLMSpell v0.9.0 with integrated kernel architecture and previews v0.10.0 service integration features. Phase 9 achieved a unified kernel architecture eliminating runtime isolation issues, while Phase 10 will add Unix daemon mode with signal handling and service integration.
 
-**Key Changes**: Removed ambiguous `--debug` flag (replaced with `--trace` for logging and `debug` command for debugging), simplified RAG configuration from 5 flags to 1, and reorganized all commands into logical subcommand groups.
+**Phase 9 Achievements**: Integrated kernel with global IO runtime, protocol/transport abstraction, DAP bridge for debugging, and comprehensive tracing.
+
+**Phase 10 Preview**: Daemon mode with double-fork technique, signal-to-message bridge (SIGTERM→shutdown_request), systemd/launchd service integration, and enhanced logging infrastructure.
 
 ---
 
@@ -19,10 +21,12 @@ This document describes the CLI command architecture implemented in LLMSpell v0.
 2. [Flag Consolidation](#2-flag-consolidation)
 3. [Primary Execution Commands](#3-primary-execution-commands)
 4. [Subcommand Groups](#4-subcommand-groups)
-5. [Dual-Mode Design](#5-dual-mode-design)
-6. [Help System](#6-help-system)
-7. [Breaking Changes](#7-breaking-changes)
-8. [Implementation Examples](#8-implementation-examples)
+5. [Daemon Mode and Service Integration](#5-daemon-mode-and-service-integration)
+6. [Signal Handling Architecture](#6-signal-handling-architecture)
+7. [Dual-Mode Design](#7-dual-mode-design)
+8. [Help System](#8-help-system)
+9. [Breaking Changes](#9-breaking-changes)
+10. [Implementation Examples](#10-implementation-examples)
 
 ---
 
@@ -64,10 +68,12 @@ llmspell
 ├── repl [--history]
 ├── debug <script> [--break-at] [--port] [-- args...]
 ├── kernel
-│   ├── start [--port] [--daemon]
-│   ├── stop <id>
+│   ├── start [--port] [--daemon] [--log-file] [--pid-file]
+│   ├── stop <id|--pid-file>
 │   ├── status [id]
-│   └── connect <address>
+│   ├── connect <address>
+│   ├── install-service [--type systemd|launchd]
+│   └── signal <id> <signal>
 ├── state
 │   ├── show [--key] [--kernel|--config]
 │   ├── clear [--key] [--kernel|--config]
@@ -214,6 +220,12 @@ OPTIONS:
     --kernel <ADDRESS>     Kernel connection [default: auto]
     --port <PORT>          DAP server port for IDE attachment
 
+DEBUGGING INFRASTRUCTURE (Phase 9):
+    Uses integrated DAP bridge in kernel for full debugging support
+    Supports VS Code, IntelliJ, and other DAP-compatible IDEs
+    Real-time variable inspection and call stack navigation
+    Integrated with kernel's execution manager for seamless debugging
+
 SCRIPT ARGUMENTS:
     Arguments after -- are passed to the script as ARGS global variable
     Available during debugging for testing different parameters
@@ -235,17 +247,47 @@ EXAMPLES:
 llmspell kernel <SUBCOMMAND>
 
 SUBCOMMANDS:
-    start     Start kernel server
-    stop      Stop kernel by ID
-    status    Show running kernels or specific kernel details
-    connect   Connect to external kernel
+    start            Start kernel server (integrated kernel from Phase 9)
+    stop             Stop kernel by ID or PID file
+    status           Show running kernels or specific kernel details
+    connect          Connect to external kernel
+    install-service  Install as system service (Phase 10)
+    signal           Send signal to kernel (Phase 10)
+
+START OPTIONS (Phase 10 daemon mode):
+    --port <PORT>        Port to bind [default: auto]
+    --daemon             Run as Unix daemon (detach from terminal)
+    --log-file <PATH>    Log file for daemon mode [default: ~/.llmspell/kernel.log]
+    --pid-file <PATH>    PID file location [default: ~/.llmspell/kernel.pid]
+    --connection-file    Write connection info to file
+    --idle-timeout <SEC> Shutdown after idle time [default: 3600]
+    --max-clients <N>    Maximum concurrent clients [default: 10]
 
 EXAMPLES:
-    llmspell kernel start --port 9555 --daemon
-    llmspell kernel status                    # List all running kernels
-    llmspell kernel status abc123             # Show detailed status
-    llmspell kernel stop abc123
-    llmspell kernel connect localhost:9555
+    # Simple start (foreground)
+    llmspell kernel start --port 9555
+
+    # Daemon mode with logging (Phase 10)
+    llmspell kernel start --daemon --log-file /var/log/llmspell.log
+
+    # Full daemon configuration
+    llmspell kernel start --daemon \
+        --port 9555 \
+        --pid-file /var/run/llmspell.pid \
+        --log-file /var/log/llmspell/kernel.log \
+        --idle-timeout 7200
+
+    # Stop daemon using PID file
+    llmspell kernel stop --pid-file /var/run/llmspell.pid
+
+    # Send signal to kernel (Phase 10)
+    llmspell kernel signal abc123 TERM  # Graceful shutdown
+    llmspell kernel signal abc123 INT   # Interrupt execution
+
+    # Install as service (Phase 10)
+    llmspell kernel install-service --type systemd
+    sudo systemctl start llmspell-kernel
+    sudo systemctl enable llmspell-kernel
 ```
 
 #### Kernel Status Output
@@ -352,7 +394,189 @@ EXAMPLES:
 
 ---
 
-## 5. Dual-Mode Design
+## 5. Daemon Mode and Service Integration
+
+### 5.1 Daemon Mode Architecture (Phase 10)
+
+The kernel supports Unix daemon mode with proper process management:
+
+```bash
+# Start as daemon
+llmspell kernel start --daemon
+
+# What happens internally:
+1. First fork() - parent exits, child continues
+2. setsid() - create new session, become session leader
+3. Second fork() - prevent reacquiring controlling terminal
+4. chdir("/") - change to root directory
+5. Redirect stdin/stdout/stderr to /dev/null or log file
+6. Write PID file for process management
+7. Set up signal handlers for graceful shutdown
+```
+
+### 5.2 Service File Generation
+
+#### systemd Service (Linux)
+```bash
+# Generate and install systemd service
+llmspell kernel install-service --type systemd
+
+# Creates: /etc/systemd/system/llmspell-kernel.service
+```
+
+```ini
+[Unit]
+Description=LLMSpell Kernel Service
+After=network.target
+
+[Service]
+Type=forking
+PIDFile=/var/run/llmspell-kernel.pid
+ExecStart=/usr/local/bin/llmspell kernel start --daemon \
+    --pid-file /var/run/llmspell-kernel.pid \
+    --log-file /var/log/llmspell/kernel.log
+ExecStop=/usr/local/bin/llmspell kernel stop --pid-file /var/run/llmspell-kernel.pid
+Restart=on-failure
+RestartSec=5s
+User=llmspell
+Group=llmspell
+
+[Install]
+WantedBy=multi-user.target
+```
+
+#### launchd Service (macOS)
+```bash
+# Generate and install launchd plist
+llmspell kernel install-service --type launchd
+
+# Creates: ~/Library/LaunchAgents/com.llmspell.kernel.plist
+```
+
+```xml
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN"
+    "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+    <key>Label</key>
+    <string>com.llmspell.kernel</string>
+    <key>ProgramArguments</key>
+    <array>
+        <string>/usr/local/bin/llmspell</string>
+        <string>kernel</string>
+        <string>start</string>
+        <string>--daemon</string>
+    </array>
+    <key>RunAtLoad</key>
+    <true/>
+    <key>KeepAlive</key>
+    <dict>
+        <key>SuccessfulExit</key>
+        <false/>
+    </dict>
+    <key>StandardOutPath</key>
+    <string>/var/log/llmspell/kernel.log</string>
+    <key>StandardErrorPath</key>
+    <string>/var/log/llmspell/kernel.error.log</string>
+</dict>
+</plist>
+```
+
+### 5.3 Logging Infrastructure
+
+Daemon mode includes comprehensive logging:
+
+```rust
+// Log levels and outputs
+pub struct DaemonLogger {
+    log_file: Option<File>,
+    syslog: Option<Syslog>,
+    rotation: LogRotation,
+}
+
+// Log rotation configuration
+pub struct LogRotation {
+    max_size: u64,        // Rotate at size (default: 100MB)
+    max_files: usize,     // Keep N old files (default: 5)
+    compress: bool,       // Compress rotated logs (default: true)
+}
+```
+
+Log format example:
+```
+2024-12-20T10:15:30.123Z [INFO] kernel::daemon - Kernel started as daemon (PID: 12345)
+2024-12-20T10:15:30.456Z [DEBUG] kernel::transport - Binding to port 9555
+2024-12-20T10:15:31.789Z [INFO] kernel::signal - Signal handler installed for SIGTERM
+2024-12-20T10:16:45.012Z [INFO] kernel::client - Client connected from 127.0.0.1:54321
+```
+
+---
+
+## 6. Signal Handling Architecture
+
+### 6.1 Signal-to-Message Bridge (Phase 10)
+
+Unix signals are converted to Jupyter protocol messages for graceful handling:
+
+```rust
+pub struct SignalBridge {
+    kernel: Arc<IntegratedKernel>,
+    signal_handlers: HashMap<Signal, SignalAction>,
+}
+
+pub enum SignalAction {
+    Shutdown,      // SIGTERM → shutdown_request
+    Interrupt,     // SIGINT → interrupt_request
+    Reload,        // SIGUSR1 → reload_config
+    DumpState,     // SIGUSR2 → dump_state
+    Ignore,        // SIGHUP in daemon mode
+}
+```
+
+### 6.2 Signal Handling Examples
+
+```bash
+# Graceful shutdown (SIGTERM)
+kill -TERM $(cat ~/.llmspell/kernel.pid)
+# Kernel receives shutdown_request, saves state, closes connections
+
+# Interrupt execution (SIGINT)
+kill -INT $(cat ~/.llmspell/kernel.pid)
+# Kernel receives interrupt_request, stops current execution
+
+# Reload configuration (SIGUSR1)
+kill -USR1 $(cat ~/.llmspell/kernel.pid)
+# Kernel reloads config without restart
+
+# Dump state for debugging (SIGUSR2)
+kill -USR2 $(cat ~/.llmspell/kernel.pid)
+# Kernel writes state to log file
+```
+
+### 6.3 Signal Safety
+
+All signal handlers are async-signal-safe:
+
+```rust
+// Signal handler just sets atomic flag
+extern "C" fn handle_sigterm(_: c_int) {
+    SHUTDOWN_REQUESTED.store(true, Ordering::SeqCst);
+}
+
+// Main loop checks flag periodically
+loop {
+    if SHUTDOWN_REQUESTED.load(Ordering::SeqCst) {
+        kernel.graceful_shutdown().await?;
+        break;
+    }
+    // Normal message processing
+}
+```
+
+---
+
+## 7. Dual-Mode Design
 
 ### 5.1 Online vs Offline Operations
 
@@ -416,7 +640,7 @@ llmspell session list  # Smart detection
 
 ---
 
-## 6. Help System
+## 8. Help System
 
 ### 6.1 Contextual Help Behavior
 
@@ -509,19 +733,20 @@ GLOBAL OPTIONS:
 
 ---
 
-## 7. Breaking Changes
+## 9. Breaking Changes
 
-### 7.1 Command Structure Changes
+### 9.1 Command Structure Changes
 
 | Old Command | New Command | Notes |
 |-------------|-------------|-------|
 | `llmspell kernel --port 9555` | `llmspell kernel start --port 9555` | Subcommand pattern |
+| `llmspell serve` (Phase 10 early) | `llmspell kernel start --daemon` | No separate serve command |
 | `llmspell apps file-organizer run` | `llmspell app file-organizer` | Simplified |
 | `llmspell init` | `llmspell config init` | Grouped under config |
 | `llmspell validate` | `llmspell config validate` | Grouped under config |
 | `llmspell providers` | `llmspell providers list` | Explicit subcommand |
 
-### 7.2 Flag Removals
+### 9.2 Flag Removals
 
 All these flags have been removed or renamed:
 
@@ -533,7 +758,7 @@ All these flags have been removed or renamed:
 - ❌ `--debug-perf` → Move to config file
 - ❌ `--rag`, `--no-rag`, `--rag-config`, `--rag-dims`, `--rag-backend` → Use `--rag-profile`
 
-### 7.3 Migration Examples
+### 9.3 Migration Examples
 
 ```bash
 # OLD
@@ -554,9 +779,9 @@ llmspell run script.lua --trace debug  # With debug logging
 
 ---
 
-## 8. Implementation Examples
+## 10. Implementation Examples
 
-### 8.1 CLI Structure (Clap)
+### 10.1 CLI Structure (Clap)
 
 ```rust
 // llmspell-cli/src/cli.rs
@@ -630,7 +855,7 @@ pub enum Commands {
 }
 ```
 
-### 8.2 Command Handler
+### 10.2 Command Handler
 
 ```rust
 // llmspell-cli/src/main.rs
@@ -668,7 +893,90 @@ async fn main() -> Result<()> {
 }
 ```
 
-### 8.3 Script Argument Handling
+### 10.3 Daemon Mode Implementation (Phase 10)
+
+```rust
+// llmspell-cli/src/kernel/daemon.rs
+use nix::sys::signal::{self, Signal};
+use nix::unistd::{self, ForkResult, Pid};
+use std::os::unix::io::RawFd;
+
+pub struct DaemonManager {
+    kernel: Arc<IntegratedKernel<JupyterProtocol>>,
+    config: DaemonConfig,
+    signal_bridge: SignalBridge,
+}
+
+impl DaemonManager {
+    pub fn daemonize(&mut self) -> Result<()> {
+        // First fork
+        match unsafe { unistd::fork()? } {
+            ForkResult::Parent { .. } => {
+                // Parent exits
+                std::process::exit(0);
+            }
+            ForkResult::Child => {}
+        }
+
+        // Create new session
+        unistd::setsid()?;
+
+        // Second fork (prevent controlling terminal)
+        match unsafe { unistd::fork()? } {
+            ForkResult::Parent { .. } => {
+                std::process::exit(0);
+            }
+            ForkResult::Child => {}
+        }
+
+        // Change to root directory
+        std::env::set_current_dir("/")?;
+
+        // Clear umask
+        unsafe { libc::umask(0) };
+
+        // Redirect standard file descriptors
+        self.redirect_stdio()?;
+
+        // Write PID file
+        self.write_pid_file()?;
+
+        // Set up signal handlers
+        self.setup_signal_handlers()?;
+
+        // Start kernel with logging
+        info!("Kernel daemonized successfully (PID: {})", std::process::id());
+        Ok(())
+    }
+
+    fn redirect_stdio(&self) -> Result<()> {
+        let dev_null = std::fs::OpenOptions::new()
+            .read(true)
+            .write(true)
+            .open("/dev/null")?;
+
+        let log_file = if let Some(path) = &self.config.log_file {
+            std::fs::OpenOptions::new()
+                .create(true)
+                .append(true)
+                .open(path)?
+        } else {
+            dev_null.try_clone()?
+        };
+
+        // Redirect stdin to /dev/null
+        unistd::dup2(dev_null.as_raw_fd(), 0)?;
+
+        // Redirect stdout/stderr to log file
+        unistd::dup2(log_file.as_raw_fd(), 1)?;
+        unistd::dup2(log_file.as_raw_fd(), 2)?;
+
+        Ok(())
+    }
+}
+```
+
+### 10.4 Script Argument Handling
 
 #### Parsing and Passing Arguments
 
@@ -763,17 +1071,26 @@ file_writer:write({
 
 ## Summary
 
-The CLI command architecture provides a clean, intuitive interface through:
+The CLI command architecture provides a production-ready interface with:
 
-1. **Clear command hierarchy** with logical subcommand groups
-2. **Unambiguous flags** - no more `--debug` confusion
-3. **RAG simplification** - single profile flag replaces 5
-4. **Dual-mode design** - online (kernel) and offline (config) operations
-5. **Contextual help** - intelligent help based on command level
-6. **Script argument separation** - proper `--` handling
+### Phase 9 Achievements (Implemented)
+1. **Integrated kernel architecture** - No separate kernel binary
+2. **Global IO runtime** - Eliminates "dispatch task is gone" errors
+3. **DAP bridge integration** - Full debugging support in IDEs
+4. **Clear command hierarchy** - Logical subcommand groups
+5. **Unambiguous flags** - Removed `--debug` confusion
+6. **RAG simplification** - Single profile flag replaces 5
 
-All changes are breaking but necessary for a cleaner, more maintainable CLI. The restructure eliminates confusion, reduces flag duplication (20 → 4 for RAG), and provides a solid foundation for future features.
+### Phase 10 Enhancements (Designed)
+1. **Unix daemon mode** - Proper double-fork with setsid
+2. **Signal handling** - SIGTERM/SIGINT to Jupyter messages
+3. **Service integration** - systemd/launchd support
+4. **Comprehensive logging** - With rotation and syslog
+5. **Multi-tenant kernels** - Isolation and resource limits
+6. **Production deployment** - PID files, idle timeout, connection limits
+
+The architecture maintains backward compatibility for basic usage while adding advanced service features for production deployments.
 
 ---
 
-*This document consolidates the CLI command architecture from Phase 9.8.13.10 implementation, providing a comprehensive reference for the restructured command-line interface.*
+*This document consolidates the CLI command architecture from Phase 9 implementation with integrated kernel and Phase 10 design for daemon mode and service integration.*
