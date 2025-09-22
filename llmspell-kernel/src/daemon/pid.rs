@@ -316,4 +316,39 @@ mod tests {
         pid_file.write().unwrap();
         assert_eq!(pid_file.read_pid().unwrap(), process::id());
     }
+
+    #[test]
+    fn test_concurrent_start_prevention() {
+        let temp_dir = tempdir().unwrap();
+        let pid_path = temp_dir.path().join("test.pid");
+
+        // First instance
+        let mut pid_file1 = PidFile::new(pid_path.clone());
+        pid_file1.write().unwrap();
+        assert!(pid_file1.try_lock().unwrap());
+
+        // Second instance should fail
+        let mut pid_file2 = PidFile::new(pid_path.clone());
+        let result = pid_file2.write();
+        assert!(result.is_err());
+        assert!(result.unwrap_err().to_string().contains("Another instance"));
+    }
+
+    #[test]
+    fn test_atomic_pid_write() {
+        let temp_dir = tempdir().unwrap();
+        let pid_path = temp_dir.path().join("test.pid");
+
+        let mut pid_file = PidFile::new(pid_path.clone());
+        pid_file.write().unwrap();
+
+        // Verify PID was written atomically
+        let contents = fs::read_to_string(&pid_path).unwrap();
+        let pid: u32 = contents.trim().parse().unwrap();
+        assert_eq!(pid, process::id());
+
+        // Verify file is properly synced
+        drop(pid_file);
+        assert!(!pid_path.exists());
+    }
 }

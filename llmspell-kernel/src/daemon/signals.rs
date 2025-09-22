@@ -326,7 +326,7 @@ mod tests {
 
     #[test]
     fn test_signal_bridge_process() {
-        let mut bridge = SignalBridge::new();
+        let bridge = SignalBridge::new();
 
         // No signals initially
         assert!(bridge.process_signals().is_none());
