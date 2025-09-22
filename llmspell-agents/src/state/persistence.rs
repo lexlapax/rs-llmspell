@@ -4,10 +4,12 @@
 use anyhow::Result;
 use async_trait::async_trait;
 use llmspell_core::traits::agent::{Agent, ConversationMessage, MessageRole as CoreMessageRole};
-use llmspell_state_persistence::{
-    AgentMetadata as PersistentMetadata, MessageRole, PersistentAgentState, StateManager,
+use llmspell_kernel::state::{
+    agent_state::{AgentMetadata as PersistentMetadata, MessageRole, PersistentAgentState},
+    StateManager,
 };
 use std::sync::Arc;
+use tracing::instrument;
 use tracing::{debug, info};
 
 /// Extension trait for agents to add state persistence capabilities
@@ -35,6 +37,7 @@ pub trait StatePersistence: Agent {
     }
 
     /// Load the agent's state from storage
+    #[instrument(skip(self))]
     async fn load_state(&self) -> Result<bool> {
         if let Some(state_manager) = self.state_manager() {
             let agent_id = self.metadata().id.to_string();
@@ -56,6 +59,7 @@ pub trait StatePersistence: Agent {
     }
 
     /// Create a persistent state representation from current agent state
+    #[instrument(skip(self))]
     async fn create_persistent_state(&self) -> Result<PersistentAgentState> {
         let mut state =
             PersistentAgentState::new(self.metadata().id.to_string(), self.metadata().name.clone());
@@ -92,6 +96,7 @@ pub trait StatePersistence: Agent {
     }
 
     /// Restore agent state from persistent state
+    #[instrument(skip(self))]
     async fn restore_from_persistent_state(&self, state: PersistentAgentState) -> Result<()> {
         // Clear current conversation
         self.clear_conversation().await?;
@@ -141,32 +146,31 @@ pub trait StateManagerHolder {
 macro_rules! impl_persistent_agent {
     ($agent_type:ty) => {
         #[async_trait::async_trait]
-        impl llmspell_state_persistence::PersistentAgent for $agent_type {
+        impl llmspell_kernel::state::agent_state::PersistentAgent for $agent_type {
             fn agent_id(&self) -> &str {
                 &self.agent_id_string
             }
 
             fn get_persistent_state(
                 &self,
-            ) -> llmspell_state_persistence::StateResult<
-                llmspell_state_persistence::PersistentAgentState,
-            > {
+            ) -> llmspell_kernel::state::StateResult<llmspell_kernel::state::PersistentAgentState>
+            {
                 // Since we need async, we use block_on here
                 let rt = tokio::runtime::Handle::current();
                 rt.block_on(self.create_persistent_state()).map_err(|e| {
-                    llmspell_state_persistence::StateError::SerializationError(e.to_string())
+                    llmspell_kernel::state::StateError::SerializationError(e.to_string())
                 })
             }
 
             fn apply_persistent_state(
                 &self,
-                state: llmspell_state_persistence::PersistentAgentState,
-            ) -> llmspell_state_persistence::StateResult<()> {
+                state: llmspell_kernel::state::PersistentAgentState,
+            ) -> llmspell_kernel::state::StateResult<()> {
                 // Since we need async, we use block_on here
                 let rt = tokio::runtime::Handle::current();
                 rt.block_on(self.restore_from_persistent_state(state))
                     .map_err(|e| {
-                        llmspell_state_persistence::StateError::SerializationError(e.to_string())
+                        llmspell_kernel::state::StateError::SerializationError(e.to_string())
                     })
             }
         }
@@ -197,6 +201,7 @@ mod tests {
             &self.metadata
         }
 
+        #[instrument(skip(self))]
         async fn execute_impl(
             &self,
             _input: AgentInput,
@@ -205,10 +210,12 @@ mod tests {
             Ok(AgentOutput::text("Mock response"))
         }
 
+        #[instrument(skip(self))]
         async fn validate_input(&self, _input: &AgentInput) -> llmspell_core::Result<()> {
             Ok(())
         }
 
+        #[instrument(skip(self))]
         async fn handle_error(
             &self,
             error: llmspell_core::LLMSpellError,
@@ -223,6 +230,7 @@ mod tests {
             &self.config
         }
 
+        #[instrument(skip(self))]
         async fn get_conversation(&self) -> llmspell_core::Result<Vec<ConversationMessage>> {
             self.conversation
                 .lock()
@@ -233,6 +241,7 @@ mod tests {
                 })
         }
 
+        #[instrument(skip(self))]
         async fn add_message(&self, message: ConversationMessage) -> llmspell_core::Result<()> {
             self.conversation
                 .lock()
@@ -243,6 +252,7 @@ mod tests {
                 })
         }
 
+        #[instrument(skip(self))]
         async fn clear_conversation(&self) -> llmspell_core::Result<()> {
             self.conversation
                 .lock()

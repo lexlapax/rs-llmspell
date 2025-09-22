@@ -26,7 +26,7 @@ use serde_json::json;
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
 use tokio::fs;
-use tracing::{debug, info};
+use tracing::{debug, info, instrument};
 
 /// File converter tool configuration
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -82,6 +82,7 @@ impl FileConverterTool {
     /// - Failed to read input file
     /// - Text encoding conversion fails
     /// - Failed to write output file
+    #[instrument(skip(self))]
     async fn convert_encoding(
         &self,
         input_path: &Path,
@@ -121,6 +122,7 @@ impl FileConverterTool {
     /// Returns an error if:
     /// - Failed to read input file
     /// - Failed to write output file
+    #[instrument(skip(self))]
     async fn convert_line_endings(
         &self,
         input_path: &Path,
@@ -157,6 +159,7 @@ impl FileConverterTool {
     /// Returns an error if:
     /// - Failed to read input file
     /// - Failed to write output file
+    #[instrument(skip(self))]
     async fn convert_indentation(
         &self,
         input_path: &Path,
@@ -197,6 +200,7 @@ impl FileConverterTool {
     /// # Errors
     ///
     /// Returns an error if file copy operation fails
+    #[instrument(skip(self))]
     async fn create_backup(&self, file_path: &Path) -> Result<PathBuf> {
         let backup_path = file_path.with_extension(format!(
             "{}.backup",
@@ -239,6 +243,7 @@ impl FileConverterTool {
     ///
     /// Returns an error if an invalid operation is specified
     #[allow(clippy::unused_async)]
+    #[instrument(skip(self))]
     async fn validate_parameters(&self, params: &serde_json::Value) -> LLMResult<()> {
         // Validate operation
         if let Some(operation) = params.get("operation").and_then(|v| v.as_str()) {
@@ -261,6 +266,7 @@ impl BaseAgent for FileConverterTool {
     }
 
     #[allow(clippy::too_many_lines)]
+    #[instrument(skip(_context, input, self), fields(tool = %self.metadata().name))]
     async fn execute_impl(
         &self,
         input: AgentInput,
@@ -462,6 +468,7 @@ impl BaseAgent for FileConverterTool {
         Ok(AgentOutput::text(output_text).with_metadata(metadata))
     }
 
+    #[instrument(skip(self))]
     async fn validate_input(&self, input: &AgentInput) -> LLMResult<()> {
         if input.text.is_empty() {
             return Err(LLMSpellError::Validation {
@@ -472,6 +479,7 @@ impl BaseAgent for FileConverterTool {
         Ok(())
     }
 
+    #[instrument(skip(self))]
     async fn handle_error(&self, error: LLMSpellError) -> LLMResult<AgentOutput> {
         Ok(AgentOutput::text(format!("File converter error: {error}")))
     }

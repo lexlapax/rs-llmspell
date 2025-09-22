@@ -34,6 +34,8 @@ use llmspell_utils::{
 };
 use serde::{Deserialize, Serialize};
 use serde_json::{json, Value};
+use std::time::Instant;
+use tracing::{debug, error, info, instrument, trace};
 
 #[derive(Debug, Clone, Copy, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
@@ -92,6 +94,13 @@ impl TextManipulatorTool {
     /// Create a new text manipulator tool
     #[must_use]
     pub fn new(config: TextManipulatorConfig) -> Self {
+        info!(
+            default_truncate_length = config.default_truncate_length,
+            default_indent_spaces = config.default_indent_spaces,
+            default_wrap_width = config.default_wrap_width,
+            supported_operations = 15, // 15 text operations supported
+            "Creating TextManipulatorTool"
+        );
         Self {
             metadata: ComponentMetadata::new(
                 "text-manipulator".to_string(),
@@ -101,13 +110,22 @@ impl TextManipulatorTool {
         }
     }
 
+    #[allow(clippy::too_many_lines)]
     fn perform_operation(
         &self,
         text: &str,
         operation: TextOperation,
         options: Option<Value>,
     ) -> Result<String> {
-        match operation {
+        let operation_start = Instant::now();
+        debug!(
+            operation = ?operation,
+            input_length = text.len(),
+            has_options = options.is_some(),
+            "Starting text manipulation operation"
+        );
+
+        let result = match operation {
             TextOperation::Uppercase => Ok(string_utils::to_uppercase(text)),
             TextOperation::Lowercase => Ok(string_utils::to_lowercase(text)),
             TextOperation::Reverse => Ok(string_utils::reverse(text)),
@@ -206,14 +224,46 @@ impl TextManipulatorTool {
                 let lines = string_utils::word_wrap(text, width);
                 Ok(lines.join("\n"))
             }
+        };
+
+        let operation_duration_ms = operation_start.elapsed().as_millis();
+        if let Ok(ref output) = result {
+            debug!(
+                operation = ?operation,
+                input_length = text.len(),
+                output_length = output.len(),
+                success = true,
+                duration_ms = operation_duration_ms,
+                "Text manipulation operation completed successfully"
+            );
+        } else {
+            error!(
+                operation = ?operation,
+                input_length = text.len(),
+                success = false,
+                duration_ms = operation_duration_ms,
+                "Text manipulation operation failed"
+            );
         }
+
+        result
     }
 
     #[allow(clippy::unused_async)]
+    #[instrument(skip(self))]
     async fn validate_parameters(&self, params: &Value) -> Result<()> {
+        let validation_start = Instant::now();
+        trace!("Starting parameter validation for text manipulator");
+
         // Required parameters
-        extract_required_string(params, "input")?;
+        let input_text = extract_required_string(params, "input")?;
         let operation_str = extract_required_string(params, "operation")?;
+
+        debug!(
+            operation = %operation_str,
+            input_length = input_text.len(),
+            "Validating text manipulation parameters"
+        );
 
         // Validate operation is valid
         let valid_operations = [
@@ -296,12 +346,26 @@ impl TextManipulatorTool {
             }
         }
 
+        debug!(
+            operation = %operation_str,
+            input_length = input_text.len(),
+            validation_duration_ms = validation_start.elapsed().as_millis(),
+            "Parameter validation completed successfully"
+        );
+
         Ok(())
     }
 }
 
 impl Default for TextManipulatorTool {
     fn default() -> Self {
+        info!(
+            tool_name = "text-manipulator",
+            category = "Tool",
+            phase = "Phase 3 (comprehensive instrumentation)",
+            "Creating TextManipulatorTool"
+        );
+
         Self::new(TextManipulatorConfig::default())
     }
 }
@@ -312,11 +376,19 @@ impl BaseAgent for TextManipulatorTool {
         &self.metadata
     }
 
+    #[instrument(skip(_context, input, self), fields(tool = %self.metadata().name))]
     async fn execute_impl(
         &self,
         input: AgentInput,
         _context: ExecutionContext,
     ) -> Result<AgentOutput> {
+        let start = Instant::now();
+        info!(
+            input_size = input.text.len(),
+            has_params = !input.parameters.is_empty(),
+            "Executing text manipulator tool"
+        );
+
         // Get parameters using shared utility
         let params = extract_parameters(&input)?;
 
@@ -326,6 +398,12 @@ impl BaseAgent for TextManipulatorTool {
         // Extract parameters using utilities
         let text = extract_required_string(params, "input")?;
         let operation_str = extract_required_string(params, "operation")?;
+
+        debug!(
+            operation = %operation_str,
+            text_length = text.len(),
+            "Processing text manipulation request"
+        );
 
         let operation: TextOperation =
             serde_json::from_value(json!(operation_str)).map_err(|_| {
@@ -352,9 +430,20 @@ impl BaseAgent for TextManipulatorTool {
             }))
             .build();
 
+        let elapsed_ms = start.elapsed().as_millis();
+        info!(
+            operation = %operation_str,
+            text_length = text.len(),
+            result_length = result.len(),
+            success = true,
+            duration_ms = elapsed_ms,
+            "Text manipulator execution completed successfully"
+        );
+
         Ok(AgentOutput::text(serde_json::to_string_pretty(&response)?))
     }
 
+    #[instrument(skip(self))]
     async fn validate_input(&self, input: &AgentInput) -> Result<()> {
         if input.text.is_empty() {
             return Err(validation_error(
@@ -365,6 +454,7 @@ impl BaseAgent for TextManipulatorTool {
         Ok(())
     }
 
+    #[instrument(skip(self))]
     async fn handle_error(&self, error: LLMSpellError) -> Result<AgentOutput> {
         Ok(AgentOutput::text(format!(
             "Text manipulation error: {error}"

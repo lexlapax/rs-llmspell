@@ -6,6 +6,7 @@ use crate::factory::AgentConfig;
 use anyhow::Result;
 use llmspell_core::traits::agent::Agent;
 use std::{collections::HashMap, sync::Arc};
+use tracing::instrument;
 use uuid::Uuid;
 
 /// Agent registration options
@@ -124,6 +125,7 @@ impl<R: AgentRegistry> AgentRegistrar<R> {
     /// # Errors
     ///
     /// Returns an error if agent registration fails
+    #[instrument(skip(agent, self))]
     pub async fn register_agent(
         &self,
         agent: Arc<dyn Agent>,
@@ -143,6 +145,7 @@ impl<R: AgentRegistry> AgentRegistrar<R> {
     /// - Metadata serialization fails
     /// - Registry registration fails
     /// - Heartbeat fails (if enabled)
+    #[instrument(skip(agent, self))]
     pub async fn register_agent_with_options(
         &self,
         agent: Arc<dyn Agent>,
@@ -210,6 +213,7 @@ impl<R: AgentRegistry> AgentRegistrar<R> {
     /// - Agent validation fails
     /// - Agent is not responsive
     /// - Configuration is invalid
+    #[instrument(skip(agent, self))]
     async fn validate_agent(&self, agent: &Arc<dyn Agent>, config: &AgentConfig) -> Result<()> {
         // Check agent is responsive
         let test_input = llmspell_core::types::AgentInput::text("__registry_validation__");
@@ -240,6 +244,7 @@ impl<R: AgentRegistry> AgentRegistrar<R> {
     /// - Agent not found
     /// - Status update fails
     /// - Removal from registry fails
+    #[instrument(skip(self))]
     pub async fn unregister_agent(&self, id: &str) -> Result<()> {
         // Update status to stopped first
         self.registry
@@ -255,6 +260,7 @@ impl<R: AgentRegistry> AgentRegistrar<R> {
     /// # Errors
     ///
     /// Returns an error if any agent registration fails
+    #[instrument(skip(agents, self))]
     pub async fn register_agents(
         &self,
         agents: Vec<(Arc<dyn Agent>, AgentConfig)>,
@@ -319,6 +325,7 @@ impl Default for CompositeRegistrationHook {
 
 #[async_trait::async_trait]
 impl RegistrationHook for CompositeRegistrationHook {
+    #[instrument(skip(self))]
     async fn before_register(&self, config: &AgentConfig) -> Result<()> {
         for hook in &self.hooks {
             hook.before_register(config).await?;
@@ -326,6 +333,7 @@ impl RegistrationHook for CompositeRegistrationHook {
         Ok(())
     }
 
+    #[instrument(skip(self))]
     async fn after_register(&self, id: &str, metadata: &AgentMetadata) -> Result<()> {
         for hook in &self.hooks {
             hook.after_register(id, metadata).await?;
@@ -333,6 +341,7 @@ impl RegistrationHook for CompositeRegistrationHook {
         Ok(())
     }
 
+    #[instrument(skip(self))]
     async fn on_register_error(&self, config: &AgentConfig, error: &anyhow::Error) -> Result<()> {
         for hook in &self.hooks {
             hook.on_register_error(config, error).await?;

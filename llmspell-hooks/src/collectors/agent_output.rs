@@ -7,8 +7,10 @@ use anyhow::{anyhow, Result};
 use async_trait::async_trait;
 use chrono::Utc;
 use serde_json::json;
+use tracing::warn;
 
 /// Collector for agent execution outputs
+#[derive(Debug)]
 pub struct AgentOutputCollector {
     config: CollectionConfig,
 }
@@ -62,7 +64,7 @@ impl Hook for AgentOutputCollector {
             }
             Err(e) => {
                 // Log error but don't fail the hook chain
-                tracing::warn!("Failed to collect agent output artifact: {}", e);
+                warn!("Failed to collect agent output artifact: {}", e);
                 Ok(HookResult::Continue)
             }
         }

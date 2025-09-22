@@ -293,3 +293,21 @@ pub use llmspell_config::LLMSpellConfig;
 pub use providers::ProviderManager;
 pub use registry::ComponentRegistry;
 pub use runtime::ScriptRuntime;
+
+use llmspell_core::traits::script_executor::ScriptExecutor;
+use std::sync::Arc;
+
+/// Create a script executor for the given configuration
+///
+/// This factory function creates a `ScriptExecutor` without exposing
+/// the concrete `ScriptRuntime` type, avoiding cyclic dependencies.
+///
+/// # Errors
+///
+/// Returns an error if the script runtime fails to initialize with the given configuration.
+pub async fn create_script_executor(
+    config: LLMSpellConfig,
+) -> Result<Arc<dyn ScriptExecutor>, llmspell_core::error::LLMSpellError> {
+    let runtime = ScriptRuntime::new_with_lua(config).await?;
+    Ok(Arc::new(runtime) as Arc<dyn ScriptExecutor>)
+}

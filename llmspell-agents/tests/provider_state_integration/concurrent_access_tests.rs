@@ -592,7 +592,12 @@ async fn test_concurrent_state_conflict_resolution() -> Result<()> {
             .state
             .conversation_history
             .iter()
-            .filter(|msg| matches!(msg.role, llmspell_state_persistence::MessageRole::User))
+            .filter(|msg| {
+                matches!(
+                    msg.role,
+                    llmspell_kernel::state::agent_state::MessageRole::User
+                )
+            })
             .next_back()
             .map(|msg| msg.content.clone())
             .unwrap_or_default();

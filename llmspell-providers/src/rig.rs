@@ -10,6 +10,9 @@ use llmspell_core::{
 use rig::{completion::CompletionModel, providers};
 use serde_json::json;
 use std::collections::HashMap;
+use std::sync::atomic::{AtomicU64, Ordering};
+use std::time::Instant;
+use tracing::{debug, info, instrument, span, warn, Level};
 
 /// Enum to hold different provider models
 enum RigModel {
@@ -18,12 +21,18 @@ enum RigModel {
     Cohere(providers::cohere::CompletionModel),
 }
 
-/// Rig provider implementation
+/// Rig provider implementation with cost tracking and tracing
 pub struct RigProvider {
     config: ProviderConfig,
     capabilities: ProviderCapabilities,
     model: RigModel,
     max_tokens: u64,
+    /// Total cost accrued by this provider instance
+    total_cost: std::sync::atomic::AtomicU64,
+    /// Total tokens used by this provider instance
+    total_tokens: std::sync::atomic::AtomicU64,
+    /// Total requests made by this provider instance
+    total_requests: std::sync::atomic::AtomicU64,
 }
 
 impl RigProvider {
@@ -126,10 +135,100 @@ impl RigProvider {
             capabilities,
             model,
             max_tokens,
+            total_cost: AtomicU64::new(0),
+            total_tokens: AtomicU64::new(0),
+            total_requests: AtomicU64::new(0),
         })
     }
 
+    /// Estimate cost in cents based on provider pricing
+    /// These are rough estimates based on published pricing as of 2024
+    fn estimate_cost_cents(&self, input_tokens: u64, output_tokens: u64) -> u64 {
+        match self.config.provider_type.as_str() {
+            "openai" => {
+                match self.config.model.as_str() {
+                    "gpt-4" | "gpt-4-0613" => {
+                        // GPT-4: $0.03/1K input, $0.06/1K output
+                        let input_cost = (input_tokens as f64 / 1000.0) * 3.0;
+                        let output_cost = (output_tokens as f64 / 1000.0) * 6.0;
+                        ((input_cost + output_cost) * 100.0).round() as u64
+                    }
+                    "gpt-3.5-turbo" | "gpt-3.5-turbo-0613" => {
+                        // GPT-3.5: $0.001/1K input, $0.002/1K output
+                        let input_cost = (input_tokens as f64 / 1000.0) * 0.1;
+                        let output_cost = (output_tokens as f64 / 1000.0) * 0.2;
+                        ((input_cost + output_cost) * 100.0).round() as u64
+                    }
+                    _ => {
+                        // Default to GPT-3.5 pricing
+                        let input_cost = (input_tokens as f64 / 1000.0) * 0.1;
+                        let output_cost = (output_tokens as f64 / 1000.0) * 0.2;
+                        ((input_cost + output_cost) * 100.0).round() as u64
+                    }
+                }
+            }
+            "anthropic" => {
+                match self.config.model.as_str() {
+                    "claude-3-opus-20240229" => {
+                        // Claude 3 Opus: $0.015/1K input, $0.075/1K output
+                        let input_cost = (input_tokens as f64 / 1000.0) * 1.5;
+                        let output_cost = (output_tokens as f64 / 1000.0) * 7.5;
+                        ((input_cost + output_cost) * 100.0).round() as u64
+                    }
+                    "claude-3-sonnet-20240229" => {
+                        // Claude 3 Sonnet: $0.003/1K input, $0.015/1K output
+                        let input_cost = (input_tokens as f64 / 1000.0) * 0.3;
+                        let output_cost = (output_tokens as f64 / 1000.0) * 1.5;
+                        ((input_cost + output_cost) * 100.0).round() as u64
+                    }
+                    _ => {
+                        // Default to Claude 3 Sonnet pricing
+                        let input_cost = (input_tokens as f64 / 1000.0) * 0.3;
+                        let output_cost = (output_tokens as f64 / 1000.0) * 1.5;
+                        ((input_cost + output_cost) * 100.0).round() as u64
+                    }
+                }
+            }
+            "cohere" => {
+                // Cohere Command: $0.0015/1K input, $0.002/1K output (estimate)
+                let input_cost = (input_tokens as f64 / 1000.0) * 0.15;
+                let output_cost = (output_tokens as f64 / 1000.0) * 0.2;
+                ((input_cost + output_cost) * 100.0).round() as u64
+            }
+            _ => {
+                // Unknown provider, use conservative estimate
+                let input_cost = (input_tokens as f64 / 1000.0) * 0.1;
+                let output_cost = (output_tokens as f64 / 1000.0) * 0.2;
+                ((input_cost + output_cost) * 100.0).round() as u64
+            }
+        }
+    }
+
+    /// Get current total cost in cents
+    pub fn total_cost_cents(&self) -> u64 {
+        self.total_cost.load(Ordering::SeqCst)
+    }
+
+    /// Get current total tokens used
+    pub fn total_tokens_used(&self) -> u64 {
+        self.total_tokens.load(Ordering::SeqCst)
+    }
+
+    /// Get current total requests made
+    pub fn total_requests_made(&self) -> u64 {
+        self.total_requests.load(Ordering::SeqCst)
+    }
+
+    #[instrument(level = "debug", skip(prompt, self), fields(
+        prompt_length = prompt.len(),
+        provider = %self.config.provider_type,
+        model = %self.config.model
+    ))]
     async fn execute_completion(&self, prompt: String) -> Result<String, LLMSpellError> {
+        debug!(
+            "Executing completion with {} character prompt",
+            prompt.len()
+        );
         match &self.model {
             RigModel::OpenAI(model) => model
                 .completion_request(&prompt)
@@ -201,7 +300,29 @@ impl ProviderInstance for RigProvider {
         &self.capabilities
     }
 
+    #[instrument(level = "info", skip(input, self), fields(
+        provider_type = %self.config.provider_type,
+        model = %self.config.model,
+        input_length = tracing::field::Empty,
+        output_length = tracing::field::Empty,
+        tokens_used = tracing::field::Empty,
+        estimated_cost_cents = tracing::field::Empty,
+        request_duration_ms = tracing::field::Empty,
+        total_requests = tracing::field::Empty
+    ))]
     async fn complete(&self, input: &AgentInput) -> Result<AgentOutput, LLMSpellError> {
+        let start_time = Instant::now();
+        let span = span!(Level::INFO, "provider_completion");
+        let _enter = span.enter();
+
+        // Record input metrics
+        let input_length = input.text.len();
+        span.record("input_length", input_length);
+        info!(
+            "Starting LLM completion request with {} character input",
+            input_length
+        );
+
         // Build the prompt
         let mut prompt = input.text.clone();
 
@@ -217,32 +338,98 @@ impl ProviderInstance for RigProvider {
                     .join("\n");
 
                 prompt = format!("{}\n\n{}", context_text, prompt);
+                debug!("Added {} context items to prompt", context.data.len());
             }
         }
 
-        // TODO: In a real implementation, we would handle parameters like max_tokens, temperature, etc.
-        // For now, we'll use defaults since Rig's simple completion API doesn't expose these
+        debug!("Final prompt length: {} characters", prompt.len());
 
-        // Execute the completion
-        let output_text = self.execute_completion(prompt).await?;
+        // Execute the completion with error tracking
+        let output_text = match self.execute_completion(prompt).await {
+            Ok(text) => {
+                info!("LLM completion succeeded");
+                text
+            }
+            Err(e) => {
+                warn!("LLM completion failed: {}", e);
+                return Err(e);
+            }
+        };
+
+        // Record output metrics
+        let output_length = output_text.len();
+        span.record("output_length", output_length);
+
+        // Estimate tokens and cost (rough approximation)
+        let estimated_input_tokens = (input_length as f64 / 4.0).ceil() as u64; // ~4 chars per token
+        let estimated_output_tokens = (output_length as f64 / 4.0).ceil() as u64;
+        let total_tokens = estimated_input_tokens + estimated_output_tokens;
+
+        // Estimate cost in cents based on provider type and model
+        let estimated_cost_cents =
+            self.estimate_cost_cents(estimated_input_tokens, estimated_output_tokens);
+
+        // Record metrics
+        span.record("tokens_used", total_tokens);
+        span.record("estimated_cost_cents", estimated_cost_cents);
+
+        // Update provider-level metrics
+        let request_count = self.total_requests.fetch_add(1, Ordering::SeqCst) + 1;
+        self.total_tokens.fetch_add(total_tokens, Ordering::SeqCst);
+        self.total_cost
+            .fetch_add(estimated_cost_cents, Ordering::SeqCst);
+
+        span.record("total_requests", request_count);
+
+        // Record timing
+        let duration = start_time.elapsed();
+        span.record("request_duration_ms", duration.as_millis() as u64);
+
+        info!(
+            "Completion finished: {} -> {} chars, ~{} tokens, ~{:.2}¢, {}ms",
+            input_length,
+            output_length,
+            total_tokens,
+            estimated_cost_cents as f64 / 100.0,
+            duration.as_millis()
+        );
 
         // Build the output
         let mut output = AgentOutput::text(output_text);
 
-        // Add provider metadata
+        // Add provider metadata with cost tracking
         output.metadata.model = Some(self.config.model.clone());
         output
             .metadata
             .extra
             .insert("provider".to_string(), json!(self.config.name));
-
-        // Note: Rig's simple completion API doesn't return usage information
-        // In a real implementation, we might need to use more advanced APIs
+        output
+            .metadata
+            .extra
+            .insert("estimated_tokens".to_string(), json!(total_tokens));
+        output.metadata.extra.insert(
+            "estimated_cost_cents".to_string(),
+            json!(estimated_cost_cents),
+        );
+        output
+            .metadata
+            .extra
+            .insert("duration_ms".to_string(), json!(duration.as_millis()));
+        output
+            .metadata
+            .extra
+            .insert("provider_total_requests".to_string(), json!(request_count));
 
         Ok(output)
     }
 
+    #[instrument(level = "debug", skip(_input, self), fields(
+        provider_type = %self.config.provider_type,
+        model = %self.config.model,
+        streaming_support = false
+    ))]
     async fn complete_streaming(&self, _input: &AgentInput) -> Result<AgentStream, LLMSpellError> {
+        debug!("Streaming completion requested but not supported");
         // Rig doesn't expose streaming yet, use default implementation
         Err(LLMSpellError::Provider {
             message: "Streaming not yet supported in Rig provider".to_string(),
@@ -251,7 +438,12 @@ impl ProviderInstance for RigProvider {
         })
     }
 
+    #[instrument(level = "debug", skip(self), fields(
+        provider_type = %self.config.provider_type,
+        model = %self.config.model
+    ))]
     async fn validate(&self) -> Result<(), LLMSpellError> {
+        info!("Validating provider configuration");
         // Try a simple completion to validate the configuration
         let test_input = AgentInput::text("Say 'test'");
 

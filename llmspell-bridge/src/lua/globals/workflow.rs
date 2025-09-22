@@ -12,7 +12,7 @@ use llmspell_workflows::{Condition, ErrorStrategy, StepType, WorkflowStep};
 use mlua::{AnyUserDataExt, Lua, Table, UserData, UserDataMethods, Value};
 use std::sync::Arc;
 // use std::time::Duration; // Unused for now
-use tracing::{debug, info};
+use tracing::{debug, info, instrument};
 use uuid;
 
 /// Parse step configuration from Lua table
@@ -1120,11 +1120,20 @@ impl Clone for WorkflowBuilder {
 ///
 /// Panics if the Lua table creation or function binding fails
 #[allow(clippy::too_many_lines)]
+#[instrument(
+    level = "info",
+    skip(lua, _context, workflow_bridge),
+    fields(
+        global_name = "Workflow",
+        workflow_features = "sequential,parallel,conditional,iterative"
+    )
+)]
 pub fn inject_workflow_global(
     lua: &Lua,
     _context: &GlobalContext,
     workflow_bridge: Arc<WorkflowBridge>,
 ) -> mlua::Result<()> {
+    info!("Injecting Workflow global API with all patterns");
     let workflow_table = lua.create_table()?;
 
     // Workflow.sequential() - accepts full configuration

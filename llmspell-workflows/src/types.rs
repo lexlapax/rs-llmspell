@@ -75,6 +75,7 @@ pub struct WorkflowInput {
 }
 
 impl WorkflowInput {
+    /// Create a new workflow input with the given data
     pub fn new(input: serde_json::Value) -> Self {
         Self {
             input,
@@ -83,11 +84,13 @@ impl WorkflowInput {
         }
     }
 
+    /// Add a context variable to the workflow input
     pub fn with_context(mut self, key: String, value: serde_json::Value) -> Self {
         self.context.insert(key, value);
         self
     }
 
+    /// Set a timeout for the workflow execution
     pub fn with_timeout(mut self, timeout: Duration) -> Self {
         self.timeout = Some(timeout);
         self
@@ -114,6 +117,7 @@ pub struct WorkflowOutput {
 }
 
 impl WorkflowOutput {
+    /// Create a successful workflow output
     pub fn success(
         output: serde_json::Value,
         duration: Duration,
@@ -131,6 +135,7 @@ impl WorkflowOutput {
         }
     }
 
+    /// Create a failed workflow output
     pub fn failure(
         error: String,
         duration: Duration,
@@ -170,6 +175,7 @@ pub struct WorkflowState {
 }
 
 impl WorkflowState {
+    /// Create a new workflow state
     pub fn new() -> Self {
         Self {
             execution_id: ComponentId::new(),
@@ -181,38 +187,46 @@ impl WorkflowState {
         }
     }
 
+    /// Mark the workflow execution as started
     pub fn start_execution(&mut self) {
         self.start_time = Some(Instant::now());
         self.last_update = Instant::now();
     }
 
+    /// Move to the next step in the workflow
     pub fn advance_step(&mut self) {
         self.current_step += 1;
         self.last_update = Instant::now();
     }
 
+    /// Store the output of a step
     pub fn set_step_output(&mut self, step_id: ComponentId, output: serde_json::Value) {
         self.step_outputs.insert(step_id, output);
         self.last_update = Instant::now();
     }
 
+    /// Retrieve the output of a step
     pub fn get_step_output(&self, step_id: ComponentId) -> Option<&serde_json::Value> {
         self.step_outputs.get(&step_id)
     }
 
+    /// Store shared data accessible by all steps
     pub fn set_shared_data(&mut self, key: String, value: serde_json::Value) {
         self.shared_data.insert(key, value);
         self.last_update = Instant::now();
     }
 
+    /// Retrieve shared data by key
     pub fn get_shared_data(&self, key: &str) -> Option<&serde_json::Value> {
         self.shared_data.get(key)
     }
 
+    /// Get the duration of the workflow execution
     pub fn execution_duration(&self) -> Option<Duration> {
         self.start_time.map(|start| start.elapsed())
     }
 
+    /// Reset the workflow state to initial values
     pub fn reset(&mut self) {
         self.execution_id = ComponentId::new();
         self.current_step = 0;
@@ -406,6 +420,7 @@ pub struct StepExecutionContext {
 }
 
 impl StepExecutionContext {
+    /// Create a new step execution context
     pub fn new(workflow_state: WorkflowState, timeout: Option<Duration>) -> Self {
         Self {
             workflow_state,
@@ -439,6 +454,7 @@ impl StepExecutionContext {
         self
     }
 
+    /// Configure retry information for this execution
     pub fn with_retry(mut self, attempt: u32, max_attempts: u32) -> Self {
         self.retry_attempt = attempt;
         self.is_final_retry = attempt >= max_attempts;

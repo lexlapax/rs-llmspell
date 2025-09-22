@@ -3,15 +3,15 @@
 
 use anyhow::{Context, Result};
 use async_trait::async_trait;
+use llmspell_core::state::{StateManager, StateScope};
 use llmspell_core::traits::tool::Tool;
 use llmspell_core::ComponentMetadata;
-use llmspell_state_traits::{StateManager, StateScope};
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use std::collections::HashMap;
 use std::sync::Arc;
 use std::time::{Duration, SystemTime};
-use tracing::{debug, info, warn};
+use tracing::{debug, info, instrument, warn};
 
 /// Tool execution state for persistence
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -229,6 +229,7 @@ pub trait ToolStatePersistence: Tool {
     }
 
     /// Load the tool's state from storage
+    #[instrument(skip(self))]
     async fn load_state(&self) -> Result<bool> {
         if let Some(state_manager) = self.state_manager() {
             let tool_id = self.metadata().id.to_string();
@@ -254,6 +255,7 @@ pub trait ToolStatePersistence: Tool {
     }
 
     /// Create a tool state representation from current tool state
+    #[instrument(skip(self))]
     async fn create_tool_state(&self) -> Result<ToolState> {
         let mut tool_state =
             ToolState::new(self.metadata().id.to_string(), self.metadata().clone());
@@ -277,6 +279,7 @@ pub trait ToolStatePersistence: Tool {
     }
 
     /// Restore tool state from saved state
+    #[instrument(skip(self))]
     async fn restore_from_tool_state(&self, state: ToolState) -> Result<()> {
         let cache_count = state.result_cache.len();
         let tool_id = state.tool_id.clone();
@@ -366,6 +369,7 @@ impl ToolStateRegistry {
     /// # Errors
     ///
     /// Returns an error if tool registration fails
+    #[instrument(skip(self, tool))]
     pub async fn register_tool<T: ToolStatePersistence>(&mut self, tool: T) -> Result<T> {
         tool.set_state_manager(self.state_manager.clone());
 
@@ -387,6 +391,7 @@ impl ToolStateRegistry {
     /// # Errors
     ///
     /// Returns an error if saving any tool state fails
+    #[instrument(skip(self))]
     pub async fn save_all_states(&self) -> Result<()> {
         for (tool_id, tool_state) in &self.tool_states {
             let state_scope = StateScope::Custom(format!("tool_{tool_id}"));
@@ -405,6 +410,7 @@ impl ToolStateRegistry {
     /// Returns an error if:
     /// - State loading fails
     /// - State deserialization fails
+    #[instrument(skip(self))]
     pub async fn load_tool_state(&self, tool_id: &str) -> Result<Option<ToolState>> {
         let state_scope = StateScope::Custom(format!("tool_{tool_id}"));
 
@@ -421,6 +427,7 @@ impl ToolStateRegistry {
 
     /// Get registry statistics
     #[allow(clippy::unused_async)]
+    #[instrument(skip(self))]
     pub async fn get_registry_stats(&self) -> RegistryStatistics {
         let total_tools = self.tool_states.len();
         let total_cached_results: usize = self
@@ -474,13 +481,13 @@ macro_rules! impl_tool_state_persistence {
         impl $crate::state::tool_state::ToolStatePersistence for $tool_type {
             fn state_manager(
                 &self,
-            ) -> Option<&std::sync::Arc<llmspell_state_persistence::StateManager>> {
+            ) -> Option<&std::sync::Arc<llmspell_kernel::state::StateManager>> {
                 self.state_manager()
             }
 
             fn set_state_manager(
                 &mut self,
-                state_manager: std::sync::Arc<llmspell_state_persistence::StateManager>,
+                state_manager: std::sync::Arc<llmspell_kernel::state::StateManager>,
             ) {
                 self.set_state_manager(state_manager)
             }
@@ -493,8 +500,8 @@ mod tests {
     use super::*;
     use llmspell_core::types::{AgentInput, AgentOutput};
     use llmspell_core::{BaseAgent, ExecutionContext, LLMSpellError};
-    use llmspell_state_persistence::config::PersistenceConfig;
-    use llmspell_state_persistence::config::StorageBackendType;
+    use llmspell_kernel::state::config::PersistenceConfig;
+    use llmspell_kernel::state::config::StorageBackendType;
     use std::sync::Mutex;
 
     // Mock tool for testing
@@ -512,6 +519,7 @@ mod tests {
             &self.metadata
         }
 
+        #[instrument(skip(self, _input, _context), fields(tool = %self.metadata().name))]
         async fn execute_impl(
             &self,
             _input: AgentInput,
@@ -520,10 +528,12 @@ mod tests {
             Ok(AgentOutput::text("Mock output"))
         }
 
+        #[instrument(skip(self))]
         async fn validate_input(&self, _input: &AgentInput) -> llmspell_core::Result<()> {
             Ok(())
         }
 
+        #[instrument(skip(self))]
         async fn handle_error(&self, error: LLMSpellError) -> llmspell_core::Result<AgentOutput> {
             Ok(AgentOutput::text(format!("Error: {error}")))
         }
@@ -602,6 +612,7 @@ mod tests {
         }
     }
 
+    #[instrument]
     async fn create_test_state_manager() -> Arc<dyn StateManager> {
         let config = PersistenceConfig {
             enabled: true,
@@ -609,12 +620,9 @@ mod tests {
         };
 
         Arc::new(
-            llmspell_state_persistence::StateManager::with_backend(
-                StorageBackendType::Memory,
-                config,
-            )
-            .await
-            .unwrap(),
+            llmspell_kernel::state::StateManager::with_backend(StorageBackendType::Memory, config)
+                .await
+                .unwrap(),
         )
     }
     #[tokio::test]

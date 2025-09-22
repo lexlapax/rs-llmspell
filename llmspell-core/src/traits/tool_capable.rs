@@ -9,6 +9,7 @@ use async_trait::async_trait;
 use serde::{Deserialize, Serialize};
 use serde_json::Value as JsonValue;
 use std::collections::HashMap;
+use tracing::error;
 
 /// Tool query criteria for tool discovery.
 ///
@@ -434,6 +435,10 @@ pub trait ToolCapable: BaseAgent {
         _composition: &ToolComposition,
         _context: ExecutionContext,
     ) -> Result<AgentOutput> {
+        error!(
+            component = %self.metadata().name,
+            "Tool composition not supported by this component"
+        );
         return Err(LLMSpellError::Component {
             message: "Tool composition not supported by this component".to_owned(),
             source: None,

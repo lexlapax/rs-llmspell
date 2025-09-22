@@ -14,6 +14,7 @@ use llmspell_core::{
     types::{AgentInput, AgentOutput},
     ComponentMetadata, ExecutionContext, LLMSpellError, Result,
 };
+use llmspell_kernel::runtime::create_io_bound_resource;
 use llmspell_utils::{
     extract_optional_object, extract_optional_string, extract_parameters, extract_required_string,
     response::ResponseBuilder,
@@ -24,7 +25,7 @@ use serde_json::{json, Value};
 use std::collections::HashMap;
 use std::sync::Arc;
 use tokio::sync::RwLock;
-use tracing::{debug, info};
+use tracing::{debug, info, instrument};
 
 /// GraphQL operation types
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -176,14 +177,18 @@ impl GraphQLQueryTool {
     /// # Errors
     /// Returns an error if the HTTP client cannot be created or rate limiter setup fails.
     pub fn new(config: GraphQLConfig) -> Result<Self> {
-        let client = Client::builder()
-            .timeout(std::time::Duration::from_secs(config.timeout_seconds))
-            .user_agent(&config.user_agent)
-            .build()
-            .map_err(|e| LLMSpellError::Internal {
-                message: format!("Failed to create HTTP client: {e}"),
-                source: None,
-            })?;
+        let timeout_seconds = config.timeout_seconds;
+        let user_agent = config.user_agent.clone();
+        let client = create_io_bound_resource(move || {
+            Client::builder()
+                .timeout(std::time::Duration::from_secs(timeout_seconds))
+                .user_agent(&user_agent)
+                .build()
+        })
+        .map_err(|e| LLMSpellError::Internal {
+            message: format!("Failed to create HTTP client: {e}"),
+            source: None,
+        })?;
 
         Ok(Self {
             metadata: ComponentMetadata::new(
@@ -197,6 +202,7 @@ impl GraphQLQueryTool {
     }
 
     /// Execute GraphQL request
+    #[instrument(skip(headers, self))]
     async fn execute_graphql(
         &self,
         endpoint: &str,
@@ -249,6 +255,7 @@ impl GraphQLQueryTool {
     }
 
     /// Get or fetch schema with caching
+    #[instrument(skip(headers, self))]
     async fn get_schema(
         &self,
         endpoint: &str,
@@ -289,6 +296,7 @@ impl GraphQLQueryTool {
     }
 
     /// Fetch schema from endpoint
+    #[instrument(skip(headers, self))]
     async fn fetch_schema(
         &self,
         endpoint: &str,
@@ -465,6 +473,13 @@ struct GraphQLParameters {
 
 impl Default for GraphQLQueryTool {
     fn default() -> Self {
+        info!(
+            tool_name = "graph-q-l-query",
+            category = "Tool",
+            phase = "Phase 3 (comprehensive instrumentation)",
+            "Creating GraphQLQueryTool"
+        );
+
         Self::new(GraphQLConfig::default()).expect("Default config should be valid")
     }
 }
@@ -475,6 +490,7 @@ impl BaseAgent for GraphQLQueryTool {
         &self.metadata
     }
 
+    #[instrument(skip(_context, input, self), fields(tool = %self.metadata().name))]
     async fn execute_impl(
         &self,
         input: AgentInput,
@@ -568,6 +584,7 @@ impl BaseAgent for GraphQLQueryTool {
         Ok(AgentOutput::text(serde_json::to_string_pretty(&response)?))
     }
 
+    #[instrument(skip(self))]
     async fn validate_input(&self, input: &AgentInput) -> Result<()> {
         if input.parameters.is_empty() {
             return Err(LLMSpellError::Validation {
@@ -601,6 +618,7 @@ impl BaseAgent for GraphQLQueryTool {
         Ok(())
     }
 
+    #[instrument(skip(self))]
     async fn handle_error(&self, error: LLMSpellError) -> Result<AgentOutput> {
         Ok(AgentOutput::text(format!("GraphQL query error: {error}")))
     }

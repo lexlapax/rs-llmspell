@@ -19,6 +19,7 @@ use std::time::Duration;
 use uuid::Uuid;
 
 // Simple implementation of HookReplayManager for tests
+#[derive(Debug)]
 struct TestReplayManager;
 
 #[async_trait]

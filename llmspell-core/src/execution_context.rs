@@ -9,6 +9,7 @@ use serde_json::Value;
 use std::collections::HashMap;
 use std::fmt;
 use std::sync::{Arc, RwLock};
+use tracing::{debug, info, trace};
 
 /// Context inheritance policy
 #[derive(Debug, Clone, Copy, PartialEq, Serialize, Deserialize)]
@@ -69,6 +70,11 @@ impl SharedMemory {
     /// Get value from a memory region
     #[must_use]
     pub fn get(&self, scope: &ContextScope, key: &str) -> Option<Value> {
+        trace!(
+            scope = %scope,
+            key = %key,
+            "SharedMemory::get"
+        );
         self.regions
             .read()
             .unwrap_or_else(|poisoned| poisoned.into_inner())
@@ -78,6 +84,11 @@ impl SharedMemory {
 
     /// Set value in a memory region
     pub fn set(&self, scope: ContextScope, key: String, value: Value) {
+        debug!(
+            scope = %scope,
+            key = %key,
+            "SharedMemory::set"
+        );
         let mut regions = self
             .regions
             .write()
@@ -211,6 +222,13 @@ impl ExecutionContext {
     /// Create a child context with inheritance
     #[must_use]
     pub fn create_child(&self, scope: ContextScope, inheritance: InheritancePolicy) -> Self {
+        info!(
+            parent_id = %self.id,
+            child_scope = %scope,
+            inheritance_policy = ?inheritance,
+            "Creating child context"
+        );
+
         let mut child = Self {
             id: uuid::Uuid::new_v4().to_string(),
             parent_id: Some(self.id.clone()),
@@ -253,34 +271,78 @@ impl ExecutionContext {
 
     /// Get data from context hierarchy
     pub fn get(&self, key: &str) -> Option<Value> {
+        trace!(
+            context_id = %self.id,
+            key = %key,
+            scope = %self.scope,
+            "Getting value from context"
+        );
+
         // First check local data
         if let Some(value) = self.data.get(key) {
+            trace!(
+                context_id = %self.id,
+                key = %key,
+                found_in = "local",
+                "Value found in local data"
+            );
             return Some(value.clone());
         }
 
         // Then check shared memory at current scope
         if let Some(value) = self.shared_memory.get(&self.scope, key) {
+            trace!(
+                context_id = %self.id,
+                key = %key,
+                found_in = "shared_memory",
+                "Value found in shared memory"
+            );
             return Some(value);
         }
 
         // Finally, check parent if inheritance allows
         // Note: Without parent reference, we can't check parent data
         // This would need to be handled by the HierarchicalContext
+        trace!(
+            context_id = %self.id,
+            key = %key,
+            "Value not found in context"
+        );
         None
     }
 
     /// Set data in context
     pub fn set(&mut self, key: String, value: Value) {
+        let value_size = serde_json::to_string(&value).map(|s| s.len()).unwrap_or(0);
+        debug!(
+            context_id = %self.id,
+            key = %key,
+            value_size,
+            scope = %self.scope,
+            "Setting value in context"
+        );
         self.data.insert(key, value);
     }
 
     /// Set data in shared memory
     pub fn set_shared(&self, key: String, value: Value) {
+        debug!(
+            context_id = %self.id,
+            key = %key,
+            scope = %self.scope,
+            "Setting value in shared memory"
+        );
         self.shared_memory.set(self.scope.clone(), key, value);
     }
 
     /// Get data from shared memory at specific scope
     pub fn get_shared(&self, scope: &ContextScope, key: &str) -> Option<Value> {
+        trace!(
+            context_id = %self.id,
+            key = %key,
+            scope = %scope,
+            "Getting value from shared memory"
+        );
         self.shared_memory.get(scope, key)
     }
 
@@ -337,6 +399,13 @@ impl ExecutionContext {
 
     /// Merge data from another context
     pub fn merge(&mut self, other: &ExecutionContext) {
+        let key_count = other.data.len();
+        debug!(
+            context_id = %self.id,
+            other_context_id = %other.id,
+            key_count,
+            "Merging context data"
+        );
         for (key, value) in &other.data {
             self.data.insert(key.clone(), value.clone());
         }

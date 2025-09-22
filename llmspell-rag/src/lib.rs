@@ -129,7 +129,7 @@ pub mod prelude {
         SessionVectorResult,
     };
 
-    pub use llmspell_state_traits::StateScope;
+    pub use llmspell_core::state::StateScope;
 }
 
 /// Library version

@@ -14,6 +14,7 @@ use std::task::{Context, Poll};
 use std::time::Duration;
 use thiserror::Error;
 use tokio::time;
+use tracing::{debug, error};
 
 /// Represents a cancellable async operation
 pub struct Cancellable;
@@ -176,19 +177,16 @@ where
             Ok(value) => return Ok(value),
             Err(e) => {
                 if attempt >= config.max_attempts {
-                    tracing::error!(
+                    error!(
                         "Retry limit exceeded after {} attempts. Last error: {:?}",
-                        attempt,
-                        e
+                        attempt, e
                     );
                     return Err(AsyncError::RetryLimitExceeded { attempts: attempt });
                 }
 
-                tracing::debug!(
+                debug!(
                     "Attempt {} failed with error: {:?}. Retrying in {:?}",
-                    attempt,
-                    e,
-                    delay
+                    attempt, e, delay
                 );
 
                 // Add jitter if configured
@@ -382,7 +380,7 @@ where
     match result {
         Ok(value) => Ok(value),
         Err(e) => {
-            tracing::error!("All futures failed. Last error: {:?}", e);
+            error!("All futures failed. Last error: {:?}", e);
             Err(AsyncError::RetryLimitExceeded { attempts: 1 })
         }
     }

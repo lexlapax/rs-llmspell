@@ -18,8 +18,9 @@ use llmspell_core::{
 use llmspell_utils::{extract_parameters, response::ResponseBuilder};
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
+use std::time::Instant;
 use tokio::io::{AsyncBufReadExt, AsyncRead, BufReader};
-use tracing::{debug, info};
+use tracing::{debug, error, info, instrument, trace};
 
 /// JSON processing operation types
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -89,6 +90,18 @@ pub struct JsonProcessorTool {
 impl JsonProcessorTool {
     #[must_use]
     pub fn new(config: JsonProcessorConfig) -> Self {
+        info!(
+            tool_name = "json-processor-tool",
+            supported_operations = 3, // query, validate, stream
+            jq_engine = "jaq",
+            max_input_size_mb = config.max_input_size / (1024 * 1024),
+            enable_streaming = config.enable_streaming,
+            max_execution_time_seconds = config.max_execution_time_ms / 1000,
+            security_level = "Safe",
+            category = "Data",
+            phase = "Phase 3 (comprehensive instrumentation)",
+            "Creating JsonProcessorTool with configuration"
+        );
         Self {
             metadata: ComponentMetadata::new(
                 "json-processor-tool".to_string(),
@@ -221,6 +234,7 @@ impl JsonProcessorTool {
 
     /// Validate JSON against a schema
     #[allow(clippy::unused_async)]
+    #[instrument(skip(self))]
     async fn validate_json(&self, input: &Value, schema: &Value) -> Result<ValidationResult> {
         debug!("Validating JSON against schema");
 
@@ -268,6 +282,7 @@ impl JsonProcessorTool {
     /// - The JQ query is invalid or contains security risks
     /// - JSON parsing fails for any line
     /// - I/O errors occur while reading from the stream
+    #[instrument(skip(self, reader))]
     pub async fn process_json_stream<R: AsyncRead + Unpin>(
         &self,
         reader: R,
@@ -337,6 +352,13 @@ impl JsonProcessorTool {
 
 impl Default for JsonProcessorTool {
     fn default() -> Self {
+        info!(
+            tool_name = "json-processor",
+            category = "Tool",
+            phase = "Phase 3 (comprehensive instrumentation)",
+            "Creating JsonProcessorTool"
+        );
+
         Self::new(JsonProcessorConfig::default())
     }
 }
@@ -360,38 +382,191 @@ impl BaseAgent for JsonProcessorTool {
         &self.metadata
     }
 
+    #[allow(clippy::too_many_lines)]
+    #[instrument(skip(_context, input, self), fields(tool = %self.metadata().name))]
     async fn execute_impl(
         &self,
         input: AgentInput,
         _context: ExecutionContext,
     ) -> Result<AgentOutput> {
+        let _execute_start = Instant::now();
+        info!(
+            tool_name = %self.metadata().name,
+            input_text_length = input.text.len(),
+            has_parameters = !input.parameters.is_empty(),
+            "Starting JsonProcessorTool execution"
+        );
+
         // Get parameters using shared utility
-        let params = extract_parameters(&input)?;
+        let params = match extract_parameters(&input) {
+            Ok(params) => {
+                debug!(
+                    param_count = params.as_object().map_or(0, serde_json::Map::len),
+                    "Successfully extracted parameters"
+                );
+                params
+            }
+            Err(e) => {
+                error!(
+                    error = %e,
+                    input_text_length = input.text.len(),
+                    "Failed to extract parameters"
+                );
+                return Err(e);
+            }
+        };
 
-        let (operation, input_json, query) = Self::parse_parameters(params)?;
+        let parameter_parsing_start = Instant::now();
+        let (operation, input_json, query) = match Self::parse_parameters(params) {
+            Ok(parsed) => {
+                let parameter_parsing_duration_ms = parameter_parsing_start.elapsed().as_millis();
+                debug!(
+                    operation = %parsed.0,
+                    has_input_json = parsed.1.is_some(),
+                    has_query = parsed.2.is_some(),
+                    parameter_parsing_duration_ms,
+                    "Successfully parsed operation parameters"
+                );
+                parsed
+            }
+            Err(e) => {
+                let parameter_parsing_duration_ms = parameter_parsing_start.elapsed().as_millis();
+                error!(
+                    error = %e,
+                    parameter_parsing_duration_ms,
+                    "Failed to parse operation parameters"
+                );
+                return Err(e);
+            }
+        };
 
-        info!("Executing JSON {} operation", operation);
-        eprintln!("DEBUG: input_json = {:?}", input_json);
+        info!(
+            operation = %operation,
+            has_input_json = input_json.is_some(),
+            has_query = query.is_some(),
+            input_json_type = input_json.as_ref().map(|v| match v {
+                serde_json::Value::Null => "null",
+                serde_json::Value::Bool(_) => "boolean",
+                serde_json::Value::Number(_) => "number",
+                serde_json::Value::String(_) => "string",
+                serde_json::Value::Array(_) => "array",
+                serde_json::Value::Object(_) => "object",
+            }),
+            input_json_size_estimate = input_json.as_ref()
+                .and_then(|v| serde_json::to_string(v).ok())
+                .map_or(0, |s| s.len()),
+            query_length = query.as_ref().map(std::string::String::len),
+            "Executing JSON operation"
+        );
 
+        trace!(
+            input_json_preview = ?input_json.as_ref().map(|v|
+                serde_json::to_string(v).unwrap_or_default()
+                    .chars().take(200).collect::<String>()
+            ),
+            query_preview = ?query.as_ref().map(|q| q.chars().take(100).collect::<String>()),
+            "Operation details"
+        );
+
+        let _operation_execution_start = Instant::now();
         let result = match operation {
             JsonOperation::Query => {
-                let input_val = input_json.ok_or_else(|| LLMSpellError::Validation {
-                    message: "Query operation requires 'input' parameter".to_string(),
-                    field: Some("input".to_string()),
-                })?;
-                let query_str = query.ok_or_else(|| LLMSpellError::Validation {
-                    message: "Query operation requires 'query' parameter".to_string(),
-                    field: Some("query".to_string()),
-                })?;
+                debug!("Starting JSON query operation");
 
-                let results = self.execute_jq_query(&input_val, &query_str)?;
+                let input_val = if let Some(val) = input_json {
+                    debug!(
+                        input_type = match &val {
+                            serde_json::Value::Null => "null",
+                            serde_json::Value::Bool(_) => "boolean",
+                            serde_json::Value::Number(_) => "number",
+                            serde_json::Value::String(_) => "string",
+                            serde_json::Value::Array(arr) => {
+                                if arr.len() > 100 {
+                                    "large_array"
+                                } else {
+                                    "array"
+                                }
+                            }
+                            serde_json::Value::Object(obj) => {
+                                if obj.len() > 50 {
+                                    "large_object"
+                                } else {
+                                    "object"
+                                }
+                            }
+                        },
+                        "Input value validated for query operation"
+                    );
+                    val
+                } else {
+                    error!("Query operation missing required 'input' parameter");
+                    return Err(LLMSpellError::Validation {
+                        message: "Query operation requires 'input' parameter".to_string(),
+                        field: Some("input".to_string()),
+                    });
+                };
+
+                let query_str = if let Some(q) = query {
+                    debug!(
+                        query_length = q.len(),
+                        query_preview = %q.chars().take(50).collect::<String>(),
+                        "Query string validated for query operation"
+                    );
+                    q
+                } else {
+                    error!("Query operation missing required 'query' parameter");
+                    return Err(LLMSpellError::Validation {
+                        message: "Query operation requires 'query' parameter".to_string(),
+                        field: Some("query".to_string()),
+                    });
+                };
+
+                let jq_execution_start = Instant::now();
+                let results = match self.execute_jq_query(&input_val, &query_str) {
+                    Ok(results) => {
+                        let jq_execution_duration_ms = jq_execution_start.elapsed().as_millis();
+                        debug!(
+                            result_count = results.len(),
+                            jq_execution_duration_ms, "JQ query executed successfully"
+                        );
+                        results
+                    }
+                    Err(e) => {
+                        let jq_execution_duration_ms = jq_execution_start.elapsed().as_millis();
+                        error!(
+                            query = %query_str,
+                            jq_execution_duration_ms,
+                            error = %e,
+                            "JQ query execution failed"
+                        );
+                        return Err(e);
+                    }
+                };
 
                 // If single result, return it directly; otherwise return array
-                if results.len() == 1 {
+                let final_result = if results.len() == 1 {
+                    trace!("Returning single query result");
                     results.into_iter().next().unwrap()
                 } else {
+                    trace!(
+                        result_count = results.len(),
+                        "Returning array of query results"
+                    );
                     Value::Array(results)
-                }
+                };
+
+                debug!(
+                    operation = "query",
+                    input_size_estimate =
+                        serde_json::to_string(&input_val).unwrap_or_default().len(),
+                    query_length = query_str.len(),
+                    result_size_estimate = serde_json::to_string(&final_result)
+                        .unwrap_or_default()
+                        .len(),
+                    "Query operation completed successfully"
+                );
+
+                final_result
             }
             JsonOperation::Validate => {
                 let input_val = input_json.ok_or_else(|| LLMSpellError::Validation {
@@ -461,6 +636,7 @@ impl BaseAgent for JsonProcessorTool {
         Ok(AgentOutput::text(output_text).with_metadata(metadata))
     }
 
+    #[instrument(skip(self))]
     async fn validate_input(&self, input: &AgentInput) -> Result<()> {
         if input.parameters.is_empty() {
             return Err(LLMSpellError::Validation {
@@ -486,6 +662,7 @@ impl BaseAgent for JsonProcessorTool {
         Ok(())
     }
 
+    #[instrument(skip(self))]
     async fn handle_error(&self, error: LLMSpellError) -> Result<AgentOutput> {
         Ok(AgentOutput::text(format!("JSON processing error: {error}")))
     }
@@ -614,6 +791,7 @@ impl JsonProcessorTool {
     /// - Tool execution fails
     /// - Hook execution fails
     /// - JSON parsing or processing fails
+    #[instrument(skip(self, tool_executor))]
     pub async fn demonstrate_hook_integration(
         &self,
         tool_executor: &crate::lifecycle::ToolExecutor,

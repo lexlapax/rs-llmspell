@@ -7,6 +7,7 @@ use llmspell_core::{
     ExecutionContext,
 };
 use std::time::Duration;
+use tracing::debug;
 
 /// Test data generators
 pub struct TestDataGenerator;
@@ -211,7 +212,7 @@ impl PerformanceMeasure {
     /// End measurement and log
     pub fn end(self) -> Duration {
         let duration = self.start.elapsed();
-        tracing::debug!("{} took {:?}", self.name, duration);
+        debug!("{} took {:?}", self.name, duration);
         duration
     }
 }

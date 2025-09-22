@@ -7,6 +7,7 @@ use async_trait::async_trait;
 use llmspell_hooks::{Hook, HookContext, HookPoint, HookRegistry, HookResult};
 use std::sync::{Arc, Mutex};
 use std::time::{Duration, Instant};
+use tracing::instrument;
 
 /// Production-style logging hook - minimal overhead
 #[derive(Debug)]
@@ -37,6 +38,7 @@ impl ProductionLoggingHook {
 
 #[async_trait]
 impl Hook for ProductionLoggingHook {
+    #[instrument(skip(self))]
     async fn execute(&self, _context: &mut HookContext) -> Result<HookResult> {
         // Realistic logging: increment counter (like writing to log buffer)
         {
@@ -94,6 +96,7 @@ impl ProductionMetricsHook {
 
 #[async_trait]
 impl Hook for ProductionMetricsHook {
+    #[instrument(skip(self))]
     async fn execute(&self, context: &mut HookContext) -> Result<HookResult> {
         let start = Instant::now();
 
@@ -203,6 +206,7 @@ impl PerformanceBenchmark {
     }
 
     /// Run baseline benchmark without hooks
+    #[instrument(skip(self))]
     async fn run_baseline(&self) -> Result<(Duration, u64)> {
         let start = Instant::now();
         let mut total_transitions = 0;
@@ -266,6 +270,7 @@ impl PerformanceBenchmark {
     }
 
     /// Run benchmark with production hooks
+    #[instrument(skip(self))]
     async fn run_with_hooks(&self) -> Result<(Duration, u64, u64)> {
         // Create production-style hook registry
         let hook_registry = Arc::new(HookRegistry::new());
@@ -366,6 +371,7 @@ impl PerformanceBenchmark {
     ///
     /// Returns an error if the benchmark execution fails due to resource constraints,
     /// hook execution failures, or system-level issues that prevent performance measurement.
+    #[instrument(skip(self))]
     pub async fn run(&self) -> Result<BenchmarkResults> {
         println!("🚀 Starting production performance benchmark...");
         println!(

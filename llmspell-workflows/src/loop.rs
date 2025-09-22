@@ -37,9 +37,19 @@ use tracing::{debug, info, warn};
 #[serde(tag = "type", rename_all = "snake_case")]
 pub enum LoopIterator {
     /// Iterate over a collection of values
-    Collection { values: Vec<Value> },
+    Collection {
+        /// Values to iterate over
+        values: Vec<Value>,
+    },
     /// Iterate over a numeric range
-    Range { start: i64, end: i64, step: i64 },
+    Range {
+        /// Starting value (inclusive)
+        start: i64,
+        /// Ending value (exclusive)
+        end: i64,
+        /// Step size for iteration
+        step: i64,
+    },
     /// Iterate while a condition is true
     WhileCondition {
         /// Condition to evaluate - can reference loop variables
@@ -233,6 +243,7 @@ pub struct LoopWorkflowResult {
 }
 
 impl LoopWorkflowResult {
+    /// Create a successful loop workflow result
     pub fn success(
         workflow_name: String,
         total_iterations: usize,
@@ -253,6 +264,7 @@ impl LoopWorkflowResult {
         }
     }
 
+    /// Create a failed loop workflow result
     pub fn failure(
         workflow_name: String,
         total_iterations: usize,
@@ -1676,6 +1688,7 @@ pub struct LoopWorkflowBuilder {
 }
 
 impl LoopWorkflowBuilder {
+    /// Create a new loop workflow builder
     pub fn new(name: impl Into<String>) -> Self {
         Self {
             name: name.into(),
@@ -1693,11 +1706,13 @@ impl LoopWorkflowBuilder {
         }
     }
 
+    /// Set the description for this loop workflow
     pub fn description(mut self, desc: impl Into<String>) -> Self {
         self.description = desc.into();
         self
     }
 
+    /// Configure the loop to iterate over a collection of values
     pub fn with_collection<T: Into<Value>>(mut self, values: Vec<T>) -> Self {
         self.iterator = Some(LoopIterator::Collection {
             values: values.into_iter().map(|v| v.into()).collect(),
@@ -1705,11 +1720,13 @@ impl LoopWorkflowBuilder {
         self
     }
 
+    /// Configure the loop to iterate over a numeric range
     pub fn with_range(mut self, start: i64, end: i64, step: i64) -> Self {
         self.iterator = Some(LoopIterator::Range { start, end, step });
         self
     }
 
+    /// Configure the loop to iterate while a condition is true
     pub fn with_while_condition(
         mut self,
         condition: impl Into<String>,
@@ -1722,11 +1739,13 @@ impl LoopWorkflowBuilder {
         self
     }
 
+    /// Add a step to the loop body
     pub fn add_step(mut self, step: TraitWorkflowStep) -> Self {
         self.body.push(step);
         self
     }
 
+    /// Add a condition that can break the loop early
     pub fn add_break_condition(
         mut self,
         expression: impl Into<String>,
@@ -1739,31 +1758,37 @@ impl LoopWorkflowBuilder {
         self
     }
 
+    /// Set the result aggregation strategy
     pub fn with_aggregation(mut self, aggregation: ResultAggregation) -> Self {
         self.aggregation = aggregation;
         self
     }
 
+    /// Configure whether to continue on error
     pub fn continue_on_error(mut self, continue_on_error: bool) -> Self {
         self.continue_on_error = continue_on_error;
         self
     }
 
+    /// Set the overall timeout for the loop workflow
     pub fn with_timeout(mut self, timeout: Duration) -> Self {
         self.timeout = Some(timeout);
         self
     }
 
+    /// Add a delay between iterations
     pub fn with_iteration_delay(mut self, delay: Duration) -> Self {
         self.iteration_delay = Some(delay);
         self
     }
 
+    /// Set the workflow configuration
     pub fn with_workflow_config(mut self, config: WorkflowConfig) -> Self {
         self.workflow_config = config;
         self
     }
 
+    /// Set the error handling strategy
     pub fn with_error_strategy(mut self, strategy: ErrorStrategy) -> Self {
         self.workflow_config.default_error_strategy = strategy;
         self
@@ -1781,6 +1806,7 @@ impl LoopWorkflowBuilder {
         self
     }
 
+    /// Build the loop workflow
     pub fn build(self) -> Result<LoopWorkflow> {
         let iterator =
             self.iterator

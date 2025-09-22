@@ -6,10 +6,11 @@ use crate::globals::GlobalContext;
 use crate::lua::conversion::{json_to_lua_value, lua_value_to_json};
 use crate::lua::sync_utils::block_on_async;
 use crate::session_bridge::SessionBridge;
-use llmspell_sessions::{artifact::ArtifactId, SessionId};
+use llmspell_kernel::sessions::{artifact::ArtifactId, SessionId};
 use mlua::{Error as LuaError, Lua, Table, Value};
 use std::str::FromStr;
 use std::sync::Arc;
+use tracing::{debug, instrument};
 
 /// Inject Artifact global into Lua environment
 ///
@@ -19,11 +20,17 @@ use std::sync::Arc;
 /// - Lua table creation fails
 /// - Function binding fails
 #[allow(clippy::too_many_lines)]
+#[instrument(
+    level = "debug",
+    skip(lua, _context, artifact_bridge),
+    fields(global_name = "Artifact")
+)]
 pub fn inject_artifact_global(
     lua: &Lua,
     _context: &GlobalContext,
     artifact_bridge: Arc<ArtifactBridge>,
 ) -> mlua::Result<()> {
+    debug!("Injecting Artifact global API");
     // Create Artifact table
     let artifact_table = lua.create_table()?;
 
@@ -39,7 +46,7 @@ pub fn inject_artifact_global(
 
             // Parse artifact type
             let artifact_type =
-                llmspell_sessions::bridge::conversions::parse_artifact_type(&type_str)
+                llmspell_kernel::sessions::bridge::conversions::parse_artifact_type(&type_str)
                     .map_err(mlua::Error::RuntimeError)?;
 
             // Convert content to bytes
@@ -127,7 +134,9 @@ pub fn inject_artifact_global(
 
         // Convert metadata to JSON then to Lua
         let metadata_json =
-            llmspell_sessions::bridge::conversions::artifact_metadata_to_json(&result.metadata);
+            llmspell_kernel::sessions::bridge::conversions::artifact_metadata_to_json(
+                &result.metadata,
+            );
         let metadata_lua = json_to_lua_value(lua, &metadata_json)?;
         result_table.set("metadata", metadata_lua)?;
 
@@ -167,7 +176,7 @@ pub fn inject_artifact_global(
         let lua_table = lua.create_table()?;
         for (i, metadata) in result.iter().enumerate() {
             let json_value =
-                llmspell_sessions::bridge::conversions::artifact_metadata_to_json(metadata);
+                llmspell_kernel::sessions::bridge::conversions::artifact_metadata_to_json(metadata);
             let lua_value = json_to_lua_value(lua, &json_value)?;
             lua_table.set(i + 1, lua_value)?;
         }
@@ -217,7 +226,7 @@ pub fn inject_artifact_global(
 
             // Parse artifact type
             let artifact_type =
-                llmspell_sessions::bridge::conversions::parse_artifact_type(&type_str)
+                llmspell_kernel::sessions::bridge::conversions::parse_artifact_type(&type_str)
                     .map_err(mlua::Error::RuntimeError)?;
 
             // Convert metadata table to HashMap
@@ -263,7 +272,7 @@ pub fn inject_artifact_global(
     let query_fn = lua.create_function(move |lua, query_table: Option<Table>| {
         // Convert Lua table to ArtifactQuery
         let query = if let Some(table) = query_table {
-            let mut artifact_query = llmspell_sessions::artifact::ArtifactQuery::default();
+            let mut artifact_query = llmspell_kernel::sessions::artifact::ArtifactQuery::default();
 
             // Parse session_id
             if let Ok(Some(session_id_str)) = table.get::<_, Option<String>>("session_id") {
@@ -276,7 +285,7 @@ pub fn inject_artifact_global(
             // Parse artifact_type
             if let Ok(Some(type_str)) = table.get::<_, Option<String>>("type") {
                 artifact_query.artifact_type = Some(
-                    llmspell_sessions::bridge::conversions::parse_artifact_type(&type_str)
+                    llmspell_kernel::sessions::bridge::conversions::parse_artifact_type(&type_str)
                         .map_err(mlua::Error::RuntimeError)?,
                 );
             }
@@ -322,7 +331,7 @@ pub fn inject_artifact_global(
 
             artifact_query
         } else {
-            llmspell_sessions::artifact::ArtifactQuery::default()
+            llmspell_kernel::sessions::artifact::ArtifactQuery::default()
         };
 
         let bridge = query_bridge.clone();
@@ -336,7 +345,7 @@ pub fn inject_artifact_global(
         let lua_table = lua.create_table()?;
         for (i, metadata) in result.iter().enumerate() {
             let json_value =
-                llmspell_sessions::bridge::conversions::artifact_metadata_to_json(metadata);
+                llmspell_kernel::sessions::bridge::conversions::artifact_metadata_to_json(metadata);
             let lua_value = json_to_lua_value(lua, &json_value)?;
             lua_table.set(i + 1, lua_value)?;
         }

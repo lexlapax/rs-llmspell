@@ -8,9 +8,8 @@ use llmspell_core::traits::agent::Agent;
 use llmspell_core::traits::base_agent::BaseAgent;
 use llmspell_core::types::AgentInput;
 use llmspell_core::ExecutionContext;
-use llmspell_state_persistence::{
-    PerformanceConfig, PersistenceConfig, StateManager, StorageBackendType,
-};
+use llmspell_kernel::state::config::PerformanceConfig;
+use llmspell_kernel::state::{PersistenceConfig, StateManager, StorageBackendType};
 use std::sync::Arc;
 
 #[tokio::main]

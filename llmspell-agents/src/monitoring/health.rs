@@ -8,6 +8,8 @@ use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::sync::Arc;
 use std::time::Duration;
+use tracing::instrument;
+use tracing::{error, info, warn};
 
 /// Health status levels
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -275,6 +277,7 @@ impl HealthMonitor {
     /// Currently never returns an error as it handles all individual health check failures
     /// internally and converts them to unhealthy indicators. The Result type is provided
     /// for future extensibility (e.g., system-level health check failures).
+    #[instrument(skip(self))]
     pub async fn check_all(&self) -> Result<HealthCheckResult> {
         let mut components = HashMap::new();
         let _start = std::time::Instant::now();
@@ -321,21 +324,17 @@ impl HealthMonitor {
 
                 match monitor.check_all().await {
                     Ok(result) => {
-                        tracing::info!("Health check completed: {}", result.summary());
+                        info!("Health check completed: {}", result.summary());
 
                         // Log any unhealthy components
                         for (id, health) in &result.components {
                             if health.status == HealthStatus::Unhealthy {
-                                tracing::warn!(
-                                    "Component {} is unhealthy: {:?}",
-                                    id,
-                                    health.indicators
-                                );
+                                warn!("Component {} is unhealthy: {:?}", id, health.indicators);
                             }
                         }
                     }
                     Err(e) => {
-                        tracing::error!("Health check failed: {}", e);
+                        error!("Health check failed: {}", e);
                     }
                 }
             }
@@ -400,6 +399,7 @@ impl AgentHealthCheck {
 
 #[async_trait]
 impl HealthCheck for AgentHealthCheck {
+    #[instrument(skip(self))]
     async fn check_health(&self) -> Result<Vec<HealthIndicator>> {
         let mut indicators = Vec::new();
 

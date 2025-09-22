@@ -10,6 +10,7 @@ use anyhow::{anyhow, Result};
 use async_trait::async_trait;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
+use tracing::instrument;
 
 /// Template customization options
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
@@ -144,6 +145,7 @@ impl AgentTemplate for CustomizedTemplate {
         self.base_template.schema()
     }
 
+    #[instrument(skip(self))]
     async fn validate_parameters(&self, params: &TemplateInstantiationParams) -> Result<()> {
         // First validate base parameters
         self.base_template.validate_parameters(params).await?;
@@ -169,6 +171,7 @@ impl AgentTemplate for CustomizedTemplate {
         Ok(())
     }
 
+    #[instrument(skip(self))]
     async fn instantiate(
         &self,
         _params: TemplateInstantiationParams,
@@ -431,6 +434,7 @@ impl AgentTemplate for BasicTemplate {
         &self.schema
     }
 
+    #[instrument(skip(self))]
     async fn instantiate(
         &self,
         _params: TemplateInstantiationParams,

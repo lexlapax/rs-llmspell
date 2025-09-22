@@ -2,7 +2,7 @@
 //! ABOUTME: Wraps `SessionManager` for script access with async operations
 
 use llmspell_core::{error::LLMSpellError, Result};
-use llmspell_sessions::{
+use llmspell_kernel::sessions::{
     manager::SessionManager,
     session::Session,
     types::{CreateSessionOptions, SessionQuery},
@@ -155,7 +155,8 @@ impl SessionBridge {
         _options: serde_json::Value,
     ) -> Result<serde_json::Value> {
         // For now, use default config - full implementation in Task 6.5.6
-        let config = llmspell_sessions::replay::session_adapter::SessionReplayConfig::default();
+        let config =
+            llmspell_kernel::sessions::replay::session_adapter::SessionReplayConfig::default();
         let result = convert_err!(
             self.session_manager
                 .replay_session(session_id, config)
@@ -210,7 +211,7 @@ impl SessionBridge {
     pub async fn get_session_metadata(&self, session_id: &SessionId) -> Result<serde_json::Value> {
         let session = convert_err!(self.session_manager.get_session(session_id).await)?;
         let metadata = session.metadata.read().await.clone();
-        Ok(llmspell_sessions::bridge::conversions::session_metadata_to_json(&metadata))
+        Ok(llmspell_kernel::sessions::bridge::conversions::session_metadata_to_json(&metadata))
     }
 
     /// Update session metadata
@@ -224,7 +225,7 @@ impl SessionBridge {
         updates: std::collections::HashMap<String, serde_json::Value>,
     ) -> Result<()> {
         // Create a SessionOperations instance for extended operations
-        let ops = llmspell_sessions::bridge::operations::SessionOperations::new(
+        let ops = llmspell_kernel::sessions::bridge::operations::SessionOperations::new(
             self.session_manager.clone(),
         );
         convert_err!(ops.update_metadata(session_id, updates).await)
@@ -236,7 +237,7 @@ impl SessionBridge {
     ///
     /// Returns an error if the session tags cannot be retrieved
     pub async fn get_session_tags(&self, session_id: &SessionId) -> Result<Vec<String>> {
-        let ops = llmspell_sessions::bridge::operations::SessionOperations::new(
+        let ops = llmspell_kernel::sessions::bridge::operations::SessionOperations::new(
             self.session_manager.clone(),
         );
         convert_err!(ops.get_tags(session_id).await)
@@ -248,7 +249,7 @@ impl SessionBridge {
     ///
     /// Returns an error if the session tags cannot be set
     pub async fn set_session_tags(&self, session_id: &SessionId, tags: Vec<String>) -> Result<()> {
-        let ops = llmspell_sessions::bridge::operations::SessionOperations::new(
+        let ops = llmspell_kernel::sessions::bridge::operations::SessionOperations::new(
             self.session_manager.clone(),
         );
         convert_err!(ops.set_tags(session_id, tags).await)

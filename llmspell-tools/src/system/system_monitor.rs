@@ -21,7 +21,7 @@ use serde_json::json;
 use std::collections::HashMap;
 use std::sync::Arc;
 use std::time::Instant;
-use tracing::{debug, info};
+use tracing::{debug, info, instrument, trace};
 
 /// System resource statistics
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -140,6 +140,11 @@ impl SystemMonitorTool {
     /// Create a new system monitor tool
     #[must_use]
     pub fn new(config: SystemMonitorConfig, sandbox: Arc<FileSandbox>) -> Self {
+        info!(
+            enabled_stats = ?config.collect.enabled_stats,
+            cpu_sample_duration_ms = config.cpu_sample_duration_ms,
+            "Creating SystemMonitorTool"
+        );
         Self {
             metadata: ComponentMetadata::new(
                 "system_monitor".to_string(),
@@ -150,13 +155,98 @@ impl SystemMonitorTool {
         }
     }
 
+    fn format_monitoring_response(operation: &str, stats: &SystemStats) -> serde_json::Value {
+        match operation {
+            "cpu" => {
+                let message = format!(
+                    "CPU usage: {:.1}% ({} cores)",
+                    stats.cpu_usage_percent, stats.cpu_count
+                );
+                ResponseBuilder::success("cpu")
+                    .with_message(message)
+                    .with_result(json!({
+                        "cpu_usage_percent": stats.cpu_usage_percent,
+                        "cpu_count": stats.cpu_count,
+                        "load_average": stats.load_average
+                    }))
+                    .build()
+            }
+            "memory" => {
+                let message = format!(
+                    "Memory usage: {:.1}% ({} / {} used)",
+                    stats.memory_usage_percent,
+                    format_bytes(stats.used_memory_bytes),
+                    format_bytes(stats.total_memory_bytes)
+                );
+                ResponseBuilder::success("memory")
+                    .with_message(message)
+                    .with_result(json!({
+                        "total_memory_bytes": stats.total_memory_bytes,
+                        "used_memory_bytes": stats.used_memory_bytes,
+                        "available_memory_bytes": stats.available_memory_bytes,
+                        "memory_usage_percent": stats.memory_usage_percent,
+                        "total_memory_formatted": format_bytes(stats.total_memory_bytes),
+                        "used_memory_formatted": format_bytes(stats.used_memory_bytes),
+                        "available_memory_formatted": format_bytes(stats.available_memory_bytes)
+                    }))
+                    .build()
+            }
+            "disk" => {
+                let message = format!(
+                    "Disk usage for {} mount points collected",
+                    stats.disk_usage.len()
+                );
+                ResponseBuilder::success("disk")
+                    .with_message(message)
+                    .with_result(json!({
+                        "disk_usage": stats.disk_usage
+                    }))
+                    .build()
+            }
+            "stats" | "all" => {
+                let message = format!(
+                    "System stats: CPU {:.1}%, Memory {:.1}% ({}/{}), {} disks, {} processes",
+                    stats.cpu_usage_percent,
+                    stats.memory_usage_percent,
+                    format_bytes(stats.used_memory_bytes),
+                    format_bytes(stats.total_memory_bytes),
+                    stats.disk_usage.len(),
+                    stats.process_count.unwrap_or(0)
+                );
+                ResponseBuilder::success("all")
+                    .with_message(message)
+                    .with_result(json!({
+                        "cpu_usage_percent": stats.cpu_usage_percent,
+                        "cpu_count": stats.cpu_count,
+                        "total_memory_bytes": stats.total_memory_bytes,
+                        "used_memory_bytes": stats.used_memory_bytes,
+                        "available_memory_bytes": stats.available_memory_bytes,
+                        "memory_usage_percent": stats.memory_usage_percent,
+                        "disk_usage": stats.disk_usage,
+                        "uptime_seconds": stats.uptime_seconds,
+                        "load_average": stats.load_average,
+                        "process_count": stats.process_count,
+                        "formatted": {
+                            "total_memory": format_bytes(stats.total_memory_bytes),
+                            "used_memory": format_bytes(stats.used_memory_bytes),
+                            "available_memory": format_bytes(stats.available_memory_bytes)
+                        }
+                    }))
+                    .build()
+            }
+            _ => unreachable!(), // Already validated above
+        }
+    }
+
     /// Get basic system information
     ///
     /// # Errors
     ///
     /// Returns an error if system information cannot be retrieved
     #[allow(clippy::unused_async)]
+    #[instrument(skip_all)]
     async fn get_basic_system_info(&self) -> LLMResult<SystemStats> {
+        trace!("Getting basic system information");
         let system_info = get_system_info().map_err(|e| LLMSpellError::Tool {
             message: format!("Failed to get system information: {e}"),
             tool_name: Some("system_monitor".to_string()),
@@ -198,6 +288,7 @@ impl SystemMonitorTool {
 
     /// Get CPU usage (simplified version without external dependencies)
     #[allow(clippy::unused_async)]
+    #[instrument(skip_all)]
     async fn get_cpu_usage(&self) -> f64 {
         if !self.config.collect.is_enabled(StatType::Cpu) {
             return 0.0;
@@ -251,6 +342,7 @@ impl SystemMonitorTool {
 
     /// Get disk usage statistics
     #[allow(clippy::unused_async)]
+    #[instrument(skip_all)]
     async fn get_disk_usage(&self) -> HashMap<String, DiskStats> {
         if !self.config.collect.is_enabled(StatType::Disk) {
             return HashMap::new();
@@ -451,6 +543,7 @@ impl SystemMonitorTool {
 
     /// Get process count (simplified implementation)
     #[allow(clippy::unused_async)]
+    #[instrument(skip(sandbox, self))]
     async fn get_process_count(&self, sandbox: &FileSandbox) -> Option<u32> {
         if !self.config.collect.is_enabled(StatType::Process) {
             return None;
@@ -488,6 +581,7 @@ impl SystemMonitorTool {
 
     /// Get system uptime (simplified implementation)
     #[allow(clippy::unused_async)]
+    #[instrument(skip(sandbox, self))]
     async fn get_uptime(&self, sandbox: &FileSandbox) -> Option<u64> {
         #[cfg(unix)]
         {
@@ -512,6 +606,8 @@ impl SystemMonitorTool {
     /// # Errors
     ///
     /// Returns an error if system information cannot be retrieved
+    #[allow(clippy::cognitive_complexity)]
+    #[instrument(skip_all)]
     async fn collect_system_stats(&self) -> LLMResult<SystemStats> {
         let start_time = Instant::now();
 
@@ -520,16 +616,19 @@ impl SystemMonitorTool {
 
         // Collect CPU usage
         if self.config.collect.is_enabled(StatType::Cpu) {
+            debug!("Collecting CPU usage statistics");
             stats.cpu_usage_percent = self.get_cpu_usage().await;
         }
 
         // Collect disk usage
         if self.config.collect.is_enabled(StatType::Disk) {
+            debug!("Collecting disk usage statistics");
             stats.disk_usage = self.get_disk_usage().await;
         }
 
         // Collect process count
         if self.config.collect.is_enabled(StatType::Process) {
+            debug!("Collecting process count");
             stats.process_count = self.get_process_count(&self.sandbox).await;
         }
 
@@ -546,15 +645,12 @@ impl SystemMonitorTool {
 
         let collection_time = start_time.elapsed();
         info!(
-            "System statistics collected in {}ms - CPU: {:.1}%, Memory: {:.1}%, Disks: {}",
-            {
-                #[allow(clippy::cast_possible_truncation)]
-                let millis = collection_time.as_millis() as u64;
-                millis
-            },
-            stats.cpu_usage_percent,
-            stats.memory_usage_percent,
-            stats.disk_usage.len()
+            duration_ms = collection_time.as_millis(),
+            cpu_usage = stats.cpu_usage_percent,
+            memory_usage = stats.memory_usage_percent,
+            disk_count = stats.disk_usage.len(),
+            process_count = stats.process_count.unwrap_or(0),
+            "System statistics collected"
         );
 
         Ok(stats)
@@ -567,6 +663,7 @@ impl SystemMonitorTool {
     /// Returns an error if:
     /// - An invalid operation is specified
     #[allow(clippy::unused_async)]
+    #[instrument(skip_all)]
     async fn validate_monitoring_parameters(&self, params: &serde_json::Value) -> LLMResult<()> {
         // Validate operation if provided
         if let Some(operation) = extract_optional_string(params, "operation") {
@@ -593,11 +690,19 @@ impl BaseAgent for SystemMonitorTool {
         &self.metadata
     }
 
+    #[instrument(skip(_context, input, self), fields(tool = %self.metadata().name))]
     async fn execute_impl(
         &self,
         input: AgentInput,
         _context: ExecutionContext,
     ) -> LLMResult<AgentOutput> {
+        let start = Instant::now();
+        info!(
+            input_size = input.text.len(),
+            has_params = !input.parameters.is_empty(),
+            "Executing system monitor tool"
+        );
+
         // Get parameters using shared utility
         let params = extract_parameters(&input)?;
 
@@ -605,95 +710,28 @@ impl BaseAgent for SystemMonitorTool {
 
         // Extract operation (default to "all")
         let operation = extract_optional_string(params, "operation").unwrap_or("all");
+        debug!(
+            operation = %operation,
+            "Starting system statistics collection"
+        );
 
         // Collect system statistics
         let stats = self.collect_system_stats().await?;
 
         // Format response based on operation
-        let response = match operation {
-            "cpu" => {
-                let message = format!(
-                    "CPU usage: {:.1}% ({} cores)",
-                    stats.cpu_usage_percent, stats.cpu_count
-                );
-                ResponseBuilder::success("cpu")
-                    .with_message(message)
-                    .with_result(json!({
-                        "cpu_usage_percent": stats.cpu_usage_percent,
-                        "cpu_count": stats.cpu_count,
-                        "load_average": stats.load_average
-                    }))
-                    .build()
-            }
-            "memory" => {
-                let message = format!(
-                    "Memory usage: {:.1}% ({} / {} used)",
-                    stats.memory_usage_percent,
-                    format_bytes(stats.used_memory_bytes),
-                    format_bytes(stats.total_memory_bytes)
-                );
-                ResponseBuilder::success("memory")
-                    .with_message(message)
-                    .with_result(json!({
-                        "total_memory_bytes": stats.total_memory_bytes,
-                        "used_memory_bytes": stats.used_memory_bytes,
-                        "available_memory_bytes": stats.available_memory_bytes,
-                        "memory_usage_percent": stats.memory_usage_percent,
-                        "total_memory_formatted": format_bytes(stats.total_memory_bytes),
-                        "used_memory_formatted": format_bytes(stats.used_memory_bytes),
-                        "available_memory_formatted": format_bytes(stats.available_memory_bytes)
-                    }))
-                    .build()
-            }
-            "disk" => {
-                let message = format!(
-                    "Disk usage for {} mount points collected",
-                    stats.disk_usage.len()
-                );
-                ResponseBuilder::success("disk")
-                    .with_message(message)
-                    .with_result(json!({
-                        "disk_usage": stats.disk_usage
-                    }))
-                    .build()
-            }
-            "stats" | "all" => {
-                let message = format!(
-                    "System stats: CPU {:.1}%, Memory {:.1}% ({}/{}), {} disks, {} processes",
-                    stats.cpu_usage_percent,
-                    stats.memory_usage_percent,
-                    format_bytes(stats.used_memory_bytes),
-                    format_bytes(stats.total_memory_bytes),
-                    stats.disk_usage.len(),
-                    stats.process_count.unwrap_or(0)
-                );
-                ResponseBuilder::success("all")
-                    .with_message(message)
-                    .with_result(json!({
-                        "cpu_usage_percent": stats.cpu_usage_percent,
-                        "cpu_count": stats.cpu_count,
-                        "total_memory_bytes": stats.total_memory_bytes,
-                        "used_memory_bytes": stats.used_memory_bytes,
-                        "available_memory_bytes": stats.available_memory_bytes,
-                        "memory_usage_percent": stats.memory_usage_percent,
-                        "disk_usage": stats.disk_usage,
-                        "uptime_seconds": stats.uptime_seconds,
-                        "load_average": stats.load_average,
-                        "process_count": stats.process_count,
-                        "formatted": {
-                            "total_memory": format_bytes(stats.total_memory_bytes),
-                            "used_memory": format_bytes(stats.used_memory_bytes),
-                            "available_memory": format_bytes(stats.available_memory_bytes)
-                        }
-                    }))
-                    .build()
-            }
-            _ => unreachable!(), // Already validated above
-        };
+        let response = Self::format_monitoring_response(operation, &stats);
+
+        let elapsed_ms = start.elapsed().as_millis();
+        debug!(
+            operation = %operation,
+            duration_ms = elapsed_ms,
+            "System monitoring completed"
+        );
 
         Ok(AgentOutput::text(serde_json::to_string_pretty(&response)?))
     }
 
+    #[instrument(skip(self))]
     async fn validate_input(&self, input: &AgentInput) -> LLMResult<()> {
         if input.text.is_empty() {
             return Err(LLMSpellError::Validation {
@@ -704,6 +742,7 @@ impl BaseAgent for SystemMonitorTool {
         Ok(())
     }
 
+    #[instrument(skip(self))]
     async fn handle_error(&self, error: LLMSpellError) -> LLMResult<AgentOutput> {
         Ok(AgentOutput::text(format!("System monitor error: {error}")))
     }

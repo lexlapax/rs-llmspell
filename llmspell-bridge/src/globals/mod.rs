@@ -32,6 +32,7 @@ pub use types::{GlobalContext, GlobalMetadata, GlobalObject};
 
 use llmspell_core::Result;
 use std::sync::Arc;
+use tracing::warn;
 
 /// Register core globals (json, logger, config, debug)
 fn register_core_globals(builder: &mut GlobalRegistryBuilder) {
@@ -45,9 +46,9 @@ fn register_core_globals(builder: &mut GlobalRegistryBuilder) {
 fn register_session_artifacts(
     builder: &mut GlobalRegistryBuilder,
     context: &Arc<GlobalContext>,
-) -> Option<Arc<llmspell_sessions::manager::SessionManager>> {
+) -> Option<Arc<llmspell_kernel::sessions::manager::SessionManager>> {
     let session_manager_opt =
-        context.get_bridge::<llmspell_sessions::manager::SessionManager>("session_manager");
+        context.get_bridge::<llmspell_kernel::sessions::manager::SessionManager>("session_manager");
 
     if let Some(session_manager) = session_manager_opt.clone() {
         let session_bridge = Arc::new(crate::session_bridge::SessionBridge::new(
@@ -69,7 +70,7 @@ fn register_session_artifacts(
 async fn register_rag_global(
     builder: &mut GlobalRegistryBuilder,
     context: &Arc<GlobalContext>,
-    session_manager_opt: Option<Arc<llmspell_sessions::manager::SessionManager>>,
+    session_manager_opt: Option<Arc<llmspell_kernel::sessions::manager::SessionManager>>,
 ) {
     // Try to get vector storage from infrastructure
     let vector_storage = context
@@ -77,7 +78,7 @@ async fn register_rag_global(
         .and_then(|infra| infra.vector_storage.clone());
 
     if let (Some(state_manager), Some(session_manager), Some(multi_tenant_rag)) = (
-        context.get_bridge::<llmspell_state_persistence::StateManager>("state_manager"),
+        context.get_bridge::<llmspell_kernel::state::StateManager>("state_manager"),
         session_manager_opt,
         context.get_bridge::<llmspell_rag::multi_tenant_integration::MultiTenantRAG>(
             "multi_tenant_rag",
@@ -97,7 +98,7 @@ async fn register_rag_global(
                 builder.register(Arc::new(rag_global));
             }
             Err(e) => {
-                tracing::warn!("Failed to initialize RAG global: {}", e);
+                warn!("Failed to initialize RAG global: {}", e);
             }
         }
     }
@@ -127,7 +128,7 @@ async fn register_agent_workflow(
 ) -> Result<()> {
     // Create agent global with state manager if available
     let agent_global = if let Some(state_manager) =
-        context.get_bridge::<llmspell_state_persistence::StateManager>("state_manager")
+        context.get_bridge::<llmspell_kernel::state::StateManager>("state_manager")
     {
         agent_global::AgentGlobal::with_state_manager(
             context.registry.clone(),
@@ -142,7 +143,7 @@ async fn register_agent_workflow(
 
     // Create workflow global with state manager if available
     let workflow_global = context
-        .get_bridge::<llmspell_state_persistence::StateManager>("state_manager")
+        .get_bridge::<llmspell_kernel::state::StateManager>("state_manager")
         .map_or_else(
             || workflow_global::WorkflowGlobal::new(context.registry.clone()),
             |state_manager| {
@@ -179,7 +180,7 @@ async fn create_state_global(context: &Arc<GlobalContext>) -> Arc<state_global::
                     ));
                 }
                 Err(e) => {
-                    tracing::warn!(
+                    warn!(
                         "Failed to initialize state infrastructure: {}, falling back to in-memory",
                         e
                     );

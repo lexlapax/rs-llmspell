@@ -9,6 +9,7 @@ use llmspell_storage::{StorageBackend, StorageSerialize};
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::sync::Arc;
+use tracing::info;
 use uuid::Uuid;
 
 /// Event storage interface (domain-specific)
@@ -56,6 +57,7 @@ pub struct StorageStats {
 }
 
 /// Event storage adapter that uses any StorageBackend
+#[derive(Debug)]
 pub struct EventStorageAdapter<B: StorageBackend> {
     backend: Arc<B>,
 }
@@ -363,6 +365,7 @@ impl Default for PersistenceConfig {
 }
 
 /// Event persistence manager using storage adapter
+#[derive(Debug)]
 pub struct EventPersistenceManager<B: StorageBackend> {
     storage: Arc<EventStorageAdapter<B>>,
     config: PersistenceConfig,
@@ -387,7 +390,7 @@ impl<B: StorageBackend + 'static> EventPersistenceManager<B> {
 
         // For now, disable automatic cleanup to avoid thread safety issues
         // This will be implemented properly in a future version
-        tracing::info!("Persistence manager started (automatic cleanup disabled for now)");
+        info!("Persistence manager started (automatic cleanup disabled for now)");
 
         Ok(())
     }

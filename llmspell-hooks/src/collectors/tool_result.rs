@@ -7,8 +7,10 @@ use anyhow::{anyhow, Result};
 use async_trait::async_trait;
 use chrono::Utc;
 use serde_json::json;
+use tracing::warn;
 
 /// Collector for tool execution results
+#[derive(Debug)]
 pub struct ToolResultCollector {
     config: CollectionConfig,
 }
@@ -62,7 +64,7 @@ impl Hook for ToolResultCollector {
             }
             Err(e) => {
                 // Log error but don't fail the hook chain
-                tracing::warn!("Failed to collect tool result artifact: {}", e);
+                warn!("Failed to collect tool result artifact: {}", e);
                 Ok(HookResult::Continue)
             }
         }

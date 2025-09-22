@@ -15,6 +15,7 @@ use llmspell_hooks::{
 use std::collections::HashMap;
 use std::sync::Arc;
 use tokio::sync::RwLock;
+use tracing::error;
 use uuid::Uuid;
 
 /// Wrapper for language-specific hooks
@@ -30,7 +31,22 @@ struct LanguageHook {
         Arc<dyn HookAdapter<Context = Box<dyn std::any::Any>, Result = Box<dyn std::any::Any>>>,
 }
 
+impl std::fmt::Debug for LanguageHook {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("LanguageHook")
+            .field("id", &self.id)
+            .field("language", &self.language)
+            .field("hook_point", &self.hook_point)
+            .field("priority", &self.priority)
+            .field("enabled", &"<RwLock>")
+            .field("callback", &"<dyn Any>")
+            .field("adapter", &"<dyn HookAdapter>")
+            .finish()
+    }
+}
+
 /// Convert `LanguageHook` to a Hook trait implementation
+#[derive(Debug)]
 struct LanguageHookWrapper {
     inner: Arc<LanguageHook>,
 }
@@ -379,7 +395,7 @@ impl HookBridge {
                 .await
             {
                 // Log error but don't fail hook execution
-                eprintln!("Failed to publish before hook event: {e}");
+                error!("Failed to publish before hook event: {e}");
             }
         }
 
@@ -405,7 +421,7 @@ impl HookBridge {
                 .publish_correlated_event(after_event, correlation_id)
                 .await
             {
-                eprintln!("Failed to publish after hook event: {e}");
+                error!("Failed to publish after hook event: {e}");
             }
         }
 

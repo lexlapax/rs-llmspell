@@ -9,6 +9,7 @@ use std::collections::HashMap;
 use std::sync::{Arc, RwLock};
 use std::time::Duration;
 use token_bucket::TokenBucket;
+use tracing::debug;
 
 /// Token bucket configuration
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -83,6 +84,7 @@ pub struct BucketState {
 }
 
 /// Thread-safe rate limiter with multiple buckets
+#[derive(Debug)]
 pub struct RateLimiter {
     /// Token buckets keyed by identifier
     buckets: Arc<RwLock<HashMap<String, Arc<RwLock<TokenBucket>>>>>,
@@ -238,7 +240,7 @@ impl RateLimiter {
             for key in keys_to_remove {
                 buckets.remove(&key);
                 access_times.remove(&key);
-                log::debug!("Cleaned up old rate limiter bucket: {}", key);
+                debug!("Cleaned up old rate limiter bucket: {}", key);
             }
         }
     }

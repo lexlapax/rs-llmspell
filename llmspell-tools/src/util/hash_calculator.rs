@@ -34,6 +34,8 @@ use llmspell_utils::{
 use serde::{Deserialize, Serialize};
 use serde_json::json;
 use std::path::Path;
+use std::time::Instant;
+use tracing::{debug, error, info, instrument, trace};
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct HashCalculatorConfig {
@@ -72,6 +74,14 @@ impl HashCalculatorTool {
     /// Create a new hash calculator tool
     #[must_use]
     pub fn new(config: HashCalculatorConfig) -> Self {
+        info!(
+            default_algorithm = %config.default_algorithm.to_string(),
+            default_format = ?config.default_format,
+            max_file_size_mb = config.max_file_size / (1024 * 1024),
+            supported_algorithms = 4, // MD5, SHA-1, SHA-256, SHA-512
+            supported_formats = 2, // hex, base64
+            "Creating HashCalculatorTool"
+        );
         Self {
             metadata: ComponentMetadata::new(
                 "hash-calculator".to_string(),
@@ -107,8 +117,21 @@ impl HashCalculatorTool {
         }
     }
 
+    #[instrument(skip(self))]
     async fn check_file_size(&self, path: &Path) -> Result<u64> {
+        let check_start = Instant::now();
+        debug!(
+            file_path = %path.display(),
+            max_file_size_mb = self.config.max_file_size / (1024 * 1024),
+            "Checking file size for hash operation"
+        );
+
         let metadata = tokio::fs::metadata(path).await.map_err(|e| {
+            error!(
+                file_path = %path.display(),
+                error = %e,
+                "Failed to read file metadata"
+            );
             storage_error(
                 format!("Failed to read file metadata: {e}"),
                 Some("read_metadata".to_string()),
@@ -116,21 +139,58 @@ impl HashCalculatorTool {
         })?;
 
         let file_size = metadata.len();
+        trace!(
+            file_path = %path.display(),
+            file_size_bytes = file_size,
+            file_size_mb = file_size / (1024 * 1024),
+            max_file_size_mb = self.config.max_file_size / (1024 * 1024),
+            check_duration_ms = check_start.elapsed().as_millis(),
+            "File size metadata retrieved"
+        );
+
         llmspell_utils::validators::validate_file_size(file_size, self.config.max_file_size)?;
+
+        debug!(
+            file_path = %path.display(),
+            file_size_mb = file_size / (1024 * 1024),
+            check_duration_ms = check_start.elapsed().as_millis(),
+            "File size validation passed"
+        );
 
         Ok(file_size)
     }
 
+    #[instrument(skip(self))]
     async fn execute_hash_operation(&self, params: &serde_json::Value) -> Result<AgentOutput> {
+        let hash_op_start = Instant::now();
         let input_type = extract_string_with_default(params, "input_type", "string");
         let algorithm = self.parse_algorithm(extract_optional_string(params, "algorithm"));
         let format = self.parse_format(extract_optional_string(params, "format"));
+
+        debug!(
+            operation = "hash",
+            input_type = %input_type,
+            algorithm = %algorithm.to_string(),
+            format = ?format,
+            "Starting hash calculation operation"
+        );
 
         // Validate input type
         validate_enum(&input_type, &["string", "file"], "input_type")?;
 
         let hash = self.compute_hash(params, input_type, algorithm).await?;
+
+        let format_start = Instant::now();
         let formatted = self.format_hash(&hash, &format);
+        trace!(
+            operation = "hash",
+            algorithm = %algorithm.to_string(),
+            format = ?format,
+            hash_length = hash.len(),
+            formatted_length = formatted.len(),
+            format_duration_ms = format_start.elapsed().as_millis(),
+            "Hash formatting completed"
+        );
 
         let response = ResponseBuilder::success("hash")
             .with_message(format!(
@@ -147,22 +207,65 @@ impl HashCalculatorTool {
             }))
             .build();
 
+        let total_duration_ms = hash_op_start.elapsed().as_millis();
+        info!(
+            operation = "hash",
+            input_type = %input_type,
+            algorithm = %algorithm.to_string(),
+            format = ?format,
+            hash_length = hash.len(),
+            formatted_length = formatted.len(),
+            total_duration_ms,
+            "Hash operation completed successfully"
+        );
+
         Ok(AgentOutput::text(serde_json::to_string_pretty(&response)?))
     }
 
+    #[allow(clippy::cognitive_complexity)]
+    #[instrument(skip(self))]
     async fn execute_verify_operation(&self, params: &serde_json::Value) -> Result<AgentOutput> {
+        let verify_op_start = Instant::now();
         let input_type = extract_string_with_default(params, "input_type", "string");
         let algorithm = self.parse_algorithm(extract_optional_string(params, "algorithm"));
         let expected_hash_str = extract_required_string(params, "expected_hash")?;
         let expected_format = extract_string_with_default(params, "expected_format", "hex");
 
+        debug!(
+            operation = "verify",
+            input_type = %input_type,
+            algorithm = %algorithm.to_string(),
+            expected_format = %expected_format,
+            expected_hash_length = expected_hash_str.len(),
+            "Starting hash verification operation"
+        );
+
         // Validate enums
         validate_enum(&input_type, &["string", "file"], "input_type")?;
         validate_enum(&expected_format, &["hex", "base64"], "expected_format")?;
 
+        let decode_start = Instant::now();
         let expected_hash = Self::decode_expected_hash(expected_hash_str, expected_format)?;
+        trace!(
+            expected_format = %expected_format,
+            expected_hash_length = expected_hash.len(),
+            decode_duration_ms = decode_start.elapsed().as_millis(),
+            "Expected hash decoded successfully"
+        );
+
         let actual_hash = self.compute_hash(params, input_type, algorithm).await?;
+
+        let compare_start = Instant::now();
         let matches = actual_hash == expected_hash;
+        debug!(
+            operation = "verify",
+            algorithm = %algorithm.to_string(),
+            expected_length = expected_hash.len(),
+            actual_length = actual_hash.len(),
+            verified = matches,
+            compare_duration_ms = compare_start.elapsed().as_millis(),
+            "Hash verification comparison completed"
+        );
 
         let response = if matches {
             ResponseBuilder::success("verify")
@@ -183,34 +286,121 @@ impl HashCalculatorTool {
         }
         .build();
 
+        let total_duration_ms = verify_op_start.elapsed().as_millis();
+        info!(
+            operation = "verify",
+            input_type = %input_type,
+            algorithm = %algorithm.to_string(),
+            verified = matches,
+            total_duration_ms,
+            "Hash verification operation completed"
+        );
+
         Ok(AgentOutput::text(serde_json::to_string_pretty(&response)?))
     }
 
+    #[instrument(skip(self))]
     async fn compute_hash(
         &self,
         params: &serde_json::Value,
         input_type: &str,
         algorithm: HashAlgorithm,
     ) -> Result<Vec<u8>> {
-        match input_type {
-            "string" => {
-                let text = extract_required_string(params, "input")?;
-                Ok(hash_string(text, algorithm))
-            }
-            "file" => {
-                let file_path = extract_required_string(params, "file")?;
-                let path = Path::new(file_path);
-                self.check_file_size(path).await?;
+        let compute_start = Instant::now();
+        trace!(
+            input_type = %input_type,
+            algorithm = %algorithm.to_string(),
+            "Starting hash computation"
+        );
 
-                hash_file(path, algorithm).map_err(|e| {
-                    storage_error(
-                        format!("Failed to hash file: {e}"),
-                        Some(format!("hash file {file_path}")),
-                    )
-                })
-            }
+        let result = match input_type {
+            "string" => Self::compute_string_hash(params, algorithm),
+            "file" => self.compute_file_hash(params, algorithm).await,
             _ => unreachable!(), // Already validated
+        };
+
+        debug!(
+            input_type = %input_type,
+            algorithm = %algorithm.to_string(),
+            success = result.is_ok(),
+            total_compute_duration_ms = compute_start.elapsed().as_millis(),
+            "Hash computation completed"
+        );
+
+        result
+    }
+
+    fn compute_string_hash(
+        params: &serde_json::Value,
+        algorithm: HashAlgorithm,
+    ) -> Result<Vec<u8>> {
+        let text = extract_required_string(params, "input")?;
+        debug!(
+            input_type = "string",
+            algorithm = %algorithm.to_string(),
+            text_length = text.len(),
+            "Computing hash for string input"
+        );
+
+        let hash_start = Instant::now();
+        let hash = hash_string(text, algorithm);
+        trace!(
+            input_type = "string",
+            algorithm = %algorithm.to_string(),
+            text_length = text.len(),
+            hash_length = hash.len(),
+            string_hash_duration_ms = hash_start.elapsed().as_millis(),
+            "String hash computation completed"
+        );
+        Ok(hash)
+    }
+
+    #[instrument(skip(self))]
+    async fn compute_file_hash(
+        &self,
+        params: &serde_json::Value,
+        algorithm: HashAlgorithm,
+    ) -> Result<Vec<u8>> {
+        let file_path = extract_required_string(params, "file")?;
+        let path = Path::new(file_path);
+
+        debug!(
+            input_type = "file",
+            algorithm = %algorithm.to_string(),
+            file_path = %file_path,
+            "Computing hash for file input"
+        );
+
+        let file_size = self.check_file_size(path).await?;
+
+        let hash_start = Instant::now();
+        let hash_result = hash_file(path, algorithm).map_err(|e| {
+            error!(
+                input_type = "file",
+                algorithm = %algorithm.to_string(),
+                file_path = %file_path,
+                error = %e,
+                "Failed to compute file hash"
+            );
+            storage_error(
+                format!("Failed to hash file: {e}"),
+                Some(format!("hash file {file_path}")),
+            )
+        });
+
+        if let Ok(ref hash) = hash_result {
+            trace!(
+                input_type = "file",
+                algorithm = %algorithm.to_string(),
+                file_path = %file_path,
+                file_size_bytes = file_size,
+                hash_length = hash.len(),
+                file_hash_duration_ms = hash_start.elapsed().as_millis(),
+                "File hash computation completed"
+            );
         }
+
+        hash_result
     }
 
     fn decode_expected_hash(expected_hash_str: &str, expected_format: &str) -> Result<Vec<u8>> {
@@ -238,24 +428,63 @@ impl BaseAgent for HashCalculatorTool {
         &self.metadata
     }
 
+    #[instrument(skip(_context, input, self), fields(tool = %self.metadata().name))]
     async fn execute_impl(
         &self,
         input: AgentInput,
         _context: ExecutionContext,
     ) -> Result<AgentOutput> {
+        let start = Instant::now();
+        info!(
+            input_size = input.text.len(),
+            has_params = !input.parameters.is_empty(),
+            "Executing hash calculator tool"
+        );
+
         let params = extract_parameters(&input)?;
         let operation = extract_required_string(params, "operation")?;
 
-        match operation {
+        debug!(
+            operation = %operation,
+            "Processing hash calculator operation"
+        );
+
+        let result = match operation {
             "hash" => self.execute_hash_operation(params).await,
             "verify" => self.execute_verify_operation(params).await,
-            _ => Err(validation_error(
-                format!("Invalid operation: {operation}"),
-                Some("operation".to_string()),
-            )),
+            _ => {
+                error!(
+                    operation = %operation,
+                    "Invalid hash calculator operation requested"
+                );
+                Err(validation_error(
+                    format!("Invalid operation: {operation}"),
+                    Some("operation".to_string()),
+                ))
+            }
+        };
+
+        let elapsed_ms = start.elapsed().as_millis();
+        if result.is_ok() {
+            debug!(
+                operation = %operation,
+                success = true,
+                duration_ms = elapsed_ms,
+                "Hash calculator execution completed successfully"
+            );
+        } else {
+            error!(
+                operation = %operation,
+                success = false,
+                duration_ms = elapsed_ms,
+                "Hash calculator execution failed"
+            );
         }
+
+        result
     }
 
+    #[instrument(skip(self))]
     async fn validate_input(&self, input: &AgentInput) -> Result<()> {
         if input.text.is_empty() {
             return Err(validation_error(
@@ -266,6 +495,7 @@ impl BaseAgent for HashCalculatorTool {
         Ok(())
     }
 
+    #[instrument(skip(self))]
     async fn handle_error(&self, error: llmspell_core::LLMSpellError) -> Result<AgentOutput> {
         Ok(AgentOutput::text(format!("Hash calculator error: {error}")))
     }

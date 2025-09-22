@@ -1,7 +1,7 @@
 //! Core RAG pipeline orchestrator
 
 use anyhow::Result;
-use llmspell_state_traits::StateScope;
+use llmspell_core::state::StateScope;
 use llmspell_storage::vector_storage::VectorStorage;
 use std::sync::Arc;
 use thiserror::Error;
@@ -320,7 +320,7 @@ impl RAGPipeline {
                 .map_err(|e| RAGPipelineError::Storage { source: e })?;
             // Convert to scoped stats format
             llmspell_storage::vector_storage::ScopedStats {
-                scope: llmspell_state_traits::StateScope::Global,
+                scope: llmspell_core::state::StateScope::Global,
                 vector_count: stats.total_vectors,
                 storage_bytes: stats.storage_bytes,
                 query_count: 0,      // Global stats don't track queries

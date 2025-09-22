@@ -4,14 +4,14 @@
 //! artifact tracking, and tenant isolation.
 
 use anyhow::Result;
-use llmspell_sessions::{SessionId, SessionManager};
-use llmspell_state_traits::StateScope;
+use llmspell_core::state::StateScope;
+use llmspell_kernel::sessions::{SessionId, SessionManager};
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::sync::Arc;
 use std::time::{Duration, SystemTime};
 use tokio::sync::RwLock;
-use tracing::{debug, info};
+use tracing::{debug, error, info};
 use uuid::Uuid;
 
 use crate::state_integration::StateAwareVectorStorage;
@@ -319,7 +319,7 @@ impl SessionAwareRAGPipeline {
             tokio::time::sleep(Duration::from_secs(ttl_seconds)).await;
 
             if let Err(e) = pipeline.cleanup_session(session_id).await {
-                tracing::error!("Failed to cleanup session {} vectors: {}", session_id, e);
+                error!("Failed to cleanup session {} vectors: {}", session_id, e);
             } else {
                 info!("TTL cleanup completed for session {}", session_id);
             }
@@ -407,7 +407,7 @@ impl Clone for SessionAwareRAGPipeline {
 
 /// Helper functions for `StateScope` tenant patterns
 pub mod scope_helpers {
-    use llmspell_state_traits::StateScope;
+    use llmspell_core::state::StateScope;
 
     /// Create a tenant scope
     #[must_use]

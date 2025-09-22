@@ -1,0 +1,123 @@
+[package]
+name = "llmspell-kernel"
+version.workspace = true
+edition.workspace = true
+authors.workspace = true
+repository.workspace = true
+license.workspace = true
+description = "Integrated kernel architecture with REPL and debugging infrastructure"
+readme = "README.md"
+keywords = ["llm", "kernel", "repl", "debug", "jupyter"]
+categories = ["development-tools", "command-line-utilities"]
+
+[dependencies]
+# Core dependencies (minimal to avoid cycles)
+llmspell-core = { path = "../llmspell-core", version = "0.9.0" }
+llmspell-config = { path = "../llmspell-config", version = "0.9.0" }
+llmspell-utils = { path = "../llmspell-utils", version = "0.9.0" }
+llmspell-events = { path = "../llmspell-events", version = "0.9.0" }
+llmspell-hooks = { path = "../llmspell-hooks", version = "0.9.0" }
+llmspell-storage = { path = "../llmspell-storage", version = "0.9.0" }
+
+# State dependencies now consolidated internally
+
+# Async runtime
+tokio = { version = "1.41", features = ["full", "tracing"] }
+tokio-util = { version = "0.7", features = ["codec", "io"] }
+tokio-stream = { workspace = true }
+async-trait = "0.1"
+futures = { workspace = true }
+
+# Transport
+zmq = { version = "0.10", optional = true }
+tungstenite = { version = "0.24", optional = true }
+tokio-tungstenite = { version = "0.24", optional = true }
+
+# Tracing and logging
+tracing = "0.1"
+tracing-subscriber = { version = "0.3", features = [
+    "env-filter",
+    "json",
+    "fmt",
+] }
+tracing-appender = "0.2"
+
+# Serialization
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+bincode = { workspace = true }
+rmp-serde = "1.3"
+
+# Error handling
+anyhow = "1.0"
+thiserror = "2.0"
+
+# Utilities
+uuid = { version = "1.11", features = ["v4", "serde"] }
+chrono = { version = "0.4", features = ["serde"] }
+parking_lot = "0.12"
+once_cell = "1.20"
+arc-swap = "1.7"
+num_cpus = "1.16"
+dirs = "5.0"
+unicode-normalization = "0.1"
+rand = "0.8"
+
+# Performance optimizations (for consolidated state persistence)
+crossbeam = "0.8"
+crossbeam-skiplist = "0.1"
+dashmap = "6.1"
+
+# Vector storage (for consolidated state persistence)
+hnsw_rs = "0.3"
+
+# Session artifact storage dependencies
+lru = "0.12"
+blake3 = { workspace = true }
+lz4_flex = { workspace = true }
+
+# Storage
+sled = "0.34"
+
+# Compression libraries (for consolidated state persistence)
+flate2 = "1.0"
+zstd = "0.13"
+lz4 = "1.24"
+brotli = "3.5"
+
+# Cryptography
+sha2 = "0.10"
+
+# Text processing
+regex = "1.10"
+
+# Performance monitoring
+metrics = "0.24"
+metrics-exporter-prometheus = { version = "0.16", optional = true }
+
+[dev-dependencies]
+# Testing utilities
+llmspell-testing = { path = "../llmspell-testing", version = "0.9.0" }
+tokio-test = "0.4"
+proptest = "1.5"
+criterion = { version = "0.5", features = ["async_tokio"] }
+pretty_assertions = "1.4"
+tempfile = "3.14"
+test-log = { version = "0.2", features = ["trace"] }
+env_logger = "0.11"
+
+# HTTP testing
+wiremock = "0.6"
+reqwest = { version = "0.12", features = ["json"] }
+
+[features]
+default = ["metrics", "zeromq"]
+metrics = ["dep:metrics-exporter-prometheus"]
+zeromq = ["dep:zmq"]
+websocket = ["dep:tungstenite", "dep:tokio-tungstenite"]
+debug = ["tracing-subscriber/fmt"]
+test-utils = []
+
+[lib]
+name = "llmspell_kernel"
+path = "src/lib.rs"

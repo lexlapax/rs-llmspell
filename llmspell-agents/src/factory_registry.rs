@@ -9,6 +9,7 @@ use async_trait::async_trait;
 use llmspell_core::traits::agent::Agent;
 use std::{collections::HashMap, sync::Arc};
 use tokio::sync::RwLock;
+use tracing::instrument;
 
 /// Registry for agent factories
 pub struct FactoryRegistry {
@@ -31,6 +32,7 @@ impl FactoryRegistry {
     /// # Errors
     ///
     /// Returns an error if a factory with the same name is already registered
+    #[instrument(skip(factory, self))]
     pub async fn register_factory(
         &self,
         name: String,
@@ -52,12 +54,14 @@ impl FactoryRegistry {
     }
 
     /// Get a factory by name
+    #[instrument(skip_all)]
     pub async fn get_factory(&self, name: &str) -> Option<Arc<dyn AgentFactory>> {
         let factories = self.factories.read().await;
         factories.get(name).cloned()
     }
 
     /// Get the default factory
+    #[instrument(skip_all)]
     pub async fn get_default_factory(&self) -> Option<Arc<dyn AgentFactory>> {
         let default = self.default_factory.read().await;
         if let Some(name) = default.as_ref() {
@@ -72,6 +76,7 @@ impl FactoryRegistry {
     /// # Errors
     ///
     /// Returns an error if the factory is not registered
+    #[instrument(skip(self))]
     pub async fn set_default_factory(&self, name: String) -> Result<()> {
         let factories = self.factories.read().await;
         if !factories.contains_key(&name) {
@@ -84,6 +89,7 @@ impl FactoryRegistry {
     }
 
     /// List all registered factory names
+    #[instrument(skip(self))]
     pub async fn list_factories(&self) -> Vec<String> {
         let factories = self.factories.read().await;
         factories.keys().cloned().collect()
@@ -96,6 +102,7 @@ impl FactoryRegistry {
     /// Returns an error if:
     /// - Factory is not found
     /// - Agent creation fails
+    #[instrument(skip(self))]
     pub async fn create_agent_with(
         &self,
         factory_name: &str,
@@ -116,6 +123,7 @@ impl FactoryRegistry {
     /// Returns an error if:
     /// - No default factory is set
     /// - Agent creation fails
+    #[instrument(skip(self))]
     pub async fn create_agent(&self, config: AgentConfig) -> Result<Arc<dyn Agent>> {
         let factory = self
             .get_default_factory()
@@ -132,6 +140,7 @@ impl FactoryRegistry {
     /// Returns an error if:
     /// - Factory is not found
     /// - Template creation fails
+    #[instrument(skip(self))]
     pub async fn create_from_template_with(
         &self,
         factory_name: &str,
@@ -152,6 +161,7 @@ impl FactoryRegistry {
     /// Returns an error if:
     /// - No default factory is set
     /// - Template creation fails
+    #[instrument(skip(self))]
     pub async fn create_from_template(&self, template_name: &str) -> Result<Arc<dyn Agent>> {
         let factory = self
             .get_default_factory()
@@ -209,6 +219,7 @@ impl CustomAgentFactory {
 
 #[async_trait]
 impl AgentFactory for CustomAgentFactory {
+    #[instrument(skip_all)]
     async fn create_agent(&self, mut config: AgentConfig) -> Result<Arc<dyn Agent>> {
         // Apply all customizers
         for customizer in &self.customizers {
@@ -219,6 +230,7 @@ impl AgentFactory for CustomAgentFactory {
         self.base_factory.create_agent(config).await
     }
 
+    #[instrument(skip_all)]
     async fn create_from_template(&self, template_name: &str) -> Result<Arc<dyn Agent>> {
         // For now, just delegate
         // TODO: Apply customizers to template config when we have agent implementations

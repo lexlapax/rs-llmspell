@@ -14,6 +14,7 @@ use std::collections::HashMap;
 use std::sync::Arc;
 use std::time::{Duration, Instant};
 use tokio::sync::RwLock;
+use tracing::instrument;
 use tracing::{debug, error, info, warn};
 use uuid::Uuid;
 
@@ -116,7 +117,7 @@ impl LifecyclePhase {
 
 /// Lifecycle middleware trait
 #[async_trait]
-pub trait LifecycleMiddleware: Send + Sync {
+pub trait LifecycleMiddleware: Send + Sync + std::fmt::Debug {
     /// Called before the lifecycle phase executes
     ///
     /// # Errors
@@ -250,6 +251,7 @@ impl LifecycleMiddlewareChain {
     /// # Panics
     ///
     /// Panics if the chain is empty after adding middleware (should never happen)
+    #[instrument(skip(self))]
     pub async fn add_middleware(&self, middleware: Arc<dyn LifecycleMiddleware>) {
         let mut chain = self.middleware.write().await;
         chain.push(middleware);
@@ -358,6 +360,7 @@ impl LifecycleMiddlewareChain {
     }
 
     /// Execute middleware error handlers
+    #[instrument(skip(self))]
     pub async fn handle_error(
         &self,
         mut context: MiddlewareContext,
@@ -387,6 +390,7 @@ impl LifecycleMiddlewareChain {
     }
 
     /// Execute single middleware before hook
+    #[instrument(skip(self, context))]
     async fn execute_middleware_before(
         &self,
         middleware: &dyn LifecycleMiddleware,
@@ -438,6 +442,7 @@ impl LifecycleMiddlewareChain {
     }
 
     /// Execute single middleware after hook
+    #[instrument(skip(self))]
     async fn execute_middleware_after(
         &self,
         middleware: &dyn LifecycleMiddleware,
@@ -487,6 +492,7 @@ impl LifecycleMiddlewareChain {
     }
 
     /// Execute single middleware error hook
+    #[instrument(skip(self, context))]
     async fn execute_middleware_error(
         &self,
         middleware: &dyn LifecycleMiddleware,
@@ -571,6 +577,7 @@ impl LifecycleMiddlewareChain {
 
 /// Built-in middleware implementations
 /// Logging middleware
+#[derive(Debug)]
 pub struct LoggingMiddleware {
     log_level: tracing::Level,
 }
@@ -598,6 +605,7 @@ impl LoggingMiddleware {
 
 #[async_trait]
 impl LifecycleMiddleware for LoggingMiddleware {
+    #[instrument(skip(self))]
     async fn before(&self, context: &mut MiddlewareContext) -> Result<()> {
         match self.log_level {
             tracing::Level::DEBUG => debug!(
@@ -613,6 +621,7 @@ impl LifecycleMiddleware for LoggingMiddleware {
         Ok(())
     }
 
+    #[instrument(skip(self))]
     async fn after(&self, context: &mut MiddlewareContext) -> Result<()> {
         match self.log_level {
             tracing::Level::DEBUG => debug!(
@@ -632,6 +641,7 @@ impl LifecycleMiddleware for LoggingMiddleware {
         Ok(())
     }
 
+    #[instrument(skip(context, self))]
     async fn on_error(&self, context: &mut MiddlewareContext, error: &anyhow::Error) -> Result<()> {
         error!(
             "Agent {} failed in phase {:?} after {:?}: {}",
@@ -657,6 +667,7 @@ impl LifecycleMiddleware for LoggingMiddleware {
 }
 
 /// Metrics collection middleware
+#[derive(Debug)]
 pub struct MetricsMiddleware {
     metrics: Arc<RwLock<HashMap<String, f64>>>,
 }
@@ -702,6 +713,7 @@ impl LifecycleMiddleware for MetricsMiddleware {
         Ok(())
     }
 
+    #[instrument(skip(self))]
     async fn on_error(
         &self,
         context: &mut MiddlewareContext,
@@ -727,6 +739,7 @@ impl LifecycleMiddleware for MetricsMiddleware {
 }
 
 /// Security validation middleware
+#[derive(Debug)]
 pub struct SecurityMiddleware {
     trusted_agents: Vec<String>,
     security_policies: HashMap<LifecyclePhase, Vec<String>>,
@@ -762,6 +775,7 @@ impl SecurityMiddleware {
 
 #[async_trait]
 impl LifecycleMiddleware for SecurityMiddleware {
+    #[instrument(skip(self))]
     async fn before(&self, context: &mut MiddlewareContext) -> Result<()> {
         // Check if agent is trusted
         if !self.trusted_agents.contains(&context.agent_id) {
@@ -785,10 +799,12 @@ impl LifecycleMiddleware for SecurityMiddleware {
         Ok(())
     }
 
+    #[instrument(skip(self))]
     async fn after(&self, _context: &mut MiddlewareContext) -> Result<()> {
         Ok(())
     }
 
+    #[instrument(skip(self))]
     async fn on_error(&self, context: &mut MiddlewareContext, error: &anyhow::Error) -> Result<()> {
         warn!(
             "Security middleware detected error in agent {} during phase {:?}: {}",
@@ -902,6 +918,7 @@ mod tests {
     }
     #[tokio::test]
     async fn test_middleware_error_handling() {
+        #[derive(Debug)]
         struct FailingMiddleware;
 
         #[async_trait]
@@ -914,6 +931,7 @@ mod tests {
                 Ok(())
             }
 
+            #[instrument(skip(self))]
             async fn on_error(
                 &self,
                 _context: &mut MiddlewareContext,

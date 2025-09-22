@@ -10,6 +10,7 @@ use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::sync::Arc;
 use tokio::sync::RwLock;
+use tracing::{debug, info, instrument};
 
 use crate::ModelSpecifier;
 
@@ -270,6 +271,7 @@ impl ProviderManager {
     }
 
     /// Register a provider factory
+    #[instrument(skip_all)]
     pub async fn register_provider<F>(&self, name: impl Into<String>, factory: F)
     where
         F: Fn(ProviderConfig) -> Result<Box<dyn ProviderInstance>, LLMSpellError>
@@ -282,7 +284,13 @@ impl ProviderManager {
     }
 
     /// Initialize a provider instance
+    #[instrument(level = "info", skip(self), fields(
+        provider_name = %config.name,
+        provider_type = %config.provider_type,
+        model = %config.model
+    ))]
     pub async fn init_provider(&self, config: ProviderConfig) -> Result<(), LLMSpellError> {
+        info!("Initializing provider");
         // Use hierarchical naming: name/provider_type/model
         let instance_name = config.instance_name();
 
@@ -305,10 +313,12 @@ impl ProviderManager {
     }
 
     /// Get a provider instance
+    #[instrument(level = "debug", skip(self))]
     pub async fn get_provider(
         &self,
         name: Option<&str>,
     ) -> Result<Arc<Box<dyn ProviderInstance>>, LLMSpellError> {
+        debug!("Getting provider instance: {:?}", name);
         let instances = self.instances.read().await;
         let default = self.default_provider.read().await;
 
@@ -370,12 +380,18 @@ impl ProviderManager {
     /// # Ok(())
     /// # }
     /// ```
+    #[instrument(level = "info", skip(api_key, self), fields(
+        model = %spec.model,
+        provider = ?spec.provider,
+        base_url = ?base_url_override
+    ))]
     pub async fn create_agent_from_spec(
         &self,
         spec: ModelSpecifier,
         base_url_override: Option<&str>,
         api_key: Option<&str>,
     ) -> Result<Arc<Box<dyn ProviderInstance>>, LLMSpellError> {
+        info!("Creating agent from model specification");
         // Determine the provider name
         let provider_name = match &spec.provider {
             Some(provider) => provider.clone(),
@@ -470,6 +486,7 @@ impl ProviderManager {
     }
 
     /// Get the default provider instance
+    #[instrument(skip(self))]
     pub async fn get_default_provider(
         &self,
     ) -> Result<Arc<Box<dyn ProviderInstance>>, LLMSpellError> {
@@ -477,6 +494,7 @@ impl ProviderManager {
     }
 
     /// Set the default provider
+    #[instrument(skip_all)]
     pub async fn set_default_provider(&self, name: impl Into<String>) -> Result<(), LLMSpellError> {
         let name = name.into();
         let instances = self.instances.read().await;
@@ -494,6 +512,7 @@ impl ProviderManager {
     }
 
     /// Query capabilities of a provider
+    #[instrument(skip(self))]
     pub async fn query_capabilities(
         &self,
         name: Option<&str>,
@@ -523,12 +542,14 @@ impl ProviderManager {
     }
 
     /// List all initialized providers
+    #[instrument(skip(self))]
     pub async fn list_providers(&self) -> Vec<String> {
         let instances = self.instances.read().await;
         instances.keys().cloned().collect()
     }
 
     /// List all available provider types
+    #[instrument(skip(self))]
     pub async fn available_provider_types(&self) -> Vec<String> {
         let registry = self.registry.read().await;
         registry

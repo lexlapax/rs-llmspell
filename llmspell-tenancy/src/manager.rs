@@ -3,7 +3,7 @@
 use anyhow::{anyhow, Result};
 use async_trait::async_trait;
 use dashmap::DashMap;
-use llmspell_state_traits::StateScope;
+use llmspell_core::state::StateScope;
 use llmspell_storage::{
     ScopedStats, StorageStats, VectorEntry, VectorQuery, VectorResult, VectorStorage,
 };

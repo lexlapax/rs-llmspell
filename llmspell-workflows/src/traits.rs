@@ -11,14 +11,20 @@ use std::time::Duration;
 /// Workflow step is designed for workflow patterns with memory-based state management.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct WorkflowStep {
+    /// Unique identifier for this step
     pub id: ComponentId,
+    /// Human-readable name of the step
     pub name: String,
+    /// Type of operation this step performs
     pub step_type: StepType,
+    /// Optional timeout for step execution
     pub timeout: Option<Duration>,
+    /// Number of retry attempts on failure
     pub retry_attempts: u32,
 }
 
 impl WorkflowStep {
+    /// Create a new workflow step with the given name and type
     pub fn new(name: String, step_type: StepType) -> Self {
         Self {
             id: ComponentId::new(),
@@ -29,11 +35,13 @@ impl WorkflowStep {
         }
     }
 
+    /// Set the timeout for this step
     pub fn with_timeout(mut self, timeout: Duration) -> Self {
         self.timeout = Some(timeout);
         self
     }
 
+    /// Set the number of retry attempts for this step
     pub fn with_retry(mut self, attempts: u32) -> Self {
         self.retry_attempts = attempts;
         self
@@ -45,23 +53,31 @@ impl WorkflowStep {
 pub enum StepType {
     /// Execute a tool with given parameters
     Tool {
+        /// Name of the tool to execute
         tool_name: String,
+        /// Parameters to pass to the tool
         parameters: serde_json::Value,
     },
     /// Execute an agent with given input
     Agent {
+        /// ID or name of the agent to execute
         // Changed from ComponentId to String to preserve original agent name for registry lookup
         agent_id: String,
+        /// Input to pass to the agent
         input: String,
     },
     /// Custom function execution
     Custom {
+        /// Name of the custom function to execute
         function_name: String,
+        /// Parameters to pass to the function
         parameters: serde_json::Value,
     },
     /// Execute a nested workflow
     Workflow {
+        /// ID of the workflow to execute
         workflow_id: ComponentId,
+        /// Input to pass to the workflow
         input: serde_json::Value,
     },
 }
@@ -69,16 +85,24 @@ pub enum StepType {
 /// Workflow execution result
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct StepResult {
+    /// ID of the step that produced this result
     pub step_id: ComponentId,
+    /// Name of the step that produced this result
     pub step_name: String,
+    /// Whether the step completed successfully
     pub success: bool,
+    /// Output produced by the step
     pub output: String,
+    /// Error message if the step failed
     pub error: Option<String>,
+    /// How long the step took to execute
     pub duration: Duration,
+    /// Number of times this step was retried
     pub retry_count: u32,
 }
 
 impl StepResult {
+    /// Create a successful step result
     pub fn success(
         step_id: ComponentId,
         step_name: String,
@@ -96,6 +120,7 @@ impl StepResult {
         }
     }
 
+    /// Create a failed step result
     pub fn failure(
         step_id: ComponentId,
         step_name: String,
@@ -118,11 +143,17 @@ impl StepResult {
 /// Workflow status
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 pub enum WorkflowStatus {
+    /// Workflow is queued but not started
     Pending,
+    /// Workflow is currently executing
     Running,
+    /// Workflow completed successfully
     Completed,
+    /// Workflow failed
     Failed,
+    /// Workflow was cancelled
     Cancelled,
+    /// Some steps completed but workflow didn't finish
     PartiallyCompleted,
 }
 
@@ -134,7 +165,12 @@ pub enum ErrorStrategy {
     /// Continue executing remaining steps
     Continue,
     /// Retry failed step with exponential backoff
-    Retry { max_attempts: u32, backoff_ms: u64 },
+    Retry {
+        /// Maximum number of retry attempts
+        max_attempts: u32,
+        /// Initial backoff duration in milliseconds
+        backoff_ms: u64,
+    },
 }
 
 impl Default for ErrorStrategy {

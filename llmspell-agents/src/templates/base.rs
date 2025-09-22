@@ -9,6 +9,7 @@ use async_trait::async_trait;
 use llmspell_core::BaseAgent;
 use std::collections::HashMap;
 use std::sync::Arc;
+use tracing::instrument;
 
 /// Template instantiation parameters
 #[derive(Clone)]
@@ -138,6 +139,7 @@ pub trait AgentTemplate: Send + Sync {
 
     /// Validate individual parameter value
     #[allow(clippy::too_many_lines)]
+    #[instrument(skip(self))]
     async fn validate_parameter_value(
         &self,
         param_def: &ParameterDefinition,
@@ -277,6 +279,7 @@ pub trait AgentTemplate: Send + Sync {
     }
 
     /// Validate custom constraints (override in implementations)
+    #[instrument(skip(self))]
     async fn validate_custom_constraint(
         &self,
         _parameter_name: &str,
@@ -291,6 +294,7 @@ pub trait AgentTemplate: Send + Sync {
     /// # Errors
     ///
     /// Returns an error if default value application fails
+    #[instrument(skip(self))]
     async fn apply_defaults(&self, params: &mut TemplateInstantiationParams) -> Result<()> {
         let schema = self.schema();
 
@@ -467,6 +471,7 @@ impl TemplateFactory {
     /// Returns an error if:
     /// - Template not found
     /// - Instantiation fails
+    #[instrument(skip(self))]
     pub async fn instantiate_template(
         &self,
         template_id: &str,
@@ -486,6 +491,7 @@ impl TemplateFactory {
     /// Returns an error if:
     /// - Template not found
     /// - Parameter validation fails
+    #[instrument(skip(self))]
     pub async fn validate_template_parameters(
         &self,
         template_id: &str,
@@ -587,6 +593,7 @@ mod tests {
             &self.schema
         }
 
+        #[instrument(skip(self))]
         async fn instantiate(
             &self,
             _params: TemplateInstantiationParams,

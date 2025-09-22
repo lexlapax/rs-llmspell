@@ -8,6 +8,7 @@ use crate::ComponentRegistry;
 use llmspell_core::execution_context::{ContextScope, ExecutionContextBuilder};
 use mlua::{Lua, Table, Value};
 use std::sync::Arc;
+use tracing::{info, instrument};
 
 /// Inject Tool global into Lua environment
 ///
@@ -17,11 +18,18 @@ use std::sync::Arc;
 /// - Lua table creation fails
 /// - Function binding fails
 #[allow(clippy::too_many_lines)]
+#[instrument(
+    level = "info",
+    skip(lua, context, registry),
+    fields(global_name = "Tool", tool_count = 0)
+)]
 pub fn inject_tool_global(
     lua: &Lua,
     context: &GlobalContext,
     registry: Arc<ComponentRegistry>,
 ) -> mlua::Result<()> {
+    let tool_count = registry.list_tools().len();
+    info!(tool_count = tool_count, "Injecting Tool global API");
     let tool_table = lua.create_table()?;
 
     // Create Tool.list() function
@@ -127,7 +135,7 @@ pub fn inject_tool_global(
 
                             // Convert output to Lua table
                             let table =
-                                crate::lua::conversion::agent_output_to_lua_table(lua, output)?;
+                                crate::lua::conversion::agent_output_to_lua_table(lua, &output)?;
                             Ok(Value::Table(table))
                         },
                         None,
@@ -189,7 +197,7 @@ pub fn inject_tool_global(
                 })?;
 
                 // Convert output to Lua table
-                let table = crate::lua::conversion::agent_output_to_lua_table(lua, output)?;
+                let table = crate::lua::conversion::agent_output_to_lua_table(lua, &output)?;
                 Ok(Value::Table(table))
             },
             None,
@@ -305,7 +313,7 @@ pub fn inject_tool_global(
                                 })?;
 
                             // Convert output to Lua table
-                            crate::lua::conversion::agent_output_to_lua_table(lua, output)
+                            crate::lua::conversion::agent_output_to_lua_table(lua, &output)
                         }
                     })?,
                 )?;

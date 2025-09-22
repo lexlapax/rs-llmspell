@@ -7,10 +7,17 @@ use crate::{
     registry::ComponentRegistry,
     tools::register_all_tools,
 };
+use async_trait::async_trait;
 use llmspell_config::LLMSpellConfig;
 use llmspell_core::error::LLMSpellError;
+use llmspell_core::traits::script_executor::{
+    ScriptExecutionMetadata, ScriptExecutionOutput, ScriptExecutor,
+};
 use std::collections::HashMap;
+use std::fmt::Write;
 use std::sync::{Arc, RwLock};
+use std::time::Instant;
+use tracing::{debug, info, instrument};
 
 /// Central script runtime that uses `ScriptEngineBridge` abstraction
 ///
@@ -124,7 +131,13 @@ impl ScriptRuntime {
     /// # Errors
     ///
     /// Returns an error if runtime initialization fails
+    #[instrument(level = "info", skip(config), fields(
+        engine_type = "lua",
+        default_engine = %config.default_engine,
+        events_enabled = config.events.enabled
+    ))]
     pub async fn new_with_lua(config: LLMSpellConfig) -> Result<Self, LLMSpellError> {
+        info!("Creating Lua script runtime");
         // Convert llmspell-config LuaConfig to bridge LuaConfig
         let lua_config = LuaConfig::default(); // For now, use defaults - TODO: proper conversion
         let engine = EngineFactory::create_lua_engine_with_runtime(
@@ -139,7 +152,13 @@ impl ScriptRuntime {
     /// # Errors
     ///
     /// Returns an error if runtime initialization fails
+    #[instrument(level = "info", skip(config), fields(
+        engine_type = "javascript",
+        default_engine = %config.default_engine,
+        events_enabled = config.events.enabled
+    ))]
     pub async fn new_with_javascript(config: LLMSpellConfig) -> Result<Self, LLMSpellError> {
+        info!("Creating JavaScript script runtime");
         // Convert llmspell-config JSConfig to bridge JSConfig
         let js_config = JSConfig::default(); // For now, use defaults - TODO: proper conversion
         let engine = EngineFactory::create_javascript_engine(&js_config)?;
@@ -151,10 +170,16 @@ impl ScriptRuntime {
     /// # Errors
     ///
     /// Returns an error if the engine is not found or runtime initialization fails
+    #[instrument(level = "info", skip(config), fields(
+        engine_name = %engine_name,
+        default_engine = %config.default_engine,
+        events_enabled = config.events.enabled
+    ))]
     pub async fn new_with_engine_name(
         engine_name: &str,
         config: LLMSpellConfig,
     ) -> Result<Self, LLMSpellError> {
+        info!("Creating script runtime with engine: {}", engine_name);
         match engine_name {
             "lua" => Self::new_with_lua(config).await,
             "javascript" | "js" => Self::new_with_javascript(config).await,
@@ -166,10 +191,17 @@ impl ScriptRuntime {
     }
 
     /// Core initialization with any engine
+    #[instrument(level = "debug", skip(engine, config), fields(
+        engine_name = engine.get_engine_name(),
+        events_enabled = config.events.enabled,
+        tools_enabled = config.tools.enabled,
+        providers_count = config.providers.providers.len()
+    ))]
     async fn new_with_engine(
         mut engine: Box<dyn ScriptEngineBridge>,
         config: LLMSpellConfig,
     ) -> Result<Self, LLMSpellError> {
+        debug!("Initializing script runtime with engine");
         // Create component registry with event support based on config
         let registry = if config.events.enabled {
             // Create EventBus with default configuration
@@ -236,7 +268,13 @@ impl ScriptRuntime {
     /// # Errors
     ///
     /// Returns an error if script execution fails
+    #[instrument(level = "info", skip(self, script), fields(
+        engine_name = self.engine.get_engine_name(),
+        script_size = script.len(),
+        execution_id = %uuid::Uuid::new_v4()
+    ))]
     pub async fn execute_script(&self, script: &str) -> Result<ScriptOutput, LLMSpellError> {
+        info!("Executing script with {} bytes", script.len());
         self.engine.execute_script(script).await
     }
 
@@ -245,10 +283,17 @@ impl ScriptRuntime {
     /// # Errors
     ///
     /// Returns an error if the engine doesn't support streaming or script execution fails
+    #[instrument(level = "debug", skip(self, script), fields(
+        engine_name = self.engine.get_engine_name(),
+        script_size = script.len(),
+        execution_id = %uuid::Uuid::new_v4(),
+        streaming_supported = self.engine.supports_streaming()
+    ))]
     pub async fn execute_script_streaming(
         &self,
         script: &str,
     ) -> Result<ScriptStream, LLMSpellError> {
+        debug!("Executing script with streaming output");
         if !self.engine.supports_streaming() {
             return Err(LLMSpellError::Component {
                 message: format!(
@@ -271,10 +316,15 @@ impl ScriptRuntime {
     /// # Errors
     ///
     /// Returns an error if the engine fails to set arguments
+    #[instrument(level = "debug", skip(self, args), fields(
+        engine_name = self.engine.get_engine_name(),
+        argument_count = args.len()
+    ))]
     pub async fn set_script_args(
         &mut self,
         args: HashMap<String, String>,
     ) -> Result<(), LLMSpellError> {
+        debug!("Setting {} script arguments", args.len());
         self.engine.set_script_args(args).await
     }
 
@@ -354,6 +404,96 @@ impl From<llmspell_config::SecurityConfig> for crate::engine::SecurityContext {
             max_memory_bytes: config.max_memory_bytes,
             max_execution_time_ms: config.max_execution_time_ms,
         }
+    }
+}
+
+/// Implementation of `ScriptExecutor` trait for `ScriptRuntime`
+///
+/// This allows the kernel to execute scripts without directly depending on
+/// the bridge crate, avoiding cyclic dependencies.
+#[async_trait]
+impl ScriptExecutor for ScriptRuntime {
+    #[instrument(skip(self, script))]
+    async fn execute_script(&self, script: &str) -> Result<ScriptExecutionOutput, LLMSpellError> {
+        let start = Instant::now();
+
+        // Execute using the underlying engine
+        let engine_output = self.engine.execute_script(script).await?;
+
+        // Convert ScriptOutput to ScriptExecutionOutput
+        let output = ScriptExecutionOutput {
+            output: engine_output.output,
+            console_output: engine_output.console_output,
+            metadata: ScriptExecutionMetadata {
+                duration: start.elapsed(),
+                language: engine_output.metadata.engine.clone(),
+                exit_code: None, // ScriptMetadata doesn't have exit_code
+                warnings: engine_output.metadata.warnings,
+            },
+        };
+
+        Ok(output)
+    }
+
+    async fn execute_script_with_args(
+        &self,
+        script: &str,
+        args: std::collections::HashMap<String, String>,
+    ) -> Result<ScriptExecutionOutput, LLMSpellError> {
+        let start = Instant::now();
+
+        debug!("Executing script with {} arguments", args.len());
+
+        // We need to temporarily set the args and then execute
+        // Since we can't mutate self, we need to use a different approach
+        // Create a new script with args injected as a preamble
+        let script_with_args = if args.is_empty() {
+            script.to_string()
+        } else {
+            let mut preamble = String::from("-- Injected script arguments\nARGS = {}\n");
+            for (key, value) in &args {
+                // Escape the value for Lua string
+                let escaped_value = value.replace('\\', "\\\\").replace('"', "\\\"");
+                writeln!(preamble, "ARGS[\"{key}\"] = \"{escaped_value}\"")
+                    .expect("String write should never fail");
+            }
+            preamble.push_str("\n-- Original script\n");
+            preamble.push_str(script);
+            preamble
+        };
+
+        // Execute using the underlying engine
+        let engine_output = self.engine.execute_script(&script_with_args).await?;
+
+        // Convert ScriptOutput to ScriptExecutionOutput
+        let output = ScriptExecutionOutput {
+            output: engine_output.output,
+            console_output: engine_output.console_output,
+            metadata: ScriptExecutionMetadata {
+                duration: start.elapsed(),
+                language: engine_output.metadata.engine.clone(),
+                exit_code: None,
+                warnings: engine_output.metadata.warnings,
+            },
+        };
+
+        Ok(output)
+    }
+
+    fn supports_streaming(&self) -> bool {
+        self.engine.supports_streaming()
+    }
+
+    fn language(&self) -> &'static str {
+        // Return the configured engine type
+        // TODO: Add a method to get current engine language
+        "lua" // Default for now since we use Lua primarily
+    }
+
+    async fn is_ready(&self) -> bool {
+        // Engine is ready if it's been initialized
+        // TODO: Add proper readiness check to ScriptEngineBridge trait
+        true
     }
 }
 

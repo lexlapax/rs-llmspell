@@ -115,6 +115,7 @@ pub mod error;
 pub mod events;
 pub mod execution_context;
 pub mod logging;
+pub mod mocks;
 pub mod state;
 pub mod types;
 
@@ -122,7 +123,12 @@ pub mod traits {
     pub mod agent;
     pub mod base_agent;
     pub mod component_lookup;
+    pub mod debug;
     pub mod event;
+    pub mod memory;
+    pub mod observability;
+    pub mod script_executor;
+    pub mod service;
     pub mod state;
     pub mod tool;
     pub mod tool_capable;

@@ -16,14 +16,14 @@ use llmspell_core::{
     types::AgentInput,
     ExecutionContext,
 };
-use llmspell_state_persistence::{
-    PerformanceConfig, PersistenceConfig, StateManager, StorageBackendType,
-};
+use llmspell_kernel::state::config::{PerformanceConfig, SledConfig};
+use llmspell_kernel::state::{PersistenceConfig, StateManager, StorageBackendType};
 use std::collections::HashMap;
 use std::sync::Arc;
 use std::time::Duration;
 use tempfile::TempDir;
 use tokio::time::sleep;
+use tracing::error;
 use tracing::{info, Level};
 
 #[tokio::main]
@@ -40,7 +40,7 @@ async fn main() -> Result<()> {
     // Create state manager with persistent storage
     let state_manager = Arc::new(
         StateManager::with_backend(
-            StorageBackendType::Sled(llmspell_state_persistence::SledConfig {
+            StorageBackendType::Sled(SledConfig {
                 path: storage_path.join("agent_states"),
                 cache_capacity: 1024 * 1024, // 1MB
                 use_compression: true,
@@ -92,7 +92,7 @@ async fn main() -> Result<()> {
                     let event = event.clone();
                     tokio::spawn(async move {
                         if let Err(e) = hook.handle_event(&event).await {
-                            tracing::error!("Persistence hook error: {}", e);
+                            error!("Persistence hook error: {}", e);
                         }
                     });
                 }
@@ -149,7 +149,7 @@ async fn main() -> Result<()> {
             loop {
                 sleep(Duration::from_secs(5)).await;
                 if let Err(e) = hook.check_auto_save().await {
-                    tracing::error!("Auto-save check failed: {}", e);
+                    error!("Auto-save check failed: {}", e);
                 }
             }
         })

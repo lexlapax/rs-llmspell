@@ -1,9 +1,11 @@
 //! ABOUTME: `DuckDuckGo` search provider implementation
 //! ABOUTME: Uses `DuckDuckGo` Instant Answer API (no API key required)
+use tracing::instrument;
 
 use super::{SearchOptions, SearchProvider, SearchResult, SearchType};
 use async_trait::async_trait;
 use llmspell_core::{LLMSpellError, Result};
+use llmspell_kernel::runtime::create_io_bound_resource;
 use reqwest::Client;
 use serde_json::Value;
 use tracing::{debug, info, warn};
@@ -14,10 +16,11 @@ pub struct DuckDuckGoProvider {
 }
 
 impl DuckDuckGoProvider {
+    /// Create a new `DuckDuckGo` search provider with global runtime
     #[must_use]
     pub fn new() -> Self {
         Self {
-            client: Client::new(),
+            client: create_io_bound_resource(Client::new),
         }
     }
 }
@@ -43,6 +46,7 @@ impl SearchProvider for DuckDuckGoProvider {
     }
 
     #[allow(clippy::too_many_lines)]
+    #[instrument(skip(self))]
     async fn search(&self, query: &str, options: &SearchOptions) -> Result<Vec<SearchResult>> {
         // DuckDuckGo Instant Answer API only supports web search
         if options.search_type != SearchType::Web {

@@ -11,6 +11,7 @@ use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 use std::collections::{HashMap, HashSet};
 use std::sync::{Arc, RwLock};
+use tracing::warn;
 
 /// Security event severity levels
 #[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq, PartialOrd, Ord)]
@@ -228,7 +229,7 @@ impl SecurityStorage {
 
         // Log the security event
         if self.config.enable_audit_logging {
-            log::warn!(
+            warn!(
                 "SECURITY EVENT [{}]: {} - {} ({}:{})",
                 event.severity,
                 event.event_type,
@@ -343,6 +344,7 @@ impl SecurityStorage {
 }
 
 /// Built-in security hook for comprehensive security monitoring
+#[derive(Debug)]
 pub struct SecurityHook {
     storage: Arc<SecurityStorage>,
     metadata: HookMetadata,

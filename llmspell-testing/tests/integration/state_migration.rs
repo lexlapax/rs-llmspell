@@ -2,7 +2,7 @@
 // ABOUTME: Validates complex migration scenarios and data integrity
 
 // Test categorization will be added later
-use llmspell_state_persistence::{
+use llmspell_kernel::state::{
     config::{FieldSchema, PersistenceConfig, StorageBackendType},
     manager::{SerializableState, StateManager},
     migration::{

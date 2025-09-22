@@ -7,6 +7,7 @@ use mlua::{Lua, Result as LuaResult, Table, Value};
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::fmt::Write;
+use tracing::{instrument, trace};
 
 /// Object dumping configuration options
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -129,7 +130,12 @@ impl DumpContext {
 
 /// Dump a Lua value with advanced formatting options
 #[must_use]
+#[instrument(level = "trace", skip(value, options), fields(
+    value_type = ?value.type_name(),
+    max_depth = options.max_depth
+))]
 pub fn dump_value(value: &Value, options: &DumpOptions) -> String {
+    trace!("Dumping Lua value");
     let mut context = DumpContext::new(options.clone());
     dump_value_impl(value, &mut context);
     context.output

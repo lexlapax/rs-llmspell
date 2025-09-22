@@ -1,7 +1,7 @@
 //! Document ingestion and processing flow
 
 use anyhow::Result;
-use llmspell_state_traits::StateScope;
+use llmspell_core::state::StateScope;
 use llmspell_storage::vector_storage::{VectorEntry, VectorStorage};
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;

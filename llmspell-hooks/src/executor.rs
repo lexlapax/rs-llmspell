@@ -49,6 +49,7 @@ impl Default for HookExecutorConfig {
 }
 
 /// Hook executor with performance protection
+#[derive(Debug)]
 pub struct HookExecutor {
     config: HookExecutorConfig,
     circuit_breakers: Arc<CircuitBreakerManager>,

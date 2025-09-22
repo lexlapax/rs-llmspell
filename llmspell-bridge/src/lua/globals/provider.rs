@@ -6,6 +6,7 @@ use crate::ProviderManager;
 use llmspell_core::error::LLMSpellError;
 use mlua::{Lua, Result as LuaResult, Table, Value};
 use std::sync::Arc;
+use tracing::{info, instrument};
 
 /// Inject Provider global into Lua environment
 ///
@@ -16,11 +17,17 @@ use std::sync::Arc;
 /// - Function injection fails
 /// - Global setting fails
 #[allow(clippy::too_many_lines)]
+#[instrument(
+    level = "info",
+    skip(lua, _context, providers),
+    fields(global_name = "Provider", provider_count = 0)
+)]
 pub fn inject_provider_global(
     lua: &Lua,
     _context: &GlobalContext,
     providers: &Arc<ProviderManager>,
 ) -> Result<(), LLMSpellError> {
+    info!("Injecting Provider global API");
     // Create the Provider table
     let provider_table = lua.create_table().map_err(|e| LLMSpellError::Component {
         message: format!("Failed to create Provider table: {e}"),

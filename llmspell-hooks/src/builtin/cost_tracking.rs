@@ -12,6 +12,7 @@ use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::sync::Arc;
 use std::time::Duration;
+use tracing::{debug, error, info, trace, warn};
 
 /// Token usage information
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -329,6 +330,7 @@ impl CostAggregator {
 }
 
 /// Built-in cost tracking hook for AI/ML operations
+#[derive(Debug)]
 pub struct CostTrackingHook {
     config: CostTrackingConfig,
     aggregator: Arc<CostAggregator>,
@@ -481,20 +483,17 @@ impl CostTrackingHook {
 
                 // Log alert
                 match alert.level {
-                    AlertLevel::Info => log::info!(
+                    AlertLevel::Info => info!(
                         "Cost alert: ${:.2} (threshold: ${:.2})",
-                        total_cost,
-                        alert.threshold
+                        total_cost, alert.threshold
                     ),
-                    AlertLevel::Warning => log::warn!(
+                    AlertLevel::Warning => warn!(
                         "Cost warning: ${:.2} (threshold: ${:.2})",
-                        total_cost,
-                        alert.threshold
+                        total_cost, alert.threshold
                     ),
-                    AlertLevel::Critical => log::error!(
+                    AlertLevel::Critical => error!(
                         "Cost critical: ${:.2} (threshold: ${:.2})",
-                        total_cost,
-                        alert.threshold
+                        total_cost, alert.threshold
                     ),
                 }
 
@@ -533,7 +532,7 @@ impl Hook for CostTrackingHook {
             match serde_json::from_value::<TokenUsage>(usage_value.clone()) {
                 Ok(usage) => usage,
                 Err(e) => {
-                    log::debug!("CostTrackingHook: Failed to parse token usage: {}", e);
+                    debug!("CostTrackingHook: Failed to parse token usage: {}", e);
                     return Ok(HookResult::Continue);
                 }
             }
@@ -546,7 +545,7 @@ impl Hook for CostTrackingHook {
         let cost_breakdown = match self.calculate_cost(&usage) {
             Ok(breakdown) => breakdown,
             Err(e) => {
-                log::warn!("CostTrackingHook: Failed to calculate cost: {}", e);
+                warn!("CostTrackingHook: Failed to calculate cost: {}", e);
                 return Ok(HookResult::Continue);
             }
         };
@@ -628,11 +627,9 @@ impl Hook for CostTrackingHook {
         self.aggregator
             .cleanup_old_history(Duration::from_secs(86400)); // 24 hours
 
-        log::debug!(
+        debug!(
             "CostTrackingHook: Tracked cost ${:.6} for {} ({} tokens)",
-            cost_breakdown.total_cost,
-            usage.model,
-            usage.total_tokens
+            cost_breakdown.total_cost, usage.model, usage.total_tokens
         );
 
         Ok(HookResult::Continue)
@@ -654,7 +651,7 @@ impl Hook for CostTrackingHook {
 #[async_trait]
 impl MetricHook for CostTrackingHook {
     async fn record_pre_execution(&self, context: &HookContext) -> Result<()> {
-        log::trace!(
+        trace!(
             "CostTrackingHook: Pre-execution for hook point {:?}",
             context.point
         );

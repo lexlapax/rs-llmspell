@@ -4,7 +4,7 @@
 // Benchmark file
 
 use criterion::{black_box, criterion_group, criterion_main, Criterion};
-use llmspell_state_persistence::{
+use llmspell_kernel::state::{
     agent_state::{
         AgentMetadata, AgentStateData, ExecutionState, PersistentAgentState, ToolUsageStats,
     },
@@ -417,7 +417,7 @@ fn bench_migration_transformation_basic(c: &mut Criterion) {
             rt.block_on(async {
                 let transformer = DataTransformer::new();
 
-                let mut state = llmspell_state_persistence::manager::SerializableState {
+                let mut state = llmspell_kernel::state::manager::SerializableState {
                     key: "bench_state".to_string(),
                     value: serde_json::json!({
                         "name": "Test User",
@@ -461,7 +461,7 @@ fn bench_migration_batch_performance(c: &mut Criterion) {
                 // Create batch of states
                 let mut states = Vec::new();
                 for i in 0..100 {
-                    states.push(llmspell_state_persistence::manager::SerializableState {
+                    states.push(llmspell_kernel::state::manager::SerializableState {
                         key: format!("batch_item_{}", i),
                         value: serde_json::json!({
                             "id": i,
@@ -503,7 +503,7 @@ fn bench_schema_compatibility_check(c: &mut Criterion) {
             let mut schema_v1 = EnhancedStateSchema::new(SemanticVersion::new(1, 0, 0));
             schema_v1.add_field(
                 "name".to_string(),
-                llmspell_state_persistence::config::FieldSchema {
+                llmspell_kernel::state::config::FieldSchema {
                     field_type: "string".to_string(),
                     required: true,
                     default_value: None,
@@ -512,7 +512,7 @@ fn bench_schema_compatibility_check(c: &mut Criterion) {
             );
             schema_v1.add_field(
                 "age".to_string(),
-                llmspell_state_persistence::config::FieldSchema {
+                llmspell_kernel::state::config::FieldSchema {
                     field_type: "number".to_string(),
                     required: false,
                     default_value: Some(serde_json::json!(0)),
@@ -523,7 +523,7 @@ fn bench_schema_compatibility_check(c: &mut Criterion) {
             let mut schema_v2 = EnhancedStateSchema::new(SemanticVersion::new(1, 1, 0));
             schema_v2.add_field(
                 "name".to_string(),
-                llmspell_state_persistence::config::FieldSchema {
+                llmspell_kernel::state::config::FieldSchema {
                     field_type: "string".to_string(),
                     required: true,
                     default_value: None,
@@ -532,7 +532,7 @@ fn bench_schema_compatibility_check(c: &mut Criterion) {
             );
             schema_v2.add_field(
                 "age".to_string(),
-                llmspell_state_persistence::config::FieldSchema {
+                llmspell_kernel::state::config::FieldSchema {
                     field_type: "number".to_string(),
                     required: false,
                     default_value: Some(serde_json::json!(0)),
@@ -541,7 +541,7 @@ fn bench_schema_compatibility_check(c: &mut Criterion) {
             );
             schema_v2.add_field(
                 "email".to_string(),
-                llmspell_state_persistence::config::FieldSchema {
+                llmspell_kernel::state::config::FieldSchema {
                     field_type: "string".to_string(),
                     required: false,
                     default_value: Some(serde_json::json!("user@example.com")),
@@ -570,7 +570,7 @@ fn bench_migration_validation(c: &mut Criterion) {
                 // Create batch of states to validate
                 let mut states = Vec::new();
                 for i in 0..100 {
-                    states.push(llmspell_state_persistence::manager::SerializableState {
+                    states.push(llmspell_kernel::state::manager::SerializableState {
                         key: format!("validation_item_{}", i),
                         value: serde_json::json!({
                             "id": i,
@@ -602,7 +602,7 @@ fn bench_migration_planner(c: &mut Criterion) {
             let mut schema_v1 = EnhancedStateSchema::new(v1_0_0.clone());
             schema_v1.add_field(
                 "name".to_string(),
-                llmspell_state_persistence::config::FieldSchema {
+                llmspell_kernel::state::config::FieldSchema {
                     field_type: "string".to_string(),
                     required: true,
                     default_value: None,
@@ -613,7 +613,7 @@ fn bench_migration_planner(c: &mut Criterion) {
             let mut schema_v1_1 = EnhancedStateSchema::new(v1_1_0.clone());
             schema_v1_1.add_field(
                 "name".to_string(),
-                llmspell_state_persistence::config::FieldSchema {
+                llmspell_kernel::state::config::FieldSchema {
                     field_type: "string".to_string(),
                     required: true,
                     default_value: None,
@@ -622,7 +622,7 @@ fn bench_migration_planner(c: &mut Criterion) {
             );
             schema_v1_1.add_field(
                 "email".to_string(),
-                llmspell_state_persistence::config::FieldSchema {
+                llmspell_kernel::state::config::FieldSchema {
                     field_type: "string".to_string(),
                     required: false,
                     default_value: Some(serde_json::json!("user@example.com")),
@@ -664,7 +664,7 @@ fn calculate_migration_performance_overhead(_c: &mut Criterion) {
         );
 
         // Baseline: Direct state manipulation
-        let mut baseline_state = llmspell_state_persistence::manager::SerializableState {
+        let mut baseline_state = llmspell_kernel::state::manager::SerializableState {
             key: "baseline".to_string(),
             value: serde_json::json!({"name": "Test", "age": 30}),
             timestamp: std::time::SystemTime::now(),
@@ -681,7 +681,7 @@ fn calculate_migration_performance_overhead(_c: &mut Criterion) {
         // With transformation
         let start = tokio::time::Instant::now();
         for _ in 0..1000 {
-            let mut test_state = llmspell_state_persistence::manager::SerializableState {
+            let mut test_state = llmspell_kernel::state::manager::SerializableState {
                 key: "test".to_string(),
                 value: serde_json::json!({"name": "Test", "age": 30}),
                 timestamp: std::time::SystemTime::now(),
@@ -714,7 +714,7 @@ fn calculate_migration_performance_overhead(_c: &mut Criterion) {
         let schema = EnhancedStateSchema::new(SemanticVersion::new(1, 0, 0));
 
         let test_states: Vec<_> = (0..100)
-            .map(|i| llmspell_state_persistence::manager::SerializableState {
+            .map(|i| llmspell_kernel::state::manager::SerializableState {
                 key: format!("item_{}", i),
                 value: serde_json::json!({"id": i, "name": format!("Item {}", i)}),
                 timestamp: std::time::SystemTime::now(),

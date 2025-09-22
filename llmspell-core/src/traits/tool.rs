@@ -9,6 +9,7 @@ use crate::{
 use async_trait::async_trait;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
+use tracing::{debug, trace};
 
 /// Tool category for organization and discovery.
 ///
@@ -489,19 +490,34 @@ pub trait Tool: BaseAgent {
 
     /// Get security requirements for this tool
     fn security_requirements(&self) -> SecurityRequirements {
+        let level = self.security_level();
+        trace!(
+            tool_name = %self.metadata().name,
+            security_level = ?level,
+            "Getting security requirements"
+        );
         SecurityRequirements {
-            level: self.security_level(),
+            level,
             ..Default::default()
         }
     }
 
     /// Get resource limits for this tool
     fn resource_limits(&self) -> ResourceLimits {
-        match self.security_level() {
+        let level = self.security_level();
+        let limits = match level {
             SecurityLevel::Safe => ResourceLimits::strict(),
             SecurityLevel::Restricted => ResourceLimits::default(),
             SecurityLevel::Privileged => ResourceLimits::unlimited(),
-        }
+        };
+        trace!(
+            tool_name = %self.metadata().name,
+            security_level = ?level,
+            max_memory_bytes = ?limits.max_memory_bytes,
+            max_cpu_time_ms = ?limits.max_cpu_time_ms,
+            "Getting resource limits"
+        );
+        limits
     }
 
     /// Execute tool with streaming output
@@ -510,6 +526,11 @@ pub trait Tool: BaseAgent {
         input: AgentInput,
         context: crate::execution_context::ExecutionContext,
     ) -> Result<AgentStream> {
+        debug!(
+            tool_name = %self.metadata().name,
+            input_size = input.text.len(),
+            "Tool stream_execute using default implementation"
+        );
         // Default implementation: execute normally and convert to a single chunk stream
         let output = self.execute(input, context).await?;
 
@@ -535,6 +556,11 @@ pub trait Tool: BaseAgent {
 
     /// Validate tool parameters
     async fn validate_parameters(&self, params: &serde_json::Value) -> Result<()> {
+        debug!(
+            tool_name = %self.metadata().name,
+            params = %params,
+            "Validating tool parameters"
+        );
         // Basic validation implementation
         let schema = self.schema();
 

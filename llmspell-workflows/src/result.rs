@@ -10,20 +10,43 @@ use std::time::Duration;
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub enum WorkflowError {
     /// A step in the workflow failed to execute
-    StepExecutionFailed { step_name: String, reason: String },
+    StepExecutionFailed {
+        /// Name of the step that failed
+        step_name: String,
+        /// Reason for the failure
+        reason: String,
+    },
     /// The workflow timed out
-    Timeout { duration: Duration, message: String },
+    Timeout {
+        /// Duration before timeout occurred
+        duration: Duration,
+        /// Descriptive timeout message
+        message: String,
+    },
     /// A condition evaluation failed
     ConditionFailed {
+        /// Name of the condition that failed
         condition_name: String,
+        /// Error details from condition evaluation
         error: String,
     },
     /// State access failed
-    StateAccessFailed { operation: String, error: String },
+    StateAccessFailed {
+        /// State operation that failed (e.g., "read", "write")
+        operation: String,
+        /// Error details from state access
+        error: String,
+    },
     /// Configuration error
-    ConfigurationError { message: String },
+    ConfigurationError {
+        /// Configuration error message
+        message: String,
+    },
     /// General workflow error
-    General { message: String },
+    General {
+        /// General error message
+        message: String,
+    },
 }
 
 impl fmt::Display for WorkflowError {
@@ -59,10 +82,15 @@ impl std::error::Error for WorkflowError {}
 /// Workflow type identifier for result categorization
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub enum WorkflowType {
+    /// Sequential workflow execution
     Sequential,
+    /// Parallel workflow execution
     Parallel,
+    /// Conditional workflow execution
     Conditional,
+    /// Loop workflow execution
     Loop,
+    /// Custom workflow type with name
     Custom(String),
 }
 

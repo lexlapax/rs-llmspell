@@ -11,6 +11,8 @@ use serde_json::Value;
 use std::collections::HashMap;
 use std::sync::Arc;
 use tokio::sync::{broadcast, RwLock};
+use tracing::instrument;
+use tracing::{error, info};
 
 /// Context-aware event
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -230,6 +232,7 @@ impl ContextEventBus {
     /// Returns an error if:
     /// - Event broadcast fails
     /// - Event persistence fails (if enabled)
+    #[instrument(skip(self))]
     pub async fn publish(&self, event: ContextEvent) -> Result<()> {
         // Add to history
         {
@@ -251,6 +254,7 @@ impl ContextEventBus {
     /// # Errors
     ///
     /// Returns an error if subscription fails
+    #[instrument(skip(handler, self))]
     pub async fn subscribe(
         &self,
         context_scope: ContextScope,
@@ -277,6 +281,7 @@ impl ContextEventBus {
     /// # Errors
     ///
     /// Returns an error if subscription not found
+    #[instrument(skip(self))]
     pub async fn unsubscribe(&self, subscription_id: &str) -> Result<()> {
         let mut subscriptions = self.subscriptions.write().await;
         subscriptions.retain(|sub| sub.id != subscription_id);
@@ -290,18 +295,21 @@ impl ContextEventBus {
     }
 
     /// Get event history by type
+    #[instrument(skip(self))]
     pub async fn history_by_type(&self, event_type: &str) -> Vec<ContextEvent> {
         let history = self.history.read().await;
         history.get_by_type(event_type)
     }
 
     /// Get event history by context
+    #[instrument(skip(self))]
     pub async fn history_by_context(&self, context: &ContextScope) -> Vec<ContextEvent> {
         let history = self.history.read().await;
         history.get_by_context(context)
     }
 
     /// Dispatch event to registered handlers
+    #[instrument(skip(self))]
     async fn dispatch_to_handlers(&self, event: ContextEvent) -> Result<()> {
         let subscriptions = self.subscriptions.read().await;
 
@@ -358,7 +366,7 @@ impl ContextEventBus {
         // Wait for all handlers to complete
         for task in tasks {
             if let Err(e) = task.await {
-                eprintln!("Handler task failed: {e:?}");
+                error!("Handler task failed: {e:?}");
             }
         }
 
@@ -366,6 +374,7 @@ impl ContextEventBus {
     }
 
     /// Get event bus statistics
+    #[instrument(skip(self))]
     pub async fn stats(&self) -> EventBusStats {
         let subscriptions = self.subscriptions.read().await;
         let history = self.history.read().await;
@@ -413,8 +422,9 @@ impl EventHandler for LoggingEventHandler {
     /// # Errors
     ///
     /// Returns an error if logging fails
+    #[instrument(skip(self))]
     async fn handle(&self, event: ContextEvent, _context: ExecutionContext) -> Result<()> {
-        tracing::info!(
+        info!(
             event_type = %event.event_type,
             event_id = %event.id,
             source = %event.source_context,
@@ -441,6 +451,7 @@ mod tests {
 
     #[async_trait]
     impl EventHandler for TestHandler {
+        #[instrument(skip(self))]
         async fn handle(&self, event: ContextEvent, _context: ExecutionContext) -> Result<()> {
             let mut received = self.received.write().await;
             received.push(event);

@@ -38,6 +38,8 @@ use llmspell_utils::{
 use serde::{Deserialize, Serialize};
 use serde_json::{json, Value as JsonValue};
 use std::collections::HashMap;
+use std::time::Instant;
+use tracing::{debug, error, info, instrument, warn};
 
 /// Graph types supported by the tool
 #[derive(Debug, Clone)]
@@ -90,6 +92,15 @@ impl GraphBuilderTool {
     /// Create a new graph builder tool
     #[must_use]
     pub fn new() -> Self {
+        info!(
+            max_nodes = 10_000,
+            max_edges = 50_000,
+            max_json_size_mb = 10,
+            supported_operations = 6, // create_graph, add_node, add_edge, analyze, export_json, import_json
+            supported_graph_types = 2, // directed, undirected
+            phase = "Phase 7 (basic graph operations)",
+            "Creating GraphBuilderTool"
+        );
         Self {
             metadata: ComponentMetadata::new(
                 "graph-builder".to_string(),
@@ -122,15 +133,32 @@ impl GraphBuilderTool {
     }
 
     /// Add node to graph
+    #[allow(clippy::cognitive_complexity)]
     fn add_node_to_graph(
         &self,
         mut graph: SerializableGraph,
-        node_id: String,
+        node_id: &str,
         label: Option<String>,
         data: Option<JsonValue>,
     ) -> Result<SerializableGraph> {
+        let add_node_start = Instant::now();
+        debug!(
+            operation = "add_node",
+            node_id = %node_id,
+            has_label = label.is_some(),
+            has_data = data.is_some(),
+            current_nodes = graph.nodes.len(),
+            max_nodes = self.max_nodes,
+            "Starting add node operation"
+        );
+
         // Check if node already exists
         if graph.nodes.iter().any(|n| n.id == node_id) {
+            warn!(
+                operation = "add_node",
+                node_id = %node_id,
+                "Node with specified ID already exists"
+            );
             return Err(validation_error(
                 format!("Node with id '{node_id}' already exists"),
                 Some("node_id".to_string()),
@@ -139,6 +167,12 @@ impl GraphBuilderTool {
 
         // Check node limit
         if graph.nodes.len() >= self.max_nodes {
+            error!(
+                operation = "add_node",
+                current_nodes = graph.nodes.len(),
+                max_nodes = self.max_nodes,
+                "Maximum number of nodes reached"
+            );
             return Err(validation_error(
                 format!("Maximum number of nodes reached: {}", self.max_nodes),
                 Some("max_nodes".to_string()),
@@ -147,7 +181,7 @@ impl GraphBuilderTool {
 
         // Add the node
         graph.nodes.push(NodeData {
-            id: node_id,
+            id: node_id.to_string(),
             label,
             data,
         });
@@ -163,6 +197,16 @@ impl GraphBuilderTool {
             }
         }
 
+        let add_node_duration_ms = add_node_start.elapsed().as_millis();
+        debug!(
+            operation = "add_node",
+            node_id = %node_id,
+            total_nodes = graph.nodes.len(),
+            success = true,
+            duration_ms = add_node_duration_ms,
+            "Add node operation completed successfully"
+        );
+
         Ok(graph)
     }
 
@@ -170,44 +214,96 @@ impl GraphBuilderTool {
     fn add_edge_to_graph(
         &self,
         mut graph: SerializableGraph,
-        from: String,
-        to: String,
+        from: &str,
+        to: &str,
         label: Option<String>,
         weight: Option<f64>,
         data: Option<JsonValue>,
     ) -> Result<SerializableGraph> {
-        // Check if nodes exist
+        let add_edge_start = Instant::now();
+        debug!(
+            operation = "add_edge",
+            from = %from,
+            to = %to,
+            has_label = label.is_some(),
+            has_weight = weight.is_some(),
+            has_data = data.is_some(),
+            current_edges = graph.edges.len(),
+            max_edges = self.max_edges,
+            "Starting add edge operation"
+        );
+
+        Self::validate_edge_nodes(&graph, from, to)?;
+        self.validate_edge_limit(&graph)?;
+
+        // Add the edge
+        graph.edges.push(EdgeData {
+            from: from.to_string(),
+            to: to.to_string(),
+            label,
+            weight,
+            data,
+        });
+
+        Self::update_graph_metadata(&mut graph);
+
+        let add_edge_duration_ms = add_edge_start.elapsed().as_millis();
+        debug!(
+            operation = "add_edge",
+            from = %from,
+            to = %to,
+            total_edges = graph.edges.len(),
+            success = true,
+            duration_ms = add_edge_duration_ms,
+            "Add edge operation completed successfully"
+        );
+
+        Ok(graph)
+    }
+
+    fn validate_edge_nodes(graph: &SerializableGraph, from: &str, to: &str) -> Result<()> {
         if !graph.nodes.iter().any(|n| n.id == from) {
+            warn!(
+                operation = "add_edge",
+                from = %from,
+                "Source node does not exist"
+            );
             return Err(validation_error(
                 format!("Source node '{from}' does not exist"),
                 Some("from".to_string()),
             ));
         }
         if !graph.nodes.iter().any(|n| n.id == to) {
+            warn!(
+                operation = "add_edge",
+                to = %to,
+                "Target node does not exist"
+            );
             return Err(validation_error(
                 format!("Target node '{to}' does not exist"),
                 Some("to".to_string()),
             ));
         }
+        Ok(())
+    }
 
-        // Check edge limit
+    fn validate_edge_limit(&self, graph: &SerializableGraph) -> Result<()> {
         if graph.edges.len() >= self.max_edges {
+            error!(
+                operation = "add_edge",
+                current_edges = graph.edges.len(),
+                max_edges = self.max_edges,
+                "Maximum number of edges reached"
+            );
             return Err(validation_error(
                 format!("Maximum number of edges reached: {}", self.max_edges),
                 Some("max_edges".to_string()),
             ));
         }
+        Ok(())
+    }
 
-        // Add the edge
-        graph.edges.push(EdgeData {
-            from,
-            to,
-            label,
-            weight,
-            data,
-        });
-
-        // Update metadata
+    fn update_graph_metadata(graph: &mut SerializableGraph) {
         if let Some(ref mut meta) = graph.metadata {
             if let Some(meta_obj) = meta.as_object_mut() {
                 meta_obj.insert("edge_count".to_string(), json!(graph.edges.len()));
@@ -217,8 +313,6 @@ impl GraphBuilderTool {
                 );
             }
         }
-
-        Ok(graph)
     }
 
     /// Analyze graph structure
@@ -290,10 +384,14 @@ impl GraphBuilderTool {
         })
     }
 
-    /// Import graph from JSON
-    async fn import_graph_from_json(&self, json_str: &str) -> Result<SerializableGraph> {
-        // Validate JSON size
+    fn validate_json_size(&self, json_str: &str) -> Result<()> {
         if json_str.len() > self.max_json_size {
+            error!(
+                operation = "import_graph",
+                json_size = json_str.len(),
+                max_json_size = self.max_json_size,
+                "JSON size exceeds maximum limit"
+            );
             return Err(validation_error(
                 format!(
                     "JSON too large: {} bytes (max: {} bytes)",
@@ -303,26 +401,10 @@ impl GraphBuilderTool {
                 Some("input".to_string()),
             ));
         }
+        Ok(())
+    }
 
-        // Parse JSON with timeout
-        let graph: SerializableGraph =
-            with_timeout(std::time::Duration::from_secs(10), async move {
-                serde_json::from_str(json_str).map_err(|e| {
-                    tool_error(
-                        format!("JSON parsing failed: {e}"),
-                        Some("json_parse".to_string()),
-                    )
-                })
-            })
-            .await
-            .map_err(|_| {
-                tool_error(
-                    "JSON parsing timed out after 10 seconds".to_string(),
-                    Some("timeout".to_string()),
-                )
-            })??;
-
-        // Validate graph constraints
+    fn validate_graph_constraints(&self, graph: &SerializableGraph) -> Result<()> {
         if graph.nodes.len() > self.max_nodes {
             return Err(validation_error(
                 format!(
@@ -345,23 +427,91 @@ impl GraphBuilderTool {
             ));
         }
 
-        // Validate edge references
+        Ok(())
+    }
+
+    fn validate_edge_references(graph: &SerializableGraph) -> Result<()> {
         let node_ids: std::collections::HashSet<String> =
             graph.nodes.iter().map(|n| n.id.clone()).collect();
+
         for edge in &graph.edges {
             if !node_ids.contains(&edge.from) {
+                error!(
+                    operation = "import_graph",
+                    edge_from = %edge.from,
+                    "Edge references non-existent source node"
+                );
                 return Err(validation_error(
                     format!("Edge references non-existent node: {}", edge.from),
                     Some("edges".to_string()),
                 ));
             }
             if !node_ids.contains(&edge.to) {
+                error!(
+                    operation = "import_graph",
+                    edge_to = %edge.to,
+                    "Edge references non-existent target node"
+                );
                 return Err(validation_error(
                     format!("Edge references non-existent node: {}", edge.to),
                     Some("edges".to_string()),
                 ));
             }
         }
+
+        Ok(())
+    }
+
+    /// Import graph from JSON
+    #[instrument(skip(self))]
+    async fn import_graph_from_json(&self, json_str: &str) -> Result<SerializableGraph> {
+        let import_start = Instant::now();
+        debug!(
+            operation = "import_graph",
+            json_size = json_str.len(),
+            max_json_size = self.max_json_size,
+            "Starting graph JSON import"
+        );
+
+        // Validate JSON size
+        self.validate_json_size(json_str)?;
+
+        // Parse JSON with timeout
+        let graph: SerializableGraph =
+            with_timeout(std::time::Duration::from_secs(10), async move {
+                serde_json::from_str(json_str).map_err(|e| {
+                    tool_error(
+                        format!("JSON parsing failed: {e}"),
+                        Some("json_parse".to_string()),
+                    )
+                })
+            })
+            .await
+            .map_err(|_| {
+                tool_error(
+                    "JSON parsing timed out after 10 seconds".to_string(),
+                    Some("timeout".to_string()),
+                )
+            })??;
+
+        // Validate graph constraints
+        self.validate_graph_constraints(&graph)?;
+
+        // Validate edge references
+        let validation_start = Instant::now();
+        Self::validate_edge_references(&graph)?;
+
+        let import_duration_ms = import_start.elapsed().as_millis();
+        let validation_duration_ms = validation_start.elapsed().as_millis();
+        info!(
+            operation = "import_graph",
+            nodes_imported = graph.nodes.len(),
+            edges_imported = graph.edges.len(),
+            graph_type = %graph.graph_type,
+            validation_duration_ms,
+            total_duration_ms = import_duration_ms,
+            "Graph JSON import completed successfully"
+        );
 
         Ok(graph)
     }
@@ -380,6 +530,13 @@ impl GraphBuilderTool {
 
 impl Default for GraphBuilderTool {
     fn default() -> Self {
+        info!(
+            tool_name = "graph-builder",
+            category = "Tool",
+            phase = "Phase 3 (comprehensive instrumentation)",
+            "Creating GraphBuilderTool"
+        );
+
         Self::new()
     }
 }
@@ -391,11 +548,19 @@ impl BaseAgent for GraphBuilderTool {
     }
 
     #[allow(clippy::too_many_lines)]
+    #[instrument(skip(_context, input, self), fields(tool = %self.metadata().name))]
     async fn execute_impl(
         &self,
         input: AgentInput,
         _context: ExecutionContext,
     ) -> Result<AgentOutput> {
+        let start = Instant::now();
+        info!(
+            input_size = input.text.len(),
+            has_params = !input.parameters.is_empty(),
+            "Executing graph builder tool"
+        );
+
         // Create resource tracker for this execution
         let limits = ResourceLimits {
             max_memory_bytes: Some(100 * 1024 * 1024), // 100MB for graph processing
@@ -414,6 +579,11 @@ impl BaseAgent for GraphBuilderTool {
 
         // Extract operation type
         let operation = extract_string_with_default(params, "operation", "create_graph");
+
+        debug!(
+            operation = %operation,
+            "Processing graph builder operation"
+        );
 
         // Execute based on operation
         let result = match operation {
@@ -452,8 +622,7 @@ impl BaseAgent for GraphBuilderTool {
                 let data = extract_optional_object(params, "data")
                     .map(|obj| JsonValue::Object(obj.clone()));
 
-                let updated_graph =
-                    self.add_node_to_graph(graph, node_id.to_string(), label, data)?;
+                let updated_graph = self.add_node_to_graph(graph, node_id, label, data)?;
 
                 json!({
                     "operation": "add_node",
@@ -477,14 +646,7 @@ impl BaseAgent for GraphBuilderTool {
                 let data = extract_optional_object(params, "data")
                     .map(|obj| JsonValue::Object(obj.clone()));
 
-                let updated_graph = self.add_edge_to_graph(
-                    graph,
-                    from.to_string(),
-                    to.to_string(),
-                    label,
-                    weight,
-                    data,
-                )?;
+                let updated_graph = self.add_edge_to_graph(graph, from, to, label, weight, data)?;
 
                 json!({
                     "operation": "add_edge",
@@ -548,6 +710,10 @@ impl BaseAgent for GraphBuilderTool {
                 })
             }
             _ => {
+                error!(
+                    operation = %operation,
+                    "Unsupported graph builder operation requested"
+                );
                 return Err(validation_error(
                     format!("Unsupported operation: {operation}. Supported: create_graph, add_node, add_edge, analyze, export_json, import_json"),
                     Some("operation".to_string()),
@@ -558,9 +724,19 @@ impl BaseAgent for GraphBuilderTool {
         let response = ResponseBuilder::success("graph_builder_execute")
             .with_result(result)
             .build();
+
+        let elapsed_ms = start.elapsed().as_millis();
+        info!(
+            operation = %operation,
+            success = true,
+            duration_ms = elapsed_ms,
+            "Graph builder execution completed successfully"
+        );
+
         Ok(AgentOutput::text(serde_json::to_string_pretty(&response)?))
     }
 
+    #[instrument(skip(self))]
     async fn validate_input(&self, input: &AgentInput) -> Result<()> {
         let params = extract_parameters(input)?;
 
@@ -603,6 +779,7 @@ impl BaseAgent for GraphBuilderTool {
         Ok(())
     }
 
+    #[instrument(skip(self))]
     async fn handle_error(&self, error: LLMSpellError) -> Result<AgentOutput> {
         let error_response = json!({
             "operation": "error",

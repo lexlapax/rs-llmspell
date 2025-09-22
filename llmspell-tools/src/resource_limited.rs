@@ -13,8 +13,11 @@ use llmspell_core::{
     types::{AgentInput, AgentOutput},
     ComponentMetadata, ExecutionContext, LLMSpellError, Result as LLMResult,
 };
-use llmspell_utils::resource_limits::{ResourceLimits, ResourceTracker};
+use llmspell_utils::resource_limits::{MemoryGuard, ResourceLimits, ResourceTracker};
 use serde_json::json;
+use std::fs;
+use std::time::Instant;
+use tracing::{debug, error, info, instrument, trace, warn};
 
 /// Trait for tools that support resource limiting
 #[async_trait]
@@ -38,7 +41,17 @@ pub struct ResourceLimitedTool<T: Tool> {
 
 impl<T: Tool> ResourceLimitedTool<T> {
     /// Create a new resource-limited tool
-    pub const fn new(tool: T, limits: ResourceLimits) -> Self {
+    pub fn new(tool: T, limits: ResourceLimits) -> Self {
+        info!(
+            tool_category = ?tool.category(),
+            tool_security = ?tool.security_level(),
+            memory_limit_mb = limits.max_memory_bytes.map(|m| m / (1024 * 1024)),
+            cpu_limit_ms = limits.max_cpu_time_ms,
+            file_size_limit_mb = limits.max_file_size_bytes.map(|s| s / (1024 * 1024)),
+            timeout_ms = limits.operation_timeout_ms,
+            max_operations = limits.max_operations,
+            "Creating ResourceLimitedTool wrapper"
+        );
         Self {
             inner: tool,
             limits,
@@ -47,11 +60,13 @@ impl<T: Tool> ResourceLimitedTool<T> {
 
     /// Create with default limits
     pub fn with_defaults(tool: T) -> Self {
+        debug!("Creating ResourceLimitedTool with default limits");
         Self::new(tool, ResourceLimits::default())
     }
 
     /// Create with strict limits
     pub fn with_strict_limits(tool: T) -> Self {
+        debug!("Creating ResourceLimitedTool with strict limits");
         Self::new(tool, ResourceLimits::strict())
     }
 }
@@ -62,44 +77,112 @@ impl<T: Tool + Send + Sync> BaseAgent for ResourceLimitedTool<T> {
         self.inner.metadata()
     }
 
+    #[instrument(skip(self))]
     async fn execute_impl(
         &self,
         input: AgentInput,
         context: ExecutionContext,
     ) -> LLMResult<AgentOutput> {
+        let start = Instant::now();
+        info!(
+            input_size = input.text.len(),
+            has_params = !input.parameters.is_empty(),
+            memory_limit_mb = self.limits.max_memory_bytes.map(|m| m / (1024 * 1024)),
+            cpu_limit_ms = self.limits.max_cpu_time_ms,
+            timeout_ms = self.limits.operation_timeout_ms,
+            "Executing ResourceLimitedTool wrapper"
+        );
+
         let tracker = ResourceTracker::new(self.limits.clone());
+
+        debug!(
+            concurrent_limit = self.limits.max_concurrent_ops,
+            "Tracking concurrent operation start"
+        );
 
         // Track concurrent operation
         let _guard = tracker.track_concurrent_start()?;
 
+        debug!(
+            inner_tool = %self.inner.metadata().name,
+            "Executing inner tool with resource tracking"
+        );
+
         // Execute with timeout
+        let execution_start = Instant::now();
         let result = tracker
             .with_timeout(self.inner.execute(input, context))
-            .await??;
+            .await;
 
-        // Add resource metrics to output
-        let metrics = tracker.get_metrics();
-        let metrics_json = json!({
-            "resource_usage": {
-                "memory_bytes": metrics.memory_bytes,
-                "cpu_time_ms": metrics.cpu_time_ms,
-                "operations_count": metrics.operations_count,
-            }
-        });
+        let execution_duration_ms = execution_start.elapsed().as_millis();
 
-        let output_text = format!(
-            "{}
+        match result {
+            Ok(Ok(inner_result)) => {
+                // Add resource metrics to output
+                let metrics = tracker.get_metrics();
+                trace!(
+                    memory_bytes = metrics.memory_bytes,
+                    cpu_time_ms = metrics.cpu_time_ms,
+                    operations_count = metrics.operations_count,
+                    "Collected resource usage metrics"
+                );
+
+                let metrics_json = json!({
+                    "resource_usage": {
+                        "memory_bytes": metrics.memory_bytes,
+                        "cpu_time_ms": metrics.cpu_time_ms,
+                        "operations_count": metrics.operations_count,
+                    }
+                });
+
+                let output_text = format!(
+                    "{}
 \nResource usage: {}",
-            result.text,
-            serde_json::to_string_pretty(&metrics_json).unwrap()
-        );
-        Ok(AgentOutput::text(output_text))
+                    inner_result.text,
+                    serde_json::to_string_pretty(&metrics_json).unwrap()
+                );
+
+                let total_duration_ms = start.elapsed().as_millis();
+                info!(
+                    inner_tool = %self.inner.metadata().name,
+                    execution_duration_ms,
+                    total_duration_ms,
+                    memory_used = metrics.memory_bytes,
+                    cpu_used_ms = metrics.cpu_time_ms,
+                    operations_count = metrics.operations_count,
+                    success = true,
+                    "ResourceLimitedTool execution completed successfully"
+                );
+
+                Ok(AgentOutput::text(output_text))
+            }
+            Ok(Err(e)) => {
+                error!(
+                    inner_tool = %self.inner.metadata().name,
+                    execution_duration_ms,
+                    error = %e,
+                    "Inner tool execution failed"
+                );
+                Err(e)
+            }
+            Err(e) => {
+                error!(
+                    inner_tool = %self.inner.metadata().name,
+                    execution_duration_ms,
+                    error = %e,
+                    "Resource-limited execution failed (timeout or resource limit)"
+                );
+                Err(e)
+            }
+        }
     }
 
+    #[instrument(skip(self))]
     async fn validate_input(&self, input: &AgentInput) -> LLMResult<()> {
         self.inner.validate_input(input).await
     }
 
+    #[instrument(skip(self))]
     async fn handle_error(&self, error: LLMSpellError) -> LLMResult<AgentOutput> {
         self.inner.handle_error(error).await
     }
@@ -162,12 +245,19 @@ impl<T: Tool> ResourceLimitExt for T {}
 /// - Operation tracking fails due to resource limits
 /// - File size exceeds configured limits
 #[allow(clippy::unused_async)]
+#[allow(clippy::cognitive_complexity)]
+#[instrument(skip(tracker))]
 pub async fn check_file_operation(
     tracker: &ResourceTracker,
     path: &std::path::Path,
     operation: &str,
 ) -> LLMResult<()> {
-    use std::fs;
+    let check_start = Instant::now();
+    debug!(
+        operation = %operation,
+        file_path = %path.display(),
+        "Starting file operation check"
+    );
 
     tracker.track_operation()?;
 
@@ -175,9 +265,51 @@ pub async fn check_file_operation(
         if let Ok(metadata) = fs::metadata(path) {
             #[allow(clippy::cast_possible_truncation)]
             let size = metadata.len() as usize;
-            tracker.check_file_size(size)?;
+
+            debug!(
+                operation = %operation,
+                file_path = %path.display(),
+                file_size_bytes = size,
+                file_size_mb = size / (1024 * 1024),
+                "Checking file size against limits"
+            );
+
+            match tracker.check_file_size(size) {
+                Ok(()) => {
+                    trace!(
+                        operation = %operation,
+                        file_path = %path.display(),
+                        file_size_bytes = size,
+                        "File size check passed"
+                    );
+                }
+                Err(e) => {
+                    error!(
+                        operation = %operation,
+                        file_path = %path.display(),
+                        file_size_bytes = size,
+                        error = %e,
+                        "File size check failed"
+                    );
+                    return Err(e);
+                }
+            }
+        } else {
+            warn!(
+                operation = %operation,
+                file_path = %path.display(),
+                "Could not read file metadata"
+            );
         }
     }
+
+    let check_duration_ms = check_start.elapsed().as_millis();
+    debug!(
+        operation = %operation,
+        file_path = %path.display(),
+        duration_ms = check_duration_ms,
+        "File operation check completed successfully"
+    );
 
     Ok(())
 }
@@ -197,17 +329,99 @@ pub fn track_data_processing<T, F>(
 where
     F: FnOnce() -> LLMResult<T>,
 {
-    use llmspell_utils::resource_limits::MemoryGuard;
+    let processing_start = Instant::now();
+    debug!(
+        estimated_size_bytes = estimated_size,
+        estimated_size_mb = estimated_size / (1024 * 1024),
+        "Starting data processing with memory tracking"
+    );
 
-    // Track the memory allocation
-    let _guard = MemoryGuard::new(tracker, estimated_size)?;
+    let _guard = create_memory_guard(tracker, estimated_size)?;
+    perform_resource_checks(tracker)?;
 
-    // Track the operation
-    tracker.track_operation()?;
-    tracker.check_cpu_time()?;
+    trace!("All resource checks passed, executing operation");
 
-    // Execute the operation
-    operation()
+    execute_tracked_operation(operation, estimated_size, processing_start)
+}
+
+fn create_memory_guard(
+    tracker: &ResourceTracker,
+    estimated_size: usize,
+) -> LLMResult<MemoryGuard<'_>> {
+    let guard_result = MemoryGuard::new(tracker, estimated_size);
+    match guard_result {
+        Ok(guard) => {
+            trace!(
+                allocated_bytes = estimated_size,
+                "Memory guard created successfully"
+            );
+            Ok(guard)
+        }
+        Err(e) => {
+            error!(
+                estimated_size_bytes = estimated_size,
+                error = %e,
+                "Failed to create memory guard - memory limit exceeded"
+            );
+            Err(e)
+        }
+    }
+}
+
+fn perform_resource_checks(tracker: &ResourceTracker) -> LLMResult<()> {
+    if let Err(e) = tracker.track_operation() {
+        error!(
+            error = %e,
+            "Failed to track operation - operation limit exceeded"
+        );
+        return Err(e);
+    }
+
+    if let Err(e) = tracker.check_cpu_time() {
+        error!(
+            error = %e,
+            "CPU time limit exceeded before operation"
+        );
+        return Err(e);
+    }
+
+    Ok(())
+}
+
+fn execute_tracked_operation<T, F>(
+    operation: F,
+    estimated_size: usize,
+    processing_start: Instant,
+) -> LLMResult<T>
+where
+    F: FnOnce() -> LLMResult<T>,
+{
+    let operation_start = Instant::now();
+    let result = operation();
+    let operation_duration_ms = operation_start.elapsed().as_millis();
+    let total_processing_duration_ms = processing_start.elapsed().as_millis();
+
+    match result {
+        Ok(value) => {
+            debug!(
+                estimated_size_bytes = estimated_size,
+                operation_duration_ms,
+                total_duration_ms = total_processing_duration_ms,
+                "Data processing completed successfully"
+            );
+            Ok(value)
+        }
+        Err(e) => {
+            error!(
+                estimated_size_bytes = estimated_size,
+                operation_duration_ms,
+                total_duration_ms = total_processing_duration_ms,
+                error = %e,
+                "Data processing operation failed"
+            );
+            Err(e)
+        }
+    }
 }
 
 #[cfg(test)]
@@ -238,6 +452,7 @@ mod tests {
             &self.metadata
         }
 
+        #[instrument(skip(self))]
         async fn execute_impl(
             &self,
             _input: AgentInput,
@@ -247,10 +462,12 @@ mod tests {
             Ok(AgentOutput::text("Success"))
         }
 
+        #[instrument(skip(self))]
         async fn validate_input(&self, _input: &AgentInput) -> LLMResult<()> {
             Ok(())
         }
 
+        #[instrument(skip(self))]
         async fn handle_error(&self, error: LLMSpellError) -> LLMResult<AgentOutput> {
             Ok(AgentOutput::text(format!("Error: {error}")))
         }

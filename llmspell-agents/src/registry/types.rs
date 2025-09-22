@@ -8,6 +8,7 @@ use async_trait::async_trait;
 use llmspell_core::traits::agent::Agent;
 use serde::{Deserialize, Serialize};
 use std::{collections::HashMap, sync::Arc};
+use tracing::instrument;
 
 /// Agent metadata for registry tracking
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -191,6 +192,7 @@ impl Default for InMemoryAgentRegistry {
 
 #[async_trait]
 impl AgentRegistry for InMemoryAgentRegistry {
+    #[instrument(skip(agent, self))]
     async fn register_agent(
         &self,
         id: String,
@@ -206,6 +208,7 @@ impl AgentRegistry for InMemoryAgentRegistry {
         Ok(())
     }
 
+    #[instrument(skip(self))]
     async fn unregister_agent(&self, id: &str) -> Result<()> {
         let mut agents = self.agents.write().await;
         let mut metadata_store = self.metadata.write().await;
@@ -218,22 +221,26 @@ impl AgentRegistry for InMemoryAgentRegistry {
         Ok(())
     }
 
+    #[instrument(skip(self))]
     async fn get_agent(&self, id: &str) -> Result<Option<Arc<dyn Agent>>> {
         let agents = self.agents.read().await;
         Ok(agents.get(id).cloned())
     }
 
+    #[instrument(skip(self))]
     async fn get_metadata(&self, id: &str) -> Result<Option<AgentMetadata>> {
         let metadata = self.metadata.read().await;
         Ok(metadata.get(id).cloned())
     }
 
+    #[instrument(skip(self))]
     async fn update_metadata(&self, id: &str, metadata: AgentMetadata) -> Result<()> {
         let mut metadata_store = self.metadata.write().await;
         metadata_store.insert(id.to_string(), metadata);
         Ok(())
     }
 
+    #[instrument(skip(self))]
     async fn update_status(&self, id: &str, status: AgentStatus) -> Result<()> {
         let mut metadata = self.metadata.write().await;
 
@@ -247,6 +254,7 @@ impl AgentRegistry for InMemoryAgentRegistry {
         Ok(())
     }
 
+    #[instrument(skip(self))]
     async fn query_agents(&self, query: &AgentQuery) -> Result<Vec<AgentMetadata>> {
         let metadata = self.metadata.read().await;
         let mut results = Vec::new();
@@ -296,16 +304,19 @@ impl AgentRegistry for InMemoryAgentRegistry {
         Ok(results)
     }
 
+    #[instrument(skip(self))]
     async fn list_agent_ids(&self) -> Result<Vec<String>> {
         let metadata = self.metadata.read().await;
         Ok(metadata.keys().cloned().collect())
     }
 
+    #[instrument(skip(self))]
     async fn count_agents(&self) -> Result<usize> {
         let metadata = self.metadata.read().await;
         Ok(metadata.len())
     }
 
+    #[instrument(skip(self))]
     async fn update_metrics(&self, id: &str, metrics: AgentMetrics) -> Result<()> {
         let mut metadata = self.metadata.write().await;
 
@@ -319,6 +330,7 @@ impl AgentRegistry for InMemoryAgentRegistry {
         Ok(())
     }
 
+    #[instrument(skip(self))]
     async fn heartbeat(&self, id: &str) -> Result<()> {
         let mut heartbeats = self.heartbeats.write().await;
 
@@ -330,6 +342,7 @@ impl AgentRegistry for InMemoryAgentRegistry {
         }
     }
 
+    #[instrument(skip(self))]
     async fn exists(&self, id: &str) -> Result<bool> {
         let metadata = self.metadata.read().await;
         Ok(metadata.contains_key(id))

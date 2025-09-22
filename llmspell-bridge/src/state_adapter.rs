@@ -3,7 +3,7 @@
 
 use async_trait::async_trait;
 use llmspell_core::{traits::state::StateAccess, LLMSpellError, Result};
-use llmspell_state_persistence::{
+use llmspell_kernel::state::{
     config::StorageBackendType, manager::StateManager, PersistenceConfig, StateScope,
 };
 use serde_json::Value;
@@ -55,7 +55,7 @@ impl StateManagerAdapter {
             "memory" => StorageBackendType::Memory,
             "sled" => {
                 // Create sled config from settings
-                StorageBackendType::Sled(llmspell_state_persistence::config::SledConfig {
+                StorageBackendType::Sled(llmspell_kernel::state::config::SledConfig {
                     path: std::path::PathBuf::from("./data/sled"),
                     cache_capacity: 64 * 1024 * 1024, // 64MB
                     use_compression: true,
@@ -63,7 +63,7 @@ impl StateManagerAdapter {
             }
             "rocksdb" => {
                 // Create rocksdb config from settings
-                StorageBackendType::RocksDB(llmspell_state_persistence::config::RocksDBConfig {
+                StorageBackendType::RocksDB(llmspell_kernel::state::config::RocksDBConfig {
                     path: std::path::PathBuf::from("./data/rocksdb"),
                     create_if_missing: true,
                     optimize_for_point_lookup: false,
@@ -87,14 +87,14 @@ impl StateManagerAdapter {
             encryption: None, // TODO: Add encryption config if needed
             backup_retention: std::time::Duration::from_secs(7 * 24 * 60 * 60), // 7 days
             backup: config.backup.as_ref().map(|b| {
-                llmspell_state_persistence::config::BackupConfig {
+                llmspell_kernel::state::config::BackupConfig {
                     backup_dir: std::path::PathBuf::from(
                         b.backup_dir
                             .clone()
                             .unwrap_or_else(|| "./backups".to_string()),
                     ),
                     compression_enabled: b.compression_enabled,
-                    compression_type: llmspell_state_persistence::config::CompressionType::Zstd,
+                    compression_type: llmspell_kernel::state::config::CompressionType::Zstd,
                     compression_level: b.compression_level,
                     encryption_enabled: false,
                     max_backups: b.max_backups,
@@ -103,7 +103,7 @@ impl StateManagerAdapter {
                     full_backup_interval: std::time::Duration::from_secs(86400), // 1 day
                 }
             }),
-            performance: llmspell_state_persistence::config::PerformanceConfig::default(),
+            performance: llmspell_kernel::state::config::PerformanceConfig::default(),
         };
 
         // Create state manager

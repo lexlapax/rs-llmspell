@@ -330,7 +330,7 @@ fn bench_mixed_operations(c: &mut Criterion) {
                     "parameters",
                     json!({
                         "operation": "query",
-                        "input": {"data": "test value", "id": 123},
+                        "input": r#"{"data": "test value", "id": 123}"#,
                         "query": ".data"
                     }),
                 );
@@ -358,7 +358,7 @@ fn bench_mixed_operations(c: &mut Criterion) {
                     json!({
                         "operation": "hash",
                         "algorithm": "sha256",
-                        "data": "TEST VALUE"
+                        "input": "TEST VALUE"
                     }),
                 );
                 let hash_result = hash_tool

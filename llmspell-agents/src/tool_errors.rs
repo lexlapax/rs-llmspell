@@ -8,6 +8,8 @@ use serde_json::Value as JsonValue;
 use std::collections::HashMap;
 use std::fmt;
 use std::time::Duration;
+use tracing::instrument;
+use tracing::{debug, info, warn};
 
 /// Comprehensive error type for tool integration operations
 #[derive(Debug, Clone)]
@@ -490,7 +492,10 @@ impl std::error::Error for ToolIntegrationError {}
 
 impl ErrorContext {
     /// Create new error context
-    pub fn new(operation: impl Into<String>, component: impl Into<String>) -> Self {
+    pub fn new(
+        operation: impl Into<String> + std::fmt::Debug,
+        component: impl Into<String> + std::fmt::Debug,
+    ) -> Self {
         Self {
             operation: operation.into(),
             component: component.into(),
@@ -510,7 +515,7 @@ impl ErrorContext {
 
     /// Add context data
     #[must_use]
-    pub fn with_data(mut self, key: impl Into<String>, value: JsonValue) -> Self {
+    pub fn with_data(mut self, key: impl Into<String> + std::fmt::Debug, value: JsonValue) -> Self {
         self.context_data.insert(key.into(), value);
         self
     }
@@ -569,7 +574,7 @@ impl ToolErrorHandler {
     #[must_use]
     pub fn with_tool_strategy(
         mut self,
-        tool_name: impl Into<String>,
+        tool_name: impl Into<String> + std::fmt::Debug,
         strategy: ErrorRecoveryStrategy,
     ) -> Self {
         self.tool_strategies.insert(tool_name.into(), strategy);
@@ -581,6 +586,7 @@ impl ToolErrorHandler {
     /// # Errors
     ///
     /// Returns an error if the error handler fails or if the error is unrecoverable
+    #[instrument(skip(self))]
     pub async fn handle_error(
         &self,
         error: ToolIntegrationError,
@@ -610,16 +616,16 @@ impl ToolErrorHandler {
                     .await
             }
             ErrorRecoveryStrategy::BestEffort => {
-                tracing::warn!("Error occurred but continuing with best effort: {}", error);
+                warn!("Error occurred but continuing with best effort: {}", error);
                 Ok(Some(JsonValue::Null))
             }
             ErrorRecoveryStrategy::CollectErrors => {
-                tracing::warn!("Error collected for later reporting: {}", error);
+                warn!("Error collected for later reporting: {}", error);
                 Ok(None)
             }
             ErrorRecoveryStrategy::Custom(_strategy_name) => {
                 // Custom strategies would be implemented here
-                tracing::warn!("Custom recovery strategy not implemented, failing fast");
+                warn!("Custom recovery strategy not implemented, failing fast");
                 Err(error.into_llmspell_error())
             }
         }
@@ -627,6 +633,7 @@ impl ToolErrorHandler {
 
     /// Attempt recovery from an error
     #[allow(clippy::cognitive_complexity)]
+    #[instrument(skip(context, self))]
     async fn attempt_recovery(
         &self,
         error: ToolIntegrationError,
@@ -651,17 +658,17 @@ impl ToolErrorHandler {
                 continue;
             }
 
-            tracing::info!("Attempting recovery action: {:?}", action);
+            info!("Attempting recovery action: {:?}", action);
 
             match self.execute_recovery_action(action, context, timeout).await {
                 Ok(result) => {
                     context.record_error(error.clone(), Some(action.clone()), true);
-                    tracing::info!("Recovery successful");
+                    info!("Recovery successful");
                     return Ok(Some(result));
                 }
                 Err(recovery_error) => {
                     context.record_error(error.clone(), Some(action.clone()), false);
-                    tracing::warn!("Recovery action failed: {}", recovery_error);
+                    warn!("Recovery action failed: {}", recovery_error);
                 }
             }
         }
@@ -671,15 +678,20 @@ impl ToolErrorHandler {
     }
 
     /// Execute a specific recovery action
+    #[instrument(skip(self, _context))]
     async fn execute_recovery_action(
         &self,
         action: &RecoveryAction,
         _context: &ErrorContext,
-        _timeout: Duration,
+        timeout: Duration,
     ) -> Result<JsonValue> {
+        debug!("Executing recovery action with timeout: {:?}", timeout);
+
         match action {
             RecoveryAction::Retry { delay, .. } => {
-                tokio::time::sleep(*delay).await;
+                // Ensure retry delay doesn't exceed timeout
+                let actual_delay = (*delay).min(timeout);
+                tokio::time::sleep(actual_delay).await;
                 // Return indication that retry should be attempted
                 Ok(JsonValue::String("retry".to_string()))
             }
@@ -697,7 +709,7 @@ impl ToolErrorHandler {
                     .collect(),
             )),
             RecoveryAction::RequestUserIntervention { message, .. } => {
-                tracing::warn!("User intervention requested: {}", message);
+                warn!("User intervention requested: {}", message);
                 Err(LLMSpellError::Component {
                     message: format!("User intervention required: {message}"),
                     source: None,

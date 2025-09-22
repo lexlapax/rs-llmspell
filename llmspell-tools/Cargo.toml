@@ -14,8 +14,7 @@ workspace = true
 llmspell-core = { path = "../llmspell-core" }
 llmspell-utils = { path = "../llmspell-utils" }
 llmspell-hooks = { path = "../llmspell-hooks" }
-llmspell-state-persistence = { path = "../llmspell-state-persistence" }
-llmspell-state-traits = { path = "../llmspell-state-traits" }
+llmspell-kernel = { path = "../llmspell-kernel" }
 tokio.workspace = true
 async-trait.workspace = true
 serde.workspace = true
@@ -136,6 +135,7 @@ futures = "0.3"
 criterion = { version = "0.5", features = ["html_reports"] }
 llmspell-bridge = { path = "../llmspell-bridge" }
 llmspell-testing = { path = "../llmspell-testing" }
+tracing-subscriber.workspace = true
 
 [[bench]]
 name = "tool_initialization"

@@ -8,8 +8,8 @@ mod artifact_tests {
     use llmspell_config::providers::ProviderManagerConfig;
     use llmspell_events::bus::EventBus;
     use llmspell_hooks::{HookExecutor, HookRegistry};
-    use llmspell_sessions::{SessionManager, SessionManagerConfig};
-    use llmspell_state_persistence::StateManager;
+    use llmspell_kernel::sessions::{SessionManager, SessionManagerConfig};
+    use llmspell_kernel::state::StateManager;
     use llmspell_storage::MemoryBackend;
     use mlua::Lua;
     use std::fs;

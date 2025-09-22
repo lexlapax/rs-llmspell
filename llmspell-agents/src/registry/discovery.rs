@@ -9,6 +9,7 @@ use super::{
 };
 use anyhow::Result;
 use std::{collections::HashMap, sync::Arc};
+use tracing::instrument;
 
 /// Advanced search criteria
 #[derive(Debug, Clone, Default)]
@@ -112,6 +113,7 @@ impl<R: AgentRegistry> Discovery<R> {
     /// - Agent querying fails
     /// - Metadata retrieval fails
     /// - Scoring calculation fails
+    #[instrument(skip(self))]
     pub async fn search(&self, criteria: &SearchCriteria) -> Result<Vec<SearchResult>> {
         // First, get basic results from registry
         let basic_results = self.registry.query_agents(&criteria.base_query).await?;
@@ -217,6 +219,7 @@ impl<R: AgentRegistry> Discovery<R> {
     /// Returns an error if:
     /// - Reference agent metadata is not found
     /// - Agent similarity search fails
+    #[instrument(skip(self))]
     pub async fn find_similar(&self, agent_id: &str, limit: usize) -> Result<Vec<SearchResult>> {
         // Get the reference agent
         let Some(reference) = self.registry.get_metadata(agent_id).await? else {
@@ -250,6 +253,7 @@ impl<R: AgentRegistry> Discovery<R> {
     /// # Panics
     ///
     /// Panics if `DateTime` conversion fails
+    #[instrument(skip(self))]
     pub async fn get_recommendations(
         &self,
         context: &RecommendationContext,
@@ -306,12 +310,14 @@ impl<R: AgentRegistry> Discovery<R> {
     }
 
     /// Cache extended metadata
+    #[instrument(skip(self))]
     pub async fn cache_extended_metadata(&self, id: String, metadata: ExtendedAgentMetadata) {
         let mut cache = self.metadata_cache.write().await;
         cache.insert(id, metadata);
     }
 
     /// Get extended metadata from cache
+    #[instrument(skip(self))]
     async fn get_extended_metadata(&self, id: &str) -> Option<ExtendedAgentMetadata> {
         let cache = self.metadata_cache.read().await;
         cache.get(id).cloned()

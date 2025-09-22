@@ -10,7 +10,7 @@ use std::sync::Arc;
 use std::time::SystemTime;
 use uuid::Uuid;
 
-use llmspell_state_traits::{StateManager, StateScope};
+use llmspell_core::state::{StateManager, StateScope};
 
 /// Hook-specific metadata for enhanced storage
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -77,6 +77,7 @@ impl HookMetadata {
 }
 
 /// Hook storage adapter for metadata persistence
+#[derive(Debug)]
 pub struct HookStorageAdapter {
     /// In-memory cache for fast access
     metadata_cache: Arc<RwLock<HashMap<String, HookMetadata>>>,

@@ -37,6 +37,8 @@ use llmspell_utils::{
     response::ResponseBuilder,
 };
 use serde_json::{json, Value as JsonValue};
+use std::time::Instant;
+use tracing::{debug, error, info, instrument, warn};
 
 /// Citation Formatter tool for academic bibliography management
 #[derive(Debug, Clone)]
@@ -66,6 +68,16 @@ impl CitationFormatterTool {
             "vancouver".to_string(),
         ];
 
+        info!(
+            supported_styles_count = supported_styles.len(),
+            max_entries = 1000,
+            max_entry_length_kb = 5,
+            supported_formats = 2,    // YAML, BibTeX
+            supported_operations = 3, // format_citation, validate_bibliography, list_styles
+            phase = "Phase 7 (simplified implementation)",
+            "Creating CitationFormatterTool"
+        );
+
         Self {
             metadata: ComponentMetadata::new(
                 "citation-formatter".to_string(),
@@ -80,9 +92,25 @@ impl CitationFormatterTool {
 
     /// Parse YAML bibliography (Phase 7 basic validation)
     #[allow(clippy::unused_async)]
+    #[allow(clippy::cognitive_complexity)]
+    #[instrument(skip(self))]
     async fn parse_yaml_bibliography(&self, yaml_content: &str) -> Result<String> {
+        let parse_start = Instant::now();
+        debug!(
+            format = "yaml",
+            content_length = yaml_content.len(),
+            max_total_size = self.max_entry_length * self.max_entries,
+            "Starting YAML bibliography parsing"
+        );
+
         // Validate input length
         if yaml_content.len() > self.max_entry_length * self.max_entries {
+            error!(
+                format = "yaml",
+                content_length = yaml_content.len(),
+                max_total_size = self.max_entry_length * self.max_entries,
+                "Bibliography size exceeds maximum limit"
+            );
             return Err(validation_error(
                 format!(
                     "Bibliography too large: {} chars (max: {} chars)",
@@ -95,6 +123,7 @@ impl CitationFormatterTool {
 
         // Phase 7 basic YAML validation
         if yaml_content.trim().is_empty() {
+            warn!(format = "yaml", "Empty YAML content provided");
             return Err(validation_error(
                 "Empty YAML content".to_string(),
                 Some("input".to_string()),
@@ -103,20 +132,65 @@ impl CitationFormatterTool {
 
         // Basic YAML syntax check
         if !yaml_content.contains(':') {
+            warn!(
+                format = "yaml",
+                content_preview = &yaml_content[..yaml_content.len().min(100)],
+                "Invalid YAML format - missing key-value pairs"
+            );
             return Err(validation_error(
                 "Invalid YAML format - missing key-value pairs".to_string(),
                 Some("input".to_string()),
             ));
         }
 
+        let parse_duration_ms = parse_start.elapsed().as_millis();
+        debug!(
+            format = "yaml",
+            content_length = yaml_content.len(),
+            success = true,
+            duration_ms = parse_duration_ms,
+            "YAML bibliography parsing completed successfully"
+        );
+
         Ok(yaml_content.to_string())
     }
 
     /// Parse BibTeX bibliography (Phase 7 basic validation)
     #[allow(clippy::unused_async)]
+    #[instrument(skip(self))]
     async fn parse_bibtex_bibliography(&self, bibtex_content: &str) -> Result<String> {
-        // Validate input length
+        let parse_start = Instant::now();
+        debug!(
+            format = "bibtex",
+            content_length = bibtex_content.len(),
+            max_total_size = self.max_entry_length * self.max_entries,
+            "Starting BibTeX bibliography parsing"
+        );
+
+        self.validate_bibtex_length(bibtex_content)?;
+        Self::validate_bibtex_content(bibtex_content)?;
+        Self::validate_bibtex_syntax(bibtex_content)?;
+
+        let parse_duration_ms = parse_start.elapsed().as_millis();
+        debug!(
+            format = "bibtex",
+            content_length = bibtex_content.len(),
+            success = true,
+            duration_ms = parse_duration_ms,
+            "BibTeX bibliography parsing completed successfully"
+        );
+
+        Ok(bibtex_content.to_string())
+    }
+
+    fn validate_bibtex_length(&self, bibtex_content: &str) -> Result<()> {
         if bibtex_content.len() > self.max_entry_length * self.max_entries {
+            error!(
+                format = "bibtex",
+                content_length = bibtex_content.len(),
+                max_total_size = self.max_entry_length * self.max_entries,
+                "Bibliography size exceeds maximum limit"
+            );
             return Err(validation_error(
                 format!(
                     "Bibliography too large: {} chars (max: {} chars)",
@@ -126,27 +200,37 @@ impl CitationFormatterTool {
                 Some("input".to_string()),
             ));
         }
+        Ok(())
+    }
 
-        // Phase 7 basic BibTeX validation
+    fn validate_bibtex_content(bibtex_content: &str) -> Result<()> {
         if bibtex_content.trim().is_empty() {
+            warn!(format = "bibtex", "Empty BibTeX content provided");
             return Err(validation_error(
                 "Empty BibTeX content".to_string(),
                 Some("input".to_string()),
             ));
         }
+        Ok(())
+    }
 
-        // Basic BibTeX syntax check
+    fn validate_bibtex_syntax(bibtex_content: &str) -> Result<()> {
         if !bibtex_content.contains('@') || !bibtex_content.contains('{') {
+            warn!(
+                format = "bibtex",
+                content_preview = &bibtex_content[..bibtex_content.len().min(100)],
+                "Invalid BibTeX format - missing @ or {{}} syntax"
+            );
             return Err(validation_error(
-                "Invalid BibTeX format - missing @ or {} syntax".to_string(),
+                "Invalid BibTeX format - missing @ or {{}} syntax".to_string(),
                 Some("input".to_string()),
             ));
         }
-
-        Ok(bibtex_content.to_string())
+        Ok(())
     }
 
     /// Format citation in specified style
+    #[instrument(skip(self))]
     async fn format_citation(
         &self,
         bibliography: &str,
@@ -154,6 +238,16 @@ impl CitationFormatterTool {
         style: &str,
         cite_keys: Option<Vec<String>>,
     ) -> Result<JsonValue> {
+        let format_start = Instant::now();
+        debug!(
+            operation = "format_citation",
+            format = %format,
+            style = %style,
+            bibliography_length = bibliography.len(),
+            cite_keys_count = cite_keys.as_ref().map_or(0, std::vec::Vec::len),
+            "Starting citation formatting"
+        );
+
         // Parse bibliography based on format
         let _bibliography = match format {
             "yaml" => self.parse_yaml_bibliography(bibliography).await?,
@@ -191,24 +285,51 @@ impl CitationFormatterTool {
             reference_list.push(citation);
         }
 
-        Ok(json!({
+        let result = json!({
             "style": style,
             "format": format,
             "citations": citations,
             "reference_list": reference_list,
             "entry_count": 1, // Simplified for Phase 7
             "note": format!("Phase 7 basic {style} formatting - Full hayagriva CSL processor integration coming in Phase 8")
-        }))
+        });
+
+        let format_duration_ms = format_start.elapsed().as_millis();
+        info!(
+            operation = "format_citation",
+            format = %format,
+            style = %style,
+            citations_generated = citations.len(),
+            success = true,
+            duration_ms = format_duration_ms,
+            "Citation formatting completed successfully"
+        );
+
+        Ok(result)
     }
 
     // Removed format_entry_basic for Phase 7 simplification
 
     /// Validate bibliography format and entries
+    #[instrument(skip(self))]
     async fn validate_bibliography(&self, bibliography: &str, format: &str) -> Result<JsonValue> {
+        let validation_start = Instant::now();
+        debug!(
+            operation = "validate_bibliography",
+            format = %format,
+            bibliography_length = bibliography.len(),
+            "Starting bibliography validation"
+        );
+
         let _bibliography = match format {
             "yaml" => self.parse_yaml_bibliography(bibliography).await?,
             "bibtex" => self.parse_bibtex_bibliography(bibliography).await?,
             _ => {
+                error!(
+                    operation = "validate_bibliography",
+                    format = %format,
+                    "Unsupported bibliography format"
+                );
                 return Err(validation_error(
                     format!("Unsupported format: {format}"),
                     Some("format".to_string()),
@@ -217,7 +338,7 @@ impl CitationFormatterTool {
         };
 
         // For Phase 7 implementation, provide basic validation
-        Ok(json!({
+        let result = json!({
             "format": format,
             "total_entries": 1, // Simplified
             "valid_entries": 1,
@@ -232,7 +353,20 @@ impl CitationFormatterTool {
             ],
             "is_valid": true,
             "note": "Phase 7 basic validation - Full hayagriva validation coming in Phase 8"
-        }))
+        });
+
+        let validation_duration_ms = validation_start.elapsed().as_millis();
+        info!(
+            operation = "validate_bibliography",
+            format = %format,
+            total_entries = 1,
+            valid_entries = 1,
+            success = true,
+            duration_ms = validation_duration_ms,
+            "Bibliography validation completed successfully"
+        );
+
+        Ok(result)
     }
 
     /// List supported citation styles
@@ -252,6 +386,13 @@ impl CitationFormatterTool {
 
 impl Default for CitationFormatterTool {
     fn default() -> Self {
+        info!(
+            tool_name = "citation-formatter",
+            category = "Tool",
+            phase = "Phase 3 (comprehensive instrumentation)",
+            "Creating CitationFormatterTool"
+        );
+
         Self::new()
     }
 }
@@ -262,11 +403,19 @@ impl BaseAgent for CitationFormatterTool {
         &self.metadata
     }
 
+    #[instrument(skip(_context, input, self), fields(tool = %self.metadata().name))]
     async fn execute_impl(
         &self,
         input: AgentInput,
         _context: ExecutionContext,
     ) -> Result<AgentOutput> {
+        let start = Instant::now();
+        info!(
+            input_size = input.text.len(),
+            has_params = !input.parameters.is_empty(),
+            "Executing citation formatter tool"
+        );
+
         // Create resource tracker for this execution
         let limits = ResourceLimits {
             max_memory_bytes: Some(20 * 1024 * 1024), // 20MB for bibliography processing
@@ -285,6 +434,11 @@ impl BaseAgent for CitationFormatterTool {
 
         // Extract operation type
         let operation = extract_string_with_default(params, "operation", "format_citation");
+
+        debug!(
+            operation = %operation,
+            "Processing citation formatter operation"
+        );
 
         // Execute based on operation
         let result = match operation {
@@ -339,6 +493,10 @@ impl BaseAgent for CitationFormatterTool {
                 })
             }
             _ => {
+                error!(
+                    operation = %operation,
+                    "Unsupported citation formatter operation requested"
+                );
                 return Err(validation_error(
                     format!("Unsupported operation: {operation}. Supported: format_citation, validate_bibliography, list_styles"),
                     Some("operation".to_string()),
@@ -349,9 +507,19 @@ impl BaseAgent for CitationFormatterTool {
         let response = ResponseBuilder::success("citation_formatter_execute")
             .with_result(result)
             .build();
+
+        let elapsed_ms = start.elapsed().as_millis();
+        info!(
+            operation = %operation,
+            success = true,
+            duration_ms = elapsed_ms,
+            "Citation formatter execution completed successfully"
+        );
+
         Ok(AgentOutput::text(serde_json::to_string_pretty(&response)?))
     }
 
+    #[instrument(skip(self))]
     async fn validate_input(&self, input: &AgentInput) -> Result<()> {
         let params = extract_parameters(input)?;
 
@@ -399,6 +567,7 @@ impl BaseAgent for CitationFormatterTool {
         Ok(())
     }
 
+    #[instrument(skip(self))]
     async fn handle_error(&self, error: LLMSpellError) -> Result<AgentOutput> {
         let error_response = json!({
             "operation": "error",

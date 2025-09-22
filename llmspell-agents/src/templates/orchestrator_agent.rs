@@ -17,6 +17,7 @@ use llmspell_core::{
 };
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
+use tracing::instrument;
 
 /// Orchestration strategy types
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -559,6 +560,7 @@ impl AgentTemplate for OrchestratorAgentTemplate {
         &self.schema
     }
 
+    #[instrument(skip(self))]
     async fn instantiate(
         &self,
         mut params: TemplateInstantiationParams,
@@ -693,6 +695,7 @@ impl BaseAgent for MockOrchestratorAgent {
         &self.metadata
     }
 
+    #[instrument(skip(self))]
     async fn execute_impl(
         &self,
         _input: AgentInput,
@@ -707,10 +710,12 @@ impl BaseAgent for MockOrchestratorAgent {
         })
     }
 
+    #[instrument(skip(self))]
     async fn validate_input(&self, _input: &AgentInput) -> Result<(), LLMSpellError> {
         Ok(())
     }
 
+    #[instrument(skip(self))]
     async fn handle_error(&self, error: LLMSpellError) -> Result<AgentOutput, LLMSpellError> {
         Ok(AgentOutput {
             text: format!("Orchestrator error handled: {error}"),

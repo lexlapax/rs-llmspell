@@ -9,6 +9,7 @@ use std::sync::Arc;
 use tokio::sync::RwLock;
 
 /// In-memory storage backend
+#[derive(Debug)]
 pub struct MemoryBackend {
     data: Arc<RwLock<HashMap<String, Vec<u8>>>>,
 }

@@ -72,6 +72,9 @@ pub async fn validate_config(
         OutputFormat::Json => {
             println!("{}", serde_json::to_string_pretty(&validation_result)?);
         }
+        OutputFormat::Yaml => {
+            println!("{}", serde_yaml::to_string(&validation_result)?);
+        }
         OutputFormat::Text | OutputFormat::Pretty => {
             println!("Configuration validation:");
             println!("  File: {}", actual_path);

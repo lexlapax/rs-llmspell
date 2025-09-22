@@ -21,8 +21,9 @@ use llmspell_utils::{
 };
 use serde::{Deserialize, Serialize};
 use serde_json::{json, Value};
+use std::time::Instant;
 use tera::{Context as TeraContext, Tera};
-use tracing::info;
+use tracing::{debug, info, instrument, trace};
 
 /// Supported template engines
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
@@ -126,12 +127,35 @@ impl TemplateEngineTool {
     /// Create a new template engine tool
     #[must_use]
     pub fn new() -> Self {
+        info!(
+            tool_name = "template-engine-tool",
+            default_engine = "tera",
+            supported_engines = 2,    // Tera, Handlebars
+            max_template_size_mb = 1, // 1MB default
+            max_context_size_mb = 10, // 10MB default
+            max_render_time_seconds = 5,
+            auto_escape = true,
+            allow_custom_filters = true,
+            security_level = "Restricted",
+            category = "Utility",
+            phase = "Phase 3 (comprehensive instrumentation)",
+            "Creating TemplateEngineTool with default configuration"
+        );
         Self::with_config(TemplateEngineConfig::default())
     }
 
     /// Create with custom configuration
     #[must_use]
     pub fn with_config(config: TemplateEngineConfig) -> Self {
+        debug!(
+            default_engine = %config.default_engine,
+            auto_escape = config.auto_escape,
+            max_template_size_bytes = config.max_template_size,
+            max_context_size_bytes = config.max_context_size,
+            max_render_time_ms = config.max_render_time_ms,
+            allow_custom_filters = config.allow_custom_filters,
+            "Creating TemplateEngineTool with custom configuration"
+        );
         Self {
             metadata: ComponentMetadata::new(
                 "template-engine-tool".to_string(),
@@ -310,7 +334,231 @@ impl TemplateEngineTool {
 
 impl Default for TemplateEngineTool {
     fn default() -> Self {
+        info!(
+            tool_name = "template-engine",
+            category = "Tool",
+            phase = "Phase 3 (comprehensive instrumentation)",
+            "Creating TemplateEngineTool"
+        );
+
         Self::new()
+    }
+}
+
+impl TemplateEngineTool {
+    fn extract_template_params(params: &Value) -> Result<(String, Value)> {
+        let template = extract_required_string(params, "input")?;
+        trace!(
+            template_length = template.len(),
+            template_preview = %&template[..template.len().min(100)],
+            "Extracted template parameter"
+        );
+
+        let context = extract_optional_object(params, "context").map_or_else(
+            || {
+                debug!("No context provided, using empty object");
+                Value::Object(serde_json::Map::new())
+            },
+            |obj| {
+                debug!(
+                    context_keys = obj.len(),
+                    context_size_estimate = serde_json::to_string(obj).unwrap_or_default().len(),
+                    "Extracted context parameter"
+                );
+                Value::Object(obj.clone())
+            },
+        );
+
+        Ok((template.to_string(), context))
+    }
+
+    fn determine_template_engine(
+        &self,
+        params: &Value,
+        template: &str,
+        auto_detect: bool,
+    ) -> Result<TemplateEngine> {
+        let engine_detection_start = Instant::now();
+
+        let engine = self.get_template_engine(params, template, auto_detect)?;
+
+        let engine_detection_duration_ms = engine_detection_start.elapsed().as_millis();
+        debug!(
+            engine = %engine,
+            auto_detect,
+            detection_duration_ms = engine_detection_duration_ms,
+            "Template engine determined"
+        );
+
+        Ok(engine)
+    }
+
+    fn get_template_engine(
+        &self,
+        params: &Value,
+        template: &str,
+        auto_detect: bool,
+    ) -> Result<TemplateEngine> {
+        extract_optional_string(params, "engine").map_or_else(
+            || {
+                if auto_detect {
+                    Ok(Self::detect_engine_from_template(template))
+                } else {
+                    Ok(self.get_default_engine())
+                }
+            },
+            Self::parse_engine_from_params,
+        )
+    }
+
+    fn parse_engine_from_params(engine_str: &str) -> Result<TemplateEngine> {
+        let e = engine_str.parse::<TemplateEngine>()?;
+        debug!(
+            engine = %e,
+            source = "parameter",
+            "Template engine specified in parameters"
+        );
+        Ok(e)
+    }
+
+    fn detect_engine_from_template(template: &str) -> TemplateEngine {
+        let detected = Self::detect_engine(template);
+        debug!(
+            detected_engine = %detected,
+            template_preview = %&template[..template.len().min(50)],
+            source = "auto_detection",
+            "Auto-detected template engine from syntax"
+        );
+        detected
+    }
+
+    fn get_default_engine(&self) -> TemplateEngine {
+        debug!(
+            default_engine = %self.config.default_engine,
+            source = "configuration",
+            "Using configured default engine"
+        );
+        self.config.default_engine
+    }
+
+    fn validate_and_sanitize(&self, template: &str, context: &Value) -> Result<String> {
+        self.perform_size_validation(template, context)?;
+        self.perform_template_sanitization(template)
+    }
+
+    fn perform_size_validation(&self, template: &str, context: &Value) -> Result<()> {
+        let validation_start = Instant::now();
+        debug!(
+            template_size_bytes = template.len(),
+            context_size_estimate = serde_json::to_string(context).unwrap_or_default().len(),
+            max_template_size = self.config.max_template_size,
+            max_context_size = self.config.max_context_size,
+            "Starting size validation"
+        );
+
+        self.validate_sizes(template, context)?;
+        let validation_duration_ms = validation_start.elapsed().as_millis();
+        debug!(validation_duration_ms, "Size validation passed");
+        Ok(())
+    }
+
+    fn perform_template_sanitization(&self, template: &str) -> Result<String> {
+        let sanitization_start = Instant::now();
+        debug!("Starting template sanitization");
+
+        let safe_template = self.sanitize_template(template)?;
+        let sanitization_duration_ms = sanitization_start.elapsed().as_millis();
+        debug!(
+            original_length = template.len(),
+            sanitized_length = safe_template.len(),
+            sanitization_duration_ms,
+            "Template sanitization completed"
+        );
+
+        Ok(safe_template)
+    }
+
+    fn render_with_engine(
+        &self,
+        engine: TemplateEngine,
+        template: &str,
+        context: &Value,
+    ) -> Result<String> {
+        let rendering_start = Instant::now();
+        debug!(
+            engine = %engine,
+            template_size = template.len(),
+            "Starting template rendering"
+        );
+
+        let result = self.execute_engine_rendering(engine, template, context)?;
+
+        let rendering_duration_ms = rendering_start.elapsed().as_millis();
+        debug!(
+            engine = %engine,
+            template_size = template.len(),
+            output_size = result.len(),
+            rendering_duration_ms,
+            "Template rendering completed successfully"
+        );
+
+        Ok(result)
+    }
+
+    fn execute_engine_rendering(
+        &self,
+        engine: TemplateEngine,
+        template: &str,
+        context: &Value,
+    ) -> Result<String> {
+        match engine {
+            TemplateEngine::Tera => self.render_with_tera(template, context),
+            TemplateEngine::Handlebars => self.render_with_handlebars(template, context),
+        }
+    }
+
+    fn render_with_tera(&self, template: &str, context: &Value) -> Result<String> {
+        trace!("Using Tera rendering engine");
+        self.render_tera(template, context)
+    }
+
+    fn render_with_handlebars(&self, template: &str, context: &Value) -> Result<String> {
+        trace!("Using Handlebars rendering engine");
+        self.render_handlebars(template, context)
+    }
+
+    fn build_template_response(
+        engine: TemplateEngine,
+        template_len: usize,
+        context: &Value,
+        rendered: &str,
+    ) -> Result<Value> {
+        let response_building_start = Instant::now();
+        let context_size = serde_json::to_string(context)?.len();
+
+        debug!(
+            rendered_size = rendered.len(),
+            context_size, "Building response"
+        );
+
+        let response = ResponseBuilder::success("render_template")
+            .with_message(format!(
+                "Template rendered successfully using {engine} engine"
+            ))
+            .with_result(json!({
+                "rendered": rendered,
+                "engine": engine.to_string(),
+                "template_length": template_len,
+                "context_size": context_size
+            }))
+            .with_metadata("engine", json!(engine.to_string()))
+            .with_metadata("template_length", json!(template_len))
+            .build();
+
+        let response_building_duration_ms = response_building_start.elapsed().as_millis();
+        debug!(response_building_duration_ms, "Response building completed");
+
+        Ok(response)
     }
 }
 
@@ -320,62 +568,65 @@ impl BaseAgent for TemplateEngineTool {
         &self.metadata
     }
 
+    #[instrument(skip(_context, input, self), fields(tool = %self.metadata().name))]
     async fn execute_impl(
         &self,
         input: AgentInput,
         _context: ExecutionContext,
     ) -> Result<AgentOutput> {
+        let execute_start = Instant::now();
+        info!(
+            tool_name = %self.metadata().name,
+            input_text_length = input.text.len(),
+            has_parameters = !input.parameters.is_empty(),
+            "Starting TemplateEngineTool execution"
+        );
+
         // Get parameters using shared utility
         let params = extract_parameters(&input)?;
-
-        // Extract parameters
-        let template = extract_required_string(params, "input")?;
-        let context = extract_optional_object(params, "context").map_or_else(
-            || Value::Object(serde_json::Map::new()),
-            |obj| Value::Object(obj.clone()),
+        debug!(
+            param_count = params.as_object().map_or(0, serde_json::Map::len),
+            "Successfully extracted parameters"
         );
+
+        // Extract template and context
+        let (template, context) = Self::extract_template_params(params)?;
         let auto_detect = extract_bool_with_default(params, "auto_detect", true);
 
-        let engine = if let Some(engine_str) = extract_optional_string(params, "engine") {
-            engine_str.parse::<TemplateEngine>()?
-        } else if auto_detect {
-            Self::detect_engine(template)
-        } else {
-            self.config.default_engine
-        };
+        // Determine which engine to use
+        let engine = self.determine_template_engine(params, &template, auto_detect)?;
 
-        info!("Rendering template with {} engine", engine);
+        info!(
+            engine = %engine,
+            template_length = template.len(),
+            context_size = serde_json::to_string(&context).unwrap_or_default().len(),
+            auto_detect,
+            "Rendering template with selected engine"
+        );
 
-        // Validate sizes
-        self.validate_sizes(template, &context)?;
-
-        // Sanitize template
-        let safe_template = self.sanitize_template(template)?;
+        // Validate and sanitize
+        let safe_template = self.validate_and_sanitize(&template, &context)?;
 
         // Render template
-        let rendered = match engine {
-            TemplateEngine::Tera => self.render_tera(&safe_template, &context)?,
-            TemplateEngine::Handlebars => self.render_handlebars(&safe_template, &context)?,
-        };
+        let rendered = self.render_with_engine(engine, &safe_template, &context)?;
 
-        // Create response using ResponseBuilder
-        let response = ResponseBuilder::success("render_template")
-            .with_message(format!(
-                "Template rendered successfully using {engine} engine"
-            ))
-            .with_result(json!({
-                "rendered": rendered,
-                "engine": engine.to_string(),
-                "template_length": template.len(),
-                "context_size": serde_json::to_string(&context)?.len()
-            }))
-            .with_metadata("engine", json!(engine.to_string()))
-            .with_metadata("template_length", json!(template.len()))
-            .build();
+        // Build response
+        let response = Self::build_template_response(engine, template.len(), &context, &rendered)?;
+
+        let total_execution_duration_ms = execute_start.elapsed().as_millis();
+        info!(
+            engine = %engine,
+            template_length = template.len(),
+            rendered_size = rendered.len(),
+            total_duration_ms = total_execution_duration_ms,
+            success = true,
+            "TemplateEngineTool execution completed successfully"
+        );
 
         Ok(AgentOutput::text(serde_json::to_string_pretty(&response)?))
     }
 
+    #[instrument(skip(self))]
     async fn validate_input(&self, input: &AgentInput) -> Result<()> {
         if input.parameters.is_empty() {
             return Err(validation_error(
@@ -386,6 +637,7 @@ impl BaseAgent for TemplateEngineTool {
         Ok(())
     }
 
+    #[instrument(skip(self))]
     async fn handle_error(&self, error: LLMSpellError) -> Result<AgentOutput> {
         Ok(AgentOutput::text(format!(
             "Template rendering error: {error}"

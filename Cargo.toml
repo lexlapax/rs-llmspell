@@ -3,7 +3,7 @@ resolver = "2"
 
 members = [
     "llmspell-cli",
-    "llmspell-core", 
+    "llmspell-core",
     "llmspell-agents",
     "llmspell-tools",
     "llmspell-workflows",
@@ -16,20 +16,19 @@ members = [
     "llmspell-events",
     "llmspell-testing",
     "llmspell-utils",
-    "llmspell-state-persistence",
-    "llmspell-state-traits",
-    "llmspell-sessions",
     "llmspell-rag",
+    "llmspell-tenancy",
+    "llmspell-kernel",
     "examples/rust-developers/extension-pattern-example",
-    "examples/rust-developers/builder-pattern-example", 
+    "examples/rust-developers/builder-pattern-example",
     "examples/rust-developers/custom-tool-example",
     "examples/rust-developers/custom-agent-example",
     "examples/rust-developers/async-patterns-example",
     "examples/rust-developers/integration-test-example"
-, "llmspell-tenancy"]
+]
 
 [workspace.package]
-version = "0.8.0"
+version = "0.9.0"
 edition = "2021"
 authors = ["Lex Lapax<lexlapax@gmail.com>"]
 repository = "https://github.com/lexlapax/rs-llmspell"
@@ -86,6 +85,7 @@ mockall = "0.13"
 proptest = "1.4"
 criterion = { version = "0.5", features = ["html_reports", "async_tokio"] }
 serial_test = "3.1"
+tracing-test = "0.2"
 
 # Storage backends
 sled = "0.34"

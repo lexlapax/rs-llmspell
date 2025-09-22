@@ -18,7 +18,8 @@ use regex::Regex;
 use serde::{Deserialize, Serialize};
 use serde_json::{json, Value};
 use std::collections::HashMap;
-use tracing::info;
+use std::time::Instant;
+use tracing::{debug, error, info, instrument, trace};
 
 /// Validation rule types
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
@@ -165,12 +166,32 @@ impl DataValidationTool {
     /// Create a new data validation tool
     #[must_use]
     pub fn new() -> Self {
+        info!(
+            tool_name = "data-validation-tool",
+            supported_rule_types = 12, // required, type, length, range, pattern, enum, email, url, date, custom, array, object
+            builtin_custom_validators = 3, // phone, uuid, credit_card
+            max_errors_default = 100,
+            fail_fast_default = false,
+            validate_nested_default = true,
+            security_level = "Safe",
+            category = "Utility",
+            phase = "Phase 3 (comprehensive instrumentation)",
+            "Creating DataValidationTool with default configuration"
+        );
         Self::with_config(DataValidationConfig::default())
     }
 
     /// Create with custom configuration
     #[must_use]
     pub fn with_config(config: DataValidationConfig) -> Self {
+        debug!(
+            fail_fast = config.fail_fast,
+            max_errors = config.max_errors,
+            validate_nested = config.validate_nested,
+            custom_messages_count = config.custom_messages.len(),
+            "Creating DataValidationTool with custom configuration"
+        );
+
         let mut tool = Self {
             metadata: ComponentMetadata::new(
                 "data-validation-tool".to_string(),
@@ -181,7 +202,16 @@ impl DataValidationTool {
         };
 
         // Register built-in custom validators
+        let validator_registration_start = Instant::now();
         tool.register_builtin_validators();
+        let validator_registration_duration_ms = validator_registration_start.elapsed().as_millis();
+
+        debug!(
+            registered_validators = tool.custom_validators.len(),
+            registration_duration_ms = validator_registration_duration_ms,
+            "Built-in custom validators registered"
+        );
+
         tool
     }
 
@@ -572,6 +602,13 @@ impl DataValidationTool {
 
 impl Default for DataValidationTool {
     fn default() -> Self {
+        info!(
+            tool_name = "data-validation",
+            category = "Tool",
+            phase = "Phase 3 (comprehensive instrumentation)",
+            "Creating DataValidationTool"
+        );
+
         Self::new()
     }
 }
@@ -582,40 +619,160 @@ impl BaseAgent for DataValidationTool {
         &self.metadata
     }
 
+    #[allow(clippy::too_many_lines)]
+    #[instrument(skip(_context, input, self), fields(tool = %self.metadata().name))]
     async fn execute_impl(
         &self,
         input: AgentInput,
         _context: ExecutionContext,
     ) -> Result<AgentOutput> {
+        let execute_start = Instant::now();
+        info!(
+            tool_name = %self.metadata().name,
+            input_text_length = input.text.len(),
+            has_parameters = !input.parameters.is_empty(),
+            "Starting DataValidationTool execution"
+        );
+
         // Get parameters using shared utility
-        let params = extract_parameters(&input)?;
+        let params = match extract_parameters(&input) {
+            Ok(params) => {
+                debug!(
+                    param_count = params.as_object().map_or(0, serde_json::Map::len),
+                    "Successfully extracted parameters"
+                );
+                params
+            }
+            Err(e) => {
+                error!(
+                    error = %e,
+                    input_text_length = input.text.len(),
+                    "Failed to extract parameters"
+                );
+                return Err(e);
+            }
+        };
 
-        // Extract parameters
-        let data = params.get("input").ok_or_else(|| {
-            validation_error("Missing 'input' parameter", Some("input".to_string()))
-        })?;
+        // Extract data parameter
+        let data = if let Some(data) = params.get("input") {
+            let data_size_estimate = serde_json::to_string(data).unwrap_or_default().len();
+            trace!(
+                data_type = match data {
+                    serde_json::Value::Null => "null",
+                    serde_json::Value::Bool(_) => "boolean",
+                    serde_json::Value::Number(_) => "number",
+                    serde_json::Value::String(_) => "string",
+                    serde_json::Value::Array(_) => "array",
+                    serde_json::Value::Object(_) => "object",
+                },
+                data_size_estimate,
+                "Extracted data parameter"
+            );
+            data
+        } else {
+            error!("Missing 'input' parameter");
+            return Err(validation_error(
+                "Missing 'input' parameter",
+                Some("input".to_string()),
+            ));
+        };
 
-        let rules = params.get("rules").ok_or_else(|| {
-            validation_error("Missing 'rules' parameter", Some("rules".to_string()))
-        })?;
+        // Extract rules parameter
+        let rules = if let Some(rules) = params.get("rules") {
+            trace!(
+                rules_type = match rules {
+                    serde_json::Value::Object(_) => "object",
+                    serde_json::Value::Array(_) => "array",
+                    _ => "other",
+                },
+                "Extracted rules parameter"
+            );
+            rules
+        } else {
+            error!("Missing 'rules' parameter");
+            return Err(validation_error(
+                "Missing 'rules' parameter",
+                Some("rules".to_string()),
+            ));
+        };
 
         // Parse validation rules
+        let rule_parsing_start = Instant::now();
         let validation_rules: ValidationRules =
-            serde_json::from_value(rules.clone()).map_err(|e| {
-                validation_error(
-                    format!("Invalid rules format: {e}"),
-                    Some("rules".to_string()),
-                )
-            })?;
+            match serde_json::from_value::<ValidationRules>(rules.clone()) {
+                Ok(parsed_rules) => {
+                    let rule_parsing_duration_ms = rule_parsing_start.elapsed().as_millis();
+                    debug!(
+                        rule_count = parsed_rules.rules.len(),
+                        rule_parsing_duration_ms, "Successfully parsed validation rules"
+                    );
+                    parsed_rules
+                }
+                Err(e) => {
+                    let rule_parsing_duration_ms = rule_parsing_start.elapsed().as_millis();
+                    error!(
+                        error = %e,
+                        rule_parsing_duration_ms,
+                        "Failed to parse validation rules"
+                    );
+                    return Err(validation_error(
+                        format!("Invalid rules format: {e}"),
+                        Some("rules".to_string()),
+                    ));
+                }
+            };
 
         info!(
-            "Validating data against {} rules",
-            validation_rules.rules.len()
+            rule_count = validation_rules.rules.len(),
+            max_errors = self.config.max_errors,
+            fail_fast = self.config.fail_fast,
+            validate_nested = self.config.validate_nested,
+            "Starting data validation against rules"
         );
 
         // Perform validation
+        let validation_start = Instant::now();
         let mut errors = Vec::new();
+
+        debug!(
+            data_type = match data {
+                serde_json::Value::Null => "null",
+                serde_json::Value::Bool(_) => "boolean",
+                serde_json::Value::Number(_) => "number",
+                serde_json::Value::String(s) => {
+                    if s.len() > 100 {
+                        "long_string"
+                    } else {
+                        "string"
+                    }
+                }
+                serde_json::Value::Array(arr) => {
+                    if arr.len() > 10 {
+                        "large_array"
+                    } else {
+                        "array"
+                    }
+                }
+                serde_json::Value::Object(obj) => {
+                    if obj.len() > 10 {
+                        "large_object"
+                    } else {
+                        "object"
+                    }
+                }
+            },
+            "Starting validation of data"
+        );
+
         self.validate_value("input", data, &validation_rules, &mut errors);
+
+        let validation_duration_ms = validation_start.elapsed().as_millis();
+        debug!(
+            validation_duration_ms,
+            error_count = errors.len(),
+            success = errors.is_empty(),
+            "Data validation completed"
+        );
 
         let result = ValidationResult {
             valid: errors.is_empty(),
@@ -623,6 +780,7 @@ impl BaseAgent for DataValidationTool {
         };
 
         // Create response using ResponseBuilder
+        let response_building_start = Instant::now();
         let response = ResponseBuilder::success("validate_data")
             .with_message(if result.valid {
                 "Data validation passed"
@@ -634,9 +792,24 @@ impl BaseAgent for DataValidationTool {
             .with_metadata("error_count", json!(result.errors.len()))
             .build();
 
+        let response_building_duration_ms = response_building_start.elapsed().as_millis();
+        let total_execution_duration_ms = execute_start.elapsed().as_millis();
+
+        info!(
+            rule_count = validation_rules.rules.len(),
+            error_count = result.errors.len(),
+            validation_passed = result.valid,
+            total_duration_ms = total_execution_duration_ms,
+            validation_duration_ms,
+            response_building_duration_ms,
+            success = true,
+            "DataValidationTool execution completed successfully"
+        );
+
         Ok(AgentOutput::text(serde_json::to_string_pretty(&response)?))
     }
 
+    #[instrument(skip(self))]
     async fn validate_input(&self, input: &AgentInput) -> Result<()> {
         if input.parameters.is_empty() {
             return Err(validation_error(
@@ -647,6 +820,7 @@ impl BaseAgent for DataValidationTool {
         Ok(())
     }
 
+    #[instrument(skip(self))]
     async fn handle_error(&self, error: LLMSpellError) -> Result<AgentOutput> {
         Ok(AgentOutput::text(format!("Validation error: {error}")))
     }

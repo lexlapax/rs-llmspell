@@ -11,7 +11,7 @@ use std::sync::Arc;
 use std::time::{Duration, SystemTime};
 use tokio::sync::{Mutex, RwLock};
 use tokio_util::sync::CancellationToken;
-use tracing::{debug, error, info, warn};
+use tracing::{debug, error, info, instrument, warn};
 
 // Hook system imports (optional - only used if hooks are enabled)
 use llmspell_hooks::circuit_breaker::{BreakerConfig, BreakerState};
@@ -233,7 +233,7 @@ impl StateContext {
 
 /// Trait for handling state transitions
 #[async_trait]
-pub trait StateHandler: Send + Sync {
+pub trait StateHandler: Send + Sync + std::fmt::Debug {
     /// Enter the state
     async fn enter(&self, context: &StateContext) -> Result<()>;
 
@@ -253,6 +253,7 @@ pub trait StateHandler: Send + Sync {
 }
 
 /// Default state handlers
+#[derive(Debug)]
 pub struct DefaultStateHandler {
     state: AgentState,
 }
@@ -266,21 +267,25 @@ impl DefaultStateHandler {
 
 #[async_trait]
 impl StateHandler for DefaultStateHandler {
+    #[instrument(level = "trace", skip(self))]
     async fn enter(&self, context: &StateContext) -> Result<()> {
         debug!("Agent {} entering state {:?}", context.agent_id, self.state);
         Ok(())
     }
 
+    #[instrument(level = "trace", skip(self))]
     async fn exit(&self, context: &StateContext) -> Result<()> {
         debug!("Agent {} exiting state {:?}", context.agent_id, self.state);
         Ok(())
     }
 
+    #[instrument(level = "trace", skip(self))]
     async fn handle(&self, _context: &StateContext) -> Result<()> {
         // Default handler does nothing
         Ok(())
     }
 
+    #[instrument(level = "trace", skip(self))]
     async fn can_transition_to(&self, target: AgentState) -> bool {
         use AgentState::{
             Error, Initializing, Paused, Ready, Recovering, Running, Terminated, Terminating,
@@ -306,6 +311,7 @@ impl StateHandler for DefaultStateHandler {
 }
 
 /// Agent state machine
+#[derive(Debug)]
 pub struct AgentStateMachine {
     agent_id: String,
     current_state: Arc<RwLock<AgentState>>,
@@ -421,11 +427,13 @@ impl AgentStateMachine {
     }
 
     /// Get current state
+    #[instrument(level = "trace", skip(self))]
     pub async fn current_state(&self) -> AgentState {
         *self.current_state.read().await
     }
 
     /// Check if agent is in specific state
+    #[instrument(level = "trace", skip(self))]
     pub async fn is_state(&self, state: AgentState) -> bool {
         *self.current_state.read().await == state
     }
@@ -437,39 +445,75 @@ impl AgentStateMachine {
 
     /// Execute hooks for a state transition phase
     #[allow(clippy::cognitive_complexity)]
+    #[instrument(level = "trace", skip(self))]
     async fn execute_transition_hooks(
         &self,
         state: AgentState,
         is_entering: bool,
         context: &StateContext,
     ) -> Result<()> {
-        // Only execute hooks if enabled and components are available
-        if !self.config.feature_flags.enable_hooks {
+        // Compile-time optimization: if hooks feature is disabled, this becomes a no-op
+        #[cfg(not(feature = "hooks"))]
+        {
+            let _ = (state, is_entering, context);
             return Ok(());
         }
 
-        let Some((hook_executor, hook_registry)) =
-            self.hook_executor.as_ref().zip(self.hook_registry.as_ref())
-        else {
-            return Ok(()); // No hooks configured
-        };
+        #[cfg(feature = "hooks")]
+        {
+            // Fast path: check if hooks are disabled or not configured
+            if !self.config.feature_flags.enable_hooks {
+                return Ok(());
+            }
+
+            let Some((hook_executor, hook_registry)) =
+                self.hook_executor.as_ref().zip(self.hook_registry.as_ref())
+            else {
+                return Ok(()); // No hooks configured
+            };
 
         let hook_point = state_to_hook_point(state, is_entering);
+
+        // Early exit: check if any hooks are registered for this point before building context
+        let hooks = hook_registry.get_hooks(&hook_point);
+        if hooks.is_empty() {
+            return Ok(());
+        }
+
+        // Only build context if we actually have hooks to execute
         let component_id = ComponentId::new(ComponentType::Agent, self.agent_id.clone());
+        let mut hook_context = HookContext::new(hook_point, component_id);
 
-        // Build hook context with full state information
-        let mut hook_context = HookContext::new(hook_point.clone(), component_id);
-
-        // Add metadata about the transition
+        // Optimized metadata building - avoid string formatting where possible
         hook_context.insert_metadata("agent_id".to_string(), self.agent_id.clone());
-        hook_context.insert_metadata(
-            "from_state".to_string(),
-            format!("{:?}", context.current_state),
-        );
-        hook_context.insert_metadata(
-            "to_state".to_string(),
-            format!("{:?}", context.target_state),
-        );
+
+        // Use static strings for common state names to avoid allocations
+        let from_state_str = match context.current_state {
+            AgentState::Uninitialized => "Uninitialized",
+            AgentState::Initializing => "Initializing",
+            AgentState::Ready => "Ready",
+            AgentState::Running => "Running",
+            AgentState::Paused => "Paused",
+            AgentState::Terminated => "Terminated",
+            AgentState::Terminating => "Terminating",
+            AgentState::Error => "Error",
+            AgentState::Recovering => "Recovering",
+        };
+
+        let to_state_str = match context.target_state {
+            AgentState::Uninitialized => "Uninitialized",
+            AgentState::Initializing => "Initializing",
+            AgentState::Ready => "Ready",
+            AgentState::Running => "Running",
+            AgentState::Paused => "Paused",
+            AgentState::Terminated => "Terminated",
+            AgentState::Terminating => "Terminating",
+            AgentState::Error => "Error",
+            AgentState::Recovering => "Recovering",
+        };
+
+        hook_context.insert_metadata("from_state".to_string(), from_state_str.to_string());
+        hook_context.insert_metadata("to_state".to_string(), to_state_str.to_string());
         hook_context.insert_metadata(
             "transition_phase".to_string(),
             if is_entering {
@@ -479,16 +523,11 @@ impl AgentStateMachine {
             },
         );
 
-        // Add any additional metadata from the context
-        for (key, value) in &context.metadata {
-            hook_context.insert_metadata(key.clone(), value.clone());
-        }
-
-        // Get hooks for this point
-        let hooks = hook_registry.get_hooks(&hook_point);
-
-        if hooks.is_empty() {
-            return Ok(());
+        // Only add context metadata if it's non-empty
+        if !context.metadata.is_empty() {
+            for (key, value) in &context.metadata {
+                hook_context.insert_metadata(key.clone(), value.clone());
+            }
         }
 
         // Execute hooks
@@ -556,9 +595,11 @@ impl AgentStateMachine {
                 Ok(())
             }
         }
+        } // End of hooks feature block
     }
 
     /// Cancel an ongoing state transition
+    #[instrument(skip(self))]
     pub async fn cancel_transition(&self, from_state: AgentState, to_state: AgentState) -> bool {
         let transition_id = format!("{}-{:?}-{:?}", self.agent_id, from_state, to_state);
 
@@ -574,6 +615,7 @@ impl AgentStateMachine {
     /// # Errors
     ///
     /// Returns an error if state transition fails
+    #[instrument(level = "trace", skip(self))]
     pub async fn transition_to(&self, target_state: AgentState) -> Result<()> {
         self.transition_to_with_reason(target_state, None).await
     }
@@ -588,6 +630,7 @@ impl AgentStateMachine {
     /// - Hook execution prevents the transition
     /// - Validation fails
     /// - Timeout occurs
+    #[instrument(level = "trace", skip(self))]
     pub async fn transition_to_with_reason(
         &self,
         target_state: AgentState,
@@ -671,6 +714,7 @@ impl AgentStateMachine {
 
     /// Internal method to execute the actual state transition
     #[allow(clippy::too_many_lines)]
+    #[instrument(skip(self))]
     async fn execute_state_transition(
         &self,
         current: AgentState,
@@ -849,6 +893,7 @@ impl AgentStateMachine {
     /// Returns an error if:
     /// - Agent is not in Uninitialized state
     /// - State transition fails
+    #[instrument(level = "trace", skip(self), fields(agent_name = %self.agent_id, state_transition = "initialize"))]
     pub async fn initialize(&self) -> Result<()> {
         if !self.is_state(AgentState::Uninitialized).await {
             return Err(anyhow!(
@@ -883,6 +928,7 @@ impl AgentStateMachine {
     /// Returns an error if:
     /// - Agent is not in Ready or Paused state
     /// - State transition fails
+    #[instrument(level = "trace", skip(self), fields(agent_name = %self.agent_id, state_transition = "start"))]
     pub async fn start(&self) -> Result<()> {
         let current = self.current_state().await;
         if !matches!(current, AgentState::Ready | AgentState::Paused) {
@@ -903,6 +949,7 @@ impl AgentStateMachine {
     /// Returns an error if:
     /// - Agent is not in Running state
     /// - State transition fails
+    #[instrument(level = "debug", skip(self), fields(agent_name = %self.agent_id, state_transition = "pause"))]
     pub async fn pause(&self) -> Result<()> {
         if !self.is_state(AgentState::Running).await {
             return Err(anyhow!("Agent can only be paused from Running state"));
@@ -919,6 +966,7 @@ impl AgentStateMachine {
     /// Returns an error if:
     /// - Agent is not in Paused state
     /// - State transition fails
+    #[instrument(level = "debug", skip(self), fields(agent_name = %self.agent_id, state_transition = "resume"))]
     pub async fn resume(&self) -> Result<()> {
         if !self.is_state(AgentState::Paused).await {
             return Err(anyhow!("Agent can only be resumed from Paused state"));
@@ -935,6 +983,7 @@ impl AgentStateMachine {
     /// Returns an error if:
     /// - Agent is not in Running state
     /// - State transition fails
+    #[instrument(level = "trace", skip(self), fields(agent_name = %self.agent_id, state_transition = "stop"))]
     pub async fn stop(&self) -> Result<()> {
         if !self.is_state(AgentState::Running).await {
             return Err(anyhow!("Agent can only be stopped from Running state"));
@@ -949,6 +998,7 @@ impl AgentStateMachine {
     /// # Errors
     ///
     /// Returns an error if agent cannot be terminated from current state
+    #[instrument(level = "trace", skip(self), fields(agent_name = %self.agent_id, state_transition = "terminate"))]
     pub async fn terminate(&self) -> Result<()> {
         let current = self.current_state().await;
         if !current.can_terminate() {
@@ -983,6 +1033,7 @@ impl AgentStateMachine {
     /// # Errors
     ///
     /// Returns an error if agent is already terminated
+    #[instrument(level = "debug", skip(self), fields(agent_name = %self.agent_id, state_transition = "error", error_message = %error_message))]
     pub async fn error(&self, error_message: String) -> Result<()> {
         let current = self.current_state().await;
         if current == AgentState::Terminated {
@@ -1010,6 +1061,7 @@ impl AgentStateMachine {
     /// - Agent is not in error state
     /// - Maximum recovery attempts exceeded
     /// - State transition fails
+    #[instrument(level = "debug", skip(self), fields(agent_name = %self.agent_id, state_transition = "recover"))]
     pub async fn recover(&self) -> Result<()> {
         if !self.is_state(AgentState::Error).await {
             return Err(anyhow!("Agent can only recover from Error state"));
@@ -1054,24 +1106,28 @@ impl AgentStateMachine {
     }
 
     /// Get transition history
+    #[instrument(skip(self))]
     pub async fn get_transition_history(&self) -> Vec<StateTransition> {
         let history = self.transition_history.lock().await;
         history.clone()
     }
 
     /// Get last error message
+    #[instrument(skip(self))]
     pub async fn get_last_error(&self) -> Option<String> {
         let last_error = self.last_error.lock().await;
         last_error.clone()
     }
 
     /// Get recovery attempt count
+    #[instrument(skip(self))]
     pub async fn get_recovery_attempts(&self) -> usize {
         let attempts = self.recovery_attempts.lock().await;
         *attempts
     }
 
     /// Check if agent is healthy
+    #[instrument(skip(self))]
     pub async fn is_healthy(&self) -> bool {
         self.current_state().await.is_healthy()
     }
@@ -1091,6 +1147,7 @@ impl AgentStateMachine {
     }
 
     /// Get state machine metrics
+    #[instrument(skip(self))]
     pub async fn get_metrics(&self) -> StateMachineMetrics {
         let current_state = self.current_state().await;
         let history = self.transition_history.lock().await;

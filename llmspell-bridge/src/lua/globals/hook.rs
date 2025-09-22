@@ -11,6 +11,7 @@ use llmspell_hooks::{HookContext, HookPoint, HookResult, Language, Priority};
 use mlua::{Function, Lua, Table, UserData, UserDataMethods, Value};
 use std::sync::Arc;
 use tokio::sync::RwLock;
+use tracing::{debug, instrument};
 
 /// Lua representation of a hook handle for cleanup
 struct LuaHookHandle {
@@ -248,11 +249,17 @@ fn parse_priority(s: Option<&String>) -> Priority {
 ///
 /// Returns an error if Lua global injection fails
 #[allow(clippy::too_many_lines)]
+#[instrument(
+    level = "debug",
+    skip(lua, _context, hook_bridge),
+    fields(global_name = "Hook", hook_points = "multiple")
+)]
 pub fn inject_hook_global(
     lua: &Lua,
     _context: &GlobalContext,
     hook_bridge: Arc<HookBridge>,
 ) -> Result<()> {
+    debug!("Injecting Hook global API");
     // Create the Hook table
     let hook_table = lua.create_table().map_err(|e| LLMSpellError::Component {
         message: format!("Failed to create Hook table: {e}"),

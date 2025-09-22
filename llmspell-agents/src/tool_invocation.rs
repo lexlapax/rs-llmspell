@@ -13,6 +13,8 @@ use serde_json::Value as JsonValue;
 use std::sync::Arc;
 use std::time::{Duration, Instant};
 use tokio::time::timeout;
+use tracing::debug;
+use tracing::instrument;
 
 /// Tool invocation wrapper that provides validation, error handling,
 /// and execution tracking for tool calls.
@@ -200,7 +202,10 @@ pub struct ValidationError {
 
 impl ValidationError {
     /// Create a new validation error
-    pub fn new(field: impl Into<String>, message: impl Into<String>) -> Self {
+    pub fn new(
+        field: impl Into<String> + std::fmt::Debug,
+        message: impl Into<String> + std::fmt::Debug,
+    ) -> Self {
         Self {
             field: field.into(),
             message: message.into(),
@@ -211,7 +216,7 @@ impl ValidationError {
 
     /// Add expected value information
     #[must_use]
-    pub fn with_expected(mut self, expected: impl Into<String>) -> Self {
+    pub fn with_expected(mut self, expected: impl Into<String> + std::fmt::Debug) -> Self {
         self.expected = Some(expected.into());
         self
     }
@@ -240,6 +245,7 @@ impl ToolInvoker {
     /// - Security checks fail
     /// - Tool execution fails
     /// - Resource limits are exceeded
+    #[instrument(skip(self, tool))]
     pub async fn invoke(
         &self,
         tool: Arc<dyn Tool>,
@@ -315,7 +321,7 @@ impl ToolInvoker {
 
         // Log execution if debug logging is enabled
         if self.config.feature_flags.debug_logging {
-            tracing::debug!(
+            debug!(
                 "Tool {} executed in {:?}",
                 tool.metadata().name,
                 metrics.execution_time
@@ -337,6 +343,7 @@ impl ToolInvoker {
     /// Returns an error if:
     /// - Tool invocation fails
     /// - Tool returns an error result
+    #[instrument(skip(self, tool))]
     pub async fn invoke_simple(
         &self,
         tool: Arc<dyn Tool>,
@@ -491,6 +498,7 @@ mod tests {
             &self.metadata
         }
 
+        #[instrument(skip(self))]
         async fn execute_impl(
             &self,
             input: AgentInput,
@@ -513,10 +521,12 @@ mod tests {
             Ok(AgentOutput::text(format!("Processed: {text}")))
         }
 
+        #[instrument(skip(self))]
         async fn validate_input(&self, _input: &AgentInput) -> Result<()> {
             Ok(())
         }
 
+        #[instrument(skip(self))]
         async fn handle_error(&self, error: LLMSpellError) -> Result<AgentOutput> {
             Ok(AgentOutput::text(format!("Error: {error}")))
         }

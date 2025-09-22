@@ -43,7 +43,7 @@ pub struct StorageCharacteristics {
 
 /// Unified storage backend trait
 #[async_trait]
-pub trait StorageBackend: Send + Sync {
+pub trait StorageBackend: Send + Sync + std::fmt::Debug {
     /// Get a value by key
     async fn get(&self, key: &str) -> Result<Option<Vec<u8>>>;
 

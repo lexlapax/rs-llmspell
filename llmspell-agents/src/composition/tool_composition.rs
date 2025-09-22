@@ -5,6 +5,8 @@ use llmspell_core::{ExecutionContext, LLMSpellError, Result};
 use serde_json::{Map, Value as JsonValue};
 use std::collections::HashMap;
 use std::time::{Duration, Instant};
+use tracing::instrument;
+use tracing::warn;
 
 /// A composition of tools that can be executed as a workflow
 ///
@@ -267,7 +269,7 @@ pub struct StepMetrics {
 
 impl ToolComposition {
     /// Create a new tool composition
-    pub fn new(name: impl Into<String>) -> Self {
+    pub fn new(name: impl Into<String> + std::fmt::Debug) -> Self {
         let name = name.into();
         Self {
             id: uuid::Uuid::new_v4().to_string(),
@@ -309,7 +311,11 @@ impl ToolComposition {
 
     /// Add shared context data
     #[must_use]
-    pub fn with_shared_context(mut self, key: impl Into<String>, value: JsonValue) -> Self {
+    pub fn with_shared_context(
+        mut self,
+        key: impl Into<String> + std::fmt::Debug,
+        value: JsonValue,
+    ) -> Self {
         self.shared_context.insert(key.into(), value);
         self
     }
@@ -324,6 +330,7 @@ impl ToolComposition {
     ///
     /// Panics if a `RwLock` is poisoned
     #[allow(clippy::future_not_send)] // Tool provider may not be Send
+    #[instrument(skip(self, tool_provider))]
     pub async fn execute<T>(
         &self,
         tool_provider: &T,
@@ -583,7 +590,7 @@ impl ToolComposition {
             },
             DataTransform::Custom(function_name) => {
                 // Custom transformations would be implemented here
-                tracing::warn!("Custom transform '{}' not implemented", function_name);
+                warn!("Custom transform '{}' not implemented", function_name);
                 Ok(value.clone())
             }
         }
@@ -591,6 +598,7 @@ impl ToolComposition {
 
     /// Execute a single step
     #[allow(clippy::future_not_send)]
+    #[instrument(skip(self, tool_provider))]
     async fn execute_step<T>(
         &self,
         tool_provider: &T,
@@ -692,7 +700,10 @@ impl ToolComposition {
 
 impl CompositionStep {
     /// Create a new composition step
-    pub fn new(id: impl Into<String>, tool_name: impl Into<String>) -> Self {
+    pub fn new(
+        id: impl Into<String> + std::fmt::Debug,
+        tool_name: impl Into<String> + std::fmt::Debug,
+    ) -> Self {
         Self {
             id: id.into(),
             tool_name: tool_name.into(),
@@ -710,7 +721,7 @@ impl CompositionStep {
     #[must_use]
     pub fn with_input_mapping(
         mut self,
-        param_name: impl Into<String>,
+        param_name: impl Into<String> + std::fmt::Debug,
         data_flow: DataFlow,
     ) -> Self {
         self.input_mappings.insert(param_name.into(), data_flow);
@@ -819,6 +830,7 @@ mod tests {
 
     #[async_trait::async_trait]
     impl ToolProvider for MockToolProvider {
+        #[instrument(skip(self))]
         async fn execute_tool(
             &self,
             tool_name: &str,
@@ -838,6 +850,7 @@ mod tests {
             }
         }
 
+        #[instrument(skip(self))]
         async fn has_tool(&self, tool_name: &str) -> bool {
             self.tools.contains_key(tool_name)
         }

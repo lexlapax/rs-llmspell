@@ -14,9 +14,8 @@ use llmspell_core::{
     types::AgentInput,
     ExecutionContext,
 };
-use llmspell_state_persistence::{
-    PerformanceConfig, PersistenceConfig, StateManager, StorageBackendType,
-};
+use llmspell_kernel::state::config::{PerformanceConfig, SledConfig};
+use llmspell_kernel::state::{PersistenceConfig, StateManager, StorageBackendType};
 use std::sync::Arc;
 use tempfile::TempDir;
 #[tokio::test]
@@ -37,7 +36,7 @@ async fn test_basic_agent_state_persistence() -> Result<()> {
     // Create state manager with persistent storage
     let state_manager = Arc::new(
         StateManager::with_backend(
-            StorageBackendType::Sled(llmspell_state_persistence::SledConfig {
+            StorageBackendType::Sled(SledConfig {
                 path: storage_path.join("agent_states"),
                 cache_capacity: 1024 * 1024, // 1MB
                 use_compression: true,

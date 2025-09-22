@@ -1,9 +1,11 @@
 //! ABOUTME: Serper.dev search provider implementation
 //! ABOUTME: Modern Google Search API with excellent free tier (2,500 searches/month)
+use tracing::instrument;
 
 use super::{ProviderConfig, SearchOptions, SearchProvider, SearchResult, SearchType};
 use async_trait::async_trait;
 use llmspell_core::{LLMSpellError, Result};
+use llmspell_kernel::runtime::create_io_bound_resource;
 use reqwest::{header, Client};
 use serde::Deserialize;
 use serde_json::{json, Value};
@@ -24,10 +26,12 @@ impl SerperDevProvider {
             header::HeaderValue::from_static("application/json"),
         );
 
-        let client = Client::builder()
-            .default_headers(headers)
-            .build()
-            .unwrap_or_else(|_| Client::new());
+        let client = create_io_bound_resource(|| {
+            Client::builder()
+                .default_headers(headers)
+                .build()
+                .unwrap_or_else(|_| Client::new())
+        });
 
         Self {
             client,
@@ -144,6 +148,7 @@ impl SearchProvider for SerperDevProvider {
     }
 
     #[allow(clippy::too_many_lines)]
+    #[instrument(skip(self))]
     async fn search(&self, query: &str, options: &SearchOptions) -> Result<Vec<SearchResult>> {
         let api_key = self
             .api_key

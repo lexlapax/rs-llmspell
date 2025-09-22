@@ -13,6 +13,7 @@ use async_trait::async_trait;
 use llmspell_core::{traits::base_agent::BaseAgent, LLMSpellError, Result};
 use serde::{Deserialize, Serialize};
 use std::sync::Arc;
+use tracing::{debug, info, warn};
 
 /// Workflow creation parameters
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -31,9 +32,13 @@ pub struct WorkflowParams {
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
 pub enum WorkflowType {
+    /// Sequential workflow execution
     Sequential,
+    /// Parallel workflow execution
     Parallel,
+    /// Conditional workflow execution
     Conditional,
+    /// Loop workflow execution
     Loop,
 }
 
@@ -70,6 +75,7 @@ pub trait WorkflowFactory: Send + Sync {
 pub struct DefaultWorkflowFactory;
 
 impl DefaultWorkflowFactory {
+    /// Create a new default workflow factory
     pub fn new() -> Self {
         Self
     }
@@ -128,15 +134,15 @@ impl WorkflowFactory for DefaultWorkflowFactory {
                     .unwrap_or_else(|| serde_json::json!([]));
 
                 // Debug logging
-                tracing::debug!("Sequential workflow steps JSON: {:?}", steps_json);
+                debug!("Sequential workflow steps JSON: {:?}", steps_json);
 
                 let steps = if let Ok(steps_config) =
                     serde_json::from_value::<Vec<WorkflowStep>>(steps_json.clone())
                 {
-                    tracing::info!("Successfully parsed {} steps", steps_config.len());
+                    info!("Successfully parsed {} steps", steps_config.len());
                     steps_config
                 } else if let Err(e) = serde_json::from_value::<Vec<WorkflowStep>>(steps_json) {
-                    tracing::warn!("Failed to parse workflow steps: {}", e);
+                    warn!("Failed to parse workflow steps: {}", e);
                     Vec::new()
                 } else {
                     Vec::new()
@@ -208,11 +214,17 @@ impl WorkflowFactory for DefaultWorkflowFactory {
 /// Workflow template for common configurations
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct WorkflowTemplate {
+    /// Template name
     pub name: String,
+    /// Template description
     pub description: String,
+    /// Type of workflow this template creates
     pub workflow_type: WorkflowType,
+    /// Workflow configuration
     pub config: WorkflowConfig,
+    /// Type-specific configuration as JSON
     pub type_config: serde_json::Value,
+    /// Predefined workflow steps
     pub steps: Vec<WorkflowStep>,
 }
 
@@ -223,6 +235,7 @@ pub struct TemplateWorkflowFactory {
 }
 
 impl TemplateWorkflowFactory {
+    /// Create a new template-based workflow factory
     pub fn new() -> Self {
         let mut factory = Self {
             templates: std::collections::HashMap::new(),

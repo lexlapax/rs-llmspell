@@ -16,6 +16,7 @@ use std::sync::Arc;
 use std::time::{Duration, Instant, SystemTime};
 use tokio::sync::{Mutex, RwLock};
 use tokio::time::interval;
+use tracing::instrument;
 use tracing::{debug, error, info, warn};
 use uuid::Uuid;
 
@@ -275,6 +276,7 @@ impl AgentHealthMonitor {
     }
 
     /// Add health check
+    #[instrument(skip(check, self))]
     pub async fn add_health_check(&self, check: Arc<dyn HealthCheck>) {
         let mut checks = self.health_checks.write().await;
         checks.push(check);
@@ -294,6 +296,7 @@ impl AgentHealthMonitor {
     /// Returns an error if any health check fails to execute
     #[allow(clippy::too_many_lines)]
     #[allow(clippy::cognitive_complexity)]
+    #[instrument(skip(self))]
     pub async fn check_health(&self) -> Result<HealthCheckResult> {
         let start_time = Instant::now();
 
@@ -472,28 +475,33 @@ impl AgentHealthMonitor {
     }
 
     /// Get current health status
+    #[instrument(skip(self))]
     pub async fn get_current_status(&self) -> HealthStatus {
         *self.current_status.read().await
     }
 
     /// Get health check history
+    #[instrument(skip(self))]
     pub async fn get_health_history(&self) -> Vec<HealthCheckResult> {
         let history = self.check_history.lock().await;
         history.clone()
     }
 
     /// Get latest health check result
+    #[instrument(skip(self))]
     pub async fn get_latest_result(&self) -> Option<HealthCheckResult> {
         let history = self.check_history.lock().await;
         history.last().cloned()
     }
 
     /// Check if agent is healthy
+    #[instrument(skip(self))]
     pub async fn is_healthy(&self) -> bool {
         self.get_current_status().await.is_operational()
     }
 
     /// Get time since last health check
+    #[instrument(skip(self))]
     pub async fn time_since_last_check(&self) -> Option<Duration> {
         let last_check = self.last_check.lock().await;
         last_check.as_ref().map(|t| t.elapsed().unwrap_or_default())
@@ -532,6 +540,7 @@ impl StateMachineHealthCheck {
 
 #[async_trait]
 impl HealthCheck for StateMachineHealthCheck {
+    #[instrument(skip(self))]
     async fn check(&self, agent_id: &str) -> Result<HealthCheckResult> {
         let start_time = Instant::now();
         let current_state = self.state_machine.current_state().await;
@@ -625,6 +634,7 @@ impl ResourceHealthCheck {
 
 #[async_trait]
 impl HealthCheck for ResourceHealthCheck {
+    #[instrument(skip(self))]
     async fn check(&self, agent_id: &str) -> Result<HealthCheckResult> {
         let start_time = Instant::now();
         let allocations = self.resource_manager.get_agent_allocations(agent_id).await;
@@ -696,6 +706,7 @@ pub struct ResponsivenessHealthCheck;
 
 #[async_trait]
 impl HealthCheck for ResponsivenessHealthCheck {
+    #[instrument(skip(self))]
     async fn check(&self, agent_id: &str) -> Result<HealthCheckResult> {
         let start_time = Instant::now();
 

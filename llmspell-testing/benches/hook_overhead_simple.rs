@@ -12,6 +12,7 @@ use std::sync::Arc;
 use tokio::runtime::Runtime;
 
 /// Simple test hook that does minimal work
+#[derive(Debug)]
 struct TestHook {
     name: String,
 }

@@ -8,6 +8,7 @@ use parking_lot::RwLock;
 use std::collections::HashMap;
 use std::sync::Arc;
 use std::time::Instant;
+use tracing::{debug, instrument};
 
 #[cfg(feature = "lua")]
 use mlua::Lua;
@@ -91,7 +92,12 @@ impl GlobalInjector {
     /// - Global initialization fails
     /// - Lua injection fails for any global
     #[cfg(feature = "lua")]
+    #[instrument(level = "debug", skip(self, lua, context), fields(
+        total_globals = 0,
+        injection_id = %uuid::Uuid::new_v4()
+    ))]
     pub fn inject_lua(&self, lua: &Lua, context: &GlobalContext) -> Result<InjectionMetrics> {
+        debug!("Starting Lua global injection");
         let start = Instant::now();
         let mut metrics = InjectionMetrics::default();
         let globals = self.registry.get_all_ordered();
@@ -107,6 +113,7 @@ impl GlobalInjector {
             let metadata = global.metadata();
 
             // Try to inject the global
+            debug!(global_name = %metadata.name, "Injecting global");
             global
                 .inject_lua(lua, context)
                 .map_err(|e| LLMSpellError::Component {

@@ -53,6 +53,7 @@ impl ReplayableHook for DoublerHook {
 }
 
 /// Simple in-memory replay manager for testing
+#[derive(Debug)]
 struct TestReplayManager {
     executions: Arc<parking_lot::RwLock<HashMap<Uuid, SerializedHookExecution>>>,
 }

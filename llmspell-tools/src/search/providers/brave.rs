@@ -1,9 +1,11 @@
 //! ABOUTME: Brave Search API provider implementation
 //! ABOUTME: Requires API key from <https://brave.com/search/api/>
+use tracing::instrument;
 
 use super::{ProviderConfig, SearchOptions, SearchProvider, SearchResult, SearchType};
 use async_trait::async_trait;
 use llmspell_core::{LLMSpellError, Result};
+use llmspell_kernel::runtime::create_io_bound_resource;
 use reqwest::{header, Client};
 use serde::Deserialize;
 use tracing::{debug, info};
@@ -23,10 +25,12 @@ impl BraveSearchProvider {
             header::HeaderValue::from_static("application/json"),
         );
 
-        let client = Client::builder()
-            .default_headers(headers)
-            .build()
-            .unwrap_or_else(|_| Client::new());
+        let client = create_io_bound_resource(|| {
+            Client::builder()
+                .default_headers(headers)
+                .build()
+                .unwrap_or_else(|_| Client::new())
+        });
 
         Self {
             client,
@@ -130,6 +134,7 @@ impl SearchProvider for BraveSearchProvider {
     }
 
     #[allow(clippy::too_many_lines)]
+    #[instrument(skip(self))]
     async fn search(&self, query: &str, options: &SearchOptions) -> Result<Vec<SearchResult>> {
         let api_key = self
             .api_key

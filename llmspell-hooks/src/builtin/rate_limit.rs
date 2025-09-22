@@ -13,6 +13,7 @@ use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::sync::Arc;
 use std::time::Duration;
+use tracing::{debug, trace, warn};
 
 /// Rate limiting strategy
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]
@@ -119,6 +120,7 @@ impl RateLimitMetrics {
 }
 
 /// Built-in rate limiting hook for API quota management
+#[derive(Debug)]
 pub struct RateLimitHook {
     rate_limiter: Arc<RateLimiter>,
     config: RateLimitConfig,
@@ -402,10 +404,9 @@ impl Hook for RateLimitHook {
             self.add_rate_limit_headers(context, &key, tokens_remaining, &rate_limiter);
 
             // Log if debug level
-            log::debug!(
+            debug!(
                 "RateLimitHook: Allowed request for key '{}', {} tokens remaining",
-                key,
-                tokens_remaining
+                key, tokens_remaining
             );
 
             Ok(HookResult::Continue)
@@ -420,10 +421,9 @@ impl Hook for RateLimitHook {
             self.add_rate_limit_headers(context, &key, tokens_remaining, &rate_limiter);
 
             // Log rate limiting
-            log::warn!(
+            warn!(
                 "RateLimitHook: Rate limited request for key '{}', action: {:?}",
-                key,
-                self.config.rate_limited_action
+                key, self.config.rate_limited_action
             );
 
             // Take configured action
@@ -493,7 +493,7 @@ impl Hook for RateLimitHook {
 #[async_trait]
 impl MetricHook for RateLimitHook {
     async fn record_pre_execution(&self, context: &HookContext) -> Result<()> {
-        log::trace!(
+        trace!(
             "RateLimitHook: Pre-execution for hook point {:?}",
             context.point
         );

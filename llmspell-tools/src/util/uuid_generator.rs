@@ -37,6 +37,8 @@ use llmspell_utils::{
 };
 use serde::{Deserialize, Serialize};
 use serde_json::json;
+use std::time::Instant;
+use tracing::{debug, error, info, instrument, trace};
 use uuid::Uuid;
 
 #[derive(Debug, Clone, Copy, Serialize, Deserialize)]
@@ -84,6 +86,14 @@ impl UuidGeneratorTool {
     /// Create a new UUID generator tool
     #[must_use]
     pub fn new(config: UuidGeneratorConfig) -> Self {
+        info!(
+            default_version = ?config.default_version,
+            default_format = ?config.default_format,
+            supported_versions = 3, // v1, v4, v5
+            supported_formats = 5, // standard, hyphenated, simple, urn, braced
+            supported_operations = 5, // generate, component_id, deterministic, custom, validate
+            "Creating UuidGeneratorTool"
+        );
         Self {
             metadata: ComponentMetadata::new(
                 "uuid-generator".to_string(),
@@ -98,7 +108,15 @@ impl UuidGeneratorTool {
         namespace: Option<&str>,
         name: Option<&str>,
     ) -> Result<Uuid> {
-        match version {
+        let generation_start = Instant::now();
+        debug!(
+            version = ?version,
+            has_namespace = namespace.is_some(),
+            has_name = name.is_some(),
+            "Starting UUID generation"
+        );
+
+        let result = match version {
             UuidVersion::V1 | UuidVersion::V4 => {
                 // UUID v1 is timestamp-based, we'll use v4 as fallback for security
                 // v1 requires MAC address which can be a privacy concern
@@ -133,7 +151,27 @@ impl UuidGeneratorTool {
 
                 Ok(Uuid::new_v5(&namespace_uuid, name.as_bytes()))
             }
+        };
+
+        let generation_duration_ms = generation_start.elapsed().as_millis();
+        if let Ok(ref uuid) = result {
+            debug!(
+                version = ?version,
+                uuid = %uuid,
+                success = true,
+                duration_ms = generation_duration_ms,
+                "UUID generation completed successfully"
+            );
+        } else {
+            error!(
+                version = ?version,
+                success = false,
+                duration_ms = generation_duration_ms,
+                "UUID generation failed"
+            );
         }
+
+        result
     }
 
     #[allow(clippy::unused_self)]
@@ -147,9 +185,18 @@ impl UuidGeneratorTool {
     }
 
     #[allow(clippy::unused_async)]
+    #[instrument(skip(self))]
     async fn validate_parameters(&self, params: &serde_json::Value) -> Result<()> {
+        let validation_start = Instant::now();
+        trace!("Starting parameter validation for UUID generator");
+
         // Extract operation type for validation
         let operation = extract_string_with_default(params, "operation", "generate");
+
+        debug!(
+            operation = %operation,
+            "Validating UUID generator parameters"
+        );
 
         // Validate operation value
         validate_enum(
@@ -190,12 +237,26 @@ impl UuidGeneratorTool {
             }
             _ => {} // Other operations have optional parameters
         }
+
+        debug!(
+            operation = %operation,
+            validation_duration_ms = validation_start.elapsed().as_millis(),
+            "Parameter validation completed successfully"
+        );
+
         Ok(())
     }
 }
 
 impl Default for UuidGeneratorTool {
     fn default() -> Self {
+        info!(
+            tool_name = "uuid-generator",
+            category = "Tool",
+            phase = "Phase 3 (comprehensive instrumentation)",
+            "Creating UuidGeneratorTool"
+        );
+
         Self::new(UuidGeneratorConfig::default())
     }
 }
@@ -207,11 +268,19 @@ impl BaseAgent for UuidGeneratorTool {
     }
 
     #[allow(clippy::too_many_lines)]
+    #[instrument(skip(_context, input, self), fields(tool = %self.metadata().name))]
     async fn execute_impl(
         &self,
         input: AgentInput,
         _context: ExecutionContext,
     ) -> Result<AgentOutput> {
+        let start = Instant::now();
+        info!(
+            input_size = input.text.len(),
+            has_params = !input.parameters.is_empty(),
+            "Executing UUID generator tool"
+        );
+
         // Get parameters from input using shared utility
         let params = extract_parameters(&input)?;
 
@@ -221,7 +290,12 @@ impl BaseAgent for UuidGeneratorTool {
         // Extract operation type
         let operation = extract_string_with_default(params, "operation", "generate");
 
-        match operation {
+        debug!(
+            operation = %operation,
+            "Processing UUID generator operation"
+        );
+
+        let result = match operation {
             "generate" => {
                 // Extract version
                 let version = extract_optional_string(params, "version").map_or(
@@ -369,13 +443,39 @@ impl BaseAgent for UuidGeneratorTool {
                     Ok(AgentOutput::text(serde_json::to_string_pretty(&result)?))
                 }
             }
-            _ => Err(validation_error(
-                format!("Unknown operation: {operation}"),
-                Some("operation".to_string()),
-            )),
+            _ => {
+                error!(
+                    operation = %operation,
+                    "Unknown UUID generator operation requested"
+                );
+                Err(validation_error(
+                    format!("Unknown operation: {operation}"),
+                    Some("operation".to_string()),
+                ))
+            }
+        };
+
+        let elapsed_ms = start.elapsed().as_millis();
+        if result.is_ok() {
+            info!(
+                operation = %operation,
+                success = true,
+                duration_ms = elapsed_ms,
+                "UUID generator execution completed successfully"
+            );
+        } else {
+            error!(
+                operation = %operation,
+                success = false,
+                duration_ms = elapsed_ms,
+                "UUID generator execution failed"
+            );
         }
+
+        result
     }
 
+    #[instrument(skip(self))]
     async fn validate_input(&self, input: &AgentInput) -> Result<()> {
         if input.text.is_empty() {
             return Err(validation_error(
@@ -386,6 +486,7 @@ impl BaseAgent for UuidGeneratorTool {
         Ok(())
     }
 
+    #[instrument(skip(self))]
     async fn handle_error(&self, error: LLMSpellError) -> Result<AgentOutput> {
         Ok(AgentOutput::text(format!("UUID generation error: {error}")))
     }

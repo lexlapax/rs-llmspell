@@ -12,7 +12,8 @@ use std::sync::Arc;
 use std::time::{Duration, Instant};
 use tokio::sync::{oneshot, RwLock};
 use tokio::task::JoinHandle;
-use tracing::{debug, info, warn};
+use tracing::field::Empty;
+use tracing::{debug, info, instrument, warn, Span};
 
 /// Execution metrics for workflow runs
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -117,6 +118,7 @@ pub struct DefaultWorkflowExecutor {
 }
 
 impl DefaultWorkflowExecutor {
+    /// Create a new default workflow executor
     pub fn new() -> Self {
         Self {
             active_executions: Arc::new(RwLock::new(std::collections::HashMap::new())),
@@ -125,8 +127,10 @@ impl DefaultWorkflowExecutor {
         }
     }
 
+    #[instrument(level = "trace", skip(self, input), fields(workflow_name = %workflow_name, hook_count = Empty))]
     async fn run_before_hooks(&self, workflow_name: &str, input: &WorkflowInput) -> Result<()> {
         let hooks = self.hooks.read().await;
+        Span::current().record("hook_count", hooks.len());
         for hook in hooks.iter() {
             if let Err(e) = hook.before_execution(workflow_name, input).await {
                 warn!("Before execution hook failed: {}", e);
@@ -135,6 +139,11 @@ impl DefaultWorkflowExecutor {
         Ok(())
     }
 
+    #[instrument(level = "trace", skip(self, output, metrics), fields(
+        workflow_name = %workflow_name,
+        duration_ms = metrics.duration.as_millis() as u64,
+        steps_executed = metrics.steps_executed
+    ))]
     async fn run_after_hooks(
         &self,
         workflow_name: &str,
@@ -150,6 +159,10 @@ impl DefaultWorkflowExecutor {
         Ok(())
     }
 
+    #[instrument(level = "debug", skip(self, error), fields(
+        workflow_name = %workflow_name,
+        error_type = ?error
+    ))]
     async fn run_error_hooks(&self, workflow_name: &str, error: &LLMSpellError) -> Result<()> {
         let hooks = self.hooks.read().await;
         for hook in hooks.iter() {
@@ -169,6 +182,11 @@ impl Default for DefaultWorkflowExecutor {
 
 #[async_trait]
 impl WorkflowExecutor for DefaultWorkflowExecutor {
+    #[instrument(level = "info", skip(self, workflow, input), fields(
+        workflow_name = Empty,
+        execution_id = Empty,
+        input_size = input.input.to_string().len()
+    ))]
     async fn execute_workflow(
         &self,
         workflow: Arc<dyn Workflow + Send + Sync>,
@@ -178,6 +196,13 @@ impl WorkflowExecutor for DefaultWorkflowExecutor {
         self.execute_with_context(workflow, input, context).await
     }
 
+    #[instrument(level = "info", skip(self, workflow, input, context), fields(
+        workflow_name = Empty,
+        execution_id = Empty,
+        with_timeout = context.timeout.is_some(),
+        with_cancellation = context.cancel_token.is_some(),
+        collect_metrics = context.collect_metrics
+    ))]
     async fn execute_with_context(
         &self,
         workflow: Arc<dyn Workflow + Send + Sync>,
@@ -189,6 +214,10 @@ impl WorkflowExecutor for DefaultWorkflowExecutor {
         let workflow_name = base_agent.metadata().name.clone();
         let execution_id = format!("exec_{}", uuid::Uuid::new_v4());
         let start_time = Instant::now();
+
+        // Record tracing fields
+        Span::current().record("workflow_name", workflow_name.as_str());
+        Span::current().record("execution_id", execution_id.as_str());
 
         debug!(
             "Starting workflow execution: {} ({})",
@@ -277,6 +306,7 @@ impl WorkflowExecutor for DefaultWorkflowExecutor {
         Ok(output)
     }
 
+    #[instrument(level = "debug", skip(self, workflow, input))]
     fn execute_async(
         &self,
         workflow: Arc<dyn Workflow + Send + Sync>,
@@ -286,6 +316,7 @@ impl WorkflowExecutor for DefaultWorkflowExecutor {
         tokio::spawn(async move { executor.execute_workflow(workflow, input).await })
     }
 
+    #[instrument(level = "info", skip(self))]
     async fn cancel_execution(&self, execution_id: &str) -> Result<()> {
         let mut executions = self.active_executions.write().await;
         if let Some(cancel_tx) = executions.remove(execution_id) {
@@ -301,11 +332,13 @@ impl WorkflowExecutor for DefaultWorkflowExecutor {
         }
     }
 
+    #[instrument(level = "debug", skip(self))]
     async fn get_metrics(&self, execution_id: &str) -> Result<Option<ExecutionMetrics>> {
         let metrics = self.metrics_store.read().await;
         Ok(metrics.get(execution_id).cloned())
     }
 
+    #[instrument(level = "debug", skip_all)]
     async fn register_hook(&self, hook: Arc<dyn ExecutionHook>) -> Result<()> {
         let mut hooks = self.hooks.write().await;
         hooks.push(hook);

@@ -6,7 +6,7 @@ use std::future::Future;
 use std::panic::{catch_unwind, AssertUnwindSafe};
 use std::sync::Arc;
 use std::time::Duration;
-use tracing::{debug, error, trace};
+use tracing::{debug, error, info, instrument, trace};
 
 /// Execute an async operation synchronously with proper error handling and panic safety
 ///
@@ -54,6 +54,11 @@ use tracing::{debug, error, trace};
 /// # Ok(())
 /// # }
 /// ```
+#[instrument(level = "info", skip(future), fields(
+    operation_name = %operation_name,
+    has_timeout = timeout.is_some(),
+    execution_id = %uuid::Uuid::new_v4()
+))]
 pub fn block_on_async<F, T, E>(
     operation_name: &str,
     future: F,
@@ -63,10 +68,7 @@ where
     F: Future<Output = Result<T, E>>,
     E: std::error::Error + Send + Sync + 'static,
 {
-    trace!(
-        "Starting synchronous execution of async operation: {}",
-        operation_name
-    );
+    info!("Bridging async operation to Lua sync context");
 
     // Capture the operation name for use in error messages
     let op_name = operation_name.to_string();
@@ -162,6 +164,11 @@ where
 /// # Ok(())
 /// # }
 /// ```
+#[instrument(level = "info", skip(future), fields(
+    operation_name = %operation_name,
+    has_timeout = timeout.is_some(),
+    execution_id = %uuid::Uuid::new_v4()
+))]
 pub fn block_on_async_lua<'lua, F>(
     operation_name: &str,
     future: F,
@@ -170,6 +177,7 @@ pub fn block_on_async_lua<'lua, F>(
 where
     F: Future<Output = LuaResult<LuaValue<'lua>>>,
 {
+    info!("Bridging Lua-specific async operation");
     trace!(
         "Starting synchronous execution of async Lua operation: {}",
         operation_name
@@ -177,55 +185,97 @@ where
 
     let op_name = operation_name.to_string();
 
-    let result = catch_unwind(AssertUnwindSafe(|| {
-        #[allow(clippy::cognitive_complexity)] // Complex async-to-sync bridge with retries
-        tokio::task::block_in_place(|| {
-            let handle = match tokio::runtime::Handle::try_current() {
-                Ok(handle) => handle,
-                Err(e) => {
-                    error!("No tokio runtime available for {}: {}", op_name, e);
-                    return Err(mlua::Error::RuntimeError(format!(
-                        "No async runtime available for {op_name}: {e}"
-                    )));
-                }
-            };
+    // Execute with panic safety
+    execute_with_panic_safety(operation_name, || {
+        execute_in_runtime(&op_name, future, timeout)
+    })
+}
 
-            #[allow(clippy::option_if_let_else)] // Complex timeout logic is clearer with if let
-            let result = if let Some(duration) = timeout {
-                debug!("Executing {} with timeout of {:?}", op_name, duration);
-                handle.block_on(async {
-                    match tokio::time::timeout(duration, future).await {
-                        Ok(result) => result,
-                        Err(_) => Err(mlua::Error::RuntimeError(format!(
-                            "{op_name} timed out after {duration:?}"
-                        ))),
-                    }
-                })
-            } else {
-                debug!("Executing {} without timeout", op_name);
-                handle.block_on(future)
-            };
-
-            match result {
-                Ok(value) => {
-                    trace!("{} completed successfully", op_name);
-                    Ok(value)
-                }
-                Err(e) => {
-                    error!("{} failed with error: {}", op_name, e);
-                    Err(e)
-                }
-            }
-        })
-    }));
-
-    match result {
+/// Execute operation with panic safety
+fn execute_with_panic_safety<'lua>(
+    operation_name: &str,
+    f: impl FnOnce() -> LuaResult<LuaValue<'lua>>,
+) -> LuaResult<LuaValue<'lua>> {
+    match catch_unwind(AssertUnwindSafe(f)) {
         Ok(result) => result,
         Err(panic_err) => {
             error!("{} panicked: {:?}", operation_name, panic_err);
             Err(mlua::Error::RuntimeError(format!(
                 "Runtime panic in {operation_name}: operation failed unexpectedly"
             )))
+        }
+    }
+}
+
+/// Execute future in tokio runtime
+fn execute_in_runtime<'lua, F>(
+    op_name: &str,
+    future: F,
+    timeout: Option<Duration>,
+) -> LuaResult<LuaValue<'lua>>
+where
+    F: Future<Output = LuaResult<LuaValue<'lua>>>,
+{
+    tokio::task::block_in_place(|| {
+        let handle = get_runtime_handle(op_name)?;
+        let result = execute_with_optional_timeout(&handle, op_name, future, timeout);
+        log_execution_result(op_name, result)
+    })
+}
+
+/// Get tokio runtime handle
+fn get_runtime_handle(op_name: &str) -> LuaResult<tokio::runtime::Handle> {
+    match tokio::runtime::Handle::try_current() {
+        Ok(handle) => Ok(handle),
+        Err(e) => {
+            error!("No tokio runtime available for {}: {}", op_name, e);
+            Err(mlua::Error::RuntimeError(format!(
+                "No async runtime available for {op_name}: {e}"
+            )))
+        }
+    }
+}
+
+/// Execute future with optional timeout
+fn execute_with_optional_timeout<'lua, F>(
+    handle: &tokio::runtime::Handle,
+    op_name: &str,
+    future: F,
+    timeout: Option<Duration>,
+) -> LuaResult<LuaValue<'lua>>
+where
+    F: Future<Output = LuaResult<LuaValue<'lua>>>,
+{
+    if let Some(duration) = timeout {
+        debug!("Executing {} with timeout of {:?}", op_name, duration);
+        handle.block_on(async {
+            tokio::time::timeout(duration, future)
+                .await
+                .unwrap_or_else(|_| {
+                    Err(mlua::Error::RuntimeError(format!(
+                        "{op_name} timed out after {duration:?}"
+                    )))
+                })
+        })
+    } else {
+        debug!("Executing {} without timeout", op_name);
+        handle.block_on(future)
+    }
+}
+
+/// Log execution result
+fn log_execution_result<'lua>(
+    op_name: &str,
+    result: LuaResult<LuaValue<'lua>>,
+) -> LuaResult<LuaValue<'lua>> {
+    match result {
+        Ok(value) => {
+            trace!("{} completed successfully", op_name);
+            Ok(value)
+        }
+        Err(e) => {
+            error!("{} failed with error: {}", op_name, e);
+            Err(e)
         }
     }
 }

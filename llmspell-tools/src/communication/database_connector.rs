@@ -24,7 +24,7 @@ use llmspell_utils::{
 };
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
-use tracing::{debug, error, info, warn};
+use tracing::{debug, error, info, instrument, warn};
 
 #[cfg(feature = "database")]
 use sqlx::Column;
@@ -225,6 +225,7 @@ impl DatabaseConnectorTool {
     /// - Query validation fails
     /// - The database type is unsupported
     /// - Query execution fails
+    #[instrument(skip(self))]
     async fn execute_query(
         &self,
         database: &str,
@@ -355,6 +356,7 @@ impl DatabaseConnectorTool {
     /// - Failed to connect to `PostgreSQL`
     /// - Query execution fails
     #[allow(clippy::unused_async)]
+    #[instrument(skip(self))]
     async fn execute_postgresql_query(
         &self,
         #[allow(unused_variables)] config: &DatabaseConfig,
@@ -449,14 +451,18 @@ impl DatabaseConnectorTool {
     ///
     /// Returns an error if `MySQL` query execution fails (currently returns mock success)
     #[allow(clippy::unused_async)]
+    #[instrument(skip(self))]
     async fn execute_mysql_query(
         &self,
-        _config: &DatabaseConfig,
+        config: &DatabaseConfig,
         query: &str,
     ) -> Result<serde_json::Value> {
         // Note: MySQL implementation would require sqlx or mysql_async
         // For now, return a mock response
-        warn!("MySQL query execution not fully implemented - returning mock response");
+        warn!(
+            "MySQL query execution not fully implemented - returning mock response for {}",
+            config.database_type
+        );
 
         Ok(serde_json::json!({
             "database_type": "mysql",
@@ -475,14 +481,18 @@ impl DatabaseConnectorTool {
     ///
     /// Returns an error if `SQLite` query execution fails (currently returns mock success)
     #[allow(clippy::unused_async)]
+    #[instrument(skip(self))]
     async fn execute_sqlite_query(
         &self,
-        _config: &DatabaseConfig,
+        config: &DatabaseConfig,
         query: &str,
     ) -> Result<serde_json::Value> {
         // Note: SQLite implementation would require sqlx or rusqlite
         // For now, return a mock response
-        warn!("SQLite query execution not fully implemented - returning mock response");
+        warn!(
+            "SQLite query execution not fully implemented - returning mock response for {}",
+            config.database_type
+        );
 
         Ok(serde_json::json!({
             "database_type": "sqlite",
@@ -501,6 +511,7 @@ impl DatabaseConnectorTool {
     ///
     /// Returns an error if the specified database is not configured
     #[allow(clippy::unused_async)]
+    #[instrument(skip(self))]
     async fn get_schema(&self, database: &str) -> Result<serde_json::Value> {
         debug!("Getting schema for database '{}'", database);
 
@@ -547,6 +558,7 @@ impl BaseAgent for DatabaseConnectorTool {
         &self.metadata
     }
 
+    #[instrument(skip(_context, input, self), fields(tool = %self.metadata().name))]
     async fn execute_impl(
         &self,
         input: AgentInput,
@@ -643,6 +655,7 @@ impl BaseAgent for DatabaseConnectorTool {
         }
     }
 
+    #[instrument(skip(self))]
     async fn validate_input(&self, input: &AgentInput) -> Result<()> {
         let params = extract_parameters(input)?;
 
@@ -678,6 +691,7 @@ impl BaseAgent for DatabaseConnectorTool {
         Ok(())
     }
 
+    #[instrument(skip(self))]
     async fn handle_error(&self, error: LLMSpellError) -> Result<AgentOutput> {
         // Use SafeErrorHandler to sanitize error messages
         let context = ErrorContext::new()

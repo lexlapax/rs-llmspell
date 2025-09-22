@@ -23,7 +23,7 @@ use llmspell_core::{
 use std::sync::Arc;
 use std::time::Instant;
 use tokio::sync::RwLock;
-use tracing::{debug, error, info, warn};
+use tracing::{debug, error, info, instrument, warn};
 
 /// Sequential workflow that executes steps one after another
 pub struct SequentialWorkflow {
@@ -201,6 +201,11 @@ impl BaseAgent for SequentialWorkflow {
         &self.metadata
     }
 
+    #[instrument(level = "info", skip(self, input, context), fields(
+        workflow_name = %self.metadata.name,
+        step_count = self.steps.len(),
+        input_size = input.text.len()
+    ))]
     async fn execute_impl(
         &self,
         input: AgentInput,
@@ -407,7 +412,6 @@ impl BaseAgent for SequentialWorkflow {
                             warn!("All retries exhausted for step {}, continuing", step.name);
                             steps_skipped += 1;
                             self.state_manager.advance_step().await?;
-                            continue;
                         } else {
                             warn!(
                                 "All retries exhausted for step {}, stopping workflow",

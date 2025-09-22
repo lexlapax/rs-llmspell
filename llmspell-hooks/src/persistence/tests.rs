@@ -23,6 +23,7 @@ use std::time::{Duration, SystemTime};
 use uuid::Uuid;
 
 /// Mock replayable hook for testing
+#[derive(Debug)]
 #[cfg(test)]
 struct MockReplayableHook {
     id: String,
@@ -142,6 +143,7 @@ async fn test_storage_backend_lifecycle() {
 #[tokio::test]
 async fn test_hook_persistence_manager() {
     // Create mock replay manager (simplified)
+    #[derive(Debug)]
     struct MockReplayManager;
 
     #[async_trait]
@@ -381,6 +383,7 @@ async fn test_inspection_query_filtering() {
     assert_eq!(results.len(), 0);
 }
 
+#[derive(Debug)]
 struct MockReplayManager;
 
 #[async_trait]

@@ -18,7 +18,8 @@ use llmspell_utils::{
 use reqwest::Client;
 use serde::{Deserialize, Serialize};
 use serde_json::{json, Value};
-use std::time::Duration;
+use std::time::{Duration, Instant};
+use tracing::{debug, error, info, instrument, trace, warn};
 use url::{Host, Url};
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -28,6 +29,13 @@ pub struct UrlAnalyzerTool {
 
 impl Default for UrlAnalyzerTool {
     fn default() -> Self {
+        info!(
+            tool_name = "url-analyzer",
+            category = "Tool",
+            phase = "Phase 3 (comprehensive instrumentation)",
+            "Creating UrlAnalyzerTool"
+        );
+
         Self::new()
     }
 }
@@ -35,6 +43,7 @@ impl Default for UrlAnalyzerTool {
 impl UrlAnalyzerTool {
     #[must_use]
     pub fn new() -> Self {
+        info!("Creating UrlAnalyzerTool");
         Self {
             metadata: ComponentMetadata::new(
                 "url-analyzer".to_string(),
@@ -43,7 +52,14 @@ impl UrlAnalyzerTool {
         }
     }
 
+    #[instrument(skip(self))]
     async fn fetch_url_metadata(&self, url: &Url) -> Result<Value> {
+        let request_start = Instant::now();
+        debug!(
+            url = %url,
+            "Fetching URL metadata with HEAD request"
+        );
+
         let client = Client::builder()
             .timeout(Duration::from_secs(10))
             .user_agent("Mozilla/5.0 (compatible; LLMSpell/1.0)")
@@ -52,6 +68,12 @@ impl UrlAnalyzerTool {
 
         // HEAD request to get headers without body
         let response = client.head(url.to_string()).send().await.map_err(|e| {
+            error!(
+                url = %url,
+                error = %e,
+                duration_ms = request_start.elapsed().as_millis(),
+                "Failed to fetch URL metadata"
+            );
             llmspell_utils::error_builders::llmspell::component_error(format!(
                 "Failed to fetch URL metadata: {e}"
             ))
@@ -59,6 +81,15 @@ impl UrlAnalyzerTool {
 
         let status = response.status();
         let headers = response.headers();
+
+        debug!(
+            url = %url,
+            status_code = status.as_u16(),
+            success = status.is_success(),
+            redirect = status.is_redirection(),
+            duration_ms = request_start.elapsed().as_millis(),
+            "URL metadata request completed"
+        );
 
         let mut metadata = json!({
             "status_code": status.as_u16(),
@@ -142,28 +173,58 @@ impl BaseAgent for UrlAnalyzerTool {
         &self.metadata
     }
 
+    #[instrument(skip(self))]
     async fn validate_input(&self, _input: &AgentInput) -> Result<()> {
         Ok(())
     }
 
+    #[instrument(skip(self))]
     async fn handle_error(&self, error: llmspell_core::LLMSpellError) -> Result<AgentOutput> {
         Ok(AgentOutput::text(format!("UrlAnalyzer error: {error}")))
     }
 
+    #[allow(clippy::too_many_lines)]
+    #[instrument(skip(_context, input, self), fields(tool = %self.metadata().name))]
     async fn execute_impl(
         &self,
         input: AgentInput,
         _context: ExecutionContext,
     ) -> Result<AgentOutput> {
+        let start = Instant::now();
+        info!(
+            input_size = input.text.len(),
+            has_params = !input.parameters.is_empty(),
+            "Executing URL analyzer tool"
+        );
+
         let params = extract_parameters(&input)?;
         let url_str = extract_required_string(params, "input")?;
         let fetch_metadata = extract_optional_bool(params, "fetch_metadata").unwrap_or(false);
         let _decode_params = extract_optional_bool(params, "decode_params").unwrap_or(true);
 
+        debug!(
+            url = %url_str,
+            fetch_metadata,
+            "Starting URL analysis"
+        );
+
         // Parse and validate URL
         let url = match Url::parse(url_str) {
-            Ok(u) => u,
+            Ok(u) => {
+                trace!(
+                    url = %url_str,
+                    scheme = %u.scheme(),
+                    host = ?u.host_str(),
+                    "URL parsed successfully"
+                );
+                u
+            }
             Err(e) => {
+                error!(
+                    url = %url_str,
+                    error = %e,
+                    "URL parsing failed"
+                );
                 // Check if it's a relative URL error
                 if e.to_string().contains("relative URL without a base") {
                     return Err(validation_error(
@@ -180,6 +241,11 @@ impl BaseAgent for UrlAnalyzerTool {
 
         // Validate scheme - only allow HTTP and HTTPS
         if url.scheme() != "http" && url.scheme() != "https" {
+            error!(
+                url = %url_str,
+                scheme = %url.scheme(),
+                "Unsupported URL scheme"
+            );
             return Err(validation_error(
                 format!(
                     "Unsupported URL scheme '{}'. Only http:// and https:// are supported.",
@@ -188,6 +254,14 @@ impl BaseAgent for UrlAnalyzerTool {
                 Some("input".to_string()),
             ));
         }
+
+        debug!(
+            url = %url_str,
+            scheme = %url.scheme(),
+            host = ?url.host_str(),
+            port = ?url.port(),
+            "URL validation passed"
+        );
 
         let mut result = json!({
             "valid": true,
@@ -242,19 +316,46 @@ impl BaseAgent for UrlAnalyzerTool {
                 query_params.insert(key, json!(value));
             }
             result["query_params"] = json!(query_params);
+            trace!(
+                url = %url_str,
+                param_count = query_params.len(),
+                "Parsed query parameters"
+            );
         }
 
         // Fetch metadata if requested
         if fetch_metadata && (url.scheme() == "http" || url.scheme() == "https") {
+            debug!(
+                url = %url_str,
+                "Fetching HTTP metadata"
+            );
             match self.fetch_url_metadata(&url).await {
                 Ok(metadata) => {
+                    debug!(
+                        url = %url_str,
+                        "Successfully fetched metadata"
+                    );
                     result["metadata"] = metadata;
                 }
                 Err(e) => {
+                    warn!(
+                        url = %url_str,
+                        error = %e,
+                        "Failed to fetch metadata"
+                    );
                     result["metadata_error"] = json!(e.to_string());
                 }
             }
         }
+
+        let elapsed_ms = start.elapsed().as_millis();
+        debug!(
+            url = %url_str,
+            scheme = %url.scheme(),
+            has_metadata = fetch_metadata,
+            duration_ms = elapsed_ms,
+            "URL analysis completed"
+        );
 
         let response = ResponseBuilder::success("analyze")
             .with_result(result)

@@ -47,7 +47,7 @@ impl AgentGlobal {
     pub async fn with_state_manager(
         registry: Arc<ComponentRegistry>,
         providers: Arc<ProviderManager>,
-        state_manager: Arc<llmspell_state_persistence::StateManager>,
+        state_manager: Arc<llmspell_kernel::state::StateManager>,
     ) -> Result<Self> {
         // Create a core provider manager for the agent bridge
         let core_providers = providers.create_core_manager_arc().await?;

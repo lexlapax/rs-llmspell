@@ -22,7 +22,7 @@ use llmspell_utils::{
 };
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
-use tracing::{debug, error, info, warn};
+use tracing::{debug, error, info, instrument, warn};
 
 use crate::api_key_integration::{get_api_key, ApiKeyConfig, RequiresApiKey};
 
@@ -219,6 +219,7 @@ impl EmailSenderTool {
     /// - The specified provider is not configured
     /// - The provider type is unsupported
     /// - Email sending fails
+    #[instrument(skip(self))]
     async fn send_email(
         &self,
         provider: &str,
@@ -274,6 +275,7 @@ impl EmailSenderTool {
     /// - Failed to create SMTP transport
     /// - Failed to send email
     #[allow(clippy::unused_async)]
+    #[instrument(skip(self))]
     async fn send_via_smtp(
         &self,
         #[allow(unused_variables)] config: &EmailProviderConfig,
@@ -380,22 +382,35 @@ impl EmailSenderTool {
     ///
     /// Returns an error if `SendGrid` API call fails (currently returns mock success)
     #[allow(clippy::unused_async)]
+    #[instrument(skip(self, body))]
     async fn send_via_sendgrid(
         &self,
-        _config: &EmailProviderConfig,
-        _from: &str,
-        _to: &str,
-        _subject: &str,
-        _body: &str,
-        _html: bool,
+        config: &EmailProviderConfig,
+        from: &str,
+        to: &str,
+        subject: &str,
+        body: &str,
+        html: bool,
     ) -> Result<serde_json::Value> {
         // Note: SendGrid implementation would require HTTP client and API calls
         // For now, return a mock success response
-        warn!("SendGrid email sending not fully implemented - returning mock response");
+        warn!(
+            "SendGrid email sending not fully implemented - returning mock response for {} -> {}",
+            from, to
+        );
+        debug!(
+            "Mock email: subject='{}', html={}, provider={:?}",
+            subject, html, config.provider_type
+        );
 
         Ok(serde_json::json!({
             "provider": "sendgrid",
             "status": "mock_sent",
+            "from": from,
+            "to": to,
+            "subject": subject,
+            "html": html,
+            "body_length": body.len(),
             "message_id": format!("mock-sg-{}", uuid::Uuid::new_v4()),
             "timestamp": chrono::Utc::now().to_rfc3339()
         }))
@@ -409,6 +424,7 @@ impl EmailSenderTool {
     /// - Failed to build email content
     /// - AWS SES API call fails
     #[allow(clippy::unused_async)]
+    #[instrument(skip(self))]
     async fn send_via_ses(
         &self,
         #[allow(unused_variables)] config: &EmailProviderConfig,
@@ -518,6 +534,7 @@ impl BaseAgent for EmailSenderTool {
         &self.metadata
     }
 
+    #[instrument(skip(_context, input, self), fields(tool = %self.metadata().name))]
     async fn execute_impl(
         &self,
         input: AgentInput,
@@ -578,6 +595,7 @@ impl BaseAgent for EmailSenderTool {
         }
     }
 
+    #[instrument(skip(self))]
     async fn validate_input(&self, input: &AgentInput) -> Result<()> {
         let params = extract_parameters(input)?;
 
@@ -608,6 +626,7 @@ impl BaseAgent for EmailSenderTool {
         Ok(())
     }
 
+    #[instrument(skip(self))]
     async fn handle_error(&self, error: LLMSpellError) -> Result<AgentOutput> {
         // Use SafeErrorHandler to sanitize error messages
         let context = ErrorContext::new()

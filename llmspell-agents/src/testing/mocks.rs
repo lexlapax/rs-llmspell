@@ -24,14 +24,15 @@ use llmspell_core::{
     },
     BaseAgent, ExecutionContext, LLMSpellError,
 };
-use llmspell_state_persistence::ToolUsageStats;
-use llmspell_state_persistence::{PersistentAgentState, StateManager};
+use llmspell_kernel::state::ToolUsageStats;
+use llmspell_kernel::state::{PersistentAgentState, StateManager};
 use std::{
     collections::HashMap,
     sync::{Arc, Mutex},
     time::Duration,
 };
 use tokio::sync::broadcast;
+use tracing::{debug, instrument};
 
 /// Configuration for mock agent behavior
 #[derive(Debug, Clone)]
@@ -108,7 +109,12 @@ pub struct MockAgent {
 impl MockAgent {
     /// Create new mock agent
     #[must_use]
+    #[instrument(level = "debug", skip(config), fields(agent_name = %config.agent_config.name, agent_type = %config.agent_config.agent_type))]
     pub fn new(config: MockAgentConfig) -> Self {
+        debug!(
+            config = ?config,
+            "Creating MockAgent with configuration"
+        );
         let metadata = ComponentMetadata {
             id: ComponentId::from_name(&config.agent_config.name),
             name: config.agent_config.name.clone(),
@@ -276,6 +282,15 @@ impl BaseAgent for MockAgent {
     /// # Panics
     ///
     /// Panics if any Mutex is poisoned
+    #[instrument(
+        level = "debug",
+        skip(self, context),
+        fields(
+            agent_name = %self.metadata.name,
+            input_size = input.text.len(),
+            execution_id = %uuid::Uuid::new_v4()
+        )
+    )]
     async fn execute_impl(
         &self,
         input: AgentInput,
@@ -508,16 +523,16 @@ impl StatePersistence for MockAgent {
         let conversation_history = conversation
             .into_iter()
             .map(
-                |msg| llmspell_state_persistence::agent_state::ConversationMessage {
+                |msg| llmspell_kernel::state::agent_state::ConversationMessage {
                     role: match msg.role {
                         llmspell_core::traits::agent::MessageRole::System => {
-                            llmspell_state_persistence::agent_state::MessageRole::System
+                            llmspell_kernel::state::agent_state::MessageRole::System
                         }
                         llmspell_core::traits::agent::MessageRole::User => {
-                            llmspell_state_persistence::agent_state::MessageRole::User
+                            llmspell_kernel::state::agent_state::MessageRole::User
                         }
                         llmspell_core::traits::agent::MessageRole::Assistant => {
-                            llmspell_state_persistence::agent_state::MessageRole::Assistant
+                            llmspell_kernel::state::agent_state::MessageRole::Assistant
                         }
                     },
                     content: msg.content,
@@ -527,15 +542,15 @@ impl StatePersistence for MockAgent {
             )
             .collect();
 
-        let state_data = llmspell_state_persistence::agent_state::AgentStateData {
+        let state_data = llmspell_kernel::state::agent_state::AgentStateData {
             conversation_history,
             context_variables: HashMap::new(),
             tool_usage_stats: ToolUsageStats::default(),
-            execution_state: llmspell_state_persistence::agent_state::ExecutionState::Idle,
+            execution_state: llmspell_kernel::state::agent_state::ExecutionState::Idle,
             custom_data: HashMap::new(),
         };
 
-        let metadata = llmspell_state_persistence::agent_state::AgentMetadata {
+        let metadata = llmspell_kernel::state::agent_state::AgentMetadata {
             name: self.metadata.name.clone(),
             description: Some(self.metadata.description.clone()),
             version: self.metadata.version.to_string(),
@@ -564,14 +579,14 @@ impl StatePersistence for MockAgent {
 
         for entry in state.state.conversation_history {
             let role = match entry.role {
-                llmspell_state_persistence::agent_state::MessageRole::System => {
+                llmspell_kernel::state::agent_state::MessageRole::System => {
                     llmspell_core::traits::agent::MessageRole::System
                 }
-                llmspell_state_persistence::agent_state::MessageRole::User => {
+                llmspell_kernel::state::agent_state::MessageRole::User => {
                     llmspell_core::traits::agent::MessageRole::User
                 }
-                llmspell_state_persistence::agent_state::MessageRole::Assistant
-                | llmspell_state_persistence::agent_state::MessageRole::Tool => {
+                llmspell_kernel::state::agent_state::MessageRole::Assistant
+                | llmspell_kernel::state::agent_state::MessageRole::Tool => {
                     llmspell_core::traits::agent::MessageRole::Assistant
                 } // Map Tool to Assistant
             };
@@ -663,6 +678,15 @@ impl BaseAgent for MockTool {
     /// # Panics
     ///
     /// Panics if any Mutex is poisoned
+    #[instrument(
+        level = "debug",
+        skip(self, _context),
+        fields(
+            agent_name = %self.metadata.name,
+            input_size = input.text.len(),
+            execution_id = %uuid::Uuid::new_v4()
+        )
+    )]
     async fn execute_impl(
         &self,
         input: AgentInput,

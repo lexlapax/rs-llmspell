@@ -4,6 +4,7 @@
 use crate::factory::{AgentConfig, ModelConfig, ResourceLimits};
 use anyhow::Result;
 use serde_json::Value;
+use tracing::{debug, instrument};
 
 /// Builder for creating agent configurations with a fluent API
 #[derive(Debug, Clone)]
@@ -13,12 +14,16 @@ pub struct AgentBuilder {
 
 impl AgentBuilder {
     /// Create a new agent builder with required fields
+    #[instrument(level = "debug", skip_all)]
     pub fn new(name: impl Into<String>, agent_type: impl Into<String>) -> Self {
+        let name = name.into();
+        let agent_type = agent_type.into();
+        debug!("Creating AgentBuilder for {} of type {}", name, agent_type);
         Self {
             config: AgentConfig {
-                name: name.into(),
+                name,
                 description: String::new(),
-                agent_type: agent_type.into(),
+                agent_type,
                 model: None,
                 allowed_tools: vec![],
                 custom_config: serde_json::Map::new(),
@@ -158,7 +163,13 @@ impl AgentBuilder {
     /// - Agent type is empty
     /// - Invalid tool IDs are specified
     /// - Configuration validation fails
+    #[instrument(level = "debug", skip(self), fields(agent_name = %self.config.name, agent_type = %self.config.agent_type))]
     pub fn build(self) -> Result<AgentConfig> {
+        debug!(
+            config = ?self.config,
+            "Building agent configuration"
+        );
+
         // Validate the configuration
         if self.config.name.is_empty() {
             anyhow::bail!("Agent name cannot be empty");

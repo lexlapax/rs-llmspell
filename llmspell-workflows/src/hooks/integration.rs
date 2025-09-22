@@ -25,6 +25,7 @@ pub struct WorkflowLifecycleConfig {
     pub max_hook_execution_time: Duration,
     /// Circuit breaker configuration
     pub circuit_breaker_failure_threshold: u32,
+    /// Time to wait before attempting recovery after circuit opens
     pub circuit_breaker_recovery_time: Duration,
     /// Enable comprehensive audit logging
     pub enable_audit_logging: bool,
@@ -70,19 +71,33 @@ pub struct WorkflowHookContext {
 /// Workflow execution phases for hook context
 #[derive(Debug, Clone)]
 pub enum WorkflowExecutionPhase {
+    /// Workflow is starting execution
     WorkflowStart,
+    /// Workflow has completed execution
     WorkflowComplete,
+    /// At a step transition boundary
     StepBoundary,
+    /// Workflow state has changed
     StateChange,
+    /// Accessing shared workflow data
     SharedDataAccess,
+    /// Evaluating a conditional expression
     ConditionEvaluation,
+    /// Selecting a branch for execution
     BranchSelection,
+    /// Starting a loop iteration
     LoopIterationStart,
+    /// Completing a loop iteration
     LoopIterationComplete,
+    /// Loop is terminating
     LoopTermination,
+    /// Forking parallel execution
     ParallelFork,
+    /// Joining parallel branches
     ParallelJoin,
+    /// Synchronizing parallel execution
     ParallelSynchronization,
+    /// Handling an error condition
     ErrorHandling,
 }
 

@@ -344,6 +344,7 @@ impl MetricsStorage {
 }
 
 /// Built-in metrics hook for comprehensive performance tracking
+#[derive(Debug)]
 pub struct MetricsHook {
     storage: Arc<MetricsStorage>,
     metadata: HookMetadata,

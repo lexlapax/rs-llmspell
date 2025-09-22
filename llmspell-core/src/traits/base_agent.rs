@@ -8,6 +8,7 @@ use crate::{ComponentMetadata, Result};
 use async_trait::async_trait;
 use serde_json::json;
 use std::time::Instant;
+use tracing::{debug, error, info, trace};
 
 /// Base trait for all components in the LLMSpell system.
 ///
@@ -101,6 +102,15 @@ pub trait BaseAgent: Send + Sync {
         let component_type = metadata.component_type();
         let component_id = metadata.id;
 
+        info!(
+            agent_id = %component_id,
+            component_name = %metadata.name,
+            component_type = %component_type,
+            input_size = input.text.len(),
+            has_context = input.context.is_some(),
+            "Executing component"
+        );
+
         // Emit start event if events are enabled
         if let Some(ref events) = context.events {
             if events.is_enabled() {
@@ -123,13 +133,38 @@ pub trait BaseAgent: Send + Sync {
         }
 
         // Execute the actual component implementation
+        debug!(
+            agent_id = %component_id,
+            input_size = input.text.len(),
+            "Calling execute_impl"
+        );
         let result = self.execute_impl(input.clone(), context.clone()).await;
+
+        let elapsed_ms = start.elapsed().as_millis();
+
+        // Log the result (outside of event handling so it always logs)
+        match &result {
+            Ok(output) => {
+                debug!(
+                    agent_id = %component_id,
+                    duration_ms = elapsed_ms,
+                    output_size = output.text.len(),
+                    "Component execution completed successfully"
+                );
+            }
+            Err(e) => {
+                error!(
+                    agent_id = %component_id,
+                    duration_ms = elapsed_ms,
+                    error = %e,
+                    "Component execution failed"
+                );
+            }
+        }
 
         // Emit completion or error event
         if let Some(ref events) = context.events {
             if events.is_enabled() {
-                let elapsed_ms = start.elapsed().as_millis();
-
                 match &result {
                     Ok(output) => {
                         let event_data = EventData::new(format!("{}.completed", component_type))
@@ -248,6 +283,10 @@ pub trait BaseAgent: Send + Sync {
         _input: AgentInput,
         _context: ExecutionContext,
     ) -> Result<AgentStream> {
+        trace!(
+            component_id = %self.metadata().id,
+            "Stream execute called on component that doesn't support streaming"
+        );
         Err(crate::LLMSpellError::Component {
             message: "Streaming execution not supported by this component".to_string(),
             source: None,

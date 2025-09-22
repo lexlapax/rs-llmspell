@@ -11,6 +11,7 @@ use std::collections::HashMap;
 use std::sync::Arc;
 use std::time::{Duration, SystemTime};
 use tokio::sync::{Mutex, RwLock};
+use tracing::instrument;
 use tracing::{debug, info, warn};
 use uuid::Uuid;
 
@@ -276,6 +277,7 @@ impl ResourceManager {
     /// - Insufficient resources available
     /// - Quota exceeded
     #[allow(clippy::cognitive_complexity)]
+    #[instrument(skip(self))]
     pub async fn allocate(&self, request: ResourceRequest) -> Result<ResourceAllocation> {
         debug!(
             "Allocating {} {} for agent {}",
@@ -468,6 +470,7 @@ impl ResourceManager {
     }
 
     /// Check resource limits before allocation
+    #[instrument(skip(self))]
     async fn check_limits(&self, request: &ResourceRequest) -> Result<()> {
         // Check per-agent limits
         if let Some(per_agent_limit) = self.limits.get_per_agent_limit(&request.resource_type) {
@@ -560,6 +563,7 @@ pub struct LoggingResourceHook;
 
 #[async_trait]
 impl ResourceAllocationHook for LoggingResourceHook {
+    #[instrument(skip(self))]
     async fn before_allocate(&self, request: &ResourceRequest) -> Result<()> {
         debug!(
             "About to allocate {} {} for agent {}",
@@ -570,6 +574,7 @@ impl ResourceAllocationHook for LoggingResourceHook {
         Ok(())
     }
 
+    #[instrument(skip(self))]
     async fn after_allocate(&self, allocation: &ResourceAllocation) -> Result<()> {
         info!(
             "Allocated {} {} for agent {} (ID: {})",
@@ -581,6 +586,7 @@ impl ResourceAllocationHook for LoggingResourceHook {
         Ok(())
     }
 
+    #[instrument(skip(self))]
     async fn before_deallocate(&self, allocation: &ResourceAllocation) -> Result<()> {
         debug!(
             "About to deallocate {} {} from agent {} (ID: {})",
@@ -592,6 +598,7 @@ impl ResourceAllocationHook for LoggingResourceHook {
         Ok(())
     }
 
+    #[instrument(skip(self))]
     async fn after_deallocate(&self, allocation: &ResourceAllocation) -> Result<()> {
         info!(
             "Deallocated {} {} from agent {} (ID: {})",
@@ -634,6 +641,7 @@ impl SecurityResourceHook {
 
 #[async_trait]
 impl ResourceAllocationHook for SecurityResourceHook {
+    #[instrument(skip(self))]
     async fn before_allocate(&self, request: &ResourceRequest) -> Result<()> {
         // Enforce stricter limits for untrusted agents
         if !self.trusted_agents.contains(&request.agent_id)
@@ -650,14 +658,17 @@ impl ResourceAllocationHook for SecurityResourceHook {
         Ok(())
     }
 
+    #[instrument(skip(self))]
     async fn after_allocate(&self, _allocation: &ResourceAllocation) -> Result<()> {
         Ok(())
     }
 
+    #[instrument(skip(self))]
     async fn before_deallocate(&self, _allocation: &ResourceAllocation) -> Result<()> {
         Ok(())
     }
 
+    #[instrument(skip(self))]
     async fn after_deallocate(&self, _allocation: &ResourceAllocation) -> Result<()> {
         Ok(())
     }

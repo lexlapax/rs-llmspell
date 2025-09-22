@@ -12,7 +12,9 @@ use llmspell_hooks::{HookExecutor, HookRegistry};
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::sync::Arc;
+use std::time::Instant;
 use tokio::sync::RwLock;
+use tracing::{debug, error, info, instrument, trace};
 
 // Type alias to simplify the complex tool storage type
 type ToolStorage = Arc<RwLock<HashMap<String, Arc<Box<dyn Tool>>>>>;
@@ -149,6 +151,7 @@ impl ToolRegistry {
     /// Create a new tool registry
     #[must_use]
     pub fn new() -> Self {
+        debug!("Creating new tool registry without hooks");
         Self {
             tools: Arc::new(RwLock::new(HashMap::new())),
             metadata_cache: Arc::new(RwLock::new(HashMap::new())),
@@ -165,6 +168,10 @@ impl ToolRegistry {
         hook_registry: Option<Arc<HookRegistry>>,
         hook_config: ToolLifecycleConfig,
     ) -> Self {
+        debug!(
+            hooks_enabled = hook_config.features.hooks_enabled,
+            "Creating new tool registry with hook configuration"
+        );
         let tool_executor = if hook_config.features.hooks_enabled {
             Some(Arc::new(ToolExecutor::new(
                 hook_config.clone(),
@@ -189,10 +196,15 @@ impl ToolRegistry {
     /// # Errors
     ///
     /// Returns an error if tool validation fails or if a tool with the same name already exists
+    #[instrument(skip(self, tool))]
     pub async fn register<T>(&self, name: String, tool: T) -> Result<()>
     where
         T: Tool + 'static,
     {
+        info!(
+            tool_name = %name,
+            "Registering tool in registry"
+        );
         // Validate the tool before registration
         self.validate_tool(&tool).await?;
 
@@ -240,7 +252,12 @@ impl ToolRegistry {
 
     /// Validate a tool before registration
     #[allow(clippy::unused_async)]
+    #[instrument(skip(self, tool))]
     async fn validate_tool(&self, tool: &dyn Tool) -> Result<()> {
+        debug!(
+            tool_name = %tool.metadata().name,
+            "Validating tool before registration"
+        );
         // Check that the tool has a valid schema
         let schema = tool.schema();
         if schema.name.is_empty() {
@@ -281,31 +298,54 @@ impl ToolRegistry {
     }
 
     /// Get a tool by name
+    #[instrument(skip(self))]
     pub async fn get_tool(&self, name: &str) -> Option<Arc<Box<dyn Tool>>> {
+        debug!(
+            tool_name = %name,
+            "Looking up tool in registry"
+        );
         let tools = self.tools.read().await;
         tools.get(name).cloned()
     }
 
     /// Get tool metadata by name
+    #[instrument(skip_all)]
     pub async fn get_tool_info(&self, name: &str) -> Option<ToolInfo> {
+        trace!(
+            tool_name = %name,
+            "Getting tool metadata from registry"
+        );
         let cache = self.metadata_cache.read().await;
         cache.get(name).cloned()
     }
 
     /// List all registered tools
+    #[instrument(skip(self))]
     pub async fn list_tools(&self) -> Vec<String> {
+        trace!("Listing all registered tools");
         let tools = self.tools.read().await;
         tools.keys().cloned().collect()
     }
 
     /// Get tools by category
+    #[instrument(skip(self))]
     pub async fn get_tools_by_category(&self, category: &ToolCategory) -> Vec<String> {
+        debug!(
+            category = ?category,
+            "Searching tools by category"
+        );
         let index = self.category_index.read().await;
         index.get(category).cloned().unwrap_or_default()
     }
 
     /// Discover tools by capabilities
+    #[instrument(skip_all)]
     pub async fn discover_tools(&self, matcher: &CapabilityMatcher) -> Vec<ToolInfo> {
+        debug!(
+            categories = ?matcher.categories,
+            search_terms = ?matcher.search_terms,
+            "Discovering tools by capabilities"
+        );
         let cache = self.metadata_cache.read().await;
         cache
             .values()
@@ -315,13 +355,23 @@ impl ToolRegistry {
     }
 
     /// Get tools compatible with a security level
+    #[instrument(skip_all)]
     pub async fn get_tools_for_security_level(&self, level: SecurityLevel) -> Vec<ToolInfo> {
+        debug!(
+            security_level = ?level,
+            "Getting tools for security level"
+        );
         let matcher = CapabilityMatcher::new().with_max_security_level(level);
         self.discover_tools(&matcher).await
     }
 
     /// Check if a tool is registered
+    #[instrument(skip(self))]
     pub async fn contains_tool(&self, name: &str) -> bool {
+        trace!(
+            tool_name = %name,
+            "Checking if tool exists in registry"
+        );
         let tools = self.tools.read().await;
         tools.contains_key(name)
     }
@@ -331,7 +381,12 @@ impl ToolRegistry {
     /// # Errors
     ///
     /// Returns an error if the tool is not found in the registry
+    #[instrument(skip(self))]
     pub async fn unregister_tool(&self, name: &str) -> Result<()> {
+        info!(
+            tool_name = %name,
+            "Unregistering tool from registry"
+        );
         // Get tool info before removal for category cleanup
         let tool_info = {
             let cache = self.metadata_cache.read().await;
@@ -365,7 +420,9 @@ impl ToolRegistry {
     }
 
     /// Get registry statistics
+    #[instrument(skip(self))]
     pub async fn get_statistics(&self) -> RegistryStatistics {
+        trace!("Getting registry statistics");
         let tools = self.tools.read().await;
         let category_index = self.category_index.read().await;
 
@@ -392,6 +449,65 @@ impl ToolRegistry {
         }
     }
 
+    /// Get tool from registry with error handling
+    #[instrument(skip(self))]
+    async fn get_tool_or_error(&self, tool_name: &str) -> Result<Arc<Box<dyn Tool>>> {
+        self.get_tool(tool_name)
+            .await
+            .ok_or_else(|| LLMSpellError::Component {
+                message: format!("Tool '{tool_name}' not found in registry"),
+                source: None,
+            })
+    }
+
+    /// Execute tool with or without hooks based on configuration
+    #[instrument(skip(self, tool))]
+    async fn execute_with_optional_hooks(
+        &self,
+        tool: Arc<Box<dyn Tool>>,
+        tool_name: &str,
+        input: AgentInput,
+        context: ExecutionContext,
+    ) -> Result<AgentOutput> {
+        if let Some(ref executor) = self.tool_executor {
+            debug!(
+                tool_name = %tool_name,
+                "Executing tool with hooks"
+            );
+            executor
+                .execute_tool_with_hooks(tool.as_ref().as_ref(), input, context)
+                .await
+        } else {
+            debug!(
+                tool_name = %tool_name,
+                "Executing tool without hooks"
+            );
+            tool.execute(input, context).await
+        }
+    }
+
+    /// Log tool execution result
+    fn log_execution_result(tool_name: &str, result: &Result<AgentOutput>, elapsed_ms: u128) {
+        match result {
+            Ok(output) => {
+                debug!(
+                    tool_name = %tool_name,
+                    duration_ms = elapsed_ms,
+                    output_size = output.text.len(),
+                    "Tool execution completed successfully"
+                );
+            }
+            Err(e) => {
+                error!(
+                    tool_name = %tool_name,
+                    duration_ms = elapsed_ms,
+                    error = %e,
+                    "Tool execution failed"
+                );
+            }
+        }
+    }
+
     /// Execute a tool with hook integration (if enabled)
     ///
     /// # Errors
@@ -400,29 +516,30 @@ impl ToolRegistry {
     /// - Tool not found in registry
     /// - Hook execution fails
     /// - Tool execution fails
+    #[instrument(skip(self))]
     pub async fn execute_tool_with_hooks(
         &self,
         tool_name: &str,
         input: AgentInput,
         context: ExecutionContext,
     ) -> Result<AgentOutput> {
-        let tool = self
-            .get_tool(tool_name)
-            .await
-            .ok_or_else(|| LLMSpellError::Component {
-                message: format!("Tool '{tool_name}' not found in registry"),
-                source: None,
-            })?;
+        let start = Instant::now();
+        info!(
+            tool_name = %tool_name,
+            input_size = input.text.len(),
+            has_hooks = self.tool_executor.is_some(),
+            "Executing tool from registry"
+        );
 
-        if let Some(ref executor) = self.tool_executor {
-            // Execute with hooks
-            executor
-                .execute_tool_with_hooks(tool.as_ref().as_ref(), input, context)
-                .await
-        } else {
-            // Execute directly without hooks
-            tool.execute(input, context).await
-        }
+        let tool = self.get_tool_or_error(tool_name).await?;
+        let result = self
+            .execute_with_optional_hooks(tool, tool_name, input, context)
+            .await;
+
+        let elapsed_ms = start.elapsed().as_millis();
+        Self::log_execution_result(tool_name, &result, elapsed_ms);
+
+        result
     }
 
     /// Execute a tool by name (with or without hooks based on configuration)
@@ -433,6 +550,7 @@ impl ToolRegistry {
     /// - Tool not found in registry
     /// - Tool execution fails
     /// - Hook execution fails (if hooks are enabled)
+    #[instrument(skip(self))]
     pub async fn execute_tool(
         &self,
         tool_name: &str,
@@ -477,7 +595,9 @@ impl ToolRegistry {
     }
 
     /// Get resource usage statistics for all tool executions
+    #[instrument(skip(self))]
     pub async fn get_resource_usage_stats(&self) -> ResourceUsageStats {
+        trace!("Getting resource usage statistics");
         let stats = self.get_statistics().await;
         let execution_metrics = self.get_execution_metrics().unwrap_or_default();
 
@@ -499,6 +619,11 @@ impl ToolRegistry {
 
 impl Default for ToolRegistry {
     fn default() -> Self {
+        info!(
+            tool_name = "tool-registry",
+            category = "Tool",
+            "Initializing ToolRegistry"
+        );
         Self::new()
     }
 }
@@ -574,6 +699,7 @@ mod tests {
             &self.metadata
         }
 
+        #[instrument(skip(self))]
         async fn execute_impl(
             &self,
             _input: AgentInput,
@@ -582,10 +708,12 @@ mod tests {
             Ok(AgentOutput::text(format!("Executed {}", self.name)))
         }
 
+        #[instrument(skip(self))]
         async fn validate_input(&self, _input: &AgentInput) -> Result<()> {
             Ok(())
         }
 
+        #[instrument(skip(self))]
         async fn handle_error(&self, error: LLMSpellError) -> Result<AgentOutput> {
             Ok(AgentOutput::text(format!("Error: {error}")))
         }
@@ -711,6 +839,7 @@ mod tests {
                 &self.metadata
             }
 
+            #[instrument(skip(self))]
             async fn execute_impl(
                 &self,
                 _input: AgentInput,
@@ -719,10 +848,12 @@ mod tests {
                 Ok(AgentOutput::text("test".to_string()))
             }
 
+            #[instrument(skip(self))]
             async fn validate_input(&self, _input: &AgentInput) -> Result<()> {
                 Ok(())
             }
 
+            #[instrument(skip(self))]
             async fn handle_error(&self, error: LLMSpellError) -> Result<AgentOutput> {
                 Ok(AgentOutput::text(format!("Error: {error}")))
             }
@@ -895,9 +1026,7 @@ mod tests {
         assert!(output.text.contains("Executed hook_test_tool"));
 
         // Test direct execute_tool method as well
-        let result = registry
-            .execute_tool("hook_test_tool", input, context)
-            .await;
+        let result = Box::pin(registry.execute_tool("hook_test_tool", input, context)).await;
         assert!(result.is_ok());
     }
     #[tokio::test]
@@ -922,7 +1051,7 @@ mod tests {
         // Execute tool without hooks
         let input = AgentInput::text("test input");
         let context = ExecutionContext::default();
-        let result = registry.execute_tool("no_hook_tool", input, context).await;
+        let result = Box::pin(registry.execute_tool("no_hook_tool", input, context)).await;
 
         assert!(result.is_ok());
         let output = result.unwrap();
@@ -936,9 +1065,7 @@ mod tests {
         let context = ExecutionContext::default();
 
         // Try to execute non-existent tool
-        let result = registry
-            .execute_tool("nonexistent_tool", input, context)
-            .await;
+        let result = Box::pin(registry.execute_tool("nonexistent_tool", input, context)).await;
 
         assert!(result.is_err());
         if let Err(LLMSpellError::Component { message, .. }) = result {

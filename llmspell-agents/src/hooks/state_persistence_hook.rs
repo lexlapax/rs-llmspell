@@ -6,12 +6,13 @@
 use crate::lifecycle::events::{LifecycleEvent, LifecycleEventType};
 use anyhow::Result;
 use llmspell_core::traits::agent::Agent;
-use llmspell_state_persistence::StateManager;
+use llmspell_kernel::state::StateManager;
 use std::collections::HashMap;
 use std::sync::atomic::{AtomicU32, Ordering};
 use std::sync::Arc;
 use std::time::{Duration, SystemTime};
 use tokio::sync::{Mutex, RwLock};
+use tracing::instrument;
 use tracing::{debug, error, info, warn};
 
 /// Type alias for agent storage
@@ -104,12 +105,14 @@ impl StatePersistenceHook {
     }
 
     /// Register an agent with the hook for state management
+    #[instrument(skip(self, agent))]
     pub async fn register_agent(&self, agent_id: String, agent: AgentRef) {
         let mut agents = self.agents.write().await;
         agents.insert(agent_id, agent);
     }
 
     /// Unregister an agent
+    #[instrument(skip(self))]
     pub async fn unregister_agent(&self, agent_id: &str) {
         let mut agents = self.agents.write().await;
         agents.remove(agent_id);
@@ -122,6 +125,7 @@ impl StatePersistenceHook {
     /// Returns an error if:
     /// - State save fails
     /// - State restore fails
+    #[instrument(skip(self))]
     pub async fn handle_event(&self, event: &LifecycleEvent) -> Result<()> {
         match &event.event_type {
             LifecycleEventType::AgentPaused => {
@@ -149,6 +153,7 @@ impl StatePersistenceHook {
     /// # Errors
     ///
     /// Returns an error if state save fails for any agent
+    #[instrument(skip(self))]
     pub async fn check_auto_save(&self) -> Result<()> {
         if let Some(interval) = self.config.auto_save_interval {
             let now = SystemTime::now();
@@ -201,6 +206,7 @@ impl StatePersistenceHook {
     }
 
     /// Save agent state with retry logic
+    #[instrument(skip(self))]
     async fn save_state(&self, agent_id: &str) -> Result<()> {
         self.metrics.saves_attempted.fetch_add(1, Ordering::Relaxed);
 
@@ -258,6 +264,7 @@ impl StatePersistenceHook {
     }
 
     /// Restore agent state with retry logic
+    #[instrument(skip(self))]
     async fn restore_state(&self, agent_id: &str) -> Result<()> {
         self.metrics
             .restores_attempted

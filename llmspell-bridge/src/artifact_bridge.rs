@@ -2,7 +2,7 @@
 //! ABOUTME: Wraps `ArtifactStorage` for script access with async operations
 
 use llmspell_core::{error::LLMSpellError, Result};
-use llmspell_sessions::{
+use llmspell_kernel::sessions::{
     artifact::{
         access::Permission, ArtifactId, ArtifactMetadata, ArtifactQuery, ArtifactType,
         SessionArtifact,

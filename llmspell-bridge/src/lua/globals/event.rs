@@ -4,13 +4,20 @@
 use crate::globals::event_global::EventGlobal;
 use crate::globals::types::{GlobalContext, GlobalObject};
 use llmspell_core::error::LLMSpellError;
+use tracing::{debug, instrument};
 
 /// Inject the Event global into a Lua environment
 ///
 /// # Errors
 ///
 /// Returns an error if global injection fails
+#[instrument(
+    level = "debug",
+    skip(lua, context),
+    fields(global_name = "Event", event_bus_status = "enabled")
+)]
 pub fn inject_event_global(lua: &mlua::Lua, context: &GlobalContext) -> Result<(), LLMSpellError> {
+    debug!("Injecting Event global API");
     let event_global = EventGlobal::new();
     event_global.inject_lua(lua, context)
 }

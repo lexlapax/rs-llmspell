@@ -15,6 +15,7 @@ use tokio::sync::Mutex;
 pub fn format_output(output: &ScriptOutput, format: OutputFormat) -> Result<String> {
     match format {
         OutputFormat::Json => Ok(serde_json::to_string_pretty(&output.output)?),
+        OutputFormat::Yaml => Ok(serde_yaml::to_string(&output.output)?),
         OutputFormat::Text => {
             // Simple text representation
             match output.output {
@@ -72,6 +73,7 @@ pub async fn print_stream(stream: &mut ScriptStream, format: OutputFormat) -> Re
 
     match format {
         OutputFormat::Json => print_stream_json(stream, interrupted).await,
+        OutputFormat::Yaml => print_stream_yaml(stream, interrupted).await,
         OutputFormat::Text => print_stream_text(stream, false, interrupted).await,
         OutputFormat::Pretty => print_stream_text(stream, true, interrupted).await,
     }
@@ -104,6 +106,36 @@ async fn print_stream_json(stream: &mut ScriptStream, interrupted: Arc<Mutex<boo
 
     spinner.finish_and_clear();
     println!("{}", serde_json::to_string_pretty(&chunks)?);
+    Ok(())
+}
+
+/// Print streaming output as YAML
+async fn print_stream_yaml(stream: &mut ScriptStream, interrupted: Arc<Mutex<bool>>) -> Result<()> {
+    // Show progress while collecting chunks
+    let spinner = ProgressBar::new_spinner();
+    spinner.set_style(
+        ProgressStyle::default_spinner()
+            .template("{spinner:.cyan} {msg}")
+            .unwrap(),
+    );
+    spinner.set_message("Collecting stream data...");
+    spinner.enable_steady_tick(Duration::from_millis(100));
+
+    let mut chunks = Vec::new();
+    while let Some(chunk) = stream.stream.next().await {
+        // Check if interrupted
+        if *interrupted.lock().await {
+            spinner.finish_with_message("Stream interrupted by user");
+            eprintln!("\n⚠️ Stream interrupted by Ctrl+C");
+            break;
+        }
+
+        chunks.push(chunk?);
+        spinner.set_message(format!("Collected {} chunks", chunks.len()));
+    }
+
+    spinner.finish_and_clear();
+    println!("{}", serde_yaml::to_string(&chunks)?);
     Ok(())
 }
 
@@ -205,7 +237,8 @@ async fn print_stream_text(
             llmspell_core::types::ChunkContent::Control(msg) => {
                 // Handle control messages
                 use llmspell_core::types::ControlMessage;
-                tracing::debug!("Control message: {:?}", msg);
+                use tracing::debug;
+                debug!("Control message: {:?}", msg);
                 if let Some(ref pb) = progress {
                     match msg {
                         ControlMessage::StreamStart { .. } => {

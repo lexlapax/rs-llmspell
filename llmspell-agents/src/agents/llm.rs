@@ -14,10 +14,10 @@ use llmspell_core::{
     types::{AgentInput, AgentOutput},
     ComponentMetadata, ExecutionContext, LLMSpellError,
 };
+use llmspell_kernel::state::StateManager;
 use llmspell_providers::{ModelSpecifier, ProviderInstance, ProviderManager};
-use llmspell_state_persistence::StateManager;
 use std::sync::{Arc, Mutex};
-use tracing::{debug, error, info, warn};
+use tracing::{debug, error, info, instrument, warn};
 
 /// LLM-powered agent implementation
 pub struct LLMAgent {
@@ -41,6 +41,7 @@ impl LLMAgent {
     /// - Model configuration is missing
     /// - Provider creation fails
     /// - Agent initialization fails
+    #[instrument(level = "debug", skip(config, provider_manager), fields(agent_name = %config.name, agent_type = %config.agent_type))]
     pub async fn new(config: AgentConfig, provider_manager: Arc<ProviderManager>) -> Result<Self> {
         let metadata = ComponentMetadata::new(config.name.clone(), config.description.clone());
         let agent_id_string = metadata.id.to_string();
@@ -66,6 +67,12 @@ impl LLMAgent {
                 base_url: None,
             }
         };
+
+        info!(
+            provider = ?model_spec.provider,
+            model = %model_spec.model,
+            "Creating LLMAgent with provider and model"
+        );
 
         // Get or create provider instance
         let provider = provider_manager
@@ -168,6 +175,7 @@ impl LLMAgent {
     /// # Errors
     ///
     /// Returns an error if state machine initialization fails
+    #[instrument(skip(self))]
     pub async fn initialize(&self) -> Result<()> {
         info!("Initializing LLMAgent '{}'", self.metadata.name);
         self.state_machine.initialize().await?;
@@ -180,6 +188,7 @@ impl LLMAgent {
     /// # Errors
     ///
     /// Returns an error if state machine start fails
+    #[instrument(skip(self))]
     pub async fn start(&self) -> Result<()> {
         info!("Starting LLMAgent '{}'", self.metadata.name);
 
@@ -200,6 +209,7 @@ impl LLMAgent {
     ///
     /// Returns an error if state machine pause fails
     #[allow(clippy::cognitive_complexity)]
+    #[instrument(skip(self))]
     pub async fn pause(&self) -> Result<()> {
         info!("Pausing LLMAgent '{}'", self.metadata.name);
         self.state_machine.pause().await?;
@@ -228,6 +238,7 @@ impl LLMAgent {
     /// # Errors
     ///
     /// Returns an error if state machine resume fails
+    #[instrument(skip(self))]
     pub async fn resume(&self) -> Result<()> {
         info!("Resuming LLMAgent '{}'", self.metadata.name);
 
@@ -248,6 +259,7 @@ impl LLMAgent {
     ///
     /// Returns an error if state machine stop fails
     #[allow(clippy::cognitive_complexity)]
+    #[instrument(skip(self))]
     pub async fn stop(&self) -> Result<()> {
         info!("Stopping LLMAgent '{}'", self.metadata.name);
 
@@ -276,6 +288,7 @@ impl LLMAgent {
     /// # Errors
     ///
     /// Returns an error if state machine termination fails
+    #[instrument(skip(self))]
     pub async fn terminate(&self) -> Result<()> {
         info!("Terminating LLMAgent '{}'", self.metadata.name);
         self.state_machine.terminate().await?;
@@ -284,6 +297,7 @@ impl LLMAgent {
     }
 
     /// Check if agent is healthy
+    #[instrument(skip(self))]
     pub async fn is_healthy(&self) -> bool {
         self.state_machine.is_healthy().await
     }
@@ -295,6 +309,15 @@ impl BaseAgent for LLMAgent {
         &self.metadata
     }
 
+    #[instrument(
+        skip(self, _context),
+        level = "debug",
+        fields(
+            agent_name = %self.metadata.name,
+            input_size = input.text.len(),
+            execution_id = %uuid::Uuid::new_v4()
+        )
+    )]
     async fn execute_impl(
         &self,
         input: AgentInput,
@@ -367,6 +390,10 @@ impl BaseAgent for LLMAgent {
 
         // Build messages for the provider
         let messages = self.build_messages(&input.text);
+        debug!(
+            message_count = messages.len(),
+            "Built message history for provider"
+        );
 
         // Create provider input with conversation messages as JSON
         let messages_json =
@@ -391,18 +418,36 @@ impl BaseAgent for LLMAgent {
         }
 
         // Call the provider
+        info!(
+            provider_call = "complete",
+            max_tokens = ?self.core_config.max_tokens,
+            temperature = ?self.core_config.temperature,
+            "Calling LLM provider"
+        );
         let response = self.provider.complete(&provider_input).await?;
+        debug!(
+            response_size = response.text.len(),
+            "Received response from provider"
+        );
 
         // Update conversation history
         if let Ok(mut conv) = self.conversation.lock() {
+            debug!(
+                conversation_length = conv.len(),
+                "Updating conversation history"
+            );
             conv.push(ConversationMessage::user(input.text.clone()));
             conv.push(ConversationMessage::assistant(response.text.clone()));
         }
 
-        debug!("LLMAgent '{}' completed execution", self.metadata.name);
+        debug!(
+            output_size = response.text.len(),
+            "LLMAgent '{}' completed execution", self.metadata.name
+        );
         Ok(response)
     }
 
+    #[instrument(skip(self))]
     async fn validate_input(&self, input: &AgentInput) -> Result<(), LLMSpellError> {
         if input.text.is_empty() {
             return Err(LLMSpellError::Validation {
@@ -428,6 +473,7 @@ impl BaseAgent for LLMAgent {
         Ok(())
     }
 
+    #[instrument(skip(self))]
     async fn handle_error(&self, error: LLMSpellError) -> Result<AgentOutput, LLMSpellError> {
         error!(
             "LLMAgent '{}' encountered error: {}",
@@ -468,6 +514,7 @@ impl Agent for LLMAgent {
         &self.core_config
     }
 
+    #[instrument(skip(self))]
     async fn get_conversation(&self) -> Result<Vec<ConversationMessage>, LLMSpellError> {
         self.conversation
             .lock()
@@ -478,6 +525,7 @@ impl Agent for LLMAgent {
             })
     }
 
+    #[instrument(skip(self))]
     async fn add_message(&self, message: ConversationMessage) -> Result<(), LLMSpellError> {
         self.conversation
             .lock()
@@ -488,6 +536,7 @@ impl Agent for LLMAgent {
             })
     }
 
+    #[instrument(skip(self))]
     async fn clear_conversation(&self) -> Result<(), LLMSpellError> {
         self.conversation
             .lock()

@@ -31,7 +31,7 @@ use llmspell_utils::{
 use notify::{RecommendedWatcher, RecursiveMode, Watcher};
 use serde::{Deserialize, Serialize};
 use serde_json::{json, Value};
-use tracing::{error, info, warn};
+use tracing::{error, info, instrument, warn};
 
 /// Configuration for the `FileWatcherTool`
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -81,6 +81,7 @@ impl FileWatcherTool {
     /// Start watching files and return events
     #[allow(clippy::unused_async)]
     #[allow(clippy::cognitive_complexity)]
+    #[instrument(skip(self))]
     async fn watch_files(&self, watch_config: WatchConfig) -> AnyhowResult<Vec<FileEvent>> {
         // Validate configuration
         watch_config.validate()?;
@@ -212,6 +213,7 @@ impl FileWatcherTool {
 
     /// Validate parameters for file watching operations
     #[allow(clippy::unused_async)]
+    #[instrument(skip(self))]
     async fn validate_parameters(&self, params: &Value) -> Result<()> {
         if !params.is_object() {
             return Err(LLMSpellError::Validation {
@@ -236,6 +238,13 @@ impl FileWatcherTool {
 
 impl Default for FileWatcherTool {
     fn default() -> Self {
+        info!(
+            tool_name = "file-watcher",
+            category = "Tool",
+            phase = "Phase 3 (comprehensive instrumentation)",
+            "Creating FileWatcherTool"
+        );
+
         // Create a default sandbox context for testing
         let security_requirements = SecurityRequirements {
             level: SecurityLevel::Restricted,
@@ -261,6 +270,7 @@ impl BaseAgent for FileWatcherTool {
         &self.metadata
     }
 
+    #[instrument(skip(_context, input, self), fields(tool = %self.metadata().name))]
     async fn execute_impl(
         &self,
         input: AgentInput,
@@ -361,6 +371,7 @@ impl BaseAgent for FileWatcherTool {
         }
     }
 
+    #[instrument(skip(self))]
     async fn validate_input(&self, input: &AgentInput) -> Result<()> {
         if input.text.is_empty() {
             return Err(LLMSpellError::Validation {
@@ -371,6 +382,7 @@ impl BaseAgent for FileWatcherTool {
         Ok(())
     }
 
+    #[instrument(skip(self))]
     async fn handle_error(&self, error: LLMSpellError) -> Result<AgentOutput> {
         Ok(AgentOutput::text(format!("File watcher error: {error}")))
     }

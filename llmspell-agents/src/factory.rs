@@ -8,7 +8,7 @@ use llmspell_core::traits::agent::Agent;
 use llmspell_hooks::HookRegistry;
 use serde::{Deserialize, Serialize};
 use std::sync::Arc;
-use tracing::info;
+use tracing::{debug, info, instrument};
 
 /// Configuration for creating agents
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -37,7 +37,7 @@ pub struct AgentConfig {
 
 impl AgentConfig {
     /// Create a new builder for `AgentConfig`
-    pub fn builder(name: impl Into<String>) -> AgentConfigBuilder {
+    pub fn builder(name: impl Into<String> + std::fmt::Debug) -> AgentConfigBuilder {
         AgentConfigBuilder::new(name)
     }
 }
@@ -102,7 +102,7 @@ pub struct AgentConfigBuilder {
 
 impl AgentConfigBuilder {
     /// Create a new builder with required name
-    pub fn new(name: impl Into<String>) -> Self {
+    pub fn new(name: impl Into<String> + std::fmt::Debug) -> Self {
         Self {
             name: name.into(),
             description: String::new(),
@@ -116,14 +116,14 @@ impl AgentConfigBuilder {
 
     /// Set the agent's description
     #[must_use]
-    pub fn description(mut self, description: impl Into<String>) -> Self {
+    pub fn description(mut self, description: impl Into<String> + std::fmt::Debug) -> Self {
         self.description = description.into();
         self
     }
 
     /// Set the agent type
     #[must_use]
-    pub fn agent_type(mut self, agent_type: impl Into<String>) -> Self {
+    pub fn agent_type(mut self, agent_type: impl Into<String> + std::fmt::Debug) -> Self {
         self.agent_type = agent_type.into();
         self
     }
@@ -137,7 +137,7 @@ impl AgentConfigBuilder {
 
     /// Add an allowed tool
     #[must_use]
-    pub fn allow_tool(mut self, tool_id: impl Into<String>) -> Self {
+    pub fn allow_tool(mut self, tool_id: impl Into<String> + std::fmt::Debug) -> Self {
         self.allowed_tools.push(tool_id.into());
         self
     }
@@ -151,7 +151,11 @@ impl AgentConfigBuilder {
 
     /// Add a custom configuration parameter
     #[must_use]
-    pub fn custom_param(mut self, key: impl Into<String>, value: serde_json::Value) -> Self {
+    pub fn custom_param(
+        mut self,
+        key: impl Into<String> + std::fmt::Debug,
+        value: serde_json::Value,
+    ) -> Self {
         self.custom_config.insert(key.into(), value);
         self
     }
@@ -268,7 +272,9 @@ pub trait CreationHook: Send + Sync {
 impl DefaultAgentFactory {
     /// Create a new agent factory with provider manager
     #[must_use]
+    #[instrument(level = "debug", skip(provider_manager))]
     pub fn new(provider_manager: Arc<llmspell_providers::ProviderManager>) -> Self {
+        debug!("Creating DefaultAgentFactory with provider manager");
         let mut templates = std::collections::HashMap::new();
 
         // LLM agent is now the default template
@@ -373,6 +379,7 @@ impl DefaultAgentFactory {
     }
 
     /// Run creation hooks before creating agent
+    #[instrument(skip(self))]
     async fn run_before_hooks(&self, config: &AgentConfig) -> Result<()> {
         for hook in &self.creation_hooks {
             hook.before_create(config).await?;
@@ -381,6 +388,7 @@ impl DefaultAgentFactory {
     }
 
     /// Run creation hooks after creating agent
+    #[instrument(skip_all)]
     async fn run_after_hooks(&self, agent: &Arc<dyn Agent>) -> Result<()> {
         for hook in &self.creation_hooks {
             hook.after_create(agent).await?;
@@ -404,7 +412,13 @@ impl DefaultAgentFactory {
 
 #[async_trait]
 impl AgentFactory for DefaultAgentFactory {
+    #[instrument(level = "debug", skip(config, self), fields(agent_name = %config.name, agent_type = %config.agent_type))]
     async fn create_agent(&self, config: AgentConfig) -> Result<Arc<dyn Agent>> {
+        debug!(
+            config = ?config,
+            "Creating agent from configuration"
+        );
+
         // Validate configuration
         self.validate_config(&config)?;
 
@@ -443,7 +457,10 @@ impl AgentFactory for DefaultAgentFactory {
         Ok(agent)
     }
 
+    #[instrument(level = "debug", skip(self))]
     async fn create_from_template(&self, template_name: &str) -> Result<Arc<dyn Agent>> {
+        debug!("Creating agent from template: {}", template_name);
+
         let config = self
             .templates
             .get(template_name)
@@ -626,11 +643,13 @@ mod tests {
 
         #[async_trait]
         impl CreationHook for TestHook {
+            #[instrument(skip(self))]
             async fn before_create(&self, _config: &AgentConfig) -> Result<()> {
                 self.before_called.store(true, Ordering::SeqCst);
                 Ok(())
             }
 
+            #[instrument(skip_all)]
             async fn after_create(&self, _agent: &Arc<dyn Agent>) -> Result<()> {
                 self.after_called.store(true, Ordering::SeqCst);
                 Ok(())

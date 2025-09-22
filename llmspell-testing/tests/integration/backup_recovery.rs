@@ -1,7 +1,7 @@
 // ABOUTME: Integration tests for backup and recovery functionality
 // ABOUTME: Validates end-to-end backup operations, disaster recovery scenarios, and data integrity
 
-use llmspell_state_persistence::{
+use llmspell_kernel::state::{
     backup::{BackupStatus, RestoreOptions},
     StateScope,
 };

@@ -849,7 +849,7 @@ fn json_to_agent_input(input: &serde_json::Value) -> llmspell_core::types::Agent
 #[allow(dead_code)]
 #[allow(clippy::cognitive_complexity)]
 async fn create_execution_context_with_state(
-    state_manager: Option<Arc<llmspell_state_persistence::StateManager>>,
+    state_manager: Option<Arc<llmspell_kernel::state::StateManager>>,
 ) -> Result<llmspell_core::execution_context::ExecutionContext> {
     use tracing::info;
 
@@ -928,7 +928,7 @@ pub struct WorkflowBridge {
     #[allow(dead_code)] // Used when creating StandardizedWorkflowFactory
     registry: Arc<ComponentRegistry>,
     /// Shared state manager for workflow state persistence
-    state_manager: Option<Arc<llmspell_state_persistence::StateManager>>,
+    state_manager: Option<Arc<llmspell_kernel::state::StateManager>>,
     // active_workflows field removed - workflows stored in ComponentRegistry only
     /// Workflow execution history
     execution_history: Arc<RwLock<Vec<WorkflowExecutionRecord>>>,
@@ -983,7 +983,7 @@ impl WorkflowBridge {
     #[must_use]
     pub fn new(
         registry: &Arc<ComponentRegistry>,
-        state_manager: Option<Arc<llmspell_state_persistence::StateManager>>,
+        state_manager: Option<Arc<llmspell_kernel::state::StateManager>>,
     ) -> Self {
         Self {
             discovery: Arc::new(WorkflowDiscovery::new()),
@@ -1002,7 +1002,7 @@ impl WorkflowBridge {
 
     /// Get the state manager if available
     #[must_use]
-    pub const fn state_manager(&self) -> &Option<Arc<llmspell_state_persistence::StateManager>> {
+    pub const fn state_manager(&self) -> &Option<Arc<llmspell_kernel::state::StateManager>> {
         &self.state_manager
     }
 
@@ -1451,12 +1451,12 @@ impl WorkflowBridge {
 
             // Write to workflow-specific namespace
             if let Err(e) = state_adapter.write(&workflow_key, value.clone()).await {
-                tracing::warn!("Failed to write workflow-specific shared data: {}", e);
+                warn!("Failed to write workflow-specific shared data: {}", e);
             }
 
             // Also write to global shared namespace for broader access
             if let Err(e) = state_adapter.write(&global_key, value).await {
-                tracing::warn!("Failed to write global shared data: {}", e);
+                warn!("Failed to write global shared data: {}", e);
             }
         }
 

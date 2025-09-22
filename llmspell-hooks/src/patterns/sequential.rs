@@ -12,6 +12,7 @@ use std::sync::Arc;
 use tracing::debug;
 
 /// A sequential hook that executes hooks in order
+#[derive(Debug)]
 pub struct SequentialHook {
     inner: CompositeHook,
 }
@@ -137,6 +138,7 @@ impl SequentialHookBuilder {
 }
 
 /// Advanced sequential hook with conditional execution
+#[derive(Debug)]
 pub struct ConditionalSequentialHook {
     base: SequentialHook,
     conditions: Vec<Box<dyn Fn(&HookContext) -> bool + Send + Sync>>,

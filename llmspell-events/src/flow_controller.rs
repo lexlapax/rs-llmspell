@@ -138,6 +138,7 @@ impl Default for FlowControllerConfig {
 }
 
 /// Flow controller for rate limiting and backpressure handling
+#[derive(Debug)]
 pub struct FlowController {
     /// Configuration
     config: FlowControllerConfig,

@@ -8,7 +8,8 @@ use llmspell_core::{ComponentId, ComponentLookup, ComponentMetadata, LLMSpellErr
 use std::sync::Arc;
 use std::time::{Duration, Instant};
 use tokio::time::timeout;
-use tracing::{debug, error, info, warn};
+use tracing::field::Empty;
+use tracing::{debug, error, info, instrument, warn};
 
 /// Basic step executor for workflow steps
 #[derive(Clone)]
@@ -66,6 +67,12 @@ impl StepExecutor {
     }
 
     /// Execute a single step with retry logic
+    #[instrument(level = "info", skip(self, step, context), fields(
+        step_name = %step.name,
+        step_type = ?step.step_type,
+        execution_count = Empty,
+        retry_attempt = Empty
+    ))]
     pub async fn execute_step(
         &self,
         step: &WorkflowStep,
@@ -76,6 +83,14 @@ impl StepExecutor {
     }
 
     /// Execute a single step with workflow metadata for hooks
+    #[instrument(level = "info", skip_all, fields(
+        step_name = %step.name,
+        step_type = ?step.step_type,
+        workflow_id = "",
+        workflow_name = workflow_metadata.as_ref().map_or("", |m| m.name.as_str()),
+        step_name = %step.name,
+        step_type = ?step.step_type
+    ))]
     pub async fn execute_step_with_metadata(
         &self,
         step: &WorkflowStep,
@@ -195,6 +210,9 @@ impl StepExecutor {
     }
 
     /// Execute a step with retry logic
+    #[instrument(level = "info", skip(self, step, context, error_strategy), fields(
+        step_name = %step.name
+    ))]
     pub async fn execute_step_with_retry(
         &self,
         step: &WorkflowStep,
@@ -269,6 +287,10 @@ impl StepExecutor {
     }
 
     /// Internal step execution logic with hook integration
+    #[instrument(level = "debug", skip_all, fields(
+        step_name = %step.name,
+        step_type = ?step.step_type
+    ))]
     async fn execute_step_internal(
         &self,
         step: &WorkflowStep,
@@ -586,11 +608,58 @@ impl StepExecutor {
                 let input = parameters.get("input").unwrap_or(&default_input);
                 format!("JSON processed: {}", input)
             }
-            _ => {
+            "email_handler" => {
+                let priority = parameters
+                    .get("priority")
+                    .and_then(|v| v.as_str())
+                    .unwrap_or("normal");
+                format!("Email handled with priority: {}", priority)
+            }
+            "text_processor" => {
+                let action = parameters
+                    .get("action")
+                    .and_then(|v| v.as_str())
+                    .unwrap_or("process");
+                format!("Text processing completed: {}", action)
+            }
+            "mock_tool" | "tool" | "test_tool" => {
+                // Generic mock tools for testing
                 format!(
-                    "Tool '{}' executed with parameters: {}",
+                    "Mock tool '{}' executed with parameters: {}",
                     tool_name, parameters
                 )
+            }
+            "http_request" => {
+                let method = parameters
+                    .get("method")
+                    .and_then(|v| v.as_str())
+                    .unwrap_or("GET");
+                format!("HTTP {} request completed", method)
+            }
+            "data_processor" => {
+                let operation = parameters
+                    .get("operation")
+                    .and_then(|v| v.as_str())
+                    .unwrap_or("process");
+                format!("Data processing operation '{}' completed", operation)
+            }
+            "csv_parser" => {
+                format!("CSV data parsed with parameters: {}", parameters)
+            }
+            "text_parser" => {
+                format!("Text parsed with parameters: {}", parameters)
+            }
+            "item_processor" => {
+                let default_item = serde_json::json!("item");
+                let item = parameters.get("item").unwrap_or(&default_item);
+                format!("Item processed: {}", item)
+            }
+            _ => {
+                // Unknown tools should fail
+                return Err(LLMSpellError::Component {
+                    message: format!("Tool '{}' not found in mock registry", tool_name),
+                    source: None,
+                });
             }
         };
 

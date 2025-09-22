@@ -7,8 +7,9 @@ use super::types::{GlobalContext, GlobalMetadata, GlobalObject};
 use crate::workflows::WorkflowBridge;
 use crate::ComponentRegistry;
 use llmspell_core::Result;
-use llmspell_state_persistence::StateManager;
+use llmspell_kernel::state::StateManager;
 use std::sync::Arc;
+use tracing::info;
 
 /// Workflow global object for script engines
 pub struct WorkflowGlobal {
@@ -30,7 +31,7 @@ impl WorkflowGlobal {
         registry: Arc<ComponentRegistry>,
         state_manager: Arc<StateManager>,
     ) -> Self {
-        tracing::info!(
+        info!(
             "WorkflowGlobal: Creating WorkflowBridge with StateManager at {:p}",
             Arc::as_ptr(&state_manager)
         );

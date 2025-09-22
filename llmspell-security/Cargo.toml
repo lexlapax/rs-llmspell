@@ -9,7 +9,6 @@ license.workspace = true
 
 [dependencies]
 llmspell-core = { path = "../llmspell-core" }
-llmspell-state-traits = { path = "../llmspell-state-traits" }
 tokio.workspace = true
 serde.workspace = true
 serde_json.workspace = true

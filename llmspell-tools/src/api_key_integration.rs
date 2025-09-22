@@ -6,6 +6,7 @@ use chrono::Utc;
 use llmspell_utils::api_key_manager::{ApiKeyManager, ApiKeyMetadata};
 use parking_lot::RwLock;
 use std::sync::Arc;
+use tracing::warn;
 
 /// Global API key manager instance
 static API_KEY_MANAGER: std::sync::LazyLock<Arc<RwLock<ApiKeyManager>>> =
@@ -42,7 +43,7 @@ pub fn get_api_key(service: &str) -> Option<String> {
             std::env::var(format!("LLMSPELL_API_KEY_{}", service.to_uppercase())).ok()
         }
         Err(e) => {
-            tracing::warn!("Error retrieving API key for service '{}': {}", service, e);
+            warn!("Error retrieving API key for service '{}': {}", service, e);
             None
         }
     }

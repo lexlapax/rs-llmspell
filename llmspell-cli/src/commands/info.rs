@@ -36,6 +36,20 @@ pub async fn show_engine_info(
                 .collect::<Vec<_>>();
             println!("{}", serde_json::to_string_pretty(&info)?);
         }
+        OutputFormat::Yaml => {
+            let info = engines
+                .iter()
+                .map(|engine| {
+                    json!({
+                        "name": engine.as_str(),
+                        "available": engine.is_available(),
+                        "status": engine.availability_message(),
+                        "current": *engine == current_engine,
+                    })
+                })
+                .collect::<Vec<_>>();
+            println!("{}", serde_yaml::to_string(&info)?);
+        }
         OutputFormat::Text | OutputFormat::Pretty => {
             println!("LLMSpell Script Engines:");
             println!();

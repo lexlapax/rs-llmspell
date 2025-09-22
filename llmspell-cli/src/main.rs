@@ -1,127 +1,52 @@
-//! ABOUTME: Main entry point for the llmspell command-line tool
-//! ABOUTME: Handles argument parsing and dispatches to appropriate command handlers
+//! ABOUTME: Main entry point for llmspell CLI - Phase 9.4.4 Complete Restructure
+//! ABOUTME: Professional CLI with dual-mode design and comprehensive tracing
 
 use anyhow::Result;
 use clap::Parser;
 use llmspell_cli::{cli::Cli, commands::execute_command, config::load_runtime_config};
-use llmspell_utils::debug::{global_debug_manager, DebugLevel};
-use std::sync::Arc;
 
 #[tokio::main]
 async fn main() -> Result<()> {
-    // Initialize logging based on verbosity
     let cli = Cli::parse();
 
-    let log_level = if cli.verbose {
-        tracing::Level::DEBUG
-    } else {
-        tracing::Level::INFO
-    };
-
-    tracing_subscriber::fmt()
-        .with_max_level(log_level)
-        .with_target(false)
-        .init();
-
-    // Initialize debug system based on CLI flags
-    let debug_manager = global_debug_manager();
-
-    // Apply CLI debug settings (highest priority)
-    if cli.debug {
-        debug_manager.set_enabled(true);
-    }
-
-    if let Some(ref level) = cli.debug_level {
-        if let Some(debug_level) = parse_debug_level(level) {
-            debug_manager.set_level(debug_level);
-        }
-    }
-
-    if let Some(ref modules) = cli.debug_modules {
-        apply_module_filters(&debug_manager, modules);
-    }
-
-    if cli.debug_perf {
-        // Enable performance tracking will be handled by the config
-    }
-
-    // Validate engine selection
-    cli.validate_engine()?;
+    // Initialize tracing based on --trace flag
+    setup_tracing(cli.trace);
 
     // Load runtime configuration
     let config_path = cli.config_path();
-    let mut runtime_config = load_runtime_config(config_path.as_deref()).await?;
+    let runtime_config = load_runtime_config(config_path.as_deref()).await?;
 
-    // Apply CLI debug settings to config (for passing to script engines)
-    apply_debug_cli_to_config(&cli, &mut runtime_config);
-
-    // Execute the command
-    execute_command(cli.command, cli.engine, runtime_config, cli.output).await?;
+    // Execute the command with new architecture
+    execute_command(cli.command, runtime_config, cli.output).await?;
 
     Ok(())
 }
 
-fn parse_debug_level(level: &str) -> Option<DebugLevel> {
-    match level.to_lowercase().as_str() {
-        "off" => Some(DebugLevel::Off),
-        "error" => Some(DebugLevel::Error),
-        "warn" => Some(DebugLevel::Warn),
-        "info" => Some(DebugLevel::Info),
-        "debug" => Some(DebugLevel::Debug),
-        "trace" => Some(DebugLevel::Trace),
-        _ => None,
-    }
-}
+/// Set up tracing based on RUST_LOG environment variable or --trace flag
+/// Priority: RUST_LOG > --trace flag > default (warn)
+///
+/// Best Practice: Tracing output goes to stderr to keep stdout clean for program output
+/// This allows: `llmspell exec "code" > output.txt 2> debug.log`
+fn setup_tracing(trace_level: llmspell_cli::cli::TraceLevel) {
+    use std::io;
+    use tracing::Level;
+    use tracing_subscriber::EnvFilter;
 
-fn apply_module_filters(debug_manager: &Arc<llmspell_utils::debug::DebugManager>, modules: &str) {
-    for module in modules.split(',') {
-        let module = module.trim();
-        if let Some(enabled_module) = module.strip_prefix('+') {
-            debug_manager.add_module_filter(enabled_module, true);
-        } else if let Some(disabled_module) = module.strip_prefix('-') {
-            debug_manager.add_module_filter(disabled_module, false);
-        } else {
-            // Default to enabling if no prefix
-            debug_manager.add_module_filter(module, true);
-        }
-    }
-}
-
-fn apply_debug_cli_to_config(cli: &Cli, config: &mut llmspell_config::LLMSpellConfig) {
-    // Apply CLI debug settings to config (highest priority)
-    if cli.debug {
-        config.debug.enabled = true;
-    }
-
-    if let Some(ref level) = cli.debug_level {
-        config.debug.level = level.clone();
-    }
-
-    if let Some(ref format) = cli.debug_format {
-        config.debug.output.format = format.clone();
-    }
-
-    if let Some(ref modules) = cli.debug_modules {
-        // Parse module filters
-        for module in modules.split(',') {
-            let module = module.trim();
-            if let Some(enabled) = module.strip_prefix('+') {
-                config
-                    .debug
-                    .module_filters
-                    .enabled
-                    .push(enabled.to_string());
-            } else if let Some(disabled) = module.strip_prefix('-') {
-                config
-                    .debug
-                    .module_filters
-                    .disabled
-                    .push(disabled.to_string());
-            }
-        }
-    }
-
-    if cli.debug_perf {
-        config.debug.performance.enabled = true;
+    // Check if RUST_LOG is set
+    if std::env::var("RUST_LOG").is_ok() {
+        // Use RUST_LOG environment variable with EnvFilter
+        tracing_subscriber::fmt()
+            .with_env_filter(EnvFilter::from_default_env())
+            .with_writer(io::stderr) // Explicitly use stderr for tracing
+            .with_target(false)
+            .init();
+    } else {
+        // Use --trace flag
+        let level: Level = trace_level.into();
+        tracing_subscriber::fmt()
+            .with_max_level(level)
+            .with_writer(io::stderr) // Explicitly use stderr for tracing
+            .with_target(false)
+            .init();
     }
 }

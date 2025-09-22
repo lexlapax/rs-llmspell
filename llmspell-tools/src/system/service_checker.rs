@@ -10,6 +10,7 @@ use llmspell_core::{
     types::{AgentInput, AgentOutput},
     ComponentMetadata, ExecutionContext, LLMSpellError, Result as LLMResult,
 };
+use llmspell_kernel::runtime::create_io_bound_resource;
 use llmspell_security::sandbox::SandboxContext;
 use llmspell_utils::{
     extract_optional_u64, extract_parameters, extract_required_string, response::ResponseBuilder,
@@ -22,7 +23,7 @@ use std::sync::Arc;
 use std::time::{Duration, Instant};
 use tokio::net::TcpStream;
 use tokio::time::timeout;
-use tracing::{debug, info, warn};
+use tracing::{debug, info, instrument, warn};
 
 /// Service check result
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -113,6 +114,12 @@ impl ServiceCheckerTool {
     /// Create a new service checker tool
     #[must_use]
     pub fn new(config: ServiceCheckerConfig) -> Self {
+        info!(
+            default_timeout_seconds = config.default_timeout_seconds,
+            max_timeout_seconds = config.max_timeout_seconds,
+            allowed_ports_count = config.allowed_ports.len(),
+            "Creating ServiceCheckerTool"
+        );
         Self {
             metadata: ComponentMetadata::new(
                 "service_checker".to_string(),
@@ -208,6 +215,7 @@ impl ServiceCheckerTool {
     /// Check TCP port connectivity
     #[allow(clippy::too_many_lines)]
     #[allow(clippy::cognitive_complexity)]
+    #[instrument(skip(self))]
     async fn check_tcp_port(
         &self,
         host: &str,
@@ -215,6 +223,12 @@ impl ServiceCheckerTool {
         timeout_duration: Duration,
     ) -> ServiceCheckResult {
         let target = format!("{host}:{port}");
+        debug!(
+            host = %host,
+            port = port,
+            timeout_seconds = timeout_duration.as_secs(),
+            "Checking TCP port"
+        );
         let start_time = Instant::now();
 
         debug!("Checking TCP port: {}", target);
@@ -332,6 +346,7 @@ impl ServiceCheckerTool {
     /// Check HTTP/HTTPS service health
     #[allow(clippy::too_many_lines)]
     #[allow(clippy::cognitive_complexity)]
+    #[instrument(skip(self))]
     async fn check_http_service(
         &self,
         url: &str,
@@ -390,16 +405,24 @@ impl ServiceCheckerTool {
             };
         }
 
-        // Create HTTP client with timeout
-        let client = reqwest::Client::builder()
-            .timeout(timeout_duration)
-            .build()
-            .map_err(|e| LLMSpellError::Tool {
-                message: format!("Failed to create HTTP client: {e}"),
-                tool_name: Some("service_checker".to_string()),
-                source: None,
-            })
-            .unwrap();
+        // Create HTTP client with timeout using global runtime
+        let client = match create_io_bound_resource(move || {
+            reqwest::Client::builder().timeout(timeout_duration).build()
+        }) {
+            Ok(client) => client,
+            Err(e) => {
+                warn!("Failed to create HTTP client: {}", e);
+                return ServiceCheckResult {
+                    target: url.to_string(),
+                    available: false,
+                    #[allow(clippy::cast_possible_truncation)]
+                    response_time_ms: start_time.elapsed().as_millis() as u64,
+                    status: "Failed to create HTTP client".to_string(),
+                    error: Some(format!("Failed to create HTTP client: {e}")),
+                    metadata: HashMap::new(),
+                };
+            }
+        };
 
         // Make HEAD request to check service availability
         match client.head(url).send().await {
@@ -477,17 +500,30 @@ impl BaseAgent for ServiceCheckerTool {
     }
 
     #[allow(clippy::too_many_lines)]
+    #[instrument(skip(_context, input, self), fields(tool = %self.metadata().name))]
     async fn execute_impl(
         &self,
         input: AgentInput,
         _context: ExecutionContext,
     ) -> LLMResult<AgentOutput> {
+        let _start = Instant::now();
+        info!(
+            input_size = input.text.len(),
+            has_params = !input.parameters.is_empty(),
+            "Executing service checker tool"
+        );
+
         // Get parameters using shared utility
         let params = extract_parameters(&input)?;
 
         // Extract required parameters
         let target = extract_required_string(params, "target")?;
         let check_type = extract_required_string(params, "check_type")?;
+        debug!(
+            target = %target,
+            check_type = %check_type,
+            "Starting service check"
+        );
 
         // Validate check_type
         match check_type {
@@ -629,6 +665,7 @@ impl BaseAgent for ServiceCheckerTool {
         Ok(AgentOutput::text(serde_json::to_string_pretty(&response)?))
     }
 
+    #[instrument(skip(self))]
     async fn validate_input(&self, input: &AgentInput) -> LLMResult<()> {
         if input.text.is_empty() {
             return Err(LLMSpellError::Validation {
@@ -639,6 +676,7 @@ impl BaseAgent for ServiceCheckerTool {
         Ok(())
     }
 
+    #[instrument(skip(self))]
     async fn handle_error(&self, error: LLMSpellError) -> LLMResult<AgentOutput> {
         Ok(AgentOutput::text(format!("Service checker error: {error}")))
     }

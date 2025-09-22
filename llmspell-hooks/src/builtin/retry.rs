@@ -12,6 +12,7 @@ use serde::{Deserialize, Serialize};
 use std::collections::{HashMap, HashSet};
 use std::sync::Arc;
 use std::time::Duration;
+use tracing::{debug, info, trace, warn};
 
 /// Backoff strategy for retries
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -152,6 +153,7 @@ struct RetryState {
 }
 
 /// Built-in retry hook with exponential backoff
+#[derive(Debug)]
 pub struct RetryHook {
     config: RetryConfig,
     attempt_tracker: Arc<parking_lot::RwLock<HashMap<String, RetryState>>>,
@@ -379,7 +381,7 @@ impl Hook for RetryHook {
 
         // Check if error is retryable
         if !self.is_retryable_error(&error) {
-            log::debug!("RetryHook: Error '{}' is not retryable", error);
+            debug!("RetryHook: Error '{}' is not retryable", error);
             return Ok(HookResult::Continue);
         }
 
@@ -411,10 +413,9 @@ impl Hook for RetryHook {
 
         // Check max attempts
         if state.attempts >= self.config.max_attempts {
-            log::warn!(
+            warn!(
                 "RetryHook: Max attempts ({}) reached for {}",
-                self.config.max_attempts,
-                retry_key
+                self.config.max_attempts, retry_key
             );
 
             {
@@ -430,7 +431,7 @@ impl Hook for RetryHook {
         // Check max duration
         if let Some(max_duration) = self.config.max_retry_duration {
             if state.start_time.elapsed() > max_duration {
-                log::warn!("RetryHook: Max retry duration exceeded for {}", retry_key);
+                warn!("RetryHook: Max retry duration exceeded for {}", retry_key);
 
                 {
                     let mut metrics = self.metrics.write().unwrap();
@@ -461,12 +462,9 @@ impl Hook for RetryHook {
         context.insert_metadata("retry_delay_ms".to_string(), delay.as_millis().to_string());
         context.insert_metadata("retry_reason".to_string(), error);
 
-        log::info!(
+        info!(
             "RetryHook: Retrying {} (attempt {}/{}) with {:?} delay",
-            retry_key,
-            state.attempts,
-            self.config.max_attempts,
-            delay
+            retry_key, state.attempts, self.config.max_attempts, delay
         );
 
         // Return retry result
@@ -492,7 +490,7 @@ impl Hook for RetryHook {
 #[async_trait]
 impl MetricHook for RetryHook {
     async fn record_pre_execution(&self, context: &HookContext) -> Result<()> {
-        log::trace!(
+        trace!(
             "RetryHook: Pre-execution for hook point {:?}",
             context.point
         );

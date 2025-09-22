@@ -13,6 +13,7 @@ use std::{
     sync::Arc,
 };
 use tokio::sync::RwLock;
+use tracing::instrument;
 
 /// Type-safe dependency injection container
 pub struct DIContainer {
@@ -42,6 +43,7 @@ impl DIContainer {
     /// # Errors
     ///
     /// Returns an error if a tool with the same ID is already registered
+    #[instrument(skip_all)]
     pub async fn register_tool(&self, id: String, tool: Arc<dyn Tool>) -> Result<()> {
         let mut tools = self.tools.write().await;
         if tools.contains_key(&id) {
@@ -52,12 +54,14 @@ impl DIContainer {
     }
 
     /// Get a tool by ID
+    #[instrument(skip_all)]
     pub async fn get_tool(&self, id: &str) -> Option<Arc<dyn Tool>> {
         let tools = self.tools.read().await;
         tools.get(id).cloned()
     }
 
     /// List all registered tool IDs
+    #[instrument(skip(self))]
     pub async fn list_tools(&self) -> Vec<String> {
         let tools = self.tools.read().await;
         tools.keys().cloned().collect()
@@ -68,6 +72,7 @@ impl DIContainer {
     /// # Errors
     ///
     /// Returns an error if a service of the same type is already registered
+    #[instrument(skip(self, service))]
     pub async fn register_service<T: Any + Send + Sync + 'static>(&self, service: T) -> Result<()> {
         let type_id = TypeId::of::<T>();
         let mut services = self.services.write().await;
@@ -82,6 +87,7 @@ impl DIContainer {
     }
 
     /// Get a service by type
+    #[instrument(skip(self))]
     pub async fn get_service<T: Any + Send + Sync + Clone + 'static>(&self) -> Option<Arc<T>> {
         let type_id = TypeId::of::<T>();
         let services = self.services.read().await;
@@ -98,6 +104,7 @@ impl DIContainer {
     /// # Errors
     ///
     /// Returns an error if a named instance with the same name is already registered
+    #[instrument(skip(self, instance))]
     pub async fn register_named<T: Any + Send + Sync + 'static>(
         &self,
         name: String,
@@ -112,6 +119,7 @@ impl DIContainer {
     }
 
     /// Get a named instance
+    #[instrument(skip_all)]
     pub async fn get_named<T: Any + Send + Sync + Clone + 'static>(
         &self,
         name: &str,
@@ -155,6 +163,7 @@ impl ScopedDIContainer<'_> {
     /// # Errors
     ///
     /// Returns an error if service registration fails
+    #[instrument(skip(self, service))]
     pub async fn register_scoped<T: Any + Send + Sync + 'static>(&self, service: T) -> Result<()> {
         let type_id = TypeId::of::<T>();
         let mut services = self.scoped_services.write().await;
@@ -163,6 +172,7 @@ impl ScopedDIContainer<'_> {
     }
 
     /// Get a service (checks scope first, then parent)
+    #[instrument(skip_all)]
     pub async fn get_service<T: Any + Send + Sync + Clone + 'static>(&self) -> Option<Arc<T>> {
         let type_id = TypeId::of::<T>();
 
@@ -180,6 +190,7 @@ impl ScopedDIContainer<'_> {
     }
 
     /// Get a tool (delegates to parent)
+    #[instrument(skip_all)]
     pub async fn get_tool(&self, id: &str) -> Option<Arc<dyn Tool>> {
         self.parent.get_tool(id).await
     }
@@ -243,6 +254,7 @@ mod tests {
 
     #[async_trait::async_trait]
     impl BaseAgent for MockTool {
+        #[instrument(skip(self))]
         async fn execute_impl(
             &self,
             _input: AgentInput,
@@ -256,6 +268,7 @@ mod tests {
             unimplemented!("Mock metadata")
         }
 
+        #[instrument(skip(self))]
         async fn validate_input(
             &self,
             _input: &AgentInput,
@@ -263,6 +276,7 @@ mod tests {
             Ok(())
         }
 
+        #[instrument(skip(self))]
         async fn handle_error(
             &self,
             error: llmspell_core::LLMSpellError,

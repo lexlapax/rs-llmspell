@@ -190,7 +190,7 @@ impl StateSharingManager {
     /// - The specified channel does not exist
     /// - The sender agent is not a participant in the channel
     /// - Pattern permissions validation fails
-    #[instrument(skip(self, payload))]
+    #[instrument(skip(payload, self))]
     pub async fn publish_message(
         &self,
         channel_id: &str,
@@ -262,7 +262,7 @@ impl StateSharingManager {
     /// - The specified channel does not exist
     /// - The original message to reply to is not found
     /// - Publishing the reply message fails
-    #[instrument(skip(self, payload))]
+    #[instrument(skip(payload, self))]
     pub async fn reply_to_message(
         &self,
         channel_id: &str,
@@ -460,7 +460,7 @@ impl StateSharingManager {
     /// - Pipeline stages metadata is missing or invalid
     /// - The current agent is not in the pipeline
     /// - Publishing the stage completion message fails
-    #[instrument(skip(self, data))]
+    #[instrument(skip(data, self))]
     pub async fn process_pipeline_stage(
         &self,
         pipeline_id: &str,
@@ -621,6 +621,7 @@ impl SharedStateAccessor {
     /// # Errors
     ///
     /// Returns an error if publishing the message fails
+    #[instrument(skip(self))]
     pub async fn publish(
         &self,
         channel_id: &str,
@@ -652,7 +653,7 @@ mod tests {
 
     fn init_tracing() {
         INIT.call_once(|| {
-            // Initialize tracing subscriber for tests to prevent hangs with #[instrument]
+            // Initialize tracing subscriber for tests to prevent hangs with #[instrument(skip(self))]
             let _ = tracing_subscriber::fmt()
                 .with_test_writer()
                 .with_max_level(tracing::Level::DEBUG)

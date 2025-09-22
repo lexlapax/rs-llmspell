@@ -14,6 +14,7 @@ use tracing::{debug, error, info};
 use uuid::Uuid;
 
 /// Event bus for publishing and subscribing to events
+#[derive(Debug)]
 pub struct EventBus {
     /// Pattern-based subscriptions
     subscriptions: Arc<DashMap<String, Vec<Subscription>>>,
@@ -29,7 +30,7 @@ pub struct EventBus {
 
 /// Trait for type-erased persistence manager
 #[async_trait::async_trait]
-trait EventPersistenceManagerTrait: Send + Sync {
+trait EventPersistenceManagerTrait: Send + Sync + std::fmt::Debug {
     async fn maybe_store_event(&self, event: &UniversalEvent) -> anyhow::Result<bool>;
     fn storage(&self) -> &dyn EventStorage;
 }

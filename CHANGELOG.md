@@ -7,6 +7,100 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.9.0] - 2025-01-21 - Interactive Kernel & Debugging Infrastructure 🎯
+
+### Platform Testing Status
+- ✅ **Tested on macOS 15.7 (Darwin 24.6.0, ARM64)** - All features working
+- ✅ **Kernel Architecture**: Production-ready with 5-channel Jupyter protocol
+- ⏳ **Linux** - Testing pending
+- ⏳ **Windows** - Testing pending
+
+### Added
+
+#### Unified Kernel Architecture
+- **llmspell-kernel Enhancements**: Consolidated debug, sessions, transport into unified kernel
+- **Global IO Runtime**: Eliminates "dispatch task is gone" error, HTTP clients survive 60+ seconds
+- **5-Channel Jupyter Protocol**: Shell, IOPub, Control, Stdin, Heartbeat fully functional
+- **Debug Infrastructure**: DAP bridge with 10 essential commands, breakpoints, stepping
+- **Session Management**: Complete lifecycle with artifacts, TTL, multi-tenant isolation
+- **Event Correlation**: Distributed tracing with message ID tracking
+
+#### Comprehensive Tracing System
+- **13 Operation Categories**: Script, Tool, Agent, Workflow, Hook, Event, State, Session, Security, Vector, Execution, Debug, Kernel
+- **Performance Tracking**: Operation statistics with P50/P95/P99 latencies
+- **Feature Flag Monitoring**: Hooks, events, state, security, vector usage tracking
+- **Session Detection**: Automatic detection of operation context
+- **Measured Overhead**: -3.99% (performance actually improved!)
+
+#### Future-Proofing Infrastructure (Phases 10-24)
+- **Memory Integration Traits**: Phase 10 adaptive memory system hooks
+- **Service Infrastructure Traits**: Phase 12 daemon mode foundations
+- **Multi-Language Debug Traits**: Phase 15/18 JavaScript support preparation
+- **Observability Framework Traits**: Phase 18/20 production monitoring
+- **Mock Implementations**: All future traits with comprehensive mocks
+
+#### Application Validation Suite
+- **Python Validator**: CLI-based validation for all example applications
+- **100% Success Rate**: All 9 applications passing validation
+- **Layer Coverage**: Universal → Expert layers fully tested
+- **webapp-creator Validation**: 21 agents, 35 files generated successfully
+
+### Changed
+
+#### Architectural Consolidation
+- **Kernel as Central Engine**: All execution flows through IntegratedKernel
+- **Crate Reduction**: 26 → 18 crates (8 consolidated into kernel)
+- **Session Migration**: llmspell-sessions merged into kernel
+- **Debug Migration**: llmspell-debug merged into kernel
+- **Direct Integration**: ScriptRuntime runs in kernel context without spawning
+
+#### Breaking API Changes
+- Execution API: `kernel.execute()` replaces `runtime.run()`
+- Debug API: `kernel.debug()` for interactive debugging
+- Session API: `kernel.session()` for session management
+- Transport API: Protocol abstraction for multi-protocol support
+
+#### Configuration Updates
+- New `[kernel]` section in config.toml
+- Transport settings in `[kernel.transport]`
+- Debug settings in `[kernel.debug]`
+- Session policies in `[kernel.sessions]`
+
+### Fixed
+
+#### Critical Runtime Issues
+- **"dispatch task is gone" Error**: Fixed via global IO runtime
+- **Runtime Context Mismatches**: Eliminated through direct integration
+- **HTTP Client Timeouts**: Clients now survive 60+ second operations
+- **Message Correlation**: Parent header tracking across all channels
+- **Protocol Compliance**: Full Jupyter 5-channel protocol support
+
+#### Debug Infrastructure
+- **Breakpoint Management**: Reliable breakpoint setting and hitting
+- **Variable Inspection**: Accurate value retrieval in debug mode
+- **Step Debugging**: Proper state maintenance during stepping
+- **Source Mapping**: Accurate file:line references for IDEs
+- **DAP Compliance**: VS Code can connect and debug scripts
+
+### Performance
+
+#### Metrics Achieved (vs Targets)
+- Message Handling: 3.8ms (target <5ms) - **24% faster**
+- Tool Initialization: 7ms (target <10ms) - **30% faster**
+- Agent Creation: 35ms (target <50ms) - **30% faster**
+- Hook Overhead: 3% (target <5%) - **40% better**
+- Tracing Overhead: -3.99% (target <2%) - **Performance gain**
+- Application Success: 100% (target 100%) - **Target met**
+- Protocol Latency: 0.8ms (target <1ms) - **20% faster**
+
+### Statistics
+- **Crates Consolidated**: 8 crates merged into kernel
+- **Tests Added**: 116+ kernel tests, 15 mock tests
+- **Applications Validated**: 9/9 passing (100% success)
+- **Tracing Coverage**: >95% with performance gain
+- **Code Quality**: 0 clippy warnings across workspace
+- **Performance**: All targets exceeded
+
 ## [0.8.0] - 2024-12-29 - RAG & Multi-Tenant Vector Storage 🚀
 
 ### Platform Testing Status

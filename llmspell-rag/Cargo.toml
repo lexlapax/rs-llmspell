@@ -14,9 +14,7 @@ description = "Vector storage and RAG (Retrieval-Augmented Generation) infrastru
 llmspell-core = { path = "../llmspell-core" }
 llmspell-utils = { path = "../llmspell-utils" }
 llmspell-providers = { path = "../llmspell-providers" }
-llmspell-state-persistence = { path = "../llmspell-state-persistence" }
-llmspell-state-traits = { path = "../llmspell-state-traits" }
-llmspell-sessions = { path = "../llmspell-sessions" }
+llmspell-kernel = { path = "../llmspell-kernel" }
 llmspell-security = { path = "../llmspell-security" }
 llmspell-storage = { path = "../llmspell-storage" }
 llmspell-tenancy = { path = "../llmspell-tenancy" }

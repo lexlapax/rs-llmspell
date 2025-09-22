@@ -4,9 +4,8 @@
 use anyhow::Result;
 use llmspell_agents::{agents::basic::BasicAgent, builder::AgentBuilder, state::StatePersistence};
 use llmspell_core::{traits::base_agent::BaseAgent, types::AgentInput, ExecutionContext};
-use llmspell_state_persistence::{
-    PersistenceConfig, SledConfig, StateManager, StateScope, StorageBackendType,
-};
+use llmspell_kernel::state::config::SledConfig;
+use llmspell_kernel::state::{PersistenceConfig, StateManager, StateScope, StorageBackendType};
 use std::sync::Arc;
 use tempfile::TempDir;
 use tokio::sync::RwLock;
