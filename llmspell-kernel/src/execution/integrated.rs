@@ -15,6 +15,7 @@ use std::time::Duration;
 use tokio::sync::mpsc;
 use tracing::{debug, error, info, instrument, trace, warn};
 
+use crate::debug::{DAPBridge, ExecutionManager};
 use crate::events::correlation::{ExecutionState, ExecutionStatus};
 use crate::events::{KernelEvent, KernelEventCorrelator};
 use crate::io::manager::EnhancedIOManager;
@@ -23,7 +24,6 @@ use crate::runtime::tracing::{OperationCategory, TracingInstrumentation};
 use crate::sessions::{CreateSessionOptions, SessionManager, SessionManagerConfig};
 use crate::state::{KernelState, StorageBackend};
 use crate::traits::{Protocol, Transport};
-use crate::debug::{DAPBridge, ExecutionManager};
 
 // Session dependencies
 use crate::state::StateManager;
@@ -367,8 +367,11 @@ impl<P: Protocol + 'static> IntegratedKernel<P> {
                                     // Parse the message using protocol
                                     match self.protocol.parse_message(first_part) {
                                         Ok(parsed_msg) => {
-                                            trace!("Received message on {}: {:?}", channel,
-                                                parsed_msg.get("msg_type"));
+                                            trace!(
+                                                "Received message on {}: {:?}",
+                                                channel,
+                                                parsed_msg.get("msg_type")
+                                            );
                                             messages_to_process.push(parsed_msg);
                                         }
                                         Err(e) => {
@@ -408,8 +411,10 @@ impl<P: Protocol + 'static> IntegratedKernel<P> {
                     // Log message handling time for performance analysis
                     let elapsed = start_time.elapsed();
                     if elapsed.as_millis() > 5 {
-                        warn!("Message handling took {}ms (target: <5ms)",
-                            elapsed.as_millis());
+                        warn!(
+                            "Message handling took {}ms (target: <5ms)",
+                            elapsed.as_millis()
+                        );
                     } else {
                         trace!("Message handled in {}μs", elapsed.as_micros());
                     }
@@ -1108,29 +1113,39 @@ mod tests {
         // Create test kernel
         let protocol = crate::protocols::jupyter::JupyterProtocol::new(
             "test-session".to_string(),
-            "test-kernel".to_string()
+            "test-kernel".to_string(),
         );
         let config = ExecutionConfig::default();
         let session_id = "test-session".to_string();
         let script_executor = Arc::new(MockScriptExecutor) as Arc<dyn ScriptExecutor>;
 
-        let mut kernel = IntegratedKernel::new(protocol, config, session_id, script_executor).await?;
+        let mut kernel =
+            IntegratedKernel::new(protocol, config, session_id, script_executor).await?;
 
         // Create a simple kernel_info_request message (faster than execute_request)
         let mut message = HashMap::new();
-        message.insert("msg_type".to_string(), serde_json::Value::String("kernel_info_request".to_string()));
+        message.insert(
+            "msg_type".to_string(),
+            serde_json::Value::String("kernel_info_request".to_string()),
+        );
 
         // Test single message handling performance
         let start_time = Instant::now();
         kernel.handle_message(message.clone()).await?;
         let elapsed = start_time.elapsed();
 
-        println!("Single kernel_info message handling took: {}μs ({}ms)",
-                elapsed.as_micros(), elapsed.as_millis());
+        println!(
+            "Single kernel_info message handling took: {}μs ({}ms)",
+            elapsed.as_micros(),
+            elapsed.as_millis()
+        );
 
         // Note: We expect this to be very fast since kernel_info_request is lightweight
-        assert!(elapsed.as_millis() < 5,
-                "Message handling took {}ms, target is <5ms", elapsed.as_millis());
+        assert!(
+            elapsed.as_millis() < 5,
+            "Message handling took {}ms, target is <5ms",
+            elapsed.as_millis()
+        );
 
         // Test multiple messages for consistency
         let iterations = 20;
@@ -1143,11 +1158,18 @@ mod tests {
         }
 
         let avg_time = total_time / iterations;
-        println!("Average message handling time over {} iterations: {}μs ({}ms)",
-                iterations, avg_time.as_micros(), avg_time.as_millis());
+        println!(
+            "Average message handling time over {} iterations: {}μs ({}ms)",
+            iterations,
+            avg_time.as_micros(),
+            avg_time.as_millis()
+        );
 
-        assert!(avg_time.as_millis() < 5,
-                "Average message handling took {}ms, target is <5ms", avg_time.as_millis());
+        assert!(
+            avg_time.as_millis() < 5,
+            "Average message handling took {}ms, target is <5ms",
+            avg_time.as_millis()
+        );
 
         println!("✅ Message handling performance test passed - meeting <5ms target");
         Ok(())

@@ -39,6 +39,43 @@
 
 ---
 
+## MANDATORY QUALITY POLICY - ZERO WARNINGS
+
+**CRITICAL**: This project enforces a **ZERO CLIPPY WARNINGS** policy. Every task MUST pass quality checks before being marked complete.
+
+### Required Quality Checks After EVERY Task:
+```bash
+# MANDATORY - Run after implementing each task
+./scripts/quality-check-minimal.sh     # Must pass with ZERO warnings
+
+# If minimal check passes, run comprehensive checks:
+./scripts/quality-check-fast.sh        # Should complete in ~1 minute
+./scripts/quality-check.sh             # Full validation (5+ minutes)
+```
+
+### Quality Gate Enforcement:
+- **NO TASK** is complete until `cargo clippy --workspace --all-features --all-targets` shows **ZERO warnings**
+- **NO COMMITS** without running `./scripts/quality-check-minimal.sh`
+- **NO MERGE** without full quality check pass
+- **EVERY Definition of Done** includes: "✅ Quality check passes with zero warnings"
+
+### Common Clippy Fixes:
+- Use `#[allow(dead_code)]` ONLY during active development, remove before task completion
+- Replace `.unwrap()` with proper error handling
+- Fix all `needless_borrow`, `redundant_clone`, `unused_imports`
+- Address `missing_docs` warnings with proper documentation
+- Resolve `too_many_arguments` by refactoring into structs
+
+### Task Completion Checklist Template:
+Every task MUST include in its Definition of Done:
+- [ ] ✅ `./scripts/quality-check-minimal.sh` passes with ZERO warnings
+- [ ] ✅ `cargo clippy --workspace --all-features --all-targets` - ZERO warnings
+- [ ] ✅ `cargo fmt --all --check` passes
+- [ ] ✅ All tests pass: `cargo test --workspace --all-features`
+- [ ] ✅ Documentation builds: `cargo doc --workspace --all-features --no-deps`
+
+---
+
 ## Phase 10.1: Unix Daemon Infrastructure (Days 1-2)
 
 ### Task 10.1.1: Create Daemon Module in Kernel
@@ -81,6 +118,10 @@
 - [ ] Double-fork properly detaches from TTY
 - [ ] Tests verify daemon behavior
 - [ ] Documentation complete
+- [ ] ✅ `./scripts/quality-check-minimal.sh` passes with ZERO warnings
+- [ ] ✅ `cargo clippy --workspace --all-features --all-targets` - ZERO warnings
+- [ ] ✅ `cargo fmt --all --check` passes
+- [ ] ✅ All tests pass: `cargo test --workspace --all-features`
 
 ### Task 10.1.2: Implement PID File Management
 **Priority**: CRITICAL
@@ -117,6 +158,10 @@
 - [ ] Stale files properly detected
 - [ ] Cleanup always happens
 - [ ] Tests cover edge cases
+- [ ] ✅ `./scripts/quality-check-minimal.sh` passes with ZERO warnings
+- [ ] ✅ `cargo clippy --workspace --all-features --all-targets` - ZERO warnings
+- [ ] ✅ `cargo fmt --all --check` passes
+- [ ] ✅ All tests pass: `cargo test --workspace --all-features`
 
 ### Task 10.1.3: Implement I/O Redirection
 **Priority**: HIGH
@@ -151,6 +196,10 @@
 - [ ] Logs appear in files
 - [ ] Rotation works correctly
 - [ ] No file descriptor leaks
+- [ ] ✅ `./scripts/quality-check-minimal.sh` passes with ZERO warnings
+- [ ] ✅ `cargo clippy --workspace --all-features --all-targets` - ZERO warnings
+- [ ] ✅ `cargo fmt --all --check` passes
+- [ ] ✅ All tests pass: `cargo test --workspace --all-features`
 
 ---
 
@@ -195,6 +244,10 @@
 - [ ] Messages correctly generated
 - [ ] Async-signal-safe
 - [ ] Tests verify behavior
+- [ ] ✅ `./scripts/quality-check-minimal.sh` passes with ZERO warnings
+- [ ] ✅ `cargo clippy --workspace --all-features --all-targets` - ZERO warnings
+- [ ] ✅ `cargo fmt --all --check` passes
+- [ ] ✅ All tests pass: `cargo test --workspace --all-features`
 
 ### Task 10.2.2: Implement Graceful Shutdown
 **Priority**: HIGH
@@ -229,6 +282,10 @@
 - [ ] State properly saved
 - [ ] Clients receive notification
 - [ ] Timeout prevents hanging
+- [ ] ✅ `./scripts/quality-check-minimal.sh` passes with ZERO warnings
+- [ ] ✅ `cargo clippy --workspace --all-features --all-targets` - ZERO warnings
+- [ ] ✅ `cargo fmt --all --check` passes
+- [ ] ✅ All tests pass: `cargo test --workspace --all-features`
 
 ### Task 10.2.3: Implement Signal-Based Operations
 **Priority**: MEDIUM
@@ -262,6 +319,10 @@
 - [ ] State dump comprehensive
 - [ ] No service disruption
 - [ ] Documentation complete
+- [ ] ✅ `./scripts/quality-check-minimal.sh` passes with ZERO warnings
+- [ ] ✅ `cargo clippy --workspace --all-features --all-targets` - ZERO warnings
+- [ ] ✅ `cargo fmt --all --check` passes
+- [ ] ✅ All tests pass: `cargo test --workspace --all-features`
 
 ---
 
@@ -303,6 +364,10 @@
 - [ ] Signal handling works
 - [ ] Protocol servers ready
 - [ ] Tests pass
+- [ ] ✅ `./scripts/quality-check-minimal.sh` passes with ZERO warnings
+- [ ] ✅ `cargo clippy --workspace --all-features --all-targets` - ZERO warnings
+- [ ] ✅ `cargo fmt --all --check` passes
+- [ ] ✅ All tests pass: `cargo test --workspace --all-features`
 
 ### Task 10.3.2: Implement Connection File Management
 **Priority**: HIGH
@@ -345,6 +410,10 @@
 - [ ] Jupyter can discover kernel
 - [ ] File properly formatted
 - [ ] Cleanup works
+- [ ] ✅ `./scripts/quality-check-minimal.sh` passes with ZERO warnings
+- [ ] ✅ `cargo clippy --workspace --all-features --all-targets` - ZERO warnings
+- [ ] ✅ `cargo fmt --all --check` passes
+- [ ] ✅ All tests pass: `cargo test --workspace --all-features`
 
 ### Task 10.3.3: Implement Health Monitoring
 **Priority**: HIGH
@@ -379,6 +448,10 @@
 - [ ] Metrics accurate
 - [ ] Resource tracking works
 - [ ] Export formats supported
+- [ ] ✅ `./scripts/quality-check-minimal.sh` passes with ZERO warnings
+- [ ] ✅ `cargo clippy --workspace --all-features --all-targets` - ZERO warnings
+- [ ] ✅ `cargo fmt --all --check` passes
+- [ ] ✅ All tests pass: `cargo test --workspace --all-features`
 
 ---
 
@@ -422,6 +495,10 @@
 - [ ] Compression functional
 - [ ] No data loss
 - [ ] Performance acceptable
+- [ ] ✅ `./scripts/quality-check-minimal.sh` passes with ZERO warnings
+- [ ] ✅ `cargo clippy --workspace --all-features --all-targets` - ZERO warnings
+- [ ] ✅ `cargo fmt --all --check` passes
+- [ ] ✅ All tests pass: `cargo test --workspace --all-features`
 
 ### Task 10.4.2: Implement Structured Logging
 **Priority**: HIGH
@@ -460,6 +537,10 @@
 - [ ] All fields present
 - [ ] Performance tracked
 - [ ] Queries work on logs
+- [ ] ✅ `./scripts/quality-check-minimal.sh` passes with ZERO warnings
+- [ ] ✅ `cargo clippy --workspace --all-features --all-targets` - ZERO warnings
+- [ ] ✅ `cargo fmt --all --check` passes
+- [ ] ✅ All tests pass: `cargo test --workspace --all-features`
 
 ### Task 10.4.3: Implement Syslog Integration
 **Priority**: MEDIUM
@@ -490,6 +571,10 @@
 - [ ] Remote syslog works
 - [ ] Configuration documented
 - [ ] Fallback functional
+- [ ] ✅ `./scripts/quality-check-minimal.sh` passes with ZERO warnings
+- [ ] ✅ `cargo clippy --workspace --all-features --all-targets` - ZERO warnings
+- [ ] ✅ `cargo fmt --all --check` passes
+- [ ] ✅ All tests pass: `cargo test --workspace --all-features`
 
 ---
 
@@ -543,6 +628,10 @@
 - [ ] All flags functional
 - [ ] Help text comprehensive
 - [ ] Error handling robust
+- [ ] ✅ `./scripts/quality-check-minimal.sh` passes with ZERO warnings
+- [ ] ✅ `cargo clippy --workspace --all-features --all-targets` - ZERO warnings
+- [ ] ✅ `cargo fmt --all --check` passes
+- [ ] ✅ All tests pass: `cargo test --workspace --all-features`
 
 ### Task 10.5.2: Implement kernel stop Command
 **Priority**: HIGH
@@ -574,6 +663,10 @@
 - [ ] Graceful shutdown works
 - [ ] Files cleaned up
 - [ ] Edge cases handled
+- [ ] ✅ `./scripts/quality-check-minimal.sh` passes with ZERO warnings
+- [ ] ✅ `cargo clippy --workspace --all-features --all-targets` - ZERO warnings
+- [ ] ✅ `cargo fmt --all --check` passes
+- [ ] ✅ All tests pass: `cargo test --workspace --all-features`
 
 ### Task 10.5.3: Implement kernel status Command
 **Priority**: HIGH
@@ -609,6 +702,10 @@
 - [ ] Metrics displayed
 - [ ] Output well-formatted
 - [ ] Edge cases handled
+- [ ] ✅ `./scripts/quality-check-minimal.sh` passes with ZERO warnings
+- [ ] ✅ `cargo clippy --workspace --all-features --all-targets` - ZERO warnings
+- [ ] ✅ `cargo fmt --all --check` passes
+- [ ] ✅ All tests pass: `cargo test --workspace --all-features`
 
 ### Task 10.5.4: Implement install-service Subcommand
 **Priority**: MEDIUM
@@ -649,6 +746,10 @@
 - [ ] Installation works
 - [ ] Instructions clear
 - [ ] Platform detection works
+- [ ] ✅ `./scripts/quality-check-minimal.sh` passes with ZERO warnings
+- [ ] ✅ `cargo clippy --workspace --all-features --all-targets` - ZERO warnings
+- [ ] ✅ `cargo fmt --all --check` passes
+- [ ] ✅ All tests pass: `cargo test --workspace --all-features`
 
 ---
 
@@ -700,6 +801,10 @@
 - [ ] Jupyter Lab connects
 - [ ] Messages routed correctly
 - [ ] Tests comprehensive
+- [ ] ✅ `./scripts/quality-check-minimal.sh` passes with ZERO warnings
+- [ ] ✅ `cargo clippy --workspace --all-features --all-targets` - ZERO warnings
+- [ ] ✅ `cargo fmt --all --check` passes
+- [ ] ✅ All tests pass: `cargo test --workspace --all-features`
 
 ### Task 10.6.2: Implement HMAC Authentication
 **Priority**: HIGH
@@ -733,6 +838,10 @@
 - [ ] Verification works
 - [ ] Security ensured
 - [ ] Performance <1ms overhead
+- [ ] ✅ `./scripts/quality-check-minimal.sh` passes with ZERO warnings
+- [ ] ✅ `cargo clippy --workspace --all-features --all-targets` - ZERO warnings
+- [ ] ✅ `cargo fmt --all --check` passes
+- [ ] ✅ All tests pass: `cargo test --workspace --all-features`
 
 ### Task 10.6.3: Implement Message Routing
 **Priority**: HIGH
@@ -766,6 +875,10 @@
 - [ ] Multi-client works
 - [ ] Order preserved
 - [ ] Tests comprehensive
+- [ ] ✅ `./scripts/quality-check-minimal.sh` passes with ZERO warnings
+- [ ] ✅ `cargo clippy --workspace --all-features --all-targets` - ZERO warnings
+- [ ] ✅ `cargo fmt --all --check` passes
+- [ ] ✅ All tests pass: `cargo test --workspace --all-features`
 
 ---
 
@@ -808,6 +921,10 @@
 - [ ] VS Code connects
 - [ ] Basic debugging works
 - [ ] Tests pass
+- [ ] ✅ `./scripts/quality-check-minimal.sh` passes with ZERO warnings
+- [ ] ✅ `cargo clippy --workspace --all-features --all-targets` - ZERO warnings
+- [ ] ✅ `cargo fmt --all --check` passes
+- [ ] ✅ All tests pass: `cargo test --workspace --all-features`
 
 ### Task 10.7.2: Implement Breakpoint Management
 **Priority**: HIGH
@@ -857,6 +974,10 @@
 - [ ] Conditions evaluated
 - [ ] Updates work dynamically
 - [ ] Performance acceptable
+- [ ] ✅ `./scripts/quality-check-minimal.sh` passes with ZERO warnings
+- [ ] ✅ `cargo clippy --workspace --all-features --all-targets` - ZERO warnings
+- [ ] ✅ `cargo fmt --all --check` passes
+- [ ] ✅ All tests pass: `cargo test --workspace --all-features`
 
 ### Task 10.7.3: Implement Variable Inspection
 **Priority**: HIGH
@@ -894,6 +1015,10 @@
 - [ ] Complex types handled
 - [ ] Performance good
 - [ ] VS Code displays correctly
+- [ ] ✅ `./scripts/quality-check-minimal.sh` passes with ZERO warnings
+- [ ] ✅ `cargo clippy --workspace --all-features --all-targets` - ZERO warnings
+- [ ] ✅ `cargo fmt --all --check` passes
+- [ ] ✅ All tests pass: `cargo test --workspace --all-features`
 
 ### Task 10.7.4: Implement Stepping Operations
 **Priority**: HIGH
@@ -927,6 +1052,10 @@
 - [ ] Latency <20ms
 - [ ] Edge cases handled
 - [ ] Tests comprehensive
+- [ ] ✅ `./scripts/quality-check-minimal.sh` passes with ZERO warnings
+- [ ] ✅ `cargo clippy --workspace --all-features --all-targets` - ZERO warnings
+- [ ] ✅ `cargo fmt --all --check` passes
+- [ ] ✅ All tests pass: `cargo test --workspace --all-features`
 
 ---
 
@@ -971,6 +1100,10 @@
 - [ ] Handshake works
 - [ ] Transport works
 - [ ] VS Code connects
+- [ ] ✅ `./scripts/quality-check-minimal.sh` passes with ZERO warnings
+- [ ] ✅ `cargo clippy --workspace --all-features --all-targets` - ZERO warnings
+- [ ] ✅ `cargo fmt --all --check` passes
+- [ ] ✅ All tests pass: `cargo test --workspace --all-features`
 
 ### Task 10.8.2: Implement Code Completion
 **Priority**: HIGH
@@ -1007,6 +1140,10 @@
 - [ ] API covered
 - [ ] Performance good
 - [ ] Quality high
+- [ ] ✅ `./scripts/quality-check-minimal.sh` passes with ZERO warnings
+- [ ] ✅ `cargo clippy --workspace --all-features --all-targets` - ZERO warnings
+- [ ] ✅ `cargo fmt --all --check` passes
+- [ ] ✅ All tests pass: `cargo test --workspace --all-features`
 
 ### Task 10.8.3: Implement Diagnostics
 **Priority**: HIGH
@@ -1042,6 +1179,10 @@
 - [ ] Real-time updates
 - [ ] Quick fixes work
 - [ ] Performance good
+- [ ] ✅ `./scripts/quality-check-minimal.sh` passes with ZERO warnings
+- [ ] ✅ `cargo clippy --workspace --all-features --all-targets` - ZERO warnings
+- [ ] ✅ `cargo fmt --all --check` passes
+- [ ] ✅ All tests pass: `cargo test --workspace --all-features`
 
 ### Task 10.8.4: Implement Hover and Signatures
 **Priority**: MEDIUM
@@ -1077,6 +1218,10 @@
 - [ ] Signatures helpful
 - [ ] Documentation good
 - [ ] Performance fast
+- [ ] ✅ `./scripts/quality-check-minimal.sh` passes with ZERO warnings
+- [ ] ✅ `cargo clippy --workspace --all-features --all-targets` - ZERO warnings
+- [ ] ✅ `cargo fmt --all --check` passes
+- [ ] ✅ All tests pass: `cargo test --workspace --all-features`
 
 ---
 
@@ -1126,6 +1271,10 @@
 - [ ] Commands execute correctly
 - [ ] Session state persists
 - [ ] Tests comprehensive
+- [ ] ✅ `./scripts/quality-check-minimal.sh` passes with ZERO warnings
+- [ ] ✅ `cargo clippy --workspace --all-features --all-targets` - ZERO warnings
+- [ ] ✅ `cargo fmt --all --check` passes
+- [ ] ✅ All tests pass: `cargo test --workspace --all-features`
 
 ### Task 10.9.2: REPL Protocol Implementation
 **Priority**: HIGH
@@ -1168,6 +1317,10 @@
 - [ ] Switching between modes works
 - [ ] Error handling consistent
 - [ ] Performance acceptable
+- [ ] ✅ `./scripts/quality-check-minimal.sh` passes with ZERO warnings
+- [ ] ✅ `cargo clippy --workspace --all-features --all-targets` - ZERO warnings
+- [ ] ✅ `cargo fmt --all --check` passes
+- [ ] ✅ All tests pass: `cargo test --workspace --all-features`
 
 ### Task 10.9.3: REPL Client Integration
 **Priority**: MEDIUM
@@ -1209,6 +1362,10 @@
 - [ ] Interactive features functional
 - [ ] Batch mode works
 - [ ] User experience smooth
+- [ ] ✅ `./scripts/quality-check-minimal.sh` passes with ZERO warnings
+- [ ] ✅ `cargo clippy --workspace --all-features --all-targets` - ZERO warnings
+- [ ] ✅ `cargo fmt --all --check` passes
+- [ ] ✅ All tests pass: `cargo test --workspace --all-features`
 
 ---
 
@@ -1252,6 +1409,10 @@
 - [ ] Features work
 - [ ] Documentation complete
 - [ ] Tests pass
+- [ ] ✅ `./scripts/quality-check-minimal.sh` passes with ZERO warnings
+- [ ] ✅ `cargo clippy --workspace --all-features --all-targets` - ZERO warnings
+- [ ] ✅ `cargo fmt --all --check` passes
+- [ ] ✅ All tests pass: `cargo test --workspace --all-features`
 
 ### Task 10.10.2: Implement Development Environment Service
 **Priority**: HIGH
@@ -1296,6 +1457,10 @@
 - [ ] IDE features work
 - [ ] Documentation complete
 - [ ] Tests pass
+- [ ] ✅ `./scripts/quality-check-minimal.sh` passes with ZERO warnings
+- [ ] ✅ `cargo clippy --workspace --all-features --all-targets` - ZERO warnings
+- [ ] ✅ `cargo fmt --all --check` passes
+- [ ] ✅ All tests pass: `cargo test --workspace --all-features`
 
 ### Task 10.10.3: Create Service Deployment Examples
 **Priority**: MEDIUM
@@ -1327,6 +1492,10 @@
 - [ ] Containers build
 - [ ] Manifests valid
 - [ ] Instructions clear
+- [ ] ✅ `./scripts/quality-check-minimal.sh` passes with ZERO warnings
+- [ ] ✅ `cargo clippy --workspace --all-features --all-targets` - ZERO warnings
+- [ ] ✅ `cargo fmt --all --check` passes
+- [ ] ✅ All tests pass: `cargo test --workspace --all-features`
 
 ### Task 10.10.4: Update Application Documentation
 **Priority**: MEDIUM
@@ -1359,6 +1528,10 @@
 - [ ] Examples clear
 - [ ] Progression logical
 - [ ] Usage documented
+- [ ] ✅ `./scripts/quality-check-minimal.sh` passes with ZERO warnings
+- [ ] ✅ `cargo clippy --workspace --all-features --all-targets` - ZERO warnings
+- [ ] ✅ `cargo fmt --all --check` passes
+- [ ] ✅ All tests pass: `cargo test --workspace --all-features`
 
 ---
 
@@ -1400,6 +1573,10 @@
 - [ ] Edge cases covered
 - [ ] CI integration works
 - [ ] No flaky tests
+- [ ] ✅ `./scripts/quality-check-minimal.sh` passes with ZERO warnings
+- [ ] ✅ `cargo clippy --workspace --all-features --all-targets` - ZERO warnings
+- [ ] ✅ `cargo fmt --all --check` passes
+- [ ] ✅ All tests pass: `cargo test --workspace --all-features`
 
 ### Task 10.11.2: Multi-Protocol Testing
 **Priority**: HIGH
@@ -1430,6 +1607,10 @@
 - [ ] No interference
 - [ ] Performance good
 - [ ] Stable operation
+- [ ] ✅ `./scripts/quality-check-minimal.sh` passes with ZERO warnings
+- [ ] ✅ `cargo clippy --workspace --all-features --all-targets` - ZERO warnings
+- [ ] ✅ `cargo fmt --all --check` passes
+- [ ] ✅ All tests pass: `cargo test --workspace --all-features`
 
 ### Task 10.11.3: Performance Validation
 **Priority**: HIGH
@@ -1463,6 +1644,10 @@
 - [ ] Benchmarks reproducible
 - [ ] Results documented
 - [ ] Regressions detected
+- [ ] ✅ `./scripts/quality-check-minimal.sh` passes with ZERO warnings
+- [ ] ✅ `cargo clippy --workspace --all-features --all-targets` - ZERO warnings
+- [ ] ✅ `cargo fmt --all --check` passes
+- [ ] ✅ All tests pass: `cargo test --workspace --all-features`
 
 ### Task 10.11.4: Security Testing
 **Priority**: HIGH
@@ -1490,6 +1675,10 @@
 - [ ] No vulnerabilities
 - [ ] Permissions correct
 - [ ] Audit complete
+- [ ] ✅ `./scripts/quality-check-minimal.sh` passes with ZERO warnings
+- [ ] ✅ `cargo clippy --workspace --all-features --all-targets` - ZERO warnings
+- [ ] ✅ `cargo fmt --all --check` passes
+- [ ] ✅ All tests pass: `cargo test --workspace --all-features`
 
 ---
 
@@ -1526,6 +1715,10 @@
 - [ ] Examples work
 - [ ] Clear instructions
 - [ ] Reviewed
+- [ ] ✅ `./scripts/quality-check-minimal.sh` passes with ZERO warnings
+- [ ] ✅ `cargo clippy --workspace --all-features --all-targets` - ZERO warnings
+- [ ] ✅ `cargo fmt --all --check` passes
+- [ ] ✅ All tests pass: `cargo test --workspace --all-features`
 
 ### Task 10.12.2: IDE Integration Guide
 **Priority**: HIGH
@@ -1557,6 +1750,10 @@
 - [ ] Setup verified
 - [ ] Screenshots included
 - [ ] Tested
+- [ ] ✅ `./scripts/quality-check-minimal.sh` passes with ZERO warnings
+- [ ] ✅ `cargo clippy --workspace --all-features --all-targets` - ZERO warnings
+- [ ] ✅ `cargo fmt --all --check` passes
+- [ ] ✅ All tests pass: `cargo test --workspace --all-features`
 
 ### Task 10.12.3: API Reference Updates
 **Priority**: HIGH
@@ -1584,6 +1781,10 @@
 - [ ] Examples compile
 - [ ] Cross-refs work
 - [ ] Generated correctly
+- [ ] ✅ `./scripts/quality-check-minimal.sh` passes with ZERO warnings
+- [ ] ✅ `cargo clippy --workspace --all-features --all-targets` - ZERO warnings
+- [ ] ✅ `cargo fmt --all --check` passes
+- [ ] ✅ All tests pass: `cargo test --workspace --all-features`
 
 ### Task 10.12.4: Update Architecture Documentation
 **Priority**: MEDIUM
@@ -1611,6 +1812,10 @@
 - [ ] Diagrams current
 - [ ] Accurate reflection
 - [ ] Reviewed
+- [ ] ✅ `./scripts/quality-check-minimal.sh` passes with ZERO warnings
+- [ ] ✅ `cargo clippy --workspace --all-features --all-targets` - ZERO warnings
+- [ ] ✅ `cargo fmt --all --check` passes
+- [ ] ✅ All tests pass: `cargo test --workspace --all-features`
 
 ---
 
@@ -1642,6 +1847,10 @@
 - [ ] No conflicts
 - [ ] Documentation complete
 - [ ] Placeholders created
+- [ ] ✅ `./scripts/quality-check-minimal.sh` passes with ZERO warnings
+- [ ] ✅ `cargo clippy --workspace --all-features --all-targets` - ZERO warnings
+- [ ] ✅ `cargo fmt --all --check` passes
+- [ ] ✅ All tests pass: `cargo test --workspace --all-features`
 
 ### Task 10.13.2: Performance Baseline
 **Priority**: HIGH
@@ -1669,6 +1878,10 @@
 - [ ] Tests repeatable
 - [ ] Report complete
 - [ ] Archive created
+- [ ] ✅ `./scripts/quality-check-minimal.sh` passes with ZERO warnings
+- [ ] ✅ `cargo clippy --workspace --all-features --all-targets` - ZERO warnings
+- [ ] ✅ `cargo fmt --all --check` passes
+- [ ] ✅ All tests pass: `cargo test --workspace --all-features`
 
 ### Task 10.13.3: Create PHASE10-DONE Document
 **Priority**: CRITICAL
@@ -1696,6 +1909,10 @@
 - [ ] Metrics accurate
 - [ ] Lessons documented
 - [ ] Ready for Phase 11
+- [ ] ✅ `./scripts/quality-check-minimal.sh` passes with ZERO warnings
+- [ ] ✅ `cargo clippy --workspace --all-features --all-targets` - ZERO warnings
+- [ ] ✅ `cargo fmt --all --check` passes
+- [ ] ✅ All tests pass: `cargo test --workspace --all-features`
 
 ---
 
@@ -1744,6 +1961,10 @@
 - [ ] Isolation verified
 - [ ] Cleanup automatic
 - [ ] Tests comprehensive
+- [ ] ✅ `./scripts/quality-check-minimal.sh` passes with ZERO warnings
+- [ ] ✅ `cargo clippy --workspace --all-features --all-targets` - ZERO warnings
+- [ ] ✅ `cargo fmt --all --check` passes
+- [ ] ✅ All tests pass: `cargo test --workspace --all-features`
 
 ### Task 10.14.2: Session Isolation Implementation
 **Priority**: HIGH
@@ -1789,6 +2010,10 @@
 - [ ] No data leakage
 - [ ] Resources tracked
 - [ ] Performance good
+- [ ] ✅ `./scripts/quality-check-minimal.sh` passes with ZERO warnings
+- [ ] ✅ `cargo clippy --workspace --all-features --all-targets` - ZERO warnings
+- [ ] ✅ `cargo fmt --all --check` passes
+- [ ] ✅ All tests pass: `cargo test --workspace --all-features`
 
 ### Task 10.14.3: Session Persistence
 **Priority**: MEDIUM
@@ -1827,6 +2052,10 @@
 - [ ] Recovery reliable
 - [ ] Data integrity maintained
 - [ ] Performance acceptable
+- [ ] ✅ `./scripts/quality-check-minimal.sh` passes with ZERO warnings
+- [ ] ✅ `cargo clippy --workspace --all-features --all-targets` - ZERO warnings
+- [ ] ✅ `cargo fmt --all --check` passes
+- [ ] ✅ All tests pass: `cargo test --workspace --all-features`
 
 ---
 
@@ -1874,6 +2103,10 @@
 - [ ] Fairness verified
 - [ ] Metrics accurate
 - [ ] Performance acceptable
+- [ ] ✅ `./scripts/quality-check-minimal.sh` passes with ZERO warnings
+- [ ] ✅ `cargo clippy --workspace --all-features --all-targets` - ZERO warnings
+- [ ] ✅ `cargo fmt --all --check` passes
+- [ ] ✅ All tests pass: `cargo test --workspace --all-features`
 
 ### Task 10.15.2: Memory Usage Control
 **Priority**: HIGH
@@ -1917,6 +2150,10 @@
 - [ ] OOM prevented
 - [ ] Cleanup works
 - [ ] Performance impact minimal
+- [ ] ✅ `./scripts/quality-check-minimal.sh` passes with ZERO warnings
+- [ ] ✅ `cargo clippy --workspace --all-features --all-targets` - ZERO warnings
+- [ ] ✅ `cargo fmt --all --check` passes
+- [ ] ✅ All tests pass: `cargo test --workspace --all-features`
 
 ### Task 10.15.3: Request Rate Limiting
 **Priority**: HIGH
@@ -1958,6 +2195,10 @@
 - [ ] Headers accurate
 - [ ] Performance good
 - [ ] Configuration flexible
+- [ ] ✅ `./scripts/quality-check-minimal.sh` passes with ZERO warnings
+- [ ] ✅ `cargo clippy --workspace --all-features --all-targets` - ZERO warnings
+- [ ] ✅ `cargo fmt --all --check` passes
+- [ ] ✅ All tests pass: `cargo test --workspace --all-features`
 
 ### Task 10.15.4: Connection Throttling
 **Priority**: MEDIUM
@@ -2001,6 +2242,10 @@
 - [ ] DDoS mitigation works
 - [ ] Performance maintained
 - [ ] Monitoring complete
+- [ ] ✅ `./scripts/quality-check-minimal.sh` passes with ZERO warnings
+- [ ] ✅ `cargo clippy --workspace --all-features --all-targets` - ZERO warnings
+- [ ] ✅ `cargo fmt --all --check` passes
+- [ ] ✅ All tests pass: `cargo test --workspace --all-features`
 
 ---
 
@@ -2054,6 +2299,10 @@
 - [ ] Size under 100MB
 - [ ] Security scan passes
 - [ ] All features work
+- [ ] ✅ `./scripts/quality-check-minimal.sh` passes with ZERO warnings
+- [ ] ✅ `cargo clippy --workspace --all-features --all-targets` - ZERO warnings
+- [ ] ✅ `cargo fmt --all --check` passes
+- [ ] ✅ All tests pass: `cargo test --workspace --all-features`
 
 ### Task 10.16.2: Docker Compose Configuration
 **Priority**: MEDIUM
@@ -2102,6 +2351,10 @@
 - [ ] Services communicate
 - [ ] Data persists
 - [ ] Easy to use
+- [ ] ✅ `./scripts/quality-check-minimal.sh` passes with ZERO warnings
+- [ ] ✅ `cargo clippy --workspace --all-features --all-targets` - ZERO warnings
+- [ ] ✅ `cargo fmt --all --check` passes
+- [ ] ✅ All tests pass: `cargo test --workspace --all-features`
 
 ### Task 10.16.3: Container Health Checks
 **Priority**: MEDIUM
@@ -2141,6 +2394,10 @@
 - [ ] Recovery automatic
 - [ ] Metrics available
 - [ ] Documentation complete
+- [ ] ✅ `./scripts/quality-check-minimal.sh` passes with ZERO warnings
+- [ ] ✅ `cargo clippy --workspace --all-features --all-targets` - ZERO warnings
+- [ ] ✅ `cargo fmt --all --check` passes
+- [ ] ✅ All tests pass: `cargo test --workspace --all-features`
 
 ---
 
@@ -2193,6 +2450,10 @@
 - [ ] Prometheus scrapes successfully
 - [ ] Performance impact <1%
 - [ ] Documentation complete
+- [ ] ✅ `./scripts/quality-check-minimal.sh` passes with ZERO warnings
+- [ ] ✅ `cargo clippy --workspace --all-features --all-targets` - ZERO warnings
+- [ ] ✅ `cargo fmt --all --check` passes
+- [ ] ✅ All tests pass: `cargo test --workspace --all-features`
 
 ### Task 10.17.2: OpenTelemetry Integration
 **Priority**: MEDIUM
@@ -2236,6 +2497,10 @@
 - [ ] Spans complete
 - [ ] Context preserved
 - [ ] Performance good
+- [ ] ✅ `./scripts/quality-check-minimal.sh` passes with ZERO warnings
+- [ ] ✅ `cargo clippy --workspace --all-features --all-targets` - ZERO warnings
+- [ ] ✅ `cargo fmt --all --check` passes
+- [ ] ✅ All tests pass: `cargo test --workspace --all-features`
 
 ### Task 10.17.3: Custom Metrics Collection
 **Priority**: MEDIUM
@@ -2276,6 +2541,10 @@
 - [ ] Aggregation accurate
 - [ ] Export works
 - [ ] Dashboard useful
+- [ ] ✅ `./scripts/quality-check-minimal.sh` passes with ZERO warnings
+- [ ] ✅ `cargo clippy --workspace --all-features --all-targets` - ZERO warnings
+- [ ] ✅ `cargo fmt --all --check` passes
+- [ ] ✅ All tests pass: `cargo test --workspace --all-features`
 
 ### Task 10.17.4: Grafana Dashboard Templates
 **Priority**: LOW
@@ -2317,6 +2586,10 @@
 - [ ] Alerts functional
 - [ ] Templates exported
 - [ ] Documentation ready
+- [ ] ✅ `./scripts/quality-check-minimal.sh` passes with ZERO warnings
+- [ ] ✅ `cargo clippy --workspace --all-features --all-targets` - ZERO warnings
+- [ ] ✅ `cargo fmt --all --check` passes
+- [ ] ✅ All tests pass: `cargo test --workspace --all-features`
 
 ---
 
@@ -2367,6 +2640,10 @@
 - [ ] Benchmarks run
 - [ ] Results stored
 - [ ] CI integrated
+- [ ] ✅ `./scripts/quality-check-minimal.sh` passes with ZERO warnings
+- [ ] ✅ `cargo clippy --workspace --all-features --all-targets` - ZERO warnings
+- [ ] ✅ `cargo fmt --all --check` passes
+- [ ] ✅ All tests pass: `cargo test --workspace --all-features`
 
 ### Task 10.18.2: Baseline Performance Metrics
 **Priority**: HIGH
@@ -2407,6 +2684,10 @@
 - [ ] Targets documented
 - [ ] Detection working
 - [ ] Reports generated
+- [ ] ✅ `./scripts/quality-check-minimal.sh` passes with ZERO warnings
+- [ ] ✅ `cargo clippy --workspace --all-features --all-targets` - ZERO warnings
+- [ ] ✅ `cargo fmt --all --check` passes
+- [ ] ✅ All tests pass: `cargo test --workspace --all-features`
 
 ### Task 10.18.3: Optimization Implementation
 **Priority**: MEDIUM
@@ -2448,6 +2729,10 @@
 - [ ] Performance improved
 - [ ] No regressions
 - [ ] Documentation updated
+- [ ] ✅ `./scripts/quality-check-minimal.sh` passes with ZERO warnings
+- [ ] ✅ `cargo clippy --workspace --all-features --all-targets` - ZERO warnings
+- [ ] ✅ `cargo fmt --all --check` passes
+- [ ] ✅ All tests pass: `cargo test --workspace --all-features`
 
 ---
 
@@ -2494,6 +2779,10 @@
 - [ ] Limits documented
 - [ ] Recovery verified
 - [ ] Reports ready
+- [ ] ✅ `./scripts/quality-check-minimal.sh` passes with ZERO warnings
+- [ ] ✅ `cargo clippy --workspace --all-features --all-targets` - ZERO warnings
+- [ ] ✅ `cargo fmt --all --check` passes
+- [ ] ✅ All tests pass: `cargo test --workspace --all-features`
 
 ### Task 10.19.2: Cross-Platform Testing
 **Priority**: MEDIUM
@@ -2534,6 +2823,10 @@
 - [ ] Bugs fixed
 - [ ] CI matrix complete
 - [ ] Docs updated
+- [ ] ✅ `./scripts/quality-check-minimal.sh` passes with ZERO warnings
+- [ ] ✅ `cargo clippy --workspace --all-features --all-targets` - ZERO warnings
+- [ ] ✅ `cargo fmt --all --check` passes
+- [ ] ✅ All tests pass: `cargo test --workspace --all-features`
 
 ### Task 10.19.3: Protocol Compliance Testing
 **Priority**: HIGH
@@ -2574,6 +2867,10 @@
 - [ ] Tests automated
 - [ ] Edge cases handled
 - [ ] Docs complete
+- [ ] ✅ `./scripts/quality-check-minimal.sh` passes with ZERO warnings
+- [ ] ✅ `cargo clippy --workspace --all-features --all-targets` - ZERO warnings
+- [ ] ✅ `cargo fmt --all --check` passes
+- [ ] ✅ All tests pass: `cargo test --workspace --all-features`
 
 ### Task 10.19.4: Troubleshooting Guide
 **Priority**: MEDIUM
@@ -2615,6 +2912,10 @@
 - [ ] Solutions tested
 - [ ] Examples work
 - [ ] FAQ comprehensive
+- [ ] ✅ `./scripts/quality-check-minimal.sh` passes with ZERO warnings
+- [ ] ✅ `cargo clippy --workspace --all-features --all-targets` - ZERO warnings
+- [ ] ✅ `cargo fmt --all --check` passes
+- [ ] ✅ All tests pass: `cargo test --workspace --all-features`
 
 ### Task 10.19.5: Performance Tuning Guide
 **Priority**: LOW
@@ -2656,6 +2957,10 @@
 - [ ] Examples tested
 - [ ] Best practices clear
 - [ ] Monitoring documented
+- [ ] ✅ `./scripts/quality-check-minimal.sh` passes with ZERO warnings
+- [ ] ✅ `cargo clippy --workspace --all-features --all-targets` - ZERO warnings
+- [ ] ✅ `cargo fmt --all --check` passes
+- [ ] ✅ All tests pass: `cargo test --workspace --all-features`
 
 ---
 
@@ -2663,9 +2968,6 @@
 
 ### Quality Gates
 - [ ] All code compiles without warnings
-- [ ] Clippy passes: `cargo clippy --workspace --all-features --all-targets`
-- [ ] Format compliance: `cargo fmt --all --check`
-- [ ] Tests pass: `cargo test --workspace --all-features`
 - [ ] Documentation builds: `cargo doc --workspace --all-features --no-deps`
 - [ ] Examples run successfully
 - [ ] Integration tests pass

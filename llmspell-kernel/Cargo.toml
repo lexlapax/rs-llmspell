@@ -91,6 +91,10 @@ sha2 = "0.10"
 # Text processing
 regex = "1.10"
 
+# Unix daemon support
+nix = { version = "0.27", features = ["signal", "process", "fs"] }
+libc = "0.2"
+
 # Performance monitoring
 metrics = "0.24"
 metrics-exporter-prometheus = { version = "0.16", optional = true }
