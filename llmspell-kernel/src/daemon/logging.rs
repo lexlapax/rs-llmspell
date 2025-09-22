@@ -369,18 +369,163 @@ mod tests {
         // Write more data to ensure rotation happened
         rotator.write(b"After rotation\n").unwrap();
 
-        // Verify main log file exists
-        assert!(log_path.exists());
-
-        // Verify rotated file was created
-        let parent_dir = log_path.parent().unwrap();
-        let entries: Vec<_> = fs::read_dir(parent_dir)
+        // Check that rotated files exist
+        let entries: Vec<_> = fs::read_dir(temp_dir.path())
             .unwrap()
             .filter_map(Result::ok)
             .collect();
+        assert!(entries.len() >= 2, "Should have original and rotated file");
+    }
 
-        // Should have at least 2 files (current + rotated)
-        assert!(entries.len() >= 2);
+    #[test]
+    fn test_log_compression() {
+        let temp_dir = tempdir().unwrap();
+        let log_path = temp_dir.path().join("test.log");
+        let config = LogRotationConfig {
+            base_path: log_path.clone(),
+            max_size: 50,
+            max_files: 3,
+            compress: true, // Enable compression
+        };
+
+        let rotator = LogRotator::new(config);
+        rotator.open().unwrap();
+
+        // Trigger rotation with compression
+        let data = b"Data that will be compressed after rotation\n";
+        rotator.write(data).unwrap();
+        rotator.write(data).unwrap(); // Trigger rotation
+
+        // Check for .gz file
+        let has_compressed = fs::read_dir(temp_dir.path()).unwrap().any(|entry| {
+            entry
+                .ok()
+                .and_then(|e| e.file_name().to_str().map(|s| s.ends_with(".gz")))
+                .unwrap_or(false)
+        });
+        assert!(has_compressed, "Should have created compressed file");
+    }
+
+    #[test]
+    fn test_cleanup_old_files() {
+        let temp_dir = tempdir().unwrap();
+        let log_path = temp_dir.path().join("test.log");
+        let config = LogRotationConfig {
+            base_path: log_path.clone(),
+            max_size: 30,
+            max_files: 2, // Keep only 2 rotated files
+            compress: false,
+        };
+
+        let rotator = LogRotator::new(config);
+        rotator.open().unwrap();
+
+        // Create multiple rotations
+        for i in 0..5 {
+            let data = format!("Rotation {}: Some test data\n", i);
+            rotator.write(data.as_bytes()).unwrap();
+            std::thread::sleep(std::time::Duration::from_millis(10)); // Ensure different timestamps
+        }
+
+        // Count files (should be current + max_files)
+        let file_count = fs::read_dir(temp_dir.path())
+            .unwrap()
+            .filter_map(Result::ok)
+            .filter(|entry| {
+                entry
+                    .file_name()
+                    .to_str()
+                    .map(|s| s.contains("test.log"))
+                    .unwrap_or(false)
+            })
+            .count();
+
+        assert!(
+            file_count <= 3,
+            "Should have at most 3 files (current + 2 rotated)"
+        );
+    }
+
+    #[test]
+    fn test_concurrent_writes() {
+        use std::sync::Arc;
+        use std::thread;
+
+        let temp_dir = tempdir().unwrap();
+        let config = LogRotationConfig {
+            base_path: temp_dir.path().join("test.log"),
+            max_size: 1000,
+            max_files: 3,
+            compress: false,
+        };
+
+        let rotator = Arc::new(LogRotator::new(config));
+        rotator.open().unwrap();
+
+        // Spawn multiple threads writing concurrently
+        let handles: Vec<_> = (0..5)
+            .map(|i| {
+                let rotator_clone = rotator.clone();
+                thread::spawn(move || {
+                    for j in 0..10 {
+                        let msg = format!("Thread {} message {}\n", i, j);
+                        rotator_clone.write(msg.as_bytes()).unwrap();
+                    }
+                })
+            })
+            .collect();
+
+        // Wait for all threads
+        for handle in handles {
+            handle.join().unwrap();
+        }
+
+        // Verify log file has content from all threads
+        let log_path = temp_dir.path().join("test.log");
+        let contents = fs::read_to_string(&log_path).unwrap();
+        for i in 0..5 {
+            assert!(contents.contains(&format!("Thread {}", i)));
+        }
+    }
+
+    #[test]
+    fn test_rotation_atomicity() {
+        let temp_dir = tempdir().unwrap();
+        let log_path = temp_dir.path().join("test.log");
+        let config = LogRotationConfig {
+            base_path: log_path.clone(),
+            max_size: 40,
+            max_files: 2,
+            compress: false,
+        };
+
+        let rotator = LogRotator::new(config);
+        rotator.open().unwrap();
+
+        // Write initial data
+        rotator.write(b"Before rotation\n").unwrap();
+
+        // This should trigger rotation
+        rotator
+            .write(b"This triggers rotation due to size\n")
+            .unwrap();
+
+        // Verify no data loss
+        let mut all_content = String::new();
+        for entry in fs::read_dir(temp_dir.path()).unwrap() {
+            if let Ok(entry) = entry {
+                if entry.file_name().to_str().unwrap().contains("test.log") {
+                    all_content.push_str(&fs::read_to_string(entry.path()).unwrap());
+                }
+            }
+        }
+
+        assert!(all_content.contains("Before rotation"));
+        assert!(all_content.contains("This triggers rotation"));
+        rotator.write(b"After rotation\n").unwrap();
+
+        // Verify main log file exists
+        assert!(log_path.exists());
     }
 
     #[test]
