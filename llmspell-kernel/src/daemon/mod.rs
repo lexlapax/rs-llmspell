@@ -15,9 +15,11 @@
 pub mod logging;
 pub mod manager;
 pub mod pid;
+pub mod shutdown;
 pub mod signals;
 
 // Re-export key types
 pub use manager::{DaemonConfig, DaemonManager};
 pub use pid::PidFile;
-pub use signals::{SignalBridge, SignalHandler};
+pub use shutdown::{OperationGuard, ShutdownConfig, ShutdownCoordinator, ShutdownPhase};
+pub use signals::{KernelMessage, SignalBridge, SignalHandler};

@@ -15,6 +15,9 @@ use std::time::Duration;
 use tokio::sync::mpsc;
 use tracing::{debug, error, info, instrument, trace, warn};
 
+use crate::daemon::{
+    KernelMessage, OperationGuard, ShutdownConfig, ShutdownCoordinator, SignalBridge,
+};
 use crate::debug::{DAPBridge, ExecutionManager};
 use crate::events::correlation::{ExecutionState, ExecutionStatus};
 use crate::events::{KernelEvent, KernelEventCorrelator};
@@ -118,6 +121,10 @@ pub struct IntegratedKernel<P: Protocol> {
     dap_bridge: Arc<parking_lot::Mutex<DAPBridge>>,
     /// Shutdown signal receiver
     shutdown_rx: Option<mpsc::Receiver<()>>,
+    /// Shutdown coordinator for graceful shutdown
+    shutdown_coordinator: Arc<ShutdownCoordinator>,
+    /// Signal bridge for handling Unix signals
+    signal_bridge: Option<Arc<SignalBridge>>,
 }
 
 #[allow(dead_code)] // These methods will be used when transport is fully integrated
@@ -240,6 +247,13 @@ impl<P: Protocol + 'static> IntegratedKernel<P> {
         dap_bridge.connect_execution_manager(execution_manager.clone());
         let dap_bridge = Arc::new(parking_lot::Mutex::new(dap_bridge));
 
+        // Create shutdown coordinator
+        let shutdown_config = ShutdownConfig::default();
+        let mut shutdown_coordinator = ShutdownCoordinator::new(shutdown_config);
+        shutdown_coordinator.set_message_router(message_router.clone());
+        shutdown_coordinator.set_kernel_state(state.clone());
+        let shutdown_coordinator = Arc::new(shutdown_coordinator);
+
         Ok(Self {
             script_executor,
             protocol,
@@ -256,12 +270,80 @@ impl<P: Protocol + 'static> IntegratedKernel<P> {
             execution_manager,
             dap_bridge,
             shutdown_rx: None,
+            shutdown_coordinator,
+            signal_bridge: None,
         })
     }
 
     /// Set shutdown signal receiver
     pub fn set_shutdown_receiver(&mut self, rx: mpsc::Receiver<()>) {
         self.shutdown_rx = Some(rx);
+    }
+
+    /// Set signal bridge for Unix signal handling
+    pub fn set_signal_bridge(&mut self, bridge: Arc<SignalBridge>) {
+        self.signal_bridge = Some(bridge);
+    }
+
+    /// Get shutdown coordinator
+    pub fn shutdown_coordinator(&self) -> Arc<ShutdownCoordinator> {
+        self.shutdown_coordinator.clone()
+    }
+
+    /// Handle shutdown request from signal or message
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the shutdown coordinator fails to initiate shutdown
+    pub async fn handle_shutdown(&mut self, restart: bool) -> Result<()> {
+        info!("Handling shutdown request (restart={})", restart);
+
+        // Initiate graceful shutdown
+        self.shutdown_coordinator.initiate_shutdown().await?;
+
+        // Send shutdown reply if transport is available
+        if self.transport.is_some() {
+            let reply = serde_json::json!({
+                "msg_type": "shutdown_reply",
+                "restart": restart,
+            });
+            debug!("Shutdown reply would be sent: {:?}", reply);
+        }
+
+        Ok(())
+    }
+
+    /// Process signals from signal bridge
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if signal processing or shutdown handling fails
+    pub async fn process_signals(&mut self) -> Result<()> {
+        if let Some(ref bridge) = self.signal_bridge {
+            if let Some(action) = bridge.process_signals_to_messages().await {
+                // Convert to kernel message
+                if let Some(msg) = SignalBridge::action_to_message(&action) {
+                    match msg {
+                        KernelMessage::ShutdownRequest { restart } => {
+                            self.handle_shutdown(restart).await?;
+                        }
+                        KernelMessage::InterruptRequest => {
+                            info!("Handling interrupt request from signal");
+                            // TODO: Interrupt current execution
+                        }
+                        KernelMessage::ConfigReload => {
+                            info!("Reloading configuration from signal");
+                            // TODO: Implement config reload
+                        }
+                        KernelMessage::StateDump => {
+                            info!("Dumping state from signal");
+                            // State dump logic can be added here
+                        }
+                    }
+                }
+            }
+        }
+        Ok(())
     }
 
     /// Set transport for message communication
@@ -858,6 +940,16 @@ impl<P: Protocol + 'static> IntegratedKernel<P> {
         code: &str,
         args: HashMap<String, String>,
     ) -> Result<String> {
+        // Check if we're accepting requests
+        if !self.shutdown_coordinator.is_accepting_requests().await {
+            return Err(anyhow::anyhow!(
+                "Kernel is shutting down, not accepting new requests"
+            ));
+        }
+
+        // Track this operation
+        let _guard = OperationGuard::new(self.shutdown_coordinator.clone());
+
         // Generate execution ID
         let exec_id = format!("exec-{}", uuid::Uuid::new_v4());
 
@@ -964,13 +1056,24 @@ impl<P: Protocol + 'static> IntegratedKernel<P> {
 
         info!("Handling shutdown_request (restart={})", restart);
 
-        // TODO: Send shutdown reply via transport when integrated
+        // Create reply for protocol
         let reply = serde_json::json!({
             "restart": restart
         });
         let _response = self.protocol.create_response("shutdown_reply", reply)?;
 
-        // Trigger shutdown
+        // Use async block to handle graceful shutdown
+        let shutdown_coordinator = self.shutdown_coordinator.clone();
+        let handle = tokio::spawn(async move {
+            if let Err(e) = shutdown_coordinator.initiate_shutdown().await {
+                error!("Failed to initiate shutdown: {}", e);
+            }
+        });
+
+        // Don't wait for completion here, let it run in background
+        drop(handle);
+
+        // Also trigger the old shutdown mechanism for compatibility
         if let Some(ref mut shutdown_rx) = self.shutdown_rx {
             shutdown_rx.close();
         }
