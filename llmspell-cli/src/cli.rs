@@ -437,7 +437,9 @@ pub enum KernelCommands {
 
 EXAMPLES:
     llmspell kernel start --port 9555 --daemon  # Start daemon on port 9555
-    llmspell kernel start --id my-kernel        # Start with custom ID")]
+    llmspell kernel start --id my-kernel        # Start with custom ID
+    llmspell kernel start --daemon --log-file /var/log/kernel.log  # With logging
+    llmspell kernel start --daemon --idle-timeout 7200  # 2 hour idle timeout")]
     Start {
         /// Port to listen on
         #[arg(short, long, default_value = "9555")]
@@ -454,6 +456,30 @@ EXAMPLES:
         /// Connection file path (for Jupyter discovery)
         #[arg(short = 'f', long)]
         connection_file: Option<PathBuf>,
+
+        /// Log file path (for daemon mode)
+        #[arg(long)]
+        log_file: Option<PathBuf>,
+
+        /// PID file path (for daemon mode)
+        #[arg(long)]
+        pid_file: Option<PathBuf>,
+
+        /// Idle timeout in seconds (0 = no timeout)
+        #[arg(long, default_value = "3600")]
+        idle_timeout: u64,
+
+        /// Maximum concurrent clients
+        #[arg(long, default_value = "10")]
+        max_clients: usize,
+
+        /// Log rotation size in bytes
+        #[arg(long)]
+        log_rotate_size: Option<u64>,
+
+        /// Number of rotated log files to keep
+        #[arg(long, default_value = "5")]
+        log_rotate_count: usize,
     },
 
     /// Stop kernel by ID

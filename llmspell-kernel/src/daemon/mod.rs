@@ -20,6 +20,7 @@ pub mod shutdown;
 pub mod signals;
 
 // Re-export key types
+pub use logging::{DaemonLogWriter, LogRotationConfig, LogRotator};
 pub use manager::{DaemonConfig, DaemonManager};
 pub use operations::{KernelConfig, SignalOperationsConfig, SignalOperationsHandler};
 pub use pid::PidFile;

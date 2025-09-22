@@ -138,7 +138,7 @@ pub const PROTOCOL_VERSION: &str = "5.3";
 // Re-export high-level API
 pub use api::{
     connect_to_kernel, start_embedded_kernel, start_embedded_kernel_with_executor,
-    start_kernel_service, ClientHandle, KernelHandle, ServiceHandle,
+    start_kernel_service, start_kernel_service_with_config, ClientHandle, KernelHandle, ServiceHandle,
 };
 
 // Re-export REPL types
