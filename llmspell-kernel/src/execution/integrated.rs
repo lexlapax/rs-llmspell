@@ -17,6 +17,7 @@ use tracing::{debug, error, info, instrument, trace, warn};
 
 use crate::daemon::{
     KernelMessage, OperationGuard, ShutdownConfig, ShutdownCoordinator, SignalBridge,
+    SignalOperationsConfig, SignalOperationsHandler,
 };
 use crate::debug::{DAPBridge, ExecutionManager};
 use crate::events::correlation::{ExecutionState, ExecutionStatus};
@@ -125,6 +126,8 @@ pub struct IntegratedKernel<P: Protocol> {
     shutdown_coordinator: Arc<ShutdownCoordinator>,
     /// Signal bridge for handling Unix signals
     signal_bridge: Option<Arc<SignalBridge>>,
+    /// Signal operations handler for SIGUSR1/SIGUSR2
+    signal_operations: Arc<SignalOperationsHandler>,
 }
 
 #[allow(dead_code)] // These methods will be used when transport is fully integrated
@@ -135,6 +138,7 @@ impl<P: Protocol + 'static> IntegratedKernel<P> {
     ///
     /// Returns an error if the script runtime cannot be created
     #[instrument(level = "info", skip_all)]
+    #[allow(clippy::too_many_lines)]
     pub async fn new(
         protocol: P,
         config: ExecutionConfig,
@@ -254,6 +258,12 @@ impl<P: Protocol + 'static> IntegratedKernel<P> {
         shutdown_coordinator.set_kernel_state(state.clone());
         let shutdown_coordinator = Arc::new(shutdown_coordinator);
 
+        // Create signal operations handler
+        let signal_operations_config = SignalOperationsConfig::default();
+        let mut signal_operations = SignalOperationsHandler::new(signal_operations_config);
+        signal_operations.set_kernel_state(state.clone());
+        let signal_operations = Arc::new(signal_operations);
+
         Ok(Self {
             script_executor,
             protocol,
@@ -272,6 +282,7 @@ impl<P: Protocol + 'static> IntegratedKernel<P> {
             shutdown_rx: None,
             shutdown_coordinator,
             signal_bridge: None,
+            signal_operations,
         })
     }
 
@@ -332,12 +343,16 @@ impl<P: Protocol + 'static> IntegratedKernel<P> {
                             // TODO: Interrupt current execution
                         }
                         KernelMessage::ConfigReload => {
-                            info!("Reloading configuration from signal");
-                            // TODO: Implement config reload
+                            info!("Processing config reload from SIGUSR1");
+                            if let Err(e) = self.signal_operations.handle_config_reload().await {
+                                error!("Failed to reload configuration: {}", e);
+                            }
                         }
                         KernelMessage::StateDump => {
-                            info!("Dumping state from signal");
-                            // State dump logic can be added here
+                            info!("Processing state dump from SIGUSR2");
+                            if let Err(e) = self.signal_operations.handle_state_dump().await {
+                                error!("Failed to dump state: {}", e);
+                            }
                         }
                     }
                 }

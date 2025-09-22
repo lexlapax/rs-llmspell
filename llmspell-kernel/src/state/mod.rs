@@ -9,6 +9,7 @@
 use anyhow::Result;
 use parking_lot::RwLock;
 use serde::{Deserialize, Serialize};
+use serde_json::json;
 use std::sync::Arc;
 use std::time::{Duration, Instant};
 use tracing::{debug, info, instrument, warn};
@@ -365,6 +366,54 @@ impl KernelState {
     /// Reset circuit breaker
     pub fn reset_circuit(&self) {
         self.circuit_breaker.reset();
+    }
+
+    /// Get the current session ID
+    pub fn session_id(&self) -> String {
+        self.session
+            .read()
+            .session_id
+            .clone()
+            .unwrap_or_else(|| "default".to_string())
+    }
+
+    /// Get the current execution count
+    pub fn execution_count(&self) -> u64 {
+        self.execution.read().execution_count as u64
+    }
+
+    /// Create a snapshot of current state for serialization
+    pub fn snapshot(&self) -> serde_json::Value {
+        let execution = self.execution.read();
+        let session = self.session.read();
+        let debug = self.debug.read();
+        let metrics = self.metrics();
+
+        json!({
+            "execution": {
+                "count": execution.execution_count,
+                "current_execution_id": execution.current_execution_id,
+                "status": format!("{execution_status:?}", execution_status=execution.status),
+                "current_code": execution.current_code,
+                "total_execution_time_secs": execution.total_execution_time.as_secs(),
+                "history_count": execution.history.len(),
+            },
+            "session": {
+                "id": session.session_id,
+                "created_at": session.created_at.map(|t| format!("{t:?}")),
+                "last_activity": session.last_activity.map(|t| format!("{t:?}")),
+                "metadata": session.metadata,
+                "breakpoint_count": session.breakpoints.len(),
+            },
+            "debug": {
+                "enabled": debug.enabled,
+                "mode": format!("{debug_mode:?}", debug_mode=debug.mode),
+                "stack_frames": debug.stack_frames.len(),
+                "variable_scopes": debug.variables.len(),
+                "watches": debug.watches.len(),
+            },
+            "metrics": metrics,
+        })
     }
 }
 
