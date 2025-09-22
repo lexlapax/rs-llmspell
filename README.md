@@ -2,9 +2,9 @@
 
 **Production-Ready AI Workflow Orchestration Platform** - Script-driven LLM coordination with RAG at scale
 
-**🚀 Version 0.8.0 - RAG & Multi-Tenant Vector Storage Complete**
+**🚀 Version 0.9.0 - Interactive Kernel & Debugging Infrastructure Complete**
 
-**🔗 Quick Links**: [📘 User Guide](docs/user-guide/) | [🔧 Developer Guide](docs/developer-guide/) | [📚 Examples](examples/) | [🚀 Get Started](#-quick-start) | [📖 Release Notes](RELEASE_NOTES_v0.8.0.md)
+**🔗 Quick Links**: [📘 User Guide](docs/user-guide/) | [🔧 Developer Guide](docs/developer-guide/) | [📚 Examples](examples/) | [🚀 Get Started](#-quick-start) | [📖 Release Notes](RELEASE_NOTES_v0.9.0.md)
 
 ---
 
@@ -12,11 +12,18 @@
 
 ---
 
-## 🌟 Production Ready with Enterprise RAG
+## 🌟 Production Ready with Interactive Kernel Architecture
 
-rs-llmspell v0.8.0 delivers **complete RAG infrastructure** with enterprise-grade vector storage, multi-tenant isolation, and high-performance search. Build knowledge-aware AI applications with persistent memory, <8ms vector search across 100K+ vectors, and 80% embedding cache hit rates.
+rs-llmspell v0.9.0 delivers **unified kernel architecture** with interactive REPL capabilities, comprehensive debugging infrastructure, and multi-protocol support. Build sophisticated AI applications with Jupyter integration, DAP debugging, real-time tracing, and 100% validated application suite across all complexity layers.
 
 ## ✨ Key Features
+
+### 🎯 Unified Kernel & Debug Infrastructure (v0.9.0)
+- **Interactive REPL**: Jupyter 5-channel protocol support
+- **Debug Capabilities**: DAP bridge with breakpoints and stepping
+- **Global IO Runtime**: Eliminates runtime context issues
+- **Session Management**: Complete lifecycle with artifacts
+- **Comprehensive Tracing**: -3.99% overhead (performance gain!)
 
 ### 🧠 Complete RAG System (v0.8.0)
 - **HNSW Vector Storage**: <8ms search @ 100K vectors, <35ms @ 1M vectors
@@ -31,7 +38,7 @@ rs-llmspell v0.8.0 delivers **complete RAG infrastructure** with enterprise-grad
 - Real-time state sharing between agents
 - Automatic error recovery and retry logic
 
-### 🛠️ 37+ Built-in Tools (v0.8.0)
+### 🛠️ 37+ Built-in Tools
 - File operations, web search, data processing
 - **NEW**: pdf-processor, document-chunker, embedding-generator
 - **NEW**: vector-search, similarity-calculator, web-scraper
@@ -52,7 +59,10 @@ Progressive complexity with RAG capabilities:
 - **Resource Boundaries**: Per-tenant CPU, memory, I/O limits
 - **Audit Compliance**: Complete trails with event correlation
 
-### ⚡ Blazing Performance (v0.8.0)
+### ⚡ Blazing Performance (v0.9.0)
+- **Message handling**: 3.8ms (24% faster than target)
+- **Tracing overhead**: -3.99% (performance improved!)
+- **Application validation**: 100% success rate
 - **Vector search**: <8ms @ 100K vectors, <35ms @ 1M vectors
 - **Embedding generation**: 45ms with caching (80% hit rate)
 - **Multi-tenant overhead**: 3% (40% better than target)
@@ -70,7 +80,7 @@ Progressive complexity with RAG capabilities:
 | Linux | ⏳ Testing Pending | Expected to work, formal testing in progress |
 | Windows | ⏳ Testing Pending | Expected to work, formal testing in progress |
 
-> **Note**: v0.8.0 has been thoroughly tested on macOS 15.7 (Darwin 24.6.0, ARM64) with complete RAG functionality. Linux and Windows testing is in progress.
+> **Note**: v0.9.0 has been thoroughly tested on macOS 15.7 (Darwin 24.6.0, ARM64) with complete kernel architecture and debugging support. Linux and Windows testing is in progress.
 
 ## Quick Example
 

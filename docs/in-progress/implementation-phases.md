@@ -10,7 +10,7 @@
 
 ## Overview
 
-Rs-LLMSpell follows a carefully structured 18+ phase implementation approach that prioritizes core functionality while building toward production readiness. Each phase has specific goals, components, and measurable success criteria. The roadmap includes Phase 9 for Interactive REPL and Debugging Infrastructure, critical for developer experience, and Phase 10 for Adaptive Memory System, essential for agent intelligence.
+Rs-LLMSpell follows a carefully structured 21+ phase implementation approach that prioritizes core functionality while building toward production readiness. Each phase has specific goals, components, and measurable success criteria. The roadmap includes Phase 9 for Interactive REPL and Debugging Infrastructure, Phase 10 for Service Integration & IDE Connectivity, and Phase 11 for Adaptive Memory System, essential for agent intelligence.
 
 ### Phase Categories
 
@@ -20,14 +20,13 @@ Rs-LLMSpell follows a carefully structured 18+ phase implementation approach tha
 - **Infrastructure Consolidation** (Phase 7): Foundational solidification for production readiness
 - **Advanced Features** (Phase 8): Vector storage and search infrastructure
 - **Developer Experience** (Phase 9): Interactive REPL and debugging infrastructure
-- **Advanced AI** (Phase 10): Adaptive memory system with temporal knowledge graphs
-- **Enterprise Integration** (Phase 11): Advanced workflow features and enterprise IDE tools
-- **Service Mode** (Phase 12): Daemon and service mode
-- **Protocol Support** (Phases 13-14): MCP client and server integration
-- **Language Extensions** (Phase 15): JavaScript engine support
-- **Platform Support** (Phases 16-17): Library mode and cross-platform support
-- **Production Optimization** (Phase 18): Performance and security hardening
-- **Future Enhancements** (Phases 19+): Extended tools, A2A protocols, multimodal, and AI/ML tools
+- **Service & IDE Integration** (Phase 10): External service layer and IDE connectivity
+- **Advanced AI** (Phase 11): Adaptive memory system with temporal knowledge graphs
+- **Protocol Support** (Phases 12-13): MCP client and server integration
+- **Language Extensions** (Phase 14): JavaScript engine support
+- **Platform Support** (Phases 15-16): Library mode and cross-platform support
+- **Production Optimization** (Phase 17): Performance and security hardening
+- **Future Enhancements** (Phases 18+): Extended tools, A2A protocols, multimodal, and AI/ML tools
 
 ---
 
@@ -94,7 +93,7 @@ Rs-LLMSpell follows a carefully structured 18+ phase implementation approach tha
 - [x] ScriptEngineBridge abstraction works (not just Lua integration)
 - [x] Engine factory pattern functional
 - [x] Directory structure supports multi-language from day one
-- [x] API injection is language-agnostic (ready for Phase 12)
+- [x] API injection is language-agnostic (ready for Phase 14)
 - [x] Can execute simple Lua scripts through ScriptEngineBridge abstraction
 - [x] LLM providers can be called from scripts
 - [x] Basic tool execution works
@@ -108,7 +107,7 @@ Rs-LLMSpell follows a carefully structured 18+ phase implementation approach tha
 **Testing Requirements**:
 - ScriptEngineBridge trait behavior tests
 - Engine factory pattern validation
-- Cross-engine API consistency framework (ready for Phase 12)
+- Cross-engine API consistency framework (ready for Phase 14)
 - Script execution integration tests
 - Language-agnostic API injection testing
 - Bridge abstraction unit tests
@@ -319,7 +318,7 @@ Rs-LLMSpell follows a carefully structured 18+ phase implementation approach tha
 - Agent lifecycle hooks integration with **ReplayableHook trait for Phase 5 persistence**
 - **CircuitBreaker for automatic performance protection (<5% overhead guaranteed)**
 - **UniversalEvent format for cross-language event propagation**
-- **DistributedHookContext for future A2A protocol support (Phase 17-18)**
+- **DistributedHookContext for future A2A protocol support (Phase 18-19)**
 - **CompositeHook patterns (Sequential, Parallel, FirstMatch, Voting)**
 - **Enhanced HookResult enum (Continue, Modified, Cancel, Redirect, Replace, Retry, Fork, Cache, Skipped)**
 
@@ -576,7 +575,7 @@ Rs-LLMSpell follows a carefully structured 18+ phase implementation approach tha
 **Goal**: Implement interactive REPL for development with comprehensive debugging capabilities
 **Priority**: HIGH (Developer Experience - Critical for adoption)
 **Dependencies**: Requires Phase 8 Vector Storage for search context
-**Evolution**: Combines original Phase 11 REPL with advanced debugging infrastructure from Phase-9 branch learnings
+**Evolution**: Combines original REPL concept with advanced debugging infrastructure from Phase-9 branch learnings
 
 **Core Architecture**:
 - **REPL Engine**: Interactive command-line interface with state persistence
@@ -710,11 +709,237 @@ Rs-LLMSpell follows a carefully structured 18+ phase implementation approach tha
 
 ---
 
-### **Phase 10: Adaptive Memory System (Weeks 33-38)**
+### **Phase 10: Service Integration & IDE Connectivity (Weeks 33-36)**
 
-**Goal**: Implement Adaptive Temporal Knowledge Graph (A-TKG) memory architecture
+**Goal**: Implement external service layer for client connectivity and IDE integration
+**Priority**: HIGH (Critical for Developer Experience and External Tool Integration)
+**Duration**: 4 weeks (optimized from 6 weeks by combining shared infrastructure)
+**Dependencies**:
+- ✅ **Phase 9** (Kernel Integration): Kernel foundation with message loop and DAP bridge
+- ✅ **Phase 4** (Hook System): FlowController and CircuitBreaker for service stability
+
+**Rationale**: Service mode and IDE integration share 60-70% of infrastructure (transport layers, connection management, multi-client support). Combining them accelerates time-to-value by 6 weeks and enables immediate IDE connectivity after Phase 9.
+
+#### **10.1: Service Infrastructure Foundation (Week 33)**
+
+**Core Service Layer**:
+- **`llmspell serve` Command Framework**:
+  ```bash
+  llmspell serve --jupyter --port 8888     # Jupyter Lab connectivity
+  llmspell serve --dap --port 8889         # VS Code debugging
+  llmspell serve --lsp --port 8890         # Language server
+  llmspell serve --repl                    # Interactive REPL
+  llmspell serve --all                     # Multi-protocol mode
+  ```
+
+- **Multi-Protocol Service Manager**:
+  ```rust
+  pub struct ServiceManager {
+      jupyter_service: Option<JupyterService>,
+      dap_service: Option<DAPService>,
+      lsp_service: Option<LSPService>,
+      repl_service: Option<REPLService>,
+      client_registry: ClientConnectionRegistry,
+      session_manager: MultiClientSessionManager,
+  }
+  ```
+
+- **Connection Registry & Discovery**:
+  - Service announcement via mDNS/DNS-SD
+  - Connection file generation (Jupyter kernel.json)
+  - Port management and conflict resolution
+  - Client authentication and authorization
+  - Session isolation and resource limits
+
+- **Transport Layer Implementation**:
+  - ZeroMQ for Jupyter 5-channel protocol
+  - TCP/WebSocket for DAP and LSP
+  - Unix domain sockets for local connections
+  - TLS 1.3 for secure remote connections
+
+#### **10.2: Jupyter Lab Integration (Week 34 - Part 1)**
+
+**ZeroMQ Transport Implementation**:
+- **5-Channel Architecture**:
+  ```rust
+  pub struct JupyterTransport {
+      shell: zmq::Socket,      // Execute requests
+      iopub: zmq::Socket,      // Output publication
+      stdin: zmq::Socket,      // Input requests
+      control: zmq::Socket,    // Control commands
+      heartbeat: zmq::Socket,  // Keep-alive
+  }
+  ```
+
+- **Kernel Registration & Discovery**:
+  - Generate kernel.json with connection info
+  - Install kernel spec for Jupyter discovery
+  - Support custom kernel display names
+  - Handle multiple kernel instances
+
+- **Message Processing Integration**:
+  - Connect ZeroMQ transport to IntegratedKernel
+  - Message signing and verification (HMAC)
+  - Parent header tracking for message correlation
+  - Comm channel support for widgets
+
+- **Notebook Features**:
+  - Rich display support (HTML, images, plots)
+  - Magic commands (%time, %debug, etc.)
+  - Tab completion and introspection
+  - Inline documentation and help
+
+#### **10.2: VS Code Integration (Week 34 - Part 2)**
+
+**Debug Adapter Protocol Server**:
+- **DAP 1.0 Protocol Implementation**:
+  ```rust
+  pub struct DAPServer {
+      tcp_listener: TcpListener,
+      dap_bridge: Arc<Mutex<DAPBridge>>,  // From Phase 9
+      protocol_handler: DAPProtocolHandler,
+      client_sessions: HashMap<ClientId, DAPSession>,
+  }
+  ```
+
+- **Essential DAP Commands**:
+  - initialize/launch/attach
+  - setBreakpoints/setExceptionBreakpoints
+  - continue/next/stepIn/stepOut/pause
+  - stackTrace/scopes/variables/evaluate
+  - disconnect/terminate
+
+- **VS Code Extension**:
+  - One-click debugging with auto-kernel start
+  - Integrated terminal with REPL
+  - Syntax highlighting for Lua/JavaScript
+  - Breakpoint management UI
+  - Variable watch and hover inspection
+  - Call stack visualization
+  - Debug console with expression evaluation
+
+#### **10.3: Language Server Protocol (Week 35 - Part 1)**
+
+**LSP Implementation**:
+- **Core LSP Features**:
+  ```rust
+  pub struct LSPServer {
+      tcp_listener: TcpListener,
+      kernel: Arc<IntegratedKernel>,
+      document_store: DocumentStore,
+      symbol_index: SymbolIndex,
+  }
+  ```
+
+- **Language Intelligence**:
+  - Code completion from runtime context
+  - Go-to-definition using kernel state
+  - Find references across scripts
+  - Real-time diagnostics from execution
+  - Hover information with type details
+  - Code actions and quick fixes
+  - Document formatting and refactoring
+
+- **Multi-Language Support**:
+  - Lua language server features
+  - JavaScript support (future-proofing)
+  - Custom DSL highlighting
+  - Mixed-language documents
+
+#### **10.3: Interactive REPL Service (Week 35 - Part 2)**
+
+**Enhanced REPL Implementation**:
+- **REPL Server Features**:
+  - Multi-client REPL sessions
+  - Session persistence and replay
+  - Command history across sessions
+  - Tab completion from kernel state
+  - Inline documentation
+  - Debug commands integration
+
+- **Advanced REPL Capabilities**:
+  - Hot code reloading
+  - Watch mode for file changes
+  - Performance profiling commands
+  - Memory inspection tools
+  - State visualization
+
+#### **10.4: Service Deployment & Management (Week 36 - Part 1)**
+
+**System Service Integration**:
+- **Service Management**:
+  ```bash
+  # systemd integration
+  systemctl start llmspell.service
+  systemctl enable llmspell.service
+
+  # launchd integration (macOS)
+  launchctl load ~/Library/LaunchAgents/com.llmspell.plist
+  ```
+
+- **Production Features**:
+  - Automatic restart on failure
+  - Health checks and monitoring
+  - Resource limits and quotas
+  - Log rotation and management
+  - Metrics export (Prometheus)
+
+- **Scheduler Integration**:
+  - Cron-like job scheduling
+  - Interval-based task execution
+  - Event-driven triggers
+  - Task queue management
+
+#### **10.4: Multi-Client & Security (Week 36 - Part 2)**
+
+**Multi-Client Architecture**:
+- **Session Management**:
+  - Client isolation and sandboxing
+  - Shared kernel with separate contexts
+  - Collaborative debugging support
+  - Session migration between clients
+
+- **Security Layer**:
+  - TLS 1.3 for all remote connections
+  - Certificate-based authentication
+  - OAuth2/OIDC integration
+  - RBAC for operations
+  - Audit logging
+  - Secret masking in output
+
+**Success Criteria**:
+- ✅ **`llmspell serve` launches multi-protocol server**
+- ✅ **Jupyter Lab connects and executes notebooks**
+- ✅ **VS Code debugging works with <20ms stepping**
+- ✅ **LSP provides code intelligence in any IDE**
+- ✅ **Multiple clients connect simultaneously**
+- ✅ **Service runs as systemd/launchd daemon**
+- ✅ **Session persistence across restarts**
+- ✅ **Health monitoring and auto-restart functional**
+- ✅ **Performance: <5ms message handling maintained**
+- ✅ **Security: TLS + auth for remote connections**
+
+**Testing Requirements**:
+- Multi-protocol server startup tests
+- Jupyter kernel protocol compliance
+- DAP protocol compliance validation
+- LSP protocol compliance tests
+- Multi-client synchronization tests
+- Service stability (24-hour run)
+- Security penetration testing
+- Performance benchmarks under load
+- Session persistence validation
+- Crash recovery testing
+
+---
+
+### **Phase 11: Adaptive Memory System (Weeks 37-41)**
+
+**Goal**: Implement Adaptive Temporal Knowledge Graph (A-TKG) memory architecture with IDE visualization
 **Priority**: HIGH (Core AI Capability)
-**Dependencies**: Requires Phase 8 Vector Storage as foundation
+**Dependencies**:
+- Phase 8: Vector Storage as foundation
+- Phase 10: IDE integration for memory visualization
 **Research Foundation**: Based on Zep/Graphiti (94.8% DMR accuracy) and Mem0 (26% improvement over OpenAI)
 
 **Memory Architecture Overview**:
@@ -723,7 +948,7 @@ Rs-LLMSpell follows a carefully structured 18+ phase implementation approach tha
 - **Semantic Memory**: Temporal Knowledge Graph storing facts, entities, relationships
 - **Adaptive Consolidation**: LLM-driven memory management (add/update/delete logic)
 
-**Phase 10.1: Foundational Episodic Memory (Week 33)**:
+**Phase 11.1: Foundational Episodic Memory (Week 37)**:
 - Create `llmspell-memory` crate with core data structures
 - Implement `InteractionLog` and `MemoryItem` types
 - Integrate with `llmspell-events` for interaction capture
@@ -731,7 +956,7 @@ Rs-LLMSpell follows a carefully structured 18+ phase implementation approach tha
 - Basic vector retrieval using Phase 8 infrastructure
 - Memory persistence via `llmspell-storage`
 
-**Phase 10.2: Temporal Knowledge Graph Foundation (Weeks 34-35)**:
+**Phase 11.2: Temporal Knowledge Graph Foundation (Weeks 38-39)**:
 - **New Crate: `llmspell-graph`**
   - Bi-temporal data model (event time + ingestion time)
   - Node/Edge structures with temporal validity intervals
@@ -746,7 +971,7 @@ Rs-LLMSpell follows a carefully structured 18+ phase implementation approach tha
   - Temporal information parsing
   - Contradiction detection and resolution
 
-**Phase 10.3: Hybrid Retrieval System (Week 36)**:
+**Phase 11.3: Hybrid Retrieval System (Week 40)**:
 - **Memory Orchestrator** in `llmspell-memory`:
   - Unified API for all memory types
   - Query planning and routing logic
@@ -761,7 +986,7 @@ Rs-LLMSpell follows a carefully structured 18+ phase implementation approach tha
   - No LLM calls during retrieval
   - Support for 1M+ memory items
 
-**Phase 10.4: Adaptive Consolidation (Week 37)**:
+**Phase 11.4: Adaptive Consolidation (Week 40)**:
 - **Memory Consolidation Pipeline** (Mem0-inspired):
   - Periodic review of memory items
   - LLM-driven decisions: Add/Update/Delete/Ignore
@@ -776,7 +1001,22 @@ Rs-LLMSpell follows a carefully structured 18+ phase implementation approach tha
   - Adjust importance scores based on outcomes
   - Self-improving relevance ranking
 
-**Phase 10.5: Integration and Polish (Week 38)**:
+**Phase 11.5: Integration and Polish (Week 41)**:
+- **Script API** (`MemoryGlobal`):
+  - `Memory.store()` - Store new memories
+  - `Memory.search()` - Semantic search
+  - `Memory.graphQuery()` - Graph traversal
+  - `Memory.buildContext()` - Unified context assembly
+- **Agent Integration**:
+  - Automatic memory injection into agent context
+  - Memory-aware tool selection
+  - Cross-session continuity
+- **IDE Visualization** (NEW - leverages Phase 10):
+  - VS Code memory graph explorer
+  - Jupyter notebook memory inspection
+  - Real-time memory state via DAP
+  - Memory performance profiler
+- **Observability**:
 - **Script API** (`MemoryGlobal`):
   - `Memory.store()` - Store new memories
   - `Memory.search()` - Semantic search
@@ -820,191 +1060,8 @@ Rs-LLMSpell follows a carefully structured 18+ phase implementation approach tha
 
 ## Advanced Integration Phases
 
-### **Phase 11: Enterprise IDE and Developer Tools Integration (Weeks 39-40)**
 
-**Goal**: Implement comprehensive IDE integration, web client foundation, and remote debugging capabilities leveraging Phase 9's **complete debug infrastructure** and unified kernel architecture
-**Priority**: HIGH (Developer Experience - Critical for enterprise adoption)
-**Dependencies**:
-- ✅ **Phase 9** (Complete Debug Infrastructure): Core debugging 100% functional with execution blocking
-- ✅ **Phase 8** (Kernel as Execution Hub): Unified execution model ready for multi-client connections
-- ✅ **Phase 10** (Memory System): Context for code intelligence
-
-**Rationale**: With Phase 9's **complete debug infrastructure** (breakpoints actually pause execution, variables inspectable, step debugging functional) and the kernel-as-execution-hub architecture, IDE integration becomes primarily a **protocol translation task**. Multiple clients (CLI, Web, IDE) can connect to the same kernel session, enabling collaborative debugging and development.
-
-**🎯 CRITICAL FOUNDATION**: Phase 9 eliminated the major technical risk by delivering **working debugging functionality**. Phase 11 focuses on exposing this proven infrastructure via standard protocols (LSP/DAP), not building debugging from scratch.
-
-**Components**:
-
-#### **11.1: Web Client Foundation (Week 39 - Part 1)**
-- **Web REPL Interface**:
-  - WebSocket transport layer for kernel protocol
-  - Browser-based terminal emulator
-  - Syntax highlighting and auto-completion
-  - Session persistence across browser refreshes
-- **Interactive Debug UI**:
-  - Visual breakpoint management
-  - Variable inspector with tree view
-  - Call stack visualization
-  - Step controls with keyboard shortcuts
-- **Multi-tenant Support**:
-  - User authentication and session isolation
-  - Resource limits per web session
-  - Enterprise SSO integration hooks
-
-#### **11.2: IDE Integration - LSP/DAP Implementation (Week 39 - Part 2)**
-- **Language Server Protocol (LSP)**:
-  - Code completion from kernel runtime
-  - Hover information with type details
-  - Go-to-definition using kernel state
-  - Real-time diagnostics from execution
-  - Refactoring support with kernel validation
-- **Debug Adapter Protocol (DAP)** (Building on Phase 9 Complete Infrastructure):
-  - **Protocol translation layer** between proven DebugCoordinator and DAP 1.0 standard
-  - **Jupyter debug_request/reply integration** (specific postponed item from Phase 9)
-  - **Direct API mapping**: DebugCoordinator methods → DAP protocol messages
-  - **Breakpoint synchronization** via existing `coordinator.add_breakpoint()`
-  - **Variable evaluation** via existing `coordinator.inspect_locals()`
-  - **Step operations** via existing `coordinator.step_*()` methods
-  - **State synchronization** between internal debug state and DAP protocol
-  - **Multi-IDE support** through protocol compliance (not custom integrations)
-- **Multi-IDE Support**:
-  - Protocol-based architecture works with any LSP/DAP client
-  - Tested with VS Code, Neovim, IntelliJ, Emacs
-
-#### **11.3: VS Code Extension (Week 40 - Part 1)**
-- **Extension Features**:
-  - One-click debugging with automatic kernel start
-  - Integrated REPL panel
-  - Syntax highlighting for Lua/JavaScript
-  - Snippet library for common patterns
-  - Task runner integration
-- **Advanced Debugging UI**:
-  - Inline variable values during debug
-  - Conditional breakpoint editor
-  - Watch expression evaluator
-  - Memory usage visualizer
-- **Marketplace Integration**:
-  - Published to VS Code marketplace
-  - Auto-update mechanism
-  - Telemetry for usage analytics (optional)
-
-#### **11.4: Remote Debugging Security (Week 40 - Part 2)**
-- **Secure Connection Layer**:
-  - TLS 1.3 for all remote connections
-  - Certificate-based authentication
-  - SSH tunnel support
-  - VPN-friendly architecture
-- **Enterprise Security Features**:
-  - RBAC for debug operations
-  - Audit logging for all debug sessions
-  - Compliance mode (HIPAA, SOC2)
-  - Secret masking in debug output
-- **Session Management**:
-  - Secure session tokens
-  - Automatic timeout and cleanup
-  - Session recording for audit
-  - Multi-factor authentication support
-
-#### **11.5: Media and Streaming Support**
-- **Streaming Protocols**:
-  - WebRTC for real-time media debugging
-  - HLS/DASH for streaming content
-  - Binary WebSocket for efficient data transfer
-- **Media Debugging**:
-  - Image preview in debugger
-  - Audio waveform visualization
-  - Video frame stepping
-  - Large file streaming without memory exhaustion
-- **Performance Optimization**:
-  - Chunked transfer for large data
-  - Progressive loading for media
-  - Bandwidth management
-  - Client-side caching
-
-**Success Criteria**:
-- [x] **Core debugging infrastructure functional** (✅ Phase 9 - execution blocking verified)
-- [ ] **Web client connects to kernel via WebSocket** (protocol integration)
-- [ ] **LSP provides code completion and diagnostics** (using kernel runtime context)
-- [ ] **DAP enables full debugging from any IDE** (protocol translation layer)
-- [ ] **Jupyter debug_request/reply integration** (postponed item from Phase 9 completed)
-- [ ] **VS Code extension published and functional** (leveraging DAP bridge)
-- [ ] **Remote debugging works securely over internet** (secure transport layer)
-- [ ] **Multi-client debugging sessions work** (2+ IDEs on same kernel via protocol)
-- [ ] **Media debugging doesn't exhaust memory** (streaming optimization)
-- [ ] **Performance acceptable** (<100ms local, <200ms remote, <10ms protocol overhead)
-- [ ] **Enterprise security requirements met** (TLS, RBAC, audit logging)
-
-**Testing Requirements**:
-- WebSocket connection stability tests
-- LSP protocol compliance validation
-- DAP protocol compliance validation
-- Multi-IDE integration tests
-- Security penetration testing
-- Performance benchmarks (local and remote)
-- Media handling stress tests
-- Multi-client synchronization tests
-- Browser compatibility testing (Chrome, Firefox, Safari, Edge)
-
-**Integration with Previous Phases**:
-- **Phase 9 (Complete Debug Infrastructure)**: **Core debugging 100% functional** - breakpoints pause execution, variables inspectable, step debugging works. Phase 11 provides **protocol access** to this proven functionality.
-- **Phase 8 (Kernel Hub)**: All IDE clients connect to unified kernel via WebSocket/protocol layer
-- **Phase 9 (Debug Infrastructure Foundation)**: DebugCoordinator, ExecutionManager, and debug bridges provide complete API surface
-- **Phase 10 (Memory)**: IDE can visualize memory system state via LSP context
-- **Future Phase 12 (Daemon)**: IDE can manage long-running services
-- **Future Phase 13-14 (MCP)**: IDE becomes MCP client/server
-
-**Key Integration Success**: Phase 9's completion of core debugging functionality transforms Phase 11 from a **high-risk development task** into a **lower-risk integration task**.
-
----
-
-### **Phase 12: Daemon and Service Mode (Weeks 41-42)**
-
-**Goal**: Implement long-running daemon mode with scheduler
-**Priority**: LOW (Advanced Feature)
-**Phase 4 Integration**: FlowController and CircuitBreaker from Phase 4 are CRITICAL for daemon stability, preventing memory exhaustion and runaway operations in long-running services.
-
-**Components**:
-- `llmspell serve` command
-- `Scheduler` component with cron/interval triggers
-- Service integration (systemd/launchd)
-- API endpoints for external control
-- **Automatic FlowController integration for event overflow prevention**
-- **CircuitBreaker protection for all scheduled tasks**
-- **Built-in monitoring via Phase 4 performance hooks**
-- **Model Specification Support**:
-  - REST API must accept both full configuration and "provider/model" formats
-  - Configuration file schema should support convenience syntax
-  - Ensure backward compatibility for existing configurations
-  - API documentation includes both specification formats
-  - Service configuration examples using convenience syntax
-
-**Success Criteria**:
-- [ ] Daemon mode runs continuously
-- [ ] Scheduled tasks execute at correct intervals
-- [ ] Service can be controlled via system service manager
-- [ ] API endpoints respond to external requests
-- [ ] Resource usage remains stable over long periods
-- [ ] **Event overflow prevented by FlowController**
-- [ ] **Runaway tasks stopped by CircuitBreaker**
-- [ ] **Performance metrics available via monitoring hooks**
-- [ ] REST API accepts both model specification formats
-- [ ] Configuration files support convenience syntax
-- [ ] Backward compatibility maintained for existing configs
-- [ ] API documentation covers both formats
-
-**Testing Requirements**:
-- Long-running stability tests
-- Scheduler accuracy validation
-- Service integration tests
-- API endpoint functionality tests
-- Resource usage monitoring tests
-- **Event overflow stress tests**
-- **Circuit breaker activation tests**
-- **Monitoring hook accuracy tests**
-
----
-
-### **Phase 13: MCP Tool Integration (Weeks 43-44)**
+### **Phase 12: MCP Tool Integration (Weeks 42-43)**
 
 **Goal**: Support Model Control Protocol for external tools
 **Priority**: LOW (Advanced Integration)
@@ -1031,7 +1088,7 @@ Rs-LLMSpell follows a carefully structured 18+ phase implementation approach tha
 
 ---
 
-### **Phase 14: MCP Server Mode (Weeks 45-46)**
+### **Phase 13: MCP Server Mode (Weeks 44-45)**
 
 **Goal**: Expose rs-llmspell tools and agents via MCP protocol
 **Priority**: LOW (Advanced Integration)
@@ -1058,7 +1115,36 @@ Rs-LLMSpell follows a carefully structured 18+ phase implementation approach tha
 
 ---
 
-### **Phase 15: A2A Client Support (Weeks 47-48)**
+### **Phase 14: JavaScript Engine Support (Weeks 46-47)**
+
+**Goal**: Add JavaScript support via bridge pattern established in Phase 1
+**Priority**: MEDIUM (Multi-Language Support)
+**Dependencies**: Phase 1 ScriptEngineBridge foundation
+
+**Components**:
+- JavaScript engine selection and integration (V8, QuickJS, or Boa)
+- `JavaScriptEngine` implementing `ScriptEngineBridge`
+- JavaScript-specific API bindings
+- Node.js compatibility layer
+- npm package support (selective)
+
+**Success Criteria**:
+- [ ] JavaScript scripts execute correctly
+- [ ] Bridge abstraction maintains <5% overhead
+- [ ] Mixed Lua/JavaScript execution works
+- [ ] Basic npm packages can be used
+- [ ] Memory usage acceptable (<100MB overhead)
+
+**Testing Requirements**:
+- JavaScript execution tests
+- Bridge overhead benchmarks
+- Cross-language interop tests
+- npm integration tests
+- Memory usage monitoring
+
+---
+
+### **Phase 15: Library Mode Support (Weeks 48-49)**
 
 **Goal**: Agent-to-Agent communication as client
 **Priority**: LOW (Advanced Networking)
@@ -1085,7 +1171,7 @@ Rs-LLMSpell follows a carefully structured 18+ phase implementation approach tha
 
 ---
 
-### **Phase 16: A2A Server Support (Weeks 49-50)**
+### **Phase 16: Cross-Platform Support (Weeks 50-51)**
 
 **Goal**: Expose local agents via A2A protocol
 **Priority**: LOW (Advanced Networking)
@@ -1114,7 +1200,7 @@ Rs-LLMSpell follows a carefully structured 18+ phase implementation approach tha
 
 ## Production Optimization Phase
 
-### **Phase 17: Library Mode Support (Weeks 51-52)**
+### **Phase 17: Production Optimization (Weeks 52-53)**
 
 **Goal**: Support usage as native module in external runtimes
 **Priority**: MEDIUM (Alternative Usage Mode)
@@ -1141,7 +1227,7 @@ Rs-LLMSpell follows a carefully structured 18+ phase implementation approach tha
 
 ---
 
-### **Phase 18: JavaScript Engine Support (Weeks 53-54)**
+### **Phase 18: A2A Client Support (Weeks 54-55)**
 
 **Goal**: Add JavaScript as second script engine using existing ScriptEngineBridge infrastructure
 **Priority**: MEDIUM (Enhancement)
@@ -1192,129 +1278,7 @@ Rs-LLMSpell follows a carefully structured 18+ phase implementation approach tha
 
 ---
 
-## Production Optimization Phase
-
-### **Phase 16: Library Mode Support (Weeks 48-49)**
-
-**Goal**: Support usage as native module in external runtimes  
-**Priority**: MEDIUM (Alternative Usage Mode)
-
-**Components**:
-- C API layer for FFI
-- `RuntimeMode::Library` implementation
-- `SelectiveInitStrategy` for partial initialization
-- Native module packaging (LuaRock, NPM)
-
-**Success Criteria**:
-- [ ] Can be compiled as shared library
-- [ ] C API allows external lua_State injection
-- [ ] Selective initialization works (tools-only, agents-only)
-- [ ] Native modules can be required in external scripts
-- [ ] Memory management safe in external runtimes
-
-**Testing Requirements**:
-- C API functionality tests
-- External runtime integration tests
-- Memory safety validation
-- Selective initialization tests
-- Native module packaging tests
-
----
-
-## Additional Enhancement Phases
-
-### **Phase 17: Cross-Platform Support (Weeks 50-51)**
-
-**Goal**: Full Windows support and cross-platform compatibility  
-**Priority**: MEDIUM (Platform Coverage)
-
-**Components**:
-- Windows-specific implementations
-- Cross-platform build system
-- Platform-specific service integration
-- Cross-platform testing matrix
-
-**Success Criteria**:
-- [ ] All features work on Windows
-- [ ] Windows Service integration functional
-- [ ] Build system supports all target platforms
-- [ ] Cross-platform CI pipeline validates all platforms
-- [ ] Path handling works correctly on all platforms
-
-**Testing Requirements**:
-- Windows-specific functionality tests
-- Cross-platform build validation
-- Service integration tests per platform
-- Path handling compatibility tests
-- Full platform matrix testing
-
----
-## Platform Support Phases
-
-### **Phase 18: Production Optimization (Weeks 52-53)**
-
-**Goal**: Performance optimization and production hardening  
-**Priority**: HIGH (Production Readiness)
-**Phase 4 Benefit**: CircuitBreaker, PerformanceMonitor, and SecurityHook from Phase 4 provide built-in protection, reducing this phase's scope by ~1 week.
-
-**Components**:
-- Performance profiling and optimization **(building on Phase 4 monitoring)**
-- Memory usage optimization
-- Comprehensive observability **(extending Phase 4 metrics)**
-- Security audit and hardening **(leveraging SecurityHook patterns)**
-- **Fine-tuning of existing CircuitBreaker thresholds**
-- **Optimization of hook execution paths**
-
-**Success Criteria**:
-- [ ] Performance benchmarks meet targets
-- [ ] Memory usage optimized and bounded
-- [ ] Full observability stack functional
-- [ ] Security audit passes
-- [ ] Production deployment validated
-- [ ] **CircuitBreaker thresholds optimized for production**
-- [ ] **Hook execution overhead remains <5%**
-- [ ] **Security patterns from Phase 4 validated**
-
-**Testing Requirements**:
-- Performance benchmark validation
-- Memory usage profiling
-- Observability stack integration tests
-- Security penetration testing
-- Production deployment simulation
-- **Hook performance regression tests**
-- **Circuit breaker threshold optimization tests**
-
----
-
-## Enhanced Capabilities
-
-### **Phase 18: Additional Optional Enhancements (Extended Tools, Other Enhancements) (Weeks 48-49)**
-
-**Goal**: Implement additional data processing and integration tools  
-**Priority**: LOW (Post-Production Enhancement)
-
-**Components**:
-- **Data Processing Tools** (5 tools): `xml_processor`, `yaml_processor`, `data_transformer`, `statistical_analyzer`, `text_analyzer`
-- **System Integration Tools** (3 tools): `slack_integration`, `github_integration`, `cron_scheduler`
-- Integration with existing tool ecosystem
-- Comprehensive documentation and examples
-
-**Success Criteria**:
-- [ ] All 8 tools functional and tested
-- [ ] Tools follow established Phase 3.0 standards
-- [ ] Integration with workflow patterns verified
-- [ ] Documentation and examples complete
-- [ ] Performance meets established benchmarks
-
-**Testing Requirements**:
-- Individual tool unit tests
-- Integration tests with existing tools
-- Workflow compatibility validation
-- Performance benchmarking
-- Security review
-
----
-### **Phase 19: A2A Client Support (Weeks 54-55)**
+### **Phase 18: A2A Client Support (Weeks 54-55)**
 
 **Goal**: Agent-to-Agent communication as client  
 **Priority**: LOW (Advanced Networking)
@@ -1341,7 +1305,7 @@ Rs-LLMSpell follows a carefully structured 18+ phase implementation approach tha
 
 ---
 
-### **Phase 20: A2A Server Support (Weeks 56-57)**
+### **Phase 19: A2A Server Support (Weeks 56-57)**
 
 **Goal**: Expose local agents via A2A protocol  
 **Priority**: LOW (Advanced Networking)
@@ -1368,11 +1332,11 @@ Rs-LLMSpell follows a carefully structured 18+ phase implementation approach tha
 
 ---
 
-### **Phase 21: Multimodal Tools Implementation (Weeks 58-59)**
+### **Phase 20: Multimodal Tools Implementation (Weeks 58-59)**
 
 **Goal**: Implement comprehensive multimodal processing tools  
 **Priority**: MEDIUM (Feature Enhancement)
-**Dependencies**: Requires Phase 10 Advanced Workflows for multimodal workflows
+**Dependencies**: Requires Phase 8 Vector Storage and Phase 11 Memory System
 **Phase 4 Integration**: Media processing hooks enable dynamic parameter adjustment, progress tracking, and cost monitoring for expensive operations.
 
 **Components**:
@@ -1428,7 +1392,7 @@ Rs-LLMSpell follows a carefully structured 18+ phase implementation approach tha
 
 ---
 
-### **Phase 22: AI/ML Complex Tools (Weeks 60-61)**
+### **Phase 21: AI/ML Complex Tools (Weeks 60-61)**
 
 **Goal**: Implement AI and ML dependent complex tools  
 **Priority**: MEDIUM (Advanced AI Features)
@@ -1459,6 +1423,156 @@ Rs-LLMSpell follows a carefully structured 18+ phase implementation approach tha
 - Advanced multimodal integration tests
 - Memory usage optimization tests
 - Production deployment validation
+
+---
+
+### **Phase 22: Advanced Workflow Features (Weeks 62-65)**
+**Goal**: Implement sophisticated workflow orchestration capabilities and advanced patterns
+**Priority**: LOW (Advanced Enhancement)
+**Dependencies**: Builds on Phase 3 (Workflows), Phase 8 (Vector Storage), Phase 11 (Memory System), and Phase 10 (Service Integration)
+
+**Advanced Workflow Patterns**:
+```rust
+// Conditional Branching with Complex Logic
+pub struct ConditionalWorkflow {
+    condition_evaluator: Box<dyn ConditionEvaluator>,
+    branches: HashMap<String, Workflow>,
+    default_branch: Option<Box<Workflow>>,
+    state_machine: WorkflowStateMachine,
+}
+
+// Parallel Execution with Synchronization
+pub struct ParallelWorkflow {
+    parallel_branches: Vec<Workflow>,
+    synchronization_strategy: SyncStrategy,
+    merge_handler: Box<dyn MergeHandler>,
+    resource_pool: WorkflowResourcePool,
+}
+
+// Dynamic Workflow Generation
+pub struct DynamicWorkflow {
+    workflow_generator: Box<dyn WorkflowGenerator>,
+    runtime_compiler: WorkflowCompiler,
+    validation_engine: WorkflowValidator,
+}
+
+// Event-Driven Workflows
+pub struct EventDrivenWorkflow {
+    event_handlers: HashMap<EventType, WorkflowHandler>,
+    event_bus: EventBus,
+    correlation_engine: EventCorrelator,
+}
+```
+
+**Components**:
+- **Advanced Pattern Library**:
+  - Saga patterns for distributed transactions
+  - Circuit breaker workflows for fault tolerance
+  - Retry with exponential backoff and jitter
+  - Bulkhead isolation patterns
+  - Pipeline with back-pressure handling
+  - Fork-join with custom merge strategies
+  - Map-reduce workflow patterns
+  - State machine workflows with persistence
+
+- **Workflow Composition Engine**:
+  - Runtime workflow composition from templates
+  - Workflow inheritance and extension
+  - Mixin patterns for reusable workflow components
+  - Workflow versioning and migration
+  - Hot-reload of workflow definitions
+
+- **Optimization Engine**:
+  - Workflow execution plan optimization
+  - Resource allocation and scheduling
+  - Parallel execution optimization
+  - Caching strategies for workflow results
+  - Predictive pre-computation based on patterns
+
+- **Monitoring and Observability**:
+  - Workflow execution tracing with OpenTelemetry
+  - Performance profiling per workflow step
+  - Resource usage tracking and alerts
+  - Workflow analytics and insights
+  - Visual workflow execution timeline
+
+- **Integration Features**:
+  - Workflow-as-a-Service API
+  - REST/GraphQL workflow triggers
+  - Webhook integration for external events
+  - Message queue integration (AMQP, Kafka)
+  - Workflow federation across instances
+
+**Advanced Capabilities**:
+```rust
+// Workflow Template System
+pub struct WorkflowTemplateEngine {
+    template_registry: TemplateRegistry,
+    parameter_resolver: ParameterResolver,
+    validation_rules: ValidationRuleSet,
+    instantiation_context: Context,
+}
+
+impl WorkflowTemplateEngine {
+    pub fn instantiate_from_template(
+        &self,
+        template_id: &str,
+        parameters: Parameters,
+    ) -> Result<Workflow> {
+        let template = self.template_registry.get(template_id)?;
+        let resolved = self.parameter_resolver.resolve(&template, parameters)?;
+        self.validation_rules.validate(&resolved)?;
+        Ok(resolved)
+    }
+}
+
+// Workflow Scheduling System
+pub struct WorkflowScheduler {
+    schedule_store: ScheduleStore,
+    trigger_engine: TriggerEngine,
+    execution_queue: PriorityQueue<ScheduledWorkflow>,
+    resource_manager: ResourceManager,
+}
+
+// Workflow Testing Framework
+pub struct WorkflowTestHarness {
+    mock_registry: MockServiceRegistry,
+    simulation_engine: SimulationEngine,
+    assertion_framework: AssertionFramework,
+    coverage_analyzer: CoverageAnalyzer,
+}
+```
+
+**Success Criteria**:
+- [ ] All advanced workflow patterns implemented and tested
+- [ ] Dynamic workflow composition working with validation
+- [ ] Parallel execution with proper synchronization
+- [ ] Event-driven workflows with correlation support
+- [ ] Workflow versioning and migration tools complete
+- [ ] Performance optimization showing 30%+ improvement
+- [ ] Monitoring integration with full observability
+- [ ] Template system with 50+ built-in templates
+- [ ] Testing framework with simulation capabilities
+- [ ] Documentation with pattern cookbook
+
+**Testing Requirements**:
+- Complex workflow pattern integration tests
+- Parallel execution stress tests
+- Event correlation accuracy tests
+- Template instantiation validation
+- Performance benchmarks vs baseline
+- Resource utilization tests
+- Failure recovery scenarios
+- Load testing with 1000+ concurrent workflows
+- End-to-end workflow federation tests
+
+**Performance Targets**:
+- Workflow compilation: <100ms for complex workflows
+- Parallel branch overhead: <5ms per branch
+- Event correlation: <10ms for 10,000 events
+- Template instantiation: <50ms
+- Workflow state persistence: <20ms
+- Resource scheduling decisions: <5ms
 
 ---
 
@@ -1556,15 +1670,15 @@ Each phase must pass:
 - **Phase 7**: API Consistency depends on Phase 6 Session Management completion
 - **Phase 8**: Vector Storage depends on Phase 7 API Standardization
 - **Phase 9**: REPL and Debugging depends on Phase 8 Vector Storage for search context
-- **Phase 10**: Adaptive Memory System depends on Phase 8 Vector Storage
-- **Phase 11**: Enterprise IDE Integration depends on Phase 9 **(Complete Debug Infrastructure critical)** and Phase 10 Memory System
-- **Phase 12**: Daemon Mode depends on Phase 4 **(FlowController and CircuitBreaker critical)**
-- **Phase 15-16**: A2A Protocol depends on Phase 4 **(DistributedHookContext required)**
-- **Phase 18**: JavaScript Engine Support depends on MVP completion + ScriptEngineBridge foundation from Phase 1.2 **(greatly simplified by Phase 4 JavaScriptHookAdapter)**
-- **Phase 17**: Library Mode depends on Phase 4 **(SelectiveHookRegistry needed)**
-- **Phase 21**: Advanced Workflow Features depends on Phase 8 Vector Storage and Phase 10 Memory System
-- **Phase 23**: Multimodal Tools depends on Phase 21 Advanced Workflows
-- **Phase 24**: AI/ML Tools depends on Phase 4 **(CostTrackingHook essential)**
+- **Phase 10**: Service & IDE Integration depends on Phase 9 (Kernel Integration)
+- **Phase 11**: Adaptive Memory System depends on Phase 8 Vector Storage and Phase 10 IDE for visualization
+- **Phase 12**: MCP Tool Integration depends on Phase 10 Service infrastructure
+- **Phase 18-19**: A2A Protocol depends on Phase 4 **(DistributedHookContext required)**
+- **Phase 14**: JavaScript Engine Support depends on MVP completion + ScriptEngineBridge foundation from Phase 1.2 **(greatly simplified by Phase 4 JavaScriptHookAdapter)**
+- **Phase 15**: Library Mode depends on Phase 4 **(SelectiveHookRegistry needed)**
+- **Phase 22**: Advanced Workflow Features depends on Phase 8 Vector Storage and Phase 11 Memory System
+- **Phase 20**: Multimodal Tools depends on Phase 11 Memory System
+- **Phase 21**: AI/ML Tools depends on Phase 4 **(CostTrackingHook essential)**
 - **Cross-language testing**: Can begin in Phase 1 with bridge abstraction tests
 - **Engine implementations**: Can be developed in parallel once ScriptEngineBridge is stable
 - **Third-party engines**: Can be added after Phase 1.2 completion using bridge pattern
@@ -1582,11 +1696,15 @@ Each phase must pass:
 - **Pre-1.0 Polish**: 29 weeks (Phases 0-7, API consistency and documentation)
 - **Advanced Features**: 32 weeks (Phases 0-8, includes vector storage and search)
 - **Developer Experience**: 32 weeks (Phases 0-9, REPL and debugging infrastructure)
-- **Advanced AI**: 38 weeks (Phases 0-10, adaptive memory system)
-- **Enterprise Ready**: 40 weeks (Phases 0-11, IDE integration and remote debugging)
-- **Service Mode**: 42 weeks (Phases 0-12, daemon and service support)
-- **Multi-Language Ready**: 54 weeks (Phases 0-18, JavaScript support)
-- **Full Feature Set**: 56 weeks (All 24 phases)
+- **Service & IDE Integration**: 36 weeks (Phases 0-10, external connectivity and IDE support)
+- **Advanced AI**: 41 weeks (Phases 0-11, adaptive memory system with IDE visualization)
+- **Protocol Support**: 45 weeks (Phases 0-13, MCP client and server)
+- **Multi-Language Ready**: 47 weeks (Phases 0-14, JavaScript support)
+- **Library & Platform Support**: 51 weeks (Phases 0-16, library mode and cross-platform)
+- **Production Ready**: 53 weeks (Phases 0-17, optimization and hardening)
+- **Distributed Computing**: 57 weeks (Phases 0-19, A2A protocol support)
+- **Advanced Tools**: 61 weeks (Phases 0-21, multimodal and AI/ML tools)
+- **Full Feature Set**: 65 weeks (All 22 phases)
 
 ### Resource Requirements
 
@@ -1614,7 +1732,7 @@ Each phase must pass:
 - **Architecture Risk**: CRITICAL - implement bridge pattern correctly in Phase 1.2 or face major refactoring in Phase 14
 - **Architecture Risk**: Phase 4 hook system designed with future phases in mind, preventing Phase 3-style rework
 - **Cross-Language Risk**: UniversalEvent and language adapters prepared in Phase 4
-- **Distributed Risk**: DistributedHookContext ready for Phase 19-20 A2A protocol
+- **Distributed Risk**: DistributedHookContext ready for Phase 18-19 A2A protocol
 - **Cost Risk**: Built-in cost tracking hooks prevent runaway AI/ML expenses
 
 ---
@@ -1633,7 +1751,7 @@ After analyzing implementation complexity and team collaboration needs, we recom
 - Better to discover and fix architectural issues early than propagate them through all phases
 
 **2. Focus and Cognitive Load Management**
-- Developers working on Phase 1 don't need Phase 10 distractions
+- Developers working on Phase 1 don't need Phase 11 distractions
 - The main architecture document is already 15,034+ lines - adding detailed implementation specs would make it unmanageable
 - Focused documents are easier to review, approve, and implement effectively
 
