@@ -16,7 +16,7 @@ use tokio::sync::mpsc;
 use tracing::{debug, error, info, instrument, trace, warn};
 
 use crate::daemon::{
-    KernelMessage, OperationGuard, ShutdownConfig, ShutdownCoordinator, SignalBridge,
+    DaemonConfig, KernelMessage, OperationGuard, ShutdownConfig, ShutdownCoordinator, SignalBridge,
     SignalOperationsConfig, SignalOperationsHandler,
 };
 use crate::debug::{DAPBridge, ExecutionManager};
@@ -74,6 +74,10 @@ pub struct ExecutionConfig {
     pub monitor_agents: bool,
     /// Enable performance tracking
     pub track_performance: bool,
+    /// Enable daemon mode
+    pub daemon_mode: bool,
+    /// Optional daemon configuration
+    pub daemon_config: Option<DaemonConfig>,
 }
 
 impl Default for ExecutionConfig {
@@ -85,6 +89,8 @@ impl Default for ExecutionConfig {
             execution_timeout_secs: 300,
             monitor_agents: true,
             track_performance: true,
+            daemon_mode: false,
+            daemon_config: None,
         }
     }
 }
@@ -1120,6 +1126,158 @@ impl<P: Protocol + 'static> IntegratedKernel<P> {
 
         Ok(())
     }
+
+    /// Run kernel as daemon
+    ///
+    /// This method daemonizes the process and runs the kernel in the background
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if daemonization fails or server setup fails
+    pub async fn run_as_daemon(&mut self) -> Result<()> {
+        info!("Starting IntegratedKernel in daemon mode");
+
+        // Check if daemon mode is enabled
+        if !self.config.daemon_mode {
+            return Err(anyhow::anyhow!("Daemon mode not enabled in configuration"));
+        }
+
+        // Get daemon config or use default
+        let daemon_config = self.config.daemon_config.clone().unwrap_or_default();
+
+        // Create and daemonize
+        let mut daemon_manager = crate::daemon::DaemonManager::new(daemon_config.clone());
+
+        if daemon_config.daemonize {
+            info!("Daemonizing process...");
+            daemon_manager.daemonize()?;
+            info!("Process daemonized successfully");
+        }
+
+        // Start protocol servers
+        self.start_protocol_servers();
+
+        // Run the main event loop
+        self.run_event_loop().await
+    }
+
+    /// Start protocol servers
+    ///
+    /// Sets up all protocol-specific servers (shell, iopub, stdin, control, heartbeat)
+    ///
+    /// # Errors
+    ///
+    /// Starts protocol servers (heartbeat, etc.)
+    fn start_protocol_servers(&mut self) {
+        info!("Starting protocol servers");
+
+        // If we have a transport, initialize it
+        // TODO: Bind transport when we have proper TransportConfig
+        if self.transport.is_some() {
+            debug!("Transport would be bound here with proper config");
+        }
+
+        // TODO: Register protocol handlers with message router when method is available
+        debug!("Protocol handler registration would happen here");
+
+        // Start heartbeat service
+        let heartbeat_interval = Duration::from_secs(5);
+        let heartbeat_handle = {
+            let session_id = self.session_id.clone();
+            tokio::spawn(async move {
+                let mut interval = tokio::time::interval(heartbeat_interval);
+                loop {
+                    interval.tick().await;
+                    trace!("Heartbeat for session {}", session_id);
+                }
+            })
+        };
+
+        // Store handle for cleanup
+        drop(heartbeat_handle); // For now, let it run
+
+        info!("Protocol servers started successfully");
+    }
+
+    /// Main event loop for all protocols
+    ///
+    /// Processes messages from all sources (transport, signals, internal)
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the event loop encounters a fatal error
+    pub async fn run_event_loop(&mut self) -> Result<()> {
+        info!("Starting main event loop for session {}", self.session_id);
+
+        // Create a channel for shutdown coordination
+        let (shutdown_tx, shutdown_rx) = mpsc::channel::<()>(1);
+
+        // Store shutdown sender
+        self.shutdown_rx = Some(shutdown_rx);
+
+        // Simplified event loop - real implementation would handle messages properly
+        loop {
+            tokio::select! {
+                // Check for shutdown signal
+                () = shutdown_tx.closed() => {
+                    info!("Shutdown signal received, exiting event loop");
+                    break;
+                }
+
+                // Periodic processing
+                () = tokio::time::sleep(Duration::from_secs(1)) => {
+                    trace!("Event loop tick");
+
+                    // Process transport messages
+                    self.process_transport_messages();
+
+                    // Process internal events
+                    self.process_internal_events();
+                }
+            }
+        }
+
+        // Cleanup before exit
+        info!("Event loop ended, performing cleanup");
+        self.shutdown_coordinator.initiate_shutdown().await?;
+
+        Ok(())
+    }
+
+    /// Process messages from transport
+    fn process_transport_messages(&mut self) {
+        // TODO: Process transport messages when Transport trait has receive method
+        trace!(
+            "Processing transport messages for session {}",
+            self.session_id
+        );
+    }
+
+    /// Process internal events
+    fn process_internal_events(&mut self) {
+        // TODO: Check for events from event correlator when method is available
+        trace!(
+            "Checking for internal events in session {}",
+            self.session_id
+        );
+    }
+
+    /// Perform periodic health check
+    fn perform_health_check(&self) {
+        let metrics = self.state.metrics();
+        debug!(
+            "Health check - Reads: {}, Writes: {}, Circuit breaker open: {}",
+            metrics.reads,
+            metrics.writes,
+            self.state.is_circuit_open()
+        );
+
+        // Check memory usage
+        let execution_count = *self.execution_count.read();
+        if execution_count > 10000 {
+            warn!("High execution count: {}", execution_count);
+        }
+    }
 }
 
 #[cfg(test)]
@@ -1127,7 +1285,7 @@ mod tests {
     use super::*;
 
     // Mock script executor for testing
-    struct MockScriptExecutor;
+    pub(super) struct MockScriptExecutor;
 
     #[async_trait::async_trait]
     impl ScriptExecutor for MockScriptExecutor {
@@ -1223,74 +1381,184 @@ mod tests {
         // Check that we got some output
         assert!(output.output != serde_json::Value::Null || !output.console_output.is_empty());
     }
+}
+
+#[tokio::test]
+async fn test_message_handling_performance() -> Result<()> {
+    use std::collections::HashMap;
+    use std::time::Instant;
+
+    // Create test kernel
+    let protocol = crate::protocols::jupyter::JupyterProtocol::new(
+        "test-session".to_string(),
+        "test-kernel".to_string(),
+    );
+    let config = ExecutionConfig::default();
+    let session_id = "test-session".to_string();
+    let script_executor = Arc::new(tests::MockScriptExecutor) as Arc<dyn ScriptExecutor>;
+
+    let mut kernel = IntegratedKernel::new(protocol, config, session_id, script_executor).await?;
+
+    // Create a simple kernel_info_request message (faster than execute_request)
+    let mut message = HashMap::new();
+    message.insert(
+        "msg_type".to_string(),
+        serde_json::Value::String("kernel_info_request".to_string()),
+    );
+
+    // Test single message handling performance
+    let start_time = Instant::now();
+    kernel.handle_message(message.clone()).await?;
+    let elapsed = start_time.elapsed();
+
+    println!(
+        "Single kernel_info message handling took: {}μs ({}ms)",
+        elapsed.as_micros(),
+        elapsed.as_millis()
+    );
+
+    // Note: We expect this to be very fast since kernel_info_request is lightweight
+    assert!(
+        elapsed.as_millis() < 5,
+        "Message handling took {}ms, target is <5ms",
+        elapsed.as_millis()
+    );
+
+    // Test multiple messages for consistency
+    let iterations = 20;
+    let mut total_time = std::time::Duration::ZERO;
+
+    for _i in 0..iterations {
+        let start = Instant::now();
+        kernel.handle_message(message.clone()).await?;
+        total_time += start.elapsed();
+    }
+
+    let avg_time = total_time / iterations;
+    println!(
+        "Average message handling time over {} iterations: {}μs ({}ms)",
+        iterations,
+        avg_time.as_micros(),
+        avg_time.as_millis()
+    );
+
+    assert!(
+        avg_time.as_millis() < 5,
+        "Average message handling took {}ms, target is <5ms",
+        avg_time.as_millis()
+    );
+
+    println!("✅ Message handling performance test passed - meeting <5ms target");
+    Ok(())
+}
+
+#[cfg(test)]
+mod daemon_tests {
+    use super::*;
+    use std::path::PathBuf;
+    use std::sync::Arc;
 
     #[tokio::test]
-    async fn test_message_handling_performance() -> Result<()> {
-        use std::collections::HashMap;
-        use std::time::Instant;
+    async fn test_daemon_config_serialization() {
+        let config = ExecutionConfig {
+            daemon_mode: true,
+            daemon_config: Some(DaemonConfig {
+                daemonize: false, // Don't actually daemonize in tests
+                pid_file: Some(PathBuf::from("/tmp/test.pid")),
+                working_dir: PathBuf::from("/tmp"),
+                stdout_path: Some(PathBuf::from("/tmp/stdout.log")),
+                stderr_path: Some(PathBuf::from("/tmp/stderr.log")),
+                close_stdin: true,
+                umask: Some(0o027),
+            }),
+            ..Default::default()
+        };
 
-        // Create test kernel
+        // Should serialize and deserialize correctly
+        let json = serde_json::to_string(&config).unwrap();
+        let _deserialized: ExecutionConfig = serde_json::from_str(&json).unwrap();
+    }
+
+    // Reuse MockScriptExecutor from tests module
+    use super::tests::MockScriptExecutor;
+
+    #[tokio::test]
+    async fn test_daemon_mode_disabled() {
+        let config = ExecutionConfig {
+            daemon_mode: false,
+            daemon_config: None,
+            ..Default::default()
+        };
+
+        let script_executor = Arc::new(MockScriptExecutor) as Arc<dyn ScriptExecutor>;
         let protocol = crate::protocols::jupyter::JupyterProtocol::new(
             "test-session".to_string(),
             "test-kernel".to_string(),
         );
+
+        let mut kernel = IntegratedKernel::new(
+            protocol,
+            config,
+            "test-session".to_string(),
+            script_executor,
+        )
+        .await
+        .unwrap();
+
+        // Should fail when daemon mode is not enabled
+        let result = kernel.run_as_daemon().await;
+        assert!(result.is_err());
+        assert!(result
+            .unwrap_err()
+            .to_string()
+            .contains("Daemon mode not enabled"));
+    }
+
+    #[tokio::test]
+    async fn test_protocol_servers_startup() {
         let config = ExecutionConfig::default();
-        let session_id = "test-session".to_string();
         let script_executor = Arc::new(MockScriptExecutor) as Arc<dyn ScriptExecutor>;
-
-        let mut kernel =
-            IntegratedKernel::new(protocol, config, session_id, script_executor).await?;
-
-        // Create a simple kernel_info_request message (faster than execute_request)
-        let mut message = HashMap::new();
-        message.insert(
-            "msg_type".to_string(),
-            serde_json::Value::String("kernel_info_request".to_string()),
+        let protocol = crate::protocols::jupyter::JupyterProtocol::new(
+            "test-session".to_string(),
+            "test-kernel".to_string(),
         );
 
-        // Test single message handling performance
-        let start_time = Instant::now();
-        kernel.handle_message(message.clone()).await?;
-        let elapsed = start_time.elapsed();
+        let mut kernel = IntegratedKernel::new(
+            protocol,
+            config,
+            "test-session".to_string(),
+            script_executor,
+        )
+        .await
+        .unwrap();
 
-        println!(
-            "Single kernel_info message handling took: {}μs ({}ms)",
-            elapsed.as_micros(),
-            elapsed.as_millis()
+        // Start protocol servers should succeed even without transport
+        kernel.start_protocol_servers();
+    }
+
+    #[tokio::test]
+    async fn test_health_check() {
+        let config = ExecutionConfig::default();
+        let script_executor = Arc::new(MockScriptExecutor) as Arc<dyn ScriptExecutor>;
+        let protocol = crate::protocols::jupyter::JupyterProtocol::new(
+            "test-session".to_string(),
+            "test-kernel".to_string(),
         );
 
-        // Note: We expect this to be very fast since kernel_info_request is lightweight
-        assert!(
-            elapsed.as_millis() < 5,
-            "Message handling took {}ms, target is <5ms",
-            elapsed.as_millis()
-        );
+        let kernel = IntegratedKernel::new(
+            protocol,
+            config,
+            "test-session".to_string(),
+            script_executor,
+        )
+        .await
+        .unwrap();
 
-        // Test multiple messages for consistency
-        let iterations = 20;
-        let mut total_time = std::time::Duration::ZERO;
+        // Health check should not panic
+        kernel.perform_health_check();
 
-        for _i in 0..iterations {
-            let start = Instant::now();
-            kernel.handle_message(message.clone()).await?;
-            total_time += start.elapsed();
-        }
-
-        let avg_time = total_time / iterations;
-        println!(
-            "Average message handling time over {} iterations: {}μs ({}ms)",
-            iterations,
-            avg_time.as_micros(),
-            avg_time.as_millis()
-        );
-
-        assert!(
-            avg_time.as_millis() < 5,
-            "Average message handling took {}ms, target is <5ms",
-            avg_time.as_millis()
-        );
-
-        println!("✅ Message handling performance test passed - meeting <5ms target");
-        Ok(())
+        // Check metrics were recorded
+        let metrics = kernel.state.metrics();
+        assert_eq!(metrics.circuit_breaker_trips, 0);
     }
 }

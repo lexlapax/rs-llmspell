@@ -471,6 +471,8 @@ fn build_execution_config(config: &LLMSpellConfig) -> crate::execution::Executio
         execution_timeout_secs: 300,
         monitor_agents: true,
         track_performance: true,
+        daemon_mode: false,
+        daemon_config: None,
     }
 }
 

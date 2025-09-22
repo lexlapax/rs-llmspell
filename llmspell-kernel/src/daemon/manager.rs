@@ -5,6 +5,7 @@
 
 use anyhow::{Context, Result};
 use nix::unistd::{chdir, fork, setsid, ForkResult};
+use serde::{Deserialize, Serialize};
 use std::fs::{File, OpenOptions};
 use std::os::unix::io::AsRawFd;
 use std::path::PathBuf;
@@ -14,8 +15,10 @@ use tracing::{debug, info};
 use super::pid::PidFile;
 
 /// Configuration for the daemon process
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct DaemonConfig {
+    /// Whether to actually daemonize (fork to background)
+    pub daemonize: bool,
     /// Path to the PID file
     pub pid_file: Option<PathBuf>,
     /// Working directory for the daemon
@@ -33,6 +36,7 @@ pub struct DaemonConfig {
 impl Default for DaemonConfig {
     fn default() -> Self {
         Self {
+            daemonize: true,
             pid_file: None,
             working_dir: PathBuf::from("/"),
             stdout_path: None,
@@ -265,6 +269,7 @@ mod tests {
     fn test_daemon_config_with_paths() {
         let temp_dir = tempdir().unwrap();
         let config = DaemonConfig {
+            daemonize: true,
             pid_file: Some(temp_dir.path().join("test.pid")),
             working_dir: temp_dir.path().to_path_buf(),
             stdout_path: Some(temp_dir.path().join("stdout.log")),
@@ -285,6 +290,7 @@ mod tests {
         let stderr_path = temp_dir.path().join("stderr.log");
 
         let config = DaemonConfig {
+            daemonize: false,
             pid_file: None,
             working_dir: temp_dir.path().to_path_buf(),
             stdout_path: Some(stdout_path.clone()),
@@ -304,6 +310,7 @@ mod tests {
     #[test]
     fn test_io_redirection_to_dev_null() {
         let config = DaemonConfig {
+            daemonize: true,
             pid_file: None,
             working_dir: PathBuf::from("/tmp"),
             stdout_path: None, // Should redirect to /dev/null
