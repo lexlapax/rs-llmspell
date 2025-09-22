@@ -426,10 +426,22 @@ impl SignalOperationsHandler {
         if include_full_state {
             if let Some(ref kernel_state) = self.kernel_state {
                 // Get basic state info - we can't serialize the full state directly
+                let state_metrics = kernel_state.metrics();
                 state_info["kernel_state"] = serde_json::json!({
                     "session_id": kernel_state.session_id(),
                     "execution_count": kernel_state.execution_count(),
-                    // Add more state fields as needed
+                    "error_rate_per_minute": kernel_state.get_error_rate_per_minute(),
+                    "circuit_breaker_open": kernel_state.is_circuit_open(),
+                    "state_metrics": {
+                        "reads": state_metrics.reads,
+                        "writes": state_metrics.writes,
+                        "read_errors": state_metrics.read_errors,
+                        "write_errors": state_metrics.write_errors,
+                        "persistence_errors": state_metrics.persistence_errors,
+                        "circuit_breaker_trips": state_metrics.circuit_breaker_trips,
+                        "avg_read_latency_us": state_metrics.avg_read_latency_us,
+                        "avg_write_latency_us": state_metrics.avg_write_latency_us,
+                    }
                 });
             }
         }
@@ -469,21 +481,54 @@ impl SignalOperationsHandler {
 
     /// Get process uptime in seconds
     fn get_uptime_secs() -> u64 {
-        // This is a simplified implementation
-        // In production, track actual start time
-        0
+        use std::time::{SystemTime, UNIX_EPOCH};
+
+        // Get current process start time via sysinfo
+        let mut system = sysinfo::System::new();
+        system.refresh_processes(sysinfo::ProcessesToUpdate::All);
+
+        if let Some(process) =
+            system.process(sysinfo::get_current_pid().unwrap_or_else(|_| sysinfo::Pid::from_u32(0)))
+        {
+            let start_time = process.start_time();
+            let current_time = SystemTime::now()
+                .duration_since(UNIX_EPOCH)
+                .unwrap_or_default()
+                .as_secs();
+            current_time.saturating_sub(start_time)
+        } else {
+            // Fallback: return 0 if process info unavailable
+            0
+        }
     }
 
     /// Get memory usage in MB
     fn get_memory_usage_mb() -> u64 {
-        // Simplified - in production use actual memory tracking
-        0
+        let mut system = sysinfo::System::new();
+        system.refresh_processes(sysinfo::ProcessesToUpdate::All);
+
+        if let Some(process) =
+            system.process(sysinfo::get_current_pid().unwrap_or_else(|_| sysinfo::Pid::from_u32(0)))
+        {
+            process.memory() / (1024 * 1024) // Convert bytes to MB
+        } else {
+            0
+        }
     }
 
     /// Get CPU usage percentage
     fn get_cpu_usage_percent() -> f64 {
-        // Simplified - in production use actual CPU tracking
-        0.0
+        let mut system = sysinfo::System::new();
+        system.refresh_cpu_all();
+        system.refresh_processes(sysinfo::ProcessesToUpdate::All);
+
+        if let Some(process) =
+            system.process(sysinfo::get_current_pid().unwrap_or_else(|_| sysinfo::Pid::from_u32(0)))
+        {
+            f64::from(process.cpu_usage())
+        } else {
+            0.0
+        }
     }
 
     /// Get current statistics

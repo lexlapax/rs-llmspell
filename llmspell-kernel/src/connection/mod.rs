@@ -149,8 +149,9 @@ impl ConnectionFileManager {
     pub fn remove(&mut self) -> Result<()> {
         if let Some(ref path) = self.file_path {
             if path.exists() {
-                fs::remove_file(path)
-                    .with_context(|| format!("Failed to remove connection file: {}", path.display()))?;
+                fs::remove_file(path).with_context(|| {
+                    format!("Failed to remove connection file: {}", path.display())
+                })?;
                 info!("Removed connection file: {}", path.display());
             } else {
                 debug!("Connection file already removed: {}", path.display());

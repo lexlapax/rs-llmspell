@@ -31,6 +31,7 @@ pub mod events;
 pub mod execution;
 pub mod hooks;
 pub mod io;
+pub mod monitoring;
 pub mod protocols;
 pub mod repl;
 pub mod runtime;

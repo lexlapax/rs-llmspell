@@ -64,6 +64,7 @@ dirs = "5.0"
 unicode-normalization = "0.1"
 rand = "0.8"
 hex = "0.4"
+sysinfo = "0.31"
 
 # Performance optimizations (for consolidated state persistence)
 crossbeam = "0.8"

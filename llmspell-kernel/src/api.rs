@@ -473,6 +473,7 @@ fn build_execution_config(config: &LLMSpellConfig) -> crate::execution::Executio
         track_performance: true,
         daemon_mode: false,
         daemon_config: None,
+        health_thresholds: None,
     }
 }
 

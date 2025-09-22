@@ -142,6 +142,15 @@ pub struct StateMetrics {
     pub persistence_ops: u64,
     /// Number of circuit breaker trips
     pub circuit_breaker_trips: u64,
+    /// Total number of read errors
+    pub read_errors: u64,
+    /// Total number of write errors
+    pub write_errors: u64,
+    /// Total number of persistence errors
+    pub persistence_errors: u64,
+    /// Timestamp of last error
+    #[serde(skip)]
+    pub last_error_at: Option<Instant>,
     /// Last update timestamp (skipped in serialization)
     #[serde(skip)]
     pub last_update: Option<Instant>,
@@ -366,6 +375,49 @@ impl KernelState {
     /// Reset circuit breaker
     pub fn reset_circuit(&self) {
         self.circuit_breaker.reset();
+    }
+
+    /// Record a read error
+    pub fn record_read_error(&self) {
+        let mut metrics = self.metrics.write();
+        metrics.read_errors += 1;
+        metrics.last_error_at = Some(Instant::now());
+        metrics.last_update = Some(Instant::now());
+    }
+
+    /// Record a write error
+    pub fn record_write_error(&self) {
+        let mut metrics = self.metrics.write();
+        metrics.write_errors += 1;
+        metrics.last_error_at = Some(Instant::now());
+        metrics.last_update = Some(Instant::now());
+    }
+
+    /// Record a persistence error
+    pub fn record_persistence_error(&self) {
+        let mut metrics = self.metrics.write();
+        metrics.persistence_errors += 1;
+        metrics.last_error_at = Some(Instant::now());
+        metrics.last_update = Some(Instant::now());
+    }
+
+    /// Get error rate per minute based on recent errors
+    pub fn get_error_rate_per_minute(&self) -> f64 {
+        let metrics = self.metrics.read();
+        let total_errors = metrics.read_errors + metrics.write_errors + metrics.persistence_errors;
+
+        // Simple calculation: assume uniform distribution over uptime
+        // In production, would use sliding window
+        if let Some(last_error) = metrics.last_error_at {
+            let elapsed_minutes = last_error.elapsed().as_secs_f64() / 60.0;
+            if elapsed_minutes > 0.0 {
+                total_errors as f64 / elapsed_minutes
+            } else {
+                0.0
+            }
+        } else {
+            0.0
+        }
     }
 
     /// Get the current session ID
