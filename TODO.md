@@ -863,48 +863,336 @@ llmspell-kernel/src/daemon/
 
 ## Phase 10.5: CLI Integration (Days 6-7)
 
-### Task 10.5.1: Implement kernel start Command
-**Priority**: CRITICAL
-**Estimated Time**: 4 hours
+### Task 10.5.0: Implement Kernel Discovery Infrastructure ✅ **COMPLETED**
+**Priority**: CRITICAL (Prerequisite for 10.5.2 and 10.5.3)
+**Estimated Time**: 2 hours
+**Actual Time**: 1.5 hours
 **Assignee**: CLI Team Lead
 
-**Description**: Enhance CLI with `kernel start` command supporting daemon mode.
+**Description**: Create kernel discovery module to find and track running kernels.
+
+**Rationale**: This is a foundational component needed by both the stop and status commands. Without discovery, we cannot find running kernels by ID, check their health, or clean up stale files.
 
 **Acceptance Criteria:**
-- [ ] `kernel start` subcommand works
-- [ ] `--daemon` flag implemented
-- [ ] `--log-file` option works
-- [ ] `--pid-file` option works
-- [ ] `--port` selection works
-- [ ] Connection file written
+- [x] Discovers all running kernels by scanning connection files
+- [x] Verifies process is actually alive using kill(pid, 0)
+- [x] Cleans up stale connection files for dead processes
+- [x] Provides structured KernelInfo with all metadata
+- [x] Supports finding kernel by ID or port
+- [x] Thread-safe and efficient for repeated calls
 
 **Implementation Steps:**
-1. Update `llmspell-cli/src/commands/kernel.rs`:
+1. Create `llmspell-cli/src/kernel_discovery.rs` module:
    ```rust
-   pub enum KernelCommands {
-       Start {
-           #[arg(long)]
-           daemon: bool,
-           #[arg(long)]
-           port: Option<u16>,
-           #[arg(long)]
-           log_file: Option<PathBuf>,
-           #[arg(long)]
-           pid_file: Option<PathBuf>,
-       },
-       Stop { id: Option<String> },
-       Status { id: Option<String> },
-       Connect { address: String },
+   use std::fs;
+   use std::path::PathBuf;
+   use serde::{Deserialize, Serialize};
+   use anyhow::Result;
+
+   #[derive(Debug, Clone, Serialize, Deserialize)]
+   pub enum KernelStatus {
+       Healthy,
+       Busy,
+       Idle,
+       Shutting_down,
+       Unknown,
+   }
+
+   #[derive(Debug, Clone, Serialize, Deserialize)]
+   pub struct KernelInfo {
+       pub id: String,
+       pub pid: u32,
+       pub port: u16,
+       pub connection_file: PathBuf,
+       pub pid_file: Option<PathBuf>,
+       pub log_file: Option<PathBuf>,
+       pub status: KernelStatus,
+       pub start_time: Option<std::time::SystemTime>,
+   }
+
+   /// Discovers all running kernels on the system
+   pub fn discover_kernels() -> Result<Vec<KernelInfo>> {
+       let kernel_dirs = vec![
+           // Primary location
+           dirs::home_dir().map(|h| h.join(".llmspell/kernels")),
+           // Runtime directory
+           dirs::runtime_dir().map(|r| r.join("llmspell/kernels")),
+           // Fallback
+           Some(PathBuf::from("/tmp/llmspell/kernels")),
+       ];
+
+       let mut kernels = Vec::new();
+       let mut seen_pids = std::collections::HashSet::new();
+
+       for dir_opt in kernel_dirs {
+           if let Some(dir) = dir_opt {
+               if dir.exists() {
+                   scan_directory(&dir, &mut kernels, &mut seen_pids)?;
+               }
+           }
+       }
+
+       Ok(kernels)
+   }
+
+   fn scan_directory(
+       dir: &Path,
+       kernels: &mut Vec<KernelInfo>,
+       seen_pids: &mut HashSet<u32>,
+   ) -> Result<()> {
+       for entry in fs::read_dir(dir)? {
+           let path = entry?.path();
+           if path.extension().map_or(false, |e| e == "json") {
+               if let Ok(kernel) = parse_kernel_file(&path) {
+                   // Check if process is alive
+                   if !seen_pids.contains(&kernel.pid) {
+                       if is_process_alive(kernel.pid) {
+                           seen_pids.insert(kernel.pid);
+                           kernels.push(kernel);
+                       } else {
+                           // Clean up stale file
+                           info!("Cleaning stale connection file: {}", path.display());
+                           fs::remove_file(&path).ok();
+                       }
+                   }
+               }
+           }
+       }
+       Ok(())
    }
    ```
-2. Implement start logic:
-   - Create kernel configuration
-   - Enable daemon mode if requested
-   - Start kernel service
-   - Write connection file
-3. Add validation and error handling
-4. Test all flag combinations
-5. Update help text
+2. Parse connection files and extract kernel information:
+   ```rust
+   #[derive(Deserialize)]
+   struct ConnectionInfo {
+       transport: String,
+       ip: String,
+       shell_port: u16,
+       iopub_port: u16,
+       stdin_port: u16,
+       control_port: u16,
+       hb_port: u16,
+       key: String,
+       signature_scheme: String,
+       kernel_name: String,
+       #[serde(default)]
+       kernel_id: Option<String>,
+       #[serde(default)]
+       pid: Option<u32>,
+   }
+
+   fn parse_kernel_file(path: &Path) -> Result<KernelInfo> {
+       let content = fs::read_to_string(path)?;
+       let conn_info: ConnectionInfo = serde_json::from_str(&content)?;
+
+       // Extract kernel ID from filename if not in JSON
+       let kernel_id = conn_info.kernel_id.unwrap_or_else(|| {
+           path.file_stem()
+               .and_then(|s| s.to_str())
+               .unwrap_or("unknown")
+               .to_string()
+       });
+
+       // Try to find associated PID file
+       let pid_file = find_pid_file(&kernel_id);
+       let pid = if let Some(ref pf) = pid_file {
+           read_pid_from_file(pf).ok()
+       } else {
+           conn_info.pid
+       }.ok_or_else(|| anyhow!("No PID found for kernel"))?;
+
+       // Try to find log file
+       let log_file = find_log_file(&kernel_id);
+
+       Ok(KernelInfo {
+           id: kernel_id,
+           pid,
+           port: conn_info.shell_port,
+           connection_file: path.to_path_buf(),
+           pid_file,
+           log_file,
+           status: KernelStatus::Unknown,
+           start_time: fs::metadata(path)
+               .ok()
+               .and_then(|m| m.created().ok()),
+       })
+   }
+   ```
+3. Process status checking utilities:
+   ```rust
+   /// Check if a process is alive using kill(pid, 0)
+   pub fn is_process_alive(pid: u32) -> bool {
+       // kill(pid, 0) checks if process exists without sending signal
+       unsafe { libc::kill(pid as i32, 0) == 0 }
+   }
+
+   /// Read PID from a file
+   fn read_pid_from_file(path: &Path) -> Result<u32> {
+       let content = fs::read_to_string(path)?;
+       content.trim().parse()
+           .map_err(|e| anyhow!("Invalid PID in file: {}", e))
+   }
+
+   /// Find PID file for a kernel ID
+   fn find_pid_file(kernel_id: &str) -> Option<PathBuf> {
+       let candidates = vec![
+           dirs::runtime_dir().map(|r| r.join(format!("llmspell-{}.pid", kernel_id))),
+           dirs::home_dir().map(|h| h.join(format!(".llmspell/{}.pid", kernel_id))),
+           Some(PathBuf::from(format!("/tmp/llmspell-{}.pid", kernel_id))),
+       ];
+
+       candidates.into_iter()
+           .flatten()
+           .find(|p| p.exists())
+   }
+
+   /// Find log file for a kernel ID
+   fn find_log_file(kernel_id: &str) -> Option<PathBuf> {
+       let candidates = vec![
+           dirs::state_dir().map(|s| s.join(format!("llmspell/{}.log", kernel_id))),
+           dirs::home_dir().map(|h| h.join(format!(".llmspell/logs/{}.log", kernel_id))),
+           Some(PathBuf::from(format!("/tmp/llmspell-{}.log", kernel_id))),
+       ];
+
+       candidates.into_iter()
+           .flatten()
+           .find(|p| p.exists())
+   }
+   ```
+4. Convenience functions for finding specific kernels:
+   ```rust
+   /// Find a kernel by its ID
+   pub fn find_kernel_by_id(id: &str) -> Result<KernelInfo> {
+       discover_kernels()?
+           .into_iter()
+           .find(|k| k.id == id)
+           .ok_or_else(|| anyhow!("Kernel '{}' not found", id))
+   }
+
+   /// Find a kernel by port
+   pub fn find_kernel_by_port(port: u16) -> Result<KernelInfo> {
+       discover_kernels()?
+           .into_iter()
+           .find(|k| k.port == port)
+           .ok_or_else(|| anyhow!("No kernel found on port {}", port))
+   }
+
+   /// Get all healthy kernels
+   pub fn get_healthy_kernels() -> Result<Vec<KernelInfo>> {
+       Ok(discover_kernels()?
+           .into_iter()
+           .filter(|k| matches!(k.status, KernelStatus::Healthy | KernelStatus::Idle))
+           .collect())
+   }
+   ```
+5. Add module to CLI lib.rs:
+   ```rust
+   // In llmspell-cli/src/lib.rs
+   pub mod kernel_discovery;
+   ```
+
+**Definition of Done:**
+- [x] Module created and integrated
+- [x] Discovery finds all running kernels
+- [x] Process status checking works on Linux and macOS
+- [x] Stale files are cleaned automatically
+- [x] Unit tests for discovery logic (6 tests passing)
+- [x] Compiles without errors
+- [x] All kernel_discovery tests pass: `cargo test -p llmspell-cli --lib kernel_discovery::tests`
+
+**Implementation Insights:**
+1. **Dependencies**: Required adding `libc = "0.2"` to Cargo.toml for process checking
+2. **Dead Code Warnings**: ConnectionInfo fields marked with `#[allow(dead_code)]` since they're used for deserialization but not all fields are accessed
+3. **Multiple Search Paths**: Implemented fallback directory search (home, runtime, /tmp) for robustness
+4. **PID Discovery**: Added multiple strategies - reading from connection file JSON, finding associated PID files
+5. **Cleanup Strategy**: Automatically removes stale connection files but preserves log files for debugging
+6. **Cross-Platform Support**: Used `libc::kill(pid, 0)` for portable process checking
+7. **Error Handling**: Graceful handling of missing files and parse errors, continuing discovery even if some files are malformed
+8. **Testing**: All 6 unit tests pass including process alive check, serialization, and file parsing
+9. **Next Steps**: Ready for integration with 10.5.2 (stop command) and 10.5.3 (status command) which can now use `kernel_discovery::find_kernel_by_id()` and `kernel_discovery::discover_kernels()`
+
+### Task 10.5.1: Implement kernel start Command with Full Daemon Support
+**Priority**: CRITICAL
+**Estimated Time**: 5 hours
+**Assignee**: CLI Team Lead
+
+**Description**: Enhance CLI with `kernel start` command integrating existing daemon infrastructure.
+
+**Current State**: Basic command exists with `--daemon` flag, but doesn't use DaemonManager or full configuration.
+
+**Acceptance Criteria:**
+- [ ] `kernel start` subcommand fully integrated with DaemonManager
+- [ ] `--daemon` flag triggers double-fork daemonization
+- [ ] `--log-file` option configures LogRotator
+- [ ] `--pid-file` option uses PidFile manager
+- [ ] `--idle-timeout` and `--max-clients` options work
+- [ ] ConnectionFileManager writes Jupyter discovery file
+- [ ] SignalBridge properly configured for SIGTERM/SIGUSR1/SIGUSR2
+
+**Implementation Steps:**
+1. Update `llmspell-cli/src/cli.rs` KernelCommands::Start with complete flags:
+   ```rust
+   Start {
+       #[arg(short, long, default_value = "9555")]
+       port: u16,
+       #[arg(long)]
+       daemon: bool,
+       #[arg(long)]
+       log_file: Option<PathBuf>,
+       #[arg(long)]
+       pid_file: Option<PathBuf>,
+       #[arg(long, default_value = "3600")]
+       idle_timeout: u64,
+       #[arg(long, default_value = "10")]
+       max_clients: usize,
+       #[arg(long)]
+       log_rotate_size: Option<u64>,  // bytes
+       #[arg(long, default_value = "5")]
+       log_rotate_count: usize,
+       #[arg(long)]
+       connection_file: Option<PathBuf>,
+   }
+   ```
+2. Update `llmspell-cli/src/commands/kernel.rs` handler to build DaemonConfig:
+   ```rust
+   let daemon_config = if daemon {
+       Some(DaemonConfig {
+           daemonize: true,
+           pid_file: pid_file.or_else(|| Some(default_pid_path())),
+           working_dir: PathBuf::from("/"),
+           stdout_path: log_file.clone(),
+           stderr_path: log_file,
+           close_stdin: true,
+           umask: Some(0o027),
+       })
+   } else { None };
+
+   let exec_config = ExecutionConfig {
+       daemon_mode: daemon,
+       daemon_config,
+       health_thresholds: Some(HealthThresholds::default()),
+       // ... other config
+   };
+   ```
+3. Modify `llmspell-kernel/src/api.rs` start_kernel_service to accept full config:
+   - Pass ExecutionConfig instead of just LLMSpellConfig
+   - If daemon_mode, create DaemonManager and call daemonize()
+   - Initialize ConnectionFileManager and write after binding
+   - Configure LogRotator if log_file specified
+   - Set up SignalBridge connecting to ShutdownCoordinator
+4. Integration sequence:
+   - Parse CLI args into DaemonConfig
+   - Create ExecutionConfig with daemon settings
+   - Initialize kernel with configuration
+   - If daemon: DaemonManager::daemonize() before kernel.run()
+   - ConnectionFileManager::write() after transport binding
+   - SignalBridge setup for graceful shutdown
+5. Test comprehensive scenarios:
+   - Foreground mode without --daemon
+   - Full daemon mode with all options
+   - Signal handling (kill -TERM for graceful shutdown)
+   - Connection file discovery by clients
+   - Log rotation when size exceeded
 
 **Definition of Done:**
 - [ ] Command works correctly
@@ -916,30 +1204,128 @@ llmspell-kernel/src/daemon/
 - [ ] `cargo fmt --all --check` passes
 - [ ] All tests pass: `cargo test --workspace --all-features`
 
-### Task 10.5.2: Implement kernel stop Command
+### Task 10.5.2: Implement kernel stop Command with Process Management
 **Priority**: HIGH
-**Estimated Time**: 3 hours
+**Estimated Time**: 4 hours
 **Assignee**: CLI Team
 
-**Description**: Implement kernel stop command with graceful shutdown.
+**Description**: Implement kernel stop command with process discovery and graceful shutdown.
+
+**Current State**: Handler returns "not yet implemented" - infrastructure exists but not connected.
+
+**Required Prerequisite**: Kernel discovery infrastructure for finding running kernels.
 
 **Acceptance Criteria:**
-- [ ] Stops kernel by ID or PID file
-- [ ] Graceful shutdown via SIGTERM
-- [ ] Timeout for forced kill
-- [ ] Cleans up files
-- [ ] Confirms shutdown
+- [ ] Kernel discovery finds running kernels by scanning connection files
+- [ ] Stops kernel by ID (from connection file) or PID file path
+- [ ] Graceful shutdown via SIGTERM with ShutdownCoordinator
+- [ ] 30-second timeout then SIGKILL for forced termination
+- [ ] Cleans up connection and PID files after shutdown
+- [ ] Confirms process actually terminated via kill(pid, 0)
 
 **Implementation Steps:**
-1. Implement stop logic:
-   - Read PID from file or find by ID
-   - Send SIGTERM signal
-   - Wait for graceful shutdown
-   - Send SIGKILL if timeout
-2. Clean up connection and PID files
-3. Verify process terminated
-4. Test stop scenarios
-5. Handle edge cases
+1. Create kernel discovery module `llmspell-cli/src/kernel_discovery.rs`:
+   ```rust
+   use std::fs;
+   use std::path::PathBuf;
+   use serde::{Deserialize, Serialize};
+
+   #[derive(Debug, Clone, Serialize, Deserialize)]
+   pub struct KernelInfo {
+       pub id: String,
+       pub pid: u32,
+       pub port: u16,
+       pub connection_file: PathBuf,
+       pub pid_file: Option<PathBuf>,
+       pub status: KernelStatus,
+   }
+
+   pub fn discover_kernels() -> Result<Vec<KernelInfo>> {
+       let kernel_dir = dirs::home_dir()
+           .map(|h| h.join(".llmspell/kernels"))
+           .unwrap_or_else(|| PathBuf::from("/tmp/llmspell/kernels"));
+
+       let mut kernels = Vec::new();
+       for entry in fs::read_dir(kernel_dir)? {
+           let path = entry?.path();
+           if path.extension().map_or(false, |e| e == "json") {
+               let conn_info = parse_connection_file(&path)?;
+               let pid = read_pid_from_connection(&conn_info)?;
+               if is_process_alive(pid) {
+                   kernels.push(KernelInfo { /* ... */ });
+               } else {
+                   // Clean up stale file
+                   fs::remove_file(&path).ok();
+               }
+           }
+       }
+       Ok(kernels)
+   }
+
+   fn is_process_alive(pid: u32) -> bool {
+       unsafe { libc::kill(pid as i32, 0) == 0 }
+   }
+   ```
+2. Update stop command handler with discovery and signal management:
+   ```rust
+   use nix::sys::signal::{self, Signal};
+   use nix::unistd::Pid;
+
+   pub async fn handle_kernel_stop(id: Option<String>, pid_file: Option<PathBuf>) -> Result<()> {
+       let kernel = if let Some(id) = id {
+           // Find by ID through discovery
+           discover_kernels()?.into_iter()
+               .find(|k| k.id == id)
+               .ok_or_else(|| anyhow!("Kernel {} not found", id))?
+       } else if let Some(pid_file) = pid_file {
+           // Read PID directly from file
+           let pid: u32 = fs::read_to_string(&pid_file)?.trim().parse()?;
+           KernelInfo { pid, /* ... */ }
+       } else {
+           bail!("Must specify kernel ID or PID file");
+       };
+
+       // Send SIGTERM for graceful shutdown
+       signal::kill(Pid::from_raw(kernel.pid as i32), Signal::SIGTERM)?;
+
+       // Wait up to 30 seconds
+       let deadline = Instant::now() + Duration::from_secs(30);
+       while Instant::now() < deadline {
+           if !is_process_alive(kernel.pid) {
+               break;
+           }
+           tokio::time::sleep(Duration::from_millis(100)).await;
+       }
+
+       // Force kill if still alive
+       if is_process_alive(kernel.pid) {
+           warn!("Kernel didn't shutdown gracefully, sending SIGKILL");
+           signal::kill(Pid::from_raw(kernel.pid as i32), Signal::SIGKILL)?;
+       }
+
+       // Clean up files
+       fs::remove_file(kernel.connection_file).ok();
+       if let Some(pid_file) = kernel.pid_file {
+           fs::remove_file(pid_file).ok();
+       }
+
+       Ok(())
+   }
+   ```
+3. Add signal handling configuration options:
+   - Support custom timeout via --timeout flag
+   - Allow --force to skip graceful shutdown
+   - Add --no-cleanup to preserve files for debugging
+4. Enhanced error handling:
+   - Permission errors (can't kill process owned by different user)
+   - Stale PID files (process doesn't exist)
+   - Multiple kernels with same ID (shouldn't happen but handle)
+5. Test comprehensive scenarios:
+   - Stop by kernel ID from discovery
+   - Stop by PID file path
+   - Timeout triggers SIGKILL
+   - Multiple kernels running
+   - Cleanup of stale files
 
 **Definition of Done:**
 - [ ] Stop works reliably
@@ -951,34 +1337,138 @@ llmspell-kernel/src/daemon/
 - [ ] `cargo fmt --all --check` passes
 - [ ] All tests pass: `cargo test --workspace --all-features`
 
-### Task 10.5.3: Implement kernel status Command
+### Task 10.5.3: Implement kernel status Command with Health Monitoring
 **Priority**: HIGH
-**Estimated Time**: 3 hours
+**Estimated Time**: 4 hours
 **Assignee**: CLI Team
 
-**Description**: Show status of running kernels with detailed information.
+**Description**: Show status of running kernels with resource metrics and health information.
+
+**Current State**: Handler just prints "unknown" - HealthMonitor exists but not used.
+
+**Dependencies**: Requires kernel discovery from 10.5.2.
 
 **Acceptance Criteria:**
-- [ ] Lists all running kernels
-- [ ] Shows detailed kernel info
-- [ ] Displays resource usage
-- [ ] Shows connection info
-- [ ] Pretty output format
+- [ ] Lists all running kernels in table format
+- [ ] Shows detailed kernel info when ID specified
+- [ ] Displays CPU and memory usage via procfs or ps
+- [ ] Shows connection info from ConnectionFileManager
+- [ ] Pretty table output with colored health status
+- [ ] JSON output option with --output json
+- [ ] HTTP health check endpoint integration
 
 **Implementation Steps:**
-1. Implement status logic:
-   - Scan kernel directory
-   - Check each kernel health
-   - Gather metrics
-   - Format output
-2. Show kernel details:
-   - PID and uptime
-   - Memory usage
-   - Active connections
-   - Protocol servers
-3. Add JSON output option
-4. Test status display
-5. Handle missing kernels
+1. Enhance kernel discovery with metrics:
+   ```rust
+   pub struct KernelMetrics {
+       pub cpu_percent: f32,
+       pub memory_mb: u64,
+       pub uptime: Duration,
+       pub active_sessions: usize,
+       pub total_executions: u64,
+   }
+
+   fn get_process_metrics(pid: u32) -> Result<KernelMetrics> {
+       // Linux: Read from /proc/{pid}/stat
+       #[cfg(target_os = "linux")]
+       {
+           let stat = fs::read_to_string(format!("/proc/{}/stat", pid))?;
+           // Parse CPU time, memory from stat
+       }
+
+       // macOS: Use ps command
+       #[cfg(target_os = "macos")]
+       {
+           let output = Command::new("ps")
+               .args(&["-p", &pid.to_string(), "-o", "pcpu,rss,etime"])
+               .output()?;
+           // Parse ps output
+       }
+   }
+   ```
+2. Table output format using `tabled` crate:
+   ```rust
+   use tabled::{Table, Tabled};
+   use colored::Colorize;
+
+   #[derive(Tabled)]
+   struct KernelRow {
+       id: String,
+       port: u16,
+       pid: u32,
+       #[tabled(display_with = "display_status")]
+       status: String,
+       cpu_percent: String,
+       memory: String,
+       uptime: String,
+       sessions: usize,
+   }
+
+   fn display_status(s: &str) -> String {
+       match s {
+           "healthy" => s.green().to_string(),
+           "busy" => s.yellow().to_string(),
+           "unhealthy" => s.red().to_string(),
+           _ => s.to_string(),
+       }
+   }
+   ```
+3. Detailed view implementation:
+   ```rust
+   fn show_kernel_details(id: &str) -> Result<()> {
+       let kernel = discover_kernel_by_id(id)?;
+       let metrics = get_process_metrics(kernel.pid)?;
+       let health = try_health_check(&kernel).await?;
+
+       println!("Kernel ID:        {}", kernel.id);
+       println!("Port:             {}", kernel.port);
+       println!("PID:              {}", kernel.pid);
+       println!("Status:           {}", health.status);
+       println!("Health:           {} ({})",
+           health.overall_health, health.message);
+       println!("CPU Usage:        {:.1}%", metrics.cpu_percent);
+       println!("Memory:           {} MB", metrics.memory_mb);
+       println!("Uptime:           {}", format_duration(metrics.uptime));
+       println!("Sessions:         {} active, {} total",
+           health.active_sessions, health.total_sessions);
+       println!("Executions:       {:,}", health.total_executions);
+       println!("Connection File:  {}", kernel.connection_file.display());
+       if let Some(pid_file) = kernel.pid_file {
+           println!("PID File:         {}", pid_file.display());
+       }
+       if let Some(log_file) = kernel.log_file {
+           println!("Log File:         {}", log_file.display());
+       }
+       Ok(())
+   }
+   ```
+4. Health check integration:
+   ```rust
+   async fn try_health_check(kernel: &KernelInfo) -> Result<HealthReport> {
+       // Try HTTP health endpoint if available
+       let health_url = format!("http://127.0.0.1:{}/health", kernel.port + 100);
+       if let Ok(response) = reqwest::get(&health_url).await {
+           if let Ok(report) = response.json::<HealthReport>().await {
+               return Ok(report);
+           }
+       }
+
+       // Fall back to process check
+       Ok(HealthReport {
+           status: if is_process_alive(kernel.pid) {
+               HealthStatus::Healthy
+           } else {
+               HealthStatus::Unhealthy
+           },
+           /* ... */
+       })
+   }
+   ```
+5. Output formatting options:
+   - Table format (default) with colors
+   - JSON format for scripting (--output json)
+   - Quiet mode for just IDs (--quiet)
+   - Watch mode for continuous updates (--watch)
 
 **Definition of Done:**
 - [ ] Status accurately shown
@@ -990,39 +1480,211 @@ llmspell-kernel/src/daemon/
 - [ ] `cargo fmt --all --check` passes
 - [ ] All tests pass: `cargo test --workspace --all-features`
 
-### Task 10.5.4: Implement install-service Subcommand
+### Task 10.5.4: Implement install-service Subcommand with Platform Detection
 **Priority**: MEDIUM
-**Estimated Time**: 3 hours
+**Estimated Time**: 4 hours
 **Assignee**: CLI Team
 
-**Description**: Generate and install systemd/launchd service files.
+**Description**: Generate and install systemd/launchd service files with automatic platform detection.
+
+**Current State**: No InstallService subcommand exists in CLI.
 
 **Acceptance Criteria:**
-- [ ] Generates systemd unit file
-- [ ] Generates launchd plist
-- [ ] Detects platform correctly
-- [ ] Installs to correct location
-- [ ] Provides instructions
+- [ ] Generates correct systemd unit file for Linux
+- [ ] Generates correct launchd plist for macOS
+- [ ] Auto-detects platform via std::env::consts::OS
+- [ ] Installs to correct system location with proper permissions
+- [ ] Provides clear post-install instructions
+- [ ] Supports both user and system services
 
 **Implementation Steps:**
-1. Add `install-service` subcommand:
+1. Add to `llmspell-cli/src/cli.rs` KernelCommands:
    ```rust
    InstallService {
        #[arg(long)]
-       service_type: Option<ServiceType>,
+       service_type: Option<ServiceType>, // systemd/launchd/auto
        #[arg(long)]
-       user: bool,
+       user: bool,  // User service vs system service
+       #[arg(long)]
+       name: Option<String>, // Service name (default: llmspell-kernel)
+       #[arg(long, default_value = "9555")]
+       port: u16, // Port for kernel
+       #[arg(long)]
+       log_file: Option<PathBuf>, // Log file path
+       #[arg(long)]
+       pid_file: Option<PathBuf>, // PID file path
    }
    ```
-2. Generate systemd unit:
-   - Type=forking
-   - PIDFile path
-   - Restart policies
-3. Generate launchd plist:
-   - RunAtLoad
-   - KeepAlive settings
-4. Install files with proper permissions
-5. Print post-install instructions
+2. Create service templates in `llmspell-cli/src/services/templates.rs`:
+   ```rust
+   pub const SYSTEMD_TEMPLATE: &str = r#"[Unit]
+   Description=LLMSpell Kernel Service
+   After=network.target
+   Documentation=https://github.com/llmspell/llmspell
+
+   [Service]
+   Type=forking
+   PIDFile={pid_file}
+   ExecStart={binary_path} kernel start --daemon --port {port} --pid-file {pid_file} --log-file {log_file}
+   ExecStop={binary_path} kernel stop --pid-file {pid_file}
+   ExecReload=/bin/kill -USR1 $MAINPID
+   Restart=on-failure
+   RestartSec=5s
+   User={user}
+   Group={group}
+   # Resource limits
+   LimitNOFILE=65536
+   # Security hardening
+   PrivateTmp=true
+   NoNewPrivileges=true
+
+   [Install]
+   WantedBy=multi-user.target"#;
+
+   pub const LAUNCHD_TEMPLATE: &str = r#"<?xml version="1.0" encoding="UTF-8"?>
+   <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN"
+     "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+   <plist version="1.0">
+   <dict>
+       <key>Label</key>
+       <string>com.llmspell.kernel</string>
+       <key>ProgramArguments</key>
+       <array>
+           <string>{binary_path}</string>
+           <string>kernel</string>
+           <string>start</string>
+           <string>--daemon</string>
+           <string>--port</string>
+           <string>{port}</string>
+           <string>--pid-file</string>
+           <string>{pid_file}</string>
+           <string>--log-file</string>
+           <string>{log_file}</string>
+       </array>
+       <key>RunAtLoad</key>
+       <true/>
+       <key>KeepAlive</key>
+       <dict>
+           <key>SuccessfulExit</key>
+           <false/>
+           <key>Crashed</key>
+           <true/>
+       </dict>
+       <key>StandardOutPath</key>
+       <string>{log_file}</string>
+       <key>StandardErrorPath</key>
+       <string>{error_log_file}</string>
+       <key>ThrottleInterval</key>
+       <integer>5</integer>
+   </dict>
+   </plist>"#;
+   ```
+3. Platform detection and path resolution:
+   ```rust
+   use std::env;
+
+   fn get_service_info(user: bool) -> Result<ServiceInfo> {
+       let os = env::consts::OS;
+       let home = dirs::home_dir().ok_or("No home directory")?;
+
+       match os {
+           "linux" => Ok(ServiceInfo {
+               service_type: ServiceType::Systemd,
+               install_dir: if user {
+                   home.join(".config/systemd/user")
+               } else {
+                   PathBuf::from("/etc/systemd/system")
+               },
+               service_file: "llmspell-kernel.service".into(),
+               template: SYSTEMD_TEMPLATE,
+           }),
+           "macos" => Ok(ServiceInfo {
+               service_type: ServiceType::Launchd,
+               install_dir: if user {
+                   home.join("Library/LaunchAgents")
+               } else {
+                   PathBuf::from("/Library/LaunchDaemons")
+               },
+               service_file: "com.llmspell.kernel.plist".into(),
+               template: LAUNCHD_TEMPLATE,
+           }),
+           _ => Err(anyhow!("Unsupported platform: {}", os)),
+       }
+   }
+   ```
+4. Service file generation and installation:
+   ```rust
+   fn install_service(opts: InstallServiceOpts) -> Result<()> {
+       let info = get_service_info(opts.user)?;
+       let binary_path = env::current_exe()?;
+
+       // Resolve paths
+       let pid_file = opts.pid_file.unwrap_or_else(|| {
+           dirs::runtime_dir().unwrap_or_else(|| "/var/run".into())
+               .join("llmspell-kernel.pid")
+       });
+       let log_file = opts.log_file.unwrap_or_else(|| {
+           dirs::state_dir().unwrap_or_else(|| "/var/log".into())
+               .join("llmspell-kernel.log")
+       });
+
+       // Expand template
+       let service_content = info.template
+           .replace("{binary_path}", &binary_path.display().to_string())
+           .replace("{port}", &opts.port.to_string())
+           .replace("{pid_file}", &pid_file.display().to_string())
+           .replace("{log_file}", &log_file.display().to_string())
+           .replace("{user}", &whoami::username())
+           .replace("{group}", &whoami::username());
+
+       // Create directory if needed
+       fs::create_dir_all(&info.install_dir)?;
+
+       // Write service file
+       let service_path = info.install_dir.join(&info.service_file);
+       fs::write(&service_path, service_content)?;
+       fs::set_permissions(&service_path, fs::Permissions::from_mode(0o644))?;
+
+       // Print instructions
+       print_post_install_instructions(&info, &service_path, opts.user)?;
+
+       Ok(())
+   }
+   ```
+5. Post-installation instructions:
+   ```rust
+   fn print_post_install_instructions(info: &ServiceInfo, path: &Path, user: bool) {
+       println!("\n✅ Service file installed at: {}", path.display());
+       println!("\n📝 Next steps:");
+
+       match info.service_type {
+           ServiceType::Systemd => {
+               let sudo = if user { "" } else { "sudo " };
+               let user_flag = if user { " --user" } else { "" };
+               println!("  1. Reload systemd:");
+               println!("     {}systemctl{} daemon-reload", sudo, user_flag);
+               println!("  2. Enable service to start on boot:");
+               println!("     {}systemctl{} enable llmspell-kernel", sudo, user_flag);
+               println!("  3. Start the service:");
+               println!("     {}systemctl{} start llmspell-kernel", sudo, user_flag);
+               println!("  4. Check status:");
+               println!("     {}systemctl{} status llmspell-kernel", sudo, user_flag);
+           }
+           ServiceType::Launchd => {
+               let sudo = if user { "" } else { "sudo " };
+               println!("  1. Load the service:");
+               println!("     {}launchctl load {}", sudo, path.display());
+               println!("  2. Start the service:");
+               println!("     {}launchctl start com.llmspell.kernel", sudo);
+               println!("  3. Check status:");
+               println!("     {}launchctl list | grep llmspell", sudo);
+           }
+       }
+
+       println!("\n🔍 To view logs:");
+       println!("   tail -f {}", info.log_file.display());
+   }
+   ```
 
 **Definition of Done:**
 - [ ] Service files generated
@@ -1094,7 +1756,7 @@ llmspell-kernel/src/daemon/
 **Estimated Time**: 4 hours
 **Assignee**: Protocol Team
 
-**Description**: Add HMAC-based message authentication for security.
+**Description**: Add or verify existing HMAC-based message authentication for security.
 
 **Acceptance Criteria:**
 - [ ] HMAC signatures generated
@@ -1131,7 +1793,7 @@ llmspell-kernel/src/daemon/
 **Estimated Time**: 4 hours
 **Assignee**: Protocol Team
 
-**Description**: Implement proper message routing between channels.
+**Description**: Implement or augment existing proper message routing between channels.
 
 **Acceptance Criteria:**
 - [ ] Request/reply correlation works
@@ -1172,7 +1834,7 @@ llmspell-kernel/src/daemon/
 **Estimated Time**: 6 hours
 **Assignee**: Debug Team Lead
 
-**Description**: Implement Debug Adapter Protocol server in kernel.
+**Description**: Implement or augment Debug Adapter Protocol server in kernel.
 
 **Acceptance Criteria:**
 - [ ] DAP server starts on configured port
@@ -1214,7 +1876,7 @@ llmspell-kernel/src/daemon/
 **Estimated Time**: 4 hours
 **Assignee**: Debug Team
 
-**Description**: Full breakpoint support with conditions, hit counts, and logpoints.
+**Description**: Implement or augment existing Full breakpoint support with conditions, hit counts, and logpoints.
 
 **Acceptance Criteria:**
 - [ ] Line breakpoints work
@@ -1267,7 +1929,7 @@ llmspell-kernel/src/daemon/
 **Estimated Time**: 4 hours
 **Assignee**: Debug Team
 
-**Description**: Variable inspection with proper scopes and formatting.
+**Description**: Implement or augment existing Variable inspection with proper scopes and formatting.
 
 **Acceptance Criteria:**
 - [ ] Local variables shown
@@ -1308,7 +1970,7 @@ llmspell-kernel/src/daemon/
 **Estimated Time**: 3 hours
 **Assignee**: Debug Team
 
-**Description**: Implement all stepping operations with <20ms latency.
+**Description**: Implement or augment existing all stepping operations with <20ms latency.
 
 **Acceptance Criteria:**
 - [ ] Step over works
@@ -1349,7 +2011,7 @@ llmspell-kernel/src/daemon/
 **Estimated Time**: 6 hours
 **Assignee**: LSP Team Lead
 
-**Description**: Implement Language Server Protocol for code intelligence.
+**Description**: Implement or augment existing  Language Server Protocol for code intelligence.
 
 **Acceptance Criteria:**
 - [ ] LSP server starts
@@ -1433,7 +2095,7 @@ llmspell-kernel/src/daemon/
 **Estimated Time**: 4 hours
 **Assignee**: LSP Team
 
-**Description**: Real-time diagnostics for script errors and warnings.
+**Description**: Implement or augment existing Real-time diagnostics for script errors and warnings.
 
 **Acceptance Criteria:**
 - [ ] Syntax errors detected
@@ -1515,7 +2177,7 @@ llmspell-kernel/src/daemon/
 **Estimated Time**: 6 hours
 **Assignee**: Protocol Team Lead
 
-**Description**: Implement the Interactive REPL Service for direct script interaction.
+**Description**: Implement or augment the Interactive REPL Service for direct script interaction.
 
 **Acceptance Criteria:**
 - [ ] REPL server starts on configured port
@@ -1564,11 +2226,10 @@ llmspell-kernel/src/daemon/
 **Estimated Time**: 4 hours
 **Assignee**: Protocol Team
 
-**Description**: Implement the wire protocol for REPL communication.
+**Description**: Implement or augment existing the wire protocol for REPL communication ? use zmq as transport and jupyter as protocol?.
 
 **Acceptance Criteria:**
 - [ ] Text-based protocol works
-- [ ] JSON-RPC mode available
 - [ ] Binary mode for efficiency
 - [ ] Error handling robust
 - [ ] Protocol versioning

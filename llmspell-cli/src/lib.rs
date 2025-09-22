@@ -6,6 +6,7 @@ pub mod commands;
 pub mod config;
 pub mod embedded_resources;
 pub mod execution_context;
+pub mod kernel_discovery;
 pub mod output;
 
 // Re-export commonly used types for testing
