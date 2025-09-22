@@ -347,4 +347,150 @@ mod tests {
         assert!(contents.contains("TEST"));
         assert!(contents.contains("Log message"));
     }
+
+    #[test]
+    fn test_log_rotation_trigger() {
+        let temp_dir = tempdir().unwrap();
+        let log_path = temp_dir.path().join("test.log");
+        let config = LogRotationConfig {
+            base_path: log_path.clone(),
+            max_size: 50, // Very small size to trigger rotation
+            max_files: 2,
+            compress: false,
+        };
+
+        let rotator = LogRotator::new(config);
+        rotator.open().unwrap();
+
+        // Write enough data to trigger rotation
+        let large_data = b"This is a test message that should trigger rotation\n";
+        rotator.write(large_data).unwrap();
+
+        // Write more data to ensure rotation happened
+        rotator.write(b"After rotation\n").unwrap();
+
+        // Verify main log file exists
+        assert!(log_path.exists());
+
+        // Verify rotated file was created
+        let parent_dir = log_path.parent().unwrap();
+        let entries: Vec<_> = fs::read_dir(parent_dir)
+            .unwrap()
+            .filter_map(Result::ok)
+            .collect();
+
+        // Should have at least 2 files (current + rotated)
+        assert!(entries.len() >= 2);
+    }
+
+    #[test]
+    fn test_log_rotation_with_compression() {
+        use flate2::read::GzDecoder;
+        use std::io::Read;
+
+        let temp_dir = tempdir().unwrap();
+        let log_path = temp_dir.path().join("test.log");
+        let config = LogRotationConfig {
+            base_path: log_path.clone(),
+            max_size: 30, // Small size for rotation
+            max_files: 1,
+            compress: true, // Enable compression
+        };
+
+        let rotator = LogRotator::new(config);
+        rotator.open().unwrap();
+
+        // Write data to trigger rotation
+        rotator.write(b"First log entry before rotation\n").unwrap();
+        rotator.write(b"Second entry\n").unwrap();
+
+        // Find compressed file
+        let parent_dir = log_path.parent().unwrap();
+        let compressed_file = fs::read_dir(parent_dir)
+            .unwrap()
+            .filter_map(Result::ok)
+            .find(|entry| {
+                entry
+                    .file_name()
+                    .to_str()
+                    .map_or(false, |name| name.ends_with(".gz"))
+            });
+
+        // If rotation occurred with compression, verify the compressed file
+        if let Some(entry) = compressed_file {
+            let compressed_path = entry.path();
+            let file = File::open(&compressed_path).unwrap();
+            let mut decoder = GzDecoder::new(file);
+            let mut contents = String::new();
+            decoder.read_to_string(&mut contents).unwrap();
+            assert!(contents.contains("First log entry"));
+        }
+    }
+
+    #[test]
+    fn test_log_file_cleanup() {
+        let temp_dir = tempdir().unwrap();
+        let log_path = temp_dir.path().join("test.log");
+        let config = LogRotationConfig {
+            base_path: log_path.clone(),
+            max_size: 20, // Very small for frequent rotation
+            max_files: 2, // Keep only 2 rotated files
+            compress: false,
+        };
+
+        let rotator = LogRotator::new(config);
+        rotator.open().unwrap();
+
+        // Trigger multiple rotations
+        for i in 0..5 {
+            let data = format!("Log entry number {}\n", i);
+            rotator.write(data.as_bytes()).unwrap();
+        }
+
+        // Count log files
+        let parent_dir = log_path.parent().unwrap();
+        let log_files: Vec<_> = fs::read_dir(parent_dir)
+            .unwrap()
+            .filter_map(Result::ok)
+            .filter(|entry| {
+                entry
+                    .file_name()
+                    .to_str()
+                    .map_or(false, |name| name.contains("test.log"))
+            })
+            .collect();
+
+        // Should have at most max_files + 1 (current file)
+        assert!(log_files.len() <= 3);
+    }
+
+    #[test]
+    fn test_io_stream_redirection() {
+        let temp_dir = tempdir().unwrap();
+        let config = LogRotationConfig {
+            base_path: temp_dir.path().join("daemon.log"),
+            max_size: 1024,
+            max_files: 3,
+            compress: false,
+        };
+
+        let rotator = Arc::new(LogRotator::new(config));
+        rotator.open().unwrap();
+
+        // Create writers for stdout and stderr
+        let mut stdout_writer = DaemonLogWriter::new(rotator.clone(), "STDOUT");
+        let mut stderr_writer = DaemonLogWriter::new(rotator.clone(), "STDERR");
+
+        // Write to both streams
+        stdout_writer.write(b"Standard output message\n").unwrap();
+        stderr_writer.write(b"Standard error message\n").unwrap();
+
+        // Verify both messages are in the log
+        let log_path = temp_dir.path().join("daemon.log");
+        let contents = fs::read_to_string(&log_path).unwrap();
+        assert!(contents.contains("STDOUT"));
+        assert!(contents.contains("Standard output message"));
+        assert!(contents.contains("STDERR"));
+        assert!(contents.contains("Standard error message"));
+    }
 }

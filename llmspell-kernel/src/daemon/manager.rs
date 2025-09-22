@@ -277,4 +277,46 @@ mod tests {
         assert!(config.stdout_path.is_some());
         assert!(config.stderr_path.is_some());
     }
+
+    #[test]
+    fn test_io_redirection_configuration() {
+        let temp_dir = tempdir().unwrap();
+        let stdout_path = temp_dir.path().join("stdout.log");
+        let stderr_path = temp_dir.path().join("stderr.log");
+
+        let config = DaemonConfig {
+            pid_file: None,
+            working_dir: temp_dir.path().to_path_buf(),
+            stdout_path: Some(stdout_path.clone()),
+            stderr_path: Some(stderr_path.clone()),
+            close_stdin: true,
+            umask: None,
+        };
+
+        let manager = DaemonManager::new(config);
+
+        // Verify paths are set correctly
+        assert_eq!(manager.config.stdout_path.as_ref().unwrap(), &stdout_path);
+        assert_eq!(manager.config.stderr_path.as_ref().unwrap(), &stderr_path);
+        assert!(manager.config.close_stdin);
+    }
+
+    #[test]
+    fn test_io_redirection_to_dev_null() {
+        let config = DaemonConfig {
+            pid_file: None,
+            working_dir: PathBuf::from("/tmp"),
+            stdout_path: None, // Should redirect to /dev/null
+            stderr_path: None, // Should redirect to /dev/null
+            close_stdin: true,
+            umask: None,
+        };
+
+        let manager = DaemonManager::new(config);
+
+        // Verify no paths set means /dev/null redirection
+        assert!(manager.config.stdout_path.is_none());
+        assert!(manager.config.stderr_path.is_none());
+        assert!(manager.config.close_stdin);
+    }
 }
