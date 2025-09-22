@@ -6,9 +6,12 @@
 
 use anyhow::{Context, Result};
 use nix::sys::signal::{self, SaFlags, SigAction, SigHandler as NixSigHandler, SigSet, Signal};
+use serde_json::json;
+use std::collections::HashMap;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
-use tracing::{debug, info};
+use tokio::sync::mpsc;
+use tracing::{debug, error, info, trace};
 
 /// Atomic flags for signal handling
 static SIGTERM_RECEIVED: AtomicBool = AtomicBool::new(false);
@@ -135,16 +138,16 @@ impl SignalHandler {
             return Some(SignalAction::Reload);
         }
 
-        // Check SIGUSR1 (custom action - dump state)
+        // Check SIGUSR1 (config reload)
         if SIGUSR1_RECEIVED.swap(false, Ordering::SeqCst) {
-            info!("SIGUSR1 received, dumping state");
-            return Some(SignalAction::DumpState);
+            info!("SIGUSR1 received, triggering config reload");
+            return Some(SignalAction::Reload);
         }
 
-        // Check SIGUSR2 (custom action)
+        // Check SIGUSR2 (state dump)
         if SIGUSR2_RECEIVED.swap(false, Ordering::SeqCst) {
-            info!("SIGUSR2 received, executing custom action");
-            return Some(SignalAction::Custom("usr2".to_string()));
+            info!("SIGUSR2 received, triggering state dump");
+            return Some(SignalAction::DumpState);
         }
 
         None
@@ -192,10 +195,53 @@ impl Default for SignalHandler {
     }
 }
 
+/// Jupyter protocol message type for kernel control
+#[derive(Debug, Clone)]
+pub enum KernelMessage {
+    /// Shutdown request message
+    ShutdownRequest { restart: bool },
+    /// Interrupt request message
+    InterruptRequest,
+    /// Configuration reload request
+    ConfigReload,
+    /// State dump request
+    StateDump,
+}
+
+impl KernelMessage {
+    /// Convert to Jupyter protocol message
+    pub fn to_jupyter_message(&self) -> HashMap<String, serde_json::Value> {
+        let msg_type = match self {
+            Self::ShutdownRequest { .. } => "shutdown_request",
+            Self::InterruptRequest => "interrupt_request",
+            Self::ConfigReload | Self::StateDump => "custom_request",
+        };
+
+        let content = match self {
+            Self::ShutdownRequest { restart } => json!({
+                "restart": restart
+            }),
+            Self::InterruptRequest => json!({}),
+            Self::ConfigReload => json!({
+                "type": "config_reload"
+            }),
+            Self::StateDump => json!({
+                "type": "state_dump"
+            }),
+        };
+
+        let mut message = HashMap::new();
+        message.insert("msg_type".to_string(), json!(msg_type));
+        message.insert("content".to_string(), content);
+        message
+    }
+}
+
 /// Bridge between Unix signals and kernel messages
 pub struct SignalBridge {
     handler: SignalHandler,
     shutdown_requested: Arc<AtomicBool>,
+    message_sender: Option<mpsc::Sender<KernelMessage>>,
 }
 
 impl SignalBridge {
@@ -204,6 +250,16 @@ impl SignalBridge {
         Self {
             handler: SignalHandler::new(),
             shutdown_requested: Arc::new(AtomicBool::new(false)),
+            message_sender: None,
+        }
+    }
+
+    /// Creates a new signal bridge with message channel
+    pub fn with_message_channel(sender: mpsc::Sender<KernelMessage>) -> Self {
+        Self {
+            handler: SignalHandler::new(),
+            shutdown_requested: Arc::new(AtomicBool::new(false)),
+            message_sender: Some(sender),
         }
     }
 
@@ -246,6 +302,73 @@ impl SignalBridge {
         None
     }
 
+    /// Processes pending signals and converts to kernel messages
+    ///
+    /// This should be called periodically from the main event loop.
+    /// Returns the signal action and optionally sends kernel messages.
+    pub async fn process_signals_to_messages(&self) -> Option<SignalAction> {
+        if let Some(action) = self.handler.check_signals() {
+            // Convert signal action to kernel message
+            let kernel_message = match &action {
+                SignalAction::Shutdown => {
+                    self.shutdown_requested.store(true, Ordering::SeqCst);
+                    info!("SIGTERM received, converting to shutdown_request");
+                    Some(KernelMessage::ShutdownRequest { restart: false })
+                }
+                SignalAction::Interrupt => {
+                    info!("SIGINT received, converting to interrupt_request");
+                    Some(KernelMessage::InterruptRequest)
+                }
+                SignalAction::Reload => {
+                    info!("SIGUSR1 received, triggering config reload");
+                    Some(KernelMessage::ConfigReload)
+                }
+                SignalAction::DumpState => {
+                    info!("SIGUSR2 received, triggering state dump");
+                    Some(KernelMessage::StateDump)
+                }
+                SignalAction::Custom(name) => {
+                    debug!("Custom signal action: {}, no message conversion", name);
+                    None
+                }
+            };
+
+            // Send kernel message if we have a channel
+            if let Some(ref sender) = self.message_sender {
+                if let Some(msg) = kernel_message {
+                    trace!("Sending kernel message: {:?}", msg);
+                    if let Err(e) = sender.send(msg).await {
+                        error!("Failed to send kernel message: {}", e);
+                    }
+                }
+            }
+
+            return Some(action);
+        }
+        None
+    }
+
+    /// Convert a signal action to a kernel message
+    pub fn action_to_message(action: &SignalAction) -> Option<KernelMessage> {
+        match action {
+            SignalAction::Shutdown => Some(KernelMessage::ShutdownRequest { restart: false }),
+            SignalAction::Interrupt => Some(KernelMessage::InterruptRequest),
+            SignalAction::Reload => Some(KernelMessage::ConfigReload),
+            SignalAction::DumpState => Some(KernelMessage::StateDump),
+            SignalAction::Custom(_) => None,
+        }
+    }
+
+    /// Get a receiver for kernel messages
+    ///
+    /// Creates a channel for receiving kernel messages from signal handlers.
+    /// Returns both a new `SignalBridge` with sender and the receiver.
+    pub fn create_message_channel(buffer_size: usize) -> (Self, mpsc::Receiver<KernelMessage>) {
+        let (sender, receiver) = mpsc::channel(buffer_size);
+        let bridge = Self::with_message_channel(sender);
+        (bridge, receiver)
+    }
+
     /// Checks if shutdown has been requested
     pub fn is_shutdown_requested(&self) -> bool {
         self.shutdown_requested.load(Ordering::SeqCst)
@@ -281,6 +404,53 @@ mod tests {
     fn test_signal_handler_creation() {
         let handler = SignalHandler::new();
         assert!(!handler.installed);
+    }
+
+    #[test]
+    fn test_kernel_message_conversion() {
+        // Test shutdown request conversion
+        let msg = KernelMessage::ShutdownRequest { restart: true };
+        let jupyter_msg = msg.to_jupyter_message();
+        assert_eq!(jupyter_msg["msg_type"], json!("shutdown_request"));
+        assert_eq!(jupyter_msg["content"]["restart"], json!(true));
+
+        // Test interrupt request conversion
+        let msg = KernelMessage::InterruptRequest;
+        let jupyter_msg = msg.to_jupyter_message();
+        assert_eq!(jupyter_msg["msg_type"], json!("interrupt_request"));
+        assert_eq!(jupyter_msg["content"], json!({}));
+
+        // Test config reload conversion
+        let msg = KernelMessage::ConfigReload;
+        let jupyter_msg = msg.to_jupyter_message();
+        assert_eq!(jupyter_msg["msg_type"], json!("custom_request"));
+        assert_eq!(jupyter_msg["content"]["type"], json!("config_reload"));
+    }
+
+    #[test]
+    fn test_action_to_message_conversion() {
+        // Test SIGTERM to shutdown_request
+        let action = SignalAction::Shutdown;
+        let msg = SignalBridge::action_to_message(&action);
+        assert!(matches!(
+            msg,
+            Some(KernelMessage::ShutdownRequest { restart: false })
+        ));
+
+        // Test SIGINT to interrupt_request
+        let action = SignalAction::Interrupt;
+        let msg = SignalBridge::action_to_message(&action);
+        assert!(matches!(msg, Some(KernelMessage::InterruptRequest)));
+
+        // Test SIGUSR1 to config reload
+        let action = SignalAction::Reload;
+        let msg = SignalBridge::action_to_message(&action);
+        assert!(matches!(msg, Some(KernelMessage::ConfigReload)));
+
+        // Test SIGUSR2 to state dump
+        let action = SignalAction::DumpState;
+        let msg = SignalBridge::action_to_message(&action);
+        assert!(matches!(msg, Some(KernelMessage::StateDump)));
     }
 
     #[test]
@@ -354,5 +524,69 @@ mod tests {
 
         // Should be visible through shared flag
         assert!(flag.load(Ordering::SeqCst));
+    }
+
+    #[tokio::test]
+    async fn test_signal_bridge_with_message_channel() {
+        // Reset all signal flags at start of test
+        SignalHandler::new().reset();
+
+        let (bridge, mut receiver) = SignalBridge::create_message_channel(10);
+
+        // Simulate SIGTERM
+        SIGTERM_RECEIVED.store(true, Ordering::SeqCst);
+
+        // Process signals
+        let action = bridge.process_signals_to_messages().await;
+        assert!(matches!(action, Some(SignalAction::Shutdown)));
+
+        // Check that message was sent
+        if let Ok(msg) = receiver.try_recv() {
+            assert!(matches!(
+                msg,
+                KernelMessage::ShutdownRequest { restart: false }
+            ));
+        }
+
+        // Verify shutdown flag was set
+        assert!(bridge.is_shutdown_requested());
+    }
+
+    #[tokio::test]
+    async fn test_multiple_signal_processing() {
+        // Reset all signal flags at start of test
+        SignalHandler::new().reset();
+
+        let (bridge, mut receiver) = SignalBridge::create_message_channel(10);
+
+        // Simulate SIGINT
+        SIGINT_RECEIVED.store(true, Ordering::SeqCst);
+        let action = bridge.process_signals_to_messages().await;
+        assert!(matches!(action, Some(SignalAction::Interrupt)));
+
+        // Check interrupt message
+        if let Ok(msg) = receiver.try_recv() {
+            assert!(matches!(msg, KernelMessage::InterruptRequest));
+        }
+
+        // Simulate SIGUSR1
+        SIGUSR1_RECEIVED.store(true, Ordering::SeqCst);
+        let action = bridge.process_signals_to_messages().await;
+        assert!(matches!(action, Some(SignalAction::Reload)));
+
+        // Check config reload message
+        if let Ok(msg) = receiver.try_recv() {
+            assert!(matches!(msg, KernelMessage::ConfigReload));
+        }
+
+        // Simulate SIGUSR2
+        SIGUSR2_RECEIVED.store(true, Ordering::SeqCst);
+        let action = bridge.process_signals_to_messages().await;
+        assert!(matches!(action, Some(SignalAction::DumpState)));
+
+        // Check state dump message
+        if let Ok(msg) = receiver.try_recv() {
+            assert!(matches!(msg, KernelMessage::StateDump));
+        }
     }
 }

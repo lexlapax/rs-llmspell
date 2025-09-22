@@ -410,14 +410,11 @@ mod tests {
             .unwrap()
             .filter_map(Result::ok)
             .find(|entry| {
-                entry
-                    .file_name()
-                    .to_str()
-                    .is_some_and(|name| {
-                        std::path::Path::new(name)
-                            .extension()
-                            .is_some_and(|ext| ext.eq_ignore_ascii_case("gz"))
-                    })
+                entry.file_name().to_str().is_some_and(|name| {
+                    std::path::Path::new(name)
+                        .extension()
+                        .is_some_and(|ext| ext.eq_ignore_ascii_case("gz"))
+                })
             });
 
         // If rotation occurred with compression, verify the compressed file
@@ -486,8 +483,12 @@ mod tests {
         let mut stderr_writer = DaemonLogWriter::new(rotator.clone(), "STDERR");
 
         // Write to both streams
-        stdout_writer.write_all(b"Standard output message\n").unwrap();
-        stderr_writer.write_all(b"Standard error message\n").unwrap();
+        stdout_writer
+            .write_all(b"Standard output message\n")
+            .unwrap();
+        stderr_writer
+            .write_all(b"Standard error message\n")
+            .unwrap();
 
         // Verify both messages are in the log
         let log_path = temp_dir.path().join("daemon.log");
