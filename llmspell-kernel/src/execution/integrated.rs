@@ -15,6 +15,7 @@ use std::time::Duration;
 use tokio::sync::mpsc;
 use tracing::{debug, error, info, instrument, trace, warn};
 
+use crate::connection::ConnectionFileManager;
 use crate::daemon::{
     DaemonConfig, KernelMessage, OperationGuard, ShutdownConfig, ShutdownCoordinator, SignalBridge,
     SignalOperationsConfig, SignalOperationsHandler,
@@ -134,6 +135,8 @@ pub struct IntegratedKernel<P: Protocol> {
     signal_bridge: Option<Arc<SignalBridge>>,
     /// Signal operations handler for SIGUSR1/SIGUSR2
     signal_operations: Arc<SignalOperationsHandler>,
+    /// Connection file manager for Jupyter discovery
+    connection_manager: Option<Arc<parking_lot::Mutex<ConnectionFileManager>>>,
 }
 
 #[allow(dead_code)] // These methods will be used when transport is fully integrated
@@ -289,6 +292,7 @@ impl<P: Protocol + 'static> IntegratedKernel<P> {
             shutdown_coordinator,
             signal_bridge: None,
             signal_operations,
+            connection_manager: None,
         })
     }
 
@@ -305,6 +309,24 @@ impl<P: Protocol + 'static> IntegratedKernel<P> {
     /// Get shutdown coordinator
     pub fn shutdown_coordinator(&self) -> Arc<ShutdownCoordinator> {
         self.shutdown_coordinator.clone()
+    }
+
+    /// Get connection file path if available
+    ///
+    /// Returns the path to the Jupyter connection file if one was created
+    pub fn connection_file_path(&self) -> Option<std::path::PathBuf> {
+        self.connection_manager
+            .as_ref()
+            .and_then(|mgr| mgr.lock().file_path().map(std::path::Path::to_path_buf))
+    }
+
+    /// Get connection info if available
+    ///
+    /// Returns a clone of the connection info for Jupyter clients
+    pub fn connection_info(&self) -> Option<crate::connection::ConnectionInfo> {
+        self.connection_manager
+            .as_ref()
+            .map(|mgr| mgr.lock().info().clone())
     }
 
     /// Handle shutdown request from signal or message
@@ -1171,10 +1193,48 @@ impl<P: Protocol + 'static> IntegratedKernel<P> {
     fn start_protocol_servers(&mut self) {
         info!("Starting protocol servers");
 
+        // Create connection file for Jupyter discovery
+        // Using base port 5555 for now, will be configurable later
+        let base_port = 5555;
+        let kernel_id = format!("{}-{}", self.session_id, uuid::Uuid::new_v4());
+
+        let mut connection_manager = ConnectionFileManager::new(kernel_id.clone(), base_port);
+
+        // Write connection file for Jupyter clients
+        match connection_manager.write() {
+            Ok(file_path) => {
+                info!("Created connection file at {}", file_path.display());
+
+                // Store connection manager for cleanup on drop
+                let connection_manager_arc = Arc::new(parking_lot::Mutex::new(connection_manager));
+                self.connection_manager = Some(connection_manager_arc);
+            }
+            Err(e) => {
+                warn!("Failed to create connection file: {}", e);
+                // Continue without connection file - not critical for operation
+            }
+        }
+
         // If we have a transport, initialize it
         // TODO: Bind transport when we have proper TransportConfig
         if self.transport.is_some() {
             debug!("Transport would be bound here with proper config");
+
+            // Update connection manager with actual bound ports
+            if let Some(ref connection_mgr) = self.connection_manager {
+                // TODO: Get actual ports from transport after binding
+                // For now, using the base port sequence
+                let mut mgr = connection_mgr.lock();
+                mgr.update_ports(
+                    base_port,
+                    base_port + 1,
+                    base_port + 2,
+                    base_port + 3,
+                    base_port + 4,
+                );
+                // Rewrite the file with updated ports
+                let _ = mgr.write();
+            }
         }
 
         // TODO: Register protocol handlers with message router when method is available

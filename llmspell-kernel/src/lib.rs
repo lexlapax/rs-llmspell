@@ -24,6 +24,7 @@
 #![allow(clippy::must_use_candidate)]
 
 pub mod api;
+pub mod connection;
 pub mod daemon;
 pub mod debug;
 pub mod events;

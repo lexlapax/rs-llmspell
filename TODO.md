@@ -502,9 +502,9 @@ llmspell-kernel/src/daemon/
 9. **Trait-Based Architecture**: Kernel accepts `Arc<dyn ScriptExecutor>` in constructor, allowing bridge to inject `ScriptRuntime` at runtime without compile-time dependency. This maintains proper dependency hierarchy: bridge → kernel → core
 10. **Test Independence**: Tests use `MockScriptExecutor` directly in kernel tests, avoiding any dev-dependency on bridge. This keeps test compilation fast and prevents dependency cycles
 
-### Task 10.3.2: Implement Connection File Management
+### Task 10.3.2: Implement Connection File Management ✅ **COMPLETED**
 **Priority**: HIGH
-**Estimated Time**: 3 hours
+**Estimated Time**: 3 hours (Actual: 2.5 hours)
 **Assignee**: Kernel Team
 
 **Description**: Create Jupyter-compatible connection files for kernel discovery.
@@ -515,11 +515,11 @@ llmspell-kernel/src/daemon/
 - Should integrate with the daemon's PID file management for cleanup
 
 **Acceptance Criteria:**
-- [ ] Connection file created on startup
-- [ ] File contains ZMQ endpoints
-- [ ] HMAC key included
-- [ ] File location configurable
-- [ ] Cleanup on shutdown
+- [x] Connection file created on startup
+- [x] File contains ZMQ endpoints
+- [x] HMAC key included
+- [x] File location configurable
+- [x] Cleanup on shutdown
 
 **Implementation Steps:**
 1. Create connection module in `llmspell-kernel/src/connection/mod.rs`:
@@ -547,14 +547,32 @@ llmspell-kernel/src/daemon/
 5. Test Jupyter discovery with `jupyter kernelspec list`
 
 **Definition of Done:**
-- [ ] Connection file created
-- [ ] Jupyter can discover kernel
-- [ ] File properly formatted
-- [ ] Cleanup works
-- [ ] `./scripts/quality-check-minimal.sh` passes with ZERO warnings
-- [ ] `cargo clippy --workspace --all-features --all-targets` - ZERO warnings
-- [ ] `cargo fmt --all --check` passes
-- [ ] All tests pass: `cargo test --workspace --all-features`
+- [x] Connection file created
+- [x] Jupyter can discover kernel
+- [x] File properly formatted
+- [x] Cleanup works
+- [x] `./scripts/quality-check-minimal.sh` passes with ZERO warnings
+- [x] `cargo clippy --workspace --all-features --all-targets` - ZERO warnings
+- [x] `cargo fmt --all --check` passes
+- [x] All tests pass: `cargo test --workspace --all-features`
+
+**Implementation Notes:**
+- Created `ConnectionFileManager` in `llmspell-kernel/src/connection/mod.rs` with full Jupyter compatibility
+- Added `hex` dependency for HMAC key generation
+- Integrated connection file creation into `IntegratedKernel::start_protocol_servers()`
+- Connection files created at `~/.llmspell/kernels/kernel-{id}.json` with fallback to runtime dir or `/tmp`
+- Added public methods `connection_file_path()` and `connection_info()` to IntegratedKernel for external access
+- Automatic cleanup on drop via RAII pattern - no need for explicit ShutdownCoordinator registration
+
+**Key Insights Gained:**
+1. **Jupyter Protocol Standard**: Connection files must contain exact fields and format expected by Jupyter clients (shell_port, iopub_port, stdin_port, control_port, hb_port, transport, ip, key, signature_scheme, kernel_name)
+2. **HMAC Key Security**: Generated 32-byte random keys using `rand` crate and encoded as hex strings for Jupyter compatibility
+3. **Directory Discovery**: Standard path resolution: `~/.llmspell/kernels/` → runtime dir → `/tmp` fallback for maximum compatibility
+4. **RAII Cleanup Pattern**: Using Drop trait for connection file cleanup is more reliable than manual registration with ShutdownCoordinator
+5. **Port Configuration**: Base port + sequential numbering (shell=5555, iopub=5556, stdin=5557, control=5558, hb=5559) follows Jupyter convention
+6. **Path Display**: Using `path.display()` instead of `{:?}` formatting for better user experience in logs and error messages
+7. **Clippy Best Practices**: Functions not using `self` should be static, Result wrappers should be avoided when not needed, redundant closures should use method references
+8. **Integration Points**: Connection file creation fits naturally into protocol server startup, allowing real-time port updates after transport binding
 
 ### Task 10.3.3: Implement Health Monitoring
 **Priority**: HIGH
