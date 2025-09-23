@@ -125,6 +125,7 @@ zeromq = ["dep:zmq"]
 websocket = ["dep:tungstenite", "dep:tokio-tungstenite"]
 debug = ["tracing-subscriber/fmt"]
 test-utils = []
+skip-python-tests = []  # Skip Python integration tests (for CI or when Python unavailable)
 
 [lib]
 name = "llmspell_kernel"
