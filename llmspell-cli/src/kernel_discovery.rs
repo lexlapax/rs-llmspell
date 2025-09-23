@@ -8,6 +8,7 @@ use serde::{Deserialize, Serialize};
 use std::collections::HashSet;
 use std::fs;
 use std::path::{Path, PathBuf};
+use std::time::{Duration, SystemTime};
 use tracing::info;
 
 /// Status of a running kernel
@@ -44,6 +45,25 @@ pub struct KernelInfo {
     pub status: KernelStatus,
     /// Time when kernel was started
     pub start_time: Option<std::time::SystemTime>,
+}
+
+/// Process metrics for a running kernel
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct KernelMetrics {
+    /// CPU usage percentage (0.0 to 100.0)
+    pub cpu_percent: f64,
+    /// Memory usage in bytes
+    pub memory_bytes: u64,
+    /// Memory usage as percentage
+    pub memory_percent: f32,
+    /// Number of open file descriptors
+    pub open_files: u32,
+    /// Number of active connections
+    pub active_connections: u32,
+    /// Uptime duration since start
+    pub uptime: Duration,
+    /// Last activity timestamp
+    pub last_activity: Option<SystemTime>,
 }
 
 /// Connection information from Jupyter connection file
@@ -301,6 +321,108 @@ fn cleanup_directory(dir: &Path) -> Result<usize> {
     }
 
     Ok(cleaned)
+}
+
+/// Get process metrics for a kernel
+pub fn get_kernel_metrics(kernel: &KernelInfo) -> Result<KernelMetrics> {
+    // Check if process is alive first
+    if !is_process_alive(kernel.pid) {
+        return Err(anyhow!("Kernel process {} is not running", kernel.pid));
+    }
+
+    // Get process start time if available
+    let uptime = if let Some(start_time) = kernel.start_time {
+        SystemTime::now()
+            .duration_since(start_time)
+            .unwrap_or(Duration::ZERO)
+    } else {
+        // Estimate from file modification time
+        kernel.connection_file
+            .metadata()
+            .and_then(|m| m.modified())
+            .ok()
+            .and_then(|t| SystemTime::now().duration_since(t).ok())
+            .unwrap_or(Duration::ZERO)
+    };
+
+    // Read /proc/{pid}/stat for CPU and memory info on Linux
+    #[cfg(target_os = "linux")]
+    let (cpu_percent, memory_bytes) = {
+        let stat_path = format!("/proc/{}/stat", kernel.pid);
+        if let Ok(stat) = fs::read_to_string(&stat_path) {
+            // Parse basic stats from /proc/pid/stat
+            let fields: Vec<&str> = stat.split_whitespace().collect();
+            if fields.len() > 23 {
+                // utime + stime (user + system time in clock ticks)
+                let total_time: u64 = fields[13].parse().unwrap_or(0) + fields[14].parse().unwrap_or(0);
+                // Convert to percentage (rough estimate)
+                let cpu = (total_time as f64 / 100.0).min(100.0);
+
+                // RSS (resident set size) in pages
+                let rss_pages: u64 = fields[23].parse().unwrap_or(0);
+                let page_size = 4096; // Common page size
+                let mem = rss_pages * page_size;
+
+                (cpu, mem)
+            } else {
+                (0.0, 0)
+            }
+        } else {
+            (0.0, 0)
+        }
+    };
+
+    // Simplified metrics for macOS/other platforms
+    #[cfg(not(target_os = "linux"))]
+    let (cpu_percent, memory_bytes) = {
+        // For non-Linux, return placeholder values
+        // Real implementation would use platform-specific APIs
+        (0.0, 0)
+    };
+
+    // Count open files (simplified)
+    let open_files = count_open_files(kernel.pid).unwrap_or(0);
+
+    // Count active connections (simplified - based on port)
+    let active_connections = if kernel.port > 0 { 1 } else { 0 };
+
+    // Memory percentage (simplified)
+    let total_memory = 8_000_000_000u64; // 8GB placeholder
+    let memory_percent = ((memory_bytes as f64 / total_memory as f64) * 100.0) as f32;
+
+    Ok(KernelMetrics {
+        cpu_percent,
+        memory_bytes,
+        memory_percent,
+        open_files,
+        active_connections,
+        uptime,
+        last_activity: Some(SystemTime::now()),
+    })
+}
+
+/// Count open file descriptors for a process
+#[allow(unused_variables)]
+fn count_open_files(pid: u32) -> Result<u32> {
+    #[cfg(target_os = "linux")]
+    {
+        let fd_dir = format!("/proc/{}/fd", pid);
+        if let Ok(entries) = fs::read_dir(&fd_dir) {
+            return Ok(entries.count() as u32);
+        }
+    }
+
+    #[cfg(target_os = "macos")]
+    {
+        // macOS: Use lsof or other system calls
+        // For now, return a placeholder
+        return Ok(0);
+    }
+
+    #[cfg(not(any(target_os = "linux", target_os = "macos")))]
+    {
+        Ok(0)
+    }
 }
 
 #[cfg(test)]

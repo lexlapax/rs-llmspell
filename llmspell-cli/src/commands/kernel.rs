@@ -4,6 +4,7 @@
 //! All kernel logic is in llmspell-kernel, this is just command handling.
 
 use anyhow::{anyhow, Result};
+use colored::Colorize;
 use llmspell_config::LLMSpellConfig;
 use llmspell_kernel::{
     connect_to_kernel, start_embedded_kernel_with_executor, start_kernel_service_with_config,
@@ -14,15 +15,16 @@ use nix::unistd::Pid;
 use std::fs;
 use std::path::PathBuf;
 use std::time::{Duration, Instant};
+use tabled::{builder::Builder, settings::Style};
 use tracing::{info, warn};
 
-use crate::kernel_discovery::{self, KernelInfo};
+use crate::kernel_discovery::{self, KernelInfo, KernelMetrics, KernelStatus};
 
 /// Handle kernel management commands
 pub async fn handle_kernel_command(
     command: crate::cli::KernelCommands,
     runtime_config: LLMSpellConfig,
-    _output_format: crate::cli::OutputFormat,
+    output_format: crate::cli::OutputFormat,
 ) -> Result<()> {
     use crate::cli::KernelCommands;
 
@@ -243,16 +245,31 @@ pub async fn handle_kernel_command(
             }
         }
 
-        KernelCommands::Status { id } => {
-            // Get kernel status
-            if let Some(id) = id {
-                info!("Getting status for kernel: {}", id);
-                println!("Kernel {} status: unknown", id);
+        KernelCommands::Status { id, format, quiet, watch, interval } => {
+            // Parse output format from string
+            let output_format = match format.as_str() {
+                "json" => crate::cli::OutputFormat::Json,
+                "yaml" => crate::cli::OutputFormat::Yaml,
+                "table" | "pretty" => crate::cli::OutputFormat::Pretty,
+                _ => crate::cli::OutputFormat::Text,
+            };
+
+            // Check for detailed mode based on format string
+            let detailed = format.contains("detailed");
+
+            // Handle watch mode
+            if watch {
+                loop {
+                    // Clear screen for watch mode
+                    print!("\x1B[2J\x1B[1;1H");
+
+                    display_kernel_status(id.as_deref(), quiet, detailed, &output_format)?;
+
+                    tokio::time::sleep(Duration::from_secs(interval)).await;
+                }
             } else {
-                info!("Getting status for all kernels");
-                println!("No kernels currently running");
+                display_kernel_status(id.as_deref(), quiet, detailed, &output_format)
             }
-            Ok(())
         }
     }
 }
@@ -356,4 +373,237 @@ fn cleanup_kernel_files(kernel: &KernelInfo) -> Result<()> {
     }
 
     Ok(())
+}
+
+/// Display kernel status information
+fn display_kernel_status(
+    kernel_id: Option<&str>,
+    quiet: bool,
+    detailed: bool,
+    output_format: &crate::cli::OutputFormat,
+) -> Result<()> {
+    use crate::cli::OutputFormat;
+
+    // Discover kernels
+    let kernels = if let Some(id) = kernel_id {
+        // Find specific kernel
+        vec![kernel_discovery::find_kernel_by_id(id)?]
+    } else {
+        // Find all kernels
+        kernel_discovery::discover_kernels()?
+    };
+
+    if kernels.is_empty() {
+        if !quiet {
+            println!("No kernels currently running");
+        }
+        return Ok(());
+    }
+
+    // Collect metrics for each kernel
+    let mut kernel_data = Vec::new();
+    for kernel in &kernels {
+        let metrics = kernel_discovery::get_kernel_metrics(kernel).ok();
+        kernel_data.push((kernel, metrics));
+    }
+
+    match output_format {
+        OutputFormat::Pretty => {
+            if detailed {
+                display_detailed_table(&kernel_data)?;
+            } else {
+                display_summary_table(&kernel_data)?;
+            }
+        }
+        OutputFormat::Json => {
+            display_json(&kernel_data)?;
+        }
+        OutputFormat::Yaml => {
+            // Convert to YAML format
+            println!("{}", serde_yaml::to_string(&kernel_data.iter()
+                .map(|(k, m)| serde_json::json!({
+                    "kernel": k,
+                    "metrics": m,
+                }))
+                .collect::<Vec<_>>())?);
+        }
+        OutputFormat::Text => {
+            display_simple(&kernel_data, quiet)?;
+        }
+    }
+
+    Ok(())
+}
+
+/// Display kernels in a summary table
+fn display_summary_table(kernel_data: &[(&KernelInfo, Option<KernelMetrics>)]) -> Result<()> {
+    let mut builder = Builder::default();
+
+    // Add header
+    builder.push_record(["ID", "PID", "Port", "Status", "CPU%", "Memory", "Uptime"]);
+
+    for (kernel, metrics) in kernel_data {
+        let status_str = format_status(&kernel.status);
+
+        if let Some(m) = metrics {
+            builder.push_record([
+                &kernel.id,
+                &kernel.pid.to_string(),
+                &kernel.port.to_string(),
+                &status_str,
+                &format!("{:.1}", m.cpu_percent),
+                &format_memory(m.memory_bytes),
+                &format_duration(&m.uptime),
+            ]);
+        } else {
+            builder.push_record([
+                &kernel.id,
+                &kernel.pid.to_string(),
+                &kernel.port.to_string(),
+                &status_str,
+                "N/A",
+                "N/A",
+                "N/A",
+            ]);
+        }
+    }
+
+    let table = builder.build().with(Style::rounded()).to_string();
+    println!("{}", table);
+
+    Ok(())
+}
+
+/// Display kernels in a detailed table
+fn display_detailed_table(kernel_data: &[(&KernelInfo, Option<KernelMetrics>)]) -> Result<()> {
+    for (kernel, metrics) in kernel_data {
+        println!("\n{}", "═".repeat(60));
+        println!("Kernel: {}", kernel.id.bold());
+        println!("{}", "─".repeat(60));
+
+        let mut builder = Builder::default();
+        builder.push_record(["Property", "Value"]);
+
+        builder.push_record(["Process ID", &kernel.pid.to_string()]);
+        builder.push_record(["Port", &kernel.port.to_string()]);
+        builder.push_record(["Status", &format_status(&kernel.status)]);
+        builder.push_record(["Connection File", &kernel.connection_file.display().to_string()]);
+
+        if let Some(pid_file) = &kernel.pid_file {
+            builder.push_record(["PID File", &pid_file.display().to_string()]);
+        }
+
+        if let Some(log_file) = &kernel.log_file {
+            builder.push_record(["Log File", &log_file.display().to_string()]);
+        }
+
+        if let Some(m) = metrics {
+            builder.push_record(["", ""]);
+            builder.push_record(["CPU Usage", &format!("{:.1}%", m.cpu_percent)]);
+            builder.push_record(["Memory Usage", &format!("{} ({:.1}%)", format_memory(m.memory_bytes), m.memory_percent)]);
+            builder.push_record(["Open Files", &m.open_files.to_string()]);
+            builder.push_record(["Active Connections", &m.active_connections.to_string()]);
+            builder.push_record(["Uptime", &format_duration(&m.uptime)]);
+
+            if let Some(last_activity) = m.last_activity {
+                let elapsed = std::time::SystemTime::now()
+                    .duration_since(last_activity)
+                    .unwrap_or(Duration::ZERO);
+                builder.push_record(["Last Activity", &format!("{} ago", format_duration(&elapsed))]);
+            }
+        }
+
+        let table = builder.build().with(Style::rounded()).to_string();
+        println!("{}", table);
+    }
+
+    Ok(())
+}
+
+/// Display kernels as JSON
+fn display_json(kernel_data: &[(&KernelInfo, Option<KernelMetrics>)]) -> Result<()> {
+    #[derive(serde::Serialize)]
+    struct KernelStatusOutput {
+        kernel: KernelInfo,
+        metrics: Option<KernelMetrics>,
+    }
+
+    let output: Vec<KernelStatusOutput> = kernel_data
+        .iter()
+        .map(|(k, m)| KernelStatusOutput {
+            kernel: (*k).clone(),
+            metrics: m.clone(),
+        })
+        .collect();
+
+    println!("{}", serde_json::to_string_pretty(&output)?);
+
+    Ok(())
+}
+
+/// Display kernels in simple format
+fn display_simple(kernel_data: &[(&KernelInfo, Option<KernelMetrics>)], quiet: bool) -> Result<()> {
+    for (kernel, metrics) in kernel_data {
+        if quiet {
+            println!("{}", kernel.id);
+        } else {
+            print!("{}: PID={} Port={} Status={}",
+                kernel.id, kernel.pid, kernel.port, format_status(&kernel.status));
+
+            if let Some(m) = metrics {
+                print!(" CPU={:.1}% Memory={} Uptime={}",
+                    m.cpu_percent,
+                    format_memory(m.memory_bytes),
+                    format_duration(&m.uptime));
+            }
+
+            println!();
+        }
+    }
+
+    Ok(())
+}
+
+/// Format kernel status with color
+fn format_status(status: &KernelStatus) -> String {
+    match status {
+        KernelStatus::Healthy => "Healthy".green().to_string(),
+        KernelStatus::Busy => "Busy".yellow().to_string(),
+        KernelStatus::Idle => "Idle".blue().to_string(),
+        KernelStatus::ShuttingDown => "Shutting Down".red().to_string(),
+        KernelStatus::Unknown => "Unknown".dimmed().to_string(),
+    }
+}
+
+/// Format memory size in human-readable format
+fn format_memory(bytes: u64) -> String {
+    const UNITS: &[&str] = &["B", "KB", "MB", "GB", "TB"];
+    let mut size = bytes as f64;
+    let mut unit_idx = 0;
+
+    while size >= 1024.0 && unit_idx < UNITS.len() - 1 {
+        size /= 1024.0;
+        unit_idx += 1;
+    }
+
+    if unit_idx == 0 {
+        format!("{} {}", size as u64, UNITS[unit_idx])
+    } else {
+        format!("{:.1} {}", size, UNITS[unit_idx])
+    }
+}
+
+/// Format duration in human-readable format
+fn format_duration(duration: &Duration) -> String {
+    let secs = duration.as_secs();
+
+    if secs < 60 {
+        format!("{}s", secs)
+    } else if secs < 3600 {
+        format!("{}m {}s", secs / 60, secs % 60)
+    } else if secs < 86400 {
+        format!("{}h {}m", secs / 3600, (secs % 3600) / 60)
+    } else {
+        format!("{}d {}h", secs / 86400, (secs % 86400) / 3600)
+    }
 }

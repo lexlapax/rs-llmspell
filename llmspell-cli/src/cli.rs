@@ -517,9 +517,33 @@ EXAMPLES:
     },
 
     /// Show running kernels or specific kernel details
+    #[command(long_about = "Display status of running kernels with health and resource metrics.
+
+EXAMPLES:
+    llmspell kernel status                    # List all running kernels
+    llmspell kernel status --id my-kernel     # Detailed view of specific kernel
+    llmspell kernel status --output json      # JSON output for scripting
+    llmspell kernel status --watch            # Continuous monitoring")]
     Status {
         /// Kernel ID for detailed status (if not provided, lists all kernels)
+        #[arg(short, long)]
         id: Option<String>,
+
+        /// Output format (table, json, yaml, text)
+        #[arg(short = 'f', long = "format", default_value = "table")]
+        format: String,
+
+        /// Show only kernel IDs (quiet mode)
+        #[arg(short, long)]
+        quiet: bool,
+
+        /// Watch mode - refresh continuously
+        #[arg(short, long)]
+        watch: bool,
+
+        /// Refresh interval in seconds (for watch mode)
+        #[arg(long, default_value = "5")]
+        interval: u64,
     },
 
     /// Connect to external kernel
