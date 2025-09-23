@@ -299,6 +299,197 @@ impl DAPBridge {
         info!("Connected execution manager to DAP bridge");
     }
 
+    /// Check if execution manager is connected
+    pub fn is_connected(&self) -> bool {
+        self.execution_manager.is_some()
+    }
+
+    /// Handle generic DAP request
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the request cannot be handled
+    #[instrument(level = "debug", skip(self, request))]
+    #[allow(clippy::too_many_lines)]
+    pub fn handle_request(&self, request: &Value) -> Result<Value> {
+        // Extract command from request
+        let command = request
+            .get("command")
+            .and_then(|v| v.as_str())
+            .unwrap_or("unknown");
+
+        debug!("Handling DAP request: {}", command);
+
+        // Route to appropriate handler based on command
+        let response = match command {
+            "initialize" => {
+                let args: InitializeArguments =
+                    serde_json::from_value(request.get("arguments").cloned().unwrap_or_default())?;
+                let capabilities = self.handle_initialize(args)?;
+                serde_json::json!({
+                    "type": "response",
+                    "command": "initialize",
+                    "success": true,
+                    "body": capabilities
+                })
+            }
+            "launch" => {
+                let args = request.get("arguments").cloned().unwrap_or_default();
+                self.handle_launch(&args)?;
+                serde_json::json!({
+                    "type": "response",
+                    "command": "launch",
+                    "success": true
+                })
+            }
+            "setBreakpoints" => {
+                let args = request.get("arguments").unwrap_or(&Value::Null);
+                let source: Source =
+                    serde_json::from_value(args.get("source").cloned().unwrap_or_default())?;
+                let breakpoints: Vec<SourceBreakpoint> =
+                    serde_json::from_value(args.get("breakpoints").cloned().unwrap_or_default())?;
+                let dap_breakpoints = self.handle_set_breakpoints(&source, &breakpoints)?;
+                serde_json::json!({
+                    "type": "response",
+                    "command": "setBreakpoints",
+                    "success": true,
+                    "body": {
+                        "breakpoints": dap_breakpoints
+                    }
+                })
+            }
+            "stackTrace" => {
+                let thread_id = request
+                    .get("arguments")
+                    .and_then(|a| a.get("threadId"))
+                    .and_then(serde_json::Value::as_i64)
+                    .unwrap_or(1) as i32;
+                let frames = self.handle_stack_trace(thread_id)?;
+                serde_json::json!({
+                    "type": "response",
+                    "command": "stackTrace",
+                    "success": true,
+                    "body": {
+                        "stackFrames": frames
+                    }
+                })
+            }
+            "scopes" => {
+                let frame_id = request
+                    .get("arguments")
+                    .and_then(|a| a.get("frameId"))
+                    .and_then(serde_json::Value::as_i64)
+                    .unwrap_or(0) as i32;
+                let scopes = self.handle_scopes(frame_id)?;
+                serde_json::json!({
+                    "type": "response",
+                    "command": "scopes",
+                    "success": true,
+                    "body": {
+                        "scopes": scopes
+                    }
+                })
+            }
+            "variables" => {
+                let var_ref = request
+                    .get("arguments")
+                    .and_then(|a| a.get("variablesReference"))
+                    .and_then(serde_json::Value::as_i64)
+                    .unwrap_or(0) as i32;
+                let variables = self.handle_variables(var_ref)?;
+                serde_json::json!({
+                    "type": "response",
+                    "command": "variables",
+                    "success": true,
+                    "body": {
+                        "variables": variables
+                    }
+                })
+            }
+            "continue" => {
+                self.handle_continue()?;
+                serde_json::json!({
+                    "type": "response",
+                    "command": "continue",
+                    "success": true
+                })
+            }
+            "next" => {
+                self.handle_next()?;
+                serde_json::json!({
+                    "type": "response",
+                    "command": "next",
+                    "success": true
+                })
+            }
+            "stepIn" => {
+                self.handle_step_in()?;
+                serde_json::json!({
+                    "type": "response",
+                    "command": "stepIn",
+                    "success": true
+                })
+            }
+            "stepOut" => {
+                self.handle_step_out()?;
+                serde_json::json!({
+                    "type": "response",
+                    "command": "stepOut",
+                    "success": true
+                })
+            }
+            "pause" => {
+                self.handle_pause()?;
+                serde_json::json!({
+                    "type": "response",
+                    "command": "pause",
+                    "success": true
+                })
+            }
+            "evaluate" => {
+                let expression = request
+                    .get("arguments")
+                    .and_then(|a| a.get("expression"))
+                    .and_then(|v| v.as_str())
+                    .unwrap_or("");
+                let frame_id = request
+                    .get("arguments")
+                    .and_then(|a| a.get("frameId"))
+                    .and_then(serde_json::Value::as_i64)
+                    .map(|id| id as i32);
+                let result = self.handle_evaluate(expression, &frame_id)?;
+                serde_json::json!({
+                    "type": "response",
+                    "command": "evaluate",
+                    "success": true,
+                    "body": {
+                        "result": result,
+                        "variablesReference": 0
+                    }
+                })
+            }
+            "disconnect" => {
+                self.handle_disconnect()?;
+                serde_json::json!({
+                    "type": "response",
+                    "command": "disconnect",
+                    "success": true
+                })
+            }
+            _ => {
+                warn!("Unknown DAP command: {}", command);
+                serde_json::json!({
+                    "type": "response",
+                    "command": command,
+                    "success": false,
+                    "message": format!("Unknown command: {}", command)
+                })
+            }
+        };
+
+        Ok(response)
+    }
+
     /// Map script to source reference
     pub fn map_script_to_source(&self, script_id: u32) -> Option<SourceReference> {
         self.source_map.read().get(&script_id).cloned()

@@ -565,6 +565,7 @@ impl<P: Protocol + 'static> IntegratedKernel<P> {
                                 {
                                     if msg_type == "interrupt_request"
                                         || msg_type == "shutdown_request"
+                                        || msg_type == "debug_request"
                                     {
                                         trace!("Received control message: {}", msg_type);
                                         // Process control messages immediately (priority)
@@ -771,6 +772,7 @@ impl<P: Protocol + 'static> IntegratedKernel<P> {
             "kernel_info_request" => self.handle_kernel_info_request(&message)?,
             "shutdown_request" => self.handle_shutdown_request(&message)?,
             "interrupt_request" => self.handle_interrupt_request(&message)?,
+            "debug_request" => self.handle_debug_request(message).await?,
             _ => {
                 warn!("Unhandled message type: {}", msg_type);
             }
@@ -893,6 +895,78 @@ impl<P: Protocol + 'static> IntegratedKernel<P> {
         } else {
             Err(anyhow::anyhow!("No transport available for input request"))
         }
+    }
+
+    /// Handle `debug_request` message from control channel
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if debug request handling fails
+    #[instrument(level = "debug", skip(self, message))]
+    async fn handle_debug_request(&mut self, message: HashMap<String, Value>) -> Result<()> {
+        let header = message
+            .get("header")
+            .ok_or_else(|| anyhow::anyhow!("Missing header"))?;
+        let content = message
+            .get("content")
+            .ok_or_else(|| anyhow::anyhow!("Missing content"))?;
+
+        debug!("Handling debug_request");
+
+        // Connect DAPBridge to ExecutionManager if not connected
+        // Process DAP request through existing DAPBridge
+        let dap_response = {
+            let mut dap_bridge = self.dap_bridge.lock();
+            if !dap_bridge.is_connected() {
+                dap_bridge.connect_execution_manager(self.execution_manager.clone());
+            }
+            dap_bridge.handle_request(content)?
+        };
+
+        // Send debug_reply on control channel
+        let reply = json!({
+            "msg_type": "debug_reply",
+            "parent_header": header,
+            "content": dap_response,
+        });
+
+        // Send reply through transport if available
+        if let Some(ref mut transport) = self.transport {
+            let msg_bytes = self.protocol.create_response("debug_reply", reply)?;
+            transport.send("control", vec![msg_bytes]).await?;
+        } else {
+            debug!("No transport available for debug_reply");
+        }
+
+        Ok(())
+    }
+
+    /// Broadcast debug event on `IOPub` channel
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if broadcasting fails
+    pub async fn broadcast_debug_event(&mut self, event: Value) -> Result<()> {
+        debug!("Broadcasting debug event: {:?}", event);
+
+        // Create debug_event message for IOPub channel
+        let debug_event = json!({
+            "msg_type": "debug_event",
+            "content": event,
+        });
+
+        // Send event through IOPub channel via transport
+        if let Some(ref mut transport) = self.transport {
+            let msg_bytes = self.protocol.create_request("debug_event", debug_event)?;
+            transport.send("iopub", vec![msg_bytes]).await?;
+        } else {
+            // Use IO manager to publish the event
+            let mut display_data = HashMap::new();
+            display_data.insert("application/debug+json".to_string(), event);
+            self.io_manager.publish_display_data(display_data).await?;
+        }
+
+        Ok(())
     }
 
     /// Handle `execute_request` message
