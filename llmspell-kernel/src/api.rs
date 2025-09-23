@@ -242,7 +242,7 @@ pub async fn start_embedded_kernel_with_executor(
 
     // Bind transport to channels
     let mut transport_mut = (*transport).clone();
-    transport_mut.bind(&transport_config).await?;
+    let _bound_ports = transport_mut.bind(&transport_config).await?;
 
     // Build execution config from LLMSpellConfig
     let exec_config = build_execution_config(&config);
@@ -445,14 +445,20 @@ pub async fn start_kernel_service_with_config(
     // Set the HMAC key on the protocol from the connection info
     protocol.set_hmac_key(&conn_manager.info().key);
 
+    // Create and bind transport, updating connection manager with actual ports
+    let transport = setup_kernel_transport(config.port, &mut conn_manager).await?;
+
     // Create integrated kernel with protocol that has the HMAC key
-    let kernel = IntegratedKernel::new(
+    let mut kernel = IntegratedKernel::new(
         protocol.clone(),
         config.exec_config.clone(),
         session_id,
         config.script_executor,
     )
     .await?;
+
+    // Set the transport on the kernel
+    kernel.set_transport(Box::new(transport));
 
     // If daemon mode, set up DaemonManager
     if config.exec_config.daemon_mode {
@@ -508,6 +514,72 @@ pub async fn start_kernel_service_with_config(
         port: config.port,
         connection_file,
     })
+}
+
+/// Helper function to set up kernel transport with `ZeroMQ`
+///
+/// Creates a `ZeroMQ` transport, binds to the specified ports,
+/// and updates the connection manager with actual bound ports.
+async fn setup_kernel_transport(
+    base_port: u16,
+    conn_manager: &mut crate::connection::ConnectionFileManager,
+) -> Result<crate::transport::zeromq::ZmqTransport> {
+    // Create ZeroMQ transport for the kernel service
+    let mut transport = crate::transport::zeromq::ZmqTransport::new()?;
+
+    // Build transport configuration for Jupyter 5 channels
+    let transport_config = TransportConfig {
+        transport_type: "tcp".to_string(),
+        base_address: "127.0.0.1".to_string(),
+        channels: {
+            let mut channels = HashMap::new();
+            channels.insert("shell".to_string(), ChannelConfig {
+                pattern: "router".to_string(),
+                endpoint: base_port.to_string(),
+                options: HashMap::new(),
+            });
+            channels.insert("iopub".to_string(), ChannelConfig {
+                pattern: "pub".to_string(),
+                endpoint: (base_port + 1).to_string(),
+                options: HashMap::new(),
+            });
+            channels.insert("stdin".to_string(), ChannelConfig {
+                pattern: "router".to_string(),
+                endpoint: (base_port + 2).to_string(),
+                options: HashMap::new(),
+            });
+            channels.insert("control".to_string(), ChannelConfig {
+                pattern: "router".to_string(),
+                endpoint: (base_port + 3).to_string(),
+                options: HashMap::new(),
+            });
+            channels.insert("heartbeat".to_string(), ChannelConfig {
+                pattern: "rep".to_string(),
+                endpoint: (base_port + 4).to_string(),
+                options: HashMap::new(),
+            });
+            channels
+        },
+        auth_key: None,
+    };
+
+    // Bind transport and get actual ports (important when port 0 is used)
+    let bound_ports = transport.bind(&transport_config).await?;
+
+    // Update connection manager with actual bound ports
+    if let Some(ports) = bound_ports {
+        conn_manager.update_ports(
+            ports.shell,
+            ports.iopub,
+            ports.stdin,
+            ports.control,
+            ports.hb,
+        );
+        info!("Kernel bound to actual ports - shell: {}, iopub: {}, stdin: {}, control: {}, hb: {}",
+              ports.shell, ports.iopub, ports.stdin, ports.control, ports.hb);
+    }
+
+    Ok(transport)
 }
 
 /// Start a kernel in service mode that listens for connections (legacy)

@@ -12,6 +12,7 @@ use tokio::sync::mpsc;
 use tracing::{debug, instrument, trace};
 
 use crate::traits::{Transport, TransportConfig};
+use crate::traits::transport::BoundPorts;
 
 /// Channel pair for bidirectional communication
 struct ChannelPair {
@@ -90,7 +91,7 @@ impl Default for InProcessTransport {
 #[async_trait]
 impl Transport for InProcessTransport {
     #[instrument(level = "debug", skip_all)]
-    async fn bind(&mut self, config: &TransportConfig) -> Result<()> {
+    async fn bind(&mut self, config: &TransportConfig) -> Result<Option<BoundPorts>> {
         debug!(
             "Binding in-process transport to {} channels",
             config.channels.len()
@@ -102,7 +103,7 @@ impl Transport for InProcessTransport {
             trace!("Setup in-process channel: {}", name);
         }
 
-        Ok(())
+        Ok(None) // In-process transport doesn't use real ports
     }
 
     #[instrument(level = "debug", skip_all)]
@@ -220,7 +221,7 @@ mod tests {
             },
         );
 
-        kernel_transport.bind(&config).await.unwrap();
+        let _bound_ports = kernel_transport.bind(&config).await.unwrap();
         client_transport.connect(&config).await.unwrap();
 
         // Send from client to kernel
