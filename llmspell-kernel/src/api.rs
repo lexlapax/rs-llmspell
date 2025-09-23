@@ -533,31 +533,46 @@ async fn setup_kernel_transport(
         base_address: "127.0.0.1".to_string(),
         channels: {
             let mut channels = HashMap::new();
-            channels.insert("shell".to_string(), ChannelConfig {
-                pattern: "router".to_string(),
-                endpoint: base_port.to_string(),
-                options: HashMap::new(),
-            });
-            channels.insert("iopub".to_string(), ChannelConfig {
-                pattern: "pub".to_string(),
-                endpoint: (base_port + 1).to_string(),
-                options: HashMap::new(),
-            });
-            channels.insert("stdin".to_string(), ChannelConfig {
-                pattern: "router".to_string(),
-                endpoint: (base_port + 2).to_string(),
-                options: HashMap::new(),
-            });
-            channels.insert("control".to_string(), ChannelConfig {
-                pattern: "router".to_string(),
-                endpoint: (base_port + 3).to_string(),
-                options: HashMap::new(),
-            });
-            channels.insert("heartbeat".to_string(), ChannelConfig {
-                pattern: "rep".to_string(),
-                endpoint: (base_port + 4).to_string(),
-                options: HashMap::new(),
-            });
+            channels.insert(
+                "shell".to_string(),
+                ChannelConfig {
+                    pattern: "router".to_string(),
+                    endpoint: base_port.to_string(),
+                    options: HashMap::new(),
+                },
+            );
+            channels.insert(
+                "iopub".to_string(),
+                ChannelConfig {
+                    pattern: "pub".to_string(),
+                    endpoint: (base_port + 1).to_string(),
+                    options: HashMap::new(),
+                },
+            );
+            channels.insert(
+                "stdin".to_string(),
+                ChannelConfig {
+                    pattern: "router".to_string(),
+                    endpoint: (base_port + 2).to_string(),
+                    options: HashMap::new(),
+                },
+            );
+            channels.insert(
+                "control".to_string(),
+                ChannelConfig {
+                    pattern: "router".to_string(),
+                    endpoint: (base_port + 3).to_string(),
+                    options: HashMap::new(),
+                },
+            );
+            channels.insert(
+                "heartbeat".to_string(),
+                ChannelConfig {
+                    pattern: "rep".to_string(),
+                    endpoint: (base_port + 4).to_string(),
+                    options: HashMap::new(),
+                },
+            );
             channels
         },
         auth_key: None,
@@ -575,8 +590,10 @@ async fn setup_kernel_transport(
             ports.control,
             ports.hb,
         );
-        info!("Kernel bound to actual ports - shell: {}, iopub: {}, stdin: {}, control: {}, hb: {}",
-              ports.shell, ports.iopub, ports.stdin, ports.control, ports.hb);
+        info!(
+            "Kernel bound to actual ports - shell: {}, iopub: {}, stdin: {}, control: {}, hb: {}",
+            ports.shell, ports.iopub, ports.stdin, ports.control, ports.hb
+        );
     }
 
     Ok(transport)

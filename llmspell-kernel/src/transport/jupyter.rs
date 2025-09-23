@@ -18,8 +18,8 @@ use std::collections::HashMap;
 use std::path::Path;
 use tracing::{debug, info, instrument, warn};
 
-use crate::traits::{ChannelConfig, Transport, TransportConfig};
 use crate::traits::transport::BoundPorts;
+use crate::traits::{ChannelConfig, Transport, TransportConfig};
 
 /// Jupyter connection file structure
 #[derive(Debug, Clone, Serialize, Deserialize)]

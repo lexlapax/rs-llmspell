@@ -11,8 +11,8 @@ use std::sync::Arc;
 use tokio::sync::mpsc;
 use tracing::{debug, instrument, trace};
 
-use crate::traits::{Transport, TransportConfig};
 use crate::traits::transport::BoundPorts;
+use crate::traits::{Transport, TransportConfig};
 
 /// Channel pair for bidirectional communication
 struct ChannelPair {

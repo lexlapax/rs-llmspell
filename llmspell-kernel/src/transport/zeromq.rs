@@ -19,8 +19,8 @@ use tracing::{debug, info, instrument, trace, warn};
 use zmq::{Context as ZmqContext, Socket, SocketType};
 
 use crate::runtime::io_runtime::create_io_bound_resource;
-use crate::traits::{ChannelConfig, Transport, TransportConfig};
 use crate::traits::transport::BoundPorts;
+use crate::traits::{ChannelConfig, Transport, TransportConfig};
 
 /// Thread-safe wrapper for `ZeroMQ` Socket
 ///

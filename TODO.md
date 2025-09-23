@@ -2257,11 +2257,11 @@ llmspell-kernel/src/daemon/
 6. **Zero Clippy Warnings**: All code follows best practices with proper error handling
 7. **Backward Compatibility**: Option<BoundPorts> return allows non-network transports
 
-### Task 10.7.5: Wire Transport to IntegratedKernel in Daemon Mode 🚨 NEW
+### Task 10.7.5: Wire Transport to IntegratedKernel in Daemon Mode ✅ COMPLETED
 **Priority**: CRITICAL
-**Estimated Time**: 2 hours
+**Estimated Time**: 2 hours (Actual: 30 minutes)
 **Assignee**: Integration Team
-**Status**: NOT STARTED
+**Status**: ✅ COMPLETED
 
 **Description**: Connect ZeroMQ transport to IntegratedKernel message handling in daemon mode.
 
@@ -2271,37 +2271,40 @@ llmspell-kernel/src/daemon/
 - IntegratedKernel responses don't go back through ZeroMQ
 
 **Acceptance Criteria:**
-- [ ] Transport receives messages and forwards to IntegratedKernel
-- [ ] IntegratedKernel responses sent back through transport
-- [ ] All 5 channels (shell, control, stdin, iopub, hb) connected
-- [ ] Heartbeat channel echoes messages
+- [x] Transport receives messages and forwards to IntegratedKernel
+- [x] IntegratedKernel responses sent back through transport
+- [x] All 5 channels (shell, control, stdin, iopub, hb) connected
+- [x] Heartbeat channel echoes messages
 
-**Implementation Steps:**
-1. Create transport message router:
+**Implementation Analysis:**
+1. ✅ **Transport wiring already complete!**
+   - IntegratedKernel::run() has full message polling (lines 540-724)
+   - start_kernel_service_with_config() sets transport via kernel.set_transport()
+   - No additional router needed - kernel handles routing internally
+
+2. ✅ **Message flow implemented in IntegratedKernel::run():**
+   - Control channel: Priority handling for interrupts/shutdown (lines 547-588)
+   - Shell channel: Execute/complete/inspect requests (lines 591-632)
+   - Stdin channel: Input replies from frontend (lines 635-673)
+   - Heartbeat: Direct echo implementation (lines 676-694)
+   - IOPub: Handled via IOManager for broadcasts
+
+3. ✅ **All 5 channels properly connected:**
    ```rust
-   // In start_kernel_service()
-   let transport_router = TransportRouter::new(transport.clone());
-   transport_router.route_to_kernel(integrated_kernel.clone());
+   // Line 461 in api.rs: Transport set on kernel
+   kernel.set_transport(Box::new(transport));
+   // Kernel's run() method polls all channels
    ```
 
-2. Implement message flow:
-   ```rust
-   loop {
-       let (channel, msg) = transport.receive_any().await?;
-       let response = kernel.handle_message(msg).await?;
-       transport.send(channel, response).await?;
-   }
-   ```
+**Implementation Insights:**
+1. **Elegant Design**: IntegratedKernel already contains complete transport polling logic
+2. **No Router Needed**: Kernel directly polls transport channels, avoiding extra abstraction
+3. **Priority Handling**: Control channel checked first for interrupt/shutdown requests
+4. **Performance**: Messages batched to avoid multiple mutable borrows (lines 543-696)
+5. **Clean Separation**: Transport layer knows nothing about Jupyter protocol
+6. **Zero Warnings**: Compiles with cargo clippy --all-targets --all-features
 
-3. Special handling for iopub broadcasts:
-   ```rust
-   // DAP events should broadcast on iopub
-   if let Some(event) = dap_event {
-       transport.send("iopub", event).await?;
-   }
-   ```
-
-### Task 10.7.6: Validate Jupyter Protocol Conformance 🚨 NEW
+### Task 10.7.6: Validate Jupyter Protocol Conformance 🔄 IN PROGRESS
 **Priority**: HIGH
 **Estimated Time**: 2 hours
 **Assignee**: QA Team
