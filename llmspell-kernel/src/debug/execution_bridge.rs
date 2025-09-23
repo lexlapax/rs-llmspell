@@ -9,7 +9,9 @@ use anyhow::Result;
 use parking_lot::RwLock;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
+use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
+use tokio::sync::{mpsc, Notify};
 use tracing::{debug, instrument, trace};
 
 /// Breakpoint information
@@ -117,6 +119,49 @@ pub enum StepMode {
     Pause,
 }
 
+/// Debug event for stopped execution
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct StoppedEvent {
+    /// Reason for stopping (breakpoint, step, pause, exception)
+    pub reason: String,
+    /// Thread ID (usually 1 for single-threaded scripts)
+    pub thread_id: i32,
+    /// Optional breakpoint ID that was hit
+    pub breakpoint_id: Option<String>,
+    /// Current file
+    pub file: String,
+    /// Current line
+    pub line: u32,
+}
+
+/// Pause state for async coordination
+#[derive(Debug, Clone)]
+pub struct PauseState {
+    /// Whether execution is paused
+    pub paused: Arc<AtomicBool>,
+    /// Signal to resume execution
+    pub resume_signal: Arc<Notify>,
+    /// Current step mode
+    pub step_mode: Arc<RwLock<StepMode>>,
+}
+
+impl PauseState {
+    /// Create a new pause state
+    pub fn new() -> Self {
+        Self {
+            paused: Arc::new(AtomicBool::new(false)),
+            resume_signal: Arc::new(Notify::new()),
+            step_mode: Arc::new(RwLock::new(StepMode::Continue)),
+        }
+    }
+}
+
+impl Default for PauseState {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 /// Manages execution state and debugging operations
 pub struct ExecutionManager {
     /// Active breakpoints
@@ -131,6 +176,10 @@ pub struct ExecutionManager {
     _variable_refs: Arc<RwLock<HashMap<String, Vec<Variable>>>>,
     /// Session ID
     _session_id: String,
+    /// Pause state for async coordination
+    pause_state: PauseState,
+    /// Channel to send stopped events
+    stopped_event_tx: Option<mpsc::Sender<StoppedEvent>>,
 }
 
 impl ExecutionManager {
@@ -143,7 +192,14 @@ impl ExecutionManager {
             stack_frames: Arc::new(RwLock::new(Vec::new())),
             _variable_refs: Arc::new(RwLock::new(HashMap::new())),
             _session_id: session_id,
+            pause_state: PauseState::new(),
+            stopped_event_tx: None,
         }
+    }
+
+    /// Set the stopped event sender
+    pub fn set_stopped_event_sender(&mut self, tx: mpsc::Sender<StoppedEvent>) {
+        self.stopped_event_tx = Some(tx);
     }
 
     /// Set a breakpoint
@@ -210,6 +266,7 @@ impl ExecutionManager {
     /// Pause execution
     pub fn pause(&self) {
         *self.paused.write() = true;
+        self.pause_state.paused.store(true, Ordering::SeqCst);
         trace!("Execution paused");
     }
 
@@ -217,7 +274,85 @@ impl ExecutionManager {
     pub fn resume(&self, mode: StepMode) {
         *self.paused.write() = false;
         *self.step_mode.write() = Some(mode);
+        self.pause_state.paused.store(false, Ordering::SeqCst);
+        *self.pause_state.step_mode.write() = mode;
+        self.pause_state.resume_signal.notify_one();
         trace!("Execution resumed with mode: {:?}", mode);
+    }
+
+    /// Check if we should pause at a breakpoint
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if DAP communication fails
+    #[instrument(level = "trace", skip(self))]
+    pub async fn check_breakpoint(&self, file: &str, line: u32) -> Result<()> {
+        // First check if we should pause at this location
+        let (should_pause, breakpoint_id, reason) = {
+            let breakpoints = self.breakpoints.read();
+
+            // Check if there's a breakpoint at this location
+            let mut hit_breakpoint = None;
+            if let Some(bp_list) = breakpoints.get(file) {
+                for bp in bp_list {
+                    if bp.line == line && bp.enabled && bp.should_break() {
+                        hit_breakpoint = Some(bp.id.clone());
+                        break;
+                    }
+                }
+            }
+
+            // Check step mode
+            let step_mode = self.step_mode.read();
+            let step_reason = match *step_mode {
+                Some(StepMode::StepIn) => Some("step"),
+                Some(StepMode::StepOver) => Some("step"),
+                Some(StepMode::StepOut) => Some("step"),
+                _ => None,
+            };
+
+            if let Some(bp_id) = hit_breakpoint {
+                (true, Some(bp_id), "breakpoint")
+            } else if let Some(reason) = step_reason {
+                (true, None, reason)
+            } else {
+                (false, None, "")
+            }
+        };
+
+        if should_pause {
+            // Set paused state
+            self.pause_state.paused.store(true, Ordering::SeqCst);
+            *self.paused.write() = true;
+
+            debug!("Pausing at {}:{} (reason: {})", file, line, reason);
+
+            // Send stopped event via channel if available
+            if let Some(ref tx) = self.stopped_event_tx {
+                let event = StoppedEvent {
+                    reason: reason.to_string(),
+                    thread_id: 1, // Single-threaded for now
+                    breakpoint_id,
+                    file: file.to_string(),
+                    line,
+                };
+
+                // Send without blocking
+                let _ = tx.try_send(event);
+            }
+
+            // Wait for resume signal
+            self.pause_state.resume_signal.notified().await;
+
+            debug!("Resuming from pause at {}:{}", file, line);
+        }
+
+        Ok(())
+    }
+
+    /// Get the pause state for external coordination
+    pub fn pause_state(&self) -> &PauseState {
+        &self.pause_state
     }
 
     /// Get current stack frames

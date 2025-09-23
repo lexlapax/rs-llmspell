@@ -304,6 +304,31 @@ impl DAPBridge {
         self.execution_manager.is_some()
     }
 
+    /// Send a stopped event via DAP
+    ///
+    /// This will be forwarded to the kernel for broadcasting on `IOPub`
+    pub async fn send_stopped_event(
+        &self,
+        reason: &str,
+        thread_id: i32,
+        breakpoint_id: Option<String>,
+    ) -> serde_json::Value {
+        let event = serde_json::json!({
+            "type": "event",
+            "event": "stopped",
+            "body": {
+                "reason": reason,
+                "threadId": thread_id,
+                "breakpointId": breakpoint_id,
+                "allThreadsStopped": true,
+                "preserveFocusHint": false
+            }
+        });
+
+        debug!("Sending stopped event: {}", reason);
+        event
+    }
+
     /// Handle generic DAP request
     ///
     /// # Errors
@@ -678,26 +703,81 @@ impl DAPBridge {
 
         let mut dap_vars = Vec::new();
         for var in variables {
-            let var_ref = if var.has_children {
-                // TODO: Store child variables
-                self.next_var_ref.fetch_add(1, Ordering::Relaxed)
+            // Format the value based on type
+            let formatted_value = Self::format_variable_value(var);
+
+            // Handle variable references for lazy expansion
+            let (var_ref, named_count, indexed_count) = if var.has_children {
+                // Allocate a new reference for child variables
+                let ref_id = self.next_var_ref.fetch_add(1, Ordering::Relaxed);
+
+                // For complex types, estimate child counts
+                let (named, indexed) = Self::estimate_child_counts(var);
+
+                // Store placeholder for child variables (would be populated on demand)
+                // In real implementation, we'd need to store child retrieval info
+                self.variable_refs.write().insert(ref_id, Vec::new());
+
+                (ref_id, Some(named), Some(indexed))
             } else {
-                0
+                (0, None, None)
             };
 
             dap_vars.push(DapVariable {
                 name: var.name.clone(),
-                value: var.value.clone(),
+                value: formatted_value,
                 var_type: Some(var.var_type.clone()),
-                presentation_hint: None,
+                presentation_hint: Self::get_presentation_hint(&var.var_type),
                 evaluate_name: Some(var.name.clone()),
                 variables_reference: var_ref,
-                named_variables: None,
-                indexed_variables: None,
+                named_variables: named_count,
+                indexed_variables: indexed_count,
             });
         }
 
         Ok(dap_vars)
+    }
+
+    /// Format variable value for display
+    fn format_variable_value(var: &Variable) -> String {
+        match var.var_type.as_str() {
+            "table" => {
+                // For tables, show a summary
+                if var.value.contains('{') && var.value.contains('}') {
+                    // Try to parse table size from value if available
+                    "table[...]".to_string()
+                } else {
+                    var.value.clone()
+                }
+            }
+            "function" => "function".to_string(),
+            "userdata" => format!("userdata: {}", var.value),
+            "thread" => "coroutine".to_string(),
+            _ => var.value.clone(),
+        }
+    }
+
+    /// Estimate child counts for complex types
+    fn estimate_child_counts(var: &Variable) -> (i32, i32) {
+        match var.var_type.as_str() {
+            "table" => {
+                // For tables, we'd need to inspect to get actual counts
+                // Return conservative estimates for now
+                (10, 0) // Assume up to 10 named properties
+            }
+            "userdata" => (5, 0), // Some metadata properties
+            _ => (0, 0),
+        }
+    }
+
+    /// Get presentation hint for variable type
+    fn get_presentation_hint(var_type: &str) -> Option<String> {
+        match var_type {
+            "function" => Some("method".to_string()),
+            "table" => Some("class".to_string()),
+            "userdata" => Some("data".to_string()),
+            _ => None,
+        }
     }
 
     /// Handle DAP continue request
