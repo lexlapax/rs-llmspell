@@ -20,6 +20,26 @@ use std::sync::Arc;
 use tracing::{debug, info};
 use uuid::Uuid;
 
+/// Configuration for starting a kernel service
+pub struct KernelServiceConfig {
+    /// Port to listen on
+    pub port: u16,
+    /// Execution configuration (includes daemon settings)
+    pub exec_config: crate::execution::ExecutionConfig,
+    /// Optional kernel ID
+    pub kernel_id: Option<String>,
+    /// Optional connection file path
+    pub connection_file_path: Option<PathBuf>,
+    /// Maximum number of clients (TODO: Implement limiting)
+    pub max_clients: usize,
+    /// Log rotation size limit in bytes
+    pub log_rotate_size: Option<u64>,
+    /// Number of log files to keep
+    pub log_rotate_count: usize,
+    /// Script executor implementation
+    pub script_executor: Arc<dyn ScriptExecutor>,
+}
+
 /// Handle for an embedded kernel running in-process
 pub struct KernelHandle {
     kernel: IntegratedKernel<JupyterProtocol>,
@@ -397,42 +417,48 @@ pub async fn connect_to_kernel(connection_string: &str) -> Result<ClientHandle> 
 
 /// Start a kernel in service mode with full configuration
 ///
-/// This is the enhanced version that accepts ExecutionConfig with daemon settings.
+/// This is the enhanced version that accepts `ExecutionConfig` with daemon settings.
 ///
 /// # Errors
 ///
 /// Returns an error if the kernel service fails to start or bind to the port
 pub async fn start_kernel_service_with_config(
-    port: u16,
-    exec_config: crate::execution::ExecutionConfig,
-    kernel_id: Option<String>,
-    connection_file_path: Option<PathBuf>,
-    _max_clients: usize,  // TODO: Implement client limiting
-    log_rotate_size: Option<u64>,
-    log_rotate_count: usize,
-    script_executor: Arc<dyn ScriptExecutor>,
+    config: KernelServiceConfig,
 ) -> Result<ServiceHandle> {
-
-    let kernel_id = kernel_id.unwrap_or_else(|| format!("service-{}", Uuid::new_v4()));
+    let kernel_id = config
+        .kernel_id
+        .unwrap_or_else(|| format!("service-{}", Uuid::new_v4()));
     let session_id = format!("session-{}", Uuid::new_v4());
 
-    info!("Starting kernel service {} on port {}", kernel_id, port);
+    info!(
+        "Starting kernel service {} on port {}",
+        kernel_id, config.port
+    );
 
     // Create Jupyter protocol
     let protocol = JupyterProtocol::new(session_id.clone(), kernel_id.clone());
 
     // Create integrated kernel with provided config
-    let mut kernel = IntegratedKernel::new(protocol, exec_config.clone(), session_id, script_executor).await?;
+    let kernel = IntegratedKernel::new(
+        protocol,
+        config.exec_config.clone(),
+        session_id,
+        config.script_executor,
+    )
+    .await?;
 
     // If daemon mode, set up DaemonManager
-    if exec_config.daemon_mode {
-        if let Some(ref daemon_config) = exec_config.daemon_config {
+    if config.exec_config.daemon_mode {
+        if let Some(ref daemon_config) = config.exec_config.daemon_config {
             // Create DaemonManager and daemonize
             let mut daemon_manager = crate::daemon::DaemonManager::new(daemon_config.clone());
 
             // Check if already running
             if daemon_manager.is_running()? {
-                return Err(anyhow::anyhow!("Kernel daemon already running with PID file {:?}", daemon_config.pid_file));
+                return Err(anyhow::anyhow!(
+                    "Kernel daemon already running with PID file {:?}",
+                    daemon_config.pid_file
+                ));
             }
 
             // Daemonize the process
@@ -441,28 +467,28 @@ pub async fn start_kernel_service_with_config(
 
             // Set up log rotation if configured
             if let Some(ref log_path) = daemon_config.stdout_path {
-                if let Some(size_limit) = log_rotate_size {
+                if let Some(size_limit) = config.log_rotate_size {
                     let log_config = crate::daemon::LogRotationConfig {
                         max_size: size_limit,
-                        max_files: log_rotate_count,
+                        max_files: config.log_rotate_count,
                         compress: true,
                         base_path: log_path.clone(),
                     };
                     let _log_rotator = crate::daemon::LogRotator::new(log_config);
-                    info!("Log rotation configured: max size {} bytes, keeping {} files",
-                          size_limit, log_rotate_count);
+                    info!(
+                        "Log rotation configured: max size {} bytes, keeping {} files",
+                        size_limit, config.log_rotate_count
+                    );
                 }
             }
         }
     }
 
     // Set up ConnectionFileManager and write connection file
-    let mut conn_manager = crate::connection::ConnectionFileManager::new(
-        kernel_id.clone(),
-        port,
-    );
+    let mut conn_manager =
+        crate::connection::ConnectionFileManager::new(kernel_id.clone(), config.port);
 
-    let connection_file = if let Some(path) = connection_file_path {
+    let connection_file = if let Some(path) = config.connection_file_path {
         // Use specified path
         std::fs::write(&path, serde_json::to_string_pretty(conn_manager.info())?)?;
         path
@@ -475,7 +501,7 @@ pub async fn start_kernel_service_with_config(
 
     Ok(ServiceHandle {
         kernel,
-        port,
+        port: config.port,
         connection_file,
     })
 }

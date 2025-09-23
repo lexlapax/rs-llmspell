@@ -7,13 +7,15 @@ use anyhow::{anyhow, Result};
 use colored::Colorize;
 use llmspell_config::LLMSpellConfig;
 use llmspell_kernel::{
-    connect_to_kernel, start_embedded_kernel_with_executor, start_kernel_service_with_config,
-    daemon::DaemonConfig, execution::ExecutionConfig, monitoring::HealthThresholds,
+    api::KernelServiceConfig, connect_to_kernel, daemon::DaemonConfig, execution::ExecutionConfig,
+    monitoring::HealthThresholds, start_embedded_kernel_with_executor,
+    start_kernel_service_with_config,
 };
 use nix::sys::signal::{self, Signal};
 use nix::unistd::Pid;
+use std::env;
 use std::fs;
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 use std::time::{Duration, Instant};
 use tabled::{builder::Builder, settings::Style};
 use tracing::{info, warn};
@@ -24,7 +26,7 @@ use crate::kernel_discovery::{self, KernelInfo, KernelMetrics, KernelStatus};
 pub async fn handle_kernel_command(
     command: crate::cli::KernelCommands,
     runtime_config: LLMSpellConfig,
-    output_format: crate::cli::OutputFormat,
+    _output_format: crate::cli::OutputFormat,
 ) -> Result<()> {
     use crate::cli::KernelCommands;
 
@@ -47,18 +49,24 @@ pub async fn handle_kernel_command(
                 let default_pid_path = || {
                     dirs::runtime_dir()
                         .unwrap_or_else(|| PathBuf::from("/tmp"))
-                        .join(format!("llmspell-kernel-{}.pid",
-                            id.as_ref().unwrap_or(&format!("port-{}", port))))
+                        .join(format!(
+                            "llmspell-kernel-{}.pid",
+                            id.as_ref().unwrap_or(&format!("port-{}", port))
+                        ))
                 };
 
                 let default_log_path = || {
                     dirs::state_dir()
-                        .unwrap_or_else(|| dirs::home_dir()
-                            .unwrap_or_else(|| PathBuf::from("/tmp"))
-                            .join(".llmspell"))
+                        .unwrap_or_else(|| {
+                            dirs::home_dir()
+                                .unwrap_or_else(|| PathBuf::from("/tmp"))
+                                .join(".llmspell")
+                        })
                         .join("logs")
-                        .join(format!("kernel-{}.log",
-                            id.as_ref().unwrap_or(&format!("port-{}", port))))
+                        .join(format!(
+                            "kernel-{}.log",
+                            id.as_ref().unwrap_or(&format!("port-{}", port))
+                        ))
                 };
 
                 Some(DaemonConfig {
@@ -109,16 +117,19 @@ pub async fn handle_kernel_command(
                 let script_executor =
                     llmspell_bridge::create_script_executor(runtime_config.clone()).await?;
 
-                let service = start_kernel_service_with_config(
+                // Create service configuration
+                let service_config = KernelServiceConfig {
                     port,
                     exec_config,
-                    id,
-                    connection_file,
+                    kernel_id: id,
+                    connection_file_path: connection_file,
                     max_clients,
                     log_rotate_size,
                     log_rotate_count,
                     script_executor,
-                ).await?;
+                };
+
+                let service = start_kernel_service_with_config(service_config).await?;
 
                 info!(
                     "Kernel service started. Connection file: {:?}",
@@ -190,7 +201,9 @@ pub async fn handle_kernel_command(
                 // Read PID from file
                 let pid_str = fs::read_to_string(&pid_file_path)
                     .map_err(|e| anyhow!("Failed to read PID file: {}", e))?;
-                let pid: u32 = pid_str.trim().parse()
+                let pid: u32 = pid_str
+                    .trim()
+                    .parse()
                     .map_err(|e| anyhow!("Invalid PID in file: {}", e))?;
 
                 // Create minimal KernelInfo
@@ -245,7 +258,13 @@ pub async fn handle_kernel_command(
             }
         }
 
-        KernelCommands::Status { id, format, quiet, watch, interval } => {
+        KernelCommands::Status {
+            id,
+            format,
+            quiet,
+            watch,
+            interval,
+        } => {
             // Parse output format from string
             let output_format = match format.as_str() {
                 "json" => crate::cli::OutputFormat::Json,
@@ -270,6 +289,33 @@ pub async fn handle_kernel_command(
             } else {
                 display_kernel_status(id.as_deref(), quiet, detailed, &output_format)
             }
+        }
+
+        KernelCommands::InstallService {
+            service_type,
+            system,
+            name,
+            port,
+            id,
+            log_file,
+            pid_file,
+            enable,
+            start,
+            force,
+        } => {
+            let config = InstallServiceConfig {
+                service_type,
+                system,
+                name,
+                port,
+                id,
+                log_file,
+                pid_file,
+                enable,
+                start,
+                force,
+            };
+            install_kernel_service(config)
         }
     }
 }
@@ -300,7 +346,10 @@ async fn stop_kernel_process(
             .map_err(|e| anyhow!("Failed to send SIGKILL: {}", e))?;
     } else {
         // Send SIGTERM for graceful shutdown
-        info!("Sending SIGTERM to kernel {} (PID {})", kernel.id, kernel.pid);
+        info!(
+            "Sending SIGTERM to kernel {} (PID {})",
+            kernel.id, kernel.pid
+        );
         signal::kill(Pid::from_raw(kernel.pid as i32), Signal::SIGTERM)
             .map_err(|e| anyhow!("Failed to send SIGTERM: {}", e))?;
 
@@ -317,7 +366,10 @@ async fn stop_kernel_process(
             // Print progress every 5 seconds
             if Instant::now() - last_check > Duration::from_secs(5) {
                 let remaining = (deadline - Instant::now()).as_secs();
-                println!("  Waiting for graceful shutdown... {} seconds remaining", remaining);
+                println!(
+                    "  Waiting for graceful shutdown... {} seconds remaining",
+                    remaining
+                );
                 last_check = Instant::now();
             }
 
@@ -326,8 +378,10 @@ async fn stop_kernel_process(
 
         // Force kill if still alive
         if kernel_discovery::is_process_alive(kernel.pid) {
-            warn!("Kernel {} didn't shutdown gracefully within {} seconds, sending SIGKILL",
-                  kernel.id, timeout);
+            warn!(
+                "Kernel {} didn't shutdown gracefully within {} seconds, sending SIGKILL",
+                kernel.id, timeout
+            );
             signal::kill(Pid::from_raw(kernel.pid as i32), Signal::SIGKILL)
                 .map_err(|e| anyhow!("Failed to send SIGKILL: {}", e))?;
 
@@ -338,7 +392,11 @@ async fn stop_kernel_process(
 
     // Verify process is dead
     if kernel_discovery::is_process_alive(kernel.pid) {
-        return Err(anyhow!("Failed to stop kernel {} (PID {})", kernel.id, kernel.pid));
+        return Err(anyhow!(
+            "Failed to stop kernel {} (PID {})",
+            kernel.id,
+            kernel.pid
+        ));
     }
 
     // Clean up files unless --no-cleanup was specified
@@ -353,7 +411,10 @@ async fn stop_kernel_process(
 fn cleanup_kernel_files(kernel: &KernelInfo) -> Result<()> {
     // Clean up connection file
     if !kernel.connection_file.as_os_str().is_empty() && kernel.connection_file.exists() {
-        info!("Removing connection file: {}", kernel.connection_file.display());
+        info!(
+            "Removing connection file: {}",
+            kernel.connection_file.display()
+        );
         fs::remove_file(&kernel.connection_file)
             .map_err(|e| anyhow!("Failed to remove connection file: {}", e))?;
     }
@@ -362,8 +423,7 @@ fn cleanup_kernel_files(kernel: &KernelInfo) -> Result<()> {
     if let Some(ref pid_file) = kernel.pid_file {
         if pid_file.exists() {
             info!("Removing PID file: {}", pid_file.display());
-            fs::remove_file(pid_file)
-                .map_err(|e| anyhow!("Failed to remove PID file: {}", e))?;
+            fs::remove_file(pid_file).map_err(|e| anyhow!("Failed to remove PID file: {}", e))?;
         }
     }
 
@@ -420,12 +480,18 @@ fn display_kernel_status(
         }
         OutputFormat::Yaml => {
             // Convert to YAML format
-            println!("{}", serde_yaml::to_string(&kernel_data.iter()
-                .map(|(k, m)| serde_json::json!({
-                    "kernel": k,
-                    "metrics": m,
-                }))
-                .collect::<Vec<_>>())?);
+            println!(
+                "{}",
+                serde_yaml::to_string(
+                    &kernel_data
+                        .iter()
+                        .map(|(k, m)| serde_json::json!({
+                            "kernel": k,
+                            "metrics": m,
+                        }))
+                        .collect::<Vec<_>>()
+                )?
+            );
         }
         OutputFormat::Text => {
             display_simple(&kernel_data, quiet)?;
@@ -487,7 +553,10 @@ fn display_detailed_table(kernel_data: &[(&KernelInfo, Option<KernelMetrics>)]) 
         builder.push_record(["Process ID", &kernel.pid.to_string()]);
         builder.push_record(["Port", &kernel.port.to_string()]);
         builder.push_record(["Status", &format_status(&kernel.status)]);
-        builder.push_record(["Connection File", &kernel.connection_file.display().to_string()]);
+        builder.push_record([
+            "Connection File",
+            &kernel.connection_file.display().to_string(),
+        ]);
 
         if let Some(pid_file) = &kernel.pid_file {
             builder.push_record(["PID File", &pid_file.display().to_string()]);
@@ -500,7 +569,14 @@ fn display_detailed_table(kernel_data: &[(&KernelInfo, Option<KernelMetrics>)]) 
         if let Some(m) = metrics {
             builder.push_record(["", ""]);
             builder.push_record(["CPU Usage", &format!("{:.1}%", m.cpu_percent)]);
-            builder.push_record(["Memory Usage", &format!("{} ({:.1}%)", format_memory(m.memory_bytes), m.memory_percent)]);
+            builder.push_record([
+                "Memory Usage",
+                &format!(
+                    "{} ({:.1}%)",
+                    format_memory(m.memory_bytes),
+                    m.memory_percent
+                ),
+            ]);
             builder.push_record(["Open Files", &m.open_files.to_string()]);
             builder.push_record(["Active Connections", &m.active_connections.to_string()]);
             builder.push_record(["Uptime", &format_duration(&m.uptime)]);
@@ -509,7 +585,10 @@ fn display_detailed_table(kernel_data: &[(&KernelInfo, Option<KernelMetrics>)]) 
                 let elapsed = std::time::SystemTime::now()
                     .duration_since(last_activity)
                     .unwrap_or(Duration::ZERO);
-                builder.push_record(["Last Activity", &format!("{} ago", format_duration(&elapsed))]);
+                builder.push_record([
+                    "Last Activity",
+                    &format!("{} ago", format_duration(&elapsed)),
+                ]);
             }
         }
 
@@ -547,14 +626,21 @@ fn display_simple(kernel_data: &[(&KernelInfo, Option<KernelMetrics>)], quiet: b
         if quiet {
             println!("{}", kernel.id);
         } else {
-            print!("{}: PID={} Port={} Status={}",
-                kernel.id, kernel.pid, kernel.port, format_status(&kernel.status));
+            print!(
+                "{}: PID={} Port={} Status={}",
+                kernel.id,
+                kernel.pid,
+                kernel.port,
+                format_status(&kernel.status)
+            );
 
             if let Some(m) = metrics {
-                print!(" CPU={:.1}% Memory={} Uptime={}",
+                print!(
+                    " CPU={:.1}% Memory={} Uptime={}",
                     m.cpu_percent,
                     format_memory(m.memory_bytes),
-                    format_duration(&m.uptime));
+                    format_duration(&m.uptime)
+                );
             }
 
             println!();
@@ -606,4 +692,596 @@ fn format_duration(duration: &Duration) -> String {
     } else {
         format!("{}d {}h", secs / 86400, (secs % 86400) / 3600)
     }
+}
+
+/// Configuration for installing a kernel service
+struct InstallServiceConfig {
+    service_type: Option<crate::cli::ServiceType>,
+    system: bool,
+    name: String,
+    port: u16,
+    id: Option<String>,
+    log_file: Option<PathBuf>,
+    pid_file: Option<PathBuf>,
+    enable: bool,
+    start: bool,
+    force: bool,
+}
+
+/// Install kernel as system/user service
+fn install_kernel_service(config: InstallServiceConfig) -> Result<()> {
+    use std::env;
+    use std::os::unix::fs::PermissionsExt;
+
+    // Detect platform and service type
+    let detected_service = detect_service_type(config.service_type)?;
+    let service_info = get_service_info(detected_service, config.system, &config.name)?;
+
+    // Get binary path
+    let binary_path =
+        env::current_exe().map_err(|e| anyhow!("Failed to get executable path: {}", e))?;
+
+    // Resolve paths with defaults
+    let kernel_id = config
+        .id
+        .unwrap_or_else(|| format!("{}-{}", config.name, config.port));
+
+    let pid_file = config.pid_file.unwrap_or_else(|| {
+        if config.system {
+            PathBuf::from(format!("/var/run/{}.pid", config.name))
+        } else {
+            dirs::runtime_dir()
+                .unwrap_or_else(|| PathBuf::from("/tmp"))
+                .join(format!("{}.pid", config.name))
+        }
+    });
+
+    let log_file = config.log_file.unwrap_or_else(|| {
+        if config.system {
+            PathBuf::from(format!("/var/log/{}.log", config.name))
+        } else {
+            dirs::state_dir()
+                .unwrap_or_else(|| {
+                    dirs::home_dir()
+                        .unwrap_or_else(|| PathBuf::from("/tmp"))
+                        .join(".llmspell")
+                })
+                .join("logs")
+                .join(format!("{}.log", config.name))
+        }
+    });
+
+    // Generate service file content
+    let service_content = generate_service_file(
+        detected_service,
+        &service_info,
+        &binary_path,
+        config.port,
+        &kernel_id,
+        &pid_file,
+        &log_file,
+    )?;
+
+    // Check if service already exists
+    let service_path = service_info.install_dir.join(&service_info.service_file);
+    if service_path.exists() && !config.force {
+        return Err(anyhow!(
+            "Service file already exists at: {}\nUse --force to override",
+            service_path.display()
+        ));
+    }
+
+    // Create directory if needed
+    if !service_info.install_dir.exists() {
+        info!(
+            "Creating service directory: {}",
+            service_info.install_dir.display()
+        );
+        fs::create_dir_all(&service_info.install_dir)
+            .map_err(|e| anyhow!("Failed to create service directory: {}", e))?;
+    }
+
+    // Write service file
+    info!("Writing service file: {}", service_path.display());
+    fs::write(&service_path, service_content)
+        .map_err(|e| anyhow!("Failed to write service file: {}", e))?;
+
+    // Set appropriate permissions
+    #[cfg(unix)]
+    {
+        let metadata = fs::metadata(&service_path)?;
+        let mut permissions = metadata.permissions();
+        permissions.set_mode(0o644); // rw-r--r--
+        fs::set_permissions(&service_path, permissions)?;
+    }
+
+    println!("✓ Service file installed: {}", service_path.display());
+
+    // Print post-installation instructions
+    print_post_install_instructions(
+        detected_service,
+        &config.name,
+        config.system,
+        config.enable,
+        config.start,
+    )?;
+
+    // Optionally enable and start service
+    if config.enable || config.start {
+        manage_service(
+            detected_service,
+            &config.name,
+            config.system,
+            config.enable,
+            config.start,
+        )?;
+    }
+
+    Ok(())
+}
+
+/// Detect service type based on platform
+fn detect_service_type(
+    service_type: Option<crate::cli::ServiceType>,
+) -> Result<crate::cli::ServiceType> {
+    use crate::cli::ServiceType;
+    use std::env;
+
+    match service_type {
+        Some(ServiceType::Auto) | None => match env::consts::OS {
+            "linux" => Ok(ServiceType::Systemd),
+            "macos" => Ok(ServiceType::Launchd),
+            os => Err(anyhow!("Unsupported platform: {}", os)),
+        },
+        Some(t) => Ok(t),
+    }
+}
+
+/// Service installation information
+struct ServiceInfo {
+    install_dir: PathBuf,
+    service_file: String,
+    user: String,
+    group: String,
+}
+
+/// Get service installation information
+fn get_service_info(
+    service_type: crate::cli::ServiceType,
+    system: bool,
+    name: &str,
+) -> Result<ServiceInfo> {
+    use crate::cli::ServiceType;
+
+    let home = dirs::home_dir().ok_or_else(|| anyhow!("Could not determine home directory"))?;
+
+    let user = env::var("USER").unwrap_or_else(|_| "nobody".to_string());
+    let group = env::var("USER").unwrap_or_else(|_| "nobody".to_string());
+
+    match service_type {
+        ServiceType::Systemd => Ok(ServiceInfo {
+            install_dir: if system {
+                PathBuf::from("/etc/systemd/system")
+            } else {
+                home.join(".config/systemd/user")
+            },
+            service_file: format!("{}.service", name),
+            user,
+            group,
+        }),
+        ServiceType::Launchd => Ok(ServiceInfo {
+            install_dir: if system {
+                PathBuf::from("/Library/LaunchDaemons")
+            } else {
+                home.join("Library/LaunchAgents")
+            },
+            service_file: format!("com.llmspell.{}.plist", name),
+            user,
+            group,
+        }),
+        ServiceType::Auto => unreachable!("Auto should be resolved to specific type"),
+    }
+}
+
+/// Generate service file content
+fn generate_service_file(
+    service_type: crate::cli::ServiceType,
+    service_info: &ServiceInfo,
+    binary_path: &Path,
+    port: u16,
+    kernel_id: &str,
+    pid_file: &Path,
+    log_file: &Path,
+) -> Result<String> {
+    use crate::cli::ServiceType;
+
+    match service_type {
+        ServiceType::Systemd => Ok(format!(
+            r#"[Unit]
+Description=LLMSpell Kernel Service ({})
+After=network.target
+Documentation=https://github.com/llmspell/llmspell
+
+[Service]
+Type=forking
+PIDFile={}
+ExecStart={} kernel start --daemon --port {} --id {} --pid-file {} --log-file {}
+ExecStop={} kernel stop --pid-file {}
+ExecReload=/bin/kill -USR1 $MAINPID
+Restart=on-failure
+RestartSec=5s
+User={}
+Group={}
+
+# Resource limits
+LimitNOFILE=65536
+
+# Security hardening
+PrivateTmp=true
+NoNewPrivileges=true
+
+[Install]
+WantedBy=multi-user.target
+"#,
+            kernel_id,
+            pid_file.display(),
+            binary_path.display(),
+            port,
+            kernel_id,
+            pid_file.display(),
+            log_file.display(),
+            binary_path.display(),
+            pid_file.display(),
+            service_info.user,
+            service_info.group,
+        )),
+        ServiceType::Launchd => Ok(format!(
+            r#"<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+    <key>Label</key>
+    <string>com.llmspell.{}</string>
+
+    <key>ProgramArguments</key>
+    <array>
+        <string>{}</string>
+        <string>kernel</string>
+        <string>start</string>
+        <string>--daemon</string>
+        <string>--port</string>
+        <string>{}</string>
+        <string>--id</string>
+        <string>{}</string>
+        <string>--pid-file</string>
+        <string>{}</string>
+        <string>--log-file</string>
+        <string>{}</string>
+    </array>
+
+    <key>RunAtLoad</key>
+    <true/>
+
+    <key>KeepAlive</key>
+    <dict>
+        <key>SuccessfulExit</key>
+        <false/>
+        <key>Crashed</key>
+        <true/>
+    </dict>
+
+    <key>StandardOutPath</key>
+    <string>{}</string>
+
+    <key>StandardErrorPath</key>
+    <string>{}</string>
+
+    <key>ThrottleInterval</key>
+    <integer>5</integer>
+
+    <key>UserName</key>
+    <string>{}</string>
+</dict>
+</plist>"#,
+            kernel_id,
+            binary_path.display(),
+            port,
+            kernel_id,
+            pid_file.display(),
+            log_file.display(),
+            log_file.display(),
+            log_file.display(),
+            service_info.user,
+        )),
+        _ => unreachable!(),
+    }
+}
+
+/// Print post-installation instructions
+fn print_post_install_instructions(
+    service_type: crate::cli::ServiceType,
+    name: &str,
+    system: bool,
+    enable: bool,
+    start: bool,
+) -> Result<()> {
+    use crate::cli::ServiceType;
+
+    println!("\n{}", "═".repeat(60));
+    println!("Post-Installation Instructions");
+    println!("{}", "─".repeat(60));
+
+    match service_type {
+        ServiceType::Systemd => {
+            if !enable && !start {
+                println!("To enable the service to start at boot:");
+                if system {
+                    println!("  sudo systemctl enable {}", name);
+                } else {
+                    println!("  systemctl --user enable {}", name);
+                }
+                println!();
+            }
+
+            if !start {
+                println!("To start the service immediately:");
+                if system {
+                    println!("  sudo systemctl start {}", name);
+                } else {
+                    println!("  systemctl --user start {}", name);
+                }
+                println!();
+            }
+
+            println!("To check service status:");
+            if system {
+                println!("  sudo systemctl status {}", name);
+            } else {
+                println!("  systemctl --user status {}", name);
+            }
+
+            println!("\nTo view logs:");
+            if system {
+                println!("  sudo journalctl -u {} -f", name);
+            } else {
+                println!("  journalctl --user -u {} -f", name);
+            }
+
+            println!("\nTo stop the service:");
+            if system {
+                println!("  sudo systemctl stop {}", name);
+            } else {
+                println!("  systemctl --user stop {}", name);
+            }
+
+            println!("\nTo uninstall the service:");
+            if system {
+                println!("  sudo systemctl disable {}", name);
+                println!("  sudo rm /etc/systemd/system/{}.service", name);
+                println!("  sudo systemctl daemon-reload");
+            } else {
+                println!("  systemctl --user disable {}", name);
+                println!("  rm ~/.config/systemd/user/{}.service", name);
+                println!("  systemctl --user daemon-reload");
+            }
+        }
+        ServiceType::Launchd => {
+            let service_label = format!("com.llmspell.{}", name);
+
+            if !enable && !start {
+                println!("To load (enable) the service:");
+                if system {
+                    println!(
+                        "  sudo launchctl load /Library/LaunchDaemons/{}.plist",
+                        service_label
+                    );
+                } else {
+                    println!(
+                        "  launchctl load ~/Library/LaunchAgents/{}.plist",
+                        service_label
+                    );
+                }
+                println!();
+            }
+
+            if !start {
+                println!("To start the service immediately:");
+                if system {
+                    println!("  sudo launchctl start {}", service_label);
+                } else {
+                    println!("  launchctl start {}", service_label);
+                }
+                println!();
+            }
+
+            println!("To check service status:");
+            if system {
+                println!("  sudo launchctl list | grep {}", name);
+            } else {
+                println!("  launchctl list | grep {}", name);
+            }
+
+            println!("\nTo view logs:");
+            println!("  tail -f /var/log/system.log | grep {}", name);
+
+            println!("\nTo stop the service:");
+            if system {
+                println!("  sudo launchctl stop {}", service_label);
+            } else {
+                println!("  launchctl stop {}", service_label);
+            }
+
+            println!("\nTo unload (disable) the service:");
+            if system {
+                println!(
+                    "  sudo launchctl unload /Library/LaunchDaemons/{}.plist",
+                    service_label
+                );
+            } else {
+                println!(
+                    "  launchctl unload ~/Library/LaunchAgents/{}.plist",
+                    service_label
+                );
+            }
+
+            println!("\nTo uninstall the service:");
+            if system {
+                println!(
+                    "  sudo launchctl unload /Library/LaunchDaemons/{}.plist",
+                    service_label
+                );
+                println!("  sudo rm /Library/LaunchDaemons/{}.plist", service_label);
+            } else {
+                println!(
+                    "  launchctl unload ~/Library/LaunchAgents/{}.plist",
+                    service_label
+                );
+                println!("  rm ~/Library/LaunchAgents/{}.plist", service_label);
+            }
+        }
+        _ => {}
+    }
+
+    println!("{}", "═".repeat(60));
+    Ok(())
+}
+
+/// Manage service (enable/start)
+fn manage_service(
+    service_type: crate::cli::ServiceType,
+    name: &str,
+    system: bool,
+    enable: bool,
+    start: bool,
+) -> Result<()> {
+    use crate::cli::ServiceType;
+    use std::process::Command;
+
+    match service_type {
+        ServiceType::Systemd => {
+            // Reload daemon to pick up new service file
+            let reload_output = if system {
+                Command::new("sudo")
+                    .args(["systemctl", "daemon-reload"])
+                    .output()?
+            } else {
+                Command::new("systemctl")
+                    .args(["--user", "daemon-reload"])
+                    .output()?
+            };
+
+            if !reload_output.status.success() {
+                warn!(
+                    "Failed to reload systemd daemon: {}",
+                    String::from_utf8_lossy(&reload_output.stderr)
+                );
+            }
+
+            if enable {
+                println!("Enabling service...");
+                let output = if system {
+                    Command::new("sudo")
+                        .args(["systemctl", "enable", name])
+                        .output()?
+                } else {
+                    Command::new("systemctl")
+                        .args(["--user", "enable", name])
+                        .output()?
+                };
+
+                if output.status.success() {
+                    println!("✓ Service enabled");
+                } else {
+                    warn!(
+                        "Failed to enable service: {}",
+                        String::from_utf8_lossy(&output.stderr)
+                    );
+                }
+            }
+
+            if start {
+                println!("Starting service...");
+                let output = if system {
+                    Command::new("sudo")
+                        .args(["systemctl", "start", name])
+                        .output()?
+                } else {
+                    Command::new("systemctl")
+                        .args(["--user", "start", name])
+                        .output()?
+                };
+
+                if output.status.success() {
+                    println!("✓ Service started");
+                } else {
+                    return Err(anyhow!(
+                        "Failed to start service: {}",
+                        String::from_utf8_lossy(&output.stderr)
+                    ));
+                }
+            }
+        }
+        ServiceType::Launchd => {
+            let service_label = format!("com.llmspell.{}", name);
+            let plist_path = if system {
+                format!("/Library/LaunchDaemons/{}.plist", service_label)
+            } else {
+                dirs::home_dir()
+                    .ok_or_else(|| anyhow!("Could not determine home directory"))?
+                    .join("Library/LaunchAgents")
+                    .join(format!("{}.plist", service_label))
+                    .to_string_lossy()
+                    .to_string()
+            };
+
+            if enable || start {
+                println!("Loading service...");
+                let output = if system {
+                    Command::new("sudo")
+                        .args(["launchctl", "load", &plist_path])
+                        .output()?
+                } else {
+                    Command::new("launchctl")
+                        .args(["load", &plist_path])
+                        .output()?
+                };
+
+                if output.status.success() {
+                    println!("✓ Service loaded");
+                } else {
+                    // It might already be loaded
+                    let stderr = String::from_utf8_lossy(&output.stderr);
+                    if !stderr.contains("already loaded") {
+                        warn!("Failed to load service: {}", stderr);
+                    }
+                }
+            }
+
+            if start {
+                println!("Starting service...");
+                let output = if system {
+                    Command::new("sudo")
+                        .args(["launchctl", "start", &service_label])
+                        .output()?
+                } else {
+                    Command::new("launchctl")
+                        .args(["start", &service_label])
+                        .output()?
+                };
+
+                if output.status.success() {
+                    println!("✓ Service started");
+                } else {
+                    // Check if it's already running
+                    let stderr = String::from_utf8_lossy(&output.stderr);
+                    if !stderr.contains("already running") {
+                        return Err(anyhow!("Failed to start service: {}", stderr));
+                    }
+                }
+            }
+        }
+        _ => {}
+    }
+
+    Ok(())
 }

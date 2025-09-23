@@ -400,7 +400,12 @@ mod tests {
         let has_compressed = fs::read_dir(temp_dir.path()).unwrap().any(|entry| {
             entry
                 .ok()
-                .and_then(|e| e.file_name().to_str().map(|s| s.ends_with(".gz")))
+                .and_then(|e| {
+                    e.path()
+                        .extension()
+                        .and_then(|ext| ext.to_str())
+                        .map(|s| s.eq_ignore_ascii_case("gz"))
+                })
                 .unwrap_or(false)
         });
         assert!(has_compressed, "Should have created compressed file");
@@ -422,7 +427,7 @@ mod tests {
 
         // Create multiple rotations
         for i in 0..5 {
-            let data = format!("Rotation {}: Some test data\n", i);
+            let data = format!("Rotation {i}: Some test data\n");
             rotator.write(data.as_bytes()).unwrap();
             std::thread::sleep(std::time::Duration::from_millis(10)); // Ensure different timestamps
         }
@@ -435,8 +440,7 @@ mod tests {
                 entry
                     .file_name()
                     .to_str()
-                    .map(|s| s.contains("test.log"))
-                    .unwrap_or(false)
+                    .is_some_and(|s| s.contains("test.log"))
             })
             .count();
 
@@ -468,7 +472,7 @@ mod tests {
                 let rotator_clone = rotator.clone();
                 thread::spawn(move || {
                     for j in 0..10 {
-                        let msg = format!("Thread {} message {}\n", i, j);
+                        let msg = format!("Thread {i} message {j}\n");
                         rotator_clone.write(msg.as_bytes()).unwrap();
                     }
                 })
@@ -484,7 +488,7 @@ mod tests {
         let log_path = temp_dir.path().join("test.log");
         let contents = fs::read_to_string(&log_path).unwrap();
         for i in 0..5 {
-            assert!(contents.contains(&format!("Thread {}", i)));
+            assert!(contents.contains(&format!("Thread {i}")));
         }
     }
 
@@ -512,11 +516,9 @@ mod tests {
 
         // Verify no data loss
         let mut all_content = String::new();
-        for entry in fs::read_dir(temp_dir.path()).unwrap() {
-            if let Ok(entry) = entry {
-                if entry.file_name().to_str().unwrap().contains("test.log") {
-                    all_content.push_str(&fs::read_to_string(entry.path()).unwrap());
-                }
+        for entry in fs::read_dir(temp_dir.path()).unwrap().flatten() {
+            if entry.file_name().to_str().unwrap().contains("test.log") {
+                all_content.push_str(&fs::read_to_string(entry.path()).unwrap());
             }
         }
 

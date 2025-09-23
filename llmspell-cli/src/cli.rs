@@ -172,6 +172,17 @@ pub enum OutputFormat {
     Pretty,
 }
 
+/// Service type for install-service command
+#[derive(Debug, Clone, Copy, PartialEq, Eq, ValueEnum)]
+pub enum ServiceType {
+    /// systemd (Linux)
+    Systemd,
+    /// launchd (macOS)
+    Launchd,
+    /// Auto-detect based on platform
+    Auto,
+}
+
 /// Primary execution commands and subcommand groups
 #[derive(Subcommand, Debug)]
 pub enum Commands {
@@ -517,13 +528,15 @@ EXAMPLES:
     },
 
     /// Show running kernels or specific kernel details
-    #[command(long_about = "Display status of running kernels with health and resource metrics.
+    #[command(
+        long_about = "Display status of running kernels with health and resource metrics.
 
 EXAMPLES:
     llmspell kernel status                    # List all running kernels
     llmspell kernel status --id my-kernel     # Detailed view of specific kernel
     llmspell kernel status --output json      # JSON output for scripting
-    llmspell kernel status --watch            # Continuous monitoring")]
+    llmspell kernel status --watch            # Continuous monitoring"
+    )]
     Status {
         /// Kernel ID for detailed status (if not provided, lists all kernels)
         #[arg(short, long)]
@@ -551,6 +564,56 @@ EXAMPLES:
         /// Kernel address (e.g., "localhost:9555" or "/path/to/connection.json")
         /// If not provided, uses the last successful connection
         address: Option<String>,
+    },
+
+    /// Install kernel as system service
+    #[command(long_about = "Generate and install systemd/launchd service files.
+
+EXAMPLES:
+    llmspell kernel install-service               # Auto-detect platform, user service
+    llmspell kernel install-service --system      # Install as system service
+    llmspell kernel install-service --port 9600   # Custom port
+    llmspell kernel install-service --name custom # Custom service name")]
+    InstallService {
+        /// Service type (systemd/launchd/auto)
+        #[arg(long, value_enum)]
+        service_type: Option<ServiceType>,
+
+        /// Install as system service (default: user service)
+        #[arg(long)]
+        system: bool,
+
+        /// Service name
+        #[arg(long, default_value = "llmspell-kernel")]
+        name: String,
+
+        /// Port for kernel
+        #[arg(long, default_value = "9555")]
+        port: u16,
+
+        /// Kernel ID
+        #[arg(long)]
+        id: Option<String>,
+
+        /// Log file path
+        #[arg(long)]
+        log_file: Option<PathBuf>,
+
+        /// PID file path
+        #[arg(long)]
+        pid_file: Option<PathBuf>,
+
+        /// Enable service after installation
+        #[arg(long)]
+        enable: bool,
+
+        /// Start service after installation
+        #[arg(long)]
+        start: bool,
+
+        /// Override if service already exists
+        #[arg(long)]
+        force: bool,
     },
 }
 

@@ -104,11 +104,9 @@ pub fn discover_kernels() -> Result<Vec<KernelInfo>> {
     let mut kernels = Vec::new();
     let mut seen_pids = HashSet::new();
 
-    for dir_opt in kernel_dirs {
-        if let Some(dir) = dir_opt {
-            if dir.exists() {
-                scan_directory(&dir, &mut kernels, &mut seen_pids)?;
-            }
+    for dir in kernel_dirs.into_iter().flatten() {
+        if dir.exists() {
+            scan_directory(&dir, &mut kernels, &mut seen_pids)?;
         }
     }
 
@@ -126,7 +124,7 @@ fn scan_directory(
         let path = entry.path();
 
         // Only process JSON connection files
-        if path.extension().map_or(false, |e| e == "json") {
+        if path.extension().is_some_and(|e| e == "json") {
             match parse_kernel_file(&path) {
                 Ok(kernel) => {
                     // Check if we've already seen this PID (avoid duplicates)
@@ -143,11 +141,7 @@ fn scan_directory(
                 }
                 Err(e) => {
                     // Log but continue scanning
-                    tracing::debug!(
-                        "Failed to parse connection file {}: {}",
-                        path.display(),
-                        e
-                    );
+                    tracing::debug!("Failed to parse connection file {}: {}", path.display(), e);
                 }
             }
         }
@@ -184,9 +178,7 @@ fn parse_kernel_file(path: &Path) -> Result<KernelInfo> {
     let log_file = find_log_file(&kernel_id);
 
     // Get file creation time as start time
-    let start_time = fs::metadata(path)
-        .ok()
-        .and_then(|m| m.created().ok());
+    let start_time = fs::metadata(path).ok().and_then(|m| m.created().ok());
 
     Ok(KernelInfo {
         id: kernel_id,
@@ -225,10 +217,7 @@ fn find_pid_file(kernel_id: &str) -> Option<PathBuf> {
         dirs::home_dir().map(|h| h.join(format!(".llmspell/kernel-{}.pid", kernel_id))),
     ];
 
-    candidates
-        .into_iter()
-        .flatten()
-        .find(|p| p.exists())
+    candidates.into_iter().flatten().find(|p| p.exists())
 }
 
 /// Find log file for a kernel ID
@@ -240,10 +229,7 @@ fn find_log_file(kernel_id: &str) -> Option<PathBuf> {
         dirs::home_dir().map(|h| h.join(format!(".llmspell/kernel-{}.log", kernel_id))),
     ];
 
-    candidates
-        .into_iter()
-        .flatten()
-        .find(|p| p.exists())
+    candidates.into_iter().flatten().find(|p| p.exists())
 }
 
 /// Find a kernel by its ID
@@ -280,11 +266,9 @@ pub fn cleanup_stale_kernels() -> Result<usize> {
 
     let mut cleaned = 0;
 
-    for dir_opt in kernel_dirs {
-        if let Some(dir) = dir_opt {
-            if dir.exists() {
-                cleaned += cleanup_directory(&dir)?;
-            }
+    for dir in kernel_dirs.into_iter().flatten() {
+        if dir.exists() {
+            cleaned += cleanup_directory(&dir)?;
         }
     }
 
@@ -299,7 +283,7 @@ fn cleanup_directory(dir: &Path) -> Result<usize> {
         let entry = entry?;
         let path = entry.path();
 
-        if path.extension().map_or(false, |e| e == "json") {
+        if path.extension().is_some_and(|e| e == "json") {
             // Try to parse the connection file
             if let Ok(conn_info) = parse_kernel_file(&path) {
                 if !is_process_alive(conn_info.pid) {
@@ -337,7 +321,8 @@ pub fn get_kernel_metrics(kernel: &KernelInfo) -> Result<KernelMetrics> {
             .unwrap_or(Duration::ZERO)
     } else {
         // Estimate from file modification time
-        kernel.connection_file
+        kernel
+            .connection_file
             .metadata()
             .and_then(|m| m.modified())
             .ok()
@@ -354,7 +339,8 @@ pub fn get_kernel_metrics(kernel: &KernelInfo) -> Result<KernelMetrics> {
             let fields: Vec<&str> = stat.split_whitespace().collect();
             if fields.len() > 23 {
                 // utime + stime (user + system time in clock ticks)
-                let total_time: u64 = fields[13].parse().unwrap_or(0) + fields[14].parse().unwrap_or(0);
+                let total_time: u64 =
+                    fields[13].parse().unwrap_or(0) + fields[14].parse().unwrap_or(0);
                 // Convert to percentage (rough estimate)
                 let cpu = (total_time as f64 / 100.0).min(100.0);
 
@@ -416,7 +402,7 @@ fn count_open_files(pid: u32) -> Result<u32> {
     {
         // macOS: Use lsof or other system calls
         // For now, return a placeholder
-        return Ok(0);
+        Ok(0)
     }
 
     #[cfg(not(any(target_os = "linux", target_os = "macos")))]
