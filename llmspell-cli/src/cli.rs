@@ -482,10 +482,38 @@ EXAMPLES:
         log_rotate_count: usize,
     },
 
-    /// Stop kernel by ID
+    /// Stop kernel by ID or PID file
+    #[command(long_about = "Stop a running kernel gracefully.
+
+EXAMPLES:
+    llmspell kernel stop --id my-kernel      # Stop by kernel ID
+    llmspell kernel stop --pid-file /tmp/kernel.pid  # Stop by PID file
+    llmspell kernel stop --all                # Stop all kernels
+    llmspell kernel stop --force             # Force kill without graceful shutdown")]
     Stop {
-        /// Kernel ID to stop (if not provided, stops all kernels)
+        /// Kernel ID to stop
+        #[arg(short, long)]
         id: Option<String>,
+
+        /// PID file path to identify kernel
+        #[arg(long)]
+        pid_file: Option<PathBuf>,
+
+        /// Stop all running kernels
+        #[arg(long)]
+        all: bool,
+
+        /// Force immediate termination (skip graceful shutdown)
+        #[arg(long)]
+        force: bool,
+
+        /// Timeout in seconds for graceful shutdown
+        #[arg(long, default_value = "30")]
+        timeout: u64,
+
+        /// Don't clean up files after stopping
+        #[arg(long)]
+        no_cleanup: bool,
     },
 
     /// Show running kernels or specific kernel details
