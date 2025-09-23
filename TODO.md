@@ -1910,176 +1910,342 @@ llmspell-kernel/src/daemon/
 
 ---
 
-## Phase 10.7: Debug Adapter Protocol (Days 9-11)
+## Phase 10.7: Debug Adapter Protocol via Jupyter (Days 9-11)
 
-### Task 10.7.1: Implement DAP Server
+**Architecture Change Rationale**: Jupyter Wire Protocol v5.3 specifies DAP tunneling via `debug_request`/`debug_reply` messages on control channel. Creating a standalone TCP DAP server violates protocol spec and duplicates 2000+ lines of existing code (auth, transport, routing). DAPBridge already implements 80% of DAP logic - we just need to connect it to Jupyter's message flow.
+
+### Task 10.7.1: Implement Jupyter DAP Message Handler
 **Priority**: CRITICAL
 **Estimated Time**: 6 hours
 **Assignee**: Debug Team Lead
 
-**Description**: Implement or augment Debug Adapter Protocol server in kernel.
+**Description**: Connect existing DAPBridge to Jupyter control channel debug messages per protocol v5.3.
 
 **Acceptance Criteria:**
-- [ ] DAP server starts on configured port
-- [ ] Initialize request handled
-- [ ] Basic DAP messages work
-- [ ] Capabilities reported correctly
-- [ ] VS Code can connect
+- [ ] IntegratedKernel handles debug_request messages
+- [ ] DAPBridge processes DAP commands via Jupyter
+- [ ] debug_reply messages sent correctly
+- [ ] debug_event messages broadcast on IOPub
+- [ ] HMAC authentication preserved
 
 **Implementation Steps:**
-1. Create `llmspell-kernel/src/dap/mod.rs`:
+1. Add debug_request handler to `IntegratedKernel`:
    ```rust
-   pub struct DAPServer {
-       port: u16,
-       debug_bridge: Arc<DAPBridge>,
-       sessions: HashMap<String, DebugSession>,
+   // In handle_control_message()
+   "debug_request" => self.handle_debug_request(message).await?,
+
+   async fn handle_debug_request(&mut self, message: HashMap<String, Value>) -> Result<()> {
+       let header = message.get("header").ok_or_else(|| anyhow!("Missing header"))?;
+       let content = message.get("content").ok_or_else(|| anyhow!("Missing content"))?;
+
+       // Connect DAPBridge to ExecutionManager if not connected
+       if !self.dap_bridge.is_connected() {
+           self.dap_bridge.connect_execution_manager(self.execution_manager.clone());
+       }
+
+       // Process DAP request through existing DAPBridge
+       let dap_response = self.dap_bridge.handle_request(content.clone()).await?;
+
+       // Send debug_reply on control channel
+       let reply = json!({
+           "msg_type": "debug_reply",
+           "parent_header": header,
+           "content": dap_response,
+       });
+
+       self.send_control_reply(reply).await?;
+       Ok(())
    }
    ```
-2. Implement DAP message handling:
-   - Initialize/launch/attach
-   - SetBreakpoints
-   - Continue/next/stepIn/stepOut
-   - Variables/stackTrace
-3. Integrate with kernel's debug infrastructure
-4. Test with VS Code
-5. Handle edge cases
-
-**Definition of Done:**
-- [ ] DAP server runs
-- [ ] VS Code connects
-- [ ] Basic debugging works
-- [ ] Tests pass
-- [ ] `./scripts/quality-check-minimal.sh` passes with ZERO warnings
-- [ ] `cargo clippy --workspace --all-features --all-targets` - ZERO warnings
-- [ ] `cargo fmt --all --check` passes
-- [ ] All tests pass: `cargo test --workspace --all-features`
-
-### Task 10.7.2: Implement Breakpoint Management
-**Priority**: HIGH
-**Estimated Time**: 4 hours
-**Assignee**: Debug Team
-
-**Description**: Implement or augment existing Full breakpoint support with conditions, hit counts, and logpoints.
-
-**Acceptance Criteria:**
-- [ ] Line breakpoints work
-- [ ] Conditional breakpoints work
-- [ ] Hit count breakpoints work
-- [ ] Logpoints work (non-breaking logging)
-- [ ] Breakpoint validation works
-- [ ] Dynamic updates work
-
-**Implementation Steps:**
-1. Enhance breakpoint handling:
-   - Store breakpoint metadata
-   - Evaluate conditions (Lua expressions)
-   - Track hit counts
-   - Validate locations
-   - Implement logpoints (log without stopping)
-2. Support breakpoint updates:
-   - Add/remove dynamically
-   - Update conditions
-   - Enable/disable
-   - Convert between types (breakpoint <-> logpoint)
-3. VS Code launch.json templates:
-   ```json
-   {
-     "type": "llmspell",
-     "request": "attach",
-     "name": "Attach to Kernel",
-     "kernelId": "${input:kernelId}"
+2. Implement debug_event broadcasting:
+   ```rust
+   // In DAPBridge when events occur
+   if let Some(event) = dap_event {
+       self.kernel.broadcast_debug_event(event).await?;
    }
    ```
-4. Compound debug configurations:
-   - Multiple script debugging
-   - Parallel kernel debugging
-5. Test various scenarios
-6. Verify performance impact
-7. Handle edge cases
+3. Python test with jupyter_client:
+   ```python
+   from jupyter_client import KernelManager
+   import json
+
+   km = KernelManager(kernel_name='llmspell')
+   km.start_kernel()
+   kc = km.client()
+
+   # Send initialize request
+   msg_id = kc.session.send(
+       kc.control_channel,
+       'debug_request',
+       {'seq': 1, 'type': 'request', 'command': 'initialize', 'arguments': {'clientID': 'jupyter'}}
+   )
+   reply = kc.get_control_reply(msg_id)
+   assert reply['content']['success'] == True
+   ```
 
 **Definition of Done:**
-- [ ] All breakpoint types work
-- [ ] Conditions evaluated
-- [ ] Updates work dynamically
-- [ ] Performance acceptable
+- [ ] Jupyter clients can send debug_request messages
+- [ ] Kernel responds with debug_reply messages
+- [ ] Events broadcast on IOPub channel
+- [ ] Tests pass with jupyter_client
 - [ ] `./scripts/quality-check-minimal.sh` passes with ZERO warnings
 - [ ] `cargo clippy --workspace --all-features --all-targets` - ZERO warnings
 - [ ] `cargo fmt --all --check` passes
 - [ ] All tests pass: `cargo test --workspace --all-features`
 
-### Task 10.7.3: Implement Variable Inspection
+### Task 10.7.2: Implement Execution Pause/Resume Mechanism
 **Priority**: HIGH
-**Estimated Time**: 4 hours
+**Estimated Time**: 5 hours
 **Assignee**: Debug Team
 
-**Description**: Implement or augment existing Variable inspection with proper scopes and formatting.
+**Description**: Fix critical gap - scripts don't actually pause at breakpoints. Implement pause mechanism in script executors.
 
 **Acceptance Criteria:**
-- [ ] Local variables shown
-- [ ] Global variables shown
-- [ ] Complex types handled
-- [ ] Lazy expansion works
-- [ ] Formatting correct
+- [ ] Scripts pause at breakpoints
+- [ ] Execution resumes on continue/step
+- [ ] Pause state visible via DAP
+- [ ] Thread-safe pause/resume
+- [ ] <5ms pause overhead
 
 **Implementation Steps:**
-1. Implement variable retrieval:
-   - Get variables by scope
-   - Format for DAP
-   - Handle complex types
-   - Support lazy loading
-2. Variable scopes:
-   - Local scope
-   - Global scope
-   - Closure scope
-3. Format complex types:
-   - Tables/arrays
-   - Objects
-   - Functions
-4. Test with various types
-5. Optimize performance
+1. Add pause mechanism to ExecutionManager:
+   ```rust
+   // In ExecutionManager
+   pub struct PauseState {
+       paused: Arc<AtomicBool>,
+       resume_signal: Arc<Notify>,
+       step_mode: StepMode,
+   }
+
+   pub async fn check_breakpoint(&self, file: &str, line: u32) -> Result<()> {
+       if let Some(bp) = self.breakpoints.get(&(file.to_string(), line)) {
+           if bp.should_break() {  // Check condition & hit count
+               self.pause_state.paused.store(true, Ordering::SeqCst);
+
+               // Notify DAP of stopped event
+               self.send_stopped_event("breakpoint", thread_id).await?;
+
+               // Wait for resume signal
+               self.pause_state.resume_signal.notified().await;
+           }
+       }
+       Ok(())
+   }
+   ```
+2. Integrate with Lua executor:
+   ```rust
+   // In lua debug hook
+   fn debug_hook(lua: &Lua, debug: Debug) {
+       if let Some(source) = debug.source() {
+           let line = debug.curr_line();
+           if line > 0 {
+               // Check breakpoints (blocking in async context)
+               let exec_mgr = get_execution_manager(lua);
+               block_on(exec_mgr.check_breakpoint(source.file, line as u32));
+           }
+       }
+   }
+   ```
+3. Python test for pause/resume:
+   ```python
+   # Set breakpoint
+   kc.control_channel.send('debug_request', {
+       'command': 'setBreakpoints',
+       'arguments': {'source': {'path': 'test.lua'}, 'breakpoints': [{'line': 5}]}
+   })
+
+   # Execute code that hits breakpoint
+   kc.execute('llm.execute_file("test.lua")')
+
+   # Wait for stopped event on IOPub
+   msg = kc.get_iopub_msg()
+   assert msg['msg_type'] == 'debug_event'
+   assert msg['content']['event'] == 'stopped'
+
+   # Continue execution
+   kc.control_channel.send('debug_request', {'command': 'continue'})
+   ```
 
 **Definition of Done:**
-- [ ] All scopes work
-- [ ] Complex types handled
-- [ ] Performance good
-- [ ] VS Code displays correctly
+- [ ] Scripts pause at breakpoints
+- [ ] Resume/step operations work
+- [ ] Pause state thread-safe
+- [ ] Performance <5ms overhead
 - [ ] `./scripts/quality-check-minimal.sh` passes with ZERO warnings
 - [ ] `cargo clippy --workspace --all-features --all-targets` - ZERO warnings
 - [ ] `cargo fmt --all --check` passes
 - [ ] All tests pass: `cargo test --workspace --all-features`
 
-### Task 10.7.4: Implement Stepping Operations
+### Task 10.7.3: Complete Variable Inspection via DAP
 **Priority**: HIGH
 **Estimated Time**: 3 hours
 **Assignee**: Debug Team
 
-**Description**: Implement or augment existing all stepping operations with <20ms latency.
+**Description**: Connect existing variable inspection to DAP responses. ExecutionManager already tracks variables.
 
 **Acceptance Criteria:**
-- [ ] Step over works
-- [ ] Step into works
-- [ ] Step out works
-- [ ] Continue works
-- [ ] Latency <20ms
+- [ ] Variables request returns all scopes
+- [ ] Complex Lua tables formatted correctly
+- [ ] Lazy expansion for nested structures
+- [ ] Variable references work
+- [ ] <10ms response time
 
 **Implementation Steps:**
-1. Implement stepping logic:
-   - Track execution position
-   - Calculate next position
-   - Handle function calls
-   - Resume execution
-2. Optimize for performance:
-   - Minimize overhead
-   - Efficient state tracking
-3. Test stepping scenarios
-4. Measure latency
-5. Handle edge cases
+1. Connect DAPBridge variables to ExecutionManager:
+   ```rust
+   // In DAPBridge::handle_variables_request
+   async fn handle_variables_request(&self, args: VariablesArguments) -> Result<VariablesResponse> {
+       let exec_mgr = self.execution_manager.lock().await;
+       let variables = exec_mgr.get_variables(args.variables_reference)?;
+
+       Ok(VariablesResponse {
+           variables: variables.into_iter().map(|v| Variable {
+               name: v.name,
+               value: format_lua_value(&v.value),
+               type_: v.type_name,
+               variables_reference: v.ref_id,  // For lazy expansion
+           }).collect()
+       })
+   }
+   ```
+2. Format Lua values properly:
+   ```rust
+   fn format_lua_value(val: &LuaValue) -> String {
+       match val {
+           LuaValue::Table(t) => format!("table[{}]", t.len()),
+           LuaValue::Function(_) => "function".to_string(),
+           _ => val.to_string()
+       }
+   }
+   ```
+3. Python test for variables:
+   ```python
+   # After hitting breakpoint
+   # Get stack frame
+   response = kc.control_channel.send('debug_request', {'command': 'stackTrace'})
+   frame_id = response['body']['stackFrames'][0]['id']
+
+   # Get scopes
+   response = kc.control_channel.send('debug_request', {
+       'command': 'scopes',
+       'arguments': {'frameId': frame_id}
+   })
+
+   # Get variables for local scope
+   local_scope_ref = response['body']['scopes'][0]['variablesReference']
+   response = kc.control_channel.send('debug_request', {
+       'command': 'variables',
+       'arguments': {'variablesReference': local_scope_ref}
+   })
+   ```
 
 **Definition of Done:**
-- [ ] All stepping works
-- [ ] Latency <20ms
-- [ ] Edge cases handled
-- [ ] Tests comprehensive
+- [ ] Variable inspection works via Jupyter
+- [ ] Complex types displayed correctly
+- [ ] Lazy loading works
+- [ ] Tests pass with jupyter_client
+- [ ] `./scripts/quality-check-minimal.sh` passes with ZERO warnings
+- [ ] `cargo clippy --workspace --all-features --all-targets` - ZERO warnings
+- [ ] `cargo fmt --all --check` passes
+- [ ] All tests pass: `cargo test --workspace --all-features`
+
+### Task 10.7.4: Integration Testing with Jupyter Clients
+**Priority**: HIGH
+**Estimated Time**: 3 hours
+**Assignee**: Debug Team
+
+**Description**: Comprehensive testing of DAP via Jupyter with Python jupyter_client.
+
+**Acceptance Criteria:**
+- [ ] Full debug session test works
+- [ ] Multi-breakpoint scenarios tested
+- [ ] Step operations verified
+- [ ] Variable inspection tested
+- [ ] Performance benchmarks met
+
+**Implementation Steps:**
+1. Create comprehensive test suite:
+   ```python
+   # tests/test_jupyter_dap.py
+   import pytest
+   from jupyter_client import KernelManager
+   import json
+   import time
+
+   class TestJupyterDAP:
+       @pytest.fixture
+       def kernel(self):
+           km = KernelManager(kernel_name='llmspell')
+           km.start_kernel()
+           kc = km.client()
+           yield kc
+           km.shutdown_kernel()
+
+       def test_full_debug_session(self, kernel):
+           # Initialize DAP
+           self.send_debug_request(kernel, 'initialize', {'clientID': 'test'})
+
+           # Set breakpoints
+           self.send_debug_request(kernel, 'setBreakpoints', {
+               'source': {'path': 'test.lua'},
+               'breakpoints': [{'line': 5}, {'line': 10}]
+           })
+
+           # Launch debug session
+           self.send_debug_request(kernel, 'launch', {
+               'program': 'test.lua',
+               'stopOnEntry': False
+           })
+
+           # Execute and hit first breakpoint
+           kernel.execute('llm.execute_file("test.lua")')
+           event = self.wait_for_stopped_event(kernel)
+           assert event['reason'] == 'breakpoint'
+
+           # Inspect variables
+           variables = self.get_variables_at_breakpoint(kernel)
+           assert 'x' in [v['name'] for v in variables]
+
+           # Step over
+           self.send_debug_request(kernel, 'next')
+           event = self.wait_for_stopped_event(kernel)
+           assert event['reason'] == 'step'
+
+           # Continue to next breakpoint
+           self.send_debug_request(kernel, 'continue')
+           event = self.wait_for_stopped_event(kernel)
+           assert event['line'] == 10
+
+           # Finish execution
+           self.send_debug_request(kernel, 'continue')
+   ```
+2. Performance benchmarks:
+   ```python
+   def test_dap_performance(self, kernel):
+       start = time.time()
+       response = self.send_debug_request(kernel, 'initialize', {})
+       init_time = time.time() - start
+       assert init_time < 0.05  # <50ms
+
+       # Test stepping latency
+       latencies = []
+       for _ in range(10):
+           start = time.time()
+           self.send_debug_request(kernel, 'next')
+           latencies.append(time.time() - start)
+       assert max(latencies) < 0.02  # <20ms
+   ```
+3. Edge case testing:
+   - Conditional breakpoints with complex expressions
+   - Breakpoints in nested functions
+   - Variable inspection of closures
+   - Concurrent debug sessions
+
+**Definition of Done:**
+- [ ] All test scenarios pass
+- [ ] Performance targets met
+- [ ] Documentation updated
+- [ ] Integration guide written
 - [ ] `./scripts/quality-check-minimal.sh` passes with ZERO warnings
 - [ ] `cargo clippy --workspace --all-features --all-targets` - ZERO warnings
 - [ ] `cargo fmt --all --check` passes
