@@ -307,11 +307,11 @@ impl DAPBridge {
     /// Send a stopped event via DAP
     ///
     /// This will be forwarded to the kernel for broadcasting on `IOPub`
-    pub async fn send_stopped_event(
+    pub fn send_stopped_event(
         &self,
         reason: &str,
         thread_id: i32,
-        breakpoint_id: Option<String>,
+        breakpoint_id: Option<&str>,
     ) -> serde_json::Value {
         let event = serde_json::json!({
             "type": "event",

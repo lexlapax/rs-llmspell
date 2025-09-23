@@ -305,9 +305,7 @@ impl ExecutionManager {
             // Check step mode
             let step_mode = self.step_mode.read();
             let step_reason = match *step_mode {
-                Some(StepMode::StepIn) => Some("step"),
-                Some(StepMode::StepOver) => Some("step"),
-                Some(StepMode::StepOut) => Some("step"),
+                Some(StepMode::StepIn | StepMode::StepOver | StepMode::StepOut) => Some("step"),
                 _ => None,
             };
 

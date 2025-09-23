@@ -2268,8 +2268,8 @@ mod daemon_tests {
         // Use test-friendly thresholds (higher limits)
         let config = ExecutionConfig {
             health_thresholds: Some(crate::monitoring::HealthThresholds {
-                max_memory_mb: 10240,   // 10GB - very high for testing
-                max_cpu_percent: 200.0, // 200% - allow high CPU in tests
+                max_memory_mb: 10240,    // 10GB - very high for testing
+                max_cpu_percent: 1000.0, // 1000% - allow high CPU in tests (multi-core systems)
                 max_connections: 100,
                 max_avg_latency_us: 10000,
                 max_error_rate_per_minute: 100.0,
