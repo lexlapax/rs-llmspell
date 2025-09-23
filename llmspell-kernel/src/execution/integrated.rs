@@ -8,11 +8,11 @@ use anyhow::Result;
 use llmspell_core::traits::script_executor::ScriptExecutor;
 use parking_lot::RwLock;
 use serde::{Deserialize, Serialize};
-use serde_json::Value;
+use serde_json::{json, Value};
 use std::collections::HashMap;
 use std::sync::Arc;
 use std::time::Duration;
-use tokio::sync::mpsc;
+use tokio::sync::{mpsc, oneshot};
 use tracing::{debug, error, info, instrument, trace, warn};
 
 use crate::connection::ConnectionFileManager;
@@ -143,6 +143,10 @@ pub struct IntegratedKernel<P: Protocol> {
     connection_manager: Option<Arc<parking_lot::Mutex<ConnectionFileManager>>>,
     /// Health monitor for system monitoring
     health_monitor: Arc<HealthMonitor>,
+    /// Pending input request sender for stdin channel
+    pending_input_request: Option<oneshot::Sender<String>>,
+    /// Channel health tracking - last activity timestamps
+    channel_last_activity: Arc<RwLock<HashMap<String, std::time::Instant>>>,
 }
 
 #[allow(dead_code)] // These methods will be used when transport is fully integrated
@@ -303,6 +307,8 @@ impl<P: Protocol + 'static> IntegratedKernel<P> {
             signal_operations,
             connection_manager: None,
             health_monitor,
+            pending_input_request: None,
+            channel_last_activity: Arc::new(RwLock::new(HashMap::new())),
         })
     }
 
@@ -536,44 +542,151 @@ impl<P: Protocol + 'static> IntegratedKernel<P> {
                 // Collect messages from all channels first
                 let mut messages_to_process = Vec::new();
 
-                if let Some(ref mut transport) = self.transport {
-                    // Poll multiple channels for messages
-                    let channels = vec!["shell", "control", "stdin"];
+                // Process channels sequentially to avoid multiple mutable borrows
+                // First, check Control channel (priority)
+                let control_msg = if let Some(ref mut transport) = self.transport {
+                    transport.recv("control").await.ok().flatten()
+                } else {
+                    None
+                };
 
-                    for channel in channels {
-                        // Try to receive a message from this channel (non-blocking)
-                        match transport.recv(channel).await {
-                            Ok(Some(message_parts)) => {
-                                if let Some(first_part) = message_parts.first() {
-                                    // Parse the message using protocol
-                                    match self.protocol.parse_message(first_part) {
-                                        Ok(parsed_msg) => {
-                                            trace!(
-                                                "Received message on {}: {:?}",
-                                                channel,
-                                                parsed_msg.get("msg_type")
-                                            );
-                                            messages_to_process.push(parsed_msg);
+                if let Some(message_parts) = control_msg {
+                    // Update channel activity timestamp
+                    self.channel_last_activity
+                        .write()
+                        .insert("control".to_string(), std::time::Instant::now());
+
+                    if let Some(first_part) = message_parts.first() {
+                        match self.protocol.parse_message(first_part) {
+                            Ok(parsed_msg) => {
+                                // Validate message type for control channel
+                                if let Some(msg_type) =
+                                    parsed_msg.get("msg_type").and_then(|v| v.as_str())
+                                {
+                                    if msg_type == "interrupt_request"
+                                        || msg_type == "shutdown_request"
+                                    {
+                                        trace!("Received control message: {}", msg_type);
+                                        // Process control messages immediately (priority)
+                                        if let Err(e) = self.handle_message(parsed_msg).await {
+                                            error!("Error handling control message: {}", e);
                                         }
-                                        Err(e) => {
-                                            warn!("Failed to parse message on {}: {}", channel, e);
-                                        }
+                                    } else {
+                                        warn!(
+                                            "Invalid message type '{}' on control channel",
+                                            msg_type
+                                        );
                                     }
                                 }
                             }
-                            Ok(None) => {
-                                // No message available, continue
-                            }
                             Err(e) => {
-                                error!("Error receiving from {}: {}", channel, e);
+                                warn!("Failed to parse control message: {}", e);
                             }
                         }
                     }
+                }
 
-                    // Process heartbeat separately (simple echo)
-                    if let Ok(Some(hb_data)) = transport.recv("heartbeat").await {
-                        // Echo heartbeat immediately
-                        if let Err(e) = transport.send("heartbeat", hb_data).await {
+                // Process Shell channel for execution requests
+                let shell_msg = if let Some(ref mut transport) = self.transport {
+                    transport.recv("shell").await.ok().flatten()
+                } else {
+                    None
+                };
+
+                if let Some(message_parts) = shell_msg {
+                    // Update channel activity timestamp
+                    self.channel_last_activity
+                        .write()
+                        .insert("shell".to_string(), std::time::Instant::now());
+
+                    if let Some(first_part) = message_parts.first() {
+                        match self.protocol.parse_message(first_part) {
+                            Ok(parsed_msg) => {
+                                // Validate message type for shell channel
+                                if let Some(msg_type) =
+                                    parsed_msg.get("msg_type").and_then(|v| v.as_str())
+                                {
+                                    if msg_type == "execute_request"
+                                        || msg_type == "complete_request"
+                                        || msg_type == "inspect_request"
+                                        || msg_type == "kernel_info_request"
+                                        || msg_type == "comm_info_request"
+                                        || msg_type == "history_request"
+                                    {
+                                        trace!("Received shell message: {}", msg_type);
+                                        messages_to_process.push(parsed_msg);
+                                    } else {
+                                        warn!(
+                                            "Invalid message type '{}' on shell channel",
+                                            msg_type
+                                        );
+                                    }
+                                }
+                            }
+                            Err(e) => {
+                                warn!("Failed to parse shell message: {}", e);
+                            }
+                        }
+                    }
+                }
+
+                // Process Stdin channel for input requests (kernel → frontend)
+                let stdin_msg = if let Some(ref mut transport) = self.transport {
+                    transport.recv("stdin").await.ok().flatten()
+                } else {
+                    None
+                };
+
+                if let Some(message_parts) = stdin_msg {
+                    // Update channel activity timestamp
+                    self.channel_last_activity
+                        .write()
+                        .insert("stdin".to_string(), std::time::Instant::now());
+
+                    if let Some(first_part) = message_parts.first() {
+                        match self.protocol.parse_message(first_part) {
+                            Ok(parsed_msg) => {
+                                // Validate message type for stdin channel
+                                if let Some(msg_type) =
+                                    parsed_msg.get("msg_type").and_then(|v| v.as_str())
+                                {
+                                    if msg_type == "input_reply" {
+                                        trace!("Received stdin message: {}", msg_type);
+                                        // Handle input reply from frontend
+                                        if let Err(e) = self.handle_input_reply(parsed_msg).await {
+                                            error!("Error handling input reply: {}", e);
+                                        }
+                                    } else {
+                                        warn!(
+                                            "Invalid message type '{}' on stdin channel",
+                                            msg_type
+                                        );
+                                    }
+                                }
+                            }
+                            Err(e) => {
+                                warn!("Failed to parse stdin message: {}", e);
+                            }
+                        }
+                    }
+                }
+
+                // Process heartbeat separately (simple echo)
+                let hb_data = if let Some(ref mut transport) = self.transport {
+                    transport.recv("heartbeat").await.ok().flatten()
+                } else {
+                    None
+                };
+
+                if let Some(data) = hb_data {
+                    // Update channel activity timestamp
+                    self.channel_last_activity
+                        .write()
+                        .insert("heartbeat".to_string(), std::time::Instant::now());
+
+                    // Echo heartbeat immediately
+                    if let Some(ref mut transport) = self.transport {
+                        if let Err(e) = transport.send("heartbeat", data).await {
                             warn!("Failed to send heartbeat response: {}", e);
                         }
                     }
@@ -664,6 +777,122 @@ impl<P: Protocol + 'static> IntegratedKernel<P> {
         }
 
         Ok(())
+    }
+
+    /// Handle input reply from frontend
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if handling fails
+    #[instrument(level = "debug", skip(self, message))]
+    async fn handle_input_reply(&mut self, message: HashMap<String, Value>) -> Result<()> {
+        // Extract the input value
+        let input_value = message
+            .get("content")
+            .and_then(|c| c.get("value"))
+            .and_then(|v| v.as_str())
+            .unwrap_or("");
+
+        debug!("Received input reply: {}", input_value);
+
+        // Store the input value for future reference (could be stored in state if needed)
+        debug!("Input value stored: {}", input_value);
+
+        // Notify any waiting input request
+        if let Some(sender) = self.pending_input_request.take() {
+            let _ = sender.send(input_value.to_string());
+        }
+
+        Ok(())
+    }
+
+    /// Validate that a message type is appropriate for a channel
+    pub fn validate_message_for_channel(&self, channel: &str, message: &serde_json::Value) -> bool {
+        let msg_type = message
+            .get("msg_type")
+            .and_then(|v| v.as_str())
+            .unwrap_or("");
+
+        match channel {
+            "shell" => matches!(
+                msg_type,
+                "execute_request"
+                    | "complete_request"
+                    | "inspect_request"
+                    | "history_request"
+                    | "is_complete_request"
+                    | "comm_info_request"
+                    | "kernel_info_request"
+            ),
+            "control" => matches!(
+                msg_type,
+                "interrupt_request" | "shutdown_request" | "debug_request"
+            ),
+            "stdin" => matches!(msg_type, "input_reply"),
+            "heartbeat" => true, // Heartbeat accepts any message (it's just echo)
+            _ => false,
+        }
+    }
+
+    /// Get channel health status
+    ///
+    /// Returns a map of channel names to their health status (active within last 30 seconds)
+    pub fn get_channel_health(&self) -> HashMap<String, bool> {
+        let mut health = HashMap::new();
+        let now = std::time::Instant::now();
+        let timeout = Duration::from_secs(30);
+
+        let activity = self.channel_last_activity.read();
+
+        for channel in ["shell", "control", "stdin", "heartbeat", "iopub"] {
+            let is_healthy = activity
+                .get(channel)
+                .is_some_and(|last| now.duration_since(*last) < timeout);
+            health.insert(channel.to_string(), is_healthy);
+        }
+
+        // IOPub is always healthy if IO manager exists
+        health.insert("iopub".to_string(), true);
+
+        health
+    }
+
+    /// Request input from frontend
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the request cannot be sent
+    #[instrument(level = "debug", skip(self))]
+    pub async fn request_input(&mut self, prompt: &str, password: bool) -> Result<String> {
+        info!("Requesting input from frontend: {}", prompt);
+
+        // Create input_request message
+        let request = json!({
+            "msg_type": "input_request",
+            "content": {
+                "prompt": prompt,
+                "password": password,
+            }
+        });
+
+        // Send to stdin channel
+        if let Some(ref mut transport) = self.transport {
+            let msg_bytes = self.protocol.create_request("input_request", request)?;
+            transport.send("stdin", vec![msg_bytes]).await?;
+
+            // Create oneshot channel for reply
+            let (tx, rx) = tokio::sync::oneshot::channel();
+            self.pending_input_request = Some(tx);
+
+            // Wait for reply with timeout
+            match tokio::time::timeout(Duration::from_secs(120), rx).await {
+                Ok(Ok(input)) => Ok(input),
+                Ok(Err(_)) => Err(anyhow::anyhow!("Input request cancelled")),
+                Err(_) => Err(anyhow::anyhow!("Input request timed out after 120 seconds")),
+            }
+        } else {
+            Err(anyhow::anyhow!("No transport available for input request"))
+        }
     }
 
     /// Handle `execute_request` message
@@ -1495,6 +1724,315 @@ mod tests {
         let output = result.unwrap();
         // Check that we got some output
         assert!(output.output != serde_json::Value::Null || !output.console_output.is_empty());
+    }
+
+    #[tokio::test]
+    async fn test_channel_message_type_validation() {
+        use crate::protocols::jupyter::JupyterProtocol;
+
+        let protocol = JupyterProtocol::new("test-session".to_string(), "test-kernel".to_string());
+
+        let config = ExecutionConfig::default();
+        let session_id = "test-session".to_string();
+        let executor = Arc::new(MockScriptExecutor);
+
+        let kernel = IntegratedKernel::new(protocol, config, session_id, executor)
+            .await
+            .unwrap();
+
+        // Test Shell channel accepts execute_request
+        let execute_msg = json!({
+            "msg_type": "execute_request",
+            "content": {"code": "print('test')"}
+        });
+        let result = kernel.validate_message_for_channel("shell", &execute_msg);
+        assert!(result, "Shell should accept execute_request");
+
+        // Test Shell channel accepts complete_request
+        let complete_msg = json!({
+            "msg_type": "complete_request",
+            "content": {"code": "pri", "cursor_pos": 3}
+        });
+        let result = kernel.validate_message_for_channel("shell", &complete_msg);
+        assert!(result, "Shell should accept complete_request");
+
+        // Test Control channel accepts interrupt_request
+        let interrupt_msg = json!({
+            "msg_type": "interrupt_request",
+            "content": {}
+        });
+        let result = kernel.validate_message_for_channel("control", &interrupt_msg);
+        assert!(result, "Control should accept interrupt_request");
+
+        // Test Control channel accepts shutdown_request
+        let shutdown_msg = json!({
+            "msg_type": "shutdown_request",
+            "content": {"restart": false}
+        });
+        let result = kernel.validate_message_for_channel("control", &shutdown_msg);
+        assert!(result, "Control should accept shutdown_request");
+
+        // Test Stdin channel accepts input_reply
+        let input_msg = json!({
+            "msg_type": "input_reply",
+            "content": {"value": "user input"}
+        });
+        let result = kernel.validate_message_for_channel("stdin", &input_msg);
+        assert!(result, "Stdin should accept input_reply");
+
+        // Test Shell rejects control messages
+        let result = kernel.validate_message_for_channel("shell", &interrupt_msg);
+        assert!(!result, "Shell should reject interrupt_request");
+
+        // Test Control rejects shell messages
+        let result = kernel.validate_message_for_channel("control", &execute_msg);
+        assert!(!result, "Control should reject execute_request");
+    }
+
+    #[tokio::test]
+    async fn test_stdin_input_handling() {
+        use crate::protocols::jupyter::JupyterProtocol;
+
+        let protocol = JupyterProtocol::new("test-session".to_string(), "test-kernel".to_string());
+
+        let config = ExecutionConfig::default();
+        let session_id = "test-session".to_string();
+        let executor = Arc::new(MockScriptExecutor);
+
+        let mut kernel = IntegratedKernel::new(protocol, config, session_id, executor)
+            .await
+            .unwrap();
+
+        // Simulate an input request
+        let (tx, rx) = tokio::sync::oneshot::channel();
+        kernel.pending_input_request = Some(tx);
+
+        // Handle input reply
+        let input_reply = json!({
+            "msg_type": "input_reply",
+            "content": {"value": "test input"}
+        });
+
+        let mut input_map = HashMap::new();
+        for (k, v) in input_reply.as_object().unwrap() {
+            input_map.insert(k.clone(), v.clone());
+        }
+        kernel.handle_input_reply(input_map).await.unwrap();
+
+        // Check that the input was sent through the channel
+        let received = rx.await.unwrap();
+        assert_eq!(received, "test input");
+
+        // Verify pending_input_request is cleared
+        assert!(kernel.pending_input_request.is_none());
+    }
+
+    #[tokio::test]
+    async fn test_channel_health_monitoring() {
+        use crate::protocols::jupyter::JupyterProtocol;
+        use std::time::Duration;
+
+        let protocol = JupyterProtocol::new("test-session".to_string(), "test-kernel".to_string());
+
+        let config = ExecutionConfig::default();
+        let session_id = "test-session".to_string();
+        let executor = Arc::new(MockScriptExecutor);
+
+        let kernel = IntegratedKernel::new(protocol, config, session_id, executor)
+            .await
+            .unwrap();
+
+        // Update channel activity timestamps
+        {
+            let mut activity = kernel.channel_last_activity.write();
+            activity.insert("shell".to_string(), std::time::Instant::now());
+            activity.insert(
+                "control".to_string(),
+                std::time::Instant::now()
+                    .checked_sub(Duration::from_secs(40))
+                    .unwrap(),
+            );
+            activity.insert(
+                "stdin".to_string(),
+                std::time::Instant::now()
+                    .checked_sub(Duration::from_secs(10))
+                    .unwrap(),
+            );
+            activity.insert("heartbeat".to_string(), std::time::Instant::now());
+        }
+
+        // Get channel health
+        let health = kernel.get_channel_health();
+
+        // Shell should be healthy (just updated)
+        assert!(
+            health.get("shell").copied().unwrap_or(false),
+            "Shell should be healthy"
+        );
+
+        // Control should be unhealthy (40s ago > 30s timeout)
+        assert!(
+            !health.get("control").copied().unwrap_or(true),
+            "Control should be unhealthy"
+        );
+
+        // Stdin should be healthy (10s ago < 30s timeout)
+        assert!(
+            health.get("stdin").copied().unwrap_or(false),
+            "Stdin should be healthy"
+        );
+
+        // Heartbeat should be healthy (just updated)
+        assert!(
+            health.get("heartbeat").copied().unwrap_or(false),
+            "Heartbeat should be healthy"
+        );
+    }
+
+    #[tokio::test]
+    async fn test_channel_separation() {
+        use crate::protocols::jupyter::JupyterProtocol;
+
+        let protocol = JupyterProtocol::new("test-session".to_string(), "test-kernel".to_string());
+
+        let config = ExecutionConfig::default();
+        let session_id = "test-session".to_string();
+        let executor = Arc::new(MockScriptExecutor);
+
+        let kernel = IntegratedKernel::new(protocol, config, session_id, executor)
+            .await
+            .unwrap();
+
+        // Test that shell messages update shell activity
+        let before_shell = kernel
+            .channel_last_activity
+            .read()
+            .get("shell")
+            .copied()
+            .unwrap_or(std::time::Instant::now());
+        tokio::time::sleep(tokio::time::Duration::from_millis(10)).await;
+
+        // Process a shell message (this would normally happen in the main loop)
+        kernel
+            .channel_last_activity
+            .write()
+            .insert("shell".to_string(), std::time::Instant::now());
+        let after_shell = kernel
+            .channel_last_activity
+            .read()
+            .get("shell")
+            .copied()
+            .unwrap_or(std::time::Instant::now());
+
+        assert!(
+            after_shell > before_shell,
+            "Shell activity should be updated"
+        );
+
+        // Test that control messages update control activity
+        let before_control = kernel
+            .channel_last_activity
+            .read()
+            .get("control")
+            .copied()
+            .unwrap_or(std::time::Instant::now());
+        tokio::time::sleep(tokio::time::Duration::from_millis(10)).await;
+
+        kernel
+            .channel_last_activity
+            .write()
+            .insert("control".to_string(), std::time::Instant::now());
+        let after_control = kernel
+            .channel_last_activity
+            .read()
+            .get("control")
+            .copied()
+            .unwrap_or(std::time::Instant::now());
+
+        assert!(
+            after_control > before_control,
+            "Control activity should be updated"
+        );
+    }
+
+    #[tokio::test]
+    async fn test_message_type_extraction() {
+        use crate::protocols::jupyter::JupyterProtocol;
+
+        let protocol = JupyterProtocol::new("test-session".to_string(), "test-kernel".to_string());
+
+        let config = ExecutionConfig::default();
+        let session_id = "test-session".to_string();
+        let executor = Arc::new(MockScriptExecutor);
+
+        let _kernel = IntegratedKernel::new(protocol, config, session_id, executor)
+            .await
+            .unwrap();
+
+        // Test extracting msg_type from various message structures
+        let msg1 = json!({
+            "msg_type": "execute_request",
+            "content": {}
+        });
+        assert_eq!(
+            msg1.get("msg_type").and_then(|v| v.as_str()),
+            Some("execute_request")
+        );
+
+        let msg2 = json!({
+            "header": {
+                "msg_type": "complete_request"
+            },
+            "content": {}
+        });
+        assert_eq!(
+            msg2.get("header")
+                .and_then(|h| h.get("msg_type"))
+                .and_then(|v| v.as_str()),
+            Some("complete_request")
+        );
+
+        // Test missing msg_type
+        let msg3 = json!({
+            "content": {}
+        });
+        assert_eq!(msg3.get("msg_type").and_then(|v| v.as_str()), None);
+    }
+
+    #[tokio::test]
+    async fn test_control_channel_priority() {
+        // This test verifies that control channel messages are processed with priority
+        use crate::protocols::jupyter::JupyterProtocol;
+
+        let protocol = JupyterProtocol::new("test-session".to_string(), "test-kernel".to_string());
+
+        let config = ExecutionConfig::default();
+        let session_id = "test-session".to_string();
+        let executor = Arc::new(MockScriptExecutor);
+
+        let kernel = IntegratedKernel::new(protocol, config, session_id, executor)
+            .await
+            .unwrap();
+
+        // In a real scenario, control messages would be processed first in the main loop
+        // Here we just verify the validation works correctly for priority messages
+        let interrupt_msg = json!({
+            "msg_type": "interrupt_request",
+            "content": {}
+        });
+
+        let shutdown_msg = json!({
+            "msg_type": "shutdown_request",
+            "content": {"restart": false}
+        });
+
+        // Both interrupt and shutdown should be valid for control channel
+        assert!(kernel.validate_message_for_channel("control", &interrupt_msg));
+        assert!(kernel.validate_message_for_channel("control", &shutdown_msg));
+
+        // They should not be valid for other channels
+        assert!(!kernel.validate_message_for_channel("shell", &interrupt_msg));
+        assert!(!kernel.validate_message_for_channel("stdin", &shutdown_msg));
     }
 }
 

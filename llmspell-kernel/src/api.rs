@@ -436,11 +436,18 @@ pub async fn start_kernel_service_with_config(
     );
 
     // Create Jupyter protocol
-    let protocol = JupyterProtocol::new(session_id.clone(), kernel_id.clone());
+    let mut protocol = JupyterProtocol::new(session_id.clone(), kernel_id.clone());
 
-    // Create integrated kernel with provided config
+    // Create ConnectionFileManager early to get the HMAC key
+    let mut conn_manager =
+        crate::connection::ConnectionFileManager::new(kernel_id.clone(), config.port);
+
+    // Set the HMAC key on the protocol from the connection info
+    protocol.set_hmac_key(&conn_manager.info().key);
+
+    // Create integrated kernel with protocol that has the HMAC key
     let kernel = IntegratedKernel::new(
-        protocol,
+        protocol.clone(),
         config.exec_config.clone(),
         session_id,
         config.script_executor,
@@ -484,10 +491,7 @@ pub async fn start_kernel_service_with_config(
         }
     }
 
-    // Set up ConnectionFileManager and write connection file
-    let mut conn_manager =
-        crate::connection::ConnectionFileManager::new(kernel_id.clone(), config.port);
-
+    // Write the connection file
     let connection_file = if let Some(path) = config.connection_file_path {
         // Use specified path
         std::fs::write(&path, serde_json::to_string_pretty(conn_manager.info())?)?;

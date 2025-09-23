@@ -90,6 +90,7 @@ brotli = "3.5"
 
 # Cryptography
 sha2 = "0.10"
+hmac = "0.12"
 
 # Text processing
 regex = "1.10"
