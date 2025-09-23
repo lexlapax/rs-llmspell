@@ -1664,129 +1664,198 @@ llmspell-kernel/src/daemon/
 
 ## Phase 10.6: Jupyter Protocol Enhancement (Days 7-9)
 
-### Task 10.6.1: Complete 5-Channel Implementation
-**Priority**: CRITICAL
-**Estimated Time**: 6 hours
-**Assignee**: Protocol Team Lead
+**ANALYSIS INSIGHT**: Significant portions already implemented - 5-channel architecture exists in `transport/jupyter.rs`, HMAC key generation in `connection/mod.rs`, MessageRouter in `io/router.rs`. Critical missing piece is actual HMAC signing/verification.
 
-**Description**: Ensure all 5 Jupyter channels are properly implemented.
-
-**Acceptance Criteria:**
-- [ ] Shell channel (ROUTER-DEALER) works
-- [ ] IOPub channel (PUB-SUB) works
-- [ ] Stdin channel (ROUTER-DEALER) works
-- [ ] Control channel (ROUTER-DEALER) works
-- [ ] Heartbeat channel (REQ-REP) works
-
-**Implementation Steps:**
-1. Verify shell channel implementation:
-   - Execute requests/replies
-   - Completion requests
-   - Inspection requests
-   - Priority queue for urgent requests
-2. Implement IOPub channel:
-   - Status broadcasts
-   - Stream outputs
-   - Display data
-   - Buffer overflow handling (max 1000 messages)
-3. Implement control channel:
-   - Interrupt requests
-   - Shutdown requests
-   - Priority override for control messages
-4. Implement heartbeat:
-   - Simple echo service
-   - 30-second timeout detection
-   - Automatic reconnection on failure
-   - Exponential backoff (1s, 2s, 4s, 8s, max 30s)
-5. Channel failure recovery:
-   - Detect channel disconnection
-   - Buffer pending messages (max 100)
-   - Attempt reconnection with backoff
-   - Notify clients of channel status
-6. Test with Jupyter Lab
-
-**Definition of Done:**
-- [ ] All channels functional
-- [ ] Jupyter Lab connects
-- [ ] Messages routed correctly
-- [ ] Tests comprehensive
-- [ ] `./scripts/quality-check-minimal.sh` passes with ZERO warnings
-- [ ] `cargo clippy --workspace --all-features --all-targets` - ZERO warnings
-- [ ] `cargo fmt --all --check` passes
-- [ ] All tests pass: `cargo test --workspace --all-features`
-
-### Task 10.6.2: Implement HMAC Authentication
-**Priority**: HIGH
+### Task 10.6.1: Implement HMAC Authentication (was 10.6.2)
+**Priority**: CRITICAL - Security foundation for Jupyter
 **Estimated Time**: 4 hours
 **Assignee**: Protocol Team
 
-**Description**: Add or verify existing HMAC-based message authentication for security.
+**Description**: Complete HMAC-based message authentication. Key generation exists but signing/verification NOT implemented.
+
+**Current State:**
+- ✅ HMAC key generated in `connection/mod.rs:58-63`
+- ✅ `signature_scheme: "hmac-sha256"` in connection file
+- ✅ `sha2 = "0.10"` dependency present
+- ❌ **MISSING**: `hmac` crate dependency
+- ❌ **MISSING**: Actual message signing
+- ❌ **MISSING**: Signature verification
 
 **Acceptance Criteria:**
-- [ ] HMAC signatures generated
-- [ ] Signature verification works
-- [ ] Key from connection file
-- [ ] Invalid messages rejected
-- [ ] Performance acceptable
+- [ ] Add `hmac = "0.12"` to Cargo.toml
+- [ ] HMAC signatures computed on outgoing messages
+- [ ] Signature verification on incoming messages
+- [ ] Invalid signatures rejected with clear error
+- [ ] Key loaded from connection file auth_key field
+- [ ] Performance overhead <1ms per message
 
 **Implementation Steps:**
-1. Add HMAC support:
+1. Add hmac dependency to `llmspell-kernel/Cargo.toml`:
+   ```toml
+   hmac = "0.12"
+   ```
+2. Implement signing in `protocols/jupyter.rs`:
    ```rust
    use hmac::{Hmac, Mac};
    use sha2::Sha256;
 
-   fn sign_message(key: &[u8], parts: &[&[u8]]) -> Vec<u8>
+   fn sign_message(key: &[u8], header: &[u8], parent: &[u8],
+                   metadata: &[u8], content: &[u8]) -> Vec<u8> {
+       let mut mac = Hmac::<Sha256>::new_from_slice(key)?;
+       mac.update(header);
+       mac.update(parent);
+       mac.update(metadata);
+       mac.update(content);
+       mac.finalize().into_bytes().to_vec()
+   }
    ```
-2. Sign outgoing messages
-3. Verify incoming messages
-4. Handle authentication errors
-5. Test with real Jupyter client
+3. Integrate with ZeroMQ multipart messages:
+   - Signature goes in first frame
+   - Then header, parent_header, metadata, content
+4. Verify signatures on receive:
+   - Extract signature from first frame
+   - Recompute and compare
+   - Reject if mismatch
+5. Test with real Jupyter Lab connection
+6. Add unit tests for signing/verification
 
 **Definition of Done:**
-- [ ] Signatures correct
-- [ ] Verification works
-- [ ] Security ensured
-- [ ] Performance <1ms overhead
+- [ ] `hmac` dependency added
+- [ ] Signing implemented in protocol layer
+- [ ] Verification working correctly
+- [ ] Jupyter Lab connects with authentication
+- [ ] Performance <1ms overhead verified
 - [ ] `./scripts/quality-check-minimal.sh` passes with ZERO warnings
 - [ ] `cargo clippy --workspace --all-features --all-targets` - ZERO warnings
-- [ ] `cargo fmt --all --check` passes
 - [ ] All tests pass: `cargo test --workspace --all-features`
 
-### Task 10.6.3: Implement Message Routing
-**Priority**: HIGH
+### Task 10.6.2: Complete Message Routing (was 10.6.3)
+**Priority**: HIGH - Enables proper multi-client support
 **Estimated Time**: 4 hours
 **Assignee**: Protocol Team
 
-**Description**: Implement or augment existing proper message routing between channels.
+**Description**: Complete parent header tracking for request/reply correlation. MessageRouter exists but parent headers not preserved through execution.
+
+**Current State:**
+- ✅ `MessageRouter` implemented in `io/router.rs`
+- ✅ Multi-client registration/tracking
+- ✅ Broadcast/Client/Requester destinations
+- ✅ Correlation ID tracking with UUID
+- ❌ **MISSING**: Parent header preservation
+- ❌ **MISSING**: Reply routing to original requester
 
 **Acceptance Criteria:**
-- [ ] Request/reply correlation works
-- [ ] Broadcasts reach all clients
-- [ ] Parent headers preserved
-- [ ] Message ordering maintained
-- [ ] Multi-client support works
+- [ ] Parent headers preserved through execution pipeline
+- [ ] Replies routed to correct requester using parent header
+- [ ] Broadcasts reach all connected clients on IOPub
+- [ ] Message ordering maintained per client
+- [ ] Concurrent client requests handled correctly
 
 **Implementation Steps:**
-1. Implement message router:
-   - Track parent headers
-   - Route replies to requesters
-   - Broadcast on IOPub
-   - Maintain message order
-2. Support multiple clients:
-   - Client session tracking
-   - Isolated execution contexts
-3. Test concurrent clients
-4. Verify message ordering
-5. Test edge cases
+1. Enhance message structure to carry parent header:
+   ```rust
+   pub struct KernelMessage {
+       header: HashMap<String, Value>,
+       parent_header: HashMap<String, Value>,  // Preserve this!
+       metadata: HashMap<String, Value>,
+       content: Value,
+   }
+   ```
+2. Update `IntegratedKernel` to pass parent headers:
+   - Extract parent from incoming request
+   - Thread through script execution context
+   - Include in response messages
+3. Modify `MessageRouter::route_message()`:
+   - Check parent_header for original client
+   - Route replies to that specific client
+   - Fallback to broadcast if no parent
+4. Test scenarios:
+   - Two clients sending simultaneous requests
+   - Verify each gets correct response
+   - Check IOPub broadcasts reach both
+5. Add integration tests for multi-client scenarios
+6. Verify with multiple Jupyter Lab instances
 
 **Definition of Done:**
-- [ ] Routing works correctly
-- [ ] Multi-client works
-- [ ] Order preserved
-- [ ] Tests comprehensive
+- [ ] Parent headers preserved end-to-end
+- [ ] Request/reply correlation working
+- [ ] Multi-client tested with 2+ Jupyter Labs
+- [ ] Message ordering verified
+- [ ] Integration tests pass
 - [ ] `./scripts/quality-check-minimal.sh` passes with ZERO warnings
 - [ ] `cargo clippy --workspace --all-features --all-targets` - ZERO warnings
-- [ ] `cargo fmt --all --check` passes
+- [ ] All tests pass: `cargo test --workspace --all-features`
+
+### Task 10.6.3: Channel-Specific Message Processing (was 10.6.1)
+**Priority**: MEDIUM - Refinement of existing implementation
+**Estimated Time**: 6 hours
+**Assignee**: Protocol Team Lead
+
+**Description**: Refine channel-specific message handling. All 5 channels exist but need separation and proper message filtering.
+
+**Current State:**
+- ✅ All 5 channels configured in `transport/jupyter.rs:103-163`
+- ✅ Socket patterns correct (ROUTER/PUB/REP)
+- ✅ Heartbeat echo working in `execution/integrated.rs`
+- ⚠️ Shell and Control processed together (not separated)
+- ❌ **MISSING**: Stdin channel not actively used
+- ❌ **MISSING**: Channel-specific message filtering
+
+**Acceptance Criteria:**
+- [ ] Shell channel handles only execute/complete/inspect requests
+- [ ] Control channel handles only interrupt/shutdown requests
+- [ ] Stdin channel handles input requests from kernel to frontend
+- [ ] IOPub properly broadcasts all outputs and status
+- [ ] Heartbeat maintains 5-second interval
+- [ ] Channel isolation verified
+
+**Implementation Steps:**
+1. Separate Shell and Control processing in `integrated.rs`:
+   ```rust
+   // Process shell separately
+   if let Ok(Some(msg)) = transport.recv("shell").await {
+       // Handle execute_request, complete_request, inspect_request
+   }
+
+   // Process control with priority
+   if let Ok(Some(msg)) = transport.recv("control").await {
+       // Handle interrupt_request, shutdown_request
+   }
+   ```
+2. Implement Stdin channel for input requests:
+   ```rust
+   async fn request_input(&self, prompt: &str, password: bool) -> Result<String> {
+       let msg = create_input_request(prompt, password);
+       transport.send("stdin", msg).await?;
+       // Wait for input_reply
+   }
+   ```
+3. Enhance IOPub broadcasting:
+   - Status updates (busy/idle/starting)
+   - Stream outputs (stdout/stderr)
+   - Display data with MIME types
+   - Execution results
+4. Add message type filtering per channel:
+   - Reject wrong message types
+   - Log violations for debugging
+5. Channel health monitoring:
+   - Track last activity per channel
+   - Detect stuck channels
+   - Report channel status
+6. Test with Jupyter Lab:
+   - Verify code execution works
+   - Test input() function
+   - Confirm interrupt handling
+   - Check all outputs displayed
+
+**Definition of Done:**
+- [ ] Channels properly separated
+- [ ] Stdin input requests working
+- [ ] Message filtering enforced
+- [ ] Jupyter Lab fully functional
+- [ ] Channel health monitoring active
+- [ ] `./scripts/quality-check-minimal.sh` passes with ZERO warnings
+- [ ] `cargo clippy --workspace --all-features --all-targets` - ZERO warnings
 - [ ] All tests pass: `cargo test --workspace --all-features`
 
 ---
