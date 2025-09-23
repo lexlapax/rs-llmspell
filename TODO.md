@@ -2304,48 +2304,146 @@ llmspell-kernel/src/daemon/
 5. **Clean Separation**: Transport layer knows nothing about Jupyter protocol
 6. **Zero Warnings**: Compiles with cargo clippy --all-targets --all-features
 
-### Task 10.7.6: Validate Jupyter Protocol Conformance 🔄 IN PROGRESS
-**Priority**: HIGH
-**Estimated Time**: 2 hours
+### Task 10.7.6: Validate Jupyter Protocol Conformance ❌ CRITICAL ISSUE FOUND
+**Priority**: CRITICAL
+**Estimated Time**: 2 hours (Actual: 1 hour)
 **Assignee**: QA Team
-**Status**: NOT STARTED
+**Status**: ❌ BLOCKED - CRITICAL TRANSPORT ISSUE DISCOVERED
 
 **Description**: Ensure kernel properly implements Jupyter Messaging Protocol for DAP.
 
 **Acceptance Criteria:**
-- [ ] kernel_info_request/reply works
-- [ ] debug_request/reply properly formatted
-- [ ] Message signing with HMAC-SHA256 works
-- [ ] Parent header propagation correct
-- [ ] IOPub broadcasts include proper parent_header
+- ❌ kernel_info_request/reply works
+- ❌ debug_request/reply properly formatted
+- ❌ Message signing with HMAC-SHA256 works
+- ❌ Parent header propagation correct
+- ❌ IOPub broadcasts include proper parent_header
 
-**Implementation Steps:**
-1. Test with jupyter console:
-   ```bash
-   jupyter console --kernel llmspell --debug
+**CRITICAL ISSUE DISCOVERED**: Transport Not Wired to Kernel Message Loop
+
+**Problem Analysis:**
+1. ✅ ZeroMQ transport binds successfully to ports 57000-57004
+2. ✅ Connection file generated with correct ports and HMAC key
+3. ✅ Kernel starts and reaches "idle" status
+4. ❌ **Transport polling loop never activates**
+
+**Root Cause**: IntegratedKernel::run() checks `self.transport.is_some()` but transport is None
+
+**Evidence from TRACE logs:**
+- Kernel logs: "Running kernel service on port 57000"
+- Kernel logs: "Published status: idle"
+- **Missing**: No transport polling messages despite --trace trace
+- **Missing**: No "Process messages from transport" logs
+- **Missing**: No transport.recv() calls in logs
+
+**Code Analysis (IntegratedKernel::run()):**
+```rust
+// Line 540: Check if transport exists
+let has_transport = self.transport.is_some();
+
+if has_transport {
+    // Transport polling loop (lines 542-719)
+} else {
+    // Line 721: No transport - just sleep
+    tokio::time::sleep(Duration::from_millis(100)).await;
+}
+```
+
+**Test Results:**
+- ❌ Python ZeroMQ clients timeout connecting to kernel
+- ❌ Heartbeat (REQ/REP) never receives echo response
+- ❌ Shell channel (DEALER/ROUTER) never processes messages
+- ❌ All Jupyter protocol validation fails
+
+**Critical Analysis & Insights:**
+
+1. **Transport Lifecycle Issue**:
+   - api.rs:461: `kernel.set_transport(Box::new(transport))` called successfully
+   - ServiceHandle stores kernel with transport supposedly set
+   - ServiceHandle::run() calls `self.kernel.run().await`
+   - IntegratedKernel::run():540: `self.transport.is_some()` returns **false**
+
+2. **Ownership Investigation Needed**:
+   - Transport may be moved/consumed during ServiceHandle creation
+   - Kernel might be cloned without transport somewhere
+   - Transport field could be reset between set_transport() and run()
+
+3. **Evidence of Broken Message Loop**:
+   - Kernel logs show "Published status: idle" but no transport polling
+   - Zero "Process messages from transport" traces despite --trace trace
+   - No transport.recv() calls in any logs
+   - Network listeners active but never process incoming messages
+
+4. **Impact Assessment**:
+   - **ALL Jupyter protocol communication broken**
+   - DAP debugging completely non-functional
+   - Kernel appears "started" but is effectively deaf to clients
+   - Python integration tests will fail indefinitely
+
+**Root Cause Hypothesis**: ServiceHandle::run() moves `self.kernel` but transport reference may be lost during this transfer. Need to investigate if IntegratedKernel::run() receives the correct instance.
+
+**Implementation Insights**:
+- Tasks 10.7.4 and 10.7.5 were correctly implemented
+- Transport binding and connection wiring work as designed
+- Issue is in the final handoff between ServiceHandle and IntegratedKernel
+- Critical that this be fixed before any further DAP work
+
+### Task 10.7.6.1: Fix Critical Transport Wiring Bug 🚨 URGENT
+**Priority**: CRITICAL - BLOCKS ALL JUPYTER FUNCTIONALITY
+**Estimated Time**: 2 hours
+**Assignee**: Core Transport Team
+**Status**: NOT STARTED
+
+**Description**: Fix the critical bug where IntegratedKernel receives None transport despite ServiceHandle calling set_transport().
+
+**Problem**:
+- `kernel.set_transport()` called in api.rs:461
+- `self.transport.is_some()` returns false in IntegratedKernel::run():540
+- Kernel message loop never activates, making kernel unresponsive
+
+**Investigation Steps:**
+1. **Add debug logging**:
+   ```rust
+   // In ServiceHandle::run() - before calling kernel.run()
+   debug!("ServiceHandle: kernel has transport: {}", self.kernel.transport.is_some());
+
+   // In IntegratedKernel::run() - line 540
+   debug!("IntegratedKernel: transport check: {:?}", self.transport.is_some());
    ```
 
-2. Verify message format:
-   ```python
-   # Should see proper ZeroMQ frames:
-   # [<identity>, <delimiter>, <HMAC>, <header>, <parent>, <metadata>, <content>]
-   ```
+2. **Check transport field ownership**:
+   - Verify transport isn't moved during ServiceHandle creation
+   - Ensure kernel instance in ServiceHandle is the same as created
+   - Check for any clone() calls that might lose transport
 
-3. Test debug_request specifically:
-   ```python
-   from jupyter_client import KernelManager
-   km = KernelManager(kernel_name='llmspell')
-   km.start_kernel()
-   kc = km.client()
+3. **Fix root cause**:
+   - If transport lost during move: fix ownership transfer
+   - If kernel cloned: ensure transport is preserved
+   - If field reset: identify and fix the reset location
 
-   # Send debug_request
-   msg = kc.session.msg('debug_request', {'command': 'initialize'})
-   kc.shell_channel.send(msg)
-   reply = kc.get_shell_msg()
-   assert reply['msg_type'] == 'debug_reply'
-   ```
+**Acceptance Criteria:**
+- [ ] IntegratedKernel::run() shows `self.transport.is_some() == true`
+- [ ] Transport polling loop activates ("Process messages from transport" logs)
+- [ ] Heartbeat test responds with echo
+- [ ] Basic kernel_info_request/reply works
+- [ ] Zero clippy warnings
 
-### Task 10.7.7: Python-Based Integration Testing with Real Jupyter Client 🔧
+**Test Validation**:
+```bash
+# After fix, this should work:
+python3 -c "
+import zmq
+ctx = zmq.Context()
+s = ctx.socket(zmq.REQ)
+s.connect('tcp://127.0.0.1:57004')
+s.send(b'ping')
+print('Reply:', s.recv())
+s.close()
+ctx.term()
+"
+```
+
+### Task 10.7.7: Python-Based Integration Testing with Real Jupyter Client ⏸️ BLOCKED
 **Priority**: CRITICAL
 **Estimated Time**: 6 hours (Actual: 2 hours)
 **Assignee**: Debug Team
