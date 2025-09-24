@@ -51,7 +51,7 @@ def build_llmspell():
 
     logger.info("Building llmspell...")
     result = subprocess.run(
-        ["cargo", "build", "-p", "llmspell-cli"],
+        ["cargo", "build", "--all-targets", "--all-features"],
         capture_output=True,
         text=True,
         check=False,
@@ -126,13 +126,24 @@ def llmspell_daemon(build_llmspell):
                     continue
 
             # Check if process died
+            # In daemon mode, the parent process exits with code 0 after forking
             if proc.poll() is not None:
+                exit_code = proc.returncode
                 stdout, stderr = proc.communicate()
-                logger.error(f"Kernel process died. stdout: {stdout}")
-                logger.error(f"stderr: {stderr}")
-                if log_file.exists():
-                    logger.error(f"Log file contents:\n{log_file.read_text()}")
-                raise RuntimeError(f"Kernel failed to start. Exit code: {proc.returncode}")
+
+                # Exit code 0 is expected for daemon mode - parent exits after fork
+                if exit_code == 0:
+                    logger.debug("Parent process exited normally (daemon mode)")
+                    # Give daemon child a moment to create connection file
+                    time.sleep(0.5)
+                    continue
+                else:
+                    # Non-zero exit code indicates actual failure
+                    logger.error(f"Kernel process died. stdout: {stdout}")
+                    logger.error(f"stderr: {stderr}")
+                    if log_file.exists():
+                        logger.error(f"Log file contents:\n{log_file.read_text()}")
+                    raise RuntimeError(f"Kernel failed to start. Exit code: {exit_code}")
 
             time.sleep(0.1)
         else:
@@ -143,30 +154,52 @@ def llmspell_daemon(build_llmspell):
                 logger.error(f"Log file contents:\n{log_file.read_text()}")
             raise RuntimeError("Kernel failed to start within 30 seconds")
 
-        # Store PID for monitoring
+        # Get actual daemon PID from PID file (since parent process exited)
+        kernel_pid = None
         if pid_file.exists():
-            kernel_pid = int(pid_file.read_text().strip())
-            logger.info(f"Kernel PID: {kernel_pid}")
+            try:
+                kernel_pid = int(pid_file.read_text().strip())
+                logger.info(f"Kernel daemon PID: {kernel_pid}")
+            except (ValueError, FileNotFoundError):
+                logger.warning("Could not read PID from PID file")
 
         yield {
             "process": proc,
             "connection_file": connection_file,
             "log_file": log_file,
             "tmpdir": tmpdir,
-            "connection_info": conn_info
+            "connection_info": conn_info,
+            "kernel_pid": kernel_pid,
+            "pid_file": pid_file
         }
 
         # Cleanup: terminate daemon gracefully
         logger.info("Shutting down kernel daemon...")
-        if proc.poll() is None:
-            proc.terminate()
+
+        # For daemon mode, use the PID from PID file to kill the actual daemon process
+        if kernel_pid:
             try:
-                proc.wait(timeout=10)
-                logger.info("Kernel terminated gracefully")
-            except subprocess.TimeoutExpired:
-                logger.warning("Kernel didn't terminate gracefully, forcing kill")
-                proc.kill()
-                proc.wait()
+                os.kill(kernel_pid, signal.SIGTERM)
+                # Wait a bit for graceful shutdown
+                for _ in range(10):
+                    try:
+                        os.kill(kernel_pid, 0)  # Check if process still exists
+                        time.sleep(1)
+                    except ProcessLookupError:
+                        logger.info("Kernel daemon terminated gracefully")
+                        break
+                else:
+                    # Force kill if still running
+                    logger.warning("Kernel didn't terminate gracefully, forcing kill")
+                    os.kill(kernel_pid, signal.SIGKILL)
+            except ProcessLookupError:
+                logger.info("Kernel daemon already terminated")
+            except Exception as e:
+                logger.error(f"Error terminating kernel: {e}")
+
+        # Clean up PID file
+        if pid_file.exists():
+            pid_file.unlink()
 
         # Log final state if there were issues
         if log_file.exists():

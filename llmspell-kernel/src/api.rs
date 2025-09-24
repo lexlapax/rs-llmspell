@@ -476,6 +476,7 @@ pub async fn start_kernel_service_with_config(
 
     // Note: Daemon mode is now handled by the CLI before creating tokio runtime
     // The daemonization happens BEFORE this async function is called
+    // The PID file is already created by DaemonManager::daemonize()
     // We just need to handle log rotation if configured
     if config.exec_config.daemon_mode {
         if let Some(ref daemon_config) = config.exec_config.daemon_config {
@@ -496,11 +497,13 @@ pub async fn start_kernel_service_with_config(
                 }
             }
 
-            // Create PID file if configured (daemon has already forked)
+            // PID file is already created by DaemonManager::daemonize() in main.rs
+            // Do NOT create it again here as it causes "Another instance is already running" error
             if let Some(ref pid_path) = daemon_config.pid_file {
-                let mut pid_file = crate::daemon::PidFile::new(pid_path.clone());
-                pid_file.write()?;
-                info!("Created PID file at {:?}", pid_path);
+                debug!(
+                    "PID file already created at {:?} by DaemonManager",
+                    pid_path
+                );
             }
         }
     }
@@ -542,16 +545,38 @@ async fn setup_kernel_transport(
     info!("setup_kernel_transport: ZeroMQ transport created");
 
     // Build transport configuration for Jupyter 5 channels
+    // Special handling for port 0 - let OS assign all ports independently
     let transport_config = TransportConfig {
         transport_type: "tcp".to_string(),
         base_address: "127.0.0.1".to_string(),
         channels: {
             let mut channels = HashMap::new();
+
+            // When base_port is 0, use 0 for all channels to let OS assign each independently
+            // Otherwise use sequential ports starting from base_port
+            let (shell_port, iopub_port, stdin_port, control_port, hb_port) = if base_port == 0 {
+                (
+                    "0".to_string(),
+                    "0".to_string(),
+                    "0".to_string(),
+                    "0".to_string(),
+                    "0".to_string(),
+                )
+            } else {
+                (
+                    base_port.to_string(),
+                    (base_port + 1).to_string(),
+                    (base_port + 2).to_string(),
+                    (base_port + 3).to_string(),
+                    (base_port + 4).to_string(),
+                )
+            };
+
             channels.insert(
                 "shell".to_string(),
                 ChannelConfig {
                     pattern: "router".to_string(),
-                    endpoint: base_port.to_string(),
+                    endpoint: shell_port,
                     options: HashMap::new(),
                 },
             );
@@ -559,7 +584,7 @@ async fn setup_kernel_transport(
                 "iopub".to_string(),
                 ChannelConfig {
                     pattern: "pub".to_string(),
-                    endpoint: (base_port + 1).to_string(),
+                    endpoint: iopub_port,
                     options: HashMap::new(),
                 },
             );
@@ -567,7 +592,7 @@ async fn setup_kernel_transport(
                 "stdin".to_string(),
                 ChannelConfig {
                     pattern: "router".to_string(),
-                    endpoint: (base_port + 2).to_string(),
+                    endpoint: stdin_port,
                     options: HashMap::new(),
                 },
             );
@@ -575,7 +600,7 @@ async fn setup_kernel_transport(
                 "control".to_string(),
                 ChannelConfig {
                     pattern: "router".to_string(),
-                    endpoint: (base_port + 3).to_string(),
+                    endpoint: control_port,
                     options: HashMap::new(),
                 },
             );
@@ -583,7 +608,7 @@ async fn setup_kernel_transport(
                 "heartbeat".to_string(),
                 ChannelConfig {
                     pattern: "rep".to_string(),
-                    endpoint: (base_port + 4).to_string(),
+                    endpoint: hb_port,
                     options: HashMap::new(),
                 },
             );

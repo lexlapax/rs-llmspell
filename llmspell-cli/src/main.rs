@@ -72,18 +72,30 @@ fn handle_daemon_mode(cli: Cli) -> Result<()> {
     };
 
     let default_log_path = || {
-        let base = log_file
-            .clone()
-            .unwrap_or_else(|| {
-                dirs::home_dir()
-                    .unwrap_or_else(|| PathBuf::from("/tmp"))
-                    .join(".llmspell")
-            })
-            .join("logs")
-            .join(format!(
-                "kernel-{}.log",
-                id.as_deref().unwrap_or(&format!("port-{}", port))
-            ));
+        // If log_file is provided and ends with .log, use it directly
+        // Otherwise treat it as a directory base
+        let base = if let Some(ref log_path) = log_file {
+            if log_path.extension().and_then(|s| s.to_str()) == Some("log") {
+                // Full log file path provided
+                log_path.clone()
+            } else {
+                // Directory path provided, append kernel log filename
+                log_path.join(format!(
+                    "kernel-{}.log",
+                    id.as_deref().unwrap_or(&format!("port-{}", port))
+                ))
+            }
+        } else {
+            // No log file specified, use default location
+            dirs::home_dir()
+                .unwrap_or_else(|| PathBuf::from("/tmp"))
+                .join(".llmspell")
+                .join("logs")
+                .join(format!(
+                    "kernel-{}.log",
+                    id.as_deref().unwrap_or(&format!("port-{}", port))
+                ))
+        };
 
         // Ensure parent directory exists
         if let Some(parent) = base.parent() {
