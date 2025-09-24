@@ -50,13 +50,9 @@ impl JupyterProtocol {
 
     /// Set the HMAC key for message authentication
     pub fn set_hmac_key(&mut self, key: &str) {
-        // Decode hex-encoded key
-        if let Ok(decoded) = hex::decode(key) {
-            self.hmac_key = Some(decoded);
-        } else {
-            // If not hex, use raw bytes
-            self.hmac_key = Some(key.as_bytes().to_vec());
-        }
+        // jupyter_client expects the raw UTF-8 key, not hex-decoded
+        // This matches the reference implementation behavior
+        self.hmac_key = Some(key.as_bytes().to_vec());
     }
 
     /// Sign message components according to Jupyter protocol
@@ -371,6 +367,39 @@ impl Protocol for JupyterProtocol {
         });
 
         Ok(serde_json::to_vec(&request)?)
+    }
+
+    fn sign_message(
+        &self,
+        header: &[u8],
+        parent_header: &[u8],
+        metadata: &[u8],
+        content: &[u8],
+    ) -> Result<String> {
+        // Use the existing internal sign_message implementation
+        if let Some(ref key) = self.hmac_key {
+            type HmacSha256 = Hmac<Sha256>;
+            let mut mac =
+                HmacSha256::new_from_slice(key).map_err(|e| anyhow!("Invalid HMAC key: {}", e))?;
+
+            // Sign in the order specified by Jupyter protocol
+            mac.update(header);
+            mac.update(parent_header);
+            mac.update(metadata);
+            mac.update(content);
+
+            let result = mac.finalize();
+            Ok(hex::encode(result.into_bytes()))
+        } else {
+            // No key set, return empty signature
+            Ok(String::new())
+        }
+    }
+
+    fn set_hmac_key(&mut self, key: &str) {
+        // jupyter_client expects the raw UTF-8 key, not hex-decoded
+        // This matches the reference implementation behavior
+        self.hmac_key = Some(key.as_bytes().to_vec());
     }
 }
 

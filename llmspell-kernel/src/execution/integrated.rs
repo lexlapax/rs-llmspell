@@ -151,6 +151,8 @@ pub struct IntegratedKernel<P: Protocol> {
     channel_last_activity: Arc<RwLock<HashMap<String, std::time::Instant>>>,
     /// Current client identity for message routing
     current_client_identity: Option<Vec<u8>>,
+    /// Current message header (becomes parent_header in replies)
+    current_msg_header: Option<serde_json::Value>,
 }
 
 #[allow(dead_code)] // These methods will be used when transport is fully integrated
@@ -314,6 +316,7 @@ impl<P: Protocol + 'static> IntegratedKernel<P> {
             pending_input_request: None,
             channel_last_activity: Arc::new(RwLock::new(HashMap::new())),
             current_client_identity: None,
+            current_msg_header: None,
         })
     }
 
@@ -610,8 +613,16 @@ impl<P: Protocol + 'static> IntegratedKernel<P> {
                     match parsed_result {
                         Ok(parsed_msg) => {
                             // Extract client identity from Part 0 for response routing
-                            let client_identity =
-                                message_parts.first().cloned().unwrap_or_default();
+                            // Handle both REQ (empty first frame) and DEALER (identity first) sockets
+                            let client_identity = if let Some(first_part) = message_parts.first() {
+                                // Always use Part 0 as the client identity for routing
+                                // For DEALER: Part 0 is the explicit client identity
+                                // For REQ: Part 0 is the ZMQ-generated routing identity
+                                // Both cases: echo back exactly what we received in Part 0
+                                first_part.clone()
+                            } else {
+                                b"unknown_client".to_vec()
+                            };
 
                             // Validate message type for control channel
                             if let Some(msg_type) =
@@ -738,8 +749,16 @@ impl<P: Protocol + 'static> IntegratedKernel<P> {
                     match parsed_result {
                         Ok(parsed_msg) => {
                             // Extract client identity from Part 0 for response routing
-                            let client_identity =
-                                message_parts.first().cloned().unwrap_or_default();
+                            // Handle both REQ (empty first frame) and DEALER (identity first) sockets
+                            let client_identity = if let Some(first_part) = message_parts.first() {
+                                // Always use Part 0 as the client identity for routing
+                                // For DEALER: Part 0 is the explicit client identity
+                                // For REQ: Part 0 is the ZMQ-generated routing identity
+                                // Both cases: echo back exactly what we received in Part 0
+                                first_part.clone()
+                            } else {
+                                b"unknown_client".to_vec()
+                            };
 
                             // Validate message type for shell channel
                             if let Some(msg_type) =
@@ -950,6 +969,31 @@ impl<P: Protocol + 'static> IntegratedKernel<P> {
     ) -> Result<()> {
         // Store client identity for use in responses
         self.current_client_identity = Some(client_identity);
+
+        // Store the message header to use as parent_header in replies
+        // The header has already been extracted and is in the message map
+        if let Some(header) = message.get("header").cloned() {
+            self.current_msg_header = Some(header);
+        } else if let Some(msg_id) = message.get("msg_id") {
+            // If no header but we have individual fields, construct it
+            let mut header = serde_json::Map::new();
+            if let Some(msg_id) = message.get("msg_id") {
+                header.insert("msg_id".to_string(), msg_id.clone());
+            }
+            if let Some(session) = message.get("session") {
+                header.insert("session".to_string(), session.clone());
+            }
+            if let Some(username) = message.get("username") {
+                header.insert("username".to_string(), username.clone());
+            }
+            if let Some(msg_type) = message.get("msg_type") {
+                header.insert("msg_type".to_string(), msg_type.clone());
+            }
+            if let Some(version) = message.get("version") {
+                header.insert("version".to_string(), version.clone());
+            }
+            self.current_msg_header = Some(serde_json::Value::Object(header));
+        }
 
         // Delegate to the original handle_message method
         self.handle_message(message).await
@@ -1662,17 +1706,27 @@ impl<P: Protocol + 'static> IntegratedKernel<P> {
         msg_type: &str,
         content: &serde_json::Value,
     ) -> Result<Vec<Vec<u8>>> {
+        // Extract client session from the request header for echo back
+        let client_session = self.current_msg_header
+            .as_ref()
+            .and_then(|h| h.get("session"))
+            .and_then(|s| s.as_str())
+            .unwrap_or(&self.session_id)
+            .to_string();
+
         // Create header
         let header = serde_json::json!({
             "msg_id": uuid::Uuid::new_v4().to_string(),
-            "session": self.session_id,
+            "session": client_session,
             "username": "kernel",
             "msg_type": msg_type,
             "version": "5.3",
             "date": chrono::Utc::now().to_rfc3339(),
         });
 
-        let parent_header = serde_json::json!({});
+        // Use the stored header from the request as parent_header
+        let parent_header = self.current_msg_header.clone()
+            .unwrap_or_else(|| serde_json::json!({}));
         let metadata = serde_json::json!({});
 
         // Serialize components
@@ -1681,15 +1735,28 @@ impl<P: Protocol + 'static> IntegratedKernel<P> {
         let metadata_bytes = serde_json::to_vec(&metadata)?;
         let content_bytes = serde_json::to_vec(&content)?;
 
-        // Create signature (empty for now, TODO: add HMAC)
-        let signature = b"".to_vec();
+        // Create HMAC signature using the protocol
+        debug!("Signing message with components:");
+        debug!("  Header ({} bytes): {}", header_bytes.len(), String::from_utf8_lossy(&header_bytes));
+        debug!("  Parent header ({} bytes): {}", parent_header_bytes.len(), String::from_utf8_lossy(&parent_header_bytes));
+        debug!("  Metadata ({} bytes): {}", metadata_bytes.len(), String::from_utf8_lossy(&metadata_bytes));
+        debug!("  Content ({} bytes): {}", content_bytes.len(), String::from_utf8_lossy(&content_bytes));
+
+        let signature = self.protocol.sign_message(
+            &header_bytes,
+            &parent_header_bytes,
+            &metadata_bytes,
+            &content_bytes,
+        )?;
+
+        debug!("  Generated signature: {}", signature);
 
         // Build multipart message according to Jupyter wire protocol
         // [identity, delimiter, signature, header, parent_header, metadata, content]
         let parts = vec![
             client_identity.to_vec(), // Client identity for ROUTER routing
             b"<IDS|MSG>".to_vec(),    // Delimiter
-            signature,                // HMAC signature
+            signature.as_bytes().to_vec(), // HMAC signature (hex-encoded string as bytes)
             header_bytes,             // Header JSON
             parent_header_bytes,      // Parent header JSON
             metadata_bytes,           // Metadata JSON
@@ -2003,6 +2070,20 @@ mod tests {
 
         fn create_request(&self, _msg_type: &str, _content: Value) -> Result<Vec<u8>> {
             Ok(vec![])
+        }
+
+        fn sign_message(
+            &self,
+            _header: &[u8],
+            _parent_header: &[u8],
+            _metadata: &[u8],
+            _content: &[u8],
+        ) -> Result<String> {
+            Ok(String::new()) // Mock returns empty signature
+        }
+
+        fn set_hmac_key(&mut self, _key: &str) {
+            // Mock does nothing with key
         }
     }
 

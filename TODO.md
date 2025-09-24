@@ -2794,36 +2794,58 @@ The fundamental issue is that jupyter_client cannot receive ANY replies from our
    - Variable inspection
    - Performance benchmarks (<50ms init, <20ms step)
 
-### Task 10.7.8: Resolve jupyter_client Compatibility Issue 🚨 CRITICAL
+### Task 10.7.8: Resolve jupyter_client Compatibility Issue 🚨 IN PROGRESS
 **Priority**: CRITICAL
-**Estimated Time**: 4 hours
+**Estimated Time**: 4 hours (Actual: 6+ hours)
 **Assignee**: Debug Team
-**Status**: 🚨 MUST FIX - jupyter_client is primary Python interface for Jupyter kernels
+**Status**: 🚨 IN PROGRESS - Fixed HMAC signing, parent_header issue remains
 
-**Description**: Investigate and fix why jupyter_client.BlockingKernelClient fails to receive replies despite kernel working with raw ZeroMQ.
+**Description**: Fix jupyter_client.BlockingKernelClient compatibility with llmspell kernel.
 
-**Problem Analysis:**
-- Kernel correctly receives messages from jupyter_client (verified in trace logs)
-- Kernel sends properly formatted replies (7-part multipart message)
-- Raw ZeroMQ DEALER socket receives replies successfully
-- jupyter_client reports "Kernel died before replying to kernel_info"
-- Heartbeat channel works (different pattern: REQ/REP)
+**Progress Made:**
+1. ✅ **HMAC Signing Fixed** (2025-09-23):
+   - Added `sign_message()` and `set_hmac_key()` to Protocol trait
+   - Updated JupyterProtocol to implement trait methods
+   - Modified IntegratedKernel to use protocol signing
+   - Result: Changed from "Unsigned Message" to "Invalid Signature"
 
-**Investigation Areas:**
-1. **Session Management**:
-   - jupyter_client may expect specific session_id handling
-   - Session validation or matching requirements
-   - Parent header session tracking
+2. 🔧 **Parent Header Issue Identified**:
+   - Current: Creating empty parent_header in replies
+   - Required: Use request's header as parent_header in reply
+   - Impact: jupyter_client can't validate signatures without proper parent_header
 
-2. **IOPub Status Messages**:
-   - jupyter_client may expect status broadcasts on IOPub
-   - Execution state transitions (idle/busy)
-   - Missing kernel_info_reply echo on IOPub
+**Remaining Issues:**
+1. **Parent Header Tracking**:
+   - Need to extract header from incoming messages (position idx+2 in multipart)
+   - Store as current_msg_header field
+   - Use as parent_header in create_multipart_response()
 
-3. **Message Signing/HMAC**:
-   - Currently sending empty signature field
-   - jupyter_client may require valid HMAC-SHA256 signatures
-   - Connection file "key" field usage
+2. **Full Message Parsing**:
+   - Currently only extracting content (position idx+5)
+   - Need to extract: header, parent_header, metadata for full context
+   - Preserve request session info in replies
+
+**How to Start Kernel Daemon for Testing:**
+```bash
+# Kill any existing kernel
+pkill -f "llmspell.*kernel" || true
+
+# Start with full tracing
+./target/debug/llmspell kernel start \
+  --daemon \
+  --trace trace \
+  --port 0 \
+  --connection-file /tmp/llmspell-test/kernel.json \
+  --log-file /tmp/llmspell-test/kernel.log \
+  --pid-file /tmp/llmspell-test/kernel.pid \
+  --idle-timeout 0
+
+# Check connection file
+cat /tmp/llmspell-test/kernel.json
+
+# Test with jupyter_client
+python3 /tmp/test_jupyter_client.py
+```
 
 4. **Client Identity Handling**:
    - ROUTER socket identity routing for jupyter_client's UUID
