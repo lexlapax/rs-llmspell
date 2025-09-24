@@ -224,8 +224,9 @@ def kernel_client(llmspell_daemon):
 
     logger.info(f"Creating kernel client with connection file: {connection_file}")
 
-    # Create client with connection file
-    client = BlockingKernelClient(connection_file=str(connection_file))
+    # Create client and load connection file
+    client = BlockingKernelClient()
+    client.load_connection_file(str(connection_file))  # MUST call this explicitly!
 
     # Start channels
     client.start_channels()
