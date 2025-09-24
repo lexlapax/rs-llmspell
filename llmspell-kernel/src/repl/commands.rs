@@ -82,6 +82,10 @@ pub enum MetaCommand {
     Info,
     /// Reset session
     Reset,
+    /// Run script file
+    Run { file: PathBuf, args: Vec<String> },
+    /// Toggle performance monitoring
+    Perf { enabled: bool },
 }
 
 impl MetaCommand {
@@ -151,6 +155,27 @@ impl MetaCommand {
             }
             "info" => Ok(MetaCommand::Info),
             "reset" => Ok(MetaCommand::Reset),
+            "run" => {
+                if parts.len() < 2 {
+                    Err(anyhow::anyhow!("Usage: .run <script> [args...]\nExamples:\n  .run hello.lua\n  .run test.lua arg1 arg2"))
+                } else {
+                    let file = PathBuf::from(parts[1]);
+                    let args = parts[2..].iter().map(|s| (*s).to_string()).collect();
+                    Ok(MetaCommand::Run { file, args })
+                }
+            }
+            "perf" => {
+                let enabled = if parts.len() > 1 {
+                    match parts[1] {
+                        "on" | "true" | "1" => true,
+                        "off" | "false" | "0" => false,
+                        _ => return Err(anyhow::anyhow!("Usage: .perf [on|off]"))
+                    }
+                } else {
+                    true // Toggle to on if no argument
+                };
+                Ok(MetaCommand::Perf { enabled })
+            }
             _ => Err(anyhow::anyhow!("Unknown meta command: {}", parts[0])),
         }
     }
@@ -172,7 +197,9 @@ impl MetaCommand {
   .pwd                 Print working directory
   .ls [path]           List files
   .info                Show system info
-  .reset               Reset session state"
+  .reset               Reset session state
+  .run <script> [args] Run a script file with optional arguments
+  .perf [on|off]       Toggle performance monitoring"
     }
 }
 

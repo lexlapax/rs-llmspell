@@ -7,10 +7,12 @@ use crate::debug::{DebugCoordinator, DebugSession};
 use crate::execution::IntegratedKernel;
 use crate::protocols::jupyter::JupyterProtocol;
 use crate::repl::commands::{DebugCommand, MetaCommand, ReplCommand};
+use crate::repl::readline::ReplReadline;
 use crate::repl::state::{Breakpoint, ReplState};
 use anyhow::Result;
 use std::path::PathBuf;
 use std::sync::Arc;
+use std::sync::atomic::{AtomicBool, Ordering};
 use std::time::Instant;
 use tokio::sync::RwLock;
 use tracing::{debug, error, info, warn};
@@ -56,8 +58,16 @@ pub struct InteractiveSession {
     execution_count: u32,
     /// Session start time
     start_time: Instant,
+    /// Performance monitoring enabled
+    perf_monitoring: bool,
     /// Current debug session (if debugging)
     debug_session: Option<DebugSession>,
+    /// Readline interface (optional - falls back to stdin if not available)
+    readline: Option<ReplReadline>,
+    /// Multi-line input buffer
+    multiline_buffer: Vec<String>,
+    /// Flag to track if we're executing
+    executing: Arc<AtomicBool>,
 }
 
 impl InteractiveSession {
@@ -66,7 +76,7 @@ impl InteractiveSession {
     /// # Errors
     ///
     /// Returns an error if the session cannot be created
-    pub fn new(
+    pub async fn new(
         kernel: IntegratedKernel<JupyterProtocol>,
         config: ReplSessionConfig,
     ) -> Result<Self> {
@@ -79,6 +89,24 @@ impl InteractiveSession {
             }
         }
 
+        // Create shared state
+        let state_arc = Arc::new(RwLock::new(state));
+
+        // Create readline interface
+        let readline = match ReplReadline::new(state_arc.clone()).await {
+            Ok(mut rl) => {
+                // Load history file if configured
+                if let Some(ref history_file) = config.history_file {
+                    let _ = rl.load_history(history_file);
+                }
+                Some(rl)
+            }
+            Err(e) => {
+                warn!("Failed to initialize readline, falling back to stdin: {}", e);
+                None
+            }
+        };
+
         // Create debug coordinator if debug commands are enabled
         let debug_coordinator = if config.enable_debug_commands {
             let session_id = format!("repl-{}", uuid::Uuid::new_v4());
@@ -90,11 +118,15 @@ impl InteractiveSession {
         Ok(Self {
             kernel,
             debug_coordinator,
-            state: Arc::new(RwLock::new(state)),
-            config,
+            state: state_arc,
             execution_count: 0,
             start_time: Instant::now(),
+            perf_monitoring: config.enable_performance_monitoring,
             debug_session: None,
+            readline,
+            multiline_buffer: Vec::new(),
+            executing: Arc::new(AtomicBool::new(false)),
+            config,
         })
     }
 
@@ -106,16 +138,64 @@ impl InteractiveSession {
     pub async fn run_repl(&mut self) -> Result<()> {
         info!("Starting interactive REPL session");
 
+        // Set up signal handler for Ctrl-C
+        self.setup_signal_handler();
+
         // Print welcome message
         self.print_welcome();
 
         // Main REPL loop
         loop {
-            // Get user input (would be provided by CLI layer)
-            let input = Self::read_input();
+            // Determine prompt based on multi-line state
+            let prompt = if self.multiline_buffer.is_empty() {
+                "> "
+            } else {
+                "... "
+            };
+
+            // Get user input
+            let input = self.read_input(prompt).await;
+
+            // Check if interrupted
+            if input.is_empty() && self.multiline_buffer.is_empty() {
+                // Ctrl-C at prompt - just show new prompt
+                continue;
+            }
+
+            // Handle multi-line input
+            let full_input = if !self.multiline_buffer.is_empty() {
+                // Check for empty line to execute accumulated buffer
+                if input.trim().is_empty() {
+                    let code = self.multiline_buffer.join("\n");
+                    self.multiline_buffer.clear();
+                    code
+                } else {
+                    // Add to buffer and check if complete
+                    self.multiline_buffer.push(input.clone());
+                    let code = self.multiline_buffer.join("\n");
+
+                    // Check if expression is complete
+                    if self.is_complete_expression(&code) {
+                        self.multiline_buffer.clear();
+                        code
+                    } else {
+                        // Continue accumulating
+                        continue;
+                    }
+                }
+            } else if input.trim().is_empty() {
+                // Empty line - skip
+                continue;
+            } else if self.looks_like_multiline_start(&input) {
+                // Start multi-line accumulation
+                self.multiline_buffer.push(input);
+                continue;
+            } else {
+                input
+            };
 
             // Parse and handle command
-            match ReplCommand::parse(&input) {
+            match ReplCommand::parse(&full_input) {
                 Ok(ReplCommand::Empty) => {}
                 Ok(ReplCommand::Meta(MetaCommand::Exit)) => {
                     self.cleanup().await?;
@@ -128,6 +208,15 @@ impl InteractiveSession {
                 }
                 Err(e) => {
                     error!("Command parse error: {e}");
+                }
+            }
+        }
+
+        // Save history on exit
+        if let Some(ref mut readline) = self.readline {
+            if let Some(ref history_file) = self.config.history_file {
+                if let Err(e) = readline.save_history(history_file) {
+                    debug!("Failed to save history: {}", e);
                 }
             }
         }
@@ -157,14 +246,20 @@ impl InteractiveSession {
         }
 
         // Performance monitoring
-        let start = if self.config.enable_performance_monitoring {
+        let start = if self.perf_monitoring {
             Some(Instant::now())
         } else {
             None
         };
 
+        // Set executing flag
+        self.executing.store(true, Ordering::Relaxed);
+
         // Execute through kernel's direct execution
         let result = self.execute_via_kernel(code).await;
+
+        // Clear executing flag
+        self.executing.store(false, Ordering::Relaxed);
 
         // Print result
         println!("{result}");
@@ -172,6 +267,10 @@ impl InteractiveSession {
         // Check performance
         if let Some(start_time) = start {
             let duration = start_time.elapsed();
+            let millis = duration.as_millis();
+            if self.perf_monitoring {
+                println!("⏱️ {millis} ms");
+            }
             if duration.as_secs() > 1 {
                 warn!("Slow execution: {:.2}s", duration.as_secs_f64());
             }
@@ -271,6 +370,13 @@ impl InteractiveSession {
             MetaCommand::Reset => {
                 self.reset_session().await?;
                 println!("Session reset");
+            }
+            MetaCommand::Run { file, args } => {
+                self.execute_script_file(&file, args).await?;
+            }
+            MetaCommand::Perf { enabled } => {
+                self.perf_monitoring = enabled;
+                println!("Performance monitoring {}", if enabled { "enabled" } else { "disabled" });
             }
             MetaCommand::Exit => unreachable!(), // Handled in run_repl
         }
@@ -574,21 +680,190 @@ impl InteractiveSession {
         Ok(())
     }
 
-    /// Read user input from stdin
-    fn read_input() -> String {
-        use std::io::{self, Write};
-
-        // Print prompt
-        print!("> ");
-        io::stdout().flush().unwrap();
-
-        // Read line from stdin
-        let mut input = String::new();
-        if io::stdin().read_line(&mut input).is_ok() {
-            input
+    /// Read user input using readline or fallback to stdin
+    async fn read_input(&mut self, prompt: &str) -> String {
+        if let Some(ref mut readline) = self.readline {
+            // Use readline interface
+            match readline.readline(prompt).await {
+                Ok(line) => line,
+                Err(e) => {
+                    // Handle interrupts and EOF
+                    if e.to_string().contains("Interrupted") {
+                        // Ctrl-C pressed - return empty line to continue
+                        String::new()
+                    } else {
+                        // EOF or other error - exit
+                        ".exit".to_string()
+                    }
+                }
+            }
         } else {
-            // On error or EOF, return exit command
-            ".exit".to_string()
+            // Fallback to stdin
+            use std::io::{self, Write};
+
+            // Print prompt
+            print!("{prompt}");
+            io::stdout().flush().unwrap();
+
+            // Read line from stdin
+            let mut input = String::new();
+            if io::stdin().read_line(&mut input).is_ok() {
+                input
+            } else {
+                // On error or EOF, return exit command
+                ".exit".to_string()
+            }
         }
+    }
+
+    /// Set up signal handler for Ctrl-C
+    fn setup_signal_handler(&self) {
+        let executing = self.executing.clone();
+
+        tokio::spawn(async move {
+            loop {
+                match tokio::signal::ctrl_c().await {
+                    Ok(()) => {
+                        if executing.load(Ordering::Relaxed) {
+                            // Interrupt current execution
+                            println!("\n^C Interrupted (execution interruption not fully implemented)");
+                            executing.store(false, Ordering::Relaxed);
+                        } else {
+                            // At prompt or in multi-line - handled by readline
+                            // The readline library will handle this case
+                        }
+                    }
+                    Err(e) => {
+                        error!("Failed to listen for Ctrl-C: {}", e);
+                        break;
+                    }
+                }
+            }
+        });
+    }
+
+    /// Check if an expression looks like it needs multi-line input
+    fn looks_like_multiline_start(&self, input: &str) -> bool {
+        #![allow(clippy::unused_self)]
+        let trimmed = input.trim();
+        // Common patterns that suggest multi-line input
+        trimmed.ends_with("function") ||
+        trimmed.ends_with("do") ||
+        trimmed.ends_with("then") ||
+        trimmed.ends_with("else") ||
+        trimmed.ends_with("repeat") ||
+        trimmed.ends_with('{') ||
+        trimmed.ends_with('[') ||
+        trimmed.ends_with('(') ||
+        (trimmed.starts_with("function") && !trimmed.contains("end")) ||
+        (trimmed.starts_with("if") && !trimmed.contains("end")) ||
+        (trimmed.starts_with("for") && !trimmed.contains("end")) ||
+        (trimmed.starts_with("while") && !trimmed.contains("end"))
+    }
+
+    /// Check if an expression is complete (can be executed)
+    fn is_complete_expression(&self, code: &str) -> bool {
+        #![allow(clippy::unused_self)]
+        // For now, use simple heuristics for Lua
+        // In the future, this should delegate to ScriptEngineBridge
+
+        // Count opening and closing keywords/brackets
+        let opens = code.matches("function").count() +
+                   code.matches(" do").count() +
+                   code.matches(" then").count() +
+                   code.matches(" repeat").count();
+        let closes = code.matches("end").count() +
+                    code.matches("until").count();
+
+        // Count brackets
+        let open_braces = code.chars().filter(|&c| c == '{').count();
+        let close_braces = code.chars().filter(|&c| c == '}').count();
+        let open_brackets = code.chars().filter(|&c| c == '[').count();
+        let close_brackets = code.chars().filter(|&c| c == ']').count();
+        let open_parens = code.chars().filter(|&c| c == '(').count();
+        let close_parens = code.chars().filter(|&c| c == ')').count();
+
+        // Check for unclosed strings (simple check)
+        let mut in_string = false;
+        let mut escape = false;
+        let mut quote_char = ' ';
+        for c in code.chars() {
+            if escape {
+                escape = false;
+                continue;
+            }
+            if c == '\\' {
+                escape = true;
+                continue;
+            }
+            if !in_string && (c == '"' || c == '\'' || c == '[' && code.contains("[[")) {
+                in_string = true;
+                quote_char = c;
+            } else if in_string && c == quote_char {
+                in_string = false;
+            }
+        }
+
+        // Expression is complete if all are balanced and no unclosed strings
+        !in_string &&
+        opens <= closes &&
+        open_braces == close_braces &&
+        open_brackets == close_brackets &&
+        open_parens == close_parens
+    }
+
+    /// Execute a script file with arguments
+    async fn execute_script_file(&mut self, file: &std::path::Path, args: Vec<String>) -> Result<()> {
+        // Resolve the file path (add .lua if needed)
+        let resolved_file = if !file.exists() && file.extension().is_none() {
+            let mut lua_file = file.to_path_buf();
+            lua_file.set_extension("lua");
+            if lua_file.exists() {
+                lua_file
+            } else {
+                return Err(anyhow::anyhow!("File not found: {}", file.display()));
+            }
+        } else if !file.exists() {
+            return Err(anyhow::anyhow!("File not found: {}", file.display()));
+        } else {
+            file.to_path_buf()
+        };
+
+        // Read the script content
+        let script = tokio::fs::read_to_string(&resolved_file).await
+            .map_err(|e| anyhow::anyhow!("Failed to read {}: {}", resolved_file.display(), e))?;
+
+        // Save current directory and change to script's directory
+        let original_dir = std::env::current_dir()?;
+        if let Some(parent) = resolved_file.parent() {
+            std::env::set_current_dir(parent)?;
+        }
+
+        println!("Running {}...", resolved_file.display());
+        if !args.is_empty() {
+            println!("Arguments: {args:?}");
+        }
+
+        // TODO: Pass args to script when ScriptEngineBridge supports it
+        // For now, just execute the script
+        let start = if self.perf_monitoring {
+            Some(Instant::now())
+        } else {
+            None
+        };
+
+        let result = self.execute_via_kernel(&script).await;
+        println!("{result}");
+
+        // Show performance
+        if let Some(start_time) = start {
+            let duration = start_time.elapsed();
+            println!("⏱️ Script execution time: {} ms", duration.as_millis());
+        }
+
+        // Restore original directory
+        std::env::set_current_dir(original_dir)?;
+
+        Ok(())
     }
 }

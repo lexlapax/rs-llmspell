@@ -47,7 +47,7 @@ async fn start_embedded_repl(
 ) -> Result<()> {
     // Create interactive session
     let kernel = handle.into_kernel();
-    let mut session = InteractiveSession::new(kernel, session_config)?;
+    let mut session = InteractiveSession::new(kernel, session_config).await?;
 
     // Run REPL loop
     session.run_repl().await?;
