@@ -163,10 +163,8 @@ impl InteractiveSession {
             None
         };
 
-        // Execute through kernel's script runtime
-        // For now, we'll use the runtime directly through the kernel
-        // In a real implementation, this would go through the protocol
-        let result = self.execute_via_protocol(code);
+        // Execute through kernel's direct execution
+        let result = self.execute_via_kernel(code).await;
 
         // Print result
         println!("{result}");
@@ -182,28 +180,13 @@ impl InteractiveSession {
         Ok(())
     }
 
-    /// Execute code via the kernel's protocol
-    fn execute_via_protocol(&mut self, code: &str) -> String {
-        // This would normally send an execute_request through the protocol
-        // and wait for execute_reply. For now, return a placeholder.
-        // The actual implementation would use the kernel's message handling.
-
-        // Increment execution counter in kernel
-        let count = {
-            let mut ec = self.kernel.execution_count.write();
-            *ec += 1;
-            *ec
-        };
-
-        debug!("Executing code block #{}: {}", count, code);
-
-        // In a full implementation, this would:
-        // 1. Create execute_request message via protocol
-        // 2. Send through transport
-        // 3. Wait for execute_reply
-        // 4. Extract and return result
-
-        format!("[Execution #{count}] Code executed successfully")
+    /// Execute code via the kernel's direct execution method
+    async fn execute_via_kernel(&mut self, code: &str) -> String {
+        // Execute code directly through the kernel
+        match self.kernel.execute_direct(code).await {
+            Ok(result) => result,
+            Err(e) => format!("Error: {e}"),
+        }
     }
 
     /// Handle meta commands
@@ -456,11 +439,11 @@ impl InteractiveSession {
     }
 
     /// Handle expression evaluation commands
-    fn handle_expression_command(&mut self, command: DebugCommand) -> Option<()> {
+    async fn handle_expression_command(&mut self, command: DebugCommand) -> Option<()> {
         match command {
             DebugCommand::Print(expr) => {
                 // Evaluate expression in current context
-                let result = self.execute_via_protocol(&expr);
+                let result = self.execute_via_kernel(&expr).await;
                 println!("{result}");
                 Some(())
             }
@@ -513,7 +496,7 @@ impl InteractiveSession {
         if let Some(()) = self.handle_info_command(command.clone()).await? {
             return Ok(());
         }
-        if let Some(()) = self.handle_expression_command(command) {
+        if let Some(()) = self.handle_expression_command(command).await {
             return Ok(());
         }
 
@@ -591,10 +574,21 @@ impl InteractiveSession {
         Ok(())
     }
 
-    /// Read user input (placeholder - would be provided by CLI layer)
+    /// Read user input from stdin
     fn read_input() -> String {
-        // In real implementation, this would be provided by the CLI layer
-        // For now, return empty string to exit
-        String::new()
+        use std::io::{self, Write};
+
+        // Print prompt
+        print!("> ");
+        io::stdout().flush().unwrap();
+
+        // Read line from stdin
+        let mut input = String::new();
+        if io::stdin().read_line(&mut input).is_ok() {
+            input
+        } else {
+            // On error or EOF, return exit command
+            ".exit".to_string()
+        }
     }
 }
