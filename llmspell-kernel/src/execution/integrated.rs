@@ -151,7 +151,7 @@ pub struct IntegratedKernel<P: Protocol> {
     channel_last_activity: Arc<RwLock<HashMap<String, std::time::Instant>>>,
     /// Current client identity for message routing
     current_client_identity: Option<Vec<u8>>,
-    /// Current message header (becomes parent_header in replies)
+    /// Current message header (becomes `parent_header` in replies)
     current_msg_header: Option<serde_json::Value>,
 }
 
@@ -589,7 +589,7 @@ impl<P: Protocol + 'static> IntegratedKernel<P> {
                         .insert("control".to_string(), std::time::Instant::now());
 
                     // For Jupyter protocol, we need to parse the multipart message format
-                    // Find the delimiter "<IDS|MSG>" and extract the content
+                    // Find the delimiter "<IDS|MSG>" and extract the header
                     let delimiter = b"<IDS|MSG>";
                     let delimiter_idx = message_parts
                         .iter()
@@ -597,9 +597,17 @@ impl<P: Protocol + 'static> IntegratedKernel<P> {
 
                     let parsed_result = if let Some(idx) = delimiter_idx {
                         // This is a proper Jupyter wire protocol message
-                        // The content is at position idx + 5 (after delimiter, signature, header, parent_header, metadata)
+                        // Parse header (idx + 2) and include content (idx + 5) for debug_request
                         if message_parts.len() > idx + 5 {
-                            self.protocol.parse_message(&message_parts[idx + 5])
+                            // Parse the header part to get message type and routing info
+                            let mut parsed_msg = self.protocol.parse_message(&message_parts[idx + 2])?;
+
+                            // For debug_request, add the actual DAP content from part 6
+                            if let Ok(content_json) = serde_json::from_slice::<Value>(&message_parts[idx + 5]) {
+                                parsed_msg.insert("content".to_string(), content_json);
+                            }
+
+                            Ok(parsed_msg)
                         } else {
                             Err(anyhow::anyhow!("Incomplete Jupyter message"))
                         }
@@ -974,7 +982,7 @@ impl<P: Protocol + 'static> IntegratedKernel<P> {
         // The header has already been extracted and is in the message map
         if let Some(header) = message.get("header").cloned() {
             self.current_msg_header = Some(header);
-        } else if let Some(msg_id) = message.get("msg_id") {
+        } else if let Some(_msg_id) = message.get("msg_id") {
             // If no header but we have individual fields, construct it
             let mut header = serde_json::Map::new();
             if let Some(msg_id) = message.get("msg_id") {
