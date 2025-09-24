@@ -319,6 +319,18 @@ impl Transport for ZmqTransport {
         match result {
             Ok(parts) => {
                 trace!("Received {} parts on {} channel", parts.len(), channel);
+                for (i, part) in parts.iter().enumerate() {
+                    let preview = if part.len() > 100 {
+                        format!(
+                            "{}... ({} bytes)",
+                            String::from_utf8_lossy(&part[..100]),
+                            part.len()
+                        )
+                    } else {
+                        format!("{} ({} bytes)", String::from_utf8_lossy(part), part.len())
+                    };
+                    debug!("  Part {}: {}", i, preview);
+                }
                 Ok(Some(parts))
             }
             Err(zmq::Error::EAGAIN) => {
@@ -333,6 +345,18 @@ impl Transport for ZmqTransport {
     #[instrument(level = "trace", skip(self, parts))]
     async fn send(&self, channel: &str, parts: Vec<Vec<u8>>) -> Result<()> {
         trace!("Sending {} parts on {} channel", parts.len(), channel);
+        for (i, part) in parts.iter().enumerate() {
+            let preview = if part.len() > 100 {
+                format!(
+                    "{}... ({} bytes)",
+                    String::from_utf8_lossy(&part[..100]),
+                    part.len()
+                )
+            } else {
+                format!("{} ({} bytes)", String::from_utf8_lossy(part), part.len())
+            };
+            debug!("  Send Part {}: {}", i, preview);
+        }
 
         // Special handling for heartbeat
         if channel == "heartbeat" {

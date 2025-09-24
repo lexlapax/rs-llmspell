@@ -8,8 +8,7 @@ use colored::Colorize;
 use llmspell_config::LLMSpellConfig;
 use llmspell_kernel::{
     api::KernelServiceConfig, connect_to_kernel, daemon::DaemonConfig, execution::ExecutionConfig,
-    monitoring::HealthThresholds, start_embedded_kernel_with_executor,
-    start_kernel_service_with_config,
+    monitoring::HealthThresholds, start_kernel_service_with_config,
 };
 use nix::sys::signal::{self, Signal};
 use nix::unistd::Pid;
@@ -100,56 +99,46 @@ pub async fn handle_kernel_command(
                 health_thresholds: Some(HealthThresholds::default()),
             };
 
-            if daemon {
-                // Service mode - start kernel that listens for connections
-                info!("Starting kernel service on port {} in daemon mode", port);
+            // Always use service mode (with ZeroMQ transport) for the start command
+            // Service mode - start kernel that listens for connections
+            info!(
+                "Starting kernel service on port {} {}",
+                port,
+                if daemon { "in daemon mode" } else { "" }
+            );
 
-                // Create log directory if needed
-                if let Some(ref config) = daemon_config {
-                    if let Some(ref log_path) = config.stdout_path {
-                        if let Some(parent) = log_path.parent() {
-                            std::fs::create_dir_all(parent).ok();
-                        }
+            // Create log directory if needed
+            if let Some(ref config) = daemon_config {
+                if let Some(ref log_path) = config.stdout_path {
+                    if let Some(parent) = log_path.parent() {
+                        std::fs::create_dir_all(parent).ok();
                     }
                 }
-
-                // Create real ScriptExecutor from llmspell-bridge
-                let script_executor =
-                    llmspell_bridge::create_script_executor(runtime_config.clone()).await?;
-
-                // Create service configuration
-                let service_config = KernelServiceConfig {
-                    port,
-                    exec_config,
-                    kernel_id: id,
-                    connection_file_path: connection_file,
-                    max_clients,
-                    log_rotate_size,
-                    log_rotate_count,
-                    script_executor,
-                };
-
-                let service = start_kernel_service_with_config(service_config).await?;
-
-                info!(
-                    "Kernel service started. Connection file: {:?}",
-                    service.connection_file()
-                );
-                service.run().await
-            } else {
-                // Embedded mode - run kernel in-process
-                info!("Starting embedded kernel");
-
-                // Create real ScriptExecutor from llmspell-bridge
-                let script_executor =
-                    llmspell_bridge::create_script_executor(runtime_config.clone()).await?;
-
-                // Create kernel with real executor
-                let kernel =
-                    start_embedded_kernel_with_executor(runtime_config, script_executor).await?;
-                info!("Kernel {} started", kernel.kernel_id());
-                kernel.run().await
             }
+
+            // Create real ScriptExecutor from llmspell-bridge
+            let script_executor =
+                llmspell_bridge::create_script_executor(runtime_config.clone()).await?;
+
+            // Create service configuration
+            let service_config = KernelServiceConfig {
+                port,
+                exec_config,
+                kernel_id: id,
+                connection_file_path: connection_file,
+                max_clients,
+                log_rotate_size,
+                log_rotate_count,
+                script_executor,
+            };
+
+            let service = start_kernel_service_with_config(service_config).await?;
+
+            info!(
+                "Kernel service started. Connection file: {:?}",
+                service.connection_file()
+            );
+            service.run().await
         }
 
         KernelCommands::Connect { address } => {

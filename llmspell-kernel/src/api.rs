@@ -188,6 +188,13 @@ impl ServiceHandle {
     pub async fn run(self) -> Result<()> {
         info!("Running kernel service on port {}", self.port);
         info!("Connection file: {:?}", self.connection_file);
+
+        // Debug: Check if kernel has transport before running
+        debug!(
+            "ServiceHandle::run() - kernel has transport: {}",
+            self.kernel.has_transport()
+        );
+
         self.kernel.run().await
     }
 
@@ -228,7 +235,9 @@ pub async fn start_embedded_kernel_with_executor(
         auth_key: None,
     };
 
-    // Add all 5 Jupyter channels
+    // TODO: This function path is not used by the CLI and should be removed
+    // The actual path is through start_kernel_service_with_config
+    // Original code that doesn't work:
     for channel in &["shell", "iopub", "stdin", "control", "heartbeat"] {
         transport_config.channels.insert(
             (*channel).to_string(),
@@ -240,7 +249,7 @@ pub async fn start_embedded_kernel_with_executor(
         );
     }
 
-    // Bind transport to channels
+    // Bind transport to channels (this won't work with empty endpoints)
     let mut transport_mut = (*transport).clone();
     let _bound_ports = transport_mut.bind(&transport_config).await?;
 
@@ -446,7 +455,9 @@ pub async fn start_kernel_service_with_config(
     protocol.set_hmac_key(&conn_manager.info().key);
 
     // Create and bind transport, updating connection manager with actual ports
+    info!("About to setup kernel transport on port {}", config.port);
     let transport = setup_kernel_transport(config.port, &mut conn_manager).await?;
+    info!("Transport setup complete");
 
     // Create integrated kernel with protocol that has the HMAC key
     let mut kernel = IntegratedKernel::new(
@@ -460,24 +471,14 @@ pub async fn start_kernel_service_with_config(
     // Set the transport on the kernel
     kernel.set_transport(Box::new(transport));
 
-    // If daemon mode, set up DaemonManager
+    // Debug: Verify transport was set
+    debug!("Transport set on kernel: {}", kernel.has_transport());
+
+    // Note: Daemon mode is now handled by the CLI before creating tokio runtime
+    // The daemonization happens BEFORE this async function is called
+    // We just need to handle log rotation if configured
     if config.exec_config.daemon_mode {
         if let Some(ref daemon_config) = config.exec_config.daemon_config {
-            // Create DaemonManager and daemonize
-            let mut daemon_manager = crate::daemon::DaemonManager::new(daemon_config.clone());
-
-            // Check if already running
-            if daemon_manager.is_running()? {
-                return Err(anyhow::anyhow!(
-                    "Kernel daemon already running with PID file {:?}",
-                    daemon_config.pid_file
-                ));
-            }
-
-            // Daemonize the process
-            daemon_manager.daemonize()?;
-            info!("Process daemonized successfully");
-
             // Set up log rotation if configured
             if let Some(ref log_path) = daemon_config.stdout_path {
                 if let Some(size_limit) = config.log_rotate_size {
@@ -493,6 +494,13 @@ pub async fn start_kernel_service_with_config(
                         size_limit, config.log_rotate_count
                     );
                 }
+            }
+
+            // Create PID file if configured (daemon has already forked)
+            if let Some(ref pid_path) = daemon_config.pid_file {
+                let mut pid_file = crate::daemon::PidFile::new(pid_path.clone());
+                pid_file.write()?;
+                info!("Created PID file at {:?}", pid_path);
             }
         }
     }
@@ -524,8 +532,14 @@ async fn setup_kernel_transport(
     base_port: u16,
     conn_manager: &mut crate::connection::ConnectionFileManager,
 ) -> Result<crate::transport::zeromq::ZmqTransport> {
+    info!(
+        "setup_kernel_transport: Creating ZeroMQ transport for port {}",
+        base_port
+    );
+
     // Create ZeroMQ transport for the kernel service
     let mut transport = crate::transport::zeromq::ZmqTransport::new()?;
+    info!("setup_kernel_transport: ZeroMQ transport created");
 
     // Build transport configuration for Jupyter 5 channels
     let transport_config = TransportConfig {
@@ -578,8 +592,18 @@ async fn setup_kernel_transport(
         auth_key: None,
     };
 
+    info!(
+        "setup_kernel_transport: About to bind transport with config for {} channels",
+        transport_config.channels.len()
+    );
+
     // Bind transport and get actual ports (important when port 0 is used)
     let bound_ports = transport.bind(&transport_config).await?;
+
+    info!(
+        "setup_kernel_transport: Binding complete, got bound_ports: {:?}",
+        bound_ports
+    );
 
     // Update connection manager with actual bound ports
     if let Some(ports) = bound_ports {

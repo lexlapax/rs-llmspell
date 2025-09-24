@@ -175,18 +175,102 @@ impl JupyterProtocol {
     }
 }
 
+impl JupyterProtocol {
+    /// Parse a multipart `ZeroMQ` message according to Jupyter wire protocol
+    ///
+    /// Expected format:
+    /// [identity1, identity2, ..., "<IDS|MSG>", signature, header, `parent_header`, metadata, content, ...buffers]
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the message format is invalid or parsing fails
+    pub fn parse_wire_message(&self, parts: &[Vec<u8>]) -> Result<HashMap<String, Value>> {
+        if parts.is_empty() {
+            return Ok(HashMap::new());
+        }
+
+        // Find the delimiter "<IDS|MSG>"
+        let delimiter = b"<IDS|MSG>";
+        let delimiter_idx = parts
+            .iter()
+            .position(|part| part == delimiter)
+            .ok_or_else(|| anyhow!("Missing <IDS|MSG> delimiter in message"))?;
+
+        // Need at least 5 parts after delimiter: signature, header, parent, metadata, content
+        if parts.len() < delimiter_idx + 6 {
+            return Err(anyhow!(
+                "Incomplete message: expected at least 6 parts after delimiter, got {}",
+                parts.len() - delimiter_idx - 1
+            ));
+        }
+
+        // Extract message components after delimiter
+        let signature = &parts[delimiter_idx + 1];
+        let header_bytes = &parts[delimiter_idx + 2];
+        let parent_header_bytes = &parts[delimiter_idx + 3];
+        let metadata_bytes = &parts[delimiter_idx + 4];
+        let content_bytes = &parts[delimiter_idx + 5];
+
+        // Verify HMAC signature if key is set
+        if self.hmac_key.is_some() {
+            let sig_str = std::str::from_utf8(signature)
+                .map_err(|_| anyhow!("Invalid signature encoding"))?;
+
+            if !self.verify_signature(
+                sig_str,
+                header_bytes,
+                parent_header_bytes,
+                metadata_bytes,
+                content_bytes,
+            )? {
+                return Err(anyhow!("Invalid message signature"));
+            }
+        }
+
+        // Parse JSON components
+        let header: Value = serde_json::from_slice(header_bytes)?;
+        let parent_header: Value = serde_json::from_slice(parent_header_bytes)?;
+        let metadata: Value = serde_json::from_slice(metadata_bytes)?;
+        let content: Value = serde_json::from_slice(content_bytes)?;
+
+        // Extract any binary buffers
+        let buffers: Vec<Vec<u8>> = if parts.len() > delimiter_idx + 6 {
+            parts[delimiter_idx + 6..].to_vec()
+        } else {
+            Vec::new()
+        };
+
+        // Build result map
+        let mut result = HashMap::new();
+
+        // Extract msg_type and other fields from header
+        if let Value::Object(header_map) = &header {
+            for (key, value) in header_map {
+                result.insert(key.clone(), value.clone());
+            }
+        }
+
+        // Add the full components for processing
+        result.insert("header".to_string(), header);
+        result.insert("parent_header".to_string(), parent_header);
+        result.insert("metadata".to_string(), metadata);
+        result.insert("content".to_string(), content);
+        result.insert("buffers".to_string(), json!(buffers.len()));
+
+        Ok(result)
+    }
+}
+
 impl Protocol for JupyterProtocol {
     fn parse_message(&self, data: &[u8]) -> Result<HashMap<String, Value>> {
-        // Parse Jupyter wire protocol message with HMAC verification
-        // Expected format for multipart message:
-        // [signature, header, parent_header, metadata, content, ...buffers]
+        // This method is for single-part messages (legacy/testing)
+        // For real wire protocol, use parse_wire_message with all parts
 
         if data.is_empty() {
             return Ok(HashMap::new());
         }
 
-        // For now, parse as JSON directly
-        // In full implementation, this would handle multipart messages
+        // Try to parse as JSON directly (for testing/legacy)
         let message: Value = serde_json::from_slice(data)?;
 
         // Extract message parts for verification

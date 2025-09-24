@@ -10,7 +10,7 @@ use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::sync::Arc;
 use tokio::sync::mpsc::{self, Sender};
-use tracing::{debug, instrument, trace};
+use tracing::{debug, instrument, trace, warn};
 use uuid::Uuid;
 
 use crate::runtime::tracing::TracingInstrumentation;
@@ -323,12 +323,20 @@ impl EnhancedIOManager {
             content,
         };
 
-        sender
-            .send(message)
-            .await
-            .map_err(|e| anyhow::anyhow!("Failed to send status: {}", e))?;
+        // Use try_send to avoid blocking and handle channel full/closed gracefully
+        match sender.try_send(message) {
+            Ok(()) => {
+                debug!("Published status: {}", status);
+            }
+            Err(mpsc::error::TrySendError::Full(_)) => {
+                warn!("IOPub channel full, dropping status message: {}", status);
+            }
+            Err(mpsc::error::TrySendError::Closed(_)) => {
+                // Channel closed is not fatal during startup/shutdown
+                debug!("IOPub channel closed, ignoring status: {}", status);
+            }
+        }
 
-        debug!("Published status: {}", status);
         Ok(())
     }
 

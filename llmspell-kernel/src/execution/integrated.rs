@@ -5,6 +5,7 @@
 //! the same runtime context.
 
 use anyhow::Result;
+use chrono;
 use llmspell_core::traits::script_executor::ScriptExecutor;
 use parking_lot::RwLock;
 use serde::{Deserialize, Serialize};
@@ -14,6 +15,7 @@ use std::sync::Arc;
 use std::time::Duration;
 use tokio::sync::{mpsc, oneshot};
 use tracing::{debug, error, info, instrument, trace, warn};
+use uuid;
 
 use crate::connection::ConnectionFileManager;
 use crate::daemon::{
@@ -147,6 +149,8 @@ pub struct IntegratedKernel<P: Protocol> {
     pending_input_request: Option<oneshot::Sender<String>>,
     /// Channel health tracking - last activity timestamps
     channel_last_activity: Arc<RwLock<HashMap<String, std::time::Instant>>>,
+    /// Current client identity for message routing
+    current_client_identity: Option<Vec<u8>>,
 }
 
 #[allow(dead_code)] // These methods will be used when transport is fully integrated
@@ -309,6 +313,7 @@ impl<P: Protocol + 'static> IntegratedKernel<P> {
             health_monitor,
             pending_input_request: None,
             channel_last_activity: Arc::new(RwLock::new(HashMap::new())),
+            current_client_identity: None,
         })
     }
 
@@ -452,7 +457,14 @@ impl<P: Protocol + 'static> IntegratedKernel<P> {
 
     /// Set transport for message communication
     pub fn set_transport(&mut self, transport: Box<dyn Transport>) {
+        debug!("Setting transport on IntegratedKernel");
         self.transport = Some(transport);
+        debug!("Transport set: {}", self.transport.is_some());
+    }
+
+    /// Check if transport is configured
+    pub fn has_transport(&self) -> bool {
+        self.transport.is_some()
     }
 
     /// Get the execution manager for debugging
@@ -490,6 +502,12 @@ impl<P: Protocol + 'static> IntegratedKernel<P> {
     pub async fn run(mut self) -> Result<()> {
         info!("Starting IntegratedKernel in current context (no spawning)");
 
+        // Debug: Check transport status at beginning of run
+        debug!(
+            "IntegratedKernel::run() - transport check at start: {}",
+            self.transport.is_some()
+        );
+
         // Start tracing
         self.tracing.trace_operation(
             OperationCategory::ScriptRuntime,
@@ -526,6 +544,11 @@ impl<P: Protocol + 'static> IntegratedKernel<P> {
         // Publish idle status to indicate kernel is ready
         self.io_manager.publish_status("idle").await?;
 
+        info!(
+            "Entering main kernel loop with transport={}",
+            self.transport.is_some()
+        );
+
         loop {
             // Check for shutdown signal
             if let Some(ref mut shutdown_rx) = self.shutdown_rx {
@@ -537,16 +560,22 @@ impl<P: Protocol + 'static> IntegratedKernel<P> {
 
             // Process messages from transport if available
             let has_transport = self.transport.is_some();
+            trace!("Transport polling check: has_transport={}", has_transport);
 
             if has_transport {
+                trace!("Starting channel polling cycle");
                 // Collect messages from all channels first
-                let mut messages_to_process = Vec::new();
+                let mut messages_to_process: Vec<(HashMap<String, Value>, Vec<u8>)> = Vec::new();
 
                 // Process channels sequentially to avoid multiple mutable borrows
                 // First, check Control channel (priority)
+                trace!("Checking control channel");
                 let control_msg = if let Some(ref mut transport) = self.transport {
-                    transport.recv("control").await.ok().flatten()
+                    let result = transport.recv("control").await;
+                    trace!("Control recv result: {:?}", result.is_ok());
+                    result.ok().flatten()
                 } else {
+                    trace!("No transport for control channel");
                     None
                 };
 
@@ -556,41 +585,73 @@ impl<P: Protocol + 'static> IntegratedKernel<P> {
                         .write()
                         .insert("control".to_string(), std::time::Instant::now());
 
-                    if let Some(first_part) = message_parts.first() {
-                        match self.protocol.parse_message(first_part) {
-                            Ok(parsed_msg) => {
-                                // Validate message type for control channel
-                                if let Some(msg_type) =
-                                    parsed_msg.get("msg_type").and_then(|v| v.as_str())
+                    // For Jupyter protocol, we need to parse the multipart message format
+                    // Find the delimiter "<IDS|MSG>" and extract the content
+                    let delimiter = b"<IDS|MSG>";
+                    let delimiter_idx = message_parts
+                        .iter()
+                        .position(|part| part.as_slice() == delimiter);
+
+                    let parsed_result = if let Some(idx) = delimiter_idx {
+                        // This is a proper Jupyter wire protocol message
+                        // The content is at position idx + 5 (after delimiter, signature, header, parent_header, metadata)
+                        if message_parts.len() > idx + 5 {
+                            self.protocol.parse_message(&message_parts[idx + 5])
+                        } else {
+                            Err(anyhow::anyhow!("Incomplete Jupyter message"))
+                        }
+                    } else if let Some(first_part) = message_parts.first() {
+                        // Try parsing as a simple message (for compatibility)
+                        self.protocol.parse_message(first_part)
+                    } else {
+                        Err(anyhow::anyhow!("Empty message"))
+                    };
+
+                    match parsed_result {
+                        Ok(parsed_msg) => {
+                            // Extract client identity from Part 0 for response routing
+                            let client_identity =
+                                message_parts.first().cloned().unwrap_or_default();
+
+                            // Validate message type for control channel
+                            if let Some(msg_type) =
+                                parsed_msg.get("msg_type").and_then(|v| v.as_str())
+                            {
+                                if msg_type == "interrupt_request"
+                                    || msg_type == "shutdown_request"
+                                    || msg_type == "debug_request"
                                 {
-                                    if msg_type == "interrupt_request"
-                                        || msg_type == "shutdown_request"
-                                        || msg_type == "debug_request"
+                                    trace!("Received control message: {}", msg_type);
+                                    // Process control messages immediately (priority)
+                                    if let Err(e) = self
+                                        .handle_message_with_identity(parsed_msg, client_identity)
+                                        .await
                                     {
-                                        trace!("Received control message: {}", msg_type);
-                                        // Process control messages immediately (priority)
-                                        if let Err(e) = self.handle_message(parsed_msg).await {
-                                            error!("Error handling control message: {}", e);
-                                        }
-                                    } else {
-                                        warn!(
-                                            "Invalid message type '{}' on control channel",
-                                            msg_type
-                                        );
+                                        error!("Error handling control message: {}", e);
                                     }
+                                } else {
+                                    warn!("Invalid message type '{}' on control channel", msg_type);
                                 }
                             }
-                            Err(e) => {
-                                warn!("Failed to parse control message: {}", e);
-                            }
+                        }
+                        Err(e) => {
+                            warn!("Failed to parse control message: {}", e);
                         }
                     }
                 }
 
                 // Process Shell channel for execution requests
+                trace!("Checking shell channel");
                 let shell_msg = if let Some(ref mut transport) = self.transport {
-                    transport.recv("shell").await.ok().flatten()
+                    let result = transport.recv("shell").await;
+                    match &result {
+                        Ok(Some(parts)) => trace!("Shell recv SUCCESS: {} parts", parts.len()),
+                        Ok(None) => trace!("Shell recv: no message"),
+                        Err(e) => trace!("Shell recv ERROR: {}", e),
+                    }
+                    result.ok().flatten()
                 } else {
+                    trace!("No transport for shell channel");
                     None
                 };
 
@@ -600,33 +661,106 @@ impl<P: Protocol + 'static> IntegratedKernel<P> {
                         .write()
                         .insert("shell".to_string(), std::time::Instant::now());
 
-                    if let Some(first_part) = message_parts.first() {
-                        match self.protocol.parse_message(first_part) {
-                            Ok(parsed_msg) => {
-                                // Validate message type for shell channel
-                                if let Some(msg_type) =
-                                    parsed_msg.get("msg_type").and_then(|v| v.as_str())
+                    trace!(
+                        "Processing shell message with {} parts",
+                        message_parts.len()
+                    );
+                    for (i, part) in message_parts.iter().enumerate() {
+                        trace!("Shell Part {}: {:?}", i, String::from_utf8_lossy(part));
+                    }
+
+                    // For Jupyter protocol, we need to parse the multipart message format
+                    // Find the delimiter "<IDS|MSG>" and extract the content
+                    let delimiter = b"<IDS|MSG>";
+                    let delimiter_idx = message_parts
+                        .iter()
+                        .position(|part| part.as_slice() == delimiter);
+
+                    let parsed_result = if let Some(idx) = delimiter_idx {
+                        // Reconstruct full Jupyter message from wire protocol parts
+                        if message_parts.len() > idx + 4 {
+                            let header_bytes = &message_parts[idx + 2]; // header after delimiter + signature
+                            let parent_header_bytes = &message_parts[idx + 3]; // parent_header
+                            let metadata_bytes = &message_parts[idx + 4]; // metadata
+                            let content_bytes = if message_parts.len() > idx + 5 {
+                                &message_parts[idx + 5]
+                            } else {
+                                &vec![b'{', b'}']
+                            };
+
+                            // Parse header to get msg_type
+                            if let Ok(header_value) =
+                                serde_json::from_slice::<serde_json::Value>(header_bytes)
+                            {
+                                let mut full_message = std::collections::HashMap::new();
+                                if let Ok(header_map) =
+                                    serde_json::from_value::<
+                                        std::collections::HashMap<String, serde_json::Value>,
+                                    >(header_value.clone())
                                 {
-                                    if msg_type == "execute_request"
-                                        || msg_type == "complete_request"
-                                        || msg_type == "inspect_request"
-                                        || msg_type == "kernel_info_request"
-                                        || msg_type == "comm_info_request"
-                                        || msg_type == "history_request"
-                                    {
-                                        trace!("Received shell message: {}", msg_type);
-                                        messages_to_process.push(parsed_msg);
-                                    } else {
-                                        warn!(
-                                            "Invalid message type '{}' on shell channel",
-                                            msg_type
-                                        );
+                                    for (k, v) in header_map {
+                                        full_message.insert(k, v);
                                     }
                                 }
+                                full_message.insert(
+                                    "parent_header".to_string(),
+                                    serde_json::from_slice(parent_header_bytes).unwrap_or(
+                                        serde_json::Value::Object(serde_json::Map::new()),
+                                    ),
+                                );
+                                full_message.insert(
+                                    "metadata".to_string(),
+                                    serde_json::from_slice(metadata_bytes).unwrap_or(
+                                        serde_json::Value::Object(serde_json::Map::new()),
+                                    ),
+                                );
+                                full_message.insert(
+                                    "content".to_string(),
+                                    serde_json::from_slice(content_bytes).unwrap_or(
+                                        serde_json::Value::Object(serde_json::Map::new()),
+                                    ),
+                                );
+
+                                Ok(full_message)
+                            } else {
+                                Err(anyhow::anyhow!("Failed to parse Jupyter message header"))
                             }
-                            Err(e) => {
-                                warn!("Failed to parse shell message: {}", e);
+                        } else {
+                            Err(anyhow::anyhow!("Incomplete Jupyter message"))
+                        }
+                    } else if let Some(first_part) = message_parts.first() {
+                        // Try parsing as a simple message (for compatibility)
+                        self.protocol.parse_message(first_part)
+                    } else {
+                        Err(anyhow::anyhow!("Empty message"))
+                    };
+
+                    match parsed_result {
+                        Ok(parsed_msg) => {
+                            // Extract client identity from Part 0 for response routing
+                            let client_identity =
+                                message_parts.first().cloned().unwrap_or_default();
+
+                            // Validate message type for shell channel
+                            if let Some(msg_type) =
+                                parsed_msg.get("msg_type").and_then(|v| v.as_str())
+                            {
+                                if msg_type == "execute_request"
+                                    || msg_type == "complete_request"
+                                    || msg_type == "inspect_request"
+                                    || msg_type == "kernel_info_request"
+                                    || msg_type == "comm_info_request"
+                                    || msg_type == "history_request"
+                                {
+                                    trace!("Received shell message: {}", msg_type);
+                                    messages_to_process.push((parsed_msg, client_identity));
+                                } else {
+                                    warn!("Invalid message type '{}' on shell channel", msg_type);
+                                }
                             }
+                        }
+                        Err(e) => {
+                            warn!("Failed to parse shell message: {}", e);
                         }
                     }
                 }
@@ -644,30 +778,47 @@ impl<P: Protocol + 'static> IntegratedKernel<P> {
                         .write()
                         .insert("stdin".to_string(), std::time::Instant::now());
 
-                    if let Some(first_part) = message_parts.first() {
-                        match self.protocol.parse_message(first_part) {
-                            Ok(parsed_msg) => {
-                                // Validate message type for stdin channel
-                                if let Some(msg_type) =
-                                    parsed_msg.get("msg_type").and_then(|v| v.as_str())
-                                {
-                                    if msg_type == "input_reply" {
-                                        trace!("Received stdin message: {}", msg_type);
-                                        // Handle input reply from frontend
-                                        if let Err(e) = self.handle_input_reply(parsed_msg).await {
-                                            error!("Error handling input reply: {}", e);
-                                        }
-                                    } else {
-                                        warn!(
-                                            "Invalid message type '{}' on stdin channel",
-                                            msg_type
-                                        );
+                    // For Jupyter protocol, we need to parse the multipart message format
+                    // Find the delimiter "<IDS|MSG>" and extract the content
+                    let delimiter = b"<IDS|MSG>";
+                    let delimiter_idx = message_parts
+                        .iter()
+                        .position(|part| part.as_slice() == delimiter);
+
+                    let parsed_result = if let Some(idx) = delimiter_idx {
+                        // This is a proper Jupyter wire protocol message
+                        // The content is at position idx + 5 (after delimiter, signature, header, parent_header, metadata)
+                        if message_parts.len() > idx + 5 {
+                            self.protocol.parse_message(&message_parts[idx + 5])
+                        } else {
+                            Err(anyhow::anyhow!("Incomplete Jupyter message"))
+                        }
+                    } else if let Some(first_part) = message_parts.first() {
+                        // Try parsing as a simple message (for compatibility)
+                        self.protocol.parse_message(first_part)
+                    } else {
+                        Err(anyhow::anyhow!("Empty message"))
+                    };
+
+                    match parsed_result {
+                        Ok(parsed_msg) => {
+                            // Validate message type for stdin channel
+                            if let Some(msg_type) =
+                                parsed_msg.get("msg_type").and_then(|v| v.as_str())
+                            {
+                                if msg_type == "input_reply" {
+                                    trace!("Received stdin message: {}", msg_type);
+                                    // Handle input reply from frontend
+                                    if let Err(e) = self.handle_input_reply(parsed_msg).await {
+                                        error!("Error handling input reply: {}", e);
                                     }
+                                } else {
+                                    warn!("Invalid message type '{}' on stdin channel", msg_type);
                                 }
                             }
-                            Err(e) => {
-                                warn!("Failed to parse stdin message: {}", e);
-                            }
+                        }
+                        Err(e) => {
+                            warn!("Failed to parse stdin message: {}", e);
                         }
                     }
                 }
@@ -694,12 +845,15 @@ impl<P: Protocol + 'static> IntegratedKernel<P> {
                 }
 
                 // Now process collected messages (transport no longer borrowed)
-                for parsed_msg in messages_to_process {
+                for (parsed_msg, client_identity) in messages_to_process {
                     // Start measuring message handling time
                     let start_time = std::time::Instant::now();
 
-                    // Handle the message
-                    if let Err(e) = self.handle_message(parsed_msg).await {
+                    // Handle the message with client identity
+                    if let Err(e) = self
+                        .handle_message_with_identity(parsed_msg, client_identity)
+                        .await
+                    {
                         error!("Error handling message: {}", e);
                     }
 
@@ -716,9 +870,11 @@ impl<P: Protocol + 'static> IntegratedKernel<P> {
                 }
 
                 // Small yield to prevent busy-waiting
+                trace!("Completed channel polling cycle, sleeping 1ms");
                 tokio::time::sleep(Duration::from_millis(1)).await;
             } else {
                 // No transport configured, sleep longer
+                trace!("No transport, sleeping 100ms");
                 tokio::time::sleep(Duration::from_millis(100)).await;
             }
         }
@@ -769,7 +925,7 @@ impl<P: Protocol + 'static> IntegratedKernel<P> {
 
         match msg_type {
             "execute_request" => self.handle_execute_request(message).await?,
-            "kernel_info_request" => self.handle_kernel_info_request(&message)?,
+            "kernel_info_request" => self.handle_kernel_info_request(&message).await?,
             "shutdown_request" => self.handle_shutdown_request(&message)?,
             "interrupt_request" => self.handle_interrupt_request(&message)?,
             "debug_request" => self.handle_debug_request(message).await?,
@@ -779,6 +935,24 @@ impl<P: Protocol + 'static> IntegratedKernel<P> {
         }
 
         Ok(())
+    }
+
+    /// Handle a parsed message with client identity for response routing
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if message handling fails
+    #[instrument(level = "debug", skip(self, message, client_identity))]
+    async fn handle_message_with_identity(
+        &mut self,
+        message: HashMap<String, Value>,
+        client_identity: Vec<u8>,
+    ) -> Result<()> {
+        // Store client identity for use in responses
+        self.current_client_identity = Some(client_identity);
+
+        // Delegate to the original handle_message method
+        self.handle_message(message).await
     }
 
     /// Handle input reply from frontend
@@ -904,9 +1078,6 @@ impl<P: Protocol + 'static> IntegratedKernel<P> {
     /// Returns an error if debug request handling fails
     #[instrument(level = "debug", skip(self, message))]
     async fn handle_debug_request(&mut self, message: HashMap<String, Value>) -> Result<()> {
-        let header = message
-            .get("header")
-            .ok_or_else(|| anyhow::anyhow!("Missing header"))?;
         let content = message
             .get("content")
             .ok_or_else(|| anyhow::anyhow!("Missing content"))?;
@@ -923,17 +1094,28 @@ impl<P: Protocol + 'static> IntegratedKernel<P> {
             dap_bridge.handle_request(content)?
         };
 
-        // Send debug_reply on control channel
-        let reply = json!({
-            "msg_type": "debug_reply",
-            "parent_header": header,
-            "content": dap_response,
-        });
+        // Send debug_reply on control channel using proper multipart format
+        if self.transport.is_some() {
+            // Use stored client identity from the request for response routing
+            let client_identity = self
+                .current_client_identity
+                .clone()
+                .unwrap_or_else(|| b"unknown_client".to_vec());
+            let multipart_response =
+                self.create_multipart_response(&client_identity, "debug_reply", &dap_response)?;
 
-        // Send reply through transport if available
-        if let Some(ref mut transport) = self.transport {
-            let msg_bytes = self.protocol.create_response("debug_reply", reply)?;
-            transport.send("control", vec![msg_bytes]).await?;
+            debug!(
+                "debug_reply multipart created, {} parts",
+                multipart_response.len()
+            );
+
+            // Now borrow transport mutably
+            if let Some(ref mut transport) = self.transport {
+                match transport.send("control", multipart_response).await {
+                    Ok(()) => debug!("debug_reply sent successfully via control channel"),
+                    Err(e) => error!("Failed to send debug_reply: {}", e),
+                }
+            }
         } else {
             debug!("No transport available for debug_reply");
         }
@@ -949,16 +1131,19 @@ impl<P: Protocol + 'static> IntegratedKernel<P> {
     pub async fn broadcast_debug_event(&mut self, event: Value) -> Result<()> {
         debug!("Broadcasting debug event: {:?}", event);
 
-        // Create debug_event message for IOPub channel
-        let debug_event = json!({
-            "msg_type": "debug_event",
-            "content": event,
-        });
+        // Send event through IOPub channel via transport using multipart format
+        if self.transport.is_some() {
+            // IOPub messages don't need client identity routing (broadcast channel)
+            let client_identity = b"".to_vec(); // Empty identity for IOPub
+            let multipart_event =
+                self.create_multipart_response(&client_identity, "debug_event", &event)?;
 
-        // Send event through IOPub channel via transport
-        if let Some(ref mut transport) = self.transport {
-            let msg_bytes = self.protocol.create_request("debug_event", debug_event)?;
-            transport.send("iopub", vec![msg_bytes]).await?;
+            if let Some(ref mut transport) = self.transport {
+                match transport.send("iopub", multipart_event).await {
+                    Ok(()) => debug!("debug_event broadcast successfully via iopub channel"),
+                    Err(e) => error!("Failed to broadcast debug_event: {}", e),
+                }
+            }
         } else {
             // Use IO manager to publish the event
             let mut display_data = HashMap::new();
@@ -1411,7 +1596,10 @@ impl<P: Protocol + 'static> IntegratedKernel<P> {
     /// # Errors
     ///
     /// Returns an error if response creation fails
-    fn handle_kernel_info_request(&mut self, _message: &HashMap<String, Value>) -> Result<()> {
+    async fn handle_kernel_info_request(
+        &mut self,
+        _message: &HashMap<String, Value>,
+    ) -> Result<()> {
         debug!("Handling kernel_info_request");
 
         // Create kernel info response with language from script executor
@@ -1435,12 +1623,80 @@ impl<P: Protocol + 'static> IntegratedKernel<P> {
             "banner": format!("LLMSpell Kernel v{} ({})", crate::KERNEL_VERSION, language),
         });
 
-        // TODO: Send response via transport when integrated
-        let _response = self
-            .protocol
-            .create_response("kernel_info_reply", kernel_info)?;
+        // Send response via transport using proper multipart format
+        if self.transport.is_some() {
+            // Use stored client identity from the request for response routing
+            let client_identity = self
+                .current_client_identity
+                .clone()
+                .unwrap_or_else(|| b"unknown_client".to_vec());
+            let multipart_response = self.create_multipart_response(
+                &client_identity,
+                "kernel_info_reply",
+                &kernel_info,
+            )?;
+
+            debug!(
+                "kernel_info_reply multipart created, {} parts",
+                multipart_response.len()
+            );
+
+            // Now borrow transport mutably
+            if let Some(ref mut transport) = self.transport {
+                match transport.send("shell", multipart_response).await {
+                    Ok(()) => debug!("kernel_info_reply sent successfully via shell channel"),
+                    Err(e) => error!("Failed to send kernel_info_reply: {}", e),
+                }
+            }
+        } else {
+            debug!("No transport available for kernel_info_reply");
+        }
 
         Ok(())
+    }
+
+    /// Create a multipart response for ZMQ ROUTER socket
+    fn create_multipart_response(
+        &self,
+        client_identity: &[u8],
+        msg_type: &str,
+        content: &serde_json::Value,
+    ) -> Result<Vec<Vec<u8>>> {
+        // Create header
+        let header = serde_json::json!({
+            "msg_id": uuid::Uuid::new_v4().to_string(),
+            "session": self.session_id,
+            "username": "kernel",
+            "msg_type": msg_type,
+            "version": "5.3",
+            "date": chrono::Utc::now().to_rfc3339(),
+        });
+
+        let parent_header = serde_json::json!({});
+        let metadata = serde_json::json!({});
+
+        // Serialize components
+        let header_bytes = serde_json::to_vec(&header)?;
+        let parent_header_bytes = serde_json::to_vec(&parent_header)?;
+        let metadata_bytes = serde_json::to_vec(&metadata)?;
+        let content_bytes = serde_json::to_vec(&content)?;
+
+        // Create signature (empty for now, TODO: add HMAC)
+        let signature = b"".to_vec();
+
+        // Build multipart message according to Jupyter wire protocol
+        // [identity, delimiter, signature, header, parent_header, metadata, content]
+        let parts = vec![
+            client_identity.to_vec(), // Client identity for ROUTER routing
+            b"<IDS|MSG>".to_vec(),    // Delimiter
+            signature,                // HMAC signature
+            header_bytes,             // Header JSON
+            parent_header_bytes,      // Parent header JSON
+            metadata_bytes,           // Metadata JSON
+            content_bytes,            // Content JSON
+        ];
+
+        Ok(parts)
     }
 
     /// Handle `shutdown_request`
