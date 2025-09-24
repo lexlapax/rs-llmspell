@@ -2960,1814 +2960,11 @@ python3 tests/python/test_jupyter_client.py
 - [x] Performance requirements validated (kernel-side)
 - [x] Test procedure documented (test_dap_simple.py exists)
 
-### Phase 10.7 Summary and Next Steps
-
-**Status**: BLOCKED - DAP protocol implementation complete, but debugging cannot proceed without architectural changes.
-
-**Architectural Analysis**: Complete analysis documented in `/Users/spuri/projects/lexlapax/rs-llmspell/DEVELOPER_UX_ANALYSIS.md`
-
-**Resolution Plan**: The debugging architecture issues will be resolved through new phases:
-- **Phase 10.8**: Basic REPL Implementation (foundation without debug)
-- **Phase 10.9**: Debug Infrastructure Foundation (fix architectural disconnect)
-- **Phase 10.10**: Connect REPL to Debug Infrastructure (integrate features)
-- **Phase 10.11**: DAP Completion (complete IDE integration)
-
-See these new phases below for detailed implementation plans.
-
 ---
 
-## Phase 10.8: Basic REPL Implementation (Days 11-12)
+## Phase 10.8: Language Server Protocol (Days 11-13)
 
-**Rationale**: Before adding debug complexity, we need a solid foundation with a working REPL that can execute scripts through the existing ScriptExecutor. This validates the execution pipeline and provides immediate value to users. Debug functionality will be added as placeholders to show integration points without complicating the initial implementation.
-
-### Task 10.8.1: Core REPL Infrastructure
-**Priority**: HIGH
-**Estimated Time**: 4 hours
-**Assignee**: Core Team
-**Status**: 🔲 NOT STARTED
-
-**Description**: Implement the fundamental REPL loop with command parsing, script execution, and output display. This establishes the basic interactive environment without any debugging complexity.
-
-**Acceptance Criteria:**
-- [ ] REPL binary created (`llmspell repl` command works)
-- [ ] Interactive prompt displays and accepts input
-- [ ] Command history works (arrow keys navigate history)
-- [ ] Multi-line input supported (detects incomplete expressions)
-- [ ] Ctrl-C interrupts current execution
-- [ ] Ctrl-D exits cleanly
-- [ ] Output properly formatted and displayed
-- [ ] Error messages clear and helpful
-- [ ] Performance: <10ms prompt response time
-
-**Implementation Steps:**
-1. Create `llmspell-cli/src/repl/mod.rs`:
-   ```rust
-   pub struct Repl {
-       executor: Arc<dyn ScriptExecutor>,
-       history: Vec<String>,
-       multiline_buffer: String,
-       prompt: String,
-   }
-   ```
-
-2. Implement command loop:
-   ```rust
-   impl Repl {
-       pub async fn run(&mut self) -> Result<()> {
-           loop {
-               let input = self.read_input()?;
-               match self.parse_command(&input) {
-                   Command::Execute(code) => self.execute(code).await?,
-                   Command::Exit => break,
-                   // ... other commands
-               }
-           }
-       }
-   }
-   ```
-
-3. Add readline support:
-   - Use `rustyline` crate for history and editing
-   - Configure completions (file paths initially)
-   - Handle multi-line with continuation prompt
-
-4. Connect to ScriptExecutor:
-   - Create ScriptRuntime with Lua engine
-   - Execute code through existing pipeline
-   - Capture and display output
-
-5. Error handling:
-   - Parse errors show location
-   - Runtime errors show stack trace
-   - Graceful recovery to prompt
-
-**Testing Requirements:**
-- [ ] Unit tests for command parsing
-- [ ] Integration test executing simple Lua script
-- [ ] Test multi-line input (function definitions)
-- [ ] Test error recovery
-- [ ] Test history persistence
-- [ ] Manual testing checklist documented
-
-**Definition of Done:**
-- [ ] All acceptance criteria met
-- [ ] Test coverage >80% for new code
-- [ ] `cargo clippy --workspace --all-features --all-targets` - ZERO warnings
-- [ ] `cargo fmt --all --check` passes
-- [ ] Documentation updated with REPL usage
-- [ ] No performance regressions
-
----
-
-### Task 10.8.2: Basic Command Implementation
-**Priority**: HIGH
-**Estimated Time**: 3 hours
-**Assignee**: Core Team
-**Status**: 🔲 NOT STARTED
-
-**Description**: Implement the essential REPL commands for script execution and session management. These commands work without any debug functionality.
-
-**Acceptance Criteria:**
-- [ ] `run <file>` - Execute script file
-- [ ] `eval <code>` - Execute inline code
-- [ ] `clear` - Clear screen
-- [ ] `history` - Show command history
-- [ ] `help` - Show available commands
-- [ ] `.exit` or `quit` - Exit REPL
-- [ ] Commands are case-insensitive where appropriate
-- [ ] Tab completion for commands
-- [ ] File path completion for `run` command
-
-**Implementation Steps:**
-1. Define command enum:
-   ```rust
-   enum Command {
-       Run { file: PathBuf },
-       Eval { code: String },
-       Clear,
-       History,
-       Help,
-       Exit,
-       Debug(DebugCommand), // Placeholder
-   }
-   ```
-
-2. Implement command parser:
-   ```rust
-   fn parse_command(input: &str) -> Result<Command> {
-       let parts: Vec<&str> = input.split_whitespace().collect();
-       match parts.first().map(|s| s.to_lowercase()).as_deref() {
-           Some("run") => Ok(Command::Run {
-               file: PathBuf::from(parts.get(1).ok_or("Missing file")?)
-           }),
-           // ... other commands
-       }
-   }
-   ```
-
-3. Implement each command:
-   - `run`: Read file, execute via ScriptExecutor
-   - `eval`: Direct execution of input
-   - `clear`: ANSI escape codes or terminal crate
-   - `history`: Display numbered history
-   - `help`: Format and display command list
-
-4. Add tab completion:
-   ```rust
-   impl rustyline::completion::Completer for ReplCompleter {
-       fn complete(&self, line: &str, pos: usize) -> Result<(usize, Vec<Pair>)> {
-           // Complete commands and file paths
-       }
-   }
-   ```
-
-**Testing Requirements:**
-- [ ] Test each command with valid input
-- [ ] Test each command with invalid input
-- [ ] Test file path completion
-- [ ] Test command completion
-- [ ] Integration test running actual Lua file
-
-**Definition of Done:**
-- [ ] All commands functional
-- [ ] Help text clear and accurate
-- [ ] Tab completion works smoothly
-- [ ] `cargo clippy --workspace --all-features --all-targets` - ZERO warnings
-- [ ] Tests pass with coverage >85%
-
----
-
-### Task 10.8.3: Debug Command Placeholders
-**Priority**: MEDIUM
-**Estimated Time**: 2 hours
-**Assignee**: Core Team
-**Status**: 🔲 NOT STARTED
-
-**Description**: Add placeholder debug commands that indicate where debugging will be integrated. These commands parse correctly but return "Debug functionality not yet implemented" messages.
-
-**Rationale**: This shows users (and developers) exactly where debug functionality will plug in, without adding complexity to the initial implementation. It also allows us to test the command parsing without needing working debug infrastructure.
-
-**Acceptance Criteria:**
-- [ ] Debug commands parse correctly
-- [ ] Each returns helpful "not yet implemented" message
-- [ ] Commands shown in help with [DEBUG] tag
-- [ ] No attempt to access ExecutionManager
-- [ ] Clean separation from working commands
-
-**Placeholder Commands:**
-```
-> break script.lua:10       # Set breakpoint
-> clear script.lua:10       # Clear breakpoint
-> list breaks              # List all breakpoints
-> run -d script.lua        # Run with debugging
-> step                     # Step into
-> next                     # Step over
-> continue                 # Continue execution
-> where                    # Show stack trace
-> locals                   # Show local variables
-> print <expr>             # Evaluate expression
-> watch <expr>             # Set watch expression
-```
-
-**Implementation Steps:**
-1. Define debug command enum:
-   ```rust
-   enum DebugCommand {
-       SetBreak { file: String, line: u32 },
-       ClearBreak { file: String, line: u32 },
-       ListBreaks,
-       RunDebug { file: PathBuf },
-       Step,
-       Next,
-       Continue,
-       Where,
-       Locals,
-       Print { expr: String },
-       Watch { expr: String },
-   }
-   ```
-
-2. Parse debug commands:
-   ```rust
-   fn parse_debug_command(input: &str) -> Result<DebugCommand> {
-       // Parse but don't execute
-   }
-   ```
-
-3. Return placeholder messages:
-   ```rust
-   fn handle_debug_command(&self, cmd: DebugCommand) -> Result<()> {
-       println!("⚠️  Debug functionality not yet implemented");
-       println!("This command will be available after Phase 10.10");
-       match cmd {
-           DebugCommand::SetBreak { file, line } => {
-               println!("Would set breakpoint at {}:{}", file, line);
-           }
-           // ... other commands
-       }
-       Ok(())
-   }
-   ```
-
-4. Update help to show debug commands:
-   ```
-   Debug Commands [NOT YET IMPLEMENTED]:
-     break <file>:<line>  - Set breakpoint
-     step                 - Step into function
-     ...
-   ```
-
-**Testing Requirements:**
-- [ ] Each placeholder command parses correctly
-- [ ] Each returns appropriate message
-- [ ] Invalid syntax shows error
-- [ ] Help clearly indicates not implemented
-
-**Definition of Done:**
-- [ ] All placeholder commands parse
-- [ ] Clear "not implemented" messages
-- [ ] No debug functionality attempted
-- [ ] `cargo clippy` - ZERO warnings
-- [ ] Ready for Phase 10.10 integration
-
----
-
-### Task 10.8.4: REPL Testing and Polish
-**Priority**: MEDIUM
-**Estimated Time**: 3 hours
-**Assignee**: QA Team
-**Status**: 🔲 NOT STARTED
-
-**Description**: Comprehensive testing of the REPL to ensure it's production-ready, including edge cases, performance validation, and user experience polish.
-
-**Acceptance Criteria:**
-- [ ] All edge cases handled gracefully
-- [ ] Performance meets requirements
-- [ ] User experience smooth and intuitive
-- [ ] Documentation complete
-- [ ] Integration tests comprehensive
-
-**Testing Scenarios:**
-1. **Basic Functionality:**
-   - Execute simple expressions
-   - Execute multi-line functions
-   - Run script files
-   - Handle syntax errors
-   - Handle runtime errors
-
-2. **Edge Cases:**
-   - Empty input
-   - Very long input (>10KB)
-   - Malformed commands
-   - Non-existent files
-   - Permission denied files
-   - Infinite loops (Ctrl-C works)
-   - Stack overflow
-   - Out of memory
-
-3. **Performance Tests:**
-   - Prompt response <10ms
-   - Script execution overhead <5ms
-   - History with 10,000 entries
-   - Large output (>1MB)
-
-4. **User Experience:**
-   - Colors appropriate (respects NO_COLOR)
-   - Unicode support
-   - Wide character display
-   - Copy/paste works
-   - Terminal resize handled
-
-**Definition of Done:**
-- [ ] All test scenarios pass
-- [ ] Performance benchmarks met
-- [ ] User manual written
-- [ ] No known bugs
-- [ ] `cargo test --workspace` passes
-- [ ] `cargo clippy` - ZERO warnings
-- [ ] Ready for release
-
----
-
-## Phase 10.9: Debug Infrastructure Foundation (Days 13-14)
-
-**Rationale**: The current architecture has no connection between the script execution engine (ScriptExecutor/LuaEngine) and the debug infrastructure (ExecutionManager/DAPBridge). This phase creates the necessary abstractions and wiring to enable debugging without breaking existing functionality. Debug support is OPTIONAL - when not enabled, there is zero performance impact.
-
-### Task 10.9.1: Create DebugContext Abstraction
-**Priority**: CRITICAL
-**Estimated Time**: 3 hours
-**Assignee**: Architecture Team
-**Status**: 🔲 NOT STARTED
-
-**Description**: Define the DebugContext trait that abstracts debug operations, allowing ScriptExecutor to interact with ExecutionManager without direct dependency. This maintains clean architecture boundaries.
-
-**Acceptance Criteria:**
-- [ ] DebugContext trait defined in llmspell-core
-- [ ] Trait is object-safe (can use dyn)
-- [ ] Async and sync methods properly separated
-- [ ] Send + Sync for thread safety
-- [ ] No dependency on kernel types
-- [ ] Clear documentation of each method
-- [ ] Example implementation provided
-
-**Implementation Steps:**
-1. Create `llmspell-core/src/traits/debug_context.rs`:
-   ```rust
-   use async_trait::async_trait;
-   use std::sync::Arc;
-
-   /// Abstraction for debug operations during script execution
-   #[async_trait]
-   pub trait DebugContext: Send + Sync {
-       /// Check if execution should pause at given location (sync for hooks)
-       fn should_pause_sync(&self, file: &str, line: u32) -> bool;
-
-       /// Async pause and wait for resume
-       async fn pause_and_wait(&self, file: &str, line: u32) -> Result<()>;
-
-       /// Enable debug mode
-       fn enable_debug_mode(&self);
-
-       /// Disable debug mode
-       fn disable_debug_mode(&self);
-
-       /// Check if debug mode is enabled
-       fn is_debug_enabled(&self) -> bool;
-
-       /// Set a breakpoint
-       fn set_breakpoint(&self, file: &str, line: u32) -> Result<String>;
-
-       /// Clear a breakpoint
-       fn clear_breakpoint(&self, id: &str) -> Result<()>;
-
-       /// Get current stack frames (when paused)
-       fn get_stack_frames(&self) -> Vec<StackFrame>;
-
-       /// Get variables in scope (when paused)
-       fn get_variables(&self, frame_id: usize) -> Vec<Variable>;
-   }
-   ```
-
-2. Create mock implementation for testing:
-   ```rust
-   pub struct MockDebugContext {
-       enabled: AtomicBool,
-       breakpoints: Arc<RwLock<HashMap<(String, u32), String>>>,
-   }
-
-   #[async_trait]
-   impl DebugContext for MockDebugContext {
-       fn should_pause_sync(&self, file: &str, line: u32) -> bool {
-           if !self.enabled.load(Ordering::Relaxed) {
-               return false;
-           }
-           self.breakpoints.read().contains_key(&(file.to_string(), line))
-       }
-       // ... implement other methods
-   }
-   ```
-
-3. Add to llmspell-core exports:
-   ```rust
-   pub mod traits {
-       // ... existing
-       pub mod debug_context;
-   }
-   pub use traits::debug_context::{DebugContext, MockDebugContext};
-   ```
-
-**Testing Requirements:**
-- [ ] Mock implementation works correctly
-- [ ] Trait object can be created (dyn DebugContext)
-- [ ] Thread safety verified
-- [ ] Async methods tested
-- [ ] Performance: should_pause_sync <100ns when disabled
-
-**Definition of Done:**
-- [ ] Trait well-designed and documented
-- [ ] Mock implementation complete
-- [ ] Tests pass with >90% coverage
-- [ ] `cargo clippy` - ZERO warnings
-- [ ] Ready for integration
-
----
-
-### Task 10.9.2: Implement DebugContext for ExecutionManager
-**Priority**: CRITICAL
-**Estimated Time**: 4 hours
-**Assignee**: Kernel Team
-**Status**: 🔲 NOT STARTED
-
-**Description**: Implement the DebugContext trait for ExecutionManager, bridging the gap between the abstract interface and the concrete DAP implementation.
-
-**Acceptance Criteria:**
-- [ ] ExecutionManager implements DebugContext
-- [ ] All trait methods properly implemented
-- [ ] Async/sync coordination handled correctly
-- [ ] Thread-safe access to internal state
-- [ ] Integration with existing DAP bridge maintained
-- [ ] Performance optimized for disabled case
-
-**Implementation Steps:**
-1. Add dependency in llmspell-kernel:
-   ```toml
-   [dependencies]
-   llmspell-core = { path = "../llmspell-core", features = ["debug"] }
-   ```
-
-2. Implement trait for ExecutionManager:
-   ```rust
-   #[async_trait]
-   impl DebugContext for ExecutionManager {
-       fn should_pause_sync(&self, file: &str, line: u32) -> bool {
-           // Fast path when disabled
-           if !self.debug_enabled.load(Ordering::Relaxed) {
-               return false;
-           }
-
-           // Check breakpoints
-           self.should_pause(file, line)
-       }
-
-       async fn pause_and_wait(&self, file: &str, line: u32) -> Result<()> {
-           // Set paused state
-           self.pause_state.paused.store(true, Ordering::SeqCst);
-
-           // Send stopped event
-           if let Some(tx) = &self.stopped_event_tx {
-               let event = StoppedEvent {
-                   reason: "breakpoint".to_string(),
-                   thread_id: 1,
-                   file: file.to_string(),
-                   line,
-               };
-               let _ = tx.send(event).await;
-           }
-
-           // Wait for resume
-           self.pause_state.resume_signal.notified().await;
-           Ok(())
-       }
-
-       fn enable_debug_mode(&self) {
-           self.debug_enabled.store(true, Ordering::SeqCst);
-       }
-       // ... other methods
-   }
-   ```
-
-3. Add debug_enabled flag:
-   ```rust
-   pub struct ExecutionManager {
-       // ... existing fields
-       debug_enabled: Arc<AtomicBool>,
-   }
-   ```
-
-4. Optimize for performance:
-   - Use atomic operations for flag checks
-   - Fast path when debug disabled
-   - Lazy initialization of debug structures
-
-**Testing Requirements:**
-- [ ] All trait methods tested
-- [ ] Async coordination tested
-- [ ] Thread safety verified
-- [ ] Performance: <10ns overhead when disabled
-- [ ] Integration with DAP bridge tested
-
-**Definition of Done:**
-- [ ] Implementation complete and optimized
-- [ ] All tests pass
-- [ ] Performance validated
-- [ ] `cargo clippy` - ZERO warnings
-- [ ] No regression in existing DAP code
-
----
-
-### Task 10.9.3: Modify ScriptExecutor Trait
-**Priority**: CRITICAL
-**Estimated Time**: 3 hours
-**Assignee**: Bridge Team
-**Status**: 🔲 NOT STARTED
-
-**Description**: Add optional debug context support to the ScriptExecutor trait, maintaining backward compatibility with existing implementations.
-
-**Acceptance Criteria:**
-- [ ] ScriptExecutor trait extended with debug support
-- [ ] Backward compatible (existing code still compiles)
-- [ ] Debug context is optional (None = no debug)
-- [ ] Clear documentation of debug behavior
-- [ ] Default implementation provided
-
-**Implementation Steps:**
-1. Modify trait in llmspell-core:
-   ```rust
-   #[async_trait]
-   pub trait ScriptExecutor: Send + Sync {
-       // New method with default implementation for compatibility
-       fn set_debug_context(&mut self, context: Option<Arc<dyn DebugContext>>) {
-           // Default: ignore (for backward compatibility)
-           let _ = context;
-       }
-
-       // New method to check if debug is supported
-       fn supports_debugging(&self) -> bool {
-           false // Default: no debug support
-       }
-
-       // Existing methods unchanged
-       async fn execute_script(&self, script: &str) -> Result<ScriptExecutionOutput>;
-
-       // ... other existing methods
-   }
-   ```
-
-2. Update ScriptRuntime to support debug:
-   ```rust
-   pub struct ScriptRuntime {
-       engine: Box<dyn ScriptEngineBridge>,
-       debug_context: Option<Arc<dyn DebugContext>>,
-       // ... existing fields
-   }
-
-   impl ScriptExecutor for ScriptRuntime {
-       fn set_debug_context(&mut self, context: Option<Arc<dyn DebugContext>>) {
-           self.debug_context = context.clone();
-           // Pass to engine if supported
-           if let Some(engine) = self.engine.as_debug_capable() {
-               engine.set_debug_context(context);
-           }
-       }
-
-       fn supports_debugging(&self) -> bool {
-           self.engine.supports_debugging()
-       }
-   }
-   ```
-
-3. Update ScriptEngineBridge trait:
-   ```rust
-   pub trait ScriptEngineBridge: Send + Sync {
-       // New method
-       fn set_debug_context(&mut self, context: Option<Arc<dyn DebugContext>>) {
-           // Default: ignore
-       }
-
-       fn supports_debugging(&self) -> bool {
-           false
-       }
-
-       // ... existing methods
-   }
-   ```
-
-**Testing Requirements:**
-- [ ] Existing code compiles without changes
-- [ ] Debug context can be set and retrieved
-- [ ] None context means no debug
-- [ ] Mock executor with debug support works
-
-**Definition of Done:**
-- [ ] Trait changes backward compatible
-- [ ] Documentation complete
-- [ ] Tests pass
-- [ ] `cargo clippy` - ZERO warnings
-- [ ] No breaking changes
-
----
-
-### Task 10.9.4: Wire Debug Context Through Execution Chain
-**Priority**: HIGH
-**Estimated Time**: 4 hours
-**Assignee**: Integration Team
-**Status**: 🔲 NOT STARTED
-
-**Description**: Connect the debug context from IntegratedKernel through ScriptRuntime to LuaEngine, establishing the complete debug pipeline.
-
-**Acceptance Criteria:**
-- [ ] IntegratedKernel passes ExecutionManager to ScriptExecutor
-- [ ] ScriptRuntime forwards to LuaEngine
-- [ ] LuaEngine stores and uses debug context
-- [ ] Debug remains optional throughout
-- [ ] No performance impact when disabled
-
-**Implementation Steps:**
-1. Modify IntegratedKernel construction:
-   ```rust
-   impl IntegratedKernel {
-       pub async fn new(
-           protocol: P,
-           config: ExecutionConfig,
-           session_id: String,
-           mut script_executor: Arc<dyn ScriptExecutor>,
-       ) -> Result<Self> {
-           // ... existing setup
-
-           // Create ExecutionManager
-           let execution_manager = Arc::new(ExecutionManager::new(session_id.clone()));
-
-           // Set debug context if executor supports it
-           if script_executor.supports_debugging() {
-               Arc::get_mut(&mut script_executor)
-                   .unwrap()
-                   .set_debug_context(Some(execution_manager.clone() as Arc<dyn DebugContext>));
-           }
-
-           // ... rest of construction
-       }
-   }
-   ```
-
-2. Update LuaEngine to store context:
-   ```rust
-   pub struct LuaEngine {
-       lua: Arc<Mutex<mlua::Lua>>,
-       debug_context: Option<Arc<dyn DebugContext>>,
-       // ... existing fields
-   }
-
-   impl ScriptEngineBridge for LuaEngine {
-       fn set_debug_context(&mut self, context: Option<Arc<dyn DebugContext>>) {
-           self.debug_context = context;
-       }
-
-       fn supports_debugging(&self) -> bool {
-           true // Lua supports debug hooks
-       }
-   }
-   ```
-
-3. Add configuration option:
-   ```rust
-   pub struct ExecutionConfig {
-       // ... existing
-       pub enable_debugging: bool,
-   }
-   ```
-
-4. Conditional debug setup:
-   ```rust
-   // Only set debug context if configured
-   if config.enable_debugging && script_executor.supports_debugging() {
-       // Set up debug context
-   }
-   ```
-
-**Testing Requirements:**
-- [ ] Debug context properly propagated
-- [ ] Works with debug enabled
-- [ ] Works with debug disabled
-- [ ] No performance impact when disabled
-- [ ] Integration test with full chain
-
-**Definition of Done:**
-- [ ] Wiring complete and tested
-- [ ] Performance validated
-- [ ] Documentation updated
-- [ ] `cargo clippy` - ZERO warnings
-- [ ] Ready for hook implementation
-
----
-
-### Task 10.9.5: Implement Lua Debug Hooks
-**Priority**: HIGH
-**Estimated Time**: 6 hours
-**Assignee**: Bridge Team
-**Status**: 🔲 NOT STARTED
-
-**Description**: Install Lua debug hooks that call the DebugContext when appropriate, handling the async/sync boundary correctly.
-
-**Rationale**: This is the critical piece that actually enables breakpoints to pause execution. The main challenge is that Lua hooks are synchronous but ExecutionManager operations are async.
-
-**Acceptance Criteria:**
-- [ ] Lua hooks installed when debug enabled
-- [ ] Hooks check breakpoints on each line
-- [ ] Async/sync coordination works correctly
-- [ ] No deadlocks or race conditions
-- [ ] Performance acceptable when enabled
-- [ ] Zero overhead when disabled
-
-**Implementation Steps:**
-1. Modify LuaEngine::execute_script:
-   ```rust
-   async fn execute_script(&self, script: &str) -> Result<ScriptOutput> {
-       let start_time = Instant::now();
-
-       // Check if debug enabled
-       let should_install_hooks = self.debug_context.as_ref()
-           .map(|ctx| ctx.is_debug_enabled())
-           .unwrap_or(false);
-
-       let result = {
-           let lua = self.lua.lock();
-
-           // Install debug hooks if needed
-           if should_install_hooks {
-               self.install_debug_hooks(&lua)?;
-           }
-
-           // Execute script
-           let lua_result = lua.load(script).eval();
-
-           // Remove hooks after execution
-           if should_install_hooks {
-               lua.remove_hook();
-           }
-
-           lua_result
-       };
-
-       // ... handle result
-   }
-   ```
-
-2. Implement hook installation:
-   ```rust
-   fn install_debug_hooks(&self, lua: &mlua::Lua) -> Result<()> {
-       let debug_ctx = self.debug_context.clone();
-
-       lua.set_hook(
-           mlua::HookTriggers::every_line(),
-           move |_lua, debug| {
-               let Some(ctx) = debug_ctx.as_ref() else {
-                   return Ok(());
-               };
-
-               // Get current location
-               let source = debug.source().short_src();
-               let line = debug.curr_line() as u32;
-
-               // Check if should pause (synchronous)
-               if ctx.should_pause_sync(&source, line) {
-                   // Handle async pause in sync context
-                   Self::handle_pause_sync(ctx.clone(), &source, line);
-               }
-
-               Ok(())
-           }
-       )?;
-
-       Ok(())
-   }
-   ```
-
-3. Handle async/sync boundary:
-   ```rust
-   fn handle_pause_sync(ctx: Arc<dyn DebugContext>, file: &str, line: u32) {
-       // Option 1: Use tokio Handle
-       if let Ok(handle) = tokio::runtime::Handle::try_current() {
-           handle.block_on(async {
-               let _ = ctx.pause_and_wait(file, line).await;
-           });
-       }
-
-       // Option 2: Channel-based approach
-       // ... alternative implementation
-   }
-   ```
-
-4. Add hook for function calls (stepping):
-   ```rust
-   mlua::HookTriggers::every_line() | mlua::HookTriggers::on_calls()
-   ```
-
-5. Performance optimization:
-   - Cache file names to avoid string allocation
-   - Use atomic flag for quick enable check
-   - Minimize work in hook callback
-
-**Testing Requirements:**
-- [ ] Hooks fire on each line
-- [ ] Breakpoint causes pause
-- [ ] Resume works correctly
-- [ ] No deadlocks during pause/resume
-- [ ] Performance: <1ms overhead per line
-- [ ] Stress test with recursive functions
-
-**Definition of Done:**
-- [ ] Hooks working correctly
-- [ ] Async/sync boundary handled
-- [ ] Performance acceptable
-- [ ] No deadlocks or races
-- [ ] `cargo clippy` - ZERO warnings
-- [ ] Ready for integration
-
----
-
-### Task 10.9.6: Test Debug Infrastructure
-**Priority**: HIGH
-**Estimated Time**: 4 hours
-**Assignee**: QA Team
-**Status**: 🔲 NOT STARTED
-
-**Description**: Comprehensive testing of the debug infrastructure to ensure it works correctly and doesn't impact non-debug execution.
-
-**Acceptance Criteria:**
-- [ ] Basic breakpoint test works
-- [ ] Multiple breakpoints work
-- [ ] Step operations work
-- [ ] No performance impact when disabled
-- [ ] Thread safety verified
-- [ ] Edge cases handled
-
-**Test Scenarios:**
-1. **Basic Breakpoint Test:**
-   ```lua
-   -- test.lua
-   local x = 10      -- line 1
-   local y = 20      -- line 2
-   local z = x + y   -- line 3: SET BREAKPOINT HERE
-   print(z)          -- line 4
-   ```
-   - Set breakpoint at line 3
-   - Run script
-   - Verify pauses at line 3
-   - Verify can resume
-
-2. **Multiple Breakpoints:**
-   - Set breakpoints at lines 2, 4, 6
-   - Verify stops at each
-   - Verify continue works
-
-3. **Performance Tests:**
-   - Run 1000-line script with debug disabled
-   - Measure execution time
-   - Enable debug (no breakpoints)
-   - Measure overhead (<5%)
-   - Add 10 breakpoints (none hit)
-   - Measure overhead (<10%)
-
-4. **Thread Safety:**
-   - Multiple scripts executing simultaneously
-   - Each with own debug context
-   - Verify no interference
-
-5. **Edge Cases:**
-   - Breakpoint in non-existent file
-   - Breakpoint at invalid line
-   - Recursive function with breakpoint
-   - Very deep call stack
-   - Script with syntax error
-   - Script that never terminates
-
-**Integration Test:**
-```rust
-#[tokio::test]
-async fn test_debug_infrastructure() {
-    // Create kernel with debug
-    let config = ExecutionConfig {
-        enable_debugging: true,
-        ..Default::default()
-    };
-
-    let executor = Arc::new(ScriptRuntime::new_with_lua(config));
-    let exec_mgr = Arc::new(ExecutionManager::new("test"));
-
-    // Set debug context
-    executor.set_debug_context(Some(exec_mgr.clone()));
-
-    // Set breakpoint
-    exec_mgr.set_breakpoint("test.lua", 3)?;
-
-    // Run script
-    let handle = tokio::spawn(async move {
-        executor.execute_script(SCRIPT).await
-    });
-
-    // Wait for pause
-    tokio::time::sleep(Duration::from_millis(100)).await;
-    assert!(exec_mgr.is_paused());
-
-    // Resume
-    exec_mgr.resume(StepMode::Continue);
-
-    // Verify completes
-    let result = handle.await??;
-    assert_eq!(result.output, json!(30));
-}
-```
-
-**Definition of Done:**
-- [ ] All test scenarios pass
-- [ ] Performance requirements met
-- [ ] No regressions
-- [ ] Thread safety confirmed
-- [ ] `cargo test` passes
-- [ ] `cargo clippy` - ZERO warnings
-- [ ] Ready for REPL integration
-
----
-
-## Phase 10.10: Connect REPL to Debug Infrastructure (Days 15-16)
-
-**Rationale**: With both REPL and debug infrastructure working independently, this phase connects them together. The debug command placeholders from Phase 10.8 are replaced with actual functionality, providing the first user-facing debug interface.
-
-### Task 10.10.1: Create REPL Debug Session Manager
-**Priority**: HIGH
-**Estimated Time**: 4 hours
-**Assignee**: REPL Team
-**Status**: 🔲 NOT STARTED
-
-**Description**: Implement debug session management within the REPL, tracking debug state and coordinating with ExecutionManager.
-
-**Acceptance Criteria:**
-- [ ] Debug session can be started/stopped
-- [ ] Breakpoints tracked and managed
-- [ ] Current pause state tracked
-- [ ] Stack frames accessible when paused
-- [ ] Clean state transitions
-- [ ] Thread-safe operations
-
-**Implementation Steps:**
-1. Create debug session structure:
-   ```rust
-   pub struct ReplDebugSession {
-       execution_manager: Arc<ExecutionManager>,
-       script_executor: Arc<dyn ScriptExecutor>,
-       breakpoints: HashMap<String, Vec<u32>>,
-       current_frame: Option<usize>,
-       paused: Arc<AtomicBool>,
-       pause_location: Option<(String, u32)>,
-   }
-   ```
-
-2. Add to REPL struct:
-   ```rust
-   pub struct Repl {
-       executor: Arc<dyn ScriptExecutor>,
-       debug_session: Option<ReplDebugSession>,
-       // ... existing fields
-   }
-   ```
-
-3. Implement session management:
-   ```rust
-   impl Repl {
-       fn start_debug_session(&mut self) -> Result<()> {
-           let exec_mgr = Arc::new(ExecutionManager::new("repl"));
-
-           // Set debug context
-           self.executor.set_debug_context(Some(exec_mgr.clone()));
-
-           self.debug_session = Some(ReplDebugSession {
-               execution_manager: exec_mgr,
-               script_executor: self.executor.clone(),
-               // ...
-           });
-
-           Ok(())
-       }
-
-       fn stop_debug_session(&mut self) {
-           self.executor.set_debug_context(None);
-           self.debug_session = None;
-       }
-   }
-   ```
-
-4. Handle pause events:
-   ```rust
-   // Listen for stopped events
-   tokio::spawn(async move {
-       while let Some(event) = stopped_rx.recv().await {
-           println!("⏸️  Paused at {}:{}", event.file, event.line);
-           println!("   Reason: {}", event.reason);
-           paused.store(true, Ordering::SeqCst);
-       }
-   });
-   ```
-
-**Testing Requirements:**
-- [ ] Session creation/destruction
-- [ ] State transitions tested
-- [ ] Thread safety verified
-- [ ] Event handling tested
-
-**Definition of Done:**
-- [ ] Session management working
-- [ ] Clean state handling
-- [ ] Tests pass
-- [ ] `cargo clippy` - ZERO warnings
-
----
-
-### Task 10.10.2: Implement Debug Commands
-**Priority**: HIGH
-**Estimated Time**: 6 hours
-**Assignee**: REPL Team
-**Status**: 🔲 NOT STARTED
-
-**Description**: Replace the placeholder debug commands with actual implementations that interact with the debug session.
-
-**Acceptance Criteria:**
-- [ ] All debug commands functional
-- [ ] Commands only work in debug mode
-- [ ] Clear error messages when not in debug
-- [ ] Smooth user experience
-- [ ] Help text updated
-
-**Implementation for each command:**
-
-1. **Break command:**
-   ```rust
-   Command::SetBreak { file, line } => {
-       if let Some(session) = &mut self.debug_session {
-           let id = session.execution_manager.set_breakpoint(&file, line)?;
-           session.breakpoints.entry(file.clone())
-               .or_default()
-               .push(line);
-           println!("🔴 Breakpoint set at {}:{} (id: {})", file, line, id);
-       } else {
-           println!("⚠️  Debug mode not active. Use 'debug on' first.");
-       }
-   }
-   ```
-
-2. **Run with debug:**
-   ```rust
-   Command::RunDebug { file } => {
-       // Ensure debug session active
-       if self.debug_session.is_none() {
-           self.start_debug_session()?;
-       }
-
-       // Enable debug mode
-       if let Some(session) = &self.debug_session {
-           session.execution_manager.enable_debug_mode();
-       }
-
-       // Execute script
-       let code = std::fs::read_to_string(&file)?;
-
-       // Run in separate task to handle pausing
-       let executor = self.executor.clone();
-       let handle = tokio::spawn(async move {
-           executor.execute_script(&code).await
-       });
-
-       // Wait for completion or pause
-       self.handle_debug_execution(handle).await?;
-   }
-   ```
-
-3. **Step/Next/Continue:**
-   ```rust
-   Command::Step => {
-       if let Some(session) = &self.debug_session {
-           if session.paused.load(Ordering::SeqCst) {
-               session.execution_manager.resume(StepMode::StepIn);
-               println!("➡️  Stepping into...");
-           } else {
-               println!("⚠️  Not paused at breakpoint");
-           }
-       }
-   }
-   ```
-
-4. **Where (stack trace):**
-   ```rust
-   Command::Where => {
-       if let Some(session) = &self.debug_session {
-           let frames = session.execution_manager.get_stack_frames();
-           println!("📚 Call Stack:");
-           for (i, frame) in frames.iter().enumerate() {
-               let marker = if Some(i) == session.current_frame { "→" } else { " " };
-               println!("{} #{}: {} at {}:{}",
-                   marker, i, frame.name, frame.source, frame.line);
-           }
-       }
-   }
-   ```
-
-5. **Locals (variables):**
-   ```rust
-   Command::Locals => {
-       if let Some(session) = &self.debug_session {
-           let frame_id = session.current_frame.unwrap_or(0);
-           let vars = session.execution_manager.get_variables(frame_id);
-           println!("📦 Local Variables:");
-           for var in vars {
-               println!("  {} = {} ({})", var.name, var.value, var.var_type);
-           }
-       }
-   }
-   ```
-
-**Testing Requirements:**
-- [ ] Each command works correctly
-- [ ] Error handling tested
-- [ ] State transitions smooth
-- [ ] User feedback clear
-
-**Definition of Done:**
-- [ ] All commands implemented
-- [ ] Smooth user experience
-- [ ] Tests comprehensive
-- [ ] `cargo clippy` - ZERO warnings
-
----
-
-### Task 10.10.3: Implement Debug Execution Loop
-**Priority**: HIGH
-**Estimated Time**: 4 hours
-**Assignee**: REPL Team
-**Status**: 🔲 NOT STARTED
-
-**Description**: Handle the execution loop when debugging, managing pause/resume cycles and user input while paused.
-
-**Acceptance Criteria:**
-- [ ] Execution pauses at breakpoints
-- [ ] Debug commands available when paused
-- [ ] Normal commands blocked when paused
-- [ ] Clean resume/continue
-- [ ] Ctrl-C handling during pause
-
-**Implementation Steps:**
-1. Create debug execution handler:
-   ```rust
-   async fn handle_debug_execution(&mut self,
-       handle: JoinHandle<Result<ScriptOutput>>) -> Result<()> {
-       loop {
-           tokio::select! {
-               // Script completed
-               result = &mut handle => {
-                   match result? {
-                       Ok(output) => {
-                           self.display_output(output);
-                           break;
-                       }
-                       Err(e) => {
-                           self.display_error(e);
-                           break;
-                       }
-                   }
-               }
-
-               // Check if paused
-               _ = tokio::time::sleep(Duration::from_millis(100)) => {
-                   if let Some(session) = &self.debug_session {
-                       if session.paused.load(Ordering::SeqCst) {
-                           // Enter debug command loop
-                           self.debug_command_loop().await?;
-                           session.paused.store(false, Ordering::SeqCst);
-                       }
-                   }
-               }
-           }
-       }
-       Ok(())
-   }
-   ```
-
-2. Debug command loop:
-   ```rust
-   async fn debug_command_loop(&mut self) -> Result<()> {
-       println!("🔷 Debugging (type 'help debug' for commands)");
-
-       loop {
-           // Show debug prompt
-           let input = self.read_input("(debug) > ")?;
-
-           match self.parse_debug_command(&input)? {
-               DebugCommand::Continue => {
-                   self.debug_session.as_ref()
-                       .unwrap()
-                       .execution_manager
-                       .resume(StepMode::Continue);
-                   break;
-               }
-               DebugCommand::Step => {
-                   // ... handle step
-                   break;
-               }
-               // ... other commands
-           }
-       }
-       Ok(())
-   }
-   ```
-
-3. Update prompt to show state:
-   ```rust
-   fn get_prompt(&self) -> String {
-       if let Some(session) = &self.debug_session {
-           if session.paused.load(Ordering::SeqCst) {
-               if let Some((file, line)) = &session.pause_location {
-                   return format!("[{}:{}] debug> ", file, line);
-               }
-               return "(debug) > ".to_string();
-           }
-       }
-       "> ".to_string()
-   }
-   ```
-
-**Testing Requirements:**
-- [ ] Pause at breakpoint tested
-- [ ] Resume works correctly
-- [ ] Commands during pause
-- [ ] State transitions clean
-
-**Definition of Done:**
-- [ ] Debug loop working smoothly
-- [ ] User experience polished
-- [ ] Tests pass
-- [ ] `cargo clippy` - ZERO warnings
-
----
-
-### Task 10.10.4: Add Debug UI Enhancements
-**Priority**: MEDIUM
-**Estimated Time**: 3 hours
-**Assignee**: UX Team
-**Status**: 🔲 NOT STARTED
-
-**Description**: Enhance the REPL UI to clearly show debug state, with colors, icons, and helpful information.
-
-**Acceptance Criteria:**
-- [ ] Visual indicators for debug mode
-- [ ] Breakpoint markers in listings
-- [ ] Current line highlighting
-- [ ] Variable value formatting
-- [ ] Colors respect NO_COLOR env
-
-**UI Enhancements:**
-1. **Status bar:**
-   ```
-   ╭─────────────────────────────────────╮
-   │ 🔷 DEBUG MODE | 3 breakpoints | ⏸️   │
-   ╰─────────────────────────────────────╯
-   ```
-
-2. **Source listing with breakpoints:**
-   ```
-      1  local function calculate(x, y)
-   ●  2    local sum = x + y
-      3    local diff = x - y
-   →  4    local prod = x * y  -- current line
-   ●  5    return sum, diff, prod
-      6  end
-   ```
-
-3. **Variable display:**
-   ```
-   Local Variables:
-   ├─ x: number = 10
-   ├─ y: number = 20
-   ├─ sum: number = 30
-   └─ diff: number = -10
-   ```
-
-4. **Color scheme:**
-   - Red: Breakpoints (●)
-   - Blue: Debug mode indicators
-   - Green: Current line (→)
-   - Yellow: Modified values
-   - Gray: Disabled items
-
-**Implementation:**
-- Use `termcolor` or `colored` crate
-- Check `NO_COLOR` and `TERM` env vars
-- Provide ASCII fallback
-
-**Testing Requirements:**
-- [ ] Colors display correctly
-- [ ] NO_COLOR respected
-- [ ] ASCII mode works
-- [ ] Terminal width handled
-
-**Definition of Done:**
-- [ ] UI enhancements complete
-- [ ] Accessible and clear
-- [ ] Documentation updated
-- [ ] `cargo clippy` - ZERO warnings
-
----
-
-### Task 10.10.5: Integration Testing
-**Priority**: HIGH
-**Estimated Time**: 4 hours
-**Assignee**: QA Team
-**Status**: 🔲 NOT STARTED
-
-**Description**: Comprehensive testing of the integrated REPL with debug functionality.
-
-**Test Scenarios:**
-
-1. **Complete Debug Session:**
-   ```lua
-   -- factorial.lua
-   function factorial(n)
-       if n <= 1 then
-           return 1
-       end
-       return n * factorial(n - 1)
-   end
-
-   print(factorial(5))
-   ```
-   - Set breakpoint in function
-   - Run with debug
-   - Step through recursion
-   - Inspect variables
-   - Continue to end
-
-2. **Multiple Breakpoints:**
-   - Set 5 breakpoints
-   - Hit each one
-   - Clear some
-   - Continue
-
-3. **Error Handling:**
-   - Breakpoint in error path
-   - Runtime error during debug
-   - Syntax error with debug enabled
-
-4. **Performance:**
-   - Large script with many breakpoints
-   - Deep recursion with stepping
-   - Many variables in scope
-
-5. **User Workflows:**
-   - Start REPL → Enable debug → Set breakpoints → Run
-   - Start REPL → Run script → Error → Enable debug → Rerun
-   - Debug → Fix code → Rerun → Verify fix
-
-**Automated Test Suite:**
-```rust
-#[test]
-fn test_repl_debug_integration() {
-    // Start REPL with test input
-    let mut repl = TestRepl::new();
-
-    // Enable debug
-    repl.send_command("debug on");
-    repl.expect_output("Debug mode enabled");
-
-    // Set breakpoint
-    repl.send_command("break test.lua:3");
-    repl.expect_output("Breakpoint set");
-
-    // Run script
-    repl.send_command("run -d test.lua");
-    repl.expect_output("Paused at test.lua:3");
-
-    // Check variables
-    repl.send_command("locals");
-    repl.expect_output("x = 10");
-
-    // Continue
-    repl.send_command("continue");
-    repl.expect_output("Result: 30");
-}
-```
-
-**Definition of Done:**
-- [ ] All scenarios tested
-- [ ] Automated tests pass
-- [ ] Manual testing complete
-- [ ] Performance validated
-- [ ] No known bugs
-- [ ] `cargo test` passes
-- [ ] `cargo clippy` - ZERO warnings
-- [ ] Ready for release
-
----
-
-## Phase 10.11: DAP Completion (Days 17-18)
-
-**Rationale**: With the debug infrastructure proven and working in the REPL, we can now complete the DAP implementation for IDE integration. The architectural issues that blocked Phase 10.7 are now resolved.
-
-### Task 10.11.1: Fix DAP Launch Command
-**Priority**: CRITICAL
-**Estimated Time**: 2 hours
-**Assignee**: DAP Team
-**Status**: 🔲 NOT STARTED
-
-**Description**: Implement the launch command properly to enable debug mode and prepare for script execution.
-
-**Current Problem:** The launch command is a no-op that just logs and returns.
-
-**Acceptance Criteria:**
-- [ ] Launch command enables debug mode
-- [ ] Program path stored for execution
-- [ ] Debug session initialized
-- [ ] noDebug flag respected
-- [ ] Response sent correctly
-
-**Implementation:**
-```rust
-impl DAPBridge {
-    pub fn handle_launch(&mut self, args: &Value) -> Result<()> {
-        debug!("Handling launch request: {:?}", args);
-
-        // Extract arguments
-        let program = args.get("program")
-            .and_then(|v| v.as_str())
-            .ok_or("Missing program")?;
-
-        let no_debug = args.get("noDebug")
-            .and_then(|v| v.as_bool())
-            .unwrap_or(false);
-
-        let stop_on_entry = args.get("stopOnEntry")
-            .and_then(|v| v.as_bool())
-            .unwrap_or(false);
-
-        // Store program for later execution
-        self.launch_config = Some(LaunchConfig {
-            program: PathBuf::from(program),
-            no_debug,
-            stop_on_entry,
-            args: extract_args(args),
-        });
-
-        // Enable debug mode if not noDebug
-        if !no_debug {
-            if let Some(ref exec_mgr) = self.execution_manager {
-                exec_mgr.enable_debug_mode();
-                info!("Debug mode enabled for {}", program);
-
-                // Set entry breakpoint if requested
-                if stop_on_entry {
-                    exec_mgr.set_breakpoint(program, 1)?;
-                }
-            }
-        }
-
-        // Send initialized event
-        self.send_event("initialized", json!({}))?;
-
-        Ok(())
-    }
-}
-```
-
-**Testing Requirements:**
-- [ ] Launch with debug works
-- [ ] Launch with noDebug works
-- [ ] stopOnEntry works
-- [ ] Arguments passed correctly
-
-**Definition of Done:**
-- [ ] Launch command functional
-- [ ] Tests pass
-- [ ] `cargo clippy` - ZERO warnings
-
----
-
-### Task 10.11.2: Implement ConfigurationDone Handler
-**Priority**: HIGH
-**Estimated Time**: 2 hours
-**Assignee**: DAP Team
-**Status**: 🔲 NOT STARTED
-
-**Description**: Handle the configurationDone request which signals that all breakpoints have been set and execution can begin.
-
-**Acceptance Criteria:**
-- [ ] ConfigurationDone triggers execution
-- [ ] Script runs with debug enabled
-- [ ] Execution happens in background
-- [ ] Stopped events sent on breakpoints
-
-**Implementation:**
-```rust
-pub fn handle_configuration_done(&mut self) -> Result<()> {
-    debug!("Configuration done, starting execution");
-
-    if let Some(config) = &self.launch_config {
-        // Read script file
-        let code = std::fs::read_to_string(&config.program)?;
-
-        // Execute in background task
-        let executor = self.script_executor.clone();
-        let exec_mgr = self.execution_manager.clone();
-
-        tokio::spawn(async move {
-            // Enable debug if needed
-            if !config.no_debug {
-                exec_mgr.enable_debug_mode();
-            }
-
-            // Execute script
-            match executor.execute_script(&code).await {
-                Ok(output) => {
-                    debug!("Script completed: {:?}", output);
-                    // Send terminated event
-                }
-                Err(e) => {
-                    error!("Script failed: {}", e);
-                    // Send error event
-                }
-            }
-        });
-    }
-
-    Ok(())
-}
-```
-
-**Testing Requirements:**
-- [ ] Execution starts correctly
-- [ ] Breakpoints work
-- [ ] Errors handled
-
-**Definition of Done:**
-- [ ] Configuration done works
-- [ ] Execution proper
-- [ ] `cargo clippy` - ZERO warnings
-
----
-
-### Task 10.11.3: Complete DAP Event System
-**Priority**: HIGH
-**Estimated Time**: 3 hours
-**Assignee**: DAP Team
-**Status**: 🔲 NOT STARTED
-
-**Description**: Implement the event system to send stopped, continued, and terminated events to the client.
-
-**Acceptance Criteria:**
-- [ ] Stopped events sent when hitting breakpoints
-- [ ] Continued events sent on resume
-- [ ] Terminated event sent on completion
-- [ ] Thread events if needed
-- [ ] Events have correct format
-
-**Implementation:**
-1. Connect to ExecutionManager events:
-   ```rust
-   // In DAPBridge::new()
-   let (stopped_tx, mut stopped_rx) = mpsc::channel(100);
-   execution_manager.set_stopped_event_sender(stopped_tx);
-
-   // Spawn event handler
-   tokio::spawn(async move {
-       while let Some(event) = stopped_rx.recv().await {
-           dap_bridge.send_stopped_event(event).await;
-       }
-   });
-   ```
-
-2. Send stopped event:
-   ```rust
-   async fn send_stopped_event(&self, event: StoppedEvent) {
-       let body = json!({
-           "reason": event.reason,
-           "threadId": event.thread_id,
-           "allThreadsStopped": true,
-           "preserveFocusHint": false,
-           "text": format!("Paused at {}:{}", event.file, event.line)
-       });
-
-       self.send_event("stopped", body)?;
-   }
-   ```
-
-3. Other events:
-   ```rust
-   fn send_continued_event(&self, thread_id: i32) {
-       self.send_event("continued", json!({
-           "threadId": thread_id,
-           "allThreadsContinued": true
-       }))?;
-   }
-
-   fn send_terminated_event(&self) {
-       self.send_event("terminated", json!({}))?;
-   }
-   ```
-
-**Testing Requirements:**
-- [ ] Events sent correctly
-- [ ] Client receives events
-- [ ] Timing correct
-
-**Definition of Done:**
-- [ ] Event system complete
-- [ ] Tests pass
-- [ ] `cargo clippy` - ZERO warnings
-
----
-
-### Task 10.11.4: Implement Remaining DAP Commands
-**Priority**: HIGH
-**Estimated Time**: 4 hours
-**Assignee**: DAP Team
-**Status**: 🔲 NOT STARTED
-
-**Description**: Implement the remaining DAP commands for full debugging: continue, next, stepIn, stepOut, pause, stackTrace, scopes, variables, evaluate.
-
-**Commands to Implement:**
-
-1. **Continue:**
-   ```rust
-   pub fn handle_continue(&self, args: &Value) -> Result<ContinueResponse> {
-       let thread_id = args.get("threadId").and_then(|v| v.as_i64()).unwrap_or(1);
-
-       if let Some(ref exec_mgr) = self.execution_manager {
-           exec_mgr.resume(StepMode::Continue);
-           self.send_continued_event(thread_id);
-       }
-
-       Ok(ContinueResponse {
-           all_threads_continued: true
-       })
-   }
-   ```
-
-2. **Step commands:**
-   ```rust
-   pub fn handle_step_in(&self, args: &Value) -> Result<()> {
-       self.execution_manager.as_ref()
-           .unwrap()
-           .resume(StepMode::StepIn);
-       Ok(())
-   }
-   ```
-
-3. **StackTrace:**
-   ```rust
-   pub fn handle_stack_trace(&self, args: &Value) -> Result<StackTraceResponse> {
-       let frames = self.execution_manager.as_ref()
-           .unwrap()
-           .get_stack_frames();
-
-       let stack_frames: Vec<_> = frames.into_iter()
-           .map(|f| StackFrame {
-               id: f.id,
-               name: f.name,
-               source: Some(Source {
-                   path: Some(f.source),
-                   ..Default::default()
-               }),
-               line: f.line,
-               column: f.column.unwrap_or(1),
-           })
-           .collect();
-
-       Ok(StackTraceResponse {
-           stack_frames,
-           total_frames: None,
-       })
-   }
-   ```
-
-4. **Variables:**
-   ```rust
-   pub fn handle_variables(&self, args: &Value) -> Result<VariablesResponse> {
-       let reference = args.get("variablesReference")
-           .and_then(|v| v.as_i64())
-           .unwrap_or(0) as usize;
-
-       let vars = self.execution_manager.as_ref()
-           .unwrap()
-           .get_variables(reference);
-
-       let variables = vars.into_iter()
-           .map(|v| Variable {
-               name: v.name,
-               value: v.value,
-               type_: Some(v.var_type),
-               variables_reference: 0,
-           })
-           .collect();
-
-       Ok(VariablesResponse { variables })
-   }
-   ```
-
-**Testing Requirements:**
-- [ ] Each command tested
-- [ ] Responses correct format
-- [ ] State transitions proper
-
-**Definition of Done:**
-- [ ] All commands implemented
-- [ ] Protocol compliant
-- [ ] Tests pass
-- [ ] `cargo clippy` - ZERO warnings
-
----
-
-### Task 10.11.5: VS Code Extension Testing
-**Priority**: CRITICAL
-**Estimated Time**: 4 hours
-**Assignee**: QA Team
-**Status**: 🔲 NOT STARTED
-
-**Description**: Test the complete DAP implementation with VS Code to ensure real-world IDE integration works.
-
-**Prerequisites:**
-- VS Code installed
-- Sample Lua projects ready
-- Debug configurations prepared
-
-**Test Plan:**
-
-1. **Setup:**
-   - Create `.vscode/launch.json`:
-   ```json
-   {
-       "version": "0.2.0",
-       "configurations": [
-           {
-               "type": "llmspell",
-               "request": "launch",
-               "name": "Debug Lua Script",
-               "program": "${file}",
-               "stopOnEntry": false
-           }
-       ]
-   }
-   ```
-
-2. **Basic Debugging:**
-   - Set breakpoint in VS Code
-   - Press F5 to start debugging
-   - Verify stops at breakpoint
-   - Verify variables visible
-   - Step through code
-   - Continue to end
-
-3. **Advanced Features:**
-   - Multiple breakpoints
-   - Conditional breakpoints
-   - Watch expressions
-   - Call stack navigation
-   - Debug console evaluation
-
-4. **Error Scenarios:**
-   - Syntax errors
-   - Runtime errors
-   - Missing files
-   - Permission issues
-
-5. **Performance:**
-   - Large files (>1000 lines)
-   - Many breakpoints (>20)
-   - Deep call stacks (>50 frames)
-   - Large data structures
-
-**Documentation:**
-- Create VS Code setup guide
-- Document known limitations
-- Provide troubleshooting steps
-
-**Definition of Done:**
-- [ ] VS Code debugging works
-- [ ] All features tested
-- [ ] Documentation complete
-- [ ] Known issues documented
-- [ ] Ready for users
-
----
----
-
-## Phase 10.12: Language Server Protocol (Days 19-21)
-
-### Task 10.12.1: Implement LSP Server
+### Task 10.8.1: Implement LSP Server
 **Priority**: HIGH
 **Estimated Time**: 6 hours
 **Assignee**: LSP Team Lead
@@ -4811,7 +3008,7 @@ pub fn handle_configuration_done(&mut self) -> Result<()> {
 - [ ] `cargo fmt --all --check` passes
 - [ ] All tests pass: `cargo test --workspace --all-features`
 
-### Task 10.12.2: Implement Code Completion
+### Task 10.8.2: Implement Code Completion
 **Priority**: HIGH
 **Estimated Time**: 5 hours
 **Assignee**: LSP Team
@@ -4851,7 +3048,7 @@ pub fn handle_configuration_done(&mut self) -> Result<()> {
 - [ ] `cargo fmt --all --check` passes
 - [ ] All tests pass: `cargo test --workspace --all-features`
 
-### Task 10.12.3: Implement Diagnostics
+### Task 10.8.3: Implement Diagnostics
 **Priority**: HIGH
 **Estimated Time**: 4 hours
 **Assignee**: LSP Team
@@ -4890,7 +3087,7 @@ pub fn handle_configuration_done(&mut self) -> Result<()> {
 - [ ] `cargo fmt --all --check` passes
 - [ ] All tests pass: `cargo test --workspace --all-features`
 
-### Task 10.12.4: Implement Hover and Signatures
+### Task 10.8.4: Implement Hover and Signatures
 **Priority**: MEDIUM
 **Estimated Time**: 3 hours
 **Assignee**: LSP Team
@@ -4931,9 +3128,9 @@ pub fn handle_configuration_done(&mut self) -> Result<()> {
 
 ---
 
-## Phase 10.13: REPL Service Implementation (Days 21-22)
+## Phase 10.9: REPL Service Implementation (Days 13-14)
 
-### Task 10.13.1: Implement REPL Server
+### Task 10.9.1: Implement REPL Server
 **Priority**: HIGH
 **Estimated Time**: 6 hours
 **Assignee**: Protocol Team Lead
@@ -4982,7 +3179,7 @@ pub fn handle_configuration_done(&mut self) -> Result<()> {
 - [ ] `cargo fmt --all --check` passes
 - [ ] All tests pass: `cargo test --workspace --all-features`
 
-### Task 10.13.2:REPL Protocol Implementation
+### Task 10.9.2: REPL Protocol Implementation
 **Priority**: HIGH
 **Estimated Time**: 4 hours
 **Assignee**: Protocol Team
@@ -5027,7 +3224,7 @@ pub fn handle_configuration_done(&mut self) -> Result<()> {
 - [ ] `cargo fmt --all --check` passes
 - [ ] All tests pass: `cargo test --workspace --all-features`
 
-### Task 10.13.3:REPL Client Integration
+### Task 10.9.3: REPL Client Integration
 **Priority**: MEDIUM
 **Estimated Time**: 4 hours
 **Assignee**: CLI Team
@@ -5074,9 +3271,9 @@ pub fn handle_configuration_done(&mut self) -> Result<()> {
 
 ---
 
-## Phase 10.14: Example Applications (Days 14-16)
+## Phase 10.10: Example Applications (Days 14-16)
 
-### Task 10.14.1: Implement Kernel Fleet Manager
+### Task 10.10.1: Implement Kernel Fleet Manager
 **Priority**: HIGH
 **Estimated Time**: 6 hours
 **Assignee**: Applications Team Lead
@@ -5119,7 +3316,7 @@ pub fn handle_configuration_done(&mut self) -> Result<()> {
 - [ ] `cargo fmt --all --check` passes
 - [ ] All tests pass: `cargo test --workspace --all-features`
 
-### Task 10.14.2: Implement Development Environment Service
+### Task 10.10.2: Implement Development Environment Service
 **Priority**: HIGH
 **Estimated Time**: 6 hours
 **Assignee**: Applications Team
@@ -5167,7 +3364,7 @@ pub fn handle_configuration_done(&mut self) -> Result<()> {
 - [ ] `cargo fmt --all --check` passes
 - [ ] All tests pass: `cargo test --workspace --all-features`
 
-### Task 10.14.3: Create Service Deployment Examples
+### Task 10.10.3: Create Service Deployment Examples
 **Priority**: MEDIUM
 **Estimated Time**: 4 hours
 **Assignee**: Applications Team
@@ -5202,7 +3399,7 @@ pub fn handle_configuration_done(&mut self) -> Result<()> {
 - [ ] `cargo fmt --all --check` passes
 - [ ] All tests pass: `cargo test --workspace --all-features`
 
-### Task 10.14.4: Update Application Documentation
+### Task 10.10.4: Update Application Documentation
 **Priority**: MEDIUM
 **Estimated Time**: 3 hours
 **Assignee**: Documentation Team
@@ -5240,9 +3437,9 @@ pub fn handle_configuration_done(&mut self) -> Result<()> {
 
 ---
 
-## Phase 10.15: Integration Testing (Days 16-18)
+## Phase 10.11: Integration Testing (Days 16-18)
 
-### Task 10.15.1: End-to-End Daemon Tests
+### Task 10.11.1: End-to-End Daemon Tests
 **Priority**: CRITICAL
 **Estimated Time**: 4 hours
 **Assignee**: QA Team Lead
@@ -5283,7 +3480,7 @@ pub fn handle_configuration_done(&mut self) -> Result<()> {
 - [ ] `cargo fmt --all --check` passes
 - [ ] All tests pass: `cargo test --workspace --all-features`
 
-### Task 10.15.2: Multi-Protocol Testing
+### Task 10.11.2: Multi-Protocol Testing
 **Priority**: HIGH
 **Estimated Time**: 4 hours
 **Assignee**: QA Team
@@ -5317,7 +3514,7 @@ pub fn handle_configuration_done(&mut self) -> Result<()> {
 - [ ] `cargo fmt --all --check` passes
 - [ ] All tests pass: `cargo test --workspace --all-features`
 
-### Task 10.15.3: Performance Validation
+### Task 10.11.3: Performance Validation
 **Priority**: HIGH
 **Estimated Time**: 4 hours
 **Assignee**: Performance Team
@@ -5354,7 +3551,7 @@ pub fn handle_configuration_done(&mut self) -> Result<()> {
 - [ ] `cargo fmt --all --check` passes
 - [ ] All tests pass: `cargo test --workspace --all-features`
 
-### Task 10.15.4: Security Testing
+### Task 10.11.4: Security Testing
 **Priority**: HIGH
 **Estimated Time**: 3 hours
 **Assignee**: Security Team
@@ -5387,9 +3584,9 @@ pub fn handle_configuration_done(&mut self) -> Result<()> {
 
 ---
 
-## Phase 10.16: Documentation (Days 18-19)
+## Phase 10.12: Documentation (Days 18-19)
 
-### Task 10.16.1: Service Deployment Guide
+### Task 10.12.1: Service Deployment Guide
 **Priority**: HIGH
 **Estimated Time**: 4 hours
 **Assignee**: Documentation Lead
@@ -5425,7 +3622,7 @@ pub fn handle_configuration_done(&mut self) -> Result<()> {
 - [ ] `cargo fmt --all --check` passes
 - [ ] All tests pass: `cargo test --workspace --all-features`
 
-### Task 10.16.2: IDE Integration Guide
+### Task 10.12.2: IDE Integration Guide
 **Priority**: HIGH
 **Estimated Time**: 4 hours
 **Assignee**: Documentation Team
@@ -5460,7 +3657,7 @@ pub fn handle_configuration_done(&mut self) -> Result<()> {
 - [ ] `cargo fmt --all --check` passes
 - [ ] All tests pass: `cargo test --workspace --all-features`
 
-### Task 10.16.3: API Reference Updates
+### Task 10.12.3: API Reference Updates
 **Priority**: HIGH
 **Estimated Time**: 3 hours
 **Assignee**: Documentation Team
@@ -5491,7 +3688,7 @@ pub fn handle_configuration_done(&mut self) -> Result<()> {
 - [ ] `cargo fmt --all --check` passes
 - [ ] All tests pass: `cargo test --workspace --all-features`
 
-### Task 10.16.4: Update Architecture Documentation
+### Task 10.12.4: Update Architecture Documentation
 **Priority**: MEDIUM
 **Estimated Time**: 3 hours
 **Assignee**: Architecture Team
@@ -5524,9 +3721,9 @@ pub fn handle_configuration_done(&mut self) -> Result<()> {
 
 ---
 
-## Phase 10.17: Phase 11 Preparation (Days 19-20)
+## Phase 10.13: Phase 11 Preparation (Days 19-20)
 
-### Task 10.17.1: Define Phase 11 Interfaces
+### Task 10.13.1: Define Phase 11 Interfaces
 **Priority**: HIGH
 **Estimated Time**: 3 hours
 **Assignee**: Architecture Team
@@ -5557,7 +3754,7 @@ pub fn handle_configuration_done(&mut self) -> Result<()> {
 - [ ] `cargo fmt --all --check` passes
 - [ ] All tests pass: `cargo test --workspace --all-features`
 
-### Task 10.13.2:Performance Baseline
+### Task 10.13.2: Performance Baseline
 **Priority**: HIGH
 **Estimated Time**: 2 hours
 **Assignee**: Performance Team
@@ -5588,7 +3785,7 @@ pub fn handle_configuration_done(&mut self) -> Result<()> {
 - [ ] `cargo fmt --all --check` passes
 - [ ] All tests pass: `cargo test --workspace --all-features`
 
-### Task 10.13.3:Create PHASE10-DONE Document
+### Task 10.13.3: Create PHASE10-DONE Document
 **Priority**: CRITICAL
 **Estimated Time**: 3 hours
 **Assignee**: Team Lead
@@ -5621,9 +3818,9 @@ pub fn handle_configuration_done(&mut self) -> Result<()> {
 
 ---
 
-## Phase 10.18: Client Registry & Session Management (Days 20-21)
+## Phase 10.14: Client Registry & Session Management (Days 20-21)
 
-### Task 10.18.1: Implement ClientRegistry
+### Task 10.14.1: Implement ClientRegistry
 **Priority**: CRITICAL
 **Estimated Time**: 5 hours
 **Assignee**: Kernel Team Lead
@@ -5671,7 +3868,7 @@ pub fn handle_configuration_done(&mut self) -> Result<()> {
 - [ ] `cargo fmt --all --check` passes
 - [ ] All tests pass: `cargo test --workspace --all-features`
 
-### Task 10.18.2: Session Isolation Implementation
+### Task 10.14.2: Session Isolation Implementation
 **Priority**: HIGH
 **Estimated Time**: 4 hours
 **Assignee**: Kernel Team
@@ -5720,7 +3917,7 @@ pub fn handle_configuration_done(&mut self) -> Result<()> {
 - [ ] `cargo fmt --all --check` passes
 - [ ] All tests pass: `cargo test --workspace --all-features`
 
-### Task 10.18.3: Session Persistence
+### Task 10.14.3: Session Persistence
 **Priority**: MEDIUM
 **Estimated Time**: 3 hours
 **Assignee**: State Team
@@ -5764,9 +3961,9 @@ pub fn handle_configuration_done(&mut self) -> Result<()> {
 
 ---
 
-## Phase 10.19: Resource Limits & Throttling (Days 21-22)
+## Phase 10.15: Resource Limits & Throttling (Days 21-22)
 
-### Task 10.19.1: CPU Usage Limiting
+### Task 10.15.1: CPU Usage Limiting
 **Priority**: HIGH
 **Estimated Time**: 4 hours
 **Assignee**: Runtime Team Lead
@@ -5813,7 +4010,7 @@ pub fn handle_configuration_done(&mut self) -> Result<()> {
 - [ ] `cargo fmt --all --check` passes
 - [ ] All tests pass: `cargo test --workspace --all-features`
 
-### Task 10.19.2: Memory Usage Control
+### Task 10.15.2: Memory Usage Control
 **Priority**: HIGH
 **Estimated Time**: 4 hours
 **Assignee**: Runtime Team
@@ -5860,7 +4057,7 @@ pub fn handle_configuration_done(&mut self) -> Result<()> {
 - [ ] `cargo fmt --all --check` passes
 - [ ] All tests pass: `cargo test --workspace --all-features`
 
-### Task 10.19.3: Request Rate Limiting
+### Task 10.15.3: Request Rate Limiting
 **Priority**: HIGH
 **Estimated Time**: 3 hours
 **Assignee**: Protocol Team
@@ -5905,7 +4102,7 @@ pub fn handle_configuration_done(&mut self) -> Result<()> {
 - [ ] `cargo fmt --all --check` passes
 - [ ] All tests pass: `cargo test --workspace --all-features`
 
-### Task 10.19.4: Connection Throttling
+### Task 10.15.4: Connection Throttling
 **Priority**: MEDIUM
 **Estimated Time**: 3 hours
 **Assignee**: Network Team
@@ -5954,9 +4151,9 @@ pub fn handle_configuration_done(&mut self) -> Result<()> {
 
 ---
 
-## Phase 10.20: Docker & Containerization (Days 22-23)
+## Phase 10.16: Docker & Containerization (Days 22-23)
 
-### Task 10.20.1: Create Multi-Stage Dockerfile
+### Task 10.16.1: Create Multi-Stage Dockerfile
 **Priority**: HIGH
 **Estimated Time**: 4 hours
 **Assignee**: DevOps Team Lead
@@ -6009,7 +4206,7 @@ pub fn handle_configuration_done(&mut self) -> Result<()> {
 - [ ] `cargo fmt --all --check` passes
 - [ ] All tests pass: `cargo test --workspace --all-features`
 
-### Task 10.20.2: Docker Compose Configuration
+### Task 10.16.2: Docker Compose Configuration
 **Priority**: MEDIUM
 **Estimated Time**: 3 hours
 **Assignee**: DevOps Team
@@ -6061,7 +4258,7 @@ pub fn handle_configuration_done(&mut self) -> Result<()> {
 - [ ] `cargo fmt --all --check` passes
 - [ ] All tests pass: `cargo test --workspace --all-features`
 
-### Task 10.20.3: Container Health Checks
+### Task 10.16.3: Container Health Checks
 **Priority**: MEDIUM
 **Estimated Time**: 2 hours
 **Assignee**: DevOps Team
@@ -6106,9 +4303,9 @@ pub fn handle_configuration_done(&mut self) -> Result<()> {
 
 ---
 
-## Phase 10.21: Metrics & Monitoring Infrastructure (Days 23-24)
+## Phase 10.17: Metrics & Monitoring Infrastructure (Days 23-24)
 
-### Task 10.21.1: Prometheus Metrics Exporter
+### Task 10.17.1: Prometheus Metrics Exporter
 **Priority**: HIGH
 **Estimated Time**: 5 hours
 **Assignee**: Observability Team Lead
@@ -6160,7 +4357,7 @@ pub fn handle_configuration_done(&mut self) -> Result<()> {
 - [ ] `cargo fmt --all --check` passes
 - [ ] All tests pass: `cargo test --workspace --all-features`
 
-### Task 10.21.2: OpenTelemetry Integration
+### Task 10.17.2: OpenTelemetry Integration
 **Priority**: MEDIUM
 **Estimated Time**: 4 hours
 **Assignee**: Observability Team
@@ -6207,7 +4404,7 @@ pub fn handle_configuration_done(&mut self) -> Result<()> {
 - [ ] `cargo fmt --all --check` passes
 - [ ] All tests pass: `cargo test --workspace --all-features`
 
-### Task 10.21.3: Custom Metrics Collection
+### Task 10.17.3: Custom Metrics Collection
 **Priority**: MEDIUM
 **Estimated Time**: 3 hours
 **Assignee**: Observability Team
@@ -6251,7 +4448,7 @@ pub fn handle_configuration_done(&mut self) -> Result<()> {
 - [ ] `cargo fmt --all --check` passes
 - [ ] All tests pass: `cargo test --workspace --all-features`
 
-### Task 10.21.4: Grafana Dashboard Templates
+### Task 10.17.4: Grafana Dashboard Templates
 **Priority**: LOW
 **Estimated Time**: 3 hours
 **Assignee**: Observability Team
@@ -6298,9 +4495,9 @@ pub fn handle_configuration_done(&mut self) -> Result<()> {
 
 ---
 
-## Phase 10.22: Performance Benchmarking (Days 24-25)
+## Phase 10.18: Performance Benchmarking (Days 24-25)
 
-### Task 10.22.1: Create Benchmark Harness
+### Task 10.18.1: Create Benchmark Harness
 **Priority**: HIGH
 **Estimated Time**: 4 hours
 **Assignee**: Performance Team Lead
@@ -6350,7 +4547,7 @@ pub fn handle_configuration_done(&mut self) -> Result<()> {
 - [ ] `cargo fmt --all --check` passes
 - [ ] All tests pass: `cargo test --workspace --all-features`
 
-### Task 10.22.2: Baseline Performance Metrics
+### Task 10.18.2: Baseline Performance Metrics
 **Priority**: HIGH
 **Estimated Time**: 3 hours
 **Assignee**: Performance Team
@@ -6394,7 +4591,7 @@ pub fn handle_configuration_done(&mut self) -> Result<()> {
 - [ ] `cargo fmt --all --check` passes
 - [ ] All tests pass: `cargo test --workspace --all-features`
 
-### Task 10.22.3: Optimization Implementation
+### Task 10.18.3: Optimization Implementation
 **Priority**: MEDIUM
 **Estimated Time**: 6 hours
 **Assignee**: Performance Team
@@ -6441,9 +4638,9 @@ pub fn handle_configuration_done(&mut self) -> Result<()> {
 
 ---
 
-## Phase 10.23: Additional Testing & Documentation (Days 25)
+## Phase 10.19: Additional Testing & Documentation (Days 25)
 
-### Task 10.23.1: Stress Testing Suite
+### Task 10.19.1: Stress Testing Suite
 **Priority**: HIGH
 **Estimated Time**: 4 hours
 **Assignee**: QA Team Lead
@@ -6489,7 +4686,7 @@ pub fn handle_configuration_done(&mut self) -> Result<()> {
 - [ ] `cargo fmt --all --check` passes
 - [ ] All tests pass: `cargo test --workspace --all-features`
 
-### Task 10.23.2: Cross-Platform Testing
+### Task 10.19.2: Cross-Platform Testing
 **Priority**: MEDIUM
 **Estimated Time**: 4 hours
 **Assignee**: QA Team
@@ -6533,7 +4730,7 @@ pub fn handle_configuration_done(&mut self) -> Result<()> {
 - [ ] `cargo fmt --all --check` passes
 - [ ] All tests pass: `cargo test --workspace --all-features`
 
-### Task 10.23.3: Protocol Compliance Testing
+### Task 10.19.3: Protocol Compliance Testing
 **Priority**: HIGH
 **Estimated Time**: 3 hours
 **Assignee**: Protocol Team
@@ -6577,7 +4774,7 @@ pub fn handle_configuration_done(&mut self) -> Result<()> {
 - [ ] `cargo fmt --all --check` passes
 - [ ] All tests pass: `cargo test --workspace --all-features`
 
-### Task 10.23.4: Troubleshooting Guide
+### Task 10.19.4: Troubleshooting Guide
 **Priority**: MEDIUM
 **Estimated Time**: 3 hours
 **Assignee**: Documentation Team
@@ -6622,7 +4819,7 @@ pub fn handle_configuration_done(&mut self) -> Result<()> {
 - [ ] `cargo fmt --all --check` passes
 - [ ] All tests pass: `cargo test --workspace --all-features`
 
-### Task 10.23.5: Performance Tuning Guide
+### Task 10.19.5: Performance Tuning Guide
 **Priority**: LOW
 **Estimated Time**: 3 hours
 **Assignee**: Documentation Team

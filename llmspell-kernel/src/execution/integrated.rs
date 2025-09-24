@@ -600,10 +600,13 @@ impl<P: Protocol + 'static> IntegratedKernel<P> {
                         // Parse header (idx + 2) and include content (idx + 5) for debug_request
                         if message_parts.len() > idx + 5 {
                             // Parse the header part to get message type and routing info
-                            let mut parsed_msg = self.protocol.parse_message(&message_parts[idx + 2])?;
+                            let mut parsed_msg =
+                                self.protocol.parse_message(&message_parts[idx + 2])?;
 
                             // For debug_request, add the actual DAP content from part 6
-                            if let Ok(content_json) = serde_json::from_slice::<Value>(&message_parts[idx + 5]) {
+                            if let Ok(content_json) =
+                                serde_json::from_slice::<Value>(&message_parts[idx + 5])
+                            {
                                 parsed_msg.insert("content".to_string(), content_json);
                             }
 
@@ -1715,7 +1718,8 @@ impl<P: Protocol + 'static> IntegratedKernel<P> {
         content: &serde_json::Value,
     ) -> Result<Vec<Vec<u8>>> {
         // Extract client session from the request header for echo back
-        let client_session = self.current_msg_header
+        let client_session = self
+            .current_msg_header
             .as_ref()
             .and_then(|h| h.get("session"))
             .and_then(|s| s.as_str())
@@ -1733,7 +1737,9 @@ impl<P: Protocol + 'static> IntegratedKernel<P> {
         });
 
         // Use the stored header from the request as parent_header
-        let parent_header = self.current_msg_header.clone()
+        let parent_header = self
+            .current_msg_header
+            .clone()
             .unwrap_or_else(|| serde_json::json!({}));
         let metadata = serde_json::json!({});
 
@@ -1745,10 +1751,26 @@ impl<P: Protocol + 'static> IntegratedKernel<P> {
 
         // Create HMAC signature using the protocol
         debug!("Signing message with components:");
-        debug!("  Header ({} bytes): {}", header_bytes.len(), String::from_utf8_lossy(&header_bytes));
-        debug!("  Parent header ({} bytes): {}", parent_header_bytes.len(), String::from_utf8_lossy(&parent_header_bytes));
-        debug!("  Metadata ({} bytes): {}", metadata_bytes.len(), String::from_utf8_lossy(&metadata_bytes));
-        debug!("  Content ({} bytes): {}", content_bytes.len(), String::from_utf8_lossy(&content_bytes));
+        debug!(
+            "  Header ({} bytes): {}",
+            header_bytes.len(),
+            String::from_utf8_lossy(&header_bytes)
+        );
+        debug!(
+            "  Parent header ({} bytes): {}",
+            parent_header_bytes.len(),
+            String::from_utf8_lossy(&parent_header_bytes)
+        );
+        debug!(
+            "  Metadata ({} bytes): {}",
+            metadata_bytes.len(),
+            String::from_utf8_lossy(&metadata_bytes)
+        );
+        debug!(
+            "  Content ({} bytes): {}",
+            content_bytes.len(),
+            String::from_utf8_lossy(&content_bytes)
+        );
 
         let signature = self.protocol.sign_message(
             &header_bytes,
@@ -1762,13 +1784,13 @@ impl<P: Protocol + 'static> IntegratedKernel<P> {
         // Build multipart message according to Jupyter wire protocol
         // [identity, delimiter, signature, header, parent_header, metadata, content]
         let parts = vec![
-            client_identity.to_vec(), // Client identity for ROUTER routing
-            b"<IDS|MSG>".to_vec(),    // Delimiter
+            client_identity.to_vec(),      // Client identity for ROUTER routing
+            b"<IDS|MSG>".to_vec(),         // Delimiter
             signature.as_bytes().to_vec(), // HMAC signature (hex-encoded string as bytes)
-            header_bytes,             // Header JSON
-            parent_header_bytes,      // Parent header JSON
-            metadata_bytes,           // Metadata JSON
-            content_bytes,            // Content JSON
+            header_bytes,                  // Header JSON
+            parent_header_bytes,           // Parent header JSON
+            metadata_bytes,                // Metadata JSON
+            content_bytes,                 // Content JSON
         ];
 
         Ok(parts)
