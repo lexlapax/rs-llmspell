@@ -2,12 +2,10 @@
 
 #[cfg(all(test, feature = "lua"))]
 mod lua_completion_tests {
-    use llmspell_bridge::engine::bridge::{
-        CompletionContext, CompletionKind, ScriptEngineBridge,
-    };
+    use llmspell_bridge::engine::bridge::{CompletionContext, CompletionKind, ScriptEngineBridge};
+    use llmspell_bridge::engine::factory::LuaConfig;
     use llmspell_bridge::lua::completion::LuaCompletionProvider;
     use llmspell_bridge::lua::engine::LuaEngine;
-    use llmspell_bridge::engine::factory::LuaConfig;
     use llmspell_bridge::ComponentRegistry;
     use llmspell_bridge::ProviderManager;
     use llmspell_config::providers::ProviderManagerConfig;
@@ -21,9 +19,8 @@ mod lua_completion_tests {
         let mut engine = LuaEngine::new(&config).unwrap();
         let registry = Arc::new(ComponentRegistry::new());
         let provider_config = ProviderManagerConfig::default();
-        let providers = Arc::new(
-            futures::executor::block_on(ProviderManager::new(provider_config)).unwrap()
-        );
+        let providers =
+            Arc::new(futures::executor::block_on(ProviderManager::new(provider_config)).unwrap());
         let _ = engine.inject_apis(&registry, &providers);
         engine
     }
@@ -165,16 +162,28 @@ mod lua_completion_tests {
         let completions = engine.get_completion_candidates(&ctx);
 
         // Should include keywords
-        assert!(completions.iter().any(|c| c.text == "if" && c.kind == CompletionKind::Keyword));
-        assert!(completions.iter().any(|c| c.text == "for" && c.kind == CompletionKind::Keyword));
-        assert!(completions.iter().any(|c| c.text == "while" && c.kind == CompletionKind::Keyword));
-        assert!(completions.iter().any(|c| c.text == "function" && c.kind == CompletionKind::Keyword));
-        assert!(completions.iter().any(|c| c.text == "local" && c.kind == CompletionKind::Keyword));
+        assert!(completions
+            .iter()
+            .any(|c| c.text == "if" && c.kind == CompletionKind::Keyword));
+        assert!(completions
+            .iter()
+            .any(|c| c.text == "for" && c.kind == CompletionKind::Keyword));
+        assert!(completions
+            .iter()
+            .any(|c| c.text == "while" && c.kind == CompletionKind::Keyword));
+        assert!(completions
+            .iter()
+            .any(|c| c.text == "function" && c.kind == CompletionKind::Keyword));
+        assert!(completions
+            .iter()
+            .any(|c| c.text == "local" && c.kind == CompletionKind::Keyword));
 
         // Test after 'local'
         let ctx = CompletionContext::new("local ", 6);
         let completions = engine.get_completion_candidates(&ctx);
-        assert!(completions.iter().any(|c| c.text == "function" && c.kind == CompletionKind::Keyword));
+        assert!(completions
+            .iter()
+            .any(|c| c.text == "function" && c.kind == CompletionKind::Keyword));
     }
 
     #[test]
@@ -204,13 +213,24 @@ mod lua_completion_tests {
         let provider = LuaCompletionProvider::new();
 
         // Add custom global
-        lua.globals().set("myCustomFunction", lua.create_function(|_, ()| Ok(())).unwrap()).unwrap();
-        lua.globals().set("myCustomTable", lua.create_table().unwrap()).unwrap();
+        lua.globals()
+            .set(
+                "myCustomFunction",
+                lua.create_function(|_, ()| Ok(())).unwrap(),
+            )
+            .unwrap();
+        lua.globals()
+            .set("myCustomTable", lua.create_table().unwrap())
+            .unwrap();
 
         // Should find custom globals
         let symbols = provider.get_global_symbols(&lua, "my");
-        assert!(symbols.iter().any(|s| s.text == "myCustomFunction" && s.kind == CompletionKind::Function));
-        assert!(symbols.iter().any(|s| s.text == "myCustomTable" && s.kind == CompletionKind::Module));
+        assert!(symbols
+            .iter()
+            .any(|s| s.text == "myCustomFunction" && s.kind == CompletionKind::Function));
+        assert!(symbols
+            .iter()
+            .any(|s| s.text == "myCustomTable" && s.kind == CompletionKind::Module));
     }
 
     #[test]
@@ -265,7 +285,7 @@ mod lua_completion_tests {
         let handle = thread::spawn(move || {
             // Execute a script to hold the Lua lock
             let _ = futures::executor::block_on(
-                engine_clone.execute_script("for i=1,1000000 do local x = i end return 'done'")
+                engine_clone.execute_script("for i=1,1000000 do local x = i end return 'done'"),
             );
         });
 
@@ -294,7 +314,10 @@ mod lua_completion_tests {
         assert!(io_members.iter().any(|m| m.text == "write"));
 
         let open_member = io_members.iter().find(|m| m.text == "open").unwrap();
-        assert_eq!(open_member.signature, Some("io.open(filename, mode?)".to_string()));
+        assert_eq!(
+            open_member.signature,
+            Some("io.open(filename, mode?)".to_string())
+        );
 
         // Test os module members
         let os_members = provider.get_table_members(&lua, "os", "");
@@ -322,7 +345,10 @@ mod lua_completion_tests {
 
         // Verify signatures
         let sub_method = methods.iter().find(|m| m.text == "sub").unwrap();
-        assert_eq!(sub_method.signature, Some("string.sub(s, i, j?)".to_string()));
+        assert_eq!(
+            sub_method.signature,
+            Some("string.sub(s, i, j?)".to_string())
+        );
     }
 
     #[test]
@@ -338,7 +364,10 @@ mod lua_completion_tests {
         let ctx = CompletionContext::new("p", 1);
         let completions = engine.get_completion_candidates(&ctx);
         // Should return completions starting with 'p' like print, pairs, pcall
-        assert!(!completions.is_empty(), "Expected completions for 'p' prefix");
+        assert!(
+            !completions.is_empty(),
+            "Expected completions for 'p' prefix"
+        );
         assert!(completions.iter().any(|c| c.text == "print"));
     }
 
@@ -353,9 +382,15 @@ mod lua_completion_tests {
         let completions = engine.get_completion_candidates(&ctx);
         // Should provide globals and keywords as potential arguments
         assert!(!completions.is_empty());
-        assert!(completions.iter().any(|c| c.text == "true" && c.kind == CompletionKind::Keyword));
-        assert!(completions.iter().any(|c| c.text == "false" && c.kind == CompletionKind::Keyword));
-        assert!(completions.iter().any(|c| c.text == "nil" && c.kind == CompletionKind::Keyword));
+        assert!(completions
+            .iter()
+            .any(|c| c.text == "true" && c.kind == CompletionKind::Keyword));
+        assert!(completions
+            .iter()
+            .any(|c| c.text == "false" && c.kind == CompletionKind::Keyword));
+        assert!(completions
+            .iter()
+            .any(|c| c.text == "nil" && c.kind == CompletionKind::Keyword));
 
         // Test completion with partial text inside arguments
         let ctx = CompletionContext::new("print(pr", 8);

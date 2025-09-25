@@ -9,7 +9,9 @@ mod repl_completion_tests {
     use llmspell_core::traits::script_executor::{
         ScriptExecutionMetadata, ScriptExecutionOutput, ScriptExecutor,
     };
-    use llmspell_kernel::repl::readline::{ScriptExecutorCompletionAdapter, ScriptCompletionProvider};
+    use llmspell_kernel::repl::readline::{
+        ScriptCompletionProvider, ScriptExecutorCompletionAdapter,
+    };
     use std::sync::Arc;
     use std::time::Duration;
 
@@ -58,7 +60,11 @@ mod repl_completion_tests {
             true
         }
 
-        fn get_completion_candidates(&self, line: &str, cursor_pos: usize) -> Vec<(String, String)> {
+        fn get_completion_candidates(
+            &self,
+            line: &str,
+            cursor_pos: usize,
+        ) -> Vec<(String, String)> {
             // Get the word being completed
             let before_cursor = &line[..cursor_pos.min(line.len())];
             let word_start = before_cursor

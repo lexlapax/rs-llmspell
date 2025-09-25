@@ -113,7 +113,7 @@ fn test_python_environment_available() {
 
     // Check if pip is available
     let pip_check = Command::new("python3")
-        .args(&["-m", "pip", "--version"])
+        .args(["-m", "pip", "--version"])
         .output();
 
     match pip_check {
