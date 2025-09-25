@@ -105,7 +105,6 @@ impl LuaEngine {
     pub fn set_runtime_config(&mut self, config: Arc<llmspell_config::LLMSpellConfig>) {
         self.runtime_config = Some(config);
     }
-
 }
 
 /// Install debug hooks for the current script execution

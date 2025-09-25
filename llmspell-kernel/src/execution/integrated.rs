@@ -481,6 +481,11 @@ impl<P: Protocol + 'static> IntegratedKernel<P> {
         self.execution_manager.clone()
     }
 
+    /// Get the script executor
+    pub fn get_script_executor(&self) -> Arc<dyn ScriptExecutor> {
+        self.script_executor.clone()
+    }
+
     /// Get the DAP bridge for IDE debugging
     pub fn dap_bridge(&self) -> Arc<parking_lot::Mutex<DAPBridge>> {
         self.dap_bridge.clone()

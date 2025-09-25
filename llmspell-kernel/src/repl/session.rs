@@ -3,18 +3,20 @@
 //! Consolidates REPL functionality from Phase-9 llmspell-repl and debug
 //! capabilities from llmspell-debug into a unified interactive experience.
 
-use crate::debug::{DebugCoordinator, DebugSession};
+use crate::debug::{DebugCoordinator, ExecutionManager};
 use crate::execution::IntegratedKernel;
 use crate::protocols::jupyter::JupyterProtocol;
 use crate::repl::commands::{DebugCommand, MetaCommand, ReplCommand};
 use crate::repl::readline::ReplReadline;
 use crate::repl::state::{Breakpoint, ReplState};
 use anyhow::Result;
+use llmspell_core::traits::debug_context::DebugContext;
+use llmspell_core::traits::script_executor::ScriptExecutor;
 use std::path::PathBuf;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
 use std::time::Instant;
-use tokio::sync::RwLock;
+use tokio::sync::{mpsc, RwLock};
 use tracing::{debug, error, info, warn};
 
 /// REPL session configuration
@@ -44,11 +46,86 @@ impl Default for ReplSessionConfig {
     }
 }
 
+/// Debug session manager for REPL
+///
+/// Manages debug state and coordinates between REPL and `ExecutionManager`
+pub struct ReplDebugSession {
+    /// `ExecutionManager` that implements `DebugContext`
+    execution_manager: Arc<ExecutionManager>,
+    /// Script executor reference
+    #[allow(dead_code)]
+    script_executor: Arc<dyn ScriptExecutor>,
+    /// Map of breakpoints by file
+    breakpoints: std::collections::HashMap<String, Vec<u32>>,
+    /// Current stack frame index when paused
+    current_frame: Option<usize>,
+    /// Flag indicating if execution is paused
+    paused: Arc<AtomicBool>,
+    /// Current pause location (file, line)
+    pause_location: Arc<RwLock<Option<(String, u32)>>>,
+    /// Channel to receive stopped events
+    stopped_rx: Option<mpsc::UnboundedReceiver<StoppedEvent>>,
+    /// Channel to send stopped events
+    #[allow(dead_code)]
+    stopped_tx: mpsc::UnboundedSender<StoppedEvent>,
+}
+
+/// Event sent when execution stops at a breakpoint
+#[derive(Debug, Clone)]
+pub struct StoppedEvent {
+    /// Reason for stopping
+    reason: String,
+    /// Thread ID (always 1 for single-threaded)
+    #[allow(dead_code)]
+    thread_id: u32,
+    /// File where stopped
+    file: String,
+    /// Line number where stopped
+    line: u32,
+}
+
+impl ReplDebugSession {
+    /// Create a new debug session
+    pub fn new(
+        execution_manager: Arc<ExecutionManager>,
+        script_executor: Arc<dyn ScriptExecutor>,
+    ) -> Self {
+        let (stopped_tx, stopped_rx) = mpsc::unbounded_channel();
+
+        Self {
+            execution_manager,
+            script_executor,
+            breakpoints: std::collections::HashMap::new(),
+            current_frame: None,
+            paused: Arc::new(AtomicBool::new(false)),
+            pause_location: Arc::new(RwLock::new(None)),
+            stopped_rx: Some(stopped_rx),
+            stopped_tx,
+        }
+    }
+
+    /// Check if execution is paused
+    pub fn is_paused(&self) -> bool {
+        self.paused.load(Ordering::Relaxed)
+    }
+
+    /// Get current pause location
+    pub async fn get_pause_location(&self) -> Option<(String, u32)> {
+        self.pause_location.read().await.clone()
+    }
+
+    /// Start listening for stopped events
+    pub fn take_stopped_receiver(&mut self) -> Option<mpsc::UnboundedReceiver<StoppedEvent>> {
+        self.stopped_rx.take()
+    }
+}
+
 /// Interactive session combining REPL and debug
 pub struct InteractiveSession {
     /// Integrated kernel
     kernel: IntegratedKernel<JupyterProtocol>,
     /// Debug coordinator (optional)
+    #[allow(dead_code)]
     debug_coordinator: Option<Arc<DebugCoordinator>>,
     /// REPL state
     state: Arc<RwLock<ReplState>>,
@@ -61,7 +138,9 @@ pub struct InteractiveSession {
     /// Performance monitoring enabled
     perf_monitoring: bool,
     /// Current debug session (if debugging)
-    debug_session: Option<DebugSession>,
+    debug_session: Option<ReplDebugSession>,
+    /// `ExecutionManager` for debug support
+    execution_manager: Option<Arc<ExecutionManager>>,
     /// Readline interface (optional - falls back to stdin if not available)
     readline: Option<ReplReadline>,
     /// Multi-line input buffer
@@ -110,12 +189,14 @@ impl InteractiveSession {
             }
         };
 
-        // Create debug coordinator if debug commands are enabled
-        let debug_coordinator = if config.enable_debug_commands {
+        // Create debug coordinator and execution manager if debug commands are enabled
+        let (debug_coordinator, execution_manager) = if config.enable_debug_commands {
             let session_id = format!("repl-{}", uuid::Uuid::new_v4());
-            Some(Arc::new(DebugCoordinator::new(session_id)))
+            let exec_mgr = Arc::new(ExecutionManager::new(session_id.clone()));
+            let coordinator = Arc::new(DebugCoordinator::new(session_id));
+            (Some(coordinator), Some(exec_mgr))
         } else {
-            None
+            (None, None)
         };
 
         Ok(Self {
@@ -126,6 +207,7 @@ impl InteractiveSession {
             start_time: Instant::now(),
             perf_monitoring: config.enable_performance_monitoring,
             debug_session: None,
+            execution_manager,
             readline,
             multiline_buffer: Vec::new(),
             executing: Arc::new(AtomicBool::new(false)),
@@ -149,15 +231,11 @@ impl InteractiveSession {
 
         // Main REPL loop
         loop {
-            // Determine prompt based on multi-line state
-            let prompt = if self.multiline_buffer.is_empty() {
-                "> "
-            } else {
-                "... "
-            };
+            // Get appropriate prompt
+            let prompt = self.get_prompt();
 
             // Get user input
-            let input = self.read_input(prompt).await;
+            let input = self.read_input(&prompt).await;
 
             // Check if interrupted
             if input.is_empty() && self.multiline_buffer.is_empty() {
@@ -393,19 +471,47 @@ impl InteractiveSession {
     async fn handle_breakpoint_command(&mut self, command: DebugCommand) -> Result<Option<()>> {
         match command {
             DebugCommand::Break(spec) => {
-                let mut state = self.state.write().await;
-                let id = state.breakpoints.len();
-                let mut breakpoint = Breakpoint::new(id, spec.line);
+                // Ensure debug session exists
+                if self.debug_session.is_none() {
+                    self.start_debug_session()?;
+                }
 
-                if let Some(file) = spec.file {
-                    breakpoint = breakpoint.with_file(file);
+                // Get debug session
+                let session = self
+                    .debug_session
+                    .as_mut()
+                    .ok_or_else(|| anyhow::anyhow!("Debug session not available"))?;
+
+                // Set breakpoint via ExecutionManager
+                let file = spec.file.clone().unwrap_or_else(|| "current".to_string());
+                let line =
+                    u32::try_from(spec.line).map_err(|_| anyhow::anyhow!("Invalid line number"))?;
+                let bp = session
+                    .execution_manager
+                    .set_breakpoint(file.clone(), line)
+                    .map_err(|e| anyhow::anyhow!("Failed to set breakpoint: {}", e))?;
+
+                // Track in session
+                session
+                    .breakpoints
+                    .entry(file.clone())
+                    .or_default()
+                    .push(line);
+
+                // Also track in state for display
+                let mut state = self.state.write().await;
+                let bp_id = state.breakpoints.len();
+                let mut breakpoint = Breakpoint::new(bp_id, spec.line);
+
+                if let Some(file_path) = spec.file {
+                    breakpoint = breakpoint.with_file(file_path);
                 }
                 if let Some(condition) = spec.condition {
                     breakpoint = breakpoint.with_condition(condition);
                 }
 
                 state.add_breakpoint(breakpoint.clone());
-                println!("Breakpoint #{id} set at line {}", spec.line);
+                println!("🔴 Breakpoint set at {}:{} (id: {})", file, line, bp.id);
                 Ok(Some(()))
             }
             DebugCommand::Delete(id) => {
@@ -461,35 +567,61 @@ impl InteractiveSession {
     }
 
     /// Handle execution control commands
-    async fn handle_execution_command(
-        &mut self,
-        command: DebugCommand,
-        coordinator: &Arc<DebugCoordinator>,
-    ) -> Result<Option<()>> {
-        match command {
+    fn handle_execution_command(&mut self, command: &DebugCommand) -> Result<Option<()>> {
+        // Get debug session
+        let session = self
+            .debug_session
+            .as_ref()
+            .ok_or_else(|| anyhow::anyhow!("Debug session not active"))?;
+
+        match *command {
             DebugCommand::Step => {
-                coordinator.step_into().await?;
-                println!("Stepped into");
+                if session.is_paused() {
+                    session
+                        .execution_manager
+                        .resume(crate::debug::execution_bridge::StepMode::StepIn);
+                    println!("➡️  Stepping into...");
+                } else {
+                    println!("⚠️  Not paused at breakpoint");
+                }
                 Ok(Some(()))
             }
             DebugCommand::Next => {
-                coordinator.step_over().await?;
-                println!("Stepped over");
+                if session.is_paused() {
+                    session
+                        .execution_manager
+                        .resume(crate::debug::execution_bridge::StepMode::StepOver);
+                    println!("➡️  Stepping over...");
+                } else {
+                    println!("⚠️  Not paused at breakpoint");
+                }
                 Ok(Some(()))
             }
             DebugCommand::Finish => {
-                coordinator.step_out().await?;
-                println!("Stepped out");
+                if session.is_paused() {
+                    session
+                        .execution_manager
+                        .resume(crate::debug::execution_bridge::StepMode::StepOut);
+                    println!("➡️  Stepping out...");
+                } else {
+                    println!("⚠️  Not paused at breakpoint");
+                }
                 Ok(Some(()))
             }
             DebugCommand::Continue => {
-                coordinator.continue_execution().await?;
-                println!("Continuing execution");
+                if session.is_paused() {
+                    session
+                        .execution_manager
+                        .resume(crate::debug::execution_bridge::StepMode::Continue);
+                    println!("▶️  Continuing execution...");
+                } else {
+                    println!("⚠️  Not paused at breakpoint");
+                }
                 Ok(Some(()))
             }
             DebugCommand::Pause => {
-                coordinator.pause().await?;
-                println!("Execution paused");
+                // This would pause a running script - not implemented yet
+                println!("⚠️  Pause not yet implemented for running scripts");
                 Ok(Some(()))
             }
             _ => Ok(None), // Not an execution command
@@ -497,56 +629,82 @@ impl InteractiveSession {
     }
 
     /// Handle information display commands
-    async fn handle_info_command(&mut self, command: DebugCommand) -> Result<Option<()>> {
-        match command {
+    fn handle_info_command(&mut self, command: &DebugCommand) -> Option<()> {
+        match *command {
             DebugCommand::Locals => {
-                let state = self.state.read().await;
-                if let Some(ref ctx) = state.debug_context {
-                    if ctx.locals.is_empty() {
-                        println!("No local variables");
-                    } else {
-                        for (name, value) in &ctx.locals {
-                            println!("{name} = {value}");
+                // Get debug session
+                if let Some(ref session) = self.debug_session {
+                    if session.is_paused() {
+                        let frame_id = session.current_frame.unwrap_or(0);
+                        let vars = session.execution_manager.get_variables(
+                            &crate::debug::execution_bridge::VariableScope::Local,
+                            Some(&frame_id.to_string()),
+                        );
+                        if vars.is_empty() {
+                            println!("No local variables");
+                        } else {
+                            println!("📦 Local Variables:");
+                            for var in vars {
+                                println!("  {} = {} ({})", var.name, var.value, var.var_type);
+                            }
                         }
+                    } else {
+                        println!("⚠️  Not paused at breakpoint");
                     }
                 } else {
-                    println!("Not in debug context");
+                    println!("⚠️  Debug session not active");
                 }
-                Ok(Some(()))
+                Some(())
             }
             DebugCommand::Backtrace | DebugCommand::Where => {
-                let state = self.state.read().await;
-                if let Some(ref ctx) = state.debug_context {
-                    for (i, frame) in ctx.stack_frames.iter().enumerate() {
-                        let marker = if i == ctx.current_frame { ">" } else { " " };
-                        let location = frame.file.as_deref().unwrap_or("<unknown>");
-                        println!(
-                            "{marker} #{} {} at {location}:{}",
-                            frame.id,
-                            frame.name,
-                            frame.line.unwrap_or(0)
-                        );
+                // Get debug session
+                if let Some(ref session) = self.debug_session {
+                    if session.is_paused() {
+                        let frames = session.execution_manager.get_stack_frames();
+                        if frames.is_empty() {
+                            println!("No stack frames available");
+                        } else {
+                            println!("📚 Call Stack:");
+                            for (i, frame) in frames.iter().enumerate() {
+                                let marker = if Some(i) == session.current_frame {
+                                    "→"
+                                } else {
+                                    " "
+                                };
+                                println!(
+                                    "{} #{}: {} at {}:{}",
+                                    marker, i, frame.name, frame.source, frame.line
+                                );
+                            }
+                        }
+                    } else {
+                        println!("⚠️  Not paused at breakpoint");
                     }
                 } else {
-                    println!("Not in debug context");
+                    println!("⚠️  Debug session not active");
                 }
-                Ok(Some(()))
+                Some(())
             }
             DebugCommand::Frame(n) => {
-                let mut state = self.state.write().await;
-                if let Some(ref mut ctx) = state.debug_context {
-                    if n < ctx.stack_frames.len() {
-                        ctx.current_frame = n;
-                        println!("Selected frame #{n}");
+                // Get debug session
+                if let Some(ref mut session) = self.debug_session {
+                    if session.is_paused() {
+                        let frames = session.execution_manager.get_stack_frames();
+                        if n < frames.len() {
+                            session.current_frame = Some(n);
+                            println!("Selected frame #{n}");
+                        } else {
+                            println!("Invalid frame number (max: {})", frames.len() - 1);
+                        }
                     } else {
-                        println!("Invalid frame number");
+                        println!("⚠️  Not paused at breakpoint");
                     }
                 } else {
-                    println!("Not in debug context");
+                    println!("⚠️  Debug session not active");
                 }
-                Ok(Some(()))
+                Some(())
             }
-            _ => Ok(None), // Not an info command
+            _ => None, // Not an info command
         }
     }
 
@@ -583,7 +741,7 @@ impl InteractiveSession {
             return Ok(());
         }
 
-        // For execution commands, we need the coordinator
+        // For execution commands
         if matches!(
             command,
             DebugCommand::Step
@@ -592,20 +750,12 @@ impl InteractiveSession {
                 | DebugCommand::Continue
                 | DebugCommand::Pause
         ) {
-            let coordinator = self
-                .debug_coordinator
-                .as_ref()
-                .ok_or_else(|| anyhow::anyhow!("Debug coordinator not initialized"))?
-                .clone();
-            if let Some(()) = self
-                .handle_execution_command(command.clone(), &coordinator)
-                .await?
-            {
+            if let Some(()) = self.handle_execution_command(&command)? {
                 return Ok(());
             }
         }
 
-        if let Some(()) = self.handle_info_command(command.clone()).await? {
+        if let Some(()) = self.handle_info_command(&command) {
             return Ok(());
         }
         if let Some(()) = self.handle_expression_command(command).await {
@@ -877,5 +1027,84 @@ impl InteractiveSession {
         std::env::set_current_dir(original_dir)?;
 
         Ok(())
+    }
+
+    /// Start a debug session
+    fn start_debug_session(&mut self) -> Result<()> {
+        if self.debug_session.is_some() {
+            println!("Debug session already active");
+            return Ok(());
+        }
+
+        let exec_mgr = self
+            .execution_manager
+            .as_ref()
+            .ok_or_else(|| anyhow::anyhow!("Debug commands not enabled"))?
+            .clone();
+
+        // Enable debug mode on execution manager
+        exec_mgr.enable_debug_mode();
+
+        // Get script executor from kernel
+        let script_executor = self.kernel.get_script_executor();
+
+        // Set debug context on script executor
+        script_executor.set_debug_context(Some(exec_mgr.clone()));
+
+        // Create debug session
+        let mut debug_session = ReplDebugSession::new(exec_mgr, script_executor);
+
+        // Start listening for stopped events
+        if let Some(mut stopped_rx) = debug_session.take_stopped_receiver() {
+            let paused = debug_session.paused.clone();
+            let pause_location = debug_session.pause_location.clone();
+
+            tokio::spawn(async move {
+                while let Some(event) = stopped_rx.recv().await {
+                    println!("⏸️  Paused at {}:{}", event.file, event.line);
+                    println!("   Reason: {}", event.reason);
+                    paused.store(true, Ordering::SeqCst);
+                    *pause_location.write().await = Some((event.file, event.line));
+                }
+            });
+        }
+
+        self.debug_session = Some(debug_session);
+        println!("🔷 Debug session started");
+        Ok(())
+    }
+
+    /// Stop the debug session
+    #[allow(dead_code)]
+    fn stop_debug_session(&mut self) {
+        if let Some(_session) = self.debug_session.take() {
+            // Clear debug context from script executor
+            let script_executor = self.kernel.get_script_executor();
+            script_executor.set_debug_context(None);
+
+            // Disable debug mode on execution manager
+            if let Some(exec_mgr) = &self.execution_manager {
+                exec_mgr.disable_debug_mode();
+            }
+
+            println!("Debug session stopped");
+        } else {
+            println!("No debug session active");
+        }
+    }
+
+    /// Get prompt string based on current state
+    fn get_prompt(&self) -> String {
+        if let Some(ref session) = self.debug_session {
+            if session.is_paused() {
+                return "(debug) > ".to_string();
+            }
+        }
+
+        if self.multiline_buffer.is_empty() {
+            "> ".to_string()
+        } else {
+            "... ".to_string()
+        }
     }
 }
