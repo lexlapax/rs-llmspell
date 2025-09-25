@@ -29,11 +29,14 @@ impl ReplReadline {
     ///
     /// Returns an error if the readline editor cannot be created
     pub async fn new(state: Arc<RwLock<ReplState>>) -> Result<Self> {
-        // Configure editor
+        // Configure editor with full readline features
         let config = rustyline::Config::builder()
             .history_ignore_space(true)
+            .history_ignore_dups(true)? // Avoid duplicate entries
             .completion_type(rustyline::CompletionType::List)
-            .edit_mode(rustyline::EditMode::Emacs)
+            .edit_mode(rustyline::EditMode::Emacs) // Enables Ctrl+R, Ctrl+A, Ctrl+E, Ctrl+W
+            .auto_add_history(true) // Automatically add commands to history
+            .max_history_size(10000)? // Large history buffer
             .build();
 
         // Create editor with config
@@ -96,14 +99,39 @@ impl ReplReadline {
         Ok(())
     }
 
-    /// Load history from file
+    /// Load history from file with corruption recovery
     ///
     /// # Errors
     ///
     /// Returns an error if the history file cannot be loaded
     pub fn load_history(&mut self, path: &std::path::Path) -> Result<()> {
         if path.exists() {
-            self.editor.load_history(path)?;
+            match self.editor.load_history(path) {
+                Ok(()) => {
+                    debug!("Loaded history from {:?}", path);
+                }
+                Err(e) => {
+                    warn!(
+                        "Failed to load history from {:?}: {}. Creating backup and starting fresh.",
+                        path, e
+                    );
+
+                    // Create backup of corrupted history
+                    let backup_path = path.with_extension("corrupt.backup");
+                    if let Err(backup_err) = std::fs::copy(path, &backup_path) {
+                        warn!("Failed to backup corrupted history: {}", backup_err);
+                    } else {
+                        debug!("Backed up corrupted history to {:?}", backup_path);
+                    }
+
+                    // Remove corrupted file and start fresh
+                    if let Err(remove_err) = std::fs::remove_file(path) {
+                        warn!("Failed to remove corrupted history file: {}", remove_err);
+                    }
+
+                    // Continue with empty history - not a fatal error
+                }
+            }
         }
         Ok(())
     }
@@ -212,8 +240,50 @@ impl Completer for ReplHelper {
 
         // Complete file paths for certain commands
         if line.starts_with(".load ") || line.starts_with(".save ") || line.starts_with(".run ") {
-            // For now, we don't implement file completion
-            // This could be added later using std::fs::read_dir
+            // Get the partial path to complete
+            let partial = &line[start..pos];
+
+            // Determine directory and file prefix
+            let (dir_path, file_prefix) = if let Some(slash_pos) = partial.rfind('/') {
+                let dir = &partial[..=slash_pos];
+                let prefix = &partial[slash_pos + 1..];
+                (dir.to_string(), prefix.to_string())
+            } else {
+                ("./".to_string(), partial.to_string())
+            };
+
+            // Try to read the directory
+            if let Ok(entries) = std::fs::read_dir(&dir_path) {
+                for entry in entries.flatten() {
+                    if let Some(file_name) = entry.file_name().to_str() {
+                        // Skip hidden files unless user is explicitly looking for them
+                        if file_name.starts_with('.') && !file_prefix.starts_with('.') {
+                            continue;
+                        }
+
+                        // Check if the file name starts with the prefix
+                        if file_name.starts_with(&file_prefix) {
+                            let full_path = if dir_path == "./" {
+                                file_name.to_string()
+                            } else {
+                                format!("{dir_path}{file_name}")
+                            };
+
+                            // Add trailing slash for directories
+                            let display_path = if entry.path().is_dir() {
+                                format!("{full_path}/")
+                            } else {
+                                full_path.clone()
+                            };
+
+                            candidates.push(Pair {
+                                display: display_path.clone(),
+                                replacement: display_path,
+                            });
+                        }
+                    }
+                }
+            }
         }
 
         Ok((start, candidates))

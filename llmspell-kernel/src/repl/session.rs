@@ -120,6 +120,42 @@ impl ReplDebugSession {
     }
 }
 
+/// Session statistics tracking
+#[derive(Debug, Clone)]
+pub struct SessionStatistics {
+    /// Total execution time (milliseconds)
+    pub total_execution_time_ms: u128,
+    /// Average execution time (milliseconds)
+    pub avg_execution_time_ms: u128,
+    /// Min execution time (milliseconds)
+    pub min_execution_time_ms: u128,
+    /// Max execution time (milliseconds)
+    pub max_execution_time_ms: u128,
+    /// Total commands executed
+    pub commands_executed: u32,
+    /// Errors encountered
+    pub errors_encountered: u32,
+    /// Memory snapshots (before, after) for last execution
+    pub memory_delta: Option<(u64, u64)>,
+    /// Peak memory usage
+    pub peak_memory_bytes: u64,
+}
+
+impl Default for SessionStatistics {
+    fn default() -> Self {
+        Self {
+            total_execution_time_ms: 0,
+            avg_execution_time_ms: 0,
+            min_execution_time_ms: u128::MAX,
+            max_execution_time_ms: 0,
+            commands_executed: 0,
+            errors_encountered: 0,
+            memory_delta: None,
+            peak_memory_bytes: 0,
+        }
+    }
+}
+
 /// Interactive session combining REPL and debug
 pub struct InteractiveSession {
     /// Integrated kernel
@@ -137,6 +173,8 @@ pub struct InteractiveSession {
     start_time: Instant,
     /// Performance monitoring enabled
     perf_monitoring: bool,
+    /// Session statistics
+    session_stats: SessionStatistics,
     /// Current debug session (if debugging)
     debug_session: Option<ReplDebugSession>,
     /// `ExecutionManager` for debug support
@@ -206,6 +244,7 @@ impl InteractiveSession {
             execution_count: 0,
             start_time: Instant::now(),
             perf_monitoring: config.enable_performance_monitoring,
+            session_stats: SessionStatistics::default(),
             debug_session: None,
             execution_manager,
             readline,
@@ -319,12 +358,16 @@ impl InteractiveSession {
     /// Execute code in the kernel
     async fn execute_code(&mut self, code: &str) -> Result<()> {
         self.execution_count += 1;
+        self.session_stats.commands_executed += 1;
 
         // Add to history
         {
             let mut state = self.state.write().await;
             state.history.add(code.to_string());
         }
+
+        // Memory tracking - before execution
+        let mem_before = get_current_memory_usage();
 
         // Performance monitoring
         let start = if self.perf_monitoring {
@@ -339,18 +382,53 @@ impl InteractiveSession {
         // Execute through kernel's direct execution
         let result = self.execute_via_kernel(code).await;
 
+        // Track errors
+        if result.contains("Error") || result.contains("error") {
+            self.session_stats.errors_encountered += 1;
+        }
+
         // Clear executing flag
         self.executing.store(false, Ordering::Relaxed);
 
         // Print result
         println!("{result}");
 
-        // Check performance
+        // Memory tracking - after execution
+        let mem_after = get_current_memory_usage();
+        self.session_stats.memory_delta = Some((mem_before, mem_after));
+        if mem_after > self.session_stats.peak_memory_bytes {
+            self.session_stats.peak_memory_bytes = mem_after;
+        }
+
+        // Check performance and update statistics
         if let Some(start_time) = start {
             let duration = start_time.elapsed();
             let millis = duration.as_millis();
+
+            // Update statistics
+            self.session_stats.total_execution_time_ms += millis;
+            if millis < self.session_stats.min_execution_time_ms {
+                self.session_stats.min_execution_time_ms = millis;
+            }
+            if millis > self.session_stats.max_execution_time_ms {
+                self.session_stats.max_execution_time_ms = millis;
+            }
+            self.session_stats.avg_execution_time_ms = self.session_stats.total_execution_time_ms
+                / u128::from(self.session_stats.commands_executed);
+
             if self.perf_monitoring {
                 println!("⏱️ {millis} ms");
+
+                // Show memory delta if significant
+                if let Some((before, after)) = self.session_stats.memory_delta {
+                    let delta = i64::try_from(after).unwrap_or(i64::MAX)
+                        - i64::try_from(before).unwrap_or(0);
+                    if delta.abs() > 1024 * 1024 {
+                        // > 1MB change
+                        let delta_mb = delta as f64 / 1024.0 / 1024.0;
+                        println!("💾 Memory Δ: {delta_mb:+.2} MB");
+                    }
+                }
             }
             if duration.as_secs() > 1 {
                 warn!("Slow execution: {:.2}s", duration.as_secs_f64());
@@ -370,6 +448,7 @@ impl InteractiveSession {
     }
 
     /// Handle meta commands
+    #[allow(clippy::too_many_lines)]
     async fn handle_meta_command(&mut self, command: MetaCommand) -> Result<()> {
         match command {
             MetaCommand::Help => {
@@ -408,9 +487,35 @@ impl InteractiveSession {
                 if state.variables.is_empty() {
                     println!("No variables set");
                 } else {
-                    for (name, value) in &state.variables {
-                        println!("{name} = {value}");
+                    // Calculate max name width for alignment
+                    let max_width = state
+                        .variables
+                        .keys()
+                        .map(std::string::String::len)
+                        .max()
+                        .unwrap_or(0)
+                        .min(30); // Cap at 30 chars for readability
+
+                    println!("📦 Session Variables:");
+                    println!("{}", "─".repeat(60));
+
+                    // Sort variables by name for consistent display
+                    let mut vars: Vec<_> = state.variables.iter().collect();
+                    vars.sort_by_key(|(k, _)| k.as_str());
+
+                    for (name, value) in vars {
+                        // Detect type based on value content
+                        let type_hint = detect_value_type(value);
+                        let display_value = format_value(value, 40); // Truncate long values
+
+                        println!("  {name:<max_width$} : {type_hint} {display_value}");
                     }
+                    println!("{}", "─".repeat(60));
+                    println!(
+                        "Total: {} variable{}",
+                        state.variables.len(),
+                        if state.variables.len() == 1 { "" } else { "s" }
+                    );
                 }
             }
             MetaCommand::Set(name, value) => {
@@ -780,13 +885,71 @@ impl InteractiveSession {
         let uptime = self.start_time.elapsed();
         let state = self.state.read().await;
 
-        println!("Session Information:");
+        println!("📊 Session Information:");
+        println!("{}", "─".repeat(60));
+
+        // Basic info
+        println!("📅 Session:");
         println!("  Uptime: {:.1}s", uptime.as_secs_f64());
         println!("  Executions: {}", self.execution_count);
         println!("  History entries: {}", state.history.entries().len());
         println!("  Variables: {}", state.variables.len());
         println!("  Breakpoints: {}", state.breakpoints.len());
         println!("  Debug mode: {}", self.debug_session.is_some());
+
+        // Performance statistics
+        if self.session_stats.commands_executed > 0 {
+            println!("\n⏱️ Performance:");
+            println!(
+                "  Total execution time: {} ms",
+                self.session_stats.total_execution_time_ms
+            );
+            println!(
+                "  Average time: {} ms",
+                self.session_stats.avg_execution_time_ms
+            );
+            println!(
+                "  Min time: {} ms",
+                if self.session_stats.min_execution_time_ms == u128::MAX {
+                    0
+                } else {
+                    self.session_stats.min_execution_time_ms
+                }
+            );
+            println!(
+                "  Max time: {} ms",
+                self.session_stats.max_execution_time_ms
+            );
+            println!(
+                "  Commands executed: {}",
+                self.session_stats.commands_executed
+            );
+            println!(
+                "  Errors encountered: {}",
+                self.session_stats.errors_encountered
+            );
+        }
+
+        // Memory statistics
+        let current_memory = get_current_memory_usage();
+        println!("\n💾 Memory:");
+        println!(
+            "  Current: {:.2} MB",
+            current_memory as f64 / 1024.0 / 1024.0
+        );
+        if self.session_stats.peak_memory_bytes > 0 {
+            println!(
+                "  Peak: {:.2} MB",
+                self.session_stats.peak_memory_bytes as f64 / 1024.0 / 1024.0
+            );
+        }
+        if let Some((before, after)) = self.session_stats.memory_delta {
+            let delta =
+                i64::try_from(after).unwrap_or(i64::MAX) - i64::try_from(before).unwrap_or(0);
+            println!("  Last delta: {:+.2} MB", delta as f64 / 1024.0 / 1024.0);
+        }
+
+        println!("{}", "─".repeat(60));
     }
 
     /// Save session to file
@@ -1107,4 +1270,109 @@ impl InteractiveSession {
             "... ".to_string()
         }
     }
+}
+
+/// Detect value type based on string content
+fn detect_value_type(value: &str) -> &'static str {
+    // Try to parse as various types
+    if value == "true" || value == "false" {
+        "bool"
+    } else if value.parse::<i64>().is_ok() {
+        "int"
+    } else if value.parse::<f64>().is_ok() {
+        "float"
+    } else if value.starts_with('"') && value.ends_with('"') {
+        "string"
+    } else if value.starts_with('[') && value.ends_with(']') {
+        "array"
+    } else if value.starts_with('{') && value.ends_with('}') {
+        "object"
+    } else if value == "nil" || value == "null" || value == "None" {
+        "null"
+    } else if value.starts_with('/') || value.contains('\\') {
+        "path"
+    } else {
+        "string"
+    }
+}
+
+/// Format value for display with truncation
+fn format_value(value: &str, max_len: usize) -> String {
+    let cleaned = value.trim();
+
+    // Handle special cases
+    if cleaned.starts_with('{') && cleaned.ends_with('}') {
+        // Try to format as JSON object
+        if let Ok(json_val) = serde_json::from_str::<serde_json::Value>(cleaned) {
+            let compact = serde_json::to_string(&json_val).unwrap_or_else(|_| cleaned.to_string());
+            if compact.len() > max_len {
+                format!("{}...}}", &compact[..max_len.saturating_sub(4)])
+            } else {
+                compact
+            }
+        } else if cleaned.len() > max_len {
+            format!("{}...}}", &cleaned[..max_len.saturating_sub(4)])
+        } else {
+            cleaned.to_string()
+        }
+    } else if cleaned.starts_with('[') && cleaned.ends_with(']') {
+        // Try to format as JSON array
+        if let Ok(json_val) = serde_json::from_str::<serde_json::Value>(cleaned) {
+            let compact = serde_json::to_string(&json_val).unwrap_or_else(|_| cleaned.to_string());
+            if compact.len() > max_len {
+                format!("{}...]", &compact[..max_len.saturating_sub(4)])
+            } else {
+                compact
+            }
+        } else if cleaned.len() > max_len {
+            format!("{}...]", &cleaned[..max_len.saturating_sub(4)])
+        } else {
+            cleaned.to_string()
+        }
+    } else if cleaned.len() > max_len {
+        format!("{}...", &cleaned[..max_len.saturating_sub(3)])
+    } else {
+        cleaned.to_string()
+    }
+}
+
+/// Get current memory usage in bytes
+fn get_current_memory_usage() -> u64 {
+    // Try to get memory stats from procfs on Linux
+    #[cfg(target_os = "linux")]
+    {
+        if let Ok(contents) = std::fs::read_to_string("/proc/self/status") {
+            for line in contents.lines() {
+                if line.starts_with("VmRSS:") {
+                    if let Some(kb_str) = line.split_whitespace().nth(1) {
+                        if let Ok(kb) = kb_str.parse::<u64>() {
+                            return kb * 1024; // Convert KB to bytes
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    // Try to get memory stats on macOS
+    #[cfg(target_os = "macos")]
+    {
+        use std::process::Command;
+        if let Ok(output) = Command::new("ps")
+            .arg("-o")
+            .arg("rss=")
+            .arg("-p")
+            .arg(std::process::id().to_string())
+            .output()
+        {
+            if let Ok(rss_str) = String::from_utf8(output.stdout) {
+                if let Ok(kb) = rss_str.trim().parse::<u64>() {
+                    return kb * 1024; // Convert KB to bytes
+                }
+            }
+        }
+    }
+
+    // Fallback: return 0 if we can't get memory stats
+    0
 }

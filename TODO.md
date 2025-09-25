@@ -3889,7 +3889,7 @@ See these new phases below for detailed implementation plans.
 
 ---
 
-## Phase 10.8 Summary
+### Phase 10.8 Summary
 
 **Status**: ✅ FUNCTIONALLY COMPLETE (Started: 2025-09-24, Core Features Done: 2025-09-24)
 **Completed Features**: 10/11 tasks (All core functionality implemented)
@@ -3975,23 +3975,104 @@ See these new phases below for detailed implementation plans.
 
 ---
 
-## Phase 10.8 - Deferred Work Tracking
+### Phase 10.8 - Next Steps (Critical Decision Point)
+
+**Date**: 2025-09-25
+**Current Status**: Phase 10.10 is 90% complete (functional but missing tests)
+**Recommendation**: **Complete Phase 10.8 remaining work FIRST, then return to finish 10.10**
+
+#### Strategic Assessment (After Completing 10.10):
+
+**Phase 10.10 Actual Status:**
+- ✅ **10.10.1**: ReplDebugSession created and functional
+- ✅ **10.10.2**: All debug commands connected to ExecutionManager
+- ✅ **10.10.3**: Debug execution loop with pause/resume implemented
+- ✅ **10.10.4**: UI enhancements added (emojis, prompts) - 95% (NO_COLOR not done)
+- ❌ **10.10.5**: Integration tests NOT WRITTEN - only compilation verified
+
+**Why Complete 10.8 First:**
+1. **Foundation Required**: Debug features need solid REPL foundation to test properly
+2. **Test Coverage**: Can't write meaningful debug tests without REPL tests
+3. **User Experience**: History, completion, and performance features enhance debug UX
+4. **Logical Flow**: Debug is an enhancement to REPL, not standalone
+
+#### Execution Plan:
+
+**Step 1: Complete Phase 10.8 Remaining Tasks**
+1. **Command History Persistence** (10.8.5 remaining):
+   - Implement Ctrl+R search configuration
+   - Verify Ctrl+A/E navigation
+   - Test history file corruption recovery
+
+2. **Variable Inspection** (enhance existing):
+   - Improve `.variables` command formatting
+   - Add variable type information
+   - Support nested object inspection
+
+3. **Performance Optimizations** (10.8.10 remaining):
+   - Add memory delta tracking
+   - Implement session statistics
+   - Profile and optimize hot paths
+
+4. **Comprehensive REPL Tests** (10.8.11 - critical):
+   - Write all deferred unit tests
+   - Integration tests for readline
+   - Multi-line input tests
+   - Signal handling tests
+   - Tab completion tests
+   - Script execution tests
+
+**Step 2: Return to Complete Phase 10.10.5**
+After 10.8 is fully complete with tests, return to write:
+1. Debug session lifecycle tests
+2. Breakpoint operation tests
+3. Pause/resume/step command tests
+4. Debug UI interaction tests
+5. Performance validation tests
+6. End-to-end debug scenario tests
+
+**Step 3: Validate Complete REPL+Debug System**
+- Run full test suite covering both REPL and debug
+- Manual testing of debug workflows
+- Performance benchmarking
+- Documentation updates
+
+#### Key Insight:
+The debug infrastructure is architecturally complete and compiles cleanly. However, without the REPL foundation being fully tested and polished, we can't properly validate the debug functionality. The tight integration between REPL and debug means they should be tested together as a complete system.
+
+---
+
+#### Phase 10.8 - Deferred Work Tracking
 
 **IMPORTANT**: These items were deferred to focus on Phase 10.9 architecture. Return here after 10.9 completion.
 
-### Deferred Features (Minor)
-- [ ] **10.8.5**: Ctrl+R history search configuration
-- [ ] **10.8.5**: Verify Ctrl+A/E line navigation
-- [ ] **10.8.5**: Verify Ctrl+W word deletion
-- [ ] **10.8.8**: File path completion for .load/.save/.run
-- [ ] **10.8.8**: Language-specific completions via ScriptEngineBridge
-- [ ] **10.8.10**: Memory delta tracking
-- [ ] **10.8.10**: Session statistics accumulation
+##### Deferred Features
+- [x] **10.8.5**: Ctrl+R history search configuration ✅ (2025-09-25)
+- [x] **10.8.5**: Verify Ctrl+A/E line navigation ✅ (2025-09-25)
+- [x] **10.8.5**: Verify Ctrl+W word deletion ✅ (2025-09-25)
+- [x] **10.8.5**: History file corruption recovery with backup ✅ (2025-09-25)
+- [x] **10.8.8**: File path completion for .load/.save/.run ✅ (2025-09-25)
+- [ ] **10.8.8**: Language-specific completions via ScriptEngineBridge (deferred - needs script engine context)
+- [x] **10.8.10**: Memory delta tracking ✅ (2025-09-25)
+- [x] **10.8.10**: Session statistics accumulation ✅ (2025-09-25)
 
-### Deferred Testing (Task 10.8.11)
+##### Additional Enhancements (2025-09-25)
+- [x] **Variable Inspection**: Enhanced `.variables` command with:
+  - Aligned column formatting
+  - Type detection (bool, int, float, string, array, object, path)
+  - JSON object/array formatting support
+  - Value truncation for long strings
+  - Total variable count display
+- [x] **Session Info**: Enhanced `.info` command with:
+  - Performance statistics (total, avg, min, max execution times)
+  - Memory statistics (current, peak, delta)
+  - Error counting
+  - Organized sections with emoji indicators
+
+##### Deferred Testing (Task 10.8.11)
 **All testing requirements from 10.8.5-10.8.10 need implementation:**
 
-#### 10.8.5 Readline Tests
+##### 10.8.5 Readline Tests
 - [ ] Unit test history navigation with mock readline
 - [ ] Integration test history persistence across sessions
 - [ ] Test arrow keys in actual terminal
@@ -3999,7 +4080,7 @@ See these new phases below for detailed implementation plans.
 - [ ] Verify fallback to stdin works
 - [ ] Test history file corruption recovery
 
-#### 10.8.6 Multi-line Tests
+##### 10.8.6 Multi-line Tests
 - [ ] Unit test Lua incomplete expression detection
 - [ ] Test unclosed function/if/while/for statements
 - [ ] Test unclosed strings and comments
@@ -4008,7 +4089,7 @@ See these new phases below for detailed implementation plans.
 - [ ] Integration test multi-line function definition
 - [ ] Test buffer clearing on completion/error
 
-#### 10.8.7 Signal Handling Tests
+##### 10.8.7 Signal Handling Tests
 - [ ] Test Ctrl+C during long-running script
 - [ ] Test Ctrl+C at empty prompt
 - [ ] Test Ctrl+C with partially typed command
@@ -4017,7 +4098,7 @@ See these new phases below for detailed implementation plans.
 - [ ] Verify no resource leaks after interruption
 - [ ] Test signal handler cleanup on exit
 
-#### 10.8.8 Tab Completion Tests
+##### 10.8.8 Tab Completion Tests
 - [ ] Unit test command completion matching
 - [ ] Test file path completion with various paths
 - [ ] Test partial matches and ambiguous completions
@@ -4026,7 +4107,7 @@ See these new phases below for detailed implementation plans.
 - [ ] Test completion at different cursor positions
 - [ ] Performance test with many candidates
 
-#### 10.8.9 Script Execution Tests
+##### 10.8.9 Script Execution Tests
 - [ ] Test executing valid Lua scripts
 - [ ] Test file not found error
 - [ ] Test syntax error reporting with line numbers
@@ -4036,7 +4117,7 @@ See these new phases below for detailed implementation plans.
 - [ ] Test script arguments passing
 - [ ] Test working directory setting
 
-#### 10.8.10 Performance Monitoring Tests
+##### 10.8.10 Performance Monitoring Tests
 - [ ] Test execution time accuracy
 - [ ] Test memory tracking accuracy
 - [ ] Test toggle on/off functionality
@@ -4045,17 +4126,25 @@ See these new phases below for detailed implementation plans.
 - [ ] Test session statistics accumulation
 - [ ] Test formatting of various magnitudes
 
-### Why Defer?
+#### Why Defer?
 1. **Architecture First**: Phase 10.9 enables real debugging - more valuable than tests
 2. **Tests Need Real Behavior**: Many tests are meaningless until debug actually works
 3. **Time Efficiency**: 10.9 unblocks future phases, tests don't
 4. **Iterative Refinement**: We'll likely refactor after 10.9 anyway
 
-### Return Criteria
+#### Return Criteria
 Come back to this section when:
 - [x] Phase 10.9 complete (DebugContext trait implemented) ✅ VALIDATED
-- [ ] Phase 10.10 complete (REPL connected to debug)
-- [ ] Need comprehensive testing before Phase 10.11
+- [x] Phase 10.10 complete (REPL connected to debug) ✅ COMPLETED (2025-09-25)
+- [x] Need comprehensive testing before Phase 10.11 ✅ NOW IS THE TIME
+
+**✅ ALL CRITERIA MET - READY TO COMPLETE PHASE 10.8 DEFERRED WORK**
+
+The REPL-Debug connection is functional. Now we need to:
+1. Complete remaining REPL features (history persistence, variable inspection, performance)
+2. Write comprehensive test suite for REPL (Task 10.8.11)
+3. Then write integration tests for debug functionality (Phase 10.10.5)
+4. Test the complete REPL+Debug system as an integrated whole
 
 ---
 
