@@ -106,49 +106,43 @@ impl LuaEngine {
         self.runtime_config = Some(config);
     }
 
-    /// Set up Lua debug hooks for debugging support (called when set_debug_context is called)
-    #[cfg(feature = "lua")]
-    fn setup_lua_debug_hooks(&self, _debug_context: Arc<dyn DebugContext>) {
-        // No longer install hooks here - they are installed per execution in execute_script
-        debug!("Debug context set, hooks will be installed during script execution");
-    }
+}
 
-    /// Install debug hooks for the current script execution
-    #[cfg(feature = "lua")]
-    fn install_debug_hooks_internal(&self, lua: &mlua::Lua, debug_context: Arc<dyn DebugContext>) {
-        use mlua::DebugEvent;
+/// Install debug hooks for the current script execution
+#[cfg(feature = "lua")]
+fn install_debug_hooks_internal(lua: &mlua::Lua, debug_context: &Arc<dyn DebugContext>) {
+    use mlua::DebugEvent;
 
-        // Set up a debug hook that gets called on each line
-        let debug_ctx = debug_context.clone();
-        lua.set_hook(mlua::HookTriggers::EVERY_LINE, move |_lua, debug| {
-            if debug.event() == DebugEvent::Line {
-                // Get current location info
-                let source = debug.source();
-                let file = source.source.unwrap_or_else(|| "unknown".into());
-                // Use curr_line() method to get current line
-                // Note: curr_line() returns i32, convert to u32 (always positive in practice)
-                let line = debug.curr_line().max(0) as u32;
+    // Set up a debug hook that gets called on each line
+    let debug_ctx = Arc::clone(debug_context);
+    lua.set_hook(mlua::HookTriggers::EVERY_LINE, move |_lua, debug| {
+        if debug.event() == DebugEvent::Line {
+            // Get current location info
+            let source = debug.source();
+            let file = source.source.unwrap_or_else(|| "unknown".into());
+            // Use curr_line() method to get current line
+            // Note: curr_line() returns i32, convert to u32 (always positive in practice)
+            let line = u32::try_from(debug.curr_line().max(0)).unwrap_or(0);
 
-                // Report current location to debug context
-                debug_ctx.report_location(&file, line);
+            // Report current location to debug context
+            debug_ctx.report_location(&file, line);
 
-                // Check if we should pause at this line (breakpoint or stepping)
-                if debug_ctx.should_pause_sync(&file, line) {
-                    // Handle async pause in sync context
-                    // We need to use a different approach since block_on doesn't work in async tests
-                    // Use futures::executor::block_on which works in any context
-                    futures::executor::block_on(async {
-                        if let Err(e) = debug_ctx.pause_and_wait(&file, line).await {
-                            warn!("Failed to pause execution: {}", e);
-                        }
-                    });
-                }
+            // Check if we should pause at this line (breakpoint or stepping)
+            if debug_ctx.should_pause_sync(&file, line) {
+                // Handle async pause in sync context
+                // We need to use a different approach since block_on doesn't work in async tests
+                // Use futures::executor::block_on which works in any context
+                futures::executor::block_on(async {
+                    if let Err(e) = debug_ctx.pause_and_wait(&file, line).await {
+                        warn!("Failed to pause execution: {}", e);
+                    }
+                });
             }
-            Ok(())
-        });
+        }
+        Ok(())
+    });
 
-        debug!("Lua debug hooks installed for current execution");
-    }
+    debug!("Lua debug hooks installed for current execution");
 }
 
 #[async_trait]
@@ -170,8 +164,7 @@ impl ScriptEngineBridge for LuaEngine {
                 let debug_context = self.debug_context.read();
                 debug_context
                     .as_ref()
-                    .map(|ctx| ctx.is_debug_enabled())
-                    .unwrap_or(false)
+                    .is_some_and(|ctx| ctx.is_debug_enabled())
             };
 
             let result = {
@@ -179,8 +172,9 @@ impl ScriptEngineBridge for LuaEngine {
 
                 // Install debug hooks if debugging is enabled
                 if should_install_hooks {
-                    if let Some(ctx) = self.debug_context.read().clone() {
-                        self.install_debug_hooks_internal(&lua, ctx);
+                    let debug_ctx = self.debug_context.read().clone();
+                    if let Some(ctx) = debug_ctx {
+                        install_debug_hooks_internal(&lua, &ctx);
                     }
                 }
 
@@ -483,10 +477,10 @@ impl ScriptEngineBridge for LuaEngine {
         let mut debug_context = self.debug_context.write();
         debug_context.clone_from(&context);
 
-        // If we have a debug context and Lua is available, set up debug hooks
+        // Debug hooks are installed during script execution, not here
         #[cfg(feature = "lua")]
-        if let Some(ctx) = context {
-            self.setup_lua_debug_hooks(ctx);
+        if context.is_some() {
+            debug!("Debug context set, hooks will be installed during script execution");
         }
     }
 
@@ -591,7 +585,6 @@ mod tests {
     use std::sync::atomic::{AtomicBool, Ordering};
     use std::sync::Arc;
     use std::time::Duration;
-    use tokio::sync::Notify;
     use tracing::{debug, trace};
 
     /// Mock debug context for testing
@@ -678,7 +671,7 @@ mod tests {
 
         fn set_breakpoint(&self, file: &str, line: u32) -> Result<String, LLMSpellError> {
             self.add_breakpoint(file, line);
-            Ok(format!("bp_{}_{}", file, line))
+            Ok(format!("bp_{file}_{line}"))
         }
 
         fn clear_breakpoint(&self, _id: &str) -> Result<(), LLMSpellError> {
@@ -721,11 +714,11 @@ mod tests {
         engine.set_debug_context(Some(debug_ctx.clone()));
 
         // Script that will hit breakpoint at line 3
-        let script = r#"
+        let script = r"
             local x = 10  -- line 1
             local y = 20  -- line 2 (breakpoint here - actually line 3)
             return x + y  -- line 3
-        "#;
+        ";
 
         // Execute script in background task
         let engine = Arc::new(engine);
@@ -796,7 +789,7 @@ mod tests {
         let duration_no_debug = start.elapsed();
 
         // Expected result: sum of 1 to 1000 = 500500
-        assert_eq!(result.output, serde_json::json!(500500));
+        assert_eq!(result.output, serde_json::json!(500_500));
 
         // Verify execution was fast (no debug overhead)
         assert!(

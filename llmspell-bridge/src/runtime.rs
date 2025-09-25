@@ -502,8 +502,7 @@ impl ScriptExecutor for ScriptRuntime {
 
     fn set_debug_context(&self, context: Option<Arc<dyn DebugContext>>) {
         // Use interior mutability to set debug context
-        let mut debug_context = self.debug_context.write().unwrap();
-        debug_context.clone_from(&context);
+        self.debug_context.write().unwrap().clone_from(&context);
 
         // Also set it on the underlying engine if it supports debugging
         self.engine.set_debug_context(context);
