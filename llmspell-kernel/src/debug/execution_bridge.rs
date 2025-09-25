@@ -6,6 +6,11 @@
 //! Migrated from Phase-9 branch (originally 642 lines)
 
 use anyhow::Result;
+use async_trait::async_trait;
+use llmspell_core::traits::debug_context::{
+    DebugContext, StackFrame as DebugStackFrame, Variable as DebugVariable,
+};
+use llmspell_core::LLMSpellError;
 use parking_lot::RwLock;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
@@ -180,6 +185,10 @@ pub struct ExecutionManager {
     pause_state: PauseState,
     /// Channel to send stopped events
     stopped_event_tx: Option<mpsc::Sender<StoppedEvent>>,
+    /// Debug mode enabled flag
+    debug_enabled: Arc<AtomicBool>,
+    /// Current execution location
+    current_location: Arc<RwLock<Option<(String, u32)>>>,
 }
 
 impl ExecutionManager {
@@ -194,6 +203,8 @@ impl ExecutionManager {
             _session_id: session_id,
             pause_state: PauseState::new(),
             stopped_event_tx: None,
+            debug_enabled: Arc::new(AtomicBool::new(false)),
+            current_location: Arc::new(RwLock::new(None)),
         }
     }
 
@@ -388,6 +399,135 @@ impl ExecutionManager {
     }
 }
 
+#[async_trait]
+impl DebugContext for ExecutionManager {
+    fn should_pause_sync(&self, file: &str, line: u32) -> bool {
+        // Fast path when disabled
+        if !self.debug_enabled.load(Ordering::Relaxed) {
+            return false;
+        }
+
+        // Check if stepping
+        if let Some(StepMode::StepIn | StepMode::StepOver | StepMode::StepOut) =
+            &*self.step_mode.read()
+        {
+            return true;
+        }
+
+        // Check breakpoints
+        self.should_pause(file, line)
+    }
+
+    async fn pause_and_wait(&self, file: &str, line: u32) -> Result<(), LLMSpellError> {
+        // Set paused state
+        self.pause_state.paused.store(true, Ordering::SeqCst);
+        *self.paused.write() = true;
+        *self.current_location.write() = Some((file.to_string(), line));
+
+        // Send stopped event if channel available
+        if let Some(ref tx) = self.stopped_event_tx {
+            let event = StoppedEvent {
+                reason: "breakpoint".to_string(),
+                thread_id: 1,
+                breakpoint_id: None,
+                file: file.to_string(),
+                line,
+            };
+            let _ = tx.send(event).await;
+        }
+
+        // Wait for resume signal
+        self.pause_state.resume_signal.notified().await;
+
+        Ok(())
+    }
+
+    fn enable_debug_mode(&self) {
+        self.debug_enabled.store(true, Ordering::SeqCst);
+        debug!("Debug mode enabled");
+    }
+
+    fn disable_debug_mode(&self) {
+        self.debug_enabled.store(false, Ordering::SeqCst);
+        debug!("Debug mode disabled");
+    }
+
+    fn is_debug_enabled(&self) -> bool {
+        self.debug_enabled.load(Ordering::Relaxed)
+    }
+
+    fn set_breakpoint(&self, file: &str, line: u32) -> Result<String, LLMSpellError> {
+        match ExecutionManager::set_breakpoint(self, file.to_string(), line) {
+            Ok(bp) => Ok(bp.id),
+            Err(e) => Err(LLMSpellError::Component {
+                message: format!("Failed to set breakpoint: {e}"),
+                source: None,
+            }),
+        }
+    }
+
+    fn clear_breakpoint(&self, id: &str) -> Result<(), LLMSpellError> {
+        self.remove_breakpoint(id)
+            .map_err(|e| LLMSpellError::Component {
+                message: format!("Failed to clear breakpoint: {e}"),
+                source: None,
+            })
+    }
+
+    fn get_stack_frames(&self) -> Vec<DebugStackFrame> {
+        self.stack_frames
+            .read()
+            .iter()
+            .enumerate()
+            .map(|(i, frame)| DebugStackFrame {
+                id: i,
+                name: frame.name.clone(),
+                file: frame.source.clone(),
+                line: frame.line,
+                column: frame.column,
+            })
+            .collect()
+    }
+
+    fn get_variables(&self, frame_id: usize) -> Vec<DebugVariable> {
+        let frames = self.stack_frames.read();
+        if let Some(frame) = frames.get(frame_id) {
+            frame
+                .locals
+                .iter()
+                .map(|var| DebugVariable {
+                    name: var.name.clone(),
+                    value: var.value.clone(),
+                    var_type: var.var_type.clone(),
+                    has_children: var.has_children,
+                })
+                .collect()
+        } else {
+            vec![]
+        }
+    }
+
+    fn report_location(&self, file: &str, line: u32) {
+        *self.current_location.write() = Some((file.to_string(), line));
+        trace!("Execution at {}:{}", file, line);
+    }
+
+    fn should_step(&self) -> bool {
+        matches!(
+            &*self.step_mode.read(),
+            Some(StepMode::StepIn | StepMode::StepOver | StepMode::StepOut)
+        )
+    }
+
+    fn set_step_mode(&self, stepping: bool) {
+        *self.step_mode.write() = if stepping {
+            Some(StepMode::StepIn)
+        } else {
+            None
+        };
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -429,5 +569,105 @@ mod tests {
 
         manager.resume(StepMode::Continue);
         assert!(!manager.is_paused());
+    }
+
+    #[tokio::test]
+    async fn test_debug_context_implementation() {
+        use llmspell_core::traits::debug_context::DebugContext;
+
+        let manager = Arc::new(ExecutionManager::new("test-session".to_string()));
+        let debug_ctx: Arc<dyn DebugContext> = manager.clone();
+
+        // Test debug mode enable/disable
+        assert!(!debug_ctx.is_debug_enabled());
+        debug_ctx.enable_debug_mode();
+        assert!(debug_ctx.is_debug_enabled());
+        debug_ctx.disable_debug_mode();
+        assert!(!debug_ctx.is_debug_enabled());
+
+        // Re-enable for further tests
+        debug_ctx.enable_debug_mode();
+
+        // Test breakpoint setting
+        let bp_id = debug_ctx.set_breakpoint("test.lua", 42).unwrap();
+        assert!(!bp_id.is_empty());
+
+        // Test should_pause_sync
+        assert!(debug_ctx.should_pause_sync("test.lua", 42));
+        assert!(!debug_ctx.should_pause_sync("test.lua", 43));
+
+        // Test step mode
+        assert!(!debug_ctx.should_step());
+        debug_ctx.set_step_mode(true);
+        assert!(debug_ctx.should_step());
+        debug_ctx.set_step_mode(false);
+        assert!(!debug_ctx.should_step());
+
+        // Test location reporting
+        debug_ctx.report_location("test.lua", 100);
+        // Location reporting doesn't return a value, but we can verify it doesn't panic
+
+        // Test stack frames
+        let frames = debug_ctx.get_stack_frames();
+        assert!(frames.is_empty()); // No frames in test mode
+
+        // Test variables
+        let vars = debug_ctx.get_variables(0);
+        assert!(vars.is_empty()); // No variables in test mode
+
+        // Test breakpoint clearing
+        debug_ctx.clear_breakpoint(&bp_id).unwrap();
+        assert!(!debug_ctx.should_pause_sync("test.lua", 42));
+
+        // Test pause_and_wait with immediate resume
+        let manager_clone = manager.clone();
+        tokio::spawn(async move {
+            tokio::time::sleep(tokio::time::Duration::from_millis(10)).await;
+            manager_clone.resume(StepMode::Continue);
+        });
+        debug_ctx.pause_and_wait("test.lua", 50).await.unwrap();
+    }
+
+    #[test]
+    fn test_debug_context_thread_safety() {
+        use llmspell_core::traits::debug_context::DebugContext;
+        use std::thread;
+
+        let manager = Arc::new(ExecutionManager::new("test-session".to_string()));
+        let debug_ctx: Arc<dyn DebugContext> = manager.clone();
+
+        // Enable debugging
+        debug_ctx.enable_debug_mode();
+
+        // Test concurrent access from multiple threads
+        let ctx1 = debug_ctx.clone();
+        let ctx2 = debug_ctx.clone();
+        let ctx3 = debug_ctx.clone();
+
+        let handle1 = thread::spawn(move || {
+            for i in 0..10 {
+                ctx1.set_breakpoint("thread1.lua", i).unwrap();
+            }
+        });
+
+        let handle2 = thread::spawn(move || {
+            for i in 0..10 {
+                ctx2.report_location("thread2.lua", i);
+            }
+        });
+
+        let handle3 = thread::spawn(move || {
+            for _ in 0..10 {
+                ctx3.set_step_mode(true);
+                ctx3.set_step_mode(false);
+            }
+        });
+
+        handle1.join().unwrap();
+        handle2.join().unwrap();
+        handle3.join().unwrap();
+
+        // If we get here without panicking, thread safety works
+        assert!(debug_ctx.is_debug_enabled());
     }
 }

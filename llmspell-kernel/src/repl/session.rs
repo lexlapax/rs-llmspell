@@ -11,8 +11,8 @@ use crate::repl::readline::ReplReadline;
 use crate::repl::state::{Breakpoint, ReplState};
 use anyhow::Result;
 use std::path::PathBuf;
-use std::sync::Arc;
 use std::sync::atomic::{AtomicBool, Ordering};
+use std::sync::Arc;
 use std::time::Instant;
 use tokio::sync::RwLock;
 use tracing::{debug, error, info, warn};
@@ -102,7 +102,10 @@ impl InteractiveSession {
                 Some(rl)
             }
             Err(e) => {
-                warn!("Failed to initialize readline, falling back to stdin: {}", e);
+                warn!(
+                    "Failed to initialize readline, falling back to stdin: {}",
+                    e
+                );
                 None
             }
         };
@@ -376,7 +379,10 @@ impl InteractiveSession {
             }
             MetaCommand::Perf { enabled } => {
                 self.perf_monitoring = enabled;
-                println!("Performance monitoring {}", if enabled { "enabled" } else { "disabled" });
+                println!(
+                    "Performance monitoring {}",
+                    if enabled { "enabled" } else { "disabled" }
+                );
             }
             MetaCommand::Exit => unreachable!(), // Handled in run_repl
         }
@@ -726,7 +732,9 @@ impl InteractiveSession {
                     Ok(()) => {
                         if executing.load(Ordering::Relaxed) {
                             // Interrupt current execution
-                            println!("\n^C Interrupted (execution interruption not fully implemented)");
+                            println!(
+                                "\n^C Interrupted (execution interruption not fully implemented)"
+                            );
                             executing.store(false, Ordering::Relaxed);
                         } else {
                             // At prompt or in multi-line - handled by readline
@@ -747,18 +755,18 @@ impl InteractiveSession {
         #![allow(clippy::unused_self)]
         let trimmed = input.trim();
         // Common patterns that suggest multi-line input
-        trimmed.ends_with("function") ||
-        trimmed.ends_with("do") ||
-        trimmed.ends_with("then") ||
-        trimmed.ends_with("else") ||
-        trimmed.ends_with("repeat") ||
-        trimmed.ends_with('{') ||
-        trimmed.ends_with('[') ||
-        trimmed.ends_with('(') ||
-        (trimmed.starts_with("function") && !trimmed.contains("end")) ||
-        (trimmed.starts_with("if") && !trimmed.contains("end")) ||
-        (trimmed.starts_with("for") && !trimmed.contains("end")) ||
-        (trimmed.starts_with("while") && !trimmed.contains("end"))
+        trimmed.ends_with("function")
+            || trimmed.ends_with("do")
+            || trimmed.ends_with("then")
+            || trimmed.ends_with("else")
+            || trimmed.ends_with("repeat")
+            || trimmed.ends_with('{')
+            || trimmed.ends_with('[')
+            || trimmed.ends_with('(')
+            || (trimmed.starts_with("function") && !trimmed.contains("end"))
+            || (trimmed.starts_with("if") && !trimmed.contains("end"))
+            || (trimmed.starts_with("for") && !trimmed.contains("end"))
+            || (trimmed.starts_with("while") && !trimmed.contains("end"))
     }
 
     /// Check if an expression is complete (can be executed)
@@ -768,12 +776,11 @@ impl InteractiveSession {
         // In the future, this should delegate to ScriptEngineBridge
 
         // Count opening and closing keywords/brackets
-        let opens = code.matches("function").count() +
-                   code.matches(" do").count() +
-                   code.matches(" then").count() +
-                   code.matches(" repeat").count();
-        let closes = code.matches("end").count() +
-                    code.matches("until").count();
+        let opens = code.matches("function").count()
+            + code.matches(" do").count()
+            + code.matches(" then").count()
+            + code.matches(" repeat").count();
+        let closes = code.matches("end").count() + code.matches("until").count();
 
         // Count brackets
         let open_braces = code.chars().filter(|&c| c == '{').count();
@@ -805,15 +812,19 @@ impl InteractiveSession {
         }
 
         // Expression is complete if all are balanced and no unclosed strings
-        !in_string &&
-        opens <= closes &&
-        open_braces == close_braces &&
-        open_brackets == close_brackets &&
-        open_parens == close_parens
+        !in_string
+            && opens <= closes
+            && open_braces == close_braces
+            && open_brackets == close_brackets
+            && open_parens == close_parens
     }
 
     /// Execute a script file with arguments
-    async fn execute_script_file(&mut self, file: &std::path::Path, args: Vec<String>) -> Result<()> {
+    async fn execute_script_file(
+        &mut self,
+        file: &std::path::Path,
+        args: Vec<String>,
+    ) -> Result<()> {
         // Resolve the file path (add .lua if needed)
         let resolved_file = if !file.exists() && file.extension().is_none() {
             let mut lua_file = file.to_path_buf();
@@ -830,7 +841,8 @@ impl InteractiveSession {
         };
 
         // Read the script content
-        let script = tokio::fs::read_to_string(&resolved_file).await
+        let script = tokio::fs::read_to_string(&resolved_file)
+            .await
             .map_err(|e| anyhow::anyhow!("Failed to read {}: {}", resolved_file.display(), e))?;
 
         // Save current directory and change to script's directory

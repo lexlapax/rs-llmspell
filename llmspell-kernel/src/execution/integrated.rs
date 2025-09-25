@@ -276,6 +276,12 @@ impl<P: Protocol + 'static> IntegratedKernel<P> {
         dap_bridge.connect_execution_manager(execution_manager.clone());
         let dap_bridge = Arc::new(parking_lot::Mutex::new(dap_bridge));
 
+        // Wire debug context to script executor if it supports debugging
+        if script_executor.supports_debugging() {
+            debug!("Wiring debug context to script executor");
+            script_executor.set_debug_context(Some(execution_manager.clone()));
+        }
+
         // Create shutdown coordinator
         let shutdown_config = ShutdownConfig::default();
         let mut shutdown_coordinator = ShutdownCoordinator::new(shutdown_config);
@@ -2505,7 +2511,7 @@ async fn test_message_handling_performance() -> Result<()> {
     kernel.handle_message(message.clone()).await?;
     let elapsed = start_time.elapsed();
 
-    println!(
+    debug!(
         "Single kernel_info message handling took: {}μs ({}ms)",
         elapsed.as_micros(),
         elapsed.as_millis()
@@ -2529,7 +2535,7 @@ async fn test_message_handling_performance() -> Result<()> {
     }
 
     let avg_time = total_time / iterations;
-    println!(
+    debug!(
         "Average message handling time over {} iterations: {}μs ({}ms)",
         iterations,
         avg_time.as_micros(),
@@ -2542,7 +2548,7 @@ async fn test_message_handling_performance() -> Result<()> {
         avg_time.as_millis()
     );
 
-    println!("✅ Message handling performance test passed - meeting <5ms target");
+    debug!("✅ Message handling performance test passed - meeting <5ms target");
     Ok(())
 }
 
@@ -2667,12 +2673,12 @@ mod daemon_tests {
 
         // Log the issues to debug what's causing degraded status
         if !health_report.issues.is_empty() {
-            eprintln!("Health issues detected: {:?}", health_report.issues);
-            eprintln!(
+            warn!("Health issues detected: {:?}", health_report.issues);
+            debug!(
                 "System metrics: memory_usage_mb={}, cpu_usage_percent={}",
                 health_report.system.memory_usage_mb, health_report.system.cpu_usage_percent
             );
-            eprintln!(
+            debug!(
                 "Performance metrics: avg_read_latency_us={}, avg_write_latency_us={}",
                 health_report.performance.avg_read_latency_us,
                 health_report.performance.avg_write_latency_us

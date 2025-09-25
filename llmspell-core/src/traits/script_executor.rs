@@ -2,9 +2,11 @@
 //! ABOUTME: Defines the interface for executing scripts without cyclic dependencies
 
 use crate::error::LLMSpellError;
+use crate::traits::debug_context::DebugContext;
 use async_trait::async_trait;
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
+use std::sync::Arc;
 use std::time::Duration;
 
 /// Output from script execution
@@ -76,6 +78,29 @@ pub trait ScriptExecutor: Send + Sync {
     /// Check if the executor is ready
     async fn is_ready(&self) -> bool {
         true
+    }
+
+    /// Set debug context for debugging support
+    ///
+    /// Default implementation does nothing for backward compatibility.
+    /// Executors that support debugging should override this method.
+    /// Uses &self instead of &mut self to allow use with Arc<dyn ScriptExecutor>
+    fn set_debug_context(&self, _context: Option<Arc<dyn DebugContext>>) {
+        // Default: ignore (for backward compatibility)
+    }
+
+    /// Check if this executor supports debugging
+    ///
+    /// Default returns false. Executors with debug support should override.
+    fn supports_debugging(&self) -> bool {
+        false
+    }
+
+    /// Get the current debug context if set
+    ///
+    /// Default returns None. Executors with debug support should override.
+    fn get_debug_context(&self) -> Option<Arc<dyn DebugContext>> {
+        None
     }
 }
 

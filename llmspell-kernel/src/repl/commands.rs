@@ -169,7 +169,7 @@ impl MetaCommand {
                     match parts[1] {
                         "on" | "true" | "1" => true,
                         "off" | "false" | "0" => false,
-                        _ => return Err(anyhow::anyhow!("Usage: .perf [on|off]"))
+                        _ => return Err(anyhow::anyhow!("Usage: .perf [on|off]")),
                     }
                 } else {
                     true // Toggle to on if no argument

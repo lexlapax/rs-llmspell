@@ -2,7 +2,9 @@
 //! ABOUTME: Foundation for multi-language script execution (Lua, JavaScript, Python, etc.)
 
 use async_trait::async_trait;
-use llmspell_core::{error::LLMSpellError, types::AgentStream};
+use llmspell_core::{
+    error::LLMSpellError, traits::debug_context::DebugContext, types::AgentStream,
+};
 use serde_json::Value;
 use std::collections::HashMap;
 use std::sync::Arc;
@@ -74,6 +76,30 @@ pub trait ScriptEngineBridge: Send + Sync {
     ///
     /// Returns an error if the execution context cannot be set
     fn set_execution_context(&mut self, context: ExecutionContext) -> Result<(), LLMSpellError>;
+
+    /// Set debug context for debugging support
+    ///
+    /// Default implementation does nothing for backward compatibility.
+    /// Engines that support debugging should override this method.
+    /// Uses &self instead of &mut self to allow use with Arc
+    fn set_debug_context(&self, _context: Option<Arc<dyn DebugContext>>) {
+        // Default: ignore (for backward compatibility)
+    }
+
+    /// Check if this engine supports debugging
+    ///
+    /// Returns true if the engine has debug support capabilities.
+    /// Default returns false for backward compatibility.
+    fn supports_debugging(&self) -> bool {
+        false
+    }
+
+    /// Get the current debug context if set
+    ///
+    /// Default returns None. Engines with debug support should override.
+    fn get_debug_context(&self) -> Option<Arc<dyn DebugContext>> {
+        None
+    }
 }
 
 /// Output from script execution

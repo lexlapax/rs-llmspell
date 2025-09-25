@@ -37,7 +37,8 @@ impl ReplReadline {
             .build();
 
         // Create editor with config
-        let mut editor = Editor::<ReplHelper, rustyline::history::FileHistory>::with_config(config)?;
+        let mut editor =
+            Editor::<ReplHelper, rustyline::history::FileHistory>::with_config(config)?;
 
         // Set helper for completion and hints
         editor.set_helper(Some(ReplHelper::new()));
@@ -49,10 +50,7 @@ impl ReplReadline {
         }
         drop(repl_state); // Release read lock
 
-        Ok(Self {
-            editor,
-            state,
-        })
+        Ok(Self { editor, state })
     }
 
     /// Read a line with the given prompt
@@ -144,7 +142,6 @@ impl ReplHelper {
                 ".reset".to_string(),
                 ".run".to_string(),
                 ".perf".to_string(),
-
                 // Debug commands
                 "break".to_string(),
                 "b".to_string(),
@@ -169,7 +166,6 @@ impl ReplHelper {
                 "p".to_string(),
                 "watch".to_string(),
                 "unwatch".to_string(),
-
                 // Debug command prefix
                 "db:".to_string(),
             ],
@@ -292,7 +288,8 @@ mod tests {
     #[test]
     fn test_completion() {
         let helper = ReplHelper::new();
-        let ctx = rustyline::Context::new(&rustyline::history::MemHistory::new());
+        let history = rustyline::history::MemHistory::new();
+        let ctx = rustyline::Context::new(&history);
 
         // Test command completion
         let (start, candidates) = helper.complete(".hel", 4, &ctx).unwrap();
