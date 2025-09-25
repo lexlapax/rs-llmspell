@@ -102,6 +102,26 @@ pub trait ScriptExecutor: Send + Sync {
     fn get_debug_context(&self) -> Option<Arc<dyn DebugContext>> {
         None
     }
+
+    /// Get completion candidates for the given line and cursor position
+    ///
+    /// This is used for REPL tab completion to suggest available variables,
+    /// functions, and other completable elements in the script context.
+    ///
+    /// Default implementation returns empty vector for backward compatibility.
+    /// Executors with completion support should override this method.
+    ///
+    /// # Arguments
+    ///
+    /// * `line` - The current line being edited
+    /// * `cursor_pos` - The cursor position within the line
+    ///
+    /// # Returns
+    ///
+    /// A vector of (replacement_text, display_text) pairs for completion candidates
+    fn get_completion_candidates(&self, _line: &str, _cursor_pos: usize) -> Vec<(String, String)> {
+        Vec::new()
+    }
 }
 
 /// Factory trait for creating script executors

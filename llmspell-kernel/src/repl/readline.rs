@@ -5,6 +5,7 @@
 
 use crate::repl::state::ReplState;
 use anyhow::{anyhow, Result};
+use llmspell_core::traits::script_executor::ScriptExecutor;
 use rustyline::completion::{Completer, Pair};
 use rustyline::error::ReadlineError;
 use rustyline::highlight::Highlighter;
@@ -13,8 +14,35 @@ use rustyline::validate::Validator;
 use rustyline::{Context, Editor, Helper};
 use std::borrow::Cow;
 use std::sync::Arc;
+use std::sync::RwLock as StdRwLock;
 use tokio::sync::RwLock;
-use tracing::{debug, warn};
+use tracing::{debug, trace, warn};
+
+/// Trait for providing script-specific completions
+pub trait ScriptCompletionProvider: Send + Sync {
+    /// Get completion candidates for the given line and cursor position
+    /// Returns a vector of (`replacement_text`, `display_text`) pairs
+    fn get_completions(&self, line: &str, cursor_pos: usize) -> Vec<(String, String)>;
+}
+
+/// Wrapper that adapts `ScriptExecutor` to `ScriptCompletionProvider`
+pub struct ScriptExecutorCompletionAdapter {
+    executor: Arc<dyn ScriptExecutor>,
+}
+
+impl ScriptExecutorCompletionAdapter {
+    /// Create a new adapter
+    pub fn new(executor: Arc<dyn ScriptExecutor>) -> Self {
+        Self { executor }
+    }
+}
+
+impl ScriptCompletionProvider for ScriptExecutorCompletionAdapter {
+    fn get_completions(&self, line: &str, cursor_pos: usize) -> Vec<(String, String)> {
+        // Delegate to the script executor's completion method
+        self.executor.get_completion_candidates(line, cursor_pos)
+    }
+}
 
 /// REPL readline interface with history support
 pub struct ReplReadline {
@@ -135,17 +163,27 @@ impl ReplReadline {
         }
         Ok(())
     }
+
+    /// Set the script completion provider for code completions
+    pub fn set_script_completion_provider(&mut self, provider: Arc<dyn ScriptCompletionProvider>) {
+        if let Some(helper) = self.editor.helper_mut() {
+            helper.set_script_completion_provider(provider);
+            debug!("Script completion provider set for REPL");
+        }
+    }
 }
 
 /// Helper for readline with completion and hints
 pub struct ReplHelper {
     commands: Vec<String>,
+    script_completion_provider: Arc<StdRwLock<Option<Arc<dyn ScriptCompletionProvider>>>>,
 }
 
 impl ReplHelper {
     /// Create a new REPL helper
     pub fn new() -> Self {
         Self {
+            script_completion_provider: Arc::new(StdRwLock::new(None)),
             commands: vec![
                 // Meta commands
                 ".help".to_string(),
@@ -199,6 +237,16 @@ impl ReplHelper {
             ],
         }
     }
+
+    /// Set the script completion provider
+    /// Set the script completion provider
+    ///
+    /// # Panics
+    ///
+    /// Panics if the `RwLock` is poisoned
+    pub fn set_script_completion_provider(&self, provider: Arc<dyn ScriptCompletionProvider>) {
+        *self.script_completion_provider.write().unwrap() = Some(provider);
+    }
 }
 
 impl Default for ReplHelper {
@@ -238,6 +286,28 @@ impl Completer for ReplHelper {
             }
         }
 
+        // If not a command, try script completions
+        if !line.starts_with('.') && !line.starts_with("db:") {
+            if let Ok(provider_guard) = self.script_completion_provider.read() {
+                if let Some(ref provider) = *provider_guard {
+                    trace!("Getting script completions for: {}", line);
+                    let script_candidates = provider.get_completions(line, pos);
+
+                    // Convert (text, display) pairs to rustyline Pair
+                    for (text, display) in script_candidates {
+                        candidates.push(Pair {
+                            display: if display.is_empty() {
+                                text.clone()
+                            } else {
+                                format!("{text} ({display})")
+                            },
+                            replacement: text,
+                        });
+                    }
+                }
+            }
+        }
+
         // Complete file paths for certain commands
         if line.starts_with(".load ") || line.starts_with(".save ") || line.starts_with(".run ") {
             // Get the partial path to complete
@@ -266,7 +336,7 @@ impl Completer for ReplHelper {
                             let full_path = if dir_path == "./" {
                                 file_name.to_string()
                             } else {
-                                format!("{dir_path}{file_name}")
+                                format!("{dir_path}{file_name})")
                             };
 
                             // Add trailing slash for directories

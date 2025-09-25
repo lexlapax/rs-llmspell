@@ -4052,7 +4052,7 @@ The debug infrastructure is architecturally complete and compiles cleanly. Howev
 - [x] **10.8.5**: Verify Ctrl+W word deletion ✅ (2025-09-25)
 - [x] **10.8.5**: History file corruption recovery with backup ✅ (2025-09-25)
 - [x] **10.8.8**: File path completion for .load/.save/.run ✅ (2025-09-25)
-- [ ] **10.8.8**: Language-specific completions via ScriptEngineBridge (deferred - needs script engine context)
+- [x] **10.8.8**: Language-specific completions via ScriptEngineBridge ✅ (2025-09-25)
 - [x] **10.8.10**: Memory delta tracking ✅ (2025-09-25)
 - [x] **10.8.10**: Session statistics accumulation ✅ (2025-09-25)
 
@@ -4068,6 +4068,99 @@ The debug infrastructure is architecturally complete and compiles cleanly. Howev
   - Memory statistics (current, peak, delta)
   - Error counting
   - Organized sections with emoji indicators
+
+##### Language-Specific Completions (10.8.8 Completion) ✅ COMPLETE
+**Target**: Complete the deferred language-specific completions via ScriptEngineBridge
+**Status**: COMPLETE (Full engine + REPL integration implemented)
+**Completed**: 2025-09-25
+
+**Summary**: The completion infrastructure is fully implemented and integrated:
+- ✅ ScriptEngineBridge trait extended with completion API
+- ✅ LuaCompletionProvider with full Lua introspection
+- ✅ Thread-safe with timeout and caching
+- ✅ Comprehensive test suite with 16 passing tests
+- ✅ REPL integration via lazy initialization pattern
+
+**Solution Implemented**: Used lazy initialization pattern to connect script executor
+to ReplHelper after creation. The ScriptExecutorCompletionAdapter bridges the
+script executor's completion method to the REPL's ScriptCompletionProvider trait.
+
+###### Implementation Tasks
+- [x] **1. Extend ScriptEngineBridge Trait** (llmspell-bridge/src/engine/bridge.rs) ✅
+  - [x] Add `CompletionCandidate` struct with name, kind, signature, doc
+  - [x] Add `CompletionKind` enum (Variable, Function, Method, Property, Keyword, Module)
+  - [x] Add `get_completion_candidates(&self, context: CompletionContext) -> Vec<CompletionCandidate>`
+  - [x] Add `CompletionContext` with line parsing and member access detection
+  - [x] Default implementation returns empty vec for backward compatibility
+
+- [x] **2. Implement Lua Completion Provider** (llmspell-bridge/src/lua/completion.rs) ✅
+  - [x] Create `LuaCompletionProvider` struct with caching
+  - [x] Implement `get_global_symbols()` - iterate `_G` table
+  - [x] Implement `get_table_members()` - get table fields/methods
+  - [x] Implement `get_object_methods()` - string methods via metatable
+  - [x] Implement `get_keywords()` - Lua language keywords
+  - [x] Handle partial name matching with prefix filtering
+  - [x] Cache frequently accessed globals for 5-second TTL
+
+- [x] **3. Wire to LuaEngine** (llmspell-bridge/src/lua/engine.rs) ✅
+  - [x] Add completion provider to LuaEngine struct
+  - [x] Implement ScriptEngineBridge completion methods
+  - [x] Use try_lock with 10ms timeout to avoid blocking execution
+  - [x] Return empty results if Lua is busy
+
+- [x] **4. Create Completion Context Parser** ✅ (Implemented in llmspell-bridge/src/engine/bridge.rs - 2025-09-25)
+  - [x] Parse line to determine completion type:
+    - [x] Global variable/function: `prin` -> complete "print" ✅
+    - [x] Table member: `table.` -> complete table methods ✅
+    - [x] Method call: `str:` -> complete string methods ✅
+    - [x] Local variable: after `local ` ✅ (basic support)
+    - [x] Function arguments: inside parentheses ✅ (2025-09-25)
+  - [x] Extract prefix for filtering ✅
+  - [x] Handle cursor position correctly ✅
+  - [x] Detect if cursor is inside function arguments ✅
+  - [x] Extract function name context ✅
+  **Note**: Implemented in CompletionContext struct in bridge layer instead of kernel layer.
+  Works perfectly as demonstrated by tests, but location differs from original plan.
+
+- [x] **5. Integrate with ReplHelper** (llmspell-kernel/src/repl/readline.rs) ✅
+  - [x] Add ScriptCompletionProvider trait for script completions
+  - [x] Create ScriptExecutorCompletionAdapter wrapper
+  - [x] Wire up in InteractiveSession after script executor creation
+  - [x] Check if line is not a meta command (starts with '.')
+  - [x] Call script executor's completion method
+  - [x] Convert (text, display) pairs to rustyline Pair
+  - [x] Merge with existing command completions
+  **Solution**: Used lazy initialization pattern with `set_script_completion_provider()` to inject
+  completion provider after ReplHelper creation, avoiding initialization order issues.
+
+- [x] **6. Thread Safety & Performance** ✅ (Implemented in engine)
+  - [x] Use Arc for thread-safe access
+  - [x] Implement 10ms timeout for completion requests
+  - [x] Return empty results if engine is busy
+  - [x] Cache global symbols with 5-second TTL
+  - [x] Invalidate cache method available
+
+- [x] **7. Testing** ✅ (Comprehensive test suite implemented - 2025-09-25)
+  - [x] Unit test completion context parsing
+  - [x] Test prefix filtering
+  - [x] Test Lua global symbol extraction ✅
+  - [x] Test table member completion (math, string, table, io, os) ✅
+  - [x] Test performance (<50ms for completion) ✅
+  - [x] Integration test with REPL ✅ (repl_completion_test.rs - 3 tests pass)
+  - [x] Test thread safety with concurrent execution ✅
+  - [x] Test caching behavior and invalidation ✅
+  - [x] Test custom globals and private symbol filtering ✅
+  - [x] Test keyword completions in various contexts ✅
+  - [x] Test method call completion with colon syntax ✅
+  - [x] Test completion behavior with busy engine (10ms timeout) ✅
+
+###### Success Criteria
+- Tab completion shows Lua globals (print, table, string, etc.)
+- Typing `table.` shows table methods (insert, remove, sort, etc.)
+- Completion responds in <50ms
+- Doesn't block or slow down script execution
+- Falls back gracefully when engine is busy
+- Works alongside existing meta command completions
 
 ##### Deferred Testing (Task 10.8.11)
 **All testing requirements from 10.8.5-10.8.10 need implementation:**

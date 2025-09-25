@@ -7,7 +7,7 @@ use crate::debug::{DebugCoordinator, ExecutionManager};
 use crate::execution::IntegratedKernel;
 use crate::protocols::jupyter::JupyterProtocol;
 use crate::repl::commands::{DebugCommand, MetaCommand, ReplCommand};
-use crate::repl::readline::ReplReadline;
+use crate::repl::readline::{ReplReadline, ScriptExecutorCompletionAdapter};
 use crate::repl::state::{Breakpoint, ReplState};
 use anyhow::Result;
 use llmspell_core::traits::debug_context::DebugContext;
@@ -210,7 +210,7 @@ impl InteractiveSession {
         let state_arc = Arc::new(RwLock::new(state));
 
         // Create readline interface
-        let readline = match ReplReadline::new(state_arc.clone()).await {
+        let mut readline = match ReplReadline::new(state_arc.clone()).await {
             Ok(mut rl) => {
                 // Load history file if configured
                 if let Some(ref history_file) = config.history_file {
@@ -226,6 +226,16 @@ impl InteractiveSession {
                 None
             }
         };
+
+        // Wire up script completion provider for REPL tab completion
+        // This only affects interactive paths, not script execution
+        if let Some(ref mut rl) = readline {
+            let script_executor = kernel.get_script_executor();
+            let completion_adapter = ScriptExecutorCompletionAdapter::new(script_executor);
+            let provider = Arc::new(completion_adapter);
+            rl.set_script_completion_provider(provider);
+            debug!("Script completion provider wired up for REPL");
+        }
 
         // Create debug coordinator and execution manager if debug commands are enabled
         let (debug_coordinator, execution_manager) = if config.enable_debug_commands {

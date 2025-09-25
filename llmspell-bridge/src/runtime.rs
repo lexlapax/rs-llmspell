@@ -282,6 +282,26 @@ impl ScriptRuntime {
         self.engine.execute_script(script).await
     }
 
+    /// Get completion candidates for the given context
+    ///
+    /// This method is used for REPL tab completion to suggest available
+    /// variables, functions, and other completable elements.
+    ///
+    /// # Arguments
+    ///
+    /// * `context` - The completion context containing the line and cursor position
+    ///
+    /// # Returns
+    ///
+    /// A vector of completion candidates suitable for the current context
+    #[must_use]
+    pub fn get_completion_candidates(
+        &self,
+        context: &crate::engine::bridge::CompletionContext,
+    ) -> Vec<crate::engine::bridge::CompletionCandidate> {
+        self.engine.get_completion_candidates(context)
+    }
+
     /// Execute a script with streaming output
     ///
     /// # Errors
@@ -517,6 +537,23 @@ impl ScriptExecutor for ScriptRuntime {
         // Return the stored debug context
         let debug_context = self.debug_context.read().unwrap();
         debug_context.clone()
+    }
+
+    fn get_completion_candidates(&self, line: &str, cursor_pos: usize) -> Vec<(String, String)> {
+        // Create a CompletionContext from the provided line and cursor position
+        let context = crate::engine::bridge::CompletionContext::new(line, cursor_pos);
+
+        // Get completions from the underlying engine
+        let candidates = self.engine.get_completion_candidates(&context);
+
+        // Convert CompletionCandidate to tuple format expected by ScriptExecutor trait
+        candidates
+            .into_iter()
+            .map(|candidate| {
+                let display = format!("{:?}", candidate.kind).to_lowercase();
+                (candidate.text, display)
+            })
+            .collect()
     }
 }
 

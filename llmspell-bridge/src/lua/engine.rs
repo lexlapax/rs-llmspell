@@ -3,11 +3,13 @@
 
 #![allow(clippy::significant_drop_tightening)]
 
+use crate::engine::bridge::{CompletionCandidate, CompletionContext};
 use crate::engine::types::ScriptEngineError;
 use crate::engine::{
     factory::LuaConfig, EngineFeatures, ExecutionContext, ScriptEngineBridge, ScriptMetadata,
     ScriptOutput, ScriptStream,
 };
+use crate::lua::completion::LuaCompletionProvider;
 use crate::lua::globals::args::inject_args_global;
 use crate::lua::output_capture::{install_output_capture, ConsoleCapture};
 use crate::{ComponentRegistry, ProviderManager};
@@ -16,8 +18,8 @@ use llmspell_core::error::LLMSpellError;
 use llmspell_core::traits::debug_context::DebugContext;
 use serde_json::Value;
 use std::sync::Arc;
-use std::time::Instant;
-use tracing::{debug, info, instrument, warn};
+use std::time::{Duration, Instant};
+use tracing::{debug, info, instrument, trace, warn};
 
 #[cfg(feature = "lua")]
 use {
@@ -39,6 +41,9 @@ pub struct LuaEngine {
     console_capture: Option<Arc<ConsoleCapture>>,
     /// Debug context for debugging support (uses interior mutability)
     debug_context: Arc<parking_lot::RwLock<Option<Arc<dyn DebugContext>>>>,
+    /// Completion provider for interactive use
+    #[cfg(feature = "lua")]
+    completion_provider: Arc<LuaCompletionProvider>,
 }
 
 // SAFETY: We ensure thread safety by using Mutex for all Lua access
@@ -75,6 +80,7 @@ impl LuaEngine {
                 script_args: None,
                 console_capture,
                 debug_context: Arc::new(parking_lot::RwLock::new(None)),
+                completion_provider: Arc::new(LuaCompletionProvider::new()),
             })
         }
 
@@ -492,6 +498,38 @@ impl ScriptEngineBridge for LuaEngine {
         // Return the stored debug context
         let debug_context = self.debug_context.read();
         debug_context.clone()
+    }
+
+    fn get_completion_candidates(&self, context: &CompletionContext) -> Vec<CompletionCandidate> {
+        #[cfg(feature = "lua")]
+        {
+            // Try to acquire Lua lock with timeout to avoid blocking execution
+            self.lua
+                .try_lock_for(Duration::from_millis(10))
+                .map_or_else(
+                    || {
+                        debug!("Lua engine busy, returning cached/empty completions");
+                        // Could return cached results here if we maintained a separate cache
+                        Vec::new()
+                    },
+                    |lua| {
+                        trace!("Getting completion candidates for: {:?}", context);
+                        let candidates = self.completion_provider.get_completions(&lua, context);
+
+                        // Invalidate cache after execution to keep it fresh
+                        if context.line.contains('=') || context.line.contains('(') {
+                            self.completion_provider.invalidate_cache();
+                        }
+
+                        candidates
+                    },
+                )
+        }
+
+        #[cfg(not(feature = "lua"))]
+        {
+            Vec::new()
+        }
     }
 }
 
