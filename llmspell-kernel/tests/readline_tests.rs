@@ -4,8 +4,8 @@
 
 #[cfg(test)]
 mod readline_tests {
-    use llmspell_kernel::repl::SessionHistory;
     use llmspell_kernel::repl::state::ReplState;
+    use llmspell_kernel::repl::SessionHistory;
     use std::fs;
     use tempfile::TempDir;
 
@@ -197,7 +197,9 @@ mod readline_tests {
             let mut count = 0;
             while state.history.previous().is_some() {
                 count += 1;
-                if count >= 5 { break; }
+                if count >= 5 {
+                    break;
+                }
             }
             assert_eq!(count, 5);
         });

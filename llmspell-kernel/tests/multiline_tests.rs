@@ -32,8 +32,12 @@ mod multiline_tests {
             }
 
             // Count opening keywords
-            if word == &"function" || word == &"if" || word == &"while" ||
-               word == &"for" || word == &"repeat" {
+            if word == &"function"
+                || word == &"if"
+                || word == &"while"
+                || word == &"for"
+                || word == &"repeat"
+            {
                 opens += 1;
             }
             if word == &"then" || word == &"do" {
@@ -46,7 +50,7 @@ mod multiline_tests {
                 closes += 1;
             }
             if word == &"until" {
-                closes += 1;  // Until closes repeat
+                closes += 1; // Until closes repeat
             }
         }
 
@@ -63,12 +67,12 @@ mod multiline_tests {
         let close_square = code.chars().filter(|&c| c == ']').count();
 
         // Expression is complete if all are balanced
-        opens == closes &&
-        double_quotes % 2 == 0 &&
-        single_quotes % 2 == 0 &&
-        open_paren == close_paren &&
-        open_bracket == close_bracket &&
-        open_square == close_square
+        opens == closes
+            && double_quotes % 2 == 0
+            && single_quotes % 2 == 0
+            && open_paren == close_paren
+            && open_bracket == close_bracket
+            && open_square == close_square
     }
 
     /// Test detection of unclosed function definitions

@@ -573,8 +573,9 @@ mod tests {
         protocol.set_hmac_key("0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef");
         assert!(protocol.hmac_key.is_some());
 
-        // Key should be decoded from hex (32 bytes for 64 hex chars)
-        assert_eq!(protocol.hmac_key.as_ref().unwrap().len(), 32);
+        // Key is stored as raw UTF-8 bytes (64 bytes for 64 hex chars)
+        // This matches jupyter_client behavior which expects the raw key
+        assert_eq!(protocol.hmac_key.as_ref().unwrap().len(), 64);
     }
 
     #[test]

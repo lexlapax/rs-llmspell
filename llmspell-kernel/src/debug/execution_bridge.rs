@@ -291,6 +291,58 @@ impl ExecutionManager {
         trace!("Execution resumed with mode: {:?}", mode);
     }
 
+    /// Check if execution is paused
+    pub fn is_paused(&self) -> bool {
+        *self.paused.read()
+    }
+
+    /// Get current step mode
+    pub fn get_step_mode(&self) -> Option<StepMode> {
+        *self.step_mode.read()
+    }
+
+    /// Get breakpoints for a source file
+    pub fn get_breakpoints(&self, source: &str) -> Vec<Breakpoint> {
+        self.breakpoints
+            .read()
+            .get(source)
+            .cloned()
+            .unwrap_or_default()
+    }
+
+    /// Push a new stack frame
+    pub fn push_frame(&self, name: String, source: String, line: u32, column: Option<u32>) {
+        let frame_id = self.stack_frames.read().len();
+        let frame = StackFrame {
+            id: frame_id.to_string(), // Use numeric string IDs like "0", "1", etc.
+            name,
+            source,
+            line,
+            column,
+            locals: Vec::new(),
+        };
+        self.stack_frames.write().push(frame);
+    }
+
+    /// Add a variable to a scope
+    pub fn add_variable(&self, _scope: &str, name: &str, value: &str, var_type: &str) {
+        // For simplicity, add to the top frame if it exists
+        if let Some(frame) = self.stack_frames.write().last_mut() {
+            frame.locals.push(Variable {
+                name: name.to_string(),
+                value: value.to_string(),
+                var_type: var_type.to_string(),
+                has_children: false,
+                reference: None,
+            });
+        }
+    }
+
+    /// Check if debug mode is enabled
+    pub fn is_debug_enabled(&self) -> bool {
+        self.debug_enabled.load(Ordering::Relaxed)
+    }
+
     /// Check if we should pause at a breakpoint
     ///
     /// # Errors
@@ -391,11 +443,6 @@ impl ExecutionManager {
             }
             _ => Vec::new(), // Simplified for now
         }
-    }
-
-    /// Check if currently paused
-    pub fn is_paused(&self) -> bool {
-        *self.paused.read()
     }
 }
 
