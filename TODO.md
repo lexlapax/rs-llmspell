@@ -6357,40 +6357,60 @@ pub fn handle_configuration_done(&mut self) -> Result<()> {
 
 ---
 
-## Phase 10.14: Example Applications (Days 14-16)
+## Phase 10.14: Example Application - AI Development Studio (Days 14-16)
 
-### Task 10.14.1: Implement Kernel Fleet Manager
+**Rationale for Change**: After analysis, the originally proposed "Kernel Fleet Manager" and "Development Environment Service" were too infrastructure-focused and duplicated Phase 10's built-in capabilities. Instead, we implement ONE comprehensive user-facing application that naturally demonstrates all Phase 10 features while solving a real developer problem.
+
+### Task 10.14.1: Implement AI Development Studio
 **Priority**: HIGH
 **Estimated Time**: 6 hours
 **Assignee**: Applications Team Lead
 
-**Description**: Create production orchestration example application.
+**Description**: Create a comprehensive AI agent development environment that showcases all Phase 10 service capabilities through practical developer tooling.
+
+**Why This Application**:
+1. **Real Problem**: Developers building AI agents lack proper debugging and testing tools
+2. **Natural Fit**: Uses daemon mode, multi-protocol support, and IDE connectivity organically
+3. **User-Facing**: Unlike infrastructure demos, developers will actually use this
+4. **Layer 7 Evolution**: Professional development territory, natural progression from existing examples
 
 **Acceptance Criteria:**
-- [ ] Application structure created
-- [ ] Multi-kernel management works
-- [ ] Load balancing implemented
-- [ ] Health monitoring works
-- [ ] Configuration complete
+- [ ] Application demonstrates daemon mode with persistent service
+- [ ] Multi-IDE support (VS Code + Jupyter Lab concurrent connections)
+- [ ] Interactive debugging with breakpoints and stepping
+- [ ] REPL-based agent testing with state inspection
+- [ ] Session persistence across development iterations
 
 **Implementation Steps:**
-1. Create `examples/script-users/applications/kernel-fleet-manager/`:
-   - main.lua implementation
-   - config.toml configuration
-   - README.md documentation
-2. Implement fleet management:
-   - Start/stop kernels
-   - Load balancing (round-robin, least-connections)
-   - Health checks (liveness & readiness)
-   - Tenant isolation
-   - Prometheus metrics export
-3. Signal handling integration
-4. Monitoring integration:
-   - Export kernel metrics to Prometheus
-   - Custom fleet metrics (kernels_active, requests_per_kernel)
-   - Grafana dashboard template
-5. Test application
-6. Document usage
+1. Create `examples/script-users/applications/ai-dev-studio/`:
+   - main.lua implementation showcasing all protocols
+   - ai-dev-studio-config.toml configuration
+   - Comprehensive README.md with developer workflow
+2. Core development features:
+   - Debug session management with breakpoint support
+   - Multi-IDE connection handling (Jupyter/DAP/LSP/REPL)
+   - Interactive agent testing framework
+   - Performance profiling and analysis
+   - Development workflow automation
+3. Phase 10 feature demonstration:
+   - Daemon mode: `llmspell kernel start --daemon` with multi-protocol
+   - Signal handling: Graceful session save/restore
+   - Session persistence: Development continuity
+   - Multi-client: Concurrent VS Code + Jupyter connections
+4. Developer assistance agents:
+   - debug_assistant: Explains execution flow and state
+   - test_generator: Creates test cases for agents
+   - performance_analyzer: Optimization suggestions
+   - code_reviewer: Best practices enforcement
+5. Integration testing:
+   - VS Code connection test
+   - Jupyter notebook test
+   - REPL interaction test
+   - Session persistence test
+6. Documentation:
+   - Quick start guide
+   - IDE setup instructions
+   - Debugging workflow examples
 
 **Definition of Done:**
 - [ ] Application runs
@@ -6402,43 +6422,39 @@ pub fn handle_configuration_done(&mut self) -> Result<()> {
 - [ ] `cargo fmt --all --check` passes
 - [ ] All tests pass: `cargo test --workspace --all-features`
 
-### Task 10.14.2: Implement Development Environment Service
+### Task 10.14.2: Create Development Workflow Integration
 **Priority**: HIGH
 **Estimated Time**: 6 hours
 **Assignee**: Applications Team
 
-**Description**: Create IDE integration service example.
+**Description**: Integrate AI Development Studio with typical developer workflows and toolchains.
 
 **Acceptance Criteria:**
-- [ ] Application structure created
-- [ ] LSP features demonstrated
-- [ ] DAP debugging shown
-- [ ] File watching works
-- [ ] Configuration complete
+- [ ] Git integration for version control of agent code
+- [ ] CI/CD pipeline examples for agent testing
+- [ ] Docker containerization for deployment
+- [ ] Performance benchmarking framework
+- [ ] Documentation generation automation
 
 **Implementation Steps:**
-1. Create `examples/script-users/applications/dev-environment-service/`:
-   - main.lua implementation
-   - config.toml configuration
-   - README.md documentation
-2. Implement IDE features:
-   - Code completion via LSP
-   - Real-time diagnostics
-   - Debugging with DAP
-   - Hot reload implementation:
-     * File watcher using inotify/kqueue
-     * Automatic script reload on change
-     * State preservation during reload
-     * WebSocket notifications to clients
-3. Multi-client support:
-   - Concurrent IDE connections
-   - Shared workspace state
-   - Collaborative features
-4. Distributed tracing:
-   - OpenTelemetry integration
-   - Request flow visualization
-5. Test application
-6. Document usage
+1. Workflow automation scripts:
+   - Pre-commit hooks for agent validation
+   - GitHub Actions for automated testing
+   - Performance regression detection
+2. Development patterns:
+   - Agent template library
+   - Best practices cookbook
+   - Common debugging scenarios
+3. Deployment preparation:
+   - Agent packaging for production
+   - Configuration management
+   - Secret handling patterns
+4. Monitoring integration:
+   - Development metrics collection
+   - Error tracking setup
+   - Performance dashboards
+5. Test the complete workflow
+6. Create video walkthrough
 
 **Definition of Done:**
 - [ ] Application runs
@@ -6450,12 +6466,12 @@ pub fn handle_configuration_done(&mut self) -> Result<()> {
 - [ ] `cargo fmt --all --check` passes
 - [ ] All tests pass: `cargo test --workspace --all-features`
 
-### Task 10.14.3: Create Service Deployment Examples
+### Task 10.14.3: Create Production Deployment Guide
 **Priority**: MEDIUM
 **Estimated Time**: 4 hours
 **Assignee**: Applications Team
 
-**Description**: Create deployment configurations for example applications.
+**Description**: Create production deployment guide for AI Development Studio.
 
 **Acceptance Criteria:**
 - [ ] systemd service files created
@@ -6465,15 +6481,20 @@ pub fn handle_configuration_done(&mut self) -> Result<()> {
 - [ ] Documentation complete
 
 **Implementation Steps:**
-1. Create systemd units:
-   - llmspell-fleet.service
-   - llmspell-dev.service
-2. Create launchd plists:
-   - com.llmspell.fleet.plist
-   - com.llmspell.dev.plist
-3. Create Dockerfiles
-4. Create K8s manifests
-5. Test deployments
+1. Create systemd unit:
+   - llmspell-ai-dev-studio.service
+2. Create launchd plist:
+   - com.llmspell.ai-dev-studio.plist
+3. Create Docker configuration:
+   - Multi-stage Dockerfile
+   - docker-compose.yml for local development
+4. Cloud deployment guides:
+   - AWS/GCP/Azure setup instructions
+   - Kubernetes manifests for scalability
+5. Security hardening:
+   - TLS configuration
+   - Authentication setup
+   - Network isolation
 
 **Definition of Done:**
 - [ ] Service files work
@@ -6485,12 +6506,12 @@ pub fn handle_configuration_done(&mut self) -> Result<()> {
 - [ ] `cargo fmt --all --check` passes
 - [ ] All tests pass: `cargo test --workspace --all-features`
 
-### Task 10.14.4: Update Application Documentation
+### Task 10.14.4: Update Application Documentation for Layer 7
 **Priority**: MEDIUM
 **Estimated Time**: 3 hours
 **Assignee**: Documentation Team
 
-**Description**: Update application README with Layer 7 examples.
+**Description**: Update application README with Layer 7 Professional Development territory.
 
 **Acceptance Criteria:**
 - [ ] Layer 7 documented
@@ -6501,15 +6522,24 @@ pub fn handle_configuration_done(&mut self) -> Result<()> {
 
 **Implementation Steps:**
 1. Update `examples/script-users/applications/README.md`:
-   - Add Layer 7 section
-   - Document new applications
-   - Update progression diagram
-2. Create individual READMEs:
-   - Fleet manager documentation
-   - Dev service documentation
-3. Add configuration guides
-4. Include deployment instructions
-5. Update architecture diagrams
+   - Add Layer 7: Professional Development section
+   - Document AI Development Studio as natural progression
+   - Show how it builds on layers 1-6
+2. Create comprehensive README:
+   - AI Development Studio complete guide
+   - Video tutorials and demos
+   - Integration examples
+3. Architecture documentation:
+   - How Phase 10 features enable the studio
+   - Multi-protocol architecture diagram
+   - Session management flow
+4. Developer journey:
+   - From simple scripts to production agents
+   - Debugging workflow examples
+   - Performance optimization guide
+5. Update main docs:
+   - Link from phase-10-design-doc.md
+   - Add to examples index
 
 **Definition of Done:**
 - [ ] Documentation complete

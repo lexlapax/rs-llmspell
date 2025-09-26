@@ -20,7 +20,7 @@
 ### Goal
 Enhance `llmspell-kernel` with daemon mode capabilities and multi-protocol server support, transforming llmspell from a CLI tool into a proper Unix service that IDEs, notebooks, and other tools can connect to. The kernel operates as a single process that can run either embedded (foreground) or daemon (background) mode.
 
-This phase includes comprehensive example applications demonstrating production service capabilities: **Kernel Fleet Manager** for orchestrating multiple kernel instances and **Development Environment Service** for IDE integration with code intelligence.
+This phase includes a comprehensive example application demonstrating production service capabilities: **AI Development Studio** - a complete development environment for building, testing, and debugging AI agents using llmspell's full service infrastructure.
 
 ### Core Principles
 - **Single Binary**: `llmspell` is the only executable, no separate service binary
@@ -2320,170 +2320,215 @@ Layer 3: Power User (content-creator)
 Layer 4: Business (communication-manager)
 Layer 5: Professional (process-orchestrator, code-review)
 Layer 6: Expert (webapp-creator)
-Layer 7: Service & Production (NEW - Phase 10)
-    ├── kernel-fleet-manager/     # Production orchestration
-    └── dev-environment-service/  # IDE integration
+Layer 7: Professional Development (NEW - Phase 10)
+    └── ai-dev-studio/             # AI agent development environment
 ```
 
-### 8.3 Kernel Fleet Manager
+### 8.3 AI Development Studio
 
-**Purpose**: Production orchestration of multiple kernel instances as services
-**Problem Statement**: "Managing multiple AI workloads requires intelligent orchestration"
-**Key Features**: Multi-kernel management, load balancing, tenant isolation, health monitoring
+**Purpose**: Professional development environment for building and debugging AI agents
+**Problem Statement**: "Building AI agents without proper debugging tools is like coding blindfolded"
+**Key Features**: Interactive debugging, multi-IDE support, session persistence, live testing
 
 ```lua
--- examples/script-users/applications/kernel-fleet-manager/main.lua
+-- examples/script-users/applications/ai-dev-studio/main.lua
 --[[
-Kernel Fleet Manager - Production Orchestration Service
-Phase 10 Application showcasing daemon mode and service integration
+AI Development Studio - Professional AI Agent Development Environment
+Phase 10 Application showcasing daemon mode, multi-protocol support, and IDE integration
 
-Problem: Organizations need to manage multiple kernel instances for different
-teams, projects, and workloads with proper resource allocation and monitoring.
+Problem: Developers building AI agents lack proper debugging, testing, and
+introspection tools. Current development is trial-and-error with print statements.
+
+Solution: A comprehensive development environment that provides:
+- Interactive debugging with breakpoints and stepping
+- Multi-IDE support (VS Code + Jupyter Lab simultaneously)
+- Live agent testing via REPL
+- Session persistence across development iterations
+- Real-time state inspection and modification
 ]]
 
-local config = Config.load("fleet-config.toml")
+local config = Config.load("ai-dev-studio-config.toml")
 
--- Fleet management agents
-local fleet_monitor = Agent.new({
-    name = "fleet_monitor",
+-- Development assistant agents
+local debug_assistant = Agent.new({
+    name = "debug_assistant",
     model = "gpt-4",
-    purpose = "Monitor health and performance of kernel fleet"
+    purpose = "Help developers understand agent execution flow and debug issues"
 })
 
-local load_balancer = Agent.new({
-    name = "load_balancer",
+local test_generator = Agent.new({
+    name = "test_generator",
     model = "gpt-4",
-    purpose = "Distribute workloads across available kernels"
+    purpose = "Generate test cases for agent behaviors"
 })
 
-local resource_manager = Agent.new({
-    name = "resource_manager",
-    model = "gpt-4",
-    purpose = "Manage CPU, memory, and connection limits"
-})
-
-local incident_responder = Agent.new({
-    name = "incident_responder",
-    model = "gpt-4",
-    purpose = "Handle failures and recover services"
-})
-
-local metrics_collector = Agent.new({
-    name = "metrics_collector",
+local performance_analyzer = Agent.new({
+    name = "performance_analyzer",
     model = "gpt-3.5-turbo",
-    purpose = "Collect and aggregate performance metrics"
+    purpose = "Analyze agent performance and suggest optimizations"
 })
 
--- Initialize fleet state
-local fleet_state = State.new({
+local documentation_assistant = Agent.new({
+    name = "documentation_assistant",
+    model = "gpt-3.5-turbo",
+    purpose = "Generate documentation for agent behaviors and APIs"
+})
+
+local code_reviewer = Agent.new({
+    name = "code_reviewer",
+    model = "gpt-4",
+    purpose = "Review agent code for best practices and potential issues"
+})
+
+-- Initialize development session state
+local dev_session = State.new({
     persistence = "sled",
-    scope = "global"
+    scope = "session"  -- Per-development session
 })
 
--- Signal handling for graceful operations
-local function setup_signal_handlers()
-    Hook.register("signal.SIGTERM", function()
-        print("🛑 Received SIGTERM - initiating graceful shutdown")
+-- Debug session management
+local function setup_debug_session()
+    -- Initialize debugging infrastructure
+    Hook.register("debug.breakpoint", function(ctx)
+        print(string.format("🔴 Breakpoint hit at %s:%d", ctx.file, ctx.line))
 
-        -- Save fleet state
-        fleet_state:set("shutdown_time", os.time())
-        fleet_state:set("shutdown_reason", "SIGTERM")
+        -- Use debug assistant to explain current state
+        local analysis = debug_assistant:execute({
+            action = "analyze_state",
+            variables = ctx.locals,
+            call_stack = ctx.stack,
+            agent_context = ctx.agent_state
+        })
 
-        -- Notify all kernels
-        local kernels = fleet_state:get("active_kernels") or {}
-        for id, kernel in pairs(kernels) do
-            print(string.format("  Shutting down kernel %s...", id))
-            -- Send shutdown_request via Jupyter protocol
-            kernel:shutdown_gracefully()
-        end
+        print("📊 Current State Analysis:")
+        print(analysis.output)
 
-        -- Wait for confirmations
-        os.execute("sleep 5")
-        print("✅ Fleet shutdown complete")
+        -- Store in session for IDE access
+        dev_session:set("current_breakpoint", {
+            location = string.format("%s:%d", ctx.file, ctx.line),
+            analysis = analysis.output,
+            timestamp = os.time()
+        })
     end)
 
-    Hook.register("signal.SIGUSR1", function()
-        print("📊 Received SIGUSR1 - dumping fleet statistics")
-        local stats = metrics_collector:execute({
-            action = "generate_report",
-            kernels = fleet_state:get("active_kernels")
+    Hook.register("debug.step", function(ctx)
+        -- Track execution flow for visualization
+        local flow = dev_session:get("execution_flow") or {}
+        table.insert(flow, {
+            file = ctx.file,
+            line = ctx.line,
+            function_name = ctx.function_name,
+            timestamp = os.time()
         })
-        print(stats.output)
+        dev_session:set("execution_flow", flow)
     end)
 end
 
--- Kernel lifecycle management
-local function manage_kernel_lifecycle(kernel_id, config)
-    local kernel_cmd = string.format(
-        "llmspell kernel start --daemon --port %d --log-file %s --pid-file %s --idle-timeout %d",
-        config.port,
-        config.log_file,
-        config.pid_file,
-        config.idle_timeout or 3600
+-- Multi-IDE connection management
+local function setup_ide_connections()
+    -- Start daemon with multi-protocol support
+    local daemon_cmd = string.format(
+        "llmspell kernel start --daemon --jupyter-port %d --dap-port %d --lsp-port %d --repl-port %d",
+        config.jupyter_port or 8888,
+        config.dap_port or 5678,
+        config.lsp_port or 9999,
+        config.repl_port or 7777
     )
 
-    -- Start kernel as daemon
-    os.execute(kernel_cmd)
+    print("🚀 Starting AI Development Studio daemon...")
+    os.execute(daemon_cmd)
 
-    -- Monitor health
-    Hook.register("timer.1m", function()
-        local health = fleet_monitor:execute({
-            action = "check_health",
-            kernel_id = kernel_id,
-            pid_file = config.pid_file
+    -- Monitor IDE connections
+    Hook.register("ide.connected", function(ctx)
+        print(string.format("🖥  %s connected via %s", ctx.client_type, ctx.protocol))
+
+        -- Store connection info for session management
+        dev_session:set(string.format("ide.%s", ctx.client_id), {
+            type = ctx.client_type,
+            protocol = ctx.protocol,
+            connected_at = os.time()
         })
 
-        if health.status == "unhealthy" then
-            incident_responder:execute({
-                action = "recover_kernel",
-                kernel_id = kernel_id,
-                failure = health.reason
-            })
+        -- Send welcome info
+        if ctx.protocol == "jupyter" then
+            print("  📓 Jupyter Lab ready for notebook development")
+        elseif ctx.protocol == "dap" then
+            print("  🐛 VS Code debugger attached")
+        elseif ctx.protocol == "lsp" then
+            print("  💡 Code intelligence activated")
+        elseif ctx.protocol == "repl" then
+            print("  🎆 Interactive testing REPL ready")
         end
     end)
 end
 
--- Load balancing logic
-local function route_request(request)
-    local available_kernels = fleet_state:get("available_kernels") or {}
+-- Interactive agent testing
+local function setup_agent_testing()
+    -- REPL-based testing interface
+    Hook.register("repl.command", function(cmd)
+        if cmd:match("^test ") then
+            local agent_name = cmd:match("^test (.+)$")
 
-    local selected = load_balancer:execute({
-        action = "select_kernel",
-        request = request,
-        kernels = available_kernels,
-        strategy = config.load_balancing.strategy -- "round_robin", "least_loaded", "sticky"
-    })
+            -- Generate test cases
+            local tests = test_generator:execute({
+                action = "generate_tests",
+                agent_name = agent_name,
+                context = dev_session:get("current_agent_code")
+            })
 
-    return selected.kernel_id
+            print(string.format("🧪 Generated %d test cases for %s", #tests.cases, agent_name))
+
+            -- Run tests interactively
+            for i, test_case in ipairs(tests.cases) do
+                print(string.format("Test %d: %s", i, test_case.description))
+                -- Execute with debugging enabled
+                local result = Debug.execute_with_trace(test_case.code)
+                print(string.format("  %s", result.passed and "✅" or "❌"))
+            end
+        end
+    end)
 end
 
--- Multi-tenant isolation
-local function create_tenant_kernel(tenant_id, resource_limits)
-    local tenant_config = {
-        port = allocate_port(),
-        log_file = string.format("/var/log/llmspell/tenant_%s.log", tenant_id),
-        pid_file = string.format("/var/run/llmspell/tenant_%s.pid", tenant_id),
-        idle_timeout = resource_limits.idle_timeout or 1800,
-        max_memory = resource_limits.max_memory or "1GB",
-        max_clients = resource_limits.max_clients or 5
-    }
+-- Agent performance profiling
+local function setup_performance_profiling()
+    -- Real-time performance monitoring
+    Hook.register("agent.execute.start", function(ctx)
+        dev_session:set(string.format("profile.%s.start", ctx.agent_id), {
+            timestamp = os.time(),
+            memory_before = collectgarbage("count"),
+            context_size = #tostring(ctx.prompt)
+        })
+    end)
 
-    -- Apply resource constraints
-    resource_manager:execute({
-        action = "apply_limits",
-        tenant_id = tenant_id,
-        limits = resource_limits
-    })
+    Hook.register("agent.execute.complete", function(ctx)
+        local start_data = dev_session:get(string.format("profile.%s.start", ctx.agent_id))
+        if start_data then
+            local profile = {
+                agent = ctx.agent_id,
+                duration = os.time() - start_data.timestamp,
+                memory_delta = collectgarbage("count") - start_data.memory_before,
+                tokens_used = ctx.usage.total_tokens,
+                cost = ctx.usage.cost
+            }
 
-    -- Start isolated kernel
-    manage_kernel_lifecycle(tenant_id, tenant_config)
+            -- Analyze performance
+            local analysis = performance_analyzer:execute({
+                action = "analyze_execution",
+                profile = profile,
+                historical = dev_session:get("performance_history") or {}
+            })
 
-    -- Track in fleet state
-    fleet_state:set(string.format("tenant.%s", tenant_id), {
-        config = tenant_config,
-        created = os.time(),
-        resource_limits = resource_limits
-    })
+            if analysis.suggestions then
+                print(string.format("📈 Performance suggestion for %s:", ctx.agent_id))
+                print(analysis.suggestions)
+            end
+
+            -- Store for trend analysis
+            local history = dev_session:get("performance_history") or {}
+            table.insert(history, profile)
+            dev_session:set("performance_history", history)
+        end
+    end)
 end
 
 -- Production monitoring dashboard
@@ -2623,23 +2668,6 @@ model = "gpt-4"
 api_key_env = "OPENAI_API_KEY"
 ```
 
-### 8.4 Development Environment Service
-
-**Purpose**: IDE integration service providing code intelligence for llmspell scripts
-**Problem Statement**: "Developers need intelligent IDE support for llmspell script development"
-**Key Features**: LSP implementation, DAP debugging, code completion, live diagnostics
-
-```lua
--- examples/script-users/applications/dev-environment-service/main.lua
---[[
-Development Environment Service - IDE Integration Daemon
-Phase 10 Application showcasing LSP and DAP protocol support
-
-Problem: Developers need code completion, debugging, and intelligence
-features when writing llmspell scripts in their favorite IDEs.
-]]
-
-local config = Config.load("dev-service-config.toml")
 
 -- IDE service agents
 local code_analyzer = Agent.new({
@@ -3231,8 +3259,8 @@ Documentation deliverables for Phase 10:
 5. **API Reference**: Protocol-specific API documentation
 6. **Troubleshooting Guide**: Common issues and solutions
 7. **Performance Tuning Guide**: Optimization recommendations
-8. **Example Applications Guide**: Kernel Fleet Manager and Dev Environment Service
-9. **Application Layer 7 Documentation**: Service & Production Territory examples
+8. **Example Application Guide**: AI Development Studio walkthrough
+9. **Application Layer 7 Documentation**: Professional Development Territory example
 
 ---
 
@@ -3653,14 +3681,19 @@ This Phase 10 design refactors the service architecture to maintain a single-bin
 
 The architecture maintains simplicity while providing production-ready daemon capabilities, proper process management, and multi-protocol support for IDE connectivity.
 
-### Example Applications
+### Example Application: AI Development Studio
 
-Phase 10 introduces two production-ready example applications that showcase the new service capabilities:
+Phase 10 introduces a single, comprehensive example application that naturally showcases all service capabilities:
 
-- **Kernel Fleet Manager**: Production orchestration service managing multiple kernel instances with load balancing, multi-tenant isolation, and health monitoring
-- **Development Environment Service**: IDE integration daemon providing LSP code intelligence, DAP debugging support, and real-time diagnostics for llmspell script development
+**AI Development Studio**: A production-ready development environment for AI agent creators that demonstrates:
+- **Daemon Mode**: Always-on service for continuous development
+- **Multi-Protocol Support**: Concurrent Jupyter (notebooks), DAP (debugging), LSP (code intelligence), and REPL (testing)
+- **Multi-IDE Connectivity**: Simultaneous VS Code, Jupyter Lab, and terminal connections
+- **Session Management**: Persistent development sessions across reconnections
+- **Interactive Debugging**: Step-through debugging of AI agent execution flows
+- **Live Testing**: REPL-based interactive agent testing with state inspection
 
-These examples represent the evolution to **Layer 7: Service & Production Territory**, building upon the existing application progression from universal user problems through professional automation to production service deployments.
+This application represents the evolution to **Layer 7: Professional Development Territory**, addressing the real problem that developers face when building AI agents - the lack of proper debugging and testing tools. Unlike infrastructure demos, this is a user-facing application that developers will actually use to build their own AI solutions.
 
 ---
 
