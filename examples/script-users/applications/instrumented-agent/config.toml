@@ -1,0 +1,51 @@
+# Instrumented Agent Debugger Configuration
+# Demonstrates debugging and tracing capabilities for agent applications
+
+# Default script engine
+default_engine = "lua"
+
+[engines.lua]
+stdlib = "Standard"
+max_memory_bytes = 10000000
+enable_debug = true
+timeout_ms = 30000
+
+# Provider configurations
+[providers]
+default_provider = "openai"
+
+[providers.providers.openai]
+provider_type = "openai"
+api_key_env = "OPENAI_API_KEY"
+default_model = "gpt-4o-mini"
+timeout_seconds = 30
+
+[providers.providers.anthropic]
+provider_type = "anthropic"
+api_key_env = "ANTHROPIC_API_KEY"
+default_model = "claude-3-haiku-20240307"
+timeout_seconds = 30
+
+# Runtime configuration
+[runtime]
+max_concurrent_scripts = 3
+script_timeout_seconds = 60
+enable_streaming = true
+
+[runtime.debug]
+enabled = true
+level = "debug"  # Set to debug level for demonstration
+capture_output = true
+performance_tracking = true
+stack_traces = true
+
+[runtime.state_persistence]
+enabled = true
+backend_type = "memory"
+max_state_size_bytes = 1000000
+
+# Tool configurations
+[tools.file_operations]
+allowed_paths = ["/tmp"]
+atomic_writes = true
+max_file_size = 1048576
