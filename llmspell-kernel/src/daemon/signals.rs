@@ -14,11 +14,11 @@ use tokio::sync::mpsc;
 use tracing::{debug, error, info, trace};
 
 /// Atomic flags for signal handling
-static SIGTERM_RECEIVED: AtomicBool = AtomicBool::new(false);
-static SIGINT_RECEIVED: AtomicBool = AtomicBool::new(false);
-static SIGHUP_RECEIVED: AtomicBool = AtomicBool::new(false);
-static SIGUSR1_RECEIVED: AtomicBool = AtomicBool::new(false);
-static SIGUSR2_RECEIVED: AtomicBool = AtomicBool::new(false);
+pub static SIGTERM_RECEIVED: AtomicBool = AtomicBool::new(false);
+pub static SIGINT_RECEIVED: AtomicBool = AtomicBool::new(false);
+pub static SIGHUP_RECEIVED: AtomicBool = AtomicBool::new(false);
+pub static SIGUSR1_RECEIVED: AtomicBool = AtomicBool::new(false);
+pub static SIGUSR2_RECEIVED: AtomicBool = AtomicBool::new(false);
 
 /// Signal handler function
 extern "C" fn handle_signal(sig: libc::c_int) {
