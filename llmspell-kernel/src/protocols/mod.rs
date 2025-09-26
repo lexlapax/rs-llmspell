@@ -1,13 +1,15 @@
 //! Protocol implementations for kernel communication
 //!
 //! This module provides the Jupyter protocol implementation
-//! which is the ONLY protocol used by the kernel.
+//! and REPL network service protocol.
 
 pub mod jupyter;
 pub mod registry;
+pub mod repl;
 
 pub use jupyter::JupyterProtocol;
 pub use registry::{ProtocolFactory, ProtocolRegistry};
+pub use repl::{REPLConfig, REPLProtocol, REPLServer};
 
 /// Protocol configuration for creating protocol instances
 #[derive(Debug, Clone)]
