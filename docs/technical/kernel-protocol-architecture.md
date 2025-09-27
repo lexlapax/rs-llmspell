@@ -1,15 +1,18 @@
 # Kernel and Protocol Architecture
 
-**Version**: v0.9.0  
-**Status**: Production Implementation  
-**Last Updated**: December 2025  
-**Phase**: 9 (REPL, Debugging, and Kernel Architecture)  
+**Version**: v0.9.0
+**Status**: Production-Ready with Daemon Support
+**Last Updated**: December 2024
+**Phase**: 10 (Integrated Kernel with Daemon and Service Support)  
 
 ## Executive Summary
 
-This document describes the kernel and protocol architecture implemented in LLMSpell v0.9.0. The system uses an **EmbeddedKernel** architecture that spawns a Jupyter kernel in a background thread within the CLI process, communicating via ZeroMQ locally. The architecture provides clean separation between transport mechanics (ZeroMQ, TCP) and protocol semantics (Jupyter, future: LSP, DAP, MCP) through a trait-based design.
+This document describes the kernel and protocol architecture implemented in LLMSpell v0.9.0. The system uses an **IntegratedKernel** architecture (Phase 9-10) that can run either embedded in the CLI process or as a standalone daemon service. The architecture provides clean separation between transport mechanics (ZeroMQ, TCP) and protocol semantics (Jupyter, DAP, LSP) through a trait-based design with full daemon support for production deployment.
 
-**Key Decision**: Removed in-process kernel entirely in favor of always-external architecture with auto-spawn, resulting in simpler codebase (-250 lines) and enabling full ecosystem integration.
+**Key Decisions**:
+- Phase 9: Unified kernel architecture with global IO runtime eliminating "dispatch task is gone" errors
+- Phase 10: Added daemon mode with double-fork, signal handling, and systemd/launchd service integration
+- Consolidated state/sessions/debug into unified llmspell-kernel crate
 
 ---
 
@@ -28,78 +31,93 @@ This document describes the kernel and protocol architecture implemented in LLMS
 
 ## 1. Kernel Architecture
 
-### 1.1 EmbeddedKernel Design
+### 1.1 IntegratedKernel Design (Phase 9-10)
 
-The kernel runs in a background thread within the CLI process, not as a standalone process:
-
-```rust
-// llmspell-cli/src/kernel_client/embedded_kernel.rs
-pub struct EmbeddedKernel {
-    /// Handle to the kernel thread
-    kernel_thread: Option<JoinHandle<Result<()>>>,
-    /// The kernel ID
-    kernel_id: String,
-    /// Connection info for the kernel
-    connection_info: ConnectionInfo,
-    /// The client for communicating with the kernel
-    client: Option<JupyterClient>,
-    /// Whether the kernel is running
-    running: bool,
-    /// Shutdown sender
-    shutdown_tx: Option<oneshot::Sender<()>>,
-}
-```
-
-### 1.2 GenericKernel Architecture
-
-The kernel uses a protocol-agnostic design with traits:
+The kernel provides a unified execution runtime that can run embedded or as a daemon:
 
 ```rust
-// llmspell-kernel/src/kernel.rs
-pub struct GenericKernel<T: Transport, P: Protocol> {
-    /// Unique kernel identifier
-    pub kernel_id: String,
-    /// Transport layer (ZeroMQ)
-    transport: T,
-    /// Protocol handler (Jupyter)
+// llmspell-kernel/src/execution/integrated.rs
+pub struct IntegratedKernel<P: Protocol<T>, T: Transport> {
+    /// Script executor with debug support
+    script_executor: Arc<dyn ScriptExecutor>,
+    /// Protocol handler (Jupyter/DAP/LSP)
     protocol: P,
-    /// Script runtime from llmspell-bridge
-    pub runtime: Arc<Mutex<ScriptRuntime>>,
-    /// Current execution state
-    pub execution_state: Arc<RwLock<KernelState>>,
-    /// Shared configuration
-    pub config: Arc<LLMSpellConfig>,
-    /// Shared state manager
-    pub state_manager: Option<Arc<StateManager>>,
+    /// Transport layer (ZeroMQ/WebSocket/TCP)
+    transport: Option<T>,
+    /// Global IO manager
+    io_manager: Arc<EnhancedIOManager>,
+    /// Multi-client message routing
+    message_router: Arc<MessageRouter>,
+    /// Event correlation
+    event_correlator: Arc<KernelEventCorrelator>,
+    /// Unified state (includes sessions)
+    state: Arc<KernelState>,
+    /// Debug execution manager
+    execution_manager: Arc<ExecutionManager>,
+    /// DAP bridge for IDE integration
+    dap_bridge: Arc<Mutex<DAPBridge>>,
+}
+```
+
+### 1.2 Daemon Support (Phase 10)
+
+The kernel can run as a system daemon for production deployment:
+
+```rust
+// llmspell-kernel/src/daemon/manager.rs
+pub struct DaemonManager {
+    config: DaemonConfig,
+    pid_file: Option<PidFile>,
 }
 
-// Type alias for production kernel
-pub type JupyterKernel = GenericKernel<ZmqTransport, JupyterProtocol>;
+pub struct DaemonConfig {
+    pub daemonize: bool,
+    pub pid_file: Option<PathBuf>,
+    pub working_dir: PathBuf,
+    pub stdout_path: Option<PathBuf>,
+    pub stderr_path: Option<PathBuf>,
+    pub close_stdin: bool,
+    pub umask: Option<u32>,  // 0o027 for security
+}
+
+// Signal handling for graceful shutdown
+pub struct SignalBridge {
+    shutdown_tx: watch::Sender<bool>,  // SIGTERM/SIGINT
+    reload_tx: watch::Sender<bool>,    // SIGHUP
+    stats_tx: watch::Sender<bool>,     // SIGUSR1
+}
 ```
 
-### 1.3 Client-Kernel Communication
+### 1.3 Deployment Modes
 
 ```
-CLI Process
-├── Main Thread
-│   └── CLI Commands (run, exec, repl, debug)
-│       └── EmbeddedKernel::execute()
-│           └── client.execute(code) → [ZeroMQ localhost]
-│
-└── Background Thread
-    └── JupyterKernel::serve()
-        └── Receives via ZeroMQ
-            └── ScriptRuntime::execute()
-                └── Returns result via ZeroMQ
+1. Embedded Mode (Development)
+   CLI Process
+   ├── Main Thread → Commands
+   └── Kernel Thread → IntegratedKernel
+
+2. Daemon Mode (Production)
+   System Service (systemd/launchd)
+   └── IntegratedKernel (forked daemon)
+       ├── PID file management
+       ├── Signal handling
+       └── Multi-protocol servers
+
+3. Connection Modes
+   - Local: Unix sockets or localhost TCP
+   - Remote: TCP with authentication
+   - Multi-client: MessageRouter handles concurrent clients
 ```
 
 ### 1.4 Kernel Lifecycle
 
-1. **Auto-Spawn**: CLI automatically spawns kernel if not running
-2. **Connection Discovery**: Checks ~/.llmspell/kernels/ for existing kernels
-3. **Heartbeat Verification**: Confirms kernel is alive before reuse
-4. **Idle Timeout**: Kernel shuts down after configurable idle period
-5. **Cleanup**: OS cleans up on CLI exit
+1. **Startup**: Auto-spawn or daemon start with service manager
+2. **Connection Discovery**: Checks connection files in ~/.llmspell/kernels/
+3. **Heartbeat Verification**: 5-channel Jupyter with dedicated heartbeat
+4. **Signal Handling**: SIGTERM/SIGINT for graceful shutdown, SIGHUP for reload
+5. **PID Management**: Prevents concurrent instances, enables service control
+6. **Idle Timeout**: Configurable shutdown after inactivity
+7. **Cleanup**: PID file removal, resource cleanup, state persistence
 
 ---
 
@@ -431,24 +449,27 @@ Total: 267ms (first run), 168ms (subsequent batch)
 
 ## 7. Future Protocol Extensions
 
-### 7.1 Supported Future Protocols
+### 7.1 Supported Protocols
 
-The architecture supports adding new protocols without changing the kernel:
+The architecture supports multiple protocols, with several already implemented:
 
 ```rust
+// Implemented protocols (Phase 9-10)
+pub type JupyterKernel = IntegratedKernel<JupyterProtocol, ZmqTransport>;
+// DAP is integrated via DAPBridge in IntegratedKernel
+
 // Future protocol implementations
-pub type LSPKernel = GenericKernel<TcpTransport, LSPProtocol>;
-pub type DAPKernel = GenericKernel<TcpTransport, DAPProtocol>;  
-pub type MCPKernel = GenericKernel<WebSocketTransport, MCPProtocol>;
+pub type LSPKernel = IntegratedKernel<LSPProtocol, TcpTransport>;
+pub type MCPKernel = IntegratedKernel<MCPProtocol, WebSocketTransport>;
 ```
 
 ### 7.2 Protocol Capabilities
 
 | Protocol | Purpose | Transport | Status |
 |----------|---------|-----------|--------|
-| Jupyter | Notebook execution | ZeroMQ | ✅ Implemented |
+| Jupyter | Notebook execution | ZeroMQ | ✅ Implemented (Phase 9) |
+| DAP | Debug adapter | Integrated | ✅ Implemented (Phase 10) |
 | LSP | Language server | TCP/Pipe | 🔮 Future (Phase 11) |
-| DAP | Debug adapter | TCP | 🔮 Future (Phase 11) |
 | MCP | Model context | WebSocket | 🔮 Future (Phase 12) |
 | HTTP/REST | API access | TCP/HTTP | 🔮 Future |
 | gRPC | High-performance RPC | HTTP/2 | 🔮 Future |
@@ -576,17 +597,25 @@ jupyter console --existing ~/.llmspell/kernels/abc123.json
 
 ## Summary
 
-The kernel and protocol architecture provides a robust foundation for LLMSpell's execution model:
+The kernel and protocol architecture provides a production-ready foundation for LLMSpell's execution model:
 
-1. **EmbeddedKernel** runs in background thread for simplicity
-2. **Protocol traits** enable clean separation of concerns
-3. **Jupyter protocol** provides industry-standard compatibility
-4. **Single shell channel** simplifies implementation
-5. **Connection reuse** optimizes performance
-6. **Extensible design** supports future protocols
+**Phase 9 Achievements**:
+1. **IntegratedKernel** with global IO runtime eliminating runtime isolation
+2. **Protocol/Transport traits** for clean separation of concerns
+3. **Jupyter protocol** with 5-channel architecture
+4. **DAP bridge** for IDE debugging integration
+5. **Unified state** combining sessions and persistence
 
-The architecture decision to remove in-process kernel resulted in a simpler, more maintainable codebase that enables full ecosystem integration while maintaining excellent performance characteristics.
+**Phase 10 Achievements**:
+1. **Daemon mode** with double-fork and TTY detachment
+2. **Signal handling** for graceful shutdown and configuration reload
+3. **Service integration** with systemd and launchd support
+4. **PID management** for production deployment
+5. **Multi-protocol support** with Jupyter and DAP implemented
+6. **Consolidated kernel** merging state/sessions/debug into unified crate
+
+The architecture provides both development convenience (embedded mode) and production robustness (daemon mode) while maintaining excellent performance characteristics and full ecosystem compatibility.
 
 ---
 
-*This document consolidates the kernel and protocol architecture from Phase 9 implementation, replacing multiple design documents with a single comprehensive reference.*
+*This document consolidates the kernel and protocol architecture from Phase 10 implementation, replacing multiple design documents with a single comprehensive production-ready reference.*

@@ -354,7 +354,7 @@ When extending LLMSpell with Rust:
 
 | LLMSpell Version | Rust Version | Key Features |
 |-----------------|--------------|--------------|
-| 0.8.10 | 1.75+ | Phase 8.10.6: Enhanced RAG with cost optimization |
+| 0.9.0 | 1.75+ | Phase 10: Integrated kernel, daemon support, protocol servers |
 | 0.8.x | 1.75+ | Phase 8: RAG, HNSW, Multi-tenancy |
 | 0.7.x | 1.70+ | Phase 7: Hooks, Events, Sessions |
 | 0.6.x | 1.70+ | Phase 6: Workflows, Tools |

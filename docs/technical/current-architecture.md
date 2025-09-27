@@ -1,11 +1,11 @@
-# Current Architecture (v0.9.0 - Phase 9 Complete)
+# Current Architecture (v0.9.0 - Phase 10 Complete)
 
-**Status**: Integrated Kernel Architecture with Full Protocol Support
+**Status**: Production-Ready Kernel with Daemon Support and Protocol Servers
 **Last Updated**: December 2024
-**Implementation**: Phases 0-9 Complete
+**Implementation**: Phases 0-10 Complete
 **Validation**: Cross-referenced with phase design documents and codebase
 
-> **📋 Single Source of Truth**: This document reflects the ACTUAL implementation as evolved through 9 development phases, validated against phase design documents (phase-01 through phase-09) and current codebase. **Phase 9 adds integrated kernel with protocol/transport abstraction, eliminating runtime isolation issues.**
+> **📋 Single Source of Truth**: This document reflects the ACTUAL implementation as evolved through 10 development phases, validated against phase design documents (phase-01 through phase-10) and current codebase. **Phase 10 adds daemon support, signal handling, and production deployment capabilities.**
 
 ## Related Documentation
 
@@ -43,6 +43,7 @@ This overview document is supported by detailed guides:
 - **Phase 7**: API Standardization - Service→Manager rename, builder patterns, retrieve→get, test infrastructure
 - **Phase 8**: RAG System - HNSW vector storage (100K vectors), multi-tenant RAG, OpenAI embeddings, 8ms search latency
 - **Phase 9**: Integrated Kernel - Protocol/transport abstraction, global IO runtime, no-spawn execution, 46% code reduction
+- **Phase 10**: Production Deployment - Daemon support (systemd/launchd), signal handling, PID management, multi-protocol servers, consolidated state/sessions into kernel
 
 ### Key Architectural Decisions (Evolved Through Phases)
 
@@ -62,17 +63,20 @@ This overview document is supported by detailed guides:
 - **Phase 9**: Global IO runtime for preventing "dispatch task is gone" (ADR-019)
 - **Phase 9**: Protocol/Transport trait abstraction (ADR-020)
 - **Phase 9**: No-spawn execution model for kernel (ADR-021)
+- **Phase 10**: Daemon process management with double-fork (ADR-022)
+- **Phase 10**: Signal bridge for async signal handling (ADR-023)
+- **Phase 10**: Unified kernel consolidating state/sessions (ADR-024)
 
 ---
 
 ## Kernel Architecture
 
-### Integrated Kernel Design (Phase 9)
+### Integrated Kernel Design (Phase 9-10)
 
 The kernel provides the central execution engine for llmspell, implementing a unified runtime that eliminates runtime isolation issues:
 
 ```rust
-// Phase 9: IntegratedKernel runs ScriptRuntime in-context
+// Phase 9-10: IntegratedKernel with daemon and debugging support
 pub struct IntegratedKernel<P: Protocol> {
     script_executor: Arc<dyn ScriptExecutor>,
     protocol: P,                              // Protocol handler (Jupyter/LSP/DAP)
@@ -131,6 +135,82 @@ pub fn block_on_global<F>(future: F) -> F::Output;
 - Script execution happens in kernel context
 - No runtime isolation between components
 - Direct message flow from transport to script and back
+
+## Daemon and Service Support (Phase 10)
+
+### Daemon Architecture
+
+Phase 10 introduces production-ready daemon support for deploying LLMSpell kernel as a system service:
+
+```rust
+// Daemon management with double-fork technique
+pub struct DaemonManager {
+    config: DaemonConfig,
+    pid_file: Option<PidFile>,
+}
+
+pub struct DaemonConfig {
+    pub daemonize: bool,
+    pub pid_file: Option<PathBuf>,
+    pub working_dir: PathBuf,
+    pub stdout_path: Option<PathBuf>,
+    pub stderr_path: Option<PathBuf>,
+    pub close_stdin: bool,
+    pub umask: Option<u32>,  // 0o027 for security
+}
+```
+
+### Signal Handling
+
+**Signal Bridge for Async Runtime**:
+```rust
+pub struct SignalBridge {
+    shutdown_tx: watch::Sender<bool>,
+    reload_tx: watch::Sender<bool>,
+    stats_tx: watch::Sender<bool>,
+}
+
+// Supported signals:
+// - SIGTERM/SIGINT: Graceful shutdown
+// - SIGHUP: Configuration reload
+// - SIGUSR1: Dump statistics
+// - SIGUSR2: Toggle debug logging
+```
+
+### Service Deployment
+
+**systemd Support (Linux)**:
+```ini
+[Service]
+Type=forking
+ExecStart=/usr/local/bin/llmspell kernel start --daemon --port 9555
+PIDFile=/var/run/llmspell/kernel.pid
+Restart=on-failure
+PrivateTmp=yes
+NoNewPrivileges=yes
+```
+
+**launchd Support (macOS)**:
+```xml
+<key>ProgramArguments</key>
+<array>
+    <string>/usr/local/bin/llmspell</string>
+    <string>kernel</string>
+    <string>start</string>
+    <string>--daemon</string>
+</array>
+<key>RunAtLoad</key><true/>
+<key>KeepAlive</key><true/>
+```
+
+### Production Features
+
+- **PID File Management**: Prevents concurrent daemon instances
+- **TTY Detachment**: Complete terminal separation via double-fork
+- **Resource Limits**: File descriptor and process limits
+- **Log Rotation**: Signal-based log rotation support
+- **Health Checks**: HTTP endpoints for monitoring
+- **Graceful Shutdown**: Clean resource cleanup on termination
 
 ---
 
@@ -587,14 +667,16 @@ pub trait Workflow: BaseAgent { /* Workflow-specific */ }
 
 ## Implementation Reality
 
-### Phase 9 Implementation Achievements
+### Phase 10 Implementation Achievements
 
 **Code Quality Metrics:**
-- **46% code reduction** through kernel consolidation
+- **46% code reduction** through kernel consolidation (Phase 9)
 - **Zero runtime isolation errors** with global IO runtime
-- **100% integration test success** rate
+- **100% integration test success** rate (37+ tests in Phase 10)
 - **12 tracing categories** for comprehensive observability
 - **5-channel architecture** fully implemented
+- **17 crates** after consolidating state/sessions into kernel (Phase 10)
+- **5 comprehensive daemon tests** validating signal handling
 
 ### What's Production Ready ✅
 - Lua scripting with 17+ globals (including RAG)
@@ -616,6 +698,11 @@ pub trait Workflow: BaseAgent { /* Workflow-specific */ }
 - 5-channel Jupyter architecture (shell, iopub, stdin, control, heartbeat)
 - Comprehensive distributed tracing
 - Debug infrastructure with DAP bridge
+- **Unix daemon mode with systemd/launchd support** (Phase 10)
+- **Signal handling** (SIGTERM, SIGINT, SIGHUP, SIGUSR1, SIGUSR2)
+- **PID file management** for service managers
+- **Double-fork daemonization** for proper detachment
+- **Service deployment guides** for production use
 
 ### What's Partial 🚧
 - Session/artifact management (integrated with kernel and RAG)
@@ -630,7 +717,6 @@ pub trait Workflow: BaseAgent { /* Workflow-specific */ }
 - Python support (not started)
 - GUI interface (deferred)
 - Distributed execution (Phase 12)
-- Unix daemon mode (Phase 10)
 - Local embedding models (BGE-M3, E5, ColBERT)
 - Multi-provider embeddings (Cohere, Voyage AI, Google)
 - Hybrid search (vector + keyword combination)
@@ -647,7 +733,7 @@ pub trait Workflow: BaseAgent { /* Workflow-specific */ }
 - **Phase 9**: Multiple kernel implementations (consolidated to single IntegratedKernel)
 
 ### Code Statistics
-- **20 crates** in workspace (llmspell-kernel now central)
+- **17 crates** in workspace (state/sessions consolidated into kernel in Phase 10)
 - **~65K lines** of Rust code (46% reduction from consolidation)
 - **48+ tool files** implemented
 - **600+ test files** across all crates
@@ -656,7 +742,7 @@ pub trait Workflow: BaseAgent { /* Workflow-specific */ }
 
 ### Architecture Validation
 This architecture has been validated by:
-- Cross-referencing 9 phase design documents (including Phase 9 kernel)
+- Cross-referencing 10 phase design documents (including Phase 10 daemon support)
 - Analyzing actual crate structure and dependencies
 - Reviewing implementation files and test coverage
 - Confirming performance measurements (including kernel metrics)
@@ -668,17 +754,17 @@ This architecture has been validated by:
 
 ## Documentation Structure
 
-As of Phase 9 completion, technical documentation has been consolidated into 5 comprehensive guides:
+As of Phase 10 completion, technical documentation has been consolidated into 5 comprehensive guides:
 
 ### Core Documents
 1. **current-architecture.md** (this file) - Overview and navigation
-2. **architecture-decisions.md** - All ADRs from Phase 0-9
+2. **architecture-decisions.md** - All ADRs from Phase 0-10
 3. **operational-guide.md** - Performance and security unified
 4. **rag-system-guide.md** - Complete RAG system documentation
 5. **kernel-protocol-architecture.md** - Kernel design and protocol/transport abstraction
 
-This consolidation provides 5 comprehensive guides aligned with Phase 9 implementation.
+This consolidation provides 5 comprehensive guides aligned with Phase 10 implementation.
 
 ---
 
-*This document represents the actual implementation state of LLMSpell v0.9.0 after completing Phases 0-9, with integrated kernel architecture eliminating runtime isolation issues.*
+*This document represents the actual implementation state of LLMSpell v0.9.0 after completing Phases 0-10, with production-ready daemon support and consolidated kernel architecture.*

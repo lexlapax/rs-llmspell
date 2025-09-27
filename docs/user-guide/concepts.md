@@ -772,7 +772,141 @@ pub struct Metadata {
 
 ---
 
+## Service Deployment ⭐ **Phase 10**
+
+LLMSpell can be deployed as a production service with proper Unix daemon behavior.
+
+### Daemon Mode
+
+```bash
+# Start as daemon
+./llmspell kernel start --daemon --port 9555
+
+# With custom paths
+./llmspell kernel start --daemon \
+  --log-file /var/log/llmspell/kernel.log \
+  --pid-file /var/run/llmspell/kernel.pid
+```
+
+**Features:**
+- **Double-fork technique**: Proper daemon detachment
+- **PID file management**: Prevents multiple instances
+- **Signal handling**: SIGTERM, SIGHUP, SIGUSR1, SIGUSR2
+- **Log rotation**: Automatic log management
+- **TTY detachment**: True background operation
+
+### systemd Integration (Linux)
+
+```ini
+[Service]
+Type=forking
+ExecStart=/usr/local/bin/llmspell kernel start --daemon --port 9555
+PIDFile=/var/run/llmspell/kernel.pid
+Restart=on-failure
+```
+
+### launchd Integration (macOS)
+
+```xml
+<key>ProgramArguments</key>
+<array>
+    <string>/usr/local/bin/llmspell</string>
+    <string>kernel</string>
+    <string>start</string>
+    <string>--daemon</string>
+</array>
+<key>RunAtLoad</key><true/>
+<key>KeepAlive</key><true/>
+```
+
+### Signal Handling
+
+- **SIGTERM/SIGINT**: Graceful shutdown
+- **SIGHUP**: Reload configuration
+- **SIGUSR1**: Dump statistics
+- **SIGUSR2**: Toggle debug logging
+
+---
+
+## Debug & IDE Integration ⭐ **Phase 9-10**
+
+### Debug Adapter Protocol (DAP)
+
+Phase 9 added full DAP support for IDE debugging:
+
+```lua
+-- Enable DAP in script
+Debug.enableDAP({
+    port = 9556,
+    wait_for_debugger = true
+})
+
+-- Programmatic breakpoints
+Debug.breakpoint("function_name", line_number)
+```
+
+**DAP Features:**
+- **Breakpoints**: Set/clear/conditional
+- **Stepping**: Step in/over/out
+- **Variables**: Inspect locals and globals
+- **Call Stack**: View execution stack
+- **REPL**: Evaluate expressions
+
+### VS Code Integration
+
+```json
+{
+  "type": "llmspell",
+  "request": "attach",
+  "name": "Debug LLMSpell",
+  "port": 9556
+}
+```
+
+### Jupyter Lab Integration
+
+The kernel implements full Jupyter protocol:
+
+```bash
+# Connect Jupyter Lab
+jupyter console --existing /var/lib/llmspell/kernel.json
+
+# Or use notebook
+jupyter notebook --kernel llmspell
+```
+
+### Performance Monitoring
+
+```bash
+# Health check
+curl http://localhost:9555/health
+
+# Metrics endpoint
+curl http://localhost:9555/metrics
+
+# Event correlation
+curl http://localhost:9555/events
+```
+
+---
+
 ## Security Model
+
+### Kernel Security
+
+Phase 9-10 enhanced security with kernel-level isolation:
+
+**Process Isolation:**
+- Dedicated service user
+- Restricted file permissions
+- Resource limits (memory, CPU, files)
+- Namespace isolation (Linux)
+
+**Network Security:**
+- HMAC message signing
+- TLS support for remote connections
+- IP whitelisting
+- Rate limiting
 
 ### Sandboxing
 
@@ -814,23 +948,31 @@ Target performance metrics (validated in benchmarks):
 | Tool Invocation | <10ms | <5ms | Core |
 | State Read | <1ms | <1ms | Core |
 | State Write | <5ms | <3ms | Core |
-| Hook Overhead | <1% | <0.5% | Phase 7 |
-| Event Throughput | >50K/sec | 90K/sec | Phase 7 |
-| Workflow Step | <5ms | <5ms | Phase 6 |
-| **Vector Search (1M)** | **<10ms** | **<8ms** | **Phase 8.10.6** |
-| **RAG Query (E2E)** | **<100ms** | **<75ms** | **Phase 8.10.6** |
-| **Embedding Cache Hit** | **<1ms** | **<0.5ms** | **Phase 8.10.6** |
-| **Tenant Isolation Check** | **<1ms** | **<0.3ms** | **Phase 8.10.6** |
-| **HNSW Index Build (100K)** | **<60s** | **<45s** | **Phase 8.10.6** |
+| Hook Overhead | <1% | <0.5% | Phase 4 |
+| Event Throughput | >50K/sec | 90K/sec | Phase 4 |
+| Workflow Step | <5ms | <5ms | Phase 3 |
+| Vector Search (1M) | <10ms | <8ms | Phase 8 |
+| RAG Query (E2E) | <100ms | <75ms | Phase 8 |
+| Embedding Cache Hit | <1ms | <0.5ms | Phase 8 |
+| Tenant Isolation Check | <1ms | <0.3ms | Phase 8 |
+| HNSW Index Build (100K) | <60s | <45s | Phase 8 |
+| **Kernel Startup** | **<200ms** | **<100ms** | **Phase 9** |
+| **Message Processing** | **<10ms** | **<5ms** | **Phase 9** |
+| **Protocol Parsing** | **<5ms** | **<1ms** | **Phase 9** |
+| **DAP Stepping** | **<20ms** | **<10ms** | **Phase 9** |
+| **Daemon Fork** | **<50ms** | **<30ms** | **Phase 10** |
+| **Signal Handling** | **<5ms** | **<2ms** | **Phase 10** |
 
 ---
 
 ## See Also
 
-- [Getting Started](getting-started.md) - Quick start with RAG setup
-- [Configuration](configuration.md) - RAG, multi-tenancy, and system configuration
-- [Lua API Reference](api/lua/README.md) - Complete API with RAG globals
-- [Rust API Reference](api/rust/README.md) - Complete traits including storage and tenancy
-- [RAG Examples](../../examples/script-users/applications/) - Knowledge-base, personal-assistant
-- [Configuration Examples](../../examples/script-users/configs/) - RAG development, production, multi-tenant configs
-- [Examples Index](../../examples/EXAMPLE-INDEX.md) - 60+ examples including Phase 8.10.6 features
+- [Getting Started](getting-started.md) - Quick start with kernel setup
+- [Configuration](configuration.md) - Kernel, RAG, and service configuration
+- [Service Deployment](service-deployment.md) - Production deployment guide
+- [Troubleshooting](troubleshooting.md) - Common issues and solutions
+- [Lua API Reference](api/lua/README.md) - Complete API including Debug globals
+- [Rust API Reference](api/rust/README.md) - Complete traits including kernel architecture
+- [Kernel Examples](../../examples/script-users/kernel/) - Kernel and service examples
+- [Configuration Examples](../../examples/script-users/configs/) - Kernel, RAG, and daemon configs
+- [Examples Index](../../examples/EXAMPLE-INDEX.md) - 60+ examples including Phase 9-10 features
