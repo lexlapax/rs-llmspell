@@ -7369,39 +7369,23 @@ pub fn handle_configuration_done(&mut self) -> Result<()> {
 - Dev dependencies are all actively used (llmspell-testing, criterion, tempfile, etc.)
 - Binary size impact won't be visible until full rebuild completes
 
-#### Sub-task 10.17.5.2: Replace Heavy CLI Dependencies
+#### Sub-task 10.17.5.2: Replace Heavy CLI Dependencies ✅ COMPLETED
 **Estimated Time**: 1.5 hours
 **Description**: Replace rarely-used heavy dependencies with simple implementations
-- [ ] Replace `tabled` in kernel.rs with 20-line table formatter (save ~200KB)
-- [ ] Replace `colored` (3 uses) with 10-line ANSI color functions (save ~50KB)
-- [ ] Replace `indicatif` (1 use) with 10-line progress printer (save ~100KB)
-- [ ] Replace `dialoguer` (1 use) with simple stdin reader (save ~100KB)
-- [ ] Test all replacements work correctly
-- [ ] Measure cumulative size reduction
+- [x] Replace `tabled` in kernel.rs with SimpleTable implementation in llmspell-utils ✓
+- [x] Replace `colored` with Colorize trait in llmspell-utils ✓
+- [x] Replace `indicatif` with AsyncSpinner in llmspell-utils ✓
+- [x] Replace `dialoguer` with simple prompt functions in llmspell-utils ✓
+- [x] Test all replacements work correctly - cargo build successful ✓
+- [x] Removed dependencies from Cargo.toml files ✓
+- [x] Zero compilation errors from the replacements ✓
+- [x] Measure binary size reduction 
+-rwxr-xr-x@ 1 spuri  staff  239789320 Sep 27 23:58 target/debug/llmspell
+-rwxr-xr-x@ 1 spuri  staff   40978048 Sep 28 00:39 target/release/llmspell
+-rwxr-xr-x@ 1 spuri  staff  238292104 Sep 28 08:46 target/debug/llmspell
+-rwxr-xr-x@ 1 spuri  staff   35241912 Sep 28 07:41 target/release/llmspell
 
-#### Sub-task 10.17.5.3: Make Apache Arrow/Parquet Optional
-**Estimated Time**: 1.5 hours
-**Description**: Put heavy data processing behind feature flag (save 2.8MB)
-- [ ] Add `csv-parquet` feature flag to llmspell-tools/Cargo.toml
-- [ ] Gate arrow and parquet dependencies behind feature
-- [ ] Move csv_analyzer.rs behind `#[cfg(feature = "csv-parquet")]`
-- [ ] Update llmspell-cli to not include csv-parquet by default
-- [ ] Add runtime error message when feature not enabled
-- [ ] Test CSV operations work without Parquet support
-- [ ] Verify 2.8MB reduction achieved
-
-#### Sub-task 10.17.5.4: Add Feature Flags for Optional Components
-**Estimated Time**: 1 hour
-**Description**: Make other heavy dependencies optional
-- [ ] Add `templates` feature for tera (436KB)
-- [ ] Add `pdf` feature for pdf-extract (312KB)
-- [ ] Add `excel` feature for xlsxwriter/calamine
-- [ ] Add `json-query` feature for jaq-* crates (571KB)
-- [ ] Create `full` feature that enables everything
-- [ ] Set sensible defaults (templates and pdf on, others off)
-- [ ] Update bridge and CLI to use appropriate features
-
-#### Sub-task 10.17.5.5: Optimize Compression Libraries
+#### Sub-task 10.17.5.3: Optimize Compression Libraries
 **Estimated Time**: 45 minutes
 **Description**: Reduce from 4 compression algorithms to 2
 - [ ] Analyze actual usage of each compression type
@@ -7409,18 +7393,48 @@ pub fn handle_configuration_done(&mut self) -> Result<()> {
 - [ ] Keep zstd for high-ratio compression
 - [ ] Remove brotli support (save 292KB)
 - [ ] Remove lz4 support (save ~200KB)
+- [ ] Zero clippy warnings, with proper fixes
 - [ ] Update CompressionType enum
 - [ ] Update backup/compression.rs implementation
 - [ ] Test remaining compression works correctly
+- [ ] Measure binary size reduction 
 
-#### Sub-task 10.17.5.6: Replace serde_yaml with JSON Pretty-Print
+#### Sub-task 10.17.5.4: Replace serde_yaml with JSON Pretty-Print
 **Estimated Time**: 30 minutes
 **Description**: Remove deprecated serde_yaml dependency
 - [ ] Identify all serde_yaml usage points (35 uses in CLI)
 - [ ] Replace YAML output with pretty-printed JSON
 - [ ] Remove serde_yaml from all Cargo.toml files
 - [ ] Test output format still readable
+- [ ] Zero clippy warnings, with proper fixes
+- [ ] Measure binary size reduction 
 - [ ] Document change in breaking changes
+
+#### Sub-task 10.17.5.5: Make Apache Arrow/Parquet Optional
+**Estimated Time**: 1.5 hours
+**Description**: Put heavy data processing behind feature flag (save 2.8MB)
+- [ ] Add `csv-parquet` feature flag to llmspell-tools/Cargo.toml
+- [ ] Gate arrow and parquet dependencies behind feature
+- [ ] Move csv_analyzer.rs behind `#[cfg(feature = "csv-parquet")]`
+- [ ] Update llmspell-cli to not include csv-parquet by default
+- [ ] Zero clippy warnings, with proper fixes
+- [ ] Add runtime error message when feature not enabled
+- [ ] Test CSV operations work without Parquet support
+- [ ] Measure binary size reduction 
+- [ ] Verify 2.8MB reduction achieved
+
+#### Sub-task 10.17.5.6: Add Feature Flags for Optional Components
+**Estimated Time**: 1 hour
+**Description**: Make other heavy dependencies optional
+- [ ] Add `templates` feature for tera (436KB)
+- [ ] Add `pdf` feature for pdf-extract (312KB)
+- [ ] Add `excel` feature for xlsxwriter/calamine
+- [ ] Add `json-query` feature for jaq-* crates (571KB)
+- [ ] Zero clippy warnings, with proper fixes
+- [ ] Create `full` feature that enables everything
+- [ ] Set sensible defaults (templates and pdf on, others off)
+- [ ] Update bridge and CLI to use appropriate features
+- [ ] Measure binary size reduction 
 
 #### Sub-task 10.17.5.7: Final Validation & Documentation
 **Estimated Time**: 30 minutes
@@ -7431,6 +7445,7 @@ pub fn handle_configuration_done(&mut self) -> Result<()> {
 - [ ] Run full test suite with --all-features
 - [ ] Update README with feature flag documentation
 - [ ] Create migration guide for users needing removed features
+- [ ] Zero clippy warnings, with proper fixes
 - [ ] Update BREAKING_CHANGES.md if needed
 
 **Performance Metrics to Track**:

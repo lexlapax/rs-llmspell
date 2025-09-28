@@ -4,19 +4,18 @@
 //! All kernel logic is in llmspell-kernel, this is just command handling.
 
 use anyhow::{anyhow, Result};
-use colored::Colorize;
 use llmspell_config::LLMSpellConfig;
 use llmspell_kernel::{
     api::KernelServiceConfig, connect_to_kernel, daemon::DaemonConfig, execution::ExecutionConfig,
     monitoring::HealthThresholds, start_kernel_service_with_config,
 };
+use llmspell_utils::terminal::{Colorize, SimpleTable, TableStyle};
 use nix::sys::signal::{self, Signal};
 use nix::unistd::Pid;
 use std::env;
 use std::fs;
 use std::path::{Path, PathBuf};
 use std::time::{Duration, Instant};
-use tabled::{builder::Builder, settings::Style};
 use tracing::{info, warn};
 
 use crate::kernel_discovery::{self, KernelInfo, KernelMetrics, KernelStatus};
@@ -492,40 +491,44 @@ fn display_kernel_status(
 
 /// Display kernels in a summary table
 fn display_summary_table(kernel_data: &[(&KernelInfo, Option<KernelMetrics>)]) -> Result<()> {
-    let mut builder = Builder::default();
-
-    // Add header
-    builder.push_record(["ID", "PID", "Port", "Status", "CPU%", "Memory", "Uptime"]);
+    let mut table = SimpleTable::new(vec![
+        "ID".to_string(),
+        "PID".to_string(),
+        "Port".to_string(),
+        "Status".to_string(),
+        "CPU%".to_string(),
+        "Memory".to_string(),
+        "Uptime".to_string(),
+    ])
+    .with_style(TableStyle::Rounded);
 
     for (kernel, metrics) in kernel_data {
         let status_str = format_status(&kernel.status);
 
         if let Some(m) = metrics {
-            builder.push_record([
-                &kernel.id,
-                &kernel.pid.to_string(),
-                &kernel.port.to_string(),
-                &status_str,
-                &format!("{:.1}", m.cpu_percent),
-                &format_memory(m.memory_bytes),
-                &format_duration(&m.uptime),
+            table.add_row(vec![
+                kernel.id.clone(),
+                kernel.pid.to_string(),
+                kernel.port.to_string(),
+                status_str,
+                format!("{:.1}", m.cpu_percent),
+                format_memory(m.memory_bytes),
+                format_duration(&m.uptime),
             ]);
         } else {
-            builder.push_record([
-                &kernel.id,
-                &kernel.pid.to_string(),
-                &kernel.port.to_string(),
-                &status_str,
-                "N/A",
-                "N/A",
-                "N/A",
+            table.add_row(vec![
+                kernel.id.clone(),
+                kernel.pid.to_string(),
+                kernel.port.to_string(),
+                status_str,
+                "N/A".to_string(),
+                "N/A".to_string(),
+                "N/A".to_string(),
             ]);
         }
     }
 
-    let table = builder.build().with(Style::rounded()).to_string();
     println!("{}", table);
-
     Ok(())
 }
 
@@ -536,52 +539,56 @@ fn display_detailed_table(kernel_data: &[(&KernelInfo, Option<KernelMetrics>)]) 
         println!("Kernel: {}", kernel.id.bold());
         println!("{}", "─".repeat(60));
 
-        let mut builder = Builder::default();
-        builder.push_record(["Property", "Value"]);
+        let mut table = SimpleTable::new(vec!["Property".to_string(), "Value".to_string()])
+            .with_style(TableStyle::Rounded);
 
-        builder.push_record(["Process ID", &kernel.pid.to_string()]);
-        builder.push_record(["Port", &kernel.port.to_string()]);
-        builder.push_record(["Status", &format_status(&kernel.status)]);
-        builder.push_record([
-            "Connection File",
-            &kernel.connection_file.display().to_string(),
+        table.add_row(vec!["Process ID".to_string(), kernel.pid.to_string()]);
+        table.add_row(vec!["Port".to_string(), kernel.port.to_string()]);
+        table.add_row(vec!["Status".to_string(), format_status(&kernel.status)]);
+        table.add_row(vec![
+            "Connection File".to_string(),
+            kernel.connection_file.display().to_string(),
         ]);
 
         if let Some(pid_file) = &kernel.pid_file {
-            builder.push_record(["PID File", &pid_file.display().to_string()]);
+            table.add_row(vec!["PID File".to_string(), pid_file.display().to_string()]);
         }
 
         if let Some(log_file) = &kernel.log_file {
-            builder.push_record(["Log File", &log_file.display().to_string()]);
+            table.add_row(vec!["Log File".to_string(), log_file.display().to_string()]);
         }
 
         if let Some(m) = metrics {
-            builder.push_record(["", ""]);
-            builder.push_record(["CPU Usage", &format!("{:.1}%", m.cpu_percent)]);
-            builder.push_record([
-                "Memory Usage",
-                &format!(
+            table.add_row(vec!["".to_string(), "".to_string()]);
+            table.add_row(vec![
+                "CPU Usage".to_string(),
+                format!("{:.1}%", m.cpu_percent),
+            ]);
+            table.add_row(vec![
+                "Memory Usage".to_string(),
+                format!(
                     "{} ({:.1}%)",
                     format_memory(m.memory_bytes),
                     m.memory_percent
                 ),
             ]);
-            builder.push_record(["Open Files", &m.open_files.to_string()]);
-            builder.push_record(["Active Connections", &m.active_connections.to_string()]);
-            builder.push_record(["Uptime", &format_duration(&m.uptime)]);
+            table.add_row(vec!["Open Files".to_string(), m.open_files.to_string()]);
+            table.add_row(vec![
+                "Active Connections".to_string(),
+                m.active_connections.to_string(),
+            ]);
+            table.add_row(vec!["Uptime".to_string(), format_duration(&m.uptime)]);
 
             if let Some(last_activity) = m.last_activity {
                 let elapsed = std::time::SystemTime::now()
                     .duration_since(last_activity)
                     .unwrap_or(Duration::ZERO);
-                builder.push_record([
-                    "Last Activity",
-                    &format!("{} ago", format_duration(&elapsed)),
+                table.add_row(vec![
+                    "Last Activity".to_string(),
+                    format!("{} ago", format_duration(&elapsed)),
                 ]);
             }
         }
-
-        let table = builder.build().with(Style::rounded()).to_string();
         println!("{}", table);
     }
 
@@ -646,7 +653,7 @@ fn format_status(status: &KernelStatus) -> String {
         KernelStatus::Busy => "Busy".yellow().to_string(),
         KernelStatus::Idle => "Idle".blue().to_string(),
         KernelStatus::ShuttingDown => "Shutting Down".red().to_string(),
-        KernelStatus::Unknown => "Unknown".dimmed().to_string(),
+        KernelStatus::Unknown => "Unknown".dim().to_string(),
     }
 }
 

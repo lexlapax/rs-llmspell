@@ -2,7 +2,7 @@
 //! ABOUTME: Guides users through API key configuration and initial setup
 
 use anyhow::Result;
-use dialoguer::{theme::ColorfulTheme, Confirm, Input, Select};
+use llmspell_utils::terminal::{confirm, input_with_validation, select};
 use std::path::PathBuf;
 
 /// Run interactive setup for first-time users
@@ -16,10 +16,7 @@ pub async fn run_interactive_setup(force: bool) -> Result<()> {
         .unwrap_or_else(|| PathBuf::from("llmspell.toml"));
 
     if config_path.exists() && !force {
-        let overwrite = Confirm::with_theme(&ColorfulTheme::default())
-            .with_prompt("Configuration already exists. Overwrite?")
-            .default(false)
-            .interact()?;
+        let overwrite = confirm("Configuration already exists. Overwrite?", false)?;
 
         if !overwrite {
             println!("Setup cancelled. Use --force to overwrite existing configuration.");
@@ -31,11 +28,7 @@ pub async fn run_interactive_setup(force: bool) -> Result<()> {
     println!("\n📋 Step 1: Choose your AI provider\n");
 
     let providers = vec!["OpenAI (Recommended)", "Anthropic", "Both", "Skip for now"];
-    let provider_choice = Select::with_theme(&ColorfulTheme::default())
-        .with_prompt("Which AI provider would you like to use?")
-        .items(&providers)
-        .default(0)
-        .interact()?;
+    let provider_choice = select("Which AI provider would you like to use?", &providers)?;
 
     let mut config = llmspell_config::LLMSpellConfig::default();
 
@@ -46,16 +39,16 @@ pub async fn run_interactive_setup(force: bool) -> Result<()> {
             println!("\n🔑 Step 2: OpenAI API Key\n");
             println!("Get your API key from: https://platform.openai.com/api-keys\n");
 
-            let api_key: String = Input::with_theme(&ColorfulTheme::default())
-                .with_prompt("Enter your OpenAI API key")
-                .validate_with(|input: &String| {
+            let api_key = input_with_validation(
+                "Enter your OpenAI API key: ",
+                |input: &str| {
                     if input.starts_with("sk-") && input.len() > 20 {
                         Ok(())
                     } else {
                         Err("Invalid OpenAI API key format (should start with 'sk-')")
                     }
-                })
-                .interact_text()?;
+                },
+            )?;
 
             // Save to environment variable
             std::env::set_var("OPENAI_API_KEY", &api_key);
@@ -89,16 +82,16 @@ pub async fn run_interactive_setup(force: bool) -> Result<()> {
             println!("\n🔑 Step 2: Anthropic API Key\n");
             println!("Get your API key from: https://console.anthropic.com/settings/keys\n");
 
-            let api_key: String = Input::with_theme(&ColorfulTheme::default())
-                .with_prompt("Enter your Anthropic API key")
-                .validate_with(|input: &String| {
+            let api_key = input_with_validation(
+                "Enter your Anthropic API key: ",
+                |input: &str| {
                     if input.starts_with("sk-ant-") && input.len() > 30 {
                         Ok(())
                     } else {
                         Err("Invalid Anthropic API key format (should start with 'sk-ant-')")
                     }
-                })
-                .interact_text()?;
+                },
+            )?;
 
             // Save to environment variable
             std::env::set_var("ANTHROPIC_API_KEY", &api_key);
@@ -136,11 +129,7 @@ pub async fn run_interactive_setup(force: bool) -> Result<()> {
         "Skip - I'll explore on my own",
     ];
 
-    let app_choice = Select::with_theme(&ColorfulTheme::default())
-        .with_prompt("Which application would you like to try first?")
-        .items(&apps)
-        .default(0)
-        .interact()?;
+    let app_choice = select("Which application would you like to try first?", &apps)?;
 
     // Step 4: Save configuration
     println!("\n💾 Step 4: Saving configuration...\n");

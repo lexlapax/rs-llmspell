@@ -2,8 +2,8 @@
 // ABOUTME: Provides simple interface to run different test categories
 
 use clap::{Parser, Subcommand};
-use colored::*;
 use llmspell_testing::runner::{TestCategory, TestRunner, TestRunnerConfig};
+use llmspell_utils::terminal::Colorize;
 use std::process;
 
 #[derive(Parser)]
@@ -161,7 +161,7 @@ fn list_categories(detailed: bool) -> Result<(), Box<dyn std::error::Error>> {
     for (name, short, long) in categories {
         if detailed {
             println!("  {} - {}", name.yellow().bold(), short);
-            println!("    {}", long.dimmed());
+            println!("    {}", long.dim());
             println!();
         } else {
             println!("  {} - {}", name.yellow(), short);
