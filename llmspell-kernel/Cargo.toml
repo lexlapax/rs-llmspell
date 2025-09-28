@@ -83,10 +83,7 @@ lz4_flex = { workspace = true }
 sled = "0.34"
 
 # Compression libraries (for consolidated state persistence)
-flate2 = "1.0"
 zstd = "0.13"
-lz4 = "1.24"
-brotli = "3.5"
 
 # Cryptography
 sha2 = "0.10"

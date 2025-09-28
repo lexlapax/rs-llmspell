@@ -6,3 +6,5 @@
 -rwxr-xr-x@ 1 spuri  staff   40978048 Sep 28 00:39 target/release/llmspell
 -rwxr-xr-x@ 1 spuri  staff   35241912 Sep 28 07:41 target/release/llmspell
 -rwxr-xr-x@ 1 spuri  staff  238292104 Sep 28 08:46 target/debug/llmspell
+-rwxr-xr-x@ 1 spuri  staff  238289416 Sep 28 10:26 target/debug/llmspell
+-rwxr-xr-x@ 1 spuri  staff   31237952 Sep 28 10:34 target/release/llmspell

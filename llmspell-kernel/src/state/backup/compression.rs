@@ -1,11 +1,11 @@
-// ABOUTME: Backup compression implementation with multiple algorithm support
+// ABOUTME: Backup compression implementation with lz4 and zstd support
 // ABOUTME: Targets >70% compression ratio for typical state data
 
 use super::super::config::CompressionType;
 use crate::state::StateError;
 use anyhow::Result;
+use lz4_flex::{compress_prepend_size, decompress_size_prepended};
 use serde::{Deserialize, Serialize};
-use std::io::{Read, Write};
 use tracing::debug;
 
 // CompressionType is imported from config module
@@ -88,10 +88,8 @@ impl BackupCompression {
 
         let compressed = match self.compression_type {
             CompressionType::None => data.to_vec(),
-            CompressionType::Gzip => self.compress_gzip(data)?,
-            CompressionType::Zstd => self.compress_zstd(data)?,
             CompressionType::Lz4 => self.compress_lz4(data)?,
-            CompressionType::Brotli => self.compress_brotli(data)?,
+            CompressionType::Zstd => self.compress_zstd(data)?,
         };
 
         let compressed_size = compressed.len();
@@ -130,39 +128,11 @@ impl BackupCompression {
 
         let decompressed = match self.compression_type {
             CompressionType::None => data.to_vec(),
-            CompressionType::Gzip => Self::decompress_gzip(data)?,
-            CompressionType::Zstd => Self::decompress_zstd(data)?,
             CompressionType::Lz4 => Self::decompress_lz4(data)?,
-            CompressionType::Brotli => Self::decompress_brotli(data)?,
+            CompressionType::Zstd => Self::decompress_zstd(data)?,
         };
 
         debug!("Decompression complete: {} bytes", decompressed.len());
-        Ok(decompressed)
-    }
-
-    /// Compress with gzip
-    fn compress_gzip(&self, data: &[u8]) -> Result<Vec<u8>, StateError> {
-        use flate2::write::GzEncoder;
-        use flate2::Compression;
-
-        let mut encoder = GzEncoder::new(Vec::new(), Compression::new(self.compression_level.0));
-        encoder
-            .write_all(data)
-            .map_err(|e| StateError::storage(format!("Compression error: {e}")))?;
-        encoder
-            .finish()
-            .map_err(|e| StateError::storage(format!("Compression error: {e}")))
-    }
-
-    /// Decompress gzip
-    fn decompress_gzip(data: &[u8]) -> Result<Vec<u8>, StateError> {
-        use flate2::read::GzDecoder;
-
-        let mut decoder = GzDecoder::new(data);
-        let mut decompressed = Vec::new();
-        decoder
-            .read_to_end(&mut decompressed)
-            .map_err(|e| StateError::storage(format!("Decompression error: {e}")))?;
         Ok(decompressed)
     }
 
@@ -180,50 +150,18 @@ impl BackupCompression {
     }
 
     /// Compress with lz4
+    #[allow(clippy::unnecessary_wraps)] // Keep Result for API consistency
     fn compress_lz4(&self, data: &[u8]) -> Result<Vec<u8>, StateError> {
-        // LZ4 doesn't use traditional compression levels, but we can map them
-        let acceleration = match self.compression_level.0 {
-            1..=3 => 1, // Fast
-            7..=9 => 9, // Best
-            _ => 3,     // Default (4..=6 and any other value)
-        };
-
-        lz4::block::compress(
-            data,
-            Some(lz4::block::CompressionMode::HIGHCOMPRESSION(acceleration)),
-            true,
-        )
-        .map_err(|e| StateError::storage(format!("Compression error: {e}")))
+        // lz4_flex uses prepended size for safer decompression
+        // Note: lz4_flex doesn't use compression levels, so self is unused
+        let _ = self;
+        Ok(compress_prepend_size(data))
     }
 
     /// Decompress lz4
     fn decompress_lz4(data: &[u8]) -> Result<Vec<u8>, StateError> {
-        lz4::block::decompress(data, None)
+        decompress_size_prepended(data)
             .map_err(|e| StateError::storage(format!("Decompression error: {e}")))
-    }
-
-    /// Compress with brotli
-    fn compress_brotli(&self, data: &[u8]) -> Result<Vec<u8>, StateError> {
-        let mut output = Vec::new();
-        let params = brotli::enc::BrotliEncoderParams {
-            #[allow(clippy::cast_possible_wrap)]
-            quality: self.compression_level.0 as i32,
-            ..Default::default()
-        };
-
-        brotli::BrotliCompress(&mut std::io::Cursor::new(data), &mut output, &params)
-            .map_err(|e| StateError::storage(format!("Compression error: {e}")))?;
-
-        Ok(output)
-    }
-
-    /// Decompress brotli
-    fn decompress_brotli(data: &[u8]) -> Result<Vec<u8>, StateError> {
-        let mut output = Vec::new();
-        brotli::BrotliDecompress(&mut std::io::Cursor::new(data), &mut output)
-            .map_err(|e| StateError::storage(format!("Decompression error: {e}")))?;
-
-        Ok(output)
     }
 
     /// Analyze compression efficiency for data
@@ -302,10 +240,8 @@ pub fn find_optimal_compression(
     max_time_ms: u64,
 ) -> Result<(CompressionType, CompressionLevel), StateError> {
     let algorithms = vec![
-        CompressionType::Lz4,    // Fastest
-        CompressionType::Zstd,   // Balanced
-        CompressionType::Gzip,   // Compatible
-        CompressionType::Brotli, // Best ratio
+        CompressionType::Lz4,  // Fastest
+        CompressionType::Zstd, // Best ratio with good speed
     ];
 
     let levels = vec![
@@ -355,10 +291,8 @@ mod tests {
     #[test]
     fn test_compression_type_extension() {
         assert_eq!(CompressionType::None.extension(), "");
-        assert_eq!(CompressionType::Gzip.extension(), ".gz");
-        assert_eq!(CompressionType::Zstd.extension(), ".zst");
         assert_eq!(CompressionType::Lz4.extension(), ".lz4");
-        assert_eq!(CompressionType::Brotli.extension(), ".br");
+        assert_eq!(CompressionType::Zstd.extension(), ".zst");
     }
     #[test]
     fn test_compression_roundtrip() {
@@ -376,10 +310,8 @@ mod tests {
         let data = b"Test data for all compression algorithms".repeat(50);
         let algorithms = vec![
             CompressionType::None,
-            CompressionType::Gzip,
-            CompressionType::Zstd,
             CompressionType::Lz4,
-            CompressionType::Brotli,
+            CompressionType::Zstd,
         ];
 
         for algorithm in algorithms {
@@ -425,7 +357,7 @@ mod tests {
     #[test]
     fn test_compression_ratio_calculation() {
         // Test that compression ratio calculation doesn't panic
-        let compressor = BackupCompression::new(CompressionType::Gzip, CompressionLevel::default());
+        let compressor = BackupCompression::new(CompressionType::Lz4, CompressionLevel::default());
 
         // Case 1: Data that compresses well
         let good_data = b"AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA".to_vec();

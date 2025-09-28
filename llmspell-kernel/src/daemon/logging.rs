@@ -160,18 +160,15 @@ impl LogRotator {
 
     /// Compresses a rotated log file
     fn compress_file(path: &str) -> Result<()> {
-        use flate2::write::GzEncoder;
-        use flate2::Compression;
+        use lz4_flex::compress_prepend_size;
+        use std::fs;
 
         let input_path = Path::new(path);
-        let output_path = PathBuf::from(format!("{path}.gz"));
+        let output_path = PathBuf::from(format!("{path}.lz4"));
 
-        let input_file = File::open(input_path)?;
-        let output_file = File::create(&output_path)?;
-        let mut encoder = GzEncoder::new(output_file, Compression::default());
-
-        std::io::copy(&mut &input_file, &mut encoder)?;
-        encoder.finish()?;
+        let input_data = fs::read(input_path)?;
+        let compressed = compress_prepend_size(&input_data);
+        fs::write(&output_path, compressed)?;
 
         // Remove uncompressed file
         fs::remove_file(input_path)?;
@@ -396,7 +393,7 @@ mod tests {
         rotator.write(data).unwrap();
         rotator.write(data).unwrap(); // Trigger rotation
 
-        // Check for .gz file
+        // Check for .lz4 file
         let has_compressed = fs::read_dir(temp_dir.path()).unwrap().any(|entry| {
             entry
                 .ok()
@@ -404,11 +401,11 @@ mod tests {
                     e.path()
                         .extension()
                         .and_then(|ext| ext.to_str())
-                        .map(|s| s.eq_ignore_ascii_case("gz"))
+                        .map(|s| s.eq_ignore_ascii_case("lz4"))
                 })
                 .unwrap_or(false)
         });
-        assert!(has_compressed, "Should have created compressed file");
+        assert!(has_compressed, "Should have created compressed .lz4 file");
     }
 
     #[test]
@@ -532,8 +529,7 @@ mod tests {
 
     #[test]
     fn test_log_rotation_with_compression() {
-        use flate2::read::GzDecoder;
-        use std::io::Read;
+        use lz4_flex::decompress_size_prepended;
 
         let temp_dir = tempdir().unwrap();
         let log_path = temp_dir.path().join("test.log");
@@ -560,17 +556,16 @@ mod tests {
                 entry.file_name().to_str().is_some_and(|name| {
                     std::path::Path::new(name)
                         .extension()
-                        .is_some_and(|ext| ext.eq_ignore_ascii_case("gz"))
+                        .is_some_and(|ext| ext.eq_ignore_ascii_case("lz4"))
                 })
             });
 
         // If rotation occurred with compression, verify the compressed file
         if let Some(entry) = compressed_file {
             let compressed_path = entry.path();
-            let file = File::open(&compressed_path).unwrap();
-            let mut decoder = GzDecoder::new(file);
-            let mut contents = String::new();
-            decoder.read_to_string(&mut contents).unwrap();
+            let compressed_data = std::fs::read(&compressed_path).unwrap();
+            let decompressed = decompress_size_prepended(&compressed_data).unwrap();
+            let contents = String::from_utf8(decompressed).unwrap();
             assert!(contents.contains("First log entry"));
         }
     }

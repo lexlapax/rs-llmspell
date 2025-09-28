@@ -277,10 +277,8 @@ impl Default for BackupConfig {
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 pub enum CompressionType {
     None,
-    Gzip,
-    Zstd,
     Lz4,
-    Brotli,
+    Zstd,
 }
 
 impl CompressionType {
@@ -288,10 +286,8 @@ impl CompressionType {
     pub fn extension(&self) -> &'static str {
         match self {
             CompressionType::None => "",
-            CompressionType::Gzip => ".gz",
-            CompressionType::Zstd => ".zst",
             CompressionType::Lz4 => ".lz4",
-            CompressionType::Brotli => ".br",
+            CompressionType::Zstd => ".zst",
         }
     }
 }
@@ -300,10 +296,8 @@ impl std::fmt::Display for CompressionType {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
             CompressionType::None => write!(f, "none"),
-            CompressionType::Gzip => write!(f, "gzip"),
-            CompressionType::Zstd => write!(f, "zstd"),
             CompressionType::Lz4 => write!(f, "lz4"),
-            CompressionType::Brotli => write!(f, "brotli"),
+            CompressionType::Zstd => write!(f, "zstd"),
         }
     }
 }

@@ -5,11 +5,10 @@ use crate::persistence::{HookMetadata, SerializedHookExecution};
 use anyhow::{Context, Result};
 use async_trait::async_trait;
 use bytes::Bytes;
-use flate2::{read::GzDecoder, write::GzEncoder, Compression};
+use lz4_flex::{compress_prepend_size, decompress_size_prepended};
 use parking_lot::RwLock;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
-use std::io::{Read, Write};
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
 use std::time::{Duration, SystemTime};
@@ -90,21 +89,12 @@ impl InMemoryStorageBackend {
     }
 
     fn compress_data(data: &[u8]) -> Result<Bytes> {
-        let mut encoder = GzEncoder::new(Vec::new(), Compression::default());
-        encoder
-            .write_all(data)
-            .context("Failed to write to compressor")?;
-        let compressed = encoder.finish().context("Failed to finish compression")?;
+        let compressed = compress_prepend_size(data);
         Ok(Bytes::from(compressed))
     }
 
     fn decompress_data(data: &[u8]) -> Result<Vec<u8>> {
-        let mut decoder = GzDecoder::new(data);
-        let mut decompressed = Vec::new();
-        decoder
-            .read_to_end(&mut decompressed)
-            .context("Failed to decompress data")?;
-        Ok(decompressed)
+        decompress_size_prepended(data).context("Failed to decompress data")
     }
 }
 

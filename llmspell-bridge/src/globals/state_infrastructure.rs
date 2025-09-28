@@ -137,9 +137,8 @@ pub async fn get_or_create_state_infrastructure(
                 ),
                 compression_enabled: backup_cfg.compression_enabled,
                 compression_type: match backup_cfg.compression_type.as_str() {
-                    "gzip" => llmspell_kernel::state::config::CompressionType::Gzip,
+                    "none" => llmspell_kernel::state::config::CompressionType::None,
                     "lz4" => llmspell_kernel::state::config::CompressionType::Lz4,
-                    "brotli" => llmspell_kernel::state::config::CompressionType::Brotli,
                     _ => llmspell_kernel::state::config::CompressionType::Zstd,
                 },
                 compression_level: backup_cfg.compression_level,
