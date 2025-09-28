@@ -1,0 +1,11 @@
+# Default configuration for llmspell kernel
+[kernel]
+language = "lua"
+debug = false
+
+[llm]
+provider = "mock"
+model = "mock-model"
+
+[logging]
+level = "info"
