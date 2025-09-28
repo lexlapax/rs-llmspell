@@ -16,8 +16,8 @@ async-trait.workspace = true
 serde = { workspace = true, features = ["derive"] }
 anyhow.workspace = true
 tracing.workspace = true
-uuid = { version = "1.8", features = ["v4", "serde"] }
-chrono = { version = "0.4", features = ["serde", "std"] }
+uuid = { workspace = true }
+chrono = { workspace = true }
 dashmap = "5.5"
 parking_lot = "0.12"
 rand = "0.8"

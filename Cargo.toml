@@ -62,7 +62,7 @@ serde_yaml = "0.9"
 toml = "0.8"
 
 # UUID and time handling
-uuid = { version = "1.10", features = ["v4", "v5", "serde"] }
+uuid = { version = "1.17", features = ["v4", "v5", "serde"] }
 chrono = { version = "0.4", features = ["serde"] }
 
 # Error handling

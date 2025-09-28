@@ -20,7 +20,7 @@ llmspell-storage = { path = "../llmspell-storage" }
 llmspell-tenancy = { path = "../llmspell-tenancy" }
 
 # Vector storage
-hnsw = "0.11"  # HNSW vector index implementation
+# Note: Using hnsw_rs from llmspell-kernel instead
 
 # Async runtime
 tokio = { version = "1.35", features = ["full"] }
@@ -38,8 +38,8 @@ thiserror = "1.0"
 tracing = "0.1"
 parking_lot = "0.12"
 dashmap = "5.5"
-uuid = { version = "1.7", features = ["v4", "serde"] }
-chrono = { version = "0.4", features = ["serde"] }
+uuid = { workspace = true }
+chrono = { workspace = true }
 
 # Token counting for chunking
 tiktoken-rs = "0.5"

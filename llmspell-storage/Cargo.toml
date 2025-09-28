@@ -18,7 +18,7 @@ tracing.workspace = true
 sled.workspace = true
 dashmap = "5.5"
 parking_lot = "0.12"
-uuid = { version = "1.7", features = ["v4", "serde"] }
+uuid = { workspace = true }
 tempfile = { workspace = true, optional = true }
 
 # HNSW implementation dependencies
