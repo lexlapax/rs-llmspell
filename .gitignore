@@ -28,8 +28,8 @@ tarpaulin-report.json
 build_rs_cov.profraw
 examples/backups/*
 tests/python/venv/
-tests/python/__pycache__/
-tests/python/*.pyc
-tests/python/.pytest_cache/
+*.pyc
+__pycache__/
+.pytest_cache
 
 

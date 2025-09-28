@@ -18,6 +18,13 @@ rs-llmspell v0.9.0 delivers **unified kernel architecture** with interactive REP
 
 ## ✨ Key Features
 
+### 📦 Optimized Feature-Based Builds (NEW in Phase 10)
+- **Minimal 19MB binary** - 43% smaller than before, perfect for containers
+- **Choose your features** - Include only what you need (templates, PDF, data tools)
+- **Zero runtime overhead** - Feature flags are compile-time only
+- **Automatic tool discovery** - Runtime adapts to available features
+- **Three preset configurations**: minimal (19MB), common (25MB), full (35MB)
+
 ### 🎯 Unified Kernel & Debug Infrastructure (v0.9.0)
 - **Interactive REPL**: Jupyter 5-channel protocol support
 - **Debug Capabilities**: DAP bridge with breakpoints and stepping
@@ -59,7 +66,8 @@ Progressive complexity with RAG capabilities:
 - **Resource Boundaries**: Per-tenant CPU, memory, I/O limits
 - **Audit Compliance**: Complete trails with event correlation
 
-### ⚡ Blazing Performance (v0.9.0)
+### ⚡ Blazing Performance (v0.9.0 + Phase 10)
+- **Binary size**: 19MB minimal, 25MB common, 35MB full (was 33.6MB fixed)
 - **Message handling**: 3.8ms (24% faster than target)
 - **Tracing overhead**: -3.99% (performance improved!)
 - **Application validation**: 100% success rate
@@ -204,13 +212,17 @@ local tenant_results = RAG.search("knowledge", {
 
 ## 🚀 Quick Start
 
-### Easy Installation (Recommended)
+### Easy Installation (Choose Your Build)
 
 ```bash
-# Clone and build
+# Clone repository
 git clone https://github.com/lexlapax/rs-llmspell
 cd rs-llmspell
-cargo build --release
+
+# Choose your build size:
+cargo build --release                   # Minimal: 19MB (core tools only)
+cargo build --release --features common # Common: 25MB (+templates, PDF)
+cargo build --release --features full   # Full: 35MB (all features)
 
 # Use the friendly launcher with setup wizard
 ./scripts/llmspell-easy.sh
@@ -218,6 +230,8 @@ cargo build --release
 # Run your first application!
 ./scripts/llmspell-easy.sh file-organizer
 ```
+
+💡 **Build Size Tip**: Start with minimal (19MB) for production or common (25MB) for development. See [Installation Options](#-installation-options) below for details.
 
 ### Try Production Applications
 

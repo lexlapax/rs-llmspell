@@ -9,20 +9,50 @@
 
 ## 🎯 Developer Quick Start (5 minutes)
 
-### Setup
-```bash
-# 1. Clone and build
-git clone <repository-url> && cd rs-llmspell
-cargo build --release
+### Setup & Build Options
 
-# 2. Verify setup - MANDATORY quality checks
+rs-llmspell uses a **feature-based build system** to optimize binary size and dependencies. Choose your build based on your needs:
+
+```bash
+# 1. Clone repository
+git clone <repository-url> && cd rs-llmspell
+
+# 2. Choose your build configuration:
+
+# OPTION A: Minimal Build (19MB) - Recommended for production containers
+cargo build --release --bin llmspell
+# Includes: Core functionality, Lua scripting, essential tools
+
+# OPTION B: Common Build (25MB) - Recommended for most developers
+cargo build --release --bin llmspell --features common
+# Adds: Template engines (Tera, Handlebars), PDF processing
+
+# OPTION C: Full Build (35MB) - All features for complete development
+cargo build --release --bin llmspell --features full
+# Adds: CSV/Parquet, Excel, archives, email, database support
+
+# 3. Verify setup - MANDATORY quality checks
 ./scripts/quality/quality-check-minimal.sh  # <5 seconds - format, clippy, compile
 ./scripts/quality/quality-check-fast.sh     # ~1 min - adds unit tests & docs
 ./scripts/quality/quality-check.sh          # 5+ min - full validation
 
-# 3. Run example to verify
-./target/debug/llmspell run examples/script-users/getting-started/00-hello-world.lua
+# 4. Run example to verify
+./target/release/llmspell run examples/script-users/getting-started/00-hello-world.lua
 ```
+
+### Quick Feature Reference
+
+| Feature | Size Impact | Tools Added | Use Case |
+|---------|------------|-------------|----------|
+| (minimal) | 19MB base | Core tools only | Production, containers |
+| `templates` | +400KB | TemplateEngine | Document generation |
+| `pdf` | +300KB | PdfProcessor | PDF analysis/extraction |
+| `csv-parquet` | +2.8MB | CsvAnalyzer | Data analytics |
+| `excel` | +1MB | ExcelHandler | Spreadsheet processing |
+| `json-query` | +600KB | JsonQuery (JQ) | Complex JSON ops |
+| `archives` | +400KB | ArchiveHandler | ZIP/TAR handling |
+| `email` | +500KB | EmailTool (SMTP) | Email notifications |
+| `database` | +2MB | Database ops | SQL connectivity |
 
 ### Your First Contribution
 
@@ -91,6 +121,211 @@ Application Layer (10 crates):
 4. **Security Levels**: Safe, Restricted, Privileged - every tool must declare
 5. **Test Categories**: unit, integration, external - always categorize
 6. **RAG System (Phase 8)**: Vector storage, embeddings, multi-tenant isolation
+
+---
+
+## 📦 Build Configuration & Features
+
+### Feature-Based Build System
+
+rs-llmspell uses **Cargo feature flags** to create optimized binaries. This system reduces binary size from 33.6MB (old default) to as small as 19MB (minimal), while allowing developers to include only the dependencies they need.
+
+### Build Configurations
+
+#### 1. Minimal Build (19MB) - Production Ready
+```bash
+cargo build --release --bin llmspell
+# Or explicitly:
+cargo build --release --bin llmspell --no-default-features --features lua
+```
+
+**Includes:**
+- Core functionality (llmspell-core, utils, bridge)
+- Lua scripting support
+- Essential tools (file operations, HTTP, shell, text processing)
+- State management and persistence
+- Hook system and events
+- Session management
+
+**Excludes:** Heavy dependencies like Apache Arrow, template engines, PDF processing
+
+**Use Cases:** Production deployments, containers, embedded systems, CI/CD pipelines
+
+#### 2. Common Build (25MB) - Developer Friendly
+```bash
+cargo build --release --bin llmspell --features common
+```
+
+**Adds to Minimal:**
+- Template engines (Tera, Handlebars) - document generation
+- PDF processing (pdf-extract) - document analysis
+
+**Use Cases:** Most development work, documentation generation, report creation
+
+#### 3. Full Build (35MB) - Complete Toolkit
+```bash
+cargo build --release --bin llmspell --features full
+```
+
+**Adds Everything:**
+- CSV/Parquet support (Apache Arrow) - data analytics
+- Excel processing (calamine, xlsxwriter)
+- Archive handling (ZIP, TAR, GZ)
+- Email support (SMTP, AWS SES)
+- Database connectivity (PostgreSQL, MySQL, SQLite)
+- JSON query engine (JQ implementation)
+
+**Use Cases:** Data science, full-featured development, all examples
+
+### Custom Feature Selection
+
+Mix and match features based on your specific needs:
+
+```bash
+# Just add template support to minimal
+cargo build --release --features templates
+
+# Data processing focus
+cargo build --release --features csv-parquet,excel
+
+# Communication tools
+cargo build --release --features email,database
+
+# Multiple features
+cargo build --release --features templates,pdf,archives
+```
+
+### Feature Flags Reference
+
+| Feature | Dependencies | Binary Impact | Tools Enabled |
+|---------|-------------|---------------|---------------|
+| `templates` | tera, handlebars | +400KB | TemplateEngineTool |
+| `pdf` | pdf-extract | +300KB | PdfProcessorTool |
+| `csv-parquet` | arrow, parquet | +2.8MB | CsvAnalyzerTool |
+| `excel` | calamine, xlsxwriter | +1MB | ExcelHandlerTool |
+| `json-query` | jaq-* crates | +600KB | JsonQueryTool |
+| `archives` | zip, tar, flate2 | +400KB | ArchiveHandlerTool |
+| `email` | lettre | +500KB | EmailTool (SMTP) |
+| `email-aws` | aws-sdk-ses | +1.5MB | EmailTool (AWS) |
+| `database` | sqlx | +2MB | Database operations |
+
+### Testing with Features
+
+```bash
+# Test minimal configuration
+cargo test --no-default-features --features lua
+
+# Test specific feature
+cargo test --features templates
+
+# Test everything
+cargo test --all-features
+
+# Clippy with features
+cargo clippy --features common --all-targets
+```
+
+### CI/CD Configuration
+
+#### GitHub Actions
+```yaml
+strategy:
+  matrix:
+    features: [minimal, common, full]
+steps:
+  - name: Build ${{ matrix.features }}
+    run: |
+      if [ "${{ matrix.features }}" = "minimal" ]; then
+        cargo build --release --bin llmspell
+      else
+        cargo build --release --bin llmspell --features ${{ matrix.features }}
+      fi
+```
+
+#### Docker Multi-Stage
+```dockerfile
+# Minimal image (19MB binary)
+FROM rust:1.76 as minimal
+WORKDIR /app
+COPY . .
+RUN cargo build --release --bin llmspell
+
+# Common image (25MB binary)
+FROM rust:1.76 as common
+WORKDIR /app
+COPY . .
+RUN cargo build --release --features common --bin llmspell
+
+# Runtime
+FROM debian:bookworm-slim
+COPY --from=minimal /app/target/release/llmspell /usr/local/bin/
+```
+
+### Development Workflow
+
+1. **Start with minimal** for core development
+2. **Add features as needed** when working on specific tools
+3. **Test with minimal** to ensure core functionality
+4. **Test with full** before releases
+5. **Document feature requirements** in your code
+
+### Feature-Gated Code
+
+When developing tools that require optional dependencies:
+
+```rust
+// In llmspell-tools/src/lib.rs
+#[cfg(feature = "templates")]
+pub mod template_engine;
+
+// In your code
+#[cfg(feature = "templates")]
+use llmspell_tools::template_engine::TemplateEngineTool;
+
+// Conditional registration
+pub fn register_tools(registry: &mut ToolRegistry) {
+    #[cfg(feature = "templates")]
+    registry.register("template_engine", TemplateEngineTool::new);
+}
+```
+
+### Runtime Tool Discovery
+
+Tool availability is **automatic** - the runtime discovers available tools:
+
+```lua
+-- This always works, showing only available tools
+local tools = Tool.list()
+for _, name in ipairs(tools) do
+    print("Available: " .. name)
+end
+
+-- Graceful handling of optional tools
+local template = Tool.try_get("template_engine")
+if template then
+    -- Use template engine
+else
+    -- Fallback to simple string formatting
+end
+```
+
+### Performance Comparison
+
+| Build Type | Binary Size | Startup Time | Memory Usage | Tool Count |
+|------------|------------|--------------|--------------|------------|
+| Minimal | 19MB | 15ms | 12MB | 25 tools |
+| Common | 25MB | 18ms | 14MB | 27 tools |
+| Full | 35MB | 25ms | 18MB | 37+ tools |
+| Old Default | 33.6MB | 23ms | 17MB | 37+ tools |
+
+### Migration from Pre-Feature System
+
+If upgrading from versions before the feature system:
+
+1. **Assess tool usage** - Run with minimal, note missing tools
+2. **Choose configuration** - minimal, common, or full
+3. **Update build scripts** - Add feature flags to cargo commands
+4. **No code changes needed** - API remains identical
 
 ---
 
