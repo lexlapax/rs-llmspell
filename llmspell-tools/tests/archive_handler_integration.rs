@@ -1,5 +1,7 @@
 //! Integration tests for `ArchiveHandlerTool`
 
+#![cfg(feature = "archives")]
+
 use anyhow::Result;
 use llmspell_core::{
     traits::{

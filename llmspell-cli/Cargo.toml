@@ -14,7 +14,7 @@ path = "src/main.rs"
 [dependencies]
 llmspell-core = { path = "../llmspell-core" }
 llmspell-config = { path = "../llmspell-config" }
-llmspell-bridge = { path = "../llmspell-bridge" }
+llmspell-bridge = { path = "../llmspell-bridge", default-features = false, features = ["lua"] }
 llmspell-kernel = { path = "../llmspell-kernel" }
 llmspell-providers = { path = "../llmspell-providers" }
 llmspell-utils = { path = "../llmspell-utils" }
@@ -23,7 +23,6 @@ tokio.workspace = true
 clap = { workspace = true, features = ["derive", "env"] }
 serde.workspace = true
 serde_json.workspace = true
-serde_yaml = "0.9"
 anyhow.workspace = true
 tracing.workspace = true
 tracing-subscriber.workspace = true
@@ -36,6 +35,22 @@ once_cell = { workspace = true }
 libc = "0.2"
 nix = { version = "0.29", features = ["signal", "process"] }
 rustyline = "14.0"
+
+[features]
+default = []  # Truly minimal binary - no heavy external dependencies
+common = ["llmspell-bridge/common"]  # Convenient preset for typical usage
+full = ["llmspell-bridge/full"]  # All features enabled
+
+# Forward individual tool features
+csv-parquet = ["llmspell-bridge/csv-parquet"]
+templates = ["llmspell-bridge/templates"]
+pdf = ["llmspell-bridge/pdf"]
+excel = ["llmspell-bridge/excel"]
+json-query = ["llmspell-bridge/json-query"]
+archives = ["llmspell-bridge/archives"]
+email = ["llmspell-bridge/email"]
+email-aws = ["llmspell-bridge/email-aws"]
+database = ["llmspell-bridge/database"]
 
 [dev-dependencies]
 assert_cmd = "2.0"

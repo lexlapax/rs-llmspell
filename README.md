@@ -235,6 +235,51 @@ cargo build --release
 ./scripts/llmspell-easy.sh webapp-creator
 ```
 
+## 📦 Installation Options
+
+rs-llmspell supports flexible installation via Cargo feature flags to control binary size and dependencies:
+
+### Minimal Installation (19MB)
+Includes core functionality with Lua scripting and essential tools:
+```bash
+cargo build --release --bin llmspell
+# Or explicitly:
+cargo build --release --bin llmspell --no-default-features --features lua
+```
+
+### Common Installation (recommended for most users)
+Adds template engines and PDF processing (~25MB):
+```bash
+cargo build --release --bin llmspell --features common
+```
+
+### Full Installation
+Includes all optional components - CSV/Parquet, Excel, archives, email, database support (~35MB):
+```bash
+cargo build --release --bin llmspell --features full
+```
+
+### Custom Feature Selection
+Mix and match features based on your needs:
+```bash
+# Example: Just add template support
+cargo build --release --features templates
+
+# Example: Add CSV/Parquet and archives
+cargo build --release --features csv-parquet,archives
+```
+
+**Available Features:**
+- `templates` - Tera and Handlebars template engines
+- `pdf` - PDF document processing
+- `csv-parquet` - Apache Arrow/Parquet support for data analysis
+- `excel` - Excel file reading/writing
+- `json-query` - JQ-style JSON queries
+- `archives` - ZIP, TAR, GZ archive handling
+- `email` - Email sending via SMTP
+- `email-aws` - Email via AWS SES
+- `database` - SQL database connectivity (PostgreSQL, MySQL, SQLite)
+
 ## 📊 Comprehensive Feature Set
 
 ### Core Capabilities
