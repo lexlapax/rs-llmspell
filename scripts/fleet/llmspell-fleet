@@ -44,10 +44,10 @@ spawn() {
     LLMSPELL_BIN=""
     if command -v llmspell >/dev/null 2>&1; then
         LLMSPELL_BIN="llmspell"
-    elif [ -x "../target/release/llmspell" ]; then
-        LLMSPELL_BIN="../target/release/llmspell"
-    elif [ -x "../target/debug/llmspell" ]; then
-        LLMSPELL_BIN="../target/debug/llmspell"
+    elif [ -x "../../target/release/llmspell" ]; then
+        LLMSPELL_BIN="../../target/release/llmspell"
+    elif [ -x "../../target/debug/llmspell" ]; then
+        LLMSPELL_BIN="../../target/debug/llmspell"
     else
         echo "ERROR: llmspell binary not found"
         exit 1

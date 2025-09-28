@@ -1,0 +1,11 @@
+[kernel]
+language = "lua"
+debug = false
+
+[llm]
+provider = "openai"
+model = "gpt-4"
+api_key_env = "OPENAI_API_KEY"
+
+[logging]
+level = "info"

@@ -1,0 +1,11 @@
+[kernel]
+language = "lua"
+debug = true
+
+[llm]
+provider = "local"
+model = "llama2"
+endpoint = "http://localhost:11434"
+
+[logging]
+level = "debug"

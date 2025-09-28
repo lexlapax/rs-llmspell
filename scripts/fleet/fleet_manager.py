@@ -86,10 +86,10 @@ class FleetManager:
         llmspell_bin = None
         if subprocess.run(["which", "llmspell"], capture_output=True).returncode == 0:
             llmspell_bin = "llmspell"
-        elif Path("../target/release/llmspell").is_file():
-            llmspell_bin = str(Path("../target/release/llmspell").absolute())
-        elif Path("../target/debug/llmspell").is_file():
-            llmspell_bin = str(Path("../target/debug/llmspell").absolute())
+        elif Path("../../target/release/llmspell").is_file():
+            llmspell_bin = str(Path("../../target/release/llmspell").absolute())
+        elif Path("../../target/debug/llmspell").is_file():
+            llmspell_bin = str(Path("../../target/debug/llmspell").absolute())
         else:
             print("ERROR: llmspell binary not found")
             return None

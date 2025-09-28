@@ -1,0 +1,45 @@
+Fleet Integration Test Results
+==============================
+Date: Sat Sep 27 17:27:38 PDT 2025
+Passed: 34
+Failed: 2
+Skipped: 0
+
+Detailed Results:
+-----------------
+  PASS: Help command works
+  PASS: Empty list shows no kernels
+  PASS: Spawn creates kernel
+  PASS: Cleanup removes dead kernels
+  PASS: Spawn multiple kernels
+  FAIL: Each kernel gets unique port - Expected '3' but got '       2'
+  FAIL: Stop by port works - Expected 'stopped' but got 'Kernel 44MB not found'
+  PASS: Stop-all works
+  PASS: Python spawn works
+  PASS: Python list works
+  PASS: Python metrics works
+  PASS: Python find works
+  PASS: Python stop-all works
+  PASS: Registry file exists
+  PASS: Registry is valid JSON
+  PASS: Registry tracks port allocation
+  PASS: Stop non-existent kernel fails gracefully
+  PASS: Invalid port number handled
+  PASS: Duplicate PID file handled
+  PASS: Connection file created
+  PASS: Connection file has required fields
+  PASS: Connection file has valid ports
+  PASS: Kernel spawn time - 0s (max 5s)
+  PASS: List command speed - 1s (max 1s)
+  PASS: Stop kernel speed - 0s (max 3s)
+  PASS: Nice priority applied
+  PASS: Memory usage reasonable
+  PASS: Concurrent spawns
+  PASS: Concurrent stops
+  PASS: Health check detects running kernel
+  PASS: Health check detects dead kernel
+  PASS: HTTP health endpoint
+  PASS: HTTP kernels endpoint
+  PASS: HTTP metrics endpoint
+  PASS: Stop all remaining kernels
+  PASS: Clean up dead entries
