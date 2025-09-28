@@ -40,7 +40,7 @@ llmspell [global-flags] <command> [command-flags] [-- script-args]
 Global Flags (available everywhere):
   --trace <LEVEL>    # Logging verbosity: off|error|warn|info|debug|trace
   --config <FILE>    # Configuration file path
-  --output <FORMAT>  # Output format: text|json|yaml|pretty
+  --output <FORMAT>  # Output format: text|json|pretty
   -h, --help        # Show contextual help
 
 Primary Commands:

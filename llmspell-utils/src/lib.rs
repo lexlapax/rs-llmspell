@@ -157,8 +157,8 @@ pub use search::{
     SearchResult,
 };
 pub use serialization::{
-    convert_format, from_json, from_toml, from_yaml, json, merge_json, to_json, to_json_pretty,
-    to_toml, to_yaml, Format,
+    convert_format, from_json, from_toml, json, merge_json, to_json, to_json_pretty, to_toml,
+    Format,
 };
 pub use string_utils::{
     dedent, indent, is_valid_identifier, join_with, normalize_whitespace, replace_all, reverse,

@@ -256,7 +256,6 @@ pub async fn handle_kernel_command(
             // Parse output format from string
             let output_format = match format.as_str() {
                 "json" => crate::cli::OutputFormat::Json,
-                "yaml" => crate::cli::OutputFormat::Yaml,
                 "table" | "pretty" => crate::cli::OutputFormat::Pretty,
                 _ => crate::cli::OutputFormat::Text,
             };
@@ -465,21 +464,6 @@ fn display_kernel_status(
         }
         OutputFormat::Json => {
             display_json(&kernel_data)?;
-        }
-        OutputFormat::Yaml => {
-            // Convert to YAML format
-            println!(
-                "{}",
-                serde_yaml::to_string(
-                    &kernel_data
-                        .iter()
-                        .map(|(k, m)| serde_json::json!({
-                            "kernel": k,
-                            "metrics": m,
-                        }))
-                        .collect::<Vec<_>>()
-                )?
-            );
         }
         OutputFormat::Text => {
             display_simple(&kernel_data, quiet)?;

@@ -94,29 +94,6 @@ async fn list_applications(
                 }))?
             );
         }
-        OutputFormat::Yaml => {
-            let app_list: Vec<_> = apps
-                .values()
-                .map(|app| {
-                    json!({
-                        "name": app.name,
-                        "description": app.description,
-                        "version": app.version,
-                        "complexity": app.complexity,
-                        "agents": app.agents,
-                        "tags": app.tags,
-                        "path": app.path.display().to_string()
-                    })
-                })
-                .collect();
-
-            let data = json!({
-                "status": "success",
-                "count": apps.len(),
-                "applications": app_list
-            });
-            println!("{}", serde_yaml::to_string(&data)?);
-        }
         _ => {
             if apps.is_empty() {
                 println!("No applications found.");
@@ -188,25 +165,6 @@ async fn show_app_info(
                 }
             });
             println!("{}", serde_json::to_string_pretty(&info)?);
-        }
-        OutputFormat::Yaml => {
-            let info = json!({
-                "status": "success",
-                "application": {
-                    "name": app.name,
-                    "description": app.description,
-                    "version": app.version,
-                    "complexity": app.complexity,
-                    "agents": app.agents,
-                    "tags": app.tags,
-                    "path": app.path.display().to_string(),
-                    "main_script": app.main_script.display().to_string(),
-                    "config_path": app.config_path.as_ref().map(|p| p.display().to_string()),
-                    "has_config": app.config_path.is_some(),
-                    "script_exists": app.main_script.exists(),
-                }
-            });
-            println!("{}", serde_yaml::to_string(&info)?);
         }
         _ => {
             println!("Application: {}\n", app.name);
@@ -338,27 +296,6 @@ async fn search_applications(
                     "results": search_results
                 }))?
             );
-        }
-        OutputFormat::Yaml => {
-            let search_results: Vec<_> = results
-                .iter()
-                .map(|app| {
-                    json!({
-                        "name": app.name,
-                        "description": app.description,
-                        "complexity": app.complexity,
-                        "agents": app.agents,
-                        "tags": app.tags,
-                    })
-                })
-                .collect();
-
-            let data = json!({
-                "status": "success",
-                "count": results.len(),
-                "results": search_results
-            });
-            println!("{}", serde_yaml::to_string(&data)?);
         }
         _ => {
             if results.is_empty() {
@@ -574,17 +511,6 @@ async fn execute_app_script_embedded(
                 })
             );
         }
-        OutputFormat::Yaml => {
-            let data = serde_json::json!({
-                "status": "success",
-                "mode": "embedded",
-                "execution_type": "app",
-                "script_length": script_content.len(),
-                "args_count": args.len(),
-                "result": result
-            });
-            println!("{}", serde_yaml::to_string(&data)?);
-        }
         _ => {
             // For plain text output, the result is already printed via IOPub
             debug!("App script execution completed");
@@ -615,17 +541,6 @@ async fn execute_app_script_connected(
                     "result": "App script execution completed successfully via connected kernel"
                 })
             );
-        }
-        OutputFormat::Yaml => {
-            let data = serde_json::json!({
-                "status": "executed",
-                "mode": "connected",
-                "execution_type": "app",
-                "script_length": script_content.len(),
-                "args_count": args.len(),
-                "result": "App script execution completed successfully via connected kernel"
-            });
-            println!("{}", serde_yaml::to_string(&data)?);
         }
         _ => {
             println!("✓ Executing app via connected kernel...");

@@ -163,8 +163,6 @@ pub enum OutputFormat {
     Text,
     /// JSON output
     Json,
-    /// YAML output
-    Yaml,
     /// Pretty-printed output
     Pretty,
 }
@@ -852,8 +850,6 @@ pub enum BackupCommands {
 pub enum ExportFormat {
     /// JSON format
     Json,
-    /// YAML format
-    Yaml,
     /// TOML format
     Toml,
 }
@@ -865,8 +861,6 @@ pub enum ConfigFormat {
     Toml,
     /// JSON format
     Json,
-    /// YAML format
-    Yaml,
 }
 
 impl Cli {

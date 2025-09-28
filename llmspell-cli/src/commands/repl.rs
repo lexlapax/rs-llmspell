@@ -141,26 +141,15 @@ async fn start_connected_repl(
         }
     }
 
-    match output_format {
-        OutputFormat::Json => {
-            println!(
-                "{}",
-                serde_json::json!({
-                    "status": "repl_disconnected",
-                    "mode": "connected",
-                    "engine": engine.as_str(),
-                })
-            );
-        }
-        OutputFormat::Yaml => {
-            let data = serde_json::json!({
+    if output_format == OutputFormat::Json {
+        println!(
+            "{}",
+            serde_json::json!({
                 "status": "repl_disconnected",
                 "mode": "connected",
                 "engine": engine.as_str(),
-            });
-            println!("{}", serde_yaml::to_string(&data)?);
-        }
-        _ => {}
+            })
+        );
     }
 
     Ok(())

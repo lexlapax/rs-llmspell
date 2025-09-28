@@ -98,8 +98,8 @@ fn test_serialization_exports() {
     assert_eq!(deserialized["key"], "value");
 
     // Test format conversion
-    let yaml = convert_format(&json_str, Format::Json, Format::Yaml).unwrap();
-    assert!(yaml.contains("key: value"));
+    let toml = convert_format(&json_str, Format::Json, Format::Toml).unwrap();
+    assert!(toml.contains("key = \"value\""));
 
     // Test merge functionality
     let base = json!({"a": 1, "b": 2});

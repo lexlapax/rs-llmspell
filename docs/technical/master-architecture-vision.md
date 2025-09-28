@@ -25534,7 +25534,7 @@ llmspell config schema --format json     # Export schema as JSON/YAML
 llmspell prompts list                     # List all configured prompt templates
 llmspell prompts validate                 # Validate prompt templates and variables
 llmspell prompts test <template>          # Test prompt template with sample data
-llmspell prompts export --format yaml    # Export prompt templates
+llmspell prompts export --format json    # Export prompt templates
 
 # Configuration migration and upgrades
 llmspell config migrate                   # Migrate config to latest schema version

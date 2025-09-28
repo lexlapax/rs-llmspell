@@ -42,7 +42,7 @@ rs-llmspell v0.9.0 delivers **unified kernel architecture** with interactive REP
 - File operations, web search, data processing
 - **NEW**: pdf-processor, document-chunker, embedding-generator
 - **NEW**: vector-search, similarity-calculator, web-scraper
-- JSON/YAML manipulation, text transformation
+- JSON manipulation, text transformation
 - All tools run in secure sandboxes
 
 ### 📦 9 Production Applications

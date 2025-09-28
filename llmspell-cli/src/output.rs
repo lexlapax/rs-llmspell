@@ -14,7 +14,6 @@ use tokio::sync::Mutex;
 pub fn format_output(output: &ScriptOutput, format: OutputFormat) -> Result<String> {
     match format {
         OutputFormat::Json => Ok(serde_json::to_string_pretty(&output.output)?),
-        OutputFormat::Yaml => Ok(serde_yaml::to_string(&output.output)?),
         OutputFormat::Text => {
             // Simple text representation
             match output.output {
@@ -72,7 +71,6 @@ pub async fn print_stream(stream: &mut ScriptStream, format: OutputFormat) -> Re
 
     match format {
         OutputFormat::Json => print_stream_json(stream, interrupted).await,
-        OutputFormat::Yaml => print_stream_yaml(stream, interrupted).await,
         OutputFormat::Text => print_stream_text(stream, false, interrupted).await,
         OutputFormat::Pretty => print_stream_text(stream, true, interrupted).await,
     }
@@ -105,36 +103,6 @@ async fn print_stream_json(stream: &mut ScriptStream, interrupted: Arc<Mutex<boo
     }
 
     println!("{}", serde_json::to_string_pretty(&chunks)?);
-    Ok(())
-}
-
-/// Print streaming output as YAML
-async fn print_stream_yaml(stream: &mut ScriptStream, interrupted: Arc<Mutex<bool>>) -> Result<()> {
-    // Show progress while collecting chunks
-    let spinner = AsyncSpinner::new("Collecting stream data...");
-
-    let mut chunks = Vec::new();
-    let mut was_interrupted = false;
-
-    while let Some(chunk) = stream.stream.next().await {
-        // Check if interrupted
-        if *interrupted.lock().await {
-            was_interrupted = true;
-            break;
-        }
-
-        chunks.push(chunk?);
-        spinner.set_message(&format!("Collected {} chunks", chunks.len()));
-    }
-
-    if was_interrupted {
-        spinner.finish_with_message("Stream interrupted by user");
-        eprintln!("\n⚠️ Stream interrupted by Ctrl+C");
-    } else {
-        spinner.finish_and_clear();
-    }
-
-    println!("{}", serde_yaml::to_string(&chunks)?);
     Ok(())
 }
 

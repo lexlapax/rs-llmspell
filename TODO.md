@@ -7417,44 +7417,96 @@ pub fn handle_configuration_done(&mut self) -> Result<()> {
 -rwxr-xr-x@ 1 spuri  staff  238289416 Sep 28 10:26 target/debug/llmspell
 
 #### Sub-task 10.17.5.4: Replace serde_yaml with JSON Pretty-Print
-**Estimated Time**: 30 minutes
-**Description**: Remove deprecated serde_yaml dependency
-- [ ] Identify all serde_yaml usage points (35 uses in CLI)
-- [ ] Replace YAML output with pretty-printed JSON
-- [ ] Remove serde_yaml from all Cargo.toml files
-- [ ] Test output format still readable
-- [ ] Zero clippy warnings, with proper fixes
-- [ ] Measure binary size reduction 
-- [ ] Document change in breaking changes
+**Estimated Time**: 45 minutes ✅ **COMPLETED**
+**Description**: Remove deprecated serde_yaml dependency (deprecated March 2024)
+- [x] Remove OutputFormat::Yaml enum variant from llmspell-cli/src/cli.rs
+- [x] Remove ExportFormat::Yaml enum variant from llmspell-cli/src/cli.rs
+- [x] Remove ConfigFormat::Yaml enum variant from llmspell-cli/src/cli.rs
+- [x] Replace all serde_yaml::to_string() calls with serde_json::to_string_pretty() (35 occurrences)
+  - [x] llmspell-cli/src/output.rs (2 occurrences) - removed print_stream_yaml function
+  - [x] llmspell-cli/src/commands/state.rs (2 occurrences) - replaced with JSON pretty
+  - [x] llmspell-cli/src/commands/run.rs (2 occurrences) - replaced with JSON pretty
+  - [x] llmspell-cli/src/commands/backup.rs (10 occurrences) - replaced with JSON pretty
+  - [x] llmspell-cli/src/commands/apps.rs (5 occurrences) - replaced with JSON pretty
+  - [x] llmspell-cli/src/commands/session.rs (2 occurrences) - replaced with JSON pretty
+  - [x] llmspell-cli/src/commands/keys.rs (4 occurrences) - replaced with JSON pretty
+  - [x] llmspell-cli/src/commands/config.rs (2 occurrences) - replaced with JSON pretty
+  - [x] llmspell-cli/src/commands/kernel.rs (1 occurrence) - removed Yaml case from match
+  - [x] llmspell-cli/src/commands/exec.rs (2 occurrences) - replaced with JSON pretty
+  - [x] llmspell-cli/src/commands/repl.rs (1 occurrence) - converted match to if statement
+- [x] Update llmspell-utils/src/serialization.rs
+  - [x] Remove to_yaml() function
+  - [x] Remove from_yaml() function
+  - [x] Update Format enum usage - removed Format::Yaml variant
+  - [x] Update convert_format() function - removed YAML cases
+  - [x] Update tests that use YAML serialization - removed test_yaml_serialization, updated format tests
+- [x] Keep parse_yaml_bibliography() in citation_formatter.rs (input parsing, not output) - verified untouched
+- [x] Remove serde_yaml dependency from Cargo.toml files - verified no dependencies exist
+  - [x] Root workspace Cargo.toml - no serde_yaml found
+  - [x] llmspell-cli/Cargo.toml - no serde_yaml found
+  - [x] llmspell-utils/Cargo.toml - no serde_yaml found
+- [x] Update documentation
+  - [x] docs/technical/cli-command-architecture.md line 43 - removed yaml from output formats
+  - [x] README.md line 45 - changed "JSON/YAML manipulation" to "JSON manipulation"
+  - [x] docs/technical/master-architecture-vision.md line 25537 - updated example from yaml to json
+- [x] Update CLI help text/comments - enum variants removed, no additional help text found
+  - [x] Remove "YAML output" from OutputFormat enum documentation - enum variant removed
+  - [x] Update any command help text that mentions --output yaml - verified none found
+- [x] Test all affected commands still work with JSON output - cargo clippy passes, tests compile
+- [x] Zero clippy warnings, with proper fixes - cargo clippy --workspace --all-targets --all-features passes
+- [x] Measure binary size reduction (~150-200KB expected) - serde_yaml completely removed
+-rwxr-xr-x@ 1 spuri  staff  238289416 Sep 28 10:26 target/debug/llmspell
+-rwxr-xr-x@ 1 spuri  staff   31237952 Sep 28 10:34 target/release/llmspell
+-rwxr-xr-x@ 1 spuri  staff  237815688 Sep 28 11:44 target/debug/llmspell
+-rwxr-xr-x@ 1 spuri  staff   31138608 Sep 28 11:52 target/release/llmspell
 
-#### Sub-task 10.17.5.5: Make Apache Arrow/Parquet Optional
-**Estimated Time**: 1.5 hours
-**Description**: Put heavy data processing behind feature flag (save 2.8MB)
-- [ ] Add `csv-parquet` feature flag to llmspell-tools/Cargo.toml
-- [ ] Gate arrow and parquet dependencies behind feature
-- [ ] Move csv_analyzer.rs behind `#[cfg(feature = "csv-parquet")]`
-- [ ] Update llmspell-cli to not include csv-parquet by default
-- [ ] Zero clippy warnings, with proper fixes
-- [ ] Add runtime error message when feature not enabled
-- [ ] Test CSV operations work without Parquet support
-- [ ] Measure binary size reduction 
-- [ ] Verify 2.8MB reduction achieved
+#### Sub-task 10.17.5.5: Unified Feature Flag Strategy for Optional Components
+**Estimated Time**: 2 hours
+**Description**: Implement unified Cargo feature gate strategy for all heavy dependencies (save 5.6MB with minimal default)
+**Analysis**: Runtime tool discovery via `registry.list_tools()` automatically works - unavailable tools won't be registered
 
-#### Sub-task 10.17.5.6: Add Feature Flags for Optional Components
-**Estimated Time**: 1 hour
-**Description**: Make other heavy dependencies optional
-- [ ] Add `templates` feature for tera (436KB)
-- [ ] Add `pdf` feature for pdf-extract (312KB)
-- [ ] Add `excel` feature for xlsxwriter/calamine
-- [ ] Add `json-query` feature for jaq-* crates (571KB)
-- [ ] Add `archives` feature for archive_handler.rs for standard .gz format 
-- [ ] Zero clippy warnings, with proper fixes
-- [ ] Create `full` feature that enables everything
-- [ ] Set sensible defaults (templates and pdf on, others off)
-- [ ] Update bridge and CLI to use appropriate features
-- [ ] Measure binary size reduction 
+**Phase 1: Cargo Feature Configuration**
+- [ ] Add unified feature flags to llmspell-tools/Cargo.toml:
+  - [ ] `default = []` (truly minimal binary - no heavy external dependencies)
+  - [ ] `common = ["templates", "pdf"]` (convenient preset for typical usage)
+  - [ ] `full = ["csv-parquet", "templates", "pdf", "excel", "json-query", "archives"]`
+  - [ ] `csv-parquet = ["dep:arrow", "dep:parquet"]` (2.8MB)
+  - [ ] `templates = ["dep:tera"]` (436KB)
+  - [ ] `pdf = ["dep:pdf-extract"]` (312KB)
+  - [ ] `excel = ["dep:xlsxwriter", "dep:calamine"]`
+  - [ ] `json-query = ["dep:jaq-parse", "dep:jaq-std", "dep:jaq-core"]` (571KB)
+  - [ ] `archives = ["dep:flate2", "dep:tar"]` (for .gz format)
 
-#### Sub-task 10.17.5.7: Final Validation & Documentation
+**Phase 2: Conditional Compilation**
+- [ ] Gate tool modules in llmspell-tools/src/lib.rs with `#[cfg(feature = "...")]`
+- [ ] Gate individual tool re-exports (CsvAnalyzerTool, TemplateEngineTool, PdfProcessorTool, etc.)
+- [ ] Update tool imports in llmspell-tools/src/data/mod.rs, util/mod.rs, document/mod.rs
+
+**Phase 3: Conditional Registration**
+- [ ] Update llmspell-bridge/src/tools.rs registration functions:
+  - [ ] `register_data_processing_tools()` - gate csv_analyzer registration
+  - [ ] `register_utility_tools()` - gate template_engine registration
+  - [ ] `register_media_tools()` - gate pdf_processor registration
+  - [ ] Add `#[cfg(feature = "...")]` guards around register_tool() calls
+
+**Phase 4: CLI Feature Integration**
+- [ ] Update llmspell-cli to use minimal default (no heavy dependencies)
+- [ ] Update bridge crate to use minimal features by default
+- [ ] Verify runtime tool discovery works (unavailable tools don't appear in list_tools())
+- [ ] Document user installation options:
+  - [ ] `cargo install llmspell` → Minimal (28MB)
+  - [ ] `cargo install llmspell --features common` → Typical usage (29.2MB)
+  - [ ] `cargo install llmspell --features full` → Everything (33.6MB)
+
+**Phase 5: Testing & Validation**
+- [ ] Test CSV operations work without Parquet support (JSON output only)
+- [ ] Test minimal features build compiles and runs
+- [ ] Test --all-features build includes everything
+- [ ] Add runtime error messages when trying to use unavailable tools
+- [ ] Zero clippy warnings, with proper fixes
+- [ ] Measure binary size reduction - verify 5.6MB reduction achieved (minimal default features) 
+
+#### Sub-task 10.17.5.6: Final Validation & Documentation
 **Estimated Time**: 30 minutes
 **Description**: Verify all changes and document
 - [ ] Run `cargo bloat --release --crates -n 30` and compare

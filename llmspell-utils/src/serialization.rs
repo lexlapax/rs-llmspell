@@ -214,74 +214,6 @@ where
     toml::from_str(s).context("Failed to deserialize from TOML")
 }
 
-/// Serialize a value to YAML string
-///
-/// # Examples
-///
-/// ```rust
-/// use llmspell_utils::serialization::to_yaml;
-/// use serde::Serialize;
-///
-/// #[derive(Serialize)]
-/// struct Server {
-///     host: String,
-///     ports: Vec<u16>,
-/// }
-///
-/// let server = Server {
-///     host: "localhost".to_string(),
-///     ports: vec![80, 443],
-/// };
-///
-/// let yaml = to_yaml(&server).unwrap();
-/// assert!(yaml.contains("host: localhost"));
-/// ```
-///
-/// # Errors
-///
-/// Returns an error if serialization fails
-pub fn to_yaml<T>(value: &T) -> Result<String>
-where
-    T: Serialize,
-{
-    serde_yaml::to_string(value).context("Failed to serialize to YAML")
-}
-
-/// Deserialize a value from YAML string
-///
-/// # Examples
-///
-/// ```rust
-/// use llmspell_utils::serialization::from_yaml;
-/// use serde::Deserialize;
-///
-/// #[derive(Deserialize)]
-/// struct Config {
-///     version: String,
-///     features: Vec<String>,
-/// }
-///
-/// let yaml = r#"
-/// version: "1.0"
-/// features:
-///   - logging
-///   - metrics
-/// "#;
-///
-/// let config: Config = from_yaml(yaml).unwrap();
-/// assert_eq!(config.version, "1.0");
-/// ```
-///
-/// # Errors
-///
-/// Returns an error if deserialization fails
-pub fn from_yaml<T>(s: &str) -> Result<T>
-where
-    T: serde::de::DeserializeOwned,
-{
-    serde_yaml::from_str(s).context("Failed to deserialize from YAML")
-}
-
 /// Merge two JSON values
 ///
 /// When merging:
@@ -356,8 +288,8 @@ pub fn merge_toml(base: &TomlValue, other: &TomlValue) -> TomlValue {
 /// use llmspell_utils::serialization::{convert_format, Format};
 ///
 /// let json = r#"{"name": "test", "value": 42}"#;
-/// let yaml = convert_format(json, Format::Json, Format::Yaml).unwrap();
-/// assert!(yaml.contains("name: test"));
+/// let toml = convert_format(json, Format::Json, Format::Toml).unwrap();
+/// assert!(toml.contains("name = \"test\""));
 /// ```
 ///
 /// # Errors
@@ -369,14 +301,12 @@ pub fn convert_format(input: &str, from: Format, to: Format) -> Result<String> {
     // First, deserialize to a generic Value type
     let value: serde_json::Value = match from {
         Format::Json => from_json(input)?,
-        Format::Yaml => from_yaml(input)?,
         Format::Toml => from_toml(input)?,
     };
 
     // Then serialize to the target format
     match to {
         Format::Json => to_json_pretty(&value).context("Failed to convert to JSON"),
-        Format::Yaml => to_yaml(&value),
         Format::Toml => to_toml_pretty(&value),
     }
 }
@@ -386,8 +316,6 @@ pub fn convert_format(input: &str, from: Format, to: Format) -> Result<String> {
 pub enum Format {
     /// JSON format
     Json,
-    /// YAML format
-    Yaml,
     /// TOML format
     Toml,
 }
@@ -396,7 +324,6 @@ impl fmt::Display for Format {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
             Self::Json => write!(f, "JSON"),
-            Self::Yaml => write!(f, "YAML"),
             Self::Toml => write!(f, "TOML"),
         }
     }
@@ -408,7 +335,6 @@ impl Format {
     pub fn extension(&self) -> &'static str {
         match self {
             Self::Json => "json",
-            Self::Yaml => "yaml",
             Self::Toml => "toml",
         }
     }
@@ -418,7 +344,6 @@ impl Format {
     pub fn from_extension(ext: &str) -> Option<Self> {
         match ext.to_lowercase().as_str() {
             "json" => Some(Self::Json),
-            "yaml" | "yml" => Some(Self::Yaml),
             "toml" => Some(Self::Toml),
             _ => None,
         }
@@ -555,19 +480,6 @@ mod tests {
         assert_eq!(deserialized, config);
     }
     #[test]
-    fn test_yaml_serialization() {
-        let mut map = HashMap::new();
-        map.insert("name", "test");
-        map.insert("environment", "production");
-
-        let yaml = to_yaml(&map).unwrap();
-        assert!(yaml.contains("name: test"));
-        assert!(yaml.contains("environment: production"));
-
-        let deserialized: HashMap<String, String> = from_yaml(&yaml).unwrap();
-        assert_eq!(deserialized["name"], "test");
-    }
-    #[test]
     fn test_merge_json() {
         let base: JsonValue = from_json(
             r#"{
@@ -609,13 +521,8 @@ mod tests {
     fn test_format_conversion() {
         let json = r#"{"name": "test", "values": [1, 2, 3]}"#;
 
-        // JSON to YAML
-        let yaml = convert_format(json, Format::Json, Format::Yaml).unwrap();
-        assert!(yaml.contains("name: test"));
-        assert!(yaml.contains("values:"));
-
-        // YAML to TOML
-        let toml = convert_format(&yaml, Format::Yaml, Format::Toml).unwrap();
+        // JSON to TOML
+        let toml = convert_format(json, Format::Json, Format::Toml).unwrap();
         assert!(toml.contains("name = \"test\""));
 
         // TOML back to JSON
@@ -627,13 +534,12 @@ mod tests {
     #[test]
     fn test_format_detection() {
         assert_eq!(Format::from_extension("json"), Some(Format::Json));
-        assert_eq!(Format::from_extension("yaml"), Some(Format::Yaml));
-        assert_eq!(Format::from_extension("yml"), Some(Format::Yaml));
         assert_eq!(Format::from_extension("toml"), Some(Format::Toml));
+        assert_eq!(Format::from_extension("yaml"), None);
+        assert_eq!(Format::from_extension("yml"), None);
         assert_eq!(Format::from_extension("txt"), None);
 
         assert_eq!(Format::Json.extension(), "json");
-        assert_eq!(Format::Yaml.extension(), "yaml");
         assert_eq!(Format::Toml.extension(), "toml");
     }
     #[test]
@@ -676,10 +582,6 @@ mod tests {
 
         // Invalid TOML
         let result: Result<HashMap<String, String>> = from_toml("[[invalid toml");
-        assert!(result.is_err());
-
-        // Invalid YAML
-        let result: Result<HashMap<String, String>> = from_yaml(":\n  - invalid");
         assert!(result.is_err());
     }
 }

@@ -114,9 +114,6 @@ async fn validate_config(config_path: Option<PathBuf>, output_format: OutputForm
         OutputFormat::Json => {
             println!("{}", serde_json::to_string_pretty(&validation_result)?);
         }
-        OutputFormat::Yaml => {
-            println!("{}", serde_yaml::to_string(&validation_result)?);
-        }
         OutputFormat::Text | OutputFormat::Pretty => {
             println!("Configuration validation:");
             println!("  File: {}", actual_path);
@@ -213,7 +210,6 @@ async fn show_config(
                 }
             }
         }
-        ConfigFormat::Yaml => serde_yaml::to_string(&config_data)?,
     };
 
     match output_format {
@@ -233,9 +229,6 @@ async fn show_config(
                 println!("Full configuration:");
                 println!();
             }
-            println!("{}", formatted_output);
-        }
-        OutputFormat::Yaml => {
             println!("{}", formatted_output);
         }
     }

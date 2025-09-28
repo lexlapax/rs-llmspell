@@ -319,13 +319,6 @@ fn display_session_list(
                 })
             );
         }
-        OutputFormat::Yaml => {
-            let data = json!({
-                "sessions": sessions,
-                "count": sessions.len()
-            });
-            println!("{}", serde_yaml::to_string(&data)?);
-        }
         OutputFormat::Text | OutputFormat::Pretty => {
             if sessions.is_empty() {
                 println!("No sessions found");
@@ -382,9 +375,6 @@ fn display_session_details(session: &serde_json::Value, output_format: OutputFor
     match output_format {
         OutputFormat::Json => {
             println!("{}", serde_json::to_string_pretty(session)?);
-        }
-        OutputFormat::Yaml => {
-            println!("{}", serde_yaml::to_string(session)?);
         }
         OutputFormat::Text | OutputFormat::Pretty => {
             println!("Session Details:");

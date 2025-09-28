@@ -57,16 +57,6 @@ async fn execute_code_embedded(
                 })
             );
         }
-        OutputFormat::Yaml => {
-            let data = serde_json::json!({
-                "status": "executed",
-                "engine": engine.as_str(),
-                "streaming": stream,
-                "code_length": code.len(),
-                "result": "Code execution completed successfully"
-            });
-            println!("{}", serde_yaml::to_string(&data)?);
-        }
         _ => {
             println!("Executing {} code:", engine.as_str());
             println!("```{}", engine.as_str());
@@ -107,16 +97,6 @@ async fn execute_code_connected(
                     "code_length": code.len()
                 })
             );
-        }
-        OutputFormat::Yaml => {
-            let data = serde_json::json!({
-                "status": "executed",
-                "mode": "connected",
-                "engine": engine.as_str(),
-                "streaming": stream,
-                "code_length": code.len()
-            });
-            println!("{}", serde_yaml::to_string(&data)?);
         }
         _ => {
             println!("Executing {} code via connected kernel:", engine.as_str());
