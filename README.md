@@ -4,7 +4,7 @@
 
 **🚀 Version 0.9.0 - Interactive Kernel & Debugging Infrastructure Complete**
 
-**🔗 Quick Links**: [📘 User Guide](docs/user-guide/) | [🔧 Developer Guide](docs/developer-guide/) | [📚 Examples](examples/) | [🚀 Get Started](#-quick-start) | [📖 Release Notes](RELEASE_NOTES_v0.9.0.md)
+**🔗 Quick Links**: [📘 User Guide](docs/user-guide/) | [🔧 Developer Guide](docs/developer-guide/) | [📚 Examples](examples/) | [🛠️ Scripts](scripts/) | [🚀 Get Started](#-quick-start) | [📖 Release Notes](RELEASE_NOTES_v0.9.0.md)
 
 ---
 
@@ -304,14 +304,22 @@ cargo build --release
 - **[RAG System Guide](docs/technical/rag-system-guide.md)** - Complete RAG documentation
 - **[Examples](examples/)** - 60+ working examples with RAG patterns
 
+## Scripts & Automation
+
+- **[Scripts Overview](scripts/)** - All automation tools
+  - **[Quality & CI](scripts/quality/)** - Code quality, CI/CD pipelines
+  - **[Testing](scripts/testing/)** - Test execution, coverage analysis
+  - **[Utilities](scripts/utilities/)** - Helper tools, easy launcher
+  - **[Fleet Management](scripts/fleet/)** - Kernel orchestration, monitoring
+
 ## Development
 
 ```bash
 # Run quality checks before committing
-./scripts/quality-check-minimal.sh
+./scripts/quality/quality-check-minimal.sh
 
 # Run full test suite
-cargo test --workspace
+./scripts/testing/test-by-tag.sh unit
 
 # See development guide for more
 cat docs/developer-guide/README.md

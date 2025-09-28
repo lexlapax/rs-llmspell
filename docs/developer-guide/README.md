@@ -17,8 +17,10 @@
 
 1. **Read**: [developer-guide.md](developer-guide.md) - Complete onboarding guide
 2. **Study**: One of the 60+ examples in `examples/`
-3. **Test**: Run `./scripts/quality-check-fast.sh`
+3. **Test**: Run `./scripts/quality/quality-check-fast.sh`
 4. **Build**: Follow patterns in [extending-llmspell.md](extending-llmspell.md)
+
+> 📚 **Scripts Documentation**: See [Scripts Overview](../../scripts/) for all automation tools
 
 ---
 
@@ -103,19 +105,28 @@
 ## 🛠 Developer Workflow
 
 ### Essential Commands
+
+> 📖 **Complete documentation**: See [Scripts README](../../scripts/) for all available scripts
+
 ```bash
 # Quick checks (use frequently)
-./scripts/quality-check-minimal.sh  # <5 seconds - format, clippy
-./scripts/quality-check-fast.sh     # ~1 minute - adds unit tests
+./scripts/quality/quality-check-minimal.sh  # <5 seconds - format, clippy
+./scripts/quality/quality-check-fast.sh     # ~1 minute - adds unit tests
 
 # Before PR (mandatory)
-./scripts/quality-check.sh          # 5+ minutes - full validation
+./scripts/quality/quality-check.sh          # 5+ minutes - full validation
 
 # Component testing
-./scripts/test-by-tag.sh unit       # Unit tests only
-./scripts/test-by-tag.sh rag        # RAG tests
-./scripts/test-by-tag.sh tool       # Tool tests
+./scripts/testing/test-by-tag.sh unit       # Unit tests only
+./scripts/testing/test-by-tag.sh rag        # RAG tests
+./scripts/testing/test-by-tag.sh tool       # Tool tests
 ```
+
+**Script Categories:**
+- [Quality & CI](../../scripts/quality/) - Code quality, CI/CD pipelines
+- [Testing](../../scripts/testing/) - Test execution, coverage
+- [Utilities](../../scripts/utilities/) - Helper tools, easy launcher
+- [Fleet](../../scripts/fleet/) - Kernel orchestration, monitoring
 
 ### Performance Requirements
 | Component | Target | Status | Measure |

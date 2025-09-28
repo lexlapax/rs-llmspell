@@ -16,9 +16,9 @@ git clone <repository-url> && cd rs-llmspell
 cargo build --release
 
 # 2. Verify setup - MANDATORY quality checks
-./scripts/quality-check-minimal.sh  # <5 seconds - format, clippy, compile
-./scripts/quality-check-fast.sh     # ~1 min - adds unit tests & docs
-./scripts/quality-check.sh          # 5+ min - full validation
+./scripts/quality/quality-check-minimal.sh  # <5 seconds - format, clippy, compile
+./scripts/quality/quality-check-fast.sh     # ~1 min - adds unit tests & docs
+./scripts/quality/quality-check.sh          # 5+ min - full validation
 
 # 3. Run example to verify
 ./target/debug/llmspell run examples/script-users/getting-started/00-hello-world.lua
@@ -344,7 +344,7 @@ fn test_bug_reproduction() {
 
 # 3. Fix and verify
 cargo test -p <crate> --lib
-./scripts/quality-check-minimal.sh
+./scripts/quality/quality-check-minimal.sh
 
 # 4. Update TODO.md if tracked
 ```
@@ -358,16 +358,16 @@ cargo test -p <crate> --lib
 ```bash
 # During development (seconds)
 cargo test -p <crate> --lib          # Unit tests only
-./scripts/test-by-tag.sh unit        # All unit tests
+./scripts/testing/test-by-tag.sh unit        # All unit tests
 
 # Before commit (1 minute) - MANDATORY
-./scripts/quality-check-fast.sh      # Format + clippy + unit tests
+./scripts/quality/quality-check-fast.sh      # Format + clippy + unit tests
 
 # Before PR (5 minutes) - MANDATORY
-./scripts/quality-check.sh           # Everything including integration
+./scripts/quality/quality-check.sh           # Everything including integration
 
 # External tests (when needed)
-./scripts/test-by-tag.sh external    # Real API calls
+./scripts/testing/test-by-tag.sh external    # Real API calls
 ```
 
 ### Test Organization Best Practices
@@ -465,7 +465,7 @@ Read these for deep expertise:
 rg "function_name" --type rust
 
 # Find tests
-./scripts/test-by-tag.sh <component>
+./scripts/testing/test-by-tag.sh <component>
 
 # Check docs
 cargo doc --open -p <crate>

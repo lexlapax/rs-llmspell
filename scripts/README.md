@@ -1,95 +1,104 @@
-# Scripts Directory
+# LLMSpell Scripts
 
-**Quality assurance and utility scripts for LLMSpell development**
+> 🚀 **Comprehensive automation, testing, and deployment tools for the LLMSpell project**
 
 **🔗 Navigation**: [← Project Root](../) | [Developer Guide](../docs/developer-guide/) | [Contributing](../CONTRIBUTING.md)
 
 ---
 
-## Overview
+## 📁 Directory Structure
 
-This directory contains utility scripts for development, testing, quality assurance, and user-friendly application launching.
-
-## User Scripts
-
-### llmspell-easy.sh
-**Purpose**: User-friendly launcher for LLMSpell applications
-**Usage**: `./scripts/llmspell-easy.sh [app-name]`
-
-Features:
-- Auto-detects llmspell binary location
-- Checks and guides API key setup
-- Simplified application launching
-- Interactive setup wizard for first-time users
-
-Examples:
-```bash
-./scripts/llmspell-easy.sh                # List available apps
-./scripts/llmspell-easy.sh file-organizer  # Run file organizer
-./scripts/llmspell-easy.sh help           # Show help
+```
+scripts/
+├── 📊 quality/      # Code quality & CI/CD tools
+├── 🧪 testing/      # Test execution & coverage
+├── 🛠️  utilities/    # Helper scripts & tools
+└── 🚢 fleet/        # Fleet orchestration & monitoring
 ```
 
-## Quality Check Scripts
+## 🎯 Quick Navigation
 
-### quality-check.sh
-Full quality gates check including all tests and optional coverage analysis.
-- Runs formatting check, clippy, build, all tests, documentation
-- Optional: coverage analysis (requires cargo-tarpaulin)
-- Optional: security audit (requires cargo-audit)
-- Use `SKIP_SLOW_TESTS=true` to exclude slow/external tests
-- Takes 5+ minutes for full run
+| Category | Purpose | Key Scripts | Documentation |
+|----------|---------|-------------|---------------|
+| **[Quality](./quality/)** | Code standards & CI | `quality-check-*.sh`, `ci-test.sh` | [📖 Quality README](./quality/README.md) |
+| **[Testing](./testing/)** | Test execution | `test-by-tag.sh`, `test-coverage.sh` | [📖 Testing README](./testing/README.md) |
+| **[Utilities](./utilities/)** | Helper tools | `llmspell-easy.sh`, `backup_maintenance.sh` | [📖 Utilities README](./utilities/README.md) |
+| **[Fleet](./fleet/)** | Fleet management | `llmspell-fleet`, `fleet_dashboard.py` | [📖 Fleet README](./fleet/README.md) |
 
-### quality-check-fast.sh
-Fast quality check with essential validations.
-- Runs formatting, clippy, build, unit tests only, documentation
-- Skips integration tests for speed
-- Takes ~1 minute
+## 🚀 Essential Scripts
 
-### quality-check-minimal.sh
-Minimal quality check for quick validation.
-- Only runs formatting, clippy, and compilation check
-- Takes seconds to complete
-- Good for pre-commit checks
-
-## Application Validation Suite
-
-### validate_applications.py
-**Purpose**: Comprehensive validation of all 9 example Lua applications
-**Usage**: `python3 scripts/validate_applications.py [options]`
-
-Features:
-- Tests all example applications via llmspell CLI
-- Layer-based testing (Universal → Expert)
-- Output validation against expected patterns
-- File creation verification
-- Performance tracking and reporting
-- HTML/JSON report generation
-- **Script argument testing** - Validates that applications respect CLI arguments
+### For Developers
 
 ```bash
-# Run standard tests (excludes webapp-creator)
-python3 scripts/validate_applications.py
+# Quick quality check before commit
+./quality/quality-check-fast.sh
 
-# Include expensive tests (webapp-creator takes 8+ minutes)
-RUN_EXPENSIVE_TESTS=1 python3 scripts/validate_applications.py
+# Run specific tests
+./testing/test-by-tag.sh unit
 
-# Generate reports
-python3 scripts/validate_applications.py --html report.html --json report.json
+# Find relevant examples
+./utilities/find-examples.sh agent
 
-# Verbose output for debugging
-python3 scripts/validate_applications.py --verbose
+# Start local kernel fleet
+./fleet/llmspell-fleet start 3
 ```
 
-**Script Arguments Support:**
-The validation suite tests that applications properly handle script arguments passed via the CLI.
-For example, webapp-creator is tested with `--output /tmp/test-webapp-output` to verify that
-the ARGS global is properly injected into the Lua runtime.
+### For DevOps
+
+```bash
+# Full CI validation
+./quality/ci-test.sh full
+
+# Generate coverage reports
+./testing/test-coverage.sh all html
+
+# Manage backups
+./utilities/backup_maintenance.sh
+
+# Monitor fleet health
+./fleet/fleet_dashboard.py
+```
+
+### For End Users
+
+```bash
+# Easy launcher (zero config)
+./utilities/llmspell-easy.sh
+
+# Find examples by complexity
+./utilities/find-examples.sh --tag beginner
+```
+
+## 📊 Quality Scripts (`quality/`)
+
+**Purpose:** Maintain code quality, run CI/CD pipelines, validate applications
+
+### Key Scripts
+- **`quality-check-minimal.sh`** - Format & lint (~5s)
+- **`quality-check-fast.sh`** - Add tests & docs (~1min)
+- **`quality-check.sh`** - Full validation (~5min)
+- **`ci-test.sh`** - CI pipeline runner
+- **`validate_applications.py`** - Application validation
+
+### Quick Usage
+```bash
+cd quality
+
+# Pre-commit check
+./quality-check-minimal.sh
+
+# Pre-push validation
+./quality-check-fast.sh
+
+# Full PR validation
+./quality-check.sh
+```
 
 **Application Test Matrix:**
 
 | Layer | Agents | Applications | Runtime | Complexity |
 |-------|--------|-------------|---------|------------|
-| 1 - Universal | 2-3 | file-organizer, research-collector | <30s | Basic agents, simple workflows |
+| 1 - Universal | 2-3 | file-organizer, research-collector | <30s | Basic agents |
 | 2 - Power User | 4 | content-creator | ~30s | Conditional workflows |
 | 3 - Business | 5-7 | personal-assistant, communication-manager, code-review-assistant | 30-60s | State persistence |
 | 4 - Professional | 8 | process-orchestrator, knowledge-base | 60-90s | Complex orchestration, RAG |
@@ -97,151 +106,267 @@ the ARGS global is properly injected into the Lua runtime.
 
 **Current Status:** ✅ 9/9 applications passing (100% success rate)
 
-## Test Runner Scripts
+[→ Full Quality Documentation](./quality/README.md)
 
-### test-by-tag.sh
-Run tests filtered by category tag.
-```bash
-./scripts/test-by-tag.sh <tag> [cargo test args]
-```
+## 🧪 Testing Scripts (`testing/`)
 
-Available tags:
+**Purpose:** Execute tests, analyze coverage, manage test suites
+
+### Key Scripts
+- **`test-by-tag.sh`** - Run tests by category
+- **`test-coverage.sh`** - Generate coverage reports
+- **`run-llmspell-tests.sh`** - Comprehensive runner
+- **`list-tests-by-tag.sh`** - Discover test categories
+- **`test-multiple-tags.sh`** - Batch test execution
+
+### Available Test Tags
 - `unit` - Library unit tests only
 - `integration` - Integration tests only
 - `tool` - Tests in llmspell-tools package
 - `agent` - Tests in llmspell-agents package
-- `workflow` - Tests with "workflow" in name
+- `workflow` - Workflow pattern tests
+- `bridge` - Language bridge tests
 - `fast` - Fast unit tests
 - `slow` - Ignored tests marked as slow
 - `external` - Tests requiring external services
 - `all` - All tests including ignored
 
-Examples:
+### Quick Usage
 ```bash
-./scripts/test-by-tag.sh unit
-./scripts/test-by-tag.sh tool --release
-./scripts/test-by-tag.sh external -- --nocapture
+cd testing
+
+# Run unit tests
+./test-by-tag.sh unit
+
+# Generate coverage
+./test-coverage.sh all html
+
+# Run full test suite
+./run-llmspell-tests.sh comprehensive
 ```
 
-### test-multiple-tags.sh
-Run tests matching multiple tags.
+[→ Full Testing Documentation](./testing/README.md)
+
+## 🛠️ Utility Scripts (`utilities/`)
+
+**Purpose:** Helper tools for users, developers, and administrators
+
+### Key Scripts
+- **`llmspell-easy.sh`** - User-friendly launcher
+- **`find-examples.sh`** - Example discovery
+- **`backup_maintenance.sh`** - Backup automation
+- **`test_backup_integrity.sh`** - Backup validation
+
+### Features
+- Auto-detection of llmspell binary
+- API key setup guidance
+- Example discovery by tag/feature
+- Automated backup management
+- Integrity validation
+
+### Quick Usage
 ```bash
-./scripts/test-multiple-tags.sh "tag1,tag2" [cargo test args]
+cd utilities
+
+# Launch LLMSpell easily
+./llmspell-easy.sh
+
+# Find examples
+./find-examples.sh --feature workflow
+
+# Create backup
+./backup_maintenance.sh --backup-only
 ```
 
-Examples:
+[→ Full Utilities Documentation](./utilities/README.md)
+
+## 🚢 Fleet Scripts (`fleet/`)
+
+**Purpose:** Kernel fleet management, monitoring, and orchestration
+
+### Key Components
+- **`llmspell-fleet`** - Fleet management CLI
+- **`fleet_manager.py`** - Python fleet controller
+- **`fleet_dashboard.py`** - Real-time monitoring
+- **`log_aggregator.py`** - Centralized logging
+- **Docker support** - Container orchestration
+- **Prometheus metrics** - Monitoring integration
+
+### Features
+- **Multi-kernel orchestration** - Manage 1-100+ kernels
+- **Resource monitoring** - CPU, memory, connections
+- **Health checks** - Automatic recovery
+- **Log aggregation** - Centralized analysis
+- **Docker deployment** - Production-ready containers
+- **Prometheus export** - Metrics integration
+
+### Quick Usage
 ```bash
-./scripts/test-multiple-tags.sh "tool,fast"
-./scripts/test-multiple-tags.sh "unit,!slow"
+cd fleet
+
+# Start fleet
+./llmspell-fleet start 3
+
+# Monitor fleet
+python3 fleet_dashboard.py
+
+# View aggregated logs
+python3 log_aggregator.py tail
+
+# Docker deployment
+./docker-fleet.sh up
 ```
 
-### list-tests-by-tag.sh
-List tests that would run for a given tag without executing them.
+[→ Full Fleet Documentation](./fleet/README.md)
+
+## 🔧 Common Workflows
+
+### Development Workflow
 ```bash
-./scripts/list-tests-by-tag.sh <tag>
+# 1. Write code
+# 2. Format and lint
+scripts/quality/quality-check-minimal.sh
+
+# 3. Run tests
+scripts/testing/test-by-tag.sh unit
+
+# 4. Full validation before PR
+scripts/quality/quality-check.sh
 ```
 
-Available tags:
-- `unit` - Show unit tests
-- `integration` - Show integration tests
-- `tool` - Show tool tests
-- `ignored` - Show ignored tests with reasons
-- `all` - Show test count summary
-
-### tag-integration-tests.sh
-Analyze test files and suggest appropriate `#[ignore]` tags based on their characteristics.
+### CI/CD Workflow
 ```bash
-./scripts/tag-integration-tests.sh         # Dry run mode - show suggestions
-./scripts/tag-integration-tests.sh --apply  # Apply suggestions (not yet implemented)
+# Minimal checks (PR draft)
+TEST_LEVEL=minimal scripts/quality/ci-test.sh
+
+# Fast checks (PR ready)
+TEST_LEVEL=fast scripts/quality/ci-test.sh
+
+# Full validation (merge)
+TEST_LEVEL=full scripts/quality/ci-test.sh
+
+# Expensive tests (weekly)
+RUN_EXPENSIVE_TESTS=1 scripts/quality/ci-test.sh
 ```
 
-Detects:
-- External network dependencies
-- Tool/bridge/LLM tests
-- Slow operations
-- Database usage
-
-### test-timings.sh
-Run tests and show execution times to identify slow tests.
+### Deployment Workflow
 ```bash
-./scripts/test-timings.sh              # Time all tests
-./scripts/test-timings.sh llmspell-tools  # Time tests in specific package
+# 1. Create backup
+scripts/utilities/backup_maintenance.sh
+
+# 2. Deploy fleet
+scripts/fleet/docker-fleet.sh up
+
+# 3. Monitor health
+scripts/fleet/fleet_dashboard.py
+
+# 4. Check logs
+scripts/fleet/log_aggregator.py monitor
 ```
 
-Helps identify tests that should be marked with `#[ignore = "slow"]`
+## 📋 Best Practices
 
-## Best Practices
+### Script Execution Order
 
-1. **Before commits**: Run `./scripts/quality-check-minimal.sh`
-2. **Before pushing**: Run `./scripts/quality-check-fast.sh`
-3. **Before PRs**: Run `./scripts/quality-check.sh`
-4. **During development**: Use `test-by-tag.sh` for focused testing
+**For New Contributors:**
+1. `utilities/llmspell-easy.sh --setup`
+2. `utilities/find-examples.sh --tag beginner`
+3. `testing/test-by-tag.sh unit`
 
-## CI Integration
+**For Regular Development:**
+1. `quality/quality-check-minimal.sh` (pre-commit)
+2. `testing/test-by-tag.sh <relevant-tag>` (during development)
+3. `quality/quality-check-fast.sh` (pre-push)
 
-### ci-test.sh
-**Purpose**: Unified CI test runner with configurable test levels
-**Usage**: `TEST_LEVEL=<level> ./scripts/ci-test.sh`
+**For Releases:**
+1. `quality/quality-check.sh` (full validation)
+2. `testing/test-coverage.sh all` (coverage analysis)
+3. `quality/validate_applications.py` (application tests)
 
-Provides consistent test execution for both local development and CI environments.
+### Performance Targets
 
-**Test Levels:**
-- `minimal` - Format and lint checks only (<1 min)
-- `fast` - Unit tests and basic validation (~2 min)
-- `full` - All tests including application validation (~10 min)
-- `expensive` - Include webapp-creator test (~20 min)
-- `coverage` - Generate code coverage report
+All scripts enforce these targets:
+- **Tool initialization:** <10ms
+- **State operations:** <5ms write, <1ms read
+- **Test coverage:** >90% for units, >70% overall
+- **Zero warnings:** Clean `cargo clippy`
+- **Documentation:** >95% API coverage
 
-```bash
-# Local CI simulation
-TEST_LEVEL=minimal ./scripts/ci-test.sh   # Quick PR checks
-TEST_LEVEL=fast ./scripts/ci-test.sh      # Before pushing
-TEST_LEVEL=full ./scripts/ci-test.sh      # Before merging
+## 🌍 Environment Variables
 
-# With custom report directory
-REPORT_DIR=./my-reports TEST_LEVEL=full ./scripts/ci-test.sh
-```
+### Quality & Testing
+- `SKIP_SLOW_TESTS=true` - Skip slow/external tests
+- `RUN_EXPENSIVE_TESTS=1` - Enable webapp-creator test
+- `TEST_LEVEL=<level>` - CI test level (minimal/fast/full)
+- `REPORT_DIR=<path>` - Test report directory
+
+### Fleet Management
+- `FLEET_DIR=<path>` - Fleet data directory
+- `MAX_KERNELS=<n>` - Maximum kernel limit
+- `PROMETHEUS_PORT=<port>` - Metrics export port
+
+### General
+- `LLMSPELL_BIN=<path>` - Override llmspell binary
+- `RUST_LOG=<level>` - Logging level
+- `VERBOSE=true` - Verbose output
+
+## 📈 CI/CD Integration
 
 ### GitHub Actions Workflows
 
-**`.github/workflows/test.yml`** - Main test workflow
-- Runs on: Pull requests, pushes to main, manual trigger
-- Test levels based on event type
-- Cross-platform testing (Linux, macOS, Windows)
+**Main Test Workflow** (`.github/workflows/test.yml`)
+- Runs on: Pull requests, pushes to main
+- Cross-platform: Linux, macOS, Windows
 - Performance benchmarking
 - Security audit
 
-**`.github/workflows/scheduled-tests.yml`** - Scheduled comprehensive tests
-- Daily: Full test suite at 2 AM UTC
-- Weekly: Expensive tests including webapp-creator (Sunday 3 AM UTC)
-- Code coverage analysis with threshold checking
+**Scheduled Tests** (`.github/workflows/scheduled-tests.yml`)
+- Daily: Full test suite (2 AM UTC)
+- Weekly: Expensive tests (Sunday 3 AM UTC)
+- Coverage analysis with thresholds
 - Performance regression detection
-- Automatic issue creation on failure
-
-### CI Configuration
-
-**Environment Variables:**
-- `TEST_LEVEL` - Test level to run (minimal/fast/full/expensive)
-- `RUN_EXPENSIVE_TESTS` - Enable webapp-creator testing
-- `REPORT_DIR` - Directory for test reports (default: ./test-reports)
-
-**GitHub Secrets Required:**
-- `OPENAI_API_KEY` - For running application tests with real API (optional)
 
 ### Test Reports
 
 CI generates multiple report types:
-- **HTML Report** - Visual test results dashboard
-- **JSON Report** - Machine-readable test data
-- **Coverage Report** - Code coverage analysis (weekly)
+- **HTML Report** - Visual test results
+- **JSON Report** - Machine-readable data
+- **Coverage Report** - Code coverage analysis
 - **Performance Report** - Benchmark comparisons
 
-All reports are uploaded as GitHub Actions artifacts for review.
+All reports uploaded as GitHub Actions artifacts.
 
-## Environment Variables
+## 🔗 Related Documentation
 
-- `SKIP_SLOW_TESTS=true` - Skip slow/external tests in quality-check.sh
-- `RUN_EXPENSIVE_TESTS=1` - Enable webapp-creator test (8+ minutes)
-- `TEST_LEVEL=<level>` - CI test level (minimal/fast/full/expensive)
-- `REPORT_DIR=<path>` - Custom report output directory
-- `LLMSPELL_BIN=<path>` - Override llmspell binary location
+- [Development Guide](../docs/development/README.md)
+- [Testing Guide](../docs/development/testing.md)
+- [CI/CD Pipeline](../.github/workflows/README.md)
+- [Fleet Operations](../docs/operations/fleet.md)
+- [Contributing Guidelines](../CONTRIBUTING.md)
+
+## 🤝 Contributing
+
+To contribute new scripts:
+
+1. **Choose category:** quality, testing, utilities, or fleet
+2. **Follow conventions:** Descriptive names with hyphens
+3. **Add documentation:** Script header, usage examples
+4. **Include error handling:** Proper exit codes, logging
+5. **Update README:** Add to category README
+6. **Test platforms:** macOS and Linux compatibility
+7. **Submit PR:** With usage examples
+
+See [CONTRIBUTING.md](../CONTRIBUTING.md) for detailed guidelines.
+
+## 📊 Script Health Status
+
+| Category | Scripts | Status | Last Updated |
+|----------|---------|--------|--------------|
+| Quality | 5 | ✅ Active | 2024-09-27 |
+| Testing | 5 | ✅ Active | 2024-09-27 |
+| Utilities | 4 | ✅ Active | 2024-09-27 |
+| Fleet | 12+ | ✅ Active | 2024-09-27 |
+
+---
+
+**Need help?** Check the individual category READMEs or open an issue in the [project repository](https://github.com/yourusername/rs-llmspell/issues).
