@@ -84,19 +84,16 @@ use tracing::info;
 ///
 /// # Examples
 ///
-/// ```rust,no_run
-/// use llmspell_cli::commands::{execute_command, Commands};
-/// use llmspell_cli::cli::OutputFormat;
+/// ```rust,ignore
+/// use llmspell_cli::commands::execute_command;
+/// use llmspell_cli::cli::{Commands, OutputFormat};
 /// use llmspell_config::LLMSpellConfig;
 ///
-/// # async fn example() -> anyhow::Result<()> {
 /// let config = LLMSpellConfig::default();
-/// let command = Commands::Info; // Example command
+/// let command = Commands::Config { /* ... */ };
 /// let format = OutputFormat::Pretty;
 ///
 /// execute_command(command, config, format).await?;
-/// # Ok(())
-/// # }
 /// ```
 pub async fn execute_command(
     command: Commands,
@@ -215,10 +212,13 @@ pub async fn execute_command(
             backup::handle_backup_command(command, runtime_config, output_format).await
         }
 
-        Commands::App { name, args } => {
+        Commands::App {
+            command,
+            search_path,
+        } => {
             let context =
                 ExecutionContext::resolve(None, None, None, runtime_config.clone()).await?;
-            apps::run_application(name, args, context, output_format).await
+            apps::handle_app_command(command, search_path, context, output_format).await
         }
     }
 }

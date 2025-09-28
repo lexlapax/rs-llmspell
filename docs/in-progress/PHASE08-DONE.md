@@ -2447,10 +2447,10 @@ Check the `docs/user-guide/api/lua/README.md` to actually see what API calls to 
 - **Workflow Custom Steps Issue**: The Workflow.builder():add_step() method doesn't support custom steps with handler functions. Only "tool", "agent", or "workflow" type steps work correctly. Attempting to use custom steps with handler functions causes "error converting Lua nil to String" errors.
 - **RAG.get_stats() Parameters**: The function requires two parameters: collection name and a nil/tenant parameter. Example: `RAG.get_stats("collection_name", nil)`
 - **Conditional Workflow Creation**: When agents may not be available (e.g., missing API keys), create workflows conditionally and check for nil before execution
-- **CLI Integration**: New apps must be registered in three places:
-  1. `llmspell-cli/src/cli.rs` - Add to AppsSubcommand enum
-  2. `llmspell-cli/src/commands/apps.rs` - Add match arm for execution
-  3. `llmspell-cli/src/embedded_resources.rs` - Add to EMBEDDED_APPS with include_str!
+- **CLI Integration**: New apps are automatically discovered from filesystem:
+  1. Place app in `examples/script-users/applications/` directory
+  2. Include `main.lua` and `config.toml` in the app directory
+  3. App is automatically discovered by `llmspell app list` command
 - **Application Headers**: All applications should include proper headers with version, tags, how-to-run instructions, and ABOUTME descriptions for consistency
 - **Simplified Architecture**: RAG-enhanced apps work best with simplified 2-4 agent architectures rather than complex multi-agent systems
 

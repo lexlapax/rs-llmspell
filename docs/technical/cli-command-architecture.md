@@ -56,7 +56,7 @@ Subcommand Groups:
   config            # Configuration management
   keys              # API key management
   backup            # Backup operations
-  app               # Example applications
+  app               # Discover and run applications from filesystem
 ```
 
 ### 1.2 Command Tree
@@ -97,7 +97,11 @@ llmspell
 │   ├── restore <file>
 │   ├── list
 │   └── delete <id>
-└── app [name] [-- app-args...]
+└── app
+    ├── list
+    ├── info <name>
+    ├── run <name> [-- app-args...]
+    └── search [--tag TAG] [--complexity LEVEL] [--agents N]
 ```
 
 ---
@@ -741,7 +745,7 @@ GLOBAL OPTIONS:
 |-------------|-------------|-------|
 | `llmspell kernel --port 9555` | `llmspell kernel start --port 9555` | Subcommand pattern |
 | `llmspell serve` (Phase 10 early) | `llmspell kernel start --daemon` | No separate serve command |
-| `llmspell apps file-organizer run` | `llmspell app file-organizer` | Simplified |
+| `llmspell apps file-organizer run` | `llmspell app run file-organizer` | Subcommand pattern |
 | `llmspell init` | `llmspell config init` | Grouped under config |
 | `llmspell validate` | `llmspell config validate` | Grouped under config |
 | `llmspell providers` | `llmspell providers list` | Explicit subcommand |

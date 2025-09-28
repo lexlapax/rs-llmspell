@@ -9060,6 +9060,7 @@ ls -la examples/script-users/applications/webapp-creator/generated/shopeasy/
 ##### 7.3.12.11: Single Binary Distribution (2 days)
 **Status**: COMPLETED ✅ (2025-08-24)
 **Description**: Create single executable binary with embedded resources for universal appeal
+**Note**: This embedded resources approach was later replaced in Phase 10.17.1 with filesystem-based discovery for better flexibility and reduced binary size
 
 **Context**: User testing revealed 100% of users struggled with path confusion. Solution: embed all scripts and configs directly in the binary.
 
@@ -9109,6 +9110,8 @@ ls -la examples/script-users/applications/webapp-creator/generated/shopeasy/
   - Resources now part of CLI crate (not external dependencies)
   - Clean paths: `../resources/applications/` instead of `../../examples/`
   - CLI crate is fully self-contained for distribution
+
+**Note**: The embedded resources approach (`llmspell apps` command) was later replaced in Phase 10.17.1 with filesystem-based discovery (`llmspell app` command with subcommands: list, info, run, search) for better flexibility, reduced binary size (23.6% reduction), and easier app development
 - **Simplified Launcher**: Created `llmspell-easy` bash script with:
   - Auto-detection of llmspell binary location
   - API key checking with helpful setup prompts

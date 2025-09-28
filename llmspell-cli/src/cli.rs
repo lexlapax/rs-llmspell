@@ -17,20 +17,17 @@
 //!
 //! ```text
 //! llmspell [GLOBAL_FLAGS] <COMMAND>
-//! ├── run <script> [args...]           # Execute scripts with streaming support
-//! ├── exec <code>                      # Execute inline code
-//! ├── repl [--history-file]            # Interactive REPL sessions
-//! ├── debug <script> [debug-flags]     # Interactive debugging with DAP
-//! ├── kernel {start|connect|stop|status} # Kernel lifecycle management
-//! ├── session {list|show|replay|delete}  # Session management
-//! ├── config {init|validate|show}       # Configuration management
-//! ├── keys {list|add|remove}           # API key management
-//! ├── state {list|get|set|delete}      # State persistence
-//! ├── rag {search|index|stats}         # RAG operations
-//! ├── apps {list|install|create}       # Application templates
-//! ├── backup {create|list|restore}     # Backup operations
-//! ├── tools {list|install|update}      # Tool management
-//! └── info                             # System information
+//! ├── run <script> [args...]                       # Execute scripts with streaming support
+//! ├── exec <code>                                  # Execute inline code
+//! ├── repl [--history-file]                        # Interactive REPL sessions
+//! ├── debug <script> [debug-flags]                 # Interactive debugging with DAP
+//! ├── kernel {start|stop|status|connect|install-service}  # Kernel lifecycle management
+//! ├── session {list|show|replay|delete}            # Session management
+//! ├── config {init|validate|show}                  # Configuration management
+//! ├── keys {add|list|remove}                       # API key management
+//! ├── state {show|clear|export|import}             # State persistence
+//! ├── app {list|info|run|search}                   # Discover and run applications
+//! └── backup {create|restore|list|delete}          # Backup operations
 //! ```
 //!
 //! ## Usage Examples
@@ -421,22 +418,90 @@ EXAMPLES:
         command: BackupCommands,
     },
 
-    /// Run example applications
-    #[command(long_about = "Run example applications and use cases.
+    /// Manage and run applications
+    #[command(
+        long_about = "Discover, list, and run applications with filesystem-based discovery.
 
 EXAMPLES:
-    llmspell app file-organizer                # Run file organizer app
-    llmspell app research-collector -- --verbose  # Run with app arguments
-    llmspell app code-review-assistant         # Run code review assistant
-    llmspell app webapp-creator                # Run web app creator")]
+    llmspell app list                          # List all available applications
+    llmspell app info file-organizer           # Show app metadata and details
+    llmspell app run file-organizer            # Run file organizer app
+    llmspell app run research-collector -- --verbose  # Run with app arguments
+    llmspell app search --tag productivity     # Search apps by tag
+    llmspell app search --complexity Simple    # Search apps by complexity"
+    )]
     App {
-        /// Application name (file-organizer, research-collector, etc.)
+        #[command(subcommand)]
+        command: AppCommands,
+
+        /// Additional search paths for applications
+        #[arg(long, value_name = "PATH", action = clap::ArgAction::Append)]
+        search_path: Vec<String>,
+    },
+}
+
+/// Application management subcommands
+#[derive(Subcommand, Debug)]
+pub enum AppCommands {
+    /// List all available applications
+    #[command(long_about = "List all applications discovered in search paths.
+
+EXAMPLES:
+    llmspell app list                          # List all apps
+    llmspell app list --format json           # List in JSON format")]
+    List,
+
+    /// Show detailed information about an application
+    #[command(
+        long_about = "Show detailed metadata and information about a specific application.
+
+EXAMPLES:
+    llmspell app info file-organizer           # Show file-organizer details
+    llmspell app info webapp-creator --format json  # Show details in JSON"
+    )]
+    Info {
+        /// Application name to show information for
+        #[arg(value_name = "APP")]
+        name: String,
+    },
+
+    /// Run an application
+    #[command(long_about = "Execute an application with optional arguments.
+
+EXAMPLES:
+    llmspell app run file-organizer            # Run file organizer
+    llmspell app run research-collector -- --verbose  # Run with arguments")]
+    Run {
+        /// Application name to run
         #[arg(value_name = "APP")]
         name: String,
 
         /// Application arguments
         #[arg(last = true)]
         args: Vec<String>,
+    },
+
+    /// Search applications by criteria
+    #[command(
+        long_about = "Search applications by tags, complexity, or other criteria.
+
+EXAMPLES:
+    llmspell app search --tag productivity     # Search by tag
+    llmspell app search --complexity Simple    # Search by complexity
+    llmspell app search --agents 2             # Search by agent count"
+    )]
+    Search {
+        /// Search by tag
+        #[arg(long, value_name = "TAG")]
+        tag: Option<String>,
+
+        /// Search by complexity level
+        #[arg(long, value_name = "LEVEL")]
+        complexity: Option<String>,
+
+        /// Search by number of agents
+        #[arg(long, value_name = "COUNT")]
+        agents: Option<u32>,
     },
 }
 
