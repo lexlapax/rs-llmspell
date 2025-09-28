@@ -73,9 +73,127 @@ def find_or_create():
 
 @app.route('/metrics', methods=['GET'])
 def get_metrics():
-    """Get fleet metrics"""
+    """Get fleet metrics - supports both JSON and Prometheus formats"""
+    # Check for Prometheus format request
+    if request.headers.get('Accept') == 'text/plain' or request.args.get('format') == 'prometheus':
+        return get_prometheus_metrics()
+
+    # Default to JSON format
     metrics = fleet.get_metrics()
     return jsonify(metrics), 200
+
+@app.route('/metrics/prometheus', methods=['GET'])
+def get_prometheus_metrics():
+    """Export metrics in Prometheus format"""
+    fleet.cleanup_dead_kernels()
+    metrics = fleet.get_metrics()
+
+    # Build Prometheus format output
+    lines = []
+
+    # Help and type annotations
+    lines.extend([
+        "# HELP llmspell_kernels_total Total number of kernels in registry",
+        "# TYPE llmspell_kernels_total gauge",
+        f"llmspell_kernels_total {metrics['total_kernels']}",
+        "",
+        "# HELP llmspell_kernels_active Number of active running kernels",
+        "# TYPE llmspell_kernels_active gauge",
+        f"llmspell_kernels_active {metrics['aggregated']['active_kernels']}",
+        "",
+        "# HELP llmspell_kernels_dead Number of dead kernels",
+        "# TYPE llmspell_kernels_dead gauge",
+        f"llmspell_kernels_dead {metrics['aggregated']['dead_kernels']}",
+        "",
+        "# HELP llmspell_memory_mb_total Total memory usage in MB",
+        "# TYPE llmspell_memory_mb_total gauge",
+        f"llmspell_memory_mb_total {metrics['aggregated']['total_memory_mb']}",
+        "",
+        "# HELP llmspell_cpu_percent_total Total CPU usage percentage",
+        "# TYPE llmspell_cpu_percent_total gauge",
+        f"llmspell_cpu_percent_total {metrics['aggregated']['total_cpu_percent']}",
+        "",
+        "# HELP llmspell_connections_total Total number of connections",
+        "# TYPE llmspell_connections_total gauge",
+        f"llmspell_connections_total {metrics['aggregated']['total_connections']}",
+        "",
+        "# HELP llmspell_threads_total Total number of threads",
+        "# TYPE llmspell_threads_total gauge",
+        f"llmspell_threads_total {metrics['aggregated']['total_threads']}",
+        ""
+    ])
+
+    # Per-kernel metrics with labels
+    lines.extend([
+        "# HELP llmspell_kernel_memory_mb Memory usage per kernel in MB",
+        "# TYPE llmspell_kernel_memory_mb gauge"
+    ])
+
+    for kernel in metrics['kernels']:
+        if kernel.get('status') == 'running':
+            kernel_id = kernel['id']
+            port = kernel['port']
+            language = kernel['language']
+
+            # Memory metric
+            lines.append(
+                f'llmspell_kernel_memory_mb{{kernel_id="{kernel_id}",port="{port}",language="{language}"}} {kernel.get("memory_mb", 0):.2f}'
+            )
+
+    lines.append("")
+    lines.extend([
+        "# HELP llmspell_kernel_cpu_percent CPU usage per kernel",
+        "# TYPE llmspell_kernel_cpu_percent gauge"
+    ])
+
+    for kernel in metrics['kernels']:
+        if kernel.get('status') == 'running':
+            kernel_id = kernel['id']
+            port = kernel['port']
+            language = kernel['language']
+
+            # CPU metric
+            lines.append(
+                f'llmspell_kernel_cpu_percent{{kernel_id="{kernel_id}",port="{port}",language="{language}"}} {kernel.get("cpu_percent", 0):.2f}'
+            )
+
+    lines.append("")
+    lines.extend([
+        "# HELP llmspell_kernel_uptime_seconds Uptime per kernel in seconds",
+        "# TYPE llmspell_kernel_uptime_seconds counter"
+    ])
+
+    for kernel in metrics['kernels']:
+        if kernel.get('status') == 'running':
+            kernel_id = kernel['id']
+            port = kernel['port']
+            language = kernel['language']
+
+            # Uptime metric
+            lines.append(
+                f'llmspell_kernel_uptime_seconds{{kernel_id="{kernel_id}",port="{port}",language="{language}"}} {kernel.get("uptime_seconds", 0):.0f}'
+            )
+
+    lines.append("")
+    lines.extend([
+        "# HELP llmspell_kernel_connections Number of connections per kernel",
+        "# TYPE llmspell_kernel_connections gauge"
+    ])
+
+    for kernel in metrics['kernels']:
+        if kernel.get('status') == 'running':
+            kernel_id = kernel['id']
+            port = kernel['port']
+            language = kernel['language']
+
+            # Connections metric
+            lines.append(
+                f'llmspell_kernel_connections{{kernel_id="{kernel_id}",port="{port}",language="{language}"}} {kernel.get("connections", 0)}'
+            )
+
+    # Return Prometheus format text
+    response = '\n'.join(lines)
+    return response, 200, {'Content-Type': 'text/plain; version=0.0.4'}
 
 @app.route('/registry', methods=['GET'])
 def get_registry():

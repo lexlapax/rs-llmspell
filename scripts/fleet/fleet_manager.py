@@ -402,30 +402,90 @@ class FleetManager:
         )
 
     def get_metrics(self) -> Dict[str, Any]:
-        """Collect metrics for all kernels"""
+        """Collect comprehensive metrics for all kernels"""
+        total_memory = 0
+        total_cpu = 0
+        total_connections = 0
+        total_threads = 0
+
         metrics = {
             "timestamp": datetime.now(timezone.utc).isoformat(),
             "total_kernels": len(self.registry["kernels"]),
             "total_spawned": self.registry.get("total_spawned", 0),
-            "kernels": []
+            "kernels": [],
+            "aggregated": {}
         }
 
         for kernel in self.registry["kernels"]:
             try:
                 process = psutil.Process(kernel["pid"])
+                mem_info = process.memory_info()
+                cpu_percent = process.cpu_percent(interval=0.1)
+                connections = process.connections()
+                num_threads = process.num_threads()
+
+                # Collect IO stats if available
+                io_stats = {}
+                try:
+                    io_counters = process.io_counters()
+                    io_stats = {
+                        "read_bytes": io_counters.read_bytes,
+                        "write_bytes": io_counters.write_bytes,
+                        "read_count": io_counters.read_count,
+                        "write_count": io_counters.write_count
+                    }
+                except (AttributeError, psutil.AccessDenied):
+                    pass
+
                 kernel_metrics = {
                     "id": kernel["id"],
                     "port": kernel["port"],
                     "language": kernel["language"],
-                    "memory_mb": process.memory_info().rss / 1024 / 1024,
-                    "cpu_percent": process.cpu_percent(interval=0.1),
-                    "connections": len(process.connections()),
-                    "threads": process.num_threads(),
-                    "uptime_seconds": time.time() - process.create_time()
+                    "status": "running",
+                    "memory_mb": mem_info.rss / 1024 / 1024,
+                    "memory_percent": process.memory_percent(),
+                    "cpu_percent": cpu_percent,
+                    "connections": len(connections),
+                    "connection_details": [
+                        {"local": f"{c.laddr.ip}:{c.laddr.port}",
+                         "remote": f"{c.raddr.ip}:{c.raddr.port}" if c.raddr else "N/A",
+                         "status": c.status}
+                        for c in connections[:5]  # Limit to 5 connections
+                    ],
+                    "threads": num_threads,
+                    "uptime_seconds": time.time() - process.create_time(),
+                    "nice": process.nice(),
+                    "io": io_stats
                 }
+
+                # Update totals for aggregation
+                total_memory += mem_info.rss / 1024 / 1024
+                total_cpu += cpu_percent
+                total_connections += len(connections)
+                total_threads += num_threads
+
                 metrics["kernels"].append(kernel_metrics)
             except psutil.NoSuchProcess:
-                pass
+                # Mark kernel as dead
+                metrics["kernels"].append({
+                    "id": kernel["id"],
+                    "port": kernel["port"],
+                    "status": "dead",
+                    "language": kernel["language"]
+                })
+
+        # Add aggregated metrics
+        active_kernels = len([k for k in metrics["kernels"] if k.get("status") == "running"])
+        metrics["aggregated"] = {
+            "active_kernels": active_kernels,
+            "dead_kernels": len(metrics["kernels"]) - active_kernels,
+            "total_memory_mb": round(total_memory, 2),
+            "avg_memory_mb": round(total_memory / active_kernels, 2) if active_kernels > 0 else 0,
+            "total_cpu_percent": round(total_cpu, 2),
+            "avg_cpu_percent": round(total_cpu / active_kernels, 2) if active_kernels > 0 else 0,
+            "total_connections": total_connections,
+            "total_threads": total_threads
+        }
 
         return metrics
 

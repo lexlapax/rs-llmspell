@@ -1,0 +1,2 @@
+-rwxr-xr-x@ 1 spuri  staff  239165240 Sep 26 16:18 target/debug/llmspell
+-rwxr-xr-x@ 1 spuri  staff   40845440 Sep 26 18:56 target/release/llmspell
