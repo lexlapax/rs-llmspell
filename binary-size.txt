@@ -2,3 +2,5 @@
 -rwxr-xr-x@ 1 spuri  staff   40845440 Sep 26 18:56 target/release/llmspell
 -rwxr-xr-x@ 1 spuri  staff   40978048 Sep 27 23:33 target/release/llmspell
 -rwxr-xr-x@ 1 spuri  staff  239791720 Sep 27 23:35 target/debug/llmspell
+-rwxr-xr-x@ 1 spuri  staff  239789320 Sep 27 23:58 target/debug/llmspell
+-rwxr-xr-x@ 1 spuri  staff   40978048 Sep 28 00:39 target/release/llmspell

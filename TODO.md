@@ -7327,6 +7327,114 @@ pub fn handle_configuration_done(&mut self) -> Result<()> {
 
 ---
 
+### Task 10.17.5: Binary Size Reduction & Dependency Cleanup
+**Priority**: HIGH
+**Estimated Time**: 5 hours
+**Status**: ⏳ PENDING
+**Assignee**: Core Team
+
+**Analysis Summary**: Comprehensive binary size analysis revealed 33.6MB release binary with significant reduction opportunities. Apache Arrow/Parquet alone contributes 2.8MB for a feature used in only one file. Multiple unused dependencies, duplicate libraries, and heavy CLI dependencies identified. Full analysis archived at `docs/archives/BINARY_SIZE_ANALYSIS.md`.
+
+**Current State**:
+- Release binary: 33.6MB (.text section: 23.0MB)
+- Top contributors: std (3.0MB), llmspell_bridge (1.6MB), llmspell_tools (1.4MB), mlua (1.2MB), arrow_cast (1.2MB)
+- Apache Arrow/Parquet: 2.8MB total for CSV->Parquet conversion in one file
+- Multiple compression libraries: zstd, brotli, lz4, flate2 all included
+- Heavy CLI deps: tabled, dialoguer, indicatif, colored barely used
+
+**Target**: Reduce binary from 33.6MB to ~28MB (16% reduction) without losing core features
+
+**Acceptance Criteria**:
+- [ ] Binary size reduced by at least 5MB
+- [ ] All core features remain functional
+- [ ] Advanced features available via feature flags
+- [ ] Zero clippy warnings after cleanup
+- [ ] All tests pass with minimal feature set
+- [ ] Feature documentation added to README
+
+#### Sub-task 10.17.5.1: Remove Unused Dependencies (Quick Wins)
+**Estimated Time**: 30 minutes
+**Description**: Remove completely unused dependencies and standardize versions
+- [ ] Remove `hnsw = "0.11"` from llmspell-rag/Cargo.toml (unused, using hnsw_rs instead)
+- [ ] Standardize UUID version to 1.17 across workspace (currently: 1.7, 1.8, 1.11, 1.17)
+- [ ] Standardize chrono to workspace version 0.4 (11 different import styles found)
+- [ ] Remove unused dev dependencies
+- [ ] Measure binary size reduction
+
+#### Sub-task 10.17.5.2: Replace Heavy CLI Dependencies
+**Estimated Time**: 1.5 hours
+**Description**: Replace rarely-used heavy dependencies with simple implementations
+- [ ] Replace `tabled` in kernel.rs with 20-line table formatter (save ~200KB)
+- [ ] Replace `colored` (3 uses) with 10-line ANSI color functions (save ~50KB)
+- [ ] Replace `indicatif` (1 use) with 10-line progress printer (save ~100KB)
+- [ ] Replace `dialoguer` (1 use) with simple stdin reader (save ~100KB)
+- [ ] Test all replacements work correctly
+- [ ] Measure cumulative size reduction
+
+#### Sub-task 10.17.5.3: Make Apache Arrow/Parquet Optional
+**Estimated Time**: 1.5 hours
+**Description**: Put heavy data processing behind feature flag (save 2.8MB)
+- [ ] Add `csv-parquet` feature flag to llmspell-tools/Cargo.toml
+- [ ] Gate arrow and parquet dependencies behind feature
+- [ ] Move csv_analyzer.rs behind `#[cfg(feature = "csv-parquet")]`
+- [ ] Update llmspell-cli to not include csv-parquet by default
+- [ ] Add runtime error message when feature not enabled
+- [ ] Test CSV operations work without Parquet support
+- [ ] Verify 2.8MB reduction achieved
+
+#### Sub-task 10.17.5.4: Add Feature Flags for Optional Components
+**Estimated Time**: 1 hour
+**Description**: Make other heavy dependencies optional
+- [ ] Add `templates` feature for tera (436KB)
+- [ ] Add `pdf` feature for pdf-extract (312KB)
+- [ ] Add `excel` feature for xlsxwriter/calamine
+- [ ] Add `json-query` feature for jaq-* crates (571KB)
+- [ ] Create `full` feature that enables everything
+- [ ] Set sensible defaults (templates and pdf on, others off)
+- [ ] Update bridge and CLI to use appropriate features
+
+#### Sub-task 10.17.5.5: Optimize Compression Libraries
+**Estimated Time**: 45 minutes
+**Description**: Reduce from 4 compression algorithms to 2
+- [ ] Analyze actual usage of each compression type
+- [ ] Keep gzip (flate2) for standard compression
+- [ ] Keep zstd for high-ratio compression
+- [ ] Remove brotli support (save 292KB)
+- [ ] Remove lz4 support (save ~200KB)
+- [ ] Update CompressionType enum
+- [ ] Update backup/compression.rs implementation
+- [ ] Test remaining compression works correctly
+
+#### Sub-task 10.17.5.6: Replace serde_yaml with JSON Pretty-Print
+**Estimated Time**: 30 minutes
+**Description**: Remove deprecated serde_yaml dependency
+- [ ] Identify all serde_yaml usage points (35 uses in CLI)
+- [ ] Replace YAML output with pretty-printed JSON
+- [ ] Remove serde_yaml from all Cargo.toml files
+- [ ] Test output format still readable
+- [ ] Document change in breaking changes
+
+#### Sub-task 10.17.5.7: Final Validation & Documentation
+**Estimated Time**: 30 minutes
+**Description**: Verify all changes and document
+- [ ] Run `cargo bloat --release --crates -n 30` and compare
+- [ ] Verify binary reduced to ~28MB target
+- [ ] Run full test suite with minimal features
+- [ ] Run full test suite with --all-features
+- [ ] Update README with feature flag documentation
+- [ ] Create migration guide for users needing removed features
+- [ ] Update BREAKING_CHANGES.md if needed
+
+**Performance Metrics to Track**:
+- Pre-optimization binary size: 33.6MB
+- Post-optimization target: 28MB
+- Reduction achieved: ___MB (___%)
+- Features made optional: ___
+- Dependencies removed: ___
+- Lines of replacement code: ___
+
+---
+
 ## Phase 10.18: Fleet Manager Implementation (Days 20-21) ✅ COMPLETE
 
 ### Phase Summary & Key Insights
