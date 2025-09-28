@@ -2,6 +2,32 @@
 
 Fleet management system for orchestrating multiple LLMSpell kernel processes with OS-level isolation.
 
+**✨ Now with full Docker support!** Build, deploy, and scale LLMSpell kernels using Docker containers with complete isolation, health checks, and resource management.
+
+## Table of Contents
+
+- [Overview](#overview)
+- [Files Overview](#files-overview)
+- [Architecture](#architecture)
+- [Quick Start](#quick-start)
+- [Core Scripts](#core-scripts)
+  - [llmspell-fleet](#1-llmspell-fleet-shell-implementation)
+  - [fleet_manager.py](#2-fleet_managerpy-python-implementation)
+  - [fleet_http_service.py](#3-fleet_http_servicepy-rest-api)
+- [Docker Support](#docker-support-comprehensive)
+  - [Docker Architecture](#docker-architecture)
+  - [Docker Files](#docker-files)
+  - [Docker Quick Start](#docker-quick-start)
+  - [Docker Troubleshooting](#docker-troubleshooting)
+- [Example Scripts](#example-scripts)
+- [Test Suites](#test-suites)
+- [Makefile Commands](#makefile-commands)
+- [Configuration](#configuration)
+- [Resource Management](#resource-management)
+- [Performance](#performance-characteristics)
+- [Troubleshooting](#troubleshooting)
+- [Production Deployment](#production-deployment)
+
 ## Overview
 
 The fleet management system allows you to run multiple isolated LLMSpell kernels, each with its own configuration, resource limits, and client connections. This enables:
@@ -10,6 +36,35 @@ The fleet management system allows you to run multiple isolated LLMSpell kernels
 - **Collaborative sessions** - Multiple users can share a kernel for pair programming
 - **Resource isolation** - OS-level process boundaries ensure true isolation
 - **Service deployment** - Production-ready with systemd/Docker support
+
+## Files Overview
+
+```
+scripts/fleet/
+├── llmspell-fleet              # Shell script fleet manager
+├── fleet_manager.py            # Python fleet manager with psutil
+├── fleet_http_service.py       # REST API service
+├── docker-fleet.sh             # Docker management script
+├── Dockerfile                  # Multi-stage Docker build
+├── docker-compose.yml          # Docker orchestration config
+├── Makefile                    # Automation commands
+├── README.md                   # This documentation
+│
+├── configs/                    # Configuration files
+│   ├── default.toml
+│   ├── openai.toml
+│   ├── anthropic.toml
+│   └── local.toml
+│
+├── examples/                   # Example scripts
+│   ├── multi_developer_setup.sh
+│   ├── collaborative_session.sh
+│   └── resource_management.sh
+│
+└── tests/                      # Test suites
+    ├── test_fleet_integration.sh
+    └── test_fleet_advanced.sh
+```
 
 ## Architecture
 
@@ -205,33 +260,334 @@ Covers:
 - Error handling
 - HTTP service validation
 
-## Docker Support
+## Docker Support (Comprehensive)
 
-### Docker Compose
-```bash
-# Start fleet with Docker
-docker-compose up -d
+### Docker Architecture
 
-# View specific kernel
-docker-compose up kernel-lua-openai
+The Docker fleet provides containerized kernel orchestration with complete isolation:
 
-# Stop all
-docker-compose down
+```
+┌────────────────────────────────────────────────────────────┐
+│                    Docker Host Machine                      │
+├────────────────────────────────────────────────────────────┤
+│  ┌──────────────────┐  ┌──────────────────┐  ┌──────────┐│
+│  │ kernel-lua-openai│  │kernel-lua-anthropic│ │kernel-dev││
+│  │  Container       │  │  Container         │ │Container ││
+│  │  Port: 9555      │  │  Port: 9556        │ │Port: 9558││
+│  │  Memory: 512MB   │  │  Memory: 512MB     │ │Mem: 2GB  ││
+│  │  CPU: 0.5 core   │  │  CPU: 0.5 core     │ │CPU: 1.0  ││
+│  └──────────────────┘  └──────────────────┘  └──────────┘│
+│           │                      │                   │     │
+│           └──────────────────────┴───────────────────┘     │
+│                              │                              │
+│                   ┌──────────▼──────────┐                  │
+│                   │ llmspell-network     │                  │
+│                   │ (Docker Bridge)      │                  │
+│                   └──────────────────────┘                  │
+└────────────────────────────────────────────────────────────┘
 ```
 
-Configuration in `docker-compose.yml`:
-- Per-kernel resource limits (memory, CPU)
-- Health checks
-- Volume management
-- Network isolation
+### Docker Files
 
-### Resource Limits
+#### 1. Dockerfile (Multi-stage Build)
+Location: `scripts/fleet/Dockerfile`
+
+**Features:**
+- Multi-stage build for optimization (builder + runtime)
+- Size optimization with stripped binaries
+- Security hardening (non-root user: llmspell:1000)
+- Minimal base image (debian:bookworm-slim)
+- Health check integration
+- Configurable ports (9555-9600)
+
+**Build Process:**
+```bash
+# Build from fleet directory
+cd scripts/fleet
+docker build -f Dockerfile -t llmspell:latest ../..
+
+# Or use Makefile
+make docker-build
+
+# Verify image
+docker images | grep llmspell
+```
+
+#### 2. docker-fleet.sh Management Script
+Location: `scripts/fleet/docker-fleet.sh`
+
+**Commands:**
+```bash
+# Build Docker image
+./docker-fleet.sh build
+
+# Start fleet (default services)
+./docker-fleet.sh up
+
+# Start with specific profile
+./docker-fleet.sh up dev         # Development profile
+./docker-fleet.sh up javascript  # JavaScript kernel
+./docker-fleet.sh up registry    # With registry service
+
+# Scale services
+./docker-fleet.sh scale kernel-lua-openai 3
+
+# View logs
+./docker-fleet.sh logs                    # All logs
+./docker-fleet.sh logs kernel-lua-openai  # Specific service
+
+# Health check
+./docker-fleet.sh health
+
+# Container shell access
+./docker-fleet.sh shell kernel-lua-openai
+
+# List containers
+./docker-fleet.sh ps
+
+# Stop fleet
+./docker-fleet.sh down
+
+# Clean everything (containers + images)
+./docker-fleet.sh clean
+```
+
+#### 3. docker-compose.yml Configuration
+
+**Services Defined:**
+1. **kernel-lua-openai** - OpenAI provider kernel
+2. **kernel-lua-anthropic** - Anthropic provider kernel
+3. **kernel-javascript** - JavaScript kernel (profile: javascript)
+4. **kernel-dev** - Development kernel with debug (profile: dev)
+5. **fleet-registry** - Nginx registry service (profile: registry)
+
+**Service Configuration:**
+```yaml
+kernel-lua-openai:
+  image: llmspell:latest
+  container_name: llmspell-kernel-lua-openai
+  command: kernel start --daemon --port 9555
+  ports:
+    - "9555:9555"
+  volumes:
+    - ./configs/openai.toml:/etc/llmspell/config.toml:ro
+    - ./connection-files:/var/lib/llmspell/connections
+    - ./logs/kernel-lua-openai:/var/log/llmspell
+  environment:
+    LLMSPELL_CONFIG: /etc/llmspell/config.toml
+    LLMSPELL_CONNECTION_FILE: /var/lib/llmspell/connections/kernel-lua-openai.json
+    KERNEL_ID: kernel-lua-openai
+  restart: unless-stopped
+  mem_limit: 512m
+  cpus: 0.5
+  healthcheck:
+    test: ["CMD", "nc", "-z", "localhost", "9555"]
+    interval: 30s
+    timeout: 3s
+    retries: 3
+  networks:
+    - llmspell-network
+```
+
+### Docker Quick Start
+
+```bash
+# 1. Build the image
+make docker-build
+# or
+./docker-fleet.sh build
+
+# 2. Start the fleet
+make docker-up
+# or
+./docker-fleet.sh up
+
+# 3. Check status
+./docker-fleet.sh ps
+./docker-fleet.sh health
+
+# 4. Connect to kernel
+docker exec -it llmspell-kernel-lua-openai \
+  jupyter console --existing /var/lib/llmspell/connections/kernel-lua-openai.json
+
+# 5. View logs
+./docker-fleet.sh logs kernel-lua-openai
+
+# 6. Stop everything
+make docker-down
+# or
+./docker-fleet.sh down
+```
+
+### Docker Resource Management
+
+#### Memory Limits
+```yaml
+# Per-service in docker-compose.yml
+mem_limit: 512m  # 512MB limit
+mem_limit: 2g    # 2GB for dev kernel
+```
+
+#### CPU Limits
+```yaml
+cpus: 0.5   # 50% of one core
+cpus: 1.0   # Full core for dev
+```
+
+#### Volume Mounts
+- **Config files**: Read-only mount from `./configs/`
+- **Connection files**: Shared volume for kernel discovery
+- **Logs**: Per-kernel log directories
+- **Workspace**: Development code mount (dev profile only)
+
+### Docker Health Checks
+
+Each container includes health checks:
+```yaml
+healthcheck:
+  test: ["CMD", "nc", "-z", "localhost", "9555"]
+  interval: 30s      # Check every 30 seconds
+  timeout: 3s        # Timeout after 3 seconds
+  retries: 3         # Mark unhealthy after 3 failures
+  start-period: 5s   # Grace period on startup
+```
+
+Monitor health status:
+```bash
+# Check all container health
+./docker-fleet.sh health
+
+# Docker native health check
+docker ps --format "table {{.Names}}\t{{.Status}}"
+```
+
+### Docker Networking
+
+All containers join the `llmspell-network` bridge network:
+- Internal DNS resolution by container name
+- Isolated from host network
+- Port mapping for external access
+- Container-to-container communication enabled
+
+### Docker Profiles
+
+Use profiles to control which services start:
+
+```bash
+# Default (no profile) - starts basic kernels
+docker-compose up
+
+# Development profile - includes debug kernel
+docker-compose --profile dev up
+
+# JavaScript profile - includes JS kernel
+docker-compose --profile javascript up
+
+# Registry profile - includes registry service
+docker-compose --profile registry up
+
+# Multiple profiles
+docker-compose --profile dev --profile registry up
+```
+
+### Docker Troubleshooting
+
+#### Container Won't Start
+```bash
+# Check container logs
+docker logs llmspell-kernel-lua-openai
+
+# Inspect container
+docker inspect llmspell-kernel-lua-openai
+
+# Check build logs
+docker build -f Dockerfile -t llmspell:test ../.. --progress=plain
+```
+
+#### Build Failures
+```bash
+# Clean build cache
+docker system prune -a
+
+# Build with no cache
+docker build --no-cache -f Dockerfile -t llmspell:latest ../..
+
+# Check disk space
+docker system df
+```
+
+#### Network Issues
+```bash
+# List networks
+docker network ls
+
+# Inspect network
+docker network inspect scripts_llmspell-network
+
+# Test connectivity
+docker exec llmspell-kernel-lua-openai ping kernel-lua-anthropic
+```
+
+#### Resource Issues
+```bash
+# Check resource usage
+docker stats
+
+# Limit check
+docker inspect llmspell-kernel-lua-openai | grep -A 5 "HostConfig"
+
+# Clean up unused resources
+docker system prune -a --volumes
+```
+
+### Docker Production Deployment
+
+#### Production docker-compose.yml
 ```yaml
 services:
-  kernel-lua-openai:
-    mem_limit: 512m     # Memory limit
-    cpus: 0.5          # CPU limit (50% of one core)
+  kernel-production:
+    image: llmspell:latest
+    deploy:
+      replicas: 3
+      resources:
+        limits:
+          cpus: '0.5'
+          memory: 512M
+        reservations:
+          cpus: '0.25'
+          memory: 256M
+    restart: always
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
 ```
+
+#### Docker Swarm Deployment
+```bash
+# Initialize swarm
+docker swarm init
+
+# Deploy stack
+docker stack deploy -c docker-compose.yml llmspell-fleet
+
+# Scale service
+docker service scale llmspell-fleet_kernel-lua-openai=5
+
+# Update service
+docker service update --limit-memory 1G llmspell-fleet_kernel-lua-openai
+```
+
+### Docker Security Best Practices
+
+1. **Non-root user**: Containers run as `llmspell:1000`
+2. **Read-only mounts**: Config files mounted read-only
+3. **Network isolation**: Custom bridge network
+4. **Resource limits**: Memory and CPU constraints
+5. **Health checks**: Automatic unhealthy container handling
+6. **Minimal base image**: Using debian:bookworm-slim
+7. **No unnecessary packages**: Only runtime dependencies
 
 ## Makefile Commands
 

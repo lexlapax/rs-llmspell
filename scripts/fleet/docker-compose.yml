@@ -1,4 +1,4 @@
-version: '3.8'
+# Docker Compose v3.8 compatible (version field deprecated in v2)
 
 # Docker Compose fleet orchestration for LLMSpell kernels
 # Each service is an independent kernel with its own runtime

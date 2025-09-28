@@ -93,7 +93,7 @@ health:
 # Docker commands
 docker-build:
 	@echo "$(GREEN)Building Docker image...$(NC)"
-	@cd .. && docker build -t llmspell:latest .
+	@docker build -f Dockerfile -t llmspell:latest ../..
 
 docker-up: docker-build
 	@echo "$(GREEN)Starting Docker fleet...$(NC)"
