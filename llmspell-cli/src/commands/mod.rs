@@ -46,15 +46,12 @@ pub mod backup;
 pub mod config;
 pub mod debug;
 pub mod exec;
-pub mod info;
-pub mod init;
 pub mod kernel;
 pub mod keys;
 pub mod repl;
 pub mod run;
 pub mod session;
 pub mod state;
-pub mod validate;
 
 use crate::cli::{Commands, OutputFormat, ScriptEngine};
 use crate::execution_context::ExecutionContext;

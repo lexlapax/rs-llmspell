@@ -1073,6 +1073,33 @@ file_writer:write({
 
 ---
 
+## Architectural Decisions
+
+### Why RAG and Tools Are Not CLI Commands
+
+After comprehensive analysis (Task 10.17.2), the following architectural decisions were made:
+
+#### RAG Operations
+- **NOT implemented as CLI command** - RAG operations are script-context operations
+- **Access via script API**: Use `RAG.*` methods within Lua/JavaScript/Python scripts
+- **Configuration via flag**: `--rag-profile` flag available on execution commands (run, exec, repl, debug)
+- **Rationale**: RAG operations require script context and state management that doesn't make sense as standalone CLI operations
+
+#### Tools Management
+- **NOT implemented as CLI command** - Tools are runtime discoveries, not CLI operations
+- **Access via script API**: Use `Tool.*` methods within scripts
+- **Auto-discovery**: Tools are automatically discovered and loaded at runtime
+- **Rationale**: No user value in CLI-level tool management; tools are implementation details
+
+#### Info Command
+- **DELETED** - The info command showing engine availability was vestigial code
+- **Engine errors**: Already handled by `--engine` flag with clear error messages
+- **Rationale**: Trivial information not worth maintenance burden
+
+These decisions maintain CLI simplicity while keeping full functionality accessible through the script execution context where it belongs.
+
+---
+
 ## Summary
 
 The CLI command architecture provides a production-ready interface with:

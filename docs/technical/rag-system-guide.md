@@ -578,18 +578,26 @@ async fn check_rag_health() -> HealthStatus {
 ### Maintenance Tasks
 
 #### Regular Operations
-```bash
-# Optimize index (monthly)
-llmspell rag optimize-index
+```lua
+-- RAG operations are performed via script API, not CLI commands
+-- Create maintenance scripts for regular operations:
 
-# Clean expired session vectors (daily)
-llmspell rag cleanup-sessions --ttl-hours 24
+-- optimize_index.lua (monthly)
+local stats = RAG.get_stats("default", nil)
+print("Collection stats:", json.encode(stats))
 
-# Export tenant metrics (weekly)
-llmspell rag export-metrics --tenant all
+-- cleanup_sessions.lua (daily)
+-- Session cleanup happens automatically based on TTL configuration
 
-# Backup vector index (daily)
-llmspell rag backup --path /backups/
+-- export_metrics.lua (weekly)
+local collections = RAG.list_collections()
+for _, collection in ipairs(collections) do
+    local stats = RAG.get_stats(collection, nil)
+    print(collection .. " metrics:", json.encode(stats))
+end
+
+-- Note: RAG operations are script-context operations, not CLI commands
+-- Use llmspell run <script.lua> to execute maintenance scripts
 ```
 
 #### Capacity Planning
