@@ -11,13 +11,13 @@ use llmspell_core::Tool;
 use llmspell_security::sandbox::{file_sandbox::FileSandbox, SandboxContext};
 // Import tools conditionally based on features
 use llmspell_tools::{
-    ApiTesterTool, AudioProcessorTool, Base64EncoderTool, CalculatorTool,
-    CitationFormatterTool, DataValidationTool, DateTimeHandlerTool, DiffCalculatorTool,
-    EnvironmentReaderTool, FileConverterTool, FileOperationsTool, FileSearchTool,
-    FileWatcherTool, GraphBuilderTool, GraphQLQueryTool, HashCalculatorTool, HttpRequestTool,
-    ImageProcessorTool, ProcessExecutorTool, ServiceCheckerTool, SitemapCrawlerTool,
-    SystemMonitorTool, TextManipulatorTool, UrlAnalyzerTool, UuidGeneratorTool,
-    VideoProcessorTool, WebScraperTool, WebSearchTool, WebhookCallerTool, WebpageMonitorTool,
+    ApiTesterTool, AudioProcessorTool, Base64EncoderTool, CalculatorTool, CitationFormatterTool,
+    DataValidationTool, DateTimeHandlerTool, DiffCalculatorTool, EnvironmentReaderTool,
+    FileConverterTool, FileOperationsTool, FileSearchTool, FileWatcherTool, GraphBuilderTool,
+    GraphQLQueryTool, HashCalculatorTool, HttpRequestTool, ImageProcessorTool, ProcessExecutorTool,
+    ServiceCheckerTool, SitemapCrawlerTool, SystemMonitorTool, TextManipulatorTool,
+    UrlAnalyzerTool, UuidGeneratorTool, VideoProcessorTool, WebScraperTool, WebSearchTool,
+    WebhookCallerTool, WebpageMonitorTool,
 };
 
 #[cfg(feature = "archives")]
@@ -387,8 +387,8 @@ fn register_web_tools(registry: &Arc<ComponentRegistry>) -> Result<(), Box<dyn s
 }
 
 /// Register communication tools
-#[allow(unused_variables)]  // registry is unused when no features are enabled
-#[allow(clippy::unnecessary_wraps)]  // Result needed for consistency with other register functions
+#[allow(unused_variables)] // registry is unused when no features are enabled
+#[allow(clippy::unnecessary_wraps)] // Result needed for consistency with other register functions
 fn register_communication_tools(
     registry: &Arc<ComponentRegistry>,
 ) -> Result<(), Box<dyn std::error::Error>> {

@@ -160,10 +160,10 @@ async fn test_binary_data_handling() {
 
         // The decoded hex might not have leading zeros, so we compare the actual bytes
         let original_bytes = hex::decode(hex_input).unwrap();
-        let decoded_hex_padded = if decoded_hex.len() % 2 == 1 {
-            format!("0{decoded_hex}")
-        } else {
+        let decoded_hex_padded = if decoded_hex.len().is_multiple_of(2) {
             decoded_hex.to_string()
+        } else {
+            format!("0{decoded_hex}")
         };
         let decoded_bytes = hex::decode(&decoded_hex_padded).unwrap();
         assert_eq!(

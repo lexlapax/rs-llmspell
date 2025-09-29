@@ -655,13 +655,16 @@ impl ToolExecutor {
             return;
         }
 
-        let success_status = entry.success.map_or("PENDING".to_string(), |s| {
-            if s {
-                "SUCCESS".to_string()
-            } else {
-                "FAILURE".to_string()
-            }
-        });
+        let success_status = entry.success.map_or_else(
+            || "PENDING".to_string(),
+            |s| {
+                if s {
+                    "SUCCESS".to_string()
+                } else {
+                    "FAILURE".to_string()
+                }
+            },
+        );
 
         info!(
             "AUDIT: tool={} security_level={:?} phase={:?} status={} memory_mb={} cpu_ms={}",

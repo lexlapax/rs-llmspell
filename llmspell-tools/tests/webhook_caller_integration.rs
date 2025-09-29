@@ -1,5 +1,11 @@
 //! ABOUTME: Integration tests for `WebhookCallerTool`
 //! ABOUTME: Tests webhook calling functionality with various HTTP methods and payloads
+//!
+//! Note: These tests depend on httpbin.org and are marked as ignored by default.
+//! To run these integration tests:
+//! ```bash
+//! cargo test -p llmspell-tools --test webhook_caller_integration -- --ignored
+//! ```
 
 mod common;
 
@@ -8,6 +14,7 @@ use llmspell_core::BaseAgent;
 use llmspell_tools::WebhookCallerTool;
 use serde_json::json;
 #[tokio::test]
+#[ignore = "Integration test - requires httpbin.org service availability"]
 async fn test_webhook_caller_post() {
     let tool = WebhookCallerTool::new();
     let context = create_test_context();
@@ -42,6 +49,7 @@ async fn test_webhook_caller_post() {
     assert_eq!(response_body["event"], "test_event");
 }
 #[tokio::test]
+#[ignore = "Integration test - requires httpbin.org service availability"]
 async fn test_webhook_caller_with_headers() {
     let tool = WebhookCallerTool::new();
     let context = create_test_context();
@@ -72,6 +80,7 @@ async fn test_webhook_caller_with_headers() {
     assert_eq!(request_headers["X-Event-Type"], "user.created");
 }
 #[tokio::test]
+#[ignore = "Integration test - requires httpbin.org service availability"]
 async fn test_webhook_caller_get_method() {
     let tool = WebhookCallerTool::new();
     let context = create_test_context();
@@ -93,6 +102,7 @@ async fn test_webhook_caller_get_method() {
     assert!(result["response_time_ms"].as_f64().unwrap() > 0.0);
 }
 #[tokio::test]
+#[ignore = "Integration test - requires httpbin.org service availability"]
 async fn test_webhook_caller_retry_on_failure() {
     let tool = WebhookCallerTool::new();
     let context = create_test_context();
@@ -117,6 +127,7 @@ async fn test_webhook_caller_retry_on_failure() {
     assert!(result.get("retries_attempted").is_some() || result.get("retry_count").is_some());
 }
 #[tokio::test]
+#[ignore = "Integration test - requires httpbin.org service availability"]
 async fn test_webhook_caller_timeout() {
     let tool = WebhookCallerTool::new();
     let context = create_test_context();
@@ -206,6 +217,7 @@ async fn test_webhook_caller_invalid_url() {
     assert!(error.to_string().contains("URL") || error.to_string().contains("url"));
 }
 #[tokio::test]
+#[ignore = "Integration test - requires httpbin.org service availability"]
 async fn test_webhook_caller_custom_method() {
     let tool = WebhookCallerTool::new();
     let context = create_test_context();

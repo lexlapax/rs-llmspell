@@ -61,8 +61,8 @@ impl DimensionMapper {
     #[must_use]
     pub const fn are_compatible(&self, dims1: usize, dims2: usize) -> bool {
         dims1 == dims2
-            || (self.config.allow_reduction && dims1 > dims2 && dims1 % dims2 == 0)
-            || (self.config.allow_expansion && dims2 > dims1 && dims2 % dims1 == 0)
+            || (self.config.allow_reduction && dims1 > dims2 && dims1.is_multiple_of(dims2))
+            || (self.config.allow_expansion && dims2 > dims1 && dims2.is_multiple_of(dims1))
     }
 
     /// Reduce dimensions using Matryoshka representation learning
@@ -148,7 +148,9 @@ impl DimensionMapper {
         // Try reduction first (preferred)
         if self.config.allow_reduction {
             for &supported_dim in self.config.supported_dimensions.iter().rev() {
-                if supported_dim <= dims && (dims % supported_dim == 0 || supported_dim == dims) {
+                if supported_dim <= dims
+                    && (dims.is_multiple_of(supported_dim) || supported_dim == dims)
+                {
                     return Ok(supported_dim);
                 }
             }

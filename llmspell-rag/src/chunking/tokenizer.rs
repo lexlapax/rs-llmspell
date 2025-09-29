@@ -33,17 +33,6 @@ impl TiktokenCounter {
     /// Returns an error if the tokenizer cannot be created
     pub fn for_model(model: &str) -> Result<Self> {
         let (tokenizer, model_name) = match model {
-            // GPT-4 and GPT-3.5-turbo use cl100k_base
-            "gpt-4"
-            | "gpt-4-32k"
-            | "gpt-4-0125-preview"
-            | "gpt-4-turbo-preview"
-            | "gpt-3.5-turbo"
-            | "gpt-3.5-turbo-16k"
-            | "gpt-3.5-turbo-0125"
-            | "text-embedding-3-small"
-            | "text-embedding-3-large" => (cl100k_base()?, "cl100k_base"),
-
             // Older GPT-3 models
             "text-davinci-003" | "text-davinci-002" | "code-davinci-002" => {
                 (p50k_base()?, "p50k_base")
@@ -57,7 +46,7 @@ impl TiktokenCounter {
                 (r50k_base()?, "r50k_base")
             }
 
-            // Default to cl100k_base for unknown models
+            // Default to cl100k_base for all modern models (GPT-4, GPT-3.5-turbo, etc.)
             _ => (cl100k_base()?, "cl100k_base"),
         };
 

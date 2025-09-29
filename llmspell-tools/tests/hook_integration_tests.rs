@@ -332,18 +332,16 @@ async fn test_hook_integration_with_multiple_tool_types() {
     let executor = ToolExecutor::new(config, None, None);
 
     // Test different tool categories and security levels
-    let mut test_cases = vec![
-        (
-            Box::new(CalculatorTool::new()) as Box<dyn Tool>,
-            "calculator",
-            json!({
-                "operation": "evaluate",
-                "input": "2 + 2"
-            }),
-            ToolCategory::Utility,
-            SecurityLevel::Safe,
-        ),
-    ];
+    let mut test_cases = vec![(
+        Box::new(CalculatorTool::new()) as Box<dyn Tool>,
+        "calculator",
+        json!({
+            "operation": "evaluate",
+            "input": "2 + 2"
+        }),
+        ToolCategory::Utility,
+        SecurityLevel::Safe,
+    )];
 
     #[cfg(feature = "json-query")]
     test_cases.push((
@@ -448,12 +446,10 @@ async fn test_hookable_tool_execution_trait() {
 }
 #[tokio::test]
 async fn test_different_security_levels() {
-    let mut tools_and_levels = vec![
-        (
-            Box::new(CalculatorTool::new()) as Box<dyn Tool>,
-            SecurityLevel::Safe,
-        ),
-    ];
+    let mut tools_and_levels = vec![(
+        Box::new(CalculatorTool::new()) as Box<dyn Tool>,
+        SecurityLevel::Safe,
+    )];
 
     #[cfg(feature = "json-query")]
     tools_and_levels.push((

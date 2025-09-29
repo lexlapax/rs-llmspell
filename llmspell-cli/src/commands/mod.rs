@@ -52,6 +52,7 @@ pub mod repl;
 pub mod run;
 pub mod session;
 pub mod state;
+pub mod tool;
 
 use crate::cli::{Commands, OutputFormat, ScriptEngine};
 use crate::execution_context::ExecutionContext;
@@ -216,6 +217,10 @@ pub async fn execute_command(
             let context =
                 ExecutionContext::resolve(None, None, None, runtime_config.clone()).await?;
             apps::handle_app_command(command, search_path, context, output_format).await
+        }
+
+        Commands::Tool { command, source } => {
+            tool::handle_tool_command(command, source, runtime_config, output_format).await
         }
     }
 }

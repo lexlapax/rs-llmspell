@@ -847,9 +847,9 @@ mod tests {
         let hook = CostTrackingHook::new();
 
         // Multiple requests
-        for i in 0..5 {
+        for i in 0u32..5 {
             let mut context = create_test_context_with_usage("openai", "gpt-3.5-turbo", 1000, 500);
-            if i % 2 == 0 {
+            if i.is_multiple_of(2) {
                 context.insert_metadata("user_id".to_string(), "user1".to_string());
             } else {
                 context.insert_metadata("user_id".to_string(), "user2".to_string());

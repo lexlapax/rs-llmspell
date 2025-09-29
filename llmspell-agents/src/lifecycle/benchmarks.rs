@@ -47,7 +47,7 @@ impl Hook for ProductionLoggingHook {
         }
 
         // Simulate minimal I/O overhead (realistic for buffered logging)
-        if *self.log_count.lock().unwrap() % 100 == 0 {
+        if (*self.log_count.lock().unwrap()).is_multiple_of(100) {
             // Batch flush simulation - very minimal
             tokio::task::yield_now().await;
         }

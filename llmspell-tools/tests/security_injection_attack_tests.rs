@@ -292,6 +292,7 @@ async fn test_data_validation_regex_dos() {
     }
 }
 #[tokio::test]
+#[ignore = "Integration test - requires httpbin.org service availability"]
 async fn test_http_request_header_injection() {
     let http_tool =
         HttpRequestTool::new(HttpRequestConfig::default()).expect("Failed to create HTTP tool");

@@ -68,8 +68,8 @@ mod multiline_tests {
 
         // Expression is complete if all are balanced
         opens == closes
-            && double_quotes % 2 == 0
-            && single_quotes % 2 == 0
+            && double_quotes.is_multiple_of(2)
+            && single_quotes.is_multiple_of(2)
             && open_paren == close_paren
             && open_bracket == close_bracket
             && open_square == close_square

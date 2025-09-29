@@ -624,7 +624,7 @@ mod property_tests {
             let mut override_map = serde_json::Map::new();
 
             for (i, (k, v)) in keys.iter().zip(values.iter()).enumerate() {
-                if i % 2 == 0 {
+                if i.is_multiple_of(2) {
                     base_map.insert(k.clone(), json!(v));
                 } else {
                     override_map.insert(k.clone(), json!(v * 2));

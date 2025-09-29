@@ -4,11 +4,25 @@
 //! through real Jupyter protocol interactions. The Python tests use jupyter_client
 //! to connect to a subprocess-managed llmspell daemon.
 //!
-//! To skip Python tests during development, use:
-//! cargo test --features skip-python-tests
+//! REQUIREMENTS:
+//! - Python 3 with pytest and jupyter_client installed
+//! - A built llmspell binary in target/debug/ or target/release/
+//! - The tests will automatically start a kernel daemon if needed
+//! - Requires network access for ZMQ communication
+//! - May take 30+ seconds to complete all DAP tests
 //!
-//! To run only Python tests:
-//! cargo test python_jupyter_integration -- --nocapture
+//! RUNNING THE TESTS:
+//! - To skip Python tests during development:
+//!   cargo test --features skip-python-tests
+//!
+//! - To run only Python tests with output:
+//!   cargo test python_jupyter_integration -- --nocapture
+//!
+//! - To run directly (for debugging):
+//!   cd tests/python && python3 -m pytest test_dap*.py -v
+//!
+//! These tests are marked as #[ignore] by default since they require
+//! special setup and take significant time to run.
 
 #[cfg(not(feature = "skip-python-tests"))]
 use std::process::Command;
@@ -16,9 +30,10 @@ use std::process::Command;
 /// Run Python integration tests for Jupyter DAP functionality.
 ///
 /// This test:
-/// 1. Ensures llmspell is built
+/// 1. Ensures llmspell is built (requires `cargo build` to have been run)
 /// 2. Runs the Python test suite via shell script
-/// 3. Reports success/failure based on Python test results
+/// 3. Each Python test starts its own kernel daemon if needed
+/// 4. Reports success/failure based on Python test results
 ///
 /// The Python tests validate:
 /// - DAP initialization and capabilities
@@ -27,16 +42,29 @@ use std::process::Command;
 /// - Variable inspection
 /// - Performance benchmarks
 /// - Multiple simultaneous debug sessions
+///
+/// This test is ignored by default. To run:
+/// cargo test python_jupyter_integration -- --ignored --nocapture
 #[test]
+#[ignore = "Requires Python environment, built binary, and takes 30+ seconds"]
 #[cfg(not(feature = "skip-python-tests"))]
 fn test_python_jupyter_integration() {
     // Determine if we're in verbose mode
     let verbose =
         std::env::var("RUST_LOG").is_ok() || std::env::args().any(|arg| arg == "--nocapture");
 
-    // Build the command
+    // Build the command - script is in root tests/scripts directory
+    // When run via cargo test, we're in the package directory
+    let script_path = if std::path::Path::new("../tests/scripts/run_python_tests.sh").exists() {
+        "../tests/scripts/run_python_tests.sh"
+    } else if std::path::Path::new("tests/scripts/run_python_tests.sh").exists() {
+        "tests/scripts/run_python_tests.sh"
+    } else {
+        panic!("Cannot find run_python_tests.sh script");
+    };
+
     let mut cmd = Command::new("bash");
-    cmd.arg("tests/scripts/run_python_tests.sh");
+    cmd.arg(script_path);
 
     if verbose {
         cmd.arg("--verbose");
@@ -76,7 +104,7 @@ fn test_python_jupyter_integration() {
              \n\
              To debug:\n\
              1. Run with --nocapture to see full output\n\
-             2. Run the Python tests directly: ./tests/scripts/run_python_tests.sh --verbose\n\
+             2. Run the Python tests directly: ../tests/scripts/run_python_tests.sh --verbose\n\
              3. Check if Python 3 and pip are installed\n\
              4. Ensure llmspell builds successfully: cargo build -p llmspell-cli\n\
              \n\
@@ -91,7 +119,9 @@ fn test_python_jupyter_integration() {
 /// Verify Python environment is available for testing.
 ///
 /// This is a separate test to help diagnose setup issues.
+/// Checks for Python 3 and pip availability.
 #[test]
+#[ignore = "Part of Python integration test suite"]
 #[cfg(not(feature = "skip-python-tests"))]
 fn test_python_environment_available() {
     // Check if Python 3 is available
@@ -132,17 +162,26 @@ fn test_python_environment_available() {
 }
 
 /// Test that the Python test script exists and is executable.
+///
+/// Verifies the test infrastructure is in place.
 #[test]
+#[ignore = "Part of Python integration test suite"]
 #[cfg(not(feature = "skip-python-tests"))]
 fn test_python_test_script_exists() {
-    let script_path = "tests/scripts/run_python_tests.sh";
+    // Try both possible locations
+    let script_path = if std::path::Path::new("../tests/scripts/run_python_tests.sh").exists() {
+        "../tests/scripts/run_python_tests.sh"
+    } else if std::path::Path::new("tests/scripts/run_python_tests.sh").exists() {
+        "tests/scripts/run_python_tests.sh"
+    } else {
+        ""
+    };
 
     // Check if file exists
-    if !std::path::Path::new(script_path).exists() {
+    if script_path.is_empty() {
         panic!(
-            "Python test script not found at {}.\n\
-             Ensure you're running tests from the project root.",
-            script_path
+            "Python test script not found at tests/scripts/run_python_tests.sh or ../tests/scripts/run_python_tests.sh.\n\
+             Ensure you're running tests from the project root."
         );
     }
 

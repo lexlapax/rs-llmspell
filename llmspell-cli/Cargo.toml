@@ -41,6 +41,10 @@ default = []  # Truly minimal binary - no heavy external dependencies
 common = ["llmspell-bridge/common"]  # Convenient preset for typical usage
 full = ["llmspell-bridge/full"]  # All features enabled
 
+# Future protocol support
+mcp = []  # Model Context Protocol support (Phase 12)
+a2a = []  # Agent-to-Agent protocol support (Phase 18)
+
 # Forward individual tool features
 csv-parquet = ["llmspell-bridge/csv-parquet"]
 templates = ["llmspell-bridge/templates"]

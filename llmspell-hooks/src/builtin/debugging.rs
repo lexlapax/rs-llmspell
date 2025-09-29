@@ -664,16 +664,16 @@ mod tests {
         let storage = TraceStorage::new(DebuggingConfig::default());
 
         // Add multiple traces with different characteristics
-        for i in 0..5 {
+        for i in 0u32..5 {
             let trace = DebugTrace {
                 timestamp: Utc::now(),
-                hook_point: if i % 2 == 0 {
+                hook_point: if i.is_multiple_of(2) {
                     HookPoint::SystemStartup
                 } else {
                     HookPoint::BeforeAgentInit
                 },
                 component_name: format!("test{}", i),
-                component_type: if i % 2 == 0 {
+                component_type: if i.is_multiple_of(2) {
                     "System".to_string()
                 } else {
                     "Agent".to_string()
@@ -722,7 +722,7 @@ mod tests {
         let storage = TraceStorage::new(config);
 
         // Add more traces than the limit
-        for i in 0..5 {
+        for i in 0u32..5 {
             let trace = DebugTrace {
                 timestamp: Utc::now(),
                 hook_point: HookPoint::SystemStartup,

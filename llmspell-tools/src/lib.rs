@@ -80,12 +80,12 @@ pub use system::{
 };
 
 // Utility tools (conditional)
+#[cfg(feature = "templates")]
+pub use util::TemplateEngineTool;
 pub use util::{
     Base64EncoderTool, CalculatorTool, DataValidationTool, DateTimeHandlerTool, DiffCalculatorTool,
     HashCalculatorTool, TextManipulatorTool, UuidGeneratorTool,
 };
-#[cfg(feature = "templates")]
-pub use util::TemplateEngineTool;
 
 // Web tools (always available)
 pub use web::{

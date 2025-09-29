@@ -436,6 +436,30 @@ EXAMPLES:
         #[arg(long, value_name = "PATH", action = clap::ArgAction::Append)]
         search_path: Vec<String>,
     },
+
+    /// Tool management and direct invocation
+    #[command(
+        long_about = "Manage and execute tools directly via kernel communication.
+
+Tools are executed in the kernel process which has access to the ComponentRegistry.
+The CLI sends tool requests to the kernel and displays the results.
+
+EXAMPLES:
+    llmspell tool list                         # List all available tools
+    llmspell tool list --category filesystem   # List filesystem tools
+    llmspell tool info calculator              # Show tool details and schema
+    llmspell tool invoke calculator --params '{\"expression\":\"2+2\"}'  # Execute tool
+    llmspell tool search \"file\" \"web\"          # Search tools by keywords
+    llmspell tool test calculator --verbose    # Test tool with examples"
+    )]
+    Tool {
+        #[command(subcommand)]
+        command: ToolCommands,
+
+        /// Tool source (future: local|mcp:<server>|a2a:<node>)
+        #[arg(long, default_value = "local", hide = true)]
+        source: String,
+    },
 }
 
 /// Application management subcommands
@@ -500,6 +524,105 @@ EXAMPLES:
         /// Search by number of agents
         #[arg(long, value_name = "COUNT")]
         agents: Option<u32>,
+    },
+}
+
+/// Tool management subcommands
+#[derive(Subcommand, Debug)]
+pub enum ToolCommands {
+    /// List available tools with filtering
+    #[command(
+        long_about = "List all tools registered in the kernel's ComponentRegistry.
+
+EXAMPLES:
+    llmspell tool list                         # List all tools
+    llmspell tool list --category filesystem   # Filter by category
+    llmspell tool list --format json           # Output in JSON format"
+    )]
+    List {
+        /// Filter by tool category
+        #[arg(long)]
+        category: Option<String>, // Will be parsed to ToolCategory in handler
+
+        /// Output format (overrides global format)
+        #[arg(long)]
+        format: Option<OutputFormat>,
+    },
+
+    /// Show detailed tool information
+    #[command(
+        long_about = "Display detailed information about a specific tool including schema.
+
+EXAMPLES:
+    llmspell tool info calculator              # Show calculator tool details
+    llmspell tool info file_operations --show-schema  # Include input/output schema"
+    )]
+    Info {
+        /// Tool name to show information for
+        name: String,
+
+        /// Show detailed input/output schema
+        #[arg(long)]
+        show_schema: bool,
+    },
+
+    /// Invoke tool directly with parameters
+    #[command(
+        long_about = "Execute a tool directly by sending a request to the kernel.
+
+The kernel accesses the ComponentRegistry and executes the tool with proper context.
+
+EXAMPLES:
+    llmspell tool invoke calculator --params '{\"expression\":\"sqrt(16)\"}'
+    llmspell tool invoke web_scraper --params '{\"url\":\"example.com\"}' --stream
+    llmspell tool invoke file_operations --params '{\"operation\":\"list\",\"path\":\"/tmp\"}'"
+    )]
+    Invoke {
+        /// Tool name to invoke
+        name: String,
+
+        /// Parameters as JSON object
+        #[arg(long, value_parser = parse_json_value)]
+        params: serde_json::Value,
+
+        /// Enable streaming output
+        #[arg(long)]
+        stream: bool,
+    },
+
+    /// Search tools by capability/keywords
+    #[command(
+        long_about = "Search for tools by keywords, capabilities, or descriptions.
+
+EXAMPLES:
+    llmspell tool search \"file\"                # Search for file-related tools
+    llmspell tool search \"web\" \"api\"           # Search for web or API tools
+    llmspell tool search \"json\" --category data  # Search with category filter"
+    )]
+    Search {
+        /// Search keywords (can specify multiple)
+        query: Vec<String>,
+
+        /// Filter by tool category
+        #[arg(long)]
+        category: Option<String>,
+    },
+
+    /// Test tool with example inputs
+    #[command(long_about = "Test a tool using its built-in example cases.
+
+Tools provide test cases that demonstrate their functionality.
+
+EXAMPLES:
+    llmspell tool test calculator              # Run calculator tests
+    llmspell tool test file_operations --verbose  # Show detailed test output")]
+    Test {
+        /// Tool name to test
+        name: String,
+
+        /// Show detailed test output
+        #[arg(long)]
+        verbose: bool,
     },
 }
 
@@ -889,4 +1012,9 @@ impl Cli {
             }
         })
     }
+}
+
+/// Parse JSON value from command line argument
+fn parse_json_value(s: &str) -> Result<serde_json::Value, String> {
+    serde_json::from_str(s).map_err(|e| format!("Invalid JSON: {}", e))
 }

@@ -1,10 +1,21 @@
 #!/usr/bin/env python3
 """
-Test DAP with existing kernel (don't start new one).
+Test DAP with existing kernel or start one if needed.
+
+REQUIREMENTS:
+- llmspell binary built in ../../target/debug/ or ../../target/release/
+- Python packages: pytest, jupyter_client
+- Will reuse existing kernel at /tmp/llmspell-test/kernel.json if available
+- Otherwise starts a new kernel daemon automatically
+
+This test demonstrates using DAP with a persistent kernel session,
+which is useful for interactive debugging workflows.
 """
 
 import json
 import time
+import subprocess
+import os
 from pathlib import Path
 from jupyter_client import BlockingKernelClient
 
@@ -32,7 +43,58 @@ def send_debug_request(client, command, arguments=None):
 
     return None
 
+def start_kernel_if_needed():
+    """Start kernel if not already running."""
+    conn_file = Path("/tmp/llmspell-test/kernel.json")
+    if conn_file.exists():
+        # Kernel might already be running
+        return True
+
+    # Create test directory
+    test_dir = Path("/tmp/llmspell-test")
+    test_dir.mkdir(exist_ok=True)
+
+    # Start kernel daemon - binary is in project root
+    llmspell_path = "../../target/debug/llmspell"
+    if not Path(llmspell_path).exists():
+        # Try release build
+        llmspell_path = "../../target/release/llmspell"
+        if not Path(llmspell_path).exists():
+            print(f"Error: llmspell binary not found")
+            return False
+
+    cmd = [
+        llmspell_path, "kernel", "start",
+        "--daemon",
+        "--port", "0",
+        "--connection-file", "/tmp/llmspell-test/kernel.json",
+        "--log-file", "/tmp/llmspell-test/kernel.log",
+        "--idle-timeout", "0"
+    ]
+
+    print(f"Starting kernel: {' '.join(cmd)}")
+    result = subprocess.run(cmd, capture_output=True, text=True)
+
+    if result.returncode != 0:
+        print(f"Failed to start kernel: {result.stderr}")
+        return False
+
+    # Wait for connection file
+    for _ in range(10):
+        if conn_file.exists():
+            print(f"Kernel started, connection file: {conn_file}")
+            return True
+        time.sleep(0.5)
+
+    print("Timeout waiting for kernel to start")
+    return False
+
 def test_dap_workflow():
+    # Ensure kernel is running
+    if not start_kernel_if_needed():
+        print("Failed to ensure kernel is running")
+        import pytest
+        pytest.skip("Kernel not available")
     """Test complete DAP workflow."""
 
     print("DAP Workflow Test (Using Existing Kernel)")

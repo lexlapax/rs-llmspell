@@ -380,7 +380,7 @@ impl AtomicBackup {
         }
 
         // Restore state atomically
-        let mut restored_count = 0;
+        let mut restored_count: usize = 0;
 
         for (key, entry) in snapshot.entries {
             match self
@@ -459,7 +459,7 @@ impl AtomicBackup {
         debug!("Restoring {} entries", total_entries);
 
         // Restore state atomically with progress reporting
-        let mut restored_count = 0;
+        let mut restored_count: usize = 0;
 
         for (idx, (key, entry)) in snapshot.entries.into_iter().enumerate() {
             match self
@@ -470,7 +470,7 @@ impl AtomicBackup {
                 Ok(()) => {
                     restored_count += 1;
                     // Report progress every 10 entries or on last entry
-                    if restored_count % 10 == 0 || idx == total_entries - 1 {
+                    if restored_count.is_multiple_of(10) || idx == total_entries - 1 {
                         progress_callback(restored_count, total_entries);
                     }
                 }

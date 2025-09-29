@@ -123,11 +123,12 @@ run_tests() {
         ARGS="$ARGS --cov=. --cov-report=term-missing"
     fi
 
-    # Add specific test file or all
+    # Add specific test file or all DAP tests
     if [ -n "${TEST_FILE:-}" ]; then
         ARGS="$ARGS $TEST_FILE"
     else
-        ARGS="$ARGS test_jupyter_dap.py"
+        # Run all DAP-related tests
+        ARGS="$ARGS test_dap*.py"
     fi
 
     # Add any additional arguments from environment

@@ -128,19 +128,19 @@ async fn test_registry_query() {
     let registry = InMemoryAgentRegistry::new();
 
     // Register multiple agents
-    for i in 1..=3 {
+    for i in 1u32..=3 {
         let agent = Arc::new(TestAgent::new(&format!("agent-{i}"), &format!("Agent {i}")));
 
         let metadata = AgentMetadata {
             id: format!("agent-{i}"),
             name: format!("Agent {i}"),
-            agent_type: if i % 2 == 0 { "even" } else { "odd" }.to_string(),
+            agent_type: if i.is_multiple_of(2) { "even" } else { "odd" }.to_string(),
             description: format!("Test agent {i}"),
             categories: vec![format!("group-{}", if i <= 2 { "a" } else { "b" })],
             custom_metadata: HashMap::new(),
             created_at: chrono::Utc::now(),
             updated_at: chrono::Utc::now(),
-            status: if i % 2 == 0 {
+            status: if i.is_multiple_of(2) {
                 AgentStatus::Active
             } else {
                 AgentStatus::Paused

@@ -10,6 +10,61 @@ use std::sync::Arc;
 use tokio::signal;
 use tokio::sync::Mutex;
 
+/// Output formatter for various data types
+pub struct OutputFormatter {
+    format: OutputFormat,
+}
+
+impl OutputFormatter {
+    /// Create a new output formatter
+    pub fn new(format: OutputFormat) -> Self {
+        Self { format }
+    }
+
+    /// Print a list of tools
+    pub fn print_tool_list(&self, tools: &[String]) -> Result<()> {
+        match self.format {
+            OutputFormat::Json => {
+                println!("{}", serde_json::to_string_pretty(tools)?);
+            }
+            OutputFormat::Text => {
+                for tool in tools {
+                    println!("{}", tool);
+                }
+            }
+            OutputFormat::Pretty => {
+                println!("Available Tools:");
+                println!("{}", "─".repeat(50));
+                for tool in tools {
+                    println!("  • {}", tool);
+                }
+                println!("\nTotal: {} tools", tools.len());
+            }
+        }
+        Ok(())
+    }
+
+    /// Print JSON data
+    pub fn print_json(&self, value: &serde_json::Value) -> Result<()> {
+        match self.format {
+            OutputFormat::Json => {
+                println!("{}", serde_json::to_string_pretty(value)?);
+            }
+            OutputFormat::Text => {
+                if let Some(text) = value.as_str() {
+                    println!("{}", text);
+                } else {
+                    println!("{}", value);
+                }
+            }
+            OutputFormat::Pretty => {
+                println!("{}", serde_json::to_string_pretty(value)?);
+            }
+        }
+        Ok(())
+    }
+}
+
 /// Format script output according to the specified format
 pub fn format_output(output: &ScriptOutput, format: OutputFormat) -> Result<String> {
     match format {

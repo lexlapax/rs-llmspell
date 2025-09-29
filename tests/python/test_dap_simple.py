@@ -3,6 +3,18 @@
 Simple standalone test for DAP functionality through Jupyter protocol.
 Tests debugging a Lua script with breakpoints, variable inspection, and stepping.
 
+REQUIREMENTS:
+- llmspell binary built in ../../target/debug/ or ../../target/release/
+- Python packages: pytest, jupyter_client (install via requirements.txt)
+- The test will automatically start a kernel daemon if needed
+- Requires ~15-20 seconds to complete
+
+HOW IT WORKS:
+1. Starts an llmspell kernel daemon (or uses existing one)
+2. Connects via Jupyter protocol over ZMQ
+3. Sends DAP commands to debug Lua scripts
+4. Validates breakpoints, stepping, and variable inspection
+
 Task 10.7.9: Complete End-to-End DAP Testing with Lua Scripts
 """
 
@@ -26,9 +38,14 @@ def start_kernel():
     test_dir = Path("/tmp/llmspell-test")
     test_dir.mkdir(exist_ok=True)
 
-    # Start kernel daemon
+    # Start kernel daemon - binary is in project root
+    llmspell_path = "../../target/debug/llmspell"
+    if not Path(llmspell_path).exists():
+        # Try release build
+        llmspell_path = "../../target/release/llmspell"
+
     cmd = [
-        "./target/debug/llmspell", "kernel", "start",
+        llmspell_path, "kernel", "start",
         "--daemon",
         "--port", "0",  # Let OS assign ports
         "--connection-file", "/tmp/llmspell-test/kernel.json",

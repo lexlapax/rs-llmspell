@@ -244,9 +244,8 @@ fn benchmark_circuit_breaker(c: &mut Criterion) {
 
 fn benchmark_hook_overhead_comparison(c: &mut Criterion) {
     let sandbox = create_default_test_sandbox();
-    let mut tools: Vec<(&str, Box<dyn Tool>)> = vec![
-        ("calculator", Box::new(CalculatorTool::new())),
-    ];
+    let mut tools: Vec<(&str, Box<dyn Tool>)> =
+        vec![("calculator", Box::new(CalculatorTool::new()))];
 
     #[cfg(feature = "json-query")]
     tools.push(("json_processor", Box::new(JsonProcessorTool::default())));

@@ -134,14 +134,14 @@ async fn test_circuit_breaker_concurrent_access() {
 
     // Spawn concurrent tasks
     let mut tasks = vec![];
-    for i in 0..10 {
+    for i in 0usize..10 {
         let breaker = Arc::clone(&breaker);
         let success_count = Arc::clone(&success_count);
         let failure_count = Arc::clone(&failure_count);
 
         let task = tokio::spawn(async move {
             // Even tasks succeed, odd tasks fail
-            if i % 2 == 0 {
+            if i.is_multiple_of(2) {
                 let result = breaker
                     .execute(move || Box::pin(async move { Ok::<_, std::io::Error>(i) }))
                     .await;

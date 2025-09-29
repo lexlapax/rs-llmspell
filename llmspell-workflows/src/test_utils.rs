@@ -277,7 +277,7 @@ pub fn generate_large_test_data(size_mb: usize) -> Value {
         data.push(Value::String("x".repeat(chunk_size)));
 
         // Add some variety every 100 chunks
-        if i % 100 == 0 {
+        if i.is_multiple_of(100) {
             data.push(Value::Object({
                 let mut obj = serde_json::Map::new();
                 obj.insert("chunk_id".to_string(), Value::Number(i.into()));

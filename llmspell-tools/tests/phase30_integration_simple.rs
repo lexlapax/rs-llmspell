@@ -19,7 +19,10 @@ use llmspell_tools::util::text_manipulator::TextManipulatorConfig;
 use llmspell_tools::util::uuid_generator::UuidGeneratorConfig;
 #[cfg(feature = "templates")]
 use llmspell_tools::util::TemplateEngineTool;
-use llmspell_tools::util::{Base64EncoderTool, CalculatorTool, DataValidationTool, DateTimeHandlerTool, DiffCalculatorTool, HashCalculatorTool, TextManipulatorTool, UuidGeneratorTool};
+use llmspell_tools::util::{
+    Base64EncoderTool, CalculatorTool, DataValidationTool, DateTimeHandlerTool, DiffCalculatorTool,
+    HashCalculatorTool, TextManipulatorTool, UuidGeneratorTool,
+};
 use serde_json::{json, Value};
 use std::{collections::HashMap, time::Instant};
 

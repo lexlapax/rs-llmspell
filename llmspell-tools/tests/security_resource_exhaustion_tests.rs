@@ -9,8 +9,8 @@ use llmspell_tools::data::{json_processor::JsonProcessorConfig, JsonProcessorToo
 #[cfg(feature = "archives")]
 use llmspell_tools::fs::ArchiveHandlerTool;
 use llmspell_tools::util::{
-    hash_calculator::HashCalculatorConfig, text_manipulator::TextManipulatorConfig,
-    CalculatorTool, HashCalculatorTool, TextManipulatorTool,
+    hash_calculator::HashCalculatorConfig, text_manipulator::TextManipulatorConfig, CalculatorTool,
+    HashCalculatorTool, TextManipulatorTool,
 };
 use serde_json::json;
 use std::sync::Arc;

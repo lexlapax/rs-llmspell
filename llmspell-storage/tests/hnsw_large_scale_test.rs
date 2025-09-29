@@ -100,7 +100,7 @@ async fn test_hnsw_memory_usage_100k_vectors() {
 
         storage.insert(batch).await.expect("Failed to insert batch");
 
-        if (batch_idx + 1) % 10 == 0 {
+        if (batch_idx + 1).is_multiple_of(10) {
             let current_memory = get_process_memory_bytes();
             let memory_used = current_memory.saturating_sub(baseline_memory);
             println!(

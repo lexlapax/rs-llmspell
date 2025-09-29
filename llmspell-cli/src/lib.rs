@@ -8,6 +8,7 @@ pub mod config;
 pub mod execution_context;
 pub mod kernel_discovery;
 pub mod output;
+pub mod tool_source;
 
 // Re-export commonly used types for testing
 pub use cli::OutputFormat;

@@ -17,8 +17,8 @@ use llmspell_tools::{
     api::{graphql_query::GraphQLConfig, http_request::HttpRequestConfig},
     fs::{
         file_converter::FileConverterConfig, file_operations::FileOperationsConfig,
-        file_search::FileSearchConfig, file_watcher::FileWatcherConfig,
-        FileConverterTool, FileOperationsTool, FileSearchTool, FileWatcherTool,
+        file_search::FileSearchConfig, file_watcher::FileWatcherConfig, FileConverterTool,
+        FileOperationsTool, FileSearchTool, FileWatcherTool,
     },
     search::web_search::WebSearchConfig,
     system::{
@@ -29,8 +29,8 @@ use llmspell_tools::{
     util::{
         hash_calculator::HashCalculatorConfig, text_manipulator::TextManipulatorConfig,
         uuid_generator::UuidGeneratorConfig, Base64EncoderTool, CalculatorTool, DataValidationTool,
-        DateTimeHandlerTool, DiffCalculatorTool, HashCalculatorTool,
-        TextManipulatorTool, UuidGeneratorTool,
+        DateTimeHandlerTool, DiffCalculatorTool, HashCalculatorTool, TextManipulatorTool,
+        UuidGeneratorTool,
     },
     GraphQLQueryTool, HttpRequestTool, WebSearchTool,
 };

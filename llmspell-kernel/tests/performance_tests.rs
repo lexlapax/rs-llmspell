@@ -259,7 +259,7 @@ mod performance_tests {
         let mut stats = SessionStatistics::default();
 
         // Simulate a long session (1000 commands)
-        for i in 0..1000 {
+        for i in 0u32..1000 {
             stats.commands_executed += 1;
 
             // Vary execution times
@@ -275,7 +275,7 @@ mod performance_tests {
             }
 
             // Simulate occasional errors (5% error rate)
-            if i % 20 == 0 {
+            if i.is_multiple_of(20) {
                 stats.errors_encountered += 1;
             }
 

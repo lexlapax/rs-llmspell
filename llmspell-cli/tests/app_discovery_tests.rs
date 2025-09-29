@@ -102,9 +102,9 @@ fn test_document_binary_size() {
             size_bytes, size_mb
         );
 
-        // Document for later comparison - should be around 39-40MB
-        assert!(size_bytes > 30_000_000, "Expected binary > 30MB");
-        assert!(size_bytes < 50_000_000, "Expected binary < 50MB");
+        // Document for later comparison - now optimized to around 21MB after CLI app changes
+        assert!(size_bytes > 15_000_000, "Expected binary > 15MB");
+        assert!(size_bytes < 30_000_000, "Expected binary < 30MB");
     } else {
         println!("BASELINE: Release binary not found - cannot measure current size");
     }
