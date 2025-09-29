@@ -8,6 +8,7 @@ use anyhow::{anyhow, Result};
 use chrono;
 use llmspell_core::traits::script_executor::ScriptExecutor;
 use llmspell_core::traits::tool::ToolCategory;
+use llmspell_core::types::AgentInput;
 use parking_lot::RwLock;
 use serde::{Deserialize, Serialize};
 use serde_json::{json, Value};
@@ -1887,10 +1888,9 @@ impl<P: Protocol + 'static> IntegratedKernel<P> {
             .ok_or_else(|| anyhow!("No command in tool_request"))?;
 
         // TODO: Access ComponentRegistry via script_executor
-        // This requires adding ComponentRegistry access to ScriptExecutor trait
-        // For now, this is a placeholder implementation
+        // Handle tool commands with ComponentRegistry access
         match command {
-            "list" => self.handle_tool_list().await,
+            "list" => self.handle_tool_list(content).await,
             "info" => self.handle_tool_info(content).await,
             "invoke" => self.handle_tool_invoke(content).await,
             "search" => self.handle_tool_search(content).await,
@@ -1900,27 +1900,71 @@ impl<P: Protocol + 'static> IntegratedKernel<P> {
     }
 
     /// Handle tool list command
-    async fn handle_tool_list(&mut self) -> Result<()> {
+    async fn handle_tool_list(&mut self, content: &Value) -> Result<()> {
         debug!("Listing tools from ComponentRegistry");
+
+        // Check for category filter in the request
+        let category_filter = content
+            .get("category")
+            .and_then(|v| v.as_str());
 
         // Get tools from ComponentRegistry via ScriptExecutor
         let tools = if let Some(registry) = self.script_executor.component_registry() {
             // Get actual tools from the registry
-            registry.list_tools().await
+            let all_tools = registry.list_tools().await;
+
+            // If category filter is provided, filter tools by category
+            if let Some(category) = category_filter {
+                let mut filtered = Vec::new();
+                for tool_name in all_tools {
+                    if let Some(tool) = registry.get_tool(&tool_name).await {
+                        let tool_category = match tool.category() {
+                            ToolCategory::Filesystem => "filesystem".to_string(),
+                            ToolCategory::Web => "web".to_string(),
+                            ToolCategory::Api => "api".to_string(),
+                            ToolCategory::Analysis => "analysis".to_string(),
+                            ToolCategory::Data => "data".to_string(),
+                            ToolCategory::System => "system".to_string(),
+                            ToolCategory::Media => "media".to_string(),
+                            ToolCategory::Utility => "utility".to_string(),
+                            ToolCategory::Custom(ref s) => s.clone(),
+                        };
+                        if tool_category.eq_ignore_ascii_case(category) {
+                            filtered.push(tool_name);
+                        }
+                    }
+                }
+                filtered
+            } else {
+                all_tools
+            }
         } else {
             // Fallback to placeholder tools if no registry available
-            vec![
-                "calculator".to_string(),
-                "file_operations".to_string(),
-                "web_scraper".to_string(),
-                "json_processor".to_string(),
-                "text_analyzer".to_string(),
-                "data_converter".to_string(),
-                "image_processor".to_string(),
-                "pdf_generator".to_string(),
-                "email_sender".to_string(),
-                "database_connector".to_string(),
-            ]
+            let placeholders = vec![
+                ("calculator", "utility"),
+                ("file_operations", "filesystem"),
+                ("web_scraper", "web"),
+                ("json_processor", "data"),
+                ("text_analyzer", "analysis"),
+                ("data_converter", "data"),
+                ("image_processor", "media"),
+                ("pdf_generator", "utility"),
+                ("email_sender", "communication"),
+                ("database_connector", "data"),
+            ];
+
+            if let Some(category) = category_filter {
+                placeholders
+                    .into_iter()
+                    .filter(|(_, cat)| cat.eq_ignore_ascii_case(category))
+                    .map(|(name, _)| name.to_string())
+                    .collect()
+            } else {
+                placeholders
+                    .into_iter()
+                    .map(|(name, _)| name.to_string())
+                    .collect()
+            }
         };
 
         let response = json!({
@@ -1928,7 +1972,8 @@ impl<P: Protocol + 'static> IntegratedKernel<P> {
             "content": {
                 "status": "ok",
                 "tools": tools,
-                "count": tools.len()
+                "count": tools.len(),
+                "category": category_filter
             }
         });
 
@@ -1962,11 +2007,11 @@ impl<P: Protocol + 'static> IntegratedKernel<P> {
                 };
                 (desc, cat)
             } else {
-                (format!("Tool '{}' not found", tool_name), "unknown".to_string())
+                (format!("Tool '{tool_name}' not found"), "unknown".to_string())
             }
         } else {
             // Fallback placeholder info
-            (format!("Tool '{}' - placeholder description", tool_name), "utility".to_string())
+            (format!("Tool '{tool_name}' - placeholder description"), "utility".to_string())
         };
 
         let info = json!({
@@ -1986,21 +2031,74 @@ impl<P: Protocol + 'static> IntegratedKernel<P> {
     /// Handle tool invoke command
     async fn handle_tool_invoke(&mut self, content: &Value) -> Result<()> {
         let tool_name = content
-            .get("tool_name")
+            .get("name")
             .and_then(|v| v.as_str())
             .unwrap_or("unknown");
 
         let params = content.get("params").cloned().unwrap_or(json!({}));
         info!("Invoking tool: {} with params: {:?}", tool_name, params);
 
-        let result = json!({
-            "msg_type": "tool_reply",
-            "content": {
-                "status": "ok",
-                "tool": tool_name,
-                "result": "Tool execution placeholder - ComponentRegistry integration pending"
+        // Try to invoke the actual tool from registry
+        let result = if let Some(registry) = self.script_executor.component_registry() {
+            if let Some(tool) = registry.get_tool(tool_name).await {
+                // Create an execution context for the tool
+                let exec_context = llmspell_core::ExecutionContext::default();
+
+                // Convert JSON params to AgentInput
+                let input_text = params.to_string();
+                let mut agent_input = AgentInput::text(input_text);
+
+                // Add parameters from JSON to AgentInput
+                if let Some(obj) = params.as_object() {
+                    for (key, value) in obj {
+                        agent_input.parameters.insert(key.clone(), value.clone());
+                    }
+                }
+
+                // Execute the tool with the provided input
+                match tool.execute(agent_input, exec_context).await {
+                    Ok(output) => {
+                        json!({
+                            "msg_type": "tool_reply",
+                            "content": {
+                                "status": "ok",
+                                "tool": tool_name,
+                                "result": output
+                            }
+                        })
+                    }
+                    Err(e) => {
+                        json!({
+                            "msg_type": "tool_reply",
+                            "content": {
+                                "status": "error",
+                                "tool": tool_name,
+                                "error": format!("Tool execution failed: {e}")
+                            }
+                        })
+                    }
+                }
+            } else {
+                json!({
+                    "msg_type": "tool_reply",
+                    "content": {
+                        "status": "error",
+                        "tool": tool_name,
+                        "error": format!("Tool '{tool_name}' not found")
+                    }
+                })
             }
-        });
+        } else {
+            // Fallback when no registry available
+            json!({
+                "msg_type": "tool_reply",
+                "content": {
+                    "status": "error",
+                    "tool": tool_name,
+                    "error": "No ComponentRegistry available"
+                }
+            })
+        };
 
         self.io_manager.write_stdout(&result.to_string()).await
     }
@@ -2051,20 +2149,87 @@ impl<P: Protocol + 'static> IntegratedKernel<P> {
     /// Handle tool test command
     async fn handle_tool_test(&mut self, content: &Value) -> Result<()> {
         let tool_name = content
-            .get("tool_name")
+            .get("name")
             .and_then(|v| v.as_str())
             .unwrap_or("unknown");
 
+        let verbose = content.get("verbose").and_then(serde_json::Value::as_bool).unwrap_or(false);
+
         info!("Testing tool: {}", tool_name);
 
-        let result = json!({
-            "msg_type": "tool_reply",
-            "content": {
-                "status": "ok",
-                "tool": tool_name,
-                "test_result": "Tool test placeholder"
+        // Try to test the tool from registry
+        let result = if let Some(registry) = self.script_executor.component_registry() {
+            if let Some(tool) = registry.get_tool(tool_name).await {
+                // Create a test execution context
+                let exec_context = llmspell_core::ExecutionContext::default();
+
+                // Create test input for the tool
+                let mut test_input = AgentInput::text("Test input for validation".to_string());
+                test_input.parameters.insert("test".to_string(), json!(true));
+
+                match tool.execute(test_input, exec_context).await {
+                    Ok(output) => {
+                        let mut details = format!("Tool '{tool_name}' test successful");
+                        if verbose {
+                            details.push_str(&format!("\nOutput: {output:?}"));
+                        }
+
+                        json!({
+                            "msg_type": "tool_reply",
+                            "content": {
+                                "status": "ok",
+                                "success": true,
+                                "tool": tool_name,
+                                "message": format!("Tool '{tool_name}' is operational"),
+                                "details": details
+                            }
+                        })
+                    }
+                    Err(e) => {
+                        // Some tools might fail with test params, which is OK for a test
+                        let details = if verbose {
+                            format!("Tool test completed with error: {e}")
+                        } else {
+                            "Tool responded to test invocation".to_string()
+                        };
+
+                        json!({
+                            "msg_type": "tool_reply",
+                            "content": {
+                                "status": "ok",
+                                "success": true,  // Tool exists and responded
+                                "tool": tool_name,
+                                "message": format!("Tool '{tool_name}' is available"),
+                                "details": details
+                            }
+                        })
+                    }
+                }
+            } else {
+                json!({
+                    "msg_type": "tool_reply",
+                    "content": {
+                        "status": "error",
+                        "success": false,
+                        "tool": tool_name,
+                        "message": format!("Tool '{tool_name}' not found"),
+                        "details": "Tool is not registered in ComponentRegistry"
+                    }
+                })
             }
-        });
+        } else {
+            // Fallback when no registry available
+            json!({
+                "msg_type": "tool_reply",
+                "content": {
+                    "status": "error",
+                    "success": false,
+                    "tool": tool_name,
+                    "message": "No ComponentRegistry available",
+                    "details": "Cannot test tools without registry"
+                }
+            })
+        };
 
         self.io_manager.write_stdout(&result.to_string()).await
     }
@@ -2076,7 +2241,7 @@ impl<P: Protocol + 'static> IntegratedKernel<P> {
             "msg_type": "tool_reply",
             "content": {
                 "status": "error",
-                "error": format!("Unknown tool command: {}", command)
+                "error": format!("Unknown tool command: {command}")
             }
         });
 

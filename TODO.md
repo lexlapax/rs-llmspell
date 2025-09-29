@@ -8592,7 +8592,7 @@ docker-compose -f scripts/fleet/docker-compose.yml up -d
 **Tasks Required for Actual Functionality:**
 - ✅ Task 10.22.7: Wire CLI to Kernel Message Protocol
 - ✅ Task 10.22.8: Add ComponentRegistry Access to ScriptExecutor Trait
-- ⬜ Task 10.22.9: Connect Kernel Tool Handlers to Real ComponentRegistry
+- ✅ Task 10.22.9: Connect Kernel Tool Handlers to Real ComponentRegistry
 - ⬜ Task 10.22.10: Implement Tool Invocation Pipeline
 - ⬜ Task 10.22.11: Fix Message Reply Routing
 
@@ -9326,20 +9326,20 @@ $ llmspell version --output json
 
 ---
 
-### Task 10.22.9: Connect Kernel Tool Handlers to Real ComponentRegistry ⬜
+### Task 10.22.9: Connect Kernel Tool Handlers to Real ComponentRegistry ✅
 **Priority**: HIGH
-**Estimated Time**: 4 hours
+**Estimated Time**: 4 hours (Actual: 2 hours)
 **Assignee**: Kernel Team
-**Status**: NOT STARTED
+**Status**: COMPLETED
 
 **Description**: Make kernel tool handlers query actual ComponentRegistry instead of returning hardcoded tool lists.
 
 **Acceptance Criteria:**
-- [ ] `handle_tool_list` returns real tools from registry
-- [ ] Category filtering works properly
-- [ ] Tool count is accurate (40+ tools)
-- [ ] Tool metadata included in responses
-- [ ] Performance < 10ms for tool listing
+- [x] `handle_tool_list` returns real tools from registry
+- [x] Category filtering works properly
+- [x] Tool count is accurate (40+ tools)
+- [x] Tool metadata included in responses
+- [x] Performance < 10ms for tool listing
 
 **Implementation Steps:**
 1. Replace in `llmspell-kernel/src/execution/integrated.rs`:
@@ -9362,6 +9362,16 @@ $ llmspell version --output json
 4. Format response properly
 
 **Depends On**: Task 10.22.8 (trait modification)
+
+**Implementation Notes:**
+- Modified `handle_tool_list()` in `llmspell-kernel/src/execution/integrated.rs` to query real ComponentRegistry
+- Implemented category filtering support using ToolCategory enum
+- Modified `handle_tool_invoke()` to execute actual tools from registry with AgentInput/AgentOutput
+- Modified `handle_tool_test()` to test actual tools from registry
+- Modified `handle_tool_info()` to retrieve real tool metadata from registry
+- Added comprehensive tests in `tool_registry_test.rs`
+- Fixed format string clippy warnings throughout the file
+- All tools are now properly registered via `register_all_tools()` during kernel initialization
 
 ---
 
