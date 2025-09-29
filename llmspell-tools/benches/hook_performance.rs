@@ -6,8 +6,9 @@
 use criterion::{black_box, criterion_group, criterion_main, BenchmarkId, Criterion};
 use llmspell_core::{traits::tool::Tool, types::AgentInput, ExecutionContext};
 use llmspell_testing::tool_helpers::create_default_test_sandbox;
+#[cfg(feature = "json-query")]
+use llmspell_tools::data::json_processor::JsonProcessorTool;
 use llmspell_tools::{
-    data::json_processor::JsonProcessorTool,
     fs::file_operations::{FileOperationsConfig, FileOperationsTool},
     lifecycle::hook_integration::{HookFeatures, ToolExecutor, ToolLifecycleConfig},
     util::calculator::CalculatorTool,
@@ -103,6 +104,7 @@ fn benchmark_calculator_with_hooks(c: &mut Criterion) {
     group.finish();
 }
 
+#[cfg(feature = "json-query")]
 fn benchmark_json_processor_hooks(c: &mut Criterion) {
     let config_no_hooks = ToolLifecycleConfig {
         features: HookFeatures {
@@ -242,17 +244,20 @@ fn benchmark_circuit_breaker(c: &mut Criterion) {
 
 fn benchmark_hook_overhead_comparison(c: &mut Criterion) {
     let sandbox = create_default_test_sandbox();
-    let tools: Vec<(&str, Box<dyn Tool>)> = vec![
+    let mut tools: Vec<(&str, Box<dyn Tool>)> = vec![
         ("calculator", Box::new(CalculatorTool::new())),
-        ("json_processor", Box::new(JsonProcessorTool::default())),
-        (
-            "file_operations",
-            Box::new(FileOperationsTool::new(
-                FileOperationsConfig::default(),
-                sandbox,
-            )),
-        ),
     ];
+
+    #[cfg(feature = "json-query")]
+    tools.push(("json_processor", Box::new(JsonProcessorTool::default())));
+
+    tools.push((
+        "file_operations",
+        Box::new(FileOperationsTool::new(
+            FileOperationsConfig::default(),
+            sandbox,
+        )),
+    ));
 
     let mut group = c.benchmark_group("hook_overhead_percentage");
     group.measurement_time(Duration::from_secs(10));
@@ -453,6 +458,7 @@ fn benchmark_concurrent_hook_execution(c: &mut Criterion) {
     group.finish();
 }
 
+#[cfg(feature = "json-query")]
 criterion_group!(
     benches,
     benchmark_calculator_without_hooks,
@@ -463,4 +469,16 @@ criterion_group!(
     benchmark_hook_phases,
     benchmark_concurrent_hook_execution
 );
+
+#[cfg(not(feature = "json-query"))]
+criterion_group!(
+    benches,
+    benchmark_calculator_without_hooks,
+    benchmark_calculator_with_hooks,
+    benchmark_circuit_breaker,
+    benchmark_hook_overhead_comparison,
+    benchmark_hook_phases,
+    benchmark_concurrent_hook_execution
+);
+
 criterion_main!(benches);

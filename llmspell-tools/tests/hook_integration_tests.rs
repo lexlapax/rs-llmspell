@@ -2,8 +2,9 @@
 //! Tests all 8 hook points with various tools and scenarios
 
 use llmspell_testing::tool_helpers::create_default_test_sandbox;
+#[cfg(feature = "json-query")]
+use llmspell_tools::data::json_processor::JsonProcessorTool;
 use llmspell_tools::{
-    data::json_processor::JsonProcessorTool,
     fs::file_operations::{FileOperationsConfig, FileOperationsTool},
     lifecycle::{
         hook_integration::{AuditConfig, HookFeatures, ToolExecutor, ToolLifecycleConfig},
@@ -331,7 +332,7 @@ async fn test_hook_integration_with_multiple_tool_types() {
     let executor = ToolExecutor::new(config, None, None);
 
     // Test different tool categories and security levels
-    let test_cases = vec![
+    let mut test_cases = vec![
         (
             Box::new(CalculatorTool::new()) as Box<dyn Tool>,
             "calculator",
@@ -342,18 +343,20 @@ async fn test_hook_integration_with_multiple_tool_types() {
             ToolCategory::Utility,
             SecurityLevel::Safe,
         ),
-        (
-            Box::new(JsonProcessorTool::default()) as Box<dyn Tool>,
-            "json_processor",
-            json!({
-                "operation": "query",
-                "input": r#"{"test": 123}"#,
-                "query": ".test"
-            }),
-            ToolCategory::Data,
-            SecurityLevel::Safe,
-        ),
     ];
+
+    #[cfg(feature = "json-query")]
+    test_cases.push((
+        Box::new(JsonProcessorTool::default()) as Box<dyn Tool>,
+        "json_processor",
+        json!({
+            "operation": "query",
+            "input": r#"{"test": 123}"#,
+            "query": ".test"
+        }),
+        ToolCategory::Data,
+        SecurityLevel::Safe,
+    ));
 
     for (tool, name, params, expected_category, expected_security) in test_cases {
         let input = AgentInput::text(format!("Test {name}")).with_parameter("parameters", params);
@@ -388,6 +391,7 @@ async fn test_tool_registry_with_executor() {
         .register("calculator".to_string(), CalculatorTool::new())
         .await
         .unwrap();
+    #[cfg(feature = "json-query")]
     registry
         .register("json_processor".to_string(), JsonProcessorTool::default())
         .await
@@ -444,30 +448,34 @@ async fn test_hookable_tool_execution_trait() {
 }
 #[tokio::test]
 async fn test_different_security_levels() {
-    let tools_and_levels = vec![
+    let mut tools_and_levels = vec![
         (
             Box::new(CalculatorTool::new()) as Box<dyn Tool>,
             SecurityLevel::Safe,
         ),
-        (
-            Box::new(JsonProcessorTool::default()) as Box<dyn Tool>,
-            SecurityLevel::Safe,
-        ),
-        (
-            Box::new(FileOperationsTool::new(
-                FileOperationsConfig::default(),
-                create_default_test_sandbox(),
-            )) as Box<dyn Tool>,
-            SecurityLevel::Privileged,
-        ),
-        (
-            Box::new(ProcessExecutorTool::new(
-                ProcessExecutorConfig::default(),
-                create_default_test_sandbox(),
-            )) as Box<dyn Tool>,
-            SecurityLevel::Restricted,
-        ),
     ];
+
+    #[cfg(feature = "json-query")]
+    tools_and_levels.push((
+        Box::new(JsonProcessorTool::default()) as Box<dyn Tool>,
+        SecurityLevel::Safe,
+    ));
+
+    tools_and_levels.push((
+        Box::new(FileOperationsTool::new(
+            FileOperationsConfig::default(),
+            create_default_test_sandbox(),
+        )) as Box<dyn Tool>,
+        SecurityLevel::Privileged,
+    ));
+
+    tools_and_levels.push((
+        Box::new(ProcessExecutorTool::new(
+            ProcessExecutorConfig::default(),
+            create_default_test_sandbox(),
+        )) as Box<dyn Tool>,
+        SecurityLevel::Restricted,
+    ));
 
     for (tool, expected_level) in tools_and_levels {
         assert_eq!(tool.security_level(), expected_level);

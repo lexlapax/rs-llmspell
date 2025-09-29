@@ -17,7 +17,9 @@ use llmspell_core::{
 use llmspell_tools::util::hash_calculator::HashCalculatorConfig;
 use llmspell_tools::util::text_manipulator::TextManipulatorConfig;
 use llmspell_tools::util::uuid_generator::UuidGeneratorConfig;
-use llmspell_tools::util::*;
+#[cfg(feature = "templates")]
+use llmspell_tools::util::TemplateEngineTool;
+use llmspell_tools::util::{Base64EncoderTool, CalculatorTool, DataValidationTool, DateTimeHandlerTool, DiffCalculatorTool, HashCalculatorTool, TextManipulatorTool, UuidGeneratorTool};
 use serde_json::{json, Value};
 use std::{collections::HashMap, time::Instant};
 
@@ -39,7 +41,7 @@ fn create_test_input(text: &str, params: Value) -> AgentInput {
 /// Test that all standardized tools use "input" parameter consistently
 #[tokio::test]
 async fn test_parameter_standardization_compliance() {
-    let test_cases: Vec<(&str, Box<dyn Tool + Send + Sync>, Value)> = vec![
+    let mut test_cases: Vec<(&str, Box<dyn Tool + Send + Sync>, Value)> = vec![
         (
             "calculator",
             Box::new(CalculatorTool::new()),
@@ -55,12 +57,14 @@ async fn test_parameter_standardization_compliance() {
             Box::new(Base64EncoderTool::new()),
             json!({"operation": "encode", "input": "hello"}),
         ),
-        (
-            "template_engine",
-            Box::new(TemplateEngineTool::new()),
-            json!({"input": "Hello {{ name }}", "context": {"name": "World"}, "engine": "tera"}),
-        ),
     ];
+
+    #[cfg(feature = "templates")]
+    test_cases.push((
+        "template_engine",
+        Box::new(TemplateEngineTool::new()),
+        json!({"input": "Hello {{ name }}", "context": {"name": "World"}, "engine": "tera"}),
+    ));
 
     for (name, tool, params) in test_cases {
         let test_input = create_test_input("test", params);
@@ -117,9 +121,12 @@ async fn test_tool_initialization_performance() {
                 "base64_encoder" => {
                     let _tool = Base64EncoderTool::new();
                 }
+                #[cfg(feature = "templates")]
                 "template_engine" => {
                     let _tool = TemplateEngineTool::new();
                 }
+                #[cfg(not(feature = "templates"))]
+                "template_engine" => {}
                 "diff_calculator" => {
                     let _tool = DiffCalculatorTool::new();
                 }
@@ -301,25 +308,28 @@ async fn test_phase30_migration_compliance() {
     );
 
     // 3. Template engine uses "input" instead of "template"
-    let template_engine = TemplateEngineTool::new();
-    let test_input = create_test_input(
-        "test",
-        json!({
-            "input": "Hello {{ name }}",  // Should be "input", not "template"
-            "context": {"name": "World"},
-            "engine": "tera"
-        }),
-    );
+    #[cfg(feature = "templates")]
+    {
+        let template_engine = TemplateEngineTool::new();
+        let test_input = create_test_input(
+            "test",
+            json!({
+                "input": "Hello {{ name }}",  // Should be "input", not "template"
+                "context": {"name": "World"},
+                "engine": "tera"
+            }),
+        );
 
-    let result = template_engine
-        .execute(test_input, ExecutionContext::default())
-        .await
-        .unwrap();
-    let parsed: Value = serde_json::from_str(&result.text).unwrap();
-    assert!(
-        parsed["success"].as_bool().unwrap_or(false),
-        "Template engine should accept 'input' parameter"
-    );
+        let result = template_engine
+            .execute(test_input, ExecutionContext::default())
+            .await
+            .unwrap();
+        let parsed: Value = serde_json::from_str(&result.text).unwrap();
+        assert!(
+            parsed["success"].as_bool().unwrap_or(false),
+            "Template engine should accept 'input' parameter"
+        );
+    }
 
     println!("✅ Phase 3.0 parameter migration requirements met");
 }

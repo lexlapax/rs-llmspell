@@ -8575,9 +8575,448 @@ docker-compose -f scripts/fleet/docker-compose.yml up -d
 
 ---
 
-## Phase 10.22: Performance Benchmarking (Days 24-25)
+## Phase 10.22: Tool CLI Commands (Day 24)
+**Status**: NOT STARTED
+**Priority**: HIGH
+**Duration**: 1 day
 
-### Task 10.22.1: Create Benchmark Harness
+### Architectural Rationale
+
+**Why Tool CLI Commands are Essential:**
+
+1. **Developer Experience**: Direct tool invocation enables rapid testing, debugging, and exploration of the 40+ tools without script overhead
+2. **Production Operations**: Operators need CLI access for troubleshooting, health checks, and manual interventions
+3. **Foundation for Remote Tools**: Establishes the command patterns that will extend naturally to MCP (Phase 12) and A2A (Phase 18) protocols
+4. **Trace Integration**: Tool execution is complex; --trace flag support provides critical debugging visibility
+5. **Tool Discovery**: 40+ tools with varying capabilities need discoverable, documented CLI access
+
+**Key Design Principles:**
+
+- **No Script Engine Required**: Tools are native Rust implementations accessed directly via ComponentRegistry
+- **Dual-Mode Context**: Leverages existing ExecutionContext for embedded vs connected kernel operation
+- **Future-Proof Architecture**: ToolSource abstraction ready for MCP/A2A extension without breaking changes
+- **Streaming Support**: Tools already implement execute_stream() for real-time output
+- **State Integration**: Tools receive ExecutionContext with full state access
+
+### Task 10.22.1: CLI Command Structure Implementation
+**Priority**: HIGH
+**Estimated Time**: 3 hours
+**Assignee**: CLI Team Lead
+
+**Description**: Add tool command structure to CLI with comprehensive subcommands.
+
+**Acceptance Criteria:**
+- [ ] Tool command added to cli.rs
+- [ ] Subcommands: list, info, invoke, search, test
+- [ ] --trace flag properly propagated
+- [ ] Help text comprehensive
+- [ ] Argument validation complete
+
+**Implementation Steps:**
+1. Add to `llmspell-cli/src/cli.rs:439`:
+   ```rust
+   /// Tool management and direct invocation
+   Tool {
+       #[command(subcommand)]
+       command: ToolCommands,
+
+       /// Tool source (future: local|mcp:<server>|a2a:<node>)
+       #[arg(long, default_value = "local", hide = true)]
+       source: String,
+   }
+   ```
+
+2. Define ToolCommands enum:
+   ```rust
+   #[derive(Subcommand, Debug)]
+   pub enum ToolCommands {
+       /// List available tools with filtering
+       List {
+           #[arg(long)]
+           category: Option<ToolCategory>,
+           #[arg(long)]
+           format: Option<OutputFormat>,
+       },
+
+       /// Show detailed tool information
+       Info {
+           name: String,
+           #[arg(long)]
+           show_schema: bool,
+       },
+
+       /// Invoke tool directly with parameters
+       Invoke {
+           name: String,
+           #[arg(long, value_parser = parse_json)]
+           params: serde_json::Value,
+           #[arg(long)]
+           stream: bool,
+       },
+
+       /// Search tools by capability/keywords
+       Search {
+           query: Vec<String>,
+           #[arg(long)]
+           category: Option<ToolCategory>,
+       },
+
+       /// Test tool with example inputs
+       Test {
+           name: String,
+           #[arg(long)]
+           verbose: bool,
+       },
+   }
+   ```
+
+3. Trace flag integration:
+   - Ensure --trace propagates to tool execution
+   - Add trace spans for tool discovery/invocation
+   - Include tool parameters in trace context
+
+**Definition of Done:**
+- [ ] Commands compile without warnings
+- [ ] Help text clear and comprehensive
+- [ ] Examples included in long_about
+- [ ] Trace flag properly handled
+
+### Task 10.22.2: Tool Command Handler Implementation
+**Priority**: HIGH
+**Estimated Time**: 4 hours
+**Assignee**: Runtime Team
+
+**Description**: Implement tool command execution logic with direct ComponentRegistry access.
+
+**Acceptance Criteria:**
+- [ ] Handler dispatches all subcommands
+- [ ] Direct registry access working
+- [ ] Streaming execution supported
+- [ ] Error handling comprehensive
+- [ ] Trace instrumentation complete
+
+**Implementation Steps:**
+1. Create `llmspell-cli/src/commands/tool.rs`:
+   ```rust
+   use crate::execution_context::ExecutionContext;
+   use llmspell_tools::CapabilityMatcher;
+   use tracing::{debug, info, instrument, trace};
+
+   #[instrument(skip(context), fields(command_type))]
+   pub async fn handle_tool_command(
+       command: ToolCommands,
+       context: ExecutionContext,
+       output_format: OutputFormat,
+   ) -> Result<()> {
+       trace!("Executing tool command");
+
+       match context {
+           ExecutionContext::Embedded(runtime) => {
+               let registry = runtime.component_registry();
+               execute_tool_locally(command, registry, output_format).await
+           }
+           ExecutionContext::Connected(client) => {
+               // Future: Forward to kernel via protocol
+               execute_tool_remotely(command, client, output_format).await
+           }
+       }
+   }
+   ```
+
+2. Local execution implementation:
+   ```rust
+   #[instrument(skip(registry))]
+   async fn execute_tool_locally(
+       command: ToolCommands,
+       registry: Arc<ComponentRegistry>,
+       output: OutputFormat,
+   ) -> Result<()> {
+       match command {
+           ToolCommands::List { category, format } => {
+               debug!("Listing tools, category: {:?}", category);
+               list_tools(registry, category, format.unwrap_or(output))
+           }
+
+           ToolCommands::Invoke { name, params, stream } => {
+               info!("Invoking tool: {}", name);
+               trace!("Parameters: {:?}", params);
+
+               let tool = registry.get_tool(&name)
+                   .ok_or_else(|| anyhow!("Tool '{}' not found", name))?;
+
+               let input = json_to_agent_input(params)?;
+               let ctx = ExecutionContext::default();
+
+               if stream {
+                   trace!("Using streaming execution");
+                   let mut stream = tool.execute_stream(input, ctx).await?;
+                   while let Some(chunk) = stream.next().await {
+                       output_chunk(chunk, output)?;
+                   }
+               } else {
+                   let result = tool.execute(input, ctx).await?;
+                   output_result(result, output)?;
+               }
+               Ok(())
+           }
+           // ... other commands
+       }
+   }
+   ```
+
+3. Trace instrumentation:
+   - Add spans for tool discovery
+   - Include tool metadata in traces
+   - Measure execution times
+   - Log parameter validation
+
+**Definition of Done:**
+- [ ] All commands implemented
+- [ ] Streaming works correctly
+- [ ] Trace output useful
+- [ ] Error messages helpful
+
+### Task 10.22.3: Tool Discovery and Search Implementation
+**Priority**: MEDIUM
+**Estimated Time**: 2 hours
+**Assignee**: Tools Team
+
+**Description**: Implement tool discovery, search, and capability matching.
+
+**Acceptance Criteria:**
+- [ ] List shows all 40+ tools
+- [ ] Category filtering works
+- [ ] Search finds relevant tools
+- [ ] Info shows complete details
+- [ ] Test runs validation
+
+**Implementation Steps:**
+1. Tool listing with categories:
+   ```rust
+   fn list_tools(
+       registry: Arc<ComponentRegistry>,
+       category: Option<ToolCategory>,
+       format: OutputFormat,
+   ) -> Result<()> {
+       let tools = registry.list_tools();
+       let mut tool_infos = Vec::new();
+
+       for name in tools {
+           if let Some(tool) = registry.get_tool(&name) {
+               if category.map_or(true, |c| tool.category() == c) {
+                   tool_infos.push(ToolInfo::from(tool));
+               }
+           }
+       }
+
+       output_tool_list(tool_infos, format)
+   }
+   ```
+
+2. Capability-based search:
+   ```rust
+   fn search_tools(
+       registry: Arc<ComponentRegistry>,
+       query: Vec<String>,
+       category: Option<ToolCategory>,
+   ) -> Result<Vec<ToolInfo>> {
+       let matcher = CapabilityMatcher::new()
+           .with_search_terms(query)
+           .with_categories(category.into_iter().collect());
+
+       registry.discover_tools(matcher)
+   }
+   ```
+
+3. Tool testing with examples:
+   ```rust
+   async fn test_tool(
+       registry: Arc<ComponentRegistry>,
+       name: &str,
+       verbose: bool,
+   ) -> Result<()> {
+       let tool = registry.get_tool(name)?;
+       let examples = tool.examples(); // Tools provide test cases
+
+       for (i, example) in examples.iter().enumerate() {
+           if verbose {
+               println!("Test {}: {}", i+1, example.description);
+           }
+           let result = tool.execute(example.input, ctx).await?;
+           validate_output(result, &example.expected)?;
+       }
+       Ok(())
+   }
+   ```
+
+**Definition of Done:**
+- [ ] Discovery finds all tools
+- [ ] Search is case-insensitive
+- [ ] Categories properly filtered
+- [ ] Test validates examples
+
+### Task 10.22.4: Remote Tool Preparation (MCP/A2A Stubs)
+**Priority**: LOW
+**Estimated Time**: 2 hours
+**Assignee**: Protocol Team
+
+**Description**: Add extension points for future MCP/A2A tool sources.
+
+**Acceptance Criteria:**
+- [ ] ToolSource enum defined
+- [ ] Registry abstraction ready
+- [ ] Remote stubs return "not implemented"
+- [ ] Architecture documented
+- [ ] No breaking changes
+
+**Implementation Steps:**
+1. Define tool source abstraction:
+   ```rust
+   #[derive(Debug, Clone)]
+   pub enum ToolSource {
+       Local,
+       #[cfg(feature = "mcp")]  // Phase 12
+       MCP { server: String },
+       #[cfg(feature = "a2a")]  // Phase 18
+       A2A { node: String },
+   }
+
+   pub trait ToolResolver: Send + Sync {
+       async fn resolve(&self, name: &str) -> Option<Arc<dyn Tool>>;
+       async fn list(&self) -> Vec<String>;
+       async fn search(&self, matcher: CapabilityMatcher) -> Vec<ToolInfo>;
+   }
+   ```
+
+2. Prepare for MCP wrapper (Phase 12):
+   ```rust
+   // Stub for future implementation
+   #[cfg(feature = "mcp")]
+   struct MCPToolWrapper {
+       spec: MCPToolSpec,
+       client: Arc<MCPClient>,
+   }
+
+   #[cfg(feature = "mcp")]
+   impl Tool for MCPToolWrapper {
+       async fn execute(&self, input: AgentInput, ctx: ExecutionContext) -> Result<AgentOutput> {
+           // Forward to MCP server
+           todo!("MCP implementation in Phase 12")
+       }
+   }
+   ```
+
+3. CLI examples for future:
+   ```bash
+   # Future Phase 12:
+   llmspell tool list --source mcp:localhost:9000
+   llmspell tool invoke remote_calc --params '{"x":5}' --source mcp:localhost:9000
+
+   # Future Phase 18:
+   llmspell tool list --source a2a:cluster.local
+   llmspell tool invoke distributed_compute --params '{"task":"render"}' --source a2a:gpu-node
+   ```
+
+**Definition of Done:**
+- [ ] Stubs compile conditionally
+- [ ] Architecture documented
+- [ ] No runtime overhead
+- [ ] Extension points clear
+
+### Task 10.22.5: Testing and Documentation
+**Priority**: HIGH
+**Estimated Time**: 2 hours
+**Assignee**: QA Team
+
+**Description**: Comprehensive testing and documentation for tool commands.
+
+**Acceptance Criteria:**
+- [ ] Integration tests complete
+- [ ] CLI examples documented
+- [ ] Performance validated
+- [ ] User guide updated
+- [ ] Trace examples shown
+
+**Implementation Steps:**
+1. Integration tests:
+   ```rust
+   #[tokio::test]
+   async fn test_tool_list_command() {
+       let output = run_cli(["tool", "list", "--trace", "debug"]);
+       assert!(output.contains("calculator"));
+       assert!(output.contains("file_operations"));
+   }
+
+   #[tokio::test]
+   async fn test_tool_invoke_with_trace() {
+       std::env::set_var("RUST_LOG", "llmspell=trace");
+       let output = run_cli([
+           "tool", "invoke", "calculator",
+           "--params", r#"{"expression":"2+2"}"#,
+           "--trace", "trace"
+       ]);
+       assert!(output.contains("result"));
+       // Verify trace output includes tool execution details
+   }
+   ```
+
+2. Documentation examples:
+   ```markdown
+   ## Tool CLI Commands
+
+   ### Basic Usage
+   ```bash
+   # List all tools
+   llmspell tool list
+
+   # List by category with trace
+   llmspell tool list --category filesystem --trace debug
+
+   # Get tool information
+   llmspell tool info file_operations --show-schema
+
+   # Invoke tool directly
+   llmspell tool invoke calculator --params '{"expression":"sqrt(16)"}'
+
+   # Stream tool output with trace
+   llmspell tool invoke web_scraper --params '{"url":"example.com"}' --stream --trace trace
+
+   # Search tools
+   llmspell tool search "file" "system" --category utilities
+
+   # Test tool with examples
+   llmspell tool test calculator --verbose
+   ```
+
+   ### Debugging with --trace
+   ```bash
+   # Debug tool discovery
+   llmspell --trace debug tool list
+
+   # Trace tool execution
+   llmspell --trace trace tool invoke complex_tool --params '{...}'
+
+   # Full trace with timing
+   RUST_LOG=llmspell=trace llmspell tool invoke slow_tool --params '{...}'
+   ```
+   ```
+
+3. Performance validation:
+   - Tool discovery: <10ms
+   - Tool invocation overhead: <5ms
+   - Streaming latency: <1ms per chunk
+
+**Definition of Done:**
+- [ ] All tests pass
+- [ ] Examples run successfully
+- [ ] Docs comprehensive
+- [ ] Performance targets met
+
+---
+
+## Phase 10.23: Performance Benchmarking (Days 25-26)
+
+### Task 10.23.1: Create Benchmark Harness
 **Priority**: HIGH
 **Estimated Time**: 4 hours
 **Assignee**: Performance Team Lead
@@ -8627,7 +9066,7 @@ docker-compose -f scripts/fleet/docker-compose.yml up -d
 - [ ] `cargo fmt --all --check` passes
 - [ ] All tests pass: `cargo test --workspace --all-features`
 
-### Task 10.22.2: Baseline Performance Metrics
+### Task 10.23.2: Baseline Performance Metrics
 **Priority**: HIGH
 **Estimated Time**: 3 hours
 **Assignee**: Performance Team
@@ -8671,7 +9110,7 @@ docker-compose -f scripts/fleet/docker-compose.yml up -d
 - [ ] `cargo fmt --all --check` passes
 - [ ] All tests pass: `cargo test --workspace --all-features`
 
-### Task 10.22.3: Optimization Implementation
+### Task 10.23.3: Optimization Implementation
 **Priority**: MEDIUM
 **Estimated Time**: 6 hours
 **Assignee**: Performance Team
@@ -8715,9 +9154,9 @@ docker-compose -f scripts/fleet/docker-compose.yml up -d
 
 ---
 
-## Phase 10.23: Additional Testing & Documentation (Days 25)
+## Phase 10.24: Additional Testing & Documentation (Days 26)
 
-### Task 10.23.1: Stress Testing Suite
+### Task 10.24.1: Stress Testing Suite
 **Priority**: HIGH
 **Estimated Time**: 4 hours
 **Assignee**: QA Team Lead
@@ -8759,7 +9198,7 @@ docker-compose -f scripts/fleet/docker-compose.yml up -d
 - [ ] Recovery verified
 - [ ] Reports ready
 
-### Task 10.23.2: Protocol Compliance Testing
+### Task 10.24.2: Protocol Compliance Testing
 **Priority**: HIGH
 **Estimated Time**: 3 hours
 **Assignee**: Protocol Team
@@ -8799,7 +9238,7 @@ docker-compose -f scripts/fleet/docker-compose.yml up -d
 - [ ] Edge cases handled
 - [ ] Docs complete
 
-### Task 10.23.3: Troubleshooting Guide
+### Task 10.24.3: Troubleshooting Guide
 **Priority**: MEDIUM
 **Estimated Time**: 3 hours
 **Assignee**: Documentation Team
@@ -8841,7 +9280,7 @@ docker-compose -f scripts/fleet/docker-compose.yml up -d
 - [ ] FAQ comprehensive
 
 
-### Task 10.23.4: Performance Tuning Guide
+### Task 10.24.4: Performance Tuning Guide
 **Priority**: LOW
 **Estimated Time**: 3 hours
 **Assignee**: Documentation Team
@@ -8984,7 +9423,8 @@ docker-compose -f scripts/fleet/docker-compose.yml up -d
 **Days 21-22**: Resource limits & throttling
 **Days 22-23**: Docker & containerization
 **Days 23-24**: Metrics & monitoring infrastructure
-**Days 24-25**: Performance benchmarking & additional testing
+**Day 24**: Tool CLI commands
+**Days 25-26**: Performance benchmarking & additional testing
 
 ---
 

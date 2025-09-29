@@ -2,17 +2,19 @@
 // ABOUTME: Simplified test that works with the actual API without complex setup
 
 use llmspell_core::traits::tool::{SecurityLevel, Tool};
+#[cfg(feature = "templates")]
+use llmspell_tools::util::TemplateEngineTool;
 use llmspell_tools::util::{
     hash_calculator::HashCalculatorConfig, text_manipulator::TextManipulatorConfig,
     uuid_generator::UuidGeneratorConfig, Base64EncoderTool, CalculatorTool, DataValidationTool,
-    DateTimeHandlerTool, DiffCalculatorTool, HashCalculatorTool, TemplateEngineTool,
-    TextManipulatorTool, UuidGeneratorTool,
+    DateTimeHandlerTool, DiffCalculatorTool, HashCalculatorTool, TextManipulatorTool,
+    UuidGeneratorTool,
 };
 
 /// Test that all utility tools have appropriate security levels
 #[test]
 fn test_utility_tools_security_levels() {
-    let utility_tools: Vec<(String, Box<dyn Tool>)> = vec![
+    let mut utility_tools: Vec<(String, Box<dyn Tool>)> = vec![
         (
             "TextManipulatorTool".to_string(),
             Box::new(TextManipulatorTool::new(TextManipulatorConfig::default())),
@@ -42,14 +44,16 @@ fn test_utility_tools_security_levels() {
             Box::new(CalculatorTool::new()),
         ),
         (
-            "TemplateEngineTool".to_string(),
-            Box::new(TemplateEngineTool::new()),
-        ),
-        (
             "DataValidationTool".to_string(),
             Box::new(DataValidationTool::new()),
         ),
     ];
+
+    #[cfg(feature = "templates")]
+    utility_tools.push((
+        "TemplateEngineTool".to_string(),
+        Box::new(TemplateEngineTool::new()),
+    ));
 
     let tool_count = utility_tools.len();
     println!("🔍 Security Audit: Validating {tool_count} utility tools");
@@ -130,20 +134,22 @@ fn test_resource_limits_are_reasonable() {
 /// Test that tools have appropriate security requirements
 #[test]
 fn test_security_requirements_structure() {
-    let tools = vec![
+    let mut tools = vec![
         (
             "TextManipulatorTool",
             Box::new(TextManipulatorTool::new(TextManipulatorConfig::default())) as Box<dyn Tool>,
-        ),
-        (
-            "TemplateEngineTool",
-            Box::new(TemplateEngineTool::new()) as Box<dyn Tool>,
         ),
         (
             "DataValidationTool",
             Box::new(DataValidationTool::new()) as Box<dyn Tool>,
         ),
     ];
+
+    #[cfg(feature = "templates")]
+    tools.push((
+        "TemplateEngineTool",
+        Box::new(TemplateEngineTool::new()) as Box<dyn Tool>,
+    ));
 
     for (name, tool) in tools {
         let security_reqs = tool.security_requirements();
@@ -178,14 +184,17 @@ fn test_security_requirements_structure() {
 #[test]
 fn test_sensitive_operations_controlled() {
     // Template engine should be safe but may have restrictions
-    let template_tool = TemplateEngineTool::new();
-    assert!(
-        matches!(
-            template_tool.security_level(),
-            SecurityLevel::Safe | SecurityLevel::Restricted
-        ),
-        "TemplateEngineTool should be Safe or Restricted"
-    );
+    #[cfg(feature = "templates")]
+    {
+        let template_tool = TemplateEngineTool::new();
+        assert!(
+            matches!(
+                template_tool.security_level(),
+                SecurityLevel::Safe | SecurityLevel::Restricted
+            ),
+            "TemplateEngineTool should be Safe or Restricted"
+        );
+    }
 
     // Data validation should be safe
     let validation_tool = DataValidationTool::new();

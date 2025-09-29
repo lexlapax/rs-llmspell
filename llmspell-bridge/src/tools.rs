@@ -49,16 +49,12 @@ use llmspell_tools::data::json_processor::JsonProcessorConfig;
 use llmspell_tools::fs::{
     FileConverterConfig, FileOperationsConfig, FileSearchConfig, FileWatcherConfig,
 };
-#[cfg(feature = "archives")]
-use llmspell_tools::fs::ArchiveHandlerConfig;
 use llmspell_tools::media::{AudioProcessorConfig, ImageProcessorConfig, VideoProcessorConfig};
 use llmspell_tools::search::WebSearchConfig;
 use llmspell_tools::system::{
     EnvironmentReaderConfig, ProcessExecutorConfig, ServiceCheckerConfig, SystemMonitorConfig,
 };
 use llmspell_tools::util::{HashCalculatorConfig, TextManipulatorConfig, UuidGeneratorConfig};
-#[cfg(feature = "templates")]
-use llmspell_tools::util::TemplateEngineConfig;
 use llmspell_tools::web::web_scraper::WebScraperConfig;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;

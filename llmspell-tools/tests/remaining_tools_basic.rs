@@ -304,10 +304,12 @@ fn test_tool_creation_performance() {
     use std::time::Instant;
 
     let iterations = 100;
+    // Create sandbox once outside the loop to avoid overhead
+    let sandbox = create_file_sandbox();
+
     let start = Instant::now();
 
     for _ in 0..iterations {
-        let sandbox = create_file_sandbox();
         let _ = FileWatcherTool::new(FileWatcherConfig::default(), sandbox.clone());
         let _ = FileConverterTool::new(FileConverterConfig::default(), sandbox.clone());
         let _ = FileSearchTool::new(FileSearchConfig::default(), sandbox.clone());

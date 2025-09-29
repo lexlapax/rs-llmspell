@@ -1,5 +1,7 @@
 //! Integration tests for `JsonProcessorTool`
 
+#![cfg(feature = "json-query")]
+
 use llmspell_core::{
     traits::{base_agent::BaseAgent, tool::Tool},
     types::AgentInput,
