@@ -7,6 +7,7 @@
 use anyhow::{anyhow, Result};
 use chrono;
 use llmspell_core::traits::script_executor::ScriptExecutor;
+use llmspell_core::traits::tool::ToolCategory;
 use parking_lot::RwLock;
 use serde::{Deserialize, Serialize};
 use serde_json::{json, Value};
@@ -1902,19 +1903,25 @@ impl<P: Protocol + 'static> IntegratedKernel<P> {
     async fn handle_tool_list(&mut self) -> Result<()> {
         debug!("Listing tools from ComponentRegistry");
 
-        // TODO: Access ComponentRegistry when trait support is added
-        let tools = vec![
-            "calculator",
-            "file_operations",
-            "web_scraper",
-            "json_processor",
-            "text_analyzer",
-            "data_converter",
-            "image_processor",
-            "pdf_generator",
-            "email_sender",
-            "database_connector",
-        ];
+        // Get tools from ComponentRegistry via ScriptExecutor
+        let tools = if let Some(registry) = self.script_executor.component_registry() {
+            // Get actual tools from the registry
+            registry.list_tools().await
+        } else {
+            // Fallback to placeholder tools if no registry available
+            vec![
+                "calculator".to_string(),
+                "file_operations".to_string(),
+                "web_scraper".to_string(),
+                "json_processor".to_string(),
+                "text_analyzer".to_string(),
+                "data_converter".to_string(),
+                "image_processor".to_string(),
+                "pdf_generator".to_string(),
+                "email_sender".to_string(),
+                "database_connector".to_string(),
+            ]
+        };
 
         let response = json!({
             "msg_type": "tool_reply",
@@ -1931,19 +1938,44 @@ impl<P: Protocol + 'static> IntegratedKernel<P> {
     /// Handle tool info command
     async fn handle_tool_info(&mut self, content: &Value) -> Result<()> {
         let tool_name = content
-            .get("tool_name")
+            .get("name")
             .and_then(|v| v.as_str())
             .unwrap_or("unknown");
 
         debug!("Getting info for tool: {}", tool_name);
 
+        // Try to get actual tool from registry
+        let (description, category) = if let Some(registry) = self.script_executor.component_registry() {
+            if let Some(tool) = registry.get_tool(tool_name).await {
+                // Get actual tool metadata
+                let desc = tool.metadata().description.clone();
+                let cat = match tool.category() {
+                    ToolCategory::Filesystem => "filesystem".to_string(),
+                    ToolCategory::Web => "web".to_string(),
+                    ToolCategory::Api => "api".to_string(),
+                    ToolCategory::Analysis => "analysis".to_string(),
+                    ToolCategory::Data => "data".to_string(),
+                    ToolCategory::System => "system".to_string(),
+                    ToolCategory::Media => "media".to_string(),
+                    ToolCategory::Utility => "utility".to_string(),
+                    ToolCategory::Custom(ref s) => s.clone(),
+                };
+                (desc, cat)
+            } else {
+                (format!("Tool '{}' not found", tool_name), "unknown".to_string())
+            }
+        } else {
+            // Fallback placeholder info
+            (format!("Tool '{}' - placeholder description", tool_name), "utility".to_string())
+        };
+
         let info = json!({
             "msg_type": "tool_reply",
             "content": {
                 "status": "ok",
-                "tool": tool_name,
-                "description": format!("Tool {} - implementation pending", tool_name),
-                "category": "utility",
+                "name": tool_name,
+                "description": description,
+                "category": category,
                 "security_level": "safe"
             }
         });
@@ -1983,17 +2015,25 @@ impl<P: Protocol + 'static> IntegratedKernel<P> {
 
         debug!("Searching tools with query: {:?}", query);
 
-        let all_tools = vec![
-            "calculator",
-            "file_operations",
-            "web_scraper",
-            "json_processor",
-            "text_analyzer",
-        ];
+        // Get tools from registry or use placeholders
+        let all_tools = if let Some(registry) = self.script_executor.component_registry() {
+            registry.list_tools().await
+        } else {
+            vec![
+                "calculator".to_string(),
+                "file_operations".to_string(),
+                "web_scraper".to_string(),
+                "json_processor".to_string(),
+                "text_analyzer".to_string(),
+            ]
+        };
 
-        let matches: Vec<&str> = all_tools
+        // Filter tools based on query
+        let matches: Vec<String> = all_tools
             .into_iter()
-            .filter(|name| query.is_empty() || query.iter().any(|q| name.contains(q)))
+            .filter(|name| {
+                query.is_empty() || query.iter().any(|q| name.to_lowercase().contains(&q.to_lowercase()))
+            })
             .collect();
 
         let response = json!({

@@ -2,6 +2,7 @@
 //! ABOUTME: Defines the interface for executing scripts without cyclic dependencies
 
 use crate::error::LLMSpellError;
+use crate::traits::component_lookup::ComponentLookup;
 use crate::traits::debug_context::DebugContext;
 use async_trait::async_trait;
 use serde::{Deserialize, Serialize};
@@ -100,6 +101,18 @@ pub trait ScriptExecutor: Send + Sync {
     ///
     /// Default returns None. Executors with debug support should override.
     fn get_debug_context(&self) -> Option<Arc<dyn DebugContext>> {
+        None
+    }
+
+    /// Access to component registry for tool discovery and invocation
+    ///
+    /// Returns the ComponentLookup implementation that provides access to
+    /// tools, agents, and workflows. This allows kernels to query and
+    /// execute actual components instead of using placeholders.
+    ///
+    /// Default returns None for backward compatibility.
+    /// Executors with component registry should override this method.
+    fn component_registry(&self) -> Option<Arc<dyn ComponentLookup>> {
         None
     }
 

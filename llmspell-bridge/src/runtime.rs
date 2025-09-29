@@ -10,6 +10,7 @@ use crate::{
 use async_trait::async_trait;
 use llmspell_config::LLMSpellConfig;
 use llmspell_core::error::LLMSpellError;
+use llmspell_core::traits::component_lookup::ComponentLookup;
 use llmspell_core::traits::debug_context::DebugContext;
 use llmspell_core::traits::script_executor::{
     ScriptExecutionMetadata, ScriptExecutionOutput, ScriptExecutor,
@@ -537,6 +538,11 @@ impl ScriptExecutor for ScriptRuntime {
         // Return the stored debug context
         let debug_context = self.debug_context.read().unwrap();
         debug_context.clone()
+    }
+
+    fn component_registry(&self) -> Option<Arc<dyn ComponentLookup>> {
+        // Return the component registry as ComponentLookup trait
+        Some(Arc::clone(&self.registry) as Arc<dyn ComponentLookup>)
     }
 
     fn get_completion_candidates(&self, line: &str, cursor_pos: usize) -> Vec<(String, String)> {

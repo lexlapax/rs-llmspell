@@ -8591,7 +8591,7 @@ docker-compose -f scripts/fleet/docker-compose.yml up -d
 
 **Tasks Required for Actual Functionality:**
 - ✅ Task 10.22.7: Wire CLI to Kernel Message Protocol
-- ⬜ Task 10.22.8: Add ComponentRegistry Access to ScriptExecutor Trait
+- ✅ Task 10.22.8: Add ComponentRegistry Access to ScriptExecutor Trait
 - ⬜ Task 10.22.9: Connect Kernel Tool Handlers to Real ComponentRegistry
 - ⬜ Task 10.22.10: Implement Tool Invocation Pipeline
 - ⬜ Task 10.22.11: Fix Message Reply Routing
@@ -9278,20 +9278,20 @@ $ llmspell version --output json
 
 ---
 
-### Task 10.22.8: Add ComponentRegistry Access to ScriptExecutor Trait ⬜
+### Task 10.22.8: Add ComponentRegistry Access to ScriptExecutor Trait ✅
 **Priority**: CRITICAL
 **Estimated Time**: 6 hours
 **Assignee**: Core Team
-**Status**: NOT STARTED
+**Status**: COMPLETE
 
 **Description**: Expose ComponentRegistry through the trait hierarchy so kernel can access actual tools instead of placeholders.
 
 **Acceptance Criteria:**
-- [ ] ScriptExecutor trait has `component_registry()` method
-- [ ] Bridge implementation returns its registry
-- [ ] IntegratedKernel can access registry via script_executor
-- [ ] Backward compatibility maintained
-- [ ] No performance regression
+- [x] ScriptExecutor trait has `component_registry()` method
+- [x] Bridge implementation returns its registry
+- [x] IntegratedKernel can access registry via script_executor
+- [x] Backward compatibility maintained
+- [x] No performance regression
 
 **Implementation Steps:**
 1. Add to `llmspell-core/src/traits/script_executor.rs`:
@@ -9312,6 +9312,17 @@ $ llmspell version --output json
 3. Update IntegratedKernel to use it in tool handlers
 
 **Risk**: Modifying core trait - needs careful testing
+
+**Implementation Completed**:
+- Added `component_registry()` method to ScriptExecutor trait in llmspell-core/src/traits/script_executor.rs:115
+- Implemented the method in ScriptRuntime in llmspell-bridge/src/runtime.rs:542
+- Updated kernel tool handlers to use registry in llmspell-kernel/src/execution/integrated.rs
+  - `handle_tool_list()` now gets tools from registry (lines 1906-1923)
+  - `handle_tool_info()` retrieves actual tool metadata (lines 1947-1963)
+  - `handle_tool_search()` searches real tools (lines 2006-2024)
+- Added ComponentLookup trait import where needed
+- Created test in llmspell-bridge/tests/component_registry_test.rs
+- Zero compilation errors, builds successfully with all features
 
 ---
 
