@@ -206,7 +206,7 @@ impl TraceStorage {
             let mut sorted_durations = durations.clone();
             sorted_durations.sort_by(|a, b| a.partial_cmp(b).unwrap());
 
-            let median = if sorted_durations.len() % 2 == 0 {
+            let median = if sorted_durations.len().is_multiple_of(2) {
                 let mid = sorted_durations.len() / 2;
                 (sorted_durations[mid - 1] + sorted_durations[mid]) / 2.0
             } else {

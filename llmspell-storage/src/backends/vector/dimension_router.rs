@@ -106,7 +106,7 @@ impl DimensionRouter {
             // Try to find a smaller dimension that divides evenly (Matryoshka)
             for storage_entry in &self.storages {
                 let storage_dims = *storage_entry.key();
-                if storage_dims < vector_dims && vector_dims % storage_dims == 0 {
+                if storage_dims < vector_dims && vector_dims.is_multiple_of(storage_dims) {
                     debug!(
                         "Using Matryoshka reduction from {} to {} dimensions",
                         vector_dims, storage_dims

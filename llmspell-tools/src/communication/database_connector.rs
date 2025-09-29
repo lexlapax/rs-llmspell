@@ -26,8 +26,6 @@ use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use tracing::{debug, error, info, instrument, warn};
 
-#[cfg(feature = "database")]
-use sqlx::Column;
 
 /// Database connection configuration
 #[derive(Debug, Clone, Serialize, Deserialize)]
