@@ -23,7 +23,7 @@ llmspell-storage = { path = "../llmspell-storage", version = "0.9.0" }
 
 # Async runtime
 tokio = { version = "1.41", features = ["full", "tracing"] }
-tokio-util = { version = "0.7", features = ["codec", "io"] }
+tokio-util = { version = "0.7", features = ["codec", "io", "time"] }
 tokio-stream = { workspace = true }
 async-trait = "0.1"
 futures = { workspace = true }
@@ -129,6 +129,7 @@ websocket = ["dep:tungstenite", "dep:tokio-tungstenite"]
 debug = ["tracing-subscriber/fmt"]
 test-utils = []
 skip-python-tests = []  # Skip Python integration tests (for CI or when Python unavailable)
+lua = []  # Enable Lua-specific tests (used in test configurations)
 
 [lib]
 name = "llmspell_kernel"

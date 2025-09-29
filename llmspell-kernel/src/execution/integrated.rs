@@ -14,8 +14,9 @@ use serde::{Deserialize, Serialize};
 use serde_json::{json, Value};
 use std::collections::HashMap;
 use std::sync::Arc;
-use std::time::Duration;
+use std::time::{Duration, Instant};
 use tokio::sync::{mpsc, oneshot};
+use tokio::time::timeout;
 use tracing::{debug, error, info, instrument, trace, warn};
 use uuid;
 
@@ -2028,79 +2029,186 @@ impl<P: Protocol + 'static> IntegratedKernel<P> {
         self.io_manager.write_stdout(&info.to_string()).await
     }
 
-    /// Handle tool invoke command
+    /// Handle tool invoke command with comprehensive pipeline
+    #[instrument(skip(self, content), fields(tool_name))]
     async fn handle_tool_invoke(&mut self, content: &Value) -> Result<()> {
+        let start_time = Instant::now();
+
+        // Extract and validate tool name
         let tool_name = content
             .get("name")
             .and_then(|v| v.as_str())
-            .unwrap_or("unknown");
+            .ok_or_else(|| anyhow!("Missing or invalid tool name"))?;
 
+        // Extract parameters with validation
         let params = content.get("params").cloned().unwrap_or(json!({}));
-        info!("Invoking tool: {} with params: {:?}", tool_name, params);
 
-        // Try to invoke the actual tool from registry
-        let result = if let Some(registry) = self.script_executor.component_registry() {
-            if let Some(tool) = registry.get_tool(tool_name).await {
-                // Create an execution context for the tool
-                let exec_context = llmspell_core::ExecutionContext::default();
+        // Extract optional timeout (default: 30 seconds)
+        let timeout_secs = content
+            .get("timeout")
+            .and_then(|v| v.as_u64())
+            .unwrap_or(30);
+        let tool_timeout = Duration::from_secs(timeout_secs);
 
-                // Convert JSON params to AgentInput
-                let input_text = params.to_string();
-                let mut agent_input = AgentInput::text(input_text);
+        // Extract streaming flag (for future use)
+        let streaming = content
+            .get("streaming")
+            .and_then(|v| v.as_bool())
+            .unwrap_or(false);
 
-                // Add parameters from JSON to AgentInput
-                if let Some(obj) = params.as_object() {
-                    for (key, value) in obj {
-                        agent_input.parameters.insert(key.clone(), value.clone());
-                    }
+        info!("Invoking tool '{}' with timeout {}s, streaming: {}",
+              tool_name, timeout_secs, streaming);
+        debug!("Tool parameters: {:?}", params);
+
+        // Get registry and tool
+        let registry = self.script_executor
+            .component_registry()
+            .ok_or_else(|| anyhow!("No ComponentRegistry available"))?;
+
+        let tool = registry
+            .get_tool(tool_name)
+            .await
+            .ok_or_else(|| anyhow!("Tool '{}' not found in registry", tool_name))?;
+
+        // Validate tool metadata and parameters
+        let tool_meta = tool.metadata();
+        debug!("Tool metadata: name={}, description={}",
+               tool_meta.name, tool_meta.description);
+
+        // Parameter validation phase
+        let validation_result = self.validate_tool_params(tool_name, &params).await;
+        if let Err(e) = validation_result {
+            warn!("Parameter validation failed for tool '{}': {}", tool_name, e);
+            let error_response = json!({
+                "msg_type": "tool_reply",
+                "content": {
+                    "status": "error",
+                    "tool": tool_name,
+                    "error": format!("Parameter validation failed: {e}"),
+                    "validation_errors": e.to_string(),
+                    "duration_ms": start_time.elapsed().as_millis()
+                }
+            });
+            return self.io_manager.write_stdout(&error_response.to_string()).await;
+        }
+
+        // Prepare execution context with metadata
+        let mut exec_context = llmspell_core::ExecutionContext::default();
+        exec_context.data.insert("kernel_id".to_string(), json!(self.session_id));
+        exec_context.data.insert("invocation_time".to_string(), json!(chrono::Utc::now().to_rfc3339()));
+        exec_context.data.insert("timeout_secs".to_string(), json!(timeout_secs));
+
+        // Convert parameters to AgentInput with enhanced structure
+        let mut agent_input = AgentInput::text(
+            params.get("input")
+                .and_then(|v| v.as_str())
+                .unwrap_or(&params.to_string())
+                .to_string()
+        );
+
+        // Add all parameters from JSON to AgentInput
+        if let Some(obj) = params.as_object() {
+            for (key, value) in obj {
+                agent_input.parameters.insert(key.clone(), value.clone());
+            }
+        }
+
+        // Execute tool with timeout
+        let execution_future = tool.execute(agent_input, exec_context);
+
+        let result = match timeout(tool_timeout, execution_future).await {
+            Ok(Ok(output)) => {
+                let duration_ms = start_time.elapsed().as_millis();
+                info!("Tool '{}' executed successfully in {}ms", tool_name, duration_ms);
+
+                // Stream output if requested and output supports it
+                if streaming {
+                    // For now, we'll just send the full output
+                    // Future: implement actual streaming with chunks
+                    debug!("Streaming output for tool '{}'", tool_name);
                 }
 
-                // Execute the tool with the provided input
-                match tool.execute(agent_input, exec_context).await {
-                    Ok(output) => {
-                        json!({
-                            "msg_type": "tool_reply",
-                            "content": {
-                                "status": "ok",
-                                "tool": tool_name,
-                                "result": output
-                            }
-                        })
+                json!({
+                    "msg_type": "tool_reply",
+                    "content": {
+                        "status": "ok",
+                        "tool": tool_name,
+                        "result": output,
+                        "duration_ms": duration_ms,
+                        "streaming": streaming
                     }
-                    Err(e) => {
-                        json!({
-                            "msg_type": "tool_reply",
-                            "content": {
-                                "status": "error",
-                                "tool": tool_name,
-                                "error": format!("Tool execution failed: {e}")
-                            }
-                        })
-                    }
-                }
-            } else {
+                })
+            }
+            Ok(Err(e)) => {
+                let duration_ms = start_time.elapsed().as_millis();
+                error!("Tool '{}' execution failed after {}ms: {}", tool_name, duration_ms, e);
+
                 json!({
                     "msg_type": "tool_reply",
                     "content": {
                         "status": "error",
                         "tool": tool_name,
-                        "error": format!("Tool '{tool_name}' not found")
+                        "error": format!("Tool execution failed: {e}"),
+                        "duration_ms": duration_ms,
+                        "error_type": "execution_error"
                     }
                 })
             }
-        } else {
-            // Fallback when no registry available
-            json!({
-                "msg_type": "tool_reply",
-                "content": {
-                    "status": "error",
-                    "tool": tool_name,
-                    "error": "No ComponentRegistry available"
-                }
-            })
+            Err(_) => {
+                let duration_ms = start_time.elapsed().as_millis();
+                error!("Tool '{}' execution timed out after {}ms", tool_name, duration_ms);
+
+                // Attempt to cancel if possible (future enhancement)
+                json!({
+                    "msg_type": "tool_reply",
+                    "content": {
+                        "status": "error",
+                        "tool": tool_name,
+                        "error": format!("Tool execution timed out after {} seconds", timeout_secs),
+                        "duration_ms": duration_ms,
+                        "error_type": "timeout",
+                        "timeout_secs": timeout_secs
+                    }
+                })
+            }
         };
 
+        // Send result back through proper channel
         self.io_manager.write_stdout(&result.to_string()).await
+    }
+
+    /// Validate tool parameters before execution
+    async fn validate_tool_params(&self, tool_name: &str, params: &Value) -> Result<()> {
+        // Basic validation - ensure params is an object
+        if !params.is_null() && !params.is_object() {
+            return Err(anyhow!("Parameters must be a JSON object"));
+        }
+
+        // Tool-specific validation (can be extended)
+        match tool_name {
+            "calculator" => {
+                // Calculator requires an 'expression' field
+                if let Some(obj) = params.as_object() {
+                    if !obj.contains_key("expression") && !obj.contains_key("input") {
+                        return Err(anyhow!("Calculator tool requires 'expression' or 'input' parameter"));
+                    }
+                }
+            }
+            "file_operations" => {
+                // File operations require 'action' and 'path'
+                if let Some(obj) = params.as_object() {
+                    if !obj.contains_key("action") {
+                        return Err(anyhow!("File operations tool requires 'action' parameter"));
+                    }
+                }
+            }
+            _ => {
+                // No specific validation for other tools yet
+                debug!("No specific validation rules for tool '{}'", tool_name);
+            }
+        }
+
+        Ok(())
     }
 
     /// Handle tool search command

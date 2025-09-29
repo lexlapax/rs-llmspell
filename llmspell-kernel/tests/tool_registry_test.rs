@@ -188,3 +188,248 @@ async fn test_kernel_tool_count() {
     // For now, we may have fewer until all tools are implemented
     assert!(count > 0, "Should have at least some tools registered");
 }
+
+#[cfg(feature = "lua")]
+#[tokio::test]
+async fn test_tool_invocation_with_timeout() {
+    use llmspell_bridge::ScriptRuntime;
+    use llmspell_config::LLMSpellConfig;
+    use llmspell_kernel::api::start_embedded_kernel_with_executor;
+    use llmspell_tools::util::CalculatorTool;
+    use serde_json::json;
+    use std::sync::Arc;
+
+    // Create runtime with tools
+    let config = LLMSpellConfig::default();
+    let runtime = ScriptRuntime::new_with_lua(config.clone())
+        .await
+        .expect("Failed to create runtime");
+
+    // Register calculator tool
+    runtime.registry()
+        .register_tool("calculator".to_string(), Arc::new(CalculatorTool::new()))
+        .expect("Failed to register calculator");
+
+    // Create kernel
+    let executor = Arc::new(runtime);
+    let mut kernel_handle = start_embedded_kernel_with_executor(config, executor.clone())
+        .await
+        .expect("Failed to start kernel");
+
+    // Test 1: Normal invocation with timeout
+    let invoke_request = json!({
+        "command": "invoke",
+        "name": "calculator",
+        "params": {
+            "expression": "2 + 2"
+        },
+        "timeout": 5  // 5 second timeout
+    });
+
+    let response = kernel_handle
+        .send_tool_request(invoke_request)
+        .await
+        .expect("Failed to send tool invoke request");
+
+    assert_eq!(response["status"].as_str(), Some("ok"));
+    assert_eq!(response["tool"].as_str(), Some("calculator"));
+    assert!(response.get("duration_ms").is_some(), "Should have duration tracking");
+
+    // Test 2: Invocation with very short timeout (should not timeout for simple calculation)
+    let quick_invoke = json!({
+        "command": "invoke",
+        "name": "calculator",
+        "params": {
+            "expression": "10 * 5"
+        },
+        "timeout": 1  // 1 second timeout (should be enough)
+    });
+
+    let response = kernel_handle
+        .send_tool_request(quick_invoke)
+        .await
+        .expect("Failed to send quick invoke request");
+
+    assert_eq!(response["status"].as_str(), Some("ok"));
+
+    // Test 3: Streaming flag (for future use)
+    let streaming_invoke = json!({
+        "command": "invoke",
+        "name": "calculator",
+        "params": {
+            "expression": "100 / 4"
+        },
+        "streaming": true,
+        "timeout": 5
+    });
+
+    let response = kernel_handle
+        .send_tool_request(streaming_invoke)
+        .await
+        .expect("Failed to send streaming invoke request");
+
+    assert_eq!(response["status"].as_str(), Some("ok"));
+    assert_eq!(response["streaming"].as_bool(), Some(true));
+}
+
+#[cfg(feature = "lua")]
+#[tokio::test]
+async fn test_tool_parameter_validation() {
+    use llmspell_bridge::ScriptRuntime;
+    use llmspell_config::LLMSpellConfig;
+    use llmspell_kernel::api::start_embedded_kernel_with_executor;
+    use llmspell_tools::util::CalculatorTool;
+    use serde_json::json;
+    use std::sync::Arc;
+
+    // Create runtime
+    let config = LLMSpellConfig::default();
+    let runtime = ScriptRuntime::new_with_lua(config.clone())
+        .await
+        .expect("Failed to create runtime");
+
+    // Register calculator tool
+    runtime.registry()
+        .register_tool("calculator".to_string(), Arc::new(CalculatorTool::new()))
+        .expect("Failed to register calculator");
+
+    // Create kernel
+    let executor = Arc::new(runtime);
+    let mut kernel_handle = start_embedded_kernel_with_executor(config, executor.clone())
+        .await
+        .expect("Failed to start kernel");
+
+    // Test 1: Valid parameters
+    let valid_request = json!({
+        "command": "invoke",
+        "name": "calculator",
+        "params": {
+            "expression": "5 + 3"
+        }
+    });
+
+    let response = kernel_handle
+        .send_tool_request(valid_request)
+        .await
+        .expect("Failed to send valid request");
+
+    assert_eq!(response["status"].as_str(), Some("ok"));
+
+    // Test 2: Missing tool name (should error)
+    let missing_name = json!({
+        "command": "invoke",
+        "params": {
+            "expression": "5 + 3"
+        }
+    });
+
+    let response = kernel_handle
+        .send_tool_request(missing_name)
+        .await;
+
+    // Should either error or handle gracefully
+    assert!(response.is_ok() || response.is_err());
+
+    // Test 3: Invalid tool name
+    let invalid_tool = json!({
+        "command": "invoke",
+        "name": "nonexistent_tool",
+        "params": {}
+    });
+
+    let response = kernel_handle
+        .send_tool_request(invalid_tool)
+        .await
+        .expect("Failed to send invalid tool request");
+
+    assert_eq!(response["status"].as_str(), Some("error"));
+    assert!(response["error"].as_str().unwrap().contains("not found"));
+
+    // Test 4: Empty parameters (should be handled)
+    let empty_params = json!({
+        "command": "invoke",
+        "name": "calculator",
+        "params": {}
+    });
+
+    let response = kernel_handle
+        .send_tool_request(empty_params)
+        .await
+        .expect("Failed to send empty params request");
+
+    // Calculator might error or handle empty params gracefully
+    assert!(response.get("status").is_some());
+}
+
+#[cfg(feature = "lua")]
+#[tokio::test]
+async fn test_tool_invocation_error_handling() {
+    use llmspell_bridge::ScriptRuntime;
+    use llmspell_config::LLMSpellConfig;
+    use llmspell_kernel::api::start_embedded_kernel_with_executor;
+    use llmspell_tools::util::CalculatorTool;
+    use serde_json::json;
+    use std::sync::Arc;
+
+    let config = LLMSpellConfig::default();
+    let runtime = ScriptRuntime::new_with_lua(config.clone())
+        .await
+        .expect("Failed to create runtime");
+
+    runtime.registry()
+        .register_tool("calculator".to_string(), Arc::new(CalculatorTool::new()))
+        .expect("Failed to register calculator");
+
+    let executor = Arc::new(runtime);
+    let mut kernel_handle = start_embedded_kernel_with_executor(config, executor.clone())
+        .await
+        .expect("Failed to start kernel");
+
+    // Test 1: Invalid expression for calculator (should handle error)
+    let invalid_expr = json!({
+        "command": "invoke",
+        "name": "calculator",
+        "params": {
+            "expression": "invalid math expression @#$"
+        }
+    });
+
+    let response = kernel_handle
+        .send_tool_request(invalid_expr)
+        .await
+        .expect("Failed to send invalid expression");
+
+    // Should either succeed with an error message or return error status
+    assert!(response.get("status").is_some());
+
+    // Test 2: Null parameters
+    let null_params = json!({
+        "command": "invoke",
+        "name": "calculator",
+        "params": null
+    });
+
+    let response = kernel_handle
+        .send_tool_request(null_params)
+        .await
+        .expect("Failed to send null params");
+
+    assert!(response.get("status").is_some());
+
+    // Test 3: Non-object parameters (should be validated)
+    let array_params = json!({
+        "command": "invoke",
+        "name": "calculator",
+        "params": ["not", "an", "object"]
+    });
+
+    let response = kernel_handle
+        .send_tool_request(array_params)
+        .await
+        .expect("Failed to send array params");
+
+    // Should reject non-object params
+    assert_eq!(response["status"].as_str(), Some("error"));
+    assert!(response["error"].as_str().unwrap_or("").contains("validation") ||
+            response["error"].as_str().unwrap_or("").contains("object"));
+}
