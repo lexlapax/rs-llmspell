@@ -97,6 +97,51 @@ impl KernelHandle {
         }
     }
 
+    /// Send a tool request to the kernel and return the response
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the request fails or communication with kernel fails
+    pub async fn send_tool_request(&mut self, content: serde_json::Value) -> Result<serde_json::Value> {
+        debug!("Sending tool request to kernel {}", self.kernel_id);
+
+        // Create tool_request message
+        let request = self.protocol.create_request("tool_request", content)?;
+
+        // Send request through transport
+        self.transport.send("shell", vec![request]).await?;
+
+        // Wait for tool_reply
+        let start_time = std::time::Instant::now();
+        let timeout = std::time::Duration::from_secs(30);
+
+        loop {
+            if start_time.elapsed() > timeout {
+                return Err(anyhow::anyhow!("Timeout waiting for tool_reply"));
+            }
+
+            if let Some(reply_parts) = self.transport.recv("shell").await? {
+                if let Some(first_part) = reply_parts.first() {
+                    // Parse reply and check message type
+                    let reply_msg = self.protocol.parse_message(first_part)?;
+
+                    // Check if this is a tool_reply
+                    if let Some(header) = reply_msg.get("header") {
+                        if let Some(msg_type) = header.get("msg_type") {
+                            if msg_type == "tool_reply" {
+                                // Extract and return the content
+                                if let Some(content) = reply_msg.get("content") {
+                                    return Ok(content.clone());
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+            tokio::time::sleep(tokio::time::Duration::from_millis(10)).await;
+        }
+    }
+
     /// Get the kernel ID
     pub fn kernel_id(&self) -> &str {
         &self.kernel_id
@@ -152,6 +197,51 @@ impl ClientHandle {
                     if let Some(content) = reply_msg.get("content") {
                         // Extract execution result
                         return Ok(format!("Result: {content:?}"));
+                    }
+                }
+            }
+            tokio::time::sleep(tokio::time::Duration::from_millis(10)).await;
+        }
+    }
+
+    /// Send a tool request to the remote kernel and return the response
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the request fails or communication with kernel fails
+    pub async fn send_tool_request(&mut self, content: serde_json::Value) -> Result<serde_json::Value> {
+        debug!("Sending tool request to remote kernel");
+
+        // Create tool_request message
+        let request = self.protocol.create_request("tool_request", content)?;
+
+        // Send request through transport
+        self.transport.send("shell", vec![request]).await?;
+
+        // Wait for tool_reply
+        let start_time = std::time::Instant::now();
+        let timeout = std::time::Duration::from_secs(30);
+
+        loop {
+            if start_time.elapsed() > timeout {
+                return Err(anyhow::anyhow!("Timeout waiting for tool_reply"));
+            }
+
+            if let Some(reply_parts) = self.transport.recv("shell").await? {
+                if let Some(first_part) = reply_parts.first() {
+                    // Parse reply and check message type
+                    let reply_msg = self.protocol.parse_message(first_part)?;
+
+                    // Check if this is a tool_reply
+                    if let Some(header) = reply_msg.get("header") {
+                        if let Some(msg_type) = header.get("msg_type") {
+                            if msg_type == "tool_reply" {
+                                // Extract and return the content
+                                if let Some(content) = reply_msg.get("content") {
+                                    return Ok(content.clone());
+                                }
+                            }
+                        }
                     }
                 }
             }

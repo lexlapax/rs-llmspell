@@ -5,7 +5,7 @@
 
 use anyhow::{anyhow, Result};
 use serde_json::json;
-use tracing::{debug, info, instrument, trace, warn};
+use tracing::{info, instrument, trace, warn};
 
 use crate::cli::{OutputFormat, ToolCommands};
 use crate::execution_context::ExecutionContext;
@@ -46,30 +46,38 @@ pub async fn handle_tool_command(
 /// Handle tool commands in embedded mode (kernel in same process)
 async fn handle_tool_embedded(
     command: ToolCommands,
-    _handle: Box<llmspell_kernel::api::KernelHandle>,
+    mut handle: Box<llmspell_kernel::api::KernelHandle>,
     _config: Box<LLMSpellConfig>,
     output_format: OutputFormat,
 ) -> Result<()> {
     trace!("Handling tool command in embedded mode");
 
-    // TODO: In embedded mode, we need to send tool_request messages to the kernel
-    // For now, provide placeholder implementation
     match command {
         ToolCommands::List {
-            category: _category,
+            category,
             format,
         } => {
-            info!("Listing tools (placeholder implementation)");
+            info!("Listing tools via kernel message protocol");
 
-            // TODO: Send tool_request to kernel via handle
-            // For now, return placeholder list
-            let tools = vec![
-                "calculator".to_string(),
-                "file_operations".to_string(),
-                "web_scraper".to_string(),
-                "json_processor".to_string(),
-                "text_analyzer".to_string(),
-            ];
+            // Create tool_request message for list command
+            let request_content = json!({
+                "command": "list",
+                "category": category,
+            });
+
+            // Send request to kernel and wait for response
+            let response = handle.send_tool_request(request_content).await?;
+
+            // Extract tools from response
+            let tools = response
+                .get("tools")
+                .and_then(|t| t.as_array())
+                .map(|arr| {
+                    arr.iter()
+                        .filter_map(|v| v.as_str().map(String::from))
+                        .collect::<Vec<String>>()
+                })
+                .unwrap_or_default();
 
             // Format output
             let formatter = OutputFormatter::new(format.unwrap_or(output_format));
@@ -78,20 +86,26 @@ async fn handle_tool_embedded(
         }
 
         ToolCommands::Info { name, show_schema } => {
-            info!("Getting info for tool: {} (placeholder)", name);
+            info!("Getting info for tool: {} via kernel", name);
 
-            // TODO: Send tool_info request to kernel
-            // For now, return placeholder info
-            let info = json!({
+            // Create tool_request message for info command
+            let request_content = json!({
+                "command": "info",
                 "name": name,
-                "description": format!("Tool {} - placeholder description", name),
-                "category": "utility",
-                "security_level": "safe",
                 "show_schema": show_schema,
             });
 
+            // Send request to kernel and wait for response
+            let response = handle.send_tool_request(request_content).await?;
+
+            // Check for error in response
+            if let Some(error) = response.get("error") {
+                return Err(anyhow!("Tool info error: {}", error));
+            }
+
+            // Format and display the response
             let formatter = OutputFormatter::new(output_format);
-            formatter.print_json(&info)?;
+            formatter.print_json(&response)?;
             Ok(())
         }
 
@@ -100,68 +114,99 @@ async fn handle_tool_embedded(
             params,
             stream,
         } => {
-            info!("Invoking tool: {} (placeholder)", name);
+            info!("Invoking tool: {} via kernel", name);
             trace!("Parameters: {:?}", params);
 
-            // TODO: Send tool_invoke request to kernel
-            // For now, return placeholder result
             if stream {
                 warn!("Streaming not yet implemented");
             }
 
-            let result = json!({
-                "status": "success",
-                "tool": name,
-                "message": "Tool execution placeholder - kernel protocol not yet implemented",
-                "input": params,
+            // Create tool_request message for invoke command
+            let request_content = json!({
+                "command": "invoke",
+                "name": name,
+                "params": params,
+                "stream": stream,
             });
 
+            // Send request to kernel and wait for response
+            let response = handle.send_tool_request(request_content).await?;
+
+            // Check for error in response
+            if let Some(error) = response.get("error") {
+                return Err(anyhow!("Tool invocation error: {}", error));
+            }
+
+            // Format and display the result
             let formatter = OutputFormatter::new(output_format);
-            formatter.print_json(&result)?;
+            formatter.print_json(&response)?;
             Ok(())
         }
 
         ToolCommands::Search { query, category } => {
-            info!("Searching tools with query: {:?} (placeholder)", query);
+            info!("Searching tools with query: {:?} via kernel", query);
 
-            // TODO: Send tool_search request to kernel
-            // For now, do simple filtering on placeholder list
-            let all_tools = vec![
-                "calculator".to_string(),
-                "file_operations".to_string(),
-                "web_scraper".to_string(),
-                "json_processor".to_string(),
-                "text_analyzer".to_string(),
-            ];
+            // Create tool_request message for search command
+            let request_content = json!({
+                "command": "search",
+                "query": query,
+                "category": category,
+            });
 
-            let matches: Vec<String> = all_tools
-                .into_iter()
-                .filter(|name| {
-                    let name_lower = name.to_lowercase();
-                    query.iter().any(|q| name_lower.contains(&q.to_lowercase()))
+            // Send request to kernel and wait for response
+            let response = handle.send_tool_request(request_content).await?;
+
+            // Extract matching tools from response
+            let matches = response
+                .get("matches")
+                .and_then(|m| m.as_array())
+                .map(|arr| {
+                    arr.iter()
+                        .filter_map(|v| v.as_str().map(String::from))
+                        .collect::<Vec<String>>()
                 })
-                .collect();
+                .unwrap_or_default();
 
-            if let Some(cat) = category {
-                debug!("Would filter by category: {}", cat);
-            }
-
+            // Format output
             let formatter = OutputFormatter::new(output_format);
             formatter.print_tool_list(&matches)?;
             Ok(())
         }
 
         ToolCommands::Test { name, verbose } => {
-            info!("Testing tool: {} (placeholder)", name);
+            info!("Testing tool: {} via kernel", name);
 
-            // TODO: Send tool_test request to kernel
-            if verbose {
-                println!("Testing tool: {}", name);
-                println!("This is a placeholder implementation");
-                println!("Kernel protocol integration pending");
+            // Create tool_request message for test command
+            let request_content = json!({
+                "command": "test",
+                "name": name,
+                "verbose": verbose,
+            });
+
+            // Send request to kernel and wait for response
+            let response = handle.send_tool_request(request_content).await?;
+
+            // Check for error in response
+            if let Some(error) = response.get("error") {
+                return Err(anyhow!("Tool test error: {}", error));
             }
 
-            println!("✓ Tool '{}' test placeholder successful", name);
+            // Display test results
+            if verbose {
+                if let Some(details) = response.get("details") {
+                    println!("Test details: {}", details);
+                }
+            }
+
+            if response.get("success").and_then(|v| v.as_bool()).unwrap_or(false) {
+                println!("✓ Tool '{}' test successful", name);
+            } else {
+                let message = response
+                    .get("message")
+                    .and_then(|m| m.as_str())
+                    .unwrap_or("Test failed");
+                println!("✗ Tool '{}' test failed: {}", name, message);
+            }
             Ok(())
         }
     }
@@ -170,28 +215,168 @@ async fn handle_tool_embedded(
 /// Handle tool commands in connected mode (remote kernel)
 async fn handle_tool_remote(
     command: ToolCommands,
-    _handle: llmspell_kernel::api::ClientHandle,
-    _address: String,
-    _output_format: OutputFormat,
+    mut handle: llmspell_kernel::api::ClientHandle,
+    address: String,
+    output_format: OutputFormat,
 ) -> Result<()> {
-    // For connected mode, we need to send tool_request messages to kernel
-    // This will be implemented when kernel protocol support is added
+    trace!("Handling tool command in connected mode to {}", address);
 
     match command {
-        ToolCommands::List { .. } => {
-            Err(anyhow!("Remote tool execution not yet implemented. Start a local kernel with 'llmspell kernel start'"))
+        ToolCommands::List {
+            category,
+            format,
+        } => {
+            info!("Listing tools via remote kernel");
+
+            // Create tool_request message for list command
+            let request_content = json!({
+                "command": "list",
+                "category": category,
+            });
+
+            // Send request to kernel and wait for response
+            let response = handle.send_tool_request(request_content).await?;
+
+            // Extract tools from response
+            let tools = response
+                .get("tools")
+                .and_then(|t| t.as_array())
+                .map(|arr| {
+                    arr.iter()
+                        .filter_map(|v| v.as_str().map(String::from))
+                        .collect::<Vec<String>>()
+                })
+                .unwrap_or_default();
+
+            // Format output
+            let formatter = OutputFormatter::new(format.unwrap_or(output_format));
+            formatter.print_tool_list(&tools)?;
+            Ok(())
         }
-        ToolCommands::Info { name, .. } => {
-            Err(anyhow!("Remote tool info for '{}' not yet implemented", name))
+
+        ToolCommands::Info { name, show_schema } => {
+            info!("Getting info for tool: {} via remote kernel", name);
+
+            // Create tool_request message for info command
+            let request_content = json!({
+                "command": "info",
+                "name": name,
+                "show_schema": show_schema,
+            });
+
+            // Send request to kernel and wait for response
+            let response = handle.send_tool_request(request_content).await?;
+
+            // Check for error in response
+            if let Some(error) = response.get("error") {
+                return Err(anyhow!("Tool info error: {}", error));
+            }
+
+            // Format and display the response
+            let formatter = OutputFormatter::new(output_format);
+            formatter.print_json(&response)?;
+            Ok(())
         }
-        ToolCommands::Invoke { name, .. } => {
-            Err(anyhow!("Remote tool invocation for '{}' not yet implemented", name))
+
+        ToolCommands::Invoke {
+            name,
+            params,
+            stream,
+        } => {
+            info!("Invoking tool: {} via remote kernel", name);
+            trace!("Parameters: {:?}", params);
+
+            if stream {
+                warn!("Streaming not yet implemented");
+            }
+
+            // Create tool_request message for invoke command
+            let request_content = json!({
+                "command": "invoke",
+                "name": name,
+                "params": params,
+                "stream": stream,
+            });
+
+            // Send request to kernel and wait for response
+            let response = handle.send_tool_request(request_content).await?;
+
+            // Check for error in response
+            if let Some(error) = response.get("error") {
+                return Err(anyhow!("Tool invocation error: {}", error));
+            }
+
+            // Format and display the result
+            let formatter = OutputFormatter::new(output_format);
+            formatter.print_json(&response)?;
+            Ok(())
         }
-        ToolCommands::Search { .. } => {
-            Err(anyhow!("Remote tool search not yet implemented"))
+
+        ToolCommands::Search { query, category } => {
+            info!("Searching tools with query: {:?} via remote kernel", query);
+
+            // Create tool_request message for search command
+            let request_content = json!({
+                "command": "search",
+                "query": query,
+                "category": category,
+            });
+
+            // Send request to kernel and wait for response
+            let response = handle.send_tool_request(request_content).await?;
+
+            // Extract matching tools from response
+            let matches = response
+                .get("matches")
+                .and_then(|m| m.as_array())
+                .map(|arr| {
+                    arr.iter()
+                        .filter_map(|v| v.as_str().map(String::from))
+                        .collect::<Vec<String>>()
+                })
+                .unwrap_or_default();
+
+            // Format output
+            let formatter = OutputFormatter::new(output_format);
+            formatter.print_tool_list(&matches)?;
+            Ok(())
         }
-        ToolCommands::Test { name, .. } => {
-            Err(anyhow!("Remote tool testing for '{}' not yet implemented", name))
+
+        ToolCommands::Test { name, verbose } => {
+            info!("Testing tool: {} via remote kernel", name);
+
+            // Create tool_request message for test command
+            let request_content = json!({
+                "command": "test",
+                "name": name,
+                "verbose": verbose,
+            });
+
+            // Send request to kernel and wait for response
+            let response = handle.send_tool_request(request_content).await?;
+
+            // Check for error in response
+            if let Some(error) = response.get("error") {
+                return Err(anyhow!("Tool test error: {}", error));
+            }
+
+            // Display test results
+            if verbose {
+                if let Some(details) = response.get("details") {
+                    println!("Test details: {}", details);
+                }
+            }
+
+            if response.get("success").and_then(|v| v.as_bool()).unwrap_or(false) {
+                println!("✓ Tool '{}' test successful", name);
+            } else {
+                let message = response
+                    .get("message")
+                    .and_then(|m| m.as_str())
+                    .unwrap_or("Test failed");
+                println!("✗ Tool '{}' test failed: {}", name, message);
+            }
+            Ok(())
         }
     }
 }

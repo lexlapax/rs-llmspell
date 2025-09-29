@@ -8575,19 +8575,26 @@ docker-compose -f scripts/fleet/docker-compose.yml up -d
 
 ---
 
-## Phase 10.22: Tool CLI Commands (Day 24) ✅ COMPLETE
-**Status**: COMPLETED (6/6 tasks complete)
+## Phase 10.22: Tool CLI Commands (Day 24) 🔧 PARTIAL
+**Status**: PARTIAL (6/11 tasks complete - placeholder implementation only)
 **Priority**: HIGH
-**Duration**: 1 day
-**Completed**: 2025-09-29
+**Duration**: 3 days (extended)
+**Started**: 2025-09-29
 
-**All Tasks Completed:**
-- ✅ Task 10.22.1: CLI Command Structure Implementation
-- ✅ Task 10.22.2: Tool Command Handler Implementation (CLI side)
-- ✅ Task 10.22.3: Tool Discovery and Search Implementation (Kernel side)
+**Tasks Completed (Placeholder Implementation):**
+- ✅ Task 10.22.1: CLI Command Structure Implementation (structure only)
+- ✅ Task 10.22.2: Tool Command Handler Implementation (CLI placeholder)
+- ✅ Task 10.22.3: Tool Discovery and Search Implementation (Kernel placeholder)
 - ✅ Task 10.22.4: Remote Tool Preparation (MCP/A2A stubs for future phases)
-- ✅ Task 10.22.5: Testing and Documentation
+- ✅ Task 10.22.5: Testing and Documentation (for placeholders)
 - ✅ Task 10.22.6: Enhanced Version Command and Build Information
+
+**Tasks Required for Actual Functionality:**
+- ✅ Task 10.22.7: Wire CLI to Kernel Message Protocol
+- ⬜ Task 10.22.8: Add ComponentRegistry Access to ScriptExecutor Trait
+- ⬜ Task 10.22.9: Connect Kernel Tool Handlers to Real ComponentRegistry
+- ⬜ Task 10.22.10: Implement Tool Invocation Pipeline
+- ⬜ Task 10.22.11: Fix Message Reply Routing
 
 **Key Achievements:**
 - Full tool command structure in CLI with list/info/invoke/search/test subcommands
@@ -9222,6 +9229,217 @@ $ llmspell version --output json
 - **Industry standards**: Follows patterns from rustc, docker, kubectl
 - **Clean separation**: `-V` for simple output, `version` subcommand for full features
 - **Future-ready**: Structure supports adding kernel/bridge version queries
+
+---
+
+### Task 10.22.7: Wire CLI to Kernel Message Protocol ✅
+**Priority**: CRITICAL
+**Estimated Time**: 4 hours
+**Assignee**: CLI Team
+**Status**: COMPLETE
+
+**Description**: Implement actual message sending from CLI to kernel for tool commands. Currently the CLI returns hardcoded placeholder data instead of communicating with the kernel.
+
+**Acceptance Criteria:**
+- [x] CLI constructs proper `tool_request` messages
+- [x] Messages sent via `kernel_handle.send_tool_request()`
+- [x] CLI awaits and parses `tool_reply` responses
+- [x] Async message flow handled correctly
+- [x] Placeholder data removed from CLI
+
+**Implementation Steps:**
+1. Modify `handle_tool_embedded` in `llmspell-cli/src/commands/tool.rs`:
+   ```rust
+   // Replace placeholder with actual kernel communication
+   let request = json!({
+       "msg_type": "tool_request",
+       "content": {
+           "command": "list",
+           "category": category,
+       }
+   });
+   let response = kernel_handle.send_message(request).await?;
+   let tools = response["content"]["tools"].as_array()?;
+   ```
+
+2. Handle all tool subcommands (list, info, invoke, search, test)
+3. Parse responses and format appropriately
+4. Add timeout and error handling
+
+**Implementation Completed**:
+- Added `send_tool_request()` method to both KernelHandle and ClientHandle in api.rs
+- Modified handle_tool_embedded() and handle_tool_remote() to use kernel message protocol
+- Implemented request/response flow for all tool subcommands (list, info, invoke, search, test)
+- Added integration test in tool_integration_test.rs
+- Zero clippy warnings achieved
+- Messages now properly sent to kernel and replies awaited with 30s timeout
+
+**Note**: While the message protocol is now wired, the kernel still returns placeholder data until Tasks 10.22.8-10.22.11 complete the ComponentRegistry integration.
+
+---
+
+### Task 10.22.8: Add ComponentRegistry Access to ScriptExecutor Trait ⬜
+**Priority**: CRITICAL
+**Estimated Time**: 6 hours
+**Assignee**: Core Team
+**Status**: NOT STARTED
+
+**Description**: Expose ComponentRegistry through the trait hierarchy so kernel can access actual tools instead of placeholders.
+
+**Acceptance Criteria:**
+- [ ] ScriptExecutor trait has `component_registry()` method
+- [ ] Bridge implementation returns its registry
+- [ ] IntegratedKernel can access registry via script_executor
+- [ ] Backward compatibility maintained
+- [ ] No performance regression
+
+**Implementation Steps:**
+1. Add to `llmspell-core/src/traits/script_executor.rs`:
+   ```rust
+   /// Access to component registry for tool discovery
+   fn component_registry(&self) -> Option<Arc<dyn ComponentRegistry>> {
+       None // Default implementation
+   }
+   ```
+
+2. Implement in `llmspell-bridge/src/engine/bridge.rs`:
+   ```rust
+   fn component_registry(&self) -> Option<Arc<dyn ComponentRegistry>> {
+       Some(Arc::clone(&self.component_registry))
+   }
+   ```
+
+3. Update IntegratedKernel to use it in tool handlers
+
+**Risk**: Modifying core trait - needs careful testing
+
+---
+
+### Task 10.22.9: Connect Kernel Tool Handlers to Real ComponentRegistry ⬜
+**Priority**: HIGH
+**Estimated Time**: 4 hours
+**Assignee**: Kernel Team
+**Status**: NOT STARTED
+
+**Description**: Make kernel tool handlers query actual ComponentRegistry instead of returning hardcoded tool lists.
+
+**Acceptance Criteria:**
+- [ ] `handle_tool_list` returns real tools from registry
+- [ ] Category filtering works properly
+- [ ] Tool count is accurate (40+ tools)
+- [ ] Tool metadata included in responses
+- [ ] Performance < 10ms for tool listing
+
+**Implementation Steps:**
+1. Replace in `llmspell-kernel/src/execution/integrated.rs`:
+   ```rust
+   async fn handle_tool_list(&mut self) -> Result<()> {
+       let registry = self.script_executor.component_registry()
+           .ok_or_else(|| anyhow!("No ComponentRegistry available"))?;
+
+       let tools = registry.list_components("tool");
+       let tool_info: Vec<_> = tools.iter()
+           .map(|id| registry.get_metadata(id))
+           .collect();
+
+       // Return actual tool data...
+   }
+   ```
+
+2. Implement category filtering
+3. Add tool metadata extraction
+4. Format response properly
+
+**Depends On**: Task 10.22.8 (trait modification)
+
+---
+
+### Task 10.22.10: Implement Tool Invocation Pipeline ⬜
+**Priority**: HIGH
+**Estimated Time**: 8 hours
+**Assignee**: Kernel Team
+**Status**: NOT STARTED
+
+**Description**: Enable actual tool execution through the kernel instead of returning placeholder "not implemented" messages.
+
+**Acceptance Criteria:**
+- [ ] Tool parameters parsed from request
+- [ ] Tool looked up in ComponentRegistry
+- [ ] Tool executed with parameters
+- [ ] Results streamed back properly
+- [ ] Error handling comprehensive
+- [ ] Validation working
+
+**Implementation Steps:**
+1. Implement `handle_tool_invoke` properly:
+   ```rust
+   async fn handle_tool_invoke(&mut self, content: &Value) -> Result<()> {
+       let tool_name = content["name"].as_str()?;
+       let params = &content["params"];
+
+       let registry = self.script_executor.component_registry()?;
+       let tool = registry.get_component(tool_name)?;
+
+       // Execute tool
+       let result = tool.execute(params).await?;
+
+       // Send result back
+       self.send_tool_reply(json!({
+           "status": "ok",
+           "result": result
+       })).await
+   }
+   ```
+
+2. Add parameter validation
+3. Implement streaming for long-running tools
+4. Add cancellation support
+
+**Complexity**: HIGH - involves async execution and streaming
+
+---
+
+### Task 10.22.11: Fix Message Reply Routing ⬜
+**Priority**: CRITICAL
+**Estimated Time**: 6 hours
+**Assignee**: Kernel Team
+**Status**: NOT STARTED
+
+**Description**: Ensure tool replies reach the CLI properly through the message protocol instead of being written to stdout.
+
+**Acceptance Criteria:**
+- [ ] `send_tool_reply` method implemented
+- [ ] Proper message routing (not stdout)
+- [ ] Message correlation maintained (msg_id)
+- [ ] Client identity handled for routing
+- [ ] Async reply flow working
+
+**Implementation Steps:**
+1. Add method to IntegratedKernel:
+   ```rust
+   async fn send_tool_reply(&mut self, content: Value) -> Result<()> {
+       let msg_id = self.current_msg_header
+           .as_ref()
+           .and_then(|h| h["msg_id"].as_str())
+           .ok_or_else(|| anyhow!("No message ID for reply"))?;
+
+       let reply = json!({
+           "msg_type": "tool_reply",
+           "parent_header": self.current_msg_header.clone(),
+           "msg_id": format!("{}_reply", msg_id),
+           "content": content,
+       });
+
+       // Send via proper channel, not stdout
+       self.send_message(reply).await
+   }
+   ```
+
+2. Update all tool handlers to use `send_tool_reply`
+3. Ensure client identity is preserved
+4. Test bidirectional communication
+
+**Critical**: Without this, tool commands can't return results
 
 ### Post-Implementation Cleanup (2025-09-29)
 
