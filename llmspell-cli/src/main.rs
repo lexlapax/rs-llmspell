@@ -6,6 +6,13 @@ use clap::Parser;
 use llmspell_cli::{cli::Cli, commands::execute_command, config::load_runtime_config};
 
 fn main() -> Result<()> {
+    // Check for -V flag before full parsing (simple version output)
+    let args: Vec<String> = std::env::args().collect();
+    if args.len() >= 2 && args[1] == "-V" {
+        llmspell_cli::commands::version::show_version_simple();
+        return Ok(());
+    }
+
     let cli = Cli::parse();
 
     // Initialize tracing based on --trace flag

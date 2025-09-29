@@ -38,8 +38,13 @@ rustyline = "14.0"
 
 [features]
 default = []  # Truly minimal binary - no heavy external dependencies
-common = ["llmspell-bridge/common"]  # Convenient preset for typical usage
-full = ["llmspell-bridge/full"]  # All features enabled
+common = ["llmspell-bridge/common", "lua"]  # Convenient preset for typical usage
+full = ["llmspell-bridge/full", "lua", "javascript"]  # All features enabled
+
+# Language features (forward from bridge)
+lua = ["llmspell-bridge/lua"]
+javascript = ["llmspell-bridge/javascript"]
+python = []  # Python support placeholder for future
 
 # Future protocol support
 mcp = []  # Model Context Protocol support (Phase 12)

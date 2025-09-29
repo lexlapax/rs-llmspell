@@ -53,6 +53,7 @@ pub mod run;
 pub mod session;
 pub mod state;
 pub mod tool;
+pub mod version;
 
 use crate::cli::{Commands, OutputFormat, ScriptEngine};
 use crate::execution_context::ExecutionContext;
@@ -221,6 +222,10 @@ pub async fn execute_command(
 
         Commands::Tool { command, source } => {
             tool::handle_tool_command(command, source, runtime_config, output_format).await
+        }
+
+        Commands::Version(version_cmd) => {
+            version::execute(version_cmd, output_format).await
         }
     }
 }

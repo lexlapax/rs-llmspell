@@ -8576,7 +8576,7 @@ docker-compose -f scripts/fleet/docker-compose.yml up -d
 ---
 
 ## Phase 10.22: Tool CLI Commands (Day 24) ✅ COMPLETE
-**Status**: COMPLETED (5/5 tasks complete)
+**Status**: COMPLETED (6/6 tasks complete)
 **Priority**: HIGH
 **Duration**: 1 day
 **Completed**: 2025-09-29
@@ -8587,6 +8587,7 @@ docker-compose -f scripts/fleet/docker-compose.yml up -d
 - ✅ Task 10.22.3: Tool Discovery and Search Implementation (Kernel side)
 - ✅ Task 10.22.4: Remote Tool Preparation (MCP/A2A stubs for future phases)
 - ✅ Task 10.22.5: Testing and Documentation
+- ✅ Task 10.22.6: Enhanced Version Command and Build Information
 
 **Key Achievements:**
 - Full tool command structure in CLI with list/info/invoke/search/test subcommands
@@ -9108,6 +9109,119 @@ docker-compose -f scripts/fleet/docker-compose.yml up -d
 - CLI commands work: `llmspell tool list --output pretty`
 - All clippy warnings fixed with #[allow(dead_code)] for future features
 - Tool discovery performance < 10ms as required
+
+---
+
+### Task 10.22.6: Enhanced Version Command and Build Information ✅
+**Priority**: MEDIUM
+**Estimated Time**: 3 hours
+**Assignee**: CLI Team
+**Status**: COMPLETED (2025-09-29)
+
+**Description**: Implement comprehensive version information display with build-time metadata capture, following best practices from tools like rustc, docker, and kubectl.
+
+**Acceptance Criteria:**
+- [x] Build script captures git information (commit, branch, dirty state) ✅
+- [x] Build metadata embedded (timestamp, profile, host/target) ✅
+- [x] `-V` flag shows simple version ✅
+- [x] `version` subcommand with verbose/json/short options ✅
+- [x] Rustc version and feature flags included ✅
+
+**Implementation Details:**
+
+1. **Created build.rs script** to capture build-time information:
+   - Git commit hash (full and short)
+   - Git branch name and commit date
+   - Working tree dirty state detection
+   - Build timestamp and profile (debug/release)
+   - Host and target triple information
+   - Rust compiler version
+   - Enabled feature flags
+
+2. **Implemented version subcommand** (`commands/version.rs`):
+   - `--verbose`: Detailed multi-line output like rustc
+   - `--output json`: Machine-readable JSON format
+   - `--short`: Just version number for scripts
+   - `--client`: Client version only (kubectl style)
+   - `--component`: Show specific component versions
+
+3. **Clean architecture** - Single source of truth:
+   - All version logic in `commands/version.rs`
+   - No duplicate `version.rs` file
+   - `-V` flag calls simple helper function
+   - `version` subcommand has full functionality
+
+**Usage Examples:**
+```bash
+# Simple version (-V flag)
+$ llmspell -V
+llmspell 0.9.0 (c20ea2b7-modified 2025-09-29)
+
+# Verbose version information
+$ llmspell version --verbose
+llmspell 0.9.0 (c20ea2b7-modified 2025-09-29)
+binary: llmspell
+commit-hash: c20ea2b7721aab824fa54e9a5c21f76b947ccef6
+commit-date: 2025-09-29
+branch: Phase-10
+working-tree: modified
+build-timestamp: 2025-09-29T12:00:16-0700
+build-profile: debug
+host: aarch64-apple-darwin
+target: aarch64-apple-darwin
+rustc: rustc 1.90.0 (1159e78c4 2025-09-14) (Homebrew)
+features: default
+
+# JSON output for automation
+$ llmspell version --output json
+{
+  "version": "0.9.0",
+  "git": {
+    "commit": "c20ea2b7721aab824fa54e9a5c21f76b947ccef6",
+    "commit_short": "c20ea2b7",
+    "branch": "Phase-10",
+    "commit_date": "2025-09-29",
+    "dirty": true
+  },
+  "build": {
+    "timestamp": "2025-09-29T12:00:16-0700",
+    "profile": "debug",
+    "host": "aarch64-apple-darwin",
+    "target": "aarch64-apple-darwin",
+    "rustc": "rustc 1.90.0",
+    "features": ["default"]
+  }
+}
+```
+
+**Files Modified:**
+- `llmspell-cli/build.rs` (new) - Build script for metadata capture
+- `llmspell-cli/src/commands/version.rs` (new) - Version command implementation
+- `llmspell-cli/src/commands/mod.rs` - Added version module
+- `llmspell-cli/src/cli.rs` - Added Version command variant
+- `llmspell-cli/src/main.rs` - Handle -V flag for simple output
+
+**Testing Results:**
+- [x] `-V` flag outputs simple version ✅
+- [x] `version` command shows standard output ✅
+- [x] `--verbose` shows all build metadata ✅
+- [x] `--output json` produces valid JSON ✅
+- [x] `--short` outputs just version number ✅
+- [x] `--client` shows client version format ✅
+
+**Definition of Done:**
+- [x] Build script captures all metadata ✅
+- [x] Version command fully functional ✅
+- [x] All output formats working ✅
+- [x] No code duplication ✅
+- [x] Zero clippy warnings ✅
+
+**Key Design Decisions:**
+- **Single source of truth**: All version logic centralized in commands/version.rs
+- **Build-time capture**: Metadata embedded at compile time via build.rs
+- **Industry standards**: Follows patterns from rustc, docker, kubectl
+- **Clean separation**: `-V` for simple output, `version` subcommand for full features
+- **Future-ready**: Structure supports adding kernel/bridge version queries
 
 ### Post-Implementation Cleanup (2025-09-29)
 

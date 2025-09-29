@@ -82,7 +82,7 @@ impl From<TraceLevel> for tracing::Level {
 /// Command-line interface for LLMSpell - Professional Architecture
 #[derive(Parser, Debug)]
 #[command(name = "llmspell")]
-#[command(version)]
+#[command(version)]  // Default version for --version flag
 #[command(about = "LLMSpell - Scriptable LLM interactions")]
 #[command(
     long_about = "LLMSpell provides scriptable LLM interactions through Lua, JavaScript, and Python engines.
@@ -460,6 +460,19 @@ EXAMPLES:
         #[arg(long, default_value = "local", hide = true)]
         source: String,
     },
+
+    /// Display version information
+    #[command(
+        long_about = "Display detailed version and build information.
+
+EXAMPLES:
+    llmspell version                    # Show version information
+    llmspell version --verbose          # Show detailed build information
+    llmspell version --short            # Show just the version number
+    llmspell version --client           # Show client version only
+    llmspell version --output json      # Output as JSON"
+    )]
+    Version(crate::commands::version::VersionCommand),
 }
 
 /// Application management subcommands
