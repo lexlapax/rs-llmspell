@@ -135,3 +135,8 @@ lua = []  # Enable Lua-specific tests (used in test configurations)
 [lib]
 name = "llmspell_kernel"
 path = "src/lib.rs"
+
+[[bench]]
+name = "kernel_performance"
+harness = false
+required-features = ["lua"]
