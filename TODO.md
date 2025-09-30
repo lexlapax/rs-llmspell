@@ -9891,140 +9891,477 @@ uuid_generator
 
 ## Phase 10.23: Performance Benchmarking (Days 25-26)
 
-### Task 10.23.1: Create Benchmark Harness
-**Priority**: HIGH
+**Context**: Phase 10 built daemon mode, InProcess/ZeroMQ transports, tool commands, and ComponentRegistry integration. Need to measure actual performance against targets defined in Success Criteria (line 39): <5ms message handling, <2s daemon startup, <20ms debug stepping, <50MB memory overhead.
+
+**Existing Benchmarks**: 22 benchmark files across workspace using Criterion (llmspell-tools, llmspell-bridge, llmspell-workflows, llmspell-testing). Missing: kernel-specific benchmarks for critical Phase 10 operations.
+
+**Goals**:
+1. Create kernel performance benchmarks for startup, messaging, and tool invocation
+2. Measure baseline performance and validate against targets
+3. Establish automated benchmark infrastructure for regression detection
+
+### Task 10.23.1: Create Kernel Performance Benchmarks
+**Priority**: CRITICAL
 **Estimated Time**: 4 hours
-**Assignee**: Performance Team Lead
+**Status**: PENDING
 
-**Description**: Create comprehensive benchmark harness for performance testing.
+**Description**: Create comprehensive Criterion benchmarks for kernel operations introduced in Phase 10. Focus on critical paths: embedded kernel startup, InProcess transport message handling, tool command execution via ComponentRegistry, and ZeroMQ protocol overhead.
+
+**Performance Targets** (from Success Criteria line 39):
+- Kernel startup (embedded mode): <2s cold start, <100ms warm start
+- Message handling (InProcess transport): <5ms request→reply roundtrip
+- Tool invocation (ComponentRegistry lookup + execute): <10ms for simple tools
+- ZeroMQ protocol overhead: <1ms per message serialization/deserialization
+- Memory overhead (idle kernel): <50MB baseline, <100MB with 10 tools loaded
 
 **Acceptance Criteria:**
-- [ ] Harness framework ready
-- [ ] Automated execution
-- [ ] Result storage
-- [ ] Comparison support
-- [ ] CI integration
+- [ ] Benchmark file created: `llmspell-kernel/benches/kernel_performance.rs`
+- [ ] Kernel startup benchmarks: embedded mode cold/warm start
+- [ ] Message handling benchmarks: InProcess transport send/recv, ZeroMQ roundtrip
+- [ ] Tool invocation benchmarks: registry lookup, tool execution (calculator, file_operations)
+- [ ] Memory profiling: idle kernel baseline, tool-loaded footprint
+- [ ] All benchmarks compile and run successfully via `cargo bench -p llmspell-kernel`
 
 **Implementation Steps:**
-1. Benchmark framework:
+
+1. Create `llmspell-kernel/benches/kernel_performance.rs`:
    ```rust
-   use criterion::{criterion_group, criterion_main, Criterion};
+   use criterion::{black_box, criterion_group, criterion_main, Criterion, BenchmarkId};
+   use llmspell_config::LLMSpellConfig;
+   use llmspell_kernel::api::start_embedded_kernel_with_executor;
+   use llmspell_bridge::ScriptRuntime;
+   use serde_json::json;
+   use std::sync::Arc;
+   use tokio::runtime::Runtime;
 
-   fn benchmark_kernel_ops(c: &mut Criterion) {
-       c.bench_function("kernel_startup", |b| {
-           b.iter(|| start_kernel())
+   fn bench_kernel_startup(c: &mut Criterion) {
+       let mut group = c.benchmark_group("kernel_startup");
+
+       // Cold start: create fresh runtime + kernel
+       group.bench_function("embedded_cold_start", |b| {
+           b.to_async(Runtime::new().unwrap()).iter(|| async {
+               let config = LLMSpellConfig::default();
+               let runtime = ScriptRuntime::new_with_lua(config.clone())
+                   .await
+                   .unwrap();
+               let executor = Arc::new(runtime);
+               let kernel = start_embedded_kernel_with_executor(config, executor)
+                   .await
+                   .unwrap();
+               black_box(kernel)
+           });
        });
+
+       group.finish();
    }
+
+   fn bench_message_handling(c: &mut Criterion) {
+       let mut group = c.benchmark_group("message_handling");
+
+       // InProcess transport send/recv roundtrip
+       group.bench_function("inprocess_roundtrip", |b| {
+           b.to_async(Runtime::new().unwrap()).iter(|| async {
+               // Setup kernel with InProcess transport
+               // Send tool_request, measure until tool_reply received
+               // Target: <5ms roundtrip
+           });
+       });
+
+       group.finish();
+   }
+
+   fn bench_tool_invocation(c: &mut Criterion) {
+       let mut group = c.benchmark_group("tool_invocation");
+
+       // Registry lookup + tool execution
+       group.bench_function("calculator_invoke", |b| {
+           b.to_async(Runtime::new().unwrap()).iter(|| async {
+               // Send tool_request for calculator with expression
+               // Measure total time: lookup + execute + reply
+               // Target: <10ms for calculator
+           });
+       });
+
+       group.finish();
+   }
+
+   criterion_group!(
+       benches,
+       bench_kernel_startup,
+       bench_message_handling,
+       bench_tool_invocation
+   );
+   criterion_main!(benches);
    ```
-2. Benchmark categories:
-   - Startup time
-   - Message handling
-   - Script execution
-   - Protocol operations
-3. Load generation:
-   - Concurrent clients
-   - Request patterns
-   - Resource stress
-4. Result tracking:
-   - Store results
-   - Track regressions
-   - Generate reports
-5. CI integration
+
+2. Add benchmark to `llmspell-kernel/Cargo.toml`:
+   ```toml
+   [[bench]]
+   name = "kernel_performance"
+   harness = false
+   required-features = ["lua"]
+   ```
+
+3. Implement each benchmark function with proper async setup using tokio Runtime
+
+4. Add memory profiling benchmarks using criterion's `measurement` feature:
+   ```rust
+   use criterion::measurement::WallTime;
+   use std::alloc::{GlobalAlloc, Layout, System};
+
+   // Track allocations during benchmark
+   ```
+
+5. Test benchmarks run successfully:
+   ```bash
+   cargo bench -p llmspell-kernel --bench kernel_performance
+   ```
 
 **Definition of Done:**
-- [ ] Harness complete
-- [ ] Benchmarks run
-- [ ] Results stored
-- [ ] CI integrated
+- [ ] `llmspell-kernel/benches/kernel_performance.rs` created with 4 benchmark groups
+- [ ] Kernel startup benchmarks measure cold/warm start times
+- [ ] Message handling benchmarks measure InProcess and ZeroMQ roundtrip
+- [ ] Tool invocation benchmarks measure calculator and file_operations
+- [ ] Memory profiling captures baseline and loaded footprint
+- [ ] Benchmarks compile: `cargo check --benches -p llmspell-kernel`
+- [ ] Benchmarks run: `cargo bench -p llmspell-kernel --bench kernel_performance`
+- [ ] HTML reports generated in `target/criterion/`
 - [ ] `./scripts/quality-check-minimal.sh` passes with ZERO warnings
 - [ ] `cargo clippy --workspace --all-features --all-targets` - ZERO warnings
-- [ ] `cargo fmt --all --check` passes
-- [ ] All tests pass: `cargo test --workspace --all-features`
 
-### Task 10.23.2: Baseline Performance Metrics
+**Notes:**
+- Use `#[cfg(feature = "lua")]` to gate Lua-dependent benchmarks
+- Use `tokio::runtime::Runtime::new()` for async benchmarks (multi-threaded)
+- Set reasonable sample sizes (e.g., 100 iterations) to avoid long benchmark runs
+- Use `black_box()` to prevent compiler optimizations from skipping operations
+
+---
+
+### Task 10.23.2: Measure Baseline Performance and Validate Targets
 **Priority**: HIGH
-**Estimated Time**: 3 hours
-**Assignee**: Performance Team
+**Estimated Time**: 2 hours
+**Status**: PENDING
+**Depends On**: Task 10.23.1
 
-**Description**: Establish baseline performance metrics for all operations.
+**Description**: Run the kernel performance benchmarks, collect baseline measurements, and validate against Performance Targets defined in Task 10.23.1. Document actual performance vs targets and identify any gaps requiring optimization.
 
 **Acceptance Criteria:**
-- [ ] Baselines measured
-- [ ] Targets documented
-- [ ] Regression detection
-- [ ] Report generated
-- [ ] Trends tracked
+- [ ] All benchmarks executed successfully on representative hardware
+- [ ] Baseline measurements documented in `docs/technical/performance-baseline.md`
+- [ ] Each metric compared against target (✅ meets target, ⚠️ close, ❌ misses target)
+- [ ] Performance gaps identified with severity assessment
+- [ ] Memory profiling results captured (heap allocations, RSS, peak usage)
 
 **Implementation Steps:**
-1. Measure baselines:
-   - Daemon startup: target <2s
-   - Message handling: target <5ms
-   - Debug stepping: target <20ms
-   - Memory overhead: target <50MB
-2. Document targets:
-   - Performance SLAs
-   - Acceptable ranges
-   - Critical thresholds
-3. Regression detection:
-   - Compare to baseline
-   - Statistical significance
-   - Alert on regression
-4. Trend analysis:
-   - Track over time
-   - Identify patterns
-   - Predict issues
-5. Generate reports
+
+1. Run full benchmark suite:
+   ```bash
+   # Run with stable environment (no background processes)
+   cargo bench -p llmspell-kernel --bench kernel_performance -- --save-baseline phase10-baseline
+
+   # Generate HTML reports
+   open target/criterion/report/index.html
+   ```
+
+2. Create `docs/technical/performance-baseline.md`:
+   ```markdown
+   # Phase 10 Performance Baseline
+
+   **Date**: 2025-09-30
+   **Hardware**: [CPU, RAM, OS]
+   **Rust Version**: [version]
+   **Build Profile**: release
+
+   ## Kernel Startup Performance
+
+   | Metric | Target | Actual | Status | Notes |
+   |--------|--------|--------|--------|-------|
+   | Embedded Cold Start | <2s | [measured] | [✅/⚠️/❌] | First runtime + kernel creation |
+   | Embedded Warm Start | <100ms | [measured] | [✅/⚠️/❌] | Reuse existing runtime |
+
+   ## Message Handling Performance
+
+   | Metric | Target | Actual | Status | Notes |
+   |--------|--------|--------|--------|-------|
+   | InProcess Roundtrip | <5ms | [measured] | [✅/⚠️/❌] | tool_request → tool_reply |
+   | ZeroMQ Roundtrip | <10ms | [measured] | [✅/⚠️/❌] | Includes serialization |
+
+   ## Tool Invocation Performance
+
+   | Metric | Target | Actual | Status | Notes |
+   |--------|--------|--------|--------|-------|
+   | Registry Lookup | <1ms | [measured] | [✅/⚠️/❌] | HashMap get |
+   | Calculator Execute | <10ms | [measured] | [✅/⚠️/❌] | Simple expression |
+   | File Operations Execute | <50ms | [measured] | [✅/⚠️/❌] | Read small file |
+
+   ## Memory Usage
+
+   | Metric | Target | Actual | Status | Notes |
+   |--------|--------|--------|--------|-------|
+   | Idle Kernel Baseline | <50MB | [measured] | [✅/⚠️/❌] | No tools loaded |
+   | With 10 Tools Loaded | <100MB | [measured] | [✅/⚠️/❌] | Calculator, file ops, etc |
+   | Peak During Tool Exec | <200MB | [measured] | [✅/⚠️/❌] | Including temp buffers |
+
+   ## Performance Gaps Identified
+
+   [List any metrics that miss targets with severity and notes]
+
+   ## Recommendations
+
+   [Only if significant gaps found - defer optimization to future phase]
+   ```
+
+3. Document actual measurements from Criterion HTML reports
+
+4. Analyze results:
+   - ✅ Meets target: Within 10% of target
+   - ⚠️ Close to target: Within 10-25% of target
+   - ❌ Misses target: >25% over target
+
+5. Create summary report for Phase 10 completion
 
 **Definition of Done:**
-- [ ] Baselines established
-- [ ] Targets documented
-- [ ] Detection working
-- [ ] Reports generated
-- [ ] `./scripts/quality-check-minimal.sh` passes with ZERO warnings
-- [ ] `cargo clippy --workspace --all-features --all-targets` - ZERO warnings
-- [ ] `cargo fmt --all --check` passes
-- [ ] All tests pass: `cargo test --workspace --all-features`
+- [ ] Benchmarks executed: `cargo bench -p llmspell-kernel --bench kernel_performance`
+- [ ] Baseline saved: `--save-baseline phase10-baseline` flag used
+- [ ] `docs/technical/performance-baseline.md` created with all measurements
+- [ ] All 10+ metrics measured and compared against targets
+- [ ] Performance status clear: ✅/⚠️/❌ for each metric
+- [ ] HTML reports reviewed: `target/criterion/report/index.html`
+- [ ] Any significant gaps (❌ status) documented with notes
+- [ ] Summary added to Phase 10 completion status in TODO.md
 
-### Task 10.23.3: Optimization Implementation
+**Notes:**
+- Run benchmarks multiple times (3-5 runs) to ensure consistency
+- Measure on representative hardware (not underpowered dev machine)
+- Document hardware specs for reproducibility
+- If targets are missed significantly (>50%), note but don't optimize yet
+- Phase 10 goal is measurement, not optimization - defer fixes to Phase 11+
+
+---
+
+### Task 10.23.3: Create Benchmark Automation Script
 **Priority**: MEDIUM
-**Estimated Time**: 6 hours
-**Assignee**: Performance Team
+**Estimated Time**: 2 hours
+**Status**: PENDING
+**Depends On**: Task 10.23.2
 
-**Description**: Implement performance optimizations based on profiling.
+**Description**: Create a benchmark automation script for easy execution, comparison, and regression detection. This enables CI integration and makes it simple to validate performance after code changes.
 
 **Acceptance Criteria:**
-- [ ] Hot paths identified
-- [ ] Optimizations applied
-- [ ] Performance improved
-- [ ] No regressions
-- [ ] Documentation updated
+- [ ] Script created: `scripts/benchmark.sh`
+- [ ] Can run all benchmarks or specific suites
+- [ ] Supports baseline saving and comparison
+- [ ] Generates human-readable summary report
+- [ ] Detects significant regressions (>10% slower)
 
 **Implementation Steps:**
-1. Profiling:
-   - CPU profiling
-   - Memory profiling
-   - I/O profiling
-   - Lock contention
-2. Optimization targets:
-   - Zero-copy message passing
-   - Connection pooling
-   - Cache warming
-   - Lazy initialization
-3. Implementation:
-   - Apply optimizations
-   - Measure impact
-   - Verify correctness
-4. Validation:
-   - Run benchmarks
-   - Check for regressions
-   - Stress testing
-5. Document changes
+
+1. Create `scripts/benchmark.sh`:
+   ```bash
+   #!/usr/bin/env bash
+   # ABOUTME: Benchmark automation for llmspell performance testing
+   # ABOUTME: Supports running, comparing, and regression detection
+
+   set -euo pipefail
+
+   SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+   PROJECT_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
+
+   # Colors for output
+   GREEN='\033[0;32m'
+   YELLOW='\033[1;33m'
+   RED='\033[0;31m'
+   NC='\033[0m' # No Color
+
+   usage() {
+       cat <<EOF
+   Usage: $0 [OPTIONS] [BENCHMARK_NAME]
+
+   Run performance benchmarks for llmspell components
+
+   OPTIONS:
+       -p, --package PACKAGE    Run benchmarks for specific package (default: all)
+       -b, --baseline NAME      Save results as baseline NAME
+       -c, --compare BASELINE   Compare current run against saved BASELINE
+       -l, --list              List available benchmarks
+       -h, --help              Show this help message
+
+   EXAMPLES:
+       $0                                    # Run all benchmarks
+       $0 -p llmspell-kernel                # Run kernel benchmarks only
+       $0 -b my-baseline                     # Run and save as baseline
+       $0 -c my-baseline                     # Run and compare against baseline
+       $0 -p llmspell-kernel kernel_performance  # Run specific benchmark
+
+   EOF
+   }
+
+   list_benchmarks() {
+       echo "Available benchmarks:"
+       echo ""
+       echo "llmspell-kernel:"
+       echo "  - kernel_performance: Startup, messaging, tool invocation"
+       echo ""
+       echo "llmspell-tools:"
+       echo "  - tool_initialization: Tool creation time (<10ms target)"
+       echo "  - tool_operations: Tool execution performance"
+       echo ""
+       echo "llmspell-bridge:"
+       echo "  - session_bench: Session management performance"
+       echo "  - workflow_bridge_bench: Workflow execution"
+       echo ""
+   }
+
+   run_benchmarks() {
+       local package="${1:-}"
+       local benchmark="${2:-}"
+       local baseline="${3:-}"
+       local compare="${4:-}"
+
+       local cargo_args="bench"
+
+       if [[ -n "$package" ]]; then
+           cargo_args="$cargo_args -p $package"
+       fi
+
+       if [[ -n "$benchmark" ]]; then
+           cargo_args="$cargo_args --bench $benchmark"
+       fi
+
+       local criterion_args=""
+       if [[ -n "$baseline" ]]; then
+           criterion_args="--save-baseline $baseline"
+       elif [[ -n "$compare" ]]; then
+           criterion_args="--baseline $compare"
+       fi
+
+       echo "Running: cargo $cargo_args -- $criterion_args"
+       cargo $cargo_args -- $criterion_args
+   }
+
+   check_regressions() {
+       local baseline="${1:-}"
+
+       if [[ -z "$baseline" ]]; then
+           echo "No baseline specified for regression check"
+           return 0
+       fi
+
+       # Parse Criterion comparison output for regressions
+       # Look for "Performance has regressed" or change >10%
+       echo "Checking for regressions against baseline: $baseline"
+
+       # TODO: Parse target/criterion/*/change/estimates.json for regression detection
+       # For now, just remind user to check HTML reports
+       echo ""
+       echo "Check HTML reports for detailed comparison:"
+       echo "  open target/criterion/report/index.html"
+   }
+
+   main() {
+       local package=""
+       local benchmark=""
+       local baseline=""
+       local compare=""
+
+       while [[ $# -gt 0 ]]; do
+           case $1 in
+               -p|--package)
+                   package="$2"
+                   shift 2
+                   ;;
+               -b|--baseline)
+                   baseline="$2"
+                   shift 2
+                   ;;
+               -c|--compare)
+                   compare="$2"
+                   shift 2
+                   ;;
+               -l|--list)
+                   list_benchmarks
+                   exit 0
+                   ;;
+               -h|--help)
+                   usage
+                   exit 0
+                   ;;
+               *)
+                   benchmark="$1"
+                   shift
+                   ;;
+           esac
+       done
+
+       run_benchmarks "$package" "$benchmark" "$baseline" "$compare"
+       check_regressions "$compare"
+   }
+
+   main "$@"
+   ```
+
+2. Make script executable:
+   ```bash
+   chmod +x scripts/benchmark.sh
+   ```
+
+3. Test script:
+   ```bash
+   # List available benchmarks
+   ./scripts/benchmark.sh --list
+
+   # Run all benchmarks
+   ./scripts/benchmark.sh
+
+   # Run kernel benchmarks only
+   ./scripts/benchmark.sh -p llmspell-kernel
+
+   # Save baseline
+   ./scripts/benchmark.sh -b phase10-final
+
+   # Compare against baseline
+   ./scripts/benchmark.sh -c phase10-final
+   ```
+
+4. Add documentation to README or docs:
+   ```markdown
+   ## Performance Benchmarking
+
+   Run performance benchmarks:
+   ```bash
+   # Run all benchmarks
+   ./scripts/benchmark.sh
+
+   # Run specific package
+   ./scripts/benchmark.sh -p llmspell-kernel
+
+   # Save baseline for future comparison
+   ./scripts/benchmark.sh -b my-baseline
+
+   # Compare against baseline (detect regressions)
+   ./scripts/benchmark.sh -c my-baseline
+   ```
+
+   View HTML reports: `open target/criterion/report/index.html`
+   ```
 
 **Definition of Done:**
-- [ ] Optimizations complete
-- [ ] Performance improved
-- [ ] No regressions
-- [ ] Documentation updated
+- [ ] `scripts/benchmark.sh` created and executable
+- [ ] Can list available benchmarks: `./scripts/benchmark.sh --list`
+- [ ] Can run all benchmarks: `./scripts/benchmark.sh`
+- [ ] Can run package-specific benchmarks: `./scripts/benchmark.sh -p llmspell-kernel`
+- [ ] Can save baselines: `./scripts/benchmark.sh -b baseline-name`
+- [ ] Can compare against baselines: `./scripts/benchmark.sh -c baseline-name`
+- [ ] Usage help displays correctly: `./scripts/benchmark.sh --help`
+- [ ] Script includes error handling and clear output
+- [ ] Documentation added to README or docs/technical/
+- [ ] `./scripts/quality-check-minimal.sh` passes with ZERO warnings
+
+**Notes:**
+- Script is a convenience wrapper around `cargo bench` with Criterion flags
+- Regression detection can be enhanced later with JSON parsing from `target/criterion/*/change/estimates.json`
+- Consider adding CI integration in Phase 11 (not required for Phase 10)
+- Focus on developer UX: make benchmarking easy and fast
 
 
 ---
