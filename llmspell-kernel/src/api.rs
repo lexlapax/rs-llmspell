@@ -14,10 +14,11 @@ use llmspell_config::LLMSpellConfig;
 use llmspell_core::traits::script_executor::{
     ScriptExecutionMetadata, ScriptExecutionOutput, ScriptExecutor,
 };
+use llmspell_core::{Agent, ComponentLookup, Tool, Workflow};
 use std::collections::HashMap;
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
-use tracing::{debug, error, info};
+use tracing::{debug, error, info, trace};
 use uuid::Uuid;
 
 /// Configuration for starting a kernel service
@@ -102,19 +103,22 @@ impl KernelHandle {
     /// # Errors
     ///
     /// Returns an error if the request fails or communication with kernel fails
-    pub async fn send_tool_request(&mut self, content: serde_json::Value) -> Result<serde_json::Value> {
+    pub async fn send_tool_request(
+        &mut self,
+        content: serde_json::Value,
+    ) -> Result<serde_json::Value> {
         debug!("Sending tool request to kernel {}", self.kernel_id);
 
         // Create tool_request message
         let request = self.protocol.create_request("tool_request", content)?;
 
-        // Debug transport type and send
-        println!("DEBUG: About to send on transport");
-        println!("DEBUG: Sending request on shell channel, message size: {}", request.len());
+        debug!(
+            "Sending tool_request on shell channel, message size: {}",
+            request.len()
+        );
 
         // Send request through transport
         self.transport.send("shell", vec![request]).await?;
-        println!("DEBUG: Send completed successfully");
 
         // Wait for tool_reply
         let start_time = std::time::Instant::now();
@@ -126,7 +130,10 @@ impl KernelHandle {
             }
 
             if let Some(reply_parts) = self.transport.recv("shell").await? {
-                println!("DEBUG: Client received {} parts on shell channel", reply_parts.len());
+                trace!(
+                    "Client received {} parts on shell channel",
+                    reply_parts.len()
+                );
 
                 // Handle multipart Jupyter wire protocol format
                 let delimiter = b"<IDS|MSG>";
@@ -134,11 +141,14 @@ impl KernelHandle {
                     .iter()
                     .position(|part| part.as_slice() == delimiter);
 
-                let reply_msg: HashMap<String, serde_json::Value> = if let Some(idx) = delimiter_idx {
+                let reply_msg: HashMap<String, serde_json::Value> = if let Some(idx) = delimiter_idx
+                {
                     // Parse multipart message (header at idx+2, content at idx+5)
                     if reply_parts.len() > idx + 5 {
-                        let header = serde_json::from_slice::<serde_json::Value>(&reply_parts[idx + 2])?;
-                        let content = serde_json::from_slice::<serde_json::Value>(&reply_parts[idx + 5])?;
+                        let header =
+                            serde_json::from_slice::<serde_json::Value>(&reply_parts[idx + 2])?;
+                        let content =
+                            serde_json::from_slice::<serde_json::Value>(&reply_parts[idx + 5])?;
 
                         let mut msg = HashMap::new();
                         msg.insert("header".to_string(), header);
@@ -166,9 +176,8 @@ impl KernelHandle {
                                 // The content contains the actual response nested in a "content" field
                                 if let Some(actual_content) = content_wrapper.get("content") {
                                     return Ok(actual_content.clone());
-                                } else {
-                                    return Ok(content_wrapper.clone());
                                 }
+                                return Ok(content_wrapper.clone());
                             }
                         }
                     }
@@ -245,7 +254,10 @@ impl ClientHandle {
     /// # Errors
     ///
     /// Returns an error if the request fails or communication with kernel fails
-    pub async fn send_tool_request(&mut self, content: serde_json::Value) -> Result<serde_json::Value> {
+    pub async fn send_tool_request(
+        &mut self,
+        content: serde_json::Value,
+    ) -> Result<serde_json::Value> {
         debug!("Sending tool request to remote kernel");
 
         // Create tool_request message
@@ -264,7 +276,10 @@ impl ClientHandle {
             }
 
             if let Some(reply_parts) = self.transport.recv("shell").await? {
-                println!("DEBUG: Client received {} parts on shell channel", reply_parts.len());
+                trace!(
+                    "Client received {} parts on shell channel",
+                    reply_parts.len()
+                );
 
                 // Handle multipart Jupyter wire protocol format
                 let delimiter = b"<IDS|MSG>";
@@ -272,11 +287,14 @@ impl ClientHandle {
                     .iter()
                     .position(|part| part.as_slice() == delimiter);
 
-                let reply_msg: HashMap<String, serde_json::Value> = if let Some(idx) = delimiter_idx {
+                let reply_msg: HashMap<String, serde_json::Value> = if let Some(idx) = delimiter_idx
+                {
                     // Parse multipart message (header at idx+2, content at idx+5)
                     if reply_parts.len() > idx + 5 {
-                        let header = serde_json::from_slice::<serde_json::Value>(&reply_parts[idx + 2])?;
-                        let content = serde_json::from_slice::<serde_json::Value>(&reply_parts[idx + 5])?;
+                        let header =
+                            serde_json::from_slice::<serde_json::Value>(&reply_parts[idx + 2])?;
+                        let content =
+                            serde_json::from_slice::<serde_json::Value>(&reply_parts[idx + 5])?;
 
                         let mut msg = HashMap::new();
                         msg.insert("header".to_string(), header);
@@ -304,9 +322,8 @@ impl ClientHandle {
                                 // The content contains the actual response nested in a "content" field
                                 if let Some(actual_content) = content_wrapper.get("content") {
                                     return Ok(actual_content.clone());
-                                } else {
-                                    return Ok(content_wrapper.clone());
                                 }
+                                return Ok(content_wrapper.clone());
                             }
                         }
                     }
@@ -373,11 +390,11 @@ pub async fn start_embedded_kernel_with_executor(
     config: LLMSpellConfig,
     script_executor: Arc<dyn ScriptExecutor>,
 ) -> Result<KernelHandle> {
-    println!("DEBUG: start_embedded_kernel_with_executor CALLED!");
     let kernel_id = format!("embedded-{}", Uuid::new_v4());
     let session_id = format!("session-{}", Uuid::new_v4());
 
     info!("Starting embedded kernel {}", kernel_id);
+    debug!("start_embedded_kernel_with_executor called");
 
     // Create Jupyter protocol
     let protocol = JupyterProtocol::new(session_id.clone(), kernel_id.clone());
@@ -386,9 +403,11 @@ pub async fn start_embedded_kernel_with_executor(
     // Important: We must use create_pair() to ensure transports can communicate
     let (mut kernel_transport, mut client_transport) = InProcessTransport::create_pair();
 
-    println!("DEBUG: Created transport pair - kernel: {:p}, client: {:p}",
-             &kernel_transport as *const _, &client_transport as *const _);
-    debug!("Created transport pair in start_embedded_kernel_with_executor");
+    trace!(
+        "Created transport pair - kernel: {:p}, client: {:p}",
+        &raw const kernel_transport,
+        &raw const client_transport
+    );
 
     // Setup Jupyter 5-channel configuration
     let mut transport_config = TransportConfig {
@@ -412,18 +431,13 @@ pub async fn start_embedded_kernel_with_executor(
 
     // Setup paired channels for bidirectional communication
     // This is crucial - we MUST set up the channels BEFORE passing the transports
-    println!("DEBUG: About to setup paired channels, count: {}", transport_config.channels.len());
     for channel_name in transport_config.channels.keys() {
-        println!("DEBUG: Setting up paired channel: {}", channel_name);
-        InProcessTransport::setup_paired_channel(&mut kernel_transport, &mut client_transport, channel_name);
-        debug!("Setup paired channel: {}", channel_name);
-    }
-    println!("DEBUG: Finished setting up all paired channels");
-
-    // Verify channels immediately after setup
-    println!("DEBUG: Verifying client transport channels after setup:");
-    for (name, pair) in client_transport.get_channels_map().read().iter() {
-        println!("  [{}] sender: {:p}", name, &pair.sender as *const _);
+        InProcessTransport::setup_paired_channel(
+            &mut kernel_transport,
+            &mut client_transport,
+            channel_name,
+        );
+        trace!("Setup paired channel: {}", channel_name);
     }
 
     // Build execution config from LLMSpellConfig
@@ -432,32 +446,26 @@ pub async fn start_embedded_kernel_with_executor(
     // Use the provided script executor (clone it for sharing between kernels)
     let script_executor_clone = script_executor.clone();
     // Create integrated kernel with the provided executor
-    let mut kernel =
-        IntegratedKernel::new(protocol.clone(), exec_config.clone(), session_id.clone(), script_executor).await?;
-
-    // Debug kernel transport before setting
-    println!("DEBUG: Kernel transport channels before set_transport:");
-    for (name, pair) in kernel_transport.get_channels_map().read().iter() {
-        println!("  [{}] sender: {:p}", name, &pair.sender as *const _);
-    }
-    println!("DEBUG: Kernel transport reverse_channels before set_transport:");
-    for (name, pair) in kernel_transport.get_reverse_channels_map().read().iter() {
-        println!("  [{}] receiver: {:p}", name, Arc::as_ptr(&pair.receiver));
-    }
+    let mut kernel = IntegratedKernel::new(
+        protocol.clone(),
+        exec_config.clone(),
+        session_id.clone(),
+        script_executor,
+    )
+    .await?;
 
     // Set kernel transport for kernel message processing
-    println!("DEBUG: About to set_transport, kernel_transport at {:p}", &kernel_transport as *const _);
-    println!("DEBUG: kernel_transport channels Arc: {:p}", Arc::as_ptr(kernel_transport.get_channels_map()));
-    println!("DEBUG: kernel_transport reverse_channels Arc: {:p}", Arc::as_ptr(kernel_transport.get_reverse_channels_map()));
     kernel.set_transport(Box::new(kernel_transport));
-    println!("DEBUG: set_transport completed");
 
     // Spawn the kernel to run in background and process messages
     let kernel_id_clone = kernel_id.clone();
     tokio::spawn(async move {
         debug!("Starting embedded kernel {} event loop", kernel_id_clone);
         if let Err(e) = kernel.run().await {
-            error!("Embedded kernel {} event loop failed: {}", kernel_id_clone, e);
+            error!(
+                "Embedded kernel {} event loop failed: {}",
+                kernel_id_clone, e
+            );
         } else {
             debug!("Embedded kernel {} event loop completed", kernel_id_clone);
         }
@@ -468,32 +476,107 @@ pub async fn start_embedded_kernel_with_executor(
     let dummy_kernel = IntegratedKernel::new(
         protocol.clone(),
         exec_config.clone(),
-        format!("dummy-{}", session_id),
-        script_executor_clone
-    ).await?;
-
-    println!("DEBUG: Creating KernelHandle with client_transport at {:p}",
-             &client_transport as *const _);
-
-    // Check what channels the client transport has before wrapping in Arc
-    println!("DEBUG: Client transport channels before Arc:");
-    for (name, pair) in client_transport.get_channels_map().read().iter() {
-        println!("  [{}] sender: {:p}", name, &pair.sender as *const _);
-    }
+        format!("dummy-{session_id}"),
+        script_executor_clone,
+    )
+    .await?;
 
     let transport_arc = Arc::new(client_transport);
-    println!("DEBUG: Created Arc<InProcessTransport> at {:p}", Arc::as_ptr(&transport_arc));
 
     let handle = KernelHandle {
-        kernel: dummy_kernel,  // This won't be used for embedded mode - only transport and protocol matter
+        kernel: dummy_kernel, // This won't be used for embedded mode - only transport and protocol matter
         kernel_id: kernel_id.clone(),
-        transport: transport_arc,  // CLI uses client transport
+        transport: transport_arc, // CLI uses client transport
         protocol,
     };
     debug!("Created KernelHandle with kernel_id: {}", kernel_id);
-    println!("DEBUG: KernelHandle created with transport Arc at {:p}",
-             Arc::as_ptr(&handle.transport));
     Ok(handle)
+}
+
+// Shared stub tool implementation for testing
+struct StubTool {
+    meta: llmspell_core::types::ComponentMetadata,
+    category: llmspell_core::traits::tool::ToolCategory,
+    security: llmspell_core::traits::tool::SecurityLevel,
+}
+
+impl StubTool {
+    fn new(
+        name: &str,
+        description: &str,
+        category: llmspell_core::traits::tool::ToolCategory,
+    ) -> Self {
+        Self {
+            meta: llmspell_core::types::ComponentMetadata {
+                id: llmspell_core::types::ComponentId::from_name(name),
+                name: name.to_string(),
+                description: description.to_string(),
+                version: llmspell_core::types::Version::new(1, 0, 0),
+                created_at: chrono::Utc::now(),
+                updated_at: chrono::Utc::now(),
+            },
+            category,
+            security: llmspell_core::traits::tool::SecurityLevel::Safe,
+        }
+    }
+}
+
+#[async_trait]
+impl llmspell_core::traits::base_agent::BaseAgent for StubTool {
+    fn metadata(&self) -> &llmspell_core::types::ComponentMetadata {
+        &self.meta
+    }
+
+    async fn execute_impl(
+        &self,
+        input: llmspell_core::types::AgentInput,
+        _context: llmspell_core::ExecutionContext,
+    ) -> llmspell_core::Result<llmspell_core::types::AgentOutput> {
+        // Simple stub implementation that returns the tool name and input
+        Ok(llmspell_core::types::AgentOutput::text(format!(
+            "Executed {} with input: {}",
+            self.meta.name, input.text
+        )))
+    }
+
+    async fn validate_input(
+        &self,
+        _input: &llmspell_core::types::AgentInput,
+    ) -> llmspell_core::Result<()> {
+        // Stub always accepts any input
+        Ok(())
+    }
+
+    async fn handle_error(
+        &self,
+        error: llmspell_core::error::LLMSpellError,
+    ) -> llmspell_core::Result<llmspell_core::types::AgentOutput> {
+        // Simple error handling
+        Ok(llmspell_core::types::AgentOutput::text(format!(
+            "Error in {}: {}",
+            self.meta.name, error
+        )))
+    }
+}
+
+impl Tool for StubTool {
+    fn category(&self) -> llmspell_core::traits::tool::ToolCategory {
+        self.category.clone()
+    }
+
+    fn security_level(&self) -> llmspell_core::traits::tool::SecurityLevel {
+        self.security.clone()
+    }
+
+    fn schema(&self) -> llmspell_core::traits::tool::ToolSchema {
+        // Simple schema for stubs
+        llmspell_core::traits::tool::ToolSchema {
+            name: self.meta.name.clone(),
+            description: self.meta.description.clone(),
+            parameters: vec![],
+            returns: Some(llmspell_core::traits::tool::ParameterType::String),
+        }
+    }
 }
 
 /// Start an embedded kernel that runs in-process
@@ -504,9 +587,220 @@ pub async fn start_embedded_kernel_with_executor(
 /// # Errors
 ///
 /// Returns an error if the kernel fails to start or transport setup fails
+#[allow(clippy::too_many_lines)]
 pub async fn start_embedded_kernel(config: LLMSpellConfig) -> Result<KernelHandle> {
-    // Create a default executor for backward compatibility
-    struct DefaultExecutor;
+    // Create a default executor with stub component registry for backward compatibility
+    struct DefaultExecutor {
+        component_registry: Arc<DefaultStubComponentRegistry>,
+    }
+
+    // Reuse stub component registry for embedded mode
+    struct DefaultStubComponentRegistry;
+
+    #[async_trait]
+    impl ComponentLookup for DefaultStubComponentRegistry {
+        async fn list_tools(&self) -> Vec<String> {
+            // Return all placeholder tools for embedded testing
+            vec![
+                "calculator",
+                "file_operations",
+                "web_scraper",
+                "json_processor",
+                "text_analyzer",
+                "data_converter",
+                "image_processor",
+                "api_tester",
+                "base64_encoder",
+                "citation_formatter",
+                "sitemap_crawler",
+                "graphql_query",
+                "url_analyzer",
+                "http_request",
+                "video_processor",
+                "webpage_monitor",
+                "service_checker",
+                "environment_reader",
+                "uuid_generator",
+                "hash_calculator",
+                "data_validation",
+                "web_search",
+                "webhook_caller",
+                "process_executor",
+                "date_time_handler",
+                "file_search",
+                "file_watcher",
+                "audio_processor",
+                "diff_calculator",
+                "system_monitor",
+                "graph_builder",
+                "text_manipulator",
+                "file_converter",
+            ]
+            .into_iter()
+            .map(String::from)
+            .collect()
+        }
+
+        #[allow(clippy::too_many_lines)]
+        async fn get_tool(&self, name: &str) -> Option<Arc<dyn Tool>> {
+            // Return actual stub tools for embedded testing
+            use llmspell_core::traits::tool::ToolCategory;
+
+            let tool = match name {
+                "calculator" => StubTool::new(
+                    "calculator",
+                    "Perform mathematical calculations",
+                    ToolCategory::Utility,
+                ),
+                "file_operations" => StubTool::new(
+                    "file_operations",
+                    "Read and write files",
+                    ToolCategory::Filesystem,
+                ),
+                "web_scraper" => {
+                    StubTool::new("web_scraper", "Scrape web pages", ToolCategory::Web)
+                }
+                "json_processor" => {
+                    StubTool::new("json_processor", "Process JSON data", ToolCategory::Data)
+                }
+                "text_analyzer" => StubTool::new(
+                    "text_analyzer",
+                    "Analyze text content",
+                    ToolCategory::Analysis,
+                ),
+                "data_converter" => StubTool::new(
+                    "data_converter",
+                    "Convert between data formats",
+                    ToolCategory::Data,
+                ),
+                "image_processor" => {
+                    StubTool::new("image_processor", "Process images", ToolCategory::Media)
+                }
+                "api_tester" => {
+                    StubTool::new("api_tester", "Test API endpoints", ToolCategory::Api)
+                }
+                "base64_encoder" => StubTool::new(
+                    "base64_encoder",
+                    "Encode/decode base64",
+                    ToolCategory::Utility,
+                ),
+                "citation_formatter" => StubTool::new(
+                    "citation_formatter",
+                    "Format citations",
+                    ToolCategory::Utility,
+                ),
+                "sitemap_crawler" => StubTool::new(
+                    "sitemap_crawler",
+                    "Crawl website sitemaps",
+                    ToolCategory::Web,
+                ),
+                "graphql_query" => StubTool::new(
+                    "graphql_query",
+                    "Execute GraphQL queries",
+                    ToolCategory::Api,
+                ),
+                "url_analyzer" => {
+                    StubTool::new("url_analyzer", "Analyze URL components", ToolCategory::Web)
+                }
+                "http_request" => {
+                    StubTool::new("http_request", "Make HTTP requests", ToolCategory::Web)
+                }
+                "video_processor" => StubTool::new(
+                    "video_processor",
+                    "Process video files",
+                    ToolCategory::Media,
+                ),
+                "webpage_monitor" => StubTool::new(
+                    "webpage_monitor",
+                    "Monitor webpage changes",
+                    ToolCategory::Web,
+                ),
+                "service_checker" => StubTool::new(
+                    "service_checker",
+                    "Check service status",
+                    ToolCategory::System,
+                ),
+                "environment_reader" => StubTool::new(
+                    "environment_reader",
+                    "Read environment variables",
+                    ToolCategory::System,
+                ),
+                "uuid_generator" => {
+                    StubTool::new("uuid_generator", "Generate UUIDs", ToolCategory::Utility)
+                }
+                "hash_calculator" => {
+                    StubTool::new("hash_calculator", "Calculate hashes", ToolCategory::Utility)
+                }
+                "data_validation" => {
+                    StubTool::new("data_validation", "Validate data", ToolCategory::Data)
+                }
+                "web_search" => StubTool::new("web_search", "Search the web", ToolCategory::Web),
+                "webhook_caller" => {
+                    StubTool::new("webhook_caller", "Call webhooks", ToolCategory::Api)
+                }
+                "process_executor" => StubTool::new(
+                    "process_executor",
+                    "Execute processes",
+                    ToolCategory::System,
+                ),
+                "date_time_handler" => StubTool::new(
+                    "date_time_handler",
+                    "Handle dates and times",
+                    ToolCategory::Utility,
+                ),
+                "file_search" => {
+                    StubTool::new("file_search", "Search files", ToolCategory::Filesystem)
+                }
+                "file_watcher" => StubTool::new(
+                    "file_watcher",
+                    "Watch file changes",
+                    ToolCategory::Filesystem,
+                ),
+                "audio_processor" => StubTool::new(
+                    "audio_processor",
+                    "Process audio files",
+                    ToolCategory::Media,
+                ),
+                "diff_calculator" => StubTool::new(
+                    "diff_calculator",
+                    "Calculate differences",
+                    ToolCategory::Analysis,
+                ),
+                "system_monitor" => StubTool::new(
+                    "system_monitor",
+                    "Monitor system resources",
+                    ToolCategory::System,
+                ),
+                "graph_builder" => {
+                    StubTool::new("graph_builder", "Build graphs", ToolCategory::Data)
+                }
+                "text_manipulator" => {
+                    StubTool::new("text_manipulator", "Manipulate text", ToolCategory::Utility)
+                }
+                "file_converter" => {
+                    StubTool::new("file_converter", "Convert file formats", ToolCategory::Data)
+                }
+                _ => return None,
+            };
+            Some(Arc::new(tool))
+        }
+
+        async fn list_agents(&self) -> Vec<String> {
+            vec![]
+        }
+
+        async fn get_agent(&self, _name: &str) -> Option<Arc<dyn Agent>> {
+            None
+        }
+
+        async fn list_workflows(&self) -> Vec<String> {
+            vec![]
+        }
+
+        async fn get_workflow(&self, _name: &str) -> Option<Arc<dyn Workflow>> {
+            None
+        }
+    }
 
     #[async_trait]
     impl ScriptExecutor for DefaultExecutor {
@@ -531,9 +825,15 @@ pub async fn start_embedded_kernel(config: LLMSpellConfig) -> Result<KernelHandl
         fn language(&self) -> &'static str {
             "lua"
         }
+
+        fn component_registry(&self) -> Option<Arc<dyn ComponentLookup>> {
+            Some(self.component_registry.clone())
+        }
     }
 
-    let script_executor = Arc::new(DefaultExecutor) as Arc<dyn ScriptExecutor>;
+    let script_executor = Arc::new(DefaultExecutor {
+        component_registry: Arc::new(DefaultStubComponentRegistry),
+    }) as Arc<dyn ScriptExecutor>;
     start_embedded_kernel_with_executor(config, script_executor).await
 }
 
@@ -879,10 +1179,95 @@ async fn setup_kernel_transport(
 /// # Errors
 ///
 /// Returns an error if the kernel service fails to start or bind to the port
+#[allow(clippy::too_many_lines)]
 pub async fn start_kernel_service(port: u16, config: LLMSpellConfig) -> Result<ServiceHandle> {
     // TODO: In subtask 9.4.6.4, this will be replaced with real ScriptRuntime from llmspell-bridge
-    // For now, create a stub executor that will be replaced (same as in start_embedded_kernel)
-    struct ServiceStubExecutor;
+    // For now, create a stub executor with minimal ComponentRegistry
+    struct ServiceStubExecutor {
+        component_registry: Arc<StubComponentRegistry>,
+    }
+
+    // Stub ComponentRegistry with actual tool implementations for testing
+    struct StubComponentRegistry;
+
+    #[async_trait]
+    impl ComponentLookup for StubComponentRegistry {
+        async fn list_tools(&self) -> Vec<String> {
+            // Return a reasonable set of stub tools for testing
+            vec![
+                "calculator".to_string(),
+                "file_operations".to_string(),
+                "web_scraper".to_string(),
+                "json_processor".to_string(),
+                "text_analyzer".to_string(),
+                "data_converter".to_string(),
+                "system_monitor".to_string(),
+                "environment_reader".to_string(),
+            ]
+        }
+
+        async fn get_tool(&self, name: &str) -> Option<Arc<dyn Tool>> {
+            // Return actual stub tools for testing
+            use llmspell_core::traits::tool::ToolCategory;
+
+            let tool = match name {
+                "calculator" => StubTool::new(
+                    "calculator",
+                    "Perform mathematical calculations",
+                    ToolCategory::Utility,
+                ),
+                "file_operations" => StubTool::new(
+                    "file_operations",
+                    "Read and write files",
+                    ToolCategory::Filesystem,
+                ),
+                "web_scraper" => {
+                    StubTool::new("web_scraper", "Scrape web pages", ToolCategory::Web)
+                }
+                "json_processor" => {
+                    StubTool::new("json_processor", "Process JSON data", ToolCategory::Data)
+                }
+                "text_analyzer" => StubTool::new(
+                    "text_analyzer",
+                    "Analyze text content",
+                    ToolCategory::Analysis,
+                ),
+                "data_converter" => StubTool::new(
+                    "data_converter",
+                    "Convert between data formats",
+                    ToolCategory::Data,
+                ),
+                "system_monitor" => StubTool::new(
+                    "system_monitor",
+                    "Monitor system resources",
+                    ToolCategory::System,
+                ),
+                "environment_reader" => StubTool::new(
+                    "environment_reader",
+                    "Read environment variables",
+                    ToolCategory::System,
+                ),
+                _ => return None,
+            };
+            Some(Arc::new(tool))
+        }
+
+        async fn list_agents(&self) -> Vec<String> {
+            vec![]
+        }
+
+        async fn get_agent(&self, _name: &str) -> Option<Arc<dyn Agent>> {
+            None
+        }
+
+        async fn list_workflows(&self) -> Vec<String> {
+            vec![]
+        }
+
+        async fn get_workflow(&self, _name: &str) -> Option<Arc<dyn Workflow>> {
+            None
+        }
+    }
 
     #[async_trait]
     impl ScriptExecutor for ServiceStubExecutor {
@@ -905,6 +1290,10 @@ pub async fn start_kernel_service(port: u16, config: LLMSpellConfig) -> Result<S
         fn language(&self) -> &'static str {
             "stub"
         }
+
+        fn component_registry(&self) -> Option<Arc<dyn ComponentLookup>> {
+            Some(self.component_registry.clone())
+        }
     }
 
     let kernel_id = format!("service-{}", Uuid::new_v4());
@@ -918,7 +1307,9 @@ pub async fn start_kernel_service(port: u16, config: LLMSpellConfig) -> Result<S
     // Build execution config
     let exec_config = build_execution_config(&config);
 
-    let script_executor = Arc::new(ServiceStubExecutor) as Arc<dyn ScriptExecutor>;
+    let script_executor = Arc::new(ServiceStubExecutor {
+        component_registry: Arc::new(StubComponentRegistry),
+    }) as Arc<dyn ScriptExecutor>;
 
     // Create integrated kernel
     let kernel = IntegratedKernel::new(protocol, exec_config, session_id, script_executor).await?;

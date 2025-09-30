@@ -179,13 +179,13 @@ fn test_tool_json_serialization() {
 #[cfg(feature = "lua")]
 #[tokio::test]
 async fn test_tool_kernel_message_protocol() {
+    use async_trait::async_trait;
     use llmspell_config::LLMSpellConfig;
-    use llmspell_kernel::api::start_embedded_kernel_with_executor;
+    use llmspell_core::error::LLMSpellError;
     use llmspell_core::traits::script_executor::{
         ScriptExecutionMetadata, ScriptExecutionOutput, ScriptExecutor,
     };
-    use llmspell_core::error::LLMSpellError;
-    use async_trait::async_trait;
+    use llmspell_kernel::api::start_embedded_kernel_with_executor;
     use std::sync::Arc;
 
     // Create a test executor
@@ -244,7 +244,10 @@ async fn test_tool_kernel_message_protocol() {
         "category": None::<String>,
     });
     assert!(list_request.get("command").is_some());
-    assert_eq!(list_request.get("command").unwrap().as_str().unwrap(), "list");
+    assert_eq!(
+        list_request.get("command").unwrap().as_str().unwrap(),
+        "list"
+    );
     // Test info command message structure
     let info_request = serde_json::json!({
         "command": "info",
@@ -252,8 +255,14 @@ async fn test_tool_kernel_message_protocol() {
         "show_schema": false,
     });
     assert!(info_request.get("command").is_some());
-    assert_eq!(info_request.get("command").unwrap().as_str().unwrap(), "info");
-    assert_eq!(info_request.get("name").unwrap().as_str().unwrap(), "calculator");
+    assert_eq!(
+        info_request.get("command").unwrap().as_str().unwrap(),
+        "info"
+    );
+    assert_eq!(
+        info_request.get("name").unwrap().as_str().unwrap(),
+        "calculator"
+    );
 
     // Test search command message structure
     let search_request = serde_json::json!({
@@ -262,6 +271,9 @@ async fn test_tool_kernel_message_protocol() {
         "category": None::<String>,
     });
     assert!(search_request.get("command").is_some());
-    assert_eq!(search_request.get("command").unwrap().as_str().unwrap(), "search");
+    assert_eq!(
+        search_request.get("command").unwrap().as_str().unwrap(),
+        "search"
+    );
     assert!(search_request.get("query").unwrap().is_array());
 }

@@ -224,9 +224,7 @@ pub async fn execute_command(
             tool::handle_tool_command(command, source, runtime_config, output_format).await
         }
 
-        Commands::Version(version_cmd) => {
-            version::execute(version_cmd, output_format).await
-        }
+        Commands::Version(version_cmd) => version::execute(version_cmd, output_format).await,
     }
 }
 

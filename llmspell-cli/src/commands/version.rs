@@ -3,9 +3,9 @@
 //! Provides detailed version and build information as a subcommand
 //! This is the single source of truth for all version information.
 
+use crate::cli::OutputFormat;
 use anyhow::Result;
 use clap::Parser;
-use crate::cli::OutputFormat;
 use std::fmt;
 
 /// Show version information
@@ -99,7 +99,9 @@ impl VersionInfo {
                 self.version,
                 commit_short,
                 dirty_suffix,
-                self.git_commit_date.as_ref().unwrap_or(&"unknown".to_string())
+                self.git_commit_date
+                    .as_ref()
+                    .unwrap_or(&"unknown".to_string())
             )
         } else {
             format!("llmspell {}", self.version)

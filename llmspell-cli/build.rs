@@ -9,10 +9,7 @@ use std::process::Command;
 
 fn main() {
     // Git information
-    if let Ok(output) = Command::new("git")
-        .args(["rev-parse", "HEAD"])
-        .output()
-    {
+    if let Ok(output) = Command::new("git").args(["rev-parse", "HEAD"]).output() {
         let git_hash = String::from_utf8(output.stdout)
             .unwrap_or_default()
             .trim()
@@ -32,10 +29,7 @@ fn main() {
         }
 
         // Check if working tree is dirty
-        if let Ok(output) = Command::new("git")
-            .args(["status", "--porcelain"])
-            .output()
-        {
+        if let Ok(output) = Command::new("git").args(["status", "--porcelain"]).output() {
             let is_dirty = !output.stdout.is_empty();
             println!("cargo:rustc-env=LLMSPELL_GIT_DIRTY={}", is_dirty);
         }
@@ -66,18 +60,19 @@ fn main() {
     }
 
     // Build timestamp using date command
-    let build_timestamp = if let Ok(output) = Command::new("date")
-        .args(["+%Y-%m-%dT%H:%M:%S%z"])
-        .output()
-    {
-        String::from_utf8(output.stdout)
-            .unwrap_or_default()
-            .trim()
-            .to_string()
-    } else {
-        "unknown".to_string()
-    };
-    println!("cargo:rustc-env=LLMSPELL_BUILD_TIMESTAMP={}", build_timestamp);
+    let build_timestamp =
+        if let Ok(output) = Command::new("date").args(["+%Y-%m-%dT%H:%M:%S%z"]).output() {
+            String::from_utf8(output.stdout)
+                .unwrap_or_default()
+                .trim()
+                .to_string()
+        } else {
+            "unknown".to_string()
+        };
+    println!(
+        "cargo:rustc-env=LLMSPELL_BUILD_TIMESTAMP={}",
+        build_timestamp
+    );
 
     // Build profile (debug/release)
     let profile = std::env::var("PROFILE").unwrap_or_else(|_| "unknown".to_string());
@@ -92,10 +87,7 @@ fn main() {
     println!("cargo:rustc-env=LLMSPELL_HOST={}", host);
 
     // Rust compiler version
-    if let Ok(output) = Command::new("rustc")
-        .args(["--version"])
-        .output()
-    {
+    if let Ok(output) = Command::new("rustc").args(["--version"]).output() {
         let rustc_version = String::from_utf8(output.stdout)
             .unwrap_or_default()
             .trim()

@@ -1,7 +1,7 @@
 //! Test that kernel tool handlers use real ComponentRegistry
 
 #[cfg(feature = "lua")]
-#[tokio::test]
+#[tokio::test(flavor = "multi_thread")]
 async fn test_kernel_tool_handlers_with_registry() {
     use llmspell_bridge::ScriptRuntime;
     use llmspell_config::LLMSpellConfig;
@@ -23,10 +23,16 @@ async fn test_kernel_tool_handlers_with_registry() {
 
     // Manually register additional tools for testing
     registry
-        .register_tool("test_calculator".to_string(), Arc::new(CalculatorTool::new()))
+        .register_tool(
+            "test_calculator".to_string(),
+            Arc::new(CalculatorTool::new()),
+        )
         .expect("Failed to register test calculator");
     registry
-        .register_tool("test_datetime".to_string(), Arc::new(DateTimeHandlerTool::new()))
+        .register_tool(
+            "test_datetime".to_string(),
+            Arc::new(DateTimeHandlerTool::new()),
+        )
         .expect("Failed to register test datetime");
 
     // Create kernel with the runtime as executor
@@ -55,8 +61,14 @@ async fn test_kernel_tool_handlers_with_registry() {
         .filter_map(|v| v.as_str().map(String::from))
         .collect();
 
-    assert!(tool_names.contains(&"test_calculator".to_string()), "Should have test_calculator");
-    assert!(tool_names.contains(&"test_datetime".to_string()), "Should have test_datetime");
+    assert!(
+        tool_names.contains(&"test_calculator".to_string()),
+        "Should have test_calculator"
+    );
+    assert!(
+        tool_names.contains(&"test_datetime".to_string()),
+        "Should have test_datetime"
+    );
 
     // Test 2: Tool list with category filter
     let list_category_request = json!({
@@ -75,8 +87,10 @@ async fn test_kernel_tool_handlers_with_registry() {
         .iter()
         .filter_map(|v| v.as_str().map(String::from))
         .collect();
-    assert!(utility_tool_names.contains(&"test_calculator".to_string()),
-            "Calculator should be in utility category");
+    assert!(
+        utility_tool_names.contains(&"test_calculator".to_string()),
+        "Calculator should be in utility category"
+    );
 
     // Test 3: Tool info command
     let info_request = json!({
@@ -142,12 +156,14 @@ async fn test_kernel_tool_handlers_with_registry() {
         .iter()
         .filter_map(|v| v.as_str().map(String::from))
         .collect();
-    assert!(match_names.contains(&"test_calculator".to_string()),
-            "Search for 'calc' should find test_calculator");
+    assert!(
+        match_names.contains(&"test_calculator".to_string()),
+        "Search for 'calc' should find test_calculator"
+    );
 }
 
 #[cfg(feature = "lua")]
-#[tokio::test]
+#[tokio::test(flavor = "multi_thread")]
 async fn test_kernel_tool_count() {
     use llmspell_bridge::ScriptRuntime;
     use llmspell_config::LLMSpellConfig;
@@ -181,7 +197,11 @@ async fn test_kernel_tool_count() {
     let count = response["count"].as_u64().unwrap();
 
     println!("Kernel reports {} tools available", count);
-    assert_eq!(tools.len() as u64, count, "Tool count should match array length");
+    assert_eq!(
+        tools.len() as u64,
+        count,
+        "Tool count should match array length"
+    );
 
     // The requirement is 40+ tools when all are registered
     // If register_all_tools worked, we should have many tools
@@ -190,27 +210,21 @@ async fn test_kernel_tool_count() {
 }
 
 #[cfg(feature = "lua")]
-#[tokio::test]
+#[tokio::test(flavor = "multi_thread")]
 async fn test_tool_invocation_with_timeout() {
     use llmspell_bridge::ScriptRuntime;
     use llmspell_config::LLMSpellConfig;
     use llmspell_kernel::api::start_embedded_kernel_with_executor;
-    use llmspell_tools::util::CalculatorTool;
     use serde_json::json;
     use std::sync::Arc;
 
-    // Create runtime with tools
+    // Create runtime with tools (calculator already registered by register_all_tools)
     let config = LLMSpellConfig::default();
     let runtime = ScriptRuntime::new_with_lua(config.clone())
         .await
         .expect("Failed to create runtime");
 
-    // Register calculator tool
-    runtime.registry()
-        .register_tool("calculator".to_string(), Arc::new(CalculatorTool::new()))
-        .expect("Failed to register calculator");
-
-    // Create kernel
+    // Create kernel (calculator already registered via register_all_tools)
     let executor = Arc::new(runtime);
     let mut kernel_handle = start_embedded_kernel_with_executor(config, executor.clone())
         .await
@@ -233,7 +247,10 @@ async fn test_tool_invocation_with_timeout() {
 
     assert_eq!(response["status"].as_str(), Some("ok"));
     assert_eq!(response["tool"].as_str(), Some("calculator"));
-    assert!(response.get("duration_ms").is_some(), "Should have duration tracking");
+    assert!(
+        response.get("duration_ms").is_some(),
+        "Should have duration tracking"
+    );
 
     // Test 2: Invocation with very short timeout (should not timeout for simple calculation)
     let quick_invoke = json!({
@@ -273,27 +290,21 @@ async fn test_tool_invocation_with_timeout() {
 }
 
 #[cfg(feature = "lua")]
-#[tokio::test]
+#[tokio::test(flavor = "multi_thread")]
 async fn test_tool_parameter_validation() {
     use llmspell_bridge::ScriptRuntime;
     use llmspell_config::LLMSpellConfig;
     use llmspell_kernel::api::start_embedded_kernel_with_executor;
-    use llmspell_tools::util::CalculatorTool;
     use serde_json::json;
     use std::sync::Arc;
 
-    // Create runtime
+    // Create runtime (calculator already registered by register_all_tools)
     let config = LLMSpellConfig::default();
     let runtime = ScriptRuntime::new_with_lua(config.clone())
         .await
         .expect("Failed to create runtime");
 
-    // Register calculator tool
-    runtime.registry()
-        .register_tool("calculator".to_string(), Arc::new(CalculatorTool::new()))
-        .expect("Failed to register calculator");
-
-    // Create kernel
+    // Create kernel (calculator already registered via register_all_tools)
     let executor = Arc::new(runtime);
     let mut kernel_handle = start_embedded_kernel_with_executor(config, executor.clone())
         .await
@@ -323,9 +334,7 @@ async fn test_tool_parameter_validation() {
         }
     });
 
-    let response = kernel_handle
-        .send_tool_request(missing_name)
-        .await;
+    let response = kernel_handle.send_tool_request(missing_name).await;
 
     // Should either error or handle gracefully
     assert!(response.is_ok() || response.is_err());
@@ -362,12 +371,11 @@ async fn test_tool_parameter_validation() {
 }
 
 #[cfg(feature = "lua")]
-#[tokio::test]
+#[tokio::test(flavor = "multi_thread")]
 async fn test_tool_invocation_error_handling() {
     use llmspell_bridge::ScriptRuntime;
     use llmspell_config::LLMSpellConfig;
     use llmspell_kernel::api::start_embedded_kernel_with_executor;
-    use llmspell_tools::util::CalculatorTool;
     use serde_json::json;
     use std::sync::Arc;
 
@@ -376,10 +384,7 @@ async fn test_tool_invocation_error_handling() {
         .await
         .expect("Failed to create runtime");
 
-    runtime.registry()
-        .register_tool("calculator".to_string(), Arc::new(CalculatorTool::new()))
-        .expect("Failed to register calculator");
-
+    // Calculator already registered via register_all_tools
     let executor = Arc::new(runtime);
     let mut kernel_handle = start_embedded_kernel_with_executor(config, executor.clone())
         .await
@@ -430,17 +435,21 @@ async fn test_tool_invocation_error_handling() {
 
     // Should reject non-object params
     assert_eq!(response["status"].as_str(), Some("error"));
-    assert!(response["error"].as_str().unwrap_or("").contains("validation") ||
-            response["error"].as_str().unwrap_or("").contains("object"));
+    assert!(
+        response["error"]
+            .as_str()
+            .unwrap_or("")
+            .contains("validation")
+            || response["error"].as_str().unwrap_or("").contains("object")
+    );
 }
 
 #[cfg(feature = "lua")]
-#[tokio::test]
+#[tokio::test(flavor = "multi_thread")]
 async fn test_tool_reply_message_routing() {
     use llmspell_bridge::ScriptRuntime;
     use llmspell_config::LLMSpellConfig;
     use llmspell_kernel::api::start_embedded_kernel_with_executor;
-    use llmspell_tools::util::CalculatorTool;
     use serde_json::json;
     use std::sync::Arc;
 
@@ -450,9 +459,7 @@ async fn test_tool_reply_message_routing() {
         .await
         .expect("Failed to create runtime");
 
-    runtime.registry()
-        .register_tool("calculator".to_string(), Arc::new(CalculatorTool::new()))
-        .expect("Failed to register calculator");
+    // Calculator already registered via register_all_tools
 
     // Create kernel with executor
     let executor = Arc::new(runtime);
@@ -471,8 +478,14 @@ async fn test_tool_reply_message_routing() {
         .expect("Failed to send tool list request");
 
     // Verify message structure indicates proper routing (not stdout)
-    assert!(response.get("tools").is_some(), "Should have tools field from proper message routing");
-    assert!(response.get("count").is_some(), "Should have count field from proper message routing");
+    assert!(
+        response.get("tools").is_some(),
+        "Should have tools field from proper message routing"
+    );
+    assert!(
+        response.get("count").is_some(),
+        "Should have count field from proper message routing"
+    );
 
     // Test 2: Tool invoke should return structured response through message protocol
     let invoke_request = json!({
@@ -489,8 +502,14 @@ async fn test_tool_reply_message_routing() {
         .expect("Failed to send tool invoke request");
 
     // Verify structured response (not raw stdout text)
-    assert!(response.get("status").is_some(), "Should have structured status field");
-    assert!(response.get("tool").is_some(), "Should have tool name field");
+    assert!(
+        response.get("status").is_some(),
+        "Should have structured status field"
+    );
+    assert!(
+        response.get("tool").is_some(),
+        "Should have tool name field"
+    );
 
     // Test 3: Error responses should also use message protocol
     let error_request = json!({
@@ -505,16 +524,18 @@ async fn test_tool_reply_message_routing() {
         .expect("Failed to send error request");
 
     assert_eq!(response["status"].as_str(), Some("error"));
-    assert!(response.get("error").is_some(), "Should have structured error field");
+    assert!(
+        response.get("error").is_some(),
+        "Should have structured error field"
+    );
 }
 
 #[cfg(feature = "lua")]
-#[tokio::test]
+#[tokio::test(flavor = "multi_thread")]
 async fn test_message_correlation_and_identity() {
     use llmspell_bridge::ScriptRuntime;
     use llmspell_config::LLMSpellConfig;
     use llmspell_kernel::api::start_embedded_kernel_with_executor;
-    use llmspell_tools::util::CalculatorTool;
     use serde_json::json;
     use std::sync::Arc;
 
@@ -523,9 +544,7 @@ async fn test_message_correlation_and_identity() {
         .await
         .expect("Failed to create runtime");
 
-    runtime.registry()
-        .register_tool("calculator".to_string(), Arc::new(CalculatorTool::new()))
-        .expect("Failed to register calculator");
+    // Calculator already registered via register_all_tools
 
     let executor = Arc::new(runtime);
     let mut kernel_handle = start_embedded_kernel_with_executor(config, executor.clone())
@@ -555,19 +574,18 @@ async fn test_message_correlation_and_identity() {
     assert!(responses[0].get("tools").is_some());
 
     // Second and third should be invoke results
-    for i in 1..3 {
-        assert!(responses[i].get("status").is_some());
-        assert_eq!(responses[i]["tool"].as_str(), Some("calculator"));
+    for response in responses.iter().skip(1).take(2) {
+        assert!(response.get("status").is_some());
+        assert_eq!(response["tool"].as_str(), Some("calculator"));
     }
 }
 
 #[cfg(feature = "lua")]
-#[tokio::test]
+#[tokio::test(flavor = "multi_thread")]
 async fn test_bidirectional_communication_flow() {
     use llmspell_bridge::ScriptRuntime;
     use llmspell_config::LLMSpellConfig;
     use llmspell_kernel::api::start_embedded_kernel_with_executor;
-    use llmspell_tools::util::{CalculatorTool, DateTimeHandlerTool};
     use serde_json::json;
     use std::sync::Arc;
 
@@ -576,13 +594,7 @@ async fn test_bidirectional_communication_flow() {
         .await
         .expect("Failed to create runtime");
 
-    // Register multiple tools
-    runtime.registry()
-        .register_tool("calculator".to_string(), Arc::new(CalculatorTool::new()))
-        .expect("Failed to register calculator");
-    runtime.registry()
-        .register_tool("datetime".to_string(), Arc::new(DateTimeHandlerTool::new()))
-        .expect("Failed to register datetime");
+    // Calculator and datetime already registered via register_all_tools
 
     let executor = Arc::new(runtime);
     let mut kernel_handle = start_embedded_kernel_with_executor(config, executor.clone())
@@ -617,15 +629,27 @@ async fn test_bidirectional_communication_flow() {
         let response = kernel_handle
             .send_tool_request(request)
             .await
-            .expect(&format!("Failed to invoke {}", tool_name));
+            .unwrap_or_else(|_| panic!("Failed to invoke {}", tool_name));
 
         // Verify structured response through message protocol
-        assert!(response.get("status").is_some(), "Tool {} should return structured status", tool_name);
-        assert_eq!(response["tool"].as_str(), Some(tool_name), "Tool name should be preserved");
+        assert!(
+            response.get("status").is_some(),
+            "Tool {} should return structured status",
+            tool_name
+        );
+        assert_eq!(
+            response["tool"].as_str(),
+            Some(tool_name),
+            "Tool name should be preserved"
+        );
 
         // For successful tools, should have result field
         if response["status"] == "ok" {
-            assert!(response.get("result").is_some(), "Successful tool {} should have result", tool_name);
+            assert!(
+                response.get("result").is_some(),
+                "Successful tool {} should have result",
+                tool_name
+            );
         }
     }
 

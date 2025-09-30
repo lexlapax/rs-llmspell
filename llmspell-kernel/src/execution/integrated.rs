@@ -469,14 +469,12 @@ impl<P: Protocol + 'static> IntegratedKernel<P> {
 
     /// Set transport for message communication
     pub fn set_transport(&mut self, transport: Box<dyn Transport>) {
-        debug!("Setting transport on IntegratedKernel");
-        println!("DEBUG: set_transport() called with transport at {:p}", &transport as *const _);
-        // Try to see if we can inspect the transport channels (if it's InProcessTransport)
-        println!("DEBUG: Transport has channels: {:?}", transport.channels());
+        debug!(
+            "Setting transport on IntegratedKernel with {} channels",
+            transport.channels().len()
+        );
         self.transport = Some(transport);
         debug!("Transport set: {}", self.transport.is_some());
-        println!("DEBUG: Transport stored in kernel, has channels: {:?}",
-                 self.transport.as_ref().map(|t| t.channels()));
     }
 
     /// Check if transport is configured
@@ -640,17 +638,16 @@ impl<P: Protocol + 'static> IntegratedKernel<P> {
                         Err(anyhow::anyhow!("Empty message"))
                     };
 
-                    println!("DEBUG: Parsed result: {:?}", parsed_result.is_ok());
                     match parsed_result {
                         Ok(parsed_msg) => {
-                            println!("DEBUG: Successfully parsed message");
                             // Extract client identity from Part 0 for response routing
                             // Handle both REQ (empty first frame) and DEALER (identity first) sockets
                             let client_identity = b"inprocess_client".to_vec();
 
                             // Validate message type for control channel
                             // Check for msg_type in header (Jupyter format) or at top level (simplified format)
-                            let msg_type = parsed_msg.get("header")
+                            let msg_type = parsed_msg
+                                .get("header")
                                 .and_then(|h| h.get("msg_type"))
                                 .and_then(|v| v.as_str())
                                 .or_else(|| parsed_msg.get("msg_type").and_then(|v| v.as_str()));
@@ -682,14 +679,12 @@ impl<P: Protocol + 'static> IntegratedKernel<P> {
                 // Process Shell channel for execution requests
                 trace!("Checking shell channel");
                 let shell_msg = if let Some(ref mut transport) = self.transport {
-                    println!("DEBUG: Kernel using transport at {:p} for recv", &transport as *const _);
-                    println!("DEBUG: Kernel transport has channels: {:?}", transport.channels());
                     let result = transport.recv("shell").await;
                     match &result {
                         Ok(Some(parts)) => {
                             trace!("Shell recv SUCCESS: {} parts", parts.len());
-                            println!("DEBUG: Kernel received shell message: {} parts", parts.len());
-                        },
+                            trace!("Kernel received shell message: {} parts", parts.len());
+                        }
                         Ok(None) => trace!("Shell recv: no message"),
                         Err(e) => trace!("Shell recv ERROR: {}", e),
                     }
@@ -779,25 +774,26 @@ impl<P: Protocol + 'static> IntegratedKernel<P> {
                         Err(anyhow::anyhow!("Empty message"))
                     };
 
-                    println!("DEBUG: Parsed result: {:?}", parsed_result.is_ok());
                     match parsed_result {
                         Ok(parsed_msg) => {
-                            println!("DEBUG: Successfully parsed message");
                             // Extract client identity from Part 0 for response routing
                             // Handle both REQ (empty first frame) and DEALER (identity first) sockets
                             let client_identity = b"inprocess_client".to_vec();
 
                             // Validate message type for shell channel
-                            println!("DEBUG: Looking for msg_type in parsed_msg");
-                            println!("DEBUG: parsed_msg keys: {:?}", parsed_msg.keys().collect::<Vec<_>>());
+                            trace!(
+                                "parsed_msg keys: {:?}",
+                                parsed_msg.keys().collect::<Vec<_>>()
+                            );
                             // Check for msg_type in header (Jupyter format) or at top level (simplified format)
-                            let msg_type = parsed_msg.get("header")
+                            let msg_type = parsed_msg
+                                .get("header")
                                 .and_then(|h| h.get("msg_type"))
                                 .and_then(|v| v.as_str())
                                 .or_else(|| parsed_msg.get("msg_type").and_then(|v| v.as_str()));
 
                             if let Some(msg_type) = msg_type {
-                                println!("DEBUG: Shell message msg_type: '{}'", msg_type);
+                                trace!("Shell message msg_type: '{}'", msg_type);
                                 if msg_type == "execute_request"
                                     || msg_type == "complete_request"
                                     || msg_type == "inspect_request"
@@ -807,7 +803,7 @@ impl<P: Protocol + 'static> IntegratedKernel<P> {
                                     || msg_type == "tool_request"
                                 {
                                     trace!("Received shell message: {}", msg_type);
-                                    println!("DEBUG: Adding {} to messages_to_process", msg_type);
+                                    trace!("Adding {} to messages_to_process", msg_type);
                                     messages_to_process.push((parsed_msg, client_identity));
                                 } else {
                                     warn!("Invalid message type '{}' on shell channel", msg_type);
@@ -855,10 +851,8 @@ impl<P: Protocol + 'static> IntegratedKernel<P> {
                         Err(anyhow::anyhow!("Empty message"))
                     };
 
-                    println!("DEBUG: Parsed result: {:?}", parsed_result.is_ok());
                     match parsed_result {
                         Ok(parsed_msg) => {
-                            println!("DEBUG: Successfully parsed message");
                             // Validate message type for stdin channel
                             if let Some(msg_type) =
                                 parsed_msg.get("msg_type").and_then(|v| v.as_str())
@@ -1851,15 +1845,14 @@ impl<P: Protocol + 'static> IntegratedKernel<P> {
 
         // Ensure we have message header for correlation
         if self.current_msg_header.is_none() {
-            return Err(anyhow!("No message header available for tool reply correlation"));
+            return Err(anyhow!(
+                "No message header available for tool reply correlation"
+            ));
         }
 
         // Create multipart response using existing infrastructure
-        let multipart_response = self.create_multipart_response(
-            &client_identity,
-            "tool_reply",
-            &content,
-        )?;
+        let multipart_response =
+            self.create_multipart_response(&client_identity, "tool_reply", &content)?;
 
         debug!(
             "tool_reply multipart created, {} parts",
@@ -1979,9 +1972,7 @@ impl<P: Protocol + 'static> IntegratedKernel<P> {
         debug!("Listing tools from ComponentRegistry");
 
         // Check for category filter in the request
-        let category_filter = content
-            .get("category")
-            .and_then(|v| v.as_str());
+        let category_filter = content.get("category").and_then(|v| v.as_str());
 
         // Get tools from ComponentRegistry via ScriptExecutor
         let tools = if let Some(registry) = self.script_executor.component_registry() {
@@ -2065,29 +2056,36 @@ impl<P: Protocol + 'static> IntegratedKernel<P> {
         debug!("Getting info for tool: {}", tool_name);
 
         // Try to get actual tool from registry
-        let (description, category) = if let Some(registry) = self.script_executor.component_registry() {
-            if let Some(tool) = registry.get_tool(tool_name).await {
-                // Get actual tool metadata
-                let desc = tool.metadata().description.clone();
-                let cat = match tool.category() {
-                    ToolCategory::Filesystem => "filesystem".to_string(),
-                    ToolCategory::Web => "web".to_string(),
-                    ToolCategory::Api => "api".to_string(),
-                    ToolCategory::Analysis => "analysis".to_string(),
-                    ToolCategory::Data => "data".to_string(),
-                    ToolCategory::System => "system".to_string(),
-                    ToolCategory::Media => "media".to_string(),
-                    ToolCategory::Utility => "utility".to_string(),
-                    ToolCategory::Custom(ref s) => s.clone(),
-                };
-                (desc, cat)
+        let (description, category) =
+            if let Some(registry) = self.script_executor.component_registry() {
+                if let Some(tool) = registry.get_tool(tool_name).await {
+                    // Get actual tool metadata
+                    let desc = tool.metadata().description.clone();
+                    let cat = match tool.category() {
+                        ToolCategory::Filesystem => "filesystem".to_string(),
+                        ToolCategory::Web => "web".to_string(),
+                        ToolCategory::Api => "api".to_string(),
+                        ToolCategory::Analysis => "analysis".to_string(),
+                        ToolCategory::Data => "data".to_string(),
+                        ToolCategory::System => "system".to_string(),
+                        ToolCategory::Media => "media".to_string(),
+                        ToolCategory::Utility => "utility".to_string(),
+                        ToolCategory::Custom(ref s) => s.clone(),
+                    };
+                    (desc, cat)
+                } else {
+                    (
+                        format!("Tool '{tool_name}' not found"),
+                        "unknown".to_string(),
+                    )
+                }
             } else {
-                (format!("Tool '{tool_name}' not found"), "unknown".to_string())
-            }
-        } else {
-            // Fallback placeholder info
-            (format!("Tool '{tool_name}' - placeholder description"), "utility".to_string())
-        };
+                // Fallback placeholder info
+                (
+                    format!("Tool '{tool_name}' - placeholder description"),
+                    "utility".to_string(),
+                )
+            };
 
         let info = json!({
             "msg_type": "tool_reply",
@@ -2100,19 +2098,28 @@ impl<P: Protocol + 'static> IntegratedKernel<P> {
             }
         });
 
-        self.io_manager.write_stdout(&info.to_string()).await
+        self.send_tool_reply(info).await
     }
 
     /// Handle tool invoke command with comprehensive pipeline
     #[instrument(skip(self, content), fields(tool_name))]
+    #[allow(clippy::too_many_lines)]
     async fn handle_tool_invoke(&mut self, content: &Value) -> Result<()> {
         let start_time = Instant::now();
 
         // Extract and validate tool name
-        let tool_name = content
-            .get("name")
-            .and_then(|v| v.as_str())
-            .ok_or_else(|| anyhow!("Missing or invalid tool name"))?;
+        let Some(tool_name) = content.get("name").and_then(|v| v.as_str()) else {
+            let error_response = json!({
+                "msg_type": "tool_reply",
+                "content": {
+                    "status": "error",
+                    "error": "Missing or invalid tool name",
+                    "duration_ms": start_time.elapsed().as_millis(),
+                    "error_type": "validation_error"
+                }
+            });
+            return self.send_tool_reply(error_response).await;
+        };
 
         // Extract parameters with validation
         let params = content.get("params").cloned().unwrap_or(json!({}));
@@ -2130,29 +2137,56 @@ impl<P: Protocol + 'static> IntegratedKernel<P> {
             .and_then(serde_json::Value::as_bool)
             .unwrap_or(false);
 
-        info!("Invoking tool '{}' with timeout {}s, streaming: {}",
-              tool_name, timeout_secs, streaming);
+        info!(
+            "Invoking tool '{}' with timeout {}s, streaming: {}",
+            tool_name, timeout_secs, streaming
+        );
         debug!("Tool parameters: {:?}", params);
 
         // Get registry and tool
-        let registry = self.script_executor
-            .component_registry()
-            .ok_or_else(|| anyhow!("No ComponentRegistry available"))?;
+        let Some(registry) = self.script_executor.component_registry() else {
+            let error_response = json!({
+                "msg_type": "tool_reply",
+                "content": {
+                    "status": "error",
+                    "tool": tool_name,
+                    "error": "No ComponentRegistry available",
+                    "duration_ms": start_time.elapsed().as_millis(),
+                    "error_type": "configuration_error"
+                }
+            });
+            return self.send_tool_reply(error_response).await;
+        };
 
-        let tool = registry
-            .get_tool(tool_name)
-            .await
-            .ok_or_else(|| anyhow!("Tool '{}' not found in registry", tool_name))?;
+        let Some(tool) = registry.get_tool(tool_name).await else {
+            warn!("Tool '{}' not found in registry", tool_name);
+            let error_response = json!({
+                "msg_type": "tool_reply",
+                "content": {
+                    "status": "error",
+                    "tool": tool_name,
+                    "error": format!("Tool '{}' not found", tool_name),
+                    "duration_ms": start_time.elapsed().as_millis(),
+                    "error_type": "not_found"
+                }
+            });
+            return self.send_tool_reply(error_response).await;
+        };
 
         // Validate tool metadata and parameters
         let tool_meta = tool.metadata();
-        debug!("Tool metadata: name={}, description={}",
-               tool_meta.name, tool_meta.description);
+        debug!(
+            "Tool metadata: name={}, description={}",
+            tool_meta.name, tool_meta.description
+        );
 
         // Parameter validation phase
         let validation_result = Self::validate_tool_params(tool_name, &params);
         if let Err(e) = validation_result {
-            warn!("Parameter validation failed for tool '{}': {}", tool_name, e);
+            warn!(
+                "Parameter validation failed for tool '{}': {}",
+                tool_name, e
+            );
             let error_response = json!({
                 "msg_type": "tool_reply",
                 "content": {
@@ -2168,24 +2202,31 @@ impl<P: Protocol + 'static> IntegratedKernel<P> {
 
         // Prepare execution context with metadata
         let mut exec_context = llmspell_core::ExecutionContext::default();
-        exec_context.data.insert("kernel_id".to_string(), json!(self.session_id));
-        exec_context.data.insert("invocation_time".to_string(), json!(chrono::Utc::now().to_rfc3339()));
-        exec_context.data.insert("timeout_secs".to_string(), json!(timeout_secs));
+        exec_context
+            .data
+            .insert("kernel_id".to_string(), json!(self.session_id));
+        exec_context.data.insert(
+            "invocation_time".to_string(),
+            json!(chrono::Utc::now().to_rfc3339()),
+        );
+        exec_context
+            .data
+            .insert("timeout_secs".to_string(), json!(timeout_secs));
 
         // Convert parameters to AgentInput with enhanced structure
         let mut agent_input = AgentInput::text(
-            params.get("input")
+            params
+                .get("input")
                 .and_then(|v| v.as_str())
                 .unwrap_or(&params.to_string())
-                .to_string()
+                .to_string(),
         );
 
-        // Add all parameters from JSON to AgentInput
-        if let Some(obj) = params.as_object() {
-            for (key, value) in obj {
-                agent_input.parameters.insert(key.clone(), value.clone());
-            }
-        }
+        // Tools expect parameters to be wrapped in a "parameters" object
+        // This is the documented convention in llmspell-utils/params.rs
+        agent_input
+            .parameters
+            .insert("parameters".to_string(), params.clone());
 
         // Execute tool with timeout
         let execution_future = tool.execute(agent_input, exec_context);
@@ -2193,7 +2234,10 @@ impl<P: Protocol + 'static> IntegratedKernel<P> {
         let result = match timeout(tool_timeout, execution_future).await {
             Ok(Ok(output)) => {
                 let duration_ms = start_time.elapsed().as_millis();
-                info!("Tool '{}' executed successfully in {}ms", tool_name, duration_ms);
+                info!(
+                    "Tool '{}' executed successfully in {}ms",
+                    tool_name, duration_ms
+                );
 
                 // Stream output if requested and output supports it
                 if streaming {
@@ -2215,7 +2259,10 @@ impl<P: Protocol + 'static> IntegratedKernel<P> {
             }
             Ok(Err(e)) => {
                 let duration_ms = start_time.elapsed().as_millis();
-                error!("Tool '{}' execution failed after {}ms: {}", tool_name, duration_ms, e);
+                error!(
+                    "Tool '{}' execution failed after {}ms: {}",
+                    tool_name, duration_ms, e
+                );
 
                 json!({
                     "msg_type": "tool_reply",
@@ -2230,7 +2277,10 @@ impl<P: Protocol + 'static> IntegratedKernel<P> {
             }
             Err(_) => {
                 let duration_ms = start_time.elapsed().as_millis();
-                error!("Tool '{}' execution timed out after {}ms", tool_name, duration_ms);
+                error!(
+                    "Tool '{}' execution timed out after {}ms",
+                    tool_name, duration_ms
+                );
 
                 // Attempt to cancel if possible (future enhancement)
                 json!({
@@ -2264,7 +2314,9 @@ impl<P: Protocol + 'static> IntegratedKernel<P> {
                 // Calculator requires an 'expression' field
                 if let Some(obj) = params.as_object() {
                     if !obj.contains_key("expression") && !obj.contains_key("input") {
-                        return Err(anyhow!("Calculator tool requires 'expression' or 'input' parameter"));
+                        return Err(anyhow!(
+                            "Calculator tool requires 'expression' or 'input' parameter"
+                        ));
                     }
                 }
             }
@@ -2312,7 +2364,10 @@ impl<P: Protocol + 'static> IntegratedKernel<P> {
         let matches: Vec<String> = all_tools
             .into_iter()
             .filter(|name| {
-                query.is_empty() || query.iter().any(|q| name.to_lowercase().contains(&q.to_lowercase()))
+                query.is_empty()
+                    || query
+                        .iter()
+                        .any(|q| name.to_lowercase().contains(&q.to_lowercase()))
             })
             .collect();
 
@@ -2335,7 +2390,10 @@ impl<P: Protocol + 'static> IntegratedKernel<P> {
             .and_then(|v| v.as_str())
             .unwrap_or("unknown");
 
-        let verbose = content.get("verbose").and_then(serde_json::Value::as_bool).unwrap_or(false);
+        let verbose = content
+            .get("verbose")
+            .and_then(serde_json::Value::as_bool)
+            .unwrap_or(false);
 
         info!("Testing tool: {}", tool_name);
 
@@ -2347,13 +2405,16 @@ impl<P: Protocol + 'static> IntegratedKernel<P> {
 
                 // Create test input for the tool
                 let mut test_input = AgentInput::text("Test input for validation".to_string());
-                test_input.parameters.insert("test".to_string(), json!(true));
+                test_input
+                    .parameters
+                    .insert("test".to_string(), json!(true));
 
                 match tool.execute(test_input, exec_context).await {
                     Ok(output) => {
                         let mut details = format!("Tool '{tool_name}' test successful");
                         if verbose {
-                            details.push_str(&format!("\nOutput: {output:?}"));
+                            use std::fmt::Write;
+                            let _ = write!(details, "\nOutput: {output:?}");
                         }
 
                         json!({
