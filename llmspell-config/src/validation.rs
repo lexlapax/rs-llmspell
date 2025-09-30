@@ -501,17 +501,17 @@ fn validate_events_config(config: &LLMSpellConfig) -> Result<(), ConfigError> {
         }
     }
 
-    // Warn if all event types are disabled
+    // Debug log if all event types are disabled
     if !events.emit_timing_events && !events.emit_state_events && !events.emit_debug_events {
-        warn!("All event types are disabled - event system will emit no events");
+        debug!("All event types are disabled - event system will emit no events");
     }
 
     // Validate export configuration
     let export = &events.export;
 
-    // Check if any export method is configured when events are enabled
+    // Debug log if no export method is configured (informational, not a problem)
     if events.enabled && !export.stdout && export.file.is_none() && export.webhook.is_none() {
-        warn!("Events are enabled but no export method is configured - events will be generated but not output");
+        debug!("Events are enabled but no export method is configured - events will be generated but not output");
     }
 
     // Validate file path if specified

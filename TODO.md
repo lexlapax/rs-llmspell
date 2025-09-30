@@ -9728,6 +9728,167 @@ Finished `dev` profile [unoptimized + debuginfo] target(s) in 34.48s
 
 ---
 
+### Phase 10.22 Test Fixes and Additional Cleanup (2025-09-30) ✅
+
+**Issue**: After clippy cleanup, running test suites revealed runtime errors and timeout issues across kernel and bridge tests.
+
+**Problems Identified:**
+
+1. **Multi-threaded Runtime Requirement** (10 test failures):
+   - **Root Cause**: Lua bridge requires multi-threaded tokio runtime, tests using default `#[tokio::test]` (current_thread)
+   - **Error**: "can call blocking only when running on the multi-threaded runtime" at sync_utils.rs:80
+   - **Tests Affected**: 8 in tool_registry_test.rs, 2 in component_registry_test.rs
+   - **Fix**: Changed all Lua-dependent tests to `#[tokio::test(flavor = "multi_thread")]`
+
+2. **Tool Registration Conflicts** (6 test failures):
+   - **Root Cause**: Tests manually registering tools (calculator, datetime, uuid_generator) already registered by `register_all_tools()`
+   - **Error**: `Validation { message: "Tool 'calculator' already registered", field: Some("tool_name") }`
+   - **Fix**: Removed manual `registry.register_tool()` calls, rely on automatic registration
+
+3. **Missing Error Reply Messages** (3 test timeouts):
+   - **Root Cause**: `handle_tool_invoke` returned early on errors without sending `tool_reply` messages
+   - **Error**: "Timeout waiting for tool_reply" on invalid tool names or missing parameters
+   - **Impact**: Tests expecting error responses hung for 30+ seconds waiting for replies
+   - **Fix**: Converted all early returns to proper error reply flow:
+     ```rust
+     // OLD: Early return causes timeout
+     let tool_name = content.get("name").and_then(|v| v.as_str())
+         .ok_or_else(|| anyhow!("Missing tool name"))?;
+
+     // NEW: Send error reply
+     let Some(tool_name) = content.get("name").and_then(|v| v.as_str()) else {
+         let error_response = json!({
+             "msg_type": "tool_reply",
+             "content": {
+                 "status": "error",
+                 "error": "Missing or invalid tool name",
+                 "error_type": "validation_error"
+             }
+         });
+         return self.send_tool_reply(error_response).await;
+     };
+     ```
+
+4. **Clippy Style Improvements** (3 warnings):
+   - `let...else` pattern preferred over `if let/else` for early returns
+   - Changed 3 instances in `handle_tool_invoke` to use `let Some(...) else { ... }` pattern
+   - Improves readability and follows Rust 2021 edition idioms
+
+5. **Event Configuration Warning Spam**:
+   - **Issue**: `WARN Events are enabled but no export method is configured` appearing twice on every CLI invocation
+   - **Root Cause**: Config validation running during both runtime and kernel creation
+   - **Why Wrong Level**: Default config should not produce warnings - this is informational, not actionable
+   - **Fix**: Changed `warn!` to `debug!` in validation.rs lines 506 and 514
+   - **Rationale**: Users shouldn't see warnings for default configuration choices
+
+**Files Modified:**
+
+1. **llmspell-kernel/tests/tool_registry_test.rs**:
+   - Added `flavor = "multi_thread"` to 8 test functions
+   - Removed manual tool registration (calculator, datetime) from 6 tests
+   - Removed unused imports (CalculatorTool, DateTimeHandlerTool, UuidGeneratorTool)
+
+2. **llmspell-bridge/tests/component_registry_test.rs**:
+   - Added `flavor = "multi_thread"` to 2 test functions
+   - Removed manual tool registration from both tests
+   - Removed unused imports from top of file
+   - Fixed `uninlined_format_args` warnings in assertions
+
+3. **llmspell-kernel/src/execution/integrated.rs**:
+   - Line 2111: Added error reply for missing tool name (was early return)
+   - Line 2147: Added error reply for missing ComponentRegistry (was early return)
+   - Line 2161: Added error reply for tool not found (was early return)
+   - Refactored all three to use `let Some(...) else { ... }` pattern
+
+4. **llmspell-kernel/src/transport/inprocess.rs**:
+   - Line 413: Added `setup_paired_channel()` call in test before bind/connect
+   - **Issue**: Test created pair but didn't pair channels before using them
+   - **Fix**: Explicitly setup paired channel for "shell" before bind/connect
+
+5. **llmspell-config/src/validation.rs**:
+   - Line 506: Changed `warn!` to `debug!` for "All event types are disabled"
+   - Line 514: Changed `warn!` to `debug!` for "no export method configured"
+
+**Test Results:**
+```bash
+# Before fixes
+cargo test -p llmspell-kernel --test tool_registry_test --all-features
+test result: FAILED. 0 passed; 8 failed; 0 ignored
+# Runtime errors: "can call blocking only when running on multi-threaded runtime"
+# Validation errors: "Tool 'calculator' already registered"
+# Timeout errors: "Timeout waiting for tool_reply"
+
+# After fixes
+cargo test -p llmspell-kernel --test tool_registry_test --all-features
+test result: ok. 8 passed; 0 failed; 0 ignored; finished in 1.08s
+
+cargo test -p llmspell-bridge --test component_registry_test --all-features
+test result: ok. 2 passed; 0 failed; 0 ignored; finished in 0.80s
+
+cargo test -p llmspell-kernel --lib --all-features
+test result: ok. 605 passed; 0 failed; 2 ignored; finished in 1.36s
+
+cargo test --workspace --all-features
+# All 605+ tests pass
+```
+
+**Clippy Verification:**
+```bash
+cargo clippy --workspace --all-targets --all-features
+Finished `dev` profile [unoptimized + debuginfo] target(s) in 1m 24s
+# ZERO warnings
+```
+
+**CLI Output Verification:**
+```bash
+# Before fix
+target/debug/llmspell tool list
+2025-09-30T17:59:52.124298Z  WARN Events are enabled but no export method is configured
+2025-09-30T17:59:52.124420Z  WARN Events are enabled but no export method is configured
+calculator
+...
+
+# After fix
+target/debug/llmspell tool list
+calculator
+datetime_handler
+uuid_generator
+...
+# Clean output, no warnings
+```
+
+**Architecture Insights:**
+
+1. **Error Handling in Message Protocols**: When using request/reply protocols (like Jupyter's tool_request/tool_reply), **every code path must send a reply**. Early returns without replies cause timeouts on the client side.
+
+2. **Test Runtime Selection**: Lua bridge uses `block_on()` internally for sync operations, requiring multi-threaded runtime. Always use `#[tokio::test(flavor = "multi_thread")]` for tests involving Lua/Python bridges.
+
+3. **Tool Registration Lifecycle**: `register_all_tools()` is called during `ScriptRuntime::new_with_lua()`, registering 40+ tools automatically. Tests should not manually register tools that are auto-registered.
+
+4. **Warning Severity**: Configuration choices are `debug!` level, runtime problems are `warn!` level. Default configs should never produce warnings.
+
+5. **InProcess Transport Pairing**: When using `InProcessTransport::create_pair()`, must explicitly call `setup_paired_channel()` for each channel before using them. The `bind()`/`connect()` methods alone don't create paired channels.
+
+**Quality Impact:**
+- ✅ All 605+ tests pass consistently
+- ✅ Zero clippy warnings maintained
+- ✅ Clean CLI output (no spurious warnings)
+- ✅ Proper error handling for all tool request failure modes
+- ✅ Tests use correct async runtime configuration
+- ✅ Code follows Rust 2021 edition idioms (let...else pattern)
+
+**Phase 10.22 Complete:**
+- ✅ All 12 implementation tasks (10.22.1 through 10.22.12)
+- ✅ Debug output cleanup (println! → trace!/debug!)
+- ✅ Clippy warnings (33 → 0)
+- ✅ Test fixes (10 runtime errors → 0)
+- ✅ Error handling (3 timeout bugs → proper replies)
+- ✅ Configuration warnings (2 → 0 in normal operation)
+- ✅ Documentation updated (cli-command-architecture.md, kernel-protocol-architecture.md)
+- ✅ Ready for Phase 10.23
+
+---
+
 ## Phase 10.23: Performance Benchmarking (Days 25-26)
 
 ### Task 10.23.1: Create Benchmark Harness
