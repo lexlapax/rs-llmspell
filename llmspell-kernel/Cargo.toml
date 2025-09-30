@@ -108,6 +108,7 @@ metrics-exporter-prometheus = { version = "0.16", optional = true }
 llmspell-testing = { path = "../llmspell-testing", version = "0.9.0" }
 llmspell-bridge = { path = "../llmspell-bridge", version = "0.9.0", features = ["lua"] }
 llmspell-config = { path = "../llmspell-config", version = "0.9.0" }
+llmspell-tools = { path = "../llmspell-tools", version = "0.9.0" }
 mlua = { version = "0.9", features = ["lua54", "async", "send"] }
 tokio-test = "0.4"
 proptest = "1.5"

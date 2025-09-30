@@ -17,7 +17,7 @@ use llmspell_core::traits::script_executor::{
 use std::collections::HashMap;
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
-use tracing::{debug, info};
+use tracing::{debug, error, info};
 use uuid::Uuid;
 
 /// Configuration for starting a kernel service
@@ -108,8 +108,13 @@ impl KernelHandle {
         // Create tool_request message
         let request = self.protocol.create_request("tool_request", content)?;
 
+        // Debug transport type and send
+        println!("DEBUG: About to send on transport");
+        println!("DEBUG: Sending request on shell channel, message size: {}", request.len());
+
         // Send request through transport
         self.transport.send("shell", vec![request]).await?;
+        println!("DEBUG: Send completed successfully");
 
         // Wait for tool_reply
         let start_time = std::time::Instant::now();
@@ -121,17 +126,48 @@ impl KernelHandle {
             }
 
             if let Some(reply_parts) = self.transport.recv("shell").await? {
-                if let Some(first_part) = reply_parts.first() {
-                    // Parse reply and check message type
-                    let reply_msg = self.protocol.parse_message(first_part)?;
+                println!("DEBUG: Client received {} parts on shell channel", reply_parts.len());
 
-                    // Check if this is a tool_reply
-                    if let Some(header) = reply_msg.get("header") {
-                        if let Some(msg_type) = header.get("msg_type") {
-                            if msg_type == "tool_reply" {
-                                // Extract and return the content
-                                if let Some(content) = reply_msg.get("content") {
-                                    return Ok(content.clone());
+                // Handle multipart Jupyter wire protocol format
+                let delimiter = b"<IDS|MSG>";
+                let delimiter_idx = reply_parts
+                    .iter()
+                    .position(|part| part.as_slice() == delimiter);
+
+                let reply_msg: HashMap<String, serde_json::Value> = if let Some(idx) = delimiter_idx {
+                    // Parse multipart message (header at idx+2, content at idx+5)
+                    if reply_parts.len() > idx + 5 {
+                        let header = serde_json::from_slice::<serde_json::Value>(&reply_parts[idx + 2])?;
+                        let content = serde_json::from_slice::<serde_json::Value>(&reply_parts[idx + 5])?;
+
+                        let mut msg = HashMap::new();
+                        msg.insert("header".to_string(), header);
+                        msg.insert("content".to_string(), content);
+                        msg
+                    } else {
+                        continue; // Incomplete message, wait for next
+                    }
+                } else if let Some(first_part) = reply_parts.first() {
+                    // Try parsing as simple JSON message for backward compatibility
+                    match self.protocol.parse_message(first_part) {
+                        Ok(msg) => msg,
+                        Err(_) => continue, // Not a valid message, wait for next
+                    }
+                } else {
+                    continue; // No parts, wait for next
+                };
+
+                // Check if this is a tool_reply
+                if let Some(header) = reply_msg.get("header") {
+                    if let Some(msg_type) = header.get("msg_type") {
+                        if msg_type == "tool_reply" {
+                            // Extract and return the content's content field
+                            if let Some(content_wrapper) = reply_msg.get("content") {
+                                // The content contains the actual response nested in a "content" field
+                                if let Some(actual_content) = content_wrapper.get("content") {
+                                    return Ok(actual_content.clone());
+                                } else {
+                                    return Ok(content_wrapper.clone());
                                 }
                             }
                         }
@@ -228,17 +264,48 @@ impl ClientHandle {
             }
 
             if let Some(reply_parts) = self.transport.recv("shell").await? {
-                if let Some(first_part) = reply_parts.first() {
-                    // Parse reply and check message type
-                    let reply_msg = self.protocol.parse_message(first_part)?;
+                println!("DEBUG: Client received {} parts on shell channel", reply_parts.len());
 
-                    // Check if this is a tool_reply
-                    if let Some(header) = reply_msg.get("header") {
-                        if let Some(msg_type) = header.get("msg_type") {
-                            if msg_type == "tool_reply" {
-                                // Extract and return the content
-                                if let Some(content) = reply_msg.get("content") {
-                                    return Ok(content.clone());
+                // Handle multipart Jupyter wire protocol format
+                let delimiter = b"<IDS|MSG>";
+                let delimiter_idx = reply_parts
+                    .iter()
+                    .position(|part| part.as_slice() == delimiter);
+
+                let reply_msg: HashMap<String, serde_json::Value> = if let Some(idx) = delimiter_idx {
+                    // Parse multipart message (header at idx+2, content at idx+5)
+                    if reply_parts.len() > idx + 5 {
+                        let header = serde_json::from_slice::<serde_json::Value>(&reply_parts[idx + 2])?;
+                        let content = serde_json::from_slice::<serde_json::Value>(&reply_parts[idx + 5])?;
+
+                        let mut msg = HashMap::new();
+                        msg.insert("header".to_string(), header);
+                        msg.insert("content".to_string(), content);
+                        msg
+                    } else {
+                        continue; // Incomplete message, wait for next
+                    }
+                } else if let Some(first_part) = reply_parts.first() {
+                    // Try parsing as simple JSON message for backward compatibility
+                    match self.protocol.parse_message(first_part) {
+                        Ok(msg) => msg,
+                        Err(_) => continue, // Not a valid message, wait for next
+                    }
+                } else {
+                    continue; // No parts, wait for next
+                };
+
+                // Check if this is a tool_reply
+                if let Some(header) = reply_msg.get("header") {
+                    if let Some(msg_type) = header.get("msg_type") {
+                        if msg_type == "tool_reply" {
+                            // Extract and return the content's content field
+                            if let Some(content_wrapper) = reply_msg.get("content") {
+                                // The content contains the actual response nested in a "content" field
+                                if let Some(actual_content) = content_wrapper.get("content") {
+                                    return Ok(actual_content.clone());
+                                } else {
+                                    return Ok(content_wrapper.clone());
                                 }
                             }
                         }
@@ -306,6 +373,7 @@ pub async fn start_embedded_kernel_with_executor(
     config: LLMSpellConfig,
     script_executor: Arc<dyn ScriptExecutor>,
 ) -> Result<KernelHandle> {
+    println!("DEBUG: start_embedded_kernel_with_executor CALLED!");
     let kernel_id = format!("embedded-{}", Uuid::new_v4());
     let session_id = format!("session-{}", Uuid::new_v4());
 
@@ -314,8 +382,13 @@ pub async fn start_embedded_kernel_with_executor(
     // Create Jupyter protocol
     let protocol = JupyterProtocol::new(session_id.clone(), kernel_id.clone());
 
-    // Create in-process transport
-    let transport = Arc::new(InProcessTransport::new());
+    // Create bidirectional in-process transport pair
+    // Important: We must use create_pair() to ensure transports can communicate
+    let (mut kernel_transport, mut client_transport) = InProcessTransport::create_pair();
+
+    println!("DEBUG: Created transport pair - kernel: {:p}, client: {:p}",
+             &kernel_transport as *const _, &client_transport as *const _);
+    debug!("Created transport pair in start_embedded_kernel_with_executor");
 
     // Setup Jupyter 5-channel configuration
     let mut transport_config = TransportConfig {
@@ -325,9 +398,7 @@ pub async fn start_embedded_kernel_with_executor(
         auth_key: None,
     };
 
-    // TODO: This function path is not used by the CLI and should be removed
-    // The actual path is through start_kernel_service_with_config
-    // Original code that doesn't work:
+    // Setup required Jupyter channels
     for channel in &["shell", "iopub", "stdin", "control", "heartbeat"] {
         transport_config.channels.insert(
             (*channel).to_string(),
@@ -339,27 +410,90 @@ pub async fn start_embedded_kernel_with_executor(
         );
     }
 
-    // Bind transport to channels (this won't work with empty endpoints)
-    let mut transport_mut = (*transport).clone();
-    let _bound_ports = transport_mut.bind(&transport_config).await?;
+    // Setup paired channels for bidirectional communication
+    // This is crucial - we MUST set up the channels BEFORE passing the transports
+    println!("DEBUG: About to setup paired channels, count: {}", transport_config.channels.len());
+    for channel_name in transport_config.channels.keys() {
+        println!("DEBUG: Setting up paired channel: {}", channel_name);
+        InProcessTransport::setup_paired_channel(&mut kernel_transport, &mut client_transport, channel_name);
+        debug!("Setup paired channel: {}", channel_name);
+    }
+    println!("DEBUG: Finished setting up all paired channels");
+
+    // Verify channels immediately after setup
+    println!("DEBUG: Verifying client transport channels after setup:");
+    for (name, pair) in client_transport.get_channels_map().read().iter() {
+        println!("  [{}] sender: {:p}", name, &pair.sender as *const _);
+    }
 
     // Build execution config from LLMSpellConfig
     let exec_config = build_execution_config(&config);
 
-    // Use the provided script executor
+    // Use the provided script executor (clone it for sharing between kernels)
+    let script_executor_clone = script_executor.clone();
     // Create integrated kernel with the provided executor
     let mut kernel =
-        IntegratedKernel::new(protocol.clone(), exec_config, session_id, script_executor).await?;
+        IntegratedKernel::new(protocol.clone(), exec_config.clone(), session_id.clone(), script_executor).await?;
 
-    // Set transport for message processing
-    kernel.set_transport(Box::new(transport_mut));
+    // Debug kernel transport before setting
+    println!("DEBUG: Kernel transport channels before set_transport:");
+    for (name, pair) in kernel_transport.get_channels_map().read().iter() {
+        println!("  [{}] sender: {:p}", name, &pair.sender as *const _);
+    }
+    println!("DEBUG: Kernel transport reverse_channels before set_transport:");
+    for (name, pair) in kernel_transport.get_reverse_channels_map().read().iter() {
+        println!("  [{}] receiver: {:p}", name, Arc::as_ptr(&pair.receiver));
+    }
 
-    Ok(KernelHandle {
-        kernel,
-        kernel_id,
-        transport,
+    // Set kernel transport for kernel message processing
+    println!("DEBUG: About to set_transport, kernel_transport at {:p}", &kernel_transport as *const _);
+    println!("DEBUG: kernel_transport channels Arc: {:p}", Arc::as_ptr(kernel_transport.get_channels_map()));
+    println!("DEBUG: kernel_transport reverse_channels Arc: {:p}", Arc::as_ptr(kernel_transport.get_reverse_channels_map()));
+    kernel.set_transport(Box::new(kernel_transport));
+    println!("DEBUG: set_transport completed");
+
+    // Spawn the kernel to run in background and process messages
+    let kernel_id_clone = kernel_id.clone();
+    tokio::spawn(async move {
+        debug!("Starting embedded kernel {} event loop", kernel_id_clone);
+        if let Err(e) = kernel.run().await {
+            error!("Embedded kernel {} event loop failed: {}", kernel_id_clone, e);
+        } else {
+            debug!("Embedded kernel {} event loop completed", kernel_id_clone);
+        }
+    });
+
+    // For embedded mode, create a minimal kernel handle that only contains what's needed for message sending
+    // The actual kernel is running in the background spawn
+    let dummy_kernel = IntegratedKernel::new(
+        protocol.clone(),
+        exec_config.clone(),
+        format!("dummy-{}", session_id),
+        script_executor_clone
+    ).await?;
+
+    println!("DEBUG: Creating KernelHandle with client_transport at {:p}",
+             &client_transport as *const _);
+
+    // Check what channels the client transport has before wrapping in Arc
+    println!("DEBUG: Client transport channels before Arc:");
+    for (name, pair) in client_transport.get_channels_map().read().iter() {
+        println!("  [{}] sender: {:p}", name, &pair.sender as *const _);
+    }
+
+    let transport_arc = Arc::new(client_transport);
+    println!("DEBUG: Created Arc<InProcessTransport> at {:p}", Arc::as_ptr(&transport_arc));
+
+    let handle = KernelHandle {
+        kernel: dummy_kernel,  // This won't be used for embedded mode - only transport and protocol matter
+        kernel_id: kernel_id.clone(),
+        transport: transport_arc,  // CLI uses client transport
         protocol,
-    })
+    };
+    debug!("Created KernelHandle with kernel_id: {}", kernel_id);
+    println!("DEBUG: KernelHandle created with transport Arc at {:p}",
+             Arc::as_ptr(&handle.transport));
+    Ok(handle)
 }
 
 /// Start an embedded kernel that runs in-process

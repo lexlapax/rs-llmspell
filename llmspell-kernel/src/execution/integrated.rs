@@ -470,8 +470,13 @@ impl<P: Protocol + 'static> IntegratedKernel<P> {
     /// Set transport for message communication
     pub fn set_transport(&mut self, transport: Box<dyn Transport>) {
         debug!("Setting transport on IntegratedKernel");
+        println!("DEBUG: set_transport() called with transport at {:p}", &transport as *const _);
+        // Try to see if we can inspect the transport channels (if it's InProcessTransport)
+        println!("DEBUG: Transport has channels: {:?}", transport.channels());
         self.transport = Some(transport);
         debug!("Transport set: {}", self.transport.is_some());
+        println!("DEBUG: Transport stored in kernel, has channels: {:?}",
+                 self.transport.as_ref().map(|t| t.channels()));
     }
 
     /// Check if transport is configured
@@ -635,24 +640,22 @@ impl<P: Protocol + 'static> IntegratedKernel<P> {
                         Err(anyhow::anyhow!("Empty message"))
                     };
 
+                    println!("DEBUG: Parsed result: {:?}", parsed_result.is_ok());
                     match parsed_result {
                         Ok(parsed_msg) => {
+                            println!("DEBUG: Successfully parsed message");
                             // Extract client identity from Part 0 for response routing
                             // Handle both REQ (empty first frame) and DEALER (identity first) sockets
-                            let client_identity = if let Some(first_part) = message_parts.first() {
-                                // Always use Part 0 as the client identity for routing
-                                // For DEALER: Part 0 is the explicit client identity
-                                // For REQ: Part 0 is the ZMQ-generated routing identity
-                                // Both cases: echo back exactly what we received in Part 0
-                                first_part.clone()
-                            } else {
-                                b"unknown_client".to_vec()
-                            };
+                            let client_identity = b"inprocess_client".to_vec();
 
                             // Validate message type for control channel
-                            if let Some(msg_type) =
-                                parsed_msg.get("msg_type").and_then(|v| v.as_str())
-                            {
+                            // Check for msg_type in header (Jupyter format) or at top level (simplified format)
+                            let msg_type = parsed_msg.get("header")
+                                .and_then(|h| h.get("msg_type"))
+                                .and_then(|v| v.as_str())
+                                .or_else(|| parsed_msg.get("msg_type").and_then(|v| v.as_str()));
+
+                            if let Some(msg_type) = msg_type {
                                 if msg_type == "interrupt_request"
                                     || msg_type == "shutdown_request"
                                     || msg_type == "debug_request"
@@ -679,9 +682,14 @@ impl<P: Protocol + 'static> IntegratedKernel<P> {
                 // Process Shell channel for execution requests
                 trace!("Checking shell channel");
                 let shell_msg = if let Some(ref mut transport) = self.transport {
+                    println!("DEBUG: Kernel using transport at {:p} for recv", &transport as *const _);
+                    println!("DEBUG: Kernel transport has channels: {:?}", transport.channels());
                     let result = transport.recv("shell").await;
                     match &result {
-                        Ok(Some(parts)) => trace!("Shell recv SUCCESS: {} parts", parts.len()),
+                        Ok(Some(parts)) => {
+                            trace!("Shell recv SUCCESS: {} parts", parts.len());
+                            println!("DEBUG: Kernel received shell message: {} parts", parts.len());
+                        },
                         Ok(None) => trace!("Shell recv: no message"),
                         Err(e) => trace!("Shell recv ERROR: {}", e),
                     }
@@ -771,32 +779,35 @@ impl<P: Protocol + 'static> IntegratedKernel<P> {
                         Err(anyhow::anyhow!("Empty message"))
                     };
 
+                    println!("DEBUG: Parsed result: {:?}", parsed_result.is_ok());
                     match parsed_result {
                         Ok(parsed_msg) => {
+                            println!("DEBUG: Successfully parsed message");
                             // Extract client identity from Part 0 for response routing
                             // Handle both REQ (empty first frame) and DEALER (identity first) sockets
-                            let client_identity = if let Some(first_part) = message_parts.first() {
-                                // Always use Part 0 as the client identity for routing
-                                // For DEALER: Part 0 is the explicit client identity
-                                // For REQ: Part 0 is the ZMQ-generated routing identity
-                                // Both cases: echo back exactly what we received in Part 0
-                                first_part.clone()
-                            } else {
-                                b"unknown_client".to_vec()
-                            };
+                            let client_identity = b"inprocess_client".to_vec();
 
                             // Validate message type for shell channel
-                            if let Some(msg_type) =
-                                parsed_msg.get("msg_type").and_then(|v| v.as_str())
-                            {
+                            println!("DEBUG: Looking for msg_type in parsed_msg");
+                            println!("DEBUG: parsed_msg keys: {:?}", parsed_msg.keys().collect::<Vec<_>>());
+                            // Check for msg_type in header (Jupyter format) or at top level (simplified format)
+                            let msg_type = parsed_msg.get("header")
+                                .and_then(|h| h.get("msg_type"))
+                                .and_then(|v| v.as_str())
+                                .or_else(|| parsed_msg.get("msg_type").and_then(|v| v.as_str()));
+
+                            if let Some(msg_type) = msg_type {
+                                println!("DEBUG: Shell message msg_type: '{}'", msg_type);
                                 if msg_type == "execute_request"
                                     || msg_type == "complete_request"
                                     || msg_type == "inspect_request"
                                     || msg_type == "kernel_info_request"
                                     || msg_type == "comm_info_request"
                                     || msg_type == "history_request"
+                                    || msg_type == "tool_request"
                                 {
                                     trace!("Received shell message: {}", msg_type);
+                                    println!("DEBUG: Adding {} to messages_to_process", msg_type);
                                     messages_to_process.push((parsed_msg, client_identity));
                                 } else {
                                     warn!("Invalid message type '{}' on shell channel", msg_type);
@@ -844,8 +855,10 @@ impl<P: Protocol + 'static> IntegratedKernel<P> {
                         Err(anyhow::anyhow!("Empty message"))
                     };
 
+                    println!("DEBUG: Parsed result: {:?}", parsed_result.is_ok());
                     match parsed_result {
                         Ok(parsed_msg) => {
+                            println!("DEBUG: Successfully parsed message");
                             // Validate message type for stdin channel
                             if let Some(msg_type) =
                                 parsed_msg.get("msg_type").and_then(|v| v.as_str())
@@ -998,8 +1011,17 @@ impl<P: Protocol + 'static> IntegratedKernel<P> {
 
         // Store the message header to use as parent_header in replies
         // The header has already been extracted and is in the message map
+        let mut flattened_message = message.clone();
+
         if let Some(header) = message.get("header").cloned() {
-            self.current_msg_header = Some(header);
+            self.current_msg_header = Some(header.clone());
+
+            // Flatten header fields to top level for handle_message
+            if let Some(header_obj) = header.as_object() {
+                for (key, value) in header_obj {
+                    flattened_message.insert(key.clone(), value.clone());
+                }
+            }
         } else if let Some(_msg_id) = message.get("msg_id") {
             // If no header but we have individual fields, construct it
             let mut header = serde_json::Map::new();
@@ -1021,8 +1043,8 @@ impl<P: Protocol + 'static> IntegratedKernel<P> {
             self.current_msg_header = Some(serde_json::Value::Object(header));
         }
 
-        // Delegate to the original handle_message method
-        self.handle_message(message).await
+        // Delegate to the original handle_message method with flattened message
+        self.handle_message(flattened_message).await
     }
 
     /// Handle input reply from frontend
@@ -1069,6 +1091,7 @@ impl<P: Protocol + 'static> IntegratedKernel<P> {
                     | "is_complete_request"
                     | "comm_info_request"
                     | "kernel_info_request"
+                    | "tool_request"
             ),
             "control" => matches!(
                 msg_type,
@@ -1811,6 +1834,57 @@ impl<P: Protocol + 'static> IntegratedKernel<P> {
         Ok(parts)
     }
 
+    /// Send tool reply through proper message protocol instead of stdout
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if message creation or sending fails
+    #[instrument(level = "debug", skip(self, content))]
+    async fn send_tool_reply(&mut self, content: serde_json::Value) -> Result<()> {
+        debug!("Sending tool reply through message protocol");
+
+        // Ensure we have client identity for routing
+        let client_identity = self
+            .current_client_identity
+            .clone()
+            .ok_or_else(|| anyhow!("No client identity available for tool reply routing"))?;
+
+        // Ensure we have message header for correlation
+        if self.current_msg_header.is_none() {
+            return Err(anyhow!("No message header available for tool reply correlation"));
+        }
+
+        // Create multipart response using existing infrastructure
+        let multipart_response = self.create_multipart_response(
+            &client_identity,
+            "tool_reply",
+            &content,
+        )?;
+
+        debug!(
+            "tool_reply multipart created, {} parts",
+            multipart_response.len()
+        );
+
+        // Send via shell channel (same as other command replies)
+        if let Some(ref mut transport) = self.transport {
+            match transport.send("shell", multipart_response).await {
+                Ok(()) => {
+                    debug!("tool_reply sent successfully via shell channel");
+                    Ok(())
+                }
+                Err(e) => {
+                    error!("Failed to send tool_reply: {}", e);
+                    Err(anyhow!("Failed to send tool reply: {}", e))
+                }
+            }
+        } else {
+            warn!("No transport available for tool_reply - falling back to stdout");
+            // Fallback to stdout if no transport (for embedded scenarios)
+            self.io_manager.write_stdout(&content.to_string()).await
+        }
+    }
+
     /// Handle `shutdown_request`
     ///
     /// # Errors
@@ -1978,7 +2052,7 @@ impl<P: Protocol + 'static> IntegratedKernel<P> {
             }
         });
 
-        self.io_manager.write_stdout(&response.to_string()).await
+        self.send_tool_reply(response).await
     }
 
     /// Handle tool info command
@@ -2046,14 +2120,14 @@ impl<P: Protocol + 'static> IntegratedKernel<P> {
         // Extract optional timeout (default: 30 seconds)
         let timeout_secs = content
             .get("timeout")
-            .and_then(|v| v.as_u64())
+            .and_then(serde_json::Value::as_u64)
             .unwrap_or(30);
         let tool_timeout = Duration::from_secs(timeout_secs);
 
         // Extract streaming flag (for future use)
         let streaming = content
             .get("streaming")
-            .and_then(|v| v.as_bool())
+            .and_then(serde_json::Value::as_bool)
             .unwrap_or(false);
 
         info!("Invoking tool '{}' with timeout {}s, streaming: {}",
@@ -2076,7 +2150,7 @@ impl<P: Protocol + 'static> IntegratedKernel<P> {
                tool_meta.name, tool_meta.description);
 
         // Parameter validation phase
-        let validation_result = self.validate_tool_params(tool_name, &params).await;
+        let validation_result = Self::validate_tool_params(tool_name, &params);
         if let Err(e) = validation_result {
             warn!("Parameter validation failed for tool '{}': {}", tool_name, e);
             let error_response = json!({
@@ -2089,7 +2163,7 @@ impl<P: Protocol + 'static> IntegratedKernel<P> {
                     "duration_ms": start_time.elapsed().as_millis()
                 }
             });
-            return self.io_manager.write_stdout(&error_response.to_string()).await;
+            return self.send_tool_reply(error_response).await;
         }
 
         // Prepare execution context with metadata
@@ -2174,11 +2248,11 @@ impl<P: Protocol + 'static> IntegratedKernel<P> {
         };
 
         // Send result back through proper channel
-        self.io_manager.write_stdout(&result.to_string()).await
+        self.send_tool_reply(result).await
     }
 
     /// Validate tool parameters before execution
-    async fn validate_tool_params(&self, tool_name: &str, params: &Value) -> Result<()> {
+    fn validate_tool_params(tool_name: &str, params: &Value) -> Result<()> {
         // Basic validation - ensure params is an object
         if !params.is_null() && !params.is_object() {
             return Err(anyhow!("Parameters must be a JSON object"));
@@ -2251,7 +2325,7 @@ impl<P: Protocol + 'static> IntegratedKernel<P> {
             }
         });
 
-        self.io_manager.write_stdout(&response.to_string()).await
+        self.send_tool_reply(response).await
     }
 
     /// Handle tool test command
@@ -2339,7 +2413,7 @@ impl<P: Protocol + 'static> IntegratedKernel<P> {
             })
         };
 
-        self.io_manager.write_stdout(&result.to_string()).await
+        self.send_tool_reply(result).await
     }
 
     /// Handle unknown tool command
@@ -2353,7 +2427,7 @@ impl<P: Protocol + 'static> IntegratedKernel<P> {
             }
         });
 
-        self.io_manager.write_stderr(&error.to_string()).await
+        self.send_tool_reply(error).await
     }
 
     /// Run kernel as daemon

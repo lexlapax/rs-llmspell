@@ -433,3 +433,214 @@ async fn test_tool_invocation_error_handling() {
     assert!(response["error"].as_str().unwrap_or("").contains("validation") ||
             response["error"].as_str().unwrap_or("").contains("object"));
 }
+
+#[cfg(feature = "lua")]
+#[tokio::test]
+async fn test_tool_reply_message_routing() {
+    use llmspell_bridge::ScriptRuntime;
+    use llmspell_config::LLMSpellConfig;
+    use llmspell_kernel::api::start_embedded_kernel_with_executor;
+    use llmspell_tools::util::CalculatorTool;
+    use serde_json::json;
+    use std::sync::Arc;
+
+    // Create runtime and register tools
+    let config = LLMSpellConfig::default();
+    let runtime = ScriptRuntime::new_with_lua(config.clone())
+        .await
+        .expect("Failed to create runtime");
+
+    runtime.registry()
+        .register_tool("calculator".to_string(), Arc::new(CalculatorTool::new()))
+        .expect("Failed to register calculator");
+
+    // Create kernel with executor
+    let executor = Arc::new(runtime);
+    let mut kernel_handle = start_embedded_kernel_with_executor(config, executor.clone())
+        .await
+        .expect("Failed to start kernel");
+
+    // Test 1: Tool list should return proper message structure
+    let list_request = json!({
+        "command": "list",
+    });
+
+    let response = kernel_handle
+        .send_tool_request(list_request)
+        .await
+        .expect("Failed to send tool list request");
+
+    // Verify message structure indicates proper routing (not stdout)
+    assert!(response.get("tools").is_some(), "Should have tools field from proper message routing");
+    assert!(response.get("count").is_some(), "Should have count field from proper message routing");
+
+    // Test 2: Tool invoke should return structured response through message protocol
+    let invoke_request = json!({
+        "command": "invoke",
+        "name": "calculator",
+        "params": {
+            "expression": "5 + 5"
+        }
+    });
+
+    let response = kernel_handle
+        .send_tool_request(invoke_request)
+        .await
+        .expect("Failed to send tool invoke request");
+
+    // Verify structured response (not raw stdout text)
+    assert!(response.get("status").is_some(), "Should have structured status field");
+    assert!(response.get("tool").is_some(), "Should have tool name field");
+
+    // Test 3: Error responses should also use message protocol
+    let error_request = json!({
+        "command": "invoke",
+        "name": "nonexistent_tool",
+        "params": {}
+    });
+
+    let response = kernel_handle
+        .send_tool_request(error_request)
+        .await
+        .expect("Failed to send error request");
+
+    assert_eq!(response["status"].as_str(), Some("error"));
+    assert!(response.get("error").is_some(), "Should have structured error field");
+}
+
+#[cfg(feature = "lua")]
+#[tokio::test]
+async fn test_message_correlation_and_identity() {
+    use llmspell_bridge::ScriptRuntime;
+    use llmspell_config::LLMSpellConfig;
+    use llmspell_kernel::api::start_embedded_kernel_with_executor;
+    use llmspell_tools::util::CalculatorTool;
+    use serde_json::json;
+    use std::sync::Arc;
+
+    let config = LLMSpellConfig::default();
+    let runtime = ScriptRuntime::new_with_lua(config.clone())
+        .await
+        .expect("Failed to create runtime");
+
+    runtime.registry()
+        .register_tool("calculator".to_string(), Arc::new(CalculatorTool::new()))
+        .expect("Failed to register calculator");
+
+    let executor = Arc::new(runtime);
+    let mut kernel_handle = start_embedded_kernel_with_executor(config, executor.clone())
+        .await
+        .expect("Failed to start kernel");
+
+    // Test that multiple concurrent requests maintain proper correlation
+    let requests = vec![
+        json!({"command": "list"}),
+        json!({"command": "invoke", "name": "calculator", "params": {"expression": "1 + 1"}}),
+        json!({"command": "invoke", "name": "calculator", "params": {"expression": "2 * 3"}}),
+    ];
+
+    let mut responses = Vec::new();
+    for request in requests {
+        let response = kernel_handle
+            .send_tool_request(request)
+            .await
+            .expect("Failed to send request");
+        responses.push(response);
+    }
+
+    // Verify all responses are properly structured (indicating message protocol routing)
+    assert_eq!(responses.len(), 3);
+
+    // First response should be tool list
+    assert!(responses[0].get("tools").is_some());
+
+    // Second and third should be invoke results
+    for i in 1..3 {
+        assert!(responses[i].get("status").is_some());
+        assert_eq!(responses[i]["tool"].as_str(), Some("calculator"));
+    }
+}
+
+#[cfg(feature = "lua")]
+#[tokio::test]
+async fn test_bidirectional_communication_flow() {
+    use llmspell_bridge::ScriptRuntime;
+    use llmspell_config::LLMSpellConfig;
+    use llmspell_kernel::api::start_embedded_kernel_with_executor;
+    use llmspell_tools::util::{CalculatorTool, DateTimeHandlerTool};
+    use serde_json::json;
+    use std::sync::Arc;
+
+    let config = LLMSpellConfig::default();
+    let runtime = ScriptRuntime::new_with_lua(config.clone())
+        .await
+        .expect("Failed to create runtime");
+
+    // Register multiple tools
+    runtime.registry()
+        .register_tool("calculator".to_string(), Arc::new(CalculatorTool::new()))
+        .expect("Failed to register calculator");
+    runtime.registry()
+        .register_tool("datetime".to_string(), Arc::new(DateTimeHandlerTool::new()))
+        .expect("Failed to register datetime");
+
+    let executor = Arc::new(runtime);
+    let mut kernel_handle = start_embedded_kernel_with_executor(config, executor.clone())
+        .await
+        .expect("Failed to start kernel");
+
+    // Test complete bidirectional flow: CLI → Kernel → Tool → Kernel → CLI
+
+    // 1. List tools (should return multiple tools)
+    let list_response = kernel_handle
+        .send_tool_request(json!({"command": "list"}))
+        .await
+        .expect("Failed to list tools");
+
+    let tools = list_response["tools"].as_array().unwrap();
+    assert!(tools.len() >= 2, "Should have at least 2 registered tools");
+
+    // 2. Test each tool to verify bidirectional communication
+    let test_cases = vec![
+        ("calculator", json!({"expression": "10 / 2"})),
+        ("datetime", json!({"format": "iso"})),
+    ];
+
+    for (tool_name, params) in test_cases {
+        // Send tool request
+        let request = json!({
+            "command": "invoke",
+            "name": tool_name,
+            "params": params
+        });
+
+        let response = kernel_handle
+            .send_tool_request(request)
+            .await
+            .expect(&format!("Failed to invoke {}", tool_name));
+
+        // Verify structured response through message protocol
+        assert!(response.get("status").is_some(), "Tool {} should return structured status", tool_name);
+        assert_eq!(response["tool"].as_str(), Some(tool_name), "Tool name should be preserved");
+
+        // For successful tools, should have result field
+        if response["status"] == "ok" {
+            assert!(response.get("result").is_some(), "Successful tool {} should have result", tool_name);
+        }
+    }
+
+    // 3. Test error handling preserves message structure
+    let error_request = json!({
+        "command": "invoke",
+        "name": "invalid_tool",
+        "params": {}
+    });
+
+    let error_response = kernel_handle
+        .send_tool_request(error_request)
+        .await
+        .expect("Failed to send error request");
+
+    assert_eq!(error_response["status"].as_str(), Some("error"));
+    assert!(error_response.get("error").is_some());
+}

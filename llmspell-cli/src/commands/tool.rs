@@ -31,12 +31,15 @@ pub async fn handle_tool_command(
     )
     .await?;
 
+    println!("DEBUG: ExecutionContext resolved, checking type...");
     match context {
         ExecutionContext::Embedded { handle, config } => {
+            println!("DEBUG: Using Embedded context, calling handle_tool_embedded");
             // For embedded mode, send tool requests to embedded kernel
             handle_tool_embedded(command, handle, config, output_format).await
         }
         ExecutionContext::Connected { handle, address } => {
+            println!("DEBUG: Using Connected context at address: {}", address);
             // For connected mode, send tool requests to remote kernel
             handle_tool_remote(command, handle, address, output_format).await
         }
@@ -50,6 +53,7 @@ async fn handle_tool_embedded(
     _config: Box<LLMSpellConfig>,
     output_format: OutputFormat,
 ) -> Result<()> {
+    println!("DEBUG: handle_tool_embedded called with command: {:?}", command);
     trace!("Handling tool command in embedded mode");
 
     match command {
@@ -65,8 +69,10 @@ async fn handle_tool_embedded(
                 "category": category,
             });
 
+            println!("DEBUG: About to call send_tool_request with content: {:?}", request_content);
             // Send request to kernel and wait for response
             let response = handle.send_tool_request(request_content).await?;
+            println!("DEBUG: send_tool_request returned successfully");
 
             // Extract tools from response
             let tools = response
