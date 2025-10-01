@@ -95,7 +95,7 @@ async fn test_provider_runtime_context_60_seconds() {
 
         // Report progress every 20 seconds
         let elapsed = start_time.elapsed();
-        if elapsed.as_secs() % 20 == 0 && elapsed.as_secs() > 0 {
+        if elapsed.as_secs().is_multiple_of(20) && elapsed.as_secs() > 0 {
             println!(
                 "Progress: {:.1}% complete, {} iterations in {}s",
                 (elapsed.as_secs_f64() / test_duration.as_secs_f64()) * 100.0,

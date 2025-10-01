@@ -291,8 +291,6 @@ async fn test_workflow_failure_event() {
     // Verify we got workflow.started and workflow.step.failed events
     let event_types: Vec<String> = events.iter().map(|e| e.event_type.clone()).collect();
 
-    println!("DEBUG: Events received: {event_types:?}");
-
     assert!(
         event_types.contains(&"workflow.started".to_string()),
         "Should have workflow.started event. Got: {event_types:?}"

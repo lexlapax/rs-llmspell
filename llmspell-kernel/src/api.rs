@@ -14,11 +14,32 @@ use llmspell_config::LLMSpellConfig;
 use llmspell_core::traits::script_executor::{
     ScriptExecutionMetadata, ScriptExecutionOutput, ScriptExecutor,
 };
+use llmspell_core::{Agent, ComponentLookup, Tool, Workflow};
 use std::collections::HashMap;
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
-use tracing::{debug, info};
+use tracing::{debug, error, info, trace};
 use uuid::Uuid;
+
+/// Configuration for starting a kernel service
+pub struct KernelServiceConfig {
+    /// Port to listen on
+    pub port: u16,
+    /// Execution configuration (includes daemon settings)
+    pub exec_config: crate::execution::ExecutionConfig,
+    /// Optional kernel ID
+    pub kernel_id: Option<String>,
+    /// Optional connection file path
+    pub connection_file_path: Option<PathBuf>,
+    /// Maximum number of clients (TODO: Implement limiting)
+    pub max_clients: usize,
+    /// Log rotation size limit in bytes
+    pub log_rotate_size: Option<u64>,
+    /// Number of log files to keep
+    pub log_rotate_count: usize,
+    /// Script executor implementation
+    pub script_executor: Arc<dyn ScriptExecutor>,
+}
 
 /// Handle for an embedded kernel running in-process
 pub struct KernelHandle {
@@ -70,6 +91,95 @@ impl KernelHandle {
                     if let Some(content) = reply_msg.get("content") {
                         // Extract execution result
                         return Ok(format!("Result: {content:?}"));
+                    }
+                }
+            }
+            tokio::time::sleep(tokio::time::Duration::from_millis(10)).await;
+        }
+    }
+
+    /// Send a tool request to the kernel and return the response
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the request fails or communication with kernel fails
+    pub async fn send_tool_request(
+        &mut self,
+        content: serde_json::Value,
+    ) -> Result<serde_json::Value> {
+        debug!("Sending tool request to kernel {}", self.kernel_id);
+
+        // Create tool_request message
+        let request = self.protocol.create_request("tool_request", content)?;
+
+        debug!(
+            "Sending tool_request on shell channel, message size: {}",
+            request.len()
+        );
+
+        // Send request through transport
+        self.transport.send("shell", vec![request]).await?;
+
+        // Wait for tool_reply
+        let start_time = std::time::Instant::now();
+        let timeout = std::time::Duration::from_secs(30);
+
+        loop {
+            if start_time.elapsed() > timeout {
+                return Err(anyhow::anyhow!("Timeout waiting for tool_reply"));
+            }
+
+            if let Some(reply_parts) = self.transport.recv("shell").await? {
+                trace!(
+                    "Client received {} parts on shell channel",
+                    reply_parts.len()
+                );
+
+                // Handle multipart Jupyter wire protocol format
+                let delimiter = b"<IDS|MSG>";
+                let delimiter_idx = reply_parts
+                    .iter()
+                    .position(|part| part.as_slice() == delimiter);
+
+                let reply_msg: HashMap<String, serde_json::Value> = if let Some(idx) = delimiter_idx
+                {
+                    // Parse multipart message (header at idx+2, content at idx+5)
+                    if reply_parts.len() > idx + 5 {
+                        let header =
+                            serde_json::from_slice::<serde_json::Value>(&reply_parts[idx + 2])?;
+                        let content =
+                            serde_json::from_slice::<serde_json::Value>(&reply_parts[idx + 5])?;
+
+                        let mut msg = HashMap::new();
+                        msg.insert("header".to_string(), header);
+                        msg.insert("content".to_string(), content);
+                        msg
+                    } else {
+                        continue; // Incomplete message, wait for next
+                    }
+                } else if let Some(first_part) = reply_parts.first() {
+                    // Try parsing as simple JSON message for backward compatibility
+                    match self.protocol.parse_message(first_part) {
+                        Ok(msg) => msg,
+                        Err(_) => continue, // Not a valid message, wait for next
+                    }
+                } else {
+                    continue; // No parts, wait for next
+                };
+
+                // Check if this is a tool_reply
+                if let Some(header) = reply_msg.get("header") {
+                    if let Some(msg_type) = header.get("msg_type") {
+                        if msg_type == "tool_reply" {
+                            // Extract and return the content's content field
+                            if let Some(content_wrapper) = reply_msg.get("content") {
+                                // The content contains the actual response nested in a "content" field
+                                if let Some(actual_content) = content_wrapper.get("content") {
+                                    return Ok(actual_content.clone());
+                                }
+                                return Ok(content_wrapper.clone());
+                            }
+                        }
                     }
                 }
             }
@@ -139,6 +249,90 @@ impl ClientHandle {
         }
     }
 
+    /// Send a tool request to the remote kernel and return the response
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the request fails or communication with kernel fails
+    pub async fn send_tool_request(
+        &mut self,
+        content: serde_json::Value,
+    ) -> Result<serde_json::Value> {
+        debug!("Sending tool request to remote kernel");
+
+        // Create tool_request message
+        let request = self.protocol.create_request("tool_request", content)?;
+
+        // Send request through transport
+        self.transport.send("shell", vec![request]).await?;
+
+        // Wait for tool_reply
+        let start_time = std::time::Instant::now();
+        let timeout = std::time::Duration::from_secs(30);
+
+        loop {
+            if start_time.elapsed() > timeout {
+                return Err(anyhow::anyhow!("Timeout waiting for tool_reply"));
+            }
+
+            if let Some(reply_parts) = self.transport.recv("shell").await? {
+                trace!(
+                    "Client received {} parts on shell channel",
+                    reply_parts.len()
+                );
+
+                // Handle multipart Jupyter wire protocol format
+                let delimiter = b"<IDS|MSG>";
+                let delimiter_idx = reply_parts
+                    .iter()
+                    .position(|part| part.as_slice() == delimiter);
+
+                let reply_msg: HashMap<String, serde_json::Value> = if let Some(idx) = delimiter_idx
+                {
+                    // Parse multipart message (header at idx+2, content at idx+5)
+                    if reply_parts.len() > idx + 5 {
+                        let header =
+                            serde_json::from_slice::<serde_json::Value>(&reply_parts[idx + 2])?;
+                        let content =
+                            serde_json::from_slice::<serde_json::Value>(&reply_parts[idx + 5])?;
+
+                        let mut msg = HashMap::new();
+                        msg.insert("header".to_string(), header);
+                        msg.insert("content".to_string(), content);
+                        msg
+                    } else {
+                        continue; // Incomplete message, wait for next
+                    }
+                } else if let Some(first_part) = reply_parts.first() {
+                    // Try parsing as simple JSON message for backward compatibility
+                    match self.protocol.parse_message(first_part) {
+                        Ok(msg) => msg,
+                        Err(_) => continue, // Not a valid message, wait for next
+                    }
+                } else {
+                    continue; // No parts, wait for next
+                };
+
+                // Check if this is a tool_reply
+                if let Some(header) = reply_msg.get("header") {
+                    if let Some(msg_type) = header.get("msg_type") {
+                        if msg_type == "tool_reply" {
+                            // Extract and return the content's content field
+                            if let Some(content_wrapper) = reply_msg.get("content") {
+                                // The content contains the actual response nested in a "content" field
+                                if let Some(actual_content) = content_wrapper.get("content") {
+                                    return Ok(actual_content.clone());
+                                }
+                                return Ok(content_wrapper.clone());
+                            }
+                        }
+                    }
+                }
+            }
+            tokio::time::sleep(tokio::time::Duration::from_millis(10)).await;
+        }
+    }
+
     /// Run interactive REPL connected to the kernel
     ///
     /// # Errors
@@ -168,6 +362,13 @@ impl ServiceHandle {
     pub async fn run(self) -> Result<()> {
         info!("Running kernel service on port {}", self.port);
         info!("Connection file: {:?}", self.connection_file);
+
+        // Debug: Check if kernel has transport before running
+        debug!(
+            "ServiceHandle::run() - kernel has transport: {}",
+            self.kernel.has_transport()
+        );
+
         self.kernel.run().await
     }
 
@@ -193,12 +394,20 @@ pub async fn start_embedded_kernel_with_executor(
     let session_id = format!("session-{}", Uuid::new_v4());
 
     info!("Starting embedded kernel {}", kernel_id);
+    debug!("start_embedded_kernel_with_executor called");
 
     // Create Jupyter protocol
     let protocol = JupyterProtocol::new(session_id.clone(), kernel_id.clone());
 
-    // Create in-process transport
-    let transport = Arc::new(InProcessTransport::new());
+    // Create bidirectional in-process transport pair
+    // Important: We must use create_pair() to ensure transports can communicate
+    let (mut kernel_transport, mut client_transport) = InProcessTransport::create_pair();
+
+    trace!(
+        "Created transport pair - kernel: {:p}, client: {:p}",
+        &raw const kernel_transport,
+        &raw const client_transport
+    );
 
     // Setup Jupyter 5-channel configuration
     let mut transport_config = TransportConfig {
@@ -208,7 +417,7 @@ pub async fn start_embedded_kernel_with_executor(
         auth_key: None,
     };
 
-    // Add all 5 Jupyter channels
+    // Setup required Jupyter channels
     for channel in &["shell", "iopub", "stdin", "control", "heartbeat"] {
         transport_config.channels.insert(
             (*channel).to_string(),
@@ -220,27 +429,154 @@ pub async fn start_embedded_kernel_with_executor(
         );
     }
 
-    // Bind transport to channels
-    let mut transport_mut = (*transport).clone();
-    transport_mut.bind(&transport_config).await?;
+    // Setup paired channels for bidirectional communication
+    // This is crucial - we MUST set up the channels BEFORE passing the transports
+    for channel_name in transport_config.channels.keys() {
+        InProcessTransport::setup_paired_channel(
+            &mut kernel_transport,
+            &mut client_transport,
+            channel_name,
+        );
+        trace!("Setup paired channel: {}", channel_name);
+    }
 
     // Build execution config from LLMSpellConfig
     let exec_config = build_execution_config(&config);
 
-    // Use the provided script executor
+    // Use the provided script executor (clone it for sharing between kernels)
+    let script_executor_clone = script_executor.clone();
     // Create integrated kernel with the provided executor
-    let mut kernel =
-        IntegratedKernel::new(protocol.clone(), exec_config, session_id, script_executor).await?;
+    let mut kernel = IntegratedKernel::new(
+        protocol.clone(),
+        exec_config.clone(),
+        session_id.clone(),
+        script_executor,
+    )
+    .await?;
 
-    // Set transport for message processing
-    kernel.set_transport(Box::new(transport_mut));
+    // Set kernel transport for kernel message processing
+    kernel.set_transport(Box::new(kernel_transport));
 
-    Ok(KernelHandle {
-        kernel,
-        kernel_id,
-        transport,
+    // Spawn the kernel to run in background and process messages
+    let kernel_id_clone = kernel_id.clone();
+    tokio::spawn(async move {
+        debug!("Starting embedded kernel {} event loop", kernel_id_clone);
+        if let Err(e) = kernel.run().await {
+            error!(
+                "Embedded kernel {} event loop failed: {}",
+                kernel_id_clone, e
+            );
+        } else {
+            debug!("Embedded kernel {} event loop completed", kernel_id_clone);
+        }
+    });
+
+    // For embedded mode, create a minimal kernel handle that only contains what's needed for message sending
+    // The actual kernel is running in the background spawn
+    let dummy_kernel = IntegratedKernel::new(
+        protocol.clone(),
+        exec_config.clone(),
+        format!("dummy-{session_id}"),
+        script_executor_clone,
+    )
+    .await?;
+
+    let transport_arc = Arc::new(client_transport);
+
+    let handle = KernelHandle {
+        kernel: dummy_kernel, // This won't be used for embedded mode - only transport and protocol matter
+        kernel_id: kernel_id.clone(),
+        transport: transport_arc, // CLI uses client transport
         protocol,
-    })
+    };
+    debug!("Created KernelHandle with kernel_id: {}", kernel_id);
+    Ok(handle)
+}
+
+// Shared stub tool implementation for testing
+struct StubTool {
+    meta: llmspell_core::types::ComponentMetadata,
+    category: llmspell_core::traits::tool::ToolCategory,
+    security: llmspell_core::traits::tool::SecurityLevel,
+}
+
+impl StubTool {
+    fn new(
+        name: &str,
+        description: &str,
+        category: llmspell_core::traits::tool::ToolCategory,
+    ) -> Self {
+        Self {
+            meta: llmspell_core::types::ComponentMetadata {
+                id: llmspell_core::types::ComponentId::from_name(name),
+                name: name.to_string(),
+                description: description.to_string(),
+                version: llmspell_core::types::Version::new(1, 0, 0),
+                created_at: chrono::Utc::now(),
+                updated_at: chrono::Utc::now(),
+            },
+            category,
+            security: llmspell_core::traits::tool::SecurityLevel::Safe,
+        }
+    }
+}
+
+#[async_trait]
+impl llmspell_core::traits::base_agent::BaseAgent for StubTool {
+    fn metadata(&self) -> &llmspell_core::types::ComponentMetadata {
+        &self.meta
+    }
+
+    async fn execute_impl(
+        &self,
+        input: llmspell_core::types::AgentInput,
+        _context: llmspell_core::ExecutionContext,
+    ) -> llmspell_core::Result<llmspell_core::types::AgentOutput> {
+        // Simple stub implementation that returns the tool name and input
+        Ok(llmspell_core::types::AgentOutput::text(format!(
+            "Executed {} with input: {}",
+            self.meta.name, input.text
+        )))
+    }
+
+    async fn validate_input(
+        &self,
+        _input: &llmspell_core::types::AgentInput,
+    ) -> llmspell_core::Result<()> {
+        // Stub always accepts any input
+        Ok(())
+    }
+
+    async fn handle_error(
+        &self,
+        error: llmspell_core::error::LLMSpellError,
+    ) -> llmspell_core::Result<llmspell_core::types::AgentOutput> {
+        // Simple error handling
+        Ok(llmspell_core::types::AgentOutput::text(format!(
+            "Error in {}: {}",
+            self.meta.name, error
+        )))
+    }
+}
+
+impl Tool for StubTool {
+    fn category(&self) -> llmspell_core::traits::tool::ToolCategory {
+        self.category.clone()
+    }
+
+    fn security_level(&self) -> llmspell_core::traits::tool::SecurityLevel {
+        self.security.clone()
+    }
+
+    fn schema(&self) -> llmspell_core::traits::tool::ToolSchema {
+        // Simple schema for stubs
+        llmspell_core::traits::tool::ToolSchema {
+            name: self.meta.name.clone(),
+            description: self.meta.description.clone(),
+            parameters: vec![],
+            returns: Some(llmspell_core::traits::tool::ParameterType::String),
+        }
+    }
 }
 
 /// Start an embedded kernel that runs in-process
@@ -251,9 +587,220 @@ pub async fn start_embedded_kernel_with_executor(
 /// # Errors
 ///
 /// Returns an error if the kernel fails to start or transport setup fails
+#[allow(clippy::too_many_lines)]
 pub async fn start_embedded_kernel(config: LLMSpellConfig) -> Result<KernelHandle> {
-    // Create a default executor for backward compatibility
-    struct DefaultExecutor;
+    // Create a default executor with stub component registry for backward compatibility
+    struct DefaultExecutor {
+        component_registry: Arc<DefaultStubComponentRegistry>,
+    }
+
+    // Reuse stub component registry for embedded mode
+    struct DefaultStubComponentRegistry;
+
+    #[async_trait]
+    impl ComponentLookup for DefaultStubComponentRegistry {
+        async fn list_tools(&self) -> Vec<String> {
+            // Return all placeholder tools for embedded testing
+            vec![
+                "calculator",
+                "file_operations",
+                "web_scraper",
+                "json_processor",
+                "text_analyzer",
+                "data_converter",
+                "image_processor",
+                "api_tester",
+                "base64_encoder",
+                "citation_formatter",
+                "sitemap_crawler",
+                "graphql_query",
+                "url_analyzer",
+                "http_request",
+                "video_processor",
+                "webpage_monitor",
+                "service_checker",
+                "environment_reader",
+                "uuid_generator",
+                "hash_calculator",
+                "data_validation",
+                "web_search",
+                "webhook_caller",
+                "process_executor",
+                "date_time_handler",
+                "file_search",
+                "file_watcher",
+                "audio_processor",
+                "diff_calculator",
+                "system_monitor",
+                "graph_builder",
+                "text_manipulator",
+                "file_converter",
+            ]
+            .into_iter()
+            .map(String::from)
+            .collect()
+        }
+
+        #[allow(clippy::too_many_lines)]
+        async fn get_tool(&self, name: &str) -> Option<Arc<dyn Tool>> {
+            // Return actual stub tools for embedded testing
+            use llmspell_core::traits::tool::ToolCategory;
+
+            let tool = match name {
+                "calculator" => StubTool::new(
+                    "calculator",
+                    "Perform mathematical calculations",
+                    ToolCategory::Utility,
+                ),
+                "file_operations" => StubTool::new(
+                    "file_operations",
+                    "Read and write files",
+                    ToolCategory::Filesystem,
+                ),
+                "web_scraper" => {
+                    StubTool::new("web_scraper", "Scrape web pages", ToolCategory::Web)
+                }
+                "json_processor" => {
+                    StubTool::new("json_processor", "Process JSON data", ToolCategory::Data)
+                }
+                "text_analyzer" => StubTool::new(
+                    "text_analyzer",
+                    "Analyze text content",
+                    ToolCategory::Analysis,
+                ),
+                "data_converter" => StubTool::new(
+                    "data_converter",
+                    "Convert between data formats",
+                    ToolCategory::Data,
+                ),
+                "image_processor" => {
+                    StubTool::new("image_processor", "Process images", ToolCategory::Media)
+                }
+                "api_tester" => {
+                    StubTool::new("api_tester", "Test API endpoints", ToolCategory::Api)
+                }
+                "base64_encoder" => StubTool::new(
+                    "base64_encoder",
+                    "Encode/decode base64",
+                    ToolCategory::Utility,
+                ),
+                "citation_formatter" => StubTool::new(
+                    "citation_formatter",
+                    "Format citations",
+                    ToolCategory::Utility,
+                ),
+                "sitemap_crawler" => StubTool::new(
+                    "sitemap_crawler",
+                    "Crawl website sitemaps",
+                    ToolCategory::Web,
+                ),
+                "graphql_query" => StubTool::new(
+                    "graphql_query",
+                    "Execute GraphQL queries",
+                    ToolCategory::Api,
+                ),
+                "url_analyzer" => {
+                    StubTool::new("url_analyzer", "Analyze URL components", ToolCategory::Web)
+                }
+                "http_request" => {
+                    StubTool::new("http_request", "Make HTTP requests", ToolCategory::Web)
+                }
+                "video_processor" => StubTool::new(
+                    "video_processor",
+                    "Process video files",
+                    ToolCategory::Media,
+                ),
+                "webpage_monitor" => StubTool::new(
+                    "webpage_monitor",
+                    "Monitor webpage changes",
+                    ToolCategory::Web,
+                ),
+                "service_checker" => StubTool::new(
+                    "service_checker",
+                    "Check service status",
+                    ToolCategory::System,
+                ),
+                "environment_reader" => StubTool::new(
+                    "environment_reader",
+                    "Read environment variables",
+                    ToolCategory::System,
+                ),
+                "uuid_generator" => {
+                    StubTool::new("uuid_generator", "Generate UUIDs", ToolCategory::Utility)
+                }
+                "hash_calculator" => {
+                    StubTool::new("hash_calculator", "Calculate hashes", ToolCategory::Utility)
+                }
+                "data_validation" => {
+                    StubTool::new("data_validation", "Validate data", ToolCategory::Data)
+                }
+                "web_search" => StubTool::new("web_search", "Search the web", ToolCategory::Web),
+                "webhook_caller" => {
+                    StubTool::new("webhook_caller", "Call webhooks", ToolCategory::Api)
+                }
+                "process_executor" => StubTool::new(
+                    "process_executor",
+                    "Execute processes",
+                    ToolCategory::System,
+                ),
+                "date_time_handler" => StubTool::new(
+                    "date_time_handler",
+                    "Handle dates and times",
+                    ToolCategory::Utility,
+                ),
+                "file_search" => {
+                    StubTool::new("file_search", "Search files", ToolCategory::Filesystem)
+                }
+                "file_watcher" => StubTool::new(
+                    "file_watcher",
+                    "Watch file changes",
+                    ToolCategory::Filesystem,
+                ),
+                "audio_processor" => StubTool::new(
+                    "audio_processor",
+                    "Process audio files",
+                    ToolCategory::Media,
+                ),
+                "diff_calculator" => StubTool::new(
+                    "diff_calculator",
+                    "Calculate differences",
+                    ToolCategory::Analysis,
+                ),
+                "system_monitor" => StubTool::new(
+                    "system_monitor",
+                    "Monitor system resources",
+                    ToolCategory::System,
+                ),
+                "graph_builder" => {
+                    StubTool::new("graph_builder", "Build graphs", ToolCategory::Data)
+                }
+                "text_manipulator" => {
+                    StubTool::new("text_manipulator", "Manipulate text", ToolCategory::Utility)
+                }
+                "file_converter" => {
+                    StubTool::new("file_converter", "Convert file formats", ToolCategory::Data)
+                }
+                _ => return None,
+            };
+            Some(Arc::new(tool))
+        }
+
+        async fn list_agents(&self) -> Vec<String> {
+            vec![]
+        }
+
+        async fn get_agent(&self, _name: &str) -> Option<Arc<dyn Agent>> {
+            None
+        }
+
+        async fn list_workflows(&self) -> Vec<String> {
+            vec![]
+        }
+
+        async fn get_workflow(&self, _name: &str) -> Option<Arc<dyn Workflow>> {
+            None
+        }
+    }
 
     #[async_trait]
     impl ScriptExecutor for DefaultExecutor {
@@ -278,9 +825,15 @@ pub async fn start_embedded_kernel(config: LLMSpellConfig) -> Result<KernelHandl
         fn language(&self) -> &'static str {
             "lua"
         }
+
+        fn component_registry(&self) -> Option<Arc<dyn ComponentLookup>> {
+            Some(self.component_registry.clone())
+        }
     }
 
-    let script_executor = Arc::new(DefaultExecutor) as Arc<dyn ScriptExecutor>;
+    let script_executor = Arc::new(DefaultExecutor {
+        component_registry: Arc::new(DefaultStubComponentRegistry),
+    }) as Arc<dyn ScriptExecutor>;
     start_embedded_kernel_with_executor(config, script_executor).await
 }
 
@@ -395,17 +948,326 @@ pub async fn connect_to_kernel(connection_string: &str) -> Result<ClientHandle> 
     })
 }
 
-/// Start a kernel in service mode that listens for connections
+/// Start a kernel in service mode with full configuration
+///
+/// This is the enhanced version that accepts `ExecutionConfig` with daemon settings.
+///
+/// # Errors
+///
+/// Returns an error if the kernel service fails to start or bind to the port
+pub async fn start_kernel_service_with_config(
+    config: KernelServiceConfig,
+) -> Result<ServiceHandle> {
+    let kernel_id = config
+        .kernel_id
+        .unwrap_or_else(|| format!("service-{}", Uuid::new_v4()));
+    let session_id = format!("session-{}", Uuid::new_v4());
+
+    info!(
+        "Starting kernel service {} on port {}",
+        kernel_id, config.port
+    );
+
+    // Create Jupyter protocol
+    let mut protocol = JupyterProtocol::new(session_id.clone(), kernel_id.clone());
+
+    // Create ConnectionFileManager early to get the HMAC key
+    let mut conn_manager =
+        crate::connection::ConnectionFileManager::new(kernel_id.clone(), config.port);
+
+    // Set the HMAC key on the protocol from the connection info
+    protocol.set_hmac_key(&conn_manager.info().key);
+
+    // Create and bind transport, updating connection manager with actual ports
+    info!("About to setup kernel transport on port {}", config.port);
+    let transport = setup_kernel_transport(config.port, &mut conn_manager).await?;
+    info!("Transport setup complete");
+
+    // Create integrated kernel with protocol that has the HMAC key
+    let mut kernel = IntegratedKernel::new(
+        protocol.clone(),
+        config.exec_config.clone(),
+        session_id,
+        config.script_executor,
+    )
+    .await?;
+
+    // Set the transport on the kernel
+    kernel.set_transport(Box::new(transport));
+
+    // Debug: Verify transport was set
+    debug!("Transport set on kernel: {}", kernel.has_transport());
+
+    // Note: Daemon mode is now handled by the CLI before creating tokio runtime
+    // The daemonization happens BEFORE this async function is called
+    // The PID file is already created by DaemonManager::daemonize()
+    // We just need to handle log rotation if configured
+    if config.exec_config.daemon_mode {
+        if let Some(ref daemon_config) = config.exec_config.daemon_config {
+            // Set up log rotation if configured
+            if let Some(ref log_path) = daemon_config.stdout_path {
+                if let Some(size_limit) = config.log_rotate_size {
+                    let log_config = crate::daemon::LogRotationConfig {
+                        max_size: size_limit,
+                        max_files: config.log_rotate_count,
+                        compress: true,
+                        base_path: log_path.clone(),
+                    };
+                    let _log_rotator = crate::daemon::LogRotator::new(log_config);
+                    info!(
+                        "Log rotation configured: max size {} bytes, keeping {} files",
+                        size_limit, config.log_rotate_count
+                    );
+                }
+            }
+
+            // PID file is already created by DaemonManager::daemonize() in main.rs
+            // Do NOT create it again here as it causes "Another instance is already running" error
+            if let Some(ref pid_path) = daemon_config.pid_file {
+                debug!(
+                    "PID file already created at {:?} by DaemonManager",
+                    pid_path
+                );
+            }
+        }
+    }
+
+    // Write the connection file
+    let connection_file = if let Some(path) = config.connection_file_path {
+        // Use specified path
+        std::fs::write(&path, serde_json::to_string_pretty(conn_manager.info())?)?;
+        path
+    } else {
+        // Use default path
+        conn_manager.write()?
+    };
+
+    info!("Connection file written to: {:?}", connection_file);
+
+    Ok(ServiceHandle {
+        kernel,
+        port: config.port,
+        connection_file,
+    })
+}
+
+/// Helper function to set up kernel transport with `ZeroMQ`
+///
+/// Creates a `ZeroMQ` transport, binds to the specified ports,
+/// and updates the connection manager with actual bound ports.
+async fn setup_kernel_transport(
+    base_port: u16,
+    conn_manager: &mut crate::connection::ConnectionFileManager,
+) -> Result<crate::transport::zeromq::ZmqTransport> {
+    info!(
+        "setup_kernel_transport: Creating ZeroMQ transport for port {}",
+        base_port
+    );
+
+    // Create ZeroMQ transport for the kernel service
+    let mut transport = crate::transport::zeromq::ZmqTransport::new()?;
+    info!("setup_kernel_transport: ZeroMQ transport created");
+
+    // Build transport configuration for Jupyter 5 channels
+    // Special handling for port 0 - let OS assign all ports independently
+    let transport_config = TransportConfig {
+        transport_type: "tcp".to_string(),
+        base_address: "127.0.0.1".to_string(),
+        channels: {
+            let mut channels = HashMap::new();
+
+            // When base_port is 0, use 0 for all channels to let OS assign each independently
+            // Otherwise use sequential ports starting from base_port
+            let (shell_port, iopub_port, stdin_port, control_port, hb_port) = if base_port == 0 {
+                (
+                    "0".to_string(),
+                    "0".to_string(),
+                    "0".to_string(),
+                    "0".to_string(),
+                    "0".to_string(),
+                )
+            } else {
+                (
+                    base_port.to_string(),
+                    (base_port + 1).to_string(),
+                    (base_port + 2).to_string(),
+                    (base_port + 3).to_string(),
+                    (base_port + 4).to_string(),
+                )
+            };
+
+            channels.insert(
+                "shell".to_string(),
+                ChannelConfig {
+                    pattern: "router".to_string(),
+                    endpoint: shell_port,
+                    options: HashMap::new(),
+                },
+            );
+            channels.insert(
+                "iopub".to_string(),
+                ChannelConfig {
+                    pattern: "pub".to_string(),
+                    endpoint: iopub_port,
+                    options: HashMap::new(),
+                },
+            );
+            channels.insert(
+                "stdin".to_string(),
+                ChannelConfig {
+                    pattern: "router".to_string(),
+                    endpoint: stdin_port,
+                    options: HashMap::new(),
+                },
+            );
+            channels.insert(
+                "control".to_string(),
+                ChannelConfig {
+                    pattern: "router".to_string(),
+                    endpoint: control_port,
+                    options: HashMap::new(),
+                },
+            );
+            channels.insert(
+                "heartbeat".to_string(),
+                ChannelConfig {
+                    pattern: "rep".to_string(),
+                    endpoint: hb_port,
+                    options: HashMap::new(),
+                },
+            );
+            channels
+        },
+        auth_key: None,
+    };
+
+    info!(
+        "setup_kernel_transport: About to bind transport with config for {} channels",
+        transport_config.channels.len()
+    );
+
+    // Bind transport and get actual ports (important when port 0 is used)
+    let bound_ports = transport.bind(&transport_config).await?;
+
+    info!(
+        "setup_kernel_transport: Binding complete, got bound_ports: {:?}",
+        bound_ports
+    );
+
+    // Update connection manager with actual bound ports
+    if let Some(ports) = bound_ports {
+        conn_manager.update_ports(
+            ports.shell,
+            ports.iopub,
+            ports.stdin,
+            ports.control,
+            ports.hb,
+        );
+        info!(
+            "Kernel bound to actual ports - shell: {}, iopub: {}, stdin: {}, control: {}, hb: {}",
+            ports.shell, ports.iopub, ports.stdin, ports.control, ports.hb
+        );
+    }
+
+    Ok(transport)
+}
+
+/// Start a kernel in service mode that listens for connections (legacy)
 ///
 /// This is used when starting a kernel as a service that other clients can connect to.
 ///
 /// # Errors
 ///
 /// Returns an error if the kernel service fails to start or bind to the port
+#[allow(clippy::too_many_lines)]
 pub async fn start_kernel_service(port: u16, config: LLMSpellConfig) -> Result<ServiceHandle> {
     // TODO: In subtask 9.4.6.4, this will be replaced with real ScriptRuntime from llmspell-bridge
-    // For now, create a stub executor that will be replaced (same as in start_embedded_kernel)
-    struct ServiceStubExecutor;
+    // For now, create a stub executor with minimal ComponentRegistry
+    struct ServiceStubExecutor {
+        component_registry: Arc<StubComponentRegistry>,
+    }
+
+    // Stub ComponentRegistry with actual tool implementations for testing
+    struct StubComponentRegistry;
+
+    #[async_trait]
+    impl ComponentLookup for StubComponentRegistry {
+        async fn list_tools(&self) -> Vec<String> {
+            // Return a reasonable set of stub tools for testing
+            vec![
+                "calculator".to_string(),
+                "file_operations".to_string(),
+                "web_scraper".to_string(),
+                "json_processor".to_string(),
+                "text_analyzer".to_string(),
+                "data_converter".to_string(),
+                "system_monitor".to_string(),
+                "environment_reader".to_string(),
+            ]
+        }
+
+        async fn get_tool(&self, name: &str) -> Option<Arc<dyn Tool>> {
+            // Return actual stub tools for testing
+            use llmspell_core::traits::tool::ToolCategory;
+
+            let tool = match name {
+                "calculator" => StubTool::new(
+                    "calculator",
+                    "Perform mathematical calculations",
+                    ToolCategory::Utility,
+                ),
+                "file_operations" => StubTool::new(
+                    "file_operations",
+                    "Read and write files",
+                    ToolCategory::Filesystem,
+                ),
+                "web_scraper" => {
+                    StubTool::new("web_scraper", "Scrape web pages", ToolCategory::Web)
+                }
+                "json_processor" => {
+                    StubTool::new("json_processor", "Process JSON data", ToolCategory::Data)
+                }
+                "text_analyzer" => StubTool::new(
+                    "text_analyzer",
+                    "Analyze text content",
+                    ToolCategory::Analysis,
+                ),
+                "data_converter" => StubTool::new(
+                    "data_converter",
+                    "Convert between data formats",
+                    ToolCategory::Data,
+                ),
+                "system_monitor" => StubTool::new(
+                    "system_monitor",
+                    "Monitor system resources",
+                    ToolCategory::System,
+                ),
+                "environment_reader" => StubTool::new(
+                    "environment_reader",
+                    "Read environment variables",
+                    ToolCategory::System,
+                ),
+                _ => return None,
+            };
+            Some(Arc::new(tool))
+        }
+
+        async fn list_agents(&self) -> Vec<String> {
+            vec![]
+        }
+
+        async fn get_agent(&self, _name: &str) -> Option<Arc<dyn Agent>> {
+            None
+        }
+
+        async fn list_workflows(&self) -> Vec<String> {
+            vec![]
+        }
+
+        async fn get_workflow(&self, _name: &str) -> Option<Arc<dyn Workflow>> {
+            None
+        }
+    }
 
     #[async_trait]
     impl ScriptExecutor for ServiceStubExecutor {
@@ -428,6 +1290,10 @@ pub async fn start_kernel_service(port: u16, config: LLMSpellConfig) -> Result<S
         fn language(&self) -> &'static str {
             "stub"
         }
+
+        fn component_registry(&self) -> Option<Arc<dyn ComponentLookup>> {
+            Some(self.component_registry.clone())
+        }
     }
 
     let kernel_id = format!("service-{}", Uuid::new_v4());
@@ -441,7 +1307,9 @@ pub async fn start_kernel_service(port: u16, config: LLMSpellConfig) -> Result<S
     // Build execution config
     let exec_config = build_execution_config(&config);
 
-    let script_executor = Arc::new(ServiceStubExecutor) as Arc<dyn ScriptExecutor>;
+    let script_executor = Arc::new(ServiceStubExecutor {
+        component_registry: Arc::new(StubComponentRegistry),
+    }) as Arc<dyn ScriptExecutor>;
 
     // Create integrated kernel
     let kernel = IntegratedKernel::new(protocol, exec_config, session_id, script_executor).await?;
@@ -471,6 +1339,9 @@ fn build_execution_config(config: &LLMSpellConfig) -> crate::execution::Executio
         execution_timeout_secs: 300,
         monitor_agents: true,
         track_performance: true,
+        daemon_mode: false,
+        daemon_config: None,
+        health_thresholds: None,
     }
 }
 

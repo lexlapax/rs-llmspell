@@ -7,6 +7,7 @@
 
 use super::execution_bridge::{ExecutionManager, StepMode, Variable, VariableScope};
 use anyhow::Result;
+use llmspell_core::traits::debug_context::DebugContext;
 use parking_lot::RwLock;
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
@@ -267,6 +268,8 @@ pub struct DAPBridge {
     execution_manager: Option<Arc<ExecutionManager>>,
     /// Whether initialized
     initialized: AtomicBool,
+    /// Whether connected (for disconnect tracking)
+    connected: AtomicBool,
     /// Sequence number for messages
     next_seq: AtomicI32,
     /// Source mapping
@@ -277,6 +280,12 @@ pub struct DAPBridge {
     next_var_ref: AtomicI32,
     /// Session ID
     _session_id: String,
+    /// Program path to debug (set by launch command)
+    program_path: Arc<RwLock<Option<String>>>,
+    /// Launch arguments (stored for configurationDone)
+    launch_args: Arc<RwLock<Option<Value>>>,
+    /// Debug mode enabled flag
+    debug_enabled: Arc<AtomicBool>,
 }
 
 impl DAPBridge {
@@ -285,18 +294,275 @@ impl DAPBridge {
         Self {
             execution_manager: None,
             initialized: AtomicBool::new(false),
+            connected: AtomicBool::new(false),
             next_seq: AtomicI32::new(1),
             source_map: Arc::new(RwLock::new(HashMap::new())),
             variable_refs: Arc::new(RwLock::new(HashMap::new())),
             next_var_ref: AtomicI32::new(1000),
             _session_id: session_id,
+            program_path: Arc::new(RwLock::new(None)),
+            launch_args: Arc::new(RwLock::new(None)),
+            debug_enabled: Arc::new(AtomicBool::new(false)),
         }
     }
 
     /// Connect to execution manager
     pub fn connect_execution_manager(&mut self, manager: Arc<ExecutionManager>) {
+        // Apply debug mode state if launch was already called
+        if self.debug_enabled.load(Ordering::Relaxed) {
+            manager.enable_debug_mode();
+            info!("Enabled debug mode on newly connected ExecutionManager");
+        } else if self.program_path.read().is_some() {
+            // If we have a program path but debug is not enabled, ensure it's disabled
+            manager.disable_debug_mode();
+            info!("Debug mode disabled on newly connected ExecutionManager");
+        }
+
         self.execution_manager = Some(manager);
+        self.connected.store(true, Ordering::Relaxed);
         info!("Connected execution manager to DAP bridge");
+    }
+
+    /// Check if execution manager is connected
+    pub fn is_connected(&self) -> bool {
+        self.connected.load(Ordering::Relaxed)
+    }
+
+    /// Send a generic event via DAP
+    ///
+    /// This will be forwarded to the kernel for broadcasting on `IOPub`
+    pub fn send_event(&self, event_name: &str, body: &serde_json::Value) {
+        let event = serde_json::json!({
+            "type": "event",
+            "event": event_name,
+            "body": body
+        });
+
+        debug!("Sending {} event: {:?}", event_name, event);
+        // TODO: Actually send this via the DAP transport
+        // For now, just log it
+    }
+
+    /// Send a stopped event via DAP
+    ///
+    /// This will be forwarded to the kernel for broadcasting on `IOPub`
+    pub fn send_stopped_event(
+        &self,
+        reason: &str,
+        thread_id: i32,
+        breakpoint_id: Option<&str>,
+    ) -> serde_json::Value {
+        let event = serde_json::json!({
+            "type": "event",
+            "event": "stopped",
+            "body": {
+                "reason": reason,
+                "threadId": thread_id,
+                "breakpointId": breakpoint_id,
+                "allThreadsStopped": true,
+                "preserveFocusHint": false
+            }
+        });
+
+        debug!("Sending stopped event: {}", reason);
+        event
+    }
+
+    /// Handle generic DAP request
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the request cannot be handled
+    #[instrument(level = "debug", skip(self, request))]
+    #[allow(clippy::too_many_lines)]
+    pub fn handle_request(&self, request: &Value) -> Result<Value> {
+        // Extract command from request
+        let command = request
+            .get("command")
+            .and_then(|v| v.as_str())
+            .unwrap_or("unknown");
+
+        // Extract sequence number from request
+        let request_seq = request
+            .get("seq")
+            .and_then(serde_json::Value::as_i64)
+            .unwrap_or(0);
+
+        debug!("Handling DAP request: {}", command);
+
+        // Route to appropriate handler based on command
+        let mut response = match command {
+            "initialize" => {
+                let args: InitializeArguments =
+                    serde_json::from_value(request.get("arguments").cloned().unwrap_or_default())?;
+                let capabilities = self.handle_initialize(args)?;
+                serde_json::json!({
+                    "type": "response",
+                    "command": "initialize",
+                    "success": true,
+                    "body": capabilities
+                })
+            }
+            "launch" => {
+                let args = request.get("arguments").cloned().unwrap_or_default();
+                self.handle_launch(&args)?;
+                serde_json::json!({
+                    "type": "response",
+                    "command": "launch",
+                    "success": true
+                })
+            }
+            "setBreakpoints" => {
+                let args = request.get("arguments").unwrap_or(&Value::Null);
+                let source: Source =
+                    serde_json::from_value(args.get("source").cloned().unwrap_or_default())?;
+                let breakpoints: Vec<SourceBreakpoint> =
+                    serde_json::from_value(args.get("breakpoints").cloned().unwrap_or_default())?;
+                let dap_breakpoints = self.handle_set_breakpoints(&source, &breakpoints)?;
+                serde_json::json!({
+                    "type": "response",
+                    "command": "setBreakpoints",
+                    "success": true,
+                    "body": {
+                        "breakpoints": dap_breakpoints
+                    }
+                })
+            }
+            "stackTrace" => {
+                let thread_id = request
+                    .get("arguments")
+                    .and_then(|a| a.get("threadId"))
+                    .and_then(serde_json::Value::as_i64)
+                    .unwrap_or(1) as i32;
+                let frames = self.handle_stack_trace(thread_id)?;
+                serde_json::json!({
+                    "type": "response",
+                    "command": "stackTrace",
+                    "success": true,
+                    "body": {
+                        "stackFrames": frames
+                    }
+                })
+            }
+            "scopes" => {
+                let frame_id = request
+                    .get("arguments")
+                    .and_then(|a| a.get("frameId"))
+                    .and_then(serde_json::Value::as_i64)
+                    .unwrap_or(0) as i32;
+                let scopes = self.handle_scopes(frame_id)?;
+                serde_json::json!({
+                    "type": "response",
+                    "command": "scopes",
+                    "success": true,
+                    "body": {
+                        "scopes": scopes
+                    }
+                })
+            }
+            "variables" => {
+                let var_ref = request
+                    .get("arguments")
+                    .and_then(|a| a.get("variablesReference"))
+                    .and_then(serde_json::Value::as_i64)
+                    .unwrap_or(0) as i32;
+                let variables = self.handle_variables(var_ref)?;
+                serde_json::json!({
+                    "type": "response",
+                    "command": "variables",
+                    "success": true,
+                    "body": {
+                        "variables": variables
+                    }
+                })
+            }
+            "continue" => {
+                self.handle_continue()?;
+                serde_json::json!({
+                    "type": "response",
+                    "command": "continue",
+                    "success": true
+                })
+            }
+            "next" => {
+                self.handle_next()?;
+                serde_json::json!({
+                    "type": "response",
+                    "command": "next",
+                    "success": true
+                })
+            }
+            "stepIn" => {
+                self.handle_step_in()?;
+                serde_json::json!({
+                    "type": "response",
+                    "command": "stepIn",
+                    "success": true
+                })
+            }
+            "stepOut" => {
+                self.handle_step_out()?;
+                serde_json::json!({
+                    "type": "response",
+                    "command": "stepOut",
+                    "success": true
+                })
+            }
+            "pause" => {
+                self.handle_pause()?;
+                serde_json::json!({
+                    "type": "response",
+                    "command": "pause",
+                    "success": true
+                })
+            }
+            "evaluate" => {
+                let expression = request
+                    .get("arguments")
+                    .and_then(|a| a.get("expression"))
+                    .and_then(|v| v.as_str())
+                    .unwrap_or("");
+                let frame_id = request
+                    .get("arguments")
+                    .and_then(|a| a.get("frameId"))
+                    .and_then(serde_json::Value::as_i64)
+                    .map(|id| id as i32);
+                let result = self.handle_evaluate(expression, &frame_id)?;
+                serde_json::json!({
+                    "type": "response",
+                    "command": "evaluate",
+                    "success": true,
+                    "body": {
+                        "result": result,
+                        "variablesReference": 0
+                    }
+                })
+            }
+            "disconnect" => {
+                self.handle_disconnect()?;
+                serde_json::json!({
+                    "type": "response",
+                    "command": "disconnect",
+                    "success": true
+                })
+            }
+            _ => {
+                warn!("Unknown DAP command: {}", command);
+                serde_json::json!({
+                    "type": "response",
+                    "command": command,
+                    "success": false,
+                    "message": format!("Unknown command: {}", command)
+                })
+            }
+        };
+
+        // Add request_seq to all responses
+        if let Some(obj) = response.as_object_mut() {
+            obj.insert("request_seq".to_string(), Value::Number(request_seq.into()));
+        }
+
+        Ok(response)
     }
 
     /// Map script to source reference
@@ -334,11 +600,148 @@ impl DAPBridge {
     #[instrument(level = "debug", skip(self, args))]
     pub fn handle_launch(&self, args: &Value) -> Result<()> {
         debug!("Handling launch request: {:?}", args);
+
         // Extract program path and arguments
         if let Some(program) = args.get("program").and_then(|v| v.as_str()) {
-            info!("Launching program: {}", program);
-            // TODO: Actually launch the program
+            info!("Preparing to debug program: {}", program);
+
+            // Store the program path for later execution
+            *self.program_path.write() = Some(program.to_string());
+
+            // Store launch arguments for configurationDone
+            *self.launch_args.write() = Some(args.clone());
+
+            // Check noDebug flag to determine if debugging should be enabled
+            let no_debug = args
+                .get("noDebug")
+                .and_then(serde_json::Value::as_bool)
+                .unwrap_or(false);
+
+            // Enable debug mode on the ExecutionManager if connected and not noDebug
+            if no_debug {
+                info!("Running in no-debug mode for: {}", program);
+                self.debug_enabled.store(false, Ordering::Relaxed);
+                // Explicitly disable debug mode if it was previously enabled
+                if let Some(ref manager) = self.execution_manager {
+                    manager.disable_debug_mode();
+                }
+            } else if let Some(ref manager) = self.execution_manager {
+                manager.enable_debug_mode();
+                self.debug_enabled.store(true, Ordering::Relaxed);
+                info!("Debug mode enabled for: {}", program);
+            } else {
+                warn!("ExecutionManager not connected - debug mode will be enabled when connected");
+                // Still set our local flag so we enable debug when manager connects
+                self.debug_enabled.store(true, Ordering::Relaxed);
+            }
+
+            // Check for stopOnEntry flag
+            let stop_on_entry = args
+                .get("stopOnEntry")
+                .and_then(serde_json::Value::as_bool)
+                .unwrap_or(false);
+
+            if stop_on_entry {
+                debug!("Will stop on entry when execution begins");
+                // This will be handled in configurationDone
+            }
+
+            // Handle working directory if specified
+            if let Some(cwd) = args.get("cwd").and_then(|v| v.as_str()) {
+                debug!("Working directory set to: {}", cwd);
+                // Store for later use when executing
+            }
+
+            // Handle environment variables if specified
+            if let Some(env) = args.get("env").and_then(|v| v.as_object()) {
+                debug!("Environment variables: {:?}", env);
+                // Store for later use when executing
+            }
+
+            // Handle script arguments if specified
+            if let Some(script_args) = args.get("args").and_then(|v| v.as_array()) {
+                debug!("Script arguments: {:?}", script_args);
+                // Store for later use when executing
+            }
+
+            Ok(())
+        } else {
+            Err(anyhow::anyhow!(
+                "No program path specified in launch request"
+            ))
         }
+    }
+
+    /// Handle DAP configurationDone request
+    ///
+    /// This signals that all breakpoints have been set and execution can begin.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if no program was set via launch or if execution fails
+    #[instrument(level = "debug", skip(self))]
+    pub fn handle_configuration_done(&self) -> Result<()> {
+        debug!("Handling configurationDone request");
+
+        // Get the program path from launch
+        let program_path =
+            self.program_path.read().clone().ok_or_else(|| {
+                anyhow::anyhow!("No program path set - launch must be called first")
+            })?;
+
+        info!("Configuration done, preparing to execute: {}", program_path);
+
+        // Get launch arguments
+        let launch_args = self.launch_args.read().clone();
+
+        // Check for stopOnEntry
+        let stop_on_entry = launch_args
+            .as_ref()
+            .and_then(|args| args.get("stopOnEntry"))
+            .and_then(serde_json::Value::as_bool)
+            .unwrap_or(false);
+
+        if stop_on_entry {
+            debug!("stopOnEntry is enabled - will pause at first line");
+            // Set a breakpoint at line 1 or pause immediately
+            if let Some(ref manager) = self.execution_manager {
+                manager.set_breakpoint(program_path.clone(), 1)?;
+            }
+        }
+
+        // Extract working directory
+        let cwd = launch_args
+            .as_ref()
+            .and_then(|args| args.get("cwd"))
+            .and_then(|v| v.as_str());
+
+        if let Some(cwd) = cwd {
+            debug!("Setting working directory to: {}", cwd);
+            std::env::set_current_dir(cwd)?;
+        }
+
+        // TODO: Actually trigger script execution
+        // This would normally be done through the kernel's script executor
+        // For now we just log that we're ready
+        info!("Ready to begin script execution for: {}", program_path);
+
+        // If we have an ExecutionManager and stopOnEntry is false, resume execution
+        if !stop_on_entry {
+            if let Some(ref manager) = self.execution_manager {
+                debug!("Resuming execution (no stopOnEntry)");
+                manager.resume(StepMode::Continue);
+            }
+        }
+
+        // Send a started event to indicate execution has begun
+        // In a real implementation, this would be sent when the script actually starts
+        self.send_event(
+            "started",
+            &serde_json::json!({
+                "threadId": 1
+            }),
+        );
+
         Ok(())
     }
 
@@ -408,7 +811,8 @@ impl DAPBridge {
         let frames = manager.get_stack_frames();
         let mut dap_frames = Vec::new();
 
-        for (i, frame) in frames.iter().enumerate() {
+        // Reverse the frames to have newest (top of stack) first
+        for (i, frame) in frames.iter().rev().enumerate() {
             let source = self.map_script_to_source(frame.line).map(|src| Source {
                 name: Some(frame.source.clone()),
                 path: Some(src.path),
@@ -446,19 +850,17 @@ impl DAPBridge {
 
         let mut scopes = Vec::new();
 
-        // Local scope
+        // Local scope - always add even if empty
         let locals = manager.get_variables(&VariableScope::Local, Some(&frame_id.to_string()));
-        if !locals.is_empty() {
-            let var_ref = self.next_var_ref.fetch_add(1, Ordering::Relaxed);
-            self.variable_refs.write().insert(var_ref, locals);
-            scopes.push(Scope {
-                name: "Locals".to_string(),
-                variables_reference: var_ref,
-                expensive: false,
-            });
-        }
+        let var_ref = self.next_var_ref.fetch_add(1, Ordering::Relaxed);
+        self.variable_refs.write().insert(var_ref, locals);
+        scopes.push(Scope {
+            name: "Locals".to_string(),
+            variables_reference: var_ref,
+            expensive: false,
+        });
 
-        // Global scope
+        // Global scope - add if not empty
         let globals = manager.get_variables(&VariableScope::Global, None);
         if !globals.is_empty() {
             let var_ref = self.next_var_ref.fetch_add(1, Ordering::Relaxed);
@@ -487,26 +889,81 @@ impl DAPBridge {
 
         let mut dap_vars = Vec::new();
         for var in variables {
-            let var_ref = if var.has_children {
-                // TODO: Store child variables
-                self.next_var_ref.fetch_add(1, Ordering::Relaxed)
+            // Format the value based on type
+            let formatted_value = Self::format_variable_value(var);
+
+            // Handle variable references for lazy expansion
+            let (var_ref, named_count, indexed_count) = if var.has_children {
+                // Allocate a new reference for child variables
+                let ref_id = self.next_var_ref.fetch_add(1, Ordering::Relaxed);
+
+                // For complex types, estimate child counts
+                let (named, indexed) = Self::estimate_child_counts(var);
+
+                // Store placeholder for child variables (would be populated on demand)
+                // In real implementation, we'd need to store child retrieval info
+                self.variable_refs.write().insert(ref_id, Vec::new());
+
+                (ref_id, Some(named), Some(indexed))
             } else {
-                0
+                (0, None, None)
             };
 
             dap_vars.push(DapVariable {
                 name: var.name.clone(),
-                value: var.value.clone(),
+                value: formatted_value,
                 var_type: Some(var.var_type.clone()),
-                presentation_hint: None,
+                presentation_hint: Self::get_presentation_hint(&var.var_type),
                 evaluate_name: Some(var.name.clone()),
                 variables_reference: var_ref,
-                named_variables: None,
-                indexed_variables: None,
+                named_variables: named_count,
+                indexed_variables: indexed_count,
             });
         }
 
         Ok(dap_vars)
+    }
+
+    /// Format variable value for display
+    fn format_variable_value(var: &Variable) -> String {
+        match var.var_type.as_str() {
+            "table" => {
+                // For tables, show a summary
+                if var.value.contains('{') && var.value.contains('}') {
+                    // Try to parse table size from value if available
+                    "table[...]".to_string()
+                } else {
+                    var.value.clone()
+                }
+            }
+            "function" => "function".to_string(),
+            "userdata" => format!("userdata: {}", var.value),
+            "thread" => "coroutine".to_string(),
+            _ => var.value.clone(),
+        }
+    }
+
+    /// Estimate child counts for complex types
+    fn estimate_child_counts(var: &Variable) -> (i32, i32) {
+        match var.var_type.as_str() {
+            "table" => {
+                // For tables, we'd need to inspect to get actual counts
+                // Return conservative estimates for now
+                (10, 0) // Assume up to 10 named properties
+            }
+            "userdata" => (5, 0), // Some metadata properties
+            _ => (0, 0),
+        }
+    }
+
+    /// Get presentation hint for variable type
+    fn get_presentation_hint(var_type: &str) -> Option<String> {
+        match var_type {
+            "function" => Some("method".to_string()),
+            "table" => Some("class".to_string()),
+            "userdata" => Some("data".to_string()),
+            _ => None,
+        }
     }
 
     /// Handle DAP continue request
@@ -604,7 +1061,13 @@ impl DAPBridge {
     /// Returns an error if disconnection fails
     #[instrument(level = "debug", skip(self))]
     pub fn handle_disconnect(&self) -> Result<()> {
+        // Disable debug mode when disconnecting
+        if let Some(ref manager) = self.execution_manager {
+            manager.disable_debug_mode();
+        }
+        self.debug_enabled.store(false, Ordering::Relaxed);
         self.initialized.store(false, Ordering::Relaxed);
+        self.connected.store(false, Ordering::Relaxed);
         info!("DAP bridge disconnected");
         Ok(())
     }
@@ -617,6 +1080,11 @@ impl DAPBridge {
     /// Get next sequence number
     pub fn next_sequence(&self) -> i32 {
         self.next_seq.fetch_add(1, Ordering::Relaxed)
+    }
+
+    /// Get stored launch arguments
+    pub fn get_launch_args(&self) -> Option<Value> {
+        self.launch_args.read().clone()
     }
 }
 

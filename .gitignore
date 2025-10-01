@@ -27,4 +27,9 @@ Thumbs.db
 tarpaulin-report.json
 build_rs_cov.profraw
 examples/backups/*
+tests/python/venv/
+*.pyc
+__pycache__/
+.pytest_cache
+
 

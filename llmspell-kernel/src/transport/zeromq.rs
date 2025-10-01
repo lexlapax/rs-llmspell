@@ -19,6 +19,7 @@ use tracing::{debug, info, instrument, trace, warn};
 use zmq::{Context as ZmqContext, Socket, SocketType};
 
 use crate::runtime::io_runtime::create_io_bound_resource;
+use crate::traits::transport::BoundPorts;
 use crate::traits::{ChannelConfig, Transport, TransportConfig};
 
 /// Thread-safe wrapper for `ZeroMQ` Socket
@@ -167,12 +168,30 @@ impl ZmqTransport {
             ),
         }
     }
+
+    /// Extract port number from a `ZeroMQ` endpoint string
+    ///
+    /// Examples:
+    /// - <tcp://127.0.0.1:5555> -> 5555
+    /// - "tcp://*:5556" -> 5556
+    fn extract_port_from_endpoint(endpoint: &str) -> Result<u16> {
+        // For TCP endpoints, extract the port after the last colon
+        if let Some(pos) = endpoint.rfind(':') {
+            let port_str = &endpoint[pos + 1..];
+            port_str
+                .parse::<u16>()
+                .with_context(|| format!("Failed to parse port from endpoint: {endpoint}"))
+        } else {
+            // For non-TCP endpoints (IPC, inproc), return 0
+            Ok(0)
+        }
+    }
 }
 
 #[async_trait]
 impl Transport for ZmqTransport {
     #[instrument(level = "info", skip(self, config))]
-    async fn bind(&mut self, config: &TransportConfig) -> Result<()> {
+    async fn bind(&mut self, config: &TransportConfig) -> Result<Option<BoundPorts>> {
         info!(
             "Binding ZeroMQ transport to {} channels",
             config.channels.len()
@@ -180,6 +199,9 @@ impl Transport for ZmqTransport {
 
         // Store configuration
         *self.config.lock() = Some(config.clone());
+
+        // Track actual bound ports for Jupyter channels
+        let mut bound_ports = BoundPorts::default();
 
         // Create and bind sockets for each channel
         for (channel_name, channel_config) in &config.channels {
@@ -191,7 +213,35 @@ impl Transport for ZmqTransport {
                 .bind(&addr)
                 .with_context(|| format!("Failed to bind {channel_name} to {addr}"))?;
 
-            info!("Bound {} channel to {}", channel_name, addr);
+            // Get actual bound endpoint (important when port 0 is used)
+            let actual_endpoint = socket
+                .socket
+                .get_last_endpoint()
+                .context("Failed to get last endpoint")?;
+
+            // Convert Result<String, Vec<u8>> to String
+            let Ok(actual_endpoint) = actual_endpoint else {
+                warn!("Could not get endpoint for channel {}", channel_name);
+                continue;
+            };
+
+            // Extract port from actual endpoint
+            let actual_port = Self::extract_port_from_endpoint(&actual_endpoint)?;
+
+            info!(
+                "Bound {} channel to {} (actual port: {})",
+                channel_name, addr, actual_port
+            );
+
+            // Store actual ports for Jupyter channels
+            match channel_name.as_str() {
+                "shell" => bound_ports.shell = actual_port,
+                "iopub" => bound_ports.iopub = actual_port,
+                "stdin" => bound_ports.stdin = actual_port,
+                "control" => bound_ports.control = actual_port,
+                "heartbeat" | "hb" => bound_ports.hb = actual_port,
+                _ => {}
+            }
 
             // Special handling for heartbeat channel
             if channel_name == "heartbeat" {
@@ -201,7 +251,12 @@ impl Transport for ZmqTransport {
             }
         }
 
-        Ok(())
+        // Return bound ports if we have Jupyter channels
+        if bound_ports.shell > 0 || bound_ports.control > 0 {
+            Ok(Some(bound_ports))
+        } else {
+            Ok(None)
+        }
     }
 
     #[instrument(level = "info", skip(self, config))]
@@ -264,6 +319,18 @@ impl Transport for ZmqTransport {
         match result {
             Ok(parts) => {
                 trace!("Received {} parts on {} channel", parts.len(), channel);
+                for (i, part) in parts.iter().enumerate() {
+                    let preview = if part.len() > 100 {
+                        format!(
+                            "{}... ({} bytes)",
+                            String::from_utf8_lossy(&part[..100]),
+                            part.len()
+                        )
+                    } else {
+                        format!("{} ({} bytes)", String::from_utf8_lossy(part), part.len())
+                    };
+                    debug!("  Part {}: {}", i, preview);
+                }
                 Ok(Some(parts))
             }
             Err(zmq::Error::EAGAIN) => {
@@ -278,6 +345,18 @@ impl Transport for ZmqTransport {
     #[instrument(level = "trace", skip(self, parts))]
     async fn send(&self, channel: &str, parts: Vec<Vec<u8>>) -> Result<()> {
         trace!("Sending {} parts on {} channel", parts.len(), channel);
+        for (i, part) in parts.iter().enumerate() {
+            let preview = if part.len() > 100 {
+                format!(
+                    "{}... ({} bytes)",
+                    String::from_utf8_lossy(&part[..100]),
+                    part.len()
+                )
+            } else {
+                format!("{} ({} bytes)", String::from_utf8_lossy(part), part.len())
+            };
+            debug!("  Send Part {}: {}", i, preview);
+        }
 
         // Special handling for heartbeat
         if channel == "heartbeat" {

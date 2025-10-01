@@ -24,11 +24,14 @@
 #![allow(clippy::must_use_candidate)]
 
 pub mod api;
+pub mod connection;
+pub mod daemon;
 pub mod debug;
 pub mod events;
 pub mod execution;
 pub mod hooks;
 pub mod io;
+pub mod monitoring;
 pub mod protocols;
 pub mod repl;
 pub mod runtime;
@@ -135,11 +138,15 @@ pub const PROTOCOL_VERSION: &str = "5.3";
 // Re-export high-level API
 pub use api::{
     connect_to_kernel, start_embedded_kernel, start_embedded_kernel_with_executor,
-    start_kernel_service, ClientHandle, KernelHandle, ServiceHandle,
+    start_kernel_service, start_kernel_service_with_config, ClientHandle, KernelHandle,
+    ServiceHandle,
 };
 
 // Re-export REPL types
 pub use repl::{DebugCommand, InteractiveSession, MetaCommand, ReplCommand, ReplSessionConfig};
+
+// Re-export daemon types
+pub use daemon::{DaemonConfig, DaemonManager, PidFile, SignalBridge, SignalHandler};
 
 #[cfg(test)]
 mod tests {

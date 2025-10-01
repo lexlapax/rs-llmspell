@@ -23,10 +23,8 @@ mod backup_tests {
     async fn test_compression_types() {
         let types = vec![
             CompressionType::None,
-            CompressionType::Gzip,
-            CompressionType::Zstd,
             CompressionType::Lz4,
-            CompressionType::Brotli,
+            CompressionType::Zstd,
         ];
 
         for comp_type in types {
@@ -59,10 +57,8 @@ mod backup_tests {
     #[test]
     fn test_compression_type_extensions() {
         assert_eq!(CompressionType::None.extension(), "");
-        assert_eq!(CompressionType::Gzip.extension(), ".gz");
-        assert_eq!(CompressionType::Zstd.extension(), ".zst");
         assert_eq!(CompressionType::Lz4.extension(), ".lz4");
-        assert_eq!(CompressionType::Brotli.extension(), ".br");
+        assert_eq!(CompressionType::Zstd.extension(), ".zst");
     }
     #[tokio::test]
     async fn test_atomic_backup_builder() {
@@ -289,10 +285,8 @@ mod integration_tests {
         // Test with different compression types
         let compression_types = vec![
             CompressionType::None,
-            CompressionType::Gzip,
-            CompressionType::Zstd,
             CompressionType::Lz4,
-            CompressionType::Brotli,
+            CompressionType::Zstd,
         ];
 
         for compression_type in compression_types {

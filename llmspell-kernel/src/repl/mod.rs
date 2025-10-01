@@ -4,6 +4,7 @@
 //! REPL functionality with integrated debugging capabilities.
 
 pub mod commands;
+pub mod readline;
 pub mod session;
 pub mod state;
 

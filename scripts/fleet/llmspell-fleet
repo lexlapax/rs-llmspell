@@ -1,0 +1,420 @@
+#!/bin/bash
+# llmspell-fleet - Fleet manager for LLMSpell kernel processes
+# Simple process-based orchestration without complex dependencies
+
+set -e
+
+FLEET_DIR="$HOME/.llmspell/fleet"
+REGISTRY_FILE="$FLEET_DIR/registry.json"
+LOG_DIR="$FLEET_DIR/logs"
+BASE_PORT=9555
+
+# Initialize fleet directory structure
+init_fleet() {
+    mkdir -p "$FLEET_DIR"
+    mkdir -p "$LOG_DIR"
+
+    if [ ! -f "$REGISTRY_FILE" ]; then
+        echo '{"kernels": [], "next_port": 9555}' > "$REGISTRY_FILE"
+    fi
+}
+
+# Find next available port
+find_free_port() {
+    local port=$(jq -r '.next_port' "$REGISTRY_FILE")
+    while lsof -Pi :$port -sTCP:LISTEN -t >/dev/null 2>&1; do
+        port=$((port + 1))
+    done
+    echo $port
+}
+
+# Spawn a new kernel
+spawn() {
+    local config_file="${1:-default.toml}"
+    local language="${2:-lua}"
+    local port=$(find_free_port)
+    local kernel_id="kernel-$(uuidgen | tr '[:upper:]' '[:lower:]' | head -c 8)"
+    local pid_file="$FLEET_DIR/$kernel_id.pid"
+    local log_file="$LOG_DIR/$kernel_id.log"
+    local connection_file="$FLEET_DIR/$kernel_id.json"
+
+    echo "Spawning kernel $kernel_id on port $port..."
+
+    # Find llmspell binary
+    LLMSPELL_BIN=""
+    if command -v llmspell >/dev/null 2>&1; then
+        LLMSPELL_BIN="llmspell"
+    elif [ -x "../../target/release/llmspell" ]; then
+        LLMSPELL_BIN="../../target/release/llmspell"
+    elif [ -x "../../target/debug/llmspell" ]; then
+        LLMSPELL_BIN="../../target/debug/llmspell"
+    else
+        echo "ERROR: llmspell binary not found"
+        exit 1
+    fi
+
+    # Start kernel process with proper daemon parameters
+    # Note: The daemon will create its own PID file, we don't need to track it
+    if [ "$config_file" != "default.toml" ] && [ -f "configs/$config_file" ]; then
+        "$LLMSPELL_BIN" kernel start \
+            --daemon \
+            --port "$port" \
+            --config "configs/$config_file" \
+            --connection-file "$connection_file" \
+            --log-file "$log_file" \
+            --pid-file "$pid_file"
+    else
+        # Start without config file (use defaults)
+        "$LLMSPELL_BIN" kernel start \
+            --daemon \
+            --port "$port" \
+            --connection-file "$connection_file" \
+            --log-file "$log_file" \
+            --pid-file "$pid_file"
+    fi
+
+    # Read the PID from the file created by the daemon
+    local pid=$(cat "$pid_file" 2>/dev/null || echo 0)
+
+    # Wait for kernel to start
+    local attempts=0
+    while [ $attempts -lt 30 ]; do
+        if lsof -Pi :$port -sTCP:LISTEN -t >/dev/null 2>&1; then
+            break
+        fi
+        sleep 0.5
+        attempts=$((attempts + 1))
+    done
+
+    if [ $attempts -eq 30 ]; then
+        echo "ERROR: Kernel failed to start on port $port"
+        kill $pid 2>/dev/null || true
+        rm -f "$pid_file"
+        exit 1
+    fi
+
+    # Update registry
+    local temp_file=$(mktemp)
+    jq ".kernels += [{
+        \"id\": \"$kernel_id\",
+        \"pid\": $pid,
+        \"port\": $port,
+        \"language\": \"$language\",
+        \"config\": \"$config_file\",
+        \"connection_file\": \"$connection_file\",
+        \"log_file\": \"$log_file\",
+        \"started_at\": \"$(date -u +%Y-%m-%dT%H:%M:%SZ)\",
+        \"status\": \"running\"
+    }] | .next_port = $((port + 1))" "$REGISTRY_FILE" > "$temp_file"
+    mv "$temp_file" "$REGISTRY_FILE"
+
+    echo "✓ Kernel $kernel_id started"
+    echo "  Port: $port"
+    echo "  PID: $pid"
+    echo "  Config: $config_file"
+    echo "  Connection: $connection_file"
+    echo "  Logs: $log_file"
+
+    # Return connection info for clients
+    echo ""
+    echo "Connect with:"
+    echo "  jupyter console --existing $connection_file"
+    echo "  llmspell repl connect --port $port"
+}
+
+# List running kernels
+list() {
+    echo "Active Kernels:"
+    echo "───────────────"
+
+    local kernels=$(jq -r '.kernels[] | @json' "$REGISTRY_FILE" 2>/dev/null)
+
+    if [ -z "$kernels" ]; then
+        echo "No kernels running"
+        return
+    fi
+
+    while IFS= read -r kernel_json; do
+        local kernel=$(echo "$kernel_json" | jq -r '.')
+        local id=$(echo "$kernel" | jq -r '.id')
+        local pid=$(echo "$kernel" | jq -r '.pid')
+        local port=$(echo "$kernel" | jq -r '.port')
+        local language=$(echo "$kernel" | jq -r '.language')
+        local config=$(echo "$kernel" | jq -r '.config')
+        local started=$(echo "$kernel" | jq -r '.started_at')
+
+        # Check if process is still running
+        if kill -0 "$pid" 2>/dev/null; then
+            local status="✓ running"
+            local mem=$(ps -o rss= -p "$pid" | awk '{print int($1/1024)"MB"}')
+        else
+            local status="✗ dead"
+            local mem="N/A"
+        fi
+
+        printf "%-12s  PID:%-7d  Port:%-5d  Lang:%-10s  Mem:%-6s  %s\n" \
+            "$id" "$pid" "$port" "$language" "$mem" "$status"
+    done <<< "$kernels"
+}
+
+# Stop a kernel
+stop() {
+    local kernel_id="$1"
+
+    if [ -z "$kernel_id" ]; then
+        echo "Usage: fleet stop <kernel-id|port>"
+        exit 1
+    fi
+
+    # Support stopping by port number
+    if [[ "$kernel_id" =~ ^[0-9]+$ ]]; then
+        local port=$kernel_id
+        kernel_id=$(jq -r ".kernels[] | select(.port == $port) | .id" "$REGISTRY_FILE")
+        if [ -z "$kernel_id" ]; then
+            echo "No kernel running on port $port"
+            exit 1
+        fi
+    fi
+
+    local kernel=$(jq -r ".kernels[] | select(.id == \"$kernel_id\") | @json" "$REGISTRY_FILE")
+
+    if [ -z "$kernel" ]; then
+        echo "Kernel $kernel_id not found"
+        exit 1
+    fi
+
+    local pid=$(echo "$kernel" | jq -r '.pid')
+    local port=$(echo "$kernel" | jq -r '.port')
+
+    echo "Stopping kernel $kernel_id (PID: $pid, Port: $port)..."
+
+    # Send SIGTERM for graceful shutdown
+    if kill -TERM "$pid" 2>/dev/null; then
+        # Wait up to 5 seconds for process to exit
+        local count=0
+        while kill -0 "$pid" 2>/dev/null && [ $count -lt 50 ]; do
+            sleep 0.1
+            count=$((count + 1))
+        done
+
+        # Force kill if still running
+        if kill -0 "$pid" 2>/dev/null; then
+            kill -9 "$pid" 2>/dev/null || true
+        fi
+    fi
+
+    # Remove from registry
+    local temp_file=$(mktemp)
+    jq ".kernels = [.kernels[] | select(.id != \"$kernel_id\")]" "$REGISTRY_FILE" > "$temp_file"
+    mv "$temp_file" "$REGISTRY_FILE"
+
+    # Clean up files
+    rm -f "$FLEET_DIR/$kernel_id.pid"
+
+    echo "✓ Kernel $kernel_id stopped"
+}
+
+# Stop all kernels
+stop_all() {
+    echo "Stopping all kernels..."
+
+    local kernel_ids=$(jq -r '.kernels[].id' "$REGISTRY_FILE" 2>/dev/null)
+
+    if [ -z "$kernel_ids" ]; then
+        echo "No kernels to stop"
+        return
+    fi
+
+    while IFS= read -r id; do
+        stop "$id"
+    done <<< "$kernel_ids"
+}
+
+# Clean up dead kernels
+cleanup() {
+    echo "Cleaning up dead kernels..."
+
+    local temp_file=$(mktemp)
+    local cleaned=0
+
+    jq -c '.kernels[]' "$REGISTRY_FILE" | while IFS= read -r kernel; do
+        local pid=$(echo "$kernel" | jq -r '.pid')
+        local id=$(echo "$kernel" | jq -r '.id')
+
+        if ! kill -0 "$pid" 2>/dev/null; then
+            echo "  Removing dead kernel $id (PID: $pid)"
+            cleaned=$((cleaned + 1))
+        fi
+    done
+
+    # Remove dead kernels from registry
+    jq '.kernels = [.kernels[] | select(.pid as $p | $p | tostring | test("^[0-9]+$") and ($p | tonumber | . as $pid | (try ($pid | tostring | @sh | "kill -0 " + . | system) catch 1) == 0))]' \
+        "$REGISTRY_FILE" > "$temp_file" 2>/dev/null || \
+    jq '.kernels = []' "$REGISTRY_FILE" > "$temp_file"
+
+    mv "$temp_file" "$REGISTRY_FILE"
+
+    echo "✓ Cleanup complete"
+}
+
+# Show kernel logs
+logs() {
+    local kernel_id="$1"
+
+    if [ -z "$kernel_id" ]; then
+        echo "Usage: fleet logs <kernel-id|port>"
+        exit 1
+    fi
+
+    # Support logs by port number
+    if [[ "$kernel_id" =~ ^[0-9]+$ ]]; then
+        local port=$kernel_id
+        kernel_id=$(jq -r ".kernels[] | select(.port == $port) | .id" "$REGISTRY_FILE")
+    fi
+
+    local log_file="$LOG_DIR/$kernel_id.log"
+
+    if [ -f "$log_file" ]; then
+        tail -f "$log_file"
+    else
+        echo "Log file not found: $log_file"
+        exit 1
+    fi
+}
+
+# Connect to a kernel (finds or spawns)
+connect() {
+    local requirements="$1"
+
+    # Simple matching: if a kernel exists, use it; otherwise spawn new one
+    local existing_kernel=$(jq -r '.kernels[0].port // empty' "$REGISTRY_FILE")
+
+    if [ -n "$existing_kernel" ]; then
+        echo "Connecting to existing kernel on port $existing_kernel"
+        echo "Connection file: $(jq -r ".kernels[] | select(.port == $existing_kernel) | .connection_file" "$REGISTRY_FILE")"
+    else
+        echo "No kernels running, spawning new one..."
+        spawn
+    fi
+}
+
+# Health check all kernels
+health() {
+    echo "Kernel Health Status:"
+    echo "────────────────────"
+
+    local kernels=$(jq -r '.kernels[] | @json' "$REGISTRY_FILE" 2>/dev/null)
+
+    if [ -z "$kernels" ]; then
+        echo "No kernels running"
+        return
+    fi
+
+    while IFS= read -r kernel_json; do
+        local kernel=$(echo "$kernel_json" | jq -r '.')
+        local id=$(echo "$kernel" | jq -r '.id')
+        local pid=$(echo "$kernel" | jq -r '.pid')
+        local port=$(echo "$kernel" | jq -r '.port')
+
+        printf "%-12s  " "$id"
+
+        # Check process
+        if kill -0 "$pid" 2>/dev/null; then
+            printf "Process:✓  "
+        else
+            printf "Process:✗  "
+            echo "DEAD"
+            continue
+        fi
+
+        # Check port
+        if lsof -Pi :$port -sTCP:LISTEN -t >/dev/null 2>&1; then
+            printf "Port:✓  "
+        else
+            printf "Port:✗  "
+        fi
+
+        # Check memory
+        local mem=$(ps -o rss= -p "$pid" | awk '{print int($1/1024)}')
+        if [ "$mem" -lt 1024 ]; then
+            printf "Memory:✓ (%dMB)  " "$mem"
+        else
+            printf "Memory:⚠ (%dMB)  " "$mem"
+        fi
+
+        echo "HEALTHY"
+    done <<< "$kernels"
+}
+
+# Show usage
+usage() {
+    cat << EOF
+llmspell-fleet - Manage multiple LLMSpell kernel processes
+
+Usage:
+    fleet <command> [arguments]
+
+Commands:
+    spawn [config] [language]   Spawn a new kernel
+    list                        List running kernels
+    stop <kernel-id|port>       Stop a kernel
+    stop-all                    Stop all kernels
+    cleanup                     Clean up dead kernels
+    logs <kernel-id|port>       Show kernel logs
+    connect [requirements]      Connect to or spawn kernel
+    health                      Check health of all kernels
+    help                        Show this help message
+
+Examples:
+    fleet spawn                          # Spawn with defaults
+    fleet spawn openai.toml lua          # Spawn Lua kernel with config
+    fleet spawn anthropic.toml javascript # Spawn JS kernel
+    fleet list                           # Show running kernels
+    fleet stop kernel-abc123             # Stop by ID
+    fleet stop 9555                      # Stop by port
+    fleet logs 9555                      # View logs
+    fleet health                         # Check all kernels
+
+Environment:
+    FLEET_DIR: $FLEET_DIR
+    Registry:  $REGISTRY_FILE
+EOF
+}
+
+# Main command dispatcher
+init_fleet
+
+case "${1:-help}" in
+    spawn)
+        spawn "${2:-default.toml}" "${3:-lua}"
+        ;;
+    list|ls)
+        list
+        ;;
+    stop|kill)
+        stop "$2"
+        ;;
+    stop-all|kill-all)
+        stop_all
+        ;;
+    cleanup|clean)
+        cleanup
+        ;;
+    logs|log)
+        logs "$2"
+        ;;
+    connect)
+        connect "$2"
+        ;;
+    health|status)
+        health
+        ;;
+    help|--help|-h)
+        usage
+        ;;
+    *)
+        echo "Unknown command: $1"
+        usage
+        exit 1
+        ;;
+esac

@@ -44,7 +44,7 @@ pub async fn debug_script(
     match context {
         ExecutionContext::Embedded { handle, .. } => {
             let kernel = handle.into_kernel();
-            let mut session = InteractiveSession::new(kernel, session_config)?;
+            let mut session = InteractiveSession::new(kernel, session_config).await?;
 
             // Set initial breakpoints
             for breakpoint in debug_config.break_at {

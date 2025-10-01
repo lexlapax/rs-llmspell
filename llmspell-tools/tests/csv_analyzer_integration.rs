@@ -1,6 +1,8 @@
 //! ABOUTME: Integration tests for `CsvAnalyzerTool` with real-world CSV scenarios
 //! ABOUTME: Tests complex workflows, large file handling, and error cases
 
+#![cfg(feature = "csv-parquet")]
+
 use llmspell_core::{traits::base_agent::BaseAgent, types::AgentInput, ExecutionContext};
 use llmspell_tools::CsvAnalyzerTool;
 use serde_json::json;
@@ -133,13 +135,13 @@ async fn test_large_csv_streaming() {
 
     // Generate a large CSV (but still within default limits)
     let mut csv_content = String::from("id,value,category\n");
-    for i in 1..=1000 {
+    for i in 1u32..=1000 {
         writeln!(
             csv_content,
             "{},value_{},{}",
             i,
             i,
-            if i % 2 == 0 { "A" } else { "B" }
+            if i.is_multiple_of(2) { "A" } else { "B" }
         )
         .unwrap();
     }

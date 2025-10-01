@@ -1341,10 +1341,7 @@ impl WorkflowBridge {
                     builder = builder.with_range(start, end, step);
                 } else {
                     // Default range with max_iterations applied
-                    let mut end = 10;
-                    if let Some(max) = max_iterations {
-                        end = 1 + i64::try_from(max).unwrap_or(10);
-                    }
+                    let end = max_iterations.map_or(10, |max| 1 + i64::try_from(max).unwrap_or(10));
                     builder = builder.with_range(1, end, 1);
                 }
             }

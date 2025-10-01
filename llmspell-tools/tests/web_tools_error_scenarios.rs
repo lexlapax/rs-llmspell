@@ -1,5 +1,11 @@
 //! ABOUTME: Comprehensive error scenario tests for web tools
 //! ABOUTME: Tests various failure modes and edge cases for external integration tools
+//!
+//! Note: Some tests are marked as `#[ignore]` because they depend on external services like httpbin.org.
+//! To run all tests including ignored ones:
+//! ```bash
+//! cargo test -p llmspell-tools --test web_tools_error_scenarios -- --ignored
+//! ```
 
 mod common;
 
@@ -253,6 +259,7 @@ mod network_failure_tests {
 mod http_status_tests {
     use super::*;
     #[tokio::test]
+    #[ignore = "Integration test - requires httpbin.org service availability"]
     async fn test_http_error_statuses() {
         let statuses: Vec<u32> = vec![400, 401, 403, 404, 500, 502, 503];
         let tool = ApiTesterTool::new();
@@ -291,10 +298,12 @@ mod http_status_tests {
                 .as_u64()
                 .unwrap();
 
-            // If we get 503, it means httpbin.org is down/overloaded - skip the specific assertion
-            if actual_status == 503 {
-                eprintln!("Warning: httpbin.org returned 503 (Service Unavailable) instead of expected {status}");
-                eprintln!("This indicates the external service is temporarily unavailable - skipping specific status assertion");
+            // If we get 502 or 503, it means httpbin.org is having issues - skip the specific assertion
+            if actual_status == 502 || actual_status == 503 {
+                eprintln!(
+                    "Warning: httpbin.org returned {actual_status} instead of expected {status}"
+                );
+                eprintln!("This indicates the external service is having issues - skipping specific status assertion");
                 continue; // Skip to next status code
             }
 
@@ -307,6 +316,7 @@ mod http_status_tests {
 mod rate_limit_tests {
     use super::*;
     #[tokio::test]
+    #[ignore = "Integration test - requires httpbin.org service availability"]
     async fn test_rapid_requests() {
         let _tool = ApiTesterTool::new();
 

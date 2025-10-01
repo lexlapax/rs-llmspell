@@ -5,13 +5,12 @@
 
 use criterion::{black_box, criterion_group, criterion_main, Criterion};
 use llmspell_core::{traits::base_agent::BaseAgent, types::AgentInput, ExecutionContext};
-use llmspell_tools::{
-    data::{json_processor::JsonProcessorConfig, JsonProcessorTool},
-    util::{
-        hash_calculator::HashCalculatorConfig, text_manipulator::TextManipulatorConfig,
-        uuid_generator::UuidGeneratorConfig, Base64EncoderTool, CalculatorTool, HashCalculatorTool,
-        TextManipulatorTool, UuidGeneratorTool,
-    },
+#[cfg(feature = "json-query")]
+use llmspell_tools::data::{json_processor::JsonProcessorConfig, JsonProcessorTool};
+use llmspell_tools::util::{
+    hash_calculator::HashCalculatorConfig, text_manipulator::TextManipulatorConfig,
+    uuid_generator::UuidGeneratorConfig, Base64EncoderTool, CalculatorTool, HashCalculatorTool,
+    TextManipulatorTool, UuidGeneratorTool,
 };
 use serde_json::json;
 use tokio::runtime::Runtime;
@@ -208,6 +207,7 @@ fn bench_text_operations(c: &mut Criterion) {
     group.finish();
 }
 
+#[cfg(feature = "json-query")]
 fn bench_json_operations(c: &mut Criterion) {
     let mut group = c.benchmark_group("json_operations");
     let rt = Runtime::new().unwrap();
@@ -313,6 +313,7 @@ fn bench_uuid_generation(c: &mut Criterion) {
     group.finish();
 }
 
+#[cfg(feature = "json-query")]
 fn bench_mixed_operations(c: &mut Criterion) {
     let mut group = c.benchmark_group("mixed_operations");
     let rt = Runtime::new().unwrap();
@@ -374,6 +375,7 @@ fn bench_mixed_operations(c: &mut Criterion) {
     group.finish();
 }
 
+#[cfg(feature = "json-query")]
 criterion_group!(
     benches,
     bench_base64_operations,
@@ -384,4 +386,15 @@ criterion_group!(
     bench_uuid_generation,
     bench_mixed_operations
 );
+
+#[cfg(not(feature = "json-query"))]
+criterion_group!(
+    benches,
+    bench_base64_operations,
+    bench_calculator_operations,
+    bench_hash_operations,
+    bench_text_operations,
+    bench_uuid_generation
+);
+
 criterion_main!(benches);

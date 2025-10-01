@@ -2,9 +2,9 @@
 
 **Production-Ready AI Workflow Orchestration Platform** - Script-driven LLM coordination with RAG at scale
 
-**🚀 Version 0.9.0 - Interactive Kernel & Debugging Infrastructure Complete**
+**🚀 Version 0.10.0 - Service Integration & IDE Connectivity Complete**
 
-**🔗 Quick Links**: [📘 User Guide](docs/user-guide/) | [🔧 Developer Guide](docs/developer-guide/) | [📚 Examples](examples/) | [🚀 Get Started](#-quick-start) | [📖 Release Notes](RELEASE_NOTES_v0.9.0.md)
+**🔗 Quick Links**: [📘 User Guide](docs/user-guide/) | [🔧 Developer Guide](docs/developer-guide/) | [📚 Examples](examples/) | [🛠️ Scripts](scripts/) | [🚀 Get Started](#-quick-start) | [📖 Release Notes](RELEASE_NOTES_v0.10.0.md)
 
 ---
 
@@ -12,18 +12,27 @@
 
 ---
 
-## 🌟 Production Ready with Interactive Kernel Architecture
+## 🌟 Production Ready with Service Integration & Daemon Mode
 
-rs-llmspell v0.9.0 delivers **unified kernel architecture** with interactive REPL capabilities, comprehensive debugging infrastructure, and multi-protocol support. Build sophisticated AI applications with Jupyter integration, DAP debugging, real-time tracing, and 100% validated application suite across all complexity layers.
+rs-llmspell v0.10.0 delivers **production Unix service infrastructure** with daemon mode, tool CLI commands, fleet management, and modular feature-based builds (19-35MB). Deploy as system services with systemd/launchd, orchestrate multi-kernel fleets, invoke tools directly from CLI, and optimize binary size with compile-time feature flags—all while maintaining 100% backward compatibility for existing scripts.
 
 ## ✨ Key Features
 
-### 🎯 Unified Kernel & Debug Infrastructure (v0.9.0)
-- **Interactive REPL**: Jupyter 5-channel protocol support
-- **Debug Capabilities**: DAP bridge with breakpoints and stepping
-- **Global IO Runtime**: Eliminates runtime context issues
-- **Session Management**: Complete lifecycle with artifacts
-- **Comprehensive Tracing**: -3.99% overhead (performance gain!)
+### 📦 Optimized Feature-Based Builds (NEW in Phase 10)
+- **Minimal 19MB binary** - 43% smaller than before, perfect for containers
+- **Choose your features** - Include only what you need (templates, PDF, data tools)
+- **Zero runtime overhead** - Feature flags are compile-time only
+- **Automatic tool discovery** - Runtime adapts to available features
+- **Three preset configurations**: minimal (19MB), common (25MB), full (35MB)
+
+### 🎯 Production Service Infrastructure (v0.10.0)
+- **Unix Daemon Mode**: Double-fork daemonization with 1.8s startup (10% faster than target)
+- **Tool CLI Commands**: 5 subcommands for direct tool access without scripts
+- **Fleet Management**: OS-level multi-kernel orchestration with Bash/Python/Docker managers
+- **Signal Handling**: SIGTERM/SIGINT → graceful Jupyter shutdown with resource cleanup
+- **systemd/launchd Ready**: Production service deployment on Linux/macOS
+- **Log Rotation**: Automatic rotation with 78ms performance (22% faster than target)
+- **PID Management**: Lifecycle tracking with 6ms validation (40% faster than target)
 
 ### 🧠 Complete RAG System (v0.8.0)
 - **HNSW Vector Storage**: <8ms search @ 100K vectors, <35ms @ 1M vectors
@@ -38,12 +47,13 @@ rs-llmspell v0.9.0 delivers **unified kernel architecture** with interactive REP
 - Real-time state sharing between agents
 - Automatic error recovery and retry logic
 
-### 🛠️ 37+ Built-in Tools
-- File operations, web search, data processing
-- **NEW**: pdf-processor, document-chunker, embedding-generator
-- **NEW**: vector-search, similarity-calculator, web-scraper
-- JSON/YAML manipulation, text transformation
-- All tools run in secure sandboxes
+### 🛠️ 40+ Built-in Tools (Modular)
+- **Core Tools** (always available): File ops, web search, calculator, HTTP client
+- **Common Tools** (`--features common`): Templates (Tera/Handlebars), PDF processing
+- **Full Tools** (`--features full`): Excel, CSV, archives, email (SMTP/SES), database (Postgres/MySQL/SQLite)
+- **RAG Tools**: pdf-processor, document-chunker, embedding-generator, vector-search
+- **Direct CLI Access**: `llmspell tool list|info|invoke|search|test` (v0.10.0)
+- All tools run in secure sandboxes with automatic feature detection
 
 ### 📦 9 Production Applications
 Progressive complexity with RAG capabilities:
@@ -59,28 +69,31 @@ Progressive complexity with RAG capabilities:
 - **Resource Boundaries**: Per-tenant CPU, memory, I/O limits
 - **Audit Compliance**: Complete trails with event correlation
 
-### ⚡ Blazing Performance (v0.9.0)
-- **Message handling**: 3.8ms (24% faster than target)
-- **Tracing overhead**: -3.99% (performance improved!)
-- **Application validation**: 100% success rate
-- **Vector search**: <8ms @ 100K vectors, <35ms @ 1M vectors
-- **Embedding generation**: 45ms with caching (80% hit rate)
-- **Multi-tenant overhead**: 3% (40% better than target)
-- **Ingestion throughput**: 1.8K vectors/sec
-- Agent creation: 2-3ms
-- Tool initialization: 1-2ms
-- State operations: <1ms
-- WebApp generation: 4.5 minutes (20 agents)
+### ⚡ Blazing Performance (v0.10.0)
+**All 10 Phase 10 targets exceeded by 10-40%**:
+- **Binary size**: 19MB minimal (43% smaller), 25MB common (26% smaller), 35MB full
+- **Daemon startup**: 1.8s (10% faster than <2s target)
+- **Message handling**: 3.8ms (24% faster than <5ms target)
+- **Signal response**: 85ms (15% faster than <100ms target)
+- **Tool initialization**: 7ms (30% faster than <10ms target)
+- **Log rotation**: 78ms (22% faster than <100ms target)
+- **PID file check**: 6ms (40% faster than <10ms target)
+- **Memory overhead**: 42MB (16% better than <50MB target)
+- **Heartbeat latency**: 0.8ms (20% faster than <1ms target)
+- **Vector search**: 8ms @ 100K (20% faster), 35ms @ 1M (30% faster)
+- **Multi-tenant overhead**: 3% (40% better than <5% target)
+- **Application validation**: 100% success rate (9/9 apps passing)
+- **Test coverage**: 486 tests (kernel:57, bridge:334, CLI:57, fleet:38)
 
 ## Platform Support
 
 | Platform | Status | Notes |
 |----------|--------|-------|
-| macOS 15.7 (ARM64) | ✅ Fully Tested | All features including RAG working |
+| macOS 15.7 (ARM64) | ✅ Fully Tested | All features including daemon, tool CLI, fleet management working |
 | Linux | ⏳ Testing Pending | Expected to work, formal testing in progress |
 | Windows | ⏳ Testing Pending | Expected to work, formal testing in progress |
 
-> **Note**: v0.9.0 has been thoroughly tested on macOS 15.7 (Darwin 24.6.0, ARM64) with complete kernel architecture and debugging support. Linux and Windows testing is in progress.
+> **Note**: v0.10.0 has been thoroughly tested on macOS 15.7 (Darwin 24.6.0, ARM64) with complete daemon infrastructure, tool CLI commands, and fleet management. Linux and Windows testing is in progress.
 
 ## Quick Example
 
@@ -204,13 +217,17 @@ local tenant_results = RAG.search("knowledge", {
 
 ## 🚀 Quick Start
 
-### Easy Installation (Recommended)
+### Easy Installation (Choose Your Build)
 
 ```bash
-# Clone and build
+# Clone repository
 git clone https://github.com/lexlapax/rs-llmspell
 cd rs-llmspell
-cargo build --release
+
+# Choose your build size:
+cargo build --release                   # Minimal: 19MB (core tools only)
+cargo build --release --features common # Common: 25MB (+templates, PDF)
+cargo build --release --features full   # Full: 35MB (all features)
 
 # Use the friendly launcher with setup wizard
 ./scripts/llmspell-easy.sh
@@ -218,6 +235,8 @@ cargo build --release
 # Run your first application!
 ./scripts/llmspell-easy.sh file-organizer
 ```
+
+💡 **Build Size Tip**: Start with minimal (19MB) for production or common (25MB) for development. See [Installation Options](#-installation-options) below for details.
 
 ### Try Production Applications
 
@@ -235,10 +254,58 @@ cargo build --release
 ./scripts/llmspell-easy.sh webapp-creator
 ```
 
+## 📦 Installation Options
+
+rs-llmspell supports flexible installation via Cargo feature flags to control binary size and dependencies:
+
+### Minimal Installation (19MB)
+Includes core functionality with Lua scripting and essential tools:
+```bash
+cargo build --release --bin llmspell
+# Or explicitly:
+cargo build --release --bin llmspell --no-default-features --features lua
+```
+
+### Common Installation (recommended for most users)
+Adds template engines and PDF processing (~25MB):
+```bash
+cargo build --release --bin llmspell --features common
+```
+
+### Full Installation
+Includes all optional components - CSV/Parquet, Excel, archives, email, database support (~35MB):
+```bash
+cargo build --release --bin llmspell --features full
+```
+
+### Custom Feature Selection
+Mix and match features based on your needs:
+```bash
+# Example: Just add template support
+cargo build --release --features templates
+
+# Example: Add CSV/Parquet and archives
+cargo build --release --features csv-parquet,archives
+```
+
+**Available Features:**
+- `templates` - Tera and Handlebars template engines
+- `pdf` - PDF document processing
+- `csv-parquet` - Apache Arrow/Parquet support for data analysis
+- `excel` - Excel file reading/writing
+- `json-query` - JQ-style JSON queries
+- `archives` - ZIP, TAR, GZ archive handling
+- `email` - Email sending via SMTP
+- `email-aws` - Email via AWS SES
+- `database` - SQL database connectivity (PostgreSQL, MySQL, SQLite)
+
 ## 📊 Comprehensive Feature Set
 
 ### Core Capabilities
-- **34 Production Tools**: File operations, web scraping, data processing, system utilities
+- **40+ Production Tools**: File operations, web scraping, data processing, system utilities (modular with feature flags)
+- **Tool CLI Commands**: Direct tool access via `llmspell tool list|info|invoke|search|test` (v0.10.0)
+- **Unix Daemon Mode**: Production service deployment with systemd/launchd (v0.10.0)
+- **Fleet Management**: Multi-kernel orchestration with OS-level process isolation (v0.10.0)
 - **Multi-Agent Coordination**: Orchestrate 2-20+ LLM agents with different models and roles
 - **Workflow Patterns**: Sequential, parallel, conditional, and recursive execution
 - **Session Management**: Long-running sessions with suspend/resume, artifacts, and replay
@@ -269,49 +336,64 @@ cargo build --release
 
 ## 🎯 Roadmap
 
-### Current: v0.8.0 - RAG & Multi-Tenancy ✅
-- **Phase 8 Completed**: Production RAG with HNSW vector search
-- Multi-tenant isolation with StateScope::Custom
-- 3 new crates: llmspell-rag, llmspell-storage, llmspell-tenancy
-- 37+ tools with 11 new RAG/data tools
-- <8ms vector search @ 100K vectors achieved
+### Current: v0.10.0 - Service Integration & IDE Connectivity ✅
+- **Phase 10 Completed**: Production daemon infrastructure with tool CLI and fleet management
+- Unix daemon with systemd/launchd integration
+- Tool CLI: 5 subcommands for direct tool access
+- Fleet management: Bash/Python/Docker orchestration
+- Feature flags: Modular builds (19-35MB)
+- 17 crates with 486 tests total
+- All 10 performance targets exceeded by 10-40%
 
-### Next: Phase 9 - Enhanced Observability (Q1 2025)
-- **OpenTelemetry Integration**: Distributed tracing and metrics
-- **Performance Analytics**: Cost tracking and optimization
-- **Advanced Debugging**: Profilers and diagnostic tools
-- **Developer Experience**: Enhanced error messages and documentation
+### Next: Phase 11 - Adaptive Memory System (Q1 2025)
+- **Working Memory**: Short-term context for active conversations
+- **Episodic Memory**: Long-term conversation history and patterns
+- **Semantic Memory**: Knowledge graph with fact extraction
+- **Adaptive Temporal Knowledge Graph (A-TKG)**: Time-aware memory consolidation
+- **LLM-Driven Consolidation**: Automatic summarization and importance scoring
+- **IDE Memory Visualization**: Memory state inspection and debugging
 
-### Upcoming Feature Additions (Phases 10-16)
+### Upcoming Feature Additions (Phases 12-16)
 
 #### Near Term (2025)
-- **Phase 10**: Advanced Workflow Patterns - Complex orchestration
-- **Phase 11**: LLM Router - Intelligent model selection
-- **Phase 12**: JavaScript Bridge - Full JS/TypeScript support
+- **Phase 12**: Model Context Protocol (MCP) - External tool integration
+- **Phase 13**: Security Hardening - Advanced threat protection
+- **Phase 14**: Production Orchestration - Kubernetes, autoscaling, monitoring
 
 #### Medium Term (2025-2026)
-- **Phase 13**: IDE Plugins - VSCode and IntelliJ integration
-- **Phase 14**: Cloud Platform - Managed service offering
-- **Phase 15**: Mobile SDKs - iOS and Android libraries
-- **Phase 16**: Python Bridge - Complete Python integration
+- **Phase 15**: Multi-Language Debug - JavaScript debugging support
+- **Phase 16**: Distributed Execution - Multi-node orchestration
+- **Phase 17**: Cloud Platform - Managed service offering
+- **Phase 18**: Agent-to-Agent (A2A) - Distributed agent collaboration
 
-*Note: From v0.8.0 onwards, infrastructure is stable. Updates will add features without breaking existing functionality.*
+*Note: From v0.10.0 onwards, infrastructure is production-stable. Updates add features without breaking existing functionality. Feature flags ensure backward compatibility.*
 
 ## Documentation
 
 - **[Quick Start Guide](docs/user-guide/getting-started.md)** - Get started in 5 minutes
-- **[Documentation Hub](docs/README.md)** - Complete documentation index
+- **[Documentation Hub](docs/README.md)** - Complete documentation index (10 user guides, 6 developer guides, 13 technical docs)
+- **[Service Deployment](docs/user-guide/service-deployment.md)** - systemd/launchd deployment with daemon mode ⭐ NEW
+- **[IDE Integration](docs/user-guide/ide-integration.md)** - VS Code, Jupyter Lab, vim/neovim setup ⭐ NEW
+- **[Feature Flags Migration](docs/developer-guide/feature-flags-migration.md)** - Modular builds guide ⭐ NEW
 - **[RAG System Guide](docs/technical/rag-system-guide.md)** - Complete RAG documentation
-- **[Examples](examples/)** - 60+ working examples with RAG patterns
+- **[Examples](examples/)** - 60+ working examples with RAG patterns and tool CLI
+
+## Scripts & Automation
+
+- **[Scripts Overview](scripts/)** - All automation tools
+  - **[Quality & CI](scripts/quality/)** - Code quality, CI/CD pipelines
+  - **[Testing](scripts/testing/)** - Test execution, coverage analysis
+  - **[Utilities](scripts/utilities/)** - Helper tools, easy launcher
+  - **[Fleet Management](scripts/fleet/)** - Kernel orchestration, monitoring
 
 ## Development
 
 ```bash
 # Run quality checks before committing
-./scripts/quality-check-minimal.sh
+./scripts/quality/quality-check-minimal.sh
 
 # Run full test suite
-cargo test --workspace
+./scripts/testing/test-by-tag.sh unit
 
 # See development guide for more
 cat docs/developer-guide/README.md
@@ -333,4 +415,4 @@ This project is licensed under the Apache License, Version 2.0. See [LICENSE-APA
 
 ---
 
-**🚀 v0.8.0 Released**: Complete RAG & Multi-Tenant Vector Storage with <8ms search @ 100K vectors, 80% embedding cache hit rate, and 9 production applications. See [Release Notes](RELEASE_NOTES_v0.8.0.md) for details.
+**🚀 v0.10.0 Released**: Production Service Integration & IDE Connectivity with Unix daemon mode (1.8s startup), tool CLI (5 subcommands), fleet management, and feature flags (19-35MB builds). All 10 performance targets exceeded by 10-40%. See [Release Notes](RELEASE_NOTES_v0.10.0.md) for complete details.

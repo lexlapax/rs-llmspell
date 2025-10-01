@@ -1,9 +1,16 @@
 //! Separate test for HTTP timeout functionality
+//!
+//! These tests require httpbin.org to be available and are marked as ignored by default.
+//! To run these integration tests:
+//! ```bash
+//! cargo test -p llmspell-tools --test http_timeout_test -- --ignored
+//! ```
 
 use llmspell_core::{traits::base_agent::BaseAgent, types::AgentInput, ExecutionContext};
 use llmspell_tools::api::http_request::{HttpRequestConfig, HttpRequestTool};
 use serde_json::json;
 #[tokio::test]
+#[ignore = "Integration test - requires httpbin.org service availability"]
 async fn test_http_timeout_with_short_timeout() {
     // Create tool with very short timeout
     let config = HttpRequestConfig {
@@ -38,6 +45,7 @@ async fn test_http_timeout_with_short_timeout() {
     }
 }
 #[tokio::test]
+#[ignore = "Integration test - requires httpbin.org service availability"]
 async fn test_http_no_timeout_with_long_timeout() {
     // Create tool with long timeout
     let config = HttpRequestConfig {

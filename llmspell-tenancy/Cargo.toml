@@ -33,10 +33,10 @@ anyhow = "1.0"
 tracing = "0.1"
 
 # UUID for tenant IDs
-uuid = { version = "1.7", features = ["v4", "serde"] }
+uuid = { workspace = true }
 
 # Time handling
-chrono = { version = "0.4", features = ["serde"] }
+chrono = { workspace = true }
 
 [dev-dependencies]
 llmspell-testing = { path = "../llmspell-testing" }

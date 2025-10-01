@@ -1,11 +1,11 @@
 # Getting Started
 
-**Version**: 0.8.10  
+**Version**: 0.9.0
 **Time Required**: 10 minutes
 
-> **🚀 Quick Start**: Get LLMSpell running in under 5 minutes with this focused guide.
+> **🚀 Quick Start**: Get LLMSpell kernel running in under 5 minutes with this focused guide.
 
-**🔗 Navigation**: [← User Guide](README.md) | [Core Concepts →](concepts.md) | [Examples →](../../examples/EXAMPLE-INDEX.md)
+**🔗 Navigation**: [← User Guide](README.md) | [Core Concepts →](concepts.md) | [Service Deployment →](service-deployment.md)
 
 ---
 
@@ -177,11 +177,13 @@ local scopes = State.list_scopes()
 
 ## Command Line Usage
 
+### Basic Execution (Embedded Kernel)
+
 ```bash
-# Execute inline code
+# Execute inline code (kernel runs embedded)
 ./target/release/llmspell exec 'print("Hello from LLMSpell!")'
 
-# Run a script  
+# Run a script
 ./target/release/llmspell run script.lua
 
 # Pass arguments
@@ -190,14 +192,45 @@ local scopes = State.list_scopes()
 # Use configuration file (required for agents and RAG)
 ./target/release/llmspell -c config.toml run script.lua
 
-# RAG-specific configuration
-./target/release/llmspell -c examples/script-users/configs/rag-basic.toml run rag-script.lua
-
-# Enable debug output
-RUST_LOG=debug ./target/release/llmspell run script.lua
+# Enable debug output with --trace flag (Phase 9)
+./target/release/llmspell --trace debug run script.lua
+./target/release/llmspell --trace info exec "print('test')"
 
 # Validate configuration
 ./target/release/llmspell -c config.toml validate
+```
+
+### Kernel Service Mode (Phase 9-10)
+
+```bash
+# Start kernel as service (listens for connections)
+./target/release/llmspell kernel start --port 9555
+
+# Start as daemon (background service)
+./target/release/llmspell kernel start --daemon --port 9555
+
+# Connect to running kernel
+./target/release/llmspell kernel connect --address tcp://localhost:9555
+
+# List running kernels
+./target/release/llmspell kernel list
+
+# Stop kernel
+./target/release/llmspell kernel stop --all
+```
+
+### Service Installation (Phase 10)
+
+```bash
+# Install as system service (auto-detect platform)
+./target/release/llmspell kernel install-service
+
+# Install with options
+./target/release/llmspell kernel install-service --enable --start --port 9600
+
+# Manage service
+systemctl --user start llmspell-kernel  # Linux
+launchctl start com.llmspell.kernel     # macOS
 ```
 
 ## Progressive Learning Path
@@ -327,17 +360,25 @@ end
 
 ## Quick Tips
 
-- **17+ globals pre-injected** (no `require()` needed): `Agent`, `Tool`, `RAG`, `State`, etc.
+### Core Tips
+- **17+ globals pre-injected** (no `require()` needed): `Agent`, `Tool`, `RAG`, `State`, `Debug`, etc.
 - **Configuration required** for agents and RAG (use `-c config.toml`)
-- **Provider setup**: Add API keys to config files, not environment variables
-- **RAG setup**: Use `configs/rag-basic.toml` for document search and ingestion
-- **Tool discovery**: `Tool.list()` shows all 37+ available tools
+- **Provider setup**: Add API keys to config files or environment variables
+- **Tool discovery**: `Tool.list()` shows all 40+ available tools
 - **Error handling**: Always check `.success` field on agent/tool results
-- **Debug mode**: `RUST_LOG=debug` for verbose output
 - **Timeouts**: Scripts timeout after 5 minutes by default
 - **State scoping**: State operations require scope parameter (`"global"`, `"user"`, etc.)
 
-### Phase 8.10.6 Specific
+### Phase 9-10 Kernel Features
+- **Use --trace flag**: Replace `--debug`/`--verbose` with `--trace debug` or `--trace info`
+- **Kernel modes**: Embedded (default), Service (external connections), Daemon (background)
+- **Service installation**: Use `kernel install-service` for production deployment
+- **Debug with DAP**: Enable IDE debugging with `Debug.enableDAP()`
+- **Multiple kernels**: Run fleet of kernels on different ports for scaling
+- **Global IO runtime**: Fixes "dispatch task is gone" errors automatically
+- **Signal handling**: SIGTERM (shutdown), SIGHUP (reload), SIGUSR1 (stats)
+
+### Phase 8 RAG Features
 - **RAG requires OpenAI**: Set up OpenAI provider for embedding generation
 - **Vector dimensions**: Default 384, supports 768, 1536, 3072
 - **HNSW performance**: <10ms search for 1M vectors with proper configuration
@@ -356,8 +397,8 @@ end
 - [ ] 🔄 Build your first workflow
 - [ ] 📖 Read [Core Concepts](concepts.md) to understand RAG and HNSW
 
-**Phase 8.10.6 Ready!** RAG, vector search, and multi-tenancy at your fingertips.
+**Phase 9-10 Ready!** Kernel architecture with service deployment, DAP debugging, and multi-protocol support.
 
 ---
 
-**Need help?** Check [Troubleshooting](troubleshooting.md) or [Configuration Guide](configuration.md) for RAG setup. Report issues on [GitHub](https://github.com/yourusername/rs-llmspell/issues)
+**Need help?** Check [Troubleshooting](troubleshooting.md) for kernel issues or [Service Deployment](service-deployment.md) for production setup. Report issues on [GitHub](https://github.com/yourusername/rs-llmspell/issues)

@@ -2,7 +2,9 @@
 //! ABOUTME: Foundation for multi-language script execution (Lua, JavaScript, Python, etc.)
 
 use async_trait::async_trait;
-use llmspell_core::{error::LLMSpellError, types::AgentStream};
+use llmspell_core::{
+    error::LLMSpellError, traits::debug_context::DebugContext, types::AgentStream,
+};
 use serde_json::Value;
 use std::collections::HashMap;
 use std::sync::Arc;
@@ -74,6 +76,199 @@ pub trait ScriptEngineBridge: Send + Sync {
     ///
     /// Returns an error if the execution context cannot be set
     fn set_execution_context(&mut self, context: ExecutionContext) -> Result<(), LLMSpellError>;
+
+    /// Set debug context for debugging support
+    ///
+    /// Default implementation does nothing for backward compatibility.
+    /// Engines that support debugging should override this method.
+    /// Uses &self instead of &mut self to allow use with Arc
+    fn set_debug_context(&self, _context: Option<Arc<dyn DebugContext>>) {
+        // Default: ignore (for backward compatibility)
+    }
+
+    /// Check if this engine supports debugging
+    ///
+    /// Returns true if the engine has debug support capabilities.
+    /// Default returns false for backward compatibility.
+    fn supports_debugging(&self) -> bool {
+        false
+    }
+
+    /// Get the current debug context if set
+    ///
+    /// Default returns None. Engines with debug support should override.
+    fn get_debug_context(&self) -> Option<Arc<dyn DebugContext>> {
+        None
+    }
+
+    /// Get completion candidates for interactive use (REPL, IDE)
+    ///
+    /// This is used for tab completion and IntelliSense-like features.
+    /// Default implementation returns empty vector for backward compatibility.
+    ///
+    /// # Arguments
+    ///
+    /// * `context` - The completion context containing the text and cursor position
+    ///
+    /// # Returns
+    ///
+    /// A vector of completion candidates appropriate for the context
+    fn get_completion_candidates(&self, _context: &CompletionContext) -> Vec<CompletionCandidate> {
+        Vec::new()
+    }
+}
+
+/// Context for completion requests
+#[derive(Debug, Clone)]
+pub struct CompletionContext {
+    /// The full line of text
+    pub line: String,
+    /// Cursor position in the line
+    pub cursor_pos: usize,
+    /// The word being completed (extracted from line and cursor)
+    pub word: String,
+    /// Position where the word starts
+    pub word_start: usize,
+}
+
+impl CompletionContext {
+    /// Create a new completion context
+    #[must_use]
+    pub fn new(line: &str, cursor_pos: usize) -> Self {
+        // Extract the word being completed
+        let before_cursor = &line[..cursor_pos.min(line.len())];
+        let word_start = before_cursor
+            .rfind(|c: char| c.is_whitespace() || c == '.' || c == ':' || c == '(' || c == ',')
+            .map_or(0, |i| i + 1);
+
+        let word = line[word_start..cursor_pos.min(line.len())].to_string();
+
+        Self {
+            line: line.to_string(),
+            cursor_pos,
+            word,
+            word_start,
+        }
+    }
+
+    /// Check if we're completing after a dot (member access)
+    #[must_use]
+    pub fn is_member_access(&self) -> Option<String> {
+        if self.word_start > 0 {
+            let before = &self.line[..self.word_start];
+            if let Some(stripped) = before.strip_suffix('.') {
+                // Extract the object name before the dot
+                let obj_start = stripped
+                    .rfind(|c: char| c.is_whitespace() || c == '(' || c == ',')
+                    .map_or(0, |i| i + 1);
+                return Some(stripped[obj_start..].to_string());
+            }
+        }
+        None
+    }
+
+    /// Check if we're completing after a colon (method call)
+    #[must_use]
+    pub fn is_method_call(&self) -> Option<String> {
+        if self.word_start > 0 {
+            let before = &self.line[..self.word_start];
+            if let Some(stripped) = before.strip_suffix(':') {
+                let obj_start = stripped
+                    .rfind(|c: char| c.is_whitespace() || c == '(' || c == ',')
+                    .map_or(0, |i| i + 1);
+                return Some(stripped[obj_start..].to_string());
+            }
+        }
+        None
+    }
+
+    /// Check if we're inside function arguments (between parentheses)
+    #[must_use]
+    pub fn is_inside_function_args(&self) -> bool {
+        // Check if we're inside parentheses by counting open/close before cursor
+        let before_cursor = &self.line[..self.cursor_pos.min(self.line.len())];
+        let open_count = before_cursor.matches('(').count();
+        let close_count = before_cursor.matches(')').count();
+
+        // We're inside if there are more open parens than close parens
+        open_count > close_count
+    }
+
+    /// Get the function name if we're inside its arguments
+    #[must_use]
+    pub fn get_function_context(&self) -> Option<String> {
+        if !self.is_inside_function_args() {
+            return None;
+        }
+
+        // Find the last unmatched open paren before cursor
+        let before_cursor = &self.line[..self.cursor_pos.min(self.line.len())];
+        let mut depth = 0;
+        let mut last_open_pos = None;
+
+        // Iterate in reverse using char_indices
+        let chars: Vec<(usize, char)> = before_cursor.char_indices().collect();
+        for (i, ch) in chars.iter().rev() {
+            match ch {
+                ')' => depth += 1,
+                '(' => {
+                    if depth == 0 {
+                        last_open_pos = Some(*i);
+                        break;
+                    }
+                    depth -= 1;
+                }
+                _ => {}
+            }
+        }
+
+        if let Some(pos) = last_open_pos {
+            // Extract the function name before the open paren
+            let before_paren = &self.line[..pos];
+            let func_start = before_paren
+                .rfind(|c: char| c.is_whitespace() || c == '=' || c == '(' || c == ',')
+                .map_or(0, |i| i + 1);
+
+            let func_name = before_paren[func_start..].trim();
+            if !func_name.is_empty() {
+                return Some(func_name.to_string());
+            }
+        }
+
+        None
+    }
+}
+
+/// A completion candidate
+#[derive(Debug, Clone)]
+pub struct CompletionCandidate {
+    /// The text to insert
+    pub text: String,
+    /// The kind of completion
+    pub kind: CompletionKind,
+    /// Optional signature (for functions)
+    pub signature: Option<String>,
+    /// Optional documentation
+    pub documentation: Option<String>,
+}
+
+/// Kind of completion candidate
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum CompletionKind {
+    /// A variable
+    Variable,
+    /// A function
+    Function,
+    /// A method
+    Method,
+    /// A property/field
+    Property,
+    /// A language keyword
+    Keyword,
+    /// A module/library
+    Module,
+    /// Unknown/other
+    Other,
 }
 
 /// Output from script execution

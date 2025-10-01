@@ -26,9 +26,6 @@ use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use tracing::{debug, error, info, instrument, warn};
 
-#[cfg(feature = "database")]
-use sqlx::Column;
-
 /// Database connection configuration
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct DatabaseConfig {
@@ -364,7 +361,7 @@ impl DatabaseConnectorTool {
     ) -> Result<serde_json::Value> {
         #[cfg(feature = "database-postgres")]
         {
-            use sqlx::{postgres::PgPoolOptions, Row};
+            use sqlx::{postgres::PgPoolOptions, Column, Row};
             use std::time::Duration;
 
             let url = config.connection.get("url").ok_or_else(|| {

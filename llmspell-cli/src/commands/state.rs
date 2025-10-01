@@ -144,7 +144,6 @@ async fn export_state(
     // Format the data
     let formatted = match format {
         ExportFormat::Json => serde_json::to_string_pretty(&state_data)?,
-        ExportFormat::Yaml => serde_yaml::to_string(&state_data)?,
         ExportFormat::Toml => toml::to_string_pretty(&state_data)?,
     };
 
@@ -260,9 +259,6 @@ fn display_state_data(
     match output_format {
         OutputFormat::Json => {
             println!("{}", serde_json::to_string_pretty(data)?);
-        }
-        OutputFormat::Yaml => {
-            println!("{}", serde_yaml::to_string(data)?);
         }
         OutputFormat::Text | OutputFormat::Pretty => {
             if let Some(key) = key {

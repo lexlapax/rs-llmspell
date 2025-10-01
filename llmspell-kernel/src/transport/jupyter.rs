@@ -18,6 +18,7 @@ use std::collections::HashMap;
 use std::path::Path;
 use tracing::{debug, info, instrument, warn};
 
+use crate::traits::transport::BoundPorts;
 use crate::traits::{ChannelConfig, Transport, TransportConfig};
 
 /// Jupyter connection file structure
@@ -94,8 +95,14 @@ impl JupyterTransport {
         // Build configuration for 5 channels
         let config = Self::build_config(&connection_info);
 
-        // Bind to all channels
-        jupyter_transport.transport.bind(&config).await?;
+        // Bind to all channels and get actual ports
+        let bound_ports = jupyter_transport.transport.bind(&config).await?;
+
+        // Store bound ports if available
+        if let Some(ports) = bound_ports {
+            debug!("Jupyter transport bound to ports - shell: {}, iopub: {}, stdin: {}, control: {}, hb: {}",
+                  ports.shell, ports.iopub, ports.stdin, ports.control, ports.hb);
+        }
 
         Ok(jupyter_transport)
     }
@@ -210,7 +217,7 @@ impl JupyterTransport {
 // Delegate Transport trait to underlying implementation
 #[async_trait]
 impl Transport for JupyterTransport {
-    async fn bind(&mut self, config: &TransportConfig) -> Result<()> {
+    async fn bind(&mut self, config: &TransportConfig) -> Result<Option<BoundPorts>> {
         // Validate that all 5 channels are present
         if !config.channels.contains_key("shell")
             || !config.channels.contains_key("iopub")

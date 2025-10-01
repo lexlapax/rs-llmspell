@@ -1,5 +1,11 @@
 //! Integration tests for web scraping tools suite
 //! Tests all 6 tools: `WebScraper`, `UrlAnalyzer`, `ApiTester`, `WebhookCaller`, `WebpageMonitor`, `SitemapCrawler`
+//!
+//! Note: Most tests depend on httpbin.org and are marked as ignored by default.
+//! To run these integration tests:
+//! ```bash
+//! cargo test -p llmspell-tools --test web_tools_integration -- --ignored
+//! ```
 
 use llmspell_core::traits::base_agent::BaseAgent;
 use llmspell_core::types::AgentInput;
@@ -18,6 +24,7 @@ fn create_agent_input(parameters: Value) -> AgentInput {
     AgentInput::text("test-input").with_parameter("parameters", parameters)
 }
 #[tokio::test]
+#[ignore = "Integration test - requires httpbin.org service availability"]
 async fn test_web_scraper_tool_basic() {
     let tool = WebScraperTool::default();
     let input = create_agent_input(json!({
@@ -55,6 +62,7 @@ async fn test_web_scraper_tool_invalid_url() {
     );
 }
 #[tokio::test]
+#[ignore = "Integration test - requires httpbin.org service availability"]
 async fn test_url_analyzer_tool_valid_url() {
     let tool = UrlAnalyzerTool::new();
     let input = create_agent_input(json!({
@@ -99,6 +107,7 @@ async fn test_url_analyzer_tool_invalid_url() {
     );
 }
 #[tokio::test]
+#[ignore = "Integration test - requires httpbin.org service availability"]
 async fn test_api_tester_tool_get_request() {
     let tool = ApiTesterTool::new();
     let input = create_agent_input(json!({
@@ -120,6 +129,7 @@ async fn test_api_tester_tool_get_request() {
     assert!(response_text.contains("200"), "Should have 200 status code");
 }
 #[tokio::test]
+#[ignore = "Integration test - requires httpbin.org service availability"]
 async fn test_api_tester_tool_post_request() {
     let tool = ApiTesterTool::new();
     let input = create_agent_input(json!({
@@ -145,6 +155,7 @@ async fn test_api_tester_tool_post_request() {
     assert!(response_text.contains("200"), "Should have 200 status code");
 }
 #[tokio::test]
+#[ignore = "Integration test - requires httpbin.org service availability"]
 async fn test_api_tester_tool_invalid_method() {
     let tool = ApiTesterTool::new();
     let input = create_agent_input(json!({
@@ -160,6 +171,7 @@ async fn test_api_tester_tool_invalid_method() {
     );
 }
 #[tokio::test]
+#[ignore = "Integration test - requires httpbin.org service availability"]
 async fn test_webhook_caller_tool_success() {
     let tool = WebhookCallerTool::new();
     let input = create_agent_input(json!({
@@ -198,6 +210,7 @@ async fn test_webhook_caller_tool_invalid_url() {
     );
 }
 #[tokio::test]
+#[ignore = "Integration test - requires httpbin.org service availability"]
 async fn test_webpage_monitor_tool_no_previous_content() {
     let tool = WebpageMonitorTool::new();
     let input = create_agent_input(json!({
@@ -224,6 +237,7 @@ async fn test_webpage_monitor_tool_no_previous_content() {
     );
 }
 #[tokio::test]
+#[ignore = "Integration test - requires httpbin.org service availability"]
 async fn test_webpage_monitor_tool_with_selector() {
     let tool = WebpageMonitorTool::new();
     let input = create_agent_input(json!({
@@ -261,6 +275,7 @@ async fn test_webpage_monitor_tool_invalid_url() {
     );
 }
 #[tokio::test]
+#[ignore = "Integration test - requires httpbin.org service availability"]
 async fn test_sitemap_crawler_tool_basic() {
     let tool = SitemapCrawlerTool::new();
     let input = create_agent_input(json!({

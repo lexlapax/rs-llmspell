@@ -47,7 +47,7 @@ async fn start_embedded_repl(
 ) -> Result<()> {
     // Create interactive session
     let kernel = handle.into_kernel();
-    let mut session = InteractiveSession::new(kernel, session_config)?;
+    let mut session = InteractiveSession::new(kernel, session_config).await?;
 
     // Run REPL loop
     session.run_repl().await?;
@@ -62,35 +62,94 @@ async fn start_connected_repl(
     engine: ScriptEngine,
     output_format: OutputFormat,
 ) -> Result<()> {
-    // For connected mode, use the client handle differently
-    // For now, simulate REPL mode
-    println!("Connected REPL mode not yet fully implemented");
-    println!("This would connect to the remote kernel for interactive sessions");
+    use tokio::io::{AsyncBufReadExt, AsyncWriteExt, BufReader};
+    use tokio::net::TcpStream;
 
-    match output_format {
-        OutputFormat::Json => {
-            println!(
-                "{}",
-                serde_json::json!({
-                    "status": "repl_started",
-                    "mode": "connected",
-                    "engine": engine.as_str(),
-                    "message": "Connected REPL mode placeholder"
-                })
-            );
+    // TODO: Get the connection address from the client handle
+    // For now, use localhost:9999 as the default REPL server address
+    let repl_address = "127.0.0.1:9999";
+
+    println!("Connecting to REPL server at {}...", repl_address);
+
+    // Connect to REPL server
+    let stream = TcpStream::connect(&repl_address).await?;
+    let (reader, mut writer) = stream.into_split();
+    let mut reader = BufReader::new(reader);
+
+    // Read and display welcome message
+    let mut line = String::new();
+    loop {
+        reader.read_line(&mut line).await?;
+        print!("{}", line);
+        if line.contains("> ") {
+            break;
         }
-        OutputFormat::Yaml => {
-            let data = serde_json::json!({
-                "status": "repl_started",
+        line.clear();
+    }
+
+    // Set up readline for local input
+    use rustyline::DefaultEditor;
+    let mut rl = DefaultEditor::new()?;
+
+    // Main REPL client loop
+    loop {
+        // Read user input
+        let input = match rl.readline("") {
+            Ok(line) => {
+                rl.add_history_entry(&line)?;
+                line
+            }
+            Err(rustyline::error::ReadlineError::Interrupted) => {
+                continue;
+            }
+            Err(rustyline::error::ReadlineError::Eof) => {
+                println!("Disconnecting...");
+                writer.write_all(b".exit\n").await?;
+                break;
+            }
+            Err(err) => {
+                println!("Error reading input: {}", err);
+                break;
+            }
+        };
+
+        // Send to server
+        writer.write_all(format!("{}\n", input).as_bytes()).await?;
+        writer.flush().await?;
+
+        // Read response
+        line.clear();
+        loop {
+            let bytes_read = reader.read_line(&mut line).await?;
+            if bytes_read == 0 {
+                println!("Server disconnected");
+                return Ok(());
+            }
+
+            print!("{}", line);
+
+            // Check if we've received the prompt
+            if line.contains("> ") {
+                break;
+            }
+            line.clear();
+        }
+
+        // Check for exit command
+        if input.trim() == ".exit" {
+            break;
+        }
+    }
+
+    if output_format == OutputFormat::Json {
+        println!(
+            "{}",
+            serde_json::json!({
+                "status": "repl_disconnected",
                 "mode": "connected",
                 "engine": engine.as_str(),
-                "message": "Connected REPL mode placeholder"
-            });
-            println!("{}", serde_yaml::to_string(&data)?);
-        }
-        _ => {
-            println!("Starting interactive REPL with connected kernel...");
-        }
+            })
+        );
     }
 
     Ok(())

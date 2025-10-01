@@ -29,7 +29,7 @@ fn create_test_state(id: usize) -> SerializableState {
                 "updated": "2024-01-01T00:00:00Z",
                 "tags": vec![format!("tag{}", id % 10), format!("category{}", id % 5)],
                 "attributes": {
-                    "color": if id % 2 == 0 { "blue" } else { "red" },
+                    "color": if id.is_multiple_of(2) { "blue" } else { "red" },
                     "size": match id % 3 {
                         0 => "small",
                         1 => "medium",

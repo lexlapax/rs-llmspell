@@ -33,8 +33,10 @@ use tracing::{error, info, trace, warn};
 /// This test creates an HTTP client and maintains it for 60+ seconds,
 /// making periodic requests to ensure the connection stays alive and
 /// doesn't trigger "dispatch task is gone" errors.
+///
+/// Note: Requires httpbin.org service availability for testing HTTP requests
 #[test]
-#[ignore] // Run with --ignored flag
+#[ignore = "Long-running test (60s) that requires httpbin.org service availability"]
 fn test_http_client_60_second_keepalive() {
     tracing_subscriber::fmt()
         .with_env_filter("debug")
@@ -144,8 +146,10 @@ fn test_http_client_60_second_keepalive() {
 ///
 /// Simulates long-running LLM provider operations to ensure they remain
 /// stable over extended periods without runtime context issues.
+///
+/// Note: Requires httpbin.org service availability for testing HTTP requests
 #[test]
-#[ignore] // Run with --ignored flag
+#[ignore = "Long-running test (90s) that requires httpbin.org service availability"]
 fn test_provider_operations_90_seconds() {
     tracing_subscriber::fmt()
         .with_env_filter("debug")
@@ -250,8 +254,10 @@ fn test_provider_operations_90_seconds() {
 ///
 /// Tests that the runtime can handle many concurrent operations without
 /// context mismatches or "dispatch task is gone" errors.
+///
+/// Note: Requires httpbin.org service availability for testing HTTP requests
 #[test]
-#[ignore] // Run with --ignored flag
+#[ignore = "Long-running test with 100 concurrent operations that requires httpbin.org"]
 fn test_100_concurrent_runtime_operations() {
     tracing_subscriber::fmt()
         .with_env_filter("info")
@@ -534,8 +540,10 @@ fn test_memory_stability_60_seconds() {
 /// Integration test combining all scenarios
 ///
 /// This is the ultimate test that validates complete stability
+///
+/// Note: Requires httpbin.org service availability for testing HTTP requests
 #[test]
-#[ignore] // Run with --ignored flag
+#[ignore = "Comprehensive long-running test that requires httpbin.org service availability"]
 fn test_comprehensive_runtime_stability() {
     tracing_subscriber::fmt()
         .with_env_filter("info")

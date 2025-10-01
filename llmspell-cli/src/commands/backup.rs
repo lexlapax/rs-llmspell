@@ -214,9 +214,6 @@ async fn create_backup(
         OutputFormat::Json | OutputFormat::Pretty => {
             println!("{}", serde_json::to_string_pretty(&result)?)
         }
-        OutputFormat::Yaml => {
-            println!("{}", serde_yaml::to_string(&result)?)
-        }
         OutputFormat::Text => {}
     }
     Ok(())
@@ -365,9 +362,6 @@ async fn validate_backup(
         OutputFormat::Json | OutputFormat::Pretty => {
             println!("{}", serde_json::to_string_pretty(&result)?)
         }
-        OutputFormat::Yaml => {
-            println!("{}", serde_yaml::to_string(&result)?)
-        }
         OutputFormat::Text => {}
     }
     Ok(())
@@ -393,9 +387,6 @@ async fn show_backup_info(
     match output_format {
         OutputFormat::Json | OutputFormat::Pretty => {
             println!("{}", serde_json::to_string_pretty(&json!(backup))?)
-        }
-        OutputFormat::Yaml => {
-            println!("{}", serde_yaml::to_string(&json!(backup))?)
         }
         OutputFormat::Text => {
             println!("ID: {}", backup["id"].as_str().unwrap_or("unknown"));
@@ -521,9 +512,6 @@ async fn cleanup_backups(
             OutputFormat::Json | OutputFormat::Pretty => {
                 println!("{}", serde_json::to_string_pretty(&result)?)
             }
-            OutputFormat::Yaml => {
-                println!("{}", serde_yaml::to_string(&result)?)
-            }
             OutputFormat::Text => {}
         }
     } else {
@@ -572,9 +560,6 @@ async fn cleanup_backups(
             OutputFormat::Json | OutputFormat::Pretty => {
                 println!("{}", serde_json::to_string_pretty(&result)?)
             }
-            OutputFormat::Yaml => {
-                println!("{}", serde_yaml::to_string(&result)?)
-            }
             OutputFormat::Text => {}
         }
     }
@@ -619,15 +604,6 @@ async fn handle_create_backup(
                 })
             );
         }
-        OutputFormat::Yaml => {
-            let data = serde_json::json!({
-                "status": "success",
-                "action": "create_backup",
-                "output_file": output,
-                "message": "Backup creation functionality not yet implemented"
-            });
-            println!("{}", serde_yaml::to_string(&data)?);
-        }
         _ => {
             println!("Creating backup...");
             if let Some(path) = output {
@@ -653,14 +629,6 @@ async fn handle_list_backups(
                     "message": "Backup listing functionality not yet implemented"
                 })
             );
-        }
-        OutputFormat::Yaml => {
-            let data = serde_json::json!({
-                "status": "success",
-                "action": "list_backups",
-                "message": "Backup listing functionality not yet implemented"
-            });
-            println!("{}", serde_yaml::to_string(&data)?);
         }
         _ => {
             println!("📋 Available Backups:");
@@ -693,9 +661,6 @@ async fn handle_show_backup(
     match output_format {
         OutputFormat::Json => {
             println!("{}", serde_json::to_string_pretty(&backup_info)?);
-        }
-        OutputFormat::Yaml => {
-            println!("{}", serde_yaml::to_string(&backup_info)?);
         }
         _ => {
             println!("📋 Backup Details: {}", backup_id);
@@ -743,15 +708,6 @@ async fn handle_restore_backup(
                 })
             );
         }
-        OutputFormat::Yaml => {
-            let data = serde_json::json!({
-                "status": "success",
-                "action": "restore_backup",
-                "file": file,
-                "message": "Backup restore functionality not yet implemented"
-            });
-            println!("{}", serde_yaml::to_string(&data)?);
-        }
         _ => {
             println!("Restoring from backup file: {}", file.display());
             println!("Backup restore functionality not yet implemented");
@@ -776,15 +732,6 @@ async fn handle_delete_backup(
                     "message": "Backup delete functionality not yet implemented"
                 })
             );
-        }
-        OutputFormat::Yaml => {
-            let data = serde_json::json!({
-                "status": "success",
-                "action": "delete_backup",
-                "id": id,
-                "message": "Backup delete functionality not yet implemented"
-            });
-            println!("{}", serde_yaml::to_string(&data)?);
         }
         _ => {
             println!("Deleting backup with ID: {}", id);

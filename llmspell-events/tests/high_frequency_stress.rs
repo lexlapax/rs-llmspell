@@ -69,7 +69,7 @@ mod stress_tests {
             }
 
             // Micro-sleep to control rate (100 microseconds = 10K EPS)
-            if i % 100 == 0 {
+            if i.is_multiple_of(100) {
                 tokio::time::sleep(Duration::from_micros(10)).await;
             }
         }
@@ -384,7 +384,7 @@ mod stress_tests {
         let mut successful_publishes = 0u64;
         let mut failed_publishes = 0u64;
 
-        for i in 0..10_000 {
+        for i in 0u64..10_000 {
             let event = create_test_event(i);
 
             match bus.publish(event).await {
@@ -396,7 +396,7 @@ mod stress_tests {
             }
 
             // Small delay to allow some processing
-            if i % 1000 == 0 {
+            if i.is_multiple_of(1000) {
                 tokio::time::sleep(Duration::from_millis(10)).await;
             }
         }

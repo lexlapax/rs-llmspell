@@ -282,7 +282,7 @@ impl DataValidationTool {
                         alternate = !alternate;
                     }
 
-                    if sum % 10 == 0 {
+                    if sum.is_multiple_of(10) {
                         Ok(())
                     } else {
                         Err(validation_error("Invalid credit card number", None))

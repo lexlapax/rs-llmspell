@@ -207,6 +207,7 @@ async fn test_data_validation_response_format() {
 }
 
 #[tokio::test]
+#[cfg(feature = "templates")]
 async fn test_template_engine_response_format() {
     let tool = TemplateEngineTool::new();
     let input = create_test_input(
@@ -252,10 +253,6 @@ async fn test_refactored_tools_error_consistency() {
             json!({"format": "unified"}),
         ), // missing old_text/new_text
         (Box::new(DataValidationTool::new()), json!({"input": {}})), // missing rules
-        (
-            Box::new(TemplateEngineTool::new()),
-            json!({"engine": "handlebars"}),
-        ), // missing input
     ];
 
     for (i, (tool, params)) in test_cases.into_iter().enumerate() {
@@ -536,6 +533,7 @@ async fn test_data_validation_functionality() {
 }
 
 #[tokio::test]
+#[cfg(feature = "templates")]
 async fn test_template_engine_functionality() {
     let tool = TemplateEngineTool::new();
 

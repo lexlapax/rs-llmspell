@@ -253,7 +253,7 @@ async fn test_execution_context_concurrent_access() {
     });
 
     let mut handles = Vec::new();
-    for i in 0..20 {
+    for i in 0u32..20 {
         let context_clone = Arc::clone(&context);
         let handle = tokio::spawn(async move {
             // Concurrent reads
@@ -264,7 +264,7 @@ async fn test_execution_context_concurrent_access() {
             assert_eq!(context_clone.user_id, Some("user-123".to_string()));
 
             // Access data variables
-            if i % 2 == 0 {
+            if i.is_multiple_of(2) {
                 assert_eq!(
                     context_clone.data.get("KEY1"),
                     Some(&serde_json::json!("value1"))

@@ -2,16 +2,15 @@
 // ABOUTME: Tests that tools cannot consume excessive resources
 
 use llmspell_core::{traits::base_agent::BaseAgent, types::AgentInput, ExecutionContext};
-use llmspell_tools::{
-    data::{
-        csv_analyzer::CsvAnalyzerConfig, json_processor::JsonProcessorConfig, CsvAnalyzerTool,
-        JsonProcessorTool,
-    },
-    fs::ArchiveHandlerTool,
-    util::{
-        hash_calculator::HashCalculatorConfig, text_manipulator::TextManipulatorConfig,
-        CalculatorTool, HashCalculatorTool, TextManipulatorTool,
-    },
+#[cfg(feature = "csv-parquet")]
+use llmspell_tools::data::{csv_analyzer::CsvAnalyzerConfig, CsvAnalyzerTool};
+#[cfg(feature = "json-query")]
+use llmspell_tools::data::{json_processor::JsonProcessorConfig, JsonProcessorTool};
+#[cfg(feature = "archives")]
+use llmspell_tools::fs::ArchiveHandlerTool;
+use llmspell_tools::util::{
+    hash_calculator::HashCalculatorConfig, text_manipulator::TextManipulatorConfig, CalculatorTool,
+    HashCalculatorTool, TextManipulatorTool,
 };
 use serde_json::json;
 use std::sync::Arc;
@@ -48,6 +47,7 @@ async fn test_hash_calculator_large_input_limit() {
         let _test_alloc = vec![0u8; 1024];
     }
 }
+#[cfg(feature = "json-query")]
 #[tokio::test]
 async fn test_json_processor_recursive_query_limit() {
     let json_tool = JsonProcessorTool::new(JsonProcessorConfig::default());
@@ -153,6 +153,7 @@ async fn test_calculator_computation_limit() {
         }
     }
 }
+#[cfg(feature = "csv-parquet")]
 #[tokio::test]
 async fn test_csv_analyzer_large_file_limit() {
     let csv_tool = CsvAnalyzerTool::new(CsvAnalyzerConfig::default());
@@ -193,6 +194,7 @@ async fn test_csv_analyzer_large_file_limit() {
         );
     }
 }
+#[cfg(feature = "archives")]
 #[tokio::test]
 async fn test_archive_handler_zip_bomb_protection() {
     use llmspell_security::sandbox::{FileSandbox, SandboxContext};

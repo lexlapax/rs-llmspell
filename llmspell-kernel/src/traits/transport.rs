@@ -10,6 +10,16 @@ use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use tracing::{debug, info, instrument};
 
+/// Actual bound ports after binding to OS-assigned ports
+#[derive(Debug, Clone, Default)]
+pub struct BoundPorts {
+    pub shell: u16,
+    pub iopub: u16,
+    pub stdin: u16,
+    pub control: u16,
+    pub hb: u16,
+}
+
 /// Generic transport configuration
 ///
 /// This configuration is protocol-agnostic and can be used for any
@@ -50,7 +60,8 @@ pub struct ChannelConfig {
 #[async_trait]
 pub trait Transport: Send + Sync {
     /// Bind to specified addresses from configuration (server mode)
-    async fn bind(&mut self, config: &TransportConfig) -> Result<()>;
+    /// Returns actual bound ports (important when port 0 is used for OS assignment)
+    async fn bind(&mut self, config: &TransportConfig) -> Result<Option<BoundPorts>>;
 
     /// Connect to specified addresses from configuration (client mode)
     async fn connect(&mut self, config: &TransportConfig) -> Result<()>;

@@ -446,6 +446,7 @@ impl AgentStateMachine {
     /// Execute hooks for a state transition phase
     #[allow(clippy::cognitive_complexity)]
     #[instrument(level = "trace", skip(self))]
+    #[allow(clippy::too_many_lines)]
     async fn execute_transition_hooks(
         &self,
         state: AgentState,
@@ -472,129 +473,134 @@ impl AgentStateMachine {
                 return Ok(()); // No hooks configured
             };
 
-        let hook_point = state_to_hook_point(state, is_entering);
+            let hook_point = state_to_hook_point(state, is_entering);
 
-        // Early exit: check if any hooks are registered for this point before building context
-        let hooks = hook_registry.get_hooks(&hook_point);
-        if hooks.is_empty() {
-            return Ok(());
-        }
-
-        // Only build context if we actually have hooks to execute
-        let component_id = ComponentId::new(ComponentType::Agent, self.agent_id.clone());
-        let mut hook_context = HookContext::new(hook_point, component_id);
-
-        // Optimized metadata building - avoid string formatting where possible
-        hook_context.insert_metadata("agent_id".to_string(), self.agent_id.clone());
-
-        // Use static strings for common state names to avoid allocations
-        let from_state_str = match context.current_state {
-            AgentState::Uninitialized => "Uninitialized",
-            AgentState::Initializing => "Initializing",
-            AgentState::Ready => "Ready",
-            AgentState::Running => "Running",
-            AgentState::Paused => "Paused",
-            AgentState::Terminated => "Terminated",
-            AgentState::Terminating => "Terminating",
-            AgentState::Error => "Error",
-            AgentState::Recovering => "Recovering",
-        };
-
-        let to_state_str = match context.target_state {
-            AgentState::Uninitialized => "Uninitialized",
-            AgentState::Initializing => "Initializing",
-            AgentState::Ready => "Ready",
-            AgentState::Running => "Running",
-            AgentState::Paused => "Paused",
-            AgentState::Terminated => "Terminated",
-            AgentState::Terminating => "Terminating",
-            AgentState::Error => "Error",
-            AgentState::Recovering => "Recovering",
-        };
-
-        hook_context.insert_metadata("from_state".to_string(), from_state_str.to_string());
-        hook_context.insert_metadata("to_state".to_string(), to_state_str.to_string());
-        hook_context.insert_metadata(
-            "transition_phase".to_string(),
-            if is_entering {
-                "enter".to_string()
-            } else {
-                "exit".to_string()
-            },
-        );
-
-        // Only add context metadata if it's non-empty
-        if !context.metadata.is_empty() {
-            for (key, value) in &context.metadata {
-                hook_context.insert_metadata(key.clone(), value.clone());
+            // Early exit: check if any hooks are registered for this point before building context
+            let hooks = hook_registry.get_hooks(&hook_point);
+            if hooks.is_empty() {
+                return Ok(());
             }
-        }
 
-        // Execute hooks
-        let results = hook_executor.execute_hooks(&hooks, &mut hook_context).await;
+            // Only build context if we actually have hooks to execute
+            let component_id = ComponentId::new(ComponentType::Agent, self.agent_id.clone());
+            let mut hook_context = HookContext::new(hook_point, component_id);
 
-        match results {
-            Ok(hook_results) => {
-                // Check results for any that should block the transition
-                for result in hook_results {
-                    match result {
-                        HookResult::Continue | HookResult::Skipped(_) => {}
-                        HookResult::Retry {
-                            delay: _,
-                            max_attempts: _,
-                        } => {
-                            // For state transitions, we don't support retry
-                            warn!("Hook requested retry for state transition - ignoring");
-                        }
-                        HookResult::Fork {
-                            parallel_operations: _,
-                        } => {
-                            // For state transitions, we don't support forking
-                            warn!("Hook attempted to fork state transition - ignoring");
-                        }
-                        HookResult::Modified(_) => {
-                            // For state transitions, modifications are logged but don't affect transition
-                            debug!("Hook modified state transition context - continuing");
-                        }
-                        HookResult::Cancel(reason) => {
-                            // Cancel blocks the transition
-                            return Err(anyhow!("State transition cancelled by hook: {}", reason));
-                        }
-                        HookResult::Redirect(target) => {
-                            warn!("Hook attempted redirect during state transition to '{}' - ignoring", target);
-                        }
-                        HookResult::Replace(_) => {
-                            warn!("Hook attempted to replace state transition result - ignoring");
-                        }
-                        HookResult::Cache { key: _, ttl: _ } => {
-                            // Caching doesn't affect state transitions
-                            debug!("Hook requested caching for state transition - noted");
+            // Optimized metadata building - avoid string formatting where possible
+            hook_context.insert_metadata("agent_id".to_string(), self.agent_id.clone());
+
+            // Use static strings for common state names to avoid allocations
+            let from_state_str = match context.current_state {
+                AgentState::Uninitialized => "Uninitialized",
+                AgentState::Initializing => "Initializing",
+                AgentState::Ready => "Ready",
+                AgentState::Running => "Running",
+                AgentState::Paused => "Paused",
+                AgentState::Terminated => "Terminated",
+                AgentState::Terminating => "Terminating",
+                AgentState::Error => "Error",
+                AgentState::Recovering => "Recovering",
+            };
+
+            let to_state_str = match context.target_state {
+                AgentState::Uninitialized => "Uninitialized",
+                AgentState::Initializing => "Initializing",
+                AgentState::Ready => "Ready",
+                AgentState::Running => "Running",
+                AgentState::Paused => "Paused",
+                AgentState::Terminated => "Terminated",
+                AgentState::Terminating => "Terminating",
+                AgentState::Error => "Error",
+                AgentState::Recovering => "Recovering",
+            };
+
+            hook_context.insert_metadata("from_state".to_string(), from_state_str.to_string());
+            hook_context.insert_metadata("to_state".to_string(), to_state_str.to_string());
+            hook_context.insert_metadata(
+                "transition_phase".to_string(),
+                if is_entering {
+                    "enter".to_string()
+                } else {
+                    "exit".to_string()
+                },
+            );
+
+            // Only add context metadata if it's non-empty
+            if !context.metadata.is_empty() {
+                for (key, value) in &context.metadata {
+                    hook_context.insert_metadata(key.clone(), value.clone());
+                }
+            }
+
+            // Execute hooks
+            let results = hook_executor.execute_hooks(&hooks, &mut hook_context).await;
+
+            match results {
+                Ok(hook_results) => {
+                    // Check results for any that should block the transition
+                    for result in hook_results {
+                        match result {
+                            HookResult::Continue | HookResult::Skipped(_) => {}
+                            HookResult::Retry {
+                                delay: _,
+                                max_attempts: _,
+                            } => {
+                                // For state transitions, we don't support retry
+                                warn!("Hook requested retry for state transition - ignoring");
+                            }
+                            HookResult::Fork {
+                                parallel_operations: _,
+                            } => {
+                                // For state transitions, we don't support forking
+                                warn!("Hook attempted to fork state transition - ignoring");
+                            }
+                            HookResult::Modified(_) => {
+                                // For state transitions, modifications are logged but don't affect transition
+                                debug!("Hook modified state transition context - continuing");
+                            }
+                            HookResult::Cancel(reason) => {
+                                // Cancel blocks the transition
+                                return Err(anyhow!(
+                                    "State transition cancelled by hook: {}",
+                                    reason
+                                ));
+                            }
+                            HookResult::Redirect(target) => {
+                                warn!("Hook attempted redirect during state transition to '{}' - ignoring", target);
+                            }
+                            HookResult::Replace(_) => {
+                                warn!(
+                                    "Hook attempted to replace state transition result - ignoring"
+                                );
+                            }
+                            HookResult::Cache { key: _, ttl: _ } => {
+                                // Caching doesn't affect state transitions
+                                debug!("Hook requested caching for state transition - noted");
+                            }
                         }
                     }
-                }
 
-                debug!(
-                    "Hooks executed successfully for {:?} ({}) on agent {}",
-                    state,
-                    if is_entering { "enter" } else { "exit" },
-                    self.agent_id
-                );
-                Ok(())
+                    debug!(
+                        "Hooks executed successfully for {:?} ({}) on agent {}",
+                        state,
+                        if is_entering { "enter" } else { "exit" },
+                        self.agent_id
+                    );
+                    Ok(())
+                }
+                Err(e) => {
+                    error!(
+                        "Hook execution failed for {:?} ({}) on agent {}: {}",
+                        state,
+                        if is_entering { "enter" } else { "exit" },
+                        self.agent_id,
+                        e
+                    );
+                    // Log but continue - hooks should not block transitions on execution errors
+                    // This ensures backward compatibility and prevents hook failures from breaking agents
+                    warn!("Hook failed but continuing transition: {}", e);
+                    Ok(())
+                }
             }
-            Err(e) => {
-                error!(
-                    "Hook execution failed for {:?} ({}) on agent {}: {}",
-                    state,
-                    if is_entering { "enter" } else { "exit" },
-                    self.agent_id,
-                    e
-                );
-                // Log but continue - hooks should not block transitions on execution errors
-                // This ensures backward compatibility and prevents hook failures from breaking agents
-                warn!("Hook failed but continuing transition: {}", e);
-                Ok(())
-            }
-        }
         } // End of hooks feature block
     }
 

@@ -92,9 +92,9 @@ fn bench_state_large_data(c: &mut Criterion) {
 
                 // Create large conversation history
                 let mut conversation = Vec::new();
-                for i in 0..100 {
+                for i in 0u32..100 {
                     conversation.push(serde_json::json!({
-                        "role": if i % 2 == 0 { "user" } else { "assistant" },
+                        "role": if i.is_multiple_of(2) { "user" } else { "assistant" },
                         "content": format!("This is message number {} with some content to make it realistic", i),
                         "timestamp": "2025-07-25T12:00:00Z"
                     }));

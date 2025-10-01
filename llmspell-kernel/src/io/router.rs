@@ -52,6 +52,8 @@ pub struct MessageRouter {
     tracing: Option<TracingInstrumentation>,
     /// Current correlation ID for message tracking
     correlation_id: Arc<RwLock<Option<Uuid>>>,
+    /// Track which client sent which message (`msg_id` -> `client_id`)
+    message_origins: Arc<RwLock<HashMap<String, String>>>,
 }
 
 impl MessageRouter {
@@ -69,6 +71,7 @@ impl MessageRouter {
             max_history,
             tracing: None,
             correlation_id: Arc::new(RwLock::new(None)),
+            message_origins: Arc::new(RwLock::new(HashMap::new())),
         }
     }
 
@@ -108,12 +111,25 @@ impl MessageRouter {
         if removed {
             debug!("Unregistered client {}", client_id);
 
+            // Clean up message origins for this client
+            let mut origins = self.message_origins.write();
+            origins.retain(|_, v| v != client_id);
+
             if let Some(ref tracing) = self.tracing {
                 tracing.trace_session_operation("client_unregister", client_id);
             }
         }
 
         removed
+    }
+
+    /// Track that a message originated from a specific client
+    #[instrument(level = "trace", skip(self))]
+    pub fn track_message_origin(&self, msg_id: &str, client_id: &str) {
+        self.message_origins
+            .write()
+            .insert(msg_id.to_string(), client_id.to_string());
+        trace!("Tracked message {} from client {}", msg_id, client_id);
     }
 
     /// Mark a client as inactive
@@ -251,7 +267,20 @@ impl MessageRouter {
     /// Send message to original requester using parent header
     async fn send_to_requester(&self, message: IOPubMessage) -> Result<()> {
         if let Some(ref parent_header) = message.parent_header {
-            // Find client with matching session
+            // First, try to find the specific client that sent this message
+            let client_id = self
+                .message_origins
+                .read()
+                .get(&parent_header.msg_id)
+                .cloned();
+
+            if let Some(client_id) = client_id {
+                // Send to the specific client that originated the request
+                debug!("Routing message to originating client {}", client_id);
+                return self.send_to_client(&client_id, message).await;
+            }
+
+            // Fallback: Find clients with matching session
             let matching_clients: Vec<_> = {
                 let clients = self.clients.read();
                 clients
@@ -468,5 +497,310 @@ mod tests {
             let index = msg.content.get("index").unwrap().as_i64().unwrap();
             assert_eq!(index, i);
         }
+    }
+
+    #[tokio::test]
+    async fn test_message_origin_tracking() {
+        let router = MessageRouter::new(100);
+
+        let (id1, mut rx1) = router.create_client_channel("session1".to_string());
+        let (_id2, mut rx2) = router.create_client_channel("session2".to_string());
+
+        // Track that a message originated from client 1
+        let msg_id = "test-msg-123";
+        router.track_message_origin(msg_id, &id1);
+
+        // Create a response message with parent header pointing to that message
+        let mut parent_header = MessageHeader::new("execute_request", "session1");
+        parent_header.msg_id = msg_id.to_string();
+
+        let response = IOPubMessage {
+            parent_header: Some(parent_header),
+            header: MessageHeader::new("execute_result", "session1"),
+            metadata: HashMap::new(),
+            content: HashMap::new(),
+        };
+
+        // Route to requester - should go only to client 1
+        router
+            .route_message(response, MessageDestination::Requester)
+            .await
+            .unwrap();
+
+        // Only client 1 should receive the message
+        let msg1 = rx1.recv().await.unwrap();
+        assert_eq!(msg1.header.msg_type, "execute_result");
+
+        // Client 2 should not receive
+        assert!(rx2.try_recv().is_err());
+    }
+
+    #[tokio::test]
+    async fn test_concurrent_client_requests() {
+        let router = MessageRouter::new(100);
+
+        let (id1, mut rx1) = router.create_client_channel("session1".to_string());
+        let (id2, mut rx2) = router.create_client_channel("session2".to_string());
+
+        // Track two different requests from different clients
+        router.track_message_origin("msg-from-client1", &id1);
+        router.track_message_origin("msg-from-client2", &id2);
+
+        // Create responses for both requests
+        let mut parent1 = MessageHeader::new("execute_request", "session1");
+        parent1.msg_id = "msg-from-client1".to_string();
+
+        let mut parent2 = MessageHeader::new("execute_request", "session2");
+        parent2.msg_id = "msg-from-client2".to_string();
+
+        let response1 = IOPubMessage {
+            parent_header: Some(parent1),
+            header: MessageHeader::new("execute_result", "session1"),
+            metadata: HashMap::new(),
+            content: {
+                let mut content = HashMap::new();
+                content.insert("client".to_string(), serde_json::Value::Number(1.into()));
+                content
+            },
+        };
+
+        let response2 = IOPubMessage {
+            parent_header: Some(parent2),
+            header: MessageHeader::new("execute_result", "session2"),
+            metadata: HashMap::new(),
+            content: {
+                let mut content = HashMap::new();
+                content.insert("client".to_string(), serde_json::Value::Number(2.into()));
+                content
+            },
+        };
+
+        // Route both responses
+        router
+            .route_message(response1, MessageDestination::Requester)
+            .await
+            .unwrap();
+        router
+            .route_message(response2, MessageDestination::Requester)
+            .await
+            .unwrap();
+
+        // Each client should receive only their response
+        let msg1 = rx1.recv().await.unwrap();
+        assert_eq!(msg1.content.get("client").unwrap().as_i64().unwrap(), 1);
+
+        let msg2 = rx2.recv().await.unwrap();
+        assert_eq!(msg2.content.get("client").unwrap().as_i64().unwrap(), 2);
+
+        // No cross-talk
+        assert!(rx1.try_recv().is_err());
+        assert!(rx2.try_recv().is_err());
+    }
+
+    #[tokio::test]
+    async fn test_client_cleanup_on_unregister() {
+        let router = MessageRouter::new(100);
+
+        let (id1, _rx1) = router.create_client_channel("session1".to_string());
+
+        // Track some message origins
+        router.track_message_origin("msg1", &id1);
+        router.track_message_origin("msg2", &id1);
+
+        // Verify client is registered
+        assert_eq!(router.active_client_count(), 1);
+
+        // Unregister client
+        assert!(router.unregister_client(&id1));
+
+        // Client should be gone
+        assert_eq!(router.active_client_count(), 0);
+
+        // Message origins should be cleaned up (indirectly verify through behavior)
+        // After cleanup, routing to requester should not crash or route to non-existent client
+        let mut parent = MessageHeader::new("execute_request", "session1");
+        parent.msg_id = "msg1".to_string();
+
+        let message = IOPubMessage {
+            parent_header: Some(parent),
+            header: MessageHeader::new("execute_result", "session1"),
+            metadata: HashMap::new(),
+            content: HashMap::new(),
+        };
+
+        // Should not error even though client is gone
+        router
+            .route_message(message, MessageDestination::Requester)
+            .await
+            .unwrap();
+    }
+
+    #[tokio::test]
+    async fn test_client_deactivation() {
+        let router = MessageRouter::new(100);
+
+        let (id1, mut rx1) = router.create_client_channel("session1".to_string());
+
+        assert_eq!(router.active_client_count(), 1);
+
+        // Deactivate client
+        router.deactivate_client(&id1);
+
+        // Client should be marked inactive but still registered
+        assert_eq!(router.active_client_count(), 0);
+        assert!(router.get_client_ids().contains(&id1));
+
+        // Broadcast should skip inactive client
+        let message = IOPubMessage {
+            parent_header: None,
+            header: MessageHeader::new("status", "session1"),
+            metadata: HashMap::new(),
+            content: HashMap::new(),
+        };
+
+        router
+            .route_message(message.clone(), MessageDestination::Broadcast)
+            .await
+            .unwrap();
+
+        // Inactive client should not receive
+        assert!(rx1.try_recv().is_err());
+
+        // Direct send to inactive client should fail
+        let result = router
+            .route_message(message, MessageDestination::Client(id1))
+            .await;
+
+        assert!(result.is_err());
+    }
+
+    #[tokio::test]
+    async fn test_correlation_id_tracking() {
+        let router = MessageRouter::new(100);
+
+        // Initially no correlation ID
+        assert!(router.correlation_id.read().is_none());
+
+        // Create correlation ID on first message
+        let id1 = router.get_or_create_correlation_id();
+        assert!(router.correlation_id.read().is_some());
+
+        // Same ID returned on subsequent calls
+        let id2 = router.get_or_create_correlation_id();
+        assert_eq!(id1, id2);
+
+        // Can set new correlation ID
+        let new_id = Uuid::new_v4();
+        router.set_correlation_id(Some(new_id));
+        let id3 = router.get_or_create_correlation_id();
+        assert_eq!(id3, new_id);
+
+        // Can clear correlation ID
+        router.set_correlation_id(None);
+        assert!(router.correlation_id.read().is_none());
+    }
+
+    #[tokio::test]
+    async fn test_message_history_trimming() {
+        let max_history = 5;
+        let router = MessageRouter::new(max_history);
+
+        // Send more messages than max_history
+        for i in 0..10 {
+            let mut content = HashMap::new();
+            content.insert("index".to_string(), serde_json::Value::Number(i.into()));
+
+            let message = IOPubMessage {
+                parent_header: None,
+                header: MessageHeader::new("test", "session"),
+                metadata: HashMap::new(),
+                content,
+            };
+
+            router
+                .route_message(message, MessageDestination::Broadcast)
+                .await
+                .unwrap();
+        }
+
+        // Create a new client and replay history
+        let (id, mut rx) = router.create_client_channel("session".to_string());
+        router.replay_history(&id, max_history).await.unwrap();
+
+        // Should only receive the last max_history messages (5-9)
+        for i in 5..10 {
+            let msg = rx.recv().await.unwrap();
+            let index = msg.content.get("index").unwrap().as_i64().unwrap();
+            assert_eq!(index, i);
+        }
+
+        // No more messages
+        assert!(rx.try_recv().is_err());
+    }
+
+    #[tokio::test]
+    async fn test_session_fallback_routing() {
+        let router = MessageRouter::new(100);
+
+        // Create two clients with same session
+        let (_id1, mut rx1) = router.create_client_channel("shared-session".to_string());
+        let (_id2, mut rx2) = router.create_client_channel("shared-session".to_string());
+
+        // Don't track message origin, rely on session fallback
+        let mut parent = MessageHeader::new("execute_request", "shared-session");
+        parent.msg_id = "unknown-msg".to_string();
+
+        let message = IOPubMessage {
+            parent_header: Some(parent),
+            header: MessageHeader::new("execute_result", "shared-session"),
+            metadata: HashMap::new(),
+            content: HashMap::new(),
+        };
+
+        // Route to requester should fall back to session matching
+        router
+            .route_message(message, MessageDestination::Requester)
+            .await
+            .unwrap();
+
+        // Both clients with same session should receive
+        let msg1 = rx1.recv().await.unwrap();
+        let msg2 = rx2.recv().await.unwrap();
+
+        assert_eq!(msg1.header.msg_type, "execute_result");
+        assert_eq!(msg2.header.msg_type, "execute_result");
+    }
+
+    #[tokio::test]
+    async fn test_clear_history() {
+        let router = MessageRouter::new(100);
+
+        // Add some messages to history
+        for i in 0..5 {
+            let mut content = HashMap::new();
+            content.insert("index".to_string(), serde_json::Value::Number(i.into()));
+
+            let message = IOPubMessage {
+                parent_header: None,
+                header: MessageHeader::new("test", "session"),
+                metadata: HashMap::new(),
+                content,
+            };
+
+            router
+                .route_message(message, MessageDestination::Broadcast)
+                .await
+                .unwrap();
+        }
+
+        // Clear history
+        router.clear_history();
+
+        // Create a new client and replay history
+        let (id, mut rx) = router.create_client_channel("session".to_string());
+        router.replay_history(&id, 10).await.unwrap();
+
+        // Should receive no messages
+        assert!(rx.try_recv().is_err());
     }
 }

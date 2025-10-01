@@ -8,8 +8,11 @@ use llmspell_core::{
 };
 use llmspell_security::sandbox::{file_sandbox::FileSandbox, SandboxContext};
 use llmspell_testing::tool_helpers::create_default_test_sandbox;
+#[cfg(feature = "database")]
 use llmspell_tools::communication::database_connector::DatabaseConnectorConfig;
+#[cfg(feature = "email")]
 use llmspell_tools::communication::email_sender::EmailSenderConfig;
+#[cfg(feature = "json-query")]
 use llmspell_tools::data::json_processor::JsonProcessorConfig;
 use llmspell_tools::fs::{FileOperationsConfig, FileSearchConfig};
 use llmspell_tools::search::WebSearchConfig;
@@ -17,6 +20,16 @@ use llmspell_tools::system::ProcessExecutorConfig;
 use llmspell_tools::util::text_manipulator::TextManipulatorConfig;
 use llmspell_tools::util::uuid_generator::UuidGeneratorConfig;
 use llmspell_tools::web::web_scraper::WebScraperConfig;
+#[cfg(feature = "archives")]
+use llmspell_tools::ArchiveHandlerTool;
+#[cfg(feature = "database")]
+use llmspell_tools::DatabaseConnectorTool;
+#[cfg(feature = "email")]
+use llmspell_tools::EmailSenderTool;
+#[cfg(feature = "json-query")]
+use llmspell_tools::JsonProcessorTool;
+#[cfg(feature = "templates")]
+use llmspell_tools::TemplateEngineTool;
 use llmspell_tools::*;
 use serde_json::{json, Value};
 use std::sync::Arc;
@@ -492,6 +505,7 @@ async fn test_secure_randomness() {
 
 /// Test timeout enforcement
 #[tokio::test]
+#[ignore = "Integration test - requires httpbin.org service availability"]
 async fn test_timeout_enforcement() {
     let result = execute_tool_raw(
         "web-scraper",
@@ -535,13 +549,13 @@ async fn test_error_message_safety() {
     }
 }
 
-/// Helper function to execute tools directly
-async fn execute_tool_raw(tool_name: &str, params: Value) -> Result<AgentOutput, LLMSpellError> {
-    let context = create_test_context();
-    let input = create_agent_input(&params);
-
+/// Execute file system tools
+async fn execute_file_system_tool(
+    tool_name: &str,
+    input: AgentInput,
+    context: ExecutionContext,
+) -> Result<AgentOutput, LLMSpellError> {
     match tool_name {
-        // File system tools
         "file-operations" => {
             FileOperationsTool::new(
                 FileOperationsConfig::default(),
@@ -565,9 +579,31 @@ async fn execute_tool_raw(tool_name: &str, params: Value) -> Result<AgentOutput,
                 .execute(input, context)
                 .await
         }
+        #[cfg(feature = "archives")]
         "archive-handler" => ArchiveHandlerTool::new().execute(input, context).await,
+        #[cfg(not(feature = "archives"))]
+        "archive-handler" => {
+            return Err(LLMSpellError::Tool {
+                tool_name: Some("archive-handler".to_string()),
+                message: "archives feature not enabled".to_string(),
+                source: None,
+            })
+        }
+        _ => Err(LLMSpellError::Tool {
+            message: format!("Unknown file system tool: {tool_name}"),
+            tool_name: Some(tool_name.to_string()),
+            source: None,
+        }),
+    }
+}
 
-        // Web tools
+/// Execute web tools
+async fn execute_web_tool(
+    tool_name: &str,
+    input: AgentInput,
+    context: ExecutionContext,
+) -> Result<AgentOutput, LLMSpellError> {
+    match tool_name {
         "web-scraper" => {
             WebScraperTool::new(WebScraperConfig::default())
                 .execute(input, context)
@@ -582,8 +618,64 @@ async fn execute_tool_raw(tool_name: &str, params: Value) -> Result<AgentOutput,
                 .execute(input, context)
                 .await
         }
+        _ => Err(LLMSpellError::Tool {
+            message: format!("Unknown web tool: {tool_name}"),
+            tool_name: Some(tool_name.to_string()),
+            source: None,
+        }),
+    }
+}
 
-        // System tools
+/// Execute data processing tools
+async fn execute_data_tool(
+    tool_name: &str,
+    #[allow(unused_variables)] input: AgentInput,
+    #[allow(unused_variables)] context: ExecutionContext,
+) -> Result<AgentOutput, LLMSpellError> {
+    match tool_name {
+        #[cfg(feature = "json-query")]
+        "json-processor" => {
+            JsonProcessorTool::new(JsonProcessorConfig::default())
+                .execute(input, context)
+                .await
+        }
+        #[cfg(not(feature = "json-query"))]
+        "json-processor" => {
+            return Err(LLMSpellError::Tool {
+                tool_name: Some("json-processor".to_string()),
+                message: "json-query feature not enabled".to_string(),
+                source: None,
+            })
+        }
+        #[cfg(feature = "database")]
+        "database-connector" => {
+            DatabaseConnectorTool::new(DatabaseConnectorConfig::default())?
+                .execute(input, context)
+                .await
+        }
+        #[cfg(not(feature = "database"))]
+        "database-connector" => {
+            return Err(LLMSpellError::Tool {
+                tool_name: Some("database-connector".to_string()),
+                message: "database feature not enabled".to_string(),
+                source: None,
+            })
+        }
+        _ => Err(LLMSpellError::Tool {
+            message: format!("Unknown data tool: {tool_name}"),
+            tool_name: Some(tool_name.to_string()),
+            source: None,
+        }),
+    }
+}
+
+/// Execute utility and communication tools
+async fn execute_utility_tool(
+    tool_name: &str,
+    input: AgentInput,
+    context: ExecutionContext,
+) -> Result<AgentOutput, LLMSpellError> {
+    match tool_name {
         "process-executor" => {
             ProcessExecutorTool::new(
                 ProcessExecutorConfig::default(),
@@ -592,21 +684,16 @@ async fn execute_tool_raw(tool_name: &str, params: Value) -> Result<AgentOutput,
             .execute(input, context)
             .await
         }
-
-        // Data processing tools
-        "json-processor" => {
-            JsonProcessorTool::new(JsonProcessorConfig::default())
-                .execute(input, context)
-                .await
-        }
-        "database-connector" => {
-            DatabaseConnectorTool::new(DatabaseConnectorConfig::default())?
-                .execute(input, context)
-                .await
-        }
-
-        // Utility tools
+        #[cfg(feature = "templates")]
         "template-engine" => TemplateEngineTool::new().execute(input, context).await,
+        #[cfg(not(feature = "templates"))]
+        "template-engine" => {
+            return Err(LLMSpellError::Tool {
+                tool_name: Some("template-engine".to_string()),
+                message: "templates feature not enabled".to_string(),
+                source: None,
+            })
+        }
         "text-manipulator" => {
             TextManipulatorTool::new(TextManipulatorConfig::default())
                 .execute(input, context)
@@ -617,14 +704,45 @@ async fn execute_tool_raw(tool_name: &str, params: Value) -> Result<AgentOutput,
                 .execute(input, context)
                 .await
         }
-
-        // Communication tools
+        #[cfg(feature = "email")]
         "email-sender" => {
             EmailSenderTool::new(EmailSenderConfig::default())?
                 .execute(input, context)
                 .await
         }
+        #[cfg(not(feature = "email"))]
+        "email-sender" => {
+            return Err(LLMSpellError::Tool {
+                tool_name: Some("email-sender".to_string()),
+                message: "email feature not enabled".to_string(),
+                source: None,
+            })
+        }
+        _ => Err(LLMSpellError::Tool {
+            message: format!("Unknown utility tool: {tool_name}"),
+            tool_name: Some(tool_name.to_string()),
+            source: None,
+        }),
+    }
+}
 
+/// Helper function to execute tools directly
+async fn execute_tool_raw(tool_name: &str, params: Value) -> Result<AgentOutput, LLMSpellError> {
+    let context = create_test_context();
+    let input = create_agent_input(&params);
+
+    // Route to appropriate category handler
+    match tool_name {
+        "file-operations" | "file-search" | "archive-handler" => {
+            execute_file_system_tool(tool_name, input, context).await
+        }
+        "web-scraper" | "api-tester" | "webhook-caller" | "url-analyzer" | "sitemap-crawler"
+        | "web_search" => execute_web_tool(tool_name, input, context).await,
+        "json-processor" | "database-connector" => {
+            execute_data_tool(tool_name, input, context).await
+        }
+        "process-executor" | "template-engine" | "text-manipulator" | "uuid-generator"
+        | "email-sender" => execute_utility_tool(tool_name, input, context).await,
         _ => Err(LLMSpellError::Tool {
             message: format!("Unknown tool: {tool_name}"),
             tool_name: Some(tool_name.to_string()),

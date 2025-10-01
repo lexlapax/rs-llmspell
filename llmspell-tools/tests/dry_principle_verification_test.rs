@@ -2,12 +2,11 @@
 // ABOUTME: Ensures tools using shared utilities from llmspell-utils behave consistently
 
 use llmspell_core::{traits::base_agent::BaseAgent, types::AgentInput, ExecutionContext};
-use llmspell_tools::{
-    data::{json_processor::JsonProcessorConfig, JsonProcessorTool},
-    util::{
-        Base64EncoderTool, DateTimeHandlerTool, HashCalculatorConfig, HashCalculatorTool,
-        UuidGeneratorConfig, UuidGeneratorTool,
-    },
+#[cfg(feature = "json-query")]
+use llmspell_tools::data::{json_processor::JsonProcessorConfig, JsonProcessorTool};
+use llmspell_tools::util::{
+    Base64EncoderTool, DateTimeHandlerTool, HashCalculatorConfig, HashCalculatorTool,
+    UuidGeneratorConfig, UuidGeneratorTool,
 };
 use serde_json::{json, Value};
 
@@ -114,6 +113,7 @@ mod dry_principle_tests {
             "Should be UUID v4"
         );
     }
+    #[cfg(feature = "json-query")]
     #[tokio::test]
     async fn test_json_processing_consistency() {
         // Test that JSON operations are consistent

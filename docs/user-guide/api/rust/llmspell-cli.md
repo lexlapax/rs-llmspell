@@ -32,18 +32,24 @@ llmspell run script.lua
 # Interactive REPL
 llmspell repl
 
-# Configuration
-llmspell config show
-llmspell config set providers.openai.model gpt-4
-llmspell config validate
+# Configuration management
+llmspell config init                    # Create default config
+llmspell config validate                # Validate configuration
+llmspell config show                     # Show full configuration
+llmspell config show --section rag       # Show specific section
 
-# List available tools
-llmspell tools list
-llmspell tools search json
+# API key management
+llmspell keys add openai sk-xxxx        # Add API key
+llmspell keys list                      # List configured providers
+llmspell keys remove openai             # Remove API key
 
-# Agent operations
-llmspell agent list
-llmspell agent create --name assistant --model gpt-4
+# Application discovery and execution
+llmspell app list                        # List available applications
+llmspell app info file-organizer         # Show app details
+llmspell app run file-organizer         # Run an application
+llmspell app search --tag productivity   # Search by criteria
+
+# Note: Tools and agents are accessed via script API (Tool.*, Agent.*), not CLI commands
 ```
 
 ## CLI Structure

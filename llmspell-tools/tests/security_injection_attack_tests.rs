@@ -3,17 +3,21 @@
 
 use llmspell_core::{traits::base_agent::BaseAgent, types::AgentInput, ExecutionContext};
 use llmspell_testing::tool_helpers::create_default_test_sandbox;
+#[cfg(feature = "json-query")]
+use llmspell_tools::data::{json_processor::JsonProcessorConfig, JsonProcessorTool};
+#[cfg(feature = "templates")]
+use llmspell_tools::util::TemplateEngineTool;
 use llmspell_tools::{
     api::{graphql_query::GraphQLConfig, http_request::HttpRequestConfig},
-    data::{json_processor::JsonProcessorConfig, JsonProcessorTool},
     system::{
         environment_reader::EnvironmentReaderConfig, process_executor::ProcessExecutorConfig,
         EnvironmentReaderTool, ProcessExecutorTool,
     },
-    util::{DataValidationTool, TemplateEngineTool},
+    util::DataValidationTool,
     GraphQLQueryTool, HttpRequestTool,
 };
 use serde_json::json;
+#[cfg(feature = "templates")]
 #[tokio::test]
 async fn test_template_engine_code_injection() {
     let template_tool = TemplateEngineTool::new();
@@ -69,6 +73,7 @@ async fn test_template_engine_code_injection() {
         }
     }
 }
+#[cfg(feature = "json-query")]
 #[tokio::test]
 async fn test_json_processor_jq_injection() {
     let json_tool = JsonProcessorTool::new(JsonProcessorConfig::default());
@@ -287,6 +292,7 @@ async fn test_data_validation_regex_dos() {
     }
 }
 #[tokio::test]
+#[ignore = "Integration test - requires httpbin.org service availability"]
 async fn test_http_request_header_injection() {
     let http_tool =
         HttpRequestTool::new(HttpRequestConfig::default()).expect("Failed to create HTTP tool");

@@ -90,7 +90,7 @@ pub mod timeout;
 pub mod connection_pool;
 
 /// Progress reporting framework
-pub mod progress;
+pub mod terminal;
 
 /// Security utilities for DoS protection and resource limits
 pub mod security;
@@ -157,8 +157,8 @@ pub use search::{
     SearchResult,
 };
 pub use serialization::{
-    convert_format, from_json, from_toml, from_yaml, json, merge_json, to_json, to_json_pretty,
-    to_toml, to_yaml, Format,
+    convert_format, from_json, from_toml, json, merge_json, to_json, to_json_pretty, to_toml,
+    Format,
 };
 pub use string_utils::{
     dedent, indent, is_valid_identifier, join_with, normalize_whitespace, replace_all, reverse,
@@ -208,10 +208,14 @@ pub use connection_pool::{
     PoolableConnection,
 };
 
-// Re-export progress utilities
-pub use progress::{
+// Re-export terminal utilities (including progress)
+pub use terminal::progress::{
     ProgressBuilder, ProgressError, ProgressEvent, ProgressIteratorExt, ProgressReporter,
     ProgressTracker,
+};
+pub use terminal::{
+    colored_text, confirm, input, select, AsyncSpinner, Color, Colorize, SimpleSpinner,
+    SimpleTable, TableStyle,
 };
 
 // Re-export security utilities

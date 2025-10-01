@@ -1,7 +1,7 @@
 # The Complete rs-llmspell Developer Guide
 
-✅ **CURRENT**: Phase 8 Complete - RAG & Vector Storage
-**Version**: 0.8.0 | **Crates**: 20 | **Tools**: 37+ | **Examples**: 60+
+✅ **CURRENT**: Phase 10 Complete - Service Integration & IDE Connectivity
+**Version**: 0.10.0 | **Crates**: 17 | **Tools**: 40+ | **Examples**: 60+ | **Feature Flags**: Modular builds (19-35MB)
 
 **Quick Navigation**: [Setup](#setup) | [Architecture](#architecture) | [Core Patterns](#core-patterns) | [Testing](#testing) | [Common Tasks](#common-tasks) | [Deep Dives](#deep-dives)
 
@@ -9,20 +9,50 @@
 
 ## 🎯 Developer Quick Start (5 minutes)
 
-### Setup
+### Setup & Build Options
+
+rs-llmspell uses a **feature-based build system** to optimize binary size and dependencies. Choose your build based on your needs:
+
 ```bash
-# 1. Clone and build
+# 1. Clone repository
 git clone <repository-url> && cd rs-llmspell
-cargo build --release
 
-# 2. Verify setup - MANDATORY quality checks
-./scripts/quality-check-minimal.sh  # <5 seconds - format, clippy, compile
-./scripts/quality-check-fast.sh     # ~1 min - adds unit tests & docs
-./scripts/quality-check.sh          # 5+ min - full validation
+# 2. Choose your build configuration:
 
-# 3. Run example to verify
-./target/debug/llmspell run examples/script-users/getting-started/00-hello-world.lua
+# OPTION A: Minimal Build (19MB) - Recommended for production containers
+cargo build --release --bin llmspell
+# Includes: Core functionality, Lua scripting, essential tools
+
+# OPTION B: Common Build (25MB) - Recommended for most developers
+cargo build --release --bin llmspell --features common
+# Adds: Template engines (Tera, Handlebars), PDF processing
+
+# OPTION C: Full Build (35MB) - All features for complete development
+cargo build --release --bin llmspell --features full
+# Adds: CSV/Parquet, Excel, archives, email, database support
+
+# 3. Verify setup - MANDATORY quality checks
+./scripts/quality/quality-check-minimal.sh  # <5 seconds - format, clippy, compile
+./scripts/quality/quality-check-fast.sh     # ~1 min - adds unit tests & docs
+./scripts/quality/quality-check.sh          # 5+ min - full validation
+
+# 4. Run example to verify
+./target/release/llmspell run examples/script-users/getting-started/00-hello-world.lua
 ```
+
+### Quick Feature Reference
+
+| Feature | Size Impact | Tools Added | Use Case |
+|---------|------------|-------------|----------|
+| (minimal) | 19MB base | Core tools only | Production, containers |
+| `templates` | +400KB | TemplateEngine | Document generation |
+| `pdf` | +300KB | PdfProcessor | PDF analysis/extraction |
+| `csv-parquet` | +2.8MB | CsvAnalyzer | Data analytics |
+| `excel` | +1MB | ExcelHandler | Spreadsheet processing |
+| `json-query` | +600KB | JsonQuery (JQ) | Complex JSON ops |
+| `archives` | +400KB | ArchiveHandler | ZIP/TAR handling |
+| `email` | +500KB | EmailTool (SMTP) | Email notifications |
+| `database` | +2MB | Database ops | SQL connectivity |
 
 ### Your First Contribution
 
@@ -40,7 +70,7 @@ cargo build --release
 
 ## 📚 Essential Knowledge
 
-### Phase 8 Architecture (20 Crates)
+### Phase 10 Architecture (17 Crates)
 
 ```
 ┌─────────────────────────────────────────────────────────┐
@@ -55,32 +85,29 @@ cargo build --release
                             ↓
 ┌─────────────────────────────────────────────────────────┐
 │              Rust Core (Async/Await)                    │
-│                  20 Specialized Crates                  │
+│                  17 Specialized Crates                  │
 └─────────────────────────────────────────────────────────┘
 
-Foundation Layer (10 crates):
+Foundation Layer (8 crates):
 ├── llmspell-core         - BaseAgent trait, types
 ├── llmspell-utils        - Parameter extraction, error builders, response
 ├── llmspell-storage      - HNSW vector storage (Phase 8)
 ├── llmspell-security     - 3-level security model
 ├── llmspell-config       - Configuration management
-├── llmspell-state-traits - State abstractions
-├── llmspell-state-persistence - Persistent state
 ├── llmspell-rag          - RAG pipeline (Phase 8)
 ├── llmspell-tenancy      - Multi-tenant isolation (Phase 8)
 └── llmspell-testing      - Centralized test utilities
 
-Application Layer (10 crates):
-├── llmspell-tools        - 37+ built-in tools
+Application Layer (9 crates):
+├── llmspell-kernel       - Daemon, signals, Jupyter, DAP (Phase 10)
+├── llmspell-tools        - 40+ built-in tools (feature flags)
 ├── llmspell-agents       - Agent infrastructure
 ├── llmspell-workflows    - Sequential/Parallel/Conditional/Loop
 ├── llmspell-bridge       - Script language integration
 ├── llmspell-hooks        - 40+ hook points, <2% overhead
 ├── llmspell-events       - Event bus system
-├── llmspell-sessions     - Session management
 ├── llmspell-providers    - LLM provider integration
-├── llmspell-cli          - Command line interface
-└── llmspell-examples     - Example utilities
+└── llmspell-cli          - Command line interface + tool commands
 ```
 
 ### Core Concepts (Must Know)
@@ -91,6 +118,211 @@ Application Layer (10 crates):
 4. **Security Levels**: Safe, Restricted, Privileged - every tool must declare
 5. **Test Categories**: unit, integration, external - always categorize
 6. **RAG System (Phase 8)**: Vector storage, embeddings, multi-tenant isolation
+
+---
+
+## 📦 Build Configuration & Features
+
+### Feature-Based Build System
+
+rs-llmspell uses **Cargo feature flags** to create optimized binaries. This system reduces binary size from 33.6MB (old default) to as small as 19MB (minimal), while allowing developers to include only the dependencies they need.
+
+### Build Configurations
+
+#### 1. Minimal Build (19MB) - Production Ready
+```bash
+cargo build --release --bin llmspell
+# Or explicitly:
+cargo build --release --bin llmspell --no-default-features --features lua
+```
+
+**Includes:**
+- Core functionality (llmspell-core, utils, bridge)
+- Lua scripting support
+- Essential tools (file operations, HTTP, shell, text processing)
+- State management and persistence
+- Hook system and events
+- Session management
+
+**Excludes:** Heavy dependencies like Apache Arrow, template engines, PDF processing
+
+**Use Cases:** Production deployments, containers, embedded systems, CI/CD pipelines
+
+#### 2. Common Build (25MB) - Developer Friendly
+```bash
+cargo build --release --bin llmspell --features common
+```
+
+**Adds to Minimal:**
+- Template engines (Tera, Handlebars) - document generation
+- PDF processing (pdf-extract) - document analysis
+
+**Use Cases:** Most development work, documentation generation, report creation
+
+#### 3. Full Build (35MB) - Complete Toolkit
+```bash
+cargo build --release --bin llmspell --features full
+```
+
+**Adds Everything:**
+- CSV/Parquet support (Apache Arrow) - data analytics
+- Excel processing (calamine, xlsxwriter)
+- Archive handling (ZIP, TAR, GZ)
+- Email support (SMTP, AWS SES)
+- Database connectivity (PostgreSQL, MySQL, SQLite)
+- JSON query engine (JQ implementation)
+
+**Use Cases:** Data science, full-featured development, all examples
+
+### Custom Feature Selection
+
+Mix and match features based on your specific needs:
+
+```bash
+# Just add template support to minimal
+cargo build --release --features templates
+
+# Data processing focus
+cargo build --release --features csv-parquet,excel
+
+# Communication tools
+cargo build --release --features email,database
+
+# Multiple features
+cargo build --release --features templates,pdf,archives
+```
+
+### Feature Flags Reference
+
+| Feature | Dependencies | Binary Impact | Tools Enabled |
+|---------|-------------|---------------|---------------|
+| `templates` | tera, handlebars | +400KB | TemplateEngineTool |
+| `pdf` | pdf-extract | +300KB | PdfProcessorTool |
+| `csv-parquet` | arrow, parquet | +2.8MB | CsvAnalyzerTool |
+| `excel` | calamine, xlsxwriter | +1MB | ExcelHandlerTool |
+| `json-query` | jaq-* crates | +600KB | JsonQueryTool |
+| `archives` | zip, tar, flate2 | +400KB | ArchiveHandlerTool |
+| `email` | lettre | +500KB | EmailTool (SMTP) |
+| `email-aws` | aws-sdk-ses | +1.5MB | EmailTool (AWS) |
+| `database` | sqlx | +2MB | Database operations |
+
+### Testing with Features
+
+```bash
+# Test minimal configuration
+cargo test --no-default-features --features lua
+
+# Test specific feature
+cargo test --features templates
+
+# Test everything
+cargo test --all-features
+
+# Clippy with features
+cargo clippy --features common --all-targets
+```
+
+### CI/CD Configuration
+
+#### GitHub Actions
+```yaml
+strategy:
+  matrix:
+    features: [minimal, common, full]
+steps:
+  - name: Build ${{ matrix.features }}
+    run: |
+      if [ "${{ matrix.features }}" = "minimal" ]; then
+        cargo build --release --bin llmspell
+      else
+        cargo build --release --bin llmspell --features ${{ matrix.features }}
+      fi
+```
+
+#### Docker Multi-Stage
+```dockerfile
+# Minimal image (19MB binary)
+FROM rust:1.76 as minimal
+WORKDIR /app
+COPY . .
+RUN cargo build --release --bin llmspell
+
+# Common image (25MB binary)
+FROM rust:1.76 as common
+WORKDIR /app
+COPY . .
+RUN cargo build --release --features common --bin llmspell
+
+# Runtime
+FROM debian:bookworm-slim
+COPY --from=minimal /app/target/release/llmspell /usr/local/bin/
+```
+
+### Development Workflow
+
+1. **Start with minimal** for core development
+2. **Add features as needed** when working on specific tools
+3. **Test with minimal** to ensure core functionality
+4. **Test with full** before releases
+5. **Document feature requirements** in your code
+
+### Feature-Gated Code
+
+When developing tools that require optional dependencies:
+
+```rust
+// In llmspell-tools/src/lib.rs
+#[cfg(feature = "templates")]
+pub mod template_engine;
+
+// In your code
+#[cfg(feature = "templates")]
+use llmspell_tools::template_engine::TemplateEngineTool;
+
+// Conditional registration
+pub fn register_tools(registry: &mut ToolRegistry) {
+    #[cfg(feature = "templates")]
+    registry.register("template_engine", TemplateEngineTool::new);
+}
+```
+
+### Runtime Tool Discovery
+
+Tool availability is **automatic** - the runtime discovers available tools:
+
+```lua
+-- This always works, showing only available tools
+local tools = Tool.list()
+for _, name in ipairs(tools) do
+    print("Available: " .. name)
+end
+
+-- Graceful handling of optional tools
+local template = Tool.try_get("template_engine")
+if template then
+    -- Use template engine
+else
+    -- Fallback to simple string formatting
+end
+```
+
+### Performance Comparison
+
+| Build Type | Binary Size | Startup Time | Memory Usage | Tool Count |
+|------------|------------|--------------|--------------|------------|
+| Minimal | 19MB | 15ms | 12MB | 25 tools |
+| Common | 25MB | 18ms | 14MB | 27 tools |
+| Full | 35MB | 25ms | 18MB | 37+ tools |
+| Old Default | 33.6MB | 23ms | 17MB | 37+ tools |
+
+### Migration from Pre-Feature System
+
+If upgrading from versions before the feature system:
+
+1. **Assess tool usage** - Run with minimal, note missing tools
+2. **Choose configuration** - minimal, common, or full
+3. **Update build scripts** - Add feature flags to cargo commands
+4. **No code changes needed** - API remains identical
 
 ---
 
@@ -344,7 +576,7 @@ fn test_bug_reproduction() {
 
 # 3. Fix and verify
 cargo test -p <crate> --lib
-./scripts/quality-check-minimal.sh
+./scripts/quality/quality-check-minimal.sh
 
 # 4. Update TODO.md if tracked
 ```
@@ -358,16 +590,16 @@ cargo test -p <crate> --lib
 ```bash
 # During development (seconds)
 cargo test -p <crate> --lib          # Unit tests only
-./scripts/test-by-tag.sh unit        # All unit tests
+./scripts/testing/test-by-tag.sh unit        # All unit tests
 
 # Before commit (1 minute) - MANDATORY
-./scripts/quality-check-fast.sh      # Format + clippy + unit tests
+./scripts/quality/quality-check-fast.sh      # Format + clippy + unit tests
 
 # Before PR (5 minutes) - MANDATORY
-./scripts/quality-check.sh           # Everything including integration
+./scripts/quality/quality-check.sh           # Everything including integration
 
 # External tests (when needed)
-./scripts/test-by-tag.sh external    # Real API calls
+./scripts/testing/test-by-tag.sh external    # Real API calls
 ```
 
 ### Test Organization Best Practices
@@ -387,8 +619,8 @@ Your code MUST meet these targets:
 | Tool init | <10ms | `cargo bench -p llmspell-tools` |
 | Agent creation | <50ms | `cargo bench -p llmspell-agents` |
 | Hook overhead | <2% | Performance tests |
-| State operations | <5ms write, <1ms read | `cargo bench -p llmspell-state-persistence` |
 | Vector search | <8ms @ 100K vectors | `cargo bench -p llmspell-storage` |
+| Multi-tenant | 3% overhead | Integration tests |
 
 ---
 
@@ -465,7 +697,7 @@ Read these for deep expertise:
 rg "function_name" --type rust
 
 # Find tests
-./scripts/test-by-tag.sh <component>
+./scripts/testing/test-by-tag.sh <component>
 
 # Check docs
 cargo doc --open -p <crate>

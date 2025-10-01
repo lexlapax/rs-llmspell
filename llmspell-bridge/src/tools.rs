@@ -9,23 +9,42 @@ use llmspell_core::traits::tool::{
 };
 use llmspell_core::Tool;
 use llmspell_security::sandbox::{file_sandbox::FileSandbox, SandboxContext};
+// Import tools conditionally based on features
 use llmspell_tools::{
-    ApiTesterTool, ArchiveHandlerTool, AudioProcessorTool, Base64EncoderTool, CalculatorTool,
-    CitationFormatterTool, CsvAnalyzerTool, DataValidationTool, DatabaseConnectorTool,
-    DateTimeHandlerTool, DiffCalculatorTool, EmailSenderTool, EnvironmentReaderTool,
+    ApiTesterTool, AudioProcessorTool, Base64EncoderTool, CalculatorTool, CitationFormatterTool,
+    DataValidationTool, DateTimeHandlerTool, DiffCalculatorTool, EnvironmentReaderTool,
     FileConverterTool, FileOperationsTool, FileSearchTool, FileWatcherTool, GraphBuilderTool,
-    GraphQLQueryTool, HashCalculatorTool, HttpRequestTool, ImageProcessorTool, JsonProcessorTool,
-    PdfProcessorTool, ProcessExecutorTool, ServiceCheckerTool, SitemapCrawlerTool,
-    SystemMonitorTool, TemplateEngineTool, TextManipulatorTool, UrlAnalyzerTool, UuidGeneratorTool,
-    VideoProcessorTool, WebScraperTool, WebSearchTool, WebhookCallerTool, WebpageMonitorTool,
+    GraphQLQueryTool, HashCalculatorTool, HttpRequestTool, ImageProcessorTool, ProcessExecutorTool,
+    ServiceCheckerTool, SitemapCrawlerTool, SystemMonitorTool, TextManipulatorTool,
+    UrlAnalyzerTool, UuidGeneratorTool, VideoProcessorTool, WebScraperTool, WebSearchTool,
+    WebhookCallerTool, WebpageMonitorTool,
 };
+
+#[cfg(feature = "archives")]
+use llmspell_tools::ArchiveHandlerTool;
+#[cfg(feature = "csv-parquet")]
+use llmspell_tools::CsvAnalyzerTool;
+#[cfg(feature = "database")]
+use llmspell_tools::DatabaseConnectorTool;
+#[cfg(feature = "email")]
+use llmspell_tools::EmailSenderTool;
+#[cfg(feature = "json-query")]
+use llmspell_tools::JsonProcessorTool;
+#[cfg(feature = "pdf")]
+use llmspell_tools::PdfProcessorTool;
+#[cfg(feature = "templates")]
+use llmspell_tools::TemplateEngineTool;
 
 // Import Config types from submodules
 use llmspell_tools::api::graphql_query::GraphQLConfig;
 use llmspell_tools::api::http_request::{HttpRequestConfig, RetryConfig};
+#[cfg(feature = "database")]
 use llmspell_tools::communication::database_connector::DatabaseConnectorConfig;
+#[cfg(feature = "email")]
 use llmspell_tools::communication::email_sender::EmailSenderConfig;
+#[cfg(feature = "csv-parquet")]
 use llmspell_tools::data::csv_analyzer::CsvAnalyzerConfig;
+#[cfg(feature = "json-query")]
 use llmspell_tools::data::json_processor::JsonProcessorConfig;
 use llmspell_tools::fs::{
     FileConverterConfig, FileOperationsConfig, FileSearchConfig, FileWatcherConfig,
@@ -155,6 +174,7 @@ fn register_utility_tools(
     register_tool(registry, "hash_calculator", || {
         HashCalculatorTool::new(HashCalculatorConfig::default())
     })?;
+    #[cfg(feature = "templates")]
     register_tool(registry, "template_engine", TemplateEngineTool::new)?;
     register_tool(registry, "text_manipulator", || {
         TextManipulatorTool::new(TextManipulatorConfig::default())
@@ -172,9 +192,11 @@ fn register_data_processing_tools(
     registry: &Arc<ComponentRegistry>,
     http_request_config: &llmspell_config::tools::HttpRequestConfig,
 ) -> Result<(), Box<dyn std::error::Error>> {
+    #[cfg(feature = "csv-parquet")]
     register_tool(registry, "csv_analyzer", || {
         CsvAnalyzerTool::new(CsvAnalyzerConfig::default())
     })?;
+    #[cfg(feature = "json-query")]
     register_tool(registry, "json_processor", || {
         JsonProcessorTool::new(JsonProcessorConfig::default())
     })?;
@@ -201,6 +223,7 @@ fn register_data_processing_tools(
         HttpRequestTool::new(tool_config)
     })?;
     // Phase 7 tools
+    #[cfg(feature = "pdf")]
     register_tool(registry, "pdf-processor", PdfProcessorTool::new)?;
     register_tool(registry, "graph-builder", GraphBuilderTool::new)?;
     Ok(())
@@ -212,6 +235,7 @@ fn register_file_system_tools(
     file_sandbox: Arc<FileSandbox>,
     file_ops_config: &llmspell_config::tools::FileOperationsConfig,
 ) -> Result<(), Box<dyn std::error::Error>> {
+    #[cfg(feature = "archives")]
     register_tool(registry, "archive_handler", ArchiveHandlerTool::new)?;
 
     // File converter with sandbox
@@ -363,12 +387,16 @@ fn register_web_tools(registry: &Arc<ComponentRegistry>) -> Result<(), Box<dyn s
 }
 
 /// Register communication tools
+#[allow(unused_variables)] // registry is unused when no features are enabled
+#[allow(clippy::unnecessary_wraps)] // Result needed for consistency with other register functions
 fn register_communication_tools(
     registry: &Arc<ComponentRegistry>,
 ) -> Result<(), Box<dyn std::error::Error>> {
+    #[cfg(feature = "email")]
     register_tool_result(registry, "email-sender", || {
         EmailSenderTool::new(EmailSenderConfig::default())
     })?;
+    #[cfg(feature = "database")]
     register_tool_result(registry, "database-connector", || {
         DatabaseConnectorTool::new(DatabaseConnectorConfig::default())
     })?;

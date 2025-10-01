@@ -206,7 +206,7 @@ impl TraceStorage {
             let mut sorted_durations = durations.clone();
             sorted_durations.sort_by(|a, b| a.partial_cmp(b).unwrap());
 
-            let median = if sorted_durations.len() % 2 == 0 {
+            let median = if sorted_durations.len().is_multiple_of(2) {
                 let mid = sorted_durations.len() / 2;
                 (sorted_durations[mid - 1] + sorted_durations[mid]) / 2.0
             } else {
@@ -664,16 +664,16 @@ mod tests {
         let storage = TraceStorage::new(DebuggingConfig::default());
 
         // Add multiple traces with different characteristics
-        for i in 0..5 {
+        for i in 0u32..5 {
             let trace = DebugTrace {
                 timestamp: Utc::now(),
-                hook_point: if i % 2 == 0 {
+                hook_point: if i.is_multiple_of(2) {
                     HookPoint::SystemStartup
                 } else {
                     HookPoint::BeforeAgentInit
                 },
                 component_name: format!("test{}", i),
-                component_type: if i % 2 == 0 {
+                component_type: if i.is_multiple_of(2) {
                     "System".to_string()
                 } else {
                     "Agent".to_string()
@@ -722,7 +722,7 @@ mod tests {
         let storage = TraceStorage::new(config);
 
         // Add more traces than the limit
-        for i in 0..5 {
+        for i in 0u32..5 {
             let trace = DebugTrace {
                 timestamp: Utc::now(),
                 hook_point: HookPoint::SystemStartup,

@@ -1,12 +1,14 @@
 //! ABOUTME: File system tools module for safe file operations
 //! ABOUTME: Provides sandboxed file operations with security controls
 
+#[cfg(feature = "archives")]
 pub mod archive_handler;
 pub mod file_converter;
 pub mod file_operations;
 pub mod file_search;
 pub mod file_watcher;
 
+#[cfg(feature = "archives")]
 pub use archive_handler::{ArchiveHandlerConfig, ArchiveHandlerTool};
 pub use file_converter::{FileConverterConfig, FileConverterTool};
 pub use file_operations::{FileOperationsConfig, FileOperationsTool};

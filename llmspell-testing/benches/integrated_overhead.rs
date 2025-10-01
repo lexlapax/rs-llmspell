@@ -507,7 +507,7 @@ fn bench_streaming_with_state(c: &mut Criterion) {
                 // Process chunks and save state
                 for (chunk_count, chunk_text) in chunks.iter().enumerate() {
                     // Save chunk state (simulate real streaming scenario)
-                    if chunk_count % 10 == 0 {
+                    if chunk_count.is_multiple_of(10) {
                         state_manager
                             .set_with_class(
                                 scope.clone(),

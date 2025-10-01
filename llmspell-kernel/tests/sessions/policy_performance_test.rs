@@ -99,9 +99,9 @@ async fn test_policy_overhead() -> Result<()> {
     let start = Instant::now();
     let iterations = 1000;
 
-    for i in 0..iterations {
+    for i in 0usize..iterations {
         // Periodically update activity time to keep it fresh
-        if i % 100 == 0 {
+        if i.is_multiple_of(100) {
             context.data.insert(
                 "last_activity_time".to_string(),
                 serde_json::json!(chrono::Utc::now().to_rfc3339()),
@@ -118,7 +118,10 @@ async fn test_policy_overhead() -> Result<()> {
         "With policies: {:?} for {} iterations",
         policy_duration, iterations
     );
-    println!("Average per operation: {:?}", policy_duration / iterations);
+    println!(
+        "Average per operation: {:?}",
+        policy_duration / iterations as u32
+    );
 
     // Calculate overhead
     let baseline_ns = 100_000; // 100 microseconds baseline (estimated)
@@ -203,9 +206,9 @@ async fn test_composition_performance() -> Result<()> {
         let start = Instant::now();
         let iterations = 1000;
 
-        for i in 0..iterations {
+        for i in 0usize..iterations {
             // Update activity time periodically
-            if i % 100 == 0 {
+            if i.is_multiple_of(100) {
                 context.data.insert(
                     "last_activity_time".to_string(),
                     serde_json::json!(chrono::Utc::now().to_rfc3339()),
@@ -225,7 +228,7 @@ async fn test_composition_performance() -> Result<()> {
             "{} composition: {:?} for {} iterations",
             name, duration, iterations
         );
-        println!("Average per operation: {:?}", duration / iterations);
+        println!("Average per operation: {:?}", duration / iterations as u32);
     }
 
     Ok(())
@@ -237,7 +240,7 @@ async fn test_memory_overhead() -> Result<()> {
     // Create multiple policy managers to test memory usage
     let mut managers = Vec::new();
 
-    for i in 0..100 {
+    for i in 0u32..100 {
         let hook_registry = Arc::new(HookRegistry::new());
         let hook_executor = Arc::new(HookExecutor::new());
 
@@ -248,7 +251,7 @@ async fn test_memory_overhead() -> Result<()> {
         policy_manager.register_policies()?;
         managers.push((policy_manager, hook_registry, hook_executor));
 
-        if i % 10 == 0 {
+        if i.is_multiple_of(10) {
             println!("Created {} policy managers", i + 1);
         }
     }

@@ -24,6 +24,19 @@ use tracing::{debug, info, instrument, trace, warn, Level, Span};
 use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt, EnvFilter};
 use uuid::Uuid;
 
+/// Log output format
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+pub enum LogFormat {
+    /// Plain text format (default)
+    Text,
+    /// JSON structured logging
+    Json,
+    /// Pretty-printed JSON
+    Pretty,
+    /// Compact format for terminals
+    Compact,
+}
+
 /// Session type for tracing context
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 pub enum SessionType {
@@ -41,6 +54,20 @@ pub enum SessionType {
     Session,
     /// Daemon/service mode session
     Daemon,
+}
+
+impl std::fmt::Display for SessionType {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Self::Script => write!(f, "script"),
+            Self::Repl => write!(f, "repl"),
+            Self::Exec => write!(f, "exec"),
+            Self::Debug => write!(f, "debug"),
+            Self::State => write!(f, "state"),
+            Self::Session => write!(f, "session"),
+            Self::Daemon => write!(f, "daemon"),
+        }
+    }
 }
 
 /// Operation category for structured tracing
@@ -70,6 +97,26 @@ pub enum OperationCategory {
     Transport,
     /// Debug operations (breakpoints, stepping)
     Debug,
+}
+
+impl OperationCategory {
+    /// Get string representation of the category
+    pub fn as_str(&self) -> &'static str {
+        match self {
+            Self::ScriptRuntime => "script_runtime",
+            Self::Tool => "tool",
+            Self::Agent => "agent",
+            Self::Workflow => "workflow",
+            Self::Hook => "hook",
+            Self::Event => "event",
+            Self::State => "state",
+            Self::Session => "session",
+            Self::Security => "security",
+            Self::Vector => "vector",
+            Self::Transport => "transport",
+            Self::Debug => "debug",
+        }
+    }
 }
 
 /// Tracing instrumentation for kernel operations
@@ -576,26 +623,97 @@ impl TracingLevel {
 /// Initialize tracing subscriber
 ///
 /// This should be called once at application startup to configure tracing.
-/// It respects the `RUST_LOG` environment variable for filtering.
+/// It respects the `RUST_LOG` environment variable for filtering and
+/// `LOG_FORMAT` for output format (text, json, pretty, compact).
 ///
 /// # Errors
 ///
 /// Returns an error if the subscriber cannot be initialized.
 pub fn init_tracing() -> Result<()> {
+    // Check environment for format preference
+    let format = std::env::var("LOG_FORMAT")
+        .ok()
+        .and_then(|s| match s.to_lowercase().as_str() {
+            "json" => Some(LogFormat::Json),
+            "pretty" => Some(LogFormat::Pretty),
+            "compact" => Some(LogFormat::Compact),
+            "text" => Some(LogFormat::Text),
+            _ => None,
+        })
+        .unwrap_or(LogFormat::Text);
+
+    init_tracing_with_format(format)
+}
+
+/// Initialize tracing with specific format
+///
+/// # Errors
+///
+/// Returns an error if the subscriber cannot be initialized.
+pub fn init_tracing_with_format(format: LogFormat) -> Result<()> {
     let env_filter = EnvFilter::try_from_default_env().unwrap_or_else(|_| EnvFilter::new("info"));
 
-    let fmt_layer = tracing_subscriber::fmt::layer()
-        .with_target(true)
-        .with_thread_ids(true)
-        .with_thread_names(true)
-        .with_file(true)
-        .with_line_number(true);
+    match format {
+        LogFormat::Json => {
+            let fmt_layer = tracing_subscriber::fmt::layer()
+                .json()
+                .with_current_span(true)
+                .with_span_list(true)
+                .with_target(true)
+                .with_file(true)
+                .with_line_number(true);
 
-    tracing_subscriber::registry()
-        .with(env_filter)
-        .with(fmt_layer)
-        .try_init()
-        .map_err(|e| anyhow::anyhow!("Failed to initialize tracing: {}", e))
+            tracing_subscriber::registry()
+                .with(env_filter)
+                .with(fmt_layer)
+                .try_init()
+                .map_err(|e| anyhow::anyhow!("Failed to initialize tracing: {}", e))
+        }
+        LogFormat::Pretty => {
+            let fmt_layer = tracing_subscriber::fmt::layer()
+                .pretty()
+                .with_target(true)
+                .with_thread_ids(true)
+                .with_thread_names(true)
+                .with_file(true)
+                .with_line_number(true);
+
+            tracing_subscriber::registry()
+                .with(env_filter)
+                .with(fmt_layer)
+                .try_init()
+                .map_err(|e| anyhow::anyhow!("Failed to initialize tracing: {}", e))
+        }
+        LogFormat::Compact => {
+            let fmt_layer = tracing_subscriber::fmt::layer()
+                .compact()
+                .with_target(false)
+                .with_thread_ids(false)
+                .with_thread_names(false)
+                .with_file(false)
+                .with_line_number(false);
+
+            tracing_subscriber::registry()
+                .with(env_filter)
+                .with(fmt_layer)
+                .try_init()
+                .map_err(|e| anyhow::anyhow!("Failed to initialize tracing: {}", e))
+        }
+        LogFormat::Text => {
+            let fmt_layer = tracing_subscriber::fmt::layer()
+                .with_target(true)
+                .with_thread_ids(true)
+                .with_thread_names(true)
+                .with_file(true)
+                .with_line_number(true);
+
+            tracing_subscriber::registry()
+                .with(env_filter)
+                .with(fmt_layer)
+                .try_init()
+                .map_err(|e| anyhow::anyhow!("Failed to initialize tracing: {}", e))
+        }
+    }
 }
 
 /// Initialize tracing with custom filter
@@ -624,7 +742,32 @@ pub fn init_tracing_with_filter(filter: &str) -> Result<()> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use test_log::test;
+
+    #[test]
+    fn test_log_format_parsing() {
+        // Test format detection from string
+        let format = match "json" {
+            "json" => LogFormat::Json,
+            "pretty" => LogFormat::Pretty,
+            "compact" => LogFormat::Compact,
+            _ => LogFormat::Text,
+        };
+        assert_eq!(format, LogFormat::Json);
+    }
+
+    #[test]
+    fn test_session_type_display() {
+        assert_eq!(SessionType::Script.to_string(), "script");
+        assert_eq!(SessionType::Repl.to_string(), "repl");
+        assert_eq!(SessionType::Debug.to_string(), "debug");
+    }
+
+    #[test]
+    fn test_operation_category_string() {
+        assert_eq!(OperationCategory::Tool.as_str(), "tool");
+        assert_eq!(OperationCategory::Agent.as_str(), "agent");
+        assert_eq!(OperationCategory::State.as_str(), "state");
+    }
 
     #[test]
     fn test_tracing_instrumentation_creation() {

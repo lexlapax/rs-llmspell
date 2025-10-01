@@ -29,9 +29,9 @@ rs-llmspell: **Scriptable LLM interactions** via Lua, JavaScript - Cast scriptin
 ## Quality Gates (MANDATORY)
 ```bash
 # MANDATORY before commits
-./scripts/quality-check-minimal.sh     # seconds - format, clippy, compile
-./scripts/quality-check-fast.sh        # 1 min - adds unit tests & docs  
-./scripts/quality-check.sh             # 5+ min - full validation
+./scripts/quality/quality-check-minimal.sh     # seconds - format, clippy, compile
+./scripts/quality/quality-check-fast.sh        # 1 min - adds unit tests & docs  
+./scripts/quality/quality-check.sh             # 5+ min - full validation
 ```
 
 ## Testing System

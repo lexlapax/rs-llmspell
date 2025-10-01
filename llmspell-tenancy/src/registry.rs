@@ -374,7 +374,7 @@ mod tests {
             id.split('-')
                 .next_back()
                 .and_then(|n| n.parse::<u32>().ok())
-                .map(|n| n % 2 == 0)
+                .map(|n| n.is_multiple_of(2))
                 .unwrap_or(false)
         });
 

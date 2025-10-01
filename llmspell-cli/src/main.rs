@@ -5,21 +5,147 @@ use anyhow::Result;
 use clap::Parser;
 use llmspell_cli::{cli::Cli, commands::execute_command, config::load_runtime_config};
 
-#[tokio::main]
-async fn main() -> Result<()> {
+fn main() -> Result<()> {
+    // Check for -V flag before full parsing (simple version output)
+    let args: Vec<String> = std::env::args().collect();
+    if args.len() >= 2 && args[1] == "-V" {
+        llmspell_cli::commands::version::show_version_simple();
+        return Ok(());
+    }
+
     let cli = Cli::parse();
 
     // Initialize tracing based on --trace flag
     setup_tracing(cli.trace);
 
-    // Load runtime configuration
-    let config_path = cli.config_path();
-    let runtime_config = load_runtime_config(config_path.as_deref()).await?;
+    // Check if this is a kernel start command with daemon mode
+    // We need to handle daemon mode BEFORE creating any tokio runtime
+    if let llmspell_cli::cli::Commands::Kernel {
+        command: llmspell_cli::cli::KernelCommands::Start { daemon: true, .. },
+    } = cli.command
+    {
+        // Handle daemon mode specially - fork BEFORE creating tokio runtime
+        return handle_daemon_mode(cli);
+    }
 
-    // Execute the command with new architecture
-    execute_command(cli.command, runtime_config, cli.output).await?;
+    // For all other cases, use normal async runtime
+    let runtime = tokio::runtime::Runtime::new()?;
+    runtime.block_on(async {
+        // Load runtime configuration
+        let config_path = cli.config_path();
+        let runtime_config = load_runtime_config(config_path.as_deref()).await?;
 
-    Ok(())
+        // Execute the command with new architecture
+        execute_command(cli.command, runtime_config, cli.output).await
+    })
+}
+
+/// Handle daemon mode by forking BEFORE creating tokio runtime
+fn handle_daemon_mode(cli: Cli) -> Result<()> {
+    use llmspell_kernel::daemon::{DaemonConfig, DaemonManager};
+    use std::path::PathBuf;
+
+    // Extract daemon-specific parameters
+    let (port, id, _connection_file, log_file, pid_file) =
+        if let llmspell_cli::cli::Commands::Kernel {
+            command:
+                llmspell_cli::cli::KernelCommands::Start {
+                    port,
+                    id,
+                    connection_file,
+                    log_file,
+                    pid_file,
+                    ..
+                },
+        } = &cli.command
+        {
+            (
+                *port,
+                id.clone(),
+                connection_file.clone(),
+                log_file.clone(),
+                pid_file.clone(),
+            )
+        } else {
+            unreachable!("Already checked this is a daemon kernel start command");
+        };
+
+    // Set up daemon configuration
+    let default_pid_path = || {
+        PathBuf::from("/tmp").join(format!(
+            "llmspell-kernel-{}.pid",
+            id.as_deref().unwrap_or(&format!("port-{}", port))
+        ))
+    };
+
+    let default_log_path = || {
+        // If log_file is provided and ends with .log, use it directly
+        // Otherwise treat it as a directory base
+        let base = if let Some(ref log_path) = log_file {
+            if log_path.extension().and_then(|s| s.to_str()) == Some("log") {
+                // Full log file path provided
+                log_path.clone()
+            } else {
+                // Directory path provided, append kernel log filename
+                log_path.join(format!(
+                    "kernel-{}.log",
+                    id.as_deref().unwrap_or(&format!("port-{}", port))
+                ))
+            }
+        } else {
+            // No log file specified, use default location
+            dirs::home_dir()
+                .unwrap_or_else(|| PathBuf::from("/tmp"))
+                .join(".llmspell")
+                .join("logs")
+                .join(format!(
+                    "kernel-{}.log",
+                    id.as_deref().unwrap_or(&format!("port-{}", port))
+                ))
+        };
+
+        // Ensure parent directory exists
+        if let Some(parent) = base.parent() {
+            let _ = std::fs::create_dir_all(parent);
+        }
+        base
+    };
+
+    let daemon_config = DaemonConfig {
+        daemonize: true,
+        pid_file: Some(pid_file.unwrap_or_else(default_pid_path)),
+        working_dir: PathBuf::from("/tmp"), // Use /tmp as working directory for writeable access
+        stdout_path: Some(default_log_path()),
+        stderr_path: Some(default_log_path()),
+        close_stdin: true,
+        umask: Some(0o027),
+    };
+
+    // Create DaemonManager and daemonize BEFORE creating tokio runtime
+    let mut daemon_manager = DaemonManager::new(daemon_config.clone());
+
+    // Check if already running
+    if daemon_manager.is_running()? {
+        return Err(anyhow::anyhow!(
+            "Kernel daemon already running with PID file {:?}",
+            daemon_config.pid_file
+        ));
+    }
+
+    // Daemonize the process (this will fork)
+    daemon_manager.daemonize()?;
+
+    // Now we're in the daemon child process with no tokio runtime
+    // Create a fresh runtime and run the kernel
+    let runtime = tokio::runtime::Runtime::new()?;
+    runtime.block_on(async {
+        // Load runtime configuration
+        let config_path = cli.config_path();
+        let runtime_config = load_runtime_config(config_path.as_deref()).await?;
+
+        // Execute the command (now in daemon mode with fresh runtime)
+        execute_command(cli.command, runtime_config, cli.output).await
+    })
 }
 
 /// Set up tracing based on RUST_LOG environment variable or --trace flag

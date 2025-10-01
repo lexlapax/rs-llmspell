@@ -2,7 +2,7 @@
 // ABOUTME: Handles cargo invocation, output formatting, and result aggregation
 
 use super::{TestCategory, TestRunnerConfig};
-use colored::*;
+use llmspell_utils::terminal::Colorize;
 use std::io::{BufRead, BufReader};
 use std::process::{Command, Stdio};
 use std::time::Instant;

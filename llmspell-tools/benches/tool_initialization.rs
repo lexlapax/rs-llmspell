@@ -5,16 +5,20 @@
 
 use criterion::{black_box, criterion_group, criterion_main, Criterion};
 use llmspell_security::sandbox::{FileSandbox, SandboxContext};
+#[cfg(feature = "csv-parquet")]
+use llmspell_tools::data::{csv_analyzer::CsvAnalyzerConfig, CsvAnalyzerTool};
+#[cfg(feature = "json-query")]
+use llmspell_tools::data::{json_processor::JsonProcessorConfig, JsonProcessorTool};
+#[cfg(feature = "archives")]
+use llmspell_tools::fs::ArchiveHandlerTool;
+#[cfg(feature = "templates")]
+use llmspell_tools::util::TemplateEngineTool;
 use llmspell_tools::{
     api::{graphql_query::GraphQLConfig, http_request::HttpRequestConfig},
-    data::{
-        csv_analyzer::CsvAnalyzerConfig, json_processor::JsonProcessorConfig, CsvAnalyzerTool,
-        JsonProcessorTool,
-    },
     fs::{
         file_converter::FileConverterConfig, file_operations::FileOperationsConfig,
-        file_search::FileSearchConfig, file_watcher::FileWatcherConfig, ArchiveHandlerTool,
-        FileConverterTool, FileOperationsTool, FileSearchTool, FileWatcherTool,
+        file_search::FileSearchConfig, file_watcher::FileWatcherConfig, FileConverterTool,
+        FileOperationsTool, FileSearchTool, FileWatcherTool,
     },
     search::web_search::WebSearchConfig,
     system::{
@@ -25,8 +29,8 @@ use llmspell_tools::{
     util::{
         hash_calculator::HashCalculatorConfig, text_manipulator::TextManipulatorConfig,
         uuid_generator::UuidGeneratorConfig, Base64EncoderTool, CalculatorTool, DataValidationTool,
-        DateTimeHandlerTool, DiffCalculatorTool, HashCalculatorTool, TemplateEngineTool,
-        TextManipulatorTool, UuidGeneratorTool,
+        DateTimeHandlerTool, DiffCalculatorTool, HashCalculatorTool, TextManipulatorTool,
+        UuidGeneratorTool,
     },
     GraphQLQueryTool, HttpRequestTool, WebSearchTool,
 };
@@ -90,6 +94,7 @@ fn bench_utility_tools_init(c: &mut Criterion) {
         });
     });
 
+    #[cfg(feature = "templates")]
     group.bench_function("template_engine", |b| {
         b.iter(|| {
             let tool = TemplateEngineTool::new();
@@ -117,6 +122,7 @@ fn bench_utility_tools_init(c: &mut Criterion) {
 fn bench_data_tools_init(c: &mut Criterion) {
     let mut group = c.benchmark_group("data_tools_init");
 
+    #[cfg(feature = "csv-parquet")]
     group.bench_function("csv_analyzer", |b| {
         b.iter(|| {
             let tool = CsvAnalyzerTool::new(CsvAnalyzerConfig::default());
@@ -124,6 +130,7 @@ fn bench_data_tools_init(c: &mut Criterion) {
         });
     });
 
+    #[cfg(feature = "json-query")]
     group.bench_function("json_processor", |b| {
         b.iter(|| {
             let tool = JsonProcessorTool::new(JsonProcessorConfig::default());
@@ -153,6 +160,7 @@ fn bench_data_tools_init(c: &mut Criterion) {
 fn bench_file_system_tools_init(c: &mut Criterion) {
     let mut group = c.benchmark_group("file_system_tools_init");
 
+    #[cfg(feature = "archives")]
     group.bench_function("archive_handler", |b| {
         b.iter(|| {
             let tool = ArchiveHandlerTool::new();
@@ -258,12 +266,15 @@ fn bench_all_tools_sequential(c: &mut Criterion) {
             let _datetime = DateTimeHandlerTool::new();
             let _diff = DiffCalculatorTool::new();
             let _hash = HashCalculatorTool::new(HashCalculatorConfig::default());
+            #[cfg(feature = "templates")]
             let _template = TemplateEngineTool::new();
             let _text = TextManipulatorTool::new(TextManipulatorConfig::default());
             let _uuid = UuidGeneratorTool::new(UuidGeneratorConfig::default());
 
             // Data tools
+            #[cfg(feature = "csv-parquet")]
             let _csv = CsvAnalyzerTool::new(CsvAnalyzerConfig::default());
+            #[cfg(feature = "json-query")]
             let _json = JsonProcessorTool::new(JsonProcessorConfig::default());
             let _graphql =
                 GraphQLQueryTool::new(GraphQLConfig::default()).expect("GraphQL creation failed");
@@ -271,6 +282,7 @@ fn bench_all_tools_sequential(c: &mut Criterion) {
                 HttpRequestTool::new(HttpRequestConfig::default()).expect("HTTP creation failed");
 
             // File system tools
+            #[cfg(feature = "archives")]
             let _archive = ArchiveHandlerTool::new();
             let _file_conv =
                 FileConverterTool::new(FileConverterConfig::default(), sandbox.clone());

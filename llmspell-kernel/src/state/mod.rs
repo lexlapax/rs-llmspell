@@ -9,6 +9,7 @@
 use anyhow::Result;
 use parking_lot::RwLock;
 use serde::{Deserialize, Serialize};
+use serde_json::json;
 use std::sync::Arc;
 use std::time::{Duration, Instant};
 use tracing::{debug, info, instrument, warn};
@@ -141,6 +142,15 @@ pub struct StateMetrics {
     pub persistence_ops: u64,
     /// Number of circuit breaker trips
     pub circuit_breaker_trips: u64,
+    /// Total number of read errors
+    pub read_errors: u64,
+    /// Total number of write errors
+    pub write_errors: u64,
+    /// Total number of persistence errors
+    pub persistence_errors: u64,
+    /// Timestamp of last error
+    #[serde(skip)]
+    pub last_error_at: Option<Instant>,
     /// Last update timestamp (skipped in serialization)
     #[serde(skip)]
     pub last_update: Option<Instant>,
@@ -365,6 +375,97 @@ impl KernelState {
     /// Reset circuit breaker
     pub fn reset_circuit(&self) {
         self.circuit_breaker.reset();
+    }
+
+    /// Record a read error
+    pub fn record_read_error(&self) {
+        let mut metrics = self.metrics.write();
+        metrics.read_errors += 1;
+        metrics.last_error_at = Some(Instant::now());
+        metrics.last_update = Some(Instant::now());
+    }
+
+    /// Record a write error
+    pub fn record_write_error(&self) {
+        let mut metrics = self.metrics.write();
+        metrics.write_errors += 1;
+        metrics.last_error_at = Some(Instant::now());
+        metrics.last_update = Some(Instant::now());
+    }
+
+    /// Record a persistence error
+    pub fn record_persistence_error(&self) {
+        let mut metrics = self.metrics.write();
+        metrics.persistence_errors += 1;
+        metrics.last_error_at = Some(Instant::now());
+        metrics.last_update = Some(Instant::now());
+    }
+
+    /// Get error rate per minute based on recent errors
+    pub fn get_error_rate_per_minute(&self) -> f64 {
+        let metrics = self.metrics.read();
+        let total_errors = metrics.read_errors + metrics.write_errors + metrics.persistence_errors;
+
+        // Simple calculation: assume uniform distribution over uptime
+        // In production, would use sliding window
+        if let Some(last_error) = metrics.last_error_at {
+            let elapsed_minutes = last_error.elapsed().as_secs_f64() / 60.0;
+            if elapsed_minutes > 0.0 {
+                total_errors as f64 / elapsed_minutes
+            } else {
+                0.0
+            }
+        } else {
+            0.0
+        }
+    }
+
+    /// Get the current session ID
+    pub fn session_id(&self) -> String {
+        self.session
+            .read()
+            .session_id
+            .clone()
+            .unwrap_or_else(|| "default".to_string())
+    }
+
+    /// Get the current execution count
+    pub fn execution_count(&self) -> u64 {
+        self.execution.read().execution_count as u64
+    }
+
+    /// Create a snapshot of current state for serialization
+    pub fn snapshot(&self) -> serde_json::Value {
+        let execution = self.execution.read();
+        let session = self.session.read();
+        let debug = self.debug.read();
+        let metrics = self.metrics();
+
+        json!({
+            "execution": {
+                "count": execution.execution_count,
+                "current_execution_id": execution.current_execution_id,
+                "status": format!("{execution_status:?}", execution_status=execution.status),
+                "current_code": execution.current_code,
+                "total_execution_time_secs": execution.total_execution_time.as_secs(),
+                "history_count": execution.history.len(),
+            },
+            "session": {
+                "id": session.session_id,
+                "created_at": session.created_at.map(|t| format!("{t:?}")),
+                "last_activity": session.last_activity.map(|t| format!("{t:?}")),
+                "metadata": session.metadata,
+                "breakpoint_count": session.breakpoints.len(),
+            },
+            "debug": {
+                "enabled": debug.enabled,
+                "mode": format!("{debug_mode:?}", debug_mode=debug.mode),
+                "stack_frames": debug.stack_frames.len(),
+                "variable_scopes": debug.variables.len(),
+                "watches": debug.watches.len(),
+            },
+            "metrics": metrics,
+        })
     }
 }
 

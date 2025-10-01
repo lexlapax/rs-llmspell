@@ -452,6 +452,7 @@ impl SitemapCrawlerTool {
                         "has_metadata": false
                     });
 
+                    #[allow(clippy::useless_let_if_seq)]
                     let mut has_metadata = false;
                     if let Some(lastmod) = current_lastmod.take() {
                         url_entry["lastmod"] = json!(lastmod);

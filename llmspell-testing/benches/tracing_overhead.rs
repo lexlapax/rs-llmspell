@@ -8,7 +8,7 @@ use llmspell_tools::registry::ToolRegistry;
 use std::collections::HashMap;
 use std::time::Duration;
 use tokio::runtime::Runtime;
-use tracing::Level;
+use tracing::{debug, debug_span, info_span, trace, Level};
 use tracing_subscriber::EnvFilter;
 
 /// Setup tracing at specified level
@@ -208,7 +208,7 @@ fn bench_span_creation_overhead(c: &mut Criterion) {
     group.bench_function("with_span_info", |b| {
         setup_tracing_at_level(Level::INFO);
         b.iter(|| {
-            let span = tracing::info_span!("hot_path_operation");
+            let span = info_span!("hot_path_operation");
             let _guard = span.enter();
             let mut sum = 0;
             for i in 0..1000 {
@@ -222,11 +222,11 @@ fn bench_span_creation_overhead(c: &mut Criterion) {
     group.bench_function("with_span_debug", |b| {
         setup_tracing_at_level(Level::DEBUG);
         b.iter(|| {
-            let span = tracing::debug_span!("hot_path_operation", iteration = 0);
+            let span = debug_span!("hot_path_operation", iteration = 0);
             let _guard = span.enter();
             let mut sum = 0;
             for i in 0..1000 {
-                tracing::trace!("Iteration {}", i);
+                trace!("Iteration {}", i);
                 sum += black_box(i);
             }
             black_box(sum)
@@ -323,7 +323,7 @@ fn measure_overhead_percentages(c: &mut Criterion) {
             rt.block_on(async {
                 let mut results = Vec::with_capacity(100);
                 for i in 0..100 {
-                    let span = tracing::info_span!("operation", id = i);
+                    let span = info_span!("operation", id = i);
                     let _guard = span.enter();
                     let result = tokio::task::yield_now().await;
                     results.push((i, result));
@@ -339,9 +339,9 @@ fn measure_overhead_percentages(c: &mut Criterion) {
             rt.block_on(async {
                 let mut results = Vec::with_capacity(100);
                 for i in 0..100 {
-                    let span = tracing::debug_span!("operation", id = i);
+                    let span = debug_span!("operation", id = i);
                     let _guard = span.enter();
-                    tracing::debug!("Processing item {}", i);
+                    debug!("Processing item {}", i);
                     let result = tokio::task::yield_now().await;
                     results.push((i, result));
                 }

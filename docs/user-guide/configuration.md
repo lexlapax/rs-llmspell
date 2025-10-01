@@ -1,11 +1,11 @@
 # Configuration Guide
 
-**Version**: 0.8.10  
+**Version**: 0.9.0
 **Last Updated**: December 2024
 
-> **📋 Quick Reference**: Complete configuration guide for LLMSpell including providers, security, resources, and external APIs.
+> **📋 Quick Reference**: Complete configuration guide for LLMSpell kernel architecture including providers, daemon mode, protocols, and services.
 
-**🔗 Navigation**: [← User Guide](README.md) | [Core Concepts](concepts.md) | [Getting Started](getting-started.md)
+**🔗 Navigation**: [← User Guide](README.md) | [Core Concepts](concepts.md) | [Service Deployment](service-deployment.md)
 
 ---
 
@@ -13,16 +13,21 @@
 
 1. [Quick Start](#quick-start)
 2. [Configuration Files](#configuration-files)
-3. [LLM Providers](#llm-providers)
-4. [RAG Configuration](#rag-configuration) ⭐ **Phase 8.10.6**
-5. [Multi-Tenancy](#multi-tenancy) ⭐ **Phase 8.10.6**
-6. [State & Sessions](#state--sessions)
-7. [Security Settings](#security-settings)
-8. [Tool Configuration](#tool-configuration)
-9. [External API Setup](#external-api-setup)
-10. [Deployment Profiles](#deployment-profiles)
-11. [Environment Variables](#environment-variables)
-12. [Troubleshooting](#troubleshooting)
+3. [Kernel Configuration](#kernel-configuration) ⭐ **Phase 9-10**
+4. [Daemon & Service Settings](#daemon--service-settings) ⭐ **Phase 10**
+5. [Protocol Configuration](#protocol-configuration) ⭐ **Phase 9-10**
+6. [Debug & IDE Integration](#debug--ide-integration) ⭐ **Phase 9**
+7. [Logging & Monitoring](#logging--monitoring) ⭐ **Phase 9-10**
+8. [LLM Providers](#llm-providers)
+9. [RAG Configuration](#rag-configuration) ⭐ **Phase 8**
+10. [Multi-Tenancy](#multi-tenancy) ⭐ **Phase 8**
+11. [State & Sessions](#state--sessions)
+12. [Security Settings](#security-settings)
+13. [Tool Configuration](#tool-configuration)
+14. [External API Setup](#external-api-setup)
+15. [Deployment Profiles](#deployment-profiles)
+16. [Environment Variables](#environment-variables)
+17. [Troubleshooting](#troubleshooting)
 
 ---
 
@@ -34,18 +39,17 @@ Minimal configuration to get started:
 # Set at least one LLM provider
 export OPENAI_API_KEY="sk-..."
 
-# Optional: Additional providers
-export ANTHROPIC_API_KEY="sk-ant-..."
+# Optional: Start kernel in service mode
+./target/release/llmspell kernel start --port 9555
 
-# Run with default configuration
+# Run with embedded kernel (default)
 ./target/release/llmspell run script.lua
-```
 
-Using a configuration file:
-
-```bash
-# Run with specific config
+# Use configuration file
 ./target/release/llmspell -c config.toml run script.lua
+
+# Use --trace flag for debugging (Phase 9)
+./target/release/llmspell --trace debug run script.lua
 ```
 
 ---
@@ -55,13 +59,41 @@ Using a configuration file:
 ### Main Configuration Structure
 
 ```toml
-# config.toml - Complete configuration example
+# config.toml - Complete configuration example with Phase 9-10 features
+
+# Kernel configuration (Phase 9-10)
+[kernel]
+port = 9555
+connection_file = "/var/lib/llmspell/kernel.json"
+kernel_id = "auto"  # auto-generated if not specified
+hmac_key = "your-secret-key"  # For message signing
+idle_timeout = 0  # 0 = never timeout
+max_clients = 100
+max_message_size_mb = 10
+
+# Daemon configuration (Phase 10)
+[daemon]
+daemonize = false  # Set to true for production
+pid_file = "/var/run/llmspell/kernel.pid"
+working_dir = "/"
+umask = 0o027
+close_stdin = true
+
+# Logging configuration (Phase 9-10)
+[logging]
+log_file = "/var/log/llmspell/kernel.log"
+log_level = "info"  # trace, debug, info, warn, error
+max_size_mb = 100
+max_backups = 5
+compress = true
+enable_syslog = false  # Unix only
 
 # Main runtime configuration
 [runtime]
 max_concurrent_scripts = 10
 script_timeout_seconds = 300
 enable_streaming = true
+use_global_io_runtime = true  # Phase 9 - prevents "dispatch task is gone"
 
 # Provider configuration
 [providers]
@@ -74,7 +106,7 @@ default_model = "gpt-4o-mini"
 temperature = 0.7
 max_tokens = 2000
 
-# RAG (Retrieval-Augmented Generation) - Phase 8.10.6
+# RAG (Retrieval-Augmented Generation) - Phase 8
 [rag]
 enabled = false  # Enable for RAG functionality
 multi_tenant = false
@@ -123,6 +155,417 @@ Configuration is loaded in order (later overrides earlier):
 5. CLI specified: `-c custom.toml`
 6. Environment variables
 7. Command-line arguments
+
+---
+
+## Kernel Configuration
+
+Phase 9-10 introduced the integrated kernel architecture with comprehensive configuration options.
+
+### Basic Kernel Settings
+
+```toml
+[kernel]
+# Network settings
+port = 9555                               # Base port (other channels are +1, +2, etc)
+ip = "127.0.0.1"                         # Bind IP address
+transport = "tcp"                        # tcp or ipc
+
+# Connection management
+connection_file = "/var/lib/llmspell/kernel.json"  # Jupyter connection file
+kernel_id = "auto"                       # auto-generated if not specified
+hmac_key = "your-secret-key"            # Message signing key
+
+# Resource limits
+idle_timeout = 0                          # Seconds (0 = never timeout)
+max_clients = 100                        # Maximum concurrent clients
+max_message_size_mb = 10                # Maximum message size
+max_memory_mb = 2048                    # Memory limit
+max_execution_time_secs = 300          # Per-execution timeout
+
+# Protocol support
+enable_jupyter = true                    # Enable Jupyter protocol
+enable_dap = false                       # Enable Debug Adapter Protocol
+enable_lsp = false                      # Enable Language Server Protocol
+enable_repl = true                      # Enable REPL service
+```
+
+### Execution Configuration
+
+```toml
+[kernel.execution]
+max_history = 1000                       # Command history size
+execution_timeout_secs = 300            # Per-execution timeout
+monitor_agents = true                   # Track agent performance
+track_performance = true                # Enable performance metrics
+enable_tracing = false                  # Enable execution tracing
+
+# Health monitoring
+[kernel.health]
+enable_health_checks = true
+health_check_interval = 30              # Seconds
+memory_threshold_mb = 1500              # Warning threshold
+cpu_threshold_percent = 80              # Warning threshold
+restart_on_failure = true               # Auto-restart on health failure
+```
+
+### Transport Configuration
+
+```toml
+# ZeroMQ transport settings (Jupyter)
+[kernel.transport.zeromq]
+shell_port = 9555
+iopub_port = 9556
+stdin_port = 9557
+control_port = 9558
+hb_port = 9559
+send_timeout_ms = 1000
+recv_timeout_ms = 1000
+max_message_size = 104857600  # 100MB
+
+# WebSocket transport (future)
+[kernel.transport.websocket]
+port = 9560
+path = "/ws"
+max_frame_size = 65536
+compression = true
+
+# In-process transport (embedded mode)
+[kernel.transport.inprocess]
+buffer_size = 1048576  # 1MB
+use_channels = true
+```
+
+---
+
+## Daemon & Service Settings
+
+Phase 10 added proper Unix daemon support with systemd/launchd integration.
+
+### Daemon Configuration
+
+```toml
+[daemon]
+daemonize = true                         # Run as daemon
+pid_file = "/var/run/llmspell/kernel.pid"  # PID file location
+working_dir = "/"                        # Working directory
+umask = 0o027                           # File creation mask
+close_stdin = true                      # Close stdin in daemon mode
+detach_tty = true                       # Detach from TTY
+
+# Double-fork settings
+double_fork = true                       # Use double-fork technique
+become_session_leader = true            # setsid()
+
+# Log redirection
+[daemon.logging]
+stdout_path = "/var/log/llmspell/stdout.log"
+stderr_path = "/var/log/llmspell/stderr.log"
+rotate_size_mb = 100
+rotate_count = 5
+compress_rotated = true
+```
+
+### Service Management
+
+```toml
+[service]
+# systemd settings (Linux)
+systemd_type = "forking"                # forking or simple
+restart_policy = "on-failure"           # always, on-failure, no
+restart_sec = 10                        # Seconds between restarts
+watchdog_sec = 0                        # Systemd watchdog (0=disabled)
+
+# Security hardening
+private_tmp = true
+no_new_privileges = true
+protect_system = "strict"
+protect_home = "read-only"
+read_write_paths = ["/var/log/llmspell", "/var/lib/llmspell"]
+
+# launchd settings (macOS)
+launchd_label = "com.llmspell.kernel"
+run_at_load = true
+keep_alive = true
+throttle_interval = 10                  # Seconds between restart attempts
+
+# Windows service (future)
+windows_service_name = "LLMSpellKernel"
+windows_display_name = "LLMSpell Kernel Service"
+windows_start_type = "automatic"        # automatic, manual, disabled
+```
+
+### Signal Configuration
+
+```toml
+[signals]
+# Signal handling behavior
+handle_sigterm = true                   # Graceful shutdown
+handle_sighup = true                    # Reload configuration
+handle_sigusr1 = true                   # Dump statistics
+handle_sigusr2 = true                   # Toggle debug logging
+handle_sigint = true                    # Interrupt execution
+
+# Shutdown behavior
+graceful_shutdown_timeout = 30          # Seconds to wait for clean shutdown
+force_shutdown_on_second_signal = true  # Force exit on second SIGTERM
+save_state_on_shutdown = true          # Persist state before exit
+notify_clients_on_shutdown = true      # Send shutdown message to clients
+```
+
+---
+
+## Protocol Configuration
+
+Phase 9-10 added support for multiple protocols through the kernel.
+
+### Jupyter Protocol
+
+```toml
+[protocols.jupyter]
+enabled = true
+signature_scheme = "hmac-sha256"
+kernel_name = "llmspell"
+language = "lua"
+display_name = "LLMSpell"
+codemirror_mode = "lua"
+
+# Message handling
+[protocols.jupyter.messages]
+max_iopub_queue = 100
+max_stdin_queue = 10
+broadcast_iopub = true
+validate_signatures = true
+
+# Execution
+[protocols.jupyter.execution]
+store_history = true
+silent_execution_reply = false
+stop_on_error = true
+```
+
+### Debug Adapter Protocol (DAP)
+
+```toml
+[protocols.dap]
+enabled = false
+port = 9556
+wait_for_client = false
+break_on_entry = false
+break_on_error = false
+
+# Capabilities
+[protocols.dap.capabilities]
+supports_configuration_done_request = true
+supports_function_breakpoints = true
+supports_conditional_breakpoints = true
+supports_evaluate_for_hovers = true
+supports_step_back = false
+supports_restart_frame = false
+supports_exception_info_request = true
+supports_terminate_request = true
+
+# Debugging
+[protocols.dap.debugging]
+show_return_value = true
+all_threads_stopped = true
+lines_start_at_1 = true
+columns_start_at_1 = true
+```
+
+### Language Server Protocol (LSP)
+
+```toml
+[protocols.lsp]
+enabled = false
+port = 9557
+root_uri = "file:///workspace"
+
+# Capabilities
+[protocols.lsp.capabilities]
+completion_provider = true
+hover_provider = true
+signature_help_provider = true
+definition_provider = true
+references_provider = true
+document_symbol_provider = true
+workspace_symbol_provider = true
+code_action_provider = true
+```
+
+### REPL Service
+
+```toml
+[protocols.repl]
+enabled = true
+port = 9558
+history_file = "~/.llmspell/repl_history"
+history_size = 1000
+multiline_enabled = true
+auto_indent = true
+syntax_highlighting = true
+
+# Prompt customization
+[protocols.repl.prompt]
+primary = "llmspell> "
+secondary = "      > "
+error_prefix = "Error: "
+```
+
+---
+
+## Debug & IDE Integration
+
+Phase 9 added comprehensive debugging support with DAP and IDE integration.
+
+### Debug Configuration
+
+```toml
+[debug]
+enable_dap = true                        # Enable Debug Adapter Protocol
+dap_port = 9556                         # DAP server port
+wait_for_debugger = false               # Wait for debugger to attach
+break_on_error = false                  # Auto-break on errors
+break_on_entry = false                  # Break at script start
+
+# Source mapping
+[debug.source_map]
+enable = true
+map_script_paths = true                 # Map script paths to source files
+source_root = "/workspace"              # Source root directory
+strip_prefix = ""                       # Path prefix to strip
+add_prefix = ""                         # Path prefix to add
+```
+
+### IDE Integration
+
+```toml
+[ide]
+# VS Code integration
+vscode_extension = "llmspell.llmspell-debug"
+launch_config_template = true           # Generate launch.json template
+attach_config_template = true           # Generate attach config
+
+# Jupyter integration
+jupyter_kernel_name = "llmspell"
+jupyter_display_name = "LLMSpell"
+jupyter_language = "lua"
+jupyter_codemirror_mode = "lua"
+jupyter_file_extension = ".lua"
+
+# IntelliJ/JetBrains integration
+intellij_plugin = "com.llmspell.idea"
+intellij_run_config = true
+
+# Vim/Neovim integration
+vim_plugin = "llmspell.nvim"
+nvim_lsp_config = true
+```
+
+### Performance Profiling
+
+```toml
+[profiling]
+enable_profiling = false                # Enable performance profiling
+profile_output = "/var/log/llmspell/profile.json"
+sample_rate = 100                       # Samples per second
+track_allocations = false               # Track memory allocations
+track_cpu_time = true                  # Track CPU usage
+track_io_time = true                   # Track I/O operations
+flamegraph_enabled = false             # Generate flamegraphs
+```
+
+---
+
+## Logging & Monitoring
+
+Enhanced logging and monitoring for Phase 9-10 kernel architecture.
+
+### Logging Configuration
+
+```toml
+[logging]
+# File logging
+log_file = "/var/log/llmspell/kernel.log"
+log_level = "info"                      # off, error, warn, info, debug, trace
+max_size_mb = 100
+max_backups = 5
+max_age_days = 30
+compress = true
+json_format = false                     # Use JSON structured logging
+
+# Console logging
+console_enabled = true
+console_level = "warn"
+console_color = true
+
+# Syslog (Unix only)
+syslog_enabled = false
+syslog_facility = "daemon"
+syslog_tag = "llmspell"
+
+# Rotation
+[logging.rotation]
+strategy = "size"                       # size, daily, hourly
+size_limit = "100MB"
+time_format = "%Y-%m-%d"
+keep_files = 5
+compress_old = true
+```
+
+### Metrics & Monitoring
+
+```toml
+[monitoring]
+# Metrics collection
+enable_metrics = true
+metrics_port = 9559
+metrics_path = "/metrics"
+export_format = "prometheus"            # prometheus, json, statsd
+
+# Health checks
+[monitoring.health]
+enable_health = true
+health_port = 9559
+health_path = "/health"
+liveness_path = "/healthz"
+readiness_path = "/ready"
+
+# Performance monitoring
+[monitoring.performance]
+track_latency = true
+track_throughput = true
+track_errors = true
+percentiles = [0.5, 0.9, 0.95, 0.99]
+window_size_secs = 60
+
+# Resource monitoring
+[monitoring.resources]
+track_memory = true
+track_cpu = true
+track_disk_io = true
+track_network_io = true
+sample_interval_secs = 10
+```
+
+### Event Correlation
+
+```toml
+[events]
+# Event system (Phase 9)
+enabled = true
+buffer_size = 10000
+emit_timing_events = true
+emit_state_events = true
+emit_protocol_events = true
+
+# Correlation
+[events.correlation]
+enable_correlation = true
+correlation_timeout_secs = 300
+max_correlation_depth = 10
+track_causation = true
+```
 
 ---
 
@@ -234,7 +677,7 @@ default_model = "your-model"
 
 ---
 
-## RAG Configuration ⭐ **Phase 8.10.6**
+## RAG Configuration ⭐ **Phase 8**
 
 LLMSpell includes comprehensive RAG (Retrieval-Augmented Generation) capabilities with HNSW vector storage, multi-tenant isolation, and cost optimization.
 
@@ -361,7 +804,7 @@ auto_cleanup = true
 
 ---
 
-## Multi-Tenancy ⭐ **Phase 8.10.6**
+## Multi-Tenancy ⭐ **Phase 8**
 
 Complete tenant isolation for RAG and state data.
 
@@ -500,585 +943,430 @@ max_connections = 10
 ```toml
 [security.rate_limiting]
 enabled = true
-algorithm = "token_bucket"
+window_size_secs = 60
+max_requests_per_window = 100
+max_burst = 20
+cleanup_interval_secs = 300
 
-[security.rate_limiting.global]
-rate = 10000  # per minute
-burst = 100
-
-[security.rate_limiting.per_user]
-rate = 1000
-burst = 20
-
-[[security.rate_limiting.tools]]
-name = "web-search"
-rate = 10
-burst = 2
+[security.rate_limiting.endpoints]
+"/execute" = 50
+"/kernel/start" = 10
+"/rag/search" = 100
 ```
 
----
-
-## Resource Limits
-
-### Profiles
+### Audit Logging
 
 ```toml
-[resources.profiles.strict]
-memory_limit = "256MB"
-cpu_time_limit = "10s"
-file_size_limit = "1MB"
-max_operations = 100
-max_concurrent = 2
-operation_timeout = "5s"
-
-[resources.profiles.default]
-memory_limit = "512MB"
-cpu_time_limit = "30s"
-file_size_limit = "10MB"
-max_operations = 1000
-max_concurrent = 5
-operation_timeout = "30s"
-
-[resources.profiles.relaxed]
-memory_limit = "2GB"
-cpu_time_limit = "5m"
-file_size_limit = "100MB"
-max_operations = 10000
-max_concurrent = 20
-operation_timeout = "5m"
-```
-
-### Per-Tool Limits
-
-```toml
-[[resources.tool_limits]]
-tool = "web-scraper"
-memory_limit = "1GB"
-timeout = "60s"
-max_concurrent = 3
-
-[[resources.tool_limits]]
-tool = "file-operations"
-file_size_limit = "50MB"
-max_operations = 500
+[security.audit]
+enabled = true
+log_file = "/var/log/llmspell/audit.log"
+log_authentication = true
+log_authorization = true
+log_data_access = true
+log_configuration_changes = true
+include_request_body = false
+include_response_body = false
 ```
 
 ---
 
 ## Tool Configuration
 
-### File Operations
+### Tool Discovery
 
 ```toml
-[tools.file_operations]
-enabled = true
-allowed_paths = ["/workspace", "/tmp"]
-max_file_size = "10MB"
-allowed_extensions = ["txt", "json", "csv", "md"]
-denied_extensions = ["exe", "dll", "so"]
+[tools]
+auto_discover = true
+tool_directories = ["./tools", "~/.llmspell/tools"]
+reload_on_change = false
+cache_metadata = true
+
+[tools.categories]
+enabled = ["filesystem", "web", "api", "data", "system"]
+disabled = []
 ```
 
-### Web Tools
+### Tool Security
 
 ```toml
-[tools.web]
-enabled = true
-timeout = 30
-max_redirects = 5
-user_agent = "LLMSpell/0.6.0"
+[tools.security]
+default_level = "restricted"  # safe, restricted, privileged
+require_approval = false
+sandbox_tools = true
 
-[tools.web.scraper]
-max_depth = 3
-max_pages = 100
-respect_robots_txt = true
-
-[tools.web.search]
-provider = "brave"  # google, brave, serpapi, serperdev
-max_results = 10
-safe_search = true
+[tools.permissions]
+"file-operations" = "restricted"
+"web-fetch" = "safe"
+"command-executor" = "privileged"
 ```
 
-### Database Tools
+### Tool Timeouts
 
 ```toml
-[tools.database]
-enabled = false  # Disabled by default for security
-
-[[tools.database.connections]]
-name = "primary"
-type = "postgresql"
-host = "localhost"
-port = 5432
-database = "llmspell"
-username = "${DB_USER}"
-password = "${DB_PASS}"
-ssl_mode = "require"
-max_connections = 10
+[tools.timeouts]
+default = 30  # seconds
+"web-scraper" = 60
+"api-caller" = 45
+"database-query" = 120
 ```
 
 ---
 
 ## External API Setup
 
-### Web Search APIs
+### API Keys
 
-#### Google Custom Search
-
-1. **Create Search Engine:**
-   - Visit [Google Programmable Search](https://programmablesearchengine.google.com/)
-   - Create new search engine
-   - Note the Search Engine ID (cx)
-
-2. **Get API Key:**
-   - Go to [Google Cloud Console](https://console.cloud.google.com/)
-   - Enable Custom Search API
-   - Create API key
-
-3. **Configure:**
 ```toml
-[tools.web.search.google]
-api_key = "${GOOGLE_API_KEY}"
-search_engine_id = "${GOOGLE_SEARCH_ENGINE_ID}"
-# Free: 100/day, Paid: $5/1000 queries
+[apis]
+# Weather API
+weather_api_key = "${WEATHER_API_KEY}"
+weather_base_url = "https://api.weather.com"
+
+# News API
+news_api_key = "${NEWS_API_KEY}"
+news_base_url = "https://newsapi.org"
+
+# Custom APIs
+[apis.custom]
+endpoint = "https://api.example.com"
+auth_type = "bearer"  # bearer, api_key, basic
+auth_value = "${CUSTOM_API_TOKEN}"
 ```
 
-#### Brave Search
-
-1. **Sign Up:**
-   - Visit [Brave Search API](https://brave.com/search/api/)
-   - Create account
-
-2. **Configure:**
-```toml
-[tools.web.search.brave]
-api_key = "${BRAVE_API_KEY}"
-# Free: 2000/month
-```
-
-#### SerpAPI
+### Webhook Configuration
 
 ```toml
-[tools.web.search.serpapi]
-api_key = "${SERPAPI_KEY}"
-# Free trial: 100 searches
-```
+[webhooks]
+enabled = true
+timeout = 30
+retry_count = 3
+retry_delay = 5
 
-#### SerperDev
-
-```toml
-[tools.web.search.serperdev]
-api_key = "${SERPERDEV_KEY}"
-# Free: 2500 searches
-```
-
-### Email Services
-
-#### SendGrid
-
-```toml
-[tools.email.sendgrid]
-api_key = "${SENDGRID_API_KEY}"
-from_email = "noreply@example.com"
-from_name = "LLMSpell"
-# Free: 100/day
-```
-
-#### AWS SES
-
-```toml
-[tools.email.aws_ses]
-access_key_id = "${AWS_ACCESS_KEY_ID}"
-secret_access_key = "${AWS_SECRET_ACCESS_KEY}"
-region = "us-east-1"
-from_email = "noreply@example.com"
+[webhooks.endpoints]
+"on_execution_complete" = "https://example.com/webhook"
+"on_error" = "https://example.com/error-webhook"
 ```
 
 ---
 
 ## Deployment Profiles
 
-### Development
+### Development Profile
 
 ```toml
-# rag-development.toml
-[rag]
-enabled = true
-multi_tenant = false
+[profiles.development]
+extends = "default"
 
-[rag.vector_storage]
-dimensions = 384
-backend = "hnsw" 
-max_memory_mb = 512
+[profiles.development.kernel]
+port = 9555
+idle_timeout = 3600  # 1 hour timeout
+max_clients = 10
+enable_dap = true
+enable_lsp = true
 
-[rag.vector_storage.hnsw]
-m = 8
-ef_construction = 50
-ef_search = 25
-max_elements = 10000
-num_threads = 2
+[profiles.development.daemon]
+daemonize = false  # Run in foreground
 
-[rag.embedding]
-default_provider = "openai"
-cache_enabled = false      # Test fresh each time
-batch_size = 4            # Small batches for debugging
-timeout_seconds = 10
+[profiles.development.logging]
+log_level = "debug"
+log_file = "./llmspell.log"
+console_enabled = true
 
-[rag.cache]
-search_cache_enabled = false
-document_cache_enabled = false
+[profiles.development.debug]
+enable_dap = true
+break_on_error = true
+wait_for_debugger = false
+
+[profiles.development.security]
+sandboxing_enabled = false
+rate_limiting_enabled = false
 ```
 
-### Production
+### Production Profile
 
 ```toml
-# rag-production.toml
-[rag]
-enabled = true
-multi_tenant = true       # Enable tenant isolation
+[profiles.production]
+extends = "default"
 
-[rag.vector_storage]
-dimensions = 768          # Better accuracy
-backend = "hnsw"
-persistence_path = "/var/lib/llmspell/rag/vectors"
-max_memory_mb = 4096
+[profiles.production.kernel]
+port = 9555
+idle_timeout = 0  # Never timeout
+max_clients = 1000
+max_memory_mb = 8192
+enable_jupyter = true
+enable_dap = false
+enable_lsp = false
 
-[rag.vector_storage.hnsw]
-m = 16                    # Balanced performance
-ef_construction = 200
-ef_search = 50
-max_elements = 5000000    # 5M vectors
-num_threads = 4
+[profiles.production.daemon]
+daemonize = true
+pid_file = "/var/run/llmspell/kernel.pid"
+umask = 0o077  # Restrictive permissions
 
-[rag.embedding]
-default_provider = "openai"
-cache_enabled = true      # 70% cost reduction
-cache_size = 20000
-cache_ttl_seconds = 1800  # 30 minutes
-batch_size = 32
-timeout_seconds = 45
-max_retries = 3
+[profiles.production.logging]
+log_level = "info"
+log_file = "/var/log/llmspell/kernel.log"
+max_size_mb = 500
+max_backups = 10
+syslog_enabled = true
+json_format = true
 
-[rag.cache]
-search_cache_enabled = true
-search_cache_size = 5000
-search_cache_ttl_seconds = 600
-
-# Multi-tenant quotas
-[rag.multi_tenant_settings]
-max_vectors_per_tenant = 100000
-tenant_ttl_hours = 168
-strict_isolation = true
-max_concurrent_operations = 10
+[profiles.production.security]
+sandboxing_enabled = true
+require_authentication = true
+enable_tls = true
+audit_log = true
+rate_limiting_enabled = true
 ```
 
-### Multi-Tenant SaaS
+### Service Profile
 
 ```toml
-# rag-multi-tenant.toml
-[rag]
-enabled = true
-multi_tenant = true
+[profiles.service]
+extends = "production"
 
-[rag.vector_storage]
-dimensions = 768
-backend = "hnsw"
-persistence_path = "./data/rag/vectors"
+[profiles.service.service]
+systemd_type = "forking"
+restart_policy = "always"
+private_tmp = true
+no_new_privileges = true
+protect_system = "strict"
 
-[rag.vector_storage.hnsw]
-m = 32                    # More connections for better recall
-ef_construction = 400     # High quality
-ef_search = 100
-max_elements = 10000000   # 10M vectors for many tenants
-num_threads = 8
+[profiles.service.signals]
+handle_sigterm = true
+handle_sighup = true
+graceful_shutdown_timeout = 60
 
-[rag.embedding]
-cache_enabled = true
-cache_size = 50000        # Large cache for multiple tenants
-cache_ttl_seconds = 7200  # 2 hours
-batch_size = 64
-max_retries = 5
+[profiles.service.monitoring]
+enable_metrics = true
+enable_health = true
+export_format = "prometheus"
+```
 
-[tenancy.quotas]
-max_vectors = 50000
-max_queries_per_minute = 100
-max_embedding_tokens_per_day = 100000
-billing_enabled = true
+### Fleet Profile (Multiple Kernels)
+
+```toml
+[profiles.fleet]
+extends = "service"
+
+[profiles.fleet.fleet]
+max_kernels = 10
+port_range_start = 9555
+port_range_end = 9655
+auto_spawn = true
+load_balance = true
+health_check_interval = 30
+
+[profiles.fleet.fleet.scaling]
+min_kernels = 2
+max_kernels = 10
+scale_up_threshold = 80  # CPU %
+scale_down_threshold = 20
+scale_cooldown_secs = 300
 ```
 
 ---
 
 ## Environment Variables
 
-### Core Variables
+### Kernel & Runtime Variables
+
+```bash
+# Kernel configuration (Phase 9-10)
+export LLMSPELL_KERNEL_PORT="9555"
+export LLMSPELL_KERNEL_ID="my-kernel"
+export LLMSPELL_CONNECTION_FILE="/var/lib/llmspell/kernel.json"
+export LLMSPELL_HMAC_KEY="secret-key"
+
+# Daemon settings (Phase 10)
+export LLMSPELL_DAEMON="true"
+export LLMSPELL_PID_FILE="/var/run/llmspell/kernel.pid"
+export LLMSPELL_LOG_FILE="/var/log/llmspell/kernel.log"
+export LLMSPELL_WORKING_DIR="/"
+
+# Runtime settings
+export RUST_LOG="info"  # trace, debug, info, warn, error
+export LLMSPELL_CONFIG="/etc/llmspell/config.toml"
+export LLMSPELL_LOG_LEVEL="info"
+export LLMSPELL_DEBUG="false"
+
+# Protocol settings (Phase 9-10)
+export LLMSPELL_ENABLE_JUPYTER="true"
+export LLMSPELL_ENABLE_DAP="false"
+export LLMSPELL_ENABLE_LSP="false"
+export LLMSPELL_ENABLE_REPL="true"
+```
+
+### Provider Variables
 
 ```bash
 # LLM Providers
-OPENAI_API_KEY="sk-..."
-ANTHROPIC_API_KEY="sk-ant-..."
-GROQ_API_KEY="gsk_..."
+export OPENAI_API_KEY="sk-..."
+export ANTHROPIC_API_KEY="sk-ant-..."
+export GROQ_API_KEY="gsk_..."
+export COHERE_API_KEY="..."
 
-# Configuration
-LLMSPELL_CONFIG="/path/to/config.toml"
-LLMSPELL_LOG_LEVEL="info"
-LLMSPELL_DEBUG="false"
+# Local Model Endpoints
+export OLLAMA_BASE_URL="http://localhost:11434"
+export LLAMA_CPP_URL="http://localhost:8080"
+```
 
-# RAG Configuration (Phase 8.10.6)
-LLMSPELL_RAG_ENABLED="true"
-LLMSPELL_RAG_MULTI_TENANT="false"
-LLMSPELL_RAG_DIMENSIONS="768"
-LLMSPELL_RAG_BACKEND="hnsw"
-LLMSPELL_RAG_PERSISTENCE_PATH="/var/lib/llmspell/rag"
-LLMSPELL_RAG_MAX_MEMORY_MB="1024"
+### RAG Variables (Phase 8)
+
+```bash
+# RAG Configuration
+export LLMSPELL_RAG_ENABLED="true"
+export LLMSPELL_RAG_MULTI_TENANT="false"
+export LLMSPELL_RAG_DIMENSIONS="768"
+export LLMSPELL_RAG_BACKEND="hnsw"
+export LLMSPELL_RAG_PERSISTENCE_PATH="/var/lib/llmspell/rag"
+export LLMSPELL_RAG_MAX_MEMORY_MB="1024"
 
 # HNSW Configuration
-LLMSPELL_HNSW_M="16"
-LLMSPELL_HNSW_EF_CONSTRUCTION="200"
-LLMSPELL_HNSW_EF_SEARCH="50"
-LLMSPELL_HNSW_MAX_ELEMENTS="1000000"
-LLMSPELL_HNSW_METRIC="cosine"
+export LLMSPELL_HNSW_M="16"
+export LLMSPELL_HNSW_EF_CONSTRUCTION="200"
+export LLMSPELL_HNSW_EF_SEARCH="50"
+export LLMSPELL_HNSW_MAX_ELEMENTS="1000000"
+export LLMSPELL_HNSW_METRIC="cosine"
 
 # Embedding Configuration
-LLMSPELL_EMBEDDING_PROVIDER="openai"
-LLMSPELL_EMBEDDING_CACHE_ENABLED="true"
-LLMSPELL_EMBEDDING_CACHE_SIZE="20000"
-LLMSPELL_EMBEDDING_BATCH_SIZE="32"
+export LLMSPELL_EMBEDDING_PROVIDER="openai"
+export LLMSPELL_EMBEDDING_MODEL="text-embedding-3-small"
+export LLMSPELL_EMBEDDING_CACHE="true"
+export LLMSPELL_EMBEDDING_BATCH_SIZE="32"
 
-# Multi-Tenancy (Phase 8.10.6)
-LLMSPELL_TENANT_MAX_VECTORS="50000"
-LLMSPELL_TENANT_RATE_LIMIT="100"
-LLMSPELL_TENANT_TTL_HOURS="168"
-
-# State & Sessions
-LLMSPELL_STATE_ENABLED="true"
-LLMSPELL_STATE_BACKEND="sled"
-LLMSPELL_STATE_PATH="/var/lib/llmspell"
-LLMSPELL_SESSIONS_ENABLED="false"
-LLMSPELL_SESSIONS_BACKEND="memory"
+# Multi-tenancy
+export LLMSPELL_TENANT_ID="default"
+export LLMSPELL_TENANT_ISOLATION="strict"
+export LLMSPELL_TENANT_MAX_VECTORS="100000"
 ```
 
-### Provider-Specific
+### Service Variables (Phase 10)
 
 ```bash
-# OpenAI
-OPENAI_API_KEY="sk-..."
-OPENAI_ORG_ID="org-..."
-OPENAI_BASE_URL="https://api.openai.com/v1"
+# systemd/launchd
+export LLMSPELL_SERVICE_TYPE="systemd"  # systemd, launchd, windows
+export LLMSPELL_SERVICE_NAME="llmspell-kernel"
+export LLMSPELL_SERVICE_RESTART="on-failure"
+export LLMSPELL_SERVICE_USER="llmspell"
+export LLMSPELL_SERVICE_GROUP="llmspell"
 
-# Anthropic
-ANTHROPIC_API_KEY="sk-ant-..."
-ANTHROPIC_BASE_URL="https://api.anthropic.com"
-
-# Ollama
-OLLAMA_BASE_URL="http://localhost:11434"
-
-# Custom
-CUSTOM_API_KEY="..."
-CUSTOM_BASE_URL="https://your-api.com"
+# Signal handling
+export LLMSPELL_HANDLE_SIGTERM="true"
+export LLMSPELL_HANDLE_SIGHUP="true"
+export LLMSPELL_HANDLE_SIGUSR1="true"
+export LLMSPELL_HANDLE_SIGUSR2="true"
+export LLMSPELL_GRACEFUL_SHUTDOWN_TIMEOUT="30"
 ```
 
-### Tool APIs
+### Monitoring Variables
 
 ```bash
-# Web Search
-GOOGLE_API_KEY="..."
-GOOGLE_SEARCH_ENGINE_ID="..."
-BRAVE_API_KEY="..."
-SERPAPI_KEY="..."
-SERPERDEV_KEY="..."
+# Metrics & Health
+export LLMSPELL_METRICS_ENABLED="true"
+export LLMSPELL_METRICS_PORT="9559"
+export LLMSPELL_HEALTH_ENABLED="true"
+export LLMSPELL_HEALTH_PORT="9559"
 
-# Email
-SENDGRID_API_KEY="..."
-AWS_ACCESS_KEY_ID="..."
-AWS_SECRET_ACCESS_KEY="..."
-
-# Database
-DB_HOST="localhost"
-DB_PORT="5432"
-DB_NAME="llmspell"
-DB_USER="..."
-DB_PASS="..."
+# Performance
+export LLMSPELL_PROFILE_ENABLED="false"
+export LLMSPELL_PROFILE_OUTPUT="/var/log/llmspell/profile.json"
+export LLMSPELL_TRACE_ENABLED="false"
 ```
+
+### Precedence
+
+Environment variables override config file settings:
+1. Command-line arguments (highest)
+2. Environment variables
+3. Config file
+4. Defaults (lowest)
 
 ---
 
 ## Troubleshooting
 
-### Common Issues
-
-#### "No API key found"
-```bash
-# Check environment
-echo $OPENAI_API_KEY
-
-# Set if missing
-export OPENAI_API_KEY="sk-..."
-
-# Or use config file
-echo 'api_key = "sk-..."' >> config.toml
-```
-
-#### "Rate limit exceeded"
-```toml
-# Adjust rate limits
-[security.rate_limiting.per_user]
-rate = 2000  # Increase limit
-burst = 50
-```
-
-#### "Memory limit exceeded"
-```toml
-# Increase memory limits
-[resources.profiles.default]
-memory_limit = "1GB"  # Increase from 512MB
-```
-
-#### "Connection timeout"
-```toml
-# Increase timeouts
-[providers.providers.openai]
-timeout_seconds = 60
-
-[rag.embedding]
-timeout_seconds = 45
-```
-
-#### "RAG not enabled"
-```bash
-# Check RAG configuration
-export LLMSPELL_RAG_ENABLED="true"
-
-# Or in config file
-[rag]
-enabled = true
-```
-
-#### "Vector storage error"
-```toml
-# Check storage path permissions
-[rag.vector_storage]
-persistence_path = "./data/rag/vectors"  # Ensure writable
-
-# Reduce memory if needed
-max_memory_mb = 256  # Lower limit
-```
-
-#### "HNSW index build failed"
-```toml
-# Use smaller parameters for limited memory
-[rag.vector_storage.hnsw]
-m = 8                    # Reduce connections
-ef_construction = 50     # Lower quality
-max_elements = 10000     # Smaller dataset
-```
-
-#### "Multi-tenant isolation error"
-```toml
-# Ensure proper tenant configuration
-[rag]
-multi_tenant = true      # Must be enabled
-
-[rag.multi_tenant_settings]
-strict_isolation = true  # Enforce separation
-```
-
-#### "Embedding cache miss"
-```bash
-# Check cache status
-[rag.embedding]
-cache_enabled = true
-cache_size = 20000      # Increase if needed
-cache_ttl_seconds = 3600 # Extend TTL
-```
-
-### Debug Mode
-
-Enable detailed logging:
+### Config Loading Issues
 
 ```bash
-# Via environment
-export LLMSPELL_DEBUG=true
-export LLMSPELL_LOG_LEVEL=debug
+# Validate configuration
+./target/release/llmspell validate -c config.toml
 
-# Via config
-[global]
-debug = true
-log_level = "debug"
+# Show effective configuration
+./target/release/llmspell config show
 
-# Via CLI
-./llmspell --debug --log-level debug run script.lua
+# Test specific profile
+./target/release/llmspell --profile production validate
 ```
 
-### Validation
+### Common Problems
 
-Check configuration:
+**Config not found:**
+```bash
+# Check search paths
+./target/release/llmspell config paths
+
+# Use explicit path
+./target/release/llmspell -c /absolute/path/config.toml run script.lua
+```
+
+**Invalid TOML:**
+```bash
+# Validate TOML syntax
+toml-cli validate config.toml
+
+# Check for typos in section names
+grep -E '^\[' config.toml
+```
+
+**Environment variables not working:**
+```bash
+# Debug environment
+env | grep LLMSPELL
+
+# Export correctly
+export LLMSPELL_CONFIG="/path/to/config.toml"  # Not just assignment
+```
+
+**Profile not loading:**
+```bash
+# List available profiles
+./target/release/llmspell config profiles
+
+# Use profile explicitly
+./target/release/llmspell --profile production run script.lua
+```
+
+**Kernel config issues:**
+```bash
+# Test kernel configuration
+./target/release/llmspell kernel start --dry-run
+
+# Verify ports available
+netstat -an | grep 9555
+```
+
+### Debug Commands
 
 ```bash
-# Validate config file
-./llmspell validate -c config.toml
+# Show all configuration sources
+./target/release/llmspell config debug
 
-# Test provider connection
-./llmspell test-provider openai
+# Test configuration merge
+./target/release/llmspell config test
 
-# Test RAG functionality
-./llmspell test-rag --config rag-development.toml
+# Export effective configuration
+./target/release/llmspell config export > effective.toml
 
-# Check vector storage status
-./llmspell exec 'local stats = RAG.get_stats("default", nil); print(JSON.stringify(stats))'
-
-# List available tools
-./llmspell list-tools
-
-# Check resource usage and tenant quotas
-./llmspell stats
-
-# Validate RAG configuration
-./scripts/validate-rag-configs.sh
+# Trace configuration loading
+RUST_LOG=llmspell_config=trace ./target/release/llmspell run script.lua
 ```
-
----
-
-## Best Practices
-
-1. **Use Environment Variables for Secrets**
-   - Never commit API keys to version control
-   - Use `.env` files with `.gitignore`
-
-2. **Start with RAG Development Profile**
-   - Use `rag-development.toml` for testing
-   - Small datasets and fast iteration
-   - Disable caching for fresh results
-
-3. **Enable Multi-Tenancy in Production**
-   - Always set `multi_tenant = true` in production
-   - Configure proper tenant quotas
-   - Enable strict isolation
-
-4. **Optimize HNSW for Your Use Case**
-   - Small datasets: Use `speed_optimized` profile
-   - Large datasets: Use `accuracy_optimized` profile
-   - Monitor memory usage and vector counts
-
-5. **Enable RAG Caching (70% Cost Reduction)**
-   - Set `cache_enabled = true` for embeddings
-   - Use appropriate cache sizes and TTL
-   - Monitor cache hit rates
-
-6. **Monitor Resource Usage**
-   - Track vector storage growth
-   - Monitor tenant quotas and usage
-   - Set up alerts for HNSW memory limits
-
-7. **Use Configuration Profiles**
-   - `rag-development.toml` for development
-   - `rag-production.toml` for production
-   - `rag-multi-tenant.toml` for SaaS deployments
 
 ---
 
 ## See Also
 
-- [Core Concepts](concepts.md) - Understanding RAG and multi-tenancy
-- [Getting Started](getting-started.md) - Quick setup with RAG
-- [API Documentation](api/README.md) - RAG and provider APIs
-- [Configuration Examples](../../examples/script-users/configs/) - 15+ config files
-- [RAG Examples](../../examples/script-users/applications/) - RAG-powered applications
+- [Core Concepts](concepts.md) - Understanding kernel architecture
+- [Service Deployment](service-deployment.md) - Production deployment
+- [Troubleshooting](troubleshooting.md) - Common issues and solutions
+- [Getting Started](getting-started.md) - Quick start guide
+- [API Reference](api/README.md) - Complete API documentation

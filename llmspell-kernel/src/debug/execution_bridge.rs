@@ -6,10 +6,17 @@
 //! Migrated from Phase-9 branch (originally 642 lines)
 
 use anyhow::Result;
+use async_trait::async_trait;
+use llmspell_core::traits::debug_context::{
+    DebugContext, StackFrame as DebugStackFrame, Variable as DebugVariable,
+};
+use llmspell_core::LLMSpellError;
 use parking_lot::RwLock;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
+use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
+use tokio::sync::{mpsc, Notify};
 use tracing::{debug, instrument, trace};
 
 /// Breakpoint information
@@ -117,6 +124,49 @@ pub enum StepMode {
     Pause,
 }
 
+/// Debug event for stopped execution
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct StoppedEvent {
+    /// Reason for stopping (breakpoint, step, pause, exception)
+    pub reason: String,
+    /// Thread ID (usually 1 for single-threaded scripts)
+    pub thread_id: i32,
+    /// Optional breakpoint ID that was hit
+    pub breakpoint_id: Option<String>,
+    /// Current file
+    pub file: String,
+    /// Current line
+    pub line: u32,
+}
+
+/// Pause state for async coordination
+#[derive(Debug, Clone)]
+pub struct PauseState {
+    /// Whether execution is paused
+    pub paused: Arc<AtomicBool>,
+    /// Signal to resume execution
+    pub resume_signal: Arc<Notify>,
+    /// Current step mode
+    pub step_mode: Arc<RwLock<StepMode>>,
+}
+
+impl PauseState {
+    /// Create a new pause state
+    pub fn new() -> Self {
+        Self {
+            paused: Arc::new(AtomicBool::new(false)),
+            resume_signal: Arc::new(Notify::new()),
+            step_mode: Arc::new(RwLock::new(StepMode::Continue)),
+        }
+    }
+}
+
+impl Default for PauseState {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 /// Manages execution state and debugging operations
 pub struct ExecutionManager {
     /// Active breakpoints
@@ -131,6 +181,14 @@ pub struct ExecutionManager {
     _variable_refs: Arc<RwLock<HashMap<String, Vec<Variable>>>>,
     /// Session ID
     _session_id: String,
+    /// Pause state for async coordination
+    pause_state: PauseState,
+    /// Channel to send stopped events
+    stopped_event_tx: Option<mpsc::Sender<StoppedEvent>>,
+    /// Debug mode enabled flag
+    debug_enabled: Arc<AtomicBool>,
+    /// Current execution location
+    current_location: Arc<RwLock<Option<(String, u32)>>>,
 }
 
 impl ExecutionManager {
@@ -143,7 +201,16 @@ impl ExecutionManager {
             stack_frames: Arc::new(RwLock::new(Vec::new())),
             _variable_refs: Arc::new(RwLock::new(HashMap::new())),
             _session_id: session_id,
+            pause_state: PauseState::new(),
+            stopped_event_tx: None,
+            debug_enabled: Arc::new(AtomicBool::new(false)),
+            current_location: Arc::new(RwLock::new(None)),
         }
+    }
+
+    /// Set the stopped event sender
+    pub fn set_stopped_event_sender(&mut self, tx: mpsc::Sender<StoppedEvent>) {
+        self.stopped_event_tx = Some(tx);
     }
 
     /// Set a breakpoint
@@ -210,6 +277,7 @@ impl ExecutionManager {
     /// Pause execution
     pub fn pause(&self) {
         *self.paused.write() = true;
+        self.pause_state.paused.store(true, Ordering::SeqCst);
         trace!("Execution paused");
     }
 
@@ -217,7 +285,135 @@ impl ExecutionManager {
     pub fn resume(&self, mode: StepMode) {
         *self.paused.write() = false;
         *self.step_mode.write() = Some(mode);
+        self.pause_state.paused.store(false, Ordering::SeqCst);
+        *self.pause_state.step_mode.write() = mode;
+        self.pause_state.resume_signal.notify_one();
         trace!("Execution resumed with mode: {:?}", mode);
+    }
+
+    /// Check if execution is paused
+    pub fn is_paused(&self) -> bool {
+        *self.paused.read()
+    }
+
+    /// Get current step mode
+    pub fn get_step_mode(&self) -> Option<StepMode> {
+        *self.step_mode.read()
+    }
+
+    /// Get breakpoints for a source file
+    pub fn get_breakpoints(&self, source: &str) -> Vec<Breakpoint> {
+        self.breakpoints
+            .read()
+            .get(source)
+            .cloned()
+            .unwrap_or_default()
+    }
+
+    /// Push a new stack frame
+    pub fn push_frame(&self, name: String, source: String, line: u32, column: Option<u32>) {
+        let frame_id = self.stack_frames.read().len();
+        let frame = StackFrame {
+            id: frame_id.to_string(), // Use numeric string IDs like "0", "1", etc.
+            name,
+            source,
+            line,
+            column,
+            locals: Vec::new(),
+        };
+        self.stack_frames.write().push(frame);
+    }
+
+    /// Add a variable to a scope
+    pub fn add_variable(&self, _scope: &str, name: &str, value: &str, var_type: &str) {
+        // For simplicity, add to the top frame if it exists
+        if let Some(frame) = self.stack_frames.write().last_mut() {
+            frame.locals.push(Variable {
+                name: name.to_string(),
+                value: value.to_string(),
+                var_type: var_type.to_string(),
+                has_children: false,
+                reference: None,
+            });
+        }
+    }
+
+    /// Check if debug mode is enabled
+    pub fn is_debug_enabled(&self) -> bool {
+        self.debug_enabled.load(Ordering::Relaxed)
+    }
+
+    /// Check if we should pause at a breakpoint
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if DAP communication fails
+    #[instrument(level = "trace", skip(self))]
+    pub async fn check_breakpoint(&self, file: &str, line: u32) -> Result<()> {
+        // First check if we should pause at this location
+        let (should_pause, breakpoint_id, reason) = {
+            let breakpoints = self.breakpoints.read();
+
+            // Check if there's a breakpoint at this location
+            let mut hit_breakpoint = None;
+            if let Some(bp_list) = breakpoints.get(file) {
+                for bp in bp_list {
+                    if bp.line == line && bp.enabled && bp.should_break() {
+                        hit_breakpoint = Some(bp.id.clone());
+                        break;
+                    }
+                }
+            }
+
+            // Check step mode
+            let step_mode = self.step_mode.read();
+            let step_reason = match *step_mode {
+                Some(StepMode::StepIn | StepMode::StepOver | StepMode::StepOut) => Some("step"),
+                _ => None,
+            };
+
+            if let Some(bp_id) = hit_breakpoint {
+                (true, Some(bp_id), "breakpoint")
+            } else if let Some(reason) = step_reason {
+                (true, None, reason)
+            } else {
+                (false, None, "")
+            }
+        };
+
+        if should_pause {
+            // Set paused state
+            self.pause_state.paused.store(true, Ordering::SeqCst);
+            *self.paused.write() = true;
+
+            debug!("Pausing at {}:{} (reason: {})", file, line, reason);
+
+            // Send stopped event via channel if available
+            if let Some(ref tx) = self.stopped_event_tx {
+                let event = StoppedEvent {
+                    reason: reason.to_string(),
+                    thread_id: 1, // Single-threaded for now
+                    breakpoint_id,
+                    file: file.to_string(),
+                    line,
+                };
+
+                // Send without blocking
+                let _ = tx.try_send(event);
+            }
+
+            // Wait for resume signal
+            self.pause_state.resume_signal.notified().await;
+
+            debug!("Resuming from pause at {}:{}", file, line);
+        }
+
+        Ok(())
+    }
+
+    /// Get the pause state for external coordination
+    pub fn pause_state(&self) -> &PauseState {
+        &self.pause_state
     }
 
     /// Get current stack frames
@@ -248,10 +444,134 @@ impl ExecutionManager {
             _ => Vec::new(), // Simplified for now
         }
     }
+}
 
-    /// Check if currently paused
-    pub fn is_paused(&self) -> bool {
-        *self.paused.read()
+#[async_trait]
+impl DebugContext for ExecutionManager {
+    fn should_pause_sync(&self, file: &str, line: u32) -> bool {
+        // Fast path when disabled
+        if !self.debug_enabled.load(Ordering::Relaxed) {
+            return false;
+        }
+
+        // Check if stepping
+        if let Some(StepMode::StepIn | StepMode::StepOver | StepMode::StepOut) =
+            &*self.step_mode.read()
+        {
+            return true;
+        }
+
+        // Check breakpoints
+        self.should_pause(file, line)
+    }
+
+    async fn pause_and_wait(&self, file: &str, line: u32) -> Result<(), LLMSpellError> {
+        // Set paused state
+        self.pause_state.paused.store(true, Ordering::SeqCst);
+        *self.paused.write() = true;
+        *self.current_location.write() = Some((file.to_string(), line));
+
+        // Send stopped event if channel available
+        if let Some(ref tx) = self.stopped_event_tx {
+            let event = StoppedEvent {
+                reason: "breakpoint".to_string(),
+                thread_id: 1,
+                breakpoint_id: None,
+                file: file.to_string(),
+                line,
+            };
+            let _ = tx.send(event).await;
+        }
+
+        // Wait for resume signal
+        self.pause_state.resume_signal.notified().await;
+
+        Ok(())
+    }
+
+    fn enable_debug_mode(&self) {
+        self.debug_enabled.store(true, Ordering::SeqCst);
+        debug!("Debug mode enabled");
+    }
+
+    fn disable_debug_mode(&self) {
+        self.debug_enabled.store(false, Ordering::SeqCst);
+        debug!("Debug mode disabled");
+    }
+
+    fn is_debug_enabled(&self) -> bool {
+        self.debug_enabled.load(Ordering::Relaxed)
+    }
+
+    fn set_breakpoint(&self, file: &str, line: u32) -> Result<String, LLMSpellError> {
+        match ExecutionManager::set_breakpoint(self, file.to_string(), line) {
+            Ok(bp) => Ok(bp.id),
+            Err(e) => Err(LLMSpellError::Component {
+                message: format!("Failed to set breakpoint: {e}"),
+                source: None,
+            }),
+        }
+    }
+
+    fn clear_breakpoint(&self, id: &str) -> Result<(), LLMSpellError> {
+        self.remove_breakpoint(id)
+            .map_err(|e| LLMSpellError::Component {
+                message: format!("Failed to clear breakpoint: {e}"),
+                source: None,
+            })
+    }
+
+    fn get_stack_frames(&self) -> Vec<DebugStackFrame> {
+        self.stack_frames
+            .read()
+            .iter()
+            .enumerate()
+            .map(|(i, frame)| DebugStackFrame {
+                id: i,
+                name: frame.name.clone(),
+                file: frame.source.clone(),
+                line: frame.line,
+                column: frame.column,
+            })
+            .collect()
+    }
+
+    fn get_variables(&self, frame_id: usize) -> Vec<DebugVariable> {
+        let frames = self.stack_frames.read();
+        if let Some(frame) = frames.get(frame_id) {
+            frame
+                .locals
+                .iter()
+                .map(|var| DebugVariable {
+                    name: var.name.clone(),
+                    value: var.value.clone(),
+                    var_type: var.var_type.clone(),
+                    has_children: var.has_children,
+                })
+                .collect()
+        } else {
+            vec![]
+        }
+    }
+
+    fn report_location(&self, file: &str, line: u32) {
+        *self.current_location.write() = Some((file.to_string(), line));
+        trace!("Execution at {}:{}", file, line);
+    }
+
+    fn should_step(&self) -> bool {
+        matches!(
+            &*self.step_mode.read(),
+            Some(StepMode::StepIn | StepMode::StepOver | StepMode::StepOut)
+        )
+    }
+
+    fn set_step_mode(&self, stepping: bool) {
+        *self.step_mode.write() = if stepping {
+            Some(StepMode::StepIn)
+        } else {
+            None
+        };
     }
 }
 
@@ -296,5 +616,105 @@ mod tests {
 
         manager.resume(StepMode::Continue);
         assert!(!manager.is_paused());
+    }
+
+    #[tokio::test]
+    async fn test_debug_context_implementation() {
+        use llmspell_core::traits::debug_context::DebugContext;
+
+        let manager = Arc::new(ExecutionManager::new("test-session".to_string()));
+        let debug_ctx: Arc<dyn DebugContext> = manager.clone();
+
+        // Test debug mode enable/disable
+        assert!(!debug_ctx.is_debug_enabled());
+        debug_ctx.enable_debug_mode();
+        assert!(debug_ctx.is_debug_enabled());
+        debug_ctx.disable_debug_mode();
+        assert!(!debug_ctx.is_debug_enabled());
+
+        // Re-enable for further tests
+        debug_ctx.enable_debug_mode();
+
+        // Test breakpoint setting
+        let bp_id = debug_ctx.set_breakpoint("test.lua", 42).unwrap();
+        assert!(!bp_id.is_empty());
+
+        // Test should_pause_sync
+        assert!(debug_ctx.should_pause_sync("test.lua", 42));
+        assert!(!debug_ctx.should_pause_sync("test.lua", 43));
+
+        // Test step mode
+        assert!(!debug_ctx.should_step());
+        debug_ctx.set_step_mode(true);
+        assert!(debug_ctx.should_step());
+        debug_ctx.set_step_mode(false);
+        assert!(!debug_ctx.should_step());
+
+        // Test location reporting
+        debug_ctx.report_location("test.lua", 100);
+        // Location reporting doesn't return a value, but we can verify it doesn't panic
+
+        // Test stack frames
+        let frames = debug_ctx.get_stack_frames();
+        assert!(frames.is_empty()); // No frames in test mode
+
+        // Test variables
+        let vars = debug_ctx.get_variables(0);
+        assert!(vars.is_empty()); // No variables in test mode
+
+        // Test breakpoint clearing
+        debug_ctx.clear_breakpoint(&bp_id).unwrap();
+        assert!(!debug_ctx.should_pause_sync("test.lua", 42));
+
+        // Test pause_and_wait with immediate resume
+        let manager_clone = manager.clone();
+        tokio::spawn(async move {
+            tokio::time::sleep(tokio::time::Duration::from_millis(10)).await;
+            manager_clone.resume(StepMode::Continue);
+        });
+        debug_ctx.pause_and_wait("test.lua", 50).await.unwrap();
+    }
+
+    #[test]
+    fn test_debug_context_thread_safety() {
+        use llmspell_core::traits::debug_context::DebugContext;
+        use std::thread;
+
+        let manager = Arc::new(ExecutionManager::new("test-session".to_string()));
+        let debug_ctx: Arc<dyn DebugContext> = manager.clone();
+
+        // Enable debugging
+        debug_ctx.enable_debug_mode();
+
+        // Test concurrent access from multiple threads
+        let ctx1 = debug_ctx.clone();
+        let ctx2 = debug_ctx.clone();
+        let ctx3 = debug_ctx.clone();
+
+        let handle1 = thread::spawn(move || {
+            for i in 0..10 {
+                ctx1.set_breakpoint("thread1.lua", i).unwrap();
+            }
+        });
+
+        let handle2 = thread::spawn(move || {
+            for i in 0..10 {
+                ctx2.report_location("thread2.lua", i);
+            }
+        });
+
+        let handle3 = thread::spawn(move || {
+            for _ in 0..10 {
+                ctx3.set_step_mode(true);
+                ctx3.set_step_mode(false);
+            }
+        });
+
+        handle1.join().unwrap();
+        handle2.join().unwrap();
+        handle3.join().unwrap();
+
+        // If we get here without panicking, thread safety works
+        assert!(debug_ctx.is_debug_enabled());
     }
 }

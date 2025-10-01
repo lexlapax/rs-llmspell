@@ -386,9 +386,9 @@ async fn test_communication_resilience() {
 
     // Test alternating success/failure pattern
     let mut success_count = 0;
-    for i in 0..10 {
+    for i in 0u32..10 {
         // Set failure state before each attempt
-        agent.set_failure(i % 2 == 0, "Intermittent failure");
+        agent.set_failure(i.is_multiple_of(2), "Intermittent failure");
 
         // Small delay to ensure state is set
         tokio::time::sleep(Duration::from_millis(10)).await;

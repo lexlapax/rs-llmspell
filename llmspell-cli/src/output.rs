@@ -4,18 +4,71 @@
 use crate::cli::OutputFormat;
 use anyhow::Result;
 use futures::StreamExt;
-use indicatif::{ProgressBar, ProgressStyle};
 use llmspell_bridge::engine::{ScriptOutput, ScriptStream};
+use llmspell_utils::terminal::AsyncSpinner;
 use std::sync::Arc;
-use std::time::Duration;
 use tokio::signal;
 use tokio::sync::Mutex;
+
+/// Output formatter for various data types
+pub struct OutputFormatter {
+    format: OutputFormat,
+}
+
+impl OutputFormatter {
+    /// Create a new output formatter
+    pub fn new(format: OutputFormat) -> Self {
+        Self { format }
+    }
+
+    /// Print a list of tools
+    pub fn print_tool_list(&self, tools: &[String]) -> Result<()> {
+        match self.format {
+            OutputFormat::Json => {
+                println!("{}", serde_json::to_string_pretty(tools)?);
+            }
+            OutputFormat::Text => {
+                for tool in tools {
+                    println!("{}", tool);
+                }
+            }
+            OutputFormat::Pretty => {
+                println!("Available Tools:");
+                println!("{}", "─".repeat(50));
+                for tool in tools {
+                    println!("  • {}", tool);
+                }
+                println!("\nTotal: {} tools", tools.len());
+            }
+        }
+        Ok(())
+    }
+
+    /// Print JSON data
+    pub fn print_json(&self, value: &serde_json::Value) -> Result<()> {
+        match self.format {
+            OutputFormat::Json => {
+                println!("{}", serde_json::to_string_pretty(value)?);
+            }
+            OutputFormat::Text => {
+                if let Some(text) = value.as_str() {
+                    println!("{}", text);
+                } else {
+                    println!("{}", value);
+                }
+            }
+            OutputFormat::Pretty => {
+                println!("{}", serde_json::to_string_pretty(value)?);
+            }
+        }
+        Ok(())
+    }
+}
 
 /// Format script output according to the specified format
 pub fn format_output(output: &ScriptOutput, format: OutputFormat) -> Result<String> {
     match format {
         OutputFormat::Json => Ok(serde_json::to_string_pretty(&output.output)?),
-        OutputFormat::Yaml => Ok(serde_yaml::to_string(&output.output)?),
         OutputFormat::Text => {
             // Simple text representation
             match output.output {
@@ -73,7 +126,6 @@ pub async fn print_stream(stream: &mut ScriptStream, format: OutputFormat) -> Re
 
     match format {
         OutputFormat::Json => print_stream_json(stream, interrupted).await,
-        OutputFormat::Yaml => print_stream_yaml(stream, interrupted).await,
         OutputFormat::Text => print_stream_text(stream, false, interrupted).await,
         OutputFormat::Pretty => print_stream_text(stream, true, interrupted).await,
     }
@@ -82,60 +134,30 @@ pub async fn print_stream(stream: &mut ScriptStream, format: OutputFormat) -> Re
 /// Print streaming output as JSON
 async fn print_stream_json(stream: &mut ScriptStream, interrupted: Arc<Mutex<bool>>) -> Result<()> {
     // Show progress while collecting chunks
-    let spinner = ProgressBar::new_spinner();
-    spinner.set_style(
-        ProgressStyle::default_spinner()
-            .template("{spinner:.cyan} {msg}")
-            .unwrap(),
-    );
-    spinner.set_message("Collecting stream data...");
-    spinner.enable_steady_tick(Duration::from_millis(100));
+    let spinner = AsyncSpinner::new("Collecting stream data...");
 
     let mut chunks = Vec::new();
+    let mut was_interrupted = false;
+
     while let Some(chunk) = stream.stream.next().await {
         // Check if interrupted
         if *interrupted.lock().await {
-            spinner.finish_with_message("Stream interrupted by user");
-            eprintln!("\n⚠️ Stream interrupted by Ctrl+C");
+            was_interrupted = true;
             break;
         }
 
         chunks.push(chunk?);
-        spinner.set_message(format!("Collected {} chunks", chunks.len()));
+        spinner.set_message(&format!("Collected {} chunks", chunks.len()));
     }
 
-    spinner.finish_and_clear();
+    if was_interrupted {
+        spinner.finish_with_message("Stream interrupted by user");
+        eprintln!("\n⚠️ Stream interrupted by Ctrl+C");
+    } else {
+        spinner.finish_and_clear();
+    }
+
     println!("{}", serde_json::to_string_pretty(&chunks)?);
-    Ok(())
-}
-
-/// Print streaming output as YAML
-async fn print_stream_yaml(stream: &mut ScriptStream, interrupted: Arc<Mutex<bool>>) -> Result<()> {
-    // Show progress while collecting chunks
-    let spinner = ProgressBar::new_spinner();
-    spinner.set_style(
-        ProgressStyle::default_spinner()
-            .template("{spinner:.cyan} {msg}")
-            .unwrap(),
-    );
-    spinner.set_message("Collecting stream data...");
-    spinner.enable_steady_tick(Duration::from_millis(100));
-
-    let mut chunks = Vec::new();
-    while let Some(chunk) = stream.stream.next().await {
-        // Check if interrupted
-        if *interrupted.lock().await {
-            spinner.finish_with_message("Stream interrupted by user");
-            eprintln!("\n⚠️ Stream interrupted by Ctrl+C");
-            break;
-        }
-
-        chunks.push(chunk?);
-        spinner.set_message(format!("Collected {} chunks", chunks.len()));
-    }
-
-    spinner.finish_and_clear();
-    println!("{}", serde_yaml::to_string(&chunks)?);
     Ok(())
 }
 
@@ -148,15 +170,7 @@ async fn print_stream_text(
     use std::io::{self, Write};
 
     let progress = if show_progress {
-        let pb = ProgressBar::new_spinner();
-        pb.set_style(
-            ProgressStyle::default_spinner()
-                .template("{spinner:.green} {msg}")
-                .unwrap(),
-        );
-        pb.set_message("Streaming output...");
-        pb.enable_steady_tick(Duration::from_millis(100));
-        Some(pb)
+        Some(AsyncSpinner::new("Streaming output..."))
     } else {
         None
     };
@@ -167,8 +181,9 @@ async fn print_stream_text(
     while let Some(chunk) = stream.stream.next().await {
         // Check if interrupted
         if *interrupted.lock().await {
-            if let Some(ref pb) = progress {
+            if let Some(pb) = progress {
                 pb.finish_with_message("Stream interrupted by user");
+                return Ok(());
             }
             eprintln!("\n⚠️ Stream interrupted by Ctrl+C");
             break;
@@ -179,7 +194,7 @@ async fn print_stream_text(
 
         // Update progress message
         if let Some(ref pb) = progress {
-            pb.set_message(format!("Processing chunk {}", chunk_count));
+            pb.set_message(&format!("Processing chunk {}", chunk_count));
         }
 
         // Print chunk content based on its type
@@ -204,7 +219,7 @@ async fn print_stream_text(
                     pb.suspend(|| {
                         println!("\n🔧 Calling tool: {}...", tool_name);
                     });
-                    pb.set_message(format!("Tool: {}", tool_name));
+                    pb.set_message(&format!("Tool: {}", tool_name));
                 } else {
                     println!("\n[Calling tool: {}...]", tool_name);
                 }
@@ -248,13 +263,13 @@ async fn print_stream_text(
                             pb.set_message("Stream ending...");
                         }
                         ControlMessage::StreamCancelled { reason } => {
-                            pb.set_message(format!("Stream cancelled: {}", reason));
+                            pb.set_message(&format!("Stream cancelled: {}", reason));
                         }
                         ControlMessage::Heartbeat => {
                             // Keep spinner alive
                         }
                         ControlMessage::RateLimit { remaining, .. } => {
-                            pb.set_message(format!("Rate limited ({} remaining)", remaining));
+                            pb.set_message(&format!("Rate limited ({} remaining)", remaining));
                         }
                         ControlMessage::Custom { .. } => {
                             // Custom control messages
@@ -268,7 +283,6 @@ async fn print_stream_text(
     // Clean up progress bar
     if let Some(pb) = progress {
         pb.finish_with_message("Stream complete");
-        pb.finish_and_clear();
     }
 
     println!(); // Final newline

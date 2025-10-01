@@ -29,7 +29,7 @@ fn bench_event_publishing(c: &mut Criterion) {
             |b, &count| {
                 b.iter(|| {
                     rt.block_on(async {
-                        for i in 0..count {
+                        for i in 0usize..count {
                             let event = UniversalEvent::new(
                                 format!("test.event.{}", i % 100),
                                 serde_json::json!({"data": format!("event-{}", i)}),
@@ -39,7 +39,7 @@ fn bench_event_publishing(c: &mut Criterion) {
                             let _ = black_box(event_bus.publish(event).await);
 
                             // Add small delay every 1000 events to avoid overwhelming the system
-                            if i > 0 && i % 1000 == 0 {
+                            if i > 0 && i.is_multiple_of(1000) {
                                 tokio::time::sleep(Duration::from_millis(1)).await;
                             }
                         }

@@ -17,20 +17,17 @@
 //!
 //! ```text
 //! llmspell [GLOBAL_FLAGS] <COMMAND>
-//! ├── run <script> [args...]           # Execute scripts with streaming support
-//! ├── exec <code>                      # Execute inline code
-//! ├── repl [--history-file]            # Interactive REPL sessions
-//! ├── debug <script> [debug-flags]     # Interactive debugging with DAP
-//! ├── kernel {start|connect|stop|status} # Kernel lifecycle management
-//! ├── session {list|show|replay|delete}  # Session management
-//! ├── config {init|validate|show}       # Configuration management
-//! ├── keys {list|add|remove}           # API key management
-//! ├── state {list|get|set|delete}      # State persistence
-//! ├── rag {search|index|stats}         # RAG operations
-//! ├── apps {list|install|create}       # Application templates
-//! ├── backup {create|list|restore}     # Backup operations
-//! ├── tools {list|install|update}      # Tool management
-//! └── info                             # System information
+//! ├── run <script> [args...]                       # Execute scripts with streaming support
+//! ├── exec <code>                                  # Execute inline code
+//! ├── repl [--history-file]                        # Interactive REPL sessions
+//! ├── debug <script> [debug-flags]                 # Interactive debugging with DAP
+//! ├── kernel {start|stop|status|connect|install-service}  # Kernel lifecycle management
+//! ├── session {list|show|replay|delete}            # Session management
+//! ├── config {init|validate|show}                  # Configuration management
+//! ├── keys {add|list|remove}                       # API key management
+//! ├── state {show|clear|export|import}             # State persistence
+//! ├── app {list|info|run|search}                   # Discover and run applications
+//! └── backup {create|restore|list|delete}          # Backup operations
 //! ```
 //!
 //! ## Usage Examples
@@ -85,7 +82,7 @@ impl From<TraceLevel> for tracing::Level {
 /// Command-line interface for LLMSpell - Professional Architecture
 #[derive(Parser, Debug)]
 #[command(name = "llmspell")]
-#[command(version)]
+#[command(version)] // Default version for --version flag
 #[command(about = "LLMSpell - Scriptable LLM interactions")]
 #[command(
     long_about = "LLMSpell provides scriptable LLM interactions through Lua, JavaScript, and Python engines.
@@ -166,10 +163,19 @@ pub enum OutputFormat {
     Text,
     /// JSON output
     Json,
-    /// YAML output
-    Yaml,
     /// Pretty-printed output
     Pretty,
+}
+
+/// Service type for install-service command
+#[derive(Debug, Clone, Copy, PartialEq, Eq, ValueEnum)]
+pub enum ServiceType {
+    /// systemd (Linux)
+    Systemd,
+    /// launchd (macOS)
+    Launchd,
+    /// Auto-detect based on platform
+    Auto,
 }
 
 /// Primary execution commands and subcommand groups
@@ -410,22 +416,224 @@ EXAMPLES:
         command: BackupCommands,
     },
 
-    /// Run example applications
-    #[command(long_about = "Run example applications and use cases.
+    /// Manage and run applications
+    #[command(
+        long_about = "Discover, list, and run applications with filesystem-based discovery.
 
 EXAMPLES:
-    llmspell app file-organizer                # Run file organizer app
-    llmspell app research-collector -- --verbose  # Run with app arguments
-    llmspell app code-review-assistant         # Run code review assistant
-    llmspell app webapp-creator                # Run web app creator")]
+    llmspell app list                          # List all available applications
+    llmspell app info file-organizer           # Show app metadata and details
+    llmspell app run file-organizer            # Run file organizer app
+    llmspell app run research-collector -- --verbose  # Run with app arguments
+    llmspell app search --tag productivity     # Search apps by tag
+    llmspell app search --complexity Simple    # Search apps by complexity"
+    )]
     App {
-        /// Application name (file-organizer, research-collector, etc.)
+        #[command(subcommand)]
+        command: AppCommands,
+
+        /// Additional search paths for applications
+        #[arg(long, value_name = "PATH", action = clap::ArgAction::Append)]
+        search_path: Vec<String>,
+    },
+
+    /// Tool management and direct invocation
+    #[command(
+        long_about = "Manage and execute tools directly via kernel communication.
+
+Tools are executed in the kernel process which has access to the ComponentRegistry.
+The CLI sends tool requests to the kernel and displays the results.
+
+EXAMPLES:
+    llmspell tool list                         # List all available tools
+    llmspell tool list --category filesystem   # List filesystem tools
+    llmspell tool info calculator              # Show tool details and schema
+    llmspell tool invoke calculator --params '{\"expression\":\"2+2\"}'  # Execute tool
+    llmspell tool search \"file\" \"web\"          # Search tools by keywords
+    llmspell tool test calculator --verbose    # Test tool with examples"
+    )]
+    Tool {
+        #[command(subcommand)]
+        command: ToolCommands,
+
+        /// Tool source (future: local|mcp:\<server\>|a2a:\<node\>)
+        #[arg(long, default_value = "local", hide = true)]
+        source: String,
+    },
+
+    /// Display version information
+    #[command(long_about = "Display detailed version and build information.
+
+EXAMPLES:
+    llmspell version                    # Show version information
+    llmspell version --verbose          # Show detailed build information
+    llmspell version --short            # Show just the version number
+    llmspell version --client           # Show client version only
+    llmspell version --output json      # Output as JSON")]
+    Version(crate::commands::version::VersionCommand),
+}
+
+/// Application management subcommands
+#[derive(Subcommand, Debug)]
+pub enum AppCommands {
+    /// List all available applications
+    #[command(long_about = "List all applications discovered in search paths.
+
+EXAMPLES:
+    llmspell app list                          # List all apps
+    llmspell app list --format json           # List in JSON format")]
+    List,
+
+    /// Show detailed information about an application
+    #[command(
+        long_about = "Show detailed metadata and information about a specific application.
+
+EXAMPLES:
+    llmspell app info file-organizer           # Show file-organizer details
+    llmspell app info webapp-creator --format json  # Show details in JSON"
+    )]
+    Info {
+        /// Application name to show information for
+        #[arg(value_name = "APP")]
+        name: String,
+    },
+
+    /// Run an application
+    #[command(long_about = "Execute an application with optional arguments.
+
+EXAMPLES:
+    llmspell app run file-organizer            # Run file organizer
+    llmspell app run research-collector -- --verbose  # Run with arguments")]
+    Run {
+        /// Application name to run
         #[arg(value_name = "APP")]
         name: String,
 
         /// Application arguments
         #[arg(last = true)]
         args: Vec<String>,
+    },
+
+    /// Search applications by criteria
+    #[command(
+        long_about = "Search applications by tags, complexity, or other criteria.
+
+EXAMPLES:
+    llmspell app search --tag productivity     # Search by tag
+    llmspell app search --complexity Simple    # Search by complexity
+    llmspell app search --agents 2             # Search by agent count"
+    )]
+    Search {
+        /// Search by tag
+        #[arg(long, value_name = "TAG")]
+        tag: Option<String>,
+
+        /// Search by complexity level
+        #[arg(long, value_name = "LEVEL")]
+        complexity: Option<String>,
+
+        /// Search by number of agents
+        #[arg(long, value_name = "COUNT")]
+        agents: Option<u32>,
+    },
+}
+
+/// Tool management subcommands
+#[derive(Subcommand, Debug)]
+pub enum ToolCommands {
+    /// List available tools with filtering
+    #[command(
+        long_about = "List all tools registered in the kernel's ComponentRegistry.
+
+EXAMPLES:
+    llmspell tool list                         # List all tools
+    llmspell tool list --category filesystem   # Filter by category
+    llmspell tool list --format json           # Output in JSON format"
+    )]
+    List {
+        /// Filter by tool category
+        #[arg(long)]
+        category: Option<String>, // Will be parsed to ToolCategory in handler
+
+        /// Output format (overrides global format)
+        #[arg(long)]
+        format: Option<OutputFormat>,
+    },
+
+    /// Show detailed tool information
+    #[command(
+        long_about = "Display detailed information about a specific tool including schema.
+
+EXAMPLES:
+    llmspell tool info calculator              # Show calculator tool details
+    llmspell tool info file_operations --show-schema  # Include input/output schema"
+    )]
+    Info {
+        /// Tool name to show information for
+        name: String,
+
+        /// Show detailed input/output schema
+        #[arg(long)]
+        show_schema: bool,
+    },
+
+    /// Invoke tool directly with parameters
+    #[command(
+        long_about = "Execute a tool directly by sending a request to the kernel.
+
+The kernel accesses the ComponentRegistry and executes the tool with proper context.
+
+EXAMPLES:
+    llmspell tool invoke calculator --params '{\"expression\":\"sqrt(16)\"}'
+    llmspell tool invoke web_scraper --params '{\"url\":\"example.com\"}' --stream
+    llmspell tool invoke file_operations --params '{\"operation\":\"list\",\"path\":\"/tmp\"}'"
+    )]
+    Invoke {
+        /// Tool name to invoke
+        name: String,
+
+        /// Parameters as JSON object
+        #[arg(long, value_parser = parse_json_value)]
+        params: serde_json::Value,
+
+        /// Enable streaming output
+        #[arg(long)]
+        stream: bool,
+    },
+
+    /// Search tools by capability/keywords
+    #[command(
+        long_about = "Search for tools by keywords, capabilities, or descriptions.
+
+EXAMPLES:
+    llmspell tool search \"file\"                # Search for file-related tools
+    llmspell tool search \"web\" \"api\"           # Search for web or API tools
+    llmspell tool search \"json\" --category data  # Search with category filter"
+    )]
+    Search {
+        /// Search keywords (can specify multiple)
+        query: Vec<String>,
+
+        /// Filter by tool category
+        #[arg(long)]
+        category: Option<String>,
+    },
+
+    /// Test tool with example inputs
+    #[command(long_about = "Test a tool using its built-in example cases.
+
+Tools provide test cases that demonstrate their functionality.
+
+EXAMPLES:
+    llmspell tool test calculator              # Run calculator tests
+    llmspell tool test file_operations --verbose  # Show detailed test output")]
+    Test {
+        /// Tool name to test
+        name: String,
+
+        /// Show detailed test output
+        #[arg(long)]
+        verbose: bool,
     },
 }
 
@@ -437,7 +645,9 @@ pub enum KernelCommands {
 
 EXAMPLES:
     llmspell kernel start --port 9555 --daemon  # Start daemon on port 9555
-    llmspell kernel start --id my-kernel        # Start with custom ID")]
+    llmspell kernel start --id my-kernel        # Start with custom ID
+    llmspell kernel start --daemon --log-file /var/log/kernel.log  # With logging
+    llmspell kernel start --daemon --idle-timeout 7200  # 2 hour idle timeout")]
     Start {
         /// Port to listen on
         #[arg(short, long, default_value = "9555")]
@@ -454,18 +664,96 @@ EXAMPLES:
         /// Connection file path (for Jupyter discovery)
         #[arg(short = 'f', long)]
         connection_file: Option<PathBuf>,
+
+        /// Log file path (for daemon mode)
+        #[arg(long)]
+        log_file: Option<PathBuf>,
+
+        /// PID file path (for daemon mode)
+        #[arg(long)]
+        pid_file: Option<PathBuf>,
+
+        /// Idle timeout in seconds (0 = no timeout)
+        #[arg(long, default_value = "3600")]
+        idle_timeout: u64,
+
+        /// Maximum concurrent clients
+        #[arg(long, default_value = "10")]
+        max_clients: usize,
+
+        /// Log rotation size in bytes
+        #[arg(long)]
+        log_rotate_size: Option<u64>,
+
+        /// Number of rotated log files to keep
+        #[arg(long, default_value = "5")]
+        log_rotate_count: usize,
     },
 
-    /// Stop kernel by ID
+    /// Stop kernel by ID or PID file
+    #[command(long_about = "Stop a running kernel gracefully.
+
+EXAMPLES:
+    llmspell kernel stop --id my-kernel      # Stop by kernel ID
+    llmspell kernel stop --pid-file /tmp/kernel.pid  # Stop by PID file
+    llmspell kernel stop --all                # Stop all kernels
+    llmspell kernel stop --force             # Force kill without graceful shutdown")]
     Stop {
-        /// Kernel ID to stop (if not provided, stops all kernels)
+        /// Kernel ID to stop
+        #[arg(short, long)]
         id: Option<String>,
+
+        /// PID file path to identify kernel
+        #[arg(long)]
+        pid_file: Option<PathBuf>,
+
+        /// Stop all running kernels
+        #[arg(long)]
+        all: bool,
+
+        /// Force immediate termination (skip graceful shutdown)
+        #[arg(long)]
+        force: bool,
+
+        /// Timeout in seconds for graceful shutdown
+        #[arg(long, default_value = "30")]
+        timeout: u64,
+
+        /// Don't clean up files after stopping
+        #[arg(long)]
+        no_cleanup: bool,
     },
 
     /// Show running kernels or specific kernel details
+    #[command(
+        long_about = "Display status of running kernels with health and resource metrics.
+
+EXAMPLES:
+    llmspell kernel status                    # List all running kernels
+    llmspell kernel status --id my-kernel     # Detailed view of specific kernel
+    llmspell kernel status --output json      # JSON output for scripting
+    llmspell kernel status --watch            # Continuous monitoring"
+    )]
     Status {
         /// Kernel ID for detailed status (if not provided, lists all kernels)
+        #[arg(short, long)]
         id: Option<String>,
+
+        /// Output format (table, json, yaml, text)
+        #[arg(short = 'f', long = "format", default_value = "table")]
+        format: String,
+
+        /// Show only kernel IDs (quiet mode)
+        #[arg(short, long)]
+        quiet: bool,
+
+        /// Watch mode - refresh continuously
+        #[arg(short, long)]
+        watch: bool,
+
+        /// Refresh interval in seconds (for watch mode)
+        #[arg(long, default_value = "5")]
+        interval: u64,
     },
 
     /// Connect to external kernel
@@ -473,6 +761,56 @@ EXAMPLES:
         /// Kernel address (e.g., "localhost:9555" or "/path/to/connection.json")
         /// If not provided, uses the last successful connection
         address: Option<String>,
+    },
+
+    /// Install kernel as system service
+    #[command(long_about = "Generate and install systemd/launchd service files.
+
+EXAMPLES:
+    llmspell kernel install-service               # Auto-detect platform, user service
+    llmspell kernel install-service --system      # Install as system service
+    llmspell kernel install-service --port 9600   # Custom port
+    llmspell kernel install-service --name custom # Custom service name")]
+    InstallService {
+        /// Service type (systemd/launchd/auto)
+        #[arg(long, value_enum)]
+        service_type: Option<ServiceType>,
+
+        /// Install as system service (default: user service)
+        #[arg(long)]
+        system: bool,
+
+        /// Service name
+        #[arg(long, default_value = "llmspell-kernel")]
+        name: String,
+
+        /// Port for kernel
+        #[arg(long, default_value = "9555")]
+        port: u16,
+
+        /// Kernel ID
+        #[arg(long)]
+        id: Option<String>,
+
+        /// Log file path
+        #[arg(long)]
+        log_file: Option<PathBuf>,
+
+        /// PID file path
+        #[arg(long)]
+        pid_file: Option<PathBuf>,
+
+        /// Enable service after installation
+        #[arg(long)]
+        enable: bool,
+
+        /// Start service after installation
+        #[arg(long)]
+        start: bool,
+
+        /// Override if service already exists
+        #[arg(long)]
+        force: bool,
     },
 }
 
@@ -646,8 +984,6 @@ pub enum BackupCommands {
 pub enum ExportFormat {
     /// JSON format
     Json,
-    /// YAML format
-    Yaml,
     /// TOML format
     Toml,
 }
@@ -659,8 +995,6 @@ pub enum ConfigFormat {
     Toml,
     /// JSON format
     Json,
-    /// YAML format
-    Yaml,
 }
 
 impl Cli {
@@ -689,4 +1023,9 @@ impl Cli {
             }
         })
     }
+}
+
+/// Parse JSON value from command line argument
+fn parse_json_value(s: &str) -> Result<serde_json::Value, String> {
+    serde_json::from_str(s).map_err(|e| format!("Invalid JSON: {}", e))
 }

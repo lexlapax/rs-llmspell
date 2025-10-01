@@ -1,6 +1,8 @@
 //! ABOUTME: Integration tests for `TemplateEngineTool`
 //! ABOUTME: Tests template rendering with both Tera and Handlebars engines
 
+#![cfg(feature = "templates")]
+
 use llmspell_core::{
     traits::{base_agent::BaseAgent, tool::Tool},
     types::AgentInput,

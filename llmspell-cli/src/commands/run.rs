@@ -143,17 +143,6 @@ async fn execute_script_embedded(
                 })
             );
         }
-        OutputFormat::Yaml => {
-            let data = serde_json::json!({
-                "status": "success",
-                "mode": "embedded",
-                "script_length": script_content.len(),
-                "args_count": args.len(),
-                "streaming": stream,
-                "result": result
-            });
-            println!("{}", serde_yaml::to_string(&data)?);
-        }
         _ => {
             // For plain text output, the result is already printed via IOPub
             // Just show completion status
@@ -189,17 +178,6 @@ async fn execute_script_connected(
                     "result": "Script execution completed successfully via connected kernel"
                 })
             );
-        }
-        OutputFormat::Yaml => {
-            let data = serde_json::json!({
-                "status": "executed",
-                "mode": "connected",
-                "script_length": script_content.len(),
-                "args_count": args.len(),
-                "streaming": stream,
-                "result": "Script execution completed successfully via connected kernel"
-            });
-            println!("{}", serde_yaml::to_string(&data)?);
         }
         _ => {
             println!("Executing script via connected kernel...");

@@ -378,8 +378,12 @@ async fn test_concurrent_access_safety() {
     // Spawn concurrent tasks
     let mut handles = vec![];
 
-    for i in 0..10 {
-        let agent_id = if i % 2 == 0 { "agent1" } else { "agent2" };
+    for i in 0u32..10 {
+        let agent_id = if i.is_multiple_of(2) {
+            "agent1"
+        } else {
+            "agent2"
+        };
         let isolation_mgr = isolation_manager.clone();
         let _state_mgr = state_manager.clone();
         let scope_clone = scope.clone();

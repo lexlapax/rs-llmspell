@@ -22,3 +22,7 @@ TODO.md and find out what needs to be updated in the lua user guide. do thorough
 looking at implementation code and update the lua user-guide. 
 
 
+complete 10.13 with ultrathink. review and analyze everything that's already been done in different previous 
+tasks and phases first, some of the tasks in 10.13 may already be done. update sub tasks and steps in TODO.md as you complete them.
+after completion you need to check by going back and reading all the check boxes in each task to see we didn't 
+miss anything. no clippy warnings and all tests passing.

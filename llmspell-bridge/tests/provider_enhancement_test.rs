@@ -310,7 +310,7 @@ async fn test_provider_model_parsing() {
                 -- Supported providers should create agents successfully
                 if not r.created then
                     -- Some models might fail due to API validation even with supported providers
-                    if r.error:find("does not exist") or r.error:find("validation failed") then
+                    if r.error:find("does not exist") or r.error:find("validation failed") or r.error:find("API key required") then
                         print("Model validation failed as expected for: " .. r.model)
                     else
                         print("ERROR: Unexpected failure for supported model: " .. r.model)

@@ -899,10 +899,10 @@ mod tests {
         let storage = SecurityStorage::new(SecurityConfig::default());
 
         // Add multiple events
-        for i in 0..5 {
+        for i in 0u32..5 {
             let event = SecurityEvent {
                 timestamp: Utc::now(),
-                event_type: if i % 2 == 0 {
+                event_type: if i.is_multiple_of(2) {
                     SecurityEventType::AccessAttempt
                 } else {
                     SecurityEventType::AuditLog

@@ -28,13 +28,13 @@ csv = "1.3"
 encoding_rs = "0.8"
 chardetng = "0.1"
 
-# Parquet support
-arrow = "54.0"
-parquet = "54.0"
+# Parquet support (optional)
+arrow = { version = "54.0", optional = true }
+parquet = { version = "54.0", optional = true }
 
-# Excel support
-calamine = "0.26"
-xlsxwriter = "0.6"
+# Excel support (optional)
+calamine = { version = "0.26", optional = true }
+xlsxwriter = { version = "0.6", optional = true }
 
 # Base64 encoding
 base64 = "0.22"
@@ -48,22 +48,22 @@ llmspell-security = { path = "../llmspell-security" }
 # Random number generation for jitter
 rand = { workspace = true }
 
-# JSON processing with jq
-jaq-core = "1.5"
-jaq-interpret = "1.5"
-jaq-parse = "1.0"
-jaq-syn = "1.0"
-jaq-std = "1.5"
-indexmap = "2.10.0"
+# JSON processing with jq (optional)
+jaq-core = { version = "1.5", optional = true }
+jaq-interpret = { version = "1.5", optional = true }
+jaq-parse = { version = "1.0", optional = true }
+jaq-syn = { version = "1.0", optional = true }
+jaq-std = { version = "1.5", optional = true }
+indexmap = { version = "2.10.0", optional = true }
 
-# Archive support
-zip = "2.2"
-tar = "0.4"
-flate2 = "1.0"
+# Archive support (optional)
+zip = { version = "2.2", optional = true }
+tar = { version = "0.4", optional = true }
+flate2 = { version = "1.0", optional = true }
 
-# Template engines
-tera = "1.20"
-handlebars = "6.3"
+# Template engines (optional)
+tera = { version = "1.20", optional = true }
+handlebars = { version = "6.3", optional = true }
 
 # Validation dependencies
 regex = "1.11"
@@ -73,7 +73,7 @@ url = "2.5"
 scraper = "0.22"
 
 # UUID generation
-uuid = { version = "1.17", features = ["v1", "v4", "v5", "serde"] }
+uuid = { workspace = true }
 
 # Hex encoding/decoding
 hex = "0.4"
@@ -102,8 +102,8 @@ aws-config = { version = "1.5", optional = true }
 sqlx = { version = "0.8", optional = true, features = ["runtime-tokio-rustls", "postgres", "mysql", "sqlite", "chrono", "uuid"] }
 
 # Phase 7 Tools Dependencies
-# PDF processing
-pdf-extract = "0.9"
+# PDF processing (optional)
+pdf-extract = { version = "0.9", optional = true }
 
 # Citation formatting (comprehensive CSL support)
 hayagriva = "0.5"
@@ -120,14 +120,27 @@ libc = "0.2"
 winapi = { version = "0.3", features = ["fileapi"] }
 
 [features]
-default = []
-email = ["lettre"]
-email-aws = ["aws-sdk-ses", "aws-config"]
-database = ["sqlx"]
+default = []  # Truly minimal - no heavy external dependencies
+common = ["templates", "pdf"]  # Convenient preset for typical usage
+full = ["csv-parquet", "templates", "pdf", "excel", "json-query", "archives", "email", "email-aws", "database"]
+
+# Individual feature flags
+csv-parquet = ["dep:arrow", "dep:parquet"]
+templates = ["dep:tera", "dep:handlebars"]
+pdf = ["dep:pdf-extract"]
+excel = ["dep:calamine", "dep:xlsxwriter"]
+json-query = ["dep:jaq-core", "dep:jaq-interpret", "dep:jaq-parse", "dep:jaq-syn", "dep:jaq-std", "dep:indexmap"]
+archives = ["dep:zip", "dep:tar", "dep:flate2"]
+
+# Email support
+email = ["dep:lettre"]
+email-aws = ["dep:aws-sdk-ses", "dep:aws-config"]
+
+# Database support
+database = ["dep:sqlx"]
 database-postgres = ["database", "sqlx/postgres"]
 database-mysql = ["database", "sqlx/mysql"]
 database-sqlite = ["database", "sqlx/sqlite"]
-full = ["email", "email-aws", "database"]
 
 [dev-dependencies]
 tempfile = "3.20"

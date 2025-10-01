@@ -2,9 +2,12 @@
 //! ABOUTME: Defines the interface for executing scripts without cyclic dependencies
 
 use crate::error::LLMSpellError;
+use crate::traits::component_lookup::ComponentLookup;
+use crate::traits::debug_context::DebugContext;
 use async_trait::async_trait;
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
+use std::sync::Arc;
 use std::time::Duration;
 
 /// Output from script execution
@@ -76,6 +79,61 @@ pub trait ScriptExecutor: Send + Sync {
     /// Check if the executor is ready
     async fn is_ready(&self) -> bool {
         true
+    }
+
+    /// Set debug context for debugging support
+    ///
+    /// Default implementation does nothing for backward compatibility.
+    /// Executors that support debugging should override this method.
+    /// Uses &self instead of &mut self to allow use with Arc\<dyn ScriptExecutor\>
+    fn set_debug_context(&self, _context: Option<Arc<dyn DebugContext>>) {
+        // Default: ignore (for backward compatibility)
+    }
+
+    /// Check if this executor supports debugging
+    ///
+    /// Default returns false. Executors with debug support should override.
+    fn supports_debugging(&self) -> bool {
+        false
+    }
+
+    /// Get the current debug context if set
+    ///
+    /// Default returns None. Executors with debug support should override.
+    fn get_debug_context(&self) -> Option<Arc<dyn DebugContext>> {
+        None
+    }
+
+    /// Access to component registry for tool discovery and invocation
+    ///
+    /// Returns the ComponentLookup implementation that provides access to
+    /// tools, agents, and workflows. This allows kernels to query and
+    /// execute actual components instead of using placeholders.
+    ///
+    /// Default returns None for backward compatibility.
+    /// Executors with component registry should override this method.
+    fn component_registry(&self) -> Option<Arc<dyn ComponentLookup>> {
+        None
+    }
+
+    /// Get completion candidates for the given line and cursor position
+    ///
+    /// This is used for REPL tab completion to suggest available variables,
+    /// functions, and other completable elements in the script context.
+    ///
+    /// Default implementation returns empty vector for backward compatibility.
+    /// Executors with completion support should override this method.
+    ///
+    /// # Arguments
+    ///
+    /// * `line` - The current line being edited
+    /// * `cursor_pos` - The cursor position within the line
+    ///
+    /// # Returns
+    ///
+    /// A vector of (replacement_text, display_text) pairs for completion candidates
+    fn get_completion_candidates(&self, _line: &str, _cursor_pos: usize) -> Vec<(String, String)> {
+        Vec::new()
     }
 }
 

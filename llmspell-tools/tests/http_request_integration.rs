@@ -1,4 +1,13 @@
 //! Integration tests for `HttpRequestTool`
+//!
+//! These tests make real HTTP requests to httpbin.org and are ignored by default.
+//!
+//! To run these integration tests:
+//! ```bash
+//! cargo test -p llmspell-tools --test http_request_integration -- --ignored
+//! ```
+//!
+//! Note: Tests may fail if httpbin.org is unavailable or experiencing issues.
 
 use llmspell_core::{
     traits::{base_agent::BaseAgent, tool::Tool},
@@ -19,6 +28,7 @@ async fn test_http_request_tool_creation() {
     ));
 }
 #[tokio::test]
+#[ignore = "Integration test - requires httpbin.org service availability"]
 async fn test_http_get_request() {
     let tool = HttpRequestTool::new(HttpRequestConfig::default()).unwrap();
 
@@ -62,6 +72,7 @@ async fn test_http_get_request() {
     }
 }
 #[tokio::test]
+#[ignore = "Integration test - requires httpbin.org service availability"]
 async fn test_http_post_request() {
     let tool = HttpRequestTool::new(HttpRequestConfig::default()).unwrap();
 
@@ -88,6 +99,7 @@ async fn test_http_post_request() {
     assert!(output.text.contains("123"));
 }
 #[tokio::test]
+#[ignore = "Integration test - requires httpbin.org service availability"]
 async fn test_http_basic_auth() {
     let tool = HttpRequestTool::new(HttpRequestConfig::default()).unwrap();
 
@@ -140,6 +152,7 @@ async fn test_http_bearer_auth() {
     assert!(output.text.contains("authenticated"));
 }
 #[tokio::test]
+#[ignore = "Integration test - requires httpbin.org service availability"]
 async fn test_http_custom_headers() {
     let tool = HttpRequestTool::new(HttpRequestConfig::default()).unwrap();
 
@@ -171,6 +184,7 @@ async fn test_http_custom_headers() {
     }
 }
 #[tokio::test]
+#[ignore = "Integration test - requires httpbin.org service availability"]
 async fn test_http_error_handling() {
     let tool = HttpRequestTool::new(HttpRequestConfig::default()).unwrap();
 
@@ -191,6 +205,7 @@ async fn test_http_error_handling() {
     assert!(output.text.contains("404"));
 }
 #[tokio::test]
+#[ignore = "Integration test - requires httpbin.org service availability"]
 async fn test_http_retry_logic() {
     let tool = HttpRequestTool::new(HttpRequestConfig::default()).unwrap();
 
@@ -226,6 +241,7 @@ async fn test_http_retry_logic() {
     }
 }
 #[tokio::test]
+#[ignore = "Integration test - requires httpbin.org service availability"]
 async fn test_http_json_response_parsing() {
     let tool = HttpRequestTool::new(HttpRequestConfig::default()).unwrap();
 
@@ -271,6 +287,7 @@ async fn test_http_timeout() {
     }
 }
 #[tokio::test]
+#[ignore = "Integration test - requires httpbin.org service availability"]
 async fn test_http_put_request() {
     let tool = HttpRequestTool::new(HttpRequestConfig::default()).unwrap();
 
@@ -298,6 +315,7 @@ async fn test_http_put_request() {
     assert_eq!(response["metadata"]["method"], "PUT");
 }
 #[tokio::test]
+#[ignore = "Integration test - requires httpbin.org service availability"]
 async fn test_http_delete_request() {
     let tool = HttpRequestTool::new(HttpRequestConfig::default()).unwrap();
 

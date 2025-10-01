@@ -10,6 +10,8 @@ use crate::{
 use async_trait::async_trait;
 use llmspell_config::LLMSpellConfig;
 use llmspell_core::error::LLMSpellError;
+use llmspell_core::traits::component_lookup::ComponentLookup;
+use llmspell_core::traits::debug_context::DebugContext;
 use llmspell_core::traits::script_executor::{
     ScriptExecutionMetadata, ScriptExecutionOutput, ScriptExecutor,
 };
@@ -103,6 +105,8 @@ pub struct ScriptRuntime {
     provider_manager: Arc<ProviderManager>,
     /// Execution context
     execution_context: Arc<RwLock<crate::engine::ExecutionContext>>,
+    /// Debug context for debugging support (uses interior mutability)
+    debug_context: Arc<RwLock<Option<Arc<dyn DebugContext>>>>,
     /// Runtime configuration
     _config: LLMSpellConfig,
 }
@@ -259,6 +263,7 @@ impl ScriptRuntime {
             registry,
             provider_manager,
             execution_context,
+            debug_context: Arc::new(RwLock::new(None)),
             _config: config,
         })
     }
@@ -276,6 +281,26 @@ impl ScriptRuntime {
     pub async fn execute_script(&self, script: &str) -> Result<ScriptOutput, LLMSpellError> {
         info!("Executing script with {} bytes", script.len());
         self.engine.execute_script(script).await
+    }
+
+    /// Get completion candidates for the given context
+    ///
+    /// This method is used for REPL tab completion to suggest available
+    /// variables, functions, and other completable elements.
+    ///
+    /// # Arguments
+    ///
+    /// * `context` - The completion context containing the line and cursor position
+    ///
+    /// # Returns
+    ///
+    /// A vector of completion candidates suitable for the current context
+    #[must_use]
+    pub fn get_completion_candidates(
+        &self,
+        context: &crate::engine::bridge::CompletionContext,
+    ) -> Vec<crate::engine::bridge::CompletionCandidate> {
+        self.engine.get_completion_candidates(context)
     }
 
     /// Execute a script with streaming output
@@ -494,6 +519,47 @@ impl ScriptExecutor for ScriptRuntime {
         // Engine is ready if it's been initialized
         // TODO: Add proper readiness check to ScriptEngineBridge trait
         true
+    }
+
+    fn set_debug_context(&self, context: Option<Arc<dyn DebugContext>>) {
+        // Use interior mutability to set debug context
+        self.debug_context.write().unwrap().clone_from(&context);
+
+        // Also set it on the underlying engine if it supports debugging
+        self.engine.set_debug_context(context);
+    }
+
+    fn supports_debugging(&self) -> bool {
+        // Check if the underlying engine supports debugging
+        self.engine.supports_debugging()
+    }
+
+    fn get_debug_context(&self) -> Option<Arc<dyn DebugContext>> {
+        // Return the stored debug context
+        let debug_context = self.debug_context.read().unwrap();
+        debug_context.clone()
+    }
+
+    fn component_registry(&self) -> Option<Arc<dyn ComponentLookup>> {
+        // Return the component registry as ComponentLookup trait
+        Some(Arc::clone(&self.registry) as Arc<dyn ComponentLookup>)
+    }
+
+    fn get_completion_candidates(&self, line: &str, cursor_pos: usize) -> Vec<(String, String)> {
+        // Create a CompletionContext from the provided line and cursor position
+        let context = crate::engine::bridge::CompletionContext::new(line, cursor_pos);
+
+        // Get completions from the underlying engine
+        let candidates = self.engine.get_completion_candidates(&context);
+
+        // Convert CompletionCandidate to tuple format expected by ScriptExecutor trait
+        candidates
+            .into_iter()
+            .map(|candidate| {
+                let display = format!("{:?}", candidate.kind).to_lowercase();
+                (candidate.text, display)
+            })
+            .collect()
     }
 }
 

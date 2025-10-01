@@ -12,18 +12,18 @@ categories = ["development-tools", "command-line-utilities"]
 
 [dependencies]
 # Core dependencies (minimal to avoid cycles)
-llmspell-core = { path = "../llmspell-core", version = "0.9.0" }
-llmspell-config = { path = "../llmspell-config", version = "0.9.0" }
-llmspell-utils = { path = "../llmspell-utils", version = "0.9.0" }
-llmspell-events = { path = "../llmspell-events", version = "0.9.0" }
-llmspell-hooks = { path = "../llmspell-hooks", version = "0.9.0" }
-llmspell-storage = { path = "../llmspell-storage", version = "0.9.0" }
+llmspell-core = { path = "../llmspell-core" }
+llmspell-config = { path = "../llmspell-config" }
+llmspell-utils = { path = "../llmspell-utils" }
+llmspell-events = { path = "../llmspell-events" }
+llmspell-hooks = { path = "../llmspell-hooks" }
+llmspell-storage = { path = "../llmspell-storage" }
 
 # State dependencies now consolidated internally
 
 # Async runtime
 tokio = { version = "1.41", features = ["full", "tracing"] }
-tokio-util = { version = "0.7", features = ["codec", "io"] }
+tokio-util = { version = "0.7", features = ["codec", "io", "time"] }
 tokio-stream = { workspace = true }
 async-trait = "0.1"
 futures = { workspace = true }
@@ -45,6 +45,7 @@ tracing-appender = "0.2"
 # Serialization
 serde = { version = "1.0", features = ["derive"] }
 serde_json = "1.0"
+toml = "0.8"
 bincode = { workspace = true }
 rmp-serde = "1.3"
 
@@ -53,8 +54,8 @@ anyhow = "1.0"
 thiserror = "2.0"
 
 # Utilities
-uuid = { version = "1.11", features = ["v4", "serde"] }
-chrono = { version = "0.4", features = ["serde"] }
+uuid = { workspace = true }
+chrono = { workspace = true }
 parking_lot = "0.12"
 once_cell = "1.20"
 arc-swap = "1.7"
@@ -62,6 +63,8 @@ num_cpus = "1.16"
 dirs = "5.0"
 unicode-normalization = "0.1"
 rand = "0.8"
+hex = "0.4"
+sysinfo = "0.31"
 
 # Performance optimizations (for consolidated state persistence)
 crossbeam = "0.8"
@@ -80,16 +83,21 @@ lz4_flex = { workspace = true }
 sled = "0.34"
 
 # Compression libraries (for consolidated state persistence)
-flate2 = "1.0"
 zstd = "0.13"
-lz4 = "1.24"
-brotli = "3.5"
 
 # Cryptography
 sha2 = "0.10"
+hmac = "0.12"
 
 # Text processing
 regex = "1.10"
+
+# REPL readline support
+rustyline = { version = "14.0", features = ["with-file-history"], default-features = false }
+
+# Unix daemon support
+nix = { version = "0.27", features = ["signal", "process", "fs"] }
+libc = "0.2"
 
 # Performance monitoring
 metrics = "0.24"
@@ -97,7 +105,11 @@ metrics-exporter-prometheus = { version = "0.16", optional = true }
 
 [dev-dependencies]
 # Testing utilities
-llmspell-testing = { path = "../llmspell-testing", version = "0.9.0" }
+llmspell-testing = { path = "../llmspell-testing" }
+llmspell-bridge = { path = "../llmspell-bridge", features = ["lua"] }
+llmspell-config = { path = "../llmspell-config" }
+llmspell-tools = { path = "../llmspell-tools" }
+mlua = { version = "0.9", features = ["lua54", "async", "send"] }
 tokio-test = "0.4"
 proptest = "1.5"
 criterion = { version = "0.5", features = ["async_tokio"] }
@@ -117,7 +129,14 @@ zeromq = ["dep:zmq"]
 websocket = ["dep:tungstenite", "dep:tokio-tungstenite"]
 debug = ["tracing-subscriber/fmt"]
 test-utils = []
+skip-python-tests = []  # Skip Python integration tests (for CI or when Python unavailable)
+lua = []  # Enable Lua-specific tests (used in test configurations)
 
 [lib]
 name = "llmspell_kernel"
 path = "src/lib.rs"
+
+[[bench]]
+name = "kernel_performance"
+harness = false
+required-features = ["lua"]

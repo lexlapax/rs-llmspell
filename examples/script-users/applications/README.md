@@ -1,6 +1,6 @@
 # LLMSpell Application Examples - Progressive Learning Architecture
 
-**Status**: 🚀 **Phase 8.10.6** - RAG enhancements implemented, 9 applications available (7 base + 2 RAG-enhanced)
+**Status**: 🚀 **Phase 10.14** - Debug instrumentation example added, 10 applications available (7 base + 2 RAG-enhanced + 1 debug template)
 
 > **📦 Single Binary Distribution**: These applications are embedded in the `llmspell` binary! Users can run them with `llmspell apps <app-name>` without any path configuration. The embedded versions are compiled from `llmspell-cli/resources/applications/` into the binary using `include_str!` and extract to temp directories at runtime.
 
@@ -18,6 +18,7 @@
 | **webapp-creator** | Expert | ✅ Working | Generate full web applications | 20 |
 | **knowledge-base** | Phase 8 RAG | 🆕 New | Personal knowledge management | 3 + RAG |
 | **personal-assistant** | Phase 8 RAG | 🆕 New | AI productivity companion | 4 + RAG |
+| **instrumented-agent** | Debug/Dev | 🔧 Phase 10 | Debugging template for agents | 2 |
 
 ### Running Applications
 ```bash
@@ -128,6 +129,23 @@ Our application examples follow research-backed progressive learning principles:
     ├── 🔧 Workflows: Master-level nested orchestration with complex state management
     ├── 📦 Showcases: Complete llmspell ecosystem at maximum complexity
     └── 🚀 Expert Appeal: Senior developers, architects, CTO-level automation experts
+```
+
+#### **Layer 7: Professional Development Territory** 🆕 Phase 10
+```
+08. instrumented-agent/              # Professional Dev: "Debug and optimize agent systems" 🔧 PHASE 10
+    ├── 📱 Problem: Agent applications are hard to debug and optimize
+    ├── 🔍 Evolution: After building complex agents, developers need professional debugging tools
+    ├── 🤖 Agents: 2 demonstration agents (analyzer, reviewer) instrumented with debugging
+    ├── 🔧 Workflows: Showcases debugging patterns, state inspection, performance profiling
+    ├── 📦 Showcases: Debug API, State persistence, REPL integration, performance timing
+    ├── 🛠️ Tools: Debug.timer(), State.save/load(), REPL inspection commands
+    └── 👨‍💻 Professional Appeal: AI developers debugging production agent systems
+
+    Key Learning: The transition from building (Layer 6) to debugging/maintaining (Layer 7)
+    - Layer 1-5: Learn to build increasingly complex agent systems
+    - Layer 6: Master full application generation
+    - Layer 7: Professional tools for maintaining and debugging what you've built
 ```
 
 ### **Phase 8 Enhancements: RAG Integration (IMPLEMENTED)**
