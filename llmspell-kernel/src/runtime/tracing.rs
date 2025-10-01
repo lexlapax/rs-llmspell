@@ -768,7 +768,6 @@ mod tests {
         assert_eq!(OperationCategory::Agent.as_str(), "agent");
         assert_eq!(OperationCategory::State.as_str(), "state");
     }
-    use test_log::test;
 
     #[test]
     fn test_tracing_instrumentation_creation() {

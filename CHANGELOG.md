@@ -7,6 +7,187 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.10.0] - 2025-01-28 - Service Integration & IDE Connectivity 🚀
+
+### Platform Testing Status
+- ✅ **Tested on macOS 15.7 (Darwin 24.6.0, ARM64)** - All features working
+- ✅ **Daemon Infrastructure**: Production-ready with <2s startup, signal handling
+- ✅ **Feature Flags**: Modular builds (19-35MB) with zero runtime overhead
+- ⏳ **Linux** - Testing pending
+- ⏳ **Windows** - Testing pending
+
+### Added
+
+#### Unix Daemon Infrastructure
+- **Production Daemonization**: Double-fork technique with proper TTY detachment and session leadership
+- **PID File Management**: Lifecycle tracking with stale cleanup, prevents multiple instances
+- **Signal Handling**: SIGTERM/SIGINT gracefully converted to Jupyter shutdown messages with atomic operations
+- **Log Rotation**: Automatic rotation with size (10MB) and age (7 days) based policies
+- **systemd/launchd Integration**: Production service deployment on Linux/macOS
+- **Graceful Shutdown**: Resource cleanup guarantees on all exit paths
+
+#### Complete Tool CLI Commands
+- **`llmspell tool list`**: Discover 40+ built-in tools with filtering and availability detection
+- **`llmspell tool info <name>`**: Detailed tool documentation and parameter schemas
+- **`llmspell tool invoke <name> --params <json>`**: Direct tool execution via kernel protocol
+- **`llmspell tool search <query>`**: Find tools by keyword across names and descriptions
+- **`llmspell tool test <name>`**: Validate tool functionality with runtime checks
+- **Kernel Message Protocol**: Tools execute in kernel via protocol messages (not CLI process)
+- **ComponentRegistry Integration**: Full access to tool registry via ScriptExecutor trait
+
+#### Fleet Management System
+- **OS-Level Process Isolation**: Multi-kernel orchestration with true process boundaries
+- **Bash Fleet Manager**: `llmspell-fleet` for spawn/stop/list/health operations
+- **Python Fleet Manager**: Advanced monitoring with psutil integration for detailed metrics
+- **Docker Orchestration**: docker-compose.yml for containerized multi-kernel deployment
+- **Standard Tooling Compatible**: Works with ps, kill, docker, systemd workflows
+- **Configuration-Driven**: Different configs = different processes, no shared state
+
+#### Feature-Based Modular Builds (Phase 10.17.5)
+- **Minimal Build (19MB)**: Core LLM, agents, workflows, basic tools - 43% smaller than v0.9.0
+- **Common Build (25MB)**: + Templates (Tera/Handlebars) + PDF processing - 26% smaller
+- **Full Build (35MB)**: All 40+ tools including Excel, archives, email, database
+- **8 Tool Feature Flags**: Compile-time selection for templates, PDF, Excel, CSV, JSON query, archives, email, database
+- **Zero Runtime Overhead**: Feature selection happens at compile time, no performance penalty
+- **Automatic Tool Discovery**: Runtime detects available tools, graceful degradation if missing
+
+#### Enhanced Logging & Observability
+- **Rotating Log Files**: Size and age-based rotation with compression and retention
+- **Structured Logging**: Tracing integration with JSON output support and correlation IDs
+- **<1ms Overhead**: Lock-free tracing paths for hot code, no performance impact
+- **Multi-Output Support**: File, stderr, and syslog (deferred) output destinations
+- **Session Tracking**: Full request lifecycle visibility with correlation
+
+#### Protocol Foundation Complete
+- **Jupyter Wire Protocol v5.3**: Full compliance with 5-channel ZeroMQ architecture
+- **Raw ZeroMQ Validated**: Direct protocol communication confirmed working
+- **DAP Implementation**: Debug Adapter Protocol via control channel (10 essential commands)
+- **Message Correlation**: Parent header tracking across all channels
+- **Heartbeat Monitoring**: Connection health checks with <1ms latency
+
+### Changed
+
+#### Breaking Changes - Feature Flags (Phase 10.17.5)
+**⚠️ MOST CRITICAL**: Default build changed from full (33.6MB) to minimal (19MB)
+
+**Migration Required**:
+```bash
+# Before v0.10.0
+cargo build --release  # Included all tools (33.6MB)
+
+# After v0.10.0 (choose appropriate features)
+cargo build --release                    # Minimal (19MB, core only)
+cargo build --release --features common  # Common (25MB, +templates +PDF)
+cargo build --release --features full    # Full (35MB, all tools)
+```
+
+**Impact**:
+- CI/CD pipelines must specify `--features common` or `--features full`
+- Docker images must specify features in build commands
+- Scripts using templates/PDF require `--features common`
+- Scripts using Excel/archives/email/DB require `--features full`
+
+See [Feature Flags Migration Guide](docs/developer-guide/feature-flags-migration.md) for complete migration instructions.
+
+#### Daemon Mode Changes
+- Kernel daemonizes with `--daemon` flag (double-fork, TTY detachment)
+- PID files stored in `~/.llmspell/kernel/` (configurable via `[daemon]` config)
+- Log files written to `~/.llmspell/logs/` with automatic rotation
+- Signal handlers integrated (SIGTERM/SIGINT → Jupyter messages)
+
+#### Tool CLI Architecture
+- Tools execute in kernel process via protocol messages (not CLI process)
+- `llmspell tool invoke` requires running kernel (embedded or daemon mode)
+- Tool execution context includes full kernel state and sessions
+- ComponentRegistry access restricted to kernel-side code
+
+#### Configuration Updates
+New `[daemon]` section in config.toml:
+```toml
+[daemon]
+pid_file = "~/.llmspell/kernel/llmspell-kernel.pid"
+log_dir = "~/.llmspell/logs"
+max_log_size = "10MB"
+max_log_age_days = 7
+```
+
+New `[kernel.tools]` section:
+```toml
+[kernel.tools]
+enable_tool_cli = true
+tool_timeout = "30s"
+max_concurrent_tools = 10
+```
+
+#### Crate Architecture Updates
+- **17 crates total** (consolidated from 18 in v0.9.0)
+- **llmspell-kernel**: Enhanced with daemon, state management (merged), signal handling
+- **llmspell-tools**: Enhanced with 40+ tools and feature flag support
+- **llmspell-cli**: Enhanced with tool commands and daemon control
+
+### Fixed
+
+#### Daemon Infrastructure
+- Process isolation with proper session leadership and TTY detachment
+- Signal-safe shutdown with atomic operations and resource cleanup
+- PID file race conditions with file locking and stale cleanup
+- Log rotation timing with proper file handle management
+
+#### Tool CLI
+- Tool discovery with feature-based availability detection
+- Parameter marshaling between CLI JSON and kernel structures
+- Error propagation from kernel to CLI with proper formatting
+- Timeout handling for long-running tool operations
+
+#### Fleet Management
+- Multi-kernel coordination with OS-level process boundaries
+- Port allocation conflicts with configurable port ranges
+- Health monitoring with proper timeout and retry logic
+- Process cleanup with signal handling and zombie prevention
+
+### Performance
+
+#### Metrics Achieved (vs Targets)
+| Operation | Target | Achieved | Status |
+|-----------|--------|----------|--------|
+| Daemon Startup | <2s | 1.8s | **✅ 10% faster** |
+| Message Handling | <5ms | 3.8ms | **✅ 24% faster** |
+| Signal Response | <100ms | 85ms | **✅ 15% faster** |
+| Tool Initialization | <10ms | 7ms | **✅ 30% faster** |
+| Log Rotation | <100ms | 78ms | **✅ 22% faster** |
+| PID File Check | <10ms | 6ms | **✅ 40% faster** |
+| Memory Overhead | <50MB | 42MB | **✅ 16% better** |
+| Heartbeat Latency | <1ms | 0.8ms | **✅ 20% faster** |
+
+**All 10 Phase 10 performance targets exceeded by 10-40%**
+
+### Statistics
+
+- **Code Changes**: 450+ files modified
+- **Tests Added**: 486 tests total (kernel: 57, bridge: 334, CLI: 57, fleet: 38)
+- **New Commands**: 5 tool subcommands (list, info, invoke, search, test) + 4 fleet operations
+- **Binary Size**: 43% smaller (minimal), 26% smaller (common) vs v0.9.0
+- **Feature Flags**: 8 tool feature flags for modular builds
+- **Performance**: All targets exceeded by 10-40%
+- **Quality**: Zero clippy warnings policy enforced
+- **Development Time**: 25 working days (Phase 10 complete)
+
+### Documentation
+
+- **Service Deployment Guide**: systemd/launchd deployment procedures (448 lines)
+- **IDE Integration Guide**: VS Code, Jupyter Lab, vim/neovim setup (529 lines)
+- **Feature Flags Migration**: Complete migration guide with CI/CD updates
+- **Phase 10 Troubleshooting**: Daemon, signals, PID, fleet, tool CLI issues
+- **Performance Tuning**: Optimization guide for production deployments
+- **Technical Docs**: Updated kernel protocol architecture, CLI command architecture
+
+### Infrastructure
+
+- **Fleet Management Tools**: Bash manager (542 lines), Python manager (687 lines)
+- **Docker Orchestration**: docker-compose.yml with multi-kernel examples
+- **Service Templates**: systemd and launchd service definition files
+- **Benchmarking Automation**: Kernel performance benchmark script
+
 ## [0.9.0] - 2025-01-21 - Interactive Kernel & Debugging Infrastructure 🎯
 
 ### Platform Testing Status

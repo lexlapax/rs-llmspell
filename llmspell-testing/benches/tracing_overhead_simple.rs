@@ -7,6 +7,7 @@ use llmspell_core::{types::AgentInput, BaseAgent, ExecutionContext};
 use std::collections::HashMap;
 use std::time::Duration;
 use tokio::runtime::Runtime;
+use tracing::{debug, debug_span, info_span};
 
 /// Benchmark agent execution with different tracing levels
 fn bench_agent_tracing_overhead(c: &mut Criterion) {
@@ -125,7 +126,7 @@ fn bench_hot_path_spans(c: &mut Criterion) {
             rt.block_on(async {
                 let mut sum = 0i64;
                 for i in 0..100 {
-                    let _span = tracing::info_span!("iteration", i = i).entered();
+                    let _span = info_span!("iteration", i = i).entered();
                     // Simulate async work
                     tokio::task::yield_now().await;
                     sum += i;
@@ -143,8 +144,8 @@ fn bench_hot_path_spans(c: &mut Criterion) {
             rt.block_on(async {
                 let mut sum = 0i64;
                 for i in 0..100 {
-                    let _span = tracing::debug_span!("iteration", i = i).entered();
-                    tracing::debug!("Processing item {}", i);
+                    let _span = debug_span!("iteration", i = i).entered();
+                    debug!("Processing item {}", i);
                     // Simulate async work
                     tokio::task::yield_now().await;
                     sum += i;

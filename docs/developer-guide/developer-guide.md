@@ -1,7 +1,7 @@
 # The Complete rs-llmspell Developer Guide
 
-✅ **CURRENT**: Phase 8 Complete - RAG & Vector Storage
-**Version**: 0.8.0 | **Crates**: 20 | **Tools**: 37+ | **Examples**: 60+
+✅ **CURRENT**: Phase 10 Complete - Service Integration & IDE Connectivity
+**Version**: 0.10.0 | **Crates**: 17 | **Tools**: 40+ | **Examples**: 60+ | **Feature Flags**: Modular builds (19-35MB)
 
 **Quick Navigation**: [Setup](#setup) | [Architecture](#architecture) | [Core Patterns](#core-patterns) | [Testing](#testing) | [Common Tasks](#common-tasks) | [Deep Dives](#deep-dives)
 
@@ -70,7 +70,7 @@ cargo build --release --bin llmspell --features full
 
 ## 📚 Essential Knowledge
 
-### Phase 8 Architecture (20 Crates)
+### Phase 10 Architecture (17 Crates)
 
 ```
 ┌─────────────────────────────────────────────────────────┐
@@ -85,32 +85,29 @@ cargo build --release --bin llmspell --features full
                             ↓
 ┌─────────────────────────────────────────────────────────┐
 │              Rust Core (Async/Await)                    │
-│                  20 Specialized Crates                  │
+│                  17 Specialized Crates                  │
 └─────────────────────────────────────────────────────────┘
 
-Foundation Layer (10 crates):
+Foundation Layer (8 crates):
 ├── llmspell-core         - BaseAgent trait, types
 ├── llmspell-utils        - Parameter extraction, error builders, response
 ├── llmspell-storage      - HNSW vector storage (Phase 8)
 ├── llmspell-security     - 3-level security model
 ├── llmspell-config       - Configuration management
-├── llmspell-state-traits - State abstractions
-├── llmspell-state-persistence - Persistent state
 ├── llmspell-rag          - RAG pipeline (Phase 8)
 ├── llmspell-tenancy      - Multi-tenant isolation (Phase 8)
 └── llmspell-testing      - Centralized test utilities
 
-Application Layer (10 crates):
-├── llmspell-tools        - 37+ built-in tools
+Application Layer (9 crates):
+├── llmspell-kernel       - Daemon, signals, Jupyter, DAP (Phase 10)
+├── llmspell-tools        - 40+ built-in tools (feature flags)
 ├── llmspell-agents       - Agent infrastructure
 ├── llmspell-workflows    - Sequential/Parallel/Conditional/Loop
 ├── llmspell-bridge       - Script language integration
 ├── llmspell-hooks        - 40+ hook points, <2% overhead
 ├── llmspell-events       - Event bus system
-├── llmspell-sessions     - Session management
 ├── llmspell-providers    - LLM provider integration
-├── llmspell-cli          - Command line interface
-└── llmspell-examples     - Example utilities
+└── llmspell-cli          - Command line interface + tool commands
 ```
 
 ### Core Concepts (Must Know)
@@ -622,8 +619,8 @@ Your code MUST meet these targets:
 | Tool init | <10ms | `cargo bench -p llmspell-tools` |
 | Agent creation | <50ms | `cargo bench -p llmspell-agents` |
 | Hook overhead | <2% | Performance tests |
-| State operations | <5ms write, <1ms read | `cargo bench -p llmspell-state-persistence` |
 | Vector search | <8ms @ 100K vectors | `cargo bench -p llmspell-storage` |
+| Multi-tenant | 3% overhead | Integration tests |
 
 ---
 

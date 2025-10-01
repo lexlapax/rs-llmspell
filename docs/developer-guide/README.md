@@ -1,7 +1,7 @@
 # Developer Guide
 
-✅ **CURRENT**: Phase 8 Complete - RAG & Multi-Tenancy Operational
-**Version**: 0.8.0 | **Crates**: 20 | **Tools**: 37+ | **Examples**: 60+
+✅ **CURRENT**: Phase 10 Complete - Service Integration & IDE Connectivity
+**Version**: 0.10.0 | **Crates**: 17 | **Tools**: 40+ | **Examples**: 60+ | **Feature Flags**: Modular builds (19-35MB)
 
 **Build and extend rs-llmspell with comprehensive developer documentation**
 
@@ -16,21 +16,32 @@
 **New contributor? Start here in 30 minutes:**
 
 1. **Read**: [developer-guide.md](developer-guide.md) - Complete onboarding guide
-2. **Study**: One of the 60+ examples in `examples/`
-3. **Test**: Run `./scripts/quality/quality-check-fast.sh`
-4. **Build**: Follow patterns in [extending-llmspell.md](extending-llmspell.md)
+2. **⚠️ IMPORTANT**: [feature-flags-migration.md](feature-flags-migration.md) - Build system changes (Phase 10.17.5+)
+3. **Study**: One of the 60+ examples in `examples/`
+4. **Test**: Run `./scripts/quality/quality-check-fast.sh`
+5. **Build**: Follow patterns in [extending-llmspell.md](extending-llmspell.md)
 
 > 📚 **Scripts Documentation**: See [Scripts Overview](../../scripts/) for all automation tools
 
 ---
 
-## 📖 The 4 Comprehensive Guides (Fully Consolidated)
+## 📖 The 6 Essential Guides (Fully Consolidated)
+
+### 0. **[Feature Flags Migration](feature-flags-migration.md)** ⚠️
+**BREAKING CHANGES - Read First (Phase 10.17.5+)**
+- ✅ Modular build system (minimal/common/full)
+- ✅ Binary size reduction (19MB minimal, 25MB common, 35MB full)
+- ✅ Optional tool dependencies (templates, PDF, CSV, Excel, archives, email, DB)
+- ✅ CI/CD and Docker migration steps
+- ✅ Feature mapping and troubleshooting
+
+*Essential for all developers: Build commands changed from Phase 10.17.5*
 
 ### 1. **[Developer Guide](developer-guide.md)** 📘
-**Foundation - Start Here (40% new content)**
+**Foundation - Start Here (Phase 10 updated)**
 - ✅ Quick start setup in 5 minutes
-- ✅ Phase 8 architecture (20 crates including RAG)
-- ✅ Core patterns: BaseAgent, sync bridge, **llmspell-utils** (NEW)
+- ✅ Phase 10 architecture (17 crates including Kernel)
+- ✅ Core patterns: BaseAgent, sync bridge, **llmspell-utils**
 - ✅ Testing with llmspell-testing helpers
 - ✅ Common tasks and workflows
 - ✅ Performance requirements (<10ms tools, <8ms vector search)
@@ -81,24 +92,40 @@
 
 *Updates: examples-standards with full catalog and learning paths*
 
+### 5. **[Tracing Best Practices](tracing-best-practices.md)** 🔍
+**Comprehensive Instrumentation Guide (Supplemental)**
+- ✅ Structured tracing patterns across all components
+- ✅ Session correlation and context propagation
+- ✅ Performance optimization (<2% overhead at INFO level)
+- ✅ Component-specific guidelines (tools, agents, workflows)
+- ✅ Testing and environment configuration
+
+*Essential for maintaining consistent, performant instrumentation across the codebase*
+
 ---
 
-## 🆕 What's New in Phase 8
+## 🆕 What's New in Phase 10
 
-### RAG System (Complete)
-- **llmspell-rag**: RAG pipeline with embeddings
-- **llmspell-storage**: HNSW vector storage (<8ms @ 100K vectors)
-- **llmspell-tenancy**: Multi-tenant isolation (3% overhead)
-- **Performance**: 80% embedding cache hit rate, 70% cost reduction
+### Service Integration & IDE Connectivity (Complete)
+- **Unix Daemon Infrastructure**: Double-fork daemonization, PID management, log rotation, graceful shutdown
+- **Signal Handling**: SIGTERM/SIGINT → Jupyter messages, atomic operations, resource cleanup
+- **Tool CLI Commands**: 5 subcommands (list, info, invoke, search, test) for direct tool access
+- **Fleet Management**: Bash/Python managers, Docker orchestration, OS-level process isolation
+- **Enhanced Logging**: Rotating log files, structured tracing, <1ms overhead, multi-output support
+- **Jupyter Protocol**: Wire protocol v5.3 with 5-channel ZeroMQ, message correlation, heartbeat
+- **Debug Adapter Protocol**: 10 DAP commands (kernel-side), execution state machine, breakpoint support
+- **Feature Flags**: Modular build system with minimal/common/full configurations (Phase 10.17.5+)
 
 ### By the Numbers
-| Metric | Phase 7 | Phase 8 | Change |
-|--------|---------|---------|--------|
-| Crates | 17 | 20 | +3 RAG crates |
-| Tools | 26 | 37+ | +11 tools |
-| Examples | 40 | 60+ | +20 examples |
-| Vector Search | N/A | <8ms @ 100K | NEW |
-| Multi-tenant | N/A | 3% overhead | NEW |
+| Metric | Phase 9 | Phase 10 | Change |
+|--------|---------|----------|--------|
+| Crates | 16 | 17 | +1 kernel crate |
+| Tools | 37+ | 40+ | +3 tools |
+| Binary Size (minimal) | N/A | 19MB | NEW |
+| Binary Size (common) | N/A | 25MB | NEW |
+| Binary Size (full) | ~33.6MB | 35MB | +4% |
+| Daemon Startup | N/A | 1.8s | NEW |
+| Message Handling | N/A | 3.8ms | NEW |
 
 ---
 
@@ -108,7 +135,14 @@
 
 > 📖 **Complete documentation**: See [Scripts README](../../scripts/) for all available scripts
 
+> ⚠️ **BREAKING CHANGE (Phase 10.17.5+)**: Feature flags required for builds. See [feature-flags-migration.md](feature-flags-migration.md)
+
 ```bash
+# Build commands (Phase 10.17.5+)
+cargo build --release --features common     # Recommended (25MB, templates+PDF)
+cargo build --release --features full       # All tools (35MB)
+cargo build --release                       # Minimal (19MB, core only)
+
 # Quick checks (use frequently)
 ./scripts/quality/quality-check-minimal.sh  # <5 seconds - format, clippy
 ./scripts/quality/quality-check-fast.sh     # ~1 minute - adds unit tests
@@ -120,6 +154,7 @@
 ./scripts/testing/test-by-tag.sh unit       # Unit tests only
 ./scripts/testing/test-by-tag.sh rag        # RAG tests
 ./scripts/testing/test-by-tag.sh tool       # Tool tests
+./scripts/testing/test-by-tag.sh kernel     # Kernel tests (Phase 10)
 ```
 
 **Script Categories:**
@@ -167,33 +202,30 @@
 
 ---
 
-## 🏗 Current Architecture (Phase 8)
+## 🏗 Current Architecture (Phase 10)
 
-### 20 Crates Structure
+### 17 Crates Structure
 ```
-Foundation Layer (10 crates):
+Foundation Layer (8 crates):
 ├── llmspell-core         - BaseAgent trait, types
 ├── llmspell-utils        - Parameters, errors, responses
 ├── llmspell-storage      - HNSW vectors (Phase 8)
 ├── llmspell-security     - 3-level model
 ├── llmspell-config       - Configuration
-├── llmspell-state-traits - State abstractions
-├── llmspell-state-persistence - Persistence
 ├── llmspell-rag          - RAG pipeline (Phase 8)
 ├── llmspell-tenancy      - Multi-tenant (Phase 8)
 └── llmspell-testing      - Test utilities
 
-Application Layer (10 crates):
-├── llmspell-tools        - 37+ built-in tools
+Application Layer (9 crates):
+├── llmspell-kernel       - Daemon, signals, Jupyter, DAP (Phase 10)
+├── llmspell-tools        - 40+ built-in tools (feature flags)
 ├── llmspell-agents       - Agent infrastructure
 ├── llmspell-workflows    - 4 workflow types
 ├── llmspell-bridge       - Script integration
 ├── llmspell-hooks        - 40+ hook points
 ├── llmspell-events       - Event bus
-├── llmspell-sessions     - Session management
 ├── llmspell-providers    - LLM providers
-├── llmspell-cli          - CLI interface
-└── llmspell-examples     - Example utilities
+└── llmspell-cli          - CLI interface + tool commands
 ```
 
 ### Key Patterns
@@ -246,17 +278,27 @@ let result = block_on_async::<_, T, E>("operation", async move { ... }, timeout)
 
 ## 🗺 Roadmap
 
-### Phase 9 (Next)
-- Enhanced observability
-- Advanced workflow patterns
-- Extended provider support
-- Performance optimizations
+### Phase 10 (✅ Complete)
+- Unix daemon infrastructure with double-fork
+- Signal handling (SIGTERM/SIGINT → Jupyter messages)
+- Tool CLI commands (direct invocation)
+- Fleet management (OS-level processes)
+- Jupyter Protocol v5.3 (5-channel ZeroMQ)
+- Debug Adapter Protocol (DAP)
+- Feature flags for modular builds (Phase 10.17.5+)
 
-### Phase 10+ (Vision)
-- Distributed execution
-- Advanced caching
+### Phase 11 (Next)
+- Adaptive Memory System
+- Working, episodic, semantic memory types
+- Adaptive Temporal Knowledge Graph (A-TKG)
+- Context-aware retrieval
+- LLM-driven consolidation
+
+### Phase 12+ (Vision)
+- Model Context Protocol (MCP) integration
+- Language Server Protocol (LSP)
+- Agent-to-Agent (A2A) communication
 - Plugin marketplace
-- Visual development tools
 
 ---
 
@@ -271,13 +313,13 @@ let result = block_on_async::<_, T, E>("operation", async move { ... }, timeout)
 
 ## Summary
 
-**Phase 8 Complete** with comprehensive developer documentation:
+**Phase 10 Complete** with comprehensive developer documentation:
 
-✅ **4 Consolidated Guides** covering everything developers need
-✅ **20 Crates** with RAG, storage, and multi-tenancy
-✅ **37+ Tools** with standardized patterns
+✅ **6 Essential Guides** including feature flags migration and tracing best practices
+✅ **17 Crates** with Kernel, RAG, storage, and multi-tenancy
+✅ **40+ Tools** with feature flag modularity (19-35MB builds)
 ✅ **60+ Examples** with learning paths
-✅ **All Performance Targets Met**
+✅ **All Performance Targets Exceeded** (10-40% faster than targets)
 
 Start with [developer-guide.md](developer-guide.md) for complete onboarding.
 

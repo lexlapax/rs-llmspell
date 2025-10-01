@@ -1,10 +1,10 @@
 # Rs-LLMSpell Documentation Hub
 
-**Complete documentation for production-ready scriptable LLM interactions with kernel architecture**
+**Complete documentation for production-ready scriptable LLM interactions with service integration**
 
 **🔗 Navigation**: [← Project Home](../README.md) | [Examples](../examples/) | [Contributing](../CONTRIBUTING.md)
 
-> **📖 Documentation Hub**: All documentation for rs-llmspell v0.9.0 (Phase 10 Complete). Fully consolidated with integrated kernel architecture, production daemon support, and comprehensive debugging capabilities. **Phase 9-10 adds unified kernel, global IO runtime, DAP debugging, and service deployment.**
+> **📖 Documentation Hub**: All documentation for rs-llmspell v0.10.0 (Phase 10 Complete - Service Integration & IDE Connectivity). Fully consolidated with integrated kernel architecture, Unix daemon infrastructure, tool CLI commands, fleet management, and feature flags for modular builds (19-35MB). **Phase 10 delivers production service capabilities with daemon mode, signal handling, direct tool invocation, and OS-level fleet management.**
 
 ---
 
@@ -13,33 +13,33 @@
 ### 📘 [User Guide](user-guide/) - *For Script Writers*
 **Purpose**: Practical guides for using rs-llmspell to build LLM-driven scripts and workflows.
 
-**Status**: ✅ Updated with kernel architecture and service deployment
-**Contents**: Getting started, concepts, configuration, complete API reference (Lua + 17 Rust crates), troubleshooting, service deployment, IDE integration
-**Key Files**: `getting-started.md`, `concepts.md`, `configuration.md`, `service-deployment.md`, `ide-integration.md`, `api/lua/README.md`
-**Phase 9-10 Additions**: Kernel modes, --trace flag, daemon deployment, DAP debugging, fleet management
-**Start here if**: You want to write Lua scripts that use LLMs and tools, or deploy as services
+**Status**: ✅ Updated with Phase 10 service integration and tool CLI
+**Contents**: 10 essential documents including getting started, concepts, configuration, API reference (Lua + 17 Rust crates), troubleshooting, Phase 10 troubleshooting, performance tuning, service deployment, IDE integration
+**Key Files**: `getting-started.md`, `concepts.md`, `configuration.md`, `service-deployment.md`, `ide-integration.md`, `troubleshooting-phase10.md`, `performance-tuning.md`, `api/lua/README.md`
+**Phase 10 Additions**: Tool CLI (5 subcommands), feature flags (19-35MB builds), fleet management, daemon infrastructure, log rotation, signal handling
+**Start here if**: You want to write Lua scripts, use tool CLI directly, or deploy as production services
 
 ---
 
 ### 🔧 [Developer Guide](developer-guide/) - *For Contributors*
 **Purpose**: Technical guides for developers contributing to or extending rs-llmspell.
 
-**Status**: ✅ Consolidated with kernel architecture patterns
-**Contents**: Onboarding guide, extension patterns, production deployment, examples reference
-**Key Files**: `developer-guide.md`, `extending-llmspell.md`, `production-guide.md`, `examples-reference.md`
-**Phase 9-10 Additions**: Kernel integration patterns, global IO runtime usage, protocol implementation, daemon development
-**Start here if**: You want to create custom tools, contribute code, or understand kernel architecture
+**Status**: ✅ Updated with Phase 10 patterns and feature flags
+**Contents**: 6 essential guides including developer guide, extending guide, production guide, examples reference, feature flags migration, tracing best practices
+**Key Files**: `developer-guide.md`, `extending-llmspell.md`, `production-guide.md`, `examples-reference.md`, `feature-flags-migration.md`, `tracing-best-practices.md`
+**Phase 10 Additions**: Tool CLI development, fleet management patterns, daemon infrastructure, feature flags system, tracing instrumentation
+**Start here if**: You want to create custom tools, contribute code, or understand modular build system
 
 ---
 
 ### 🏗️ [Technical](technical/) - *For Architects*
 **Purpose**: Core architectural documentation and implementation decisions.
 
-**Status**: ✅ Updated for Phase 10 with kernel and debug architecture
-**Contents**: Current architecture, master vision, kernel protocol architecture, debug DAP architecture, CLI command architecture
-**Key Files**: `current-architecture.md`, `kernel-protocol-architecture.md`, `debug-dap-architecture.md`, `cli-command-architecture.md`
-**Phase 9-10 Additions**: Integrated kernel design, global IO runtime, DAP bridge, multi-protocol support, event correlation
-**Start here if**: You need to understand system architecture, protocols, or debugging infrastructure
+**Status**: ✅ Complete for Phase 10 with 13 documents
+**Contents**: 6 core guides + 7 supplementary docs covering architecture, protocols, performance, benchmarking, stress testing, protocol compliance, and dependency analysis
+**Key Files**: `current-architecture.md`, `kernel-protocol-architecture.md`, `debug-dap-architecture.md`, `cli-command-architecture.md`, `performance-baseline.md`, `benchmarking-guide.md`, `stress-test-results.md`, `protocol-compliance-report.md`, `mlua-upgrade-analysis.md`
+**Phase 10 Additions**: Daemon architecture, tool CLI design, fleet management, performance baselines, stress testing, protocol compliance validation
+**Start here if**: You need to understand system architecture, protocols, performance characteristics, or debugging infrastructure
 
 ---
 
@@ -64,36 +64,43 @@
 
 ## What Rs-LLMSpell Actually Is
 
-**Production-Ready Features** (v0.9.0):
+**Production-Ready Features** (v0.10.0):
+- ✅ **Unix Daemon Infrastructure** with double-fork, TTY detachment, session leadership
+- ✅ **Signal Handling** (SIGTERM/SIGINT → Jupyter shutdown, atomic operations)
+- ✅ **Tool CLI Commands** (5 subcommands: list, info, invoke, search, test)
+- ✅ **Fleet Management** with OS-level process isolation, Bash/Python managers, Docker orchestration
+- ✅ **Feature Flags** for modular builds (minimal 19MB, common 25MB, full 35MB)
+- ✅ **Enhanced Logging** with rotation (10MB/7 days), structured tracing, <1ms overhead
+- ✅ **PID File Management** with lifecycle tracking and stale cleanup
+- ✅ **systemd/launchd Integration** for production service deployment
 - ✅ **Integrated Kernel Architecture** with global IO runtime (no "dispatch task is gone")
-- ✅ **Production Daemon Mode** with systemd/launchd integration
-- ✅ **Debug Adapter Protocol (DAP)** with IDE integration
-- ✅ **Multi-Protocol Support** (Jupyter, DAP, LSP, REPL)
-- ✅ **Fleet Management** for multiple kernel instances
-- ✅ **40+ tools** across 9 categories (file, web, data, media, system)
-- ✅ **17 crates** with unified kernel (consolidated from 20)
-- ✅ **Lua scripting** with 17 zero-import globals (including Debug)
-- ✅ **--trace flag** replacing --debug/--verbose
-- ✅ **Signal handling** (SIGTERM, SIGHUP, SIGUSR1, SIGUSR2)
-- ✅ **Event correlation** for request tracking
+- ✅ **Debug Adapter Protocol (DAP)** with 10 essential commands, IDE integration
+- ✅ **Multi-Protocol Support** (Jupyter v5.3, DAP, LSP, REPL)
+- ✅ **40+ tools** with optional dependencies (templates, PDF, CSV, Excel, archives, email, DB)
+- ✅ **17 crates** with unified kernel
+- ✅ **Lua scripting** with 17 zero-import globals (Agent, Tool, RAG, Debug, etc.)
+- ✅ **--trace flag** with unified logging control
+- ✅ **Event correlation** for request tracking with correlation IDs
 - ✅ **Multi-client support** with message routing
-- ✅ **Connection file discovery** for IDE attachment
+- ✅ **Connection file discovery** for IDE attachment (Jupyter-compatible)
 - ✅ **Agent infrastructure** with BaseAgent trait and builder patterns
 - ✅ **4 workflow patterns** (Sequential, Parallel, Conditional, Loop)
-- ✅ **RAG system** with HNSW vector search (<8ms @ 100K vectors)
-- ✅ **Multi-tenant architecture** with StateScope::Custom isolation
+- ✅ **RAG system** with HNSW vector search (8ms @ 100K vectors, 20% faster than target)
+- ✅ **Multi-tenant architecture** with StateScope::Custom isolation (3% overhead, 40% better)
 - ✅ **State persistence** unified in kernel
 - ✅ **Hook system** with 40+ points and circuit breakers
 - ✅ **Event bus** with 90K+ events/sec throughput
 - ✅ **60+ production examples** across 6 categories
 
-**Phase 9-10 Achievements**:
-- ✅ **Kernel Unification**: State, sessions, and debug merged into `llmspell-kernel`
-- ✅ **Global IO Runtime**: Single Tokio runtime eliminates context issues
-- ✅ **Service Deployment**: Double-fork daemon with PID management
-- ✅ **IDE Integration**: VS Code, Jupyter Lab, vim/neovim support
-- ✅ **Debug Infrastructure**: 10 essential DAP commands cover 95% needs
-- ✅ **Production Safety**: Rate limiting, sanitization, health monitoring
+**Phase 10 Achievements** (v0.10.0):
+- ✅ **Unix Daemon Infrastructure**: 1.8s startup (10% faster), double-fork, signal handling
+- ✅ **Tool CLI**: 5 subcommands for direct tool access, 7ms initialization (30% faster)
+- ✅ **Fleet Management**: OS-level isolation, Bash/Python managers, Docker orchestration
+- ✅ **Feature Flags**: Modular builds reducing size 43% (minimal) to 26% (common)
+- ✅ **Enhanced Logging**: Rotating logs with 78ms rotation (22% faster), <1ms overhead
+- ✅ **Performance**: All 10 targets exceeded by 10-40% (message handling 3.8ms, 24% faster)
+- ✅ **Testing**: 486 tests total (kernel:57, bridge:334, CLI:57, fleet:38)
+- ✅ **Production Ready**: systemd/launchd, graceful shutdown, health monitoring
 
 **What it doesn't do**:
 - ❌ GUI or web interface (CLI and library only)
@@ -106,80 +113,88 @@
 ## Quick Start Paths
 
 ### 🚀 **I want to use rs-llmspell**
-1. **[Getting Started](user-guide/getting-started.md)** - 5-minute setup with kernel modes
-2. **[Core Concepts](user-guide/concepts.md)** - Understand kernel, tools, agents, workflows
-3. **[Service Deployment](user-guide/service-deployment.md)** - Deploy as system service
-4. **[IDE Integration](user-guide/ide-integration.md)** - Connect VS Code or Jupyter
-5. **[Lua API Reference](user-guide/api/lua/README.md)** - Complete API documentation
-6. **[Examples](../examples/script-users/)** - 60+ working examples
+1. **[Getting Started](user-guide/getting-started.md)** - 5-minute setup with feature flags
+2. **[Core Concepts](user-guide/concepts.md)** - Understand kernel, tools (40+), agents, workflows
+3. **Tool CLI** - `llmspell tool list`, `invoke`, `info`, `search`, `test` commands
+4. **[Service Deployment](user-guide/service-deployment.md)** - Deploy as daemon with systemd/launchd
+5. **[IDE Integration](user-guide/ide-integration.md)** - Connect VS Code or Jupyter
+6. **[Lua API Reference](user-guide/api/lua/README.md)** - Complete API documentation
+7. **[Examples](../examples/script-users/)** - 60+ working examples including tool CLI
 
 ### 🔨 **I want to extend rs-llmspell**
-1. **[Developer Guide](developer-guide/developer-guide.md)** - Complete onboarding
-2. **[Extending LLMSpell](developer-guide/extending-llmspell.md)** - Build tools, agents, protocols
-3. **[Production Guide](developer-guide/production-guide.md)** - Deploy to production
-4. **[Kernel Architecture](technical/kernel-protocol-architecture.md)** - Understand kernel design
+1. **[Developer Guide](developer-guide/developer-guide.md)** - Complete onboarding for 17 crates
+2. **[Feature Flags Migration](developer-guide/feature-flags-migration.md)** - Build system changes (Phase 10.17.5+)
+3. **[Extending LLMSpell](developer-guide/extending-llmspell.md)** - Build tools, agents, protocols
+4. **[Production Guide](developer-guide/production-guide.md)** - Deploy to production
+5. **[Kernel Architecture](technical/kernel-protocol-architecture.md)** - Daemon, protocols, fleet
 
 ### 🏛️ **I need architectural understanding**
-1. **[Current Architecture](technical/current-architecture.md)** - 17 crates, Phase 10 complete
-2. **[Kernel Protocol Architecture](technical/kernel-protocol-architecture.md)** - Protocols & transport
-3. **[Debug DAP Architecture](technical/debug-dap-architecture.md)** - Debug infrastructure
-4. **[Master Vision](technical/master-architecture-vision.md)** - 16-phase roadmap
+1. **[Current Architecture](technical/current-architecture.md)** - 17 crates, Phase 10 achievements
+2. **[Kernel Protocol Architecture](technical/kernel-protocol-architecture.md)** - Daemon, protocols, transport
+3. **[Debug DAP Architecture](technical/debug-dap-architecture.md)** - 10 DAP commands, IDE integration
+4. **[Performance Baseline](technical/performance-baseline.md)** - Phase 10 metrics (10-40% faster)
+5. **[Master Vision](technical/master-architecture-vision.md)** - 16-phase roadmap
 
 ### 🛠️ **I want to deploy in production**
-1. **[Service Deployment](user-guide/service-deployment.md)** - systemd/launchd setup
-2. **[Configuration Guide](user-guide/configuration.md)** - Daemon & kernel config
-3. **[Troubleshooting](user-guide/troubleshooting.md)** - Debug production issues
-4. **[Production Guide](developer-guide/production-guide.md)** - Best practices
+1. **[Service Deployment](user-guide/service-deployment.md)** - systemd/launchd, daemon mode, fleet
+2. **[Configuration Guide](user-guide/configuration.md)** - Daemon, feature flags, fleet config
+3. **[Performance Tuning](user-guide/performance-tuning.md)** - Optimization for production
+4. **[Troubleshooting](user-guide/troubleshooting.md)** - General issues
+5. **[Phase 10 Troubleshooting](user-guide/troubleshooting-phase10.md)** - Daemon, signals, PID, fleet
+6. **[Production Guide](developer-guide/production-guide.md)** - Best practices
 
 ---
 
-## Phase 9-10 Documentation Achievements
+## Phase 10 Documentation Achievements (v0.10.0)
 
-### Phase 9: Kernel Architecture & Debug Support
-- **Kernel Unification**: Merged state, sessions, debug into single `llmspell-kernel` crate
-- **Global IO Runtime**: Documented solution to "dispatch task is gone" errors
-- **DAP Bridge**: 10 essential commands with ~500 lines of code
-- **Multi-Protocol**: Jupyter, DAP, LSP, REPL in single kernel
-- **--trace Flag**: Unified logging control replacing --debug/--verbose
-- **Event Correlation**: Request tracking with correlation IDs
-- **Multi-Client**: Independent debug sessions per client
+### Core Infrastructure Documentation
+- **Unix Daemon Guide**: Double-fork, TTY detachment, session leadership, PID lifecycle
+- **Signal Handling**: SIGTERM/SIGINT → Jupyter messages, atomic operations, resource cleanup
+- **Tool CLI Architecture**: 5 subcommands, kernel message protocol, ComponentRegistry access
+- **Fleet Management**: OS-level isolation, Bash/Python managers, Docker orchestration patterns
+- **Feature Flags Migration**: Modular builds (19-35MB), dependency mapping, troubleshooting
 
-### Phase 10: Production Deployment
-- **Service Deployment Guide**: Complete systemd/launchd documentation
-- **Daemon Mode**: Double-fork technique with PID management
-- **Signal Handling**: SIGTERM, SIGHUP, SIGUSR1, SIGUSR2 documentation
-- **Fleet Management**: Multiple kernel instance coordination
-- **IDE Integration Guide**: VS Code, Jupyter Lab, vim setup
-- **Health Monitoring**: Prometheus-compatible metrics endpoints
-- **Production Safety**: Rate limiting and data sanitization
+### Performance & Testing Documentation
+- **Performance Baseline**: 10 metrics with targets vs actuals (all 10-40% faster)
+- **Benchmarking Guide**: Automated kernel benchmarking, Criterion setup, regression detection
+- **Stress Test Results**: >24h uptime, 42MB stable memory, multi-client scenarios
+- **Protocol Compliance**: Jupyter v5.3 wire protocol, ZeroMQ 5-channel validation
+- **MLua Analysis**: Upgrade impact assessment (0.9.9 → 0.11), revert rationale
+
+### User & Developer Documentation
+- **User Guide**: 10 essential documents (added Phase 10 troubleshooting, performance tuning)
+- **Developer Guide**: 6 essential guides (added feature flags migration, tracing best practices)
+- **Technical Docs**: 13 documents (6 core + 7 supplementary)
+- **Troubleshooting**: General + Phase 10 specific (daemon, signals, PID, fleet, tool CLI)
 
 ### Consolidation Results
-- **Crate Reduction**: 20 → 17 crates (15% reduction)
-- **Unified Kernel**: State, sessions, debug in one place
-- **Service Docs**: New deployment and IDE guides
-- **Debug Docs**: Complete DAP architecture documentation
-- **Examples**: Updated with kernel and service patterns
+- **Documentation Growth**: 8 → 10 user docs, 4 → 6 developer docs, 8 → 13 technical docs
+- **New Guides**: Phase 10 troubleshooting, performance tuning, feature flags migration, tracing best practices
+- **Performance Data**: Complete baseline with 10 Phase 10 metrics
+- **Testing Coverage**: 486 tests documented (kernel:57, bridge:334, CLI:57, fleet:38)
 
 ---
 
 ## Documentation Quality Standards
 
 ### Accuracy ✅
-- All code examples tested with v0.9.0
+- All code examples tested with v0.10.0
 - API documentation matches Phase 10 implementation
-- Performance metrics from kernel measurements
-- Architecture validated against unified kernel
+- Performance metrics from actual Phase 10 measurements (10-40% faster)
+- Architecture validated against 17 crates with daemon infrastructure
 
 ### Organization ✅
-- Clear separation: Kernel (how it works) vs Usage (how to use)
-- Service deployment separate from development
+- Clear separation: User (usage) vs Developer (contributing) vs Technical (architecture)
+- Service deployment with daemon, tool CLI, and fleet management
 - IDE integration documented independently
-- Cross-references updated for Phase 10
+- Phase 10 troubleshooting separate from general issues
+- Cross-references updated for all Phase 10 features
 
 ### Maintenance 📋
-- Version tracking (v0.9.0)
-- Phase status clearly marked (Phase 10 Complete)
-- Update dates: December 2024
+- Version tracking (v0.10.0)
+- Phase status clearly marked (Phase 10 Complete - Service Integration & IDE Connectivity)
+- Update dates: January 2025
+- Feature flags migration guide for Phase 10.17.5+ builds
 - Deprecation notices for old patterns
 
 ---
@@ -208,47 +223,55 @@
 
 ## Examples Structure
 
-### 📚 [Script Users](../examples/script-users/) - 50+ Lua Examples
+### 📚 [Script Users](../examples/script-users/) - 60+ Lua Examples
 - **Getting Started**: 6 progressive tutorials (hello world → kernel → RAG)
-- **Kernel Examples**: Service mode, daemon deployment, multi-client
+- **Kernel Examples**: Service mode, daemon deployment, multi-client, tool CLI
 - **Debug Examples**: DAP integration, breakpoints, tracing
-- **Features**: Agent, tool, workflow, state, provider examples
-- **Cookbook**: 11 patterns (caching, RAG multi-tenant, error handling)
+- **Features**: Agent, tool (40+), workflow, state, provider examples
+- **Cookbook**: 11 patterns (caching, RAG multi-tenant, error handling, tool CLI)
 - **Applications**: 9 full applications (webapp creator, knowledge base, etc.)
-- **Configs**: 15+ configuration examples including daemon configs
+- **Configs**: 15+ configuration examples including daemon, feature flags, fleet configs
+- **Tool CLI**: Direct tool invocation examples (list, info, invoke, search, test)
 
 ### 🦀 [Rust Developers](../examples/rust-developers/) - 10+ Reference Projects
-- Kernel integration patterns
-- Protocol implementation
+- Kernel integration patterns (daemon, signals, PID management)
+- Protocol implementation (Jupyter, DAP)
 - Custom transport layers
 - Debug hook implementation
 - Service wrapper creation
 - Global IO runtime usage
 - Event correlation patterns
 - Multi-client handling
+- Tool CLI integration
+- Fleet management patterns
+- Feature flags configuration
 
 ---
 
-## Performance Metrics (Phase 10)
+## Performance Metrics (Phase 10 Actual)
 
-| Component | Metric | Target | Achieved |
-|-----------|--------|--------|----------|
-| Kernel Startup | Cold start | <200ms | <100ms ✅ |
-| Message Processing | Latency | <10ms | <5ms ✅ |
-| Debug Overhead | No breakpoints | <5% | <2% ✅ |
-| DAP Commands | Response time | <5ms | <2ms ✅ |
-| Multi-Client | Overhead per client | <10% | <5% ✅ |
-| Event Correlation | Lookup time | <1ms | <0.5ms ✅ |
-| Daemon Fork | Process creation | <50ms | <30ms ✅ |
-| Signal Handling | Response time | <5ms | <2ms ✅ |
-| Fleet Coordination | Sync overhead | <100ms | <50ms ✅ |
+| Component | Metric | Target | Achieved | Status |
+|-----------|--------|--------|----------|--------|
+| Daemon Startup | Cold start | <2s | 1.8s | ✅ 10% faster |
+| Message Handling | Latency | <5ms | 3.8ms | ✅ 24% faster |
+| Signal Response | SIGTERM/SIGINT | <100ms | 85ms | ✅ 15% faster |
+| Tool Initialization | Startup time | <10ms | 7ms | ✅ 30% faster |
+| Log Rotation | File rotation | <100ms | 78ms | ✅ 22% faster |
+| PID File Check | Validation | <10ms | 6ms | ✅ 40% faster |
+| Memory Overhead | Kernel daemon | <50MB | 42MB | ✅ 16% better |
+| Heartbeat Latency | ZeroMQ ping | <1ms | 0.8ms | ✅ 20% faster |
+| Vector Search | 100K vectors | <10ms | 8ms | ✅ 20% faster |
+| Multi-Tenant | Isolation overhead | <5% | 3% | ✅ 40% better |
 
 ---
 
 ## Getting Help
 
 **📋 Documentation Issues**: File GitHub issues for corrections
-**❓ Usage Questions**: Check [Troubleshooting](user-guide/troubleshooting.md)
+**❓ General Questions**: Check [Troubleshooting](user-guide/troubleshooting.md)
+**⚙️ Phase 10 Issues**: See [Phase 10 Troubleshooting](user-guide/troubleshooting-phase10.md) for daemon, signals, PID, fleet
+**🚀 Performance**: Review [Performance Tuning](user-guide/performance-tuning.md) for optimization
+**🏗️ Feature Flags**: Check [Feature Flags Migration](developer-guide/feature-flags-migration.md) for build issues
 **🐛 Bug Reports**: Use GitHub issues with reproduction steps
 **💡 Feature Requests**: Review [roadmap](in-progress/implementation-phases.md) first
 **🤝 Contributing**: Start with [Developer Guide](developer-guide/)
@@ -257,4 +280,4 @@
 
 ---
 
-**Last Updated**: December 2024 | **Version**: 0.9.0 (Phase 10 Complete) | **Next**: Phase 11 (Enhanced Observability & Python Support)
+**Last Updated**: January 2025 | **Version**: 0.10.0 (Phase 10 Complete - Service Integration & IDE Connectivity) | **Next**: Phase 11 (Adaptive Memory System)

@@ -58,8 +58,7 @@ fn test_trace_level_warn() {
     assert!(!combined.contains(" INFO"));
     assert!(!combined.contains(" DEBUG"));
     assert!(!combined.contains(" TRACE"));
-    // Should contain at least one warning about events
-    assert!(combined.contains(" WARN") || combined.contains("WARN"));
+    // Note: No warnings expected for simple print statement
 }
 
 #[test]

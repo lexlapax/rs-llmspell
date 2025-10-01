@@ -12,12 +12,12 @@ categories = ["development-tools", "command-line-utilities"]
 
 [dependencies]
 # Core dependencies (minimal to avoid cycles)
-llmspell-core = { path = "../llmspell-core", version = "0.9.0" }
-llmspell-config = { path = "../llmspell-config", version = "0.9.0" }
-llmspell-utils = { path = "../llmspell-utils", version = "0.9.0" }
-llmspell-events = { path = "../llmspell-events", version = "0.9.0" }
-llmspell-hooks = { path = "../llmspell-hooks", version = "0.9.0" }
-llmspell-storage = { path = "../llmspell-storage", version = "0.9.0" }
+llmspell-core = { path = "../llmspell-core" }
+llmspell-config = { path = "../llmspell-config" }
+llmspell-utils = { path = "../llmspell-utils" }
+llmspell-events = { path = "../llmspell-events" }
+llmspell-hooks = { path = "../llmspell-hooks" }
+llmspell-storage = { path = "../llmspell-storage" }
 
 # State dependencies now consolidated internally
 
@@ -105,10 +105,10 @@ metrics-exporter-prometheus = { version = "0.16", optional = true }
 
 [dev-dependencies]
 # Testing utilities
-llmspell-testing = { path = "../llmspell-testing", version = "0.9.0" }
-llmspell-bridge = { path = "../llmspell-bridge", version = "0.9.0", features = ["lua"] }
-llmspell-config = { path = "../llmspell-config", version = "0.9.0" }
-llmspell-tools = { path = "../llmspell-tools", version = "0.9.0" }
+llmspell-testing = { path = "../llmspell-testing" }
+llmspell-bridge = { path = "../llmspell-bridge", features = ["lua"] }
+llmspell-config = { path = "../llmspell-config" }
+llmspell-tools = { path = "../llmspell-tools" }
 mlua = { version = "0.9", features = ["lua54", "async", "send"] }
 tokio-test = "0.4"
 proptest = "1.5"

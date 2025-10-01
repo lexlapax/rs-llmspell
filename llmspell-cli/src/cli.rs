@@ -456,7 +456,7 @@ EXAMPLES:
         #[command(subcommand)]
         command: ToolCommands,
 
-        /// Tool source (future: local|mcp:<server>|a2a:<node>)
+        /// Tool source (future: local|mcp:\<server\>|a2a:\<node\>)
         #[arg(long, default_value = "local", hide = true)]
         source: String,
     },

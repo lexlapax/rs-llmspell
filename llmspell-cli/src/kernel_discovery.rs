@@ -9,7 +9,7 @@ use std::collections::HashSet;
 use std::fs;
 use std::path::{Path, PathBuf};
 use std::time::{Duration, SystemTime};
-use tracing::info;
+use tracing::{debug, info};
 
 /// Status of a running kernel
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
@@ -141,7 +141,7 @@ fn scan_directory(
                 }
                 Err(e) => {
                     // Log but continue scanning
-                    tracing::debug!("Failed to parse connection file {}: {}", path.display(), e);
+                    debug!("Failed to parse connection file {}: {}", path.display(), e);
                 }
             }
         }
@@ -297,7 +297,7 @@ fn cleanup_directory(dir: &Path) -> Result<usize> {
                     }
                     if let Some(log_file) = conn_info.log_file {
                         // Don't delete logs - they might be useful for debugging
-                        tracing::debug!("Keeping log file for debugging: {}", log_file.display());
+                        debug!("Keeping log file for debugging: {}", log_file.display());
                     }
                 }
             }

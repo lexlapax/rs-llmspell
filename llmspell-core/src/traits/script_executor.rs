@@ -85,7 +85,7 @@ pub trait ScriptExecutor: Send + Sync {
     ///
     /// Default implementation does nothing for backward compatibility.
     /// Executors that support debugging should override this method.
-    /// Uses &self instead of &mut self to allow use with Arc<dyn ScriptExecutor>
+    /// Uses &self instead of &mut self to allow use with Arc\<dyn ScriptExecutor\>
     fn set_debug_context(&self, _context: Option<Arc<dyn DebugContext>>) {
         // Default: ignore (for backward compatibility)
     }

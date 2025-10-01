@@ -73,10 +73,16 @@ mod stress_tests {
         println!("Errors: {}", error_count);
         println!("Duration: {:?}", elapsed);
         println!("Ops/sec: {:.2}", ops_per_sec);
-        println!("Avg latency: {:.2}ms", (elapsed.as_millis() as f64) / (ITERATIONS as f64));
+        println!(
+            "Avg latency: {:.2}ms",
+            (elapsed.as_millis() as f64) / (ITERATIONS as f64)
+        );
 
         // Acceptance criteria: >95% success rate, >50 ops/sec
-        assert!(success_count >= (ITERATIONS * 95) / 100, "Success rate below 95%");
+        assert!(
+            success_count >= (ITERATIONS * 95) / 100,
+            "Success rate below 95%"
+        );
         assert!(ops_per_sec >= 50.0, "Performance below 50 ops/sec");
         assert_eq!(error_count, 0, "Unexpected errors during stress test");
     }
@@ -225,7 +231,10 @@ mod stress_tests {
         println!("Duration: {:?}", elapsed);
         println!("Ops/sec: {:.2}", ops_per_sec);
 
-        assert!(success_count >= (ITERATIONS * 95) / 100, "Success rate below 95%");
+        assert!(
+            success_count >= (ITERATIONS * 95) / 100,
+            "Success rate below 95%"
+        );
         assert!(ops_per_sec >= 30.0, "Performance below 30 ops/sec");
     }
 
@@ -253,7 +262,11 @@ mod stress_tests {
         });
 
         let payload_size = serde_json::to_string(&request).unwrap().len();
-        println!("Testing payload size: {} bytes ({:.2} MB)", payload_size, payload_size as f64 / 1_000_000.0);
+        println!(
+            "Testing payload size: {} bytes ({:.2} MB)",
+            payload_size,
+            payload_size as f64 / 1_000_000.0
+        );
 
         let start = Instant::now();
         let response = kernel_handle
@@ -267,8 +280,14 @@ mod stress_tests {
         println!("Processing time: {:?}", elapsed);
 
         // Verify response is valid
-        assert!(response.get("status").is_some(), "Invalid response to large payload");
-        assert!(elapsed < Duration::from_secs(5), "Large payload took >5s to process");
+        assert!(
+            response.get("status").is_some(),
+            "Invalid response to large payload"
+        );
+        assert!(
+            elapsed < Duration::from_secs(5),
+            "Large payload took >5s to process"
+        );
     }
 
     /// Test error recovery under stress
@@ -298,7 +317,7 @@ mod stress_tests {
                 json!({"command": "list"})
             } else {
                 // Invalid request (missing required field)
-                json!({"command": "invoke"})  // Missing "name" field
+                json!({"command": "invoke"}) // Missing "name" field
             };
 
             match kernel_handle.send_tool_request(request).await {
@@ -334,9 +353,20 @@ mod stress_tests {
         println!("Unexpected errors: {}", unexpected_errors);
 
         // Acceptance: All valid requests succeed, all invalid requests handled gracefully
-        assert_eq!(valid_success, ITERATIONS / 2, "Not all valid requests succeeded");
-        assert_eq!(invalid_handled, ITERATIONS / 2, "Not all invalid requests handled");
-        assert_eq!(unexpected_errors, 0, "Unexpected errors during error recovery test");
+        assert_eq!(
+            valid_success,
+            ITERATIONS / 2,
+            "Not all valid requests succeeded"
+        );
+        assert_eq!(
+            invalid_handled,
+            ITERATIONS / 2,
+            "Not all invalid requests handled"
+        );
+        assert_eq!(
+            unexpected_errors, 0,
+            "Unexpected errors during error recovery test"
+        );
     }
 
     /// Test sustained load for memory stability
@@ -390,7 +420,10 @@ mod stress_tests {
         println!("Memory samples taken: {}", memory_samples.len());
 
         // Acceptance: High success rate, sustained performance
-        assert!(success_count >= (ITERATIONS * 95) / 100, "Success rate below 95%");
+        assert!(
+            success_count >= (ITERATIONS * 95) / 100,
+            "Success rate below 95%"
+        );
         assert!(ops_per_sec >= 40.0, "Performance degraded below 40 ops/sec");
     }
 
@@ -410,7 +443,7 @@ mod stress_tests {
             .expect("Failed to start kernel");
 
         const ITERATIONS: usize = 500;
-        let search_queries = vec!["calc", "file", "time", "uuid", "text", "data", "web", "sys"];
+        let search_queries = ["calc", "file", "time", "uuid", "text", "data", "web", "sys"];
         let start = Instant::now();
         let mut success_count = 0;
 
@@ -441,6 +474,9 @@ mod stress_tests {
         println!("Duration: {:?}", elapsed);
         println!("Ops/sec: {:.2}", ops_per_sec);
 
-        assert!(success_count >= (ITERATIONS * 95) / 100, "Success rate below 95%");
+        assert!(
+            success_count >= (ITERATIONS * 95) / 100,
+            "Success rate below 95%"
+        );
     }
 }
