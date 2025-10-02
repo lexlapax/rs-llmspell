@@ -16,3 +16,6 @@ serde_json.workspace = true
 anyhow.workspace = true
 tracing.workspace = true
 rig-core.workspace = true
+ollama-rs = "0.3.2"
+url = "2"
+chrono.workspace = true
