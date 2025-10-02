@@ -28,6 +28,7 @@ Production-ready AI workflow orchestration platform built in Rust for script-dri
 - **Less files are better** - edit existing files, never create new ones unless critical
 - **NO backward compatibility** until 1.0 - prioritize correctness and simplicity
 - **NO SHORTCUTS** - holistic completion required, no TODOs for later
+- **NO CLIPPY ALLOWS** - fix properly if possible
 
 ## Architecture Mandates
 - **Traits over dependencies** - use Rust trait system for modularity

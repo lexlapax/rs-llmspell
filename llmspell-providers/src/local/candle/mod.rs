@@ -3,9 +3,19 @@
 //! This module provides local LLM inference using the Candle framework.
 //! Models are loaded as GGUF files and run directly in Rust with no external dependencies.
 
+mod gguf_loader;
+mod hf_downloader;
+mod model_wrapper;
 mod provider;
+mod sampling;
+mod tokenizer_loader;
 
+pub use gguf_loader::{GGUFLoader, GGUFMetadata};
+pub use hf_downloader::{HFDownloader, HFModelRepo};
+pub use model_wrapper::ModelWrapper;
 pub use provider::CandleProvider;
+pub use sampling::{sample_token, SamplingConfig};
+pub use tokenizer_loader::TokenizerLoader;
 
 use crate::abstraction::ProviderConfig;
 use crate::abstraction::ProviderInstance;
@@ -49,16 +59,15 @@ pub fn create_candle_provider(
         .custom_config
         .get("model_directory")
         .and_then(|v| v.as_str())
-        .map(|s| std::path::PathBuf::from(s));
+        .map(std::path::PathBuf::from);
 
-    let provider = CandleProvider::new(
-        config.model.clone(),
-        model_directory,
-        device,
-    ).map_err(|e| LLMSpellError::Component {
-        message: format!("Failed to create Candle provider: {}", e),
-        source: None,
-    })?;
+    let provider =
+        CandleProvider::new(config.model.clone(), model_directory, device).map_err(|e| {
+            LLMSpellError::Component {
+                message: format!("Failed to create Candle provider: {}", e),
+                source: None,
+            }
+        })?;
 
     Ok(Box::new(provider))
 }

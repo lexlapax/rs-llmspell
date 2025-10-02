@@ -2552,7 +2552,10 @@ impl<P: Protocol + 'static> IntegratedKernel<P> {
         for backend_name in backends_to_query {
             trace!("Querying backend: {}", backend_name);
 
-            match provider_manager.get_provider_for_backend(backend_name).await {
+            match provider_manager
+                .get_provider_for_backend(backend_name)
+                .await
+            {
                 Ok(Some(provider)) => {
                     // Downcast to LocalProviderInstance
                     if let Some(local_provider) = provider.as_local() {
@@ -2638,10 +2641,14 @@ impl<P: Protocol + 'static> IntegratedKernel<P> {
 
                             let status_str = match progress.status {
                                 llmspell_providers::local::DownloadStatus::Starting => "starting",
-                                llmspell_providers::local::DownloadStatus::Downloading => "downloading",
+                                llmspell_providers::local::DownloadStatus::Downloading => {
+                                    "downloading"
+                                }
                                 llmspell_providers::local::DownloadStatus::Verifying => "verifying",
                                 llmspell_providers::local::DownloadStatus::Complete => "complete",
-                                llmspell_providers::local::DownloadStatus::Failed { .. } => "failed",
+                                llmspell_providers::local::DownloadStatus::Failed { .. } => {
+                                    "failed"
+                                }
                             };
 
                             let response = json!({
@@ -2704,106 +2711,118 @@ impl<P: Protocol + 'static> IntegratedKernel<P> {
         }
     }
 
+    /// Build status response from `HealthStatus`
+    fn build_health_status_response(
+        backend: &str,
+        health_status: llmspell_providers::local::HealthStatus,
+    ) -> Value {
+        use llmspell_providers::local::HealthStatus;
+
+        match health_status {
+            HealthStatus::Healthy {
+                available_models,
+                version,
+            } => {
+                info!(
+                    "Backend {} healthy with {} models",
+                    backend, available_models
+                );
+                json!({
+                    "status": "ok",
+                    "backend": backend,
+                    "running": true,
+                    "available_models": available_models,
+                    "version": version,
+                })
+            }
+            HealthStatus::Unhealthy { reason } => {
+                warn!("Backend {} unhealthy: {}", backend, reason);
+                json!({
+                    "status": "ok",
+                    "backend": backend,
+                    "running": false,
+                    "reason": reason,
+                })
+            }
+            HealthStatus::Unknown => {
+                debug!("Backend {} status unknown", backend);
+                json!({
+                    "status": "ok",
+                    "backend": backend,
+                    "running": false,
+                    "reason": "Status unknown",
+                })
+            }
+        }
+    }
+
     /// Handle model status command
     async fn handle_model_status(&mut self, content: &Value) -> Result<()> {
         debug!("Checking model backend status");
 
-        // Get provider manager
         let provider_manager = self.provider_manager.as_ref().ok_or_else(|| {
             anyhow!("Provider manager not available - local model operations not supported")
         })?;
 
-        let backend = content.get("backend").and_then(|v| v.as_str()).unwrap_or("ollama");
+        let backend = content
+            .get("backend")
+            .and_then(|v| v.as_str())
+            .unwrap_or("ollama");
         debug!("Status check for backend: {}", backend);
 
-        match provider_manager.get_provider_for_backend(backend).await {
-            Ok(Some(provider)) => {
-                if let Some(local_provider) = provider.as_local() {
-                    match local_provider.health_check().await {
-                        Ok(health_status) => {
-                            use llmspell_providers::local::HealthStatus;
-
-                            let status_info = match health_status {
-                                HealthStatus::Healthy { available_models, version } => {
-                                    info!("Backend {} healthy with {} models", backend, available_models);
-                                    json!({
-                                        "status": "ok",
-                                        "backend": backend,
-                                        "running": true,
-                                        "available_models": available_models,
-                                        "version": version,
-                                    })
-                                }
-                                HealthStatus::Unhealthy { reason } => {
-                                    warn!("Backend {} unhealthy: {}", backend, reason);
-                                    json!({
-                                        "status": "ok",
-                                        "backend": backend,
-                                        "running": false,
-                                        "reason": reason,
-                                    })
-                                }
-                                HealthStatus::Unknown => {
-                                    debug!("Backend {} status unknown", backend);
-                                    json!({
-                                        "status": "ok",
-                                        "backend": backend,
-                                        "running": false,
-                                        "reason": "Status unknown",
-                                    })
-                                }
-                            };
-
-                            let response = json!({
-                                "msg_type": "model_reply",
-                                "content": status_info
-                            });
-                            self.send_model_reply(response).await
-                        }
-                        Err(e) => {
-                            error!("Failed to check health for {}: {}", backend, e);
-                            let response = json!({
-                                "msg_type": "model_reply",
-                                "content": {
-                                    "status": "error",
-                                    "error": format!("Failed to check health: {}", e)
-                                }
-                            });
-                            self.send_model_reply(response).await
-                        }
+        let response = match provider_manager.get_provider_for_backend(backend).await {
+            Ok(Some(provider)) => match provider.as_local() {
+                Some(local_provider) => match local_provider.health_check().await {
+                    Ok(health_status) => {
+                        let status_info =
+                            Self::build_health_status_response(backend, health_status);
+                        json!({
+                            "msg_type": "model_reply",
+                            "content": status_info
+                        })
                     }
-                } else {
-                    let response = json!({
+                    Err(e) => {
+                        error!("Failed to check health for {}: {}", backend, e);
+                        json!({
+                            "msg_type": "model_reply",
+                            "content": {
+                                "status": "error",
+                                "error": format!("Failed to check health: {}", e)
+                            }
+                        })
+                    }
+                },
+                None => {
+                    json!({
                         "msg_type": "model_reply",
                         "content": {
                             "status": "error",
                             "error": format!("Provider {} is not a local provider", backend)
                         }
-                    });
-                    self.send_model_reply(response).await
+                    })
                 }
-            }
+            },
             Ok(None) => {
-                let response = json!({
+                json!({
                     "msg_type": "model_reply",
                     "content": {
                         "status": "error",
                         "error": format!("Backend '{}' not configured", backend)
                     }
-                });
-                self.send_model_reply(response).await
+                })
             }
             Err(e) => {
-                let response = json!({
+                json!({
                     "msg_type": "model_reply",
                     "content": {
                         "status": "error",
                         "error": format!("Failed to get provider: {}", e)
                     }
-                });
-                self.send_model_reply(response).await
+                })
             }
-        }
+        };
+
+        self.send_model_reply(response).await
     }
 
     /// Handle model info command
@@ -2847,11 +2866,9 @@ impl<P: Protocol + 'static> IntegratedKernel<P> {
                             });
 
                             return self.send_model_reply(response).await;
-                        } else {
-                            // Model not found in this backend, continue searching
-                            trace!("Model {} not found in {}", model_id, backend);
-                            continue;
                         }
+                        // Model not found in this backend, continue searching
+                        trace!("Model {} not found in {}", model_id, backend);
                     }
                 }
                 Ok(None) => {
@@ -3173,7 +3190,8 @@ mod tests {
         let executor = Arc::new(MockScriptExecutor) as Arc<dyn ScriptExecutor>;
 
         let kernel =
-            IntegratedKernel::new(protocol, config, "test-session".to_string(), executor).await;
+            IntegratedKernel::new(protocol, config, "test-session".to_string(), executor, None)
+                .await;
 
         assert!(kernel.is_ok());
     }
@@ -3188,7 +3206,7 @@ mod tests {
         let executor = Arc::new(MockScriptExecutor) as Arc<dyn ScriptExecutor>;
 
         let mut kernel =
-            IntegratedKernel::new(protocol, config, "test-session".to_string(), executor)
+            IntegratedKernel::new(protocol, config, "test-session".to_string(), executor, None)
                 .await
                 .unwrap();
 
@@ -3226,7 +3244,7 @@ mod tests {
         let session_id = "test-session".to_string();
         let executor = Arc::new(MockScriptExecutor);
 
-        let kernel = IntegratedKernel::new(protocol, config, session_id, executor)
+        let kernel = IntegratedKernel::new(protocol, config, session_id, executor, None)
             .await
             .unwrap();
 
@@ -3289,7 +3307,7 @@ mod tests {
         let session_id = "test-session".to_string();
         let executor = Arc::new(MockScriptExecutor);
 
-        let mut kernel = IntegratedKernel::new(protocol, config, session_id, executor)
+        let mut kernel = IntegratedKernel::new(protocol, config, session_id, executor, None)
             .await
             .unwrap();
 
@@ -3328,7 +3346,7 @@ mod tests {
         let session_id = "test-session".to_string();
         let executor = Arc::new(MockScriptExecutor);
 
-        let kernel = IntegratedKernel::new(protocol, config, session_id, executor)
+        let kernel = IntegratedKernel::new(protocol, config, session_id, executor, None)
             .await
             .unwrap();
 
@@ -3389,7 +3407,7 @@ mod tests {
         let session_id = "test-session".to_string();
         let executor = Arc::new(MockScriptExecutor);
 
-        let kernel = IntegratedKernel::new(protocol, config, session_id, executor)
+        let kernel = IntegratedKernel::new(protocol, config, session_id, executor, None)
             .await
             .unwrap();
 
@@ -3455,7 +3473,7 @@ mod tests {
         let session_id = "test-session".to_string();
         let executor = Arc::new(MockScriptExecutor);
 
-        let _kernel = IntegratedKernel::new(protocol, config, session_id, executor)
+        let _kernel = IntegratedKernel::new(protocol, config, session_id, executor, None)
             .await
             .unwrap();
 
@@ -3500,7 +3518,7 @@ mod tests {
         let session_id = "test-session".to_string();
         let executor = Arc::new(MockScriptExecutor);
 
-        let kernel = IntegratedKernel::new(protocol, config, session_id, executor)
+        let kernel = IntegratedKernel::new(protocol, config, session_id, executor, None)
             .await
             .unwrap();
 
@@ -3540,7 +3558,8 @@ async fn test_message_handling_performance() -> Result<()> {
     let session_id = "test-session".to_string();
     let script_executor = Arc::new(tests::MockScriptExecutor) as Arc<dyn ScriptExecutor>;
 
-    let mut kernel = IntegratedKernel::new(protocol, config, session_id, script_executor).await?;
+    let mut kernel =
+        IntegratedKernel::new(protocol, config, session_id, script_executor, None).await?;
 
     // Create a simple kernel_info_request message (faster than execute_request)
     let mut message = HashMap::new();
@@ -3647,7 +3666,8 @@ mod daemon_tests {
             protocol,
             config,
             "test-session".to_string(),
-            script_executor, None,
+            script_executor,
+            None,
         )
         .await
         .unwrap();
@@ -3674,7 +3694,8 @@ mod daemon_tests {
             protocol,
             config,
             "test-session".to_string(),
-            script_executor, None,
+            script_executor,
+            None,
         )
         .await
         .unwrap();
@@ -3707,7 +3728,8 @@ mod daemon_tests {
             protocol,
             config,
             "test-session".to_string(),
-            script_executor, None,
+            script_executor,
+            None,
         )
         .await
         .unwrap();
@@ -3790,7 +3812,8 @@ mod daemon_tests {
             protocol,
             config,
             "test-session".to_string(),
-            script_executor, None,
+            script_executor,
+            None,
         )
         .await
         .unwrap();
@@ -3820,7 +3843,8 @@ mod multi_protocol_tests {
             protocol.clone(),
             config.clone(),
             "coexist-test".to_string(),
-            script_executor.clone(), None,
+            script_executor.clone(),
+            None,
         )
         .await
         .unwrap();
@@ -3859,7 +3883,8 @@ mod multi_protocol_tests {
             jupyter_protocol,
             config.clone(),
             "switch-test".to_string(),
-            script_executor.clone(), None,
+            script_executor.clone(),
+            None,
         )
         .await
         .unwrap();
@@ -3899,14 +3924,16 @@ mod multi_protocol_tests {
             protocol1,
             config.clone(),
             "iso1".to_string(),
-            script_executor.clone(), None,
+            script_executor.clone(),
+            None,
         )
         .await
         .unwrap();
 
-        let kernel2 = IntegratedKernel::new(protocol2, config, "iso2".to_string(), script_executor)
-            .await
-            .unwrap();
+        let kernel2 =
+            IntegratedKernel::new(protocol2, config, "iso2".to_string(), script_executor, None)
+                .await
+                .unwrap();
 
         // Sessions should be isolated
         assert_ne!(kernel1.session_id, kernel2.session_id);
@@ -3928,7 +3955,8 @@ mod multi_protocol_tests {
                 protocol,
                 config,
                 "concurrent-test".to_string(),
-                script_executor.clone(), None,
+                script_executor.clone(),
+                None,
             )
             .await
             .unwrap(),
@@ -3978,7 +4006,8 @@ mod multi_protocol_tests {
             protocol,
             config,
             "error-test".to_string(),
-            script_executor.clone(), None,
+            script_executor.clone(),
+            None,
         )
         .await
         .unwrap();
@@ -4012,7 +4041,8 @@ mod multi_protocol_tests {
             protocol.clone(),
             config,
             "state-test".to_string(),
-            script_executor.clone(), None,
+            script_executor.clone(),
+            None,
         )
         .await
         .unwrap();
@@ -4050,7 +4080,8 @@ mod multi_protocol_tests {
             jupyter_protocol,
             config,
             "share-test".to_string(),
-            script_executor.clone(), None,
+            script_executor.clone(),
+            None,
         )
         .await
         .unwrap();
@@ -4083,10 +4114,15 @@ mod performance_tests {
             "perf-kernel".to_string(),
         );
 
-        let mut kernel =
-            IntegratedKernel::new(protocol, config, "perf-test".to_string(), script_executor)
-                .await
-                .unwrap();
+        let mut kernel = IntegratedKernel::new(
+            protocol,
+            config,
+            "perf-test".to_string(),
+            script_executor,
+            None,
+        )
+        .await
+        .unwrap();
 
         let msg = std::collections::HashMap::from([
             (
@@ -4174,7 +4210,8 @@ mod performance_tests {
             protocol,
             config.clone(),
             "mem-test".to_string(),
-            script_executor.clone(), None,
+            script_executor.clone(),
+            None,
         )
         .await
         .unwrap();
@@ -4218,7 +4255,8 @@ mod performance_tests {
                 protocol,
                 config,
                 "throughput-test".to_string(),
-                script_executor, None,
+                script_executor,
+                None,
             )
             .await
             .unwrap(),
@@ -4272,7 +4310,8 @@ mod performance_tests {
             protocol,
             config,
             "state-perf-test".to_string(),
-            script_executor, None,
+            script_executor,
+            None,
         )
         .await
         .unwrap();
@@ -4313,7 +4352,8 @@ mod performance_tests {
             protocol,
             config,
             "timeout-test".to_string(),
-            script_executor, None,
+            script_executor,
+            None,
         )
         .await
         .unwrap();
@@ -4412,7 +4452,8 @@ mod security_tests {
             protocol,
             config,
             "validation-test".to_string(),
-            script_executor, None,
+            script_executor,
+            None,
         )
         .await
         .unwrap();
@@ -4555,7 +4596,8 @@ mod security_tests {
             protocol,
             config,
             "sanitize-test".to_string(),
-            script_executor, None,
+            script_executor,
+            None,
         )
         .await
         .unwrap();
@@ -4605,10 +4647,15 @@ mod security_tests {
             "limits-kernel".to_string(),
         );
 
-        let mut kernel =
-            IntegratedKernel::new(protocol, config, "limits-test".to_string(), script_executor)
-                .await
-                .unwrap();
+        let mut kernel = IntegratedKernel::new(
+            protocol,
+            config,
+            "limits-test".to_string(),
+            script_executor,
+            None,
+        )
+        .await
+        .unwrap();
 
         // Test message size limit (simulate large message)
         let large_content = "x".repeat(10_000_000); // 10MB string
@@ -4656,7 +4703,8 @@ mod security_tests {
             protocol,
             config,
             "isolation-test".to_string(),
-            script_executor, None,
+            script_executor,
+            None,
         )
         .await
         .unwrap();

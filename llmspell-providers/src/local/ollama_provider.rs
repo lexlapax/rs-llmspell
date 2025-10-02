@@ -1,28 +1,27 @@
 //! Ollama provider combining rig inference + ollama-rs management
 
-use std::sync::Arc;
-use async_trait::async_trait;
 use anyhow::Result;
+use async_trait::async_trait;
+use std::sync::Arc;
 use tracing::{debug, info};
 
 use crate::abstraction::{ProviderCapabilities, ProviderInstance};
-use llmspell_core::types::{AgentInput, AgentOutput, AgentStream};
 use llmspell_core::error::LLMSpellError;
+use llmspell_core::types::{AgentInput, AgentOutput, AgentStream};
 
-use super::{LocalProviderInstance, OllamaModelManager, HealthStatus, LocalModel,
-            PullProgress, ModelSpec, ModelInfo};
+use super::{
+    HealthStatus, LocalModel, LocalProviderInstance, ModelInfo, ModelSpec, OllamaModelManager,
+    PullProgress,
+};
 
 /// Ollama provider using rig for inference, ollama-rs for management
 pub struct OllamaProvider {
-    rig_provider: Arc<Box<dyn ProviderInstance>>,  // Rig handles inference
-    manager: OllamaModelManager,                    // ollama-rs handles models
+    rig_provider: Arc<Box<dyn ProviderInstance>>, // Rig handles inference
+    manager: OllamaModelManager,                  // ollama-rs handles models
 }
 
 impl OllamaProvider {
-    pub fn new(
-        rig_provider: Box<dyn ProviderInstance>,
-        base_url: impl Into<String>,
-    ) -> Self {
+    pub fn new(rig_provider: Box<dyn ProviderInstance>, base_url: impl Into<String>) -> Self {
         info!("Creating OllamaProvider with rig + ollama-rs hybrid");
         let manager = OllamaModelManager::new(base_url);
         debug!("OllamaProvider initialized");

@@ -1511,7 +1511,8 @@ pub async fn start_kernel_service(port: u16, config: LLMSpellConfig) -> Result<S
     }) as Arc<dyn ScriptExecutor>;
 
     // Create integrated kernel
-    let kernel = IntegratedKernel::new(protocol, exec_config, session_id, script_executor, None).await?;
+    let kernel =
+        IntegratedKernel::new(protocol, exec_config, session_id, script_executor, None).await?;
     // Note: Service kernels don't need transport set here as they use external connections
 
     // Write connection file for clients

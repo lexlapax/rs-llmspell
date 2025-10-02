@@ -46,7 +46,7 @@ pub struct LocalLLMGlobal {
 }
 
 impl LocalLLMGlobal {
-    /// Create a new LocalLLM global with the given provider manager
+    /// Create a new `LocalLLM` global with the given provider manager
     ///
     /// # Arguments
     /// * `provider_manager` - The core provider manager for accessing local providers

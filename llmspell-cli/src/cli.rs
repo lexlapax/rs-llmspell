@@ -462,8 +462,7 @@ EXAMPLES:
     },
 
     /// Manage local LLM models (Ollama and Candle)
-    #[command(
-        long_about = "Manage local LLM models with Ollama and Candle backends.
+    #[command(long_about = "Manage local LLM models with Ollama and Candle backends.
 
 Local models provide inference without cloud dependencies. Ollama manages GGUF models
 while Candle supports native Rust inference.
@@ -473,8 +472,7 @@ EXAMPLES:
     llmspell model list --backend ollama       # List only Ollama models
     llmspell model pull llama3.1:8b@ollama     # Download Llama 3.1 8B via Ollama
     llmspell model status                      # Check backend health
-    llmspell model info llama3.1:8b            # Show model details"
-    )]
+    llmspell model info llama3.1:8b            # Show model details")]
     Model {
         #[command(subcommand)]
         command: ModelCommands,
@@ -684,8 +682,7 @@ EXAMPLES:
     },
 
     /// Download a model
-    #[command(
-        long_about = "Download a model from the specified backend.
+    #[command(long_about = "Download a model from the specified backend.
 
 Model specifications follow the format: model:variant@backend
 - model: Base model name (e.g., llama3.1, mistral, phi3)
@@ -695,8 +692,7 @@ Model specifications follow the format: model:variant@backend
 EXAMPLES:
     llmspell model pull llama3.1:8b@ollama     # Download Llama 3.1 8B via Ollama
     llmspell model pull mistral:7b@candle      # Download Mistral 7B via Candle
-    llmspell model pull phi3@ollama --force    # Force re-download"
-    )]
+    llmspell model pull phi3@ollama --force    # Force re-download")]
     Pull {
         /// Model specification (e.g., \"llama3.1:8b@ollama\")
         model: String,
@@ -711,13 +707,11 @@ EXAMPLES:
     },
 
     /// Remove a model
-    #[command(
-        long_about = "Remove a local model to free disk space.
+    #[command(long_about = "Remove a local model to free disk space.
 
 EXAMPLES:
     llmspell model remove llama3.1:8b          # Remove Llama 3.1 8B
-    llmspell model remove mistral:7b --yes     # Skip confirmation"
-    )]
+    llmspell model remove mistral:7b --yes     # Skip confirmation")]
     Remove {
         /// Model identifier
         model: String,
@@ -728,13 +722,11 @@ EXAMPLES:
     },
 
     /// Show model information
-    #[command(
-        long_about = "Display detailed information about a specific model.
+    #[command(long_about = "Display detailed information about a specific model.
 
 EXAMPLES:
     llmspell model info llama3.1:8b            # Show Llama 3.1 info
-    llmspell model info phi3 --format json     # JSON output"
-    )]
+    llmspell model info phi3 --format json     # JSON output")]
     Info {
         /// Model identifier
         model: String,
@@ -760,28 +752,24 @@ EXAMPLES:
     },
 
     /// Check local LLM installation status
-    #[command(
-        long_about = "Check health and status of local LLM backends.
+    #[command(long_about = "Check health and status of local LLM backends.
 
 Shows whether Ollama and Candle backends are available, their versions,
 and the number of models installed.
 
 EXAMPLES:
     llmspell model status                      # Check all backends
-    llmspell model status --format json        # JSON output"
-    )]
+    llmspell model status --format json        # JSON output")]
     Status,
 
     /// Install Ollama binary (macOS and Linux only)
-    #[command(
-        long_about = "Download and install the Ollama binary.
+    #[command(long_about = "Download and install the Ollama binary.
 
 This command downloads the official Ollama installer and sets up the binary.
 macOS and Linux only.
 
 EXAMPLES:
-    llmspell model install-ollama              # Install Ollama"
-    )]
+    llmspell model install-ollama              # Install Ollama")]
     InstallOllama,
 }
 

@@ -3,9 +3,9 @@
 //! This module defines traits and types for local LLM providers (Ollama and Candle)
 //! that extend the base ProviderInstance with model management capabilities.
 
+pub mod candle;
 pub mod ollama_manager;
 pub mod ollama_provider;
-pub mod candle;
 
 use anyhow::Result;
 use async_trait::async_trait;
@@ -15,9 +15,9 @@ use std::time::SystemTime;
 use crate::abstraction::{ProviderConfig, ProviderInstance};
 use llmspell_core::error::LLMSpellError;
 
+pub use candle::{create_candle_provider, CandleProvider};
 pub use ollama_manager::OllamaModelManager;
 pub use ollama_provider::OllamaProvider;
-pub use candle::{CandleProvider, create_candle_provider};
 
 /// Factory function to create an Ollama provider instance
 ///

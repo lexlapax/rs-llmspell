@@ -1,4 +1,4 @@
-//! ABOUTME: Lua-specific LocalLLM global implementation
+//! ABOUTME: Lua-specific `LocalLLM` global implementation
 //! ABOUTME: Provides Lua bindings for local model management
 
 use crate::globals::GlobalContext;
@@ -9,9 +9,9 @@ use mlua::{Lua, Table, Value};
 use std::sync::Arc;
 use tracing::{debug, info, instrument, warn};
 
-/// Inject LocalLLM global into Lua environment
+/// Inject `LocalLLM` global into Lua environment
 ///
-/// This function creates the LocalLLM table with all local model management
+/// This function creates the `LocalLLM` table with all local model management
 /// methods and injects it into the Lua global namespace.
 ///
 /// # Errors
@@ -72,7 +72,52 @@ pub fn inject_local_llm_global(
     Ok(())
 }
 
-/// Register the status() method
+/// Helper to populate backend health status into a Lua table
+fn build_status_table<'a>(
+    lua: &'a Lua,
+    status_key: &str,
+    health_status: HealthStatus,
+) -> mlua::Result<Table<'a>> {
+    let table = lua.create_table()?;
+    match health_status {
+        HealthStatus::Healthy {
+            available_models,
+            version,
+        } => {
+            table.set(status_key, true)?;
+            table.set("models", available_models)?;
+            if let Some(v) = version {
+                table.set("version", v)?;
+            }
+        }
+        HealthStatus::Unhealthy { reason } => {
+            table.set(status_key, false)?;
+            table.set("error", reason)?;
+            table.set("models", 0)?;
+        }
+        HealthStatus::Unknown => {
+            table.set(status_key, false)?;
+            table.set("error", "Status unknown")?;
+            table.set("models", 0)?;
+        }
+    }
+    Ok(table)
+}
+
+/// Helper to create error table for backend status
+fn build_error_table<'a>(
+    lua: &'a Lua,
+    status_key: &str,
+    error_msg: String,
+) -> mlua::Result<Table<'a>> {
+    let table = lua.create_table()?;
+    table.set(status_key, false)?;
+    table.set("error", error_msg)?;
+    table.set("models", 0)?;
+    Ok(table)
+}
+
+/// Register the `status()` method
 ///
 /// Returns health status for all local backends (Ollama, Candle)
 fn register_status_method(
@@ -85,122 +130,65 @@ fn register_status_method(
         async move {
             info!("LocalLLM.status() called from Lua");
 
-            // Use shared sync utility to execute async code
             let result = block_on_async_lua(
                 "local_llm_status",
                 async move {
                     let result_table = lua.create_table()?;
 
-                    // Check Ollama backend
+                    // Check Ollama
                     debug!("Checking Ollama status");
-                    let ollama_table = lua.create_table()?;
-
-                    match pm.get_provider_for_backend("ollama").await {
-                        Ok(Some(provider)) => {
-                            if let Some(local_provider) = provider.as_local() {
-                                match local_provider.health_check().await {
-                                    Ok(HealthStatus::Healthy {
-                                        available_models,
-                                        version,
-                                    }) => {
-                                        ollama_table.set("running", true)?;
-                                        ollama_table.set("models", available_models)?;
-                                        if let Some(v) = version {
-                                            ollama_table.set("version", v)?;
-                                        }
-                                    }
-                                    Ok(HealthStatus::Unhealthy { reason }) => {
-                                        ollama_table.set("running", false)?;
-                                        ollama_table.set("error", reason)?;
-                                        ollama_table.set("models", 0)?;
-                                    }
-                                    Ok(HealthStatus::Unknown) => {
-                                        ollama_table.set("running", false)?;
-                                        ollama_table.set("error", "Status unknown")?;
-                                        ollama_table.set("models", 0)?;
-                                    }
-                                    Err(e) => {
-                                        warn!("Ollama health check failed: {}", e);
-                                        ollama_table.set("running", false)?;
-                                        ollama_table.set("error", e.to_string())?;
-                                        ollama_table.set("models", 0)?;
-                                    }
+                    let ollama_table = match pm.get_provider_for_backend("ollama").await {
+                        Ok(Some(provider)) => match provider.as_local() {
+                            Some(local) => match local.health_check().await {
+                                Ok(health) => build_status_table(lua, "running", health)?,
+                                Err(e) => {
+                                    warn!("Ollama health check failed: {}", e);
+                                    build_error_table(lua, "running", e.to_string())?
                                 }
-                            } else {
-                                ollama_table.set("running", false)?;
-                                ollama_table.set("error", "Provider not a LocalProviderInstance")?;
-                                ollama_table.set("models", 0)?;
-                            }
-                        }
+                            },
+                            None => build_error_table(
+                                lua,
+                                "running",
+                                "Provider not a LocalProviderInstance".to_string(),
+                            )?,
+                        },
                         Ok(None) => {
                             debug!("No Ollama provider initialized");
-                            ollama_table.set("running", false)?;
-                            ollama_table.set("error", "Not configured")?;
-                            ollama_table.set("models", 0)?;
+                            build_error_table(lua, "running", "Not configured".to_string())?
                         }
                         Err(e) => {
                             warn!("Failed to get Ollama provider: {}", e);
-                            ollama_table.set("running", false)?;
-                            ollama_table.set("error", e.to_string())?;
-                            ollama_table.set("models", 0)?;
+                            build_error_table(lua, "running", e.to_string())?
                         }
-                    }
+                    };
                     result_table.set("ollama", ollama_table)?;
 
-                    // Check Candle backend
+                    // Check Candle
                     debug!("Checking Candle status");
-                    let candle_table = lua.create_table()?;
-
-                    match pm.get_provider_for_backend("candle").await {
-                        Ok(Some(provider)) => {
-                            if let Some(local_provider) = provider.as_local() {
-                                match local_provider.health_check().await {
-                                    Ok(HealthStatus::Healthy {
-                                        available_models,
-                                        version,
-                                    }) => {
-                                        candle_table.set("ready", true)?;
-                                        candle_table.set("models", available_models)?;
-                                        if let Some(v) = version {
-                                            candle_table.set("version", v)?;
-                                        }
-                                    }
-                                    Ok(HealthStatus::Unhealthy { reason }) => {
-                                        candle_table.set("ready", false)?;
-                                        candle_table.set("error", reason)?;
-                                        candle_table.set("models", 0)?;
-                                    }
-                                    Ok(HealthStatus::Unknown) => {
-                                        candle_table.set("ready", false)?;
-                                        candle_table.set("error", "Status unknown")?;
-                                        candle_table.set("models", 0)?;
-                                    }
-                                    Err(e) => {
-                                        warn!("Candle health check failed: {}", e);
-                                        candle_table.set("ready", false)?;
-                                        candle_table.set("error", e.to_string())?;
-                                        candle_table.set("models", 0)?;
-                                    }
+                    let candle_table = match pm.get_provider_for_backend("candle").await {
+                        Ok(Some(provider)) => match provider.as_local() {
+                            Some(local) => match local.health_check().await {
+                                Ok(health) => build_status_table(lua, "ready", health)?,
+                                Err(e) => {
+                                    warn!("Candle health check failed: {}", e);
+                                    build_error_table(lua, "ready", e.to_string())?
                                 }
-                            } else {
-                                candle_table.set("ready", false)?;
-                                candle_table.set("error", "Provider not a LocalProviderInstance")?;
-                                candle_table.set("models", 0)?;
-                            }
-                        }
+                            },
+                            None => build_error_table(
+                                lua,
+                                "ready",
+                                "Provider not a LocalProviderInstance".to_string(),
+                            )?,
+                        },
                         Ok(None) => {
-                            debug!("No Candle provider initialized (expected in Phase 11)");
-                            candle_table.set("ready", false)?;
-                            candle_table.set("error", "Not configured")?;
-                            candle_table.set("models", 0)?;
+                            debug!("No Candle provider initialized");
+                            build_error_table(lua, "ready", "Not configured".to_string())?
                         }
                         Err(e) => {
                             warn!("Failed to get Candle provider: {}", e);
-                            candle_table.set("ready", false)?;
-                            candle_table.set("error", e.to_string())?;
-                            candle_table.set("models", 0)?;
+                            build_error_table(lua, "ready", e.to_string())?
                         }
-                    }
+                    };
                     result_table.set("candle", candle_table)?;
 
                     debug!("Status check complete");
@@ -217,7 +205,7 @@ fn register_status_method(
     Ok(())
 }
 
-/// Register the list() method
+/// Register the `list()` method
 ///
 /// Returns array of all local models
 fn register_list_method(
@@ -258,8 +246,10 @@ fn register_list_method(
                                                 let model_table = lua.create_table()?;
                                                 model_table.set("id", model.id)?;
                                                 model_table.set("backend", model.backend)?;
-                                                #[allow(clippy::cast_precision_loss)] // Acceptable for file sizes (>4PB for precision loss)
-                                                model_table.set("size_bytes", model.size_bytes as f64)?;
+                                                #[allow(clippy::cast_precision_loss)]
+                                                // Acceptable for file sizes (>4PB for precision loss)
+                                                model_table
+                                                    .set("size_bytes", model.size_bytes as f64)?;
 
                                                 if let Some(quant) = model.quantization {
                                                     model_table.set("quantization", quant)?;
@@ -269,6 +259,8 @@ fn register_list_method(
                                                     if let Ok(timestamp) = modified
                                                         .duration_since(std::time::UNIX_EPOCH)
                                                     {
+                                                        #[allow(clippy::cast_precision_loss)]
+                                                        // Lua only supports f64; precision loss acceptable for timestamps
                                                         model_table.set(
                                                             "modified_at",
                                                             timestamp.as_secs() as f64,
@@ -309,7 +301,7 @@ fn register_list_method(
     Ok(())
 }
 
-/// Register the pull() method
+/// Register the `pull()` method
 ///
 /// Downloads a model from the backend library
 fn register_pull_method(
@@ -328,7 +320,7 @@ fn register_pull_method(
                 async move {
                     // Parse model specification
                     let spec = ModelSpec::parse(&spec_str).map_err(|e| {
-                        mlua::Error::RuntimeError(format!("Invalid model spec '{}': {}", spec_str, e))
+                        mlua::Error::RuntimeError(format!("Invalid model spec '{spec_str}': {e}"))
                     })?;
 
                     // Determine backend (from spec or default to ollama)
@@ -344,14 +336,19 @@ fn register_pull_method(
                                     Ok(progress) => {
                                         let result_table = lua.create_table()?;
                                         result_table.set("model_id", progress.model_id)?;
-                                        result_table
-                                            .set("percent_complete", progress.percent_complete as f64)?;
+                                        result_table.set(
+                                            "percent_complete",
+                                            f64::from(progress.percent_complete),
+                                        )?;
+                                        #[allow(clippy::cast_precision_loss)]
+                                        // Lua only supports f64; precision loss acceptable for byte counts
                                         result_table.set(
                                             "bytes_downloaded",
                                             progress.bytes_downloaded as f64,
                                         )?;
 
                                         if let Some(total) = progress.bytes_total {
+                                            #[allow(clippy::cast_precision_loss)]
                                             result_table.set("bytes_total", total as f64)?;
                                         }
 
@@ -374,14 +371,12 @@ fn register_pull_method(
                                         Ok(Value::Table(result_table))
                                     }
                                     Err(e) => Err(mlua::Error::RuntimeError(format!(
-                                        "Failed to pull model: {}",
-                                        e
+                                        "Failed to pull model: {e}"
                                     ))),
                                 }
                             } else {
                                 Err(mlua::Error::RuntimeError(format!(
-                                    "Provider '{}' does not support model management",
-                                    backend
+                                    "Provider '{backend}' does not support model management"
                                 )))
                             }
                         }
@@ -423,38 +418,30 @@ fn register_info_method(
                 async move {
                     // Try both backends to find the model
                     for backend in &["ollama", "candle"] {
-                        match pm.get_provider_for_backend(backend).await {
-                            Ok(Some(provider)) => {
-                                if let Some(local_provider) = provider.as_local() {
-                                    match local_provider.model_info(&model_id).await {
-                                        Ok(info) => {
-                                            let result_table = lua.create_table()?;
-                                            result_table.set("id", info.id)?;
-                                            result_table.set("backend", info.backend)?;
-                                            #[allow(clippy::cast_precision_loss)] // Acceptable for file sizes (>4PB for precision loss)
-                                            result_table.set("size_bytes", info.size_bytes as f64)?;
-                                            result_table.set("format", info.format)?;
-                                            result_table.set("loaded", info.loaded)?;
+                        if let Ok(Some(provider)) = pm.get_provider_for_backend(backend).await {
+                            if let Some(local_provider) = provider.as_local() {
+                                if let Ok(info) = local_provider.model_info(&model_id).await {
+                                    let result_table = lua.create_table()?;
+                                    result_table.set("id", info.id)?;
+                                    result_table.set("backend", info.backend)?;
+                                    #[allow(clippy::cast_precision_loss)]
+                                    // Acceptable for file sizes (>4PB for precision loss)
+                                    result_table.set("size_bytes", info.size_bytes as f64)?;
+                                    result_table.set("format", info.format)?;
+                                    result_table.set("loaded", info.loaded)?;
 
-                                            if let Some(param_count) = info.parameter_count {
-                                                result_table.set("parameter_count", param_count)?;
-                                            }
-
-                                            if let Some(quant) = info.quantization {
-                                                result_table.set("quantization", quant)?;
-                                            }
-
-                                            debug!("Model info found in {}", backend);
-                                            return Ok(Value::Table(result_table));
-                                        }
-                                        Err(_) => {
-                                            // Model not found in this backend, try next
-                                            continue;
-                                        }
+                                    if let Some(param_count) = info.parameter_count {
+                                        result_table.set("parameter_count", param_count)?;
                                     }
+
+                                    if let Some(quant) = info.quantization {
+                                        result_table.set("quantization", quant)?;
+                                    }
+
+                                    debug!("Model info found in {}", backend);
+                                    return Ok(Value::Table(result_table));
                                 }
                             }
-                            _ => continue,
                         }
                     }
 
@@ -489,17 +476,19 @@ mod tests {
         let core_provider_manager = Arc::new(CoreProviderManager::new());
 
         // Create minimal config for testing
-        let config = crate::providers::ProviderManagerConfig {
+        let config = llmspell_config::ProviderManagerConfig {
+            default_provider: None,
             providers: std::collections::HashMap::new(),
         };
         let bridge_provider_manager = Arc::new(
             crate::providers::ProviderManager::new(config)
                 .await
-                .expect("Failed to create provider manager")
+                .expect("Failed to create provider manager"),
         );
         let context = GlobalContext::new(registry, bridge_provider_manager);
 
-        inject_local_llm_global(&lua, &context, core_provider_manager).expect("Injection should succeed");
+        inject_local_llm_global(&lua, &context, core_provider_manager)
+            .expect("Injection should succeed");
 
         // Verify LocalLLM table exists
         let result: mlua::Result<Table> = lua.globals().get("LocalLLM");
@@ -512,17 +501,19 @@ mod tests {
         let registry = Arc::new(ComponentRegistry::new());
         let core_provider_manager = Arc::new(CoreProviderManager::new());
 
-        let config = crate::providers::ProviderManagerConfig {
+        let config = llmspell_config::ProviderManagerConfig {
+            default_provider: None,
             providers: std::collections::HashMap::new(),
         };
         let bridge_provider_manager = Arc::new(
             crate::providers::ProviderManager::new(config)
                 .await
-                .expect("Failed to create provider manager")
+                .expect("Failed to create provider manager"),
         );
         let context = GlobalContext::new(registry, bridge_provider_manager);
 
-        inject_local_llm_global(&lua, &context, core_provider_manager).expect("Injection should succeed");
+        inject_local_llm_global(&lua, &context, core_provider_manager)
+            .expect("Injection should succeed");
 
         // Verify status() method exists
         let local_llm: Table = lua.globals().get("LocalLLM").unwrap();
@@ -536,17 +527,19 @@ mod tests {
         let registry = Arc::new(ComponentRegistry::new());
         let core_provider_manager = Arc::new(CoreProviderManager::new());
 
-        let config = crate::providers::ProviderManagerConfig {
+        let config = llmspell_config::ProviderManagerConfig {
+            default_provider: None,
             providers: std::collections::HashMap::new(),
         };
         let bridge_provider_manager = Arc::new(
             crate::providers::ProviderManager::new(config)
                 .await
-                .expect("Failed to create provider manager")
+                .expect("Failed to create provider manager"),
         );
         let context = GlobalContext::new(registry, bridge_provider_manager);
 
-        inject_local_llm_global(&lua, &context, core_provider_manager).expect("Injection should succeed");
+        inject_local_llm_global(&lua, &context, core_provider_manager)
+            .expect("Injection should succeed");
 
         // Verify list() method exists
         let local_llm: Table = lua.globals().get("LocalLLM").unwrap();

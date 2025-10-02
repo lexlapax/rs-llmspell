@@ -72,10 +72,12 @@ impl RigProvider {
                     client_builder = client_builder.base_url(base_url);
                 }
 
-                let client = client_builder.build().map_err(|e| LLMSpellError::Configuration {
-                    message: format!("Failed to create Anthropic client: {}", e),
-                    source: Some(Box::new(e)),
-                })?;
+                let client = client_builder
+                    .build()
+                    .map_err(|e| LLMSpellError::Configuration {
+                        message: format!("Failed to create Anthropic client: {}", e),
+                        source: Some(Box::new(e)),
+                    })?;
 
                 let model = client.completion_model(&config.model);
                 RigModel::Anthropic(model)
@@ -276,7 +278,10 @@ impl RigProvider {
                     match response.choice.first() {
                         AssistantContent::Text(text) => Ok(text.text.clone()),
                         AssistantContent::ToolCall(call) => Err(LLMSpellError::Provider {
-                            message: format!("Unexpected tool call response: {}", call.function.name),
+                            message: format!(
+                                "Unexpected tool call response: {}",
+                                call.function.name
+                            ),
                             provider: Some(self.config.name.clone()),
                             source: None,
                         }),
@@ -302,7 +307,10 @@ impl RigProvider {
                     match response.choice.first() {
                         AssistantContent::Text(text) => Ok(text.text.clone()),
                         AssistantContent::ToolCall(call) => Err(LLMSpellError::Provider {
-                            message: format!("Unexpected tool call response: {}", call.function.name),
+                            message: format!(
+                                "Unexpected tool call response: {}",
+                                call.function.name
+                            ),
                             provider: Some(self.config.name.clone()),
                             source: None,
                         }),
@@ -328,7 +336,10 @@ impl RigProvider {
                     match response.choice.first() {
                         AssistantContent::Text(text) => Ok(text.text.clone()),
                         AssistantContent::ToolCall(call) => Err(LLMSpellError::Provider {
-                            message: format!("Unexpected tool call response: {}", call.function.name),
+                            message: format!(
+                                "Unexpected tool call response: {}",
+                                call.function.name
+                            ),
                             provider: Some(self.config.name.clone()),
                             source: None,
                         }),
@@ -356,7 +367,10 @@ impl RigProvider {
                         match response.choice.first() {
                             AssistantContent::Text(text) => Ok(text.text.clone()),
                             AssistantContent::ToolCall(call) => Err(LLMSpellError::Provider {
-                                message: format!("Unexpected tool call response: {}", call.function.name),
+                                message: format!(
+                                    "Unexpected tool call response: {}",
+                                    call.function.name
+                                ),
                                 provider: Some(self.config.name.clone()),
                                 source: None,
                             }),
