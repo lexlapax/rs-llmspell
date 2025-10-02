@@ -625,11 +625,17 @@ pub async fn start_embedded_kernel_with_executor(
         .await;
     debug!("Registered Ollama provider factory");
 
+    // Register Candle provider factory (Phase 11.6)
+    provider_manager
+        .register_provider("candle", llmspell_providers::create_candle_provider)
+        .await;
+    debug!("Registered Candle provider factory");
+
     // Register rig provider factory for cloud providers
     provider_manager
         .register_provider("rig", llmspell_providers::create_rig_provider)
         .await;
-    debug!("Created provider manager for kernel with Ollama and rig factories");
+    debug!("Created provider manager for kernel with Ollama, Candle, and rig factories");
 
     // Use the provided script executor (clone it for sharing between kernels)
     let script_executor_clone = script_executor.clone();

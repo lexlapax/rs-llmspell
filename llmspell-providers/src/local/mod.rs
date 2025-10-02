@@ -5,6 +5,7 @@
 
 pub mod ollama_manager;
 pub mod ollama_provider;
+pub mod candle;
 
 use anyhow::Result;
 use async_trait::async_trait;
@@ -16,6 +17,7 @@ use llmspell_core::error::LLMSpellError;
 
 pub use ollama_manager::OllamaModelManager;
 pub use ollama_provider::OllamaProvider;
+pub use candle::{CandleProvider, create_candle_provider};
 
 /// Factory function to create an Ollama provider instance
 ///
