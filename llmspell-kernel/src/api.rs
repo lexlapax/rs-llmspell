@@ -187,6 +187,95 @@ impl KernelHandle {
         }
     }
 
+    /// Send a model management request to the kernel and return the response
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the request fails or communication with kernel fails
+    pub async fn send_model_request(
+        &mut self,
+        content: serde_json::Value,
+    ) -> Result<serde_json::Value> {
+        debug!("Sending model request to kernel {}", self.kernel_id);
+
+        // Create model_request message
+        let request = self.protocol.create_request("model_request", content)?;
+
+        debug!(
+            "Sending model_request on shell channel, message size: {}",
+            request.len()
+        );
+
+        // Send request through transport
+        self.transport.send("shell", vec![request]).await?;
+
+        // Wait for model_reply
+        let start_time = std::time::Instant::now();
+        let timeout = std::time::Duration::from_secs(30);
+
+        loop {
+            if start_time.elapsed() > timeout {
+                return Err(anyhow::anyhow!("Timeout waiting for model_reply"));
+            }
+
+            if let Some(reply_parts) = self.transport.recv("shell").await? {
+                trace!(
+                    "Client received {} parts on shell channel",
+                    reply_parts.len()
+                );
+
+                // Handle multipart Jupyter wire protocol format
+                let delimiter = b"<IDS|MSG>";
+                let delimiter_idx = reply_parts
+                    .iter()
+                    .position(|part| part.as_slice() == delimiter);
+
+                let reply_msg: HashMap<String, serde_json::Value> = if let Some(idx) = delimiter_idx
+                {
+                    // Parse multipart message (header at idx+2, content at idx+5)
+                    if reply_parts.len() > idx + 5 {
+                        let header =
+                            serde_json::from_slice::<serde_json::Value>(&reply_parts[idx + 2])?;
+                        let content =
+                            serde_json::from_slice::<serde_json::Value>(&reply_parts[idx + 5])?;
+
+                        let mut msg = HashMap::new();
+                        msg.insert("header".to_string(), header);
+                        msg.insert("content".to_string(), content);
+                        msg
+                    } else {
+                        continue; // Incomplete message, wait for next
+                    }
+                } else if let Some(first_part) = reply_parts.first() {
+                    // Try parsing as simple JSON message for backward compatibility
+                    match self.protocol.parse_message(first_part) {
+                        Ok(msg) => msg,
+                        Err(_) => continue, // Not a valid message, wait for next
+                    }
+                } else {
+                    continue; // No parts, wait for next
+                };
+
+                // Check if this is a model_reply
+                if let Some(header) = reply_msg.get("header") {
+                    if let Some(msg_type) = header.get("msg_type") {
+                        if msg_type == "model_reply" {
+                            // Extract and return the content's content field
+                            if let Some(content_wrapper) = reply_msg.get("content") {
+                                // The content contains the actual response nested in a "content" field
+                                if let Some(actual_content) = content_wrapper.get("content") {
+                                    return Ok(actual_content.clone());
+                                }
+                                return Ok(content_wrapper.clone());
+                            }
+                        }
+                    }
+                }
+            }
+            tokio::time::sleep(tokio::time::Duration::from_millis(10)).await;
+        }
+    }
+
     /// Get the kernel ID
     pub fn kernel_id(&self) -> &str {
         &self.kernel_id
@@ -317,6 +406,90 @@ impl ClientHandle {
                 if let Some(header) = reply_msg.get("header") {
                     if let Some(msg_type) = header.get("msg_type") {
                         if msg_type == "tool_reply" {
+                            // Extract and return the content's content field
+                            if let Some(content_wrapper) = reply_msg.get("content") {
+                                // The content contains the actual response nested in a "content" field
+                                if let Some(actual_content) = content_wrapper.get("content") {
+                                    return Ok(actual_content.clone());
+                                }
+                                return Ok(content_wrapper.clone());
+                            }
+                        }
+                    }
+                }
+            }
+            tokio::time::sleep(tokio::time::Duration::from_millis(10)).await;
+        }
+    }
+
+    /// Send a model management request to the remote kernel and return the response
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the request fails or communication with kernel fails
+    pub async fn send_model_request(
+        &mut self,
+        content: serde_json::Value,
+    ) -> Result<serde_json::Value> {
+        debug!("Sending model request to remote kernel");
+
+        // Create model_request message
+        let request = self.protocol.create_request("model_request", content)?;
+
+        // Send request through transport
+        self.transport.send("shell", vec![request]).await?;
+
+        // Wait for model_reply
+        let start_time = std::time::Instant::now();
+        let timeout = std::time::Duration::from_secs(30);
+
+        loop {
+            if start_time.elapsed() > timeout {
+                return Err(anyhow::anyhow!("Timeout waiting for model_reply"));
+            }
+
+            if let Some(reply_parts) = self.transport.recv("shell").await? {
+                trace!(
+                    "Client received {} parts on shell channel",
+                    reply_parts.len()
+                );
+
+                // Handle multipart Jupyter wire protocol format
+                let delimiter = b"<IDS|MSG>";
+                let delimiter_idx = reply_parts
+                    .iter()
+                    .position(|part| part.as_slice() == delimiter);
+
+                let reply_msg: HashMap<String, serde_json::Value> = if let Some(idx) = delimiter_idx
+                {
+                    // Parse multipart message (header at idx+2, content at idx+5)
+                    if reply_parts.len() > idx + 5 {
+                        let header =
+                            serde_json::from_slice::<serde_json::Value>(&reply_parts[idx + 2])?;
+                        let content =
+                            serde_json::from_slice::<serde_json::Value>(&reply_parts[idx + 5])?;
+
+                        let mut msg = HashMap::new();
+                        msg.insert("header".to_string(), header);
+                        msg.insert("content".to_string(), content);
+                        msg
+                    } else {
+                        continue; // Incomplete message, wait for next
+                    }
+                } else if let Some(first_part) = reply_parts.first() {
+                    // Try parsing as simple JSON message for backward compatibility
+                    match self.protocol.parse_message(first_part) {
+                        Ok(msg) => msg,
+                        Err(_) => continue, // Not a valid message, wait for next
+                    }
+                } else {
+                    continue; // No parts, wait for next
+                };
+
+                // Check if this is a model_reply
+                if let Some(header) = reply_msg.get("header") {
+                    if let Some(msg_type) = header.get("msg_type") {
+                        if msg_type == "model_reply" {
                             // Extract and return the content's content field
                             if let Some(content_wrapper) = reply_msg.get("content") {
                                 // The content contains the actual response nested in a "content" field

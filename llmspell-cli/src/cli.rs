@@ -461,6 +461,25 @@ EXAMPLES:
         source: String,
     },
 
+    /// Manage local LLM models (Ollama and Candle)
+    #[command(
+        long_about = "Manage local LLM models with Ollama and Candle backends.
+
+Local models provide inference without cloud dependencies. Ollama manages GGUF models
+while Candle supports native Rust inference.
+
+EXAMPLES:
+    llmspell model list                        # List all local models
+    llmspell model list --backend ollama       # List only Ollama models
+    llmspell model pull llama3.1:8b@ollama     # Download Llama 3.1 8B via Ollama
+    llmspell model status                      # Check backend health
+    llmspell model info llama3.1:8b            # Show model details"
+    )]
+    Model {
+        #[command(subcommand)]
+        command: ModelCommands,
+    },
+
     /// Display version information
     #[command(long_about = "Display detailed version and build information.
 
@@ -635,6 +654,135 @@ EXAMPLES:
         #[arg(long)]
         verbose: bool,
     },
+}
+
+/// Model management subcommands
+#[derive(Subcommand, Debug)]
+pub enum ModelCommands {
+    /// List installed local models
+    #[command(
+        long_about = "List all models installed locally with optional filtering.
+
+EXAMPLES:
+    llmspell model list                        # List all models
+    llmspell model list --backend ollama       # List only Ollama models
+    llmspell model list --verbose              # Show sizes and dates
+    llmspell model list --format json          # Output in JSON format"
+    )]
+    List {
+        /// Filter by backend (ollama, candle, or all)
+        #[arg(long, default_value = "all")]
+        backend: String,
+
+        /// Show verbose output with sizes and dates
+        #[arg(long, short)]
+        verbose: bool,
+
+        /// Output format override
+        #[arg(long)]
+        format: Option<OutputFormat>,
+    },
+
+    /// Download a model
+    #[command(
+        long_about = "Download a model from the specified backend.
+
+Model specifications follow the format: model:variant@backend
+- model: Base model name (e.g., llama3.1, mistral, phi3)
+- variant: Model variant/size (e.g., 8b, 7b, 13b)
+- backend: Backend to use (ollama or candle)
+
+EXAMPLES:
+    llmspell model pull llama3.1:8b@ollama     # Download Llama 3.1 8B via Ollama
+    llmspell model pull mistral:7b@candle      # Download Mistral 7B via Candle
+    llmspell model pull phi3@ollama --force    # Force re-download"
+    )]
+    Pull {
+        /// Model specification (e.g., \"llama3.1:8b@ollama\")
+        model: String,
+
+        /// Force re-download even if exists
+        #[arg(long, short)]
+        force: bool,
+
+        /// Quantization level for Candle models
+        #[arg(long, default_value = "Q4_K_M")]
+        quantization: String,
+    },
+
+    /// Remove a model
+    #[command(
+        long_about = "Remove a local model to free disk space.
+
+EXAMPLES:
+    llmspell model remove llama3.1:8b          # Remove Llama 3.1 8B
+    llmspell model remove mistral:7b --yes     # Skip confirmation"
+    )]
+    Remove {
+        /// Model identifier
+        model: String,
+
+        /// Skip confirmation prompt
+        #[arg(long, short = 'y')]
+        yes: bool,
+    },
+
+    /// Show model information
+    #[command(
+        long_about = "Display detailed information about a specific model.
+
+EXAMPLES:
+    llmspell model info llama3.1:8b            # Show Llama 3.1 info
+    llmspell model info phi3 --format json     # JSON output"
+    )]
+    Info {
+        /// Model identifier
+        model: String,
+    },
+
+    /// List available models from library
+    #[command(
+        long_about = "List models available for download from backend libraries.
+
+EXAMPLES:
+    llmspell model available                   # List all available models
+    llmspell model available --backend ollama  # List Ollama library
+    llmspell model available --recommended     # Show only recommended"
+    )]
+    Available {
+        /// Backend to query (ollama or candle)
+        #[arg(long)]
+        backend: Option<String>,
+
+        /// Show only recommended models
+        #[arg(long)]
+        recommended: bool,
+    },
+
+    /// Check local LLM installation status
+    #[command(
+        long_about = "Check health and status of local LLM backends.
+
+Shows whether Ollama and Candle backends are available, their versions,
+and the number of models installed.
+
+EXAMPLES:
+    llmspell model status                      # Check all backends
+    llmspell model status --format json        # JSON output"
+    )]
+    Status,
+
+    /// Install Ollama binary (macOS and Linux only)
+    #[command(
+        long_about = "Download and install the Ollama binary.
+
+This command downloads the official Ollama installer and sets up the binary.
+macOS and Linux only.
+
+EXAMPLES:
+    llmspell model install-ollama              # Install Ollama"
+    )]
+    InstallOllama,
 }
 
 /// Kernel management subcommands

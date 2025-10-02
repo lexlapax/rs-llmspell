@@ -48,6 +48,7 @@ pub mod debug;
 pub mod exec;
 pub mod kernel;
 pub mod keys;
+pub mod model;
 pub mod repl;
 pub mod run;
 pub mod session;
@@ -222,6 +223,10 @@ pub async fn execute_command(
 
         Commands::Tool { command, source } => {
             tool::handle_tool_command(command, source, runtime_config, output_format).await
+        }
+
+        Commands::Model { command } => {
+            model::handle_model_command(command, runtime_config, output_format).await
         }
 
         Commands::Version(version_cmd) => version::execute(version_cmd, output_format).await,
