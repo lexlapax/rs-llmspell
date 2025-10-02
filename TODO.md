@@ -7,9 +7,13 @@
 **Timeline**: 20 working days
 **Priority**: CRITICAL
 **Dependencies**: Phase 10 ✅
+**Arch-Document**: docs/technical/master-architecture-vision.md
+**All-Phases-Document**: docs/in-progress/implementation-phases.md
+**Current-Architecture-Document**: docs/technical/current-architecture.md
 **Design-Document**: docs/in-progress/phase-11-design-doc.md
-**Old-TODO**: docs/in-progress/PHASE11-TODO.md.old
-**Gap-Analysis**: LOCAL-LLM-ANALYSIS-V2.md
+**Gap-Analysis**: docs/archives/LOCAL-LLM-ANALYSIS-V2.md
+**Old-TODO**: docs/archives/PHASE11-TODO.invalid.md
+**This-document**: working copy /TODO.md (pristine/immutable copy in docs/in-progress/PHASE11-DONE.md)
 
 > **🎯 Implementation Focus**: This TODO comprehensively covers ALL integration points identified in the design doc, including: rig-based Ollama integration, kernel message protocol extensions, dual-mode CLI handlers, flat config structure, ModelSpecifier extensions, bridge layer integration, and Candle implementation.
 
@@ -55,7 +59,7 @@
 
 ## SECTION 1: Provider Architecture Foundation
 
-### Task 1.1: Extend ModelSpecifier with Backend Field
+### Task 11.1.1: Extend ModelSpecifier with Backend Field
 
 **File**: `llmspell-providers/src/model_specifier.rs`
 **Priority**: CRITICAL
@@ -112,12 +116,12 @@
 
 ---
 
-### Task 1.2: Update Provider Routing Logic
+### Task 11.1.2: Update Provider Routing Logic
 
 **File**: `llmspell-providers/src/abstraction.rs` (lines 427-431)
 **Priority**: CRITICAL
 **Estimated**: 2 hours
-**Dependencies**: Task 1.1
+**Dependencies**: Task 11.1.1
 
 **Context**: Current routing maps provider names to factory names (e.g., "openai" → "rig"). Need to add "local" provider with backend resolution logic.
 
@@ -173,7 +177,7 @@
 
 ---
 
-### Task 1.3: Create LocalProviderInstance Trait
+### Task 11.1.3: Create LocalProviderInstance Trait
 
 **File**: `llmspell-providers/src/local/mod.rs` (NEW FILE)
 **Priority**: CRITICAL
@@ -305,7 +309,7 @@
 
 ---
 
-### Task 1.4: Add Provider Configuration (No Struct Changes)
+### Task 11.1.4: Add Provider Configuration (No Struct Changes)
 
 **Files**:
 - `llmspell-config/src/providers.rs` (READ ONLY - verify no changes needed)
@@ -400,7 +404,7 @@
 
 ## SECTION 2: Ollama Integration (via rig + ollama-rs hybrid)
 
-### Task 2.1: Add Rig Ollama Variant to RigModel Enum
+### Task 11.2.1: Add Rig Ollama Variant to RigModel Enum
 
 **File**: `llmspell-providers/src/rig.rs` (lines 17-22)
 **Priority**: CRITICAL
@@ -498,12 +502,12 @@
 
 ---
 
-### Task 2.2: Create OllamaModelManager for Model Operations
+### Task 11.2.2: Create OllamaModelManager for Model Operations
 
 **File**: `llmspell-providers/src/local/ollama_manager.rs` (NEW FILE)
 **Priority**: HIGH
 **Estimated**: 4 hours
-**Dependencies**: Task 1.3 (LocalProviderInstance trait)
+**Dependencies**: Task 11.1.3 (LocalProviderInstance trait)
 
 **Context**: Rig handles inference, but we need ollama-rs for model management (list, pull, info, remove). Hybrid approach.
 
@@ -674,12 +678,12 @@
 
 ---
 
-### Task 2.3: Implement OllamaProvider with LocalProviderInstance
+### Task 11.2.3: Implement OllamaProvider with LocalProviderInstance
 
 **File**: `llmspell-providers/src/local/ollama_provider.rs` (NEW FILE)
 **Priority**: CRITICAL
 **Estimated**: 3 hours
-**Dependencies**: Task 2.1, Task 2.2
+**Dependencies**: Task 11.2.1, Task 11.2.2
 
 **Context**: Wrapper that combines rig for inference + OllamaModelManager for model ops.
 
@@ -783,7 +787,7 @@
 
 ## SECTION 3: Kernel Protocol Extension
 
-### Task 3.1: Add ModelRequest/ModelReply Message Types
+### Task 11.3.1: Add ModelRequest/ModelReply Message Types
 
 **File**: `llmspell-kernel/src/protocol.rs`
 **Priority**: CRITICAL
@@ -844,12 +848,12 @@
 
 ---
 
-### Task 3.2: Implement handle_model_request in Kernel
+### Task 11.3.2: Implement handle_model_request in Kernel
 
 **File**: `llmspell-kernel/src/handlers/mod.rs` (NEW HANDLER)
 **Priority**: CRITICAL
 **Estimated**: 6 hours
-**Dependencies**: Task 3.1, Task 2.3
+**Dependencies**: Task 11.3.1, Task 11.2.3
 
 **Context**: Kernel handler that processes model commands (list, pull, status) using ProviderManager.
 
@@ -1058,12 +1062,12 @@
 
 ---
 
-### Task 3.3: Add send_model_request to KernelHandle and ClientHandle
+### Task 11.3.3: Add send_model_request to KernelHandle and ClientHandle
 
 **File**: `llmspell-kernel/src/api.rs`
 **Priority**: CRITICAL
 **Estimated**: 2 hours
-**Dependencies**: Task 3.1
+**Dependencies**: Task 11.3.1
 
 **Context**: CLI needs to send model_request messages to kernel (both embedded and remote modes).
 
@@ -1123,7 +1127,7 @@
 
 ## SECTION 4: CLI Implementation (Dual-Mode)
 
-### Task 4.1: Create ModelCommands Enum
+### Task 11.4.1: Create ModelCommands Enum
 
 **File**: `llmspell-cli/src/cli.rs`
 **Priority**: CRITICAL
@@ -1229,12 +1233,12 @@
 
 ---
 
-### Task 4.2: Add Model Command to execute_command
+### Task 11.4.2: Add Model Command to execute_command
 
 **File**: `llmspell-cli/src/commands/mod.rs` (around line 223)
 **Priority**: CRITICAL
 **Estimated**: 1 hour
-**Dependencies**: Task 4.1
+**Dependencies**: Task 11.4.1
 
 **Context**: Wire Model command into main command dispatcher.
 
@@ -1281,12 +1285,12 @@
 
 ---
 
-### Task 4.3: Implement Dual-Mode Model Command Handlers
+### Task 11.4.3: Implement Dual-Mode Model Command Handlers
 
 **File**: `llmspell-cli/src/commands/model.rs` (NEW FILE)
 **Priority**: CRITICAL
 **Estimated**: 8 hours
-**Dependencies**: Task 3.3, Task 4.1
+**Dependencies**: Task 11.3.3, Task 11.4.1
 
 **Context**: Implement handle_model_command following tool.rs dual-mode pattern (embedded vs remote kernel).
 
@@ -1551,12 +1555,12 @@
 
 ## SECTION 5: Bridge Layer Integration
 
-### Task 5.1: Create LocalLLM Global Object Injection
+### Task 11.5.1: Create LocalLLM Global Object Injection
 
 **File**: `llmspell-bridge/src/lua/globals/local_llm.rs` (NEW FILE)
 **Priority**: HIGH
 **Estimated**: 3 hours
-**Dependencies**: Task 2.3 (OllamaProvider)
+**Dependencies**: Task 11.2.3 (OllamaProvider)
 
 **Context**: Inject LocalLLM global into Lua for script access to local models.
 
@@ -1638,12 +1642,12 @@
 
 ---
 
-### Task 5.2: Implement LocalLLM.status() Method
+### Task 11.5.2: Implement LocalLLM.status() Method
 
 **File**: `llmspell-bridge/src/lua/globals/local_llm.rs`
 **Priority**: HIGH
 **Estimated**: 2 hours
-**Dependencies**: Task 5.1
+**Dependencies**: Task 11.5.1
 
 **Context**: Implement status() method to check backend availability from Lua.
 
@@ -1741,12 +1745,12 @@
 
 ---
 
-### Task 5.3: Implement LocalLLM.list() Method
+### Task 11.5.3: Implement LocalLLM.list() Method
 
 **File**: `llmspell-bridge/src/lua/globals/local_llm.rs`
 **Priority**: HIGH
 **Estimated**: 2 hours
-**Dependencies**: Task 5.1
+**Dependencies**: Task 11.5.1
 
 **Context**: Implement list() to get local models from Lua.
 
@@ -1770,12 +1774,12 @@
 
 ---
 
-### Task 5.4: Update Agent.create() for Local Models
+### Task 11.5.4: Update Agent.create() for Local Models
 
 **File**: `llmspell-bridge/src/lua/globals/agent.rs`
 **Priority**: CRITICAL
 **Estimated**: 3 hours
-**Dependencies**: Task 1.1 (ModelSpecifier extension)
+**Dependencies**: Task 11.1.1 (ModelSpecifier extension)
 
 **Context**: Update Agent.create() to parse and handle `model = "local/llama3.1:8b"` syntax.
 
@@ -1814,7 +1818,7 @@
 
 ## SECTION 6: Candle Implementation
 
-### Task 6.1: Add Candle Dependencies
+### Task 11.6.1: Add Candle Dependencies
 
 **File**: `llmspell-providers/Cargo.toml`
 **Priority**: CRITICAL
@@ -1849,12 +1853,12 @@
 
 ---
 
-### Task 6.2: Implement GGUF Model Loading
+### Task 11.6.2: Implement GGUF Model Loading
 
 **File**: `llmspell-providers/src/local/candle/gguf_loader.rs` (NEW FILE)
 **Priority**: CRITICAL
 **Estimated**: 8 hours
-**Dependencies**: Task 6.1
+**Dependencies**: Task 11.6.1
 
 **Context**: Core GGUF loading from local files and HuggingFace.
 
@@ -1885,12 +1889,12 @@
 
 ---
 
-### Task 6.3: Implement CandleProvider with Inference Loop
+### Task 11.6.3: Implement CandleProvider with Inference Loop
 
 **File**: `llmspell-providers/src/local/candle/provider.rs` (NEW FILE)
 **Priority**: CRITICAL
 **Estimated**: 10 hours
-**Dependencies**: Task 6.2
+**Dependencies**: Task 11.6.2
 
 **Context**: CandleProvider with text generation inference.
 
@@ -1923,7 +1927,7 @@
 
 ## SECTION 7: Testing & Validation
 
-### Task 7.1: Unit Test Suite
+### Task 11.7.1: Unit Test Suite
 
 **Priority**: CRITICAL
 **Estimated**: 8 hours
@@ -1954,7 +1958,7 @@
 
 ---
 
-### Task 7.2: Integration Tests
+### Task 11.7.2: Integration Tests
 
 **Priority**: HIGH
 **Estimated**: 6 hours
@@ -1980,7 +1984,7 @@
 
 ---
 
-### Task 7.3: Performance Benchmarks
+### Task 11.7.3: Performance Benchmarks
 
 **Priority**: HIGH
 **Estimated**: 4 hours
@@ -2008,7 +2012,7 @@
 
 ## SECTION 8: Documentation
 
-### Task 8.1: API Documentation
+### Task 11.8.1: API Documentation
 
 **Priority**: HIGH
 **Estimated**: 4 hours
@@ -2034,7 +2038,7 @@
 
 ---
 
-### Task 8.2: User Guide
+### Task 11.8.2: User Guide
 
 **Priority**: HIGH
 **Estimated**: 4 hours
@@ -2060,7 +2064,7 @@
 
 ---
 
-### Task 8.3: Example Applications
+### Task 11.8.3: Example Applications
 
 **Priority**: MEDIUM
 **Estimated**: 5 hours
