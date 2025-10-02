@@ -616,14 +616,32 @@ pub async fn start_embedded_kernel_with_executor(
     // Build execution config from LLMSpellConfig
     let exec_config = build_execution_config(&config);
 
+    // Create provider manager for local LLM operations (Phase 11)
+    let provider_manager = Arc::new(llmspell_providers::ProviderManager::new());
+
+    // Register Ollama provider factory (Phase 11.2)
+    provider_manager
+        .register_provider("ollama", llmspell_providers::create_ollama_provider)
+        .await;
+    debug!("Registered Ollama provider factory");
+
+    // Register rig provider factory for cloud providers
+    provider_manager
+        .register_provider("rig", llmspell_providers::create_rig_provider)
+        .await;
+    debug!("Created provider manager for kernel with Ollama and rig factories");
+
     // Use the provided script executor (clone it for sharing between kernels)
     let script_executor_clone = script_executor.clone();
+    let provider_manager_clone = provider_manager.clone();
+
     // Create integrated kernel with the provided executor
     let mut kernel = IntegratedKernel::new(
         protocol.clone(),
         exec_config.clone(),
         session_id.clone(),
         script_executor,
+        Some(provider_manager),
     )
     .await?;
 
@@ -651,6 +669,7 @@ pub async fn start_embedded_kernel_with_executor(
         exec_config.clone(),
         format!("dummy-{session_id}"),
         script_executor_clone,
+        Some(provider_manager_clone),
     )
     .await?;
 
@@ -1162,6 +1181,7 @@ pub async fn start_kernel_service_with_config(
         config.exec_config.clone(),
         session_id,
         config.script_executor,
+        None,
     )
     .await?;
 
@@ -1485,7 +1505,7 @@ pub async fn start_kernel_service(port: u16, config: LLMSpellConfig) -> Result<S
     }) as Arc<dyn ScriptExecutor>;
 
     // Create integrated kernel
-    let kernel = IntegratedKernel::new(protocol, exec_config, session_id, script_executor).await?;
+    let kernel = IntegratedKernel::new(protocol, exec_config, session_id, script_executor, None).await?;
     // Note: Service kernels don't need transport set here as they use external connections
 
     // Write connection file for clients

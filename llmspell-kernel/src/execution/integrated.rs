@@ -156,6 +156,8 @@ pub struct IntegratedKernel<P: Protocol> {
     current_client_identity: Option<Vec<u8>>,
     /// Current message header (becomes `parent_header` in replies)
     current_msg_header: Option<serde_json::Value>,
+    /// Provider manager for local LLM operations (Phase 11)
+    provider_manager: Option<Arc<llmspell_providers::ProviderManager>>,
 }
 
 #[allow(dead_code)] // These methods will be used when transport is fully integrated
@@ -172,6 +174,7 @@ impl<P: Protocol + 'static> IntegratedKernel<P> {
         config: ExecutionConfig,
         session_id: String,
         script_executor: Arc<dyn ScriptExecutor>,
+        provider_manager: Option<Arc<llmspell_providers::ProviderManager>>,
     ) -> Result<Self> {
         info!("Creating IntegratedKernel for session {}", session_id);
 
@@ -326,6 +329,7 @@ impl<P: Protocol + 'static> IntegratedKernel<P> {
             channel_last_activity: Arc::new(RwLock::new(HashMap::new())),
             current_client_identity: None,
             current_msg_header: None,
+            provider_manager,
         })
     }
 
@@ -2520,19 +2524,78 @@ impl<P: Protocol + 'static> IntegratedKernel<P> {
     }
 
     /// Handle model list command
-    async fn handle_model_list(&mut self, _content: &Value) -> Result<()> {
+    async fn handle_model_list(&mut self, content: &Value) -> Result<()> {
         debug!("Listing local models");
 
-        // TODO: Implement actual provider access via component registry
-        // For now, return empty list
-        let models: Vec<Value> = vec![];
+        // Get provider manager or return error
+        let provider_manager = self.provider_manager.as_ref().ok_or_else(|| {
+            anyhow!("Provider manager not available - local model operations not supported")
+        })?;
+
+        // Get backend filter (defaults to "all")
+        let backend = content
+            .get("backend")
+            .and_then(|v| v.as_str())
+            .unwrap_or("all");
+        debug!("Listing models for backend: {}", backend);
+
+        let mut models_array: Vec<Value> = vec![];
+
+        // Query requested backends
+        let backends_to_query = match backend {
+            "ollama" => vec!["ollama"],
+            "candle" => vec!["candle"],
+            "all" => vec!["ollama", "candle"],
+            other => vec![other],
+        };
+
+        for backend_name in backends_to_query {
+            trace!("Querying backend: {}", backend_name);
+
+            match provider_manager.get_provider_for_backend(backend_name).await {
+                Ok(Some(provider)) => {
+                    // Downcast to LocalProviderInstance
+                    if let Some(local_provider) = provider.as_local() {
+                        match local_provider.list_local_models().await {
+                            Ok(models) => {
+                                debug!("Found {} models from {}", models.len(), backend_name);
+                                for model in models {
+                                    models_array.push(json!({
+                                        "id": model.id,
+                                        "backend": model.backend,
+                                        "size_bytes": model.size_bytes,
+                                        "quantization": model.quantization,
+                                        "modified_at": model.modified_at.and_then(|t| {
+                                            t.duration_since(std::time::UNIX_EPOCH)
+                                             .ok()
+                                             .map(|d| d.as_secs())
+                                        }),
+                                    }));
+                                }
+                            }
+                            Err(e) => {
+                                warn!("Failed to list {} models: {}", backend_name, e);
+                            }
+                        }
+                    } else {
+                        warn!("Provider {} is not a local provider", backend_name);
+                    }
+                }
+                Ok(None) => {
+                    trace!("Backend {} not configured", backend_name);
+                }
+                Err(e) => {
+                    warn!("Failed to get provider for {}: {}", backend_name, e);
+                }
+            }
+        }
 
         let response = json!({
             "msg_type": "model_reply",
             "content": {
                 "status": "ok",
-                "models": models,
-                "count": models.len(),
+                "models": models_array,
+                "count": models_array.len(),
             }
         });
 
@@ -2543,68 +2606,271 @@ impl<P: Protocol + 'static> IntegratedKernel<P> {
     async fn handle_model_pull(&mut self, content: &Value) -> Result<()> {
         info!("Pulling model");
 
-        let model_spec = content
-            .get("model_spec")
+        // Get provider manager
+        let provider_manager = self.provider_manager.as_ref().ok_or_else(|| {
+            anyhow!("Provider manager not available - local model operations not supported")
+        })?;
+
+        let model_spec_str = content
+            .get("model")
             .and_then(|v| v.as_str())
-            .ok_or_else(|| anyhow!("No model_spec in pull request"))?;
+            .ok_or_else(|| anyhow!("No model in pull request"))?;
 
-        debug!("Pull request for model: {}", model_spec);
+        debug!("Pull request for model: {}", model_spec_str);
 
-        // TODO: Implement actual model pull via provider
-        let result = json!({
-            "status": "error",
-            "error": "Model pull not yet implemented in kernel"
-        });
+        // Parse ModelSpec
+        let spec = llmspell_providers::local::ModelSpec::parse(model_spec_str)
+            .map_err(|e| anyhow!("Invalid model spec '{}': {}", model_spec_str, e))?;
 
-        let response = json!({
-            "msg_type": "model_reply",
-            "content": result
-        });
+        let backend = spec.backend.as_deref().unwrap_or("ollama");
+        trace!("Using backend: {}", backend);
 
-        self.send_model_reply(response).await
+        // Get provider for backend
+        match provider_manager.get_provider_for_backend(backend).await {
+            Ok(Some(provider)) => {
+                if let Some(local_provider) = provider.as_local() {
+                    match local_provider.pull_model(&spec).await {
+                        Ok(progress) => {
+                            info!(
+                                "Model pull successful: {} ({}% complete)",
+                                progress.model_id, progress.percent_complete
+                            );
+
+                            let status_str = match progress.status {
+                                llmspell_providers::local::DownloadStatus::Starting => "starting",
+                                llmspell_providers::local::DownloadStatus::Downloading => "downloading",
+                                llmspell_providers::local::DownloadStatus::Verifying => "verifying",
+                                llmspell_providers::local::DownloadStatus::Complete => "complete",
+                                llmspell_providers::local::DownloadStatus::Failed { .. } => "failed",
+                            };
+
+                            let response = json!({
+                                "msg_type": "model_reply",
+                                "content": {
+                                    "status": "ok",
+                                    "model_id": progress.model_id,
+                                    "download_status": status_str,
+                                    "percent_complete": progress.percent_complete,
+                                    "bytes_downloaded": progress.bytes_downloaded,
+                                    "bytes_total": progress.bytes_total,
+                                }
+                            });
+
+                            self.send_model_reply(response).await
+                        }
+                        Err(e) => {
+                            error!("Failed to pull model: {}", e);
+                            let response = json!({
+                                "msg_type": "model_reply",
+                                "content": {
+                                    "status": "error",
+                                    "error": format!("Failed to pull model: {}", e)
+                                }
+                            });
+                            self.send_model_reply(response).await
+                        }
+                    }
+                } else {
+                    let response = json!({
+                        "msg_type": "model_reply",
+                        "content": {
+                            "status": "error",
+                            "error": format!("Provider {} is not a local provider", backend)
+                        }
+                    });
+                    self.send_model_reply(response).await
+                }
+            }
+            Ok(None) => {
+                let response = json!({
+                    "msg_type": "model_reply",
+                    "content": {
+                        "status": "error",
+                        "error": format!("Backend '{}' not configured", backend)
+                    }
+                });
+                self.send_model_reply(response).await
+            }
+            Err(e) => {
+                let response = json!({
+                    "msg_type": "model_reply",
+                    "content": {
+                        "status": "error",
+                        "error": format!("Failed to get provider: {}", e)
+                    }
+                });
+                self.send_model_reply(response).await
+            }
+        }
     }
 
     /// Handle model status command
     async fn handle_model_status(&mut self, content: &Value) -> Result<()> {
         debug!("Checking model backend status");
 
+        // Get provider manager
+        let provider_manager = self.provider_manager.as_ref().ok_or_else(|| {
+            anyhow!("Provider manager not available - local model operations not supported")
+        })?;
+
         let backend = content.get("backend").and_then(|v| v.as_str()).unwrap_or("ollama");
         debug!("Status check for backend: {}", backend);
 
-        // TODO: Implement actual health check via provider
-        let status = json!({
-            "status": "error",
-            "error": "Backend status check not yet implemented in kernel"
-        });
+        match provider_manager.get_provider_for_backend(backend).await {
+            Ok(Some(provider)) => {
+                if let Some(local_provider) = provider.as_local() {
+                    match local_provider.health_check().await {
+                        Ok(health_status) => {
+                            use llmspell_providers::local::HealthStatus;
 
-        let response = json!({
-            "msg_type": "model_reply",
-            "content": status
-        });
+                            let status_info = match health_status {
+                                HealthStatus::Healthy { available_models, version } => {
+                                    info!("Backend {} healthy with {} models", backend, available_models);
+                                    json!({
+                                        "status": "ok",
+                                        "backend": backend,
+                                        "running": true,
+                                        "available_models": available_models,
+                                        "version": version,
+                                    })
+                                }
+                                HealthStatus::Unhealthy { reason } => {
+                                    warn!("Backend {} unhealthy: {}", backend, reason);
+                                    json!({
+                                        "status": "ok",
+                                        "backend": backend,
+                                        "running": false,
+                                        "reason": reason,
+                                    })
+                                }
+                                HealthStatus::Unknown => {
+                                    debug!("Backend {} status unknown", backend);
+                                    json!({
+                                        "status": "ok",
+                                        "backend": backend,
+                                        "running": false,
+                                        "reason": "Status unknown",
+                                    })
+                                }
+                            };
 
-        self.send_model_reply(response).await
+                            let response = json!({
+                                "msg_type": "model_reply",
+                                "content": status_info
+                            });
+                            self.send_model_reply(response).await
+                        }
+                        Err(e) => {
+                            error!("Failed to check health for {}: {}", backend, e);
+                            let response = json!({
+                                "msg_type": "model_reply",
+                                "content": {
+                                    "status": "error",
+                                    "error": format!("Failed to check health: {}", e)
+                                }
+                            });
+                            self.send_model_reply(response).await
+                        }
+                    }
+                } else {
+                    let response = json!({
+                        "msg_type": "model_reply",
+                        "content": {
+                            "status": "error",
+                            "error": format!("Provider {} is not a local provider", backend)
+                        }
+                    });
+                    self.send_model_reply(response).await
+                }
+            }
+            Ok(None) => {
+                let response = json!({
+                    "msg_type": "model_reply",
+                    "content": {
+                        "status": "error",
+                        "error": format!("Backend '{}' not configured", backend)
+                    }
+                });
+                self.send_model_reply(response).await
+            }
+            Err(e) => {
+                let response = json!({
+                    "msg_type": "model_reply",
+                    "content": {
+                        "status": "error",
+                        "error": format!("Failed to get provider: {}", e)
+                    }
+                });
+                self.send_model_reply(response).await
+            }
+        }
     }
 
     /// Handle model info command
     async fn handle_model_info(&mut self, content: &Value) -> Result<()> {
         debug!("Getting model info");
 
+        // Get provider manager
+        let provider_manager = self.provider_manager.as_ref().ok_or_else(|| {
+            anyhow!("Provider manager not available - local model operations not supported")
+        })?;
+
         let model_id = content
-            .get("model_id")
+            .get("model")
             .and_then(|v| v.as_str())
-            .ok_or_else(|| anyhow!("No model_id in info request"))?;
+            .ok_or_else(|| anyhow!("No model in info request"))?;
 
         debug!("Info request for model: {}", model_id);
 
-        // TODO: Implement actual model info via provider
-        let info = json!({
-            "status": "error",
-            "error": "Model info not yet implemented in kernel"
-        });
+        // Try to find the model in any backend
+        for backend in &["ollama", "candle"] {
+            trace!("Searching for model {} in backend {}", model_id, backend);
 
+            match provider_manager.get_provider_for_backend(backend).await {
+                Ok(Some(provider)) => {
+                    if let Some(local_provider) = provider.as_local() {
+                        if let Ok(info) = local_provider.model_info(model_id).await {
+                            info!("Found model {} in backend {}", model_id, backend);
+
+                            let response = json!({
+                                "msg_type": "model_reply",
+                                "content": {
+                                    "status": "ok",
+                                    "id": info.id,
+                                    "backend": info.backend,
+                                    "size_bytes": info.size_bytes,
+                                    "format": info.format,
+                                    "loaded": info.loaded,
+                                    "parameter_count": info.parameter_count,
+                                    "quantization": info.quantization,
+                                }
+                            });
+
+                            return self.send_model_reply(response).await;
+                        } else {
+                            // Model not found in this backend, continue searching
+                            trace!("Model {} not found in {}", model_id, backend);
+                            continue;
+                        }
+                    }
+                }
+                Ok(None) => {
+                    trace!("Backend {} not configured", backend);
+                }
+                Err(e) => {
+                    warn!("Failed to get provider for {}: {}", backend, e);
+                }
+            }
+        }
+
+        // Model not found in any backend
+        warn!("Model {} not found in any backend", model_id);
         let response = json!({
             "msg_type": "model_reply",
-            "content": info
+            "content": {
+                "status": "error",
+                "error": format!("Model '{}' not found in any backend", model_id)
+            }
         });
 
         self.send_model_reply(response).await
@@ -3381,7 +3647,7 @@ mod daemon_tests {
             protocol,
             config,
             "test-session".to_string(),
-            script_executor,
+            script_executor, None,
         )
         .await
         .unwrap();
@@ -3408,7 +3674,7 @@ mod daemon_tests {
             protocol,
             config,
             "test-session".to_string(),
-            script_executor,
+            script_executor, None,
         )
         .await
         .unwrap();
@@ -3441,7 +3707,7 @@ mod daemon_tests {
             protocol,
             config,
             "test-session".to_string(),
-            script_executor,
+            script_executor, None,
         )
         .await
         .unwrap();
@@ -3524,7 +3790,7 @@ mod daemon_tests {
             protocol,
             config,
             "test-session".to_string(),
-            script_executor,
+            script_executor, None,
         )
         .await
         .unwrap();
@@ -3554,7 +3820,7 @@ mod multi_protocol_tests {
             protocol.clone(),
             config.clone(),
             "coexist-test".to_string(),
-            script_executor.clone(),
+            script_executor.clone(), None,
         )
         .await
         .unwrap();
@@ -3593,7 +3859,7 @@ mod multi_protocol_tests {
             jupyter_protocol,
             config.clone(),
             "switch-test".to_string(),
-            script_executor.clone(),
+            script_executor.clone(), None,
         )
         .await
         .unwrap();
@@ -3633,7 +3899,7 @@ mod multi_protocol_tests {
             protocol1,
             config.clone(),
             "iso1".to_string(),
-            script_executor.clone(),
+            script_executor.clone(), None,
         )
         .await
         .unwrap();
@@ -3662,7 +3928,7 @@ mod multi_protocol_tests {
                 protocol,
                 config,
                 "concurrent-test".to_string(),
-                script_executor.clone(),
+                script_executor.clone(), None,
             )
             .await
             .unwrap(),
@@ -3712,7 +3978,7 @@ mod multi_protocol_tests {
             protocol,
             config,
             "error-test".to_string(),
-            script_executor.clone(),
+            script_executor.clone(), None,
         )
         .await
         .unwrap();
@@ -3746,7 +4012,7 @@ mod multi_protocol_tests {
             protocol.clone(),
             config,
             "state-test".to_string(),
-            script_executor.clone(),
+            script_executor.clone(), None,
         )
         .await
         .unwrap();
@@ -3784,7 +4050,7 @@ mod multi_protocol_tests {
             jupyter_protocol,
             config,
             "share-test".to_string(),
-            script_executor.clone(),
+            script_executor.clone(), None,
         )
         .await
         .unwrap();
@@ -3908,7 +4174,7 @@ mod performance_tests {
             protocol,
             config.clone(),
             "mem-test".to_string(),
-            script_executor.clone(),
+            script_executor.clone(), None,
         )
         .await
         .unwrap();
@@ -3952,7 +4218,7 @@ mod performance_tests {
                 protocol,
                 config,
                 "throughput-test".to_string(),
-                script_executor,
+                script_executor, None,
             )
             .await
             .unwrap(),
@@ -4006,7 +4272,7 @@ mod performance_tests {
             protocol,
             config,
             "state-perf-test".to_string(),
-            script_executor,
+            script_executor, None,
         )
         .await
         .unwrap();
@@ -4047,7 +4313,7 @@ mod performance_tests {
             protocol,
             config,
             "timeout-test".to_string(),
-            script_executor,
+            script_executor, None,
         )
         .await
         .unwrap();
@@ -4146,7 +4412,7 @@ mod security_tests {
             protocol,
             config,
             "validation-test".to_string(),
-            script_executor,
+            script_executor, None,
         )
         .await
         .unwrap();
@@ -4289,7 +4555,7 @@ mod security_tests {
             protocol,
             config,
             "sanitize-test".to_string(),
-            script_executor,
+            script_executor, None,
         )
         .await
         .unwrap();
@@ -4390,7 +4656,7 @@ mod security_tests {
             protocol,
             config,
             "isolation-test".to_string(),
-            script_executor,
+            script_executor, None,
         )
         .await
         .unwrap();
