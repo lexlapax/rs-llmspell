@@ -57,7 +57,7 @@
 
 ---
 
-## SECTION 1: Provider Architecture Foundation
+## PHASE 11.1: Provider Architecture Foundation
 
 ### Task 11.1.1: Extend ModelSpecifier with Backend Field
 
@@ -402,7 +402,7 @@
 
 ---
 
-## SECTION 2: Ollama Integration (via rig + ollama-rs hybrid)
+## PHASE 11.2: Ollama Integration (via rig + ollama-rs hybrid)
 
 ### Task 11.2.1: Add Rig Ollama Variant to RigModel Enum
 
@@ -785,7 +785,7 @@
 
 ---
 
-## SECTION 3: Kernel Protocol Extension
+## PHASE 11.3: Kernel Protocol Extension
 
 ### Task 11.3.1: Add ModelRequest/ModelReply Message Types
 
@@ -1125,7 +1125,7 @@
 
 ---
 
-## SECTION 4: CLI Implementation (Dual-Mode)
+## PHASE 11.4: CLI Implementation (Dual-Mode)
 
 ### Task 11.4.1: Create ModelCommands Enum
 
@@ -1553,7 +1553,7 @@
 
 ---
 
-## SECTION 5: Bridge Layer Integration
+## PHASE 11.5: Bridge Layer Integration
 
 ### Task 11.5.1: Create LocalLLM Global Object Injection
 
@@ -1816,7 +1816,7 @@
 
 ---
 
-## SECTION 6: Candle Implementation
+## PHASE 11.6: Candle Implementation
 
 ### Task 11.6.1: Add Candle Dependencies
 
@@ -1925,7 +1925,7 @@
 
 ---
 
-## SECTION 7: Testing & Validation
+## PHASE 11.7: Testing & Validation
 
 ### Task 11.7.1: Unit Test Suite
 
@@ -2010,7 +2010,7 @@
 
 ---
 
-## SECTION 8: Documentation
+## PHASE 11.8: Documentation
 
 ### Task 11.8.1: API Documentation
 
