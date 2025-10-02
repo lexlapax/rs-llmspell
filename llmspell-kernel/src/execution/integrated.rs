@@ -801,6 +801,7 @@ impl<P: Protocol + 'static> IntegratedKernel<P> {
                                     || msg_type == "comm_info_request"
                                     || msg_type == "history_request"
                                     || msg_type == "tool_request"
+                                    || msg_type == "model_request"
                                 {
                                     trace!("Received shell message: {}", msg_type);
                                     trace!("Adding {} to messages_to_process", msg_type);
@@ -981,6 +982,7 @@ impl<P: Protocol + 'static> IntegratedKernel<P> {
             "interrupt_request" => self.handle_interrupt_request(&message)?,
             "debug_request" => self.handle_debug_request(message).await?,
             "tool_request" => self.handle_tool_request(message).await?,
+            "model_request" => self.handle_model_request(message).await?,
             _ => {
                 warn!("Unhandled message type: {}", msg_type);
             }
@@ -1086,6 +1088,7 @@ impl<P: Protocol + 'static> IntegratedKernel<P> {
                     | "comm_info_request"
                     | "kernel_info_request"
                     | "tool_request"
+                    | "model_request"
             ),
             "control" => matches!(
                 msg_type,
@@ -2489,6 +2492,155 @@ impl<P: Protocol + 'static> IntegratedKernel<P> {
         });
 
         self.send_tool_reply(error).await
+    }
+
+    /// Handle model request for local model management
+    async fn handle_model_request(&mut self, message: HashMap<String, Value>) -> Result<()> {
+        info!("Handling model_request");
+
+        let content = message
+            .get("content")
+            .ok_or_else(|| anyhow!("No content in model_request"))?;
+
+        let command = content
+            .get("command")
+            .and_then(|v| v.as_str())
+            .ok_or_else(|| anyhow!("No command in model_request"))?;
+
+        debug!("Model command: {}", command);
+
+        // Handle model commands
+        match command {
+            "list" => self.handle_model_list(content).await,
+            "pull" => self.handle_model_pull(content).await,
+            "status" => self.handle_model_status(content).await,
+            "info" => self.handle_model_info(content).await,
+            _ => self.handle_unknown_model_command(command).await,
+        }
+    }
+
+    /// Handle model list command
+    async fn handle_model_list(&mut self, _content: &Value) -> Result<()> {
+        debug!("Listing local models");
+
+        // TODO: Implement actual provider access via component registry
+        // For now, return empty list
+        let models: Vec<Value> = vec![];
+
+        let response = json!({
+            "msg_type": "model_reply",
+            "content": {
+                "status": "ok",
+                "models": models,
+                "count": models.len(),
+            }
+        });
+
+        self.send_model_reply(response).await
+    }
+
+    /// Handle model pull command
+    async fn handle_model_pull(&mut self, content: &Value) -> Result<()> {
+        info!("Pulling model");
+
+        let model_spec = content
+            .get("model_spec")
+            .and_then(|v| v.as_str())
+            .ok_or_else(|| anyhow!("No model_spec in pull request"))?;
+
+        debug!("Pull request for model: {}", model_spec);
+
+        // TODO: Implement actual model pull via provider
+        let result = json!({
+            "status": "error",
+            "error": "Model pull not yet implemented in kernel"
+        });
+
+        let response = json!({
+            "msg_type": "model_reply",
+            "content": result
+        });
+
+        self.send_model_reply(response).await
+    }
+
+    /// Handle model status command
+    async fn handle_model_status(&mut self, content: &Value) -> Result<()> {
+        debug!("Checking model backend status");
+
+        let backend = content.get("backend").and_then(|v| v.as_str()).unwrap_or("ollama");
+        debug!("Status check for backend: {}", backend);
+
+        // TODO: Implement actual health check via provider
+        let status = json!({
+            "status": "error",
+            "error": "Backend status check not yet implemented in kernel"
+        });
+
+        let response = json!({
+            "msg_type": "model_reply",
+            "content": status
+        });
+
+        self.send_model_reply(response).await
+    }
+
+    /// Handle model info command
+    async fn handle_model_info(&mut self, content: &Value) -> Result<()> {
+        debug!("Getting model info");
+
+        let model_id = content
+            .get("model_id")
+            .and_then(|v| v.as_str())
+            .ok_or_else(|| anyhow!("No model_id in info request"))?;
+
+        debug!("Info request for model: {}", model_id);
+
+        // TODO: Implement actual model info via provider
+        let info = json!({
+            "status": "error",
+            "error": "Model info not yet implemented in kernel"
+        });
+
+        let response = json!({
+            "msg_type": "model_reply",
+            "content": info
+        });
+
+        self.send_model_reply(response).await
+    }
+
+    /// Handle unknown model command
+    async fn handle_unknown_model_command(&mut self, command: &str) -> Result<()> {
+        warn!("Unknown model command: {}", command);
+        let error = json!({
+            "msg_type": "model_reply",
+            "content": {
+                "status": "error",
+                "error": format!("Unknown model command: {command}")
+            }
+        });
+
+        self.send_model_reply(error).await
+    }
+
+    /// Send model reply message
+    async fn send_model_reply(&mut self, response: Value) -> Result<()> {
+        debug!("Sending model_reply");
+
+        // Send via transport
+        if let Some(ref transport) = self.transport {
+            let reply_bytes = self.protocol.create_response(
+                "model_reply",
+                response.get("content").unwrap_or(&response).clone(),
+            )?;
+            transport.send("shell", vec![reply_bytes]).await?;
+            trace!("Model reply sent successfully");
+        } else {
+            warn!("No transport available to send model reply");
+        }
+
+        Ok(())
     }
 
     /// Run kernel as daemon

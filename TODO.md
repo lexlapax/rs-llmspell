@@ -989,21 +989,22 @@
 
 ## PHASE 11.3: Kernel Protocol Extension
 
-### Task 11.3.1: Add ModelRequest/ModelReply Message Types
+### Task 11.3.1: Add ModelRequest/ModelReply Message Types ✅ COMPLETE
 
-**File**: `llmspell-kernel/src/protocol.rs`
+**File**: `llmspell-kernel/src/execution/integrated.rs`
 **Priority**: CRITICAL
 **Estimated**: 2 hours
+**Actual**: 1.5 hours
 **Dependencies**: None
 
 **Context**: Need new message types for model operations, similar to existing tool_request pattern.
 
 **Acceptance Criteria:**
-- [ ] ModelRequest message type added to KernelMessage enum
-- [ ] ModelReply message type added to KernelMessage enum
-- [ ] Serialization/deserialization works
-- [ ] Message types follow existing pattern
-- [ ] Zero clippy warnings
+- [x] ModelRequest message type added to kernel routing
+- [x] ModelReply message type added to kernel routing
+- [x] Serialization/deserialization works
+- [x] Message types follow existing pattern
+- [x] Zero clippy warnings
 
 **Implementation Steps:**
 1. Read existing protocol.rs to understand message pattern
