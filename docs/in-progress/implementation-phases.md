@@ -10,7 +10,7 @@
 
 ## Overview
 
-Rs-LLMSpell follows a carefully structured 21+ phase implementation approach that prioritizes core functionality while building toward production readiness. Each phase has specific goals, components, and measurable success criteria. The roadmap includes Phase 9 for Interactive REPL and Debugging Infrastructure, Phase 10 for Service Integration & IDE Connectivity, and Phase 11 for Adaptive Memory System, essential for agent intelligence.
+Rs-LLMSpell follows a carefully structured 23+ phase implementation approach that prioritizes core functionality while building toward production readiness. Each phase has specific goals, components, and measurable success criteria. The roadmap includes Phase 9 for Interactive REPL and Debugging Infrastructure, Phase 10 for Service Integration & IDE Connectivity, Phase 11 for Local LLM Integration, and Phase 12 for Adaptive Memory System, essential for agent intelligence.
 
 ### Phase Categories
 
@@ -21,12 +21,13 @@ Rs-LLMSpell follows a carefully structured 21+ phase implementation approach tha
 - **Advanced Features** (Phase 8): Vector storage and search infrastructure
 - **Developer Experience** (Phase 9): Interactive REPL and debugging infrastructure
 - **Service & IDE Integration** (Phase 10): External service layer and IDE connectivity
-- **Advanced AI** (Phase 11): Adaptive memory system with temporal knowledge graphs
-- **Protocol Support** (Phases 12-13): MCP client and server integration
-- **Language Extensions** (Phase 14): JavaScript engine support
-- **Platform Support** (Phases 15-16): Library mode and cross-platform support
-- **Production Optimization** (Phase 17): Performance and security hardening
-- **Future Enhancements** (Phases 18+): Extended tools, A2A protocols, multimodal, and AI/ML tools
+- **Local LLM Support** (Phase 11): Ollama and Candle integration for offline operation
+- **Advanced AI** (Phase 12): Adaptive memory system with temporal knowledge graphs
+- **Protocol Support** (Phases 13-14): MCP client and server integration
+- **Language Extensions** (Phase 15): JavaScript engine support
+- **Platform Support** (Phases 16-17): Library mode and cross-platform support
+- **Production Optimization** (Phase 18): Performance and security hardening
+- **Future Enhancements** (Phases 19+): Extended tools, A2A protocols, multimodal, and AI/ML tools
 
 ---
 
@@ -933,13 +934,152 @@ Rs-LLMSpell follows a carefully structured 21+ phase implementation approach tha
 
 ---
 
-### **Phase 11: Adaptive Memory System (Weeks 37-41)**
+### **Phase 11: Local LLM Integration (Weeks 37-41)**
+
+**Goal**: Implement dual-path local LLM support via Ollama (external process) and Candle (embedded Rust) with unified model management
+**Priority**: CRITICAL (Enables offline and cost-free LLM operations)
+**Timeline**: 20 working days (both Ollama and Candle)
+**Dependencies**: Phase 10 Service Integration ✅
+
+**Architecture Overview**:
+- **Dual Implementation**: Both Ollama and Candle support in single phase
+- **Unified UX**: Same script API regardless of backend (Ollama vs Candle)
+- **Model Agnostic**: Support LLaMA 3.1, Mistral, Phi-3, Gemma 2 via both paths
+- **CLI-First**: Model download/install managed through `llmspell model` subcommand
+- **Provider Abstraction**: Extend existing ProviderInstance trait for local providers
+
+**Phase 11.1: Ollama Integration (Days 1-10)**:
+- Fast path to local LLM (mature ecosystem)
+- Uses ollama-rs crate (v0.3.2+)
+- External process dependency at localhost:11434
+- Rich model library via `ollama pull`
+- Streaming support built-in
+- Auto-start capability
+
+**Phase 11.2: Candle Integration (Days 11-20)**:
+- Pure Rust embedded inference
+- Uses candle-core + candle-transformers
+- GGUF format from HuggingFace
+- GPU acceleration (CUDA/Metal)
+- Q4_K_M quantization default
+- No external dependencies
+
+**Unified Model Management**:
+- Single CLI: `llmspell model` for both backends
+- Consistent syntax: `local/<model>:<variant>[@backend]`
+- Auto-detection: Prefers Ollama, falls back to Candle
+- Examples:
+  - `local/llama3.1:8b` (auto-detect)
+  - `local/phi3:3.8b@ollama` (force Ollama)
+  - `local/mistral:7b@candle` (force Candle)
+
+**Recommended Models**:
+1. **Phi-3 Mini (3.8B)** - Smallest, fastest (~2.4GB)
+2. **Mistral 7B** - Best quality/size ratio (~4.1GB)
+3. **LLaMA 3.1 8B** - Most capable (~4.7GB)
+4. **Gemma 2 9B** - Google's efficient model (~5.4GB)
+
+**Script API** (`LocalLLM` global):
+```lua
+-- Check status
+local status = LocalLLM.status()
+
+-- List local models
+local models = LocalLLM.list()
+
+-- Create agent with local model (backend auto-detected)
+local agent = Agent.create({
+    model = "local/llama3.1:8b",
+    temperature = 0.7
+})
+
+-- Download model from script
+LocalLLM.pull("ollama/llama3.1:8b")
+```
+
+**CLI Commands**:
+```bash
+# Check status
+llmspell model status
+
+# List local models
+llmspell model list [--backend ollama|candle]
+
+# Download models
+llmspell model pull ollama/phi3:3.8b
+llmspell model pull candle/mistral:7b --quantization Q4_K_M
+
+# View available models
+llmspell model available [--recommended]
+
+# Install Ollama
+llmspell model install-ollama
+```
+
+**Performance Targets**:
+- **First token latency**: <100ms (Ollama), <200ms (Candle)
+- **Throughput**: >20 tokens/second for 7B models
+- **Memory**: <5GB RAM for Q4_K_M quantized models
+- **Model load**: <5 seconds
+- **Cold start**: <10 seconds total
+
+**Example Applications**:
+Created 5 example applications in `examples/script-users/applications/local-chat/`:
+1. `local_chat.lua` - Simple chat with auto-detection
+2. `ollama_chat.lua` - Ollama-specific example
+3. `candle_inference.lua` - Candle-specific with benchmarking
+4. `backend_comparison.lua` - Compare Ollama vs Candle performance
+5. `llmspell.toml` - Configuration template
+
+**Tracing Integration**:
+All code includes comprehensive tracing with trace!, debug!, info!, warn!, error! macros following Phase 10 patterns:
+- info!() for lifecycle events (provider init, model loading)
+- debug!() for operational details (config values, timing)
+- trace!() for fine-grained flow (tokenization, file loading)
+- warn!() for recoverable issues (model not found, fallback)
+- error!() for critical failures (GGUF parse errors, API failures)
+
+**Success Criteria**:
+- [ ] `llmspell model list` shows available local models (both Ollama and Candle)
+- [ ] `llmspell model pull ollama/llama3.1:8b` downloads via Ollama
+- [ ] `llmspell model pull candle/mistral:7b` downloads GGUF for Candle
+- [ ] Scripts use `model = "local/llama3.1:8b"` syntax (backend auto-detected)
+- [ ] Ollama provider functional with streaming support
+- [ ] Candle provider functional with GGUF loading
+- [ ] Performance: <100ms first token, >20 tokens/sec for 7B models
+- [ ] Memory: <5GB RAM for Q4_K_M quantized models
+- [ ] Examples demonstrate both Ollama and Candle usage
+- [ ] Comprehensive test coverage for both providers
+- [ ] Documentation covers installation, configuration, and usage
+
+**Testing Requirements**:
+- Ollama provider unit tests (health check, list models, completion)
+- Candle provider unit tests (model loading, GGUF parsing, inference)
+- Integration tests (full workflow from pull to completion)
+- Backend switching tests (agent can use both backends)
+- Performance benchmarks (meet latency/throughput targets)
+- Memory usage validation (<5GB for Q4_K_M models)
+- Example application validation (all 5 examples working)
+
+**Research References**:
+- Ollama: Go-based LLM server (localhost:11434) with easy model management
+- ollama-rs: Rust client library (v0.3.2+) for Ollama API
+- rig-core: Rust LLM framework (v0.20.0) with native Ollama provider support
+- Candle: HuggingFace's pure Rust ML framework for embedded LLM inference
+- GGUF Format: Quantized model format for efficient inference (Q4_K_M quantization)
+
+**Design Document**: `/docs/in-progress/phase-11-design-doc.md` (2,500+ lines)
+
+---
+
+### **Phase 12: Adaptive Memory System (Weeks 42-46)**
 
 **Goal**: Implement Adaptive Temporal Knowledge Graph (A-TKG) memory architecture with IDE visualization
 **Priority**: HIGH (Core AI Capability)
 **Dependencies**:
 - Phase 8: Vector Storage as foundation
 - Phase 10: IDE integration for memory visualization
+- Phase 11: Local LLM support for knowledge extraction
 **Research Foundation**: Based on Zep/Graphiti (94.8% DMR accuracy) and Mem0 (26% improvement over OpenAI)
 
 **Memory Architecture Overview**:
@@ -948,7 +1088,7 @@ Rs-LLMSpell follows a carefully structured 21+ phase implementation approach tha
 - **Semantic Memory**: Temporal Knowledge Graph storing facts, entities, relationships
 - **Adaptive Consolidation**: LLM-driven memory management (add/update/delete logic)
 
-**Phase 11.1: Foundational Episodic Memory (Week 37)**:
+**Phase 12.1: Foundational Episodic Memory (Week 42)**:
 - Create `llmspell-memory` crate with core data structures
 - Implement `InteractionLog` and `MemoryItem` types
 - Integrate with `llmspell-events` for interaction capture
@@ -956,7 +1096,7 @@ Rs-LLMSpell follows a carefully structured 21+ phase implementation approach tha
 - Basic vector retrieval using Phase 8 infrastructure
 - Memory persistence via `llmspell-storage`
 
-**Phase 11.2: Temporal Knowledge Graph Foundation (Weeks 38-39)**:
+**Phase 12.2: Temporal Knowledge Graph Foundation (Weeks 43-44)**:
 - **New Crate: `llmspell-graph`**
   - Bi-temporal data model (event time + ingestion time)
   - Node/Edge structures with temporal validity intervals
@@ -971,7 +1111,7 @@ Rs-LLMSpell follows a carefully structured 21+ phase implementation approach tha
   - Temporal information parsing
   - Contradiction detection and resolution
 
-**Phase 11.3: Hybrid Retrieval System (Week 40)**:
+**Phase 12.3: Hybrid Retrieval System (Week 45)**:
 - **Memory Orchestrator** in `llmspell-memory`:
   - Unified API for all memory types
   - Query planning and routing logic
@@ -986,7 +1126,7 @@ Rs-LLMSpell follows a carefully structured 21+ phase implementation approach tha
   - No LLM calls during retrieval
   - Support for 1M+ memory items
 
-**Phase 11.4: Adaptive Consolidation (Week 40)**:
+**Phase 12.4: Adaptive Consolidation (Week 45)**:
 - **Memory Consolidation Pipeline** (Mem0-inspired):
   - Periodic review of memory items
   - LLM-driven decisions: Add/Update/Delete/Ignore
@@ -1001,7 +1141,7 @@ Rs-LLMSpell follows a carefully structured 21+ phase implementation approach tha
   - Adjust importance scores based on outcomes
   - Self-improving relevance ranking
 
-**Phase 11.5: Integration and Polish (Week 41)**:
+**Phase 12.5: Integration and Polish (Week 46)**:
 - **Script API** (`MemoryGlobal`):
   - `Memory.store()` - Store new memories
   - `Memory.search()` - Semantic search
@@ -1061,7 +1201,7 @@ Rs-LLMSpell follows a carefully structured 21+ phase implementation approach tha
 ## Advanced Integration Phases
 
 
-### **Phase 12: MCP Tool Integration (Weeks 42-43)**
+### **Phase 13: MCP Tool Integration (Weeks 47-48)**
 
 **Goal**: Support Model Control Protocol for external tools
 **Priority**: LOW (Advanced Integration)
@@ -1088,7 +1228,7 @@ Rs-LLMSpell follows a carefully structured 21+ phase implementation approach tha
 
 ---
 
-### **Phase 13: MCP Server Mode (Weeks 44-45)**
+### **Phase 14: MCP Server Mode (Weeks 49-50)**
 
 **Goal**: Expose rs-llmspell tools and agents via MCP protocol
 **Priority**: LOW (Advanced Integration)
@@ -1115,7 +1255,7 @@ Rs-LLMSpell follows a carefully structured 21+ phase implementation approach tha
 
 ---
 
-### **Phase 14: JavaScript Engine Support (Weeks 46-47)**
+### **Phase 15: JavaScript Engine Support (Weeks 51-52)**
 
 **Goal**: Add JavaScript support via bridge pattern established in Phase 1
 **Priority**: MEDIUM (Multi-Language Support)
@@ -1144,7 +1284,7 @@ Rs-LLMSpell follows a carefully structured 21+ phase implementation approach tha
 
 ---
 
-### **Phase 15: Library Mode Support (Weeks 48-49)**
+### **Phase 16: Library Mode Support (Weeks 53-54)**
 
 **Goal**: Agent-to-Agent communication as client
 **Priority**: LOW (Advanced Networking)
@@ -1171,7 +1311,7 @@ Rs-LLMSpell follows a carefully structured 21+ phase implementation approach tha
 
 ---
 
-### **Phase 16: Cross-Platform Support (Weeks 50-51)**
+### **Phase 17: Cross-Platform Support (Weeks 55-56)**
 
 **Goal**: Expose local agents via A2A protocol
 **Priority**: LOW (Advanced Networking)
@@ -1200,7 +1340,7 @@ Rs-LLMSpell follows a carefully structured 21+ phase implementation approach tha
 
 ## Production Optimization Phase
 
-### **Phase 17: Production Optimization (Weeks 52-53)**
+### **Phase 18: Production Optimization (Weeks 57-58)**
 
 **Goal**: Support usage as native module in external runtimes
 **Priority**: MEDIUM (Alternative Usage Mode)
@@ -1227,60 +1367,9 @@ Rs-LLMSpell follows a carefully structured 21+ phase implementation approach tha
 
 ---
 
-### **Phase 18: A2A Client Support (Weeks 54-55)**
+### **Phase 19: A2A Client Support (Weeks 59-60)**
 
-**Goal**: Add JavaScript as second script engine using existing ScriptEngineBridge infrastructure
-**Priority**: MEDIUM (Enhancement)
-**Phase 4 Preparation**: JavaScriptHookAdapter, Promise-based patterns, and UniversalEvent cross-language support already designed in Phase 4, significantly reducing implementation complexity.
-
-**Components**:
-- JavaScript engine integration (`boa` or `quickjs`)
-- `JSEngine` implementing existing ScriptEngineBridge trait
-- ScriptRuntime::new_with_javascript() factory method
-- Reuse existing language-agnostic API injection framework
-- JavaScript Promise-based async patterns
-- Streaming support via async generators
-- Media type marshalling (base64/typed arrays)
-- **JavaScriptHookAdapter from Phase 4 for Promise-based hooks**
-- **UniversalEvent handling for Lua↔JS event propagation**
-- **Model Specification Features**:
-  - Implement same ModelSpecifier parsing in JavaScript bridge
-  - Ensure JavaScript API matches Lua API for model specification
-  - Support both full configuration and "provider/model" syntax in scripts
-  - JavaScript-specific tests for convenience syntax
-  - Consistent error handling for invalid model specifications
-
-**Success Criteria**:
-- [ ] JSEngine implements ScriptEngineBridge (same interface as LuaEngine)
-- [ ] Existing ScriptRuntime works with JSEngine without changes
-- [ ] CLI supports --engine javascript flag
-- [ ] Same API surface available in JavaScript as Lua (validated by tests)
-- [ ] JavaScript async/await patterns work through bridge
-- [ ] Streaming via async generators functional through bridge
-- [ ] Media types properly marshalled through bridge abstraction
-- [ ] Performance comparable to Lua execution
-- [ ] Error handling consistent across engines
-- [ ] **JavaScript Promise-based hooks work via JavaScriptHookAdapter from Phase 4**
-- [ ] **Cross-language events propagate correctly (Lua↔JS) via UniversalEvent**
-- [ ] **Async/await patterns in hooks handled transparently**
-- [ ] Model specification syntax identical between Lua and JavaScript
-- [ ] "provider/model" convenience syntax works in JavaScript scripts
-- [ ] JavaScript tests validate all model specification formats
-
-**Testing Requirements**:
-- Cross-engine API compatibility tests (using existing framework)
-- JavaScript-specific behavior tests
-- Engine switching integration tests
-- Performance comparison benchmarks (Lua vs JavaScript)
-- JavaScript async pattern validation
-- Error handling consistency tests
-- Cross-engine integration tests
-
----
-
-### **Phase 18: A2A Client Support (Weeks 54-55)**
-
-**Goal**: Agent-to-Agent communication as client  
+**Goal**: Agent-to-Agent communication as client
 **Priority**: LOW (Advanced Networking)
 
 **Components**:
@@ -1305,7 +1394,7 @@ Rs-LLMSpell follows a carefully structured 21+ phase implementation approach tha
 
 ---
 
-### **Phase 19: A2A Server Support (Weeks 56-57)**
+### **Phase 20: A2A Server Support (Weeks 61-62)**
 
 **Goal**: Expose local agents via A2A protocol  
 **Priority**: LOW (Advanced Networking)
@@ -1332,11 +1421,11 @@ Rs-LLMSpell follows a carefully structured 21+ phase implementation approach tha
 
 ---
 
-### **Phase 20: Multimodal Tools Implementation (Weeks 58-59)**
+### **Phase 21: Multimodal Tools Implementation (Weeks 63-64)**
 
 **Goal**: Implement comprehensive multimodal processing tools  
 **Priority**: MEDIUM (Feature Enhancement)
-**Dependencies**: Requires Phase 8 Vector Storage and Phase 11 Memory System
+**Dependencies**: Requires Phase 8 Vector Storage and Phase 12 Memory System
 **Phase 4 Integration**: Media processing hooks enable dynamic parameter adjustment, progress tracking, and cost monitoring for expensive operations.
 
 **Components**:
@@ -1392,7 +1481,7 @@ Rs-LLMSpell follows a carefully structured 21+ phase implementation approach tha
 
 ---
 
-### **Phase 21: AI/ML Complex Tools (Weeks 60-61)**
+### **Phase 22: AI/ML Complex Tools (Weeks 65-66)**
 
 **Goal**: Implement AI and ML dependent complex tools  
 **Priority**: MEDIUM (Advanced AI Features)
@@ -1426,10 +1515,10 @@ Rs-LLMSpell follows a carefully structured 21+ phase implementation approach tha
 
 ---
 
-### **Phase 22: Advanced Workflow Features (Weeks 62-65)**
+### **Phase 23: Advanced Workflow Features (Weeks 67-70)**
 **Goal**: Implement sophisticated workflow orchestration capabilities and advanced patterns
 **Priority**: LOW (Advanced Enhancement)
-**Dependencies**: Builds on Phase 3 (Workflows), Phase 8 (Vector Storage), Phase 11 (Memory System), and Phase 10 (Service Integration)
+**Dependencies**: Builds on Phase 3 (Workflows), Phase 8 (Vector Storage), Phase 12 (Memory System), and Phase 10 (Service Integration)
 
 **Advanced Workflow Patterns**:
 ```rust
@@ -1633,11 +1722,11 @@ pub struct WorkflowTestHarness {
    - Phase 1.2 MUST implement ScriptEngineBridge foundation
    - NO direct Lua coupling allowed in ScriptRuntime
    - Bridge pattern implementation is CRITICAL for future phases
-2. **High Priority** (Phases 3-4, 7, 17): Agent infrastructure, hooks, API consistency, and production optimization
-3. **Medium Priority** (Phases 5-6, 8-11, 14-16, 21-22): State management, sessions, vector storage, REPL, platform support, and AI/ML tools
-   - Phase 14 (JavaScript) becomes much simpler due to existing bridge infrastructure
+2. **High Priority** (Phases 3-4, 7, 11-12, 18): Agent infrastructure, hooks, API consistency, local LLM support, memory system, and production optimization
+3. **Medium Priority** (Phases 5-6, 8-10, 15-17, 21-23): State management, sessions, vector storage, REPL, IDE integration, platform support, and AI/ML tools
+   - Phase 15 (JavaScript) becomes much simpler due to existing bridge infrastructure
    - Additional engines can be added as medium priority features
-4. **Low Priority** (Phases 9, 12-13, 18-20): Advanced workflows, MCP protocols, and A2A support
+4. **Low Priority** (Phases 13-14, 19-20): MCP protocols and A2A support
 
 ### Breaking Changes Strategy
 
@@ -1671,14 +1760,15 @@ Each phase must pass:
 - **Phase 8**: Vector Storage depends on Phase 7 API Standardization
 - **Phase 9**: REPL and Debugging depends on Phase 8 Vector Storage for search context
 - **Phase 10**: Service & IDE Integration depends on Phase 9 (Kernel Integration)
-- **Phase 11**: Adaptive Memory System depends on Phase 8 Vector Storage and Phase 10 IDE for visualization
-- **Phase 12**: MCP Tool Integration depends on Phase 10 Service infrastructure
-- **Phase 18-19**: A2A Protocol depends on Phase 4 **(DistributedHookContext required)**
-- **Phase 14**: JavaScript Engine Support depends on MVP completion + ScriptEngineBridge foundation from Phase 1.2 **(greatly simplified by Phase 4 JavaScriptHookAdapter)**
-- **Phase 15**: Library Mode depends on Phase 4 **(SelectiveHookRegistry needed)**
-- **Phase 22**: Advanced Workflow Features depends on Phase 8 Vector Storage and Phase 11 Memory System
-- **Phase 20**: Multimodal Tools depends on Phase 11 Memory System
-- **Phase 21**: AI/ML Tools depends on Phase 4 **(CostTrackingHook essential)**
+- **Phase 11**: Local LLM Integration depends on Phase 10 Service Integration (for model management service)
+- **Phase 12**: Adaptive Memory System depends on Phase 8 Vector Storage, Phase 10 IDE for visualization, and Phase 11 Local LLM for knowledge extraction
+- **Phase 13**: MCP Tool Integration depends on Phase 10 Service infrastructure
+- **Phase 19-20**: A2A Protocol depends on Phase 4 **(DistributedHookContext required)**
+- **Phase 15**: JavaScript Engine Support depends on MVP completion + ScriptEngineBridge foundation from Phase 1.2 **(greatly simplified by Phase 4 JavaScriptHookAdapter)**
+- **Phase 16**: Library Mode depends on Phase 4 **(SelectiveHookRegistry needed)**
+- **Phase 23**: Advanced Workflow Features depends on Phase 8 Vector Storage and Phase 12 Memory System
+- **Phase 21**: Multimodal Tools depends on Phase 12 Memory System
+- **Phase 22**: AI/ML Tools depends on Phase 4 **(CostTrackingHook essential)**
 - **Cross-language testing**: Can begin in Phase 1 with bridge abstraction tests
 - **Engine implementations**: Can be developed in parallel once ScriptEngineBridge is stable
 - **Third-party engines**: Can be added after Phase 1.2 completion using bridge pattern
@@ -1697,14 +1787,15 @@ Each phase must pass:
 - **Advanced Features**: 32 weeks (Phases 0-8, includes vector storage and search)
 - **Developer Experience**: 32 weeks (Phases 0-9, REPL and debugging infrastructure)
 - **Service & IDE Integration**: 36 weeks (Phases 0-10, external connectivity and IDE support)
-- **Advanced AI**: 41 weeks (Phases 0-11, adaptive memory system with IDE visualization)
-- **Protocol Support**: 45 weeks (Phases 0-13, MCP client and server)
-- **Multi-Language Ready**: 47 weeks (Phases 0-14, JavaScript support)
-- **Library & Platform Support**: 51 weeks (Phases 0-16, library mode and cross-platform)
-- **Production Ready**: 53 weeks (Phases 0-17, optimization and hardening)
-- **Distributed Computing**: 57 weeks (Phases 0-19, A2A protocol support)
-- **Advanced Tools**: 61 weeks (Phases 0-21, multimodal and AI/ML tools)
-- **Full Feature Set**: 65 weeks (All 22 phases)
+- **Local LLM Support**: 41 weeks (Phases 0-11, Ollama and Candle integration)
+- **Advanced AI**: 46 weeks (Phases 0-12, adaptive memory system with IDE visualization)
+- **Protocol Support**: 50 weeks (Phases 0-14, MCP client and server)
+- **Multi-Language Ready**: 52 weeks (Phases 0-15, JavaScript support)
+- **Library & Platform Support**: 56 weeks (Phases 0-17, library mode and cross-platform)
+- **Production Ready**: 58 weeks (Phases 0-18, optimization and hardening)
+- **Distributed Computing**: 62 weeks (Phases 0-20, A2A protocol support)
+- **Advanced Tools**: 66 weeks (Phases 0-22, multimodal and AI/ML tools)
+- **Full Feature Set**: 70 weeks (All 23 phases)
 
 ### Resource Requirements
 

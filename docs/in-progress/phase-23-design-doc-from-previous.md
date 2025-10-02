@@ -1,4 +1,4 @@
-# Phase 8: Advanced Workflow Features Design Document
+# Phase 23 (from Phase 8): Advanced Workflow Features Design Document
 
 **Version**: 2.0  
 **Date**: July 2025  

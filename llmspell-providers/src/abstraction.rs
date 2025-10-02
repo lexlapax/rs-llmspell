@@ -427,6 +427,18 @@ impl ProviderManager {
         let implementation_name = match provider_name.as_str() {
             "openai" | "anthropic" | "cohere" | "groq" | "perplexity" | "together" | "gemini"
             | "mistral" | "replicate" | "fireworks" => "rig",
+
+            // Local provider routing with backend resolution (Phase 11)
+            "local" => {
+                // Backend resolution: spec.backend -> default "ollama"
+                let backend = spec.backend.as_deref().unwrap_or("ollama");
+                debug!(
+                    "Local provider routing: spec.backend={:?}, resolved={}",
+                    spec.backend, backend
+                );
+                backend
+            }
+
             other => other,
         };
 

@@ -3,11 +3,20 @@
 ## Project Identity
 rs-llmspell: **Scriptable LLM interactions** via Lua, JavaScript - Cast scripting spells to animate LLM golems
 
+Production-ready AI workflow orchestration platform built in Rust for script-driven LLM coordination with RAG at scale.
+
 ## Critical References
 - **Architecture**: `/docs/technical/master-architecture-vision.md`
-- **Implementation Phases**: `/docs/in-progress/implementation-phases.md` (16-phase roadmap)
-- **Current Status**: Phase 8 (check `/TODO.md` for active tasks)
+- **Implementation Phases**: `/docs/in-progress/implementation-phases.md` (23+ phase roadmap)
+- **Current Status**: Phase 11 Local LLM Integration (Ollama + Candle dual-path)
+- **Phase 11 Design**: `/docs/in-progress/phase-11-design-doc.md` (comprehensive integration details)
+- **Phase 11 Tasks**: `/docs/in-progress/PHASE11-TODO.md` (detailed implementation tasks)
 - **Current Work**: ALWAYS read `/TODO.md` - hierarchical checkboxes with numbered tasks
+
+## Recent Completion Status
+- ✅ **Phase 7**: Infrastructure Consolidation (536+ files refactored, centralized testing, config revolution)
+- ✅ **Phase 10**: Service Integration & IDE Connectivity (kernel, Jupyter, VS Code, LSP)
+- 🚧 **Phase 11**: Starting - Local LLM Integration (Ollama via rig + Candle embedded inference)
 
 ## Project-Specific Behavior Controls
 - **Always Megathink**: analyze existing code, never guess

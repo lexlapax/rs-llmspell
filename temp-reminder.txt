@@ -14,15 +14,18 @@
 - scriptruntime capture stdin, stdout, stderr
 
 
+- local llm models 
 
-after that, similarly like rust api, ultrathink, now and analyze code because we need to redo the lua api user-guide 
-based on what we've added / changed in Phase 9. look at what we have in docs/user-guide/lua/* analyze what's 
-there, and analyze what we've accomplished in Phase 9 via docs/in-progress/phase-09-design-doc.md and 
-TODO.md and find out what needs to be updated in the lua user guide. do thorough analysis including 
-looking at implementation code and update the lua user-guide. 
+we ended up using rust rig crate in llmspell-providers to wrap calls to cloud hosted llms.. but  
+even though we planned to implement local, we never did. there are two options for local, one
+is to use rig's support for ollama (which is an external library/binary to llmspell) or use one 
+of rust candle, rust orca and other crates to support local llm providers. look through the 
+docs including. first question, i don't see a plan to implement that in the future. second 
+question look at @docs/in-progress/PHASE*DONE.md at what we've implemented .. what happened? 
+3rd question.. research on the internet what approach we should use for local? and tell me. 
+this is a lot of documents for you to consume, it will fill up your context, do it one at a 
+time and keep track of your analysis in a temporary @LOCAL-LLM-ANALYSIS.md file if you need to 
+as you go through the todos.         
 
-
-complete 10.13 with ultrathink. review and analyze everything that's already been done in different previous 
-tasks and phases first, some of the tasks in 10.13 may already be done. update sub tasks and steps in TODO.md as you complete them.
-after completion you need to check by going back and reading all the check boxes in each task to see we didn't 
-miss anything. no clippy warnings and all tests passing.
+do not take the easy route. you need to research and analyze rust candle and rust orca and update 
+your analysis.   

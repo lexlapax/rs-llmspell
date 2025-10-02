@@ -230,11 +230,14 @@ cargo build --release --features common # Common: 25MB (+templates, PDF)
 cargo build --release --features full   # Full: 35MB (all features)
 
 # Use the friendly launcher with setup wizard
-./scripts/llmspell-easy.sh
+./scripts/utilities/llmspell-easy.sh
 
 # Run your first application!
-./scripts/llmspell-easy.sh file-organizer
+./scripts/utilities/llmspell-easy.sh file-organizer
 ```
+
+💡 **Advanced User Tip**: You can also run applications directly with the `llmspell` binary:
+`llmspell app run file-organizer`
 
 💡 **Build Size Tip**: Start with minimal (19MB) for production or common (25MB) for development. See [Installation Options](#-installation-options) below for details.
 
@@ -242,16 +245,16 @@ cargo build --release --features full   # Full: 35MB (all features)
 
 ```bash
 # Organize messy files (2 agents, <30s)
-./scripts/llmspell-easy.sh file-organizer
+./scripts/utilities/llmspell-easy.sh file-organizer
 
 # Generate content (4 agents, <1min)
-./scripts/llmspell-easy.sh content-creator
+./scripts/utilities/llmspell-easy.sh content-creator
 
 # Review code (8 agents, <2min)
-./scripts/llmspell-easy.sh code-review-assistant
+./scripts/utilities/llmspell-easy.sh code-review-assistant
 
 # Build a web app (20 agents, 4.5min)
-./scripts/llmspell-easy.sh webapp-creator
+./scripts/utilities/llmspell-easy.sh webapp-creator
 ```
 
 ## 📦 Installation Options
