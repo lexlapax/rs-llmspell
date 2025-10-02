@@ -3,8 +3,8 @@
 //! This module defines traits and types for local LLM providers (Ollama and Candle)
 //! that extend the base ProviderInstance with model management capabilities.
 
-use async_trait::async_trait;
 use anyhow::Result;
+use async_trait::async_trait;
 use serde::{Deserialize, Serialize};
 use std::time::SystemTime;
 
@@ -130,10 +130,7 @@ impl ModelSpec {
 
         // Split on : to extract variant
         let (model, variant) = if let Some(idx) = model_part.find(':') {
-            (
-                &model_part[..idx],
-                Some(model_part[idx + 1..].to_string()),
-            )
+            (&model_part[..idx], Some(model_part[idx + 1..].to_string()))
         } else {
             (model_part, None)
         };
