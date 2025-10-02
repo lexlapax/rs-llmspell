@@ -192,6 +192,27 @@ pub trait ProviderInstance: Send + Sync {
 
     /// Get current model
     fn model(&self) -> &str;
+
+    /// Downcast to LocalProviderInstance if this provider supports local model management
+    ///
+    /// Returns Some if this provider implements LocalProviderInstance trait,
+    /// None otherwise. This enables accessing local-specific operations like
+    /// health_check(), list_local_models(), pull_model(), etc.
+    ///
+    /// # Examples
+    ///
+    /// ```no_run
+    /// # use llmspell_providers::{ProviderInstance, local::LocalProviderInstance};
+    /// # async fn example(provider: &dyn ProviderInstance) {
+    /// if let Some(local) = provider.as_local() {
+    ///     // Can now access LocalProviderInstance methods
+    ///     let models = local.list_local_models().await;
+    /// }
+    /// # }
+    /// ```
+    fn as_local(&self) -> Option<&dyn crate::local::LocalProviderInstance> {
+        None // Default: not a local provider
+    }
 }
 
 /// Factory function type for creating provider instances
@@ -569,6 +590,54 @@ impl ProviderManager {
             .into_iter()
             .map(str::to_string)
             .collect()
+    }
+
+    /// Get a provider instance for a specific backend (ollama, candle, etc.)
+    ///
+    /// This method searches for provider instances whose hierarchical name starts
+    /// with the specified backend. For example, backend="ollama" will match instances
+    /// like "ollama/local/llama3.1:8b".
+    ///
+    /// # Arguments
+    /// * `backend` - The backend name to search for (e.g., "ollama", "candle")
+    ///
+    /// # Returns
+    /// * `Ok(Some(provider))` - Found a provider for this backend
+    /// * `Ok(None)` - No provider found for this backend
+    /// * `Err` - Error accessing provider instances
+    ///
+    /// # Examples
+    ///
+    /// ```no_run
+    /// # use llmspell_providers::ProviderManager;
+    /// # async fn example(manager: &ProviderManager) -> anyhow::Result<()> {
+    /// if let Some(provider) = manager.get_provider_for_backend("ollama").await? {
+    ///     // Use as_local() to access LocalProviderInstance methods
+    ///     if let Some(local) = provider.as_local() {
+    ///         let models = local.list_local_models().await?;
+    ///     }
+    /// }
+    /// # Ok(())
+    /// # }
+    /// ```
+    #[instrument(skip(self))]
+    pub async fn get_provider_for_backend(
+        &self,
+        backend: &str,
+    ) -> Result<Option<Arc<Box<dyn ProviderInstance>>>, LLMSpellError> {
+        debug!("Looking for provider with backend: {}", backend);
+        let instances = self.instances.read().await;
+
+        // Find first instance that starts with the backend name
+        for (name, provider) in instances.iter() {
+            if name.starts_with(backend) {
+                debug!("Found provider instance: {}", name);
+                return Ok(Some(provider.clone()));
+            }
+        }
+
+        debug!("No provider found for backend: {}", backend);
+        Ok(None)
     }
 }
 

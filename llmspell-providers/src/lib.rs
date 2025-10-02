@@ -19,4 +19,5 @@ pub use local::{
 };
 
 // Re-export provider factories
+pub use local::create_ollama_provider;
 pub use rig::create_rig_provider;

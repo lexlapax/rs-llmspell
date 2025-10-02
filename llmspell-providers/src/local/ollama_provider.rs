@@ -63,6 +63,10 @@ impl ProviderInstance for OllamaProvider {
     fn model(&self) -> &str {
         self.rig_provider.model()
     }
+
+    fn as_local(&self) -> Option<&dyn LocalProviderInstance> {
+        Some(self)
+    }
 }
 
 #[async_trait]

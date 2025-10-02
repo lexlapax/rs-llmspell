@@ -28,8 +28,9 @@ impl ProviderManager {
             config: config.clone(),
         };
 
-        // Register the rig provider factory
+        // Register provider factories
         manager.register_rig_provider().await?;
+        manager.register_ollama_provider().await?;
 
         // Initialize configured providers
         manager.initialize_providers().await?;
@@ -41,6 +42,14 @@ impl ProviderManager {
     async fn register_rig_provider(&self) -> Result<(), LLMSpellError> {
         self.core_manager
             .register_provider("rig", llmspell_providers::create_rig_provider)
+            .await;
+        Ok(())
+    }
+
+    /// Register the Ollama provider factory
+    async fn register_ollama_provider(&self) -> Result<(), LLMSpellError> {
+        self.core_manager
+            .register_provider("ollama", llmspell_providers::create_ollama_provider)
             .await;
         Ok(())
     }
@@ -74,6 +83,8 @@ impl ProviderManager {
             let provider_name = match provider_config.provider_type.as_str() {
                 "openai" | "anthropic" | "cohere" | "groq" | "perplexity" | "together"
                 | "gemini" | "mistral" | "replicate" | "fireworks" => "rig",
+                "ollama" => "ollama",
+                "candle" => "candle",
                 other => other,
             };
 
@@ -98,6 +109,8 @@ impl ProviderManager {
         let provider_name = match config.provider_type.as_str() {
             "openai" | "anthropic" | "cohere" | "groq" | "perplexity" | "together" | "gemini"
             | "mistral" | "replicate" | "fireworks" => "rig",
+            "ollama" => "ollama",
+            "candle" => "candle", // Future
             other => other,
         };
 
@@ -301,7 +314,10 @@ impl ProviderManager {
                     }
                 })?;
                 let provider_name = match provider_config.provider_type.as_str() {
-                    "openai" | "anthropic" | "cohere" => "rig",
+                    "openai" | "anthropic" | "cohere" | "groq" | "perplexity" | "together"
+                    | "gemini" | "mistral" | "replicate" | "fireworks" => "rig",
+                    "ollama" => "ollama",
+                    "candle" => "candle",
                     other => other,
                 };
                 core_manager

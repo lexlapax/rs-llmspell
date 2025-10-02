@@ -11,10 +11,61 @@ use async_trait::async_trait;
 use serde::{Deserialize, Serialize};
 use std::time::SystemTime;
 
-use crate::abstraction::ProviderInstance;
+use crate::abstraction::{ProviderConfig, ProviderInstance};
+use llmspell_core::error::LLMSpellError;
 
 pub use ollama_manager::OllamaModelManager;
 pub use ollama_provider::OllamaProvider;
+
+/// Factory function to create an Ollama provider instance
+///
+/// This function creates an OllamaProvider that uses rig for inference
+/// and ollama-rs for model management. It requires:
+/// - A rig provider for the actual inference
+/// - Base URL for Ollama API (defaults to http://localhost:11434)
+///
+/// # Arguments
+/// * `config` - Provider configuration with model and optional endpoint
+///
+/// # Returns
+/// * `Ok(Box<dyn ProviderInstance>)` - Initialized Ollama provider
+/// * `Err(LLMSpellError)` - Configuration or initialization error
+///
+/// # Examples
+///
+/// ```no_run
+/// # use llmspell_providers::abstraction::ProviderConfig;
+/// # use llmspell_providers::local::create_ollama_provider;
+/// let mut config = ProviderConfig::new_with_type("ollama", "local", "llama3.1:8b");
+/// config.endpoint = Some("http://localhost:11434".to_string());
+/// let provider = create_ollama_provider(config).unwrap();
+/// ```
+pub fn create_ollama_provider(
+    config: ProviderConfig,
+) -> Result<Box<dyn ProviderInstance>, LLMSpellError> {
+    // Base URL for Ollama (from config or default)
+    let base_url = config
+        .endpoint
+        .clone()
+        .unwrap_or_else(|| "http://localhost:11434".to_string());
+
+    // Create underlying rig provider for inference
+    let rig_config = ProviderConfig {
+        name: "rig".to_string(),
+        provider_type: "ollama".to_string(),
+        model: config.model.clone(),
+        endpoint: Some(base_url.clone()),
+        api_key: None, // Ollama doesn't require API keys
+        timeout_secs: config.timeout_secs,
+        max_retries: config.max_retries,
+        custom_config: config.custom_config.clone(),
+    };
+
+    let rig_provider = crate::rig::create_rig_provider(rig_config)?;
+
+    // Wrap in OllamaProvider for model management
+    Ok(Box::new(OllamaProvider::new(rig_provider, base_url)))
+}
 
 /// Health status of a local provider backend
 #[derive(Debug, Clone, Serialize, Deserialize)]
