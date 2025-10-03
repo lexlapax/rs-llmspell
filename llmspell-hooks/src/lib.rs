@@ -21,6 +21,7 @@
 //! use async_trait::async_trait;
 //! use anyhow::Result;
 //!
+//! #[derive(Debug)]
 //! struct MyHook;
 //!
 //! #[async_trait]

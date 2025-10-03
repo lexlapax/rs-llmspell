@@ -116,6 +116,9 @@ async fn test_candle_download_and_inference() {
     let output = provider.complete(&input).await;
     let duration = start.elapsed();
 
+    if let Err(ref e) = output {
+        println!("ERROR: {:?}", e);
+    }
     assert!(output.is_ok(), "Inference should succeed");
 
     let output = output.unwrap();
