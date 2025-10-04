@@ -26,3 +26,4 @@ tokenizers.workspace = true
 parking_lot.workspace = true
 rand.workspace = true
 dirs = "5.0"
+ureq = "2.12"

@@ -20,15 +20,18 @@ impl OllamaModelManager {
         let base_url = base_url.into();
         info!("Initializing OllamaModelManager: {}", base_url);
 
-        // Parse base URL to extract host and port
+        // Parse base URL to extract scheme, host and port
         let url = url::Url::parse(&base_url)
             .unwrap_or_else(|_| url::Url::parse("http://localhost:11434").unwrap());
 
-        let host = url.host_str().unwrap_or("localhost").to_string();
+        let scheme = url.scheme();
+        let host = url.host_str().unwrap_or("localhost");
         let port = url.port().unwrap_or(11434);
 
-        let client = Ollama::new(host, port);
-        debug!("Ollama client created");
+        // Reconstruct full URL for Ollama client (needs scheme)
+        let full_url = format!("{}://{}", scheme, host);
+        let client = Ollama::new(full_url, port);
+        debug!("Ollama client created for {}:{}", host, port);
 
         Self { client, base_url }
     }

@@ -78,15 +78,59 @@ impl HFDownloader {
         info!("GGUF copied to: {:?}", dest_gguf);
 
         // Try to download tokenizer.json (common filename)
+        let dest_tokenizer = dest_dir.join("tokenizer.json");
+
         if let Ok(tokenizer_path) = repo.get("tokenizer.json") {
-            let dest_tokenizer = dest_dir.join("tokenizer.json");
+            // GGUF repo has tokenizer (rare but possible)
             std::fs::copy(&tokenizer_path, &dest_tokenizer)?;
-            info!("Tokenizer downloaded to: {:?}", dest_tokenizer);
+            info!("Tokenizer downloaded from GGUF repo: {:?}", dest_tokenizer);
         } else {
-            warn!(
-                "tokenizer.json not found in repo {}, you may need to provide it manually",
+            // GGUF repo lacks tokenizer - try original model repo
+            info!(
+                "tokenizer.json not in GGUF repo {}, trying original repo",
                 repo_id
             );
+
+            // Extract model name and get original repo
+            if let Some(model_name) = HFModelRepo::extract_model_name(repo_id) {
+                if let Some(original_repo) = HFModelRepo::get_original_repo(model_name) {
+                    info!(
+                        "Downloading tokenizer from original repo: {}",
+                        original_repo
+                    );
+
+                    // Download tokenizer directly via HTTP
+                    // NOTE: Using direct HTTP instead of hf-hub API due to API state issues when
+                    // calling model() multiple times in the same function
+                    let tokenizer_url = format!(
+                        "https://huggingface.co/{}/resolve/main/tokenizer.json",
+                        original_repo
+                    );
+                    debug!("Tokenizer URL: {}", tokenizer_url);
+
+                    let response = ureq::get(&tokenizer_url).call().map_err(|e| {
+                        anyhow!("Failed to download tokenizer from {}: {}", tokenizer_url, e)
+                    })?;
+
+                    let mut file = std::fs::File::create(&dest_tokenizer)?;
+                    std::io::copy(&mut response.into_reader(), &mut file)?;
+
+                    info!(
+                        "Tokenizer downloaded from original repo: {:?}",
+                        dest_tokenizer
+                    );
+                } else {
+                    warn!(
+                        "No original repo mapping for model {}, tokenizer must be provided manually",
+                        model_name
+                    );
+                }
+            } else {
+                warn!(
+                    "Cannot extract model name from GGUF repo {}, tokenizer must be provided manually",
+                    repo_id
+                );
+            }
         }
 
         Ok(dest_gguf)
@@ -165,6 +209,50 @@ impl HFModelRepo {
             }
         }
     }
+
+    /// Get original model repo for tokenizer download
+    ///
+    /// GGUF repos (e.g., TheBloke/*-GGUF) often lack tokenizer.json.
+    /// This maps to the original model repo which has all required files.
+    ///
+    /// # Arguments
+    /// * `model_name` - Simple model name (e.g., "tinyllama", "phi-2")
+    ///
+    /// # Returns
+    /// * `Some(repo_id)` - Original HuggingFace repo with tokenizer
+    /// * `None` - Unknown model or no mapping
+    pub fn get_original_repo(model_name: &str) -> Option<&'static str> {
+        match model_name.to_lowercase().as_str() {
+            "tinyllama" | "tinyllama-1.1b" => Some("TinyLlama/TinyLlama-1.1B-Chat-v1.0"),
+            "phi-2" => Some("microsoft/phi-2"),
+            "qwen2-0.5b" => Some("Qwen/Qwen2-0.5B-Instruct"),
+            _ => {
+                debug!("No original repo mapping for: {}", model_name);
+                None
+            }
+        }
+    }
+
+    /// Extract model name from GGUF repo ID
+    ///
+    /// # Arguments
+    /// * `gguf_repo_id` - GGUF repository ID (e.g., "TheBloke/TinyLlama-1.1B-Chat-v1.0-GGUF")
+    ///
+    /// # Returns
+    /// * `Some(model_name)` - Extracted model name for original repo lookup
+    /// * `None` - Cannot extract model name
+    pub fn extract_model_name(gguf_repo_id: &str) -> Option<&'static str> {
+        // Map GGUF repo IDs to model names
+        match gguf_repo_id {
+            "TheBloke/TinyLlama-1.1B-Chat-v1.0-GGUF" => Some("tinyllama"),
+            "TheBloke/phi-2-GGUF" => Some("phi-2"),
+            "Qwen/Qwen2-0.5B-Instruct-GGUF" => Some("qwen2-0.5b"),
+            _ => {
+                debug!("Cannot extract model name from GGUF repo: {}", gguf_repo_id);
+                None
+            }
+        }
+    }
 }
 
 #[cfg(test)]
@@ -189,6 +277,43 @@ mod tests {
     #[test]
     fn test_hf_model_repo_unknown() {
         let result = HFModelRepo::get_repo_info("unknown-model", "Q4_K_M");
+        assert!(result.is_none());
+    }
+
+    #[test]
+    fn test_get_original_repo_tinyllama() {
+        let repo = HFModelRepo::get_original_repo("tinyllama").unwrap();
+        assert_eq!(repo, "TinyLlama/TinyLlama-1.1B-Chat-v1.0");
+    }
+
+    #[test]
+    fn test_get_original_repo_phi2() {
+        let repo = HFModelRepo::get_original_repo("phi-2").unwrap();
+        assert_eq!(repo, "microsoft/phi-2");
+    }
+
+    #[test]
+    fn test_get_original_repo_unknown() {
+        let result = HFModelRepo::get_original_repo("unknown-model");
+        assert!(result.is_none());
+    }
+
+    #[test]
+    fn test_extract_model_name_tinyllama() {
+        let name =
+            HFModelRepo::extract_model_name("TheBloke/TinyLlama-1.1B-Chat-v1.0-GGUF").unwrap();
+        assert_eq!(name, "tinyllama");
+    }
+
+    #[test]
+    fn test_extract_model_name_phi2() {
+        let name = HFModelRepo::extract_model_name("TheBloke/phi-2-GGUF").unwrap();
+        assert_eq!(name, "phi-2");
+    }
+
+    #[test]
+    fn test_extract_model_name_unknown() {
+        let result = HFModelRepo::extract_model_name("SomeRepo/UnknownModel-GGUF");
         assert!(result.is_none());
     }
 
