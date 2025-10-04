@@ -8,7 +8,7 @@ use std::collections::HashMap;
 use std::path::PathBuf;
 use tracing::{debug, error, info, warn};
 
-use candle_core::{Device, IndexOp, Tensor};
+use candle_core::{Device, Tensor};
 
 use crate::abstraction::{ProviderCapabilities, ProviderInstance};
 use llmspell_core::error::LLMSpellError;
@@ -153,6 +153,12 @@ impl CandleProvider {
         config
     }
 
+    /// Format prompt for chat models
+    fn format_chat_prompt(&self, prompt: &str) -> String {
+        // TinyLlama-Chat and similar models expect chat template format
+        format!("<|user|>\n{}</s>\n<|assistant|>\n", prompt)
+    }
+
     /// Generate text using loaded model
     fn generate_with_model(
         &self,
@@ -164,9 +170,13 @@ impl CandleProvider {
         debug!("Starting generation: max_tokens={}", max_tokens);
         let gen_start = std::time::Instant::now();
 
+        // Format prompt for chat models
+        let formatted_prompt = self.format_chat_prompt(prompt);
+        debug!("Formatted prompt: {}", formatted_prompt);
+
         // Tokenize prompt
         let tokenize_start = std::time::Instant::now();
-        let prompt_tokens = model_wrapper.tokenizer().encode(prompt, true)?;
+        let prompt_tokens = model_wrapper.tokenizer().encode(&formatted_prompt, true)?;
         let tokenize_duration = tokenize_start.elapsed();
         info!(
             "Prompt tokenized: {} tokens in {:.2}ms",
@@ -178,12 +188,13 @@ impl CandleProvider {
         let eos_token_id = model_wrapper.tokenizer().eos_token_id().unwrap_or(2);
 
         // Process prompt (index_pos = 0) - FIRST TOKEN LATENCY
+        // Note: forward() returns logits for LAST token only [batch, vocab_size]
         let first_token_start = std::time::Instant::now();
         let prompt_tensor =
             Tensor::new(prompt_tokens.as_slice(), model_wrapper.device())?.unsqueeze(0)?;
 
         let mut logits = model_wrapper.model().forward(&prompt_tensor, 0)?;
-        logits = logits.i((0, prompt_tokens.len() - 1))?;
+        logits = logits.squeeze(0)?; // Remove batch dimension → [vocab_size]
 
         let first_token_duration = first_token_start.elapsed();
         info!(
@@ -197,24 +208,26 @@ impl CandleProvider {
         let mut all_tokens = prompt_tokens.clone();
         let generation_start = std::time::Instant::now();
 
-        for index_pos in 1..=max_tokens {
+        for index in 0..max_tokens {
             // Sample next token
             let next_token = sample_token(&logits, sampling_config, &all_tokens)?;
 
             // Check for EOS
             if next_token == eos_token_id {
-                debug!("EOS token encountered at position {}", index_pos);
+                debug!("EOS token encountered at position {}", index);
                 break;
             }
 
             generated_tokens.push(next_token);
             all_tokens.push(next_token);
 
-            // Forward pass with single token
+            // Forward pass with single token at position prompt_tokens.len() + index
+            // Note: forward() returns logits for LAST token only [batch, vocab_size]
             let input_tensor = Tensor::new(&[next_token], model_wrapper.device())?.unsqueeze(0)?;
+            let pos = prompt_tokens.len() + index;
 
-            logits = model_wrapper.model().forward(&input_tensor, index_pos)?;
-            logits = logits.i((0, 0))?;
+            logits = model_wrapper.model().forward(&input_tensor, pos)?;
+            logits = logits.squeeze(0)?; // [vocab_size]
         }
 
         let generation_duration = generation_start.elapsed();

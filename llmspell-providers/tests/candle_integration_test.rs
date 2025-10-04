@@ -204,12 +204,12 @@ async fn test_candle_performance_benchmark() {
     println!("\n=== Candle Performance Benchmark ===\n");
 
     // Download model
-    let model_path = ensure_test_model()
+    let _model_path = ensure_test_model()
         .await
         .expect("Failed to download test model");
 
-    // Create provider
-    let model_dir = model_path.parent().unwrap().parent().unwrap();
+    // Create provider with correct model directory
+    let model_dir = get_test_model_dir();
     let mut config = ProviderConfig::new_with_type("candle", "local", "tinyllama:Q4_K_M");
     config.custom_config.insert(
         "model_directory".to_string(),
@@ -248,6 +248,9 @@ async fn test_candle_performance_benchmark() {
         let result = provider.complete(&input).await;
         let duration = start.elapsed();
 
+        if let Err(ref e) = result {
+            println!("ERROR: {:?}", e);
+        }
         assert!(result.is_ok(), "Inference should succeed");
 
         let output = result.unwrap();
@@ -267,12 +270,12 @@ async fn test_candle_model_info() {
     }
 
     // Ensure model is downloaded
-    let model_path = ensure_test_model()
+    let _model_path = ensure_test_model()
         .await
         .expect("Failed to download test model");
 
-    // Create provider
-    let model_dir = model_path.parent().unwrap().parent().unwrap();
+    // Create provider with correct model directory
+    let model_dir = get_test_model_dir();
     let mut config = ProviderConfig::new_with_type("candle", "local", "tinyllama:Q4_K_M");
     config.custom_config.insert(
         "model_directory".to_string(),
