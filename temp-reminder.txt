@@ -1,5 +1,4 @@
 - allow security flags and configs to be set as environment variables or flags.. -e.g allow write to this directory.
-- every script /example code when it was last working should have a version stamp of rust code that it worked with in the header and the last code commit signature.
 - all lua bridges should be just wrappers to rust native bridge.. not doing json conversion etc in lua engine. we just fixed workflow bridge to be that way.
 - all tool functions should be consistent for two word functions either like-this or like_this, but not both.
 - security sandbox - add network access, add process execution access 
@@ -8,24 +7,7 @@
 - in phase 7 we redid state 
 - add postgres vector store backend in llmspell-storage, https://github.com/tensorchord/pgvecto.rs or https://github.com/tensorchord/VectorChord/ or pgvector
 - remove invoke and just use execute in agent.
-- debug for scripts not working
 - remove custom steps or document it properly
 - agent templates - ideally some of the agent templates use rag to embed more correct information for different domains, or even graphs
-- scriptruntime capture stdin, stdout, stderr
 
 
-- local llm models 
-
-we ended up using rust rig crate in llmspell-providers to wrap calls to cloud hosted llms.. but  
-even though we planned to implement local, we never did. there are two options for local, one
-is to use rig's support for ollama (which is an external library/binary to llmspell) or use one 
-of rust candle, rust orca and other crates to support local llm providers. look through the 
-docs including. first question, i don't see a plan to implement that in the future. second 
-question look at @docs/in-progress/PHASE*DONE.md at what we've implemented .. what happened? 
-3rd question.. research on the internet what approach we should use for local? and tell me. 
-this is a lot of documents for you to consume, it will fill up your context, do it one at a 
-time and keep track of your analysis in a temporary @LOCAL-LLM-ANALYSIS.md file if you need to 
-as you go through the todos.         
-
-do not take the easy route. you need to research and analyze rust candle and rust orca and update 
-your analysis.   

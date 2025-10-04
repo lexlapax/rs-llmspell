@@ -71,7 +71,7 @@ impl SamplingConfig {
 /// Sample next token from logits
 ///
 /// # Arguments
-/// * `logits` - Raw logits from model (shape: [vocab_size])
+/// * `logits` - Raw logits from model (shape: `[vocab_size]`)
 /// * `config` - Sampling configuration
 /// * `context_tokens` - Recent tokens for repeat penalty
 ///
