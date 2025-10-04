@@ -10,9 +10,9 @@
 
 > **📚 Central Hub**: Your starting point for all LLMSpell documentation. Everything you need is organized into 10 essential documents, plus comprehensive API references for both Lua and Rust. Now with Unix daemon infrastructure, tool CLI commands, fleet management, and feature flags!
 
-**Version**: 0.10.0 | **Status**: Phase 10 Complete - Service Integration & IDE Connectivity | **Last Updated**: January 2025
+**Version**: 0.10.0 | **Status**: Phase 11 Complete - Local LLM Integration | **Last Updated**: October 2025
 
-## 📖 Essential Documentation (10 Files)
+## 📖 Essential Documentation (11 Files)
 
 ### 1. [Getting Started](getting-started.md)
 **Quick start in under 10 minutes**
@@ -22,13 +22,14 @@
 - Running your first daemon with tool CLI
 
 ### 2. [Core Concepts](concepts.md)
-**Understand LLMSpell architecture including Phase 10 features**
+**Understand LLMSpell architecture including Phase 10 & 11 features**
 - Component model (BaseAgent trait)
 - Agents, Tools (40+ with feature flags), Workflows
 - RAG (Retrieval-Augmented Generation) ⭐
 - Vector Storage & HNSW algorithm ⭐
 - Multi-Tenancy with resource quotas ⭐
 - Integrated Kernel Architecture (Phase 10) ⭐
+- Local LLM Integration (Ollama + Candle, Phase 11) ⭐
 - Tool CLI and direct tool invocation ⭐
 - Fleet management and process isolation ⭐
 - State management and sessions (unified in kernel)
@@ -36,7 +37,7 @@
 
 ### 3. [Configuration](configuration.md)
 **Complete configuration guide including daemon and fleet setup**
-- LLM providers (OpenAI, Anthropic, Ollama, Groq)
+- LLM providers (OpenAI, Anthropic, Ollama, Groq, local backends)
 - RAG Configuration (HNSW, embeddings, chunking) ⭐
 - Multi-Tenancy (isolation, quotas, billing) ⭐
 - Daemon configuration (PID files, log rotation, signals) ⭐
@@ -46,7 +47,16 @@
 - Security settings and deployment profiles
 - Environment variables
 
-### 4. [Service Deployment](service-deployment.md) ⭐ Phase 10
+### 4. [Local LLM Integration](local-llm.md) ⭐ Phase 11
+**Use local LLM models via Ollama or Candle**
+- Quick start for Ollama and Candle
+- Model management (list, pull, info, status)
+- Configuration for both backends
+- Performance characteristics and comparison
+- 6 troubleshooting scenarios
+- 4 complete example scripts
+
+### 5. [Service Deployment](service-deployment.md) ⭐ Phase 10
 **Production deployment with system services**
 - systemd deployment (Linux)
 - launchd deployment (macOS)
@@ -56,7 +66,7 @@
 - Fleet management for multi-kernel deployments
 - Security best practices
 
-### 5. [IDE Integration](ide-integration.md) ⭐ Phase 10
+### 6. [IDE Integration](ide-integration.md) ⭐ Phase 10
 **Connect your IDE to LLMSpell kernel**
 - VS Code setup with Jupyter & DAP
 - Jupyter Lab configuration
@@ -65,14 +75,14 @@
 - Multi-client support
 - Connection file format and kernel discovery
 
-### 6. [API Documentation](api/README.md)
+### 7. [API Documentation](api/README.md)
 **Comprehensive API reference**
 - **[Lua API](api/lua/README.md)** - All 17 globals with 200+ methods
 - **[Rust API](api/rust/README.md)** - 17 crates with traits, builders, and extension guide
 - Unified `llmspell-kernel` crate with daemon, state, sessions, and debugging
 - Feature flags documentation for modular builds
 
-### 7. [Troubleshooting](troubleshooting.md)
+### 8. [Troubleshooting](troubleshooting.md)
 **Solutions to common problems**
 - Common issues and fixes
 - Debugging techniques
@@ -80,7 +90,7 @@
 - Daemon and service troubleshooting
 - Feature flag issues
 
-### 8. [Phase 10 Troubleshooting](troubleshooting-phase10.md) ⭐ NEW
+### 9. [Phase 10 Troubleshooting](troubleshooting-phase10.md) ⭐ Phase 10
 **Phase 10 specific issues**
 - Daemon startup problems
 - Signal handling issues
@@ -89,7 +99,7 @@
 - Fleet management debugging
 - Tool CLI troubleshooting
 
-### 9. [Performance Tuning](performance-tuning.md) ⭐ NEW
+### 10. [Performance Tuning](performance-tuning.md) ⭐ Phase 10
 **Optimize for production**
 - Daemon performance tuning
 - Memory optimization
@@ -98,7 +108,7 @@
 - HNSW parameter tuning
 - Multi-tenant resource allocation
 
-### 10. [Examples](../../examples/EXAMPLE-INDEX.md)
+### 11. [Examples](../../examples/EXAMPLE-INDEX.md)
 **Learn by doing**
 - 60+ working examples
 - 6 Getting Started → 9 Applications progression
