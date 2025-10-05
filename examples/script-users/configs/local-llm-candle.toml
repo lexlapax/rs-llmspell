@@ -1,0 +1,92 @@
+# Local LLM Configuration - Candle Backend
+# Purpose: Configuration for using Candle for embedded LLM inference
+# Usage: ./llmspell -c examples/script-users/configs/local-llm-candle.toml run <script>
+# Requires: Models downloaded to ~/.llmspell/models/candle/
+
+# Default script engine
+default_engine = "lua"
+
+# Engine configuration
+[engines.lua]
+stdlib_level = "full"
+
+# Provider configuration
+[providers]
+
+[providers.candle]
+provider_type = "candle"
+enabled = true
+timeout_seconds = 300
+default_model = "llama3.1:8b-q4"  # Default model for candle backend
+
+# Candle-specific options (captured in ProviderConfig.options HashMap)
+model_directory = "${HOME}/.llmspell/models/candle"
+device = "auto"  # auto, cpu, cuda, metal
+max_concurrent = 1  # Number of models loaded simultaneously
+default_quantization = "Q4_K_M"  # Q4_K_M, Q5_K_M, Q8_0
+cpu_threads = 0  # 0 = auto-detect
+context_size = 4096
+batch_size = 512
+use_flash_attention = true
+
+# Runtime configuration
+[runtime]
+log_level = "info"
+
+# Example metadata
+[example]
+name = "Local LLM with Candle"
+description = "Demonstrates embedded LLM inference via Candle backend"
+features = ["embedded_inference", "candle", "gguf_models", "offline_capable"]
+models = ["llama3.1:8b-q4", "phi3:3.8b-q4", "mistral:7b-q4"]
+
+# Example usage patterns
+[example.usage]
+basic = '''
+-- List local Candle models
+local models = LocalLLM.list()
+for _, model in ipairs(models) do
+  if model.backend == "candle" then
+    print(model.id, model.format, model.quantization)
+  end
+end
+
+-- Create agent with Candle model
+local agent = Agent.create({
+  model = "local/llama3.1:8b-q4@candle",
+  max_tokens = 512,
+  temperature = 0.7
+})
+
+-- Generate text (runs entirely on local device)
+local response = agent:generate("Explain ownership in Rust")
+print(response.text)
+'''
+
+model_info = '''
+-- Get detailed model information
+local info = LocalLLM.info("llama3.1:8b-q4", "candle")
+print("Format:", info.format)
+print("Quantization:", info.quantization)
+print("Size:", info.size_bytes / 1024 / 1024 / 1024, "GB")
+print("Loaded:", info.loaded)
+'''
+
+device_selection = '''
+-- Candle auto-detects best device, but you can override via config:
+-- device = "cpu"     -- Force CPU (slowest, most compatible)
+-- device = "cuda"    -- Force NVIDIA GPU (fastest on Linux/Windows)
+-- device = "metal"   -- Force Apple Metal GPU (fastest on macOS)
+-- device = "auto"    -- Let Candle choose (recommended)
+'''
+
+# Performance notes
+[example.performance]
+notes = '''
+Candle Performance Characteristics:
+- First token latency: 100-200ms (varies by model size and device)
+- Generation speed: 15-30 tokens/sec on CPU, 50+ tokens/sec on GPU
+- Memory usage: ~4-5GB for Q4_K_M 7B models
+- Recommended quantization: Q4_K_M (best quality/size trade-off)
+- Best for: Offline inference, privacy-sensitive workloads, embedded systems
+'''

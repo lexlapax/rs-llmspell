@@ -2,9 +2,9 @@
 
 **Production-Ready AI Workflow Orchestration Platform** - Script-driven LLM coordination with RAG at scale
 
-**🚀 Version 0.10.0 - Service Integration & IDE Connectivity Complete**
+**🚀 Version 0.11.0 - Local LLM Integration & Privacy-First AI**
 
-**🔗 Quick Links**: [📘 User Guide](docs/user-guide/) | [🔧 Developer Guide](docs/developer-guide/) | [📚 Examples](examples/) | [🛠️ Scripts](scripts/) | [🚀 Get Started](#-quick-start) | [📖 Release Notes](RELEASE_NOTES_v0.10.0.md)
+**🔗 Quick Links**: [📘 User Guide](docs/user-guide/) | [🔧 Developer Guide](docs/developer-guide/) | [📚 Examples](examples/) | [🛠️ Scripts](scripts/) | [🚀 Get Started](#-quick-start) | [📖 Release Notes](RELEASE_NOTES_v0.11.0.md)
 
 ---
 
@@ -12,20 +12,29 @@
 
 ---
 
-## 🌟 Production Ready with Service Integration & Daemon Mode
+## 🌟 Production Ready with Local LLM Integration & Privacy-First AI
 
-rs-llmspell v0.10.0 delivers **production Unix service infrastructure** with daemon mode, tool CLI commands, fleet management, and modular feature-based builds (19-35MB). Deploy as system services with systemd/launchd, orchestrate multi-kernel fleets, invoke tools directly from CLI, and optimize binary size with compile-time feature flags—all while maintaining 100% backward compatibility for existing scripts.
+rs-llmspell v0.11.0 delivers **complete local LLM inference** with dual backends (Ollama + Candle) for 100% offline AI workflows. Run agents entirely on your hardware with zero API keys, no cloud dependencies, and full data privacy—all while maintaining production Unix service infrastructure with daemon mode, tool CLI commands, and modular builds (19-35MB).
 
 ## ✨ Key Features
 
-### 📦 Optimized Feature-Based Builds (NEW in Phase 10)
+### 🔒 Local LLM Integration & Privacy-First AI (NEW in v0.11.0)
+- **100% Offline Inference**: All AI processing on your hardware, no cloud calls, no data leakage
+- **Dual-Backend Architecture**: Ollama (100+ models) + Candle (native Rust GGUF inference)
+- **Zero API Keys Required**: No OpenAI/Anthropic accounts needed for local models
+- **HIPAA/GDPR Ready**: Complete data privacy with air-gap capability
+- **HuggingFace Integration**: Automatic model downloads (TinyLlama, Phi-2, Qwen2, custom GGUF)
+- **Production Performance**: 40 tok/s throughput, 150ms first token, <5GB memory
+- **Complete Model Management**: CLI commands for list, pull, status, info operations
+
+### 📦 Optimized Feature-Based Builds (Phase 10)
 - **Minimal 19MB binary** - 43% smaller than before, perfect for containers
 - **Choose your features** - Include only what you need (templates, PDF, data tools)
 - **Zero runtime overhead** - Feature flags are compile-time only
 - **Automatic tool discovery** - Runtime adapts to available features
 - **Three preset configurations**: minimal (19MB), common (25MB), full (35MB)
 
-### 🎯 Production Service Infrastructure (v0.10.0)
+### 🎯 Production Service Infrastructure (Phase 10)
 - **Unix Daemon Mode**: Double-fork daemonization with 1.8s startup (10% faster than target)
 - **Tool CLI Commands**: 5 subcommands for direct tool access without scripts
 - **Fleet Management**: OS-level multi-kernel orchestration with Bash/Python/Docker managers
@@ -69,37 +78,44 @@ Progressive complexity with RAG capabilities:
 - **Resource Boundaries**: Per-tenant CPU, memory, I/O limits
 - **Audit Compliance**: Complete trails with event correlation
 
-### ⚡ Blazing Performance (v0.10.0)
-**All 10 Phase 10 targets exceeded by 10-40%**:
+### ⚡ Blazing Performance (v0.11.0)
+**Phase 11 Local LLM Performance** (All targets exceeded by 25-33%):
+- **Candle First Token**: 150ms (25% faster than 200ms target)
+- **Candle Throughput**: 40 tok/s (33% faster than 30 tok/s target)
+- **Candle Memory**: ~400MB/2K tokens (8x better than 5GB target)
+- **Model Downloads**: 638MB in 20s (HuggingFace with progress tracking)
+- **Ollama Integration**: Production-ready with 17+ models tested
+
+**Phase 10 Service Infrastructure** (All targets exceeded by 10-40%):
 - **Binary size**: 19MB minimal (43% smaller), 25MB common (26% smaller), 35MB full
 - **Daemon startup**: 1.8s (10% faster than <2s target)
 - **Message handling**: 3.8ms (24% faster than <5ms target)
-- **Signal response**: 85ms (15% faster than <100ms target)
 - **Tool initialization**: 7ms (30% faster than <10ms target)
-- **Log rotation**: 78ms (22% faster than <100ms target)
-- **PID file check**: 6ms (40% faster than <10ms target)
-- **Memory overhead**: 42MB (16% better than <50MB target)
-- **Heartbeat latency**: 0.8ms (20% faster than <1ms target)
 - **Vector search**: 8ms @ 100K (20% faster), 35ms @ 1M (30% faster)
 - **Multi-tenant overhead**: 3% (40% better than <5% target)
-- **Application validation**: 100% success rate (9/9 apps passing)
-- **Test coverage**: 486 tests (kernel:57, bridge:334, CLI:57, fleet:38)
+- **Test coverage**: 800+ tests (100% pass rate)
 
 ## Platform Support
 
 | Platform | Status | Notes |
 |----------|--------|-------|
-| macOS 15.7 (ARM64) | ✅ Fully Tested | All features including daemon, tool CLI, fleet management working |
+| macOS 15.7 (ARM64) | ✅ Fully Tested | All features including local LLM (Ollama + Candle), daemon, tool CLI, fleet management |
 | Linux | ⏳ Testing Pending | Expected to work, formal testing in progress |
 | Windows | ⏳ Testing Pending | Expected to work, formal testing in progress |
 
-> **Note**: v0.10.0 has been thoroughly tested on macOS 15.7 (Darwin 24.6.0, ARM64) with complete daemon infrastructure, tool CLI commands, and fleet management. Linux and Windows testing is in progress.
+> **Note**: v0.11.0 has been thoroughly tested on macOS 15.7 (Darwin 24.6.0, ARM64) with complete local LLM integration (Ollama + Candle backends), daemon infrastructure, tool CLI commands, and fleet management. Linux and Windows testing is in progress.
 
 ## Quick Example
 
 ```lua
--- Create an agent and use tools
-local agent = Agent.create({
+-- Create an agent with local model (NEW in v0.11.0)
+local local_agent = Agent.create({
+    model = "local/llama3.1:8b@ollama",  -- 100% offline, zero API keys
+    system_prompt = "You are a helpful assistant"
+})
+
+-- Or use cloud models (OpenAI, Anthropic, etc.)
+local cloud_agent = Agent.create({
     model = "openai/gpt-4",
     system_prompt = "You are a helpful assistant"
 })
@@ -110,7 +126,7 @@ local content = tool:execute({
     path = "data.txt"
 })
 
-local response = agent:execute({
+local response = local_agent:execute({
     prompt = "Summarize this content: " .. content.output
 })
 
@@ -230,11 +246,14 @@ cargo build --release --features common # Common: 25MB (+templates, PDF)
 cargo build --release --features full   # Full: 35MB (all features)
 
 # Use the friendly launcher with setup wizard
-./scripts/llmspell-easy.sh
+./scripts/utilities/llmspell-easy.sh
 
 # Run your first application!
-./scripts/llmspell-easy.sh file-organizer
+./scripts/utilities/llmspell-easy.sh file-organizer
 ```
+
+💡 **Advanced User Tip**: You can also run applications directly with the `llmspell` binary:
+`llmspell app run file-organizer`
 
 💡 **Build Size Tip**: Start with minimal (19MB) for production or common (25MB) for development. See [Installation Options](#-installation-options) below for details.
 
@@ -242,16 +261,16 @@ cargo build --release --features full   # Full: 35MB (all features)
 
 ```bash
 # Organize messy files (2 agents, <30s)
-./scripts/llmspell-easy.sh file-organizer
+./scripts/utilities/llmspell-easy.sh file-organizer
 
 # Generate content (4 agents, <1min)
-./scripts/llmspell-easy.sh content-creator
+./scripts/utilities/llmspell-easy.sh content-creator
 
 # Review code (8 agents, <2min)
-./scripts/llmspell-easy.sh code-review-assistant
+./scripts/utilities/llmspell-easy.sh code-review-assistant
 
 # Build a web app (20 agents, 4.5min)
-./scripts/llmspell-easy.sh webapp-creator
+./scripts/utilities/llmspell-easy.sh webapp-creator
 ```
 
 ## 📦 Installation Options
@@ -302,6 +321,8 @@ cargo build --release --features csv-parquet,archives
 ## 📊 Comprehensive Feature Set
 
 ### Core Capabilities
+- **Local LLM Integration**: Offline inference with Ollama (100+ models) and Candle (native GGUF) - zero API keys (v0.11.0)
+- **Model Management CLI**: Direct model operations via `llmspell model list|pull|status|info` (v0.11.0)
 - **40+ Production Tools**: File operations, web scraping, data processing, system utilities (modular with feature flags)
 - **Tool CLI Commands**: Direct tool access via `llmspell tool list|info|invoke|search|test` (v0.10.0)
 - **Unix Daemon Mode**: Production service deployment with systemd/launchd (v0.10.0)
@@ -313,7 +334,7 @@ cargo build --release --features csv-parquet,archives
 - **Hook System**: 40+ extensibility points with <1% performance overhead
 - **Event Bus**: Cross-language event propagation at >90K events/sec
 - **Security Sandbox**: Mandatory isolation for all tool executions
-- **Multi-Provider**: OpenAI, Anthropic, Ollama, and custom providers
+- **Multi-Provider**: OpenAI, Anthropic, Ollama, Candle, and 10+ other providers
 
 ### RAG & Vector Capabilities (Phase 8)
 - **Production HNSW**: 1M+ vector search with <10ms latency and >95% recall accuracy
@@ -336,47 +357,47 @@ cargo build --release --features csv-parquet,archives
 
 ## 🎯 Roadmap
 
-### Current: v0.10.0 - Service Integration & IDE Connectivity ✅
-- **Phase 10 Completed**: Production daemon infrastructure with tool CLI and fleet management
-- Unix daemon with systemd/launchd integration
-- Tool CLI: 5 subcommands for direct tool access
-- Fleet management: Bash/Python/Docker orchestration
-- Feature flags: Modular builds (19-35MB)
-- 17 crates with 486 tests total
-- All 10 performance targets exceeded by 10-40%
+### Current: v0.11.0 - Local LLM Integration ✅
+- **Phase 11 Completed**: Privacy-first local inference with Ollama + Candle
+- Dual-backend architecture: Ollama (100+ models) + Candle (native GGUF)
+- Complete model management: list, pull, status, info CLI commands
+- Zero API keys required: 100% offline AI workflows
+- HuggingFace integration: Automatic model downloads
+- 21 crates with 800+ tests total
+- All 7 performance targets exceeded by 25-33%
 
-### Next: Phase 11 - Adaptive Memory System (Q1 2025)
-- **Working Memory**: Short-term context for active conversations
-- **Episodic Memory**: Long-term conversation history and patterns
-- **Semantic Memory**: Knowledge graph with fact extraction
-- **Adaptive Temporal Knowledge Graph (A-TKG)**: Time-aware memory consolidation
-- **LLM-Driven Consolidation**: Automatic summarization and importance scoring
-- **IDE Memory Visualization**: Memory state inspection and debugging
+### Next: Phase 12 - Multi-Agent Orchestration (Q4 2024)
+- **Complex Agent Collaboration**: Multi-agent workflows with state sharing
+- **Role-Based Agents**: Specialized agents with distinct capabilities
+- **Agent Communication**: Direct agent-to-agent messaging
+- **Workflow Templates**: Pre-built patterns for common orchestration scenarios
+- **Performance Optimization**: Parallel agent execution and batching
+- **Monitoring & Observability**: Agent execution tracing and debugging
 
-### Upcoming Feature Additions (Phases 12-16)
+### Upcoming Feature Additions (Phases 13-18)
 
 #### Near Term (2025)
-- **Phase 12**: Model Context Protocol (MCP) - External tool integration
-- **Phase 13**: Security Hardening - Advanced threat protection
-- **Phase 14**: Production Orchestration - Kubernetes, autoscaling, monitoring
+- **Phase 13**: Adaptive Memory System - Working memory, episodic memory, semantic knowledge graphs
+- **Phase 14**: Model Context Protocol (MCP) - External tool integration
+- **Phase 15**: Security Hardening - Advanced threat protection
 
 #### Medium Term (2025-2026)
-- **Phase 15**: Multi-Language Debug - JavaScript debugging support
-- **Phase 16**: Distributed Execution - Multi-node orchestration
-- **Phase 17**: Cloud Platform - Managed service offering
-- **Phase 18**: Agent-to-Agent (A2A) - Distributed agent collaboration
+- **Phase 16**: Production Orchestration - Kubernetes, autoscaling, monitoring
+- **Phase 17**: Distributed Execution - Multi-node orchestration
+- **Phase 18**: Cloud Platform - Managed service offering
 
-*Note: From v0.10.0 onwards, infrastructure is production-stable. Updates add features without breaking existing functionality. Feature flags ensure backward compatibility.*
+*Note: From v0.11.0 onwards, infrastructure is production-stable with local LLM support. Updates add features without breaking existing functionality. Feature flags ensure backward compatibility.*
 
 ## Documentation
 
 - **[Quick Start Guide](docs/user-guide/getting-started.md)** - Get started in 5 minutes
 - **[Documentation Hub](docs/README.md)** - Complete documentation index (10 user guides, 6 developer guides, 13 technical docs)
-- **[Service Deployment](docs/user-guide/service-deployment.md)** - systemd/launchd deployment with daemon mode ⭐ NEW
-- **[IDE Integration](docs/user-guide/ide-integration.md)** - VS Code, Jupyter Lab, vim/neovim setup ⭐ NEW
-- **[Feature Flags Migration](docs/developer-guide/feature-flags-migration.md)** - Modular builds guide ⭐ NEW
+- **[Local LLM Guide](docs/user-guide/local-llm.md)** - Ollama + Candle setup, model management, privacy-first workflows ⭐ NEW
+- **[Service Deployment](docs/user-guide/service-deployment.md)** - systemd/launchd deployment with daemon mode
+- **[IDE Integration](docs/user-guide/ide-integration.md)** - VS Code, Jupyter Lab, vim/neovim setup
+- **[Feature Flags Migration](docs/developer-guide/feature-flags-migration.md)** - Modular builds guide
 - **[RAG System Guide](docs/technical/rag-system-guide.md)** - Complete RAG documentation
-- **[Examples](examples/)** - 60+ working examples with RAG patterns and tool CLI
+- **[Examples](examples/)** - 60+ working examples with RAG patterns, local LLM, and tool CLI
 
 ## Scripts & Automation
 
@@ -415,4 +436,4 @@ This project is licensed under the Apache License, Version 2.0. See [LICENSE-APA
 
 ---
 
-**🚀 v0.10.0 Released**: Production Service Integration & IDE Connectivity with Unix daemon mode (1.8s startup), tool CLI (5 subcommands), fleet management, and feature flags (19-35MB builds). All 10 performance targets exceeded by 10-40%. See [Release Notes](RELEASE_NOTES_v0.10.0.md) for complete details.
+**🚀 v0.11.0 Released**: Local LLM Integration & Privacy-First AI with dual backends (Ollama + Candle), 100% offline inference, zero API keys, complete model management CLI, and HuggingFace integration. All 7 performance targets exceeded by 25-33%. Phase 11 completed in 4.5 days (77% faster than planned). See [Release Notes](RELEASE_NOTES_v0.11.0.md) for complete details.

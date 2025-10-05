@@ -7,7 +7,7 @@ use llmspell_core::{
     error::LLMSpellError,
     types::{AgentInput, AgentOutput, AgentStream},
 };
-use rig::{completion::CompletionModel, providers};
+use rig::{client::CompletionClient, completion::CompletionModel, providers};
 use serde_json::json;
 use std::collections::HashMap;
 use std::sync::atomic::{AtomicU64, Ordering};
@@ -16,9 +16,10 @@ use tracing::{debug, info, instrument, span, warn, Level};
 
 /// Enum to hold different provider models
 enum RigModel {
-    OpenAI(providers::openai::CompletionModel),
+    OpenAI(providers::openai::responses_api::ResponsesCompletionModel),
     Anthropic(providers::anthropic::completion::CompletionModel),
     Cohere(providers::cohere::CompletionModel),
+    Ollama(providers::ollama::CompletionModel),
 }
 
 /// Rig provider implementation with cost tracking and tracing
@@ -64,14 +65,20 @@ impl RigProvider {
                             source: None,
                         })?;
 
-                // Anthropic client requires more parameters
-                let base_url = config
-                    .endpoint
-                    .as_deref()
-                    .unwrap_or("https://api.anthropic.com");
-                let version = "2023-06-01"; // Default API version
+                // New rig 0.21 API uses builder pattern
+                let mut client_builder = providers::anthropic::Client::builder(api_key);
 
-                let client = providers::anthropic::Client::new(api_key, base_url, None, version);
+                if let Some(base_url) = config.endpoint.as_deref() {
+                    client_builder = client_builder.base_url(base_url);
+                }
+
+                let client = client_builder
+                    .build()
+                    .map_err(|e| LLMSpellError::Configuration {
+                        message: format!("Failed to create Anthropic client: {}", e),
+                        source: Some(Box::new(e)),
+                    })?;
+
                 let model = client.completion_model(&config.model);
                 RigModel::Anthropic(model)
             }
@@ -88,6 +95,27 @@ impl RigProvider {
                 let client = providers::cohere::Client::new(api_key);
                 let model = client.completion_model(&config.model);
                 RigModel::Cohere(model)
+            }
+            "ollama" => {
+                info!("Creating Ollama provider via rig");
+                let base_url = config
+                    .endpoint
+                    .as_deref()
+                    .unwrap_or("http://localhost:11434");
+                debug!("Ollama base URL: {}", base_url);
+
+                let client = providers::ollama::Client::builder()
+                    .base_url(base_url)
+                    .build()
+                    .map_err(|e| LLMSpellError::Configuration {
+                        message: format!("Failed to create Ollama client: {}", e),
+                        source: Some(Box::new(e)),
+                    })?;
+
+                let model = client.completion_model(&config.model);
+
+                info!("Ollama client created successfully");
+                RigModel::Ollama(model)
             }
             _ => {
                 return Err(LLMSpellError::Configuration {
@@ -113,6 +141,7 @@ impl RigProvider {
                     _ => 100000,
                 },
                 "cohere" => 4096,
+                "ollama" => 8192, // Default, model-dependent
                 _ => 4096,
             }),
             max_output_tokens: Some(4096),
@@ -195,6 +224,10 @@ impl RigProvider {
                 let output_cost = (output_tokens as f64 / 1000.0) * 0.2;
                 ((input_cost + output_cost) * 100.0).round() as u64
             }
+            "ollama" => {
+                // Ollama is local/self-hosted, zero API cost
+                0
+            }
             _ => {
                 // Unknown provider, use conservative estimate
                 let input_cost = (input_tokens as f64 / 1000.0) * 0.1;
@@ -240,14 +273,23 @@ impl RigProvider {
                     provider: Some(self.config.name.clone()),
                     source: None,
                 })
-                .and_then(|response| match response.choice {
-                    rig::completion::ModelChoice::Message(text) => Ok(text),
-                    rig::completion::ModelChoice::ToolCall(name, _params) => {
-                        Err(LLMSpellError::Provider {
-                            message: format!("Unexpected tool call response: {}", name),
+                .and_then(|response| {
+                    use rig::completion::AssistantContent;
+                    match response.choice.first() {
+                        AssistantContent::Text(text) => Ok(text.text.clone()),
+                        AssistantContent::ToolCall(call) => Err(LLMSpellError::Provider {
+                            message: format!(
+                                "Unexpected tool call response: {}",
+                                call.function.name
+                            ),
                             provider: Some(self.config.name.clone()),
                             source: None,
-                        })
+                        }),
+                        AssistantContent::Reasoning(_) => Err(LLMSpellError::Provider {
+                            message: "Unexpected reasoning response".to_string(),
+                            provider: Some(self.config.name.clone()),
+                            source: None,
+                        }),
                     }
                 }),
             RigModel::Anthropic(model) => model
@@ -260,14 +302,23 @@ impl RigProvider {
                     provider: Some(self.config.name.clone()),
                     source: None,
                 })
-                .and_then(|response| match response.choice {
-                    rig::completion::ModelChoice::Message(text) => Ok(text),
-                    rig::completion::ModelChoice::ToolCall(name, _params) => {
-                        Err(LLMSpellError::Provider {
-                            message: format!("Unexpected tool call response: {}", name),
+                .and_then(|response| {
+                    use rig::completion::AssistantContent;
+                    match response.choice.first() {
+                        AssistantContent::Text(text) => Ok(text.text.clone()),
+                        AssistantContent::ToolCall(call) => Err(LLMSpellError::Provider {
+                            message: format!(
+                                "Unexpected tool call response: {}",
+                                call.function.name
+                            ),
                             provider: Some(self.config.name.clone()),
                             source: None,
-                        })
+                        }),
+                        AssistantContent::Reasoning(_) => Err(LLMSpellError::Provider {
+                            message: "Unexpected reasoning response".to_string(),
+                            provider: Some(self.config.name.clone()),
+                            source: None,
+                        }),
                     }
                 }),
             RigModel::Cohere(model) => model
@@ -280,16 +331,57 @@ impl RigProvider {
                     provider: Some(self.config.name.clone()),
                     source: None,
                 })
-                .and_then(|response| match response.choice {
-                    rig::completion::ModelChoice::Message(text) => Ok(text),
-                    rig::completion::ModelChoice::ToolCall(name, _params) => {
-                        Err(LLMSpellError::Provider {
-                            message: format!("Unexpected tool call response: {}", name),
+                .and_then(|response| {
+                    use rig::completion::AssistantContent;
+                    match response.choice.first() {
+                        AssistantContent::Text(text) => Ok(text.text.clone()),
+                        AssistantContent::ToolCall(call) => Err(LLMSpellError::Provider {
+                            message: format!(
+                                "Unexpected tool call response: {}",
+                                call.function.name
+                            ),
                             provider: Some(self.config.name.clone()),
                             source: None,
-                        })
+                        }),
+                        AssistantContent::Reasoning(_) => Err(LLMSpellError::Provider {
+                            message: "Unexpected reasoning response".to_string(),
+                            provider: Some(self.config.name.clone()),
+                            source: None,
+                        }),
                     }
                 }),
+            RigModel::Ollama(model) => {
+                info!("Ollama completion via rig");
+                model
+                    .completion_request(&prompt)
+                    .max_tokens(self.max_tokens)
+                    .send()
+                    .await
+                    .map_err(|e| LLMSpellError::Provider {
+                        message: format!("Ollama completion failed: {}", e),
+                        provider: Some(self.config.name.clone()),
+                        source: None,
+                    })
+                    .and_then(|response| {
+                        use rig::completion::AssistantContent;
+                        match response.choice.first() {
+                            AssistantContent::Text(text) => Ok(text.text.clone()),
+                            AssistantContent::ToolCall(call) => Err(LLMSpellError::Provider {
+                                message: format!(
+                                    "Unexpected tool call response: {}",
+                                    call.function.name
+                                ),
+                                provider: Some(self.config.name.clone()),
+                                source: None,
+                            }),
+                            AssistantContent::Reasoning(_) => Err(LLMSpellError::Provider {
+                                message: "Unexpected reasoning response".to_string(),
+                                provider: Some(self.config.name.clone()),
+                                source: None,
+                            }),
+                        }
+                    })
+            }
         }
     }
 }

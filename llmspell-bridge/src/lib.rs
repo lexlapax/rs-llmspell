@@ -311,3 +311,20 @@ pub async fn create_script_executor(
     let runtime = ScriptRuntime::new_with_lua(config).await?;
     Ok(Arc::new(runtime) as Arc<dyn ScriptExecutor>)
 }
+
+/// Create a script executor with existing provider manager (Phase 11.FIX.1)
+///
+/// This ensures the script runtime and kernel share the same `ProviderManager` instance,
+/// preventing duplicate provider initialization and factory registration.
+///
+/// # Errors
+///
+/// Returns an error if the script runtime fails to initialize.
+#[allow(clippy::unused_async)]
+pub async fn create_script_executor_with_provider(
+    config: LLMSpellConfig,
+    provider_manager: Arc<ProviderManager>,
+) -> Result<Arc<dyn ScriptExecutor>, llmspell_core::error::LLMSpellError> {
+    let runtime = ScriptRuntime::new_with_lua_and_provider(config, provider_manager)?;
+    Ok(Arc::new(runtime) as Arc<dyn ScriptExecutor>)
+}

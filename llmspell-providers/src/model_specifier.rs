@@ -5,13 +5,15 @@ use llmspell_core::error::LLMSpellError;
 use serde::{Deserialize, Serialize};
 use std::str::FromStr;
 
-/// Specification for a model with optional provider and base URL
+/// Specification for a model with optional provider, backend, and base URL
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct ModelSpecifier {
-    /// The provider name (e.g., "openai", "anthropic")
+    /// The provider name (e.g., "openai", "anthropic", "local")
     pub provider: Option<String>,
-    /// The model name (e.g., "gpt-4", "claude-3-sonnet")
+    /// The model name (e.g., "gpt-4", "claude-3-sonnet", "llama3.1:8b")
     pub model: String,
+    /// Backend for local providers (e.g., "ollama", "candle")
+    pub backend: Option<String>,
     /// Optional base URL override
     pub base_url: Option<String>,
 }
@@ -22,6 +24,7 @@ impl ModelSpecifier {
         Self {
             provider: None,
             model: model.into(),
+            backend: None,
             base_url: None,
         }
     }
@@ -31,6 +34,7 @@ impl ModelSpecifier {
         Self {
             provider: Some(provider.into()),
             model: model.into(),
+            backend: None,
             base_url: None,
         }
     }
@@ -44,6 +48,7 @@ impl ModelSpecifier {
         Self {
             provider: Some(provider.into()),
             model: model.into(),
+            backend: None,
             base_url: Some(base_url.into()),
         }
     }
@@ -51,9 +56,11 @@ impl ModelSpecifier {
     /// Parse a model specification string
     ///
     /// Supported formats:
-    /// - "model" -> ModelSpecifier { provider: None, model: "model", base_url: None }
-    /// - "provider/model" -> ModelSpecifier { provider: Some("provider"), model: "model", base_url: None }
-    /// - "provider/subprovider/model" -> ModelSpecifier { provider: Some("provider/subprovider"), model: "model", base_url: None }
+    /// - "model" -> ModelSpecifier { provider: None, model: "model", backend: None, base_url: None }
+    /// - "provider/model" -> ModelSpecifier { provider: Some("provider"), model: "model", backend: None, base_url: None }
+    /// - "provider/subprovider/model" -> ModelSpecifier { provider: Some("provider/subprovider"), model: "model", backend: None, base_url: None }
+    /// - "model@backend" -> ModelSpecifier { provider: None, model: "model", backend: Some("backend"), base_url: None }
+    /// - "provider/model@backend" -> ModelSpecifier { provider: Some("provider"), model: "model", backend: Some("backend"), base_url: None }
     ///
     /// # Examples
     ///
@@ -62,14 +69,22 @@ impl ModelSpecifier {
     /// let spec = ModelSpecifier::parse("gpt-4").unwrap();
     /// assert_eq!(spec.model, "gpt-4");
     /// assert_eq!(spec.provider, None);
+    /// assert_eq!(spec.backend, None);
     ///
     /// let spec = ModelSpecifier::parse("openai/gpt-4").unwrap();
     /// assert_eq!(spec.model, "gpt-4");
     /// assert_eq!(spec.provider, Some("openai".to_string()));
+    /// assert_eq!(spec.backend, None);
     ///
-    /// let spec = ModelSpecifier::parse("openrouter/deepseek/model").unwrap();
-    /// assert_eq!(spec.model, "model");
-    /// assert_eq!(spec.provider, Some("openrouter/deepseek".to_string()));
+    /// let spec = ModelSpecifier::parse("local/llama3.1:8b@ollama").unwrap();
+    /// assert_eq!(spec.model, "llama3.1:8b");
+    /// assert_eq!(spec.provider, Some("local".to_string()));
+    /// assert_eq!(spec.backend, Some("ollama".to_string()));
+    ///
+    /// let spec = ModelSpecifier::parse("llama3.1:8b@candle").unwrap();
+    /// assert_eq!(spec.model, "llama3.1:8b");
+    /// assert_eq!(spec.provider, None);
+    /// assert_eq!(spec.backend, Some("candle".to_string()));
     /// ```
     pub fn parse(spec: &str) -> Result<Self, LLMSpellError> {
         let spec = spec.trim();
@@ -81,33 +96,45 @@ impl ModelSpecifier {
             });
         }
 
-        // Split by '/' and handle different cases
-        let parts: Vec<&str> = spec.split('/').collect();
+        // First, extract backend if present (split on rightmost '@')
+        let (model_part, backend) = if let Some(idx) = spec.rfind('@') {
+            (&spec[..idx], Some(spec[idx + 1..].to_string()))
+        } else {
+            (spec, None)
+        };
 
-        match parts.len() {
+        // Now parse provider/model from model_part
+        let parts: Vec<&str> = model_part.split('/').collect();
+
+        let mut result = match parts.len() {
             1 => {
                 // Just a model name
-                Ok(Self::new(parts[0]))
+                Self::new(parts[0])
             }
             2 => {
                 // provider/model
-                Ok(Self::with_provider(parts[0], parts[1]))
+                Self::with_provider(parts[0], parts[1])
             }
             n if n > 2 => {
                 // provider/subprovider/.../model
                 // Join all parts except the last as provider
                 let provider = parts[..n - 1].join("/");
                 let model = parts[n - 1];
-                Ok(Self::with_provider(provider, model))
+                Self::with_provider(provider, model)
             }
             _ => {
                 // This shouldn't happen with split, but handle gracefully
-                Err(LLMSpellError::Configuration {
+                return Err(LLMSpellError::Configuration {
                     message: format!("Invalid model specification format: '{}'", spec),
                     source: None,
-                })
+                });
             }
-        }
+        };
+
+        // Set the backend field
+        result.backend = backend;
+
+        Ok(result)
     }
 
     /// Parse a model specification with an optional base URL override
@@ -144,13 +171,30 @@ impl ModelSpecifier {
     pub fn has_base_url(&self) -> bool {
         self.base_url.is_some()
     }
+
+    /// Check if this specifier has a backend
+    pub fn has_backend(&self) -> bool {
+        self.backend.is_some()
+    }
+
+    /// Get the backend name, or return a default
+    pub fn backend_or_default<'a>(&'a self, default: &'a str) -> &'a str {
+        self.backend.as_deref().unwrap_or(default)
+    }
 }
 
 impl std::fmt::Display for ModelSpecifier {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        match &self.provider {
-            Some(provider) => write!(f, "{}/{}", provider, self.model),
-            None => write!(f, "{}", self.model),
+        // Build provider/model part
+        let model_spec = match &self.provider {
+            Some(provider) => format!("{}/{}", provider, self.model),
+            None => self.model.clone(),
+        };
+
+        // Append backend if present
+        match &self.backend {
+            Some(backend) => write!(f, "{}@{}", model_spec, backend),
+            None => write!(f, "{}", model_spec),
         }
     }
 }
@@ -303,5 +347,99 @@ mod tests {
 
         let spec3 = ModelSpecifier::with_provider("anthropic", "claude-3");
         assert_ne!(spec1, spec3);
+    }
+
+    // Backend-related tests (Phase 11)
+    #[test]
+    fn test_parse_model_with_backend() {
+        let spec = ModelSpecifier::parse("llama3.1:8b@ollama").unwrap();
+        assert_eq!(spec.model, "llama3.1:8b");
+        assert_eq!(spec.provider, None);
+        assert_eq!(spec.backend, Some("ollama".to_string()));
+        assert!(!spec.has_provider());
+        assert!(spec.has_backend());
+    }
+
+    #[test]
+    fn test_parse_provider_model_with_backend() {
+        let spec = ModelSpecifier::parse("local/llama3.1:8b@ollama").unwrap();
+        assert_eq!(spec.model, "llama3.1:8b");
+        assert_eq!(spec.provider, Some("local".to_string()));
+        assert_eq!(spec.backend, Some("ollama".to_string()));
+        assert!(spec.has_provider());
+        assert!(spec.has_backend());
+    }
+
+    #[test]
+    fn test_parse_candle_backend() {
+        let spec = ModelSpecifier::parse("llama3.1:8b@candle").unwrap();
+        assert_eq!(spec.model, "llama3.1:8b");
+        assert_eq!(spec.provider, None);
+        assert_eq!(spec.backend, Some("candle".to_string()));
+        assert!(spec.has_backend());
+    }
+
+    #[test]
+    fn test_parse_local_without_backend() {
+        let spec = ModelSpecifier::parse("local/llama3.1:8b").unwrap();
+        assert_eq!(spec.model, "llama3.1:8b");
+        assert_eq!(spec.provider, Some("local".to_string()));
+        assert_eq!(spec.backend, None);
+        assert!(spec.has_provider());
+        assert!(!spec.has_backend());
+    }
+
+    #[test]
+    fn test_parse_nested_provider_with_backend() {
+        let spec = ModelSpecifier::parse("openrouter/local/model@backend").unwrap();
+        assert_eq!(spec.model, "model");
+        assert_eq!(spec.provider, Some("openrouter/local".to_string()));
+        assert_eq!(spec.backend, Some("backend".to_string()));
+        assert!(spec.has_provider());
+        assert!(spec.has_backend());
+    }
+
+    #[test]
+    fn test_backend_or_default() {
+        let spec1 = ModelSpecifier::parse("llama3.1:8b@ollama").unwrap();
+        assert_eq!(spec1.backend_or_default("default"), "ollama");
+
+        let spec2 = ModelSpecifier::parse("llama3.1:8b").unwrap();
+        assert_eq!(spec2.backend_or_default("default"), "default");
+    }
+
+    #[test]
+    fn test_display_with_backend() {
+        let spec1 = ModelSpecifier::parse("local/llama3.1:8b@ollama").unwrap();
+        assert_eq!(spec1.to_string(), "local/llama3.1:8b@ollama");
+
+        let spec2 = ModelSpecifier::parse("llama3.1:8b@candle").unwrap();
+        assert_eq!(spec2.to_string(), "llama3.1:8b@candle");
+
+        let spec3 = ModelSpecifier::parse("local/model").unwrap();
+        assert_eq!(spec3.to_string(), "local/model");
+    }
+
+    #[test]
+    fn test_backend_backward_compatibility() {
+        // Ensure existing tests still pass - no backend in old format
+        let spec = ModelSpecifier::parse("openai/gpt-4").unwrap();
+        assert_eq!(spec.backend, None);
+        assert!(!spec.has_backend());
+
+        let spec2 = ModelSpecifier::parse("gpt-4").unwrap();
+        assert_eq!(spec2.backend, None);
+    }
+
+    #[test]
+    fn test_serde_with_backend() {
+        let mut spec = ModelSpecifier::with_provider("local", "llama3.1:8b");
+        spec.backend = Some("ollama".to_string());
+
+        let serialized = serde_json::to_string(&spec).unwrap();
+        let deserialized: ModelSpecifier = serde_json::from_str(&serialized).unwrap();
+
+        assert_eq!(spec, deserialized);
+        assert_eq!(deserialized.backend, Some("ollama".to_string()));
     }
 }

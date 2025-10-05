@@ -623,6 +623,7 @@ mod tests {
                 exec_config,
                 "test-session".to_string(),
                 script_executor,
+                None,
             )
             .await
             .unwrap(),

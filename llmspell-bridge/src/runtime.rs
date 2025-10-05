@@ -169,6 +169,39 @@ impl ScriptRuntime {
         Self::new_with_engine(engine, config).await
     }
 
+    /// Create Lua runtime with existing provider manager (Phase 11.FIX.1)
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if runtime initialization fails
+    pub fn new_with_lua_and_provider(
+        config: LLMSpellConfig,
+        provider_manager: Arc<ProviderManager>,
+    ) -> Result<Self, LLMSpellError> {
+        info!("Creating Lua script runtime with existing provider manager");
+        let lua_config = LuaConfig::default();
+        let engine = EngineFactory::create_lua_engine_with_runtime(
+            &lua_config,
+            Some(Arc::new(config.clone())),
+        )?;
+        Self::new_with_engine_and_provider(engine, config, provider_manager)
+    }
+
+    /// Create JavaScript runtime with existing provider manager (Phase 11.FIX.1)
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if runtime initialization fails
+    pub fn new_with_javascript_and_provider(
+        config: LLMSpellConfig,
+        provider_manager: Arc<ProviderManager>,
+    ) -> Result<Self, LLMSpellError> {
+        info!("Creating JavaScript script runtime with existing provider manager");
+        let js_config = JSConfig::default();
+        let engine = EngineFactory::create_javascript_engine(&js_config)?;
+        Self::new_with_engine_and_provider(engine, config, provider_manager)
+    }
+
     /// Create a new runtime with a specific engine by name
     ///
     /// # Errors
@@ -242,6 +275,65 @@ impl ScriptRuntime {
         engine.inject_apis(&registry, &provider_manager)?;
 
         // Create execution context
+        let execution_context = Arc::new(RwLock::new(crate::engine::ExecutionContext {
+            working_directory: std::env::current_dir()
+                .unwrap_or_default()
+                .to_string_lossy()
+                .to_string(),
+            environment: std::env::vars().collect(),
+            state: serde_json::Value::Object(serde_json::Map::new()),
+            security: crate::engine::SecurityContext {
+                allow_file_access: config.runtime.security.allow_file_access,
+                allow_network_access: config.runtime.security.allow_network_access,
+                allow_process_spawn: config.runtime.security.allow_process_spawn,
+                max_memory_bytes: config.runtime.security.max_memory_bytes,
+                max_execution_time_ms: config.runtime.security.max_execution_time_ms,
+            },
+        }));
+
+        Ok(Self {
+            engine,
+            registry,
+            provider_manager,
+            execution_context,
+            debug_context: Arc::new(RwLock::new(None)),
+            _config: config,
+        })
+    }
+
+    /// Create runtime with existing provider manager (Phase 11.FIX.1)
+    /// This ensures a single `ProviderManager` instance is shared between kernel and script runtime
+    fn new_with_engine_and_provider(
+        mut engine: Box<dyn ScriptEngineBridge>,
+        config: LLMSpellConfig,
+        provider_manager: Arc<ProviderManager>,
+    ) -> Result<Self, LLMSpellError> {
+        debug!("Initializing script runtime with engine and existing provider manager");
+        // Create component registry with event support based on config
+        let registry = if config.events.enabled {
+            let event_bus = Arc::new(llmspell_events::EventBus::new());
+            let event_config = llmspell_core::traits::event::EventConfig {
+                enabled: config.events.enabled,
+                include_types: config.events.filtering.include_types.clone(),
+                exclude_types: config.events.filtering.exclude_types.clone(),
+                emit_timing_events: config.events.emit_timing_events,
+                emit_state_events: config.events.emit_state_events,
+                emit_debug_events: config.events.emit_debug_events,
+                max_events_per_second: config.events.max_events_per_second,
+            };
+            Arc::new(ComponentRegistry::with_event_bus(event_bus, event_config))
+        } else {
+            Arc::new(ComponentRegistry::new())
+        };
+
+        register_all_tools(&registry, &config.tools).map_err(|e| LLMSpellError::Component {
+            message: format!("Failed to register tools: {e}"),
+            source: None,
+        })?;
+
+        // Use provided provider manager instead of creating new one
+        engine.inject_apis(&registry, &provider_manager)?;
+
         let execution_context = Arc::new(RwLock::new(crate::engine::ExecutionContext {
             working_directory: std::env::current_dir()
                 .unwrap_or_default()

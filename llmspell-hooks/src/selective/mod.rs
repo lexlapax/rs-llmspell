@@ -25,6 +25,7 @@
 //! use anyhow::Result;
 //!
 //! // Define a hook
+//! #[derive(Debug)]
 //! struct MyHook;
 //!
 //! #[async_trait]

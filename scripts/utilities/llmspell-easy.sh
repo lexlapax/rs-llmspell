@@ -99,27 +99,16 @@ main() {
         echo "Would you like to set up API keys now? (y/n)"
         read -r response
         
-        if [[ "$response" == "y" || "$response" == "Y" ]]; then
-            echo ""
-            echo "Running interactive setup..."
-            "$LLMSPELL" setup
-            
-            # Reload environment if config was created
-            if [ -f "$HOME/.llmspell/config.toml" ]; then
-                print_success "Setup complete! Please run this script again."
-                exit 0
-            fi
-        else
-            echo ""
-            echo "To set up API keys manually:"
-            echo "  export OPENAI_API_KEY='your-key-here'"
-            echo "  export ANTHROPIC_API_KEY='your-key-here'"
-            echo ""
-            echo "Get your keys from:"
-            echo "  OpenAI: https://platform.openai.com/api-keys"
-            echo "  Anthropic: https://console.anthropic.com/settings/keys"
-            exit 1
-        fi
+        echo ""
+        echo "To set up API keys, you can use the 'llmspell keys add' command,"
+        echo "or set environment variables:"
+        echo "  export OPENAI_API_KEY='your-key-here'"
+        echo "  export ANTHROPIC_API_KEY='your-key-here'"
+        echo ""
+        echo "Get your keys from:"
+        echo "  OpenAI: https://platform.openai.com/api-keys"
+        echo "  Anthropic: https://console.anthropic.com/settings/keys"
+        exit 1
     fi
     print_success "API keys configured"
     
@@ -127,7 +116,7 @@ main() {
     if [ $# -eq 0 ]; then
         # No arguments - show available apps
         echo ""
-        "$LLMSPELL" apps list
+        "$LLMSPELL" app list
         echo ""
         echo "Usage: $0 <app-name> [arguments]"
         echo ""
@@ -143,45 +132,39 @@ main() {
     shift
     
     # Validate app name
-    case "$APP_NAME" in
-        file-organizer|research-collector|content-creator|communication-manager|process-orchestrator|code-review-assistant|webapp-creator)
-            print_info "Starting $APP_NAME..."
-            ;;
-        list)
-            "$LLMSPELL" apps list
-            exit 0
-            ;;
-        help|--help|-h)
-            echo "Usage: $0 <app-name> [arguments]"
-            echo ""
-            echo "Available applications:"
-            echo "  file-organizer         - Organize messy files"
-            echo "  research-collector     - Research any topic"
-            echo "  content-creator        - Create content efficiently"
-            echo "  communication-manager  - Manage business communications"
-            echo "  process-orchestrator   - Orchestrate complex processes"
-            echo "  code-review-assistant  - Review code quality"
-            echo "  webapp-creator         - Create web applications"
-            echo ""
-            echo "Other commands:"
-            echo "  list                   - List all applications"
-            echo "  help                   - Show this help"
-            exit 0
-            ;;
-        *)
-            print_error "Unknown application: $APP_NAME"
-            echo ""
-            echo "Available applications:"
-            "$LLMSPELL" apps list 2>/dev/null | grep -E "^[a-z-]+" | awk '{print "  " $1}'
-            echo ""
-            echo "Run '$0 help' for more information"
-            exit 1
-            ;;
-    esac
+    if [[ "$APP_NAME" == "help" || "$APP_NAME" == "--help" || "$APP_NAME" == "-h" ]]; then
+        echo "Usage: $0 <app-name> [arguments]"
+        echo ""
+        echo "Available applications:"
+        "$LLMSPELL" app list --output json | jq -r '.applications[] | "  " + .name + " - " + .description'
+        echo ""
+        echo "Other commands:"
+        echo "  list                   - List all applications"
+        echo "  help                   - Show this help"
+        exit 0
+    fi
+
+    if [[ "$APP_NAME" == "list" ]]; then
+        "$LLMSPELL" app list
+        exit 0
+    fi
+
+    AVAILABLE_APPS=$("$LLMSPELL" app list --output json | jq -r '.applications[].name')
+    if ! echo "$AVAILABLE_APPS" | grep -q -w "$APP_NAME"; then
+        print_error "Unknown application: $APP_NAME"
+        echo ""
+        echo "Available applications:"
+        echo "$AVAILABLE_APPS" | sed 's/^/  /'
+        echo ""
+        echo "Run '$0 help' for more information"
+        exit 1
+    fi
+
+    print_info "Starting $APP_NAME..."
     
     # Run the application
     echo ""
-    exec "$LLMSPELL" apps "$APP_NAME" "$@"
+    exec "$LLMSPELL" app run "$APP_NAME" "$@"
 }
 
 # Run main function

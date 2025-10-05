@@ -28,8 +28,10 @@ impl ProviderManager {
             config: config.clone(),
         };
 
-        // Register the rig provider factory
+        // Register provider factories
         manager.register_rig_provider().await?;
+        manager.register_ollama_provider().await?;
+        manager.register_candle_provider().await?; // Phase 11.6: Add Candle support
 
         // Initialize configured providers
         manager.initialize_providers().await?;
@@ -41,6 +43,22 @@ impl ProviderManager {
     async fn register_rig_provider(&self) -> Result<(), LLMSpellError> {
         self.core_manager
             .register_provider("rig", llmspell_providers::create_rig_provider)
+            .await;
+        Ok(())
+    }
+
+    /// Register the Ollama provider factory
+    async fn register_ollama_provider(&self) -> Result<(), LLMSpellError> {
+        self.core_manager
+            .register_provider("ollama", llmspell_providers::create_ollama_provider)
+            .await;
+        Ok(())
+    }
+
+    /// Register the Candle provider factory (Phase 11.6)
+    async fn register_candle_provider(&self) -> Result<(), LLMSpellError> {
+        self.core_manager
+            .register_provider("candle", llmspell_providers::create_candle_provider)
             .await;
         Ok(())
     }
@@ -74,6 +92,8 @@ impl ProviderManager {
             let provider_name = match provider_config.provider_type.as_str() {
                 "openai" | "anthropic" | "cohere" | "groq" | "perplexity" | "together"
                 | "gemini" | "mistral" | "replicate" | "fireworks" => "rig",
+                "ollama" => "ollama",
+                "candle" => "candle",
                 other => other,
             };
 
@@ -98,6 +118,8 @@ impl ProviderManager {
         let provider_name = match config.provider_type.as_str() {
             "openai" | "anthropic" | "cohere" | "groq" | "perplexity" | "together" | "gemini"
             | "mistral" | "replicate" | "fireworks" => "rig",
+            "ollama" => "ollama",
+            "candle" => "candle", // Future
             other => other,
         };
 
@@ -280,9 +302,15 @@ impl ProviderManager {
         // Create a new core manager
         let core_manager = CoreProviderManager::new();
 
-        // Register the rig provider factory
+        // Register all provider factories (Phase 11.FIX.1)
         core_manager
             .register_provider("rig", llmspell_providers::create_rig_provider)
+            .await;
+        core_manager
+            .register_provider("ollama", llmspell_providers::create_ollama_provider)
+            .await;
+        core_manager
+            .register_provider("candle", llmspell_providers::create_candle_provider)
             .await;
 
         // Initialize providers from our configuration
@@ -301,7 +329,10 @@ impl ProviderManager {
                     }
                 })?;
                 let provider_name = match provider_config.provider_type.as_str() {
-                    "openai" | "anthropic" | "cohere" => "rig",
+                    "openai" | "anthropic" | "cohere" | "groq" | "perplexity" | "together"
+                    | "gemini" | "mistral" | "replicate" | "fireworks" => "rig",
+                    "ollama" => "ollama",
+                    "candle" => "candle",
                     other => other,
                 };
                 core_manager

@@ -220,7 +220,7 @@ pub trait SecurityPolicy: Send + Sync {
 /// # Examples
 ///
 /// ```rust
-/// use llmspell_security::{AccessControlPolicy, AccessDecision, SecurityContext};
+/// use llmspell_security::access_control::{AccessControlPolicy, AccessDecision, SecurityContext};
 /// use async_trait::async_trait;
 /// use anyhow::Result;
 ///

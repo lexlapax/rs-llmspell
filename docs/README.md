@@ -4,42 +4,42 @@
 
 **🔗 Navigation**: [← Project Home](../README.md) | [Examples](../examples/) | [Contributing](../CONTRIBUTING.md)
 
-> **📖 Documentation Hub**: All documentation for rs-llmspell v0.10.0 (Phase 10 Complete - Service Integration & IDE Connectivity). Fully consolidated with integrated kernel architecture, Unix daemon infrastructure, tool CLI commands, fleet management, and feature flags for modular builds (19-35MB). **Phase 10 delivers production service capabilities with daemon mode, signal handling, direct tool invocation, and OS-level fleet management.**
+> **📖 Documentation Hub**: All documentation for rs-llmspell v0.11.0 (Phase 11 Complete - Local LLM Integration). Fully consolidated with integrated kernel architecture, Unix daemon infrastructure, tool CLI commands, fleet management, local LLM support (Ollama + Candle), and feature flags for modular builds (19-35MB). **Phase 11 delivers local model inference with dual-backend support for privacy-first and offline-capable LLM workflows.**
 
 ---
 
-## Documentation Structure (Phase 10 Complete)
+## Documentation Structure (Phase 11 Complete)
 
 ### 📘 [User Guide](user-guide/) - *For Script Writers*
 **Purpose**: Practical guides for using rs-llmspell to build LLM-driven scripts and workflows.
 
-**Status**: ✅ Updated with Phase 10 service integration and tool CLI
-**Contents**: 10 essential documents including getting started, concepts, configuration, API reference (Lua + 17 Rust crates), troubleshooting, Phase 10 troubleshooting, performance tuning, service deployment, IDE integration
-**Key Files**: `getting-started.md`, `concepts.md`, `configuration.md`, `service-deployment.md`, `ide-integration.md`, `troubleshooting-phase10.md`, `performance-tuning.md`, `api/lua/README.md`
-**Phase 10 Additions**: Tool CLI (5 subcommands), feature flags (19-35MB builds), fleet management, daemon infrastructure, log rotation, signal handling
-**Start here if**: You want to write Lua scripts, use tool CLI directly, or deploy as production services
+**Status**: ✅ Updated with Phase 11 local LLM integration
+**Contents**: 11 essential documents including getting started, concepts, configuration, local LLM integration, API reference (Lua + 17 Rust crates), troubleshooting, Phase 10 troubleshooting, performance tuning, service deployment, IDE integration
+**Key Files**: `getting-started.md`, `concepts.md`, `configuration.md`, `local-llm.md`, `service-deployment.md`, `ide-integration.md`, `troubleshooting-phase10.md`, `performance-tuning.md`, `api/lua/README.md`
+**Phase 11 Additions**: Local LLM support (Ollama + Candle backends), model management (list, pull, info, status), privacy-first workflows, offline inference
+**Start here if**: You want to write Lua scripts, use local LLM models, use tool CLI directly, or deploy as production services
 
 ---
 
 ### 🔧 [Developer Guide](developer-guide/) - *For Contributors*
 **Purpose**: Technical guides for developers contributing to or extending rs-llmspell.
 
-**Status**: ✅ Updated with Phase 10 patterns and feature flags
+**Status**: ✅ Updated with Phase 11 local provider patterns
 **Contents**: 6 essential guides including developer guide, extending guide, production guide, examples reference, feature flags migration, tracing best practices
 **Key Files**: `developer-guide.md`, `extending-llmspell.md`, `production-guide.md`, `examples-reference.md`, `feature-flags-migration.md`, `tracing-best-practices.md`
-**Phase 10 Additions**: Tool CLI development, fleet management patterns, daemon infrastructure, feature flags system, tracing instrumentation
-**Start here if**: You want to create custom tools, contribute code, or understand modular build system
+**Phase 11 Additions**: Local provider implementation patterns, GGUF model handling, dual-backend architecture (Ollama + Candle)
+**Start here if**: You want to create custom tools, contribute code, implement local providers, or understand modular build system
 
 ---
 
 ### 🏗️ [Technical](technical/) - *For Architects*
 **Purpose**: Core architectural documentation and implementation decisions.
 
-**Status**: ✅ Complete for Phase 10 with 13 documents
+**Status**: ✅ Complete for Phase 11 with 13 documents
 **Contents**: 6 core guides + 7 supplementary docs covering architecture, protocols, performance, benchmarking, stress testing, protocol compliance, and dependency analysis
 **Key Files**: `current-architecture.md`, `kernel-protocol-architecture.md`, `debug-dap-architecture.md`, `cli-command-architecture.md`, `performance-baseline.md`, `benchmarking-guide.md`, `stress-test-results.md`, `protocol-compliance-report.md`, `mlua-upgrade-analysis.md`
-**Phase 10 Additions**: Daemon architecture, tool CLI design, fleet management, performance baselines, stress testing, protocol compliance validation
-**Start here if**: You need to understand system architecture, protocols, performance characteristics, or debugging infrastructure
+**Phase 11 Additions**: Local provider architecture, GGUF inference pipeline, dual-backend design (Ollama via rig + Candle embedded)
+**Start here if**: You need to understand system architecture, protocols, local LLM integration, performance characteristics, or debugging infrastructure
 
 ---
 
@@ -55,8 +55,8 @@
 ### 🚧 [In-Progress](in-progress/) - *Development Tracking*
 **Purpose**: Track planning and implementation toward version 1.0.
 
-**Status**: 📋 Phase 10 Complete, Phase 11 Planning
-**Contents**: Phase completion documents (PHASE00-10 DONE), implementation roadmaps, design documents
+**Status**: 📋 Phase 11 Complete, Phase 12 Planning
+**Contents**: Phase completion documents (PHASE00-11 DONE), implementation roadmaps, design documents
 **Key Files**: `implementation-phases.md` (16-phase roadmap), phase-specific design docs
 **For**: Core team tracking progress
 
@@ -64,7 +64,13 @@
 
 ## What Rs-LLMSpell Actually Is
 
-**Production-Ready Features** (v0.10.0):
+**Production-Ready Features** (v0.11.0):
+- ✅ **Local LLM Integration** with dual-backend support (Ollama via rig + Candle embedded inference)
+- ✅ **GGUF Model Support** with HuggingFace downloads, quantization (Q4_K_M, Q5_K_M, Q8_0), and chat templates
+- ✅ **Privacy-First Workflows** with offline-capable local model inference
+- ✅ **Model Management CLI** (7 subcommands: `llmspell model list/pull/remove/info/available/status/install-ollama`)
+- ✅ **Model Management API** (LocalLLM Lua global with list, pull, info, status methods for script access)
+- ✅ **Kernel Protocol Extension** (model_request/model_reply for remote kernel model management)
 - ✅ **Unix Daemon Infrastructure** with double-fork, TTY detachment, session leadership
 - ✅ **Signal Handling** (SIGTERM/SIGINT → Jupyter shutdown, atomic operations)
 - ✅ **Tool CLI Commands** (5 subcommands: list, info, invoke, search, test)
@@ -90,7 +96,20 @@
 - ✅ **State persistence** unified in kernel
 - ✅ **Hook system** with 40+ points and circuit breakers
 - ✅ **Event bus** with 90K+ events/sec throughput
-- ✅ **60+ production examples** across 6 categories
+- ✅ **64+ production examples** across 7 categories (including local LLM examples)
+
+**Phase 11 Achievements** (v0.11.0):
+- ✅ **Dual-Backend Architecture**: Ollama via rig (REST API) + Candle (embedded GGUF inference)
+- ✅ **CLI Model Commands**: 7 subcommands (list, pull, remove, info, available, status, install-ollama) - 468 lines
+- ✅ **Kernel Protocol Extension**: model_request/model_reply messages for remote model management
+- ✅ **GGUF Integration**: Direct GGUF file loading with HuggingFace downloads, tokenizer fallback
+- ✅ **Chat Template Support**: TinyLlama-Chat and similar models with proper formatting
+- ✅ **Model Management API**: LocalLLM Lua global with list, pull, info, status methods
+- ✅ **Provider Factory**: ModelSpecifier parsing with @ollama/@candle backend selection
+- ✅ **Dual Interface**: Both CLI and Lua API for maximum user flexibility
+- ✅ **Testing**: 10/10 integration tests passing (5 Ollama + 5 Candle with RUN_EXPENSIVE_TESTS)
+- ✅ **Documentation**: Comprehensive user guide (320 lines) + 4 production examples (260 lines)
+- ✅ **Zero Warnings**: Clean cargo doc build, all clippy warnings resolved
 
 **Phase 10 Achievements** (v0.10.0):
 - ✅ **Unix Daemon Infrastructure**: 1.8s startup (10% faster), double-fork, signal handling
@@ -105,8 +124,8 @@
 **What it doesn't do**:
 - ❌ GUI or web interface (CLI and library only)
 - ❌ JavaScript support in kernel (Lua only currently)
-- ❌ Python kernel support (planned for Phase 11)
-- ❌ Distributed execution (planned for Phase 12)
+- ❌ Python kernel support (planned for Phase 12)
+- ❌ Distributed execution (planned for Phase 13)
 
 ---
 
@@ -145,6 +164,34 @@
 
 ---
 
+## Phase 11 Documentation Achievements (v0.11.0)
+
+### Local LLM Integration Documentation
+- **Local LLM User Guide**: Comprehensive 320-line guide covering both Ollama and Candle backends
+- **Quick Start Sections**: Separate quick starts for each backend (Ollama REST API, Candle embedded)
+- **Model Management**: Complete documentation for list, pull, info, status commands
+- **Configuration Examples**: Both backends with GGUF settings, quantization, chat templates
+- **Troubleshooting**: 6 common scenarios (Ollama connection, model downloads, GGUF errors, tokenizer issues)
+- **Performance Comparison**: Ollama vs Candle characteristics and use cases
+
+### Example Applications
+- **4 Production Examples**: 260 lines of runnable Lua scripts (status, chat, comparison, model info)
+- **LocalLLM Global API**: Demonstrated usage of all LocalLLM methods
+- **Agent Integration**: Examples showing local models with Agent.create()
+- **Error Handling**: Proper status checks and fallbacks
+
+### API Documentation
+- **Zero Warnings**: Clean cargo doc build for all Phase 11 packages
+- **GGUF Documentation**: Complete docs for GGUF loading, tokenization, inference
+- **Provider Patterns**: LocalProviderInstance trait, factory pattern, backend selection
+
+### Documentation Structure Updates
+- **User Guide**: Updated from 10 to 11 essential documents
+- **Navigation**: Updated all README files with Phase 11 status
+- **Examples Index**: Added local LLM examples to example categories
+
+---
+
 ## Phase 10 Documentation Achievements (v0.10.0)
 
 ### Core Infrastructure Documentation
@@ -178,10 +225,10 @@
 ## Documentation Quality Standards
 
 ### Accuracy ✅
-- All code examples tested with v0.10.0
-- API documentation matches Phase 10 implementation
+- All code examples tested with v0.11.0
+- API documentation matches Phase 11 implementation
 - Performance metrics from actual Phase 10 measurements (10-40% faster)
-- Architecture validated against 17 crates with daemon infrastructure
+- Architecture validated against 17 crates with daemon infrastructure and local LLM support
 
 ### Organization ✅
 - Clear separation: User (usage) vs Developer (contributing) vs Technical (architecture)
@@ -191,10 +238,11 @@
 - Cross-references updated for all Phase 10 features
 
 ### Maintenance 📋
-- Version tracking (v0.10.0)
-- Phase status clearly marked (Phase 10 Complete - Service Integration & IDE Connectivity)
+- Version tracking (v0.11.0)
+- Phase status clearly marked (Phase 11 Complete - Local LLM Integration)
 - Update dates: January 2025
 - Feature flags migration guide for Phase 10.17.5+ builds
+- Local LLM integration guide for Phase 11
 - Deprecation notices for old patterns
 
 ---
@@ -223,8 +271,9 @@
 
 ## Examples Structure
 
-### 📚 [Script Users](../examples/script-users/) - 60+ Lua Examples
+### 📚 [Script Users](../examples/script-users/) - 64+ Lua Examples
 - **Getting Started**: 6 progressive tutorials (hello world → kernel → RAG)
+- **Local LLM**: 4 examples (status, chat, comparison, model info) using Ollama + Candle
 - **Kernel Examples**: Service mode, daemon deployment, multi-client, tool CLI
 - **Debug Examples**: DAP integration, breakpoints, tracing
 - **Features**: Agent, tool (40+), workflow, state, provider examples
@@ -280,4 +329,4 @@
 
 ---
 
-**Last Updated**: January 2025 | **Version**: 0.10.0 (Phase 10 Complete - Service Integration & IDE Connectivity) | **Next**: Phase 11 (Adaptive Memory System)
+**Last Updated**: January 2025 | **Version**: 0.11.0 (Phase 11 Complete - Local LLM Integration) | **Next**: Phase 12 (Adaptive Memory System)

@@ -7,6 +7,16 @@ use common::*;
 use llmspell_core::BaseAgent;
 use llmspell_tools::WebpageMonitorTool;
 use serde_json::json;
+
+/// Helper to check if an error is network-related (should skip test, not fail)
+fn is_network_error(e: &llmspell_core::error::LLMSpellError) -> bool {
+    let err_str = e.to_string();
+    err_str.contains("Failed to fetch URL")
+        || err_str.contains("HTTP error")
+        || err_str.contains("network")
+        || err_str.contains("timeout")
+        || err_str.contains("connection")
+}
 #[tokio::test]
 async fn test_webpage_monitor_initial_check() {
     let tool = WebpageMonitorTool::new();
@@ -37,7 +47,7 @@ async fn test_webpage_monitor_initial_check() {
         }
         Err(e) => {
             // If it's a network error, skip the test
-            if e.to_string().contains("Failed to fetch URL") {
+            if is_network_error(&e) {
                 eprintln!("Skipping test due to network error: {e}");
                 return;
             }
@@ -75,7 +85,7 @@ async fn test_webpage_monitor_with_selector() {
         }
         Err(e) => {
             // If it's a network error, skip the test
-            if e.to_string().contains("Failed to fetch URL") {
+            if is_network_error(&e) {
                 eprintln!("Skipping test due to network error: {e}");
                 return;
             }
@@ -108,7 +118,7 @@ async fn test_webpage_monitor_metadata_changes() {
         }
         Err(e) => {
             // If it's a network error, skip the test
-            if e.to_string().contains("Failed to fetch URL") {
+            if is_network_error(&e) {
                 eprintln!("Skipping test due to network error: {e}");
                 return;
             }
@@ -156,7 +166,7 @@ async fn test_webpage_monitor_content_diff() {
                     assert!(result.get("change_count").is_some());
                 }
                 Err(e) => {
-                    if e.to_string().contains("Failed to fetch URL") {
+                    if is_network_error(&e) {
                         eprintln!("Skipping second fetch due to network error: {e}");
                         return;
                     }
@@ -166,7 +176,7 @@ async fn test_webpage_monitor_content_diff() {
         }
         Err(e) => {
             // If it's a network error, skip the test
-            if e.to_string().contains("Failed to fetch URL") {
+            if is_network_error(&e) {
                 eprintln!("Skipping test due to network error: {e}");
                 return;
             }
@@ -200,7 +210,7 @@ async fn test_webpage_monitor_alert_threshold() {
         }
         Err(e) => {
             // If it's a network error, skip the test
-            if e.to_string().contains("Failed to fetch URL") {
+            if is_network_error(&e) {
                 eprintln!("Skipping test due to network error: {e}");
                 return;
             }

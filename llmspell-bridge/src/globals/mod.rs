@@ -10,6 +10,7 @@ pub mod event_global;
 pub mod hook_global;
 pub mod injection;
 pub mod json_global;
+pub mod local_llm_global;
 pub mod provider_global;
 pub mod rag_global;
 pub mod rag_infrastructure;
@@ -224,6 +225,15 @@ pub async fn create_standard_registry(context: Arc<GlobalContext>) -> Result<Glo
     register_agent_workflow(&mut builder, &context).await?;
 
     builder.register(Arc::new(streaming_global::StreamingGlobal::new()));
+
+    // Register LocalLLM global if provider manager available
+    if let Some(provider_manager) =
+        context.get_bridge::<llmspell_providers::ProviderManager>("provider_manager")
+    {
+        builder.register(Arc::new(local_llm_global::LocalLLMGlobal::new(
+            provider_manager,
+        )));
+    }
 
     builder.build()
 }

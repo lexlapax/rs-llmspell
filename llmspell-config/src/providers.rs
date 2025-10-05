@@ -16,7 +16,7 @@ pub struct ProviderManagerConfig {
     #[serde(default)]
     pub default_provider: Option<String>,
     /// Provider-specific configurations
-    #[serde(default)]
+    #[serde(default, flatten)]
     pub providers: HashMap<String, ProviderConfig>,
 }
 

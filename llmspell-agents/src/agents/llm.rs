@@ -64,6 +64,7 @@ impl LLMAgent {
             ModelSpecifier {
                 provider: Some(model_config.provider.clone()),
                 model: model_config.model_id.clone(),
+                backend: None,
                 base_url: None,
             }
         };

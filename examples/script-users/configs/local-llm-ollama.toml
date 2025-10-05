@@ -1,0 +1,64 @@
+# Local LLM Configuration - Ollama Backend
+# Purpose: Configuration for using Ollama for local LLM inference
+# Usage: ./llmspell -c examples/script-users/configs/local-llm-ollama.toml run <script>
+# Requires: Ollama installed and running (https://ollama.ai)
+
+# Default script engine
+default_engine = "lua"
+
+# Engine configuration
+[engines.lua]
+stdlib_level = "full"
+
+# Provider configuration - Ollama
+[providers.ollama]
+provider_type = "ollama"
+enabled = true
+base_url = "http://localhost:11434"
+timeout_seconds = 120
+default_model = "llama3.1:8b"  # Default model for ollama backend
+
+# Ollama-specific options (captured in ProviderConfig.options HashMap)
+auto_start = true
+health_check_interval_seconds = 60
+default_backend = "ollama"
+
+# Runtime configuration
+[runtime]
+log_level = "info"
+
+# Example metadata
+[example]
+name = "Local LLM with Ollama"
+description = "Demonstrates local LLM usage via Ollama backend"
+features = ["local_inference", "ollama", "model_management"]
+models = ["llama3.1:8b", "phi3:3.8b", "mistral:7b"]
+
+# Example usage patterns
+[example.usage]
+basic = '''
+-- List local models
+local models = LocalLLM.list()
+for _, model in ipairs(models) do
+  print(model.id, model.size_bytes)
+end
+
+-- Create agent with local model
+local agent = Agent.create({
+  model = "local/llama3.1:8b@ollama"
+})
+
+-- Generate text
+local response = agent:generate("What is Rust?")
+print(response.text)
+'''
+
+status_check = '''
+-- Check Ollama backend status
+local status = LocalLLM.status()
+if status.ollama.running then
+  print("Ollama is running with", status.ollama.models, "models")
+else
+  print("Ollama is not available")
+end
+'''

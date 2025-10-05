@@ -1,5 +1,4 @@
 - allow security flags and configs to be set as environment variables or flags.. -e.g allow write to this directory.
-- every script /example code when it was last working should have a version stamp of rust code that it worked with in the header and the last code commit signature.
 - all lua bridges should be just wrappers to rust native bridge.. not doing json conversion etc in lua engine. we just fixed workflow bridge to be that way.
 - all tool functions should be consistent for two word functions either like-this or like_this, but not both.
 - security sandbox - add network access, add process execution access 
@@ -8,21 +7,7 @@
 - in phase 7 we redid state 
 - add postgres vector store backend in llmspell-storage, https://github.com/tensorchord/pgvecto.rs or https://github.com/tensorchord/VectorChord/ or pgvector
 - remove invoke and just use execute in agent.
-- debug for scripts not working
 - remove custom steps or document it properly
 - agent templates - ideally some of the agent templates use rag to embed more correct information for different domains, or even graphs
-- scriptruntime capture stdin, stdout, stderr
 
 
-
-after that, similarly like rust api, ultrathink, now and analyze code because we need to redo the lua api user-guide 
-based on what we've added / changed in Phase 9. look at what we have in docs/user-guide/lua/* analyze what's 
-there, and analyze what we've accomplished in Phase 9 via docs/in-progress/phase-09-design-doc.md and 
-TODO.md and find out what needs to be updated in the lua user guide. do thorough analysis including 
-looking at implementation code and update the lua user-guide. 
-
-
-complete 10.13 with ultrathink. review and analyze everything that's already been done in different previous 
-tasks and phases first, some of the tasks in 10.13 may already be done. update sub tasks and steps in TODO.md as you complete them.
-after completion you need to check by going back and reading all the check boxes in each task to see we didn't 
-miss anything. no clippy warnings and all tests passing.
