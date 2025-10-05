@@ -16,6 +16,7 @@ provider_type = "ollama"
 enabled = true
 base_url = "http://localhost:11434"
 timeout_seconds = 120
+default_model = "llama3.1:8b"  # Default model for ollama backend
 
 # Ollama-specific options (captured in ProviderConfig.options HashMap)
 auto_start = true

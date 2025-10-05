@@ -1615,4 +1615,37 @@ mod tests {
             crate::rag::ChunkingStrategy::SlidingWindow
         ));
     }
+
+    #[test]
+    fn test_provider_toml_deserialization() {
+        let toml_str = r#"
+default_engine = "lua"
+
+[providers]
+
+[providers.candle]
+provider_type = "candle"
+enabled = true
+timeout_seconds = 300
+    "#;
+
+        let config: LLMSpellConfig = toml::from_str(toml_str).unwrap();
+
+        println!("Providers count: {}", config.providers.providers.len());
+        println!("Providers: {:#?}", config.providers.providers);
+
+        assert!(
+            !config.providers.providers.is_empty(),
+            "Should have at least one provider"
+        );
+        assert!(
+            config.providers.providers.contains_key("candle"),
+            "Should have candle provider"
+        );
+
+        let candle = config.providers.providers.get("candle").unwrap();
+        assert_eq!(candle.provider_type, "candle");
+        assert!(candle.enabled);
+        assert_eq!(candle.timeout_seconds, Some(300));
+    }
 }

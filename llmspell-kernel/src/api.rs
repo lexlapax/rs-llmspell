@@ -18,7 +18,7 @@ use llmspell_core::{Agent, ComponentLookup, Tool, Workflow};
 use std::collections::HashMap;
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
-use tracing::{debug, error, info, trace};
+use tracing::{debug, error, info, trace, warn};
 use uuid::Uuid;
 
 /// Configuration for starting a kernel service
@@ -563,6 +563,87 @@ pub async fn start_embedded_kernel_with_executor(
     config: LLMSpellConfig,
     script_executor: Arc<dyn ScriptExecutor>,
 ) -> Result<KernelHandle> {
+    start_embedded_kernel_with_executor_and_provider(config, script_executor, None).await
+}
+
+/// Create and initialize a provider manager from config (Phase 11.FIX.1)
+///
+/// This creates a `ProviderManager`, registers all provider factories (ollama, candle, rig),
+/// and initializes provider instances from the configuration.
+///
+/// # Errors
+///
+/// Returns an error if provider initialization fails
+pub async fn create_provider_manager(
+    config: &LLMSpellConfig,
+) -> Result<Arc<llmspell_providers::ProviderManager>> {
+    let pm = Arc::new(llmspell_providers::ProviderManager::new());
+
+    // Register all provider factories
+    pm.register_provider("ollama", llmspell_providers::create_ollama_provider)
+        .await;
+    pm.register_provider("candle", llmspell_providers::create_candle_provider)
+        .await;
+    pm.register_provider("rig", llmspell_providers::create_rig_provider)
+        .await;
+    debug!("Registered provider factories: ollama, candle, rig");
+
+    // Initialize provider instances from configuration
+    debug!(
+        "Initializing providers from config (found {} provider configs)",
+        config.providers.providers.len()
+    );
+    for (name, config_provider) in &config.providers.providers {
+        if !config_provider.enabled {
+            debug!("Skipping disabled provider: {}", name);
+            continue;
+        }
+
+        let provider_config = llmspell_providers::ProviderConfig {
+            name: name.clone(),
+            provider_type: config_provider.provider_type.clone(),
+            model: config_provider.default_model.clone().unwrap_or_default(),
+            endpoint: config_provider.base_url.clone(),
+            api_key: config_provider.api_key.clone().or_else(|| {
+                config_provider
+                    .api_key_env
+                    .as_ref()
+                    .and_then(|env| std::env::var(env).ok())
+            }),
+            timeout_secs: config_provider.timeout_seconds,
+            max_retries: config_provider.max_retries,
+            custom_config: config_provider.options.clone(),
+        };
+
+        match pm.init_provider(provider_config).await {
+            Ok(()) => {
+                info!(
+                    "Initialized provider: {} (type: {})",
+                    name, config_provider.provider_type
+                );
+            }
+            Err(e) => {
+                warn!("Failed to initialize provider {}: {}", name, e);
+            }
+        }
+    }
+
+    Ok(pm)
+}
+
+/// Start embedded kernel with script executor and optional provider manager (Phase 11.FIX.1)
+///
+/// If `provider_manager` is provided, it will be used. Otherwise, a new one will be created.
+/// This enables sharing a single `ProviderManager` between kernel and script runtime.
+///
+/// # Errors
+///
+/// Returns an error if the kernel fails to start or transport setup fails
+pub async fn start_embedded_kernel_with_executor_and_provider(
+    config: LLMSpellConfig,
+    script_executor: Arc<dyn ScriptExecutor>,
+    provider_manager: Option<Arc<llmspell_providers::ProviderManager>>,
+) -> Result<KernelHandle> {
     let kernel_id = format!("embedded-{}", Uuid::new_v4());
     let session_id = format!("session-{}", Uuid::new_v4());
 
@@ -616,26 +697,14 @@ pub async fn start_embedded_kernel_with_executor(
     // Build execution config from LLMSpellConfig
     let exec_config = build_execution_config(&config);
 
-    // Create provider manager for local LLM operations (Phase 11)
-    let provider_manager = Arc::new(llmspell_providers::ProviderManager::new());
-
-    // Register Ollama provider factory (Phase 11.2)
-    provider_manager
-        .register_provider("ollama", llmspell_providers::create_ollama_provider)
-        .await;
-    debug!("Registered Ollama provider factory");
-
-    // Register Candle provider factory (Phase 11.6)
-    provider_manager
-        .register_provider("candle", llmspell_providers::create_candle_provider)
-        .await;
-    debug!("Registered Candle provider factory");
-
-    // Register rig provider factory for cloud providers
-    provider_manager
-        .register_provider("rig", llmspell_providers::create_rig_provider)
-        .await;
-    debug!("Created provider manager for kernel with Ollama, Candle, and rig factories");
+    // Use provided provider manager or create new one (Phase 11.FIX.1)
+    let provider_manager = if let Some(pm) = provider_manager {
+        debug!("Using provided provider manager (shared with script runtime)");
+        pm
+    } else {
+        debug!("Creating new provider manager for kernel");
+        create_provider_manager(&config).await?
+    };
 
     // Use the provided script executor (clone it for sharing between kernels)
     let script_executor_clone = script_executor.clone();

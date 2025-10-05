@@ -135,11 +135,11 @@ impl ExecutionContext {
                 info!("Using config file: {}", config_path.display());
                 let config = LLMSpellConfig::load_from_file(&config_path).await?;
 
-                // Create real ScriptExecutor from llmspell-bridge
+                // Create script executor
                 let script_executor =
                     llmspell_bridge::create_script_executor(config.clone()).await?;
 
-                // Create kernel with real executor
+                // Create kernel with executor
                 let handle =
                     start_embedded_kernel_with_executor(config.clone(), script_executor).await?;
                 Ok(ExecutionContext::Embedded {
@@ -163,11 +163,11 @@ impl ExecutionContext {
                 } else {
                     info!("No running kernel found, starting embedded mode");
 
-                    // Create real ScriptExecutor from llmspell-bridge
+                    // Create script executor
                     let script_executor =
                         llmspell_bridge::create_script_executor(default_config.clone()).await?;
 
-                    // Create kernel with real executor
+                    // Create kernel with executor
                     let handle = start_embedded_kernel_with_executor(
                         default_config.clone(),
                         script_executor,

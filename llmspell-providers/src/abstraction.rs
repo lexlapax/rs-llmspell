@@ -251,13 +251,18 @@ impl ProviderRegistry {
         &self,
         config: ProviderConfig,
     ) -> Result<Box<dyn ProviderInstance>, LLMSpellError> {
-        let factory =
-            self.factories
-                .get(&config.name)
-                .ok_or_else(|| LLMSpellError::Configuration {
-                    message: format!("Unknown provider: {}", config.name),
-                    source: None,
-                })?;
+        tracing::debug!(
+            "Looking up factory for provider_type: '{}' (available: {:?})",
+            config.provider_type,
+            self.factories.keys().collect::<Vec<_>>()
+        );
+
+        let factory = self.factories.get(&config.provider_type).ok_or_else(|| {
+            LLMSpellError::Configuration {
+                message: format!("Unknown provider type: {}", config.provider_type),
+                source: None,
+            }
+        })?;
 
         factory(config)
     }

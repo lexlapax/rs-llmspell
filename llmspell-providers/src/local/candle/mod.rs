@@ -20,6 +20,7 @@ pub use tokenizer_loader::TokenizerLoader;
 use crate::abstraction::ProviderConfig;
 use crate::abstraction::ProviderInstance;
 use llmspell_core::error::LLMSpellError;
+use llmspell_utils::file_utils::expand_path;
 
 /// Factory function to create a Candle provider instance
 ///
@@ -59,7 +60,14 @@ pub fn create_candle_provider(
         .custom_config
         .get("model_directory")
         .and_then(|v| v.as_str())
-        .map(std::path::PathBuf::from);
+        .and_then(|path_str| {
+            expand_path(path_str)
+                .map_err(|e| {
+                    tracing::warn!("Failed to expand path '{}': {}", path_str, e);
+                    e
+                })
+                .ok()
+        });
 
     let provider =
         CandleProvider::new(config.model.clone(), model_directory, device).map_err(|e| {

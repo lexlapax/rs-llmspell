@@ -134,8 +134,11 @@ fn validate_provider_config(config: &LLMSpellConfig) -> Result<(), ConfigError> 
             });
         }
 
-        // Check credentials configuration
-        if !provider_config.has_credentials() {
+        // Check credentials configuration (skip local providers that don't need API keys)
+        let is_local_provider =
+            matches!(provider_config.provider_type.as_str(), "candle" | "ollama");
+
+        if !is_local_provider && !provider_config.has_credentials() {
             warn!("Provider '{}' has no credentials configured", name);
         }
 

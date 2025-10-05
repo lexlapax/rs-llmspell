@@ -10,11 +10,14 @@ default_engine = "lua"
 [engines.lua]
 stdlib_level = "full"
 
-# Provider configuration - Candle
+# Provider configuration
+[providers]
+
 [providers.candle]
 provider_type = "candle"
 enabled = true
 timeout_seconds = 300
+default_model = "llama3.1:8b-q4"  # Default model for candle backend
 
 # Candle-specific options (captured in ProviderConfig.options HashMap)
 model_directory = "${HOME}/.llmspell/models/candle"
