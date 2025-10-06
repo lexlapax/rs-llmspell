@@ -1,8 +1,11 @@
 //! ABOUTME: Session global object providing session management for scripts
 //! ABOUTME: Integrates with `SessionManager` via `SessionBridge` for language-specific bindings
 
-use crate::globals::types::{GlobalContext, GlobalMetadata, GlobalObject};
+#[cfg(any(feature = "lua", feature = "javascript"))]
+use crate::globals::types::GlobalContext;
+use crate::globals::types::{GlobalMetadata, GlobalObject};
 use crate::session_bridge::SessionBridge;
+#[cfg(any(feature = "lua", feature = "javascript"))]
 use llmspell_core::error::LLMSpellError;
 use std::sync::Arc;
 

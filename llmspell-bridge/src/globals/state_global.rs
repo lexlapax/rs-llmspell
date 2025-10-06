@@ -3,8 +3,12 @@
 
 #![allow(clippy::significant_drop_tightening)]
 
-use crate::globals::types::{GlobalContext, GlobalMetadata, GlobalObject};
-use llmspell_core::{error::LLMSpellError, traits::state::StateAccess};
+#[cfg(any(feature = "lua", feature = "javascript"))]
+use crate::globals::types::GlobalContext;
+use crate::globals::types::{GlobalMetadata, GlobalObject};
+#[cfg(any(feature = "lua", feature = "javascript"))]
+use llmspell_core::error::LLMSpellError;
+use llmspell_core::traits::state::StateAccess;
 use llmspell_kernel::state::{
     migration::MigrationEngine, schema::SchemaRegistry, StateManager, StateScope,
 };

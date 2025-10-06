@@ -1,9 +1,12 @@
 //! ABOUTME: Config global object implementation for script engines
 //! ABOUTME: Provides configuration access and modification capabilities
 
-use super::types::{GlobalContext, GlobalMetadata, GlobalObject};
+#[cfg(any(feature = "lua", feature = "javascript"))]
+use super::types::GlobalContext;
+use super::types::{GlobalMetadata, GlobalObject};
 use crate::config_bridge::{ConfigBridge, ConfigPermissions};
 use llmspell_config::LLMSpellConfig;
+#[cfg(any(feature = "lua", feature = "javascript"))]
 use llmspell_core::Result;
 use std::sync::Arc;
 

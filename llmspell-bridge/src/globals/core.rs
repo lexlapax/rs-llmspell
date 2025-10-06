@@ -1,7 +1,10 @@
 //! ABOUTME: Core global objects that are injected into script engines
 //! ABOUTME: Provides fundamental globals like Agent, Tool, Workflow, Hook, Event, State, Logger, Config, Security, Utils
 
-use super::types::{GlobalContext, GlobalMetadata, GlobalObject};
+#[cfg(any(feature = "lua", feature = "javascript"))]
+use super::types::GlobalContext;
+use super::types::{GlobalMetadata, GlobalObject};
+#[cfg(any(feature = "lua", feature = "javascript"))]
 use llmspell_core::Result;
 
 #[cfg(feature = "lua")]

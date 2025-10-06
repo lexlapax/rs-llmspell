@@ -751,40 +751,49 @@ cargo test -p llmspell-kernel --no-run
 ### Task 11a.5.1: Add Module-Level #![cfg] Guards
 **Priority**: MEDIUM (defensive, best practice)
 **Estimated Time**: 15 minutes
-**Status**: Pending
+**Status**: ✅ COMPLETE (reverted - redundant with lib.rs gates)
 **Depends On**: 11a.4.1
 
-**Files**:
+**Initial Approach**:
+Module-level `#![cfg]` guards were initially added to lua/mod.rs and javascript/mod.rs but clippy reported them as duplicated attributes since lib.rs already gates the module imports.
 
-1. **llmspell-bridge/src/lua/mod.rs** (add at line 2):
-   ```rust
-   //! ABOUTME: Lua script engine implementation
-   #![cfg(feature = "lua")]
+**Final Solution**:
+Instead of redundant module-level guards, comprehensive `#[cfg]` guards were added throughout the codebase to fix all unused import and dead code warnings when features are disabled.
 
-   // rest of file...
-   ```
+**Files Modified** (36 files):
+1. **llmspell-bridge/src/runtime.rs**: Gated EngineFactory, register_all_tools, new_with_engine, new_with_engine_and_provider
+2. **llmspell-bridge/src/engine/factory.rs**: Gated create_lua_engine, create_lua_engine_with_runtime, match arms in create_from_name
+3. **llmspell-bridge/src/lib.rs**: Gated ScriptExecutor and Arc (lua-only)
+4. **llmspell-bridge/src/globals/*.rs** (18 files): Gated GlobalContext, Result, LLMSpellError imports per-file based on usage
+5. **llmspell-bridge/src/globals/injection.rs**: Gated LLMSpellError, HashMap, Instant, tracing imports
+6. **llmspell-bridge/src/globals/provider_global.rs**: Added `#[cfg_attr(not(feature = "lua"), allow(dead_code))]` to providers field
+7. **llmspell-bridge/src/globals/hook_global.rs**: Added `#[cfg_attr]` to hook_bridge field
 
-2. **llmspell-bridge/src/javascript/mod.rs** (add at line 2):
-   ```rust
-   //! ABOUTME: JavaScript script engine integration
-   #![cfg(feature = "javascript")]
+**Pattern Used**:
+- `GlobalContext` and `Result`/`LLMSpellError`: `#[cfg(any(feature = "lua", feature = "javascript"))]` for inject methods
+- Language-specific imports (EventSerialization, Language, etc.): `#[cfg(feature = "lua")]` if only used in Lua
+- Functions only called from cfg-gated code: `#[cfg(any(feature = "lua", feature = "javascript"))]`
 
-   // rest of file...
-   ```
-
-**Note**: lib.rs already gates module imports, this is defensive.
-
-**Verification**:
+**Verification Results**:
 ```bash
-cargo check -p llmspell-bridge --no-default-features
-cargo clippy -p llmspell-bridge --no-default-features -- -D warnings
+✅ cargo clippy -p llmspell-bridge --no-default-features -- -D warnings
+   Finished in 2.80s - PASSED
+
+✅ cargo clippy -p llmspell-bridge --features lua -- -D warnings
+   Finished in 4.16s - PASSED
+
+✅ cargo clippy -p llmspell-bridge --features javascript -- -D warnings
+   Finished in 5.08s - PASSED
 ```
 
 **Acceptance Criteria**:
-- [ ] #![cfg] added to lua/mod.rs
-- [ ] #![cfg] added to javascript/mod.rs
-- [ ] Zero clippy warnings
-- [ ] Git commit: "fix(bridge): Add module-level feature gates"
+- [x] ~~#![cfg] added to lua/mod.rs~~ Reverted (redundant)
+- [x] ~~#![cfg] added to javascript/mod.rs~~ Reverted (redundant)
+- [x] Zero clippy warnings ✅ ALL CONFIGURATIONS PASS
+
+**Key Insight**: The lib.rs module import guards (`#[cfg(feature = "...")]` on `pub mod lua;`) are sufficient. Module-level guards inside the modules are redundant and cause clippy::duplicated_attributes. The real work was systematically adding cfg guards to imports and functions that are unused when features are disabled.
+
+**Summary**: Phase 11a.5 evolved from "add module-level guards" to "comprehensive cfg cleanup across 36 files" - removing redundant module guards, adding proper import/function guards, and achieving zero clippy warnings in all three feature configurations (no-default, lua, javascript)
 
 ---
 

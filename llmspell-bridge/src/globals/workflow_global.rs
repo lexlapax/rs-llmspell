@@ -3,9 +3,12 @@
 
 #![allow(clippy::significant_drop_tightening)]
 
-use super::types::{GlobalContext, GlobalMetadata, GlobalObject};
+#[cfg(any(feature = "lua", feature = "javascript"))]
+use super::types::GlobalContext;
+use super::types::{GlobalMetadata, GlobalObject};
 use crate::workflows::WorkflowBridge;
 use crate::ComponentRegistry;
+#[cfg(any(feature = "lua", feature = "javascript"))]
 use llmspell_core::Result;
 use llmspell_kernel::state::StateManager;
 use std::sync::Arc;

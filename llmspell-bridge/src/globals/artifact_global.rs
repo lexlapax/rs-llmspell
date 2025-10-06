@@ -2,7 +2,10 @@
 //! ABOUTME: Integrates with `SessionManager` via `ArtifactBridge` for language-specific bindings
 
 use crate::artifact_bridge::ArtifactBridge;
-use crate::globals::types::{GlobalContext, GlobalMetadata, GlobalObject};
+#[cfg(any(feature = "lua", feature = "javascript"))]
+use crate::globals::types::GlobalContext;
+use crate::globals::types::{GlobalMetadata, GlobalObject};
+#[cfg(any(feature = "lua", feature = "javascript"))]
 use llmspell_core::error::LLMSpellError;
 use std::sync::Arc;
 

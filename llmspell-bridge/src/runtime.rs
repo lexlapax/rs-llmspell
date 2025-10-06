@@ -2,11 +2,15 @@
 //! ABOUTME: Central execution orchestrator supporting multiple script engines
 
 use crate::{
-    engine::{EngineFactory, ScriptEngineBridge, ScriptOutput, ScriptStream},
+    engine::{ScriptEngineBridge, ScriptOutput, ScriptStream},
     providers::ProviderManager,
     registry::ComponentRegistry,
-    tools::register_all_tools,
 };
+
+#[cfg(any(feature = "lua", feature = "javascript"))]
+use crate::engine::EngineFactory;
+#[cfg(any(feature = "lua", feature = "javascript"))]
+use crate::tools::register_all_tools;
 
 #[cfg(feature = "lua")]
 use crate::engine::LuaConfig;
@@ -258,6 +262,7 @@ impl ScriptRuntime {
     /// ```
     #[must_use]
     #[allow(clippy::vec_init_then_push)] // Cannot use vec![] with #[cfg] attributes
+    #[allow(clippy::missing_const_for_fn)] // Vec::push is not const
     pub fn available_engines() -> Vec<&'static str> {
         #[allow(unused_mut)] // mut needed when at least one feature enabled
         let mut engines = Vec::new();
@@ -269,6 +274,7 @@ impl ScriptRuntime {
     }
 
     /// Core initialization with any engine
+    #[cfg(any(feature = "lua", feature = "javascript"))]
     #[instrument(level = "debug", skip(engine, config), fields(
         engine_name = engine.get_engine_name(),
         events_enabled = config.events.enabled,
@@ -344,6 +350,7 @@ impl ScriptRuntime {
 
     /// Create runtime with existing provider manager (Phase 11.FIX.1)
     /// This ensures a single `ProviderManager` instance is shared between kernel and script runtime
+    #[cfg(any(feature = "lua", feature = "javascript"))]
     fn new_with_engine_and_provider(
         mut engine: Box<dyn ScriptEngineBridge>,
         config: LLMSpellConfig,

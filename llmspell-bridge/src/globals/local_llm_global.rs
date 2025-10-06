@@ -1,7 +1,10 @@
 //! ABOUTME: `LocalLLM` global object for local model management
 //! ABOUTME: Provides access to Ollama and Candle backends
 
-use super::types::{GlobalContext, GlobalMetadata, GlobalObject};
+#[cfg(any(feature = "lua", feature = "javascript"))]
+use super::types::GlobalContext;
+use super::types::{GlobalMetadata, GlobalObject};
+#[cfg(any(feature = "lua", feature = "javascript"))]
 use llmspell_core::Result;
 use llmspell_providers::ProviderManager as CoreProviderManager;
 use std::sync::Arc;

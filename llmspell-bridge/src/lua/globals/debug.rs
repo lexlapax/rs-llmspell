@@ -410,7 +410,11 @@ pub fn inject_debug_global(
     let bridge_clone = bridge.clone();
     let stack_trace_fn = lua.create_function(move |lua, options: Option<mlua::Table>| {
         let trace_options = options.map_or_else(
-            || bridge_clone.stack_trace_options_for_level(&bridge_clone.get_level()).into(),
+            || {
+                bridge_clone
+                    .stack_trace_options_for_level(&bridge_clone.get_level())
+                    .into()
+            },
             |opts| StackTraceOptions {
                 max_depth: opts.get("max_depth").unwrap_or(50),
                 capture_locals: opts.get("capture_locals").unwrap_or(false),
@@ -428,7 +432,11 @@ pub fn inject_debug_global(
     let bridge_clone = bridge.clone();
     let stack_trace_json_fn = lua.create_function(move |lua, options: Option<mlua::Table>| {
         let trace_options = options.map_or_else(
-            || bridge_clone.stack_trace_options_for_level(&bridge_clone.get_level()).into(),
+            || {
+                bridge_clone
+                    .stack_trace_options_for_level(&bridge_clone.get_level())
+                    .into()
+            },
             |opts| StackTraceOptions {
                 max_depth: opts.get("max_depth").unwrap_or(50),
                 capture_locals: opts.get("capture_locals").unwrap_or(false),

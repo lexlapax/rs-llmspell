@@ -17,6 +17,7 @@ impl EngineFactory {
     /// # Errors
     ///
     /// Returns an error if Lua feature is not enabled or engine creation fails
+    #[cfg(feature = "lua")]
     #[instrument(level = "debug", skip(config), fields(
         engine_type = "lua",
         stdlib_level = ?config.stdlib,
@@ -34,6 +35,7 @@ impl EngineFactory {
     /// # Errors
     ///
     /// Returns an error if Lua feature is not enabled or engine creation fails
+    #[cfg(feature = "lua")]
     #[instrument(level = "debug", skip(config, runtime_config), fields(
         engine_type = "lua",
         stdlib_level = ?config.stdlib,
@@ -45,22 +47,12 @@ impl EngineFactory {
         runtime_config: Option<Arc<llmspell_config::LLMSpellConfig>>,
     ) -> Result<Box<dyn ScriptEngineBridge>, LLMSpellError> {
         debug!("Creating Lua engine with runtime configuration");
-        #[cfg(feature = "lua")]
-        {
-            use crate::lua::LuaEngine;
-            let mut engine = LuaEngine::new(config)?;
-            if let Some(rc) = runtime_config {
-                engine.set_runtime_config(rc);
-            }
-            Ok(Box::new(engine))
+        use crate::lua::LuaEngine;
+        let mut engine = LuaEngine::new(config)?;
+        if let Some(rc) = runtime_config {
+            engine.set_runtime_config(rc);
         }
-        #[cfg(not(feature = "lua"))]
-        {
-            Err(LLMSpellError::Component {
-                message: "Lua engine not enabled. Enable the 'lua' feature.".to_string(),
-                source: None,
-            })
-        }
+        Ok(Box::new(engine))
     }
 
     /// Create a JavaScript engine with the given configuration
@@ -114,6 +106,7 @@ impl EngineFactory {
     ) -> Result<Box<dyn ScriptEngineBridge>, LLMSpellError> {
         info!("Creating engine by name: {}", name);
         match name {
+            #[cfg(feature = "lua")]
             "lua" => {
                 let lua_config =
                     serde_json::from_value::<LuaConfig>(config.clone()).map_err(|e| {
@@ -124,6 +117,7 @@ impl EngineFactory {
                     })?;
                 Self::create_lua_engine(&lua_config)
             }
+            #[cfg(feature = "javascript")]
             "javascript" | "js" => {
                 let js_config =
                     serde_json::from_value::<JSConfig>(config.clone()).map_err(|e| {

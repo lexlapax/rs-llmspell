@@ -1,7 +1,10 @@
 //! ABOUTME: JSON global object providing JSON parsing and stringification
 //! ABOUTME: Language-agnostic JSON utilities accessible from all script engines
 
-use crate::globals::types::{GlobalContext, GlobalMetadata, GlobalObject};
+#[cfg(any(feature = "lua", feature = "javascript"))]
+use crate::globals::types::GlobalContext;
+use crate::globals::types::{GlobalMetadata, GlobalObject};
+#[cfg(any(feature = "lua", feature = "javascript"))]
 use llmspell_core::error::LLMSpellError;
 
 /// JSON global object providing JSON utilities

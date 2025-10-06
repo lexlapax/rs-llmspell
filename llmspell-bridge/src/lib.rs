@@ -294,7 +294,9 @@ pub use providers::ProviderManager;
 pub use registry::ComponentRegistry;
 pub use runtime::ScriptRuntime;
 
+#[cfg(feature = "lua")]
 use llmspell_core::traits::script_executor::ScriptExecutor;
+#[cfg(feature = "lua")]
 use std::sync::Arc;
 
 /// Create a script executor for the given configuration

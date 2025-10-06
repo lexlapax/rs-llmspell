@@ -1,13 +1,17 @@
 //! ABOUTME: Provider global object implementation for script engines
 //! ABOUTME: Provides access to LLM provider information and capabilities
 
-use super::types::{GlobalContext, GlobalMetadata, GlobalObject};
+#[cfg(any(feature = "lua", feature = "javascript"))]
+use super::types::GlobalContext;
+use super::types::{GlobalMetadata, GlobalObject};
 use crate::ProviderManager;
+#[cfg(any(feature = "lua", feature = "javascript"))]
 use llmspell_core::Result;
 use std::sync::Arc;
 
 /// Provider global object for script engines
 pub struct ProviderGlobal {
+    #[cfg_attr(not(feature = "lua"), allow(dead_code))]
     providers: Arc<ProviderManager>,
 }
 
