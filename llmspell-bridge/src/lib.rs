@@ -305,6 +305,7 @@ use std::sync::Arc;
 /// # Errors
 ///
 /// Returns an error if the script runtime fails to initialize with the given configuration.
+#[cfg(feature = "lua")]
 pub async fn create_script_executor(
     config: LLMSpellConfig,
 ) -> Result<Arc<dyn ScriptExecutor>, llmspell_core::error::LLMSpellError> {
@@ -320,6 +321,7 @@ pub async fn create_script_executor(
 /// # Errors
 ///
 /// Returns an error if the script runtime fails to initialize.
+#[cfg(feature = "lua")]
 #[allow(clippy::unused_async)]
 pub async fn create_script_executor_with_provider(
     config: LLMSpellConfig,
