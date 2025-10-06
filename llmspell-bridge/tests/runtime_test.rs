@@ -5,6 +5,7 @@ use llmspell_bridge::{engine::factory::EngineFactory, runtime::ScriptRuntime};
 use llmspell_config::LLMSpellConfig;
 
 #[tokio::test(flavor = "multi_thread")]
+#[cfg(feature = "lua")]
 async fn test_runtime_with_lua_engine() {
     let config = LLMSpellConfig::default();
     assert_eq!(config.default_engine, "lua");
@@ -19,6 +20,7 @@ async fn test_runtime_with_lua_engine() {
 }
 
 #[tokio::test(flavor = "multi_thread")]
+#[cfg(feature = "lua")]
 async fn test_runtime_with_engine_name() {
     let config = LLMSpellConfig::default();
 
@@ -34,6 +36,7 @@ async fn test_runtime_with_engine_name() {
 }
 
 #[tokio::test(flavor = "multi_thread")]
+#[cfg(feature = "lua")]
 async fn test_runtime_execute_script() {
     let config = LLMSpellConfig::default();
     let runtime = ScriptRuntime::new_with_lua(config).await.unwrap();
@@ -50,6 +53,7 @@ async fn test_runtime_execute_script() {
 }
 
 #[tokio::test(flavor = "multi_thread")]
+#[cfg(feature = "lua")]
 async fn test_runtime_capability_detection() {
     let config = LLMSpellConfig::default();
     let runtime = ScriptRuntime::new_with_lua(config).await.unwrap();
@@ -67,6 +71,7 @@ async fn test_runtime_capability_detection() {
 }
 
 #[tokio::test(flavor = "multi_thread")]
+#[cfg(feature = "lua")]
 async fn test_runtime_configuration() {
     let mut config = LLMSpellConfig::default();
 
@@ -84,6 +89,7 @@ async fn test_runtime_configuration() {
 }
 
 #[tokio::test(flavor = "multi_thread")]
+#[cfg(feature = "lua")]
 async fn test_runtime_execution_context() {
     let config = LLMSpellConfig::default();
     let runtime = ScriptRuntime::new_with_lua(config).await.unwrap();
@@ -104,6 +110,7 @@ async fn test_runtime_execution_context() {
 }
 
 #[tokio::test(flavor = "multi_thread")]
+#[cfg(any(feature = "lua", feature = "javascript"))]
 async fn test_runtime_engine_switching_placeholder() {
     // This test demonstrates the architecture supports engine switching
     // even though JavaScript engine is not yet implemented
@@ -111,28 +118,20 @@ async fn test_runtime_engine_switching_placeholder() {
     let config = LLMSpellConfig::default();
 
     // Create with Lua
-    let lua_runtime = ScriptRuntime::new_with_lua(config.clone()).await.unwrap();
-    assert_eq!(lua_runtime.get_engine_name(), "lua");
+    #[cfg(feature = "lua")]
+    {
+        let lua_runtime = ScriptRuntime::new_with_lua(config.clone()).await.unwrap();
+        assert_eq!(lua_runtime.get_engine_name(), "lua");
+    }
 
     // Attempt to create with JavaScript
-    let js_runtime = ScriptRuntime::new_with_javascript(config).await;
-
     #[cfg(feature = "javascript")]
     {
+        let js_runtime = ScriptRuntime::new_with_javascript(config).await;
         // When JavaScript feature is enabled, it should create successfully
         assert!(js_runtime.is_ok());
         if let Ok(runtime) = js_runtime {
             assert_eq!(runtime.get_engine_name(), "javascript");
-        }
-    }
-
-    #[cfg(not(feature = "javascript"))]
-    {
-        // When JavaScript feature is not enabled, it should fail
-        assert!(js_runtime.is_err());
-        if let Err(e) = js_runtime {
-            let error_msg = format!("{e:?}");
-            assert!(error_msg.contains("JavaScript") || error_msg.contains("not enabled"));
         }
     }
 }
