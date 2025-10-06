@@ -146,7 +146,7 @@ database-sqlite = ["database", "sqlx/sqlite"]
 tempfile = "3.20"
 futures = "0.3"
 criterion = { version = "0.5", features = ["html_reports"] }
-llmspell-bridge = { path = "../llmspell-bridge" }
+llmspell-bridge = { path = "../llmspell-bridge", features = ["lua"] }
 llmspell-testing = { path = "../llmspell-testing" }
 tracing-subscriber.workspace = true
 

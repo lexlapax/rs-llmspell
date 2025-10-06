@@ -52,9 +52,9 @@ tempfile = "3.0"
 rand = "0.8"
 
 [features]
-default = ["lua"]  # Minimal - no heavy tool dependencies
+default = []  # Language-neutral by default - users opt-in to Lua/JavaScript
 common = ["lua", "llmspell-tools/common"]  # Common tools preset
-full = ["lua", "llmspell-tools/full"]  # All features enabled
+full = ["lua", "javascript", "llmspell-tools/full"]  # All features enabled
 
 # Script engine features
 lua = ["dep:mlua"]
