@@ -11,6 +11,21 @@ use std::collections::HashMap;
 use std::fmt;
 use std::sync::Arc;
 
+/// Language-neutral stack trace verbosity level
+///
+/// Abstracts stack trace detail configuration from language-specific types.
+/// Each script engine implements `From<StackTraceLevel>` for its options type,
+/// enabling language-neutral debug configuration across Lua, JavaScript, Python, etc.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum StackTraceLevel {
+    /// Full stack trace with locals and upvalues (verbose, for trace-level debugging)
+    Trace,
+    /// Error-focused stack trace (minimal overhead, for error reporting)
+    Error,
+    /// Standard stack trace (default detail level)
+    Default,
+}
+
 /// Debug bridge that script engines interact with
 #[derive(Clone)]
 pub struct DebugBridge {
@@ -266,16 +281,23 @@ impl DebugBridge {
         })
     }
 
-    /// Get stack trace options for different debug levels
+    /// Get stack trace level for different debug levels
+    ///
+    /// Returns a language-neutral stack trace level that can be converted
+    /// to language-specific options via `From<StackTraceLevel>` trait implementations.
+    ///
+    /// # Examples
+    /// ```ignore
+    /// let level = bridge.stack_trace_options_for_level("trace");
+    /// // Lua: let opts: StackTraceOptions = level.into();
+    /// // JS: let opts: JsStackTraceOptions = level.into();
+    /// ```
     #[must_use]
-    pub fn stack_trace_options_for_level(
-        &self,
-        level: &str,
-    ) -> crate::lua::stacktrace::StackTraceOptions {
+    pub fn stack_trace_options_for_level(&self, level: &str) -> StackTraceLevel {
         match level {
-            "trace" => crate::lua::stacktrace::StackTraceOptions::for_trace(),
-            "error" => crate::lua::stacktrace::StackTraceOptions::for_error(),
-            _ => crate::lua::stacktrace::StackTraceOptions::default(),
+            "trace" | "TRACE" => StackTraceLevel::Trace,
+            "error" | "ERROR" => StackTraceLevel::Error,
+            _ => StackTraceLevel::Default,
         }
     }
 }

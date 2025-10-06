@@ -3,6 +3,7 @@
 //! Provides comprehensive stack trace capture using Lua's debug library
 //! with local variable inspection and source location mapping.
 
+use crate::debug_bridge::StackTraceLevel;
 use mlua::{Function, Lua, Result as LuaResult, Table, Value};
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
@@ -89,6 +90,20 @@ impl StackTraceOptions {
             capture_locals: true,
             capture_upvalues: true,
             include_source: true,
+        }
+    }
+}
+
+/// Convert language-neutral stack trace level to Lua-specific options
+///
+/// This enables language-neutral debug configuration while maintaining
+/// Lua-specific optimization characteristics.
+impl From<StackTraceLevel> for StackTraceOptions {
+    fn from(level: StackTraceLevel) -> Self {
+        match level {
+            StackTraceLevel::Trace => Self::for_trace(),
+            StackTraceLevel::Error => Self::for_error(),
+            StackTraceLevel::Default => Self::default(),
         }
     }
 }
