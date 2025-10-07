@@ -7,14 +7,163 @@ use crate::agent_bridge::AgentBridge;
 use crate::globals::GlobalContext;
 use crate::lua::conversion::{
     agent_output_to_lua_table, json_to_lua_value, lua_table_to_agent_input, lua_table_to_json,
+    lua_value_to_json,
 };
 use crate::lua::sync_utils::block_on_async;
+use llmspell_agents::{AgentConfig, ModelConfig, ResourceLimits};
 use llmspell_core::execution_context::{ContextScope, ExecutionContextBuilder};
 use llmspell_core::types::ComponentId;
 use mlua::{Lua, Table, UserData, UserDataMethods, Value};
 use std::collections::HashMap;
 use std::sync::Arc;
 use tracing::{info, instrument};
+
+/// Parse `ModelConfig` from Lua table
+fn parse_model_config(table: &Table) -> mlua::Result<Option<ModelConfig>> {
+    // Check if model field exists
+    let model_value: Option<Value> = table.get("model").ok();
+
+    if let Some(Value::Table(model_table)) = model_value {
+        let provider: String = model_table.get("provider")?;
+        let model_id: String = model_table.get("model_id")?;
+        let temperature: Option<f32> = model_table.get("temperature").ok();
+        let max_tokens: Option<u32> = model_table.get("max_tokens").ok();
+
+        // Parse settings as JSON map
+        let settings_value: Option<Value> = model_table.get("settings").ok();
+        let settings = if let Some(Value::Table(settings_table)) = settings_value {
+            match lua_value_to_json(Value::Table(settings_table))? {
+                serde_json::Value::Object(map) => map,
+                _ => serde_json::Map::new(),
+            }
+        } else {
+            serde_json::Map::new()
+        };
+
+        Ok(Some(ModelConfig {
+            provider,
+            model_id,
+            temperature,
+            max_tokens,
+            settings,
+        }))
+    } else {
+        Ok(None)
+    }
+}
+
+/// Parse `ResourceLimits` from Lua table
+fn parse_resource_limits(table: &Table) -> ResourceLimits {
+    // Check if resource_limits field exists
+    let limits_value: Option<Value> = table.get("resource_limits").ok();
+
+    if let Some(Value::Table(limits_table)) = limits_value {
+        ResourceLimits {
+            max_execution_time_secs: limits_table
+                .get("max_execution_time_secs")
+                .unwrap_or(300),
+            max_memory_mb: limits_table.get("max_memory_mb").unwrap_or(512),
+            max_tool_calls: limits_table.get("max_tool_calls").unwrap_or(100),
+            max_recursion_depth: limits_table.get("max_recursion_depth").unwrap_or(10),
+        }
+    } else {
+        // Use defaults if not specified
+        ResourceLimits::default()
+    }
+}
+
+/// Parse `AgentConfig` from Lua table
+///
+/// Expected Lua table structure:
+/// ```lua
+/// {
+///     name = "my-agent",
+///     description = "Agent description",
+///     agent_type = "llm", -- or "type" (both supported)
+///     model = {
+///         provider = "openai",
+///         model_id = "gpt-3.5-turbo",
+///         temperature = 0.7,
+///         max_tokens = 150,
+///         settings = {}
+///     },
+///     allowed_tools = {"tool1", "tool2"},
+///     custom_config = {
+///         system_prompt = "You are...",
+///         ...
+///     },
+///     resource_limits = {
+///         max_execution_time_secs = 300,
+///         max_memory_mb = 512,
+///         max_tool_calls = 100,
+///         max_recursion_depth = 10
+///     }
+/// }
+/// ```
+fn parse_agent_config(table: &Table) -> mlua::Result<AgentConfig> {
+    // Extract name (required)
+    let name: String = table.get("name").unwrap_or_else(|_| {
+        // Generate UUID-based name if not provided
+        format!(
+            "agent_{}",
+            uuid::Uuid::new_v4()
+                .to_string()
+                .chars()
+                .take(8)
+                .collect::<String>()
+        )
+    });
+
+    // Extract description (default empty)
+    let description: String = table.get("description").unwrap_or_default();
+
+    // Extract agent_type - support both "agent_type" and "type" for compatibility
+    let agent_type: String = table
+        .get("agent_type")
+        .or_else(|_| table.get("type"))
+        .unwrap_or_else(|_| "llm".to_string());
+
+    // Parse model config (optional)
+    let model = parse_model_config(table)?;
+
+    // Parse allowed_tools (default empty array)
+    let allowed_tools_value: Option<Value> = table.get("allowed_tools").ok();
+    let allowed_tools = if let Some(Value::Table(tools_table)) = allowed_tools_value {
+        let mut tools = Vec::new();
+        for i in 1..=tools_table.raw_len() {
+            if let Ok(tool_name) = tools_table.get::<_, String>(i) {
+                tools.push(tool_name);
+            }
+        }
+        tools
+    } else {
+        Vec::new()
+    };
+
+    // Parse custom_config (default empty map)
+    let custom_config_value: Option<Value> = table.get("custom_config").ok();
+    let custom_config = if let Some(Value::Table(config_table)) = custom_config_value {
+        match lua_value_to_json(Value::Table(config_table))? {
+            serde_json::Value::Object(map) => map,
+            _ => serde_json::Map::new(),
+        }
+    } else {
+        serde_json::Map::new()
+    };
+
+    // Parse resource_limits (defaults if not provided)
+    let resource_limits = parse_resource_limits(table);
+
+    Ok(AgentConfig {
+        name,
+        description,
+        agent_type,
+        model,
+        allowed_tools,
+        custom_config,
+        resource_limits,
+    })
+}
 
 /// Lua userdata representing an agent instance
 struct LuaAgentInstance {
@@ -1096,17 +1245,22 @@ impl UserData for AgentBuilder {
                 )
             });
 
-            // Create model configuration
-            let model_config = serde_json::json!({
-                "provider": provider,
-                "model_id": model,
-                "temperature": this.temperature,
-                "max_tokens": this.max_tokens,
-                "settings": {
-                    "base_url": this.base_url,
-                    "api_key": this.api_key
-                }
-            });
+            // Create model configuration struct
+            let mut settings = serde_json::Map::new();
+            if let Some(base_url) = &this.base_url {
+                settings.insert("base_url".to_string(), serde_json::json!(base_url));
+            }
+            if let Some(api_key) = &this.api_key {
+                settings.insert("api_key".to_string(), serde_json::json!(api_key));
+            }
+
+            let model_config = ModelConfig {
+                provider: provider.clone(),
+                model_id: model.clone(),
+                temperature: this.temperature,
+                max_tokens: this.max_tokens,
+                settings,
+            };
 
             // Create custom config
             let mut custom_config = serde_json::Map::new();
@@ -1120,48 +1274,36 @@ impl UserData for AgentBuilder {
                 );
             }
 
-            // Create full agent configuration
-            let agent_config = serde_json::json!({
-                "name": &name,
-                "description": this.description.as_deref().unwrap_or("LLM-powered agent"),
-                "agent_type": "llm",
-                "model": model_config,
-                "allowed_tools": this.allowed_tools,
-                "custom_config": custom_config,
-                "resource_limits": {
-                    "max_execution_time_secs": this.max_execution_time_secs.unwrap_or(300),
-                    "max_memory_mb": this.max_memory_mb.unwrap_or(512),
-                    "max_tool_calls": this.max_tool_calls.unwrap_or(100),
-                    "max_recursion_depth": this.max_recursion_depth.unwrap_or(10)
-                }
-            });
-
-            // Convert JSON value to HashMap for bridge
-            let config_map: HashMap<String, serde_json::Value> = match agent_config {
-                serde_json::Value::Object(map) => map.into_iter().collect(),
-                _ => {
-                    return Err(mlua::Error::RuntimeError(
-                        "Invalid agent configuration format".to_string(),
-                    ))
-                }
+            // Create resource limits struct
+            #[allow(clippy::cast_possible_truncation)]
+            let resource_limits = ResourceLimits {
+                max_execution_time_secs: this.max_execution_time_secs.unwrap_or(300),
+                max_memory_mb: this.max_memory_mb.unwrap_or(512).into(),
+                max_tool_calls: this.max_tool_calls.unwrap_or(100),
+                max_recursion_depth: this.max_recursion_depth.unwrap_or(10) as u8,
             };
 
-            // Create agent using bridge
+            // Create typed AgentConfig struct
+            let agent_config = AgentConfig {
+                name: name.clone(),
+                description: this
+                    .description
+                    .clone()
+                    .unwrap_or_else(|| "LLM-powered agent".to_string()),
+                agent_type: "llm".to_string(),
+                model: Some(model_config),
+                allowed_tools: this.allowed_tools.clone(),
+                custom_config,
+                resource_limits,
+            };
+
+            // Create agent using bridge with typed config
             let bridge = this.bridge.clone();
-            let agent_name_clone = name.clone();
-            let agent_name_for_create = name;
+            let agent_name_clone = name;
 
             block_on_async(
                 "agent_builder_create",
-                async move {
-                    bridge
-                        .create_agent(
-                            &agent_name_for_create,
-                            "llm", // agent_type from the config
-                            config_map,
-                        )
-                        .await
-                },
+                bridge.create_agent(agent_config),
                 None,
             )?;
 
@@ -1348,52 +1490,17 @@ pub fn inject_agent_global(
     let register_fn = lua.create_function(move |_lua, args: Table| {
         let bridge = bridge_clone.clone();
 
-        // Extract configuration from Lua table
-        let name: String = args.get("name").unwrap_or_else(|_| {
-            format!(
-                "agent_{}",
-                uuid::Uuid::new_v4()
-                    .to_string()
-                    .chars()
-                    .take(8)
-                    .collect::<String>()
-            )
-        });
+        // Parse Lua table into typed AgentConfig struct
+        let agent_config = parse_agent_config(&args)
+            .map_err(|e| mlua::Error::RuntimeError(format!("Invalid agent configuration: {e}")))?;
 
-        // Get agent type - default to "llm"
-        let agent_type: String = args.get("agent_type").unwrap_or_else(|_| "llm".to_string());
+        // Capture name for return value
+        let name = agent_config.name.clone();
 
-        // Convert entire args table to JSON for config
-        let mut config_json = lua_table_to_json(args)
-            .map_err(|e| mlua::Error::RuntimeError(format!("Failed to convert config: {e}")))?;
-
-        // Fix empty objects that should be arrays
-        if let serde_json::Value::Object(ref mut map) = config_json {
-            // Fix allowed_tools if it's an empty object
-            if let Some(serde_json::Value::Object(allowed_tools)) = map.get("allowed_tools") {
-                if allowed_tools.is_empty() {
-                    map.insert(
-                        "allowed_tools".to_string(),
-                        serde_json::Value::Array(vec![]),
-                    );
-                }
-            }
-        }
-
-        // Convert JSON to HashMap for bridge
-        let config_map: HashMap<String, serde_json::Value> = match config_json {
-            serde_json::Value::Object(map) => map.into_iter().collect(),
-            _ => {
-                return Err(mlua::Error::RuntimeError(
-                    "Invalid agent configuration format".to_string(),
-                ))
-            }
-        };
-
-        // Use sync wrapper to call async method
+        // Use sync wrapper to call async method with typed config
         block_on_async(
             "agent_register",
-            bridge.create_agent(&name, &agent_type, config_map),
+            bridge.create_agent(agent_config),
             None,
         )
         .map_err(|e| mlua::Error::RuntimeError(format!("Failed to register agent: {e}")))?;

@@ -58,19 +58,8 @@ impl AgentDiscovery {
     /// # Errors
     ///
     /// Returns an error if the configuration is invalid or agent creation fails
-    pub async fn create_agent(
-        &self,
-        _agent_type: &str,
-        config: serde_json::Value,
-    ) -> Result<Arc<dyn Agent>> {
-        // Convert JSON config to AgentConfig
-        let agent_config: AgentConfig =
-            serde_json::from_value(config).map_err(|e| LLMSpellError::Validation {
-                field: Some("config".to_string()),
-                message: format!("Invalid agent configuration: {e}"),
-            })?;
-
-        // Create the agent using the factory
+    pub async fn create_agent(&self, agent_config: AgentConfig) -> Result<Arc<dyn Agent>> {
+        // Create the agent using the factory with typed config
         let agent = self.factory.create_agent(agent_config).await.map_err(|e| {
             LLMSpellError::Component {
                 message: format!("Failed to create agent: {e}"),
@@ -109,8 +98,7 @@ impl AgentDiscovery {
     pub async fn get_or_create_agent(
         &self,
         name: &str,
-        agent_type: &str,
-        config: serde_json::Value,
+        agent_config: AgentConfig,
     ) -> Result<Arc<dyn Agent>> {
         // Check cache first
         {
@@ -121,7 +109,7 @@ impl AgentDiscovery {
         }
 
         // Create new agent
-        let agent = self.create_agent(agent_type, config).await?;
+        let agent = self.create_agent(agent_config).await?;
 
         // Cache it
         {
@@ -257,31 +245,25 @@ mod tests {
         let provider_manager = create_test_provider_manager();
         let discovery = AgentDiscovery::new(provider_manager);
 
-        let config = serde_json::json!({
-            "name": "test-agent",
-            "description": "Test agent for caching",
-            "agent_type": "basic",
-            "allowed_tools": [],
-            "custom_config": {},
-            "resource_limits": {
-                "max_execution_time_secs": 300,
-                "max_memory_mb": 512,
-                "max_tool_calls": 100,
-                "max_recursion_depth": 10
-            }
-        });
+        let config = AgentConfig {
+            name: "test-agent".to_string(),
+            description: "Test agent for caching".to_string(),
+            agent_type: "basic".to_string(),
+            model: None,
+            allowed_tools: Vec::new(),
+            custom_config: serde_json::Map::new(),
+            resource_limits: llmspell_agents::ResourceLimits::default(),
+        };
 
         // Create and cache agent
-        let agent1 = discovery
-            .get_or_create_agent("test", "basic", config.clone())
-            .await;
+        let agent1 = discovery.get_or_create_agent("test", config.clone()).await;
         if let Err(e) = &agent1 {
             error!("Agent creation failed: {e:?}");
         }
         assert!(agent1.is_ok());
 
         // Get from cache
-        let agent2 = discovery.get_or_create_agent("test", "basic", config).await;
+        let agent2 = discovery.get_or_create_agent("test", config).await;
         assert!(agent2.is_ok());
 
         // Remove from cache

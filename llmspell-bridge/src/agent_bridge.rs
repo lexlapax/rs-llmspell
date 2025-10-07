@@ -11,7 +11,7 @@ use llmspell_agents::monitoring::{
     AgentMetrics, AlertConfig, AlertManager, EventLogger, HealthCheck, MetricRegistry,
     PerformanceMonitor,
 };
-use llmspell_agents::AgentFactory;
+use llmspell_agents::{AgentConfig, AgentFactory};
 use llmspell_core::execution_context::{
     ContextScope, ExecutionContextBuilder, InheritancePolicy, SecurityContext, SharedMemory,
 };
@@ -131,16 +131,13 @@ impl AgentBridge {
     /// # Errors
     ///
     /// Returns an error if the agent instance already exists or creation fails
-    pub async fn create_agent(
-        &self,
-        instance_name: &str,
-        agent_type: &str,
-        config: HashMap<String, serde_json::Value>,
-    ) -> Result<()> {
+    pub async fn create_agent(&self, config: AgentConfig) -> Result<()> {
+        let instance_name = config.name.clone();
+
         // Check if instance already exists
         {
             let agents = self.active_agents.read().await;
-            if agents.contains_key(instance_name) {
+            if agents.contains_key(&instance_name) {
                 return Err(LLMSpellError::Validation {
                     field: Some("instance_name".to_string()),
                     message: format!("Agent instance '{instance_name}' already exists"),
@@ -148,14 +145,11 @@ impl AgentBridge {
             }
         }
 
-        // Convert HashMap to JSON object
-        let config_json = serde_json::Value::Object(config.into_iter().collect());
-
-        // Create the agent
-        let agent = self.discovery.create_agent(agent_type, config_json).await?;
+        // Create the agent with typed config
+        let agent = self.discovery.create_agent(config).await?;
 
         // Create state machine for the agent
-        let state_machine = Arc::new(AgentStateMachine::default(instance_name.to_string()));
+        let state_machine = Arc::new(AgentStateMachine::default(instance_name.clone()));
 
         // Register in active agents, state machines, and component registry
         {
@@ -1479,39 +1473,30 @@ impl AgentBridge {
 
         // For now, create a composite agent as a regular agent with metadata
         // Full composite agent implementation will come with workflow patterns
-        let composite_config = serde_json::json!({
-            "name": composite_name.clone(),
-            "description": format!("Composite agent coordinating: {}", delegate_agents.join(", ")),
-            "agent_type": "basic",
-            "system_prompt": format!("You are a composite agent that coordinates between: {}", delegate_agents.join(", ")),
-            "delegates": delegate_agents,
-            "routing": routing_config,
-            "composite": true,
-            "allowed_tools": [],
-            "custom_config": {},
-            "resource_limits": {
-                "max_execution_time_secs": 300,
-                "max_memory_mb": 512,
-                "max_tool_calls": 100,
-                "max_recursion_depth": 10
-            }
-        });
+        let mut custom_config = serde_json::Map::new();
+        custom_config.insert(
+            "system_prompt".to_string(),
+            serde_json::json!(format!(
+                "You are a composite agent that coordinates between: {}",
+                delegate_agents.join(", ")
+            )),
+        );
+        custom_config.insert("delegates".to_string(), serde_json::json!(delegate_agents));
+        custom_config.insert("routing".to_string(), routing_config);
+        custom_config.insert("composite".to_string(), serde_json::json!(true));
+
+        let composite_agent_config = AgentConfig {
+            name: composite_name.clone(),
+            description: format!("Composite agent coordinating: {}", delegate_agents.join(", ")),
+            agent_type: "basic".to_string(),
+            model: None,
+            allowed_tools: Vec::new(),
+            custom_config,
+            resource_limits: llmspell_agents::ResourceLimits::default(),
+        };
 
         // Create the composite agent using regular agent creation
-        // Convert config to HashMap
-        let mut config_map = HashMap::new();
-        if let Some(obj) = composite_config.as_object() {
-            for (k, v) in obj {
-                config_map.insert(k.clone(), v.clone());
-            }
-        }
-
-        self.create_agent(
-            &composite_name,
-            "basic", // Use basic agent type for now
-            config_map,
-        )
-        .await?;
+        self.create_agent(composite_agent_config).await?;
 
         Ok(())
     }
@@ -1891,6 +1876,19 @@ impl AgentBridge {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    fn create_test_agent_config(name: &str) -> AgentConfig {
+        AgentConfig {
+            name: name.to_string(),
+            description: format!("Test agent: {name}"),
+            agent_type: "basic".to_string(),
+            model: None,
+            allowed_tools: Vec::new(),
+            custom_config: serde_json::Map::new(),
+            resource_limits: llmspell_agents::ResourceLimits::default(),
+        }
+    }
+
     #[tokio::test]
     async fn test_agent_bridge_creation() {
         let registry = Arc::new(ComponentRegistry::new());
@@ -1938,7 +1936,7 @@ mod tests {
         );
 
         // Create agent instance
-        let result = bridge.create_agent("test-instance", "basic", config).await;
+        let result = bridge.create_agent(create_test_agent_config("test-instance")).await;
         assert!(result.is_ok());
 
         // List instances
@@ -1994,7 +1992,7 @@ mod tests {
         );
 
         bridge
-            .create_agent("test-exec", "basic", config)
+            .create_agent(create_test_agent_config("test-exec"))
             .await
             .unwrap();
 
@@ -2044,7 +2042,7 @@ mod tests {
 
         // Create agent instance
         bridge
-            .create_agent("test-state", "basic", config)
+            .create_agent(create_test_agent_config("test-state"))
             .await
             .unwrap();
 
@@ -2231,7 +2229,7 @@ mod tests {
         );
 
         bridge
-            .create_agent("context-test", "basic", config)
+            .create_agent(create_test_agent_config("context-test"))
             .await
             .unwrap();
 
@@ -2293,7 +2291,7 @@ mod tests {
         );
 
         bridge
-            .create_agent("stream-test", "basic", config)
+            .create_agent(create_test_agent_config("stream-test"))
             .await
             .unwrap();
 
@@ -2338,7 +2336,7 @@ mod tests {
         );
 
         bridge
-            .create_agent("agent1", "mock", config1)
+            .create_agent(create_test_agent_config("agent1"))
             .await
             .unwrap();
 
@@ -2359,7 +2357,7 @@ mod tests {
         );
 
         bridge
-            .create_agent("agent2", "mock", config2)
+            .create_agent(create_test_agent_config("agent2"))
             .await
             .unwrap();
 
