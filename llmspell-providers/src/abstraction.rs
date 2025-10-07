@@ -257,12 +257,13 @@ impl ProviderRegistry {
             self.factories.keys().collect::<Vec<_>>()
         );
 
-        let factory = self.factories.get(&config.name).ok_or_else(|| {
-            LLMSpellError::Configuration {
-                message: format!("Unknown factory: {}", config.name),
-                source: None,
-            }
-        })?;
+        let factory =
+            self.factories
+                .get(&config.name)
+                .ok_or_else(|| LLMSpellError::Configuration {
+                    message: format!("Unknown factory: {}", config.name),
+                    source: None,
+                })?;
 
         factory(config)
     }
