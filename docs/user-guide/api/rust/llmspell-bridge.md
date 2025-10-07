@@ -251,6 +251,139 @@ local results = RAG.search("recent updates", {
 })
 ```
 
+## Typed Configuration Pattern ⭐ **Phase 11a.8**
+
+**Anti-pattern eliminated**: JSON parameters for configuration (pre-11a.8)
+**Pattern established**: Typed Rust structs with Lua layer parsers
+
+### The Pattern
+
+1. **Bridge layer**: Define typed Rust structs for configuration
+2. **Lua layer**: Create parser functions that convert Lua tables to structs
+3. **Method signatures**: Accept typed structs directly, not `serde_json::Value`
+
+### Example: Session Replay Configuration
+
+**Bridge Layer** (`session_bridge.rs`):
+```rust
+use llmspell_kernel::sessions::replay::session_adapter::SessionReplayConfig;
+
+impl SessionBridge {
+    pub async fn replay_session(
+        &self,
+        session_id: &SessionId,
+        config: SessionReplayConfig,  // ✅ Typed struct, not JSON
+    ) -> Result<serde_json::Value> {
+        let result = convert_err!(
+            self.session_manager.replay_session(session_id, config).await
+        )?;
+        // ... convert result to JSON for Lua
+    }
+}
+```
+
+**Lua Layer** (`lua/globals/session.rs`):
+```rust
+fn parse_session_replay_config(table: &Table) -> mlua::Result<SessionReplayConfig> {
+    let mode_str: String = table.get("mode").unwrap_or_else(|_| "exact".to_string());
+    let mode = match mode_str.as_str() {
+        "exact" => ReplayMode::Exact,
+        "modified" => ReplayMode::Modified,
+        "simulate" => ReplayMode::Simulate,
+        "debug" => ReplayMode::Debug,
+        _ => return Err(mlua::Error::RuntimeError(format!("Unknown mode: {mode_str}")))
+    };
+
+    Ok(SessionReplayConfig {
+        mode,
+        compare_results: table.get("compare_results").unwrap_or(false),
+        timeout_seconds: table.get("timeout_seconds").ok(),
+        stop_on_error: table.get("stop_on_error").unwrap_or(false),
+        metadata: table.get::<_, Option<Table>>("metadata").ok()
+            .and_then(|t| lua_table_to_json(&t).ok())
+            .unwrap_or_default(),
+    })
+}
+
+// Lua binding
+let replay_fn = lua.create_async_function(move |lua, (session_id_str, options_table): (String, Table)| {
+    async move {
+        let session_id = SessionId::new_v4(); // Parse ID
+        let config = parse_session_replay_config(&options_table)?;  // ✅ Parse to struct
+
+        let result = bridge.replay_session(&session_id, config).await?;  // ✅ Pass struct
+        Ok(result)
+    }
+})?;
+```
+
+### Pattern Benefits
+
+1. **Compile-Time Validation**: Rust compiler catches all config field errors
+2. **Zero Serialization Overhead**: Direct struct passing, no JSON intermediate
+3. **Clear Error Messages**: mlua reports exact Lua field issues
+4. **IDE Support**: Full autocomplete for struct construction
+5. **Refactoring Safety**: Breaking changes caught at compile time
+6. **Self-Documentation**: Struct fields show API contract explicitly
+
+### Bridge Pattern Implementations (Phase 11a.8)
+
+**Converted Methods** (7 total):
+- `AgentBridge::create_agent` - Uses `AgentConfig`
+- `AgentBridge::create_composite_agent` - Uses `RoutingConfig`
+- `AgentBridge::create_context` - Uses `ExecutionContextConfig`
+- `AgentBridge::create_child_context` - Uses `ChildContextConfig`
+- `AgentBridge::set_shared_memory` - Uses `ContextScope`
+- `AgentBridge::wrap_agent_as_tool` - Uses `ToolWrapperConfig`
+- `SessionBridge::replay_session` - Uses `SessionReplayConfig`
+
+**Reusable Parsers** (11 total):
+Located in `lua/globals/agent.rs`:
+- `parse_context_scope()` - Parses "global" | "session" | "tenant" | custom scopes
+- `parse_inheritance_policy()` - Parses "inherit" | "replace" | "merge"
+- `parse_model_config()` - Parses model, temperature, max_tokens, etc.
+- `parse_resource_limits()` - Parses timeout, max_memory, retries
+- `parse_agent_config()` - Full agent configuration
+- `parse_routing_config()` - Composite agent routing
+- `parse_execution_context_config()` - Execution context settings
+- `parse_child_context_config()` - Child context creation
+- `parse_tool_wrapper_config()` - Tool wrapping settings
+- `parse_alert_condition()` - Alert condition variants
+- `parse_alert_config()` - Full alert configuration
+
+Located in `lua/globals/session.rs`:
+- `parse_session_replay_config()` - Session replay options
+
+### Anti-Patterns Eliminated
+
+**Before Phase 11a.8** ❌:
+```rust
+// DON'T DO THIS - Anti-pattern
+pub async fn create_agent(&self, options: serde_json::Value) -> Result<AgentId> {
+    let name = options["name"].as_str().unwrap();  // ❌ Runtime errors
+    let model = options["model"].as_str().unwrap();  // ❌ No type safety
+    // ...
+}
+```
+
+**After Phase 11a.8** ✅:
+```rust
+// DO THIS - Typed pattern
+pub struct AgentConfig {
+    pub name: String,
+    pub model_config: ModelConfig,
+    pub resource_limits: Option<ResourceLimits>,
+}
+
+pub async fn create_agent(&self, config: AgentConfig) -> Result<AgentId> {
+    let name = config.name;  // ✅ Compile-time validated
+    let model = config.model_config.model;  // ✅ Type-safe access
+    // ...
+}
+```
+
+For complete bridge pattern guidance, see [Bridge Pattern Guide](../../../developer-guide/bridge-pattern-guide.md).
+
 ## Sandboxing
 
 ```rust
@@ -268,4 +401,5 @@ let engine = LuaEngine::with_sandbox(sandbox_config)?;
 ## Related Documentation
 
 - [Lua API](../lua/README.md) - Lua scripting API
+- [Bridge Pattern Guide](../../../developer-guide/bridge-pattern-guide.md) - Comprehensive pattern documentation
 - [llmspell-cli](llmspell-cli.md) - CLI using the bridge

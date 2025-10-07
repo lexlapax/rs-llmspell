@@ -5,21 +5,22 @@ This document provides comprehensive documentation of all Lua globals available 
 ## Table of Contents
 
 1. [Agent](#agent) - LLM agent creation and management
-2. [Tool](#tool) - Tool invocation and discovery  
+2. [Tool](#tool) - Tool invocation and discovery
 3. [Workflow](#workflow) - Workflow orchestration
 4. [Session](#session) - Session management and persistence
 5. [State](#state) - Global state management
 6. [Event](#event) - Event publishing and subscription
 7. [Hook](#hook) - Hook registration and management
 8. [RAG](#rag) - Retrieval-Augmented Generation with vector storage
-9. [Config](#config) - Configuration access and management
-10. [Provider](#provider) - LLM provider information
-11. [Artifact](#artifact) - Artifact storage and retrieval
-12. [Replay](#replay) - Hook replay and testing
-13. [Debug](#debug) - Debugging and profiling utilities
-14. [JSON](#json) - JSON parsing and serialization
-15. [ARGS](#args) - Command-line argument access
-16. [Streaming](#streaming) - Streaming and coroutine utilities
+9. [LocalLLM](#localllm) - Local model management (Ollama, Candle)
+10. [Config](#config) - Configuration access and management
+11. [Provider](#provider) - LLM provider information
+12. [Artifact](#artifact) - Artifact storage and retrieval
+13. [Replay](#replay) - Hook replay and testing
+14. [Debug](#debug) - Debugging and profiling utilities
+15. [JSON](#json) - JSON parsing and serialization
+16. [ARGS](#args) - Command-line argument access
+17. [Streaming](#streaming) - Streaming and coroutine utilities
 
 ---
 
@@ -697,13 +698,27 @@ end
 ```
 
 #### Session.replay(id, options)
-Replays a session.
+Replays a session with specified configuration.
 
 ```lua
 local results = Session.replay("user-123", {
-    speed = 2.0,
-    skip_delays = true
+    mode = "exact",  -- "exact", "modified", "simulate", or "debug"
+    compare_results = true,
+    timeout_seconds = 300,
+    stop_on_error = false,
+    metadata = {
+        replay_reason = "testing",
+        replayed_by = "admin"
+    }
 })
+
+-- Result structure:
+print(results.session_id)
+print(results.correlation_id)
+print(results.hooks_replayed)
+print(results.successful_replays)
+print(results.failed_replays)
+print(results.total_duration)
 ```
 
 #### Session.get_replay_metadata(id)
@@ -1275,6 +1290,120 @@ Saves RAG state to persistent storage.
 ```lua
 RAG.save()
 ```
+
+---
+
+## LocalLLM
+
+The `LocalLLM` global provides local model management for Ollama and Candle backends (Phase 11).
+
+### Backend Status
+
+#### LocalLLM.status()
+Checks health status of local backends.
+
+```lua
+local status = LocalLLM.status()
+
+-- Ollama backend
+print("Ollama running:", status.ollama.running)
+print("Ollama models:", status.ollama.models)
+if status.ollama.version then
+    print("Ollama version:", status.ollama.version)
+end
+if status.ollama.error then
+    print("Ollama error:", status.ollama.error)
+end
+
+-- Candle backend
+print("Candle ready:", status.candle.ready)
+print("Candle models:", status.candle.models)
+if status.candle.version then
+    print("Candle version:", status.candle.version)
+end
+if status.candle.error then
+    print("Candle error:", status.candle.error)
+end
+```
+
+### Model Management
+
+#### LocalLLM.list(backend)
+Lists local models from specified backend(s).
+
+```lua
+-- List all models from all backends
+local models = LocalLLM.list()
+
+-- List from specific backend
+local ollama_models = LocalLLM.list("ollama")
+local candle_models = LocalLLM.list("candle")
+
+-- Iterate results
+for _, model in ipairs(models) do
+    print("ID:", model.id)
+    print("Backend:", model.backend)
+    print("Size:", model.size_bytes, "bytes")
+    if model.quantization then
+        print("Quantization:", model.quantization)
+    end
+    if model.modified_at then
+        print("Modified:", os.date("%Y-%m-%d", model.modified_at))
+    end
+end
+```
+
+#### LocalLLM.pull(spec)
+Downloads a model from backend library.
+
+```lua
+-- Pull from Ollama
+local progress = LocalLLM.pull("llama3.1:8b@ollama")
+
+-- Pull from Candle
+local progress = LocalLLM.pull("mistral:7b@candle")
+
+-- Check progress
+print("Model:", progress.model_id)
+print("Status:", progress.status)  -- "starting", "downloading", "verifying", "complete", "failed"
+print("Progress:", progress.percent_complete .. "%")
+print("Downloaded:", progress.bytes_downloaded, "bytes")
+if progress.bytes_total then
+    print("Total:", progress.bytes_total, "bytes")
+end
+if progress.error then
+    print("Error:", progress.error)
+end
+```
+
+#### LocalLLM.info(model_id)
+Gets detailed information about a specific model.
+
+```lua
+local info = LocalLLM.info("llama3.1:8b")
+
+print("ID:", info.id)
+print("Backend:", info.backend)
+print("Size:", info.size_bytes, "bytes")
+print("Format:", info.format)
+print("Loaded:", info.loaded)
+
+if info.parameter_count then
+    print("Parameters:", info.parameter_count)
+end
+if info.quantization then
+    print("Quantization:", info.quantization)
+end
+```
+
+### Model Specification Format
+
+Models are specified using the format: `model_name[:tag][@backend]`
+
+Examples:
+- `llama3.1:8b@ollama` - Llama 3.1 8B from Ollama
+- `mistral:7b@candle` - Mistral 7B from Candle
+- `tinyllama@candle` - TinyLlama from Candle (default tag)
 
 ---
 
