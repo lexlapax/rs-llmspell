@@ -1901,33 +1901,32 @@ pub fn inject_agent_global(
 
     // Create Agent.set_shared_memory() function
     let bridge_clone = bridge.clone();
-    let set_shared_memory_fn = lua.create_function(move |_lua, args: (Table, String, Value)| {
-        let (scope, key, value) = args;
+    let set_shared_memory_fn = lua.create_function(move |_lua, args: (Value, String, Value)| {
+        let (scope_value, key, value) = args;
         let bridge = bridge_clone.clone();
-        let scope_json = lua_table_to_json(scope)
-            .map_err(|e| mlua::Error::RuntimeError(format!("Failed to convert scope: {e}")))?;
+
+        // Parse ContextScope using typed parser
+        let scope = parse_context_scope(&scope_value)
+            .map_err(|e| mlua::Error::RuntimeError(format!("Failed to parse scope: {e}")))?;
+
         let value_json = crate::lua::conversion::lua_value_to_json(value)
             .map_err(|e| mlua::Error::RuntimeError(format!("Failed to convert value: {e}")))?;
 
-        bridge
-            .set_shared_memory(&scope_json, key, value_json)
-            .map_err(|e| mlua::Error::RuntimeError(format!("Failed to set shared memory: {e}")))?;
-
+        bridge.set_shared_memory(&scope, key, value_json);
         Ok(())
     })?;
 
     // Create Agent.get_shared_memory() function
     let bridge_clone = bridge.clone();
-    let get_shared_memory_fn = lua.create_function(move |lua, args: (Table, String)| {
-        let (scope, key) = args;
+    let get_shared_memory_fn = lua.create_function(move |lua, args: (Value, String)| {
+        let (scope_value, key) = args;
         let bridge = bridge_clone.clone();
-        let scope_json = lua_table_to_json(scope)
-            .map_err(|e| mlua::Error::RuntimeError(format!("Failed to convert scope: {e}")))?;
 
-        let result = bridge
-            .get_shared_memory(&scope_json, &key)
-            .map_err(|e| mlua::Error::RuntimeError(format!("Failed to get shared memory: {e}")))?;
+        // Parse ContextScope using typed parser
+        let scope = parse_context_scope(&scope_value)
+            .map_err(|e| mlua::Error::RuntimeError(format!("Failed to parse scope: {e}")))?;
 
+        let result = bridge.get_shared_memory(&scope, &key);
         result.map_or_else(|| Ok(Value::Nil), |value| json_to_lua_value(lua, &value))
     })?;
 
