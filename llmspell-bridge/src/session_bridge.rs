@@ -152,11 +152,8 @@ impl SessionBridge {
     pub async fn replay_session(
         &self,
         session_id: &SessionId,
-        _options: serde_json::Value,
+        config: llmspell_kernel::sessions::replay::session_adapter::SessionReplayConfig,
     ) -> Result<serde_json::Value> {
-        // For now, use default config - full implementation in Task 6.5.6
-        let config =
-            llmspell_kernel::sessions::replay::session_adapter::SessionReplayConfig::default();
         let result = convert_err!(
             self.session_manager
                 .replay_session(session_id, config)

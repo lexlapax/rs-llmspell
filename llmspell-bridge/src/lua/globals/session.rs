@@ -9,10 +9,78 @@ use llmspell_kernel::sessions::{
     types::{CreateSessionOptions, SessionQuery},
     SessionId,
 };
-use mlua::{Error as LuaError, Lua, Table, UserData, UserDataMethods};
+use mlua::{Error as LuaError, Lua, Table, UserData, UserDataMethods, Value};
+use std::collections::HashMap;
 use std::str::FromStr;
 use std::sync::Arc;
+use std::time::Duration;
 use tracing::{info, instrument};
+
+/// Parse `SessionReplayConfig` from a Lua table
+///
+/// Expected fields:
+/// - mode: string (optional, defaults to "exact") - "exact", "modified", "simulate", "debug"
+/// - `compare_results`: boolean (optional, defaults to true)
+/// - `timeout_seconds`: number (optional, defaults to 300)
+/// - `stop_on_error`: boolean (optional, defaults to false)
+/// - metadata: table (optional) - string-value map
+fn parse_session_replay_config(
+    table: &Table,
+) -> mlua::Result<llmspell_kernel::sessions::replay::session_adapter::SessionReplayConfig> {
+    use llmspell_hooks::replay::ReplayMode;
+    use llmspell_kernel::sessions::replay::session_adapter::SessionReplayConfig;
+
+    // Parse mode
+    let mode_str: String = table.get("mode").unwrap_or_else(|_| "exact".to_string());
+    let mode = match mode_str.as_str() {
+        "exact" => ReplayMode::Exact,
+        "modified" => ReplayMode::Modified,
+        "simulate" => ReplayMode::Simulate,
+        "debug" => ReplayMode::Debug,
+        _ => {
+            return Err(LuaError::RuntimeError(format!(
+                "Unknown replay mode: {mode_str}. Expected: exact, modified, simulate, debug"
+            )))
+        }
+    };
+
+    // Parse compare_results (default true)
+    let compare_results: bool = table.get("compare_results").unwrap_or(true);
+
+    // Parse timeout_seconds (default 300)
+    let timeout_secs: u64 = table.get("timeout_seconds").unwrap_or(300);
+    let timeout = Duration::from_secs(timeout_secs);
+
+    // Parse stop_on_error (default false)
+    let stop_on_error: bool = table.get("stop_on_error").unwrap_or(false);
+
+    // Parse metadata (optional HashMap<String, serde_json::Value>)
+    let metadata: HashMap<String, serde_json::Value> = table
+        .get::<_, Option<Table>>("metadata")
+        .ok()
+        .flatten()
+        .map(|meta_table| {
+            let mut map = HashMap::new();
+            for pair in meta_table.pairs::<String, Value>() {
+                let (key, value) = pair?;
+                // Convert Lua value to JSON
+                let json_value = crate::lua::conversion::lua_value_to_json(value)?;
+                map.insert(key, json_value);
+            }
+            Ok::<_, mlua::Error>(map)
+        })
+        .transpose()?
+        .unwrap_or_default();
+
+    Ok(SessionReplayConfig {
+        mode,
+        target_timestamp: None, // Could be added to Lua API if needed
+        compare_results,
+        timeout,
+        stop_on_error,
+        metadata,
+    })
+}
 
 /// `SessionBuilder` for creating sessions with method chaining
 #[derive(Clone)]
@@ -360,24 +428,17 @@ pub fn inject_session_global(
         let session_id = SessionId::from_str(&session_id_str)
             .map_err(|e| LuaError::RuntimeError(format!("Invalid session ID: {e}")))?;
 
-        // Convert config table to JSON (SessionBridge handles the conversion)
-        let config_json = if let Some(config) = config_table {
-            serde_json::json!({
-                "start_from": config.get::<_, Option<String>>("start_from")?,
-                "end_at": config.get::<_, Option<String>>("end_at")?,
-                "hook_filter": config.get::<_, Option<String>>("hook_filter")?,
-                "max_duration_seconds": config.get::<_, Option<u64>>("max_duration_seconds")?,
-                "include_failed": config.get::<_, Option<bool>>("include_failed")?.unwrap_or(false),
-                "progress_callback": config.get::<_, Option<bool>>("progress_callback")?.unwrap_or(false)
-            })
+        // Parse config table to typed SessionReplayConfig (or use default if None)
+        let replay_config = if let Some(config) = config_table {
+            parse_session_replay_config(&config)?
         } else {
-            serde_json::json!({})
+            llmspell_kernel::sessions::replay::session_adapter::SessionReplayConfig::default()
         };
 
         let bridge = replay_bridge.clone();
         let result = block_on_async(
             "session_replay",
-            async move { bridge.replay_session(&session_id, config_json).await },
+            async move { bridge.replay_session(&session_id, replay_config).await },
             None,
         )?;
 

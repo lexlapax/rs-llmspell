@@ -2230,13 +2230,13 @@ This guide serves as the definitive reference for maintaining type safety and el
 ---
 
 ### Task 11a.8.8: Fix Session.replay_session - SessionReplayConfig
-**Priority**: MEDIUM | **Time**: 20min | **Status**: Pending | **Depends**: 11a.8.1
+**Priority**: MEDIUM | **Time**: 20min | **Status**: ✅ COMPLETED | **Actual**: 18min | **Depends**: 11a.8.1
 
 Fix `replay_session` to accept typed `SessionReplayConfig` instead of ignoring JSON options.
 
 **Problem**: session_bridge.rs:155 accepts `_options: serde_json::Value` but ignores it, using default config instead.
 
-**Files**: session_bridge.rs:152-176, session.rs (Lua globals - need to find replay call)
+**Files**: session_bridge.rs:152-161, session.rs:19-83,426-448
 
 **SessionReplayConfig** (already exists in llmspell-kernel):
 ```rust
@@ -2299,10 +2299,138 @@ let result = bridge.replay_session(&session_id, replay_config).await?;
 ```
 
 **Criteria**:
-- [ ] Bridge signature accepts SessionReplayConfig
-- [ ] Lua parser implemented (if Lua global exists for replay)
-- [ ] cargo clippy --features lua: 0 warnings ✅
-- [ ] cargo test --features lua: session tests pass ✅
+- [x] Bridge signature accepts SessionReplayConfig ✅
+- [x] Lua parser implemented ✅
+- [x] cargo clippy: 0 warnings ✅
+- [x] cargo test: all 429 tests pass ✅
+
+**Implementation Summary**:
+Applied bridge pattern to Session.replay_session, eliminating ignored JSON parameter and enabling typed configuration. Discovered and fixed incorrect Lua API that was using wrong field names entirely.
+
+**Key Discovery - Wrong Lua API**:
+The existing Lua binding was not just using JSON - it was using **completely wrong field names** that didn't match SessionReplayConfig at all:
+
+**Old Lua fields** (session.rs:432-440, WRONG):
+- start_from, end_at, hook_filter (not in SessionReplayConfig)
+- max_duration_seconds (should be timeout_seconds)
+- include_failed, progress_callback (not in SessionReplayConfig)
+
+**Correct SessionReplayConfig fields**:
+- mode (ReplayMode enum: exact, modified, simulate, debug)
+- target_timestamp (Option<SystemTime>)
+- compare_results (bool)
+- timeout (Duration)
+- stop_on_error (bool)
+- metadata (HashMap<String, serde_json::Value>)
+
+The old implementation was creating JSON with fields that would have been completely ignored! This task not only applied the bridge pattern but also **fixed a broken API**.
+
+**Files Modified (2)**:
+
+1. **session_bridge.rs** (lines 152-161):
+   - Updated signature: `_options: serde_json::Value` → `config: SessionReplayConfig`
+   - Removed ignored parameter prefix `_`
+   - Removed manual default config creation
+   - Now actually uses the provided config (no longer ignores it!)
+   - Simplified: 3 lines removed
+
+2. **lua/globals/session.rs**:
+   - **Added imports** (lines 12-16): Value, HashMap, Duration
+   - **Created `parse_session_replay_config()`** (lines 19-83): 65 lines
+     - Parses mode string → ReplayMode enum (4 variants)
+     - Parses compare_results (default true)
+     - Parses timeout_seconds → Duration (default 300s)
+     - Parses stop_on_error (default false)
+     - Parses metadata table → HashMap<String, serde_json::Value>
+     - Sets target_timestamp to None (could be added to Lua API if needed)
+   - **Updated Lua binding** (lines 426-448):
+     - Removed incorrect field extraction (15 lines of wrong code)
+     - Replaced with parse_session_replay_config() call
+     - Handles None config by using default SessionReplayConfig
+     - Simplified: 17 lines → 6 lines (net -11 lines)
+
+**Validation Results**:
+```bash
+✅ cargo clippy -p llmspell-bridge --all-targets --all-features -- -D warnings
+   Finished in 16.04s - 0 errors, 0 warnings
+
+✅ cargo test -p llmspell-bridge --all-features
+   Finished in test time
+   test result: ok. 429 tests passed; 0 failed; 1 ignored
+   Zero regressions
+```
+
+**Key Insights**:
+
+1. **API Mismatch Discovery**:
+   - Old Lua binding used completely wrong fields (start_from, end_at, hook_filter, etc.)
+   - These fields didn't match SessionReplayConfig structure at all
+   - Bridge was ignoring all config and using defaults
+   - **This was a double bug**: ignored parameter + wrong API surface
+   - Task fixed both issues simultaneously
+
+2. **ReplayMode from llmspell_hooks**:
+   - ReplayMode enum is imported from llmspell_hooks::replay, not defined in llmspell-kernel
+   - SessionReplayConfig uses it via public re-export
+   - Parser correctly imports from llmspell_hooks::replay::ReplayMode
+
+3. **Type Reuse Pattern Validated**:
+   - SessionReplayConfig already exists in llmspell-kernel
+   - No bridge-specific type needed (unlike AlertConfig)
+   - Direct reuse of kernel types - validates Phase 7 architecture
+   - Pattern: Use kernel types when they're suitable for Lua API
+
+4. **Metadata Handling**:
+   - HashMap<String, serde_json::Value> requires Lua table → JSON conversion
+   - Reused existing `lua_value_to_json()` conversion function
+   - Pattern matches ExecutionContextConfig data field handling (11a.8.4)
+   - Consistent metadata pattern across bridge
+
+5. **Default Handling**:
+   - Parser provides sensible defaults for all optional fields
+   - Lua binding uses `SessionReplayConfig::default()` when config table is None
+   - Two-layer defaults: parser defaults + struct defaults
+   - Ensures users don't have to specify everything
+
+6. **target_timestamp Field**:
+   - Hardcoded to None in parser (line 77)
+   - Could be added to Lua API if needed (SystemTime parsing required)
+   - Comment documents future extension point
+   - Pattern: Start simple, extend if needed
+
+7. **Pattern Consistency**:
+   - Follows exact same pattern as tasks 11a.8.1-11a.8.6
+   - Parser placed after imports, before other types
+   - Binding updated to call parser instead of JSON construction
+   - Zero deviation from established pattern
+
+8. **Error Messages**:
+   - ReplayMode parse error includes all valid options
+   - Format: "Unknown replay mode: {mode}. Expected: exact, modified, simulate, debug"
+   - Guides users to correct usage
+   - Pattern: Always enumerate valid values in error messages
+
+9. **Line Count Impact**:
+   - Added: 65 lines (parser) + 4 lines (imports) = 69 lines
+   - Removed: 15 lines (wrong JSON construction) + 3 lines (bridge default) = 18 lines
+   - Net: +51 lines
+   - **But**: Fixed broken API, eliminated ignored parameter, added type safety
+   - Value: Massive (fixing two bugs + pattern compliance)
+
+10. **Test Coverage**:
+    - All 429 llmspell-bridge tests pass
+    - No session-specific integration tests exercising replay config
+    - Existing tests likely don't use replay with config options
+    - Future: Add integration test with all SessionReplayConfig fields
+
+**Pattern Application Summary**:
+This is the 7th successful application of the bridge pattern (tasks 11a.8.1-11a.8.8). The pattern is now well-established and validated across:
+- Agent configs (create_agent, create_composite_agent, wrap_as_tool, configure_alerts)
+- Context configs (create_context, create_child_context, set/get_shared_memory)
+- Session configs (replay_session) ← This task
+
+**Remaining Anti-patterns**:
+All major bridge methods with JSON parameters have now been converted to typed structs. The bridge pattern consolidation in Phase 11a.8 is essentially complete, with only minor methods potentially remaining.
 
 ---
 
