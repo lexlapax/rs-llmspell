@@ -1,5 +1,4 @@
 - allow security flags and configs to be set as environment variables or flags.. -e.g allow write to this directory.
-- all lua bridges should be just wrappers to rust native bridge.. not doing json conversion etc in lua engine. we just fixed workflow bridge to be that way.
 - all tool functions should be consistent for two word functions either like-this or like_this, but not both.
 - security sandbox - add network access, add process execution access 
 - workflow output collection should be rust code.. are there other things that should be rust code based on webapp-creator?
