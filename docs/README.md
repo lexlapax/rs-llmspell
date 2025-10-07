@@ -24,11 +24,11 @@
 ### 🔧 [Developer Guide](developer-guide/) - *For Contributors*
 **Purpose**: Technical guides for developers contributing to or extending rs-llmspell.
 
-**Status**: ✅ Updated with Phase 11 local provider patterns
-**Contents**: 6 essential guides including developer guide, extending guide, production guide, examples reference, feature flags migration, tracing best practices
-**Key Files**: `developer-guide.md`, `extending-llmspell.md`, `production-guide.md`, `examples-reference.md`, `feature-flags-migration.md`, `tracing-best-practices.md`
-**Phase 11 Additions**: Local provider implementation patterns, GGUF model handling, dual-backend architecture (Ollama + Candle)
-**Start here if**: You want to create custom tools, contribute code, implement local providers, or understand modular build system
+**Status**: ✅ Updated with Phase 11 local provider patterns and bridge pattern guide
+**Contents**: 7 essential guides including developer guide, extending guide, production guide, examples reference, feature flags migration, tracing best practices, bridge pattern guide
+**Key Files**: `developer-guide.md`, `extending-llmspell.md`, `production-guide.md`, `examples-reference.md`, `feature-flags-migration.md`, `tracing-best-practices.md`, `bridge-pattern-guide.md`
+**Phase 11 Additions**: Local provider implementation patterns, GGUF model handling, dual-backend architecture (Ollama + Candle), typed bridge pattern (Phase 11a.8)
+**Start here if**: You want to create custom tools, contribute code, implement local providers, work on bridge layer, or understand modular build system
 
 ---
 
