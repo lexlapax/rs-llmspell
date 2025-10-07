@@ -183,7 +183,7 @@ impl VideoProcessorTool {
     pub fn new(config: VideoProcessorConfig, sandbox: Arc<FileSandbox>) -> Self {
         Self {
             metadata: ComponentMetadata::new(
-                "video_processor".to_string(),
+                "video-processor".to_string(),
                 "Video file processing for format detection, metadata extraction, and thumbnails"
                     .to_string(),
             ),
@@ -223,7 +223,7 @@ impl VideoProcessorTool {
         // Get file size
         let file_metadata = std::fs::metadata(&safe_path).map_err(|e| LLMSpellError::Tool {
             message: format!("Failed to read file metadata: {e}"),
-            tool_name: Some("video_processor".to_string()),
+            tool_name: Some("video-processor".to_string()),
             source: None,
         })?;
 
@@ -236,7 +236,7 @@ impl VideoProcessorTool {
                     "File size ({} bytes) exceeds maximum allowed size ({} bytes)",
                     file_size, self.config.max_file_size
                 ),
-                tool_name: Some("video_processor".to_string()),
+                tool_name: Some("video-processor".to_string()),
                 source: None,
             });
         }
@@ -282,7 +282,7 @@ impl VideoProcessorTool {
         // For now, we'll create a placeholder response
         Err(LLMSpellError::Tool {
             message: "Thumbnail generation is not implemented in this basic version. Video processing capabilities will be added in Phase 3+".to_string(),
-            tool_name: Some("video_processor".to_string()),
+            tool_name: Some("video-processor".to_string()),
             source: None,
         })
     }
@@ -304,7 +304,7 @@ impl VideoProcessorTool {
             message: format!(
                 "Frame extraction at {timestamp_seconds}s is not implemented in this basic version. Video processing capabilities will be added in Phase 3+"
             ),
-            tool_name: Some("video_processor".to_string()),
+            tool_name: Some("video-processor".to_string()),
             source: None,
         })
     }
@@ -516,7 +516,7 @@ impl Tool for VideoProcessorTool {
 
     fn schema(&self) -> ToolSchema {
         ToolSchema::new(
-            "video_processor".to_string(),
+            "video-processor".to_string(),
             "Process video files for format detection, metadata extraction, and thumbnails"
                 .to_string(),
         )
@@ -803,11 +803,11 @@ mod tests {
         let tool = create_test_video_processor();
 
         let metadata = tool.metadata();
-        assert_eq!(metadata.name, "video_processor");
+        assert_eq!(metadata.name, "video-processor");
         assert!(metadata.description.contains("Video file processing"));
 
         let schema = tool.schema();
-        assert_eq!(schema.name, "video_processor");
+        assert_eq!(schema.name, "video-processor");
         assert_eq!(tool.category(), ToolCategory::Media);
         assert_eq!(tool.security_level(), SecurityLevel::Safe);
 

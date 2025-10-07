@@ -126,7 +126,7 @@ impl AudioProcessorTool {
     #[must_use]
     pub fn new(config: AudioProcessorConfig, sandbox: Arc<FileSandbox>) -> Self {
         info!(
-            tool_name = "audio_processor",
+            tool_name = "audio-processor",
             supported_operations = 3, // detect, metadata, convert
             supported_formats = config.supported_formats.len(),
             max_file_size_mb = config.max_file_size / (1024 * 1024),
@@ -140,7 +140,7 @@ impl AudioProcessorTool {
         );
         Self {
             metadata: ComponentMetadata::new(
-                "audio_processor".to_string(),
+                "audio-processor".to_string(),
                 "Audio file processing for format detection, metadata extraction, and conversions"
                     .to_string(),
             ),
@@ -180,7 +180,7 @@ impl AudioProcessorTool {
         // Get file size
         let file_metadata = std::fs::metadata(&safe_path).map_err(|e| LLMSpellError::Tool {
             message: format!("Failed to read file metadata: {e}"),
-            tool_name: Some("audio_processor".to_string()),
+            tool_name: Some("audio-processor".to_string()),
             source: None,
         })?;
 
@@ -193,7 +193,7 @@ impl AudioProcessorTool {
                     "File size ({} bytes) exceeds maximum allowed size ({} bytes)",
                     file_size, self.config.max_file_size
                 ),
-                tool_name: Some("audio_processor".to_string()),
+                tool_name: Some("audio-processor".to_string()),
                 source: None,
             });
         }
@@ -258,7 +258,7 @@ impl AudioProcessorTool {
 
         let mut file = File::open(&safe_path).map_err(|e| LLMSpellError::Tool {
             message: format!("Failed to open WAV file: {e}"),
-            tool_name: Some("audio_processor".to_string()),
+            tool_name: Some("audio-processor".to_string()),
             source: None,
         })?;
 
@@ -267,7 +267,7 @@ impl AudioProcessorTool {
         file.read_exact(&mut riff_header)
             .map_err(|e| LLMSpellError::Tool {
                 message: format!("Failed to read RIFF header: {e}"),
-                tool_name: Some("audio_processor".to_string()),
+                tool_name: Some("audio-processor".to_string()),
                 source: None,
             })?;
 
@@ -275,7 +275,7 @@ impl AudioProcessorTool {
         if &riff_header[0..4] != b"RIFF" || &riff_header[8..12] != b"WAVE" {
             return Err(LLMSpellError::Tool {
                 message: "Invalid WAV file format".to_string(),
-                tool_name: Some("audio_processor".to_string()),
+                tool_name: Some("audio-processor".to_string()),
                 source: None,
             });
         }
@@ -300,7 +300,7 @@ impl AudioProcessorTool {
                 file.read_exact(&mut fmt_data)
                     .map_err(|e| LLMSpellError::Tool {
                         message: format!("Failed to read fmt chunk: {e}"),
-                        tool_name: Some("audio_processor".to_string()),
+                        tool_name: Some("audio-processor".to_string()),
                         source: None,
                     })?;
 
@@ -371,7 +371,7 @@ impl AudioProcessorTool {
 
         Err(LLMSpellError::Tool {
             message: "Could not find fmt chunk in WAV file".to_string(),
-            tool_name: Some("audio_processor".to_string()),
+            tool_name: Some("audio-processor".to_string()),
             source: None,
         })
     }
@@ -388,7 +388,7 @@ impl AudioProcessorTool {
         if !self.config.supported_formats.contains(&target_format) {
             return Err(LLMSpellError::Tool {
                 message: format!("Conversion to {target_format:?} format is not supported"),
-                tool_name: Some("audio_processor".to_string()),
+                tool_name: Some("audio-processor".to_string()),
                 source: None,
             });
         }
@@ -408,7 +408,7 @@ impl AudioProcessorTool {
             // Simple file copy for same format
             std::fs::copy(source_path, target_path).map_err(|e| LLMSpellError::Tool {
                 message: format!("Failed to copy audio file: {e}"),
-                tool_name: Some("audio_processor".to_string()),
+                tool_name: Some("audio-processor".to_string()),
                 source: None,
             })?;
 
@@ -422,7 +422,7 @@ impl AudioProcessorTool {
                 message: format!(
                     "Conversion from {source_format:?} to {target_format:?} is not implemented in this basic version. Advanced audio processing will be added in Phase 3+"
                 ),
-                tool_name: Some("audio_processor".to_string()),
+                tool_name: Some("audio-processor".to_string()),
                 source: None,
             })
         }
@@ -680,7 +680,7 @@ impl Tool for AudioProcessorTool {
 
     fn schema(&self) -> ToolSchema {
         ToolSchema::new(
-            "audio_processor".to_string(),
+            "audio-processor".to_string(),
             "Process audio files for format detection, metadata extraction, and conversions"
                 .to_string(),
         )
@@ -975,11 +975,11 @@ mod tests {
         let tool = create_test_audio_processor();
 
         let metadata = tool.metadata();
-        assert_eq!(metadata.name, "audio_processor");
+        assert_eq!(metadata.name, "audio-processor");
         assert!(metadata.description.contains("Audio file processing"));
 
         let schema = tool.schema();
-        assert_eq!(schema.name, "audio_processor");
+        assert_eq!(schema.name, "audio-processor");
         assert_eq!(tool.category(), ToolCategory::Media);
         assert_eq!(tool.security_level(), SecurityLevel::Safe);
 

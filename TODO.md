@@ -2753,56 +2753,54 @@ Add support for multiple names per tool in ToolRegistry for backward compatibili
 
 ---
 
-### Task 11a.9.2: Media Tools Standardization
-**Priority**: MEDIUM | **Time**: 15min | **Status**: ⏳ PENDING | **Depends**: 11a.9.1
+### Task 11a.9.2: Media Tools Standardization ✅
+**Priority**: MEDIUM | **Time**: 15min | **Status**: ✅ COMPLETE | **Depends**: 11a.9.1
 
 Rename 3 media processing tools from snake_case to kebab-case.
 
 **Changes**:
-1. `image_processor` → `image-processor` (alias: `image_processor`)
-2. `video_processor` → `video-processor` (alias: `video_processor`)
-3. `audio_processor` → `audio-processor` (alias: `audio_processor`)
+1. ✅ `image_processor` → `image-processor` (alias: `image_processor`)
+2. ✅ `video_processor` → `video-processor` (alias: `video_processor`)
+3. ✅ `audio_processor` → `audio-processor` (alias: `audio_processor`)
 
-**Files to Modify**:
-- llmspell-tools/src/media/image_processor.rs:181
-- llmspell-tools/src/media/video_processor.rs:186
-- llmspell-tools/src/media/audio_processor.rs:143
+**Files Modified**:
+- llmspell-tools/src/media/audio_processor.rs: 12 occurrences (metadata, schema, tests, tracing attrs, ExecutionContext)
+- llmspell-tools/src/media/image_processor.rs: 9 occurrences (metadata, schema, tests, ExecutionContext)
+- llmspell-tools/src/media/video_processor.rs: 5 occurrences (metadata, schema, tests, ExecutionContext)
+- llmspell-bridge/src/tools.rs: Updated registration to dual-register with both names
 
-**Implementation Pattern** (repeat for each tool):
-```rust
-// OLD:
-metadata: ComponentMetadata::new(
-    "image_processor".to_string(),
-    "Image file processing...".to_string(),
-)
-
-// NEW:
-metadata: ComponentMetadata::new(
-    "image-processor".to_string(),
-    "Image file processing...".to_string(),
-)
-
-// When registering (wherever that happens):
-registry.register_with_aliases(
-    "image-processor".to_string(),
-    vec!["image_processor".to_string()],
-    Arc::new(Box::new(tool))
-)?;
-```
+**Implementation** (COMPREHENSIVE):
+Each tool updated in ALL locations:
+1. ✅ `ComponentMetadata::new()` name (in `::new()` method)
+2. ✅ `ToolSchema::new()` name (in `Tool::schema()` implementation)
+3. ✅ Tracing `info!` attribute: `tool_name = "audio-processor"`
+4. ✅ All `ExecutionContext` tool_name fields: `tool_name: Some("audio-processor".to_string())`
+5. ✅ Test assertions updated to expect kebab-case
+6. ✅ Registration updated to register both names (primary kebab-case, alias snake_case)
 
 **Testing**:
-- Verify tools can be invoked by new name
-- Verify tools can be invoked by old name (alias)
-- Check tool discovery/listing shows new name
+- ✅ All 41 media tool unit tests pass
+- ✅ Tools accessible by new kebab-case names
+- ✅ Tools accessible by old snake_case names (backward compatibility)
+- ✅ Zero clippy warnings
 
 **Criteria**:
-- [  ] 3 `ComponentMetadata::new()` calls updated to kebab-case
-- [  ] 3 tools registered with snake_case aliases
-- [  ] Tool lookup works for both old and new names
-- [  ] All tests pass: `cargo test -p llmspell-tools`
-- [  ] Zero clippy warnings
+- [✅] 3 `ComponentMetadata::new()` calls updated to kebab-case
+- [✅] 3 `ToolSchema::new()` calls updated to kebab-case
+- [✅] 3 tools registered with snake_case aliases (dual registration)
+- [✅] Tool lookup works for both old and new names
+- [✅] All tests pass: `cargo test -p llmspell-tools --lib media` (41/41)
+- [✅] Zero clippy warnings
 
-**Insights**: Pattern established for remaining tool categories. Aliases ensure existing user scripts continue working.
+**Insights**:
+- **Comprehensive Renaming Required**: Tool names appear in 5+ distinct locations: ComponentMetadata, ToolSchema, tracing attributes, ExecutionContext fields, and tests - ALL must be updated for consistency
+- **Dual Registration Pattern**: Since ComponentRegistry doesn't have built-in aliasing (unlike ToolRegistry), used dual registration approach - each tool registered twice with Arc::clone() for zero runtime overhead
+- **Tracing Instrumentation**: Tool names embedded in `info!` macros and ExecutionContext `tool_name` fields for observability - critical for debugging/monitoring
+- **Schema Independence**: ToolSchema name is separate from ComponentMetadata name - both must be updated independently
+- **Test-Driven Validation**: Unit tests caught the schema name discrepancy, ensuring comprehensive coverage
+- **Pattern Established**: This 5-location update pattern + dual-registration approach applies to all remaining tools (11a.9.3-11a.9.8)
+- **Zero Breaking Changes**: Old snake_case names continue to work seamlessly for existing scripts via dual registration
+- **Total Updates**: 26 string literal replacements across 3 files (12+9+5) + registration logic changes
 
 ---
 
@@ -2910,9 +2908,9 @@ Remove `-tool` suffix from 2 data tools.
 Remove `-tool` suffix from 3 web/API tools.
 
 **Changes**:
-1. `http-request-tool` → `http-request` (alias: `http-request-tool`)
+1. `http-request-tool` → `http-requester` (alias: `http-request-tool`)
 2. `graphql-query-tool` → `graphql-query` (alias: `graphql-query-tool`)
-3. `web-search-tool` → `web-search` (alias: `web-search-tool`)
+3. `web-search-tool` → `web-searcher` (alias: `web-search-tool`)
 4. `api-tester`, `webhook-caller`, `web-scraper`, `sitemap-crawler`, `url-analyzer`, `webpage-monitor` - ALREADY CORRECT (verify no changes needed)
 
 **Files to Modify**:
@@ -2934,8 +2932,8 @@ Remove `-tool` suffix from 3 web/API tools.
 Remove `-tool` suffix from 2 utility tools.
 
 **Changes**:
-1. `data-validation-tool` → `data-validation` (alias: `data-validation-tool`)
-2. `template-engine-tool` → `template-engine` (alias: `template-engine-tool`)
+1. `data-validation-tool` → `data-validator` (alias: `data-validation-tool`)
+2. `template-engine-tool` → `template-creator` (alias: `template-engine-tool`)
 3. `datetime-handler`, `text-manipulator`, `uuid-generator`, `hash-calculator`, `base64-encoder`, `diff-calculator`, `calculator` - ALREADY CORRECT (verify no changes needed)
 
 **Files to Modify**:

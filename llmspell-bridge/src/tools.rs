@@ -326,27 +326,33 @@ fn register_media_tools(
     registry: &Arc<ComponentRegistry>,
     file_sandbox: &Arc<FileSandbox>,
 ) -> Result<(), Box<dyn std::error::Error>> {
-    let audio_sandbox = file_sandbox.clone();
-    register_tool_with_sandbox(
-        registry,
-        "audio_processor",
-        audio_sandbox.clone(),
-        move || AudioProcessorTool::new(AudioProcessorConfig::default(), audio_sandbox),
-    )?;
-    let image_sandbox = file_sandbox.clone();
-    register_tool_with_sandbox(
-        registry,
-        "image_processor",
-        image_sandbox.clone(),
-        move || ImageProcessorTool::new(ImageProcessorConfig::default(), image_sandbox),
-    )?;
-    let video_sandbox = file_sandbox.clone();
-    register_tool_with_sandbox(
-        registry,
-        "video_processor",
-        video_sandbox.clone(),
-        move || VideoProcessorTool::new(VideoProcessorConfig::default(), video_sandbox),
-    )?;
+    // Audio processor: register with kebab-case primary name
+    let audio_tool = Arc::new(AudioProcessorTool::new(
+        AudioProcessorConfig::default(),
+        file_sandbox.clone(),
+    ));
+    registry.register_tool("audio-processor".to_string(), audio_tool.clone())?;
+    // Register with snake_case alias for backward compatibility
+    registry.register_tool("audio_processor".to_string(), audio_tool)?;
+
+    // Image processor: register with kebab-case primary name
+    let image_tool = Arc::new(ImageProcessorTool::new(
+        ImageProcessorConfig::default(),
+        file_sandbox.clone(),
+    ));
+    registry.register_tool("image-processor".to_string(), image_tool.clone())?;
+    // Register with snake_case alias for backward compatibility
+    registry.register_tool("image_processor".to_string(), image_tool)?;
+
+    // Video processor: register with kebab-case primary name
+    let video_tool = Arc::new(VideoProcessorTool::new(
+        VideoProcessorConfig::default(),
+        file_sandbox.clone(),
+    ));
+    registry.register_tool("video-processor".to_string(), video_tool.clone())?;
+    // Register with snake_case alias for backward compatibility
+    registry.register_tool("video_processor".to_string(), video_tool)?;
+
     Ok(())
 }
 
