@@ -115,7 +115,7 @@ impl FileSearchTool {
         );
         Self {
             metadata: ComponentMetadata::new(
-                "file_search".to_string(),
+                "file-search".to_string(),
                 "File content search with pattern matching and context extraction".to_string(),
             ),
             config,
@@ -441,7 +441,7 @@ impl BaseAgent for FileSearchTool {
                 .await
                 .map_err(|e| LLMSpellError::Tool {
                     message: format!("File search failed: {e}"),
-                    tool_name: Some("file_search".to_string()),
+                    tool_name: Some("file-search".to_string()),
                     source: None,
                 })?
         } else if search_path.is_dir() {
@@ -454,7 +454,7 @@ impl BaseAgent for FileSearchTool {
                 .await
                 .map_err(|e| LLMSpellError::Tool {
                     message: format!("Directory search failed: {e}"),
-                    tool_name: Some("file_search".to_string()),
+                    tool_name: Some("file-search".to_string()),
                     source: None,
                 })?
         } else {
@@ -539,7 +539,7 @@ impl Tool for FileSearchTool {
 
     fn schema(&self) -> ToolSchema {
         ToolSchema::new(
-            "file_search".to_string(),
+            "file-search".to_string(),
             "Search for patterns within files and directories with context extraction".to_string(),
         )
         .with_parameter(ParameterDef {
@@ -882,12 +882,12 @@ mod tests {
         let (tool, _temp_dir) = create_test_file_search();
 
         let metadata = tool.metadata();
-        assert_eq!(metadata.name, "file_search");
+        assert_eq!(metadata.name, "file-search");
         assert_eq!(metadata.version, llmspell_core::Version::new(0, 1, 0));
         assert!(metadata.description.contains("File content search"));
 
         let schema = tool.schema();
-        assert_eq!(schema.name, "file_search");
+        assert_eq!(schema.name, "file-search");
         assert_eq!(tool.category(), ToolCategory::Filesystem);
         assert_eq!(tool.security_level(), SecurityLevel::Restricted);
 

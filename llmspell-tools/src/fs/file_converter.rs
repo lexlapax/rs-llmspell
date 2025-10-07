@@ -66,7 +66,7 @@ impl FileConverterTool {
     pub fn new(config: FileConverterConfig, sandbox: Arc<FileSandbox>) -> Self {
         Self {
             metadata: ComponentMetadata::new(
-                "file_converter".to_string(),
+                "file-converter".to_string(),
                 "File format and encoding conversion tool".to_string(),
             ),
             config,
@@ -377,7 +377,7 @@ impl BaseAgent for FileConverterTool {
                     .await
                     .map_err(|e| LLMSpellError::Tool {
                         message: format!("Encoding conversion failed: {e}"),
-                        tool_name: Some("file_converter".to_string()),
+                        tool_name: Some("file-converter".to_string()),
                         source: None,
                     })?;
             }
@@ -399,7 +399,7 @@ impl BaseAgent for FileConverterTool {
                     .await
                     .map_err(|e| LLMSpellError::Tool {
                         message: format!("Line ending conversion failed: {e}"),
-                        tool_name: Some("file_converter".to_string()),
+                        tool_name: Some("file-converter".to_string()),
                         source: None,
                     })?;
             }
@@ -419,7 +419,7 @@ impl BaseAgent for FileConverterTool {
                     .await
                     .map_err(|e| LLMSpellError::Tool {
                         message: format!("Indentation conversion failed: {e}"),
-                        tool_name: Some("file_converter".to_string()),
+                        tool_name: Some("file-converter".to_string()),
                         source: None,
                     })?;
             }
@@ -497,7 +497,7 @@ impl Tool for FileConverterTool {
 
     fn schema(&self) -> ToolSchema {
         ToolSchema::new(
-            "file_converter".to_string(),
+            "file-converter".to_string(),
             "Convert file formats, encodings, and line endings".to_string(),
         )
         .with_parameter(ParameterDef {
@@ -724,14 +724,14 @@ mod tests {
         let (tool, _temp_dir) = create_test_file_converter();
 
         let metadata = tool.metadata();
-        assert_eq!(metadata.name, "file_converter");
+        assert_eq!(metadata.name, "file-converter");
         assert_eq!(metadata.version, llmspell_core::Version::new(0, 1, 0));
         assert!(metadata
             .description
             .contains("File format and encoding conversion"));
 
         let schema = tool.schema();
-        assert_eq!(schema.name, "file_converter");
+        assert_eq!(schema.name, "file-converter");
         assert_eq!(tool.category(), ToolCategory::Filesystem);
         assert_eq!(tool.security_level(), SecurityLevel::Restricted);
     }

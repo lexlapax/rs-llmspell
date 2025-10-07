@@ -53,20 +53,20 @@ fn test_file_system_tools_creation() {
     // FileWatcherTool
     let tool = FileWatcherTool::new(FileWatcherConfig::default(), sandbox.clone());
     let schema = tool.schema();
-    assert_eq!(schema.name, "file_watcher");
+    assert_eq!(schema.name, "file-watcher");
     assert!(!schema.description.is_empty());
     assert!(!schema.parameters.is_empty());
 
     // FileConverterTool
     let tool = FileConverterTool::new(FileConverterConfig::default(), sandbox.clone());
     let schema = tool.schema();
-    assert_eq!(schema.name, "file_converter");
+    assert_eq!(schema.name, "file-converter");
     assert!(!schema.description.is_empty());
 
     // FileSearchTool
     let tool = FileSearchTool::new(FileSearchConfig::default(), sandbox);
     let schema = tool.schema();
-    assert_eq!(schema.name, "file_search");
+    assert_eq!(schema.name, "file-search");
     assert!(!schema.description.is_empty());
 }
 #[test]
@@ -109,7 +109,7 @@ fn test_media_processing_tools_creation() {
         create_default_test_sandbox(),
     );
     let schema = tool.schema();
-    assert_eq!(schema.name, "audio_processor");
+    assert_eq!(schema.name, "audio-processor");
     assert!(!schema.description.is_empty());
 
     // VideoProcessorTool
@@ -118,7 +118,7 @@ fn test_media_processing_tools_creation() {
         create_default_test_sandbox(),
     );
     let schema = tool.schema();
-    assert_eq!(schema.name, "video_processor");
+    assert_eq!(schema.name, "video-processor");
     assert!(!schema.description.is_empty());
 
     // ImageProcessorTool
@@ -127,7 +127,7 @@ fn test_media_processing_tools_creation() {
         create_default_test_sandbox(),
     );
     let schema = tool.schema();
-    assert_eq!(schema.name, "image_processor");
+    assert_eq!(schema.name, "image-processor");
     assert!(!schema.description.is_empty());
 }
 #[test]

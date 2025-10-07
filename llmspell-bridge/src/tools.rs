@@ -86,7 +86,7 @@ pub fn register_all_tools(
     register_data_processing_tools(registry, &tools_config.http_request)?;
     register_file_system_tools(
         registry,
-        file_sandbox.clone(),
+        &file_sandbox,
         &tools_config.file_operations,
     )?;
     register_system_tools(registry, &file_sandbox)?;
@@ -232,59 +232,63 @@ fn register_data_processing_tools(
 /// Register file system tools
 fn register_file_system_tools(
     registry: &Arc<ComponentRegistry>,
-    file_sandbox: Arc<FileSandbox>,
+    file_sandbox: &Arc<FileSandbox>,
     file_ops_config: &llmspell_config::tools::FileOperationsConfig,
 ) -> Result<(), Box<dyn std::error::Error>> {
+    // Archive handler: register with kebab-case primary name
     #[cfg(feature = "archives")]
-    register_tool(registry, "archive_handler", ArchiveHandlerTool::new)?;
+    {
+        let archive_tool = Arc::new(ArchiveHandlerTool::new());
+        registry.register_tool("archive-handler".to_string(), archive_tool.clone())?;
+        // Register with snake_case alias for backward compatibility
+        registry.register_tool("archive_handler".to_string(), archive_tool.clone())?;
+        // Register with old -tool suffix alias for backward compatibility
+        registry.register_tool("archive-handler-tool".to_string(), archive_tool)?;
+    }
 
-    // File converter with sandbox
-    let file_sandbox_converter = file_sandbox.clone();
-    register_tool_with_sandbox(
-        registry,
-        "file_converter",
-        file_sandbox_converter.clone(),
-        move || FileConverterTool::new(FileConverterConfig::default(), file_sandbox_converter),
-    )?;
+    // File converter: register with kebab-case primary name
+    let file_converter_tool = Arc::new(FileConverterTool::new(
+        FileConverterConfig::default(),
+        file_sandbox.clone(),
+    ));
+    registry.register_tool("file-converter".to_string(), file_converter_tool.clone())?;
+    // Register with snake_case alias for backward compatibility
+    registry.register_tool("file_converter".to_string(), file_converter_tool)?;
 
-    // Use the provided configuration for FileOperationsTool with sandbox
-    let file_ops_config = file_ops_config.clone();
-    let file_sandbox_ops = file_sandbox.clone();
-    register_tool_with_sandbox(
-        registry,
-        "file_operations",
-        file_sandbox_ops.clone(),
-        move || {
-            // Convert from llmspell_config FileOperationsConfig to llmspell_tools FileOperationsConfig
-            let tool_config = FileOperationsConfig {
-                allowed_paths: file_ops_config.allowed_paths.clone(),
-                atomic_writes: file_ops_config.atomic_writes,
-                max_file_size: file_ops_config.max_file_size,
-                max_dir_entries: 1000,      // Default value
-                allow_recursive: true,      // Default value
-                default_permissions: 0o644, // Default permissions
-            };
-            FileOperationsTool::new(tool_config, file_sandbox_ops)
-        },
-    )?;
+    // File operations: register with kebab-case primary name
+    // Convert from llmspell_config FileOperationsConfig to llmspell_tools FileOperationsConfig
+    let tool_config = FileOperationsConfig {
+        allowed_paths: file_ops_config.allowed_paths.clone(),
+        atomic_writes: file_ops_config.atomic_writes,
+        max_file_size: file_ops_config.max_file_size,
+        max_dir_entries: 1000,      // Default value
+        allow_recursive: true,      // Default value
+        default_permissions: 0o644, // Default permissions
+    };
+    let file_ops_tool = Arc::new(FileOperationsTool::new(tool_config, file_sandbox.clone()));
+    registry.register_tool("file-operations".to_string(), file_ops_tool.clone())?;
+    // Register with snake_case alias for backward compatibility
+    registry.register_tool("file_operations".to_string(), file_ops_tool.clone())?;
+    // Register with old -tool suffix alias for backward compatibility
+    registry.register_tool("file-operations-tool".to_string(), file_ops_tool)?;
 
-    // File search with sandbox
-    let file_sandbox_search = file_sandbox.clone();
-    register_tool_with_sandbox(
-        registry,
-        "file_search",
-        file_sandbox_search.clone(),
-        move || FileSearchTool::new(FileSearchConfig::default(), file_sandbox_search),
-    )?;
+    // File search: register with kebab-case primary name
+    let file_search_tool = Arc::new(FileSearchTool::new(
+        FileSearchConfig::default(),
+        file_sandbox.clone(),
+    ));
+    registry.register_tool("file-search".to_string(), file_search_tool.clone())?;
+    // Register with snake_case alias for backward compatibility
+    registry.register_tool("file_search".to_string(), file_search_tool)?;
 
-    // File watcher with sandbox
-    let file_sandbox_watcher = file_sandbox;
-    register_tool_with_sandbox(
-        registry,
-        "file_watcher",
-        file_sandbox_watcher.clone(),
-        move || FileWatcherTool::new(FileWatcherConfig::default(), file_sandbox_watcher),
-    )?;
+    // File watcher: register with kebab-case primary name
+    let file_watcher_tool = Arc::new(FileWatcherTool::new(
+        FileWatcherConfig::default(),
+        file_sandbox.clone(),
+    ));
+    registry.register_tool("file-watcher".to_string(), file_watcher_tool.clone())?;
+    // Register with snake_case alias for backward compatibility
+    registry.register_tool("file_watcher".to_string(), file_watcher_tool)?;
     Ok(())
 }
 

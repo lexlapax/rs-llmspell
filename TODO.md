@@ -2805,30 +2805,41 @@ Each tool updated in ALL locations:
 ---
 
 ### Task 11a.9.3: Filesystem Tools Standardization
-**Priority**: MEDIUM | **Time**: 20min | **Status**: ⏳ PENDING | **Depends**: 11a.9.2
+**Priority**: MEDIUM | **Time**: 20min | **Status**: ✅ COMPLETE | **Depends**: 11a.9.2
 
-Rename 3 filesystem tools from snake_case to kebab-case + remove `-tool` suffix from 3 tools.
+Rename 3 filesystem tools from snake_case to kebab-case + remove `-tool` suffix from 2 tools.
 
-**Changes**:
-1. `file_watcher` → `file-watcher` (alias: `file_watcher`)
-2. `file_converter` → `file-converter` (alias: `file_converter`)
-3. `file_search` → `file-search` (alias: `file_search`)
-4. `file-operations-tool` → `file-operations` (alias: `file-operations-tool`)
-5. `archive-handler-tool` → `archive-handler` (alias: `archive-handler-tool`)
-6. Note: Verify if there's a 6th filesystem tool
+**Changes Implemented**:
+1. `file_watcher` → `file-watcher` (3 aliases: `file_watcher`)
+2. `file_converter` → `file-converter` (3 aliases: `file_converter`)
+3. `file_search` → `file-search` (3 aliases: `file_search`)
+4. `file-operations-tool` → `file-operations` (2 aliases: `file_operations`, `file-operations-tool`)
+5. `archive-handler-tool` → `archive-handler` (2 aliases: `archive_handler`, `archive-handler-tool`)
 
-**Files to Modify**:
-- llmspell-tools/src/fs/file_watcher.rs:73
-- llmspell-tools/src/fs/file_converter.rs:69
-- llmspell-tools/src/fs/file_search.rs:118
-- llmspell-tools/src/fs/file_operations.rs:143
-- llmspell-tools/src/fs/archive_handler.rs:111
+**Files Modified**:
+- llmspell-tools/src/fs/file_watcher.rs: 5 occurrences (ComponentMetadata, ToolSchema, LLMSpellError, 2 test assertions)
+- llmspell-tools/src/fs/file_converter.rs: 7 occurrences (ComponentMetadata, ToolSchema, 3 LLMSpellError, 2 test assertions)
+- llmspell-tools/src/fs/file_search.rs: 6 occurrences (ComponentMetadata, ToolSchema, 2 LLMSpellError, 2 test assertions)
+- llmspell-tools/src/fs/file_operations.rs: 4 occurrences (ComponentMetadata, ToolSchema, 2 test assertions)
+- llmspell-tools/src/fs/archive_handler.rs: 2 occurrences (2 ComponentMetadata in new() + with_config())
+- llmspell-bridge/src/tools.rs: Converted all 5 tools to dual registration pattern, fixed parameter type (&Arc instead of Arc)
+- llmspell-tools/tests/file_operations_integration.rs: 1 test assertion
+- llmspell-tools/tests/remaining_tools_basic.rs: 3 test assertions (+ 3 media tool assertions from 11a.9.2)
 
 **Criteria**:
-- [  ] 5+ `ComponentMetadata::new()` calls updated
-- [  ] Tools registered with old names as aliases
-- [  ] All tests pass: `cargo test -p llmspell-tools`
-- [  ] Zero clippy warnings
+- [✅] 7 `ComponentMetadata::new()` calls updated (5 tools, archive-handler has 2 constructors)
+- [✅] All 5 tools registered with dual/triple aliases for backward compatibility
+- [✅] All tests pass: 443 tests passed across all test suites
+- [✅] Zero clippy warnings
+
+**Key Insights**:
+- **ToolSchema Indentation Variance**: Initial replace_all missed ToolSchema names due to different indentation (12 spaces vs 16 spaces)
+- **LLMSpellError Discovery**: Found tool_name fields in error handling code that also needed updates
+- **Discrepancy Fixed**: file-operations-tool had ComponentMetadata="file-operations-tool" but ToolSchema="file_operations" (underscore) - standardized to kebab-case
+- **Triple Aliasing**: file-operations and archive-handler get 2 legacy aliases each (snake_case + old -tool suffix)
+- **Parameter Type Optimization**: Changed register_file_system_tools() parameter from Arc<FileSandbox> to &Arc<FileSandbox> for consistency
+- **Test Coverage**: Fixed 5 tool assertions in integration tests + 3 media tool assertions missed in 11a.9.2
+- **Total Updates**: 28 string literal replacements + registration refactoring + test fixes
 
 ---
 

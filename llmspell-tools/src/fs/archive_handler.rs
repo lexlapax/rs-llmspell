@@ -108,7 +108,7 @@ impl ArchiveHandlerTool {
     pub fn new() -> Self {
         Self {
             metadata: ComponentMetadata::new(
-                "archive-handler-tool".to_string(),
+                "archive-handler".to_string(),
                 "Handle ZIP, TAR, and GZ archives with security controls".to_string(),
             ),
             config: ArchiveHandlerConfig::default(),
@@ -121,7 +121,7 @@ impl ArchiveHandlerTool {
     pub fn with_config(config: ArchiveHandlerConfig) -> Self {
         Self {
             metadata: ComponentMetadata::new(
-                "archive-handler-tool".to_string(),
+                "archive-handler".to_string(),
                 "Handle ZIP, TAR, and GZ archives with security controls".to_string(),
             ),
             config,
