@@ -1330,23 +1330,36 @@ bridge.create_workflow("sequential", name, steps, config, error_strat)
 
 **Benefits**: Compile-time type safety, zero serialization overhead, self-documenting APIs, refactoring safety
 
-**Audit Results**:
+**Comprehensive Bridge Audit** (completed):
 
-**Agent Bridge** - 10 methods need fixing:
-1. create_agent - HashMap<String, serde_json::Value>
-2. create_from_template - HashMap<String, serde_json::Value> (keep - template params dynamic)
-3. create_composite_agent - serde_json::Value routing_config
-4. create_context - serde_json::Value builder_config
-5. create_child_context - serde_json::Value scope
-6. update_context - serde_json::Value value (keep - inherently untyped)
-7. set_shared_memory - &serde_json::Value scope
-8. get_shared_memory - &serde_json::Value scope
-9. wrap_agent_as_tool - serde_json::Value wrapper_config
-10. configure_agent_alerts - serde_json::Value alert_config
+**Agent Bridge** (agent_bridge.rs) - 10 methods, 8 need fixing:
+1. create_agent - HashMap<String, serde_json::Value> → AgentConfig ❌
+2. create_from_template - HashMap (KEEP - template params dynamic) ✅
+3. create_composite_agent - serde_json::Value → CompositeAgentConfig ❌
+4. create_context - serde_json::Value → ExecutionContextConfig ❌
+5. create_child_context - serde_json::Value → ExecutionContextConfig ❌
+6. update_context - serde_json::Value (KEEP - inherently untyped) ✅
+7. set_shared_memory - &serde_json::Value → ContextScope ❌
+8. get_shared_memory - &serde_json::Value → ContextScope ❌
+9. wrap_agent_as_tool - serde_json::Value → ToolWrapperConfig ❌
+10. configure_agent_alerts - serde_json::Value → AlertConfig ❌
 
-**Code Duplication**: replay.rs:127-172 (45 lines), debug.rs:465-512 (48 lines)
+**Session Bridge** (session_bridge.rs) - 1 method needs fixing:
+1. replay_session - serde_json::Value (IGNORES IT!) → SessionReplayConfig ❌
 
-**Compliant Bridges**: Workflow✅, State✅, RAG✅, Artifact✅, Hook✅
+**Code Duplication** (93 lines total):
+- replay.rs:127-172 (45 lines duplicate lua_value_to_json) ❌
+- debug.rs:465-512 (48 lines duplicate lua_value_to_json) ❌
+
+**Compliant Bridges** (no input JSON anti-patterns):
+✅ Workflow - uses WorkflowStep, WorkflowConfig structs
+✅ State - thin wrapper over StateAccess trait
+✅ RAG - uses RAGSearchParams struct
+✅ Artifact - no JSON input params
+✅ Config - returns JSON (query ops - acceptable)
+✅ Debug - debug data inherently untyped
+✅ Event - event payloads inherently untyped
+✅ Hook - hook data inherently untyped
 
 ---
 
@@ -1457,22 +1470,124 @@ Create `docs/technical/bridge-pattern-guide.md` with principles, examples, check
 
 ---
 
-### Task 11a.8.8: Validate All Bridges Follow Pattern
-**Priority**: MEDIUM | **Time**: 30min | **Status**: Pending | **Depends**: 11a.8.7
+### Task 11a.8.8: Fix Session.replay_session - SessionReplayConfig
+**Priority**: MEDIUM | **Time**: 20min | **Status**: Pending | **Depends**: 11a.8.1
 
-Audit remaining bridges (especially Session) for JSON anti-patterns. Document findings.
+Fix `replay_session` to accept typed `SessionReplayConfig` instead of ignoring JSON options.
+
+**Problem**: session_bridge.rs:155 accepts `_options: serde_json::Value` but ignores it, using default config instead.
+
+**Files**: session_bridge.rs:152-176, session.rs (Lua globals - need to find replay call)
+
+**SessionReplayConfig** (already exists in llmspell-kernel):
+```rust
+use llmspell_kernel::sessions::replay::session_adapter::SessionReplayConfig;
+
+// Bridge accepts struct
+pub async fn replay_session(
+    &self,
+    session_id: &SessionId,
+    config: SessionReplayConfig,  // ✅ Typed struct, not JSON
+) -> Result<serde_json::Value>
+```
+
+**SessionReplayConfig fields** (llmspell-kernel):
+```rust
+pub struct SessionReplayConfig {
+    pub mode: ReplayMode,  // Exact, Modified, Simulate, Debug
+    pub target_timestamp: Option<SystemTime>,
+    pub compare_results: bool,
+    pub timeout: Duration,
+    pub stop_on_error: bool,
+    pub metadata: HashMap<String, serde_json::Value>,
+}
+```
+
+**Lua Parser** (session.rs:368-381):
+```rust
+fn parse_replay_config(table: &Table) -> mlua::Result<SessionReplayConfig> {
+    use llmspell_kernel::sessions::replay::session_adapter::{ReplayMode, SessionReplayConfig};
+
+    let mode_str: String = table.get("mode").unwrap_or_else(|_| "exact".to_string());
+    let mode = match mode_str.as_str() {
+        "exact" => ReplayMode::Exact,
+        "modified" => ReplayMode::Modified,
+        "simulate" => ReplayMode::Simulate,
+        "debug" => ReplayMode::Debug,
+        _ => return Err(mlua::Error::RuntimeError(format!("Unknown mode: {}", mode_str))),
+    };
+
+    Ok(SessionReplayConfig {
+        mode,
+        target_timestamp: None,  // Could parse from table if needed
+        compare_results: table.get("compare_results").unwrap_or(true),
+        timeout: Duration::from_secs(table.get("timeout_seconds").unwrap_or(300)),
+        stop_on_error: table.get("stop_on_error").unwrap_or(false),
+        metadata: parse_string_value_map(table, "metadata")?,
+    })
+}
+```
+
+**Lua Update** (session.rs:376-380):
+```rust
+// OLD (line 376-377):
+let config_json = lua_table_to_json(config_table)?;
+let result = bridge.replay_session(&session_id, config_json).await?;
+
+// NEW:
+let replay_config = parse_replay_config(&config_table)?;
+let result = bridge.replay_session(&session_id, replay_config).await?;
+```
 
 **Criteria**:
-- [ ] All 10 bridges audited
-- [ ] Session bridge checked
-- [ ] Findings classified (OK vs needs-fix)
-- [ ] Any issues documented as new subtasks
+- [ ] Bridge signature accepts SessionReplayConfig
+- [ ] Lua parser implemented (if Lua global exists for replay)
+- [ ] cargo clippy --features lua: 0 warnings ✅
+- [ ] cargo test --features lua: session tests pass ✅
+
+---
+
+### Task 11a.8.9: Final Bridge Pattern Validation
+**Priority**: LOW | **Time**: 15min | **Status**: Pending | **Depends**: 11a.8.8
+
+Verify all bridges comply with pattern using automated checks.
+
+**Audit Results** (completed during task creation):
+
+✅ **Artifact Bridge** - COMPLIANT (no JSON input params)
+✅ **Config Bridge** - COMPLIANT (returns JSON - query operation, acceptable)
+✅ **Debug Bridge** - COMPLIANT (debug data inherently untyped)
+✅ **Event Bridge** - COMPLIANT (event payloads inherently untyped)
+✅ **Hook Bridge** - COMPLIANT (hook data inherently untyped)
+✅ **RAG Bridge** - COMPLIANT (uses RAGSearchParams struct)
+✅ **State Bridge** - COMPLIANT (thin wrapper over StateAccess)
+✅ **Workflow Bridge** - COMPLIANT (uses WorkflowStep, WorkflowConfig structs)
+❌ **Agent Bridge** - FIXED in 11a.8.2-11a.8.6
+❌ **Session Bridge** - FIXED in 11a.8.8
+
+**Validation Commands**:
+```bash
+# No anti-patterns remain
+rg 'pub async fn create.*serde_json::Value' llmspell-bridge/src/*_bridge.rs
+# Should return 0 results after all fixes
+
+# All create/config methods use structs
+rg 'pub async fn (create|configure).*\(' llmspell-bridge/src/*_bridge.rs -A 3 | \
+  grep -v 'serde_json::Value' | wc -l
+# Should match total count of such methods
+```
+
+**Criteria**:
+- [ ] Grep validation commands run successfully
+- [ ] Zero anti-pattern matches found
+- [ ] All bridges documented as compliant
+- [ ] Pattern documentation up to date
 
 ---
 
 ## Phase 11a.8 Summary
 
-**Effort**: 5-6 hours | **Files**: 5 modified | **Structs**: 7 new | **Parsers**: 9 new
+**Effort**: 5-6 hours | **Files**: 6 modified | **Structs**: 7-8 new | **Parsers**: 9-10 new
 
 **Impact**: Eliminates 10 type-unsafe methods, removes 93 lines duplicate code, establishes pattern for future
 
