@@ -1295,6 +1295,193 @@ features = ["lua"]  # Explicit dependencies
 
 ---
 
+## Phase 11a.8: Bridge Pattern Compliance - Rust Structs Not JSON
+
+### Context
+
+**Problem**: Agent bridge (and potentially others) use JSON (`serde_json::Value`) for configuration parameters instead of typed Rust structs, violating the "thin Lua wrapper" pattern established during workflow refactoring.
+
+**Pattern Violation Example**:
+```rust
+// ❌ ANTI-PATTERN (Agent Bridge)
+pub async fn create_composite_agent(
+    routing_config: serde_json::Value,  // Untyped JSON
+) -> Result<()>
+
+// Lua side does JSON conversion
+let config_json = lua_table_to_json(config)?;
+bridge.create_composite_agent(name, agents, config_json)
+```
+
+**Correct Pattern** (Workflow Bridge - recently fixed):
+```rust
+// ✅ CORRECT PATTERN
+pub async fn create_workflow(
+    steps: Vec<WorkflowStep>,           // Typed Rust struct
+    config: WorkflowConfig,             // Typed Rust struct
+    error_strategy: Option<ErrorStrategy>,  // Typed Rust enum
+) -> Result<String>
+
+// Lua side builds Rust structs
+let step = parse_workflow_step(lua, &step_table)?;
+let config = WorkflowConfig { /* typed fields */ };
+bridge.create_workflow("sequential", name, steps, config, error_strat)
+```
+
+**Benefits**: Compile-time type safety, zero serialization overhead, self-documenting APIs, refactoring safety
+
+**Audit Results**:
+
+**Agent Bridge** - 10 methods need fixing:
+1. create_agent - HashMap<String, serde_json::Value>
+2. create_from_template - HashMap<String, serde_json::Value> (keep - template params dynamic)
+3. create_composite_agent - serde_json::Value routing_config
+4. create_context - serde_json::Value builder_config
+5. create_child_context - serde_json::Value scope
+6. update_context - serde_json::Value value (keep - inherently untyped)
+7. set_shared_memory - &serde_json::Value scope
+8. get_shared_memory - &serde_json::Value scope
+9. wrap_agent_as_tool - serde_json::Value wrapper_config
+10. configure_agent_alerts - serde_json::Value alert_config
+
+**Code Duplication**: replay.rs:127-172 (45 lines), debug.rs:465-512 (48 lines)
+
+**Compliant Bridges**: Workflow✅, State✅, RAG✅, Artifact✅, Hook✅
+
+---
+
+### Task 11a.8.1: Remove Code Duplication - lua_value_to_json
+**Priority**: HIGH | **Time**: 15min | **Status**: Pending
+
+Delete duplicate `lua_value_to_json` implementations, use centralized version from `crate::lua::conversion`.
+
+**Files**: replay.rs:127-172, debug.rs:465-512
+
+**Criteria**:
+- [ ] 93 lines duplicate code removed
+- [ ] Both files import from crate::lua::conversion
+- [ ] cargo clippy --features lua: 0 warnings ✅
+- [ ] cargo test --features lua --lib: pass ✅
+
+---
+
+### Task 11a.8.2: Fix Agent.create_agent - AgentConfig Struct
+**Priority**: CRITICAL | **Time**: 60min | **Status**: Pending | **Depends**: 11a.8.1
+
+Create `AgentConfig` struct, update bridge signature, create `parse_agent_config()` parser.
+
+**Files**: agent_bridge.rs:134-189, agent.rs:1346-1403
+
+**Criteria**:
+- [ ] AgentConfig struct with all fields
+- [ ] Bridge accepts struct not HashMap
+- [ ] parse_agent_config() implemented
+- [ ] cargo clippy: 0 warnings ✅
+- [ ] cargo test: agent tests pass ✅
+- [ ] Example scripts work ✅
+
+---
+
+### Task 11a.8.3: Fix Agent.create_composite_agent - CompositeConfig
+**Priority**: HIGH | **Time**: 45min | **Status**: Pending | **Depends**: 11a.8.2
+
+Create `CompositeAgentConfig` + `RoutingStrategy` enum, update bridge, create parser.
+
+**Files**: agent_bridge.rs:1462-1522, agent.rs:1297-1323
+
+**Criteria**:
+- [ ] CompositeAgentConfig + RoutingStrategy defined
+- [ ] parse_composite_config() with all strategies
+- [ ] cargo clippy: 0 warnings ✅
+- [ ] cargo test: composite tests pass ✅
+
+---
+
+### Task 11a.8.4: Fix Agent Context Methods - Typed Contexts
+**Priority**: HIGH | **Time**: 50min | **Status**: Pending | **Depends**: 11a.8.2
+
+Create `ExecutionContextConfig` + `ContextInheritance`, update create_context & create_child_context.
+
+**Files**: agent_bridge.rs:962, 1050, agent.rs:1495-1525
+
+**Criteria**:
+- [ ] ExecutionContextConfig + ContextInheritance defined
+- [ ] parse_context_config(), parse_context_scope(), parse_inheritance() implemented
+- [ ] Both bridge methods updated
+- [ ] cargo clippy: 0 warnings ✅
+- [ ] cargo test: context tests pass ✅
+
+---
+
+### Task 11a.8.5: Fix Agent Shared Memory - ContextScope Enum
+**Priority**: MEDIUM | **Time**: 25min | **Status**: Pending | **Depends**: 11a.8.4
+
+Update set/get_shared_memory to use ContextScope enum (reuse parse_context_scope from 11a.8.4).
+
+**Files**: agent_bridge.rs:1136, 1152, agent.rs:1586-1620
+
+**Criteria**:
+- [ ] Bridge uses ContextScope enum not JSON
+- [ ] Lua reuses parse_context_scope
+- [ ] cargo clippy: 0 warnings ✅
+- [ ] cargo test: shared memory tests pass ✅
+
+---
+
+### Task 11a.8.6: Fix wrap_as_tool + configure_alerts
+**Priority**: MEDIUM | **Time**: 40min | **Status**: Pending | **Depends**: 11a.8.2
+
+Create `ToolWrapperConfig`, `AlertConfig` (+AlertCondition, AlertComparison), update methods.
+
+**Files**: agent_bridge.rs:1322, 590, agent.rs:1232-1249
+
+**Criteria**:
+- [ ] ToolWrapperConfig + AlertConfig structs defined
+- [ ] parse_tool_wrapper_config(), parse_alert_config() implemented
+- [ ] Both bridge methods updated
+- [ ] cargo clippy: 0 warnings ✅
+- [ ] cargo test: all tests pass ✅
+
+---
+
+### Task 11a.8.7: Add Bridge Pattern Documentation
+**Priority**: MEDIUM | **Time**: 25min | **Status**: Pending | **Depends**: 11a.8.6
+
+Create `docs/technical/bridge-pattern-guide.md` with principles, examples, checklist, testing.
+
+**Criteria**:
+- [ ] Documentation file created with all sections
+- [ ] Code examples accurate and compile
+- [ ] Common parsers documented
+- [ ] Testing requirements specified
+
+---
+
+### Task 11a.8.8: Validate All Bridges Follow Pattern
+**Priority**: MEDIUM | **Time**: 30min | **Status**: Pending | **Depends**: 11a.8.7
+
+Audit remaining bridges (especially Session) for JSON anti-patterns. Document findings.
+
+**Criteria**:
+- [ ] All 10 bridges audited
+- [ ] Session bridge checked
+- [ ] Findings classified (OK vs needs-fix)
+- [ ] Any issues documented as new subtasks
+
+---
+
+## Phase 11a.8 Summary
+
+**Effort**: 5-6 hours | **Files**: 5 modified | **Structs**: 7 new | **Parsers**: 9 new
+
+**Impact**: Eliminates 10 type-unsafe methods, removes 93 lines duplicate code, establishes pattern for future
+
+**Risk**: MEDIUM-HIGH (agent bridge heavily used, 1698 lines Lua globals affected)
+
+**Testing**: Each subtask must achieve 0 clippy warnings + all tests pass before proceeding
+
+---
+**Additional clean up todos**
+
 **END OF PHASE 11a TODO** ✅
 
-**Next**: Update pristine copy at docs/in-progress/PHASE11a-TODO.md, commit results, merge to main
