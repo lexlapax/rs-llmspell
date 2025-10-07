@@ -130,6 +130,88 @@ impl Default for ChildContextConfig {
     }
 }
 
+/// Configuration for wrapping an agent as a tool
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ToolWrapperConfig {
+    /// Name for the wrapped tool
+    pub tool_name: String,
+    /// Tool category (defaults to Utility)
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub category: Option<llmspell_core::traits::tool::ToolCategory>,
+    /// Security level (defaults to Restricted)
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub security_level: Option<llmspell_core::traits::tool::SecurityLevel>,
+}
+
+impl Default for ToolWrapperConfig {
+    fn default() -> Self {
+        Self {
+            tool_name: String::new(),
+            category: Some(llmspell_core::traits::tool::ToolCategory::Utility),
+            security_level: Some(llmspell_core::traits::tool::SecurityLevel::Restricted),
+        }
+    }
+}
+
+/// Alert condition configuration for bridge
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(tag = "type", rename_all = "snake_case")]
+pub enum AlertConditionConfig {
+    /// Metric threshold condition
+    MetricThreshold {
+        metric_name: String,
+        operator: String,
+        threshold: f64,
+        duration_seconds: u64,
+    },
+    /// Health status condition
+    HealthStatus {
+        status: String,
+        duration_seconds: u64,
+    },
+    /// Error rate condition
+    ErrorRate {
+        rate_percent: f64,
+        duration_seconds: u64,
+    },
+}
+
+/// Alert configuration for bridge (distinct from monitoring `AlertConfig`)
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct BridgeAlertConfig {
+    /// Alert rule name
+    pub name: String,
+    /// Alert severity (info, warning, critical, emergency)
+    pub severity: String,
+    /// Condition that triggers the alert
+    pub condition: AlertConditionConfig,
+    /// Cooldown period in seconds
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub cooldown_seconds: Option<u64>,
+    /// Whether the alert is enabled
+    #[serde(default = "default_enabled")]
+    pub enabled: bool,
+}
+
+const fn default_enabled() -> bool {
+    true
+}
+
+impl Default for BridgeAlertConfig {
+    fn default() -> Self {
+        Self {
+            name: String::new(),
+            severity: "warning".to_string(),
+            condition: AlertConditionConfig::ErrorRate {
+                rate_percent: 10.0,
+                duration_seconds: 60,
+            },
+            cooldown_seconds: Some(300),
+            enabled: true,
+        }
+    }
+}
+
 /// Bridge between scripts and agents
 pub struct AgentBridge {
     /// Agent discovery service
@@ -690,7 +772,7 @@ impl AgentBridge {
     pub async fn configure_agent_alerts(
         &self,
         agent_instance: &str,
-        _alert_config: serde_json::Value,
+        alert_config: BridgeAlertConfig,
     ) -> Result<()> {
         // Verify agent exists
         let _agent =
@@ -702,6 +784,11 @@ impl AgentBridge {
                 })?;
 
         // Mock alert configuration - real implementation would store per-agent configs
+        // For now, just validate the typed config was received
+        debug!(
+            "Configured alert '{}' for agent '{}' with severity '{}'",
+            alert_config.name, agent_instance, alert_config.severity
+        );
         Ok(())
     }
 
@@ -1315,7 +1402,7 @@ impl AgentBridge {
     pub async fn wrap_agent_as_tool(
         &self,
         agent_name: &str,
-        wrapper_config: serde_json::Value,
+        config: ToolWrapperConfig,
     ) -> Result<String> {
         use llmspell_agents::agent_wrapped_tool::AgentWrappedTool;
         use llmspell_core::traits::tool::{SecurityLevel, ToolCategory};
@@ -1329,20 +1416,17 @@ impl AgentBridge {
                 source: None,
             })?;
 
-        // Create a unique tool name
-        let tool_name = wrapper_config
-            .get("tool_name")
-            .and_then(|v| v.as_str())
-            .unwrap_or(&format!("{agent_name}_tool"))
-            .to_string();
+        // Use configured values or defaults
+        let tool_name = if config.tool_name.is_empty() {
+            format!("{agent_name}_tool")
+        } else {
+            config.tool_name
+        };
+        let category = config.category.unwrap_or(ToolCategory::Utility);
+        let security_level = config.security_level.unwrap_or(SecurityLevel::Restricted);
 
         // Create the agent-wrapped tool
-
-        let wrapped_tool = AgentWrappedTool::new(
-            agent.clone(),
-            ToolCategory::Utility,
-            SecurityLevel::Restricted,
-        );
+        let wrapped_tool = AgentWrappedTool::new(agent.clone(), category, security_level);
 
         // Register the wrapped tool
         self.registry
@@ -2200,10 +2284,11 @@ mod tests {
         let tool_name = bridge
             .wrap_agent_as_tool(
                 "agent1",
-                serde_json::json!({
-                    "tool_name": "agent1_tool",
-                    "description": "Agent 1 wrapped as tool"
-                }),
+                ToolWrapperConfig {
+                    tool_name: "agent1_tool".to_string(),
+                    category: None,
+                    security_level: None,
+                },
             )
             .await
             .unwrap();

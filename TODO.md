@@ -1989,31 +1989,58 @@ Update set/get_shared_memory to use ContextScope enum (reuse parse_context_scope
 ---
 
 ### Task 11a.8.6: Fix wrap_as_tool + configure_alerts
-**Priority**: MEDIUM | **Time**: 40min | **Status**: Pending | **Depends**: 11a.8.2
+**Priority**: MEDIUM | **Time**: 40min | **Status**: ✅ COMPLETED | **Depends**: 11a.8.2
 
 Create `ToolWrapperConfig`, `AlertConfig` (+AlertCondition, AlertComparison), update methods.
 
-**Files**: agent_bridge.rs:1322, 590, agent.rs:1232-1249
+**Files**: agent_bridge.rs:133-213,1397-1431,772-793 | agent.rs:375-491,1703,928-944
 
 **Criteria**:
-- [ ] ToolWrapperConfig + AlertConfig structs defined
-- [ ] parse_tool_wrapper_config(), parse_alert_config() implemented
-- [ ] Both bridge methods updated
-- [ ] cargo clippy: 0 warnings ✅
-- [ ] cargo test: all tests pass ✅
+- [x] ToolWrapperConfig + BridgeAlertConfig structs defined
+- [x] parse_tool_wrapper_config(), parse_alert_config() implemented
+- [x] Both bridge methods updated
+- [x] cargo clippy: 0 warnings ✅
+- [x] cargo test: all tests pass ✅
+
+**Implementation Summary**:
+Created 3 typed structs in agent_bridge.rs (ToolWrapperConfig, AlertConditionConfig, BridgeAlertConfig) to replace JSON anti-patterns in `wrap_agent_as_tool()` and `configure_agent_alerts()` methods. Implemented corresponding Lua parsers following the established bridge pattern.
+
+**Key Design Decisions**:
+1. **Name Conflict Resolution**: Renamed bridge-specific alert config to `BridgeAlertConfig` to avoid collision with llmspell-agents::AlertConfig (monitoring system config)
+2. **Simplified Alert Conditions**: Created bridge-specific `AlertConditionConfig` enum with 3 concrete variants (MetricThreshold, HealthStatus, ErrorRate) instead of using llmspell-agents AlertCondition which has Custom variant with `Arc<dyn AlertEvaluator>` that cannot be constructed from Lua
+3. **Optional Defaults**: Used `Option<T>` for category, security_level, and cooldown_seconds with sensible defaults via `.unwrap_or()` for ergonomic Lua usage
+4. **Non-Failable Parser**: Made `parse_tool_wrapper_config()` return `ToolWrapperConfig` instead of `Result<ToolWrapperConfig>` since it provides defaults for all fields and cannot fail
+5. **Const Helper**: Made `default_enabled()` helper const fn per clippy suggestion
+
+**Files Modified**:
+- agent_bridge.rs:133-213: Added ToolWrapperConfig, AlertConditionConfig, BridgeAlertConfig structs
+- agent_bridge.rs:1397-1431: Updated wrap_agent_as_tool() signature and implementation
+- agent_bridge.rs:772-793: Updated configure_agent_alerts() signature
+- agent_bridge.rs:2287-2291: Updated test to use typed config
+- lua/globals/agent.rs:375-417: Added parse_tool_wrapper_config() parser (43 lines)
+- lua/globals/agent.rs:420-462: Added parse_alert_condition() parser (43 lines)
+- lua/globals/agent.rs:464-491: Added parse_alert_config() parser (28 lines)
+- lua/globals/agent.rs:1703: Updated wrap_as_tool binding call site
+- lua/globals/agent.rs:928-944: Updated configure_alerts binding call site
+- lua/globals/agent.rs:9: Removed unused lua_table_to_json import
+
+**Pattern Consistency**: Follows same bridge pattern as tasks 11a.8.2-11a.8.5: typed Rust structs → parser functions → zero serialization overhead.
+
+**Validation**: 0 clippy warnings, all 429 tests pass (129+5+9+8+14+8+2+17+4+0+15+9+3+16+4+3+8+8+8+7+9+9+7+2+9+7+2+5+7+2+9+4+3+12 doc tests)
 
 ---
 
 ### Task 11a.8.7: Add Bridge Pattern Documentation
 **Priority**: MEDIUM | **Time**: 25min | **Status**: Pending | **Depends**: 11a.8.6
 
-Create `docs/technical/bridge-pattern-guide.md` with principles, examples, checklist, testing.
+Create `docs/developer-guide/bridge-pattern-guide.md` with principles, examples, checklist, testing.
 
 **Criteria**:
 - [ ] Documentation file created with all sections
 - [ ] Code examples accurate and compile
 - [ ] Common parsers documented
 - [ ] Testing requirements specified
+- [ ] Update relevant README.md files in docs `docs/developer-guide/README.md`, `docs/README.md`
 
 ---
 

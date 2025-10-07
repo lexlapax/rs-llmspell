@@ -6,8 +6,7 @@
 use crate::agent_bridge::AgentBridge;
 use crate::globals::GlobalContext;
 use crate::lua::conversion::{
-    agent_output_to_lua_table, json_to_lua_value, lua_table_to_agent_input, lua_table_to_json,
-    lua_value_to_json,
+    agent_output_to_lua_table, json_to_lua_value, lua_table_to_agent_input, lua_value_to_json,
 };
 use crate::lua::sync_utils::block_on_async;
 use llmspell_agents::{AgentConfig, ModelConfig, ResourceLimits};
@@ -370,6 +369,124 @@ fn parse_routing_config(value: &Value) -> mlua::Result<crate::agent_bridge::Rout
             message: Some("Expected string or table for routing config".to_string()),
         }),
     }
+}
+
+/// Parse `ToolWrapperConfig` from a Lua table
+///
+/// Supports both minimal and full configuration:
+/// - Minimal: { `tool_name` = `"my_tool"` }
+/// - Full: { `tool_name` = `"my_tool"`, category = "api", `security_level` = "restricted" }
+fn parse_tool_wrapper_config(table: &Table) -> crate::agent_bridge::ToolWrapperConfig {
+    use crate::agent_bridge::ToolWrapperConfig;
+    use llmspell_core::traits::tool::{SecurityLevel, ToolCategory};
+
+    let tool_name: String = table.get("tool_name").unwrap_or_else(|_| String::new());
+
+    // Parse category (optional)
+    let category = table
+        .get::<_, Option<String>>("category")
+        .unwrap_or(None)
+        .map(|cat_str| match cat_str.as_str() {
+            "filesystem" => ToolCategory::Filesystem,
+            "web" => ToolCategory::Web,
+            "api" => ToolCategory::Api,
+            "analysis" => ToolCategory::Analysis,
+            "data" => ToolCategory::Data,
+            "system" => ToolCategory::System,
+            "media" => ToolCategory::Media,
+            "utility" => ToolCategory::Utility,
+            custom => ToolCategory::Custom(custom.to_string()),
+        });
+
+    // Parse security_level (optional)
+    let security_level = table
+        .get::<_, Option<String>>("security_level")
+        .unwrap_or(None)
+        .and_then(|level_str| match level_str.as_str() {
+            "safe" => Some(SecurityLevel::Safe),
+            "restricted" => Some(SecurityLevel::Restricted),
+            "privileged" => Some(SecurityLevel::Privileged),
+            _ => None,
+        });
+
+    ToolWrapperConfig {
+        tool_name,
+        category,
+        security_level,
+    }
+}
+
+/// Parse `AlertConditionConfig` from a Lua table
+fn parse_alert_condition(table: &Table) -> mlua::Result<crate::agent_bridge::AlertConditionConfig> {
+    use crate::agent_bridge::AlertConditionConfig;
+
+    let condition_type: String = table.get("type")?;
+
+    match condition_type.as_str() {
+        "metric_threshold" => {
+            let metric_name: String = table.get("metric_name")?;
+            let operator: String = table.get("operator")?;
+            let threshold: f64 = table.get("threshold")?;
+            let duration_seconds: u64 = table.get("duration_seconds").unwrap_or(60);
+
+            Ok(AlertConditionConfig::MetricThreshold {
+                metric_name,
+                operator,
+                threshold,
+                duration_seconds,
+            })
+        }
+        "health_status" => {
+            let status: String = table.get("status")?;
+            let duration_seconds: u64 = table.get("duration_seconds").unwrap_or(60);
+
+            Ok(AlertConditionConfig::HealthStatus {
+                status,
+                duration_seconds,
+            })
+        }
+        "error_rate" => {
+            let rate_percent: f64 = table.get("rate_percent")?;
+            let duration_seconds: u64 = table.get("duration_seconds").unwrap_or(60);
+
+            Ok(AlertConditionConfig::ErrorRate {
+                rate_percent,
+                duration_seconds,
+            })
+        }
+        _ => Err(mlua::Error::RuntimeError(format!(
+            "Unknown alert condition type: {condition_type}"
+        ))),
+    }
+}
+
+/// Parse `AlertConfig` from a Lua table
+///
+/// Expected fields:
+/// - name: string (required)
+/// - severity: string (optional, defaults to "warning")
+/// - condition: table with type field (required)
+/// - `cooldown_seconds`: number (optional)
+/// - enabled: boolean (optional, defaults to true)
+fn parse_alert_config(table: &Table) -> mlua::Result<crate::agent_bridge::BridgeAlertConfig> {
+    use crate::agent_bridge::BridgeAlertConfig;
+
+    let name: String = table.get("name")?;
+    let severity: String = table.get("severity").unwrap_or_else(|_| "warning".to_string());
+
+    let condition_table: Table = table.get("condition")?;
+    let condition = parse_alert_condition(&condition_table)?;
+
+    let cooldown_seconds: Option<u64> = table.get("cooldown_seconds").ok();
+    let enabled: bool = table.get("enabled").unwrap_or(true);
+
+    Ok(BridgeAlertConfig {
+        name,
+        severity,
+        condition,
+        cooldown_seconds,
+        enabled,
+    })
 }
 
 /// Lua userdata representing an agent instance
@@ -808,8 +925,8 @@ impl UserData for LuaAgentInstance {
 
         // configure_alerts method - synchronous wrapper
         methods.add_method("configure_alerts", |_lua, this, config_table: Table| {
-            // Convert Lua table to JSON for alert configuration
-            let config_json = lua_table_to_json(config_table)?;
+            // Parse Lua table to typed alert config
+            let config_typed = parse_alert_config(&config_table)?;
             let bridge = this.bridge.clone();
             let agent_name = this.agent_instance_name.clone();
 
@@ -817,7 +934,7 @@ impl UserData for LuaAgentInstance {
                 "agent_configureAlerts",
                 async move {
                     bridge
-                        .configure_agent_alerts(&agent_name, config_json)
+                        .configure_agent_alerts(&agent_name, config_typed)
                         .await
                 },
                 None,
@@ -1582,14 +1699,13 @@ pub fn inject_agent_global(
         let (agent_name, config) = args;
         let bridge = bridge_clone.clone();
 
-        // Convert Lua table to JSON
-        let config_value = lua_table_to_json(config)
-            .map_err(|e| mlua::Error::RuntimeError(format!("Failed to convert config: {e}")))?;
+        // Parse Lua table to typed config
+        let config_typed = parse_tool_wrapper_config(&config);
 
         // Use sync wrapper to call async method
         let tool_name = block_on_async(
             "agent_wrapAsTool",
-            bridge.wrap_agent_as_tool(&agent_name, config_value),
+            bridge.wrap_agent_as_tool(&agent_name, config_typed),
             None,
         )
         .map_err(|e| mlua::Error::RuntimeError(format!("Failed to wrap agent as tool: {e}")))?;
