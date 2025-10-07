@@ -165,6 +165,68 @@ fn parse_agent_config(table: &Table) -> mlua::Result<AgentConfig> {
     })
 }
 
+/// Parse `RoutingConfig` from a Lua table or simple string
+///
+/// Supports both simple string format and full config table:
+/// - Simple: "sequential", "parallel", "vote"
+/// - Full: { strategy = "sequential", `fallback_agent` = "default", `timeout_ms` = 5000 }
+fn parse_routing_config(value: &Value) -> mlua::Result<crate::agent_bridge::RoutingConfig> {
+    use crate::agent_bridge::{RoutingConfig, RoutingStrategy};
+
+    match value {
+        // Simple string format - just strategy name
+        Value::String(s) => {
+            let strategy_str = s.to_str()?;
+            let strategy = match strategy_str {
+                "sequential" => RoutingStrategy::Sequential,
+                "parallel" => RoutingStrategy::Parallel,
+                "vote" => RoutingStrategy::Vote { threshold: None },
+                custom => RoutingStrategy::Custom {
+                    name: custom.to_string(),
+                },
+            };
+            Ok(RoutingConfig {
+                strategy,
+                fallback_agent: None,
+                timeout_ms: None,
+            })
+        }
+        // Full config table
+        Value::Table(table) => {
+            // Parse strategy (required)
+            let strategy = table.get::<_, String>("strategy").map_or(
+                RoutingStrategy::Sequential,
+                |strategy_str| match strategy_str.as_str() {
+                    "sequential" => RoutingStrategy::Sequential,
+                    "parallel" => RoutingStrategy::Parallel,
+                    "vote" => {
+                        let threshold: Option<usize> = table.get("threshold").ok();
+                        RoutingStrategy::Vote { threshold }
+                    }
+                    custom => RoutingStrategy::Custom {
+                        name: custom.to_string(),
+                    },
+                },
+            );
+
+            // Parse optional fields
+            let fallback_agent: Option<String> = table.get("fallback_agent").ok();
+            let timeout_ms: Option<u64> = table.get("timeout_ms").ok();
+
+            Ok(RoutingConfig {
+                strategy,
+                fallback_agent,
+                timeout_ms,
+            })
+        }
+        _ => Err(mlua::Error::FromLuaConversionError {
+            from: value.type_name(),
+            to: "RoutingConfig",
+            message: Some("Expected string or table for routing config".to_string()),
+        }),
+    }
+}
+
 /// Lua userdata representing an agent instance
 struct LuaAgentInstance {
     agent_instance_name: String,
@@ -1438,8 +1500,8 @@ pub fn inject_agent_global(
 
     // Create Agent.create_composite() function
     let bridge_clone = bridge.clone();
-    let create_composite_fn = lua.create_function(move |_lua, args: (String, Table, Table)| {
-        let (name, agent_list, config) = args;
+    let create_composite_fn = lua.create_function(move |_lua, args: (String, Table, Value)| {
+        let (name, agent_list, routing_value) = args;
         let bridge = bridge_clone.clone();
 
         // Convert agents table to Vec<String>
@@ -1449,14 +1511,14 @@ pub fn inject_agent_global(
             agents.push(agent_name);
         }
 
-        // Convert config to JSON
-        let config_json = lua_table_to_json(config)
-            .map_err(|e| mlua::Error::RuntimeError(format!("Failed to convert config: {e}")))?;
+        // Parse routing config using typed parser
+        let routing_config = parse_routing_config(&routing_value)
+            .map_err(|e| mlua::Error::RuntimeError(format!("Failed to parse routing config: {e}")))?;
 
         // Use sync wrapper to call async method
         block_on_async(
             "agent_create_composite",
-            bridge.create_composite_agent(name, agents, config_json),
+            bridge.create_composite_agent(name, agents, routing_config),
             None,
         )
         .map_err(|e| mlua::Error::RuntimeError(format!("Failed to create composite: {e}")))?;

@@ -18,11 +18,53 @@ use llmspell_core::execution_context::{
 use llmspell_core::types::{AgentInput, AgentOutput, ComponentId};
 use llmspell_core::{Agent, ExecutionContext, LLMSpellError, Result, Tool};
 use llmspell_kernel::state::{StateManager, StateScope};
+use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::sync::Arc;
 use std::time::Duration;
 use tokio::sync::mpsc;
 use tracing::{debug, info, warn};
+
+/// Routing strategy for composite agents
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "lowercase")]
+pub enum RoutingStrategy {
+    /// Execute delegate agents sequentially
+    Sequential,
+    /// Execute delegate agents in parallel
+    Parallel,
+    /// Execute with voting/consensus mechanism
+    Vote {
+        /// Minimum votes required for consensus (defaults to majority)
+        #[serde(skip_serializing_if = "Option::is_none")]
+        threshold: Option<usize>,
+    },
+    /// Custom routing strategy
+    Custom {
+        /// Name of the custom strategy
+        name: String,
+    },
+}
+
+impl Default for RoutingStrategy {
+    fn default() -> Self {
+        Self::Sequential
+    }
+}
+
+/// Configuration for composite agent routing
+#[derive(Debug, Clone, Serialize, Deserialize, Default)]
+pub struct RoutingConfig {
+    /// The routing strategy to use
+    #[serde(default)]
+    pub strategy: RoutingStrategy,
+    /// Optional fallback agent if routing fails
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub fallback_agent: Option<String>,
+    /// Optional timeout in milliseconds
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub timeout_ms: Option<u64>,
+}
 
 /// Bridge between scripts and agents
 pub struct AgentBridge {
@@ -1457,7 +1499,7 @@ impl AgentBridge {
         &self,
         composite_name: String,
         delegate_agents: Vec<String>,
-        routing_config: serde_json::Value,
+        routing_config: RoutingConfig,
     ) -> Result<()> {
         // Verify all delegate agents exist
         let agents = self.active_agents.read().await;
@@ -1482,7 +1524,10 @@ impl AgentBridge {
             )),
         );
         custom_config.insert("delegates".to_string(), serde_json::json!(delegate_agents));
-        custom_config.insert("routing".to_string(), routing_config);
+        custom_config.insert(
+            "routing".to_string(),
+            serde_json::to_value(&routing_config).unwrap_or_else(|_| serde_json::json!({})),
+        );
         custom_config.insert("composite".to_string(), serde_json::json!(true));
 
         let composite_agent_config = AgentConfig {
@@ -2405,9 +2450,13 @@ mod tests {
             .create_composite_agent(
                 "composite1".to_string(),
                 vec!["agent1".to_string(), "agent2".to_string()],
-                serde_json::json!({
-                    "routing_strategy": "round_robin"
-                }),
+                RoutingConfig {
+                    strategy: RoutingStrategy::Custom {
+                        name: "round_robin".to_string(),
+                    },
+                    fallback_agent: None,
+                    timeout_ms: None,
+                },
             )
             .await
             .unwrap();
