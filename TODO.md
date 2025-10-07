@@ -2688,7 +2688,445 @@ This represents **~6 months of development** not reflected in Rust API docs, vs 
 Rust API docs required **10x more fixes** than Lua API docs, despite Phase 11a.8 being primarily about Rust-level bridge patterns. This suggests documentation updates were consistently deferred during Phase 10 and 11 development cycles.
 
 ---
-**Additional clean up todos**
+
+## Phase 11a.9: Tool Naming Standardization
+
+**Status**: 🚧 IN PROGRESS | **Priority**: MEDIUM | **Est. Effort**: ~5.5 hours
+
+**Problem**: Tool naming inconsistency across 38 tools
+- 34% use snake_case (`image_processor`, `file_watcher`)
+- 66% use kebab-case (`image-processor`, `file-watcher`)
+- 9 tools have inconsistent `-tool` suffix (`csv-analyzer-tool` vs `csv-analyzer`)
+- Causes user confusion, violates principle of least surprise
+
+**Solution**: Standardize all tools to clean kebab-case format without `-tool` suffix, with backward-compatible aliases
+
+**Scope**:
+- 13 snake_case tools → kebab-case
+- 9 tools with `-tool` suffix → remove suffix
+- ~40 examples to update
+- Documentation updates (user + developer guides)
+
+---
+
+### Task 11a.9.1: Add Tool Name Aliasing Infrastructure ✅
+**Priority**: HIGH | **Time**: 30min | **Status**: ✅ COMPLETE | **Depends**: None
+
+Add support for multiple names per tool in ToolRegistry for backward compatibility during migration.
+
+**Implementation**:
+1. ✅ Add `aliases: Vec<String>` field to `ToolInfo` struct in registry.rs
+2. ✅ Add `AliasIndex` (HashMap<String, String>) to ToolRegistry struct
+3. ✅ Add `register_with_aliases(name: String, aliases: Vec<String>, tool: T)` method
+4. ✅ Update `register()` to delegate to `register_with_aliases()` with empty vec
+5. ✅ Add `resolve_tool_name()` helper to map aliases → primary names
+6. ✅ Update `get_tool()`, `get_tool_info()`, `contains_tool()` to support aliases
+7. ✅ Update `unregister_tool()` to remove aliases from alias_index
+8. ✅ Add comprehensive validation: conflict detection, duplicate prevention
+
+**Files Modified**:
+- llmspell-tools/src/registry.rs: +130 lines (aliasing infrastructure + tests)
+
+**Testing**:
+- ✅ `test_tool_alias_resolution()` - verifies alias lookup returns same tool
+- ✅ `test_tool_registration_with_aliases()` - validates registration flow
+- ✅ `test_alias_conflict_detection()` - 6 conflict scenarios tested
+- ✅ `test_unregister_removes_aliases()` - ensures cleanup on unregister
+- ✅ All 16 registry tests pass (12 existing + 4 new)
+
+**Criteria**:
+- [✅] `ToolInfo` struct has `aliases: Vec<String>` field
+- [✅] `register_with_aliases()` method implemented with validation
+- [✅] `get_tool()`, `get_tool_info()`, `contains_tool()` check aliases
+- [✅] 4 new unit tests added and passing
+- [✅] All existing tests pass: `cargo test -p llmspell-tools registry::`
+- [✅] Zero clippy warnings in registry.rs
+- [✅] Proper lock management (early drop to avoid contention)
+
+**Insights**:
+- **Architecture**: Dual-index design (primary HashMap + alias HashMap) enables O(1) lookups with minimal memory overhead
+- **Validation**: 6-layer validation prevents conflicts (primary/primary, alias/primary, alias/alias, self-reference, duplicates, re-registration)
+- **Efficiency**: Explicit lock drops reduce lock contention in hot path (registration validation)
+- **Backward Compatibility**: Existing code works unchanged - aliases defaulted to empty vec in all existing ToolInfo initializations
+- **Code Quality**: Eliminated duplication by making `register()` delegate to `register_with_aliases()`
+- **Foundation Ready**: Subsequent tasks (11a.9.2-11a.9.8) can now rename 22 tools with zero breaking changes
+
+---
+
+### Task 11a.9.2: Media Tools Standardization
+**Priority**: MEDIUM | **Time**: 15min | **Status**: ⏳ PENDING | **Depends**: 11a.9.1
+
+Rename 3 media processing tools from snake_case to kebab-case.
+
+**Changes**:
+1. `image_processor` → `image-processor` (alias: `image_processor`)
+2. `video_processor` → `video-processor` (alias: `video_processor`)
+3. `audio_processor` → `audio-processor` (alias: `audio_processor`)
+
+**Files to Modify**:
+- llmspell-tools/src/media/image_processor.rs:181
+- llmspell-tools/src/media/video_processor.rs:186
+- llmspell-tools/src/media/audio_processor.rs:143
+
+**Implementation Pattern** (repeat for each tool):
+```rust
+// OLD:
+metadata: ComponentMetadata::new(
+    "image_processor".to_string(),
+    "Image file processing...".to_string(),
+)
+
+// NEW:
+metadata: ComponentMetadata::new(
+    "image-processor".to_string(),
+    "Image file processing...".to_string(),
+)
+
+// When registering (wherever that happens):
+registry.register_with_aliases(
+    "image-processor".to_string(),
+    vec!["image_processor".to_string()],
+    Arc::new(Box::new(tool))
+)?;
+```
+
+**Testing**:
+- Verify tools can be invoked by new name
+- Verify tools can be invoked by old name (alias)
+- Check tool discovery/listing shows new name
+
+**Criteria**:
+- [  ] 3 `ComponentMetadata::new()` calls updated to kebab-case
+- [  ] 3 tools registered with snake_case aliases
+- [  ] Tool lookup works for both old and new names
+- [  ] All tests pass: `cargo test -p llmspell-tools`
+- [  ] Zero clippy warnings
+
+**Insights**: Pattern established for remaining tool categories. Aliases ensure existing user scripts continue working.
+
+---
+
+### Task 11a.9.3: Filesystem Tools Standardization
+**Priority**: MEDIUM | **Time**: 20min | **Status**: ⏳ PENDING | **Depends**: 11a.9.2
+
+Rename 3 filesystem tools from snake_case to kebab-case + remove `-tool` suffix from 3 tools.
+
+**Changes**:
+1. `file_watcher` → `file-watcher` (alias: `file_watcher`)
+2. `file_converter` → `file-converter` (alias: `file_converter`)
+3. `file_search` → `file-search` (alias: `file_search`)
+4. `file-operations-tool` → `file-operations` (alias: `file-operations-tool`)
+5. `archive-handler-tool` → `archive-handler` (alias: `archive-handler-tool`)
+6. Note: Verify if there's a 6th filesystem tool
+
+**Files to Modify**:
+- llmspell-tools/src/fs/file_watcher.rs:73
+- llmspell-tools/src/fs/file_converter.rs:69
+- llmspell-tools/src/fs/file_search.rs:118
+- llmspell-tools/src/fs/file_operations.rs:143
+- llmspell-tools/src/fs/archive_handler.rs:111
+
+**Criteria**:
+- [  ] 5+ `ComponentMetadata::new()` calls updated
+- [  ] Tools registered with old names as aliases
+- [  ] All tests pass: `cargo test -p llmspell-tools`
+- [  ] Zero clippy warnings
+
+---
+
+### Task 11a.9.4: Communication Tools Standardization
+**Priority**: MEDIUM | **Time**: 10min | **Status**: ⏳ PENDING | **Depends**: 11a.9.3
+
+Rename 2 communication tools from snake_case to kebab-case.
+
+**Changes**:
+1. `email_sender` → `email-sender` (alias: `email_sender`)
+2. `database_connector` → `database-connector` (alias: `database_connector`)
+
+**Files to Modify**:
+- llmspell-tools/src/communication/email_sender.rs:182
+- llmspell-tools/src/communication/database_connector.rs:205
+
+**Criteria**:
+- [  ] 2 `ComponentMetadata::new()` calls updated
+- [  ] Tools registered with aliases
+- [  ] All tests pass
+- [  ] Zero clippy warnings
+
+---
+
+### Task 11a.9.5: System Tools Standardization
+**Priority**: MEDIUM | **Time**: 15min | **Status**: ⏳ PENDING | **Depends**: 11a.9.4
+
+Rename 4 system tools from snake_case to kebab-case.
+
+**Changes**:
+1. `process_executor` → `process-executor` (alias: `process_executor`)
+2. `system_monitor` → `system-monitor` (alias: `system_monitor`)
+3. `environment_reader` → `environment-reader` (alias: `environment_reader`)
+4. `service_checker` → `service-checker` (alias: `service_checker`)
+
+**Files to Modify**:
+- llmspell-tools/src/system/process_executor.rs:194
+- llmspell-tools/src/system/system_monitor.rs:150
+- llmspell-tools/src/system/environment_reader.rs:175
+- llmspell-tools/src/system/service_checker.rs:125
+
+**Criteria**:
+- [  ] 4 `ComponentMetadata::new()` calls updated
+- [  ] Tools registered with aliases
+- [  ] All tests pass
+- [  ] Zero clippy warnings
+
+---
+
+### Task 11a.9.6: Data & Document Tools Standardization
+**Priority**: MEDIUM | **Time**: 15min | **Status**: ⏳ PENDING | **Depends**: 11a.9.5
+
+Remove `-tool` suffix from 2 data tools.
+
+**Changes**:
+1. `csv-analyzer-tool` → `csv-analyzer` (alias: `csv-analyzer-tool`)
+2. `json-processor-tool` → `json-processor` (alias: `json-processor-tool`)
+3. `pdf-processor` - VERIFY (already correct?)
+4. `graph-builder` - ALREADY CORRECT (no change needed)
+
+**Files to Modify**:
+- llmspell-tools/src/data/csv_analyzer.rs:305
+- llmspell-tools/src/data/json_processor.rs:107
+- llmspell-tools/src/document/pdf_processor.rs:58 (verify if needs change)
+
+**Criteria**:
+- [  ] 2-3 `ComponentMetadata::new()` calls updated
+- [  ] Tools registered with old `-tool` names as aliases
+- [  ] All tests pass
+- [  ] Zero clippy warnings
+
+---
+
+### Task 11a.9.7: Web & API Tools Standardization
+**Priority**: MEDIUM | **Time**: 15min | **Status**: ⏳ PENDING | **Depends**: 11a.9.6
+
+Remove `-tool` suffix from 3 web/API tools.
+
+**Changes**:
+1. `http-request-tool` → `http-request` (alias: `http-request-tool`)
+2. `graphql-query-tool` → `graphql-query` (alias: `graphql-query-tool`)
+3. `web-search-tool` → `web-search` (alias: `web-search-tool`)
+4. `api-tester`, `webhook-caller`, `web-scraper`, `sitemap-crawler`, `url-analyzer`, `webpage-monitor` - ALREADY CORRECT (verify no changes needed)
+
+**Files to Modify**:
+- llmspell-tools/src/api/http_request.rs:249
+- llmspell-tools/src/api/graphql_query.rs:195
+- llmspell-tools/src/search/web_search.rs:287
+
+**Criteria**:
+- [  ] 3 `ComponentMetadata::new()` calls updated
+- [  ] Tools registered with `-tool` aliases
+- [  ] All tests pass
+- [  ] Zero clippy warnings
+
+---
+
+### Task 11a.9.8: Utility Tools Standardization
+**Priority**: MEDIUM | **Time**: 10min | **Status**: ⏳ PENDING | **Depends**: 11a.9.7
+
+Remove `-tool` suffix from 2 utility tools.
+
+**Changes**:
+1. `data-validation-tool` → `data-validation` (alias: `data-validation-tool`)
+2. `template-engine-tool` → `template-engine` (alias: `template-engine-tool`)
+3. `datetime-handler`, `text-manipulator`, `uuid-generator`, `hash-calculator`, `base64-encoder`, `diff-calculator`, `calculator` - ALREADY CORRECT (verify no changes needed)
+
+**Files to Modify**:
+- llmspell-tools/src/util/data_validation.rs:197
+- llmspell-tools/src/util/template_engine.rs:161
+
+**Criteria**:
+- [  ] 2 `ComponentMetadata::new()` calls updated
+- [  ] Tools registered with `-tool` aliases
+- [  ] All tests pass: `cargo test -p llmspell-tools`
+- [  ] Zero clippy warnings
+
+**Insights**: All llmspell-tools crate changes complete. Tool naming now consistent across all 38 tools.
+
+---
+
+### Task 11a.9.9: Update Examples - Getting Started
+**Priority**: MEDIUM | **Time**: 30min | **Status**: ⏳ PENDING | **Depends**: 11a.9.8
+
+Update getting-started examples to use new tool names (primary migration, not aliases).
+
+**Files to Update** (estimated 5-10 files):
+- examples/script-users/getting-started/01-first-tool.lua
+- examples/script-users/getting-started/03-first-workflow.lua (if uses renamed tools)
+- examples/script-users/getting-started/04-handle-errors.lua (if uses renamed tools)
+- Any other getting-started examples using renamed tools
+
+**Changes**:
+- Replace `Tool.invoke("file_operations", ...)` → `Tool.invoke("file-operations", ...)`
+- Replace `Tool.invoke("template_engine", ...)` → `Tool.invoke("template-engine", ...)`
+- Update inline comments referencing old tool names
+- Update any README.md files with tool name examples
+
+**Testing**:
+- Run each updated example: `./target/debug/llmspell run examples/script-users/getting-started/*.lua`
+- Verify successful execution
+- Verify output is correct
+
+**Criteria**:
+- [  ] All getting-started examples updated to new names
+- [  ] All updated examples execute successfully
+- [  ] Zero runtime errors
+- [  ] Comments and documentation in examples updated
+
+---
+
+### Task 11a.9.10: Update Examples - Applications & Cookbook
+**Priority**: MEDIUM | **Time**: 1 hour | **Status**: ⏳ PENDING | **Depends**: 11a.9.9
+
+Update applications, cookbook, and advanced examples to use new tool names.
+
+**Files to Update** (estimated 30-40 files):
+- examples/script-users/applications/**/main.lua
+- examples/script-users/cookbook/*.lua
+- examples/script-users/advanced-patterns/*.lua
+- Any README.md files in these directories
+
+**Strategy**:
+- Use `rg 'Tool\.invoke\("(file_operations|image_processor|...)' examples/` to find all uses
+- Update tool names to kebab-case systematically
+- Test a representative sample (10+ examples)
+
+**Testing**:
+- Run sample of complex examples (webapp-creator, communication-manager, etc.)
+- Verify successful execution
+- Verify output correctness
+
+**Criteria**:
+- [  ] All application examples updated
+- [  ] All cookbook examples updated
+- [  ] Sample of 10+ examples tested and working
+- [  ] Zero runtime errors in tested examples
+
+---
+
+### Task 11a.9.11: Update Documentation - User Guide
+**Priority**: MEDIUM | **Time**: 30min | **Status**: ⏳ PENDING | **Depends**: 11a.9.10
+
+Update user-facing documentation with new tool names.
+
+**Files to Update**:
+- docs/user-guide/api/lua/README.md (main Lua API reference)
+- docs/user-guide/getting-started/*.md
+- docs/user-guide/README.md (if contains tool examples)
+- Any tool listings or reference tables
+
+**Changes**:
+- Update all tool name references to kebab-case
+- Update code examples showing `Tool.invoke()` calls
+- Update any tool name tables or lists
+- Add note about old names supported via aliases (optional)
+
+**Criteria**:
+- [  ] All tool names in user guide updated
+- [  ] Code examples use new names
+- [  ] No broken references
+- [  ] Documentation renders correctly
+
+---
+
+### Task 11a.9.12: Update Documentation - Developer Guide
+**Priority**: MEDIUM | **Time**: 20min | **Status**: ⏳ PENDING | **Depends**: 11a.9.11
+
+Update developer-facing documentation with new tool names and naming convention.
+
+**Files to Update**:
+- docs/developer-guide/extending-llmspell.md (Part 1: Tool Development section)
+- docs/developer-guide/examples-reference.md (if contains tool examples)
+- docs/developer-guide/README.md (if references specific tools)
+- docs/CONTRIBUTING.md (add naming convention)
+
+**Changes**:
+- Update tool examples to use kebab-case names
+- Add section on tool naming convention:
+  - Format: `<primary-function>-<object>` (e.g., `file-operations`, `image-processor`)
+  - Always use kebab-case (hyphens)
+  - No `-tool` suffix (redundant)
+  - Single-word tools acceptable (`calculator`)
+- Update any code snippets showing tool registration
+
+**Criteria**:
+- [  ] Developer guide examples updated
+- [  ] Naming convention documented in CONTRIBUTING.md
+- [  ] All code snippets use new names
+- [  ] Documentation accurate and consistent
+
+---
+
+### Task 11a.9.13: Final Validation & Summary
+**Priority**: HIGH | **Time**: 30min | **Status**: ⏳ PENDING | **Depends**: 11a.9.12
+
+Comprehensive validation and documentation of Phase 11a.9 completion.
+
+**Validation Steps**:
+1. Run full test suite: `cargo test --workspace --all-features`
+2. Run clippy: `cargo clippy --workspace --all-targets --all-features -- -D warnings`
+3. Test sample of examples (10+ across different categories)
+4. Verify tool discovery shows new names: `./target/debug/llmspell tool list`
+5. Verify old names still work via aliases (test 5+ examples with old names)
+6. Build release binary: `cargo build --release --features full`
+
+**Documentation**:
+- Count final statistics (tools renamed, examples updated, files changed)
+- Update Phase 11a.9 summary section with metrics
+- Document backward compatibility strategy (aliases)
+- Note any deprecated names and timeline for alias removal (if applicable)
+
+**Criteria**:
+- [  ] All tests pass: `cargo test --workspace --all-features` (0 failures)
+- [  ] Zero clippy warnings: `cargo clippy ... -- -D warnings`
+- [  ] 10+ examples tested and working
+- [  ] Tool list shows new names
+- [  ] Old names work via aliases (5+ verified)
+- [  ] Release build succeeds
+- [  ] Phase 11a.9 summary completed with statistics
+
+**Final Statistics to Document**:
+- Total tools standardized: 22 (13 snake_case → kebab-case, 9 `-tool` suffix removed)
+- Files modified in llmspell-tools: ~20
+- Examples updated: ~40
+- Documentation files updated: ~10
+- Backward compatibility: 100% via aliases
+- Test results: X tests pass, 0 failures, 0 warnings
+- Build time: ~X minutes (full build)
+
+**Insights**: Tool naming now consistent across entire codebase. Users can seamlessly migrate to new names while old names continue to work via aliases. Establishes clear naming convention for future tool development.
+
+---
+
+## Phase 11a.9 Summary - Tool Naming Standardization
+
+**Status**: ⏳ IN PROGRESS | **Effort**: TBD | **Files**: TBD | **Tools Renamed**: 22 of 38
+
+**Actual Metrics** (to be updated in 11a.9.13):
+- **Tasks Completed**: 0 of 13
+- **Tools Standardized**: 0 of 22
+- **Snake_case → Kebab-case**: 0 of 13
+- **Suffix Removals**: 0 of 9
+- **Examples Updated**: 0 of ~40
+- **Documentation Updated**: 0 of ~10
+- **Test Results**: TBD
+- **Backward Compatibility**: Via aliases
+
+**Impact**: TBD
+
+**Risk**: LOW (aliases ensure zero breaking changes)
+
+**Testing**: TBD
+
+---
+**Additional clean up todos (Phase 11a.10+)**
 
 **END OF PHASE 11a TODO** ✅
 

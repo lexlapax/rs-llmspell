@@ -58,9 +58,7 @@ fn parse_resource_limits(table: &Table) -> ResourceLimits {
 
     if let Some(Value::Table(limits_table)) = limits_value {
         ResourceLimits {
-            max_execution_time_secs: limits_table
-                .get("max_execution_time_secs")
-                .unwrap_or(300),
+            max_execution_time_secs: limits_table.get("max_execution_time_secs").unwrap_or(300),
             max_memory_mb: limits_table.get("max_memory_mb").unwrap_or(512),
             max_tool_calls: limits_table.get("max_tool_calls").unwrap_or(100),
             max_recursion_depth: limits_table.get("max_recursion_depth").unwrap_or(10),
@@ -169,7 +167,9 @@ fn parse_agent_config(table: &Table) -> mlua::Result<AgentConfig> {
 /// Supports both simple string format and full table:
 /// - Simple: "global"
 /// - Full: { type = "session", id = "`sess_123`" }
-fn parse_context_scope(value: &Value) -> mlua::Result<llmspell_core::execution_context::ContextScope> {
+fn parse_context_scope(
+    value: &Value,
+) -> mlua::Result<llmspell_core::execution_context::ContextScope> {
     use llmspell_core::execution_context::ContextScope;
     use llmspell_core::types::ComponentId;
 
@@ -233,7 +233,9 @@ fn parse_inheritance_policy(value: &str) -> llmspell_core::execution_context::In
 }
 
 /// Parse `ExecutionContextConfig` from a Lua table
-fn parse_execution_context_config(table: &Table) -> mlua::Result<crate::agent_bridge::ExecutionContextConfig> {
+fn parse_execution_context_config(
+    table: &Table,
+) -> mlua::Result<crate::agent_bridge::ExecutionContextConfig> {
     use crate::agent_bridge::{ExecutionContextConfig, SecurityContextConfig};
 
     // Parse optional string fields
@@ -242,51 +244,55 @@ fn parse_execution_context_config(table: &Table) -> mlua::Result<crate::agent_br
     let session_id: Option<String> = table.get("session_id").ok();
 
     // Parse scope
-    let scope = table.get::<_, Value>("scope").ok()
+    let scope = table
+        .get::<_, Value>("scope")
+        .ok()
         .map(|v| parse_context_scope(&v))
         .transpose()?;
 
     // Parse inheritance
-    let inheritance = table.get::<_, String>("inheritance").ok()
+    let inheritance = table
+        .get::<_, String>("inheritance")
+        .ok()
         .map(|s| parse_inheritance_policy(&s));
 
     // Parse data map
-    let data = table.get::<_, Value>("data").ok()
-        .and_then(|v| {
-            if let Value::Table(data_table) = v {
-                match lua_value_to_json(Value::Table(data_table)) {
-                    Ok(serde_json::Value::Object(map)) => Some(map.into_iter().collect()),
-                    _ => None,
-                }
-            } else {
-                None
+    let data = table.get::<_, Value>("data").ok().and_then(|v| {
+        if let Value::Table(data_table) = v {
+            match lua_value_to_json(Value::Table(data_table)) {
+                Ok(serde_json::Value::Object(map)) => Some(map.into_iter().collect()),
+                _ => None,
             }
-        });
+        } else {
+            None
+        }
+    });
 
     // Parse security
-    let security = table.get::<_, Value>("security").ok()
-        .and_then(|v| {
-            if let Value::Table(sec_table) = v {
-                let permissions_val: Option<Value> = sec_table.get("permissions").ok();
-                let permissions = if let Some(Value::Table(perms_table)) = permissions_val {
-                    let mut perms = Vec::new();
-                    for i in 1..=perms_table.raw_len() {
-                        if let Ok(perm) = perms_table.get::<_, String>(i) {
-                            perms.push(perm);
-                        }
+    let security = table.get::<_, Value>("security").ok().and_then(|v| {
+        if let Value::Table(sec_table) = v {
+            let permissions_val: Option<Value> = sec_table.get("permissions").ok();
+            let permissions = if let Some(Value::Table(perms_table)) = permissions_val {
+                let mut perms = Vec::new();
+                for i in 1..=perms_table.raw_len() {
+                    if let Ok(perm) = perms_table.get::<_, String>(i) {
+                        perms.push(perm);
                     }
-                    perms
-                } else {
-                    Vec::new()
-                };
-
-                let level: String = sec_table.get("level").unwrap_or_else(|_| "default".to_string());
-
-                Some(SecurityContextConfig { permissions, level })
+                }
+                perms
             } else {
-                None
-            }
-        });
+                Vec::new()
+            };
+
+            let level: String = sec_table
+                .get("level")
+                .unwrap_or_else(|_| "default".to_string());
+
+            Some(SecurityContextConfig { permissions, level })
+        } else {
+            None
+        }
+    });
 
     Ok(ExecutionContextConfig {
         conversation_id,
@@ -300,7 +306,10 @@ fn parse_execution_context_config(table: &Table) -> mlua::Result<crate::agent_br
 }
 
 /// Parse `ChildContextConfig` from scope and inheritance values
-fn parse_child_context_config(scope_value: &Value, inheritance_str: &str) -> mlua::Result<crate::agent_bridge::ChildContextConfig> {
+fn parse_child_context_config(
+    scope_value: &Value,
+    inheritance_str: &str,
+) -> mlua::Result<crate::agent_bridge::ChildContextConfig> {
     use crate::agent_bridge::ChildContextConfig;
 
     let scope = parse_context_scope(scope_value)?;
@@ -472,7 +481,9 @@ fn parse_alert_config(table: &Table) -> mlua::Result<crate::agent_bridge::Bridge
     use crate::agent_bridge::BridgeAlertConfig;
 
     let name: String = table.get("name")?;
-    let severity: String = table.get("severity").unwrap_or_else(|_| "warning".to_string());
+    let severity: String = table
+        .get("severity")
+        .unwrap_or_else(|_| "warning".to_string());
 
     let condition_table: Table = table.get("condition")?;
     let condition = parse_alert_condition(&condition_table)?;
@@ -1773,8 +1784,9 @@ pub fn inject_agent_global(
         }
 
         // Parse routing config using typed parser
-        let routing_config = parse_routing_config(&routing_value)
-            .map_err(|e| mlua::Error::RuntimeError(format!("Failed to parse routing config: {e}")))?;
+        let routing_config = parse_routing_config(&routing_value).map_err(|e| {
+            mlua::Error::RuntimeError(format!("Failed to parse routing config: {e}"))
+        })?;
 
         // Use sync wrapper to call async method
         block_on_async(
@@ -1821,12 +1833,8 @@ pub fn inject_agent_global(
         let name = agent_config.name.clone();
 
         // Use sync wrapper to call async method with typed config
-        block_on_async(
-            "agent_register",
-            bridge.create_agent(agent_config),
-            None,
-        )
-        .map_err(|e| mlua::Error::RuntimeError(format!("Failed to register agent: {e}")))?;
+        block_on_async("agent_register", bridge.create_agent(agent_config), None)
+            .map_err(|e| mlua::Error::RuntimeError(format!("Failed to register agent: {e}")))?;
 
         // Return the agent name
         Ok(name)
@@ -1928,8 +1936,9 @@ pub fn inject_agent_global(
         let bridge = bridge_clone.clone();
 
         // Parse typed config
-        let context_config = parse_execution_context_config(&config)
-            .map_err(|e| mlua::Error::RuntimeError(format!("Failed to parse context config: {e}")))?;
+        let context_config = parse_execution_context_config(&config).map_err(|e| {
+            mlua::Error::RuntimeError(format!("Failed to parse context config: {e}"))
+        })?;
 
         let context_id = block_on_async(
             "agent_createContext",
@@ -1949,8 +1958,10 @@ pub fn inject_agent_global(
             let bridge = bridge_clone.clone();
 
             // Parse typed config
-            let child_config = parse_child_context_config(&scope_value, &inheritance)
-                .map_err(|e| mlua::Error::RuntimeError(format!("Failed to parse child context config: {e}")))?;
+            let child_config =
+                parse_child_context_config(&scope_value, &inheritance).map_err(|e| {
+                    mlua::Error::RuntimeError(format!("Failed to parse child context config: {e}"))
+                })?;
 
             let child_id = block_on_async(
                 "agent_createChildContext",

@@ -1,5 +1,4 @@
 - allow security flags and configs to be set as environment variables or flags.. -e.g allow write to this directory.
-- all tool functions should be consistent for two word functions either like-this or like_this, but not both.
 - security sandbox - add network access, add process execution access 
 - workflow output collection should be rust code.. are there other things that should be rust code based on webapp-creator?
 - agent, workflow, tool - BaseAgent, should probably have a save output, save output stream function at the rust level.

@@ -123,7 +123,6 @@ impl UserData for LuaReplaySchedule {
     }
 }
 
-
 /// Inject replay global into Lua environment
 ///
 /// # Errors

@@ -15,9 +15,9 @@ use llmspell_agents::{AgentConfig, AgentFactory};
 use llmspell_core::execution_context::{
     ContextScope, ExecutionContextBuilder, InheritancePolicy, SecurityContext, SharedMemory,
 };
-use llmspell_core::types::{AgentInput, AgentOutput};
 #[cfg(test)]
 use llmspell_core::types::ComponentId;
+use llmspell_core::types::{AgentInput, AgentOutput};
 use llmspell_core::{Agent, ExecutionContext, LLMSpellError, Result, Tool};
 use llmspell_kernel::state::{StateManager, StateScope};
 use serde::{Deserialize, Serialize};
@@ -1274,22 +1274,13 @@ impl AgentBridge {
     }
 
     /// Set shared memory data
-    pub fn set_shared_memory(
-        &self,
-        scope: &ContextScope,
-        key: String,
-        value: serde_json::Value,
-    ) {
+    pub fn set_shared_memory(&self, scope: &ContextScope, key: String, value: serde_json::Value) {
         self.shared_memory.set(scope.clone(), key, value);
     }
 
     /// Get shared memory data
     #[must_use]
-    pub fn get_shared_memory(
-        &self,
-        scope: &ContextScope,
-        key: &str,
-    ) -> Option<serde_json::Value> {
+    pub fn get_shared_memory(&self, scope: &ContextScope, key: &str) -> Option<serde_json::Value> {
         self.shared_memory.get(scope, key)
     }
 
@@ -1573,7 +1564,10 @@ impl AgentBridge {
 
         let composite_agent_config = AgentConfig {
             name: composite_name.clone(),
-            description: format!("Composite agent coordinating: {}", delegate_agents.join(", ")),
+            description: format!(
+                "Composite agent coordinating: {}",
+                delegate_agents.join(", ")
+            ),
             agent_type: "basic".to_string(),
             model: None,
             allowed_tools: Vec::new(),
@@ -1992,7 +1986,9 @@ mod tests {
         let bridge = AgentBridge::new(registry, provider_manager);
 
         // Create agent instance
-        let result = bridge.create_agent(create_test_agent_config("test-instance")).await;
+        let result = bridge
+            .create_agent(create_test_agent_config("test-instance"))
+            .await;
         assert!(result.is_ok());
 
         // List instances

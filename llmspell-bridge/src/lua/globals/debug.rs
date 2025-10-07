@@ -462,7 +462,6 @@ pub fn inject_debug_global(
     Ok(())
 }
 
-
 /// Convert JSON to Lua value
 fn json_to_lua_value<'lua>(lua: &'lua Lua, value: &serde_json::Value) -> mlua::Result<Value<'lua>> {
     match value {
