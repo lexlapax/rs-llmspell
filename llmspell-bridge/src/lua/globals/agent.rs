@@ -165,6 +165,151 @@ fn parse_agent_config(table: &Table) -> mlua::Result<AgentConfig> {
     })
 }
 
+/// Parse `ContextScope` from a Lua value (string or table)
+///
+/// Supports both simple string format and full table:
+/// - Simple: "global"
+/// - Full: { type = "session", id = "`sess_123`" }
+fn parse_context_scope(value: &Value) -> mlua::Result<llmspell_core::execution_context::ContextScope> {
+    use llmspell_core::execution_context::ContextScope;
+    use llmspell_core::types::ComponentId;
+
+    match value {
+        Value::String(s) => {
+            let scope_str = s.to_str()?;
+            match scope_str {
+                "global" => Ok(ContextScope::Global),
+                _ => Err(mlua::Error::FromLuaConversionError {
+                    from: "string",
+                    to: "ContextScope",
+                    message: Some(format!("Invalid simple scope: {scope_str}. Use table for session/workflow/agent/user scopes")),
+                }),
+            }
+        }
+        Value::Table(table) => {
+            let scope_type: String = table.get("type")?;
+            match scope_type.as_str() {
+                "global" => Ok(ContextScope::Global),
+                "session" => {
+                    let id: String = table.get("id")?;
+                    Ok(ContextScope::Session(id))
+                }
+                "workflow" => {
+                    let id: String = table.get("id")?;
+                    Ok(ContextScope::Workflow(id))
+                }
+                "agent" => {
+                    let id: String = table.get("id")?;
+                    Ok(ContextScope::Agent(ComponentId::from_name(&id)))
+                }
+                "user" => {
+                    let id: String = table.get("id")?;
+                    Ok(ContextScope::User(id))
+                }
+                _ => Err(mlua::Error::FromLuaConversionError {
+                    from: "table",
+                    to: "ContextScope",
+                    message: Some(format!("Invalid scope type: {scope_type}")),
+                }),
+            }
+        }
+        _ => Err(mlua::Error::FromLuaConversionError {
+            from: value.type_name(),
+            to: "ContextScope",
+            message: Some("Expected string or table for scope".to_string()),
+        }),
+    }
+}
+
+/// Parse `InheritancePolicy` from a string
+fn parse_inheritance_policy(value: &str) -> llmspell_core::execution_context::InheritancePolicy {
+    use llmspell_core::execution_context::InheritancePolicy;
+
+    match value {
+        "isolate" => InheritancePolicy::Isolate,
+        "copy" => InheritancePolicy::Copy,
+        "share" => InheritancePolicy::Share,
+        _ => InheritancePolicy::Inherit,
+    }
+}
+
+/// Parse `ExecutionContextConfig` from a Lua table
+fn parse_execution_context_config(table: &Table) -> mlua::Result<crate::agent_bridge::ExecutionContextConfig> {
+    use crate::agent_bridge::{ExecutionContextConfig, SecurityContextConfig};
+
+    // Parse optional string fields
+    let conversation_id: Option<String> = table.get("conversation_id").ok();
+    let user_id: Option<String> = table.get("user_id").ok();
+    let session_id: Option<String> = table.get("session_id").ok();
+
+    // Parse scope
+    let scope = table.get::<_, Value>("scope").ok()
+        .map(|v| parse_context_scope(&v))
+        .transpose()?;
+
+    // Parse inheritance
+    let inheritance = table.get::<_, String>("inheritance").ok()
+        .map(|s| parse_inheritance_policy(&s));
+
+    // Parse data map
+    let data = table.get::<_, Value>("data").ok()
+        .and_then(|v| {
+            if let Value::Table(data_table) = v {
+                match lua_value_to_json(Value::Table(data_table)) {
+                    Ok(serde_json::Value::Object(map)) => Some(map.into_iter().collect()),
+                    _ => None,
+                }
+            } else {
+                None
+            }
+        });
+
+    // Parse security
+    let security = table.get::<_, Value>("security").ok()
+        .and_then(|v| {
+            if let Value::Table(sec_table) = v {
+                let permissions_val: Option<Value> = sec_table.get("permissions").ok();
+                let permissions = if let Some(Value::Table(perms_table)) = permissions_val {
+                    let mut perms = Vec::new();
+                    for i in 1..=perms_table.raw_len() {
+                        if let Ok(perm) = perms_table.get::<_, String>(i) {
+                            perms.push(perm);
+                        }
+                    }
+                    perms
+                } else {
+                    Vec::new()
+                };
+
+                let level: String = sec_table.get("level").unwrap_or_else(|_| "default".to_string());
+
+                Some(SecurityContextConfig { permissions, level })
+            } else {
+                None
+            }
+        });
+
+    Ok(ExecutionContextConfig {
+        conversation_id,
+        user_id,
+        session_id,
+        scope,
+        inheritance,
+        data,
+        security,
+    })
+}
+
+/// Parse `ChildContextConfig` from scope and inheritance values
+fn parse_child_context_config(scope_value: &Value, inheritance_str: &str) -> mlua::Result<crate::agent_bridge::ChildContextConfig> {
+    use crate::agent_bridge::ChildContextConfig;
+
+    let scope = parse_context_scope(scope_value)?;
+    let inheritance = parse_inheritance_policy(inheritance_str);
+
+    Ok(ChildContextConfig { scope, inheritance })
+}
+
 /// Parse `RoutingConfig` from a Lua table or simple string
 ///
 /// Supports both simple string format and full config table:
@@ -1665,12 +1810,14 @@ pub fn inject_agent_global(
     let bridge_clone = bridge.clone();
     let create_context_fn = lua.create_function(move |_lua, config: Table| {
         let bridge = bridge_clone.clone();
-        let config_json = lua_table_to_json(config)
-            .map_err(|e| mlua::Error::RuntimeError(format!("Failed to convert config: {e}")))?;
+
+        // Parse typed config
+        let context_config = parse_execution_context_config(&config)
+            .map_err(|e| mlua::Error::RuntimeError(format!("Failed to parse context config: {e}")))?;
 
         let context_id = block_on_async(
             "agent_createContext",
-            bridge.create_context(config_json),
+            bridge.create_context(context_config),
             None,
         )
         .map_err(|e| mlua::Error::RuntimeError(format!("Failed to create context: {e}")))?;
@@ -1681,15 +1828,17 @@ pub fn inject_agent_global(
     // Create Agent.create_child_context() function
     let bridge_clone = bridge.clone();
     let create_child_context_fn =
-        lua.create_function(move |_lua, args: (String, Table, String)| {
-            let (parent_id, scope, inheritance) = args;
+        lua.create_function(move |_lua, args: (String, Value, String)| {
+            let (parent_id, scope_value, inheritance) = args;
             let bridge = bridge_clone.clone();
-            let scope_json = lua_table_to_json(scope)
-                .map_err(|e| mlua::Error::RuntimeError(format!("Failed to convert scope: {e}")))?;
+
+            // Parse typed config
+            let child_config = parse_child_context_config(&scope_value, &inheritance)
+                .map_err(|e| mlua::Error::RuntimeError(format!("Failed to parse child context config: {e}")))?;
 
             let child_id = block_on_async(
                 "agent_createChildContext",
-                bridge.create_child_context(&parent_id, scope_json, &inheritance),
+                bridge.create_child_context(&parent_id, child_config),
                 None,
             )
             .map_err(|e| {

@@ -66,6 +66,68 @@ pub struct RoutingConfig {
     pub timeout_ms: Option<u64>,
 }
 
+/// Security context configuration
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct SecurityContextConfig {
+    /// List of permissions
+    pub permissions: Vec<String>,
+    /// Security level
+    pub level: String,
+}
+
+impl Default for SecurityContextConfig {
+    fn default() -> Self {
+        Self {
+            permissions: Vec::new(),
+            level: "default".to_string(),
+        }
+    }
+}
+
+/// Configuration for creating an execution context
+#[derive(Debug, Clone, Serialize, Deserialize, Default)]
+pub struct ExecutionContextConfig {
+    /// Conversation identifier
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub conversation_id: Option<String>,
+    /// User identifier
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub user_id: Option<String>,
+    /// Session identifier
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub session_id: Option<String>,
+    /// Context scope
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub scope: Option<ContextScope>,
+    /// Inheritance policy
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub inheritance: Option<InheritancePolicy>,
+    /// Initial data
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub data: Option<HashMap<String, serde_json::Value>>,
+    /// Security context
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub security: Option<SecurityContextConfig>,
+}
+
+/// Configuration for creating a child context
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ChildContextConfig {
+    /// Scope for the child context
+    pub scope: ContextScope,
+    /// Inheritance policy
+    pub inheritance: InheritancePolicy,
+}
+
+impl Default for ChildContextConfig {
+    fn default() -> Self {
+        Self {
+            scope: ContextScope::Global,
+            inheritance: InheritancePolicy::Inherit,
+        }
+    }
+}
+
 /// Bridge between scripts and agents
 pub struct AgentBridge {
     /// Agent discovery service
@@ -995,67 +1057,35 @@ impl AgentBridge {
     /// # Errors
     ///
     /// Returns an error if context creation fails
-    pub async fn create_context(&self, builder_config: serde_json::Value) -> Result<String> {
+    pub async fn create_context(&self, config: ExecutionContextConfig) -> Result<String> {
         let mut builder = ExecutionContextBuilder::new();
 
-        // Apply builder configuration
-        if let Some(conversation_id) = builder_config
-            .get("conversation_id")
-            .and_then(|v| v.as_str())
-        {
-            builder = builder.conversation_id(conversation_id.to_string());
+        // Apply configuration
+        if let Some(conversation_id) = config.conversation_id {
+            builder = builder.conversation_id(conversation_id);
         }
-        if let Some(user_id) = builder_config.get("user_id").and_then(|v| v.as_str()) {
-            builder = builder.user_id(user_id.to_string());
+        if let Some(user_id) = config.user_id {
+            builder = builder.user_id(user_id);
         }
-        if let Some(session_id) = builder_config.get("session_id").and_then(|v| v.as_str()) {
-            builder = builder.session_id(session_id.to_string());
+        if let Some(session_id) = config.session_id {
+            builder = builder.session_id(session_id);
         }
-
-        // Handle scope configuration
-        if let Some(scope_config) = builder_config.get("scope") {
-            let scope = Self::parse_context_scope(scope_config)?;
+        if let Some(scope) = config.scope {
             builder = builder.scope(scope);
         }
-
-        // Handle inheritance
-        if let Some(inheritance) = builder_config.get("inheritance").and_then(|v| v.as_str()) {
-            let policy = match inheritance {
-                "isolate" => InheritancePolicy::Isolate,
-                "copy" => InheritancePolicy::Copy,
-                "share" => InheritancePolicy::Share,
-                _ => InheritancePolicy::Inherit,
-            };
-            builder = builder.inheritance(policy);
+        if let Some(inheritance) = config.inheritance {
+            builder = builder.inheritance(inheritance);
         }
-
-        // Handle data fields
-        if let Some(data) = builder_config.get("data").and_then(|v| v.as_object()) {
+        if let Some(data) = config.data {
             for (key, value) in data {
-                builder = builder.data(key.clone(), value.clone());
+                builder = builder.data(key, value);
             }
         }
-
-        // Handle security context
-        if let Some(security_config) = builder_config.get("security") {
-            if let Some(permissions) = security_config
-                .get("permissions")
-                .and_then(|v| v.as_array())
-            {
-                let perms: Vec<String> = permissions
-                    .iter()
-                    .filter_map(|p| p.as_str().map(String::from))
-                    .collect();
-                let level = security_config
-                    .get("level")
-                    .and_then(|v| v.as_str())
-                    .unwrap_or("default")
-                    .to_string();
-                builder = builder.security(SecurityContext {
-                    permissions: perms,
-                    level,
-                });
-            }
+        if let Some(security) = config.security {
+            builder = builder.security(SecurityContext {
+                permissions: security.permissions,
+                level: security.level,
+            });
         }
 
         let context = Arc::new(builder.build());
@@ -1082,12 +1112,10 @@ impl AgentBridge {
     ///
     /// Returns an error if:
     /// - Parent context is not found
-    /// - Context scope parsing fails
     pub async fn create_child_context(
         &self,
         parent_id: &str,
-        scope: serde_json::Value,
-        inheritance: &str,
+        config: ChildContextConfig,
     ) -> Result<String> {
         let parent = self
             .get_context(parent_id)
@@ -1097,15 +1125,7 @@ impl AgentBridge {
                 source: None,
             })?;
 
-        let scope = Self::parse_context_scope(&scope)?;
-        let policy = match inheritance {
-            "isolate" => InheritancePolicy::Isolate,
-            "copy" => InheritancePolicy::Copy,
-            "share" => InheritancePolicy::Share,
-            _ => InheritancePolicy::Inherit,
-        };
-
-        let child = Arc::new(parent.create_child(scope, policy));
+        let child = Arc::new(parent.create_child(config.scope, config.inheritance));
         let child_id = child.id.clone();
 
         // Store child context
@@ -2168,24 +2188,23 @@ mod tests {
         let bridge = AgentBridge::new(registry, provider_manager);
 
         // Test context creation
-        let config = serde_json::json!({
-            "conversation_id": "conv-123",
-            "user_id": "user-456",
-            "session_id": "session-789",
-            "scope": {
-                "type": "session",
-                "id": "session-789"
-            },
-            "inheritance": "inherit",
-            "data": {
-                "theme": "dark",
-                "language": "en"
-            },
-            "security": {
-                "permissions": ["read", "write"],
-                "level": "standard"
-            }
-        });
+        let config = ExecutionContextConfig {
+            conversation_id: Some("conv-123".to_string()),
+            user_id: Some("user-456".to_string()),
+            session_id: Some("session-789".to_string()),
+            scope: Some(ContextScope::Session("session-789".to_string())),
+            inheritance: Some(InheritancePolicy::Inherit),
+            data: Some({
+                let mut map = HashMap::new();
+                map.insert("theme".to_string(), serde_json::json!("dark"));
+                map.insert("language".to_string(), serde_json::json!("en"));
+                map
+            }),
+            security: Some(SecurityContextConfig {
+                permissions: vec!["read".to_string(), "write".to_string()],
+                level: "standard".to_string(),
+            }),
+        };
 
         let context_id = bridge.create_context(config).await.unwrap();
         assert!(!context_id.is_empty());
@@ -2207,12 +2226,12 @@ mod tests {
             .unwrap();
 
         // Test child context creation
-        let child_scope = serde_json::json!({
-            "type": "agent",
-            "id": "child-agent"
-        });
+        let child_config = ChildContextConfig {
+            scope: ContextScope::Agent(ComponentId::from_name("child-agent")),
+            inheritance: InheritancePolicy::Copy,
+        };
         let child_id = bridge
-            .create_child_context(&context_id, child_scope, "copy")
+            .create_child_context(&context_id, child_config)
             .await
             .unwrap();
         assert!(!child_id.is_empty());
@@ -2279,13 +2298,16 @@ mod tests {
             .unwrap();
 
         // Create context
-        let context_config = serde_json::json!({
-            "conversation_id": "conv-test",
-            "data": {
-                "user_preference": "concise",
-                "context_type": "test"
-            }
-        });
+        let context_config = ExecutionContextConfig {
+            conversation_id: Some("conv-test".to_string()),
+            data: Some({
+                let mut map = HashMap::new();
+                map.insert("user_preference".to_string(), serde_json::json!("concise"));
+                map.insert("context_type".to_string(), serde_json::json!("test"));
+                map
+            }),
+            ..Default::default()
+        };
         let context_id = bridge.create_context(context_config).await.unwrap();
 
         // Execute with context
