@@ -91,7 +91,7 @@ impl JsonProcessorTool {
     #[must_use]
     pub fn new(config: JsonProcessorConfig) -> Self {
         info!(
-            tool_name = "json-processor-tool",
+            tool_name = "json-processor",
             supported_operations = 3, // query, validate, stream
             jq_engine = "jaq",
             max_input_size_mb = config.max_input_size / (1024 * 1024),
@@ -104,7 +104,7 @@ impl JsonProcessorTool {
         );
         Self {
             metadata: ComponentMetadata::new(
-                "json-processor-tool".to_string(),
+                "json-processor".to_string(),
                 "Process JSON with full jq syntax support using jaq engine".to_string(),
             ),
             config,
@@ -849,7 +849,7 @@ mod tests {
         let tool = JsonProcessorTool::new(config);
 
         // Just check that an ID exists
-        assert_eq!(tool.metadata().name, "json-processor-tool");
+        assert_eq!(tool.metadata().name, "json-processor");
     }
     #[tokio::test]
     async fn test_jq_query() {
@@ -895,7 +895,7 @@ mod tests {
 
         // Test hook metadata
         let metadata = tool.hook_metadata();
-        assert_eq!(metadata["tool_name"], "json-processor-tool");
+        assert_eq!(metadata["tool_name"], "json-processor");
         assert!(metadata["hook_points_supported"].is_array());
         assert_eq!(
             metadata["hook_points_supported"].as_array().unwrap().len(),

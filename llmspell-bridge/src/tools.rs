@@ -170,14 +170,27 @@ fn register_data_processing_tools(
     registry: &Arc<ComponentRegistry>,
     http_request_config: &llmspell_config::tools::HttpRequestConfig,
 ) -> Result<(), Box<dyn std::error::Error>> {
+    // CSV analyzer: register with kebab-case primary name
     #[cfg(feature = "csv-parquet")]
-    register_tool(registry, "csv_analyzer", || {
-        CsvAnalyzerTool::new(CsvAnalyzerConfig::default())
-    })?;
+    {
+        let csv_tool = Arc::new(CsvAnalyzerTool::new(CsvAnalyzerConfig::default()));
+        registry.register_tool("csv-analyzer".to_string(), csv_tool.clone())?;
+        // Register with snake_case alias for backward compatibility
+        registry.register_tool("csv_analyzer".to_string(), csv_tool.clone())?;
+        // Register with old -tool suffix alias for backward compatibility
+        registry.register_tool("csv-analyzer-tool".to_string(), csv_tool)?;
+    }
+
+    // JSON processor: register with kebab-case primary name
     #[cfg(feature = "json-query")]
-    register_tool(registry, "json_processor", || {
-        JsonProcessorTool::new(JsonProcessorConfig::default())
-    })?;
+    {
+        let json_tool = Arc::new(JsonProcessorTool::new(JsonProcessorConfig::default()));
+        registry.register_tool("json-processor".to_string(), json_tool.clone())?;
+        // Register with snake_case alias for backward compatibility
+        registry.register_tool("json_processor".to_string(), json_tool.clone())?;
+        // Register with old -tool suffix alias for backward compatibility
+        registry.register_tool("json-processor-tool".to_string(), json_tool)?;
+    }
     register_tool_result(registry, "graphql_query", || {
         GraphQLQueryTool::new(GraphQLConfig::default())
     })?;

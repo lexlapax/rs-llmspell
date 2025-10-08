@@ -302,7 +302,7 @@ impl CsvAnalyzerTool {
     pub fn new(config: CsvAnalyzerConfig) -> Self {
         Self {
             metadata: ComponentMetadata::new(
-                "csv-analyzer-tool".to_string(),
+                "csv-analyzer".to_string(),
                 "Analyze and process CSV files with streaming support".to_string(),
             ),
             config,
@@ -1601,7 +1601,7 @@ mod tests {
         let config = CsvAnalyzerConfig::default();
         let tool = CsvAnalyzerTool::new(config);
 
-        assert_eq!(tool.metadata().name, "csv-analyzer-tool");
+        assert_eq!(tool.metadata().name, "csv-analyzer");
     }
     #[tokio::test]
     async fn test_streaming_column_stats() {
