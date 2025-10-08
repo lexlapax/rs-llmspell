@@ -39,7 +39,7 @@ local response = agent:execute({
 
 ### Tool Invocation
 ```lua
-local result = Tool.invoke("text-manipulator", {
+local result = Tool.execute("text-manipulator", {
     operation = "uppercase",
     text = "hello world"
 })

@@ -104,13 +104,13 @@ for i, tool in ipairs(Tool.list()) do
 end
 
 -- File operations
-local result = Tool.invoke("file-operations", {
+local result = Tool.execute("file-operations", {
     operation = "read",
     path = "document.txt"
 })
 
 -- Web search
-local search = Tool.invoke("web-search", {
+local search = Tool.execute("web-search", {
     query = "LLMSpell Phase 8",
     provider = "duckduckgo"
 })
@@ -307,7 +307,7 @@ end
 local file_path = ARGS[1] or "input.txt"
 
 -- Read file with error handling
-local content = Tool.invoke("file-operations", {
+local content = Tool.execute("file-operations", {
     operation = "read",
     path = file_path
 })
@@ -327,7 +327,7 @@ if #providers > 0 then
         local response = agent_result.result:invoke("Summarize: " .. content.content)
         if response.success then
             -- Save summary
-            Tool.invoke("file-operations", {
+            Tool.execute("file-operations", {
                 operation = "write",
                 path = "summary.txt",
                 content = response.result.content

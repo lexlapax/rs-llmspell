@@ -304,11 +304,11 @@ for i, tool in ipairs(tools) do
 end
 ```
 
-#### Tool.invoke(name, params)
+#### Tool.execute(name, params)
 Invokes a tool by name with parameters.
 
 ```lua
-local result = Tool.invoke("calculator", {
+local result = Tool.execute("calculator", {
     operation = "add",
     a = 5,
     b = 3
@@ -2187,7 +2187,7 @@ Streaming.yield(computed_value)
 Most operations return nil or false on failure:
 
 ```lua
-local result = Tool.invoke("calculator", {operation = "divide", a = 10, b = 0})
+local result = Tool.execute("calculator", {operation = "divide", a = 10, b = 0})
 if not result then
     print("Operation failed")
 elseif result.error then

@@ -3668,7 +3668,7 @@ The agent factory needs to create agents that actually use LLM providers for the
 **Started**: 2025-07-22
 **Completed**: 2025-07-23
 **Key Achievements**: 
-- Fixed critical parameter wrapping issue in Tool.invoke and Tool.get().execute() methods
+- Fixed critical parameter wrapping issue in Tool.execute and Tool.get().execute() methods
 - All 34+ tools now work correctly with proper async handling
 - Tool.executeAsync working correctly with proper JSON result parsing
 - Multiple tool examples verified working (tools-showcase.lua and others)
@@ -3690,14 +3690,14 @@ The agent factory needs to create agents that actually use LLM providers for the
    - [x] Multiple tool examples now working ✅
 
 **Phase 2 - Synchronous Wrapper Implementation** ✅ COMPLETE:
-10. [x] Convert Tool.invoke from create_async_function to create_function + block_on ✅
+10. [x] Convert Tool.execute from create_async_function to create_function + block_on ✅
 11. [x] Convert tool instance execute method to sync (in Tool.get) ✅  
 12. [x] Remove Tool.executeAsync helper (no longer needed) ✅
 13. [x] Update all tool examples to remove executeAsync usage: ✅
     - [x] tools-showcase.lua ✅
     - [x] tools-workflow.lua ✅
     - [x] All 12 tool-specific examples ✅
-14. [x] Test all tool examples work with direct API (Tool.invoke, tool:execute) ✅
+14. [x] Test all tool examples work with direct API (Tool.execute, tool:execute) ✅
 15. [x] Update tool integration tests for sync API ✅
 
 #### Sub-task 3.3.29.3: Workflow Consolidation and Synchronous API

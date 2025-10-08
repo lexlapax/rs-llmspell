@@ -210,7 +210,7 @@ All globals are pre-injected - no `require()` needed!
 | Global | Purpose | Example |
 |--------|---------|---------|
 | **Agent** | LLM interactions | `Agent.builder():model("openai/gpt-4"):build()` |
-| **Tool** | Execute tools (40+ available) | `Tool.invoke("web-search", {query = "..."})` |
+| **Tool** | Execute tools (40+ available) | `Tool.execute("web-search", {query = "..."})` |
 | **Workflow** | Orchestration | `Workflow.sequential({steps = {...}})` |
 | **State** | Data persistence | `State.set("key", value)` |
 | **Session** | Session management | `Session.create({name = "..."})` |

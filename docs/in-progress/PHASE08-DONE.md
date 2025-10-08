@@ -1500,8 +1500,8 @@ The RAG API implementation is inconsistent with the rest of the llmspell API pat
 - RAG.search expects `(query: String, options: Table)` 
 - RAG.ingest expects `(documents: Array<Table>, options: Table)`
 
-But tests and user expectations follow the pattern used by Tool.invoke and Agent:execute:
-- Tool.invoke takes `(name: String, params: Table)` where params contains ALL parameters
+But tests and user expectations follow the pattern used by Tool.execute and Agent:execute:
+- Tool.execute takes `(name: String, params: Table)` where params contains ALL parameters
 - Agent:execute takes `(params: Table)` with all parameters in one table
 
 **Root Cause Analysis**:
@@ -1517,7 +1517,7 @@ Fix RAG implementation to match consistent single-table parameter pattern used t
 - [x] RAG.ingest accepts single table: `{ content = "...", metadata = {...}, tenant_id = "..." }`
 - [x] RAG.search accepts single table: `{ query = "...", top_k = N, metadata_filter = {...} }`
 - [x] All integration tests pass (8/9 - persistence test fails due to mock storage)
-- [x] API is consistent with Tool.invoke and Agent:execute patterns
+- [x] API is consistent with Tool.execute and Agent:execute patterns
 - [x] Backward compatibility considered (explicitly broken with migration to single-table)
 
 **Implementation Steps:**
@@ -1674,7 +1674,7 @@ Refactor RAG bridge to match Agent/Tool bridge patterns:
   - Storage format: vectors.msgpack (binary) vs previous vectors.bin (bincode)
 - **Type Information Preservation**: Maintained `HashMap<String, serde_json::Value>` for metadata to support numbers, booleans, objects, arrays
 - **API Standardization**: Aligned RAG Lua API with Tool/Agent patterns for consistency
-  - `RAG.search(query, options)` - two-parameter pattern matching `Tool.invoke(name, params)`
+  - `RAG.search(query, options)` - two-parameter pattern matching `Tool.execute(name, params)`
   - `RAG.ingest(documents, options)` - separates data from configuration
   - Response format: `{success: true, total: N, results: [...]}` for proper error handling
   - Updated all E2E tests to use consistent two-parameter API

@@ -1,8 +1,8 @@
 # Architecture Decision Records (ADRs)
 
-**Version**: 0.8.0  
-**Last Updated**: December 2024  
-**Validation**: Cross-referenced with phase design documents (phase-01 through phase-08)
+**Version**: 0.11.0
+**Last Updated**: October 2025
+**Validation**: Cross-referenced with phase design documents (phase-01 through phase-11)
 
 > **📋 Decision Log**: Consolidated record of all significant architecture decisions made throughout LLMSpell development, showing how decisions evolved and sometimes reversed across phases.
 
@@ -18,8 +18,9 @@
 6. [Phase 6: Session Management Decisions](#phase-6-session-management-decisions)
 7. [Phase 7: API Standardization Decisions](#phase-7-api-standardization-decisions)
 8. [Phase 8: RAG System Decisions](#phase-8-rag-system-decisions)
-9. [Cross-Cutting Decisions](#cross-cutting-decisions)
-10. [Decision Evolution & Reversals](#decision-evolution--reversals)
+9. [Phase 11: API Refinement Decisions](#phase-11-api-refinement-decisions)
+10. [Cross-Cutting Decisions](#cross-cutting-decisions)
+11. [Decision Evolution & Reversals](#decision-evolution--reversals)
 
 ---
 
@@ -443,7 +444,7 @@ let agent = AgentBuilder::new()
 **Context**: Complex RAG operations need simple script interface  
 **Decision**: All RAG functions take (primary, options) pattern  
 **Example**: `RAG.search(query, {k=10, tenant_id="acme"})`  
-**Rationale**: Consistent with existing Tool.invoke pattern  
+**Rationale**: Consistent with existing Tool.execute pattern  
 **Consequences**:
 - ✅ Intuitive API for users
 - ✅ Consistent across all operations
@@ -505,6 +506,69 @@ ef_construction = 200
 - ✅ Automatic resource cleanup
 - ✅ Prevents data accumulation
 - ❌ Additional scope complexity
+
+---
+
+## Phase 11: API Refinement Decisions
+
+### ADR-042: Unified execute() Method Naming
+
+**Date**: October 2025 (Phase 11a.11)
+**Status**: Accepted
+**Context**: API method naming was inconsistent between Rust core traits and script language bindings
+**Problem**:
+- Rust `BaseAgent` trait: `execute()` only
+- Rust `Tool` trait: inherits `execute()` only
+- Rust `Workflow` trait: `execute()` only
+- Lua Tool binding: `invoke()` only (inconsistent)
+- Lua Agent binding: both `invoke()` and `execute()` (confusing)
+- Documentation: mixed references to both methods
+
+**Decision**: Standardize all component execution methods on `execute()` naming across all language bindings
+
+**Rationale**:
+1. **Consistency with Core**: Rust core traits universally use `execute()`
+2. **Semantic Clarity**: "Execute a component" is clearer than "invoke a component"
+3. **Future-Proof**: Ensures Python/JavaScript bindings follow same pattern
+4. **Cognitive Load**: Single method name reduces mental overhead
+5. **Documentation**: Easier to document and teach with uniform API
+
+**Implementation** (Phase 11a.11):
+- Lua: `Tool.invoke()` → `Tool.execute()`
+- Lua: Removed `agent:invoke()` (kept `agent:execute()` only)
+- Lua: Updated 20 example files (66 replacements total)
+- JavaScript: Updated stub comments to reference `execute()`
+- Documentation: 7 user guide files + 1 technical doc updated
+
+**Breaking Changes**:
+- `Tool.invoke(name, params)` → `Tool.execute(name, params)`
+- `agent:invoke(input)` removed (use `agent:execute(input)`)
+
+**Migration Path**:
+- No deprecation period (pre-1.0, breaking changes acceptable per project policy)
+- All examples updated atomically to prevent confusion
+
+**Performance Impact**: None (API rename only, implementation unchanged)
+
+**Consequences**:
+- ✅ Consistent API across all components (Tool, Agent, Workflow)
+- ✅ Matches Rust core trait naming conventions
+- ✅ Clearer mental model: "execute a component instance"
+- ✅ Future-proof for Python/JavaScript bindings (Phase 12+)
+- ✅ Reduced documentation burden (single method to document)
+- ✅ Easier for new users to learn
+- ❌ Breaking change for existing Lua scripts (acceptable pre-1.0)
+- ❌ Lost semantic distinction between registry-based vs instance-based calls (accepted trade-off)
+
+**Related ADRs**:
+- ADR-023: retrieve() → get() Standardization (similar API naming standardization in Phase 7)
+- ADR-001: BaseAgent as Universal Foundation (defines core execute() method)
+
+**Validation**:
+- 66 method call updates across 20 Lua example files
+- All workspace tests passing (1,832+ tests)
+- Zero clippy warnings
+- Examples validated across beginner/intermediate/advanced levels
 
 ---
 
@@ -646,4 +710,4 @@ ef_construction = 200
 
 ---
 
-*This document represents the consolidated architectural decisions from Phases 0-8 of LLMSpell development, validated against phase design documents.*
+*This document represents the consolidated architectural decisions from Phases 0-11 of LLMSpell development, validated against phase design documents.*

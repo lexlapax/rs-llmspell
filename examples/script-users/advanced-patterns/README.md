@@ -154,7 +154,7 @@ end
 **Solution**: Use template_engine for complex text operations:
 ```lua
 -- Instead of text_manipulator with "prepend"/"append"
-Tool.invoke("template_engine", {
+Tool.execute("template_engine", {
     input = "prefix {{content}} suffix",
     context = {content = "your text"}
 })

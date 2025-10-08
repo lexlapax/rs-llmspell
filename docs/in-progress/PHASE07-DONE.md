@@ -3556,7 +3556,7 @@ All code compiles cleanly with no warnings from cargo fmt or clippy.
      - [x] Agent.create() → Agent.builder() pattern (20+ files)
      - [x] agent:execute() → agent:invoke() (10+ files)
      - [x] JSON.parse() → direct tool result handling (8+ files)
-     - [x] tool.execute() → Tool.invoke() (5+ files)
+     - [x] tool.execute() → Tool.execute() (5+ files)
      - [x] Fixed workflow builder patterns (5+ files)
      
      **Deleted (40+ broken files with unfixable deprecated APIs)**:
@@ -4033,7 +4033,7 @@ The examples directory is now fully organized, tested, and ready for users with 
      - [x] ✅ Verified all 34+ tools properly registered and accessible via Tool.list()
    - [x] **Testing**:
      - [x] ✅ Fixed conditional-multi-branch.lua to use "webhook-caller" (hyphen) and correct parameter format
-     - [x] ✅ Verified webhook-caller tool works in script context: `Tool.invoke("webhook-caller", {...})`
+     - [x] ✅ Verified webhook-caller tool works in script context: `Tool.execute("webhook-caller", {...})`
    
 0.3. [x] **Phase 7 Appropriate Tool Implementation** (6 hours) - ✅ COMPLETED:
    **Research Complete**: Identified best Rust libraries for each tool
@@ -4070,7 +4070,7 @@ The examples directory is now fully organized, tested, and ready for users with 
      - [x] ✅ Update `llmspell-tools/src/lib.rs` re-exports
      - [x] ✅ Add comprehensive tests with proper test categorization
      - [x] ✅ Fix API mismatches for compilation (ResponseBuilder, SecurityRequirements, ResourceLimits field names)
-     - [x] ✅ Test tools in script context: `Tool.invoke("pdf-processor", {...})`
+     - [x] ✅ Test tools in script context: `Tool.execute("pdf-processor", {...})`
    
 0.4. [x] **Update Examples to Use Real Tools** (3 hours): ✅ COMPLETED
    - [x] **Code Review Assistant**: ✅ COMPLETED
@@ -4309,7 +4309,7 @@ The examples directory is now fully organized, tested, and ready for users with 
      - [x] Multi-format content generation (blog, social, email) all functioning ✅
    - [x] **WebhookCallerTool Integration**: ✅ COMPLETED
      - [x] Webhook publishing code fully implemented and working ✅
-     - [x] Uses Tool.invoke("webhook-caller", ...) for both publishing and analytics ✅
+     - [x] Uses Tool.execute("webhook-caller", ...) for both publishing and analytics ✅
      - [x] Graceful handling when webhook fails (httpbin.org demo endpoint) ✅
 
 4. [x] **Code Review Assistant** (6 hours) - ✅ COMPLETED:
@@ -5286,7 +5286,7 @@ After analyzing the codebase, we've chosen to make state a first-class citizen b
    - [x] Modify `llmspell-bridge/src/lua/globals/tool.rs`:
      - [x] Updated inject_tool_global to use GlobalContext parameter
      - [x] Updated Tool.get() execute method to create ExecutionContext with state
-     - [x] Updated Tool.invoke() to pass ExecutionContext with state
+     - [x] Updated Tool.execute() to pass ExecutionContext with state
      - [x] Updated __index metamethod execute to use state-enabled ExecutionContext
      - [x] All tools now have state access through ExecutionContext for data sharing
    
@@ -7568,7 +7568,7 @@ Make all file system tools REQUIRE sandbox context and remove ability to create 
         
         -- Write each file
         for filepath, content in pairs(file_mappings) do
-            Tool.invoke("file-writer", {
+            Tool.execute("file-writer", {
                 path = output_dir .. "/" .. filepath,
                 content = content,
                 operation = "write"
@@ -7597,7 +7597,7 @@ Make all file system tools REQUIRE sandbox context and remove ability to create 
             print(string.format("Attempt %d failed: %s", attempt, tostring(result)))
             
             if attempt < max_retries then
-                Tool.invoke("timer", { operation = "sleep", ms = delay })
+                Tool.execute("timer", { operation = "sleep", ms = delay })
                 delay = delay * 2 -- Exponential backoff
             else
                 -- Save partial results to state for recovery

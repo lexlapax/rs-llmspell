@@ -340,7 +340,7 @@ pub struct RAGPipeline {
 
 ```lua
 -- Lua API for document ingestion
-local chunks = Tool.invoke("document-chunker", {
+local chunks = Tool.execute("document-chunker", {
     strategy = "sliding_window",
     chunk_size = 512,
     overlap = 64,

@@ -4,7 +4,7 @@ The Tool module provides access to the extensive tool ecosystem for various oper
 
 ## Core Functions
 
-### Tool.invoke(name, params)
+### Tool.execute(name, params)
 Invokes a tool with the given parameters.
 
 **Parameters:**
@@ -19,7 +19,7 @@ Invokes a tool with the given parameters.
 
 **Example:**
 ```lua
-local result = Tool.invoke("text-manipulator", {
+local result = Tool.execute("text-manipulator", {
     operation = "uppercase",
     text = "hello world"
 })
@@ -68,7 +68,7 @@ Gets detailed information about a tool.
 ### Text Manipulation
 ```lua
 -- Text Manipulator
-Tool.invoke("text-manipulator", {
+Tool.execute("text-manipulator", {
     operation = "replace",
     text = "Hello World",
     pattern = "World",
@@ -76,13 +76,13 @@ Tool.invoke("text-manipulator", {
 })
 
 -- JSON Processor
-Tool.invoke("json-processor", {
+Tool.execute("json-processor", {
     operation = "parse",
     input = '{"key": "value"}'
 })
 
 -- XML Parser
-Tool.invoke("xml-parser", {
+Tool.execute("xml-parser", {
     operation = "parse",
     input = "<root><item>value</item></root>"
 })
@@ -91,20 +91,20 @@ Tool.invoke("xml-parser", {
 ### File System
 ```lua
 -- File Reader
-Tool.invoke("file-reader", {
+Tool.execute("file-reader", {
     operation = "read",
     path = "/path/to/file.txt"
 })
 
 -- File Writer
-Tool.invoke("file-writer", {
+Tool.execute("file-writer", {
     operation = "write",
     path = "/path/to/output.txt",
     content = "Hello, World!"
 })
 
 -- Directory Scanner
-Tool.invoke("directory-scanner", {
+Tool.execute("directory-scanner", {
     operation = "scan",
     path = "/path/to/directory",
     recursive = true
@@ -114,20 +114,20 @@ Tool.invoke("directory-scanner", {
 ### Web Tools
 ```lua
 -- Web Search
-Tool.invoke("web-search", {
+Tool.execute("web-search", {
     query = "LLMSpell documentation",
     provider = "duckduckgo",
     limit = 10
 })
 
 -- Web Scraper
-Tool.invoke("web-scraper", {
+Tool.execute("web-scraper", {
     url = "https://example.com",
     selector = "h1"
 })
 
 -- HTTP Request
-Tool.invoke("http-request", {
+Tool.execute("http-request", {
     method = "GET",
     url = "https://api.example.com/data",
     headers = {["Authorization"] = "Bearer token"}
@@ -137,19 +137,19 @@ Tool.invoke("http-request", {
 ### Utility Tools
 ```lua
 -- Calculator
-Tool.invoke("calculator", {
+Tool.execute("calculator", {
     expression = "2 + 2 * 3"
 })
 
 -- Hash Calculator
-Tool.invoke("hash-calculator", {
+Tool.execute("hash-calculator", {
     operation = "calculate",
     algorithm = "sha256",
     input = "data to hash"
 })
 
 -- DateTime Handler
-Tool.invoke("datetime-handler", {
+Tool.execute("datetime-handler", {
     operation = "format",
     format = "%Y-%m-%d %H:%M:%S"
 })
@@ -158,20 +158,20 @@ Tool.invoke("datetime-handler", {
 ### Data Tools
 ```lua
 -- CSV Processor
-Tool.invoke("csv-processor", {
+Tool.execute("csv-processor", {
     operation = "parse",
     input = "name,age\nJohn,30\nJane,25"
 })
 
 -- Database Connector
-Tool.invoke("database-connector", {
+Tool.execute("database-connector", {
     operation = "query",
     connection = "sqlite://data.db",
     query = "SELECT * FROM users"
 })
 
 -- Data Generator
-Tool.invoke("data-generator", {
+Tool.execute("data-generator", {
     type = "user",
     count = 10
 })
@@ -180,19 +180,19 @@ Tool.invoke("data-generator", {
 ### Media Tools
 ```lua
 -- Image Processor
-Tool.invoke("image-processor", {
+Tool.execute("image-processor", {
     operation = "info",
     input = "/path/to/image.jpg"
 })
 
 -- PDF Processor
-Tool.invoke("pdf-processor", {
+Tool.execute("pdf-processor", {
     operation = "extract_text",
     input = "/path/to/document.pdf"
 })
 
 -- Audio Analyzer
-Tool.invoke("audio-analyzer", {
+Tool.execute("audio-analyzer", {
     operation = "get_duration",
     input = "/path/to/audio.mp3"
 })
@@ -201,21 +201,21 @@ Tool.invoke("audio-analyzer", {
 ### Communication Tools
 ```lua
 -- Email Sender
-Tool.invoke("email-sender", {
+Tool.execute("email-sender", {
     to = "user@example.com",
     subject = "Test Email",
     body = "Hello from LLMSpell!"
 })
 
 -- Webhook Caller
-Tool.invoke("webhook-caller", {
+Tool.execute("webhook-caller", {
     url = "https://hooks.example.com/webhook",
     method = "POST",
     payload = {event = "test"}
 })
 
 -- API Tester
-Tool.invoke("api-tester", {
+Tool.execute("api-tester", {
     endpoint = "https://api.example.com/test",
     method = "GET"
 })
@@ -226,7 +226,7 @@ Tool.invoke("api-tester", {
 ### Tool.invoke_async(name, params)
 Invokes a tool asynchronously.
 
-**Parameters:** Same as `Tool.invoke()`
+**Parameters:** Same as `Tool.execute()`
 
 **Returns:** `Promise` - Promise that resolves to result
 
@@ -319,7 +319,7 @@ Runs tools in parallel and aggregates results.
 Tools return structured error information:
 
 ```lua
-local result = Tool.invoke("file-reader", {
+local result = Tool.execute("file-reader", {
     path = "/nonexistent/file.txt"
 })
 
