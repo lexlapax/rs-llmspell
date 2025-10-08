@@ -716,9 +716,17 @@ mod tests {
         let result = manager.create_agent_from_spec(spec, None, None).await;
         assert!(result.is_err());
 
-        if let Err(LLMSpellError::Configuration { message, .. }) = result {
-            assert!(message.contains("No provider specified"));
-        }
+        let Err(error) = result else {
+            panic!("Expected error, but create_agent_from_spec succeeded");
+        };
+        let LLMSpellError::Configuration { message, .. } = error else {
+            panic!("Expected Configuration error, got different error type: {:?}", error);
+        };
+        assert!(
+            message.contains("No provider specified"),
+            "Expected error message to contain 'No provider specified', got: {}",
+            message
+        );
     }
     #[tokio::test]
     async fn test_create_agent_from_spec_unknown_provider() {
@@ -731,9 +739,17 @@ mod tests {
         let result = manager.create_agent_from_spec(spec, None, None).await;
         assert!(result.is_err());
 
-        if let Err(LLMSpellError::Configuration { message, .. }) = result {
-            assert!(message.contains("Unknown provider"));
-        }
+        let Err(error) = result else {
+            panic!("Expected error, but create_agent_from_spec succeeded");
+        };
+        let LLMSpellError::Configuration { message, .. } = error else {
+            panic!("Expected Configuration error, got different error type: {:?}", error);
+        };
+        assert!(
+            message.contains("Unknown provider"),
+            "Expected error message to contain 'Unknown provider', got: {}",
+            message
+        );
     }
     #[tokio::test]
     async fn test_model_specifier_base_url_precedence() {
