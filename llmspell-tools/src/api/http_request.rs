@@ -246,7 +246,7 @@ impl HttpRequestTool {
 
         Ok(Self {
             metadata: ComponentMetadata::new(
-                "http-request-tool".to_string(),
+                "http-requester".to_string(),
                 "HTTP client with authentication, retries, and rate limiting".to_string(),
             ),
             config,
@@ -516,7 +516,7 @@ impl Tool for HttpRequestTool {
 
     fn schema(&self) -> ToolSchema {
         ToolSchema::new(
-            "http_request".to_string(),
+            "http-requester".to_string(),
             "Execute HTTP requests with authentication, retries, and automatic parsing".to_string(),
         )
         .with_parameter(ParameterDef {
@@ -771,7 +771,7 @@ mod tests {
 
         // Test hook metadata
         let metadata = tool.hook_metadata();
-        assert_eq!(metadata["tool_name"], "http-request-tool");
+        assert_eq!(metadata["tool_name"], "http-requester");
         assert!(metadata["hook_points_supported"].is_array());
         assert_eq!(
             metadata["hook_points_supported"].as_array().unwrap().len(),

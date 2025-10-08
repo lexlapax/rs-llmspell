@@ -111,23 +111,6 @@ where
     Ok(())
 }
 
-/// Register a tool that returns a Result
-fn register_tool_result<T, F>(
-    registry: &Arc<ComponentRegistry>,
-    name: &str,
-    tool_factory: F,
-) -> Result<(), Box<dyn std::error::Error>>
-where
-    T: Tool + Send + Sync + 'static,
-    F: FnOnce() -> Result<T, llmspell_core::error::LLMSpellError>,
-{
-    let tool = tool_factory()?;
-    registry
-        .register_tool(name.to_string(), Arc::new(tool))
-        .map_err(|e| Box::new(e) as Box<dyn std::error::Error>)?;
-    Ok(())
-}
-
 /// Get all registered tool names
 #[must_use]
 pub fn get_all_tool_names(registry: &Arc<ComponentRegistry>) -> Vec<String> {
@@ -191,28 +174,35 @@ fn register_data_processing_tools(
         // Register with old -tool suffix alias for backward compatibility
         registry.register_tool("json-processor-tool".to_string(), json_tool)?;
     }
-    register_tool_result(registry, "graphql_query", || {
-        GraphQLQueryTool::new(GraphQLConfig::default())
-    })?;
-    // Use the provided configuration for HttpRequestTool
-    let http_request_config = http_request_config.clone();
-    register_tool_result(registry, "http_request", move || {
-        // Convert from llmspell_config HttpRequestConfig to llmspell_tools HttpRequestConfig
-        // Note: Some fields in llmspell_config don't exist in tool config yet
-        let tool_config = HttpRequestConfig {
-            timeout_seconds: http_request_config.timeout_seconds,
-            follow_redirects: true, // Default to following redirects
-            max_redirects: http_request_config.max_redirects as usize,
-            retry_config: RetryConfig::default(), // TODO: Add retry config to llmspell_config
-            rate_limit_per_minute: None,          // TODO: Add rate limiting to llmspell_config
-            user_agent: http_request_config
-                .default_headers
-                .get("User-Agent")
-                .cloned()
-                .unwrap_or_else(|| "llmspell-http/1.0".to_string()),
-        };
-        HttpRequestTool::new(tool_config)
-    })?;
+    // GraphQL query: register with kebab-case primary name
+    let graphql_tool = Arc::new(GraphQLQueryTool::new(GraphQLConfig::default())?);
+    registry.register_tool("graphql-query".to_string(), graphql_tool.clone())?;
+    // Register with snake_case alias for backward compatibility
+    registry.register_tool("graphql_query".to_string(), graphql_tool.clone())?;
+    // Register with old -tool suffix alias for backward compatibility
+    registry.register_tool("graphql-query-tool".to_string(), graphql_tool)?;
+
+    // HTTP requester: register with kebab-case primary name
+    // Convert from llmspell_config HttpRequestConfig to llmspell_tools HttpRequestConfig
+    // Note: Some fields in llmspell_config don't exist in tool config yet
+    let tool_config = HttpRequestConfig {
+        timeout_seconds: http_request_config.timeout_seconds,
+        follow_redirects: true, // Default to following redirects
+        max_redirects: http_request_config.max_redirects as usize,
+        retry_config: RetryConfig::default(), // TODO: Add retry config to llmspell_config
+        rate_limit_per_minute: None,          // TODO: Add rate limiting to llmspell_config
+        user_agent: http_request_config
+            .default_headers
+            .get("User-Agent")
+            .cloned()
+            .unwrap_or_else(|| "llmspell-http/1.0".to_string()),
+    };
+    let http_tool = Arc::new(HttpRequestTool::new(tool_config)?);
+    registry.register_tool("http-requester".to_string(), http_tool.clone())?;
+    // Register with snake_case alias for backward compatibility
+    registry.register_tool("http_request".to_string(), http_tool.clone())?;
+    // Register with old -tool suffix alias for backward compatibility
+    registry.register_tool("http-request-tool".to_string(), http_tool)?;
     // Phase 7 tools
     #[cfg(feature = "pdf")]
     register_tool(registry, "pdf-processor", PdfProcessorTool::new)?;
@@ -362,21 +352,23 @@ fn register_search_tools(
     registry: &Arc<ComponentRegistry>,
     web_search_config: &llmspell_config::tools::WebSearchConfig,
 ) -> Result<(), Box<dyn std::error::Error>> {
-    // Use the provided configuration for WebSearchTool
-    let web_search_config = web_search_config.clone();
-    register_tool_result(registry, "web_search", move || {
-        // Convert from llmspell_config WebSearchConfig to llmspell_tools WebSearchConfig
-        // Note: Config structures have different fields - using defaults for missing ones
-        let tool_config = WebSearchConfig {
-            default_provider: "duckduckgo".to_string(), // Default provider
-            providers: HashMap::new(),                  // TODO: Add provider configuration
-            max_results: web_search_config.max_results,
-            safe_search: true, // Default to safe search
-            language: None,    // Default language
-            fallback_chain: vec!["duckduckgo".to_string()], // Default fallback
-        };
-        WebSearchTool::new(tool_config)
-    })?;
+    // Web searcher: register with kebab-case primary name
+    // Convert from llmspell_config WebSearchConfig to llmspell_tools WebSearchConfig
+    // Note: Config structures have different fields - using defaults for missing ones
+    let tool_config = WebSearchConfig {
+        default_provider: "duckduckgo".to_string(), // Default provider
+        providers: HashMap::new(),                  // TODO: Add provider configuration
+        max_results: web_search_config.max_results,
+        safe_search: true,                              // Default to safe search
+        language: None,                                 // Default language
+        fallback_chain: vec!["duckduckgo".to_string()], // Default fallback
+    };
+    let web_search_tool = Arc::new(WebSearchTool::new(tool_config)?);
+    registry.register_tool("web-searcher".to_string(), web_search_tool.clone())?;
+    // Register with snake_case alias for backward compatibility
+    registry.register_tool("web_search".to_string(), web_search_tool.clone())?;
+    // Register with old -tool suffix alias for backward compatibility
+    registry.register_tool("web-search-tool".to_string(), web_search_tool)?;
     Ok(())
 }
 

@@ -2937,7 +2937,7 @@ Remove `-tool` suffix from 2 data tools.
 ---
 
 ### Task 11a.9.7: Web & API Tools Standardization
-**Priority**: MEDIUM | **Time**: 15min | **Status**: ⏳ PENDING | **Depends**: 11a.9.6
+**Priority**: MEDIUM | **Time**: 15min | **Status**: ✅ DONE | **Depends**: 11a.9.6
 
 Remove `-tool` suffix from 3 web/API tools.
 
@@ -2953,10 +2953,25 @@ Remove `-tool` suffix from 3 web/API tools.
 - llmspell-tools/src/search/web_search.rs:287
 
 **Criteria**:
-- [  ] 3 `ComponentMetadata::new()` calls updated
-- [  ] Tools registered with `-tool` aliases
-- [  ] All tests pass
-- [  ] Zero clippy warnings
+- [✅] 3 `ComponentMetadata::new()` calls updated
+- [✅] Tools registered with `-tool` aliases
+- [✅] All tests pass
+- [✅] Zero clippy warnings
+
+**Implementation Summary**:
+- **http_request.rs**: Updated 3 occurrences (ComponentMetadata, ToolSchema, test assertion)
+- **graphql_query.rs**: Updated 9 occurrences (ComponentMetadata + 5 LLMSpellError tool_name + tracing attribute + ToolSchema + test assertion)
+- **web_search.rs**: Updated 2 occurrences (ComponentMetadata, ToolSchema)
+- **llmspell-bridge/src/tools.rs**: Converted from `register_tool_result()` to Arc-based triple registration for all 3 tools
+- **Removed**: Unused `register_tool_result()` helper function after conversion
+
+**Key Insights**:
+- **Triple Aliasing Pattern**: All 3 tools get kebab-case primary + snake_case alias + -tool suffix alias
+- **Error Context Discovery**: graphql_query had 5 LLMSpellError::Tool instances with tool_name field that needed updating
+- **Tracing Discovery**: graphql_query had tool_name in tracing info! attribute
+- **Code Cleanup**: Removed `register_tool_result()` helper function (unused after conversion)
+- **Total Updates**: 14 string literal replacements across 3 tool files + registration conversion + function removal
+- **Test Results**: All 285 tests passed, zero clippy warnings
 
 ---
 
@@ -3019,10 +3034,10 @@ Remove `-tool` suffix from 2 utility tools.
 15. `csv-analyzer` - remove aliases: `csv_analyzer`, `csv-analyzer-tool`
 16. `json-processor` - remove aliases: `json_processor`, `json-processor-tool`
 
-**Web & API Tools (3)** - Will be added in 11a.9.7:
-17. `http-requester` - remove aliases: TBD from 11a.9.7
-18. `graphql-query` - remove aliases: TBD from 11a.9.7
-19. `web-searcher` - remove aliases: TBD from 11a.9.7
+**Web & API Tools (3)** - Added in 11a.9.7:
+17. `http-requester` - remove aliases: `http_request`, `http-request-tool`
+18. `graphql-query` - remove aliases: `graphql_query`, `graphql-query-tool`
+19. `web-searcher` - remove aliases: `web_search`, `web-search-tool`
 
 **Utility Tools (2)** - Will be added in 11a.9.8:
 20. `data-validator` - remove aliases: TBD from 11a.9.8
@@ -3234,8 +3249,8 @@ Comprehensive validation and documentation of Phase 11a.9 completion.
 **Status**: ⏳ IN PROGRESS | **Effort**: TBD | **Files**: TBD | **Tools Renamed**: 22 of 38
 
 **Actual Metrics** (to be updated in 11a.9.14):
-- **Tasks Completed**: 6 of 14
-- **Tools Standardized**: 16 of 22
+- **Tasks Completed**: 7 of 14
+- **Tools Standardized**: 19 of 22
 - **Snake_case → Kebab-case**: 0 of 13
 - **Suffix Removals**: 0 of 9
 - **Examples Updated**: 0 of ~40
