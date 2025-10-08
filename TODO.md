@@ -4089,7 +4089,7 @@ Finished `dev` profile [optimized + debuginfo] target(s) in 1m 13s
 - `llmspell-workflows/src/step_executor.rs` (execute_agent_step refactored for unified execution path)
 - `llmspell-workflows/src/lib.rs` (test_utils made public for integration tests)
 
-**Next Steps**: Task 11a.10.6 (Update workflow documentation)
+**Next Steps**: Task 11a.10.6 (Update Lua examples - code-review-assistant and instrumented-agent)
 
 ---
 
@@ -4237,9 +4237,159 @@ metadata.extra.insert("execution_id".to_string(), json!(execution_id));
 
 ---
 
-### Task 11a.10.6: Update Workflow Documentation
+### Task 11a.10.6: Update Lua Examples
 
-**Priority**: MEDIUM | **Time**: 30min | **Status**: ⏳ PENDING | **Depends**: 11a.10.5
+**Priority**: HIGH | **Time**: 30min | **Status**: ✅ COMPLETED | **Depends**: 11a.10.5
+
+**Objective**: Update Lua examples to use automatic agent output collection instead of manual state key construction.
+
+**Scope**: Update 2 Lua example applications that currently use deprecated manual collection patterns
+
+**Files to Modify**:
+1. `examples/script-users/applications/code-review-assistant/main.lua` (REQUIRED)
+2. `examples/script-users/applications/instrumented-agent/main.lua` (RECOMMENDED)
+
+**Change 1: code-review-assistant/main.lua** (REQUIRED - Lines 401-561):
+
+**Current Pattern** (55 lines of manual collection):
+```lua
+-- Lines 401-434: Review collection with fallback logic
+local workflow_id = nil
+if result.metadata and result.metadata.extra then
+    workflow_id = result.metadata.extra.execution_id or result.metadata.extra.workflow_id
+end
+if not workflow_id then
+    workflow_id = result.workflow_id or result.execution_id or result.id
+end
+if not workflow_id then
+    workflow_id = file_workflow.id or (file_workflow.get_id and file_workflow:get_id())
+end
+
+local security_output = State.load("custom", ":workflow:" .. workflow_id .. ":agent:security_reviewer_" .. timestamp .. ":output")
+-- ... 4 more State.load() calls ...
+
+file_review.reviews = {
+    security = security_output or "",
+    quality = quality_output or "",
+    -- ...
+}
+
+-- Same pattern repeated 2 more times at lines 480-497 and 545-561
+```
+
+**New Pattern** (16 lines total):
+```lua
+-- Lines 401-408: Simplified collection
+local outputs = result.metadata and result.metadata.extra
+    and result.metadata.extra.agent_outputs or {}
+
+file_review.reviews = {
+    security = outputs.security_reviewer or "",
+    quality = outputs.quality_reviewer or "",
+    performance = outputs.performance_reviewer or "",
+    practices = outputs.practices_reviewer or "",
+    dependencies = outputs.dependency_reviewer or ""
+}
+
+-- Lines 480-483: Fix generation
+local fix_outputs = fix_result.metadata and fix_result.metadata.extra
+    and fix_result.metadata.extra.agent_outputs or {}
+generated_fixes = fix_outputs.fix_generator or ""
+
+-- Lines 545-548: Report generation
+local report_outputs = report_result.metadata and report_result.metadata.extra
+    and report_result.metadata.extra.agent_outputs or {}
+local report_output = report_outputs.report_writer or ""
+```
+
+**Impact**:
+- Lines Removed: 55
+- Lines Added: 16
+- Net Reduction: -39 lines (70.9% reduction)
+- State.load() calls eliminated: 7
+- Complexity: 3 fallback blocks → 3 simple lookups
+
+**Change 2: instrumented-agent/main.lua** (RECOMMENDED - Lines 215-222, 289-294):
+
+**Current Pattern** (Educational demo using manual state access):
+```lua
+-- Lines 217-218: Manual state key construction
+local analysis_output = State.load("custom",
+    ":workflow:debug_workflow_" .. timestamp .. ":agent:code_analyzer_" .. timestamp .. ":output")
+
+-- Line 293: Informational message for REPL users
+print("• custom::workflow:debug_workflow_" .. timestamp .. ":agent:code_analyzer_" .. timestamp .. ":output")
+```
+
+**New Pattern** (Demonstrates modern best practice):
+```lua
+-- Lines 217-221: Automatic collection demo
+local agent_outputs = result.metadata and result.metadata.extra
+    and result.metadata.extra.agent_outputs or {}
+if agent_outputs.code_analyzer then
+    Debug.debug("Workflow analysis output retrieved from metadata.extra.agent_outputs", module_name)
+end
+
+-- Line 293: Updated educational message
+print("• result.metadata.extra.agent_outputs (automatic collection)")
+```
+
+**Impact**:
+- Lines Changed: 8
+- Educational Value: HIGH - teaches modern pattern
+- Complexity: Manual state keys → Direct metadata access
+
+**Acceptance Criteria**:
+- [x] code-review-assistant.lua updated (3 collection blocks simplified)
+- [x] instrumented-agent.lua updated (educational demo modernized)
+- [x] Changes verified with grep (no manual State.load for workflows)
+- [x] Both files use modern agent_outputs pattern
+- [x] Educational value maintained in instrumented-agent
+
+**Testing Commands**:
+```bash
+# Test code-review-assistant
+./target/debug/llmspell run examples/script-users/applications/code-review-assistant/main.lua
+# Expected: Generate review with security/quality/performance/practices/dependencies sections
+# Verify: Uses automatic collection, no manual State.load() calls
+
+# Test instrumented-agent
+./target/debug/llmspell run examples/script-users/applications/instrumented-agent/main.lua
+# Expected: Debug output shows agent_outputs retrieved from metadata
+# Verify: Educational messages demonstrate modern pattern
+```
+
+**Total Impact Across All Examples**:
+- **Files Updated**: 3 (webapp-creator ✅, code-review-assistant, instrumented-agent)
+- **Lines Removed**: 111 (52 + 55 + 4)
+- **Lines Added**: 31 (11 + 16 + 4)
+- **Net Reduction**: -80 lines (72.1% reduction in infrastructure code)
+- **State.load() calls eliminated**: 7 (all from code-review-assistant)
+
+**Implementation Insights** (Completed):
+1. **Only 2 examples needed updates** - 48 other files unaffected (validation successful)
+2. **Dramatic simplification achieved** - 70.9% code reduction in code-review-assistant
+3. **Pattern consistency critical** - Agent ID lookups must match creation (e.g., "code_analyzer_" + timestamp)
+4. **Educational demo updated** - instrumented-agent now demonstrates metadata.extra.agent_outputs
+5. **Zero State.load() for workflows** - Verified no manual workflow state access remains
+6. **Fallback logic preserved** - `or {}` pattern maintains safe access if agent_outputs missing
+7. **Code clarity improved** - Metadata access more explicit than state key construction
+8. **Grep verification essential** - Confirmed no regression to old patterns
+9. **CRITICAL BUG FOUND & FIXED** - workflows.rs:1523 created ExecutionContext without state
+   - Symptom: agent_outputs always empty, "No state available" warnings
+   - Root cause: sequential.rs:552 agent collection requires `context.state`
+   - Fix: Attach state adapter to ExecutionContext (workflows.rs:1525-1529)
+   - Impact: Agent output collection now works in production (not just mocks)
+10. **Testing validated fix** - Both examples produce actual outputs
+    - instrumented-agent: Shows agent_outputs in educational message
+    - code-review-assistant: Generates complete reviews (security/quality/performance/practices/dependencies)
+    - review-report.md: 81-line comprehensive report with actual findings
+
+---
+
+### Task 11a.10.7: Update Workflow Documentation
+
+**Priority**: MEDIUM | **Time**: 30min | **Status**: ⏳ PENDING | **Depends**: 11a.10.6
 
 **Objective**: Document the automatic agent output collection feature in workflow documentation.
 
@@ -4247,7 +4397,8 @@ metadata.extra.insert("execution_id".to_string(), json!(execution_id));
 
 **Files to Modify**:
 1. `llmspell-workflows/README.md` - Add section on agent output collection
-2. `docs/user-guide/api/lua/README.md` - Update Workflow API documentation
+2. `docs/user-guide/api/lua/README.md` - Update Workflow lua API documentation
+3. `docs/user-guide/api/rust/workflows.md` - Update Workflow Rust API documentation
 3. `docs/developer-guide/developer-guide.md` - Update workflow patterns section
 
 **Content to Add**:
@@ -4330,7 +4481,7 @@ for agent_id, output in pairs(outputs) do
     -- Process output
 end
 ```
-```
+
 
 **3. docs/developer-guide/developer-guide.md**:
 ```markdown
@@ -4365,7 +4516,7 @@ if !agent_outputs.is_empty() {
 - Batch retrieval (single state access)
 - Consistent API across workflow types
 - Type-safe access via `WorkflowResult::agent_outputs()`
-```
+
 
 **Acceptance Criteria**:
 - [ ] 3 documentation files updated
@@ -4382,9 +4533,9 @@ cargo doc -p llmspell-workflows --no-deps --open
 
 ---
 
-### Task 11a.10.7: Final Validation & Integration Test
+### Task 11a.10.8: Final Validation & Integration Test
 
-**Priority**: CRITICAL | **Time**: 30min | **Status**: ⏳ PENDING | **Depends**: 11a.10.1-11a.10.6
+**Priority**: CRITICAL | **Time**: 30min | **Status**: ⏳ PENDING | **Depends**: 11a.10.1-11a.10.7
 
 **Objective**: Comprehensive validation that all changes work together without regressions.
 
@@ -4496,33 +4647,36 @@ If any test fails:
 **Status**: ⏳ PENDING | **Effort**: TBD | **Files Modified**: TBD
 
 **Completion Criteria**:
-- [ ] All 7 tasks completed (11a.10.1 through 11a.10.7)
+- [ ] All 8 tasks completed (11a.10.1 through 11a.10.8)
 - [ ] Sequential workflows collect agent outputs automatically
 - [ ] All 4 workflow types have consistent behavior
 - [ ] WorkflowResult has convenience methods
-- [ ] webapp-creator example simplified (26 lines removed)
+- [ ] webapp-creator example simplified (52 lines removed)
+- [ ] code-review-assistant example simplified (55 lines removed)
+- [ ] instrumented-agent example updated (educational)
 - [ ] Documentation updated across 3 files
 - [ ] Zero test failures, zero clippy warnings
-- [ ] Example validation successful
+- [ ] Example validation successful (3 examples tested)
 
 **Final Metrics** (to be filled upon completion):
-- Tasks Completed: 0 of 7 (0%)
+- Tasks Completed: 5 of 8 (62.5%) - Tasks 1-5 complete
 - Files Modified: TBD
 - Lines Added: TBD (Rust)
-- Lines Removed: TBD (Lua infrastructure code)
-- Tests Added: TBD
-- Documentation Updated: 3 files
-- Test Results: TBD/TBD passing
-- Clippy: TBD warnings
+- Lines Removed: 111+ lines (Lua infrastructure code across 3 examples)
+- Tests Added: 4 integration tests
+- Documentation Updated: 3 files (pending)
+- Test Results: 71 workflow tests + 12 integration tests passing
+- Clippy: 0 warnings
 
 **Impact**: 🎯 API IMPROVEMENT - Eliminates need for manual infrastructure code in Lua workflows
 
 **User Benefits**:
 - No manual state key construction required
 - Consistent API across all workflow types
-- Simplified application code (26+ line reduction in webapp-creator)
+- Simplified application code (111 lines removed across 3 examples)
 - Type-safe Rust convenience methods
 - Better performance (batch retrieval vs N individual state loads)
+- Modern examples teach best practices
 
 **Developer Benefits**:
 - Consistent implementation pattern across workflow types

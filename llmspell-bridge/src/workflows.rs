@@ -1520,7 +1520,13 @@ impl WorkflowBridge {
         let workflow_type = workflow.metadata().component_type();
 
         // Execute workflow directly (same execution path as nested workflows)
-        let execution_context = ExecutionContext::new();
+        // CRITICAL: Attach state to ExecutionContext so agent outputs can be collected
+        let mut execution_context = ExecutionContext::new();
+        if let Some(ref state_manager) = self.state_manager {
+            let state_adapter =
+                crate::state_adapter::NoScopeStateAdapter::new(state_manager.clone());
+            execution_context = execution_context.with_state(Arc::new(state_adapter) as Arc<dyn llmspell_core::traits::state::StateAccess>);
+        }
 
         // Convert JSON input to AgentInput (same logic as StepExecutor)
         #[allow(clippy::option_if_let_else)]
