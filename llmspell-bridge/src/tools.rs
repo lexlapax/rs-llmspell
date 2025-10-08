@@ -111,24 +111,6 @@ where
     Ok(())
 }
 
-/// Register a tool that requires a sandbox with the bridge registry
-fn register_tool_with_sandbox<T, F>(
-    registry: &Arc<ComponentRegistry>,
-    name: &str,
-    _sandbox: Arc<FileSandbox>,
-    tool_factory: F,
-) -> Result<(), Box<dyn std::error::Error>>
-where
-    T: Tool + Send + Sync + 'static,
-    F: FnOnce() -> T,
-{
-    let tool = tool_factory();
-    registry
-        .register_tool(name.to_string(), Arc::new(tool))
-        .map_err(|e| Box::new(e) as Box<dyn std::error::Error>)?;
-    Ok(())
-}
-
 /// Register a tool that returns a Result
 fn register_tool_result<T, F>(
     registry: &Arc<ComponentRegistry>,
@@ -293,31 +275,37 @@ fn register_system_tools(
     registry: &Arc<ComponentRegistry>,
     file_sandbox: &Arc<FileSandbox>,
 ) -> Result<(), Box<dyn std::error::Error>> {
-    register_tool(registry, "environment_reader", || {
-        EnvironmentReaderTool::new(EnvironmentReaderConfig::default())
-    })?;
-    // ProcessExecutorTool needs sandbox for working directory validation
-    let process_executor_sandbox = file_sandbox.clone();
-    register_tool_with_sandbox(
-        registry,
-        "process_executor",
-        process_executor_sandbox.clone(),
-        move || {
-            ProcessExecutorTool::new(ProcessExecutorConfig::default(), process_executor_sandbox)
-        },
-    )?;
-    register_tool(registry, "service_checker", || {
-        ServiceCheckerTool::new(ServiceCheckerConfig::default())
-    })?;
+    // Environment reader: register with kebab-case primary name
+    let env_tool = Arc::new(EnvironmentReaderTool::new(
+        EnvironmentReaderConfig::default(),
+    ));
+    registry.register_tool("environment-reader".to_string(), env_tool.clone())?;
+    // Register with snake_case alias for backward compatibility
+    registry.register_tool("environment_reader".to_string(), env_tool)?;
 
-    // SystemMonitorTool needs sandbox for /proc file access
-    let system_monitor_sandbox = file_sandbox.clone();
-    register_tool_with_sandbox(
-        registry,
-        "system_monitor",
-        system_monitor_sandbox.clone(),
-        move || SystemMonitorTool::new(SystemMonitorConfig::default(), system_monitor_sandbox),
-    )?;
+    // Process executor: register with kebab-case primary name
+    let process_tool = Arc::new(ProcessExecutorTool::new(
+        ProcessExecutorConfig::default(),
+        file_sandbox.clone(),
+    ));
+    registry.register_tool("process-executor".to_string(), process_tool.clone())?;
+    // Register with snake_case alias for backward compatibility
+    registry.register_tool("process_executor".to_string(), process_tool)?;
+
+    // Service checker: register with kebab-case primary name
+    let service_tool = Arc::new(ServiceCheckerTool::new(ServiceCheckerConfig::default()));
+    registry.register_tool("service-checker".to_string(), service_tool.clone())?;
+    // Register with snake_case alias for backward compatibility
+    registry.register_tool("service_checker".to_string(), service_tool)?;
+
+    // System monitor: register with kebab-case primary name
+    let monitor_tool = Arc::new(SystemMonitorTool::new(
+        SystemMonitorConfig::default(),
+        file_sandbox.clone(),
+    ));
+    registry.register_tool("system-monitor".to_string(), monitor_tool.clone())?;
+    // Register with snake_case alias for backward compatibility
+    registry.register_tool("system_monitor".to_string(), monitor_tool)?;
     Ok(())
 }
 

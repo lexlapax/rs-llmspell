@@ -74,7 +74,7 @@ fn test_system_integration_tools_creation() {
     // EnvironmentReaderTool
     let tool = EnvironmentReaderTool::new(EnvironmentReaderConfig::default());
     let schema = tool.schema();
-    assert_eq!(schema.name, "environment_reader");
+    assert_eq!(schema.name, "environment-reader");
     assert!(!schema.description.is_empty());
 
     // ProcessExecutorTool
@@ -83,13 +83,13 @@ fn test_system_integration_tools_creation() {
         create_default_test_sandbox(),
     );
     let schema = tool.schema();
-    assert_eq!(schema.name, "process_executor");
+    assert_eq!(schema.name, "process-executor");
     assert!(!schema.description.is_empty());
 
     // ServiceCheckerTool
     let tool = ServiceCheckerTool::new(ServiceCheckerConfig::default());
     let schema = tool.schema();
-    assert_eq!(schema.name, "service_checker");
+    assert_eq!(schema.name, "service-checker");
     assert!(!schema.description.is_empty());
 
     // SystemMonitorTool
@@ -98,7 +98,7 @@ fn test_system_integration_tools_creation() {
         create_default_test_sandbox(),
     );
     let schema = tool.schema();
-    assert_eq!(schema.name, "system_monitor");
+    assert_eq!(schema.name, "system-monitor");
     assert!(!schema.description.is_empty());
 }
 #[test]

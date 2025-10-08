@@ -122,7 +122,7 @@ impl ServiceCheckerTool {
         );
         Self {
             metadata: ComponentMetadata::new(
-                "service_checker".to_string(),
+                "service-checker".to_string(),
                 "Service availability and health checking with network connectivity testing"
                     .to_string(),
             ),
@@ -139,7 +139,7 @@ impl ServiceCheckerTool {
     ) -> Self {
         Self {
             metadata: ComponentMetadata::new(
-                "service_checker".to_string(),
+                "service-checker".to_string(),
                 "Service availability and health checking with network connectivity testing"
                     .to_string(),
             ),
@@ -694,7 +694,7 @@ impl Tool for ServiceCheckerTool {
 
     fn schema(&self) -> ToolSchema {
         ToolSchema::new(
-            "service_checker".to_string(),
+            "service-checker".to_string(),
             "Check service availability and network connectivity".to_string(),
         )
         .with_parameter(ParameterDef {
@@ -921,14 +921,14 @@ mod tests {
         let tool = create_test_service_checker();
 
         let metadata = tool.metadata();
-        assert_eq!(metadata.name, "service_checker");
+        assert_eq!(metadata.name, "service-checker");
         assert!(
             metadata.description.contains("Service availability")
                 || metadata.description.contains("service availability")
         );
 
         let schema = tool.schema();
-        assert_eq!(schema.name, "service_checker");
+        assert_eq!(schema.name, "service-checker");
         assert_eq!(tool.category(), ToolCategory::System);
         assert_eq!(tool.security_level(), SecurityLevel::Restricted);
 

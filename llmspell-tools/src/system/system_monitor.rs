@@ -147,7 +147,7 @@ impl SystemMonitorTool {
         );
         Self {
             metadata: ComponentMetadata::new(
-                "system_monitor".to_string(),
+                "system-monitor".to_string(),
                 "System resource monitoring for CPU, memory, and disk usage tracking".to_string(),
             ),
             config,
@@ -249,7 +249,7 @@ impl SystemMonitorTool {
         trace!("Getting basic system information");
         let system_info = get_system_info().map_err(|e| LLMSpellError::Tool {
             message: format!("Failed to get system information: {e}"),
-            tool_name: Some("system_monitor".to_string()),
+            tool_name: Some("system-monitor".to_string()),
             source: None,
         })?;
 
@@ -760,7 +760,7 @@ impl Tool for SystemMonitorTool {
 
     fn schema(&self) -> ToolSchema {
         ToolSchema::new(
-            "system_monitor".to_string(),
+            "system-monitor".to_string(),
             "Monitor system resources including CPU, memory, and disk usage".to_string(),
         )
         .with_parameter(ParameterDef {
@@ -949,14 +949,14 @@ mod tests {
         let tool = create_test_system_monitor();
 
         let metadata = tool.metadata();
-        assert_eq!(metadata.name, "system_monitor");
+        assert_eq!(metadata.name, "system-monitor");
         assert!(
             metadata.description.contains("System resource monitoring")
                 || metadata.description.contains("system resource")
         );
 
         let schema = tool.schema();
-        assert_eq!(schema.name, "system_monitor");
+        assert_eq!(schema.name, "system-monitor");
         assert_eq!(tool.category(), ToolCategory::System);
         assert_eq!(tool.security_level(), SecurityLevel::Safe);
 

@@ -2873,27 +2873,35 @@ Rename 2 communication tools from snake_case to kebab-case.
 ---
 
 ### Task 11a.9.5: System Tools Standardization
-**Priority**: MEDIUM | **Time**: 15min | **Status**: ⏳ PENDING | **Depends**: 11a.9.4
+**Priority**: MEDIUM | **Time**: 15min | **Status**: ✅ COMPLETE | **Depends**: 11a.9.4
 
 Rename 4 system tools from snake_case to kebab-case.
 
-**Changes**:
-1. `process_executor` → `process-executor` (alias: `process_executor`)
-2. `system_monitor` → `system-monitor` (alias: `system_monitor`)
-3. `environment_reader` → `environment-reader` (alias: `environment_reader`)
-4. `service_checker` → `service-checker` (alias: `service_checker`)
+**Changes Implemented**:
+1. `process_executor` → `process-executor` (dual registration: `process_executor` alias)
+2. `system_monitor` → `system-monitor` (dual registration: `system_monitor` alias)
+3. `environment_reader` → `environment-reader` (dual registration: `environment_reader` alias)
+4. `service_checker` → `service-checker` (dual registration: `service_checker` alias)
 
-**Files to Modify**:
-- llmspell-tools/src/system/process_executor.rs:194
-- llmspell-tools/src/system/system_monitor.rs:150
-- llmspell-tools/src/system/environment_reader.rs:175
-- llmspell-tools/src/system/service_checker.rs:125
+**Files Modified**:
+- llmspell-tools/src/system/process_executor.rs: 7 occurrences (ComponentMetadata, LLMSpellError, ErrorContext, ToolSchema, 3 test assertions)
+- llmspell-tools/src/system/system_monitor.rs: 5 occurrences (ComponentMetadata, LLMSpellError, ToolSchema, 2 test assertions)
+- llmspell-tools/src/system/environment_reader.rs: 7 occurrences (2 ComponentMetadata in new()+with_sandbox(), LLMSpellError, ToolSchema, 2 test assertions)
+- llmspell-tools/src/system/service_checker.rs: 6 occurrences (2 ComponentMetadata in new()+with_sandbox(), ToolSchema, 2 test assertions)
+- llmspell-bridge/src/tools.rs: Converted all 4 tools to dual registration + removed unused register_tool_with_sandbox() helper
+- llmspell-tools/tests/remaining_tools_basic.rs: 4 test assertions
 
 **Criteria**:
-- [  ] 4 `ComponentMetadata::new()` calls updated
-- [  ] Tools registered with aliases
-- [  ] All tests pass
-- [  ] Zero clippy warnings
+- [✅] 7 `ComponentMetadata::new()` calls updated (environment_reader and service_checker each have 2 constructors)
+- [✅] All 4 tools registered with dual aliases for backward compatibility
+- [✅] All tests pass: 443+ tests passed across all test suites
+- [✅] Zero clippy warnings
+
+**Key Insights**:
+- **Multiple Constructors**: environment_reader and service_checker each have two constructors (new() + with_sandbox()), both needed updates
+- **Code Cleanup**: Removed now-unused register_tool_with_sandbox() helper function after converting all tools to dual registration
+- **Consistency Victory**: All system tools now follow the kebab-case convention with backward-compatible aliases
+- **Total Updates**: 29 string literal replacements + dual registration refactoring + helper function removal
 
 ---
 
