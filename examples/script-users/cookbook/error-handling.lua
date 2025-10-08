@@ -81,7 +81,7 @@ local function safe_invoke_tool(tool_name, params)
 end
 
 -- Test the pattern
-local result, err, details = safe_invoke_tool("uuid_generator", {
+local result, err, details = safe_invoke_tool("uuid-generator", {
     operation = "generate",
     version = "v4"
 })

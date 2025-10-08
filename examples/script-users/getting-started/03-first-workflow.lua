@@ -55,7 +55,7 @@ local workflow = Workflow.builder()
     :add_step({
         name = "generate_id",
         type = "tool",  -- Step type must be specified
-        tool = "uuid_generator",  -- Tool to invoke
+        tool = "uuid-generator",  -- Tool to invoke
         input = {  -- Parameters for the tool
             operation = "generate",
             version = "v4"
@@ -64,7 +64,7 @@ local workflow = Workflow.builder()
     :add_step({
         name = "get_timestamp",
         type = "tool",
-        tool = "date_time_handler",
+        tool = "datetime-handler",
         input = {
             operation = "now"
         }
@@ -72,7 +72,7 @@ local workflow = Workflow.builder()
     :add_step({
         name = "calculate_hash",
         type = "tool",
-        tool = "hash_calculator",
+        tool = "hash-calculator",
         input = {
             operation = "hash",
             algorithm = "sha256",

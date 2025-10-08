@@ -140,7 +140,7 @@ and track progress. Need both web and mobile responsive design.
         research_depth = "comprehensive", -- minimal, standard, comprehensive
         
         -- Number of web searches to perform
-        max_web-searcheres = 15
+        max_web_searches = 15
     }
 }
 

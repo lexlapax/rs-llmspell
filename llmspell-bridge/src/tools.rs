@@ -127,16 +127,16 @@ pub fn get_tool_by_name(registry: &Arc<ComponentRegistry>, name: &str) -> Option
 fn register_utility_tools(
     registry: &Arc<ComponentRegistry>,
 ) -> Result<(), Box<dyn std::error::Error>> {
-    register_tool(registry, "base64_encoder", Base64EncoderTool::new)?;
+    register_tool(registry, "base64-encoder", Base64EncoderTool::new)?;
     register_tool(registry, "calculator", CalculatorTool::new)?;
 
     // Data validator
     let data_validator_tool = Arc::new(DataValidationTool::new());
     registry.register_tool("data-validator".to_string(), data_validator_tool)?;
 
-    register_tool(registry, "date_time_handler", DateTimeHandlerTool::new)?;
-    register_tool(registry, "diff_calculator", DiffCalculatorTool::new)?;
-    register_tool(registry, "hash_calculator", || {
+    register_tool(registry, "datetime-handler", DateTimeHandlerTool::new)?;
+    register_tool(registry, "diff-calculator", DiffCalculatorTool::new)?;
+    register_tool(registry, "hash-calculator", || {
         HashCalculatorTool::new(HashCalculatorConfig::default())
     })?;
 
