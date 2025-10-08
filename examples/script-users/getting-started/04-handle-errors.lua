@@ -59,7 +59,7 @@ local function safe_file_operation(operation, path, content)
     end
     
     local success, result = pcall(function()
-        return Tool.invoke("file_operations", params)
+        return Tool.invoke("file-operations", params)
     end)
     
     if success and result and result.text then

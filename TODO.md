@@ -3190,7 +3190,7 @@ Remove `-tool` suffix from 2 utility tools.
 ---
 
 ### Task 11a.9.10: Update Examples - Getting Started
-**Priority**: MEDIUM | **Time**: 30min | **Status**: ⏳ PENDING | **Depends**: 11a.9.9
+**Priority**: MEDIUM | **Time**: 30min | **Status**: ✅ DONE | **Depends**: 11a.9.9
 
 Update getting-started examples to use new tool names (primary migration, not aliases).
 
@@ -3212,10 +3212,33 @@ Update getting-started examples to use new tool names (primary migration, not al
 - Verify output is correct
 
 **Criteria**:
-- [  ] All getting-started examples updated to new names
-- [  ] All updated examples execute successfully
-- [  ] Zero runtime errors
-- [  ] Comments and documentation in examples updated
+- [✅] All getting-started examples updated to new names
+- [✅] All updated examples execute successfully
+- [✅] Zero runtime errors
+- [✅] Comments and documentation in examples updated
+
+**Implementation Summary**:
+- **01-first-tool.lua**: Updated 4 occurrences (3 Tool.invoke calls + 2 comment references) - file_operations → file-operations
+- **03-first-workflow.lua**: Updated 3 occurrences (1 workflow step + 2 Tool.invoke calls) - file_operations → file-operations
+- **04-handle-errors.lua**: Updated 1 occurrence (pcall function) - file_operations → file-operations
+- **00-hello-world.lua**: No changes needed (no tools used)
+- **02-first-agent.lua**: No changes needed (no tools used)
+- **05-first-rag.lua**: No changes needed (no tools used)
+- **README.md**: No changes needed (uses generic placeholders only)
+
+**Test Results**:
+- ✅ **01-first-tool.lua**: Executed successfully - created, read, and checked file in /tmp
+- ✅ **03-first-workflow.lua**: Executed successfully - 4-step workflow completed in 7.5ms
+- ✅ **04-handle-errors.lua**: Executed successfully - error handling patterns demonstrated
+- ✅ **Breaking Change Verified**: Old name `file_operations` fails with "Tool 'file_operations' not found"
+
+**Key Insights**:
+- **Total Updates**: 8 occurrences across 3 files (only 3 of 6 examples needed updates)
+- **Tool Changed**: Only `file_operations` → `file-operations` found in getting-started examples
+- **No Other Tools**: No other renamed tools (audio_processor, template_engine, etc.) used in getting-started
+- **Breaking Change Works**: Old tool names correctly fail with "not found" error
+- **Clean Execution**: All examples run without errors using new kebab-case names
+- **Minimal Impact**: Getting-started examples are simple and only used 1 of the 21 renamed tools
 
 ---
 
@@ -3347,15 +3370,15 @@ Comprehensive validation and documentation of Phase 11a.9 completion.
 **Status**: ⏳ IN PROGRESS | **Effort**: TBD | **Files**: TBD | **Tools Renamed**: 22 of 38
 
 **Actual Metrics** (to be updated in 11a.9.14):
-- **Tasks Completed**: 9 of 14 (64%)
+- **Tasks Completed**: 10 of 14 (71%)
 - **Tools Standardized**: 21 of 22 (95%)
 - **Snake_case → Kebab-case**: 12 of 13 (92%) - media(3) + filesystem(3) + communication(2) + system(4)
 - **Suffix Removals**: 9 of 9 (100%) - filesystem(2) + data&doc(2) + web&api(3) + utility(2)
 - **Aliases Removed**: 31 of 31 (100%) - ✅ BREAKING CHANGE CHECKPOINT COMPLETE
-- **Examples Updated**: 0 of ~40
+- **Examples Updated**: 3 of ~40 (getting-started complete: 8 occurrences)
 - **Documentation Updated**: 0 of ~10
-- **Test Results**: 405 tests passed, 0 failed, zero clippy warnings
-- **Backward Compatibility**: ❌ REMOVED - old tool names no longer work
+- **Test Results**: 405 tests passed, 0 failed, zero clippy warnings + 3 examples tested successfully
+- **Backward Compatibility**: ❌ REMOVED - old tool names no longer work (verified with test)
 
 **Impact**: BREAKING CHANGE - old tool names no longer work (checkpoint enforced in 11a.9.9)
 

@@ -82,7 +82,7 @@ local workflow = Workflow.builder()
     :add_step({
         name = "create_summary",
         type = "tool",
-        tool = "file_operations",
+        tool = "file-operations",
         input = {
             operation = "write",
             path = "/tmp/workflow_summary.txt",
@@ -122,16 +122,16 @@ if success and execution_result then
     end
     
     -- Check if the summary file was created
-    local file_check = Tool.invoke("file_operations", {
+    local file_check = Tool.invoke("file-operations", {
         operation = "exists",
         path = "/tmp/workflow_summary.txt"
     })
-    
+
     if file_check and file_check.text then
         print("   ✅ Summary file created: /tmp/workflow_summary.txt")
-        
+
         -- Read and display the summary
-        local file_content = Tool.invoke("file_operations", {
+        local file_content = Tool.invoke("file-operations", {
             operation = "read",
             path = "/tmp/workflow_summary.txt"
         })
