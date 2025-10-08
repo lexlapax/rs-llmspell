@@ -3354,7 +3354,7 @@ Update user-facing documentation with new tool names.
 ---
 
 ### Task 11a.9.13: Update Documentation - Developer Guide
-**Priority**: MEDIUM | **Time**: 20min | **Status**: ⏳ PENDING | **Depends**: 11a.9.12
+**Priority**: MEDIUM | **Time**: 20min | **Status**: ✅ DONE | **Depends**: 11a.9.12
 
 Update developer-facing documentation with new tool names and naming convention.
 
@@ -3374,10 +3374,60 @@ Update developer-facing documentation with new tool names and naming convention.
 - Update any code snippets showing tool registration
 
 **Criteria**:
-- [  ] Developer guide examples updated
-- [  ] Naming convention documented in CONTRIBUTING.md
-- [  ] All code snippets use new names
-- [  ] Documentation accurate and consistent
+- [✅] Developer guide examples updated
+- [✅] Naming convention documented in CONTRIBUTING.md
+- [✅] All code snippets use new names
+- [✅] Documentation accurate and consistent
+
+**Implementation Summary**:
+- **Files Updated**: 5 files (19 occurrences)
+
+  1. **docs/developer-guide/developer-guide.md** (4 occurrences):
+     - Line 285: `"template_engine"` → `"template-creator"` (registry.register)
+     - Line 301: `"template_engine"` → `"template-creator"` (Tool.try_get in Lua)
+     - Line 453: `"file_reader"` → `"file-reader"` (test helper example)
+     - Line 517: `"my_tool"` → `"my-tool"` (ResponseBuilder example)
+
+  2. **docs/developer-guide/feature-flags-migration.md** (1 occurrence):
+     - Line 25: `"template_engine"` → `"template-creator"` (error message example)
+
+  3. **docs/developer-guide/extending-llmspell.md** (5 occurrences):
+     - Line 51: `"custom_tool"` → `"custom-tool"` (ComponentMetadata in CustomTool)
+     - Line 93: `"custom_tool"` → `"custom-tool"` (ResponseBuilder::success)
+     - Line 146: `"file_tool"` → `"file-operations"` (ComponentMetadata in FileSystemTool)
+     - Line 172: `"custom_tool"` → `"custom-tool"` (registry.register_tool)
+     - Line 175: `"file_tool"` → `"file-operations"` (registry.register_tool)
+
+  4. **CONTRIBUTING.md** (added naming convention section):
+     - Added 6-line tool naming convention under "Tools Development":
+       - Format: `<primary-function>-<object>`
+       - Use kebab-case exclusively
+       - No `-tool` suffix
+       - Examples: `file-operations`, `image-processor`, `calculator`
+       - Distinction: Rust modules use snake_case, tool registration uses kebab-case
+
+  5. **docs/user-guide/api/rust/llmspell-tools.md** (8 occurrences):
+     - Line 64: `"web-search"` → `"web-searcher"` (Tool Registry example)
+     - Line 80-82: `"file-read"/"file-write"/"file-search"` → `"file-operations"` (3 examples with operation parameter)
+     - Line 88: `"web-search"` → `"web-searcher"` (Web Tools example)
+     - Line 89: `"http-request"` → `"http-requester"` (Web Tools example)
+     - Line 94: `"json-query"` → `"json-processor"` (Data Processing example)
+     - Line 95: `"csv-parse"` → `"csv-analyzer"` (Data Processing example)
+     - Line 96: `"text-manipulate"` → `"text-manipulator"` (Data Processing example)
+     - Line 115: `"my_tool"` → `"my-custom-tool"` (Custom Tool schema example)
+
+- **Files Verified Clean** (no changes needed):
+  - docs/developer-guide/production-guide.md - `vector_searches` is Rust variable (snake_case correct)
+  - docs/developer-guide/tracing-best-practices.md - `file_read` is trace operation name
+  - docs/developer-guide/bridge-pattern-guide.md - `tool_name` is Rust field name (snake_case correct)
+
+**Key Insights**:
+- **Developer Examples Critical**: Example code patterns directly influence how developers name their tools
+- **Consistency Matters**: Updated all example tool names to use kebab-case (custom-tool, file-operations)
+- **Clear Documentation**: Added explicit naming convention to CONTRIBUTING.md with rationale
+- **Language Conventions Preserved**: Rust code (modules, variables, functions) correctly uses snake_case
+- **Tool Registration Distinction**: Clarified that tool registration strings use kebab-case while Rust identifiers use snake_case
+- **Educational Value**: Examples now teach correct naming patterns from the start
 
 ---
 
@@ -3426,15 +3476,15 @@ Comprehensive validation and documentation of Phase 11a.9 completion.
 
 **Status**: ⏳ IN PROGRESS | **Effort**: TBD | **Files**: TBD | **Tools Renamed**: 22 of 38
 
-**Actual Metrics** (to be updated in 11a.9.14):
-- **Tasks Completed**: 12 of 14 (86%)
+**Actual Metrics** (to be finalized in 11a.9.14):
+- **Tasks Completed**: 13 of 14 (93%)
 - **Tools Standardized**: 21 of 22 (95%)
 - **Snake_case → Kebab-case**: 12 of 13 (92%) - media(3) + filesystem(3) + communication(2) + system(4)
 - **Suffix Removals**: 9 of 9 (100%) - filesystem(2) + data&doc(2) + web&api(3) + utility(2)
 - **Aliases Removed**: 31 of 31 (100%) - ✅ BREAKING CHANGE CHECKPOINT COMPLETE
 - **Examples Updated**: 29 files (getting-started: 3 files/8 occurrences + apps/cookbook: 26 files/52 occurrences)
-- **Documentation Updated - User Guide**: 1 file/3 occurrences (97% already compliant)
-- **Documentation Updated - Developer Guide**: 0 of ~5 (pending task 11a.9.13)
+- **Documentation Updated - User Guide**: 2 files/11 occurrences (troubleshooting: 3, llmspell-tools API: 8)
+- **Documentation Updated - Developer Guide**: 4 files/11 occurrences + naming convention added to CONTRIBUTING.md
 - **Test Results**: 405 unit tests + 5 examples tested successfully (getting-started: 3, apps: 2)
 - **Backward Compatibility**: ❌ REMOVED - old tool names no longer work (verified)
 

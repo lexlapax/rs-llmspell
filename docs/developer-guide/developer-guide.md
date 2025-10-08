@@ -282,7 +282,7 @@ use llmspell_tools::template_engine::TemplateEngineTool;
 // Conditional registration
 pub fn register_tools(registry: &mut ToolRegistry) {
     #[cfg(feature = "templates")]
-    registry.register("template_engine", TemplateEngineTool::new);
+    registry.register("template-creator", TemplateEngineTool::new);
 }
 ```
 
@@ -298,7 +298,7 @@ for _, name in ipairs(tools) do
 end
 
 -- Graceful handling of optional tools
-local template = Tool.try_get("template_engine")
+local template = Tool.try_get("template-creator")
 if template then
     -- Use template engine
 else
@@ -449,8 +449,8 @@ let result = block_on_async_lua(
 fn test_file_reader_basic() {
     // Use llmspell-testing helpers
     use llmspell_testing::tool_helpers::create_test_tool;
-    
-    let tool = create_test_tool("file_reader", "Reads files", vec![
+
+    let tool = create_test_tool("file-reader", "Reads files", vec![
         ("path", "string"),
     ]);
     // Test logic...
@@ -512,12 +512,12 @@ impl BaseAgent for MyTool {
         
         // Do work
         let result = self.do_operation(operation).await?;
-        
+
         // Use ResponseBuilder for consistent output
-        let response = ResponseBuilder::success("my_tool")
+        let response = ResponseBuilder::success("my-tool")
             .with_result(json!(result))
-            .build();
-            
+            .build()
+;
         Ok(AgentOutput::tool_result(response))
     }
 }
