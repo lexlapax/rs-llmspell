@@ -36,8 +36,7 @@ pub mod traits;
 /// Common workflow types
 pub mod types;
 
-// Test utilities (only available during testing)
-#[cfg(test)]
+// Test utilities (exported for integration tests and external test usage)
 pub mod test_utils;
 
 // Re-export main functionality for convenience

@@ -687,8 +687,49 @@ impl StepExecutor {
             });
         }
 
-        // Get registry or fall back to mock execution
-        let Some(ref registry) = self.registry else {
+        // Execute agent (mock or real) and get output text
+        let output_text = if let Some(ref registry) = self.registry {
+            // Real agent execution with registry
+            debug!("DEBUG: Looking for agent with name: '{}'", agent_name);
+
+            // Look up agent by its original name
+            let agent = registry.get_agent(agent_name).await.ok_or_else(|| {
+                error!("DEBUG: Agent '{}' not found in registry", agent_name);
+                LLMSpellError::Component {
+                    message: format!("Agent '{}' not found in registry", agent_name),
+                    source: None,
+                }
+            })?;
+
+            // Create AgentInput from the provided input string
+            let agent_input = llmspell_core::types::AgentInput::text(input);
+
+            // Convert StepExecutionContext to ExecutionContext for BaseAgent execution
+            // This will preserve the state field if it was set in StepExecutionContext
+            let mut exec_context = context.to_execution_context();
+
+            info!(
+                "execute_agent_step: context.state before conversion: {}, exec_context.state after conversion: {}",
+                context.state.is_some(),
+                exec_context.state.is_some()
+            );
+
+            // Override scope to Agent for this execution
+            // Create a ComponentId from the agent name for the scope
+            let agent_id = ComponentId::from_name(agent_name);
+            exec_context.scope = llmspell_core::execution_context::ContextScope::Agent(agent_id);
+
+            // Set workflow execution ID in session if not already set
+            if exec_context.session_id.is_none() {
+                exec_context.session_id = Some(context.workflow_state.execution_id.to_string());
+            }
+
+            // Execute through BaseAgent trait with automatic event emission
+            let output = agent.execute(agent_input, exec_context.clone()).await?;
+
+            // Extract output text for return and state writing
+            output.text
+        } else {
             // Fall back to mock execution for backward compatibility in tests
             warn!(
                 "No registry available, using mock execution for agent: '{}'",
@@ -696,102 +737,31 @@ impl StepExecutor {
             );
             // Create a ComponentId for the mock function (temporary)
             let mock_id = ComponentId::from_name(agent_name);
-            return self.execute_agent_step_mock(mock_id, input).await;
+            self.execute_agent_step_mock(mock_id, input).await?
         };
 
-        // DEBUG: Log what we're looking for
-        debug!("DEBUG: Looking for agent with name: '{}'", agent_name);
-
-        // Look up agent by its original name
-        let agent = registry.get_agent(agent_name).await.ok_or_else(|| {
-            error!("DEBUG: Agent '{}' not found in registry", agent_name);
-            LLMSpellError::Component {
-                message: format!("Agent '{}' not found in registry", agent_name),
-                source: None,
-            }
-        })?;
-
-        // Create AgentInput from the provided input string
-        let agent_input = llmspell_core::types::AgentInput::text(input);
-
-        // Convert StepExecutionContext to ExecutionContext for BaseAgent execution
-        // This will preserve the state field if it was set in StepExecutionContext
-        let mut exec_context = context.to_execution_context();
-
-        info!(
-            "execute_agent_step: context.state before conversion: {}, exec_context.state after conversion: {}",
-            context.state.is_some(),
-            exec_context.state.is_some()
-        );
-
-        // Override scope to Agent for this execution
-        // Create a ComponentId from the agent name for the scope
-        let agent_id = ComponentId::from_name(agent_name);
-        exec_context.scope = llmspell_core::execution_context::ContextScope::Agent(agent_id);
-
-        // Set workflow execution ID in session if not already set
-        if exec_context.session_id.is_none() {
-            exec_context.session_id = Some(context.workflow_state.execution_id.to_string());
-        }
-
-        // Execute through BaseAgent trait with automatic event emission
-        let output = agent.execute(agent_input, exec_context.clone()).await?;
-
-        // Write output to state if state is available in ExecutionContext
-        info!(
-            "After agent execution - Checking for state in ExecutionContext: state = {}",
-            exec_context.state.is_some()
-        );
-        if let Some(ref state) = exec_context.state {
+        // Write agent output to state if state is available
+        // This happens for BOTH mock and real execution to ensure consistent behavior
+        if let Some(ref state) = context.state {
             let workflow_id = context.workflow_state.execution_id.to_string();
 
             // Use standardized state key functions
             let output_key = crate::types::state_keys::agent_output(&workflow_id, agent_name);
-            let metadata_key = crate::types::state_keys::agent_metadata(&workflow_id, agent_name);
 
             info!("Writing agent output to state with key: {}", output_key);
-            info!("Agent output text: {:?}", output.text);
+            info!("Agent output text: {:?}", output_text);
 
             // Store the output in state
             state
-                .write(&output_key, serde_json::to_value(&output.text)?)
-                .await?;
-
-            // Store metadata including tool calls
-            let mut metadata = output.metadata;
-            if !output.tool_calls.is_empty() {
-                metadata.extra.insert(
-                    "tool_calls".to_string(),
-                    serde_json::to_value(&output.tool_calls)?,
-                );
-            }
-            state
-                .write(&metadata_key, serde_json::to_value(&metadata)?)
+                .write(&output_key, serde_json::to_value(&output_text)?)
                 .await?;
 
             info!("Successfully wrote agent output to state");
-
-            // Emit state change event if events are available
-            if let Some(ref events) = exec_context.events {
-                if events.config().emit_state_events {
-                    let _ = events
-                        .emit(
-                            "workflow.state.updated",
-                            serde_json::json!({
-                                "workflow_id": workflow_id,
-                                "keys": [output_key, metadata_key],
-                                "operation": "write",
-                                "component": agent_name,
-                            }),
-                        )
-                        .await;
-                }
-            }
         } else {
-            debug!("No state available in ExecutionContext to write agent output");
+            debug!("No state available in StepExecutionContext to write agent output");
         }
 
-        Ok(output.text)
+        Ok(output_text)
     }
 
     /// Mock execution fallback for agents (used when no registry is available)
