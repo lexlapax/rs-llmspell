@@ -1895,7 +1895,8 @@ pub fn inject_workflow_global(
         })?,
     )?;
 
-    // Note: executeAsync helper removed - all methods now use synchronous API
+    // Note: All workflows use synchronous execute() method via block_on() bridge (ADR-004)
+    // Async methods were never implemented
 
     // Add Workflow.builder() method
     let bridge_for_builder = workflow_bridge;

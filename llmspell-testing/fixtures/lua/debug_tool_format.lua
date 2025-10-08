@@ -75,10 +75,10 @@ else
     print("  Tool not found!")
 end
 
--- Test with executeAsync
-print("\n4. Testing with executeAsync:")
-if Tool.executeAsync then
-    local result = Tool.executeAsync("calculator", {
+-- Test with execute
+print("\n4. Testing with execute:")
+if Tool.execute then
+    local result = Tool.execute("calculator", {
         operation = "evaluate",
         expression = "2 + 2"
     })
@@ -96,5 +96,5 @@ if Tool.executeAsync then
         end
     end
 else
-    print("  executeAsync not available")
+    print("  execute not available")
 end

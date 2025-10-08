@@ -245,15 +245,7 @@ pub fn inject_tool_global(
         "__index",
         lua.create_function(move |lua, (_table, key): (Table, String)| {
             // Check if it's a built-in method first
-            let methods = [
-                "list",
-                "get",
-                "execute",
-                "exists",
-                "categories",
-                "discover",
-                "executeAsync",
-            ];
+            let methods = ["list", "get", "execute", "exists", "categories", "discover"];
             if methods.contains(&key.as_str()) {
                 return Ok(mlua::Value::Nil);
             }
@@ -408,7 +400,8 @@ pub fn inject_tool_global(
 
     tool_table.set("discover", discover_fn)?;
 
-    // Tool.executeAsync removed - all tools now use synchronous API
+    // Note: All tools use synchronous execute() method via block_on() bridge (ADR-004)
+    // Async methods (executeAsync, invoke_async) were never implemented
 
     // Set Tool as global
     lua.globals().set("Tool", tool_table)?;

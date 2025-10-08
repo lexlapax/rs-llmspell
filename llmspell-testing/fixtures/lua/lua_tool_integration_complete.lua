@@ -229,8 +229,8 @@ local function test_data_tools()
     -- 21. http_request (async tool)
     tool = Tool.get("http_request")
     -- Use the async helper if available
-    if Tool.executeAsync then
-        result = Tool.executeAsync("http_request", {
+    if Tool.execute then
+        result = Tool.execute("http_request", {
             method = "GET",
             url = "https://httpbin.org/get"
         })

@@ -7934,7 +7934,7 @@ local json_output = JSON.stringify(config)
 -- {"name":"assistant","tools":["web-searcher","calculator"],"settings":{"temperature":0.5,"max_tokens":2000}}
 
 -- Working with tool outputs
-local tool_result = Tool.executeAsync("uuid-generator", {
+local tool_result = Tool.execute("uuid-generator", {
     operation = "generate",
     version = "v4"
 })
@@ -7962,7 +7962,7 @@ local analysis_data = {
 
 -- Convert to JSON for tool input
 local json_input = JSON.stringify(analysis_data)
-local processed = Tool.executeAsync("json-processor", {
+local processed = Tool.execute("json-processor", {
     data = json_input,
     query = ".results[] | select(.score > 0.5)"
 })
@@ -7978,19 +7978,19 @@ local workflow_data = {
 }
 
 -- Tool 1: Text analysis
-local text_result = Tool.executeAsync("text-analyzer", {
+local text_result = Tool.execute("text-analyzer", {
     input = JSON.stringify(workflow_data)
 })
 local text_analysis = JSON.parse(text_result.output)
 
 -- Tool 2: Entity enrichment
-local enriched_result = Tool.executeAsync("entity-enricher", {
+local enriched_result = Tool.execute("entity-enricher", {
     entities = JSON.stringify(text_analysis.result.entities)
 })
 local enriched_data = JSON.parse(enriched_result.output)
 
 -- Tool 3: Report generation
-local report = Tool.executeAsync("report-generator", {
+local report = Tool.execute("report-generator", {
     analysis = JSON.stringify({
         text_analysis = text_analysis.result,
         enriched_entities = enriched_data.result
@@ -8041,7 +8041,7 @@ logger:debug("Processing stats", {data = compact})
 ```lua
 -- 1. Tool Output Processing Pattern
 local function process_tool_output(tool_name, params)
-    local result = Tool.executeAsync(tool_name, params)
+    local result = Tool.execute(tool_name, params)
     if result.success and result.output then
         return JSON.parse(result.output)
     else
@@ -8054,7 +8054,7 @@ local function process_batch(items)
     local results = {}
     for i, item in ipairs(items) do
         local json_item = JSON.stringify(item)
-        local processed = Tool.executeAsync("processor", {data = json_item})
+        local processed = Tool.execute("processor", {data = json_item})
         results[i] = JSON.parse(processed.output)
     end
     return results
@@ -9467,7 +9467,7 @@ const jsonString = JSON.stringify(data);
 const parsed = JSON.parse(jsonString);
 
 // Working with tool outputs (same pattern as Lua)
-const toolResult = await Tool.executeAsync("uuid-generator", {
+const toolResult = await Tool.execute("uuid-generator", {
     operation: "generate",
     version: "v4"
 });
@@ -9482,21 +9482,21 @@ if (toolResult.success && toolResult.output) {
 // Async tool chaining with JSON data
 async function processDataPipeline(inputData) {
     // Step 1: Analyze data
-    const analysisResult = await Tool.executeAsync("data-analyzer", {
+    const analysisResult = await Tool.execute("data-analyzer", {
         data: JSON.stringify(inputData),
         analysisType: "comprehensive"
     });
     const analysisData = JSON.parse(analysisResult.output);
     
     // Step 2: Transform results
-    const transformResult = await Tool.executeAsync("data-transformer", {
+    const transformResult = await Tool.execute("data-transformer", {
         input: JSON.stringify(analysisData.result),
         transformations: ["normalize", "aggregate", "summarize"]
     });
     const transformedData = JSON.parse(transformResult.output);
     
     // Step 3: Generate report
-    const reportResult = await Tool.executeAsync("report-generator", {
+    const reportResult = await Tool.execute("report-generator", {
         data: JSON.stringify({
             original: inputData,
             analysis: analysisData.result,
@@ -9512,7 +9512,7 @@ async function processDataPipeline(inputData) {
 // Error handling with JSON parsing
 async function safeToolExecution(toolName, params) {
     try {
-        const result = await Tool.executeAsync(toolName, params);
+        const result = await Tool.execute(toolName, params);
         
         if (result.success && result.output) {
             try {
