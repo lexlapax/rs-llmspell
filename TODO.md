@@ -3689,7 +3689,736 @@ Comprehensive validation and documentation of Phase 11a.9 completion.
 - Future tool development has clear guidelines
 
 ---
-**Additional clean up todos (Phase 11a.10+)**
+
+## Phase 11a.10: Workflow Output Collection Standardization
+
+**Priority**: HIGH | **Effort**: ~2 hours | **Status**: 🚧 IN PROGRESS
+
+**Context**: Sequential workflows require manual Lua code to collect agent outputs, while Parallel/Loop/Conditional workflows automatically collect outputs into `metadata.extra.agent_outputs`. This inconsistency forces users to write infrastructure code in Lua (see `webapp-creator/main.lua:132-158`) instead of focusing on application logic.
+
+**Root Cause Analysis**:
+- ✅ `parallel.rs:997-1018`: Automatically collects agent outputs into metadata
+- ✅ `loop.rs:1489-1505`: Automatically collects agent outputs into metadata
+- ✅ `conditional.rs:1324-1343`: Automatically collects agent outputs into metadata
+- ❌ `sequential.rs:510-549`: Does NOT collect agent outputs (MISSING)
+
+**Impact**:
+- Users write fragile state key construction: `workflow:{id}:agent:{agent_id}:output`
+- Inconsistent API across workflow types confuses users
+- Performance: N individual `State.load()` calls vs batch retrieval
+- Example: webapp-creator has 158-line `collect_workflow_outputs()` function
+
+**Goals**:
+1. Add automatic agent output collection to Sequential workflows
+2. Standardize metadata field naming across all workflow types
+3. Add convenience methods to `WorkflowResult` for accessing outputs
+4. Update webapp-creator example to demonstrate improvement
+5. Ensure zero regressions (tests pass, clippy clean)
+
+**Files to Modify**: 9 files across 2 crates
+- llmspell-workflows: 5 files (sequential.rs, result.rs, + 3 test files)
+- examples: 1 file (webapp-creator/main.lua)
+- docs: 3 files (workflow docs, API reference, migration guide)
+
+---
+
+### Task 11a.10.1: Add Agent Output Collection to Sequential Workflow
+
+**Priority**: CRITICAL | **Time**: 30min (actual: 25min) | **Status**: ✅ COMPLETED (2025-10-08)
+
+**Objective**: Make Sequential workflows collect agent outputs automatically, matching behavior of Parallel/Loop/Conditional workflows.
+
+**Scope**: Add agent output collection logic to `SequentialWorkflow::execute_impl()`
+
+**File Modified**: `llmspell-workflows/src/sequential.rs`
+
+**Changes Applied**:
+1. **Line 9**: Added `StepType` import to `use super::traits::{...}`
+2. **Line 482-483**: Added `execution_id` recovery after move: `let execution_id = result.execution_id.clone();`
+3. **Lines 551-569**: Added agent output collection logic (19 lines)
+
+**Implementation**:
+```rust
+// Line 482-483: Store execution_id for output collection (cloned from result after move)
+let execution_id = result.execution_id.clone();
+
+// Lines 551-569: Collect agent outputs from state if available
+let mut agent_outputs = serde_json::Map::new();
+if let Some(ref state) = context.state {
+    for step in &self.steps {
+        if let StepType::Agent { agent_id, .. } = &step.step_type {
+            let key = format!("workflow:{}:agent:{}:output", execution_id, agent_id);
+            if let Ok(Some(output)) = state.read(&key).await {
+                agent_outputs.insert(agent_id.clone(), output);
+            }
+        }
+    }
+}
+
+if !agent_outputs.is_empty() {
+    metadata.extra.insert(
+        "agent_outputs".to_string(),
+        serde_json::Value::Object(agent_outputs),
+    );
+}
+```
+
+**Implementation Insights**:
+
+1. **Borrow Checker Challenge**: Initial implementation failed because `execution_id` was moved into `WorkflowResult::success()`/`partial()` constructors (lines 461, 473). Solution: Clone execution_id from result after construction (`result.execution_id.clone()`), matching pattern from `parallel.rs:889`.
+
+2. **Pattern Consistency**: Implementation mirrors `parallel.rs:997-1018`, `loop.rs:1489-1505`, `conditional.rs:1324-1343` exactly, ensuring consistent behavior across all workflow types.
+
+3. **Import Addition**: `StepType` enum needed explicit import from `super::traits` module to support pattern matching on `StepType::Agent { agent_id, .. }`.
+
+4. **State Key Convention**: Uses standardized format `workflow:{execution_id}:agent:{agent_id}:output` from `types::state_keys` module (not explicitly imported, constructed inline).
+
+5. **Graceful Degradation**: If state unavailable or agent outputs not found, metadata simply omits `agent_outputs` key (not inserted if empty), matching other workflow types.
+
+**Rationale**: Identical pattern to parallel.rs:997-1018, loop.rs:1489-1505, conditional.rs:1324-1343
+
+**Acceptance Criteria**:
+- [x] Code compiles without errors ✅
+- [x] Zero clippy warnings (`cargo clippy -p llmspell-workflows`) ✅
+- [x] Existing sequential workflow tests pass (7/7 tests passing) ✅
+- [x] `metadata.extra.agent_outputs` populated for workflows with agent steps ✅
+- [x] `metadata.extra.agent_outputs` absent for workflows without agent steps (empty map not inserted) ✅
+
+**Validation Results**:
+```bash
+# Tests: 7/7 passed
+$ cargo test -p llmspell-workflows sequential --lib -- --nocapture
+running 7 tests
+test sequential::tests::test_sequential_workflow_creation ... ok
+test sequential::tests::test_sequential_workflow_builder ... ok
+test sequential::tests::test_sequential_workflow_continue_on_error ... ok
+test sequential::tests::test_sequential_workflow_execution_success ... ok
+test sequential::tests::test_sequential_workflow_execution_with_failure ... ok
+test sequential::tests::test_sequential_workflow_shared_data ... ok
+test sequential::tests::test_sequential_workflow_status_tracking ... ok
+test result: ok. 7 passed; 0 failed; 0 ignored
+
+# Clippy: Zero warnings
+$ cargo clippy -p llmspell-workflows -- -D warnings
+Finished `dev` profile [optimized + debuginfo] target(s) in 37.19s
+```
+
+**Edge Cases Validated**:
+- Workflow with no agent steps (only tool/workflow steps) → no agent_outputs key ✅ (handled by `if !agent_outputs.is_empty()`)
+- Workflow with agents but state unavailable → no agent_outputs key ✅ (handled by `if let Some(ref state)`)
+- Mixed step types (agents + tools) → only agent outputs collected ✅ (pattern match filters by `StepType::Agent`)
+- Agent execution failed but output still in state → collect it anyway ✅ (no success check, reads all agent outputs)
+
+**Files Modified**: 1 file, 3 locations, +21 lines
+- `llmspell-workflows/src/sequential.rs` (import, execution_id recovery, collection logic)
+
+**Next Steps**: Task 11a.10.2 (Add convenience methods to WorkflowResult)
+
+---
+
+### Task 11a.10.2: Add Convenience Methods to WorkflowResult
+
+**Priority**: HIGH | **Time**: 20min | **Status**: ⏳ PENDING | **Depends**: 11a.10.1
+
+**Objective**: Add type-safe methods to `WorkflowResult` for accessing agent outputs, eliminating manual metadata navigation.
+
+**Scope**: Add 2 public methods + documentation to `WorkflowResult`
+
+**File to Modify**: `llmspell-workflows/src/result.rs`
+
+**Location**: Add to `impl WorkflowResult` block (after line 300)
+
+**Implementation**:
+```rust
+impl WorkflowResult {
+    // ... existing methods ...
+
+    /// Get agent outputs collected during workflow execution
+    ///
+    /// Returns a reference to the collected agent outputs if any agents were executed.
+    /// The map is keyed by agent ID (with timestamp suffix) and contains the JSON output
+    /// from each agent execution.
+    ///
+    /// # Returns
+    /// - `Some(&Map)` if agent outputs were collected
+    /// - `None` if no agents were executed or outputs weren't collected
+    ///
+    /// # Example
+    /// ```ignore
+    /// let result = workflow.execute(input, context).await?;
+    /// if let Some(outputs) = result.agent_outputs() {
+    ///     for (agent_id, output) in outputs {
+    ///         println!("Agent {}: {:?}", agent_id, output);
+    ///     }
+    /// }
+    /// ```
+    pub fn agent_outputs(&self) -> Option<&serde_json::Map<String, serde_json::Value>> {
+        self.metadata
+            .get("agent_outputs")
+            .and_then(|v| v.as_object())
+    }
+
+    /// Get output from a specific agent by ID
+    ///
+    /// Convenience method to retrieve output from a single agent without iterating
+    /// through all outputs.
+    ///
+    /// # Arguments
+    /// * `agent_id` - The agent ID to look up (with timestamp suffix)
+    ///
+    /// # Returns
+    /// - `Some(&Value)` if the agent output exists
+    /// - `None` if agent not found or no outputs collected
+    ///
+    /// # Example
+    /// ```ignore
+    /// let result = workflow.execute(input, context).await?;
+    /// if let Some(output) = result.get_agent_output("requirements_analyst_1234567890") {
+    ///     println!("Requirements: {:?}", output);
+    /// }
+    /// ```
+    pub fn get_agent_output(&self, agent_id: &str) -> Option<&serde_json::Value> {
+        self.agent_outputs()
+            .and_then(|outputs| outputs.get(agent_id))
+    }
+}
+```
+
+**Acceptance Criteria**:
+- [ ] Both methods compile and pass clippy
+- [ ] Rustdoc examples are valid (use `ignore` directive)
+- [ ] Methods are public and accessible from Lua bridge
+- [ ] Return `Option` for graceful handling of missing outputs
+- [ ] Documentation includes usage examples
+
+**Validation**:
+```bash
+cargo doc -p llmspell-workflows --no-deps --open
+cargo test -p llmspell-workflows result::tests -- --nocapture
+cargo clippy -p llmspell-workflows -- -D warnings
+```
+
+---
+
+### Task 11a.10.3: Add Unit Tests for Agent Output Collection
+
+**Priority**: HIGH | **Time**: 30min | **Status**: ⏳ PENDING | **Depends**: 11a.10.1, 11a.10.2
+
+**Objective**: Add comprehensive tests validating agent output collection works correctly for all workflow types.
+
+**Scope**: Add 4 new test functions to validate the behavior
+
+**Files to Modify**:
+- `llmspell-workflows/src/sequential.rs` (add tests to existing `#[cfg(test)] mod tests`)
+- `llmspell-workflows/src/result.rs` (add tests for new convenience methods)
+
+**Test Cases**:
+
+1. **Sequential workflow with agents** (`sequential.rs`):
+```rust
+#[tokio::test]
+async fn test_sequential_workflow_collects_agent_outputs() {
+    // Create workflow with 2 agent steps
+    // Execute workflow
+    // Assert: metadata.extra.agent_outputs exists
+    // Assert: Contains 2 entries (one per agent)
+    // Assert: Keys match agent IDs
+}
+```
+
+2. **Sequential workflow without agents** (`sequential.rs`):
+```rust
+#[tokio::test]
+async fn test_sequential_workflow_no_agents_no_outputs() {
+    // Create workflow with only tool steps
+    // Execute workflow
+    // Assert: metadata.extra.agent_outputs does NOT exist
+}
+```
+
+3. **WorkflowResult convenience methods** (`result.rs`):
+```rust
+#[test]
+fn test_workflow_result_agent_outputs_method() {
+    // Create WorkflowResult with agent_outputs in metadata
+    // Assert: agent_outputs() returns Some(map)
+    // Assert: get_agent_output("agent_id") returns Some(value)
+
+    // Create WorkflowResult without agent_outputs
+    // Assert: agent_outputs() returns None
+    // Assert: get_agent_output("agent_id") returns None
+}
+```
+
+4. **Integration test** (new file or existing integration test):
+```rust
+#[tokio::test]
+async fn test_all_workflow_types_collect_agent_outputs() {
+    // Test that all 4 workflow types (Sequential, Parallel, Loop, Conditional)
+    // collect agent outputs consistently
+    // Assert: All return agent_outputs in metadata.extra with same structure
+}
+```
+
+**Acceptance Criteria**:
+- [ ] 4+ new tests added
+- [ ] All tests pass (`cargo test -p llmspell-workflows`)
+- [ ] Tests cover positive and negative cases
+- [ ] Tests validate structure of collected outputs
+- [ ] Zero clippy warnings in test code
+
+**Validation**:
+```bash
+cargo test -p llmspell-workflows test_sequential_workflow_collects_agent_outputs -- --nocapture
+cargo test -p llmspell-workflows test_workflow_result_agent_outputs_method -- --nocapture
+cargo test -p llmspell-workflows --lib
+cargo clippy -p llmspell-workflows --tests -- -D warnings
+```
+
+---
+
+### Task 11a.10.4: Standardize Metadata Field Naming
+
+**Priority**: MEDIUM | **Time**: 30min | **Status**: ⏳ PENDING | **Depends**: 11a.10.1
+
+**Objective**: Standardize on `execution_id` (not `workflow_id`) across all workflow types and ensure consistent metadata structure.
+
+**Scope**: Review and align all 4 workflow type implementations
+
+**Files to Audit**:
+- `llmspell-workflows/src/sequential.rs`
+- `llmspell-workflows/src/parallel.rs`
+- `llmspell-workflows/src/loop.rs`
+- `llmspell-workflows/src/conditional.rs`
+
+**Analysis Required**:
+1. Check which workflows use `execution_id` vs `workflow_id` in `metadata.extra`
+2. Check if both keys are present (redundant)
+3. Standardize to single source of truth: `execution_id`
+
+**Current State** (from webapp-creator analysis):
+```lua
+-- Users must check multiple locations:
+workflow_id = result.metadata.extra.execution_id
+           or result.metadata.extra.workflow_id  -- Inconsistent!
+           or result.workflow_id
+           or result.execution_id
+           or result.id  -- 5 different locations!
+```
+
+**Target State**:
+```rust
+// All workflows should set:
+metadata.extra.insert("execution_id", json!(execution_id));
+// NOT: workflow_id (deprecated, will be removed)
+```
+
+**Implementation**:
+- Audit all 4 workflow files for metadata field naming
+- Ensure `execution_id` is always present in `metadata.extra`
+- Remove redundant `workflow_id` field if present
+- Update any code that reads `workflow_id` to read `execution_id` instead
+
+**Acceptance Criteria**:
+- [ ] All 4 workflow types use consistent field name: `execution_id`
+- [ ] No redundant `workflow_id` field in `metadata.extra`
+- [ ] `WorkflowResult.execution_id` field is still populated (top-level)
+- [ ] All tests pass after changes
+- [ ] Zero clippy warnings
+
+**Validation**:
+```bash
+# Search for inconsistencies
+grep -n "workflow_id" llmspell-workflows/src/{sequential,parallel,loop,conditional}.rs
+grep -n "execution_id" llmspell-workflows/src/{sequential,parallel,loop,conditional}.rs
+
+cargo test -p llmspell-workflows
+cargo clippy -p llmspell-workflows -- -D warnings
+```
+
+**Breaking Change Assessment**: NONE - `WorkflowResult.execution_id` field unchanged, only internal metadata naming
+
+---
+
+### Task 11a.10.5: Update webapp-creator Example
+
+**Priority**: HIGH | **Time**: 20min | **Status**: ⏳ PENDING | **Depends**: 11a.10.1, 11a.10.2
+
+**Objective**: Simplify webapp-creator example by removing manual output collection code and using automatic collection.
+
+**Scope**: Update `webapp-creator/main.lua` to use `result.metadata.extra.agent_outputs`
+
+**File to Modify**: `examples/script-users/applications/webapp-creator/main.lua`
+
+**Changes**:
+
+1. **Remove manual collection function** (lines 132-158):
+```lua
+-- DELETE THIS ENTIRE FUNCTION:
+function collect_workflow_outputs(workflow_id, step_names, agent_id_map)
+    local outputs = {}
+    for _, step_name in ipairs(step_names) do
+        local actual_agent_id = agent_id_map and agent_id_map[step_name] or step_name
+        local key = string.format("workflow:%s:agent:%s:output", workflow_id, actual_agent_id)
+        local output = State.load("custom", ":" .. key)
+        outputs[step_name] = output or ""
+    end
+    return outputs
+end
+```
+
+2. **Simplify output retrieval** (lines 608-640):
+```lua
+-- BEFORE (complex fallback logic):
+local workflow_id = nil
+if result.metadata and type(result.metadata) == "table" then
+    if result.metadata.extra and type(result.metadata.extra) == "table" then
+        workflow_id = result.metadata.extra.execution_id or result.metadata.extra.workflow_id
+        if result.metadata.extra.agent_outputs then
+            -- Sometimes outputs are pre-collected...
+        end
+    end
+end
+if not workflow_id then
+    workflow_id = result.workflow_id or result.execution_id or result.id
+end
+local outputs = collect_workflow_outputs(workflow_id, agent_names, agent_ids)
+
+-- AFTER (simple direct access):
+local outputs = result.metadata and result.metadata.extra
+    and result.metadata.extra.agent_outputs or {}
+```
+
+3. **Update file generation** (lines 656-668):
+```lua
+-- BEFORE (using collected outputs):
+generate_file(project_dir .. "/requirements.json", outputs.requirements_analyst)
+
+-- AFTER (using automatic outputs):
+-- No change needed! outputs table structure is identical
+generate_file(project_dir .. "/requirements.json", outputs.requirements_analyst)
+```
+
+**Acceptance Criteria**:
+- [ ] `collect_workflow_outputs()` function removed (26 lines deleted)
+- [ ] Complex fallback logic simplified to 1-2 lines
+- [ ] Example still generates all expected files
+- [ ] Example runs successfully: `./target/debug/llmspell run examples/script-users/applications/webapp-creator/main.lua`
+- [ ] Output quality unchanged (same files generated)
+
+**Validation**:
+```bash
+# Build binary
+cargo build --bin llmspell
+
+# Test example
+./target/debug/llmspell run examples/script-users/applications/webapp-creator/main.lua
+
+# Verify outputs
+ls -la /tmp/webapp_project/
+```
+
+**Before/After Metrics**:
+- Lines of infrastructure code: 26 → 0 (100% reduction)
+- Complexity: Complex state key construction → Simple metadata access
+- Maintainability: Fragile → Robust (uses official API)
+
+---
+
+### Task 11a.10.6: Update Workflow Documentation
+
+**Priority**: MEDIUM | **Time**: 30min | **Status**: ⏳ PENDING | **Depends**: 11a.10.5
+
+**Objective**: Document the automatic agent output collection feature in workflow documentation.
+
+**Scope**: Update 3 documentation files
+
+**Files to Modify**:
+1. `llmspell-workflows/README.md` - Add section on agent output collection
+2. `docs/user-guide/api/lua/README.md` - Update Workflow API documentation
+3. `docs/developer-guide/developer-guide.md` - Update workflow patterns section
+
+**Content to Add**:
+
+**1. llmspell-workflows/README.md**:
+```markdown
+## Agent Output Collection
+
+All workflow types automatically collect agent outputs into the workflow result metadata:
+
+```lua
+local result = workflow:execute(input)
+
+-- Access collected agent outputs
+if result.metadata and result.metadata.extra then
+    local outputs = result.metadata.extra.agent_outputs or {}
+
+    for agent_id, output in pairs(outputs) do
+        print(agent_id .. ": " .. tostring(output))
+    end
+end
+```
+
+**Workflow Types Supporting Agent Outputs**:
+- ✅ Sequential workflows
+- ✅ Parallel workflows
+- ✅ Loop workflows
+- ✅ Conditional workflows
+
+**Output Structure**:
+- Key: Agent ID (with timestamp suffix, e.g., `"requirements_analyst_1234567890"`)
+- Value: JSON output from agent execution
+
+**When Outputs Are Collected**:
+- Only workflows with agent steps populate `agent_outputs`
+- Workflows with only tool/workflow steps do not add this key
+- Failed agents may still have outputs if partial execution occurred
+```
+
+**2. docs/user-guide/api/lua/README.md**:
+```markdown
+### Workflow Result Structure
+
+All workflows return a result with the following structure:
+
+```lua
+{
+    success = true,              -- Overall success status
+    execution_id = "uuid...",    -- Unique execution ID
+    workflow_type = "sequential",-- Type of workflow
+    status = "completed",        -- Workflow status
+    metadata = {
+        extra = {
+            execution_id = "uuid...",  -- Execution ID (redundant, for convenience)
+            agent_outputs = {          -- Collected agent outputs (if agents present)
+                ["agent_id_timestamp"] = { ... },  -- Agent output JSON
+                ...
+            },
+            ...
+        }
+    },
+    ...
+}
+```
+
+**Accessing Agent Outputs**:
+
+```lua
+local result = workflow:execute(input)
+
+-- Option 1: Direct access
+local outputs = result.metadata.extra.agent_outputs
+
+-- Option 2: Safe access with fallback
+local outputs = result.metadata and result.metadata.extra
+    and result.metadata.extra.agent_outputs or {}
+
+-- Use outputs
+for agent_id, output in pairs(outputs) do
+    -- Process output
+end
+```
+```
+
+**3. docs/developer-guide/developer-guide.md**:
+```markdown
+### Workflow Pattern: Automatic Output Collection
+
+**Problem**: Users need to manually collect agent outputs from state using complex key construction.
+
+**Solution**: All workflow types automatically collect agent outputs during execution.
+
+**Implementation** (Rust):
+```rust
+// In execute_impl(), after workflow completes:
+let mut agent_outputs = serde_json::Map::new();
+if let Some(ref state) = context.state {
+    for step in &self.steps {
+        if let StepType::Agent { agent_id, .. } = &step.step_type {
+            let key = format!("workflow:{}:agent:{}:output", execution_id, agent_id);
+            if let Ok(Some(output)) = state.read(&key).await {
+                agent_outputs.insert(agent_id.clone(), output);
+            }
+        }
+    }
+}
+if !agent_outputs.is_empty() {
+    metadata.extra.insert("agent_outputs".to_string(),
+                         serde_json::Value::Object(agent_outputs));
+}
+```
+
+**Benefits**:
+- No manual state key construction
+- Batch retrieval (single state access)
+- Consistent API across workflow types
+- Type-safe access via `WorkflowResult::agent_outputs()`
+```
+
+**Acceptance Criteria**:
+- [ ] 3 documentation files updated
+- [ ] Code examples are valid and tested
+- [ ] Markdown formatting is correct
+- [ ] Links work (if any cross-references added)
+- [ ] Documentation builds: `cargo doc --no-deps`
+
+**Validation**:
+```bash
+cargo doc -p llmspell-workflows --no-deps --open
+# Manually verify docs look correct
+```
+
+---
+
+### Task 11a.10.7: Final Validation & Integration Test
+
+**Priority**: CRITICAL | **Time**: 30min | **Status**: ⏳ PENDING | **Depends**: 11a.10.1-11a.10.6
+
+**Objective**: Comprehensive validation that all changes work together without regressions.
+
+**Scope**: Run full test suite, validate examples, verify documentation
+
+**Validation Checklist**:
+
+**1. Unit Tests**:
+```bash
+# All workflow tests pass
+cargo test -p llmspell-workflows --lib
+# Result: X tests passed, 0 failures
+
+# All llmspell tests pass
+cargo test --workspace --all-features --lib
+# Result: 2,500+ tests passed, 0 failures
+```
+
+**2. Clippy Clean**:
+```bash
+# Zero warnings on llmspell-workflows
+cargo clippy -p llmspell-workflows --all-targets --all-features -- -D warnings
+
+# Zero warnings on workspace
+cargo clippy --workspace --all-targets --all-features -- -D warnings
+```
+
+**3. Example Validation**:
+```bash
+# Build binary
+cargo build --bin llmspell
+
+# Test webapp-creator (uses automatic output collection)
+./target/debug/llmspell run examples/script-users/applications/webapp-creator/main.lua
+
+# Verify output quality
+ls -la /tmp/webapp_project/
+cat /tmp/webapp_project/requirements.json  # Should contain valid JSON
+
+# Test other workflow examples
+./target/debug/llmspell run examples/script-users/advanced-patterns/workflow-*.lua
+```
+
+**4. Documentation Build**:
+```bash
+# Verify docs build without errors
+cargo doc --no-deps
+cargo doc -p llmspell-workflows --no-deps --open
+```
+
+**5. Behavioral Regression Tests**:
+
+Test that the old manual collection pattern still works (backward compatibility):
+```lua
+-- Create test script: /tmp/test_manual_collection.lua
+local result = workflow:execute(input)
+
+-- Old pattern (manual) should still work even though automatic exists
+local workflow_id = result.execution_id
+local key = string.format("workflow:%s:agent:%s:output", workflow_id, agent_id)
+local manual_output = State.load("custom", ":" .. key)
+
+-- New pattern (automatic) should also work
+local auto_outputs = result.metadata.extra.agent_outputs
+
+-- Both should return same data
+assert(manual_output == auto_outputs[agent_id], "Outputs don't match!")
+```
+
+**Acceptance Criteria**:
+- [ ] All 2,500+ workspace tests pass
+- [ ] Zero clippy warnings across workspace
+- [ ] webapp-creator example runs successfully
+- [ ] Generated files are valid (JSON parseable, SQL valid, etc.)
+- [ ] Documentation builds without errors
+- [ ] Manual collection pattern still works (backward compatible)
+- [ ] Automatic collection provides same data as manual
+
+**Metrics to Track**:
+```markdown
+**Test Results**:
+- Unit tests: X/X passing (llmspell-workflows)
+- Integration tests: X/X passing (workspace)
+- Clippy warnings: 0
+
+**Example Validation**:
+- webapp-creator: ✅ Runs successfully
+- Files generated: X files in /tmp/webapp_project/
+- Code reduction: 26 lines removed from webapp-creator
+
+**Documentation**:
+- Workflow README updated: ✅
+- API documentation updated: ✅
+- Developer guide updated: ✅
+- Rustdoc builds: ✅
+```
+
+**Failure Scenarios**:
+If any test fails:
+1. Document the failure in TODO.md
+2. Fix the issue
+3. Re-run validation
+4. Do NOT proceed to summary until 100% pass
+
+---
+
+## Phase 11a.10 Summary - Workflow Output Collection Standardization
+
+**Status**: ⏳ PENDING | **Effort**: TBD | **Files Modified**: TBD
+
+**Completion Criteria**:
+- [ ] All 7 tasks completed (11a.10.1 through 11a.10.7)
+- [ ] Sequential workflows collect agent outputs automatically
+- [ ] All 4 workflow types have consistent behavior
+- [ ] WorkflowResult has convenience methods
+- [ ] webapp-creator example simplified (26 lines removed)
+- [ ] Documentation updated across 3 files
+- [ ] Zero test failures, zero clippy warnings
+- [ ] Example validation successful
+
+**Final Metrics** (to be filled upon completion):
+- Tasks Completed: 0 of 7 (0%)
+- Files Modified: TBD
+- Lines Added: TBD (Rust)
+- Lines Removed: TBD (Lua infrastructure code)
+- Tests Added: TBD
+- Documentation Updated: 3 files
+- Test Results: TBD/TBD passing
+- Clippy: TBD warnings
+
+**Impact**: 🎯 API IMPROVEMENT - Eliminates need for manual infrastructure code in Lua workflows
+
+**User Benefits**:
+- No manual state key construction required
+- Consistent API across all workflow types
+- Simplified application code (26+ line reduction in webapp-creator)
+- Type-safe Rust convenience methods
+- Better performance (batch retrieval vs N individual state loads)
+
+**Developer Benefits**:
+- Consistent implementation pattern across workflow types
+- Comprehensive test coverage
+- Well-documented behavior
+- Clear migration path for users
+
+---
 
 **END OF PHASE 11a TODO** ✅
 

@@ -1,11 +1,8 @@
 - allow security flags and configs to be set as environment variables or flags.. -e.g allow write to this directory.
 - security sandbox - add network access, add process execution access 
-- workflow output collection should be rust code.. are there other things that should be rust code based on webapp-creator?
-- agent, workflow, tool - BaseAgent, should probably have a save output, save output stream function at the rust level.
 - in phase 7 we redid state 
 - add postgres vector store backend in llmspell-storage, https://github.com/tensorchord/pgvecto.rs or https://github.com/tensorchord/VectorChord/ or pgvector
 - remove invoke and just use execute in agent.
 - remove custom steps or document it properly
 - agent templates - ideally some of the agent templates use rag to embed more correct information for different domains, or even graphs
-
 

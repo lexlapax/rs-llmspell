@@ -6,7 +6,7 @@ use super::hooks::{WorkflowExecutionPhase, WorkflowExecutor, WorkflowHookContext
 use super::result::{WorkflowError, WorkflowResult, WorkflowType};
 use super::state::StateManager;
 use super::step_executor::StepExecutor;
-use super::traits::{ErrorStrategy, WorkflowStatus, WorkflowStep};
+use super::traits::{ErrorStrategy, StepType, WorkflowStatus, WorkflowStep};
 use super::types::{StepExecutionContext, WorkflowConfig};
 use async_trait::async_trait;
 use llmspell_core::{
@@ -479,6 +479,9 @@ impl BaseAgent for SequentialWorkflow {
             )
         };
 
+        // Store execution_id for output collection (cloned from result after move)
+        let execution_id = result.execution_id.clone();
+
         // Build output text
         let output_text = if result.success {
             format!(
@@ -547,6 +550,26 @@ impl BaseAgent for SequentialWorkflow {
         metadata
             .extra
             .insert("success_rate".to_string(), serde_json::json!(success_rate));
+
+        // Collect agent outputs from state if available (matching parallel/loop/conditional)
+        let mut agent_outputs = serde_json::Map::new();
+        if let Some(ref state) = context.state {
+            for step in &self.steps {
+                if let StepType::Agent { agent_id, .. } = &step.step_type {
+                    let key = format!("workflow:{}:agent:{}:output", execution_id, agent_id);
+                    if let Ok(Some(output)) = state.read(&key).await {
+                        agent_outputs.insert(agent_id.clone(), output);
+                    }
+                }
+            }
+        }
+
+        if !agent_outputs.is_empty() {
+            metadata.extra.insert(
+                "agent_outputs".to_string(),
+                serde_json::Value::Object(agent_outputs),
+            );
+        }
 
         // If workflow failed, return an error so BaseAgent emits workflow.failed event
         if !result.success {
