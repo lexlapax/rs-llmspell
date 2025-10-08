@@ -129,14 +129,32 @@ fn register_utility_tools(
 ) -> Result<(), Box<dyn std::error::Error>> {
     register_tool(registry, "base64_encoder", Base64EncoderTool::new)?;
     register_tool(registry, "calculator", CalculatorTool::new)?;
-    register_tool(registry, "data_validation", DataValidationTool::new)?;
+
+    // Data validator: register with kebab-case primary name
+    let data_validator_tool = Arc::new(DataValidationTool::new());
+    registry.register_tool("data-validator".to_string(), data_validator_tool.clone())?;
+    // Register with snake_case alias for backward compatibility
+    registry.register_tool("data_validation".to_string(), data_validator_tool.clone())?;
+    // Register with old -tool suffix alias for backward compatibility
+    registry.register_tool("data-validation-tool".to_string(), data_validator_tool)?;
+
     register_tool(registry, "date_time_handler", DateTimeHandlerTool::new)?;
     register_tool(registry, "diff_calculator", DiffCalculatorTool::new)?;
     register_tool(registry, "hash_calculator", || {
         HashCalculatorTool::new(HashCalculatorConfig::default())
     })?;
+
+    // Template creator: register with kebab-case primary name
     #[cfg(feature = "templates")]
-    register_tool(registry, "template_engine", TemplateEngineTool::new)?;
+    {
+        let template_tool = Arc::new(TemplateEngineTool::new());
+        registry.register_tool("template-creator".to_string(), template_tool.clone())?;
+        // Register with snake_case alias for backward compatibility
+        registry.register_tool("template_engine".to_string(), template_tool.clone())?;
+        // Register with old -tool suffix alias for backward compatibility
+        registry.register_tool("template-engine-tool".to_string(), template_tool)?;
+    }
+
     register_tool(registry, "text_manipulator", || {
         TextManipulatorTool::new(TextManipulatorConfig::default())
     })?;

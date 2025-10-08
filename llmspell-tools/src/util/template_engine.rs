@@ -128,7 +128,7 @@ impl TemplateEngineTool {
     #[must_use]
     pub fn new() -> Self {
         info!(
-            tool_name = "template-engine-tool",
+            tool_name = "template-creator",
             default_engine = "tera",
             supported_engines = 2,    // Tera, Handlebars
             max_template_size_mb = 1, // 1MB default
@@ -158,7 +158,7 @@ impl TemplateEngineTool {
         );
         Self {
             metadata: ComponentMetadata::new(
-                "template-engine-tool".to_string(),
+                "template-creator".to_string(),
                 "Render templates using Tera or Handlebars engines".to_string(),
             ),
             config,
@@ -335,7 +335,7 @@ impl TemplateEngineTool {
 impl Default for TemplateEngineTool {
     fn default() -> Self {
         info!(
-            tool_name = "template-engine",
+            tool_name = "template-creator",
             category = "Tool",
             phase = "Phase 3 (comprehensive instrumentation)",
             "Creating TemplateEngineTool"
@@ -657,7 +657,7 @@ impl Tool for TemplateEngineTool {
 
     fn schema(&self) -> ToolSchema {
         ToolSchema {
-            name: "template_engine".to_string(),
+            name: "template-creator".to_string(),
             description: "Render templates using Tera or Handlebars engines".to_string(),
             parameters: vec![
                 ParameterDef {

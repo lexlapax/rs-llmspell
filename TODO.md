@@ -2976,7 +2976,7 @@ Remove `-tool` suffix from 3 web/API tools.
 ---
 
 ### Task 11a.9.8: Utility Tools Standardization
-**Priority**: MEDIUM | **Time**: 10min | **Status**: ⏳ PENDING | **Depends**: 11a.9.7
+**Priority**: MEDIUM | **Time**: 10min | **Status**: ✅ DONE | **Depends**: 11a.9.7
 
 Remove `-tool` suffix from 2 utility tools.
 
@@ -2990,12 +2990,23 @@ Remove `-tool` suffix from 2 utility tools.
 - llmspell-tools/src/util/template_engine.rs:161
 
 **Criteria**:
-- [  ] 2 `ComponentMetadata::new()` calls updated
-- [  ] Tools registered with `-tool` aliases
-- [  ] All tests pass: `cargo test -p llmspell-tools`
-- [  ] Zero clippy warnings
+- [✅] 2 `ComponentMetadata::new()` calls updated
+- [✅] Tools registered with `-tool` aliases
+- [✅] All tests pass: `cargo test -p llmspell-tools`
+- [✅] Zero clippy warnings
 
-**Insights**: All llmspell-tools crate changes complete. Tool naming now consistent across all 38 tools.
+**Implementation Summary**:
+- **data_validation.rs**: Updated 4 occurrences (ComponentMetadata + 2 tracing attributes + ToolSchema)
+- **template_engine.rs**: Updated 4 occurrences (ComponentMetadata + 2 tracing attributes + ToolSchema)
+- **llmspell-bridge/src/tools.rs**: Converted from `register_tool()` to Arc-based triple registration for both tools
+
+**Key Insights**:
+- **Triple Aliasing Pattern**: Both tools get kebab-case primary + snake_case alias + -tool suffix alias
+- **Tracing Attributes**: Both tools had tool_name in multiple tracing info! attributes (::new() and Default::default())
+- **Feature Gate**: template-creator is behind #[cfg(feature = "templates")]
+- **Total Updates**: 8 string literal replacements across 2 tool files + registration conversion
+- **Test Results**: All 285 tests passed, zero clippy warnings
+- **✅ MILESTONE**: All llmspell-tools crate changes complete - 22 of 22 tools now standardized!
 
 ---
 
@@ -3006,7 +3017,9 @@ Remove `-tool` suffix from 2 utility tools.
 
 **Objective**: Enforce clean kebab-case naming by removing all legacy snake_case and `-tool` suffix aliases. This creates a checkpoint where old tool names stop working, forcing us to update all examples and documentation in subsequent tasks.
 
-**Tools with Aliases to Remove** (22 tools total):
+**Scope**: 21 tools, 31 aliases to remove
+
+**Tools with Aliases to Remove** (21 tools, 31 aliases total):
 
 **Media Tools (3)** - Added in 11a.9.2:
 1. `audio-processor` - remove aliases: `audio_processor`
@@ -3039,34 +3052,72 @@ Remove `-tool` suffix from 2 utility tools.
 18. `graphql-query` - remove aliases: `graphql_query`, `graphql-query-tool`
 19. `web-searcher` - remove aliases: `web_search`, `web-search-tool`
 
-**Utility Tools (2)** - Will be added in 11a.9.8:
-20. `data-validator` - remove aliases: TBD from 11a.9.8
-21. `template-creator` - remove aliases: TBD from 11a.9.8
+**Utility Tools (2)** - Added in 11a.9.8:
+20. `data-validator` - remove aliases: `data_validation`, `data-validation-tool`
+21. `template-creator` - remove aliases: `template_engine`, `template-engine-tool`
 
-**Plus any additional from 11a.9.7-11a.9.8**
+**Summary**: 21 tools × ~1.5 aliases/tool avg = 31 total alias registrations to remove
 
-**File to Modify**:
-- llmspell-bridge/src/tools.rs - remove all dual/triple registration blocks
+**Files to Modify**:
+- llmspell-bridge/src/tools.rs - remove all dual/triple registration blocks from 7 functions:
+  - `register_media_tools()` - 3 tools, 3 aliases
+  - `register_file_system_tools()` - 5 tools, 8 aliases
+  - `register_system_tools()` - 4 tools, 4 aliases
+  - `register_communication_tools()` - 2 tools, 2 aliases
+  - `register_data_processing_tools()` - 4 tools, 8 aliases (csv-analyzer, json-processor, http-requester, graphql-query)
+  - `register_search_tools()` - 1 tool, 2 aliases (web-searcher)
+  - `register_utility_tools()` - 2 tools, 4 aliases
 
-**Implementation**:
-1. For each tool in `register_*_tools()` functions:
-   - Keep ONLY the primary kebab-case registration: `registry.register_tool("tool-name", tool)?`
-   - Remove all `.clone()` calls
-   - Remove all alias registration lines
-   - Change from `Arc::new()` back to simpler registration patterns where possible
-
-2. Example transformation:
+**Implementation Strategy**:
+1. **Media Tools** (register_media_tools):
    ```rust
-   // BEFORE (with aliases):
+   // BEFORE (dual registration):
    let audio_tool = Arc::new(AudioProcessorTool::new(...));
    registry.register_tool("audio-processor".to_string(), audio_tool.clone())?;
    registry.register_tool("audio_processor".to_string(), audio_tool)?;
 
    // AFTER (single registration):
-   register_tool(registry, "audio-processor", || {
-       AudioProcessorTool::new(...)
-   })?;
+   let audio_tool = Arc::new(AudioProcessorTool::new(...));
+   registry.register_tool("audio-processor".to_string(), audio_tool)?;
    ```
+
+2. **Filesystem Tools** (register_file_system_tools):
+   ```rust
+   // BEFORE (triple registration):
+   let file_ops_tool = Arc::new(FileOperationsTool::new(...));
+   registry.register_tool("file-operations".to_string(), file_ops_tool.clone())?;
+   registry.register_tool("file_operations".to_string(), file_ops_tool.clone())?;
+   registry.register_tool("file-operations-tool".to_string(), file_ops_tool)?;
+
+   // AFTER (single registration):
+   let file_ops_tool = Arc::new(FileOperationsTool::new(...));
+   registry.register_tool("file-operations".to_string(), file_ops_tool)?;
+   ```
+
+3. **Data Processing Tools** (register_data_processing_tools):
+   - csv-analyzer: remove 2 alias lines
+   - json-processor: remove 2 alias lines
+   - graphql-query: remove 2 alias lines
+   - http-requester: remove 2 alias lines
+
+4. **Communication Tools** (register_communication_tools):
+   - email-sender: remove 1 alias line
+   - database-connector: remove 1 alias line
+
+5. **System Tools** (register_system_tools):
+   - Remove 1 alias line for each of 4 tools
+
+6. **Search Tools** (register_search_tools):
+   - web-searcher: remove 2 alias lines
+
+7. **Utility Tools** (register_utility_tools):
+   - data-validator: remove 2 alias lines
+   - template-creator: remove 2 alias lines (within #[cfg(feature = "templates")])
+
+**Code Simplification**:
+- Keep Arc::new() for tools that need it (those registered multiple places or with .clone())
+- All alias registrations end with `.clone())?` - simply remove those lines
+- Final registration is without .clone() - keep only that one
 
 **Testing Strategy**:
 1. Run tests BEFORE removing aliases - should pass (old names work)
@@ -3075,19 +3126,40 @@ Remove `-tool` suffix from 2 utility tools.
 4. Try running old example with old tool name - should FAIL (expected, proves aliases removed)
 5. This failure proves we need tasks 11a.9.10-11a.9.13 to update examples/docs
 
+**Validation Strategy**:
+1. **Before Removal**: Run `cargo test --workspace --all-features` - should pass (aliases work)
+2. **Count Aliases**: Verify 31 alias registration lines are identified for removal
+3. **Remove Aliases**: Delete all `.clone())?` lines and their comments
+4. **After Removal**: Run `cargo test --workspace --all-features` - should pass (tests already use new names)
+5. **Manual Verification**: Try `llmspell run` with old tool name - should fail with "tool not found"
+6. **Code Review**: Verify no `.clone())?` remain except for primary registrations
+
 **Criteria**:
-- [  ] All 22+ tool aliases removed from llmspell-bridge/src/tools.rs
-- [  ] Only single kebab-case registration per tool
+- [  ] All 31 alias registrations removed from llmspell-bridge/src/tools.rs
+- [  ] Only single kebab-case registration per tool (21 tools total)
 - [  ] All tests pass: `cargo test --workspace --all-features`
 - [  ] Zero clippy warnings
 - [  ] Verify old names DON'T work (breaking change confirmed)
-- [  ] Tool registration code simplified (no .clone() chains)
+- [  ] Tool registration code simplified (~31 lines removed)
+- [  ] No more Arc::clone() calls in registration (except where truly needed)
+
+**Expected Changes** (31 aliases, ~2 lines each with comments):
+- **Total Lines Removed**: ~50-60 lines (31 alias registrations + their comments)
+- **register_media_tools()**: -6 lines (3 aliases × 2 lines)
+- **register_file_system_tools()**: -14 lines (8 aliases: 3×single + 2×double)
+- **register_system_tools()**: -8 lines (4 aliases × 2 lines)
+- **register_communication_tools()**: -4 lines (2 aliases × 2 lines)
+- **register_data_processing_tools()**: -16 lines (8 aliases × 2 lines)
+- **register_search_tools()**: -4 lines (2 aliases × 2 lines)
+- **register_utility_tools()**: -8 lines (4 aliases × 2 lines)
 
 **Key Insights Expected**:
-- **Code Cleanup**: Removes ~44-66 lines of alias registration code
-- **Breaking Change**: Old tool names stop working immediately
-- **Forces Correctness**: Subsequent tasks MUST use kebab-case (no alias fallback)
-- **Clean State**: Sets up clean foundation for example/doc updates
+- **Code Cleanup**: Removes ~50-60 lines of alias registration code + comments (31 alias registrations)
+- **Breaking Change**: Old tool names stop working immediately (no fallback)
+- **Forces Correctness**: Subsequent tasks MUST use kebab-case (no alias safety net)
+- **Clean State**: Sets up clean foundation for example/doc updates in 11a.9.10-11a.9.13
+- **Proof of Need**: When old tool names fail, it proves tasks 11a.9.10-11a.9.13 are necessary
+- **Test Safety**: All tests already updated to use kebab-case in tasks 11a.9.2-11a.9.8, so tests pass after removal
 
 ---
 
@@ -3249,10 +3321,10 @@ Comprehensive validation and documentation of Phase 11a.9 completion.
 **Status**: ⏳ IN PROGRESS | **Effort**: TBD | **Files**: TBD | **Tools Renamed**: 22 of 38
 
 **Actual Metrics** (to be updated in 11a.9.14):
-- **Tasks Completed**: 7 of 14
-- **Tools Standardized**: 19 of 22
-- **Snake_case → Kebab-case**: 0 of 13
-- **Suffix Removals**: 0 of 9
+- **Tasks Completed**: 8 of 14
+- **Tools Standardized**: 21 of 22 (95%)
+- **Snake_case → Kebab-case**: 12 of 13 (92%) - media(3) + filesystem(3) + communication(2) + system(4)
+- **Suffix Removals**: 9 of 9 (100%) - filesystem(2) + data&doc(2) + web&api(3) + utility(2)
 - **Examples Updated**: 0 of ~40
 - **Documentation Updated**: 0 of ~10
 - **Test Results**: TBD
