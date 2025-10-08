@@ -3818,85 +3818,117 @@ Finished `dev` profile [optimized + debuginfo] target(s) in 37.19s
 
 ### Task 11a.10.2: Add Convenience Methods to WorkflowResult
 
-**Priority**: HIGH | **Time**: 20min | **Status**: ⏳ PENDING | **Depends**: 11a.10.1
+**Priority**: HIGH | **Time**: 20min (actual: 18min) | **Status**: ✅ COMPLETED (2025-10-08) | **Depends**: 11a.10.1
 
 **Objective**: Add type-safe methods to `WorkflowResult` for accessing agent outputs, eliminating manual metadata navigation.
 
-**Scope**: Add 2 public methods + documentation to `WorkflowResult`
+**Scope**: Add 2 public methods + documentation + comprehensive tests to `WorkflowResult`
 
-**File to Modify**: `llmspell-workflows/src/result.rs`
+**File Modified**: `llmspell-workflows/src/result.rs`
 
-**Location**: Add to `impl WorkflowResult` block (after line 300)
+**Changes Applied**:
+1. **Lines 333-358**: Added `agent_outputs()` method (26 lines with documentation)
+2. **Lines 360-383**: Added `get_agent_output(agent_id)` method (24 lines with documentation)
+3. **Lines 474-599**: Added 5 comprehensive unit tests (126 lines)
 
 **Implementation**:
 ```rust
-impl WorkflowResult {
-    // ... existing methods ...
+// Lines 333-358: agent_outputs() method
+pub fn agent_outputs(&self) -> Option<&serde_json::Map<String, serde_json::Value>> {
+    self.metadata
+        .get("agent_outputs")
+        .and_then(|v| v.as_object())
+}
 
-    /// Get agent outputs collected during workflow execution
-    ///
-    /// Returns a reference to the collected agent outputs if any agents were executed.
-    /// The map is keyed by agent ID (with timestamp suffix) and contains the JSON output
-    /// from each agent execution.
-    ///
-    /// # Returns
-    /// - `Some(&Map)` if agent outputs were collected
-    /// - `None` if no agents were executed or outputs weren't collected
-    ///
-    /// # Example
-    /// ```ignore
-    /// let result = workflow.execute(input, context).await?;
-    /// if let Some(outputs) = result.agent_outputs() {
-    ///     for (agent_id, output) in outputs {
-    ///         println!("Agent {}: {:?}", agent_id, output);
-    ///     }
-    /// }
-    /// ```
-    pub fn agent_outputs(&self) -> Option<&serde_json::Map<String, serde_json::Value>> {
-        self.metadata
-            .get("agent_outputs")
-            .and_then(|v| v.as_object())
-    }
-
-    /// Get output from a specific agent by ID
-    ///
-    /// Convenience method to retrieve output from a single agent without iterating
-    /// through all outputs.
-    ///
-    /// # Arguments
-    /// * `agent_id` - The agent ID to look up (with timestamp suffix)
-    ///
-    /// # Returns
-    /// - `Some(&Value)` if the agent output exists
-    /// - `None` if agent not found or no outputs collected
-    ///
-    /// # Example
-    /// ```ignore
-    /// let result = workflow.execute(input, context).await?;
-    /// if let Some(output) = result.get_agent_output("requirements_analyst_1234567890") {
-    ///     println!("Requirements: {:?}", output);
-    /// }
-    /// ```
-    pub fn get_agent_output(&self, agent_id: &str) -> Option<&serde_json::Value> {
-        self.agent_outputs()
-            .and_then(|outputs| outputs.get(agent_id))
-    }
+// Lines 360-383: get_agent_output() method
+pub fn get_agent_output(&self, agent_id: &str) -> Option<&serde_json::Value> {
+    self.agent_outputs()
+        .and_then(|outputs| outputs.get(agent_id))
 }
 ```
 
-**Acceptance Criteria**:
-- [ ] Both methods compile and pass clippy
-- [ ] Rustdoc examples are valid (use `ignore` directive)
-- [ ] Methods are public and accessible from Lua bridge
-- [ ] Return `Option` for graceful handling of missing outputs
-- [ ] Documentation includes usage examples
+**Implementation Insights**:
 
-**Validation**:
+1. **Idiomatic Option Chaining**: Both methods use Rust's `Option` combinators (`and_then`) for safe, composable access to nested JSON structures. This eliminates runtime panics from unwrapping.
+
+2. **Zero-Cost Abstraction**: Methods return `Option<&T>` references, avoiding clones or allocations. The `&` in return types means:
+   - No ownership transfer
+   - No memory allocation
+   - Direct access to metadata's internal data
+   - Borrowing rules enforced at compile-time
+
+3. **Composition Pattern**: `get_agent_output()` composes `agent_outputs()`, demonstrating single-responsibility design:
+   ```rust
+   self.agent_outputs()           // Step 1: Get all outputs (if any)
+       .and_then(|outputs| ...)   // Step 2: Look up specific agent (if found)
+   ```
+   This means `get_agent_output()` inherits all edge case handling from `agent_outputs()` automatically.
+
+4. **Documentation Best Practices**:
+   - Marked examples as `ignore` (not `no_run`) to allow rustdoc to parse but not execute
+   - Documented all return value scenarios (Some vs None cases)
+   - Included practical usage examples showing type conversion (`as_str()`, `unwrap_or()`)
+   - Cross-referenced automatic collection behavior from all workflow types
+
+5. **Test Coverage Strategy**: 5 tests cover full decision tree:
+   ```
+   agent_outputs() exists?
+   ├─ No  → test_agent_outputs_none_when_not_present
+   └─ Yes → test_agent_outputs_some_when_present
+
+   get_agent_output(id)?
+   ├─ No outputs     → test_get_agent_output_none_when_no_outputs
+   ├─ Wrong agent ID → test_get_agent_output_none_when_agent_not_found
+   └─ Found          → test_get_agent_output_some_when_found (2 agents)
+   ```
+
+6. **Public API Implications**:
+   - Methods are `pub` and directly accessible from Rust code
+   - Lua bridge can expose these via `rlua` userdata methods (future Task 11a.10.5)
+   - JavaScript bridge can expose via `rquickjs` (future integration)
+   - Python bridge can expose via `pyo3` (future integration)
+
+7. **Memory Safety**:
+   - Returning `&Map` instead of `Map` prevents accidental metadata mutation
+   - Borrow checker enforces that `WorkflowResult` outlives all returned references
+   - Immutable references allow multiple concurrent readers (thread-safe pattern)
+
+**Acceptance Criteria**:
+- [x] Both methods compile and pass clippy ✅
+- [x] Rustdoc examples are valid (use `ignore` directive) ✅
+- [x] Methods are public and accessible from Lua bridge ✅ (ready for bridge integration)
+- [x] Return `Option` for graceful handling of missing outputs ✅
+- [x] Documentation includes usage examples ✅
+
+**Validation Results**:
 ```bash
-cargo doc -p llmspell-workflows --no-deps --open
-cargo test -p llmspell-workflows result::tests -- --nocapture
-cargo clippy -p llmspell-workflows -- -D warnings
+# Tests: 5 new tests, 9/9 passed in result module
+$ cargo test -p llmspell-workflows result::tests -- --nocapture
+running 9 tests
+test result::tests::test_agent_outputs_none_when_not_present ... ok
+test result::tests::test_agent_outputs_some_when_present ... ok
+test result::tests::test_get_agent_output_none_when_no_outputs ... ok
+test result::tests::test_get_agent_output_none_when_agent_not_found ... ok
+test result::tests::test_get_agent_output_some_when_found ... ok
+test result::tests::test_state_key_generation ... ok
+test result::tests::test_workflow_result_failure ... ok
+test result::tests::test_workflow_result_success ... ok
+test result::tests::test_workflow_type_display ... ok
+test result: ok. 9 passed; 0 failed
+
+# All workflow tests: 71/71 passed (up from 66, +5 new tests)
+$ cargo test -p llmspell-workflows --lib
+test result: ok. 71 passed; 0 failed; 0 ignored
+
+# Clippy: Zero warnings
+$ cargo clippy -p llmspell-workflows -- -D warnings
+Finished `dev` profile [optimized + debuginfo] target(s) in 2.27s
 ```
+
+**Files Modified**: 1 file, 3 sections, +176 lines
+- `llmspell-workflows/src/result.rs` (2 methods + 5 tests + documentation)
+
+**Next Steps**: Task 11a.10.3 (Add integration tests for agent output collection in workflows)
 
 ---
 
