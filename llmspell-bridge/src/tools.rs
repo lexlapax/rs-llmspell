@@ -130,13 +130,9 @@ fn register_utility_tools(
     register_tool(registry, "base64_encoder", Base64EncoderTool::new)?;
     register_tool(registry, "calculator", CalculatorTool::new)?;
 
-    // Data validator: register with kebab-case primary name
+    // Data validator
     let data_validator_tool = Arc::new(DataValidationTool::new());
-    registry.register_tool("data-validator".to_string(), data_validator_tool.clone())?;
-    // Register with snake_case alias for backward compatibility
-    registry.register_tool("data_validation".to_string(), data_validator_tool.clone())?;
-    // Register with old -tool suffix alias for backward compatibility
-    registry.register_tool("data-validation-tool".to_string(), data_validator_tool)?;
+    registry.register_tool("data-validator".to_string(), data_validator_tool)?;
 
     register_tool(registry, "date_time_handler", DateTimeHandlerTool::new)?;
     register_tool(registry, "diff_calculator", DiffCalculatorTool::new)?;
@@ -144,15 +140,11 @@ fn register_utility_tools(
         HashCalculatorTool::new(HashCalculatorConfig::default())
     })?;
 
-    // Template creator: register with kebab-case primary name
+    // Template creator
     #[cfg(feature = "templates")]
     {
         let template_tool = Arc::new(TemplateEngineTool::new());
-        registry.register_tool("template-creator".to_string(), template_tool.clone())?;
-        // Register with snake_case alias for backward compatibility
-        registry.register_tool("template_engine".to_string(), template_tool.clone())?;
-        // Register with old -tool suffix alias for backward compatibility
-        registry.register_tool("template-engine-tool".to_string(), template_tool)?;
+        registry.register_tool("template-creator".to_string(), template_tool)?;
     }
 
     register_tool(registry, "text_manipulator", || {
@@ -171,34 +163,22 @@ fn register_data_processing_tools(
     registry: &Arc<ComponentRegistry>,
     http_request_config: &llmspell_config::tools::HttpRequestConfig,
 ) -> Result<(), Box<dyn std::error::Error>> {
-    // CSV analyzer: register with kebab-case primary name
+    // CSV analyzer
     #[cfg(feature = "csv-parquet")]
     {
         let csv_tool = Arc::new(CsvAnalyzerTool::new(CsvAnalyzerConfig::default()));
-        registry.register_tool("csv-analyzer".to_string(), csv_tool.clone())?;
-        // Register with snake_case alias for backward compatibility
-        registry.register_tool("csv_analyzer".to_string(), csv_tool.clone())?;
-        // Register with old -tool suffix alias for backward compatibility
-        registry.register_tool("csv-analyzer-tool".to_string(), csv_tool)?;
+        registry.register_tool("csv-analyzer".to_string(), csv_tool)?;
     }
 
-    // JSON processor: register with kebab-case primary name
+    // JSON processor
     #[cfg(feature = "json-query")]
     {
         let json_tool = Arc::new(JsonProcessorTool::new(JsonProcessorConfig::default()));
-        registry.register_tool("json-processor".to_string(), json_tool.clone())?;
-        // Register with snake_case alias for backward compatibility
-        registry.register_tool("json_processor".to_string(), json_tool.clone())?;
-        // Register with old -tool suffix alias for backward compatibility
-        registry.register_tool("json-processor-tool".to_string(), json_tool)?;
+        registry.register_tool("json-processor".to_string(), json_tool)?;
     }
-    // GraphQL query: register with kebab-case primary name
+    // GraphQL query
     let graphql_tool = Arc::new(GraphQLQueryTool::new(GraphQLConfig::default())?);
-    registry.register_tool("graphql-query".to_string(), graphql_tool.clone())?;
-    // Register with snake_case alias for backward compatibility
-    registry.register_tool("graphql_query".to_string(), graphql_tool.clone())?;
-    // Register with old -tool suffix alias for backward compatibility
-    registry.register_tool("graphql-query-tool".to_string(), graphql_tool)?;
+    registry.register_tool("graphql-query".to_string(), graphql_tool)?;
 
     // HTTP requester: register with kebab-case primary name
     // Convert from llmspell_config HttpRequestConfig to llmspell_tools HttpRequestConfig
@@ -216,11 +196,7 @@ fn register_data_processing_tools(
             .unwrap_or_else(|| "llmspell-http/1.0".to_string()),
     };
     let http_tool = Arc::new(HttpRequestTool::new(tool_config)?);
-    registry.register_tool("http-requester".to_string(), http_tool.clone())?;
-    // Register with snake_case alias for backward compatibility
-    registry.register_tool("http_request".to_string(), http_tool.clone())?;
-    // Register with old -tool suffix alias for backward compatibility
-    registry.register_tool("http-request-tool".to_string(), http_tool)?;
+    registry.register_tool("http-requester".to_string(), http_tool)?;
     // Phase 7 tools
     #[cfg(feature = "pdf")]
     register_tool(registry, "pdf-processor", PdfProcessorTool::new)?;
@@ -234,25 +210,19 @@ fn register_file_system_tools(
     file_sandbox: &Arc<FileSandbox>,
     file_ops_config: &llmspell_config::tools::FileOperationsConfig,
 ) -> Result<(), Box<dyn std::error::Error>> {
-    // Archive handler: register with kebab-case primary name
+    // Archive handler
     #[cfg(feature = "archives")]
     {
         let archive_tool = Arc::new(ArchiveHandlerTool::new());
-        registry.register_tool("archive-handler".to_string(), archive_tool.clone())?;
-        // Register with snake_case alias for backward compatibility
-        registry.register_tool("archive_handler".to_string(), archive_tool.clone())?;
-        // Register with old -tool suffix alias for backward compatibility
-        registry.register_tool("archive-handler-tool".to_string(), archive_tool)?;
+        registry.register_tool("archive-handler".to_string(), archive_tool)?;
     }
 
-    // File converter: register with kebab-case primary name
+    // File converter
     let file_converter_tool = Arc::new(FileConverterTool::new(
         FileConverterConfig::default(),
         file_sandbox.clone(),
     ));
-    registry.register_tool("file-converter".to_string(), file_converter_tool.clone())?;
-    // Register with snake_case alias for backward compatibility
-    registry.register_tool("file_converter".to_string(), file_converter_tool)?;
+    registry.register_tool("file-converter".to_string(), file_converter_tool)?;
 
     // File operations: register with kebab-case primary name
     // Convert from llmspell_config FileOperationsConfig to llmspell_tools FileOperationsConfig
@@ -265,29 +235,21 @@ fn register_file_system_tools(
         default_permissions: 0o644, // Default permissions
     };
     let file_ops_tool = Arc::new(FileOperationsTool::new(tool_config, file_sandbox.clone()));
-    registry.register_tool("file-operations".to_string(), file_ops_tool.clone())?;
-    // Register with snake_case alias for backward compatibility
-    registry.register_tool("file_operations".to_string(), file_ops_tool.clone())?;
-    // Register with old -tool suffix alias for backward compatibility
-    registry.register_tool("file-operations-tool".to_string(), file_ops_tool)?;
+    registry.register_tool("file-operations".to_string(), file_ops_tool)?;
 
-    // File search: register with kebab-case primary name
+    // File search
     let file_search_tool = Arc::new(FileSearchTool::new(
         FileSearchConfig::default(),
         file_sandbox.clone(),
     ));
-    registry.register_tool("file-search".to_string(), file_search_tool.clone())?;
-    // Register with snake_case alias for backward compatibility
-    registry.register_tool("file_search".to_string(), file_search_tool)?;
+    registry.register_tool("file-search".to_string(), file_search_tool)?;
 
-    // File watcher: register with kebab-case primary name
+    // File watcher
     let file_watcher_tool = Arc::new(FileWatcherTool::new(
         FileWatcherConfig::default(),
         file_sandbox.clone(),
     ));
-    registry.register_tool("file-watcher".to_string(), file_watcher_tool.clone())?;
-    // Register with snake_case alias for backward compatibility
-    registry.register_tool("file_watcher".to_string(), file_watcher_tool)?;
+    registry.register_tool("file-watcher".to_string(), file_watcher_tool)?;
     Ok(())
 }
 
@@ -296,37 +258,29 @@ fn register_system_tools(
     registry: &Arc<ComponentRegistry>,
     file_sandbox: &Arc<FileSandbox>,
 ) -> Result<(), Box<dyn std::error::Error>> {
-    // Environment reader: register with kebab-case primary name
+    // Environment reader
     let env_tool = Arc::new(EnvironmentReaderTool::new(
         EnvironmentReaderConfig::default(),
     ));
-    registry.register_tool("environment-reader".to_string(), env_tool.clone())?;
-    // Register with snake_case alias for backward compatibility
-    registry.register_tool("environment_reader".to_string(), env_tool)?;
+    registry.register_tool("environment-reader".to_string(), env_tool)?;
 
-    // Process executor: register with kebab-case primary name
+    // Process executor
     let process_tool = Arc::new(ProcessExecutorTool::new(
         ProcessExecutorConfig::default(),
         file_sandbox.clone(),
     ));
-    registry.register_tool("process-executor".to_string(), process_tool.clone())?;
-    // Register with snake_case alias for backward compatibility
-    registry.register_tool("process_executor".to_string(), process_tool)?;
+    registry.register_tool("process-executor".to_string(), process_tool)?;
 
-    // Service checker: register with kebab-case primary name
+    // Service checker
     let service_tool = Arc::new(ServiceCheckerTool::new(ServiceCheckerConfig::default()));
-    registry.register_tool("service-checker".to_string(), service_tool.clone())?;
-    // Register with snake_case alias for backward compatibility
-    registry.register_tool("service_checker".to_string(), service_tool)?;
+    registry.register_tool("service-checker".to_string(), service_tool)?;
 
-    // System monitor: register with kebab-case primary name
+    // System monitor
     let monitor_tool = Arc::new(SystemMonitorTool::new(
         SystemMonitorConfig::default(),
         file_sandbox.clone(),
     ));
-    registry.register_tool("system-monitor".to_string(), monitor_tool.clone())?;
-    // Register with snake_case alias for backward compatibility
-    registry.register_tool("system_monitor".to_string(), monitor_tool)?;
+    registry.register_tool("system-monitor".to_string(), monitor_tool)?;
     Ok(())
 }
 
@@ -335,32 +289,26 @@ fn register_media_tools(
     registry: &Arc<ComponentRegistry>,
     file_sandbox: &Arc<FileSandbox>,
 ) -> Result<(), Box<dyn std::error::Error>> {
-    // Audio processor: register with kebab-case primary name
+    // Audio processor
     let audio_tool = Arc::new(AudioProcessorTool::new(
         AudioProcessorConfig::default(),
         file_sandbox.clone(),
     ));
-    registry.register_tool("audio-processor".to_string(), audio_tool.clone())?;
-    // Register with snake_case alias for backward compatibility
-    registry.register_tool("audio_processor".to_string(), audio_tool)?;
+    registry.register_tool("audio-processor".to_string(), audio_tool)?;
 
-    // Image processor: register with kebab-case primary name
+    // Image processor
     let image_tool = Arc::new(ImageProcessorTool::new(
         ImageProcessorConfig::default(),
         file_sandbox.clone(),
     ));
-    registry.register_tool("image-processor".to_string(), image_tool.clone())?;
-    // Register with snake_case alias for backward compatibility
-    registry.register_tool("image_processor".to_string(), image_tool)?;
+    registry.register_tool("image-processor".to_string(), image_tool)?;
 
-    // Video processor: register with kebab-case primary name
+    // Video processor
     let video_tool = Arc::new(VideoProcessorTool::new(
         VideoProcessorConfig::default(),
         file_sandbox.clone(),
     ));
-    registry.register_tool("video-processor".to_string(), video_tool.clone())?;
-    // Register with snake_case alias for backward compatibility
-    registry.register_tool("video_processor".to_string(), video_tool)?;
+    registry.register_tool("video-processor".to_string(), video_tool)?;
 
     Ok(())
 }
@@ -382,11 +330,7 @@ fn register_search_tools(
         fallback_chain: vec!["duckduckgo".to_string()], // Default fallback
     };
     let web_search_tool = Arc::new(WebSearchTool::new(tool_config)?);
-    registry.register_tool("web-searcher".to_string(), web_search_tool.clone())?;
-    // Register with snake_case alias for backward compatibility
-    registry.register_tool("web_search".to_string(), web_search_tool.clone())?;
-    // Register with old -tool suffix alias for backward compatibility
-    registry.register_tool("web-search-tool".to_string(), web_search_tool)?;
+    registry.register_tool("web-searcher".to_string(), web_search_tool)?;
     Ok(())
 }
 
@@ -409,24 +353,20 @@ fn register_web_tools(registry: &Arc<ComponentRegistry>) -> Result<(), Box<dyn s
 fn register_communication_tools(
     registry: &Arc<ComponentRegistry>,
 ) -> Result<(), Box<dyn std::error::Error>> {
-    // Email sender: register with kebab-case primary name
+    // Email sender
     #[cfg(feature = "email")]
     {
         let email_tool = Arc::new(EmailSenderTool::new(EmailSenderConfig::default())?);
-        registry.register_tool("email-sender".to_string(), email_tool.clone())?;
-        // Register with snake_case alias for backward compatibility
-        registry.register_tool("email_sender".to_string(), email_tool)?;
+        registry.register_tool("email-sender".to_string(), email_tool)?;
     }
 
-    // Database connector: register with kebab-case primary name
+    // Database connector
     #[cfg(feature = "database")]
     {
         let db_tool = Arc::new(DatabaseConnectorTool::new(
             DatabaseConnectorConfig::default(),
         )?);
-        registry.register_tool("database-connector".to_string(), db_tool.clone())?;
-        // Register with snake_case alias for backward compatibility
-        registry.register_tool("database_connector".to_string(), db_tool)?;
+        registry.register_tool("database-connector".to_string(), db_tool)?;
     }
     Ok(())
 }
