@@ -16,7 +16,7 @@ pub const fn inject_tool_global(
 ) -> Result<(), LLMSpellError> {
     // TODO (Phase 12): Implement Tool API for JavaScript:
     // 1. Create Tool constructor and registry
-    // 2. Add Tool.invoke() and Tool.list() methods
+    // 2. Add Tool.execute() and Tool.list() methods
     // 3. Add tool discovery and parameter validation
     // 4. Ensure behavior matches Lua implementation
     // 5. Add proper error handling and security
@@ -42,7 +42,7 @@ mod tests {
     }
 
     // TODO (Phase 12): Add comprehensive tests when JS engine is implemented:
-    // - Test Tool.invoke() with all 33+ available tools
+    // - Test Tool.execute() with all 37+ available tools
     // - Test Tool.list() and tool discovery
     // - Test parameter validation and error handling
     // - Test security and sandboxing features

@@ -151,7 +151,7 @@ pub fn inject_tool_global(
         }
     })?;
 
-    // Create Tool.invoke() function - synchronous wrapper
+    // Create Tool.execute() function - synchronous wrapper
     let registry_clone = registry.clone();
     let context_clone2 = Arc::new(context.clone());
     let invoke_fn = lua.create_function(move |lua, (name, input): (String, Table)| {
@@ -160,7 +160,7 @@ pub fn inject_tool_global(
 
         // Use shared sync utility to execute async code
         let result = block_on_async_lua(
-            "tool_invoke",
+            "tool_execute",
             async move {
                 // Get the tool
                 let tool = registry
@@ -233,7 +233,7 @@ pub fn inject_tool_global(
     // Set functions on Tool table
     tool_table.set("list", list_fn)?;
     tool_table.set("get", get_fn)?;
-    tool_table.set("invoke", invoke_fn)?;
+    tool_table.set("execute", invoke_fn)?;
     tool_table.set("exists", exists_fn)?;
     tool_table.set("categories", categories_fn)?;
 
@@ -248,7 +248,7 @@ pub fn inject_tool_global(
             let methods = [
                 "list",
                 "get",
-                "invoke",
+                "execute",
                 "exists",
                 "categories",
                 "discover",

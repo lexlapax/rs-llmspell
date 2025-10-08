@@ -4749,5 +4749,574 @@ Found critical bugs in Phase 11a.9 completion:
 
 ---
 
+## Phase 11a.11: API Method Naming Standardization (invoke → execute)
+
+**Priority**: HIGH | **Effort**: ~3 hours | **Status**: 🚧 IN PROGRESS
+
+**Context**: API method naming is inconsistent between Rust core traits and Lua/JavaScript bindings. Core traits (`BaseAgent`, `Tool`, `Workflow`) universally use `execute()`, but Lua bindings expose `Tool.invoke()` and `agent:invoke()`. This creates confusion for users and breaks the mental model of "executing a component".
+
+**Root Cause Analysis** (from `/tmp/method_consistency_analysis.md`):
+- ✅ Rust `BaseAgent` trait: `execute()` only (llmspell-core/src/traits/base_agent.rs:99)
+- ✅ Rust `Tool` trait: inherits `execute()` only (llmspell-core/src/traits/tool.rs:481)
+- ✅ Rust `Workflow` trait: `execute()` only (llmspell-workflows/src/traits.rs:186)
+- ❌ Lua Tool binding: `invoke()` only (llmspell-bridge/src/lua/globals/tool.rs:236)
+- ⚠ Lua Agent binding: BOTH `invoke()` and `execute()` (llmspell-bridge/src/lua/globals/agent.rs:514,543)
+- ✅ Lua Workflow binding: `execute()` only (llmspell-bridge/src/lua/globals/workflow.rs:284)
+
+**Inconsistency Matrix**:
+| Component | Rust Core | Lua Bridge | Lua Docs | Consistent? |
+|-----------|-----------|------------|----------|-------------|
+| Tool      | execute() | invoke()   | invoke() | ✗ NO        |
+| Agent     | execute() | both       | execute()| ⚠ PARTIAL   |
+| Workflow  | execute() | execute()  | execute()| ✓ YES       |
+
+**Impact**:
+- Confusing API: Users must remember different method names for different abstractions
+- Documentation mismatch: Docs show `execute()` for agents, but code has `invoke()` as "primary"
+- Breaking the mental model: Rust uses `execute()`, scripts use `invoke()`
+- Inconsistent with future language bindings (Python, JS)
+
+**Goals**:
+1. Standardize all components on `execute()` method name
+2. Remove deprecated `invoke()` methods from Lua/JS bindings
+3. Update all 20+ example files to use `execute()`
+4. Update all documentation (7 user guide + 1 technical doc)
+5. Maintain zero regressions (all tests pass, zero clippy warnings)
+6. Provide clear migration path for breaking changes
+
+**Files to Modify**: 35+ files across 4 categories
+- Rust bridge: 5 files (tool.rs, agent.rs for Lua + JS stubs)
+- Lua examples: 20 files (getting-started, features, cookbook, applications, advanced-patterns)
+- User guide docs: 7 files (API references, getting started, concepts)
+- Technical docs: 1 file (architecture-decisions.md)
+
+**Breaking Changes**:
+- `Tool.invoke(name, params)` → `Tool.execute(name, params)`
+- `agent:invoke(input)` → `agent:execute(input)` (already supported, removing invoke alias)
+
+**Migration Strategy**:
+- Phase 11a.11 removes methods immediately (pre-1.0, breaking changes acceptable)
+- No deprecation period needed (project policy: "NO backward compatibility until 1.0")
+- Update all examples atomically to prevent confusion
+
+---
+
+### Task 11a.11.1: Update Lua Tool Binding (invoke → execute)
+
+**Priority**: CRITICAL | **Time**: 20min (actual: 18min) | **Status**: ✅ COMPLETED (2025-10-08) | **Depends**: None
+
+**Objective**: Rename `Tool.invoke()` to `Tool.execute()` in Lua bindings to match Rust `Tool` trait.
+
+**Scope**: Update Lua global Tool binding method name
+
+**Files Modified**:
+- `llmspell-bridge/src/lua/globals/tool.rs`
+
+**Changes Applied**:
+1. **Line 154**: Updated comment: `// Create Tool.execute() function` (was `invoke()`)
+2. **Line 163**: Updated async block identifier: `"tool_execute"` (was `"tool_invoke"`)
+3. **Line 236**: Updated method registration: `tool_table.set("execute", invoke_fn)?;` (was `"invoke"`)
+4. **Line 251**: Updated methods array in `__index` metamethod: `"execute"` (was `"invoke"`)
+
+**Key Insights**:
+
+1. **Multiple Touch Points**: The rename required 4 changes, not just line 236:
+   - Method registration (line 236) - primary change
+   - Comment (line 154) - documentation consistency
+   - Async block identifier (line 163) - runtime debugging clarity
+   - Metamethod array (line 251) - prevents `Tool.execute` from being treated as tool name
+
+2. **Metamethod Array Discovery**: Line 251 contains a critical list of built-in method names used by the `__index` metamethod. This prevents users from accessing tools with names like "execute" or "list" via `Tool.toolname` syntax. Missing this update would cause subtle runtime bugs.
+
+3. **Variable Naming**: Kept internal variable name as `invoke_fn` for minimal diff (only the exposed Lua API changed). Could rename to `execute_fn` in future cleanup, but not necessary for functionality.
+
+4. **Async Identifier**: Changed `"tool_invoke"` to `"tool_execute"` for consistency in async block debugging/tracing.
+
+**Validation Results**:
+```bash
+# Clippy validation
+cargo clippy -p llmspell-bridge --all-targets --all-features -- -D warnings
+# Result: ✅ 0 warnings (18.57s)
+
+# Build validation
+cargo build -p llmspell-bridge
+# Result: ✅ Success (1m 06s)
+```
+
+**Acceptance Criteria**:
+- [x] Method renamed from `invoke` to `execute` ✅
+- [x] Internal implementation unchanged (still calls tool registry) ✅
+- [x] Zero clippy warnings ✅
+- [x] Code compiles successfully ✅
+- [x] Comment and async identifiers updated for consistency ✅
+- [x] Metamethod array updated to prevent tool name collision ✅
+
+---
+
+### Task 11a.11.2: Remove Deprecated agent:invoke() Method
+
+**Priority**: CRITICAL | **Time**: 15min (actual: 12min) | **Status**: ✅ COMPLETED (2025-10-08) | **Depends**: None
+
+**Objective**: Remove the deprecated `invoke()` method from Agent Lua binding, keeping only `execute()`.
+
+**Scope**: Remove duplicate method from agent UserData implementation
+
+**Files Modified**:
+- `llmspell-bridge/src/lua/globals/agent.rs`
+
+**Changes Applied**:
+1. **Lines 513-540**: Removed entire `invoke()` method implementation (28 lines)
+2. **Line 513**: Updated comment: `// execute method - synchronous wrapper` (was `// execute method (alias for invoke) - synchronous wrapper`)
+
+**Key Insights**:
+
+1. **Duplicate Code Elimination**: Both `invoke()` and `execute()` had identical implementations - both called `bridge.execute_agent()`. This violated DRY principle and created maintenance burden.
+
+2. **Comment Correction**: The original comment said "execute method (alias for invoke)" which incorrectly implied `execute()` was secondary. The truth is that Rust `BaseAgent::execute()` is the canonical method, so the Lua binding should reflect this hierarchy.
+
+3. **Clean Removal**: Removed 28 lines (entire method block) without affecting any other functionality. The `execute()` method at line 514+ (formerly 543+) has identical implementation.
+
+4. **Async Identifier Difference**: Note that the removed `invoke()` used `"agent_invoke"` as async block identifier while `execute()` uses `"agent_execute"`. This is cosmetic but maintains consistency for debugging/tracing.
+
+5. **Breaking Change Impact**: This is a breaking change for any Lua scripts using `agent:invoke()`. However, per project policy ("NO backward compatibility until 1.0"), this is acceptable. Scripts must now use `agent:execute()`.
+
+**Validation Results**:
+```bash
+# Clippy validation
+cargo clippy -p llmspell-bridge --all-targets --all-features -- -D warnings
+# Result: ✅ 0 warnings (16.42s)
+
+# Build validation
+cargo build -p llmspell-bridge
+# Result: ✅ Success (0.46s, cached)
+```
+
+**Acceptance Criteria**:
+- [x] `invoke()` method removed completely ✅
+- [x] `execute()` method retained with full implementation ✅
+- [x] Zero clippy warnings ✅
+- [x] Code compiles successfully ✅
+- [x] Comment updated to reflect execute() as primary method ✅
+
+---
+
+### Task 11a.11.3: Update JavaScript Stub Comments
+
+**Priority**: LOW | **Time**: 10min (actual: 8min) | **Status**: ✅ COMPLETED (2025-10-08) | **Depends**: 11a.11.1
+
+**Objective**: Update JavaScript stub comments to reflect `execute()` method naming.
+
+**Scope**: Update TODO comments in JavaScript global bindings
+
+**Files Modified**:
+- `llmspell-bridge/src/javascript/globals/tool.rs`
+- `llmspell-bridge/src/javascript/globals/agent.rs` (verified - already correct)
+
+**Changes Applied**:
+1. **Line 19**: Updated TODO comment: `// 2. Add Tool.execute() and Tool.list() methods` (was `invoke()`)
+2. **Line 45**: Updated test TODO comment: `// - Test Tool.execute() with all 37+ available tools` (was `invoke()` and `33+`)
+
+**Key Insights**:
+
+1. **Agent.rs Already Correct**: Checked `javascript/globals/agent.rs` and found it already uses `execute()` in comments (lines 19, 45). This suggests agent.rs was written after the standardization discussion, while tool.rs predates it.
+
+2. **Tool Count Update**: Bonus fix - updated comment from "33+ available tools" to "37+ available tools" to reflect current accurate tool count (verified in earlier analysis). This prevents future confusion during Phase 12 implementation.
+
+3. **Future-Proofing**: These stub files will be the reference implementation for Phase 12 (JavaScript engine integration). Correcting them now ensures Phase 12 developers implement the correct API from the start.
+
+4. **Minimal Surface Area**: JavaScript stubs are very simple (just TODO comments), making this a low-risk change with high future value.
+
+5. **Consistency Across Engines**: Both Lua and JavaScript bindings now reference `execute()` in all documentation, ensuring uniform API surface across future language bindings (Python in Phase 13+).
+
+**Validation Results**:
+```bash
+# Clippy validation
+cargo clippy -p llmspell-bridge --all-targets --all-features -- -D warnings
+# Result: ✅ 0 warnings (15.79s)
+```
+
+**Acceptance Criteria**:
+- [x] All references to `invoke` in JS stub comments updated to `execute` ✅
+- [x] Agent.rs verified as already correct ✅
+- [x] Code style maintained ✅
+- [x] Zero clippy warnings ✅
+- [x] Tool count updated to reflect current state (37 tools) ✅
+
+---
+
+### Task 11a.11.4: Batch Update Lua Examples (Tool.invoke → Tool.execute)
+
+**Priority**: CRITICAL | **Time**: 45min | **Status**: 🔲 TODO | **Depends**: 11a.11.1, 11a.11.2
+
+**Objective**: Update all Lua example files to use `execute()` instead of `invoke()` for tools and agents.
+
+**Scope**: Batch update 20 Lua example files across 5 directories
+
+**Files to Modify** (20 files):
+
+**Getting Started** (4 files):
+- `examples/script-users/getting-started/01-first-tool.lua`
+- `examples/script-users/getting-started/02-first-agent.lua`
+- `examples/script-users/getting-started/03-first-workflow.lua`
+- `examples/script-users/getting-started/04-handle-errors.lua`
+
+**Features** (2 files):
+- `examples/script-users/features/agent-basics.lua`
+- `examples/script-users/features/tool-basics.lua`
+
+**Cookbook** (2 files):
+- `examples/script-users/cookbook/error-handling.lua`
+- `examples/script-users/cookbook/multi-agent-coordination.lua`
+
+**Applications** (10 files):
+- `examples/script-users/applications/code-review-assistant/main.lua`
+- `examples/script-users/applications/communication-manager/main.lua`
+- `examples/script-users/applications/content-creator/main.lua`
+- `examples/script-users/applications/file-organizer/main.lua`
+- `examples/script-users/applications/instrumented-agent/main.lua`
+- `examples/script-users/applications/knowledge-base/main.lua`
+- `examples/script-users/applications/personal-assistant/main.lua`
+- `examples/script-users/applications/process-orchestrator/main.lua`
+- `examples/script-users/applications/research-collector/main.lua`
+- `examples/script-users/applications/webapp-creator/main.lua`
+
+**Advanced Patterns** (2 files):
+- `examples/script-users/advanced-patterns/monitoring-security.lua`
+- `examples/script-users/advanced-patterns/tool-integration-patterns.lua`
+
+**Changes Required**:
+```lua
+-- Tool invocations:
+Tool.invoke("calculator", {...})  → Tool.execute("calculator", {...})
+Tool.invoke("uuid-generator", {...})  → Tool.execute("uuid-generator", {...})
+-- etc. for all tool invocations
+
+-- Agent invocations (if any use invoke):
+agent:invoke({...})  → agent:execute({...})
+```
+
+**Strategy**:
+```bash
+# Automated batch replacement
+find examples/script-users -name "*.lua" -type f -exec sed -i '' \
+  -e 's/Tool\.invoke(/Tool.execute(/g' \
+  -e 's/:invoke(/:execute(/g' \
+  {} +
+```
+
+**Acceptance Criteria**:
+- [x] All 20 example files updated
+- [x] All `Tool.invoke()` calls replaced with `Tool.execute()`
+- [x] All `agent:invoke()` calls replaced with `agent:execute()`
+- [x] No manual state management patterns broken
+- [x] Lua syntax remains valid
+
+**Validation**:
+```bash
+# Verify no invoke() calls remain
+grep -r "\.invoke\|:invoke" examples/script-users --include="*.lua"
+# Expected: 0 matches
+
+# Test key examples
+cargo build --bin llmspell
+./target/debug/llmspell run examples/script-users/features/tool-basics.lua
+./target/debug/llmspell run examples/script-users/features/agent-basics.lua
+./target/debug/llmspell run examples/script-users/getting-started/01-first-tool.lua
+```
+
+---
+
+### Task 11a.11.5: Update User Guide Documentation
+
+**Priority**: HIGH | **Time**: 40min | **Status**: 🔲 TODO | **Depends**: 11a.11.1, 11a.11.2
+
+**Objective**: Update all user guide documentation to use `execute()` method naming exclusively.
+
+**Scope**: Update API references, code examples, and getting started guides
+
+**Files to Modify** (7 files):
+
+1. **`docs/user-guide/api/lua/README.md`** (PRIMARY - 13+ occurrences)
+   - Line 256: Agent execute() examples
+   - Line 307: Tool.invoke() → Tool.execute()
+   - Line 538: Workflow execute() (already correct)
+   - All code snippets using Tool.invoke()
+
+2. **`docs/user-guide/api/README.md`**
+   - API overview sections mentioning invoke()
+
+3. **`docs/user-guide/api/rust/llmspell-testing.md`**
+   - Test helper examples if using invoke()
+
+4. **`docs/user-guide/api/rust/llmspell-tools.md`**
+   - Tool usage examples
+
+5. **`docs/user-guide/concepts.md`**
+   - Conceptual examples using invoke()
+
+6. **`docs/user-guide/getting-started.md`**
+   - Getting started code snippets
+
+7. **`docs/user-guide/README.md`**
+   - Main overview examples
+
+**Changes Required**:
+```markdown
+<!-- BEFORE: -->
+Tool.invoke("calculator", {
+    operation = "add",
+    values = {1, 2, 3}
+})
+
+<!-- AFTER: -->
+Tool.execute("calculator", {
+    operation = "add",
+    values = {1, 2, 3}
+})
+```
+
+**Acceptance Criteria**:
+- [x] All 7 documentation files updated
+- [x] All code snippets use `execute()` exclusively
+- [x] API reference tables updated
+- [x] No references to `invoke()` remain (except in migration guides)
+- [x] Markdown formatting preserved
+- [x] Links remain functional
+
+**Validation**:
+```bash
+# Verify no invoke references remain
+grep -r "\.invoke\|:invoke" docs/user-guide --include="*.md" | grep -v "migration\|history"
+# Expected: 0 matches or only migration guide references
+
+# Build docs to verify markdown
+cargo doc --no-deps --workspace
+```
+
+---
+
+### Task 11a.11.6: Update Technical Documentation
+
+**Priority**: MEDIUM | **Time**: 15min | **Status**: 🔲 TODO | **Depends**: 11a.11.1, 11a.11.2
+
+**Objective**: Update technical documentation to reflect standardized `execute()` naming.
+
+**Scope**: Update architecture decision records and technical references
+
+**Files to Modify** (1 file):
+- `docs/technical/architecture-decisions.md`
+
+**Changes Required**:
+- Update any API design sections mentioning `invoke()`
+- Add architecture decision record for method naming standardization
+- Reference consistency with Rust core traits
+
+**Optional**: Add migration note
+```markdown
+## API Method Naming Standardization
+
+**Decision**: Standardize all component execution methods on `execute()` naming.
+
+**Rationale**:
+- Consistency with Rust core traits (BaseAgent, Tool, Workflow)
+- Uniform API across all language bindings
+- Clearer semantic: "execute a component instance"
+
+**Impact**: Breaking change for Tool.invoke() and agent:invoke()
+**Migration**: Phase 11a.11 (Q4 2025)
+```
+
+**Acceptance Criteria**:
+- [x] Technical docs updated to reflect `execute()` naming
+- [x] Architecture decision documented if applicable
+- [x] No outdated `invoke()` references
+- [x] Markdown formatting valid
+
+**Validation**:
+```bash
+grep -r "\.invoke\|:invoke" docs/technical --include="*.md"
+# Expected: 0 matches or only historical references
+```
+
+---
+
+### Task 11a.11.7: Full Validation & Regression Testing
+
+**Priority**: CRITICAL | **Time**: 30min | **Status**: 🔲 TODO | **Depends**: 11a.11.1-11a.11.6
+
+**Objective**: Comprehensive validation that all changes work together without regressions.
+
+**Scope**: Run full test suite, validate examples, verify documentation
+
+**Validation Checklist**:
+
+**1. Unit Tests**:
+```bash
+# All bridge tests pass
+cargo test -p llmspell-bridge --lib
+# Expected: All tests passing
+
+# All workspace tests pass
+cargo test --workspace --all-features --lib
+# Expected: 1,832+ tests passing, 0 failures
+```
+
+**2. Clippy Clean**:
+```bash
+# Zero warnings on llmspell-bridge
+cargo clippy -p llmspell-bridge --all-targets --all-features -- -D warnings
+# Expected: 0 warnings
+
+# Zero warnings on workspace
+cargo clippy --workspace --all-targets --all-features -- -D warnings
+# Expected: 0 warnings
+```
+
+**3. Build Validation**:
+```bash
+# Clean build
+cargo clean
+cargo build --bin llmspell
+# Expected: Successful build
+```
+
+**4. Example Validation**:
+```bash
+# Test getting-started examples
+./target/debug/llmspell run examples/script-users/getting-started/01-first-tool.lua
+./target/debug/llmspell run examples/script-users/getting-started/02-first-agent.lua
+
+# Test feature examples
+./target/debug/llmspell run examples/script-users/features/tool-basics.lua
+./target/debug/llmspell run examples/script-users/features/agent-basics.lua
+
+# Expected: All examples run successfully with Tool.execute() and agent:execute()
+```
+
+**5. Documentation Build**:
+```bash
+# Verify docs build without errors
+cargo doc --no-deps --workspace
+# Expected: Success, 0 errors
+```
+
+**6. Grep Validation**:
+```bash
+# Verify NO invoke() calls remain in examples
+grep -r "\.invoke\|:invoke" examples/script-users --include="*.lua"
+# Expected: 0 matches
+
+# Verify NO invoke() calls in user docs (except migration/history)
+grep -r "\.invoke\|:invoke" docs/user-guide --include="*.md" | grep -v migration
+# Expected: 0 matches or only benign references
+
+# Verify Rust bridge uses execute
+grep -n "tool_table.set\|add_method" llmspell-bridge/src/lua/globals/tool.rs
+grep -n "add_method" llmspell-bridge/src/lua/globals/agent.rs
+# Expected: Only "execute" method names visible
+```
+
+**Acceptance Criteria**:
+- [x] All workspace tests pass (1,832+ tests)
+- [x] Zero clippy warnings across workspace
+- [x] Binary builds successfully
+- [x] At least 4 example files run successfully
+- [x] Documentation builds without errors
+- [x] No `invoke()` calls found in examples
+- [x] No `invoke()` calls in user documentation (except migration notes)
+- [x] Rust bridge only exposes `execute()` methods
+
+---
+
+### Task 11a.11.8: Final Summary & Documentation
+
+**Priority**: MEDIUM | **Time**: 15min | **Status**: 🔲 TODO | **Depends**: 11a.11.7
+
+**Objective**: Document completion, create summary, and update TODO.md status.
+
+**Scope**: Final phase summary and completion checklist
+
+**Completion Checklist**:
+- [ ] All 8 tasks completed (11a.11.1 through 11a.11.8)
+- [ ] Lua Tool binding uses `execute()` only
+- [ ] Lua Agent binding uses `execute()` only
+- [ ] JavaScript stub comments updated
+- [ ] All 20 example files updated
+- [ ] All 7 user guide docs updated
+- [ ] Technical documentation updated
+- [ ] Zero test failures
+- [ ] Zero clippy warnings
+- [ ] All examples validated
+
+**Summary Metrics**:
+```markdown
+**Files Modified**: 35+ files
+- Rust bridge: 5 files (tool.rs, agent.rs for Lua/JS)
+- Lua examples: 20 files
+- User guide docs: 7 files
+- Technical docs: 1 file
+
+**Breaking Changes**:
+- Tool.invoke() → Tool.execute()
+- agent:invoke() removed (execute() already exists)
+
+**Test Results**:
+- Unit tests: [X/X passing]
+- Clippy warnings: 0
+- Example validation: 4+ examples tested
+- Documentation build: Success
+
+**Impact**: 🎯 API CONSISTENCY - Unified method naming across all components
+```
+
+**Acceptance Criteria**:
+- [x] Phase 11a.11 summary written
+- [x] All task statuses updated to COMPLETED
+- [x] Metrics documented
+- [x] Phase marked as COMPLETED in TODO.md
+
+**Final Validation**:
+```bash
+# Quick smoke test
+cargo build --bin llmspell
+./target/debug/llmspell run examples/script-users/features/tool-basics.lua
+```
+
+---
+
+## Phase 11a.11 Summary - API Method Naming Standardization
+
+**Status**: 🔲 TODO | **Effort**: ~3 hours | **Files Modified**: 35+
+
+**Completion Criteria**:
+- [ ] All 8 tasks completed (11a.11.1 through 11a.11.8)
+- [ ] Lua Tool binding uses `execute()` only
+- [ ] Lua Agent binding uses `execute()` only (invoke removed)
+- [ ] JavaScript stub comments updated
+- [ ] All 20 Lua examples updated
+- [ ] All 7 user guide docs updated
+- [ ] Technical documentation updated
+- [ ] Zero test failures, zero clippy warnings
+- [ ] Examples validated successfully
+
+**Breaking Changes**:
+- `Tool.invoke(name, params)` → `Tool.execute(name, params)`
+- `agent:invoke(input)` removed (use `agent:execute(input)`)
+
+**Migration Impact**: Pre-1.0 breaking change (acceptable per project policy)
+
+**User Benefits**:
+- Consistent API across all components
+- Matches Rust core trait naming
+- Clearer mental model: "execute a component"
+- Future-proof for Python/JS bindings
+
+**Developer Benefits**:
+- Uniform naming reduces cognitive load
+- Easier to document and teach
+- Consistent with trait system design
+
+---
+
 **END OF PHASE 11a TODO** ✅
 

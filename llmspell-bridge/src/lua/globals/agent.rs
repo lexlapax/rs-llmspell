@@ -510,36 +510,7 @@ struct LuaAgentInstance {
 impl UserData for LuaAgentInstance {
     #[allow(clippy::too_many_lines)]
     fn add_methods<'lua, M: UserDataMethods<'lua, Self>>(methods: &mut M) {
-        // invoke method (same as execute in API) - synchronous wrapper
-        methods.add_method("invoke", |lua, this, input: Table| {
-            let agent_input = lua_table_to_agent_input(lua, &input)?;
-            let bridge = this.bridge.clone();
-            let agent_name = this.agent_instance_name.clone();
-            let global_context = this.global_context.clone();
-
-            // Create ExecutionContext with state if available
-            let context = global_context.state_access.as_ref().map(|state_access| {
-                ExecutionContextBuilder::new()
-                    .scope(ContextScope::Agent(ComponentId::from_name(&agent_name)))
-                    .state(state_access.clone())
-                    .build()
-            });
-
-            // Use shared sync utility to execute async code
-            let result = block_on_async(
-                "agent_invoke",
-                async move {
-                    bridge
-                        .execute_agent(&agent_name, agent_input, context)
-                        .await
-                },
-                None,
-            )?;
-
-            agent_output_to_lua_table(lua, &result)
-        });
-
-        // execute method (alias for invoke) - synchronous wrapper
+        // execute method - synchronous wrapper
         methods.add_method("execute", |lua, this, input: Table| {
             let agent_input = lua_table_to_agent_input(lua, &input)?;
             let bridge = this.bridge.clone();
