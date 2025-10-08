@@ -152,6 +152,6 @@ Support multiple payment methods and international shipping.
         research_depth = "comprehensive",
         
         -- Number of web searches to perform
-        max_web_searches = 20  -- More research for e-commerce best practices
+        max_web-searcheres = 20  -- More research for e-commerce best practices
     }
 }

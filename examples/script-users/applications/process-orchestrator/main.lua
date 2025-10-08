@@ -247,7 +247,7 @@ for i, scenario in ipairs(process_scenarios) do
 end
 scenarios_json = scenarios_json .. ']}'
 
-Tool.invoke("file_operations", {
+Tool.invoke("file-operations", {
     operation = "write",
     path = "/tmp/process-scenarios.json",
     input = scenarios_json
@@ -742,7 +742,7 @@ print("      - Level 3: Document & Signature verification")
 print("    • Patterns: CONDITIONAL + NESTED (3 levels) + PARALLEL workflows")
 print("    • Nesting Depth: 3 levels demonstrated")
 print("    • Crates: Core + workflows + advanced orchestration")
-print("    • Tools: http_request, webhook_caller, file_operations")
+print("    • Tools: http-requester, webhook_caller, file-operations")
 print("    • Business Rules: Automated routing and escalation")
 
 -- Generate professional orchestration summary
@@ -788,7 +788,7 @@ Professional Appeal Validation:
     os.date("%Y-%m-%d %H:%M:%S")
 )
 
-Tool.invoke("file_operations", {
+Tool.invoke("file-operations", {
     operation = "write",
     path = "/tmp/orchestration-summary.txt", 
     input = summary

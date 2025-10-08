@@ -445,7 +445,7 @@ function ErrorLogger:log(error_type, message, details)
     self.stats.by_hour[hour] = (self.stats.by_hour[hour] or 0) + 1
     
     -- Write to file (in production, use proper logging)
-    -- Tool.invoke("file_operations", {
+    -- Tool.invoke("file-operations", {
     --     operation = "append",
     --     path = self.log_file,
     --     input = entry.date_str .. " [" .. error_type .. "] " .. message .. "\n"

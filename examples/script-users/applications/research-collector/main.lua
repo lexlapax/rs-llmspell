@@ -70,7 +70,7 @@ print("1. Creating 2 simple agents for universal research...")
 
 local timestamp = os.time()
 
--- Search Agent (merges: academic_searcher + web_searcher + search_orchestrator)
+-- Search Agent (merges: academic_searcher + web-searcherer + search_orchestrator)
 local search_agent = Agent.builder()
     :name("search_agent_" .. timestamp)
     :description("Searches for information across multiple sources")
@@ -116,7 +116,7 @@ local research_scenarios = {
 
 -- Create sample research query
 local current_research = research_scenarios.vacation
-Tool.invoke("file_operations", {
+Tool.invoke("file-operations", {
     operation = "write",
     path = config.files.research_query,
     input = current_research
@@ -313,7 +313,7 @@ local research_summary = string.format([[
     execution_time_ms
 )
 
-Tool.invoke("file_operations", {
+Tool.invoke("file-operations", {
     operation = "write",
     path = config.files.research_summary,
     input = research_summary
@@ -352,7 +352,7 @@ local search_results_summary = string.format([[
 {
   "research_query": "%s",
   "search_sources": [
-    {"source": "web_search", "results": 5, "quality": "high"},
+    {"source": "web-searcher", "results": 5, "quality": "high"},
     {"source": "travel_forums", "results": 3, "quality": "medium"},
     {"source": "official_sites", "results": 4, "quality": "high"}
   ],
@@ -363,7 +363,7 @@ local search_results_summary = string.format([[
 }
 ]], current_research, execution_time_ms)
 
-Tool.invoke("file_operations", {
+Tool.invoke("file-operations", {
     operation = "write",
     path = config.files.search_results,
     input = search_results_summary
@@ -398,8 +398,8 @@ print("")
 print("  🔧 Technical Architecture:")
 print("    • Agents: 2 (down from 11) - Universal complexity")
 print("    • Workflows: Parallel search + Sequential synthesis")
-print("    • Crates: Core + llmspell-tools (web_search integration)")
-print("    • Tools: web_search, http_request, file_operations")
+print("    • Crates: Core + llmspell-tools (web-searcher integration)")
+print("    • Tools: web-searcher, http-requester, file-operations")
 print("    • RAG: Knowledge persistence and retrieval")
 print("    • State Management: MINIMAL (immediate results + knowledge base)")
 print("")

@@ -583,7 +583,7 @@ print("\n💾 Saving review outputs...\n")
 
 -- Save detailed findings
 local findings_path = config.output_dir .. "/review-findings.json"
-Tool.invoke("file_operations", {
+Tool.invoke("file-operations", {
     operation = "write",
     path = findings_path,
     input = json.stringify({
@@ -597,7 +597,7 @@ print("  ✓ Findings saved to: " .. findings_path)
 
 -- Save markdown report
 local report_path = config.output_dir .. "/review-report.md"
-Tool.invoke("file_operations", {
+Tool.invoke("file-operations", {
     operation = "write",
     path = report_path,
     input = final_report
@@ -621,7 +621,7 @@ Generated Files:
 Review Date: %s
 ]], config.system_name, #code_samples, config.output_dir, os.date("%Y-%m-%d %H:%M:%S"))
 
-Tool.invoke("file_operations", {
+Tool.invoke("file-operations", {
     operation = "write",
     path = summary_path,
     input = summary

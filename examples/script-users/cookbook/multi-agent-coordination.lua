@@ -191,7 +191,7 @@ local market_data_json = "Product: " .. market_data.product .. "\n" ..
     "Key Trends: " .. table.concat(market_data.trends, ", ")
 
 -- Save market data as text file
-Tool.invoke("file_operations", {
+Tool.invoke("file-operations", {
     operation = "write",
     path = "/tmp/market_data.txt",
     input = market_data_json
@@ -400,7 +400,7 @@ local scenario_text = "Company: " .. scenario.company .. "\n" ..
     "Timeline: " .. scenario.constraints.timeline .. "\n" ..
     "Team Size: " .. scenario.constraints.team_size
 
-Tool.invoke("file_operations", {
+Tool.invoke("file-operations", {
     operation = "write",
     path = "/tmp/expansion_scenario.txt",
     input = scenario_text

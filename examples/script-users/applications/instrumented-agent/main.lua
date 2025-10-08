@@ -252,7 +252,7 @@ Generated: ]] .. os.date("%Y-%m-%d %H:%M:%S") .. [[
 
 -- Write to file with debug logging
 Debug.debug("Writing results to file", module_name)
-local write_result = Tool.invoke("file_operations", {
+local write_result = Tool.invoke("file-operations", {
     operation = "write",
     path = "/tmp/instrumented-analysis-" .. timestamp .. ".md",
     input = formatted_results
