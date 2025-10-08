@@ -573,6 +573,48 @@ local status = workflow:get_status()
 print(status.state)  -- "running", "completed", "failed"
 ```
 
+### Workflow Result Structure
+
+All workflows return a result with the following structure:
+
+```lua
+{
+    success = true,              -- Overall success status
+    execution_id = "uuid...",    -- Unique execution ID
+    workflow_type = "sequential",-- Type of workflow
+    status = "completed",        -- Workflow status
+    metadata = {
+        extra = {
+            execution_id = "uuid...",  -- Execution ID (redundant, for convenience)
+            agent_outputs = {          -- Collected agent outputs (if agents present)
+                ["agent_id_timestamp"] = { ... },  -- Agent output JSON
+                ...
+            },
+            ...
+        }
+    },
+    ...
+}
+```
+
+**Accessing Agent Outputs**:
+
+```lua
+local result = workflow:execute(input)
+
+-- Option 1: Direct access
+local outputs = result.metadata.extra.agent_outputs
+
+-- Option 2: Safe access with fallback
+local outputs = result.metadata and result.metadata.extra
+    and result.metadata.extra.agent_outputs or {}
+
+-- Use outputs
+for agent_id, output in pairs(outputs) do
+    -- Process output
+end
+```
+
 ---
 
 ## Session

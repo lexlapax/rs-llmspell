@@ -438,6 +438,49 @@ let result = block_on_async_lua(
 - Consistent error messages
 - Multi-threaded tokio runtime required
 
+### Workflow Pattern: Automatic Output Collection
+
+**Problem**: Users need to manually collect agent outputs from state using complex key construction.
+
+**Solution**: All workflow types automatically collect agent outputs during execution.
+
+**Implementation** (Rust):
+```rust
+// In execute_impl(), after workflow completes:
+let mut agent_outputs = serde_json::Map::new();
+if let Some(ref state) = context.state {
+    for step in &self.steps {
+        if let StepType::Agent { agent_id, .. } = &step.step_type {
+            let key = format!("workflow:{}:agent:{}:output", execution_id, agent_id);
+            if let Ok(Some(output)) = state.read(&key).await {
+                agent_outputs.insert(agent_id.clone(), output);
+            }
+        }
+    }
+}
+if !agent_outputs.is_empty() {
+    metadata.extra.insert("agent_outputs".to_string(),
+                         serde_json::Value::Object(agent_outputs));
+}
+```
+
+**Benefits**:
+- No manual state key construction
+- Batch retrieval (single state access per agent)
+- Consistent API across workflow types
+- Type-safe access via `result.metadata.extra.agent_outputs`
+
+**Lua Usage**:
+```lua
+local result = workflow:execute(input)
+local outputs = result.metadata and result.metadata.extra
+    and result.metadata.extra.agent_outputs or {}
+
+for agent_id, output in pairs(outputs) do
+    -- Process agent output
+end
+```
+
 ### Test Development Patterns
 
 #### Test Categorization (MANDATORY)
