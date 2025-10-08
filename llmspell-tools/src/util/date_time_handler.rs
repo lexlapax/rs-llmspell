@@ -687,7 +687,7 @@ impl Tool for DateTimeHandlerTool {
 
     fn schema(&self) -> ToolSchema {
         ToolSchema::new(
-            "datetime_handler".to_string(),
+            "datetime-handler".to_string(),
             "Date and time manipulation tool with parsing, timezone conversion, and arithmetic"
                 .to_string(),
         )

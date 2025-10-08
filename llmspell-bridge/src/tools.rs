@@ -147,10 +147,10 @@ fn register_utility_tools(
         registry.register_tool("template-creator".to_string(), template_tool)?;
     }
 
-    register_tool(registry, "text_manipulator", || {
+    register_tool(registry, "text-manipulator", || {
         TextManipulatorTool::new(TextManipulatorConfig::default())
     })?;
-    register_tool(registry, "uuid_generator", || {
+    register_tool(registry, "uuid-generator", || {
         UuidGeneratorTool::new(UuidGeneratorConfig::default())
     })?;
     // Phase 7 tools

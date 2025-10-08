@@ -261,7 +261,7 @@ impl ProviderRegistry {
             self.factories
                 .get(&config.name)
                 .ok_or_else(|| LLMSpellError::Configuration {
-                    message: format!("Unknown factory: {}", config.name),
+                    message: format!("Unknown provider: {}", config.name),
                     source: None,
                 })?;
 

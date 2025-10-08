@@ -108,9 +108,9 @@
 //! local parallel = Workflow.parallel({
 //!     name = "multi_search",
 //!     steps = {
-//!         {tool = "web_search", params = {query = "rust programming"}},
-//!         {tool = "arxiv_search", params = {query = "machine learning"}},
-//!         {tool = "news_search", params = {query = "technology"}}
+//!         {tool = "web-searcher", params = {query = "rust programming"}},
+//!         {tool = "arxiv-searcher", params = {query = "machine learning"}},
+//!         {tool = "news-searcher", params = {query = "technology"}}
 //!     }
 //! })
 //! ```
@@ -150,7 +150,7 @@
 //! console.log(response.text);
 //!
 //! // Tool execution
-//! const result = await Tool.execute("web_search", {
+//! const result = await Tool.execute("web-searcher", {
 //!     query: "latest AI news"
 //! });
 //! ```

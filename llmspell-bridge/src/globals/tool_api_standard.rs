@@ -38,7 +38,7 @@
 //! #### `Tool.exists(name: string) -> boolean`
 //! Checks if a tool with the given name exists.
 //! ```js
-//! if (Tool.exists("web_search")) {
+//! if (Tool.exists("web-searcher")) {
 //!     // Use web search tool
 //! }
 //! ```

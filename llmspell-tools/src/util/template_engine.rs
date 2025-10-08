@@ -264,7 +264,7 @@ impl TemplateEngineTool {
         tera.render(template_name, &tera_context).map_err(|e| {
             tool_error(
                 format!("Template rendering failed: {e}"),
-                Some("template_engine".to_string()),
+                Some("template-creator".to_string()),
             )
         })
     }
@@ -286,7 +286,7 @@ impl TemplateEngineTool {
         handlebars.render_template(template, context).map_err(|e| {
             tool_error(
                 format!("Template rendering failed: {e}"),
-                Some("template_engine".to_string()),
+                Some("template-creator".to_string()),
             )
         })
     }
