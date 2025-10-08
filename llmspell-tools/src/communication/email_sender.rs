@@ -179,7 +179,7 @@ impl EmailSenderTool {
         Ok(Self {
             config,
             metadata: ComponentMetadata::new(
-                "email_sender".to_string(),
+                "email-sender".to_string(),
                 "Email sending tool with support for SMTP, SendGrid, and AWS SES".to_string(),
             ),
             auditor: parking_lot::Mutex::new(CredentialAuditor::new()),
@@ -200,7 +200,7 @@ impl EmailSenderTool {
         let mut entry = CredentialAuditEntry::new(
             action.to_string(),
             credential_type.to_string(),
-            "email_sender".to_string(),
+            "email-sender".to_string(),
             success,
         );
 
@@ -631,7 +631,7 @@ impl BaseAgent for EmailSenderTool {
         // Use SafeErrorHandler to sanitize error messages
         let context = ErrorContext::new()
             .with_operation("email_send")
-            .with_metadata("tool", "email_sender");
+            .with_metadata("tool", "email-sender");
 
         let safe_response = self.error_handler.handle_llmspell_error(&error, &context);
 
@@ -646,7 +646,7 @@ impl BaseAgent for EmailSenderTool {
 impl Tool for EmailSenderTool {
     fn schema(&self) -> ToolSchema {
         ToolSchema::new(
-            "email_sender".to_string(),
+            "email-sender".to_string(),
             "Send emails using various providers (SMTP, SendGrid, AWS SES)".to_string(),
         )
         .with_parameter(ParameterDef {
@@ -721,7 +721,7 @@ mod tests {
     fn test_email_sender_tool_creation() {
         let config = EmailSenderConfig::default();
         let tool = EmailSenderTool::new(config).unwrap();
-        assert_eq!(tool.metadata().name, "email_sender");
+        assert_eq!(tool.metadata().name, "email-sender");
     }
     #[test]
     fn test_tool_metadata() {
@@ -732,7 +732,7 @@ mod tests {
         assert_eq!(tool.security_level(), SecurityLevel::Restricted);
 
         let schema = tool.schema();
-        assert_eq!(schema.name, "email_sender");
+        assert_eq!(schema.name, "email-sender");
         assert!(!schema.parameters.is_empty());
     }
     #[test]

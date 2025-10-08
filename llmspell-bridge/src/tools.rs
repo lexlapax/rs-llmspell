@@ -84,11 +84,7 @@ pub fn register_all_tools(
     // Register different tool categories with their specific configurations
     register_utility_tools(registry)?;
     register_data_processing_tools(registry, &tools_config.http_request)?;
-    register_file_system_tools(
-        registry,
-        &file_sandbox,
-        &tools_config.file_operations,
-    )?;
+    register_file_system_tools(registry, &file_sandbox, &tools_config.file_operations)?;
     register_system_tools(registry, &file_sandbox)?;
     register_media_tools(registry, &file_sandbox)?;
     register_search_tools(registry, &tools_config.web_search)?;
@@ -402,14 +398,25 @@ fn register_web_tools(registry: &Arc<ComponentRegistry>) -> Result<(), Box<dyn s
 fn register_communication_tools(
     registry: &Arc<ComponentRegistry>,
 ) -> Result<(), Box<dyn std::error::Error>> {
+    // Email sender: register with kebab-case primary name
     #[cfg(feature = "email")]
-    register_tool_result(registry, "email-sender", || {
-        EmailSenderTool::new(EmailSenderConfig::default())
-    })?;
+    {
+        let email_tool = Arc::new(EmailSenderTool::new(EmailSenderConfig::default())?);
+        registry.register_tool("email-sender".to_string(), email_tool.clone())?;
+        // Register with snake_case alias for backward compatibility
+        registry.register_tool("email_sender".to_string(), email_tool)?;
+    }
+
+    // Database connector: register with kebab-case primary name
     #[cfg(feature = "database")]
-    register_tool_result(registry, "database-connector", || {
-        DatabaseConnectorTool::new(DatabaseConnectorConfig::default())
-    })?;
+    {
+        let db_tool = Arc::new(DatabaseConnectorTool::new(
+            DatabaseConnectorConfig::default(),
+        )?);
+        registry.register_tool("database-connector".to_string(), db_tool.clone())?;
+        // Register with snake_case alias for backward compatibility
+        registry.register_tool("database_connector".to_string(), db_tool)?;
+    }
     Ok(())
 }
 
