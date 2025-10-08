@@ -7,7 +7,7 @@
 -- Feature Category: Tools
 --
 -- Purpose: Essential tool usage patterns for common operations
--- Architecture: Synchronous Tool.invoke() API with structured results
+-- Architecture: Synchronous Tool.execute() API with structured results
 -- Key Capabilities:
 --   • File operations (read, write, exists)
 --   • Data encoding (Base64, JSON)
@@ -32,7 +32,7 @@ print("=== Tool Basics - Essential Operations ===\n")
 
 -- Helper function for tool invocation with error handling
 local function use_tool(tool_name, params)
-    local result = Tool.invoke(tool_name, params)
+    local result = Tool.execute(tool_name, params)
     if result then
         return result
     end

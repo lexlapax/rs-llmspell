@@ -36,13 +36,13 @@ async fn test_simple_tool_integration() {
             error("Could not get base64_encoder tool")
         end
         
-        -- Test if we can call Tool.invoke directly
-        -- Tool.invoke should wrap parameters correctly
-        print("Testing Tool.invoke...")
+        -- Test if we can call Tool.execute directly
+        -- Tool.execute should wrap parameters correctly
+        print("Testing Tool.execute...")
         
-        -- Create a coroutine to call Tool.invoke (which is async)
+        -- Create a coroutine to call Tool.execute (which is async)
         local co = coroutine.create(function()
-            return Tool.invoke("base64_encoder", {
+            return Tool.execute("base64_encoder", {
                 operation = "encode",
                 input = "Hello, World!"
             })
@@ -126,9 +126,9 @@ async fn test_simple_tool_integration() {
 
     // Test 2: Calculator tool
     let calc_test = r#"
-        -- Use coroutine for async Tool.invoke
+        -- Use coroutine for async Tool.execute
         local co = coroutine.create(function()
-            return Tool.invoke("calculator", {
+            return Tool.execute("calculator", {
                 operation = "evaluate",
                 input = "2 + 3 * 4"
             })

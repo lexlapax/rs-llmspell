@@ -191,14 +191,14 @@ local market_data_json = "Product: " .. market_data.product .. "\n" ..
     "Key Trends: " .. table.concat(market_data.trends, ", ")
 
 -- Save market data as text file
-Tool.invoke("file-operations", {
+Tool.execute("file-operations", {
     operation = "write",
     path = "/tmp/market_data.txt",
     input = market_data_json
 })
 
 -- Coordinator orchestrates market analysis
-local market_result = agents.coordinator:invoke({
+local market_result = agents.coordinator:execute({
     text = string.format([[
 Coordinate a comprehensive market analysis for a new smart home product:
 
@@ -242,7 +242,7 @@ A software company is experiencing:
 ]]
 
 -- Coordinator manages problem-solving
-local problem_result = agents.coordinator:invoke({
+local problem_result = agents.coordinator:execute({
     text = string.format([[
 Coordinate a solution for this business problem:
 
@@ -282,7 +282,7 @@ local feedback_data = [[
 
 -- Step 1: Research agent analyzes feedback
 print("Step 1: Research Agent analyzing feedback...")
-local research_result = agents.researcher:invoke({
+local research_result = agents.researcher:execute({
     text = string.format([[
 Research and categorize this customer feedback:
 
@@ -298,7 +298,7 @@ Identify:
 
 -- Step 2: Analysis agent processes findings
 print("Step 2: Analysis Agent processing findings...")
-local analysis_result = agents.analyst:invoke({
+local analysis_result = agents.analyst:execute({
     text = string.format([[
 Analyze these research findings:
 
@@ -314,7 +314,7 @@ Provide:
 
 -- Step 3: Decision agent makes recommendations
 print("Step 3: Decision Agent making recommendations...")
-local decision_result = agents.decision_maker:invoke({
+local decision_result = agents.decision_maker:execute({
     text = string.format([[
 Based on this analysis, make recommendations:
 
@@ -330,7 +330,7 @@ Provide:
 
 -- Step 4: Coordinator synthesizes all results
 print("Step 4: Coordinator synthesizing results...")
-local synthesis_result = agents.coordinator:invoke({
+local synthesis_result = agents.coordinator:execute({
     text = string.format([[
 Synthesize all agent findings into an executive summary:
 
@@ -400,7 +400,7 @@ local scenario_text = "Company: " .. scenario.company .. "\n" ..
     "Timeline: " .. scenario.constraints.timeline .. "\n" ..
     "Team Size: " .. scenario.constraints.team_size
 
-Tool.invoke("file-operations", {
+Tool.execute("file-operations", {
     operation = "write",
     path = "/tmp/expansion_scenario.txt",
     input = scenario_text
@@ -412,7 +412,7 @@ print("Running parallel analysis on expansion scenario...")
 local parallel_results = {}
 
 -- Research agent examines each market
-parallel_results.market_research = agents.researcher:invoke({
+parallel_results.market_research = agents.researcher:execute({
     text = string.format([[
 Research these target markets for expansion:
 %s
@@ -426,7 +426,7 @@ For each market, identify:
 })
 
 -- Analyst examines financial implications
-parallel_results.financial_analysis = agents.analyst:invoke({
+parallel_results.financial_analysis = agents.analyst:execute({
     text = string.format([[
 Analyze financial implications of expansion:
 Budget: %s
@@ -442,7 +442,7 @@ Calculate:
 })
 
 -- Decision maker evaluates options
-parallel_results.strategic_options = agents.decision_maker:invoke({
+parallel_results.strategic_options = agents.decision_maker:execute({
     text = string.format([[
 Evaluate expansion strategies:
 Company: %s
@@ -458,7 +458,7 @@ Consider:
 })
 
 -- Coordinator merges parallel results
-local parallel_synthesis = agents.coordinator:invoke({
+local parallel_synthesis = agents.coordinator:execute({
     text = string.format([[
 Merge these parallel analyses into a cohesive expansion plan:
 
@@ -515,13 +515,13 @@ for i, request in ipairs(requests) do
     
     local result
     if request.type == "research" then
-        result = agents.researcher:invoke({ text = request.content })
+        result = agents.researcher:execute({ text = request.content })
     elseif request.type == "data_analysis" then
-        result = agents.analyst:invoke({ text = request.content })
+        result = agents.analyst:execute({ text = request.content })
     elseif request.type == "decision" then
-        result = agents.decision_maker:invoke({ text = request.content })
+        result = agents.decision_maker:execute({ text = request.content })
     else  -- complex requests need coordination
-        result = agents.coordinator:invoke({ 
+        result = agents.coordinator:execute({ 
             text = request.content .. "\n\nCoordinate with all available agents as needed."
         })
     end

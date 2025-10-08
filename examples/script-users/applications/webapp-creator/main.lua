@@ -135,7 +135,7 @@ print()
 
 -- File generation helper (Task 10.3.c)
 function generate_file(path, content)
-    Tool.invoke("file-operations", {
+    Tool.execute("file-operations", {
         operation = "write",
         path = path,
         input = type(content) == "table" and JSON.stringify(content) or content
@@ -595,7 +595,7 @@ if result then
         print("\n📁 Generating Project Files...\n")
         
         -- Create project directory (recursive to create parent dirs)
-        Tool.invoke("file-operations", {
+        Tool.execute("file-operations", {
             operation = "mkdir",
             path = project_dir,
             recursive = true
@@ -616,7 +616,7 @@ if result then
         generate_file(project_dir .. "/ui-design.json", outputs.frontend_designer)
         
         -- Frontend Code
-        Tool.invoke("file-operations", {
+        Tool.execute("file-operations", {
             operation = "mkdir",
             path = project_dir .. "/frontend"
         })
@@ -631,7 +631,7 @@ if result then
         })
         
         -- Backend Code
-        Tool.invoke("file-operations", {
+        Tool.execute("file-operations", {
             operation = "mkdir",
             path = project_dir .. "/backend"
         })
@@ -641,20 +641,20 @@ if result then
         -- Generate CRUD files from loop workflow
         if crud_result then
             print("\n📂 Generating CRUD modules from loop workflow...")
-            Tool.invoke("file-operations", {
+            Tool.execute("file-operations", {
                 operation = "mkdir",
                 path = project_dir .. "/backend/src/crud"
             })
-            Tool.invoke("file-operations", {
+            Tool.execute("file-operations", {
                 operation = "mkdir",
                 path = project_dir .. "/frontend/src/crud"
             })
             -- Create tests directory first
-            Tool.invoke("file-operations", {
+            Tool.execute("file-operations", {
                 operation = "mkdir",
                 path = project_dir .. "/tests"
             })
-            Tool.invoke("file-operations", {
+            Tool.execute("file-operations", {
                 operation = "mkdir",
                 path = project_dir .. "/tests/crud"
             })
@@ -683,14 +683,14 @@ if result then
         })
         
         -- Database
-        Tool.invoke("file-operations", {
+        Tool.execute("file-operations", {
             operation = "mkdir",
             path = project_dir .. "/database"
         })
         generate_file(project_dir .. "/database/migrations.sql", outputs.database_developer)
         
         -- Tests
-        Tool.invoke("file-operations", {
+        Tool.execute("file-operations", {
             operation = "mkdir",
             path = project_dir .. "/tests"
         })

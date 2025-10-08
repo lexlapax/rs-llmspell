@@ -122,7 +122,7 @@ if success and execution_result then
     end
     
     -- Check if the summary file was created
-    local file_check = Tool.invoke("file-operations", {
+    local file_check = Tool.execute("file-operations", {
         operation = "exists",
         path = "/tmp/workflow_summary.txt"
     })
@@ -131,7 +131,7 @@ if success and execution_result then
         print("   ✅ Summary file created: /tmp/workflow_summary.txt")
 
         -- Read and display the summary
-        local file_content = Tool.invoke("file-operations", {
+        local file_content = Tool.execute("file-operations", {
             operation = "read",
             path = "/tmp/workflow_summary.txt"
         })

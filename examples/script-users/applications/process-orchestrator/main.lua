@@ -247,7 +247,7 @@ for i, scenario in ipairs(process_scenarios) do
 end
 scenarios_json = scenarios_json .. ']}'
 
-Tool.invoke("file-operations", {
+Tool.execute("file-operations", {
     operation = "write",
     path = "/tmp/process-scenarios.json",
     input = scenarios_json
@@ -788,7 +788,7 @@ Professional Appeal Validation:
     os.date("%Y-%m-%d %H:%M:%S")
 )
 
-Tool.invoke("file-operations", {
+Tool.execute("file-operations", {
     operation = "write",
     path = "/tmp/orchestration-summary.txt", 
     input = summary

@@ -116,7 +116,7 @@ local research_scenarios = {
 
 -- Create sample research query
 local current_research = research_scenarios.vacation
-Tool.invoke("file-operations", {
+Tool.execute("file-operations", {
     operation = "write",
     path = config.files.research_query,
     input = current_research
@@ -313,7 +313,7 @@ local research_summary = string.format([[
     execution_time_ms
 )
 
-Tool.invoke("file-operations", {
+Tool.execute("file-operations", {
     operation = "write",
     path = config.files.research_summary,
     input = research_summary
@@ -363,7 +363,7 @@ local search_results_summary = string.format([[
 }
 ]], current_research, execution_time_ms)
 
-Tool.invoke("file-operations", {
+Tool.execute("file-operations", {
     operation = "write",
     path = config.files.search_results,
     input = search_results_summary

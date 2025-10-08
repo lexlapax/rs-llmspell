@@ -10,7 +10,7 @@
 -- Architecture: Synchronous agent API with builder pattern
 -- Key Capabilities:
 --   • Agent.builder() - Fluent agent creation
---   • agent:invoke() - Synchronous execution
+--   • agent:execute() - Synchronous execution
 --   • Agent.list() - Discovery and enumeration
 --   • Agent.register() - Custom agent registration
 --   • Multiple provider support (OpenAI, Anthropic)

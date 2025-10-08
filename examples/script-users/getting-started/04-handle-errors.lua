@@ -59,7 +59,7 @@ local function safe_file_operation(operation, path, content)
     end
     
     local success, result = pcall(function()
-        return Tool.invoke("file-operations", params)
+        return Tool.execute("file-operations", params)
     end)
     
     if success and result and result.text then
@@ -118,7 +118,7 @@ if #providers > 0 then
     if good_agent then
         print("   Attempting conversation...")
         local success, response = pcall(function()
-            return good_agent:invoke("Say hello!")
+            return good_agent:execute("Say hello!")
         end)
         
         if success and response and response.success then

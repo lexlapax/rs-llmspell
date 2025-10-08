@@ -29,10 +29,10 @@
 //! }
 //! ```
 //!
-//! #### `Tool.invoke(name: string, params: object) -> object`
+//! #### `Tool.execute(name: string, params: object) -> object`
 //! Directly invokes a tool by name with the given parameters.
 //! ```js
-//! const result = Tool.invoke("calculator", { expression: "2 + 2" });
+//! const result = Tool.execute("calculator", { expression: "2 + 2" });
 //! ```
 //!
 //! #### `Tool.exists(name: string) -> boolean`

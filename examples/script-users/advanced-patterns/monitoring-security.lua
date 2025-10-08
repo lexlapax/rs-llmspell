@@ -38,7 +38,7 @@ print("=== Monitoring & Security Patterns ===\n")
 -- Helper for safe tool execution
 local function use_tool(tool_name, params)
     local success, result = pcall(function()
-        return Tool.invoke(tool_name, params)
+        return Tool.execute(tool_name, params)
     end)
     
     if success and result then

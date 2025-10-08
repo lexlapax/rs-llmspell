@@ -114,7 +114,7 @@ local sample_files = {
 -- Create messy directory with sample files
 for _, filename in ipairs(sample_files) do
     local sample_content = "Sample content for " .. filename .. " created at " .. os.date()
-    Tool.invoke("file-operations", {
+    Tool.execute("file-operations", {
         operation = "write",
         path = config.files.target_directory .. filename,
         input = sample_content
@@ -277,7 +277,7 @@ SAMPLE FILE PLACEMENT:
     execution_time_ms
 )
 
-Tool.invoke("file-operations", {
+Tool.execute("file-operations", {
     operation = "write",
     path = config.files.organization_plan,
     input = organization_plan
