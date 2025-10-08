@@ -153,7 +153,7 @@ local ResearchSpell = Spell.create({
                 { 
                     agent = "AcademicResearcher", 
                     query = "{{input.topic}} academic papers last 2 years",
-                    tools = {"scholarly_search", "pdf_analysis"},
+                    tools = {"scholarly-searcher", "pdf_analysis"},
                     memory_aware = true  -- Agent can access memory directly
                 },
                 { 
@@ -165,7 +165,7 @@ local ResearchSpell = Spell.create({
                 { 
                     agent = "MarketAnalyst", 
                     query = "{{input.topic}} market implications",
-                    tools = {"market_data", "trend_analysis"},
+                    tools = {"market-data", "trend_analysis"},
                     memory_aware = true
                 }
             },
@@ -178,7 +178,7 @@ local ResearchSpell = Spell.create({
             agent = "SynthesisExpert",
             input = "{{research_data}}",
             action = "create_comprehensive_analysis",
-            tools = {"statistical_analysis", "visualization", "report_generator"},
+            tools = {"statistical-analyzer", "visualization", "report-generator"},
             output = "synthesis_report"
         },
         
@@ -840,9 +840,9 @@ local assistant = Agent.new({
     provider = "openai",  -- or "anthropic", "ollama", etc.
     model = "gpt-4",
     tools = {
-        Tools.get("web_search"),     -- Built-in web search
+        Tools.get("web-searcher"),     -- Built-in web search
         Tools.get("calculator"),     -- Built-in calculator  
-        Tools.get("file_reader")     -- Built-in file operations
+        Tools.get("file-reader")     -- Built-in file operations
     }
 })
 
@@ -889,12 +889,12 @@ Quantum computing is like having a super-powered calculator that can try many
 solutions at once...
 
 # Add tools dynamically
-llmspell> assistant:add_tool(Tools.get("web_search"))
-Tool added: web_search
+llmspell> assistant:add_tool(Tools.get("web-searcher"))
+Tool added: web-searcher
 
 # Test with tool usage
 llmspell> assistant:chat("What's the latest news about quantum computers?")
-[web_search] Searching for: latest quantum computer news 2025
+[web-searcher] Searching for: latest quantum computer news 2025
 <AgentOutput: 3 sources cited>
 
 # Save your work
@@ -937,9 +937,9 @@ const researcher = new Agent({
     name: "academic_researcher",
     systemPrompt: "You are an expert academic researcher specializing in finding and analyzing scholarly sources.",
     tools: [
-        Tools.get("scholarly_search"),
-        Tools.get("pdf_analyzer"),
-        Tools.get("citation_formatter")
+        Tools.get("scholarly-searcher"),
+        Tools.get("pdf-analyzer"),
+        Tools.get("citation-formatter")
     ]
 });
 
@@ -947,9 +947,9 @@ const analyst = new Agent({
     name: "data_analyst", 
     systemPrompt: "You are a data analyst expert at finding patterns and insights in research data.",
     tools: [
-        Tools.get("statistical_analysis"),
+        Tools.get("statistical-analyzer"),
         Tools.get("visualization"),
-        Tools.get("trend_detector")
+        Tools.get("trend-detector")
     ]
 });
 
@@ -957,9 +957,9 @@ const writer = new Agent({
     name: "technical_writer",
     systemPrompt: "You are a technical writer expert at creating clear, comprehensive reports.",
     tools: [
-        Tools.get("document_formatter"),
-        Tools.get("grammar_checker"),
-        Tools.get("readability_analyzer")
+        Tools.get("document-formatter"),
+        Tools.get("grammar-checker"),
+        Tools.get("readability-analyzer")
     ]
 });
 
@@ -1023,7 +1023,7 @@ async function runResearch() {
         });
         
         // Save the report
-        await Tools.get("file_writer").execute({
+        await Tools.get("file-writer").execute({
             path: "./research_report.md",
             content: result.final_report.content
         });
@@ -1153,9 +1153,9 @@ local robust_agent = Agent.new({
     }),
     
     tools = {
-        Tools.get("web_search"),
-        Tools.get("academic_search"), 
-        Tools.get("file_operations")
+        Tools.get("web-searcher"),
+        Tools.get("academic-searcher"),
+        Tools.get("file-operations")
     }
 })
 
@@ -3678,16 +3678,16 @@ impl AgentTemplate for ResearchAgentTemplate {
             agent_code,
             workflow_code,
             config_files,
-            tools: vec!["web_search", "document_reader", "fact_checker"],
+            tools: vec!["web-searcher", "document_reader", "fact_checker"],
             readme: self.generate_readme(&config)?,
         })
     }
     
     fn required_tools(&self) -> Vec<ToolId> {
         vec![
-            ToolId::from("web_search"),
+            ToolId::from("web-searcher"),
             ToolId::from("document_reader"),
-            ToolId::from("text_summarizer"),
+            ToolId::from("text-summarizer"),
         ]
     }
     
@@ -5642,7 +5642,7 @@ State = {
 local agent_config = {
     temperature = 0.7,
     max_tokens = 1000,
-    tools = {"web_search", "calculator"}
+    tools = {"web-searcher", "calculator"}
 }
 
 -- Save agent configuration
@@ -6121,7 +6121,7 @@ async for chunk in stream:
 
 ```lua
 -- Lua tool execution
-local search_tool = Tool.get("web_search")
+local search_tool = Tool.get("web-searcher")
 local results = search_tool:execute({
     query = "rust programming",
     limit = 10
@@ -6130,7 +6130,7 @@ local results = search_tool:execute({
 
 ```javascript
 // JavaScript tool execution - identical interface
-const searchTool = Tool.get("web_search");
+const searchTool = Tool.get("web-searcher");
 const results = await searchTool.execute({
     query: "rust programming",
     limit: 10
@@ -6139,7 +6139,7 @@ const results = await searchTool.execute({
 
 ```python
 # Python tool execution
-search_tool = Tool.get("web_search")
+search_tool = Tool.get("web-searcher")
 results = await search_tool.execute({
     "query": "rust programming", 
     "limit": 10
@@ -7261,10 +7261,10 @@ local research_agent = Agent.new({
     
     -- Tools configuration
     tools = {
-        Tools.get("web_search"),
-        Tools.get("scholarly_search"),
-        Tools.get("pdf_analyzer"),
-        Tools.get("citation_formatter"),
+        Tools.get("web-searcher"),
+        Tools.get("scholarly-searcher"),
+        Tools.get("pdf-analyzer"),
+        Tools.get("citation-formatter"),
         
         -- Custom tool with inline configuration
         Tools.create("custom_analyzer", {
@@ -7364,7 +7364,7 @@ local sequential_workflow = Workflow.sequential({
     steps = {
         {
             name = "extract_text",
-            component = Tools.get("pdf_extractor"),
+            component = Tools.get("pdf-extractor"),
             input = function(context)
                 return {
                     file_path = context.input.document_path,
@@ -7405,7 +7405,7 @@ local sequential_workflow = Workflow.sequential({
         
         {
             name = "quality_check",
-            component = Tools.get("quality_validator"),
+            component = Tools.get("quality-validator"),
             input = function(context)
                 return {
                     original = context.extracted_content,
@@ -7773,13 +7773,13 @@ WorkflowTests:test("sequential_execution", function(t)
         steps = {
             {
                 name = "step1",
-                component = Tools.get("mock_tool"),
+                component = Tools.get("mock-tool"),
                 input = { value = 10 },
                 output = "step1_result"
             },
             {
                 name = "step2", 
-                component = Tools.get("mock_tool"),
+                component = Tools.get("mock-tool"),
                 input = function(context)
                     return { value = context.step1_result.value * 2 }
                 end,
@@ -7924,17 +7924,17 @@ print(data.temperature) -- 0.7
 -- Stringify Lua table to JSON
 local config = {
     name = "assistant",
-    tools = {"web_search", "calculator"},
+    tools = {"web-searcher", "calculator"},
     settings = {
         temperature = 0.5,
         max_tokens = 2000
     }
 }
 local json_output = JSON.stringify(config)
--- {"name":"assistant","tools":["web_search","calculator"],"settings":{"temperature":0.5,"max_tokens":2000}}
+-- {"name":"assistant","tools":["web-searcher","calculator"],"settings":{"temperature":0.5,"max_tokens":2000}}
 
 -- Working with tool outputs
-local tool_result = Tool.executeAsync("uuid_generator", {
+local tool_result = Tool.executeAsync("uuid-generator", {
     operation = "generate",
     version = "v4"
 })
@@ -7962,7 +7962,7 @@ local analysis_data = {
 
 -- Convert to JSON for tool input
 local json_input = JSON.stringify(analysis_data)
-local processed = Tool.executeAsync("json_processor", {
+local processed = Tool.executeAsync("json-processor", {
     data = json_input,
     query = ".results[] | select(.score > 0.5)"
 })
@@ -7978,19 +7978,19 @@ local workflow_data = {
 }
 
 -- Tool 1: Text analysis
-local text_result = Tool.executeAsync("text_analyzer", {
+local text_result = Tool.executeAsync("text-analyzer", {
     input = JSON.stringify(workflow_data)
 })
 local text_analysis = JSON.parse(text_result.output)
 
 -- Tool 2: Entity enrichment
-local enriched_result = Tool.executeAsync("entity_enricher", {
+local enriched_result = Tool.executeAsync("entity-enricher", {
     entities = JSON.stringify(text_analysis.result.entities)
 })
 local enriched_data = JSON.parse(enriched_result.output)
 
 -- Tool 3: Report generation
-local report = Tool.executeAsync("report_generator", {
+local report = Tool.executeAsync("report-generator", {
     analysis = JSON.stringify({
         text_analysis = text_analysis.result,
         enriched_entities = enriched_data.result
@@ -8103,7 +8103,7 @@ MyApp.Agents.createResearcher = function(config)
     return Agent.create({
         name = config.name or "researcher",
         system_prompt = config.prompt or MyApp.Config.DEFAULT_RESEARCH_PROMPT,
-        tools = {"web_search", "summarizer"}
+        tools = {"web-searcher", "summarizer"}
     })
 end
 
@@ -8133,7 +8133,7 @@ MyApp.Agents.createResearcher = (config) => {
     return Agent.create({
         name: config.name || "researcher",
         systemPrompt: config.prompt || MyApp.Config.DEFAULT_RESEARCH_PROMPT,
-        tools: ["web_search", "summarizer"]
+        tools: ["web-searcher", "summarizer"]
     });
 };
 ```
@@ -8194,7 +8194,7 @@ const AppConfig = {
     agents: {
         researcher: {
             template: "research_agent",
-            tools: ["web_search", "arxiv_search", "summarizer"],
+            tools: ["web-searcher", "arxiv_search", "summarizer"],
             prompts: {
                 system: Config.get("prompts.research_agent"),
                 analysis: "Analyze the following data: {{data}}"
@@ -8348,8 +8348,8 @@ local processText = Compose.pipe(
         function(text) return #text > 100 end,
         Tools.get("summarizer").execute
     ),
-    Tools.get("sentiment_analyzer").execute,
-    Tools.get("entity_extractor").execute
+    Tools.get("sentiment-analyzer").execute,
+    Tools.get("entity-extractor").execute
 )
 
 local result = processText(longText)
@@ -8411,7 +8411,7 @@ async function comprehensiveResearch(topic) {
         });
         
         // Generate visualizations
-        const visualizations = await Tools.get("data_visualizer").execute({
+        const visualizations = await Tools.get("data-visualizer").execute({
             data: synthesis.data,
             chartTypes: ["trend", "correlation", "distribution"],
             exportFormat: "svg"
@@ -8678,7 +8678,7 @@ import { Agent, Tools, Workflow, Events, Config } from 'rs-llmspell';
 class WebScrapingTool extends Tools.BaseTool {
     constructor() {
         super({
-            name: "advanced_web_scraper",
+            name: "advanced-web-scraper",
             description: "Advanced web scraping with content extraction",
             category: "web_access"
         });
@@ -8815,10 +8815,10 @@ const researchAgent = await Agent.create({
     
     // Tools configuration
     tools: [
-        await Tools.get("web_search"),
-        await Tools.get("scholarly_search"),
-        await Tools.get("pdf_analyzer"),
-        await Tools.get("citation_formatter"),
+        await Tools.get("web-searcher"),
+        await Tools.get("scholarly-searcher"),
+        await Tools.get("pdf-analyzer"),
+        await Tools.get("citation-formatter"),
         
         // Custom tool with inline configuration
         await Tools.create("custom_analyzer", {
@@ -8952,13 +8952,13 @@ async function comprehensiveMarketResearch(topic) {
     
     // Parallel web scraping
     const scrapingPromises = searchQueries.map(async query => {
-        const searchResults = await Tools.get("web_search").execute({
+        const searchResults = await Tools.get("web-searcher").execute({
             query,
             maxResults: 5
         });
         
         const scrapingTasks = searchResults.results.map(result =>
-            Tools.get("advanced_web_scraper").execute({
+            Tools.get("advanced-web-scraper").execute({
                 url: result.url,
                 selectors: {
                     title: 'h1, .title, .headline',
@@ -9076,9 +9076,9 @@ const researcher = new TypedResearchAgent({
 });
 
 researcher
-    .addResearchTool(Tools.get("scholarly_search"))
-    .addResearchTool(Tools.get("market_data"))
-    .addResearchTool(Tools.get("news_analyzer"));
+    .addResearchTool(Tools.get("scholarly-searcher"))
+    .addResearchTool(Tools.get("market-data"))
+    .addResearchTool(Tools.get("news-analyzer"));
 
 const result: ResearchResult = await researcher.research("AI governance frameworks", {
     maxSources: 15,
@@ -9467,7 +9467,7 @@ const jsonString = JSON.stringify(data);
 const parsed = JSON.parse(jsonString);
 
 // Working with tool outputs (same pattern as Lua)
-const toolResult = await Tool.executeAsync("uuid_generator", {
+const toolResult = await Tool.executeAsync("uuid-generator", {
     operation: "generate",
     version: "v4"
 });
@@ -9482,21 +9482,21 @@ if (toolResult.success && toolResult.output) {
 // Async tool chaining with JSON data
 async function processDataPipeline(inputData) {
     // Step 1: Analyze data
-    const analysisResult = await Tool.executeAsync("data_analyzer", {
+    const analysisResult = await Tool.executeAsync("data-analyzer", {
         data: JSON.stringify(inputData),
         analysisType: "comprehensive"
     });
     const analysisData = JSON.parse(analysisResult.output);
     
     // Step 2: Transform results
-    const transformResult = await Tool.executeAsync("data_transformer", {
+    const transformResult = await Tool.executeAsync("data-transformer", {
         input: JSON.stringify(analysisData.result),
         transformations: ["normalize", "aggregate", "summarize"]
     });
     const transformedData = JSON.parse(transformResult.output);
     
     // Step 3: Generate report
-    const reportResult = await Tool.executeAsync("report_generator", {
+    const reportResult = await Tool.executeAsync("report-generator", {
         data: JSON.stringify({
             original: inputData,
             analysis: analysisData.result,
@@ -9636,20 +9636,20 @@ Tools for secure file and directory operations with comprehensive sandboxing.
 
 ```lua
 -- File operations examples
-local content = Tools.get("file_reader"):execute({
+local content = Tools.get("file-reader"):execute({
     path = "./research/data.txt",
     encoding = "utf-8",
     max_size = "10MB"
 })
 
-Tools.get("file_writer"):execute({
+Tools.get("file-writer"):execute({
     path = "./output/report.md",
     content = content.result,
     create_backup = true,
     atomic_write = true
 })
 
-local files = Tools.get("directory_lister"):execute({
+local files = Tools.get("directory-lister"):execute({
     path = "./documents",
     recursive = true,
     pattern = "*.pdf",
@@ -9662,24 +9662,24 @@ Comprehensive web access with rate limiting, caching, and security controls.
 
 | Tool Name | Description | Key Features | Rate Limits | Streaming |
 |-----------|-------------|--------------|-------------|-----------|
-| `web_search` | Multi-provider search | Google, Bing, DuckDuckGo fallback | 30/min | No |
-| `web_scraper` | Extract web content | CSS selectors, JavaScript rendering | 20/min | Yes |
-| `http_client` | HTTP/HTTPS requests | REST APIs, custom headers, auth | 60/min |
-| `url_analyzer` | Analyze URL structure | Domain info, security scoring | 100/min |
-| `webpage_monitor` | Monitor page changes | Content diffs, scheduling | 10/min |
-| `sitemap_crawler` | Crawl site structure | Robots.txt compliance, depth limits | 5/min |
-| `api_tester` | Test REST APIs | Response validation, performance | 30/min |
+| `web-searcher` | Multi-provider search | Google, Bing, DuckDuckGo fallback | 30/min | No |
+| `web-scraper` | Extract web content | CSS selectors, JavaScript rendering | 20/min | Yes |
+| `http-requester` | HTTP/HTTPS requests | REST APIs, custom headers, auth | 60/min |
+| `url-analyzer` | Analyze URL structure | Domain info, security scoring | 100/min |
+| `webpage-monitor` | Monitor page changes | Content diffs, scheduling | 10/min |
+| `sitemap-crawler` | Crawl site structure | Robots.txt compliance, depth limits | 5/min |
+| `api-tester` | Test REST APIs | Response validation, performance | 30/min |
 
 ```javascript
 // Web operations examples
-const searchResults = await Tools.get("web_search").execute({
+const searchResults = await Tools.get("web-searcher").execute({
     query: "quantum computing breakthrough 2025",
     maxResults: 10,
     providers: ["google", "bing"],
     timeframe: "last_month"
 });
 
-const scrapedContent = await Tools.get("web_scraper").execute({
+const scrapedContent = await Tools.get("web-scraper").execute({
     url: "https://example.com/article",
     selectors: {
         title: "h1",
@@ -9690,7 +9690,7 @@ const scrapedContent = await Tools.get("web_scraper").execute({
     timeout: 15000
 });
 
-const apiResponse = await Tools.get("http_client").execute({
+const apiResponse = await Tools.get("http-requester").execute({
     method: "GET",
     url: "https://api.example.com/data",
     headers: {
@@ -9719,7 +9719,7 @@ Transform, validate, and analyze structured and unstructured data.
 
 ```lua
 -- Data processing examples
-local csvData = Tools.get("csv_processor"):execute({
+local csvData = Tools.get("csv-analyzer"):execute({
     operation = "read",
     file_path = "./data/sales.csv",
     headers = true,
@@ -9727,7 +9727,7 @@ local csvData = Tools.get("csv_processor"):execute({
     encoding = "utf-8"
 })
 
-local transformed = Tools.get("data_transformer"):execute({
+local transformed = Tools.get("data-transformer"):execute({
     data = csvData.result,
     operations = {
         {
@@ -9747,7 +9747,7 @@ local transformed = Tools.get("data_transformer"):execute({
     }
 })
 
-local stats = Tools.get("statistical_analyzer"):execute({
+local stats = Tools.get("statistical-analyzer"):execute({
     data = transformed.result,
     analyses = {
         "descriptive_stats",
@@ -9772,28 +9772,28 @@ Pre-built AI capabilities for common tasks without requiring external model setu
 
 ```javascript
 // AI tools examples
-const summary = await Tools.get("text_summarizer").execute({
+const summary = await Tools.get("text-summarizer").execute({
     text: longArticleText,
     targetLength: "medium", // short, medium, long
     preserveKeyPoints: true,
     style: "extractive" // extractive, abstractive
 });
 
-const sentiment = await Tools.get("sentiment_analyzer").execute({
+const sentiment = await Tools.get("sentiment-analyzer").execute({
     text: userReview,
     language: "auto", // auto-detect or specify
     includeEmotions: true,
     confidenceThreshold: 0.7
 });
 
-const entities = await Tools.get("named_entity_recognizer").execute({
+const entities = await Tools.get("named-entity-recognizer").execute({
     text: newsArticle,
     entityTypes: ["PERSON", "ORG", "LOCATION", "DATE"],
     language: "en",
     includeConfidence: true
 });
 
-const embeddings = await Tools.get("embedding_generator").execute({
+const embeddings = await Tools.get("embedding-generator").execute({
     texts: [
         "Query about machine learning",
         "Document about artificial intelligence",
@@ -9816,7 +9816,7 @@ Interact with system processes, environment, and external services.
 
 ```lua
 -- System integration examples
-local result = Tools.get("process_executor"):execute({
+local result = Tools.get("process-executor"):execute({
     command = "git",
     args = {"status", "--porcelain"},
     working_dir = "./project",
@@ -9824,13 +9824,13 @@ local result = Tools.get("process_executor"):execute({
     capture_output = true
 })
 
-local envVars = Tools.get("environment_reader"):execute({
+local envVars = Tools.get("environment-reader"):execute({
     variables = {"PATH", "HOME", "USER"},
     include_system_info = true,
     mask_sensitive = true
 })
 
-local services = Tools.get("service_checker"):execute({
+local services = Tools.get("service-checker"):execute({
     checks = {
         { host = "localhost", port = 5432, service = "postgresql" },
         { url = "https://api.example.com/health" },
@@ -9862,7 +9862,7 @@ const mathResult = await Tools.get("calculator").execute({
     variables: { π: Math.PI }
 });
 
-const processedText = await Tools.get("text_manipulator").execute({
+const processedText = await Tools.get("text-manipulator").execute({
     text: "  Hello, World!  ",
     operations: [
         "trim",
@@ -9872,7 +9872,7 @@ const processedText = await Tools.get("text_manipulator").execute({
     ]
 });
 
-const formattedDate = await Tools.get("date_time_handler").execute({
+const formattedDate = await Tools.get("datetime-handler").execute({
     operation: "format",
     date: "2025-01-20T15:30:00Z",
     format: "YYYY-MM-DD HH:mm:ss",
@@ -9880,7 +9880,7 @@ const formattedDate = await Tools.get("date_time_handler").execute({
     locale: "en-US"
 });
 
-const renderedTemplate = await Tools.get("template_processor").execute({
+const renderedTemplate = await Tools.get("template-processor").execute({
     template: "Hello {{name}}, your score is {{score}}/{{maxScore}}!",
     variables: {
         name: "Alice",
@@ -9907,7 +9907,7 @@ Connect with external services and communication platforms.
 
 ```lua
 -- Communication tools examples
-Tools.get("email_sender"):execute({
+Tools.get("email-sender"):execute({
     provider = "smtp",
     config = {
         host = "smtp.gmail.com",
@@ -9929,7 +9929,7 @@ Tools.get("email_sender"):execute({
     }
 })
 
-Tools.get("slack_integration"):execute({
+Tools.get("slack-integration"):execute({
     action = "send_message",
     token = "${SLACK_BOT_TOKEN}",
     channel = "#ai-reports",
@@ -9958,7 +9958,7 @@ Domain-specific tools for specialized use cases.
 
 ```javascript
 // Specialized tools examples
-const pdfContent = await Tools.get("pdf_processor").execute({
+const pdfContent = await Tools.get("pdf-processor").execute({
     operation: "extract_text",
     file_path: "./documents/research_paper.pdf",
     pages: [1, 2, 3], // specific pages or "all"
@@ -9966,7 +9966,7 @@ const pdfContent = await Tools.get("pdf_processor").execute({
     ocr_fallback: true
 });
 
-const processedImage = await Tools.get("image_processor").execute({
+const processedImage = await Tools.get("image-processor").execute({
     operation: "resize",
     input_path: "./images/chart.png",
     output_path: "./images/chart_thumbnail.png",
@@ -9977,7 +9977,7 @@ const processedImage = await Tools.get("image_processor").execute({
     quality: 85
 });
 
-const academicPapers = await Tools.get("academic_searcher").execute({
+const academicPapers = await Tools.get("academic-searcher").execute({
     query: "transformer neural networks attention mechanism",
     sources: ["arxiv", "pubmed"],
     date_range: {
@@ -10006,7 +10006,7 @@ Advanced tools for processing images, audio, video, and mixed media content.
 
 ```lua
 -- Multimodal tools examples
-local ocr_result = Tools.get("ocr_extractor"):execute({
+local ocr_result = Tools.get("ocr-extractor"):execute({
     image = image_data,  -- binary image data
     languages = {"en", "es"},
     enhance_quality = true,
@@ -10014,7 +10014,7 @@ local ocr_result = Tools.get("ocr_extractor"):execute({
     confidence_threshold = 0.8
 })
 
-local video_frames = Tools.get("video_processor"):execute({
+local video_frames = Tools.get("video-processor"):execute({
     operation = "extract_frames",
     video = video_data,
     interval = 1.0,  -- extract frame every 1 second
@@ -10023,7 +10023,7 @@ local video_frames = Tools.get("video_processor"):execute({
 })
 
 -- Streaming example
-local transcription_stream = Tools.get("audio_transcriber"):stream_call({
+local transcription_stream = Tools.get("audio-transcriber"):stream_call({
     audio = audio_stream,
     language = "auto",  -- auto-detect
     real_time = true,
@@ -10038,7 +10038,7 @@ end
 
 ```javascript
 // Advanced multimodal processing
-const sceneAnalysis = await Tools.get("scene_analyzer").execute({
+const sceneAnalysis = await Tools.get("scene-analyzer").execute({
     image: imageBuffer,
     analysis_types: ["objects", "text", "faces", "emotions"],
     return_annotated_image: true,
@@ -10046,7 +10046,7 @@ const sceneAnalysis = await Tools.get("scene_analyzer").execute({
 });
 
 // Process video with multiple outputs
-const videoOutputs = await Tools.get("video_processor").execute({
+const videoOutputs = await Tools.get("video-processor").execute({
     operation: "multi_extract",
     video: videoFile,
     outputs: {
@@ -10058,7 +10058,7 @@ const videoOutputs = await Tools.get("video_processor").execute({
 });
 
 // Stream processing for real-time applications
-const imageStream = await Tools.get("image_generator").streamCall({
+const imageStream = await Tools.get("image-generator").streamCall({
     prompt: "A beautiful sunset over mountains",
     style: "photorealistic",
     resolution: { width: 1920, height: 1080 },
@@ -10085,7 +10085,7 @@ Specialized tools for managing artifacts - binary data, generated files, and per
 
 ```lua
 -- Artifact management examples
-local artifact_id = Tools.get("artifact_store"):execute({
+local artifact_id = Tools.get("artifact-store"):execute({
     operation = "store",
     artifact = {
         type = "model_output",
@@ -10103,7 +10103,7 @@ local artifact_id = Tools.get("artifact_store"):execute({
 })
 
 -- Retrieve with versioning
-local artifact = Tools.get("artifact_store"):execute({
+local artifact = Tools.get("artifact-store"):execute({
     operation = "retrieve",
     artifact_id = artifact_id,
     version = "latest",  -- latest, specific version, or tag
@@ -10111,7 +10111,7 @@ local artifact = Tools.get("artifact_store"):execute({
 })
 
 -- Browse artifacts
-local artifacts = Tools.get("artifact_browser"):execute({
+local artifacts = Tools.get("artifact-browser"):execute({
     filter = {
         type = "model_output",
         tags = {"research"},
@@ -10125,7 +10125,7 @@ local artifacts = Tools.get("artifact_browser"):execute({
 })
 
 -- Version control
-Tools.get("artifact_versioner"):execute({
+Tools.get("artifact-versioner"):execute({
     operation = "create_version",
     artifact_id = artifact_id,
     changes = {
@@ -10139,7 +10139,7 @@ Tools.get("artifact_versioner"):execute({
 })
 
 -- Batch migration
-local migration_result = Tools.get("artifact_migrator"):execute({
+local migration_result = Tools.get("artifact-migrator"):execute({
     operation = "migrate",
     source = {
         backend = "filesystem",
@@ -10164,7 +10164,7 @@ local migration_result = Tools.get("artifact_migrator"):execute({
 
 ```javascript
 // JavaScript artifact management
-const artifactStore = Tools.get("artifact_store");
+const artifactStore = Tools.get("artifact-store");
 
 // Store with automatic compression
 const storedArtifact = await artifactStore.execute({
@@ -10184,7 +10184,7 @@ const storedArtifact = await artifactStore.execute({
 });
 
 // Intelligent caching
-const cache = Tools.get("artifact_cache");
+const cache = Tools.get("artifact-cache");
 const cachedData = await cache.execute({
     operation: "get_or_compute",
     key: `processed_data_${inputHash}`,
@@ -10197,7 +10197,7 @@ const cachedData = await cache.execute({
 });
 
 // Stream large artifacts
-const compressor = Tools.get("artifact_compressor");
+const compressor = Tools.get("artifact-compressor");
 const compressionStream = await compressor.streamCall({
     operation: "compress",
     input_stream: largeFileStream,
@@ -10211,7 +10211,7 @@ const compressionStream = await compressor.streamCall({
 });
 
 // Advanced search across artifacts
-const searchResults = await Tools.get("artifact_browser").execute({
+const searchResults = await Tools.get("artifact-browser").execute({
     query: {
         text_search: "quarterly report",
         metadata_filters: {
@@ -10250,7 +10250,7 @@ const searchResults = await Tools.search("convert data format");
 const webTools = await Tools.getByCategory("web_access");
 
 // Get tool metadata
-const toolInfo = await Tools.get("web_scraper").getMetadata();
+const toolInfo = await Tools.get("web-scraper").getMetadata();
 console.log(toolInfo.inputSchema);
 console.log(toolInfo.examples);
 ```
@@ -10262,12 +10262,12 @@ local pipeline = Tools.createPipeline({
     name = "web_research_pipeline",
     steps = {
         {
-            tool = "web_search",
+            tool = "web-searcher",
             input = { query = "{{input.topic}}", max_results = 10 },
             output = "search_results"
         },
         {
-            tool = "web_scraper",
+            tool = "web-scraper",
             input = function(context)
                 local urls = {}
                 for _, result in ipairs(context.search_results.results) do
@@ -10278,7 +10278,7 @@ local pipeline = Tools.createPipeline({
             output = "scraped_content"
         },
         {
-            tool = "text_summarizer",
+            tool = "text-summarizer",
             input = function(context)
                 local combined_text = ""
                 for _, content in ipairs(context.scraped_content) do
@@ -10394,7 +10394,7 @@ impl Tool for CustomAnalyticsTool {
 #### Script-Level Tool Creation
 ```javascript
 // Create custom tool in JavaScript
-const customTool = Tools.create("text_metrics", {
+const customTool = Tools.create("text-metrics", {
     description: "Calculate detailed text metrics and readability scores",
     category: "text_processing",
     
@@ -10433,7 +10433,7 @@ const customTool = Tools.create("text_metrics", {
                     results.complexity = calculateComplexity(text);
                     break;
                 case "sentiment":
-                    results.sentiment = await Tools.get("sentiment_analyzer").execute({
+                    results.sentiment = await Tools.get("sentiment-analyzer").execute({
                         text,
                         language
                     });
@@ -10470,7 +10470,7 @@ const customTool = Tools.create("text_metrics", {
 await Tools.register(customTool);
 
 // Use the custom tool
-const textAnalysis = await Tools.get("text_metrics").execute({
+const textAnalysis = await Tools.get("text-metrics").execute({
     text: documentText,
     metrics: ["readability", "complexity", "sentiment"]
 });
@@ -10535,8 +10535,8 @@ local PerformanceMonitor = {
 }
 
 -- Wrap tool execution with performance tracking
-local original_execute = Tools.get("web_scraper").execute
-Tools.get("web_scraper").execute = PerformanceMonitor:track("web_scraper", original_execute)
+local original_execute = Tools.get("web-scraper").execute
+Tools.get("web-scraper").execute = PerformanceMonitor:track("web-scraper", original_execute)
 ```
 
 #### Caching and Optimization
@@ -10617,7 +10617,7 @@ async function cachedToolExecution(toolName, input, options = {}) {
 }
 
 // Usage with caching
-const searchResult = await cachedToolExecution("web_search", {
+const searchResult = await cachedToolExecution("web-searcher", {
     query: "machine learning trends",
     maxResults: 10
 });
@@ -10859,9 +10859,9 @@ local ChatAgent = Agent.template("conversational_assistant", {
     },
     
     tools = {
-        "web_search",
+        "web-searcher",
         "calculator", 
-        "date_time_handler"
+        "datetime-handler"
     }
 })
 
@@ -10874,8 +10874,8 @@ local myAssistant = ChatAgent.create({
         response_length = "detailed"
     },
     additional_tools = {
-        "academic_searcher",
-        "text_summarizer"
+        "academic-searcher",
+        "text-summarizer"
     }
 })
 ```
@@ -10920,20 +10920,20 @@ const ResearchAgent = Agent.template("research_specialist", {
     `,
     
     tools: [
-        "web_search",
-        "academic_searcher", 
-        "web_scraper",
-        "text_summarizer",
-        "statistical_analyzer"
+        "web-searcher",
+        "academic-searcher", 
+        "web-scraper",
+        "text-summarizer",
+        "statistical-analyzer"
     ],
     
     workflows: {
         comprehensive_research: {
             steps: [
-                { name: "initial_search", tool: "web_search" },
-                { name: "academic_lookup", tool: "academic_searcher" },
-                { name: "content_extraction", tool: "web_scraper" },
-                { name: "analysis", tool: "statistical_analyzer" },
+                { name: "initial_search", tool: "web-searcher" },
+                { name: "academic_lookup", tool: "academic-searcher" },
+                { name: "content_extraction", tool: "web-scraper" },
+                { name: "analysis", tool: "statistical-analyzer" },
                 { name: "synthesis", agent: "self" }
             ]
         }
@@ -10950,7 +10950,7 @@ const marketResearcher = ResearchAgent.create({
         outputFormats: ["structured_data", "detailed_report"],
         citationStyle: "business"
     },
-    additionalTools: ["data_visualizer"],
+    additionalTools: ["data-visualizer"],
     customPromptAdditions: `
         Focus on:
         - Market trends and size
@@ -11036,19 +11036,19 @@ const CodeAssistant = Agent.template("code_specialist", {
     `,
     
     tools: [
-        "file_reader",
-        "file_writer",
-        "process_executor", // For running code/tests
-        "text_analyzer", // For code complexity analysis
+        "file-reader",
+        "file-writer",
+        "process-executor", // For running code/tests
+        "text-analyzer", // For code complexity analysis
         "diff_calculator" // For code comparison
     ],
     
     workflows: {
         code_review: {
             steps: [
-                { name: "read_code", tool: "file_reader" },
-                { name: "analyze_style", tool: "text_analyzer" },
-                { name: "run_tests", tool: "process_executor" },
+                { name: "read_code", tool: "file-reader" },
+                { name: "analyze_style", tool: "text-analyzer" },
+                { name: "run_tests", tool: "process-executor" },
                 { name: "generate_review", agent: "self" }
             ]
         },
@@ -11057,9 +11057,9 @@ const CodeAssistant = Agent.template("code_specialist", {
             steps: [
                 { name: "analyze_requirements", agent: "self" },
                 { name: "design_solution", agent: "self" },
-                { name: "write_tests", tool: "file_writer" },
-                { name: "implement_code", tool: "file_writer" },
-                { name: "run_tests", tool: "process_executor" },
+                { name: "write_tests", tool: "file-writer" },
+                { name: "implement_code", tool: "file-writer" },
+                { name: "run_tests", tool: "process-executor" },
                 { name: "refine_implementation", agent: "self" }
             ]
         }
@@ -11098,9 +11098,9 @@ const dataScientist = CodeAssistant.create({
     testingFrameworks: ["pytest", "unittest"],
     
     additionalTools: [
-        "csv_processor",
-        "statistical_analyzer",
-        "data_visualizer"
+        "csv-analyzer",
+        "statistical-analyzer",
+        "data-visualizer"
     ],
     
     customPromptAdditions: `
@@ -11185,11 +11185,11 @@ local ContentCreator = Agent.template("content_specialist", {
     ]],
     
     tools = {
-        "web_search",
-        "text_analyzer",
-        "text_manipulator", 
-        "template_processor",
-        "academic_searcher"
+        "web-searcher",
+        "text-analyzer",
+        "text-manipulator", 
+        "template-processor",
+        "academic-searcher"
     },
     
     workflows = {
@@ -11197,12 +11197,12 @@ local ContentCreator = Agent.template("content_specialist", {
             steps = {
                 {
                     name = "research_topic",
-                    tools = {"web_search", "academic_searcher"},
+                    tools = {"web-searcher", "academic-searcher"},
                     output = "research_data"
                 },
                 {
                     name = "analyze_competitors",
-                    tool = "web_search",
+                    tool = "web-searcher",
                     input = function(context)
                         return {
                             query = context.input.topic .. " blog posts",
@@ -11340,9 +11340,9 @@ const BaseAnalyst = Agent.template("base_analyst", {
     },
     
     commonTools: [
-        "statistical_analyzer",
-        "data_visualizer", 
-        "text_summarizer"
+        "statistical-analyzer",
+        "data-visualizer", 
+        "text-summarizer"
     ],
     
     analysisFramework: {
@@ -11357,7 +11357,7 @@ const MarketAnalyst = BaseAnalyst.extend("market_analyst", {
     specialization: "market_analysis",
     
     additionalTools: [
-        "web_search",
+        "web-searcher",
         "financial_data_api"
     ],
     
@@ -11460,7 +11460,7 @@ local HealthcareExpert = TemplateFactory:create_domain_expert(
         "patient_outcomes"
     },
     {
-        "academic_searcher",
+        "academic-searcher",
         "pubmed_search", 
         "regulatory_database",
         "clinical_trials_api"
@@ -11502,7 +11502,7 @@ local DataAnalyst = Agent.template("data_analyst", {
     
     default_tools = {
         "data_loader",
-        "statistical_analysis", 
+        "statistical-analyzer", 
         "chart_generator",
         "correlation_analyzer"
     },
@@ -11544,7 +11544,7 @@ const CustomerServiceAgent = Agent.template("customer_service", {
         "knowledge_base_search",
         "ticket_creation",
         "escalation_handler",
-        "sentiment_analyzer"
+        "sentiment-analyzer"
     ],
     
     personality: {
@@ -11565,7 +11565,7 @@ local APIAgent = Agent.template("api_integration", {
     system_prompt = [[You specialize in API testing, integration, and automation. You can analyze API specifications, generate test cases, and troubleshoot integration issues.]],
     
     default_tools = {
-        "http_client",
+        "http-requester",
         "json_validator", 
         "api_tester",
         "schema_analyzer"
@@ -11594,7 +11594,7 @@ local MarketResearchAgent = Agent.extend("research_agent", {
     additional_tools = {
         "market_data_api",
         "competitor_analyzer",
-        "trend_detector"
+        "trend-detector"
     },
     
     enhanced_prompts = {
@@ -11643,9 +11643,9 @@ local template_config = {
         domain_expertise = "healthcare",
         data_sources = {"pubmed", "clinical_trials", "medical_journals"},
         compliance_mode = "HIPAA",
-        
+
         tool_overrides = {
-            web_search = {
+            ["web-searcher"] = {
                 provider = "specialized_medical_search",
                 filters = {"peer_reviewed", "recent_5_years"}
             }
@@ -19964,7 +19964,7 @@ llmspell serve --spell-dir ./automations --spell-dir ./schedules
 
 ```lua
 -- webhook_handler.lua
-local webhook_tool = Tools.get("webhook_listener")
+local webhook_tool = Tools.get("webhook-listener")
 
 -- Configure webhook endpoint
 webhook_tool:configure({
@@ -20061,7 +20061,7 @@ Serve.register({
 
 ```lua
 -- file_processor.lua
-local file_watcher = Tools.get("file_watcher")
+local file_watcher = Tools.get("file-watcher")
 
 -- Watch for new CSV files
 file_watcher:configure({
@@ -20075,7 +20075,7 @@ file_watcher:configure({
 file_watcher:on_change(function(event)
     if event.type == "create" then
         local processor = Agent.new("data_processor", {
-            tools = {"csv_parser", "data_validator", "database_writer"}
+            tools = {"csv_parser", "data-validator", "database_writer"}
         })
         
         processor:execute({
@@ -20086,7 +20086,7 @@ file_watcher:on_change(function(event)
         })
         
         -- Move processed file
-        Tools.get("file_mover"):execute({
+        Tools.get("file-mover"):execute({
             source = event.path,
             destination = "/data/processed/" .. event.filename
         })
@@ -20128,7 +20128,7 @@ local report_workflow = Workflow.sequential({
     -- Send via email
     {
         name = "email_delivery",
-        tool = "email_sender",
+        tool = "email-sender",
         config = {
             to = ["executives@company.com"],
             subject = "Weekly Business Intelligence Report - {{date}}",
@@ -22013,7 +22013,7 @@ impl IntegrationTestRunner {
             description: "Agent for integration testing".to_string(),
             llm_provider: "test_provider".to_string(),
             system_prompt: "You are an agent being tested in integration tests.".to_string(),
-            tools: vec!["calculator".to_string(), "file_reader".to_string()],
+            tools: vec!["calculator".to_string(), "file-reader".to_string()],
             max_iterations: 5,
             timeout: Duration::from_secs(30),
         };
@@ -22033,7 +22033,7 @@ impl IntegrationTestRunner {
         assert!(workflow_result.success);
         assert!(workflow_result.iterations > 0);
         assert!(workflow_result.tools_used.contains(&"calculator".to_string()));
-        assert!(workflow_result.tools_used.contains(&"file_reader".to_string()));
+        assert!(workflow_result.tools_used.contains(&"file-reader".to_string()));
         
         // Verify file was created with correct content
         let file_content = std::fs::read_to_string("result.txt")?;
@@ -23513,7 +23513,7 @@ impl PerformanceTester {
         let mut group = c.benchmark_group("tool_execution");
         
         // Benchmark different tool types
-        for tool_type in ["calculator", "file_reader", "http_client"].iter() {
+        for tool_type in ["calculator", "file-reader", "http-requester"].iter() {
             group.bench_with_input(
                 BenchmarkId::new("tool_execution", tool_type),
                 tool_type,
@@ -23758,9 +23758,9 @@ $ llmspell repl
 llmspell> Agent.list()
 ["chat_agent", "research_agent", "analysis_agent", ...]
 
-llmspell> Tools.describe("web_search")
+llmspell> Tools.describe("web-searcher")
 {
-  name = "web_search",
+  name = "web-searcher",
   description = "Search the web using multiple search engines",
   parameters = {
     query = { type = "string", required = true },
@@ -23770,7 +23770,7 @@ llmspell> Tools.describe("web_search")
 }
 
 # Test components interactively
-llmspell> searcher = Tools.get("web_search")
+llmspell> searcher = Tools.get("web-searcher")
 llmspell> results = searcher:execute({query = "rust async programming"})
 llmspell> print(#results.items)
 10
@@ -23925,13 +23925,13 @@ Exported function 'analyze_text' to analyze_module.lua
 
 -- Create shareable spell
 llmspell> Spell.create({
-       |   name = "sentiment_analyzer",
+       |   name = "sentiment-analyzer",
        |   description = "Analyzes sentiment of text with entity extraction",
        |   version = "1.0.0",
        |   main = analyze_text_v2,
        |   dependencies = {
        |     agents = {"analyzer", "summarizer"},
-       |     tools = {"entity_extractor"}
+       |     tools = {"entity-extractor"}
        |   }
        | }):save("sentiment_analyzer_spell.lua")
 Spell saved to sentiment_analyzer_spell.lua

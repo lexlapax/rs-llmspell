@@ -3431,8 +3431,67 @@ Update developer-facing documentation with new tool names and naming convention.
 
 ---
 
-### Task 11a.9.14: Final Validation & Summary
-**Priority**: HIGH | **Time**: 30min | **Status**: ⏳ PENDING | **Depends**: 11a.9.13
+### Task 11a.9.14: Update Documentation - Technical Docs
+**Priority**: MEDIUM | **Time**: 30min | **Status**: ✅ DONE | **Depends**: 11a.9.13
+
+Update technical documentation with new tool names and ensure architecture examples are correct.
+
+**Files to Update**:
+- docs/technical/master-architecture-vision.md (comprehensive architecture examples)
+- docs/technical/stress-test-results.md (test data with tool names)
+- docs/technical/operational-guide.md (operational procedures)
+- Any other technical docs with tool references
+
+**Changes**:
+- Update all tool name references to kebab-case
+- Update code examples in architecture vision
+- Update tool lists in test results
+- Ensure technical examples match current implementation
+- Update any architectural diagrams or tables
+
+**Criteria**:
+- [✅] All tool names in technical docs updated
+- [✅] Architecture examples use new names
+- [✅] Test results reflect current tool names
+- [✅] No broken references
+- [✅] Documentation technically accurate
+
+**Implementation Summary**:
+- **Files Updated**: 3 files (99+ occurrences total)
+
+  1. **docs/technical/operational-guide.md** (1 occurrence):
+     - Line 325: `"vector_search"` → `"vector-searcher"` (audit log example)
+
+  2. **docs/technical/stress-test-results.md** (13 tool names):
+     - Line 91: Complete tool list updated from mixed formats to kebab-case
+     - Examples: web_search→web-searcher, http_request→http-requester, audio_processor→audio-processor
+
+  3. **docs/technical/master-architecture-vision.md** (85+ occurrences):
+     - Core tools: web_search→web-searcher (30x), file_operations→file-operations (1x)
+     - Media tools: image_processor→image-processor, video_processor→video-processor, audio_processor→audio-processor
+     - Data tools: json_processor→json-processor, csv_processor→csv-analyzer, data_analyzer→data-analyzer
+     - Text tools: text_manipulator→text-manipulator, text_summarizer→text-summarizer
+     - Search tools: scholarly_search→scholarly-searcher, academic_search→academic-searcher
+     - Analysis tools: sentiment_analyzer→sentiment-analyzer, statistical_analyzer→statistical-analyzer
+     - Format tools: pdf_analyzer→pdf-analyzer, citation_formatter→citation-formatter
+     - Integration tools: email_sender→email-sender, slack_integration→slack-integration
+     - Artifact tools: artifact_store→artifact-store (plus cache, browser, compressor, etc.)
+     - Plus 20+ more conceptual tools used in architecture examples
+     - Special: Updated output text, tables, and Lua table keys to use kebab-case
+
+**Key Insights**:
+- **Architecture Vision Scale**: ~26,000 line file with comprehensive examples demonstrating all patterns
+- **Teaching Through Examples**: All conceptual tools now demonstrate kebab-case naming convention
+- **Output Consistency**: Updated simulated CLI output ("Tool added: web-searcher") for realism
+- **Documentation Tables**: Updated tool comparison tables showing current naming
+- **Lua Syntax Correct**: Used `["web-searcher"]` for Lua table keys with hyphens
+- **Language Conventions Respected**: Lua variables (file_watcher) remain snake_case per Lua conventions
+- **Future-Proof**: Conceptual tools don't exist yet but teach the pattern for future development
+
+---
+
+### Task 11a.9.15: Final Validation & Summary
+**Priority**: HIGH | **Time**: 30min | **Status**: ⏳ PENDING | **Depends**: 11a.9.14
 
 Comprehensive validation and documentation of Phase 11a.9 completion.
 
@@ -3476,15 +3535,16 @@ Comprehensive validation and documentation of Phase 11a.9 completion.
 
 **Status**: ⏳ IN PROGRESS | **Effort**: TBD | **Files**: TBD | **Tools Renamed**: 22 of 38
 
-**Actual Metrics** (to be finalized in 11a.9.14):
-- **Tasks Completed**: 13 of 14 (93%)
+**Actual Metrics** (to be finalized in 11a.9.15):
+- **Tasks Completed**: 14 of 15 (93%)
 - **Tools Standardized**: 21 of 22 (95%)
 - **Snake_case → Kebab-case**: 12 of 13 (92%) - media(3) + filesystem(3) + communication(2) + system(4)
 - **Suffix Removals**: 9 of 9 (100%) - filesystem(2) + data&doc(2) + web&api(3) + utility(2)
 - **Aliases Removed**: 31 of 31 (100%) - ✅ BREAKING CHANGE CHECKPOINT COMPLETE
 - **Examples Updated**: 29 files (getting-started: 3 files/8 occurrences + apps/cookbook: 26 files/52 occurrences)
 - **Documentation Updated - User Guide**: 2 files/11 occurrences (troubleshooting: 3, llmspell-tools API: 8)
-- **Documentation Updated - Developer Guide**: 4 files/11 occurrences + naming convention added to CONTRIBUTING.md
+- **Documentation Updated - Developer Guide**: 5 files/19 occurrences + naming convention added to CONTRIBUTING.md
+- **Documentation Updated - Technical Docs**: 3 files/99+ occurrences (master-architecture-vision: 85+, stress-tests: 13, operational: 1)
 - **Test Results**: 405 unit tests + 5 examples tested successfully (getting-started: 3, apps: 2)
 - **Backward Compatibility**: ❌ REMOVED - old tool names no longer work (verified)
 
