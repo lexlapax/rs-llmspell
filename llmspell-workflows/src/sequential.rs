@@ -524,10 +524,6 @@ impl BaseAgent for SequentialWorkflow {
             serde_json::json!(result.execution_id),
         );
         metadata.extra.insert(
-            "workflow_id".to_string(),
-            serde_json::json!(result.execution_id),
-        );
-        metadata.extra.insert(
             "total_steps".to_string(),
             serde_json::json!(self.steps.len()),
         );

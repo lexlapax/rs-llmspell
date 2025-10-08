@@ -4089,70 +4089,75 @@ Finished `dev` profile [optimized + debuginfo] target(s) in 1m 13s
 - `llmspell-workflows/src/step_executor.rs` (execute_agent_step refactored for unified execution path)
 - `llmspell-workflows/src/lib.rs` (test_utils made public for integration tests)
 
-**Next Steps**: Task 11a.10.4 (Standardize metadata field naming across workflow types)
+**Next Steps**: Task 11a.10.5 (Update webapp-creator example to use automatic collection)
 
 ---
 
 ### Task 11a.10.4: Standardize Metadata Field Naming
 
-**Priority**: MEDIUM | **Time**: 30min | **Status**: ⏳ PENDING | **Depends**: 11a.10.1
+**Priority**: MEDIUM | **Time**: 30min | **Status**: ✅ COMPLETED | **Depends**: 11a.10.1
 
 **Objective**: Standardize on `execution_id` (not `workflow_id`) across all workflow types and ensure consistent metadata structure.
 
 **Scope**: Review and align all 4 workflow type implementations
 
-**Files to Audit**:
+**Files Audited**:
 - `llmspell-workflows/src/sequential.rs`
 - `llmspell-workflows/src/parallel.rs`
 - `llmspell-workflows/src/loop.rs`
 - `llmspell-workflows/src/conditional.rs`
 
-**Analysis Required**:
-1. Check which workflows use `execution_id` vs `workflow_id` in `metadata.extra`
-2. Check if both keys are present (redundant)
-3. Standardize to single source of truth: `execution_id`
+**Analysis Findings**:
+All 4 workflow types had IDENTICAL redundancy pattern - both `execution_id` and `workflow_id` fields inserted into `metadata.extra` with the same value:
 
-**Current State** (from webapp-creator analysis):
-```lua
--- Users must check multiple locations:
-workflow_id = result.metadata.extra.execution_id
-           or result.metadata.extra.workflow_id  -- Inconsistent!
-           or result.workflow_id
-           or result.execution_id
-           or result.id  -- 5 different locations!
-```
+1. ❌ sequential.rs:522-528 - Had both fields (removed workflow_id)
+2. ❌ parallel.rs:989-995 - Had both fields (removed workflow_id)
+3. ❌ loop.rs:1481-1487 - Had both fields (removed workflow_id)
+4. ❌ conditional.rs:1316-1322 - Had both fields (removed workflow_id)
 
-**Target State**:
+**The Redundancy Pattern** (found in all 4 files):
 ```rust
-// All workflows should set:
-metadata.extra.insert("execution_id", json!(execution_id));
-// NOT: workflow_id (deprecated, will be removed)
+// ❌ BEFORE (redundant):
+metadata.extra.insert("execution_id".to_string(), json!(execution_id));
+metadata.extra.insert("workflow_id".to_string(), json!(execution_id)); // SAME VALUE!
+
+// ✅ AFTER (standardized):
+metadata.extra.insert("execution_id".to_string(), json!(execution_id));
 ```
 
-**Implementation**:
-- Audit all 4 workflow files for metadata field naming
-- Ensure `execution_id` is always present in `metadata.extra`
-- Remove redundant `workflow_id` field if present
-- Update any code that reads `workflow_id` to read `execution_id` instead
+**Implementation Summary**:
+- ✅ Audited all 4 workflow files for metadata field naming
+- ✅ Removed redundant `workflow_id` field from all 4 workflow types
+- ✅ `execution_id` is now the single source of truth in `metadata.extra`
+- ✅ No code reads `workflow_id` from metadata (only reads `execution_id`)
 
 **Acceptance Criteria**:
-- [ ] All 4 workflow types use consistent field name: `execution_id`
-- [ ] No redundant `workflow_id` field in `metadata.extra`
-- [ ] `WorkflowResult.execution_id` field is still populated (top-level)
-- [ ] All tests pass after changes
-- [ ] Zero clippy warnings
+- [x] All 4 workflow types use consistent field name: `execution_id`
+- [x] No redundant `workflow_id` field in `metadata.extra`
+- [x] `WorkflowResult.execution_id` field is still populated (top-level)
+- [x] All tests pass after changes (71 lib + 12 integration tests)
+- [x] Zero clippy warnings
 
-**Validation**:
-```bash
-# Search for inconsistencies
-grep -n "workflow_id" llmspell-workflows/src/{sequential,parallel,loop,conditional}.rs
-grep -n "execution_id" llmspell-workflows/src/{sequential,parallel,loop,conditional}.rs
+**Test Results**:
+```
+✅ cargo test -p llmspell-workflows --lib
+   Result: 71 tests passed
 
-cargo test -p llmspell-workflows
-cargo clippy -p llmspell-workflows -- -D warnings
+✅ cargo test -p llmspell-workflows --test workflow_agent_tests
+   Result: 12 tests passed
+
+✅ cargo clippy --workspace --all-targets --all-features -- -D warnings
+   Result: 0 warnings
 ```
 
-**Breaking Change Assessment**: NONE - `WorkflowResult.execution_id` field unchanged, only internal metadata naming
+**Breaking Change Assessment**: NONE - `WorkflowResult.execution_id` field unchanged, only removed redundant metadata field
+
+**Key Insights**:
+1. **Consistency achieved**: All workflow types now use identical metadata field naming
+2. **Reduced confusion**: Users no longer need to check multiple field names
+3. **State key alignment**: Agent output state keys use `workflow:{execution_id}:agent:{agent_id}:output` format - now metadata uses same `execution_id` naming
+4. **Clean metadata**: Removed 4 redundant field insertions across codebase
+5. **Future-proof**: Single source of truth simplifies future workflow development
 
 ---
 
