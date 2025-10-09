@@ -6019,7 +6019,7 @@ print("   - Each step can be a tool, agent, or nested workflow")
 
 ### Task 11a.12.6: Create Migration Guide - Custom Logic Patterns
 
-**Priority**: HIGH | **Time**: 60min | **Status**: 🔲 TODO | **Depends**: 11a.12.5
+**Priority**: HIGH | **Time**: 60min | **Status**: ✅ COMPLETED | **Actual**: 25min | **Depends**: 11a.12.5
 
 **Objective**: Educate users on achieving "custom" behavior using tools, agents, and workflow composition.
 
@@ -6271,11 +6271,19 @@ Custom steps never provided real functionality - they were mocks. The tool/agent
 **Recommendation**: Always use tools for logic, agents for reasoning, workflows for orchestration.
 
 **Acceptance Criteria**:
-- [ ] Migration guide added to Lua API docs (~100 lines)
-- [ ] 6 patterns documented with examples
-- [ ] 3 before/after migration examples
-- [ ] Comparison table showing advantages
-- [ ] Clear recommendations
+- [x] Migration guide added to Lua API docs (~240 lines, exceeded expectations)
+- [x] 6 patterns documented with examples
+- [x] 3 before/after migration examples
+- [x] Comparison table showing advantages
+- [x] Clear recommendations
+
+**Completion Insights**:
+1. **Comprehensive documentation**: 240 lines (2.4x original estimate) covering all migration patterns
+2. **6 pattern categories**: Tools, Agents, Conditionals, Loops, Nested Workflows, State Management
+3. **3 concrete examples**: Data transformation, validation logic, conditional processing
+4. **Comparison table**: 9-feature comparison showing superiority of new primitives
+5. **Educational value**: Clear before/after examples showing custom steps never worked
+6. **Faster than estimated**: 25min actual vs 60min estimated (well-structured template in TODO.md)
 
 ---
 

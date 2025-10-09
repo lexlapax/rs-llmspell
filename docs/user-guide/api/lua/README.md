@@ -617,6 +617,248 @@ end
 
 ---
 
+## Custom Workflow Logic - Tool & Agent Patterns
+
+**Note**: Custom step type was removed in v0.11. Use these superior patterns instead:
+
+### Pattern 1: Custom Logic via Tools
+
+For simple transformations, create a custom tool:
+
+```lua
+-- Instead of custom step:
+-- workflow:add_step({ type = "custom", function = "transform", ... })
+
+-- Use Tool pattern:
+Tool.register("my-transformer", function(params)
+    -- Your custom logic here
+    local result = params.input:upper()
+    return { text = result }
+end)
+
+workflow:add_step({
+    type = "tool",
+    tool = "my-transformer",
+    input = { input = "hello" }
+})
+```
+
+**Benefits**:
+- ✅ Reusable across workflows
+- ✅ Unit testable
+- ✅ Discoverable via Tool.list()
+- ✅ Supports full error handling
+
+### Pattern 2: Custom Logic via Agents
+
+For complex reasoning, create a custom agent:
+
+```lua
+-- Instead of custom step with complex logic:
+-- workflow:add_step({ type = "custom", function = "analyze", ... })
+
+-- Use Agent pattern:
+local analyzer = Agent.create({
+    name = "custom-analyzer",
+    provider = "openai",
+    model = "gpt-4o-mini",
+    system_prompt = "Analyze the input and extract key insights."
+})
+
+workflow:add_step({
+    type = "agent",
+    agent = "custom-analyzer",
+    input = "Analyze this text..."
+})
+```
+
+**Benefits**:
+- ✅ LLM-powered reasoning
+- ✅ Natural language input
+- ✅ Stateful across steps
+- ✅ Supports streaming
+
+### Pattern 3: Conditional Workflows for Branching Logic
+
+For if/else logic:
+
+```lua
+-- Instead of custom step with branching:
+-- workflow:add_step({ type = "custom", function = "route", ... })
+
+-- Use Conditional workflow:
+local router = Workflow.conditional()
+    :name("smart-router")
+    :condition("step:validation:output", "success")
+    :when_true({ type = "tool", tool = "process-data" })
+    :when_false({ type = "tool", tool = "handle-error" })
+    :build()
+```
+
+### Pattern 4: Loop Workflows for Iteration
+
+For custom iteration logic:
+
+```lua
+-- Instead of custom step with loop:
+-- workflow:add_step({ type = "custom", function = "iterate", ... })
+
+-- Use Loop workflow:
+local processor = Workflow.loop()
+    :name("batch-processor")
+    :max_iterations(100)
+    :body_step({ type = "tool", tool = "process-item" })
+    :build()
+```
+
+### Pattern 5: Nested Workflows for Composition
+
+For complex orchestration:
+
+```lua
+-- Instead of multiple custom steps:
+-- workflow:add_step({ type = "custom", function = "step1", ... })
+-- workflow:add_step({ type = "custom", function = "step2", ... })
+
+-- Use nested workflows:
+local preprocessing = Workflow.sequential()
+    :name("preprocessing")
+    :add_step({ type = "tool", tool = "validate" })
+    :add_step({ type = "tool", tool = "transform" })
+    :build()
+
+local main = Workflow.sequential()
+    :name("main-pipeline")
+    :add_step({ type = "workflow", workflow = preprocessing })
+    :add_step({ type = "agent", agent = "processor" })
+    :build()
+```
+
+### Pattern 6: State Management for Custom Variables
+
+For custom state tracking:
+
+```lua
+-- Use State API for custom variables
+workflow:add_step({
+    type = "tool",
+    tool = "calculator",
+    input = { operation = "add", values = {1, 2} }
+})
+
+-- Access results via state
+local result = State.load("custom", ":workflow:my_flow:tool:calculator:output")
+
+-- Or use agent_outputs for agents
+local outputs = workflow_result.metadata.extra.agent_outputs
+```
+
+### Migration Examples
+
+#### Example 1: Data Transformation
+
+**Before (Custom Step - Didn't Work)**:
+```lua
+workflow:add_step({
+    type = "custom",
+    function = "data_transform",
+    parameters = { format = "json" }
+})
+```
+
+**After (Tool Pattern)**:
+```lua
+-- Create reusable tool
+Tool.register("json-transformer", function(params)
+    local data = JSON.parse(params.input)
+    return { text = JSON.stringify(data) }
+end)
+
+workflow:add_step({
+    type = "tool",
+    tool = "json-transformer",
+    input = { input = raw_data }
+})
+```
+
+#### Example 2: Validation Logic
+
+**Before (Custom Step - Didn't Work)**:
+```lua
+workflow:add_step({
+    type = "custom",
+    function = "validation",
+    parameters = { rules = {...} }
+})
+```
+
+**After (Agent Pattern)**:
+```lua
+local validator = Agent.create({
+    name = "data-validator",
+    provider = "anthropic",
+    model = "claude-3-5-sonnet-20241022",
+    system_prompt = "Validate data against these rules: ..."
+})
+
+workflow:add_step({
+    type = "agent",
+    agent = "data-validator",
+    input = data_to_validate
+})
+```
+
+#### Example 3: Conditional Processing
+
+**Before (Custom Step - Didn't Work)**:
+```lua
+workflow:add_step({
+    type = "custom",
+    function = "check_and_route",
+    parameters = { threshold = 0.8 }
+})
+```
+
+**After (Conditional Workflow)**:
+```lua
+local router = Workflow.conditional()
+    :condition("step:scorer:output", "> 0.8")
+    :when_true({ type = "agent", agent = "high-quality-processor" })
+    :when_false({ type = "agent", agent = "standard-processor" })
+    :build()
+
+main_workflow:add_step({
+    type = "workflow",
+    workflow = router
+})
+```
+
+### Why These Patterns Are Better
+
+| Feature | Custom Steps (Old) | Tools/Agents/Workflows (New) |
+|---------|-------------------|------------------------------|
+| **Functionality** | ❌ Mock only | ✅ Real execution |
+| **Reusability** | ❌ None | ✅ Full reuse |
+| **Testing** | ❌ Can't test | ✅ Unit testable |
+| **Discovery** | ❌ Invisible | ✅ Tool.list(), Agent.discover() |
+| **Documentation** | ❌ No docs | ✅ Tool.get("name").schema |
+| **Error Handling** | ❌ Basic | ✅ Retry, fallback, hooks |
+| **State Management** | ❌ Manual | ✅ Automatic |
+| **Composition** | ❌ Limited | ✅ Nested workflows |
+| **LLM Integration** | ❌ None | ✅ Agent pattern |
+
+### Summary
+
+Custom steps never provided real functionality - they were mocks. The tool/agent/workflow primitives are:
+- ✅ **More powerful** - Full Turing-complete via tools + agents
+- ✅ **Better architecture** - Single responsibility, composable
+- ✅ **Easier to test** - Isolated, mockable components
+- ✅ **Better UX** - Discoverable, documented, reusable
+
+**Recommendation**: Always use tools for logic, agents for reasoning, workflows for orchestration.
+
+---
+
 ## Session
 
 The `Session` global manages user sessions and their persistence.
