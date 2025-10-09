@@ -895,6 +895,8 @@ storage_backend = "memory"   # memory, sled
 
 ## Security Settings
 
+> **📚 Complete Security Guide**: See [Security & Permissions Guide](security-and-permissions.md) for comprehensive coverage of security levels, sandbox configuration, permission troubleshooting, and common scenarios. This section shows configuration syntax - the guide explains when and how to use it.
+
 ### Authentication
 
 ```toml
@@ -911,31 +913,57 @@ hash_algorithm = "argon2"
 rate_limit_per_key = 1000  # per hour
 ```
 
-### Sandboxing
+### Tool Permissions & Sandboxing
+
+> **⚠️ Schema Change**: Tool permissions are now configured via `[tools.*]` sections, not `[security.sandboxing]`. See [Security & Permissions Guide](security-and-permissions.md) for migration details.
 
 ```toml
-[security.sandboxing]
-enabled = true
-implementation = "native"  # native, docker, firecracker
-
-[security.sandboxing.filesystem]
+# File System Access
+[tools.file_operations]
 enabled = true
 allowed_paths = [
-    "/workspace",
-    "/tmp/llmspell"
+    "/tmp",              # Safe scratch directory
+    "/workspace",        # Your project directory
+    "/data"              # Data directory
 ]
-denied_patterns = ["*.exe", "*.sh"]
-max_file_size = "10MB"
-max_open_files = 100
+max_file_size = 50000000  # 50MB in bytes
+atomic_writes = true
+max_depth = 10  # Directory traversal depth
+allowed_extensions = []  # Empty = all allowed except blocked
+blocked_extensions = ["exe", "dll", "so", "dylib"]
+validate_file_types = true
 
-[security.sandboxing.network]
-enabled = true
+# Network Access - Web Search Tool
+[tools.web_search]
+rate_limit_per_minute = 30
 allowed_domains = [
     "api.openai.com",
-    "*.anthropic.com"
+    "*.anthropic.com",  # Wildcard for subdomains
+    "github.com"
 ]
-deny_local_addresses = true
-max_connections = 10
+blocked_domains = []
+max_results = 10
+timeout_seconds = 30
+
+# Network Access - HTTP Request Tool
+[tools.http_request]
+allowed_hosts = [
+    "api.example.com",
+    "*.trusted.com"
+]
+blocked_hosts = ["localhost", "127.0.0.1", "0.0.0.0"]  # SSRF prevention
+max_request_size = 10000000  # 10MB
+timeout_seconds = 30
+max_redirects = 5
+
+# Process Execution
+[tools.system]
+allow_process_execution = false  # ⚠️ Set true to enable (security critical)
+allowed_commands = "echo,cat,ls,pwd,date,whoami"  # Comma-separated allowlist
+# Blocked by default: rm, sudo, chmod, chown, curl, wget, ssh, scp, python, sh, bash
+command_timeout_seconds = 30
+max_output_size = 1000000  # 1MB
+allowed_env_vars = "HOME,PATH,LANG"  # Comma-separated
 ```
 
 ### Rate Limiting
@@ -994,10 +1022,22 @@ default_level = "restricted"  # safe, restricted, privileged
 require_approval = false
 sandbox_tools = true
 
+# Per-tool security levels (optional - defaults to default_level)
 [tools.permissions]
-"file-operations" = "restricted"
-"web-fetch" = "safe"
-"command-executor" = "privileged"
+"file-operations" = "restricted"    # Requires explicit paths in [tools.file_operations]
+"http-request" = "restricted"       # Requires explicit hosts in [tools.http_request]
+"process-executor" = "restricted"   # Requires explicit commands in [tools.system]
+"web-search" = "restricted"         # Requires explicit domains in [tools.web_search]
+"calculator" = "safe"               # Pure computation, no external access
+"text-manipulator" = "safe"         # Pure computation, no external access
+"hash-calculator" = "safe"          # Pure computation, no external access
+
+# Security levels explained:
+# - safe: No file/network/process access (pure computation)
+# - restricted: Requires explicit allowlists in [tools.*] sections above
+# - privileged: Full system access (requires security review - avoid)
+#
+# See docs/user-guide/security-and-permissions.md for complete guide
 ```
 
 ### Tool Timeouts
