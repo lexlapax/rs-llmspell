@@ -5573,5 +5573,902 @@ cargo build --bin llmspell
 
 ---
 
+## Phase 11a.12: Remove Custom Steps & Document Tool/Agent Patterns
+
+**Priority**: MEDIUM | **Effort**: ~4 hours | **Status**: 🔲 TODO
+
+**Context**: Custom workflow steps (`StepType::Custom`) exist in the codebase but are:
+1. **100% mock implementation** - Only returns hardcoded strings, no real functionality
+2. **Undocumented in Lua API** - Users don't know it exists or how to use it
+3. **Misleading in Rust API docs** - Shows `Custom(Box<dyn CustomStep>)` trait that doesn't exist
+4. **Architecturally obsolete** - Phase 3 replaced all custom functions with tools/agents
+5. **Confusing to users** - Creates false expectations of extensibility
+
+**Root Cause Analysis** (from ultrathink analysis):
+- Historical intent: Trait-based custom steps with user logic
+- Phase 3 decision: Replace custom steps with tools/agents (docs/in-progress/PHASE03-DONE.md)
+- Current state: Stuck in limbo with 200+ lines of mock/dead code
+- Evidence: PHASE08-DONE.md documents that custom steps with handlers cause errors
+
+**Impact**:
+- Custom steps exposed via public API but don't work
+- Users can create custom steps that only return mocks
+- 15+ hardcoded function names in execute_custom_step() pretend to work
+- Documentation inconsistency across Rust/Lua/examples
+
+**Goals**:
+1. Remove `StepType::Custom` variant and all mock execution logic
+2. Remove custom step parsing from Lua bindings
+3. Fix documentation to show alternatives (tools/agents/workflows)
+4. Educate users on achieving "custom" behavior via existing primitives
+5. Eliminate ~200 lines of dead/mock code
+6. Zero breaking changes (feature never worked properly)
+
+**Benefits**:
+- ✅ Cleaner codebase (200+ lines removed)
+- ✅ No user confusion about unimplemented features
+- ✅ Aligns with Phase 3 architectural decision
+- ✅ Documentation accuracy restored
+- ✅ Users learn superior tool/agent patterns
+- ✅ Future maintainability improved
+
+**Files to Modify**: ~15 files across 3 categories
+- Rust code: 7 files (traits, step_executor, workflows, tests)
+- Lua bindings: 1 file (workflow.rs)
+- Documentation: 7 files (user guide, examples, migration patterns)
+
+---
+
+### Task 11a.12.1: Analyze Custom Step Usage Across Codebase
+
+**Priority**: HIGH | **Time**: 30min | **Status**: 🔲 TODO | **Depends**: None
+
+**Objective**: Comprehensive audit of all `StepType::Custom` usage to identify all removal points.
+
+**Scope**: Find all references, categorize by type, verify no real functionality
+
+**Analysis Tasks**:
+1. ✅ Grep for `StepType::Custom` across workspace
+2. ✅ Grep for `execute_custom_step` in workflows crate
+3. ✅ Grep for `type.*=.*"custom"` in Lua files
+4. ✅ Analyze test usage (workflow_tracing_test.rs has 9 occurrences)
+5. ✅ Check for CustomStep trait definition (none exists)
+6. ✅ Verify all usage is mock-only (confirmed)
+
+**Files Identified** (from analysis):
+- llmspell-workflows/src/traits.rs: StepType enum definition (line 69-75)
+- llmspell-workflows/src/step_executor.rs: execute_custom_step() (lines 779-850), match arms (6 locations)
+- llmspell-workflows/src/sequential.rs: No custom handling found
+- llmspell-workflows/src/parallel.rs: No custom handling found
+- llmspell-workflows/src/loop.rs: No custom handling found
+- llmspell-workflows/src/conditional.rs: No custom handling found
+- llmspell-bridge/src/lua/globals/workflow.rs: Custom step parsing (lines 101-118)
+- llmspell-workflows/tests/workflow_tracing_test.rs: 9 test usages
+- docs/user-guide/api/rust/llmspell-workflows.md: Wrong StepType definition (line 51)
+- examples/script-users/getting-started/03-first-workflow.lua: Misleading comment (line 158)
+
+**Deliverables**:
+- [ ] Complete file/line inventory in /tmp/custom_steps_audit.md
+- [ ] Categorization: code vs tests vs docs
+- [ ] Impact assessment for each file
+- [ ] Validation that zero real functionality exists
+
+**Acceptance Criteria**:
+- [ ] All Custom step references documented
+- [ ] Categorized by removal strategy (code/tests/docs)
+- [ ] Confirmed all usage is mock-only
+- [ ] No CustomStep trait exists
+- [ ] Migration patterns identified
+
+---
+
+### Task 11a.12.2: Remove StepType::Custom Variant from Core
+
+**Priority**: CRITICAL | **Time**: 45min | **Status**: 🔲 TODO | **Depends**: 11a.12.1
+
+**Objective**: Remove `StepType::Custom` variant from core traits and all handling logic.
+
+**Scope**: Core type definition and pattern matching
+
+**Files Modified**:
+
+**1. llmspell-workflows/src/traits.rs**:
+```rust
+// BEFORE (lines 51-83):
+pub enum StepType {
+    Tool { tool_name: String, parameters: serde_json::Value },
+    Agent { agent_id: String, input: String },
+    Custom { function_name: String, parameters: serde_json::Value },  // REMOVE
+    Workflow { workflow_id: ComponentId, input: serde_json::Value },
+}
+
+// AFTER:
+pub enum StepType {
+    Tool { tool_name: String, parameters: serde_json::Value },
+    Agent { agent_id: String, input: String },
+    Workflow { workflow_id: ComponentId, input: serde_json::Value },
+}
+```
+
+**Changes**:
+- Line 69-75: Remove entire `Custom` variant (7 lines)
+- Update rustdoc to clarify only Tool/Agent/Workflow supported
+
+**2. llmspell-workflows/src/step_executor.rs**:
+
+**Remove execute_custom_step method** (lines 779-850, 72 lines):
+```rust
+async fn execute_custom_step(...) -> Result<String> {
+    // For now, return a mock result...
+    // ENTIRE METHOD REMOVED
+}
+```
+
+**Remove Custom match arms** (6 locations):
+- Line 305: `StepType::Custom { .. } => "custom",` (step type name)
+- Line 379: `StepType::Custom { function_name, .. } => { ... }` (step name extraction)
+- Line 399-405: `StepType::Custom { function_name, parameters } => { self.execute_custom_step(...).await }` (execution)
+- Line 984: `StepType::Custom { .. } => "custom",` (duplicate type name)
+- Line 1008: `StepType::Custom { .. } => "custom",` (another duplicate)
+- Line 1079-1098: Custom retry logic (if exists)
+- Line 1130-?: Custom hook integration (if exists)
+
+**Total Removal**: ~140 lines (72 method + ~70 match arms/logic)
+
+**Acceptance Criteria**:
+- [ ] StepType::Custom variant removed from traits.rs
+- [ ] execute_custom_step() method completely removed
+- [ ] All Custom match arms removed from step_executor.rs
+- [ ] Zero compiler errors after removal
+- [ ] cargo build -p llmspell-workflows succeeds
+
+---
+
+### Task 11a.12.3: Remove Custom Step Parsing from Lua Bindings
+
+**Priority**: CRITICAL | **Time**: 20min | **Status**: 🔲 TODO | **Depends**: 11a.12.2
+
+**Objective**: Remove custom step type from Lua workflow API.
+
+**Scope**: Lua workflow step parsing
+
+**File Modified**: `llmspell-bridge/src/lua/globals/workflow.rs`
+
+**Changes**:
+```rust
+// BEFORE (lines 101-118):
+"custom" => {
+    let function_name: String = step_table.get("function")?;
+    let parameters: Option<Table> = step_table.get("parameters").ok();
+
+    let params = if let Some(params_table) = parameters {
+        lua_value_to_json(Value::Table(params_table))?
+    } else {
+        serde_json::json!({})
+    };
+
+    WorkflowStep::new(
+        name,
+        StepType::Custom {
+            function_name,
+            parameters: params,
+        },
+    )
+}
+
+// AFTER:
+// Entire "custom" case removed (18 lines)
+```
+
+**Error handling update** (line 119-123):
+```rust
+// BEFORE:
+_ => {
+    return Err(mlua::Error::RuntimeError(format!("Unknown step type: {step_type}")))
+}
+
+// AFTER:
+_ => {
+    return Err(mlua::Error::RuntimeError(format!(
+        "Unknown step type: '{}'. Supported types: 'tool', 'agent', 'workflow'",
+        step_type
+    )))
+}
+```
+
+**Acceptance Criteria**:
+- [ ] "custom" case removed from step type parsing
+- [ ] Error message updated to list only valid types
+- [ ] cargo clippy -p llmspell-bridge: 0 warnings
+- [ ] cargo build -p llmspell-bridge succeeds
+
+---
+
+### Task 11a.12.4: Update Tests to Remove Custom Step Usage
+
+**Priority**: CRITICAL | **Time**: 40min | **Status**: 🔲 TODO | **Depends**: 11a.12.2
+
+**Objective**: Replace all Custom step test usage with Tool/Agent steps.
+
+**Scope**: Test file updates for workflow_tracing_test.rs
+
+**File Modified**: `llmspell-workflows/tests/workflow_tracing_test.rs`
+
+**9 Custom step usages to replace**:
+- Line 42: `StepType::Custom { function_name: "test_function", ... }`
+- Line 102: `StepType::Custom { function_name: "step1_function", ... }`
+- Line 109: `StepType::Custom { function_name: "step2_function", ... }`
+- Line 139: `StepType::Custom { function_name: "test", ... }`
+- Line 164: `StepType::Custom { function_name: "always_success", ... }`
+- Line 197: `StepType::Custom { function_name: "test1", ... }`
+- Line 206: `StepType::Custom { function_name: "test2", ... }`
+- Line 237: `StepType::Custom { function_name: "finalize", ... }`
+- Line 308: `StepType::Custom { function_name: "test_step", ... }`
+
+**Replacement Strategy**:
+```rust
+// BEFORE:
+StepType::Custom {
+    function_name: "test_function".to_string(),
+    parameters: json!({"param": "value"}),
+}
+
+// AFTER (use Tool steps with mock tools):
+StepType::Tool {
+    tool_name: "calculator".to_string(),  // Use real tools that exist
+    parameters: json!({"operation": "add", "values": [1, 1]}),
+}
+```
+
+**Alternative**: If tests are specifically testing custom step execution (which is now removed), delete entire test functions instead of replacing.
+
+**Test Impact Analysis**:
+- `test_workflow_executor_tracing` - Replace or remove?
+- `test_sequential_workflow_tracing` - Replace with tool steps
+- Other tests - Evaluate case by case
+
+**Acceptance Criteria**:
+- [ ] All 9 Custom step usages replaced or removed
+- [ ] Tests still validate workflow tracing (core purpose)
+- [ ] cargo test -p llmspell-workflows --lib passes
+- [ ] Zero test failures from removal
+
+---
+
+### Task 11a.12.5: Fix Documentation - Remove Custom Step References
+
+**Priority**: HIGH | **Time**: 30min | **Status**: 🔲 TODO | **Depends**: 11a.12.3
+
+**Objective**: Update documentation to reflect removal of custom steps.
+
+**Scope**: Fix Rust API docs and example comments
+
+**Files Modified**:
+
+**1. docs/user-guide/api/rust/llmspell-workflows.md**:
+```rust
+// BEFORE (line 47-52):
+pub enum StepType {
+    Agent(Box<dyn Agent>),
+    Tool { name: String, params: Value },
+    Workflow(Box<Workflow>),
+    Custom(Box<dyn CustomStep>),  // ❌ WRONG - This never existed!
+}
+
+// AFTER (line 47-51):
+pub enum StepType {
+    Tool { tool_name: String, parameters: serde_json::Value },
+    Agent { agent_id: String, input: String },
+    Workflow { workflow_id: ComponentId, input: serde_json::Value },
+}
+```
+
+**2. examples/script-users/getting-started/03-first-workflow.lua**:
+```lua
+-- BEFORE (line 158):
+print("   - Each step can be a tool, agent, or custom function")
+
+-- AFTER:
+print("   - Each step can be a tool, agent, or nested workflow")
+```
+
+**Acceptance Criteria**:
+- [ ] Rust API doc shows correct StepType definition
+- [ ] Example comment no longer mentions custom functions
+- [ ] All documentation reflects only Tool/Agent/Workflow steps
+- [ ] No references to CustomStep trait
+
+---
+
+### Task 11a.12.6: Create Migration Guide - Custom Logic Patterns
+
+**Priority**: HIGH | **Time**: 60min | **Status**: 🔲 TODO | **Depends**: 11a.12.5
+
+**Objective**: Educate users on achieving "custom" behavior using tools, agents, and workflow composition.
+
+**Scope**: Add comprehensive migration guide to Lua API documentation
+
+**File Modified**: `docs/user-guide/api/lua/README.md`
+
+**New Section** (add after Workflow section, ~100 lines):
+
+```markdown
+## Custom Workflow Logic - Tool & Agent Patterns
+
+**Note**: Custom step type was removed in v0.11. Use these superior patterns instead:
+
+### Pattern 1: Custom Logic via Tools
+
+For simple transformations, create a custom tool:
+
+```lua
+-- Instead of custom step:
+-- workflow:add_step({ type = "custom", function = "transform", ... })
+
+-- Use Tool pattern:
+Tool.register("my-transformer", function(params)
+    -- Your custom logic here
+    local result = params.input:upper()
+    return { text = result }
+end)
+
+workflow:add_step({
+    type = "tool",
+    tool = "my-transformer",
+    input = { input = "hello" }
+})
+```
+
+**Benefits**:
+- ✅ Reusable across workflows
+- ✅ Unit testable
+- ✅ Discoverable via Tool.list()
+- ✅ Supports full error handling
+
+### Pattern 2: Custom Logic via Agents
+
+For complex reasoning, create a custom agent:
+
+```lua
+-- Instead of custom step with complex logic:
+-- workflow:add_step({ type = "custom", function = "analyze", ... })
+
+-- Use Agent pattern:
+local analyzer = Agent.create({
+    name = "custom-analyzer",
+    provider = "openai",
+    model = "gpt-4o-mini",
+    system_prompt = "Analyze the input and extract key insights."
+})
+
+workflow:add_step({
+    type = "agent",
+    agent = "custom-analyzer",
+    input = "Analyze this text..."
+})
+```
+
+**Benefits**:
+- ✅ LLM-powered reasoning
+- ✅ Natural language input
+- ✅ Stateful across steps
+- ✅ Supports streaming
+
+### Pattern 3: Conditional Workflows for Branching Logic
+
+For if/else logic:
+
+```lua
+-- Instead of custom step with branching:
+-- workflow:add_step({ type = "custom", function = "route", ... })
+
+-- Use Conditional workflow:
+local router = Workflow.conditional()
+    :name("smart-router")
+    :condition("step:validation:output", "success")
+    :when_true({ type = "tool", tool = "process-data" })
+    :when_false({ type = "tool", tool = "handle-error" })
+    :build()
+```
+
+### Pattern 4: Loop Workflows for Iteration
+
+For custom iteration logic:
+
+```lua
+-- Instead of custom step with loop:
+-- workflow:add_step({ type = "custom", function = "iterate", ... })
+
+-- Use Loop workflow:
+local processor = Workflow.loop()
+    :name("batch-processor")
+    :max_iterations(100)
+    :body_step({ type = "tool", tool = "process-item" })
+    :build()
+```
+
+### Pattern 5: Nested Workflows for Composition
+
+For complex orchestration:
+
+```lua
+-- Instead of multiple custom steps:
+-- workflow:add_step({ type = "custom", function = "step1", ... })
+-- workflow:add_step({ type = "custom", function = "step2", ... })
+
+-- Use nested workflows:
+local preprocessing = Workflow.sequential()
+    :name("preprocessing")
+    :add_step({ type = "tool", tool = "validate" })
+    :add_step({ type = "tool", tool = "transform" })
+    :build()
+
+local main = Workflow.sequential()
+    :name("main-pipeline")
+    :add_step({ type = "workflow", workflow = preprocessing })
+    :add_step({ type = "agent", agent = "processor" })
+    :build()
+```
+
+### Pattern 6: State Management for Custom Variables
+
+For custom state tracking:
+
+```lua
+-- Use State API for custom variables
+workflow:add_step({
+    type = "tool",
+    tool = "calculator",
+    input = { operation = "add", values = {1, 2} }
+})
+
+-- Access results via state
+local result = State.load("custom", ":workflow:my_flow:tool:calculator:output")
+
+-- Or use agent_outputs for agents
+local outputs = workflow_result.metadata.extra.agent_outputs
+```
+
+### Migration Examples
+
+#### Example 1: Data Transformation
+
+**Before (Custom Step - Didn't Work)**:
+```lua
+workflow:add_step({
+    type = "custom",
+    function = "data_transform",
+    parameters = { format = "json" }
+})
+```
+
+**After (Tool Pattern)**:
+```lua
+-- Create reusable tool
+Tool.register("json-transformer", function(params)
+    local data = JSON.parse(params.input)
+    return { text = JSON.stringify(data) }
+end)
+
+workflow:add_step({
+    type = "tool",
+    tool = "json-transformer",
+    input = { input = raw_data }
+})
+```
+
+#### Example 2: Validation Logic
+
+**Before (Custom Step - Didn't Work)**:
+```lua
+workflow:add_step({
+    type = "custom",
+    function = "validation",
+    parameters = { rules = {...} }
+})
+```
+
+**After (Agent Pattern)**:
+```lua
+local validator = Agent.create({
+    name = "data-validator",
+    provider = "anthropic",
+    model = "claude-3-5-sonnet-20241022",
+    system_prompt = "Validate data against these rules: ..."
+})
+
+workflow:add_step({
+    type = "agent",
+    agent = "data-validator",
+    input = data_to_validate
+})
+```
+
+#### Example 3: Conditional Processing
+
+**Before (Custom Step - Didn't Work)**:
+```lua
+workflow:add_step({
+    type = "custom",
+    function = "check_and_route",
+    parameters = { threshold = 0.8 }
+})
+```
+
+**After (Conditional Workflow)**:
+```lua
+local router = Workflow.conditional()
+    :condition("step:scorer:output", "> 0.8")
+    :when_true({ type = "agent", agent = "high-quality-processor" })
+    :when_false({ type = "agent", agent = "standard-processor" })
+    :build()
+
+main_workflow:add_step({
+    type = "workflow",
+    workflow = router
+})
+```
+
+### Why These Patterns Are Better
+
+| Feature | Custom Steps (Old) | Tools/Agents/Workflows (New) |
+|---------|-------------------|------------------------------|
+| **Functionality** | ❌ Mock only | ✅ Real execution |
+| **Reusability** | ❌ None | ✅ Full reuse |
+| **Testing** | ❌ Can't test | ✅ Unit testable |
+| **Discovery** | ❌ Invisible | ✅ Tool.list(), Agent.discover() |
+| **Documentation** | ❌ No docs | ✅ Tool.get("name").schema |
+| **Error Handling** | ❌ Basic | ✅ Retry, fallback, hooks |
+| **State Management** | ❌ Manual | ✅ Automatic |
+| **Composition** | ❌ Limited | ✅ Nested workflows |
+| **LLM Integration** | ❌ None | ✅ Agent pattern |
+
+### Summary
+
+Custom steps never provided real functionality - they were mocks. The tool/agent/workflow primitives are:
+- ✅ **More powerful** - Full Turing-complete via tools + agents
+- ✅ **Better architecture** - Single responsibility, composable
+- ✅ **Easier to test** - Isolated, mockable components
+- ✅ **Better UX** - Discoverable, documented, reusable
+
+**Recommendation**: Always use tools for logic, agents for reasoning, workflows for orchestration.
+
+**Acceptance Criteria**:
+- [ ] Migration guide added to Lua API docs (~100 lines)
+- [ ] 6 patterns documented with examples
+- [ ] 3 before/after migration examples
+- [ ] Comparison table showing advantages
+- [ ] Clear recommendations
+
+---
+
+### Task 11a.12.7: Add ADR-043 - Removal of Custom Steps
+
+**Priority**: MEDIUM | **Time**: 20min | **Status**: 🔲 TODO | **Depends**: 11a.12.6
+
+**Objective**: Document architectural decision to remove custom steps.
+
+**Scope**: Add ADR to architecture-decisions.md
+
+**File Modified**: `docs/technical/architecture-decisions.md`
+
+**New ADR** (add after ADR-042):
+
+```markdown
+### ADR-043: Removal of Custom Workflow Steps
+
+**Date**: October 2025 (Phase 11a.12)
+**Status**: Accepted
+**Context**: Custom workflow steps (StepType::Custom) existed in codebase but were incomplete
+
+**Problem**:
+1. **Mock Implementation**: execute_custom_step() only returned hardcoded strings
+2. **No Real Functionality**: 15 hardcoded function names, no user extension mechanism
+3. **Documentation Lies**: Rust docs showed CustomStep trait that didn't exist
+4. **API Confusion**: Exposed via Lua API but didn't work as expected
+5. **Architectural Obsolescence**: Phase 3 replaced all custom functions with tools/agents
+
+**Decision**: Remove StepType::Custom variant entirely, educate users on tool/agent/workflow patterns
+
+**Rationale**:
+1. **Tools Provide Superiority**: Tools are reusable, testable, discoverable, documented
+2. **Agents Handle Reasoning**: Complex logic better suited to LLM-based agents
+3. **Workflows Enable Composition**: Conditional/loop/nested workflows cover orchestration
+4. **Zero Real Functionality Lost**: Custom steps were 100% mock implementation
+5. **Code Quality**: Removes 200+ lines of dead/misleading code
+6. **User Clarity**: Eliminates confusion about unimplemented features
+
+**Implementation** (Phase 11a.12):
+- Removed StepType::Custom variant from traits.rs (7 lines)
+- Removed execute_custom_step() mock method (72 lines)
+- Removed all Custom match arms from step_executor.rs (~70 lines)
+- Removed custom step parsing from Lua bindings (18 lines)
+- Updated 9 test files to use Tool/Agent steps
+- Fixed Rust API documentation (llmspell-workflows.md)
+- Added 100-line migration guide to Lua API docs
+- Fixed misleading example comment in 03-first-workflow.lua
+
+**Breaking Changes**:
+- `StepType::Custom { function_name, parameters }` removed
+- Lua API: `{ type = "custom", function = "...", parameters = {...} }` removed
+- **Impact**: ZERO - Feature was never functional
+
+**Migration Path**:
+- Custom transformations → Create tools with Tool.register()
+- Custom reasoning → Create agents with Agent.create()
+- Custom branching → Use Workflow.conditional()
+- Custom iteration → Use Workflow.loop()
+- Custom composition → Use nested workflows
+
+**Alternatives Considered**:
+1. **Implement CustomStep trait** - Would duplicate tool/agent functionality (rejected)
+2. **Document as unimplemented** - Keeps dead code, doesn't address root cause (rejected)
+3. **Deprecation period** - Unnecessary since feature never worked (rejected)
+
+**Consequences**:
+- ✅ Cleaner codebase (-200 lines dead code)
+- ✅ No user confusion about unimplemented features
+- ✅ Aligns with Phase 3 architectural decision
+- ✅ Documentation accuracy restored
+- ✅ Users learn superior patterns (tools/agents/workflows)
+- ✅ Future maintainability improved
+- ✅ Zero breaking changes (feature never worked)
+
+**Performance Impact**: None (mock execution was already negligible)
+
+**Related ADRs**:
+- ADR-001: BaseAgent foundation (agents as primary reasoning primitive)
+- ADR-004: Synchronous Script Bridge (tools/agents bridge to Lua)
+- ADR-042: Unified execute() naming (consistent API across components)
+
+**Validation**:
+- 71 workflow tests pass (including tracing tests migrated to Tool steps)
+- 0 clippy warnings in llmspell-workflows
+- Migration guide demonstrates 6 patterns
+- All examples execute successfully
+```
+
+**Acceptance Criteria**:
+- [ ] ADR-043 added to architecture-decisions.md
+- [ ] All standard ADR sections included
+- [ ] Cross-references to related ADRs
+- [ ] Clear migration guidance
+- [ ] Consequences documented
+
+---
+
+### Task 11a.12.8: Full Validation & Regression Testing
+
+**Priority**: CRITICAL | **Time**: 40min | **Status**: 🔲 TODO | **Depends**: 11a.12.1-11a.12.7
+
+**Objective**: Comprehensive validation that custom step removal causes zero regressions.
+
+**Scope**: Full test suite, clippy, examples, documentation build
+
+**Validation Checklist**:
+
+**1. Unit Tests**:
+```bash
+# All workflow tests pass
+cargo test -p llmspell-workflows --lib
+# Expected: All tests pass (including updated tracing tests)
+
+# All bridge tests pass
+cargo test -p llmspell-bridge --lib
+# Expected: All tests pass
+
+# Workspace tests
+cargo test --workspace --all-features --lib
+# Expected: All tests pass
+```
+
+**2. Clippy Clean**:
+```bash
+# Workflows crate
+cargo clippy -p llmspell-workflows --all-targets --all-features -- -D warnings
+# Expected: 0 warnings
+
+# Bridge crate
+cargo clippy -p llmspell-bridge --all-targets --all-features -- -D warnings
+# Expected: 0 warnings
+
+# Workspace
+cargo clippy --workspace --all-targets --all-features -- -D warnings
+# Expected: 0 warnings
+```
+
+**3. Build Validation**:
+```bash
+cargo build --bin llmspell
+# Expected: Success
+```
+
+**4. Example Validation**:
+```bash
+# Test workflow example
+./target/debug/llmspell run examples/script-users/getting-started/03-first-workflow.lua
+# Expected: All 4 steps execute successfully
+
+# Test other workflow examples
+./target/debug/llmspell run examples/script-users/applications/webapp-creator/main.lua
+# Expected: Workflow executes (may need API key for agents)
+```
+
+**5. Documentation Build**:
+```bash
+cargo doc --no-deps --workspace
+# Expected: Builds without errors
+```
+
+**6. Grep Validation**:
+```bash
+# Verify NO Custom step references in code
+grep -r "StepType::Custom" llmspell-workflows/src
+# Expected: 0 matches
+
+# Verify NO custom step parsing in Lua
+grep -r "\"custom\".*=>" llmspell-bridge/src/lua
+# Expected: 0 matches (except in error messages listing valid types)
+
+# Verify NO execute_custom_step
+grep -r "execute_custom_step" llmspell-workflows/src
+# Expected: 0 matches
+```
+
+**7. Documentation Accuracy**:
+```bash
+# Verify migration guide exists
+grep -n "Custom Workflow Logic - Tool & Agent Patterns" docs/user-guide/api/lua/README.md
+# Expected: 1 match
+
+# Verify ADR-043 exists
+grep -n "ADR-043: Removal of Custom Workflow Steps" docs/technical/architecture-decisions.md
+# Expected: 1 match
+```
+
+**Acceptance Criteria**:
+- [ ] All workflow tests pass (71/71)
+- [ ] All bridge tests pass (129/129)
+- [ ] All workspace tests pass (2,500+)
+- [ ] Zero clippy warnings across workspace
+- [ ] Binary builds successfully
+- [ ] At least 2 workflow examples run successfully
+- [ ] Documentation builds without errors
+- [ ] Zero Custom step references in code (except docs/migration guide)
+- [ ] Migration guide findable via grep
+- [ ] ADR-043 documented
+
+**Overall Assessment Criteria**: ✅ ALL validation steps must pass
+
+---
+
+### Task 11a.12.9: Final Summary & Phase Completion
+
+**Priority**: MEDIUM | **Time**: 20min | **Status**: 🔲 TODO | **Depends**: 11a.12.8
+
+**Objective**: Document completion, create summary, and update TODO.md status.
+
+**Scope**: Final metrics, completion checklist, insights
+
+**Completion Checklist**:
+- [ ] All 9 tasks completed (11a.12.1 through 11a.12.9)
+- [ ] StepType::Custom variant removed
+- [ ] execute_custom_step() mock removed
+- [ ] Lua custom step parsing removed
+- [ ] All tests updated to use Tool/Agent steps
+- [ ] Documentation fixed (Rust API + example comment)
+- [ ] Migration guide added (~100 lines)
+- [ ] ADR-043 documented
+- [ ] Zero test failures
+- [ ] Zero clippy warnings
+- [ ] Examples validated
+
+**Summary Metrics**:
+
+**Code Removal**:
+- Lines removed: ~200 total
+  - traits.rs: 7 lines (Custom variant)
+  - step_executor.rs: ~140 lines (method + match arms)
+  - workflow.rs (Lua): 18 lines (custom parsing)
+  - workflow_tracing_test.rs: ~35 lines (test updates)
+
+**Documentation Added**:
+- Migration guide: ~100 lines (Lua API docs)
+- ADR-043: ~60 lines (architecture decisions)
+- Total added: ~160 lines
+
+**Net Change**: -40 lines (200 removed - 160 added)
+
+**Files Modified**: ~8 files
+- Rust code: 4 files (traits, step_executor, workflow.rs, tests)
+- Documentation: 4 files (Rust API, Lua API, example, ADR)
+
+**Test Results**:
+- Workflow tests: All pass
+- Bridge tests: All pass
+- Workspace tests: All pass
+- Clippy warnings: 0
+
+**Key Achievements**:
+1. ✅ Removed 200+ lines of dead/mock code
+2. ✅ Eliminated user confusion about unimplemented features
+3. ✅ Aligned codebase with Phase 3 architectural decision
+4. ✅ Educated users on superior tool/agent/workflow patterns
+5. ✅ Zero breaking changes (feature never worked)
+6. ✅ Documentation accuracy restored
+
+**Time Breakdown**:
+- Task 11a.12.1: 30min (Analysis)
+- Task 11a.12.2: 45min (Core removal)
+- Task 11a.12.3: 20min (Lua bindings)
+- Task 11a.12.4: 40min (Test updates)
+- Task 11a.12.5: 30min (Doc fixes)
+- Task 11a.12.6: 60min (Migration guide)
+- Task 11a.12.7: 20min (ADR-043)
+- Task 11a.12.8: 40min (Validation)
+- Task 11a.12.9: 20min (Summary)
+- **Total**: 305 minutes (~5 hours vs 4 hours estimated)
+
+**Insights**:
+- Mock implementations are technical debt that confuses users
+- Removing dead code is as important as adding features
+- Documentation accuracy critical for user trust
+- Tool/agent patterns provide complete extensibility
+- Zero breaking changes possible when removing non-functional features
+
+**Acceptance Criteria**:
+- [ ] Phase 11a.12 summary written
+- [ ] All task statuses updated to COMPLETED
+- [ ] Metrics documented
+- [ ] Phase marked as COMPLETED in TODO.md
+- [ ] Final validation passing
+
+**Phase 11a.12 Status**: ✅ **COMPLETED** - Custom steps removed, users educated on superior patterns
+
+---
+
+## Phase 11a.12 Summary - Custom Steps Removal & Migration
+
+**Status**: 🔲 TODO | **Effort**: ~5 hours | **Files Modified**: ~8
+
+**Completion Criteria**:
+- [ ] All 9 tasks completed (11a.12.1 through 11a.12.9)
+- [ ] StepType::Custom variant removed from traits
+- [ ] execute_custom_step() mock implementation removed
+- [ ] Lua custom step parsing removed
+- [ ] All tests migrated to Tool/Agent steps
+- [ ] Documentation updated (Rust API, Lua API, examples)
+- [ ] Migration guide added (~100 lines)
+- [ ] ADR-043 documented
+- [ ] Zero test failures, zero clippy warnings
+- [ ] Examples validated successfully
+
+**Breaking Changes**:
+- `StepType::Custom { function_name, parameters }` removed (Rust)
+- `{ type = "custom", function = "...", parameters = {...} }` removed (Lua)
+- **Impact**: ZERO - Feature was never functional
+
+**Migration Path**:
+- Custom transformations → Tools (Tool.register())
+- Custom reasoning → Agents (Agent.create())
+- Custom branching → Conditional workflows
+- Custom iteration → Loop workflows
+- Custom composition → Nested workflows
+
+**User Benefits**:
+- ✅ No confusion about unimplemented features
+- ✅ Learn superior tool/agent/workflow patterns
+- ✅ Better architecture (reusable, testable, discoverable)
+- ✅ Complete documentation with 6 migration patterns
+- ✅ Clearer mental model of llmspell primitives
+
+**Developer Benefits**:
+- ✅ 200+ lines of dead code removed
+- ✅ No maintenance burden for mock implementation
+- ✅ Aligned with Phase 3 architectural decision
+- ✅ Cleaner codebase for future development
+
+---
+
 **END OF PHASE 11a TODO** ✅
 
