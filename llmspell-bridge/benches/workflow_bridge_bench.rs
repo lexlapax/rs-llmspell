@@ -142,9 +142,9 @@ fn benchmark_workflow_execution(c: &mut Criterion) {
                 let steps = vec![WorkflowStep {
                     id: ComponentId::from_name("step1"),
                     name: "step1".to_string(),
-                    step_type: StepType::Custom {
-                        function_name: "mock_func".to_string(),
-                        parameters: serde_json::Value::default(),
+                    step_type: StepType::Tool {
+                        tool_name: "calculator".to_string(),
+                        parameters: serde_json::json!({"operation": "add", "values": [1, 1]}),
                     },
                     timeout: None,
                     retry_attempts: 0,
@@ -182,9 +182,9 @@ fn benchmark_bridge_overhead(c: &mut Criterion) {
                 let steps = vec![WorkflowStep {
                     id: ComponentId::from_name("step1"),
                     name: "step1".to_string(),
-                    step_type: StepType::Custom {
-                        function_name: "test_func".to_string(),
-                        parameters: serde_json::Value::default(),
+                    step_type: StepType::Tool {
+                        tool_name: "calculator".to_string(),
+                        parameters: serde_json::json!({"operation": "add", "values": [1, 1]}),
                     },
                     timeout: None,
                     retry_attempts: 0,

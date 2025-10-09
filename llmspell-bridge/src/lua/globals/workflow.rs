@@ -98,27 +98,9 @@ fn parse_workflow_step(_lua: &Lua, step_table: &Table) -> mlua::Result<WorkflowS
                 },
             )
         }
-        "custom" => {
-            let function_name: String = step_table.get("function")?;
-            let parameters: Option<Table> = step_table.get("parameters").ok();
-
-            let params = if let Some(params_table) = parameters {
-                lua_value_to_json(Value::Table(params_table))?
-            } else {
-                serde_json::json!({})
-            };
-
-            WorkflowStep::new(
-                name,
-                StepType::Custom {
-                    function_name,
-                    parameters: params,
-                },
-            )
-        }
         _ => {
             return Err(mlua::Error::RuntimeError(format!(
-                "Unknown step type: {step_type}"
+                "Unknown step type: '{step_type}'. Supported types: 'tool', 'agent', 'workflow'"
             )))
         }
     };

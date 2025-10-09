@@ -5792,7 +5792,7 @@ async fn execute_custom_step(...) -> Result<String> {
 
 ### Task 11a.12.3: Remove Custom Step Parsing from Lua Bindings
 
-**Priority**: CRITICAL | **Time**: 20min | **Status**: 🔲 TODO | **Depends**: 11a.12.2
+**Priority**: CRITICAL | **Time**: 20min (actual: 22min) | **Status**: ✅ COMPLETED | **Depends**: 11a.12.2
 
 **Objective**: Remove custom step type from Lua workflow API.
 
@@ -5843,10 +5843,41 @@ _ => {
 ```
 
 **Acceptance Criteria**:
-- [ ] "custom" case removed from step type parsing
-- [ ] Error message updated to list only valid types
-- [ ] cargo clippy -p llmspell-bridge: 0 warnings
-- [ ] cargo build -p llmspell-bridge succeeds
+- [x] "custom" case removed from step type parsing ✅
+- [x] Error message updated to list only valid types ✅
+- [x] cargo clippy -p llmspell-bridge: 0 warnings ✅
+- [x] cargo build -p llmspell-bridge succeeds ✅
+
+**Changes Applied**:
+
+1. **workflow.rs**: Removed "custom" step type parsing (lines 101-118, 18 lines removed)
+2. **workflow.rs**: Updated error message to list valid types ('tool', 'agent', 'workflow')
+3. **workflow.rs**: Applied clippy inline format args fix
+4. **workflow_helpers.rs** (llmspell-testing): Converted test helper from Custom to Workflow step
+5. **workflow_bridge_bench.rs** (llmspell-bridge/benches): Converted 2 benchmark steps from Custom to Tool
+
+**Total**: 18 lines removed in main code, 3 test/bench files updated
+
+**Build Verification**: ✅ cargo clippy -p llmspell-bridge completed in 2.62s with 0 warnings
+
+**Key Insights**:
+
+1. **Cascading discovery**: Removing Custom from workflows exposed references in:
+   - Testing helpers (workflow_helpers.rs)
+   - Benchmarks (workflow_bridge_bench.rs)
+   - Shows importance of all-targets build checking
+
+2. **Test helper fix**: create_test_subworkflow_step() was using Custom but should have been using Workflow - bug fix!
+
+3. **Benchmark updates**: Both benchmarks now use real Tool steps instead of mock Custom steps
+
+4. **Error message improvement**: Now provides helpful guidance listing valid types
+
+5. **Clippy enforcement**: inline format args policy caught outdated format! usage
+
+6. **Clean separation**: All Lua binding changes isolated to one match statement
+
+7. **Zero test changes needed**: No Lua test files use custom steps (confirms dead feature)
 
 ---
 
