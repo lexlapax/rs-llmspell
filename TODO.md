@@ -7930,7 +7930,7 @@ print("\nSee docs/user-guide/security-and-permissions.md for details")
 
 ### Task 11a.13.7: Update User Guide Index
 
-**Priority**: LOW | **Time**: 10min | **Status**: 🔲 TODO | **Depends**: 11a.13.2
+**Priority**: LOW | **Time**: 10min | **Status**: ✅ DONE | **Depends**: 11a.13.2
 
 **Objective**: Add new security guide to user guide table of contents.
 
@@ -7956,16 +7956,29 @@ After line 48 (### 3. [Configuration](configuration.md)):
 Update numbering for subsequent sections (shift by 1).
 
 **Deliverables**:
-- [ ] Add security-and-permissions.md to TOC
-- [ ] Update section numbering (4→5, 5→6, etc.)
-- [ ] Add ⭐ New marker
-- [ ] Provide descriptive bullet points
+- [x] Add security-and-permissions.md to TOC
+- [x] Update section numbering (4→5, 5→6, etc.)
+- [x] Add ⭐ New marker
+- [x] Provide descriptive bullet points
 
 **Acceptance Criteria**:
-- [ ] New guide listed in proper TOC position
-- [ ] Section numbering updated throughout
-- [ ] Description accurately reflects guide content
-- [ ] Links work correctly
+- [x] New guide listed in proper TOC position
+- [x] Section numbering updated throughout
+- [x] Description accurately reflects guide content
+- [x] Links work correctly
+
+**INSIGHTS**:
+- Added security-and-permissions.md as Section 4 at line 50 in docs/user-guide/README.md
+- Used "⭐ Phase 11a.13" marker (not "New") for consistency with other Phase markers
+- Comprehensive 7-bullet description covering all key aspects
+- Updated section numbering: 4→5, 5→6, 6→7, 7→8 throughout the Essential Documentation section
+- Version number and Last Updated remain unchanged (0.10.0, October 2025)
+
+**IMPACT**:
+- User guide discoverability: Security guide now prominently listed in TOC
+- Consistent section numbering maintained throughout README.md
+- Clear description helps users decide if this is the guide they need
+- Completes the documentation chain: TOC → Guide → Config Examples → Cookbook Example
 
 ---
 

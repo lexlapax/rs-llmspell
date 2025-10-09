@@ -47,7 +47,17 @@
 - Security settings and deployment profiles
 - Environment variables
 
-### 4. [Local LLM Integration](local-llm.md) ⭐ Phase 11
+### 4. [Security & Permissions](security-and-permissions.md) ⭐ Phase 11a.13
+**Comprehensive security sandbox guide for safe tool execution**
+- Three-level security model (Safe/Restricted/Privileged)
+- Sandbox system (FileSandbox, NetworkSandbox, IntegratedSandbox)
+- Permission configuration (network access, process execution, file system)
+- Tool-specific security settings via config.toml
+- Troubleshooting permission errors with solutions
+- Security best practices (least privilege, allowlists, monitoring)
+- Common scenarios (enable curl, API access, file permissions)
+
+### 5. [Local LLM Integration](local-llm.md) ⭐ Phase 11
 **Use local LLM models via Ollama or Candle**
 - Quick start for Ollama and Candle
 - Model management (list, pull, info, status)
@@ -56,7 +66,7 @@
 - 6 troubleshooting scenarios
 - 4 complete example scripts
 
-### 5. [Service Deployment](service-deployment.md) ⭐ Phase 10
+### 6. [Service Deployment](service-deployment.md) ⭐ Phase 10
 **Production deployment with system services**
 - systemd deployment (Linux)
 - launchd deployment (macOS)
@@ -66,7 +76,7 @@
 - Fleet management for multi-kernel deployments
 - Security best practices
 
-### 6. [IDE Integration](ide-integration.md) ⭐ Phase 10
+### 7. [IDE Integration](ide-integration.md) ⭐ Phase 10
 **Connect your IDE to LLMSpell kernel**
 - VS Code setup with Jupyter & DAP
 - Jupyter Lab configuration
@@ -75,7 +85,7 @@
 - Multi-client support
 - Connection file format and kernel discovery
 
-### 7. [API Documentation](api/README.md)
+### 8. [API Documentation](api/README.md)
 **Comprehensive API reference**
 - **[Lua API](api/lua/README.md)** - All 17 globals with 200+ methods
 - **[Rust API](api/rust/README.md)** - 17 crates with traits, builders, and extension guide
