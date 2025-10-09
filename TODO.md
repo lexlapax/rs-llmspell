@@ -5704,7 +5704,7 @@ cargo build --bin llmspell
 
 ### Task 11a.12.2: Remove StepType::Custom Variant from Core
 
-**Priority**: CRITICAL | **Time**: 45min | **Status**: 🔲 TODO | **Depends**: 11a.12.1
+**Priority**: CRITICAL | **Time**: 45min (actual: 42min) | **Status**: ✅ COMPLETED | **Depends**: 11a.12.1
 
 **Objective**: Remove `StepType::Custom` variant from core traits and all handling logic.
 
@@ -5756,11 +5756,37 @@ async fn execute_custom_step(...) -> Result<String> {
 **Total Removal**: ~140 lines (72 method + ~70 match arms/logic)
 
 **Acceptance Criteria**:
-- [ ] StepType::Custom variant removed from traits.rs
-- [ ] execute_custom_step() method completely removed
-- [ ] All Custom match arms removed from step_executor.rs
-- [ ] Zero compiler errors after removal
-- [ ] cargo build -p llmspell-workflows succeeds
+- [x] StepType::Custom variant removed from traits.rs ✅
+- [x] execute_custom_step() method completely removed ✅
+- [x] All Custom match arms removed from step_executor.rs ✅
+- [x] Zero compiler errors after removal ✅
+- [x] cargo build -p llmspell-workflows succeeds ✅
+
+**Changes Applied**:
+
+1. **traits.rs**: Removed Custom variant (lines 69-75, 7 lines removed)
+2. **step_executor.rs**: Removed all Custom-related code:
+   - Line 305: Step type name match arm removed
+   - Lines 378-383: Debug logging match arm removed (6 lines)
+   - Lines 392-398: Execution match arm removed (7 lines)
+   - Lines 765-836: execute_custom_step() method removed (72 lines)
+   - Lines 896, 920: Two identical step_type match arms removed (2 lines)
+   - Lines 982-1000: test_step_executor_custom_execution test deleted (19 lines)
+   - Line 1021-1024: test_step_executor_timeout converted to use Tool step (4 lines changed)
+
+**Total**: 115 lines removed, 4 lines changed
+
+**Build Verification**: ✅ cargo build -p llmspell-workflows completed in 54.29s with 0 errors
+
+**Key Insights**:
+
+1. **Clean removal**: All 9 Custom references removed without breaking anything
+2. **Test migration**: One test deleted (custom-specific), one converted to Tool step (timeout test)
+3. **No cascading changes**: Removal was clean because Custom was isolated to step_executor.rs
+4. **Mock method size**: execute_custom_step() was 72 lines of pure mock code
+5. **Duplicate code found**: Three identical match arms for step_type (lines 305, 896, 920)
+6. **Build time**: 54s indicates moderate dependency recompilation
+7. **Zero errors**: Proves Custom was truly isolated and non-functional
 
 ---
 

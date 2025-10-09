@@ -66,13 +66,6 @@ pub enum StepType {
         /// Input to pass to the agent
         input: String,
     },
-    /// Custom function execution
-    Custom {
-        /// Name of the custom function to execute
-        function_name: String,
-        /// Parameters to pass to the function
-        parameters: serde_json::Value,
-    },
     /// Execute a nested workflow
     Workflow {
         /// ID of the workflow to execute

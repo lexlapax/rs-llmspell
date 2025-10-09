@@ -302,7 +302,6 @@ impl StepExecutor {
         let step_type_name = match &step.step_type {
             StepType::Tool { .. } => "tool",
             StepType::Agent { .. } => "agent",
-            StepType::Custom { .. } => "custom",
             StepType::Workflow { .. } => "workflow",
         };
 
@@ -376,12 +375,6 @@ impl StepExecutor {
                     step.name, workflow_id
                 );
             }
-            StepType::Custom { function_name, .. } => {
-                debug!(
-                    "DEBUG: Step '{}' is Custom type with function: '{}'",
-                    step.name, function_name
-                );
-            }
         }
 
         let result = match &step.step_type {
@@ -395,13 +388,6 @@ impl StepExecutor {
                     agent_id
                 );
                 self.execute_agent_step(agent_id, input, context).await
-            }
-            StepType::Custom {
-                function_name,
-                parameters,
-            } => {
-                self.execute_custom_step(function_name, parameters, context)
-                    .await
             }
             StepType::Workflow { workflow_id, input } => {
                 self.execute_workflow_step(*workflow_id, input, context)
@@ -775,80 +761,6 @@ impl StepExecutor {
         Ok(output)
     }
 
-    /// Execute a custom function step
-    async fn execute_custom_step(
-        &self,
-        function_name: &str,
-        parameters: &serde_json::Value,
-        _context: &StepExecutionContext,
-    ) -> Result<String> {
-        debug!("Executing custom step: {}", function_name);
-
-        // For now, return a mock result - this will be extended with custom function support
-        if function_name.is_empty() {
-            return Err(LLMSpellError::Workflow {
-                message: "Custom function name cannot be empty".to_string(),
-                step: Some("custom_execution".to_string()),
-                source: None,
-            });
-        }
-
-        // Mock custom function execution
-        let output = match function_name {
-            "data_transform" => {
-                format!("Data transformed with parameters: {}", parameters)
-            }
-            "validation" => "Validation completed with result: true".to_string(),
-            "aggregation" => {
-                format!(
-                    "Aggregation completed: {}",
-                    parameters.get("type").unwrap_or(&serde_json::json!("sum"))
-                )
-            }
-            "delay" | "sleep" => {
-                // Support delay/sleep for tests
-                if let Some(ms) = parameters.get("ms").and_then(|v| v.as_u64()) {
-                    tokio::time::sleep(Duration::from_millis(ms)).await;
-                }
-                "Delay completed".to_string()
-            }
-            "success" | "always_success" | "test" | "finalize" => {
-                // Support test functions that always succeed
-                format!("Function '{}' completed successfully", function_name)
-            }
-            "quick_operation" | "slow_operation" | "process_item" => {
-                // Support example operations with optional delay
-                if let Some(delay_ms) = parameters.get("delay_ms").and_then(|v| v.as_u64()) {
-                    tokio::time::sleep(Duration::from_millis(delay_ms)).await;
-                }
-                format!("Operation '{}' completed", function_name)
-            }
-            "enrich_data" | "validate_data" | "check_business_rules" | "enrich_with_metadata" => {
-                // Support data processing functions
-                format!("Data processing function '{}' completed", function_name)
-            }
-            "flaky_operation" | "recover_state" => {
-                // Support error handling examples
-                format!("Error handling function '{}' executed", function_name)
-            }
-            "should_not_run" => {
-                // This function should not be reached in error tests
-                panic!("This function should not have been executed")
-            }
-            _ => {
-                format!(
-                    "Custom function '{}' executed with parameters: {}",
-                    function_name, parameters
-                )
-            }
-        };
-
-        // Simulate some processing time
-        tokio::time::sleep(Duration::from_millis(15)).await;
-
-        Ok(output)
-    }
-
     /// Execute a nested workflow step
     async fn execute_workflow_step(
         &self,
@@ -981,7 +893,6 @@ impl StepExecutor {
         let step_type = match &step.step_type {
             StepType::Tool { .. } => "tool",
             StepType::Agent { .. } => "agent",
-            StepType::Custom { .. } => "custom",
             StepType::Workflow { .. } => "workflow",
         };
 
@@ -1005,7 +916,6 @@ impl StepExecutor {
         let step_type = match &step.step_type {
             StepType::Tool { .. } => "tool",
             StepType::Agent { .. } => "agent",
-            StepType::Custom { .. } => "custom",
             StepType::Workflow { .. } => "workflow",
         };
 
@@ -1070,25 +980,6 @@ mod tests {
         assert!(result.output.contains("processed"));
     }
     #[tokio::test]
-    async fn test_step_executor_custom_execution() {
-        let config = WorkflowConfig::default();
-        let executor = StepExecutor::new(config);
-
-        let step = WorkflowStep::new(
-            "custom_test".to_string(),
-            StepType::Custom {
-                function_name: "data_transform".to_string(),
-                parameters: serde_json::json!({"type": "normalize"}),
-            },
-        );
-
-        let context = StepExecutionContext::new(WorkflowState::new(), None);
-        let result = executor.execute_step(&step, context).await.unwrap();
-
-        assert!(result.success);
-        assert!(result.output.contains("Data transformed"));
-    }
-    #[tokio::test]
     async fn test_step_executor_with_retry() {
         let config = WorkflowConfig {
             exponential_backoff: false, // Use fixed delay for faster test
@@ -1127,9 +1018,9 @@ mod tests {
 
         let step = WorkflowStep::new(
             "timeout_test".to_string(),
-            StepType::Custom {
-                function_name: "slow_function".to_string(),
-                parameters: serde_json::json!({}),
+            StepType::Tool {
+                tool_name: "calculator".to_string(),
+                parameters: serde_json::json!({"operation": "add", "values": [1, 1]}),
             },
         )
         .with_timeout(Duration::from_millis(1)); // Very short timeout
