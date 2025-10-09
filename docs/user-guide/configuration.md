@@ -1236,6 +1236,151 @@ export LLMSPELL_ENABLE_LSP="false"
 export LLMSPELL_ENABLE_REPL="true"
 ```
 
+### Security & Permissions Variables
+
+Override security settings without modifying config.toml. Essential for CI/CD, Docker, and quick testing.
+
+```bash
+# Runtime security (master switches)
+export LLMSPELL_ALLOW_FILE_ACCESS="true"          # Enable file system access
+export LLMSPELL_ALLOW_NETWORK_ACCESS="false"      # Disable network access
+export LLMSPELL_ALLOW_PROCESS_SPAWN="true"        # Enable process spawning
+
+# File operations
+export LLMSPELL_TOOLS_ALLOWED_PATHS="/tmp,/workspace,/data"
+export LLMSPELL_TOOLS_MAX_FILE_SIZE="104857600"   # 100MB in bytes
+export LLMSPELL_TOOLS_BLOCKED_EXTENSIONS="exe,dll,so,dylib"
+export LLMSPELL_TOOLS_MAX_DEPTH="10"              # Directory traversal depth
+export LLMSPELL_TOOLS_FILE_ENABLED="true"
+export LLMSPELL_TOOLS_FOLLOW_SYMLINKS="false"
+export LLMSPELL_TOOLS_CHECK_MIME="false"          # Validate MIME types
+
+# Web search
+export LLMSPELL_TOOLS_WEB_ALLOWED_DOMAINS="*.openai.com,github.com,*.anthropic.com"
+export LLMSPELL_TOOLS_WEB_BLOCKED_DOMAINS="spam.com,malware.com"
+export LLMSPELL_TOOLS_WEB_RATE_LIMIT="100"        # Requests per minute
+export LLMSPELL_TOOLS_WEB_ENABLED="true"
+export LLMSPELL_TOOLS_WEB_MAX_RESULTS="10"
+
+# HTTP requests
+export LLMSPELL_TOOLS_HTTP_ALLOWED_HOSTS="api.example.com,*.company.com"
+export LLMSPELL_TOOLS_HTTP_BLOCKED_HOSTS="localhost,127.0.0.1,169.254.169.254"  # SSRF protection
+export LLMSPELL_TOOLS_HTTP_TIMEOUT="60"           # Seconds
+export LLMSPELL_TOOLS_HTTP_MAX_REDIRECTS="5"
+export LLMSPELL_TOOLS_HTTP_MAX_SIZE="10485760"    # 10MB in bytes
+export LLMSPELL_TOOLS_HTTP_VERIFY_SSL="true"
+export LLMSPELL_TOOLS_HTTP_USER_AGENT="LLMSpell/0.9.0"
+export LLMSPELL_TOOLS_HTTP_ENABLED="true"
+
+# System/process execution
+export LLMSPELL_TOOLS_SYSTEM_ALLOW_PROCESS_EXEC="true"
+export LLMSPELL_TOOLS_SYSTEM_ALLOWED_COMMANDS="echo,cat,ls,pwd,git,python3"
+export LLMSPELL_TOOLS_SYSTEM_BLOCKED_COMMANDS="rm,sudo,chmod"
+export LLMSPELL_TOOLS_SYSTEM_TIMEOUT="60"         # Seconds
+export LLMSPELL_TOOLS_SYSTEM_MAX_OUTPUT="1048576" # 1MB in bytes
+export LLMSPELL_TOOLS_SYSTEM_ALLOWED_ENV="HOME,PATH,LANG,USER"
+export LLMSPELL_TOOLS_SYSTEM_WORKING_DIR="/workspace"
+export LLMSPELL_TOOLS_SYSTEM_ENABLED="true"
+
+# Network configuration
+export LLMSPELL_TOOLS_NETWORK_TIMEOUT="30"        # Seconds
+export LLMSPELL_TOOLS_NETWORK_RETRIES="3"
+export LLMSPELL_TOOLS_NETWORK_VERIFY_SSL="true"
+
+# State persistence
+export LLMSPELL_STATE_ENABLED="false"
+export LLMSPELL_STATE_PATH=".llmspell/state"
+export LLMSPELL_STATE_AUTO_SAVE="true"
+export LLMSPELL_STATE_AUTO_LOAD="true"
+```
+
+#### Environment Variable to Config Mapping
+
+| Environment Variable | Config Path | Default | Description |
+|---------------------|-------------|---------|-------------|
+| `LLMSPELL_ALLOW_FILE_ACCESS` | `runtime.security.allow_file_access` | `false` | Master switch for file system access |
+| `LLMSPELL_ALLOW_NETWORK_ACCESS` | `runtime.security.allow_network_access` | `true` | Master switch for network access |
+| `LLMSPELL_ALLOW_PROCESS_SPAWN` | `runtime.security.allow_process_spawn` | `false` | Master switch for process spawning |
+| `LLMSPELL_TOOLS_ALLOWED_PATHS` | `tools.file_operations.allowed_paths` | - | Comma-separated allowed paths |
+| `LLMSPELL_TOOLS_MAX_FILE_SIZE` | `tools.file_operations.max_file_size` | `50000000` | Max file size (50MB) |
+| `LLMSPELL_TOOLS_BLOCKED_EXTENSIONS` | `tools.file_operations.blocked_extensions` | `exe,dll,so` | Blocked file extensions |
+| `LLMSPELL_TOOLS_MAX_DEPTH` | `tools.file_operations.max_depth` | `10` | Max directory depth |
+| `LLMSPELL_TOOLS_WEB_ALLOWED_DOMAINS` | `tools.web_search.allowed_domains` | - | Comma-separated allowed domains |
+| `LLMSPELL_TOOLS_WEB_RATE_LIMIT` | `tools.web_search.rate_limit_per_minute` | `30` | Rate limit per minute |
+| `LLMSPELL_TOOLS_HTTP_ALLOWED_HOSTS` | `tools.http_request.allowed_hosts` | - | Comma-separated allowed hosts |
+| `LLMSPELL_TOOLS_HTTP_BLOCKED_HOSTS` | `tools.http_request.blocked_hosts` | `localhost,127.0.0.1` | Blocked hosts (SSRF) |
+| `LLMSPELL_TOOLS_HTTP_TIMEOUT` | `tools.http_request.timeout_seconds` | `30` | Request timeout |
+| `LLMSPELL_TOOLS_SYSTEM_ALLOW_PROCESS_EXEC` | `tools.system.allow_process_execution` | `false` | Enable process execution |
+| `LLMSPELL_TOOLS_SYSTEM_ALLOWED_COMMANDS` | `tools.system.allowed_commands` | `ls,cat,echo,pwd` | Allowed commands |
+
+**Complete list**: See `llmspell-config/src/env_registry.rs` for all 50+ registered variables.
+
+#### Common Configuration Patterns
+
+**CI/CD Testing (Permissive)**:
+```bash
+# GitHub Actions, GitLab CI, etc.
+export LLMSPELL_ALLOW_FILE_ACCESS="true"
+export LLMSPELL_ALLOW_NETWORK_ACCESS="true"
+export LLMSPELL_TOOLS_ALLOWED_PATHS="/workspace,/tmp"
+export LLMSPELL_TOOLS_SYSTEM_ALLOWED_COMMANDS="git,echo,cat,ls,python3"
+./target/release/llmspell run test-suite.lua
+```
+
+**Production Docker (Restricted)**:
+```dockerfile
+FROM rust:latest
+ENV LLMSPELL_ALLOW_FILE_ACCESS=false
+ENV LLMSPELL_ALLOW_NETWORK_ACCESS=true
+ENV LLMSPELL_TOOLS_HTTP_ALLOWED_HOSTS=api.internal.company.com
+ENV LLMSPELL_TOOLS_HTTP_BLOCKED_HOSTS=localhost,127.0.0.1,169.254.169.254
+CMD ["./target/release/llmspell", "kernel", "start"]
+```
+
+**Development (Relaxed)**:
+```bash
+# Local development with debugging
+export LLMSPELL_ALLOW_FILE_ACCESS="true"
+export LLMSPELL_ALLOW_NETWORK_ACCESS="true"
+export LLMSPELL_TOOLS_ALLOWED_PATHS="/Users/dev/workspace,/tmp"
+export LLMSPELL_TOOLS_SYSTEM_ALLOW_PROCESS_EXEC="true"
+export RUST_LOG="debug"
+./target/release/llmspell run script.lua
+```
+
+**Single Command Override**:
+```bash
+# Override for one execution only
+LLMSPELL_ALLOW_FILE_ACCESS=true ./target/release/llmspell run script.lua
+```
+
+**systemd Service**:
+```ini
+[Service]
+Environment="LLMSPELL_ALLOW_FILE_ACCESS=false"
+Environment="LLMSPELL_ALLOW_NETWORK_ACCESS=true"
+Environment="LLMSPELL_TOOLS_HTTP_ALLOWED_HOSTS=api.internal.company.com"
+Environment="LLMSPELL_TOOLS_HTTP_BLOCKED_HOSTS=localhost,127.0.0.1,169.254.169.254"
+ExecStart=/usr/local/bin/llmspell kernel start
+```
+
+**Docker Compose**:
+```yaml
+services:
+  llmspell:
+    image: llmspell:latest
+    environment:
+      LLMSPELL_ALLOW_FILE_ACCESS: "false"
+      LLMSPELL_ALLOW_NETWORK_ACCESS: "true"
+      LLMSPELL_TOOLS_HTTP_ALLOWED_HOSTS: "api.example.com,*.company.com"
+      LLMSPELL_TOOLS_HTTP_BLOCKED_HOSTS: "localhost,127.0.0.1,169.254.169.254"
+      LLMSPELL_TOOLS_WEB_ALLOWED_DOMAINS: "*.openai.com,*.anthropic.com"
+```
+
+**See also**: [Security & Permissions Guide](security-and-permissions.md) for detailed security configuration and troubleshooting.
+
+---
+
 ### Provider Variables
 
 ```bash

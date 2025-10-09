@@ -1,4 +1,3 @@
-- allow security flags and configs to be set as environment variables or flags.. -e.g allow write to this directory.
 - add postgres vector store backend in llmspell-storage, https://github.com/tensorchord/pgvecto.rs or https://github.com/tensorchord/VectorChord/ or pgvector
 - agent templates - ideally some of the agent templates use rag to embed more correct information for different domains, or even graphs
 

@@ -11,6 +11,7 @@ LLMSpell implements defense-in-depth security with a three-level security model 
 **Quick Links**:
 - [Understanding Security Levels](#understanding-security-levels)
 - [Configuring Permissions](#configuring-permissions)
+- [Environment Variable Override](#environment-variable-override)
 - [Common Scenarios](#common-scenarios)
 - [Troubleshooting](#troubleshooting)
 
@@ -101,6 +102,260 @@ allow_process_execution = false  # Set true to enable
 allowed_commands = "echo,cat,ls,pwd"  # Comma-separated allowlist
 command_timeout_seconds = 30
 allowed_env_vars = "HOME,PATH"
+```
+
+---
+
+## Environment Variable Override
+
+For CI/CD, Docker, systemd, or quick testing, override security settings with environment variables instead of modifying `config.toml`.
+
+### Quick Examples
+
+**Enable file access for single script run:**
+```bash
+LLMSPELL_ALLOW_FILE_ACCESS=true ./target/release/llmspell run script.lua
+```
+
+**Test with relaxed permissions:**
+```bash
+export LLMSPELL_ALLOW_FILE_ACCESS="true"
+export LLMSPELL_ALLOW_NETWORK_ACCESS="true"
+export LLMSPELL_TOOLS_ALLOWED_PATHS="/tmp,/workspace"
+./target/release/llmspell run test-script.lua
+```
+
+**Docker container with restricted network:**
+```bash
+docker run \
+  -e LLMSPELL_ALLOW_FILE_ACCESS=false \
+  -e LLMSPELL_ALLOW_NETWORK_ACCESS=true \
+  -e LLMSPELL_TOOLS_HTTP_ALLOWED_HOSTS="api.company.com" \
+  -e LLMSPELL_TOOLS_HTTP_BLOCKED_HOSTS="localhost,127.0.0.1,169.254.169.254" \
+  myimage ./target/release/llmspell run script.lua
+```
+
+### Security Environment Variables Reference
+
+All TOML security settings can be overridden via environment variables:
+
+| TOML Config Path | Environment Variable | Example Value |
+|-----------------|---------------------|---------------|
+| `runtime.security.allow_file_access` | `LLMSPELL_ALLOW_FILE_ACCESS` | `true` / `false` |
+| `runtime.security.allow_network_access` | `LLMSPELL_ALLOW_NETWORK_ACCESS` | `true` / `false` |
+| `runtime.security.allow_process_spawn` | `LLMSPELL_ALLOW_PROCESS_SPAWN` | `true` / `false` |
+| `tools.file_operations.allowed_paths` | `LLMSPELL_TOOLS_ALLOWED_PATHS` | `/tmp,/workspace,/data` |
+| `tools.file_operations.max_file_size` | `LLMSPELL_TOOLS_MAX_FILE_SIZE` | `104857600` (bytes) |
+| `tools.file_operations.blocked_extensions` | `LLMSPELL_TOOLS_BLOCKED_EXTENSIONS` | `exe,dll,so,dylib` |
+| `tools.file_operations.max_depth` | `LLMSPELL_TOOLS_MAX_DEPTH` | `10` |
+| `tools.web_search.allowed_domains` | `LLMSPELL_TOOLS_WEB_ALLOWED_DOMAINS` | `*.openai.com,github.com` |
+| `tools.web_search.blocked_domains` | `LLMSPELL_TOOLS_WEB_BLOCKED_DOMAINS` | `spam.com,malware.com` |
+| `tools.web_search.rate_limit_per_minute` | `LLMSPELL_TOOLS_WEB_RATE_LIMIT` | `100` |
+| `tools.http_request.allowed_hosts` | `LLMSPELL_TOOLS_HTTP_ALLOWED_HOSTS` | `api.example.com,*.company.com` |
+| `tools.http_request.blocked_hosts` | `LLMSPELL_TOOLS_HTTP_BLOCKED_HOSTS` | `localhost,127.0.0.1,169.254.169.254` |
+| `tools.http_request.timeout_seconds` | `LLMSPELL_TOOLS_HTTP_TIMEOUT` | `60` |
+| `tools.http_request.max_redirects` | `LLMSPELL_TOOLS_HTTP_MAX_REDIRECTS` | `5` |
+| `tools.http_request.verify_ssl` | `LLMSPELL_TOOLS_HTTP_VERIFY_SSL` | `true` / `false` |
+| `tools.system.allow_process_execution` | `LLMSPELL_TOOLS_SYSTEM_ALLOW_PROCESS_EXEC` | `true` / `false` |
+| `tools.system.allowed_commands` | `LLMSPELL_TOOLS_SYSTEM_ALLOWED_COMMANDS` | `echo,cat,ls,pwd,git` |
+| `tools.system.command_timeout_seconds` | `LLMSPELL_TOOLS_SYSTEM_TIMEOUT` | `60` |
+| `tools.system.allowed_env_vars` | `LLMSPELL_TOOLS_SYSTEM_ALLOWED_ENV` | `HOME,PATH,LANG` |
+| `tools.network.timeout_seconds` | `LLMSPELL_TOOLS_NETWORK_TIMEOUT` | `30` |
+| `tools.network.max_retries` | `LLMSPELL_TOOLS_NETWORK_RETRIES` | `3` |
+| `tools.network.verify_ssl` | `LLMSPELL_TOOLS_NETWORK_VERIFY_SSL` | `true` / `false` |
+
+**Complete list**: See [Configuration Guide - Environment Variables](configuration.md#security--permissions-variables) for all 50+ security environment variables.
+
+### Precedence Order
+
+Environment variables override TOML config:
+
+1. **Command-line arguments** (highest priority - not yet implemented)
+2. **Environment variables** ← Override TOML config
+3. **Config file** (`config.toml`)
+4. **Built-in defaults** (lowest priority)
+
+**Example**: If `config.toml` sets `allow_file_access = false` but `LLMSPELL_ALLOW_FILE_ACCESS=true` is set, file access is **enabled**.
+
+### Use Cases
+
+#### CI/CD Integration
+
+**GitHub Actions:**
+```yaml
+# .github/workflows/test.yml
+env:
+  LLMSPELL_ALLOW_FILE_ACCESS: "true"
+  LLMSPELL_ALLOW_NETWORK_ACCESS: "true"
+  LLMSPELL_TOOLS_ALLOWED_PATHS: "/github/workspace,/tmp"
+  LLMSPELL_TOOLS_SYSTEM_ALLOW_PROCESS_EXEC: "true"
+  LLMSPELL_TOOLS_SYSTEM_ALLOWED_COMMANDS: "git,echo,cat,ls,python3"
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+      - name: Run LLMSpell tests
+        run: ./target/release/llmspell run test-suite.lua
+```
+
+**GitLab CI:**
+```yaml
+# .gitlab-ci.yml
+test:
+  variables:
+    LLMSPELL_ALLOW_FILE_ACCESS: "true"
+    LLMSPELL_TOOLS_ALLOWED_PATHS: "/builds/$CI_PROJECT_PATH,/tmp"
+    LLMSPELL_TOOLS_SYSTEM_ALLOWED_COMMANDS: "git,echo,cat"
+  script:
+    - ./target/release/llmspell run integration-tests.lua
+```
+
+#### systemd Service
+
+**Production service with restricted permissions:**
+```ini
+# /etc/systemd/system/llmspell.service
+[Unit]
+Description=LLMSpell Kernel Service
+After=network.target
+
+[Service]
+Type=simple
+User=llmspell
+Group=llmspell
+
+# Security environment variables
+Environment="LLMSPELL_ALLOW_FILE_ACCESS=false"
+Environment="LLMSPELL_ALLOW_NETWORK_ACCESS=true"
+Environment="LLMSPELL_TOOLS_HTTP_ALLOWED_HOSTS=api.internal.company.com,*.openai.com"
+Environment="LLMSPELL_TOOLS_HTTP_BLOCKED_HOSTS=localhost,127.0.0.1,169.254.169.254,10.0.0.0/8"
+Environment="LLMSPELL_TOOLS_SYSTEM_ALLOW_PROCESS_EXEC=false"
+
+# Runtime settings
+Environment="LLMSPELL_CONFIG=/etc/llmspell/config.toml"
+Environment="RUST_LOG=info"
+
+ExecStart=/usr/local/bin/llmspell kernel start --daemon
+Restart=on-failure
+RestartSec=5s
+
+[Install]
+WantedBy=multi-user.target
+```
+
+#### Docker Deployment
+
+**Dockerfile with security environment variables:**
+```dockerfile
+FROM rust:1.75-slim
+WORKDIR /app
+
+# Copy binary
+COPY target/release/llmspell /usr/local/bin/
+
+# Set security defaults (restrictive)
+ENV LLMSPELL_ALLOW_FILE_ACCESS=false
+ENV LLMSPELL_ALLOW_NETWORK_ACCESS=true
+ENV LLMSPELL_TOOLS_HTTP_ALLOWED_HOSTS=api.openai.com,api.anthropic.com
+ENV LLMSPELL_TOOLS_HTTP_BLOCKED_HOSTS=localhost,127.0.0.1,169.254.169.254
+ENV LLMSPELL_TOOLS_SYSTEM_ALLOW_PROCESS_EXEC=false
+
+CMD ["llmspell", "kernel", "start"]
+```
+
+**Docker Compose with per-environment security:**
+```yaml
+# docker-compose.yml
+version: '3.8'
+
+services:
+  llmspell-dev:
+    image: llmspell:latest
+    environment:
+      # Development (relaxed)
+      LLMSPELL_ALLOW_FILE_ACCESS: "true"
+      LLMSPELL_ALLOW_NETWORK_ACCESS: "true"
+      LLMSPELL_TOOLS_ALLOWED_PATHS: "/workspace,/tmp"
+      LLMSPELL_TOOLS_SYSTEM_ALLOW_PROCESS_EXEC: "true"
+      RUST_LOG: "debug"
+    volumes:
+      - ./workspace:/workspace
+
+  llmspell-prod:
+    image: llmspell:latest
+    environment:
+      # Production (restricted)
+      LLMSPELL_ALLOW_FILE_ACCESS: "false"
+      LLMSPELL_ALLOW_NETWORK_ACCESS: "true"
+      LLMSPELL_TOOLS_HTTP_ALLOWED_HOSTS: "api.company.com"
+      LLMSPELL_TOOLS_HTTP_BLOCKED_HOSTS: "localhost,127.0.0.1,169.254.169.254,10.0.0.0/8,172.16.0.0/12"
+      LLMSPELL_TOOLS_SYSTEM_ALLOW_PROCESS_EXEC: "false"
+      RUST_LOG: "warn"
+```
+
+#### Quick Testing Patterns
+
+**Enable file access for debugging:**
+```bash
+LLMSPELL_ALLOW_FILE_ACCESS=true \
+LLMSPELL_TOOLS_ALLOWED_PATHS="/tmp,/workspace" \
+./target/release/llmspell run debug-script.lua
+```
+
+**Test with specific domain allowlist:**
+```bash
+LLMSPELL_TOOLS_WEB_ALLOWED_DOMAINS="github.com,*.openai.com" \
+LLMSPELL_TOOLS_WEB_RATE_LIMIT=200 \
+./target/release/llmspell run web-scraper.lua
+```
+
+**Run with process execution enabled:**
+```bash
+LLMSPELL_TOOLS_SYSTEM_ALLOW_PROCESS_EXEC=true \
+LLMSPELL_TOOLS_SYSTEM_ALLOWED_COMMANDS="git,python3,echo" \
+./target/release/llmspell run automation.lua
+```
+
+### Security Best Practices with Environment Variables
+
+**1. Use restrictive defaults in production:**
+```bash
+# Start with deny-all, then explicitly allow
+export LLMSPELL_ALLOW_FILE_ACCESS="false"
+export LLMSPELL_ALLOW_NETWORK_ACCESS="true"
+export LLMSPELL_TOOLS_HTTP_ALLOWED_HOSTS="api.internal.company.com"
+```
+
+**2. Always block SSRF-prone hosts:**
+```bash
+# Prevent Server-Side Request Forgery
+export LLMSPELL_TOOLS_HTTP_BLOCKED_HOSTS="localhost,127.0.0.1,169.254.169.254,10.0.0.0/8,172.16.0.0/12,192.168.0.0/16"
+```
+
+**3. Use environment-specific configurations:**
+```bash
+# development.env
+LLMSPELL_ALLOW_FILE_ACCESS=true
+LLMSPELL_TOOLS_SYSTEM_ALLOW_PROCESS_EXEC=true
+
+# production.env
+LLMSPELL_ALLOW_FILE_ACCESS=false
+LLMSPELL_TOOLS_SYSTEM_ALLOW_PROCESS_EXEC=false
+```
+
+**4. Document security exceptions:**
+```bash
+# CI needs file access for test artifacts
+export LLMSPELL_ALLOW_FILE_ACCESS="true"  # Required for test artifact generation
+export LLMSPELL_TOOLS_ALLOWED_PATHS="/tmp/test-artifacts"
+```
+
+**5. Audit environment variables in production:**
+```bash
+# Check what security settings are active
+env | grep LLMSPELL | sort
 ```
 
 ---

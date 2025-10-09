@@ -10,7 +10,7 @@
 
 > **🦀 Rust API**: Comprehensive documentation for all 17 LLMSpell crates, covering traits, implementations, and extension patterns for building custom components.
 
-**Version**: 0.11.0 | **Status**: Phase 11a Complete | **Last Updated**: January 2025
+**Version**: 0.11.1 | **Status**: Phase 11a Complete | **Last Updated**: October 2025
 
 ## 📚 Crate Documentation
 
