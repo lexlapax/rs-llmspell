@@ -45,10 +45,9 @@ pub struct Step {
 }
 
 pub enum StepType {
-    Agent(Box<dyn Agent>),
-    Tool { name: String, params: Value },
-    Workflow(Box<Workflow>),
-    Custom(Box<dyn CustomStep>),
+    Tool { tool_name: String, parameters: serde_json::Value },
+    Agent { agent_id: String, input: String },
+    Workflow { workflow_id: ComponentId, input: serde_json::Value },
 }
 ```
 

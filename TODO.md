@@ -5967,7 +5967,7 @@ All 9 occurrences replaced:
 
 ### Task 11a.12.5: Fix Documentation - Remove Custom Step References
 
-**Priority**: HIGH | **Time**: 30min | **Status**: 🔲 TODO | **Depends**: 11a.12.3
+**Priority**: HIGH | **Time**: 30min | **Status**: ✅ COMPLETED | **Actual**: 15min | **Depends**: 11a.12.3
 
 **Objective**: Update documentation to reflect removal of custom steps.
 
@@ -6003,10 +6003,17 @@ print("   - Each step can be a tool, agent, or nested workflow")
 ```
 
 **Acceptance Criteria**:
-- [ ] Rust API doc shows correct StepType definition
-- [ ] Example comment no longer mentions custom functions
-- [ ] All documentation reflects only Tool/Agent/Workflow steps
-- [ ] No references to CustomStep trait
+- [x] Rust API doc shows correct StepType definition
+- [x] Example comment no longer mentions custom functions
+- [x] All documentation reflects only Tool/Agent/Workflow steps
+- [x] No references to CustomStep trait
+
+**Completion Insights**:
+1. **Documentation lie discovered**: llmspell-workflows.md showed completely fabricated StepType definition with fictitious CustomStep trait
+2. **2 files fixed**: Rust API documentation and Lua getting-started example
+3. **Terminology update**: "custom function" → "nested workflow" (more accurate for available primitives)
+4. **Actual implementation revealed**: Documentation now matches actual code in traits.rs
+5. **Faster than estimated**: 15min actual vs 30min estimated (simple text replacements)
 
 ---
 
