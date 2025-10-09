@@ -7632,15 +7632,15 @@ end
 
 ---
 
-### Task 11a.13.6: Create Sandbox Permissions Cookbook Example
+### Task 11a.13.6: Create Sandbox Permissions Cookbook Example ✅
 
-**Priority**: HIGH | **Time**: 45min | **Status**: 🔲 TODO | **Depends**: 11a.13.2
+**Priority**: HIGH | **Time**: 45min | **Status**: ✅ DONE | **Depends**: 11a.13.2
 
 **Objective**: Create practical cookbook example showing sandbox permission configuration.
 
 **Scope**: New Lua script demonstrating permission scenarios
 
-**File**: `examples/script-users/cookbook/sandbox-permissions.lua`
+**File**: `examples/script-users/cookbook/sandbox-permissions.lua` (320 lines created)
 
 **Content** (~100 lines):
 
@@ -7837,21 +7837,94 @@ print("\nSee docs/user-guide/security-and-permissions.md for details")
 ```
 
 **Deliverables**:
-- [ ] Create examples/script-users/cookbook/sandbox-permissions.lua
-- [ ] Demonstrate network permission checking and errors
-- [ ] Show process execution with allowed/blocked commands
-- [ ] Cover file system path allowlisting
-- [ ] Include error handling patterns (pcall)
-- [ ] Add best practices summary
-- [ ] Document required config.toml settings
+- [x] Create examples/script-users/cookbook/sandbox-permissions.lua (320 lines)
+- [x] Demonstrate network permission checking and errors (Scenario 1)
+- [x] Show process execution with allowed/blocked commands (Scenario 2)
+- [x] Cover file system path allowlisting (Scenario 3)
+- [x] Include error handling patterns (pcall) (Scenario 4 + safe_tool_execute)
+- [x] Add best practices summary (6 practices)
+- [x] Document required config.toml settings (header + reference section)
 
 **Acceptance Criteria**:
-- [ ] Script demonstrates 3+ permission scenarios
-- [ ] Shows both success and failure cases
-- [ ] Includes helpful error messages
-- [ ] Documents required config in header
-- [ ] References security-and-permissions.md
-- [ ] Runs successfully with proper config
+- [x] Script demonstrates 4 permission scenarios (exceeded 3+)
+- [x] Shows both success and failure cases (✅/❌ for each test)
+- [x] Includes helpful error messages (with config fix suggestions)
+- [x] Documents required config in header (complete TOML examples)
+- [x] References security-and-permissions.md (footer reference)
+- [x] Runs successfully with proper config (tested)
+
+**CONTENT CREATED** (320 lines):
+
+**Header Documentation**:
+- Pattern ID: 11 - Sandbox Permissions v0.11.0
+- Complexity: INTERMEDIATE
+- Complete config.toml requirements with exact sections
+- HOW TO RUN instructions
+- Expected output description
+
+**Scenario 1: Network Access Permissions** (46 lines):
+- Test 1: Allowed domain (httpbin.org) → ✅ SUCCESS
+- Test 2: Blocked domain (example.com) → ✅ CORRECTLY BLOCKED
+- Error handling: "Add to [tools.http_request].allowed_hosts"
+- Checks Config.isNetworkAccessAllowed() first
+
+**Scenario 2: Process Execution Permissions** (60 lines):
+- Test 1: Allowed command (echo) → ✅ SUCCESS with output
+- Test 2: Blocked command (curl) → ✅ CORRECTLY BLOCKED (dangerous)
+- Test 3: Blocked command (rm) → ✅ CORRECTLY BLOCKED (very dangerous)
+- Error handling: "Add to [tools.system].allowed_commands"
+- Security note: "NEVER add 'rm' to allowed_commands"
+
+**Scenario 3: File System Permissions** (64 lines):
+- Test 1: Allowed path (/tmp) → ✅ SUCCESS (write + read back)
+- Test 2: Blocked path (/etc/passwd) → ✅ CORRECTLY BLOCKED (system file)
+- Test 3: Path traversal (../etc/passwd) → ✅ CORRECTLY BLOCKED (attack detected)
+- Error handling: "Add to [tools.file_operations].allowed_paths"
+- Security note: "NEVER add system paths"
+
+**Scenario 4: Permission Error Handling Pattern** (50 lines):
+- safe_tool_execute() helper function
+- Comprehensive error categorization:
+  - network_permission
+  - file_permission
+  - process_permission
+  - generic_permission
+  - tool_error
+  - tool_failed
+- Each error type provides specific config fix
+- Example usage demonstrating pattern
+
+**Best Practices Summary** (6 practices):
+1. Check permissions before use (Config.is*Allowed)
+2. Use pcall() to catch errors
+3. Minimal permissions (least privilege)
+4. Use allowlists not denylists
+5. Monitor security logs
+6. Document required permissions in header
+
+**Configuration Reference Section**:
+- Complete TOML examples for all 3 categories
+- Network: [tools.http_request]
+- Process: [tools.system]
+- Files: [tools.file_operations]
+- Link to security-and-permissions.md
+
+**KEY FEATURES**:
+✅ 11 test cases total (allowed + blocked for each permission type)
+✅ ✅/❌ visual feedback for each test
+✅ Helpful error messages with exact config fixes
+✅ Path traversal attack demonstration
+✅ Dangerous command blocking (curl, rm)
+✅ Reusable safe_tool_execute() pattern
+✅ Production-ready error handling
+✅ Complete documentation in header
+
+**IMPACT**:
+- Users can copy this pattern for their own scripts
+- Clear examples of all 3 permission types
+- Demonstrates security best practices
+- Shows both what works and what's blocked
+- Provides exact config to copy-paste when errors occur
 
 ---
 
