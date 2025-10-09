@@ -572,6 +572,80 @@ ef_construction = 200
 
 ---
 
+### ADR-043: Removal of Custom Workflow Steps
+
+**Date**: October 2025 (Phase 11a.12)
+**Status**: Accepted
+**Context**: Custom workflow steps (StepType::Custom) existed in codebase but were incomplete
+
+**Problem**:
+1. **Mock Implementation**: execute_custom_step() only returned hardcoded strings
+2. **No Real Functionality**: 15 hardcoded function names, no user extension mechanism
+3. **Documentation Lies**: Rust docs showed CustomStep trait that didn't exist
+4. **API Confusion**: Exposed via Lua API but didn't work as expected
+5. **Architectural Obsolescence**: Phase 3 replaced all custom functions with tools/agents
+
+**Decision**: Remove StepType::Custom variant entirely, educate users on tool/agent/workflow patterns
+
+**Rationale**:
+1. **Tools Provide Superiority**: Tools are reusable, testable, discoverable, documented
+2. **Agents Handle Reasoning**: Complex logic better suited to LLM-based agents
+3. **Workflows Enable Composition**: Conditional/loop/nested workflows cover orchestration
+4. **Zero Real Functionality Lost**: Custom steps were 100% mock implementation
+5. **Code Quality**: Removes 200+ lines of dead/misleading code
+6. **User Clarity**: Eliminates confusion about unimplemented features
+
+**Implementation** (Phase 11a.12):
+- Removed StepType::Custom variant from traits.rs (7 lines)
+- Removed execute_custom_step() mock method (72 lines)
+- Removed all Custom match arms from step_executor.rs (~70 lines)
+- Removed custom step parsing from Lua bindings (18 lines)
+- Updated 9 test files to use Tool/Agent steps
+- Fixed Rust API documentation (llmspell-workflows.md)
+- Added 240-line migration guide to Lua API docs
+- Fixed misleading example comment in 03-first-workflow.lua
+
+**Breaking Changes**:
+- `StepType::Custom { function_name, parameters }` removed
+- Lua API: `{ type = "custom", function = "...", parameters = {...} }` removed
+- **Impact**: ZERO - Feature was never functional
+
+**Migration Path**:
+- Custom transformations → Create tools with Tool.register()
+- Custom reasoning → Create agents with Agent.create()
+- Custom branching → Use Workflow.conditional()
+- Custom iteration → Use Workflow.loop()
+- Custom composition → Use nested workflows
+
+**Alternatives Considered**:
+1. **Implement CustomStep trait** - Would duplicate tool/agent functionality (rejected)
+2. **Document as unimplemented** - Keeps dead code, doesn't address root cause (rejected)
+3. **Deprecation period** - Unnecessary since feature never worked (rejected)
+
+**Consequences**:
+- ✅ Cleaner codebase (-200 lines dead code)
+- ✅ No user confusion about unimplemented features
+- ✅ Aligns with Phase 3 architectural decision
+- ✅ Documentation accuracy restored
+- ✅ Users learn superior patterns (tools/agents/workflows)
+- ✅ Future maintainability improved
+- ✅ Zero breaking changes (feature never worked)
+
+**Performance Impact**: None (mock execution was already negligible)
+
+**Related ADRs**:
+- ADR-001: BaseAgent foundation (agents as primary reasoning primitive)
+- ADR-004: Synchronous Script Bridge (tools/agents bridge to Lua)
+- ADR-042: Unified execute() naming (consistent API across components)
+
+**Validation**:
+- 71 workflow tests pass (including tracing tests migrated to Tool steps)
+- 0 clippy warnings in llmspell-workflows
+- Migration guide demonstrates 6 patterns
+- All examples execute successfully
+
+---
+
 ## Cross-Cutting Decisions
 
 ### ADR-033: Three-Level Security Model

@@ -6289,7 +6289,7 @@ Custom steps never provided real functionality - they were mocks. The tool/agent
 
 ### Task 11a.12.7: Add ADR-043 - Removal of Custom Steps
 
-**Priority**: MEDIUM | **Time**: 20min | **Status**: 🔲 TODO | **Depends**: 11a.12.6
+**Priority**: MEDIUM | **Time**: 20min | **Status**: ✅ COMPLETED | **Actual**: 10min | **Depends**: 11a.12.6
 
 **Objective**: Document architectural decision to remove custom steps.
 
@@ -6374,11 +6374,19 @@ Custom steps never provided real functionality - they were mocks. The tool/agent
 ```
 
 **Acceptance Criteria**:
-- [ ] ADR-043 added to architecture-decisions.md
-- [ ] All standard ADR sections included
-- [ ] Cross-references to related ADRs
-- [ ] Clear migration guidance
-- [ ] Consequences documented
+- [x] ADR-043 added to architecture-decisions.md
+- [x] All standard ADR sections included
+- [x] Cross-references to related ADRs (ADR-001, ADR-004, ADR-042)
+- [x] Clear migration guidance (5 migration paths documented)
+- [x] Consequences documented (7 positive outcomes)
+
+**Completion Insights**:
+1. **Comprehensive ADR**: 73 lines covering all standard sections (Problem, Decision, Rationale, Implementation, Consequences)
+2. **Cross-references**: Links to 3 related ADRs (ADR-001, ADR-004, ADR-042)
+3. **Migration paths**: 5 clear patterns for users to migrate to tool/agent/workflow primitives
+4. **Alternatives section**: Documented 3 rejected alternatives with rationale
+5. **Validation metrics**: 71 workflow tests, 0 clippy warnings, 6 patterns documented
+6. **Faster than estimated**: 10min actual vs 20min estimated (template in TODO.md was ready to use)
 
 ---
 
