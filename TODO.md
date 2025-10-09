@@ -6655,5 +6655,1059 @@ grep -n "ADR-043: Removal of Custom Workflow Steps" docs/technical/architecture-
 
 ---
 
+## Phase 11a.13: Security Sandbox Documentation for Users
+
+**Priority**: HIGH | **Effort**: ~4 hours | **Status**: 🔲 TODO
+
+**Context**: Security sandbox system (`llmspell-security`) is well-implemented but CRITICALLY underdocumented for users:
+1. **FileSandbox, NetworkSandbox, IntegratedSandbox** - not documented in user guide
+2. **SecurityRequirements fluent API** - `.with_network_access()`, `.with_file_access()` buried in developer docs
+3. **Configuration schema incorrect** - `[security.sandboxing]` in configuration.md doesn't match actual ToolsConfig
+4. **Tool permissions** - ProcessExecutorTool's allowed_executables/blocked_executables not explained
+5. **No how-to guides** - Users cannot figure out how to enable network/process execution access
+6. **Missing examples** - No cookbook showing sandbox configuration
+
+**Root Cause Analysis** (from ultrathink analysis):
+- Implementation exists: llmspell-security/src/sandbox/ has FileSandbox, NetworkSandbox, ResourceMonitor
+- Config exists: llmspell-config/src/tools.rs has SystemToolsConfig, NetworkConfig
+- Bridge wiring exists: llmspell-bridge/src/tools.rs creates sandboxes from config
+- Developer docs exist: production-guide.md shows SecurityRequirements code examples
+- User docs MISSING: No clear path from "I want curl" to working config
+- Documentation scattered: Security concept (concepts.md), config (configuration.md), API (llmspell-security.md) don't connect
+- Wrong focus: llmspell-security.md documents RBAC/auth/audit, NOT sandbox system
+
+**Impact**:
+- Users hit permission errors constantly (network denied, process blocked)
+- Configuration.md has outdated/incorrect TOML schema (`[security.sandboxing.network]` vs actual `[tools.network]`)
+- ProcessExecutorTool blocks curl/wget by default but users don't know how to enable
+- NetworkSandbox requires domain allowlisting but no user guide explains
+- No documentation of SecurityLevel (Safe/Restricted/Privileged) for users
+- Examples show input validation, not sandbox permissions
+
+**User Pain Points** (temp-reminder.txt):
+```
+security sandbox - add network access, add process execution access
+```
+- How to enable network access for tools?
+- How to allow process execution (curl, wget, python3)?
+- How to configure allowed domains/executables?
+- What are the security levels and what do they mean?
+
+**Goals**:
+1. Create comprehensive user guide: `docs/user-guide/security-and-permissions.md`
+2. Fix configuration.md with correct TOML schema for tools.network, tools.system, tools.file_operations
+3. Update llmspell-security.md to document sandbox system (not just RBAC)
+4. Add Lua API documentation for security constraints
+5. Create cookbook example: `sandbox-permissions.lua`
+6. Document SecurityLevel meanings (Safe/Restricted/Privileged) for users
+7. Provide clear migration path from permission errors to working config
+
+**Benefits**:
+- ✅ Users can enable network/process access without digging through source code
+- ✅ Clear documentation of 3-level security model (Safe/Restricted/Privileged)
+- ✅ Correct configuration schema examples
+- ✅ Practical cookbook showing real-world permission scenarios
+- ✅ Reduced friction for tool configuration
+- ✅ Better security practices through understanding
+
+**Files to Create/Modify**: ~6 files across 3 categories
+- New user guide: 1 file (security-and-permissions.md ~200 lines)
+- Config/API updates: 3 files (configuration.md, llmspell-security.md, lua/README.md)
+- New example: 1 file (sandbox-permissions.lua ~100 lines)
+- User guide index: 1 file (README.md - add new guide to TOC)
+
+---
+
+### Task 11a.13.1: Audit Current Security Documentation Gaps ✅
+
+**Priority**: HIGH | **Time**: 30min | **Status**: ✅ DONE | **Depends**: None
+
+**Objective**: Comprehensive analysis of security documentation gaps and scattered information.
+
+**Scope**: Analyze all existing security docs and identify missing user-facing content
+
+**Analysis Tasks**:
+1. Read docs/user-guide/configuration.md security sections (lines 128-132, 914-1002)
+2. Read docs/user-guide/concepts.md security model (lines 893-929)
+3. Read docs/user-guide/api/rust/llmspell-security.md (focus vs sandbox)
+4. Read docs/user-guide/api/lua/README.md security references
+5. Read docs/developer-guide/production-guide.md security patterns (lines 28-57)
+6. Read llmspell-config/src/tools.rs to understand actual config schema
+7. Check examples/ for security/sandbox examples
+
+**Deliverables**:
+- [x] Gap analysis document in /tmp/security_docs_audit.md (526 lines)
+- [x] Categorization: what exists (developer) vs what's missing (user)
+- [x] Schema comparison: documented vs actual (ToolsConfig)
+- [x] List of incorrect/outdated documentation
+- [x] User journey pain points documented
+
+**Acceptance Criteria**:
+- [x] All existing security documentation catalogued
+- [x] Developer vs user doc gaps identified
+- [x] Configuration schema errors documented (security.sandboxing vs tools.*)
+- [x] Missing how-to guides listed
+- [x] Example gaps identified
+
+**Key Questions to Answer**:
+1. Where is SecurityRequirements.with_network_access() documented for users? **❌ NOT documented for users (only in production-guide.md for developers)**
+2. Where is ProcessExecutorTool configuration explained? **❌ NOT explained anywhere**
+3. Is the 3-level security model (Safe/Restricted/Privileged) explained to users? **⚠️ Briefly in concepts.md, not actionable**
+4. Are sandbox components (FileSandbox, NetworkSandbox) user-documented? **❌ NOT documented (llmspell-security.md focuses on RBAC)**
+5. Is there a user guide for enabling network/process permissions? **❌ DOES NOT EXIST**
+
+**INSIGHTS FROM AUDIT** (/tmp/security_docs_audit.md):
+
+**Critical Findings**:
+1. **SCHEMA MISMATCH** (CRITICAL): configuration.md shows `[security.sandboxing.network]` but actual schema is `[tools.network]`
+   - Lines 914-939 in configuration.md have completely wrong TOML examples
+   - Users copy-paste and get ZERO effect because section names don't match
+
+2. **MISSING USER GUIDE** (CRITICAL): No `security-and-permissions.md` exists
+   - User wants to enable curl: searches docs → finds nothing → reads source code
+   - User wants network access: finds wrong schema → doesn't work → gives up
+
+3. **WRONG FOCUS** (HIGH): llmspell-security.md (1008 lines) documents RBAC/auth/audit, NOT sandbox system
+   - FileSandbox, NetworkSandbox, IntegratedSandbox not documented
+   - SecurityRequirements fluent API not shown to users
+   - SandboxContext missing from docs
+
+4. **SCATTERED INFORMATION** (HIGH): Security info in 5+ locations, no cohesion
+   - Security levels: concepts.md + production-guide.md (inconsistent depth)
+   - File access: configuration.md (wrong) + tools.rs (source) + monitoring-security.lua (tests)
+   - Network: configuration.md (wrong) + tools.rs + network_sandbox.rs
+   - Process execution: (completely missing from user docs)
+
+5. **NO EXAMPLES** (MEDIUM): Existing examples don't show sandbox config
+   - security-patterns.lua (776 lines): Input validation ✅, sandbox config ❌
+   - monitoring-security.lua (454 lines): Tests boundaries ✅, shows config ❌
+
+**Documentation Metrics**:
+- **Completeness**: 40% (implementation exists, user docs don't)
+- **Accuracy**: 76% (pulled down by wrong schema in configuration.md)
+- **Discoverability**: 2/10 ("How do I enable curl?" → no answer)
+
+**User Pain Points Documented**:
+1. "I want to enable curl" → Error: Command blocked → NO SOLUTION IN DOCS
+2. "I want network access" → Finds wrong schema → Doesn't work → Gives up
+3. "I want to access project files" → Wrong schema → Doesn't work
+
+**Files Analysis**:
+- configuration.md: 88 lines security section (lines 914-1002) - **WRONG SCHEMA**
+- concepts.md: 37 lines security model (lines 893-929) - **TOO SUPERFICIAL**
+- llmspell-security.md: 1008 lines - **MISSING SANDBOX SECTION**
+- lua/README.md: 17 lines (lines 1769-1785) - **CHECK FUNCTIONS ONLY, NO CONFIG**
+- production-guide.md: 30 lines (lines 28-57) - **DEVELOPER-FOCUSED**
+- tools.rs: 963 lines - **SOURCE OF TRUTH, NOT DOCUMENTED**
+
+**Next Steps**: Proceed to Task 11a.13.2 to create comprehensive security-and-permissions.md user guide.
+
+---
+
+### Task 11a.13.2: Create Security & Permissions User Guide
+
+**Priority**: CRITICAL | **Time**: 90min | **Status**: 🔲 TODO | **Depends**: 11a.13.1
+
+**Objective**: Create comprehensive user guide for security sandbox and permissions.
+
+**Scope**: New file covering security levels, sandbox system, permissions config
+
+**File**: `docs/user-guide/security-and-permissions.md`
+
+**Content Structure** (~200 lines):
+
+```markdown
+# Security & Permissions Guide
+
+## Overview
+- Three-level security model (Safe/Restricted/Privileged)
+- Sandbox system architecture (FileSandbox, NetworkSandbox, IntegratedSandbox)
+- Permission configuration via TOML
+
+## Understanding Security Levels
+
+### Safe (Default for Computation)
+- No file/network/process access
+- Pure computation only
+- Examples: calculator, text-manipulator, hash-calculator
+- Use when: No external resources needed
+
+### Restricted (Default for Most Tools)
+- Explicit permissions required
+- Path allowlists, domain allowlists
+- Resource limits enforced
+- Examples: file-operations, http-requester, process-executor
+- Use when: Controlled external access needed
+
+### Privileged (Rare - Requires Review)
+- Full system access
+- Should be exception, not rule
+- Requires security audit
+- Examples: system administration tools
+- Use when: Trusted operations requiring full access
+
+## Configuring Permissions
+
+### Via Configuration File (Recommended)
+
+#### Network Access
+[tools.network]
+allowed_domains = [
+    "api.openai.com",
+    "*.anthropic.com",  # Wildcard for subdomains
+    "github.com"
+]
+rate_limit_per_minute = 100
+deny_local_addresses = true  # Prevent SSRF
+max_connections = 10
+
+#### Process Execution
+[tools.system]
+allow_process_execution = false  # Set true to enable
+allowed_commands = "echo,cat,ls,pwd,curl,wget,python3"  # Comma-separated
+blocked_commands = "rm,sudo,chmod"  # Always blocked
+command_timeout_seconds = 30
+allowed_env_vars = "HOME,PATH,PYTHONPATH"
+
+#### File System Access
+[tools.file_operations]
+enabled = true
+allowed_paths = ["/workspace", "/tmp/llmspell", "/data"]
+denied_patterns = ["*.exe", "*.sh", "*.dll"]
+max_file_size_mb = 10
+max_open_files = 100
+
+### Via Tool Definition (Advanced)
+[SecurityRequirements Rust code examples]
+
+## Sandbox Components (Advanced)
+
+### FileSandbox
+[How it works, when it's used]
+
+### NetworkSandbox
+[Domain validation, rate limiting, SSRF prevention]
+
+### IntegratedSandbox
+[Combined enforcement]
+
+## Common Scenarios
+
+### Scenario 1: Enable Network Tools (curl, wget)
+[Step-by-step with config]
+
+### Scenario 2: Allow Specific API Domains
+[Domain allowlisting example]
+
+### Scenario 3: Enable Python Script Execution
+[Process executor config]
+
+### Scenario 4: File Operations in /tmp
+[File sandbox config]
+
+## Troubleshooting
+
+### "Network access denied" Error
+[How to diagnose, config to add]
+
+### "Executable not allowed" Error
+[ProcessExecutor config]
+
+### "Path not in allowlist" Error
+[File sandbox config]
+
+### Security Violation Audit
+[How to check violation logs]
+
+## Security Best Practices
+- Principle of least privilege
+- Always use allowlists, not denylists
+- Regular security audits
+- Monitor violation logs
+- Keep allowed_executables minimal
+```
+
+**Deliverables**:
+- [ ] Create docs/user-guide/security-and-permissions.md (~200 lines)
+- [ ] Cover all 3 security levels with clear explanations
+- [ ] Provide complete TOML config examples (tools.network, tools.system, tools.file_operations)
+- [ ] Document sandbox components for advanced users
+- [ ] Include 4+ common scenario walkthroughs
+- [ ] Add troubleshooting section for permission errors
+
+**Acceptance Criteria**:
+- [ ] File created with comprehensive security/sandbox coverage
+- [ ] 3-level security model clearly explained
+- [ ] Correct TOML schema examples (tools.* not security.sandboxing)
+- [ ] Sandbox components documented (FileSandbox, NetworkSandbox)
+- [ ] Common scenarios covered (network access, process execution)
+- [ ] Troubleshooting guide included
+- [ ] Links to related docs (configuration.md, concepts.md)
+
+---
+
+### Task 11a.13.3: Fix configuration.md Security Sections
+
+**Priority**: HIGH | **Time**: 45min | **Status**: 🔲 TODO | **Depends**: 11a.13.1
+
+**Objective**: Update configuration.md with correct TOML schema and comprehensive examples.
+
+**Scope**: Fix outdated security.sandboxing sections, add tools.* sections
+
+**File**: `docs/user-guide/configuration.md`
+
+**Changes Required**:
+
+**1. Lines 914-939: Replace outdated [security.sandboxing] section**:
+```toml
+# REMOVE (incorrect schema):
+[security.sandboxing]
+enabled = true
+implementation = "native"
+
+[security.sandboxing.filesystem]
+allowed_paths = ["/workspace", "/tmp/llmspell"]
+...
+
+[security.sandboxing.network]
+allowed_domains = ["api.openai.com"]
+...
+```
+
+**Replace with correct schema**:
+```toml
+# Tool Configuration - Security & Permissions
+
+[tools.file_operations]
+enabled = true
+allowed_paths = ["/workspace", "/tmp/llmspell", "/data"]
+denied_patterns = ["*.exe", "*.sh", "*.dll", "*.dylib"]
+max_file_size_mb = 10
+max_open_files = 100
+
+[tools.network]
+allowed_domains = [
+    "api.openai.com",
+    "*.anthropic.com",
+    "github.com"
+]
+rate_limit_per_minute = 100
+deny_local_addresses = true
+max_connections = 10
+
+[tools.system]
+allow_process_execution = false  # Enable with caution!
+allowed_commands = "echo,cat,ls,pwd"  # Comma-separated
+blocked_commands = "rm,sudo,chmod,kill"  # Always blocked
+command_timeout_seconds = 30
+allowed_env_vars = "HOME,PATH"  # Comma-separated
+max_output_size_mb = 1
+```
+
+**2. Lines 992-1001: Expand [tools.security] section**:
+```toml
+[tools.security]
+default_level = "restricted"  # safe, restricted, privileged
+require_approval = false
+sandbox_tools = true
+
+# Per-tool security levels
+[tools.permissions]
+"file-operations" = "restricted"
+"web-fetch" = "safe"
+"http-requester" = "restricted"
+"process-executor" = "privileged"  # Requires explicit config
+"calculator" = "safe"
+"text-manipulator" = "safe"
+
+# Security Requirements (Advanced - Rust API)
+# Use config above for declarative approach
+# See docs/user-guide/security-and-permissions.md for details
+```
+
+**3. Add reference to new security guide**:
+After line 896 (## Security Settings):
+```markdown
+> **📚 Complete Security Guide**: See [Security & Permissions Guide](security-and-permissions.md) for comprehensive coverage of security levels, sandbox configuration, and permission troubleshooting.
+```
+
+**Deliverables**:
+- [ ] Replace incorrect [security.sandboxing] with correct [tools.*] sections
+- [ ] Add complete examples for tools.file_operations, tools.network, tools.system
+- [ ] Expand tools.security section with per-tool permissions
+- [ ] Add reference to new security-and-permissions.md guide
+- [ ] Verify all TOML matches actual llmspell-config schema
+
+**Acceptance Criteria**:
+- [ ] Outdated security.sandboxing section removed
+- [ ] Correct tools.network, tools.system, tools.file_operations added
+- [ ] TOML schema matches llmspell-config/src/tools.rs exactly
+- [ ] Cross-reference to security-and-permissions.md added
+- [ ] All examples are copy-paste ready
+
+---
+
+### Task 11a.13.4: Update llmspell-security.md API Documentation
+
+**Priority**: MEDIUM | **Time**: 30min | **Status**: 🔲 TODO | **Depends**: 11a.13.1
+
+**Objective**: Add sandbox system section to llmspell-security.md API docs.
+
+**Scope**: Document FileSandbox, NetworkSandbox, SecurityRequirements for users
+
+**File**: `docs/user-guide/api/rust/llmspell-security.md`
+
+**Current State**: Focuses entirely on RBAC, authentication, audit logging, threat detection
+**Missing**: FileSandbox, NetworkSandbox, SandboxContext, SecurityRequirements fluent API
+
+**Changes Required**:
+
+Add new section after line 705 (before ## Usage Examples):
+
+
+## Sandbox System
+
+The sandbox system provides defense-in-depth security through file, network, and resource isolation.
+
+### SecurityRequirements
+
+Define permissions for tools and agents:
+
+```rust
+use llmspell_core::traits::tool::SecurityRequirements;
+
+// Safe - no external access
+let safe_reqs = SecurityRequirements::safe();
+
+// Restricted - explicit permissions
+let restricted_reqs = SecurityRequirements::restricted()
+    .with_file_access("/workspace")
+    .with_file_access("/tmp")
+    .with_network_access("api.openai.com")
+    .with_network_access("*.github.com")  // Wildcard
+    .with_env_access("HOME")
+    .with_env_access("PATH");
+
+// Privileged - full access (use sparingly)
+let privileged_reqs = SecurityRequirements::privileged();
+```
+
+### FileSandbox
+
+Path-based file system isolation:
+
+```rust
+use llmspell_security::sandbox::{FileSandbox, SandboxContext};
+
+let context = SandboxContext::new(
+    "my-sandbox".to_string(),
+    SecurityRequirements::restricted()
+        .with_file_access("/workspace")
+        .with_file_access("/tmp"),
+    ResourceLimits::default(),
+);
+
+let sandbox = FileSandbox::new(context)?;
+
+// Validate paths before use
+sandbox.validate_path(Path::new("/workspace/data.txt"))?;  // OK
+sandbox.validate_path(Path::new("/etc/passwd"))?;  // ERROR: not in allowlist
+```
+
+### NetworkSandbox
+
+Domain-based network isolation with rate limiting:
+
+```rust
+use llmspell_security::sandbox::{NetworkSandbox, RateLimitConfig};
+
+let context = SandboxContext::new(
+    "network-sandbox".to_string(),
+    SecurityRequirements::restricted()
+        .with_network_access("api.example.com")
+        .with_network_access("*.github.com"),
+    ResourceLimits::default(),
+);
+
+let mut sandbox = NetworkSandbox::new(context)?
+    .with_rate_limit(RateLimitConfig {
+        max_requests: 100,
+        window_seconds: 60,
+    });
+
+// Validate requests
+sandbox.validate_request("https://api.example.com/data", "GET").await?;  // OK
+sandbox.validate_request("https://evil.com/data", "GET").await?;  // ERROR: domain blocked
+
+// Make safe requests
+let response = sandbox.get("https://api.example.com/data").await?;
+```
+
+### IntegratedSandbox
+
+Combined file, network, and resource isolation:
+
+```rust
+use llmspell_security::sandbox::IntegratedSandbox;
+
+let sandbox = IntegratedSandbox::builder()
+    .with_file_permissions(vec!["/workspace", "/tmp"])
+    .with_network_policy(vec!["api.openai.com", "*.anthropic.com"])
+    .with_resource_limits(ResourceLimits {
+        max_memory: 512 * 1024 * 1024,  // 512MB
+        max_cpu_time: Duration::from_secs(300),
+        max_file_size: 100 * 1024 * 1024,
+    })
+    .build()?;
+
+// Execute with monitoring
+sandbox.execute_with_monitoring(|| async {
+    // Your code here - runs with all restrictions
+}).await?;
+
+// Check violations
+if sandbox.has_violations().await {
+    for violation in sandbox.get_violations().await {
+        eprintln!("Security violation: {}", violation);
+    }
+}
+```
+
+### Configuration Integration
+
+Sandbox permissions are typically configured via TOML:
+
+```toml
+[tools.network]
+allowed_domains = ["api.openai.com", "*.github.com"]
+rate_limit_per_minute = 100
+
+[tools.file_operations]
+allowed_paths = ["/workspace", "/tmp"]
+max_file_size_mb = 10
+```
+
+See [Security & Permissions Guide](../../security-and-permissions.md) for complete configuration details.
+
+
+**Deliverables**:
+- [ ] Add "## Sandbox System" section to llmspell-security.md
+- [ ] Document SecurityRequirements fluent API
+- [ ] Document FileSandbox with examples
+- [ ] Document NetworkSandbox with rate limiting
+- [ ] Document IntegratedSandbox usage
+- [ ] Add configuration integration section
+- [ ] Cross-reference to security-and-permissions.md
+
+**Acceptance Criteria**:
+- [ ] Sandbox section added with 4 components covered
+- [ ] Code examples are copy-paste ready
+- [ ] Links to user guide for detailed config
+- [ ] Covers safe, restricted, privileged patterns
+- [ ] Shows both Rust API and TOML config approaches
+
+---
+
+### Task 11a.13.5: Update Lua API Security Documentation
+
+**Priority**: MEDIUM | **Time**: 20min | **Status**: 🔲 TODO | **Depends**: 11a.13.1
+
+**Objective**: Document security constraints and permission errors in Lua API.
+
+**Scope**: Update api/lua/README.md security section
+
+**File**: `docs/user-guide/api/lua/README.md`
+
+**Changes Required**:
+
+Expand security section around line 1750:
+
+```lua
+## Security & Permissions
+
+### Understanding Security Constraints
+
+LLMSpell scripts run in a sandboxed environment with three security levels:
+
+- **Safe**: Pure computation, no file/network/process access
+- **Restricted** (default): Explicit permissions required
+- **Privileged**: Full access (rare, requires admin approval)
+
+### Checking Permissions
+
+```lua
+-- Check if network access is allowed
+if Config.isNetworkAccessAllowed() then
+    -- Can make HTTP requests
+    local result = Tool.execute("http-requester", {
+        method = "GET",
+        url = "https://api.example.com/data"
+    })
+else
+    print("Network access denied - configure [tools.network] in config.toml")
+end
+
+-- Check if file access is allowed
+if Config.isFileAccessAllowed() then
+    -- Can read/write files
+    local data = Tool.execute("file-operations", {
+        operation = "read",
+        path = "/workspace/data.txt"
+    })
+end
+
+-- Check if process execution is allowed
+local can_execute = Config.get("tools.system.allow_process_execution") or false
+if can_execute then
+    -- Can run system commands
+end
+```
+
+### Handling Permission Errors
+
+```lua
+-- Wrap tool calls in pcall to catch permission errors
+local success, result = pcall(function()
+    return Tool.execute("http-requester", {
+        method = "GET",
+        url = "https://blocked-domain.com"
+    })
+end)
+
+if not success then
+    if string.match(result, "Domain not in allowed list") then
+        print("ERROR: Network access denied for this domain")
+        print("Add domain to [tools.network].allowed_domains in config.toml")
+    elseif string.match(result, "Permission denied") then
+        print("ERROR: Insufficient permissions")
+        print("Check security settings in config.toml")
+    else
+        print("ERROR: " .. tostring(result))
+    end
+end
+```
+
+### Configuring Permissions (Admin)
+
+Permissions are configured in `config.toml`, not from Lua scripts:
+
+```toml
+# config.toml - Network access
+[tools.network]
+allowed_domains = ["api.example.com", "*.github.com"]
+
+# config.toml - Process execution
+[tools.system]
+allow_process_execution = true
+allowed_commands = "curl,wget,python3"
+
+# config.toml - File access
+[tools.file_operations]
+allowed_paths = ["/workspace", "/tmp"]
+```
+
+> **Note**: Lua scripts cannot modify security settings. Use Config.setSecurity() only in development/testing with explicit approval.
+
+### Best Practices
+
+1. **Check permissions before use**: Use Config.is*Allowed() to avoid runtime errors
+2. **Handle permission errors gracefully**: Use pcall() and provide helpful error messages
+3. **Request minimal permissions**: Follow principle of least privilege
+4. **Document required permissions**: Add comments about config requirements
+
+See [Security & Permissions Guide](../security-and-permissions.md) for comprehensive configuration details.
+
+
+**Deliverables**:
+- [ ] Expand security section with permission checking examples
+- [ ] Add permission error handling patterns
+- [ ] Document config.toml requirements (not Lua modifiable)
+- [ ] Add best practices for Lua scripts
+- [ ] Cross-reference to security-and-permissions.md
+
+**Acceptance Criteria**:
+- [ ] Permission checking examples added (Config.is*Allowed)
+- [ ] Error handling patterns documented (pcall wrapper)
+- [ ] Clear note that permissions are config-only (not scriptable)
+- [ ] Best practices section added
+- [ ] Link to comprehensive security guide
+
+---
+
+### Task 11a.13.6: Create Sandbox Permissions Cookbook Example
+
+**Priority**: HIGH | **Time**: 45min | **Status**: 🔲 TODO | **Depends**: 11a.13.2
+
+**Objective**: Create practical cookbook example showing sandbox permission configuration.
+
+**Scope**: New Lua script demonstrating permission scenarios
+
+**File**: `examples/script-users/cookbook/sandbox-permissions.lua`
+
+**Content** (~100 lines):
+
+```lua
+-- ============================================================
+-- LLMSPELL COOKBOOK SHOWCASE
+-- ============================================================
+-- Pattern ID: 11 - Sandbox Permissions v0.11.0
+-- Complexity Level: INTERMEDIATE
+-- Real-World Use Case: Configuring security sandbox permissions
+-- Pattern Category: Security & Configuration
+--
+-- Purpose: Demonstrate how to configure and work with security sandbox
+--          permissions including network access, process execution, and
+--          file system access. Essential for production deployments.
+-- Architecture: Defense-in-depth with explicit permission configuration
+-- Crates Showcased: llmspell-security, llmspell-config, llmspell-tools
+-- Key Features:
+--   • Network domain allowlisting
+--   • Process execution control
+--   • File system path restrictions
+--   • Permission error handling
+--   • Security best practices
+--
+-- Prerequisites:
+--   • LLMSpell installed and built
+--   • No API keys required
+--   • config.toml with security settings
+--
+-- Configuration Required (config.toml):
+--   [tools.network]
+--   allowed_domains = ["httpbin.org", "api.github.com"]
+--
+--   [tools.system]
+--   allow_process_execution = true
+--   allowed_commands = "echo,date,pwd"
+--
+--   [tools.file_operations]
+--   allowed_paths = ["/tmp", "/workspace"]
+--
+-- HOW TO RUN:
+-- ./target/debug/llmspell -c examples/config-sandbox.toml run examples/script-users/cookbook/sandbox-permissions.lua
+--
+-- EXPECTED OUTPUT:
+-- 5 permission scenarios demonstrated with success/failure handling
+--
+-- Time to Complete: <5 seconds
+-- Production Notes: Always use principle of least privilege,
+--                   configure allowlists not denylists,
+--                   monitor security violation logs.
+-- ============================================================
+
+print("=== Sandbox Permissions Demo ===")
+print("Pattern 11: Security sandbox configuration and usage\n")
+
+-- ============================================================
+-- Scenario 1: Check and Use Network Permissions
+-- ============================================================
+
+print("1. Network Access Permissions")
+print("-" .. string.rep("-", 40))
+
+if Config.isNetworkAccessAllowed() then
+    -- Network is allowed - try to access allowed domain
+    local success, result = pcall(function()
+        return Tool.execute("http-requester", {
+            method = "GET",
+            url = "https://httpbin.org/get"
+        })
+    end)
+
+    if success then
+        print("✓ Network access to httpbin.org: SUCCESS")
+    else
+        print("✗ Network access failed: " .. tostring(result))
+    end
+
+    -- Try blocked domain
+    local blocked_success, blocked_result = pcall(function()
+        return Tool.execute("http-requester", {
+            method = "GET",
+            url = "https://blocked-domain.com"
+        })
+    end)
+
+    if not blocked_success then
+        if string.match(blocked_result, "Domain not in allowed list") then
+            print("✓ Blocked domain correctly rejected")
+            print("  Add to [tools.network].allowed_domains to allow")
+        end
+    end
+else
+    print("✗ Network access disabled in config")
+    print("  Enable with [tools.network] section in config.toml")
+end
+
+-- ============================================================
+-- Scenario 2: Process Execution Permissions
+-- ============================================================
+
+print("\n2. Process Execution Permissions")
+print("-" .. string.rep("-", 40))
+
+local can_execute = Config.get("tools.system.allow_process_execution")
+if can_execute then
+    -- Try allowed command
+    local success, result = pcall(function()
+        return Tool.execute("process-executor", {
+            executable = "echo",
+            arguments = {"Hello from sandbox"}
+        })
+    end)
+
+    if success then
+        print("✓ Allowed command (echo): SUCCESS")
+    else
+        print("✗ Command failed: " .. tostring(result))
+    end
+
+    -- Try blocked command
+    local blocked_success = pcall(function()
+        return Tool.execute("process-executor", {
+            executable = "curl",
+            arguments = {"https://example.com"}
+        })
+    end)
+
+    if not blocked_success then
+        print("✓ Blocked command (curl) correctly rejected")
+        print("  Add 'curl' to [tools.system].allowed_commands to allow")
+    end
+else
+    print("✗ Process execution disabled")
+    print("  Enable with allow_process_execution = true in [tools.system]")
+end
+
+-- ============================================================
+-- Scenario 3: File System Permissions
+-- ============================================================
+
+print("\n3. File System Permissions")
+print("-" .. string.rep("-", 40))
+
+if Config.isFileAccessAllowed() then
+    -- Try allowed path
+    local success, result = pcall(function()
+        return Tool.execute("file-operations", {
+            operation = "write",
+            path = "/tmp/sandbox-test.txt",
+            input = "Test data"
+        })
+    end)
+
+    if success then
+        print("✓ Write to /tmp: SUCCESS")
+    else
+        print("✗ Write failed: " .. tostring(result))
+    end
+
+    -- Try blocked path
+    local blocked_success = pcall(function()
+        return Tool.execute("file-operations", {
+            operation = "read",
+            path = "/etc/passwd"
+        })
+    end)
+
+    if not blocked_success then
+        print("✓ Blocked path (/etc/passwd) correctly rejected")
+        print("  Paths restricted to allowlist in [tools.file_operations]")
+    end
+else
+    print("✗ File access disabled")
+    print("  Configure [tools.file_operations].allowed_paths")
+end
+
+-- ============================================================
+-- Best Practices Summary
+-- ============================================================
+
+print("\n=== Security Best Practices ===")
+print("1. Always check permissions before use (Config.is*Allowed)")
+print("2. Use pcall() to catch and handle permission errors")
+print("3. Configure minimal permissions (principle of least privilege)")
+print("4. Use allowlists, not denylists")
+print("5. Monitor security violation logs")
+print("6. Document required permissions in script header")
+
+print("\n=== Configuration Reference ===")
+print("Network: [tools.network].allowed_domains")
+print("Process: [tools.system].allow_process_execution + allowed_commands")
+print("Files:   [tools.file_operations].allowed_paths")
+print("\nSee docs/user-guide/security-and-permissions.md for details")
+```
+
+**Deliverables**:
+- [ ] Create examples/script-users/cookbook/sandbox-permissions.lua
+- [ ] Demonstrate network permission checking and errors
+- [ ] Show process execution with allowed/blocked commands
+- [ ] Cover file system path allowlisting
+- [ ] Include error handling patterns (pcall)
+- [ ] Add best practices summary
+- [ ] Document required config.toml settings
+
+**Acceptance Criteria**:
+- [ ] Script demonstrates 3+ permission scenarios
+- [ ] Shows both success and failure cases
+- [ ] Includes helpful error messages
+- [ ] Documents required config in header
+- [ ] References security-and-permissions.md
+- [ ] Runs successfully with proper config
+
+---
+
+### Task 11a.13.7: Update User Guide Index
+
+**Priority**: LOW | **Time**: 10min | **Status**: 🔲 TODO | **Depends**: 11a.13.2
+
+**Objective**: Add new security guide to user guide table of contents.
+
+**Scope**: Update README.md to reference security-and-permissions.md
+
+**File**: `docs/user-guide/README.md`
+
+**Changes Required**:
+
+After line 48 (### 3. [Configuration](configuration.md)):
+
+```markdown
+### 4. [Security & Permissions](security-and-permissions.md) ⭐ New
+**Comprehensive security sandbox guide**
+- Three-level security model (Safe/Restricted/Privileged)
+- Sandbox system (FileSandbox, NetworkSandbox, IntegratedSandbox)
+- Permission configuration (network access, process execution, file system)
+- Tool-specific security settings
+- Troubleshooting permission errors
+- Security best practices
+```
+
+Update numbering for subsequent sections (shift by 1).
+
+**Deliverables**:
+- [ ] Add security-and-permissions.md to TOC
+- [ ] Update section numbering (4→5, 5→6, etc.)
+- [ ] Add ⭐ New marker
+- [ ] Provide descriptive bullet points
+
+**Acceptance Criteria**:
+- [ ] New guide listed in proper TOC position
+- [ ] Section numbering updated throughout
+- [ ] Description accurately reflects guide content
+- [ ] Links work correctly
+
+---
+
+### Task 11a.13.8: Validation & Testing
+
+**Priority**: HIGH | **Time**: 30min | **Status**: 🔲 TODO | **Depends**: 11a.13.2, 11a.13.3, 11a.13.6
+
+**Objective**: Validate all documentation changes and test cookbook example.
+
+**Scope**: Verify documentation accuracy and example execution
+
+**Validation Tasks**:
+1. [ ] Verify all TOML examples match llmspell-config/src/tools.rs schema
+2. [ ] Test sandbox-permissions.lua with proper config
+3. [ ] Verify all cross-references work (markdown links)
+4. [ ] Check that security-and-permissions.md covers all gaps from audit
+5. [ ] Validate code examples are copy-paste ready
+6. [ ] Test permission scenarios (network blocked, process allowed, etc.)
+
+**Testing Script**:
+```bash
+# Create test config
+cat > /tmp/test-sandbox-config.toml <<EOF
+[tools.network]
+allowed_domains = ["httpbin.org", "api.github.com"]
+rate_limit_per_minute = 100
+
+[tools.system]
+allow_process_execution = true
+allowed_commands = "echo,date,pwd"
+command_timeout_seconds = 30
+
+[tools.file_operations]
+allowed_paths = ["/tmp", "/workspace"]
+max_file_size_mb = 10
+EOF
+
+# Test cookbook example
+./target/debug/llmspell -c /tmp/test-sandbox-config.toml run \
+    examples/script-users/cookbook/sandbox-permissions.lua
+
+# Verify output shows:
+# - Network access to httpbin.org: SUCCESS
+# - Blocked domain correctly rejected
+# - Allowed command (echo): SUCCESS
+# - Blocked command (curl) correctly rejected
+# - Write to /tmp: SUCCESS
+# - Blocked path (/etc/passwd) correctly rejected
+```
+
+**Deliverables**:
+- [ ] All documentation validated for accuracy
+- [ ] Cookbook example tested and working
+- [ ] Cross-references verified
+- [ ] Config schema accuracy confirmed
+- [ ] Test results documented
+
+**Acceptance Criteria**:
+- [ ] Cookbook example runs successfully
+- [ ] All permission scenarios work as documented
+- [ ] TOML examples are valid
+- [ ] Cross-references resolve correctly
+- [ ] No documentation inconsistencies
+
+---
+
+## Phase 11a.13 Summary - Security Sandbox Documentation
+
+**Status**: 🔲 TODO | **Effort**: ~4 hours | **Files to Create/Modify**: 6
+
+**Completion Criteria**:
+- [ ] All 8 tasks completed (11a.13.1 through 11a.13.8)
+- [ ] New user guide created (security-and-permissions.md ~200 lines)
+- [ ] configuration.md fixed (correct TOML schema)
+- [ ] llmspell-security.md updated (sandbox section added)
+- [ ] Lua API docs updated (permission checking/errors)
+- [ ] Cookbook example created (sandbox-permissions.lua)
+- [ ] User guide index updated (README.md)
+- [ ] All changes validated and tested
+
+**Expected Impact**:
+- ✅ Users can configure network/process access without source diving
+- ✅ Clear 3-level security model (Safe/Restricted/Privileged)
+- ✅ Correct configuration examples (tools.* not security.sandboxing)
+- ✅ Practical cookbook for permission scenarios
+- ✅ Troubleshooting guide for permission errors
+- ✅ Better security understanding across user base
+
+**Files Created**:
+1. docs/user-guide/security-and-permissions.md (~200 lines)
+2. examples/script-users/cookbook/sandbox-permissions.lua (~100 lines)
+
+**Files Modified**:
+1. docs/user-guide/configuration.md (fix security sections)
+2. docs/user-guide/api/rust/llmspell-security.md (add sandbox section)
+3. docs/user-guide/api/lua/README.md (add permission docs)
+4. docs/user-guide/README.md (update TOC)
+
+**User Benefits**:
+- ✅ No more permission error confusion
+- ✅ Clear path from error to config solution
+- ✅ Understanding of security model
+- ✅ Practical examples for common scenarios
+- ✅ Best practices for secure configuration
+
+**Documentation Quality**:
+- ✅ Schema accuracy (matches actual code)
+- ✅ Comprehensive coverage (sandbox system fully documented)
+- ✅ Practical examples (copy-paste ready configs)
+- ✅ Troubleshooting guide (common errors solved)
+- ✅ Cross-referenced (all docs connected)
+
+---
+
 **END OF PHASE 11a TODO** ✅
 
