@@ -1784,6 +1784,198 @@ if Config.isNetworkAccessAllowed() then
 end
 ```
 
+---
+
+### Security & Permissions
+
+> **📚 Complete Guide**: See [Security & Permissions Guide](../../security-and-permissions.md) for comprehensive configuration, troubleshooting, and scenarios.
+
+#### Understanding Security Constraints
+
+LLMSpell scripts run in a sandboxed environment with three security levels:
+
+- **Safe**: Pure computation, no file/network/process access (e.g., calculator, hash-calculator)
+- **Restricted** (default): Explicit permissions required via config.toml
+- **Privileged**: Full access (rare, requires admin approval)
+
+Most tools operate at **Restricted** level, requiring explicit configuration.
+
+#### Checking Permissions Before Use
+
+**Pattern**: Check before executing to provide helpful error messages
+
+```lua
+-- Network access check
+if Config.isNetworkAccessAllowed() then
+    local result = Tool.execute("http-request", {
+        method = "GET",
+        url = "https://api.example.com/data"
+    })
+else
+    print("❌ Network access denied")
+    print("Add to config.toml:")
+    print("[tools.http_request]")
+    print('allowed_hosts = ["api.example.com"]')
+end
+
+-- File access check
+if Config.isFileAccessAllowed() then
+    local data = Tool.execute("file-operations", {
+        operation = "read",
+        path = "/workspace/data.txt"
+    })
+else
+    print("❌ File access denied")
+    print("Add to config.toml:")
+    print("[tools.file_operations]")
+    print('allowed_paths = ["/workspace"]')
+end
+
+-- Process execution check (via config)
+local can_execute = Config.get("tools.system.allow_process_execution")
+if can_execute then
+    Tool.execute("process-executor", {
+        executable = "echo",
+        arguments = {"Hello"}
+    })
+else
+    print("❌ Process execution disabled")
+    print("Set in config.toml:")
+    print("[tools.system]")
+    print("allow_process_execution = true")
+end
+```
+
+#### Handling Permission Errors
+
+**Pattern**: Use `pcall()` to catch and handle permission errors gracefully
+
+```lua
+-- Wrap tool calls to catch errors
+local success, result = pcall(function()
+    return Tool.execute("http-request", {
+        method = "GET",
+        url = "https://blocked-domain.com/api"
+    })
+end)
+
+if not success then
+    local error_msg = tostring(result)
+
+    if error_msg:match("Domain not in allowed list") or
+       error_msg:match("Host blocked") then
+        print("❌ ERROR: Domain not allowed")
+        print("Solution: Add domain to config.toml:")
+        print("[tools.http_request]")
+        print('allowed_hosts = ["blocked-domain.com"]')
+
+    elseif error_msg:match("Path not in allowlist") or
+           error_msg:match("Permission denied") then
+        print("❌ ERROR: File access denied")
+        print("Solution: Add path to config.toml:")
+        print("[tools.file_operations]")
+        print('allowed_paths = ["/your/path"]')
+
+    elseif error_msg:match("Command blocked") or
+           error_msg:match("Executable not allowed") then
+        print("❌ ERROR: Process execution denied")
+        print("Solution: Enable in config.toml:")
+        print("[tools.system]")
+        print("allow_process_execution = true")
+        print('allowed_commands = "echo,cat,ls"')
+
+    else
+        print("❌ ERROR: " .. error_msg)
+        print("See docs/user-guide/security-and-permissions.md")
+    end
+end
+```
+
+#### Permission Configuration (Admin Only)
+
+**Important**: Lua scripts **CANNOT modify security settings**. Permissions must be configured in `config.toml`:
+
+```toml
+# config.toml - Network access example
+[tools.web_search]
+allowed_domains = ["api.example.com", "*.github.com"]
+rate_limit_per_minute = 100
+
+[tools.http_request]
+allowed_hosts = ["api.example.com", "*.trusted.com"]
+blocked_hosts = ["localhost", "127.0.0.1"]  # SSRF prevention
+
+# Process execution example
+[tools.system]
+allow_process_execution = false  # Set true to enable
+allowed_commands = "echo,cat,ls,pwd"  # Comma-separated allowlist
+command_timeout_seconds = 30
+
+# File access example
+[tools.file_operations]
+allowed_paths = ["/workspace", "/tmp", "/data"]
+max_file_size = 50000000  # 50MB
+blocked_extensions = ["exe", "dll", "so"]
+```
+
+> **⚠️ Security Note**: `Config.setSecurity()` is available only for development/testing. Production scripts cannot modify security settings.
+
+#### Best Practices
+
+1. **Check permissions before use**: Use `Config.is*Allowed()` to detect missing permissions early
+   ```lua
+   if not Config.isNetworkAccessAllowed() then
+       error("Script requires network access. Configure [tools.network] in config.toml")
+   end
+   ```
+
+2. **Handle permission errors gracefully**: Always use `pcall()` and provide helpful error messages
+   ```lua
+   local success, result = pcall(function()
+       return Tool.execute("http-request", {...})
+   end)
+   if not success then
+       print("Error with helpful config fix suggestion")
+   end
+   ```
+
+3. **Request minimal permissions**: Follow principle of least privilege
+   - Only request paths you actually need
+   - Only request domains you actually access
+   - Only enable commands you actually use
+
+4. **Document required permissions**: Add comments to your scripts
+   ```lua
+   -- REQUIRED CONFIG:
+   -- [tools.http_request]
+   -- allowed_hosts = ["api.example.com"]
+   --
+   -- [tools.file_operations]
+   -- allowed_paths = ["/workspace/data"]
+
+   local data = fetch_and_save()
+   ```
+
+5. **Test permission boundaries**: Verify your script handles missing permissions
+   ```lua
+   -- Test without permissions first
+   -- Then add minimal permissions
+   -- Verify error messages are helpful
+   ```
+
+#### Common Permission Errors
+
+| Error Message | Solution |
+|--------------|----------|
+| "Network access denied" | Add `[tools.http_request]` with `allowed_hosts` |
+| "Domain not in allowed list" | Add domain to `allowed_domains` in `[tools.web_search]` |
+| "Path not in allowlist" | Add path to `allowed_paths` in `[tools.file_operations]` |
+| "Command blocked" | Set `allow_process_execution = true` and add to `allowed_commands` |
+| "Executable not allowed" | Add executable to `allowed_commands` in `[tools.system]` |
+| "File extension blocked" | Remove from `blocked_extensions` or add to `allowed_extensions` |
+
+---
+
 ### Tools Configuration
 
 #### Config.getTools()

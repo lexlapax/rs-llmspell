@@ -7433,15 +7433,15 @@ SecurityRequirements::privileged()     // Full access
 
 ---
 
-### Task 11a.13.5: Update Lua API Security Documentation
+### Task 11a.13.5: Update Lua API Security Documentation ✅
 
-**Priority**: MEDIUM | **Time**: 20min | **Status**: 🔲 TODO | **Depends**: 11a.13.1
+**Priority**: MEDIUM | **Time**: 20min | **Status**: ✅ DONE | **Depends**: 11a.13.1
 
 **Objective**: Document security constraints and permission errors in Lua API.
 
 **Scope**: Update api/lua/README.md security section
 
-**File**: `docs/user-guide/api/lua/README.md`
+**File**: `docs/user-guide/api/lua/README.md` (192 lines added)
 
 **Changes Required**:
 
@@ -7544,18 +7544,91 @@ See [Security & Permissions Guide](../security-and-permissions.md) for comprehen
 
 
 **Deliverables**:
-- [ ] Expand security section with permission checking examples
-- [ ] Add permission error handling patterns
-- [ ] Document config.toml requirements (not Lua modifiable)
-- [ ] Add best practices for Lua scripts
-- [ ] Cross-reference to security-and-permissions.md
+- [x] Expand security section with permission checking examples (3 patterns shown)
+- [x] Add permission error handling patterns (comprehensive pcall wrapper)
+- [x] Document config.toml requirements (CANNOT modify from Lua - explicit note)
+- [x] Add best practices for Lua scripts (5 practices with examples)
+- [x] Cross-reference to security-and-permissions.md (prominent link)
 
 **Acceptance Criteria**:
-- [ ] Permission checking examples added (Config.is*Allowed)
-- [ ] Error handling patterns documented (pcall wrapper)
-- [ ] Clear note that permissions are config-only (not scriptable)
-- [ ] Best practices section added
-- [ ] Link to comprehensive security guide
+- [x] Permission checking examples added (Config.is*Allowed with error messages)
+- [x] Error handling patterns documented (pcall wrapper with 4 error types)
+- [x] Clear note that permissions are config-only (bold warning added)
+- [x] Best practices section added (5 numbered practices)
+- [x] Link to comprehensive security guide
+- [x] Common errors table added (6 error types with solutions)
+
+**CONTENT ADDED** (192 lines, inserted after line 1785):
+
+**1. Understanding Security Constraints**:
+- 3 security levels explained (Safe, Restricted, Privileged)
+- Most tools at Restricted level requiring config
+
+**2. Checking Permissions Before Use**:
+```lua
+if Config.isNetworkAccessAllowed() then
+    -- Use tool
+else
+    print("❌ Network access denied")
+    print("Add to config.toml:")
+    print("[tools.http_request]")
+    print('allowed_hosts = ["api.example.com"]')
+end
+```
+- Network access check with helpful error
+- File access check with config suggestion
+- Process execution check
+
+**3. Handling Permission Errors** (comprehensive pcall pattern):
+```lua
+local success, result = pcall(function()
+    return Tool.execute("http-request", {...})
+end)
+if not success then
+    -- Match error types and provide config solutions
+    if error_msg:match("Domain not in allowed list") then
+        print("Solution: Add domain to config.toml")
+    end
+end
+```
+- Catches 4 error types: network, file, process, generic
+- Provides exact config fix for each error
+- Guides users to security-and-permissions.md
+
+**4. Permission Configuration (Admin Only)**:
+- **BOLD WARNING**: Lua scripts CANNOT modify security settings
+- Complete TOML examples for all tool categories
+- Config.setSecurity() only for dev/testing
+
+**5. Best Practices** (5 numbered practices):
+1. Check permissions before use (early detection)
+2. Handle errors gracefully (pcall with helpful messages)
+3. Request minimal permissions (least privilege)
+4. Document required permissions (script comments)
+5. Test permission boundaries (verify error messages)
+
+**6. Common Permission Errors Table**:
+| Error | Solution |
+|-------|----------|
+| "Network access denied" | Add [tools.http_request] |
+| "Domain not in allowed list" | Add to allowed_domains |
+| "Path not in allowlist" | Add to allowed_paths |
+| "Command blocked" | Enable allow_process_execution |
+| "Executable not allowed" | Add to allowed_commands |
+| "File extension blocked" | Update blocked/allowed_extensions |
+
+**PATTERNS PROVIDED**:
+✅ Permission checking pattern (3 examples)
+✅ Error handling pattern (comprehensive pcall)
+✅ Config documentation pattern (script comments)
+✅ Error message pattern (helpful suggestions)
+✅ Testing pattern (verify boundaries)
+
+**IMPACT**:
+- Lua developers can now handle permission errors gracefully
+- Clear guidance: check → catch → provide helpful error → user fixes config
+- No more "Permission denied" with no guidance
+- Scripts can be user-friendly even when permissions missing
 
 ---
 
