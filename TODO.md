@@ -540,5 +540,65 @@ cargo clippy --workspace --all-features -- -D warnings
 - **Clarity**: No confusion about which entry point to use
 - **Compliance**: Adheres to single-binary architecture requirement
 
+### Task 11b.2.1: Remove Binary Target and Runner Module - ✅ COMPLETE
+**Priority**: CRITICAL
+**Estimated Time**: 20 minutes
+**Actual Time**: 15 minutes
+**Status**: ✅ COMPLETE
+
+**Files Modified**:
+1. **llmspell-testing/src/bin/** - DELETED (204 lines)
+   - test-runner.rs - Full CLI with clap subcommands, arg parsing, test execution
+
+2. **llmspell-testing/src/runner/** - DELETED (471 lines)
+   - mod.rs (10 lines) - Module exports
+   - category.rs (115 lines) - TestCategory enum (runner-specific, distinct from attributes::TestCategory)
+   - config.rs (10 lines) - TestRunnerConfig struct
+   - executor.rs (336 lines) - TestRunner implementation with cargo test invocation logic
+
+3. **llmspell-testing/Cargo.toml**:
+   - Removed `[[bin]]` section (lines 64-67)
+   - Removed `test-runner` feature from features list (line 59)
+   - Removed `clap` optional dependency (line 133)
+
+4. **llmspell-testing/src/lib.rs**:
+   - Removed conditional runner module export (lines 75-76)
+   - Added comment: "Test runner support removed - use cargo test directly or scripts in scripts/testing/"
+
+**Changes Made**:
+```toml
+# Cargo.toml - REMOVED
+test-runner = ["clap"]
+
+[[bin]]
+name = "llmspell-test"
+path = "src/bin/test-runner.rs"
+required-features = ["test-runner"]
+
+clap = { version = "4.5", features = ["derive", "env"], optional = true }
+```
+
+```rust
+// lib.rs - REMOVED
+#[cfg(feature = "test-runner")]
+pub mod runner;
+
+// lib.rs - ADDED
+// Test runner support removed - use cargo test directly or scripts in scripts/testing/
+```
+
+**Validation**:
+- [x] Directories deleted successfully (src/bin/, src/runner/) ✅
+- [x] Cargo.toml edits applied (3 removals) ✅
+- [x] lib.rs updated (module export removed) ✅
+- [x] Total lines removed: 675 (204 bin + 471 runner) ✅
+
+**Insights**:
+- **Clean Separation**: Binary/runner code was isolated - no dependencies from test utilities
+- **No Naming Conflicts**: runner::TestCategory (enum) distinct from attributes::TestCategory (struct)
+- **Optional Feature**: Binary gated by `test-runner` feature (not built by default) - low impact removal
+- **Remaining Work**: 9 cargo aliases and 1 shell script still reference removed binary (next tasks)
+- **Preserved Utilities**: All test helpers, mocks, generators, benchmarks, fixtures remain intact
+
 ---
 
