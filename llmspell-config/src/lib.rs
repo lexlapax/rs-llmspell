@@ -1800,7 +1800,10 @@ timeout_seconds = 300
 
         // Minimal profile should have basic settings
         assert_eq!(config.default_engine, "lua");
-        assert_eq!(config.engines.lua.stdlib_level, "basic");
+        assert!(matches!(
+            config.engines.lua.stdlib,
+            crate::engines::StdlibLevel::Basic
+        ));
 
         // No providers configured
         assert!(config.providers.providers.is_empty());
@@ -1815,7 +1818,10 @@ timeout_seconds = 300
 
         // Development profile should have full stdlib
         assert_eq!(config.default_engine, "lua");
-        assert_eq!(config.engines.lua.stdlib_level, "full");
+        assert!(matches!(
+            config.engines.lua.stdlib,
+            crate::engines::StdlibLevel::All
+        ));
 
         // Should have OpenAI and Anthropic providers configured
         assert!(config.providers.providers.contains_key("openai"));
@@ -1828,7 +1834,10 @@ timeout_seconds = 300
 
         let anthropic = config.providers.providers.get("anthropic").unwrap();
         assert_eq!(anthropic.provider_type, "anthropic");
-        assert_eq!(anthropic.default_model, Some("claude-3-5-sonnet-20241022".to_string()));
+        assert_eq!(
+            anthropic.default_model,
+            Some("claude-3-5-sonnet-20241022".to_string())
+        );
         assert_eq!(anthropic.api_key_env, Some("ANTHROPIC_API_KEY".to_string()));
     }
 
@@ -1899,7 +1908,10 @@ timeout_seconds = 300
             .unwrap();
 
         // Should have minimal profile settings
-        assert_eq!(config.engines.lua.stdlib_level, "basic");
+        assert!(matches!(
+            config.engines.lua.stdlib,
+            crate::engines::StdlibLevel::Basic
+        ));
 
         // Test that discovery works when no profile specified
         let config2 = LLMSpellConfig::load_with_profile(None, None).await.unwrap();

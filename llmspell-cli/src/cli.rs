@@ -202,7 +202,7 @@ EXAMPLES:
     llmspell run script.lua                    # Execute Lua script
     llmspell run script.lua -- arg1 arg2      # Pass arguments to script
     llmspell run script.js --engine javascript # Execute JavaScript script
-    llmspell run ml.lua --rag-profile production  # Use production RAG profile
+    llmspell -p rag-prod run ml.lua            # Use production RAG profile
     llmspell run script.lua --connect localhost:9555  # Execute on remote kernel
     llmspell run script.lua --stream           # Enable streaming output")]
     Run {
@@ -221,10 +221,6 @@ EXAMPLES:
         #[arg(long)]
         stream: bool,
 
-        /// RAG profile to use (e.g., "production", "development")
-        #[arg(long, value_name = "PROFILE")]
-        rag_profile: Option<String>,
-
         /// Script arguments
         #[arg(last = true)]
         args: Vec<String>,
@@ -236,7 +232,7 @@ EXAMPLES:
 EXAMPLES:
     llmspell exec \"print('hello world')\"      # Execute Lua code
     llmspell exec \"console.log('test')\" --engine javascript  # Execute JavaScript
-    llmspell exec \"agent.query('What is 2+2?')\"  # Use LLM agent
+    llmspell -p development exec \"agent.query('What is 2+2?')\"  # Use development profile
     llmspell exec \"print('test')\" --connect localhost:9555  # Execute on remote kernel
     llmspell exec \"process_data()\" --stream   # Enable streaming output")]
     Exec {
@@ -255,10 +251,6 @@ EXAMPLES:
         /// Enable streaming output
         #[arg(long)]
         stream: bool,
-
-        /// RAG profile to use (e.g., "production", "development")
-        #[arg(long, value_name = "PROFILE")]
-        rag_profile: Option<String>,
     },
 
     /// Start interactive REPL
@@ -269,7 +261,7 @@ EXAMPLES:
     llmspell repl --engine javascript         # Start JavaScript REPL
     llmspell repl --history ~/.llmspell_history  # Use custom history file
     llmspell repl --connect localhost:9555    # Connect to remote kernel
-    llmspell repl --rag-profile production    # Use production RAG profile")]
+    llmspell -p rag-prod repl                  # Use production RAG profile")]
     Repl {
         /// Script engine to use
         #[arg(long, value_enum, default_value = "lua", env = "LLMSPELL_ENGINE")]
@@ -282,10 +274,6 @@ EXAMPLES:
         /// History file path
         #[arg(long)]
         history: Option<PathBuf>,
-
-        /// RAG profile to use (e.g., "production", "development")
-        #[arg(long, value_name = "PROFILE")]
-        rag_profile: Option<String>,
     },
 
     /// Debug a script with interactive debugging
@@ -326,10 +314,6 @@ EXAMPLES:
         /// DAP server port for IDE attachment
         #[arg(long)]
         port: Option<u16>,
-
-        /// RAG profile to use (e.g., "production", "development")
-        #[arg(long, value_name = "PROFILE")]
-        rag_profile: Option<String>,
 
         /// Script arguments
         #[arg(last = true)]

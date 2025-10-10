@@ -5,7 +5,7 @@
 default_engine = "lua"
 
 [engines.lua]
-stdlib_level = "basic"
+stdlib = "Basic"
 
 [runtime]
 log_level = "warn"

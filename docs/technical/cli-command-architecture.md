@@ -46,6 +46,8 @@ llmspell [global-flags] <command> [command-flags] [-- script-args]
 Global Flags (available everywhere):
   --trace <LEVEL>    # Logging verbosity: off|error|warn|info|debug|trace
   --config <FILE>    # Configuration file path (env: LLMSPELL_CONFIG)
+  --profile <NAME>   # Built-in configuration profile
+  -p <NAME>          # Short form of --profile
   --output <FORMAT>  # Output format: text|json|pretty
   -h, --help        # Show contextual help
   -V, --version     # Show version information
@@ -72,9 +74,9 @@ Subcommand Groups:
 
 ```
 llmspell
-├── run <script> [--engine] [--connect] [--stream] [--rag-profile] [-- args...]
-├── exec <code> [--engine] [--connect] [--stream] [--rag-profile]
-├── repl [--engine] [--connect] [--history] [--rag-profile]
+├── run <script> [--engine] [--connect] [--stream] [-- args...]
+├── exec <code> [--engine] [--connect] [--stream]
+├── repl [--engine] [--connect] [--history]
 ├── debug <script> [--engine] [--connect] [--break-at] [--watch] [--step] [--port] [-- args...]
 ├── kernel
 │   ├── start [--port] [--daemon] [--id] [--connection-file] [--log-file] [--pid-file]
@@ -139,32 +141,49 @@ llmspell
 | `--engine` (global) | Per-command flag | Script engine | Command-specific |
 | `--kernel` | `--connect` | Connect to kernel | Clearer naming |
 
-### 2.2 RAG Configuration Simplification
+### 2.2 Unified Profile System
 
-**Before** (20 flag instances across 4 commands):
+**Before** (20 flag instances + incomplete hack):
 ```bash
-llmspell run script.lua \
-  --rag \
-  --rag-config custom.toml \
-  --rag-dims 384 \
-  --rag-backend hnsw \
-  --no-rag  # Confusing!
+llmspell run script.lua --rag-profile production  # Only sets 3 fields!
 ```
 
-**After** (4 flag instances total):
+**After** (unified --profile system):
 ```bash
-llmspell run script.lua --rag-profile production
+# RAG profiles (loads ALL 84 fields)
+llmspell run script.lua -p rag-prod
+llmspell run script.lua --profile rag-dev
+
+# Core profiles
+llmspell run script.lua -p minimal
+llmspell run script.lua -p development
+
+# Local LLM profiles
+llmspell run script.lua -p ollama
+llmspell run script.lua -p candle
 ```
 
-Profile defined in config:
-```toml
-[rag.profiles.production]
-enabled = true
-backend = "hnsw"
-dimensions = 384
-config_file = "custom.toml"
-description = "Production RAG configuration"
+Profile system in llmspell-config:
+```rust
+// All logic in config layer, not CLI
+impl LLMSpellConfig {
+    pub async fn load_with_profile(
+        path: Option<&Path>,
+        profile: Option<&str>,
+    ) -> Result<Self, ConfigError>;
+
+    fn load_builtin_profile(name: &str) -> Result<Self, ConfigError>;
+    pub fn list_builtin_profiles() -> Vec<&'static str>;
+}
 ```
+
+Available profiles:
+- **Core**: minimal, development
+- **Local LLM**: ollama, candle
+- **RAG**: rag-dev, rag-prod, rag-perf
+
+Precedence: `--profile` > `-c` > discovery > default
+Environment variables override everything.
 
 ---
 
@@ -179,7 +198,6 @@ OPTIONS:
     --engine <ENGINE>      Script engine [default: lua, options: lua|javascript|python]
     --connect <ADDRESS>    Connect to kernel (e.g., "localhost:9555" or "/path/to/connection.json")
     --stream              Enable streaming output
-    --rag-profile <NAME>   RAG configuration profile
 
 SCRIPT ARGUMENTS:
     Arguments after -- are passed to the script as ARGS global variable
@@ -191,7 +209,7 @@ EXAMPLES:
     llmspell run script.lua -- arg1 arg2
     llmspell run script.js --engine javascript
     llmspell run webapp-creator.lua -- --output /tmp/my-app --input spec.lua
-    llmspell run ml_task.lua --rag-profile production -- --model gpt-4
+    llmspell -p rag-prod run ml_task.lua -- --model gpt-4
     llmspell run script.lua --connect localhost:9555  # Execute on remote kernel
 ```
 
@@ -204,7 +222,6 @@ OPTIONS:
     --engine <ENGINE>      Script engine [default: lua]
     --connect <ADDRESS>    Connect to kernel
     --stream              Enable streaming
-    --rag-profile <NAME>   RAG configuration profile
 
 EXAMPLES:
     llmspell exec "print('hello')"
@@ -222,7 +239,6 @@ OPTIONS:
     --engine <ENGINE>      Script engine [default: lua]
     --connect <ADDRESS>    Connect to kernel
     --history <FILE>       History file path
-    --rag-profile <NAME>   RAG configuration profile
 
 EXAMPLES:
     llmspell repl
@@ -243,7 +259,6 @@ OPTIONS:
     --watch <EXPR>         Watch expressions (repeatable)
     --step                Start in step mode
     --port <PORT>          DAP server port for IDE attachment
-    --rag-profile <NAME>   RAG configuration profile
 
 DEBUGGING INFRASTRUCTURE (Phase 9):
     Uses integrated DAP bridge in kernel for full debugging support
@@ -954,17 +969,17 @@ OPTIONS:
     --engine <ENGINE>      Script engine [default: lua]
     --connect <ADDRESS>    Connect to kernel
     --stream              Enable streaming output
-    --rag-profile <NAME>   RAG configuration profile
     -h, --help            Print help information
 
 EXAMPLES:
     llmspell run script.lua
     llmspell run script.lua -- arg1 arg2
-    llmspell run ml.lua --rag-profile production
+    llmspell -p rag-prod run ml.lua
 
 GLOBAL OPTIONS:
     --trace <LEVEL>     Set trace level
     --config <FILE>     Config file path
+    --profile <NAME>    Built-in configuration profile
     --output <FORMAT>   Output format
 ```
 
@@ -994,7 +1009,8 @@ All these flags have been removed or renamed:
 - ❌ `--debug-format` → Removed (use `--output`)
 - ❌ `--debug-modules` → Move to config file
 - ❌ `--debug-perf` → Move to config file
-- ❌ `--rag`, `--no-rag`, `--rag-config`, `--rag-dims`, `--rag-backend` → Use `--rag-profile`
+- ❌ `--rag`, `--no-rag`, `--rag-config`, `--rag-dims`, `--rag-backend` → Use `--profile`
+- ❌ `--rag-profile` → Use `--profile` (consolidated)
 - ❌ `--kernel` → Renamed to `--connect` for clarity
 
 ### 9.3 Migration Examples
@@ -1002,11 +1018,14 @@ All these flags have been removed or renamed:
 ```bash
 # OLD
 llmspell run script.lua --debug --verbose
-llmspell run script.lua --rag --rag-backend hnsw --rag-dims 384
+llmspell run script.lua --rag-profile production  # Incomplete hack
 
 # NEW
 llmspell run script.lua --trace debug
-llmspell run script.lua --rag-profile production
+llmspell run script.lua -p rag-prod  # Loads all 84 fields
+llmspell run script.lua --profile rag-dev  # Development RAG
+llmspell run script.lua -p minimal  # Tools only
+llmspell run script.lua -p ollama  # Ollama backend
 
 # OLD
 llmspell --debug script.lua  # Debug mode? Logging?
@@ -1042,6 +1061,10 @@ pub struct Cli {
     #[arg(short = 'c', long, global = true, env = "LLMSPELL_CONFIG")]
     pub config: Option<PathBuf>,
 
+    /// Built-in configuration profile
+    #[arg(short = 'p', long, global = true)]
+    pub profile: Option<String>,
+
     /// Output format
     #[arg(long, global = true, value_enum, default_value = "text")]
     pub output: OutputFormat,
@@ -1061,8 +1084,6 @@ pub enum Commands {
         connect: Option<String>,
         #[arg(long)]
         stream: bool,
-        #[arg(long)]
-        rag_profile: Option<String>,
         #[arg(last = true)]
         args: Vec<String>,
     },
@@ -1130,10 +1151,13 @@ pub async fn execute_command(
     output_format: OutputFormat,
 ) -> Result<()> {
     match command {
-        Commands::Run { script, engine, connect, stream, rag_profile, args } => {
-            let mut config = runtime_config;
-            apply_rag_profile(&mut config, rag_profile).await?;
-            let context = ExecutionContext::resolve(connect, None, None, config).await?;
+        Commands::Run { script, engine, connect, stream, args } => {
+            let context = ExecutionContext::resolve(
+                connect,
+                None,
+                None,
+                runtime_config.clone()
+            ).await?;
             run::execute_script_file(script, engine, context, stream, args, output_format).await
         }
 
@@ -1303,7 +1327,7 @@ fn parse_script_args(args: &[String]) -> HashMap<String, String> {
 ### RAG Operations
 - **NOT implemented as standalone CLI command** - RAG operations are script-context operations
 - **Access via script API**: Use `RAG.*` methods within Lua/JavaScript/Python scripts
-- **Configuration via flag**: `--rag-profile` flag available on execution commands (run, exec, repl, debug)
+- **Configuration via global flag**: `--profile` / `-p` flag enables RAG profiles (rag-dev, rag-prod, rag-perf)
 - **Rationale**: RAG operations require script context and state management that doesn't make sense as standalone CLI operations
 
 ### Tools Management (Phase 10.22 UPDATED)

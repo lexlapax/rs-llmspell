@@ -22,7 +22,7 @@ async fn test_default_config() {
     clean_env_vars();
 
     // Load default configuration
-    let config = load_runtime_config(None).await.unwrap();
+    let config = load_runtime_config(None, None).await.unwrap();
 
     assert_eq!(config.default_engine, "lua");
     assert!(config.runtime.enable_streaming);
@@ -44,7 +44,7 @@ async fn test_create_config_file() {
     assert!(content.contains("lua"));
 
     // Load the created config
-    let config = load_runtime_config(Some(&config_path)).await.unwrap();
+    let config = load_runtime_config(Some(&config_path), None).await.unwrap();
     assert_eq!(config.default_engine, "lua");
 }
 #[tokio::test]
@@ -60,7 +60,7 @@ async fn test_environment_overrides() {
     env::set_var("LLMSPELL_ALLOW_NETWORK_ACCESS", "false");
 
     // Load config with environment overrides
-    let config = load_runtime_config(None).await.unwrap();
+    let config = load_runtime_config(None, None).await.unwrap();
 
     assert_eq!(config.default_engine, "javascript");
     assert_eq!(config.runtime.script_timeout_seconds, 600);
@@ -85,7 +85,7 @@ async fn test_config_discovery() {
     create_default_config(&config_path).await.unwrap();
 
     // Should discover the config file
-    let config = load_runtime_config(None).await.unwrap();
+    let config = load_runtime_config(None, None).await.unwrap();
     assert_eq!(config.default_engine, "lua");
 
     // Clean up
@@ -93,14 +93,14 @@ async fn test_config_discovery() {
 }
 #[tokio::test]
 async fn test_validate_config() {
-    let config = load_runtime_config(None).await.unwrap();
+    let config = load_runtime_config(None, None).await.unwrap();
 
     // Default config should be valid
     validate_config(&config).unwrap();
 }
 #[tokio::test]
 async fn test_invalid_config_validation() {
-    let mut config = load_runtime_config(None).await.unwrap();
+    let mut config = load_runtime_config(None, None).await.unwrap();
 
     // Make config invalid
     config.default_engine = "nonexistent".to_string();
@@ -116,7 +116,7 @@ async fn test_missing_config_file() {
     let nonexistent = dir.path().join("nonexistent.toml");
 
     // Should fail with clear error
-    let result = load_runtime_config(Some(&nonexistent)).await;
+    let result = load_runtime_config(Some(&nonexistent), None).await;
     assert!(result.is_err());
     assert!(result.unwrap_err().to_string().contains("not found"));
 }
@@ -129,7 +129,7 @@ async fn test_malformed_config_file() {
     fs::write(&config_path, "this is not valid toml!").unwrap();
 
     // Should fail with parse error
-    let result = load_runtime_config(Some(&config_path)).await;
+    let result = load_runtime_config(Some(&config_path), None).await;
     assert!(result.is_err());
     // The error message contains "TOML parsing error" when parsing fails
     assert!(result

@@ -5,7 +5,7 @@
 default_engine = "lua"
 
 [engines.lua]
-stdlib_level = "full"
+stdlib = "All"
 
 [providers.candle]
 provider_type = "candle"

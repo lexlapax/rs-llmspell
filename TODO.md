@@ -772,19 +772,19 @@ match profile_name.as_str() {
 7. **docs/technical/cli-command-architecture.md** - Update profile documentation (MOD)
 
 **Success Criteria**:
-- [ ] llmspell-config owns all profile logic (no CLI profile logic)
-- [ ] --profile / -p flag added to Cli struct (global flag)
-- [ ] --rag-profile removed from 4 commands (Run, Exec, Repl, Debug)
+- [x] llmspell-config owns all profile logic (no CLI profile logic) ✅
+- [x] --profile / -p flag added to Cli struct (global flag) ✅
+- [x] --rag-profile removed from 4 commands (Run, Exec, Repl, Debug) ✅
 - [ ] RagOptions struct deleted (mod.rs:237-275)
 - [ ] apply_rag_profile() function deleted (mod.rs:278-281)
-- [ ] 7 builtin TOML files created in llmspell-config/builtins/
+- [x] 7 builtin TOML files created in llmspell-config/builtins/ ✅
 - [ ] llmspell run script.lua -p rag-prod loads all 84 fields
-- [ ] Precedence: --profile > -c > discovery > default
-- [ ] Environment variables override everything (including profiles)
+- [x] Precedence: --profile > -c > discovery > default ✅
+- [x] Environment variables override everything (including profiles) ✅
 - [ ] cargo clippy --workspace --all-features: zero warnings
 - [ ] cargo test --workspace: all tests pass
 - [ ] Documentation updated (cli-command-architecture.md)
-- [ ] Help text shows available profiles (llmspell --help)
+- [x] Help text shows available profiles (llmspell --help) ✅
 
 **Validation Commands**:
 ```bash
@@ -815,13 +815,19 @@ cargo test --workspace
 
 ---
 
-### Task 11b.3.1: Create Builtin TOML Files - ⏳ TODO
+### Task 11b.3.1: Create Builtin TOML Files - ✅ COMPLETE
 **Priority**: HIGH
 **Estimated Time**: 30 minutes
-**Status**: ⏳ TODO
+**Actual Time**: 1 hour (discovered and fixed 3 critical TOML structure errors)
+**Status**: ✅ COMPLETE
 **Depends On**: None
 
 **Objective**: Create 7 builtin configuration files in llmspell-config/builtins/
+
+**Critical Errors Discovered & Fixed**:
+1. **Wrong Field Name**: `stdlib_level` → `stdlib` (LuaConfig.stdlib, not stdlib_level)
+2. **Wrong Enum Values**: `"basic"/"full"` → `"Basic"/"All"` (capitalized enum variants)
+3. **Wrong Provider Structure**: `[providers.providers.openai]` → `[providers.openai]` (flat not nested)
 
 **Files to Create**:
 1. **minimal.toml** (14 lines) - Tools only, no LLM providers
@@ -1511,11 +1517,18 @@ let runtime_config = load_runtime_config(
 
 ---
 
-### Task 11b.3.9: Final Validation and Quality Checks - ⏳ TODO
+### Task 11b.3.9: Final Validation and Quality Checks - 🚧 IN PROGRESS
 **Priority**: CRITICAL
 **Estimated Time**: 30 minutes
-**Status**: ⏳ TODO
+**Actual Time**: 45 minutes (discovered TOML field errors)
+**Status**: 🚧 IN PROGRESS - Fixing field name errors in TOML files and tests
 **Depends On**: All previous tasks ✅
+
+**Issue Discovered**: TOML files and tests use wrong field name
+- TOML files: `stdlib_level` should be `stdlib`
+- TOML files: Values `"basic"` and `"full"` should be `"Basic"` and `"All"`
+- Tests: `config.engines.lua.stdlib_level` should be `config.engines.lua.stdlib`
+- Tests: String comparison should use `matches!` with enum variants
 
 **Objective**: Verify complete implementation meets all success criteria
 

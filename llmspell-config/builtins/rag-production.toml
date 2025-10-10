@@ -5,19 +5,19 @@
 default_engine = "lua"
 
 [engines.lua]
-stdlib_level = "full"
+stdlib = "All"
 
 [providers]
 default_provider = "openai"
 
-[providers.providers.openai]
+[providers.openai]
 provider_type = "openai"
 api_key_env = "OPENAI_API_KEY"
 default_model = "gpt-4"
 temperature = 0.7
 max_tokens = 4000
 
-[providers.providers.anthropic]
+[providers.anthropic]
 provider_type = "anthropic"
 api_key_env = "ANTHROPIC_API_KEY"
 default_model = "claude-3-5-sonnet-20241022"

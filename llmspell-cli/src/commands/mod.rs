@@ -60,7 +60,6 @@ use crate::cli::{Commands, OutputFormat, ScriptEngine};
 use crate::execution_context::ExecutionContext;
 use anyhow::Result;
 use llmspell_config::LLMSpellConfig;
-use tracing::info;
 
 /// Execute a command with the professional CLI architecture
 ///
@@ -106,13 +105,10 @@ pub async fn execute_command(
             engine,
             connect,
             stream,
-            rag_profile,
             args,
         } => {
-            let mut config = runtime_config;
-            apply_rag_profile(&mut config, rag_profile).await?;
-
-            let context = ExecutionContext::resolve(connect, None, None, config.clone()).await?;
+            let context =
+                ExecutionContext::resolve(connect, None, None, runtime_config.clone()).await?;
 
             run::execute_script_file(script, engine, context, stream, args, output_format).await
         }
@@ -122,12 +118,9 @@ pub async fn execute_command(
             engine,
             connect,
             stream,
-            rag_profile,
         } => {
-            let mut config = runtime_config;
-            apply_rag_profile(&mut config, rag_profile).await?;
-
-            let context = ExecutionContext::resolve(connect, None, None, config.clone()).await?;
+            let context =
+                ExecutionContext::resolve(connect, None, None, runtime_config.clone()).await?;
 
             exec::execute_inline_script(code, engine, context, stream, output_format).await
         }
@@ -136,12 +129,9 @@ pub async fn execute_command(
             engine,
             connect,
             history,
-            rag_profile,
         } => {
-            let mut config = runtime_config;
-            apply_rag_profile(&mut config, rag_profile).await?;
-
-            let context = ExecutionContext::resolve(connect, None, None, config.clone()).await?;
+            let context =
+                ExecutionContext::resolve(connect, None, None, runtime_config.clone()).await?;
 
             repl::start_repl(engine, context, history, output_format).await
         }
@@ -154,13 +144,10 @@ pub async fn execute_command(
             watch,
             step,
             port,
-            rag_profile,
             args,
         } => {
-            let mut config = runtime_config;
-            apply_rag_profile(&mut config, rag_profile).await?;
-
-            let context = ExecutionContext::resolve(connect, None, None, config.clone()).await?;
+            let context =
+                ExecutionContext::resolve(connect, None, None, runtime_config.clone()).await?;
 
             debug::debug_script(
                 script,
@@ -231,53 +218,6 @@ pub async fn execute_command(
 
         Commands::Version(version_cmd) => version::execute(version_cmd, output_format).await,
     }
-}
-
-/// RAG configuration options from command line
-#[derive(Debug, Default)]
-pub struct RagOptions {
-    pub rag_profile: Option<String>,
-}
-
-impl RagOptions {
-    /// Apply RAG options to configuration
-    pub async fn apply_to_config(&self, config: &mut LLMSpellConfig) -> Result<()> {
-        // Apply RAG profile if specified
-        if let Some(profile_name) = &self.rag_profile {
-            info!("Applying RAG profile: {}", profile_name);
-
-            // Handle built-in profiles
-            match profile_name.as_str() {
-                "development" => {
-                    config.rag.enabled = true;
-                    config.rag.vector_storage.backend = llmspell_config::VectorBackend::HNSW;
-                    config.rag.vector_storage.dimensions = 384;
-                }
-                "production" => {
-                    config.rag.enabled = true;
-                    config.rag.vector_storage.backend = llmspell_config::VectorBackend::HNSW;
-                    config.rag.vector_storage.dimensions = 768;
-                }
-                custom => {
-                    // For now, enable RAG with default settings for custom profiles
-                    // TODO: Implement config.rag.profiles when RAG profile system is ready
-                    info!(
-                        "Custom RAG profile '{}' requested - enabling RAG with defaults",
-                        custom
-                    );
-                    config.rag.enabled = true;
-                }
-            }
-        }
-
-        Ok(())
-    }
-}
-
-/// Apply RAG profile to configuration using RagOptions
-async fn apply_rag_profile(config: &mut LLMSpellConfig, rag_profile: Option<String>) -> Result<()> {
-    let rag_options = RagOptions { rag_profile };
-    rag_options.apply_to_config(config).await
 }
 
 /// Validate script engine availability

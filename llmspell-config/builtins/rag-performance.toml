@@ -5,12 +5,12 @@
 default_engine = "lua"
 
 [engines.lua]
-stdlib_level = "full"
+stdlib = "All"
 
 [providers]
 default_provider = "openai"
 
-[providers.providers.openai]
+[providers.openai]
 provider_type = "openai"
 api_key_env = "OPENAI_API_KEY"
 default_model = "gpt-4"

@@ -61,12 +61,12 @@ async fn validate_config(config_path: Option<PathBuf>, output_format: OutputForm
     // Try to load the configuration
     let (config_result, actual_path) = match path {
         Some(p) => {
-            let result = config::load_runtime_config(Some(p)).await;
+            let result = config::load_runtime_config(Some(p), None).await;
             (result, p.to_string_lossy().to_string())
         }
         None => {
             // Try to discover config file
-            let result = config::load_runtime_config(None).await;
+            let result = config::load_runtime_config(None, None).await;
             let discovered_path = discover_actual_path().await;
             (result, discovered_path)
         }
