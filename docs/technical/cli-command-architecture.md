@@ -159,11 +159,6 @@ llmspell
 
 ### 2.2 Unified Profile System
 
-**Before** (20 flag instances + incomplete hack):
-```bash
-llmspell run script.lua --rag-profile production  # Only sets 3 fields!
-```
-
 **After** (unified --profile system):
 ```bash
 # RAG profiles (loads ALL 84 fields)

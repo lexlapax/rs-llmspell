@@ -398,16 +398,20 @@ Every example should:
 | `test-rag-errors.lua` | Error handling | Edge cases |
 | `rag-benchmark.lua` | Performance measurement | Latency, throughput |
 
-### Configuration Templates (15 Files)
+### Configuration Templates (10 Custom Configs)
+
+**Note**: Most users should use builtin profiles (`-p profile-name`) instead. Custom configs are for advanced scenarios.
+
 | File | Purpose | When to Use |
 |------|---------|-------------|
-| `minimal.toml` | Tools only | Simple scripts |
-| `basic.toml` | Basic features | Learning |
-| `example-providers.toml` | OpenAI + Anthropic | Agent examples |
-| `state-enabled.toml` | Persistence | Stateful apps |
-| `rag-basic.toml` | RAG starter | RAG examples |
-| `rag-production.toml` | Production RAG | Deployment |
+| `basic.toml` | Basic features | Learning state |
+| `example-providers.toml` | OpenAI + Anthropic | Custom provider settings |
+| `state-enabled.toml` | Persistence | Custom state backends |
+| `rag-basic.toml` | RAG starter | Simple RAG learning |
+| `rag-multi-tenant.toml` | Multi-tenant RAG | SaaS platforms |
 | `applications.toml` | Full features | Complete apps |
+
+**Builtin Profiles** (use `-p profile-name`): minimal, development, providers, state, sessions, ollama, candle, rag-dev, rag-prod, rag-perf
 
 ---
 

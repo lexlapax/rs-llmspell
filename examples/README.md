@@ -268,12 +268,11 @@ For unique patterns not covered by builtin profiles, see custom configuration te
 
 **Location**: `script-users/configs/`
 
-- **`minimal.toml`** - Tools only, no providers
 - **`basic.toml`** - Basic state operations
 - **`example-providers.toml`** - OpenAI + Anthropic setup
 - **`state-enabled.toml`** - State persistence enabled
 - **`rag-basic.toml`** - Getting started with RAG
-- **`rag-production.toml`** - Production RAG deployment
+- **`rag-multi-tenant.toml`** - Multi-tenant SaaS deployment
 - **`applications.toml`** - Full application configuration
 
 See [Configuration Guide](script-users/configs/README.md) for detailed documentation.

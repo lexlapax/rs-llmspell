@@ -25,26 +25,21 @@ This directory contains **custom configuration templates** for advanced scenario
 - Migration and backup strategies
 - Demonstrating configuration patterns for learning
 
-**15 Custom Configuration Templates** available:
+**10 Custom Configuration Templates** available:
 
 ### 📁 Files in this Directory
 
 | File | Category | Purpose |
 |------|----------|---------|
-| `minimal.toml` | Core | Minimal setup for tool-only scripts |
 | `basic.toml` | Core | Basic state operations without providers |
 | `example-providers.toml` | Providers | OpenAI + Anthropic provider setup |
 | `applications.toml` | Providers | Production application configuration |
-| `cookbook.toml` | Patterns | Configuration for cookbook examples |
 | `llmspell.toml` | System | Main LLMSpell system configuration |
 | `state-enabled.toml` | State | State persistence with memory backend |
 | `session-enabled.toml` | State | Session management and artifacts |
 | `migration-enabled.toml` | State | State migration and schema evolution |
 | `backup-enabled.toml` | State | Backup and recovery configuration |
 | `rag-basic.toml` | RAG | Getting started with RAG |
-| `rag-development.toml` | RAG | Local development with mock backend |
-| `rag-production.toml` | RAG | Production RAG deployment |
-| `rag-performance.toml` | RAG | High-performance RAG configuration |
 | `rag-multi-tenant.toml` | RAG | Multi-tenant SaaS configuration |
 
 ### 📄 Additional Files
@@ -54,15 +49,6 @@ This directory contains **custom configuration templates** for advanced scenario
 ## Available Configurations
 
 ### Core Configurations
-
-### `minimal.toml`
-- **Use Case**: Minimal setup for tool-only scripts
-- **Best For**: Testing tools without LLM providers
-- **Key Features**:
-  - No providers configured
-  - File access enabled
-  - Network and process spawn disabled
-  - Lightweight and fast startup
 
 ### `basic.toml`
 - **Use Case**: Basic state operations
@@ -90,15 +76,6 @@ This directory contains **custom configuration templates** for advanced scenario
   - Rate limiting enabled
   - Retry logic configured
   - Production-ready settings
-
-### `cookbook.toml`
-- **Use Case**: Cookbook pattern examples
-- **Best For**: Production patterns and best practices
-- **Key Features**:
-  - Comprehensive provider setup
-  - State persistence enabled
-  - Caching configured
-  - Error handling settings
 
 ### `llmspell.toml`
 - **Use Case**: Main LLMSpell configuration
@@ -157,37 +134,6 @@ This directory contains **custom configuration templates** for advanced scenario
   - Moderate resource limits
   - Basic caching enabled
   - 384-dimensional vectors (suitable for lightweight models)
-
-### `rag-development.toml`
-- **Use Case**: Local development and testing
-- **Best For**: Rapid iteration, debugging, feature development
-- **Key Features**:
-  - Mock backend option for fast testing
-  - Debug logging enabled
-  - Minimal resource usage (512MB limit)
-  - Small cache sizes for testing fresh results
-  - Debug dump functionality
-
-### `rag-production.toml`
-- **Use Case**: Production deployments
-- **Best For**: Live services, customer-facing applications
-- **Key Features**:
-  - Multi-tenant support enabled
-  - Persistent storage with backups
-  - Conservative resource limits (4GB)
-  - Comprehensive monitoring and alerting
-  - Security features (audit logging, rate limiting)
-  - Automatic backup and recovery
-
-### `rag-performance.toml`
-- **Use Case**: Maximum performance scenarios
-- **Best For**: High-throughput applications, large-scale deployments
-- **Key Features**:
-  - High-dimensional embeddings (1536d)
-  - Aggressive caching (100K embeddings)
-  - Large memory allocation (8GB)
-  - Optimized HNSW parameters
-  - Support for 50M vectors
 
 ### `rag-multi-tenant.toml`
 - **Use Case**: Multi-tenant applications
@@ -324,11 +270,11 @@ Use custom configs when you need:
 
 ```bash
 # Set via environment variable
-export LLMSPELL_CONFIG=examples/script-users/configs/rag-production.toml
+export LLMSPELL_CONFIG=examples/script-users/configs/rag-multi-tenant.toml
 llmspell run my-script.lua
 
 # Or pass directly
-llmspell --config examples/script-users/configs/rag-development.toml run my-script.lua
+llmspell --config examples/script-users/configs/rag-basic.toml run my-script.lua
 ```
 
 ### Overriding Settings via CLI
@@ -370,14 +316,14 @@ end
 
 | Use Case | Recommended Approach | Alternative (Custom Config) |
 |----------|---------------------|---------------------------|
-| **Learning LLMSpell** | `-p minimal` | `minimal.toml` |
+| **Learning LLMSpell** | `-p minimal` | N/A - use profile |
 | **First agent** | `-p providers` | `example-providers.toml` |
 | **State examples** | `-p state` | `state-enabled.toml` |
-| **RAG prototyping** | `-p rag-dev` | `rag-development.toml` |
-| **RAG production** | `-p rag-prod` | `rag-production.toml` |
+| **RAG prototyping** | `-p rag-dev` | `rag-basic.toml` |
+| **RAG production** | `-p rag-prod` | `rag-multi-tenant.toml` |
 | **SaaS platform** | `-p rag-prod` + custom | `rag-multi-tenant.toml` |
 | **Complete apps** | `-p development` | `applications.toml` |
-| **Local LLM** | `-p ollama` or `-p candle` | Custom provider config |
+| **Local LLM** | `-p ollama` or `-p candle` | N/A - use profile |
 
 **Note**: Use builtin profiles unless you need custom resource limits, multi-tenant isolation, or unique security policies.
 
@@ -387,7 +333,7 @@ end
 |------------------|---------------------|--------------------------|
 | `getting-started/` | `-p minimal`, `-p providers`, `-p rag-dev` | See individual examples |
 | `features/` | `-p providers`, `-p state` | N/A |
-| `cookbook/` | `-p providers`, `-p sessions`, `-p rag-prod` | `cookbook.toml` for patterns |
+| `cookbook/` | `-p providers`, `-p sessions`, `-p rag-prod` | N/A |
 | `applications/` | `-p development`, `-p rag-prod` | Each app has own config.toml |
 | `advanced-patterns/` | `-p providers`, `-p development` | N/A |
 
@@ -459,7 +405,7 @@ RUST_LOG=debug ./target/debug/llmspell -c config.toml run script.lua
 
 2. **"Rate limit exceeded"**
    - Builtin profiles include sensible rate limits
-   - For custom limits: Use `cookbook.toml` as reference
+   - For custom limits: Use `applications.toml` as reference
    - Implement exponential backoff in your script
 
 #### State Issues
@@ -488,7 +434,7 @@ RUST_LOG=debug ./target/debug/llmspell -c config.toml run script.lua
 3. **Slow RAG search**
    - Increase `ef_search` for parallelism
    - Enable search caching
-   - Use `rag-performance.toml` settings
+   - Use `-p rag-perf` builtin profile
 
 4. **Multi-tenant not working**
    - Set `multi_tenant = true`
@@ -500,13 +446,15 @@ RUST_LOG=debug ./target/debug/llmspell -c config.toml run script.lua
 When moving from development to production, follow the migration path:
 
 ```
-minimal.toml → basic.toml → example-providers.toml → applications.toml
+Builtin Profiles (recommended):
+  -p minimal → -p providers → -p development → -p rag-prod
+
+Custom Configs (advanced):
+  basic.toml → example-providers.toml → applications.toml
                      ↓
               state-enabled.toml → session-enabled.toml
                      ↓
-              rag-development.toml → rag-basic.toml → rag-production.toml
-                                            ↓
-                                    rag-multi-tenant.toml (for SaaS)
+              rag-basic.toml → rag-multi-tenant.toml (for SaaS)
 ```
 
 See [MIGRATION.md](MIGRATION.md) for detailed migration steps between configurations.
@@ -531,7 +479,8 @@ See [MIGRATION.md](MIGRATION.md) for detailed migration steps between configurat
 ## 🆕 Phase 8 Enhancements
 
 This release adds comprehensive RAG support with:
-- 5 specialized RAG configurations
+- 2 custom RAG configurations (rag-basic.toml, rag-multi-tenant.toml)
+- 3 RAG builtin profiles (rag-dev, rag-prod, rag-perf)
 - Multi-tenant isolation support
 - Session-based RAG for conversations
 - Cost optimization configurations
