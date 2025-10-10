@@ -16,17 +16,22 @@ Note: This example requires both backends to be available.
 ]]
 
 -- Check if both backends are available
-local ollama_status = LocalLLM.status("ollama")
-local candle_status = LocalLLM.status("candle")
+local status = LocalLLM.status()
 
-if ollama_status.health ~= "healthy" then
-    print("Error: Ollama backend not available")
+if not status.ollama.running or status.ollama.models == 0 then
+    print("Error: Ollama backend not available or no models")
+    if status.ollama.error then
+        print("Ollama error: " .. status.ollama.error)
+    end
     print("Run: ollama pull llama3.1:8b")
     os.exit(1)
 end
 
-if candle_status.available_models == 0 then
-    print("Error: No Candle models available")
+if not status.candle.ready or status.candle.models == 0 then
+    print("Error: Candle backend not ready or no models")
+    if status.candle.error then
+        print("Candle error: " .. status.candle.error)
+    end
     print("Run: llmspell model pull tinyllama:Q4_K_M@candle")
     os.exit(1)
 end
