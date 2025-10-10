@@ -2225,29 +2225,35 @@ pub fn list_builtin_profiles() -> Vec<&'static str> {
 
 ---
 
-### Task 11b.4.12: Update Test Lua Files (3 files) - 🔲 PENDING
+### Task 11b.4.12: Update Test Lua Files (3 files) - ✅ COMPLETE
 **Priority**: MEDIUM
 **Estimated Time**: 10 minutes
-**Actual Time**:
-**Status**: 🔲 PENDING
+**Actual Time**: 8 minutes
+**Status**: ✅ COMPLETE
 **Depends On**: Phase 1 Complete ✅
 
 **Objective**: Update header comments in test lua files
 
 **Files** (from CONFIG_CLEANUP_ANALYSIS.md):
-1. examples/script-users/tests/test-rag-basic.lua
-2. examples/script-users/tests/test-rag-e2e.lua
-3. examples/script-users/tests/test-rag-errors.lua
+1. examples/script-users/tests/test-rag-basic.lua → `-p rag-dev`
+2. examples/script-users/tests/test-rag-e2e.lua → `-p rag-prod` or `-p rag-perf`
+3. examples/script-users/tests/test-rag-errors.lua → `-p rag-dev`
 
 **Update**:
-- test-rag-basic.lua → `-p rag-dev`
-- test-rag-e2e.lua → `-p rag-prod` or `-p rag-perf`
-- test-rag-errors.lua → `-p rag-dev`
+- test-rag-basic.lua → `-p rag-dev` (basic validation, development focus)
+- test-rag-e2e.lua → `-p rag-prod` or `-p rag-perf` (comprehensive with performance benchmarks)
+- test-rag-errors.lua → `-p rag-dev` (error handling, development focus)
 
 **Validation**:
-- [ ] All 3 test files updated
-- [ ] Tests pass with new profiles
-- [ ] No test logic changes
+- [x] All 3 test files updated
+- [x] Tests pass with new profiles
+- [x] No test logic changes
+
+**Insights**:
+- **Test Classification**: Basic/Error tests → `rag-dev`, E2E/Performance tests → `rag-prod`/`rag-perf`
+- **Standardized Headers**: All test files now have HOW TO RUN, Prerequisites, EXPECTED OUTPUT sections
+- **Profile Options**: Test files offer both builtin profiles and custom config options for flexibility
+- **No Logic Changes**: Only header documentation updated, test code remains unchanged for validation integrity
 
 ---
 
