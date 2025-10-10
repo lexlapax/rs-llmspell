@@ -23,12 +23,11 @@
 --
 -- Prerequisites:
 --   • LLMSpell installed and built
---   • Session-enabled configuration (see configs/session-enabled.toml)
---   • RAG configuration with session support
---   • Embedding provider configured
+--   • API key: OPENAI_API_KEY environment variable (for embeddings)
+--   • Network connectivity for API calls
 --
 -- HOW TO RUN:
--- ./target/debug/llmspell -c examples/script-users/configs/session-enabled.toml \
+-- ./target/debug/llmspell -p sessions \
 --   run examples/script-users/cookbook/rag-session.lua
 --
 -- EXPECTED OUTPUT:

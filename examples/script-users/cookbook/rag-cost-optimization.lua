@@ -22,12 +22,12 @@
 --
 -- Prerequisites:
 --   • LLMSpell installed and built
---   • RAG configuration with caching enabled
---   • Multiple embedding providers for fallback
+--   • API key: OPENAI_API_KEY environment variable (for embeddings)
+--   • Network connectivity for API calls
 --   • Understanding of RAG basics
 --
 -- HOW TO RUN:
--- ./target/debug/llmspell -c examples/script-users/configs/rag-production.toml \
+-- ./target/debug/llmspell -p rag-prod \
 --   run examples/script-users/cookbook/rag-cost-optimization.lua
 --
 -- EXPECTED OUTPUT:
