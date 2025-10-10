@@ -1,20 +1,47 @@
 #!/usr/bin/env llmspell
 
---[[
-Local LLM Chat Example
-
-Simple chat interface using local LLM (Ollama or Candle).
-
-Usage:
-    llmspell run examples/local_llm_chat.lua
-
-Requirements:
-    - Ollama with llama3.1:8b OR
-    - Candle with tinyllama:Q4_K_M
-
-Environment:
-    MODEL - Override model (default: local/llama3.1:8b)
-]]
+-- ============================================================
+-- LLMSPELL LOCAL LLM EXAMPLES
+-- ============================================================
+-- Example: Interactive Chat with Local LLM
+-- Complexity Level: BEGINNER
+-- Real-World Use Case: Build a local coding assistant chatbot
+-- Category: Local LLM Integration
+--
+-- Purpose: Demonstrate interactive chat using local models (Ollama or Candle)
+-- Architecture: Agent creation with local model + interactive REPL loop
+-- Key Features:
+--   • Interactive chat interface
+--   • Persistent conversation context
+--   • Works with any local model
+--   • Configurable via environment variable
+--
+-- Prerequisites:
+--   • LLMSpell installed and built
+--   • Default: Ollama with llama3.1:8b model
+--     - Install: ollama pull llama3.1:8b
+--   • Alternative: Set MODEL env var to use different model
+--     - Candle example: MODEL=local/tinyllama:Q4_K_M@candle
+--
+-- HOW TO RUN:
+-- # Using default Ollama model (llama3.1:8b):
+-- ./target/debug/llmspell -p ollama run examples/local_llm_chat.lua
+--
+-- # Using custom model via environment variable:
+-- MODEL=local/tinyllama:Q4_K_M@candle \
+--   ./target/debug/llmspell -p candle run examples/local_llm_chat.lua
+--
+-- EXPECTED OUTPUT:
+-- Interactive chat prompt. Type messages and receive responses.
+-- Type 'exit' to quit.
+--
+-- Environment Variables:
+--   MODEL - Override default model (default: local/llama3.1:8b)
+--
+-- Next Steps:
+-- - See local_llm_comparison.lua for backend performance comparison
+-- - See cookbook/multi-agent-coordination.lua for advanced patterns
+-- ============================================================
 
 -- Configure model (default to Ollama llama3.1)
 local model = os.getenv("MODEL") or "local/llama3.1:8b"
