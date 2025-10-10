@@ -1821,42 +1821,30 @@ Created comprehensive 34-line TOML profile with:
 
 ---
 
-### Task 11b.4.5: Update list_builtin_profiles() - 🔲 PENDING
+### Task 11b.4.5: Update list_builtin_profiles() - ✅ COMPLETE
 **Priority**: HIGH
 **Estimated Time**: 5 minutes
-**Actual Time**:
-**Status**: 🔲 PENDING
+**Actual Time**: 4 minutes
+**Status**: ✅ COMPLETE
 **Depends On**: Task 11b.4.4 ✅
 
 **Objective**: Add 3 new profiles to list_builtin_profiles() return value
 
 **File**: `llmspell-config/src/lib.rs`
-**Lines**: ~1066-1076 (list_builtin_profiles function)
+**Lines**: 1046-1059 (list_builtin_profiles function)
 
-**Current Implementation** (7 profiles):
+**Implementation**: Extended profile list from 7 to 10 entries
+
+**Changes Made**:
+Added 3 new profile names after "development":
 ```rust
 pub fn list_builtin_profiles() -> Vec<&'static str> {
     vec![
         "minimal",
         "development",
-        "ollama",
-        "candle",
-        "rag-dev",
-        "rag-prod",
-        "rag-perf",
-    ]
-}
-```
-
-**Updated Implementation** (10 profiles):
-```rust
-pub fn list_builtin_profiles() -> Vec<&'static str> {
-    vec![
-        "minimal",
-        "development",
-        "providers",
-        "state",
-        "sessions",
+        "providers",      // NEW
+        "state",          // NEW
+        "sessions",       // NEW
         "ollama",
         "candle",
         "rag-dev",
@@ -1867,10 +1855,18 @@ pub fn list_builtin_profiles() -> Vec<&'static str> {
 ```
 
 **Validation**:
-- [ ] 3 new profile names added (providers, state, sessions)
-- [ ] Order groups profiles logically (Core → Common → Local LLM → RAG)
-- [ ] cargo build -p llmspell-config: compiles
-- [ ] list_builtin_profiles().len() == 10
+- [x] 3 new profile names added (providers, state, sessions)
+- [x] Order groups profiles logically (Core → Common → Local LLM → RAG)
+- [x] cargo build -p llmspell-config: compiles (1.25s)
+- [x] list_builtin_profiles().len() == 10
+- [x] Order matches load_builtin_profile() grouping
+
+**Insights**:
+- **Consistency**: Profile order matches the 4 categories in load_builtin_profile() error message
+- **API Completeness**: Both load and list functions now synchronized for all 10 profiles
+- **Simple Change**: Only 3 lines added, no logic changes required
+- **Discovery Support**: Users can now discover all 10 profiles via `llmspell profile list` command
+- **Documentation Ready**: Profile list ready for CLI help output and documentation updates
 
 ---
 

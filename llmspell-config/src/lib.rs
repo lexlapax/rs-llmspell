@@ -1047,6 +1047,9 @@ impl LLMSpellConfig {
         vec![
             "minimal",
             "development",
+            "providers",
+            "state",
+            "sessions",
             "ollama",
             "candle",
             "rag-dev",
