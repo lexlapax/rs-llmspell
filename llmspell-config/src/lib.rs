@@ -993,6 +993,11 @@ impl LLMSpellConfig {
             "minimal" => include_str!("../builtins/minimal.toml"),
             "development" => include_str!("../builtins/development.toml"),
 
+            // Common workflow profiles
+            "providers" => include_str!("../builtins/providers.toml"),
+            "state" => include_str!("../builtins/state.toml"),
+            "sessions" => include_str!("../builtins/sessions.toml"),
+
             // Local LLM profiles
             "ollama" => include_str!("../builtins/ollama.toml"),
             "candle" => include_str!("../builtins/candle.toml"),
@@ -1009,6 +1014,7 @@ impl LLMSpellConfig {
                         "Unknown builtin profile '{}'.\n\
                          Available profiles:\n\
                          Core: minimal, development\n\
+                         Common: providers, state, sessions\n\
                          Local LLM: ollama, candle\n\
                          RAG: rag-dev, rag-prod, rag-perf",
                         name
