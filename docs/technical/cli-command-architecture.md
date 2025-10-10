@@ -1,13 +1,13 @@
 # CLI Command Architecture
 
-**Version**: v0.9.0 (Phase 10 Complete including 10.22)
-**Status**: Production-Ready with Daemon Support, Service Integration, and Tool Commands
-**Last Updated**: September 2025
-**Phase**: 10 Complete (Integrated Kernel with Daemon Support + Tool CLI Commands)
+**Version**: v0.11.1 (Phase 11b Complete)
+**Status**: Production-Ready with Daemon Support, Service Integration, Tool Commands, and Local LLM Integration
+**Last Updated**: October 2025
+**Phase**: 11b Complete (Unified Profile System with Ollama + Candle Local LLM Support)
 
 ## Executive Summary
 
-This document describes the CLI command architecture implemented in LLMSpell v0.9.0 with integrated kernel architecture, full daemon support, and direct tool invocation capabilities. Phase 9 achieved a unified kernel architecture eliminating runtime isolation issues, while Phase 10 added Unix daemon mode with signal handling, service integration, and CLI-based tool management.
+This document describes the CLI command architecture implemented in LLMSpell v0.11.1 with integrated kernel architecture, full daemon support, direct tool invocation capabilities, and local LLM support. Phase 9 achieved a unified kernel architecture eliminating runtime isolation issues, Phase 10 added Unix daemon mode with service integration and tool commands, and Phase 11 completed local LLM integration with a unified profile system.
 
 **Phase 9 Achievements**: Integrated kernel with global IO runtime, protocol/transport abstraction, DAP bridge for debugging, and comprehensive tracing.
 
@@ -18,6 +18,13 @@ This document describes the CLI command architecture implemented in LLMSpell v0.
 - Enhanced logging infrastructure with rotation
 - Consolidated state/sessions into kernel
 - **Phase 10.22: Tool CLI Commands** - Direct tool invocation via kernel message protocol with list/info/invoke/search/test subcommands, enabling CLI access to 40+ tools for testing, debugging, and operations (Tasks 10.22.1-10.22.11)
+
+**Phase 11 Achievements**:
+- **Ollama Integration** - Full support for Ollama-hosted local LLMs with automatic model discovery
+- **Candle Integration** - Rust-native ML framework support for on-device inference without Python
+- **Unified Profile System (11b.3)** - Single --profile flag replacing fragmented --rag-profile hack, 7 builtin profiles (minimal, development, ollama, candle, rag-dev, rag-prod, rag-perf)
+- **Model Management CLI** - Complete model lifecycle management with pull/list/remove/info/available/status subcommands
+- **87% Compile Speedup** - Bridge-only builds improved from 38s to 5s via Cargo feature gates
 
 ---
 
@@ -61,6 +68,7 @@ Primary Commands:
 Subcommand Groups:
   kernel            # Kernel management (start/stop/status/connect/install-service)
   tool              # Tool management and direct invocation (Phase 10.22)
+  model             # Local LLM model management (Phase 11)
   state             # State management
   session           # Session management
   config            # Configuration management
@@ -92,6 +100,14 @@ llmspell
 │   ├── invoke <name> --params <json> [--stream]
 │   ├── search <keywords...> [--category]
 │   └── test <name> [--verbose]
+├── model                                       # Phase 11
+│   ├── list [--backend] [--verbose] [--format]
+│   ├── pull <model> [--force] [--quantization]
+│   ├── remove <model> [--yes]
+│   ├── info <model>
+│   ├── available [--backend] [--recommended]
+│   ├── status
+│   └── install-ollama
 ├── state
 │   ├── show [key] [--scope] [--kernel|--connect]
 │   ├── clear [key] [--scope] [--kernel|--connect]
@@ -629,6 +645,109 @@ VERSION OUTPUT INCLUDES:
     - Enabled feature flags
 ```
 
+### 4.8 Model Management (Phase 11)
+
+**Architecture Note**: Model management provides complete lifecycle operations for local LLMs via both Ollama and Candle backends. Models are downloaded, cached, and made available to scripts through provider configuration.
+
+```bash
+llmspell model <SUBCOMMAND>
+
+SUBCOMMANDS:
+    list              List installed models
+    pull              Download and install a model
+    remove            Remove an installed model
+    info              Show detailed model information
+    available         List available models for download
+    status            Show model backend status
+    install-ollama    Install Ollama backend
+
+LIST OPTIONS:
+    --backend <BACKEND>    Filter by backend (ollama|candle|all) [default: all]
+    --verbose              Show detailed model information
+    --format <FORMAT>      Output format (overrides global) [text|json|pretty]
+
+PULL OPTIONS:
+    --force               Force re-download even if model exists
+    --quantization <Q>    Quantization level for Candle models
+
+REMOVE OPTIONS:
+    --yes                 Skip confirmation prompt
+
+INFO ARGUMENTS:
+    <MODEL>              Model identifier (e.g., "llama2:7b@ollama" or "tinyllama@candle")
+
+AVAILABLE OPTIONS:
+    --backend <BACKEND>   Filter by backend (ollama|candle|all)
+    --recommended         Show only recommended models for each backend
+
+BACKENDS:
+    - **Ollama**: Community-curated models via Ollama registry (requires Ollama installed)
+    - **Candle**: Rust-native models with HuggingFace integration (no Python required)
+
+MODEL IDENTIFIER FORMAT:
+    <model-name>[:<tag>][@<backend>]
+
+    Examples:
+    - llama2:7b@ollama      # Ollama Llama 2 7B
+    - mistral@ollama        # Ollama Mistral (latest tag)
+    - tinyllama@candle      # Candle TinyLlama
+    - mistral:7b@candle     # Candle Mistral 7B
+
+EXAMPLES:
+    # List all installed models
+    llmspell model list
+
+    # List only Ollama models with details
+    llmspell model list --backend ollama --verbose
+
+    # Download Ollama model
+    llmspell model pull llama2:7b@ollama
+
+    # Download Candle model
+    llmspell model pull tinyllama@candle
+
+    # Force re-download
+    llmspell model pull mistral:7b@ollama --force
+
+    # Show model details
+    llmspell model info llama2:7b@ollama
+
+    # List available models
+    llmspell model available --backend candle
+
+    # Show only recommended models
+    llmspell model available --recommended
+
+    # Check backend status
+    llmspell model status
+
+    # Remove model without confirmation
+    llmspell model remove llama2:7b@ollama --yes
+
+    # Install Ollama backend
+    llmspell model install-ollama
+
+INTEGRATION WITH PROFILES:
+    Models work with local LLM profiles:
+
+    # Use with Ollama profile
+    llmspell -p ollama run script.lua
+
+    # Use with Candle profile
+    llmspell -p candle run script.lua
+
+    # Configure in script
+    local agent = Agent.create({
+        provider = "ollama",
+        model = "llama2:7b"
+    })
+
+CODE REFERENCES:
+    CLI: llmspell-cli/src/cli.rs:462-772 (ModelCommands enum)
+    Handler: llmspell-cli/src/commands/model.rs (handle_model_command)
+    Providers: llmspell-providers/src/{ollama,candle}/ (backend implementations)
+```
+
 ---
 
 ## 5. Daemon Mode and Service Integration
@@ -943,6 +1062,7 @@ COMMANDS:
     debug     Debug a script with breakpoints
     kernel    Manage kernel processes
     tool      Tool management and direct invocation
+    model     Local LLM model management
     state     Manage persistent state
     session   Manage sessions
     config    Configuration management
@@ -998,6 +1118,7 @@ GLOBAL OPTIONS:
 | `llmspell validate` | `llmspell config validate` | Grouped under config |
 | `llmspell providers` | `llmspell providers list` | Explicit subcommand |
 | N/A | `llmspell tool <subcommand>` | New in Phase 10.22 |
+| N/A | `llmspell model <subcommand>` | New in Phase 11 |
 
 ### 9.2 Flag Removals
 
@@ -1378,8 +1499,24 @@ The CLI command architecture provides a production-ready interface with:
    - Proper error handling and output formatting
    - Foundation for future MCP/A2A integration
 
-The architecture maintains backward compatibility for basic usage while providing robust service features for production deployments and comprehensive tool management for developer workflows.
+### Phase 11 Enhancements (Completed)
+1. **Ollama Integration** ✅ - Full local LLM support with model discovery
+2. **Candle Integration** ✅ - Rust-native ML framework, no Python deps
+3. **Model Management CLI** ✅ - Complete lifecycle operations
+   - list, pull, remove, info, available, status, install-ollama subcommands
+   - Dual-backend support (Ollama + Candle)
+   - Model identifier format: `<model>[:<tag>][@<backend>]`
+   - Integration with profile system
+4. **Unified Profile System (11b.3)** ✅ - Single --profile flag
+   - 7 builtin profiles: minimal, development, ollama, candle, rag-dev, rag-prod, rag-perf
+   - Replaced fragmented --rag-profile hack
+   - Loads complete 84-field configuration
+   - Precedence: --profile > -c > discovery > default
+5. **87% Compile Speedup** ✅ - Bridge-only builds: 38s→5s
+6. **API Standardization** ✅ - Tool.execute() consistent across all tools
+
+The architecture maintains backward compatibility for basic usage while providing robust service features for production deployments, comprehensive tool management for developer workflows, and flexible local LLM integration for privacy-focused and offline AI applications.
 
 ---
 
-*This document reflects the completed CLI command architecture from Phase 10 implementation including integrated kernel, daemon mode, full service integration, and Phase 10.22 tool command capabilities.*
+*This document reflects the completed CLI command architecture from Phase 11b implementation including integrated kernel, daemon mode, service integration, tool commands, local LLM support with Ollama and Candle, and unified profile system.*
