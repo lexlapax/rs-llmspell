@@ -2365,32 +2365,49 @@ pub fn list_builtin_profiles() -> Vec<&'static str> {
 
 ---
 
-### Task 11b.4.15: Update getting-started/README.md - 🔲 PENDING
+### Task 11b.4.15: Update getting-started/README.md - ✅ COMPLETE
 **Priority**: HIGH
 **Estimated Time**: 15 minutes
-**Actual Time**:
-**Status**: 🔲 PENDING
+**Actual Time**: 14 minutes
+**Status**: ✅ COMPLETE
 **Depends On**: Task 11b.4.14 ✅
 
 **Objective**: Update getting-started README with `-p` flag examples
 
 **File**: `examples/script-users/getting-started/README.md`
 
-**Update All Run Commands**:
-```markdown
-# Before
-llmspell -c ../configs/example-providers.toml run 02-first-agent.lua
+**Changes Made**:
 
-# After
-llmspell -p providers run 02-first-agent.lua
-# Or with debug logging:
-llmspell -p development run 02-first-agent.lua
-```
+1. **Quick Start Section** (lines 7-25):
+   - Updated Step 3: `-c configs/example-providers.toml` → `-p providers`
+   - Updated Step 5: Added `-p state` option
+   - Updated Step 6: `-c configs/rag-basic.toml` → `-p rag-dev`
+
+2. **Individual Step Sections**:
+   - **Step 3 (Agent)**: Changed from "Configuration file with providers" to "OpenAI or Anthropic API key (environment variable)"
+   - Added alternative: "Or with debug logging: `-p development`"
+   - **Step 5 (Error Handling)**: Changed from "Optional state config" to "None (state profile recommended)"
+   - Updated command: `-c ../configs/state-enabled.toml` → `-p state`
+   - **Step 6 (RAG)**: Changed prerequisites to "OpenAI API key (for text-embedding-ada-002)"
+   - Updated command: `-c ../configs/rag-basic.toml` → `-p rag-dev`
+   - Added alternative: "For production RAG settings: `-p rag-prod`"
+
+3. **Troubleshooting Section**:
+   - **Agent errors**: Replaced config file check with environment variable setup
+   - Shows how to export OPENAI_API_KEY and ANTHROPIC_API_KEY
+   - Updated command to use `-p providers`
+   - **State not available**: Simplified from `-c ../configs/state-enabled.toml` to `-p state`
 
 **Validation**:
-- [ ] All run commands use `-p` flags
-- [ ] Each example shows correct profile
-- [ ] Alternative profiles mentioned where relevant
+- [x] All run commands use `-p` flags
+- [x] Each example shows correct profile (providers, state, rag-dev, rag-prod, development)
+- [x] Alternative profiles mentioned where relevant (development for debug, rag-prod for production)
+
+**Insights**:
+- **Simplified Prerequisites**: Changed from "configuration file" to specific API key requirements
+- **Environment Variable Emphasis**: Troubleshooting now teaches proper API key setup via environment variables
+- **Profile Progression**: Shows basic profile first, then mentions alternatives (dev mode, production mode)
+- **Reduced Friction**: Users can now run all 6 getting-started examples with just builtin profiles
 
 ---
 
