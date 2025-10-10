@@ -131,49 +131,54 @@ builder.register(Arc::new(local_llm_global::LocalLLMGlobal::new(
 
 ---
 
-### Task 11b.1.2: Verify LocalLLM Global Injection - ⏳ TODO
+### Task 11b.1.2: Verify LocalLLM Global Injection - ✅ COMPLETE
 **Priority**: CRITICAL
 **Estimated Time**: 10 minutes
-**Status**: ⏳ TODO
+**Actual Time**: 15 minutes
+**Status**: ✅ COMPLETE
 **Depends On**: Task 11b.1.1 ✅
 
-**Test Command**:
+**Test Results**:
 ```bash
-target/release/llmspell exec --trace debug 'local status = LocalLLM.status("ollama")
-print("Health:", status.health)
-print("Models:", #status.available_models)'
+# Verified with debug binary
+target/debug/llmspell run /tmp/test_localllm_detailed.lua
 ```
 
-**Expected Output**:
+**Actual Output**:
 ```
-2025-10-10T03:27:40.691544Z  INFO Successfully injected all Lua globals globals_injected=15
-                                                                                         ^^^ 15, not 14!
-Health: checking
-Models: 3
+=== Testing LocalLLM.status() ===
+Status type:	table
+Status structure:
+  candle:	table
+    models:	0	(number)
+    ready:	false	(boolean)
+    error:	Not configured	(string)
+  ollama:	table
+    running:	false	(boolean)
+    models:	0	(number)
+    error:	Not configured	(string)
+
+=== Testing LocalLLM.list() ===
+Models type:	table
+Models count:	0
 ```
 
-**Failure Indicators**:
-- `globals_injected=14` in trace (still broken)
-- Lua error: `attempt to index a nil value (global 'LocalLLM')` (still broken)
-- No LocalLLM in injected globals list
-
-**Debug Trace Check**:
-```bash
-# Should see LocalLLM in globals list
-target/release/llmspell exec --trace trace 'print(LocalLLM)' 2>&1 | grep -i "localllm\|globals_injected"
-```
-
-**Steps**:
-1. Run test command above
-2. Check trace logs for `globals_injected=15` (not 14)
-3. Verify no Lua nil value errors
-4. Confirm LocalLLM methods return data (not nil)
+**Trace Confirmation**:
+- `globals_injected=15` ✅ (was 14 before fix)
+- `Injecting global global_name=LocalLLM` ✅
+- `LocalLLM global registered successfully` ✅
 
 **Validation**:
-- [ ] Trace shows 15 globals injected (was 14)
-- [ ] No Lua nil value errors
-- [ ] LocalLLM.status() returns table with health/models fields
-- [ ] LocalLLM.list() returns array
+- [x] Trace shows 15 globals injected (was 14) ✅
+- [x] No Lua nil value errors ✅
+- [x] LocalLLM.status() returns table with backend status fields ✅
+- [x] LocalLLM.list() returns array ✅
+
+**Insights**:
+- **API Structure**: `status.ollama.running/models` not `status.health/available_models` (nested backend objects)
+- **Backend Detection**: Returns "Not configured" when backends not set up (expected behavior)
+- **All Methods Functional**: status(), list() work correctly, return valid tables
+- **Registration Success**: LocalLLM now appears in global registry (15/15 vs 14/15)
 
 ---
 
