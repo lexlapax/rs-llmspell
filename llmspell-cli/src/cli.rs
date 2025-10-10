@@ -37,7 +37,7 @@
 //! llmspell --output json run script.lua arg1 arg2
 //!
 //! # Start REPL with specific RAG profile
-//! llmspell --rag-profile research-assistant repl
+//! llmspell -p rag-dev repl
 //!
 //! # Connect to remote kernel for debugging
 //! llmspell --connect localhost:9572 debug script.lua --break-at main.lua:10
