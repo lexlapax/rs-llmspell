@@ -23,6 +23,8 @@ This document describes the CLI command architecture implemented in LLMSpell v0.
 - **Ollama Integration** - Full support for Ollama-hosted local LLMs with automatic model discovery
 - **Candle Integration** - Rust-native ML framework support for on-device inference without Python
 - **Unified Profile System (11b.3)** - Single --profile flag replacing fragmented --rag-profile hack, 7 builtin profiles (minimal, development, ollama, candle, rag-dev, rag-prod, rag-perf)
+- **Profile Discovery (11b.4)** - `config list-profiles` command with metadata (categories, descriptions, use cases, features) and --detailed flag
+- **Model Discovery UX (11b.5)** - Dual-tier discovery with `model available` command and web URLs (Ollama library + HuggingFace) in help text
 - **Model Management CLI** - Complete model lifecycle management with pull/list/remove/info/available/status subcommands
 - **87% Compile Speedup** - Bridge-only builds improved from 38s to 5s via Cargo feature gates
 
@@ -121,7 +123,8 @@ llmspell
 ├── config
 │   ├── init [--output] [--force]
 │   ├── validate [--file]
-│   └── show [section] [--format]
+│   ├── show [section] [--format]
+│   └── list-profiles [--detailed]
 ├── keys
 │   ├── add <provider> <key>
 │   ├── list
@@ -551,9 +554,10 @@ EXAMPLES:
 llmspell config <SUBCOMMAND>
 
 SUBCOMMANDS:
-    init      Initialize configuration
-    validate  Validate configuration
-    show      Show configuration
+    init           Initialize configuration
+    validate       Validate configuration
+    show           Show configuration
+    list-profiles  List available builtin profiles
 
 INIT OPTIONS:
     --output <PATH>         Output path for configuration file [default: llmspell.toml]
@@ -565,10 +569,15 @@ VALIDATE OPTIONS:
 SHOW OPTIONS:
     --format <FORMAT>       Output format: toml|json [default: toml]
 
+LIST-PROFILES OPTIONS:
+    --detailed             Show detailed profile information including use cases and features
+
 EXAMPLES:
     llmspell config init --output custom.toml --force
     llmspell config validate --file production.toml
     llmspell config show rag --format json
+    llmspell config list-profiles                # List all builtin profiles
+    llmspell config list-profiles --detailed     # Show detailed information
 ```
 
 ### 4.6 Application Management
@@ -688,7 +697,18 @@ MODEL IDENTIFIER FORMAT:
     - tinyllama@candle      # Candle TinyLlama
     - mistral:7b@candle     # Candle Mistral 7B
 
+MODEL DISCOVERY (Phase 11b.5):
+    Two-tier discovery system for finding available models:
+    1. **Programmatic**: `llmspell model available` - Lists models from backend libraries
+    2. **Web Browsing**: Direct URLs provided in help text for comprehensive exploration
+       - Ollama: https://ollama.com/library
+       - Candle: https://huggingface.co/models?pipeline_tag=text-generation
+
 EXAMPLES:
+    # Discover available models (Phase 11b.5)
+    llmspell model available                     # List models from backend libraries
+    llmspell model pull --help                   # Shows discovery URLs in help text
+
     # List all installed models
     llmspell model list
 
@@ -707,7 +727,7 @@ EXAMPLES:
     # Show model details
     llmspell model info llama2:7b@ollama
 
-    # List available models
+    # List available models by backend
     llmspell model available --backend candle
 
     # Show only recommended models
@@ -1507,8 +1527,16 @@ The CLI command architecture provides a production-ready interface with:
    - Replaced fragmented --rag-profile hack
    - Loads complete 84-field configuration
    - Precedence: --profile > -c > discovery > default
-5. **87% Compile Speedup** ✅ - Bridge-only builds: 38s→5s
-6. **API Standardization** ✅ - Tool.execute() consistent across all tools
+5. **Profile Discovery (11b.4)** ✅ - `config list-profiles` command
+   - Metadata display: categories, descriptions, use cases, features
+   - --detailed flag for comprehensive profile information
+   - Grouped output by category (Core, Common Workflows, Local LLM, RAG)
+6. **Model Discovery UX (11b.5)** ✅ - Dual-tier model discovery
+   - Programmatic: `model available` command featured as first example
+   - Web browsing: URLs in help text (Ollama library + HuggingFace)
+   - Addresses "where do I find model names?" UX gap
+7. **87% Compile Speedup** ✅ - Bridge-only builds: 38s→5s
+8. **API Standardization** ✅ - Tool.execute() consistent across all tools
 
 The architecture maintains backward compatibility for basic usage while providing robust service features for production deployments, comprehensive tool management for developer workflows, and flexible local LLM integration for privacy-focused and offline AI applications.
 

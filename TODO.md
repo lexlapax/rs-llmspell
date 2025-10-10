@@ -3099,8 +3099,46 @@ llmspell model pull --help | grep "huggingface.co"  # Should find URL
 - No config migration, no database changes
 
 **Documentation Updates**:
-- N/A (help text is self-documenting)
+- [x] docs/technical/cli-command-architecture.md updated with Phase 11b.4 and 11b.5 ✅
 - Optional: Mention in RELEASE_NOTES for v0.11.2
+
+### Task 11b.5.2: Update Architecture Documentation
+**Priority**: MEDIUM
+**Estimated Time**: 10 minutes
+**Actual Time**: 8 minutes
+**Status**: ✅ COMPLETE
+**Depends On**: Task 11b.5.1 ✅
+
+**File**: `docs/technical/cli-command-architecture.md`
+
+**Changes Made**:
+1. **Phase 11 Achievements Section** (lines 22-29):
+   - Added **Profile Discovery (11b.4)** achievement
+   - Added **Model Discovery UX (11b.5)** achievement
+
+2. **Command Tree Section** (lines 122-126):
+   - Added `list-profiles [--detailed]` to config subcommands
+
+3. **Configuration Management Section** (lines 550-580):
+   - Added `list-profiles` subcommand documentation
+   - Added LIST-PROFILES OPTIONS with --detailed flag
+   - Added examples for config list-profiles
+
+4. **Model Management Section** (lines 699-742):
+   - Added **MODEL DISCOVERY (Phase 11b.5)** section explaining dual-tier system
+   - Added discovery examples as first items in EXAMPLES section
+   - Updated examples to show `model available` and `model pull --help` workflow
+
+5. **Phase 11 Enhancements Summary** (lines 1517-1539):
+   - Added **Profile Discovery (11b.4)** with details
+   - Added **Model Discovery UX (11b.5)** with dual-tier explanation
+
+**Insights**:
+- **Architecture Consistency**: Both Phase 11b.4 and 11b.5 follow same discovery UX pattern (programmatic + help text)
+- **Documentation Completeness**: All sections updated (achievements, command tree, detailed docs, summary)
+- **Cross-referencing**: Model discovery section properly references help text changes from Task 11b.5.1
+- **User Journey**: Documentation now explains complete workflow: `model pull --help` → see URLs OR `model available` → browse → pull
+- **Phase Tracking**: Architecture doc properly tracks Phase 11b sub-phases (11b.3, 11b.4, 11b.5)
 
 **Completion Insights**:
 - **Two-Tier Discovery**: Programmatic (`model available`) + Web (URLs) addresses different user workflows - implemented successfully
