@@ -2309,73 +2309,59 @@ pub fn list_builtin_profiles() -> Vec<&'static str> {
 
 ---
 
-### Task 11b.4.14: Update examples/script-users/README.md - 🔲 PENDING
+### Task 11b.4.14: Update examples/script-users/README.md - ✅ COMPLETE
 **Priority**: HIGH
 **Estimated Time**: 20 minutes
-**Actual Time**:
-**Status**: 🔲 PENDING
+**Actual Time**: 18 minutes
+**Status**: ✅ COMPLETE
 **Depends On**: Phase 2 Complete (Tasks 11b.4.7-11b.4.13) ✅
 
 **Objective**: Update main examples README to demonstrate builtin profile usage
 
 **File**: `examples/script-users/README.md`
 
-**Sections to Update**:
-1. **Quick Start** - Show `-p` flag first:
-```markdown
-## Quick Start
+**Changes Made**:
 
-All examples can run with builtin profiles:
+1. **Added Quick Start Section** (after Quick Stats):
+   - Shows 5 example commands with builtin profiles
+   - Covers: minimal, providers, state, rag-dev, ollama
+   - Zero-config approach emphasized
 
-```bash
-# Tools and workflows (no LLM needed)
-llmspell -p minimal run getting-started/00-hello-world.lua
+2. **Added "Available Builtin Profiles" subsection**:
+   - All 10 profiles documented with descriptions
+   - Clear capability descriptions for each profile
 
-# Agent examples (requires OpenAI/Anthropic API keys)
-llmspell -p providers run getting-started/02-first-agent.lua
+3. **Added "Custom Configuration (Optional)" subsection**:
+   - De-emphasized as optional
+   - Shows syntax but positions as advanced use case
 
-# State persistence examples
-llmspell -p state run features/state-persistence.lua
+4. **Updated Directory Structure**:
+   - Changed from "15 configuration files" to "Custom configuration examples (unique patterns)"
+   - De-emphasized config count
 
-# RAG examples (requires embedding model)
-llmspell -p rag-dev run getting-started/05-first-rag.lua
-```
+5. **Restructured "Running Examples" Section**:
+   - Split into two subsections:
+     - "With Builtin Profiles (Recommended)" - prioritized
+     - "With Custom Configuration (Advanced)" - de-emphasized
+   - Builtin examples shown first with 4 common patterns
+   - Custom configs positioned as advanced/unique patterns only
 
-## Available Builtin Profiles
-
-- **minimal** - Tools only, no LLM providers
-- **development** - Dev settings with OpenAI/Anthropic + debug logging
-- **providers** - Simple OpenAI/Anthropic setup for agents
-- **state** - State persistence enabled
-- **sessions** - Sessions + state + hooks + events
-- **ollama** - Local Ollama LLM backend
-- **candle** - Local Candle LLM backend
-- **rag-dev** - RAG development with debug features
-- **rag-prod** - RAG production settings
-- **rag-perf** - RAG performance tuning
-
-## Custom Configuration
-
-For advanced use cases, create a custom config file:
-```bash
-llmspell -c path/to/custom-config.toml run script.lua
-```
-```
-
-2. **Directory Structure** - Update configs/ description:
-```markdown
-configs/               # Custom configuration examples (unique patterns)
-  rag-basic.toml       # Simplified RAG for learning
-  rag-multi-tenant.toml # Multi-tenant RAG isolation
-  applications.toml    # Application-specific settings
-  ...
-```
+6. **Updated "Configs" Section**:
+   - Changed title from "15 Configuration Files" to "Custom Configuration Examples"
+   - Repositioned as demonstrating unique patterns, not primary approach
+   - Added note: "Most examples work with builtin profiles"
 
 **Validation**:
-- [ ] Quick Start section shows `-p` flag examples
-- [ ] All 10 builtin profiles documented
-- [ ] Custom config section de-emphasized (but still shown)
-- [ ] Directory structure reflects reduced config count
+- [x] Quick Start section shows `-p` flag examples
+- [x] All 10 builtin profiles documented
+- [x] Custom config section de-emphasized (but still shown)
+- [x] Directory structure reflects reduced config emphasis
+
+**Insights**:
+- **User Experience Improvement**: Quick Start now appears immediately after stats, making zero-config approach discoverable
+- **Progressive Disclosure**: Builtin profiles first, custom configs positioned as advanced
+- **Config De-emphasis**: Configs repositioned from "15 ready-to-use" to "custom examples for unique patterns"
+- **Clear Progression**: Beginner → `-p profile`, Advanced → custom config.toml
 
 ---
 
