@@ -2,11 +2,30 @@
 
 **Status**: 🚀 **Phase 8.10.6** - Complete configuration set with RAG, state persistence, providers, and applications
 
-This directory contains 15 pre-configured templates for various LLMSpell use cases, from minimal tool-only setups to production RAG deployments.
+## 🎯 Primary Approach: Builtin Profiles
 
-## 📊 Configuration Overview
+**Most users should use builtin profiles** (`-p profile-name`) instead of custom config files:
 
-**15 Configuration Files** organized by category:
+```bash
+# Recommended: Use builtin profiles
+llmspell -p providers run script.lua        # Agents with OpenAI/Anthropic
+llmspell -p state run script.lua            # State persistence
+llmspell -p rag-dev run script.lua          # RAG development
+llmspell -p rag-prod run script.lua         # RAG production
+```
+
+See [Builtin Profiles](#builtin-profiles-recommended) below for complete list.
+
+## 🔧 When to Use Custom Configs
+
+This directory contains **custom configuration templates** for advanced scenarios:
+- Multi-tenant RAG with unique isolation requirements
+- Application-specific security policies
+- Custom resource limits and performance tuning
+- Migration and backup strategies
+- Demonstrating configuration patterns for learning
+
+**15 Custom Configuration Templates** available:
 
 ### 📁 Files in this Directory
 
@@ -243,25 +262,60 @@ document_cache_enabled = true     # Cache documents
 document_cache_size_mb = 100     # Document cache size
 ```
 
-## 🚀 Quick Start Guide
+## 🎯 Builtin Profiles (Recommended)
+
+**Use builtin profiles for zero-config quick start:**
+
+| Profile | Purpose | When to Use |
+|---------|---------|-------------|
+| `minimal` | Tools only, no LLM | Testing, learning tools |
+| `development` | Dev mode with debug | Development, debugging |
+| `providers` | OpenAI + Anthropic | Agent examples, LLM scripts |
+| `state` | State persistence | State management examples |
+| `sessions` | Sessions + state + events | Conversational apps |
+| `ollama` | Local Ollama LLM | Local LLM with Ollama |
+| `candle` | Local Candle LLM | Local LLM with Candle |
+| `rag-dev` | RAG development | Learning RAG, prototyping |
+| `rag-prod` | RAG production | Production RAG deployment |
+| `rag-perf` | RAG performance | High-performance RAG |
+
+**Examples:**
+```bash
+# For agent examples (requires API key)
+llmspell -p providers run script.lua
+
+# For state persistence
+llmspell -p state run script.lua
+
+# For RAG examples
+llmspell -p rag-dev run script.lua
+llmspell -p rag-prod run script.lua
+
+# For local LLM
+llmspell -p ollama run script.lua
+```
+
+## 🔧 Custom Configurations (Advanced)
+
+### When to Use Custom Config Files
+
+Use custom configs when you need:
+- Unique multi-tenant isolation policies
+- Custom resource limits beyond profile defaults
+- Application-specific security settings
+- Advanced migration or backup strategies
 
 ### Choose Your Configuration
 
 ```bash
-# For simple tool scripts (no LLM needed)
-./target/debug/llmspell -c examples/script-users/configs/minimal.toml run script.lua
+# Multi-tenant RAG with custom isolation
+./target/debug/llmspell -c examples/script-users/configs/rag-multi-tenant.toml run script.lua
 
-# For agent/LLM examples
-./target/debug/llmspell -c examples/script-users/configs/example-providers.toml run script.lua
-
-# For state persistence
-./target/debug/llmspell -c examples/script-users/configs/state-enabled.toml run script.lua
-
-# For RAG examples
-./target/debug/llmspell -c examples/script-users/configs/rag-basic.toml run script.lua
-
-# For production applications
+# Custom application configuration
 ./target/debug/llmspell -c examples/script-users/configs/applications.toml run app/main.lua
+
+# Migration testing
+./target/debug/llmspell -c examples/script-users/configs/migration-enabled.toml run script.lua
 ```
 
 ## Usage
@@ -312,29 +366,30 @@ end
 
 ## 📋 Configuration Selection Guide
 
-### By Use Case
+### By Use Case (Builtin Profiles First)
 
-| Use Case | Recommended Config | Key Features |
-|----------|-------------------|--------------|
-| **Learning LLMSpell** | `minimal.toml` | Tools only, no setup needed |
-| **First agent** | `example-providers.toml` | OpenAI + Anthropic ready |
-| **State examples** | `state-enabled.toml` | State API with memory backend |
-| **RAG prototyping** | `rag-development.toml` | Mock backend for fast iteration |
-| **RAG production** | `rag-production.toml` | Full RAG with persistence |
-| **SaaS platform** | `rag-multi-tenant.toml` | Tenant isolation, quotas |
-| **Complete apps** | `applications.toml` | All features configured |
-| **Best practices** | `cookbook.toml` | Production patterns |
+| Use Case | Recommended Approach | Alternative (Custom Config) |
+|----------|---------------------|---------------------------|
+| **Learning LLMSpell** | `-p minimal` | `minimal.toml` |
+| **First agent** | `-p providers` | `example-providers.toml` |
+| **State examples** | `-p state` | `state-enabled.toml` |
+| **RAG prototyping** | `-p rag-dev` | `rag-development.toml` |
+| **RAG production** | `-p rag-prod` | `rag-production.toml` |
+| **SaaS platform** | `-p rag-prod` + custom | `rag-multi-tenant.toml` |
+| **Complete apps** | `-p development` | `applications.toml` |
+| **Local LLM** | `-p ollama` or `-p candle` | Custom provider config |
+
+**Note**: Use builtin profiles unless you need custom resource limits, multi-tenant isolation, or unique security policies.
 
 ### By Example Type
 
-| Example Directory | Use This Config | Why |
-|------------------|-----------------|-----|
-| `getting-started/00-04` | `minimal.toml` | No providers needed |
-| `getting-started/05` | `rag-basic.toml` | RAG introduction |
-| `features/` | `example-providers.toml` | Provider features |
-| `cookbook/` | `cookbook.toml` | Production patterns |
-| `applications/` | Each has own config | App-specific needs |
-| `advanced-patterns/` | `example-providers.toml` | Multi-agent patterns |
+| Example Directory | Use Builtin Profile | Custom Config (if needed) |
+|------------------|---------------------|--------------------------|
+| `getting-started/` | `-p minimal`, `-p providers`, `-p rag-dev` | See individual examples |
+| `features/` | `-p providers`, `-p state` | N/A |
+| `cookbook/` | `-p providers`, `-p sessions`, `-p rag-prod` | `cookbook.toml` for patterns |
+| `applications/` | `-p development`, `-p rag-prod` | Each app has own config.toml |
+| `advanced-patterns/` | `-p providers`, `-p development` | N/A |
 
 ## Validation
 
@@ -398,31 +453,32 @@ RUST_LOG=debug ./target/debug/llmspell -c config.toml run script.lua
 
 #### Provider Issues
 1. **"No providers available"**
+   - Use builtin profile: `llmspell -p providers run script.lua`
    - Check API keys are set: `echo $OPENAI_API_KEY`
-   - Verify provider section in config
-   - Use `example-providers.toml` as reference
+   - Alternative: Use `example-providers.toml` as reference for custom config
 
 2. **"Rate limit exceeded"**
-   - Add rate limiting to config
-   - Use `cookbook.toml` for retry patterns
-   - Implement exponential backoff
+   - Builtin profiles include sensible rate limits
+   - For custom limits: Use `cookbook.toml` as reference
+   - Implement exponential backoff in your script
 
 #### State Issues
 1. **"State not available"**
-   - Use `state-enabled.toml` or similar
-   - Ensure `[runtime.state_persistence]` section exists
-   - Set `enabled = true`
+   - Use builtin profile: `llmspell -p state run script.lua`
+   - Alternative: Use `state-enabled.toml` custom config
+   - Ensure `[runtime.state_persistence]` section exists with `enabled = true`
 
 2. **"State too large"**
-   - Increase `max_state_size_bytes`
+   - Increase `max_state_size_bytes` in custom config
    - Use file or sqlite backend instead of memory
    - Implement state cleanup patterns
 
 #### RAG Issues
 1. **"RAG not available"**
-   - Ensure `rag.enabled = true` in config
-   - Check embedding provider is configured
-   - Verify API key for embeddings
+   - Use builtin profile: `llmspell -p rag-dev run script.lua` (development)
+   - Or: `llmspell -p rag-prod run script.lua` (production)
+   - Verify API key for embeddings: `echo $OPENAI_API_KEY`
+   - Alternative: Ensure `rag.enabled = true` in custom config
 
 2. **Out of memory with RAG**
    - Reduce `max_memory_mb` in vector storage

@@ -2504,46 +2504,48 @@ pub fn list_builtin_profiles() -> Vec<&'static str> {
 
 ---
 
-### Task 11b.4.18: Update configs/README.md - 🔲 PENDING
+### Task 11b.4.18: Update configs/README.md - ✅ COMPLETE
 **Priority**: HIGH
 **Estimated Time**: 30 minutes
-**Actual Time**:
-**Status**: 🔲 PENDING
+**Actual Time**: 22 minutes
+**Status**: ✅ COMPLETE
 **Depends On**: Task 11b.4.14 ✅
 
-**Objective**: Update configs README to document remaining unique configs after cleanup
+**Objective**: Reposition configs README to emphasize builtin profiles as primary approach
 
 **File**: `examples/script-users/configs/README.md`
 
-**Major Rewrite** - Focus on "When to Use Custom Configs":
-```markdown
-# Configuration Examples
+**Major Changes Made**:
 
-Most examples work with builtin profiles (use `llmspell -p <profile>`).
-This directory contains **unique configuration patterns** not covered by builtins.
+1. **Added Preamble Section** (lines 5-28):
+   - **Primary Approach: Builtin Profiles** - emphasizes profiles as recommended
+   - Shows 4 example profile commands
+   - **When to Use Custom Configs** - repositions custom configs as advanced
+   - Lists scenarios: multi-tenant isolation, custom security, resource tuning, migration
+   - Changed positioning from "15 configuration files" to "15 custom configuration templates"
 
-## Builtin Profiles (Recommended)
+2. **Inserted Builtin Profiles Table** (lines 265-296):
+   - New section: "Builtin Profiles (Recommended)"
+   - Table with all 10 profiles, purpose, and when to use
+   - Example commands showing profile usage
+   - Positioned BEFORE custom config details
 
-For common workflows, use builtin profiles:
-- `llmspell -p minimal` - Tools only
-- `llmspell -p providers` - Simple agents
-- `llmspell -p state` - State persistence
-- `llmspell -p sessions` - Full session management
-- `llmspell -p rag-dev` - RAG development
-- See `llmspell --help` for all 10 builtin profiles
+3. **Renamed Quick Start Section** (lines 298-319):
+   - From "Quick Start Guide" → "Custom Configurations (Advanced)"
+   - Added "When to Use Custom Config Files" subsection
+   - Shows only 3 examples of custom configs (multi-tenant, apps, migration)
+   - De-emphasized from 5 commands to 3 advanced scenarios
 
-## Custom Configs in This Directory
+4. **Updated Configuration Selection Guide** (lines 367-392):
+   - Tables now show "Builtin Profile" first, "Alternative (Custom Config)" second
+   - By Use Case: Shows `-p profile` as primary, config files as alternative
+   - By Example Type: Shows builtin profiles first, custom configs as "if needed"
+   - Added note: "Use builtin profiles unless you need custom resource limits..."
 
-Use these for **specific patterns** not covered by builtins:
-
-### rag-basic.toml
-Simplified RAG for learning (simpler than rag-dev builtin)
-
-### rag-multi-tenant.toml
-Multi-tenant RAG with namespace isolation
-
-### applications.toml
-Complex application-specific settings with cost management
+5. **Updated Troubleshooting Section** (lines 454-481):
+   - Provider Issues: Shows `-p providers` first, config file as alternative
+   - State Issues: Shows `-p state` first, config file as alternative
+   - RAG Issues: Shows `-p rag-dev` / `-p rag-prod` first, config as alternative
 
 ### [Other unique configs]
 ...
@@ -2560,10 +2562,17 @@ See docs/user-guide/configuration.md for full config reference.
 ```
 
 **Validation**:
-- [ ] README emphasizes builtin profiles first
-- [ ] Unique configs clearly documented with use cases
-- [ ] Removed references to duplicate configs
-- [ ] Migration guide from old configs to builtins
+- [x] README emphasizes builtin profiles first (preamble + table at top)
+- [x] Unique configs clearly documented with use cases
+- [x] Custom configs repositioned as advanced patterns
+- [x] Configuration Selection Guide prioritizes profiles
+
+**Insights**:
+- **Dramatic Repositioning**: Changed from "15 configuration files for all use cases" to "15 custom templates for advanced scenarios"
+- **Zero-Config First**: Builtin profiles now appear at top of README before config file details
+- **Progressive Disclosure**: Profiles → custom configs, not the reverse
+- **Custom Config Justification**: Clear use cases for when profiles aren't sufficient
+- **Troubleshooting Flow**: Users guided to profiles first, custom configs only if needed
 
 ---
 
