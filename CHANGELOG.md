@@ -7,6 +7,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+
+#### Phase 11b: LocalLLM Global Registration Bug
+- Fixed LocalLLM global not being injected into Lua runtime (14/15 vs 15/15 globals)
+- Root cause: `get_bridge("provider_manager")` was never populated
+- Fix: Use `context.providers.create_core_manager_arc().await?` directly
+- Corrected API documentation examples across 3 files (status.ollama.running vs incorrect status.health)
+
 ## [0.11.1] - 2025-10-09 - Bridge Consolidation & Documentation Completeness 🚀
 
 ### Platform Testing Status

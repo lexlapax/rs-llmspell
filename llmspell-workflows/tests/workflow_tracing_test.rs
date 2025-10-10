@@ -17,6 +17,7 @@ use llmspell_workflows::{
 use serde_json::json;
 use std::sync::Arc;
 use std::time::Duration;
+use tracing::info_span;
 use tracing_subscriber::{fmt, layer::SubscriberExt, util::SubscriberInitExt, EnvFilter};
 
 /// Initialize test tracing subscriber
@@ -52,7 +53,7 @@ async fn test_workflow_executor_tracing() -> Result<()> {
     // Test execute_workflow tracing
     let input = WorkflowInput::new(json!({"test": "data"}));
 
-    tracing::info_span!("test_execute_workflow")
+    info_span!("test_execute_workflow")
         .in_scope(|| async {
             let result = executor
                 .execute_workflow(workflow.clone(), input.clone())
@@ -69,7 +70,7 @@ async fn test_workflow_executor_tracing() -> Result<()> {
         enable_tracing: true,
     };
 
-    tracing::info_span!("test_execute_with_context")
+    info_span!("test_execute_with_context")
         .in_scope(|| async {
             let result = executor
                 .execute_with_context(workflow.clone(), input.clone(), context)
@@ -79,7 +80,7 @@ async fn test_workflow_executor_tracing() -> Result<()> {
         .await;
 
     // Test execute_async tracing
-    tracing::info_span!("test_execute_async")
+    info_span!("test_execute_async")
         .in_scope(|| async {
             let handle = executor.execute_async(workflow.clone(), input.clone());
             let result = handle.await?;
@@ -117,7 +118,7 @@ async fn test_sequential_workflow_tracing() -> Result<()> {
     let executor = DefaultWorkflowExecutor::new();
     let input = WorkflowInput::new(json!({"sequential": "test"}));
 
-    tracing::info_span!("test_sequential_execution")
+    info_span!("test_sequential_execution")
         .in_scope(|| async {
             let result = executor.execute_workflow(workflow, input).await;
             assert!(result.is_ok());
@@ -176,7 +177,7 @@ async fn test_conditional_workflow_tracing() -> Result<()> {
     let executor = DefaultWorkflowExecutor::new();
     let input = WorkflowInput::new(json!({"conditional": "test"}));
 
-    tracing::info_span!("test_conditional_execution")
+    info_span!("test_conditional_execution")
         .in_scope(|| async {
             let result = executor.execute_workflow(Arc::new(workflow), input).await;
             assert!(result.is_ok());
@@ -215,7 +216,7 @@ async fn test_parallel_workflow_tracing() -> Result<()> {
     let executor = DefaultWorkflowExecutor::new();
     let input = WorkflowInput::new(json!({"parallel": "test"}));
 
-    tracing::info_span!("test_parallel_execution")
+    info_span!("test_parallel_execution")
         .in_scope(|| async {
             let result = executor.execute_workflow(Arc::new(workflow), input).await;
             assert!(result.is_ok());
@@ -253,7 +254,7 @@ async fn test_step_timing_tracing() -> Result<()> {
     let input = WorkflowInput::new(json!({"timing": "test"}));
 
     // Test timing instrumentation
-    tracing::info_span!("test_step_timing")
+    info_span!("test_step_timing")
         .in_scope(|| async {
             let start = std::time::Instant::now();
             let _ = workflow_executor.execute_workflow(workflow, input).await;
@@ -287,7 +288,7 @@ async fn test_error_handling_tracing() -> Result<()> {
     let executor = DefaultWorkflowExecutor::new();
     let input = WorkflowInput::new(json!({"test": "error"}));
 
-    tracing::info_span!("test_error_handling")
+    info_span!("test_error_handling")
         .in_scope(|| async {
             let result = executor.execute_workflow(workflow, input).await;
             // We expect this to fail, we're just testing that error tracing works
@@ -327,7 +328,7 @@ async fn test_workflow_tracing_performance() -> Result<()> {
 
     // Measure with tracing span
     let start = std::time::Instant::now();
-    tracing::info_span!("perf_test")
+    info_span!("perf_test")
         .in_scope(|| async {
             for _ in 0..10 {
                 let _ = executor

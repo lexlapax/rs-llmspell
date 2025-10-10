@@ -1001,7 +1001,9 @@ pub async fn start_embedded_kernel(config: LLMSpellConfig) -> Result<KernelHandl
                 "data-validator" => {
                     StubTool::new("data-validator", "Validate data", ToolCategory::Data)
                 }
-                "web-searcher" => StubTool::new("web-searcher", "Search the web", ToolCategory::Web),
+                "web-searcher" => {
+                    StubTool::new("web-searcher", "Search the web", ToolCategory::Web)
+                }
                 "webhook-caller" => {
                     StubTool::new("webhook-caller", "Call webhooks", ToolCategory::Api)
                 }

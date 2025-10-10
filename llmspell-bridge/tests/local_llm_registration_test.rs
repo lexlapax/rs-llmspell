@@ -1,12 +1,13 @@
-//! Integration test: LocalLLM global registration
+//! Integration test: `LocalLLM` global registration
 //!
-//! Validates that LocalLLM global is properly injected when ProviderManager
-//! exists in GlobalContext (regression test for Phase 11b bug fix).
+//! Validates that `LocalLLM` global is properly injected when `ProviderManager`
+//! exists in `GlobalContext` (regression test for Phase 11b bug fix).
 
 #[cfg(feature = "lua")]
 mod local_llm_registration {
     use llmspell_bridge::globals::{create_standard_registry, GlobalContext};
     use llmspell_bridge::{ComponentRegistry, ProviderManager};
+    use llmspell_config::ProviderManagerConfig;
     use std::sync::Arc;
 
     #[tokio::test]
@@ -14,7 +15,7 @@ mod local_llm_registration {
         // Arrange: Create context with provider manager (normal runtime setup)
         let registry = Arc::new(ComponentRegistry::new());
         let providers = Arc::new(
-            ProviderManager::new(Default::default())
+            ProviderManager::new(ProviderManagerConfig::default())
                 .await
                 .expect("Failed to create ProviderManager"),
         );
@@ -38,8 +39,7 @@ mod local_llm_registration {
         let global_count = global_registry.list_globals().len();
         assert_eq!(
             global_count, 15,
-            "Expected 15 globals (including LocalLLM), got {}",
-            global_count
+            "Expected 15 globals (including LocalLLM), got {global_count}"
         );
     }
 
@@ -48,7 +48,7 @@ mod local_llm_registration {
         // Arrange
         let registry = Arc::new(ComponentRegistry::new());
         let providers = Arc::new(
-            ProviderManager::new(Default::default())
+            ProviderManager::new(ProviderManagerConfig::default())
                 .await
                 .expect("Failed to create ProviderManager"),
         );
