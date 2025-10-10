@@ -16,11 +16,11 @@
 --   • Multiple provider support (OpenAI, Anthropic)
 --
 -- Prerequisites:
---   • API keys: OPENAI_API_KEY or ANTHROPIC_API_KEY
---   • Config: examples/script-users/configs/example-providers.toml
+--   • API keys: OPENAI_API_KEY or ANTHROPIC_API_KEY environment variable
+--   • Network connectivity for API calls
 --
 -- HOW TO RUN:
--- OPENAI_API_KEY=$OPENAI_API_KEY ./target/debug/llmspell run examples/script-users/features/agent-basics.lua
+-- ./target/debug/llmspell -p providers run examples/script-users/features/agent-basics.lua
 --
 -- EXPECTED OUTPUT:
 -- Creates 3 agents, demonstrates invocation, shows discovery methods
