@@ -36,29 +36,30 @@ examples/
 
 ## 🚀 Quick Start
 
+All examples work with **builtin profiles** - no configuration files needed:
+
 ### Script Users (Lua)
 
 ```bash
-# Start with basics
-./target/debug/llmspell run examples/script-users/getting-started/00-hello-world.lua
+# Start with basics (no LLM needed)
+./target/debug/llmspell -p minimal run examples/script-users/getting-started/00-hello-world.lua
+./target/debug/llmspell -p minimal run examples/script-users/getting-started/01-first-tool.lua
 
-# Try tools and agents
-./target/debug/llmspell run examples/script-users/getting-started/01-first-tool.lua
-./target/debug/llmspell run examples/script-users/getting-started/02-first-agent.lua
+# Try agents (requires OpenAI/Anthropic API keys)
+./target/debug/llmspell -p providers run examples/script-users/getting-started/02-first-agent.lua
 
-# Build your first workflow
-./target/debug/llmspell run examples/script-users/getting-started/03-first-workflow.lua
+# Build workflows
+./target/debug/llmspell -p minimal run examples/script-users/getting-started/03-first-workflow.lua
 
-# Learn error handling
-./target/debug/llmspell run examples/script-users/getting-started/04-handle-errors.lua
+# Learn error handling with state
+./target/debug/llmspell -p state run examples/script-users/getting-started/04-handle-errors.lua
 
-# Try RAG (Phase 8)
-./target/debug/llmspell -c examples/script-users/configs/rag-basic.toml \
-  run examples/script-users/getting-started/05-first-rag.lua
+# Try RAG (Phase 8 - requires embedding API)
+./target/debug/llmspell -p rag-dev run examples/script-users/getting-started/05-first-rag.lua
 
 # Explore features
-./target/debug/llmspell run examples/script-users/features/tool-basics.lua
-./target/debug/llmspell run examples/script-users/features/agent-basics.lua
+./target/debug/llmspell -p minimal run examples/script-users/features/tool-basics.lua
+./target/debug/llmspell -p providers run examples/script-users/features/agent-basics.lua
 ```
 
 ### Rust Developers
@@ -69,68 +70,86 @@ cd examples/rust-developers/custom-agent-example && cargo run
 cd examples/rust-developers/async-patterns-example && cargo run
 ```
 
-### Configuration Examples
+### Builtin Profiles (Recommended)
+
+LLMSpell includes 10 builtin profiles for common workflows:
 
 ```bash
-# Use minimal config (tools only)
-./target/debug/llmspell -c examples/script-users/configs/minimal.toml \
-  run examples/script-users/getting-started/01-first-tool.lua
+# Tools and workflows only (no LLM providers)
+./target/debug/llmspell -p minimal run examples/script-users/getting-started/01-first-tool.lua
 
-# Use provider config (agents)
-./target/debug/llmspell -c examples/script-users/configs/example-providers.toml \
-  run examples/script-users/features/agent-basics.lua
+# Agents with OpenAI/Anthropic
+./target/debug/llmspell -p providers run examples/script-users/features/agent-basics.lua
 
-# Use state-enabled config
-./target/debug/llmspell -c examples/script-users/configs/state-enabled.toml \
-  run examples/script-users/features/state-persistence.lua
+# State persistence enabled
+./target/debug/llmspell -p state run examples/script-users/features/state-persistence.lua
 
-# Use RAG config (Phase 8)
-./target/debug/llmspell -c examples/script-users/configs/rag-basic.toml \
-  run examples/script-users/getting-started/05-first-rag.lua
+# RAG development (Phase 8)
+./target/debug/llmspell -p rag-dev run examples/script-users/getting-started/05-first-rag.lua
+
+# RAG production
+./target/debug/llmspell -p rag-prod run examples/script-users/cookbook/rag-multi-tenant.lua
+
+# Local LLM with Ollama
+./target/debug/llmspell -p ollama run examples/local_llm_status.lua
+
+# Sessions (state + hooks + events)
+./target/debug/llmspell -p sessions run examples/script-users/cookbook/rag-session.lua
+```
+
+**Available Profiles**: minimal, development, providers, state, sessions, ollama, candle, rag-dev, rag-prod, rag-perf
+
+### Custom Configuration (Advanced)
+
+For unique patterns not covered by builtin profiles:
+
+```bash
+# Use custom configuration file
+./target/debug/llmspell -c path/to/custom-config.toml run script.lua
+
+# See examples/script-users/configs/ for 15 configuration templates
 ```
 
 ### Production Patterns (Cookbook)
 
 ```bash
-# Error handling patterns
+# Error handling patterns (no LLM needed)
 ./target/debug/llmspell run examples/script-users/cookbook/error-handling.lua
 
-# Rate limiting
+# Rate limiting (no LLM needed)
 ./target/debug/llmspell run examples/script-users/cookbook/rate-limiting.lua
 
-# Multi-agent coordination
-./target/debug/llmspell -c examples/script-users/configs/example-providers.toml \
-  run examples/script-users/cookbook/multi-agent-coordination.lua
+# Multi-agent coordination (requires API keys)
+./target/debug/llmspell -p providers run examples/script-users/cookbook/multi-agent-coordination.lua
 
-# RAG patterns (Phase 8)
-./target/debug/llmspell -c examples/script-users/configs/rag-multi-tenant.toml \
-  run examples/script-users/cookbook/rag-multi-tenant.lua
+# RAG patterns (Phase 8 - requires embedding API)
+./target/debug/llmspell -p rag-prod run examples/script-users/cookbook/rag-multi-tenant.lua
 
-./target/debug/llmspell -c examples/script-users/configs/rag-basic.toml \
-  run examples/script-users/cookbook/rag-session.lua
+./target/debug/llmspell -p sessions run examples/script-users/cookbook/rag-session.lua
 
-./target/debug/llmspell -c examples/script-users/configs/rag-basic.toml \
-  run examples/script-users/cookbook/rag-cost-optimization.lua
+./target/debug/llmspell -p rag-prod run examples/script-users/cookbook/rag-cost-optimization.lua
 ```
 
 ### Complete Applications
 
+Applications include app-specific config files for demonstration, but can run with builtin profiles:
+
 ```bash
-# Run complete applications
-cd examples/script-users/applications
+# Web app creator - with builtin profile
+./target/debug/llmspell -p development run examples/script-users/applications/webapp-creator/main.lua
 
-# Web app creator
-./target/debug/llmspell -c webapp-creator/config.toml \
-  run webapp-creator/main.lua
+# Or with app-specific config (demonstrates configuration patterns)
+./target/debug/llmspell -c examples/script-users/applications/webapp-creator/config.toml \
+  run examples/script-users/applications/webapp-creator/main.lua
 
-# Knowledge base (Phase 8)
-./target/debug/llmspell -c knowledge-base/config.toml \
-  run knowledge-base/main.lua
+# Knowledge base (Phase 8) - with builtin RAG profile
+./target/debug/llmspell -p rag-prod run examples/script-users/applications/knowledge-base/main.lua
 
-# Personal assistant (Phase 8)
-./target/debug/llmspell -c personal-assistant/config.toml \
-  run personal-assistant/main.lua
+# Personal assistant (Phase 8) - with sessions profile
+./target/debug/llmspell -p sessions run examples/script-users/applications/personal-assistant/main.lua
 ```
+
+See individual application READMEs for detailed configuration options.
 
 ## 📋 Example Categories
 
@@ -224,7 +243,28 @@ Production-ready applications:
 
 ## 🔧 Configuration
 
-### Available Configuration Files
+### Builtin Profiles (Recommended)
+
+LLMSpell includes **10 builtin profiles** that cover most use cases:
+
+| Profile | Purpose | When to Use |
+|---------|---------|-------------|
+| **minimal** | Tools only, no LLM | Testing, learning tools |
+| **development** | Dev mode with debug | Development, debugging |
+| **providers** | OpenAI + Anthropic | Agent examples, LLM scripts |
+| **state** | State persistence | State management examples |
+| **sessions** | Sessions + state + events | Conversational apps |
+| **ollama** | Local Ollama LLM | Local LLM with Ollama |
+| **candle** | Local Candle LLM | Local LLM with Candle |
+| **rag-dev** | RAG development | Learning RAG, prototyping |
+| **rag-prod** | RAG production | Production RAG deployment |
+| **rag-perf** | RAG performance | High-performance RAG |
+
+**Usage**: `llmspell -p <profile-name> run script.lua`
+
+### Custom Configuration Files (Advanced)
+
+For unique patterns not covered by builtin profiles, see custom configuration templates:
 
 **Location**: `script-users/configs/`
 
@@ -290,11 +330,14 @@ export ANTHROPIC_API_KEY="your-key-here"
 # Change to llmspell directory
 cd /path/to/rs-llmspell
 
-# Run with llmspell
-llmspell run examples/hello.lua
+# Run with builtin profile (recommended)
+llmspell -p minimal run examples/hello.lua
+
+# Run with custom config (advanced)
+llmspell -c path/to/config.toml run examples/hello.lua
 
 # Or use cargo run
-cargo run --bin llmspell -- run examples/hello.lua
+cargo run --bin llmspell -- -p minimal run examples/hello.lua
 ```
 
 ### Batch Execution
@@ -313,20 +356,17 @@ llmspell run examples/lua/run-all-examples.lua
 llmspell run examples/lua/run-integration-demos.lua
 ```
 
-### With Custom Config
-
-```bash
-# Use specific configuration
-llmspell run --config examples/minimal.toml examples/hello.lua
-```
-
 ## 🐛 Troubleshooting
 
 ### Common Issues
 
 1. **"API key not found"**
-   - Set environment variables for your providers
-   - Check `llmspell.toml` configuration
+   - Set environment variables for your providers:
+     ```bash
+     export OPENAI_API_KEY="your-key-here"
+     export ANTHROPIC_API_KEY="your-key-here"
+     ```
+   - Use the `providers` builtin profile: `llmspell -p providers run script.lua`
 
 2. **"Tool not found"**
    - Ensure you're using correct tool names
@@ -341,17 +381,25 @@ llmspell run --config examples/minimal.toml examples/hello.lua
    - Some system tools require elevated permissions
    - File operations are sandboxed by default
 
-5. **"Hook registration failed"**
+5. **"State not available"**
+   - Use the `state` builtin profile: `llmspell -p state run script.lua`
+   - For full sessions: `llmspell -p sessions run script.lua`
+
+6. **"RAG not available"**
+   - Use RAG builtin profiles: `llmspell -p rag-dev run script.lua`
+   - Ensure OPENAI_API_KEY is set for embeddings
+
+7. **"Hook registration failed"**
    - Check hook point name spelling and validity
    - Ensure hook function returns valid result type
    - Use `Hook.list()` to see registered hooks
 
-6. **"Event not received"**
+8. **"Event not received"**
    - Verify subscription pattern matches event name
    - Check event was published before receive timeout
    - Use `Event.list_subscriptions()` to debug subscriptions
 
-7. **"Integration example failed"**
+9. **"Integration example failed"**
    - Ensure system has sufficient resources for complex examples
    - Check that all dependencies are properly initialized
    - Review integration logs for specific component failures
