@@ -51,15 +51,11 @@ local agent = Agent.builder()
 ```
 
 #### Agent.create(config)
-Creates an agent directly from configuration.
+⚠️ **DEPRECATED** - Use `Agent.builder()` instead. This method returns an error directing users to use the builder pattern.
 
 ```lua
-local agent = Agent.create({
-    name = "my-agent",
-    type = "llm",
-    model = "anthropic/claude-3",
-    temperature = 0.5
-})
+-- DEPRECATED - Do not use
+-- Use Agent.builder() instead
 ```
 
 #### Agent.list()
@@ -84,22 +80,19 @@ end
 
 ### Agent Discovery
 
-#### Agent.discover(options)
-Discovers agents based on criteria.
-
-```lua
-local agents = Agent.discover({
-    type = "llm",
-    capabilities = {"code-generation"},
-    min_context = 4000
-})
-```
-
 #### Agent.discover_by_capability(capability)
 Finds agents with a specific capability.
 
 ```lua
 local coders = Agent.discover_by_capability("code-generation")
+```
+
+#### Agent.count()
+Returns the count of registered agents.
+
+```lua
+local total = Agent.count()
+print("Total agents:", total)
 ```
 
 ### Agent Templates
@@ -263,27 +256,59 @@ local response = agent:execute("Write a poem", {
 })
 ```
 
-#### agent:execute_streaming(prompt, options, callback)
+#### agent:invokeStream(prompt, options, callback)
 Executes with streaming response.
 
 ```lua
-agent:execute_streaming("Tell a story", {}, function(chunk)
+agent:invokeStream("Tell a story", {}, function(chunk)
     print(chunk)
 end)
 ```
 
-#### agent:reset()
-Resets the agent's state.
+#### agent:get_state()
+Gets the current state of the agent.
 
 ```lua
-agent:reset()
+local state = agent:get_state()
 ```
 
-#### agent:get_history()
-Gets conversation history.
+#### agent:set_state(new_state)
+Sets the agent's state.
 
 ```lua
-local history = agent:get_history()
+agent:set_state({context = "updated"})
+```
+
+#### agent:get_model()
+Gets the model name used by this agent.
+
+```lua
+local model = agent:get_model()
+print("Using model:", model)
+```
+
+#### agent:get_name()
+Gets the agent's name.
+
+```lua
+local name = agent:get_name()
+```
+
+#### agent:get_type()
+Gets the agent's type (e.g., "llm", "tool", "composite").
+
+```lua
+local agent_type = agent:get_type()
+```
+
+#### agent:get_capabilities()
+Gets the agent's capabilities.
+
+```lua
+local capabilities = agent:get_capabilities()
+for i, cap in ipairs(capabilities) do
+    print("Capability:", cap)
+end
 ```
 
 ---
@@ -315,16 +340,14 @@ local result = Tool.execute("calculator", {
 })
 ```
 
-#### Tool.execute(name, params, options)
-Executes a tool with additional options.
+#### Tool.get(name)
+Gets a tool instance by name.
 
 ```lua
-local result = Tool.execute("web-search", {
-    query = "LLMSpell documentation"
-}, {
-    timeout = 5000,
-    retry = 3
-})
+local tool = Tool.get("calculator")
+if tool then
+    local result = tool.execute({operation = "add", a = 5, b = 3})
+end
 ```
 
 ### Tool Discovery
@@ -355,23 +378,7 @@ Gets the parameter schema for a tool.
 local schema = Tool.get_schema("file-reader")
 ```
 
-### Tool Registration
-
-#### Tool.register(name, handler)
-Registers a new tool.
-
-```lua
-Tool.register("custom-tool", function(params)
-    return {result = params.input * 2}
-end)
-```
-
-#### Tool.unregister(name)
-Unregisters a tool.
-
-```lua
-Tool.unregister("custom-tool")
-```
+### Tool Availability
 
 #### Tool.is_available(name)
 Checks if a tool is available.
@@ -883,10 +890,10 @@ Creates a session builder.
 
 ```lua
 local session = Session.builder()
-    :id("session-456")
-    :user("bob")
-    :ttl(3600)
-    :metadata({source = "web"})
+    :name("my-session")
+    :description("User session")
+    :tag("production")
+    :tag("user-session")
     :build()
 ```
 
@@ -1021,32 +1028,72 @@ local replayable = Session.list_replayable()
 
 ### Session Instance Methods
 
-#### session:get(key)
-Gets a session value.
+#### session:get_id()
+Gets the session ID.
 
 ```lua
-local value = session:get("user_preference")
+local id = session:get_id()
 ```
 
-#### session:set(key, value)
-Sets a session value.
+#### session:get_name()
+Gets the session name.
 
 ```lua
-session:set("last_query", "weather")
+local name = session:get_name()
 ```
 
-#### session:delete(key)
-Deletes a session value.
+#### session:get_status()
+Gets the session status (e.g., "active", "completed", "suspended").
 
 ```lua
-session:delete("temp_data")
+local status = session:get_status()
 ```
 
-#### session:store_artifact(name, data)
-Stores an artifact in the session.
+#### session:get_created_at()
+Gets the session creation timestamp.
 
 ```lua
-session:store_artifact("query_results", results)
+local created = session:get_created_at()
+```
+
+#### session:get_tags()
+Gets all session tags.
+
+```lua
+local tags = session:get_tags()
+for i, tag in ipairs(tags) do
+    print("Tag:", tag)
+end
+```
+
+#### session:add_tag(tag)
+Adds a tag to the session.
+
+```lua
+session:add_tag("important")
+```
+
+#### session:has_tag(tag)
+Checks if session has a specific tag.
+
+```lua
+if session:has_tag("production") then
+    -- Handle production session
+end
+```
+
+#### session:store_value(key, value)
+Stores a value in the session.
+
+```lua
+session:store_value("last_query", "weather")
+```
+
+#### session:get_value(key)
+Gets a value from the session.
+
+```lua
+local value = session:get_value("last_query")
 ```
 
 ---
@@ -1055,113 +1102,86 @@ session:store_artifact("query_results", results)
 
 The `State` global provides persistent state management.
 
-### Basic Operations
+### Scoped State Operations
 
-#### State.get(key)
-Gets a state value.
+All state operations in LLMSpell use scopes for organization and isolation.
 
-```lua
-local value = State.get("app_config")
-```
-
-#### State.set(key, value)
-Sets a state value.
+#### State.save(scope, key, value)
+Saves a value to a scoped key.
 
 ```lua
-State.set("app_config", {
+State.save("user:123", "preferences", {
     theme = "dark",
     language = "en"
 })
 ```
 
-#### State.delete(key)
-Deletes a state entry.
+#### State.load(scope, key)
+Loads a value from a scoped key.
 
 ```lua
-State.delete("temp_state")
+local value = State.load("user:123", "preferences")
 ```
 
-#### State.exists(key)
-Checks if a key exists.
+#### State.delete(scope, key)
+Deletes a scoped key.
 
 ```lua
-if State.exists("user_settings") then
-    -- Key exists
+State.delete("user:123", "temp_state")
+```
+
+#### State.list_keys(scope)
+Lists all keys in a scope.
+
+```lua
+local keys = State.list_keys("user:123")
+for i, key in ipairs(keys) do
+    print("Key:", key)
 end
 ```
 
-#### State.clear()
-Clears all state.
+### Component-Specific State
+
+#### State.workflow_get(workflow_id, step_name)
+Gets state for a specific workflow step.
 
 ```lua
-State.clear()
+local step_state = State.workflow_get("workflow-123", "validate")
 ```
 
-#### State.list()
-Lists all state keys.
+#### State.workflow_list(workflow_id)
+Lists all state keys for a workflow.
 
 ```lua
-local keys = State.list()
+local keys = State.workflow_list("workflow-123")
 ```
 
-### Scoped State
-
-#### State.get_scoped(scope, key)
-Gets value from a scope.
+#### State.agent_get(agent_id, key)
+Gets agent-specific state.
 
 ```lua
-local value = State.get_scoped("user:123", "preferences")
+local agent_state = State.agent_get("agent-456", "memory")
 ```
 
-#### State.set_scoped(scope, key, value)
-Sets value in a scope.
+#### State.agent_set(agent_id, key, value)
+Sets agent-specific state.
 
 ```lua
-State.set_scoped("tenant:abc", "settings", config)
+State.agent_set("agent-456", "memory", {last_interaction = os.time()})
 ```
 
-#### State.delete_scoped(scope, key)
-Deletes from a scope.
+#### State.tool_get(tool_id, key)
+Gets tool-specific state.
 
 ```lua
-State.delete_scoped("session:456", "temp")
+local tool_state = State.tool_get("calculator", "history")
 ```
 
-#### State.clear_scope(scope)
-Clears an entire scope.
+#### State.tool_set(tool_id, key, value)
+Sets tool-specific state.
 
 ```lua
-State.clear_scope("user:123")
-```
-
-#### State.list_scoped(scope)
-Lists keys in a scope.
-
-```lua
-local keys = State.list_scoped("tenant:abc")
-```
-
-### Atomic Operations
-
-#### State.increment(key, amount)
-Atomically increments a numeric value.
-
-```lua
-local new_value = State.increment("counter", 1)
-```
-
-#### State.append(key, value)
-Appends to a list value.
-
-```lua
-State.append("event_log", {timestamp = os.time(), event = "login"})
-```
-
-#### State.compare_and_swap(key, old_value, new_value)
-Atomic compare and swap.
-
-```lua
-local success = State.compare_and_swap("status", "pending", "active")
+State.tool_set("calculator", "history", {last_calc = "2+2=4"})
 ```
 
 ### State Migrations
