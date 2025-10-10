@@ -15,7 +15,7 @@ llmspell-core = { path = "../llmspell-core" }
 llmspell-config = { path = "../llmspell-config" }
 llmspell-providers = { path = "../llmspell-providers" }
 llmspell-utils = { path = "../llmspell-utils" }
-llmspell-tools = { path = "../llmspell-tools", default-features = false }
+llmspell-tools = { path = "../llmspell-tools", features = ["common"] }
 llmspell-security = { path = "../llmspell-security" }
 llmspell-agents = { path = "../llmspell-agents" }
 llmspell-workflows = { path = "../llmspell-workflows" }
@@ -46,7 +46,6 @@ boa_engine = { workspace = true, optional = true }
 
 [dev-dependencies]
 llmspell-testing = { path = "../llmspell-testing" }
-llmspell-tenancy = { path = "../llmspell-tenancy" }
 criterion = { version = "0.5", features = ["html_reports", "async_tokio"] }
 tempfile = "3.0"
 rand = "0.8"
@@ -91,3 +90,84 @@ harness = false
 [[test]]
 name = "session_workflow"
 path = "tests/integration/session_workflow.rs"
+
+# Lua-dependent tests (require common feature: lua + common tools)
+[[test]]
+name = "agent_bridge_test"
+required-features = ["common"]
+
+[[test]]
+name = "async_tool_execution_test"
+required-features = ["common"]
+
+[[test]]
+name = "bridge_abstraction_test"
+required-features = ["common"]
+
+[[test]]
+name = "bridge_provider_test"
+required-features = ["common"]
+
+[[test]]
+name = "external_api_tests"
+required-features = ["common"]
+
+[[test]]
+name = "globals_test"
+required-features = ["common"]
+
+[[test]]
+name = "integration_test"
+required-features = ["common"]
+
+[[test]]
+name = "lua_completion_tests"
+required-features = ["common"]
+
+[[test]]
+name = "lua_coroutine_test"
+required-features = ["common"]
+
+[[test]]
+name = "lua_engine_test"
+required-features = ["common"]
+
+[[test]]
+name = "lua_workflow_api_tests"
+required-features = ["common"]
+
+[[test]]
+name = "performance_test"
+required-features = ["common"]
+
+[[test]]
+name = "provider_enhancement_test"
+required-features = ["common"]
+
+[[test]]
+name = "provider_integration_test"
+required-features = ["common"]
+
+[[test]]
+name = "runtime_test"
+required-features = ["common"]
+
+[[test]]
+name = "simple_tool_integration_test"
+required-features = ["common"]
+
+[[test]]
+name = "streaming_test"
+required-features = ["common"]
+
+[[test]]
+name = "sync_behavior_test"
+required-features = ["common"]
+
+[[test]]
+name = "tools_integration_test"
+required-features = ["common"]
+
+[[test]]
+name = "workflow_bridge_integration_tests"
+required-features = ["common"]

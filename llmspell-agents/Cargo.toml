@@ -40,7 +40,6 @@ hooks = []
 [dev-dependencies]
 tracing-subscriber.workspace = true
 tempfile = "3.8"
-llmspell-kernel = { path = "../llmspell-kernel" }
 llmspell-workflows = { path = "../llmspell-workflows" }
 llmspell-testing = { path = "../llmspell-testing" }
 

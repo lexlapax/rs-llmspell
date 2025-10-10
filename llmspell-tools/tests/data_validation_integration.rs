@@ -549,7 +549,7 @@ async fn test_tool_metadata() {
     let tool = DataValidationTool::new();
     let schema = tool.schema();
 
-    assert_eq!(schema.name, "data_validation");
+    assert_eq!(schema.name, "data-validator");
     assert_eq!(schema.parameters.len(), 2);
 
     let data_param = &schema.parameters[0];

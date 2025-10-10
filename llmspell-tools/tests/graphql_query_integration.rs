@@ -11,7 +11,7 @@ use serde_json::json;
 async fn test_graphql_tool_creation() {
     let tool = GraphQLQueryTool::default();
 
-    assert_eq!(tool.metadata().name, "graphql-query-tool");
+    assert_eq!(tool.metadata().name, "graphql-query");
     assert_eq!(tool.category().to_string(), "api");
     assert!(matches!(
         tool.security_level(),

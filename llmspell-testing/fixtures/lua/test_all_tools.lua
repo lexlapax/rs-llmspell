@@ -67,7 +67,7 @@ end
 TestHelpers.print_section("Utility Tools")
 
 -- 1. base64_encoder
-test_tool("base64_encoder", {
+test_tool("base64-encoder", {
     operation = "encode",
     input = "Hello, LLMSpell!"
 }, function(parsed)
@@ -76,7 +76,7 @@ test_tool("base64_encoder", {
 end)
 
 -- Test decode
-test_tool("base64_encoder", {
+test_tool("base64-encoder", {
     operation = "decode", 
     input = "SGVsbG8sIExMTVNwZWxsIQ=="
 }, function(parsed)
@@ -103,7 +103,7 @@ test_tool("calculator", {
 end)
 
 -- 3. data_validation
-test_tool("data_validation", {
+test_tool("data-validator", {
     data = {name = "test", age = 25},
     rules = {
         rules = {
@@ -117,7 +117,7 @@ test_tool("data_validation", {
 end)
 
 -- 4. date_time_handler
-test_tool("date_time_handler", {
+test_tool("datetime-handler", {
     operation = "now"
 }, function(parsed)
     return parsed.result and parsed.result.datetime,
@@ -125,7 +125,7 @@ test_tool("date_time_handler", {
 end)
 
 -- 5. diff_calculator
-test_tool("diff_calculator", {
+test_tool("diff-calculator", {
     old_text = "Hello World",
     new_text = "Hello LLMSpell",
     format = "unified"
@@ -135,7 +135,7 @@ test_tool("diff_calculator", {
 end)
 
 -- 6. hash_calculator
-test_tool("hash_calculator", {
+test_tool("hash-calculator", {
     operation = "hash",
     algorithm = "sha256",
     data = "test data"
@@ -145,7 +145,7 @@ test_tool("hash_calculator", {
 end)
 
 -- 7. template_engine
-test_tool("template_engine", {
+test_tool("template-creator", {
     template = "Hello, {{name}}!",
     context = {name = "LLMSpell"},
     engine = "handlebars"
@@ -155,7 +155,7 @@ test_tool("template_engine", {
 end)
 
 -- 8. text_manipulator
-test_tool("text_manipulator", {
+test_tool("text-manipulator", {
     operation = "uppercase",
     text = "hello world"
 }, function(parsed)
@@ -164,7 +164,7 @@ test_tool("text_manipulator", {
 end)
 
 -- 9. uuid_generator
-test_tool("uuid_generator", {
+test_tool("uuid-generator", {
     operation = "generate",
     version = "v4"
 }, function(parsed)
@@ -181,7 +181,7 @@ TestHelpers.print_section("File System Tools")
 -- 10. file_operations
 -- Create a test file first
 local test_content = "Test file content for LLMSpell"
-test_tool("file_operations", {
+test_tool("file-operations", {
     operation = "write",
     path = "/tmp/llmspell_test.txt",
     content = test_content
@@ -191,7 +191,7 @@ test_tool("file_operations", {
 end)
 
 -- Read it back
-test_tool("file_operations", {
+test_tool("file-operations", {
     operation = "read",
     path = "/tmp/llmspell_test.txt"
 }, function(parsed)
@@ -200,7 +200,7 @@ test_tool("file_operations", {
 end)
 
 -- 11. archive_handler
-test_tool("archive_handler", {
+test_tool("archive-handler", {
     operation = "create",
     format = "zip",
     output_path = "/tmp/llmspell_test.zip",
@@ -214,10 +214,10 @@ end)
 
 -- 12. file_watcher
 -- Note: File watcher is async and requires special handling
-print(TestHelpers.format_result(true, "file_watcher", "Skipped (requires async handling)"))
+print(TestHelpers.format_result(true, "file-watcher", "Skipped (requires async handling)"))
 
 -- 13. file_converter
-test_tool("file_converter", {
+test_tool("file-converter", {
     operation = "detect_encoding",
     data = "Hello, World!"
 }, function(parsed)
@@ -226,7 +226,7 @@ test_tool("file_converter", {
 end)
 
 -- 14. file_search
-test_tool("file_search", {
+test_tool("file-search", {
     operation = "search_content",
     directory = "/tmp",
     pattern = "LLMSpell",
@@ -243,7 +243,7 @@ end)
 TestHelpers.print_section("System Integration Tools")
 
 -- 15. environment_reader
-test_tool("environment_reader", {
+test_tool("environment-reader", {
     operation = "get",
     key = "PATH"
 }, function(parsed)
@@ -252,7 +252,7 @@ test_tool("environment_reader", {
 end)
 
 -- 16. process_executor
-test_tool("process_executor", {
+test_tool("process-executor", {
     command = "echo",
     args = {"Hello from LLMSpell"}
 }, function(parsed)
@@ -262,7 +262,7 @@ test_tool("process_executor", {
 end)
 
 -- 17. service_checker
-test_tool("service_checker", {
+test_tool("service-checker", {
     operation = "check_port",
     host = "localhost",
     port = 22  -- SSH port, commonly available
@@ -272,7 +272,7 @@ test_tool("service_checker", {
 end)
 
 -- 18. system_monitor
-test_tool("system_monitor", {
+test_tool("system-monitor", {
     operation = "get_stats"
 }, function(parsed)
     return parsed.result and parsed.result.cpu_usage ~= nil and parsed.result.memory ~= nil,
@@ -286,7 +286,7 @@ end)
 TestHelpers.print_section("Data Processing Tools")
 
 -- 19. json_processor
-test_tool("json_processor", {
+test_tool("json-processor", {
     operation = "query",
     data = JSON.stringify({items = {1, 2, 3, 4, 5}}),
     query = ".items | length"
@@ -297,7 +297,7 @@ end)
 
 -- 20. csv_analyzer
 local csv_data = "name,age,city\nAlice,30,NYC\nBob,25,LA"
-test_tool("csv_analyzer", {
+test_tool("csv-analyzer", {
     operation = "analyze",
     data = csv_data
 }, function(parsed)
@@ -307,7 +307,7 @@ end)
 
 -- 21. http_request
 -- Note: This is an async tool
-test_tool("http_request", {
+test_tool("http-requester", {
     method = "GET",
     url = "https://httpbin.org/get",
     headers = {["User-Agent"] = "LLMSpell/1.0"}
@@ -316,9 +316,9 @@ test_tool("http_request", {
            "HTTP request should succeed"
 end)
 
--- 22. graphql_query
+-- 22. graphql-query
 -- Skip as it requires a GraphQL endpoint
-print(TestHelpers.format_result(true, "graphql_query", "Skipped (requires GraphQL endpoint)"))
+print(TestHelpers.format_result(true, "graphql-query", "Skipped (requires GraphQL endpoint)"))
 
 -- =============================================================================
 -- MEDIA PROCESSING TOOLS (3 tools)
@@ -327,7 +327,7 @@ print(TestHelpers.format_result(true, "graphql_query", "Skipped (requires GraphQ
 TestHelpers.print_section("Media Processing Tools")
 
 -- 23. audio_processor
-test_tool("audio_processor", {
+test_tool("audio-processor", {
     operation = "get_info",
     format = "wav"
 }, function(parsed)
@@ -337,7 +337,7 @@ test_tool("audio_processor", {
 end)
 
 -- 24. video_processor
-test_tool("video_processor", {
+test_tool("video-processor", {
     operation = "get_info",
     format = "mp4"
 }, function(parsed)
@@ -347,7 +347,7 @@ test_tool("video_processor", {
 end)
 
 -- 25. image_processor
-test_tool("image_processor", {
+test_tool("image-processor", {
     operation = "get_info",
     format = "png"
 }, function(parsed)
@@ -364,7 +364,7 @@ TestHelpers.print_section("Search Tools")
 
 -- 26. web_search
 -- Skip as it's moved to Phase 2.5
-print(TestHelpers.format_result(true, "web_search", "Skipped (moved to Phase 2.5)"))
+print(TestHelpers.format_result(true, "web-searcher", "Skipped (moved to Phase 2.5)"))
 
 -- =============================================================================
 -- TOOL CHAINING TESTS
@@ -373,14 +373,14 @@ print(TestHelpers.format_result(true, "web_search", "Skipped (moved to Phase 2.5
 TestHelpers.print_section("Tool Chaining Tests")
 
 -- Chain 1: UUID -> Hash -> Base64
-local uuid_result = TestHelpers.execute_tool("uuid_generator", {
+local uuid_result = TestHelpers.execute_tool("uuid-generator", {
     operation = "generate",
     version = "v4"
 })
 if uuid_result.success then
     local uuid_parsed = TestHelpers.parse_tool_output(uuid_result)
     if uuid_parsed then
-        local hash_result = TestHelpers.execute_tool("hash_calculator", {
+        local hash_result = TestHelpers.execute_tool("hash-calculator", {
             operation = "hash",
             algorithm = "md5",
             data = uuid_parsed.result.uuid
@@ -388,7 +388,7 @@ if uuid_result.success then
         if hash_result.success then
             local hash_parsed = TestHelpers.parse_tool_output(hash_result)
             if hash_parsed then
-                local b64_result = TestHelpers.execute_tool("base64_encoder", {
+                local b64_result = TestHelpers.execute_tool("base64-encoder", {
                     operation = "encode",
                     input = hash_parsed.result.hash
                 })

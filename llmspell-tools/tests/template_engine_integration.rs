@@ -286,7 +286,7 @@ async fn test_tool_schema() {
     let tool = TemplateEngineTool::new();
     let schema = tool.schema();
 
-    assert_eq!(schema.name, "template_engine");
+    assert_eq!(schema.name, "template-creator");
     assert_eq!(schema.parameters.len(), 4);
 
     // Check required parameters (template parameter renamed to input)

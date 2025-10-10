@@ -4,7 +4,7 @@
 local TestHelpers = dofile("../../examples/test-helpers.lua")
 
 -- Use the helper function
-local result = TestHelpers.execute_tool("uuid_generator", {
+local result = TestHelpers.execute_tool("uuid-generator", {
     operation = "generate"
 })
 
@@ -36,7 +36,7 @@ end
 
 -- Try direct tool access
 print("\n\nDirect tool access:")
-local tool = Tool.get("uuid_generator")
+local tool = Tool.get("uuid-generator")
 if tool then
     local direct_result = tool.execute({operation = "generate"})
     print("Direct result type:", type(direct_result))

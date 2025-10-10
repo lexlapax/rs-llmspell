@@ -4,7 +4,7 @@ print("=== Debugging Tool Output Format ===\n")
 
 -- Test UUID generator
 print("1. Testing uuid_generator:")
-local uuid_tool = Tool.get("uuid_generator") 
+local uuid_tool = Tool.get("uuid-generator") 
 if uuid_tool then
     local result = uuid_tool.execute({operation = "generate"})
     print("  Raw result type:", type(result))
@@ -26,7 +26,7 @@ end
 
 -- Test hash calculator
 print("\n2. Testing hash_calculator:")
-local hash_tool = Tool.get("hash_calculator")
+local hash_tool = Tool.get("hash-calculator")
 if hash_tool then
     local result = hash_tool.execute({
         operation = "hash",
@@ -52,7 +52,7 @@ end
 
 -- Test base64 encoder
 print("\n3. Testing base64_encoder:")
-local b64_tool = Tool.get("base64_encoder")
+local b64_tool = Tool.get("base64-encoder")
 if b64_tool then
     local result = b64_tool.execute({
         operation = "encode",

@@ -244,7 +244,7 @@ async fn test_json_processor_tool_metadata() {
     );
 
     let schema = tool.schema();
-    assert_eq!(schema.name, "json_processor");
+    assert_eq!(schema.name, "json-processor");
     assert!(schema.description.contains("JSON"));
 
     // Check parameters

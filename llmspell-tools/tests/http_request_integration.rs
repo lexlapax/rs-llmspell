@@ -20,7 +20,7 @@ use serde_json::json;
 async fn test_http_request_tool_creation() {
     let tool = HttpRequestTool::new(HttpRequestConfig::default()).unwrap();
 
-    assert_eq!(tool.metadata().name, "http-request-tool");
+    assert_eq!(tool.metadata().name, "http-requester");
     assert_eq!(tool.category().to_string(), "api");
     assert!(matches!(
         tool.security_level(),

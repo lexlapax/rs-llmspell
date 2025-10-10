@@ -504,7 +504,7 @@ impl Tool for UuidGeneratorTool {
 
     fn schema(&self) -> ToolSchema {
         ToolSchema::new(
-            "uuid_generator".to_string(),
+            "uuid-generator".to_string(),
             "Generate UUIDs with various versions and formats".to_string(),
         )
         .with_parameter(ParameterDef {
@@ -799,7 +799,7 @@ mod tests {
         assert_eq!(tool.metadata().name, "uuid-generator");
 
         let schema = tool.schema();
-        assert_eq!(schema.name, "uuid_generator");
+        assert_eq!(schema.name, "uuid-generator");
         assert!(schema.parameters.len() >= 10); // We have many parameters
     }
 }

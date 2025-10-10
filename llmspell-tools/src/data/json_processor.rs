@@ -222,7 +222,7 @@ impl JsonProcessorTool {
                 Err(e) => {
                     return Err(LLMSpellError::Tool {
                         message: format!("jq execution error: {e}"),
-                        tool_name: Some("json_processor".to_string()),
+                        tool_name: Some("json-processor".to_string()),
                         source: None,
                     })
                 }
@@ -680,7 +680,7 @@ impl Tool for JsonProcessorTool {
 
     fn schema(&self) -> ToolSchema {
         ToolSchema {
-            name: "json_processor".to_string(),
+            name: "json-processor".to_string(),
             description: "Process JSON data using full jq syntax with the jaq engine".to_string(),
             parameters: vec![
                 ParameterDef {

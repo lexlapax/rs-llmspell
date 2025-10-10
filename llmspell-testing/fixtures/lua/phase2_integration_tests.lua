@@ -81,25 +81,25 @@ local function test_all_tools_callable()
     
     local expected_tools = {
         -- Utility Tools (9)
-        "base64_encoder", "calculator", "data_validation", "date_time_handler",
-        "diff_calculator", "hash_calculator", "template_engine", "text_manipulator",
-        "uuid_generator",
+        "base64-encoder", "calculator", "data-validator", "datetime-handler",
+        "diff-calculator", "hash-calculator", "template-creator", "text-manipulator",
+        "uuid-generator",
         
         -- File System Tools (5)
-        "file_operations", "archive_handler", "file_watcher", "file_converter",
-        "file_search",
+        "file-operations", "archive-handler", "file-watcher", "file-converter",
+        "file-search",
         
         -- System Integration Tools (4)
-        "environment_reader", "process_executor", "service_checker", "system_monitor",
+        "environment-reader", "process-executor", "service-checker", "system-monitor",
         
         -- Data Processing Tools (4)
-        "json_processor", "csv_analyzer", "http_request", "graphql_query",
+        "json-processor", "csv-analyzer", "http-requester", "graphql-query",
         
         -- Media Processing Tools (3)
-        "audio_processor", "video_processor", "image_processor",
+        "audio-processor", "video-processor", "image-processor",
         
         -- Search Tools (1)
-        "web_search"
+        "web-searcher"
     }
     
     -- Get all available tools
@@ -172,17 +172,17 @@ local function test_tool_chaining()
     
     -- Chain 1: Utility -> Utility (UUID -> Hash -> Base64)
     local chain1_success = false
-    local uuid_result = Tool.execute("uuid_generator", {operation = "generate"})
+    local uuid_result = Tool.execute("uuid-generator", {operation = "generate"})
     if uuid_result.success and uuid_result.result then
         local uuid = uuid_result.result.uuid or (uuid_result.result.uuids and uuid_result.result.uuids[1])
         if uuid then
-            local hash_result = Tool.execute("hash_calculator", {
+            local hash_result = Tool.execute("hash-calculator", {
                 operation = "hash",
                 algorithm = "SHA-256",
                 input = uuid
             })
             if hash_result.success and hash_result.result and hash_result.result.hash then
-                local base64_result = Tool.execute("base64_encoder", {
+                local base64_result = Tool.execute("base64-encoder", {
                     operation = "encode",
                     input = hash_result.result.hash
                 })
@@ -194,15 +194,15 @@ local function test_tool_chaining()
     
     -- Chain 2: System -> Data -> Utility (Env -> JSON -> Template)
     local chain2_success = false
-    local env_result = Tool.execute("environment_reader", {operation = "list"})
+    local env_result = Tool.execute("environment-reader", {operation = "list"})
     if env_result.success and env_result.result then
         -- Create JSON from environment data
-        local json_result = Tool.execute("json_processor", {
+        local json_result = Tool.execute("json-processor", {
             operation = "validate",
             json_data = {env_count = 5}  -- Simplified for test
         })
         if json_result.success then
-            local template_result = Tool.execute("template_engine", {
+            local template_result = Tool.execute("template-creator", {
                 operation = "render",
                 template = "Environment has {{env_count}} variables",
                 context = {env_count = 5},
@@ -229,7 +229,7 @@ local function test_dry_principle()
     
     -- Test 1: Hash functions should be consistent
     local input = "test_dry_principle"
-    local hash1 = Tool.execute("hash_calculator", {
+    local hash1 = Tool.execute("hash-calculator", {
         operation = "hash",
         algorithm = "SHA-256",
         input = input
@@ -244,7 +244,7 @@ local function test_dry_principle()
     record_result("Hash utilities consistent", hash_consistent)
     
     -- Test 2: UUID generation format
-    local uuid1 = Tool.execute("uuid_generator", {operation = "generate"})
+    local uuid1 = Tool.execute("uuid-generator", {operation = "generate"})
     local uuid_format_ok = false
     if uuid1.success and uuid1.result then
         local uuid = uuid1.result.uuid or (uuid1.result.uuids and uuid1.result.uuids[1])
@@ -255,7 +255,7 @@ local function test_dry_principle()
     record_result("UUID format standardized", uuid_format_ok ~= false)
     
     -- Test 3: Base64 encoding consistency
-    local b64_test = Tool.execute("base64_encoder", {
+    local b64_test = Tool.execute("base64-encoder", {
         operation = "encode",
         input = "DRY test"
     })
@@ -283,7 +283,7 @@ local function test_error_propagation()
     record_result("Missing parameter error", missing_param_ok)
     
     -- Test 2: Invalid operation
-    local invalid_op = Tool.execute("text_manipulator", {
+    local invalid_op = Tool.execute("text-manipulator", {
         operation = "invalid_operation",
         text = "test"
     })
@@ -291,7 +291,7 @@ local function test_error_propagation()
     record_result("Invalid operation error", invalid_op_ok)
     
     -- Test 3: Invalid input type
-    local invalid_type = Tool.execute("hash_calculator", {
+    local invalid_type = Tool.execute("hash-calculator", {
         operation = "hash",
         algorithm = "SHA-256",
         input = {} -- Should be string
@@ -300,7 +300,7 @@ local function test_error_propagation()
     record_result("Invalid type error", invalid_type_ok)
     
     -- Test 4: Security violation (if applicable)
-    local security_test = Tool.execute("file_operations", {
+    local security_test = Tool.execute("file-operations", {
         operation = "read",
         path = "/etc/passwd"  -- Should be blocked
     })
@@ -317,8 +317,8 @@ local function test_performance()
     
     -- Test initialization time for a sample of tools
     local perf_tools = {
-        "calculator", "uuid_generator", "hash_calculator",
-        "text_manipulator", "date_time_handler"
+        "calculator", "uuid-generator", "hash-calculator",
+        "text-manipulator", "datetime-handler"
     }
     
     local total_time = 0

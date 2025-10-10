@@ -134,7 +134,7 @@ fn test_media_processing_tools_creation() {
 fn test_search_tool_creation() {
     let tool = WebSearchTool::new(WebSearchConfig::default()).unwrap();
     let schema = tool.schema();
-    assert_eq!(schema.name, "web_search");
+    assert_eq!(schema.name, "web-searcher");
     assert!(!schema.description.is_empty());
 }
 #[test]
@@ -142,19 +142,19 @@ fn test_utility_tools_creation() {
     // HashCalculatorTool
     let tool = HashCalculatorTool::new(HashCalculatorConfig::default());
     let schema = tool.schema();
-    assert_eq!(schema.name, "hash_calculator");
+    assert_eq!(schema.name, "hash-calculator");
     assert!(!schema.description.is_empty());
 
     // TextManipulatorTool
     let tool = TextManipulatorTool::new(TextManipulatorConfig::default());
     let schema = tool.schema();
-    assert_eq!(schema.name, "text_manipulator");
+    assert_eq!(schema.name, "text-manipulator");
     assert!(!schema.description.is_empty());
 
     // UuidGeneratorTool
     let tool = UuidGeneratorTool::new(UuidGeneratorConfig::default());
     let schema = tool.schema();
-    assert_eq!(schema.name, "uuid_generator");
+    assert_eq!(schema.name, "uuid-generator");
     assert!(!schema.description.is_empty());
 }
 

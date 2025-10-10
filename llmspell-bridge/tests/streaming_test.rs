@@ -189,17 +189,17 @@ mod tests {
                 name = "test_seq",
                 description = "Test sequential workflow",
                 steps = {
-                    {name = "step1", type = "tool", tool = "uuid_generator", input = {}},
-                    {name = "step2", type = "tool", tool = "hash_calculator", input = {algorithm = "sha256", input = "test"}}
+                    {name = "step1", type = "tool", tool = "uuid-generator", input = {}},
+                    {name = "step2", type = "tool", tool = "hash-calculator", input = {algorithm = "sha256", input = "test"}}
                 }
             })
             
             -- Create parallel workflow
             local par = Workflow.parallel({
-                name = "test_par", 
+                name = "test_par",
                 description = "Test parallel workflow",
                 steps = {
-                    {name = "task1", type = "tool", tool = "uuid_generator", input = {}},
+                    {name = "task1", type = "tool", tool = "uuid-generator", input = {}},
                     {name = "task2", type = "tool", tool = "date_time_handler", input = {operation = "now"}}
                 }
             })

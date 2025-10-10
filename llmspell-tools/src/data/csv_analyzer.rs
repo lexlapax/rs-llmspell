@@ -721,7 +721,7 @@ impl CsvAnalyzerTool {
             .await
             .map_err(|e| LLMSpellError::Tool {
                 message: format!("Failed to read Excel file: {e}"),
-                tool_name: Some("csv_analyzer".to_string()),
+                tool_name: Some("csv-analyzer".to_string()),
                 source: None,
             })?;
 
@@ -1523,7 +1523,7 @@ impl Tool for CsvAnalyzerTool {
 
     fn schema(&self) -> ToolSchema {
         ToolSchema {
-            name: "csv_analyzer".to_string(),
+            name: "csv-analyzer".to_string(),
             description: "Analyze and process CSV files with streaming support".to_string(),
             parameters: vec![
                 ParameterDef {
