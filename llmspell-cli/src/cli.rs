@@ -109,9 +109,26 @@ pub struct Cli {
     /// Built-in configuration profile (GLOBAL)
     ///
     /// Available profiles:
-    ///   Core: minimal, development
-    ///   Local LLM: ollama, candle
-    ///   RAG: rag-dev, rag-prod, rag-perf
+    ///
+    /// Core:
+    ///   minimal      - Tools only, no LLM providers
+    ///   development  - Dev settings with debug logging
+    ///
+    /// Common Workflows:
+    ///   providers    - OpenAI + Anthropic setup
+    ///   state        - State persistence with memory backend
+    ///   sessions     - Sessions + state + hooks + events
+    ///
+    /// Local LLM:
+    ///   ollama       - Ollama backend configuration
+    ///   candle       - Candle embedded inference
+    ///
+    /// RAG:
+    ///   rag-dev      - Development RAG (small dims, fast)
+    ///   rag-prod     - Production RAG (reliability, monitoring)
+    ///   rag-perf     - Performance RAG (high memory, cores)
+    ///
+    /// Use 'llmspell config list-profiles' for detailed information.
     ///
     /// Profiles are complete configurations loaded from built-in TOML files.
     /// Use --profile to select a builtin, or -c for custom config files.
@@ -1062,6 +1079,19 @@ pub enum ConfigCommands {
         /// Output format
         #[arg(long, value_enum, default_value = "toml")]
         format: ConfigFormat,
+    },
+
+    /// List available builtin profiles
+    #[command(long_about = "Display all available builtin configuration profiles with detailed metadata.
+
+EXAMPLES:
+    llmspell config list-profiles                    # List all profiles
+    llmspell config list-profiles --detailed         # Show full metadata for each profile
+    llmspell config list-profiles --output json      # Output in JSON format")]
+    ListProfiles {
+        /// Show detailed profile information (use cases, features)
+        #[arg(long, short = 'd')]
+        detailed: bool,
     },
 }
 

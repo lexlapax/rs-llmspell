@@ -43,6 +43,21 @@ const CONFIG_SEARCH_PATHS: &[&str] = &[
 #[allow(dead_code)]
 const ENV_PREFIX: &str = "LLMSPELL_";
 
+/// Metadata describing a builtin configuration profile
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct ProfileMetadata {
+    /// Profile name (e.g., "minimal", "rag-dev")
+    pub name: &'static str,
+    /// Category (e.g., "Core", "RAG", "Local LLM")
+    pub category: &'static str,
+    /// Short description
+    pub description: &'static str,
+    /// Common use cases
+    pub use_cases: Vec<&'static str>,
+    /// Key features
+    pub features: Vec<&'static str>,
+}
+
 /// Central LLMSpell configuration
 #[derive(Debug, Clone, Deserialize, Serialize)]
 #[serde(default)]
@@ -1037,7 +1052,7 @@ impl LLMSpellConfig {
     /// use llmspell_config::LLMSpellConfig;
     ///
     /// let profiles = LLMSpellConfig::list_builtin_profiles();
-    /// assert_eq!(profiles.len(), 7);
+    /// assert_eq!(profiles.len(), 10);
     /// assert!(profiles.contains(&"development"));
     /// assert!(profiles.contains(&"ollama"));
     /// assert!(profiles.contains(&"rag-prod"));
@@ -1056,6 +1071,118 @@ impl LLMSpellConfig {
             "rag-prod",
             "rag-perf",
         ]
+    }
+
+    /// Get metadata for a specific builtin profile
+    ///
+    /// Returns structured information about a profile including category,
+    /// description, use cases, and key features.
+    ///
+    /// # Examples
+    ///
+    /// ```rust
+    /// use llmspell_config::LLMSpellConfig;
+    ///
+    /// let metadata = LLMSpellConfig::get_profile_metadata("providers").unwrap();
+    /// assert_eq!(metadata.category, "Common Workflows");
+    /// assert_eq!(metadata.name, "providers");
+    /// ```
+    #[must_use]
+    pub fn get_profile_metadata(name: &str) -> Option<ProfileMetadata> {
+        match name {
+            "minimal" => Some(ProfileMetadata {
+                name: "minimal",
+                category: "Core",
+                description: "Tools only, no LLM providers",
+                use_cases: vec!["Testing tools", "Learning workflow patterns", "Scripts without LLM access"],
+                features: vec!["Lua stdlib: Basic", "No providers", "No RAG", "No sessions"],
+            }),
+            "development" => Some(ProfileMetadata {
+                name: "development",
+                category: "Core",
+                description: "Dev settings with debug logging",
+                use_cases: vec!["Development", "Debugging", "Learning LLM integration"],
+                features: vec!["Lua stdlib: All", "OpenAI + Anthropic", "Debug logging", "Small resource limits"],
+            }),
+            "providers" => Some(ProfileMetadata {
+                name: "providers",
+                category: "Common Workflows",
+                description: "OpenAI + Anthropic setup",
+                use_cases: vec!["Agent examples", "LLM scripts", "Production agents"],
+                features: vec!["OpenAI gpt-3.5-turbo", "Anthropic claude-3-haiku", "Cost-efficient models", "No RAG"],
+            }),
+            "state" => Some(ProfileMetadata {
+                name: "state",
+                category: "Common Workflows",
+                description: "State persistence with memory backend",
+                use_cases: vec!["State management examples", "Scripts requiring state", "Learning persistence"],
+                features: vec!["Memory backend", "10MB max state", "No providers", "Migration/backup disabled"],
+            }),
+            "sessions" => Some(ProfileMetadata {
+                name: "sessions",
+                category: "Common Workflows",
+                description: "Sessions + state + hooks + events",
+                use_cases: vec!["Conversational apps", "Session management", "Event-driven workflows"],
+                features: vec!["Session tracking", "Artifact storage", "Hooks enabled", "Events enabled"],
+            }),
+            "ollama" => Some(ProfileMetadata {
+                name: "ollama",
+                category: "Local LLM",
+                description: "Ollama backend configuration",
+                use_cases: vec!["Local LLM with Ollama", "Offline inference", "GGUF models"],
+                features: vec!["Ollama provider", "Local inference", "No API keys needed", "Full stdlib"],
+            }),
+            "candle" => Some(ProfileMetadata {
+                name: "candle",
+                category: "Local LLM",
+                description: "Candle embedded inference",
+                use_cases: vec!["Local LLM with Candle", "CPU/GPU inference", "Rust-native models"],
+                features: vec!["Candle provider", "Rust inference", "No API keys needed", "Full stdlib"],
+            }),
+            "rag-dev" => Some(ProfileMetadata {
+                name: "rag-dev",
+                category: "RAG",
+                description: "Development RAG (small dims, fast)",
+                use_cases: vec!["Learning RAG", "Prototyping knowledge bases", "Fast iteration"],
+                features: vec!["384-dim vectors", "HNSW index", "OpenAI embeddings", "Small memory footprint"],
+            }),
+            "rag-prod" => Some(ProfileMetadata {
+                name: "rag-prod",
+                category: "RAG",
+                description: "Production RAG (reliability, monitoring)",
+                use_cases: vec!["Production RAG deployment", "Large knowledge bases", "SaaS platforms"],
+                features: vec!["1536-dim vectors", "Caching enabled", "Monitoring ready", "Production settings"],
+            }),
+            "rag-perf" => Some(ProfileMetadata {
+                name: "rag-perf",
+                category: "RAG",
+                description: "Performance RAG (high memory, cores)",
+                use_cases: vec!["High-performance RAG", "Large-scale search", "Multi-core systems"],
+                features: vec!["Optimized HNSW", "Large caches", "Multi-threaded", "High memory limits"],
+            }),
+            _ => None,
+        }
+    }
+
+    /// List metadata for all builtin profiles
+    ///
+    /// Returns structured information about all available profiles,
+    /// organized by category.
+    ///
+    /// # Examples
+    ///
+    /// ```rust
+    /// use llmspell_config::LLMSpellConfig;
+    ///
+    /// let all_metadata = LLMSpellConfig::list_profile_metadata();
+    /// assert_eq!(all_metadata.len(), 10);
+    /// ```
+    #[must_use]
+    pub fn list_profile_metadata() -> Vec<ProfileMetadata> {
+        Self::list_builtin_profiles()
+            .iter()
+            .filter_map(|name| Self::get_profile_metadata(name))
+            .collect()
     }
 
     /// Load configuration with automatic discovery

@@ -2899,6 +2899,7 @@ llmspell -p sessions exec "print(Sessions.create('test-session'))"
 - **Validation Automation**: Created reusable validation script for future profile migrations
 - **Phase Integration**: Successfully demonstrated Phase 11b.3 unified profile system in practice
 - **Strategic Keep Decision**: Retained 10 custom configs as educational templates (migration, backup, multi-tenant, etc.)
+- **Profile Discovery UX**: Three-path system optimal - (1) inline help in cli.rs:109-137 lists all 10 profiles grouped by category, (2) `llmspell config list-profiles [--detailed]` for metadata, (3) error messages show available options. Matches industry patterns (cargo, npm, docker) and llmspell's "comprehensive help + EXAMPLES" philosophy. Implementation complete and properly wired across cli.rs, config.rs, mod.rs, lib.rs
 
 ---
 
