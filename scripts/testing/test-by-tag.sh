@@ -65,21 +65,26 @@ shift
 echo "🏷️  Running tests tagged as: $TAG"
 echo "================================="
 
-# Check if test runner is available
-if command -v llmspell-test >/dev/null 2>&1; then
-    TEST_RUNNER="llmspell-test"
-else
-    TEST_RUNNER="cargo run -p llmspell-testing --features test-runner --bin llmspell-test --"
-fi
-
 case $TAG in
-    "unit"|"integration"|"agent"|"scenario"|"scenarios"|"lua")
-        # Normalize scenarios -> scenario
-        if [ "$TAG" = "scenarios" ]; then
-            TAG="scenario"
-        fi
-        print_info "Delegating to llmspell-test runner..."
-        $TEST_RUNNER run $TAG $@
+    "unit")
+        print_info "Running unit tests..."
+        cargo test -p llmspell-testing --features unit-tests --test unit $@
+        ;;
+    "integration")
+        print_info "Running integration tests..."
+        cargo test -p llmspell-testing --features integration-tests --test integration $@
+        ;;
+    "agent")
+        print_info "Running agent tests..."
+        cargo test -p llmspell-testing --features agent-tests --test agents $@
+        ;;
+    "scenario"|"scenarios")
+        print_info "Running scenario tests..."
+        cargo test -p llmspell-testing --features scenario-tests --test scenarios $@
+        ;;
+    "lua")
+        print_info "Running Lua tests..."
+        cargo test -p llmspell-testing --features lua-tests --test lua $@
         ;;
     "tool")
         print_info "Running tool tests..."
@@ -91,7 +96,7 @@ case $TAG in
         ;;
     "fast")
         print_info "Running fast tests (unit tests only)..."
-        $TEST_RUNNER run unit $@
+        cargo test -p llmspell-testing --features unit-tests --test unit $@
         ;;
     "slow")
         print_info "Running slow tests (ignored tests with single thread)..."
@@ -103,7 +108,7 @@ case $TAG in
         ;;
     "all")
         print_info "Running all tests..."
-        $TEST_RUNNER run all $@
+        cargo test --workspace $@
         ;;
     "bridge")
         print_info "Running bridge tests..."

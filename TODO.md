@@ -661,3 +661,96 @@ bench-all = "bench -p llmspell-testing"
 
 ---
 
+### Task 11b.2.3: Update Test Script - ✅ COMPLETE
+**Priority**: MEDIUM
+**Estimated Time**: 15 minutes
+**Actual Time**: 10 minutes
+**Status**: ✅ COMPLETE
+**Depends On**: Task 11b.2.2 ✅
+
+**File**: `scripts/testing/test-by-tag.sh`
+
+**Changes Made**:
+Removed TEST_RUNNER variable (lines 68-73) and replaced all invocations with direct cargo test commands (lines 76-111):
+
+```bash
+# BEFORE (lines 68-73)
+if command -v llmspell-test >/dev/null 2>&1; then
+    TEST_RUNNER="llmspell-test"
+else
+    TEST_RUNNER="cargo run -p llmspell-testing --features test-runner --bin llmspell-test --"
+fi
+
+# BEFORE (lines 76-106)
+case $TAG in
+    "unit"|"integration"|"agent"|"scenario"|"scenarios"|"lua")
+        $TEST_RUNNER run $TAG $@
+        ;;
+    "fast")
+        $TEST_RUNNER run unit $@
+        ;;
+    "all")
+        $TEST_RUNNER run all $@
+        ;;
+    # ... other cases
+esac
+
+# AFTER (lines 68-111)
+case $TAG in
+    "unit")
+        print_info "Running unit tests..."
+        cargo test -p llmspell-testing --features unit-tests --test unit $@
+        ;;
+    "integration")
+        print_info "Running integration tests..."
+        cargo test -p llmspell-testing --features integration-tests --test integration $@
+        ;;
+    "agent")
+        print_info "Running agent tests..."
+        cargo test -p llmspell-testing --features agent-tests --test agents $@
+        ;;
+    "scenario"|"scenarios")
+        print_info "Running scenario tests..."
+        cargo test -p llmspell-testing --features scenario-tests --test scenarios $@
+        ;;
+    "lua")
+        print_info "Running Lua tests..."
+        cargo test -p llmspell-testing --features lua-tests --test lua $@
+        ;;
+    "fast")
+        print_info "Running fast tests (unit tests only)..."
+        cargo test -p llmspell-testing --features unit-tests --test unit $@
+        ;;
+    "all")
+        print_info "Running all tests..."
+        cargo test --workspace $@
+        ;;
+    # ... other cases unchanged
+esac
+```
+
+**Tag Mapping**:
+- `unit` → cargo test --features unit-tests --test unit
+- `integration` → cargo test --features integration-tests --test integration
+- `agent` → cargo test --features agent-tests --test agents
+- `scenario/scenarios` → cargo test --features scenario-tests --test scenarios
+- `lua` → cargo test --features lua-tests --test lua
+- `fast` → same as unit (unit tests only)
+- `all` → cargo test --workspace (all tests)
+- `tool/workflow/bridge/llm/database` → unchanged (already using cargo test directly)
+
+**Validation**:
+- [x] TEST_RUNNER variable removed (6 lines) ✅
+- [x] All 6 test category tags updated to use cargo test directly ✅
+- [x] Feature flags match .cargo/config.toml aliases ✅
+- [x] Existing package-specific tags (tool, workflow, bridge) unchanged ✅
+
+**Insights**:
+- **Simplified Logic**: Removed command detection + fallback wrapper logic
+- **Direct Invocation**: No intermediate binary layer
+- **Consistent with Aliases**: Uses identical cargo test commands as .cargo/config.toml
+- **Better Error Messages**: Added explicit print_info messages for each tag
+- **Preserved Functionality**: All original test categories still work
+
+---
+
