@@ -405,3 +405,140 @@ print("Available models:", status.available_models)'
 
 ---
 
+## Phase 11b.2: Remove llmspell-test Binary Target - ⏳ TODO
+Remove unauthorized binary target from llmspell-testing crate to enforce single-binary architecture.
+
+**Problem**:
+- **Architecture Violation**: llmspell-testing defines `llmspell-test` binary
+- **Single-Binary Requirement**: Only llmspell-cli should produce a binary
+- **Redundancy**: Test runner functionality duplicates existing cargo/script capabilities
+- **Maintenance Burden**: Extra code path to maintain and document
+- **User Confusion**: Multiple entry points unclear which to use
+
+**Current State** (Phase 11b discovery):
+```
+Binary Targets Found: 2
+1. llmspell (llmspell-cli) ✅ EXPECTED
+2. llmspell-test (llmspell-testing) ❌ VIOLATION
+```
+
+**Evidence**:
+- **Cargo.toml Configuration** (llmspell-testing/Cargo.toml:64-67):
+  ```toml
+  [[bin]]
+  name = "llmspell-test"
+  path = "src/bin/test-runner.rs"
+  required-features = ["test-runner"]
+  ```
+
+- **Binary Implementation** (204 lines):
+  - llmspell-testing/src/bin/test-runner.rs - Full CLI with clap subcommands
+
+- **Supporting Infrastructure** (471 lines total):
+  - llmspell-testing/src/runner/mod.rs (10 lines)
+  - llmspell-testing/src/runner/category.rs (115 lines) - `TestCategory` enum
+  - llmspell-testing/src/runner/config.rs (10 lines) - `TestRunnerConfig` struct
+  - llmspell-testing/src/runner/executor.rs (336 lines) - `TestRunner` implementation
+
+- **Active Usage**:
+  - .cargo/config.toml: 9 cargo aliases reference `llmspell-test`
+  - scripts/testing/test-by-tag.sh:72 - Uses test runner
+  - llmspell-testing/README.md - 5 occurrences documenting it
+
+- **Optional Feature**: Gated by `--features test-runner` (not built by default)
+
+**Root Cause Analysis**:
+1. **Historical Context**: Added during Phase 5 (State Persistence) for test organization
+2. **Scope Creep**: Started as test utilities, expanded into full CLI binary
+3. **Architecture Drift**: Violated single-binary principle established for llmspell-cli
+4. **No Enforcement**: No automated check prevented additional binary targets
+5. **Phase Handoffs**: Requirement not re-validated during Phases 6-11
+
+**Naming Collision Discovery** (Critical Insight):
+Two DIFFERENT `TestCategory` types exist:
+1. **runner::TestCategory** (enum) - ONLY used by binary, safe to remove
+   - Values: Unit, Integration, Agents, Scenarios, Lua, Performance, All
+   - Used by: src/bin/test-runner.rs, src/runner/*.rs
+2. **attributes::TestCategory** (struct) - Used by examples/tests, MUST keep
+   - Used by: examples/categorization_example.rs, tests/categories.rs
+   - Purpose: Test categorization attributes (Speed, Scope, Priority, etc.)
+
+**No Conflict**: Different modules, different types, orthogonal purposes
+
+**Solution**:
+1. **Remove Binary Target**:
+   - Delete `[[bin]]` section from llmspell-testing/Cargo.toml
+   - Delete llmspell-testing/src/bin/ directory
+   - Delete llmspell-testing/src/runner/ module (471 lines)
+   - Remove `test-runner` feature from Cargo.toml
+
+2. **Update Cargo Aliases** (.cargo/config.toml):
+   - Replace `llmspell-test run all` → `test --workspace`
+   - Replace `llmspell-test run unit` → `test --features unit-tests`
+   - Remove 9 obsolete aliases
+
+3. **Update Scripts** (scripts/testing/test-by-tag.sh):
+   - Replace test runner invocation with direct cargo test
+
+4. **Update Documentation**:
+   - llmspell-testing/README.md - Remove binary installation/usage sections
+   - docs/user-guide/api/rust/llmspell-testing.md - Remove CLI references
+   - docs/developer-guide/*.md - Update test execution examples
+
+5. **Preserve Test Utilities**:
+   - Keep all helpers: attributes, agent_helpers, tool_helpers, etc.
+   - Keep attributes::TestCategory (struct) - unrelated to binary
+   - Keep all mocks, generators, benchmarks, fixtures
+
+**Files to Change**:
+1. **llmspell-testing/Cargo.toml** - Remove `[[bin]]`, remove `test-runner` feature
+2. **llmspell-testing/src/lib.rs** - Remove `#[cfg(feature = "test-runner")] pub mod runner;`
+3. **llmspell-testing/src/bin/** - DELETE directory (204 lines)
+4. **llmspell-testing/src/runner/** - DELETE directory (471 lines)
+5. **.cargo/config.toml** - Update 9 aliases to use cargo test directly
+6. **scripts/testing/test-by-tag.sh** - Update line 72
+7. **llmspell-testing/README.md** - Remove binary documentation sections
+8. **docs/user-guide/api/rust/llmspell-testing.md** - Remove CLI references
+
+**Success Criteria**:
+- [ ] Zero `[[bin]]` sections in workspace except llmspell-cli/Cargo.toml
+- [ ] Zero src/bin/ directories except llmspell-cli/src/bin/
+- [ ] `find . -name "main.rs" | grep -v llmspell-cli` returns empty
+- [ ] All 9 cargo aliases work without llmspell-test binary
+- [ ] scripts/testing/test-by-tag.sh executes successfully
+- [ ] Test utilities (attributes::TestCategory, helpers, mocks) still functional
+- [ ] Examples still compile and run
+- [ ] cargo clippy --workspace --all-features -- -D warnings: zero warnings
+- [ ] ./scripts/quality/quality-check-minimal.sh: all checks pass
+- [ ] No documentation references to `llmspell-test` binary
+- [ ] No documentation showing `cargo install --path llmspell-testing --features test-runner`
+
+**Validation Commands**:
+```bash
+# Verify no unexpected binaries
+find . -type f -name "Cargo.toml" | xargs grep -l "\[\[bin\]\]" | grep -v llmspell-cli
+
+# Verify no main.rs outside llmspell-cli
+find . -name "main.rs" | grep -v target | grep -v llmspell-cli
+
+# Test cargo aliases work
+cargo test-all       # Should use cargo test --workspace
+cargo test-unit      # Should use cargo test --features unit-tests
+
+# Test scripts work
+./scripts/testing/test-by-tag.sh unit
+
+# Quality gates
+cargo clippy --workspace --all-features -- -D warnings
+./scripts/quality/quality-check-minimal.sh
+```
+
+**Rationale**:
+- **Architecture Purity**: One binary (llmspell-cli) for all user interaction
+- **Simplicity**: Existing cargo test and scripts provide same functionality
+- **Maintenance**: 675 fewer lines of code to maintain (binary + runner module)
+- **Clarity**: No confusion about which entry point to use
+- **Compliance**: Adheres to single-binary architecture requirement
+
+---
+
