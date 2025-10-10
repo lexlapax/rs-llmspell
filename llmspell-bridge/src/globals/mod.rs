@@ -241,14 +241,10 @@ pub async fn create_standard_registry(context: Arc<GlobalContext>) -> Result<Glo
 
     builder.register(Arc::new(streaming_global::StreamingGlobal::new()));
 
-    // Register LocalLLM global if provider manager available
-    if let Some(provider_manager) =
-        context.get_bridge::<llmspell_providers::ProviderManager>("provider_manager")
-    {
-        builder.register(Arc::new(local_llm_global::LocalLLMGlobal::new(
-            provider_manager,
-        )));
-    }
+    // Register LocalLLM global (providers always available in context)
+    builder.register(Arc::new(local_llm_global::LocalLLMGlobal::new(
+        context.providers.create_core_manager_arc().await?,
+    )));
 
     builder.build()
 }

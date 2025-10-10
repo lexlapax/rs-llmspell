@@ -57,13 +57,14 @@ if let Some(provider_manager) =
 - [ ] Zero clippy warnings
 - [ ] Quality check scripts pass
 
-### Task 11b.1.1: Fix GlobalContext Provider Access - ⏳ TODO
+### Task 11b.1.1: Fix GlobalContext Provider Access - ✅ COMPLETE
 **Priority**: CRITICAL
 **Estimated Time**: 15 minutes
-**Status**: ⏳ TODO
+**Actual Time**: 45 minutes (included type analysis)
+**Status**: ✅ COMPLETE
 
 **File**: `llmspell-bridge/src/globals/mod.rs`
-**Lines**: 29-35
+**Lines**: 244-247 (was 29-35)
 
 **Current Code (BROKEN)**:
 ```rust
@@ -111,8 +112,22 @@ builder.register(Arc::new(local_llm_global::LocalLLMGlobal::new(
 5. Save file
 
 **Validation**:
-- [ ] Compile succeeds: `cargo check -p llmspell-bridge`
-- [ ] No new clippy warnings: `cargo clippy -p llmspell-bridge`
+- [x] Compile succeeds: `cargo check -p llmspell-bridge` ✅
+- [x] No new clippy warnings: `cargo clippy -p llmspell-bridge` ✅
+
+**Insights**:
+- **Type Mismatch Discovery**: `context.providers` is `Arc<crate::ProviderManager>` (bridge wrapper), not `Arc<llmspell_providers::ProviderManager>` (core)
+- **Existing Method Found**: `create_core_manager_arc()` at providers.rs:301-348 was purpose-built for this exact use case
+- **Pattern Validated**: Used async method (already in async fn) - cleaner than cloning + Arc wrapping
+- **Architecture Note**: Bridge's ProviderManager wraps core for config/validation - intentional wrapper pattern
+
+**Final Implementation**:
+```rust
+// llmspell-bridge/src/globals/mod.rs:244-247
+builder.register(Arc::new(local_llm_global::LocalLLMGlobal::new(
+    context.providers.create_core_manager_arc().await?,
+)));
+```
 
 ---
 
