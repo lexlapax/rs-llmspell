@@ -23,14 +23,12 @@ pub async fn execute_inline_script(
 
     match context {
         ExecutionContext::Embedded { handle, .. } => {
-            let _kernel = handle.into_kernel();
-
             // Execute inline code using embedded kernel
-            execute_code_embedded(&code, engine, stream, output_format).await?;
+            execute_code_embedded(*handle, &code, engine, stream, output_format).await?;
         }
-        ExecutionContext::Connected { .. } => {
+        ExecutionContext::Connected { handle, .. } => {
             // Execute code on connected kernel
-            execute_code_connected(&code, engine, stream, output_format).await?;
+            execute_code_connected(handle, &code, engine, stream, output_format).await?;
         }
     }
 
@@ -39,39 +37,38 @@ pub async fn execute_inline_script(
 
 /// Execute code using embedded kernel
 async fn execute_code_embedded(
+    handle: llmspell_kernel::api::KernelHandle,
     code: &str,
-    engine: ScriptEngine,
-    stream: bool,
+    _engine: ScriptEngine,
+    _stream: bool,
     output_format: OutputFormat,
 ) -> Result<()> {
+    use std::collections::HashMap;
+    use tracing::debug;
+
+    // Get the kernel from the handle and execute the code
+    let mut kernel = handle.into_kernel();
+    let result = kernel
+        .execute_direct_with_args(code, HashMap::new())
+        .await?;
+
+    // Format and display the output based on the requested format
     match output_format {
         OutputFormat::Json => {
             println!(
                 "{}",
                 serde_json::json!({
-                    "status": "executed",
-                    "engine": engine.as_str(),
-                    "streaming": stream,
+                    "status": "success",
+                    "mode": "embedded",
                     "code_length": code.len(),
-                    "result": "Code execution completed successfully"
+                    "result": result
                 })
             );
         }
         _ => {
-            println!("Executing {} code:", engine.as_str());
-            println!("```{}", engine.as_str());
-            println!("{}", code);
-            println!("```");
-            println!();
-
-            if stream {
-                println!("🔄 Streaming execution...");
-                // Simulate streaming output
-                println!("Output: Code execution completed successfully");
-            } else {
-                println!("✓ Code executed successfully");
-                println!("Result: Code execution completed successfully");
-            }
+            // For plain text output, the result is already printed via IOPub
+            // Just show completion status
+            debug!("Code execution completed");
         }
     }
 
@@ -80,31 +77,34 @@ async fn execute_code_embedded(
 
 /// Execute code using connected kernel
 async fn execute_code_connected(
+    mut handle: llmspell_kernel::api::ClientHandle,
     code: &str,
-    engine: ScriptEngine,
-    stream: bool,
+    _engine: ScriptEngine,
+    _stream: bool,
     output_format: OutputFormat,
 ) -> Result<()> {
+    use tracing::debug;
+
+    // Execute the code on the remote kernel
+    let result = handle.execute(code).await?;
+
+    // Format and display the output based on the requested format
     match output_format {
         OutputFormat::Json => {
             println!(
                 "{}",
                 serde_json::json!({
-                    "status": "executed",
+                    "status": "success",
                     "mode": "connected",
-                    "engine": engine.as_str(),
-                    "streaming": stream,
-                    "code_length": code.len()
+                    "code_length": code.len(),
+                    "result": result
                 })
             );
         }
         _ => {
-            println!("Executing {} code via connected kernel:", engine.as_str());
-            println!("```{}", engine.as_str());
-            println!("{}", code);
-            println!("```");
-            println!();
-            println!("✓ Code sent to connected kernel for execution");
+            // For plain text output, the result is already printed via IOPub
+            // Just show completion status
+            debug!("Code execution completed via connected kernel");
         }
     }
 
