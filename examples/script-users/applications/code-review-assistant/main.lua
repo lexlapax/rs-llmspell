@@ -28,9 +28,16 @@
 --    ./target/debug/llmspell run examples/script-users/applications/code-review-assistant/main.lua \
 --    -- --input my-code.lua --output /tmp/my-review
 --
--- 3. With Configuration:
+-- 3. With App-Specific Configuration (recommended for production):
 --    ./target/debug/llmspell -c examples/script-users/applications/code-review-assistant/config.toml \
 --    run examples/script-users/applications/code-review-assistant/main.lua
+--
+-- 4. Quick Start with Builtin Profiles:
+--    # For simple agent-based review:
+--    ./target/debug/llmspell -p providers run examples/script-users/applications/code-review-assistant/main.lua
+--
+--    # For development/testing with full features:
+--    ./target/debug/llmspell -p development run examples/script-users/applications/code-review-assistant/main.lua
 --
 -- Expected Output:
 --   • review-findings.json - All issues found by reviewers

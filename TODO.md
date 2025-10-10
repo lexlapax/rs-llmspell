@@ -2174,26 +2174,26 @@ pub fn list_builtin_profiles() -> Vec<&'static str> {
 
 ---
 
-### Task 11b.4.11: Update Application main.lua Files (10 files) - 🔲 PENDING
+### Task 11b.4.11: Update Application main.lua Files (10 files) - ✅ COMPLETE
 **Priority**: MEDIUM
 **Estimated Time**: 45 minutes
-**Actual Time**:
-**Status**: 🔲 PENDING
+**Actual Time**: 42 minutes
+**Status**: ✅ COMPLETE
 **Depends On**: Phase 1 Complete ✅
 
 **Objective**: Update header comments in application main.lua files to reference builtin profiles
 
 **Applications** (from CONFIG_CLEANUP_ANALYSIS.md):
-1. code-review-assistant/main.lua
-2. communication-manager/main.lua
-3. content-creator/main.lua
-4. file-organizer/main.lua
-5. instrumented-agent/main.lua
-6. knowledge-base/main.lua
-7. personal-assistant/main.lua
-8. process-orchestrator/main.lua
-9. research-collector/main.lua
-10. webapp-creator/main.lua
+1. code-review-assistant/main.lua → `-p providers`, `-p development`
+2. communication-manager/main.lua → `-p sessions`, `-p development`
+3. content-creator/main.lua → `-p providers`, `-p development`
+4. file-organizer/main.lua → `-p providers`, `-p development`
+5. instrumented-agent/main.lua → `-p development` (with debug trace)
+6. knowledge-base/main.lua → `-p rag-dev`, `-p rag-prod`
+7. personal-assistant/main.lua → `-p rag-dev`, `-p sessions`
+8. process-orchestrator/main.lua → `-p development`, `-p sessions`
+9. research-collector/main.lua → `-p rag-dev`, `-p rag-prod`
+10. webapp-creator/main.lua → `-p development`, `-p rag-prod`
 
 **Update Strategy**:
 - **Keep app-specific config.toml**: Applications demonstrate configuration patterns
@@ -2211,10 +2211,17 @@ pub fn list_builtin_profiles() -> Vec<&'static str> {
 ```
 
 **Validation**:
-- [ ] All 10 main.lua files updated
-- [ ] Comments explain both config.toml and builtin alternatives
-- [ ] Application configs preserved (not removed)
-- [ ] Files execute with both `-c config.toml` and `-p development`
+- [x] All 10 main.lua files updated
+- [x] Comments explain both config.toml and builtin alternatives
+- [x] Application configs preserved (not removed)
+- [x] Files execute with both `-c config.toml` and `-p development`
+
+**Insights**:
+- **Profile Selection Pattern**: Simple agents → `providers`, RAG features → `rag-dev`/`rag-prod`, state/sessions → `sessions`, debugging → `development`
+- **Preserved App Configs**: All application-specific config.toml files retained to demonstrate production configuration patterns
+- **Dual Entry Points**: Users can now quick-start with builtin profiles OR use full app configs for production
+- **Documentation Consistency**: All applications now follow same header format with Prerequisites, HOW TO RUN (4 options), ABOUTME sections
+- **Feature-Based Selection**: Profile recommendations based on app features (RAG, sessions, state, debugging) ensures users get appropriate capabilities
 
 ---
 
@@ -2628,7 +2635,7 @@ When multiple config sources exist:
 
 Example: `llmspell -c custom.toml -p rag-dev run script.lua`
 → Loads rag-dev builtin (profile wins over -c flag)
-```
+
 
 **Update Existing Sections**:
 - Config file locations - mention builtins first

@@ -6,9 +6,23 @@
 -- Tags: application, process-orchestrator, professional, workflow, orchestration
 --
 -- HOW TO RUN:
--- 1. Basic (no API keys): ./target/debug/llmspell run examples/script-users/applications/process-orchestrator/main.lua
--- 2. With config: ./target/debug/llmspell -c examples/script-users/applications/process-orchestrator/config.toml run examples/script-users/applications/process-orchestrator/main.lua
--- 3. Full features: export OPENAI_API_KEY="sk-..." && export ANTHROPIC_API_KEY="sk-ant-..." && ./target/debug/llmspell run examples/script-users/applications/process-orchestrator/main.lua
+-- 1. Basic (no API keys):
+--    ./target/debug/llmspell run examples/script-users/applications/process-orchestrator/main.lua
+--
+-- 2. With App-Specific Configuration (recommended for production):
+--    ./target/debug/llmspell -c examples/script-users/applications/process-orchestrator/config.toml \
+--    run examples/script-users/applications/process-orchestrator/main.lua
+--
+-- 3. Full features with API keys:
+--    export OPENAI_API_KEY="sk-..." && export ANTHROPIC_API_KEY="sk-ant-..." && \
+--    ./target/debug/llmspell run examples/script-users/applications/process-orchestrator/main.lua
+--
+-- 4. Quick Start with Builtin Profiles:
+--    # For professional process orchestration:
+--    ./target/debug/llmspell -p development run examples/script-users/applications/process-orchestrator/main.lua
+--
+--    # For advanced features with full runtime capabilities:
+--    ./target/debug/llmspell -p sessions run examples/script-users/applications/process-orchestrator/main.lua
 --
 -- ABOUTME: Professional layer business process automation with 8-12 agent orchestration
 -- ABOUTME: Demonstrates conditional routing, parallel execution, and business rule automation
