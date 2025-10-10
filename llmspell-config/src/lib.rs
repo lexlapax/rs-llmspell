@@ -903,31 +903,162 @@ impl LLMSpellConfig {
         Ok(None)
     }
 
-    /// Load configuration with automatic discovery
-    pub async fn load_with_discovery(explicit_path: Option<&Path>) -> Result<Self, ConfigError> {
-        // If explicit path provided, use it
-        if let Some(path) = explicit_path {
+    /// Load configuration with optional builtin profile
+    ///
+    /// Loads configuration using the following precedence rules:
+    /// 1. `profile` - If provided, loads the named builtin profile
+    /// 2. `explicit_path` - If provided and profile is None, loads config from file path
+    /// 3. Discovery - If neither provided, searches standard locations
+    /// 4. Default - If nothing found, uses default configuration
+    ///
+    /// Environment variables override all configuration sources.
+    ///
+    /// # Arguments
+    ///
+    /// * `explicit_path` - Optional path to custom config file
+    /// * `profile` - Optional builtin profile name
+    ///
+    /// # Examples
+    ///
+    /// ```rust,ignore
+    /// // Load builtin profile
+    /// let config = LLMSpellConfig::load_with_profile(None, Some("development")).await?;
+    ///
+    /// // Load custom config file
+    /// let config = LLMSpellConfig::load_with_profile(Some(Path::new("my.toml")), None).await?;
+    ///
+    /// // Use discovery
+    /// let config = LLMSpellConfig::load_with_profile(None, None).await?;
+    /// ```
+    pub async fn load_with_profile(
+        explicit_path: Option<&Path>,
+        profile: Option<&str>,
+    ) -> Result<Self, ConfigError> {
+        let mut config = if let Some(prof) = profile {
+            debug!("Loading builtin profile: {}", prof);
+            Self::load_builtin_profile(prof)?
+        } else if let Some(path) = explicit_path {
+            debug!("Loading config from file: {}", path.display());
             if path.exists() {
-                return Self::load_from_file(path).await;
+                Self::load_from_file(path).await?
             } else {
                 return Err(ConfigError::NotFound {
                     path: path.to_string_lossy().to_string(),
                     message: "Explicitly specified config file not found".to_string(),
                 });
             }
-        }
+        } else {
+            debug!("Using config discovery");
+            if let Some(discovered) = Self::discover_config_file().await? {
+                debug!("Discovered config file: {}", discovered.display());
+                Self::load_from_file(&discovered).await?
+            } else {
+                debug!("No config file found, using defaults");
+                Self::default()
+            }
+        };
 
-        // Discover config file
-        if let Some(discovered_path) = Self::discover_config_file().await? {
-            return Self::load_from_file(&discovered_path).await;
-        }
-
-        // No config file found, use defaults with environment overrides
-        let mut config = Self::default();
+        // Environment variables ALWAYS override
         config.apply_env_registry()?;
         config.validate()?;
 
         Ok(config)
+    }
+
+    /// Load a builtin configuration profile
+    ///
+    /// Builtin profiles are complete TOML configurations embedded at compile time.
+    ///
+    /// # Available Profiles
+    ///
+    /// ## Core Profiles
+    /// - `minimal` - Bare minimum settings for basic operation
+    /// - `development` - Development-friendly settings with debug logging
+    ///
+    /// ## Local LLM Profiles
+    /// - `ollama` - Ollama backend configuration
+    /// - `candle` - Candle embedded inference configuration
+    ///
+    /// ## RAG Profiles
+    /// - `rag-dev` - Development RAG settings (small dimensions, fast iteration)
+    /// - `rag-prod` - Production RAG settings (reliability, monitoring, security)
+    /// - `rag-perf` - Performance-optimized RAG settings (high memory, many cores)
+    ///
+    /// # Errors
+    ///
+    /// Returns `ConfigError::NotFound` if the profile name is not recognized.
+    fn load_builtin_profile(name: &str) -> Result<Self, ConfigError> {
+        let toml_content = match name {
+            // Core profiles
+            "minimal" => include_str!("../builtins/minimal.toml"),
+            "development" => include_str!("../builtins/development.toml"),
+
+            // Local LLM profiles
+            "ollama" => include_str!("../builtins/ollama.toml"),
+            "candle" => include_str!("../builtins/candle.toml"),
+
+            // RAG profiles
+            "rag-dev" => include_str!("../builtins/rag-development.toml"),
+            "rag-prod" => include_str!("../builtins/rag-production.toml"),
+            "rag-perf" => include_str!("../builtins/rag-performance.toml"),
+
+            _ => {
+                return Err(ConfigError::NotFound {
+                    path: format!("builtin:{}", name),
+                    message: format!(
+                        "Unknown builtin profile '{}'.\n\
+                         Available profiles:\n\
+                         Core: minimal, development\n\
+                         Local LLM: ollama, candle\n\
+                         RAG: rag-dev, rag-prod, rag-perf",
+                        name
+                    ),
+                });
+            }
+        };
+
+        Self::from_toml(toml_content)
+    }
+
+    /// List available builtin profiles
+    ///
+    /// Returns a vector of all builtin profile names that can be used with
+    /// `load_with_profile()` or the `--profile` CLI flag.
+    ///
+    /// # Examples
+    ///
+    /// ```rust
+    /// use llmspell_config::LLMSpellConfig;
+    ///
+    /// let profiles = LLMSpellConfig::list_builtin_profiles();
+    /// assert_eq!(profiles.len(), 7);
+    /// assert!(profiles.contains(&"development"));
+    /// assert!(profiles.contains(&"ollama"));
+    /// assert!(profiles.contains(&"rag-prod"));
+    /// ```
+    #[must_use]
+    pub fn list_builtin_profiles() -> Vec<&'static str> {
+        vec![
+            "minimal",
+            "development",
+            "ollama",
+            "candle",
+            "rag-dev",
+            "rag-prod",
+            "rag-perf",
+        ]
+    }
+
+    /// Load configuration with automatic discovery
+    ///
+    /// This method delegates to `load_with_profile` with no profile specified.
+    /// Kept for backward compatibility.
+    ///
+    /// # Deprecation Note
+    ///
+    /// Consider using `load_with_profile(explicit_path, None)` directly for new code.
+    pub async fn load_with_discovery(explicit_path: Option<&Path>) -> Result<Self, ConfigError> {
+        Self::load_with_profile(explicit_path, None).await
     }
 }
 
@@ -1647,5 +1778,133 @@ timeout_seconds = 300
         assert_eq!(candle.provider_type, "candle");
         assert!(candle.enabled);
         assert_eq!(candle.timeout_seconds, Some(300));
+    }
+
+    // Profile system tests
+    #[test]
+    fn test_list_builtin_profiles() {
+        let profiles = LLMSpellConfig::list_builtin_profiles();
+        assert_eq!(profiles.len(), 7);
+        assert!(profiles.contains(&"minimal"));
+        assert!(profiles.contains(&"development"));
+        assert!(profiles.contains(&"ollama"));
+        assert!(profiles.contains(&"candle"));
+        assert!(profiles.contains(&"rag-dev"));
+        assert!(profiles.contains(&"rag-prod"));
+        assert!(profiles.contains(&"rag-perf"));
+    }
+
+    #[test]
+    fn test_load_builtin_profile_minimal() {
+        let config = LLMSpellConfig::load_builtin_profile("minimal").unwrap();
+
+        // Minimal profile should have basic settings
+        assert_eq!(config.default_engine, "lua");
+        assert_eq!(config.engines.lua.stdlib_level, "basic");
+
+        // No providers configured
+        assert!(config.providers.providers.is_empty());
+
+        // RAG disabled by default
+        assert!(!config.rag.enabled);
+    }
+
+    #[test]
+    fn test_load_builtin_profile_development() {
+        let config = LLMSpellConfig::load_builtin_profile("development").unwrap();
+
+        // Development profile should have full stdlib
+        assert_eq!(config.default_engine, "lua");
+        assert_eq!(config.engines.lua.stdlib_level, "full");
+
+        // Should have OpenAI and Anthropic providers configured
+        assert!(config.providers.providers.contains_key("openai"));
+        assert!(config.providers.providers.contains_key("anthropic"));
+
+        let openai = config.providers.providers.get("openai").unwrap();
+        assert_eq!(openai.provider_type, "openai");
+        assert_eq!(openai.default_model, Some("gpt-4".to_string()));
+        assert_eq!(openai.api_key_env, Some("OPENAI_API_KEY".to_string()));
+
+        let anthropic = config.providers.providers.get("anthropic").unwrap();
+        assert_eq!(anthropic.provider_type, "anthropic");
+        assert_eq!(anthropic.default_model, Some("claude-3-5-sonnet-20241022".to_string()));
+        assert_eq!(anthropic.api_key_env, Some("ANTHROPIC_API_KEY".to_string()));
+    }
+
+    #[test]
+    fn test_load_builtin_profile_rag_dev() {
+        let config = LLMSpellConfig::load_builtin_profile("rag-dev").unwrap();
+
+        // RAG should be enabled
+        assert!(config.rag.enabled);
+        assert!(!config.rag.multi_tenant);
+
+        // Vector storage settings for development
+        assert_eq!(config.rag.vector_storage.dimensions, 384);
+        assert!(matches!(
+            config.rag.vector_storage.backend,
+            crate::rag::VectorBackend::HNSW
+        ));
+        assert_eq!(config.rag.vector_storage.max_memory_mb, Some(512));
+
+        // HNSW settings optimized for development
+        assert_eq!(config.rag.vector_storage.hnsw.m, 8);
+        assert_eq!(config.rag.vector_storage.hnsw.ef_construction, 50);
+        assert_eq!(config.rag.vector_storage.hnsw.ef_search, 25);
+        assert_eq!(config.rag.vector_storage.hnsw.max_elements, 10000);
+        assert_eq!(config.rag.vector_storage.hnsw.num_threads, Some(2));
+
+        // Embedding settings
+        assert_eq!(config.rag.embedding.default_provider, "openai");
+        assert!(!config.rag.embedding.cache_enabled);
+        assert_eq!(config.rag.embedding.batch_size, 4);
+
+        // Chunking settings
+        assert!(matches!(
+            config.rag.chunking.strategy,
+            crate::rag::ChunkingStrategy::SlidingWindow
+        ));
+        assert_eq!(config.rag.chunking.chunk_size, 256);
+        assert_eq!(config.rag.chunking.overlap, 32);
+
+        // Cache settings
+        assert!(!config.rag.cache.search_cache_enabled);
+        assert!(!config.rag.cache.document_cache_enabled);
+    }
+
+    #[test]
+    fn test_load_builtin_profile_unknown() {
+        let result = LLMSpellConfig::load_builtin_profile("nonexistent");
+
+        assert!(result.is_err());
+        match result {
+            Err(ConfigError::NotFound { path, message }) => {
+                assert_eq!(path, "builtin:nonexistent");
+                assert!(message.contains("Unknown builtin profile"));
+                assert!(message.contains("Available profiles"));
+                assert!(message.contains("minimal"));
+                assert!(message.contains("ollama"));
+                assert!(message.contains("rag-prod"));
+            }
+            _ => panic!("Expected NotFound error"),
+        }
+    }
+
+    #[tokio::test]
+    async fn test_load_with_profile_precedence() {
+        // Test that profile takes precedence over discovery
+        let config = LLMSpellConfig::load_with_profile(None, Some("minimal"))
+            .await
+            .unwrap();
+
+        // Should have minimal profile settings
+        assert_eq!(config.engines.lua.stdlib_level, "basic");
+
+        // Test that discovery works when no profile specified
+        let config2 = LLMSpellConfig::load_with_profile(None, None).await.unwrap();
+
+        // Should use defaults if no config file found
+        assert_eq!(config2.default_engine, "lua");
     }
 }

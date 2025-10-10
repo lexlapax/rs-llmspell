@@ -1,0 +1,69 @@
+# Performance-Optimized RAG Configuration Profile
+# Tuned for maximum RAG performance
+# Trade-offs: Higher memory usage, more CPU cores required
+
+default_engine = "lua"
+
+[engines.lua]
+stdlib_level = "full"
+
+[providers]
+default_provider = "openai"
+
+[providers.providers.openai]
+provider_type = "openai"
+api_key_env = "OPENAI_API_KEY"
+default_model = "gpt-4"
+temperature = 0.7
+max_tokens = 4000
+
+[rag]
+enabled = true
+multi_tenant = false
+
+[rag.vector_storage]
+dimensions = 1536
+backend = "hnsw"
+persistence_path = "/mnt/fast-ssd/rag/vectors"
+max_memory_mb = 8192
+
+[rag.vector_storage.hnsw]
+m = 48
+ef_construction = 500
+ef_search = 200
+max_elements = 50000000
+metric = "cosine"
+allow_replace_deleted = false
+num_threads = 16
+
+[rag.embedding]
+default_provider = "openai"
+cache_enabled = true
+cache_size = 100000
+cache_ttl_seconds = 86400
+batch_size = 128
+timeout_seconds = 120
+max_retries = 2
+
+[rag.chunking]
+strategy = "sliding_window"
+chunk_size = 1024
+overlap = 256
+max_chunk_size = 4096
+min_chunk_size = 200
+
+[rag.cache]
+search_cache_enabled = true
+search_cache_size = 50000
+search_cache_ttl_seconds = 3600
+document_cache_enabled = true
+document_cache_size_mb = 2048
+
+[rag.performance]
+enable_metrics = true
+metrics_interval_seconds = 60
+log_slow_operations = true
+slow_operation_threshold_ms = 100
+
+[runtime]
+log_level = "info"

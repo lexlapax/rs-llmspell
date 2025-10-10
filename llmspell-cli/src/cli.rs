@@ -7,8 +7,8 @@
 //!
 //! ## Architecture Highlights
 //!
-//! - **Global Flags**: `--config`, `--trace`, `--output` available on all commands
-//! - **RAG Profile Integration**: Single `--rag-profile` flag replaces 20+ individual flags
+//! - **Global Flags**: `--config`, `--profile`, `--trace`, `--output` available on all commands
+//! - **Unified Profile System**: Single `--profile` / `-p` flag for all builtin configurations
 //! - **Dual-Mode Support**: Automatic kernel context resolution (embedded vs connected)
 //! - **Professional Output**: Consistent JSON/YAML/Text formatting across all commands
 //! - **Contextual Help**: Command-specific help with examples and usage patterns
@@ -105,6 +105,20 @@ pub struct Cli {
     /// Configuration file (GLOBAL)
     #[arg(short = 'c', long, global = true, env = "LLMSPELL_CONFIG")]
     pub config: Option<PathBuf>,
+
+    /// Built-in configuration profile (GLOBAL)
+    ///
+    /// Available profiles:
+    ///   Core: minimal, development
+    ///   Local LLM: ollama, candle
+    ///   RAG: rag-dev, rag-prod, rag-perf
+    ///
+    /// Profiles are complete configurations loaded from built-in TOML files.
+    /// Use --profile to select a builtin, or -c for custom config files.
+    ///
+    /// Precedence: --profile > -c > discovery > default
+    #[arg(short = 'p', long, global = true)]
+    pub profile: Option<String>,
 
     /// Trace level (replaces --debug/--verbose)
     #[arg(long, global = true, value_enum, default_value = "warn")]

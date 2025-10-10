@@ -1,0 +1,21 @@
+# Ollama Configuration Profile
+# Local LLM inference via Ollama backend
+# Requires: Ollama installed and running (https://ollama.ai)
+
+default_engine = "lua"
+
+[engines.lua]
+stdlib_level = "full"
+
+[providers.ollama]
+provider_type = "ollama"
+enabled = true
+base_url = "http://localhost:11434"
+timeout_seconds = 120
+default_model = "llama3.1:8b"
+auto_start = true
+health_check_interval_seconds = 60
+default_backend = "ollama"
+
+[runtime]
+log_level = "info"

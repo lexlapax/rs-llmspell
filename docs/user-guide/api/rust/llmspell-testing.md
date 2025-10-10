@@ -18,40 +18,20 @@ Comprehensive testing framework and utilities for LLMSpell, providing test organ
 
 ### Test Categories
 
-**Purpose**: Organize tests by type for selective execution.
+**Purpose**: Organize tests by type for selective execution using Cargo features.
 
-```rust
-use llmspell_testing::TestCategory;
+Tests are organized into categories activated by feature flags in Cargo.toml:
+- `unit-tests` - Fast, isolated unit tests for individual components
+- `integration-tests` - Cross-crate integration tests
+- `agent-tests` - Agent-specific functionality tests
+- `scenario-tests` - End-to-end scenario tests simulating real usage
+- `lua-tests` - Lua scripting bridge tests
+- `performance-tests` - Performance benchmarks
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum TestCategory {
-    Unit,         // Isolated component tests
-    Integration,  // Cross-crate tests
-    Agents,       // Agent-specific tests
-    Scenarios,    // End-to-end scenarios
-    Lua,          // Script engine tests
-    Performance,  // Benchmarks
-    All,          // Run everything
-}
-
-impl TestCategory {
-    pub fn feature_name(&self) -> &'static str {
-        match self {
-            Self::Unit => "unit-tests",
-            Self::Integration => "integration-tests",
-            Self::Agents => "agent-tests",
-            Self::Scenarios => "scenario-tests",
-            Self::Lua => "lua-tests",
-            Self::Performance => "performance-tests",
-            Self::All => "all-tests",
-        }
-    }
-    
-    pub fn should_run(&self) -> bool {
-        // Check if corresponding feature is enabled
-        cfg!(feature = self.feature_name())
-    }
-}
+Use cargo test with the appropriate feature flag to run specific test categories:
+```bash
+cargo test -p llmspell-testing --features unit-tests
+cargo test -p llmspell-testing --features integration-tests
 ```
 
 ### Test Macros
@@ -616,7 +596,6 @@ offline-tests = []
 
 # Test utilities
 test-utilities = ["mockall", "proptest", "criterion"]
-test-runner = []
 
 [dev-dependencies]
 mockall = "0.11"
