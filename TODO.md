@@ -2456,26 +2456,51 @@ pub fn list_builtin_profiles() -> Vec<&'static str> {
 
 ---
 
-### Task 11b.4.17: Update cookbook/README.md - 🔲 PENDING
+### Task 11b.4.17: Update cookbook/README.md - ✅ COMPLETE
 **Priority**: HIGH
 **Estimated Time**: 20 minutes
-**Actual Time**:
-**Status**: 🔲 PENDING
+**Actual Time**: 10 minutes
+**Status**: ✅ COMPLETE
 **Depends On**: Task 11b.4.14 ✅
 
 **Objective**: Update cookbook README with `-p` flag examples
 
 **File**: `examples/script-users/cookbook/README.md`
 
-**Update All 12 Examples**:
-- Map each cookbook recipe to appropriate builtin profile
-- Show alternative profiles where multiple options exist
-- Keep custom config examples for unique patterns (rag-multi-tenant)
+**Changes Made**:
+
+1. **Agent Patterns Section** (lines 48-52):
+   - Multi-agent coordination: `-c configs/example-providers.toml` → `-p providers`
+
+2. **State Patterns Section** (lines 54-61):
+   - Renamed from "State Patterns (Optional Config)" to "State Patterns"
+   - With persistence: `-c configs/state-enabled.toml` → `-p state`
+   - In-memory: clarified "no profile needed"
+
+3. **RAG Patterns Section** (lines 63-73):
+   - Renamed from "Requires RAG Config" to "Requires OpenAI API Key"
+   - RAG-01 (Multi-tenant): `-c configs/rag-production.toml` → `-p rag-prod`
+   - RAG-02 (Session): `-c configs/rag-basic.toml` → `-p sessions`
+   - RAG-03 (Cost Opt): `-c configs/rag-basic.toml` → `-p rag-prod`
+
+**Profile Mapping**:
+- multi-agent-coordination.lua → `providers`
+- state-management.lua → `state` (or no profile for in-memory)
+- rag-multi-tenant.lua → `rag-prod`
+- rag-session.lua → `sessions`
+- rag-cost-optimization.lua → `rag-prod`
 
 **Validation**:
-- [ ] All run commands updated
-- [ ] Unique patterns (rag-multi-tenant.lua) keep custom config references
-- [ ] Common patterns use builtin profiles
+- [x] All 3 pattern sections updated
+- [x] RAG patterns mapped to appropriate profiles (rag-prod for prod features, sessions for session-based)
+- [x] Common patterns use builtin profiles
+- [x] Profile requirements clarified (API Key vs Config)
+
+**Insights**:
+- **Simplified Prerequisites**: Changed from "Requires RAG Config" to "Requires OpenAI API Key" - more direct
+- **Session Pattern**: rag-session.lua correctly mapped to `sessions` profile (not just RAG)
+- **Production Patterns**: Both multi-tenant and cost-optimization use `rag-prod` for production-grade features
+- **No-Profile Option**: state-management explicitly shows in-memory option without profile
 
 ---
 
