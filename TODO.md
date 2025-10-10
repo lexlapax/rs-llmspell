@@ -661,6 +661,99 @@ bench-all = "bench -p llmspell-testing"
 
 ---
 
+### Task 11b.2.3: Update Test Script - ✅ COMPLETE
+**Priority**: MEDIUM
+**Estimated Time**: 15 minutes
+**Actual Time**: 10 minutes
+**Status**: ✅ COMPLETE
+**Depends On**: Task 11b.2.2 ✅
+
+**File**: `scripts/testing/test-by-tag.sh`
+
+**Changes Made**:
+Removed TEST_RUNNER variable (lines 68-73) and replaced all invocations with direct cargo test commands (lines 76-111):
+
+```bash
+# BEFORE (lines 68-73)
+if command -v llmspell-test >/dev/null 2>&1; then
+    TEST_RUNNER="llmspell-test"
+else
+    TEST_RUNNER="cargo run -p llmspell-testing --features test-runner --bin llmspell-test --"
+fi
+
+# BEFORE (lines 76-106)
+case $TAG in
+    "unit"|"integration"|"agent"|"scenario"|"scenarios"|"lua")
+        $TEST_RUNNER run $TAG $@
+        ;;
+    "fast")
+        $TEST_RUNNER run unit $@
+        ;;
+    "all")
+        $TEST_RUNNER run all $@
+        ;;
+    # ... other cases
+esac
+
+# AFTER (lines 68-111)
+case $TAG in
+    "unit")
+        print_info "Running unit tests..."
+        cargo test -p llmspell-testing --features unit-tests --test unit $@
+        ;;
+    "integration")
+        print_info "Running integration tests..."
+        cargo test -p llmspell-testing --features integration-tests --test integration $@
+        ;;
+    "agent")
+        print_info "Running agent tests..."
+        cargo test -p llmspell-testing --features agent-tests --test agents $@
+        ;;
+    "scenario"|"scenarios")
+        print_info "Running scenario tests..."
+        cargo test -p llmspell-testing --features scenario-tests --test scenarios $@
+        ;;
+    "lua")
+        print_info "Running Lua tests..."
+        cargo test -p llmspell-testing --features lua-tests --test lua $@
+        ;;
+    "fast")
+        print_info "Running fast tests (unit tests only)..."
+        cargo test -p llmspell-testing --features unit-tests --test unit $@
+        ;;
+    "all")
+        print_info "Running all tests..."
+        cargo test --workspace $@
+        ;;
+    # ... other cases unchanged
+esac
+```
+
+**Tag Mapping**:
+- `unit` → cargo test --features unit-tests --test unit
+- `integration` → cargo test --features integration-tests --test integration
+- `agent` → cargo test --features agent-tests --test agents
+- `scenario/scenarios` → cargo test --features scenario-tests --test scenarios
+- `lua` → cargo test --features lua-tests --test lua
+- `fast` → same as unit (unit tests only)
+- `all` → cargo test --workspace (all tests)
+- `tool/workflow/bridge/llm/database` → unchanged (already using cargo test directly)
+
+**Validation**:
+- [x] TEST_RUNNER variable removed (6 lines) ✅
+- [x] All 6 test category tags updated to use cargo test directly ✅
+- [x] Feature flags match .cargo/config.toml aliases ✅
+- [x] Existing package-specific tags (tool, workflow, bridge) unchanged ✅
+
+**Insights**:
+- **Simplified Logic**: Removed command detection + fallback wrapper logic
+- **Direct Invocation**: No intermediate binary layer
+- **Consistent with Aliases**: Uses identical cargo test commands as .cargo/config.toml
+- **Better Error Messages**: Added explicit print_info messages for each tag
+- **Preserved Functionality**: All original test categories still work
+
+---
+
 ### Task 11b.2.4: Update Documentation - ✅ COMPLETE
 **Priority**: MEDIUM
 **Estimated Time**: 15 minutes
@@ -1400,96 +1493,1336 @@ llmspell -p typo run --help 2>&1 | grep "Available profiles"
 
 ---
 
-### Task 11b.2.3: Update Test Script - ✅ COMPLETE
-**Priority**: MEDIUM
-**Estimated Time**: 15 minutes
-**Actual Time**: 10 minutes
-**Status**: ✅ COMPLETE
-**Depends On**: Task 11b.2.2 ✅
+## Phase 11b.4: Configuration Consolidation and Cleanup - 🔲 PENDING
+Leverage unified profile system (Phase 11b.3) to consolidate duplicate configs and demonstrate `-p` flag usage across all examples.
 
-**File**: `scripts/testing/test-by-tag.sh`
+**Analysis Document**: `CONFIG_CLEANUP_ANALYSIS.md` (comprehensive audit of 38 config files)
 
-**Changes Made**:
-Removed TEST_RUNNER variable (lines 68-73) and replaced all invocations with direct cargo test commands (lines 76-111):
+**Problem**:
+- **Config Duplication**: 7-12 example configs duplicate builtin profiles
+- **Missing Builtins**: 3 common use cases lack builtin profiles (providers, state, sessions)
+- **Outdated Examples**: 50 lua files use old `-c path/to/config.toml` instead of new `-p profile`
+- **Inconsistent Documentation**: 17 README files don't demonstrate builtin profile system
+- **Maintenance Burden**: Multiple sources of truth for common configuration patterns
+- **User Confusion**: Unclear which config to use for basic workflows
 
-```bash
-# BEFORE (lines 68-73)
-if command -v llmspell-test >/dev/null 2>&1; then
-    TEST_RUNNER="llmspell-test"
-else
-    TEST_RUNNER="cargo run -p llmspell-testing --features test-runner --bin llmspell-test --"
-fi
+**Current State** (from CONFIG_CLEANUP_ANALYSIS.md):
+```
+Total Configs: 38 files
+├── Builtin Profiles: 7 (llmspell-config/builtins/)
+├── Example Configs: 17 (examples/script-users/configs/)
+│   ├── Duplicates: 7 files (mirror existing builtins)
+│   └── Unique: 10 files (need analysis for consolidation)
+├── Application Configs: 10 (examples/script-users/applications/*/config.toml) - KEEP
+└── Fleet Configs: 4 (scripts/fleet/configs/) - KEEP
 
-# BEFORE (lines 76-106)
-case $TAG in
-    "unit"|"integration"|"agent"|"scenario"|"scenarios"|"lua")
-        $TEST_RUNNER run $TAG $@
-        ;;
-    "fast")
-        $TEST_RUNNER run unit $@
-        ;;
-    "all")
-        $TEST_RUNNER run all $@
-        ;;
-    # ... other cases
-esac
+Lua Files: 50 total
+├── getting-started/: 6 files
+├── features/: 5 files
+├── cookbook/: 12 files
+├── top-level examples/: 4 files
+├── applications/: 15 files (main.lua)
+└── tests/: 3 files
 
-# AFTER (lines 68-111)
-case $TAG in
-    "unit")
-        print_info "Running unit tests..."
-        cargo test -p llmspell-testing --features unit-tests --test unit $@
-        ;;
-    "integration")
-        print_info "Running integration tests..."
-        cargo test -p llmspell-testing --features integration-tests --test integration $@
-        ;;
-    "agent")
-        print_info "Running agent tests..."
-        cargo test -p llmspell-testing --features agent-tests --test agents $@
-        ;;
-    "scenario"|"scenarios")
-        print_info "Running scenario tests..."
-        cargo test -p llmspell-testing --features scenario-tests --test scenarios $@
-        ;;
-    "lua")
-        print_info "Running Lua tests..."
-        cargo test -p llmspell-testing --features lua-tests --test lua $@
-        ;;
-    "fast")
-        print_info "Running fast tests (unit tests only)..."
-        cargo test -p llmspell-testing --features unit-tests --test unit $@
-        ;;
-    "all")
-        print_info "Running all tests..."
-        cargo test --workspace $@
-        ;;
-    # ... other cases unchanged
-esac
+README Files: 17 total
+├── examples/script-users/: 1 file
+├── getting-started/: 1 file
+├── features/: 1 file
+├── cookbook/: 1 file
+├── configs/: 1 file
+├── applications/: 10 files (one per app)
+├── examples/: 1 file
+└── docs/user-guide/: 1 file
 ```
 
-**Tag Mapping**:
-- `unit` → cargo test --features unit-tests --test unit
-- `integration` → cargo test --features integration-tests --test integration
-- `agent` → cargo test --features agent-tests --test agents
-- `scenario/scenarios` → cargo test --features scenario-tests --test scenarios
-- `lua` → cargo test --features lua-tests --test lua
-- `fast` → same as unit (unit tests only)
-- `all` → cargo test --workspace (all tests)
-- `tool/workflow/bridge/llm/database` → unchanged (already using cargo test directly)
+**Gap Analysis**:
+Missing 3 builtin profiles for common workflows:
+1. **providers.toml** - Simple OpenAI/Anthropic setup (replaces example-providers.toml, cookbook.toml)
+   - Used by: 02-first-agent.lua, agent-basics.lua, multi-agent-coordination.lua (5+ files)
+2. **state.toml** - State persistence with memory backend (replaces basic.toml, state-enabled.toml)
+   - Used by: state-persistence.lua, state-management.lua, 04-handle-errors.lua (3+ files)
+3. **sessions.toml** - Sessions + state + hooks + events (replaces session-enabled.toml)
+   - Used by: rag-session.lua (1+ files)
+
+**Confirmed Duplicates** (7 configs safe to remove):
+1. examples/script-users/configs/minimal.toml → use `-p minimal`
+2. examples/script-users/configs/rag-development.toml → use `-p rag-dev`
+3. examples/script-users/configs/rag-production.toml → use `-p rag-prod`
+4. examples/script-users/configs/rag-performance.toml → use `-p rag-perf`
+5. examples/script-users/configs/local-llm-ollama.toml → use `-p ollama`
+6. examples/script-users/configs/local-llm-candle.toml → use `-p candle`
+7. examples/script-users/configs/cookbook.toml → use `-p providers` (new) or `-p development`
+
+**Additional Candidates** (5 configs - consider removal after Phase 1):
+- example-providers.toml → replaced by new `-p providers`
+- basic.toml → replaced by new `-p state`
+- state-enabled.toml → replaced by new `-p state`
+- session-enabled.toml → replaced by new `-p sessions`
+- llmspell.toml → use `-p minimal`
+
+**Solution - Strategy A (Phased Migration)**:
+1. **Phase 1**: Add 3 new builtin profiles with comprehensive configs (Tasks 11b.4.1-11b.4.6)
+2. **Phase 2**: Update 50 lua file headers to use `-p` flags (Tasks 11b.4.7-11b.4.13)
+3. **Phase 3**: Update 17 README files to demonstrate builtins (Tasks 11b.4.14-11b.4.21)
+4. **Phase 4**: Remove 7-12 duplicate configs after verification (Tasks 11b.4.22-11b.4.24)
+
+**Success Criteria**:
+- [ ] 10 total builtin profiles (7 existing + 3 new)
+- [ ] 50 lua files updated to use `-p` flags in headers
+- [ ] 17 README files demonstrate builtin profile usage
+- [ ] 7-12 duplicate configs removed from examples/script-users/configs/
+- [ ] 5-10 unique configs remain (rag-basic, rag-multi-tenant, applications, etc.)
+- [ ] All examples work with builtin profiles
+- [ ] Zero broken examples or tests
+- [ ] cargo clippy --workspace --all-features: zero warnings
+- [ ] ./scripts/quality/quality-check-minimal.sh: all pass
+
+**Benefits**:
+- **User Experience**: Simpler commands (`-p providers` vs `-c examples/script-users/configs/example-providers.toml`)
+- **Clearer Examples**: Fewer config files to understand, builtin profiles are documented
+- **Better Discovery**: New users see builtin profiles first (via `--help` and docs)
+- **Maintenance**: Single source of truth for common patterns, update builtin once vs multiple files
+- **Demonstrates Phase 11b.3**: Shows proper usage of unified profile system
+
+**Validation Commands**:
+```bash
+# Verify new builtins exist
+ls -1 llmspell-config/builtins/ | wc -l  # Should be 10 (was 7)
+
+# Test new builtins load
+llmspell -p providers config show --format json | jq '.providers'
+llmspell -p state config show --format json | jq '.runtime.state_persistence'
+llmspell -p sessions config show --format json | jq '.runtime.sessions'
+
+# Verify lua files updated
+grep -r "\-p " examples/script-users/**/*.lua | wc -l  # Should show many -p usages
+
+# Verify READMEs updated
+grep -r "\-p " examples/**/README.md | wc -l  # Should show -p flag examples
+
+# Verify duplicate configs removed
+ls -1 examples/script-users/configs/*.toml | wc -l  # Should be 5-10 (was 17)
+
+# Quality gates
+cargo clippy --workspace --all-features -- -D warnings
+./scripts/quality/quality-check-minimal.sh
+```
+
+**Effort Estimate**: 9-12 hours total
+- Phase 1 (6 tasks): 2-3 hours
+- Phase 2 (7 tasks): 3-4 hours
+- Phase 3 (8 tasks): 2-3 hours
+- Phase 4 (3 tasks): 2 hours
+
+---
+
+### Task 11b.4.1: Create providers.toml Builtin Profile - 🔲 PENDING
+**Priority**: CRITICAL
+**Estimated Time**: 30 minutes
+**Actual Time**:
+**Status**: 🔲 PENDING
+**Depends On**: Phase 11b.3 Complete ✅
+
+**Objective**: Create builtin profile for simple OpenAI/Anthropic provider setup without RAG or state
+
+**File**: `llmspell-config/builtins/providers.toml`
+
+**Profile Specification** (from CONFIG_CLEANUP_ANALYSIS.md lines 119-148):
+```toml
+# Simple Providers Profile
+# Basic OpenAI/Anthropic setup for agent examples
+# Replaces: example-providers.toml, cookbook.toml
+# Used by: 02-first-agent.lua, agent-basics.lua, multi-agent-coordination.lua (5+ files)
+
+default_engine = "lua"
+
+[engines.lua]
+stdlib = "All"
+
+[providers.openai]
+provider_type = "openai"
+api_key_env = "OPENAI_API_KEY"
+default_model = "gpt-3.5-turbo"
+temperature = 0.7
+max_tokens = 2000
+
+[providers.anthropic]
+provider_type = "anthropic"
+api_key_env = "ANTHROPIC_API_KEY"
+default_model = "claude-3-haiku-20240307"
+temperature = 0.7
+max_tokens = 2000
+
+[runtime]
+log_level = "info"
+```
+
+**Source Files to Analyze**:
+- examples/script-users/configs/example-providers.toml (29 lines) - Simple provider demo
+- examples/script-users/configs/cookbook.toml (33 lines) - Nearly identical to development.toml
 
 **Validation**:
-- [x] TEST_RUNNER variable removed (6 lines) ✅
-- [x] All 6 test category tags updated to use cargo test directly ✅
-- [x] Feature flags match .cargo/config.toml aliases ✅
-- [x] Existing package-specific tags (tool, workflow, bridge) unchanged ✅
+- [ ] File created at llmspell-config/builtins/providers.toml
+- [ ] TOML parses correctly: `toml::from_str(content)` succeeds
+- [ ] Contains both OpenAI and Anthropic providers
+- [ ] Uses correct field names (stdlib = "All", not "full")
+- [ ] Includes header comment explaining purpose and replaced files
+- [ ] cargo build -p llmspell-config: compiles
 
-**Insights**:
-- **Simplified Logic**: Removed command detection + fallback wrapper logic
-- **Direct Invocation**: No intermediate binary layer
-- **Consistent with Aliases**: Uses identical cargo test commands as .cargo/config.toml
-- **Better Error Messages**: Added explicit print_info messages for each tag
-- **Preserved Functionality**: All original test categories still work
+**Success Criteria**:
+- [ ] Profile loads without errors
+- [ ] Both providers configured with reasonable defaults
+- [ ] No RAG, state, or session features enabled (pure providers)
+- [ ] Compatible with existing agent examples
 
+---
+
+### Task 11b.4.2: Create state.toml Builtin Profile - 🔲 PENDING
+**Priority**: CRITICAL
+**Estimated Time**: 30 minutes
+**Actual Time**:
+**Status**: 🔲 PENDING
+**Depends On**: Phase 11b.3 Complete ✅
+
+**Objective**: Create builtin profile for state persistence with memory backend, no providers
+
+**File**: `llmspell-config/builtins/state.toml`
+
+**Profile Specification** (from CONFIG_CLEANUP_ANALYSIS.md lines 150-173):
+```toml
+# State Persistence Profile
+# Enables State global with memory backend
+# Replaces: basic.toml, state-enabled.toml
+# Used by: state-persistence.lua, state-management.lua, 04-handle-errors.lua (3+ files)
+
+default_engine = "lua"
+
+[engines.lua]
+stdlib = "All"
+
+[runtime]
+log_level = "info"
+
+[runtime.state_persistence]
+enabled = true
+backend_type = "memory"
+max_state_size_bytes = 10_000_000  # 10MB
+migration_enabled = false
+backup_enabled = false
+```
+
+**Source Files to Analyze**:
+- examples/script-users/configs/basic.toml (32 lines) - State persistence basics
+- examples/script-users/configs/state-enabled.toml (50 lines) - Full state config
+
+**Validation**:
+- [ ] File created at llmspell-config/builtins/state.toml
+- [ ] TOML parses correctly
+- [ ] State persistence enabled with memory backend
+- [ ] No providers configured (tools + state only)
+- [ ] Includes header comment explaining purpose
+- [ ] cargo build -p llmspell-config: compiles
+
+**Success Criteria**:
+- [ ] Profile loads state_persistence section correctly
+- [ ] backend_type = "memory" configured
+- [ ] Compatible with state-persistence.lua examples
+- [ ] No provider or RAG features enabled
+
+---
+
+### Task 11b.4.3: Create sessions.toml Builtin Profile - 🔲 PENDING
+**Priority**: CRITICAL
+**Estimated Time**: 30 minutes
+**Actual Time**:
+**Status**: 🔲 PENDING
+**Depends On**: Phase 11b.3 Complete ✅
+
+**Objective**: Create builtin profile for full session management with state, hooks, and events
+
+**File**: `llmspell-config/builtins/sessions.toml`
+
+**Profile Specification** (from CONFIG_CLEANUP_ANALYSIS.md lines 174-210):
+```toml
+# Sessions Profile
+# Sessions + state + hooks + events enabled
+# Replaces: session-enabled.toml
+# Used by: rag-session.lua and session examples
+
+default_engine = "lua"
+
+[engines.lua]
+stdlib = "All"
+
+[runtime]
+log_level = "info"
+
+[runtime.state_persistence]
+enabled = true
+backend_type = "memory"
+max_state_size_bytes = 10_000_000
+
+[runtime.sessions]
+enabled = true
+max_sessions = 100
+max_artifacts_per_session = 1000
+session_timeout_seconds = 3600
+storage_backend = "memory"
+
+[runtime.hooks]
+enabled = true
+max_hooks = 100
+
+[runtime.events]
+enabled = true
+max_subscribers = 100
+event_buffer_size = 1000
+```
+
+**Source Files to Analyze**:
+- examples/script-users/configs/session-enabled.toml (68 lines) - Session + state + hooks
+
+**Validation**:
+- [ ] File created at llmspell-config/builtins/sessions.toml
+- [ ] TOML parses correctly
+- [ ] Sessions, state, hooks, and events all enabled
+- [ ] Memory backend for all features
+- [ ] Includes header comment explaining purpose
+- [ ] cargo build -p llmspell-config: compiles
+
+**Success Criteria**:
+- [ ] Profile loads all 4 runtime sections (state, sessions, hooks, events)
+- [ ] Compatible with rag-session.lua example
+- [ ] No providers configured (unless needed by examples)
+
+---
+
+### Task 11b.4.4: Update llmspell-config load_builtin_profile() - 🔲 PENDING
+**Priority**: CRITICAL
+**Estimated Time**: 15 minutes
+**Actual Time**:
+**Status**: 🔲 PENDING
+**Depends On**: Tasks 11b.4.1, 11b.4.2, 11b.4.3 ✅
+
+**Objective**: Register 3 new builtin profiles in load_builtin_profile() match statement
+
+**File**: `llmspell-config/src/lib.rs`
+**Lines**: ~1033-1060 (load_builtin_profile function)
+
+**Current Match Statement** (7 profiles):
+```rust
+fn load_builtin_profile(name: &str) -> Result<Self, ConfigError> {
+    let toml_content = match name {
+        // Core profiles
+        "minimal" => include_str!("../builtins/minimal.toml"),
+        "development" => include_str!("../builtins/development.toml"),
+
+        // Local LLM profiles
+        "ollama" => include_str!("../builtins/ollama.toml"),
+        "candle" => include_str!("../builtins/candle.toml"),
+
+        // RAG profiles
+        "rag-dev" => include_str!("../builtins/rag-development.toml"),
+        "rag-prod" => include_str!("../builtins/rag-production.toml"),
+        "rag-perf" => include_str!("../builtins/rag-performance.toml"),
+
+        _ => { return Err(...); }
+    };
+    Self::from_toml(toml_content)
+}
+```
+
+**Changes Required**:
+Add 3 new match arms after "development":
+```rust
+// Common workflow profiles
+"providers" => include_str!("../builtins/providers.toml"),
+"state" => include_str!("../builtins/state.toml"),
+"sessions" => include_str!("../builtins/sessions.toml"),
+```
+
+Update error message to list all 10 profiles:
+```rust
+_ => {
+    return Err(ConfigError::NotFound {
+        path: format!("builtin:{}", name),
+        message: format!(
+            "Unknown builtin profile '{}'.\n\
+             Available profiles:\n\
+             Core: minimal, development\n\
+             Common: providers, state, sessions\n\
+             Local LLM: ollama, candle\n\
+             RAG: rag-dev, rag-prod, rag-perf",
+            name
+        ),
+    });
+}
+```
+
+**Validation**:
+- [ ] 3 new match arms added (providers, state, sessions)
+- [ ] Error message updated to list all 10 profiles
+- [ ] cargo build -p llmspell-config: compiles
+- [ ] cargo clippy -p llmspell-config: zero warnings
+- [ ] Test loading: `llmspell -p providers config show` works
+
+---
+
+### Task 11b.4.5: Update list_builtin_profiles() - 🔲 PENDING
+**Priority**: HIGH
+**Estimated Time**: 5 minutes
+**Actual Time**:
+**Status**: 🔲 PENDING
+**Depends On**: Task 11b.4.4 ✅
+
+**Objective**: Add 3 new profiles to list_builtin_profiles() return value
+
+**File**: `llmspell-config/src/lib.rs`
+**Lines**: ~1066-1076 (list_builtin_profiles function)
+
+**Current Implementation** (7 profiles):
+```rust
+pub fn list_builtin_profiles() -> Vec<&'static str> {
+    vec![
+        "minimal",
+        "development",
+        "ollama",
+        "candle",
+        "rag-dev",
+        "rag-prod",
+        "rag-perf",
+    ]
+}
+```
+
+**Updated Implementation** (10 profiles):
+```rust
+pub fn list_builtin_profiles() -> Vec<&'static str> {
+    vec![
+        "minimal",
+        "development",
+        "providers",
+        "state",
+        "sessions",
+        "ollama",
+        "candle",
+        "rag-dev",
+        "rag-prod",
+        "rag-perf",
+    ]
+}
+```
+
+**Validation**:
+- [ ] 3 new profile names added (providers, state, sessions)
+- [ ] Order groups profiles logically (Core → Common → Local LLM → RAG)
+- [ ] cargo build -p llmspell-config: compiles
+- [ ] list_builtin_profiles().len() == 10
+
+---
+
+### Task 11b.4.6: Add Tests for New Builtin Profiles - 🔲 PENDING
+**Priority**: HIGH
+**Estimated Time**: 45 minutes
+**Actual Time**:
+**Status**: 🔲 PENDING
+**Depends On**: Tasks 11b.4.4, 11b.4.5 ✅
+
+**Objective**: Add 3 new tests validating providers, state, and sessions builtin profiles
+
+**File**: `llmspell-config/src/lib.rs` (in #[cfg(test)] mod tests)
+**Reference**: Existing tests at lines 609-748
+
+**Tests to Add**:
+
+1. **test_load_builtin_profile_providers** (~20 lines):
+```rust
+#[tokio::test]
+async fn test_load_builtin_profile_providers() {
+    let config = LLMSpellConfig::load_builtin_profile("providers").unwrap();
+
+    // Verify providers configured
+    assert!(config.providers.contains_key("openai"));
+    assert!(config.providers.contains_key("anthropic"));
+
+    // Verify no RAG/state/sessions
+    assert!(!config.rag.enabled);
+    assert!(!config.runtime.state_persistence.enabled);
+    assert!(!config.runtime.sessions.enabled);
+}
+```
+
+2. **test_load_builtin_profile_state** (~20 lines):
+```rust
+#[tokio::test]
+async fn test_load_builtin_profile_state() {
+    let config = LLMSpellConfig::load_builtin_profile("state").unwrap();
+
+    // Verify state persistence enabled
+    assert!(config.runtime.state_persistence.enabled);
+    assert_eq!(config.runtime.state_persistence.backend_type, "memory");
+
+    // Verify no providers
+    assert!(config.providers.is_empty());
+}
+```
+
+3. **test_load_builtin_profile_sessions** (~25 lines):
+```rust
+#[tokio::test]
+async fn test_load_builtin_profile_sessions() {
+    let config = LLMSpellConfig::load_builtin_profile("sessions").unwrap();
+
+    // Verify all 4 features enabled
+    assert!(config.runtime.state_persistence.enabled);
+    assert!(config.runtime.sessions.enabled);
+    assert!(config.runtime.hooks.enabled);
+    assert!(config.runtime.events.enabled);
+
+    // Verify session limits
+    assert_eq!(config.runtime.sessions.max_sessions, 100);
+}
+```
+
+4. **Update test_list_builtin_profiles**:
+```rust
+#[test]
+fn test_list_builtin_profiles() {
+    let profiles = LLMSpellConfig::list_builtin_profiles();
+    assert_eq!(profiles.len(), 10);  // Was 7, now 10
+    assert!(profiles.contains(&"providers"));
+    assert!(profiles.contains(&"state"));
+    assert!(profiles.contains(&"sessions"));
+}
+```
+
+**Validation**:
+- [ ] 3 new test functions added
+- [ ] test_list_builtin_profiles updated to expect 10 profiles
+- [ ] cargo test -p llmspell-config: all tests pass
+- [ ] Tests verify correct config sections loaded
+- [ ] Tests verify features enabled/disabled as expected
+
+---
+
+### Task 11b.4.7: Update getting-started/ Lua Files (6 files) - 🔲 PENDING
+**Priority**: HIGH
+**Estimated Time**: 30 minutes
+**Actual Time**:
+**Status**: 🔲 PENDING
+**Depends On**: Phase 1 Complete (Tasks 11b.4.1-11b.4.6) ✅
+
+**Objective**: Update header comments in getting-started lua files to use `-p` flags
+
+**Files** (from CONFIG_CLEANUP_ANALYSIS.md lines 73-80):
+1. **examples/script-users/getting-started/00-hello-world.lua**
+   - Current: No config requirement
+   - Update: Add `-- Usage: llmspell -p minimal run 00-hello-world.lua`
+
+2. **examples/script-users/getting-started/01-first-tool.lua**
+   - Current: No config requirement
+   - Update: Add `-- Usage: llmspell -p minimal run 01-first-tool.lua`
+
+3. **examples/script-users/getting-started/02-first-agent.lua**
+   - Current: `-- Config: example-providers.toml`
+   - Update: `-- Usage: llmspell -p providers run 02-first-agent.lua`
+
+4. **examples/script-users/getting-started/03-first-workflow.lua**
+   - Current: No config requirement
+   - Update: Add `-- Usage: llmspell -p minimal run 03-first-workflow.lua`
+
+5. **examples/script-users/getting-started/04-handle-errors.lua**
+   - Current: `-- Config: state-enabled.toml (optional)`
+   - Update: `-- Usage: llmspell -p state run 04-handle-errors.lua  # optional: for state persistence`
+
+6. **examples/script-users/getting-started/05-first-rag.lua**
+   - Current: `-- Config: rag-basic.toml`
+   - Update: `-- Usage: llmspell -p rag-dev run 05-first-rag.lua`
+
+**Header Comment Format**:
+```lua
+-- Usage: llmspell -p <profile> run <script-name>
+-- Alternative: llmspell -p development run <script-name>  # with debug logging
+--
+-- Builtin profiles: minimal, development, providers, state, sessions, ollama, candle, rag-dev, rag-prod, rag-perf
+-- Custom config: llmspell -c path/to/config.toml run <script-name>
+```
+
+**Validation**:
+- [ ] All 6 files updated with new header comments
+- [ ] Comments use `-p` flag syntax (not `-c` paths)
+- [ ] Alternative commands shown where relevant
+- [ ] Files still execute correctly with new profiles
+- [ ] No code changes (only comments)
+
+---
+
+### Task 11b.4.8: Update features/ Lua Files (5 files) - 🔲 PENDING
+**Priority**: HIGH
+**Estimated Time**: 20 minutes
+**Actual Time**:
+**Status**: 🔲 PENDING
+**Depends On**: Phase 1 Complete ✅
+
+**Objective**: Update header comments in features lua files to use `-p` flags
+
+**Files** (from CONFIG_CLEANUP_ANALYSIS.md lines 82-89):
+1. **examples/script-users/features/agent-basics.lua**
+   - Current: `-- Config: example-providers.toml`
+   - Update: `-- Usage: llmspell -p providers run agent-basics.lua`
+
+2. **examples/script-users/features/provider-info.lua**
+   - Current: `-- Config: any provider config (optional)`
+   - Update: `-- Usage: llmspell -p development run provider-info.lua`
+
+3. **examples/script-users/features/state-persistence.lua**
+   - Current: `-- Config: state-enabled.toml`
+   - Update: `-- Usage: llmspell -p state run state-persistence.lua`
+
+4. **examples/script-users/features/tool-basics.lua**
+   - Current: No config requirement
+   - Update: `-- Usage: llmspell -p minimal run tool-basics.lua`
+
+5. **examples/script-users/features/workflow-basics.lua**
+   - Current: No config requirement
+   - Update: `-- Usage: llmspell -p minimal run workflow-basics.lua`
+
+**Validation**:
+- [ ] All 5 files updated with new header comments
+- [ ] Comments use `-p` flag syntax
+- [ ] Files execute correctly with new profiles
+- [ ] No code changes (only comments)
+
+---
+
+### Task 11b.4.9: Update cookbook/ Lua Files (12 files) - 🔲 PENDING
+**Priority**: HIGH
+**Estimated Time**: 45 minutes
+**Actual Time**:
+**Status**: 🔲 PENDING
+**Depends On**: Phase 1 Complete ✅
+
+**Objective**: Update header comments in cookbook lua files to use `-p` flags
+
+**Files** (from CONFIG_CLEANUP_ANALYSIS.md lines 91-106):
+1. error-handling.lua → `-p minimal`
+2. rate-limiting.lua → `-p minimal`
+3. caching.lua → `-p minimal`
+4. multi-agent-coordination.lua → `-p providers`
+5. webhook-integration.lua → `-p development` (or `-p providers` if no debug needed)
+6. performance-monitoring.lua → `-p minimal`
+7. security-patterns.lua → `-p minimal`
+8. state-management.lua → `-p state`
+9. rag-multi-tenant.lua → Keep existing config (unique pattern)
+10. rag-session.lua → `-p sessions` (or keep if needs RAG too)
+11. rag-cost-optimization.lua → `-p rag-prod`
+12. sandbox-permissions.lua → `-p minimal`
+
+**Special Cases**:
+- **rag-multi-tenant.lua**: Uses rag-multi-tenant.toml (unique pattern) - keep existing comment
+- **rag-session.lua**: May need sessions + RAG combined - verify what profile works best
+
+**Validation**:
+- [ ] All 12 files updated (or 10 if 2 kept with custom configs)
+- [ ] Comments use `-p` flag syntax where applicable
+- [ ] Unique patterns retain custom config references
+- [ ] Files execute correctly
+
+---
+
+### Task 11b.4.10: Update Top-Level examples/ Lua Files (4 files) - 🔲 PENDING
+**Priority**: MEDIUM
+**Estimated Time**: 15 minutes
+**Actual Time**:
+**Status**: 🔲 PENDING
+**Depends On**: Phase 1 Complete ✅
+
+**Objective**: Update header comments in top-level example lua files
+
+**Files to Find and Update**:
+```bash
+find examples/ -maxdepth 1 -name "*.lua" -type f
+```
+
+Expected files (verify with find):
+- Workflow examples
+- Integration examples
+- Other demonstration scripts
+
+**Update Pattern**:
+- No providers needed → `-p minimal`
+- Simple agents → `-p providers`
+- State required → `-p state`
+- Complex features → `-p development`
+
+**Validation**:
+- [ ] All top-level lua files identified
+- [ ] Header comments updated with `-p` flags
+- [ ] Files execute correctly
+
+---
+
+### Task 11b.4.11: Update Application main.lua Files (10 files) - 🔲 PENDING
+**Priority**: MEDIUM
+**Estimated Time**: 45 minutes
+**Actual Time**:
+**Status**: 🔲 PENDING
+**Depends On**: Phase 1 Complete ✅
+
+**Objective**: Update header comments in application main.lua files to reference builtin profiles
+
+**Applications** (from CONFIG_CLEANUP_ANALYSIS.md):
+1. code-review-assistant/main.lua
+2. communication-manager/main.lua
+3. content-creator/main.lua
+4. file-organizer/main.lua
+5. instrumented-agent/main.lua
+6. knowledge-base/main.lua
+7. personal-assistant/main.lua
+8. process-orchestrator/main.lua
+9. research-collector/main.lua
+10. webapp-creator/main.lua
+
+**Update Strategy**:
+- **Keep app-specific config.toml**: Applications demonstrate configuration patterns
+- **Add header showing builtin alternatives**:
+```lua
+-- Application: <app-name>
+-- Default config: ./config.toml (app-specific settings)
+--
+-- Quick start with builtins:
+--   llmspell -p development run main.lua  # for development/testing
+--   llmspell -p rag-prod run main.lua     # if using RAG features
+--
+-- Production: Use app config for full features
+--   llmspell -c config.toml run main.lua
+```
+
+**Validation**:
+- [ ] All 10 main.lua files updated
+- [ ] Comments explain both config.toml and builtin alternatives
+- [ ] Application configs preserved (not removed)
+- [ ] Files execute with both `-c config.toml` and `-p development`
+
+---
+
+### Task 11b.4.12: Update Test Lua Files (3 files) - 🔲 PENDING
+**Priority**: MEDIUM
+**Estimated Time**: 10 minutes
+**Actual Time**:
+**Status**: 🔲 PENDING
+**Depends On**: Phase 1 Complete ✅
+
+**Objective**: Update header comments in test lua files
+
+**Files** (from CONFIG_CLEANUP_ANALYSIS.md):
+1. examples/script-users/tests/test-rag-basic.lua
+2. examples/script-users/tests/test-rag-e2e.lua
+3. examples/script-users/tests/test-rag-errors.lua
+
+**Update**:
+- test-rag-basic.lua → `-p rag-dev`
+- test-rag-e2e.lua → `-p rag-prod` or `-p rag-perf`
+- test-rag-errors.lua → `-p rag-dev`
+
+**Validation**:
+- [ ] All 3 test files updated
+- [ ] Tests pass with new profiles
+- [ ] No test logic changes
+
+---
+
+### Task 11b.4.13: Validate All Lua Files Work - 🔲 PENDING
+**Priority**: CRITICAL
+**Estimated Time**: 30 minutes
+**Actual Time**:
+**Status**: 🔲 PENDING
+**Depends On**: Tasks 11b.4.7-11b.4.12 ✅
+
+**Objective**: Verify all 50 updated lua files execute correctly with new `-p` flags
+
+**Test Strategy**:
+Create validation script `scripts/testing/validate-profile-migration.sh`:
+```bash
+#!/bin/bash
+# Validate all lua files work with updated -p flags
+
+FAILED=()
+
+for lua_file in examples/**/*.lua; do
+    profile=$(grep "Usage: llmspell -p" "$lua_file" | sed 's/.*-p \([a-z-]*\).*/\1/')
+    if [ -n "$profile" ]; then
+        echo "Testing: $lua_file with profile $profile"
+        if ! timeout 5 llmspell -p "$profile" run "$lua_file" --help >/dev/null 2>&1; then
+            FAILED+=("$lua_file (profile: $profile)")
+        fi
+    fi
+done
+
+if [ ${#FAILED[@]} -gt 0 ]; then
+    echo "FAILED: ${#FAILED[@]} files"
+    printf '%s\n' "${FAILED[@]}"
+    exit 1
+else
+    echo "✅ All lua files validated"
+fi
+```
+
+**Validation Commands**:
+```bash
+# Run validation script
+./scripts/testing/validate-profile-migration.sh
+
+# Spot check key files
+llmspell -p minimal run examples/script-users/getting-started/00-hello-world.lua
+llmspell -p providers run examples/script-users/getting-started/02-first-agent.lua
+llmspell -p state run examples/script-users/features/state-persistence.lua
+llmspell -p sessions run examples/script-users/cookbook/rag-session.lua
+llmspell -p rag-dev run examples/script-users/getting-started/05-first-rag.lua
+```
+
+**Success Criteria**:
+- [ ] Validation script created
+- [ ] All 50 lua files pass validation
+- [ ] No runtime errors with specified profiles
+- [ ] Spot checks verify correct profile loaded
+
+---
+
+### Task 11b.4.14: Update examples/script-users/README.md - 🔲 PENDING
+**Priority**: HIGH
+**Estimated Time**: 20 minutes
+**Actual Time**:
+**Status**: 🔲 PENDING
+**Depends On**: Phase 2 Complete (Tasks 11b.4.7-11b.4.13) ✅
+
+**Objective**: Update main examples README to demonstrate builtin profile usage
+
+**File**: `examples/script-users/README.md`
+
+**Sections to Update**:
+1. **Quick Start** - Show `-p` flag first:
+```markdown
+## Quick Start
+
+All examples can run with builtin profiles:
+
+```bash
+# Tools and workflows (no LLM needed)
+llmspell -p minimal run getting-started/00-hello-world.lua
+
+# Agent examples (requires OpenAI/Anthropic API keys)
+llmspell -p providers run getting-started/02-first-agent.lua
+
+# State persistence examples
+llmspell -p state run features/state-persistence.lua
+
+# RAG examples (requires embedding model)
+llmspell -p rag-dev run getting-started/05-first-rag.lua
+```
+
+## Available Builtin Profiles
+
+- **minimal** - Tools only, no LLM providers
+- **development** - Dev settings with OpenAI/Anthropic + debug logging
+- **providers** - Simple OpenAI/Anthropic setup for agents
+- **state** - State persistence enabled
+- **sessions** - Sessions + state + hooks + events
+- **ollama** - Local Ollama LLM backend
+- **candle** - Local Candle LLM backend
+- **rag-dev** - RAG development with debug features
+- **rag-prod** - RAG production settings
+- **rag-perf** - RAG performance tuning
+
+## Custom Configuration
+
+For advanced use cases, create a custom config file:
+```bash
+llmspell -c path/to/custom-config.toml run script.lua
+```
+```
+
+2. **Directory Structure** - Update configs/ description:
+```markdown
+configs/               # Custom configuration examples (unique patterns)
+  rag-basic.toml       # Simplified RAG for learning
+  rag-multi-tenant.toml # Multi-tenant RAG isolation
+  applications.toml    # Application-specific settings
+  ...
+```
+
+**Validation**:
+- [ ] Quick Start section shows `-p` flag examples
+- [ ] All 10 builtin profiles documented
+- [ ] Custom config section de-emphasized (but still shown)
+- [ ] Directory structure reflects reduced config count
+
+---
+
+### Task 11b.4.15: Update getting-started/README.md - 🔲 PENDING
+**Priority**: HIGH
+**Estimated Time**: 15 minutes
+**Actual Time**:
+**Status**: 🔲 PENDING
+**Depends On**: Task 11b.4.14 ✅
+
+**Objective**: Update getting-started README with `-p` flag examples
+
+**File**: `examples/script-users/getting-started/README.md`
+
+**Update All Run Commands**:
+```markdown
+# Before
+llmspell -c ../configs/example-providers.toml run 02-first-agent.lua
+
+# After
+llmspell -p providers run 02-first-agent.lua
+# Or with debug logging:
+llmspell -p development run 02-first-agent.lua
+```
+
+**Validation**:
+- [ ] All run commands use `-p` flags
+- [ ] Each example shows correct profile
+- [ ] Alternative profiles mentioned where relevant
+
+---
+
+### Task 11b.4.16: Update features/README.md - 🔲 PENDING
+**Priority**: HIGH
+**Estimated Time**: 15 minutes
+**Actual Time**:
+**Status**: 🔲 PENDING
+**Depends On**: Task 11b.4.14 ✅
+
+**Objective**: Update features README with `-p` flag examples
+
+**File**: `examples/script-users/features/README.md`
+
+**Update Strategy**: Same as Task 11b.4.15
+- Replace all `-c path/to/config.toml` with `-p profile`
+- Show appropriate profile for each feature
+
+**Validation**:
+- [ ] All run commands use `-p` flags
+- [ ] Features correctly mapped to profiles
+
+---
+
+### Task 11b.4.17: Update cookbook/README.md - 🔲 PENDING
+**Priority**: HIGH
+**Estimated Time**: 20 minutes
+**Actual Time**:
+**Status**: 🔲 PENDING
+**Depends On**: Task 11b.4.14 ✅
+
+**Objective**: Update cookbook README with `-p` flag examples
+
+**File**: `examples/script-users/cookbook/README.md`
+
+**Update All 12 Examples**:
+- Map each cookbook recipe to appropriate builtin profile
+- Show alternative profiles where multiple options exist
+- Keep custom config examples for unique patterns (rag-multi-tenant)
+
+**Validation**:
+- [ ] All run commands updated
+- [ ] Unique patterns (rag-multi-tenant.lua) keep custom config references
+- [ ] Common patterns use builtin profiles
+
+---
+
+### Task 11b.4.18: Update configs/README.md - 🔲 PENDING
+**Priority**: HIGH
+**Estimated Time**: 30 minutes
+**Actual Time**:
+**Status**: 🔲 PENDING
+**Depends On**: Task 11b.4.14 ✅
+
+**Objective**: Update configs README to document remaining unique configs after cleanup
+
+**File**: `examples/script-users/configs/README.md`
+
+**Major Rewrite** - Focus on "When to Use Custom Configs":
+```markdown
+# Configuration Examples
+
+Most examples work with builtin profiles (use `llmspell -p <profile>`).
+This directory contains **unique configuration patterns** not covered by builtins.
+
+## Builtin Profiles (Recommended)
+
+For common workflows, use builtin profiles:
+- `llmspell -p minimal` - Tools only
+- `llmspell -p providers` - Simple agents
+- `llmspell -p state` - State persistence
+- `llmspell -p sessions` - Full session management
+- `llmspell -p rag-dev` - RAG development
+- See `llmspell --help` for all 10 builtin profiles
+
+## Custom Configs in This Directory
+
+Use these for **specific patterns** not covered by builtins:
+
+### rag-basic.toml
+Simplified RAG for learning (simpler than rag-dev builtin)
+
+### rag-multi-tenant.toml
+Multi-tenant RAG with namespace isolation
+
+### applications.toml
+Complex application-specific settings with cost management
+
+### [Other unique configs]
+...
+
+## When to Create Custom Configs
+
+Create custom configs when you need:
+- Unique feature combinations not in builtins
+- Production-specific settings (API endpoints, rate limits)
+- Multi-environment setups (dev/staging/prod)
+- Custom provider configurations
+
+See docs/user-guide/configuration.md for full config reference.
+```
+
+**Validation**:
+- [ ] README emphasizes builtin profiles first
+- [ ] Unique configs clearly documented with use cases
+- [ ] Removed references to duplicate configs
+- [ ] Migration guide from old configs to builtins
+
+---
+
+### Task 11b.4.19: Update Application READMEs (10 files) - 🔲 PENDING
+**Priority**: MEDIUM
+**Estimated Time**: 30 minutes
+**Actual Time**:
+**Status**: 🔲 PENDING
+**Depends On**: Task 11b.4.14 ✅
+
+**Objective**: Update application README files to show both config.toml and builtin alternatives
+
+**Files**:
+1. examples/script-users/applications/code-review-assistant/README.md
+2. examples/script-users/applications/communication-manager/README.md
+3. [... 8 more applications ...]
+
+**Update "Running" Section**:
+```markdown
+## Running
+
+### With Application Config (Recommended)
+Full features with app-specific settings:
+```bash
+llmspell -c config.toml run main.lua
+```
+
+### Quick Start with Builtins
+For development or testing:
+```bash
+llmspell -p development run main.lua
+# Or for RAG features:
+llmspell -p rag-dev run main.lua
+```
+
+The application config (config.toml) includes production settings,
+custom providers, and app-specific tuning not in builtin profiles.
+```
+
+**Validation**:
+- [ ] All 10 application READMEs updated
+- [ ] Both config.toml and builtin options shown
+- [ ] Explains when to use each approach
+- [ ] Application configs emphasized for production
+
+---
+
+### Task 11b.4.20: Update examples/README.md - 🔲 PENDING
+**Priority**: MEDIUM
+**Estimated Time**: 10 minutes
+**Actual Time**:
+**Status**: 🔲 PENDING
+**Depends On**: Task 11b.4.14 ✅
+
+**Objective**: Update top-level examples README
+
+**File**: `examples/README.md`
+
+**Changes**:
+- Add section on builtin profiles
+- Update run commands to use `-p` flags
+- Link to llmspell-config builtin profiles
+
+**Validation**:
+- [ ] Builtin profiles documented
+- [ ] Examples use `-p` flags
+- [ ] Links to config documentation updated
+
+---
+
+### Task 11b.4.21: Update docs/user-guide/configuration.md - 🔲 PENDING
+**Priority**: HIGH
+**Estimated Time**: 20 minutes
+**Actual Time**:
+**Status**: 🔲 PENDING
+**Depends On**: Phase 3 Complete (Tasks 11b.4.14-11b.4.20) ✅
+
+**Objective**: Update user guide to document all 10 builtin profiles and profile precedence
+
+**File**: `docs/user-guide/configuration.md`
+
+**New Section to Add**:
+```markdown
+## Builtin Profiles
+
+LLMSpell includes 10 builtin configuration profiles for common workflows:
+
+### Core Profiles
+- **minimal** - Tools and workflows only, no LLM providers
+- **development** - OpenAI/Anthropic providers with debug logging
+
+### Common Workflow Profiles
+- **providers** - Simple OpenAI/Anthropic agent setup
+- **state** - State persistence with memory backend
+- **sessions** - Sessions + state + hooks + events
+
+### Local LLM Profiles
+- **ollama** - Ollama local LLM backend
+- **candle** - Candle local LLM backend (Rust-native)
+
+### RAG Profiles
+- **rag-dev** - RAG development with debug features
+- **rag-prod** - RAG production settings
+- **rag-perf** - RAG performance tuning
+
+## Using Builtin Profiles
+
+```bash
+llmspell -p <profile-name> run script.lua
+# Short form:
+llmspell -p providers run agent.lua
+```
+
+## Configuration Precedence
+
+When multiple config sources exist:
+1. Environment variables (highest priority)
+2. `--profile` flag
+3. `-c` / `--config` file
+4. Config discovery (llmspell.toml search)
+5. Default configuration (lowest priority)
+
+Example: `llmspell -c custom.toml -p rag-dev run script.lua`
+→ Loads rag-dev builtin (profile wins over -c flag)
+```
+
+**Update Existing Sections**:
+- Config file locations - mention builtins first
+- Custom configs - position as "advanced" option
+- Environment variables - clarify they override everything
+
+**Validation**:
+- [ ] All 10 builtin profiles documented
+- [ ] Precedence rules clearly explained
+- [ ] Examples use `-p` flags primarily
+- [ ] Custom configs positioned as advanced option
+
+---
+
+### Task 11b.4.22: Remove 7 Confirmed Duplicate Configs - 🔲 PENDING
+**Priority**: CRITICAL
+**Estimated Time**: 20 minutes
+**Actual Time**:
+**Status**: 🔲 PENDING
+**Depends On**: Phase 3 Complete (All README updates done) ✅
+
+**Objective**: Delete 7 confirmed duplicate config files after verifying no references remain
+
+**Files to Remove** (from CONFIG_CLEANUP_ANALYSIS.md lines 225-232):
+1. examples/script-users/configs/minimal.toml → use `-p minimal`
+2. examples/script-users/configs/rag-development.toml → use `-p rag-dev`
+3. examples/script-users/configs/rag-production.toml → use `-p rag-prod`
+4. examples/script-users/configs/rag-performance.toml → use `-p rag-perf`
+5. examples/script-users/configs/local-llm-ollama.toml → use `-p ollama`
+6. examples/script-users/configs/local-llm-candle.toml → use `-p candle`
+7. examples/script-users/configs/cookbook.toml → use `-p development` or `-p providers`
+
+**Pre-Removal Validation**:
+```bash
+# Ensure no lua files reference these configs
+for config in minimal.toml rag-development.toml rag-production.toml rag-performance.toml local-llm-ollama.toml local-llm-candle.toml cookbook.toml; do
+    echo "Checking references to $config:"
+    grep -r "$config" examples/ docs/ --include="*.lua" --include="*.md"
+done
+
+# Should return zero matches (all should use -p flags now)
+```
+
+**Removal Commands**:
+```bash
+cd examples/script-users/configs/
+rm -f minimal.toml rag-development.toml rag-production.toml rag-performance.toml \
+      local-llm-ollama.toml local-llm-candle.toml cookbook.toml
+
+# Verify removal
+ls -1 *.toml | wc -l  # Should show 10 (down from 17)
+```
+
+**Validation**:
+- [ ] No references to 7 configs in lua files
+- [ ] No references to 7 configs in README files
+- [ ] 7 files deleted successfully
+- [ ] examples/script-users/configs/ now has ~10 files (was 17)
+- [ ] All examples still work (spot check from Task 11b.4.13)
+
+---
+
+### Task 11b.4.23: Consider Removing 5 Additional Configs - 🔲 PENDING
+**Priority**: MEDIUM
+**Estimated Time**: 30 minutes
+**Actual Time**:
+**Status**: 🔲 PENDING
+**Depends On**: Task 11b.4.22 ✅
+
+**Objective**: Evaluate and potentially remove 5 additional configs now replaced by new builtins
+
+**Candidates** (from CONFIG_CLEANUP_ANALYSIS.md lines 234-239):
+1. **example-providers.toml** → replaced by new `-p providers`
+2. **basic.toml** → replaced by new `-p state`
+3. **state-enabled.toml** → replaced by new `-p state`
+4. **session-enabled.toml** → replaced by new `-p sessions`
+5. **llmspell.toml** → use `-p minimal`
+
+**Evaluation Process**:
+For each file:
+1. Check for unique settings not in corresponding builtin
+2. Grep for references in lua files / READMEs
+3. Test that builtin provides same functionality
+4. If safe: delete; If unique value: keep with updated README
+
+**Decision Matrix**:
+```bash
+# For each config, answer:
+# 1. Does builtin have identical settings? (Compare TOML)
+# 2. Are there any references left? (grep -r)
+# 3. Does corresponding builtin work for all use cases? (test)
+
+# If YES to all 3: DELETE
+# If NO to any: KEEP and document why in configs/README.md
+```
+
+**Validation**:
+- [ ] All 5 configs evaluated
+- [ ] Decision documented for each (delete or keep)
+- [ ] If kept: configs/README.md explains unique value
+- [ ] If deleted: no broken references
+- [ ] Final config count: 5-10 files (unique patterns only)
+
+---
+
+### Task 11b.4.24: Final Validation and Quality Checks - 🔲 PENDING
+**Priority**: CRITICAL
+**Estimated Time**: 30 minutes
+**Actual Time**:
+**Status**: 🔲 PENDING
+**Depends On**: All Phase 11b.4 tasks ✅
+
+**Objective**: Comprehensive validation of all changes across Phases 1-4
+
+**Validation Checklist**:
+
+**1. Builtin Profiles**:
+```bash
+# List all builtins
+llmspell --help | grep -A20 "profile"
+
+# Test all 10 load correctly
+for profile in minimal development providers state sessions ollama candle rag-dev rag-prod rag-perf; do
+    echo "Testing profile: $profile"
+    llmspell -p "$profile" config show --format json | jq -r '.default_engine' || echo "FAILED: $profile"
+done
+```
+
+**2. Lua Files**:
+```bash
+# Run validation script from Task 11b.4.13
+./scripts/testing/validate-profile-migration.sh
+
+# Spot check each directory
+llmspell -p minimal run examples/script-users/getting-started/00-hello-world.lua
+llmspell -p providers run examples/script-users/features/agent-basics.lua
+llmspell -p state run examples/script-users/cookbook/state-management.lua
+```
+
+**3. Documentation**:
+```bash
+# Verify all READMEs mention -p flag
+grep -r "\-p " examples/**/README.md | wc -l  # Should show many matches
+
+# Verify no stale config references
+! grep -r "example-providers.toml\|cookbook.toml" examples/ --include="*.md"
+```
+
+**4. Config Count**:
+```bash
+# Verify reduced config count
+ls -1 examples/script-users/configs/*.toml | wc -l  # Should be 5-10 (was 17)
+
+# Verify builtins count
+ls -1 llmspell-config/builtins/*.toml | wc -l  # Should be 10 (was 7)
+```
+
+**5. Quality Gates**:
+```bash
+# Standard quality checks
+cargo fmt --all -- --check
+cargo clippy --workspace --all-features -- -D warnings
+cargo test -p llmspell-config  # Should pass 68+ tests
+./scripts/quality/quality-check-minimal.sh
+```
+
+**6. Runtime Tests**:
+```bash
+# Test each new builtin profile works
+llmspell -p providers exec "print(Agent.list())"
+llmspell -p state exec "State.set('key', 'value'); print(State.get('key'))"
+llmspell -p sessions exec "print(Sessions.create('test-session'))"
+```
+
+**Success Criteria Checklist**:
+- [ ] 10 builtin profiles exist and load correctly
+- [ ] 50 lua files updated with `-p` flags
+- [ ] 17 README files demonstrate builtin usage
+- [ ] 7-12 duplicate configs removed
+- [ ] 5-10 unique configs remain
+- [ ] All examples execute successfully
+- [ ] No broken references in docs/code
+- [ ] cargo clippy: zero warnings
+- [ ] cargo test: all pass
+- [ ] ./scripts/quality/quality-check-minimal.sh: pass
+
+**Issues Found**:
+[ Document any issues discovered and fixes applied ]
+
+**Final Stats**:
+```bash
+# Before Phase 11b.4:
+# - Builtin profiles: 7
+# - Example configs: 17
+# - Total configs: 38
+
+# After Phase 11b.4:
+# - Builtin profiles: 10 (+3)
+# - Example configs: 5-10 (-7 to -12)
+# - Total configs: 26-31 (-7 to -12)
+# - Lua files using -p: 50
+# - README files updated: 17
+```
+
+---
+
+**new phases to be added above**
 ---
 
