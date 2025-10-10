@@ -12,45 +12,154 @@
 ## Table of Contents
 
 1. [Quick Start](#quick-start)
-2. [Configuration Files](#configuration-files)
-3. [Kernel Configuration](#kernel-configuration) ⭐ **Phase 9-10**
-4. [Daemon & Service Settings](#daemon--service-settings) ⭐ **Phase 10**
-5. [Protocol Configuration](#protocol-configuration) ⭐ **Phase 9-10**
-6. [Debug & IDE Integration](#debug--ide-integration) ⭐ **Phase 9**
-7. [Logging & Monitoring](#logging--monitoring) ⭐ **Phase 9-10**
-8. [LLM Providers](#llm-providers)
-9. [RAG Configuration](#rag-configuration) ⭐ **Phase 8**
-10. [Multi-Tenancy](#multi-tenancy) ⭐ **Phase 8**
-11. [State & Sessions](#state--sessions)
-12. [Security Settings](#security-settings)
-13. [Tool Configuration](#tool-configuration)
-14. [External API Setup](#external-api-setup)
-15. [Deployment Profiles](#deployment-profiles)
-16. [Environment Variables](#environment-variables)
-17. [Troubleshooting](#troubleshooting)
+2. [Builtin Profiles](#builtin-profiles) ⭐ **NEW - Zero-Config**
+3. [Configuration Files](#configuration-files)
+4. [Kernel Configuration](#kernel-configuration) ⭐ **Phase 9-10**
+5. [Daemon & Service Settings](#daemon--service-settings) ⭐ **Phase 10**
+6. [Protocol Configuration](#protocol-configuration) ⭐ **Phase 9-10**
+7. [Debug & IDE Integration](#debug--ide-integration) ⭐ **Phase 9**
+8. [Logging & Monitoring](#logging--monitoring) ⭐ **Phase 9-10**
+9. [LLM Providers](#llm-providers)
+10. [RAG Configuration](#rag-configuration) ⭐ **Phase 8**
+11. [Multi-Tenancy](#multi-tenancy) ⭐ **Phase 8**
+12. [State & Sessions](#state--sessions)
+13. [Security Settings](#security-settings)
+14. [Tool Configuration](#tool-configuration)
+15. [External API Setup](#external-api-setup)
+16. [Deployment Profiles](#deployment-profiles)
+17. [Environment Variables](#environment-variables)
+18. [Troubleshooting](#troubleshooting)
 
 ---
 
 ## Quick Start
 
-Minimal configuration to get started:
+**Recommended**: Use builtin profiles for zero-config startup:
 
 ```bash
-# Set at least one LLM provider
+# Set LLM provider API key (for agent examples)
 export OPENAI_API_KEY="sk-..."
+
+# Run with builtin profile (no config file needed)
+./target/release/llmspell -p minimal run script.lua        # Tools only
+./target/release/llmspell -p providers run script.lua      # With LLM agents
+./target/release/llmspell -p rag-dev run script.lua        # With RAG
+./target/release/llmspell -p development run script.lua    # Full debug mode
 
 # Optional: Start kernel in service mode
 ./target/release/llmspell kernel start --port 9555
 
-# Run with embedded kernel (default)
-./target/release/llmspell run script.lua
-
-# Use configuration file
+# Advanced: Use custom configuration file
 ./target/release/llmspell -c config.toml run script.lua
 
-# Use --trace flag for debugging (Phase 9)
-./target/release/llmspell --trace debug run script.lua
+# Debugging with trace flag (Phase 9)
+./target/release/llmspell --trace debug -p development run script.lua
 ```
+
+See [Builtin Profiles](#builtin-profiles) below for complete list of 10 available profiles.
+
+---
+
+## Builtin Profiles
+
+LLMSpell includes **10 builtin configuration profiles** that cover most use cases without requiring custom configuration files.
+
+### Core Profiles
+
+**minimal** - Tools and workflows only, no LLM providers
+```bash
+llmspell -p minimal run script.lua
+```
+Use for: Testing tools, learning workflow patterns, scripts that don't need LLM access
+
+**development** - Full development environment with debug logging
+```bash
+llmspell -p development run script.lua
+```
+Use for: Development, debugging, comprehensive logging and tracing
+
+### Common Workflow Profiles
+
+**providers** - Simple OpenAI + Anthropic agent setup
+```bash
+export OPENAI_API_KEY="sk-..."
+export ANTHROPIC_API_KEY="sk-ant-..."
+llmspell -p providers run script.lua
+```
+Use for: Agent examples, basic LLM scripts, getting started
+
+**state** - State persistence with memory backend
+```bash
+llmspell -p state run script.lua
+```
+Use for: State management examples, data persistence across runs
+
+**sessions** - Full session management (state + hooks + events)
+```bash
+llmspell -p sessions run script.lua
+```
+Use for: Conversational applications, session-based workflows
+
+### Local LLM Profiles
+
+**ollama** - Local LLM via Ollama backend
+```bash
+llmspell -p ollama run script.lua
+```
+Use for: Privacy-focused applications, offline LLM usage (requires Ollama running)
+
+**candle** - Local LLM via Candle backend (CPU/GPU)
+```bash
+llmspell -p candle run script.lua
+```
+Use for: On-device inference, custom model deployment
+
+### RAG Profiles (Phase 8)
+
+**rag-dev** - RAG development with debug features
+```bash
+export OPENAI_API_KEY="sk-..."  # For embeddings
+llmspell -p rag-dev run script.lua
+```
+Use for: Learning RAG, prototyping knowledge bases, development
+
+**rag-prod** - RAG production settings
+```bash
+llmspell -p rag-prod run script.lua
+```
+Use for: Production RAG deployment, enterprise knowledge management
+
+**rag-perf** - RAG performance tuning
+```bash
+llmspell -p rag-perf run script.lua
+```
+Use for: High-performance RAG, optimized vector search
+
+### Profile Precedence
+
+Configuration is resolved in this order (later overrides earlier):
+
+1. Built-in defaults
+2. **Builtin profile** (`-p profile-name`) ⭐ NEW
+3. System config: `/etc/llmspell/config.toml`
+4. User config: `~/.config/llmspell/config.toml`
+5. Project config: `./llmspell.toml`
+6. CLI specified: `-c custom.toml`
+7. Environment variables
+8. Command-line arguments
+
+**Note**: Builtin profiles override defaults but can be overridden by config files, environment variables, or command-line arguments.
+
+### When to Use Custom Configs
+
+Use custom configuration files instead of builtin profiles when you need:
+- Unique resource limits beyond profile defaults
+- Multi-tenant isolation policies
+- Application-specific security settings
+- Advanced migration or backup strategies
+- Custom provider endpoints
+
+See [Configuration Files](#configuration-files) section below for custom config syntax.
 
 ---
 
@@ -147,14 +256,7 @@ emit_timing_events = true
 
 ### Configuration Hierarchy
 
-Configuration is loaded in order (later overrides earlier):
-1. Built-in defaults
-2. System config: `/etc/llmspell/config.toml`
-3. User config: `~/.config/llmspell/config.toml`
-4. Project config: `./llmspell.toml`
-5. CLI specified: `-c custom.toml`
-6. Environment variables
-7. Command-line arguments
+See [Profile Precedence](#profile-precedence) in the Builtin Profiles section above for complete configuration resolution order.
 
 ---
 
@@ -1512,13 +1614,36 @@ env | grep LLMSPELL
 export LLMSPELL_CONFIG="/path/to/config.toml"  # Not just assignment
 ```
 
-**Profile not loading:**
+**Builtin profile not found:**
 ```bash
-# List available profiles
-./target/release/llmspell config profiles
+# List available builtin profiles
+llmspell -p list  # Shows: minimal, development, providers, state, sessions, ollama, candle, rag-dev, rag-prod, rag-perf
 
-# Use profile explicitly
+# Use builtin profile
+llmspell -p providers run script.lua
+
+# For custom profiles (deprecated - use builtin or custom configs)
 ./target/release/llmspell --profile production run script.lua
+```
+
+**Need providers but getting errors:**
+```bash
+# Set API keys first
+export OPENAI_API_KEY="sk-..."
+export ANTHROPIC_API_KEY="sk-ant-..."
+
+# Use providers builtin profile
+llmspell -p providers run script.lua
+```
+
+**Need RAG but getting "RAG not available":**
+```bash
+# Set embedding API key
+export OPENAI_API_KEY="sk-..."
+
+# Use RAG builtin profile
+llmspell -p rag-dev run script.lua      # Development
+llmspell -p rag-prod run script.lua     # Production
 ```
 
 **Kernel config issues:**

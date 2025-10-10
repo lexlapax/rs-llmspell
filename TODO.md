@@ -2656,72 +2656,45 @@ custom providers, and app-specific tuning not in builtin profiles.
 
 ---
 
-### Task 11b.4.21: Update docs/user-guide/configuration.md - 🔲 PENDING
+### Task 11b.4.21: Update docs/user-guide/configuration.md - ✅ COMPLETE
 **Priority**: HIGH
 **Estimated Time**: 20 minutes
-**Actual Time**:
-**Status**: 🔲 PENDING
+**Actual Time**: 15 minutes
+**Status**: ✅ COMPLETE
 **Depends On**: Phase 3 Complete (Tasks 11b.4.14-11b.4.20) ✅
 
 **Objective**: Update user guide to document all 10 builtin profiles and profile precedence
 
 **File**: `docs/user-guide/configuration.md`
 
-**New Section to Add**:
-```markdown
-## Builtin Profiles
-
-LLMSpell includes 10 builtin configuration profiles for common workflows:
-
-### Core Profiles
-- **minimal** - Tools and workflows only, no LLM providers
-- **development** - OpenAI/Anthropic providers with debug logging
-
-### Common Workflow Profiles
-- **providers** - Simple OpenAI/Anthropic agent setup
-- **state** - State persistence with memory backend
-- **sessions** - Sessions + state + hooks + events
-
-### Local LLM Profiles
-- **ollama** - Ollama local LLM backend
-- **candle** - Candle local LLM backend (Rust-native)
-
-### RAG Profiles
-- **rag-dev** - RAG development with debug features
-- **rag-prod** - RAG production settings
-- **rag-perf** - RAG performance tuning
-
-## Using Builtin Profiles
-
-```bash
-llmspell -p <profile-name> run script.lua
-# Short form:
-llmspell -p providers run agent.lua
-```
-
-## Configuration Precedence
-
-When multiple config sources exist:
-1. Environment variables (highest priority)
-2. `--profile` flag
-3. `-c` / `--config` file
-4. Config discovery (llmspell.toml search)
-5. Default configuration (lowest priority)
-
-Example: `llmspell -c custom.toml -p rag-dev run script.lua`
-→ Loads rag-dev builtin (profile wins over -c flag)
-
-
-**Update Existing Sections**:
-- Config file locations - mention builtins first
-- Custom configs - position as "advanced" option
-- Environment variables - clarify they override everything
+**Changes Made**:
+1. **Quick Start Section** (line 34-58): Replaced config-file-first with builtin-profile-first approach, added 4 profile examples
+2. **New Builtin Profiles Section** (line 62-163): Comprehensive documentation of all 10 profiles:
+   - Core Profiles: minimal, development (2)
+   - Common Workflow Profiles: providers, state, sessions (3)
+   - Local LLM Profiles: ollama, candle (2)
+   - RAG Profiles: rag-dev, rag-prod, rag-perf (3)
+3. **Profile Precedence** (line 137-150): Detailed 8-step configuration resolution order with builtin profiles at position 2
+4. **When to Use Custom Configs** (line 152-161): Clear guidance for when builtin profiles aren't sufficient
+5. **Table of Contents** (line 14-31): Added "Builtin Profiles" as item 2, renumbered all subsequent items
+6. **Configuration Hierarchy** (line 257-261): Replaced with reference to Profile Precedence section
+7. **Troubleshooting** (line 1617-1647): Added 3 builtin-profile-based solutions for common issues
 
 **Validation**:
-- [ ] All 10 builtin profiles documented
-- [ ] Precedence rules clearly explained
-- [ ] Examples use `-p` flags primarily
-- [ ] Custom configs positioned as advanced option
+- [x] All 10 builtin profiles documented with usage examples and "Use for:" descriptions
+- [x] Precedence rules clearly explained (8-step hierarchy)
+- [x] Examples use `-p` flags primarily (4 in Quick Start, all profiles section)
+- [x] Custom configs positioned as advanced option ("When to Use Custom Configs" section)
+- [x] Table of Contents updated with new section
+- [x] Troubleshooting includes profile-based solutions
+
+**Insights**:
+- **User Guide Standard**: This is the authoritative configuration reference - most comprehensive update yet
+- **Zero-Config Messaging**: "Zero-Config" label in TOC emphasizes builtin profiles as the primary approach
+- **Profile Precedence Clarity**: 8-step hierarchy shows builtin profiles override defaults but are overridden by custom configs
+- **Educational Value**: "When to Use Custom Configs" provides clear decision criteria
+- **Troubleshooting Integration**: Common issues now have profile-based solutions first
+- **Documentation Completeness**: Covers all 10 profiles with consistent structure: name, command, use cases
 
 ---
 
