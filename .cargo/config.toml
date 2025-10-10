@@ -1,14 +1,12 @@
 [alias]
-# Test runner aliases
-test-all = "run -p llmspell-testing --features test-runner --bin llmspell-test -- run all"
-test-unit = "run -p llmspell-testing --features test-runner --bin llmspell-test -- run unit"
-test-integration = "run -p llmspell-testing --features test-runner --bin llmspell-test -- run integration"
-test-agent = "run -p llmspell-testing --features test-runner --bin llmspell-test -- run agent"
-test-scenario = "run -p llmspell-testing --features test-runner --bin llmspell-test -- run scenario"
-test-lua = "run -p llmspell-testing --features test-runner --bin llmspell-test -- run lua"
-test-list = "run -p llmspell-testing --features test-runner --bin llmspell-test -- list"
-test-info = "run -p llmspell-testing --features test-runner --bin llmspell-test -- info"
-bench-all = "run -p llmspell-testing --features test-runner --bin llmspell-test -- bench"
+# Test aliases (use cargo test directly with feature flags)
+test-all = "test --workspace"
+test-unit = "test -p llmspell-testing --features unit-tests --test unit"
+test-integration = "test -p llmspell-testing --features integration-tests --test integration"
+test-agent = "test -p llmspell-testing --features agent-tests --test agents"
+test-scenario = "test -p llmspell-testing --features scenario-tests --test scenarios"
+test-lua = "test -p llmspell-testing --features lua-tests --test lua"
+bench-all = "bench -p llmspell-testing"
 
 # Quality check shortcuts
 fmt-check = "fmt --all -- --check"

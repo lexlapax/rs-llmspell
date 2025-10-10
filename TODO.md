@@ -602,3 +602,62 @@ pub mod runner;
 
 ---
 
+### Task 11b.2.2: Update Cargo Aliases - ✅ COMPLETE
+**Priority**: HIGH
+**Estimated Time**: 10 minutes
+**Actual Time**: 5 minutes
+**Status**: ✅ COMPLETE
+**Depends On**: Task 11b.2.1 ✅
+
+**File**: `.cargo/config.toml`
+
+**Changes Made**:
+Replaced 9 aliases that invoked llmspell-test binary with direct cargo test commands:
+
+```toml
+# BEFORE (lines 3-11)
+test-all = "run -p llmspell-testing --features test-runner --bin llmspell-test -- run all"
+test-unit = "run -p llmspell-testing --features test-runner --bin llmspell-test -- run unit"
+test-integration = "run -p llmspell-testing --features test-runner --bin llmspell-test -- run integration"
+test-agent = "run -p llmspell-testing --features test-runner --bin llmspell-test -- run agent"
+test-scenario = "run -p llmspell-testing --features test-runner --bin llmspell-test -- run scenario"
+test-lua = "run -p llmspell-testing --features test-runner --bin llmspell-test -- run lua"
+test-list = "run -p llmspell-testing --features test-runner --bin llmspell-test -- list"
+test-info = "run -p llmspell-testing --features test-runner --bin llmspell-test -- info"
+bench-all = "run -p llmspell-testing --features test-runner --bin llmspell-test -- bench"
+
+# AFTER (lines 3-9)
+test-all = "test --workspace"
+test-unit = "test -p llmspell-testing --features unit-tests --test unit"
+test-integration = "test -p llmspell-testing --features integration-tests --test integration"
+test-agent = "test -p llmspell-testing --features agent-tests --test agents"
+test-scenario = "test -p llmspell-testing --features scenario-tests --test scenarios"
+test-lua = "test -p llmspell-testing --features lua-tests --test lua"
+bench-all = "bench -p llmspell-testing"
+```
+
+**Alias Mapping**:
+- `test-all`: workspace-wide tests (no feature filtering)
+- `test-unit`: unit tests via unit-tests feature + unit test harness
+- `test-integration`: integration tests via integration-tests feature + integration harness
+- `test-agent`: agent tests via agent-tests feature + agents harness
+- `test-scenario`: scenario tests via scenario-tests feature + scenarios harness
+- `test-lua`: lua tests via lua-tests feature + lua harness
+- `bench-all`: all benchmarks in llmspell-testing
+- `test-list`: REMOVED (use `cargo test --list` directly)
+- `test-info`: REMOVED (no cargo test equivalent)
+
+**Validation**:
+- [x] All 9 aliases updated to use cargo test/bench directly ✅
+- [x] test-list and test-info removed (no direct equivalents) ✅
+- [x] Feature flags aligned with Cargo.toml test harness definitions ✅
+
+**Insights**:
+- **Feature Alignment**: Each alias uses required-features from corresponding [[test]] section in Cargo.toml
+- **Simpler Commands**: Direct cargo test invocation vs multi-level binary wrapper
+- **Removed Aliases**: test-list/test-info had no cargo test equivalent - users can use `cargo test --list` directly
+- **Harness Targeting**: Using `--test <name>` targets specific test harnesses defined in Cargo.toml
+- **Cleaner Abstraction**: 7 working aliases (was 9) with clearer semantics
+
+---
+
