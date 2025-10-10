@@ -705,9 +705,14 @@ Model specifications follow the format: model:variant@backend
 - backend: Backend to use (ollama or candle)
 
 EXAMPLES:
+    llmspell model available                   # List models from backend libraries
     llmspell model pull llama3.1:8b@ollama     # Download Llama 3.1 8B via Ollama
     llmspell model pull mistral:7b@candle      # Download Mistral 7B via Candle
-    llmspell model pull phi3@ollama --force    # Force re-download")]
+    llmspell model pull phi3@ollama --force    # Force re-download
+
+Browse models online:
+  Ollama:  https://ollama.com/library
+  Candle:  https://huggingface.co/models?pipeline_tag=text-generation")]
     Pull {
         /// Model specification (e.g., \"llama3.1:8b@ollama\")
         model: String,
@@ -1082,12 +1087,14 @@ pub enum ConfigCommands {
     },
 
     /// List available builtin profiles
-    #[command(long_about = "Display all available builtin configuration profiles with detailed metadata.
+    #[command(
+        long_about = "Display all available builtin configuration profiles with detailed metadata.
 
 EXAMPLES:
     llmspell config list-profiles                    # List all profiles
     llmspell config list-profiles --detailed         # Show full metadata for each profile
-    llmspell config list-profiles --output json      # Output in JSON format")]
+    llmspell config list-profiles --output json      # Output in JSON format"
+    )]
     ListProfiles {
         /// Show detailed profile information (use cases, features)
         #[arg(long, short = 'd')]

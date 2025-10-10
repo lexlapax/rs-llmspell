@@ -260,8 +260,10 @@ async fn list_profiles(detailed: bool, output_format: OutputFormat) -> Result<()
         }
         OutputFormat::Text | OutputFormat::Pretty => {
             // Group profiles by category
-            let mut by_category: std::collections::HashMap<&str, Vec<&llmspell_config::ProfileMetadata>> =
-                std::collections::HashMap::new();
+            let mut by_category: std::collections::HashMap<
+                &str,
+                Vec<&llmspell_config::ProfileMetadata>,
+            > = std::collections::HashMap::new();
             for profile in &profiles {
                 by_category
                     .entry(profile.category)

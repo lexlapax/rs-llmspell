@@ -1094,7 +1094,11 @@ impl LLMSpellConfig {
                 name: "minimal",
                 category: "Core",
                 description: "Tools only, no LLM providers",
-                use_cases: vec!["Testing tools", "Learning workflow patterns", "Scripts without LLM access"],
+                use_cases: vec![
+                    "Testing tools",
+                    "Learning workflow patterns",
+                    "Scripts without LLM access",
+                ],
                 features: vec!["Lua stdlib: Basic", "No providers", "No RAG", "No sessions"],
             }),
             "development" => Some(ProfileMetadata {
@@ -1102,63 +1106,132 @@ impl LLMSpellConfig {
                 category: "Core",
                 description: "Dev settings with debug logging",
                 use_cases: vec!["Development", "Debugging", "Learning LLM integration"],
-                features: vec!["Lua stdlib: All", "OpenAI + Anthropic", "Debug logging", "Small resource limits"],
+                features: vec![
+                    "Lua stdlib: All",
+                    "OpenAI + Anthropic",
+                    "Debug logging",
+                    "Small resource limits",
+                ],
             }),
             "providers" => Some(ProfileMetadata {
                 name: "providers",
                 category: "Common Workflows",
                 description: "OpenAI + Anthropic setup",
                 use_cases: vec!["Agent examples", "LLM scripts", "Production agents"],
-                features: vec!["OpenAI gpt-3.5-turbo", "Anthropic claude-3-haiku", "Cost-efficient models", "No RAG"],
+                features: vec![
+                    "OpenAI gpt-3.5-turbo",
+                    "Anthropic claude-3-haiku",
+                    "Cost-efficient models",
+                    "No RAG",
+                ],
             }),
             "state" => Some(ProfileMetadata {
                 name: "state",
                 category: "Common Workflows",
                 description: "State persistence with memory backend",
-                use_cases: vec!["State management examples", "Scripts requiring state", "Learning persistence"],
-                features: vec!["Memory backend", "10MB max state", "No providers", "Migration/backup disabled"],
+                use_cases: vec![
+                    "State management examples",
+                    "Scripts requiring state",
+                    "Learning persistence",
+                ],
+                features: vec![
+                    "Memory backend",
+                    "10MB max state",
+                    "No providers",
+                    "Migration/backup disabled",
+                ],
             }),
             "sessions" => Some(ProfileMetadata {
                 name: "sessions",
                 category: "Common Workflows",
                 description: "Sessions + state + hooks + events",
-                use_cases: vec!["Conversational apps", "Session management", "Event-driven workflows"],
-                features: vec!["Session tracking", "Artifact storage", "Hooks enabled", "Events enabled"],
+                use_cases: vec![
+                    "Conversational apps",
+                    "Session management",
+                    "Event-driven workflows",
+                ],
+                features: vec![
+                    "Session tracking",
+                    "Artifact storage",
+                    "Hooks enabled",
+                    "Events enabled",
+                ],
             }),
             "ollama" => Some(ProfileMetadata {
                 name: "ollama",
                 category: "Local LLM",
                 description: "Ollama backend configuration",
                 use_cases: vec!["Local LLM with Ollama", "Offline inference", "GGUF models"],
-                features: vec!["Ollama provider", "Local inference", "No API keys needed", "Full stdlib"],
+                features: vec![
+                    "Ollama provider",
+                    "Local inference",
+                    "No API keys needed",
+                    "Full stdlib",
+                ],
             }),
             "candle" => Some(ProfileMetadata {
                 name: "candle",
                 category: "Local LLM",
                 description: "Candle embedded inference",
-                use_cases: vec!["Local LLM with Candle", "CPU/GPU inference", "Rust-native models"],
-                features: vec!["Candle provider", "Rust inference", "No API keys needed", "Full stdlib"],
+                use_cases: vec![
+                    "Local LLM with Candle",
+                    "CPU/GPU inference",
+                    "Rust-native models",
+                ],
+                features: vec![
+                    "Candle provider",
+                    "Rust inference",
+                    "No API keys needed",
+                    "Full stdlib",
+                ],
             }),
             "rag-dev" => Some(ProfileMetadata {
                 name: "rag-dev",
                 category: "RAG",
                 description: "Development RAG (small dims, fast)",
-                use_cases: vec!["Learning RAG", "Prototyping knowledge bases", "Fast iteration"],
-                features: vec!["384-dim vectors", "HNSW index", "OpenAI embeddings", "Small memory footprint"],
+                use_cases: vec![
+                    "Learning RAG",
+                    "Prototyping knowledge bases",
+                    "Fast iteration",
+                ],
+                features: vec![
+                    "384-dim vectors",
+                    "HNSW index",
+                    "OpenAI embeddings",
+                    "Small memory footprint",
+                ],
             }),
             "rag-prod" => Some(ProfileMetadata {
                 name: "rag-prod",
                 category: "RAG",
                 description: "Production RAG (reliability, monitoring)",
-                use_cases: vec!["Production RAG deployment", "Large knowledge bases", "SaaS platforms"],
-                features: vec!["1536-dim vectors", "Caching enabled", "Monitoring ready", "Production settings"],
+                use_cases: vec![
+                    "Production RAG deployment",
+                    "Large knowledge bases",
+                    "SaaS platforms",
+                ],
+                features: vec![
+                    "1536-dim vectors",
+                    "Caching enabled",
+                    "Monitoring ready",
+                    "Production settings",
+                ],
             }),
             "rag-perf" => Some(ProfileMetadata {
                 name: "rag-perf",
                 category: "RAG",
                 description: "Performance RAG (high memory, cores)",
-                use_cases: vec!["High-performance RAG", "Large-scale search", "Multi-core systems"],
-                features: vec!["Optimized HNSW", "Large caches", "Multi-threaded", "High memory limits"],
+                use_cases: vec![
+                    "High-performance RAG",
+                    "Large-scale search",
+                    "Multi-core systems",
+                ],
+                features: vec![
+                    "Optimized HNSW",
+                    "Large caches",
+                    "Multi-threaded",
+                    "High memory limits",
+                ],
             }),
             _ => None,
         }
@@ -2045,7 +2118,10 @@ timeout_seconds = 300
         assert_eq!(anthropic.api_key_env, Some("ANTHROPIC_API_KEY".to_string()));
 
         // Verify default provider
-        assert_eq!(config.providers.default_provider, Some("openai".to_string()));
+        assert_eq!(
+            config.providers.default_provider,
+            Some("openai".to_string())
+        );
 
         // Verify RAG/sessions disabled (state is enabled by default)
         assert!(!config.rag.enabled);

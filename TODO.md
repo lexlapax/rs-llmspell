@@ -2903,6 +2903,224 @@ llmspell -p sessions exec "print(Sessions.create('test-session'))"
 
 ---
 
+## Phase 11b.5: Model Discovery UX Enhancement - ✅ COMPLETE
+Add model browsing URLs to `llmspell model pull --help` to solve "where do I find model names?" problem for Ollama and Candle backends.
+
+**Problem**:
+- **Discovery Gap**: Users don't know where to browse available models before running `model pull`
+- **Current Help**: cli.rs:700-710 explains format (model:variant@backend) but provides no model discovery URLs
+- **User Friction**: Must search web externally or guess model names from docs
+- **Inconsistent with llmspell**: Other commands provide discovery mechanisms (e.g., `config list-profiles`, inline `--help` with examples)
+- **Two Discovery Modes**: Need both programmatic (`model available`) and web browsing URLs
+
+**Current State**:
+```rust
+// llmspell-cli/src/cli.rs:700-710
+#[command(long_about = "Download a model from the specified backend.
+
+Model specifications follow the format: model:variant@backend
+- model: Base model name (e.g., llama3.1, mistral, phi3)
+- variant: Model variant/size (e.g., 8b, 7b, 13b)
+- backend: Backend to use (ollama or candle)
+
+EXAMPLES:
+    llmspell model pull llama3.1:8b@ollama     # Download Llama 3.1 8B via Ollama
+    llmspell model pull mistral:7b@candle      # Download Mistral 7B via Candle
+    llmspell model pull phi3@ollama --force    # Force re-download")]
+```
+
+**Research Findings** (via WebFetch + code analysis):
+
+**Verified Official URLs**:
+1. **Ollama Library**: https://ollama.com/library
+   - Official model browser with search, tags, sizes
+   - Models referenced as `llama3.1`, `mistral`, `phi3`, etc.
+   - Format matches llmspell spec: `model:variant@ollama`
+
+2. **HuggingFace Text-Gen Models**: https://huggingface.co/models?pipeline_tag=text-generation
+   - Primary source for Candle-compatible models
+   - Includes GGUF quantized models
+   - Alternative: https://huggingface.co/models?library=gguf (GGUF-specific filter)
+
+3. **Existing `model available` Command**: cli.rs:750-758
+   - Programmatic discovery via `llmspell model available [--backend ollama|candle]`
+   - Queries backend libraries for available models
+   - Complements web browsing URLs
+
+**Industry Pattern Analysis**:
+- **docker**: No URLs (uses `docker search` programmatic only)
+- **npm**: No URLs (uses `npm search` programmatic only)
+- **cargo**: No URLs (crates.io implicit, no help text)
+- **llmspell pattern**: Already includes inline help URLs and references (e.g., cli.rs:100 "For more help...", cli.rs:131 "Use 'llmspell config list-profiles'")
+- **Conclusion**: llmspell's comprehensive help philosophy supports URL inclusion
+
+**Solution - Option A+E Hybrid** (Recommended):
+
+Two-tier discovery system:
+1. **Programmatic Discovery**: Feature `model available` as first example
+2. **Web Discovery**: Add footer section with browsing URLs for both backends
+
+**Benefits**:
+- **Dual Discovery**: CLI-first (`model available`) + web browsing (URLs) for different user preferences
+- **Consistent with llmspell**: Matches "For more help" pattern (cli.rs:100), comprehensive EXAMPLES philosophy
+- **Backend Coverage**: Equal treatment for Ollama and Candle (no conditional logic needed)
+- **Always Visible**: Not profile-dependent, always appears in `--help`
+- **Low Maintenance**: Static URLs, official sources won't change frequently
+
+**Alternatives Considered**:
+- **Option B** (Inline Comment): Non-standard format, breaks examples consistency
+- **Option C** (Description Section): Disrupts description → examples flow
+- **Option D** (Conditional Display): Over-engineered, complex clap implementation
+- **Option E** (Defer to `model available` only): Doesn't help users who prefer web browsing
+
+**Success Criteria**:
+- [x] Research complete: URLs verified, industry patterns analyzed ✅
+- [x] cli.rs:700-722 updated with Option A+E format ✅
+- [x] `llmspell model pull --help` shows both discovery methods ✅
+- [x] Help output includes `model available` as first example ✅
+- [x] Footer section lists Ollama and Candle URLs ✅
+- [x] Zero clippy warnings ✅
+- [x] Quality checks pass (cargo fmt, cargo clippy, compile) ✅
+- [x] Manual UX validation: help text clear and actionable ✅
+
+**Implementation Plan**:
+
+### Task 11b.5.1: Update model pull Help Text with Discovery URLs
+**Priority**: HIGH
+**Estimated Time**: 15 minutes
+**Actual Time**: 20 minutes
+**Status**: ✅ COMPLETE
+**Depends On**: Research Complete ✅
+
+**File**: `llmspell-cli/src/cli.rs`
+**Lines**: 700-722 (ModelCommands::Pull)
+
+**Current Code** (lines 700-710):
+```rust
+/// Download a model
+#[command(long_about = "Download a model from the specified backend.
+
+Model specifications follow the format: model:variant@backend
+- model: Base model name (e.g., llama3.1, mistral, phi3)
+- variant: Model variant/size (e.g., 8b, 7b, 13b)
+- backend: Backend to use (ollama or candle)
+
+EXAMPLES:
+    llmspell model pull llama3.1:8b@ollama     # Download Llama 3.1 8B via Ollama
+    llmspell model pull mistral:7b@candle      # Download Mistral 7B via Candle
+    llmspell model pull phi3@ollama --force    # Force re-download")]
+```
+
+**Updated Code** (Option A+E Hybrid):
+```rust
+/// Download a model
+#[command(long_about = "Download a model from the specified backend.
+
+Model specifications follow the format: model:variant@backend
+- model: Base model name (e.g., llama3.1, mistral, phi3)
+- variant: Model variant/size (e.g., 8b, 7b, 13b)
+- backend: Backend to use (ollama or candle)
+
+EXAMPLES:
+    llmspell model available                   # List models from backend libraries
+    llmspell model pull llama3.1:8b@ollama     # Download Llama 3.1 8B via Ollama
+    llmspell model pull mistral:7b@candle      # Download Mistral 7B via Candle
+    llmspell model pull phi3@ollama --force    # Force re-download
+
+Browse models online:
+  Ollama:  https://ollama.com/library
+  Candle:  https://huggingface.co/models?pipeline_tag=text-generation")]
+```
+
+**Changes Summary**:
+1. **Line ~708**: Add `llmspell model available` as **first** example (programmatic discovery)
+2. **Lines ~712-714**: Add footer section "Browse models online:" with 2 URLs
+3. **Format**: Matches existing pattern (see cli.rs:100 "For more help..." footer)
+4. **Indentation**: Two-space indent for URLs (matches existing help text style)
+
+**Validation Commands**:
+```bash
+# View updated help text
+llmspell model pull --help
+
+# Verify help includes both discovery methods
+llmspell model pull --help | grep -A3 "EXAMPLES:"
+llmspell model pull --help | grep -A2 "Browse models"
+
+# Test that model available example works
+llmspell model available --backend ollama
+llmspell model available --backend candle
+
+# Verify URLs are correct and accessible (manual)
+# 1. Visit https://ollama.com/library
+# 2. Visit https://huggingface.co/models?pipeline_tag=text-generation
+```
+
+**Testing Plan**:
+1. **Compile Test**: `cargo build --release`
+2. **Help Output Test**: `llmspell model pull --help | less` (visually inspect formatting)
+3. **Discovery Test**: Verify `model available` command works for both backends
+4. **URL Validation**: Manually check both URLs load correctly
+5. **User Flow Test**:
+   - User sees help → tries `model available` → sees list
+   - User sees help → clicks URL → browses web → copies model name → runs `model pull`
+
+**Quality Gates**:
+```bash
+# Standard checks
+cargo fmt --all -- --check
+cargo clippy -p llmspell-cli --lib
+cargo build --release
+
+# Minimal quality check
+./scripts/quality/quality-check-minimal.sh
+
+# Help text validation
+llmspell model pull --help | wc -l  # Should be ~18-20 lines (was ~14)
+llmspell model pull --help | grep "ollama.com/library"  # Should find URL
+llmspell model pull --help | grep "huggingface.co"  # Should find URL
+```
+
+**Success Criteria**:
+- [x] cli.rs:700-722 updated with Option A+E format ✅
+- [x] `llmspell model pull --help` displays 4 examples (1 new: `model available`) ✅
+- [x] Footer section shows "Browse models online:" with 2 URLs ✅
+- [x] Both URLs are correct and accessible ✅
+- [x] Help text follows llmspell style (EXAMPLES section, footer pattern) ✅
+- [x] Zero clippy warnings on llmspell-cli ✅
+- [x] cargo build succeeds ✅
+- [x] Manual UX test: Help text is clear, URLs clickable in terminal emulators with URL detection ✅
+
+**Edge Cases**:
+- N/A (static help text, no runtime behavior)
+
+**Rollback Plan**:
+- Git revert single commit (only cli.rs changes)
+- No config migration, no database changes
+
+**Documentation Updates**:
+- N/A (help text is self-documenting)
+- Optional: Mention in RELEASE_NOTES for v0.11.2
+
+**Completion Insights**:
+- **Two-Tier Discovery**: Programmatic (`model available`) + Web (URLs) addresses different user workflows - implemented successfully
+- **URL Stability**: Official sources (ollama.com, huggingface.co) unlikely to change, low maintenance
+- **Pattern Reuse**: Footer section reuses existing llmspell help pattern (cli.rs:100) - formatting consistent
+- **Backend Parity**: Equal visibility for Ollama and Candle, no bias toward either backend
+- **Implementation Clean**: Single 5-line addition to cli.rs (lines 708, 712-715), zero runtime changes
+- **Validation Complete**: All 8 success criteria met, help text displays correctly with proper formatting
+- **User Flow Enhanced**: Users now have two clear paths: (1) CLI `model available` command, (2) Web browsing via URLs
+- **Actual Time**: 20 minutes (vs 15 min estimated) - extra time for compilation/validation
+
+---
+
+**Estimated Total Time**: 15 minutes (single task)
+**Actual Time**: 20 minutes
+**Priority**: HIGH (user-facing UX improvement)
+**Risk**: LOW (help text only, no runtime changes)
+
+---
+
 **new phases to be added above**
 ---
 
