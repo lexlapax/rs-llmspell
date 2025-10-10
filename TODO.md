@@ -2411,24 +2411,48 @@ pub fn list_builtin_profiles() -> Vec<&'static str> {
 
 ---
 
-### Task 11b.4.16: Update features/README.md - 🔲 PENDING
+### Task 11b.4.16: Update features/README.md - ✅ COMPLETE
 **Priority**: HIGH
 **Estimated Time**: 15 minutes
-**Actual Time**:
-**Status**: 🔲 PENDING
+**Actual Time**: 12 minutes
+**Status**: ✅ COMPLETE
 **Depends On**: Task 11b.4.14 ✅
 
 **Objective**: Update features README with `-p` flag examples
 
 **File**: `examples/script-users/features/README.md`
 
-**Update Strategy**: Same as Task 11b.4.15
-- Replace all `-c path/to/config.toml` with `-p profile`
-- Show appropriate profile for each feature
+**Changes Made**:
+
+1. **agent-basics.lua** (lines 27-33):
+   - Changed from `OPENAI_API_KEY=$OPENAI_API_KEY ./target/debug/llmspell run`
+   - To: `llmspell -p providers run`
+   - Added alternative: "Or with debug logging: `-p development`"
+
+2. **state-persistence.lua** (lines 66-72):
+   - Changed from `-c examples/script-users/configs/state-enabled.toml`
+   - To: `llmspell -p state run`
+   - Added alternative: "Or with sessions (includes state + hooks + events): `-p sessions`"
+
+3. **provider-info.lua** (lines 81-87):
+   - Added explicit profile-free command: `llmspell run` (no -p needed)
+   - Added alternative: "Or with providers profile to show configured details: `-p providers`"
+
+4. **Common Issues Section** (lines 125-145):
+   - **API Key Not Set**: Added environment variable setup + providers profile usage
+   - **New: State Not Available**: Added section showing `-p state` and `-p sessions` options
+   - Preserved existing method name and scope guidance
 
 **Validation**:
-- [ ] All run commands use `-p` flags
-- [ ] Features correctly mapped to profiles
+- [x] All run commands use `-p` flags or show no-profile option
+- [x] Features correctly mapped to profiles (providers, development, state, sessions)
+- [x] Alternatives shown for different use cases (debug, full sessions)
+
+**Insights**:
+- **Progressive Options**: Shows basic profile first, then alternatives (development for debug, sessions for full features)
+- **No-Profile Cases**: provider-info works without profile, shows this explicitly
+- **Troubleshooting Improved**: Added "State Not Available" section with profile solutions
+- **Environment Variable Emphasis**: API key setup now integrated with profile usage
 
 ---
 
