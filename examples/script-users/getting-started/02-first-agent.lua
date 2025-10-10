@@ -19,11 +19,11 @@
 --
 -- Prerequisites:
 --   • LLMSpell installed and built
---   • Provider configured (see configs/example-providers.toml)
+--   • API key: OPENAI_API_KEY or ANTHROPIC_API_KEY environment variable
 --   • Network connectivity for API calls
 --
 -- HOW TO RUN:
--- ./target/debug/llmspell -c examples/script-users/configs/example-providers.toml \
+-- ./target/debug/llmspell -p providers \
 --   run examples/script-users/getting-started/02-first-agent.lua
 --
 -- EXPECTED OUTPUT:
