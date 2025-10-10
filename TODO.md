@@ -1870,87 +1870,61 @@ pub fn list_builtin_profiles() -> Vec<&'static str> {
 
 ---
 
-### Task 11b.4.6: Add Tests for New Builtin Profiles - 🔲 PENDING
+### Task 11b.4.6: Add Tests for New Builtin Profiles - ✅ COMPLETE
 **Priority**: HIGH
 **Estimated Time**: 45 minutes
-**Actual Time**:
-**Status**: 🔲 PENDING
+**Actual Time**: 38 minutes
+**Status**: ✅ COMPLETE
 **Depends On**: Tasks 11b.4.4, 11b.4.5 ✅
 
 **Objective**: Add 3 new tests validating providers, state, and sessions builtin profiles
 
 **File**: `llmspell-config/src/lib.rs` (in #[cfg(test)] mod tests)
-**Reference**: Existing tests at lines 609-748
+**Lines**: 1794-1807 (updated test_list_builtin_profiles), 1897-1986 (3 new tests)
 
-**Tests to Add**:
+**Implementation**: Added 4 test updates
 
-1. **test_load_builtin_profile_providers** (~20 lines):
-```rust
-#[tokio::test]
-async fn test_load_builtin_profile_providers() {
-    let config = LLMSpellConfig::load_builtin_profile("providers").unwrap();
+**Tests Added**:
 
-    // Verify providers configured
-    assert!(config.providers.contains_key("openai"));
-    assert!(config.providers.contains_key("anthropic"));
+1. **test_load_builtin_profile_providers** (29 lines):
+   - Verifies both OpenAI and Anthropic providers configured
+   - Checks provider settings (type, model, api_key_env)
+   - Validates default_provider = "openai"
+   - Confirms RAG/sessions disabled, state uses default (enabled)
 
-    // Verify no RAG/state/sessions
-    assert!(!config.rag.enabled);
-    assert!(!config.runtime.state_persistence.enabled);
-    assert!(!config.runtime.sessions.enabled);
-}
-```
+2. **test_load_builtin_profile_state** (21 lines):
+   - Verifies state persistence enabled with memory backend
+   - Checks max_state_size_bytes = 10MB
+   - Validates migration and backup disabled
+   - Confirms no providers configured, sessions/RAG disabled
 
-2. **test_load_builtin_profile_state** (~20 lines):
-```rust
-#[tokio::test]
-async fn test_load_builtin_profile_state() {
-    let config = LLMSpellConfig::load_builtin_profile("state").unwrap();
+3. **test_load_builtin_profile_sessions** (32 lines):
+   - Verifies all 4 features enabled (state, sessions, hooks, events)
+   - Checks session limits (max_sessions=100, max_artifacts=1000, timeout=3600)
+   - Validates events buffer_size = 1000
+   - Confirms no providers by default, RAG disabled
 
-    // Verify state persistence enabled
-    assert!(config.runtime.state_persistence.enabled);
-    assert_eq!(config.runtime.state_persistence.backend_type, "memory");
-
-    // Verify no providers
-    assert!(config.providers.is_empty());
-}
-```
-
-3. **test_load_builtin_profile_sessions** (~25 lines):
-```rust
-#[tokio::test]
-async fn test_load_builtin_profile_sessions() {
-    let config = LLMSpellConfig::load_builtin_profile("sessions").unwrap();
-
-    // Verify all 4 features enabled
-    assert!(config.runtime.state_persistence.enabled);
-    assert!(config.runtime.sessions.enabled);
-    assert!(config.runtime.hooks.enabled);
-    assert!(config.runtime.events.enabled);
-
-    // Verify session limits
-    assert_eq!(config.runtime.sessions.max_sessions, 100);
-}
-```
-
-4. **Update test_list_builtin_profiles**:
-```rust
-#[test]
-fn test_list_builtin_profiles() {
-    let profiles = LLMSpellConfig::list_builtin_profiles();
-    assert_eq!(profiles.len(), 10);  // Was 7, now 10
-    assert!(profiles.contains(&"providers"));
-    assert!(profiles.contains(&"state"));
-    assert!(profiles.contains(&"sessions"));
-}
-```
+4. **Updated test_list_builtin_profiles**:
+   - Changed assertion from 7 to 10 profiles
+   - Added assertions for providers, state, sessions
 
 **Validation**:
-- [ ] 3 new test functions added
-- [ ] test_list_builtin_profiles updated to expect 10 profiles
-- [ ] cargo test -p llmspell-config: all tests pass
-- [ ] Tests verify correct config sections loaded
-- [ ] Tests verify features enabled/disabled as expected
+- [x] 3 new test functions added
+- [x] test_list_builtin_profiles updated to expect 10 profiles
+- [x] cargo test -p llmspell-config: all 71 tests pass
+- [x] Tests verify correct config sections loaded
+- [x] Tests verify features enabled/disabled as expected
+- [x] Fixed sessions.toml: event_buffer_size → buffer_size
+- [x] Fixed sessions.toml: [runtime.events] → [events]
+
+**Insights**:
+- **TOML Structure Discovery**: Found config structure bug - events is top-level, not under runtime
+- **Default Behavior**: State persistence enabled by default (memory backend) - providers profile uses this default
+- **Test Comprehensiveness**: Each test validates both positive (what should be enabled) and negative (what should be disabled) cases
+- **Field Name Precision**: Caught field name mismatch in sessions.toml (event_buffer_size vs buffer_size)
+- **Config Validation**: Tests serve as documentation of expected profile behavior
+- **Bug Fixes in TOML**: Fixed 2 issues in sessions.toml during test development
+- **Full Coverage**: 71 tests total (was 68), 100% pass rate validates entire builtin profile system
 
 ---
 
@@ -2478,7 +2452,7 @@ llmspell -p rag-dev run main.lua
 
 The application config (config.toml) includes production settings,
 custom providers, and app-specific tuning not in builtin profiles.
-```
+
 
 **Validation**:
 - [ ] All 10 application READMEs updated

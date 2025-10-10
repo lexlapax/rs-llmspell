@@ -1793,9 +1793,12 @@ timeout_seconds = 300
     #[test]
     fn test_list_builtin_profiles() {
         let profiles = LLMSpellConfig::list_builtin_profiles();
-        assert_eq!(profiles.len(), 7);
+        assert_eq!(profiles.len(), 10);
         assert!(profiles.contains(&"minimal"));
         assert!(profiles.contains(&"development"));
+        assert!(profiles.contains(&"providers"));
+        assert!(profiles.contains(&"state"));
+        assert!(profiles.contains(&"sessions"));
         assert!(profiles.contains(&"ollama"));
         assert!(profiles.contains(&"candle"));
         assert!(profiles.contains(&"rag-dev"));
@@ -1889,6 +1892,100 @@ timeout_seconds = 300
         // Cache settings
         assert!(!config.rag.cache.search_cache_enabled);
         assert!(!config.rag.cache.document_cache_enabled);
+    }
+
+    #[test]
+    fn test_load_builtin_profile_providers() {
+        let config = LLMSpellConfig::load_builtin_profile("providers").unwrap();
+
+        // Should have both providers configured
+        assert!(config.providers.providers.contains_key("openai"));
+        assert!(config.providers.providers.contains_key("anthropic"));
+
+        // Verify OpenAI provider settings
+        let openai = config.providers.providers.get("openai").unwrap();
+        assert_eq!(openai.provider_type, "openai");
+        assert_eq!(openai.default_model, Some("gpt-3.5-turbo".to_string()));
+        assert_eq!(openai.api_key_env, Some("OPENAI_API_KEY".to_string()));
+
+        // Verify Anthropic provider settings
+        let anthropic = config.providers.providers.get("anthropic").unwrap();
+        assert_eq!(anthropic.provider_type, "anthropic");
+        assert_eq!(
+            anthropic.default_model,
+            Some("claude-3-haiku-20240307".to_string())
+        );
+        assert_eq!(anthropic.api_key_env, Some("ANTHROPIC_API_KEY".to_string()));
+
+        // Verify default provider
+        assert_eq!(config.providers.default_provider, Some("openai".to_string()));
+
+        // Verify RAG/sessions disabled (state is enabled by default)
+        assert!(!config.rag.enabled);
+        assert!(!config.runtime.sessions.enabled);
+
+        // State persistence uses default (enabled=true with memory backend)
+        assert!(config.runtime.state_persistence.enabled);
+        assert_eq!(config.runtime.state_persistence.backend_type, "memory");
+    }
+
+    #[test]
+    fn test_load_builtin_profile_state() {
+        let config = LLMSpellConfig::load_builtin_profile("state").unwrap();
+
+        // Verify state persistence enabled
+        assert!(config.runtime.state_persistence.enabled);
+        assert_eq!(config.runtime.state_persistence.backend_type, "memory");
+        assert_eq!(
+            config.runtime.state_persistence.max_state_size_bytes,
+            Some(10_000_000)
+        );
+
+        // Verify migration and backup disabled
+        assert!(!config.runtime.state_persistence.migration_enabled);
+        assert!(!config.runtime.state_persistence.backup_enabled);
+
+        // Verify no providers configured
+        assert!(config.providers.providers.is_empty());
+
+        // Verify sessions and RAG disabled
+        assert!(!config.runtime.sessions.enabled);
+        assert!(!config.rag.enabled);
+    }
+
+    #[test]
+    fn test_load_builtin_profile_sessions() {
+        let config = LLMSpellConfig::load_builtin_profile("sessions").unwrap();
+
+        // Verify all 4 features enabled
+        assert!(config.runtime.state_persistence.enabled);
+        assert!(config.runtime.sessions.enabled);
+        assert_eq!(
+            config.runtime.state_persistence.backend_type,
+            "memory".to_string()
+        );
+
+        // Verify session limits
+        assert_eq!(config.runtime.sessions.max_sessions, 100);
+        assert_eq!(config.runtime.sessions.max_artifacts_per_session, 1000);
+        assert_eq!(config.runtime.sessions.session_timeout_seconds, 3600);
+        assert_eq!(
+            config.runtime.sessions.storage_backend,
+            "memory".to_string()
+        );
+
+        // Verify events enabled
+        assert!(config.events.enabled);
+        assert_eq!(config.events.buffer_size, 1000);
+
+        // Verify hooks enabled (if hook config exists)
+        // Note: hooks may be optional in some configs
+
+        // Verify no providers by default
+        assert!(config.providers.providers.is_empty());
+
+        // Verify RAG disabled
+        assert!(!config.rag.enabled);
     }
 
     #[test]

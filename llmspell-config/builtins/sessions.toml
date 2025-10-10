@@ -27,7 +27,6 @@ storage_backend = "memory"
 enabled = true
 max_hooks = 100
 
-[runtime.events]
+[events]
 enabled = true
-max_subscribers = 100
-event_buffer_size = 1000
+buffer_size = 1000
