@@ -178,7 +178,7 @@ impl ImageProcessorTool {
     pub fn new(config: ImageProcessorConfig, sandbox: Arc<FileSandbox>) -> Self {
         Self {
             metadata: ComponentMetadata::new(
-                "image_processor".to_string(),
+                "image-processor".to_string(),
                 "Image file processing for format conversion, resizing, and metadata extraction"
                     .to_string(),
             ),
@@ -222,7 +222,7 @@ impl ImageProcessorTool {
         // Get file size
         let file_metadata = std::fs::metadata(&safe_path).map_err(|e| LLMSpellError::Tool {
             message: format!("Failed to read file metadata: {e}"),
-            tool_name: Some("image_processor".to_string()),
+            tool_name: Some("image-processor".to_string()),
             source: None,
         })?;
 
@@ -235,7 +235,7 @@ impl ImageProcessorTool {
                     "File size ({} bytes) exceeds maximum allowed size ({} bytes)",
                     file_size, self.config.max_file_size
                 ),
-                tool_name: Some("image_processor".to_string()),
+                tool_name: Some("image-processor".to_string()),
                 source: None,
             });
         }
@@ -281,7 +281,7 @@ impl ImageProcessorTool {
 
         Err(LLMSpellError::Tool {
             message: "Image resizing is not implemented in this basic version. Image processing capabilities will be added in Phase 3+".to_string(),
-            tool_name: Some("image_processor".to_string()),
+            tool_name: Some("image-processor".to_string()),
             source: None,
         })
     }
@@ -299,7 +299,7 @@ impl ImageProcessorTool {
         if !self.config.supported_formats.contains(&target_format) {
             return Err(LLMSpellError::Tool {
                 message: format!("Conversion to {target_format:?} format is not supported"),
-                tool_name: Some("image_processor".to_string()),
+                tool_name: Some("image-processor".to_string()),
                 source: None,
             });
         }
@@ -309,7 +309,7 @@ impl ImageProcessorTool {
 
         Err(LLMSpellError::Tool {
             message: "Image format conversion is not implemented in this basic version. Full image processing will be added in Phase 3+".to_string(),
-            tool_name: Some("image_processor".to_string()),
+            tool_name: Some("image-processor".to_string()),
             source: None,
         })
     }
@@ -330,7 +330,7 @@ impl ImageProcessorTool {
 
         Err(LLMSpellError::Tool {
             message: "Image cropping is not implemented in this basic version. Image processing capabilities will be added in Phase 3+".to_string(),
-            tool_name: Some("image_processor".to_string()),
+            tool_name: Some("image-processor".to_string()),
             source: None,
         })
     }
@@ -349,7 +349,7 @@ impl ImageProcessorTool {
 
         Err(LLMSpellError::Tool {
             message: "Image rotation is not implemented in this basic version. Image processing capabilities will be added in Phase 3+".to_string(),
-            tool_name: Some("image_processor".to_string()),
+            tool_name: Some("image-processor".to_string()),
             source: None,
         })
     }
@@ -369,7 +369,7 @@ impl ImageProcessorTool {
 
         Err(LLMSpellError::Tool {
             message: "Thumbnail generation is not implemented in this basic version. Image processing capabilities will be added in Phase 3+".to_string(),
-            tool_name: Some("image_processor".to_string()),
+            tool_name: Some("image-processor".to_string()),
             source: None,
         })
     }
@@ -749,7 +749,7 @@ impl Tool for ImageProcessorTool {
 
     fn schema(&self) -> ToolSchema {
         ToolSchema::new(
-            "image_processor".to_string(),
+            "image-processor".to_string(),
             "Process image files for format conversion, resizing, and metadata extraction"
                 .to_string(),
         )
@@ -1124,11 +1124,11 @@ mod tests {
         let tool = create_test_image_processor();
 
         let metadata = tool.metadata();
-        assert_eq!(metadata.name, "image_processor");
+        assert_eq!(metadata.name, "image-processor");
         assert!(metadata.description.contains("Image file processing"));
 
         let schema = tool.schema();
-        assert_eq!(schema.name, "image_processor");
+        assert_eq!(schema.name, "image-processor");
         assert_eq!(tool.category(), ToolCategory::Media);
         assert_eq!(tool.security_level(), SecurityLevel::Safe);
 

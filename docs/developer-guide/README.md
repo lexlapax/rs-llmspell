@@ -25,7 +25,7 @@
 
 ---
 
-## 📖 The 6 Essential Guides (Fully Consolidated)
+## 📖 The 7 Essential Guides (Fully Consolidated)
 
 ### 0. **[Feature Flags Migration](feature-flags-migration.md)** ⚠️
 **BREAKING CHANGES - Read First (Phase 10.17.5+)**
@@ -101,6 +101,18 @@
 - ✅ Testing and environment configuration
 
 *Essential for maintaining consistent, performant instrumentation across the codebase*
+
+### 6. **[Bridge Pattern Guide](bridge-pattern-guide.md)** 🌉
+**Typed Rust Structs for Script-to-Rust Configuration (Phase 11a.8)**
+- ✅ Core principles: typed structs, parser separation, zero serialization overhead
+- ✅ Anti-patterns eliminated (JSON → HashMap chains)
+- ✅ Implementation checklist with step-by-step guidance
+- ✅ Common reusable parsers (ContextScope, InheritancePolicy, ModelConfig)
+- ✅ Complete examples from real implementations (6 tasks)
+- ✅ Testing requirements and troubleshooting guide
+- ✅ Design decisions reference (when to reuse vs create types)
+
+*Critical for all bridge development: Eliminates JSON anti-patterns, ensures type safety, provides compile-time validation*
 
 ---
 
@@ -198,6 +210,14 @@ cargo build --release                       # Minimal (19MB, core only)
 1. production-guide.md → All sections
 2. examples/script-users/applications/
 3. Deploy with monitoring
+```
+
+### 🌉 Bridge Developer (2-3 hours)
+```
+1. developer-guide.md → Core Patterns
+2. bridge-pattern-guide.md → All sections
+3. Review completed examples (Tasks 11a.8.1-11a.8.6)
+4. Implement typed bridge method
 ```
 
 ---

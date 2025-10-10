@@ -1,8 +1,8 @@
 # Architecture Decision Records (ADRs)
 
-**Version**: 0.8.0  
-**Last Updated**: December 2024  
-**Validation**: Cross-referenced with phase design documents (phase-01 through phase-08)
+**Version**: 0.11.1
+**Last Updated**: October 2025
+**Validation**: Cross-referenced with phase design documents (phase-01 through phase-11a)
 
 > **📋 Decision Log**: Consolidated record of all significant architecture decisions made throughout LLMSpell development, showing how decisions evolved and sometimes reversed across phases.
 
@@ -18,8 +18,9 @@
 6. [Phase 6: Session Management Decisions](#phase-6-session-management-decisions)
 7. [Phase 7: API Standardization Decisions](#phase-7-api-standardization-decisions)
 8. [Phase 8: RAG System Decisions](#phase-8-rag-system-decisions)
-9. [Cross-Cutting Decisions](#cross-cutting-decisions)
-10. [Decision Evolution & Reversals](#decision-evolution--reversals)
+9. [Phase 11: API Refinement Decisions](#phase-11-api-refinement-decisions)
+10. [Cross-Cutting Decisions](#cross-cutting-decisions)
+11. [Decision Evolution & Reversals](#decision-evolution--reversals)
 
 ---
 
@@ -443,7 +444,7 @@ let agent = AgentBuilder::new()
 **Context**: Complex RAG operations need simple script interface  
 **Decision**: All RAG functions take (primary, options) pattern  
 **Example**: `RAG.search(query, {k=10, tenant_id="acme"})`  
-**Rationale**: Consistent with existing Tool.invoke pattern  
+**Rationale**: Consistent with existing Tool.execute pattern  
 **Consequences**:
 - ✅ Intuitive API for users
 - ✅ Consistent across all operations
@@ -505,6 +506,143 @@ ef_construction = 200
 - ✅ Automatic resource cleanup
 - ✅ Prevents data accumulation
 - ❌ Additional scope complexity
+
+---
+
+## Phase 11: API Refinement Decisions
+
+### ADR-042: Unified execute() Method Naming
+
+**Date**: October 2025 (Phase 11a.11)
+**Status**: Accepted
+**Context**: API method naming was inconsistent between Rust core traits and script language bindings
+**Problem**:
+- Rust `BaseAgent` trait: `execute()` only
+- Rust `Tool` trait: inherits `execute()` only
+- Rust `Workflow` trait: `execute()` only
+- Lua Tool binding: `invoke()` only (inconsistent)
+- Lua Agent binding: both `invoke()` and `execute()` (confusing)
+- Documentation: mixed references to both methods
+
+**Decision**: Standardize all component execution methods on `execute()` naming across all language bindings
+
+**Rationale**:
+1. **Consistency with Core**: Rust core traits universally use `execute()`
+2. **Semantic Clarity**: "Execute a component" is clearer than "invoke a component"
+3. **Future-Proof**: Ensures Python/JavaScript bindings follow same pattern
+4. **Cognitive Load**: Single method name reduces mental overhead
+5. **Documentation**: Easier to document and teach with uniform API
+
+**Implementation** (Phase 11a.11):
+- Lua: `Tool.invoke()` → `Tool.execute()`
+- Lua: Removed `agent:invoke()` (kept `agent:execute()` only)
+- Lua: Updated 20 example files (66 replacements total)
+- JavaScript: Updated stub comments to reference `execute()`
+- Documentation: 7 user guide files + 1 technical doc updated
+
+**Breaking Changes**:
+- `Tool.invoke(name, params)` → `Tool.execute(name, params)`
+- `agent:invoke(input)` removed (use `agent:execute(input)`)
+
+**Migration Path**:
+- No deprecation period (pre-1.0, breaking changes acceptable per project policy)
+- All examples updated atomically to prevent confusion
+
+**Performance Impact**: None (API rename only, implementation unchanged)
+
+**Consequences**:
+- ✅ Consistent API across all components (Tool, Agent, Workflow)
+- ✅ Matches Rust core trait naming conventions
+- ✅ Clearer mental model: "execute a component instance"
+- ✅ Future-proof for Python/JavaScript bindings (Phase 12+)
+- ✅ Reduced documentation burden (single method to document)
+- ✅ Easier for new users to learn
+- ❌ Breaking change for existing Lua scripts (acceptable pre-1.0)
+- ❌ Lost semantic distinction between registry-based vs instance-based calls (accepted trade-off)
+
+**Related ADRs**:
+- ADR-023: retrieve() → get() Standardization (similar API naming standardization in Phase 7)
+- ADR-001: BaseAgent as Universal Foundation (defines core execute() method)
+
+**Validation**:
+- 66 method call updates across 20 Lua example files
+- All workspace tests passing (1,832+ tests)
+- Zero clippy warnings
+- Examples validated across beginner/intermediate/advanced levels
+
+---
+
+### ADR-043: Removal of Custom Workflow Steps
+
+**Date**: October 2025 (Phase 11a.12)
+**Status**: Accepted
+**Context**: Custom workflow steps (StepType::Custom) existed in codebase but were incomplete
+
+**Problem**:
+1. **Mock Implementation**: execute_custom_step() only returned hardcoded strings
+2. **No Real Functionality**: 15 hardcoded function names, no user extension mechanism
+3. **Documentation Lies**: Rust docs showed CustomStep trait that didn't exist
+4. **API Confusion**: Exposed via Lua API but didn't work as expected
+5. **Architectural Obsolescence**: Phase 3 replaced all custom functions with tools/agents
+
+**Decision**: Remove StepType::Custom variant entirely, educate users on tool/agent/workflow patterns
+
+**Rationale**:
+1. **Tools Provide Superiority**: Tools are reusable, testable, discoverable, documented
+2. **Agents Handle Reasoning**: Complex logic better suited to LLM-based agents
+3. **Workflows Enable Composition**: Conditional/loop/nested workflows cover orchestration
+4. **Zero Real Functionality Lost**: Custom steps were 100% mock implementation
+5. **Code Quality**: Removes 200+ lines of dead/misleading code
+6. **User Clarity**: Eliminates confusion about unimplemented features
+
+**Implementation** (Phase 11a.12):
+- Removed StepType::Custom variant from traits.rs (7 lines)
+- Removed execute_custom_step() mock method (72 lines)
+- Removed all Custom match arms from step_executor.rs (~70 lines)
+- Removed custom step parsing from Lua bindings (18 lines)
+- Updated 9 test files to use Tool/Agent steps
+- Fixed Rust API documentation (llmspell-workflows.md)
+- Added 240-line migration guide to Lua API docs
+- Fixed misleading example comment in 03-first-workflow.lua
+
+**Breaking Changes**:
+- `StepType::Custom { function_name, parameters }` removed
+- Lua API: `{ type = "custom", function = "...", parameters = {...} }` removed
+- **Impact**: ZERO - Feature was never functional
+
+**Migration Path**:
+- Custom transformations → Create tools with Tool.register()
+- Custom reasoning → Create agents with Agent.create()
+- Custom branching → Use Workflow.conditional()
+- Custom iteration → Use Workflow.loop()
+- Custom composition → Use nested workflows
+
+**Alternatives Considered**:
+1. **Implement CustomStep trait** - Would duplicate tool/agent functionality (rejected)
+2. **Document as unimplemented** - Keeps dead code, doesn't address root cause (rejected)
+3. **Deprecation period** - Unnecessary since feature never worked (rejected)
+
+**Consequences**:
+- ✅ Cleaner codebase (-200 lines dead code)
+- ✅ No user confusion about unimplemented features
+- ✅ Aligns with Phase 3 architectural decision
+- ✅ Documentation accuracy restored
+- ✅ Users learn superior patterns (tools/agents/workflows)
+- ✅ Future maintainability improved
+- ✅ Zero breaking changes (feature never worked)
+
+**Performance Impact**: None (mock execution was already negligible)
+
+**Related ADRs**:
+- ADR-001: BaseAgent foundation (agents as primary reasoning primitive)
+- ADR-004: Synchronous Script Bridge (tools/agents bridge to Lua)
+- ADR-042: Unified execute() naming (consistent API across components)
+
+**Validation**:
+- 71 workflow tests pass (including tracing tests migrated to Tool steps)
+- 0 clippy warnings in llmspell-workflows
+- Migration guide demonstrates 6 patterns
+- All examples execute successfully
 
 ---
 
@@ -646,4 +784,4 @@ ef_construction = 200
 
 ---
 
-*This document represents the consolidated architectural decisions from Phases 0-8 of LLMSpell development, validated against phase design documents.*
+*This document represents the consolidated architectural decisions from Phases 0-11 of LLMSpell development, validated against phase design documents.*

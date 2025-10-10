@@ -202,7 +202,7 @@ impl DatabaseConnectorTool {
         Ok(Self {
             config,
             metadata: ComponentMetadata::new(
-                "database_connector".to_string(),
+                "database-connector".to_string(),
                 "Database connector tool with support for PostgreSQL, MySQL, and SQLite"
                     .to_string(),
             ),
@@ -693,7 +693,7 @@ impl BaseAgent for DatabaseConnectorTool {
         // Use SafeErrorHandler to sanitize error messages
         let context = ErrorContext::new()
             .with_operation("database_query")
-            .with_metadata("tool", "database_connector");
+            .with_metadata("tool", "database-connector");
 
         let safe_response = self.error_handler.handle_llmspell_error(&error, &context);
 
@@ -708,7 +708,7 @@ impl BaseAgent for DatabaseConnectorTool {
 impl Tool for DatabaseConnectorTool {
     fn schema(&self) -> ToolSchema {
         ToolSchema::new(
-            "database_connector".to_string(),
+            "database-connector".to_string(),
             "Connect to and query databases (PostgreSQL, MySQL, SQLite)".to_string(),
         )
         .with_parameter(ParameterDef {
@@ -768,7 +768,7 @@ mod tests {
     fn test_database_connector_tool_creation() {
         let config = DatabaseConnectorConfig::default();
         let tool = DatabaseConnectorTool::new(config).unwrap();
-        assert_eq!(tool.metadata().name, "database_connector");
+        assert_eq!(tool.metadata().name, "database-connector");
     }
     #[test]
     fn test_tool_metadata() {
@@ -779,7 +779,7 @@ mod tests {
         assert_eq!(tool.security_level(), SecurityLevel::Restricted);
 
         let schema = tool.schema();
-        assert_eq!(schema.name, "database_connector");
+        assert_eq!(schema.name, "database-connector");
         assert!(!schema.parameters.is_empty());
     }
     #[test]

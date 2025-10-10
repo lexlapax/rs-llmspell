@@ -5,11 +5,11 @@
 -- Complexity Level: BEGINNER
 -- Real-World Use Case: File management and basic I/O operations
 --
--- Purpose: Learn fundamental tool invocation patterns with file_operations tool.
+-- Purpose: Learn fundamental tool invocation patterns with file-operations tool.
 --          Demonstrates how to call tools, pass parameters, and handle results.
 --          This is the foundation for all tool-based automation in LLMSpell.
--- Architecture: Synchronous tool invocation via Tool.invoke()
--- Crates Showcased: llmspell-tools (file_operations), llmspell-bridge
+-- Architecture: Synchronous tool invocation via Tool.execute()
+-- Crates Showcased: llmspell-tools (file-operations), llmspell-bridge
 -- Key Features:
 --   • Tool invocation syntax
 --   • Parameter passing patterns
@@ -35,13 +35,13 @@
 
 print("=== LLMSpell: Your First Tool ===")
 print("Example 01: BEGINNER - Learning tool invocation patterns")
-print("Showcasing: file_operations tool for basic I/O\n")
+print("Showcasing: file-operations tool for basic I/O\n")
 
 -- LLMSpell provides 34+ tools out of the box
--- We'll start with file_operations for create, read, and check operations
+-- We'll start with file-operations for create, read, and check operations
 
 print("1. Creating a test file...")
-local result = Tool.invoke("file_operations", {
+local result = Tool.execute("file-operations", {
     operation = "write",
     path = "/tmp/my_first_file.txt",
     input = "Hello from LLMSpell! This is my first tool usage."
@@ -57,7 +57,7 @@ end
 
 print()
 print("2. Reading the file back...")
-local read_result = Tool.invoke("file_operations", {
+local read_result = Tool.execute("file-operations", {
     operation = "read",
     path = "/tmp/my_first_file.txt"
 })
@@ -71,7 +71,7 @@ end
 
 print()
 print("3. Checking if file exists...")
-local exists_result = Tool.invoke("file_operations", {
+local exists_result = Tool.execute("file-operations", {
     operation = "exists",
     path = "/tmp/my_first_file.txt"
 })

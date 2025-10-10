@@ -520,6 +520,6 @@ async fn test_tool_metadata() {
 
     // Verify schema parameters
     let schema = tool.schema();
-    assert_eq!(schema.name, "datetime_handler");
+    assert_eq!(schema.name, "datetime-handler");
     assert!(schema.parameters.len() >= 9); // Should have all the parameters
 }

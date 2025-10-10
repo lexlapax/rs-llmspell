@@ -2015,15 +2015,15 @@ impl<P: Protocol + 'static> IntegratedKernel<P> {
             // Fallback to placeholder tools if no registry available
             let placeholders = vec![
                 ("calculator", "utility"),
-                ("file_operations", "filesystem"),
-                ("web_scraper", "web"),
-                ("json_processor", "data"),
-                ("text_analyzer", "analysis"),
-                ("data_converter", "data"),
-                ("image_processor", "media"),
-                ("pdf_generator", "utility"),
-                ("email_sender", "communication"),
-                ("database_connector", "data"),
+                ("file-operations", "filesystem"),
+                ("web-scraper", "web"),
+                ("json-processor", "data"),
+                ("text-analyzer", "analysis"),
+                ("data-converter", "data"),
+                ("image-processor", "media"),
+                ("pdf-generator", "utility"),
+                ("email-sender", "communication"),
+                ("database-connector", "data"),
             ];
 
             if let Some(category) = category_filter {
@@ -2327,7 +2327,7 @@ impl<P: Protocol + 'static> IntegratedKernel<P> {
                     }
                 }
             }
-            "file_operations" => {
+            "file-operations" => {
                 // File operations require 'action' and 'path'
                 if let Some(obj) = params.as_object() {
                     if !obj.contains_key("action") {
@@ -2360,10 +2360,10 @@ impl<P: Protocol + 'static> IntegratedKernel<P> {
         } else {
             vec![
                 "calculator".to_string(),
-                "file_operations".to_string(),
-                "web_scraper".to_string(),
-                "json_processor".to_string(),
-                "text_analyzer".to_string(),
+                "file-operations".to_string(),
+                "web-scraper".to_string(),
+                "json-processor".to_string(),
+                "text-analyzer".to_string(),
             ]
         };
 

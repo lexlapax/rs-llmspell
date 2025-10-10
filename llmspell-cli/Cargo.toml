@@ -37,7 +37,7 @@ nix = { version = "0.29", features = ["signal", "process"] }
 rustyline = "14.0"
 
 [features]
-default = []  # Truly minimal binary - no heavy external dependencies
+default = ["lua"]  # Backward compatibility - defaults to Lua (users can opt-out with --no-default-features)
 common = ["llmspell-bridge/common", "lua"]  # Convenient preset for typical usage
 full = ["llmspell-bridge/full", "lua", "javascript"]  # All features enabled
 

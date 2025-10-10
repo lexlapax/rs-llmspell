@@ -3194,14 +3194,14 @@ max_retries = 3
 **3. Security Architecture Validation:**
 ```lua
 -- VALIDATION: All file operations go through bridge sandbox
-local file_ops_result = Tool.invoke("file_operations", {
+local file_ops_result = Tool.execute("file_operations", {
     operation = "write",
     path = "/tmp/webapp-projects/generated/package.json",  -- ALLOWED path
     content = package_json_content
 })
 
 -- VALIDATION: Security violations properly blocked
-local security_test = Tool.invoke("file_operations", {
+local security_test = Tool.execute("file_operations", {
     operation = "write", 
     path = "/etc/passwd",  -- BLOCKED path - should return error
     content = "malicious"

@@ -292,7 +292,7 @@ impl Tool for WebSearchTool {
 
     fn schema(&self) -> ToolSchema {
         ToolSchema::new(
-            "web_search".to_string(),
+            "web-searcher".to_string(),
             "Search the web using Google, Bing, or DuckDuckGo".to_string(),
         )
         .with_parameter(ParameterDef {

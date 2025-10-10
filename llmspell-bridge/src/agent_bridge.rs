@@ -11,18 +11,206 @@ use llmspell_agents::monitoring::{
     AgentMetrics, AlertConfig, AlertManager, EventLogger, HealthCheck, MetricRegistry,
     PerformanceMonitor,
 };
-use llmspell_agents::AgentFactory;
+use llmspell_agents::{AgentConfig, AgentFactory};
 use llmspell_core::execution_context::{
     ContextScope, ExecutionContextBuilder, InheritancePolicy, SecurityContext, SharedMemory,
 };
-use llmspell_core::types::{AgentInput, AgentOutput, ComponentId};
+#[cfg(test)]
+use llmspell_core::types::ComponentId;
+use llmspell_core::types::{AgentInput, AgentOutput};
 use llmspell_core::{Agent, ExecutionContext, LLMSpellError, Result, Tool};
 use llmspell_kernel::state::{StateManager, StateScope};
+use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::sync::Arc;
 use std::time::Duration;
 use tokio::sync::mpsc;
 use tracing::{debug, info, warn};
+
+/// Routing strategy for composite agents
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "lowercase")]
+pub enum RoutingStrategy {
+    /// Execute delegate agents sequentially
+    Sequential,
+    /// Execute delegate agents in parallel
+    Parallel,
+    /// Execute with voting/consensus mechanism
+    Vote {
+        /// Minimum votes required for consensus (defaults to majority)
+        #[serde(skip_serializing_if = "Option::is_none")]
+        threshold: Option<usize>,
+    },
+    /// Custom routing strategy
+    Custom {
+        /// Name of the custom strategy
+        name: String,
+    },
+}
+
+impl Default for RoutingStrategy {
+    fn default() -> Self {
+        Self::Sequential
+    }
+}
+
+/// Configuration for composite agent routing
+#[derive(Debug, Clone, Serialize, Deserialize, Default)]
+pub struct RoutingConfig {
+    /// The routing strategy to use
+    #[serde(default)]
+    pub strategy: RoutingStrategy,
+    /// Optional fallback agent if routing fails
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub fallback_agent: Option<String>,
+    /// Optional timeout in milliseconds
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub timeout_ms: Option<u64>,
+}
+
+/// Security context configuration
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct SecurityContextConfig {
+    /// List of permissions
+    pub permissions: Vec<String>,
+    /// Security level
+    pub level: String,
+}
+
+impl Default for SecurityContextConfig {
+    fn default() -> Self {
+        Self {
+            permissions: Vec::new(),
+            level: "default".to_string(),
+        }
+    }
+}
+
+/// Configuration for creating an execution context
+#[derive(Debug, Clone, Serialize, Deserialize, Default)]
+pub struct ExecutionContextConfig {
+    /// Conversation identifier
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub conversation_id: Option<String>,
+    /// User identifier
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub user_id: Option<String>,
+    /// Session identifier
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub session_id: Option<String>,
+    /// Context scope
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub scope: Option<ContextScope>,
+    /// Inheritance policy
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub inheritance: Option<InheritancePolicy>,
+    /// Initial data
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub data: Option<HashMap<String, serde_json::Value>>,
+    /// Security context
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub security: Option<SecurityContextConfig>,
+}
+
+/// Configuration for creating a child context
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ChildContextConfig {
+    /// Scope for the child context
+    pub scope: ContextScope,
+    /// Inheritance policy
+    pub inheritance: InheritancePolicy,
+}
+
+impl Default for ChildContextConfig {
+    fn default() -> Self {
+        Self {
+            scope: ContextScope::Global,
+            inheritance: InheritancePolicy::Inherit,
+        }
+    }
+}
+
+/// Configuration for wrapping an agent as a tool
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ToolWrapperConfig {
+    /// Name for the wrapped tool
+    pub tool_name: String,
+    /// Tool category (defaults to Utility)
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub category: Option<llmspell_core::traits::tool::ToolCategory>,
+    /// Security level (defaults to Restricted)
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub security_level: Option<llmspell_core::traits::tool::SecurityLevel>,
+}
+
+impl Default for ToolWrapperConfig {
+    fn default() -> Self {
+        Self {
+            tool_name: String::new(),
+            category: Some(llmspell_core::traits::tool::ToolCategory::Utility),
+            security_level: Some(llmspell_core::traits::tool::SecurityLevel::Restricted),
+        }
+    }
+}
+
+/// Alert condition configuration for bridge
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(tag = "type", rename_all = "snake_case")]
+pub enum AlertConditionConfig {
+    /// Metric threshold condition
+    MetricThreshold {
+        metric_name: String,
+        operator: String,
+        threshold: f64,
+        duration_seconds: u64,
+    },
+    /// Health status condition
+    HealthStatus {
+        status: String,
+        duration_seconds: u64,
+    },
+    /// Error rate condition
+    ErrorRate {
+        rate_percent: f64,
+        duration_seconds: u64,
+    },
+}
+
+/// Alert configuration for bridge (distinct from monitoring `AlertConfig`)
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct BridgeAlertConfig {
+    /// Alert rule name
+    pub name: String,
+    /// Alert severity (info, warning, critical, emergency)
+    pub severity: String,
+    /// Condition that triggers the alert
+    pub condition: AlertConditionConfig,
+    /// Cooldown period in seconds
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub cooldown_seconds: Option<u64>,
+    /// Whether the alert is enabled
+    #[serde(default = "default_enabled")]
+    pub enabled: bool,
+}
+
+const fn default_enabled() -> bool {
+    true
+}
+
+impl Default for BridgeAlertConfig {
+    fn default() -> Self {
+        Self {
+            name: String::new(),
+            severity: "warning".to_string(),
+            condition: AlertConditionConfig::ErrorRate {
+                rate_percent: 10.0,
+                duration_seconds: 60,
+            },
+            cooldown_seconds: Some(300),
+            enabled: true,
+        }
+    }
+}
 
 /// Bridge between scripts and agents
 pub struct AgentBridge {
@@ -131,16 +319,13 @@ impl AgentBridge {
     /// # Errors
     ///
     /// Returns an error if the agent instance already exists or creation fails
-    pub async fn create_agent(
-        &self,
-        instance_name: &str,
-        agent_type: &str,
-        config: HashMap<String, serde_json::Value>,
-    ) -> Result<()> {
+    pub async fn create_agent(&self, config: AgentConfig) -> Result<()> {
+        let instance_name = config.name.clone();
+
         // Check if instance already exists
         {
             let agents = self.active_agents.read().await;
-            if agents.contains_key(instance_name) {
+            if agents.contains_key(&instance_name) {
                 return Err(LLMSpellError::Validation {
                     field: Some("instance_name".to_string()),
                     message: format!("Agent instance '{instance_name}' already exists"),
@@ -148,14 +333,11 @@ impl AgentBridge {
             }
         }
 
-        // Convert HashMap to JSON object
-        let config_json = serde_json::Value::Object(config.into_iter().collect());
-
-        // Create the agent
-        let agent = self.discovery.create_agent(agent_type, config_json).await?;
+        // Create the agent with typed config
+        let agent = self.discovery.create_agent(config).await?;
 
         // Create state machine for the agent
-        let state_machine = Arc::new(AgentStateMachine::default(instance_name.to_string()));
+        let state_machine = Arc::new(AgentStateMachine::default(instance_name.clone()));
 
         // Register in active agents, state machines, and component registry
         {
@@ -590,7 +772,7 @@ impl AgentBridge {
     pub async fn configure_agent_alerts(
         &self,
         agent_instance: &str,
-        _alert_config: serde_json::Value,
+        alert_config: BridgeAlertConfig,
     ) -> Result<()> {
         // Verify agent exists
         let _agent =
@@ -602,6 +784,11 @@ impl AgentBridge {
                 })?;
 
         // Mock alert configuration - real implementation would store per-agent configs
+        // For now, just validate the typed config was received
+        debug!(
+            "Configured alert '{}' for agent '{}' with severity '{}'",
+            alert_config.name, agent_instance, alert_config.severity
+        );
         Ok(())
     }
 
@@ -959,67 +1146,35 @@ impl AgentBridge {
     /// # Errors
     ///
     /// Returns an error if context creation fails
-    pub async fn create_context(&self, builder_config: serde_json::Value) -> Result<String> {
+    pub async fn create_context(&self, config: ExecutionContextConfig) -> Result<String> {
         let mut builder = ExecutionContextBuilder::new();
 
-        // Apply builder configuration
-        if let Some(conversation_id) = builder_config
-            .get("conversation_id")
-            .and_then(|v| v.as_str())
-        {
-            builder = builder.conversation_id(conversation_id.to_string());
+        // Apply configuration
+        if let Some(conversation_id) = config.conversation_id {
+            builder = builder.conversation_id(conversation_id);
         }
-        if let Some(user_id) = builder_config.get("user_id").and_then(|v| v.as_str()) {
-            builder = builder.user_id(user_id.to_string());
+        if let Some(user_id) = config.user_id {
+            builder = builder.user_id(user_id);
         }
-        if let Some(session_id) = builder_config.get("session_id").and_then(|v| v.as_str()) {
-            builder = builder.session_id(session_id.to_string());
+        if let Some(session_id) = config.session_id {
+            builder = builder.session_id(session_id);
         }
-
-        // Handle scope configuration
-        if let Some(scope_config) = builder_config.get("scope") {
-            let scope = Self::parse_context_scope(scope_config)?;
+        if let Some(scope) = config.scope {
             builder = builder.scope(scope);
         }
-
-        // Handle inheritance
-        if let Some(inheritance) = builder_config.get("inheritance").and_then(|v| v.as_str()) {
-            let policy = match inheritance {
-                "isolate" => InheritancePolicy::Isolate,
-                "copy" => InheritancePolicy::Copy,
-                "share" => InheritancePolicy::Share,
-                _ => InheritancePolicy::Inherit,
-            };
-            builder = builder.inheritance(policy);
+        if let Some(inheritance) = config.inheritance {
+            builder = builder.inheritance(inheritance);
         }
-
-        // Handle data fields
-        if let Some(data) = builder_config.get("data").and_then(|v| v.as_object()) {
+        if let Some(data) = config.data {
             for (key, value) in data {
-                builder = builder.data(key.clone(), value.clone());
+                builder = builder.data(key, value);
             }
         }
-
-        // Handle security context
-        if let Some(security_config) = builder_config.get("security") {
-            if let Some(permissions) = security_config
-                .get("permissions")
-                .and_then(|v| v.as_array())
-            {
-                let perms: Vec<String> = permissions
-                    .iter()
-                    .filter_map(|p| p.as_str().map(String::from))
-                    .collect();
-                let level = security_config
-                    .get("level")
-                    .and_then(|v| v.as_str())
-                    .unwrap_or("default")
-                    .to_string();
-                builder = builder.security(SecurityContext {
-                    permissions: perms,
-                    level,
-                });
-            }
+        if let Some(security) = config.security {
+            builder = builder.security(SecurityContext {
+                permissions: security.permissions,
+                level: security.level,
+            });
         }
 
         let context = Arc::new(builder.build());
@@ -1046,12 +1201,10 @@ impl AgentBridge {
     ///
     /// Returns an error if:
     /// - Parent context is not found
-    /// - Context scope parsing fails
     pub async fn create_child_context(
         &self,
         parent_id: &str,
-        scope: serde_json::Value,
-        inheritance: &str,
+        config: ChildContextConfig,
     ) -> Result<String> {
         let parent = self
             .get_context(parent_id)
@@ -1061,15 +1214,7 @@ impl AgentBridge {
                 source: None,
             })?;
 
-        let scope = Self::parse_context_scope(&scope)?;
-        let policy = match inheritance {
-            "isolate" => InheritancePolicy::Isolate,
-            "copy" => InheritancePolicy::Copy,
-            "share" => InheritancePolicy::Share,
-            _ => InheritancePolicy::Inherit,
-        };
-
-        let child = Arc::new(parent.create_child(scope, policy));
+        let child = Arc::new(parent.create_child(config.scope, config.inheritance));
         let child_id = child.id.clone();
 
         // Store child context
@@ -1129,33 +1274,14 @@ impl AgentBridge {
     }
 
     /// Set shared memory data
-    ///
-    /// # Errors
-    ///
-    /// Returns an error if scope parsing fails
-    pub fn set_shared_memory(
-        &self,
-        scope: &serde_json::Value,
-        key: String,
-        value: serde_json::Value,
-    ) -> Result<()> {
-        let scope = Self::parse_context_scope(scope)?;
-        self.shared_memory.set(scope, key, value);
-        Ok(())
+    pub fn set_shared_memory(&self, scope: &ContextScope, key: String, value: serde_json::Value) {
+        self.shared_memory.set(scope.clone(), key, value);
     }
 
     /// Get shared memory data
-    ///
-    /// # Errors
-    ///
-    /// Returns an error if scope parsing fails
-    pub fn get_shared_memory(
-        &self,
-        scope: &serde_json::Value,
-        key: &str,
-    ) -> Result<Option<serde_json::Value>> {
-        let scope = Self::parse_context_scope(scope)?;
-        Ok(self.shared_memory.get(&scope, key))
+    #[must_use]
+    pub fn get_shared_memory(&self, scope: &ContextScope, key: &str) -> Option<serde_json::Value> {
+        self.shared_memory.get(scope, key)
     }
 
     /// Execute agent with context
@@ -1239,61 +1365,6 @@ impl AgentBridge {
         Ok(rx)
     }
 
-    /// Parse context scope from JSON
-    fn parse_context_scope(scope_config: &serde_json::Value) -> Result<ContextScope> {
-        if let Some(scope_type) = scope_config.get("type").and_then(|v| v.as_str()) {
-            match scope_type {
-                "global" => Ok(ContextScope::Global),
-                "session" => {
-                    let id = scope_config
-                        .get("id")
-                        .and_then(|v| v.as_str())
-                        .ok_or_else(|| LLMSpellError::Validation {
-                            field: Some("scope.id".to_string()),
-                            message: "Session scope requires an ID".to_string(),
-                        })?;
-                    Ok(ContextScope::Session(id.to_string()))
-                }
-                "workflow" => {
-                    let id = scope_config
-                        .get("id")
-                        .and_then(|v| v.as_str())
-                        .ok_or_else(|| LLMSpellError::Validation {
-                            field: Some("scope.id".to_string()),
-                            message: "Workflow scope requires an ID".to_string(),
-                        })?;
-                    Ok(ContextScope::Workflow(id.to_string()))
-                }
-                "agent" => {
-                    let id = scope_config
-                        .get("id")
-                        .and_then(|v| v.as_str())
-                        .ok_or_else(|| LLMSpellError::Validation {
-                            field: Some("scope.id".to_string()),
-                            message: "Agent scope requires an ID".to_string(),
-                        })?;
-                    Ok(ContextScope::Agent(ComponentId::from_name(id)))
-                }
-                "user" => {
-                    let id = scope_config
-                        .get("id")
-                        .and_then(|v| v.as_str())
-                        .ok_or_else(|| LLMSpellError::Validation {
-                            field: Some("scope.id".to_string()),
-                            message: "User scope requires an ID".to_string(),
-                        })?;
-                    Ok(ContextScope::User(id.to_string()))
-                }
-                _ => Err(LLMSpellError::Validation {
-                    field: Some("scope.type".to_string()),
-                    message: format!("Unknown scope type: {scope_type}"),
-                }),
-            }
-        } else {
-            Ok(ContextScope::Global)
-        }
-    }
-
     /// Clean up context
     ///
     /// # Errors
@@ -1322,7 +1393,7 @@ impl AgentBridge {
     pub async fn wrap_agent_as_tool(
         &self,
         agent_name: &str,
-        wrapper_config: serde_json::Value,
+        config: ToolWrapperConfig,
     ) -> Result<String> {
         use llmspell_agents::agent_wrapped_tool::AgentWrappedTool;
         use llmspell_core::traits::tool::{SecurityLevel, ToolCategory};
@@ -1336,20 +1407,17 @@ impl AgentBridge {
                 source: None,
             })?;
 
-        // Create a unique tool name
-        let tool_name = wrapper_config
-            .get("tool_name")
-            .and_then(|v| v.as_str())
-            .unwrap_or(&format!("{agent_name}_tool"))
-            .to_string();
+        // Use configured values or defaults
+        let tool_name = if config.tool_name.is_empty() {
+            format!("{agent_name}_tool")
+        } else {
+            config.tool_name
+        };
+        let category = config.category.unwrap_or(ToolCategory::Utility);
+        let security_level = config.security_level.unwrap_or(SecurityLevel::Restricted);
 
         // Create the agent-wrapped tool
-
-        let wrapped_tool = AgentWrappedTool::new(
-            agent.clone(),
-            ToolCategory::Utility,
-            SecurityLevel::Restricted,
-        );
+        let wrapped_tool = AgentWrappedTool::new(agent.clone(), category, security_level);
 
         // Register the wrapped tool
         self.registry
@@ -1463,7 +1531,7 @@ impl AgentBridge {
         &self,
         composite_name: String,
         delegate_agents: Vec<String>,
-        routing_config: serde_json::Value,
+        routing_config: RoutingConfig,
     ) -> Result<()> {
         // Verify all delegate agents exist
         let agents = self.active_agents.read().await;
@@ -1479,39 +1547,36 @@ impl AgentBridge {
 
         // For now, create a composite agent as a regular agent with metadata
         // Full composite agent implementation will come with workflow patterns
-        let composite_config = serde_json::json!({
-            "name": composite_name.clone(),
-            "description": format!("Composite agent coordinating: {}", delegate_agents.join(", ")),
-            "agent_type": "basic",
-            "system_prompt": format!("You are a composite agent that coordinates between: {}", delegate_agents.join(", ")),
-            "delegates": delegate_agents,
-            "routing": routing_config,
-            "composite": true,
-            "allowed_tools": [],
-            "custom_config": {},
-            "resource_limits": {
-                "max_execution_time_secs": 300,
-                "max_memory_mb": 512,
-                "max_tool_calls": 100,
-                "max_recursion_depth": 10
-            }
-        });
+        let mut custom_config = serde_json::Map::new();
+        custom_config.insert(
+            "system_prompt".to_string(),
+            serde_json::json!(format!(
+                "You are a composite agent that coordinates between: {}",
+                delegate_agents.join(", ")
+            )),
+        );
+        custom_config.insert("delegates".to_string(), serde_json::json!(delegate_agents));
+        custom_config.insert(
+            "routing".to_string(),
+            serde_json::to_value(&routing_config).unwrap_or_else(|_| serde_json::json!({})),
+        );
+        custom_config.insert("composite".to_string(), serde_json::json!(true));
+
+        let composite_agent_config = AgentConfig {
+            name: composite_name.clone(),
+            description: format!(
+                "Composite agent coordinating: {}",
+                delegate_agents.join(", ")
+            ),
+            agent_type: "basic".to_string(),
+            model: None,
+            allowed_tools: Vec::new(),
+            custom_config,
+            resource_limits: llmspell_agents::ResourceLimits::default(),
+        };
 
         // Create the composite agent using regular agent creation
-        // Convert config to HashMap
-        let mut config_map = HashMap::new();
-        if let Some(obj) = composite_config.as_object() {
-            for (k, v) in obj {
-                config_map.insert(k.clone(), v.clone());
-            }
-        }
-
-        self.create_agent(
-            &composite_name,
-            "basic", // Use basic agent type for now
-            config_map,
-        )
-        .await?;
+        self.create_agent(composite_agent_config).await?;
 
         Ok(())
     }
@@ -1891,6 +1956,19 @@ impl AgentBridge {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    fn create_test_agent_config(name: &str) -> AgentConfig {
+        AgentConfig {
+            name: name.to_string(),
+            description: format!("Test agent: {name}"),
+            agent_type: "basic".to_string(),
+            model: None,
+            allowed_tools: Vec::new(),
+            custom_config: serde_json::Map::new(),
+            resource_limits: llmspell_agents::ResourceLimits::default(),
+        }
+    }
+
     #[tokio::test]
     async fn test_agent_bridge_creation() {
         let registry = Arc::new(ComponentRegistry::new());
@@ -1907,38 +1985,10 @@ mod tests {
         let provider_manager = Arc::new(llmspell_providers::ProviderManager::new());
         let bridge = AgentBridge::new(registry, provider_manager);
 
-        // Create agent config
-        let mut config = HashMap::new();
-        config.insert("name".to_string(), serde_json::json!("test-agent"));
-        config.insert(
-            "description".to_string(),
-            serde_json::json!("Test agent for unit tests"),
-        );
-        config.insert("agent_type".to_string(), serde_json::json!("basic"));
-        config.insert("allowed_tools".to_string(), serde_json::json!([]));
-        config.insert("custom_config".to_string(), serde_json::json!({}));
-        config.insert(
-            "resource_limits".to_string(),
-            serde_json::json!({
-                "max_execution_time_secs": 300,
-                "max_memory_mb": 512,
-                "max_tool_calls": 100,
-                "max_recursion_depth": 10
-            }),
-        );
-        config.insert(
-            "model".to_string(),
-            serde_json::json!({
-                "provider": "mock",
-                "model_id": "test-model",
-                "temperature": null,
-                "max_tokens": null,
-                "settings": {}
-            }),
-        );
-
         // Create agent instance
-        let result = bridge.create_agent("test-instance", "basic", config).await;
+        let result = bridge
+            .create_agent(create_test_agent_config("test-instance"))
+            .await;
         assert!(result.is_ok());
 
         // List instances
@@ -1964,37 +2014,8 @@ mod tests {
         let bridge = AgentBridge::new(registry, provider_manager);
 
         // Create agent
-        let mut config = HashMap::new();
-        config.insert("name".to_string(), serde_json::json!("test-exec-agent"));
-        config.insert(
-            "description".to_string(),
-            serde_json::json!("Test agent for execution"),
-        );
-        config.insert("agent_type".to_string(), serde_json::json!("basic"));
-        config.insert("allowed_tools".to_string(), serde_json::json!([]));
-        config.insert("custom_config".to_string(), serde_json::json!({}));
-        config.insert(
-            "resource_limits".to_string(),
-            serde_json::json!({
-                "max_execution_time_secs": 300,
-                "max_memory_mb": 512,
-                "max_tool_calls": 100,
-                "max_recursion_depth": 10
-            }),
-        );
-        config.insert(
-            "model".to_string(),
-            serde_json::json!({
-                "provider": "mock",
-                "model_id": "test-model",
-                "temperature": null,
-                "max_tokens": null,
-                "settings": {}
-            }),
-        );
-
         bridge
-            .create_agent("test-exec", "basic", config)
+            .create_agent(create_test_agent_config("test-exec"))
             .await
             .unwrap();
 
@@ -2012,39 +2033,9 @@ mod tests {
         let provider_manager = Arc::new(llmspell_providers::ProviderManager::new());
         let bridge = AgentBridge::new(registry, provider_manager);
 
-        // Create agent config
-        let mut config = HashMap::new();
-        config.insert("name".to_string(), serde_json::json!("test-state-agent"));
-        config.insert(
-            "description".to_string(),
-            serde_json::json!("Test agent for state machine"),
-        );
-        config.insert("agent_type".to_string(), serde_json::json!("basic"));
-        config.insert("allowed_tools".to_string(), serde_json::json!([]));
-        config.insert("custom_config".to_string(), serde_json::json!({}));
-        config.insert(
-            "resource_limits".to_string(),
-            serde_json::json!({
-                "max_execution_time_secs": 300,
-                "max_memory_mb": 512,
-                "max_tool_calls": 100,
-                "max_recursion_depth": 10
-            }),
-        );
-        config.insert(
-            "model".to_string(),
-            serde_json::json!({
-                "provider": "mock",
-                "model_id": "test-model",
-                "temperature": null,
-                "max_tokens": null,
-                "settings": {}
-            }),
-        );
-
         // Create agent instance
         bridge
-            .create_agent("test-state", "basic", config)
+            .create_agent(create_test_agent_config("test-state"))
             .await
             .unwrap();
 
@@ -2125,24 +2116,23 @@ mod tests {
         let bridge = AgentBridge::new(registry, provider_manager);
 
         // Test context creation
-        let config = serde_json::json!({
-            "conversation_id": "conv-123",
-            "user_id": "user-456",
-            "session_id": "session-789",
-            "scope": {
-                "type": "session",
-                "id": "session-789"
-            },
-            "inheritance": "inherit",
-            "data": {
-                "theme": "dark",
-                "language": "en"
-            },
-            "security": {
-                "permissions": ["read", "write"],
-                "level": "standard"
-            }
-        });
+        let config = ExecutionContextConfig {
+            conversation_id: Some("conv-123".to_string()),
+            user_id: Some("user-456".to_string()),
+            session_id: Some("session-789".to_string()),
+            scope: Some(ContextScope::Session("session-789".to_string())),
+            inheritance: Some(InheritancePolicy::Inherit),
+            data: Some({
+                let mut map = HashMap::new();
+                map.insert("theme".to_string(), serde_json::json!("dark"));
+                map.insert("language".to_string(), serde_json::json!("en"));
+                map
+            }),
+            security: Some(SecurityContextConfig {
+                permissions: vec!["read".to_string(), "write".to_string()],
+                level: "standard".to_string(),
+            }),
+        };
 
         let context_id = bridge.create_context(config).await.unwrap();
         assert!(!context_id.is_empty());
@@ -2164,30 +2154,25 @@ mod tests {
             .unwrap();
 
         // Test child context creation
-        let child_scope = serde_json::json!({
-            "type": "agent",
-            "id": "child-agent"
-        });
+        let child_config = ChildContextConfig {
+            scope: ContextScope::Agent(ComponentId::from_name("child-agent")),
+            inheritance: InheritancePolicy::Copy,
+        };
         let child_id = bridge
-            .create_child_context(&context_id, child_scope, "copy")
+            .create_child_context(&context_id, child_config)
             .await
             .unwrap();
         assert!(!child_id.is_empty());
 
         // Test shared memory
-        let workflow_scope = serde_json::json!({
-            "type": "workflow",
-            "id": "workflow-1"
-        });
-        bridge
-            .set_shared_memory(
-                &workflow_scope,
-                "status".to_string(),
-                serde_json::json!("running"),
-            )
-            .unwrap();
+        let workflow_scope = ContextScope::Workflow("workflow-1".to_string());
+        bridge.set_shared_memory(
+            &workflow_scope,
+            "status".to_string(),
+            serde_json::json!("running"),
+        );
 
-        let status = bridge.get_shared_memory(&workflow_scope, "status").unwrap();
+        let status = bridge.get_shared_memory(&workflow_scope, "status");
         assert_eq!(status, Some(serde_json::json!("running")));
 
         // Cleanup
@@ -2201,48 +2186,22 @@ mod tests {
         let bridge = AgentBridge::new(registry, provider_manager);
 
         // Create agent
-        let mut config = HashMap::new();
-        config.insert("name".to_string(), serde_json::json!("context-agent"));
-        config.insert(
-            "description".to_string(),
-            serde_json::json!("Test agent for context"),
-        );
-        config.insert("agent_type".to_string(), serde_json::json!("basic"));
-        config.insert("allowed_tools".to_string(), serde_json::json!([]));
-        config.insert("custom_config".to_string(), serde_json::json!({}));
-        config.insert(
-            "resource_limits".to_string(),
-            serde_json::json!({
-                "max_execution_time_secs": 300,
-                "max_memory_mb": 512,
-                "max_tool_calls": 100,
-                "max_recursion_depth": 10
-            }),
-        );
-        config.insert(
-            "model".to_string(),
-            serde_json::json!({
-                "provider": "mock",
-                "model_id": "test-model",
-                "temperature": null,
-                "max_tokens": null,
-                "settings": {}
-            }),
-        );
-
         bridge
-            .create_agent("context-test", "basic", config)
+            .create_agent(create_test_agent_config("context-test"))
             .await
             .unwrap();
 
         // Create context
-        let context_config = serde_json::json!({
-            "conversation_id": "conv-test",
-            "data": {
-                "user_preference": "concise",
-                "context_type": "test"
-            }
-        });
+        let context_config = ExecutionContextConfig {
+            conversation_id: Some("conv-test".to_string()),
+            data: Some({
+                let mut map = HashMap::new();
+                map.insert("user_preference".to_string(), serde_json::json!("concise"));
+                map.insert("context_type".to_string(), serde_json::json!("test"));
+                map
+            }),
+            ..Default::default()
+        };
         let context_id = bridge.create_context(context_config).await.unwrap();
 
         // Execute with context
@@ -2263,37 +2222,8 @@ mod tests {
         let bridge = AgentBridge::new(registry, provider_manager);
 
         // Create agent
-        let mut config = HashMap::new();
-        config.insert("name".to_string(), serde_json::json!("stream-agent"));
-        config.insert(
-            "description".to_string(),
-            serde_json::json!("Test agent for streaming"),
-        );
-        config.insert("agent_type".to_string(), serde_json::json!("basic"));
-        config.insert("allowed_tools".to_string(), serde_json::json!([]));
-        config.insert("custom_config".to_string(), serde_json::json!({}));
-        config.insert(
-            "resource_limits".to_string(),
-            serde_json::json!({
-                "max_execution_time_secs": 300,
-                "max_memory_mb": 512,
-                "max_tool_calls": 100,
-                "max_recursion_depth": 10
-            }),
-        );
-        config.insert(
-            "model".to_string(),
-            serde_json::json!({
-                "provider": "mock",
-                "model_id": "test-model",
-                "temperature": null,
-                "max_tokens": null,
-                "settings": {}
-            }),
-        );
-
         bridge
-            .create_agent("stream-test", "basic", config)
+            .create_agent(create_test_agent_config("stream-test"))
             .await
             .unwrap();
 
@@ -2321,45 +2251,13 @@ mod tests {
         let bridge = AgentBridge::new(registry, provider_manager);
 
         // Create two basic agents
-        let mut config1 = HashMap::new();
-        config1.insert("name".to_string(), serde_json::json!("agent1"));
-        config1.insert("description".to_string(), serde_json::json!("Test agent 1"));
-        config1.insert("agent_type".to_string(), serde_json::json!("basic"));
-        config1.insert("allowed_tools".to_string(), serde_json::json!([]));
-        config1.insert("custom_config".to_string(), serde_json::json!({}));
-        config1.insert(
-            "resource_limits".to_string(),
-            serde_json::json!({
-                "max_execution_time_secs": 300,
-                "max_memory_mb": 512,
-                "max_tool_calls": 100,
-                "max_recursion_depth": 10
-            }),
-        );
-
         bridge
-            .create_agent("agent1", "mock", config1)
+            .create_agent(create_test_agent_config("agent1"))
             .await
             .unwrap();
 
-        let mut config2 = HashMap::new();
-        config2.insert("name".to_string(), serde_json::json!("agent2"));
-        config2.insert("description".to_string(), serde_json::json!("Test agent 2"));
-        config2.insert("agent_type".to_string(), serde_json::json!("basic"));
-        config2.insert("allowed_tools".to_string(), serde_json::json!([]));
-        config2.insert("custom_config".to_string(), serde_json::json!({}));
-        config2.insert(
-            "resource_limits".to_string(),
-            serde_json::json!({
-                "max_execution_time_secs": 300,
-                "max_memory_mb": 512,
-                "max_tool_calls": 100,
-                "max_recursion_depth": 10
-            }),
-        );
-
         bridge
-            .create_agent("agent2", "mock", config2)
+            .create_agent(create_test_agent_config("agent2"))
             .await
             .unwrap();
 
@@ -2382,10 +2280,11 @@ mod tests {
         let tool_name = bridge
             .wrap_agent_as_tool(
                 "agent1",
-                serde_json::json!({
-                    "tool_name": "agent1_tool",
-                    "description": "Agent 1 wrapped as tool"
-                }),
+                ToolWrapperConfig {
+                    tool_name: "agent1_tool".to_string(),
+                    category: None,
+                    security_level: None,
+                },
             )
             .await
             .unwrap();
@@ -2407,9 +2306,13 @@ mod tests {
             .create_composite_agent(
                 "composite1".to_string(),
                 vec!["agent1".to_string(), "agent2".to_string()],
-                serde_json::json!({
-                    "routing_strategy": "round_robin"
-                }),
+                RoutingConfig {
+                    strategy: RoutingStrategy::Custom {
+                        name: "round_robin".to_string(),
+                    },
+                    fallback_agent: None,
+                    timeout_ms: None,
+                },
             )
             .await
             .unwrap();

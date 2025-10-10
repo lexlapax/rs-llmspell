@@ -66,7 +66,7 @@ Phase 8.10.6 has successfully passed all validation checks and is ready for Phas
 -- All globals available
 RAG.ingest({content = "test"})  -- ✅ Works
 Agent.builder():build()          -- ✅ Works
-Tool.invoke("calculator", {})    -- ✅ Works
+Tool.execute("calculator", {})    -- ✅ Works
 State.set("key", "value")       -- ✅ Works
 Session.create({name = "test"}) -- ✅ Works
 ```

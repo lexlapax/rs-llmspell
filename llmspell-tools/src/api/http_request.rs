@@ -246,7 +246,7 @@ impl HttpRequestTool {
 
         Ok(Self {
             metadata: ComponentMetadata::new(
-                "http-request-tool".to_string(),
+                "http-requester".to_string(),
                 "HTTP client with authentication, retries, and rate limiting".to_string(),
             ),
             config,
@@ -332,7 +332,7 @@ impl HttpRequestTool {
         let request = self.build_request(method, url, headers, body, auth);
         request.send().await.map_err(|e| LLMSpellError::Tool {
             message: format!("HTTP request failed: {e}"),
-            tool_name: Some("http_request".to_string()),
+            tool_name: Some("http-requester".to_string()),
             source: None,
         })
     }
@@ -409,7 +409,7 @@ impl HttpRequestTool {
 
         result.map_err(|retry_error| LLMSpellError::Tool {
             message: format!("HTTP request failed: {retry_error}"),
-            tool_name: Some("http_request".to_string()),
+            tool_name: Some("http-requester".to_string()),
             source: None,
         })
     }
@@ -516,7 +516,7 @@ impl Tool for HttpRequestTool {
 
     fn schema(&self) -> ToolSchema {
         ToolSchema::new(
-            "http_request".to_string(),
+            "http-requester".to_string(),
             "Execute HTTP requests with authentication, retries, and automatic parsing".to_string(),
         )
         .with_parameter(ParameterDef {
@@ -664,7 +664,7 @@ impl BaseAgent for HttpRequestTool {
         &self.metadata
     }
 
-    #[instrument(skip(_context, input, self), fields(tool = "http_request"))]
+    #[instrument(skip(_context, input, self), fields(tool = "http-requester"))]
     async fn execute_impl(
         &self,
         input: AgentInput,
@@ -701,7 +701,7 @@ impl BaseAgent for HttpRequestTool {
             .await
             .map_err(|e| LLMSpellError::Tool {
                 message: format!("Request timeout: {e}"),
-                tool_name: Some("http_request".to_string()),
+                tool_name: Some("http-requester".to_string()),
                 source: None,
             })?;
 
@@ -721,7 +721,7 @@ impl BaseAgent for HttpRequestTool {
             request_params.method, request_params.url, http_response.status_code
         );
 
-        let response = ResponseBuilder::success("http_request")
+        let response = ResponseBuilder::success("http-requester")
             .with_message(message)
             .with_result(json!({
                 "status_code": http_response.status_code,
@@ -771,7 +771,7 @@ mod tests {
 
         // Test hook metadata
         let metadata = tool.hook_metadata();
-        assert_eq!(metadata["tool_name"], "http-request-tool");
+        assert_eq!(metadata["tool_name"], "http-requester");
         assert!(metadata["hook_points_supported"].is_array());
         assert_eq!(
             metadata["hook_points_supported"].as_array().unwrap().len(),

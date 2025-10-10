@@ -8,9 +8,9 @@
 
 ## Overview
 
-> **🦀 Rust API**: Comprehensive documentation for all 19 LLMSpell crates, covering traits, implementations, and extension patterns for building custom components.
+> **🦀 Rust API**: Comprehensive documentation for all 17 LLMSpell crates, covering traits, implementations, and extension patterns for building custom components.
 
-**Version**: 0.8.0 | **Status**: Phase 8 Complete | **Last Updated**: December 2024
+**Version**: 0.11.1 | **Status**: Phase 11a Complete | **Last Updated**: October 2025
 
 ## 📚 Crate Documentation
 
@@ -38,7 +38,7 @@
 - Property-based test generators
 - Fixtures and benchmarking
 
-### State and Storage (4 crates)
+### State and Storage (1 crate)
 
 #### 4. [llmspell-storage](llmspell-storage.md) ⭐ **Phase 8**
 **Vector and key-value storage**
@@ -47,36 +47,16 @@
 - Multi-tenant data isolation
 - Collection management
 
-#### 5. [llmspell-state-persistence](llmspell-state-persistence.md)
-**State management with persistence**
-- `StateManager` trait
-- Scoped state operations
-- Migration and versioning
-- Backup and restore
+### Security and Multi-Tenancy (2 crates)
 
-#### 6. [llmspell-state-traits](llmspell-state-traits.md)
-**State trait definitions**
-- Core state interfaces
-- Persistence traits
-- Scope and isolation traits
-
-#### 7. [llmspell-sessions](llmspell-sessions.md)
-**Session management**
-- Session lifecycle
-- Artifact storage
-- Session replay
-- Security contexts
-
-### Security and Multi-Tenancy (3 crates)
-
-#### 8. [llmspell-security](llmspell-security.md)
+#### 5. [llmspell-security](llmspell-security.md)
 **Security framework**
 - Access control policies
 - Authentication/authorization
 - Input validation
 - Audit logging
 
-#### 9. [llmspell-tenancy](llmspell-tenancy.md) ⭐ **Phase 8**
+#### 6. [llmspell-tenancy](llmspell-tenancy.md) ⭐ **Phase 8**
 **Multi-tenant isolation**
 - Tenant management
 - Resource quotas
@@ -85,7 +65,7 @@
 
 ### AI and RAG Components (3 crates)
 
-#### 10. [llmspell-rag](llmspell-rag.md) ⭐ **Phase 8**
+#### 7. [llmspell-rag](llmspell-rag.md) ⭐ **Phase 8**
 **Retrieval-Augmented Generation**
 - Document ingestion pipeline
 - Chunking strategies
@@ -93,7 +73,7 @@
 - Vector search integration
 - Multi-tenant RAG
 
-#### 11. [llmspell-agents](llmspell-agents.md)
+#### 8. [llmspell-agents](llmspell-agents.md)
 **Agent framework**
 - Agent trait and builders
 - Context management
@@ -101,64 +81,78 @@
 - Agent composition
 - Templates and discovery
 
-#### 12. [llmspell-providers](llmspell-providers.md)
+#### 9. [llmspell-providers](llmspell-providers.md) ⭐ **Phase 11**
 **LLM provider integrations**
 - Provider trait
-- OpenAI, Anthropic, Ollama
+- OpenAI, Anthropic, Groq
+- **Local models: Ollama, Candle**
+- Model management (pull, list, info)
+- Health checks and status
 - Streaming support
 - Rate limiting
 
 ### Execution and Orchestration (4 crates)
 
-#### 13. [llmspell-workflows](llmspell-workflows.md)
+#### 10. [llmspell-workflows](llmspell-workflows.md)
 **Workflow orchestration**
 - Sequential, parallel, conditional flows
 - Step definitions
 - Error handling
 - State management
 
-#### 14. [llmspell-tools](llmspell-tools.md)
+#### 11. [llmspell-tools](llmspell-tools.md)
 **Tool system**
 - Tool trait and registry
 - Built-in tools (100+)
 - Security levels
 - Tool composition
 
-#### 15. [llmspell-hooks](llmspell-hooks.md)
+#### 12. [llmspell-hooks](llmspell-hooks.md)
 **Hook system**
 - Lifecycle hooks
 - Event interception
 - Hook priorities
 - Replay support
 
-#### 16. [llmspell-events](llmspell-events.md)
+#### 13. [llmspell-events](llmspell-events.md)
 **Event system**
 - Event bus
 - Pub/sub patterns
 - Event correlation
 - Persistence
 
-### Integration and Runtime (3 crates)
+### Integration and Runtime (4 crates)
 
-#### 17. [llmspell-bridge](llmspell-bridge.md)
+#### 14. [llmspell-bridge](llmspell-bridge.md) ⭐ **Phase 11a.8**
 **Script language bridges**
 - Lua integration
-- Type conversion
-- Global injection
+- **Typed struct pattern** for configurations
+- Parser functions for type-safe conversions
+- Global injection (17 globals)
 - Performance optimization
 
-#### 18. [llmspell-config](llmspell-config.md)
+#### 15. [llmspell-kernel](llmspell-kernel.md) ⭐ **Phase 10**
+**Kernel and daemon infrastructure**
+- Jupyter protocol v5.3 (5-channel ZeroMQ)
+- Debug Adapter Protocol (DAP)
+- Unix daemon (double-fork)
+- Signal handling (SIGTERM/SIGINT)
+- Session management
+- Fleet orchestration
+
+#### 16. [llmspell-config](llmspell-config.md)
 **Configuration system**
 - Config schema
 - Environment variables
 - Provider configs
 - Validation
 
-#### 19. [llmspell-cli](llmspell-cli.md)
+#### 17. [llmspell-cli](llmspell-cli.md) ⭐ **Phase 10**
 **CLI application**
-- Command parsing
+- Command parsing (run, kernel, tool, model)
 - Runtime initialization
 - Script execution
+- Tool CLI commands (list, info, invoke, search, test)
 - Output formatting
 
 ## 🎯 Quick Start Patterns
@@ -246,26 +240,28 @@ async fn setup_rag() -> Result<RAGPipeline> {
 }
 ```
 
-## 🆕 What's New in Phase 8.10.6
+## 🆕 What's New in Phase 11a
 
-### Enhanced RAG Capabilities
-- **Cost Optimization**: 70% reduction in embedding costs through intelligent caching
-- **Multi-Dimensional Support**: HNSW indices for 384, 768, 1536, and 3072 dimensions
-- **Session Collections**: Temporary RAG collections for conversational memory
-- **Bi-temporal Queries**: Support for both event time and ingestion time
-- **TTL Management**: Automatic document expiration for compliance
+### Local LLM Support (Phase 11)
+- **Ollama Integration**: Native support for Ollama backend with health checks
+- **Candle Inference**: Embedded inference with Candle (CPU/GPU)
+- **Model Management**: Pull, list, and inspect local models
+- **Dual-Path Architecture**: Choose between Ollama (server) or Candle (embedded)
+- **Model Specification**: Unified format `model:tag@backend`
 
-### Multi-Tenancy Improvements
-- **Complete Isolation**: Guaranteed data separation between tenants
-- **Resource Quotas**: Per-tenant limits on storage, compute, and API calls
-- **Billing Integration**: Usage tracking for tenant-based billing
-- **Cross-Tenant Admin**: Secure operations across tenant boundaries
+### Bridge Pattern Consolidation (Phase 11a.8)
+- **Typed Configurations**: Eliminated JSON anti-patterns across all bridges
+- **Type-Safe Parsers**: Lua layer converts tables to typed Rust structs
+- **Compile-Time Validation**: Catch configuration errors at compile time
+- **Zero Serialization Overhead**: Direct struct passing without JSON
+- **Comprehensive Guide**: 1,500-line bridge pattern documentation
 
-### Storage Enhancements
-- **HNSW Optimization**: Faster similarity search for millions of vectors
-- **Collection Management**: Named collections with metadata
-- **Hybrid Search**: Combine vector similarity with keyword filtering
-- **Incremental Indexing**: Add documents without rebuilding
+### Service Integration (Phase 10)
+- **Kernel Infrastructure**: Unix daemon with double-fork daemonization
+- **Jupyter Protocol**: Full v5.3 implementation with 5-channel ZeroMQ
+- **Debug Adapter Protocol**: 10 DAP commands for debugging
+- **Tool CLI**: Direct tool invocation (list, info, invoke, search, test)
+- **Signal Handling**: SIGTERM/SIGINT → Jupyter message conversion
 
 ## 📊 Architecture Overview
 

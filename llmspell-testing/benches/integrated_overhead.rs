@@ -178,9 +178,13 @@ fn bench_workflow_system_overhead(c: &mut Criterion) {
                         for i in 0..test_data.workflow_steps {
                             let step = WorkflowStep::new(
                                 format!("step_{}", i),
-                                StepType::Custom {
-                                    function_name: "test_function".to_string(),
-                                    parameters: serde_json::json!({"index": i}),
+                                StepType::Tool {
+                                    tool_name: "calculator".to_string(),
+                                    parameters: serde_json::json!({
+                                        "operation": "add",
+                                        "a": i,
+                                        "b": 1
+                                    }),
                                 },
                             );
                             builder = builder.add_step(step);
@@ -216,9 +220,13 @@ fn bench_workflow_system_overhead(c: &mut Criterion) {
                         for i in 0..test_data.workflow_steps {
                             let step = WorkflowStep::new(
                                 format!("step_{}", i),
-                                StepType::Custom {
-                                    function_name: "test_function".to_string(),
-                                    parameters: serde_json::json!({"index": i}),
+                                StepType::Tool {
+                                    tool_name: "calculator".to_string(),
+                                    parameters: serde_json::json!({
+                                        "operation": "add",
+                                        "a": i,
+                                        "b": 1
+                                    }),
                                 },
                             );
                             builder = builder.add_step(step);

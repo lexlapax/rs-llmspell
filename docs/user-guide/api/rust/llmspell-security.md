@@ -704,6 +704,241 @@ impl NetworkSecurityManager {
 }
 ```
 
+---
+
+## Sandbox System
+
+The sandbox system provides defense-in-depth security through file, network, and resource isolation. It enforces the three-level security model (Safe, Restricted, Privileged) at runtime.
+
+> **📚 User Guide**: See [Security & Permissions Guide](../../security-and-permissions.md) for complete configuration details and troubleshooting.
+
+### SecurityRequirements
+
+Define permissions for tools and agents using a fluent API:
+
+```rust
+use llmspell_security::SecurityRequirements;
+
+// Safe - no external access (pure computation)
+let safe_reqs = SecurityRequirements::safe();
+
+// Restricted - explicit permissions required
+let restricted_reqs = SecurityRequirements::restricted()
+    .with_file_access("/workspace")
+    .with_file_access("/tmp")
+    .with_network_access("api.openai.com")
+    .with_network_access("*.github.com")  // Wildcard support
+    .with_env_access("HOME")
+    .with_env_access("PATH");
+
+// Privileged - full access (use sparingly, requires review)
+let privileged_reqs = SecurityRequirements::privileged();
+```
+
+**Security Levels**:
+- **Safe**: No file/network/process access - pure computation only
+- **Restricted**: Requires explicit allowlists via `with_*` methods (DEFAULT)
+- **Privileged**: Full system access - should be exception, not rule
+
+---
+
+### FileSandbox
+
+Path-based file system isolation with traversal protection:
+
+```rust
+use llmspell_security::sandbox::{FileSandbox, SandboxContext};
+use llmspell_security::{SecurityRequirements, ResourceLimits};
+use std::path::Path;
+
+// Create sandbox context
+let context = SandboxContext::new(
+    "my-sandbox",
+    SecurityRequirements::restricted()
+        .with_file_access("/workspace")
+        .with_file_access("/tmp"),
+    ResourceLimits::default(),
+);
+
+let sandbox = FileSandbox::new(context)?;
+
+// Validate paths before use
+sandbox.validate_path(Path::new("/workspace/data.txt"))?;  // ✅ OK
+sandbox.validate_path(Path::new("/tmp/output.json"))?;     // ✅ OK
+sandbox.validate_path(Path::new("/etc/passwd"))?;          // ❌ ERROR: not in allowlist
+sandbox.validate_path(Path::new("/workspace/../etc/passwd"))?;  // ❌ ERROR: path traversal blocked
+```
+
+**Features**:
+- Path allowlisting enforcement
+- Path traversal protection (`../` attacks)
+- Symlink resolution with validation
+- File extension filtering
+- Size limits
+
+---
+
+### NetworkSandbox
+
+Domain-based network isolation with rate limiting and SSRF prevention:
+
+```rust
+use llmspell_security::sandbox::{NetworkSandbox, RateLimitConfig};
+
+// Create network sandbox
+let context = SandboxContext::new(
+    "network-sandbox",
+    SecurityRequirements::restricted()
+        .with_network_access("api.example.com")
+        .with_network_access("*.github.com"),
+    ResourceLimits::default(),
+);
+
+let mut sandbox = NetworkSandbox::new(
+    context,
+    RateLimitConfig {
+        max_requests: 100,
+        window_seconds: 60,
+    }
+)?;
+
+// Validate requests before execution
+sandbox.validate_request("https://api.example.com/data", "GET").await?;  // ✅ OK
+sandbox.validate_request("https://api.github.com/repos", "GET").await?;  // ✅ OK (wildcard)
+sandbox.validate_request("https://evil.com/data", "GET").await?;         // ❌ ERROR: domain blocked
+sandbox.validate_request("http://localhost/admin", "GET").await?;        // ❌ ERROR: SSRF blocked
+
+// Make safe HTTP requests
+let response = sandbox.get("https://api.example.com/data").await?;
+```
+
+**Features**:
+- Domain allowlisting with wildcard support
+- Rate limiting (default: 100 requests/minute)
+- SSRF prevention (blocks localhost, private IPs, cloud metadata)
+- Request/response size limits
+
+**SSRF Protection**: Automatically blocks:
+- `localhost`, `127.0.0.1`, `0.0.0.0`
+- Private IP ranges (`10.0.0.0/8`, `192.168.0.0/16`, `172.16.0.0/12`)
+- Cloud metadata endpoints (`169.254.169.254`)
+
+---
+
+### IntegratedSandbox
+
+Combined file, network, and resource isolation for comprehensive protection:
+
+```rust
+use llmspell_security::sandbox::IntegratedSandbox;
+use llmspell_security::ResourceLimits;
+use std::time::Duration;
+
+// Create integrated sandbox with all restrictions
+let sandbox = IntegratedSandbox::builder()
+    .with_file_permissions(vec!["/workspace", "/tmp"])
+    .with_network_policy(vec!["api.openai.com", "*.anthropic.com"])
+    .with_resource_limits(ResourceLimits {
+        max_memory: 512 * 1024 * 1024,      // 512MB
+        max_cpu_time: Duration::from_secs(300),  // 5 minutes
+        max_file_size: 100 * 1024 * 1024,   // 100MB
+        max_open_files: 50,
+        max_network_connections: 10,
+    })
+    .build()?;
+
+// Execute with comprehensive monitoring
+sandbox.execute_with_monitoring(|| async {
+    // Your code here - runs with all restrictions enforced
+    // File access: only /workspace and /tmp
+    // Network: only allowed domains
+    // Resources: memory, CPU, and connection limits
+
+    Ok(())
+}).await?;
+
+// Check for violations
+if sandbox.has_violations().await {
+    for violation in sandbox.get_violations().await {
+        eprintln!("Security violation: {:?}", violation);
+        // Log to audit system, alert, etc.
+    }
+}
+```
+
+**Resource Limits**:
+- **Memory**: Per-execution memory cap (default 100MB)
+- **CPU Time**: Maximum execution duration (default 5 seconds)
+- **File Size**: Maximum file read/write size (default 50MB)
+- **Open Files**: Maximum concurrent file handles (default 50)
+- **Network Connections**: Maximum concurrent connections (default 10)
+
+---
+
+### SandboxContext
+
+The `SandboxContext` ties together security requirements and resource limits:
+
+```rust
+use llmspell_security::sandbox::SandboxContext;
+use llmspell_security::{SecurityRequirements, ResourceLimits};
+
+let context = SandboxContext::new(
+    "my-context",
+    SecurityRequirements::restricted()
+        .with_file_access("/workspace")
+        .with_network_access("*.api.com"),
+    ResourceLimits {
+        max_memory: 256 * 1024 * 1024,  // 256MB
+        max_cpu_time: Duration::from_secs(10),
+        ..Default::default()
+    },
+);
+
+// Check domain allowance
+if context.is_domain_allowed("api.api.com") {  // ✅ Matches wildcard
+    println!("Domain allowed");
+}
+
+// Check path allowance
+if context.is_path_allowed(Path::new("/workspace/data.txt")) {  // ✅ OK
+    println!("Path allowed");
+}
+```
+
+---
+
+### Configuration Integration
+
+Sandbox permissions are typically configured via TOML rather than hardcoded:
+
+```toml
+# config.toml
+
+[tools.file_operations]
+allowed_paths = ["/workspace", "/tmp", "/data"]
+max_file_size = 50000000
+blocked_extensions = ["exe", "dll", "so"]
+
+[tools.web_search]
+allowed_domains = ["api.openai.com", "*.github.com"]
+rate_limit_per_minute = 100
+
+[tools.http_request]
+allowed_hosts = ["*.example.com"]
+blocked_hosts = ["localhost", "127.0.0.1"]
+
+[tools.system]
+allow_process_execution = false
+allowed_commands = "echo,cat,ls,pwd"
+```
+
+These configurations are automatically wired to sandbox instances via `llmspell-bridge`.
+
+**For complete configuration guide**, see [Security & Permissions Guide](../../security-and-permissions.md).
+
+---
+
 ## Usage Examples
 
 ### Basic Security Setup

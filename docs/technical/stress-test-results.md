@@ -88,7 +88,7 @@ Ops/sec: 88.63
 **Failure Modes**: None observed
 
 **Tools Validated**:
-web_search, base64_encoder, diff_calculator, uuid_generator, data_validation, file_search, graphql_query, citation-formatter, environment_reader, http_request, audio_processor, graph-builder, service_checker, process_executor, video_processor, image_processor, calculator, webhook-caller, file_converter, api-tester, web-scraper, url-analyzer, sitemap-crawler, date_time_handler, text_manipulator, file_operations, file_watcher, webpage-monitor, system_monitor, hash_calculator
+web-searcher, base64-encoder, diff-calculator, uuid-generator, data-validator, file-operations, graphql-query, citation-formatter, environment-reader, http-requester, audio-processor, graph-builder, service-checker, process-executor, video-processor, image-processor, calculator, webhook-caller, file-converter, api-tester, web-scraper, url-analyzer, sitemap-crawler, datetime-handler, text-manipulator, file-operations, file-watcher, webpage-monitor, system-monitor, hash-calculator
 
 ---
 

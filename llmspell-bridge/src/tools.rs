@@ -84,11 +84,7 @@ pub fn register_all_tools(
     // Register different tool categories with their specific configurations
     register_utility_tools(registry)?;
     register_data_processing_tools(registry, &tools_config.http_request)?;
-    register_file_system_tools(
-        registry,
-        file_sandbox.clone(),
-        &tools_config.file_operations,
-    )?;
+    register_file_system_tools(registry, &file_sandbox, &tools_config.file_operations)?;
     register_system_tools(registry, &file_sandbox)?;
     register_media_tools(registry, &file_sandbox)?;
     register_search_tools(registry, &tools_config.web_search)?;
@@ -115,41 +111,6 @@ where
     Ok(())
 }
 
-/// Register a tool that requires a sandbox with the bridge registry
-fn register_tool_with_sandbox<T, F>(
-    registry: &Arc<ComponentRegistry>,
-    name: &str,
-    _sandbox: Arc<FileSandbox>,
-    tool_factory: F,
-) -> Result<(), Box<dyn std::error::Error>>
-where
-    T: Tool + Send + Sync + 'static,
-    F: FnOnce() -> T,
-{
-    let tool = tool_factory();
-    registry
-        .register_tool(name.to_string(), Arc::new(tool))
-        .map_err(|e| Box::new(e) as Box<dyn std::error::Error>)?;
-    Ok(())
-}
-
-/// Register a tool that returns a Result
-fn register_tool_result<T, F>(
-    registry: &Arc<ComponentRegistry>,
-    name: &str,
-    tool_factory: F,
-) -> Result<(), Box<dyn std::error::Error>>
-where
-    T: Tool + Send + Sync + 'static,
-    F: FnOnce() -> Result<T, llmspell_core::error::LLMSpellError>,
-{
-    let tool = tool_factory()?;
-    registry
-        .register_tool(name.to_string(), Arc::new(tool))
-        .map_err(|e| Box::new(e) as Box<dyn std::error::Error>)?;
-    Ok(())
-}
-
 /// Get all registered tool names
 #[must_use]
 pub fn get_all_tool_names(registry: &Arc<ComponentRegistry>) -> Vec<String> {
@@ -166,20 +127,30 @@ pub fn get_tool_by_name(registry: &Arc<ComponentRegistry>, name: &str) -> Option
 fn register_utility_tools(
     registry: &Arc<ComponentRegistry>,
 ) -> Result<(), Box<dyn std::error::Error>> {
-    register_tool(registry, "base64_encoder", Base64EncoderTool::new)?;
+    register_tool(registry, "base64-encoder", Base64EncoderTool::new)?;
     register_tool(registry, "calculator", CalculatorTool::new)?;
-    register_tool(registry, "data_validation", DataValidationTool::new)?;
-    register_tool(registry, "date_time_handler", DateTimeHandlerTool::new)?;
-    register_tool(registry, "diff_calculator", DiffCalculatorTool::new)?;
-    register_tool(registry, "hash_calculator", || {
+
+    // Data validator
+    let data_validator_tool = Arc::new(DataValidationTool::new());
+    registry.register_tool("data-validator".to_string(), data_validator_tool)?;
+
+    register_tool(registry, "datetime-handler", DateTimeHandlerTool::new)?;
+    register_tool(registry, "diff-calculator", DiffCalculatorTool::new)?;
+    register_tool(registry, "hash-calculator", || {
         HashCalculatorTool::new(HashCalculatorConfig::default())
     })?;
+
+    // Template creator
     #[cfg(feature = "templates")]
-    register_tool(registry, "template_engine", TemplateEngineTool::new)?;
-    register_tool(registry, "text_manipulator", || {
+    {
+        let template_tool = Arc::new(TemplateEngineTool::new());
+        registry.register_tool("template-creator".to_string(), template_tool)?;
+    }
+
+    register_tool(registry, "text-manipulator", || {
         TextManipulatorTool::new(TextManipulatorConfig::default())
     })?;
-    register_tool(registry, "uuid_generator", || {
+    register_tool(registry, "uuid-generator", || {
         UuidGeneratorTool::new(UuidGeneratorConfig::default())
     })?;
     // Phase 7 tools
@@ -192,36 +163,40 @@ fn register_data_processing_tools(
     registry: &Arc<ComponentRegistry>,
     http_request_config: &llmspell_config::tools::HttpRequestConfig,
 ) -> Result<(), Box<dyn std::error::Error>> {
+    // CSV analyzer
     #[cfg(feature = "csv-parquet")]
-    register_tool(registry, "csv_analyzer", || {
-        CsvAnalyzerTool::new(CsvAnalyzerConfig::default())
-    })?;
+    {
+        let csv_tool = Arc::new(CsvAnalyzerTool::new(CsvAnalyzerConfig::default()));
+        registry.register_tool("csv-analyzer".to_string(), csv_tool)?;
+    }
+
+    // JSON processor
     #[cfg(feature = "json-query")]
-    register_tool(registry, "json_processor", || {
-        JsonProcessorTool::new(JsonProcessorConfig::default())
-    })?;
-    register_tool_result(registry, "graphql_query", || {
-        GraphQLQueryTool::new(GraphQLConfig::default())
-    })?;
-    // Use the provided configuration for HttpRequestTool
-    let http_request_config = http_request_config.clone();
-    register_tool_result(registry, "http_request", move || {
-        // Convert from llmspell_config HttpRequestConfig to llmspell_tools HttpRequestConfig
-        // Note: Some fields in llmspell_config don't exist in tool config yet
-        let tool_config = HttpRequestConfig {
-            timeout_seconds: http_request_config.timeout_seconds,
-            follow_redirects: true, // Default to following redirects
-            max_redirects: http_request_config.max_redirects as usize,
-            retry_config: RetryConfig::default(), // TODO: Add retry config to llmspell_config
-            rate_limit_per_minute: None,          // TODO: Add rate limiting to llmspell_config
-            user_agent: http_request_config
-                .default_headers
-                .get("User-Agent")
-                .cloned()
-                .unwrap_or_else(|| "llmspell-http/1.0".to_string()),
-        };
-        HttpRequestTool::new(tool_config)
-    })?;
+    {
+        let json_tool = Arc::new(JsonProcessorTool::new(JsonProcessorConfig::default()));
+        registry.register_tool("json-processor".to_string(), json_tool)?;
+    }
+    // GraphQL query
+    let graphql_tool = Arc::new(GraphQLQueryTool::new(GraphQLConfig::default())?);
+    registry.register_tool("graphql-query".to_string(), graphql_tool)?;
+
+    // HTTP requester: register with kebab-case primary name
+    // Convert from llmspell_config HttpRequestConfig to llmspell_tools HttpRequestConfig
+    // Note: Some fields in llmspell_config don't exist in tool config yet
+    let tool_config = HttpRequestConfig {
+        timeout_seconds: http_request_config.timeout_seconds,
+        follow_redirects: true, // Default to following redirects
+        max_redirects: http_request_config.max_redirects as usize,
+        retry_config: RetryConfig::default(), // TODO: Add retry config to llmspell_config
+        rate_limit_per_minute: None,          // TODO: Add rate limiting to llmspell_config
+        user_agent: http_request_config
+            .default_headers
+            .get("User-Agent")
+            .cloned()
+            .unwrap_or_else(|| "llmspell-http/1.0".to_string()),
+    };
+    let http_tool = Arc::new(HttpRequestTool::new(tool_config)?);
+    registry.register_tool("http-requester".to_string(), http_tool)?;
     // Phase 7 tools
     #[cfg(feature = "pdf")]
     register_tool(registry, "pdf-processor", PdfProcessorTool::new)?;
@@ -232,59 +207,49 @@ fn register_data_processing_tools(
 /// Register file system tools
 fn register_file_system_tools(
     registry: &Arc<ComponentRegistry>,
-    file_sandbox: Arc<FileSandbox>,
+    file_sandbox: &Arc<FileSandbox>,
     file_ops_config: &llmspell_config::tools::FileOperationsConfig,
 ) -> Result<(), Box<dyn std::error::Error>> {
+    // Archive handler
     #[cfg(feature = "archives")]
-    register_tool(registry, "archive_handler", ArchiveHandlerTool::new)?;
+    {
+        let archive_tool = Arc::new(ArchiveHandlerTool::new());
+        registry.register_tool("archive-handler".to_string(), archive_tool)?;
+    }
 
-    // File converter with sandbox
-    let file_sandbox_converter = file_sandbox.clone();
-    register_tool_with_sandbox(
-        registry,
-        "file_converter",
-        file_sandbox_converter.clone(),
-        move || FileConverterTool::new(FileConverterConfig::default(), file_sandbox_converter),
-    )?;
+    // File converter
+    let file_converter_tool = Arc::new(FileConverterTool::new(
+        FileConverterConfig::default(),
+        file_sandbox.clone(),
+    ));
+    registry.register_tool("file-converter".to_string(), file_converter_tool)?;
 
-    // Use the provided configuration for FileOperationsTool with sandbox
-    let file_ops_config = file_ops_config.clone();
-    let file_sandbox_ops = file_sandbox.clone();
-    register_tool_with_sandbox(
-        registry,
-        "file_operations",
-        file_sandbox_ops.clone(),
-        move || {
-            // Convert from llmspell_config FileOperationsConfig to llmspell_tools FileOperationsConfig
-            let tool_config = FileOperationsConfig {
-                allowed_paths: file_ops_config.allowed_paths.clone(),
-                atomic_writes: file_ops_config.atomic_writes,
-                max_file_size: file_ops_config.max_file_size,
-                max_dir_entries: 1000,      // Default value
-                allow_recursive: true,      // Default value
-                default_permissions: 0o644, // Default permissions
-            };
-            FileOperationsTool::new(tool_config, file_sandbox_ops)
-        },
-    )?;
+    // File operations: register with kebab-case primary name
+    // Convert from llmspell_config FileOperationsConfig to llmspell_tools FileOperationsConfig
+    let tool_config = FileOperationsConfig {
+        allowed_paths: file_ops_config.allowed_paths.clone(),
+        atomic_writes: file_ops_config.atomic_writes,
+        max_file_size: file_ops_config.max_file_size,
+        max_dir_entries: 1000,      // Default value
+        allow_recursive: true,      // Default value
+        default_permissions: 0o644, // Default permissions
+    };
+    let file_ops_tool = Arc::new(FileOperationsTool::new(tool_config, file_sandbox.clone()));
+    registry.register_tool("file-operations".to_string(), file_ops_tool)?;
 
-    // File search with sandbox
-    let file_sandbox_search = file_sandbox.clone();
-    register_tool_with_sandbox(
-        registry,
-        "file_search",
-        file_sandbox_search.clone(),
-        move || FileSearchTool::new(FileSearchConfig::default(), file_sandbox_search),
-    )?;
+    // File search
+    let file_search_tool = Arc::new(FileSearchTool::new(
+        FileSearchConfig::default(),
+        file_sandbox.clone(),
+    ));
+    registry.register_tool("file-search".to_string(), file_search_tool)?;
 
-    // File watcher with sandbox
-    let file_sandbox_watcher = file_sandbox;
-    register_tool_with_sandbox(
-        registry,
-        "file_watcher",
-        file_sandbox_watcher.clone(),
-        move || FileWatcherTool::new(FileWatcherConfig::default(), file_sandbox_watcher),
-    )?;
+    // File watcher
+    let file_watcher_tool = Arc::new(FileWatcherTool::new(
+        FileWatcherConfig::default(),
+        file_sandbox.clone(),
+    ));
+    registry.register_tool("file-watcher".to_string(), file_watcher_tool)?;
     Ok(())
 }
 
@@ -293,31 +258,29 @@ fn register_system_tools(
     registry: &Arc<ComponentRegistry>,
     file_sandbox: &Arc<FileSandbox>,
 ) -> Result<(), Box<dyn std::error::Error>> {
-    register_tool(registry, "environment_reader", || {
-        EnvironmentReaderTool::new(EnvironmentReaderConfig::default())
-    })?;
-    // ProcessExecutorTool needs sandbox for working directory validation
-    let process_executor_sandbox = file_sandbox.clone();
-    register_tool_with_sandbox(
-        registry,
-        "process_executor",
-        process_executor_sandbox.clone(),
-        move || {
-            ProcessExecutorTool::new(ProcessExecutorConfig::default(), process_executor_sandbox)
-        },
-    )?;
-    register_tool(registry, "service_checker", || {
-        ServiceCheckerTool::new(ServiceCheckerConfig::default())
-    })?;
+    // Environment reader
+    let env_tool = Arc::new(EnvironmentReaderTool::new(
+        EnvironmentReaderConfig::default(),
+    ));
+    registry.register_tool("environment-reader".to_string(), env_tool)?;
 
-    // SystemMonitorTool needs sandbox for /proc file access
-    let system_monitor_sandbox = file_sandbox.clone();
-    register_tool_with_sandbox(
-        registry,
-        "system_monitor",
-        system_monitor_sandbox.clone(),
-        move || SystemMonitorTool::new(SystemMonitorConfig::default(), system_monitor_sandbox),
-    )?;
+    // Process executor
+    let process_tool = Arc::new(ProcessExecutorTool::new(
+        ProcessExecutorConfig::default(),
+        file_sandbox.clone(),
+    ));
+    registry.register_tool("process-executor".to_string(), process_tool)?;
+
+    // Service checker
+    let service_tool = Arc::new(ServiceCheckerTool::new(ServiceCheckerConfig::default()));
+    registry.register_tool("service-checker".to_string(), service_tool)?;
+
+    // System monitor
+    let monitor_tool = Arc::new(SystemMonitorTool::new(
+        SystemMonitorConfig::default(),
+        file_sandbox.clone(),
+    ));
+    registry.register_tool("system-monitor".to_string(), monitor_tool)?;
     Ok(())
 }
 
@@ -326,27 +289,27 @@ fn register_media_tools(
     registry: &Arc<ComponentRegistry>,
     file_sandbox: &Arc<FileSandbox>,
 ) -> Result<(), Box<dyn std::error::Error>> {
-    let audio_sandbox = file_sandbox.clone();
-    register_tool_with_sandbox(
-        registry,
-        "audio_processor",
-        audio_sandbox.clone(),
-        move || AudioProcessorTool::new(AudioProcessorConfig::default(), audio_sandbox),
-    )?;
-    let image_sandbox = file_sandbox.clone();
-    register_tool_with_sandbox(
-        registry,
-        "image_processor",
-        image_sandbox.clone(),
-        move || ImageProcessorTool::new(ImageProcessorConfig::default(), image_sandbox),
-    )?;
-    let video_sandbox = file_sandbox.clone();
-    register_tool_with_sandbox(
-        registry,
-        "video_processor",
-        video_sandbox.clone(),
-        move || VideoProcessorTool::new(VideoProcessorConfig::default(), video_sandbox),
-    )?;
+    // Audio processor
+    let audio_tool = Arc::new(AudioProcessorTool::new(
+        AudioProcessorConfig::default(),
+        file_sandbox.clone(),
+    ));
+    registry.register_tool("audio-processor".to_string(), audio_tool)?;
+
+    // Image processor
+    let image_tool = Arc::new(ImageProcessorTool::new(
+        ImageProcessorConfig::default(),
+        file_sandbox.clone(),
+    ));
+    registry.register_tool("image-processor".to_string(), image_tool)?;
+
+    // Video processor
+    let video_tool = Arc::new(VideoProcessorTool::new(
+        VideoProcessorConfig::default(),
+        file_sandbox.clone(),
+    ));
+    registry.register_tool("video-processor".to_string(), video_tool)?;
+
     Ok(())
 }
 
@@ -355,21 +318,19 @@ fn register_search_tools(
     registry: &Arc<ComponentRegistry>,
     web_search_config: &llmspell_config::tools::WebSearchConfig,
 ) -> Result<(), Box<dyn std::error::Error>> {
-    // Use the provided configuration for WebSearchTool
-    let web_search_config = web_search_config.clone();
-    register_tool_result(registry, "web_search", move || {
-        // Convert from llmspell_config WebSearchConfig to llmspell_tools WebSearchConfig
-        // Note: Config structures have different fields - using defaults for missing ones
-        let tool_config = WebSearchConfig {
-            default_provider: "duckduckgo".to_string(), // Default provider
-            providers: HashMap::new(),                  // TODO: Add provider configuration
-            max_results: web_search_config.max_results,
-            safe_search: true, // Default to safe search
-            language: None,    // Default language
-            fallback_chain: vec!["duckduckgo".to_string()], // Default fallback
-        };
-        WebSearchTool::new(tool_config)
-    })?;
+    // Web searcher: register with kebab-case primary name
+    // Convert from llmspell_config WebSearchConfig to llmspell_tools WebSearchConfig
+    // Note: Config structures have different fields - using defaults for missing ones
+    let tool_config = WebSearchConfig {
+        default_provider: "duckduckgo".to_string(), // Default provider
+        providers: HashMap::new(),                  // TODO: Add provider configuration
+        max_results: web_search_config.max_results,
+        safe_search: true,                              // Default to safe search
+        language: None,                                 // Default language
+        fallback_chain: vec!["duckduckgo".to_string()], // Default fallback
+    };
+    let web_search_tool = Arc::new(WebSearchTool::new(tool_config)?);
+    registry.register_tool("web-searcher".to_string(), web_search_tool)?;
     Ok(())
 }
 
@@ -392,14 +353,21 @@ fn register_web_tools(registry: &Arc<ComponentRegistry>) -> Result<(), Box<dyn s
 fn register_communication_tools(
     registry: &Arc<ComponentRegistry>,
 ) -> Result<(), Box<dyn std::error::Error>> {
+    // Email sender
     #[cfg(feature = "email")]
-    register_tool_result(registry, "email-sender", || {
-        EmailSenderTool::new(EmailSenderConfig::default())
-    })?;
+    {
+        let email_tool = Arc::new(EmailSenderTool::new(EmailSenderConfig::default())?);
+        registry.register_tool("email-sender".to_string(), email_tool)?;
+    }
+
+    // Database connector
     #[cfg(feature = "database")]
-    register_tool_result(registry, "database-connector", || {
-        DatabaseConnectorTool::new(DatabaseConnectorConfig::default())
-    })?;
+    {
+        let db_tool = Arc::new(DatabaseConnectorTool::new(
+            DatabaseConnectorConfig::default(),
+        )?);
+        registry.register_tool("database-connector".to_string(), db_tool)?;
+    }
     Ok(())
 }
 

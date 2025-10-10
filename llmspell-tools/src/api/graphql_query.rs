@@ -192,7 +192,7 @@ impl GraphQLQueryTool {
 
         Ok(Self {
             metadata: ComponentMetadata::new(
-                "graphql-query-tool".to_string(),
+                "graphql-query".to_string(),
                 "GraphQL client with schema introspection and caching".to_string(),
             ),
             config,
@@ -228,7 +228,7 @@ impl GraphQLQueryTool {
         if !response.status().is_success() {
             return Err(LLMSpellError::Tool {
                 message: format!("GraphQL endpoint returned status: {}", response.status()),
-                tool_name: Some("graphql_query".to_string()),
+                tool_name: Some("graphql-query".to_string()),
                 source: None,
             });
         }
@@ -236,7 +236,7 @@ impl GraphQLQueryTool {
         let graphql_response: GraphQLResponse =
             response.json().await.map_err(|e| LLMSpellError::Tool {
                 message: format!("Failed to parse GraphQL response: {e}"),
-                tool_name: Some("graphql_query".to_string()),
+                tool_name: Some("graphql-query".to_string()),
                 source: None,
             })?;
 
@@ -245,7 +245,7 @@ impl GraphQLQueryTool {
             if !errors.is_empty() && graphql_response.data.is_none() {
                 return Err(LLMSpellError::Tool {
                     message: format!("GraphQL errors: {errors:?}"),
-                    tool_name: Some("graphql_query".to_string()),
+                    tool_name: Some("graphql-query".to_string()),
                     source: None,
                 });
             }
@@ -384,7 +384,7 @@ impl GraphQLQueryTool {
 
         response.data.ok_or_else(|| LLMSpellError::Tool {
             message: "Schema introspection returned no data".to_string(),
-            tool_name: Some("graphql_query".to_string()),
+            tool_name: Some("graphql-query".to_string()),
             source: None,
         })
     }
@@ -474,7 +474,7 @@ struct GraphQLParameters {
 impl Default for GraphQLQueryTool {
     fn default() -> Self {
         info!(
-            tool_name = "graph-q-l-query",
+            tool_name = "graphql-query",
             category = "Tool",
             phase = "Phase 3 (comprehensive instrumentation)",
             "Creating GraphQLQueryTool"
@@ -548,7 +548,7 @@ impl BaseAgent for GraphQLQueryTool {
             GraphQLOperation::Subscription => {
                 return Err(LLMSpellError::Tool {
                     message: "GraphQL subscriptions not yet supported".to_string(),
-                    tool_name: Some("graphql_query".to_string()),
+                    tool_name: Some("graphql-query".to_string()),
                     source: None,
                 });
             }
@@ -636,7 +636,7 @@ impl Tool for GraphQLQueryTool {
 
     fn schema(&self) -> ToolSchema {
         ToolSchema {
-            name: "graphql_query".to_string(),
+            name: "graphql-query".to_string(),
             description: "Execute GraphQL queries, mutations, and introspection".to_string(),
             parameters: vec![
                 ParameterDef {
@@ -757,6 +757,6 @@ mod tests {
         let config = GraphQLConfig::default();
         let tool = GraphQLQueryTool::new(config).unwrap();
 
-        assert_eq!(tool.metadata().name, "graphql-query-tool");
+        assert_eq!(tool.metadata().name, "graphql-query");
     }
 }

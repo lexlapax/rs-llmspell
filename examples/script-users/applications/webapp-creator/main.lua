@@ -16,14 +16,14 @@
 -- YOU'VE REACHED THE SUMMIT! This represents the pinnacle of llmspell capabilities.
 -- 
 -- Purpose: Generate complete production-ready web applications using 20 specialized AI agents
--- Architecture: Sequential workflow with state-based output collection and error recovery
+-- Architecture: Sequential workflow with automatic agent output collection
 -- Crates Showcased: llmspell-agents, llmspell-workflows, llmspell-tools, llmspell-bridge, 
 --                   llmspell-state-persistence, llmspell-utils, llmspell-testing
 -- Key Features:
 --   • 20 specialized agents for full-stack development
 --   • Complete app generation: frontend, backend, database, tests, deployment
---   • State-based output collection with workflow IDs
---   • Error recovery with exponential backoff
+--   • Automatic agent output collection via workflow metadata
+--   • Sequential workflow with integrated error handling
 --   • Production-ready code generation with best practices
 --
 -- Prerequisites:
@@ -62,11 +62,11 @@
 --   • Completion: You've mastered all llmspell capabilities!
 --
 -- ARCHITECTURE HIGHLIGHTS:
--- • collect_workflow_outputs(): Centralized state retrieval
--- • safe_agent_execute(): Retry logic with partial state saving
+-- • Automatic agent output collection via workflow metadata
 -- • generate_file(): Unified file generation with error handling
 -- • 20 specialized agents with specific models and prompts
--- • Recovery mechanism for resuming from failures
+-- • Sequential workflow with integrated state management
+-- • Workflow-based retry and error handling
 -- ============================================================
 
 print("=== WebApp Creator v2.0 ===")
@@ -125,44 +125,17 @@ print("📁 Output: " .. project_dir)
 print()
 
 -- ============================================================
--- Helper Functions (Task 10.3.a & 10.3.d)
+-- Helper Functions (Task 10.3.c)
 -- ============================================================
 
--- Collect workflow outputs from state (Task 10.3.a)
-function collect_workflow_outputs(workflow_id, step_names, agent_id_map)
-    local outputs = {}
-    
-    if Debug then
-        Debug.info("Collecting outputs for workflow: " .. tostring(workflow_id), "webapp.state")
-    end
-    
-    for _, step_name in ipairs(step_names) do
-        -- Use the actual agent ID with timestamp if available
-        local actual_agent_id = agent_id_map and agent_id_map[step_name] or step_name
-        local key = string.format("workflow:%s:agent:%s:output", workflow_id, actual_agent_id)
-        -- Use State.load with "custom" scope and colon prefix
-        local output = State.load("custom", ":" .. key)
-        
-        if Debug then
-            if output then
-                Debug.debug("Retrieved " .. step_name .. " output from key: " .. key, "webapp.state")
-            else
-                Debug.warn("No output for " .. step_name .. " at key: " .. key, "webapp.state")
-            end
-        end
-        
-        outputs[step_name] = output or ""
-    end
-    
-    return outputs
-end
-
--- Note: Error handling and retry logic is handled by the Rust workflow infrastructure
+-- Note: Agent output collection is now handled automatically by the workflow infrastructure
+-- The workflow result will contain agent_outputs in result.metadata.extra.agent_outputs
+-- Error handling and retry logic is handled by the Rust workflow infrastructure
 -- The workflow executor will handle retries, timeouts, and state persistence automatically
 
 -- File generation helper (Task 10.3.c)
 function generate_file(path, content)
-    Tool.invoke("file_operations", {
+    Tool.execute("file-operations", {
         operation = "write",
         path = path,
         input = type(content) == "table" and JSON.stringify(content) or content
@@ -604,49 +577,25 @@ if Debug then
 end
 
 if result then
-    -- Extract workflow ID from metadata
-    local workflow_id = nil
-    
-    -- Check if metadata exists and has the execution_id in extra
-    if result.metadata and type(result.metadata) == "table" then
-        if result.metadata.extra and type(result.metadata.extra) == "table" then
-            workflow_id = result.metadata.extra.execution_id or result.metadata.extra.workflow_id
-            
-            -- Also check if there are agent_outputs already collected
-            if result.metadata.extra.agent_outputs then
-                print("Agent outputs already collected in metadata")
-                -- Use the pre-collected outputs if available
-            end
-        end
-    end
-    
-    -- Fallback to other possible locations
-    if not workflow_id then
-        workflow_id = result.workflow_id or result.execution_id or result.id
-    end
-    
-    if workflow_id then
-        print("Workflow ID: " .. workflow_id)
-        
-        -- Collect all outputs (or use pre-collected ones from metadata)
-        local outputs = nil
-        if result.metadata and result.metadata.extra and result.metadata.extra.agent_outputs then
-            -- Use pre-collected outputs from metadata
-            outputs = result.metadata.extra.agent_outputs
-            print("Using pre-collected agent outputs from workflow metadata")
-        else
-            -- Fallback to manual collection from state
-            outputs = collect_workflow_outputs(workflow_id, agent_names, agent_ids)
-        end
-        
+    -- Get agent outputs from workflow metadata (automatically collected)
+    local outputs = result.metadata and result.metadata.extra
+        and result.metadata.extra.agent_outputs or {}
+
+    if outputs and type(outputs) == "table" then
+        -- Get execution ID for logging
+        local execution_id = result.metadata and result.metadata.extra
+            and result.metadata.extra.execution_id or "unknown"
+        print("Workflow execution ID: " .. execution_id)
+        print("Collected outputs from " .. #agent_names .. " agents")
+
         -- ============================================================
         -- File Generation Pipeline (Task 10.3.c)
         -- ============================================================
-        
+
         print("\n📁 Generating Project Files...\n")
         
         -- Create project directory (recursive to create parent dirs)
-        Tool.invoke("file_operations", {
+        Tool.execute("file-operations", {
             operation = "mkdir",
             path = project_dir,
             recursive = true
@@ -667,7 +616,7 @@ if result then
         generate_file(project_dir .. "/ui-design.json", outputs.frontend_designer)
         
         -- Frontend Code
-        Tool.invoke("file_operations", {
+        Tool.execute("file-operations", {
             operation = "mkdir",
             path = project_dir .. "/frontend"
         })
@@ -682,7 +631,7 @@ if result then
         })
         
         -- Backend Code
-        Tool.invoke("file_operations", {
+        Tool.execute("file-operations", {
             operation = "mkdir",
             path = project_dir .. "/backend"
         })
@@ -692,20 +641,20 @@ if result then
         -- Generate CRUD files from loop workflow
         if crud_result then
             print("\n📂 Generating CRUD modules from loop workflow...")
-            Tool.invoke("file_operations", {
+            Tool.execute("file-operations", {
                 operation = "mkdir",
                 path = project_dir .. "/backend/src/crud"
             })
-            Tool.invoke("file_operations", {
+            Tool.execute("file-operations", {
                 operation = "mkdir",
                 path = project_dir .. "/frontend/src/crud"
             })
             -- Create tests directory first
-            Tool.invoke("file_operations", {
+            Tool.execute("file-operations", {
                 operation = "mkdir",
                 path = project_dir .. "/tests"
             })
-            Tool.invoke("file_operations", {
+            Tool.execute("file-operations", {
                 operation = "mkdir",
                 path = project_dir .. "/tests/crud"
             })
@@ -734,14 +683,14 @@ if result then
         })
         
         -- Database
-        Tool.invoke("file_operations", {
+        Tool.execute("file-operations", {
             operation = "mkdir",
             path = project_dir .. "/database"
         })
         generate_file(project_dir .. "/database/migrations.sql", outputs.database_developer)
         
         -- Tests
-        Tool.invoke("file_operations", {
+        Tool.execute("file-operations", {
             operation = "mkdir",
             path = project_dir .. "/tests"
         })
@@ -756,9 +705,9 @@ if result then
         
         print("\n✅ WebApp Generation Complete!")
         print("📁 Project generated at: " .. project_dir)
-        
+
     else
-        print("❌ No workflow_id found in result")
+        print("❌ No agent outputs found in workflow result")
     end
 else
     print("❌ Workflow execution failed")

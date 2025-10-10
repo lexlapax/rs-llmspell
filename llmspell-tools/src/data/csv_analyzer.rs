@@ -302,7 +302,7 @@ impl CsvAnalyzerTool {
     pub fn new(config: CsvAnalyzerConfig) -> Self {
         Self {
             metadata: ComponentMetadata::new(
-                "csv-analyzer-tool".to_string(),
+                "csv-analyzer".to_string(),
                 "Analyze and process CSV files with streaming support".to_string(),
             ),
             config,
@@ -721,7 +721,7 @@ impl CsvAnalyzerTool {
             .await
             .map_err(|e| LLMSpellError::Tool {
                 message: format!("Failed to read Excel file: {e}"),
-                tool_name: Some("csv_analyzer".to_string()),
+                tool_name: Some("csv-analyzer".to_string()),
                 source: None,
             })?;
 
@@ -1523,7 +1523,7 @@ impl Tool for CsvAnalyzerTool {
 
     fn schema(&self) -> ToolSchema {
         ToolSchema {
-            name: "csv_analyzer".to_string(),
+            name: "csv-analyzer".to_string(),
             description: "Analyze and process CSV files with streaming support".to_string(),
             parameters: vec![
                 ParameterDef {
@@ -1601,7 +1601,7 @@ mod tests {
         let config = CsvAnalyzerConfig::default();
         let tool = CsvAnalyzerTool::new(config);
 
-        assert_eq!(tool.metadata().name, "csv-analyzer-tool");
+        assert_eq!(tool.metadata().name, "csv-analyzer");
     }
     #[tokio::test]
     async fn test_streaming_column_stats() {

@@ -322,7 +322,7 @@ pub enum SecurityHooks {
 ```rust
 pub struct AuditEntry {
     timestamp: DateTime<Utc>,
-    operation: String,          // "vector_search", "document_ingest"
+    operation: String,          // "vector-searcher", "document-ingest"
     tenant_id: Option<String>,  // Multi-tenant context
     principal: String,          // User/service identity
     resource: String,           // Resource accessed

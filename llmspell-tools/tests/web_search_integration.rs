@@ -213,7 +213,7 @@ async fn test_tool_metadata() {
 
     // Test schema
     let schema = tool.schema();
-    assert_eq!(schema.name, "web_search");
+    assert_eq!(schema.name, "web-searcher");
     assert!(!schema.parameters.is_empty());
 
     // Verify required parameter

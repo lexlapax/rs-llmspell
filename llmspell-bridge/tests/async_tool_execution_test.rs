@@ -14,7 +14,7 @@ async fn test_basic_tool_execution() {
     // Test basic tool execution
     let script = r#"
         -- Get a tool that performs operations
-        local hashTool = Tool.get("hash_calculator")
+        local hashTool = Tool.get("hash-calculator")
         assert(hashTool, "HashCalculatorTool should be available")
         
         -- Execute a hash calculation (synchronous from Lua's perspective)
@@ -61,9 +61,9 @@ async fn test_multiple_tool_execution() {
     // Test execution of multiple tools in sequence
     let script = r#"
         -- Get multiple tools
-        local hashTool = Tool.get("hash_calculator")
-        local base64Tool = Tool.get("base64_encoder")
-        local uuidTool = Tool.get("uuid_generator")
+        local hashTool = Tool.get("hash-calculator")
+        local base64Tool = Tool.get("base64-encoder")
+        local uuidTool = Tool.get("uuid-generator")
         
         -- Execute multiple tools in sequence
         local results = {}
@@ -123,7 +123,7 @@ async fn test_tool_with_coroutines() {
     let script = r#"
         -- Create a coroutine that executes tools
         local function toolCoroutine()
-            local tool = Tool.get("uuid_generator")
+            local tool = Tool.get("uuid-generator")
             
             -- Generate multiple UUIDs
             local uuids = {}
@@ -183,7 +183,7 @@ async fn test_tool_error_handling() {
     // Test that tools handle both success and error cases properly
     let script = r#"
         -- Test tool execution with various scenarios
-        local hashTool = Tool.get("hash_calculator")
+        local hashTool = Tool.get("hash-calculator")
         
         -- Test 1: Valid operation
         local success_raw = hashTool:execute({
@@ -241,7 +241,7 @@ async fn test_file_operations() {
     // Test file operations
     let script = r#"
         -- Get file operations tool
-        local fileTool = Tool.get("file_operations")
+        local fileTool = Tool.get("file-operations")
         assert(fileTool, "FileOperationsTool should be available")
         
         -- Create a temporary file  
@@ -300,9 +300,9 @@ async fn test_tool_execution_performance() {
         
         -- Execute multiple tools
         local tools = {
-            Tool.get("uuid_generator"),
-            Tool.get("hash_calculator"),
-            Tool.get("base64_encoder")
+            Tool.get("uuid-generator"),
+            Tool.get("hash-calculator"),
+            Tool.get("base64-encoder")
         }
         
         local results = {}
@@ -387,10 +387,10 @@ async fn test_tool_metadata_and_discovery() {
         
         -- Check that we have expected tools
         local expected_tools = {
-            "hash_calculator",
-            "base64_encoder",
-            "uuid_generator",
-            "file_operations"
+            "hash-calculator",
+            "base64-encoder",
+            "uuid-generator",
+            "file-operations"
         }
         
         -- Tool.list() returns tool objects, not names
@@ -413,15 +413,15 @@ async fn test_tool_metadata_and_discovery() {
         end
         
         -- Test getting tool metadata
-        local hashTool = Tool.get("hash_calculator")
+        local hashTool = Tool.get("hash-calculator")
         assert(hashTool, "Should get hash calculator tool")
-        
+
         -- Tools should have standard methods
         assert(type(hashTool.execute) == "function", "Tool should have execute method")
-        
+
         -- Tool.exists might not be implemented yet, so test carefully
         if Tool.exists then
-            assert(Tool.exists("hash_calculator") == true, "hash_calculator should exist")
+            assert(Tool.exists("hash-calculator") == true, "hash-calculator should exist")
             assert(Tool.exists("non_existent_tool") == false, "non_existent_tool should not exist")
         else
             -- If Tool.exists isn't implemented, that's OK
@@ -445,8 +445,8 @@ async fn test_tool_chaining() {
     // Test chaining tool operations
     let script = r#"
         -- Chain multiple tool operations
-        local hashTool = Tool.get("hash_calculator")
-        local base64Tool = Tool.get("base64_encoder")
+        local hashTool = Tool.get("hash-calculator")
+        local base64Tool = Tool.get("base64-encoder")
         
         -- Start with some data
         local original_data = "Hello, World!"

@@ -55,7 +55,7 @@ local workflow = Workflow.builder()
     :add_step({
         name = "generate_id",
         type = "tool",  -- Step type must be specified
-        tool = "uuid_generator",  -- Tool to invoke
+        tool = "uuid-generator",  -- Tool to invoke
         input = {  -- Parameters for the tool
             operation = "generate",
             version = "v4"
@@ -64,7 +64,7 @@ local workflow = Workflow.builder()
     :add_step({
         name = "get_timestamp",
         type = "tool",
-        tool = "date_time_handler",
+        tool = "datetime-handler",
         input = {
             operation = "now"
         }
@@ -72,7 +72,7 @@ local workflow = Workflow.builder()
     :add_step({
         name = "calculate_hash",
         type = "tool",
-        tool = "hash_calculator",
+        tool = "hash-calculator",
         input = {
             operation = "hash",
             algorithm = "sha256",
@@ -82,7 +82,7 @@ local workflow = Workflow.builder()
     :add_step({
         name = "create_summary",
         type = "tool",
-        tool = "file_operations",
+        tool = "file-operations",
         input = {
             operation = "write",
             path = "/tmp/workflow_summary.txt",
@@ -122,16 +122,16 @@ if success and execution_result then
     end
     
     -- Check if the summary file was created
-    local file_check = Tool.invoke("file_operations", {
+    local file_check = Tool.execute("file-operations", {
         operation = "exists",
         path = "/tmp/workflow_summary.txt"
     })
-    
+
     if file_check and file_check.text then
         print("   ✅ Summary file created: /tmp/workflow_summary.txt")
-        
+
         -- Read and display the summary
-        local file_content = Tool.invoke("file_operations", {
+        local file_content = Tool.execute("file-operations", {
             operation = "read",
             path = "/tmp/workflow_summary.txt"
         })
@@ -155,6 +155,6 @@ print("💡 Key concepts learned:")
 print("   - Workflows automate multi-step processes")
 print("   - Sequential workflows execute steps in order")
 print("   - The builder pattern provides a fluent API")
-print("   - Each step can be a tool, agent, or custom function")
+print("   - Each step can be a tool, agent, or nested workflow")
 print()
 print("Next: Try 04-handle-errors.lua to learn about error handling!")

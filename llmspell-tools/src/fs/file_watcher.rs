@@ -70,7 +70,7 @@ impl FileWatcherTool {
     pub fn new(config: FileWatcherConfig, sandbox: Arc<FileSandbox>) -> Self {
         Self {
             metadata: ComponentMetadata::new(
-                "file_watcher".to_string(),
+                "file-watcher".to_string(),
                 "Monitors file system changes and events".to_string(),
             ),
             config,
@@ -337,7 +337,7 @@ impl BaseAgent for FileWatcherTool {
                         .await
                         .map_err(|e| LLMSpellError::Tool {
                             message: format!("File watching failed: {e}"),
-                            tool_name: Some("file_watcher".to_string()),
+                            tool_name: Some("file-watcher".to_string()),
                             source: None,
                         })?;
 
@@ -400,7 +400,7 @@ impl Tool for FileWatcherTool {
 
     fn schema(&self) -> ToolSchema {
         ToolSchema::new(
-            "file_watcher".to_string(),
+            "file-watcher".to_string(),
             "Monitors file system changes and events".to_string(),
         )
         .with_parameter(ParameterDef {
@@ -496,7 +496,7 @@ mod tests {
     async fn test_file_watcher_tool_metadata() {
         let (tool, _temp_dir) = create_test_file_watcher();
         let metadata = tool.metadata();
-        assert_eq!(metadata.name, "file_watcher");
+        assert_eq!(metadata.name, "file-watcher");
         assert_eq!(
             metadata.description,
             "Monitors file system changes and events"
@@ -516,7 +516,7 @@ mod tests {
     async fn test_schema() {
         let (tool, _temp_dir) = create_test_file_watcher();
         let schema = tool.schema();
-        assert_eq!(schema.name, "file_watcher");
+        assert_eq!(schema.name, "file-watcher");
         assert_eq!(
             schema.description,
             "Monitors file system changes and events"

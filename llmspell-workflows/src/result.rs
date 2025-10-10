@@ -329,6 +329,58 @@ impl WorkflowResult {
             execution_id, iteration, step_name
         )
     }
+
+    /// Get agent outputs collected during workflow execution
+    ///
+    /// Returns a reference to the collected agent outputs if any agents were executed.
+    /// The map is keyed by agent ID and contains the JSON output from each agent execution.
+    ///
+    /// Agent outputs are automatically collected by all workflow types (Sequential, Parallel,
+    /// Loop, Conditional) when agents are executed within the workflow and state is available.
+    ///
+    /// # Returns
+    /// - `Some(&Map)` if agent outputs were collected during execution
+    /// - `None` if no agents were executed, state was unavailable, or outputs weren't collected
+    ///
+    /// # Example
+    /// ```ignore
+    /// let result = workflow.execute(input, context).await?;
+    /// if let Some(outputs) = result.agent_outputs() {
+    ///     for (agent_id, output) in outputs {
+    ///         println!("Agent {}: {:?}", agent_id, output);
+    ///     }
+    /// }
+    /// ```
+    pub fn agent_outputs(&self) -> Option<&serde_json::Map<String, serde_json::Value>> {
+        self.metadata
+            .get("agent_outputs")
+            .and_then(|v| v.as_object())
+    }
+
+    /// Get output from a specific agent by ID
+    ///
+    /// Convenience method to retrieve output from a single agent without iterating
+    /// through all outputs. This is useful when you know which agent's output you need.
+    ///
+    /// # Arguments
+    /// * `agent_id` - The agent ID to look up (as specified in workflow step configuration)
+    ///
+    /// # Returns
+    /// - `Some(&Value)` if the agent output exists
+    /// - `None` if agent not found, no outputs collected, or state was unavailable
+    ///
+    /// # Example
+    /// ```ignore
+    /// let result = workflow.execute(input, context).await?;
+    /// if let Some(output) = result.get_agent_output("requirements_analyst") {
+    ///     let text = output.as_str().unwrap_or("N/A");
+    ///     println!("Requirements: {}", text);
+    /// }
+    /// ```
+    pub fn get_agent_output(&self, agent_id: &str) -> Option<&serde_json::Value> {
+        self.agent_outputs()
+            .and_then(|outputs| outputs.get(agent_id))
+    }
 }
 
 /// Extension trait for backwards compatibility during migration
@@ -416,6 +468,133 @@ mod tests {
         assert_eq!(
             WorkflowType::Custom("etl".to_string()).to_string(),
             "custom:etl"
+        );
+    }
+
+    #[test]
+    fn test_agent_outputs_none_when_not_present() {
+        let result = WorkflowResult::success(
+            "exec-789".to_string(),
+            WorkflowType::Sequential,
+            "test-workflow".to_string(),
+            vec![],
+            3,
+            Duration::from_secs(5),
+        );
+
+        assert!(result.agent_outputs().is_none());
+    }
+
+    #[test]
+    fn test_agent_outputs_some_when_present() {
+        let mut result = WorkflowResult::success(
+            "exec-789".to_string(),
+            WorkflowType::Sequential,
+            "test-workflow".to_string(),
+            vec![],
+            3,
+            Duration::from_secs(5),
+        );
+
+        // Simulate agent outputs being added (as done by workflow execution)
+        let mut agent_outputs = serde_json::Map::new();
+        agent_outputs.insert(
+            "agent1".to_string(),
+            serde_json::json!({"text": "output1"}),
+        );
+        agent_outputs.insert(
+            "agent2".to_string(),
+            serde_json::json!({"text": "output2"}),
+        );
+        result.metadata.insert(
+            "agent_outputs".to_string(),
+            serde_json::Value::Object(agent_outputs),
+        );
+
+        let outputs = result.agent_outputs();
+        assert!(outputs.is_some());
+        assert_eq!(outputs.unwrap().len(), 2);
+        assert!(outputs.unwrap().contains_key("agent1"));
+        assert!(outputs.unwrap().contains_key("agent2"));
+    }
+
+    #[test]
+    fn test_get_agent_output_none_when_no_outputs() {
+        let result = WorkflowResult::success(
+            "exec-789".to_string(),
+            WorkflowType::Sequential,
+            "test-workflow".to_string(),
+            vec![],
+            3,
+            Duration::from_secs(5),
+        );
+
+        assert!(result.get_agent_output("agent1").is_none());
+    }
+
+    #[test]
+    fn test_get_agent_output_none_when_agent_not_found() {
+        let mut result = WorkflowResult::success(
+            "exec-789".to_string(),
+            WorkflowType::Sequential,
+            "test-workflow".to_string(),
+            vec![],
+            3,
+            Duration::from_secs(5),
+        );
+
+        // Add agent outputs but not the one we're looking for
+        let mut agent_outputs = serde_json::Map::new();
+        agent_outputs.insert(
+            "agent1".to_string(),
+            serde_json::json!({"text": "output1"}),
+        );
+        result.metadata.insert(
+            "agent_outputs".to_string(),
+            serde_json::Value::Object(agent_outputs),
+        );
+
+        assert!(result.get_agent_output("agent2").is_none());
+    }
+
+    #[test]
+    fn test_get_agent_output_some_when_found() {
+        let mut result = WorkflowResult::success(
+            "exec-789".to_string(),
+            WorkflowType::Sequential,
+            "test-workflow".to_string(),
+            vec![],
+            3,
+            Duration::from_secs(5),
+        );
+
+        // Add agent outputs
+        let mut agent_outputs = serde_json::Map::new();
+        agent_outputs.insert(
+            "requirements_agent".to_string(),
+            serde_json::json!({"text": "Requirements gathered successfully"}),
+        );
+        agent_outputs.insert(
+            "design_agent".to_string(),
+            serde_json::json!({"text": "Design completed"}),
+        );
+        result.metadata.insert(
+            "agent_outputs".to_string(),
+            serde_json::Value::Object(agent_outputs),
+        );
+
+        let output = result.get_agent_output("requirements_agent");
+        assert!(output.is_some());
+        assert_eq!(
+            output.unwrap().get("text").unwrap().as_str().unwrap(),
+            "Requirements gathered successfully"
+        );
+
+        let output2 = result.get_agent_output("design_agent");
+        assert!(output2.is_some());
+        assert_eq!(
+            output2.unwrap().get("text").unwrap().as_str().unwrap(),
+            "Design completed"
         );
     }
 }

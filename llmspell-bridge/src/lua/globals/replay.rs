@@ -1,6 +1,7 @@
 // ABOUTME: Lua bindings for hook replay functionality including scheduling and comparisons
 // ABOUTME: Provides scripting access to advanced replay capabilities for debugging
 
+use crate::lua::conversion::lua_value_to_json;
 use llmspell_core::LLMSpellError;
 use llmspell_hooks::replay::{
     HookResultComparator, ParameterModification, ReplayConfig, ReplayMode, ReplaySchedule,
@@ -94,8 +95,8 @@ impl UserData for LuaReplayConfig {
 
         methods.add_method_mut(
             "add_modification",
-            |lua, this, (path, value, enabled): (String, Value, Option<bool>)| {
-                let json_value = lua_value_to_json(lua, value)?;
+            |_lua, this, (path, value, enabled): (String, Value, Option<bool>)| {
+                let json_value = lua_value_to_json(value)?;
                 this.0.modifications.push(ParameterModification {
                     path,
                     value: json_value,
@@ -119,55 +120,6 @@ impl UserData for LuaReplaySchedule {
             ReplaySchedule::Interval { .. } => Ok("interval"),
             ReplaySchedule::Cron { .. } => Ok("cron"),
         });
-    }
-}
-
-/// Convert Lua value to JSON
-#[allow(clippy::only_used_in_recursion)]
-fn lua_value_to_json(lua: &Lua, value: Value) -> LuaResult<serde_json::Value> {
-    match value {
-        Value::Nil => Ok(serde_json::Value::Null),
-        Value::Boolean(b) => Ok(serde_json::Value::Bool(b)),
-        Value::Integer(i) => Ok(serde_json::Value::Number(i.into())),
-        Value::Number(n) => serde_json::Number::from_f64(n)
-            .map(serde_json::Value::Number)
-            .ok_or_else(|| LuaError::external("Invalid number")),
-        Value::String(s) => Ok(serde_json::Value::String(s.to_str()?.to_string())),
-        Value::Table(t) => {
-            let mut is_array = true;
-            let mut expected_index = 1;
-
-            for pair in t.clone().pairs::<Value, Value>() {
-                let (k, _) = pair?;
-                if let Value::Integer(i) = k {
-                    if i != expected_index {
-                        is_array = false;
-                        break;
-                    }
-                    expected_index += 1;
-                } else {
-                    is_array = false;
-                    break;
-                }
-            }
-
-            if is_array {
-                let mut arr = Vec::new();
-                for pair in t.pairs::<i64, Value>() {
-                    let (_, v) = pair?;
-                    arr.push(lua_value_to_json(lua, v)?);
-                }
-                Ok(serde_json::Value::Array(arr))
-            } else {
-                let mut map = serde_json::Map::new();
-                for pair in t.pairs::<String, Value>() {
-                    let (k, v) = pair?;
-                    map.insert(k, lua_value_to_json(lua, v)?);
-                }
-                Ok(serde_json::Value::Object(map))
-            }
-        }
-        _ => Err(LuaError::external("Unsupported Lua value type")),
     }
 }
 
@@ -230,8 +182,8 @@ pub fn create_replay_api(lua: &Lua) -> LuaResult<Table<'_>> {
     replay.set(
         "create_modification",
         lua.create_function(
-            |lua, (path, value, enabled): (String, Value, Option<bool>)| {
-                let json_value = lua_value_to_json(lua, value)?;
+            |_lua, (path, value, enabled): (String, Value, Option<bool>)| {
+                let json_value = lua_value_to_json(value)?;
                 Ok(LuaParameterModification(ParameterModification {
                     path,
                     value: json_value,
@@ -293,8 +245,8 @@ impl UserData for LuaHookResultComparator {
         methods.add_method(
             "compare_json",
             |lua, _this, (original, replayed): (Value, Value)| {
-                let orig_json = lua_value_to_json(lua, original)?;
-                let repl_json = lua_value_to_json(lua, replayed)?;
+                let orig_json = lua_value_to_json(original)?;
+                let repl_json = lua_value_to_json(replayed)?;
 
                 // Convert to HookResult for comparison
                 let orig_result = llmspell_hooks::HookResult::Modified(orig_json);
@@ -334,24 +286,5 @@ mod tests {
         let lua = Lua::new();
         let result = create_replay_api(&lua);
         assert!(result.is_ok());
-    }
-    #[test]
-    fn test_lua_value_to_json() {
-        let lua = Lua::new();
-
-        // Test nil
-        let nil = Value::Nil;
-        let json = lua_value_to_json(&lua, nil).unwrap();
-        assert_eq!(json, serde_json::Value::Null);
-
-        // Test boolean
-        let bool_val = Value::Boolean(true);
-        let json = lua_value_to_json(&lua, bool_val).unwrap();
-        assert_eq!(json, serde_json::Value::Bool(true));
-
-        // Test number
-        let num_val = Value::Number(42.5);
-        let json = lua_value_to_json(&lua, num_val).unwrap();
-        assert_eq!(json, serde_json::json!(42.5));
     }
 }

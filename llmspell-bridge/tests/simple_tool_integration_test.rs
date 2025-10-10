@@ -31,18 +31,18 @@ async fn test_simple_tool_integration() {
     // Test 1: Basic tool execution with JSON parsing
     let test_script = r#"
         -- Test base64 encoder
-        local tool = Tool.get("base64_encoder")
+        local tool = Tool.get("base64-encoder")
         if not tool then
-            error("Could not get base64_encoder tool")
+            error("Could not get base64-encoder tool")
         end
         
-        -- Test if we can call Tool.invoke directly
-        -- Tool.invoke should wrap parameters correctly
-        print("Testing Tool.invoke...")
+        -- Test if we can call Tool.execute directly
+        -- Tool.execute should wrap parameters correctly
+        print("Testing Tool.execute...")
         
-        -- Create a coroutine to call Tool.invoke (which is async)
+        -- Create a coroutine to call Tool.execute (which is async)
         local co = coroutine.create(function()
-            return Tool.invoke("base64_encoder", {
+            return Tool.execute("base64-encoder", {
                 operation = "encode",
                 input = "Hello, World!"
             })
@@ -126,9 +126,9 @@ async fn test_simple_tool_integration() {
 
     // Test 2: Calculator tool
     let calc_test = r#"
-        -- Use coroutine for async Tool.invoke
+        -- Use coroutine for async Tool.execute
         local co = coroutine.create(function()
-            return Tool.invoke("calculator", {
+            return Tool.execute("calculator", {
                 operation = "evaluate",
                 input = "2 + 3 * 4"
             })
@@ -188,9 +188,9 @@ async fn test_simple_tool_integration() {
         end
         
         -- Generate UUID (using Tool instance methods)
-        local uuid_tool = Tool.get("uuid_generator")
+        local uuid_tool = Tool.get("uuid-generator")
         if not uuid_tool then
-            error("Could not get uuid_generator tool")
+            error("Could not get uuid-generator tool")
         end
         
         -- Create coroutine for async execution
@@ -232,9 +232,9 @@ async fn test_simple_tool_integration() {
         local uuid = uuid_parsed.result.uuid
         
         -- Hash the UUID (using Tool instance methods)
-        local hash_tool = Tool.get("hash_calculator")
+        local hash_tool = Tool.get("hash-calculator")
         if not hash_tool then
-            error("Could not get hash_calculator tool")
+            error("Could not get hash-calculator tool")
         end
         
         -- Create coroutine for async execution
@@ -324,9 +324,9 @@ async fn test_simple_tool_integration() {
     let system_chain_test = r#"
         -- System → Data → Utility chain
         -- Step 1: Read environment variable (using Tool instance)
-        local env_tool = Tool.get("environment_reader")
+        local env_tool = Tool.get("environment-reader")
         if not env_tool then
-            error("Could not get environment_reader tool")
+            error("Could not get environment-reader tool")
         end
         
         -- Create coroutine for async execution
@@ -362,7 +362,7 @@ async fn test_simple_tool_integration() {
         
         -- Step 2: Test JSON processor with simple data (if available)
         local user_count = 2  -- Default value
-        local json_tool = Tool.get("json_processor")
+        local json_tool = Tool.get("json-processor")
         if json_tool then
             local test_data = {
                 users = {
@@ -428,7 +428,7 @@ async fn test_simple_tool_integration() {
         
         -- Step 3: Use the result in a template (if available)
         local template_output = nil
-        local template_tool = Tool.get("template_engine")
+        local template_tool = Tool.get("template-engine")
         if template_tool then
             -- Create coroutine for async execution
             local co3 = coroutine.create(function()
@@ -494,10 +494,10 @@ async fn test_simple_tool_integration() {
         -- File → Data → File chain
         -- Step 1: Write initial data
         local test_data = "name,age,city\nAlice,30,NYC\nBob,25,LA\nCharlie,35,Chicago"
-        
-        local file_tool = Tool.get("file_operations")
+
+        local file_tool = Tool.get("file-operations")
         if not file_tool then
-            error("Could not get file_operations tool")
+            error("Could not get file-operations tool")
         end
         
         -- Create coroutine for async execution
@@ -533,7 +533,7 @@ async fn test_simple_tool_integration() {
         local column_count = 3
         local headers = {"name", "age", "city"}
 
-        local csv_tool = Tool.get("csv_analyzer")
+        local csv_tool = Tool.get("csv-analyzer")
         if csv_tool then
         
         -- Create coroutine for async execution
@@ -664,7 +664,7 @@ async fn test_simple_tool_integration() {
         -- Use json_processor to query the data (if available)
         local user_count = 3  -- Default value
         local json_processed = false
-        local json_tool = Tool.get("json_processor")
+        local json_tool = Tool.get("json-processor")
         if json_tool then
         
         -- Create coroutine for async execution
@@ -713,9 +713,9 @@ async fn test_simple_tool_integration() {
         end
         
         -- Step 2: Use environment reader
-        local env_tool = Tool.get("environment_reader")
+        local env_tool = Tool.get("environment-reader")
         if not env_tool then
-            error("Could not get environment_reader tool")
+            error("Could not get environment-reader tool")
         end
         
         -- Create coroutine for async execution
@@ -749,9 +749,9 @@ async fn test_simple_tool_integration() {
         local system_checked = env_parsed and env_parsed.success
         
         -- Step 3: Save the results to a file
-        local file_tool = Tool.get("file_operations")
+        local file_tool = Tool.get("file-operations")
         if not file_tool then
-            error("Could not get file_operations tool")
+            error("Could not get file-operations tool")
         end
         
         -- Create coroutine for async execution
@@ -826,9 +826,9 @@ async fn test_simple_tool_integration() {
         
         -- Chain with invalid parameters
         local success2 = pcall(function()
-            local tool = Tool.get("base64_encoder")
+            local tool = Tool.get("base64-encoder")
             if not tool then
-                error("Could not get base64_encoder tool")
+                error("Could not get base64-encoder tool")
             end
             
             -- Create coroutine for async execution with invalid operation
@@ -862,9 +862,9 @@ async fn test_simple_tool_integration() {
         -- Chain where middle step fails
         local success3, err3 = pcall(function()
             -- Step 1: Generate UUID (should work)
-            local uuid_tool = Tool.get("uuid_generator")
+            local uuid_tool = Tool.get("uuid-generator")
             if not uuid_tool then
-                error("Could not get uuid_generator tool")
+                error("Could not get uuid-generator tool")
             end
             
             local co = coroutine.create(function()
@@ -884,9 +884,9 @@ async fn test_simple_tool_integration() {
             end
             
             -- Step 2: Try to hash with missing required parameter
-            local hash_tool = Tool.get("hash_calculator")
+            local hash_tool = Tool.get("hash-calculator")
             if not hash_tool then
-                error("Could not get hash_calculator tool")
+                error("Could not get hash-calculator tool")
             end
             
             local co2 = coroutine.create(function()
@@ -974,7 +974,7 @@ async fn test_tool_performance() {
 
     // Warm up
     let warmup_script = r#"
-        Tool.get("uuid_generator"):execute({operation = "generate", version = "v4"})
+        Tool.get("uuid-generator"):execute({operation = "generate", version = "v4"})
         return true
     "#;
     let _ = engine.execute_script(warmup_script).await;
@@ -982,16 +982,16 @@ async fn test_tool_performance() {
     // Benchmark different tools
     let benchmarks = vec![
         (
-            "uuid_generator",
-            r#"Tool.get("uuid_generator"):execute({operation = "generate", version = "v4"})"#,
+            "uuid-generator",
+            r#"Tool.get("uuid-generator"):execute({operation = "generate", version = "v4"})"#,
         ),
         (
-            "base64_encoder",
-            r#"Tool.get("base64_encoder"):execute({operation = "encode", input = "test"})"#,
+            "base64-encoder",
+            r#"Tool.get("base64-encoder"):execute({operation = "encode", input = "test"})"#,
         ),
         (
-            "hash_calculator",
-            r#"Tool.get("hash_calculator"):execute({operation = "hash", algorithm = "md5", input = "test"})"#,
+            "hash-calculator",
+            r#"Tool.get("hash-calculator"):execute({operation = "hash", algorithm = "md5", input = "test"})"#,
         ),
         (
             "calculator",

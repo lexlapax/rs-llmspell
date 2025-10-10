@@ -65,7 +65,7 @@ local function safe_invoke_tool(tool_name, params)
     
     -- Attempt tool invocation with pcall
     local success, result = pcall(function()
-        return Tool.invoke(tool_name, params or {})
+        return Tool.execute(tool_name, params or {})
     end)
     
     if success then
@@ -81,7 +81,7 @@ local function safe_invoke_tool(tool_name, params)
 end
 
 -- Test the pattern
-local result, err, details = safe_invoke_tool("uuid_generator", {
+local result, err, details = safe_invoke_tool("uuid-generator", {
     operation = "generate",
     version = "v4"
 })
@@ -445,7 +445,7 @@ function ErrorLogger:log(error_type, message, details)
     self.stats.by_hour[hour] = (self.stats.by_hour[hour] or 0) + 1
     
     -- Write to file (in production, use proper logging)
-    -- Tool.invoke("file_operations", {
+    -- Tool.execute("file-operations", {
     --     operation = "append",
     --     path = self.log_file,
     --     input = entry.date_str .. " [" .. error_type .. "] " .. message .. "\n"

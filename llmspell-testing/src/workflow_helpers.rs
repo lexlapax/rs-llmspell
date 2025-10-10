@@ -47,13 +47,12 @@ pub fn create_test_agent_step(name: &str, agent_id: &str, input: String) -> Work
 
 /// Create a test sub-workflow step
 pub fn create_test_subworkflow_step(name: &str, workflow_id: &str) -> WorkflowStep {
+    use llmspell_core::ComponentId;
     WorkflowStep::new(
         name.to_string(),
-        StepType::Custom {
-            function_name: "execute_workflow".to_string(),
-            parameters: serde_json::json!({
-                "workflow_id": workflow_id
-            }),
+        StepType::Workflow {
+            workflow_id: ComponentId::from_name(workflow_id),
+            input: serde_json::json!({}),
         },
     )
 }

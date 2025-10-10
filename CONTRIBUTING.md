@@ -73,6 +73,13 @@ cargo clippy -p llmspell-core
 - See [Tool Development Guide](docs/developer-guide/tool-development-guide.md)
 - Tools must implement proper security levels
 - Include comprehensive tests
+- **Tool Naming Convention**:
+  - Format: `<primary-function>-<object>` (e.g., `file-operations`, `image-processor`)
+  - Always use **kebab-case** (lowercase with hyphens)
+  - No `-tool` suffix (redundant - everything in the registry is a tool)
+  - Single-word tools acceptable for well-known operations (`calculator`, `scheduler`)
+  - Rust module names use snake_case per Rust conventions (`template_engine`)
+  - Tool registration strings use kebab-case (`"template-creator"`)
 
 ### Documentation
 - Keep documentation accurate and current

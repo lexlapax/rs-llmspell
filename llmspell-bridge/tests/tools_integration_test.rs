@@ -35,12 +35,12 @@ async fn test_all_tools_integration() {
         
         -- Test specific tools we know should exist
         local tools_to_test = {
-            "base64_encoder",
-            "calculator", 
-            "uuid_generator",
-            "hash_calculator",
-            "text_manipulator",
-            "file_operations"
+            "base64-encoder",
+            "calculator",
+            "uuid-generator",
+            "hash-calculator",
+            "text-manipulator",
+            "file-operations"
         }
         
         local passed = 0
@@ -121,24 +121,24 @@ async fn test_tool_performance_benchmarks() {
     // Benchmark each tool category
     let tool_benchmarks = vec![
         (
-            "base64_encoder",
-            r#"return Tool.get("base64_encoder"):execute({operation="encode", input="test"})"#,
+            "base64-encoder",
+            r#"return Tool.get("base64-encoder"):execute({operation="encode", input="test"})"#,
         ),
         (
             "calculator",
             r#"return Tool.get("calculator"):execute({operation="evaluate", expression="2+2"})"#,
         ),
         (
-            "uuid_generator",
-            r#"return Tool.get("uuid_generator"):execute({operation="generate", version="v4"})"#,
+            "uuid-generator",
+            r#"return Tool.get("uuid-generator"):execute({operation="generate", version="v4"})"#,
         ),
         (
-            "hash_calculator",
-            r#"return Tool.get("hash_calculator"):execute({operation="hash", algorithm="md5", input="test"})"#,
+            "hash-calculator",
+            r#"return Tool.get("hash-calculator"):execute({operation="hash", algorithm="md5", input="test"})"#,
         ),
         (
-            "text_manipulator",
-            r#"return Tool.get("text_manipulator"):execute({operation="uppercase", input="test"})"#,
+            "text-manipulator",
+            r#"return Tool.get("text-manipulator"):execute({operation="uppercase", input="test"})"#,
         ),
     ];
 

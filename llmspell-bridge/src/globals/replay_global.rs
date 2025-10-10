@@ -1,7 +1,10 @@
 // ABOUTME: Global object for hook replay functionality across all script languages
 // ABOUTME: Provides unified access to replay capabilities for debugging and analysis
 
-use super::{GlobalContext, GlobalMetadata, GlobalObject};
+#[cfg(any(feature = "lua", feature = "javascript"))]
+use super::GlobalContext;
+use super::{GlobalMetadata, GlobalObject};
+#[cfg(any(feature = "lua", feature = "javascript"))]
 use llmspell_core::Result;
 
 /// Global object that provides replay functionality

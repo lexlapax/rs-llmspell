@@ -1702,10 +1702,10 @@ local processor = DataProcessingWorkflow.new({
         ChartGenerator.new()
     },
     steps = {
-        { tool = "csv_reader", action = "read" },
-        { tool = "data_cleaner", action = "clean" },
-        { tool = "statistics_calculator", action = "analyze" },
-        { tool = "chart_generator", action = "visualize" }
+        { tool = "csv-reader", action = "read" },
+        { tool = "data-cleaner", action = "clean" },
+        { tool = "statistics-calculator", action = "analyze" },
+        { tool = "chart-generator", action = "visualize" }
     }
 })
 

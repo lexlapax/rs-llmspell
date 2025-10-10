@@ -121,7 +121,7 @@ local content_topics = {
 
 -- Create sample content topic
 local current_topic = content_topics.productivity
-Tool.invoke("file_operations", {
+Tool.execute("file-operations", {
     operation = "write",
     path = config.files.content_topic,
     input = current_topic
@@ -312,7 +312,7 @@ local content_plan = string.format([[
     config.settings.quality_threshold
 )
 
-Tool.invoke("file_operations", {
+Tool.execute("file-operations", {
     operation = "write",
     path = config.files.content_plan,
     input = content_plan
@@ -396,7 +396,7 @@ Remember: The best AI tool is the one you actually use consistently. Focus on ad
 *Content created using the Power User Content Creation workflow - demonstrating the very productivity principles discussed in this article.*
 ]], current_topic)
 
-Tool.invoke("file_operations", {
+Tool.execute("file-operations", {
     operation = "write",
     path = config.files.final_content,
     input = final_content
@@ -435,7 +435,7 @@ local quality_report = string.format([[
 }
 ]], current_topic, config.settings.quality_threshold, execution_time_ms)
 
-Tool.invoke("file_operations", {
+Tool.execute("file-operations", {
     operation = "write",
     path = config.files.quality_report,
     input = quality_report
@@ -473,7 +473,7 @@ print("  🔧 Technical Architecture:")
 print("    • Agents: 4 (reduced from 7) - Power User complexity")
 print("    • Workflows: Conditional logic (quality-based decisions)")
 print("    • Crates: Core + llmspell-workflows (conditional patterns)")
-print("    • Tools: text_manipulator, template_engine, json_processor")
+print("    • Tools: text_manipulator, template-creator, json-processor")
 print("    • State Management: Basic (quality thresholds, conditional routing)")
 print("")
 

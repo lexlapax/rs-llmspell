@@ -170,7 +170,7 @@ agent:terminate()
 ```lua
 Tool.list()
 Tool.get(name)
-Tool.invoke(name, params)
+Tool.execute(name, params)
 Tool.exists(name)
 Tool.categories()
 Tool.discover(filter)

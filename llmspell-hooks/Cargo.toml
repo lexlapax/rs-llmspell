@@ -41,4 +41,3 @@ tracing-subscriber = { version = "0.3", features = ["env-filter"] }
 tempfile = "3.8"
 llmspell-agents = { path = "../llmspell-agents" }
 llmspell-providers = { path = "../llmspell-providers" }
-llmspell-core = { path = "../llmspell-core" }

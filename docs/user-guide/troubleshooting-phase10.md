@@ -488,7 +488,7 @@ Error: Invalid parameters for tool
 **Tips**:
 - Search is case-insensitive partial matching
 - Searches tool names, descriptions, and categories
-- Use shorter, more general terms (e.g., "file" not "file_operations")
+- Use shorter, more general terms (e.g., "file" not "file-operations")
 - Common tool categories: filesystem, utility, web, data, analysis
 
 ---
@@ -898,11 +898,11 @@ time ./target/release/llmspell tool invoke calculator \
 # Some tools are inherently slow (API calls, file I/O)
 # Expected times:
 # - calculator: <10ms
-# - file_operations: 10-100ms (depends on file size)
-# - web_scraper: 100-1000ms (network latency)
+# - file-operations: 10-100ms (depends on file size)
+# - web-scraper: 100-1000ms (network latency)
 
 # Use --trace to see breakdown
-./target/debug/llmspell tool invoke web_scraper \
+./target/debug/llmspell tool invoke web-scraper \
   --params '{"url": "..."}' \
   --trace info
 ```

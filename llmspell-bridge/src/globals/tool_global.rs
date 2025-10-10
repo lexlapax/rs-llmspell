@@ -1,8 +1,11 @@
 //! ABOUTME: Tool global object implementation for script engines
 //! ABOUTME: Provides Tool discovery and invocation functionality
 
-use super::types::{GlobalContext, GlobalMetadata, GlobalObject};
+#[cfg(any(feature = "lua", feature = "javascript"))]
+use super::types::GlobalContext;
+use super::types::{GlobalMetadata, GlobalObject};
 use crate::ComponentRegistry;
+#[cfg(any(feature = "lua", feature = "javascript"))]
 use llmspell_core::Result;
 use std::sync::Arc;
 

@@ -11,8 +11,19 @@ The platform is highly modular and can be built with different feature sets to c
 ## Key Documents
 
 *   **Architecture**: `/docs/technical/master-architecture-vision.md`
-*   **Implementation Phases**: `/docs/in-progress/implementation-phases.md` (16-phase roadmap)
+*   **Implementation Phases**: `/docs/in-progress/implementation-phases.md` (23+ phase roadmap)
+*   **Current Status**: v0.11.1 - Phase 11a Complete, Ready for Phase 12 (Adaptive Memory System)
+*   **Phase 11a Design**: `/docs/in-progress/phase-11a-design-doc.md` (1,685-line consolidation doc)
+*   **Release Notes**: `/RELEASE_NOTES_v0.11.1.md` (comprehensive v0.11.1 changelog)
 *   **Current Work**: Always read `/TODO.md` for active tasks.
+
+## Recent Completion Status
+
+*   ✅ **Phase 7**: Infrastructure Consolidation (536+ files refactored, centralized testing, config revolution)
+*   ✅ **Phase 10**: Service Integration & IDE Connectivity (kernel, Jupyter, VS Code, LSP)
+*   ✅ **Phase 11**: Local LLM Integration (Ollama + Candle dual-path) - COMPLETE
+*   ✅ **Phase 11a**: Bridge Consolidation (87% compile speedup, API standardization, docs completeness) - COMPLETE
+*   🚧 **Phase 12**: Starting - Adaptive Memory System (A-TKG temporal knowledge graph)
 
 ## Development Philosophy
 
@@ -115,3 +126,19 @@ The following scripts are mandatory to run before committing:
 *   **Hook overhead**: <1%
 *   **State operations**: <5ms write, <1ms read
 *   **Zero warnings policy**: `cargo clippy --workspace --all-target --all-features`
+
+## v0.11.1 Key Achievements (Phase 11a)
+
+*   **87% Compile Speedup**: Bridge-only builds 38s→5s via Cargo feature gates (optional language runtimes)
+*   **API Standardization**: Tool.execute() consistent across all 40+ tools (zero ambiguity)
+*   **Workflow Introspection**: WorkflowResult.agent_outputs for debugging multi-step workflows
+*   **Documentation Completeness**: Security coverage 40%→95%, Environment variables 0%→100% (41+ documented)
+*   **Code Simplification**: 876 lines removed (StepType::Custom variant cleanup)
+*   **Lua API Documentation**: 100% accurate against llmspell-bridge implementation
+*   **Deployment Patterns**: GitHub Actions, GitLab CI, Docker, Docker Compose, systemd, Kubernetes ready
+
+## Important Notes
+
+*   When writing Lua scripts, always refer to `docs/user-guide/api/lua/README.md` for accurate API method names. **Do not guess**.
+*   All tool calls use `Tool.execute(name, params)` - no alternative methods.
+*   Environment variables are now fully documented in `docs/user-guide/configuration.md` and `docs/user-guide/security-and-permissions.md`.

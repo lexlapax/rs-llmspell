@@ -37,7 +37,7 @@ print("=== Tool Integration Patterns ===\n")
 -- Helper function for safe tool invocation
 local function use_tool(tool_name, params)
     local success, result = pcall(function()
-        return Tool.invoke(tool_name, params)
+        return Tool.execute(tool_name, params)
     end)
     
     if success and result then
@@ -78,7 +78,7 @@ print("-" .. string.rep("-", 23))
 print("   Chain: UUID → Hash → Encode → Save")
 
 -- Step 1: Generate UUID
-local uuid_result = use_tool("uuid_generator", {
+local uuid_result = use_tool("uuid-generator", {
     operation = "generate",
     version = "v4"
 })
@@ -87,7 +87,7 @@ if uuid_result and uuid_result.result and uuid_result.result.uuid then
     print_result("Generated UUID", uuid_result)
     
     -- Step 2: Hash the UUID
-    local hash_result = use_tool("hash_calculator", {
+    local hash_result = use_tool("hash-calculator", {
         operation = "hash",
         algorithm = "sha256",
         input = uuid_result.result.uuid
@@ -97,7 +97,7 @@ if uuid_result and uuid_result.result and uuid_result.result.uuid then
         print_result("Hashed UUID", hash_result)
         
         -- Step 3: Encode the hash
-        local encode_result = use_tool("base64_encoder", {
+        local encode_result = use_tool("base64-encoder", {
             operation = "encode",
             input = hash_result.result.hash
         })
@@ -106,7 +106,7 @@ if uuid_result and uuid_result.result and uuid_result.result.uuid then
             print_result("Encoded hash", encode_result)
             
             -- Step 4: Save to file
-            local save_result = use_tool("file_operations", {
+            local save_result = use_tool("file-operations", {
                 operation = "write",
                 path = "/tmp/tool_chain_result.txt",
                 input = encode_result.result.encoded
@@ -124,10 +124,10 @@ print("   Executing multiple tools independently...")
 
 -- Execute multiple independent tools
 local tools_to_execute = {
-    {name = "UUID", tool = "uuid_generator", params = {operation = "generate", version = "v4"}},
-    {name = "Timestamp", tool = "date_time_handler", params = {operation = "now"}},
+    {name = "UUID", tool = "uuid-generator", params = {operation = "generate", version = "v4"}},
+    {name = "Timestamp", tool = "datetime-handler", params = {operation = "now"}},
     {name = "Calculator", tool = "calculator", params = {operation = "evaluate", input = "42 * 17 + 89"}},
-    {name = "Hash", tool = "hash_calculator", params = {operation = "hash", algorithm = "md5", input = "test"}}
+    {name = "Hash", tool = "hash-calculator", params = {operation = "hash", algorithm = "md5", input = "test"}}
 }
 
 local results = {}
@@ -197,7 +197,7 @@ print("-" .. string.rep("-", 32))
 print("   Testing error recovery...")
 
 -- Try to read non-existent file
-local read_result = use_tool("file_operations", {
+local read_result = use_tool("file-operations", {
     operation = "read",
     path = "/tmp/nonexistent_file.txt"
 })
@@ -206,7 +206,7 @@ if read_result.error or read_result.success == false then
     print("   File not found, creating with default content...")
     
     -- Recover by creating the file
-    local create_result = use_tool("file_operations", {
+    local create_result = use_tool("file-operations", {
         operation = "write",
         path = "/tmp/nonexistent_file.txt",
         input = "Default content created during error recovery"
@@ -214,7 +214,7 @@ if read_result.error or read_result.success == false then
     
     if create_result and create_result.success ~= false then
         -- Now read the created file
-        local retry_result = use_tool("file_operations", {
+        local retry_result = use_tool("file-operations", {
             operation = "read",
             path = "/tmp/nonexistent_file.txt"
         })
@@ -287,7 +287,7 @@ local function create_secure_document(content, filename)
     print("   Creating secure document: " .. filename)
     
     -- Generate document ID
-    local id_result = use_tool("uuid_generator", {
+    local id_result = use_tool("uuid-generator", {
         operation = "generate",
         version = "v4"
     })
@@ -297,7 +297,7 @@ local function create_secure_document(content, filename)
     end
     
     -- Get timestamp
-    local time_result = use_tool("date_time_handler", {
+    local time_result = use_tool("datetime-handler", {
         operation = "now"
     })
     
@@ -310,7 +310,7 @@ local function create_secure_document(content, filename)
     )
     
     -- Hash for integrity
-    local hash_result = use_tool("hash_calculator", {
+    local hash_result = use_tool("hash-calculator", {
         operation = "hash",
         algorithm = "sha256",
         input = doc_content
@@ -320,7 +320,7 @@ local function create_secure_document(content, filename)
     doc_content = doc_content .. "\n---\nSHA256: " .. (hash_result and hash_result.result and hash_result.result.hash or "error")
     
     -- Save document
-    local save_result = use_tool("file_operations", {
+    local save_result = use_tool("file-operations", {
         operation = "write",
         path = "/tmp/" .. filename,
         input = doc_content

@@ -5,21 +5,22 @@ This document provides comprehensive documentation of all Lua globals available 
 ## Table of Contents
 
 1. [Agent](#agent) - LLM agent creation and management
-2. [Tool](#tool) - Tool invocation and discovery  
+2. [Tool](#tool) - Tool invocation and discovery
 3. [Workflow](#workflow) - Workflow orchestration
 4. [Session](#session) - Session management and persistence
 5. [State](#state) - Global state management
 6. [Event](#event) - Event publishing and subscription
 7. [Hook](#hook) - Hook registration and management
 8. [RAG](#rag) - Retrieval-Augmented Generation with vector storage
-9. [Config](#config) - Configuration access and management
-10. [Provider](#provider) - LLM provider information
-11. [Artifact](#artifact) - Artifact storage and retrieval
-12. [Replay](#replay) - Hook replay and testing
-13. [Debug](#debug) - Debugging and profiling utilities
-14. [JSON](#json) - JSON parsing and serialization
-15. [ARGS](#args) - Command-line argument access
-16. [Streaming](#streaming) - Streaming and coroutine utilities
+9. [LocalLLM](#localllm) - Local model management (Ollama, Candle)
+10. [Config](#config) - Configuration access and management
+11. [Provider](#provider) - LLM provider information
+12. [Artifact](#artifact) - Artifact storage and retrieval
+13. [Replay](#replay) - Hook replay and testing
+14. [Debug](#debug) - Debugging and profiling utilities
+15. [JSON](#json) - JSON parsing and serialization
+16. [ARGS](#args) - Command-line argument access
+17. [Streaming](#streaming) - Streaming and coroutine utilities
 
 ---
 
@@ -50,15 +51,11 @@ local agent = Agent.builder()
 ```
 
 #### Agent.create(config)
-Creates an agent directly from configuration.
+⚠️ **DEPRECATED** - Use `Agent.builder()` instead. This method returns an error directing users to use the builder pattern.
 
 ```lua
-local agent = Agent.create({
-    name = "my-agent",
-    type = "llm",
-    model = "anthropic/claude-3",
-    temperature = 0.5
-})
+-- DEPRECATED - Do not use
+-- Use Agent.builder() instead
 ```
 
 #### Agent.list()
@@ -83,22 +80,19 @@ end
 
 ### Agent Discovery
 
-#### Agent.discover(options)
-Discovers agents based on criteria.
-
-```lua
-local agents = Agent.discover({
-    type = "llm",
-    capabilities = {"code-generation"},
-    min_context = 4000
-})
-```
-
 #### Agent.discover_by_capability(capability)
 Finds agents with a specific capability.
 
 ```lua
 local coders = Agent.discover_by_capability("code-generation")
+```
+
+#### Agent.count()
+Returns the count of registered agents.
+
+```lua
+local total = Agent.count()
+print("Total agents:", total)
 ```
 
 ### Agent Templates
@@ -262,27 +256,59 @@ local response = agent:execute("Write a poem", {
 })
 ```
 
-#### agent:execute_streaming(prompt, options, callback)
+#### agent:invokeStream(prompt, options, callback)
 Executes with streaming response.
 
 ```lua
-agent:execute_streaming("Tell a story", {}, function(chunk)
+agent:invokeStream("Tell a story", {}, function(chunk)
     print(chunk)
 end)
 ```
 
-#### agent:reset()
-Resets the agent's state.
+#### agent:get_state()
+Gets the current state of the agent.
 
 ```lua
-agent:reset()
+local state = agent:get_state()
 ```
 
-#### agent:get_history()
-Gets conversation history.
+#### agent:set_state(new_state)
+Sets the agent's state.
 
 ```lua
-local history = agent:get_history()
+agent:set_state({context = "updated"})
+```
+
+#### agent:get_model()
+Gets the model name used by this agent.
+
+```lua
+local model = agent:get_model()
+print("Using model:", model)
+```
+
+#### agent:get_name()
+Gets the agent's name.
+
+```lua
+local name = agent:get_name()
+```
+
+#### agent:get_type()
+Gets the agent's type (e.g., "llm", "tool", "composite").
+
+```lua
+local agent_type = agent:get_type()
+```
+
+#### agent:get_capabilities()
+Gets the agent's capabilities.
+
+```lua
+local capabilities = agent:get_capabilities()
+for i, cap in ipairs(capabilities) do
+    print("Capability:", cap)
+end
 ```
 
 ---
@@ -303,27 +329,25 @@ for i, tool in ipairs(tools) do
 end
 ```
 
-#### Tool.invoke(name, params)
+#### Tool.execute(name, params)
 Invokes a tool by name with parameters.
 
 ```lua
-local result = Tool.invoke("calculator", {
+local result = Tool.execute("calculator", {
     operation = "add",
     a = 5,
     b = 3
 })
 ```
 
-#### Tool.execute(name, params, options)
-Executes a tool with additional options.
+#### Tool.get(name)
+Gets a tool instance by name.
 
 ```lua
-local result = Tool.execute("web-search", {
-    query = "LLMSpell documentation"
-}, {
-    timeout = 5000,
-    retry = 3
-})
+local tool = Tool.get("calculator")
+if tool then
+    local result = tool.execute({operation = "add", a = 5, b = 3})
+end
 ```
 
 ### Tool Discovery
@@ -354,23 +378,7 @@ Gets the parameter schema for a tool.
 local schema = Tool.get_schema("file-reader")
 ```
 
-### Tool Registration
-
-#### Tool.register(name, handler)
-Registers a new tool.
-
-```lua
-Tool.register("custom-tool", function(params)
-    return {result = params.input * 2}
-end)
-```
-
-#### Tool.unregister(name)
-Unregisters a tool.
-
-```lua
-Tool.unregister("custom-tool")
-```
+### Tool Availability
 
 #### Tool.is_available(name)
 Checks if a tool is available.
@@ -572,6 +580,290 @@ local status = workflow:get_status()
 print(status.state)  -- "running", "completed", "failed"
 ```
 
+### Workflow Result Structure
+
+All workflows return a result with the following structure:
+
+```lua
+{
+    success = true,              -- Overall success status
+    execution_id = "uuid...",    -- Unique execution ID
+    workflow_type = "sequential",-- Type of workflow
+    status = "completed",        -- Workflow status
+    metadata = {
+        extra = {
+            execution_id = "uuid...",  -- Execution ID (redundant, for convenience)
+            agent_outputs = {          -- Collected agent outputs (if agents present)
+                ["agent_id_timestamp"] = { ... },  -- Agent output JSON
+                ...
+            },
+            ...
+        }
+    },
+    ...
+}
+```
+
+**Accessing Agent Outputs**:
+
+```lua
+local result = workflow:execute(input)
+
+-- Option 1: Direct access
+local outputs = result.metadata.extra.agent_outputs
+
+-- Option 2: Safe access with fallback
+local outputs = result.metadata and result.metadata.extra
+    and result.metadata.extra.agent_outputs or {}
+
+-- Use outputs
+for agent_id, output in pairs(outputs) do
+    -- Process output
+end
+```
+
+---
+
+## Custom Workflow Logic - Tool & Agent Patterns
+
+**Note**: Custom step type was removed in v0.11. Use these superior patterns instead:
+
+### Pattern 1: Custom Logic via Tools
+
+For simple transformations, create a custom tool:
+
+```lua
+-- Instead of custom step:
+-- workflow:add_step({ type = "custom", function = "transform", ... })
+
+-- Use Tool pattern:
+Tool.register("my-transformer", function(params)
+    -- Your custom logic here
+    local result = params.input:upper()
+    return { text = result }
+end)
+
+workflow:add_step({
+    type = "tool",
+    tool = "my-transformer",
+    input = { input = "hello" }
+})
+```
+
+**Benefits**:
+- ✅ Reusable across workflows
+- ✅ Unit testable
+- ✅ Discoverable via Tool.list()
+- ✅ Supports full error handling
+
+### Pattern 2: Custom Logic via Agents
+
+For complex reasoning, create a custom agent:
+
+```lua
+-- Instead of custom step with complex logic:
+-- workflow:add_step({ type = "custom", function = "analyze", ... })
+
+-- Use Agent pattern:
+local analyzer = Agent.create({
+    name = "custom-analyzer",
+    provider = "openai",
+    model = "gpt-4o-mini",
+    system_prompt = "Analyze the input and extract key insights."
+})
+
+workflow:add_step({
+    type = "agent",
+    agent = "custom-analyzer",
+    input = "Analyze this text..."
+})
+```
+
+**Benefits**:
+- ✅ LLM-powered reasoning
+- ✅ Natural language input
+- ✅ Stateful across steps
+- ✅ Supports streaming
+
+### Pattern 3: Conditional Workflows for Branching Logic
+
+For if/else logic:
+
+```lua
+-- Instead of custom step with branching:
+-- workflow:add_step({ type = "custom", function = "route", ... })
+
+-- Use Conditional workflow:
+local router = Workflow.conditional()
+    :name("smart-router")
+    :condition("step:validation:output", "success")
+    :when_true({ type = "tool", tool = "process-data" })
+    :when_false({ type = "tool", tool = "handle-error" })
+    :build()
+```
+
+### Pattern 4: Loop Workflows for Iteration
+
+For custom iteration logic:
+
+```lua
+-- Instead of custom step with loop:
+-- workflow:add_step({ type = "custom", function = "iterate", ... })
+
+-- Use Loop workflow:
+local processor = Workflow.loop()
+    :name("batch-processor")
+    :max_iterations(100)
+    :body_step({ type = "tool", tool = "process-item" })
+    :build()
+```
+
+### Pattern 5: Nested Workflows for Composition
+
+For complex orchestration:
+
+```lua
+-- Instead of multiple custom steps:
+-- workflow:add_step({ type = "custom", function = "step1", ... })
+-- workflow:add_step({ type = "custom", function = "step2", ... })
+
+-- Use nested workflows:
+local preprocessing = Workflow.sequential()
+    :name("preprocessing")
+    :add_step({ type = "tool", tool = "validate" })
+    :add_step({ type = "tool", tool = "transform" })
+    :build()
+
+local main = Workflow.sequential()
+    :name("main-pipeline")
+    :add_step({ type = "workflow", workflow = preprocessing })
+    :add_step({ type = "agent", agent = "processor" })
+    :build()
+```
+
+### Pattern 6: State Management for Custom Variables
+
+For custom state tracking:
+
+```lua
+-- Use State API for custom variables
+workflow:add_step({
+    type = "tool",
+    tool = "calculator",
+    input = { operation = "add", values = {1, 2} }
+})
+
+-- Access results via state
+local result = State.load("custom", ":workflow:my_flow:tool:calculator:output")
+
+-- Or use agent_outputs for agents
+local outputs = workflow_result.metadata.extra.agent_outputs
+```
+
+### Migration Examples
+
+#### Example 1: Data Transformation
+
+**Before (Custom Step - Didn't Work)**:
+```lua
+workflow:add_step({
+    type = "custom",
+    function = "data_transform",
+    parameters = { format = "json" }
+})
+```
+
+**After (Tool Pattern)**:
+```lua
+-- Create reusable tool
+Tool.register("json-transformer", function(params)
+    local data = JSON.parse(params.input)
+    return { text = JSON.stringify(data) }
+end)
+
+workflow:add_step({
+    type = "tool",
+    tool = "json-transformer",
+    input = { input = raw_data }
+})
+```
+
+#### Example 2: Validation Logic
+
+**Before (Custom Step - Didn't Work)**:
+```lua
+workflow:add_step({
+    type = "custom",
+    function = "validation",
+    parameters = { rules = {...} }
+})
+```
+
+**After (Agent Pattern)**:
+```lua
+local validator = Agent.create({
+    name = "data-validator",
+    provider = "anthropic",
+    model = "claude-3-5-sonnet-20241022",
+    system_prompt = "Validate data against these rules: ..."
+})
+
+workflow:add_step({
+    type = "agent",
+    agent = "data-validator",
+    input = data_to_validate
+})
+```
+
+#### Example 3: Conditional Processing
+
+**Before (Custom Step - Didn't Work)**:
+```lua
+workflow:add_step({
+    type = "custom",
+    function = "check_and_route",
+    parameters = { threshold = 0.8 }
+})
+```
+
+**After (Conditional Workflow)**:
+```lua
+local router = Workflow.conditional()
+    :condition("step:scorer:output", "> 0.8")
+    :when_true({ type = "agent", agent = "high-quality-processor" })
+    :when_false({ type = "agent", agent = "standard-processor" })
+    :build()
+
+main_workflow:add_step({
+    type = "workflow",
+    workflow = router
+})
+```
+
+### Why These Patterns Are Better
+
+| Feature | Custom Steps (Old) | Tools/Agents/Workflows (New) |
+|---------|-------------------|------------------------------|
+| **Functionality** | ❌ Mock only | ✅ Real execution |
+| **Reusability** | ❌ None | ✅ Full reuse |
+| **Testing** | ❌ Can't test | ✅ Unit testable |
+| **Discovery** | ❌ Invisible | ✅ Tool.list(), Agent.discover() |
+| **Documentation** | ❌ No docs | ✅ Tool.get("name").schema |
+| **Error Handling** | ❌ Basic | ✅ Retry, fallback, hooks |
+| **State Management** | ❌ Manual | ✅ Automatic |
+| **Composition** | ❌ Limited | ✅ Nested workflows |
+| **LLM Integration** | ❌ None | ✅ Agent pattern |
+
+### Summary
+
+Custom steps never provided real functionality - they were mocks. The tool/agent/workflow primitives are:
+- ✅ **More powerful** - Full Turing-complete via tools + agents
+- ✅ **Better architecture** - Single responsibility, composable
+- ✅ **Easier to test** - Isolated, mockable components
+- ✅ **Better UX** - Discoverable, documented, reusable
+
+**Recommendation**: Always use tools for logic, agents for reasoning, workflows for orchestration.
+
 ---
 
 ## Session
@@ -598,10 +890,10 @@ Creates a session builder.
 
 ```lua
 local session = Session.builder()
-    :id("session-456")
-    :user("bob")
-    :ttl(3600)
-    :metadata({source = "web"})
+    :name("my-session")
+    :description("User session")
+    :tag("production")
+    :tag("user-session")
     :build()
 ```
 
@@ -697,13 +989,27 @@ end
 ```
 
 #### Session.replay(id, options)
-Replays a session.
+Replays a session with specified configuration.
 
 ```lua
 local results = Session.replay("user-123", {
-    speed = 2.0,
-    skip_delays = true
+    mode = "exact",  -- "exact", "modified", "simulate", or "debug"
+    compare_results = true,
+    timeout_seconds = 300,
+    stop_on_error = false,
+    metadata = {
+        replay_reason = "testing",
+        replayed_by = "admin"
+    }
 })
+
+-- Result structure:
+print(results.session_id)
+print(results.correlation_id)
+print(results.hooks_replayed)
+print(results.successful_replays)
+print(results.failed_replays)
+print(results.total_duration)
 ```
 
 #### Session.get_replay_metadata(id)
@@ -722,32 +1028,72 @@ local replayable = Session.list_replayable()
 
 ### Session Instance Methods
 
-#### session:get(key)
-Gets a session value.
+#### session:get_id()
+Gets the session ID.
 
 ```lua
-local value = session:get("user_preference")
+local id = session:get_id()
 ```
 
-#### session:set(key, value)
-Sets a session value.
+#### session:get_name()
+Gets the session name.
 
 ```lua
-session:set("last_query", "weather")
+local name = session:get_name()
 ```
 
-#### session:delete(key)
-Deletes a session value.
+#### session:get_status()
+Gets the session status (e.g., "active", "completed", "suspended").
 
 ```lua
-session:delete("temp_data")
+local status = session:get_status()
 ```
 
-#### session:store_artifact(name, data)
-Stores an artifact in the session.
+#### session:get_created_at()
+Gets the session creation timestamp.
 
 ```lua
-session:store_artifact("query_results", results)
+local created = session:get_created_at()
+```
+
+#### session:get_tags()
+Gets all session tags.
+
+```lua
+local tags = session:get_tags()
+for i, tag in ipairs(tags) do
+    print("Tag:", tag)
+end
+```
+
+#### session:add_tag(tag)
+Adds a tag to the session.
+
+```lua
+session:add_tag("important")
+```
+
+#### session:has_tag(tag)
+Checks if session has a specific tag.
+
+```lua
+if session:has_tag("production") then
+    -- Handle production session
+end
+```
+
+#### session:store_value(key, value)
+Stores a value in the session.
+
+```lua
+session:store_value("last_query", "weather")
+```
+
+#### session:get_value(key)
+Gets a value from the session.
+
+```lua
+local value = session:get_value("last_query")
 ```
 
 ---
@@ -756,113 +1102,86 @@ session:store_artifact("query_results", results)
 
 The `State` global provides persistent state management.
 
-### Basic Operations
+### Scoped State Operations
 
-#### State.get(key)
-Gets a state value.
+All state operations in LLMSpell use scopes for organization and isolation.
 
-```lua
-local value = State.get("app_config")
-```
-
-#### State.set(key, value)
-Sets a state value.
+#### State.save(scope, key, value)
+Saves a value to a scoped key.
 
 ```lua
-State.set("app_config", {
+State.save("user:123", "preferences", {
     theme = "dark",
     language = "en"
 })
 ```
 
-#### State.delete(key)
-Deletes a state entry.
+#### State.load(scope, key)
+Loads a value from a scoped key.
 
 ```lua
-State.delete("temp_state")
+local value = State.load("user:123", "preferences")
 ```
 
-#### State.exists(key)
-Checks if a key exists.
+#### State.delete(scope, key)
+Deletes a scoped key.
 
 ```lua
-if State.exists("user_settings") then
-    -- Key exists
+State.delete("user:123", "temp_state")
+```
+
+#### State.list_keys(scope)
+Lists all keys in a scope.
+
+```lua
+local keys = State.list_keys("user:123")
+for i, key in ipairs(keys) do
+    print("Key:", key)
 end
 ```
 
-#### State.clear()
-Clears all state.
+### Component-Specific State
+
+#### State.workflow_get(workflow_id, step_name)
+Gets state for a specific workflow step.
 
 ```lua
-State.clear()
+local step_state = State.workflow_get("workflow-123", "validate")
 ```
 
-#### State.list()
-Lists all state keys.
+#### State.workflow_list(workflow_id)
+Lists all state keys for a workflow.
 
 ```lua
-local keys = State.list()
+local keys = State.workflow_list("workflow-123")
 ```
 
-### Scoped State
-
-#### State.get_scoped(scope, key)
-Gets value from a scope.
+#### State.agent_get(agent_id, key)
+Gets agent-specific state.
 
 ```lua
-local value = State.get_scoped("user:123", "preferences")
+local agent_state = State.agent_get("agent-456", "memory")
 ```
 
-#### State.set_scoped(scope, key, value)
-Sets value in a scope.
+#### State.agent_set(agent_id, key, value)
+Sets agent-specific state.
 
 ```lua
-State.set_scoped("tenant:abc", "settings", config)
+State.agent_set("agent-456", "memory", {last_interaction = os.time()})
 ```
 
-#### State.delete_scoped(scope, key)
-Deletes from a scope.
+#### State.tool_get(tool_id, key)
+Gets tool-specific state.
 
 ```lua
-State.delete_scoped("session:456", "temp")
+local tool_state = State.tool_get("calculator", "history")
 ```
 
-#### State.clear_scope(scope)
-Clears an entire scope.
+#### State.tool_set(tool_id, key, value)
+Sets tool-specific state.
 
 ```lua
-State.clear_scope("user:123")
-```
-
-#### State.list_scoped(scope)
-Lists keys in a scope.
-
-```lua
-local keys = State.list_scoped("tenant:abc")
-```
-
-### Atomic Operations
-
-#### State.increment(key, amount)
-Atomically increments a numeric value.
-
-```lua
-local new_value = State.increment("counter", 1)
-```
-
-#### State.append(key, value)
-Appends to a list value.
-
-```lua
-State.append("event_log", {timestamp = os.time(), event = "login"})
-```
-
-#### State.compare_and_swap(key, old_value, new_value)
-Atomic compare and swap.
-
-```lua
-local success = State.compare_and_swap("status", "pending", "active")
+State.tool_set("calculator", "history", {last_calc = "2+2=4"})
 ```
 
 ### State Migrations
@@ -1278,6 +1597,120 @@ RAG.save()
 
 ---
 
+## LocalLLM
+
+The `LocalLLM` global provides local model management for Ollama and Candle backends (Phase 11).
+
+### Backend Status
+
+#### LocalLLM.status()
+Checks health status of local backends.
+
+```lua
+local status = LocalLLM.status()
+
+-- Ollama backend
+print("Ollama running:", status.ollama.running)
+print("Ollama models:", status.ollama.models)
+if status.ollama.version then
+    print("Ollama version:", status.ollama.version)
+end
+if status.ollama.error then
+    print("Ollama error:", status.ollama.error)
+end
+
+-- Candle backend
+print("Candle ready:", status.candle.ready)
+print("Candle models:", status.candle.models)
+if status.candle.version then
+    print("Candle version:", status.candle.version)
+end
+if status.candle.error then
+    print("Candle error:", status.candle.error)
+end
+```
+
+### Model Management
+
+#### LocalLLM.list(backend)
+Lists local models from specified backend(s).
+
+```lua
+-- List all models from all backends
+local models = LocalLLM.list()
+
+-- List from specific backend
+local ollama_models = LocalLLM.list("ollama")
+local candle_models = LocalLLM.list("candle")
+
+-- Iterate results
+for _, model in ipairs(models) do
+    print("ID:", model.id)
+    print("Backend:", model.backend)
+    print("Size:", model.size_bytes, "bytes")
+    if model.quantization then
+        print("Quantization:", model.quantization)
+    end
+    if model.modified_at then
+        print("Modified:", os.date("%Y-%m-%d", model.modified_at))
+    end
+end
+```
+
+#### LocalLLM.pull(spec)
+Downloads a model from backend library.
+
+```lua
+-- Pull from Ollama
+local progress = LocalLLM.pull("llama3.1:8b@ollama")
+
+-- Pull from Candle
+local progress = LocalLLM.pull("mistral:7b@candle")
+
+-- Check progress
+print("Model:", progress.model_id)
+print("Status:", progress.status)  -- "starting", "downloading", "verifying", "complete", "failed"
+print("Progress:", progress.percent_complete .. "%")
+print("Downloaded:", progress.bytes_downloaded, "bytes")
+if progress.bytes_total then
+    print("Total:", progress.bytes_total, "bytes")
+end
+if progress.error then
+    print("Error:", progress.error)
+end
+```
+
+#### LocalLLM.info(model_id)
+Gets detailed information about a specific model.
+
+```lua
+local info = LocalLLM.info("llama3.1:8b")
+
+print("ID:", info.id)
+print("Backend:", info.backend)
+print("Size:", info.size_bytes, "bytes")
+print("Format:", info.format)
+print("Loaded:", info.loaded)
+
+if info.parameter_count then
+    print("Parameters:", info.parameter_count)
+end
+if info.quantization then
+    print("Quantization:", info.quantization)
+end
+```
+
+### Model Specification Format
+
+Models are specified using the format: `model_name[:tag][@backend]`
+
+Examples:
+- `llama3.1:8b@ollama` - Llama 3.1 8B from Ollama
+- `mistral:7b@candle` - Mistral 7B from Candle
+- `tinyllama@candle` - TinyLlama from Candle (default tag)
+
+---
+
 ## Config
 
 The `Config` global provides access to configuration.
@@ -1370,6 +1803,198 @@ if Config.isNetworkAccessAllowed() then
     -- Can make network requests
 end
 ```
+
+---
+
+### Security & Permissions
+
+> **📚 Complete Guide**: See [Security & Permissions Guide](../../security-and-permissions.md) for comprehensive configuration, troubleshooting, and scenarios.
+
+#### Understanding Security Constraints
+
+LLMSpell scripts run in a sandboxed environment with three security levels:
+
+- **Safe**: Pure computation, no file/network/process access (e.g., calculator, hash-calculator)
+- **Restricted** (default): Explicit permissions required via config.toml
+- **Privileged**: Full access (rare, requires admin approval)
+
+Most tools operate at **Restricted** level, requiring explicit configuration.
+
+#### Checking Permissions Before Use
+
+**Pattern**: Check before executing to provide helpful error messages
+
+```lua
+-- Network access check
+if Config.isNetworkAccessAllowed() then
+    local result = Tool.execute("http-request", {
+        method = "GET",
+        url = "https://api.example.com/data"
+    })
+else
+    print("❌ Network access denied")
+    print("Add to config.toml:")
+    print("[tools.http_request]")
+    print('allowed_hosts = ["api.example.com"]')
+end
+
+-- File access check
+if Config.isFileAccessAllowed() then
+    local data = Tool.execute("file-operations", {
+        operation = "read",
+        path = "/workspace/data.txt"
+    })
+else
+    print("❌ File access denied")
+    print("Add to config.toml:")
+    print("[tools.file_operations]")
+    print('allowed_paths = ["/workspace"]')
+end
+
+-- Process execution check (via config)
+local can_execute = Config.get("tools.system.allow_process_execution")
+if can_execute then
+    Tool.execute("process-executor", {
+        executable = "echo",
+        arguments = {"Hello"}
+    })
+else
+    print("❌ Process execution disabled")
+    print("Set in config.toml:")
+    print("[tools.system]")
+    print("allow_process_execution = true")
+end
+```
+
+#### Handling Permission Errors
+
+**Pattern**: Use `pcall()` to catch and handle permission errors gracefully
+
+```lua
+-- Wrap tool calls to catch errors
+local success, result = pcall(function()
+    return Tool.execute("http-request", {
+        method = "GET",
+        url = "https://blocked-domain.com/api"
+    })
+end)
+
+if not success then
+    local error_msg = tostring(result)
+
+    if error_msg:match("Domain not in allowed list") or
+       error_msg:match("Host blocked") then
+        print("❌ ERROR: Domain not allowed")
+        print("Solution: Add domain to config.toml:")
+        print("[tools.http_request]")
+        print('allowed_hosts = ["blocked-domain.com"]')
+
+    elseif error_msg:match("Path not in allowlist") or
+           error_msg:match("Permission denied") then
+        print("❌ ERROR: File access denied")
+        print("Solution: Add path to config.toml:")
+        print("[tools.file_operations]")
+        print('allowed_paths = ["/your/path"]')
+
+    elseif error_msg:match("Command blocked") or
+           error_msg:match("Executable not allowed") then
+        print("❌ ERROR: Process execution denied")
+        print("Solution: Enable in config.toml:")
+        print("[tools.system]")
+        print("allow_process_execution = true")
+        print('allowed_commands = "echo,cat,ls"')
+
+    else
+        print("❌ ERROR: " .. error_msg)
+        print("See docs/user-guide/security-and-permissions.md")
+    end
+end
+```
+
+#### Permission Configuration (Admin Only)
+
+**Important**: Lua scripts **CANNOT modify security settings**. Permissions must be configured in `config.toml`:
+
+```toml
+# config.toml - Network access example
+[tools.web_search]
+allowed_domains = ["api.example.com", "*.github.com"]
+rate_limit_per_minute = 100
+
+[tools.http_request]
+allowed_hosts = ["api.example.com", "*.trusted.com"]
+blocked_hosts = ["localhost", "127.0.0.1"]  # SSRF prevention
+
+# Process execution example
+[tools.system]
+allow_process_execution = false  # Set true to enable
+allowed_commands = "echo,cat,ls,pwd"  # Comma-separated allowlist
+command_timeout_seconds = 30
+
+# File access example
+[tools.file_operations]
+allowed_paths = ["/workspace", "/tmp", "/data"]
+max_file_size = 50000000  # 50MB
+blocked_extensions = ["exe", "dll", "so"]
+```
+
+> **⚠️ Security Note**: `Config.setSecurity()` is available only for development/testing. Production scripts cannot modify security settings.
+
+#### Best Practices
+
+1. **Check permissions before use**: Use `Config.is*Allowed()` to detect missing permissions early
+   ```lua
+   if not Config.isNetworkAccessAllowed() then
+       error("Script requires network access. Configure [tools.network] in config.toml")
+   end
+   ```
+
+2. **Handle permission errors gracefully**: Always use `pcall()` and provide helpful error messages
+   ```lua
+   local success, result = pcall(function()
+       return Tool.execute("http-request", {...})
+   end)
+   if not success then
+       print("Error with helpful config fix suggestion")
+   end
+   ```
+
+3. **Request minimal permissions**: Follow principle of least privilege
+   - Only request paths you actually need
+   - Only request domains you actually access
+   - Only enable commands you actually use
+
+4. **Document required permissions**: Add comments to your scripts
+   ```lua
+   -- REQUIRED CONFIG:
+   -- [tools.http_request]
+   -- allowed_hosts = ["api.example.com"]
+   --
+   -- [tools.file_operations]
+   -- allowed_paths = ["/workspace/data"]
+
+   local data = fetch_and_save()
+   ```
+
+5. **Test permission boundaries**: Verify your script handles missing permissions
+   ```lua
+   -- Test without permissions first
+   -- Then add minimal permissions
+   -- Verify error messages are helpful
+   ```
+
+#### Common Permission Errors
+
+| Error Message | Solution |
+|--------------|----------|
+| "Network access denied" | Add `[tools.http_request]` with `allowed_hosts` |
+| "Domain not in allowed list" | Add domain to `allowed_domains` in `[tools.web_search]` |
+| "Path not in allowlist" | Add path to `allowed_paths` in `[tools.file_operations]` |
+| "Command blocked" | Set `allow_process_execution = true` and add to `allowed_commands` |
+| "Executable not allowed" | Add executable to `allowed_commands` in `[tools.system]` |
+| "File extension blocked" | Remove from `blocked_extensions` or add to `allowed_extensions` |
+
+---
 
 ### Tools Configuration
 
@@ -2016,7 +2641,7 @@ Streaming.yield(computed_value)
 Most operations return nil or false on failure:
 
 ```lua
-local result = Tool.invoke("calculator", {operation = "divide", a = 10, b = 0})
+local result = Tool.execute("calculator", {operation = "divide", a = 10, b = 0})
 if not result then
     print("Operation failed")
 elseif result.error then

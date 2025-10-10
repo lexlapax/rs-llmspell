@@ -53,20 +53,20 @@ fn test_file_system_tools_creation() {
     // FileWatcherTool
     let tool = FileWatcherTool::new(FileWatcherConfig::default(), sandbox.clone());
     let schema = tool.schema();
-    assert_eq!(schema.name, "file_watcher");
+    assert_eq!(schema.name, "file-watcher");
     assert!(!schema.description.is_empty());
     assert!(!schema.parameters.is_empty());
 
     // FileConverterTool
     let tool = FileConverterTool::new(FileConverterConfig::default(), sandbox.clone());
     let schema = tool.schema();
-    assert_eq!(schema.name, "file_converter");
+    assert_eq!(schema.name, "file-converter");
     assert!(!schema.description.is_empty());
 
     // FileSearchTool
     let tool = FileSearchTool::new(FileSearchConfig::default(), sandbox);
     let schema = tool.schema();
-    assert_eq!(schema.name, "file_search");
+    assert_eq!(schema.name, "file-search");
     assert!(!schema.description.is_empty());
 }
 #[test]
@@ -74,7 +74,7 @@ fn test_system_integration_tools_creation() {
     // EnvironmentReaderTool
     let tool = EnvironmentReaderTool::new(EnvironmentReaderConfig::default());
     let schema = tool.schema();
-    assert_eq!(schema.name, "environment_reader");
+    assert_eq!(schema.name, "environment-reader");
     assert!(!schema.description.is_empty());
 
     // ProcessExecutorTool
@@ -83,13 +83,13 @@ fn test_system_integration_tools_creation() {
         create_default_test_sandbox(),
     );
     let schema = tool.schema();
-    assert_eq!(schema.name, "process_executor");
+    assert_eq!(schema.name, "process-executor");
     assert!(!schema.description.is_empty());
 
     // ServiceCheckerTool
     let tool = ServiceCheckerTool::new(ServiceCheckerConfig::default());
     let schema = tool.schema();
-    assert_eq!(schema.name, "service_checker");
+    assert_eq!(schema.name, "service-checker");
     assert!(!schema.description.is_empty());
 
     // SystemMonitorTool
@@ -98,7 +98,7 @@ fn test_system_integration_tools_creation() {
         create_default_test_sandbox(),
     );
     let schema = tool.schema();
-    assert_eq!(schema.name, "system_monitor");
+    assert_eq!(schema.name, "system-monitor");
     assert!(!schema.description.is_empty());
 }
 #[test]
@@ -109,7 +109,7 @@ fn test_media_processing_tools_creation() {
         create_default_test_sandbox(),
     );
     let schema = tool.schema();
-    assert_eq!(schema.name, "audio_processor");
+    assert_eq!(schema.name, "audio-processor");
     assert!(!schema.description.is_empty());
 
     // VideoProcessorTool
@@ -118,7 +118,7 @@ fn test_media_processing_tools_creation() {
         create_default_test_sandbox(),
     );
     let schema = tool.schema();
-    assert_eq!(schema.name, "video_processor");
+    assert_eq!(schema.name, "video-processor");
     assert!(!schema.description.is_empty());
 
     // ImageProcessorTool
@@ -127,14 +127,14 @@ fn test_media_processing_tools_creation() {
         create_default_test_sandbox(),
     );
     let schema = tool.schema();
-    assert_eq!(schema.name, "image_processor");
+    assert_eq!(schema.name, "image-processor");
     assert!(!schema.description.is_empty());
 }
 #[test]
 fn test_search_tool_creation() {
     let tool = WebSearchTool::new(WebSearchConfig::default()).unwrap();
     let schema = tool.schema();
-    assert_eq!(schema.name, "web_search");
+    assert_eq!(schema.name, "web-searcher");
     assert!(!schema.description.is_empty());
 }
 #[test]
@@ -142,19 +142,19 @@ fn test_utility_tools_creation() {
     // HashCalculatorTool
     let tool = HashCalculatorTool::new(HashCalculatorConfig::default());
     let schema = tool.schema();
-    assert_eq!(schema.name, "hash_calculator");
+    assert_eq!(schema.name, "hash-calculator");
     assert!(!schema.description.is_empty());
 
     // TextManipulatorTool
     let tool = TextManipulatorTool::new(TextManipulatorConfig::default());
     let schema = tool.schema();
-    assert_eq!(schema.name, "text_manipulator");
+    assert_eq!(schema.name, "text-manipulator");
     assert!(!schema.description.is_empty());
 
     // UuidGeneratorTool
     let tool = UuidGeneratorTool::new(UuidGeneratorConfig::default());
     let schema = tool.schema();
-    assert_eq!(schema.name, "uuid_generator");
+    assert_eq!(schema.name, "uuid-generator");
     assert!(!schema.description.is_empty());
 }
 

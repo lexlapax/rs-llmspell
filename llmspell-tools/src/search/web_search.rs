@@ -284,7 +284,7 @@ impl WebSearchTool {
 
         Ok(Self {
             metadata: ComponentMetadata::new(
-                "web-search-tool".to_string(),
+                "web-searcher".to_string(),
                 "Search the web using multiple providers with fallback support".to_string(),
             ),
             config,
@@ -407,7 +407,7 @@ impl Tool for WebSearchTool {
 
     fn schema(&self) -> ToolSchema {
         ToolSchema::new(
-            "web_search".to_string(),
+            "web-searcher".to_string(),
             "Search the web using multiple providers with automatic fallback".to_string(),
         )
         .with_parameter(ParameterDef {

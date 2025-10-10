@@ -67,7 +67,7 @@ local data_pipeline = Workflow.builder()
     :add_step({
         name = "generate_id",
         type = "tool",
-        tool = "uuid_generator",
+        tool = "uuid-generator",
         input = {
             operation = "generate",
             version = "v4"
@@ -77,7 +77,7 @@ local data_pipeline = Workflow.builder()
     :add_step({
         name = "get_timestamp",
         type = "tool",
-        tool = "date_time_handler",
+        tool = "datetime-handler",
         input = {
             operation = "now"
         }
@@ -86,7 +86,7 @@ local data_pipeline = Workflow.builder()
     :add_step({
         name = "create_hash",
         type = "tool",
-        tool = "hash_calculator",
+        tool = "hash-calculator",
         input = {
             operation = "hash",
             algorithm = "sha256",
@@ -97,7 +97,7 @@ local data_pipeline = Workflow.builder()
     :add_step({
         name = "encode_result",
         type = "tool",
-        tool = "base64_encoder",
+        tool = "base64-encoder",
         input = {
             operation = "encode",
             input = "{{step.create_hash.result}}"
@@ -107,7 +107,7 @@ local data_pipeline = Workflow.builder()
     :add_step({
         name = "create_report",
         type = "tool",
-        tool = "template_engine",
+        tool = "template-creator",
         input = {
             input = "Pipeline Report:\nID: {{id}}\nTime: {{time}}\nHash: {{hash}}\nEncoded: {{encoded}}",
             context = {
@@ -135,39 +135,39 @@ local parallel_aggregator = Workflow.builder()
     :add_step({
         name = "uuid_v4",
         type = "tool",
-        tool = "uuid_generator",
+        tool = "uuid-generator",
         input = {operation = "generate", version = "v4"}
     })
     :add_step({
         name = "uuid_v5",
         type = "tool",
-        tool = "uuid_generator",
+        tool = "uuid-generator",
         input = {operation = "generate", version = "v5", namespace = "test", name = "workflow"}
     })
     -- Branch 2: Multiple hash calculations
     :add_step({
         name = "md5_hash",
         type = "tool",
-        tool = "hash_calculator",
+        tool = "hash-calculator",
         input = {operation = "hash", algorithm = "md5", input = "parallel_test"}
     })
     :add_step({
         name = "sha256_hash",
         type = "tool",
-        tool = "hash_calculator",
+        tool = "hash-calculator",
         input = {operation = "hash", algorithm = "sha256", input = "parallel_test"}
     })
     -- Branch 3: Text operations
     :add_step({
         name = "uppercase",
         type = "tool",
-        tool = "text_manipulator",
+        tool = "text-manipulator",
         input = {operation = "uppercase", input = "parallel workflow"}
     })
     :add_step({
         name = "word_count",
         type = "tool",
-        tool = "text_manipulator",
+        tool = "text-manipulator",
         input = {operation = "count", input = "parallel workflow execution test", count_type = "words"}
     })
     :build()
@@ -186,7 +186,7 @@ local blog_processor = Workflow.builder()
     :add_step({
         name = "format_blog",
         type = "tool",
-        tool = "template_engine",
+        tool = "template-creator",
         input = {
             input = "{{content}}\n\n[Formatted for Blog Publication]",
             context = {
@@ -202,7 +202,7 @@ local email_processor = Workflow.builder()
     :add_step({
         name = "format_email",
         type = "tool",
-        tool = "template_engine",
+        tool = "template-creator",
         input = {
             input = "Subject: Important Update\n\n{{content}}",
             context = {
@@ -221,7 +221,7 @@ local content_router = Workflow.builder()
     :add_step({
         name = "analyze_content",
         type = "tool",
-        tool = "text_manipulator",
+        tool = "text-manipulator",
         input = {
             operation = "count",
             input = "{{input.content}}",
@@ -280,7 +280,7 @@ local priority_system = Workflow.builder()
     :add_step({
         name = "check_priority",
         type = "tool",
-        tool = "text_manipulator",
+        tool = "text-manipulator",
         input = {
             operation = "count",
             input = "{{input.task}}",
@@ -297,7 +297,7 @@ local priority_system = Workflow.builder()
     :add_then_step({
         name = "critical_handler",
         type = "tool",
-        tool = "template_engine",
+        tool = "template-creator",
         input = {
             input = "🚨 CRITICAL ALERT: {{task}}\nImmediate action required!",
             context = {task = "{{input.task}}"}
@@ -307,7 +307,7 @@ local priority_system = Workflow.builder()
     :add_else_step({
         name = "normal_handler",
         type = "tool",
-        tool = "template_engine",
+        tool = "template-creator",
         input = {
             input = "📋 NORMAL: {{task}}\nAdded to standard queue.",
             context = {task = "{{input.task}}"}
@@ -338,13 +338,13 @@ local data_prep = Workflow.builder()
     :add_step({
         name = "generate_data",
         type = "tool",
-        tool = "uuid_generator",
+        tool = "uuid-generator",
         input = {operation = "generate", version = "v4"}
     })
     :add_step({
         name = "encode_data",
         type = "tool",
-        tool = "base64_encoder",
+        tool = "base64-encoder",
         input = {operation = "encode", input = "{{step.generate_data.result}}"}
     })
     :build()
@@ -356,7 +356,7 @@ local data_validation = Workflow.builder()
     :add_step({
         name = "verify_format",
         type = "tool",
-        tool = "text_manipulator",
+        tool = "text-manipulator",
         input = {operation = "trim", input = "{{input.data}}"}
     })
     :build()
@@ -376,7 +376,7 @@ local nested_workflow = Workflow.builder()
     :add_step({
         name = "process",
         type = "tool",
-        tool = "hash_calculator",
+        tool = "hash-calculator",
         input = {
             operation = "hash",
             algorithm = "sha256",
@@ -407,7 +407,7 @@ local recovery_workflow = Workflow.builder()
     :add_step({
         name = "generate",
         type = "tool",
-        tool = "uuid_generator",
+        tool = "uuid-generator",
         input = {
             operation = "generate",
             version = "v4"
@@ -417,7 +417,7 @@ local recovery_workflow = Workflow.builder()
     :add_step({
         name = "process",
         type = "tool",
-        tool = "hash_calculator",
+        tool = "hash-calculator",
         input = {
             operation = "hash",
             algorithm = "md5",
@@ -442,19 +442,19 @@ local perf_workflow = Workflow.builder()
     :add_step({
         name = "op1",
         type = "tool",
-        tool = "uuid_generator",
+        tool = "uuid-generator",
         input = {operation = "generate", version = "v4"}
     })
     :add_step({
         name = "op2",
         type = "tool",
-        tool = "hash_calculator",
+        tool = "hash-calculator",
         input = {operation = "hash", algorithm = "md5", input = "test"}
     })
     :add_step({
         name = "op3",
         type = "tool",
-        tool = "base64_encoder",
+        tool = "base64-encoder",
         input = {operation = "encode", input = "performance"}
     })
     :build()

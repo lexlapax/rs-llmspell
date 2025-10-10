@@ -98,7 +98,7 @@ llmspell-core = { path = "../llmspell-core" }
 llmspell-agents = { path = "../llmspell-agents" }
 llmspell-tools = { path = "../llmspell-tools" }
 llmspell-workflows = { path = "../llmspell-workflows" }
-llmspell-bridge = { path = "../llmspell-bridge" }
+llmspell-bridge = { path = "../llmspell-bridge", features = ["lua"] }
 llmspell-providers = { path = "../llmspell-providers" }
 llmspell-storage = { path = "../llmspell-storage" }
 llmspell-config = { path = "../llmspell-config" }

@@ -2,12 +2,19 @@
 //! ABOUTME: Handles batch injection of globals into script engines
 
 use super::registry::GlobalRegistry;
-use super::types::{GlobalContext, InjectionMetrics};
-use llmspell_core::{LLMSpellError, Result};
+#[cfg(any(feature = "lua", feature = "javascript"))]
+use super::types::GlobalContext;
+use super::types::InjectionMetrics;
+#[cfg(any(feature = "lua", feature = "javascript"))]
+use llmspell_core::LLMSpellError;
+use llmspell_core::Result;
 use parking_lot::RwLock;
+#[cfg(feature = "lua")]
 use std::collections::HashMap;
 use std::sync::Arc;
+#[cfg(any(feature = "lua", feature = "javascript"))]
 use std::time::Instant;
+#[cfg(feature = "lua")]
 use tracing::{debug, instrument};
 
 #[cfg(feature = "lua")]

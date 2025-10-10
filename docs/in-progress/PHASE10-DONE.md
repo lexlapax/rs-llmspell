@@ -6394,7 +6394,7 @@ pub fn handle_configuration_done(&mut self) -> Result<()> {
 - [x] Shows State persistence for checkpointing ✅ (State.save/load implemented)
 - [x] Includes performance timing with Debug.timer() ✅ (3 timers: creation, execution, workflow)
 - [x] Documents REPL usage for inspection ✅ (Full instructions in output and README)
-- [x] Uses at least one Tool.invoke() and one Workflow ✅ (file_operations + parallel workflow)
+- [x] Uses at least one Tool.execute() and one Workflow ✅ (file_operations + parallel workflow)
 
 **Implementation Steps:**
 1. Create `examples/script-users/applications/instrumented-agent/`:
@@ -6493,7 +6493,7 @@ pub fn handle_configuration_done(&mut self) -> Result<()> {
 4. Tool usage with debugging (correct API):
    ```lua
    Debug.debug("Writing results to file", "instrumented")
-   Tool.invoke("file_operations", {
+   Tool.execute("file_operations", {
        operation = "write",
        path = "/tmp/analysis-results.md",
        input = formatted_results  -- 'input' not 'content'

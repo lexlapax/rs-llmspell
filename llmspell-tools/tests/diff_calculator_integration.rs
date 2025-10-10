@@ -429,6 +429,6 @@ async fn test_tool_metadata() {
 
     // Verify schema
     let schema = tool.schema();
-    assert_eq!(schema.name, "diff_calculator");
+    assert_eq!(schema.name, "diff-calculator");
     assert!(schema.description.contains("differences"));
 }

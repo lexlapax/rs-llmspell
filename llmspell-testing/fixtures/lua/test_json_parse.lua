@@ -35,7 +35,7 @@ end
 
 -- Test if output is already parsed by checking a real tool
 print("\nTesting real tool output:")
-local tool = Tool.get("uuid_generator")
+local tool = Tool.get("uuid-generator")
 if tool then
     local result = tool.execute({operation = "generate"})
     print("  Result type:", type(result))
@@ -51,7 +51,7 @@ if tool then
         
         -- Run through test helper
         local TestHelpers = dofile("examples/test-helpers.lua")
-        local helper_result = TestHelpers.execute_tool("uuid_generator", {operation = "generate"})
+        local helper_result = TestHelpers.execute_tool("uuid-generator", {operation = "generate"})
         
         print("  Helper result type:", type(helper_result))
         print("  Helper has result?", helper_result.result ~= nil)

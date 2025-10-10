@@ -2,8 +2,11 @@
 //!
 //! Provides unified debug infrastructure access across all script languages.
 
-use super::types::{GlobalContext, GlobalMetadata, GlobalObject};
+#[cfg(any(feature = "lua", feature = "javascript"))]
+use super::types::GlobalContext;
+use super::types::{GlobalMetadata, GlobalObject};
 use crate::debug_bridge::DebugBridge;
+#[cfg(any(feature = "lua", feature = "javascript"))]
 use llmspell_core::Result;
 use std::sync::Arc;
 

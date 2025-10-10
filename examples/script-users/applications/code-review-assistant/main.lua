@@ -398,40 +398,17 @@ for file_idx, code_sample in ipairs(code_samples) do
         reviews = {}
     }
     
-    -- Collect outputs from State (following webapp-creator pattern)
-    if State then
-        -- Get the workflow ID from the result (following webapp-creator pattern)
-        local workflow_id = nil
-        if result then
-            -- Try different places where workflow_id might be
-            if result.metadata and result.metadata.extra then
-                workflow_id = result.metadata.extra.execution_id or result.metadata.extra.workflow_id
-            end
-            if not workflow_id then
-                workflow_id = result.workflow_id or result.execution_id or result.id
-            end
-        end
-        
-        -- If still no workflow_id, try the workflow object itself
-        if not workflow_id then
-            workflow_id = file_workflow.id or (file_workflow.get_id and file_workflow:get_id())
-        end
-        
-        -- Try to load individual agent outputs (using agent IDs, not step names)
-        local security_output = State.load("custom", ":workflow:" .. workflow_id .. ":agent:security_reviewer_" .. timestamp .. ":output")
-        local quality_output = State.load("custom", ":workflow:" .. workflow_id .. ":agent:quality_reviewer_" .. timestamp .. ":output")
-        local performance_output = State.load("custom", ":workflow:" .. workflow_id .. ":agent:performance_reviewer_" .. timestamp .. ":output")
-        local practices_output = State.load("custom", ":workflow:" .. workflow_id .. ":agent:practices_reviewer_" .. timestamp .. ":output")
-        local dependencies_output = State.load("custom", ":workflow:" .. workflow_id .. ":agent:dependency_reviewer_" .. timestamp .. ":output")
-        
-        file_review.reviews = {
-            security = security_output or "",
-            quality = quality_output or "",
-            performance = performance_output or "",
-            practices = practices_output or "",
-            dependencies = dependencies_output or ""
-        }
-    end
+    -- Get agent outputs from workflow metadata (automatically collected)
+    local outputs = result.metadata and result.metadata.extra
+        and result.metadata.extra.agent_outputs or {}
+
+    file_review.reviews = {
+        security = outputs["security_reviewer_" .. timestamp] or "",
+        quality = outputs["quality_reviewer_" .. timestamp] or "",
+        performance = outputs["performance_reviewer_" .. timestamp] or "",
+        practices = outputs["practices_reviewer_" .. timestamp] or "",
+        dependencies = outputs["dependency_reviewer_" .. timestamp] or ""
+    }
     
     table.insert(all_reviews, file_review)
     
@@ -475,26 +452,10 @@ fix_workflow:add_step({
 fix_workflow = fix_workflow:build()
 local fix_result = fix_workflow:execute({text = "Generate fixes"})
 
--- Collect fixes from State (don't check success)
-local generated_fixes = ""
-if State then
-    -- Get workflow ID from result
-    local workflow_id = nil
-    if fix_result then
-        if fix_result.metadata and fix_result.metadata.extra then
-            workflow_id = fix_result.metadata.extra.execution_id or fix_result.metadata.extra.workflow_id
-        end
-        if not workflow_id then
-            workflow_id = fix_result.workflow_id or fix_result.execution_id or fix_result.id
-        end
-    end
-    if not workflow_id then
-        workflow_id = fix_workflow.id or (fix_workflow.get_id and fix_workflow:get_id())
-    end
-    
-    -- Load using agent ID
-    generated_fixes = State.load("custom", ":workflow:" .. workflow_id .. ":agent:fix_generator_" .. timestamp .. ":output") or ""
-end
+-- Get fix output from workflow metadata
+local fix_outputs = fix_result.metadata and fix_result.metadata.extra
+    and fix_result.metadata.extra.agent_outputs or {}
+local generated_fixes = fix_outputs["fix_generator_" .. timestamp] or ""
 
 if generated_fixes ~= "" then
     print("  ✓ Fixes generated")
@@ -540,38 +501,24 @@ report_workflow:add_step({
 report_workflow = report_workflow:build()
 local report_result = report_workflow:execute({text = "Generate report"})
 
--- Collect report from State (don't check success)
+-- Get report output from workflow metadata
+local report_outputs = report_result.metadata and report_result.metadata.extra
+    and report_result.metadata.extra.agent_outputs or {}
+local report_output = report_outputs["report_writer_" .. timestamp]
+
 local final_report = "# Code Review Report\n\n"
-if State then
-    -- Get workflow ID from result
-    local workflow_id = nil
-    if report_result then
-        if report_result.metadata and report_result.metadata.extra then
-            workflow_id = report_result.metadata.extra.execution_id or report_result.metadata.extra.workflow_id
-        end
-        if not workflow_id then
-            workflow_id = report_result.workflow_id or report_result.execution_id or report_result.id
-        end
-    end
-    if not workflow_id then
-        workflow_id = report_workflow.id or (report_workflow.get_id and report_workflow:get_id())
-    end
-    
-    -- Load using agent ID
-    local report_output = State.load("custom", ":workflow:" .. workflow_id .. ":agent:report_writer_" .. timestamp .. ":output")
-    if report_output and report_output ~= "" then
-        print("  ✓ Report generated")
-        final_report = report_output
-    else
-        print("  ⚠ Using basic report format")
-        -- Fallback to basic report
-        final_report = final_report .. "## Summary\n\n"
-        final_report = final_report .. string.format("- Files Reviewed: %d\n", #code_samples)
-        final_report = final_report .. string.format("- Review Date: %s\n\n", os.date("%Y-%m-%d %H:%M:%S"))
-        final_report = final_report .. "## Files Reviewed\n\n"
-        for _, sample in ipairs(code_samples) do
-            final_report = final_report .. string.format("- %s (%s)\n", sample.filename, sample.language)
-        end
+if report_output and report_output ~= "" then
+    print("  ✓ Report generated")
+    final_report = report_output
+else
+    print("  ⚠ Using basic report format")
+    -- Fallback to basic report
+    final_report = final_report .. "## Summary\n\n"
+    final_report = final_report .. string.format("- Files Reviewed: %d\n", #code_samples)
+    final_report = final_report .. string.format("- Review Date: %s\n\n", os.date("%Y-%m-%d %H:%M:%S"))
+    final_report = final_report .. "## Files Reviewed\n\n"
+    for _, sample in ipairs(code_samples) do
+        final_report = final_report .. string.format("- %s (%s)\n", sample.filename, sample.language)
     end
 end
 
@@ -583,7 +530,7 @@ print("\n💾 Saving review outputs...\n")
 
 -- Save detailed findings
 local findings_path = config.output_dir .. "/review-findings.json"
-Tool.invoke("file_operations", {
+Tool.execute("file-operations", {
     operation = "write",
     path = findings_path,
     input = json.stringify({
@@ -597,7 +544,7 @@ print("  ✓ Findings saved to: " .. findings_path)
 
 -- Save markdown report
 local report_path = config.output_dir .. "/review-report.md"
-Tool.invoke("file_operations", {
+Tool.execute("file-operations", {
     operation = "write",
     path = report_path,
     input = final_report
@@ -621,7 +568,7 @@ Generated Files:
 Review Date: %s
 ]], config.system_name, #code_samples, config.output_dir, os.date("%Y-%m-%d %H:%M:%S"))
 
-Tool.invoke("file_operations", {
+Tool.execute("file-operations", {
     operation = "write",
     path = summary_path,
     input = summary

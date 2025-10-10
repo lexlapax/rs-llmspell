@@ -43,7 +43,7 @@ Progressive examples to learn LLMSpell from scratch. Each example builds on the 
 **File**: `01-first-tool.lua`  
 **Learn**: Tool invocation, parameter passing, result handling  
 **Prerequisites**: None  
-**Key Concepts**: Tool.invoke(), file operations, error checking
+**Key Concepts**: Tool.execute(), file operations, error checking
 
 ```bash
 ./target/debug/llmspell run 01-first-tool.lua
@@ -101,7 +101,7 @@ Progressive examples to learn LLMSpell from scratch. Each example builds on the 
 
 ### Using Tools
 ```lua
-local result = Tool.invoke("tool_name", {
+local result = Tool.execute("tool_name", {
     operation = "operation_name",
     input = "your data"
 })
@@ -157,7 +157,7 @@ local keys = State.list_keys("global")
 ```lua
 local function safe_operation(...)
     local success, result = pcall(function()
-        return Tool.invoke(...)
+        return Tool.execute(...)
     end)
     
     if success and result then

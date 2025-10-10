@@ -1,19 +1,21 @@
-# Current Architecture (v1.0.0 - Phase 11 Complete)
+# Current Architecture (v0.11.1 - Phase 11a Complete)
 
-**Status**: Production-Ready with Local LLM Integration (Ollama + Candle)
+**Status**: Production-Ready with Local LLM Integration + Bridge Consolidation
 **Last Updated**: October 2025
-**Implementation**: Phases 0-11 Complete
+**Implementation**: Phases 0-11a Complete
+**Consolidation**: Phase 11a quality improvements (87% compile speedup, 95% docs coverage)
 **Validation**: Cross-referenced with phase design documents and codebase
 
-> **📋 Single Source of Truth**: This document reflects the ACTUAL implementation as evolved through 11 development phases, validated against phase design documents (phase-01 through phase-11) and current codebase. **Phase 11 adds local LLM support via dual-backend implementation (Ollama + Candle) for cost-free, offline AI operations.**
+> **📋 Single Source of Truth**: This document reflects the ACTUAL implementation as evolved through 11+ development phases, validated against phase design documents (phase-01 through phase-11a) and current codebase. **Phase 11 adds local LLM support via dual-backend implementation (Ollama + Candle) for cost-free, offline AI operations. Phase 11a consolidates bridge layer with 87% compile speedup, API standardization, and documentation completeness (security 40%→95%, env vars 0%→100%).**
 
 ## Related Documentation
 
 This overview document is supported by detailed guides:
-- **[Architecture Decisions](./architecture-decisions.md)**: All ADRs from Phase 0-9
+- **[Architecture Decisions](./architecture-decisions.md)**: All ADRs from Phase 0-11a (includes ADR-042, ADR-043)
 - **[Operational Guide](./operational-guide.md)**: Performance benchmarks and security model
 - **[RAG System Guide](./rag-system-guide.md)**: Complete RAG documentation including HNSW tuning
 - **[Kernel Protocol Architecture](./kernel-protocol-architecture.md)**: Kernel design and protocol/transport layers
+- **[Phase 11a Design Document](../in-progress/phase-11a-design-doc.md)**: Bridge consolidation comprehensive documentation
 
 ---
 
@@ -45,6 +47,7 @@ This overview document is supported by detailed guides:
 - **Phase 9**: Integrated Kernel - Protocol/transport abstraction, global IO runtime, no-spawn execution, 46% code reduction
 - **Phase 10**: Production Deployment - Daemon support (systemd/launchd), signal handling, PID management, multi-protocol servers, consolidated state/sessions into kernel
 - **Phase 11**: Local LLM Integration - Dual-backend (Ollama via rig + Candle embedded), LocalProviderInstance trait, model CLI commands, 2.5K LOC provider implementation, 40 tok/s inference
+- **Phase 11a**: Bridge Consolidation & Documentation Completeness - Feature gates (87% compile speedup: 38s→5s bridge-only), workflow introspection (agent output collection), Tool.execute API standardization (40+ tools), Custom steps removal (876 LOC cleanup), security docs (40%→95% coverage), environment variables (0%→100%, 41+ security vars), Config global bug fix (critical), 1,866 LOC documentation added
 
 ### Key Architectural Decisions (Evolved Through Phases)
 
@@ -71,6 +74,10 @@ This overview document is supported by detailed guides:
 - **Phase 11**: LocalProviderInstance trait extending ProviderInstance (ADR-026)
 - **Phase 11**: Backend specifier syntax (@ollama/@candle) (ADR-027)
 - **Phase 11**: Kernel model protocol for CLI integration (ADR-028)
+- **Phase 11a**: Feature gate architecture for optional language runtimes (ADR-042)
+- **Phase 11a**: Workflow agent output collection for debugging (ADR-043)
+- **Phase 11a**: Tool.execute API standardization across all tools
+- **Phase 11a**: Config global fix (empty stub → full implementation)
 
 ---
 
@@ -655,8 +662,22 @@ llmspell model info phi3:3.8b
 ### 2. Tool Library (11,456 LOC)
 
 #### llmspell-tools
-**37+ Production Tools** (evolved from 26 in Phase 2 to 37+ in Phase 3)  
+**37+ Production Tools** (evolved from 26 in Phase 2 to 37+ in Phase 3)
 **Phase 3 Standardization**: Unified parameter naming (input/path/operation)
+**Phase 11a Standardization**: Tool.execute() API consistency across all 40+ tools
+
+**API Evolution:**
+- **Phase 2-10**: Multiple invocation methods (execute, call, invoke) caused confusion
+- **Phase 11a**: Unified to `Tool.execute(name, params)` across all tools
+- **Impact**: Zero ambiguity, single source of truth, consistent examples/docs
+
+**Lua API (Consistent):**
+```lua
+-- All tools use the same pattern
+Tool.execute("file-operations", {operation = "read", path = "data.txt"})
+Tool.execute("http-request", {url = "https://api.example.com"})
+Tool.execute("calculator", {expression = "2+2"})
+```
 
 **Categories & Tools**:
 - **Utilities (10)**: calculator, datetime-handler, uuid-generator, hash-calculator, base64-encoder, diff-calculator, text-manipulator, template-engine, data-validator, regex-matcher
@@ -686,9 +707,39 @@ llmspell model info phi3:3.8b
 #### llmspell-workflows
 **4 Workflow Types** (Phase 3 achievement):
 - **Sequential**: Steps execute in order
-- **Parallel**: Steps execute concurrently  
+- **Parallel**: Steps execute concurrently
 - **Conditional**: Branching based on conditions
 - **Loop**: Iterative execution with state
+
+**Phase 11a Enhancement - Workflow Introspection (ADR-043):**
+```rust
+pub struct WorkflowResult {
+    pub outputs: HashMap<String, serde_json::Value>,
+    pub metadata: HashMap<String, String>,
+    pub agent_outputs: Vec<(String, serde_json::Value)>,  // Phase 11a: debugging
+}
+```
+
+**Agent Output Collection** (Phase 11a):
+- Collects agent outputs during workflow execution for debugging multi-step workflows
+- Zero overhead for tool steps, <1ms overhead per agent step
+- Enables workflow introspection without custom logging
+- Foundation for Phase 14 (Agent-to-Agent) result passing
+
+**Lua API Example:**
+```lua
+local result = workflow:execute({})
+
+-- Debug agent outputs
+for i, output in ipairs(result.agent_outputs) do
+    print("Agent " .. output[1] .. " output:", output[2])
+end
+```
+
+**StepType Simplification** (Phase 11a):
+- Removed unused `StepType::Custom` variant (876 LOC cleanup)
+- Simplified to `Tool | Agent` only for clearer abstractions
+- Easier to reason about, reduced maintenance burden
 
 ### 5. State & Persistence (9,012 LOC)
 
@@ -729,7 +780,36 @@ llmspell model info phi3:3.8b
 
 #### llmspell-bridge
 **Phase 1-9 Evolution**: Synchronous wrapper over async Rust with kernel integration
+**Phase 11a Enhancement**: Feature-gated language runtimes for compile performance
 **Architecture**: `Lua Script → mlua → IntegratedKernel → Global IO Runtime → Async Rust`
+
+**Feature Gate Architecture (Phase 11a - ADR-042):**
+```toml
+[features]
+default = ["lua", "javascript"]
+lua = ["mlua", "mlua-vendored"]
+javascript = ["boa_engine"]
+```
+
+**Compile Performance Impact:**
+- **Bridge-only build** (no default features): 38s → 5s (87% faster)
+- **Bridge + Lua only**: 38s → 12s (68% faster)
+- **Full workspace build**: ~3min (unchanged)
+- **Pattern extends to**: Future language runtimes (Python, Ruby) and MCP backends
+
+**Usage:**
+```bash
+# Fast bridge-only compilation for bridge development
+cargo build -p llmspell-bridge --no-default-features  # 5s
+
+# Lua-only compilation
+cargo build -p llmspell-bridge --features lua  # 12s
+
+# Full compilation (default)
+cargo build -p llmspell-bridge  # 38s
+```
+
+**Developer Experience**: 87% faster iteration for bridge layer development, zero runtime performance impact.
 
 ### 8. Session Management (3,456 LOC)
 
@@ -904,6 +984,11 @@ Core Layer → DebugManager (global singleton)
 | Candle Throughput | >30 tok/s | 40 tok/s | Phase 11 ✅ |
 | Model Download (GGUF) | - | ~4GB/5min | Phase 11 ✅ |
 | HuggingFace Tokenizer | <500ms | ~300ms | Phase 11 ✅ |
+| Bridge compile (no features) | - | 5s | Phase 11a ✅ |
+| Bridge compile (lua only) | - | 12s | Phase 11a ✅ |
+| Bridge compile (full) | 38s | 38s | Phase 11a baseline |
+| Workflow output collection | - | <1ms | Phase 11a ✅ |
+| Tool.execute standardization | - | 100% | Phase 11a ✅ |
 
 ---
 
@@ -911,10 +996,11 @@ Core Layer → DebugManager (global singleton)
 
 ### Lua Global Objects (18+)
 **Phase 2 Decision**: Global injection pattern for zero-import scripts
+**Phase 11a Consistency**: Tool.execute() standardization
 
 1. **Agent** - Agent creation with builder pattern (Phase 7 standardization)
-2. **Tool** - Tool discovery and execution (37+ tools)
-3. **Workflow** - Sequential, Parallel, Conditional, Loop patterns
+2. **Tool** - Tool discovery and execution via Tool.execute() (37+ tools, Phase 11a standardization)
+3. **Workflow** - Sequential, Parallel, Conditional, Loop patterns (Phase 11a: agent output collection)
 4. **State** - Persistence with save/load/migrate (Phase 5)
 5. **Session** - Lifecycle with artifacts (Phase 6)
 6. **Hook** - Registration for 40+ hook points (Phase 4)
@@ -1057,6 +1143,48 @@ pub trait Workflow: BaseAgent { /* Workflow-specific */ }
 - **Documentation**: 580 LOC (320-line guide + 260-line examples)
 - **Zero warnings**: Full clippy compliance maintained
 
+### Phase 11a Consolidation Metrics
+
+**Code Quality Improvements:**
+- **87% compile speedup** for bridge-only builds (38s → 5s)
+- **876 lines removed** through Custom steps cleanup
+- **1,866 lines added** for documentation (security, env vars, design doc)
+- **100% API consistency** (Tool.execute across 40+ tools)
+- **Zero compiler warnings** maintained across workspace
+- **All quality gates passing** (format, clippy, compile, test, doc)
+
+**Documentation Completeness:**
+- **Security coverage**: 40% → 95% (+371 lines security-and-permissions.md)
+- **Environment variables**: 0% → 100% (+405 lines across 3 guides)
+- **TOML schema accuracy**: 30% → 95% (fixed fake [security.sandboxing] sections)
+- **Deployment patterns**: 6 documented (GitHub Actions, GitLab CI, Docker, Docker Compose, systemd, CLI)
+
+**Quality Metrics Achieved:**
+
+| Metric | Before | After | Improvement |
+|--------|--------|-------|-------------|
+| Bridge compile time | 38s | 5s | 87% faster |
+| Security docs coverage | 40% | 95% | +55% |
+| Env vars documentation | 0% | 100% | +100% |
+| API consistency (tools) | 60% | 100% | +40% |
+| TOML schema accuracy | 30% | 95% | +65% |
+| Code removed | 0 | 876 lines | Simplification |
+| Documentation lines | baseline | +1,866 lines | Comprehensive |
+
+**Critical Bug Fixes:**
+- **Config global**: Fixed empty stub → full ConfigBridgeGlobal implementation
+- **TOML schema**: Removed fake [security.sandboxing], added correct [tools.*] sections
+
+**Architectural Decisions:**
+- **ADR-042**: Feature gate architecture for optional language runtimes
+- **ADR-043**: Workflow agent output collection for debugging
+
+**Foundation for Future Phases:**
+- **Phase 12 (Memory)**: Fast iteration via compile speedup, workflow debugging, security docs
+- **Phase 13 (MCP)**: Feature gates extend to MCP backends, Tool.execute for MCP tools
+- **Phase 14 (A2A)**: Workflow introspection for result passing, security isolation
+- **Phase 15 (Dynamic Workflows)**: Simplified StepType enum easier to generate
+
 ### What's Production Ready ✅
 
 **Core Functionality:**
@@ -1145,6 +1273,24 @@ pub trait Workflow: BaseAgent { /* Workflow-specific */ }
   - Memory: <5GB for Q4_K_M 7B models
   - Model loading: ~2s for Candle GGUF
 
+**Phase 11a Consolidation (October 2025):**
+- **Developer Experience**:
+  - Fast bridge compilation (5s for bridge-only builds, 87% speedup)
+  - Zero-ambiguity API (Tool.execute across all tools)
+  - Comprehensive documentation (security 95%, env vars 100%)
+- **Workflow Debugging**:
+  - Agent output collection for multi-step workflow introspection
+  - <1ms collection overhead per agent step
+  - Foundation for advanced debugging and A2A communication
+- **Documentation Completeness**:
+  - Security & permissions guide (371 lines, 3 levels, 4 scenarios, 5 troubleshooting)
+  - Environment variables (41+ security vars, 6 deployment patterns)
+  - Correct TOML schema examples (fixed fake sections)
+- **Code Health**:
+  - Simplified workflow abstractions (Custom steps removed, 876 LOC cleanup)
+  - Config global bug fixed (critical)
+  - Zero compiler warnings maintained
+
 ### What's Partial 🚧
 - Session/artifact management (integrated with kernel and RAG)
 - Streaming support (IO manager ready, script bridge incomplete, Candle not implemented)
@@ -1210,26 +1356,31 @@ pub trait Workflow: BaseAgent { /* Workflow-specific */ }
 
 ### Architecture Validation
 This architecture has been validated by:
-- Cross-referencing 11 phase design documents (Phase 0-11)
+- Cross-referencing 12 phase design documents (Phase 0-11a)
 - Analyzing actual crate structure and dependencies
 - Reviewing implementation files and test coverage
-- Confirming performance measurements (including local LLM inference)
+- Confirming performance measurements (including local LLM inference and compile speedup)
 - Verifying API completeness (18 globals including LocalLLM)
 - Validating multi-tenant isolation and session integration
 - Testing integrated kernel with multiple protocols/transports
 - Validating dual-backend local LLM (Ollama + Candle)
 - Confirming ModelSpecifier backend parsing and routing
 - Testing CLI model commands in embedded + connected modes
+- Validating Phase 11a feature gates (87% compile speedup)
+- Verifying workflow introspection (agent output collection)
+- Confirming Tool.execute standardization across 40+ tools
+- Validating security documentation completeness (95% coverage)
+- Verifying environment variables documentation (100% coverage, 41+ vars)
 
 ---
 
 ## Documentation Structure
 
-As of Phase 11 completion, technical documentation has been consolidated into 5 comprehensive guides plus local LLM user documentation:
+As of Phase 11a completion, technical documentation has been consolidated into 5 comprehensive guides plus Phase 11 local LLM and Phase 11a consolidation documentation:
 
 ### Core Documents
-1. **current-architecture.md** (this file) - Overview and navigation
-2. **architecture-decisions.md** - All ADRs from Phase 0-11
+1. **current-architecture.md** (this file) - Overview and navigation (updated for Phase 11a)
+2. **architecture-decisions.md** - All ADRs from Phase 0-11a (includes ADR-042, ADR-043)
 3. **operational-guide.md** - Performance and security unified
 4. **rag-system-guide.md** - Complete RAG system documentation
 5. **kernel-protocol-architecture.md** - Kernel design and protocol/transport abstraction
@@ -1243,8 +1394,29 @@ As of Phase 11 completion, technical documentation has been consolidated into 5 
    - 4 production-ready Lua examples (260 lines)
    - Troubleshooting guide (6 scenarios)
 
-This consolidation provides comprehensive technical and user-facing documentation aligned with Phase 11 implementation.
+### Phase 11a Design Documentation
+7. **docs/in-progress/phase-11a-design-doc.md** (1,685 lines) - Comprehensive consolidation documentation
+   - 12 sections covering all 8 sub-phases
+   - Component sections: Feature Gates, Workflow Output, API Naming, Custom Steps, Security Docs, Env Vars
+   - Quality metrics, testing validation, architectural impact
+   - Lessons learned & future enablement (Phase 12-15)
+8. **ADR-042**: Feature gate architecture for optional language runtimes
+9. **ADR-043**: Workflow agent output collection for debugging
+
+### Phase 11a User Documentation Updates
+10. **docs/user-guide/security-and-permissions.md** (+256 lines) - Environment variable override section
+    - CI/CD patterns (GitHub Actions, GitLab CI)
+    - Container patterns (Docker, Docker Compose)
+    - Service patterns (systemd)
+    - 41+ security environment variables documented
+11. **docs/user-guide/configuration.md** (+143 lines) - Security & Permissions Variables section
+    - Complete security env var reference
+    - Environment variable to config path mapping
+    - Common deployment patterns
+12. **docs/user-guide/getting-started.md** (+6 lines) - Optional security env vars for development
+
+This consolidation provides comprehensive technical and user-facing documentation aligned with Phase 11a implementation.
 
 ---
 
-*This document represents the actual implementation state of LLMSpell v1.0.0 after completing Phases 0-11, with production-ready daemon support, consolidated kernel architecture, and dual-backend local LLM integration (Ollama + Candle) for cost-free, offline AI operations.*
+*This document represents the actual implementation state of LLMSpell v0.11.1 after completing Phases 0-11a, with production-ready daemon support, consolidated kernel architecture, dual-backend local LLM integration (Ollama + Candle) for cost-free offline AI operations, and Phase 11a bridge consolidation (87% compile speedup, 95% docs coverage, API standardization, workflow introspection).*

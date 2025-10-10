@@ -436,7 +436,7 @@ local knowledge_report = string.format([[
 )
 
 -- Save report
-Tool.invoke("file_operations", {
+Tool.execute("file-operations", {
     operation = "write",
     path = config.files.knowledge_output,
     input = knowledge_report
@@ -458,7 +458,7 @@ local stats_json = string.format([[{
     RAG and "true" or "false"
 )
 
-Tool.invoke("file_operations", {
+Tool.execute("file-operations", {
     operation = "write",
     path = config.files.stats_output,
     input = stats_json

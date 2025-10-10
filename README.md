@@ -2,9 +2,9 @@
 
 **Production-Ready AI Workflow Orchestration Platform** - Script-driven LLM coordination with RAG at scale
 
-**🚀 Version 0.11.0 - Local LLM Integration & Privacy-First AI**
+**🚀 Version 0.11.1 - Bridge Consolidation & Documentation Completeness**
 
-**🔗 Quick Links**: [📘 User Guide](docs/user-guide/) | [🔧 Developer Guide](docs/developer-guide/) | [📚 Examples](examples/) | [🛠️ Scripts](scripts/) | [🚀 Get Started](#-quick-start) | [📖 Release Notes](RELEASE_NOTES_v0.11.0.md)
+**🔗 Quick Links**: [📘 User Guide](docs/user-guide/) | [🔧 Developer Guide](docs/developer-guide/) | [📚 Examples](examples/) | [🛠️ Scripts](scripts/) | [🚀 Get Started](#-quick-start) | [📖 Release Notes](RELEASE_NOTES_v0.11.0.md) | [🔧 Phase 11a](docs/in-progress/phase-11a-design-doc.md)
 
 ---
 
@@ -12,13 +12,22 @@
 
 ---
 
-## 🌟 Production Ready with Local LLM Integration & Privacy-First AI
+## 🌟 Production Ready with Local LLM Integration & Bridge Consolidation
 
-rs-llmspell v0.11.0 delivers **complete local LLM inference** with dual backends (Ollama + Candle) for 100% offline AI workflows. Run agents entirely on your hardware with zero API keys, no cloud dependencies, and full data privacy—all while maintaining production Unix service infrastructure with daemon mode, tool CLI commands, and modular builds (19-35MB).
+rs-llmspell v0.11.1 delivers **complete local LLM inference** with dual backends (Ollama + Candle) for 100% offline AI workflows, plus **Phase 11a bridge consolidation** with 87% compile speedup (38s→5s bridge-only), 95% security documentation coverage, and API standardization. Run agents entirely on your hardware with zero API keys, no cloud dependencies, and full data privacy—all while maintaining production Unix service infrastructure with daemon mode, tool CLI commands, and modular builds (19-35MB).
 
 ## ✨ Key Features
 
-### 🔒 Local LLM Integration & Privacy-First AI (NEW in v0.11.0)
+### 🚀 Bridge Consolidation & Quality Improvements (NEW in v0.11.1)
+- **87% Compile Speedup**: Bridge-only builds 38s→5s via feature gates (ADR-042)
+- **API Standardization**: Tool.execute() unified across all 40+ tools (zero ambiguity)
+- **Workflow Introspection**: Agent output collection for debugging multi-step workflows (ADR-043)
+- **Documentation Completeness**: Security 40%→95%, environment variables 0%→100% (41+ vars)
+- **Code Simplification**: 876 LOC removed (Custom steps cleanup)
+- **CI/CD Ready**: 6 deployment patterns documented (GitHub Actions, Docker, systemd)
+- **Critical Bug Fixes**: Config global fixed, TOML schema corrected
+
+### 🔒 Local LLM Integration & Privacy-First AI (v0.11.0)
 - **100% Offline Inference**: All AI processing on your hardware, no cloud calls, no data leakage
 - **Dual-Backend Architecture**: Ollama (100+ models) + Candle (native Rust GGUF inference)
 - **Zero API Keys Required**: No OpenAI/Anthropic accounts needed for local models

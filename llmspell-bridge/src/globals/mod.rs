@@ -36,10 +36,25 @@ use std::sync::Arc;
 use tracing::warn;
 
 /// Register core globals (json, logger, config, debug)
-fn register_core_globals(builder: &mut GlobalRegistryBuilder) {
+fn register_core_globals(builder: &mut GlobalRegistryBuilder, context: &Arc<GlobalContext>) {
     builder.register(Arc::new(json_global::JsonGlobal::new()));
     builder.register(Arc::new(core::LoggerGlobal::new()));
-    builder.register(Arc::new(core::ConfigGlobal::new(serde_json::json!({}))));
+
+    // Register ConfigBridgeGlobal if runtime_config is available
+    if let Some(runtime_config) =
+        context.get_bridge::<llmspell_config::LLMSpellConfig>("runtime_config")
+    {
+        let permissions = crate::config_bridge::ConfigPermissions::standard();
+        builder.register(Arc::new(config_global::ConfigBridgeGlobal::new(
+            (*runtime_config).clone(),
+            permissions,
+        )));
+    } else {
+        // Fallback to empty Config global if no runtime config
+        warn!("No runtime_config available, using empty Config global");
+        builder.register(Arc::new(core::ConfigGlobal::new(serde_json::json!({}))));
+    }
+
     builder.register(Arc::new(debug_global::DebugGlobal::new()));
 }
 
@@ -203,7 +218,7 @@ pub async fn create_standard_registry(context: Arc<GlobalContext>) -> Result<Glo
     let mut builder = GlobalRegistryBuilder::new();
 
     // Register core globals
-    register_core_globals(&mut builder);
+    register_core_globals(&mut builder, &context);
 
     // Create and register StateGlobal
     let state_global = create_state_global(&context).await;

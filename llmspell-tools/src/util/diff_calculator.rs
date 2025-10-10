@@ -765,7 +765,7 @@ impl Tool for DiffCalculatorTool {
 
     fn schema(&self) -> ToolSchema {
         ToolSchema::new(
-            "diff_calculator".to_string(),
+            "diff-calculator".to_string(),
             "Calculate differences between texts, files, or JSON structures".to_string(),
         )
         .with_parameter(ParameterDef {

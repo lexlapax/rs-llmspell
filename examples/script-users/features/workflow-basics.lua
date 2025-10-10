@@ -42,7 +42,7 @@ local seq_workflow = Workflow.builder()
     :add_step({
         name = "generate_id",
         type = "tool",
-        tool = "uuid_generator",
+        tool = "uuid-generator",
         input = {
             operation = "generate",
             version = "v4"
@@ -51,7 +51,7 @@ local seq_workflow = Workflow.builder()
     :add_step({
         name = "get_timestamp",
         type = "tool",
-        tool = "date_time_handler",
+        tool = "datetime-handler",
         input = {
             operation = "now"
         }
@@ -59,7 +59,7 @@ local seq_workflow = Workflow.builder()
     :add_step({
         name = "create_message",
         type = "tool",
-        tool = "template_engine",
+        tool = "template-creator",
         input = {
             input = "Workflow {{id}} completed at {{time}}",
             context = {
@@ -100,7 +100,7 @@ local par_workflow = Workflow.builder()
     :add_step({
         name = "generate_uuid",
         type = "tool",
-        tool = "uuid_generator",
+        tool = "uuid-generator",
         input = {
             operation = "generate",
             version = "v4"
@@ -109,7 +109,7 @@ local par_workflow = Workflow.builder()
     :add_step({
         name = "calculate_hash",
         type = "tool",
-        tool = "hash_calculator",
+        tool = "hash-calculator",
         input = {
             operation = "hash",
             algorithm = "sha256",
@@ -119,7 +119,7 @@ local par_workflow = Workflow.builder()
     :add_step({
         name = "encode_data",
         type = "tool",
-        tool = "base64_encoder",
+        tool = "base64-encoder",
         input = {
             operation = "encode",
             input = "parallel_test"
@@ -156,7 +156,7 @@ local param_workflow = Workflow.builder()
     :add_step({
         name = "uppercase",
         type = "tool",
-        tool = "text_manipulator",
+        tool = "text-manipulator",
         input = {
             operation = "uppercase",
             input = "{{input.text}}"  -- Reference to workflow input
@@ -165,7 +165,7 @@ local param_workflow = Workflow.builder()
     :add_step({
         name = "hash_text",
         type = "tool",
-        tool = "hash_calculator",
+        tool = "hash-calculator",
         input = {
             operation = "hash",
             algorithm = "{{input.algorithm}}",  -- Configurable algorithm

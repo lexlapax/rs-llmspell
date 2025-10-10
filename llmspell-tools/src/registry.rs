@@ -20,6 +20,7 @@ use tracing::{debug, error, info, instrument, trace};
 type ToolStorage = Arc<RwLock<HashMap<String, Arc<Box<dyn Tool>>>>>;
 type MetadataCache = Arc<RwLock<HashMap<String, ToolInfo>>>;
 type CategoryIndex = Arc<RwLock<HashMap<ToolCategory, Vec<String>>>>;
+type AliasIndex = Arc<RwLock<HashMap<String, String>>>; // alias -> primary_name
 
 /// Metadata about a registered tool
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -40,6 +41,8 @@ pub struct ToolInfo {
     pub version: String,
     /// Custom metadata
     pub metadata: HashMap<String, serde_json::Value>,
+    /// Aliases for backward compatibility (alternative names for the same tool)
+    pub aliases: Vec<String>,
 }
 
 /// Capability matcher for tool discovery
@@ -141,6 +144,8 @@ pub struct ToolRegistry {
     metadata_cache: MetadataCache,
     /// Category index for fast category-based lookups
     category_index: CategoryIndex,
+    /// Alias index for backward compatibility (alias -> `primary_name`)
+    alias_index: AliasIndex,
     /// Hook-enabled tool executor
     tool_executor: Option<Arc<ToolExecutor>>,
     /// Hook executor configuration
@@ -156,6 +161,7 @@ impl ToolRegistry {
             tools: Arc::new(RwLock::new(HashMap::new())),
             metadata_cache: Arc::new(RwLock::new(HashMap::new())),
             category_index: Arc::new(RwLock::new(HashMap::new())),
+            alias_index: Arc::new(RwLock::new(HashMap::new())),
             tool_executor: None,
             hook_config: ToolLifecycleConfig::default(),
         }
@@ -186,25 +192,94 @@ impl ToolRegistry {
             tools: Arc::new(RwLock::new(HashMap::new())),
             metadata_cache: Arc::new(RwLock::new(HashMap::new())),
             category_index: Arc::new(RwLock::new(HashMap::new())),
+            alias_index: Arc::new(RwLock::new(HashMap::new())),
             tool_executor,
             hook_config,
         }
     }
 
-    /// Register a tool in the registry
+    /// Register a tool with aliases in the registry
     ///
     /// # Errors
     ///
-    /// Returns an error if tool validation fails or if a tool with the same name already exists
+    /// Returns an error if:
+    /// - Tool validation fails
+    /// - A tool with the same name already exists
+    /// - Any alias conflicts with an existing tool name or alias
+    /// - Primary name is included in aliases
     #[instrument(skip(self, tool))]
-    pub async fn register<T>(&self, name: String, tool: T) -> Result<()>
+    pub async fn register_with_aliases<T>(
+        &self,
+        name: String,
+        aliases: Vec<String>,
+        tool: T,
+    ) -> Result<()>
     where
         T: Tool + 'static,
     {
         info!(
             tool_name = %name,
-            "Registering tool in registry"
+            alias_count = aliases.len(),
+            "Registering tool with aliases in registry"
         );
+
+        // Validate aliases before registration
+        {
+            let tools = self.tools.read().await;
+            let alias_index = self.alias_index.read().await;
+
+            // Check that primary name doesn't already exist
+            if tools.contains_key(&name) {
+                return Err(LLMSpellError::Validation {
+                    message: format!("Tool with name '{name}' already exists"),
+                    field: Some("name".to_string()),
+                });
+            }
+
+            // Check that primary name is not in aliases list
+            if aliases.contains(&name) {
+                return Err(LLMSpellError::Validation {
+                    message: "Primary name cannot be included in aliases list".to_string(),
+                    field: Some("aliases".to_string()),
+                });
+            }
+
+            // Check for alias conflicts with existing tools and aliases
+            for alias in &aliases {
+                // Check if alias conflicts with existing primary name
+                if tools.contains_key(alias) {
+                    return Err(LLMSpellError::Validation {
+                        message: format!("Alias '{alias}' conflicts with existing tool name"),
+                        field: Some("aliases".to_string()),
+                    });
+                }
+            }
+
+            // Drop tools lock early since we're done with it
+            drop(tools);
+
+            // Check for alias conflicts with existing aliases
+            for alias in &aliases {
+                if alias_index.contains_key(alias) {
+                    return Err(LLMSpellError::Validation {
+                        message: format!("Alias '{alias}' is already registered as an alias"),
+                        field: Some("aliases".to_string()),
+                    });
+                }
+            }
+
+            // Check for duplicate aliases in the input
+            let mut unique_aliases = std::collections::HashSet::new();
+            for alias in &aliases {
+                if !unique_aliases.insert(alias) {
+                    return Err(LLMSpellError::Validation {
+                        message: format!("Duplicate alias '{alias}' in aliases list"),
+                        field: Some("aliases".to_string()),
+                    });
+                }
+            }
+        }
+
         // Validate the tool before registration
         self.validate_tool(&tool).await?;
 
@@ -227,12 +302,21 @@ impl ToolRegistry {
             resource_limits,
             version: metadata.version.to_string(),
             metadata: HashMap::new(), // TODO: Extract custom metadata from component metadata
+            aliases: aliases.clone(),
         };
 
         // Register the tool
         {
             let mut tools = self.tools.write().await;
             tools.insert(name.clone(), tool_arc);
+        }
+
+        // Register aliases
+        {
+            let mut alias_index = self.alias_index.write().await;
+            for alias in &aliases {
+                alias_index.insert(alias.clone(), name.clone());
+            }
         }
 
         // Cache metadata
@@ -248,6 +332,48 @@ impl ToolRegistry {
         }
 
         Ok(())
+    }
+
+    /// Register a tool in the registry (without aliases)
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if tool validation fails or if a tool with the same name already exists
+    #[instrument(skip(self, tool))]
+    pub async fn register<T>(&self, name: String, tool: T) -> Result<()>
+    where
+        T: Tool + 'static,
+    {
+        // Delegate to register_with_aliases with empty aliases vec
+        self.register_with_aliases(name, Vec::new(), tool).await
+    }
+
+    /// Resolve a tool name to its primary name (checking aliases if needed)
+    /// Returns the primary name if found, None otherwise
+    #[instrument(skip(self))]
+    async fn resolve_tool_name(&self, name: &str) -> Option<String> {
+        trace!(
+            tool_name = %name,
+            "Resolving tool name (checking for aliases)"
+        );
+
+        // First check if it's a primary name
+        {
+            let tools = self.tools.read().await;
+            if tools.contains_key(name) {
+                return Some(name.to_string());
+            }
+        }
+
+        // Check if it's an alias
+        {
+            let aliases = self.alias_index.read().await;
+            if let Some(primary_name) = aliases.get(name) {
+                return Some(primary_name.clone());
+            }
+        }
+
+        None
     }
 
     /// Validate a tool before registration
@@ -297,26 +423,34 @@ impl ToolRegistry {
         Ok(())
     }
 
-    /// Get a tool by name
+    /// Get a tool by name (supports both primary names and aliases)
     #[instrument(skip(self))]
     pub async fn get_tool(&self, name: &str) -> Option<Arc<Box<dyn Tool>>> {
         debug!(
             tool_name = %name,
             "Looking up tool in registry"
         );
+
+        // Resolve name to primary name (handles aliases)
+        let primary_name = self.resolve_tool_name(name).await?;
+
         let tools = self.tools.read().await;
-        tools.get(name).cloned()
+        tools.get(&primary_name).cloned()
     }
 
-    /// Get tool metadata by name
+    /// Get tool metadata by name (supports both primary names and aliases)
     #[instrument(skip_all)]
     pub async fn get_tool_info(&self, name: &str) -> Option<ToolInfo> {
         trace!(
             tool_name = %name,
             "Getting tool metadata from registry"
         );
+
+        // Resolve name to primary name (handles aliases)
+        let primary_name = self.resolve_tool_name(name).await?;
+
         let cache = self.metadata_cache.read().await;
-        cache.get(name).cloned()
+        cache.get(&primary_name).cloned()
     }
 
     /// List all registered tools
@@ -365,18 +499,17 @@ impl ToolRegistry {
         self.discover_tools(&matcher).await
     }
 
-    /// Check if a tool is registered
+    /// Check if a tool is registered (supports both primary names and aliases)
     #[instrument(skip(self))]
     pub async fn contains_tool(&self, name: &str) -> bool {
         trace!(
             tool_name = %name,
             "Checking if tool exists in registry"
         );
-        let tools = self.tools.read().await;
-        tools.contains_key(name)
+        self.resolve_tool_name(name).await.is_some()
     }
 
-    /// Unregister a tool
+    /// Unregister a tool (removes tool and all its aliases)
     ///
     /// # Errors
     ///
@@ -387,7 +520,7 @@ impl ToolRegistry {
             tool_name = %name,
             "Unregistering tool from registry"
         );
-        // Get tool info before removal for category cleanup
+        // Get tool info before removal for category cleanup and alias removal
         let tool_info = {
             let cache = self.metadata_cache.read().await;
             cache.get(name).cloned()
@@ -403,6 +536,14 @@ impl ToolRegistry {
         {
             let mut cache = self.metadata_cache.write().await;
             cache.remove(name);
+        }
+
+        // Remove aliases from alias index
+        if let Some(ref info) = tool_info {
+            let mut alias_index = self.alias_index.write().await;
+            for alias in &info.aliases {
+                alias_index.remove(alias);
+            }
         }
 
         // Update category index
@@ -946,6 +1087,7 @@ mod tests {
                 map.insert("supports_async".to_string(), serde_json::json!(true));
                 map
             },
+            aliases: Vec::new(),
         };
 
         // Test category match
@@ -1155,5 +1297,274 @@ mod tests {
         let metrics = metrics.unwrap();
         assert_eq!(metrics.total_executions, 0);
         assert_eq!(metrics.hook_overhead_ms, 0);
+    }
+
+    #[tokio::test]
+    async fn test_tool_alias_resolution() {
+        let registry = ToolRegistry::new();
+
+        // Register a tool with aliases
+        let tool = MockTool::new(
+            "primary_tool".to_string(),
+            ToolCategory::Utility,
+            SecurityLevel::Safe,
+        );
+        let aliases = vec!["alias1".to_string(), "alias2".to_string()];
+        registry
+            .register_with_aliases("primary_tool".to_string(), aliases, tool)
+            .await
+            .unwrap();
+
+        // Test that we can get the tool by primary name
+        let tool_by_primary = registry.get_tool("primary_tool").await;
+        assert!(tool_by_primary.is_some());
+
+        // Test that we can get the tool by alias1
+        let tool_by_alias1 = registry.get_tool("alias1").await;
+        assert!(tool_by_alias1.is_some());
+
+        // Test that we can get the tool by alias2
+        let tool_by_alias2 = registry.get_tool("alias2").await;
+        assert!(tool_by_alias2.is_some());
+
+        // Test that all three return the same tool (unwrap and compare pointers)
+        let primary = tool_by_primary.as_ref().unwrap();
+        let alias1 = tool_by_alias1.as_ref().unwrap();
+        let alias2 = tool_by_alias2.as_ref().unwrap();
+
+        assert!(Arc::ptr_eq(primary, alias1));
+        assert!(Arc::ptr_eq(alias1, alias2));
+
+        // Test that contains_tool works for both primary and aliases
+        assert!(registry.contains_tool("primary_tool").await);
+        assert!(registry.contains_tool("alias1").await);
+        assert!(registry.contains_tool("alias2").await);
+        assert!(!registry.contains_tool("nonexistent").await);
+
+        // Test that get_tool_info works for both primary and aliases
+        let info_primary = registry.get_tool_info("primary_tool").await;
+        let info_alias1 = registry.get_tool_info("alias1").await;
+        let info_alias2 = registry.get_tool_info("alias2").await;
+
+        assert!(info_primary.is_some());
+        assert!(info_alias1.is_some());
+        assert!(info_alias2.is_some());
+
+        let info_primary = info_primary.unwrap();
+        let info_alias1 = info_alias1.unwrap();
+        let info_alias2 = info_alias2.unwrap();
+
+        // All should have the same primary name
+        assert_eq!(info_primary.name, "primary_tool");
+        assert_eq!(info_alias1.name, "primary_tool");
+        assert_eq!(info_alias2.name, "primary_tool");
+
+        // All should have the same aliases
+        assert_eq!(info_primary.aliases.len(), 2);
+        assert!(info_primary.aliases.contains(&"alias1".to_string()));
+        assert!(info_primary.aliases.contains(&"alias2".to_string()));
+    }
+
+    #[tokio::test]
+    async fn test_tool_registration_with_aliases() {
+        let registry = ToolRegistry::new();
+
+        // Test registration with empty aliases
+        let tool1 = MockTool::new(
+            "tool1".to_string(),
+            ToolCategory::Utility,
+            SecurityLevel::Safe,
+        );
+        let result = registry
+            .register_with_aliases("tool1".to_string(), Vec::new(), tool1)
+            .await;
+        assert!(result.is_ok());
+
+        // Test registration with multiple aliases
+        let tool2 = MockTool::new(
+            "tool2".to_string(),
+            ToolCategory::Utility,
+            SecurityLevel::Safe,
+        );
+        let aliases = vec![
+            "tool2_alias1".to_string(),
+            "tool2_alias2".to_string(),
+            "tool2_alias3".to_string(),
+        ];
+        let result = registry
+            .register_with_aliases("tool2".to_string(), aliases, tool2)
+            .await;
+        assert!(result.is_ok());
+
+        // Verify all aliases work
+        assert!(registry.contains_tool("tool2").await);
+        assert!(registry.contains_tool("tool2_alias1").await);
+        assert!(registry.contains_tool("tool2_alias2").await);
+        assert!(registry.contains_tool("tool2_alias3").await);
+
+        // Test that the standard register() method works (uses empty aliases internally)
+        let tool3 = MockTool::new(
+            "tool3".to_string(),
+            ToolCategory::Utility,
+            SecurityLevel::Safe,
+        );
+        let result = registry.register("tool3".to_string(), tool3).await;
+        assert!(result.is_ok());
+
+        let info = registry.get_tool_info("tool3").await.unwrap();
+        assert_eq!(info.aliases.len(), 0);
+    }
+
+    #[tokio::test]
+    async fn test_alias_conflict_detection() {
+        let registry = ToolRegistry::new();
+
+        // Register first tool with aliases
+        let tool1 = MockTool::new(
+            "tool1".to_string(),
+            ToolCategory::Utility,
+            SecurityLevel::Safe,
+        );
+        registry
+            .register_with_aliases(
+                "tool1".to_string(),
+                vec!["alias1".to_string(), "alias2".to_string()],
+                tool1,
+            )
+            .await
+            .unwrap();
+
+        // Try to register a tool with a name that conflicts with existing primary name
+        let tool2 = MockTool::new(
+            "tool1".to_string(),
+            ToolCategory::Utility,
+            SecurityLevel::Safe,
+        );
+        let result = registry
+            .register_with_aliases("tool1".to_string(), Vec::new(), tool2)
+            .await;
+        assert!(result.is_err());
+        assert!(matches!(
+            result.unwrap_err(),
+            LLMSpellError::Validation { .. }
+        ));
+
+        // Try to register a tool with an alias that conflicts with existing primary name
+        let tool3 = MockTool::new(
+            "tool3".to_string(),
+            ToolCategory::Utility,
+            SecurityLevel::Safe,
+        );
+        let result = registry
+            .register_with_aliases("tool3".to_string(), vec!["tool1".to_string()], tool3)
+            .await;
+        assert!(result.is_err());
+        assert!(matches!(
+            result.unwrap_err(),
+            LLMSpellError::Validation { .. }
+        ));
+
+        // Try to register a tool with an alias that conflicts with existing alias
+        let tool4 = MockTool::new(
+            "tool4".to_string(),
+            ToolCategory::Utility,
+            SecurityLevel::Safe,
+        );
+        let result = registry
+            .register_with_aliases("tool4".to_string(), vec!["alias1".to_string()], tool4)
+            .await;
+        assert!(result.is_err());
+        assert!(matches!(
+            result.unwrap_err(),
+            LLMSpellError::Validation { .. }
+        ));
+
+        // Try to register a tool with primary name in aliases list
+        let tool5 = MockTool::new(
+            "tool5".to_string(),
+            ToolCategory::Utility,
+            SecurityLevel::Safe,
+        );
+        let result = registry
+            .register_with_aliases("tool5".to_string(), vec!["tool5".to_string()], tool5)
+            .await;
+        assert!(result.is_err());
+        assert!(matches!(
+            result.unwrap_err(),
+            LLMSpellError::Validation { .. }
+        ));
+
+        // Try to register a tool with duplicate aliases
+        let tool6 = MockTool::new(
+            "tool6".to_string(),
+            ToolCategory::Utility,
+            SecurityLevel::Safe,
+        );
+        let result = registry
+            .register_with_aliases(
+                "tool6".to_string(),
+                vec!["dup".to_string(), "dup".to_string()],
+                tool6,
+            )
+            .await;
+        assert!(result.is_err());
+        assert!(matches!(
+            result.unwrap_err(),
+            LLMSpellError::Validation { .. }
+        ));
+    }
+
+    #[tokio::test]
+    async fn test_unregister_removes_aliases() {
+        let registry = ToolRegistry::new();
+
+        // Register a tool with aliases
+        let tool = MockTool::new(
+            "tool_with_aliases".to_string(),
+            ToolCategory::Utility,
+            SecurityLevel::Safe,
+        );
+        let aliases = vec![
+            "alias_a".to_string(),
+            "alias_b".to_string(),
+            "alias_c".to_string(),
+        ];
+        registry
+            .register_with_aliases("tool_with_aliases".to_string(), aliases, tool)
+            .await
+            .unwrap();
+
+        // Verify tool and aliases exist
+        assert!(registry.contains_tool("tool_with_aliases").await);
+        assert!(registry.contains_tool("alias_a").await);
+        assert!(registry.contains_tool("alias_b").await);
+        assert!(registry.contains_tool("alias_c").await);
+
+        // Unregister the tool
+        let result = registry.unregister_tool("tool_with_aliases").await;
+        assert!(result.is_ok());
+
+        // Verify tool and all aliases are removed
+        assert!(!registry.contains_tool("tool_with_aliases").await);
+        assert!(!registry.contains_tool("alias_a").await);
+        assert!(!registry.contains_tool("alias_b").await);
+        assert!(!registry.contains_tool("alias_c").await);
+
+        // Verify we can now reuse the alias names
+        let new_tool = MockTool::new(
+            "new_tool".to_string(),
+            ToolCategory::Utility,
+            SecurityLevel::Safe,
+        );
+        let result = registry
+            .register_with_aliases(
+                "new_tool".to_string(),
+                vec!["alias_a".to_string()],
+                new_tool,
+            )
+            .await;
+        assert!(result.is_ok());
+        assert!(registry.contains_tool("new_tool").await);
+        assert!(registry.contains_tool("alias_a").await);
     }
 }

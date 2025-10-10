@@ -167,7 +167,7 @@ impl DataValidationTool {
     #[must_use]
     pub fn new() -> Self {
         info!(
-            tool_name = "data-validation-tool",
+            tool_name = "data-validator",
             supported_rule_types = 12, // required, type, length, range, pattern, enum, email, url, date, custom, array, object
             builtin_custom_validators = 3, // phone, uuid, credit_card
             max_errors_default = 100,
@@ -194,7 +194,7 @@ impl DataValidationTool {
 
         let mut tool = Self {
             metadata: ComponentMetadata::new(
-                "data-validation-tool".to_string(),
+                "data-validator".to_string(),
                 "Validate data against custom rules with detailed error reporting".to_string(),
             ),
             config,
@@ -603,7 +603,7 @@ impl DataValidationTool {
 impl Default for DataValidationTool {
     fn default() -> Self {
         info!(
-            tool_name = "data-validation",
+            tool_name = "data-validator",
             category = "Tool",
             phase = "Phase 3 (comprehensive instrumentation)",
             "Creating DataValidationTool"
@@ -838,7 +838,7 @@ impl Tool for DataValidationTool {
 
     fn schema(&self) -> ToolSchema {
         ToolSchema {
-            name: "data_validation".to_string(),
+            name: "data-validator".to_string(),
             description: "Validate data against custom rules with detailed error reporting"
                 .to_string(),
             parameters: vec![

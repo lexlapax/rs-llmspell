@@ -1482,9 +1482,6 @@ impl BaseAgent for LoopWorkflow {
             metadata
                 .extra
                 .insert("execution_id".to_string(), serde_json::json!(execution_id));
-            metadata
-                .extra
-                .insert("workflow_id".to_string(), serde_json::json!(execution_id));
 
             // Collect agent outputs from state if available
             let mut agent_outputs = serde_json::Map::new();

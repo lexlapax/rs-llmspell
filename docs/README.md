@@ -24,11 +24,11 @@
 ### 🔧 [Developer Guide](developer-guide/) - *For Contributors*
 **Purpose**: Technical guides for developers contributing to or extending rs-llmspell.
 
-**Status**: ✅ Updated with Phase 11 local provider patterns
-**Contents**: 6 essential guides including developer guide, extending guide, production guide, examples reference, feature flags migration, tracing best practices
-**Key Files**: `developer-guide.md`, `extending-llmspell.md`, `production-guide.md`, `examples-reference.md`, `feature-flags-migration.md`, `tracing-best-practices.md`
-**Phase 11 Additions**: Local provider implementation patterns, GGUF model handling, dual-backend architecture (Ollama + Candle)
-**Start here if**: You want to create custom tools, contribute code, implement local providers, or understand modular build system
+**Status**: ✅ Updated with Phase 11 local provider patterns and bridge pattern guide
+**Contents**: 7 essential guides including developer guide, extending guide, production guide, examples reference, feature flags migration, tracing best practices, bridge pattern guide
+**Key Files**: `developer-guide.md`, `extending-llmspell.md`, `production-guide.md`, `examples-reference.md`, `feature-flags-migration.md`, `tracing-best-practices.md`, `bridge-pattern-guide.md`
+**Phase 11 Additions**: Local provider implementation patterns, GGUF model handling, dual-backend architecture (Ollama + Candle), typed bridge pattern (Phase 11a.8)
+**Start here if**: You want to create custom tools, contribute code, implement local providers, work on bridge layer, or understand modular build system
 
 ---
 
@@ -238,9 +238,9 @@
 - Cross-references updated for all Phase 10 features
 
 ### Maintenance 📋
-- Version tracking (v0.11.0)
-- Phase status clearly marked (Phase 11 Complete - Local LLM Integration)
-- Update dates: January 2025
+- Version tracking (v0.11.1)
+- Phase status clearly marked (Phase 11a Complete - Bridge Consolidation)
+- Update dates: October 2025
 - Feature flags migration guide for Phase 10.17.5+ builds
 - Local LLM integration guide for Phase 11
 - Deprecation notices for old patterns
@@ -329,4 +329,4 @@
 
 ---
 
-**Last Updated**: January 2025 | **Version**: 0.11.0 (Phase 11 Complete - Local LLM Integration) | **Next**: Phase 12 (Adaptive Memory System)
+**Last Updated**: October 2025 | **Version**: 0.11.1 (Phase 11a Complete - Bridge Consolidation) | **Next**: Phase 12 (Adaptive Memory System)

@@ -167,7 +167,7 @@ Both Rust and Lua APIs provide identical functionality:
 | Feature | Rust API | Lua API |
 |---------|----------|---------|
 | Agent Creation | `AgentBuilder` | `Agent.builder()` |
-| Tool Invocation | `ToolRegistry::invoke()` | `Tool.invoke()` |
+| Tool Invocation | `ToolRegistry::invoke()` | `Tool.execute()` |
 | Workflows | `WorkflowBuilder` | `Workflow.new()` |
 | State Management | `KernelState` | `State` module |
 | Session Management | `SessionManager` | `Session` module |

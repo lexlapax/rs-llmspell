@@ -31,7 +31,7 @@ OPENAI_API_KEY=$OPENAI_API_KEY ./target/debug/llmspell run examples/script-users
 
 ### 2. tool-basics.lua
 **Essential tool operations**
-- Tool.invoke() for file operations
+- Tool.execute() for file operations
 - UUID generation, encoding, hashing
 - Tool discovery
 - Error handling patterns

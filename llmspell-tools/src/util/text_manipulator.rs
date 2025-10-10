@@ -474,7 +474,7 @@ impl Tool for TextManipulatorTool {
 
     fn schema(&self) -> ToolSchema {
         ToolSchema::new(
-            "text_manipulator".to_string(),
+            "text-manipulator".to_string(),
             "Manipulate and transform text with various string operations".to_string(),
         )
         .with_parameter(ParameterDef {
@@ -544,7 +544,7 @@ mod tests {
         assert_eq!(tool.metadata().name, "text-manipulator");
 
         let schema = tool.schema();
-        assert_eq!(schema.name, "text_manipulator");
+        assert_eq!(schema.name, "text-manipulator");
         assert_eq!(schema.parameters.len(), 3);
         assert_eq!(schema.required_parameters(), vec!["input", "operation"]);
     }

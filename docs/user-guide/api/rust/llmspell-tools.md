@@ -61,7 +61,7 @@ let registry = ToolRegistry::new();
 registry.register_builtin_tools()?;
 
 // Invoke a tool
-let result = registry.invoke("web-search", json!({
+let result = registry.invoke("web-searcher", json!({
     "query": "rust programming",
     "max_results": 10
 })).await?;
@@ -77,23 +77,23 @@ let tools = registry.search("json")?;
 
 ### File Operations
 ```rust
-registry.invoke("file-read", json!({"path": "data.txt"})).await?;
-registry.invoke("file-write", json!({"path": "out.txt", "content": "..."})).await?;
-registry.invoke("file-search", json!({"pattern": "*.rs", "dir": "./src"})).await?;
+registry.invoke("file-operations", json!({"operation": "read", "path": "data.txt"})).await?;
+registry.invoke("file-operations", json!({"operation": "write", "path": "out.txt", "input": "..."})).await?;
+registry.invoke("file-operations", json!({"operation": "list", "path": "./src"})).await?;
 ```
 
 ### Web Tools
 ```rust
-registry.invoke("web-fetch", json!({"url": "https://api.example.com"})).await?;
-registry.invoke("web-search", json!({"query": "LLMSpell", "engine": "duckduckgo"})).await?;
-registry.invoke("http-request", json!({"method": "POST", "url": "...", "body": {}})).await?;
+registry.invoke("http-requester", json!({"method": "GET", "url": "https://api.example.com"})).await?;
+registry.invoke("web-searcher", json!({"query": "LLMSpell", "engine": "duckduckgo"})).await?;
+registry.invoke("http-requester", json!({"method": "POST", "url": "...", "body": {}})).await?;
 ```
 
 ### Data Processing
 ```rust
-registry.invoke("json-query", json!({"data": data, "query": "$.users[?(@.age > 18)]"})).await?;
-registry.invoke("csv-parse", json!({"content": csv_string})).await?;
-registry.invoke("text-manipulate", json!({"text": "...", "operation": "capitalize"})).await?;
+registry.invoke("json-processor", json!({"operation": "query", "data": data, "query": "$.users[?(@.age > 18)]"})).await?;
+registry.invoke("csv-analyzer", json!({"operation": "parse", "input": csv_string})).await?;
+registry.invoke("text-manipulator", json!({"operation": "uppercase", "input": "hello world"})).await?;
 ```
 
 ## Creating Custom Tools
@@ -112,7 +112,7 @@ impl Tool for MyCustomTool {
     }
     
     fn schema(&self) -> ToolSchema {
-        ToolSchema::new("my_tool", "Description")
+        ToolSchema::new("my-custom-tool", "Description")
             .with_parameter("input", ParameterType::String, true)
             .with_returns(ParameterType::String)
     }

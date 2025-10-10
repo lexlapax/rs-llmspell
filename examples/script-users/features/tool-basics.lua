@@ -7,7 +7,7 @@
 -- Feature Category: Tools
 --
 -- Purpose: Essential tool usage patterns for common operations
--- Architecture: Synchronous Tool.invoke() API with structured results
+-- Architecture: Synchronous Tool.execute() API with structured results
 -- Key Capabilities:
 --   • File operations (read, write, exists)
 --   • Data encoding (Base64, JSON)
@@ -32,7 +32,7 @@ print("=== Tool Basics - Essential Operations ===\n")
 
 -- Helper function for tool invocation with error handling
 local function use_tool(tool_name, params)
-    local result = Tool.invoke(tool_name, params)
+    local result = Tool.execute(tool_name, params)
     if result then
         return result
     end
@@ -45,7 +45,7 @@ print("-" .. string.rep("-", 17))
 
 -- Write a file
 local content = "# LLMSpell Test\nThis is a test file.\nCreated: " .. os.date()
-local write_result = use_tool("file_operations", {
+local write_result = use_tool("file-operations", {
     operation = "write",
     path = "/tmp/llmspell_test.txt",
     input = content
@@ -53,14 +53,14 @@ local write_result = use_tool("file_operations", {
 print("   Write file: " .. (write_result.success ~= false and "✓" or "✗"))
 
 -- Read it back
-local read_result = use_tool("file_operations", {
+local read_result = use_tool("file-operations", {
     operation = "read",
     path = "/tmp/llmspell_test.txt"
 })
 print("   Read file: " .. (read_result.text and "✓" or "✗"))
 
 -- Check existence
-local exists_result = use_tool("file_operations", {
+local exists_result = use_tool("file-operations", {
     operation = "exists",
     path = "/tmp/llmspell_test.txt"
 })
@@ -70,14 +70,14 @@ print("   Check exists: " .. ((exists_result.success ~= false) and "✓" or "✗
 print("\n2. UUID Generation")
 print("-" .. string.rep("-", 17))
 
-local uuid_v4 = use_tool("uuid_generator", {
+local uuid_v4 = use_tool("uuid-generator", {
     operation = "generate",
     version = "v4",
     format = "hyphenated"
 })
 print("   UUID v4: " .. (uuid_v4.result and uuid_v4.result.uuid and "✓" or "✗"))
 
-local component_id = use_tool("uuid_generator", {
+local component_id = use_tool("uuid-generator", {
     operation = "component_id",
     prefix = "tool"
 })
@@ -87,14 +87,14 @@ print("   Component ID: " .. (component_id.result and component_id.result.id and
 print("\n3. Encoding Operations")
 print("-" .. string.rep("-", 21))
 
-local encode_result = use_tool("base64_encoder", {
+local encode_result = use_tool("base64-encoder", {
     operation = "encode",
     input = "Hello LLMSpell"
 })
 print("   Base64 encode: " .. (encode_result.result and encode_result.result.output and "✓" or "✗"))
 
 if encode_result.result and encode_result.result.output then
-    local decode_result = use_tool("base64_encoder", {
+    local decode_result = use_tool("base64-encoder", {
         operation = "decode",
         input = encode_result.result.output
     })
@@ -105,7 +105,7 @@ end
 print("\n4. Hash Calculations")
 print("-" .. string.rep("-", 19))
 
-local hash_result = use_tool("hash_calculator", {
+local hash_result = use_tool("hash-calculator", {
     operation = "hash",
     algorithm = "sha256",
     input = "test data"
@@ -116,13 +116,13 @@ print("   SHA256 hash: " .. (hash_result.result and hash_result.result.hash and 
 print("\n5. Text Manipulation")
 print("-" .. string.rep("-", 19))
 
-local text_result = use_tool("text_manipulator", {
+local text_result = use_tool("text-manipulator", {
     operation = "uppercase",
     input = "hello llmspell"
 })
 print("   Uppercase: " .. (text_result.result and text_result.result.result == "HELLO LLMSPELL" and "✓" or "✗"))
 
-local replace_result = use_tool("text_manipulator", {
+local replace_result = use_tool("text-manipulator", {
     operation = "replace",
     input = "hello world",
     options = {
@@ -167,7 +167,7 @@ print("\n8. Error Handling")
 print("-" .. string.rep("-", 16))
 
 -- Intentionally cause an error
-local error_result = use_tool("file_operations", {
+local error_result = use_tool("file-operations", {
     operation = "read",
     path = "/nonexistent/file.txt"
 })

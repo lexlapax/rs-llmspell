@@ -108,9 +108,9 @@
 //! local parallel = Workflow.parallel({
 //!     name = "multi_search",
 //!     steps = {
-//!         {tool = "web_search", params = {query = "rust programming"}},
-//!         {tool = "arxiv_search", params = {query = "machine learning"}},
-//!         {tool = "news_search", params = {query = "technology"}}
+//!         {tool = "web-searcher", params = {query = "rust programming"}},
+//!         {tool = "arxiv-searcher", params = {query = "machine learning"}},
+//!         {tool = "news-searcher", params = {query = "technology"}}
 //!     }
 //! })
 //! ```
@@ -150,7 +150,7 @@
 //! console.log(response.text);
 //!
 //! // Tool execution
-//! const result = await Tool.execute("web_search", {
+//! const result = await Tool.execute("web-searcher", {
 //!     query: "latest AI news"
 //! });
 //! ```
@@ -294,7 +294,9 @@ pub use providers::ProviderManager;
 pub use registry::ComponentRegistry;
 pub use runtime::ScriptRuntime;
 
+#[cfg(feature = "lua")]
 use llmspell_core::traits::script_executor::ScriptExecutor;
+#[cfg(feature = "lua")]
 use std::sync::Arc;
 
 /// Create a script executor for the given configuration
@@ -305,6 +307,7 @@ use std::sync::Arc;
 /// # Errors
 ///
 /// Returns an error if the script runtime fails to initialize with the given configuration.
+#[cfg(feature = "lua")]
 pub async fn create_script_executor(
     config: LLMSpellConfig,
 ) -> Result<Arc<dyn ScriptExecutor>, llmspell_core::error::LLMSpellError> {
@@ -320,6 +323,7 @@ pub async fn create_script_executor(
 /// # Errors
 ///
 /// Returns an error if the script runtime fails to initialize.
+#[cfg(feature = "lua")]
 #[allow(clippy::unused_async)]
 pub async fn create_script_executor_with_provider(
     config: LLMSpellConfig,

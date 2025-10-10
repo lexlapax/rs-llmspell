@@ -212,12 +212,13 @@ if analyzer or reviewer then
     local workflow_duration = workflow_timer:stop()
     Debug.info("Workflow completed in " .. tostring(workflow_duration) .. "ms", module_name)
 
-    -- Check for workflow outputs in State
+    -- Check for workflow outputs (automatic collection)
     if analyzer then
-        local analysis_output = State.load("custom",
-            ":workflow:debug_workflow_" .. timestamp .. ":agent:code_analyzer_" .. timestamp .. ":output")
+        local agent_outputs = workflow_result.metadata and workflow_result.metadata.extra
+            and workflow_result.metadata.extra.agent_outputs or {}
+        local analysis_output = agent_outputs["code_analyzer_" .. timestamp]
         if analysis_output then
-            Debug.debug("Workflow analysis output retrieved from State", module_name)
+            Debug.debug("Workflow analysis output retrieved from metadata.extra.agent_outputs", module_name)
         end
     end
 
@@ -252,7 +253,7 @@ Generated: ]] .. os.date("%Y-%m-%d %H:%M:%S") .. [[
 
 -- Write to file with debug logging
 Debug.debug("Writing results to file", module_name)
-local write_result = Tool.invoke("file_operations", {
+local write_result = Tool.execute("file-operations", {
     operation = "write",
     path = "/tmp/instrumented-analysis-" .. timestamp .. ".md",
     input = formatted_results
@@ -290,7 +291,7 @@ print("\n📦 State Keys Available for Inspection:")
 print("• custom::checkpoint:pre_analysis")
 print("• custom::last_analysis")
 if analyzer then
-    print("• custom::workflow:debug_workflow_" .. timestamp .. ":agent:code_analyzer_" .. timestamp .. ":output")
+    print("• result.metadata.extra.agent_outputs[\"code_analyzer_" .. timestamp .. "\"] (automatic collection)")
 end
 
 print("\n🔍 To inspect state in REPL:")

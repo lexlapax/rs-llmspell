@@ -3,13 +3,17 @@
 
 #![allow(clippy::significant_drop_tightening)]
 
-use crate::globals::types::{GlobalContext, GlobalMetadata, GlobalObject};
+#[cfg(any(feature = "lua", feature = "javascript"))]
+use crate::globals::types::GlobalContext;
+use crate::globals::types::{GlobalMetadata, GlobalObject};
 use crate::hook_bridge::HookBridge;
+#[cfg(any(feature = "lua", feature = "javascript"))]
 use llmspell_core::error::LLMSpellError;
 use std::sync::Arc;
 
 /// Hook global object providing cross-language hook system
 pub struct HookGlobal {
+    #[cfg_attr(not(any(feature = "lua", feature = "javascript")), allow(dead_code))]
     hook_bridge: Arc<HookBridge>,
 }
 

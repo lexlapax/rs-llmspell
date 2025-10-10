@@ -5,6 +5,7 @@
 
 use crate::debug_bridge::DebugBridge;
 use crate::globals::GlobalContext;
+use crate::lua::conversion::lua_value_to_json;
 use crate::lua::object_dump::{dump_labeled_value, dump_value, DumpOptions};
 use crate::lua::stacktrace::{capture_stack_trace, StackTraceOptions};
 use llmspell_utils::debug::FilterPattern;
@@ -116,7 +117,7 @@ pub fn inject_debug_global(
     let log_with_data_fn = lua.create_function(
         move |_lua, (level, message, data, module): (String, String, Value, Option<String>)| {
             // Convert Lua value to JSON
-            let json_value = lua_value_to_json(&data)?;
+            let json_value = lua_value_to_json(data)?;
             bridge_clone.log_with_metadata(&level, &message, module.as_deref(), json_value);
             Ok(())
         },
@@ -396,7 +397,7 @@ pub fn inject_debug_global(
     let record_event_fn = lua.create_function(
         move |_lua, (timer_id, event_name, metadata): (String, String, Option<Value>)| {
             let json_metadata = if let Some(meta) = metadata {
-                Some(lua_value_to_json(&meta)?)
+                Some(lua_value_to_json(meta)?)
             } else {
                 None
             };
@@ -410,7 +411,11 @@ pub fn inject_debug_global(
     let bridge_clone = bridge.clone();
     let stack_trace_fn = lua.create_function(move |lua, options: Option<mlua::Table>| {
         let trace_options = options.map_or_else(
-            || bridge_clone.stack_trace_options_for_level(&bridge_clone.get_level()),
+            || {
+                bridge_clone
+                    .stack_trace_options_for_level(&bridge_clone.get_level())
+                    .into()
+            },
             |opts| StackTraceOptions {
                 max_depth: opts.get("max_depth").unwrap_or(50),
                 capture_locals: opts.get("capture_locals").unwrap_or(false),
@@ -428,7 +433,11 @@ pub fn inject_debug_global(
     let bridge_clone = bridge.clone();
     let stack_trace_json_fn = lua.create_function(move |lua, options: Option<mlua::Table>| {
         let trace_options = options.map_or_else(
-            || bridge_clone.stack_trace_options_for_level(&bridge_clone.get_level()),
+            || {
+                bridge_clone
+                    .stack_trace_options_for_level(&bridge_clone.get_level())
+                    .into()
+            },
             |opts| StackTraceOptions {
                 max_depth: opts.get("max_depth").unwrap_or(50),
                 capture_locals: opts.get("capture_locals").unwrap_or(false),
@@ -451,57 +460,6 @@ pub fn inject_debug_global(
     lua.globals().set("Debug", debug_table)?;
 
     Ok(())
-}
-
-/// Convert Lua value to JSON
-fn lua_value_to_json(value: &Value) -> mlua::Result<serde_json::Value> {
-    match value {
-        Value::Boolean(b) => Ok(serde_json::Value::Bool(*b)),
-        Value::Integer(i) => Ok(serde_json::Value::Number((*i).into())),
-        Value::Number(n) => serde_json::Number::from_f64(*n)
-            .map_or(Ok(serde_json::Value::Null), |num| {
-                Ok(serde_json::Value::Number(num))
-            }),
-        Value::String(s) => Ok(serde_json::Value::String(s.to_str()?.to_string())),
-        Value::Table(t) => {
-            // Check if it's an array-like table
-            let mut is_array = true;
-            let mut max_index = 0;
-
-            for pair in t.clone().pairs::<Value, Value>() {
-                let (k, _) = pair?;
-                match k {
-                    Value::Integer(i) if i > 0 => {
-                        #[allow(clippy::cast_possible_truncation, clippy::cast_sign_loss)]
-                        {
-                            max_index = max_index.max(i as usize);
-                        }
-                    }
-                    _ => {
-                        is_array = false;
-                        break;
-                    }
-                }
-            }
-
-            if is_array && max_index > 0 {
-                let mut arr = Vec::new();
-                for i in 1..=max_index {
-                    let val = t.get::<_, Value>(i)?;
-                    arr.push(lua_value_to_json(&val)?);
-                }
-                Ok(serde_json::Value::Array(arr))
-            } else {
-                let mut map = serde_json::Map::new();
-                for pair in t.clone().pairs::<String, Value>() {
-                    let (k, v) = pair?;
-                    map.insert(k, lua_value_to_json(&v)?);
-                }
-                Ok(serde_json::Value::Object(map))
-            }
-        }
-        _ => Ok(serde_json::Value::Null),
-    }
 }
 
 /// Convert JSON to Lua value

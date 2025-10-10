@@ -484,7 +484,7 @@ local assistant_report = string.format([[
 )
 
 -- Save report
-Tool.invoke("file_operations", {
+Tool.execute("file-operations", {
     operation = "write",
     path = config.files.assistant_report,
     input = assistant_report
@@ -504,7 +504,7 @@ local tasks_json = string.format([[{
     '["work", "personal", "health", "learning", "finance"]'
 )
 
-Tool.invoke("file_operations", {
+Tool.execute("file-operations", {
     operation = "write",
     path = config.files.tasks_file,
     input = tasks_json

@@ -191,7 +191,7 @@ impl ProcessExecutorTool {
 
         Self {
             metadata: ComponentMetadata::new(
-                "process_executor".to_string(),
+                "process-executor".to_string(),
                 "Safe process execution with security controls and resource limits".to_string(),
             ),
             config,
@@ -408,7 +408,7 @@ impl ProcessExecutorTool {
             Ok(Err(e)) => {
                 return Err(LLMSpellError::Tool {
                     message: format!("Failed to execute process: {e}"),
-                    tool_name: Some("process_executor".to_string()),
+                    tool_name: Some("process-executor".to_string()),
                     source: None,
                 });
             }
@@ -651,7 +651,7 @@ impl BaseAgent for ProcessExecutorTool {
         // Use SafeErrorHandler to sanitize error messages
         let context = ErrorContext::new()
             .with_operation("process_execution")
-            .with_metadata("tool", "process_executor");
+            .with_metadata("tool", "process-executor");
 
         let safe_response = self.error_handler.handle_llmspell_error(&error, &context);
 
@@ -674,7 +674,7 @@ impl Tool for ProcessExecutorTool {
 
     fn schema(&self) -> ToolSchema {
         ToolSchema::new(
-            "process_executor".to_string(),
+            "process-executor".to_string(),
             "Execute system processes with security controls and resource limits".to_string(),
         )
         .with_parameter(ParameterDef {
@@ -1037,11 +1037,11 @@ mod tests {
         let tool = create_test_process_executor();
 
         let metadata = tool.metadata();
-        assert_eq!(metadata.name, "process_executor");
+        assert_eq!(metadata.name, "process-executor");
         assert!(metadata.description.contains("process execution"));
 
         let schema = tool.schema();
-        assert_eq!(schema.name, "process_executor");
+        assert_eq!(schema.name, "process-executor");
         assert_eq!(tool.category(), ToolCategory::System);
         assert_eq!(tool.security_level(), SecurityLevel::Restricted);
 
@@ -1144,7 +1144,7 @@ mod tests {
 
         // Test hook metadata
         let metadata = tool.hook_metadata();
-        assert_eq!(metadata["tool_name"], "process_executor");
+        assert_eq!(metadata["tool_name"], "process-executor");
         assert!(metadata["hook_points_supported"].is_array());
         assert_eq!(
             metadata["hook_points_supported"].as_array().unwrap().len(),

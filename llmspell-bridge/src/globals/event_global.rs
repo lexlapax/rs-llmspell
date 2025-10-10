@@ -3,12 +3,20 @@
 
 #![allow(clippy::significant_drop_tightening)]
 
+#[cfg(feature = "lua")]
 use crate::event_bridge::EventBridge;
+#[cfg(feature = "lua")]
 use crate::event_serialization::EventSerialization;
-use crate::globals::types::{GlobalContext, GlobalMetadata, GlobalObject};
+#[cfg(any(feature = "lua", feature = "javascript"))]
+use crate::globals::types::GlobalContext;
+use crate::globals::types::{GlobalMetadata, GlobalObject};
+#[cfg(any(feature = "lua", feature = "javascript"))]
 use llmspell_core::error::LLMSpellError;
+#[cfg(feature = "lua")]
 use llmspell_events::{Language, UniversalEvent};
+#[cfg(feature = "lua")]
 use std::sync::Arc;
+#[cfg(feature = "lua")]
 use tokio::sync::mpsc::UnboundedReceiver;
 
 /// Event global object providing cross-language event bus functionality
@@ -23,6 +31,7 @@ impl EventGlobal {
 }
 
 /// Helper function to get or create an `EventBridge` from `GlobalContext`
+#[cfg(feature = "lua")]
 fn get_or_create_event_bridge(context: &GlobalContext) -> Result<Arc<EventBridge>, LLMSpellError> {
     // Try to get existing bridge from context first
     if let Some(bridge) = context.get_bridge::<EventBridge>("event_bridge") {

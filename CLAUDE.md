@@ -8,15 +8,17 @@ Production-ready AI workflow orchestration platform built in Rust for script-dri
 ## Critical References
 - **Architecture**: `/docs/technical/master-architecture-vision.md`
 - **Implementation Phases**: `/docs/in-progress/implementation-phases.md` (23+ phase roadmap)
-- **Current Status**: Phase 11 Local LLM Integration (Ollama + Candle dual-path)
-- **Phase 11 Design**: `/docs/in-progress/phase-11-design-doc.md` (comprehensive integration details)
-- **Phase 11 Tasks**: `/docs/in-progress/PHASE11-TODO.md` (detailed implementation tasks)
+- **Current Status**: v0.11.1 - Phase 11a Complete, Ready for Phase 12 (Adaptive Memory System)
+- **Phase 11a Design**: `/docs/in-progress/phase-11a-design-doc.md` (1,685-line consolidation doc)
+- **Release Notes**: `/RELEASE_NOTES_v0.11.1.md` (comprehensive v0.11.1 changelog)
 - **Current Work**: ALWAYS read `/TODO.md` - hierarchical checkboxes with numbered tasks
 
 ## Recent Completion Status
 - ✅ **Phase 7**: Infrastructure Consolidation (536+ files refactored, centralized testing, config revolution)
 - ✅ **Phase 10**: Service Integration & IDE Connectivity (kernel, Jupyter, VS Code, LSP)
-- 🚧 **Phase 11**: Starting - Local LLM Integration (Ollama via rig + Candle embedded inference)
+- ✅ **Phase 11**: Local LLM Integration (Ollama + Candle dual-path) - COMPLETE
+- ✅ **Phase 11a**: Bridge Consolidation (87% compile speedup, API standardization, docs completeness) - COMPLETE
+- 🚧 **Phase 12**: Starting - Adaptive Memory System (A-TKG temporal knowledge graph)
 
 ## Project-Specific Behavior Controls
 - **Always Megathink**: analyze existing code, never guess
@@ -81,6 +83,14 @@ Production-ready AI workflow orchestration platform built in Rust for script-dri
 4. Run ./scripts/quality-check-fast.sh
 5. Update TODO.md sub-tasks as completed
 
+## v0.11.1 Key Achievements (Phase 11a)
+- **87% Compile Speedup**: Bridge-only builds 38s→5s via Cargo feature gates (ADR-042)
+- **API Standardization**: Tool.execute() consistent across all 40+ tools
+- **Workflow Introspection**: WorkflowResult.agent_outputs for debugging (ADR-043)
+- **Documentation Completeness**: Security 40%→95%, Env Vars 0%→100% (41+ variables)
+- **Code Simplification**: 876 lines removed (StepType::Custom cleanup)
+- **Lua API Documentation**: 100% accurate against llmspell-bridge implementation
+
 ## Banned Project Behaviors
 - Creating new files (edit existing)
 - Adding dependencies (use existing or llmspell-utils)
@@ -88,4 +98,4 @@ Production-ready AI workflow orchestration platform built in Rust for script-dri
 - Leaving TODO comments in code
 - Using unwrap() in production code
 - Skipping tests to meet deadlines
-- when writing lua scripts use  the `docs/user-guide/api/lua/README.md` to actually see what API/function calls to make in lua. do not guess.
+- When writing Lua scripts, use `docs/user-guide/api/lua/README.md` for API reference - DO NOT GUESS method names

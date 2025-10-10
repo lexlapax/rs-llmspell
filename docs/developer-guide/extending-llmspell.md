@@ -48,7 +48,7 @@ impl CustomTool {
     pub fn new(config: CustomToolConfig) -> Self {
         Self {
             metadata: ComponentMetadata::new(
-                "custom_tool".to_string(),
+                "custom-tool".to_string(),
                 "Does something useful".to_string(),
             ),
             config,
@@ -90,7 +90,7 @@ impl BaseAgent for CustomTool {
         };
         
         // 4. Build response using ResponseBuilder
-        let response = ResponseBuilder::success("custom_tool")
+        let response = ResponseBuilder::success("custom-tool")
             .with_result(json!(result))
             .with_metadata("operation", json!(operation))
             .with_duration_ms(start.elapsed().as_millis() as u64)
@@ -143,7 +143,7 @@ impl FileSystemTool {
     pub fn new(sandbox: Arc<FileSandbox>) -> Self {
         Self {
             metadata: ComponentMetadata::new(
-                "file_tool".to_string(),
+                "file-operations".to_string(),
                 "Safe file operations".to_string(),
             ),
             sandbox,
@@ -168,12 +168,12 @@ pub fn register_all_tools(
     registry: &Arc<ComponentRegistry>,
     sandbox: Arc<FileSandbox>,
 ) -> Result<()> {
-    // Standard tools
-    registry.register_tool("custom_tool", Arc::new(CustomTool::new(config)));
-    
+    // Standard tools (use kebab-case for tool names)
+    registry.register_tool("custom-tool", Arc::new(CustomTool::new(config)));
+
     // File system tools with sandbox
-    registry.register_tool("file_tool", Arc::new(FileSystemTool::new(sandbox.clone())));
-    
+    registry.register_tool("file-operations", Arc::new(FileSystemTool::new(sandbox.clone())));
+
     Ok(())
 }
 ```

@@ -172,7 +172,7 @@ impl EnvironmentReaderTool {
         );
         Self {
             metadata: ComponentMetadata::new(
-                "environment_reader".to_string(),
+                "environment-reader".to_string(),
                 "System environment variable access with security controls".to_string(),
             ),
             config,
@@ -188,7 +188,7 @@ impl EnvironmentReaderTool {
     ) -> Self {
         Self {
             metadata: ComponentMetadata::new(
-                "environment_reader".to_string(),
+                "environment-reader".to_string(),
                 "System environment variable access with security controls".to_string(),
             ),
             config,
@@ -394,7 +394,7 @@ impl EnvironmentReaderTool {
             }
             Err(e) => Err(LLMSpellError::Tool {
                 message: format!("Failed to set environment variable: {e}"),
-                tool_name: Some("environment_reader".to_string()),
+                tool_name: Some("environment-reader".to_string()),
                 source: None,
             }),
         }
@@ -498,7 +498,7 @@ impl Tool for EnvironmentReaderTool {
 
     fn schema(&self) -> ToolSchema {
         ToolSchema::new(
-            "environment_reader".to_string(),
+            "environment-reader".to_string(),
             "Access system environment variables with security controls".to_string(),
         )
         .with_parameter(ParameterDef {
@@ -768,11 +768,11 @@ mod tests {
         let tool = create_test_environment_reader();
 
         let metadata = tool.metadata();
-        assert_eq!(metadata.name, "environment_reader");
+        assert_eq!(metadata.name, "environment-reader");
         assert!(metadata.description.contains("environment variable"));
 
         let schema = tool.schema();
-        assert_eq!(schema.name, "environment_reader");
+        assert_eq!(schema.name, "environment-reader");
         assert_eq!(tool.category(), ToolCategory::System);
         assert_eq!(tool.security_level(), SecurityLevel::Restricted);
 

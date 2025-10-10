@@ -870,38 +870,38 @@ pub async fn start_embedded_kernel(config: LLMSpellConfig) -> Result<KernelHandl
             // Return all placeholder tools for embedded testing
             vec![
                 "calculator",
-                "file_operations",
-                "web_scraper",
-                "json_processor",
-                "text_analyzer",
-                "data_converter",
-                "image_processor",
-                "api_tester",
-                "base64_encoder",
-                "citation_formatter",
-                "sitemap_crawler",
-                "graphql_query",
-                "url_analyzer",
-                "http_request",
-                "video_processor",
-                "webpage_monitor",
-                "service_checker",
-                "environment_reader",
-                "uuid_generator",
-                "hash_calculator",
-                "data_validation",
-                "web_search",
-                "webhook_caller",
-                "process_executor",
-                "date_time_handler",
-                "file_search",
-                "file_watcher",
-                "audio_processor",
-                "diff_calculator",
-                "system_monitor",
-                "graph_builder",
-                "text_manipulator",
-                "file_converter",
+                "file-operations",
+                "web-scraper",
+                "json-processor",
+                "text-analyzer",
+                "data-converter",
+                "image-processor",
+                "api-tester",
+                "base64-encoder",
+                "citation-formatter",
+                "sitemap-crawler",
+                "graphql-query",
+                "url-analyzer",
+                "http-requester",
+                "video-processor",
+                "webpage-monitor",
+                "service-checker",
+                "environment-reader",
+                "uuid-generator",
+                "hash-calculator",
+                "data-validator",
+                "web-searcher",
+                "webhook-caller",
+                "process-executor",
+                "datetime-handler",
+                "file-search",
+                "file-watcher",
+                "audio-processor",
+                "diff-calculator",
+                "system-monitor",
+                "graph-builder",
+                "text-manipulator",
+                "file-converter",
             ]
             .into_iter()
             .map(String::from)
@@ -919,133 +919,133 @@ pub async fn start_embedded_kernel(config: LLMSpellConfig) -> Result<KernelHandl
                     "Perform mathematical calculations",
                     ToolCategory::Utility,
                 ),
-                "file_operations" => StubTool::new(
-                    "file_operations",
+                "file-operations" => StubTool::new(
+                    "file-operations",
                     "Read and write files",
                     ToolCategory::Filesystem,
                 ),
-                "web_scraper" => {
-                    StubTool::new("web_scraper", "Scrape web pages", ToolCategory::Web)
+                "web-scraper" => {
+                    StubTool::new("web-scraper", "Scrape web pages", ToolCategory::Web)
                 }
-                "json_processor" => {
-                    StubTool::new("json_processor", "Process JSON data", ToolCategory::Data)
+                "json-processor" => {
+                    StubTool::new("json-processor", "Process JSON data", ToolCategory::Data)
                 }
-                "text_analyzer" => StubTool::new(
-                    "text_analyzer",
+                "text-analyzer" => StubTool::new(
+                    "text-analyzer",
                     "Analyze text content",
                     ToolCategory::Analysis,
                 ),
-                "data_converter" => StubTool::new(
-                    "data_converter",
+                "data-converter" => StubTool::new(
+                    "data-converter",
                     "Convert between data formats",
                     ToolCategory::Data,
                 ),
-                "image_processor" => {
-                    StubTool::new("image_processor", "Process images", ToolCategory::Media)
+                "image-processor" => {
+                    StubTool::new("image-processor", "Process images", ToolCategory::Media)
                 }
-                "api_tester" => {
-                    StubTool::new("api_tester", "Test API endpoints", ToolCategory::Api)
+                "api-tester" => {
+                    StubTool::new("api-tester", "Test API endpoints", ToolCategory::Api)
                 }
-                "base64_encoder" => StubTool::new(
-                    "base64_encoder",
+                "base64-encoder" => StubTool::new(
+                    "base64-encoder",
                     "Encode/decode base64",
                     ToolCategory::Utility,
                 ),
-                "citation_formatter" => StubTool::new(
-                    "citation_formatter",
+                "citation-formatter" => StubTool::new(
+                    "citation-formatter",
                     "Format citations",
                     ToolCategory::Utility,
                 ),
-                "sitemap_crawler" => StubTool::new(
-                    "sitemap_crawler",
+                "sitemap-crawler" => StubTool::new(
+                    "sitemap-crawler",
                     "Crawl website sitemaps",
                     ToolCategory::Web,
                 ),
-                "graphql_query" => StubTool::new(
-                    "graphql_query",
+                "graphql-query" => StubTool::new(
+                    "graphql-query",
                     "Execute GraphQL queries",
                     ToolCategory::Api,
                 ),
-                "url_analyzer" => {
-                    StubTool::new("url_analyzer", "Analyze URL components", ToolCategory::Web)
+                "url-analyzer" => {
+                    StubTool::new("url-analyzer", "Analyze URL components", ToolCategory::Web)
                 }
-                "http_request" => {
-                    StubTool::new("http_request", "Make HTTP requests", ToolCategory::Web)
+                "http-requester" => {
+                    StubTool::new("http-requester", "Make HTTP requests", ToolCategory::Web)
                 }
-                "video_processor" => StubTool::new(
-                    "video_processor",
+                "video-processor" => StubTool::new(
+                    "video-processor",
                     "Process video files",
                     ToolCategory::Media,
                 ),
-                "webpage_monitor" => StubTool::new(
-                    "webpage_monitor",
+                "webpage-monitor" => StubTool::new(
+                    "webpage-monitor",
                     "Monitor webpage changes",
                     ToolCategory::Web,
                 ),
-                "service_checker" => StubTool::new(
-                    "service_checker",
+                "service-checker" => StubTool::new(
+                    "service-checker",
                     "Check service status",
                     ToolCategory::System,
                 ),
-                "environment_reader" => StubTool::new(
-                    "environment_reader",
+                "environment-reader" => StubTool::new(
+                    "environment-reader",
                     "Read environment variables",
                     ToolCategory::System,
                 ),
-                "uuid_generator" => {
-                    StubTool::new("uuid_generator", "Generate UUIDs", ToolCategory::Utility)
+                "uuid-generator" => {
+                    StubTool::new("uuid-generator", "Generate UUIDs", ToolCategory::Utility)
                 }
-                "hash_calculator" => {
-                    StubTool::new("hash_calculator", "Calculate hashes", ToolCategory::Utility)
+                "hash-calculator" => {
+                    StubTool::new("hash-calculator", "Calculate hashes", ToolCategory::Utility)
                 }
-                "data_validation" => {
-                    StubTool::new("data_validation", "Validate data", ToolCategory::Data)
+                "data-validator" => {
+                    StubTool::new("data-validator", "Validate data", ToolCategory::Data)
                 }
-                "web_search" => StubTool::new("web_search", "Search the web", ToolCategory::Web),
-                "webhook_caller" => {
-                    StubTool::new("webhook_caller", "Call webhooks", ToolCategory::Api)
+                "web-searcher" => StubTool::new("web-searcher", "Search the web", ToolCategory::Web),
+                "webhook-caller" => {
+                    StubTool::new("webhook-caller", "Call webhooks", ToolCategory::Api)
                 }
-                "process_executor" => StubTool::new(
-                    "process_executor",
+                "process-executor" => StubTool::new(
+                    "process-executor",
                     "Execute processes",
                     ToolCategory::System,
                 ),
-                "date_time_handler" => StubTool::new(
-                    "date_time_handler",
+                "datetime-handler" => StubTool::new(
+                    "datetime-handler",
                     "Handle dates and times",
                     ToolCategory::Utility,
                 ),
-                "file_search" => {
-                    StubTool::new("file_search", "Search files", ToolCategory::Filesystem)
+                "file-search" => {
+                    StubTool::new("file-search", "Search files", ToolCategory::Filesystem)
                 }
-                "file_watcher" => StubTool::new(
-                    "file_watcher",
+                "file-watcher" => StubTool::new(
+                    "file-watcher",
                     "Watch file changes",
                     ToolCategory::Filesystem,
                 ),
-                "audio_processor" => StubTool::new(
-                    "audio_processor",
+                "audio-processor" => StubTool::new(
+                    "audio-processor",
                     "Process audio files",
                     ToolCategory::Media,
                 ),
-                "diff_calculator" => StubTool::new(
-                    "diff_calculator",
+                "diff-calculator" => StubTool::new(
+                    "diff-calculator",
                     "Calculate differences",
                     ToolCategory::Analysis,
                 ),
-                "system_monitor" => StubTool::new(
-                    "system_monitor",
+                "system-monitor" => StubTool::new(
+                    "system-monitor",
                     "Monitor system resources",
                     ToolCategory::System,
                 ),
-                "graph_builder" => {
-                    StubTool::new("graph_builder", "Build graphs", ToolCategory::Data)
+                "graph-builder" => {
+                    StubTool::new("graph-builder", "Build graphs", ToolCategory::Data)
                 }
-                "text_manipulator" => {
-                    StubTool::new("text_manipulator", "Manipulate text", ToolCategory::Utility)
+                "text-manipulator" => {
+                    StubTool::new("text-manipulator", "Manipulate text", ToolCategory::Utility)
                 }
-                "file_converter" => {
-                    StubTool::new("file_converter", "Convert file formats", ToolCategory::Data)
+                "file-converter" => {
+                    StubTool::new("file-converter", "Convert file formats", ToolCategory::Data)
                 }
                 _ => return None,
             };
@@ -1464,13 +1464,13 @@ pub async fn start_kernel_service(port: u16, config: LLMSpellConfig) -> Result<S
             // Return a reasonable set of stub tools for testing
             vec![
                 "calculator".to_string(),
-                "file_operations".to_string(),
-                "web_scraper".to_string(),
-                "json_processor".to_string(),
-                "text_analyzer".to_string(),
-                "data_converter".to_string(),
-                "system_monitor".to_string(),
-                "environment_reader".to_string(),
+                "file-operations".to_string(),
+                "web-scraper".to_string(),
+                "json-processor".to_string(),
+                "text-analyzer".to_string(),
+                "data-converter".to_string(),
+                "system-monitor".to_string(),
+                "environment-reader".to_string(),
             ]
         }
 
@@ -1484,34 +1484,34 @@ pub async fn start_kernel_service(port: u16, config: LLMSpellConfig) -> Result<S
                     "Perform mathematical calculations",
                     ToolCategory::Utility,
                 ),
-                "file_operations" => StubTool::new(
-                    "file_operations",
+                "file-operations" => StubTool::new(
+                    "file-operations",
                     "Read and write files",
                     ToolCategory::Filesystem,
                 ),
-                "web_scraper" => {
-                    StubTool::new("web_scraper", "Scrape web pages", ToolCategory::Web)
+                "web-scraper" => {
+                    StubTool::new("web-scraper", "Scrape web pages", ToolCategory::Web)
                 }
-                "json_processor" => {
-                    StubTool::new("json_processor", "Process JSON data", ToolCategory::Data)
+                "json-processor" => {
+                    StubTool::new("json-processor", "Process JSON data", ToolCategory::Data)
                 }
-                "text_analyzer" => StubTool::new(
-                    "text_analyzer",
+                "text-analyzer" => StubTool::new(
+                    "text-analyzer",
                     "Analyze text content",
                     ToolCategory::Analysis,
                 ),
-                "data_converter" => StubTool::new(
-                    "data_converter",
+                "data-converter" => StubTool::new(
+                    "data-converter",
                     "Convert between data formats",
                     ToolCategory::Data,
                 ),
-                "system_monitor" => StubTool::new(
-                    "system_monitor",
+                "system-monitor" => StubTool::new(
+                    "system-monitor",
                     "Monitor system resources",
                     ToolCategory::System,
                 ),
-                "environment_reader" => StubTool::new(
-                    "environment_reader",
+                "environment-reader" => StubTool::new(
+                    "environment-reader",
                     "Read environment variables",
                     ToolCategory::System,
                 ),

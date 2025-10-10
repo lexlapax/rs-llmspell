@@ -39,9 +39,9 @@ async fn test_workflow_executor_tracing() -> Result<()> {
         SequentialWorkflow::builder("test-workflow".to_string())
             .add_step(WorkflowStep::new(
                 "step1".to_string(),
-                StepType::Custom {
-                    function_name: "test_function".to_string(),
-                    parameters: json!({"param": "value"}),
+                StepType::Tool {
+                    tool_name: "calculator".to_string(),
+                    parameters: json!({"operation": "add", "values": [1, 1]}),
                 },
             ))
             .build(),
@@ -99,16 +99,16 @@ async fn test_sequential_workflow_tracing() -> Result<()> {
         SequentialWorkflow::builder("test-sequential".to_string())
             .add_step(WorkflowStep::new(
                 "step1".to_string(),
-                StepType::Custom {
-                    function_name: "step1_function".to_string(),
-                    parameters: json!({}),
+                StepType::Tool {
+                    tool_name: "calculator".to_string(),
+                    parameters: json!({"operation": "add", "values": [1, 1]}),
                 },
             ))
             .add_step(WorkflowStep::new(
                 "step2".to_string(),
-                StepType::Custom {
-                    function_name: "step2_function".to_string(),
-                    parameters: json!({}),
+                StepType::Tool {
+                    tool_name: "calculator".to_string(),
+                    parameters: json!({"operation": "add", "values": [1, 1]}),
                 },
             ))
             .build(),
@@ -136,9 +136,9 @@ async fn test_step_executor_tracing() -> Result<()> {
 
     let _step = WorkflowStep::new(
         "traced-step".to_string(),
-        StepType::Custom {
-            function_name: "test_function".to_string(),
-            parameters: json!({"test": "param"}),
+        StepType::Tool {
+            tool_name: "calculator".to_string(),
+            parameters: json!({"operation": "add", "values": [1, 1]}),
         },
     );
 
@@ -161,9 +161,9 @@ async fn test_conditional_workflow_tracing() -> Result<()> {
         condition: Condition::Always,
         steps: vec![WorkflowStep::new(
             "conditional-step".to_string(),
-            StepType::Custom {
-                function_name: "conditional_function".to_string(),
-                parameters: json!({}),
+            StepType::Tool {
+                tool_name: "calculator".to_string(),
+                parameters: json!({"operation": "add", "values": [1, 1]}),
             },
         )],
         is_default: false,
@@ -194,18 +194,18 @@ async fn test_parallel_workflow_tracing() -> Result<()> {
         .add_branch(
             ParallelBranch::new("parallel-branch-1".to_string()).add_step(WorkflowStep::new(
                 "parallel-step-1".to_string(),
-                StepType::Custom {
-                    function_name: "parallel_function_1".to_string(),
-                    parameters: json!({}),
+                StepType::Tool {
+                    tool_name: "calculator".to_string(),
+                    parameters: json!({"operation": "add", "values": [1, 1]}),
                 },
             )),
         )
         .add_branch(
             ParallelBranch::new("parallel-branch-2".to_string()).add_step(WorkflowStep::new(
                 "parallel-step-2".to_string(),
-                StepType::Custom {
-                    function_name: "parallel_function_2".to_string(),
-                    parameters: json!({}),
+                StepType::Tool {
+                    tool_name: "calculator".to_string(),
+                    parameters: json!({"operation": "add", "values": [1, 1]}),
                 },
             )),
         )
@@ -234,9 +234,9 @@ async fn test_step_timing_tracing() -> Result<()> {
 
     let step = WorkflowStep::new(
         "timed-step".to_string(),
-        StepType::Custom {
-            function_name: "timed_function".to_string(),
-            parameters: json!({}),
+        StepType::Tool {
+            tool_name: "calculator".to_string(),
+            parameters: json!({"operation": "add", "values": [1, 1]}),
         },
     )
     .with_timeout(Duration::from_millis(100))
@@ -278,7 +278,7 @@ async fn test_error_handling_tracing() -> Result<()> {
                 "failing-step".to_string(),
                 StepType::Tool {
                     tool_name: "nonexistent-tool".to_string(),
-                    parameters: json!({}),
+                    parameters: json!({"operation": "add", "values": [1, 1]}),
                 },
             ))
             .build(),
@@ -305,9 +305,9 @@ async fn test_workflow_tracing_performance() -> Result<()> {
         SequentialWorkflow::builder("perf-test".to_string())
             .add_step(WorkflowStep::new(
                 "perf-step".to_string(),
-                StepType::Custom {
-                    function_name: "perf_function".to_string(),
-                    parameters: json!({}),
+                StepType::Tool {
+                    tool_name: "calculator".to_string(),
+                    parameters: json!({"operation": "add", "values": [1, 1]}),
                 },
             ))
             .build(),

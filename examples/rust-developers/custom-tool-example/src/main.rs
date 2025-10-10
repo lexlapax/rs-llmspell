@@ -51,7 +51,7 @@ impl TextAnalyzerTool {
     fn new() -> Self {
         Self {
             metadata: ComponentMetadata::new(
-                "text_analyzer".to_string(),
+                "text-analyzer".to_string(),
                 "Analyzes text for word count, character count, and sentiment".to_string(),
             ),
         }
@@ -210,7 +210,7 @@ impl Tool for TextAnalyzerTool {
 
     fn schema(&self) -> ToolSchema {
         ToolSchema::new(
-            "text_analyzer".to_string(),
+            "text-analyzer".to_string(),
             "Analyzes text for various metrics".to_string(),
         )
         .with_parameter(ParameterDef {
@@ -242,7 +242,7 @@ impl MathCalculatorTool {
     fn new() -> Self {
         Self {
             metadata: ComponentMetadata::new(
-                "math_calculator".to_string(),
+                "math-calculator".to_string(),
                 "Performs basic mathematical operations".to_string(),
             ),
         }
@@ -412,7 +412,7 @@ impl Tool for MathCalculatorTool {
 
     fn schema(&self) -> ToolSchema {
         ToolSchema::new(
-            "math_calculator".to_string(),
+            "math-calculator".to_string(),
             "Performs basic mathematical operations".to_string(),
         )
         .with_parameter(ParameterDef {

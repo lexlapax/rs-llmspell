@@ -71,7 +71,7 @@ The system uses intelligent ID prefixing to disambiguate between different compo
 
 3. **Tool IDs**: No automatic prefixing (tools are registered with exact names)
    ```lua
-   Tool.invoke("file-reader", params)
+   Tool.execute("file-reader", params)
    -- Looks for tool with exact ID "file-reader"
    ```
 

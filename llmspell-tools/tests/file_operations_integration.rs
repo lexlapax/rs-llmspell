@@ -315,7 +315,7 @@ async fn test_tool_metadata() {
 
     // Test schema
     let schema = tool.schema();
-    assert_eq!(schema.name, "file_operations");
+    assert_eq!(schema.name, "file-operations");
     assert!(!schema.parameters.is_empty());
 
     // Verify required parameters

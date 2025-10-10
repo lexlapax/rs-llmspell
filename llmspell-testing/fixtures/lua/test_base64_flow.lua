@@ -11,7 +11,7 @@ print("Testing Base64 flow from example:")
 local original = "Hello, World!"
 print("Original:", original)
 
-local encoded = use_tool("base64_encoder", {
+local encoded = use_tool("base64-encoder", {
     operation = "encode",
     input = original
 })

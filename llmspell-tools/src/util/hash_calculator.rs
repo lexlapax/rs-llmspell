@@ -513,7 +513,7 @@ impl Tool for HashCalculatorTool {
 
     fn schema(&self) -> ToolSchema {
         ToolSchema::new(
-            "hash_calculator".to_string(),
+            "hash-calculator".to_string(),
             "Calculate and verify hashes using various algorithms".to_string(),
         )
         .with_parameter(ParameterDef {

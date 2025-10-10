@@ -140,7 +140,7 @@ impl FileOperationsTool {
         );
         Self {
             metadata: ComponentMetadata::new(
-                "file-operations-tool".to_string(),
+                "file-operations".to_string(),
                 "Safe file system operations with sandboxing".to_string(),
             ),
             config,
@@ -979,7 +979,7 @@ impl Tool for FileOperationsTool {
 
     fn schema(&self) -> ToolSchema {
         ToolSchema {
-            name: "file_operations".to_string(),
+            name: "file-operations".to_string(),
             description: "Perform safe file system operations with sandboxing".to_string(),
             parameters: vec![
                 ParameterDef {
@@ -1176,7 +1176,7 @@ mod tests {
     #[tokio::test]
     async fn test_file_operations_tool_creation() {
         let tool = create_test_file_operations_tool();
-        assert_eq!(tool.metadata().name, "file-operations-tool");
+        assert_eq!(tool.metadata().name, "file-operations");
     }
     #[test]
     fn test_parse_parameters_standardized() {
@@ -1213,7 +1213,7 @@ mod tests {
 
         // Test hook metadata
         let metadata = tool.hook_metadata();
-        assert_eq!(metadata["tool_name"], "file-operations-tool");
+        assert_eq!(metadata["tool_name"], "file-operations");
         assert!(metadata["hook_points_supported"].is_array());
         assert_eq!(
             metadata["hook_points_supported"].as_array().unwrap().len(),

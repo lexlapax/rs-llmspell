@@ -22,7 +22,7 @@ Run your existing scripts and note which tools they use:
 ./target/release/llmspell run your-script.lua
 ```
 
-If you see errors like "Tool 'template_engine' not found", you need to enable the corresponding feature.
+If you see errors like "Tool 'template-creator' not found", you need to enable the corresponding feature.
 
 ### 2. Choose Your Build Configuration
 

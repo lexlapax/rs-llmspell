@@ -1,7 +1,10 @@
 //! ABOUTME: Streaming global object implementation for script engines
 //! ABOUTME: Provides streaming utilities and coroutine-based streaming functionality
 
-use super::types::{GlobalContext, GlobalMetadata, GlobalObject};
+#[cfg(any(feature = "lua", feature = "javascript"))]
+use super::types::GlobalContext;
+use super::types::{GlobalMetadata, GlobalObject};
+#[cfg(any(feature = "lua", feature = "javascript"))]
 use llmspell_core::Result;
 
 /// Streaming global object for script engines

@@ -45,10 +45,9 @@ pub struct Step {
 }
 
 pub enum StepType {
-    Agent(Box<dyn Agent>),
-    Tool { name: String, params: Value },
-    Workflow(Box<Workflow>),
-    Custom(Box<dyn CustomStep>),
+    Tool { tool_name: String, parameters: serde_json::Value },
+    Agent { agent_id: String, input: String },
+    Workflow { workflow_id: ComponentId, input: serde_json::Value },
 }
 ```
 
@@ -94,6 +93,54 @@ let workflow = WorkflowBuilder::new()
     .on_branch(Branch::A, high_quality_flow)
     .on_branch(Branch::B, standard_flow)
     .build()?;
+```
+
+## Agent Output Collection
+
+All workflow types automatically collect agent outputs during execution:
+
+```rust
+use llmspell_workflows::SequentialWorkflowBuilder;
+use llmspell_core::traits::workflow::Workflow;
+
+// Execute workflow with agents
+let result = workflow.execute(input, context).await?;
+
+// Access collected agent outputs from metadata
+if let Some(agent_outputs) = result.metadata.extra.get("agent_outputs") {
+    if let Some(outputs_map) = agent_outputs.as_object() {
+        for (agent_id, output) in outputs_map {
+            println!("Agent {}: {:?}", agent_id, output);
+        }
+    }
+}
+```
+
+**Key Points:**
+- Agent outputs are automatically collected into `result.metadata.extra.agent_outputs`
+- Only workflows with agent steps populate this field
+- Agent IDs include timestamp suffixes (e.g., `"analyst_1234567890"`)
+- Failed agents may still have outputs if partial execution occurred
+
+**Implementation Details:**
+
+```rust
+// In execute_impl(), after workflow completes:
+let mut agent_outputs = serde_json::Map::new();
+if let Some(ref state) = context.state {
+    for step in &self.steps {
+        if let StepType::Agent { agent_id, .. } = &step.step_type {
+            let key = format!("workflow:{}:agent:{}:output", execution_id, agent_id);
+            if let Ok(Some(output)) = state.read(&key).await {
+                agent_outputs.insert(agent_id.clone(), output);
+            }
+        }
+    }
+}
+if !agent_outputs.is_empty() {
+    metadata.extra.insert("agent_outputs".to_string(),
+                         serde_json::Value::Object(agent_outputs));
+}
 ```
 
 ## Related Documentation

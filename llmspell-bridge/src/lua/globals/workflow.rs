@@ -98,27 +98,9 @@ fn parse_workflow_step(_lua: &Lua, step_table: &Table) -> mlua::Result<WorkflowS
                 },
             )
         }
-        "custom" => {
-            let function_name: String = step_table.get("function")?;
-            let parameters: Option<Table> = step_table.get("parameters").ok();
-
-            let params = if let Some(params_table) = parameters {
-                lua_value_to_json(Value::Table(params_table))?
-            } else {
-                serde_json::json!({})
-            };
-
-            WorkflowStep::new(
-                name,
-                StepType::Custom {
-                    function_name,
-                    parameters: params,
-                },
-            )
-        }
         _ => {
             return Err(mlua::Error::RuntimeError(format!(
-                "Unknown step type: {step_type}"
+                "Unknown step type: '{step_type}'. Supported types: 'tool', 'agent', 'workflow'"
             )))
         }
     };
@@ -1895,7 +1877,8 @@ pub fn inject_workflow_global(
         })?,
     )?;
 
-    // Note: executeAsync helper removed - all methods now use synchronous API
+    // Note: All workflows use synchronous execute() method via block_on() bridge (ADR-004)
+    // Async methods were never implemented
 
     // Add Workflow.builder() method
     let bridge_for_builder = workflow_bridge;

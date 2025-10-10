@@ -170,9 +170,9 @@ fn benchmark_loop_workflow(c: &mut Criterion) {
                         .with_range(0, count as i64, 1)
                         .add_step(WorkflowStep::new(
                             "loop_step".to_string(),
-                            StepType::Custom {
-                                function_name: "test".to_string(),
-                                parameters: json!({}),
+                            StepType::Tool {
+                                tool_name: "calculator".to_string(),
+                                parameters: json!({"operation": "add", "values": [1, 1]}),
                             },
                         ))
                         .build()
@@ -203,9 +203,9 @@ fn benchmark_loop_workflow(c: &mut Criterion) {
                         .with_range(0, count as i64, 1)
                         .add_step(WorkflowStep::new(
                             "loop_step".to_string(),
-                            StepType::Custom {
-                                function_name: "test".to_string(),
-                                parameters: json!({}),
+                            StepType::Tool {
+                                tool_name: "calculator".to_string(),
+                                parameters: json!({"operation": "add", "values": [1, 1]}),
                             },
                         ))
                         .with_hooks(workflow_executor)
@@ -244,8 +244,8 @@ fn benchmark_parallel_workflow(c: &mut Criterion) {
                         let branch = ParallelBranch::new(format!("branch_{}", i)).add_step(
                             WorkflowStep::new(
                                 format!("step_{}", i),
-                                StepType::Custom {
-                                    function_name: "test".to_string(),
+                                StepType::Tool {
+                                    tool_name: "calculator".to_string(),
                                     parameters: json!({"branch": i}),
                                 },
                             ),
@@ -282,8 +282,8 @@ fn benchmark_parallel_workflow(c: &mut Criterion) {
                         let branch = ParallelBranch::new(format!("branch_{}", i)).add_step(
                             WorkflowStep::new(
                                 format!("step_{}", i),
-                                StepType::Custom {
-                                    function_name: "test".to_string(),
+                                StepType::Tool {
+                                    tool_name: "calculator".to_string(),
                                     parameters: json!({"branch": i}),
                                 },
                             ),

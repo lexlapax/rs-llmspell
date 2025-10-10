@@ -71,7 +71,7 @@ print()
 print("3. Having a conversation...")
 
 -- Send a simple message
-local response = agent:invoke("Hello! Can you tell me what 2 + 2 equals?")
+local response = agent:execute("Hello! Can you tell me what 2 + 2 equals?")
 
 if response.success then
     print("🤖 Agent response:")

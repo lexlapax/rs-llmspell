@@ -302,7 +302,6 @@ impl StepExecutor {
         let step_type_name = match &step.step_type {
             StepType::Tool { .. } => "tool",
             StepType::Agent { .. } => "agent",
-            StepType::Custom { .. } => "custom",
             StepType::Workflow { .. } => "workflow",
         };
 
@@ -376,12 +375,6 @@ impl StepExecutor {
                     step.name, workflow_id
                 );
             }
-            StepType::Custom { function_name, .. } => {
-                debug!(
-                    "DEBUG: Step '{}' is Custom type with function: '{}'",
-                    step.name, function_name
-                );
-            }
         }
 
         let result = match &step.step_type {
@@ -395,13 +388,6 @@ impl StepExecutor {
                     agent_id
                 );
                 self.execute_agent_step(agent_id, input, context).await
-            }
-            StepType::Custom {
-                function_name,
-                parameters,
-            } => {
-                self.execute_custom_step(function_name, parameters, context)
-                    .await
             }
             StepType::Workflow { workflow_id, input } => {
                 self.execute_workflow_step(*workflow_id, input, context)
@@ -687,8 +673,49 @@ impl StepExecutor {
             });
         }
 
-        // Get registry or fall back to mock execution
-        let Some(ref registry) = self.registry else {
+        // Execute agent (mock or real) and get output text
+        let output_text = if let Some(ref registry) = self.registry {
+            // Real agent execution with registry
+            debug!("DEBUG: Looking for agent with name: '{}'", agent_name);
+
+            // Look up agent by its original name
+            let agent = registry.get_agent(agent_name).await.ok_or_else(|| {
+                error!("DEBUG: Agent '{}' not found in registry", agent_name);
+                LLMSpellError::Component {
+                    message: format!("Agent '{}' not found in registry", agent_name),
+                    source: None,
+                }
+            })?;
+
+            // Create AgentInput from the provided input string
+            let agent_input = llmspell_core::types::AgentInput::text(input);
+
+            // Convert StepExecutionContext to ExecutionContext for BaseAgent execution
+            // This will preserve the state field if it was set in StepExecutionContext
+            let mut exec_context = context.to_execution_context();
+
+            info!(
+                "execute_agent_step: context.state before conversion: {}, exec_context.state after conversion: {}",
+                context.state.is_some(),
+                exec_context.state.is_some()
+            );
+
+            // Override scope to Agent for this execution
+            // Create a ComponentId from the agent name for the scope
+            let agent_id = ComponentId::from_name(agent_name);
+            exec_context.scope = llmspell_core::execution_context::ContextScope::Agent(agent_id);
+
+            // Set workflow execution ID in session if not already set
+            if exec_context.session_id.is_none() {
+                exec_context.session_id = Some(context.workflow_state.execution_id.to_string());
+            }
+
+            // Execute through BaseAgent trait with automatic event emission
+            let output = agent.execute(agent_input, exec_context.clone()).await?;
+
+            // Extract output text for return and state writing
+            output.text
+        } else {
             // Fall back to mock execution for backward compatibility in tests
             warn!(
                 "No registry available, using mock execution for agent: '{}'",
@@ -696,102 +723,31 @@ impl StepExecutor {
             );
             // Create a ComponentId for the mock function (temporary)
             let mock_id = ComponentId::from_name(agent_name);
-            return self.execute_agent_step_mock(mock_id, input).await;
+            self.execute_agent_step_mock(mock_id, input).await?
         };
 
-        // DEBUG: Log what we're looking for
-        debug!("DEBUG: Looking for agent with name: '{}'", agent_name);
-
-        // Look up agent by its original name
-        let agent = registry.get_agent(agent_name).await.ok_or_else(|| {
-            error!("DEBUG: Agent '{}' not found in registry", agent_name);
-            LLMSpellError::Component {
-                message: format!("Agent '{}' not found in registry", agent_name),
-                source: None,
-            }
-        })?;
-
-        // Create AgentInput from the provided input string
-        let agent_input = llmspell_core::types::AgentInput::text(input);
-
-        // Convert StepExecutionContext to ExecutionContext for BaseAgent execution
-        // This will preserve the state field if it was set in StepExecutionContext
-        let mut exec_context = context.to_execution_context();
-
-        info!(
-            "execute_agent_step: context.state before conversion: {}, exec_context.state after conversion: {}",
-            context.state.is_some(),
-            exec_context.state.is_some()
-        );
-
-        // Override scope to Agent for this execution
-        // Create a ComponentId from the agent name for the scope
-        let agent_id = ComponentId::from_name(agent_name);
-        exec_context.scope = llmspell_core::execution_context::ContextScope::Agent(agent_id);
-
-        // Set workflow execution ID in session if not already set
-        if exec_context.session_id.is_none() {
-            exec_context.session_id = Some(context.workflow_state.execution_id.to_string());
-        }
-
-        // Execute through BaseAgent trait with automatic event emission
-        let output = agent.execute(agent_input, exec_context.clone()).await?;
-
-        // Write output to state if state is available in ExecutionContext
-        info!(
-            "After agent execution - Checking for state in ExecutionContext: state = {}",
-            exec_context.state.is_some()
-        );
-        if let Some(ref state) = exec_context.state {
+        // Write agent output to state if state is available
+        // This happens for BOTH mock and real execution to ensure consistent behavior
+        if let Some(ref state) = context.state {
             let workflow_id = context.workflow_state.execution_id.to_string();
 
             // Use standardized state key functions
             let output_key = crate::types::state_keys::agent_output(&workflow_id, agent_name);
-            let metadata_key = crate::types::state_keys::agent_metadata(&workflow_id, agent_name);
 
             info!("Writing agent output to state with key: {}", output_key);
-            info!("Agent output text: {:?}", output.text);
+            info!("Agent output text: {:?}", output_text);
 
             // Store the output in state
             state
-                .write(&output_key, serde_json::to_value(&output.text)?)
-                .await?;
-
-            // Store metadata including tool calls
-            let mut metadata = output.metadata;
-            if !output.tool_calls.is_empty() {
-                metadata.extra.insert(
-                    "tool_calls".to_string(),
-                    serde_json::to_value(&output.tool_calls)?,
-                );
-            }
-            state
-                .write(&metadata_key, serde_json::to_value(&metadata)?)
+                .write(&output_key, serde_json::to_value(&output_text)?)
                 .await?;
 
             info!("Successfully wrote agent output to state");
-
-            // Emit state change event if events are available
-            if let Some(ref events) = exec_context.events {
-                if events.config().emit_state_events {
-                    let _ = events
-                        .emit(
-                            "workflow.state.updated",
-                            serde_json::json!({
-                                "workflow_id": workflow_id,
-                                "keys": [output_key, metadata_key],
-                                "operation": "write",
-                                "component": agent_name,
-                            }),
-                        )
-                        .await;
-                }
-            }
         } else {
-            debug!("No state available in ExecutionContext to write agent output");
+            debug!("No state available in StepExecutionContext to write agent output");
         }
 
-        Ok(output.text)
+        Ok(output_text)
     }
 
     /// Mock execution fallback for agents (used when no registry is available)
@@ -801,80 +757,6 @@ impl StepExecutor {
 
         // Simulate some processing time
         tokio::time::sleep(Duration::from_millis(20)).await;
-
-        Ok(output)
-    }
-
-    /// Execute a custom function step
-    async fn execute_custom_step(
-        &self,
-        function_name: &str,
-        parameters: &serde_json::Value,
-        _context: &StepExecutionContext,
-    ) -> Result<String> {
-        debug!("Executing custom step: {}", function_name);
-
-        // For now, return a mock result - this will be extended with custom function support
-        if function_name.is_empty() {
-            return Err(LLMSpellError::Workflow {
-                message: "Custom function name cannot be empty".to_string(),
-                step: Some("custom_execution".to_string()),
-                source: None,
-            });
-        }
-
-        // Mock custom function execution
-        let output = match function_name {
-            "data_transform" => {
-                format!("Data transformed with parameters: {}", parameters)
-            }
-            "validation" => "Validation completed with result: true".to_string(),
-            "aggregation" => {
-                format!(
-                    "Aggregation completed: {}",
-                    parameters.get("type").unwrap_or(&serde_json::json!("sum"))
-                )
-            }
-            "delay" | "sleep" => {
-                // Support delay/sleep for tests
-                if let Some(ms) = parameters.get("ms").and_then(|v| v.as_u64()) {
-                    tokio::time::sleep(Duration::from_millis(ms)).await;
-                }
-                "Delay completed".to_string()
-            }
-            "success" | "always_success" | "test" | "finalize" => {
-                // Support test functions that always succeed
-                format!("Function '{}' completed successfully", function_name)
-            }
-            "quick_operation" | "slow_operation" | "process_item" => {
-                // Support example operations with optional delay
-                if let Some(delay_ms) = parameters.get("delay_ms").and_then(|v| v.as_u64()) {
-                    tokio::time::sleep(Duration::from_millis(delay_ms)).await;
-                }
-                format!("Operation '{}' completed", function_name)
-            }
-            "enrich_data" | "validate_data" | "check_business_rules" | "enrich_with_metadata" => {
-                // Support data processing functions
-                format!("Data processing function '{}' completed", function_name)
-            }
-            "flaky_operation" | "recover_state" => {
-                // Support error handling examples
-                format!("Error handling function '{}' executed", function_name)
-            }
-            "should_not_run" => {
-                // This function should not be reached in error tests
-                panic!("This function should not have been executed")
-            }
-            _ => {
-                format!(
-                    "Custom function '{}' executed with parameters: {}",
-                    function_name, parameters
-                )
-            }
-        };
-
-        // Simulate some processing time
-        tokio::time::sleep(Duration::from_millis(15)).await;
 
         Ok(output)
     }
@@ -1011,7 +893,6 @@ impl StepExecutor {
         let step_type = match &step.step_type {
             StepType::Tool { .. } => "tool",
             StepType::Agent { .. } => "agent",
-            StepType::Custom { .. } => "custom",
             StepType::Workflow { .. } => "workflow",
         };
 
@@ -1035,7 +916,6 @@ impl StepExecutor {
         let step_type = match &step.step_type {
             StepType::Tool { .. } => "tool",
             StepType::Agent { .. } => "agent",
-            StepType::Custom { .. } => "custom",
             StepType::Workflow { .. } => "workflow",
         };
 
@@ -1100,25 +980,6 @@ mod tests {
         assert!(result.output.contains("processed"));
     }
     #[tokio::test]
-    async fn test_step_executor_custom_execution() {
-        let config = WorkflowConfig::default();
-        let executor = StepExecutor::new(config);
-
-        let step = WorkflowStep::new(
-            "custom_test".to_string(),
-            StepType::Custom {
-                function_name: "data_transform".to_string(),
-                parameters: serde_json::json!({"type": "normalize"}),
-            },
-        );
-
-        let context = StepExecutionContext::new(WorkflowState::new(), None);
-        let result = executor.execute_step(&step, context).await.unwrap();
-
-        assert!(result.success);
-        assert!(result.output.contains("Data transformed"));
-    }
-    #[tokio::test]
     async fn test_step_executor_with_retry() {
         let config = WorkflowConfig {
             exponential_backoff: false, // Use fixed delay for faster test
@@ -1157,9 +1018,9 @@ mod tests {
 
         let step = WorkflowStep::new(
             "timeout_test".to_string(),
-            StepType::Custom {
-                function_name: "slow_function".to_string(),
-                parameters: serde_json::json!({}),
+            StepType::Tool {
+                tool_name: "calculator".to_string(),
+                parameters: serde_json::json!({"operation": "add", "values": [1, 1]}),
             },
         )
         .with_timeout(Duration::from_millis(1)); // Very short timeout

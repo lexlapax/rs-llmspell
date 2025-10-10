@@ -2,11 +2,21 @@
 //! ABOUTME: Central execution orchestrator supporting multiple script engines
 
 use crate::{
-    engine::{EngineFactory, JSConfig, LuaConfig, ScriptEngineBridge, ScriptOutput, ScriptStream},
+    engine::{ScriptEngineBridge, ScriptOutput, ScriptStream},
     providers::ProviderManager,
     registry::ComponentRegistry,
-    tools::register_all_tools,
 };
+
+#[cfg(any(feature = "lua", feature = "javascript"))]
+use crate::engine::EngineFactory;
+#[cfg(any(feature = "lua", feature = "javascript"))]
+use crate::tools::register_all_tools;
+
+#[cfg(feature = "lua")]
+use crate::engine::LuaConfig;
+
+#[cfg(feature = "javascript")]
+use crate::engine::JSConfig;
 use async_trait::async_trait;
 use llmspell_config::LLMSpellConfig;
 use llmspell_core::error::LLMSpellError;
@@ -135,6 +145,7 @@ impl ScriptRuntime {
     /// # Errors
     ///
     /// Returns an error if runtime initialization fails
+    #[cfg(feature = "lua")]
     #[instrument(level = "info", skip(config), fields(
         engine_type = "lua",
         default_engine = %config.default_engine,
@@ -156,6 +167,7 @@ impl ScriptRuntime {
     /// # Errors
     ///
     /// Returns an error if runtime initialization fails
+    #[cfg(feature = "javascript")]
     #[instrument(level = "info", skip(config), fields(
         engine_type = "javascript",
         default_engine = %config.default_engine,
@@ -174,6 +186,7 @@ impl ScriptRuntime {
     /// # Errors
     ///
     /// Returns an error if runtime initialization fails
+    #[cfg(feature = "lua")]
     pub fn new_with_lua_and_provider(
         config: LLMSpellConfig,
         provider_manager: Arc<ProviderManager>,
@@ -192,6 +205,7 @@ impl ScriptRuntime {
     /// # Errors
     ///
     /// Returns an error if runtime initialization fails
+    #[cfg(feature = "javascript")]
     pub fn new_with_javascript_and_provider(
         config: LLMSpellConfig,
         provider_manager: Arc<ProviderManager>,
@@ -218,16 +232,49 @@ impl ScriptRuntime {
     ) -> Result<Self, LLMSpellError> {
         info!("Creating script runtime with engine: {}", engine_name);
         match engine_name {
+            #[cfg(feature = "lua")]
             "lua" => Self::new_with_lua(config).await,
+            #[cfg(feature = "javascript")]
             "javascript" | "js" => Self::new_with_javascript(config).await,
             _ => Err(LLMSpellError::Validation {
                 field: Some("engine".to_string()),
-                message: format!("Unsupported engine: {engine_name}. Available: lua, javascript"),
+                message: format!(
+                    "Unsupported or disabled engine: '{}'. Available: {}",
+                    engine_name,
+                    Self::available_engines().join(", ")
+                ),
             }),
         }
     }
 
+    /// Get list of compiled script engines
+    ///
+    /// Returns a list of engine names that were compiled into this binary
+    /// based on enabled features. Useful for error messages and diagnostics.
+    ///
+    /// # Examples
+    ///
+    /// ```rust
+    /// use llmspell_bridge::ScriptRuntime;
+    ///
+    /// let engines = ScriptRuntime::available_engines();
+    /// println!("Available engines: {}", engines.join(", "));
+    /// ```
+    #[must_use]
+    #[allow(clippy::vec_init_then_push)] // Cannot use vec![] with #[cfg] attributes
+    #[allow(clippy::missing_const_for_fn)] // Vec::push is not const
+    pub fn available_engines() -> Vec<&'static str> {
+        #[allow(unused_mut)] // mut needed when at least one feature enabled
+        let mut engines = Vec::new();
+        #[cfg(feature = "lua")]
+        engines.push("lua");
+        #[cfg(feature = "javascript")]
+        engines.push("javascript");
+        engines
+    }
+
     /// Core initialization with any engine
+    #[cfg(any(feature = "lua", feature = "javascript"))]
     #[instrument(level = "debug", skip(engine, config), fields(
         engine_name = engine.get_engine_name(),
         events_enabled = config.events.enabled,
@@ -303,6 +350,7 @@ impl ScriptRuntime {
 
     /// Create runtime with existing provider manager (Phase 11.FIX.1)
     /// This ensures a single `ProviderManager` instance is shared between kernel and script runtime
+    #[cfg(any(feature = "lua", feature = "javascript"))]
     fn new_with_engine_and_provider(
         mut engine: Box<dyn ScriptEngineBridge>,
         config: LLMSpellConfig,

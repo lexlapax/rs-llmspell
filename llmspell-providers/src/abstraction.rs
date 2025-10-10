@@ -252,17 +252,18 @@ impl ProviderRegistry {
         config: ProviderConfig,
     ) -> Result<Box<dyn ProviderInstance>, LLMSpellError> {
         tracing::debug!(
-            "Looking up factory for provider_type: '{}' (available: {:?})",
-            config.provider_type,
+            "Looking up factory for name: '{}' (available: {:?})",
+            config.name,
             self.factories.keys().collect::<Vec<_>>()
         );
 
-        let factory = self.factories.get(&config.provider_type).ok_or_else(|| {
-            LLMSpellError::Configuration {
-                message: format!("Unknown provider type: {}", config.provider_type),
-                source: None,
-            }
-        })?;
+        let factory =
+            self.factories
+                .get(&config.name)
+                .ok_or_else(|| LLMSpellError::Configuration {
+                    message: format!("Unknown provider: {}", config.name),
+                    source: None,
+                })?;
 
         factory(config)
     }
@@ -715,9 +716,17 @@ mod tests {
         let result = manager.create_agent_from_spec(spec, None, None).await;
         assert!(result.is_err());
 
-        if let Err(LLMSpellError::Configuration { message, .. }) = result {
-            assert!(message.contains("No provider specified"));
-        }
+        let Err(error) = result else {
+            panic!("Expected error, but create_agent_from_spec succeeded");
+        };
+        let LLMSpellError::Configuration { message, .. } = error else {
+            panic!("Expected Configuration error, got different error type: {:?}", error);
+        };
+        assert!(
+            message.contains("No provider specified"),
+            "Expected error message to contain 'No provider specified', got: {}",
+            message
+        );
     }
     #[tokio::test]
     async fn test_create_agent_from_spec_unknown_provider() {
@@ -730,9 +739,17 @@ mod tests {
         let result = manager.create_agent_from_spec(spec, None, None).await;
         assert!(result.is_err());
 
-        if let Err(LLMSpellError::Configuration { message, .. }) = result {
-            assert!(message.contains("Unknown provider"));
-        }
+        let Err(error) = result else {
+            panic!("Expected error, but create_agent_from_spec succeeded");
+        };
+        let LLMSpellError::Configuration { message, .. } = error else {
+            panic!("Expected Configuration error, got different error type: {:?}", error);
+        };
+        assert!(
+            message.contains("Unknown provider"),
+            "Expected error message to contain 'Unknown provider', got: {}",
+            message
+        );
     }
     #[tokio::test]
     async fn test_model_specifier_base_url_precedence() {

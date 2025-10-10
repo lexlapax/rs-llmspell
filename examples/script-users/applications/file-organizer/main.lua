@@ -114,7 +114,7 @@ local sample_files = {
 -- Create messy directory with sample files
 for _, filename in ipairs(sample_files) do
     local sample_content = "Sample content for " .. filename .. " created at " .. os.date()
-    Tool.invoke("file_operations", {
+    Tool.execute("file-operations", {
         operation = "write",
         path = config.files.target_directory .. filename,
         input = sample_content
@@ -277,7 +277,7 @@ SAMPLE FILE PLACEMENT:
     execution_time_ms
 )
 
-Tool.invoke("file_operations", {
+Tool.execute("file-operations", {
     operation = "write",
     path = config.files.organization_plan,
     input = organization_plan
@@ -314,7 +314,7 @@ print("    • Agents: 3 (down from 8) - Universal complexity")
 print("    • Workflow: LOOP pattern with collection iteration (max 5 files)")
 print("    • Loop types: Collection (used), Range (available), While (available)")
 print("    • Crates: Core only (llmspell-core, llmspell-agents, llmspell-bridge)")
-print("    • Tools: Basic only (file_operations, text_manipulator)")
+print("    • Tools: Basic only (file-operations, text_manipulator)")
 print("    • State Management: REMOVED (immediate results only)")
 print("")
 
