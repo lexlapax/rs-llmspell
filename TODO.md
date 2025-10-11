@@ -4236,15 +4236,100 @@ downloader.download_safetensors_model("google/flan-t5-small", &dest_dir)?;
 
 ---
 
-### Task 11b.8.5: Implement T5 Generation Logic - 🔲 PENDING
+### Task 11b.8.5: Implement T5 Generation Logic - ✅ COMPLETE
 **Priority**: HIGH
 **Estimated Time**: 1 hour
-**Status**: 🔲 PENDING
-**Depends On**: Tasks 11b.8.2, 11b.8.3
+**Status**: ✅ COMPLETE
+**Actual Time**: 52 minutes
+**Depends On**: Tasks 11b.8.2, 11b.8.3, 11b.8.4
 
 **File**: `llmspell-providers/src/local/candle/provider.rs`
 
 **Purpose**: Implement encoder-decoder generation for T5 models.
+
+**Implementation Insights**:
+1. **Architecture Dispatch**: Refactored `generate_with_model()` to dispatch by architecture
+   - Detects LLaMA vs T5 via `model_wrapper.architecture()`
+   - Calls `generate_llama()` or `generate_t5()` accordingly
+   - Clean separation of concerns for decoder-only vs encoder-decoder
+2. **LLaMA Generation**: Existing logic moved to `generate_llama()` method
+   - Decoder-only autoregressive generation
+   - Chat prompt formatting (TinyLlama template)
+   - Position-indexed forward passes for KV cache
+   - No changes to existing LLaMA logic
+3. **T5 Generation**: New `generate_t5()` method implements encoder-decoder generation
+   - **Encoder Phase**: Single forward pass encodes entire input
+   - **Decoder Phase**: Autoregressive generation from decoder start token
+   - Separate encoder and decoder forward passes (T5 architecture)
+4. **T5 Tokenization**: Uses HuggingFace tokenizers crate
+   - `tokenizer.encode()` returns Encoding with get_ids()
+   - Different from TokenizerLoader used by LLaMA
+   - Scoped borrows to avoid borrow checker conflicts
+5. **Special Tokens**: T5 uses SentencePiece tokens
+   - Decoder start token: `config.decoder_start_token_id` (typically 0 = `<pad>`)
+   - EOS token: `config.eos_token_id` (typically 1 = `</s>`)
+   - Decoder initialized with start token, generates until EOS
+6. **Encoder-Decoder Flow**:
+   - Input tokenization → Encoder forward pass → Decoder initialization
+   - Loop: Decoder forward with current tokens → Sample next token → Append → Repeat
+   - Encoder output reused across all decoder steps (efficiency)
+7. **Sampling**: Simple greedy sampling (argmax)
+   - Takes highest-probability token at each step
+   - TODO: Integrate sampling_config for temperature/top_p/top_k
+   - Sufficient for initial T5 functionality
+8. **Borrow Checker Solution**: Scoped tokenizer borrows
+   - Tokenizer borrowed immutably in scopes, released before mutable borrows
+   - Device cloned to avoid lifetime issues
+   - Config values extracted upfront to minimize borrow duration
+9. **Logging**: Comprehensive timing metrics
+   - Tokenize, encode, generation, decode phases tracked separately
+   - Tokens/sec throughput calculation
+   - Matches LLaMA logging structure for consistency
+10. **Error Handling**: Contextual error messages
+    - "Tokenization failed", "Encoding failed", "Decoding failed at step N"
+    - Preserves underlying Candle error context with anyhow
+
+**Files Modified**:
+- ✅ `llmspell-providers/src/local/candle/provider.rs` (+148 lines, refactor +5 lines)
+
+**Dependencies Added**:
+- `candle_core::IndexOp` (for `.i()` tensor indexing)
+
+**Test Results**:
+```
+running 72 tests
+...
+test result: ok. 72 passed; 0 failed; 0 ignored
+```
+
+**Clippy**: Zero warnings
+
+**Code Quality**:
+- DRY: Shared dispatch logic, separate implementations
+- Type Safety: Strongly typed with Candle's T5ForConditionalGeneration
+- Documentation: All methods documented with architecture notes
+- Performance: Encoder runs once, decoder reuses encoder output
+
+**Architecture Differences**:
+| Aspect | LLaMA (Decoder-Only) | T5 (Encoder-Decoder) |
+|--------|----------------------|----------------------|
+| Forward Pass | decoder.forward(tokens, pos) | encoder.encode() + decoder.decode() |
+| Position Index | Yes (for KV cache) | No (encoder stateless, decoder auto) |
+| Prompt Format | Chat template | Direct input |
+| Generation | Autoregressive from prompt | Autoregressive from start token |
+| Special Tokens | EOS only | Decoder start + EOS |
+
+**Limitations**:
+- Greedy sampling only (no temperature/top_p/top_k yet)
+- No KV cache optimization for T5 decoder (slower than LLaMA)
+- Decoder runs full forward pass at each step (can be optimized)
+
+**Performance Expectations**:
+- T5-small (80M params): ~10-20 tokens/sec on CPU, ~50-100 tokens/sec on Metal
+- flan-t5-base (250M params): ~5-10 tokens/sec on CPU, ~30-60 tokens/sec on Metal
+- Encoder amortizes over long outputs (single pass for any output length)
+
+**Next Steps**: Task 11b.8.6 will test T5 with Metal device for GPU acceleration.
 
 ---
 

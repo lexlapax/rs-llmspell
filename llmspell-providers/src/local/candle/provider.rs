@@ -8,7 +8,7 @@ use std::collections::HashMap;
 use std::path::PathBuf;
 use tracing::{debug, error, info, warn};
 
-use candle_core::{Device, Tensor};
+use candle_core::{Device, IndexOp, Tensor};
 
 use crate::abstraction::{ProviderCapabilities, ProviderInstance};
 use llmspell_core::error::LLMSpellError;
@@ -210,6 +210,27 @@ impl CandleProvider {
         max_tokens: usize,
     ) -> Result<String> {
         debug!("Starting generation: max_tokens={}", max_tokens);
+
+        // Dispatch to appropriate generation method based on architecture
+        use super::model_type::ModelArchitecture;
+        match model_wrapper.architecture() {
+            ModelArchitecture::LLaMA => {
+                self.generate_llama(model_wrapper, prompt, sampling_config, max_tokens)
+            }
+            ModelArchitecture::T5 => {
+                self.generate_t5(model_wrapper, prompt, sampling_config, max_tokens)
+            }
+        }
+    }
+
+    /// Generate text using LLaMA model (decoder-only architecture)
+    fn generate_llama(
+        &self,
+        model_wrapper: &mut ModelWrapper,
+        prompt: &str,
+        sampling_config: &SamplingConfig,
+        max_tokens: usize,
+    ) -> Result<String> {
         let gen_start = std::time::Instant::now();
 
         // Format prompt for chat models
@@ -297,6 +318,128 @@ impl CandleProvider {
             total_duration.as_secs_f64() * 1000.0,
             tokenize_duration.as_secs_f64() * 1000.0,
             first_token_duration.as_secs_f64() * 1000.0,
+            generation_duration.as_secs_f64() * 1000.0,
+            decode_duration.as_secs_f64() * 1000.0
+        );
+
+        Ok(generated_text)
+    }
+
+    /// Generate text using T5 model (encoder-decoder architecture)
+    fn generate_t5(
+        &self,
+        model_wrapper: &mut ModelWrapper,
+        prompt: &str,
+        _sampling_config: &SamplingConfig,
+        max_tokens: usize,
+    ) -> Result<String> {
+        let gen_start = std::time::Instant::now();
+
+        // Extract T5 config and device (immutable borrows)
+        let decoder_start_token_id = model_wrapper.t5_config().decoder_start_token_id.unwrap_or(0);
+        let eos_token_id = model_wrapper.t5_config().eos_token_id;
+        let device = model_wrapper.device().clone();
+
+        // Tokenize input prompt (immutable borrow, released after)
+        let tokenize_start = std::time::Instant::now();
+        let input_token_ids = {
+            let tokenizer = model_wrapper.t5_tokenizer();
+            let encoding = tokenizer
+                .encode(prompt, true)
+                .map_err(|e| anyhow!("Tokenization failed: {}", e))?;
+            encoding.get_ids().to_vec()
+        };
+        let tokenize_duration = tokenize_start.elapsed();
+        info!(
+            "T5 prompt tokenized: {} tokens in {:.2}ms",
+            input_token_ids.len(),
+            tokenize_duration.as_secs_f64() * 1000.0
+        );
+
+        // Create input tensor [batch_size=1, seq_len]
+        let input_tensor = Tensor::new(input_token_ids.as_slice(), &device)?.unsqueeze(0)?;
+
+        // Encode input (single pass) - FIRST TOKEN LATENCY
+        let encode_start = std::time::Instant::now();
+        let encoder_output = model_wrapper
+            .t5_model()
+            .encode(&input_tensor)
+            .map_err(|e| anyhow!("Encoding failed: {}", e))?;
+        let encode_duration = encode_start.elapsed();
+        info!(
+            "T5 encoding complete: {:.2}ms",
+            encode_duration.as_secs_f64() * 1000.0
+        );
+
+        // Initialize decoder with start token
+        let mut decoder_token_ids = vec![decoder_start_token_id as u32];
+        let generation_start = std::time::Instant::now();
+
+        // Autoregressive generation from decoder
+        for index in 0..max_tokens {
+            // Create decoder input tensor [batch_size=1, decoder_seq_len]
+            let decoder_tensor = Tensor::new(decoder_token_ids.as_slice(), &device)?.unsqueeze(0)?;
+
+            // Decode step
+            let logits = model_wrapper
+                .t5_model()
+                .decode(&decoder_tensor, &encoder_output)
+                .map_err(|e| anyhow!("Decoding failed at step {}: {}", index, e))?;
+
+            // Get logits for last token [batch_size, seq_len, vocab_size] → [vocab_size]
+            let last_logits = logits
+                .i((0, decoder_token_ids.len() - 1))?
+                .to_vec1::<f32>()?;
+
+            // Simple greedy sampling (take argmax)
+            // TODO: Use sampling_config for temperature/top_p/top_k
+            let next_token_id = last_logits
+                .iter()
+                .enumerate()
+                .max_by(|(_, a), (_, b)| a.partial_cmp(b).unwrap())
+                .map(|(idx, _)| idx as u32)
+                .ok_or_else(|| anyhow!("Failed to sample token"))?;
+
+            // Check for EOS
+            if next_token_id == eos_token_id as u32 {
+                debug!("T5 EOS token encountered at position {}", index);
+                break;
+            }
+
+            decoder_token_ids.push(next_token_id);
+        }
+
+        let generation_duration = generation_start.elapsed();
+        let tokens_generated = decoder_token_ids.len() - 1; // Exclude start token
+        let tokens_per_second = if generation_duration.as_secs_f64() > 0.0 {
+            tokens_generated as f64 / generation_duration.as_secs_f64()
+        } else {
+            0.0
+        };
+
+        info!(
+            "T5 generated {} tokens in {:.2}ms ({:.2} tokens/sec)",
+            tokens_generated,
+            generation_duration.as_secs_f64() * 1000.0,
+            tokens_per_second
+        );
+
+        // Decode generated tokens (skip start token)
+        let decode_start = std::time::Instant::now();
+        let generated_text = {
+            let tokenizer = model_wrapper.t5_tokenizer();
+            tokenizer
+                .decode(&decoder_token_ids[1..], true)
+                .map_err(|e| anyhow!("Token decoding failed: {}", e))?
+        };
+        let decode_duration = decode_start.elapsed();
+
+        let total_duration = gen_start.elapsed();
+        info!(
+            "T5 total generation: {:.2}ms (tokenize: {:.2}ms, encode: {:.2}ms, generation: {:.2}ms, decode: {:.2}ms)",
+            total_duration.as_secs_f64() * 1000.0,
+            tokenize_duration.as_secs_f64() * 1000.0,
+            encode_duration.as_secs_f64() * 1000.0,
             generation_duration.as_secs_f64() * 1000.0,
             decode_duration.as_secs_f64() * 1000.0
         );
