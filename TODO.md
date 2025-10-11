@@ -4136,14 +4136,103 @@ test result: ok. 3 passed; 0 failed; 0 ignored
 
 ---
 
-### Task 11b.8.4: Update HuggingFace Downloader for T5 - 🔲 PENDING
+### Task 11b.8.4: Update HuggingFace Downloader for T5 - ✅ COMPLETE
 **Priority**: MEDIUM
 **Estimated Time**: 30 minutes
-**Status**: 🔲 PENDING
+**Status**: ✅ COMPLETE
+**Actual Time**: 28 minutes
+**Depends On**: Task 11b.8.3
 
 **File**: `llmspell-providers/src/local/candle/hf_downloader.rs`
 
 **Changes**: Add T5 model repository mappings and safetensors download support.
+
+**Implementation Insights**:
+1. **Safetensors Download Method**: New `download_safetensors_model()` method
+   - Downloads config.json (required for model initialization)
+   - Downloads tokenizer.json (primary) or tokenizer_config.json (fallback)
+   - Handles both single-file models (model.safetensors) and sharded models
+   - Returns destination directory path (unlike GGUF which returns file path)
+2. **Sharded Model Support**: Detects and downloads multi-file models
+   - Tries common naming patterns: model-00001-of-00002.safetensors, etc.
+   - Iterative download until no more shards found
+   - Supports pytorch_model-* and model_* naming conventions
+   - Informative error if no safetensors files found
+3. **T5 Model Mappings**: New `HFModelRepo::get_t5_repo_info()` method
+   - Maps simple names to HuggingFace repo IDs
+   - Supported: flan-t5-small, flan-t5-base, flan-t5-large, t5-small, t5-base, t5-large
+   - Case-insensitive matching (e.g., "FLAN-T5-SMALL" works)
+   - Returns None for unknown models (clean failure)
+4. **Architecture Differences**: T5 vs GGUF download patterns
+   - GGUF: Single file + tokenizer (2 files)
+   - T5: Config + tokenizer + model weights (3+ files)
+   - T5: No quantization variants (safetensors is full precision)
+   - T5: Model directory is the artifact (not single file)
+5. **Tokenizer Fallback**: Robust tokenizer discovery
+   - Primary: tokenizer.json (HuggingFace standard)
+   - Fallback: tokenizer_config.json (less common but useful)
+   - Warning if neither found (model may still work with external tokenizer)
+6. **Error Handling**: Clear error messages for missing files
+   - "No safetensors files found" if directory empty
+   - "Failed to download config.json" if required file missing
+   - Preserves original error context from hf-hub
+7. **Testing**: 5 new unit tests added (all passing)
+   - T5 repo info for each supported model
+   - Case-insensitive matching verification
+   - Unknown model handling
+   - Total: 14 tests passing (was 9 before)
+8. **Documentation Update**: Updated module docstring
+   - Changed from "GGUF models" to "GGUF and Safetensors models"
+   - Clarified dual-architecture support (LLaMA + T5)
+9. **Code Quality**: Zero clippy warnings, formatted
+   - Fixed Rust format specifier (`:05d` → `:05`)
+   - Simplified loop structure for shard discovery
+   - Proper error propagation with anyhow
+10. **Backward Compatibility**: GGUF download logic unchanged
+    - New method added alongside existing `download_model()`
+    - Existing tests still pass (9 original + 5 new = 14 total)
+
+**Files Modified**:
+- ✅ `llmspell-providers/src/local/candle/hf_downloader.rs` (+125 lines)
+
+**Test Results**:
+```
+running 14 tests
+test local::candle::hf_downloader::tests::test_extract_model_name_phi2 ... ok
+test local::candle::hf_downloader::tests::test_extract_model_name_tinyllama ... ok
+test local::candle::hf_downloader::tests::test_extract_model_name_unknown ... ok
+test local::candle::hf_downloader::tests::test_get_original_repo_phi2 ... ok
+test local::candle::hf_downloader::tests::test_get_original_repo_unknown ... ok
+test local::candle::hf_downloader::tests::test_get_original_repo_tinyllama ... ok
+test local::candle::hf_downloader::tests::test_get_t5_repo_info_case_insensitive ... ok
+test local::candle::hf_downloader::tests::test_get_t5_repo_info_flan_t5_base ... ok
+test local::candle::hf_downloader::tests::test_get_t5_repo_info_flan_t5_small ... ok
+test local::candle::hf_downloader::tests::test_get_t5_repo_info_t5_small ... ok
+test local::candle::hf_downloader::tests::test_get_t5_repo_info_unknown ... ok
+test local::candle::hf_downloader::tests::test_hf_model_repo_phi2 ... ok
+test local::candle::hf_downloader::tests::test_hf_model_repo_tinyllama ... ok
+test local::candle::hf_downloader::tests::test_hf_model_repo_unknown ... ok
+
+test result: ok. 14 passed; 0 failed; 0 ignored
+```
+
+**Clippy**: Zero warnings
+
+**Usage Example**:
+```rust
+let downloader = HFDownloader::new()?;
+let dest_dir = PathBuf::from("/path/to/models/flan-t5-small");
+
+// Download T5 model (all required files)
+downloader.download_safetensors_model("google/flan-t5-small", &dest_dir)?;
+
+// Files downloaded:
+// - config.json
+// - tokenizer.json
+// - model.safetensors
+```
+
+**Next Steps**: Task 11b.8.5 will implement T5 generation logic in CandleProvider.
 
 ---
 

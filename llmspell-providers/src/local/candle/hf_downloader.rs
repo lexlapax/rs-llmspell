@@ -1,6 +1,6 @@
-//! HuggingFace model downloader for GGUF models
+//! HuggingFace model downloader for GGUF and Safetensors models
 //!
-//! Downloads GGUF models and tokenizers from HuggingFace Hub.
+//! Downloads GGUF models (LLaMA) and Safetensors models (T5) from HuggingFace Hub.
 
 use anyhow::{anyhow, Result};
 use std::path::{Path, PathBuf};
@@ -174,6 +174,116 @@ impl HFDownloader {
             bytes_total: Some(file_size),
         })
     }
+
+    /// Download Safetensors model from HuggingFace
+    ///
+    /// Downloads all required files for a Safetensors model:
+    /// - model.safetensors (or model-*.safetensors for sharded models)
+    /// - config.json
+    /// - tokenizer.json (optional but recommended)
+    ///
+    /// # Arguments
+    /// * `repo_id` - HuggingFace repository ID (e.g., "google/flan-t5-small")
+    /// * `dest_dir` - Destination directory for downloaded files
+    ///
+    /// # Returns
+    /// * `Ok(PathBuf)` - Path to destination directory
+    /// * `Err(anyhow::Error)` - Download failed
+    pub fn download_safetensors_model(&self, repo_id: &str, dest_dir: &Path) -> Result<PathBuf> {
+        info!("Downloading safetensors model from HF: repo={}", repo_id);
+
+        // Create destination directory
+        std::fs::create_dir_all(dest_dir)?;
+
+        // Get repository
+        let repo = self.api.model(repo_id.to_string());
+
+        // Download config.json (required)
+        info!("Downloading config.json");
+        let config_path = repo
+            .get("config.json")
+            .map_err(|e| anyhow!("Failed to download config.json: {}", e))?;
+        let dest_config = dest_dir.join("config.json");
+        std::fs::copy(&config_path, &dest_config)?;
+        info!("config.json copied to: {:?}", dest_config);
+
+        // Download tokenizer.json (highly recommended)
+        if let Ok(tokenizer_path) = repo.get("tokenizer.json") {
+            let dest_tokenizer = dest_dir.join("tokenizer.json");
+            std::fs::copy(&tokenizer_path, &dest_tokenizer)?;
+            info!("tokenizer.json copied to: {:?}", dest_tokenizer);
+        } else {
+            warn!("tokenizer.json not found in repo {}", repo_id);
+
+            // Try tokenizer_config.json as fallback
+            if let Ok(tokenizer_config_path) = repo.get("tokenizer_config.json") {
+                let dest_tokenizer_config = dest_dir.join("tokenizer_config.json");
+                std::fs::copy(&tokenizer_config_path, &dest_tokenizer_config)?;
+                info!(
+                    "tokenizer_config.json copied to: {:?}",
+                    dest_tokenizer_config
+                );
+            }
+        }
+
+        // Download safetensors files
+        // Try single-file model first (model.safetensors)
+        if let Ok(model_path) = repo.get("model.safetensors") {
+            let dest_model = dest_dir.join("model.safetensors");
+            std::fs::copy(&model_path, &dest_model)?;
+            info!("model.safetensors copied to: {:?}", dest_model);
+        } else {
+            // Try sharded model (model-00001-of-*.safetensors, etc.)
+            info!("Single model.safetensors not found, trying sharded model files");
+
+            // Try to download model index file first
+            let mut shard_index = 1;
+            let mut downloaded_shards = Vec::new();
+
+            loop {
+                // Try direct download with common naming patterns for sharded models
+                let common_names = vec![
+                    format!("model-{:05}-of-00002.safetensors", shard_index),
+                    format!("model-{:05}-of-00003.safetensors", shard_index),
+                    format!("model-{:05}-of-00004.safetensors", shard_index),
+                    format!("model_{:05}.safetensors", shard_index),
+                    format!("pytorch_model-{:05}-of-00002.safetensors", shard_index),
+                ];
+
+                let mut shard_found = false;
+
+                for name in &common_names {
+                    if let Ok(shard_path) = repo.get(name) {
+                        let dest_shard = dest_dir.join(name);
+                        std::fs::copy(&shard_path, &dest_shard)?;
+                        info!("Downloaded shard: {:?}", dest_shard);
+                        downloaded_shards.push(dest_shard);
+                        shard_found = true;
+                        break;
+                    }
+                }
+
+                if !shard_found {
+                    // No more shards found
+                    break;
+                }
+
+                shard_index += 1;
+            }
+
+            if downloaded_shards.is_empty() {
+                return Err(anyhow!(
+                    "No safetensors files found in repo {}. Expected model.safetensors or sharded model files",
+                    repo_id
+                ));
+            }
+
+            info!("Downloaded {} shard(s)", downloaded_shards.len());
+        }
+
+        info!("Safetensors model download complete: {:?}", dest_dir);
+        Ok(dest_dir.to_path_buf())
+    }
 }
 
 /// Common HuggingFace repository mappings for popular models
@@ -253,6 +363,32 @@ impl HFModelRepo {
             }
         }
     }
+
+    /// Get HuggingFace repo for T5 Safetensors models
+    ///
+    /// Maps simple model names to their HuggingFace repository IDs for T5 models.
+    /// T5 models use safetensors format and don't have quantization variants.
+    ///
+    /// # Arguments
+    /// * `model_name` - Simple model name (e.g., "flan-t5-small", "t5-base")
+    ///
+    /// # Returns
+    /// * `Some(repo_id)` - HuggingFace repository ID
+    /// * `None` - Unknown model
+    pub fn get_t5_repo_info(model_name: &str) -> Option<&'static str> {
+        match model_name.to_lowercase().as_str() {
+            "flan-t5-small" => Some("google/flan-t5-small"),
+            "flan-t5-base" => Some("google/flan-t5-base"),
+            "flan-t5-large" => Some("google/flan-t5-large"),
+            "t5-small" => Some("t5-small"),
+            "t5-base" => Some("t5-base"),
+            "t5-large" => Some("t5-large"),
+            _ => {
+                debug!("Unknown T5 model name: {}", model_name);
+                None
+            }
+        }
+    }
 }
 
 #[cfg(test)]
@@ -314,6 +450,36 @@ mod tests {
     #[test]
     fn test_extract_model_name_unknown() {
         let result = HFModelRepo::extract_model_name("SomeRepo/UnknownModel-GGUF");
+        assert!(result.is_none());
+    }
+
+    #[test]
+    fn test_get_t5_repo_info_flan_t5_small() {
+        let repo = HFModelRepo::get_t5_repo_info("flan-t5-small").unwrap();
+        assert_eq!(repo, "google/flan-t5-small");
+    }
+
+    #[test]
+    fn test_get_t5_repo_info_flan_t5_base() {
+        let repo = HFModelRepo::get_t5_repo_info("flan-t5-base").unwrap();
+        assert_eq!(repo, "google/flan-t5-base");
+    }
+
+    #[test]
+    fn test_get_t5_repo_info_t5_small() {
+        let repo = HFModelRepo::get_t5_repo_info("t5-small").unwrap();
+        assert_eq!(repo, "t5-small");
+    }
+
+    #[test]
+    fn test_get_t5_repo_info_case_insensitive() {
+        let repo = HFModelRepo::get_t5_repo_info("FLAN-T5-SMALL").unwrap();
+        assert_eq!(repo, "google/flan-t5-small");
+    }
+
+    #[test]
+    fn test_get_t5_repo_info_unknown() {
+        let result = HFModelRepo::get_t5_repo_info("unknown-t5-model");
         assert!(result.is_none());
     }
 
