@@ -2606,6 +2606,7 @@ impl<P: Protocol + 'static> IntegratedKernel<P> {
     }
 
     /// Handle model pull command
+    #[allow(clippy::too_many_lines)]
     async fn handle_model_pull(&mut self, content: &Value) -> Result<()> {
         info!("Pulling model");
 
@@ -2689,11 +2690,28 @@ impl<P: Protocol + 'static> IntegratedKernel<P> {
                 }
             }
             Ok(None) => {
+                // Check if backend matches a builtin profile
+                let builtin_profiles = llmspell_config::LLMSpellConfig::list_builtin_profiles();
+
+                let error_msg = if builtin_profiles.contains(&backend) {
+                    format!(
+                        "Backend '{backend}' not configured. To use {backend} models:\n\
+                         1. Use the builtin profile: llmspell -p {backend} model pull {model_spec_str}\n\
+                         2. Or configure {backend} provider in your config file"
+                    )
+                } else {
+                    format!(
+                        "Backend '{backend}' not configured and no matching builtin profile found.\n\
+                         Available backends: ollama, candle\n\
+                         Check your model specification format: model:variant@backend"
+                    )
+                };
+
                 let response = json!({
                     "msg_type": "model_reply",
                     "content": {
                         "status": "error",
-                        "error": format!("Backend '{}' not configured", backend)
+                        "error": error_msg
                     }
                 });
                 self.send_model_reply(response).await
