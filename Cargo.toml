@@ -98,7 +98,7 @@ quickjs_runtime = "0.12"
 
 # LLM providers and AI
 rig-core = "0.21"
-candle-core = "0.9"
+candle-core = { version = "0.9", features = ["metal"] }
 candle-nn = "0.9"
 candle-transformers = "0.9"
 hf-hub = "0.3"

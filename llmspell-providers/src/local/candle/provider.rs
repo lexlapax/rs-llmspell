@@ -48,37 +48,79 @@ impl CandleProvider {
             default_model, device_str
         );
 
-        // Device selection
+        // Device selection - platform-aware GPU detection
         let device = match device_str.as_str() {
             "cuda" => {
-                info!("Using CUDA device for Candle inference");
-                Device::cuda_if_available(0).map_err(|e| {
-                    error!("CUDA device requested but not available: {}", e);
-                    anyhow!("CUDA not available: {}", e)
-                })?
+                // CUDA only available on Linux/Windows
+                #[cfg(target_os = "macos")]
+                {
+                    warn!("CUDA requested but not available on macOS, using CPU");
+                    info!("Hint: Use device='metal' for GPU acceleration on Apple Silicon");
+                    Device::Cpu
+                }
+
+                #[cfg(not(target_os = "macos"))]
+                {
+                    info!("Using CUDA device for Candle inference");
+                    match Device::cuda_if_available(0) {
+                        Ok(Device::Cuda(d)) => Device::Cuda(d),
+                        Ok(_) => {
+                            error!("CUDA device requested but cuda_if_available returned CPU");
+                            return Err(anyhow!("CUDA not available"));
+                        }
+                        Err(e) => {
+                            error!("CUDA device requested but not available: {}", e);
+                            return Err(anyhow!("CUDA not available: {}", e));
+                        }
+                    }
+                }
             }
             "metal" => {
-                info!("Using Metal device for Candle inference");
-                Device::new_metal(0).map_err(|e| {
-                    error!("Metal device requested but not available: {}", e);
-                    anyhow!("Metal not available: {}", e)
-                })?
+                // Metal only available on macOS
+                #[cfg(not(target_os = "macos"))]
+                {
+                    warn!("Metal requested but only available on macOS, using CPU");
+                    Device::Cpu
+                }
+
+                #[cfg(target_os = "macos")]
+                {
+                    info!("Using Metal device for Candle inference");
+                    Device::new_metal(0).map_err(|e| {
+                        error!("Metal device requested but not available: {}", e);
+                        anyhow!("Metal not available: {}", e)
+                    })?
+                }
             }
             "cpu" => {
                 info!("Using CPU device for Candle inference");
                 Device::Cpu
             }
             "auto" => {
-                // Try CUDA first, then Metal, then CPU
-                if let Ok(cuda) = Device::cuda_if_available(0) {
-                    info!("Auto-detected CUDA device for Candle");
-                    cuda
-                } else if let Ok(metal) = Device::new_metal(0) {
-                    info!("Auto-detected Metal device for Candle");
-                    metal
-                } else {
-                    info!("Auto-detected CPU device for Candle (no GPU available)");
-                    Device::Cpu
+                // Platform-specific GPU auto-detection
+                #[cfg(target_os = "macos")]
+                {
+                    if let Ok(metal) = Device::new_metal(0) {
+                        info!("Auto-detected Metal device for Candle (Apple Silicon)");
+                        metal
+                    } else {
+                        info!("Auto-detected CPU device for Candle (Metal unavailable)");
+                        Device::Cpu
+                    }
+                }
+
+                #[cfg(not(target_os = "macos"))]
+                {
+                    match Device::cuda_if_available(0) {
+                        Ok(Device::Cuda(d)) => {
+                            info!("Auto-detected CUDA device for Candle");
+                            Device::Cuda(d)
+                        }
+                        _ => {
+                            info!("Auto-detected CPU device for Candle (CUDA unavailable)");
+                            Device::Cpu
+                        }
+                    }
                 }
             }
             _ => {
@@ -87,7 +129,7 @@ impl CandleProvider {
             }
         };
 
-        debug!("Candle provider using device: {:?}", device);
+        info!("Candle provider initialized with device: {:?}", device);
 
         // Model directory
         let model_directory = model_directory.unwrap_or_else(|| {

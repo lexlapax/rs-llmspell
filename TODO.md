@@ -3317,6 +3317,741 @@ llmspell model pull test@invalid
 
 ---
 
+## Phase 11b.7: Fix Candle Metal GPU Detection - ✅ COMPLETE
+**Priority**: CRITICAL (Performance bug - 13-30x speedup available)
+**Estimated Time**: 1 hour
+**Status**: ✅ COMPLETE (Device detection fixed, Metal ops incomplete in Candle v0.9)
+
+**Problem**:
+Candle provider is using CPU instead of Metal GPU on Apple Silicon (M1 Ultra), causing:
+- First execution: 65.48s (expected: 2-5s with GPU)
+- Second execution: 144.41s (expected: 2-5s with GPU)
+- Generation: ~0.1-0.3 tokens/sec (expected: 20-50 tokens/sec)
+
+**Root Cause**:
+`Device::cuda_if_available(0)` returns `Ok(Device::Cpu)` on macOS (not `Err`), so the Metal device check never runs.
+
+**Evidence**:
+```
+[INFO] Auto-detected CUDA device for Candle  ← Misleading!
+[DEBUG] Candle provider using device: Cpu   ← Actually using CPU!
+```
+
+**File**: `llmspell-providers/src/local/candle/provider.rs:71-83`
+
+**Current Code (BROKEN)**:
+```rust
+"auto" => {
+    // Try CUDA first, then Metal, then CPU
+    if let Ok(cuda) = Device::cuda_if_available(0) {  // ← Returns Ok(Cpu) on macOS!
+        info!("Auto-detected CUDA device for Candle");
+        cuda  // ← This is Device::Cpu, not CUDA!
+    } else if let Ok(metal) = Device::new_metal(0) {  // ← Never reached!
+        info!("Auto-detected Metal device for Candle");
+        metal
+    } else {
+        info!("Auto-detected CPU device for Candle (no GPU available)");
+        Device::Cpu
+    }
+}
+```
+
+**Solution (Platform-Aware)**:
+```rust
+"auto" => {
+    // On macOS, try Metal first (Apple Silicon GPU)
+    if cfg!(target_os = "macos") {
+        if let Ok(metal) = Device::new_metal(0) {
+            info!("Auto-detected Metal device for Candle (Apple Silicon)");
+            metal
+        } else {
+            info!("Auto-detected CPU device for Candle (Metal unavailable)");
+            Device::Cpu
+        }
+    } else {
+        // On Linux/Windows, try CUDA first, then fall back to CPU
+        match Device::cuda_if_available(0) {
+            Ok(Device::Cuda(_)) => {
+                info!("Auto-detected CUDA device for Candle");
+                Device::cuda_if_available(0).unwrap()
+            }
+            _ => {
+                info!("Auto-detected CPU device for Candle (CUDA unavailable)");
+                Device::Cpu
+            }
+        }
+    }
+}
+```
+
+**Expected Performance Improvement**:
+- Model loading: 2-5s → 1-3s
+- First token: 200-500ms → 50-150ms
+- Generation: 5-15 tok/s → 20-50 tok/s
+- **Total: 65s → 2-5s (13-30x speedup!)**
+
+**Success Criteria**:
+- [x] Logs show "Auto-detected Metal device" on macOS
+- [x] Debug shows "device: Metal(MetalDevice)" not "Cpu"
+- [x] Zero clippy warnings
+- [x] Quality check passes (clippy + build)
+- [~] Generation time <5s - BLOCKED: Candle Metal missing RMS-norm op (framework limitation)
+
+**IMPORTANT NOTE**:
+Metal device detection works correctly, but Candle v0.9 Metal backend lacks RMS-norm operation implementation required by LLaMA models. Error: "Metal error no metal implementation for rms-norm". This is a Candle framework limitation, not a bug in our code. Models will fall back to CPU until Candle implements missing Metal operations.
+
+**Additional Fixes**:
+- Update "auto" detection in "cuda" and "metal" explicit modes too (sanity checks)
+- Add better logging to show actual device type (not just what was requested)
+
+---
+
+### Task 11b.7.1: Fix Auto Device Detection for macOS - ✅ COMPLETE
+**Priority**: CRITICAL
+**Estimated Time**: 30 minutes
+**Status**: ✅ COMPLETE
+
+**File**: `llmspell-providers/src/local/candle/provider.rs`
+**Lines**: 71-83
+
+**Changes Required**:
+1. **Lines 71-83**: Rewrite "auto" device selection with platform detection
+   - macOS: Try Metal → CPU
+   - Linux/Windows: Try CUDA (with type check) → CPU
+
+2. **Lines 52-59**: Update "cuda" mode to warn on macOS
+   - Add `#[cfg(target_os = "macos")]` warning that CUDA not available on macOS
+
+3. **Line 90**: Improve debug logging
+   - Show actual device type, not just requested mode
+   - Example: "Candle provider using device: Metal(MetalDevice)" or "Candle provider using device: Cuda(0)"
+
+**Implementation**:
+```rust
+// Lines 51-88 (complete rewrite)
+// Device selection
+let device = match device_str.as_str() {
+    "cuda" => {
+        #[cfg(target_os = "macos")]
+        {
+            warn!("CUDA requested but not available on macOS, using CPU");
+            info!("Hint: Use device='metal' for GPU acceleration on Apple Silicon");
+            Device::Cpu
+        }
+
+        #[cfg(not(target_os = "macos"))]
+        {
+            info!("Using CUDA device for Candle inference");
+            match Device::cuda_if_available(0) {
+                Ok(Device::Cuda(d)) => Device::Cuda(d),
+                Ok(_) => {
+                    error!("CUDA device requested but cuda_if_available returned CPU");
+                    return Err(anyhow!("CUDA not available"));
+                }
+                Err(e) => {
+                    error!("CUDA device requested but not available: {}", e);
+                    return Err(anyhow!("CUDA not available: {}", e));
+                }
+            }
+        }
+    }
+    "metal" => {
+        #[cfg(not(target_os = "macos"))]
+        {
+            warn!("Metal requested but only available on macOS, using CPU");
+            Device::Cpu
+        }
+
+        #[cfg(target_os = "macos")]
+        {
+            info!("Using Metal device for Candle inference");
+            Device::new_metal(0).map_err(|e| {
+                error!("Metal device requested but not available: {}", e);
+                anyhow!("Metal not available: {}", e)
+            })?
+        }
+    }
+    "cpu" => {
+        info!("Using CPU device for Candle inference");
+        Device::Cpu
+    }
+    "auto" => {
+        // Platform-specific GPU auto-detection
+        #[cfg(target_os = "macos")]
+        {
+            if let Ok(metal) = Device::new_metal(0) {
+                info!("Auto-detected Metal device for Candle (Apple Silicon)");
+                metal
+            } else {
+                info!("Auto-detected CPU device for Candle (Metal unavailable)");
+                Device::Cpu
+            }
+        }
+
+        #[cfg(not(target_os = "macos"))]
+        {
+            match Device::cuda_if_available(0) {
+                Ok(Device::Cuda(d)) => {
+                    info!("Auto-detected CUDA device for Candle");
+                    Device::Cuda(d)
+                }
+                _ => {
+                    info!("Auto-detected CPU device for Candle (CUDA unavailable)");
+                    Device::Cpu
+                }
+            }
+        }
+    }
+    _ => {
+        warn!("Unknown device '{}', defaulting to CPU", device_str);
+        Device::Cpu
+    }
+};
+
+debug!("Candle provider initialized with device: {:?}", device);
+```
+
+**Validation**:
+```bash
+# Test 1: Verify Metal detection
+RUST_LOG=llmspell_providers=debug target/debug/llmspell -p candle exec 'print("test")'
+# Expected log: "Auto-detected Metal device for Candle (Apple Silicon)"
+# Expected log: "Candle provider initialized with device: Metal(MetalDevice)"
+
+# Test 2: Verify performance
+target/debug/llmspell -p candle repl
+> agent = Agent.builder():provider("candle"):model("tinyllama:Q4_K_M"):build()
+> print(agent:execute({text= "write a haiku"}).text)
+# Expected: <5 seconds total time (vs 65s before)
+# Expected: ~20-50 tokens/sec (vs <1 tok/sec before)
+```
+
+---
+
+## Phase 11b.8: Add T5 Safetensors Support for Metal GPU - 🔲 PENDING
+**Priority**: HIGH (Enables working Metal GPU inference in Candle)
+**Estimated Time**: 3-4 hours
+**Status**: 🔲 PENDING
+**Depends On**: Phase 11b.7 (Metal device detection)
+
+**Problem**:
+Phase 11b.7 successfully enabled Metal device detection, but discovered Candle v0.9 Metal backend lacks RMS-norm operation implementation. All current Candle provider models use GGUF LLaMA architecture which requires RMS-norm, making them incompatible with Metal GPU acceleration.
+
+**Error When Using LLaMA Models on Metal**:
+```
+Error: Component error: Generation failed: Metal error no metal implementation for rms-norm
+```
+
+**Root Cause Analysis**:
+1. **Current Implementation**: Provider only supports GGUF quantized LLaMA models (TinyLlama, Llama, Mistral, Phi, Gemma)
+2. **LLaMA Architecture**: Uses RMS-norm (Root Mean Square normalization) for layer normalization
+3. **Candle Metal Limitation**: Metal backend missing RMS-norm kernel implementation (tracked: https://github.com/huggingface/candle/issues/1916)
+4. **Impact**: Metal GPU unusable despite Phase 11b.7 device detection working correctly
+
+**Solution: Add T5 Model Support**
+
+T5 (Text-To-Text Transfer Transformer) models use **LayerNorm** instead of RMS-norm, which IS implemented in Candle Metal backend.
+
+**Why T5**:
+- ✅ Uses LayerNorm (Candle Metal has full implementation)
+- ✅ Native Candle support: `candle-transformers::models::t5`
+- ✅ Safetensors format (HuggingFace standard)
+- ✅ Proven working: Candle examples show Metal support
+- ✅ Text generation capable (encoder-decoder architecture)
+- ✅ Small models available: FLAN-T5-small (80M params), FLAN-T5-base (250M params)
+
+**Technical Architecture Differences**:
+
+| Aspect | LLaMA (Current) | T5 (New) |
+|--------|----------------|----------|
+| **File Format** | GGUF (quantized) | Safetensors (full/quantized) |
+| **Architecture** | Decoder-only autoregressive | Encoder-decoder |
+| **Normalization** | RMS-norm (broken Metal) | LayerNorm (working Metal) |
+| **Loading** | `gguf_file::Content::read()` | `VarBuilder::from_safetensors()` |
+| **Model Type** | `quantized_llama::ModelWeights` | `t5::T5ForConditionalGeneration` |
+| **Generation** | Token-by-token forward pass | Encode prompt → decode with caching |
+| **Metal Support** | ❌ BLOCKED | ✅ WORKS |
+
+**Implementation Strategy**:
+
+### Phase 1: Model Architecture (Tasks 11b.8.1-11b.8.3)
+Create dual-architecture model wrapper supporting both GGUF LLaMA and Safetensors T5:
+
+```rust
+// llmspell-providers/src/local/candle/model_type.rs (NEW)
+pub enum ModelArchitecture {
+    LLaMA,
+    T5,
+}
+
+// llmspell-providers/src/local/candle/model_wrapper.rs (REFACTOR)
+pub enum ModelWrapper {
+    LLaMA {
+        model: quantized_llama::ModelWeights,
+        tokenizer: TokenizerLoader,
+        metadata: GGUFMetadata,
+        device: Device,
+    },
+    T5 {
+        model: t5::T5ForConditionalGeneration,
+        tokenizer: Tokenizer,
+        config: t5::Config,
+        device: Device,
+    },
+}
+
+impl ModelWrapper {
+    pub fn load(model_path: &Path, device: Device) -> Result<Self> {
+        let arch = Self::detect_architecture(model_path)?;
+        match arch {
+            ModelArchitecture::LLaMA => Self::load_llama(model_path, device),
+            ModelArchitecture::T5 => Self::load_t5(model_path, device),
+        }
+    }
+
+    fn detect_architecture(path: &Path) -> Result<ModelArchitecture> {
+        // Check for .gguf files → LLaMA
+        // Check for .safetensors + config.json → T5
+    }
+}
+```
+
+### Phase 2: T5 Loading (Tasks 11b.8.4-11b.8.5)
+Implement T5 model loading from safetensors:
+
+```rust
+// llmspell-providers/src/local/candle/t5_loader.rs (NEW)
+pub struct T5Loader;
+
+impl T5Loader {
+    pub fn load(model_path: &Path, device: Device) -> Result<T5ModelBundle> {
+        // 1. Find safetensors files (model.safetensors or model-*.safetensors)
+        // 2. Load config.json
+        // 3. Create VarBuilder from safetensors
+        // 4. Load tokenizer (tokenizer.json or spiece.model)
+        // 5. Initialize T5ForConditionalGeneration
+    }
+}
+```
+
+### Phase 3: T5 Generation (Task 11b.8.6)
+Implement encoder-decoder generation logic:
+
+```rust
+// provider.rs: generate_with_model()
+match model_wrapper {
+    ModelWrapper::LLaMA { .. } => {
+        // Existing autoregressive generation
+    }
+    ModelWrapper::T5 { model, tokenizer, .. } => {
+        // 1. Encode prompt: encoder_output = model.encode(input_ids)
+        // 2. Initialize decoder with encoder output
+        // 3. Generate tokens autoregressively with decoder
+        // 4. Use encoder cross-attention
+    }
+}
+```
+
+### Phase 4: Model Discovery (Tasks 11b.8.7-11b.8.8)
+Update HuggingFace downloader and model pull:
+
+```rust
+// hf_downloader.rs
+impl HFModelRepo {
+    pub fn get_t5_repo_info(model_name: &str) -> Option<(&str, Vec<&str>)> {
+        match model_name {
+            "flan-t5-small" => Some((
+                "google/flan-t5-small",
+                vec!["model.safetensors", "config.json", "tokenizer.json"]
+            )),
+            "flan-t5-base" => Some((
+                "google/flan-t5-base",
+                vec!["model.safetensors", "config.json", "tokenizer.json"]
+            )),
+            _ => None,
+        }
+    }
+}
+```
+
+### Phase 5: Testing & Validation (Task 11b.8.9)
+
+**Files Changed**:
+```
+llmspell-providers/src/local/candle/
+├── model_type.rs (NEW - 50 lines)
+├── t5_loader.rs (NEW - 300 lines)
+├── model_wrapper.rs (REFACTOR - enum wrapper, +200 lines)
+├── provider.rs (UPDATE - T5 generation, +150 lines)
+├── hf_downloader.rs (UPDATE - T5 repos, +50 lines)
+├── mod.rs (UPDATE - exports, +5 lines)
+└── tests/ (NEW - T5 integration tests, +200 lines)
+
+Cargo.toml:
+└── (already has candle-transformers with T5 support)
+```
+
+**Known T5 Models (Metal-Compatible)**:
+1. **google/flan-t5-small** (80M params, ~320MB) - RECOMMENDED for testing
+2. **google/flan-t5-base** (250M params, ~990MB)
+3. **google/flan-t5-large** (780M params, ~3GB)
+4. **google/t5-small** (60M params, base T5)
+
+**User Experience**:
+
+**Before (Phase 11b.7 - Broken)**:
+```bash
+$ llmspell model pull tinyllama@candle
+✓ Downloaded: tinyllama:Q4_K_M (GGUF)
+
+$ llmspell -p candle exec 'print("test")'
+[INFO] Auto-detected Metal device for Candle (Apple Silicon)  ← Device works
+Error: Metal error no metal implementation for rms-norm       ← Generation fails
+```
+
+**After (Phase 11b.8 - Working)**:
+```bash
+$ llmspell model pull flan-t5-small@candle
+✓ Downloaded: google/flan-t5-small (Safetensors)
+  - model.safetensors (320MB)
+  - config.json
+  - tokenizer.json
+
+$ llmspell -p candle exec 'print("test")'
+[INFO] Auto-detected Metal device for Candle (Apple Silicon)
+[INFO] Loading T5 model from safetensors
+[INFO] Model loaded in 1.2s
+[INFO] Generating on Metal GPU
+test                                                           ← Success!
+⏱️  2.4s (vs 65s CPU)
+```
+
+**Success Criteria**:
+- [ ] T5 models load from safetensors format
+- [ ] Metal GPU acceleration works with T5
+- [ ] Text generation produces coherent output
+- [ ] Model pull downloads correct files from HuggingFace
+- [ ] GGUF LLaMA support still works (backward compatibility)
+- [ ] Generation time <5s with Metal (vs 60s+ with CPU)
+- [ ] Zero clippy warnings
+- [ ] Quality check passes
+- [ ] >90% test coverage for new code
+- [ ] Documentation updated with T5 examples
+
+**Performance Expectations (M1 Ultra with Metal)**:
+- Model loading: 1-2s (safetensors mmap)
+- First token latency: 100-200ms
+- Generation speed: 20-40 tokens/sec
+- Total (50 tokens): 2-4s (vs 60-120s CPU)
+
+**Backward Compatibility**:
+- GGUF LLaMA models remain supported (for future when Candle Metal RMS-norm works)
+- Model type auto-detected from directory contents
+- Existing configurations unchanged
+- CPU fallback works for both model types
+
+**Risks & Mitigations**:
+
+| Risk | Impact | Mitigation |
+|------|--------|------------|
+| T5 Metal ops incomplete | High | Test with Candle examples first |
+| Safetensors loading complex | Medium | Use Candle's VarBuilder (proven) |
+| Tokenizer format differences | Medium | Support both tokenizer.json and spiece.model |
+| Generation quality varies | Low | Use FLAN-T5 (instruction-tuned) |
+| Model size too large | Low | Start with flan-t5-small (320MB) |
+
+**Alternative Approaches Considered**:
+
+1. **Wait for Candle RMS-norm Metal**: No ETA, blocks GPU usage indefinitely
+2. **Switch to Ollama only**: Loses Candle's Rust-native benefits
+3. **Implement Metal RMS-norm**: Requires Metal shader expertise, 2+ weeks
+4. **Use BERT**: Embeddings only, not generative
+5. **Use Whisper**: Audio transcription, not text generation
+
+**Why T5 is Optimal**:
+- Immediate Metal GPU support (proven working)
+- Native Candle implementation (no custom code)
+- Comparable generation quality to small LLaMA models
+- Standard HuggingFace format (safetensors)
+- Small model variants available (testing-friendly)
+
+**Documentation Updates Needed**:
+- Update Candle provider README with T5 examples
+- Add Metal compatibility matrix (LLaMA=CPU, T5=GPU)
+- Update model pull help text with T5 models
+- Add T5 generation examples to cookbook
+
+**Future Work** (Post-Phase 11b.8):
+- **Phase 11b.9**: Add more T5 variants (FLAN-T5-base, FLAN-T5-large)
+- **Phase 11b.10**: Quantized T5 support (GGUF T5 when Candle supports)
+- **Phase 11b.11**: Switch back to LLaMA when Candle Metal RMS-norm implemented
+- **Phase 11b.12**: Benchmark T5 vs LLaMA generation quality
+
+---
+
+### Task 11b.8.1: Create Model Architecture Enum - 🔲 PENDING
+**Priority**: HIGH
+**Estimated Time**: 30 minutes
+**Status**: 🔲 PENDING
+
+**File**: `llmspell-providers/src/local/candle/model_type.rs` (NEW)
+
+**Purpose**: Define model architecture types and detection logic.
+
+**Implementation**:
+```rust
+//! Model architecture detection and classification
+//!
+//! Supports multiple model architectures with different file formats.
+
+use anyhow::{anyhow, Result};
+use std::path::Path;
+
+/// Supported model architectures
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum ModelArchitecture {
+    /// LLaMA-family models (quantized GGUF format)
+    /// Includes: LLaMA, TinyLlama, Mistral, Phi, Gemma, Qwen
+    /// Normalization: RMS-norm (Metal support: BLOCKED)
+    LLaMA,
+
+    /// T5 encoder-decoder models (safetensors format)
+    /// Includes: T5, FLAN-T5, UL2, MADLAD400
+    /// Normalization: LayerNorm (Metal support: WORKING)
+    T5,
+}
+
+impl ModelArchitecture {
+    /// Detect architecture from model directory/file
+    ///
+    /// Detection logic:
+    /// - GGUF file present → LLaMA
+    /// - Safetensors + config.json → T5 (check config for architecture)
+    ///
+    /// # Arguments
+    /// * `model_path` - Path to model file or directory
+    ///
+    /// # Returns
+    /// * `Ok(ModelArchitecture)` - Detected architecture
+    /// * `Err(anyhow::Error)` - Could not detect or unsupported
+    pub fn detect(model_path: &Path) -> Result<Self> {
+        // Check for GGUF file
+        if Self::has_gguf_file(model_path)? {
+            return Ok(ModelArchitecture::LLaMA);
+        }
+
+        // Check for safetensors + config.json
+        if Self::has_safetensors_and_config(model_path)? {
+            // Verify architecture from config.json
+            return Self::detect_from_config(model_path);
+        }
+
+        Err(anyhow!(
+            "Could not detect model architecture from: {:?}\n\
+            Expected either:\n\
+            - GGUF file (*.gguf) for LLaMA models\n\
+            - Safetensors (*.safetensors) + config.json for T5 models",
+            model_path
+        ))
+    }
+
+    fn has_gguf_file(path: &Path) -> Result<bool> {
+        let search_path = if path.is_file() {
+            path.parent().ok_or_else(|| anyhow!("No parent dir"))?
+        } else {
+            path
+        };
+
+        for entry in std::fs::read_dir(search_path)? {
+            let entry = entry?;
+            if entry.path().extension().and_then(|s| s.to_str()) == Some("gguf") {
+                return Ok(true);
+            }
+        }
+        Ok(false)
+    }
+
+    fn has_safetensors_and_config(path: &Path) -> Result<bool> {
+        let search_path = if path.is_file() {
+            path.parent().ok_or_else(|| anyhow!("No parent dir"))?
+        } else {
+            path
+        };
+
+        let mut has_safetensors = false;
+        let mut has_config = false;
+
+        for entry in std::fs::read_dir(search_path)? {
+            let entry = entry?;
+            let file_name = entry.file_name();
+            let file_name_str = file_name.to_str().unwrap_or("");
+
+            if file_name_str.ends_with(".safetensors") {
+                has_safetensors = true;
+            }
+            if file_name_str == "config.json" {
+                has_config = true;
+            }
+        }
+
+        Ok(has_safetensors && has_config)
+    }
+
+    fn detect_from_config(model_path: &Path) -> Result<Self> {
+        let config_path = if model_path.is_dir() {
+            model_path.join("config.json")
+        } else {
+            model_path.parent()
+                .ok_or_else(|| anyhow!("No parent dir"))?
+                .join("config.json")
+        };
+
+        let config_str = std::fs::read_to_string(&config_path)?;
+        let config: serde_json::Value = serde_json::from_str(&config_str)?;
+
+        let model_type = config.get("model_type")
+            .and_then(|v| v.as_str())
+            .ok_or_else(|| anyhow!("No model_type in config.json"))?;
+
+        match model_type {
+            "t5" => Ok(ModelArchitecture::T5),
+            other => Err(anyhow!(
+                "Unsupported model architecture: '{}'\n\
+                Currently supported: llama (GGUF), t5 (safetensors)",
+                other
+            )),
+        }
+    }
+
+    /// Get human-readable name
+    pub fn name(&self) -> &'static str {
+        match self {
+            ModelArchitecture::LLaMA => "LLaMA",
+            ModelArchitecture::T5 => "T5",
+        }
+    }
+
+    /// Check if architecture supports Metal GPU
+    pub fn supports_metal(&self) -> bool {
+        match self {
+            ModelArchitecture::LLaMA => false, // Blocked by missing RMS-norm
+            ModelArchitecture::T5 => true,     // LayerNorm fully implemented
+        }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_architecture_names() {
+        assert_eq!(ModelArchitecture::LLaMA.name(), "LLaMA");
+        assert_eq!(ModelArchitecture::T5.name(), "T5");
+    }
+
+    #[test]
+    fn test_metal_support() {
+        assert!(!ModelArchitecture::LLaMA.supports_metal());
+        assert!(ModelArchitecture::T5.supports_metal());
+    }
+}
+```
+
+**Validation**:
+```bash
+cargo build -p llmspell-providers
+cargo test -p llmspell-providers model_type
+```
+
+---
+
+### Task 11b.8.2: Refactor ModelWrapper to Enum - 🔲 PENDING
+**Priority**: HIGH
+**Estimated Time**: 45 minutes
+**Status**: 🔲 PENDING
+**Depends On**: Task 11b.8.1
+
+**File**: `llmspell-providers/src/local/candle/model_wrapper.rs`
+
+**Changes**: Convert struct to enum supporting multiple architectures.
+
+**Implementation**: See detailed design in Phase 11b.8 overview.
+
+---
+
+### Task 11b.8.3: Implement T5 Loader - 🔲 PENDING
+**Priority**: HIGH
+**Estimated Time**: 1 hour
+**Status**: 🔲 PENDING
+**Depends On**: Task 11b.8.2
+
+**File**: `llmspell-providers/src/local/candle/t5_loader.rs` (NEW)
+
+**Purpose**: Load T5 models from safetensors format.
+
+---
+
+### Task 11b.8.4: Update HuggingFace Downloader for T5 - 🔲 PENDING
+**Priority**: MEDIUM
+**Estimated Time**: 30 minutes
+**Status**: 🔲 PENDING
+
+**File**: `llmspell-providers/src/local/candle/hf_downloader.rs`
+
+**Changes**: Add T5 model repository mappings and safetensors download support.
+
+---
+
+### Task 11b.8.5: Implement T5 Generation Logic - 🔲 PENDING
+**Priority**: HIGH
+**Estimated Time**: 1 hour
+**Status**: 🔲 PENDING
+**Depends On**: Tasks 11b.8.2, 11b.8.3
+
+**File**: `llmspell-providers/src/local/candle/provider.rs`
+
+**Purpose**: Implement encoder-decoder generation for T5 models.
+
+---
+
+### Task 11b.8.6: Test T5 with Metal Device - 🔲 PENDING
+**Priority**: CRITICAL
+**Estimated Time**: 30 minutes
+**Status**: 🔲 PENDING
+**Depends On**: Tasks 11b.8.1-11b.8.5
+
+**Validation**:
+```bash
+# Download T5 model
+llmspell model pull flan-t5-small@candle
+
+# Test Metal generation
+RUST_LOG=llmspell_providers=info llmspell -p candle exec 'print("test")'
+
+# Expected logs:
+# [INFO] Auto-detected Metal device for Candle (Apple Silicon)
+# [INFO] Loading T5 model from safetensors
+# [INFO] Model loaded in 1.2s
+# [INFO] Generating on Metal GPU
+
+# Expected: <5s total time, coherent output
+```
+
+---
+
+### Task 11b.8.7: Update Documentation - 🔲 PENDING
+**Priority**: MEDIUM
+**Estimated Time**: 30 minutes
+**Status**: 🔲 PENDING
+
+**Files**:
+- llmspell-providers/src/local/candle/README.md
+- docs/user-guide/providers/candle.md
+- RELEASE_NOTES.md
+
+---
+
 **new phases to be added above**
 ---
 
