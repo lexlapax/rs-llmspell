@@ -4329,15 +4329,145 @@ test result: ok. 72 passed; 0 failed; 0 ignored
 - flan-t5-base (250M params): ~5-10 tokens/sec on CPU, ~30-60 tokens/sec on Metal
 - Encoder amortizes over long outputs (single pass for any output length)
 
-**Next Steps**: Task 11b.8.6 will test T5 with Metal device for GPU acceleration.
+**Next Steps**: Task 11b.8.6 will wire T5 models into pull command to enable Metal GPU access.
 
 ---
 
-### Task 11b.8.6: Test T5 with Metal Device - 🔲 PENDING
+### Task 11b.8.6: Wire T5 Models into Pull Command - 🔲 PENDING
+**Priority**: CRITICAL (BLOCKS 11b.8.7)
+**Estimated Time**: 15 minutes
+**Status**: 🔲 PENDING
+**Depends On**: Tasks 11b.8.3, 11b.8.4
+
+**File**: `llmspell-providers/src/local/candle/provider.rs`
+
+**Problem**: T5 models implemented but inaccessible via `llmspell model pull`
+- `download_safetensors_model()` exists but never called
+- `HFModelRepo::get_t5_repo_info()` exists but never checked
+- `pull_model()` only checks GGUF mappings (all Metal-broken)
+- Error message doesn't mention T5 models
+
+**Current Behavior**:
+```bash
+llmspell model pull flan-t5-small@candle
+# ERROR: Model 'flan-t5-small' not found in known repositories.
+# Suggests: tinyllama, phi-2, qwen2-0.5b (all crash on Metal)
+```
+
+**Required Changes** (provider.rs:615-678, `pull_model()` method):
+
+1. **Check T5 mappings after GGUF fails**:
+```rust
+// After existing GGUF check:
+if let Some((repo_id, filename)) = HFModelRepo::get_repo_info(model_name, variant) {
+    // Existing GGUF download
+} else if let Some(repo_id) = HFModelRepo::get_t5_repo_info(model_name) {
+    // NEW: T5 safetensors download
+    info!("Downloading T5 model from HuggingFace: repo={}", repo_id);
+    let downloader = HFDownloader::new()?;
+    downloader.download_safetensors_model(repo_id, &model_dir)?;
+
+    // Calculate total size
+    let mut total_size = 0u64;
+    for entry in std::fs::read_dir(&model_dir)?.flatten() {
+        if let Ok(metadata) = entry.metadata() {
+            total_size += metadata.len();
+        }
+    }
+
+    Ok(PullProgress {
+        model_id: model_name.to_string(),
+        status: DownloadStatus::Complete,
+        percent_complete: 100.0,
+        bytes_downloaded: total_size,
+        bytes_total: Some(total_size),
+    })
+} else {
+    // Error with updated message
+}
+```
+
+2. **Update error message** to include T5 models:
+```rust
+Err(anyhow!(
+    "Model '{}' not found in known repositories.\n\
+    \n\
+    GGUF models (quantized, Metal GPU blocked by RMS-norm):\n\
+    - tinyllama (TinyLlama-1.1B-Chat)\n\
+    - phi-2 (Phi-2)\n\
+    - qwen2-0.5b (Qwen2-0.5B-Instruct)\n\
+    \n\
+    T5 models (full precision, Metal GPU WORKING):\n\
+    - flan-t5-small (80M params, recommended for Metal)\n\
+    - flan-t5-base (250M params)\n\
+    - flan-t5-large (780M params)\n\
+    - t5-small, t5-base, t5-large\n\
+    \n\
+    For custom models, download manually:\n\
+    1. Download model files from HuggingFace\n\
+    2. Place in: {:?}\n\
+    3. GGUF: .gguf + tokenizer.json | T5: config.json + tokenizer.json + *.safetensors\n\
+    \n\
+    Alternative: Use Ollama backend:\n\
+    llmspell model pull {}@ollama",
+    model_name,
+    model_dir,
+    model_name
+))
+```
+
+3. **Update model_id handling** for T5 (no variant):
+```rust
+// Before creating model_dir:
+let model_id = if variant != "Q4_K_M" || HFModelRepo::get_repo_info(model_name, variant).is_some() {
+    format!("{}:{}", model_name, variant)  // GGUF with quantization
+} else {
+    model_name.to_string()  // T5 no quantization
+};
+```
+
+**Expected Behavior After Fix**:
+```bash
+# T5 models now pullable:
+llmspell model pull flan-t5-small@candle
+# [INFO] Downloading T5 model from HuggingFace: repo=google/flan-t5-small
+# [INFO] Downloading config.json
+# [INFO] Downloading tokenizer.json
+# [INFO] Downloading model.safetensors
+# ✓ Model flan-t5-small downloaded successfully
+
+# Works with Metal GPU:
+llmspell -p candle -m flan-t5-small exec 'translate to French: Hello world'
+# [INFO] Auto-detected Metal device for Candle (Apple Silicon)
+# [INFO] Detected T5 architecture
+# [INFO] T5 model loaded in 0.8s
+# → Bonjour le monde (50-100 tokens/sec on Metal)
+```
+
+**Testing**:
+```bash
+# Unit test pull_model logic
+cargo test --package llmspell-providers --lib local::candle::provider
+
+# Integration test (requires network)
+cargo build --release
+./target/release/llmspell model pull flan-t5-small@candle
+./target/release/llmspell -p candle -m flan-t5-small exec 'summarize: Testing T5 on Metal GPU'
+```
+
+**Impact**: Unlocks Metal GPU acceleration for Candle provider
+- Before: 0 working models on Metal
+- After: 6 working T5 models on Metal
+
+**Validation**: Task 11b.8.7 can proceed after this fix.
+
+---
+
+### Task 11b.8.7: Test T5 with Metal Device - 🔲 PENDING
 **Priority**: CRITICAL
 **Estimated Time**: 30 minutes
 **Status**: 🔲 PENDING
-**Depends On**: Tasks 11b.8.1-11b.8.5
+**Depends On**: Tasks 11b.8.1-11b.8.6
 
 **Validation**:
 ```bash
@@ -4358,15 +4488,23 @@ RUST_LOG=llmspell_providers=info llmspell -p candle exec 'print("test")'
 
 ---
 
-### Task 11b.8.7: Update Documentation - 🔲 PENDING
+### Task 11b.8.8: Update Documentation - 🔲 PENDING
 **Priority**: MEDIUM
 **Estimated Time**: 30 minutes
 **Status**: 🔲 PENDING
+**Depends On**: Tasks 11b.8.1-11b.8.7
 
 **Files**:
 - llmspell-providers/src/local/candle/README.md
 - docs/user-guide/providers/candle.md
 - RELEASE_NOTES.md
+
+**Content**:
+- Document T5 support and Metal GPU compatibility
+- Update model pull instructions with T5 examples
+- Add Metal GPU limitations (LLaMA blocked, T5 working)
+- Performance benchmarks for T5 on Metal
+- Architecture differences (GGUF vs Safetensors)
 
 ---
 
