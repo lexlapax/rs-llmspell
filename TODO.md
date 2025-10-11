@@ -4050,15 +4050,89 @@ test result: ok. 3 passed; 0 failed; 0 ignored
 
 ---
 
-### Task 11b.8.3: Implement T5 Loader - 🔲 PENDING
+### Task 11b.8.3: Implement T5 Loader - ✅ COMPLETE
 **Priority**: HIGH
 **Estimated Time**: 1 hour
-**Status**: 🔲 PENDING
+**Status**: ✅ COMPLETE
+**Actual Time**: 55 minutes
 **Depends On**: Task 11b.8.2
 
-**File**: `llmspell-providers/src/local/candle/t5_loader.rs` (NEW)
+**File**: `llmspell-providers/src/local/candle/model_wrapper.rs` (updated - no separate file needed)
 
 **Purpose**: Load T5 models from safetensors format.
+
+**Implementation Insights**:
+1. **T5 Variant Complete**: Replaced placeholder with actual T5 model components
+   - `model: Box<t5::T5ForConditionalGeneration>`
+   - `tokenizer: Box<Tokenizer>` (HuggingFace tokenizers crate)
+   - `config: t5::Config`
+   - `device: Device`
+2. **Safetensors Loading**: Implemented `find_safetensors_files()` method
+   - Scans directory for `.safetensors` files
+   - Supports both single and multi-file models
+   - Deterministic loading (sorted file order)
+3. **Config Loading**: Parse `config.json` using serde_json
+   - Deserializes into `t5::Config` struct
+   - Enables KV cache for performance (`use_cache = true`)
+   - Validates essential fields (vocab_size, d_model, layers)
+4. **VarBuilder Integration**: Memory-mapped safetensors loading
+   - Uses `VarBuilder::from_mmaped_safetensors()` for efficiency
+   - DType::F32 (T5 default precision)
+   - Added `candle-nn` dependency to Cargo.toml
+5. **Model Initialization**: `T5ForConditionalGeneration::load()`
+   - Loads weights from VarBuilder
+   - Uses config for architecture setup
+6. **Tokenizer Support**: Implemented `load_t5_tokenizer()` method
+   - Primary: `tokenizer.json` (HuggingFace standard format)
+   - Fallback: `spiece.model` detection with informative error (not yet implemented)
+   - Clear error messages for missing files
+7. **Accessor Methods**: Added T5-specific methods
+   - `t5_model()` - mutable reference to model
+   - `t5_tokenizer()` - reference to tokenizer
+   - `t5_config()` - reference to config
+   - Updated `tokenizer()` to guide users to `t5_tokenizer()`
+8. **Architecture Dispatch**: `load()` method routes to `load_t5()` automatically
+   - Architecture detection via `ModelArchitecture::detect()`
+   - Seamless loading of both LLaMA (GGUF) and T5 (safetensors)
+9. **Error Handling**: Comprehensive error messages
+   - Missing files: Lists expected filenames
+   - Parse errors: Shows context
+   - Loading failures: Propagates Candle errors
+10. **Performance**: Memory-mapped loading for large models
+    - Avoids loading entire model into memory
+    - Fast startup time
+
+**Files Modified**:
+- ✅ `llmspell-providers/src/local/candle/model_wrapper.rs` (+170 lines)
+- ✅ `llmspell-providers/Cargo.toml` (+1 dependency: candle-nn)
+
+**Dependencies Added**:
+- `candle-nn` (workspace) - Required for VarBuilder
+
+**Test Results**:
+```
+running 3 tests
+test local::candle::model_wrapper::tests::test_architecture_detection ... ok
+test local::candle::model_wrapper::tests::test_estimate_param_count ... ok
+test local::candle::model_wrapper::tests::test_model_wrapper_nonexistent_path ... ok
+
+test result: ok. 3 passed; 0 failed; 0 ignored
+```
+
+**Clippy**: Zero warnings
+
+**Code Quality**:
+- DRY: Reused architecture detection from Task 11b.8.1
+- Type Safety: Strongly typed with Candle's T5 structs
+- Documentation: All public methods documented
+- Logging: Info-level progress messages for model loading
+
+**Limitations**:
+- SentencePiece tokenizer not yet supported (clear error message provided)
+- Assumes DType::F32 (could be made configurable later)
+- No quantized T5 support yet (GGUF T5 when Candle adds support)
+
+**Next Steps**: Task 11b.8.4 will add T5 model discovery/download from HuggingFace.
 
 ---
 
