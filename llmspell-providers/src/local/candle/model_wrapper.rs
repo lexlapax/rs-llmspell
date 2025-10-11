@@ -154,7 +154,8 @@ impl ModelWrapper {
         // Create VarBuilder from safetensors
         // Use memory-mapped loading for efficiency
         let dtype = DType::F32; // T5 uses F32 by default
-        let vb = unsafe { VarBuilder::from_mmaped_safetensors(&safetensors_files, dtype, &device)? };
+        let vb =
+            unsafe { VarBuilder::from_mmaped_safetensors(&safetensors_files, dtype, &device)? };
 
         info!("Initializing T5ForConditionalGeneration on {:?}", device);
 
@@ -268,7 +269,9 @@ impl ModelWrapper {
     pub fn tokenizer(&self) -> &TokenizerLoader {
         match self {
             ModelWrapper::LLaMA { tokenizer, .. } => tokenizer,
-            ModelWrapper::T5 { .. } => panic!("tokenizer() called on T5 model - use t5_tokenizer()"),
+            ModelWrapper::T5 { .. } => {
+                panic!("tokenizer() called on T5 model - use t5_tokenizer()")
+            }
         }
     }
 
