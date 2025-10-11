@@ -3997,17 +3997,56 @@ test result: ok. 2 passed; 0 failed; 0 ignored
 
 ---
 
-### Task 11b.8.2: Refactor ModelWrapper to Enum - 🔲 PENDING
+### Task 11b.8.2: Refactor ModelWrapper to Enum - ✅ COMPLETE
 **Priority**: HIGH
 **Estimated Time**: 45 minutes
-**Status**: 🔲 PENDING
+**Status**: ✅ COMPLETE
+**Actual Time**: 40 minutes
 **Depends On**: Task 11b.8.1
 
 **File**: `llmspell-providers/src/local/candle/model_wrapper.rs`
 
 **Changes**: Convert struct to enum supporting multiple architectures.
 
-**Implementation**: See detailed design in Phase 11b.8 overview.
+**Implementation Insights**:
+1. **Enum Design**: Two variants - `LLaMA` (implemented) and `T5` (placeholder)
+2. **Architecture Detection**: Integrated `ModelArchitecture::detect()` in `load()` method
+3. **Dispatch Pattern**: Match on detected architecture to route to specific loaders
+4. **LLaMA Loader**: Existing logic moved to `load_llama()` private method
+5. **T5 Placeholder**: `load_t5()` returns informative error (Task 11b.8.3 will implement)
+6. **Performance Optimization**: Boxed large fields (`model`, `tokenizer`) per clippy suggestion
+   - Reduces enum size from 1480 bytes to reasonable size
+   - Box<T> auto-derefs, so accessor methods work unchanged
+7. **Accessor Methods**: Updated to match on enum variants
+   - `llama_model()` - renamed from `model()` for clarity
+   - `tokenizer()`, `metadata()`, `device()` - pattern match variants
+   - `architecture()` - new method returns enum type
+8. **Provider Integration**: Updated `provider.rs` to use `llama_model()` instead of `model()`
+   - Lines 238, 271: Changed to `model_wrapper.llama_model().forward(...)`
+9. **Backward Compatibility**: GGUF LLaMA models work identically
+10. **Error Handling**: Clear error messages when T5 loading attempted
+
+**Files Modified**:
+- ✅ `llmspell-providers/src/local/candle/model_wrapper.rs` (251 lines - complete refactor)
+- ✅ `llmspell-providers/src/local/candle/provider.rs` (2 lines - API updates)
+
+**Test Results**:
+```
+running 3 tests
+test local::candle::model_wrapper::tests::test_architecture_detection ... ok
+test local::candle::model_wrapper::tests::test_estimate_param_count ... ok
+test local::candle::model_wrapper::tests::test_model_wrapper_nonexistent_path ... ok
+
+test result: ok. 3 passed; 0 failed; 0 ignored
+```
+
+**Clippy**: Zero warnings (large enum variant warning resolved via boxing)
+
+**Breaking Changes**:
+- `model()` method renamed to `llama_model()` to reflect specific architecture
+- Returns error if T5 model attempted (not yet implemented)
+
+**Next Steps**: Task 11b.8.3 will implement actual T5 loading logic in `load_t5()`.
 
 ---
 

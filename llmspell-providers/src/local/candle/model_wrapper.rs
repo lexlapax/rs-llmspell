@@ -1,6 +1,7 @@
-//! Model wrapper for Candle quantized LLaMA models
+//! Model wrapper for Candle models
 //!
-//! Provides high-level interface for GGUF model loading and inference.
+//! Provides high-level interface for model loading and inference.
+//! Supports multiple model architectures: GGUF LLaMA and Safetensors T5.
 
 use anyhow::{anyhow, Result};
 use candle_core::Device;
@@ -9,25 +10,43 @@ use std::path::Path;
 use tracing::{debug, info};
 
 use super::gguf_loader::{GGUFLoader, GGUFMetadata};
+use super::model_type::ModelArchitecture;
 use super::tokenizer_loader::TokenizerLoader;
 
-/// Wrapper around Candle's quantized LLaMA model
-pub struct ModelWrapper {
-    /// Underlying Candle model
-    model: quantized_llama::ModelWeights,
-    /// Tokenizer
-    tokenizer: TokenizerLoader,
-    /// Model metadata
-    metadata: GGUFMetadata,
-    /// Device model is loaded on
-    device: Device,
+/// Wrapper around Candle models supporting multiple architectures
+pub enum ModelWrapper {
+    /// LLaMA-family models (GGUF quantized format)
+    LLaMA {
+        /// Underlying Candle model (boxed to reduce enum size)
+        model: Box<quantized_llama::ModelWeights>,
+        /// Tokenizer (boxed to reduce enum size)
+        tokenizer: Box<TokenizerLoader>,
+        /// Model metadata from GGUF
+        metadata: GGUFMetadata,
+        /// Device model is loaded on
+        device: Device,
+    },
+
+    /// T5 encoder-decoder models (Safetensors format)
+    /// NOTE: Not yet implemented - Task 11b.8.3
+    #[allow(dead_code)]
+    T5 {
+        /// Placeholder - will use candle_transformers::models::t5::T5ForConditionalGeneration
+        _placeholder: (),
+        /// Device model is loaded on
+        device: Device,
+    },
 }
 
 impl ModelWrapper {
-    /// Load model from GGUF file
+    /// Load model from file or directory
+    ///
+    /// Auto-detects architecture based on file contents:
+    /// - GGUF files → LLaMA models
+    /// - Safetensors + config.json → T5 models
     ///
     /// # Arguments
-    /// * `model_path` - Path to .gguf file or model directory
+    /// * `model_path` - Path to model file or directory
     /// * `device` - Device to load model on (CPU/CUDA/Metal)
     ///
     /// # Returns
@@ -39,6 +58,19 @@ impl ModelWrapper {
             model_path, device
         );
 
+        // Detect architecture
+        let architecture = ModelArchitecture::detect(model_path)?;
+        info!("Detected {} architecture", architecture.name());
+
+        // Dispatch to appropriate loader
+        match architecture {
+            ModelArchitecture::LLaMA => Self::load_llama(model_path, device),
+            ModelArchitecture::T5 => Self::load_t5(model_path, device),
+        }
+    }
+
+    /// Load LLaMA model from GGUF file
+    fn load_llama(model_path: &Path, device: Device) -> Result<Self> {
         // Determine GGUF file path
         let gguf_path = if model_path.is_file() {
             model_path.to_path_buf()
@@ -68,15 +100,36 @@ impl ModelWrapper {
         info!(
             "Model loaded successfully: {} blocks, {} params",
             metadata.block_count,
-            Self::estimate_param_count(&metadata)
+            Self::estimate_param_count_llama(&metadata)
         );
 
-        Ok(Self {
-            model,
-            tokenizer,
+        Ok(ModelWrapper::LLaMA {
+            model: Box::new(model),
+            tokenizer: Box::new(tokenizer),
             metadata,
             device,
         })
+    }
+
+    /// Load T5 model from Safetensors files
+    ///
+    /// NOTE: Not yet implemented - will be completed in Task 11b.8.3
+    fn load_t5(_model_path: &Path, device: Device) -> Result<Self> {
+        // Placeholder implementation
+        // Task 11b.8.3 will implement:
+        // - Find safetensors files
+        // - Load config.json
+        // - Create VarBuilder from safetensors
+        // - Load tokenizer (tokenizer.json or spiece.model)
+        // - Initialize T5ForConditionalGeneration
+
+        Err(anyhow!(
+            "T5 model loading not yet implemented (Task 11b.8.3)\n\
+            Architecture detected but loading logic pending.\n\
+            Currently only LLaMA GGUF models are supported.\n\
+            Device would be: {:?}",
+            device
+        ))
     }
 
     /// Find GGUF file in directory
@@ -92,28 +145,57 @@ impl ModelWrapper {
         Err(anyhow!("No GGUF file found in directory: {:?}", dir))
     }
 
-    /// Get reference to model
-    pub fn model(&mut self) -> &mut quantized_llama::ModelWeights {
-        &mut self.model
+    /// Get reference to LLaMA model
+    ///
+    /// # Panics
+    /// Panics if called on non-LLaMA model variant
+    pub fn llama_model(&mut self) -> &mut quantized_llama::ModelWeights {
+        match self {
+            ModelWrapper::LLaMA { model, .. } => model,
+            ModelWrapper::T5 { .. } => panic!("llama_model() called on T5 model"),
+        }
     }
 
     /// Get reference to tokenizer
+    ///
+    /// # Panics
+    /// Panics if called on T5 model (not yet implemented)
     pub fn tokenizer(&self) -> &TokenizerLoader {
-        &self.tokenizer
+        match self {
+            ModelWrapper::LLaMA { tokenizer, .. } => tokenizer,
+            ModelWrapper::T5 { .. } => panic!("tokenizer() called on T5 model (not implemented)"),
+        }
     }
 
-    /// Get reference to metadata
+    /// Get reference to GGUF metadata (LLaMA only)
+    ///
+    /// # Panics
+    /// Panics if called on non-LLaMA model variant
     pub fn metadata(&self) -> &GGUFMetadata {
-        &self.metadata
+        match self {
+            ModelWrapper::LLaMA { metadata, .. } => metadata,
+            ModelWrapper::T5 { .. } => panic!("metadata() called on T5 model"),
+        }
     }
 
     /// Get device model is loaded on
     pub fn device(&self) -> &Device {
-        &self.device
+        match self {
+            ModelWrapper::LLaMA { device, .. } => device,
+            ModelWrapper::T5 { device, .. } => device,
+        }
     }
 
-    /// Estimate parameter count from metadata
-    fn estimate_param_count(metadata: &GGUFMetadata) -> String {
+    /// Get model architecture type
+    pub fn architecture(&self) -> ModelArchitecture {
+        match self {
+            ModelWrapper::LLaMA { .. } => ModelArchitecture::LLaMA,
+            ModelWrapper::T5 { .. } => ModelArchitecture::T5,
+        }
+    }
+
+    /// Estimate parameter count from LLaMA metadata
+    fn estimate_param_count_llama(metadata: &GGUFMetadata) -> String {
         // Rough estimation: embedding_dim * layers * heads
         // LLaMA 7B: 4096 * 32 layers ≈ 7B
         // LLaMA 13B: 5120 * 40 layers ≈ 13B
@@ -154,10 +236,16 @@ mod tests {
             quantization: Some("Q4_K_M".to_string()),
         };
 
-        let count = ModelWrapper::estimate_param_count(&metadata);
+        let count = ModelWrapper::estimate_param_count_llama(&metadata);
         assert!(count.contains("B") || count.contains("M"));
     }
 
-    // Note: Real model loading tests require a test .gguf file
+    #[test]
+    fn test_architecture_detection() {
+        // Test would require actual model files
+        // Will be added in integration tests
+    }
+
+    // Note: Real model loading tests require test model files
     // These will be added in Task 11.7.10 (Integration Testing)
 }

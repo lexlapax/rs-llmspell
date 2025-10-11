@@ -235,7 +235,7 @@ impl CandleProvider {
         let prompt_tensor =
             Tensor::new(prompt_tokens.as_slice(), model_wrapper.device())?.unsqueeze(0)?;
 
-        let mut logits = model_wrapper.model().forward(&prompt_tensor, 0)?;
+        let mut logits = model_wrapper.llama_model().forward(&prompt_tensor, 0)?;
         logits = logits.squeeze(0)?; // Remove batch dimension → [vocab_size]
 
         let first_token_duration = first_token_start.elapsed();
@@ -268,7 +268,7 @@ impl CandleProvider {
             let input_tensor = Tensor::new(&[next_token], model_wrapper.device())?.unsqueeze(0)?;
             let pos = prompt_tokens.len() + index;
 
-            logits = model_wrapper.model().forward(&input_tensor, pos)?;
+            logits = model_wrapper.llama_model().forward(&input_tensor, pos)?;
             logits = logits.squeeze(0)?; // [vocab_size]
         }
 
