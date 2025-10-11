@@ -619,10 +619,16 @@ impl LocalProviderInstance for CandleProvider {
         let model_name = &spec.model;
         let variant = spec.variant.as_deref().unwrap_or("Q4_K_M");
 
-        // Create model directory
-        let model_id = format!("{}:{}", model_name, variant);
+        // Determine if this is a T5 model (no quantization) or GGUF model (with quantization)
+        let is_t5 = HFModelRepo::get_t5_repo_info(model_name).is_some();
+        let model_id = if is_t5 {
+            model_name.to_string() // T5 models: no variant suffix
+        } else {
+            format!("{}:{}", model_name, variant) // GGUF models: name:variant
+        };
         let model_dir = self.model_directory.join(&model_id);
 
+        // Check if model already exists
         if model_dir.exists() {
             info!("Model {} already exists", model_id);
             // Get actual size
@@ -641,36 +647,68 @@ impl LocalProviderInstance for CandleProvider {
             });
         }
 
-        // Try to map to known HuggingFace repositories
+        // Try GGUF models first (quantized LLaMA family)
         if let Some((repo_id, filename)) = HFModelRepo::get_repo_info(model_name, variant) {
             info!(
-                "Downloading from HuggingFace: repo={}, file={}",
+                "Downloading GGUF model from HuggingFace: repo={}, file={}",
                 repo_id, filename
             );
 
-            // Create downloader
             let downloader = HFDownloader::new()?;
-
-            // Download with progress
             let progress =
                 downloader.download_with_progress(repo_id, &filename, &model_dir, &model_id)?;
 
-            info!("Model {} downloaded successfully", model_id);
+            info!("GGUF model {} downloaded successfully", model_id);
             Ok(progress)
-        } else {
-            // Unknown model - provide instructions for manual download
+        }
+        // Try T5 models (safetensors format)
+        else if let Some(repo_id) = HFModelRepo::get_t5_repo_info(model_name) {
+            info!(
+                "Downloading T5 model from HuggingFace: repo={}",
+                repo_id
+            );
+
+            let downloader = HFDownloader::new()?;
+            downloader.download_safetensors_model(repo_id, &model_dir)?;
+
+            // Calculate total size of downloaded files
+            let mut total_size = 0u64;
+            for entry in std::fs::read_dir(&model_dir)?.flatten() {
+                if let Ok(metadata) = entry.metadata() {
+                    total_size += metadata.len();
+                }
+            }
+
+            info!("T5 model {} downloaded successfully ({} bytes)", model_id, total_size);
+
+            Ok(PullProgress {
+                model_id: model_id.clone(),
+                status: DownloadStatus::Complete,
+                percent_complete: 100.0,
+                bytes_downloaded: total_size,
+                bytes_total: Some(total_size),
+            })
+        }
+        // Unknown model - provide helpful error
+        else {
             Err(anyhow!(
                 "Model '{}' not found in known repositories.\n\
                 \n\
-                For known models, use:\n\
+                GGUF models (quantized, Metal GPU blocked by RMS-norm):\n\
                 - tinyllama (TinyLlama-1.1B-Chat)\n\
                 - phi-2 (Phi-2)\n\
                 - qwen2-0.5b (Qwen2-0.5B-Instruct)\n\
                 \n\
+                T5 models (full precision, Metal GPU WORKING):\n\
+                - flan-t5-small (80M params, recommended for Metal)\n\
+                - flan-t5-base (250M params)\n\
+                - flan-t5-large (780M params)\n\
+                - t5-small, t5-base, t5-large\n\
+                \n\
                 For custom models, download manually:\n\
-                1. Download GGUF model from HuggingFace\n\
-                2. Place files in: {:?}\n\
-                3. Ensure both .gguf and tokenizer.json are present\n\
+                1. Download model files from HuggingFace\n\
+                2. Place in: {:?}\n\
+                3. GGUF: .gguf + tokenizer.json | T5: config.json + tokenizer.json + *.safetensors\n\
                 \n\
                 Alternative: Use Ollama backend:\n\
                 llmspell model pull {}@ollama",
