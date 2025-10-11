@@ -3789,10 +3789,11 @@ test                                                           ← Success!
 
 ---
 
-### Task 11b.8.1: Create Model Architecture Enum - 🔲 PENDING
+### Task 11b.8.1: Create Model Architecture Enum - ✅ COMPLETE
 **Priority**: HIGH
 **Estimated Time**: 30 minutes
-**Status**: 🔲 PENDING
+**Status**: ✅ COMPLETE
+**Actual Time**: 25 minutes
 
 **File**: `llmspell-providers/src/local/candle/model_type.rs` (NEW)
 
@@ -3963,6 +3964,36 @@ mod tests {
 cargo build -p llmspell-providers
 cargo test -p llmspell-providers model_type
 ```
+
+**Implementation Insights**:
+1. **File Structure**: Created `model_type.rs` with 160 lines (enum + detection logic + tests)
+2. **Module Integration**: Added to `mod.rs` module declarations and public exports
+3. **Detection Strategy**: Three-tier approach:
+   - Check for GGUF files → LLaMA architecture
+   - Check for safetensors + config.json → Parse config for architecture type
+   - Error with helpful message if neither pattern matches
+4. **Robust Path Handling**: Handles both file and directory paths by checking parent directory
+5. **Config Parsing**: Uses `serde_json` to read `model_type` field from HuggingFace config.json
+6. **Metal Support Flag**: `supports_metal()` method documents current Candle Metal limitations
+7. **Test Coverage**: 2 unit tests (architecture names, Metal support) - both passing
+8. **Zero Warnings**: Clippy clean, no compilation warnings
+9. **Future-Proof**: Extensible design - easy to add new architectures (e.g., GPT-2, BERT)
+10. **Error Messages**: Clear, actionable error messages showing expected file patterns
+
+**Files Modified**:
+- ✅ `llmspell-providers/src/local/candle/model_type.rs` (NEW - 160 lines)
+- ✅ `llmspell-providers/src/local/candle/mod.rs` (2 lines added)
+
+**Test Results**:
+```
+running 2 tests
+test local::candle::model_type::tests::test_architecture_names ... ok
+test local::candle::model_type::tests::test_metal_support ... ok
+
+test result: ok. 2 passed; 0 failed; 0 ignored
+```
+
+**Next Steps**: Task 11b.8.2 will use this enum to refactor ModelWrapper from struct to enum.
 
 ---
 

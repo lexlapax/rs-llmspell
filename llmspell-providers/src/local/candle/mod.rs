@@ -5,6 +5,7 @@
 
 mod gguf_loader;
 mod hf_downloader;
+mod model_type;
 mod model_wrapper;
 mod provider;
 mod sampling;
@@ -12,6 +13,7 @@ mod tokenizer_loader;
 
 pub use gguf_loader::{GGUFLoader, GGUFMetadata};
 pub use hf_downloader::{HFDownloader, HFModelRepo};
+pub use model_type::ModelArchitecture;
 pub use model_wrapper::ModelWrapper;
 pub use provider::CandleProvider;
 pub use sampling::{sample_token, SamplingConfig};
