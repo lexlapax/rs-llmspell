@@ -174,6 +174,30 @@ impl CandleProvider {
         }
         Err(anyhow!("No GGUF file found in {:?}", model_path))
     }
+
+    /// Check if model directory contains required files
+    ///
+    /// For GGUF models: Requires .gguf file
+    /// For T5 models: Requires config.json
+    fn is_model_complete(&self, model_path: &PathBuf, is_t5: bool) -> Result<bool> {
+        if !model_path.is_dir() {
+            debug!("Model path {:?} is not a directory", model_path);
+            return Ok(false);
+        }
+
+        if is_t5 {
+            // T5 model requires config.json
+            let config_path = model_path.join("config.json");
+            let exists = config_path.exists();
+            debug!("T5 model completeness check: config.json exists = {}", exists);
+            Ok(exists)
+        } else {
+            // GGUF model requires .gguf file
+            let has_gguf = self.find_gguf_file(model_path).is_ok();
+            debug!("GGUF model completeness check: .gguf file exists = {}", has_gguf);
+            Ok(has_gguf)
+        }
+    }
 }
 
 impl CandleProvider {
@@ -628,23 +652,34 @@ impl LocalProviderInstance for CandleProvider {
         };
         let model_dir = self.model_directory.join(&model_id);
 
-        // Check if model already exists
-        if model_dir.exists() {
-            info!("Model {} already exists", model_id);
-            // Get actual size
-            let mut total_size = 0u64;
-            for entry in std::fs::read_dir(&model_dir)?.flatten() {
-                if let Ok(metadata) = entry.metadata() {
-                    total_size += metadata.len();
+        // Check if model already exists with required files
+        debug!("Checking if model dir exists: {:?}", model_dir);
+        let dir_exists = model_dir.exists();
+        debug!("Dir exists: {}", dir_exists);
+
+        if dir_exists {
+            let is_complete = self.is_model_complete(&model_dir, is_t5)?;
+            debug!("Model complete: {}", is_complete);
+
+            if is_complete {
+                info!("Model {} already exists and is complete", model_id);
+                // Get actual size
+                let mut total_size = 0u64;
+                for entry in std::fs::read_dir(&model_dir)?.flatten() {
+                    if let Ok(metadata) = entry.metadata() {
+                        total_size += metadata.len();
+                    }
                 }
+                return Ok(PullProgress {
+                    model_id: model_id.clone(),
+                    status: DownloadStatus::Complete,
+                    percent_complete: 100.0,
+                    bytes_downloaded: total_size,
+                    bytes_total: Some(total_size),
+                });
+            } else {
+                debug!("Model dir exists but incomplete, proceeding with download");
             }
-            return Ok(PullProgress {
-                model_id: model_id.clone(),
-                status: DownloadStatus::Complete,
-                percent_complete: 100.0,
-                bytes_downloaded: total_size,
-                bytes_total: Some(total_size),
-            });
         }
 
         // Try GGUF models first (quantized LLaMA family)

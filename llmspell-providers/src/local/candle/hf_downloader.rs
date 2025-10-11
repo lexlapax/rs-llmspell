@@ -195,32 +195,44 @@ impl HFDownloader {
         // Create destination directory
         std::fs::create_dir_all(dest_dir)?;
 
-        // Get repository
-        let repo = self.api.model(repo_id.to_string());
+        // NOTE: Using direct HTTP instead of hf-hub API due to API state issues when
+        // calling model() multiple times in the same function
+        let base_url = format!("https://huggingface.co/{}/resolve/main", repo_id);
 
         // Download config.json (required)
         info!("Downloading config.json");
-        let config_path = repo
-            .get("config.json")
-            .map_err(|e| anyhow!("Failed to download config.json: {}", e))?;
+        let config_url = format!("{}/config.json", base_url);
+        debug!("Config URL: {}", config_url);
+
+        let response = ureq::get(&config_url).call().map_err(|e| {
+            anyhow!("Failed to download config.json: {}", e)
+        })?;
+
         let dest_config = dest_dir.join("config.json");
-        std::fs::copy(&config_path, &dest_config)?;
-        info!("config.json copied to: {:?}", dest_config);
+        let mut file = std::fs::File::create(&dest_config)?;
+        std::io::copy(&mut response.into_reader(), &mut file)?;
+        info!("config.json downloaded to: {:?}", dest_config);
 
         // Download tokenizer.json (highly recommended)
-        if let Ok(tokenizer_path) = repo.get("tokenizer.json") {
+        let tokenizer_url = format!("{}/tokenizer.json", base_url);
+        debug!("Tokenizer URL: {}", tokenizer_url);
+
+        if let Ok(response) = ureq::get(&tokenizer_url).call() {
             let dest_tokenizer = dest_dir.join("tokenizer.json");
-            std::fs::copy(&tokenizer_path, &dest_tokenizer)?;
-            info!("tokenizer.json copied to: {:?}", dest_tokenizer);
+            let mut file = std::fs::File::create(&dest_tokenizer)?;
+            std::io::copy(&mut response.into_reader(), &mut file)?;
+            info!("tokenizer.json downloaded to: {:?}", dest_tokenizer);
         } else {
             warn!("tokenizer.json not found in repo {}", repo_id);
 
             // Try tokenizer_config.json as fallback
-            if let Ok(tokenizer_config_path) = repo.get("tokenizer_config.json") {
+            let tokenizer_config_url = format!("{}/tokenizer_config.json", base_url);
+            if let Ok(response) = ureq::get(&tokenizer_config_url).call() {
                 let dest_tokenizer_config = dest_dir.join("tokenizer_config.json");
-                std::fs::copy(&tokenizer_config_path, &dest_tokenizer_config)?;
+                let mut file = std::fs::File::create(&dest_tokenizer_config)?;
+                std::io::copy(&mut response.into_reader(), &mut file)?;
                 info!(
-                    "tokenizer_config.json copied to: {:?}",
+                    "tokenizer_config.json downloaded to: {:?}",
                     dest_tokenizer_config
                 );
             }
@@ -228,15 +240,18 @@ impl HFDownloader {
 
         // Download safetensors files
         // Try single-file model first (model.safetensors)
-        if let Ok(model_path) = repo.get("model.safetensors") {
+        let model_url = format!("{}/model.safetensors", base_url);
+        debug!("Model URL: {}", model_url);
+
+        if let Ok(response) = ureq::get(&model_url).call() {
             let dest_model = dest_dir.join("model.safetensors");
-            std::fs::copy(&model_path, &dest_model)?;
-            info!("model.safetensors copied to: {:?}", dest_model);
+            let mut file = std::fs::File::create(&dest_model)?;
+            std::io::copy(&mut response.into_reader(), &mut file)?;
+            info!("model.safetensors downloaded to: {:?}", dest_model);
         } else {
             // Try sharded model (model-00001-of-*.safetensors, etc.)
             info!("Single model.safetensors not found, trying sharded model files");
 
-            // Try to download model index file first
             let mut shard_index = 1;
             let mut downloaded_shards = Vec::new();
 
@@ -253,9 +268,11 @@ impl HFDownloader {
                 let mut shard_found = false;
 
                 for name in &common_names {
-                    if let Ok(shard_path) = repo.get(name) {
+                    let shard_url = format!("{}/{}", base_url, name);
+                    if let Ok(response) = ureq::get(&shard_url).call() {
                         let dest_shard = dest_dir.join(name);
-                        std::fs::copy(&shard_path, &dest_shard)?;
+                        let mut file = std::fs::File::create(&dest_shard)?;
+                        std::io::copy(&mut response.into_reader(), &mut file)?;
                         info!("Downloaded shard: {:?}", dest_shard);
                         downloaded_shards.push(dest_shard);
                         shard_found = true;
