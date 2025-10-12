@@ -498,14 +498,8 @@ mod tests {
 
         // Simulate agent outputs being added (as done by workflow execution)
         let mut agent_outputs = serde_json::Map::new();
-        agent_outputs.insert(
-            "agent1".to_string(),
-            serde_json::json!({"text": "output1"}),
-        );
-        agent_outputs.insert(
-            "agent2".to_string(),
-            serde_json::json!({"text": "output2"}),
-        );
+        agent_outputs.insert("agent1".to_string(), serde_json::json!({"text": "output1"}));
+        agent_outputs.insert("agent2".to_string(), serde_json::json!({"text": "output2"}));
         result.metadata.insert(
             "agent_outputs".to_string(),
             serde_json::Value::Object(agent_outputs),
@@ -545,10 +539,7 @@ mod tests {
 
         // Add agent outputs but not the one we're looking for
         let mut agent_outputs = serde_json::Map::new();
-        agent_outputs.insert(
-            "agent1".to_string(),
-            serde_json::json!({"text": "output1"}),
-        );
+        agent_outputs.insert("agent1".to_string(), serde_json::json!({"text": "output1"}));
         result.metadata.insert(
             "agent_outputs".to_string(),
             serde_json::Value::Object(agent_outputs),

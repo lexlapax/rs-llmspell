@@ -72,9 +72,7 @@ pub mod state_helpers;
 pub mod tool_helpers;
 pub mod workflow_helpers;
 
-// Test runner support
-#[cfg(feature = "test-runner")]
-pub mod runner;
+// Test runner support removed - use cargo test directly or scripts in scripts/testing/
 
 // Re-export commonly used test utilities when available
 // TODO: Add load_fixture function in Task 5.7.5 (Test Fixtures and Data Management)

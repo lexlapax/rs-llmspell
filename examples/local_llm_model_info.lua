@@ -1,20 +1,47 @@
 #!/usr/bin/env llmspell
 
---[[
-Model Information Example
-
-Displays detailed information about a specific local model.
-
-Usage:
-    llmspell run examples/local_llm_model_info.lua MODEL_SPEC
-
-    Example:
-        llmspell run examples/local_llm_model_info.lua llama3.1:8b@ollama
-        llmspell run examples/local_llm_model_info.lua tinyllama:Q4_K_M@candle
-
-Arguments:
-    MODEL_SPEC - Model specification (e.g., "llama3.1:8b@ollama")
-]]
+-- ============================================================
+-- LLMSPELL LOCAL LLM EXAMPLES
+-- ============================================================
+-- Example: Model Information and Test Inference
+-- Complexity Level: BEGINNER
+-- Real-World Use Case: Inspect local model details and test inference
+-- Category: Local LLM Integration
+--
+-- Purpose: Demonstrate LocalLLM.info() API and agent creation with local models
+-- Architecture: LocalLLM API + Agent creation for inference testing
+-- Key Features:
+--   • Get detailed model information (size, architecture, quantization)
+--   • Display model metadata and file paths
+--   • Test inference with sample prompt
+--   • Works with both Ollama and Candle backends
+--
+-- Prerequisites:
+--   • LLMSpell installed and built
+--   • At least one local model available:
+--     - For Ollama: ollama pull llama3.1:8b
+--     - For Candle: llmspell model pull tinyllama:Q4_K_M@candle
+--
+-- HOW TO RUN:
+-- # For Ollama models:
+-- ./target/debug/llmspell -p ollama \
+--   run examples/local_llm_model_info.lua llama3.1:8b@ollama
+--
+-- # For Candle models:
+-- ./target/debug/llmspell -p candle \
+--   run examples/local_llm_model_info.lua tinyllama:Q4_K_M@candle
+--
+-- EXPECTED OUTPUT:
+-- Model details followed by test inference response
+-- Execution time: 5-15 seconds (depending on model size)
+--
+-- Arguments:
+--   MODEL_SPEC - Model specification (e.g., "llama3.1:8b@ollama")
+--
+-- Next Steps:
+-- - See local_llm_chat.lua for interactive chat interface
+-- - See local_llm_comparison.lua for backend comparison
+-- ============================================================
 
 -- Get model spec from command line argument or environment
 local model_spec = arg[1] or os.getenv("MODEL_SPEC")

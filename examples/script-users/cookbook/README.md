@@ -48,33 +48,28 @@ Enterprise-grade patterns for building production LLMSpell applications. Each pa
 ### Agent Patterns (Requires API Key)
 ```bash
 # Multi-agent coordination
-./target/debug/llmspell -c examples/script-users/configs/example-providers.toml \
-  run examples/script-users/cookbook/multi-agent-coordination.lua
+llmspell -p providers run examples/script-users/cookbook/multi-agent-coordination.lua
 ```
 
-### State Patterns (Optional Config)
+### State Patterns
 ```bash
-# With persistence
-./target/debug/llmspell -c examples/script-users/configs/state-enabled.toml \
-  run examples/script-users/cookbook/state-management.lua
+# With state persistence
+llmspell -p state run examples/script-users/cookbook/state-management.lua
 
-# In-memory only
-./target/debug/llmspell run examples/script-users/cookbook/state-management.lua
+# In-memory only (no profile needed)
+llmspell run examples/script-users/cookbook/state-management.lua
 ```
 
-### RAG Patterns (Phase 8 - Requires RAG Config)
+### RAG Patterns (Phase 8 - Requires OpenAI API Key)
 ```bash
 # RAG-01: Multi-tenant RAG system
-./target/debug/llmspell -c examples/script-users/configs/rag-production.toml \
-  run examples/script-users/cookbook/rag-multi-tenant.lua
+llmspell -p rag-prod run examples/script-users/cookbook/rag-multi-tenant.lua
 
 # RAG-02: Session-based RAG
-./target/debug/llmspell -c examples/script-users/configs/rag-basic.toml \
-  run examples/script-users/cookbook/rag-session.lua
+llmspell -p sessions run examples/script-users/cookbook/rag-session.lua
 
 # RAG-03: Cost optimization patterns
-./target/debug/llmspell -c examples/script-users/configs/rag-basic.toml \
-  run examples/script-users/cookbook/rag-cost-optimization.lua
+llmspell -p rag-prod run examples/script-users/cookbook/rag-cost-optimization.lua
 ```
 
 ## 📊 Pattern Overview

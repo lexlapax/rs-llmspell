@@ -251,7 +251,7 @@ impl ProviderRegistry {
         &self,
         config: ProviderConfig,
     ) -> Result<Box<dyn ProviderInstance>, LLMSpellError> {
-        tracing::debug!(
+        debug!(
             "Looking up factory for name: '{}' (available: {:?})",
             config.name,
             self.factories.keys().collect::<Vec<_>>()
@@ -720,7 +720,10 @@ mod tests {
             panic!("Expected error, but create_agent_from_spec succeeded");
         };
         let LLMSpellError::Configuration { message, .. } = error else {
-            panic!("Expected Configuration error, got different error type: {:?}", error);
+            panic!(
+                "Expected Configuration error, got different error type: {:?}",
+                error
+            );
         };
         assert!(
             message.contains("No provider specified"),
@@ -743,7 +746,10 @@ mod tests {
             panic!("Expected error, but create_agent_from_spec succeeded");
         };
         let LLMSpellError::Configuration { message, .. } = error else {
-            panic!("Expected Configuration error, got different error type: {:?}", error);
+            panic!(
+                "Expected Configuration error, got different error type: {:?}",
+                error
+            );
         };
         assert!(
             message.contains("Unknown provider"),

@@ -33,7 +33,8 @@ fn main() -> Result<()> {
     runtime.block_on(async {
         // Load runtime configuration
         let config_path = cli.config_path();
-        let runtime_config = load_runtime_config(config_path.as_deref()).await?;
+        let profile = cli.profile.as_deref();
+        let runtime_config = load_runtime_config(config_path.as_deref(), profile).await?;
 
         // Execute the command with new architecture
         execute_command(cli.command, runtime_config, cli.output).await
@@ -141,7 +142,8 @@ fn handle_daemon_mode(cli: Cli) -> Result<()> {
     runtime.block_on(async {
         // Load runtime configuration
         let config_path = cli.config_path();
-        let runtime_config = load_runtime_config(config_path.as_deref()).await?;
+        let profile = cli.profile.as_deref();
+        let runtime_config = load_runtime_config(config_path.as_deref(), profile).await?;
 
         // Execute the command (now in daemon mode with fresh runtime)
         execute_command(cli.command, runtime_config, cli.output).await

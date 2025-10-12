@@ -6,9 +6,22 @@
 -- Tags: application, research-collector, universal, parallel, information-gathering, rag
 --
 -- HOW TO RUN:
--- 1. Basic (no API keys): ./target/debug/llmspell run examples/script-users/applications/research-collector/main.lua
--- 2. With config: ./target/debug/llmspell -c examples/script-users/applications/research-collector/config.toml run examples/script-users/applications/research-collector/main.lua
--- 3. Debug mode: ./target/debug/llmspell --debug run examples/script-users/applications/research-collector/main.lua
+-- 1. Basic (no API keys):
+--    ./target/debug/llmspell run examples/script-users/applications/research-collector/main.lua
+--
+-- 2. With App-Specific Configuration (recommended for production):
+--    ./target/debug/llmspell -c examples/script-users/applications/research-collector/config.toml \
+--    run examples/script-users/applications/research-collector/main.lua
+--
+-- 3. Debug mode:
+--    ./target/debug/llmspell --debug run examples/script-users/applications/research-collector/main.lua
+--
+-- 4. Quick Start with Builtin Profiles:
+--    # For RAG-enabled research with knowledge persistence (development):
+--    ./target/debug/llmspell -p rag-dev run examples/script-users/applications/research-collector/main.lua
+--
+--    # For production RAG with full features:
+--    ./target/debug/llmspell -p rag-prod run examples/script-users/applications/research-collector/main.lua
 --
 -- ABOUTME: Universal appeal application - "I need to research this thoroughly"
 -- ABOUTME: Simple parallel search + sequential synthesis for everyday research needs

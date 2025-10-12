@@ -39,7 +39,7 @@
 --    ./target/debug/llmspell run examples/script-users/applications/webapp-creator/main.lua \
 --    -- --input user-input-social.lua --output ~/projects/my-app
 --
--- 3. With Full Configuration:
+-- 3. With App-Specific Configuration (recommended for production):
 --    ./target/debug/llmspell -c examples/script-users/applications/webapp-creator/config.toml \
 --    run examples/script-users/applications/webapp-creator/main.lua \
 --    -- --input user-input-ecommerce.lua --output ./generated
@@ -47,6 +47,13 @@
 -- 4. Production Mode (with optimizations):
 --    ./target/release/llmspell -c config.toml run main.lua \
 --    -- --input requirements.lua --output /var/www/apps --production
+--
+-- 5. Quick Start with Builtin Profiles:
+--    # For expert webapp generation with development features:
+--    ./target/debug/llmspell -p development run examples/script-users/applications/webapp-creator/main.lua
+--
+--    # For production-ready webapp generation:
+--    ./target/debug/llmspell -p rag-prod run examples/script-users/applications/webapp-creator/main.lua
 --
 -- Expected Output:
 --   • Complete web application structure (20+ files)

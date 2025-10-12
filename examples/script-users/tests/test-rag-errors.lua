@@ -1,5 +1,31 @@
--- RAG Error Handling Validation Test
--- Tests error conditions and recovery
+-- Test: RAG Error Handling Validation Test
+-- Purpose: Tests error conditions, boundary cases, and recovery
+-- Prerequisites: OPENAI_API_KEY environment variable for embeddings
+-- Expected Output: Error handling test results and validation
+-- Tags: test, rag, error-handling, validation
+--
+-- HOW TO RUN:
+-- 1. With builtin RAG development profile (recommended):
+--    ./target/debug/llmspell -p rag-dev run examples/script-users/tests/test-rag-errors.lua
+--
+-- 2. With custom RAG configuration:
+--    ./target/debug/llmspell -c path/to/rag-config.toml run examples/script-users/tests/test-rag-errors.lua
+--
+-- 3. Debug mode:
+--    ./target/debug/llmspell --debug -p rag-dev run examples/script-users/tests/test-rag-errors.lua
+--
+-- Prerequisites:
+--   • LLMSpell installed and built
+--   • OPENAI_API_KEY environment variable (for text-embedding-ada-002)
+--   • Network connectivity for embedding API calls
+--
+-- EXPECTED OUTPUT:
+--   • 10+ error handling tests
+--   • Parameter validation tests (missing fields, invalid types, boundary conditions)
+--   • Recovery after errors validation
+--   • Concurrent error handling tests
+--   • Resource exhaustion simulation
+--   • Exit code 0 on success, 1 on failure
 
 print("=== RAG Error Handling Validation ===")
 print("")

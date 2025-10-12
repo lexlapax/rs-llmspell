@@ -152,13 +152,16 @@ llmspell model status --backend ollama
 
 **Lua API:**
 ```lua
+-- Get status for all backends
+local status = LocalLLM.status()
+
 -- Check Ollama status
-local status = LocalLLM.status("ollama")
-print("Health:", status.health)
-print("Available models:", status.available_models)
+print("Ollama running:", status.ollama.running)
+print("Ollama models:", status.ollama.models)
 
 -- Check Candle status
-local candle_status = LocalLLM.status("candle")
+print("Candle ready:", status.candle.ready)
+print("Candle models:", status.candle.models)
 ```
 
 ## Configuration
@@ -381,14 +384,26 @@ print(candle_agent:complete(prompt))
 ```lua
 print("=== Local LLM Status ===\n")
 
--- Check backends
-for _, backend in ipairs({"ollama", "candle"}) do
-    local status = LocalLLM.status(backend)
-    print(backend .. ":")
-    print("  Health: " .. status.health)
-    print("  Models: " .. status.available_models)
-    print()
+-- Get status for all backends
+local status = LocalLLM.status()
+
+-- Check Ollama
+print("ollama:")
+print("  Running: " .. tostring(status.ollama.running))
+print("  Models: " .. status.ollama.models)
+if status.ollama.error then
+    print("  Error: " .. status.ollama.error)
 end
+print()
+
+-- Check Candle
+print("candle:")
+print("  Ready: " .. tostring(status.candle.ready))
+print("  Models: " .. status.candle.models)
+if status.candle.error then
+    print("  Error: " .. status.candle.error)
+end
+print()
 
 -- List all models
 print("=== Available Models ===\n")

@@ -6,9 +6,24 @@
 -- Tags: application, debugging, instrumented-agent, repl, state-inspection
 --
 -- HOW TO RUN:
--- 1. Basic: ./target/debug/llmspell run examples/script-users/applications/instrumented-agent/main.lua
--- 2. With config: ./target/debug/llmspell -c examples/script-users/applications/instrumented-agent/config.toml run examples/script-users/applications/instrumented-agent/main.lua
--- 3. Debug trace: ./target/debug/llmspell --trace debug -c examples/script-users/applications/instrumented-agent/config.toml run examples/script-users/applications/instrumented-agent/main.lua
+-- 1. Basic:
+--    ./target/debug/llmspell run examples/script-users/applications/instrumented-agent/main.lua
+--
+-- 2. With App-Specific Configuration (recommended for production):
+--    ./target/debug/llmspell -c examples/script-users/applications/instrumented-agent/config.toml \
+--    run examples/script-users/applications/instrumented-agent/main.lua
+--
+-- 3. Debug trace:
+--    ./target/debug/llmspell --trace debug \
+--    -c examples/script-users/applications/instrumented-agent/config.toml \
+--    run examples/script-users/applications/instrumented-agent/main.lua
+--
+-- 4. Quick Start with Builtin Profiles:
+--    # For debugging/tracing features:
+--    ./target/debug/llmspell -p development run examples/script-users/applications/instrumented-agent/main.lua
+--
+--    # With full debugging and state inspection:
+--    ./target/debug/llmspell --trace debug -p development run examples/script-users/applications/instrumented-agent/main.lua
 --
 -- TO INSPECT WITH REPL:
 -- After running this script, use: ./target/debug/llmspell repl

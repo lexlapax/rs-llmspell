@@ -1,13 +1,13 @@
 # CLI Command Architecture
 
-**Version**: v0.9.0 (Phase 10 Complete including 10.22)
-**Status**: Production-Ready with Daemon Support, Service Integration, and Tool Commands
-**Last Updated**: September 2025
-**Phase**: 10 Complete (Integrated Kernel with Daemon Support + Tool CLI Commands)
+**Version**: v0.11.1 (Phase 11b Complete)
+**Status**: Production-Ready with Daemon Support, Service Integration, Tool Commands, and Local LLM Integration
+**Last Updated**: October 2025
+**Phase**: 11b Complete (Unified Profile System with Ollama + Candle Local LLM Support)
 
 ## Executive Summary
 
-This document describes the CLI command architecture implemented in LLMSpell v0.9.0 with integrated kernel architecture, full daemon support, and direct tool invocation capabilities. Phase 9 achieved a unified kernel architecture eliminating runtime isolation issues, while Phase 10 added Unix daemon mode with signal handling, service integration, and CLI-based tool management.
+This document describes the CLI command architecture implemented in LLMSpell v0.11.1 with integrated kernel architecture, full daemon support, direct tool invocation capabilities, and local LLM support. Phase 9 achieved a unified kernel architecture eliminating runtime isolation issues, Phase 10 added Unix daemon mode with service integration and tool commands, and Phase 11 completed local LLM integration with a unified profile system.
 
 **Phase 9 Achievements**: Integrated kernel with global IO runtime, protocol/transport abstraction, DAP bridge for debugging, and comprehensive tracing.
 
@@ -18,6 +18,15 @@ This document describes the CLI command architecture implemented in LLMSpell v0.
 - Enhanced logging infrastructure with rotation
 - Consolidated state/sessions into kernel
 - **Phase 10.22: Tool CLI Commands** - Direct tool invocation via kernel message protocol with list/info/invoke/search/test subcommands, enabling CLI access to 40+ tools for testing, debugging, and operations (Tasks 10.22.1-10.22.11)
+
+**Phase 11 Achievements**:
+- **Ollama Integration** - Full support for Ollama-hosted local LLMs with automatic model discovery
+- **Candle Integration** - Rust-native ML framework support for on-device inference without Python
+- **Unified Profile System (11b.3)** - Single --profile flag replacing fragmented --rag-profile hack, 7 builtin profiles (minimal, development, ollama, candle, rag-dev, rag-prod, rag-perf)
+- **Profile Discovery (11b.4)** - `config list-profiles` command with metadata (categories, descriptions, use cases, features) and --detailed flag
+- **Model Discovery UX (11b.5)** - Dual-tier discovery with `model available` command and web URLs (Ollama library + HuggingFace) in help text
+- **Model Management CLI** - Complete model lifecycle management with pull/list/remove/info/available/status subcommands
+- **87% Compile Speedup** - Bridge-only builds improved from 38s to 5s via Cargo feature gates
 
 ---
 
@@ -46,6 +55,8 @@ llmspell [global-flags] <command> [command-flags] [-- script-args]
 Global Flags (available everywhere):
   --trace <LEVEL>    # Logging verbosity: off|error|warn|info|debug|trace
   --config <FILE>    # Configuration file path (env: LLMSPELL_CONFIG)
+  --profile <NAME>   # Built-in configuration profile
+  -p <NAME>          # Short form of --profile
   --output <FORMAT>  # Output format: text|json|pretty
   -h, --help        # Show contextual help
   -V, --version     # Show version information
@@ -59,6 +70,7 @@ Primary Commands:
 Subcommand Groups:
   kernel            # Kernel management (start/stop/status/connect/install-service)
   tool              # Tool management and direct invocation (Phase 10.22)
+  model             # Local LLM model management (Phase 11)
   state             # State management
   session           # Session management
   config            # Configuration management
@@ -72,9 +84,9 @@ Subcommand Groups:
 
 ```
 llmspell
-├── run <script> [--engine] [--connect] [--stream] [--rag-profile] [-- args...]
-├── exec <code> [--engine] [--connect] [--stream] [--rag-profile]
-├── repl [--engine] [--connect] [--history] [--rag-profile]
+├── run <script> [--engine] [--connect] [--stream] [-- args...]
+├── exec <code> [--engine] [--connect] [--stream]
+├── repl [--engine] [--connect] [--history]
 ├── debug <script> [--engine] [--connect] [--break-at] [--watch] [--step] [--port] [-- args...]
 ├── kernel
 │   ├── start [--port] [--daemon] [--id] [--connection-file] [--log-file] [--pid-file]
@@ -90,6 +102,14 @@ llmspell
 │   ├── invoke <name> --params <json> [--stream]
 │   ├── search <keywords...> [--category]
 │   └── test <name> [--verbose]
+├── model                                       # Phase 11
+│   ├── list [--backend] [--verbose] [--format]
+│   ├── pull <model> [--force] [--quantization]
+│   ├── remove <model> [--yes]
+│   ├── info <model>
+│   ├── available [--backend] [--recommended]
+│   ├── status
+│   └── install-ollama
 ├── state
 │   ├── show [key] [--scope] [--kernel|--connect]
 │   ├── clear [key] [--scope] [--kernel|--connect]
@@ -103,7 +123,8 @@ llmspell
 ├── config
 │   ├── init [--output] [--force]
 │   ├── validate [--file]
-│   └── show [section] [--format]
+│   ├── show [section] [--format]
+│   └── list-profiles [--detailed]
 ├── keys
 │   ├── add <provider> <key>
 │   ├── list
@@ -139,32 +160,44 @@ llmspell
 | `--engine` (global) | Per-command flag | Script engine | Command-specific |
 | `--kernel` | `--connect` | Connect to kernel | Clearer naming |
 
-### 2.2 RAG Configuration Simplification
+### 2.2 Unified Profile System
 
-**Before** (20 flag instances across 4 commands):
+**After** (unified --profile system):
 ```bash
-llmspell run script.lua \
-  --rag \
-  --rag-config custom.toml \
-  --rag-dims 384 \
-  --rag-backend hnsw \
-  --no-rag  # Confusing!
+# RAG profiles (loads ALL 84 fields)
+llmspell run script.lua -p rag-prod
+llmspell run script.lua --profile rag-dev
+
+# Core profiles
+llmspell run script.lua -p minimal
+llmspell run script.lua -p development
+
+# Local LLM profiles
+llmspell run script.lua -p ollama
+llmspell run script.lua -p candle
 ```
 
-**After** (4 flag instances total):
-```bash
-llmspell run script.lua --rag-profile production
+Profile system in llmspell-config:
+```rust
+// All logic in config layer, not CLI
+impl LLMSpellConfig {
+    pub async fn load_with_profile(
+        path: Option<&Path>,
+        profile: Option<&str>,
+    ) -> Result<Self, ConfigError>;
+
+    fn load_builtin_profile(name: &str) -> Result<Self, ConfigError>;
+    pub fn list_builtin_profiles() -> Vec<&'static str>;
+}
 ```
 
-Profile defined in config:
-```toml
-[rag.profiles.production]
-enabled = true
-backend = "hnsw"
-dimensions = 384
-config_file = "custom.toml"
-description = "Production RAG configuration"
-```
+Available profiles:
+- **Core**: minimal, development
+- **Local LLM**: ollama, candle
+- **RAG**: rag-dev, rag-prod, rag-perf
+
+Precedence: `--profile` > `-c` > discovery > default
+Environment variables override everything.
 
 ---
 
@@ -179,7 +212,6 @@ OPTIONS:
     --engine <ENGINE>      Script engine [default: lua, options: lua|javascript|python]
     --connect <ADDRESS>    Connect to kernel (e.g., "localhost:9555" or "/path/to/connection.json")
     --stream              Enable streaming output
-    --rag-profile <NAME>   RAG configuration profile
 
 SCRIPT ARGUMENTS:
     Arguments after -- are passed to the script as ARGS global variable
@@ -191,7 +223,7 @@ EXAMPLES:
     llmspell run script.lua -- arg1 arg2
     llmspell run script.js --engine javascript
     llmspell run webapp-creator.lua -- --output /tmp/my-app --input spec.lua
-    llmspell run ml_task.lua --rag-profile production -- --model gpt-4
+    llmspell -p rag-prod run ml_task.lua -- --model gpt-4
     llmspell run script.lua --connect localhost:9555  # Execute on remote kernel
 ```
 
@@ -204,7 +236,6 @@ OPTIONS:
     --engine <ENGINE>      Script engine [default: lua]
     --connect <ADDRESS>    Connect to kernel
     --stream              Enable streaming
-    --rag-profile <NAME>   RAG configuration profile
 
 EXAMPLES:
     llmspell exec "print('hello')"
@@ -222,7 +253,6 @@ OPTIONS:
     --engine <ENGINE>      Script engine [default: lua]
     --connect <ADDRESS>    Connect to kernel
     --history <FILE>       History file path
-    --rag-profile <NAME>   RAG configuration profile
 
 EXAMPLES:
     llmspell repl
@@ -243,7 +273,6 @@ OPTIONS:
     --watch <EXPR>         Watch expressions (repeatable)
     --step                Start in step mode
     --port <PORT>          DAP server port for IDE attachment
-    --rag-profile <NAME>   RAG configuration profile
 
 DEBUGGING INFRASTRUCTURE (Phase 9):
     Uses integrated DAP bridge in kernel for full debugging support
@@ -525,9 +554,10 @@ EXAMPLES:
 llmspell config <SUBCOMMAND>
 
 SUBCOMMANDS:
-    init      Initialize configuration
-    validate  Validate configuration
-    show      Show configuration
+    init           Initialize configuration
+    validate       Validate configuration
+    show           Show configuration
+    list-profiles  List available builtin profiles
 
 INIT OPTIONS:
     --output <PATH>         Output path for configuration file [default: llmspell.toml]
@@ -539,10 +569,15 @@ VALIDATE OPTIONS:
 SHOW OPTIONS:
     --format <FORMAT>       Output format: toml|json [default: toml]
 
+LIST-PROFILES OPTIONS:
+    --detailed             Show detailed profile information including use cases and features
+
 EXAMPLES:
     llmspell config init --output custom.toml --force
     llmspell config validate --file production.toml
     llmspell config show rag --format json
+    llmspell config list-profiles                # List all builtin profiles
+    llmspell config list-profiles --detailed     # Show detailed information
 ```
 
 ### 4.6 Application Management
@@ -612,6 +647,120 @@ VERSION OUTPUT INCLUDES:
     - Host and target triple information
     - Rust compiler version
     - Enabled feature flags
+```
+
+### 4.8 Model Management (Phase 11)
+
+**Architecture Note**: Model management provides complete lifecycle operations for local LLMs via both Ollama and Candle backends. Models are downloaded, cached, and made available to scripts through provider configuration.
+
+```bash
+llmspell model <SUBCOMMAND>
+
+SUBCOMMANDS:
+    list              List installed models
+    pull              Download and install a model
+    remove            Remove an installed model
+    info              Show detailed model information
+    available         List available models for download
+    status            Show model backend status
+    install-ollama    Install Ollama backend
+
+LIST OPTIONS:
+    --backend <BACKEND>    Filter by backend (ollama|candle|all) [default: all]
+    --verbose              Show detailed model information
+    --format <FORMAT>      Output format (overrides global) [text|json|pretty]
+
+PULL OPTIONS:
+    --force               Force re-download even if model exists
+    --quantization <Q>    Quantization level for Candle models
+
+REMOVE OPTIONS:
+    --yes                 Skip confirmation prompt
+
+INFO ARGUMENTS:
+    <MODEL>              Model identifier (e.g., "llama2:7b@ollama" or "tinyllama@candle")
+
+AVAILABLE OPTIONS:
+    --backend <BACKEND>   Filter by backend (ollama|candle|all)
+    --recommended         Show only recommended models for each backend
+
+BACKENDS:
+    - **Ollama**: Community-curated models via Ollama registry (requires Ollama installed)
+    - **Candle**: Rust-native models with HuggingFace integration (no Python required)
+
+MODEL IDENTIFIER FORMAT:
+    <model-name>[:<tag>][@<backend>]
+
+    Examples:
+    - llama2:7b@ollama      # Ollama Llama 2 7B
+    - mistral@ollama        # Ollama Mistral (latest tag)
+    - tinyllama@candle      # Candle TinyLlama
+    - mistral:7b@candle     # Candle Mistral 7B
+
+MODEL DISCOVERY (Phase 11b.5):
+    Two-tier discovery system for finding available models:
+    1. **Programmatic**: `llmspell model available` - Lists models from backend libraries
+    2. **Web Browsing**: Direct URLs provided in help text for comprehensive exploration
+       - Ollama: https://ollama.com/library
+       - Candle: https://huggingface.co/models?pipeline_tag=text-generation
+
+EXAMPLES:
+    # Discover available models (Phase 11b.5)
+    llmspell model available                     # List models from backend libraries
+    llmspell model pull --help                   # Shows discovery URLs in help text
+
+    # List all installed models
+    llmspell model list
+
+    # List only Ollama models with details
+    llmspell model list --backend ollama --verbose
+
+    # Download Ollama model
+    llmspell model pull llama2:7b@ollama
+
+    # Download Candle model
+    llmspell model pull tinyllama@candle
+
+    # Force re-download
+    llmspell model pull mistral:7b@ollama --force
+
+    # Show model details
+    llmspell model info llama2:7b@ollama
+
+    # List available models by backend
+    llmspell model available --backend candle
+
+    # Show only recommended models
+    llmspell model available --recommended
+
+    # Check backend status
+    llmspell model status
+
+    # Remove model without confirmation
+    llmspell model remove llama2:7b@ollama --yes
+
+    # Install Ollama backend
+    llmspell model install-ollama
+
+INTEGRATION WITH PROFILES:
+    Models work with local LLM profiles:
+
+    # Use with Ollama profile
+    llmspell -p ollama run script.lua
+
+    # Use with Candle profile
+    llmspell -p candle run script.lua
+
+    # Configure in script
+    local agent = Agent.create({
+        provider = "ollama",
+        model = "llama2:7b"
+    })
+
+CODE REFERENCES:
+    CLI: llmspell-cli/src/cli.rs:462-772 (ModelCommands enum)
+    Handler: llmspell-cli/src/commands/model.rs (handle_model_command)
+    Providers: llmspell-providers/src/{ollama,candle}/ (backend implementations)
 ```
 
 ---
@@ -928,6 +1077,7 @@ COMMANDS:
     debug     Debug a script with breakpoints
     kernel    Manage kernel processes
     tool      Tool management and direct invocation
+    model     Local LLM model management
     state     Manage persistent state
     session   Manage sessions
     config    Configuration management
@@ -954,17 +1104,17 @@ OPTIONS:
     --engine <ENGINE>      Script engine [default: lua]
     --connect <ADDRESS>    Connect to kernel
     --stream              Enable streaming output
-    --rag-profile <NAME>   RAG configuration profile
     -h, --help            Print help information
 
 EXAMPLES:
     llmspell run script.lua
     llmspell run script.lua -- arg1 arg2
-    llmspell run ml.lua --rag-profile production
+    llmspell -p rag-prod run ml.lua
 
 GLOBAL OPTIONS:
     --trace <LEVEL>     Set trace level
     --config <FILE>     Config file path
+    --profile <NAME>    Built-in configuration profile
     --output <FORMAT>   Output format
 ```
 
@@ -983,6 +1133,7 @@ GLOBAL OPTIONS:
 | `llmspell validate` | `llmspell config validate` | Grouped under config |
 | `llmspell providers` | `llmspell providers list` | Explicit subcommand |
 | N/A | `llmspell tool <subcommand>` | New in Phase 10.22 |
+| N/A | `llmspell model <subcommand>` | New in Phase 11 |
 
 ### 9.2 Flag Removals
 
@@ -994,7 +1145,8 @@ All these flags have been removed or renamed:
 - ❌ `--debug-format` → Removed (use `--output`)
 - ❌ `--debug-modules` → Move to config file
 - ❌ `--debug-perf` → Move to config file
-- ❌ `--rag`, `--no-rag`, `--rag-config`, `--rag-dims`, `--rag-backend` → Use `--rag-profile`
+- ❌ `--rag`, `--no-rag`, `--rag-config`, `--rag-dims`, `--rag-backend` → Use `--profile`
+- ❌ `--rag-profile` → Use `--profile` (consolidated)
 - ❌ `--kernel` → Renamed to `--connect` for clarity
 
 ### 9.3 Migration Examples
@@ -1002,11 +1154,14 @@ All these flags have been removed or renamed:
 ```bash
 # OLD
 llmspell run script.lua --debug --verbose
-llmspell run script.lua --rag --rag-backend hnsw --rag-dims 384
+llmspell run script.lua --rag-profile production  # Incomplete hack
 
 # NEW
 llmspell run script.lua --trace debug
-llmspell run script.lua --rag-profile production
+llmspell run script.lua -p rag-prod  # Loads all 84 fields
+llmspell run script.lua --profile rag-dev  # Development RAG
+llmspell run script.lua -p minimal  # Tools only
+llmspell run script.lua -p ollama  # Ollama backend
 
 # OLD
 llmspell --debug script.lua  # Debug mode? Logging?
@@ -1042,6 +1197,10 @@ pub struct Cli {
     #[arg(short = 'c', long, global = true, env = "LLMSPELL_CONFIG")]
     pub config: Option<PathBuf>,
 
+    /// Built-in configuration profile
+    #[arg(short = 'p', long, global = true)]
+    pub profile: Option<String>,
+
     /// Output format
     #[arg(long, global = true, value_enum, default_value = "text")]
     pub output: OutputFormat,
@@ -1061,8 +1220,6 @@ pub enum Commands {
         connect: Option<String>,
         #[arg(long)]
         stream: bool,
-        #[arg(long)]
-        rag_profile: Option<String>,
         #[arg(last = true)]
         args: Vec<String>,
     },
@@ -1130,10 +1287,13 @@ pub async fn execute_command(
     output_format: OutputFormat,
 ) -> Result<()> {
     match command {
-        Commands::Run { script, engine, connect, stream, rag_profile, args } => {
-            let mut config = runtime_config;
-            apply_rag_profile(&mut config, rag_profile).await?;
-            let context = ExecutionContext::resolve(connect, None, None, config).await?;
+        Commands::Run { script, engine, connect, stream, args } => {
+            let context = ExecutionContext::resolve(
+                connect,
+                None,
+                None,
+                runtime_config.clone()
+            ).await?;
             run::execute_script_file(script, engine, context, stream, args, output_format).await
         }
 
@@ -1303,7 +1463,7 @@ fn parse_script_args(args: &[String]) -> HashMap<String, String> {
 ### RAG Operations
 - **NOT implemented as standalone CLI command** - RAG operations are script-context operations
 - **Access via script API**: Use `RAG.*` methods within Lua/JavaScript/Python scripts
-- **Configuration via flag**: `--rag-profile` flag available on execution commands (run, exec, repl, debug)
+- **Configuration via global flag**: `--profile` / `-p` flag enables RAG profiles (rag-dev, rag-prod, rag-perf)
 - **Rationale**: RAG operations require script context and state management that doesn't make sense as standalone CLI operations
 
 ### Tools Management (Phase 10.22 UPDATED)
@@ -1354,8 +1514,32 @@ The CLI command architecture provides a production-ready interface with:
    - Proper error handling and output formatting
    - Foundation for future MCP/A2A integration
 
-The architecture maintains backward compatibility for basic usage while providing robust service features for production deployments and comprehensive tool management for developer workflows.
+### Phase 11 Enhancements (Completed)
+1. **Ollama Integration** ✅ - Full local LLM support with model discovery
+2. **Candle Integration** ✅ - Rust-native ML framework, no Python deps
+3. **Model Management CLI** ✅ - Complete lifecycle operations
+   - list, pull, remove, info, available, status, install-ollama subcommands
+   - Dual-backend support (Ollama + Candle)
+   - Model identifier format: `<model>[:<tag>][@<backend>]`
+   - Integration with profile system
+4. **Unified Profile System (11b.3)** ✅ - Single --profile flag
+   - 7 builtin profiles: minimal, development, ollama, candle, rag-dev, rag-prod, rag-perf
+   - Replaced fragmented --rag-profile hack
+   - Loads complete 84-field configuration
+   - Precedence: --profile > -c > discovery > default
+5. **Profile Discovery (11b.4)** ✅ - `config list-profiles` command
+   - Metadata display: categories, descriptions, use cases, features
+   - --detailed flag for comprehensive profile information
+   - Grouped output by category (Core, Common Workflows, Local LLM, RAG)
+6. **Model Discovery UX (11b.5)** ✅ - Dual-tier model discovery
+   - Programmatic: `model available` command featured as first example
+   - Web browsing: URLs in help text (Ollama library + HuggingFace)
+   - Addresses "where do I find model names?" UX gap
+7. **87% Compile Speedup** ✅ - Bridge-only builds: 38s→5s
+8. **API Standardization** ✅ - Tool.execute() consistent across all tools
+
+The architecture maintains backward compatibility for basic usage while providing robust service features for production deployments, comprehensive tool management for developer workflows, and flexible local LLM integration for privacy-focused and offline AI applications.
 
 ---
 
-*This document reflects the completed CLI command architecture from Phase 10 implementation including integrated kernel, daemon mode, full service integration, and Phase 10.22 tool command capabilities.*
+*This document reflects the completed CLI command architecture from Phase 11b implementation including integrated kernel, daemon mode, service integration, tool commands, local LLM support with Ollama and Candle, and unified profile system.*

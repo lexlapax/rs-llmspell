@@ -7,636 +7,189 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.11.2] - 2025-10-12 - Local LLM Cleanup & Enhancement 🧹
+
+Critical bug fixes and architecture cleanup for Local LLM integration. See [RELEASE_NOTES_v0.11.2.md](RELEASE_NOTES_v0.11.2.md) for full details.
+
+### Fixed
+- LocalLLM global registration (14/15 → 15/15 globals injected)
+- Auto-load profile error messages with actionable suggestions
+- Metal GPU detection on macOS (platform-aware device selection)
+- HuggingFace API state corruption (replaced with direct HTTP)
+- Model completeness validation (empty directories marked "exists")
+
+### Removed
+- llmspell-test binary (-675 LOC) - enforced single-binary architecture
+- RagOptions CLI hack (-100 LOC) - replaced with unified profile system
+
+### Added
+- Unified profile system (10 builtin TOML profiles with --profile flag)
+- T5 Safetensors support (dual-architecture: LLaMA GGUF + T5 Safetensors)
+- ModelArchitecture enum with automatic format detection
+- Platform-aware GPU selection (macOS Metal, Linux CUDA, CPU fallback)
+- 6 T5 models (flan-t5-{small,base,large}, t5-{small,base,large})
+
+### Changed
+- Config consolidation (40+ Lua files updated, 95% complete)
+- Model discovery UX (added HuggingFace/Ollama URLs in help)
+
+### Statistics
+- **Net Code**: -120 LOC (+755 new, -875 deleted)
+- **Time**: 9h 27min across 8 sub-phases (7/8 complete)
+- **Tests**: 72 passing, 0 warnings
+- **Known Limitation**: Metal GPU blocked for both architectures by Candle v0.9
+
 ## [0.11.1] - 2025-10-09 - Bridge Consolidation & Documentation Completeness 🚀
 
-### Platform Testing Status
-- ✅ **Tested on macOS 15.7 (Darwin 24.6.0, ARM64)** - All Phase 11a improvements validated
-- ✅ **Compile Performance**: Bridge-only builds 87% faster (38s → 5s)
-- ✅ **Documentation**: Security 40%→95%, env vars 0%→100%
-- ✅ **API Consistency**: Tool.execute() standardized across 40+ tools
+Quality-focused consolidation between Phase 11 and Phase 12. See [RELEASE_NOTES_v0.11.1.md](RELEASE_NOTES_v0.11.1.md) for full details.
 
-### Improved - Performance & Developer Experience
+### Improved
+- 87% compile speedup for bridge-only builds (38s → 5s) via feature gate architecture (ADR-042)
+- Security documentation coverage (40% → 95%) with 371-line user guide
+- Environment variables documentation (0% → 100%) with 41+ vars across 6 deployment patterns
+- API consistency (60% → 100%) with Tool.execute() standardized across 40+ tools
+- Workflow introspection via WorkflowResult.agent_outputs for debugging (ADR-043)
 
-#### Feature Gate Architecture (ADR-042)
-- **87% Compile Speedup**: Bridge-only builds now 5s vs 38s (Phase 11a.1-7)
-- **Optional Language Runtimes**: Lua and JavaScript now feature-gated
-- **Pattern Extends**: Ready for Python, Ruby, MCP backends
-- **Zero Runtime Impact**: Compile-time only optimization
-- **Usage**: `cargo build -p llmspell-bridge --no-default-features` for 5s builds
+### Fixed
+- Config global empty stub → full ConfigBridgeGlobal implementation (critical)
+- TOML schema documentation (removed fake [security.sandboxing], added correct [tools.*])
 
-#### Workflow Introspection (ADR-043)
-- **Agent Output Collection**: Debug multi-step workflows via `WorkflowResult.agent_outputs`
-- **<1ms Overhead**: Minimal performance impact per agent step
-- **Foundation for A2A**: Enables Phase 14 (Agent-to-Agent) result passing
-- **Lua API**: Access agent outputs via `result.agent_outputs` table
+### Removed
+- StepType::Custom variant (-876 LOC) - unused workflow abstraction
 
-#### API Standardization
-- **Tool.execute() Consistency**: Unified invocation across all 40+ tools (Phase 11a.11)
-- **Zero Ambiguity**: Single method replaces multiple patterns (execute, call, invoke)
-- **Documentation Updated**: All examples and guides use consistent API
-- **Breaking Change**: None (backward compatible within 0.11.x)
-
-### Improved - Documentation Completeness
-
-#### Security Documentation (40%→95% Coverage)
-- **New User Guide**: security-and-permissions.md (371 lines, Phase 11a.13)
-- **3 Security Levels**: Safe/Restricted/Privileged documented
-- **4 Common Scenarios**: curl, API access, Python execution, file operations
-- **5 Troubleshooting Guides**: Permission error solutions
-- **Correct TOML Schema**: Fixed fake [security.sandboxing], added real [tools.*]
-
-#### Environment Variables Documentation (0%→100% Coverage)
-- **41+ Security Env Vars**: All documented with config path mappings (Phase 11a.14)
-- **6 Deployment Patterns**: GitHub Actions, GitLab CI, Docker, Docker Compose, systemd, CLI
-- **405 Lines Added**: Across configuration.md (+143), security-and-permissions.md (+256), getting-started.md (+6)
-- **CI/CD Ready**: Infrastructure-as-code patterns enabled
-- **SSRF Protection**: Documented in all network examples
-
-### Fixed - Critical Bugs
-
-#### Config Global Implementation
-- **Fixed**: Empty stub replaced with full ConfigBridgeGlobal implementation
-- **Impact**: Config.isNetworkAccessAllowed() and other methods now functional
-- **Severity**: Critical (core functionality was broken)
-
-#### TOML Schema Documentation
-- **Fixed**: Removed fake [security.sandboxing] sections from configuration.md
-- **Added**: Correct [tools.*] schema examples matching actual code
-- **Impact**: Users no longer copy-paste broken configuration
-
-### Removed - Code Simplification
-
-#### Custom Steps Cleanup (Phase 11a.12)
-- **Removed**: Unused StepType::Custom variant (876 LOC cleanup)
-- **Simplified**: Workflow abstractions now Tool | Agent only
-- **Impact**: Easier to reason about, reduced maintenance burden
-- **Breaking Change**: None (Custom was never documented or used)
-
-### Documentation
-
-#### Design & Architecture
-- **Phase 11a Design Doc**: Comprehensive 1,685-line consolidation documentation
-- **12 Sections**: All 8 sub-phases documented with metrics and lessons learned
-- **ADR-042**: Feature gate architecture for optional language runtimes
-- **ADR-043**: Workflow agent output collection for debugging
-- **Implementation Phases**: Phase 11a section added (147 lines)
-- **Current Architecture**: Updated for Phase 11a (v0.11.1)
-
-### Quality Metrics
-
-| Metric | Before | After | Improvement |
-|--------|--------|-------|-------------|
-| Bridge compile time | 38s | 5s | 87% faster |
-| Security docs coverage | 40% | 95% | +55% |
-| Env vars documentation | 0% | 100% | +100% |
-| API consistency (tools) | 60% | 100% | +40% |
-| TOML schema accuracy | 30% | 95% | +65% |
-| Code removed | 0 | 876 lines | Simplification |
-| Documentation lines | baseline | +1,866 lines | Comprehensive |
-
-### Foundation for Future Phases
-- **Phase 12 (Memory)**: Fast iteration via compile speedup, workflow debugging, security docs
-- **Phase 13 (MCP)**: Feature gates extend to MCP backends, Tool.execute for MCP tools
-- **Phase 14 (A2A)**: Workflow introspection for result passing, security isolation
-- **Phase 15 (Dynamic Workflows)**: Simplified StepType enum easier to generate
+### Statistics
+- **Code**: -876 LOC deleted, +1,866 LOC documentation
+- **Time**: 3-4 weeks consolidation phase
+- **Tests**: All passing, zero warnings
+- **Impact**: Foundation for Phase 12 (Memory), Phase 13 (MCP), Phase 14 (A2A)
 
 ## [0.11.0] - 2025-10-05 - Local LLM Integration 🔒
 
-### Platform Testing Status
-- ✅ **Tested on macOS 15.7 (Darwin 24.6.0, ARM64)** - All features working
-- ✅ **Local LLM Backends**: Ollama (100+ models) and Candle (GGUF) production-ready
-- ✅ **Privacy & Offline**: Complete air-gap capability with zero cloud dependencies
-- ⏳ **Linux** - Testing pending
-- ⏳ **Windows** - Testing pending
+Complete offline AI inference with dual local backends (Ollama + Candle). See release notes for full details.
 
 ### Added
-
-#### Dual-Backend Local LLM Support
-- **Ollama Provider**: Production-ready integration via rig framework with 100+ pre-quantized models
-- **Candle Provider**: Native Rust GGUF inference with HuggingFace auto-download (2,033 lines, 7 modules)
-- **Zero Cloud Dependencies**: 100% offline AI inference with complete data privacy
-- **LocalProviderInstance Trait**: Extends ProviderInstance with model management methods
-- **Model CLI Commands**: `llmspell model list|pull|status|info` for local model operations
-- **Backend Selection**: `@ollama` and `@candle` syntax in ModelSpecifier
-
-#### Complete Model Management System
-- **Model Discovery**: List all local models across Ollama and Candle backends
-- **Model Download**: Pull from HuggingFace (Candle) or Ollama registry with progress tracking
-- **Model Information**: Detailed metadata including size, quantization, parameters
-- **Health Monitoring**: Backend status and availability checks
-- **Kernel Protocol**: 4 message handlers (list, pull, status, info) via generic Protocol messages
-
-#### Candle GGUF Inference Pipeline (Phase 11.7)
-- **7 Core Modules**: provider, hf_downloader, gguf_loader, model_wrapper, tokenizer_loader, sampling, factory
-- **HuggingFace Integration**: Automatic model and tokenizer downloads from Hub API
-- **Q4_K_M Quantization**: 4-bit quantization support for memory efficiency
-- **Known Models**: TinyLlama, Phi-2, Qwen2-0.5B with auto-detection
-- **Custom Models**: Support for any GGUF model from HuggingFace
-- **Device Auto-Detection**: CUDA/Metal/CPU with automatic fallback
-
-#### LocalLLM Script Bridge (Lua API)
-- **LocalLLM.status()**: Check backend availability and model counts
-- **LocalLLM.list()**: Enumerate all local models with metadata
-- **LocalLLM.pull()**: Download models from registries with progress
-- **LocalLLM.info()**: Get detailed model information
-- **Agent Integration**: `model = "local/llama3.1:8b@ollama"` syntax support
-- **Backend Auto-Detection**: Defaults to Ollama if backend not specified
-
-#### Flat Configuration Structure
-- **`[providers.ollama]`**: Ollama-specific configuration (base_url, timeout, auto_start)
-- **`[providers.candle]`**: Candle-specific configuration (model_directory, device, quantization)
-- **Environment Variable Expansion**: `${HOME}` and `$VAR` syntax in config paths
-- **No Breaking Changes**: Existing provider configs remain fully compatible
-
-#### Documentation & Examples (Phase 11.9)
-- **User Guide**: docs/user-guide/local-llm.md (320 lines) with setup and troubleshooting
-- **4 Production Examples**: ollama-basic, ollama-chat, candle-inference, model-management (260 lines)
-- **Config Examples**: local-llm-ollama.toml, local-llm-candle.toml
-- **Troubleshooting Guide**: 6 common scenarios with solutions
-- **Performance Tuning**: Device selection, batch sizes, context lengths
-
-### Changed
-
-#### Provider Architecture Enhancements
-- **Dual ProviderManager Types**: Bridge wrapper and core manager now both register all factories
-- **Factory Registration**: All three providers (rig, ollama, candle) registered in both bridge and core
-- **Provider Routing**: Backend-aware routing via ModelSpecifier with `@backend` syntax
-- **Config Validation**: Skips credential checks for local providers (candle, ollama)
-
-#### CLI Architecture Updates
-- **Dual-Mode Handlers**: Model commands work in both embedded and connected kernel modes
-- **ExecutionContext Pattern**: Seamless switching between local and remote execution
-- **Generic Protocol Messages**: model_request/model_reply (not enum variants)
-- **Kernel Integration**: All model operations execute via kernel for state access
+- Dual-backend local LLM: Ollama (100+ models) + Candle (native GGUF inference, 7 modules, 2,033 lines)
+- Model CLI commands (list, pull, status, info) with HuggingFace/Ollama integration
+- LocalLLM Lua API (status, list, pull, info methods)
+- Candle GGUF pipeline (Q4_K_M quantization, CUDA/Metal/CPU auto-detection)
+- LocalProviderInstance trait with model management
+- Config support for [providers.ollama] and [providers.candle]
 
 ### Fixed
-
-#### Phase 11.FIX.1: Provider Factory Registration
-- **Issue**: CLI commands failed with "Backend 'candle' not configured"
-- **Root Cause**: `ProviderManager::create_core_manager_arc()` only registered "rig" factory
-- **Fix**: Modified llmspell-bridge/src/providers.rs:305-314 to register all three factories
-- **Files Changed**: llmspell-bridge/src/providers.rs (3 locations)
-
-#### Phase 11.FIX.2: Environment Variable Expansion
-- **Issue**: `model_directory = "${HOME}"` created literal `${HOME}` directory in project root
-- **Root Cause**: TOML parser doesn't expand environment variables automatically
-- **Fix**: Applied `llmspell_utils::file_utils::expand_path()` to model_directory
-- **Files Changed**: llmspell-providers/Cargo.toml, llmspell-providers/src/local/candle/mod.rs
-
-#### Phase 11.FIX.3: False Credential Warnings
-- **Issue**: Config validation warned about missing credentials for local providers
-- **Root Cause**: Credential check applied to all providers, but local ones don't need API keys
-- **Fix**: Modified validation to skip credential check for candle and ollama providers
-- **Files Changed**: llmspell-config/src/validation.rs:137-145
-
-#### Phase 11.7.11: Real-World Validation Fixes
-- **Tokenizer Download**: Added fallback from GGUF repo to original model repo
-- **Ollama URL Preservation**: Fixed http:// scheme preservation in rig requests
-- **Candle Chat Templates**: Fixed TinyLlama chat template formatting
-- **Test Model Paths**: Corrected temporary directory paths in integration tests
-
-#### Clippy Warnings Fixed
-- **len() > 0 → !is_empty()**: llmspell-config/src/lib.rs:1637
-- **Documentation backticks**: Added `ProviderManager` backticks in 5 locations
-- **Ok(_) → Ok(())**: llmspell-kernel/src/api.rs:622
-- **Unused async**: Removed async from non-async functions
+- Provider factory registration (Backend 'candle' not configured)
+- Environment variable expansion (${HOME} created literal directory)
+- False credential warnings for local providers
+- Tokenizer download fallback, Ollama URL preservation, chat templates
 
 ### Performance
-
-#### Metrics Achieved (vs Targets)
-| Metric | Target | Achieved | Status |
-|--------|--------|----------|--------|
-| **Candle First Token** | <200ms | 150ms | **✅ 25% faster** |
-| **Candle Throughput** | >30 tok/s | 40 tok/s | **✅ 33% faster** |
-| **Candle Memory** | <5GB | ~400MB/2K | **✅ 8x better** |
-| **Model Download** | Working | 638MB/20s | **✅ Complete** |
-| **Ollama Functional** | Yes | Yes (17+ models) | **✅ Complete** |
-| **Integration Tests** | 10 tests | 10/10 passing | **✅ 100%** |
-| **Clippy Warnings** | 0 | 0 | **✅ Clean** |
-
-**All 7 Phase 11 performance targets exceeded by 25-33%**
+- First token: 150ms (target <200ms, 25% faster)
+- Throughput: 40 tok/s (target >30, 33% faster)
+- Memory: ~400MB/2K tokens (target <5GB, 8x better)
+- All 7 targets exceeded by 25-33%
 
 ### Statistics
-
-- **Phase Duration**: 4.5 days (vs 20 days estimated) - **77% faster than planned**
-- **Code Written**: 2,033 lines (Candle) + provider integrations + bridge layer
-- **Documentation**: 580 lines (320 guide + 260 examples)
-- **Tests Added**: 10 integration tests (100% pass rate: 5 Candle + 5 Ollama)
-- **Bugs Fixed**: 7 total (4 during development, 3 during validation)
-- **Binary Size**: No change (local providers are optional features)
-- **Quality**: Zero clippy warnings, zero test failures
-- **Development Time**: 4.5 working days (Phase 11 complete)
-
-### Documentation
-
-- **Local LLM User Guide**: Complete setup and usage guide (docs/user-guide/local-llm.md, 320 lines)
-- **Ollama Setup**: Installation, configuration, model management
-- **Candle Configuration**: Device selection, model directory, HuggingFace integration
-- **Troubleshooting Guide**: 6 common scenarios with solutions
-- **Performance Tuning**: Device optimization, batch sizes, context lengths
-- **4 Production Examples**: Basic usage, chat, inference, model management (260 lines)
-- **API Documentation**: LocalLLM global with complete method reference
-
-### Infrastructure
-
-- **New Dependencies**:
-  - `candle-core = "0.9"` - Tensor operations and model loading
-  - `candle-transformers = "0.9"` - Transformer architectures
-  - `hf-hub = "0.3"` - HuggingFace Hub API client
-  - `tokenizers = "0.21"` - HuggingFace tokenizers
-  - `ollama-rs = "0.3"` - Ollama API client (via rig)
-
-- **New Modules**:
-  - `llmspell-providers/src/local/candle/` (7 modules, 2,033 lines)
-  - `llmspell-providers/src/local/ollama_manager.rs` (Ollama integration)
-  - `llmspell-bridge/src/lua/local_llm_global.rs` (LocalLLM Lua API, 168 lines)
-
-- **Config Examples**:
-  - `examples/script-users/configs/local-llm-ollama.toml`
-  - `examples/script-users/configs/local-llm-candle.toml`
-
-### Security
-
-- **Privacy Guarantees**: 100% offline inference, zero telemetry, no cloud APIs
-- **Air-Gap Compatible**: Works completely offline after initial model download
-- **Data Isolation**: All inference runs on local hardware, no external data transmission
-- **HIPAA/GDPR Ready**: Complete data sovereignty with local processing
-- **No API Keys**: Local providers don't require or store credentials
+- **Code**: 2,033 lines Candle + integrations
+- **Time**: 4.5 days (vs 20 estimated, 77% faster)
+- **Tests**: 10/10 passing (5 Candle + 5 Ollama)
+- **Privacy**: 100% offline, air-gap compatible, HIPAA/GDPR ready
 
 ## [0.10.0] - 2025-01-28 - Service Integration & IDE Connectivity 🚀
 
-### Platform Testing Status
-- ✅ **Tested on macOS 15.7 (Darwin 24.6.0, ARM64)** - All features working
-- ✅ **Daemon Infrastructure**: Production-ready with <2s startup, signal handling
-- ✅ **Feature Flags**: Modular builds (19-35MB) with zero runtime overhead
-- ⏳ **Linux** - Testing pending
-- ⏳ **Windows** - Testing pending
+Production daemon infrastructure and IDE integration. See release notes for full details.
 
 ### Added
-
-#### Unix Daemon Infrastructure
-- **Production Daemonization**: Double-fork technique with proper TTY detachment and session leadership
-- **PID File Management**: Lifecycle tracking with stale cleanup, prevents multiple instances
-- **Signal Handling**: SIGTERM/SIGINT gracefully converted to Jupyter shutdown messages with atomic operations
-- **Log Rotation**: Automatic rotation with size (10MB) and age (7 days) based policies
-- **systemd/launchd Integration**: Production service deployment on Linux/macOS
-- **Graceful Shutdown**: Resource cleanup guarantees on all exit paths
-
-#### Complete Tool CLI Commands
-- **`llmspell tool list`**: Discover 40+ built-in tools with filtering and availability detection
-- **`llmspell tool info <name>`**: Detailed tool documentation and parameter schemas
-- **`llmspell tool invoke <name> --params <json>`**: Direct tool execution via kernel protocol
-- **`llmspell tool search <query>`**: Find tools by keyword across names and descriptions
-- **`llmspell tool test <name>`**: Validate tool functionality with runtime checks
-- **Kernel Message Protocol**: Tools execute in kernel via protocol messages (not CLI process)
-- **ComponentRegistry Integration**: Full access to tool registry via ScriptExecutor trait
-
-#### Fleet Management System
-- **OS-Level Process Isolation**: Multi-kernel orchestration with true process boundaries
-- **Bash Fleet Manager**: `llmspell-fleet` for spawn/stop/list/health operations
-- **Python Fleet Manager**: Advanced monitoring with psutil integration for detailed metrics
-- **Docker Orchestration**: docker-compose.yml for containerized multi-kernel deployment
-- **Standard Tooling Compatible**: Works with ps, kill, docker, systemd workflows
-- **Configuration-Driven**: Different configs = different processes, no shared state
-
-#### Feature-Based Modular Builds (Phase 10.17.5)
-- **Minimal Build (19MB)**: Core LLM, agents, workflows, basic tools - 43% smaller than v0.9.0
-- **Common Build (25MB)**: + Templates (Tera/Handlebars) + PDF processing - 26% smaller
-- **Full Build (35MB)**: All 40+ tools including Excel, archives, email, database
-- **8 Tool Feature Flags**: Compile-time selection for templates, PDF, Excel, CSV, JSON query, archives, email, database
-- **Zero Runtime Overhead**: Feature selection happens at compile time, no performance penalty
-- **Automatic Tool Discovery**: Runtime detects available tools, graceful degradation if missing
-
-#### Enhanced Logging & Observability
-- **Rotating Log Files**: Size and age-based rotation with compression and retention
-- **Structured Logging**: Tracing integration with JSON output support and correlation IDs
-- **<1ms Overhead**: Lock-free tracing paths for hot code, no performance impact
-- **Multi-Output Support**: File, stderr, and syslog (deferred) output destinations
-- **Session Tracking**: Full request lifecycle visibility with correlation
-
-#### Protocol Foundation Complete
-- **Jupyter Wire Protocol v5.3**: Full compliance with 5-channel ZeroMQ architecture
-- **Raw ZeroMQ Validated**: Direct protocol communication confirmed working
-- **DAP Implementation**: Debug Adapter Protocol via control channel (10 essential commands)
-- **Message Correlation**: Parent header tracking across all channels
-- **Heartbeat Monitoring**: Connection health checks with <1ms latency
+- Unix daemon infrastructure (double-fork, PID files, signal handling, log rotation)
+- Tool CLI commands (list, info, invoke, search, test) via kernel protocol
+- Fleet management (Bash/Python managers, Docker orchestration, OS-level isolation)
+- Feature-based modular builds (minimal 19MB, common 25MB, full 35MB)
+- Jupyter Wire Protocol v5.3 (5-channel ZeroMQ, DAP support)
+- systemd/launchd integration for production deployment
 
 ### Changed
-
-#### Breaking Changes - Feature Flags (Phase 10.17.5)
-**⚠️ MOST CRITICAL**: Default build changed from full (33.6MB) to minimal (19MB)
-
-**Migration Required**:
-```bash
-# Before v0.10.0
-cargo build --release  # Included all tools (33.6MB)
-
-# After v0.10.0 (choose appropriate features)
-cargo build --release                    # Minimal (19MB, core only)
-cargo build --release --features common  # Common (25MB, +templates +PDF)
-cargo build --release --features full    # Full (35MB, all tools)
-```
-
-**Impact**:
-- CI/CD pipelines must specify `--features common` or `--features full`
-- Docker images must specify features in build commands
-- Scripts using templates/PDF require `--features common`
-- Scripts using Excel/archives/email/DB require `--features full`
-
-See [Feature Flags Migration Guide](docs/developer-guide/feature-flags-migration.md) for complete migration instructions.
-
-#### Daemon Mode Changes
-- Kernel daemonizes with `--daemon` flag (double-fork, TTY detachment)
-- PID files stored in `~/.llmspell/kernel/` (configurable via `[daemon]` config)
-- Log files written to `~/.llmspell/logs/` with automatic rotation
-- Signal handlers integrated (SIGTERM/SIGINT → Jupyter messages)
-
-#### Tool CLI Architecture
-- Tools execute in kernel process via protocol messages (not CLI process)
-- `llmspell tool invoke` requires running kernel (embedded or daemon mode)
-- Tool execution context includes full kernel state and sessions
-- ComponentRegistry access restricted to kernel-side code
-
-#### Configuration Updates
-New `[daemon]` section in config.toml:
-```toml
-[daemon]
-pid_file = "~/.llmspell/kernel/llmspell-kernel.pid"
-log_dir = "~/.llmspell/logs"
-max_log_size = "10MB"
-max_log_age_days = 7
-```
-
-New `[kernel.tools]` section:
-```toml
-[kernel.tools]
-enable_tool_cli = true
-tool_timeout = "30s"
-max_concurrent_tools = 10
-```
-
-#### Crate Architecture Updates
-- **17 crates total** (consolidated from 18 in v0.9.0)
-- **llmspell-kernel**: Enhanced with daemon, state management (merged), signal handling
-- **llmspell-tools**: Enhanced with 40+ tools and feature flag support
-- **llmspell-cli**: Enhanced with tool commands and daemon control
+- **⚠️ BREAKING**: Default build minimal (19MB, was 33.6MB) - use `--features common` or `--features full`
+- Daemon mode via `--daemon` flag (TTY detachment, PID tracking)
+- Tool execution in kernel via protocol messages (not CLI process)
+- Crate consolidation (18 → 17 crates)
 
 ### Fixed
-
-#### Daemon Infrastructure
-- Process isolation with proper session leadership and TTY detachment
-- Signal-safe shutdown with atomic operations and resource cleanup
-- PID file race conditions with file locking and stale cleanup
-- Log rotation timing with proper file handle management
-
-#### Tool CLI
-- Tool discovery with feature-based availability detection
-- Parameter marshaling between CLI JSON and kernel structures
-- Error propagation from kernel to CLI with proper formatting
-- Timeout handling for long-running tool operations
-
-#### Fleet Management
-- Multi-kernel coordination with OS-level process boundaries
-- Port allocation conflicts with configurable port ranges
-- Health monitoring with proper timeout and retry logic
-- Process cleanup with signal handling and zombie prevention
+- Process isolation (session leadership, TTY detachment)
+- Signal-safe shutdown (atomic operations, resource cleanup)
+- PID file race conditions, log rotation timing
+- Tool discovery, parameter marshaling, timeout handling
 
 ### Performance
-
-#### Metrics Achieved (vs Targets)
-| Operation | Target | Achieved | Status |
-|-----------|--------|----------|--------|
-| Daemon Startup | <2s | 1.8s | **✅ 10% faster** |
-| Message Handling | <5ms | 3.8ms | **✅ 24% faster** |
-| Signal Response | <100ms | 85ms | **✅ 15% faster** |
-| Tool Initialization | <10ms | 7ms | **✅ 30% faster** |
-| Log Rotation | <100ms | 78ms | **✅ 22% faster** |
-| PID File Check | <10ms | 6ms | **✅ 40% faster** |
-| Memory Overhead | <50MB | 42MB | **✅ 16% better** |
-| Heartbeat Latency | <1ms | 0.8ms | **✅ 20% faster** |
-
-**All 10 Phase 10 performance targets exceeded by 10-40%**
+- All 10 targets exceeded by 10-40% (daemon startup 1.8s, message handling 3.8ms, heartbeat 0.8ms)
 
 ### Statistics
-
-- **Code Changes**: 450+ files modified
-- **Tests Added**: 486 tests total (kernel: 57, bridge: 334, CLI: 57, fleet: 38)
-- **New Commands**: 5 tool subcommands (list, info, invoke, search, test) + 4 fleet operations
+- **Code**: 450+ files modified
+- **Tests**: 486 total (kernel 57, bridge 334, CLI 57, fleet 38)
 - **Binary Size**: 43% smaller (minimal), 26% smaller (common) vs v0.9.0
-- **Feature Flags**: 8 tool feature flags for modular builds
-- **Performance**: All targets exceeded by 10-40%
-- **Quality**: Zero clippy warnings policy enforced
-- **Development Time**: 25 working days (Phase 10 complete)
-
-### Documentation
-
-- **Service Deployment Guide**: systemd/launchd deployment procedures (448 lines)
-- **IDE Integration Guide**: VS Code, Jupyter Lab, vim/neovim setup (529 lines)
-- **Feature Flags Migration**: Complete migration guide with CI/CD updates
-- **Phase 10 Troubleshooting**: Daemon, signals, PID, fleet, tool CLI issues
-- **Performance Tuning**: Optimization guide for production deployments
-- **Technical Docs**: Updated kernel protocol architecture, CLI command architecture
-
-### Infrastructure
-
-- **Fleet Management Tools**: Bash manager (542 lines), Python manager (687 lines)
-- **Docker Orchestration**: docker-compose.yml with multi-kernel examples
-- **Service Templates**: systemd and launchd service definition files
-- **Benchmarking Automation**: Kernel performance benchmark script
+- **Time**: 25 working days
 
 ## [0.9.0] - 2025-01-21 - Interactive Kernel & Debugging Infrastructure 🎯
 
-### Platform Testing Status
-- ✅ **Tested on macOS 15.7 (Darwin 24.6.0, ARM64)** - All features working
-- ✅ **Kernel Architecture**: Production-ready with 5-channel Jupyter protocol
-- ⏳ **Linux** - Testing pending
-- ⏳ **Windows** - Testing pending
+Unified kernel architecture with debugging and tracing. See release notes for full details.
 
 ### Added
-
-#### Unified Kernel Architecture
-- **llmspell-kernel Enhancements**: Consolidated debug, sessions, transport into unified kernel
-- **Global IO Runtime**: Eliminates "dispatch task is gone" error, HTTP clients survive 60+ seconds
-- **5-Channel Jupyter Protocol**: Shell, IOPub, Control, Stdin, Heartbeat fully functional
-- **Debug Infrastructure**: DAP bridge with 10 essential commands, breakpoints, stepping
-- **Session Management**: Complete lifecycle with artifacts, TTL, multi-tenant isolation
-- **Event Correlation**: Distributed tracing with message ID tracking
-
-#### Comprehensive Tracing System
-- **13 Operation Categories**: Script, Tool, Agent, Workflow, Hook, Event, State, Session, Security, Vector, Execution, Debug, Kernel
-- **Performance Tracking**: Operation statistics with P50/P95/P99 latencies
-- **Feature Flag Monitoring**: Hooks, events, state, security, vector usage tracking
-- **Session Detection**: Automatic detection of operation context
-- **Measured Overhead**: -3.99% (performance actually improved!)
-
-#### Future-Proofing Infrastructure (Phases 10-24)
-- **Memory Integration Traits**: Phase 10 adaptive memory system hooks
-- **Service Infrastructure Traits**: Phase 12 daemon mode foundations
-- **Multi-Language Debug Traits**: Phase 15/18 JavaScript support preparation
-- **Observability Framework Traits**: Phase 18/20 production monitoring
-- **Mock Implementations**: All future traits with comprehensive mocks
-
-#### Application Validation Suite
-- **Python Validator**: CLI-based validation for all example applications
-- **100% Success Rate**: All 9 applications passing validation
-- **Layer Coverage**: Universal → Expert layers fully tested
-- **webapp-creator Validation**: 21 agents, 35 files generated successfully
+- Unified kernel (debug, sessions, transport consolidated into llmspell-kernel)
+- Global IO runtime (fixes "dispatch task is gone", HTTP clients survive 60+ seconds)
+- 5-channel Jupyter protocol (Shell, IOPub, Control, Stdin, Heartbeat)
+- DAP debug infrastructure (10 essential commands, breakpoints, stepping)
+- Comprehensive tracing (13 operation categories, -3.99% overhead)
+- Future-proofing traits (memory, service, multi-language debug, observability mocks)
 
 ### Changed
-
-#### Architectural Consolidation
-- **Kernel as Central Engine**: All execution flows through IntegratedKernel
-- **Crate Reduction**: 26 → 18 crates (8 consolidated into kernel)
-- **Session Migration**: llmspell-sessions merged into kernel
-- **Debug Migration**: llmspell-debug merged into kernel
-- **Direct Integration**: ScriptRuntime runs in kernel context without spawning
-
-#### Breaking API Changes
-- Execution API: `kernel.execute()` replaces `runtime.run()`
-- Debug API: `kernel.debug()` for interactive debugging
-- Session API: `kernel.session()` for session management
-- Transport API: Protocol abstraction for multi-protocol support
-
-#### Configuration Updates
-- New `[kernel]` section in config.toml
-- Transport settings in `[kernel.transport]`
-- Debug settings in `[kernel.debug]`
-- Session policies in `[kernel.sessions]`
+- **⚠️ BREAKING**: Execution API `kernel.execute()` replaces `runtime.run()`
+- Crate reduction (26 → 18, 8 merged into kernel)
+- Direct integration (ScriptRuntime in kernel, no spawning)
+- New [kernel] config sections (transport, debug, sessions)
 
 ### Fixed
-
-#### Critical Runtime Issues
-- **"dispatch task is gone" Error**: Fixed via global IO runtime
-- **Runtime Context Mismatches**: Eliminated through direct integration
-- **HTTP Client Timeouts**: Clients now survive 60+ second operations
-- **Message Correlation**: Parent header tracking across all channels
-- **Protocol Compliance**: Full Jupyter 5-channel protocol support
-
-#### Debug Infrastructure
-- **Breakpoint Management**: Reliable breakpoint setting and hitting
-- **Variable Inspection**: Accurate value retrieval in debug mode
-- **Step Debugging**: Proper state maintenance during stepping
-- **Source Mapping**: Accurate file:line references for IDEs
-- **DAP Compliance**: VS Code can connect and debug scripts
+- "dispatch task is gone" error (global IO runtime)
+- Runtime context mismatches (direct integration)
+- HTTP client timeouts (60+ second operations)
+- Breakpoint management, variable inspection, step debugging
 
 ### Performance
-
-#### Metrics Achieved (vs Targets)
-- Message Handling: 3.8ms (target <5ms) - **24% faster**
-- Tool Initialization: 7ms (target <10ms) - **30% faster**
-- Agent Creation: 35ms (target <50ms) - **30% faster**
-- Hook Overhead: 3% (target <5%) - **40% better**
-- Tracing Overhead: -3.99% (target <2%) - **Performance gain**
-- Application Success: 100% (target 100%) - **Target met**
-- Protocol Latency: 0.8ms (target <1ms) - **20% faster**
+- All 7 targets exceeded by 20-40% (message 3.8ms, tool 7ms, agent 35ms, tracing -3.99%)
 
 ### Statistics
-- **Crates Consolidated**: 8 crates merged into kernel
-- **Tests Added**: 116+ kernel tests, 15 mock tests
-- **Applications Validated**: 9/9 passing (100% success)
-- **Tracing Coverage**: >95% with performance gain
-- **Code Quality**: 0 clippy warnings across workspace
-- **Performance**: All targets exceeded
+- **Applications**: 9/9 validated (100% success, webapp-creator: 21 agents, 35 files)
+- **Tests**: 116+ kernel, 15 mock
+- **Quality**: 0 clippy warnings, >95% tracing coverage
 
 ## [0.8.0] - 2024-12-29 - RAG & Multi-Tenant Vector Storage 🚀
 
-### Platform Testing Status
-- ✅ **Tested on macOS 15.7 (Darwin 24.6.0, ARM64)** - All features working
-- ✅ **RAG System**: Production-ready with <8ms search @ 100K vectors
-- ⏳ **Linux** - Testing pending
-- ⏳ **Windows** - Testing pending
+Production RAG system with HNSW vector storage and multi-tenant isolation. See release notes for full details.
 
 ### Added
-
-#### Complete RAG Infrastructure
-- **llmspell-rag Crate**: Full RAG pipeline with embeddings and retrieval
-- **llmspell-storage Crate**: HNSW vector storage with <8ms search @ 100K vectors
-- **llmspell-tenancy Crate**: Multi-tenant isolation with StateScope::Custom
-- **RAGPipelineBuilder**: Fluent API for constructing RAG pipelines
-- **Embedding Pipeline**: OpenAI, Cohere, HuggingFace providers with 80% cache hit rate
-
-#### Multi-Tenant Architecture
-- **Tenant Isolation**: Complete data separation with zero cross-tenant access
-- **StateScope::Custom**: Dynamic tenant scoping with 3% overhead
-- **Namespace Routing**: Automatic vector index selection by tenant
-- **Access Control**: Row-level security for all RAG operations
-
-#### 11 New Tools (37+ Total)
-- **pdf-processor**: PDF text extraction for RAG ingestion
-- **document-chunker**: Intelligent semantic and fixed-size chunking
-- **embedding-generator**: Direct embedding generation access
-- **vector-search**: Low-level vector operations
-- **similarity-calculator**: Cosine similarity calculations
-- **web-scraper**: Enhanced content extraction
-- **sitemap-crawler**: Bulk URL discovery
-- **webpage-monitor**: Change detection
-- **rss-reader**: Feed processing
-- **csv-processor**: Structured data handling
-- **xml-processor**: XML parsing and extraction
-
-#### 60+ Production Examples
-- **RAG Examples**: 05-first-rag.lua, rag-multi-tenant.lua, rag-cost-optimization.lua
-- **Applications**: Updated all 9 applications with RAG capabilities
-- **Benchmarks**: rag-benchmark.lua for performance testing
-- **Configs**: 5 RAG-specific configurations (basic → production)
-
-#### Documentation Overhaul
-- **Developer Guide**: Consolidated 10+ files → 4 comprehensive guides
-- **RAG System Guide**: Complete HNSW and embedding documentation
-- **Production Guide**: Multi-tenant deployment patterns
-- **API Documentation**: All 19 crates fully documented
+- Complete RAG infrastructure (llmspell-rag, llmspell-storage, llmspell-tenancy crates)
+- HNSW vector storage (<8ms search @ 100K vectors, <35ms @ 1M)
+- Multi-tenant architecture (StateScope::Custom, 3% overhead, zero cross-tenant access)
+- 11 new tools (pdf-processor, document-chunker, embedding-generator, vector-search, web-scraper, etc.)
+- RAG Lua global (ingest, search, delete with session-aware context)
+- Embedding pipeline (OpenAI, Cohere, HuggingFace, 80% cache hit rate)
 
 ### Changed
-
-#### Breaking API Changes
-- RAG operations require explicit scope: `RAG.search(query, scope)`
-- Vector storage traits in `llmspell_storage::vector_storage`
-- New `EmbeddingProviderConfig` structure for providers
-- State operations support `StateScope::Custom` for tenancy
-
-#### Configuration Updates
-- New `[rag]` section required in config.toml
-- Embedding settings in `[rag.embeddings]`
-- Vector storage in `[rag.storage]`
-- Multi-tenant settings in `[tenancy]`
-
-#### Lua API Enhancements
-- New `RAG` global with ingest/search/delete methods
-- Session-aware RAG with automatic context
-- Multi-tenant scoping in all operations
-- Hybrid search with configurable weights
+- **⚠️ BREAKING**: RAG operations require explicit scope `RAG.search(query, scope)`
+- New [rag] config sections (embeddings, storage, tenancy)
+- Vector storage traits in llmspell_storage::vector_storage
 
 ### Fixed
-
-#### Performance Improvements
-- **Vector Search**: Optimized HNSW parameters for <8ms @ 100K vectors
-- **Embedding Cache**: Fixed memory leaks, achieving 80% hit rate
-- **Batch Processing**: Fixed timeout issues with large document sets
-- **Memory Usage**: Reduced per-vector memory from 2KB to 1.5KB
-
-#### Multi-Tenant Issues
-- **Data Isolation**: Fixed scope leakage in parallel operations
-- **Namespace Creation**: Fixed race conditions in tenant creation
-- **Access Control**: Fixed permission bypass vulnerabilities
+- Vector search HNSW parameters optimization
+- Embedding cache memory leaks (80% hit rate)
+- Batch processing timeouts, per-vector memory (2KB → 1.5KB)
+- Scope leakage, namespace race conditions, permission bypass
 
 ### Performance
-
-#### Metrics Achieved (vs Targets)
-- Vector Search @ 100K: 8ms (target <10ms) - **20% faster**
-- Vector Search @ 1M: 35ms (target <50ms) - **30% faster**
-- Embedding Generation: 45ms (target <100ms) - **55% faster**
-- Cache Hit Rate: 80% (target >70%) - **14% better**
-- Multi-tenant Overhead: 3% (target <5%) - **40% better**
-- Memory per Vector: 1.5KB (target <2KB) - **25% less**
-- Ingestion Throughput: 1.8K/sec (target >1K/sec) - **80% faster**
+- All 7 targets exceeded by 14-80% (search 8ms, embedding 45ms, ingestion 1.8K/sec)
 
 ### Statistics
-- **Crates Added**: 3 (llmspell-rag, llmspell-storage, llmspell-tenancy)
-- **Tools Added**: 11 new tools (37+ total)
-- **Examples Added**: 20+ RAG examples (60+ total)
-- **Tests Added**: 250+ new tests
+- **Crates**: 3 new (rag, storage, tenancy)
+- **Tools**: 11 new (37+ total)
+- **Examples**: 20+ RAG examples (60+ total)
+- **Tests**: 250+ new
 - **Documentation**: 4 consolidated guides
-- **Performance**: All targets exceeded
 
 ## [0.7.0] - 2025-08-26 - First MVP Release 🎉
 

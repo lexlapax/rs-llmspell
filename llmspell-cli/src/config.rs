@@ -7,23 +7,25 @@ use std::path::Path;
 use tokio::fs;
 use tracing::info;
 
-/// Load runtime configuration from file or use defaults
+/// Load runtime configuration from profile, file, or use defaults
 /// Delegates to llmspell-config which handles:
+/// - Builtin profile loading
 /// - Configuration file discovery
 /// - TOML parsing and validation
 /// - Environment variable overrides
-pub async fn load_runtime_config(config_path: Option<&Path>) -> Result<LLMSpellConfig> {
-    // Delegate to llmspell-config's comprehensive load_with_discovery
-    // This handles discovery, loading, environment overrides, and validation
-    let config = LLMSpellConfig::load_with_discovery(config_path)
+///
+/// Precedence: profile > config_path > discovery > default
+pub async fn load_runtime_config(
+    config_path: Option<&Path>,
+    profile: Option<&str>,
+) -> Result<LLMSpellConfig> {
+    // Delegate to llmspell-config's comprehensive load_with_profile
+    // This handles profile loading, discovery, environment overrides, and validation
+    let config = LLMSpellConfig::load_with_profile(config_path, profile)
         .await
         .map_err(|e| anyhow::anyhow!("Configuration error: {}", e))?;
 
-    // Validate the loaded configuration
-    config
-        .validate()
-        .map_err(|e| anyhow::anyhow!("Configuration validation failed: {}", e))?;
-
+    // Validation is already done in load_with_profile
     Ok(config)
 }
 

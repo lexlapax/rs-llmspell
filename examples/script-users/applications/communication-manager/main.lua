@@ -6,9 +6,22 @@
 -- Tags: application, communication-manager, business, state-persistence, sessions
 --
 -- HOW TO RUN:
--- 1. Basic (no API keys): ./target/debug/llmspell run examples/script-users/applications/communication-manager/main.lua
--- 2. With config: ./target/debug/llmspell -c examples/script-users/applications/communication-manager/config.toml run examples/script-users/applications/communication-manager/main.lua
--- 3. Debug mode: ./target/debug/llmspell --debug run examples/script-users/applications/communication-manager/main.lua
+-- 1. Basic (no API keys):
+--    ./target/debug/llmspell run examples/script-users/applications/communication-manager/main.lua
+--
+-- 2. With App-Specific Configuration (recommended for production):
+--    ./target/debug/llmspell -c examples/script-users/applications/communication-manager/config.toml \
+--    run examples/script-users/applications/communication-manager/main.lua
+--
+-- 3. Debug mode:
+--    ./target/debug/llmspell --debug run examples/script-users/applications/communication-manager/main.lua
+--
+-- 4. Quick Start with Builtin Profiles:
+--    # For session + state + events features:
+--    ./target/debug/llmspell -p sessions run examples/script-users/applications/communication-manager/main.lua
+--
+--    # For development/testing with full features:
+--    ./target/debug/llmspell -p development run examples/script-users/applications/communication-manager/main.lua
 --
 -- ABOUTME: Business layer - "Managing business communications is overwhelming"
 -- ABOUTME: State persistence, session management, and communication thread tracking

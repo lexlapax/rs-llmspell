@@ -19,15 +19,15 @@
 --
 -- Prerequisites:
 --   • LLMSpell installed and built
---   • Optional: API keys for agent testing
---   • Optional: State-enabled config for state testing
+--   • Optional: API keys for agent testing (OPENAI_API_KEY or ANTHROPIC_API_KEY)
+--   • Optional: Use `-p state` for state persistence testing
 --
 -- HOW TO RUN:
 -- # Basic (no state):
 -- ./target/debug/llmspell run examples/script-users/getting-started/04-handle-errors.lua
 --
 -- # With state enabled:
--- ./target/debug/llmspell -c examples/script-users/configs/state-enabled.toml \
+-- ./target/debug/llmspell -p state \
 --   run examples/script-users/getting-started/04-handle-errors.lua
 --
 -- EXPECTED OUTPUT:

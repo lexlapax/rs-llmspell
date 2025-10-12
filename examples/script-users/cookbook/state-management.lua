@@ -26,7 +26,7 @@
 --
 -- HOW TO RUN:
 -- # With state persistence:
--- ./target/debug/llmspell -c examples/script-users/configs/state-enabled.toml \
+-- ./target/debug/llmspell -p state \
 --   run examples/script-users/cookbook/state-management.lua
 --
 -- # Without persistence (in-memory only):

@@ -6,9 +6,22 @@
 -- Tags: application, file-organizer, universal, sequential, file-management
 --
 -- HOW TO RUN:
--- 1. Basic (no API keys): ./target/debug/llmspell run examples/script-users/applications/file-organizer/main.lua
--- 2. With config: ./target/debug/llmspell -c examples/script-users/applications/file-organizer/config.toml run examples/script-users/applications/file-organizer/main.lua
--- 3. Full features: ./target/debug/llmspell --debug run examples/script-users/applications/file-organizer/main.lua
+-- 1. Basic (no API keys):
+--    ./target/debug/llmspell run examples/script-users/applications/file-organizer/main.lua
+--
+-- 2. With App-Specific Configuration (recommended for production):
+--    ./target/debug/llmspell -c examples/script-users/applications/file-organizer/config.toml \
+--    run examples/script-users/applications/file-organizer/main.lua
+--
+-- 3. Full features:
+--    ./target/debug/llmspell --debug run examples/script-users/applications/file-organizer/main.lua
+--
+-- 4. Quick Start with Builtin Profiles:
+--    # For simple file organization:
+--    ./target/debug/llmspell -p providers run examples/script-users/applications/file-organizer/main.lua
+--
+--    # For development/testing:
+--    ./target/debug/llmspell -p development run examples/script-users/applications/file-organizer/main.lua
 --
 -- ABOUTME: Universal appeal application - "My files are a complete mess"
 -- ABOUTME: Simple sequential workflow (scan → classify → organize) for file chaos management

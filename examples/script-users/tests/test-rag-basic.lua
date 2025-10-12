@@ -1,5 +1,29 @@
--- Basic RAG Functionality Test
--- Minimal test to verify RAG works via CLI
+-- Test: Basic RAG Functionality Test
+-- Purpose: Minimal test to verify RAG works via CLI
+-- Prerequisites: OPENAI_API_KEY environment variable for embeddings
+-- Expected Output: Test results showing core RAG functionality
+-- Tags: test, rag, basic-validation
+--
+-- HOW TO RUN:
+-- 1. With builtin RAG development profile (recommended):
+--    ./target/debug/llmspell -p rag-dev run examples/script-users/tests/test-rag-basic.lua
+--
+-- 2. With custom RAG configuration:
+--    ./target/debug/llmspell -c path/to/rag-config.toml run examples/script-users/tests/test-rag-basic.lua
+--
+-- 3. Debug mode:
+--    ./target/debug/llmspell --debug -p rag-dev run examples/script-users/tests/test-rag-basic.lua
+--
+-- Prerequisites:
+--   • LLMSpell installed and built
+--   • OPENAI_API_KEY environment variable (for text-embedding-ada-002)
+--   • Network connectivity for embedding API calls
+--
+-- EXPECTED OUTPUT:
+--   • 5 basic RAG functionality tests
+--   • Document ingestion validation
+--   • API method presence checks
+--   • Exit code 0 on success, 1 on failure
 
 print("=== Basic RAG Test ===")
 print("")

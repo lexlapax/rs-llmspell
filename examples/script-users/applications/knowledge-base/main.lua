@@ -6,9 +6,22 @@
 -- Tags: application, knowledge-base, rag, semantic-search, personal-knowledge
 --
 -- HOW TO RUN:
--- 1. Basic (no API keys): ./target/debug/llmspell run examples/script-users/applications/knowledge-base/main.lua
--- 2. With config: ./target/debug/llmspell -c examples/script-users/applications/knowledge-base/config.toml run examples/script-users/applications/knowledge-base/main.lua
--- 3. Debug mode: ./target/debug/llmspell --debug run examples/script-users/applications/knowledge-base/main.lua
+-- 1. Basic (no API keys):
+--    ./target/debug/llmspell run examples/script-users/applications/knowledge-base/main.lua
+--
+-- 2. With App-Specific Configuration (recommended for production):
+--    ./target/debug/llmspell -c examples/script-users/applications/knowledge-base/config.toml \
+--    run examples/script-users/applications/knowledge-base/main.lua
+--
+-- 3. Debug mode:
+--    ./target/debug/llmspell --debug run examples/script-users/applications/knowledge-base/main.lua
+--
+-- 4. Quick Start with Builtin Profiles:
+--    # For RAG-based knowledge management (development):
+--    ./target/debug/llmspell -p rag-dev run examples/script-users/applications/knowledge-base/main.lua
+--
+--    # For production RAG with full features:
+--    ./target/debug/llmspell -p rag-prod run examples/script-users/applications/knowledge-base/main.lua
 --
 -- ABOUTME: Personal knowledge management - "I need to organize and retrieve my knowledge"
 -- ABOUTME: RAG-powered semantic search for instant knowledge retrieval

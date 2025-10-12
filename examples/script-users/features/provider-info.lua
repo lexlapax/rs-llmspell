@@ -1,9 +1,37 @@
--- Example: Provider Information
--- Purpose: Demonstrates Provider API for querying LLM provider capabilities
--- Prerequisites: Optional - provider config file with API keys for full info
--- Expected Output: Lists available providers and their capabilities
--- Version: 0.7.0
--- Tags: features, providers, configuration
+-- ============================================================
+-- LLMSPELL FEATURES SHOWCASE
+-- ============================================================
+-- Feature ID: 05 - Provider Information v0.7.0
+-- Complexity Level: BEGINNER
+-- Real-World Use Case: Discovering available LLM providers and their capabilities
+-- Feature Category: Providers
+--
+-- Purpose: Demonstrate Provider API for querying capabilities
+-- Architecture: Provider registry with capability metadata
+-- Key Capabilities:
+--   • Provider.list() - Enumerate available providers
+--   • Provider capabilities - Check features (streaming, multimodal)
+--   • Model discovery - List available models per provider
+--   • Configuration inspection - View provider settings
+--
+-- Prerequisites:
+--   • LLMSpell installed and built
+--   • Optional: API keys (OPENAI_API_KEY, ANTHROPIC_API_KEY) for full capability info
+--
+-- HOW TO RUN:
+-- # Basic provider listing:
+-- ./target/debug/llmspell run examples/script-users/features/provider-info.lua
+--
+-- # With full provider capabilities:
+-- ./target/debug/llmspell -p providers run examples/script-users/features/provider-info.lua
+--
+-- EXPECTED OUTPUT:
+-- Lists available providers with their capabilities and models
+-- Execution time: <2 seconds
+--
+-- Time to Complete: 2 seconds
+-- Next Steps: See agent-basics.lua for creating agents with providers
+-- ============================================================
 
 -- provider-info.lua
 -- Demonstrates provider API usage (Phase 1 - listing providers)

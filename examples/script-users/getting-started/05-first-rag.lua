@@ -21,12 +21,11 @@
 --
 -- Prerequisites:
 --   • LLMSpell installed and built
---   • RAG configuration file (see configs/rag-basic.toml)
---   • Embedding provider configured (OpenAI recommended)
+--   • API key: OPENAI_API_KEY environment variable (for embeddings)
 --   • Network connectivity for API calls
 --
 -- HOW TO RUN:
--- ./target/debug/llmspell -c examples/script-users/configs/rag-basic.toml \
+-- ./target/debug/llmspell -p rag-dev \
 --   run examples/script-users/getting-started/05-first-rag.lua
 --
 -- EXPECTED OUTPUT:

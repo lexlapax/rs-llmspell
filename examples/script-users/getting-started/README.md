@@ -11,19 +11,17 @@ Progressive examples to learn LLMSpell from scratch. Each example builds on the 
 # 2. Try your first tool
 ./target/debug/llmspell run examples/script-users/getting-started/01-first-tool.lua
 
-# 3. Create an agent (requires config)
-./target/debug/llmspell -c examples/script-users/configs/example-providers.toml \
-  run examples/script-users/getting-started/02-first-agent.lua
+# 3. Create an agent (requires API key)
+./target/debug/llmspell -p providers run examples/script-users/getting-started/02-first-agent.lua
 
 # 4. Build a workflow
 ./target/debug/llmspell run examples/script-users/getting-started/03-first-workflow.lua
 
 # 5. Handle errors properly
-./target/debug/llmspell run examples/script-users/getting-started/04-handle-errors.lua
+./target/debug/llmspell -p state run examples/script-users/getting-started/04-handle-errors.lua
 
-# 6. Build a RAG system (requires RAG config)
-./target/debug/llmspell -c examples/script-users/configs/rag-basic.toml \
-  run examples/script-users/getting-started/05-first-rag.lua
+# 6. Build a RAG system (requires embedding API)
+./target/debug/llmspell -p rag-dev run examples/script-users/getting-started/05-first-rag.lua
 ```
 
 ## 🎯 Learning Path
@@ -51,14 +49,17 @@ Progressive examples to learn LLMSpell from scratch. Each example builds on the 
 ```
 
 ### Step 3: Your First Agent (10 seconds)
-**File**: `02-first-agent.lua`  
-**Learn**: Agent creation, provider selection, basic conversation  
-**Prerequisites**: Configuration file with providers  
+**File**: `02-first-agent.lua`
+**Learn**: Agent creation, provider selection, basic conversation
+**Prerequisites**: OpenAI or Anthropic API key (environment variable)
 **Key Concepts**: Agent.builder(), system prompts, response handling
 
 ```bash
-./target/debug/llmspell -c ../configs/example-providers.toml run 02-first-agent.lua
+./target/debug/llmspell -p providers run 02-first-agent.lua
 # Creates an agent and asks a simple math question
+
+# Or with debug logging:
+./target/debug/llmspell -p development run 02-first-agent.lua
 ```
 
 ### Step 4: Your First Workflow (20 milliseconds)
@@ -73,28 +74,31 @@ Progressive examples to learn LLMSpell from scratch. Each example builds on the 
 ```
 
 ### Step 5: Error Handling (5 seconds)
-**File**: `04-handle-errors.lua`  
-**Learn**: Production-ready error handling patterns  
-**Prerequisites**: Optional state config for full demo  
+**File**: `04-handle-errors.lua`
+**Learn**: Production-ready error handling patterns
+**Prerequisites**: None (state profile recommended for full demo)
 **Key Concepts**: pcall(), graceful degradation, user-friendly errors
 
 ```bash
 # Basic run (no state):
 ./target/debug/llmspell run 04-handle-errors.lua
 
-# With state enabled:
-./target/debug/llmspell -c ../configs/state-enabled.toml run 04-handle-errors.lua
+# With state enabled (recommended):
+./target/debug/llmspell -p state run 04-handle-errors.lua
 ```
 
 ### Step 6: Your First RAG System (15 seconds)
-**File**: `05-first-rag.lua`  
-**Learn**: Document ingestion, vector embeddings, semantic search, RAG with agents  
-**Prerequisites**: RAG-enabled configuration file  
+**File**: `05-first-rag.lua`
+**Learn**: Document ingestion, vector embeddings, semantic search, RAG with agents
+**Prerequisites**: OpenAI API key (for text-embedding-ada-002)
 **Key Concepts**: RAG.ingest(), RAG.search(), vector similarity, context augmentation
 
 ```bash
-./target/debug/llmspell -c ../configs/rag-basic.toml run 05-first-rag.lua
+./target/debug/llmspell -p rag-dev run 05-first-rag.lua
 # Ingests documents, performs semantic searches, and uses RAG with agents
+
+# For production RAG settings:
+./target/debug/llmspell -p rag-prod run 05-first-rag.lua
 ```
 
 ## 💡 Common Patterns
@@ -211,16 +215,22 @@ cargo build --release
 ```
 
 ### Agent errors
-Check your configuration file has valid provider settings:
+Ensure you have API keys set in your environment:
 ```bash
-cat ../configs/example-providers.toml
-# Should show providers section with API keys or references
+# For OpenAI:
+export OPENAI_API_KEY="your-key-here"
+
+# For Anthropic:
+export ANTHROPIC_API_KEY="your-key-here"
+
+# Then run with providers profile:
+./target/debug/llmspell -p providers run your_script.lua
 ```
 
 ### State not available
-Use a state-enabled configuration:
+Use the state builtin profile:
 ```bash
-./target/debug/llmspell -c ../configs/state-enabled.toml run your_script.lua
+./target/debug/llmspell -p state run your_script.lua
 ```
 
 ### Debug mode

@@ -22,6 +22,7 @@ pub async fn handle_config_command(
         ConfigCommands::Show { section, format } => {
             show_config(section, format, output_format, runtime_config).await
         }
+        ConfigCommands::ListProfiles { detailed } => list_profiles(detailed, output_format).await,
     }
 }
 
@@ -61,12 +62,12 @@ async fn validate_config(config_path: Option<PathBuf>, output_format: OutputForm
     // Try to load the configuration
     let (config_result, actual_path) = match path {
         Some(p) => {
-            let result = config::load_runtime_config(Some(p)).await;
+            let result = config::load_runtime_config(Some(p), None).await;
             (result, p.to_string_lossy().to_string())
         }
         None => {
             // Try to discover config file
-            let result = config::load_runtime_config(None).await;
+            let result = config::load_runtime_config(None, None).await;
             let discovered_path = discover_actual_path().await;
             (result, discovered_path)
         }
@@ -230,6 +231,78 @@ async fn show_config(
                 println!();
             }
             println!("{}", formatted_output);
+        }
+    }
+
+    Ok(())
+}
+
+/// List available builtin profiles with metadata
+async fn list_profiles(detailed: bool, output_format: OutputFormat) -> Result<()> {
+    let profiles = LLMSpellConfig::list_profile_metadata();
+
+    match output_format {
+        OutputFormat::Json => {
+            // JSON output
+            let json_data: Vec<_> = profiles
+                .iter()
+                .map(|p| {
+                    json!({
+                        "name": p.name,
+                        "category": p.category,
+                        "description": p.description,
+                        "use_cases": p.use_cases,
+                        "features": p.features,
+                    })
+                })
+                .collect();
+            println!("{}", serde_json::to_string_pretty(&json_data)?);
+        }
+        OutputFormat::Text | OutputFormat::Pretty => {
+            // Group profiles by category
+            let mut by_category: std::collections::HashMap<
+                &str,
+                Vec<&llmspell_config::ProfileMetadata>,
+            > = std::collections::HashMap::new();
+            for profile in &profiles {
+                by_category
+                    .entry(profile.category)
+                    .or_default()
+                    .push(profile);
+            }
+
+            println!("Available Builtin Profiles:");
+            println!();
+
+            // Display in order: Core, Common Workflows, Local LLM, RAG
+            for category in &["Core", "Common Workflows", "Local LLM", "RAG"] {
+                if let Some(category_profiles) = by_category.get(category) {
+                    println!("{}:", category);
+                    for profile in category_profiles {
+                        println!("  {} - {}", profile.name, profile.description);
+
+                        if detailed {
+                            println!("    Use Cases:");
+                            for use_case in &profile.use_cases {
+                                println!("      • {}", use_case);
+                            }
+                            println!("    Key Features:");
+                            for feature in &profile.features {
+                                println!("      • {}", feature);
+                            }
+                            println!();
+                        }
+                    }
+                    println!();
+                }
+            }
+
+            if !detailed {
+                println!("Use --detailed/-d to see use cases and key features for each profile.");
+            }
+            println!();
+            println!("Usage: llmspell -p PROFILE_NAME run script.lua");
+            println!("Example: llmspell -p rag-dev run my_script.lua");
         }
     }
 

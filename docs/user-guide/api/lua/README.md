@@ -246,14 +246,32 @@ local details = Agent.get_details("assistant")
 
 When you have an agent instance:
 
-#### agent:execute(prompt, options)
-Executes the agent with a prompt.
+#### agent:execute(input_table)
+Executes the agent with an input table.
 
 ```lua
-local response = agent:execute("Write a poem", {
+-- Correct usage - input must be a table with 'text' field
+local response = agent:execute({
+    text = "Write a poem about autumn"
+})
+
+-- With parameters
+local response = agent:execute({
+    text = "Translate to French: Hello world",
     temperature = 0.9,
     max_tokens = 500
 })
+```
+
+**⚠️ IMPORTANT**: The `agent:execute()` method requires a **table** as input, not a string. The table must contain a `text` field with the prompt. Additional parameters (temperature, max_tokens, etc.) can be included in the same table.
+
+**Common mistake**:
+```lua
+-- ❌ WRONG - will fail with "error converting Lua string to table"
+local result = agent:execute("Hello world")
+
+-- ✅ CORRECT
+local result = agent:execute({text = "Hello world"})
 ```
 
 #### agent:invokeStream(prompt, options, callback)

@@ -1,5 +1,34 @@
--- End-to-End RAG Validation Test
--- This script comprehensively tests RAG functionality from CLI
+-- Test: End-to-End RAG Validation Test
+-- Purpose: Comprehensive RAG functionality and performance validation
+-- Prerequisites: OPENAI_API_KEY environment variable for embeddings
+-- Expected Output: Complete test suite with performance benchmarks
+-- Tags: test, rag, e2e-validation, performance
+--
+-- HOW TO RUN:
+-- 1. With builtin RAG production profile (recommended):
+--    ./target/debug/llmspell -p rag-prod run examples/script-users/tests/test-rag-e2e.lua
+--
+-- 2. With builtin RAG performance profile:
+--    ./target/debug/llmspell -p rag-perf run examples/script-users/tests/test-rag-e2e.lua
+--
+-- 3. With custom RAG configuration:
+--    ./target/debug/llmspell -c path/to/rag-config.toml run examples/script-users/tests/test-rag-e2e.lua
+--
+-- 4. Debug mode:
+--    ./target/debug/llmspell --debug -p rag-prod run examples/script-users/tests/test-rag-e2e.lua
+--
+-- Prerequisites:
+--   • LLMSpell installed and built
+--   • OPENAI_API_KEY environment variable (for text-embedding-ada-002)
+--   • Network connectivity for embedding API calls
+--
+-- EXPECTED OUTPUT:
+--   • 10 comprehensive RAG tests
+--   • Document ingestion, search, and metadata filtering validation
+--   • Performance benchmarks (ingestion <100ms, search <100ms)
+--   • Concurrent operation testing
+--   • Search quality validation
+--   • Exit code 0 on success
 
 print("=== RAG End-to-End Validation Test ===")
 print("")

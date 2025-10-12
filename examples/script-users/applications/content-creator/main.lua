@@ -6,9 +6,22 @@
 -- Tags: application, content-creator, power-user, conditional, quality-control
 --
 -- HOW TO RUN:
--- 1. Basic (no API keys): ./target/debug/llmspell run examples/script-users/applications/content-creator/main.lua
--- 2. With config: ./target/debug/llmspell -c examples/script-users/applications/content-creator/config.toml run examples/script-users/applications/content-creator/main.lua
--- 3. Debug mode: ./target/debug/llmspell --debug run examples/script-users/applications/content-creator/main.lua
+-- 1. Basic (no API keys):
+--    ./target/debug/llmspell run examples/script-users/applications/content-creator/main.lua
+--
+-- 2. With App-Specific Configuration (recommended for production):
+--    ./target/debug/llmspell -c examples/script-users/applications/content-creator/config.toml \
+--    run examples/script-users/applications/content-creator/main.lua
+--
+-- 3. Debug mode:
+--    ./target/debug/llmspell --debug run examples/script-users/applications/content-creator/main.lua
+--
+-- 4. Quick Start with Builtin Profiles:
+--    # For simple content creation:
+--    ./target/debug/llmspell -p providers run examples/script-users/applications/content-creator/main.lua
+--
+--    # For development/testing with full features:
+--    ./target/debug/llmspell -p development run examples/script-users/applications/content-creator/main.lua
 --
 -- ABOUTME: Power User layer - "Creating content takes forever"
 -- ABOUTME: Conditional workflows with quality control decisions for content productivity

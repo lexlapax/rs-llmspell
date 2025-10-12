@@ -158,41 +158,47 @@ async fn execute_script_embedded(
 
 /// Execute script using connected kernel
 async fn execute_script_connected(
-    _handle: ClientHandle,
+    mut handle: ClientHandle,
     script_content: &str,
     args: HashMap<String, String>,
-    stream: bool,
+    _stream: bool,
     output_format: OutputFormat,
 ) -> Result<()> {
-    // For now, just show that we're executing in connected mode
+    debug!(
+        "Executing script on connected kernel (length: {} chars, args: {})",
+        script_content.len(),
+        args.len()
+    );
+
+    // TODO: Inject args into the script context before execution
+    // For now, we just execute the script without args support in connected mode
+    if !args.is_empty() {
+        debug!("Warning: Script arguments not yet supported in connected mode");
+    }
+
+    // Execute the script on the remote kernel
+    let result = handle.execute(script_content).await?;
+
+    // Format and display the output based on the requested format
     match output_format {
         OutputFormat::Json => {
             println!(
                 "{}",
                 serde_json::json!({
-                    "status": "executed",
+                    "status": "success",
                     "mode": "connected",
                     "script_length": script_content.len(),
                     "args_count": args.len(),
-                    "streaming": stream,
-                    "result": "Script execution completed successfully via connected kernel"
+                    "result": result
                 })
             );
         }
         _ => {
-            println!("Executing script via connected kernel...");
-            println!("Script length: {} characters", script_content.len());
-            if !args.is_empty() {
-                println!("Arguments: {} provided", args.len());
-            }
-            if stream {
-                println!("🔄 Streaming execution...");
-                println!("Output: Script execution completed successfully");
-            } else {
-                println!("✓ Script sent to connected kernel for execution");
-                println!("Result: Script execution completed successfully");
-            }
+            // For plain text output, the result is already printed via IOPub
+            // Just show completion status
+            debug!("Script execution completed via connected kernel");
         }
     }
+
     Ok(())
 }

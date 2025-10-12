@@ -2,9 +2,9 @@
 
 **Production-Ready AI Workflow Orchestration Platform** - Script-driven LLM coordination with RAG at scale
 
-**🚀 Version 0.11.1 - Bridge Consolidation & Documentation Completeness**
+**🚀 Version 0.11.2 - Local LLM Cleanup & Enhancement**
 
-**🔗 Quick Links**: [📘 User Guide](docs/user-guide/) | [🔧 Developer Guide](docs/developer-guide/) | [📚 Examples](examples/) | [🛠️ Scripts](scripts/) | [🚀 Get Started](#-quick-start) | [📖 Release Notes](RELEASE_NOTES_v0.11.0.md) | [🔧 Phase 11a](docs/in-progress/phase-11a-design-doc.md)
+**🔗 Quick Links**: [📘 User Guide](docs/user-guide/) | [🔧 Developer Guide](docs/developer-guide/) | [📚 Examples](examples/) | [🛠️ Scripts](scripts/) | [🚀 Get Started](#-quick-start) | [📖 Release Notes](RELEASE_NOTES_v0.11.0.md) | [🔧 Phase 11a](docs/in-progress/phase-11a-design-doc.md) | [🧹 Phase 11b](docs/in-progress/phase-11b-design-doc.md)
 
 ---
 
@@ -12,13 +12,23 @@
 
 ---
 
-## 🌟 Production Ready with Local LLM Integration & Bridge Consolidation
+## 🌟 Production Ready with Local LLM Enhancement & Cleanup
 
-rs-llmspell v0.11.1 delivers **complete local LLM inference** with dual backends (Ollama + Candle) for 100% offline AI workflows, plus **Phase 11a bridge consolidation** with 87% compile speedup (38s→5s bridge-only), 95% security documentation coverage, and API standardization. Run agents entirely on your hardware with zero API keys, no cloud dependencies, and full data privacy—all while maintaining production Unix service infrastructure with daemon mode, tool CLI commands, and modular builds (19-35MB).
+rs-llmspell v0.11.2 delivers **Phase 11b local LLM cleanup** with single-binary architecture (removed unused llmspell-test), unified profile system (10 builtin TOML files), dual-architecture model support (LLaMA GGUF + T5 Safetensors), and platform-aware GPU detection (Metal/CUDA with graceful CPU fallback). Net code reduction of 120 LOC while adding T5 support, plus **Phase 11a bridge consolidation** with 87% compile speedup (38s→5s bridge-only), 95% security documentation coverage, and API standardization. Run agents entirely on your hardware with zero API keys, no cloud dependencies, and full data privacy—all while maintaining production Unix service infrastructure with daemon mode, tool CLI commands, and modular builds (19-35MB).
 
 ## ✨ Key Features
 
-### 🚀 Bridge Consolidation & Quality Improvements (NEW in v0.11.1)
+### 🧹 Local LLM Cleanup & Enhancement (NEW in v0.11.2)
+- **Single-Binary Architecture**: Removed unused llmspell-test binary (-675 LOC, enforced philosophy)
+- **Unified Profile System**: 10 builtin TOML profiles replace 100+ lines CLI mutations
+- **Dual-Architecture Models**: LLaMA (GGUF) + T5 (Safetensors) support via ModelArchitecture enum
+- **Platform-Aware GPU**: Metal (macOS) + CUDA (Linux) with graceful CPU fallback
+- **LocalLLM Fix**: 15/15 globals now injected correctly (was 14/15)
+- **Net Code Reduction**: -120 LOC (+755 new, -875 deleted) while adding T5 support
+- **Config Consolidation**: 40+ Lua examples updated to modern patterns
+- **Model Discovery**: HuggingFace and Ollama URLs added to help text
+
+### 🚀 Bridge Consolidation & Quality Improvements (v0.11.1)
 - **87% Compile Speedup**: Bridge-only builds 38s→5s via feature gates (ADR-042)
 - **API Standardization**: Tool.execute() unified across all 40+ tools (zero ambiguity)
 - **Workflow Introspection**: Agent output collection for debugging multi-step workflows (ADR-043)

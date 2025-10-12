@@ -332,13 +332,21 @@ async fn test_sequential_workflow_collects_agent_outputs() {
 
     // Verify convenience method works
     let outputs_via_method = llmspell_workflows::result::WorkflowResult::success(
-        result.metadata.extra.get("execution_id").unwrap().as_str().unwrap().to_string(),
+        result
+            .metadata
+            .extra
+            .get("execution_id")
+            .unwrap()
+            .as_str()
+            .unwrap()
+            .to_string(),
         llmspell_workflows::result::WorkflowType::Sequential,
         "agent_pipeline".to_string(),
         vec![],
         2,
         std::time::Duration::from_secs(1),
-    ).with_metadata("agent_outputs".to_string(), agent_outputs.clone());
+    )
+    .with_metadata("agent_outputs".to_string(), agent_outputs.clone());
 
     assert!(outputs_via_method.agent_outputs().is_some());
     assert_eq!(outputs_via_method.agent_outputs().unwrap().len(), 2);
@@ -399,14 +407,8 @@ async fn test_workflow_result_convenience_methods() {
 
     // Add agent outputs to metadata
     let mut agent_outputs = serde_json::Map::new();
-    agent_outputs.insert(
-        "agent1".to_string(),
-        json!({"text": "Agent 1 output"}),
-    );
-    agent_outputs.insert(
-        "agent2".to_string(),
-        json!({"text": "Agent 2 output"}),
-    );
+    agent_outputs.insert("agent1".to_string(), json!({"text": "Agent 1 output"}));
+    agent_outputs.insert("agent2".to_string(), json!({"text": "Agent 2 output"}));
     result_with_agents.metadata.insert(
         "agent_outputs".to_string(),
         serde_json::Value::Object(agent_outputs),
@@ -419,14 +421,25 @@ async fn test_workflow_result_convenience_methods() {
 
     // Test get_agent_output() method
     let agent1_output = result_with_agents.get_agent_output("agent1");
-    assert!(agent1_output.is_some(), "get_agent_output() should return Some for existing agent");
+    assert!(
+        agent1_output.is_some(),
+        "get_agent_output() should return Some for existing agent"
+    );
     assert_eq!(
-        agent1_output.unwrap().get("text").unwrap().as_str().unwrap(),
+        agent1_output
+            .unwrap()
+            .get("text")
+            .unwrap()
+            .as_str()
+            .unwrap(),
         "Agent 1 output"
     );
 
     let missing_agent = result_with_agents.get_agent_output("nonexistent");
-    assert!(missing_agent.is_none(), "get_agent_output() should return None for missing agent");
+    assert!(
+        missing_agent.is_none(),
+        "get_agent_output() should return None for missing agent"
+    );
 
     // Test 2: WorkflowResult without agent_outputs
     let result_without_agents = WorkflowResult::success(
@@ -440,7 +453,9 @@ async fn test_workflow_result_convenience_methods() {
 
     // Both methods should return None
     assert!(result_without_agents.agent_outputs().is_none());
-    assert!(result_without_agents.get_agent_output("any_agent").is_none());
+    assert!(result_without_agents
+        .get_agent_output("any_agent")
+        .is_none());
 }
 
 #[tokio::test]
@@ -450,7 +465,10 @@ async fn test_all_workflow_types_collect_agent_outputs() {
 
     // Helper to extract agent_outputs from result
     let get_agent_outputs = |result: &llmspell_core::types::AgentOutput| {
-        result.metadata.extra.get("agent_outputs")
+        result
+            .metadata
+            .extra
+            .get("agent_outputs")
             .and_then(|v| v.as_object())
             .map(|m| m.len())
     };
@@ -468,8 +486,15 @@ async fn test_all_workflow_types_collect_agent_outputs() {
 
     let mock_state = Arc::new(MockStateAccess::new());
     let context = ExecutionContext::default().with_state(mock_state);
-    let seq_result = sequential.execute(AgentInput::text("test"), context).await.unwrap();
-    assert_eq!(get_agent_outputs(&seq_result), Some(1), "Sequential should collect 1 agent output");
+    let seq_result = sequential
+        .execute(AgentInput::text("test"), context)
+        .await
+        .unwrap();
+    assert_eq!(
+        get_agent_outputs(&seq_result),
+        Some(1),
+        "Sequential should collect 1 agent output"
+    );
 
     // Note: Parallel, Loop, and Conditional workflows have the collection code implemented
     // (parallel.rs:997-1018, loop.rs:1489-1505, conditional.rs:1324-1343) but require

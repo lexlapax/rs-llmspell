@@ -6,9 +6,8 @@ Comprehensive test suite and testing utilities for the rs-llmspell framework.
 
 This crate provides:
 1. **Unified Test Suite**: All tests for the llmspell workspace organized by category
-2. **Test Runner CLI**: Simple command-line interface for test discovery and execution
-3. **Testing Utilities**: Mocks, generators, fixtures, and benchmarks for testing
-4. **Performance Benchmarks**: Criterion-based benchmarks for performance tracking
+2. **Testing Utilities**: Mocks, generators, fixtures, and benchmarks for testing
+3. **Performance Benchmarks**: Criterion-based benchmarks for performance tracking
 
 ## Test Organization
 
@@ -23,76 +22,7 @@ Tests are organized into categories for easy discovery and selective execution:
 - **lua** - Lua scripting bridge tests
 - **performance** - Performance benchmarks (Criterion)
 
-## Installation
-
-To use the test runner CLI:
-
-```bash
-# Install the test runner
-cargo install --path llmspell-testing --features test-runner
-
-# Or run directly from the workspace
-cargo run -p llmspell-testing --features test-runner --bin llmspell-test -- --help
-```
-
-## Using the Test Runner
-
-### List Available Categories
-
-```bash
-# Show all test categories
-llmspell-test list
-
-# Show detailed information
-llmspell-test list --detailed
-```
-
-### Run Tests
-
-```bash
-# Run all tests
-llmspell-test run all
-
-# Run specific categories
-llmspell-test run unit integration
-
-# Run with filter
-llmspell-test run unit --filter test_state
-
-# Run in release mode
-llmspell-test run all --release
-
-# Generate coverage report
-llmspell-test run all --coverage
-
-# Don't capture test output
-llmspell-test run unit --nocapture
-```
-
-### Run Benchmarks
-
-```bash
-# Run all benchmarks
-llmspell-test bench
-
-# Run specific benchmark
-llmspell-test bench hook_overhead
-
-# Save baseline for comparison
-llmspell-test bench --save my-baseline
-
-# Compare with baseline
-llmspell-test bench --baseline my-baseline
-```
-
-### Get Category Information
-
-```bash
-# Show information about a specific category
-llmspell-test info unit
-```
-
-## Running Tests with Cargo
+## Running Tests
 
 You can also run tests directly with cargo:
 
@@ -115,10 +45,7 @@ cargo bench -p llmspell-testing
 Performance benchmarks have been integrated into llmspell-testing and use Criterion for statistical analysis:
 
 ```bash
-# Run benchmarks with test runner
-llmspell-test bench
-
-# Or with cargo directly
+# Run all benchmarks
 cargo bench -p llmspell-testing
 
 # View results
@@ -175,10 +102,7 @@ llmspell-testing/
 │   ├── benchmarks.rs    # Benchmark utilities
 │   ├── fixtures.rs      # Test fixtures and data
 │   ├── generators.rs    # Property-based test generators
-│   ├── mocks.rs         # Mock implementations
-│   ├── runner/          # Test runner implementation
-│   └── bin/
-│       └── test-runner.rs  # CLI binary
+│   └── mocks.rs         # Mock implementations
 ├── tests/
 │   ├── unit/            # Unit tests
 │   ├── integration/     # Integration tests
@@ -203,28 +127,25 @@ llmspell-testing/
 
 ## CI/CD Integration
 
-The test runner integrates seamlessly with CI/CD pipelines:
+Tests can be integrated into CI/CD pipelines:
 
 ```yaml
 # GitHub Actions example
 - name: Run tests
-  run: |
-    cargo install --path llmspell-testing --features test-runner
-    llmspell-test run all --format junit > test-results.xml
+  run: cargo test --workspace
 
 # Or use scripts
 - name: Run tests
-  run: ./scripts/run-llmspell-tests.sh all
+  run: ./scripts/testing/test-by-tag.sh all
 ```
 
 ## Scripts Integration
 
 The following scripts use llmspell-testing:
 
-- `scripts/run-llmspell-tests.sh` - Convenience wrapper
-- `scripts/test-by-tag.sh` - Legacy script (delegates to test runner)
-- `scripts/quality-check.sh` - Includes test execution
-- `scripts/test-coverage.sh` - Coverage reporting
+- `scripts/testing/test-by-tag.sh` - Run tests by category tag
+- `scripts/quality/quality-check.sh` - Includes test execution
+- `scripts/testing/test-coverage.sh` - Coverage reporting
 
 ## Contributing
 
@@ -261,8 +182,7 @@ If coverage fails:
 
 ## Future Enhancements
 
-- [x] Unified test runner CLI (Task 5.7.3) ✅
-- [ ] Test categorization attributes (Task 5.7.4)
-- [x] Performance benchmark integration (Task 5.7.2) ✅
+- [x] Test categorization attributes ✅
+- [x] Performance benchmark integration ✅
 - [x] Coverage reporting integration ✅
 - [ ] Test result visualization

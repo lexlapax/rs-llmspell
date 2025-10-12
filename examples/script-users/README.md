@@ -15,7 +15,49 @@
 - **9 Complete Applications** - Full production examples (2 new RAG apps)
 - **3 RAG Test Suites** - Comprehensive RAG testing
 - **1 RAG Benchmark** - Performance measurement
-- **15 Configuration Files** - Ready-to-use configurations
+- **10 Builtin Profiles** - Zero-config quick start
+- **Custom Config Examples** - For unique patterns
+
+## 🚀 Quick Start
+
+All examples work with builtin profiles - no configuration files needed:
+
+```bash
+# Tools and workflows (no LLM needed)
+llmspell -p minimal run getting-started/00-hello-world.lua
+
+# Agent examples (requires OpenAI/Anthropic API keys)
+llmspell -p providers run getting-started/02-first-agent.lua
+
+# State persistence examples
+llmspell -p state run features/state-persistence.lua
+
+# RAG examples (requires embedding model)
+llmspell -p rag-dev run getting-started/05-first-rag.lua
+
+# Local LLM examples (requires Ollama installed)
+llmspell -p ollama run examples/local_llm_status.lua
+```
+
+### Available Builtin Profiles
+
+- **minimal** - Tools only, no LLM providers
+- **development** - Dev settings with OpenAI/Anthropic + debug logging
+- **providers** - Simple OpenAI/Anthropic setup for agents
+- **state** - State persistence enabled
+- **sessions** - Sessions + state + hooks + events
+- **ollama** - Local Ollama LLM backend
+- **candle** - Local Candle LLM backend (CPU/GPU)
+- **rag-dev** - RAG development with debug features
+- **rag-prod** - RAG production settings
+- **rag-perf** - RAG performance tuning
+
+### Custom Configuration (Optional)
+
+For advanced use cases, create a custom config file:
+```bash
+llmspell -c path/to/custom-config.toml run script.lua
+```
 
 ## 📂 Directory Structure
 
@@ -28,7 +70,7 @@ script-users/
 ├── applications/       # 9 complete applications (7 base + 2 RAG)
 ├── tests/             # 3 RAG test suites
 ├── benchmarks/        # 1 performance benchmark
-└── configs/           # 15 configuration files (.toml)
+└── configs/           # Custom configuration examples (unique patterns)
 ```
 
 ## 📚 Categories
@@ -106,32 +148,41 @@ Comprehensive test suites for RAG functionality.
 ### [Benchmarks](benchmarks/) - Performance Measurement
 - `rag-benchmark.lua` - RAG performance benchmarking
 
-### [Configs](configs/) - 15 Configuration Files
-Ready-to-use configuration files for various scenarios.
+### [Configs](configs/) - Custom Configuration Examples
+Custom configuration files for unique patterns and advanced scenarios.
 
-**Key Configurations:**
-- Provider configurations (OpenAI, Anthropic, etc.)
-- State persistence configurations
+**Demonstration Configs:**
 - RAG configurations (basic, production, multi-tenant)
-- Session and migration configurations
+- Multi-provider setups
+- Advanced session management
+- Application-specific settings
+
+**Note:** Most examples work with builtin profiles (`-p profile-name`). These configs demonstrate custom patterns for advanced use cases.
 
 ## 🚀 Running Examples
 
+### With Builtin Profiles (Recommended)
+
 ```bash
-# Run any Lua example
-./target/debug/llmspell run examples/script-users/getting-started/00-hello-world.lua
+# Run with appropriate builtin profile
+llmspell -p minimal run examples/script-users/getting-started/00-hello-world.lua
+llmspell -p providers run examples/script-users/features/agent-basics.lua
+llmspell -p rag-dev run examples/script-users/getting-started/05-first-rag.lua
+llmspell -p development run examples/script-users/applications/knowledge-base/main.lua
+```
 
-# With provider configuration
-./target/debug/llmspell -c examples/script-users/configs/example-providers.toml \
-  run examples/script-users/features/agent-basics.lua
+### With Custom Configuration (Advanced)
 
-# With RAG configuration (Phase 8)
-./target/debug/llmspell -c examples/script-users/configs/rag-basic.toml \
-  run examples/script-users/getting-started/05-first-rag.lua
+For unique patterns not covered by builtin profiles:
 
-# Run a complete application
-./target/debug/llmspell -c examples/script-users/configs/applications.toml \
-  run examples/script-users/applications/knowledge-base/main.lua
+```bash
+# With custom RAG configuration
+llmspell -c examples/script-users/configs/rag-multi-tenant.toml \
+  run examples/script-users/cookbook/rag-multi-tenant.lua
+
+# With application-specific configuration
+llmspell -c examples/script-users/applications/webapp-creator/config.toml \
+  run examples/script-users/applications/webapp-creator/main.lua
 ```
 
 ## 📖 Prerequisites

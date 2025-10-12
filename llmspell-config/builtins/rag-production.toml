@@ -1,0 +1,91 @@
+# Production RAG Configuration Profile
+# Battle-tested settings for production deployments
+# Focuses on reliability, monitoring, and security
+
+default_engine = "lua"
+
+[engines.lua]
+stdlib = "All"
+
+[providers]
+default_provider = "openai"
+
+[providers.openai]
+provider_type = "openai"
+api_key_env = "OPENAI_API_KEY"
+default_model = "gpt-4"
+temperature = 0.7
+max_tokens = 4000
+
+[providers.anthropic]
+provider_type = "anthropic"
+api_key_env = "ANTHROPIC_API_KEY"
+default_model = "claude-3-5-sonnet-20241022"
+temperature = 0.7
+max_tokens = 4000
+
+[rag]
+enabled = true
+multi_tenant = true
+
+[rag.vector_storage]
+dimensions = 768
+backend = "hnsw"
+persistence_path = "/var/lib/llmspell/rag/vectors"
+max_memory_mb = 4096
+
+[rag.vector_storage.hnsw]
+m = 16
+ef_construction = 200
+ef_search = 50
+max_elements = 5000000
+metric = "cosine"
+allow_replace_deleted = true
+num_threads = 4
+
+[rag.embedding]
+default_provider = "openai"
+cache_enabled = true
+cache_size = 20000
+cache_ttl_seconds = 1800
+batch_size = 32
+timeout_seconds = 45
+max_retries = 3
+
+[rag.chunking]
+strategy = "sliding_window"
+chunk_size = 512
+overlap = 64
+max_chunk_size = 2048
+min_chunk_size = 100
+
+[rag.cache]
+search_cache_enabled = true
+search_cache_size = 5000
+search_cache_ttl_seconds = 600
+document_cache_enabled = true
+document_cache_size_mb = 256
+
+[rag.monitoring]
+enable_metrics = true
+metrics_export_interval = 60
+enable_health_checks = true
+alert_on_errors = true
+error_threshold_per_minute = 10
+
+[rag.security]
+enable_audit_logging = true
+audit_log_path = "/var/log/llmspell/rag-audit.log"
+enable_rate_limiting = true
+rate_limit_per_user = 100
+enable_input_validation = true
+max_input_size_kb = 100
+
+[rag.backup]
+enable_auto_backup = true
+backup_interval_hours = 24
+backup_retention_days = 30
+backup_path = "/backup/llmspell/rag"
+
+[runtime]
+log_level = "info"

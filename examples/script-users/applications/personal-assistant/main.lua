@@ -6,9 +6,22 @@
 -- Tags: application, personal-assistant, rag, productivity, task-management, ai-assistant
 --
 -- HOW TO RUN:
--- 1. Basic (no API keys): ./target/debug/llmspell run examples/script-users/applications/personal-assistant/main.lua
--- 2. With config: ./target/debug/llmspell -c examples/script-users/applications/personal-assistant/config.toml run examples/script-users/applications/personal-assistant/main.lua
--- 3. Debug mode: ./target/debug/llmspell --debug run examples/script-users/applications/personal-assistant/main.lua
+-- 1. Basic (no API keys):
+--    ./target/debug/llmspell run examples/script-users/applications/personal-assistant/main.lua
+--
+-- 2. With App-Specific Configuration (recommended for production):
+--    ./target/debug/llmspell -c examples/script-users/applications/personal-assistant/config.toml \
+--    run examples/script-users/applications/personal-assistant/main.lua
+--
+-- 3. Debug mode:
+--    ./target/debug/llmspell --debug run examples/script-users/applications/personal-assistant/main.lua
+--
+-- 4. Quick Start with Builtin Profiles:
+--    # For RAG-enabled personal assistant (development):
+--    ./target/debug/llmspell -p rag-dev run examples/script-users/applications/personal-assistant/main.lua
+--
+--    # For full features with sessions + state + events:
+--    ./target/debug/llmspell -p sessions run examples/script-users/applications/personal-assistant/main.lua
 --
 -- ABOUTME: Personal AI assistant - "I need help managing my daily tasks and information"
 -- ABOUTME: Combines task management, scheduling, knowledge retrieval, and intelligent assistance

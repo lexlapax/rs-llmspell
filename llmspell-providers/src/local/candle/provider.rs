@@ -8,7 +8,7 @@ use std::collections::HashMap;
 use std::path::PathBuf;
 use tracing::{debug, error, info, warn};
 
-use candle_core::{Device, Tensor};
+use candle_core::{Device, IndexOp, Tensor};
 
 use crate::abstraction::{ProviderCapabilities, ProviderInstance};
 use llmspell_core::error::LLMSpellError;
@@ -48,37 +48,79 @@ impl CandleProvider {
             default_model, device_str
         );
 
-        // Device selection
+        // Device selection - platform-aware GPU detection
         let device = match device_str.as_str() {
             "cuda" => {
-                info!("Using CUDA device for Candle inference");
-                Device::cuda_if_available(0).map_err(|e| {
-                    error!("CUDA device requested but not available: {}", e);
-                    anyhow!("CUDA not available: {}", e)
-                })?
+                // CUDA only available on Linux/Windows
+                #[cfg(target_os = "macos")]
+                {
+                    warn!("CUDA requested but not available on macOS, using CPU");
+                    info!("Hint: Use device='metal' for GPU acceleration on Apple Silicon");
+                    Device::Cpu
+                }
+
+                #[cfg(not(target_os = "macos"))]
+                {
+                    info!("Using CUDA device for Candle inference");
+                    match Device::cuda_if_available(0) {
+                        Ok(Device::Cuda(d)) => Device::Cuda(d),
+                        Ok(_) => {
+                            error!("CUDA device requested but cuda_if_available returned CPU");
+                            return Err(anyhow!("CUDA not available"));
+                        }
+                        Err(e) => {
+                            error!("CUDA device requested but not available: {}", e);
+                            return Err(anyhow!("CUDA not available: {}", e));
+                        }
+                    }
+                }
             }
             "metal" => {
-                info!("Using Metal device for Candle inference");
-                Device::new_metal(0).map_err(|e| {
-                    error!("Metal device requested but not available: {}", e);
-                    anyhow!("Metal not available: {}", e)
-                })?
+                // Metal only available on macOS
+                #[cfg(not(target_os = "macos"))]
+                {
+                    warn!("Metal requested but only available on macOS, using CPU");
+                    Device::Cpu
+                }
+
+                #[cfg(target_os = "macos")]
+                {
+                    info!("Using Metal device for Candle inference");
+                    Device::new_metal(0).map_err(|e| {
+                        error!("Metal device requested but not available: {}", e);
+                        anyhow!("Metal not available: {}", e)
+                    })?
+                }
             }
             "cpu" => {
                 info!("Using CPU device for Candle inference");
                 Device::Cpu
             }
             "auto" => {
-                // Try CUDA first, then Metal, then CPU
-                if let Ok(cuda) = Device::cuda_if_available(0) {
-                    info!("Auto-detected CUDA device for Candle");
-                    cuda
-                } else if let Ok(metal) = Device::new_metal(0) {
-                    info!("Auto-detected Metal device for Candle");
-                    metal
-                } else {
-                    info!("Auto-detected CPU device for Candle (no GPU available)");
-                    Device::Cpu
+                // Platform-specific GPU auto-detection
+                #[cfg(target_os = "macos")]
+                {
+                    if let Ok(metal) = Device::new_metal(0) {
+                        info!("Auto-detected Metal device for Candle (Apple Silicon)");
+                        metal
+                    } else {
+                        info!("Auto-detected CPU device for Candle (Metal unavailable)");
+                        Device::Cpu
+                    }
+                }
+
+                #[cfg(not(target_os = "macos"))]
+                {
+                    match Device::cuda_if_available(0) {
+                        Ok(Device::Cuda(d)) => {
+                            info!("Auto-detected CUDA device for Candle");
+                            Device::Cuda(d)
+                        }
+                        _ => {
+                            info!("Auto-detected CPU device for Candle (CUDA unavailable)");
+                            Device::Cpu
+                        }
+                    }
                 }
             }
             _ => {
@@ -87,7 +129,7 @@ impl CandleProvider {
             }
         };
 
-        debug!("Candle provider using device: {:?}", device);
+        info!("Candle provider initialized with device: {:?}", device);
 
         // Model directory
         let model_directory = model_directory.unwrap_or_else(|| {
@@ -132,6 +174,30 @@ impl CandleProvider {
         }
         Err(anyhow!("No GGUF file found in {:?}", model_path))
     }
+
+    /// Check if model directory contains required files
+    ///
+    /// For GGUF models: Requires .gguf file
+    /// For T5 models: Requires config.json
+    fn is_model_complete(&self, model_path: &PathBuf, is_t5: bool) -> Result<bool> {
+        if !model_path.is_dir() {
+            debug!("Model path {:?} is not a directory", model_path);
+            return Ok(false);
+        }
+
+        if is_t5 {
+            // T5 model requires config.json
+            let config_path = model_path.join("config.json");
+            let exists = config_path.exists();
+            debug!("T5 model completeness check: config.json exists = {}", exists);
+            Ok(exists)
+        } else {
+            // GGUF model requires .gguf file
+            let has_gguf = self.find_gguf_file(model_path).is_ok();
+            debug!("GGUF model completeness check: .gguf file exists = {}", has_gguf);
+            Ok(has_gguf)
+        }
+    }
 }
 
 impl CandleProvider {
@@ -168,6 +234,27 @@ impl CandleProvider {
         max_tokens: usize,
     ) -> Result<String> {
         debug!("Starting generation: max_tokens={}", max_tokens);
+
+        // Dispatch to appropriate generation method based on architecture
+        use super::model_type::ModelArchitecture;
+        match model_wrapper.architecture() {
+            ModelArchitecture::LLaMA => {
+                self.generate_llama(model_wrapper, prompt, sampling_config, max_tokens)
+            }
+            ModelArchitecture::T5 => {
+                self.generate_t5(model_wrapper, prompt, sampling_config, max_tokens)
+            }
+        }
+    }
+
+    /// Generate text using LLaMA model (decoder-only architecture)
+    fn generate_llama(
+        &self,
+        model_wrapper: &mut ModelWrapper,
+        prompt: &str,
+        sampling_config: &SamplingConfig,
+        max_tokens: usize,
+    ) -> Result<String> {
         let gen_start = std::time::Instant::now();
 
         // Format prompt for chat models
@@ -193,7 +280,7 @@ impl CandleProvider {
         let prompt_tensor =
             Tensor::new(prompt_tokens.as_slice(), model_wrapper.device())?.unsqueeze(0)?;
 
-        let mut logits = model_wrapper.model().forward(&prompt_tensor, 0)?;
+        let mut logits = model_wrapper.llama_model().forward(&prompt_tensor, 0)?;
         logits = logits.squeeze(0)?; // Remove batch dimension → [vocab_size]
 
         let first_token_duration = first_token_start.elapsed();
@@ -226,7 +313,7 @@ impl CandleProvider {
             let input_tensor = Tensor::new(&[next_token], model_wrapper.device())?.unsqueeze(0)?;
             let pos = prompt_tokens.len() + index;
 
-            logits = model_wrapper.model().forward(&input_tensor, pos)?;
+            logits = model_wrapper.llama_model().forward(&input_tensor, pos)?;
             logits = logits.squeeze(0)?; // [vocab_size]
         }
 
@@ -255,6 +342,128 @@ impl CandleProvider {
             total_duration.as_secs_f64() * 1000.0,
             tokenize_duration.as_secs_f64() * 1000.0,
             first_token_duration.as_secs_f64() * 1000.0,
+            generation_duration.as_secs_f64() * 1000.0,
+            decode_duration.as_secs_f64() * 1000.0
+        );
+
+        Ok(generated_text)
+    }
+
+    /// Generate text using T5 model (encoder-decoder architecture)
+    fn generate_t5(
+        &self,
+        model_wrapper: &mut ModelWrapper,
+        prompt: &str,
+        _sampling_config: &SamplingConfig,
+        max_tokens: usize,
+    ) -> Result<String> {
+        let gen_start = std::time::Instant::now();
+
+        // Extract T5 config and device (immutable borrows)
+        let decoder_start_token_id = model_wrapper.t5_config().decoder_start_token_id.unwrap_or(0);
+        let eos_token_id = model_wrapper.t5_config().eos_token_id;
+        let device = model_wrapper.device().clone();
+
+        // Tokenize input prompt (immutable borrow, released after)
+        let tokenize_start = std::time::Instant::now();
+        let input_token_ids = {
+            let tokenizer = model_wrapper.t5_tokenizer();
+            let encoding = tokenizer
+                .encode(prompt, true)
+                .map_err(|e| anyhow!("Tokenization failed: {}", e))?;
+            encoding.get_ids().to_vec()
+        };
+        let tokenize_duration = tokenize_start.elapsed();
+        info!(
+            "T5 prompt tokenized: {} tokens in {:.2}ms",
+            input_token_ids.len(),
+            tokenize_duration.as_secs_f64() * 1000.0
+        );
+
+        // Create input tensor [batch_size=1, seq_len]
+        let input_tensor = Tensor::new(input_token_ids.as_slice(), &device)?.unsqueeze(0)?;
+
+        // Encode input (single pass) - FIRST TOKEN LATENCY
+        let encode_start = std::time::Instant::now();
+        let encoder_output = model_wrapper
+            .t5_model()
+            .encode(&input_tensor)
+            .map_err(|e| anyhow!("Encoding failed: {}", e))?;
+        let encode_duration = encode_start.elapsed();
+        info!(
+            "T5 encoding complete: {:.2}ms",
+            encode_duration.as_secs_f64() * 1000.0
+        );
+
+        // Initialize decoder with start token
+        let mut decoder_token_ids = vec![decoder_start_token_id as u32];
+        let generation_start = std::time::Instant::now();
+
+        // Autoregressive generation from decoder
+        for index in 0..max_tokens {
+            // Create decoder input tensor [batch_size=1, decoder_seq_len]
+            let decoder_tensor = Tensor::new(decoder_token_ids.as_slice(), &device)?.unsqueeze(0)?;
+
+            // Decode step
+            let logits = model_wrapper
+                .t5_model()
+                .decode(&decoder_tensor, &encoder_output)
+                .map_err(|e| anyhow!("Decoding failed at step {}: {}", index, e))?;
+
+            // Get logits for last token [batch_size, seq_len, vocab_size] → [vocab_size]
+            let last_logits = logits
+                .i((0, decoder_token_ids.len() - 1))?
+                .to_vec1::<f32>()?;
+
+            // Simple greedy sampling (take argmax)
+            // TODO: Use sampling_config for temperature/top_p/top_k
+            let next_token_id = last_logits
+                .iter()
+                .enumerate()
+                .max_by(|(_, a), (_, b)| a.partial_cmp(b).unwrap())
+                .map(|(idx, _)| idx as u32)
+                .ok_or_else(|| anyhow!("Failed to sample token"))?;
+
+            // Check for EOS
+            if next_token_id == eos_token_id as u32 {
+                debug!("T5 EOS token encountered at position {}", index);
+                break;
+            }
+
+            decoder_token_ids.push(next_token_id);
+        }
+
+        let generation_duration = generation_start.elapsed();
+        let tokens_generated = decoder_token_ids.len() - 1; // Exclude start token
+        let tokens_per_second = if generation_duration.as_secs_f64() > 0.0 {
+            tokens_generated as f64 / generation_duration.as_secs_f64()
+        } else {
+            0.0
+        };
+
+        info!(
+            "T5 generated {} tokens in {:.2}ms ({:.2} tokens/sec)",
+            tokens_generated,
+            generation_duration.as_secs_f64() * 1000.0,
+            tokens_per_second
+        );
+
+        // Decode generated tokens (skip start token)
+        let decode_start = std::time::Instant::now();
+        let generated_text = {
+            let tokenizer = model_wrapper.t5_tokenizer();
+            tokenizer
+                .decode(&decoder_token_ids[1..], true)
+                .map_err(|e| anyhow!("Token decoding failed: {}", e))?
+        };
+        let decode_duration = decode_start.elapsed();
+
+        let total_duration = gen_start.elapsed();
+        info!(
+            "T5 total generation: {:.2}ms (tokenize: {:.2}ms, encode: {:.2}ms, generation: {:.2}ms, decode: {:.2}ms)",
+            total_duration.as_secs_f64() * 1000.0,
+            tokenize_duration.as_secs_f64() * 1000.0,
+            encode_duration.as_secs_f64() * 1000.0,
             generation_duration.as_secs_f64() * 1000.0,
             decode_duration.as_secs_f64() * 1000.0
         );
@@ -434,58 +643,107 @@ impl LocalProviderInstance for CandleProvider {
         let model_name = &spec.model;
         let variant = spec.variant.as_deref().unwrap_or("Q4_K_M");
 
-        // Create model directory
-        let model_id = format!("{}:{}", model_name, variant);
+        // Determine if this is a T5 model (no quantization) or GGUF model (with quantization)
+        let is_t5 = HFModelRepo::get_t5_repo_info(model_name).is_some();
+        let model_id = if is_t5 {
+            model_name.to_string() // T5 models: no variant suffix
+        } else {
+            format!("{}:{}", model_name, variant) // GGUF models: name:variant
+        };
         let model_dir = self.model_directory.join(&model_id);
 
-        if model_dir.exists() {
-            info!("Model {} already exists", model_id);
-            // Get actual size
+        // Check if model already exists with required files
+        debug!("Checking if model dir exists: {:?}", model_dir);
+        let dir_exists = model_dir.exists();
+        debug!("Dir exists: {}", dir_exists);
+
+        if dir_exists {
+            let is_complete = self.is_model_complete(&model_dir, is_t5)?;
+            debug!("Model complete: {}", is_complete);
+
+            if is_complete {
+                info!("Model {} already exists and is complete", model_id);
+                // Get actual size
+                let mut total_size = 0u64;
+                for entry in std::fs::read_dir(&model_dir)?.flatten() {
+                    if let Ok(metadata) = entry.metadata() {
+                        total_size += metadata.len();
+                    }
+                }
+                return Ok(PullProgress {
+                    model_id: model_id.clone(),
+                    status: DownloadStatus::Complete,
+                    percent_complete: 100.0,
+                    bytes_downloaded: total_size,
+                    bytes_total: Some(total_size),
+                });
+            } else {
+                debug!("Model dir exists but incomplete, proceeding with download");
+            }
+        }
+
+        // Try GGUF models first (quantized LLaMA family)
+        if let Some((repo_id, filename)) = HFModelRepo::get_repo_info(model_name, variant) {
+            info!(
+                "Downloading GGUF model from HuggingFace: repo={}, file={}",
+                repo_id, filename
+            );
+
+            let downloader = HFDownloader::new()?;
+            let progress =
+                downloader.download_with_progress(repo_id, &filename, &model_dir, &model_id)?;
+
+            info!("GGUF model {} downloaded successfully", model_id);
+            Ok(progress)
+        }
+        // Try T5 models (safetensors format)
+        else if let Some(repo_id) = HFModelRepo::get_t5_repo_info(model_name) {
+            info!(
+                "Downloading T5 model from HuggingFace: repo={}",
+                repo_id
+            );
+
+            let downloader = HFDownloader::new()?;
+            downloader.download_safetensors_model(repo_id, &model_dir)?;
+
+            // Calculate total size of downloaded files
             let mut total_size = 0u64;
             for entry in std::fs::read_dir(&model_dir)?.flatten() {
                 if let Ok(metadata) = entry.metadata() {
                     total_size += metadata.len();
                 }
             }
-            return Ok(PullProgress {
+
+            info!("T5 model {} downloaded successfully ({} bytes)", model_id, total_size);
+
+            Ok(PullProgress {
                 model_id: model_id.clone(),
                 status: DownloadStatus::Complete,
                 percent_complete: 100.0,
                 bytes_downloaded: total_size,
                 bytes_total: Some(total_size),
-            });
+            })
         }
-
-        // Try to map to known HuggingFace repositories
-        if let Some((repo_id, filename)) = HFModelRepo::get_repo_info(model_name, variant) {
-            info!(
-                "Downloading from HuggingFace: repo={}, file={}",
-                repo_id, filename
-            );
-
-            // Create downloader
-            let downloader = HFDownloader::new()?;
-
-            // Download with progress
-            let progress =
-                downloader.download_with_progress(repo_id, &filename, &model_dir, &model_id)?;
-
-            info!("Model {} downloaded successfully", model_id);
-            Ok(progress)
-        } else {
-            // Unknown model - provide instructions for manual download
+        // Unknown model - provide helpful error
+        else {
             Err(anyhow!(
                 "Model '{}' not found in known repositories.\n\
                 \n\
-                For known models, use:\n\
+                GGUF models (quantized, Metal GPU blocked by RMS-norm):\n\
                 - tinyllama (TinyLlama-1.1B-Chat)\n\
                 - phi-2 (Phi-2)\n\
                 - qwen2-0.5b (Qwen2-0.5B-Instruct)\n\
                 \n\
+                T5 models (full precision, Metal GPU WORKING):\n\
+                - flan-t5-small (80M params, recommended for Metal)\n\
+                - flan-t5-base (250M params)\n\
+                - flan-t5-large (780M params)\n\
+                - t5-small, t5-base, t5-large\n\
+                \n\
                 For custom models, download manually:\n\
-                1. Download GGUF model from HuggingFace\n\
-                2. Place files in: {:?}\n\
-                3. Ensure both .gguf and tokenizer.json are present\n\
+                1. Download model files from HuggingFace\n\
+                2. Place in: {:?}\n\
+                3. GGUF: .gguf + tokenizer.json | T5: config.json + tokenizer.json + *.safetensors\n\
                 \n\
                 Alternative: Use Ollama backend:\n\
                 llmspell model pull {}@ollama",

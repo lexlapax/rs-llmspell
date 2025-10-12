@@ -25,8 +25,11 @@ getting-started/ → features/ (YOU ARE HERE) → advanced-patterns/ → cookboo
 - Agent discovery
 
 ```bash
-# Requires API key
-OPENAI_API_KEY=$OPENAI_API_KEY ./target/debug/llmspell run examples/script-users/features/agent-basics.lua
+# Requires API key (set OPENAI_API_KEY or ANTHROPIC_API_KEY)
+llmspell -p providers run examples/script-users/features/agent-basics.lua
+
+# Or with debug logging:
+llmspell -p development run examples/script-users/features/agent-basics.lua
 ```
 
 ### 2. tool-basics.lua
@@ -61,9 +64,11 @@ OPENAI_API_KEY=$OPENAI_API_KEY ./target/debug/llmspell run examples/script-users
 - Conflict resolution
 
 ```bash
-# Requires state-enabled config
-./target/debug/llmspell -c examples/script-users/configs/state-enabled.toml \
-    run examples/script-users/features/state-persistence.lua
+# Requires state persistence enabled
+llmspell -p state run examples/script-users/features/state-persistence.lua
+
+# Or with sessions (includes state + hooks + events):
+llmspell -p sessions run examples/script-users/features/state-persistence.lua
 ```
 
 ### 5. provider-info.lua
@@ -74,8 +79,11 @@ OPENAI_API_KEY=$OPENAI_API_KEY ./target/debug/llmspell run examples/script-users
 - Configuration validation
 
 ```bash
-# No API key needed
-./target/debug/llmspell run examples/script-users/features/provider-info.lua
+# Works without API keys (shows available providers)
+llmspell run examples/script-users/features/provider-info.lua
+
+# Or with providers profile to show configured details:
+llmspell -p providers run examples/script-users/features/provider-info.lua
 ```
 
 ## 🔑 Key Concepts
@@ -117,9 +125,23 @@ After mastering these features:
 ## 📝 Common Issues
 
 ### API Key Not Set
+Set environment variables and use providers profile:
 ```bash
 export OPENAI_API_KEY="your-key-here"
 export ANTHROPIC_API_KEY="your-key-here"
+
+# Then run with providers profile:
+llmspell -p providers run examples/script-users/features/agent-basics.lua
+```
+
+### State Not Available
+Use state or sessions builtin profile:
+```bash
+# Basic state:
+llmspell -p state run examples/script-users/features/state-persistence.lua
+
+# Full sessions (state + hooks + events):
+llmspell -p sessions run examples/script-users/features/state-persistence.lua
 ```
 
 ### Wrong Method Name

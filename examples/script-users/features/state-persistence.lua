@@ -1,8 +1,33 @@
--- Example: state-persistence.lua
--- Author: LLMSpell Examples
--- Purpose: Demonstrate state persistence capabilities with scoped namespaces
--- Config: Requires state-enabled configuration (see configs/state-enabled.toml)
--- Learning: How to persist data across script executions
+-- ============================================================
+-- LLMSPELL FEATURES SHOWCASE
+-- ============================================================
+-- Feature ID: 04 - State Persistence v0.7.0
+-- Complexity Level: INTERMEDIATE
+-- Real-World Use Case: Persisting data across script executions
+-- Feature Category: State Management
+--
+-- Purpose: Demonstrate state persistence with scoped namespaces
+-- Architecture: Scoped key-value store with specialized helpers
+-- Key Capabilities:
+--   • State.save() / State.load() - Basic operations
+--   • Scoped namespaces (global, custom, workflow, agent, tool)
+--   • State.list_keys() - Discovery within scopes
+--   • Specialized helpers (workflow_get, agent_set, tool_get)
+--   • State.delete() - Cleanup operations
+--
+-- Prerequisites:
+--   • LLMSpell installed and built
+--
+-- HOW TO RUN:
+-- ./target/debug/llmspell -p state run examples/script-users/features/state-persistence.lua
+--
+-- EXPECTED OUTPUT:
+-- Demonstrates 8 state operations across all 5 scopes
+-- Execution time: <2 seconds
+--
+-- Time to Complete: 2 seconds
+-- Next Steps: See getting-started/04-handle-errors.lua for error patterns
+-- ============================================================
 
 print("=== LLMSpell: State Persistence ===")
 print("This example demonstrates how to use the State API with scoped namespaces!")
@@ -11,7 +36,7 @@ print()
 -- Check if State is available
 if not State then
     print("❌ State API not available!")
-    print("   Run with: ./llmspell -c configs/state-enabled.toml run features/state-persistence.lua")
+    print("   Run with: ./target/debug/llmspell -p state run examples/script-users/features/state-persistence.lua")
     return
 end
 

@@ -7,8 +7,8 @@
 //!
 //! ## Architecture Highlights
 //!
-//! - **Global Flags**: `--config`, `--trace`, `--output` available on all commands
-//! - **RAG Profile Integration**: Single `--rag-profile` flag replaces 20+ individual flags
+//! - **Global Flags**: `--config`, `--profile`, `--trace`, `--output` available on all commands
+//! - **Unified Profile System**: Single `--profile` / `-p` flag for all builtin configurations
 //! - **Dual-Mode Support**: Automatic kernel context resolution (embedded vs connected)
 //! - **Professional Output**: Consistent JSON/YAML/Text formatting across all commands
 //! - **Contextual Help**: Command-specific help with examples and usage patterns
@@ -37,7 +37,7 @@
 //! llmspell --output json run script.lua arg1 arg2
 //!
 //! # Start REPL with specific RAG profile
-//! llmspell --rag-profile research-assistant repl
+//! llmspell -p rag-dev repl
 //!
 //! # Connect to remote kernel for debugging
 //! llmspell --connect localhost:9572 debug script.lua --break-at main.lua:10
@@ -105,6 +105,37 @@ pub struct Cli {
     /// Configuration file (GLOBAL)
     #[arg(short = 'c', long, global = true, env = "LLMSPELL_CONFIG")]
     pub config: Option<PathBuf>,
+
+    /// Built-in configuration profile (GLOBAL)
+    ///
+    /// Available profiles:
+    ///
+    /// Core:
+    ///   minimal      - Tools only, no LLM providers
+    ///   development  - Dev settings with debug logging
+    ///
+    /// Common Workflows:
+    ///   providers    - OpenAI + Anthropic setup
+    ///   state        - State persistence with memory backend
+    ///   sessions     - Sessions + state + hooks + events
+    ///
+    /// Local LLM:
+    ///   ollama       - Ollama backend configuration
+    ///   candle       - Candle embedded inference
+    ///
+    /// RAG:
+    ///   rag-dev      - Development RAG (small dims, fast)
+    ///   rag-prod     - Production RAG (reliability, monitoring)
+    ///   rag-perf     - Performance RAG (high memory, cores)
+    ///
+    /// Use 'llmspell config list-profiles' for detailed information.
+    ///
+    /// Profiles are complete configurations loaded from built-in TOML files.
+    /// Use --profile to select a builtin, or -c for custom config files.
+    ///
+    /// Precedence: --profile > -c > discovery > default
+    #[arg(short = 'p', long, global = true)]
+    pub profile: Option<String>,
 
     /// Trace level (replaces --debug/--verbose)
     #[arg(long, global = true, value_enum, default_value = "warn")]
@@ -188,7 +219,7 @@ EXAMPLES:
     llmspell run script.lua                    # Execute Lua script
     llmspell run script.lua -- arg1 arg2      # Pass arguments to script
     llmspell run script.js --engine javascript # Execute JavaScript script
-    llmspell run ml.lua --rag-profile production  # Use production RAG profile
+    llmspell -p rag-prod run ml.lua            # Use production RAG profile
     llmspell run script.lua --connect localhost:9555  # Execute on remote kernel
     llmspell run script.lua --stream           # Enable streaming output")]
     Run {
@@ -207,10 +238,6 @@ EXAMPLES:
         #[arg(long)]
         stream: bool,
 
-        /// RAG profile to use (e.g., "production", "development")
-        #[arg(long, value_name = "PROFILE")]
-        rag_profile: Option<String>,
-
         /// Script arguments
         #[arg(last = true)]
         args: Vec<String>,
@@ -222,7 +249,7 @@ EXAMPLES:
 EXAMPLES:
     llmspell exec \"print('hello world')\"      # Execute Lua code
     llmspell exec \"console.log('test')\" --engine javascript  # Execute JavaScript
-    llmspell exec \"agent.query('What is 2+2?')\"  # Use LLM agent
+    llmspell -p development exec \"agent.query('What is 2+2?')\"  # Use development profile
     llmspell exec \"print('test')\" --connect localhost:9555  # Execute on remote kernel
     llmspell exec \"process_data()\" --stream   # Enable streaming output")]
     Exec {
@@ -241,10 +268,6 @@ EXAMPLES:
         /// Enable streaming output
         #[arg(long)]
         stream: bool,
-
-        /// RAG profile to use (e.g., "production", "development")
-        #[arg(long, value_name = "PROFILE")]
-        rag_profile: Option<String>,
     },
 
     /// Start interactive REPL
@@ -255,7 +278,7 @@ EXAMPLES:
     llmspell repl --engine javascript         # Start JavaScript REPL
     llmspell repl --history ~/.llmspell_history  # Use custom history file
     llmspell repl --connect localhost:9555    # Connect to remote kernel
-    llmspell repl --rag-profile production    # Use production RAG profile")]
+    llmspell -p rag-prod repl                  # Use production RAG profile")]
     Repl {
         /// Script engine to use
         #[arg(long, value_enum, default_value = "lua", env = "LLMSPELL_ENGINE")]
@@ -268,10 +291,6 @@ EXAMPLES:
         /// History file path
         #[arg(long)]
         history: Option<PathBuf>,
-
-        /// RAG profile to use (e.g., "production", "development")
-        #[arg(long, value_name = "PROFILE")]
-        rag_profile: Option<String>,
     },
 
     /// Debug a script with interactive debugging
@@ -312,10 +331,6 @@ EXAMPLES:
         /// DAP server port for IDE attachment
         #[arg(long)]
         port: Option<u16>,
-
-        /// RAG profile to use (e.g., "production", "development")
-        #[arg(long, value_name = "PROFILE")]
-        rag_profile: Option<String>,
 
         /// Script arguments
         #[arg(last = true)]
@@ -690,9 +705,14 @@ Model specifications follow the format: model:variant@backend
 - backend: Backend to use (ollama or candle)
 
 EXAMPLES:
+    llmspell model available                   # List models from backend libraries
     llmspell model pull llama3.1:8b@ollama     # Download Llama 3.1 8B via Ollama
     llmspell model pull mistral:7b@candle      # Download Mistral 7B via Candle
-    llmspell model pull phi3@ollama --force    # Force re-download")]
+    llmspell model pull phi3@ollama --force    # Force re-download
+
+Browse models online:
+  Ollama:  https://ollama.com/library
+  Candle:  https://huggingface.co/models?pipeline_tag=text-generation")]
     Pull {
         /// Model specification (e.g., \"llama3.1:8b@ollama\")
         model: String,
@@ -1064,6 +1084,21 @@ pub enum ConfigCommands {
         /// Output format
         #[arg(long, value_enum, default_value = "toml")]
         format: ConfigFormat,
+    },
+
+    /// List available builtin profiles
+    #[command(
+        long_about = "Display all available builtin configuration profiles with detailed metadata.
+
+EXAMPLES:
+    llmspell config list-profiles                    # List all profiles
+    llmspell config list-profiles --detailed         # Show full metadata for each profile
+    llmspell config list-profiles --output json      # Output in JSON format"
+    )]
+    ListProfiles {
+        /// Show detailed profile information (use cases, features)
+        #[arg(long, short = 'd')]
+        detailed: bool,
     },
 }
 

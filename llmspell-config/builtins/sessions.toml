@@ -1,0 +1,32 @@
+# Sessions Profile
+# Sessions + state + hooks + events enabled
+# Replaces: session-enabled.toml
+# Used by: rag-session.lua and session examples
+
+default_engine = "lua"
+
+[engines.lua]
+stdlib = "All"
+
+[runtime]
+log_level = "info"
+
+[runtime.state_persistence]
+enabled = true
+backend_type = "memory"
+max_state_size_bytes = 10_000_000
+
+[runtime.sessions]
+enabled = true
+max_sessions = 100
+max_artifacts_per_session = 1000
+session_timeout_seconds = 3600
+storage_backend = "memory"
+
+[runtime.hooks]
+enabled = true
+max_hooks = 100
+
+[events]
+enabled = true
+buffer_size = 1000
