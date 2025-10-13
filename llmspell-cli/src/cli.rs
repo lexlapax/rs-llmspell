@@ -494,7 +494,8 @@ EXAMPLES:
     },
 
     /// Manage and execute templates
-    #[command(long_about = "Discover, configure, and execute production-ready AI agent templates.
+    #[command(
+        long_about = "Discover, configure, and execute production-ready AI agent templates.
 
 Templates provide turn-key solutions for common workflows by combining agents, tools,
 RAG, and workflows into pre-configured patterns. Available templates include:
@@ -512,7 +513,8 @@ EXAMPLES:
     llmspell template info research-assistant --show-schema  # Include parameter schema
     llmspell template exec research-assistant --param topic=\"Rust async\" --param max_sources=15
     llmspell template search \"research\" \"citations\"  # Search templates
-    llmspell template schema research-assistant  # Show JSON schema")]
+    llmspell template schema research-assistant  # Show JSON schema"
+    )]
     Template {
         #[command(subcommand)]
         command: TemplateCommands,
@@ -1282,12 +1284,14 @@ EXAMPLES:
     },
 
     /// Search templates by keywords
-    #[command(long_about = "Search for templates by keywords in name, description, or tags.
+    #[command(
+        long_about = "Search for templates by keywords in name, description, or tags.
 
 EXAMPLES:
     llmspell template search \"research\"         # Search for research templates
     llmspell template search \"code\" \"generator\" # Multiple keywords
-    llmspell template search \"data\" --category Analysis  # Filter by category")]
+    llmspell template search \"data\" --category Analysis  # Filter by category"
+    )]
     Search {
         /// Search keywords (can specify multiple)
         query: Vec<String>,
@@ -1298,13 +1302,15 @@ EXAMPLES:
     },
 
     /// Show template parameter schema
-    #[command(long_about = "Display the parameter schema for a template in JSON format.
+    #[command(
+        long_about = "Display the parameter schema for a template in JSON format.
 
 The schema shows parameter types, defaults, constraints, and validation rules.
 
 EXAMPLES:
     llmspell template schema research-assistant  # Show parameter schema
-    llmspell template schema interactive-chat > schema.json  # Save to file")]
+    llmspell template schema interactive-chat > schema.json  # Save to file"
+    )]
     Schema {
         /// Template ID to show schema for
         name: String,

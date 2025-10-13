@@ -229,7 +229,10 @@ async fn handle_exec(
     let duration = start.elapsed();
 
     // Display results
-    println!("\n✓ Template execution completed in {:.2}s", duration.as_secs_f64());
+    println!(
+        "\n✓ Template execution completed in {:.2}s",
+        duration.as_secs_f64()
+    );
     println!("{}", "=".repeat(80));
 
     // Show result
@@ -265,7 +268,12 @@ async fn handle_exec(
     if !output.artifacts.is_empty() {
         println!("\nArtifacts ({}):", output.artifacts.len());
         for artifact in &output.artifacts {
-            println!("  - {} ({}, {} bytes)", artifact.filename, artifact.mime_type, artifact.size());
+            println!(
+                "  - {} ({}, {} bytes)",
+                artifact.filename,
+                artifact.mime_type,
+                artifact.size()
+            );
 
             // Write artifacts to output directory if specified
             if let Some(output_path) = &output_dir {
@@ -277,7 +285,10 @@ async fn handle_exec(
 
     // Show metrics
     println!("\nMetrics:");
-    println!("  Duration:      {:.2}s", output.metrics.duration_ms as f64 / 1000.0);
+    println!(
+        "  Duration:      {:.2}s",
+        output.metrics.duration_ms as f64 / 1000.0
+    );
     if let Some(tokens) = output.metrics.tokens_used {
         println!("  Tokens:        {}", tokens);
     }
