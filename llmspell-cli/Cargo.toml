@@ -19,7 +19,7 @@ llmspell-kernel = { path = "../llmspell-kernel" }
 llmspell-providers = { path = "../llmspell-providers" }
 llmspell-utils = { path = "../llmspell-utils" }
 llmspell-storage = { path = "../llmspell-storage" }
-llmspell-templates = { path = "../llmspell-templates" }
+# llmspell-templates removed - templates now accessed via kernel message protocol
 llmspell-agents = { path = "../llmspell-agents" }
 llmspell-tools = { path = "../llmspell-tools" }
 llmspell-workflows = { path = "../llmspell-workflows" }

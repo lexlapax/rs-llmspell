@@ -805,6 +805,7 @@ impl<P: Protocol + 'static> IntegratedKernel<P> {
                                     || msg_type == "comm_info_request"
                                     || msg_type == "history_request"
                                     || msg_type == "tool_request"
+                                    || msg_type == "template_request"
                                     || msg_type == "model_request"
                                 {
                                     trace!("Received shell message: {}", msg_type);
@@ -2610,13 +2611,19 @@ impl<P: Protocol + 'static> IntegratedKernel<P> {
 
         let show_schema = content
             .get("show_schema")
-            .and_then(|v| v.as_bool())
+            .and_then(serde_json::Value::as_bool)
             .unwrap_or(false);
 
-        debug!("Getting info for template: {} (show_schema: {})", template_name, show_schema);
+        debug!(
+            "Getting info for template: {} (show_schema: {})",
+            template_name, show_schema
+        );
 
         // Use ScriptExecutor trait method (avoids concrete template types)
-        match self.script_executor.handle_template_info(template_name, show_schema) {
+        match self
+            .script_executor
+            .handle_template_info(template_name, show_schema)
+        {
             Ok(template_json) => {
                 let response = json!({
                     "msg_type": "template_reply",
@@ -2655,7 +2662,11 @@ impl<P: Protocol + 'static> IntegratedKernel<P> {
         debug!("Executing template: {}", template_name);
 
         // Use ScriptExecutor trait method (avoids concrete template types)
-        match self.script_executor.handle_template_exec(template_name, params_json).await {
+        match self
+            .script_executor
+            .handle_template_exec(template_name, params_json)
+            .await
+        {
             Ok(result_json) => {
                 let response = json!({
                     "msg_type": "template_reply",
@@ -2691,7 +2702,10 @@ impl<P: Protocol + 'static> IntegratedKernel<P> {
         debug!("Searching templates with query: {}", query);
 
         // Use ScriptExecutor trait method (avoids concrete template types)
-        match self.script_executor.handle_template_search(query, category_filter) {
+        match self
+            .script_executor
+            .handle_template_search(query, category_filter)
+        {
             Ok(results_json) => {
                 let response = json!({
                     "msg_type": "template_reply",

@@ -286,7 +286,7 @@ impl ScriptRuntime {
         config: LLMSpellConfig,
     ) -> Result<Self, LLMSpellError> {
         debug!("Initializing script runtime with engine");
-        // Create component registry with event support based on config
+        // Create component registry with event support and templates based on config
         let registry = if config.events.enabled {
             // Create EventBus with default configuration
             // Note: Buffer size is hardcoded to 10000 in EventBus implementation
@@ -303,10 +303,22 @@ impl ScriptRuntime {
                 max_events_per_second: config.events.max_events_per_second,
             };
 
-            Arc::new(ComponentRegistry::with_event_bus(event_bus, event_config))
+            Arc::new(
+                ComponentRegistry::with_event_bus_and_templates(event_bus, event_config).map_err(
+                    |e| LLMSpellError::Component {
+                        message: format!("Failed to initialize component registry: {e}"),
+                        source: None,
+                    },
+                )?,
+            )
         } else {
-            // Events disabled, create registry without event bus
-            Arc::new(ComponentRegistry::new())
+            // Events disabled, create registry with built-in templates
+            Arc::new(
+                ComponentRegistry::with_templates().map_err(|e| LLMSpellError::Component {
+                    message: format!("Failed to initialize component registry: {e}"),
+                    source: None,
+                })?,
+            )
         };
 
         // Register all Phase 2 tools with the registry using configuration
@@ -357,7 +369,7 @@ impl ScriptRuntime {
         provider_manager: Arc<ProviderManager>,
     ) -> Result<Self, LLMSpellError> {
         debug!("Initializing script runtime with engine and existing provider manager");
-        // Create component registry with event support based on config
+        // Create component registry with event support and templates based on config
         let registry = if config.events.enabled {
             let event_bus = Arc::new(llmspell_events::EventBus::new());
             let event_config = llmspell_core::traits::event::EventConfig {
@@ -369,9 +381,21 @@ impl ScriptRuntime {
                 emit_debug_events: config.events.emit_debug_events,
                 max_events_per_second: config.events.max_events_per_second,
             };
-            Arc::new(ComponentRegistry::with_event_bus(event_bus, event_config))
+            Arc::new(
+                ComponentRegistry::with_event_bus_and_templates(event_bus, event_config).map_err(
+                    |e| LLMSpellError::Component {
+                        message: format!("Failed to initialize component registry: {e}"),
+                        source: None,
+                    },
+                )?,
+            )
         } else {
-            Arc::new(ComponentRegistry::new())
+            Arc::new(
+                ComponentRegistry::with_templates().map_err(|e| LLMSpellError::Component {
+                    message: format!("Failed to initialize component registry: {e}"),
+                    source: None,
+                })?,
+            )
         };
 
         register_all_tools(&registry, &config.tools).map_err(|e| LLMSpellError::Component {
@@ -705,6 +729,390 @@ impl ScriptExecutor for ScriptRuntime {
             .map(|candidate| {
                 let display = format!("{:?}", candidate.kind).to_lowercase();
                 (candidate.text, display)
+            })
+            .collect()
+    }
+
+    // === Template Operations (JSON-based API to avoid circular dependencies) ===
+
+    fn handle_template_list(
+        &self,
+        category: Option<&str>,
+    ) -> Result<serde_json::Value, LLMSpellError> {
+        use serde_json::json;
+
+        // Get TemplateRegistry via type erasure
+        let registry_any =
+            self.template_registry_any()
+                .ok_or_else(|| LLMSpellError::Component {
+                    message: "Template registry not available".to_string(),
+                    source: None,
+                })?;
+
+        // Downcast to concrete TemplateRegistry
+        let template_registry = std::sync::Arc::downcast::<
+            llmspell_templates::registry::TemplateRegistry,
+        >(registry_any)
+        .map_err(|_| LLMSpellError::Component {
+            message: "Failed to access template registry".to_string(),
+            source: None,
+        })?;
+
+        // Get templates by category or all
+        let templates_metadata = if let Some(cat_str) = category {
+            // Parse category string
+            use llmspell_templates::core::TemplateCategory;
+            let category = match cat_str.to_lowercase().as_str() {
+                "research" => TemplateCategory::Research,
+                "chat" => TemplateCategory::Chat,
+                "analysis" => TemplateCategory::Analysis,
+                "codegen" => TemplateCategory::CodeGen,
+                "document" => TemplateCategory::Document,
+                "workflow" => TemplateCategory::Workflow,
+                _ => {
+                    return Err(LLMSpellError::Validation {
+                        field: Some("category".to_string()),
+                        message: format!("Invalid category: {cat_str}"),
+                    });
+                }
+            };
+            template_registry.discover_by_category(&category)
+        } else {
+            template_registry.list_metadata()
+        };
+
+        // Convert to JSON
+        let templates_json: Vec<serde_json::Value> = templates_metadata
+            .iter()
+            .map(|meta| {
+                json!({
+                    "id": meta.id,
+                    "name": meta.name,
+                    "description": meta.description,
+                    "category": format!("{:?}", meta.category),
+                    "version": meta.version,
+                    "author": meta.author,
+                    "tags": meta.tags,
+                })
+            })
+            .collect();
+
+        Ok(json!(templates_json))
+    }
+
+    fn handle_template_info(
+        &self,
+        template_id: &str,
+        with_schema: bool,
+    ) -> Result<serde_json::Value, LLMSpellError> {
+        use serde_json::json;
+
+        // Get TemplateRegistry via type erasure
+        let registry_any =
+            self.template_registry_any()
+                .ok_or_else(|| LLMSpellError::Component {
+                    message: "Template registry not available".to_string(),
+                    source: None,
+                })?;
+
+        // Downcast to concrete TemplateRegistry
+        let template_registry = std::sync::Arc::downcast::<
+            llmspell_templates::registry::TemplateRegistry,
+        >(registry_any)
+        .map_err(|_| LLMSpellError::Component {
+            message: "Failed to access template registry".to_string(),
+            source: None,
+        })?;
+
+        // Get template
+        let template =
+            template_registry
+                .get(template_id)
+                .map_err(|e| LLMSpellError::Component {
+                    message: format!("Template not found: {e}"),
+                    source: None,
+                })?;
+
+        let metadata = template.metadata();
+        let mut info_json = json!({
+            "id": metadata.id,
+            "name": metadata.name,
+            "description": metadata.description,
+            "category": format!("{:?}", metadata.category),
+            "version": metadata.version,
+            "author": metadata.author,
+            "requires": metadata.requires,
+            "tags": metadata.tags,
+        });
+
+        // Add schema if requested
+        if with_schema {
+            let schema = template.config_schema();
+            if let Ok(schema_json) = serde_json::to_value(schema) {
+                info_json["schema"] = schema_json;
+            }
+        }
+
+        Ok(info_json)
+    }
+
+    async fn handle_template_exec(
+        &self,
+        template_id: &str,
+        params: serde_json::Value,
+    ) -> Result<serde_json::Value, LLMSpellError> {
+        use serde_json::json;
+
+        // Get template from registry
+        let template = self.get_template_from_registry(template_id)?;
+
+        // Convert and validate params
+        let template_params = Self::convert_and_validate_params(&template, &params)?;
+
+        // Build execution context
+        let context = llmspell_templates::context::ExecutionContext::builder()
+            .build()
+            .map_err(|e| LLMSpellError::Component {
+                message: format!("Failed to build execution context: {e}"),
+                source: None,
+            })?;
+
+        // Execute template
+        let output = template
+            .execute(template_params, context)
+            .await
+            .map_err(|e| LLMSpellError::Component {
+                message: format!("Template execution failed: {e}"),
+                source: None,
+            })?;
+
+        // Convert output to JSON response
+        Ok(json!({
+            "result": Self::convert_template_result_to_json(&output.result),
+            "artifacts": Self::convert_artifacts_to_json(&output.artifacts),
+            "metrics": {
+                "duration_ms": output.metrics.duration_ms,
+                "tokens_used": output.metrics.tokens_used,
+                "cost_usd": output.metrics.cost_usd,
+                "agents_invoked": output.metrics.agents_invoked,
+                "tools_invoked": output.metrics.tools_invoked,
+                "rag_queries": output.metrics.rag_queries,
+            }
+        }))
+    }
+
+    fn handle_template_search(
+        &self,
+        query: &str,
+        category: Option<&str>,
+    ) -> Result<serde_json::Value, LLMSpellError> {
+        use serde_json::json;
+
+        // Get TemplateRegistry via type erasure
+        let registry_any =
+            self.template_registry_any()
+                .ok_or_else(|| LLMSpellError::Component {
+                    message: "Template registry not available".to_string(),
+                    source: None,
+                })?;
+
+        // Downcast to concrete TemplateRegistry
+        let template_registry = std::sync::Arc::downcast::<
+            llmspell_templates::registry::TemplateRegistry,
+        >(registry_any)
+        .map_err(|_| LLMSpellError::Component {
+            message: "Failed to access template registry".to_string(),
+            source: None,
+        })?;
+
+        // Search templates
+        let mut results = template_registry.search(query);
+
+        // Filter by category if specified
+        if let Some(cat_str) = category {
+            use llmspell_templates::core::TemplateCategory;
+            let category = match cat_str.to_lowercase().as_str() {
+                "research" => TemplateCategory::Research,
+                "chat" => TemplateCategory::Chat,
+                "analysis" => TemplateCategory::Analysis,
+                "codegen" => TemplateCategory::CodeGen,
+                "document" => TemplateCategory::Document,
+                "workflow" => TemplateCategory::Workflow,
+                _ => {
+                    return Err(LLMSpellError::Validation {
+                        field: Some("category".to_string()),
+                        message: format!("Invalid category: {cat_str}"),
+                    });
+                }
+            };
+            results.retain(|m| m.category == category);
+        }
+
+        // Convert to JSON
+        let results_json: Vec<serde_json::Value> = results
+            .iter()
+            .map(|meta| {
+                json!({
+                    "id": meta.id,
+                    "name": meta.name,
+                    "description": meta.description,
+                    "category": format!("{:?}", meta.category),
+                    "tags": meta.tags,
+                })
+            })
+            .collect();
+
+        Ok(json!(results_json))
+    }
+
+    fn handle_template_schema(
+        &self,
+        template_id: &str,
+    ) -> Result<serde_json::Value, LLMSpellError> {
+        // Get TemplateRegistry via type erasure
+        let registry_any =
+            self.template_registry_any()
+                .ok_or_else(|| LLMSpellError::Component {
+                    message: "Template registry not available".to_string(),
+                    source: None,
+                })?;
+
+        // Downcast to concrete TemplateRegistry
+        let template_registry = std::sync::Arc::downcast::<
+            llmspell_templates::registry::TemplateRegistry,
+        >(registry_any)
+        .map_err(|_| LLMSpellError::Component {
+            message: "Failed to access template registry".to_string(),
+            source: None,
+        })?;
+
+        // Get template
+        let template =
+            template_registry
+                .get(template_id)
+                .map_err(|e| LLMSpellError::Component {
+                    message: format!("Template not found: {e}"),
+                    source: None,
+                })?;
+
+        let schema = template.config_schema();
+        serde_json::to_value(schema).map_err(|e| LLMSpellError::Component {
+            message: format!("Failed to serialize schema: {e}"),
+            source: None,
+        })
+    }
+}
+
+/// Helper methods for template execution
+impl ScriptRuntime {
+    /// Helper to get template from registry with type erasure
+    fn get_template_from_registry(
+        &self,
+        template_id: &str,
+    ) -> Result<std::sync::Arc<dyn llmspell_templates::core::Template>, LLMSpellError> {
+        let registry_any =
+            self.template_registry_any()
+                .ok_or_else(|| LLMSpellError::Component {
+                    message: "Template registry not available".to_string(),
+                    source: None,
+                })?;
+
+        let template_registry = std::sync::Arc::downcast::<
+            llmspell_templates::registry::TemplateRegistry,
+        >(registry_any)
+        .map_err(|_| LLMSpellError::Component {
+            message: "Failed to access template registry".to_string(),
+            source: None,
+        })?;
+
+        template_registry
+            .get(template_id)
+            .map_err(|e| LLMSpellError::Component {
+                message: format!("Template not found: {e}"),
+                source: None,
+            })
+    }
+
+    /// Helper to convert and validate JSON params to `TemplateParams`
+    fn convert_and_validate_params(
+        template: &std::sync::Arc<dyn llmspell_templates::core::Template>,
+        params: &serde_json::Value,
+    ) -> Result<llmspell_templates::core::TemplateParams, LLMSpellError> {
+        let params_obj = params
+            .as_object()
+            .ok_or_else(|| LLMSpellError::Validation {
+                field: Some("params".to_string()),
+                message: "Parameters must be a JSON object".to_string(),
+            })?;
+
+        let mut template_params = llmspell_templates::core::TemplateParams::new();
+        for (key, value) in params_obj {
+            template_params.insert(key.clone(), value.clone());
+        }
+
+        template
+            .validate(&template_params)
+            .map_err(|e| LLMSpellError::Validation {
+                field: Some("params".to_string()),
+                message: format!("Parameter validation failed: {e}"),
+            })?;
+
+        Ok(template_params)
+    }
+
+    /// Helper to convert `TemplateResult` to JSON
+    fn convert_template_result_to_json(
+        result: &llmspell_templates::core::TemplateResult,
+    ) -> serde_json::Value {
+        use serde_json::json;
+
+        match result {
+            llmspell_templates::core::TemplateResult::Text(text) => {
+                json!({"type": "text", "value": text})
+            }
+            llmspell_templates::core::TemplateResult::Structured(value) => {
+                json!({"type": "structured", "value": value})
+            }
+            llmspell_templates::core::TemplateResult::File(path) => {
+                json!({"type": "file", "path": path.display().to_string()})
+            }
+            llmspell_templates::core::TemplateResult::Multiple(results) => {
+                let results_json: Vec<serde_json::Value> = results
+                    .iter()
+                    .map(|r| match r {
+                        llmspell_templates::core::TemplateResult::Text(t) => {
+                            json!({"type": "text", "value": t})
+                        }
+                        llmspell_templates::core::TemplateResult::File(p) => {
+                            json!({"type": "file", "path": p.display().to_string()})
+                        }
+                        llmspell_templates::core::TemplateResult::Structured(v) => {
+                            json!({"type": "structured", "value": v})
+                        }
+                        llmspell_templates::core::TemplateResult::Multiple(_) => {
+                            json!({"type": "nested_multiple"})
+                        }
+                    })
+                    .collect();
+                json!({"type": "multiple", "results": results_json})
+            }
+        }
+    }
+
+    /// Helper to convert artifacts to JSON
+    fn convert_artifacts_to_json(
+        artifacts: &[llmspell_templates::artifacts::Artifact],
+    ) -> Vec<serde_json::Value> {
+        use serde_json::json;
+
+        artifacts
+            .iter()
+            .map(|a| {
+                json!({
+                    "filename": a.filename,
+                    "mime_type": a.mime_type,
+                    "size": a.size()
+                })
             })
             .collect()
     }

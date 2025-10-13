@@ -178,7 +178,11 @@ pub trait ScriptExecutor: Send + Sync {
     /// Returns JSON object with template metadata and optionally config schema.
     ///
     /// Default returns error for backward compatibility.
-    fn handle_template_info(&self, _template_id: &str, _with_schema: bool) -> Result<Value, LLMSpellError> {
+    fn handle_template_info(
+        &self,
+        _template_id: &str,
+        _with_schema: bool,
+    ) -> Result<Value, LLMSpellError> {
         Err(LLMSpellError::Component {
             message: "Template operations not supported by this executor".to_string(),
             source: None,
@@ -190,7 +194,11 @@ pub trait ScriptExecutor: Send + Sync {
     /// Returns JSON object with execution result including output, metrics, and metadata.
     ///
     /// Default returns error for backward compatibility.
-    async fn handle_template_exec(&self, _template_id: &str, _params: Value) -> Result<Value, LLMSpellError> {
+    async fn handle_template_exec(
+        &self,
+        _template_id: &str,
+        _params: Value,
+    ) -> Result<Value, LLMSpellError> {
         Err(LLMSpellError::Component {
             message: "Template execution not supported by this executor".to_string(),
             source: None,
@@ -202,7 +210,11 @@ pub trait ScriptExecutor: Send + Sync {
     /// Returns JSON array of matching template metadata.
     ///
     /// Default returns empty array for backward compatibility.
-    fn handle_template_search(&self, _query: &str, _category: Option<&str>) -> Result<Value, LLMSpellError> {
+    fn handle_template_search(
+        &self,
+        _query: &str,
+        _category: Option<&str>,
+    ) -> Result<Value, LLMSpellError> {
         Ok(serde_json::json!([]))
     }
 

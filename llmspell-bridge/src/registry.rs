@@ -55,12 +55,11 @@ impl ComponentRegistry {
     ///
     /// Returns error if built-in template registration fails
     pub fn with_templates() -> Result<Self, LLMSpellError> {
-        let template_registry = TemplateRegistry::with_builtin_templates().map_err(|e| {
-            LLMSpellError::Component {
-                message: format!("Failed to initialize built-in templates: {}", e),
+        let template_registry =
+            TemplateRegistry::with_builtin_templates().map_err(|e| LLMSpellError::Component {
+                message: format!("Failed to initialize built-in templates: {e}"),
                 source: None,
-            }
-        })?;
+            })?;
 
         Ok(Self {
             agents: Arc::new(RwLock::new(HashMap::new())),
@@ -69,6 +68,31 @@ impl ComponentRegistry {
             template_registry: Some(Arc::new(template_registry)),
             event_bus: None,
             event_config: EventConfig::default(),
+        })
+    }
+
+    /// Create a new registry with both `EventBus` and templates initialized
+    ///
+    /// # Errors
+    ///
+    /// Returns error if built-in template registration fails
+    pub fn with_event_bus_and_templates(
+        event_bus: Arc<EventBus>,
+        config: EventConfig,
+    ) -> Result<Self, LLMSpellError> {
+        let template_registry =
+            TemplateRegistry::with_builtin_templates().map_err(|e| LLMSpellError::Component {
+                message: format!("Failed to initialize built-in templates: {e}"),
+                source: None,
+            })?;
+
+        Ok(Self {
+            agents: Arc::new(RwLock::new(HashMap::new())),
+            tools: Arc::new(RwLock::new(HashMap::new())),
+            workflows: Arc::new(RwLock::new(HashMap::new())),
+            template_registry: Some(Arc::new(template_registry)),
+            event_bus: Some(event_bus),
+            event_config: config,
         })
     }
 
