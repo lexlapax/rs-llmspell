@@ -685,6 +685,13 @@ impl ScriptExecutor for ScriptRuntime {
         Some(Arc::clone(&self.registry) as Arc<dyn ComponentLookup>)
     }
 
+    fn template_registry_any(&self) -> Option<Arc<dyn std::any::Any + Send + Sync>> {
+        // Return the template registry as type-erased Any to avoid circular dependencies
+        self.registry
+            .template_registry()
+            .map(|reg| reg as Arc<dyn std::any::Any + Send + Sync>)
+    }
+
     fn get_completion_candidates(&self, line: &str, cursor_pos: usize) -> Vec<(String, String)> {
         // Create a CompletionContext from the provided line and cursor position
         let context = crate::engine::bridge::CompletionContext::new(line, cursor_pos);

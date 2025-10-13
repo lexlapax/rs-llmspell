@@ -986,6 +986,7 @@ impl<P: Protocol + 'static> IntegratedKernel<P> {
             "interrupt_request" => self.handle_interrupt_request(&message)?,
             "debug_request" => self.handle_debug_request(message).await?,
             "tool_request" => self.handle_tool_request(message).await?,
+            "template_request" => self.handle_template_request(message).await?,
             "model_request" => self.handle_model_request(message).await?,
             _ => {
                 warn!("Unhandled message type: {}", msg_type);
@@ -1885,6 +1886,51 @@ impl<P: Protocol + 'static> IntegratedKernel<P> {
         }
     }
 
+    /// Send template reply back to client
+    async fn send_template_reply(&mut self, content: serde_json::Value) -> Result<()> {
+        debug!("Sending template reply through message protocol");
+
+        // Ensure we have client identity for routing
+        let client_identity = self
+            .current_client_identity
+            .clone()
+            .ok_or_else(|| anyhow!("No client identity available for template reply routing"))?;
+
+        // Ensure we have message header for correlation
+        if self.current_msg_header.is_none() {
+            return Err(anyhow!(
+                "No message header available for template reply correlation"
+            ));
+        }
+
+        // Create multipart response using existing infrastructure
+        let multipart_response =
+            self.create_multipart_response(&client_identity, "template_reply", &content)?;
+
+        debug!(
+            "template_reply multipart created, {} parts",
+            multipart_response.len()
+        );
+
+        // Send via shell channel (same as other command replies)
+        if let Some(ref mut transport) = self.transport {
+            match transport.send("shell", multipart_response).await {
+                Ok(()) => {
+                    debug!("template_reply sent successfully via shell channel");
+                    Ok(())
+                }
+                Err(e) => {
+                    error!("Failed to send template_reply: {}", e);
+                    Err(anyhow!("Failed to send template reply: {}", e))
+                }
+            }
+        } else {
+            warn!("No transport available for template_reply - falling back to stdout");
+            // Fallback to stdout if no transport (for embedded scenarios)
+            self.io_manager.write_stdout(&content.to_string()).await
+        }
+    }
+
     /// Handle `shutdown_request`
     ///
     /// # Errors
@@ -2496,6 +2542,227 @@ impl<P: Protocol + 'static> IntegratedKernel<P> {
         });
 
         self.send_tool_reply(error).await
+    }
+
+    /// Handle template request for template discovery and execution
+    async fn handle_template_request(&mut self, message: HashMap<String, Value>) -> Result<()> {
+        info!("Handling template_request");
+
+        let content = message
+            .get("content")
+            .ok_or_else(|| anyhow!("No content in template_request"))?;
+
+        let command = content
+            .get("command")
+            .and_then(|v| v.as_str())
+            .ok_or_else(|| anyhow!("No command in template_request"))?;
+
+        // Handle template commands
+        match command {
+            "list" => self.handle_template_list(content).await,
+            "info" => self.handle_template_info(content).await,
+            "exec" => self.handle_template_exec(content).await,
+            "search" => self.handle_template_search(content).await,
+            "schema" => self.handle_template_schema(content).await,
+            _ => self.handle_unknown_template_command(command).await,
+        }
+    }
+
+    /// Handle template list command
+    async fn handle_template_list(&mut self, content: &Value) -> Result<()> {
+        debug!("Listing templates via ScriptExecutor");
+
+        // Check for category filter in the request
+        let category_filter = content.get("category").and_then(|v| v.as_str());
+
+        // Use ScriptExecutor trait method (avoids concrete template types)
+        match self.script_executor.handle_template_list(category_filter) {
+            Ok(templates_json) => {
+                let response = json!({
+                    "msg_type": "template_reply",
+                    "content": {
+                        "status": "ok",
+                        "templates": templates_json,
+                        "category": category_filter
+                    }
+                });
+                self.send_template_reply(response).await
+            }
+            Err(e) => {
+                let error = json!({
+                    "msg_type": "template_reply",
+                    "content": {
+                        "status": "error",
+                        "error": format!("Failed to list templates: {}", e)
+                    }
+                });
+                self.send_template_reply(error).await
+            }
+        }
+    }
+
+    /// Handle template info command
+    async fn handle_template_info(&mut self, content: &Value) -> Result<()> {
+        let template_name = content
+            .get("name")
+            .and_then(|v| v.as_str())
+            .ok_or_else(|| anyhow!("No name in template info request"))?;
+
+        let show_schema = content
+            .get("show_schema")
+            .and_then(|v| v.as_bool())
+            .unwrap_or(false);
+
+        debug!("Getting info for template: {} (show_schema: {})", template_name, show_schema);
+
+        // Use ScriptExecutor trait method (avoids concrete template types)
+        match self.script_executor.handle_template_info(template_name, show_schema) {
+            Ok(template_json) => {
+                let response = json!({
+                    "msg_type": "template_reply",
+                    "content": {
+                        "status": "ok",
+                        "template": template_json
+                    }
+                });
+                self.send_template_reply(response).await
+            }
+            Err(e) => {
+                let error = json!({
+                    "msg_type": "template_reply",
+                    "content": {
+                        "status": "error",
+                        "error": format!("Failed to get template info: {}", e)
+                    }
+                });
+                self.send_template_reply(error).await
+            }
+        }
+    }
+
+    /// Handle template exec command
+    async fn handle_template_exec(&mut self, content: &Value) -> Result<()> {
+        let template_name = content
+            .get("name")
+            .and_then(|v| v.as_str())
+            .ok_or_else(|| anyhow!("No name in template exec request"))?;
+
+        let params_json = content
+            .get("params")
+            .cloned()
+            .unwrap_or(Value::Object(serde_json::Map::new()));
+
+        debug!("Executing template: {}", template_name);
+
+        // Use ScriptExecutor trait method (avoids concrete template types)
+        match self.script_executor.handle_template_exec(template_name, params_json).await {
+            Ok(result_json) => {
+                let response = json!({
+                    "msg_type": "template_reply",
+                    "content": {
+                        "status": "ok",
+                        "result": result_json
+                    }
+                });
+                self.send_template_reply(response).await
+            }
+            Err(e) => {
+                let error = json!({
+                    "msg_type": "template_reply",
+                    "content": {
+                        "status": "error",
+                        "error": format!("Template execution failed: {}", e)
+                    }
+                });
+                self.send_template_reply(error).await
+            }
+        }
+    }
+
+    /// Handle template search command
+    async fn handle_template_search(&mut self, content: &Value) -> Result<()> {
+        let query = content
+            .get("query")
+            .and_then(|v| v.as_str())
+            .ok_or_else(|| anyhow!("No query in template search request"))?;
+
+        let category_filter = content.get("category").and_then(|v| v.as_str());
+
+        debug!("Searching templates with query: {}", query);
+
+        // Use ScriptExecutor trait method (avoids concrete template types)
+        match self.script_executor.handle_template_search(query, category_filter) {
+            Ok(results_json) => {
+                let response = json!({
+                    "msg_type": "template_reply",
+                    "content": {
+                        "status": "ok",
+                        "query": query,
+                        "results": results_json,
+                        "category": category_filter
+                    }
+                });
+                self.send_template_reply(response).await
+            }
+            Err(e) => {
+                let error = json!({
+                    "msg_type": "template_reply",
+                    "content": {
+                        "status": "error",
+                        "error": format!("Template search failed: {}", e)
+                    }
+                });
+                self.send_template_reply(error).await
+            }
+        }
+    }
+
+    /// Handle template schema command
+    async fn handle_template_schema(&mut self, content: &Value) -> Result<()> {
+        let template_name = content
+            .get("name")
+            .and_then(|v| v.as_str())
+            .ok_or_else(|| anyhow!("No name in template schema request"))?;
+
+        debug!("Getting schema for template: {}", template_name);
+
+        // Use ScriptExecutor trait method (avoids concrete template types)
+        match self.script_executor.handle_template_schema(template_name) {
+            Ok(schema_json) => {
+                let response = json!({
+                    "msg_type": "template_reply",
+                    "content": {
+                        "status": "ok",
+                        "schema": schema_json
+                    }
+                });
+                self.send_template_reply(response).await
+            }
+            Err(e) => {
+                let error = json!({
+                    "msg_type": "template_reply",
+                    "content": {
+                        "status": "error",
+                        "error": format!("Failed to get template schema: {}", e)
+                    }
+                });
+                self.send_template_reply(error).await
+            }
+        }
+    }
+
+    /// Handle unknown template command
+    async fn handle_unknown_template_command(&mut self, command: &str) -> Result<()> {
+        warn!("Unknown template command: {}", command);
+        let error = json!({
+            "msg_type": "template_reply",
+            "content": {
+                "status": "error",
+                "error": format!("Unknown template command: {command}")
+            }
+        });
+
+        self.send_template_reply(error).await
     }
 
     /// Handle model request for local model management

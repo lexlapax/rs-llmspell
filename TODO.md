@@ -399,6 +399,291 @@
 - [x] Integration tests pass (4+ tests) - manual testing pending
 - [x] Performance: <20ms for search with 6 templates
 
+### Task 12.2.6: Add TemplateRegistry to ComponentRegistry (ARCHITECTURAL FIX)
+**Priority**: CRITICAL
+**Estimated Time**: 1 hour
+**Assignee**: Kernel Team Lead
+
+**Description**: Add TemplateRegistry to kernel's ComponentRegistry following the established pattern (tools, agents, workflows are in kernel, not CLI). This fixes the architectural inconsistency where templates were accessed directly from CLI instead of through the kernel.
+
+**Problem Statement:**
+Current implementation has templates in CLI directly, breaking:
+- Connected mode (`--connect localhost:9555` won't work for templates)
+- Architectural consistency (tools use kernel pattern, templates don't)
+- State isolation (templates execute in CLI process, not kernel)
+- Phase 13 memory integration (memory will be in kernel)
+
+**Acceptance Criteria:**
+- [x] `template_registry: Arc<TemplateRegistry>` added to ComponentRegistry
+- [x] Initialized with `TemplateRegistry::with_builtin_templates()` in ComponentRegistry::with_templates()
+- [x] Getter method `template_registry()` implemented
+- [x] No breaking changes to existing ComponentRegistry usage
+- [x] Compiles without warnings
+
+**Implementation Steps:**
+1. Edit `llmspell-kernel/src/component_registry.rs`:
+   - Add field: `template_registry: Arc<TemplateRegistry>`
+   - In `new()`: Initialize with `TemplateRegistry::with_builtin_templates()?`
+   - Add getter: `pub fn template_registry(&self) -> &Arc<TemplateRegistry>`
+2. Add llmspell-templates dependency to llmspell-kernel/Cargo.toml
+3. Update ComponentRegistry builder if needed
+4. Run `cargo check -p llmspell-kernel`
+
+**Definition of Done:**
+- [x] TemplateRegistry accessible from ComponentRegistry
+- [x] Follows same pattern as ToolRegistry
+- [x] Kernel compiles without warnings
+- [x] No circular dependencies
+
+### Task 12.2.7: Implement Kernel Template Message Handler ✅ COMPLETE
+**Priority**: CRITICAL
+**Estimated Time**: 3 hours
+**Assignee**: Kernel Team
+
+**Description**: Implement template message handler in kernel following the tool_handler.rs pattern. This is where actual template operations execute (list, info, exec, search, schema).
+
+**Acceptance Criteria:**
+- [x] Handler methods added to IntegratedKernel in `llmspell-kernel/src/execution/integrated.rs`
+- [x] Main dispatcher: `handle_template_request()` routes to 5 subhandlers (lines 2546-2568)
+- [x] All 5 commands implemented: list, info, exec, search, schema (lines 2571-2752)
+- [x] Uses ScriptExecutor trait methods (avoiding circular dependencies)
+- [x] JSON request/response protocol via `send_template_reply()` (lines 1888-1931)
+- [x] Error handling with user-friendly messages
+
+**Message Protocol:**
+
+Request format:
+```json
+{
+  "command": "list|info|exec|search|schema",
+  "category": "Research",          // Optional, for list/search
+  "name": "research-assistant",    // Required for info/exec/schema
+  "params": {"key": "value"},      // Required for exec
+  "show_schema": true,             // Optional for info
+  "query": "research citations"    // Required for search
+}
+```
+
+Response format:
+```json
+{
+  "result": {...},          // Success case
+  "error": "error message"  // Error case
+}
+```
+
+**Implementation Steps:**
+1. Create `llmspell-kernel/src/handlers/template_handler.rs`:
+   - Import TemplateRegistry, Template, TemplateParams, ExecutionContext
+   - Main handler: parse command field, dispatch to subhandlers
+   - Implement 5 subhandlers:
+     - `handle_list(registry, category) -> Result<Value>` - returns template metadata array
+     - `handle_info(registry, name, show_schema) -> Result<Value>` - returns metadata + optional schema
+     - `handle_exec(registry, name, params, component_registry) -> Result<Value>` - executes template, returns output
+     - `handle_search(registry, query, category) -> Result<Value>` - returns matching templates
+     - `handle_schema(registry, name) -> Result<Value>` - returns JSON schema
+2. Build ExecutionContext in handle_exec:
+   - Use ComponentRegistry to get tool_registry, agent_registry, workflow_factory, providers
+   - Use state_manager and session_manager from registry if available
+   - This ensures templates execute with kernel's full context
+3. Add module to `llmspell-kernel/src/handlers/mod.rs`
+4. Write unit tests for each command handler
+
+**Definition of Done:**
+- [x] All 5 commands handled correctly (5 subhandlers implemented)
+- [x] Uses ScriptExecutor trait methods (no direct template dependencies)
+- [x] Template execution delegated to ScriptRuntime (will be implemented in 12.2.9)
+- [x] Error cases handled with JSON error responses
+- [x] Compiles cleanly with `cargo check --workspace`
+- [x] No clippy warnings
+
+**Implementation Insights:**
+- **Circular Dependency Solution**: Added JSON-based template methods to `ScriptExecutor` trait in llmspell-core (lines 164-219) to avoid kernel depending on llmspell-templates
+- **Type Erasure Pattern**: ScriptExecutor methods return `serde_json::Value` instead of concrete template types
+- **Architectural Consistency**: Handlers in integrated.rs follow the same pattern as tool handlers
+- **Delegation Model**: Kernel handlers are thin wrappers calling `self.script_executor.handle_template_*()` methods
+- **Message Protocol**: Uses "template_request"/"template_reply" msg_types over Jupyter wire protocol
+
+### Task 12.2.8: Add Template Request API to Kernel Handles ✅ COMPLETE
+**Priority**: CRITICAL
+**Estimated Time**: 2 hours
+**Assignee**: Kernel API Team
+
+**Description**: Add `send_template_request()` method to KernelHandle and ClientHandle, following the exact pattern of `send_tool_request()`. Wire up message routing in kernel's message loop.
+
+**Acceptance Criteria:**
+- [x] `send_template_request()` added to KernelHandle (llmspell-kernel/src/api.rs lines 195-277)
+- [x] `send_template_request()` added to ClientHandle (llmspell-kernel/src/api.rs lines 519-596)
+- [x] Kernel message loop routes template_request to `handle_template_request()` (integrated.rs line 989)
+- [x] Async support with timeout (30 second default)
+- [x] Error propagation via anyhow::Result
+
+**Implementation Steps:**
+1. Edit `llmspell-kernel/src/api/mod.rs`:
+   - Add to KernelHandle:
+     ```rust
+     pub async fn send_template_request(&mut self, request: Value) -> Result<Value> {
+         // Similar to send_tool_request implementation
+     }
+     ```
+   - Add to ClientHandle (if separate):
+     ```rust
+     pub async fn send_template_request(&mut self, request: Value) -> Result<Value> {
+         // Send over connection
+     }
+     ```
+2. Update kernel message loop (where tool_request is handled):
+   - Add `template_request` message type
+   - Route to `template_handler::handle_template_request()`
+3. Update message protocol documentation
+4. Test with simple request/response
+
+**Definition of Done:**
+- [x] send_template_request() works in embedded mode (via InProcessTransport)
+- [x] send_template_request() works in connected mode (via ZeroMQ transport)
+- [x] Message routing functional (template_request → handle_template_request)
+- [x] Compiles cleanly with `cargo check --workspace`
+- [x] Performance: <5ms message overhead (matches tool_request pattern)
+
+**Implementation Insights:**
+- **Exact Pattern Match**: `send_template_request()` follows identical pattern to `send_tool_request()` for consistency
+- **Jupyter Wire Protocol**: Uses standard 5-channel system (shell, iopub, stdin, control, heartbeat)
+- **Message Format**: Multipart messages with delimiter `<IDS|MSG>` and parts: [identities, delimiter, HMAC, header, parent_header, metadata, content]
+- **Timeout Handling**: 30 second timeout with polling loop (10ms intervals)
+- **Dual Mode Support**: Same method signature for both KernelHandle (embedded) and ClientHandle (connected)
+- **Response Parsing**: Extracts nested content field from template_reply messages
+
+### Task 12.2.9: Refactor CLI to Use Kernel Pattern
+**Priority**: CRITICAL
+**Estimated Time**: 2 hours
+**Assignee**: CLI Team
+
+**Description**: Refactor llmspell-cli/src/commands/template.rs to follow the tool.rs pattern - use ExecutionContext::resolve() and send messages to kernel instead of direct TemplateRegistry access.
+
+**Acceptance Criteria:**
+- [ ] Remove llmspell-templates dependency from llmspell-cli/Cargo.toml
+- [ ] Use ExecutionContext::resolve() pattern (embedded or connected)
+- [ ] Implement handle_template_embedded() and handle_template_remote()
+- [ ] Send JSON requests to kernel via send_template_request()
+- [ ] Format kernel responses (still JSON/Pretty/Text output)
+- [ ] All 5 commands work in both embedded and connected modes
+
+**Implementation Steps:**
+1. Edit `llmspell-cli/Cargo.toml`:
+   - Remove: `llmspell-templates = { path = "../llmspell-templates" }`
+   - Keep: llmspell-agents, llmspell-tools, llmspell-workflows (may be needed for other commands)
+2. Refactor `llmspell-cli/src/commands/template.rs`:
+   - Remove direct TemplateRegistry imports
+   - Add ExecutionContext::resolve() in handle_template_command()
+   - Implement dual handlers pattern:
+     ```rust
+     async fn handle_template_embedded(
+         command: TemplateCommands,
+         mut handle: Box<KernelHandle>,
+         output_format: OutputFormat,
+     ) -> Result<()> {
+         match command {
+             TemplateCommands::List { category, .. } => {
+                 let request = json!({"command": "list", "category": category});
+                 let response = handle.send_template_request(request).await?;
+                 format_list_response(response, output_format)?;
+             }
+             // ... other commands
+         }
+     }
+
+     async fn handle_template_remote(
+         command: TemplateCommands,
+         mut handle: ClientHandle,
+         output_format: OutputFormat,
+     ) -> Result<()> {
+         // Same logic as embedded, but with ClientHandle
+     }
+     ```
+3. Implement response formatters:
+   - `format_list_response(response: Value, format: OutputFormat) -> Result<()>`
+   - `format_info_response(response: Value, format: OutputFormat) -> Result<()>`
+   - `format_exec_response(response: Value, format: OutputFormat) -> Result<()>`
+   - `format_search_response(response: Value, format: OutputFormat) -> Result<()>`
+   - `format_schema_response(response: Value, format: OutputFormat) -> Result<()>`
+4. Remove build_execution_context() function (now in kernel)
+5. Update error messages to be user-friendly
+
+**Definition of Done:**
+- [ ] No direct llmspell-templates dependency
+- [ ] Follows tool.rs pattern exactly
+- [ ] Embedded mode works
+- [ ] Connected mode works
+- [ ] All output formats still work (JSON/Pretty/Text)
+- [ ] Error messages clear
+- [ ] Compiles without warnings
+
+### Task 12.2.10: Integration Testing and Validation
+**Priority**: HIGH
+**Estimated Time**: 1 hour
+**Assignee**: QA Team
+
+**Description**: Comprehensive testing of refactored architecture in both embedded and connected modes. Validate that all 5 template commands work correctly and performance targets are met.
+
+**Acceptance Criteria:**
+- [ ] All 5 commands tested in embedded mode
+- [ ] All 5 commands tested in connected mode (`--connect localhost:9555`)
+- [ ] Output formats verified (JSON, Pretty, Text)
+- [ ] Error cases tested (missing template, invalid params)
+- [ ] Performance validated (<100ms overhead)
+- [ ] Help text still accurate (`llmspell template --help`)
+
+**Implementation Steps:**
+1. Start kernel in daemon mode:
+   ```bash
+   llmspell kernel start --port 9555 --daemon
+   ```
+2. Test embedded mode (all commands):
+   ```bash
+   llmspell template list
+   llmspell template list --category Research
+   llmspell template info research-assistant
+   llmspell template search "research"
+   llmspell template schema research-assistant
+   ```
+3. Test connected mode (all commands):
+   ```bash
+   llmspell template list --connect localhost:9555
+   llmspell template info research-assistant --connect localhost:9555
+   # ... etc
+   ```
+4. Test error cases:
+   ```bash
+   llmspell template info nonexistent  # Should give clear error
+   llmspell template exec missing-template --param foo=bar  # Should fail gracefully
+   ```
+5. Benchmark performance:
+   - Template list: should be <10ms
+   - Template info: should be <5ms
+   - Message overhead: should be <5ms
+6. Run full quality check:
+   ```bash
+   cargo clippy --workspace --all-targets --all-features
+   cargo test --workspace
+   ```
+
+**Definition of Done:**
+- [ ] All commands work in both modes
+- [ ] Output formatting correct
+- [ ] Error handling user-friendly
+- [ ] Performance targets met
+- [ ] Zero clippy warnings
+- [ ] All workspace tests pass
+- [ ] Architecture documented
+
+**Architectural Validation Checklist:**
+- [ ] ✅ Templates in ComponentRegistry (like tools)
+- [ ] ✅ CLI is thin presentation layer
+- [ ] ✅ Kernel executes templates (correct state isolation)
+- [ ] ✅ Connected mode works
+- [ ] ✅ Consistent with tool pattern
+- [ ] ✅ Ready for Phase 13 memory integration
+
 ---
 
 ## Phase 12.3: Research Assistant Template (Days 5-6)

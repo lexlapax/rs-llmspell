@@ -116,6 +116,31 @@ pub trait ScriptExecutor: Send + Sync {
         None
     }
 
+    /// Access to template registry for template discovery and execution
+    ///
+    /// Returns the TemplateRegistry as a type-erased Arc<dyn Any> to avoid
+    /// circular dependencies (llmspell-core can't depend on llmspell-templates).
+    /// Callers should downcast to `Arc<TemplateRegistry>` using `Arc::downcast`.
+    ///
+    /// Default returns None for backward compatibility.
+    /// Executors with template registry should override this method.
+    ///
+    /// # Type Erasure Pattern
+    ///
+    /// ```rust,ignore
+    /// use std::any::Any;
+    /// use llmspell_templates::registry::TemplateRegistry;
+    ///
+    /// if let Some(reg_any) = executor.template_registry_any() {
+    ///     if let Ok(template_registry) = Arc::downcast::<TemplateRegistry>(reg_any.clone()) {
+    ///         // Use template_registry
+    ///     }
+    /// }
+    /// ```
+    fn template_registry_any(&self) -> Option<Arc<dyn std::any::Any + Send + Sync>> {
+        None
+    }
+
     /// Get completion candidates for the given line and cursor position
     ///
     /// This is used for REPL tab completion to suggest available variables,
@@ -134,6 +159,63 @@ pub trait ScriptExecutor: Send + Sync {
     /// A vector of (replacement_text, display_text) pairs for completion candidates
     fn get_completion_candidates(&self, _line: &str, _cursor_pos: usize) -> Vec<(String, String)> {
         Vec::new()
+    }
+
+    // === Template Operations (JSON-based API to avoid circular dependencies) ===
+
+    /// List templates, optionally filtered by category
+    ///
+    /// Returns JSON array of template metadata. Category filter is string-based
+    /// to avoid importing template types (e.g., "research", "chat", "analysis").
+    ///
+    /// Default returns empty array for backward compatibility.
+    fn handle_template_list(&self, _category: Option<&str>) -> Result<Value, LLMSpellError> {
+        Ok(serde_json::json!([]))
+    }
+
+    /// Get template information by ID, optionally including schema
+    ///
+    /// Returns JSON object with template metadata and optionally config schema.
+    ///
+    /// Default returns error for backward compatibility.
+    fn handle_template_info(&self, _template_id: &str, _with_schema: bool) -> Result<Value, LLMSpellError> {
+        Err(LLMSpellError::Component {
+            message: "Template operations not supported by this executor".to_string(),
+            source: None,
+        })
+    }
+
+    /// Execute a template with given parameters
+    ///
+    /// Returns JSON object with execution result including output, metrics, and metadata.
+    ///
+    /// Default returns error for backward compatibility.
+    async fn handle_template_exec(&self, _template_id: &str, _params: Value) -> Result<Value, LLMSpellError> {
+        Err(LLMSpellError::Component {
+            message: "Template execution not supported by this executor".to_string(),
+            source: None,
+        })
+    }
+
+    /// Search templates by query string, optionally filtered by category
+    ///
+    /// Returns JSON array of matching template metadata.
+    ///
+    /// Default returns empty array for backward compatibility.
+    fn handle_template_search(&self, _query: &str, _category: Option<&str>) -> Result<Value, LLMSpellError> {
+        Ok(serde_json::json!([]))
+    }
+
+    /// Get template configuration schema by ID
+    ///
+    /// Returns JSON object describing the template's parameter schema.
+    ///
+    /// Default returns error for backward compatibility.
+    fn handle_template_schema(&self, _template_id: &str) -> Result<Value, LLMSpellError> {
+        Err(LLMSpellError::Component {
+            message: "Template schema not supported by this executor".to_string(),
+            source: None,
+        })
     }
 }
 
