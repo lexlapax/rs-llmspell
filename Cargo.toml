@@ -7,6 +7,7 @@ members = [
     "llmspell-agents",
     "llmspell-tools",
     "llmspell-workflows",
+    "llmspell-templates",
     "llmspell-bridge",
     "llmspell-providers",
     "llmspell-storage",

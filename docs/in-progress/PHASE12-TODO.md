@@ -17,8 +17,6 @@
 **Examples**: examples/*
 **Template-Architecture**: docs/technical/template-system-architecture.md (To be created)
 
-**This-document**: working copy /TODO.md (pristine/immutable copy in docs/in-progress/PHASE12-DONE.md)
-
 > **📋 Actionable Task List**: This document breaks down Phase 12 implementation into specific, measurable tasks for building production-ready AI agent template system solving the "0-day retention problem" with 6 turn-key workflow templates matching industry baseline (LangChain 50+, AutoGen ~10, CrewAI ~15).
 
 ---
