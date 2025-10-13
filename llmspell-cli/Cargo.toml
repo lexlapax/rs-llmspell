@@ -19,6 +19,10 @@ llmspell-kernel = { path = "../llmspell-kernel" }
 llmspell-providers = { path = "../llmspell-providers" }
 llmspell-utils = { path = "../llmspell-utils" }
 llmspell-storage = { path = "../llmspell-storage" }
+llmspell-templates = { path = "../llmspell-templates" }
+llmspell-agents = { path = "../llmspell-agents" }
+llmspell-tools = { path = "../llmspell-tools" }
+llmspell-workflows = { path = "../llmspell-workflows" }
 tokio.workspace = true
 clap = { workspace = true, features = ["derive", "env"] }
 serde.workspace = true
