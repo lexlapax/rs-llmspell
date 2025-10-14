@@ -185,12 +185,7 @@ impl crate::core::Template for DataAnalysisTemplate {
 
         // Save artifacts
         if let Some(output_dir) = &context.output_dir {
-            self.save_artifacts(
-                output_dir,
-                &report,
-                &chart_result.chart_data,
-                &mut output,
-            )?;
+            self.save_artifacts(output_dir, &report, &chart_result.chart_data, &mut output)?;
         }
 
         // Set result and metrics
@@ -235,11 +230,7 @@ impl crate::core::Template for DataAnalysisTemplate {
 
 impl DataAnalysisTemplate {
     /// Phase 1: Load data from file
-    async fn load_data(
-        &self,
-        file_path: &str,
-        _context: &ExecutionContext,
-    ) -> Result<DataSet> {
+    async fn load_data(&self, file_path: &str, _context: &ExecutionContext) -> Result<DataSet> {
         // TODO: Implement actual data loading using data-loader tool
         // For now, return placeholder dataset
         warn!(

@@ -396,7 +396,10 @@ impl InteractiveChatTemplate {
         // Save conversation transcript
         let transcript_path = output_dir.join(format!("conversation-{}.txt", session_id));
         fs::write(&transcript_path, &result.transcript).map_err(|e| {
-            TemplateError::ExecutionFailed(format!("Failed to write conversation transcript: {}", e))
+            TemplateError::ExecutionFailed(format!(
+                "Failed to write conversation transcript: {}",
+                e
+            ))
         })?;
         output.add_artifact(Artifact::new(
             transcript_path.to_string_lossy().to_string(),
