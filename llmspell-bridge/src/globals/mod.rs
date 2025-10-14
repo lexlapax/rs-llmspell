@@ -21,6 +21,7 @@ pub mod session_infrastructure;
 pub mod state_global;
 pub mod state_infrastructure;
 pub mod streaming_global;
+pub mod template_global;
 pub mod tool_api_standard;
 pub mod tool_global;
 pub mod types;
@@ -29,6 +30,7 @@ pub mod workflow_global;
 // Re-exports
 pub use injection::{GlobalInjector, InjectionCache};
 pub use registry::{GlobalRegistry, GlobalRegistryBuilder};
+pub use template_global::TemplateGlobal;
 pub use types::{GlobalContext, GlobalMetadata, GlobalObject};
 
 use llmspell_core::Result;

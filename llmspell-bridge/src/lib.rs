@@ -275,6 +275,9 @@ pub mod orchestration;
 pub mod workflow_performance;
 pub mod workflows; // Includes WorkflowBridge, WorkflowRegistry, and StandardizedWorkflowFactory (consolidated)
 
+// Template bridge module
+pub mod template_bridge;
+
 // Language-specific implementations (feature-gated)
 #[cfg(feature = "lua")]
 pub mod lua;
@@ -293,6 +296,7 @@ pub use llmspell_config::LLMSpellConfig;
 pub use providers::ProviderManager;
 pub use registry::ComponentRegistry;
 pub use runtime::ScriptRuntime;
+pub use template_bridge::{TemplateBridge, TemplateInfo};
 
 #[cfg(feature = "lua")]
 use llmspell_core::traits::script_executor::ScriptExecutor;
