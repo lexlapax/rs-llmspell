@@ -139,12 +139,13 @@ impl TemplateBridge {
         name: &str,
         include_schema: bool,
     ) -> Result<TemplateInfo, LLMSpellError> {
-        let template = self.template_registry.get(name).map_err(|e| {
-            LLMSpellError::Component {
+        let template = self
+            .template_registry
+            .get(name)
+            .map_err(|e| LLMSpellError::Component {
                 message: format!("Template not found: {e}"),
                 source: None,
-            }
-        })?;
+            })?;
 
         let metadata = template.metadata().clone();
         let schema = if include_schema {
@@ -184,27 +185,30 @@ impl TemplateBridge {
         params: TemplateParams,
     ) -> Result<TemplateOutput, LLMSpellError> {
         // Get template
-        let template = self.template_registry.get(name).map_err(|e| {
-            LLMSpellError::Component {
+        let template = self
+            .template_registry
+            .get(name)
+            .map_err(|e| LLMSpellError::Component {
                 message: format!("Template not found: {e}"),
                 source: None,
-            }
-        })?;
+            })?;
 
         // Validate parameters against schema
-        template.validate(&params).map_err(|e| {
-            LLMSpellError::Validation {
+        template
+            .validate(&params)
+            .map_err(|e| LLMSpellError::Validation {
                 field: Some("params".to_string()),
                 message: format!("Parameter validation failed: {e}"),
-            }
-        })?;
+            })?;
 
         // Build ExecutionContext from available infrastructure
         // NOTE: For Phase 12.5, we create minimal registries. Future phases can enhance this.
         let mut context_builder = llmspell_templates::ExecutionContext::builder()
             .with_tool_registry(Arc::new(llmspell_tools::ToolRegistry::new()))
             .with_agent_registry(Arc::new(llmspell_agents::FactoryRegistry::new()))
-            .with_workflow_factory(Arc::new(llmspell_workflows::factory::DefaultWorkflowFactory::new()))
+            .with_workflow_factory(Arc::new(
+                llmspell_workflows::factory::DefaultWorkflowFactory::new(),
+            ))
             .with_providers(self.providers.clone());
 
         // Add optional components
@@ -216,20 +220,21 @@ impl TemplateBridge {
             context_builder = context_builder.with_session_manager(session_mgr.clone());
         }
 
-        let exec_context = context_builder.build().map_err(|e| {
-            LLMSpellError::Component {
+        let exec_context = context_builder
+            .build()
+            .map_err(|e| LLMSpellError::Component {
                 message: format!("Failed to build execution context: {e}"),
                 source: None,
-            }
-        })?;
+            })?;
 
         // Execute template
-        template.execute(params, exec_context).await.map_err(|e| {
-            LLMSpellError::Component {
+        template
+            .execute(params, exec_context)
+            .await
+            .map_err(|e| LLMSpellError::Component {
                 message: format!("Template execution failed: {e}"),
                 source: None,
-            }
-        })
+            })
     }
 
     /// Search templates by query and optional category
@@ -272,12 +277,13 @@ impl TemplateBridge {
     ///
     /// Returns error if template not found
     pub fn get_template_schema(&self, name: &str) -> Result<ConfigSchema, LLMSpellError> {
-        let template = self.template_registry.get(name).map_err(|e| {
-            LLMSpellError::Component {
+        let template = self
+            .template_registry
+            .get(name)
+            .map_err(|e| LLMSpellError::Component {
                 message: format!("Template not found: {e}"),
                 source: None,
-            }
-        })?;
+            })?;
 
         Ok(template.config_schema())
     }
@@ -301,12 +307,13 @@ impl TemplateBridge {
         name: &str,
         params: &TemplateParams,
     ) -> Result<Option<llmspell_templates::CostEstimate>, LLMSpellError> {
-        let template = self.template_registry.get(name).map_err(|e| {
-            LLMSpellError::Component {
+        let template = self
+            .template_registry
+            .get(name)
+            .map_err(|e| LLMSpellError::Component {
                 message: format!("Template not found: {e}"),
                 source: None,
-            }
-        })?;
+            })?;
 
         let estimate = template.estimate_cost(params).await;
         Ok(Some(estimate))
@@ -386,7 +393,10 @@ mod tests {
             let info_no_schema = bridge
                 .get_template_info(&first_template.id, false)
                 .expect("Should get template info");
-            assert!(info_no_schema.schema.is_none(), "Schema should not be included");
+            assert!(
+                info_no_schema.schema.is_none(),
+                "Schema should not be included"
+            );
         }
     }
 
@@ -424,7 +434,10 @@ mod tests {
             let schema = bridge
                 .get_template_schema(&first_template.id)
                 .expect("Should get template schema");
-            assert!(!schema.parameters.is_empty(), "Schema should have parameters");
+            assert!(
+                !schema.parameters.is_empty(),
+                "Schema should have parameters"
+            );
         }
     }
 }
