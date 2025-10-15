@@ -172,12 +172,7 @@ impl TemplateRegistry {
     ///
     /// This will be populated with actual templates in later implementation
     fn register_builtin_templates(&self) -> Result<()> {
-        // Built-in templates will be registered here once implemented
-        // For now, this is a placeholder that does nothing
-        tracing::info!(
-            "Built-in templates registration (placeholder - templates not yet implemented)"
-        );
-        Ok(())
+        crate::builtin::register_builtin_templates(self)
     }
 }
 

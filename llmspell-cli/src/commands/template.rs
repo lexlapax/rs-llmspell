@@ -222,7 +222,7 @@ async fn handle_template_embedded(
         TemplateCommands::Exec {
             name,
             params,
-            output,
+            output_dir,
         } => {
             info!("Executing template: {} via kernel", name);
 
@@ -312,22 +312,74 @@ async fn handle_template_embedded(
                 }
             }
 
-            // Show artifacts
+            // Show and write artifacts
             if let Some(artifacts) = response.get("artifacts").and_then(|a| a.as_array()) {
                 if !artifacts.is_empty() {
                     println!("\nArtifacts ({}):", artifacts.len());
-                    for artifact in artifacts {
-                        if let Some(filename) = artifact.get("filename").and_then(|f| f.as_str()) {
-                            let mime_type = artifact
-                                .get("mime_type")
-                                .and_then(|m| m.as_str())
-                                .unwrap_or("unknown");
-                            let size = artifact.get("size").and_then(|s| s.as_u64()).unwrap_or(0);
-                            println!("  - {} ({}, {} bytes)", filename, mime_type, size);
 
-                            // Note: Actual artifact writing would need additional kernel support
-                            if output.is_some() {
-                                println!("    (Artifact writing to disk requires additional implementation)");
+                    // Write artifacts to disk if output_dir specified
+                    if let Some(ref dir) = output_dir {
+                        // Create output directory
+                        std::fs::create_dir_all(dir).map_err(|e| {
+                            anyhow!("Failed to create output directory {}: {}", dir.display(), e)
+                        })?;
+
+                        // Write each artifact
+                        for artifact in artifacts {
+                            if let Some(filename) =
+                                artifact.get("filename").and_then(|f| f.as_str())
+                            {
+                                let content = artifact
+                                    .get("content")
+                                    .and_then(|c| c.as_str())
+                                    .unwrap_or("");
+                                let mime_type = artifact
+                                    .get("mime_type")
+                                    .and_then(|m| m.as_str())
+                                    .unwrap_or("unknown");
+
+                                let file_path = dir.join(filename);
+
+                                // Create parent directories if filename contains subdirs
+                                if let Some(parent) = file_path.parent() {
+                                    std::fs::create_dir_all(parent).map_err(|e| {
+                                        anyhow!(
+                                            "Failed to create directory {}: {}",
+                                            parent.display(),
+                                            e
+                                        )
+                                    })?;
+                                }
+
+                                // Write file
+                                std::fs::write(&file_path, content).map_err(|e| {
+                                    anyhow!("Failed to write {}: {}", file_path.display(), e)
+                                })?;
+
+                                println!(
+                                    "  ✓ {} ({}, {} bytes)",
+                                    filename,
+                                    mime_type,
+                                    content.len()
+                                );
+                            }
+                        }
+
+                        println!("\nArtifacts written to: {}", dir.display());
+                    } else {
+                        // Just display artifacts without writing
+                        for artifact in artifacts {
+                            if let Some(filename) =
+                                artifact.get("filename").and_then(|f| f.as_str())
+                            {
+                                let mime_type = artifact
+                                    .get("mime_type")
+                                    .and_then(|m| m.as_str())
+                                    .unwrap_or("unknown");
+                                let size =
+                                    artifact.get("size").and_then(|s| s.as_u64()).unwrap_or(0);
+                                println!("  - {} ({}, {} bytes)", filename, mime_type, size);
+                                println!("    (Use --output-dir to save artifacts to disk)");
                             }
                         }
                     }

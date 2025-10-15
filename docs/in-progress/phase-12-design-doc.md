@@ -988,7 +988,7 @@ llmspell template exec research-assistant \
 # With output directory for artifacts
 llmspell template exec research-assistant \
     --param topic="Vector databases" \
-    --output ./research-output
+    --output-dir ./research-output
 ```
 
 **Lua**:
@@ -1276,7 +1276,7 @@ llmspell template list [--category <cat>]
 llmspell template info <name>
 # Detailed template documentation (parameters, examples)
 
-llmspell template exec <name> --param key=value [--output <dir>]
+llmspell template exec <name> --param key=value [--output-dir <dir>]
 # Direct template execution, returns structured result
 
 llmspell template search <query>
@@ -1356,7 +1356,7 @@ EXAMPLES:
 EXAMPLES:
     llmspell template exec research-assistant --param topic=\"Rust async\"
     llmspell template exec interactive-chat --param model=\"ollama/llama3.1:8b\"
-    llmspell template exec data-analysis --param file=\"data.csv\" --output ./results"
+    llmspell template exec data-analysis --param file=\"data.csv\" --output-dir ./results"
     )]
     Exec {
         /// Template ID to execute
@@ -2517,7 +2517,7 @@ services:
 llmspell template list
 
 # Check template execution
-llmspell template exec research-assistant --param topic="test" --output /tmp/test
+llmspell template exec research-assistant --param topic="test" --output-dir /tmp/test
 
 # Monitor template performance
 watch -n 5 'llmspell template exec interactive-chat --param message="status"'

@@ -1269,7 +1269,7 @@ EXAMPLES:
     llmspell template exec research-assistant --param topic=\"Rust async runtime design\"
     llmspell template exec research-assistant --param topic=\"AI safety\" --param max_sources=20
     llmspell template exec data-analysis --param data_file=\"data.csv\" --param chart_type=\"bar\"
-    llmspell template exec research-assistant --param topic=\"Quantum\" --output /tmp/results")]
+    llmspell template exec research-assistant --param topic=\"Quantum\" --output-dir /tmp/results")]
     Exec {
         /// Template ID to execute
         name: String,
@@ -1280,7 +1280,7 @@ EXAMPLES:
 
         /// Output directory for artifacts
         #[arg(long, short = 'o')]
-        output: Option<std::path::PathBuf>,
+        output_dir: Option<std::path::PathBuf>,
     },
 
     /// Search templates by keywords

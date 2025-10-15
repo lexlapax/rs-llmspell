@@ -118,7 +118,7 @@ pub trait ScriptExecutor: Send + Sync {
 
     /// Access to template registry for template discovery and execution
     ///
-    /// Returns the TemplateRegistry as a type-erased Arc<dyn Any> to avoid
+    /// Returns the TemplateRegistry as a type-erased `Arc<dyn Any>` to avoid
     /// circular dependencies (llmspell-core can't depend on llmspell-templates).
     /// Callers should downcast to `Arc<TemplateRegistry>` using `Arc::downcast`.
     ///

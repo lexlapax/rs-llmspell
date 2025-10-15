@@ -90,8 +90,8 @@ mod tests {
         );
         let component_registry = Arc::new(crate::registry::ComponentRegistry::new());
 
-        // Use default provider manager config for tests
-        let providers = Arc::new(crate::ProviderManager::default());
+        // Use core provider manager for tests
+        let providers = Arc::new(llmspell_providers::ProviderManager::new());
 
         let bridge = Arc::new(TemplateBridge::new(
             template_registry,
@@ -116,7 +116,7 @@ mod tests {
                 .expect("Failed to create template registry"),
         );
         let component_registry = Arc::new(crate::registry::ComponentRegistry::new());
-        let providers = Arc::new(crate::ProviderManager::default());
+        let providers = Arc::new(llmspell_providers::ProviderManager::new());
 
         let bridge = Arc::new(TemplateBridge::new(
             template_registry,

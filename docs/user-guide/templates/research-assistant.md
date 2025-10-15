@@ -238,7 +238,7 @@ llmspell template exec research-assistant \
   --param max_sources=15 \
   --param model="ollama/llama3.2:3b" \
   --param output_format="json" \
-  --output ./research_output
+  --output-dir ./research_output
 ```
 
 #### Fast Research (Fewer Sources)
@@ -387,7 +387,7 @@ The Research Assistant template generates artifacts when an output directory is 
 ```bash
 llmspell template exec research-assistant \
   --param topic="Your topic" \
-  --output ./research_artifacts
+  --output-dir ./research_artifacts
 
 ls -lh ./research_artifacts/
 ```
