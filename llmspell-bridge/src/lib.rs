@@ -328,11 +328,10 @@ pub async fn create_script_executor(
 ///
 /// Returns an error if the script runtime fails to initialize.
 #[cfg(feature = "lua")]
-#[allow(clippy::unused_async)]
 pub async fn create_script_executor_with_provider(
     config: LLMSpellConfig,
     provider_manager: Arc<ProviderManager>,
 ) -> Result<Arc<dyn ScriptExecutor>, llmspell_core::error::LLMSpellError> {
-    let runtime = ScriptRuntime::new_with_lua_and_provider(config, provider_manager)?;
+    let runtime = ScriptRuntime::new_with_lua_and_provider(config, provider_manager).await?;
     Ok(Arc::new(runtime) as Arc<dyn ScriptExecutor>)
 }

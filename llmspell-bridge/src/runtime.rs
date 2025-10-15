@@ -106,18 +106,143 @@ use tracing::{debug, info, instrument};
 /// # Ok(())
 /// # }
 /// ```
+///
+/// # Dual-Layer Registry Architecture
+///
+/// `ScriptRuntime` maintains two parallel registry layers for different purposes.
+/// This architecture was introduced in Phase 12.7.1 to fix template execution
+/// infrastructure gaps while maintaining optimal performance for script access.
+///
+/// ## Layer 1: Script Access (`ComponentRegistry`)
+///
+/// - **Purpose**: Fast tool/agent/workflow lookups for Lua/JavaScript scripts
+/// - **Implementation**: Lightweight `HashMap<String, Arc<dyn Trait>>` pattern
+/// - **Used by**: Script engines via bridge APIs (`Tool.execute()` in Lua)
+/// - **Size**: 266 lines of code, optimized for speed
+/// - **Features**: Simple name→component mapping, O(1) lookup
+///
+/// ## Layer 2: Infrastructure (`ToolRegistry` + `FactoryRegistry` + `WorkflowFactory`)
+///
+/// - **Purpose**: Template execution with discovery, validation, hooks, metrics
+/// - **Implementation**: Full-featured registries with caching, indexing, categorization
+/// - **Used by**: Template system via `ExecutionContext`
+/// - **Size**: 1571 lines (`ToolRegistry` alone), comprehensive features
+/// - **Features**: Discovery by category, validation hooks, execution metrics, dependency tracking
+///
+/// ## Why Both Layers Are Necessary
+///
+/// The two layers cannot be merged or converted between each other because:
+///
+/// 1. **Different Data Structures**:
+///    - `ComponentRegistry`: Simple `HashMap` for O(1) lookups
+///    - `ToolRegistry`: Complex indexes, hooks, validation chains
+///
+/// 2. **Different Use Cases**:
+///    - Scripts need: Fast `get_tool("calculator")` → execute
+///    - Templates need: Discovery, validation, `list_tools_by_category()`, metrics
+///
+/// 3. **Performance vs Features Trade-off**:
+///    - Scripts require minimal overhead (<1ms lookup)
+///    - Templates require comprehensive infrastructure (hooks, validation, discovery)
+///
+/// 4. **Memory Cost is Minimal**:
+///    - Both layers hold `Arc` references to the same tool instances
+///    - Only the index structures are duplicated (~few KB)
+///
+/// ## Dual-Registration Pattern
+///
+/// Tools are registered to both layers simultaneously during runtime initialization:
+///
+/// ```rust,ignore
+/// // Step 1: Create both registries
+/// let tool_registry = Arc::new(ToolRegistry::new());         // Infrastructure
+/// let component_registry = Arc::new(ComponentRegistry::new()); // Script access
+///
+/// // Step 2: Register tools to BOTH (dual-registration)
+/// let calculator = CalculatorTool::new();
+/// tool_registry.register("calculator", calculator.clone()).await?;
+/// component_registry.register_tool("calculator", Arc::new(calculator))?;
+/// ```
+///
+/// This pattern ensures:
+/// - Scripts get fast `HashMap` lookups via `ComponentRegistry`
+/// - Templates get full infrastructure via `ToolRegistry`
+/// - Both share the same tool instances (`Arc`), no memory waste
+///
+/// ## Data Flow
+///
+/// ```text
+/// ┌─────────────────────────────────────────────┐
+/// │ CLI Command / User Script                   │
+/// └────────────┬────────────────────────────────┘
+///              │
+///              ├──► Scripts (Lua/JS)
+///              │    └──► ComponentRegistry (HashMap)
+///              │         └──► Tool.execute() [Fast path]
+///              │
+///              └──► Templates
+///                   └──► ExecutionContext
+///                        ├──► ToolRegistry (full-featured)
+///                        ├──► AgentRegistry (factories)
+///                        ├──► WorkflowFactory (creation)
+///                        └──► ProviderManager (LLMs)
+/// ```
+///
+/// ## Historical Context (Phase 12.7.1)
+///
+/// **Problem**: Template execution failed with "`tool_registry` is required" error
+/// because `ExecutionContext::builder()` expected 4 infrastructure components
+/// (`ToolRegistry`, `AgentRegistry`, `WorkflowFactory`, `ProviderManager`) but
+/// `ScriptRuntime` only had `ComponentRegistry`.
+///
+/// **Root Cause Analysis**: `ComponentRegistry` (266-line `HashMap` wrapper) serves
+/// a fundamentally different purpose than `ToolRegistry` (1571-line infrastructure).
+/// They cannot be converted or merged without losing critical features.
+///
+/// **Solution**: Add infrastructure registries alongside `ComponentRegistry`,
+/// implement dual-registration for all tools, wire 4 components into
+/// `ExecutionContext` builder. See TODO.md Phase 12.7.1 for 180+ line analysis.
+///
+/// This is not a temporary workaround but the correct architectural design,
+/// following the same pattern as `provider_manager` which also exists separately
+/// from `ComponentRegistry`.
 pub struct ScriptRuntime {
     /// Language-agnostic script engine
     engine: Box<dyn ScriptEngineBridge>,
-    /// Component registry for agents, tools, workflows (script access layer)
+
+    /// Component registry for agents, tools, workflows (**script access layer** - Layer 1)
+    ///
+    /// Lightweight `HashMap`-based registry providing O(1) lookups for script engines.
+    /// Used by: Lua/JS scripts via `Tool.execute()`, `Agent.create()`, `Workflow.run()`
+    ///
+    /// **Not used by templates** - templates use the infrastructure registries below.
     registry: Arc<ComponentRegistry>,
-    /// Provider manager for LLM access (infrastructure)
+
+    /// Provider manager for LLM access (infrastructure layer)
+    ///
+    /// Shared by both scripts and templates. Provides access to configured LLM providers
+    /// (`OpenAI`, Anthropic, Ollama, etc.)
     provider_manager: Arc<ProviderManager>,
-    /// Tool registry for template infrastructure (hooks, discovery, validation)
+
+    /// Tool registry for template infrastructure (**infrastructure layer** - Layer 2)
+    ///
+    /// Full-featured registry with hooks, discovery, validation, and metrics.
+    /// Separate from `ComponentRegistry` which serves script access.
+    /// Used by: Template system via `ExecutionContext`, CLI discovery commands.
+    ///
+    /// Tools exist in BOTH this registry AND `ComponentRegistry` (dual-registration).
     tool_registry: Arc<llmspell_tools::ToolRegistry>,
-    /// Agent factory registry for template infrastructure (agent creation)
+
+    /// Agent factory registry for template infrastructure (**infrastructure layer** - Layer 2)
+    ///
+    /// Provides agent creation and discovery capabilities for templates.
+    /// Used by: Template system via `ExecutionContext` for dynamic agent instantiation.
     agent_registry: Arc<llmspell_agents::FactoryRegistry>,
-    /// Workflow factory for template infrastructure (workflow creation)
+
+    /// Workflow factory for template infrastructure (**infrastructure layer** - Layer 2)
+    ///
+    /// Provides workflow creation capabilities for templates.
+    /// Used by: Template system via `ExecutionContext` for workflow orchestration.
     workflow_factory: Arc<dyn llmspell_workflows::WorkflowFactory>,
     /// Execution context
     execution_context: Arc<RwLock<crate::engine::ExecutionContext>>,
@@ -193,7 +318,7 @@ impl ScriptRuntime {
     ///
     /// Returns an error if runtime initialization fails
     #[cfg(feature = "lua")]
-    pub fn new_with_lua_and_provider(
+    pub async fn new_with_lua_and_provider(
         config: LLMSpellConfig,
         provider_manager: Arc<ProviderManager>,
     ) -> Result<Self, LLMSpellError> {
@@ -203,7 +328,7 @@ impl ScriptRuntime {
             &lua_config,
             Some(Arc::new(config.clone())),
         )?;
-        Self::new_with_engine_and_provider(engine, config, provider_manager)
+        Self::new_with_engine_and_provider(engine, config, provider_manager).await
     }
 
     /// Create JavaScript runtime with existing provider manager (Phase 11.FIX.1)
@@ -212,14 +337,14 @@ impl ScriptRuntime {
     ///
     /// Returns an error if runtime initialization fails
     #[cfg(feature = "javascript")]
-    pub fn new_with_javascript_and_provider(
+    pub async fn new_with_javascript_and_provider(
         config: LLMSpellConfig,
         provider_manager: Arc<ProviderManager>,
     ) -> Result<Self, LLMSpellError> {
         info!("Creating JavaScript script runtime with existing provider manager");
         let js_config = JSConfig::default();
         let engine = EngineFactory::create_javascript_engine(&js_config)?;
-        Self::new_with_engine_and_provider(engine, config, provider_manager)
+        Self::new_with_engine_and_provider(engine, config, provider_manager).await
     }
 
     /// Create a new runtime with a specific engine by name
@@ -292,7 +417,16 @@ impl ScriptRuntime {
         config: LLMSpellConfig,
     ) -> Result<Self, LLMSpellError> {
         debug!("Initializing script runtime with engine");
+
+        // Create infrastructure registries BEFORE ComponentRegistry (Phase 12.7.1.2 Step 1)
+        // These provide full-featured infrastructure for templates (hooks, discovery, validation)
+        let tool_registry = Arc::new(llmspell_tools::ToolRegistry::new());
+        let agent_registry = Arc::new(llmspell_agents::FactoryRegistry::new());
+        let workflow_factory: Arc<dyn llmspell_workflows::WorkflowFactory> =
+            Arc::new(llmspell_workflows::factory::DefaultWorkflowFactory::new());
+
         // Create component registry with event support and templates based on config
+        // This provides lightweight script access layer (HashMap-based)
         let registry = if config.events.enabled {
             // Create EventBus with default configuration
             // Note: Buffer size is hardcoded to 10000 in EventBus implementation
@@ -327,11 +461,13 @@ impl ScriptRuntime {
             )
         };
 
-        // Register all Phase 2 tools with the registry using configuration
-        register_all_tools(&registry, &config.tools).map_err(|e| LLMSpellError::Component {
-            message: format!("Failed to register tools: {e}"),
-            source: None,
-        })?;
+        // Register all Phase 2 tools with BOTH registries using dual-registration (Phase 12.7.1.2 Step 5)
+        register_all_tools(&registry, &tool_registry, &config.tools)
+            .await
+            .map_err(|e| LLMSpellError::Component {
+                message: format!("Failed to register tools: {e}"),
+                source: None,
+            })?;
 
         // Create provider manager using config from llmspell-config
         let provider_manager = Arc::new(ProviderManager::new(config.providers.clone()).await?);
@@ -356,10 +492,14 @@ impl ScriptRuntime {
             },
         }));
 
+        // Phase 12.7.1.2 Step 6: Initialize struct with infrastructure registries
         Ok(Self {
             engine,
             registry,
             provider_manager,
+            tool_registry,    // NEW - infrastructure for templates
+            agent_registry,   // NEW - infrastructure for templates
+            workflow_factory, // NEW - infrastructure for templates
             execution_context,
             debug_context: Arc::new(RwLock::new(None)),
             _config: config,
@@ -369,12 +509,19 @@ impl ScriptRuntime {
     /// Create runtime with existing provider manager (Phase 11.FIX.1)
     /// This ensures a single `ProviderManager` instance is shared between kernel and script runtime
     #[cfg(any(feature = "lua", feature = "javascript"))]
-    fn new_with_engine_and_provider(
+    async fn new_with_engine_and_provider(
         mut engine: Box<dyn ScriptEngineBridge>,
         config: LLMSpellConfig,
         provider_manager: Arc<ProviderManager>,
     ) -> Result<Self, LLMSpellError> {
         debug!("Initializing script runtime with engine and existing provider manager");
+
+        // Create infrastructure registries (Phase 12.7.1.2 Step 7)
+        let tool_registry = Arc::new(llmspell_tools::ToolRegistry::new());
+        let agent_registry = Arc::new(llmspell_agents::FactoryRegistry::new());
+        let workflow_factory: Arc<dyn llmspell_workflows::WorkflowFactory> =
+            Arc::new(llmspell_workflows::factory::DefaultWorkflowFactory::new());
+
         // Create component registry with event support and templates based on config
         let registry = if config.events.enabled {
             let event_bus = Arc::new(llmspell_events::EventBus::new());
@@ -404,10 +551,13 @@ impl ScriptRuntime {
             )
         };
 
-        register_all_tools(&registry, &config.tools).map_err(|e| LLMSpellError::Component {
-            message: format!("Failed to register tools: {e}"),
-            source: None,
-        })?;
+        // Register all Phase 2 tools with BOTH registries using dual-registration (Phase 12.7.1.2 Step 7)
+        register_all_tools(&registry, &tool_registry, &config.tools)
+            .await
+            .map_err(|e| LLMSpellError::Component {
+                message: format!("Failed to register tools: {e}"),
+                source: None,
+            })?;
 
         // Use provided provider manager instead of creating new one
         engine.inject_apis(&registry, &provider_manager)?;
@@ -428,10 +578,14 @@ impl ScriptRuntime {
             },
         }));
 
+        // Phase 12.7.1.2 Step 7: Initialize struct with infrastructure registries
         Ok(Self {
             engine,
             registry,
             provider_manager,
+            tool_registry,    // NEW - infrastructure for templates
+            agent_registry,   // NEW - infrastructure for templates
+            workflow_factory, // NEW - infrastructure for templates
             execution_context,
             debug_context: Arc::new(RwLock::new(None)),
             _config: config,
@@ -557,6 +711,27 @@ impl ScriptRuntime {
     #[must_use]
     pub const fn provider_manager(&self) -> &Arc<ProviderManager> {
         &self.provider_manager
+    }
+
+    /// Get the tool registry (Phase 12.7.1.2 Step 8)
+    /// Used by template execution infrastructure for hooks, discovery, validation
+    #[must_use]
+    pub const fn tool_registry(&self) -> &Arc<llmspell_tools::ToolRegistry> {
+        &self.tool_registry
+    }
+
+    /// Get the agent factory registry (Phase 12.7.1.2 Step 8)
+    /// Used by template execution infrastructure for agent creation
+    #[must_use]
+    pub const fn agent_registry(&self) -> &Arc<llmspell_agents::FactoryRegistry> {
+        &self.agent_registry
+    }
+
+    /// Get the workflow factory (Phase 12.7.1.2 Step 8)
+    /// Used by template execution infrastructure for workflow creation
+    #[must_use]
+    pub fn workflow_factory(&self) -> &Arc<dyn llmspell_workflows::WorkflowFactory> {
+        &self.workflow_factory
     }
 
     /// Get the current execution context
@@ -875,8 +1050,14 @@ impl ScriptExecutor for ScriptRuntime {
         // Convert and validate params
         let template_params = Self::convert_and_validate_params(&template, &params)?;
 
-        // Build execution context
+        // Build execution context with infrastructure registries (Phase 12.7.1.3)
+        // Wire in the 4 required components for template execution
+        let core_provider_manager = self.provider_manager.create_core_manager_arc().await?;
         let context = llmspell_templates::context::ExecutionContext::builder()
+            .with_tool_registry(self.tool_registry.clone())
+            .with_agent_registry(self.agent_registry.clone())
+            .with_workflow_factory(self.workflow_factory.clone())
+            .with_providers(core_provider_manager)
             .build()
             .map_err(|e| LLMSpellError::Component {
                 message: format!("Failed to build execution context: {e}"),

@@ -7,6 +7,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+- **Template Execution Infrastructure Gap (Phase 12.7.1)**: Fixed critical bug where template execution failed with "tool_registry is required" error
+  - **Root Cause**: ExecutionContext required 4 infrastructure components (ToolRegistry, AgentRegistry, WorkflowFactory, ProviderManager) but ScriptRuntime only had ComponentRegistry
+  - **Architecture**: Implemented dual-layer registry pattern with clear separation of concerns:
+    - **Layer 1 (ComponentRegistry)**: Fast HashMap-based script access (266 lines, O(1) lookups <1ms)
+    - **Layer 2 (Infrastructure)**: Full-featured registries for templates (1571+ lines, discovery, validation, hooks, metrics)
+  - **Solution**: Added 3 infrastructure registries to ScriptRuntime, implemented dual-registration for all 40+ tools, wired 4 components into ExecutionContext builder
+  - **Testing**: Added 6 integration tests verifying dual-layer architecture (template_execution_test.rs, 375 lines, all passing)
+  - **Documentation**: Added 215-line dual-layer architecture section to template-system-architecture.md, enhanced runtime.rs docs with 98-line explanation
+  - **Impact**: All 6 built-in templates now execute successfully, CLI template commands functional, zero infrastructure errors
+  - **Design Rationale**: This is correct architectural design (not a workaround), following the same pattern as provider_manager which also exists separately from ComponentRegistry
+  - See TODO.md Phase 12.7.1 for 180+ line detailed analysis including 10 key architectural insights
+
 ## [0.11.2] - 2025-10-12 - Local LLM Cleanup & Enhancement 🧹
 
 Critical bug fixes and architecture cleanup for Local LLM integration. See [RELEASE_NOTES_v0.11.2.md](RELEASE_NOTES_v0.11.2.md) for full details.

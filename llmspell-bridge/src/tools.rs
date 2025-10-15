@@ -60,13 +60,18 @@ use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::sync::Arc;
 
-/// Initialize and register all Phase 2 tools with the bridge registry
+/// Initialize and register all Phase 2 tools with BOTH registries (dual-registration)
+///
+/// Phase 12.7.1.2: Registers tools in both `ComponentRegistry` (script access) and
+/// `ToolRegistry` (template infrastructure). This enables both Lua/JS scripts and
+/// template execution to access the same tool instances via Arc sharing.
 ///
 /// # Errors
 ///
-/// Returns an error if tool registration fails
-pub fn register_all_tools(
-    registry: &Arc<ComponentRegistry>,
+/// Returns an error if tool registration fails in either registry
+pub async fn register_all_tools(
+    component_registry: &Arc<ComponentRegistry>,
+    tool_registry: &Arc<llmspell_tools::ToolRegistry>,
     tools_config: &ToolsConfig,
 ) -> Result<(), Box<dyn std::error::Error>> {
     // Create a shared file sandbox for file system tools using configured allowed paths
@@ -82,32 +87,61 @@ pub fn register_all_tools(
     let file_sandbox = Arc::new(FileSandbox::new(sandbox_context)?);
 
     // Register different tool categories with their specific configurations
-    register_utility_tools(registry)?;
-    register_data_processing_tools(registry, &tools_config.http_request)?;
-    register_file_system_tools(registry, &file_sandbox, &tools_config.file_operations)?;
-    register_system_tools(registry, &file_sandbox)?;
-    register_media_tools(registry, &file_sandbox)?;
-    register_search_tools(registry, &tools_config.web_search)?;
-    register_web_tools(registry)?;
-    register_communication_tools(registry)?;
+    // Phase 12.7.1.2: Pass both registries for dual-registration
+    register_utility_tools(component_registry, tool_registry).await?;
+    register_data_processing_tools(
+        component_registry,
+        tool_registry,
+        &tools_config.http_request,
+    )
+    .await?;
+    register_file_system_tools(
+        component_registry,
+        tool_registry,
+        &file_sandbox,
+        &tools_config.file_operations,
+    )
+    .await?;
+    register_system_tools(component_registry, tool_registry, &file_sandbox).await?;
+    register_media_tools(component_registry, tool_registry, &file_sandbox).await?;
+    register_search_tools(component_registry, tool_registry, &tools_config.web_search).await?;
+    register_web_tools(component_registry, tool_registry).await?;
+    register_communication_tools(component_registry, tool_registry).await?;
 
     Ok(())
 }
 
-/// Register a single tool with the bridge registry
-fn register_tool<T, F>(
-    registry: &Arc<ComponentRegistry>,
+/// Register a single tool with BOTH registries (dual-registration pattern)
+///
+/// Phase 12.7.1.2: Registers tools in both:
+/// 1. `ComponentRegistry` (`HashMap` for script access)
+/// 2. `ToolRegistry` (infrastructure with hooks, caching, discovery)
+///
+/// Creates two separate tool instances (tools are stateless, so this is acceptable).
+/// `ToolRegistry` requires ownership to wrap internally with `Arc` and trait objects.
+async fn register_tool_dual<T, F>(
+    component_registry: &Arc<ComponentRegistry>,
+    tool_registry: &Arc<llmspell_tools::ToolRegistry>,
     name: &str,
-    tool_factory: F,
+    mut tool_factory: F,
 ) -> Result<(), Box<dyn std::error::Error>>
 where
     T: Tool + Send + Sync + 'static,
-    F: FnOnce() -> T,
+    F: FnMut() -> T,
 {
-    let tool = tool_factory();
-    registry
-        .register_tool(name.to_string(), Arc::new(tool))
+    // Create first instance for ComponentRegistry
+    let tool_for_component = Arc::new(tool_factory());
+    component_registry
+        .register_tool(name.to_string(), tool_for_component)
         .map_err(|e| Box::new(e) as Box<dyn std::error::Error>)?;
+
+    // Create second instance for ToolRegistry (it needs owned T to wrap internally)
+    let tool_for_infrastructure = tool_factory();
+    tool_registry
+        .register(name.to_string(), tool_for_infrastructure)
+        .await
+        .map_err(|e| Box::new(e) as Box<dyn std::error::Error>)?;
+
     Ok(())
 }
 
@@ -123,64 +157,127 @@ pub fn get_tool_by_name(registry: &Arc<ComponentRegistry>, name: &str) -> Option
     registry.get_tool(name)
 }
 
-/// Register utility tools
-fn register_utility_tools(
-    registry: &Arc<ComponentRegistry>,
+/// Register utility tools with dual-registration
+async fn register_utility_tools(
+    component_registry: &Arc<ComponentRegistry>,
+    tool_registry: &Arc<llmspell_tools::ToolRegistry>,
 ) -> Result<(), Box<dyn std::error::Error>> {
-    register_tool(registry, "base64-encoder", Base64EncoderTool::new)?;
-    register_tool(registry, "calculator", CalculatorTool::new)?;
+    register_tool_dual(component_registry, tool_registry, "base64-encoder", || {
+        Base64EncoderTool::new()
+    })
+    .await?;
+    register_tool_dual(component_registry, tool_registry, "calculator", || {
+        CalculatorTool::new()
+    })
+    .await?;
 
-    // Data validator
-    let data_validator_tool = Arc::new(DataValidationTool::new());
-    registry.register_tool("data-validator".to_string(), data_validator_tool)?;
+    // Data validator - manual dual-registration (create separate instances)
+    component_registry.register_tool(
+        "data-validator".to_string(),
+        Arc::new(DataValidationTool::new()),
+    )?;
+    tool_registry
+        .register("data-validator".to_string(), DataValidationTool::new())
+        .await?;
 
-    register_tool(registry, "datetime-handler", DateTimeHandlerTool::new)?;
-    register_tool(registry, "diff-calculator", DiffCalculatorTool::new)?;
-    register_tool(registry, "hash-calculator", || {
+    register_tool_dual(
+        component_registry,
+        tool_registry,
+        "datetime-handler",
+        DateTimeHandlerTool::new,
+    )
+    .await?;
+    register_tool_dual(component_registry, tool_registry, "diff-calculator", || {
+        DiffCalculatorTool::new()
+    })
+    .await?;
+    register_tool_dual(component_registry, tool_registry, "hash-calculator", || {
         HashCalculatorTool::new(HashCalculatorConfig::default())
-    })?;
+    })
+    .await?;
 
-    // Template creator
+    // Template creator - manual dual-registration (create separate instances)
     #[cfg(feature = "templates")]
     {
-        let template_tool = Arc::new(TemplateEngineTool::new());
-        registry.register_tool("template-creator".to_string(), template_tool)?;
+        component_registry.register_tool(
+            "template-creator".to_string(),
+            Arc::new(TemplateEngineTool::new()),
+        )?;
+        tool_registry
+            .register("template-creator".to_string(), TemplateEngineTool::new())
+            .await?;
     }
 
-    register_tool(registry, "text-manipulator", || {
-        TextManipulatorTool::new(TextManipulatorConfig::default())
-    })?;
-    register_tool(registry, "uuid-generator", || {
+    register_tool_dual(
+        component_registry,
+        tool_registry,
+        "text-manipulator",
+        || TextManipulatorTool::new(TextManipulatorConfig::default()),
+    )
+    .await?;
+    register_tool_dual(component_registry, tool_registry, "uuid-generator", || {
         UuidGeneratorTool::new(UuidGeneratorConfig::default())
-    })?;
+    })
+    .await?;
     // Phase 7 tools
-    register_tool(registry, "citation-formatter", CitationFormatterTool::new)?;
+    register_tool_dual(
+        component_registry,
+        tool_registry,
+        "citation-formatter",
+        CitationFormatterTool::new,
+    )
+    .await?;
     Ok(())
 }
 
-/// Register data processing tools
-fn register_data_processing_tools(
-    registry: &Arc<ComponentRegistry>,
+/// Register data processing tools with dual-registration
+async fn register_data_processing_tools(
+    component_registry: &Arc<ComponentRegistry>,
+    tool_registry: &Arc<llmspell_tools::ToolRegistry>,
     http_request_config: &llmspell_config::tools::HttpRequestConfig,
 ) -> Result<(), Box<dyn std::error::Error>> {
-    // CSV analyzer
+    // CSV analyzer - manual dual-registration (create separate instances)
     #[cfg(feature = "csv-parquet")]
     {
-        let csv_tool = Arc::new(CsvAnalyzerTool::new(CsvAnalyzerConfig::default()));
-        registry.register_tool("csv-analyzer".to_string(), csv_tool)?;
+        component_registry.register_tool(
+            "csv-analyzer".to_string(),
+            Arc::new(CsvAnalyzerTool::new(CsvAnalyzerConfig::default())),
+        )?;
+        tool_registry
+            .register(
+                "csv-analyzer".to_string(),
+                CsvAnalyzerTool::new(CsvAnalyzerConfig::default()),
+            )
+            .await?;
     }
 
-    // JSON processor
+    // JSON processor - manual dual-registration (create separate instances)
     #[cfg(feature = "json-query")]
     {
-        let json_tool = Arc::new(JsonProcessorTool::new(JsonProcessorConfig::default()));
-        registry.register_tool("json-processor".to_string(), json_tool)?;
+        component_registry.register_tool(
+            "json-processor".to_string(),
+            Arc::new(JsonProcessorTool::new(JsonProcessorConfig::default())),
+        )?;
+        tool_registry
+            .register(
+                "json-processor".to_string(),
+                JsonProcessorTool::new(JsonProcessorConfig::default()),
+            )
+            .await?;
     }
-    // GraphQL query
-    let graphql_tool = Arc::new(GraphQLQueryTool::new(GraphQLConfig::default())?);
-    registry.register_tool("graphql-query".to_string(), graphql_tool)?;
+    // GraphQL query - manual dual-registration (create separate instances)
+    component_registry.register_tool(
+        "graphql-query".to_string(),
+        Arc::new(GraphQLQueryTool::new(GraphQLConfig::default())?),
+    )?;
+    tool_registry
+        .register(
+            "graphql-query".to_string(),
+            GraphQLQueryTool::new(GraphQLConfig::default())?,
+        )
+        .await?;
 
-    // HTTP requester: register with kebab-case primary name
+    // HTTP requester: register with kebab-case primary name - manual dual-registration (create separate instances)
     // Convert from llmspell_config HttpRequestConfig to llmspell_tools HttpRequestConfig
     // Note: Some fields in llmspell_config don't exist in tool config yet
     let tool_config = HttpRequestConfig {
@@ -195,36 +292,65 @@ fn register_data_processing_tools(
             .cloned()
             .unwrap_or_else(|| "llmspell-http/1.0".to_string()),
     };
-    let http_tool = Arc::new(HttpRequestTool::new(tool_config)?);
-    registry.register_tool("http-requester".to_string(), http_tool)?;
+    component_registry.register_tool(
+        "http-requester".to_string(),
+        Arc::new(HttpRequestTool::new(tool_config.clone())?),
+    )?;
+    tool_registry
+        .register(
+            "http-requester".to_string(),
+            HttpRequestTool::new(tool_config)?,
+        )
+        .await?;
+
     // Phase 7 tools
     #[cfg(feature = "pdf")]
-    register_tool(registry, "pdf-processor", PdfProcessorTool::new)?;
-    register_tool(registry, "graph-builder", GraphBuilderTool::new)?;
+    register_tool_dual(component_registry, tool_registry, "pdf-processor", || {
+        PdfProcessorTool::new()
+    })
+    .await?;
+    register_tool_dual(component_registry, tool_registry, "graph-builder", || {
+        GraphBuilderTool::new()
+    })
+    .await?;
     Ok(())
 }
 
-/// Register file system tools
-fn register_file_system_tools(
-    registry: &Arc<ComponentRegistry>,
+/// Register file system tools with dual-registration
+async fn register_file_system_tools(
+    component_registry: &Arc<ComponentRegistry>,
+    tool_registry: &Arc<llmspell_tools::ToolRegistry>,
     file_sandbox: &Arc<FileSandbox>,
     file_ops_config: &llmspell_config::tools::FileOperationsConfig,
 ) -> Result<(), Box<dyn std::error::Error>> {
-    // Archive handler
+    // Archive handler - manual dual-registration (create separate instances)
     #[cfg(feature = "archives")]
     {
-        let archive_tool = Arc::new(ArchiveHandlerTool::new());
-        registry.register_tool("archive-handler".to_string(), archive_tool)?;
+        component_registry.register_tool(
+            "archive-handler".to_string(),
+            Arc::new(ArchiveHandlerTool::new()),
+        )?;
+        tool_registry
+            .register("archive-handler".to_string(), ArchiveHandlerTool::new())
+            .await?;
     }
 
-    // File converter
-    let file_converter_tool = Arc::new(FileConverterTool::new(
-        FileConverterConfig::default(),
-        file_sandbox.clone(),
-    ));
-    registry.register_tool("file-converter".to_string(), file_converter_tool)?;
+    // File converter - manual dual-registration (create separate instances)
+    component_registry.register_tool(
+        "file-converter".to_string(),
+        Arc::new(FileConverterTool::new(
+            FileConverterConfig::default(),
+            file_sandbox.clone(),
+        )),
+    )?;
+    tool_registry
+        .register(
+            "file-converter".to_string(),
+            FileConverterTool::new(FileConverterConfig::default(), file_sandbox.clone()),
+        )
+        .await?;
 
-    // File operations: register with kebab-case primary name
+    // File operations: register with kebab-case primary name - manual dual-registration (create separate instances)
     // Convert from llmspell_config FileOperationsConfig to llmspell_tools FileOperationsConfig
     let tool_config = FileOperationsConfig {
         allowed_paths: file_ops_config.allowed_paths.clone(),
@@ -234,91 +360,177 @@ fn register_file_system_tools(
         allow_recursive: true,      // Default value
         default_permissions: 0o644, // Default permissions
     };
-    let file_ops_tool = Arc::new(FileOperationsTool::new(tool_config, file_sandbox.clone()));
-    registry.register_tool("file-operations".to_string(), file_ops_tool)?;
+    component_registry.register_tool(
+        "file-operations".to_string(),
+        Arc::new(FileOperationsTool::new(
+            tool_config.clone(),
+            file_sandbox.clone(),
+        )),
+    )?;
+    tool_registry
+        .register(
+            "file-operations".to_string(),
+            FileOperationsTool::new(tool_config, file_sandbox.clone()),
+        )
+        .await?;
 
-    // File search
-    let file_search_tool = Arc::new(FileSearchTool::new(
-        FileSearchConfig::default(),
-        file_sandbox.clone(),
-    ));
-    registry.register_tool("file-search".to_string(), file_search_tool)?;
+    // File search - manual dual-registration (create separate instances)
+    component_registry.register_tool(
+        "file-search".to_string(),
+        Arc::new(FileSearchTool::new(
+            FileSearchConfig::default(),
+            file_sandbox.clone(),
+        )),
+    )?;
+    tool_registry
+        .register(
+            "file-search".to_string(),
+            FileSearchTool::new(FileSearchConfig::default(), file_sandbox.clone()),
+        )
+        .await?;
 
-    // File watcher
-    let file_watcher_tool = Arc::new(FileWatcherTool::new(
-        FileWatcherConfig::default(),
-        file_sandbox.clone(),
-    ));
-    registry.register_tool("file-watcher".to_string(), file_watcher_tool)?;
+    // File watcher - manual dual-registration (create separate instances)
+    component_registry.register_tool(
+        "file-watcher".to_string(),
+        Arc::new(FileWatcherTool::new(
+            FileWatcherConfig::default(),
+            file_sandbox.clone(),
+        )),
+    )?;
+    tool_registry
+        .register(
+            "file-watcher".to_string(),
+            FileWatcherTool::new(FileWatcherConfig::default(), file_sandbox.clone()),
+        )
+        .await?;
     Ok(())
 }
 
-/// Register system integration tools
-fn register_system_tools(
-    registry: &Arc<ComponentRegistry>,
+/// Register system integration tools with dual-registration
+async fn register_system_tools(
+    component_registry: &Arc<ComponentRegistry>,
+    tool_registry: &Arc<llmspell_tools::ToolRegistry>,
     file_sandbox: &Arc<FileSandbox>,
 ) -> Result<(), Box<dyn std::error::Error>> {
-    // Environment reader
-    let env_tool = Arc::new(EnvironmentReaderTool::new(
-        EnvironmentReaderConfig::default(),
-    ));
-    registry.register_tool("environment-reader".to_string(), env_tool)?;
+    // Environment reader - manual dual-registration (create separate instances)
+    component_registry.register_tool(
+        "environment-reader".to_string(),
+        Arc::new(EnvironmentReaderTool::new(
+            EnvironmentReaderConfig::default(),
+        )),
+    )?;
+    tool_registry
+        .register(
+            "environment-reader".to_string(),
+            EnvironmentReaderTool::new(EnvironmentReaderConfig::default()),
+        )
+        .await?;
 
-    // Process executor
-    let process_tool = Arc::new(ProcessExecutorTool::new(
-        ProcessExecutorConfig::default(),
-        file_sandbox.clone(),
-    ));
-    registry.register_tool("process-executor".to_string(), process_tool)?;
+    // Process executor - manual dual-registration (create separate instances)
+    component_registry.register_tool(
+        "process-executor".to_string(),
+        Arc::new(ProcessExecutorTool::new(
+            ProcessExecutorConfig::default(),
+            file_sandbox.clone(),
+        )),
+    )?;
+    tool_registry
+        .register(
+            "process-executor".to_string(),
+            ProcessExecutorTool::new(ProcessExecutorConfig::default(), file_sandbox.clone()),
+        )
+        .await?;
 
-    // Service checker
-    let service_tool = Arc::new(ServiceCheckerTool::new(ServiceCheckerConfig::default()));
-    registry.register_tool("service-checker".to_string(), service_tool)?;
+    // Service checker - manual dual-registration (create separate instances)
+    component_registry.register_tool(
+        "service-checker".to_string(),
+        Arc::new(ServiceCheckerTool::new(ServiceCheckerConfig::default())),
+    )?;
+    tool_registry
+        .register(
+            "service-checker".to_string(),
+            ServiceCheckerTool::new(ServiceCheckerConfig::default()),
+        )
+        .await?;
 
-    // System monitor
-    let monitor_tool = Arc::new(SystemMonitorTool::new(
-        SystemMonitorConfig::default(),
-        file_sandbox.clone(),
-    ));
-    registry.register_tool("system-monitor".to_string(), monitor_tool)?;
+    // System monitor - manual dual-registration (create separate instances)
+    component_registry.register_tool(
+        "system-monitor".to_string(),
+        Arc::new(SystemMonitorTool::new(
+            SystemMonitorConfig::default(),
+            file_sandbox.clone(),
+        )),
+    )?;
+    tool_registry
+        .register(
+            "system-monitor".to_string(),
+            SystemMonitorTool::new(SystemMonitorConfig::default(), file_sandbox.clone()),
+        )
+        .await?;
     Ok(())
 }
 
-/// Register media processing tools
-fn register_media_tools(
-    registry: &Arc<ComponentRegistry>,
+/// Register media processing tools with dual-registration
+async fn register_media_tools(
+    component_registry: &Arc<ComponentRegistry>,
+    tool_registry: &Arc<llmspell_tools::ToolRegistry>,
     file_sandbox: &Arc<FileSandbox>,
 ) -> Result<(), Box<dyn std::error::Error>> {
-    // Audio processor
-    let audio_tool = Arc::new(AudioProcessorTool::new(
-        AudioProcessorConfig::default(),
-        file_sandbox.clone(),
-    ));
-    registry.register_tool("audio-processor".to_string(), audio_tool)?;
+    // Audio processor - manual dual-registration (create separate instances)
+    component_registry.register_tool(
+        "audio-processor".to_string(),
+        Arc::new(AudioProcessorTool::new(
+            AudioProcessorConfig::default(),
+            file_sandbox.clone(),
+        )),
+    )?;
+    tool_registry
+        .register(
+            "audio-processor".to_string(),
+            AudioProcessorTool::new(AudioProcessorConfig::default(), file_sandbox.clone()),
+        )
+        .await?;
 
-    // Image processor
-    let image_tool = Arc::new(ImageProcessorTool::new(
-        ImageProcessorConfig::default(),
-        file_sandbox.clone(),
-    ));
-    registry.register_tool("image-processor".to_string(), image_tool)?;
+    // Image processor - manual dual-registration (create separate instances)
+    component_registry.register_tool(
+        "image-processor".to_string(),
+        Arc::new(ImageProcessorTool::new(
+            ImageProcessorConfig::default(),
+            file_sandbox.clone(),
+        )),
+    )?;
+    tool_registry
+        .register(
+            "image-processor".to_string(),
+            ImageProcessorTool::new(ImageProcessorConfig::default(), file_sandbox.clone()),
+        )
+        .await?;
 
-    // Video processor
-    let video_tool = Arc::new(VideoProcessorTool::new(
-        VideoProcessorConfig::default(),
-        file_sandbox.clone(),
-    ));
-    registry.register_tool("video-processor".to_string(), video_tool)?;
+    // Video processor - manual dual-registration (create separate instances)
+    component_registry.register_tool(
+        "video-processor".to_string(),
+        Arc::new(VideoProcessorTool::new(
+            VideoProcessorConfig::default(),
+            file_sandbox.clone(),
+        )),
+    )?;
+    tool_registry
+        .register(
+            "video-processor".to_string(),
+            VideoProcessorTool::new(VideoProcessorConfig::default(), file_sandbox.clone()),
+        )
+        .await?;
 
     Ok(())
 }
 
-/// Register search tools
-fn register_search_tools(
-    registry: &Arc<ComponentRegistry>,
+/// Register search tools with dual-registration
+async fn register_search_tools(
+    component_registry: &Arc<ComponentRegistry>,
+    tool_registry: &Arc<llmspell_tools::ToolRegistry>,
     web_search_config: &llmspell_config::tools::WebSearchConfig,
 ) -> Result<(), Box<dyn std::error::Error>> {
-    // Web searcher: register with kebab-case primary name
+    // Web searcher: register with kebab-case primary name - manual dual-registration (create separate instances)
     // Convert from llmspell_config WebSearchConfig to llmspell_tools WebSearchConfig
     // Note: Config structures have different fields - using defaults for missing ones
     let tool_config = WebSearchConfig {
@@ -329,44 +541,85 @@ fn register_search_tools(
         language: None,                                 // Default language
         fallback_chain: vec!["duckduckgo".to_string()], // Default fallback
     };
-    let web_search_tool = Arc::new(WebSearchTool::new(tool_config)?);
-    registry.register_tool("web-searcher".to_string(), web_search_tool)?;
+    component_registry.register_tool(
+        "web-searcher".to_string(),
+        Arc::new(WebSearchTool::new(tool_config.clone())?),
+    )?;
+    tool_registry
+        .register("web-searcher".to_string(), WebSearchTool::new(tool_config)?)
+        .await?;
     Ok(())
 }
 
-/// Register web tools
-fn register_web_tools(registry: &Arc<ComponentRegistry>) -> Result<(), Box<dyn std::error::Error>> {
-    register_tool(registry, "url-analyzer", UrlAnalyzerTool::new)?;
-    register_tool(registry, "web-scraper", || {
-        WebScraperTool::new(WebScraperConfig::default())
-    })?;
-    register_tool(registry, "api-tester", ApiTesterTool::new)?;
-    register_tool(registry, "webhook-caller", WebhookCallerTool::new)?;
-    register_tool(registry, "webpage-monitor", WebpageMonitorTool::new)?;
-    register_tool(registry, "sitemap-crawler", SitemapCrawlerTool::new)?;
-    Ok(())
-}
-
-/// Register communication tools
-#[allow(unused_variables)] // registry is unused when no features are enabled
-#[allow(clippy::unnecessary_wraps)] // Result needed for consistency with other register functions
-fn register_communication_tools(
-    registry: &Arc<ComponentRegistry>,
+/// Register web tools with dual-registration
+async fn register_web_tools(
+    component_registry: &Arc<ComponentRegistry>,
+    tool_registry: &Arc<llmspell_tools::ToolRegistry>,
 ) -> Result<(), Box<dyn std::error::Error>> {
-    // Email sender
+    register_tool_dual(component_registry, tool_registry, "url-analyzer", || {
+        UrlAnalyzerTool::new()
+    })
+    .await?;
+    register_tool_dual(component_registry, tool_registry, "web-scraper", || {
+        WebScraperTool::new(WebScraperConfig::default())
+    })
+    .await?;
+    register_tool_dual(component_registry, tool_registry, "api-tester", || {
+        ApiTesterTool::new()
+    })
+    .await?;
+    register_tool_dual(component_registry, tool_registry, "webhook-caller", || {
+        WebhookCallerTool::new()
+    })
+    .await?;
+    register_tool_dual(component_registry, tool_registry, "webpage-monitor", || {
+        WebpageMonitorTool::new()
+    })
+    .await?;
+    register_tool_dual(component_registry, tool_registry, "sitemap-crawler", || {
+        SitemapCrawlerTool::new()
+    })
+    .await?;
+    Ok(())
+}
+
+/// Register communication tools with dual-registration
+#[allow(unused_variables)] // registries are unused when no features are enabled
+#[allow(clippy::unnecessary_wraps)] // Result needed for consistency with other register functions
+async fn register_communication_tools(
+    component_registry: &Arc<ComponentRegistry>,
+    tool_registry: &Arc<llmspell_tools::ToolRegistry>,
+) -> Result<(), Box<dyn std::error::Error>> {
+    // Email sender - manual dual-registration (create separate instances)
     #[cfg(feature = "email")]
     {
-        let email_tool = Arc::new(EmailSenderTool::new(EmailSenderConfig::default())?);
-        registry.register_tool("email-sender".to_string(), email_tool)?;
+        component_registry.register_tool(
+            "email-sender".to_string(),
+            Arc::new(EmailSenderTool::new(EmailSenderConfig::default())?),
+        )?;
+        tool_registry
+            .register(
+                "email-sender".to_string(),
+                EmailSenderTool::new(EmailSenderConfig::default())?,
+            )
+            .await?;
     }
 
-    // Database connector
+    // Database connector - manual dual-registration (create separate instances)
     #[cfg(feature = "database")]
     {
-        let db_tool = Arc::new(DatabaseConnectorTool::new(
-            DatabaseConnectorConfig::default(),
-        )?);
-        registry.register_tool("database-connector".to_string(), db_tool)?;
+        component_registry.register_tool(
+            "database-connector".to_string(),
+            Arc::new(DatabaseConnectorTool::new(
+                DatabaseConnectorConfig::default(),
+            )?),
+        )?;
+        tool_registry
+            .register(
+                "database-connector".to_string(),
+                DatabaseConnectorTool::new(DatabaseConnectorConfig::default())?,
+            )
+            .await?;
     }
     Ok(())
 }

@@ -107,12 +107,15 @@ mod tests {
 
         // Create mock registry and provider manager
         let registry = Arc::new(ComponentRegistry::new());
+        let tool_registry = Arc::new(llmspell_tools::ToolRegistry::new());
         let provider_config = ProviderManagerConfig::default();
         let providers = Arc::new(ProviderManager::new(provider_config).await.unwrap());
 
         // Register tools with the registry
         let tools_config = llmspell_config::tools::ToolsConfig::default();
-        llmspell_bridge::tools::register_all_tools(&registry, &tools_config).unwrap();
+        llmspell_bridge::tools::register_all_tools(&registry, &tool_registry, &tools_config)
+            .await
+            .unwrap();
 
         // Inject APIs
         engine.inject_apis(&registry, &providers).unwrap();
@@ -169,12 +172,15 @@ mod tests {
 
         // Create mock registry and provider manager
         let registry = Arc::new(ComponentRegistry::new());
+        let tool_registry = Arc::new(llmspell_tools::ToolRegistry::new());
         let provider_config = ProviderManagerConfig::default();
         let providers = Arc::new(ProviderManager::new(provider_config).await.unwrap());
 
         // Register tools with the registry
         let tools_config = llmspell_config::tools::ToolsConfig::default();
-        llmspell_bridge::tools::register_all_tools(&registry, &tools_config).unwrap();
+        llmspell_bridge::tools::register_all_tools(&registry, &tool_registry, &tools_config)
+            .await
+            .unwrap();
 
         // Inject APIs
         engine.inject_apis(&registry, &providers).unwrap();
