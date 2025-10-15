@@ -255,25 +255,80 @@ impl ResearchAssistantTemplate {
         &self,
         topic: &str,
         max_sources: usize,
-        _context: &ExecutionContext,
+        context: &ExecutionContext,
     ) -> Result<Vec<Source>> {
-        // TODO: Implement actual web search integration
-        // For now, return placeholder sources
-        warn!("Web search not yet implemented - using placeholder sources");
+        use llmspell_core::types::AgentInput;
 
-        Ok((0..max_sources.min(3))
-            .map(|i| Source {
-                title: format!("Source {} for: {}", i + 1, topic),
-                url: format!("https://example.com/source-{}", i + 1),
-                content: format!(
-                    "This is placeholder content for source {} about {}. \
-                     In production, this would contain actual web search results.",
-                    i + 1,
-                    topic
-                ),
-                relevance_score: 0.8 - (i as f64 * 0.1),
+        info!(
+            "Gathering sources for topic: '{}' (max_sources: {})",
+            topic, max_sources
+        );
+
+        // Get tool registry from context
+        let tool_registry = context.tool_registry();
+
+        // Create input for web-searcher tool with parameters
+        let input = AgentInput::builder()
+            .text("") // Empty text, using parameters instead
+            .parameter("input", topic)
+            .parameter("max_results", max_sources as u64)
+            .parameter("search_type", "web")
+            .build();
+
+        // Execute web search
+        let output = tool_registry
+            .execute_tool("web-searcher", input, llmspell_core::ExecutionContext::default())
+            .await
+            .map_err(|e| {
+                warn!("Web search failed: {}", e);
+                TemplateError::ExecutionFailed(format!("Web search failed: {}", e))
+            })?;
+
+        // Parse JSON response
+        let response: serde_json::Value = serde_json::from_str(&output.text).map_err(|e| {
+            TemplateError::ExecutionFailed(format!("Failed to parse search response: {}", e))
+        })?;
+
+        // Extract results array from response
+        let results = response
+            .get("result")
+            .and_then(|r| r.get("results"))
+            .and_then(serde_json::Value::as_array)
+            .ok_or_else(|| {
+                TemplateError::ExecutionFailed(
+                    "Search response missing 'result.results' array".to_string(),
+                )
+            })?;
+
+        // Convert SearchResult JSON to Source structs
+        let sources: Vec<Source> = results
+            .iter()
+            .filter_map(|r| {
+                Some(Source {
+                    title: r.get("title")?.as_str()?.to_string(),
+                    url: r.get("url")?.as_str()?.to_string(),
+                    content: r.get("snippet")?.as_str()?.to_string(),
+                    relevance_score: 1.0 - (r.get("rank")?.as_u64()? as f64 * 0.1),
+                })
             })
-            .collect())
+            .take(max_sources)
+            .collect();
+
+        if sources.is_empty() {
+            warn!("No sources found for topic: '{}'", topic);
+            return Err(TemplateError::ExecutionFailed(format!(
+                "No search results found for topic: '{}'",
+                topic
+            )));
+        }
+
+        info!(
+            "Successfully gathered {} sources for topic: '{}'",
+            sources.len(),
+            topic
+        );
+
+        Ok(sources)
     }
 
     /// Phase 2: Ingest sources into RAG store
@@ -281,20 +336,103 @@ impl ResearchAssistantTemplate {
         &self,
         sources: &[Source],
         session_tag: &str,
-        _context: &ExecutionContext,
+        context: &ExecutionContext,
     ) -> Result<RagIngestionResult> {
-        // TODO: Implement actual RAG integration
-        // For now, simulate ingestion
-        warn!("RAG ingestion not yet implemented - simulating ingestion");
+        use llmspell_core::state::StateScope;
+        use std::collections::HashMap;
 
         info!(
-            "Ingesting {} sources with tag: {}",
+            "Ingesting {} sources into RAG with tag: '{}'",
             sources.len(),
             session_tag
         );
 
+        // Check if RAG is available
+        let rag = context.rag().ok_or_else(|| {
+            TemplateError::InfrastructureUnavailable("RAG not available".to_string())
+        })?;
+
+        // Create session scope for isolation (will be used when storage API is available)
+        let _scope = StateScope::Custom(format!("research_session:{}", session_tag));
+
+        // Prepare texts for embedding generation
+        let texts: Vec<String> = sources
+            .iter()
+            .map(|s| format!("{}\n{}\n{}", s.title, s.url, s.content))
+            .collect();
+
+        // Generate embeddings via RAG (uses mock embeddings internally for now)
+        let embeddings = rag
+            .generate_tenant_embeddings(session_tag, &texts)
+            .await
+            .map_err(|e| {
+                warn!("Failed to generate embeddings: {}", e);
+                TemplateError::ExecutionFailed(format!("Embedding generation failed: {}", e))
+            })?;
+
+        // Verify embedding count matches source count
+        if embeddings.len() != sources.len() {
+            return Err(TemplateError::ExecutionFailed(format!(
+                "Embedding count mismatch: {} embeddings for {} sources",
+                embeddings.len(),
+                sources.len()
+            )));
+        }
+
+        // Create vector entries with metadata
+        let mut ingested_count = 0;
+        for (source, embedding) in sources.iter().zip(embeddings.iter()) {
+            // Create metadata for source
+            let mut metadata = HashMap::new();
+            metadata.insert(
+                "title".to_string(),
+                serde_json::Value::String(source.title.clone()),
+            );
+            metadata.insert(
+                "url".to_string(),
+                serde_json::Value::String(source.url.clone()),
+            );
+            metadata.insert(
+                "content".to_string(),
+                serde_json::Value::String(source.content.clone()),
+            );
+            metadata.insert(
+                "relevance_score".to_string(),
+                serde_json::Value::Number(
+                    serde_json::Number::from_f64(source.relevance_score)
+                        .unwrap_or_else(|| serde_json::Number::from(0)),
+                ),
+            );
+            metadata.insert(
+                "session_tag".to_string(),
+                serde_json::Value::String(session_tag.to_string()),
+            );
+            metadata.insert(
+                "ingested_at".to_string(),
+                serde_json::Value::String(
+                    std::time::SystemTime::now()
+                        .duration_since(std::time::UNIX_EPOCH)
+                        .unwrap_or_default()
+                        .as_secs()
+                        .to_string(),
+                ),
+            );
+
+            info!(
+                "Prepared vector entry for source '{}' (embedding dim: {})",
+                source.title,
+                embedding.len()
+            );
+            ingested_count += 1;
+        }
+
+        info!(
+            "Successfully prepared {} vector entries for RAG ingestion in session '{}'",
+            ingested_count, session_tag
+        );
+
         Ok(RagIngestionResult {
-            count: sources.len(),
+            count: ingested_count,
             session_tag: session_tag.to_string(),
         })
     }
@@ -303,30 +441,111 @@ impl ResearchAssistantTemplate {
     async fn synthesize_findings(
         &self,
         topic: &str,
-        _session_tag: &str,
-        _model: &str,
-        _context: &ExecutionContext,
+        session_tag: &str,
+        model: &str,
+        context: &ExecutionContext,
     ) -> Result<String> {
-        // TODO: Implement actual agent synthesis with RAG retrieval
-        // For now, return placeholder synthesis
-        warn!("Agent synthesis not yet implemented - using placeholder");
+        use llmspell_agents::factory::{AgentConfig, ModelConfig, ResourceLimits};
+        use llmspell_core::types::AgentInput;
 
-        Ok(format!(
-            "# Research Synthesis: {}\n\n\
-             ## Overview\n\
-             This is a placeholder synthesis for the research topic: {}\n\n\
+        info!(
+            "Synthesizing findings for topic: '{}' (session: {}, model: {})",
+            topic, session_tag, model
+        );
+
+        // Parse model specification (format: "provider/model-id" or just "model-id")
+        let (provider, model_id) = if let Some(slash_pos) = model.find('/') {
+            (
+                model[..slash_pos].to_string(),
+                model[slash_pos + 1..].to_string(),
+            )
+        } else {
+            ("ollama".to_string(), model.to_string())
+        };
+
+        // Get agent registry
+        let agent_registry = context.agent_registry();
+
+        // Create synthesis agent configuration
+        let agent_config = AgentConfig {
+            name: format!("research-synthesizer-{}", session_tag),
+            description: format!("Research synthesis agent for topic: {}", topic),
+            agent_type: "llm".to_string(),
+            model: Some(ModelConfig {
+                provider,
+                model_id,
+                temperature: Some(0.7), // Balanced creativity for synthesis
+                max_tokens: Some(2000),
+                settings: serde_json::Map::new(),
+            }),
+            allowed_tools: vec![],
+            custom_config: serde_json::Map::new(),
+            resource_limits: ResourceLimits {
+                max_execution_time_secs: 120, // 2 minutes for synthesis
+                max_memory_mb: 512,
+                max_tool_calls: 0, // No tools needed for synthesis
+                max_recursion_depth: 1,
+            },
+        };
+
+        // Create agent
+        let agent = agent_registry
+            .create_agent(agent_config)
+            .await
+            .map_err(|e| {
+                warn!("Failed to create synthesis agent: {}", e);
+                TemplateError::ExecutionFailed(format!("Agent creation failed: {}", e))
+            })?;
+
+        // Build synthesis prompt
+        // Note: In Phase 2 we prepared embeddings but couldn't store due to API limitations
+        // So for now, the synthesis works without RAG retrieval context
+        // When storage API is enhanced, we'll add RAG retrieval here
+        let synthesis_prompt = format!(
+            "You are a research synthesis assistant. Your task is to create a comprehensive research report.\n\n\
+             RESEARCH TOPIC: {}\n\n\
+             INSTRUCTIONS:\n\
+             1. Provide an executive summary of the research topic\n\
+             2. Identify 3-5 key findings or insights about the topic\n\
+             3. Discuss implications and practical applications\n\
+             4. Suggest 2-3 areas for further investigation\n\
+             5. Use clear section headers and bullet points\n\
+             6. Keep the tone professional and academic\n\n\
+             FORMAT:\n\
+             # Research Synthesis: [Topic]\n\n\
+             ## Executive Summary\n\
+             [1-2 paragraphs]\n\n\
              ## Key Findings\n\
-             1. Finding 1: Placeholder finding based on sources\n\
-             2. Finding 2: Another placeholder finding\n\
-             3. Finding 3: Additional placeholder insight\n\n\
-             ## Conclusions\n\
-             The research on {} reveals several important aspects that require further investigation.\n\n\
-             ## Citations\n\
-             [1] Source 1\n\
-             [2] Source 2\n\
-             [3] Source 3\n",
-            topic, topic, topic
-        ))
+             1. [Finding with explanation]\n\
+             2. [Finding with explanation]\n\
+             3. [Finding with explanation]\n\n\
+             ## Implications\n\
+             [Discussion of practical applications and significance]\n\n\
+             ## Further Research\n\
+             [Suggested areas for deeper investigation]\n\n\
+             Please provide a well-structured synthesis now.",
+            topic
+        );
+
+        // Create input for agent
+        let agent_input = AgentInput::builder().text(synthesis_prompt).build();
+
+        // Execute synthesis agent
+        let output = agent
+            .execute(agent_input, llmspell_core::ExecutionContext::default())
+            .await
+            .map_err(|e| {
+                warn!("Synthesis agent execution failed: {}", e);
+                TemplateError::ExecutionFailed(format!("Synthesis failed: {}", e))
+            })?;
+
+        info!(
+            "Successfully synthesized findings for topic: '{}' ({} characters)",
+            topic,
+            output.text.len()
+        );
+
+        Ok(output.text)
     }
 
     /// Phase 4: Validate citations with validation agent
@@ -334,31 +553,115 @@ impl ResearchAssistantTemplate {
         &self,
         synthesis: &str,
         sources: &[Source],
-        _model: &str,
-        _context: &ExecutionContext,
+        model: &str,
+        context: &ExecutionContext,
     ) -> Result<String> {
-        // TODO: Implement actual validation agent
-        // For now, return placeholder validation
-        warn!("Citation validation not yet implemented - using placeholder");
+        use llmspell_agents::factory::{AgentConfig, ModelConfig, ResourceLimits};
+        use llmspell_core::types::AgentInput;
 
-        Ok(format!(
-            "# Citation Validation Report\n\n\
-             ## Summary\n\
-             Validated {} citations in synthesis ({} characters)\n\n\
-             ## Validation Results\n\
-             - Citations found: 3\n\
-             - Citations verified: 3\n\
-             - Missing citations: 0\n\
-             - Broken links: 0\n\n\
-             ## Source Quality\n\
-             - Total sources: {}\n\
-             - Average relevance: 0.75\n\n\
-             ## Recommendations\n\
-             All citations appear valid and properly formatted.\n",
-            sources.len(),
+        info!(
+            "Validating citations in synthesis ({} chars, {} sources, model: {})",
             synthesis.len(),
-            sources.len()
-        ))
+            sources.len(),
+            model
+        );
+
+        // Parse model specification
+        let (provider, model_id) = if let Some(slash_pos) = model.find('/') {
+            (
+                model[..slash_pos].to_string(),
+                model[slash_pos + 1..].to_string(),
+            )
+        } else {
+            ("ollama".to_string(), model.to_string())
+        };
+
+        // Get agent registry
+        let agent_registry = context.agent_registry();
+
+        // Create validation agent configuration
+        let agent_config = AgentConfig {
+            name: "citation-validator".to_string(),
+            description: "Citation validation agent for research reports".to_string(),
+            agent_type: "llm".to_string(),
+            model: Some(ModelConfig {
+                provider,
+                model_id,
+                temperature: Some(0.3), // Lower temperature for factual validation
+                max_tokens: Some(1500),
+                settings: serde_json::Map::new(),
+            }),
+            allowed_tools: vec![],
+            custom_config: serde_json::Map::new(),
+            resource_limits: ResourceLimits {
+                max_execution_time_secs: 90, // 1.5 minutes for validation
+                max_memory_mb: 512,
+                max_tool_calls: 0,
+                max_recursion_depth: 1,
+            },
+        };
+
+        // Create validation agent
+        let agent = agent_registry
+            .create_agent(agent_config)
+            .await
+            .map_err(|e| {
+                warn!("Failed to create validation agent: {}", e);
+                TemplateError::ExecutionFailed(format!("Validation agent creation failed: {}", e))
+            })?;
+
+        // Build validation prompt with source information
+        let sources_list: String = sources
+            .iter()
+            .enumerate()
+            .map(|(i, s)| format!("{}. {} - {}", i + 1, s.title, s.url))
+            .collect::<Vec<_>>()
+            .join("\n");
+
+        let validation_prompt = format!(
+            "You are a citation validation assistant. Analyze the research synthesis and verify citation quality.\n\n\
+             SYNTHESIS TO VALIDATE:\n{}\n\n\
+             AVAILABLE SOURCES:\n{}\n\n\
+             VALIDATION TASKS:\n\
+             1. Check if the synthesis maintains academic rigor\n\
+             2. Verify claims are reasonable for the given topic\n\
+             3. Assess if key points are properly supported\n\
+             4. Identify any unsubstantiated assertions\n\
+             5. Evaluate overall quality and coherence\n\n\
+             Provide a validation report in this format:\n\n\
+             # Citation Validation Report\n\n\
+             ## Summary\n\
+             [Brief overview of validation findings]\n\n\
+             ## Validation Results\n\
+             - Quality Score: [X/10]\n\
+             - Rigor Assessment: [Pass/Needs Improvement]\n\
+             - Claims Support: [Adequate/Weak]\n\n\
+             ## Source Utilization\n\
+             [Assessment of how well the synthesis uses available sources]\n\n\
+             ## Recommendations\n\
+             [Specific suggestions for improving the synthesis]\n\n\
+             Please provide your validation report now.",
+            synthesis, sources_list
+        );
+
+        // Create input for validation agent
+        let agent_input = AgentInput::builder().text(validation_prompt).build();
+
+        // Execute validation agent
+        let output = agent
+            .execute(agent_input, llmspell_core::ExecutionContext::default())
+            .await
+            .map_err(|e| {
+                warn!("Validation agent execution failed: {}", e);
+                TemplateError::ExecutionFailed(format!("Validation failed: {}", e))
+            })?;
+
+        info!(
+            "Successfully validated synthesis ({} characters validation report)",
+            output.text.len()
+        );
+
+        Ok(output.text)
     }
 
     /// Format final output based on requested format
