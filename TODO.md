@@ -2400,26 +2400,234 @@ Architectural Mismatch:
 
 **Implementation Sub-Tasks**:
 
-#### Task 12.7.1.1: Analyze ComponentRegistry Architecture
-**Time**: 30 minutes
+#### Task 12.7.1.1: ✅ Analyze ComponentRegistry Architecture - COMPLETE
+**Time**: 30 minutes → **Actual**: 35 minutes
 **Description**: Deep dive into ComponentRegistry vs underlying registries
-- [ ] Read `llmspell-bridge/src/registry.rs` (ComponentRegistry structure)
-- [ ] Read `llmspell-tools/src/registry.rs` (ToolRegistry trait/implementation)
-- [ ] Read `llmspell-agents/src/registry.rs` (FactoryRegistry trait/implementation)
-- [ ] Read `llmspell-workflows/src/factory.rs` (WorkflowFactory trait/implementation)
-- [ ] Document type mismatches and conversion requirements
-- [ ] Identify if ComponentRegistry can expose underlying registries
-- [ ] Determine if we need to store underlying registries in ScriptRuntime
+- [x] Read `llmspell-bridge/src/registry.rs` (ComponentRegistry structure)
+- [x] Read `llmspell-tools/src/registry.rs` (ToolRegistry trait/implementation)
+- [x] Read `llmspell-agents/src/factory_registry.rs` (FactoryRegistry trait/implementation)
+- [x] Read `llmspell-workflows/src/factory.rs` (WorkflowFactory trait/implementation)
+- [x] Document type mismatches and conversion requirements
+- [x] Identify if ComponentRegistry can expose underlying registries
+- [x] Determine if we need to store underlying registries in ScriptRuntime
 
-**Key Questions to Answer**:
-1. Does ComponentRegistry have underlying registries or just HashMaps?
-2. Can we extract ToolRegistry from registered tools?
-3. Do we need to refactor ComponentRegistry to store both?
-4. What's the least invasive fix?
+**Key Questions Answered**:
 
-#### Task 12.7.1.2: Refactor ScriptRuntime to Include Underlying Registries
-**Time**: 2 hours
+1. **Does ComponentRegistry have underlying registries or just HashMaps?**
+   - ❌ NO - ComponentRegistry only has `HashMap<String, Arc<dyn Trait>>`
+   - Pure script-access layer with no infrastructure (no hooks, no discovery, no validation)
+   - Structure: `agents: Arc<RwLock<HashMap>>`, `tools: Arc<RwLock<HashMap>>`, `workflows: Arc<RwLock<HashMap>>`
+
+2. **Can we extract ToolRegistry from registered tools?**
+   - ❌ NO - Cannot reconstruct `ToolRegistry` from `HashMap<String, Arc<dyn Tool>>`
+   - ToolRegistry has critical infrastructure lost in HashMap:
+     - Hook integration (`ToolExecutor`)
+     - Metadata caching for fast lookups
+     - Category indexing for discovery
+     - Alias resolution
+     - Validation logic
+     - Execution metrics
+   - Converting would lose all discovery, hooks, performance optimizations
+
+3. **Do we need to refactor ComponentRegistry to store both?**
+   - ⚠️ NO - Keep ComponentRegistry focused on script access (current design is correct)
+   - ✅ YES - Add underlying registries to ScriptRuntime (matches existing pattern)
+   - ComponentRegistry serves scripts (lightweight HashMap lookups)
+   - ScriptRuntime should hold infrastructure for templates/kernel
+
+4. **What's the least invasive fix?**
+   - ✅ **Add registries to ScriptRuntime** (not ComponentRegistry)
+   - Follow existing pattern: `provider_manager: Arc<ProviderManager>` already present
+   - Add parallel fields:
+     - `tool_registry: Arc<llmspell_tools::ToolRegistry>`
+     - `agent_registry: Arc<llmspell_agents::FactoryRegistry>`
+     - `workflow_factory: Arc<dyn llmspell_workflows::WorkflowFactory>`
+   - Wire through construction in `new_with_engine()` and `new_with_engine_and_provider()`
+
+**Architectural Findings**:
+
+### ComponentRegistry (llmspell-bridge/src/registry.rs:15-23)
+```rust
+pub struct ComponentRegistry {
+    agents: Arc<RwLock<HashMap<String, Arc<dyn Agent>>>>,
+    tools: Arc<RwLock<HashMap<String, Arc<dyn Tool>>>>,
+    workflows: Arc<RwLock<HashMap<String, Arc<dyn Workflow>>>>,
+    template_registry: Option<Arc<TemplateRegistry>>,
+    event_bus: Option<Arc<EventBus>>,
+    event_config: EventConfig,
+}
+```
+- **Purpose**: Script access layer (Lua/JS can look up components by name)
+- **No infrastructure**: Pure HashMap storage, no discovery/validation/hooks
+- **Correct design**: Should stay lightweight for script performance
+
+### ToolRegistry (llmspell-tools/src/registry.rs:140-153)
+```rust
+pub struct ToolRegistry {
+    tools: ToolStorage, // Arc<RwLock<HashMap<String, Arc<Box<dyn Tool>>>>>
+    metadata_cache: MetadataCache,
+    category_index: CategoryIndex,
+    alias_index: AliasIndex,
+    tool_executor: Option<Arc<ToolExecutor>>,
+    hook_config: ToolLifecycleConfig,
+}
+```
+- **Full-featured registry**: Caching, indexing, hooks, discovery, validation
+- **~1500 lines** of implementation with comprehensive capability matching
+- **Hook integration**: Executes pre/post hooks on tool calls
+- **Discovery**: Category-based, security-level, capability matching
+
+### FactoryRegistry (llmspell-agents/src/factory_registry.rs:15-18)
+```rust
+pub struct FactoryRegistry {
+    factories: Arc<RwLock<HashMap<String, Arc<dyn AgentFactory>>>>,
+    default_factory: Arc<RwLock<Option<String>>>,
+}
+```
+- **Factory pattern**: Creates agents on demand, not direct storage
+- **Template support**: `create_from_template()` method
+- **Customization**: Supports config customizers for agent creation
+
+### WorkflowFactory (llmspell-workflows/src/factory.rs:45-72)
+```rust
+#[async_trait]
+pub trait WorkflowFactory: Send + Sync {
+    async fn create_workflow(&self, params: WorkflowParams)
+        -> Result<Arc<dyn BaseAgent + Send + Sync>>;
+    fn available_types(&self) -> Vec<WorkflowType>;
+    fn default_config(&self, workflow_type: &WorkflowType) -> WorkflowConfig;
+}
+```
+- **Trait, not struct**: Multiple implementations (Default, Template-based)
+- **Stateless creation**: `DefaultWorkflowFactory` has no storage
+- **Dynamic**: Creates workflows from params on demand
+
+### ScriptRuntime Pattern (llmspell-bridge/src/runtime.rs:109-122)
+```rust
+pub struct ScriptRuntime {
+    engine: Box<dyn ScriptEngineBridge>,
+    registry: Arc<ComponentRegistry>,  // ← Script access
+    provider_manager: Arc<ProviderManager>,  // ← Infrastructure ✅
+    execution_context: Arc<RwLock<ExecutionContext>>,
+    debug_context: Arc<RwLock<Option<Arc<dyn DebugContext>>>>,
+    _config: LLMSpellConfig,
+}
+```
+- **Existing pattern**: Already separates `registry` (scripts) from `provider_manager` (infrastructure)
+- **Solution**: Add `tool_registry`, `agent_registry`, `workflow_factory` following same pattern
+
+**Type Mismatch Summary**:
+- Templates need: `Arc<llmspell_tools::ToolRegistry>` (1571 lines, full-featured)
+- ScriptRuntime has: `Arc<ComponentRegistry>` containing `HashMap<String, Arc<dyn Tool>>` (266 lines, lightweight)
+- **Cannot convert**: Would lose hooks, caching, discovery, validation, metrics
+- **Must coexist**: Both serve different purposes (scripts vs infrastructure)
+
+**Implementation Strategy**:
+1. Create actual `ToolRegistry`, `FactoryRegistry`, `WorkflowFactory` in `new_with_engine()`
+2. Populate them with tools/agents/workflows before creating ComponentRegistry
+3. Store infrastructure registries in ScriptRuntime fields
+4. Pass both to ComponentRegistry for script access AND keep infrastructure references
+5. Wire infrastructure registries into `ExecutionContext::builder()` in `handle_template_exec()`
+
+**Files Read**:
+- `llmspell-bridge/src/registry.rs` (311 lines)
+- `llmspell-tools/src/registry.rs` (1571 lines)
+- `llmspell-agents/src/factory_registry.rs` (416 lines)
+- `llmspell-workflows/src/factory.rs` (474 lines)
+- `llmspell-bridge/src/runtime.rs` (254-262 for struct, 185-262 for construction)
+
+#### Task 12.7.1.2: 🚧 Refactor ScriptRuntime to Include Underlying Registries - IN PROGRESS
+**Time**: 2 hours → **Estimated Remaining**: 1.5 hours
 **Description**: Add actual registry references to ScriptRuntime
+
+**Progress**:
+- [x] Added new fields to `ScriptRuntime` struct (tool_registry, agent_registry, workflow_factory)
+- [x] Code compiles with warnings (fields not initialized)
+- [ ] Create registries in `new_with_engine()`
+- [ ] Create registries in `new_with_engine_and_provider()`
+- [ ] Refactor `register_all_tools()` to populate both ToolRegistry and ComponentRegistry
+- [ ] Initialize all struct fields in both constructors
+- [ ] Add accessor methods for new registry fields
+- [ ] Verify compilation
+
+**Implementation Complexity**:
+This task is more complex than initially estimated because:
+1. Current `register_all_tools()` creates tools inline and registers only to ComponentRegistry
+2. Need to register tools to BOTH ToolRegistry (infrastructure) AND ComponentRegistry (scripts)
+3. ToolRegistry requires async registration: `tool_registry.register(name, tool).await`
+4. ComponentRegistry uses sync registration: `component_registry.register_tool(name, tool)`
+5. Must handle tool creation, validation, and dual registration
+6. Same pattern needed for agents and workflows (currently not registered at all)
+
+**Next Steps** (detailed implementation plan):
+1. Modify `new_with_engine()` to create infrastructure registries:
+   ```rust
+   // Create infrastructure registries
+   let tool_registry = Arc::new(llmspell_tools::ToolRegistry::new());
+   let agent_registry = Arc::new(llmspell_agents::FactoryRegistry::new());
+   let workflow_factory: Arc<dyn llmspell_workflows::WorkflowFactory> =
+       Arc::new(llmspell_workflows::factory::DefaultWorkflowFactory::new());
+   ```
+
+2. Refactor `register_all_tools()` signature:
+   ```rust
+   pub async fn register_all_tools(
+       component_registry: &Arc<ComponentRegistry>,
+       tool_registry: &Arc<llmspell_tools::ToolRegistry>,
+       tools_config: &ToolsConfig,
+   ) -> Result<(), Box<dyn std::error::Error>>
+   ```
+
+3. Update tool registration pattern to dual-register:
+   ```rust
+   // In register_tool helper:
+   async fn register_tool_dual<T, F>(
+       component_registry: &Arc<ComponentRegistry>,
+       tool_registry: &Arc<llmspell_tools::ToolRegistry>,
+       name: &str,
+       tool_factory: F,
+   ) -> Result<(), Box<dyn std::error::Error>>
+   where
+       T: Tool + Send + Sync + 'static,
+       F: FnOnce() -> T,
+   {
+       let tool = tool_factory();
+       let tool_arc = Arc::new(tool);
+
+       // Register to ToolRegistry (infrastructure)
+       tool_registry.register(name.to_string(), (*tool_arc).clone()).await?;
+
+       // Register to ComponentRegistry (scripts)
+       component_registry.register_tool(name.to_string(), tool_arc.clone())?;
+
+       Ok(())
+   }
+   ```
+
+4. Update both `new_with_engine()` calls to use `await`:
+   ```rust
+   register_all_tools(&registry, &tool_registry, &config.tools).await
+       .map_err(|e| LLMSpellError::Component { ... })?;
+   ```
+
+5. Update struct construction in both methods to include new fields:
+   ```rust
+   Ok(Self {
+       engine,
+       registry,
+       provider_manager,
+       tool_registry,           // NEW
+       agent_registry,          // NEW
+       workflow_factory,        // NEW
+       execution_context,
+       debug_context: Arc::new(RwLock::new(None)),
+       _config: config,
+   })
+   ```
+
+**Files to Modify**:
+- `llmspell-bridge/src/runtime.rs` (lines 290-366, 372-431)
+- `llmspell-bridge/src/tools.rs` (lines 68-95, 97-112)
 - [ ] Add fields to `ScriptRuntime` struct (llmspell-bridge/src/runtime.rs:109-122):
   ```rust
   /// Underlying tool registry (for template infrastructure)

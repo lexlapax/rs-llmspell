@@ -109,10 +109,16 @@ use tracing::{debug, info, instrument};
 pub struct ScriptRuntime {
     /// Language-agnostic script engine
     engine: Box<dyn ScriptEngineBridge>,
-    /// Component registry for agents, tools, workflows
+    /// Component registry for agents, tools, workflows (script access layer)
     registry: Arc<ComponentRegistry>,
-    /// Provider manager for LLM access
+    /// Provider manager for LLM access (infrastructure)
     provider_manager: Arc<ProviderManager>,
+    /// Tool registry for template infrastructure (hooks, discovery, validation)
+    tool_registry: Arc<llmspell_tools::ToolRegistry>,
+    /// Agent factory registry for template infrastructure (agent creation)
+    agent_registry: Arc<llmspell_agents::FactoryRegistry>,
+    /// Workflow factory for template infrastructure (workflow creation)
+    workflow_factory: Arc<dyn llmspell_workflows::WorkflowFactory>,
     /// Execution context
     execution_context: Arc<RwLock<crate::engine::ExecutionContext>>,
     /// Debug context for debugging support (uses interior mutability)
