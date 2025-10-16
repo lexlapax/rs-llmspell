@@ -352,87 +352,71 @@ impl ResearchAssistantTemplate {
             TemplateError::InfrastructureUnavailable("RAG not available".to_string())
         })?;
 
-        // Create session scope for isolation (will be used when storage API is available)
-        let _scope = StateScope::Custom(format!("research_session:{}", session_tag));
+        // Create session scope for isolation
+        let scope = StateScope::Custom(format!("research_session:{}", session_tag));
 
-        // Prepare texts for embedding generation
+        // Prepare texts for embedding (combine title, URL, and content)
         let texts: Vec<String> = sources
             .iter()
             .map(|s| format!("{}\n{}\n{}", s.title, s.url, s.content))
             .collect();
 
-        // Generate embeddings via RAG (uses mock embeddings internally for now)
-        let embeddings = rag
-            .generate_tenant_embeddings(session_tag, &texts)
+        // Clone sources data for closure to avoid borrow checker issues
+        let sources_clone: Vec<Source> = sources.to_vec();
+        let session_tag_clone = session_tag.to_string();
+
+        // Ingest documents into RAG storage with metadata
+        let vector_ids = rag
+            .ingest_documents(
+                session_tag, // tenant_id
+                &texts,
+                scope,
+                Some(move |i: usize, _text: &str| -> HashMap<String, serde_json::Value> {
+                    // Build metadata for each source
+                    let mut metadata = HashMap::new();
+                    let source = &sources_clone[i];
+
+                    metadata.insert(
+                        "title".to_string(),
+                        serde_json::Value::String(source.title.clone()),
+                    );
+                    metadata.insert(
+                        "url".to_string(),
+                        serde_json::Value::String(source.url.clone()),
+                    );
+                    metadata.insert(
+                        "content".to_string(),
+                        serde_json::Value::String(source.content.clone()),
+                    );
+                    metadata.insert(
+                        "relevance_score".to_string(),
+                        serde_json::Value::Number(
+                            serde_json::Number::from_f64(source.relevance_score)
+                                .unwrap_or_else(|| serde_json::Number::from(0)),
+                        ),
+                    );
+                    metadata.insert(
+                        "session_tag".to_string(),
+                        serde_json::Value::String(session_tag_clone.clone()),
+                    );
+                    metadata
+                }),
+            )
             .await
             .map_err(|e| {
-                warn!("Failed to generate embeddings: {}", e);
-                TemplateError::ExecutionFailed(format!("Embedding generation failed: {}", e))
+                warn!("Failed to ingest documents into RAG: {}", e);
+                TemplateError::ExecutionFailed(format!("RAG ingestion failed: {}", e))
             })?;
 
-        // Verify embedding count matches source count
-        if embeddings.len() != sources.len() {
-            return Err(TemplateError::ExecutionFailed(format!(
-                "Embedding count mismatch: {} embeddings for {} sources",
-                embeddings.len(),
-                sources.len()
-            )));
-        }
-
-        // Create vector entries with metadata
-        let mut ingested_count = 0;
-        for (source, embedding) in sources.iter().zip(embeddings.iter()) {
-            // Create metadata for source
-            let mut metadata = HashMap::new();
-            metadata.insert(
-                "title".to_string(),
-                serde_json::Value::String(source.title.clone()),
-            );
-            metadata.insert(
-                "url".to_string(),
-                serde_json::Value::String(source.url.clone()),
-            );
-            metadata.insert(
-                "content".to_string(),
-                serde_json::Value::String(source.content.clone()),
-            );
-            metadata.insert(
-                "relevance_score".to_string(),
-                serde_json::Value::Number(
-                    serde_json::Number::from_f64(source.relevance_score)
-                        .unwrap_or_else(|| serde_json::Number::from(0)),
-                ),
-            );
-            metadata.insert(
-                "session_tag".to_string(),
-                serde_json::Value::String(session_tag.to_string()),
-            );
-            metadata.insert(
-                "ingested_at".to_string(),
-                serde_json::Value::String(
-                    std::time::SystemTime::now()
-                        .duration_since(std::time::UNIX_EPOCH)
-                        .unwrap_or_default()
-                        .as_secs()
-                        .to_string(),
-                ),
-            );
-
-            info!(
-                "Prepared vector entry for source '{}' (embedding dim: {})",
-                source.title,
-                embedding.len()
-            );
-            ingested_count += 1;
-        }
-
         info!(
-            "Successfully prepared {} vector entries for RAG ingestion in session '{}'",
-            ingested_count, session_tag
+            "Successfully ingested {} sources into RAG storage (session: {}, vector_ids: {:?})",
+            sources.len(),
+            session_tag,
+            vector_ids
         );
 
         Ok(RagIngestionResult {
-            count: ingested_count,
+            count: sources.len(),
             session_tag: session_tag.to_string(),
         })
     }
@@ -446,12 +430,61 @@ impl ResearchAssistantTemplate {
         context: &ExecutionContext,
     ) -> Result<String> {
         use llmspell_agents::factory::{AgentConfig, ModelConfig, ResourceLimits};
+        use llmspell_core::state::StateScope;
         use llmspell_core::types::AgentInput;
 
         info!(
             "Synthesizing findings for topic: '{}' (session: {}, model: {})",
             topic, session_tag, model
         );
+
+        // Retrieve RAG context from ingested sources
+        let rag_context = if let Some(rag) = context.rag() {
+            let scope = StateScope::Custom(format!("research_session:{}", session_tag));
+
+            // Retrieve top 5 most relevant sources
+            match rag.retrieve_context(session_tag, topic, scope, 5).await {
+                Ok(results) => {
+                    info!("Retrieved {} relevant sources from RAG", results.len());
+
+                    // Format retrieved sources for inclusion in prompt
+                    if results.is_empty() {
+                        String::new()
+                    } else {
+                        let formatted_sources = results
+                            .iter()
+                            .enumerate()
+                            .map(|(i, result)| {
+                                let title = result.metadata.get("title")
+                                    .and_then(|v| v.as_str())
+                                    .unwrap_or("Unknown");
+                                let url = result.metadata.get("url")
+                                    .and_then(|v| v.as_str())
+                                    .unwrap_or("");
+
+                                format!(
+                                    "SOURCE {}: {} (relevance: {:.2})\nURL: {}\nContent:\n{}\n",
+                                    i + 1,
+                                    title,
+                                    result.score,
+                                    url,
+                                    result.text
+                                )
+                            })
+                            .collect::<Vec<_>>()
+                            .join("\n---\n\n");
+
+                        format!("\n\nRELEVANT SOURCES:\n{}\n", formatted_sources)
+                    }
+                }
+                Err(e) => {
+                    warn!("Failed to retrieve RAG context: {}", e);
+                    String::new()
+                }
+            }
+        } else {
+            String::new()
+        };
 
         // Parse model specification (format: "provider/model-id" or just "model-id")
         let (provider, model_id) = if let Some(slash_pos) = model.find('/') {
@@ -497,20 +530,18 @@ impl ResearchAssistantTemplate {
                 TemplateError::ExecutionFailed(format!("Agent creation failed: {}", e))
             })?;
 
-        // Build synthesis prompt
-        // Note: In Phase 2 we prepared embeddings but couldn't store due to API limitations
-        // So for now, the synthesis works without RAG retrieval context
-        // When storage API is enhanced, we'll add RAG retrieval here
+        // Build synthesis prompt with RAG context
         let synthesis_prompt = format!(
-            "You are a research synthesis assistant. Your task is to create a comprehensive research report.\n\n\
-             RESEARCH TOPIC: {}\n\n\
+            "You are a research synthesis assistant. Your task is to create a comprehensive research report based on the provided sources.\n\n\
+             RESEARCH TOPIC: {}{}\n\n\
              INSTRUCTIONS:\n\
-             1. Provide an executive summary of the research topic\n\
-             2. Identify 3-5 key findings or insights about the topic\n\
+             1. Provide an executive summary of the research topic based on the sources\n\
+             2. Identify 3-5 key findings or insights about the topic from the sources\n\
              3. Discuss implications and practical applications\n\
              4. Suggest 2-3 areas for further investigation\n\
              5. Use clear section headers and bullet points\n\
-             6. Keep the tone professional and academic\n\n\
+             6. Keep the tone professional and academic\n\
+             7. Base your synthesis on the provided sources when available\n\n\
              FORMAT:\n\
              # Research Synthesis: [Topic]\n\n\
              ## Executive Summary\n\
@@ -524,7 +555,8 @@ impl ResearchAssistantTemplate {
              ## Further Research\n\
              [Suggested areas for deeper investigation]\n\n\
              Please provide a well-structured synthesis now.",
-            topic
+            topic,
+            rag_context
         );
 
         // Create input for agent
