@@ -630,7 +630,7 @@ impl InteractiveChatTemplate {
             allowed_tools: tools.to_vec(),
             custom_config: serde_json::Map::new(),
             resource_limits: ResourceLimits {
-                max_execution_time_secs: 60, // 1 minute for chat response
+                max_execution_time_secs: 120, // 2 minutes for chat response (local LLMs: Phase 12.8.2.7)
                 max_memory_mb: 256,
                 max_tool_calls: if tools.is_empty() { 0 } else { 10 },
                 max_recursion_depth: 1,

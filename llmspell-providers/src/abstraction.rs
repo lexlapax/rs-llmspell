@@ -81,7 +81,7 @@ impl ProviderConfig {
             model: model.into(),
             endpoint: None,
             api_key: None,
-            timeout_secs: Some(30),
+            timeout_secs: None,
             max_retries: Some(3),
             custom_config: HashMap::new(),
         }
@@ -99,7 +99,7 @@ impl ProviderConfig {
             model: model.into(),
             endpoint: None,
             api_key: None,
-            timeout_secs: Some(30),
+            timeout_secs: None,
             max_retries: Some(3),
             custom_config: HashMap::new(),
         }
@@ -669,7 +669,7 @@ mod tests {
         let config = ProviderConfig::new("openai", "gpt-4");
         assert_eq!(config.name, "openai");
         assert_eq!(config.model, "gpt-4");
-        assert_eq!(config.timeout_secs, Some(30));
+        assert_eq!(config.timeout_secs, None);
         assert_eq!(config.max_retries, Some(3));
     }
     #[test]

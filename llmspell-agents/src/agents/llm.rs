@@ -418,14 +418,30 @@ impl BaseAgent for LLMAgent {
                 .insert("max_tokens".to_string(), serde_json::json!(max_tokens));
         }
 
-        // Call the provider
+        // Call the provider with timeout enforcement (Phase 12.8.2.7 Priority 2)
+        let timeout_secs = self.config.resource_limits.max_execution_time_secs;
+        let timeout_duration = std::time::Duration::from_secs(timeout_secs);
+
         info!(
             provider_call = "complete",
             max_tokens = ?self.core_config.max_tokens,
             temperature = ?self.core_config.temperature,
-            "Calling LLM provider"
+            timeout_secs = timeout_secs,
+            "Calling LLM provider with ResourceLimits timeout"
         );
-        let response = self.provider.complete(&provider_input).await?;
+
+        let response =
+            tokio::time::timeout(timeout_duration, self.provider.complete(&provider_input))
+                .await
+                .map_err(|_elapsed| LLMSpellError::Timeout {
+                    message: format!(
+                "Agent '{}' execution timed out after {}s (ResourceLimits.max_execution_time_secs)",
+                self.metadata.name,
+                timeout_secs
+            ),
+                    duration_ms: Some(timeout_secs * 1000),
+                })??; // First ? for timeout, second ? for provider error
+
         debug!(
             response_size = response.text.len(),
             "Received response from provider"

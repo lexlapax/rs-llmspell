@@ -993,7 +993,9 @@ impl ScriptExecutor for ScriptRuntime {
 
     fn set_session_manager_any(&self, manager: Arc<dyn std::any::Any + Send + Sync>) {
         // Downcast from type-erased Any to concrete SessionManager
-        if let Ok(session_manager) = Arc::downcast::<llmspell_kernel::sessions::SessionManager>(manager) {
+        if let Ok(session_manager) =
+            Arc::downcast::<llmspell_kernel::sessions::SessionManager>(manager)
+        {
             self.set_session_manager(session_manager);
         } else {
             tracing::warn!("Failed to downcast session manager from Any");

@@ -122,7 +122,7 @@ impl KernelHandle {
 
         // Wait for tool_reply
         let start_time = std::time::Instant::now();
-        let timeout = std::time::Duration::from_secs(30);
+        let timeout = std::time::Duration::from_secs(900);
 
         loop {
             if start_time.elapsed() > timeout {
@@ -211,7 +211,7 @@ impl KernelHandle {
 
         // Wait for template_reply
         let start_time = std::time::Instant::now();
-        let timeout = std::time::Duration::from_secs(30);
+        let timeout = std::time::Duration::from_secs(900);
 
         loop {
             if start_time.elapsed() > timeout {
@@ -300,7 +300,7 @@ impl KernelHandle {
 
         // Wait for model_reply
         let start_time = std::time::Instant::now();
-        let timeout = std::time::Duration::from_secs(30);
+        let timeout = std::time::Duration::from_secs(900);
 
         loop {
             if start_time.elapsed() > timeout {
@@ -446,7 +446,7 @@ impl ClientHandle {
 
         // Wait for tool_reply
         let start_time = std::time::Instant::now();
-        let timeout = std::time::Duration::from_secs(30);
+        let timeout = std::time::Duration::from_secs(900);
 
         loop {
             if start_time.elapsed() > timeout {
@@ -530,7 +530,7 @@ impl ClientHandle {
 
         // Wait for template_reply
         let start_time = std::time::Instant::now();
-        let timeout = std::time::Duration::from_secs(30);
+        let timeout = std::time::Duration::from_secs(900);
 
         loop {
             if start_time.elapsed() > timeout {
@@ -614,7 +614,7 @@ impl ClientHandle {
 
         // Wait for model_reply
         let start_time = std::time::Instant::now();
-        let timeout = std::time::Duration::from_secs(30);
+        let timeout = std::time::Duration::from_secs(900);
 
         loop {
             if start_time.elapsed() > timeout {
