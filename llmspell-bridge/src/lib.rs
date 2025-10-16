@@ -315,7 +315,7 @@ use std::sync::Arc;
 pub async fn create_script_executor(
     config: LLMSpellConfig,
 ) -> Result<Arc<dyn ScriptExecutor>, llmspell_core::error::LLMSpellError> {
-    let runtime = ScriptRuntime::new_with_lua(config).await?;
+    let runtime = Box::pin(ScriptRuntime::new_with_lua(config)).await?;
     Ok(Arc::new(runtime) as Arc<dyn ScriptExecutor>)
 }
 

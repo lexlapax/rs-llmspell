@@ -104,6 +104,32 @@ pub trait ScriptExecutor: Send + Sync {
         None
     }
 
+    /// Set session manager for template infrastructure (Phase 12.8.2.5)
+    ///
+    /// Uses type erasure to avoid circular dependency between llmspell-core and llmspell-kernel.
+    /// The session manager is passed as `Arc<dyn Any>` and implementations should downcast it
+    /// to the concrete `SessionManager` type.
+    ///
+    /// Default implementation does nothing for backward compatibility.
+    /// Executors with session support should override this method.
+    ///
+    /// # Type Erasure Pattern
+    ///
+    /// ```rust,ignore
+    /// use std::any::Any;
+    /// use std::sync::Arc;
+    /// use llmspell_kernel::sessions::SessionManager;
+    ///
+    /// // In kernel initialization:
+    /// let session_manager = Arc::new(SessionManager::new(...)?);
+    /// script_executor.set_session_manager_any(
+    ///     session_manager as Arc<dyn Any + Send + Sync>
+    /// );
+    /// ```
+    fn set_session_manager_any(&self, _manager: Arc<dyn std::any::Any + Send + Sync>) {
+        // Default: ignore (for backward compatibility)
+    }
+
     /// Access to component registry for tool discovery and invocation
     ///
     /// Returns the ComponentLookup implementation that provides access to

@@ -304,10 +304,7 @@ impl MultiTenantRAG {
                 .map_or_else(HashMap::new, |meta_fn| meta_fn(i, text));
 
             // Add default metadata
-            metadata.insert(
-                "text".to_string(),
-                serde_json::Value::String(text.clone()),
-            );
+            metadata.insert("text".to_string(), serde_json::Value::String(text.clone()));
             metadata.insert(
                 "ingested_at".to_string(),
                 serde_json::Value::String(
@@ -332,10 +329,7 @@ impl MultiTenantRAG {
         }
 
         // Calculate storage size for metrics
-        let storage_bytes: u64 = vectors
-            .iter()
-            .map(|v| (v.embedding.len() * 4) as u64)
-            .sum();
+        let storage_bytes: u64 = vectors.iter().map(|v| (v.embedding.len() * 4) as u64).sum();
 
         // Insert into storage
         let ids = self

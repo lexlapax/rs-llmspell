@@ -288,6 +288,13 @@ impl<P: Protocol + 'static> IntegratedKernel<P> {
             script_executor.set_debug_context(Some(execution_manager.clone()));
         }
 
+        // Wire session manager to script executor for template infrastructure (Phase 12.8.2.5)
+        // Use type erasure to avoid circular dependency (kernel can't import bridge types)
+        debug!("Wiring session manager to script executor");
+        script_executor.set_session_manager_any(
+            Arc::new(session_manager.clone()) as Arc<dyn std::any::Any + Send + Sync>
+        );
+
         // Create shutdown coordinator
         let shutdown_config = ShutdownConfig::default();
         let mut shutdown_coordinator = ShutdownCoordinator::new(shutdown_config);

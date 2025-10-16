@@ -277,7 +277,11 @@ impl ResearchAssistantTemplate {
 
         // Execute web search
         let output = tool_registry
-            .execute_tool("web-searcher", input, llmspell_core::ExecutionContext::default())
+            .execute_tool(
+                "web-searcher",
+                input,
+                llmspell_core::ExecutionContext::default(),
+            )
             .await
             .map_err(|e| {
                 warn!("Web search failed: {}", e);
@@ -371,36 +375,38 @@ impl ResearchAssistantTemplate {
                 session_tag, // tenant_id
                 &texts,
                 scope,
-                Some(move |i: usize, _text: &str| -> HashMap<String, serde_json::Value> {
-                    // Build metadata for each source
-                    let mut metadata = HashMap::new();
-                    let source = &sources_clone[i];
+                Some(
+                    move |i: usize, _text: &str| -> HashMap<String, serde_json::Value> {
+                        // Build metadata for each source
+                        let mut metadata = HashMap::new();
+                        let source = &sources_clone[i];
 
-                    metadata.insert(
-                        "title".to_string(),
-                        serde_json::Value::String(source.title.clone()),
-                    );
-                    metadata.insert(
-                        "url".to_string(),
-                        serde_json::Value::String(source.url.clone()),
-                    );
-                    metadata.insert(
-                        "content".to_string(),
-                        serde_json::Value::String(source.content.clone()),
-                    );
-                    metadata.insert(
-                        "relevance_score".to_string(),
-                        serde_json::Value::Number(
-                            serde_json::Number::from_f64(source.relevance_score)
-                                .unwrap_or_else(|| serde_json::Number::from(0)),
-                        ),
-                    );
-                    metadata.insert(
-                        "session_tag".to_string(),
-                        serde_json::Value::String(session_tag_clone.clone()),
-                    );
-                    metadata
-                }),
+                        metadata.insert(
+                            "title".to_string(),
+                            serde_json::Value::String(source.title.clone()),
+                        );
+                        metadata.insert(
+                            "url".to_string(),
+                            serde_json::Value::String(source.url.clone()),
+                        );
+                        metadata.insert(
+                            "content".to_string(),
+                            serde_json::Value::String(source.content.clone()),
+                        );
+                        metadata.insert(
+                            "relevance_score".to_string(),
+                            serde_json::Value::Number(
+                                serde_json::Number::from_f64(source.relevance_score)
+                                    .unwrap_or_else(|| serde_json::Number::from(0)),
+                            ),
+                        );
+                        metadata.insert(
+                            "session_tag".to_string(),
+                            serde_json::Value::String(session_tag_clone.clone()),
+                        );
+                        metadata
+                    },
+                ),
             )
             .await
             .map_err(|e| {
@@ -455,10 +461,14 @@ impl ResearchAssistantTemplate {
                             .iter()
                             .enumerate()
                             .map(|(i, result)| {
-                                let title = result.metadata.get("title")
+                                let title = result
+                                    .metadata
+                                    .get("title")
                                     .and_then(|v| v.as_str())
                                     .unwrap_or("Unknown");
-                                let url = result.metadata.get("url")
+                                let url = result
+                                    .metadata
+                                    .get("url")
                                     .and_then(|v| v.as_str())
                                     .unwrap_or("");
 
