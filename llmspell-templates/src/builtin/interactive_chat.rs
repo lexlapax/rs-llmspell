@@ -647,8 +647,8 @@ impl InteractiveChatTemplate {
             })?;
 
         // Build prompt with system instructions and conversation history
-        let conversation_context = if history.len() > 1 {
-            // Include previous conversation turns for context
+        let conversation_context = if !history.is_empty() {
+            // Include all conversation turns (including first message) for context
             let history_text: String = history
                 .iter()
                 .map(|turn| format!("{}: {}", turn.role, turn.content))

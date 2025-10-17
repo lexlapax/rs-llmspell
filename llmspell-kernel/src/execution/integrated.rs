@@ -2675,12 +2675,20 @@ impl<P: Protocol + 'static> IntegratedKernel<P> {
             .await
         {
             Ok(result_json) => {
+                // Merge result_json fields directly into content (avoid double-nesting)
+                // result_json already contains: {"result": {...}, "artifacts": [...], "metrics": {...}}
+                let mut content = serde_json::Map::new();
+                content.insert("status".to_string(), json!("ok"));
+
+                if let Some(obj) = result_json.as_object() {
+                    for (k, v) in obj {
+                        content.insert(k.clone(), v.clone());
+                    }
+                }
+
                 let response = json!({
                     "msg_type": "template_reply",
-                    "content": {
-                        "status": "ok",
-                        "result": result_json
-                    }
+                    "content": content
                 });
                 self.send_template_reply(response).await
             }
