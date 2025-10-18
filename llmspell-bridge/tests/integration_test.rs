@@ -27,7 +27,7 @@ async fn test_script_execution_through_bridge() {
     let providers = Arc::new(ProviderManager::new(provider_config).await.unwrap());
 
     // Inject APIs
-    engine.inject_apis(&registry, &providers).unwrap();
+    engine.inject_apis(&registry, &providers, None).unwrap();
 
     // Execute a simple script
     let script = r#"
@@ -101,7 +101,7 @@ async fn test_streaming_through_bridge() {
     let provider_config = ProviderManagerConfig::default();
     let providers = Arc::new(ProviderManager::new(provider_config).await.unwrap());
 
-    engine.inject_apis(&registry, &providers).unwrap();
+    engine.inject_apis(&registry, &providers, None).unwrap();
 
     // Try streaming execution (stub for now)
     let result = engine
@@ -162,7 +162,7 @@ async fn test_provider_integration() {
         }
     });
 
-    engine.inject_apis(&registry, &providers).unwrap();
+    engine.inject_apis(&registry, &providers, None).unwrap();
 
     // Test that we can access provider functionality
     let script = r"
@@ -184,7 +184,7 @@ async fn test_error_propagation() {
     let provider_config = ProviderManagerConfig::default();
     let providers = Arc::new(ProviderManager::new(provider_config).await.unwrap());
 
-    engine.inject_apis(&registry, &providers).unwrap();
+    engine.inject_apis(&registry, &providers, None).unwrap();
 
     // Test various error scenarios
     let error_cases = vec![
@@ -218,7 +218,7 @@ async fn test_multimodal_types_access() {
     let provider_config = ProviderManagerConfig::default();
     let providers = Arc::new(ProviderManager::new(provider_config).await.unwrap());
 
-    engine.inject_apis(&registry, &providers).unwrap();
+    engine.inject_apis(&registry, &providers, None).unwrap();
 
     // Test creating multimodal content (when API is available)
     let script = r"
@@ -251,7 +251,7 @@ async fn test_execution_context_integration() {
     let provider_config = ProviderManagerConfig::default();
     let providers = Arc::new(ProviderManager::new(provider_config).await.unwrap());
 
-    engine.inject_apis(&registry, &providers).unwrap();
+    engine.inject_apis(&registry, &providers, None).unwrap();
 
     // Set custom execution context
     let mut context = llmspell_bridge::engine::bridge::ExecutionContext {
@@ -286,7 +286,7 @@ async fn test_bridge_performance_overhead() {
     let provider_config = ProviderManagerConfig::default();
     let providers = Arc::new(ProviderManager::new(provider_config).await.unwrap());
 
-    engine.inject_apis(&registry, &providers).unwrap();
+    engine.inject_apis(&registry, &providers, None).unwrap();
 
     // Benchmark simple script execution
     let script = "return 1 + 1";
@@ -381,7 +381,7 @@ async fn test_component_registration_integration() {
     let provider_config = ProviderManagerConfig::default();
     let providers = Arc::new(ProviderManager::new(provider_config).await.unwrap());
 
-    engine.inject_apis(&registry, &providers).unwrap();
+    engine.inject_apis(&registry, &providers, None).unwrap();
 
     // Verify registry works
     assert_eq!(registry.list_agents(), vec!["mock-agent"]);
@@ -398,7 +398,7 @@ async fn test_concurrent_script_execution() {
     let provider_config = ProviderManagerConfig::default();
     let providers = Arc::new(ProviderManager::new(provider_config).await.unwrap());
 
-    engine.inject_apis(&registry, &providers).unwrap();
+    engine.inject_apis(&registry, &providers, None).unwrap();
 
     let engine = Arc::new(engine);
 

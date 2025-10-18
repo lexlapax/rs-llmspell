@@ -28,7 +28,7 @@ async fn test_all_tools_integration() {
     let mut engine = EngineFactory::create_lua_engine(&lua_config).unwrap();
 
     // Inject APIs
-    engine.inject_apis(&registry, &providers).unwrap();
+    engine.inject_apis(&registry, &providers, None).unwrap();
 
     // Simple integration test for all tools
     let test_script = r#"
@@ -122,7 +122,7 @@ async fn test_tool_performance_benchmarks() {
     let lua_config = LuaConfig::default();
     let mut engine = EngineFactory::create_lua_engine(&lua_config).unwrap();
 
-    engine.inject_apis(&registry, &providers).unwrap();
+    engine.inject_apis(&registry, &providers, None).unwrap();
 
     // Benchmark each tool category
     let tool_benchmarks = vec![

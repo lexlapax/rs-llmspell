@@ -44,6 +44,10 @@ pub struct LuaEngine {
     /// Completion provider for interactive use
     #[cfg(feature = "lua")]
     completion_provider: Arc<LuaCompletionProvider>,
+    /// Global context for updating infrastructure after initialization (Phase 12.8.2.10)
+    /// Stored to allow `SessionManager` registration after `inject_apis()` completes
+    #[cfg(feature = "lua")]
+    global_context: Arc<parking_lot::RwLock<Option<Arc<GlobalContext>>>>,
 }
 
 // SAFETY: We ensure thread safety by using Mutex for all Lua access
@@ -81,6 +85,7 @@ impl LuaEngine {
                 console_capture,
                 debug_context: Arc::new(parking_lot::RwLock::new(None)),
                 completion_provider: Arc::new(LuaCompletionProvider::new()),
+                global_context: Arc::new(parking_lot::RwLock::new(None)),
             })
         }
 
@@ -327,17 +332,19 @@ impl ScriptEngineBridge for LuaEngine {
     #[allow(clippy::cognitive_complexity)]
     #[instrument(
         level = "info",
-        skip(self, registry, providers),
+        skip(self, registry, providers, session_manager),
         fields(
             engine_type = "lua",
             globals_injected = 0,
-            infrastructure_initialized = 0
+            infrastructure_initialized = 0,
+            session_manager_provided = session_manager.is_some()
         )
     )]
     fn inject_apis(
         &mut self,
         registry: &Arc<ComponentRegistry>,
         providers: &Arc<ProviderManager>,
+        session_manager: Option<Arc<dyn std::any::Any + Send + Sync>>,
     ) -> Result<(), LLMSpellError> {
         info!("Injecting Lua global APIs");
         #[cfg(feature = "lua")]
@@ -380,6 +387,17 @@ impl ScriptEngineBridge for LuaEngine {
                     ))
                 },
             );
+
+            // Store SessionManager in GlobalContext if provided (Phase 12.8.2.11 - Unified Path)
+            // This allows templates to access SessionManager during execution
+            if let Some(session_manager_any) = session_manager {
+                if let Ok(session_manager) =
+                    Arc::downcast::<llmspell_kernel::sessions::SessionManager>(session_manager_any)
+                {
+                    global_context.set_bridge("session_manager", session_manager);
+                    debug!("SessionManager stored in GlobalContext during inject_apis");
+                }
+            }
 
             // Pass runtime config through global context if available
             if let Some(runtime_config) = &self.runtime_config {
@@ -440,6 +458,13 @@ impl ScriptEngineBridge for LuaEngine {
                 total_injection_time_us = metrics.total_injection_time_us,
                 "Successfully injected all Lua globals"
             );
+
+            // Store global_context for later SessionManager registration (Phase 12.8.2.10)
+            {
+                let mut ctx = self.global_context.write();
+                *ctx = Some(global_context);
+                debug!("Global context stored for later infrastructure updates");
+            }
         }
         Ok(())
     }
@@ -529,6 +554,56 @@ impl ScriptEngineBridge for LuaEngine {
         #[cfg(not(feature = "lua"))]
         {
             Vec::new()
+        }
+    }
+
+    fn as_any(&self) -> &dyn std::any::Any {
+        self
+    }
+}
+
+#[cfg(feature = "lua")]
+impl LuaEngine {
+    /// Register `SessionManager` to `GlobalContext` (Phase 12.8.2.10)
+    ///
+    /// Called after `SessionManager` is wired to `ScriptRuntime` to update the `GlobalContext`
+    /// used during template registration. This allows templates to receive `SessionManager`
+    /// via `ExecutionContext` even though it's wired after globals are injected.
+    #[allow(clippy::cognitive_complexity)]
+    #[allow(clippy::needless_pass_by_value)]
+    pub fn register_session_manager(
+        &self,
+        session_manager: Arc<llmspell_kernel::sessions::SessionManager>,
+    ) {
+        let ctx_guard = self.global_context.read();
+        if let Some(global_context) = ctx_guard.as_ref() {
+            global_context.set_bridge("session_manager", session_manager);
+            debug!("SessionManager registered to GlobalContext for template access");
+
+            // Re-inject template global with updated context
+            // Template globals are created during create_standard_registry() which checks
+            // for session_manager in GlobalContext. By registering it now and re-injecting,
+            // TemplateBridge will be recreated with SessionManager available.
+            #[allow(clippy::significant_drop_in_scrutinee)]
+            if let Some(lua) = self.lua.try_lock() {
+                match futures::executor::block_on(create_standard_registry(global_context.clone()))
+                {
+                    Ok(global_registry) => {
+                        let injector = GlobalInjector::new(Arc::new(global_registry));
+                        if let Err(e) = injector.inject_lua(&lua, global_context) {
+                            warn!("Failed to re-inject globals with SessionManager: {}", e);
+                        } else {
+                            debug!("Successfully re-injected template globals with SessionManager");
+                        }
+                    }
+                    Err(e) => {
+                        warn!(
+                            "Failed to recreate global registry with SessionManager: {}",
+                            e
+                        );
+                    }
+                }
+            }
         }
     }
 }

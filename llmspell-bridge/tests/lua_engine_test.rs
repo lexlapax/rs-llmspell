@@ -33,7 +33,7 @@ mod tests {
         let providers = Arc::new(ProviderManager::new(provider_config).await.unwrap());
 
         // Inject APIs
-        let result = engine.inject_apis(&registry, &providers);
+        let result = engine.inject_apis(&registry, &providers, None);
         assert!(result.is_ok(), "Failed to inject APIs");
 
         // Execute simple script
@@ -59,7 +59,7 @@ mod tests {
         let providers = Arc::new(ProviderManager::new(provider_config).await.unwrap());
 
         // Inject APIs
-        engine.inject_apis(&registry, &providers).unwrap();
+        engine.inject_apis(&registry, &providers, None).unwrap();
 
         // Test that Agent global exists
         let script = "return Agent ~= nil";

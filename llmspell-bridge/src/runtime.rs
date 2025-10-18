@@ -346,6 +346,59 @@ impl ScriptRuntime {
         Self::new_with_engine_and_provider(engine, config, provider_manager).await
     }
 
+    /// Create Lua runtime with provider manager AND `SessionManager` (Phase 12.8.2.11)
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if runtime initialization fails
+    #[cfg(feature = "lua")]
+    pub async fn new_with_lua_provider_and_session(
+        config: LLMSpellConfig,
+        provider_manager: Arc<ProviderManager>,
+        session_manager: Arc<llmspell_kernel::sessions::SessionManager>,
+    ) -> Result<Self, LLMSpellError> {
+        info!("Creating Lua script runtime with provider manager and session manager");
+        let lua_config = LuaConfig::default();
+        let engine = EngineFactory::create_lua_engine_with_runtime(
+            &lua_config,
+            Some(Arc::new(config.clone())),
+        )?;
+        Self::new_with_engine_provider_and_session(
+            engine,
+            config,
+            provider_manager,
+            session_manager,
+        )
+        .await
+    }
+
+    /// Create Lua runtime with core provider manager AND `SessionManager` (Phase 12.8.2.11)
+    ///
+    /// Accepts `llmspell_providers::ProviderManager` from kernel layer to avoid re-initialization.
+    /// Wraps it in bridge `ProviderManager` for script access.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if runtime initialization fails
+    #[cfg(feature = "lua")]
+    pub async fn new_with_lua_core_provider_and_session(
+        config: LLMSpellConfig,
+        core_provider_manager: Arc<llmspell_providers::ProviderManager>,
+        session_manager: Arc<llmspell_kernel::sessions::SessionManager>,
+    ) -> Result<Self, LLMSpellError> {
+        info!("Creating Lua script runtime with core provider manager and session manager");
+
+        // Wrap core manager in bridge ProviderManager
+        // Clone the core manager (cheap - uses Arc internally)
+        let bridge_provider_manager = Arc::new(ProviderManager::from_core_manager(
+            (*core_provider_manager).clone(),
+            config.providers.clone(),
+        ));
+
+        Self::new_with_lua_provider_and_session(config, bridge_provider_manager, session_manager)
+            .await
+    }
+
     /// Create JavaScript runtime with existing provider manager (Phase 11.FIX.1)
     ///
     /// # Errors
@@ -505,8 +558,8 @@ impl ScriptRuntime {
 
         debug!("Default agent factory registered successfully");
 
-        // Inject APIs into the engine
-        engine.inject_apis(&registry, &provider_manager)?;
+        // Inject APIs into the engine (no SessionManager for standalone mode)
+        engine.inject_apis(&registry, &provider_manager, None)?;
 
         // Create execution context
         let execution_context = Arc::new(RwLock::new(crate::engine::ExecutionContext {
@@ -534,6 +587,114 @@ impl ScriptRuntime {
             agent_registry,   // NEW - infrastructure for templates
             workflow_factory, // NEW - infrastructure for templates
             session_manager: Arc::new(RwLock::new(None)), // Phase 12.8.2.5 - wired from kernel later
+            execution_context,
+            debug_context: Arc::new(RwLock::new(None)),
+            _config: config,
+        })
+    }
+
+    /// Create runtime with `SessionManager` (Phase 12.8.2.11 - Unified Kernel Path)
+    /// Used by kernel to ensure `SessionManager` is available during `inject_apis()`
+    #[cfg(any(feature = "lua", feature = "javascript"))]
+    #[allow(clippy::cognitive_complexity)]
+    async fn new_with_engine_provider_and_session(
+        mut engine: Box<dyn ScriptEngineBridge>,
+        config: LLMSpellConfig,
+        provider_manager: Arc<ProviderManager>,
+        session_manager: Arc<llmspell_kernel::sessions::SessionManager>,
+    ) -> Result<Self, LLMSpellError> {
+        debug!("Initializing script runtime with provider manager AND session manager");
+
+        // Create infrastructure registries
+        let tool_registry = Arc::new(llmspell_tools::ToolRegistry::new());
+        let agent_registry = Arc::new(llmspell_agents::FactoryRegistry::new());
+        let workflow_factory: Arc<dyn llmspell_workflows::WorkflowFactory> =
+            Arc::new(llmspell_workflows::factory::DefaultWorkflowFactory::new());
+
+        // Create component registry
+        let registry = if config.events.enabled {
+            let event_bus = Arc::new(llmspell_events::EventBus::new());
+            let event_config = llmspell_core::traits::event::EventConfig {
+                enabled: config.events.enabled,
+                include_types: config.events.filtering.include_types.clone(),
+                exclude_types: config.events.filtering.exclude_types.clone(),
+                emit_timing_events: config.events.emit_timing_events,
+                emit_state_events: config.events.emit_state_events,
+                emit_debug_events: config.events.emit_debug_events,
+                max_events_per_second: config.events.max_events_per_second,
+            };
+            Arc::new(
+                ComponentRegistry::with_event_bus_and_templates(event_bus, event_config).map_err(
+                    |e| LLMSpellError::Component {
+                        message: format!("Failed to initialize component registry: {e}"),
+                        source: None,
+                    },
+                )?,
+            )
+        } else {
+            Arc::new(
+                ComponentRegistry::with_templates().map_err(|e| LLMSpellError::Component {
+                    message: format!("Failed to initialize component registry: {e}"),
+                    source: None,
+                })?,
+            )
+        };
+
+        // Register all tools with BOTH registries
+        register_all_tools(&registry, &tool_registry, &config.tools)
+            .await
+            .map_err(|e| LLMSpellError::Component {
+                message: format!("Failed to register tools: {e}"),
+                source: None,
+            })?;
+
+        // Register default agent factory
+        debug!("Registering default agent factory with existing provider manager");
+        let core_provider_manager = provider_manager.create_core_manager_arc().await?;
+        let default_agent_factory = Arc::new(llmspell_agents::DefaultAgentFactory::new(
+            core_provider_manager,
+        ));
+
+        agent_registry
+            .register_factory("default".to_string(), default_agent_factory)
+            .await
+            .map_err(|e| LLMSpellError::Component {
+                message: format!("Failed to register default agent factory: {e}"),
+                source: None,
+            })?;
+
+        debug!("Default agent factory registered successfully");
+
+        // Inject APIs with SessionManager (Phase 12.8.2.11)
+        // Type-erase SessionManager to avoid circular dependencies
+        let session_manager_any: Arc<dyn std::any::Any + Send + Sync> = session_manager.clone();
+        engine.inject_apis(&registry, &provider_manager, Some(session_manager_any))?;
+
+        let execution_context = Arc::new(RwLock::new(crate::engine::ExecutionContext {
+            working_directory: std::env::current_dir()
+                .unwrap_or_default()
+                .to_string_lossy()
+                .to_string(),
+            environment: std::env::vars().collect(),
+            state: serde_json::Value::Object(serde_json::Map::new()),
+            security: crate::engine::SecurityContext {
+                allow_file_access: config.runtime.security.allow_file_access,
+                allow_network_access: config.runtime.security.allow_network_access,
+                allow_process_spawn: config.runtime.security.allow_process_spawn,
+                max_memory_bytes: config.runtime.security.max_memory_bytes,
+                max_execution_time_ms: config.runtime.security.max_execution_time_ms,
+            },
+        }));
+
+        // Initialize struct with SessionManager already wired
+        Ok(Self {
+            engine,
+            registry,
+            provider_manager,
+            tool_registry,
+            agent_registry,
+            workflow_factory,
+            session_manager: Arc::new(RwLock::new(Some(session_manager))), // Wired during construction
             execution_context,
             debug_context: Arc::new(RwLock::new(None)),
             _config: config,
@@ -612,8 +773,8 @@ impl ScriptRuntime {
 
         debug!("Default agent factory registered successfully");
 
-        // Use provided provider manager instead of creating new one
-        engine.inject_apis(&registry, &provider_manager)?;
+        // Use provided provider manager instead of creating new one (no SessionManager for now)
+        engine.inject_apis(&registry, &provider_manager, None)?;
 
         let execution_context = Arc::new(RwLock::new(crate::engine::ExecutionContext {
             working_directory: std::env::current_dir()

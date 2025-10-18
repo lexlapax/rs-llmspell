@@ -23,7 +23,7 @@ mod tests {
         let providers = Arc::new(ProviderManager::new(provider_config).await.unwrap());
 
         // Inject APIs
-        engine.inject_apis(&registry, &providers).unwrap();
+        engine.inject_apis(&registry, &providers, None).unwrap();
 
         // Test streaming with coroutine iteration
         let script = r#"
@@ -88,7 +88,7 @@ mod tests {
         let providers = Arc::new(ProviderManager::new(provider_config).await.unwrap());
 
         // Inject APIs
-        engine.inject_apis(&registry, &providers).unwrap();
+        engine.inject_apis(&registry, &providers, None).unwrap();
 
         // Test collect method
         let script = r#"
@@ -138,7 +138,7 @@ mod tests {
         let providers = Arc::new(ProviderManager::new(provider_config).await.unwrap());
 
         // Inject APIs
-        engine.inject_apis(&registry, &providers).unwrap();
+        engine.inject_apis(&registry, &providers, None).unwrap();
 
         // Script that would produce streaming output
         let script = r#"
@@ -199,7 +199,7 @@ mod tests {
         let providers = Arc::new(ProviderManager::new(provider_config).await.unwrap());
 
         // Inject APIs
-        engine.inject_apis(&registry, &providers).unwrap();
+        engine.inject_apis(&registry, &providers, None).unwrap();
 
         // Test error in coroutine
         let script = r#"

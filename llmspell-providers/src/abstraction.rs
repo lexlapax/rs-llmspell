@@ -281,6 +281,7 @@ impl Default for ProviderRegistry {
 }
 
 /// Provider manager for handling multiple provider instances
+#[derive(Clone)]
 pub struct ProviderManager {
     registry: Arc<RwLock<ProviderRegistry>>,
     instances: Arc<RwLock<ProviderInstanceMap>>,

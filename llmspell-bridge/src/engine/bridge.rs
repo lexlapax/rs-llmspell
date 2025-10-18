@@ -28,6 +28,13 @@ pub trait ScriptEngineBridge: Send + Sync {
     /// - Tool discovery and execution APIs
     /// - Workflow orchestration APIs
     /// - Provider access APIs
+    /// - Session management APIs (if `SessionManager` provided)
+    ///
+    /// # Arguments
+    ///
+    /// * `registry` - Component registry for tools/agents/workflows
+    /// * `providers` - Provider manager for LLM access
+    /// * `session_manager` - Optional `SessionManager` for template infrastructure (Phase 12.8.2.11)
     ///
     /// # Errors
     ///
@@ -36,6 +43,7 @@ pub trait ScriptEngineBridge: Send + Sync {
         &mut self,
         registry: &Arc<crate::ComponentRegistry>,
         providers: &Arc<crate::ProviderManager>,
+        session_manager: Option<Arc<dyn std::any::Any + Send + Sync>>,
     ) -> Result<(), LLMSpellError>;
 
     /// Set script arguments to be made available in the script environment
@@ -116,6 +124,12 @@ pub trait ScriptEngineBridge: Send + Sync {
     fn get_completion_candidates(&self, _context: &CompletionContext) -> Vec<CompletionCandidate> {
         Vec::new()
     }
+
+    /// Downcast support for accessing concrete engine types (Phase 12.8.2.10)
+    ///
+    /// Enables downcasting Box<dyn ScriptEngineBridge> to concrete engine types
+    /// for calling engine-specific methods not in the trait.
+    fn as_any(&self) -> &dyn std::any::Any;
 }
 
 /// Context for completion requests

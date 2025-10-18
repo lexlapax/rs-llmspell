@@ -21,7 +21,7 @@ mod lua_completion_tests {
         let provider_config = ProviderManagerConfig::default();
         let providers =
             Arc::new(futures::executor::block_on(ProviderManager::new(provider_config)).unwrap());
-        let _ = engine.inject_apis(&registry, &providers);
+        let _ = engine.inject_apis(&registry, &providers, None);
         engine
     }
 

@@ -24,7 +24,7 @@ async fn test_api_availability_for_workflows() {
     let providers = Arc::new(ProviderManager::new(provider_config).await.unwrap());
 
     // Try basic API injection (may fail for some APIs)
-    let _ = engine.inject_apis(&registry, &providers);
+    let _ = engine.inject_apis(&registry, &providers, None);
 
     let lua_code = r"
         -- Test API availability for workflows
@@ -103,7 +103,7 @@ async fn test_state_management_integration() {
     let provider_config = ProviderManagerConfig::default();
     let providers = Arc::new(ProviderManager::new(provider_config).await.unwrap());
 
-    let _ = engine.inject_apis(&registry, &providers);
+    let _ = engine.inject_apis(&registry, &providers, None);
 
     let lua_code = r#"
         -- Test state management integration
@@ -185,7 +185,7 @@ async fn test_memory_leak_prevention() {
     let provider_config = ProviderManagerConfig::default();
     let providers = Arc::new(ProviderManager::new(provider_config).await.unwrap());
 
-    let _ = engine.inject_apis(&registry, &providers);
+    let _ = engine.inject_apis(&registry, &providers, None);
 
     // Test creating multiple script executions without memory leaks
     let lua_code = r#"
@@ -265,7 +265,7 @@ async fn test_performance_requirements() {
     let provider_config = ProviderManagerConfig::default();
     let providers = Arc::new(ProviderManager::new(provider_config).await.unwrap());
 
-    let _ = engine.inject_apis(&registry, &providers);
+    let _ = engine.inject_apis(&registry, &providers, None);
 
     // Test script execution performance
     let start_time = Instant::now();
@@ -349,7 +349,7 @@ async fn test_error_conditions_and_recovery() {
     let provider_config = ProviderManagerConfig::default();
     let providers = Arc::new(ProviderManager::new(provider_config).await.unwrap());
 
-    let _ = engine.inject_apis(&registry, &providers);
+    let _ = engine.inject_apis(&registry, &providers, None);
 
     let lua_code = r#"
         -- Error condition tests
@@ -427,7 +427,7 @@ async fn test_concurrent_operations() {
             let provider_config = ProviderManagerConfig::default();
             let providers = Arc::new(ProviderManager::new(provider_config).await.unwrap());
 
-            let _ = engine.inject_apis(&registry, &providers);
+            let _ = engine.inject_apis(&registry, &providers, None);
 
             let lua_code = format!(
                 r"
@@ -500,7 +500,7 @@ async fn test_comprehensive_api_methods() {
     let provider_config = ProviderManagerConfig::default();
     let providers = Arc::new(ProviderManager::new(provider_config).await.unwrap());
 
-    let _ = engine.inject_apis(&registry, &providers);
+    let _ = engine.inject_apis(&registry, &providers, None);
 
     let lua_code = r"
         -- Comprehensive API method availability test

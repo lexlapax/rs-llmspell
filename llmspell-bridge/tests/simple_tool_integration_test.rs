@@ -29,7 +29,7 @@ async fn test_simple_tool_integration() {
     let mut engine = EngineFactory::create_lua_engine(&lua_config).unwrap();
 
     // Inject APIs
-    engine.inject_apis(&registry, &providers).unwrap();
+    engine.inject_apis(&registry, &providers, None).unwrap();
 
     // Test 1: Basic tool execution with JSON parsing
     let test_script = r#"
@@ -976,7 +976,7 @@ async fn test_tool_performance() {
     let lua_config = LuaConfig::default();
     let mut engine = EngineFactory::create_lua_engine(&lua_config).unwrap();
 
-    engine.inject_apis(&registry, &providers).unwrap();
+    engine.inject_apis(&registry, &providers, None).unwrap();
 
     // Warm up
     let warmup_script = r#"

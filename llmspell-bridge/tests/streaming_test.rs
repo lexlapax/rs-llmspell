@@ -22,7 +22,7 @@ mod tests {
         let providers = Arc::new(ProviderManager::new(provider_config).await.unwrap());
 
         // Inject APIs including streaming
-        let result = engine.inject_apis(&registry, &providers);
+        let result = engine.inject_apis(&registry, &providers, None);
         assert!(result.is_ok(), "Failed to inject APIs with streaming");
 
         // Test that Streaming global exists
@@ -52,7 +52,7 @@ mod tests {
         let providers = Arc::new(ProviderManager::new(provider_config).await.unwrap());
 
         // Inject APIs
-        engine.inject_apis(&registry, &providers).unwrap();
+        engine.inject_apis(&registry, &providers, None).unwrap();
 
         // Test creating a stream with coroutines
         let script = r#"
@@ -118,7 +118,7 @@ mod tests {
             .unwrap();
 
         // Inject APIs
-        engine.inject_apis(&registry, &providers).unwrap();
+        engine.inject_apis(&registry, &providers, None).unwrap();
 
         // Test Tool API
         let script = r#"
@@ -183,7 +183,7 @@ mod tests {
             .unwrap();
 
         // Inject APIs
-        engine.inject_apis(&registry, &providers).unwrap();
+        engine.inject_apis(&registry, &providers, None).unwrap();
 
         // Test Workflow API
         let script = r#"
@@ -263,7 +263,7 @@ mod tests {
         let providers = Arc::new(ProviderManager::new(provider_config).await.unwrap());
 
         // Inject APIs first
-        engine.inject_apis(&registry, &providers).unwrap();
+        engine.inject_apis(&registry, &providers, None).unwrap();
 
         // Test that streaming execution returns appropriate error for now
         let script = "return 'test'";

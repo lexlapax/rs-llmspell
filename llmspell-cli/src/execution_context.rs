@@ -58,9 +58,7 @@
 
 use anyhow::Result;
 use llmspell_config::LLMSpellConfig;
-use llmspell_kernel::api::{
-    connect_to_kernel, start_embedded_kernel_with_executor, ClientHandle, KernelHandle,
-};
+use llmspell_kernel::api::{connect_to_kernel, ClientHandle, KernelHandle};
 use std::path::PathBuf;
 use tracing::{debug, info};
 
@@ -135,13 +133,16 @@ impl ExecutionContext {
                 info!("Using config file: {}", config_path.display());
                 let config = LLMSpellConfig::load_from_file(&config_path).await?;
 
-                // Create script executor
-                let script_executor =
-                    llmspell_bridge::create_script_executor(config.clone()).await?;
+                // Create full infrastructure at CLI layer (Phase 12.8.2.11 - Unified Path)
+                let (script_executor, session_manager) =
+                    create_full_infrastructure(&config).await?;
+                let handle = llmspell_kernel::api::start_embedded_kernel_with_infrastructure(
+                    config.clone(),
+                    script_executor,
+                    session_manager,
+                )
+                .await?;
 
-                // Create kernel with executor
-                let handle =
-                    start_embedded_kernel_with_executor(config.clone(), script_executor).await?;
                 Ok(ExecutionContext::Embedded {
                     handle: Box::new(handle),
                     config: Box::new(config),
@@ -163,16 +164,16 @@ impl ExecutionContext {
                 } else {
                     info!("No running kernel found, starting embedded mode");
 
-                    // Create script executor
-                    let script_executor =
-                        llmspell_bridge::create_script_executor(default_config.clone()).await?;
-
-                    // Create kernel with executor
-                    let handle = start_embedded_kernel_with_executor(
+                    // Create full infrastructure at CLI layer (Phase 12.8.2.11 - Unified Path)
+                    let (script_executor, session_manager) =
+                        create_full_infrastructure(&default_config).await?;
+                    let handle = llmspell_kernel::api::start_embedded_kernel_with_infrastructure(
                         default_config.clone(),
                         script_executor,
+                        session_manager,
                     )
                     .await?;
+
                     Ok(ExecutionContext::Embedded {
                         handle: Box::new(handle),
                         config: Box::new(default_config),
@@ -207,6 +208,53 @@ impl ExecutionContext {
             ExecutionContext::Embedded { .. } => None,
         }
     }
+}
+
+/// Create full infrastructure for embedded kernel (Phase 12.8.2.11 - Unified Path)
+///
+/// Creates SessionManager BEFORE ScriptRuntime, then creates ScriptRuntime with SessionManager
+/// passed to inject_apis() so templates can access infrastructure from GlobalContext.
+///
+/// # Errors
+///
+/// Returns an error if infrastructure creation fails
+async fn create_full_infrastructure(
+    config: &LLMSpellConfig,
+) -> Result<(
+    std::sync::Arc<dyn llmspell_core::traits::script_executor::ScriptExecutor>,
+    std::sync::Arc<llmspell_kernel::sessions::SessionManager>,
+)> {
+    use std::sync::Arc;
+
+    // Create provider manager first
+    let provider_manager = llmspell_kernel::api::create_provider_manager(config).await?;
+
+    // Create SessionManager BEFORE ScriptRuntime (Phase 12.8.2.11)
+    let state_manager = Arc::new(llmspell_kernel::state::StateManager::new().await?);
+    let session_storage_backend = Arc::new(llmspell_storage::MemoryBackend::new());
+    let hook_registry = Arc::new(llmspell_hooks::HookRegistry::new());
+    let hook_executor = Arc::new(llmspell_hooks::HookExecutor::new());
+    let event_bus = Arc::new(llmspell_events::bus::EventBus::new());
+    let session_config = llmspell_kernel::sessions::SessionManagerConfig::default();
+
+    let session_manager = Arc::new(llmspell_kernel::sessions::SessionManager::new(
+        state_manager,
+        session_storage_backend,
+        hook_registry,
+        hook_executor,
+        &event_bus,
+        session_config,
+    )?);
+
+    // Create ScriptRuntime WITH SessionManager passed to inject_apis()
+    let script_executor = llmspell_bridge::create_script_executor_with_provider_and_session(
+        config.clone(),
+        provider_manager,
+        session_manager.clone(),
+    )
+    .await?;
+
+    Ok((script_executor, session_manager))
 }
 
 /// Find running kernel by auto-detection

@@ -335,3 +335,29 @@ pub async fn create_script_executor_with_provider(
     let runtime = ScriptRuntime::new_with_lua_and_provider(config, provider_manager).await?;
     Ok(Arc::new(runtime) as Arc<dyn ScriptExecutor>)
 }
+
+/// Create script executor with provider manager AND `SessionManager` (Phase 12.8.2.11 - Unified Path)
+///
+/// This ensures `SessionManager` is available during `inject_apis()` so templates can access it.
+/// Used by kernel initialization to provide full infrastructure to script runtime.
+///
+/// Accepts the core `llmspell_providers::ProviderManager` to avoid type conversion issues
+/// when called from the CLI layer which uses the kernel API.
+///
+/// # Errors
+///
+/// Returns an error if the script runtime fails to initialize.
+#[cfg(feature = "lua")]
+pub async fn create_script_executor_with_provider_and_session(
+    config: LLMSpellConfig,
+    provider_manager: Arc<llmspell_providers::ProviderManager>,
+    session_manager: Arc<llmspell_kernel::sessions::SessionManager>,
+) -> Result<Arc<dyn ScriptExecutor>, llmspell_core::error::LLMSpellError> {
+    let runtime = Box::pin(ScriptRuntime::new_with_lua_core_provider_and_session(
+        config,
+        provider_manager,
+        session_manager,
+    ))
+    .await?;
+    Ok(Arc::new(runtime) as Arc<dyn ScriptExecutor>)
+}

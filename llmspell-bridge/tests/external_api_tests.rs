@@ -42,7 +42,7 @@ async fn test_real_llm_content_classification() {
     let providers = create_real_providers().await;
 
     let mut engine = create_test_engine();
-    engine.inject_apis(&registry, &providers).unwrap();
+    engine.inject_apis(&registry, &providers, None).unwrap();
 
     // Test with real LLM agent for classification
     let script = r#"
@@ -124,7 +124,7 @@ async fn test_multi_model_classification_routing() {
     let providers = create_real_providers().await;
 
     let mut engine = create_test_engine();
-    engine.inject_apis(&registry, &providers).unwrap();
+    engine.inject_apis(&registry, &providers, None).unwrap();
 
     // Test with multiple LLM models for robust classification
     let script = r#"
@@ -208,7 +208,7 @@ async fn test_production_content_pipeline() {
     let providers = create_real_providers().await;
 
     let mut engine = create_test_engine();
-    engine.inject_apis(&registry, &providers).unwrap();
+    engine.inject_apis(&registry, &providers, None).unwrap();
 
     // Full production-like content generation pipeline
     let script = r#"

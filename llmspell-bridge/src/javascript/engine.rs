@@ -66,6 +66,7 @@ impl ScriptEngineBridge for JSEngine {
         &mut self,
         _registry: &Arc<ComponentRegistry>,
         _providers: &Arc<ProviderManager>,
+        _session_manager: Option<Arc<dyn std::any::Any + Send + Sync>>,
     ) -> Result<(), LLMSpellError> {
         #[cfg(feature = "javascript")]
         {
@@ -128,5 +129,9 @@ impl ScriptEngineBridge for JSEngine {
         // Example future implementation:
         // self.js_context.set_global("args", convert_to_js_object(args))?;
         Ok(())
+    }
+
+    fn as_any(&self) -> &dyn std::any::Any {
+        self
     }
 }

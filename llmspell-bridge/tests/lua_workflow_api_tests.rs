@@ -40,7 +40,7 @@ async fn test_lua_workflow_sequential_creation() {
     let providers = create_test_providers().await;
 
     let mut engine = create_test_engine();
-    engine.inject_apis(&registry, &providers).unwrap();
+    engine.inject_apis(&registry, &providers, None).unwrap();
 
     let script = r#"
         local workflow = Workflow.sequential({
@@ -71,7 +71,7 @@ async fn test_lua_workflow_parallel() {
     let providers = create_test_providers().await;
 
     let mut engine = create_test_engine();
-    engine.inject_apis(&registry, &providers).unwrap();
+    engine.inject_apis(&registry, &providers, None).unwrap();
 
     let script = r#"
         local workflow = Workflow.parallel({
@@ -99,7 +99,7 @@ async fn test_lua_workflow_conditional() {
     let providers = create_test_providers().await;
 
     let mut engine = create_test_engine();
-    engine.inject_apis(&registry, &providers).unwrap();
+    engine.inject_apis(&registry, &providers, None).unwrap();
 
     // Use builder API pattern as per fixed implementation
     let script = r#"
@@ -148,7 +148,7 @@ async fn test_lua_workflow_loop() {
     let providers = create_test_providers().await;
 
     let mut engine = create_test_engine();
-    engine.inject_apis(&registry, &providers).unwrap();
+    engine.inject_apis(&registry, &providers, None).unwrap();
 
     let script = r#"
         local workflow = Workflow.loop({
@@ -181,7 +181,7 @@ async fn test_lua_workflow_list() {
     let providers = create_test_providers().await;
 
     let mut engine = create_test_engine();
-    engine.inject_apis(&registry, &providers).unwrap();
+    engine.inject_apis(&registry, &providers, None).unwrap();
 
     let script = r#"
         -- Create a workflow first
@@ -213,7 +213,7 @@ async fn test_lua_workflow_discover_types() {
     let providers = create_test_providers().await;
 
     let mut engine = create_test_engine();
-    engine.inject_apis(&registry, &providers).unwrap();
+    engine.inject_apis(&registry, &providers, None).unwrap();
 
     let script = r#"
         local types = Workflow.types()
@@ -258,7 +258,7 @@ async fn test_lua_workflow_error_handling() {
     let providers = create_test_providers().await;
 
     let mut engine = create_test_engine();
-    engine.inject_apis(&registry, &providers).unwrap();
+    engine.inject_apis(&registry, &providers, None).unwrap();
 
     // Test with invalid workflow configuration
     let script = r"

@@ -32,15 +32,11 @@ use crate::io::manager::EnhancedIOManager;
 use crate::io::router::MessageRouter;
 use crate::monitoring::{HealthMonitor, HealthReport, HealthStatus, HealthThresholds};
 use crate::runtime::tracing::{OperationCategory, TracingInstrumentation};
-use crate::sessions::{CreateSessionOptions, SessionManager, SessionManagerConfig};
+use crate::sessions::SessionManager;
 use crate::state::{KernelState, StorageBackend};
 use crate::traits::{Protocol, Transport};
 
 // Session dependencies
-use crate::state::StateManager;
-use llmspell_events::bus::EventBus;
-use llmspell_hooks::{HookExecutor, HookRegistry};
-use llmspell_storage::MemoryBackend as SessionMemoryBackend;
 
 /// I/O configuration
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -131,7 +127,7 @@ pub struct IntegratedKernel<P: Protocol> {
     state: Arc<KernelState>,
     /// Session manager
     #[allow(dead_code)] // Will be used when session integration is fully implemented
-    session_manager: SessionManager,
+    session_manager: Arc<SessionManager>,
     /// Execution manager for debugging
     execution_manager: Arc<ExecutionManager>,
     /// DAP bridge for IDE debugging
@@ -175,6 +171,7 @@ impl<P: Protocol + 'static> IntegratedKernel<P> {
         session_id: String,
         script_executor: Arc<dyn ScriptExecutor>,
         provider_manager: Option<Arc<llmspell_providers::ProviderManager>>,
+        session_manager: Arc<SessionManager>,
     ) -> Result<Self> {
         info!("Creating IntegratedKernel for session {}", session_id);
 
@@ -242,31 +239,8 @@ impl<P: Protocol + 'static> IntegratedKernel<P> {
             crate::state::KernelMemoryBackend::new(),
         )))?);
 
-        // Create session manager dependencies
-        let state_manager = Arc::new(StateManager::new().await?);
-
-        let session_storage_backend = Arc::new(SessionMemoryBackend::new());
-        let hook_registry = Arc::new(HookRegistry::new());
-        let hook_executor = Arc::new(HookExecutor::new());
-        let event_bus = Arc::new(EventBus::new());
-        let session_config = SessionManagerConfig::default();
-
-        // Create session manager with proper dependencies
-        let session_manager = SessionManager::new(
-            state_manager,
-            session_storage_backend,
-            hook_registry,
-            hook_executor,
-            &event_bus,
-            session_config,
-        )?;
-
-        // Create a session for this kernel instance
-        let session_options = CreateSessionOptions::builder()
-            .name(format!("kernel-session-{session_id}"))
-            .build();
-
-        let _session_id_obj = session_manager.create_session(session_options).await?;
+        // SessionManager is now provided as a parameter (shared across kernel instances)
+        // No need to create it here - it's created once in api.rs and shared
 
         // Initialize session state
         state.update_session(|session| {
@@ -288,12 +262,8 @@ impl<P: Protocol + 'static> IntegratedKernel<P> {
             script_executor.set_debug_context(Some(execution_manager.clone()));
         }
 
-        // Wire session manager to script executor for template infrastructure (Phase 12.8.2.5)
-        // Use type erasure to avoid circular dependency (kernel can't import bridge types)
-        debug!("Wiring session manager to script executor");
-        script_executor.set_session_manager_any(
-            Arc::new(session_manager.clone()) as Arc<dyn std::any::Any + Send + Sync>
-        );
+        // Note: SessionManager wiring to script_executor is now done ONCE in api.rs
+        // before creating any kernel instances, to avoid duplicate wiring
 
         // Create shutdown coordinator
         let shutdown_config = ShutdownConfig::default();
@@ -3497,15 +3467,43 @@ mod tests {
         }
     }
 
+    /// Helper to create a test SessionManager with minimal infrastructure
+    async fn create_test_session_manager() -> Arc<crate::sessions::SessionManager> {
+        let state_manager = Arc::new(crate::state::StateManager::new().await.unwrap());
+        let session_storage_backend = Arc::new(llmspell_storage::MemoryBackend::new());
+        let hook_registry = Arc::new(llmspell_hooks::HookRegistry::new());
+        let hook_executor = Arc::new(llmspell_hooks::HookExecutor::new());
+        let event_bus = Arc::new(llmspell_events::bus::EventBus::new());
+        let session_config = crate::sessions::SessionManagerConfig::default();
+
+        Arc::new(
+            crate::sessions::SessionManager::new(
+                state_manager,
+                session_storage_backend,
+                hook_registry,
+                hook_executor,
+                &event_bus,
+                session_config,
+            )
+            .unwrap(),
+        )
+    }
+
     #[tokio::test]
     async fn test_integrated_kernel_creation() {
         let protocol = MockProtocol;
         let config = ExecutionConfig::default();
         let executor = Arc::new(MockScriptExecutor) as Arc<dyn ScriptExecutor>;
 
-        let kernel =
-            IntegratedKernel::new(protocol, config, "test-session".to_string(), executor, None)
-                .await;
+        let kernel = IntegratedKernel::new(
+            protocol,
+            config,
+            "test-session".to_string(),
+            executor,
+            None,
+            create_test_session_manager().await,
+        )
+        .await;
 
         assert!(kernel.is_ok());
     }
@@ -3519,10 +3517,16 @@ mod tests {
         let config = ExecutionConfig::default();
         let executor = Arc::new(MockScriptExecutor) as Arc<dyn ScriptExecutor>;
 
-        let mut kernel =
-            IntegratedKernel::new(protocol, config, "test-session".to_string(), executor, None)
-                .await
-                .unwrap();
+        let mut kernel = IntegratedKernel::new(
+            protocol,
+            config,
+            "test-session".to_string(),
+            executor,
+            None,
+            create_test_session_manager().await,
+        )
+        .await
+        .unwrap();
 
         // Set up shutdown signal
         let (shutdown_tx, shutdown_rx) = mpsc::channel(1);
@@ -3558,9 +3562,16 @@ mod tests {
         let session_id = "test-session".to_string();
         let executor = Arc::new(MockScriptExecutor);
 
-        let kernel = IntegratedKernel::new(protocol, config, session_id, executor, None)
-            .await
-            .unwrap();
+        let kernel = IntegratedKernel::new(
+            protocol,
+            config,
+            session_id,
+            executor,
+            None,
+            create_test_session_manager().await,
+        )
+        .await
+        .unwrap();
 
         // Test Shell channel accepts execute_request
         let execute_msg = json!({
@@ -3621,9 +3632,16 @@ mod tests {
         let session_id = "test-session".to_string();
         let executor = Arc::new(MockScriptExecutor);
 
-        let mut kernel = IntegratedKernel::new(protocol, config, session_id, executor, None)
-            .await
-            .unwrap();
+        let mut kernel = IntegratedKernel::new(
+            protocol,
+            config,
+            session_id,
+            executor,
+            None,
+            create_test_session_manager().await,
+        )
+        .await
+        .unwrap();
 
         // Simulate an input request
         let (tx, rx) = tokio::sync::oneshot::channel();
@@ -3660,9 +3678,16 @@ mod tests {
         let session_id = "test-session".to_string();
         let executor = Arc::new(MockScriptExecutor);
 
-        let kernel = IntegratedKernel::new(protocol, config, session_id, executor, None)
-            .await
-            .unwrap();
+        let kernel = IntegratedKernel::new(
+            protocol,
+            config,
+            session_id,
+            executor,
+            None,
+            create_test_session_manager().await,
+        )
+        .await
+        .unwrap();
 
         // Update channel activity timestamps
         {
@@ -3721,9 +3746,16 @@ mod tests {
         let session_id = "test-session".to_string();
         let executor = Arc::new(MockScriptExecutor);
 
-        let kernel = IntegratedKernel::new(protocol, config, session_id, executor, None)
-            .await
-            .unwrap();
+        let kernel = IntegratedKernel::new(
+            protocol,
+            config,
+            session_id,
+            executor,
+            None,
+            create_test_session_manager().await,
+        )
+        .await
+        .unwrap();
 
         // Test that shell messages update shell activity
         let before_shell = kernel
@@ -3787,9 +3819,16 @@ mod tests {
         let session_id = "test-session".to_string();
         let executor = Arc::new(MockScriptExecutor);
 
-        let _kernel = IntegratedKernel::new(protocol, config, session_id, executor, None)
-            .await
-            .unwrap();
+        let _kernel = IntegratedKernel::new(
+            protocol,
+            config,
+            session_id,
+            executor,
+            None,
+            create_test_session_manager().await,
+        )
+        .await
+        .unwrap();
 
         // Test extracting msg_type from various message structures
         let msg1 = json!({
@@ -3832,9 +3871,16 @@ mod tests {
         let session_id = "test-session".to_string();
         let executor = Arc::new(MockScriptExecutor);
 
-        let kernel = IntegratedKernel::new(protocol, config, session_id, executor, None)
-            .await
-            .unwrap();
+        let kernel = IntegratedKernel::new(
+            protocol,
+            config,
+            session_id,
+            executor,
+            None,
+            create_test_session_manager().await,
+        )
+        .await
+        .unwrap();
 
         // In a real scenario, control messages would be processed first in the main loop
         // Here we just verify the validation works correctly for priority messages
@@ -3858,6 +3904,29 @@ mod tests {
     }
 }
 
+/// Helper to create a test SessionManager with minimal infrastructure (module-level for all tests)
+#[cfg(test)]
+async fn create_test_session_manager() -> Arc<crate::sessions::SessionManager> {
+    let state_manager = Arc::new(crate::state::StateManager::new().await.unwrap());
+    let session_storage_backend = Arc::new(llmspell_storage::MemoryBackend::new());
+    let hook_registry = Arc::new(llmspell_hooks::HookRegistry::new());
+    let hook_executor = Arc::new(llmspell_hooks::HookExecutor::new());
+    let event_bus = Arc::new(llmspell_events::bus::EventBus::new());
+    let session_config = crate::sessions::SessionManagerConfig::default();
+
+    Arc::new(
+        crate::sessions::SessionManager::new(
+            state_manager,
+            session_storage_backend,
+            hook_registry,
+            hook_executor,
+            &event_bus,
+            session_config,
+        )
+        .unwrap(),
+    )
+}
+
 #[tokio::test]
 async fn test_message_handling_performance() -> Result<()> {
     use std::collections::HashMap;
@@ -3872,8 +3941,15 @@ async fn test_message_handling_performance() -> Result<()> {
     let session_id = "test-session".to_string();
     let script_executor = Arc::new(tests::MockScriptExecutor) as Arc<dyn ScriptExecutor>;
 
-    let mut kernel =
-        IntegratedKernel::new(protocol, config, session_id, script_executor, None).await?;
+    let mut kernel = IntegratedKernel::new(
+        protocol,
+        config,
+        session_id,
+        script_executor,
+        None,
+        create_test_session_manager().await,
+    )
+    .await?;
 
     // Create a simple kernel_info_request message (faster than execute_request)
     let mut message = HashMap::new();
@@ -3982,6 +4058,7 @@ mod daemon_tests {
             "test-session".to_string(),
             script_executor,
             None,
+            create_test_session_manager().await,
         )
         .await
         .unwrap();
@@ -4010,6 +4087,7 @@ mod daemon_tests {
             "test-session".to_string(),
             script_executor,
             None,
+            create_test_session_manager().await,
         )
         .await
         .unwrap();
@@ -4044,6 +4122,7 @@ mod daemon_tests {
             "test-session".to_string(),
             script_executor,
             None,
+            create_test_session_manager().await,
         )
         .await
         .unwrap();
@@ -4128,6 +4207,7 @@ mod daemon_tests {
             "test-session".to_string(),
             script_executor,
             None,
+            create_test_session_manager().await,
         )
         .await
         .unwrap();
@@ -4159,6 +4239,7 @@ mod multi_protocol_tests {
             "coexist-test".to_string(),
             script_executor.clone(),
             None,
+            create_test_session_manager().await,
         )
         .await
         .unwrap();
@@ -4199,6 +4280,7 @@ mod multi_protocol_tests {
             "switch-test".to_string(),
             script_executor.clone(),
             None,
+            create_test_session_manager().await,
         )
         .await
         .unwrap();
@@ -4240,14 +4322,21 @@ mod multi_protocol_tests {
             "iso1".to_string(),
             script_executor.clone(),
             None,
+            create_test_session_manager().await,
         )
         .await
         .unwrap();
 
-        let kernel2 =
-            IntegratedKernel::new(protocol2, config, "iso2".to_string(), script_executor, None)
-                .await
-                .unwrap();
+        let kernel2 = IntegratedKernel::new(
+            protocol2,
+            config,
+            "iso2".to_string(),
+            script_executor,
+            None,
+            create_test_session_manager().await,
+        )
+        .await
+        .unwrap();
 
         // Sessions should be isolated
         assert_ne!(kernel1.session_id, kernel2.session_id);
@@ -4271,6 +4360,7 @@ mod multi_protocol_tests {
                 "concurrent-test".to_string(),
                 script_executor.clone(),
                 None,
+                create_test_session_manager().await,
             )
             .await
             .unwrap(),
@@ -4322,6 +4412,7 @@ mod multi_protocol_tests {
             "error-test".to_string(),
             script_executor.clone(),
             None,
+            create_test_session_manager().await,
         )
         .await
         .unwrap();
@@ -4357,6 +4448,7 @@ mod multi_protocol_tests {
             "state-test".to_string(),
             script_executor.clone(),
             None,
+            create_test_session_manager().await,
         )
         .await
         .unwrap();
@@ -4396,6 +4488,7 @@ mod multi_protocol_tests {
             "share-test".to_string(),
             script_executor.clone(),
             None,
+            create_test_session_manager().await,
         )
         .await
         .unwrap();
@@ -4434,6 +4527,7 @@ mod performance_tests {
             "perf-test".to_string(),
             script_executor,
             None,
+            create_test_session_manager().await,
         )
         .await
         .unwrap();
@@ -4526,6 +4620,7 @@ mod performance_tests {
             "mem-test".to_string(),
             script_executor.clone(),
             None,
+            create_test_session_manager().await,
         )
         .await
         .unwrap();
@@ -4571,6 +4666,7 @@ mod performance_tests {
                 "throughput-test".to_string(),
                 script_executor,
                 None,
+                create_test_session_manager().await,
             )
             .await
             .unwrap(),
@@ -4626,6 +4722,7 @@ mod performance_tests {
             "state-perf-test".to_string(),
             script_executor,
             None,
+            create_test_session_manager().await,
         )
         .await
         .unwrap();
@@ -4668,6 +4765,7 @@ mod performance_tests {
             "timeout-test".to_string(),
             script_executor,
             None,
+            create_test_session_manager().await,
         )
         .await
         .unwrap();
@@ -4768,6 +4866,7 @@ mod security_tests {
             "validation-test".to_string(),
             script_executor,
             None,
+            create_test_session_manager().await,
         )
         .await
         .unwrap();
@@ -4912,6 +5011,7 @@ mod security_tests {
             "sanitize-test".to_string(),
             script_executor,
             None,
+            create_test_session_manager().await,
         )
         .await
         .unwrap();
@@ -4967,6 +5067,7 @@ mod security_tests {
             "limits-test".to_string(),
             script_executor,
             None,
+            create_test_session_manager().await,
         )
         .await
         .unwrap();
@@ -5019,6 +5120,7 @@ mod security_tests {
             "isolation-test".to_string(),
             script_executor,
             None,
+            create_test_session_manager().await,
         )
         .await
         .unwrap();

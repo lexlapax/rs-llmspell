@@ -607,6 +607,28 @@ mod tests {
     use llmspell_bridge::ScriptRuntime;
     use llmspell_config::LLMSpellConfig;
 
+    /// Helper to create a test SessionManager with minimal infrastructure
+    async fn create_test_session_manager() -> Arc<crate::sessions::SessionManager> {
+        let state_manager = Arc::new(crate::state::StateManager::new().await.unwrap());
+        let session_storage_backend = Arc::new(llmspell_storage::MemoryBackend::new());
+        let hook_registry = Arc::new(llmspell_hooks::HookRegistry::new());
+        let hook_executor = Arc::new(llmspell_hooks::HookExecutor::new());
+        let event_bus = Arc::new(llmspell_events::bus::EventBus::new());
+        let session_config = crate::sessions::SessionManagerConfig::default();
+
+        Arc::new(
+            crate::sessions::SessionManager::new(
+                state_manager,
+                session_storage_backend,
+                hook_registry,
+                hook_executor,
+                &event_bus,
+                session_config,
+            )
+            .unwrap(),
+        )
+    }
+
     #[tokio::test(flavor = "multi_thread")]
     async fn test_repl_server_creation() {
         let config = REPLConfig::default();
@@ -624,6 +646,7 @@ mod tests {
                 "test-session".to_string(),
                 script_executor,
                 None,
+                create_test_session_manager().await,
             )
             .await
             .unwrap(),

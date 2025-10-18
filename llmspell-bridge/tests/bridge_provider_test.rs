@@ -31,7 +31,7 @@ async fn test_inject_providers() {
     let providers = Arc::new(ProviderManager::new(provider_config).await.unwrap());
 
     // Should inject successfully
-    let result = engine.inject_apis(&registry, &providers);
+    let result = engine.inject_apis(&registry, &providers, None);
     assert!(result.is_ok(), "API injection should succeed");
 }
 
@@ -45,7 +45,7 @@ async fn test_script_provider_access() {
     let provider_config = ProviderManagerConfig::default();
     let providers = Arc::new(ProviderManager::new(provider_config).await.unwrap());
 
-    engine.inject_apis(&registry, &providers).unwrap();
+    engine.inject_apis(&registry, &providers, None).unwrap();
 
     // Check that Agent API exists (providers are accessed through agents)
     let script = "return type(Agent) == 'table'";
@@ -67,7 +67,7 @@ async fn test_script_list_providers() {
     let provider_config = ProviderManagerConfig::default();
     let providers = Arc::new(ProviderManager::new(provider_config).await.unwrap());
 
-    engine.inject_apis(&registry, &providers).unwrap();
+    engine.inject_apis(&registry, &providers, None).unwrap();
 
     // Agent.create should be available
     let script = "return type(Agent.create) == 'function'";
@@ -152,7 +152,7 @@ async fn test_concurrent_provider_access() {
     let provider_config = ProviderManagerConfig::default();
     let providers = Arc::new(ProviderManager::new(provider_config).await.unwrap());
 
-    engine.inject_apis(&registry, &providers).unwrap();
+    engine.inject_apis(&registry, &providers, None).unwrap();
 
     // Create multiple tasks that access providers
     let engine = Arc::new(engine);
@@ -184,7 +184,7 @@ async fn test_script_provider_error_handling() {
     let provider_config = ProviderManagerConfig::default();
     let providers = Arc::new(ProviderManager::new(provider_config).await.unwrap());
 
-    engine.inject_apis(&registry, &providers).unwrap();
+    engine.inject_apis(&registry, &providers, None).unwrap();
 
     // Try to create an agent without a provider configured
     let script = r#"
