@@ -1,5 +1,8 @@
 //! Integration tests for all 26 Phase 2 tools
 
+mod test_helpers;
+use test_helpers::create_test_infrastructure;
+
 #[tokio::test(flavor = "multi_thread")]
 #[cfg(feature = "lua")]
 async fn test_all_tools_integration() {
@@ -28,7 +31,18 @@ async fn test_all_tools_integration() {
     let mut engine = EngineFactory::create_lua_engine(&lua_config).unwrap();
 
     // Inject APIs
-    engine.inject_apis(&registry, &providers, None).unwrap();
+    let (tool_registry, agent_registry, workflow_factory) = create_test_infrastructure();
+
+    engine
+        .inject_apis(
+            &registry,
+            &providers,
+            &tool_registry,
+            &agent_registry,
+            &workflow_factory,
+            None,
+        )
+        .unwrap();
 
     // Simple integration test for all tools
     let test_script = r#"
@@ -122,7 +136,18 @@ async fn test_tool_performance_benchmarks() {
     let lua_config = LuaConfig::default();
     let mut engine = EngineFactory::create_lua_engine(&lua_config).unwrap();
 
-    engine.inject_apis(&registry, &providers, None).unwrap();
+    let (tool_registry, agent_registry, workflow_factory) = create_test_infrastructure();
+
+    engine
+        .inject_apis(
+            &registry,
+            &providers,
+            &tool_registry,
+            &agent_registry,
+            &workflow_factory,
+            None,
+        )
+        .unwrap();
 
     // Benchmark each tool category
     let tool_benchmarks = vec![

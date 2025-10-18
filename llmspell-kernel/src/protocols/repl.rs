@@ -607,7 +607,7 @@ mod tests {
     use llmspell_bridge::ScriptRuntime;
     use llmspell_config::LLMSpellConfig;
 
-    /// Helper to create a test SessionManager with minimal infrastructure
+    /// Helper to create a test `SessionManager` with minimal infrastructure
     async fn create_test_session_manager() -> Arc<crate::sessions::SessionManager> {
         let state_manager = Arc::new(crate::state::StateManager::new().await.unwrap());
         let session_storage_backend = Arc::new(llmspell_storage::MemoryBackend::new());
@@ -633,7 +633,7 @@ mod tests {
     async fn test_repl_server_creation() {
         let config = REPLConfig::default();
         let script_executor = Arc::new(
-            ScriptRuntime::new_with_lua(LLMSpellConfig::default())
+            Box::pin(ScriptRuntime::new_with_lua(LLMSpellConfig::default()))
                 .await
                 .unwrap(),
         );

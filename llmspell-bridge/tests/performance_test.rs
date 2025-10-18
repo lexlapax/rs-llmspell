@@ -1,6 +1,9 @@
 //! ABOUTME: Performance and memory validation tests for the bridge
 //! ABOUTME: Ensures memory usage and performance targets are met
 
+mod test_helpers;
+use test_helpers::create_test_infrastructure;
+
 use llmspell_bridge::{
     engine::factory::{EngineFactory, LuaConfig},
     providers::ProviderManager,
@@ -24,7 +27,18 @@ async fn test_memory_usage_simple_scripts() {
     let provider_config = ProviderManagerConfig::default();
     let providers = Arc::new(ProviderManager::new(provider_config).await.unwrap());
 
-    engine.inject_apis(&registry, &providers, None).unwrap();
+    let (tool_registry, agent_registry, workflow_factory) = create_test_infrastructure();
+
+    engine
+        .inject_apis(
+            &registry,
+            &providers,
+            &tool_registry,
+            &agent_registry,
+            &workflow_factory,
+            None,
+        )
+        .unwrap();
 
     // Execute multiple simple scripts
     let start = Instant::now();
@@ -55,7 +69,18 @@ async fn test_no_memory_leaks() {
     let provider_config = ProviderManagerConfig::default();
     let providers = Arc::new(ProviderManager::new(provider_config).await.unwrap());
 
-    engine.inject_apis(&registry, &providers, None).unwrap();
+    let (tool_registry, agent_registry, workflow_factory) = create_test_infrastructure();
+
+    engine
+        .inject_apis(
+            &registry,
+            &providers,
+            &tool_registry,
+            &agent_registry,
+            &workflow_factory,
+            None,
+        )
+        .unwrap();
 
     // Warm up
     for _ in 0..10 {
@@ -107,7 +132,18 @@ async fn test_script_startup_time() {
 
     // Measure time to inject APIs and execute first script
     let start = Instant::now();
-    engine.inject_apis(&registry, &providers, None).unwrap();
+    let (tool_registry, agent_registry, workflow_factory) = create_test_infrastructure();
+
+    engine
+        .inject_apis(
+            &registry,
+            &providers,
+            &tool_registry,
+            &agent_registry,
+            &workflow_factory,
+            None,
+        )
+        .unwrap();
     let _ = engine.execute_script("return 'hello'").await.unwrap();
     let startup_time = start.elapsed();
 
@@ -128,7 +164,18 @@ async fn test_streaming_latency() {
     let provider_config = ProviderManagerConfig::default();
     let providers = Arc::new(ProviderManager::new(provider_config).await.unwrap());
 
-    engine.inject_apis(&registry, &providers, None).unwrap();
+    let (tool_registry, agent_registry, workflow_factory) = create_test_infrastructure();
+
+    engine
+        .inject_apis(
+            &registry,
+            &providers,
+            &tool_registry,
+            &agent_registry,
+            &workflow_factory,
+            None,
+        )
+        .unwrap();
 
     // Measure time to start streaming
     let start = Instant::now();
@@ -162,7 +209,18 @@ async fn test_operation_benchmarks() {
     let provider_config = ProviderManagerConfig::default();
     let providers = Arc::new(ProviderManager::new(provider_config).await.unwrap());
 
-    engine.inject_apis(&registry, &providers, None).unwrap();
+    let (tool_registry, agent_registry, workflow_factory) = create_test_infrastructure();
+
+    engine
+        .inject_apis(
+            &registry,
+            &providers,
+            &tool_registry,
+            &agent_registry,
+            &workflow_factory,
+            None,
+        )
+        .unwrap();
 
     // Benchmark different operations
     let operations = vec![
@@ -215,7 +273,18 @@ async fn test_concurrent_execution_correctness() {
     let provider_config = ProviderManagerConfig::default();
     let providers = Arc::new(ProviderManager::new(provider_config).await.unwrap());
 
-    engine.inject_apis(&registry, &providers, None).unwrap();
+    let (tool_registry, agent_registry, workflow_factory) = create_test_infrastructure();
+
+    engine
+        .inject_apis(
+            &registry,
+            &providers,
+            &tool_registry,
+            &agent_registry,
+            &workflow_factory,
+            None,
+        )
+        .unwrap();
 
     let engine = Arc::new(engine);
 
@@ -291,7 +360,18 @@ async fn test_large_script_memory() {
     let provider_config = ProviderManagerConfig::default();
     let providers = Arc::new(ProviderManager::new(provider_config).await.unwrap());
 
-    engine.inject_apis(&registry, &providers, None).unwrap();
+    let (tool_registry, agent_registry, workflow_factory) = create_test_infrastructure();
+
+    engine
+        .inject_apis(
+            &registry,
+            &providers,
+            &tool_registry,
+            &agent_registry,
+            &workflow_factory,
+            None,
+        )
+        .unwrap();
 
     // Create a large script (but under 10MB limit)
     let mut large_script = String::new();
@@ -345,7 +425,18 @@ async fn test_api_injection_overhead() {
         let providers = Arc::new(ProviderManager::new(provider_config).await.unwrap());
 
         let start = Instant::now();
-        engine.inject_apis(&registry, &providers, None).unwrap();
+        let (tool_registry, agent_registry, workflow_factory) = create_test_infrastructure();
+
+        engine
+            .inject_apis(
+                &registry,
+                &providers,
+                &tool_registry,
+                &agent_registry,
+                &workflow_factory,
+                None,
+            )
+            .unwrap();
         total_time += start.elapsed();
     }
 
@@ -369,7 +460,18 @@ async fn test_context_switching_overhead() {
     let provider_config = ProviderManagerConfig::default();
     let providers = Arc::new(ProviderManager::new(provider_config).await.unwrap());
 
-    engine.inject_apis(&registry, &providers, None).unwrap();
+    let (tool_registry, agent_registry, workflow_factory) = create_test_infrastructure();
+
+    engine
+        .inject_apis(
+            &registry,
+            &providers,
+            &tool_registry,
+            &agent_registry,
+            &workflow_factory,
+            None,
+        )
+        .unwrap();
 
     // Create different contexts
     let mut contexts = vec![];

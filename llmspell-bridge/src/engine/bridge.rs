@@ -32,8 +32,11 @@ pub trait ScriptEngineBridge: Send + Sync {
     ///
     /// # Arguments
     ///
-    /// * `registry` - Component registry for tools/agents/workflows
+    /// * `registry` - Component registry for tools/agents/workflows (script layer)
     /// * `providers` - Provider manager for LLM access
+    /// * `tool_registry` - Tool registry from `ScriptRuntime` (infrastructure layer)
+    /// * `agent_registry` - Agent factory registry from `ScriptRuntime` (infrastructure layer)
+    /// * `workflow_factory` - Workflow factory from `ScriptRuntime` (infrastructure layer)
     /// * `session_manager` - Optional `SessionManager` for template infrastructure (Phase 12.8.2.11)
     ///
     /// # Errors
@@ -43,6 +46,9 @@ pub trait ScriptEngineBridge: Send + Sync {
         &mut self,
         registry: &Arc<crate::ComponentRegistry>,
         providers: &Arc<crate::ProviderManager>,
+        tool_registry: &Arc<llmspell_tools::ToolRegistry>,
+        agent_registry: &Arc<llmspell_agents::FactoryRegistry>,
+        workflow_factory: &Arc<dyn llmspell_workflows::WorkflowFactory>,
         session_manager: Option<Arc<dyn std::any::Any + Send + Sync>>,
     ) -> Result<(), LLMSpellError>;
 

@@ -559,7 +559,15 @@ impl ScriptRuntime {
         debug!("Default agent factory registered successfully");
 
         // Inject APIs into the engine (no SessionManager for standalone mode)
-        engine.inject_apis(&registry, &provider_manager, None)?;
+        // Pass infrastructure registries for template execution (Phase 12.8.2.13)
+        engine.inject_apis(
+            &registry,
+            &provider_manager,
+            &tool_registry,
+            &agent_registry,
+            &workflow_factory,
+            None,
+        )?;
 
         // Create execution context
         let execution_context = Arc::new(RwLock::new(crate::engine::ExecutionContext {
@@ -667,8 +675,16 @@ impl ScriptRuntime {
 
         // Inject APIs with SessionManager (Phase 12.8.2.11)
         // Type-erase SessionManager to avoid circular dependencies
+        // Pass infrastructure registries for template execution (Phase 12.8.2.13)
         let session_manager_any: Arc<dyn std::any::Any + Send + Sync> = session_manager.clone();
-        engine.inject_apis(&registry, &provider_manager, Some(session_manager_any))?;
+        engine.inject_apis(
+            &registry,
+            &provider_manager,
+            &tool_registry,
+            &agent_registry,
+            &workflow_factory,
+            Some(session_manager_any),
+        )?;
 
         let execution_context = Arc::new(RwLock::new(crate::engine::ExecutionContext {
             working_directory: std::env::current_dir()
@@ -774,7 +790,15 @@ impl ScriptRuntime {
         debug!("Default agent factory registered successfully");
 
         // Use provided provider manager instead of creating new one (no SessionManager for now)
-        engine.inject_apis(&registry, &provider_manager, None)?;
+        // Pass infrastructure registries for template execution (Phase 12.8.2.13)
+        engine.inject_apis(
+            &registry,
+            &provider_manager,
+            &tool_registry,
+            &agent_registry,
+            &workflow_factory,
+            None,
+        )?;
 
         let execution_context = Arc::new(RwLock::new(crate::engine::ExecutionContext {
             working_directory: std::env::current_dir()

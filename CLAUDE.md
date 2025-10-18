@@ -21,7 +21,8 @@ Production-ready AI workflow orchestration platform built in Rust for script-dri
 - 🚧 **Phase 12**: Starting - Adaptive Memory System (A-TKG temporal knowledge graph)
 
 ## Project-Specific Behavior Controls
-- **Always Megathink**: analyze existing code, never guess
+- **Always Megathink**: analyze existing code, never guess,
+- **Always check docs when analyzing** : check docs/in-process, docs/technical, docs/user-guide, docs/developer-guide, NOT docs/archives
 - **Future-based thinking**: consider impact on phases 8-16 in implementation-phases.md
 - **Update TODO.md**: mark sub-tasks complete as you do them, not after entire tasks
 

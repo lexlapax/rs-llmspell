@@ -1,18 +1,18 @@
 //! ABOUTME: Integration tests for template execution with dual-registry architecture
-//! ABOUTME: Verifies tools exist in BOTH ToolRegistry and ComponentRegistry (Phase 12.7.1.4)
+//! ABOUTME: Verifies tools exist in BOTH `ToolRegistry` and `ComponentRegistry` (Phase 12.7.1.4)
 
 use llmspell_bridge::runtime::ScriptRuntime;
 use llmspell_config::LLMSpellConfig;
 use llmspell_core::error::LLMSpellError;
 use llmspell_core::traits::script_executor::ScriptExecutor;
 
-/// Test that tools are registered in both ToolRegistry (infrastructure) and ComponentRegistry (scripts)
+/// Test that tools are registered in both `ToolRegistry` (infrastructure) and `ComponentRegistry` (scripts)
 /// This verifies the dual-registration pattern from Phase 12.7.1.2
 #[tokio::test(flavor = "multi_thread")]
 #[cfg(feature = "lua")]
 async fn test_tools_registered_in_both_registries() {
     let config = LLMSpellConfig::default();
-    let runtime = ScriptRuntime::new_with_lua(config)
+    let runtime = Box::pin(ScriptRuntime::new_with_lua(config))
         .await
         .expect("Failed to create runtime");
 
@@ -51,13 +51,13 @@ async fn test_tools_registered_in_both_registries() {
     );
 }
 
-/// Test that all infrastructure components are accessible from ScriptRuntime
-/// Verifies that ExecutionContext can be built with all 4 required components
+/// Test that all infrastructure components are accessible from `ScriptRuntime`
+/// Verifies that `ExecutionContext` can be built with all 4 required components
 #[tokio::test(flavor = "multi_thread")]
 #[cfg(feature = "lua")]
 async fn test_execution_context_has_infrastructure() {
     let config = LLMSpellConfig::default();
-    let runtime = ScriptRuntime::new_with_lua(config)
+    let runtime = Box::pin(ScriptRuntime::new_with_lua(config))
         .await
         .expect("Failed to create runtime");
 
@@ -75,7 +75,7 @@ async fn test_execution_context_has_infrastructure() {
     // Verify workflow factory is accessible and has types
     let workflow_types = runtime.workflow_factory().available_types();
     assert!(
-        workflow_types.len() > 0,
+        !workflow_types.is_empty(),
         "Workflow factory should have available types"
     );
 
@@ -87,13 +87,13 @@ async fn test_execution_context_has_infrastructure() {
     );
 }
 
-/// Test that template execution does NOT fail with "tool_registry is required" error
+/// Test that template execution does NOT fail with "`tool_registry` is required" error
 /// This was the original bug that Phase 12.7.1 fixes
 #[tokio::test(flavor = "multi_thread")]
 #[cfg(feature = "lua")]
 async fn test_template_execution_no_infrastructure_error() {
     let config = LLMSpellConfig::default();
-    let runtime = ScriptRuntime::new_with_lua(config)
+    let runtime = Box::pin(ScriptRuntime::new_with_lua(config))
         .await
         .expect("Failed to create runtime");
 
@@ -159,7 +159,7 @@ async fn test_all_builtin_templates_have_infrastructure() {
     ];
 
     let config = LLMSpellConfig::default();
-    let runtime = ScriptRuntime::new_with_lua(config)
+    let runtime = Box::pin(ScriptRuntime::new_with_lua(config))
         .await
         .expect("Failed to create runtime");
 
@@ -220,13 +220,13 @@ async fn test_all_builtin_templates_have_infrastructure() {
     }
 }
 
-/// Test error type differentiation: Validation vs Infrastructure vs NotFound
+/// Test error type differentiation: Validation vs Infrastructure vs `NotFound`
 /// Ensures we can distinguish between different failure modes
 #[tokio::test(flavor = "multi_thread")]
 #[cfg(feature = "lua")]
 async fn test_validation_error_vs_infrastructure_error() {
     let config = LLMSpellConfig::default();
-    let runtime = ScriptRuntime::new_with_lua(config)
+    let runtime = Box::pin(ScriptRuntime::new_with_lua(config))
         .await
         .expect("Failed to create runtime");
 
@@ -310,7 +310,7 @@ async fn test_dual_registration_memory_safety() {
     for i in 0..3 {
         eprintln!("Creating runtime {}", i + 1);
 
-        let runtime = ScriptRuntime::new_with_lua(config.clone())
+        let runtime = Box::pin(ScriptRuntime::new_with_lua(config.clone()))
             .await
             .expect("Failed to create runtime");
 
@@ -357,15 +357,11 @@ async fn test_dual_registration_memory_safety() {
         // so ref count can also be higher than expected
         assert!(
             registry_ref_count < 100,
-            "ComponentRegistry ref count suspiciously high in runtime {}: {}",
-            i,
-            registry_ref_count
+            "ComponentRegistry ref count suspiciously high in runtime {i}: {registry_ref_count}"
         );
         assert!(
             tool_registry_ref_count < 100,
-            "ToolRegistry ref count suspiciously high in runtime {}: {}",
-            i,
-            tool_registry_ref_count
+            "ToolRegistry ref count suspiciously high in runtime {i}: {tool_registry_ref_count}"
         );
     }
 }

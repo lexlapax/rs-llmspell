@@ -3467,7 +3467,7 @@ mod tests {
         }
     }
 
-    /// Helper to create a test SessionManager with minimal infrastructure
+    /// Helper to create a test `SessionManager` with minimal infrastructure
     async fn create_test_session_manager() -> Arc<crate::sessions::SessionManager> {
         let state_manager = Arc::new(crate::state::StateManager::new().await.unwrap());
         let session_storage_backend = Arc::new(llmspell_storage::MemoryBackend::new());
@@ -3904,7 +3904,7 @@ mod tests {
     }
 }
 
-/// Helper to create a test SessionManager with minimal infrastructure (module-level for all tests)
+/// Helper to create a test `SessionManager` with minimal infrastructure (module-level for all tests)
 #[cfg(test)]
 async fn create_test_session_manager() -> Arc<crate::sessions::SessionManager> {
     let state_manager = Arc::new(crate::state::StateManager::new().await.unwrap());

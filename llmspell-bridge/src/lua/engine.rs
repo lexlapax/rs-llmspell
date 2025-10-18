@@ -332,7 +332,7 @@ impl ScriptEngineBridge for LuaEngine {
     #[allow(clippy::cognitive_complexity)]
     #[instrument(
         level = "info",
-        skip(self, registry, providers, session_manager),
+        skip(self, registry, providers, tool_registry, agent_registry, workflow_factory, session_manager),
         fields(
             engine_type = "lua",
             globals_injected = 0,
@@ -344,6 +344,9 @@ impl ScriptEngineBridge for LuaEngine {
         &mut self,
         registry: &Arc<ComponentRegistry>,
         providers: &Arc<ProviderManager>,
+        tool_registry: &Arc<llmspell_tools::ToolRegistry>,
+        agent_registry: &Arc<llmspell_agents::FactoryRegistry>,
+        workflow_factory: &Arc<dyn llmspell_workflows::WorkflowFactory>,
         session_manager: Option<Arc<dyn std::any::Any + Send + Sync>>,
     ) -> Result<(), LLMSpellError> {
         info!("Injecting Lua global APIs");
@@ -351,30 +354,11 @@ impl ScriptEngineBridge for LuaEngine {
         {
             let lua = self.lua.lock();
 
-            // API surface no longer needed - using globals system
-
             // Create GlobalContext with state support if configured
-            let mut state_access: Option<Arc<dyn llmspell_core::traits::state::StateAccess>> = None;
-
-            // Check if state persistence is enabled and create state access
-            if let Some(runtime_config) = &self.runtime_config {
-                if runtime_config.runtime.state_persistence.enabled {
-                    // Try to create StateManagerAdapter for state access
-                    match futures::executor::block_on(
-                        crate::state_adapter::StateManagerAdapter::from_config(
-                            &runtime_config.runtime.state_persistence,
-                        ),
-                    ) {
-                        Ok(adapter) => {
-                            state_access = Some(Arc::new(adapter)
-                                as Arc<dyn llmspell_core::traits::state::StateAccess>);
-                        }
-                        Err(e) => {
-                            warn!("Failed to create state adapter: {}, state will not be available in context", e);
-                        }
-                    }
-                }
-            }
+            let state_access = self
+                .runtime_config
+                .as_ref()
+                .and_then(|cfg| Self::create_state_access(cfg));
 
             // Create global context with or without state
             let global_context = state_access.map_or_else(
@@ -388,16 +372,18 @@ impl ScriptEngineBridge for LuaEngine {
                 },
             );
 
-            // Store SessionManager in GlobalContext if provided (Phase 12.8.2.11 - Unified Path)
-            // This allows templates to access SessionManager during execution
+            // Store infrastructure registries and SessionManager in GlobalContext (Phase 12.8.2.13)
+            global_context.set_bridge("tool_registry", tool_registry.clone());
+            global_context.set_bridge("agent_registry", agent_registry.clone());
+            global_context.set_bridge("workflow_factory", Arc::new(workflow_factory.clone()));
             if let Some(session_manager_any) = session_manager {
                 if let Ok(session_manager) =
                     Arc::downcast::<llmspell_kernel::sessions::SessionManager>(session_manager_any)
                 {
                     global_context.set_bridge("session_manager", session_manager);
-                    debug!("SessionManager stored in GlobalContext during inject_apis");
                 }
             }
+            debug!("Infrastructure registries stored in GlobalContext");
 
             // Pass runtime config through global context if available
             if let Some(runtime_config) = &self.runtime_config {
@@ -564,6 +550,28 @@ impl ScriptEngineBridge for LuaEngine {
 
 #[cfg(feature = "lua")]
 impl LuaEngine {
+    /// Create state access from runtime configuration
+    fn create_state_access(
+        runtime_config: &llmspell_config::LLMSpellConfig,
+    ) -> Option<Arc<dyn llmspell_core::traits::state::StateAccess>> {
+        if !runtime_config.runtime.state_persistence.enabled {
+            return None;
+        }
+
+        match futures::executor::block_on(crate::state_adapter::StateManagerAdapter::from_config(
+            &runtime_config.runtime.state_persistence,
+        )) {
+            Ok(adapter) => Some(Arc::new(adapter)),
+            Err(e) => {
+                warn!(
+                    "Failed to create state adapter: {}, state will not be available in context",
+                    e
+                );
+                None
+            }
+        }
+    }
+
     /// Register `SessionManager` to `GlobalContext` (Phase 12.8.2.10)
     ///
     /// Called after `SessionManager` is wired to `ScriptRuntime` to update the `GlobalContext`

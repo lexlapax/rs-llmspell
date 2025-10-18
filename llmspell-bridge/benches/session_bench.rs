@@ -1,6 +1,9 @@
 //! ABOUTME: Performance benchmarks for Session and Artifact operations
 //! ABOUTME: Validates <50ms session operations target from Phase 6 requirements
 
+mod test_helpers;
+use test_helpers::create_test_infrastructure;
+
 // Benchmark for llmspell-bridge sessions
 
 use criterion::{criterion_group, criterion_main, BenchmarkId, Criterion};
@@ -56,7 +59,18 @@ async fn create_setup_engine() -> LuaEngine {
     let registry = create_test_registry();
     let providers = create_test_providers().await;
 
-    engine.inject_apis(&registry, &providers).unwrap();
+    let (tool_registry, agent_registry, workflow_factory) = create_test_infrastructure();
+
+    engine
+        .inject_apis(
+            &registry,
+            &providers,
+            &tool_registry,
+            &agent_registry,
+            &workflow_factory,
+            None,
+        )
+        .unwrap();
     engine
 }
 

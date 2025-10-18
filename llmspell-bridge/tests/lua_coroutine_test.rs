@@ -1,8 +1,11 @@
 //! ABOUTME: Tests for advanced Lua coroutine streaming functionality
 //! ABOUTME: Validates true async streaming with Lua coroutines and yield
 
+mod test_helpers;
+
 #[cfg(feature = "lua")]
 mod tests {
+    use crate::test_helpers::create_test_infrastructure;
     use futures::StreamExt;
     use llmspell_bridge::{
         engine::factory::{EngineFactory, LuaConfig},
@@ -21,9 +24,19 @@ mod tests {
         let registry = Arc::new(ComponentRegistry::new());
         let provider_config = ProviderManagerConfig::default();
         let providers = Arc::new(ProviderManager::new(provider_config).await.unwrap());
+        let (tool_registry, agent_registry, workflow_factory) = create_test_infrastructure();
 
         // Inject APIs
-        engine.inject_apis(&registry, &providers, None).unwrap();
+        engine
+            .inject_apis(
+                &registry,
+                &providers,
+                &tool_registry,
+                &agent_registry,
+                &workflow_factory,
+                None,
+            )
+            .unwrap();
 
         // Test streaming with coroutine iteration
         let script = r#"
@@ -86,9 +99,19 @@ mod tests {
         let registry = Arc::new(ComponentRegistry::new());
         let provider_config = ProviderManagerConfig::default();
         let providers = Arc::new(ProviderManager::new(provider_config).await.unwrap());
+        let (tool_registry, agent_registry, workflow_factory) = create_test_infrastructure();
 
         // Inject APIs
-        engine.inject_apis(&registry, &providers, None).unwrap();
+        engine
+            .inject_apis(
+                &registry,
+                &providers,
+                &tool_registry,
+                &agent_registry,
+                &workflow_factory,
+                None,
+            )
+            .unwrap();
 
         // Test collect method
         let script = r#"
@@ -136,9 +159,19 @@ mod tests {
         let registry = Arc::new(ComponentRegistry::new());
         let provider_config = ProviderManagerConfig::default();
         let providers = Arc::new(ProviderManager::new(provider_config).await.unwrap());
+        let (tool_registry, agent_registry, workflow_factory) = create_test_infrastructure();
 
         // Inject APIs
-        engine.inject_apis(&registry, &providers, None).unwrap();
+        engine
+            .inject_apis(
+                &registry,
+                &providers,
+                &tool_registry,
+                &agent_registry,
+                &workflow_factory,
+                None,
+            )
+            .unwrap();
 
         // Script that would produce streaming output
         let script = r#"
@@ -197,9 +230,19 @@ mod tests {
         let registry = Arc::new(ComponentRegistry::new());
         let provider_config = ProviderManagerConfig::default();
         let providers = Arc::new(ProviderManager::new(provider_config).await.unwrap());
+        let (tool_registry, agent_registry, workflow_factory) = create_test_infrastructure();
 
         // Inject APIs
-        engine.inject_apis(&registry, &providers, None).unwrap();
+        engine
+            .inject_apis(
+                &registry,
+                &providers,
+                &tool_registry,
+                &agent_registry,
+                &workflow_factory,
+                None,
+            )
+            .unwrap();
 
         // Test error in coroutine
         let script = r#"

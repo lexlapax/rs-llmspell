@@ -93,10 +93,19 @@ mod tests {
         // Use core provider manager for tests
         let providers = Arc::new(llmspell_providers::ProviderManager::new());
 
+        // Create test infrastructure registries
+        let tool_registry = Arc::new(llmspell_tools::ToolRegistry::new());
+        let agent_registry = Arc::new(llmspell_agents::FactoryRegistry::new());
+        let workflow_factory: Arc<dyn llmspell_workflows::WorkflowFactory> =
+            Arc::new(llmspell_workflows::factory::DefaultWorkflowFactory::new());
+
         let bridge = Arc::new(TemplateBridge::new(
             template_registry,
             component_registry,
             providers,
+            tool_registry,
+            agent_registry,
+            workflow_factory,
         ));
 
         let global = TemplateGlobal::new(bridge);
@@ -118,10 +127,19 @@ mod tests {
         let component_registry = Arc::new(crate::registry::ComponentRegistry::new());
         let providers = Arc::new(llmspell_providers::ProviderManager::new());
 
+        // Create test infrastructure registries
+        let tool_registry = Arc::new(llmspell_tools::ToolRegistry::new());
+        let agent_registry = Arc::new(llmspell_agents::FactoryRegistry::new());
+        let workflow_factory: Arc<dyn llmspell_workflows::WorkflowFactory> =
+            Arc::new(llmspell_workflows::factory::DefaultWorkflowFactory::new());
+
         let bridge = Arc::new(TemplateBridge::new(
             template_registry,
             component_registry,
             providers,
+            tool_registry,
+            agent_registry,
+            workflow_factory,
         ));
 
         let bridge_clone = bridge.clone();

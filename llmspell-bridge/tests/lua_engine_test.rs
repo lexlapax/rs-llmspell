@@ -1,8 +1,11 @@
 //! ABOUTME: Integration tests for `LuaEngine` implementation
 //! ABOUTME: Validates basic script execution and API injection
 
+mod test_helpers;
+
 #[cfg(feature = "lua")]
 mod tests {
+    use crate::test_helpers::create_test_infrastructure;
     use llmspell_bridge::{
         engine::factory::{EngineFactory, LuaConfig},
         providers::ProviderManager,
@@ -32,8 +35,18 @@ mod tests {
         let provider_config = ProviderManagerConfig::default();
         let providers = Arc::new(ProviderManager::new(provider_config).await.unwrap());
 
+        // Create test infrastructure
+        let (tool_registry, agent_registry, workflow_factory) = create_test_infrastructure();
+
         // Inject APIs
-        let result = engine.inject_apis(&registry, &providers, None);
+        let result = engine.inject_apis(
+            &registry,
+            &providers,
+            &tool_registry,
+            &agent_registry,
+            &workflow_factory,
+            None,
+        );
         assert!(result.is_ok(), "Failed to inject APIs");
 
         // Execute simple script
@@ -58,8 +71,20 @@ mod tests {
         let provider_config = ProviderManagerConfig::default();
         let providers = Arc::new(ProviderManager::new(provider_config).await.unwrap());
 
+        // Create test infrastructure
+        let (tool_registry, agent_registry, workflow_factory) = create_test_infrastructure();
+
         // Inject APIs
-        engine.inject_apis(&registry, &providers, None).unwrap();
+        engine
+            .inject_apis(
+                &registry,
+                &providers,
+                &tool_registry,
+                &agent_registry,
+                &workflow_factory,
+                None,
+            )
+            .unwrap();
 
         // Test that Agent global exists
         let script = "return Agent ~= nil";

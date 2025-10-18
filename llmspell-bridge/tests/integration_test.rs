@@ -1,6 +1,8 @@
 //! ABOUTME: End-to-end integration tests for the script engine bridge
 //! ABOUTME: Validates complete workflows from script execution to provider calls
 
+mod test_helpers;
+
 use llmspell_bridge::{
     engine::factory::{EngineFactory, LuaConfig},
     providers::ProviderManager,
@@ -13,6 +15,7 @@ use llmspell_core::{
 };
 use std::collections::HashMap;
 use std::sync::Arc;
+use test_helpers::create_test_infrastructure;
 
 /// Test complete script execution through bridge abstraction
 #[tokio::test(flavor = "multi_thread")]
@@ -25,9 +28,19 @@ async fn test_script_execution_through_bridge() {
     let registry = Arc::new(ComponentRegistry::new());
     let provider_config = ProviderManagerConfig::default();
     let providers = Arc::new(ProviderManager::new(provider_config).await.unwrap());
+    let (tool_registry, agent_registry, workflow_factory) = create_test_infrastructure();
 
     // Inject APIs
-    engine.inject_apis(&registry, &providers, None).unwrap();
+    engine
+        .inject_apis(
+            &registry,
+            &providers,
+            &tool_registry,
+            &agent_registry,
+            &workflow_factory,
+            None,
+        )
+        .unwrap();
 
     // Execute a simple script
     let script = r#"
@@ -101,7 +114,18 @@ async fn test_streaming_through_bridge() {
     let provider_config = ProviderManagerConfig::default();
     let providers = Arc::new(ProviderManager::new(provider_config).await.unwrap());
 
-    engine.inject_apis(&registry, &providers, None).unwrap();
+    let (tool_registry, agent_registry, workflow_factory) = create_test_infrastructure();
+
+    engine
+        .inject_apis(
+            &registry,
+            &providers,
+            &tool_registry,
+            &agent_registry,
+            &workflow_factory,
+            None,
+        )
+        .unwrap();
 
     // Try streaming execution (stub for now)
     let result = engine
@@ -162,7 +186,18 @@ async fn test_provider_integration() {
         }
     });
 
-    engine.inject_apis(&registry, &providers, None).unwrap();
+    let (tool_registry, agent_registry, workflow_factory) = create_test_infrastructure();
+
+    engine
+        .inject_apis(
+            &registry,
+            &providers,
+            &tool_registry,
+            &agent_registry,
+            &workflow_factory,
+            None,
+        )
+        .unwrap();
 
     // Test that we can access provider functionality
     let script = r"
@@ -184,7 +219,18 @@ async fn test_error_propagation() {
     let provider_config = ProviderManagerConfig::default();
     let providers = Arc::new(ProviderManager::new(provider_config).await.unwrap());
 
-    engine.inject_apis(&registry, &providers, None).unwrap();
+    let (tool_registry, agent_registry, workflow_factory) = create_test_infrastructure();
+
+    engine
+        .inject_apis(
+            &registry,
+            &providers,
+            &tool_registry,
+            &agent_registry,
+            &workflow_factory,
+            None,
+        )
+        .unwrap();
 
     // Test various error scenarios
     let error_cases = vec![
@@ -218,7 +264,18 @@ async fn test_multimodal_types_access() {
     let provider_config = ProviderManagerConfig::default();
     let providers = Arc::new(ProviderManager::new(provider_config).await.unwrap());
 
-    engine.inject_apis(&registry, &providers, None).unwrap();
+    let (tool_registry, agent_registry, workflow_factory) = create_test_infrastructure();
+
+    engine
+        .inject_apis(
+            &registry,
+            &providers,
+            &tool_registry,
+            &agent_registry,
+            &workflow_factory,
+            None,
+        )
+        .unwrap();
 
     // Test creating multimodal content (when API is available)
     let script = r"
@@ -251,7 +308,18 @@ async fn test_execution_context_integration() {
     let provider_config = ProviderManagerConfig::default();
     let providers = Arc::new(ProviderManager::new(provider_config).await.unwrap());
 
-    engine.inject_apis(&registry, &providers, None).unwrap();
+    let (tool_registry, agent_registry, workflow_factory) = create_test_infrastructure();
+
+    engine
+        .inject_apis(
+            &registry,
+            &providers,
+            &tool_registry,
+            &agent_registry,
+            &workflow_factory,
+            None,
+        )
+        .unwrap();
 
     // Set custom execution context
     let mut context = llmspell_bridge::engine::bridge::ExecutionContext {
@@ -286,7 +354,18 @@ async fn test_bridge_performance_overhead() {
     let provider_config = ProviderManagerConfig::default();
     let providers = Arc::new(ProviderManager::new(provider_config).await.unwrap());
 
-    engine.inject_apis(&registry, &providers, None).unwrap();
+    let (tool_registry, agent_registry, workflow_factory) = create_test_infrastructure();
+
+    engine
+        .inject_apis(
+            &registry,
+            &providers,
+            &tool_registry,
+            &agent_registry,
+            &workflow_factory,
+            None,
+        )
+        .unwrap();
 
     // Benchmark simple script execution
     let script = "return 1 + 1";
@@ -381,7 +460,18 @@ async fn test_component_registration_integration() {
     let provider_config = ProviderManagerConfig::default();
     let providers = Arc::new(ProviderManager::new(provider_config).await.unwrap());
 
-    engine.inject_apis(&registry, &providers, None).unwrap();
+    let (tool_registry, agent_registry, workflow_factory) = create_test_infrastructure();
+
+    engine
+        .inject_apis(
+            &registry,
+            &providers,
+            &tool_registry,
+            &agent_registry,
+            &workflow_factory,
+            None,
+        )
+        .unwrap();
 
     // Verify registry works
     assert_eq!(registry.list_agents(), vec!["mock-agent"]);
@@ -398,7 +488,18 @@ async fn test_concurrent_script_execution() {
     let provider_config = ProviderManagerConfig::default();
     let providers = Arc::new(ProviderManager::new(provider_config).await.unwrap());
 
-    engine.inject_apis(&registry, &providers, None).unwrap();
+    let (tool_registry, agent_registry, workflow_factory) = create_test_infrastructure();
+
+    engine
+        .inject_apis(
+            &registry,
+            &providers,
+            &tool_registry,
+            &agent_registry,
+            &workflow_factory,
+            None,
+        )
+        .unwrap();
 
     let engine = Arc::new(engine);
 

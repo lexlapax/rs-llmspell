@@ -1,8 +1,11 @@
 //! ABOUTME: Integration tests for Lua streaming support
 //! ABOUTME: Validates coroutine-based streaming and API functionality
 
+mod test_helpers;
+
 #[cfg(feature = "lua")]
 mod tests {
+    use crate::test_helpers::create_test_infrastructure;
     use llmspell_bridge::{
         engine::factory::{EngineFactory, LuaConfig},
         providers::ProviderManager,
@@ -22,7 +25,16 @@ mod tests {
         let providers = Arc::new(ProviderManager::new(provider_config).await.unwrap());
 
         // Inject APIs including streaming
-        let result = engine.inject_apis(&registry, &providers, None);
+        let (tool_registry, agent_registry, workflow_factory) = create_test_infrastructure();
+
+        let result = engine.inject_apis(
+            &registry,
+            &providers,
+            &tool_registry,
+            &agent_registry,
+            &workflow_factory,
+            None,
+        );
         assert!(result.is_ok(), "Failed to inject APIs with streaming");
 
         // Test that Streaming global exists
@@ -52,7 +64,18 @@ mod tests {
         let providers = Arc::new(ProviderManager::new(provider_config).await.unwrap());
 
         // Inject APIs
-        engine.inject_apis(&registry, &providers, None).unwrap();
+        let (tool_registry, agent_registry, workflow_factory) = create_test_infrastructure();
+
+        engine
+            .inject_apis(
+                &registry,
+                &providers,
+                &tool_registry,
+                &agent_registry,
+                &workflow_factory,
+                None,
+            )
+            .unwrap();
 
         // Test creating a stream with coroutines
         let script = r#"
@@ -118,7 +141,18 @@ mod tests {
             .unwrap();
 
         // Inject APIs
-        engine.inject_apis(&registry, &providers, None).unwrap();
+        let (tool_registry, agent_registry, workflow_factory) = create_test_infrastructure();
+
+        engine
+            .inject_apis(
+                &registry,
+                &providers,
+                &tool_registry,
+                &agent_registry,
+                &workflow_factory,
+                None,
+            )
+            .unwrap();
 
         // Test Tool API
         let script = r#"
@@ -183,7 +217,18 @@ mod tests {
             .unwrap();
 
         // Inject APIs
-        engine.inject_apis(&registry, &providers, None).unwrap();
+        let (tool_registry, agent_registry, workflow_factory) = create_test_infrastructure();
+
+        engine
+            .inject_apis(
+                &registry,
+                &providers,
+                &tool_registry,
+                &agent_registry,
+                &workflow_factory,
+                None,
+            )
+            .unwrap();
 
         // Test Workflow API
         let script = r#"
@@ -263,7 +308,18 @@ mod tests {
         let providers = Arc::new(ProviderManager::new(provider_config).await.unwrap());
 
         // Inject APIs first
-        engine.inject_apis(&registry, &providers, None).unwrap();
+        let (tool_registry, agent_registry, workflow_factory) = create_test_infrastructure();
+
+        engine
+            .inject_apis(
+                &registry,
+                &providers,
+                &tool_registry,
+                &agent_registry,
+                &workflow_factory,
+                None,
+            )
+            .unwrap();
 
         // Test that streaming execution returns appropriate error for now
         let script = "return 'test'";

@@ -1,6 +1,9 @@
 //! ABOUTME: Comprehensive tests for `ScriptEngineBridge` abstraction
 //! ABOUTME: Validates language-agnostic bridge pattern and engine compliance
 
+mod test_helpers;
+use test_helpers::create_test_infrastructure;
+
 use llmspell_bridge::{
     engine::{
         bridge::{EngineFeatures, ExecutionContext, ScriptEngineBridge, SecurityContext},
@@ -109,7 +112,16 @@ async fn test_api_injection() {
     let providers = Arc::new(ProviderManager::new(provider_config).await.unwrap());
 
     // Inject APIs - should succeed
-    let result = engine.inject_apis(&registry, &providers, None);
+    let (tool_registry, agent_registry, workflow_factory) = create_test_infrastructure();
+
+    let result = engine.inject_apis(
+        &registry,
+        &providers,
+        &tool_registry,
+        &agent_registry,
+        &workflow_factory,
+        None,
+    );
     assert!(result.is_ok(), "API injection should succeed");
 
     // Verify APIs are available
@@ -132,7 +144,18 @@ async fn test_bridge_error_handling() {
     let registry = Arc::new(ComponentRegistry::new());
     let provider_config = ProviderManagerConfig::default();
     let providers = Arc::new(ProviderManager::new(provider_config).await.unwrap());
-    engine.inject_apis(&registry, &providers, None).unwrap();
+    let (tool_registry, agent_registry, workflow_factory) = create_test_infrastructure();
+
+    engine
+        .inject_apis(
+            &registry,
+            &providers,
+            &tool_registry,
+            &agent_registry,
+            &workflow_factory,
+            None,
+        )
+        .unwrap();
 
     // Test syntax error
     let syntax_error = engine.execute_script("invalid syntax {{").await;
@@ -168,7 +191,18 @@ async fn test_output_format_consistency() {
     let registry = Arc::new(ComponentRegistry::new());
     let provider_config = ProviderManagerConfig::default();
     let providers = Arc::new(ProviderManager::new(provider_config).await.unwrap());
-    engine.inject_apis(&registry, &providers, None).unwrap();
+    let (tool_registry, agent_registry, workflow_factory) = create_test_infrastructure();
+
+    engine
+        .inject_apis(
+            &registry,
+            &providers,
+            &tool_registry,
+            &agent_registry,
+            &workflow_factory,
+            None,
+        )
+        .unwrap();
 
     // Test various output types
     let test_cases = vec![
@@ -198,7 +232,18 @@ async fn test_console_output_capture() {
     let registry = Arc::new(ComponentRegistry::new());
     let provider_config = ProviderManagerConfig::default();
     let providers = Arc::new(ProviderManager::new(provider_config).await.unwrap());
-    engine.inject_apis(&registry, &providers, None).unwrap();
+    let (tool_registry, agent_registry, workflow_factory) = create_test_infrastructure();
+
+    engine
+        .inject_apis(
+            &registry,
+            &providers,
+            &tool_registry,
+            &agent_registry,
+            &workflow_factory,
+            None,
+        )
+        .unwrap();
 
     let script = r#"
         print("Line 1")
@@ -224,7 +269,18 @@ async fn test_output_metadata() {
     let registry = Arc::new(ComponentRegistry::new());
     let provider_config = ProviderManagerConfig::default();
     let providers = Arc::new(ProviderManager::new(provider_config).await.unwrap());
-    engine.inject_apis(&registry, &providers, None).unwrap();
+    let (tool_registry, agent_registry, workflow_factory) = create_test_infrastructure();
+
+    engine
+        .inject_apis(
+            &registry,
+            &providers,
+            &tool_registry,
+            &agent_registry,
+            &workflow_factory,
+            None,
+        )
+        .unwrap();
 
     let output = engine.execute_script("return 42").await.unwrap();
 

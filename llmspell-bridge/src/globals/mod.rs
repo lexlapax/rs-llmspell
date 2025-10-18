@@ -194,18 +194,39 @@ async fn register_template_global(
     // Get core provider manager (TemplateBridge needs core, not bridge wrapper)
     let core_providers = context.providers.create_core_manager_arc().await?;
 
+    // Get infrastructure registries from GlobalContext (Phase 12.8.2.13)
+    // These were registered by inject_apis and contain the fully-configured infrastructure
+    let tool_registry = context
+        .get_bridge::<llmspell_tools::ToolRegistry>("tool_registry")
+        .expect("tool_registry must be available in GlobalContext");
+    let agent_registry = context
+        .get_bridge::<llmspell_agents::FactoryRegistry>("agent_registry")
+        .expect("agent_registry must be available in GlobalContext");
+    // Note: workflow_factory is stored as Arc<T> in GlobalContext, so get_bridge returns Arc<Arc<T>>
+    // We need to extract the inner Arc
+    let workflow_factory: Arc<dyn llmspell_workflows::WorkflowFactory> = context
+        .get_bridge::<Arc<dyn llmspell_workflows::WorkflowFactory>>("workflow_factory")
+        .map(|arc_arc| (*arc_arc).clone())
+        .expect("workflow_factory must be available in GlobalContext");
+
     // Create template bridge with optional state and session managers
     let template_bridge = if let (Some(state_manager), Some(session_manager)) = (
         context.get_bridge::<llmspell_kernel::state::StateManager>("state_manager"),
         context.get_bridge::<llmspell_kernel::sessions::manager::SessionManager>("session_manager"),
     ) {
+        let managers = crate::template_bridge::Managers {
+            state_manager,
+            session_manager,
+        };
         Arc::new(
             crate::template_bridge::TemplateBridge::with_state_and_session(
                 template_registry,
                 context.registry.clone(),
                 core_providers,
-                state_manager,
-                session_manager,
+                tool_registry,
+                agent_registry,
+                workflow_factory,
+                managers,
             ),
         )
     } else if let Some(state_manager) =
@@ -215,6 +236,9 @@ async fn register_template_global(
             template_registry,
             context.registry.clone(),
             core_providers,
+            tool_registry,
+            agent_registry,
+            workflow_factory.clone(),
             state_manager,
         ))
     } else {
@@ -222,6 +246,9 @@ async fn register_template_global(
             template_registry,
             context.registry.clone(),
             core_providers,
+            tool_registry,
+            agent_registry,
+            workflow_factory,
         ))
     };
 
