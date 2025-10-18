@@ -18,7 +18,18 @@ mod lua_globals {
         // Create a default provider manager config for tests
         let config = ProviderManagerConfig::default();
         let providers = Arc::new(ProviderManager::new(config).await.unwrap());
-        Arc::new(GlobalContext::new(registry, providers))
+
+        // Create infrastructure registries (Phase 12.8.2.13)
+        let tool_registry = Arc::new(llmspell_tools::ToolRegistry::new());
+        let agent_registry = Arc::new(llmspell_agents::FactoryRegistry::new());
+        let workflow_factory: Arc<dyn llmspell_workflows::WorkflowFactory> =
+            Arc::new(llmspell_workflows::factory::DefaultWorkflowFactory::new());
+
+        let context = GlobalContext::new(registry, providers);
+        context.set_bridge("tool_registry", tool_registry);
+        context.set_bridge("agent_registry", agent_registry);
+        context.set_bridge("workflow_factory", Arc::new(workflow_factory));
+        Arc::new(context)
     }
 
     async fn setup_lua_with_globals() -> Result<(Lua, Arc<GlobalContext>)> {
