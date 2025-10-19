@@ -6918,10 +6918,40 @@ echo "Session ID: $SESSION_ID"
 Spec Agent → Implementation Agent → Test Agent → Linter (tool)
 ```
 
-**Sub-Task 12.8.3.1: Specification Agent** (2-3 hours)
-- **Replace**: lines 267-285 (`generate_specification` placeholder)
-- **Implementation**: Create agent with "code-spec" role, generate detailed spec from description
-- **Testing**: Verify spec includes function signatures, data structures, behavior
+**Sub-Task 12.8.3.1: Specification Agent** (2-3 hours) ✅ COMPLETE
+- **Replaced**: lines 259-295 (`generate_specification` placeholder → real agent implementation, 96 lines)
+- **Implementation Insights**:
+  - ✅ **AgentConfig Pattern** (follows research-assistant.rs:438-532):
+    - Use `llmspell_agents::factory::{AgentConfig, ModelConfig, ResourceLimits}`
+    - Use `llmspell_core::types::AgentInput` (NOT from llmspell_agents)
+    - NO `system_prompt` field in AgentConfig - instructions go in user prompt
+    - Required fields: name, description, agent_type, model, allowed_tools, custom_config, resource_limits
+  - ✅ **Model Parsing** (code_generator.rs:273-280):
+    - Format: "provider/model-id" or just "model-id"
+    - Use `model.find('/')` for safe parsing (returns Option<usize>)
+    - Split: `model[..slash_pos]` / `model[slash_pos + 1..]`
+    - Default provider: "ollama" if no slash found
+  - ✅ **Agent Creation** (code_generator.rs:308-315):
+    - `context.agent_registry().create_agent(config).await` - MUST await
+    - Returns `Result<Arc<dyn Agent>, Error>`
+    - Use `.map_err()` to convert to TemplateError::ExecutionFailed
+  - ✅ **Agent Execution Context** (code_generator.rs:344):
+    - Agent.execute() requires `llmspell_core::ExecutionContext::default()`
+    - NOT `crate::context::ExecutionContext` (template context)
+    - Different types: llmspell_core::ExecutionContext (trait-based) vs crate::context::ExecutionContext (builder-based)
+  - ✅ **AgentOutput API** (code_generator.rs:352):
+    - `agent_output.text` is a FIELD, not a method
+    - Direct access: `let content = agent_output.text;`
+    - NOT `.text()` or `.get_text()` - those don't exist
+  - ✅ **Temperature Settings** (code_generator.rs:293):
+    - Spec agent: 0.3 (structured, deterministic output)
+    - Lower than synthesis (0.7) because specs need consistency
+  - ✅ **System Prompt Strategy** (code_generator.rs:318-338):
+    - Include instructions in user prompt, not AgentConfig.system_prompt
+    - Format: "You are an expert... [role description]\n\n[task]"
+    - Provide structured guidelines (numbered sections)
+- **Files Modified**: `llmspell-templates/src/builtin/code_generator.rs` (96 lines replaced)
+- **Testing**: Compiles cleanly (`cargo check -p llmspell-templates`)
 
 **Sub-Task 12.8.3.2: Implementation Agent** (3-4 hours)
 - **Replace**: lines 287-386 (`generate_implementation` placeholder)

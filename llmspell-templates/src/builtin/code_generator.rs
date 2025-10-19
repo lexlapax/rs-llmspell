@@ -261,35 +261,99 @@ impl CodeGeneratorTemplate {
         &self,
         description: &str,
         language: &str,
-        _model: &str,
-        _context: &ExecutionContext,
+        model: &str,
+        context: &ExecutionContext,
     ) -> Result<SpecificationResult> {
-        // TODO: Implement actual spec agent
-        // For now, return placeholder specification
-        warn!("Specification generation not yet implemented - using placeholder");
+        use llmspell_agents::factory::{AgentConfig, ModelConfig, ResourceLimits};
+        use llmspell_core::types::AgentInput;
 
-        let content = format!(
-            "# Code Specification\n\n\
-             ## Overview\n\
-             Language: {}\n\
-             Description: {}\n\n\
-             ## Design\n\
-             [Placeholder specification based on description]\n\n\
-             ### Components\n\
-             1. **Main Module**: Core functionality implementation\n\
-             2. **Helper Functions**: Supporting utilities\n\
-             3. **Error Handling**: Robust error management\n\n\
-             ### Data Structures\n\
-             - Primary data structure: [To be determined]\n\
-             - Helper structures: [To be determined]\n\n\
-             ### API Design\n\
-             - Public functions: [List of public API functions]\n\
-             - Internal functions: [List of private helpers]\n\n\
-             ### Testing Strategy\n\
-             - Unit tests for each component\n\
-             - Integration tests for end-to-end workflows\n\
-             - Edge case coverage\n",
-            language, description
+        info!("Creating specification agent for {} code", language);
+
+        // Parse model string (provider/model format)
+        let (provider, model_id) = if let Some(slash_pos) = model.find('/') {
+            (
+                model[..slash_pos].to_string(),
+                model[slash_pos + 1..].to_string(),
+            )
+        } else {
+            ("ollama".to_string(), model.to_string())
+        };
+
+        // Create agent config for specification generation
+        let agent_config = AgentConfig {
+            name: "code-spec-agent".to_string(),
+            description: format!(
+                "Specification agent for {} code generation",
+                language
+            ),
+            agent_type: "llm".to_string(),
+            model: Some(ModelConfig {
+                provider,
+                model_id,
+                temperature: Some(0.3), // Lower temperature for structured specs
+                max_tokens: Some(2000),
+                settings: serde_json::Map::new(),
+            }),
+            allowed_tools: vec![],
+            custom_config: serde_json::Map::new(),
+            resource_limits: ResourceLimits {
+                max_execution_time_secs: 120,
+                max_memory_mb: 512,
+                max_tool_calls: 0,
+                max_recursion_depth: 1,
+            },
+        };
+
+        // Create the agent
+        let agent = context
+            .agent_registry()
+            .create_agent(agent_config)
+            .await
+            .map_err(|e| {
+                warn!("Failed to create specification agent: {}", e);
+                TemplateError::ExecutionFailed(format!("Agent creation failed: {}", e))
+            })?;
+
+        // Build the specification request with instructions in the prompt
+        let spec_prompt = format!(
+            "You are an expert software architect specializing in {}. \
+             Generate a detailed, well-structured technical specification from the following description.\n\n\
+             **Description**: {}\n\
+             **Language**: {}\n\n\
+             Include these sections in your specification:\n\
+             1. **Overview**: Brief summary of the functionality\n\
+             2. **Requirements**: Functional and non-functional requirements\n\
+             3. **Architecture**: High-level design and component breakdown\n\
+             4. **Data Structures**: Types, structs, classes needed\n\
+             5. **API Design**: Public interfaces and function signatures\n\
+             6. **Error Handling**: Exception/error handling strategy\n\
+             7. **Testing Strategy**: Unit and integration test approach\n\n\
+             Make the specification:\n\
+             - Detailed enough for implementation\n\
+             - Language-idiomatic for {}\n\
+             - Include function signatures and type annotations\n\
+             - Consider edge cases and error conditions\n\n\
+             Provide the specification now:",
+            language, description, language, language
+        );
+
+        // Execute the agent
+        info!("Executing specification agent...");
+        let agent_input = AgentInput::builder().text(spec_prompt).build();
+        let agent_output = agent
+            .execute(agent_input, llmspell_core::ExecutionContext::default())
+            .await
+            .map_err(|e| {
+                warn!("Specification agent execution failed: {}", e);
+                TemplateError::ExecutionFailed(format!("Agent execution failed: {}", e))
+            })?;
+
+        // Extract specification content
+        let content = agent_output.text;
+
+        info!(
+            "Specification generated ({} lines)",
+            content.lines().count()
         );
 
         Ok(SpecificationResult { content })
@@ -300,79 +364,95 @@ impl CodeGeneratorTemplate {
         &self,
         spec: &SpecificationResult,
         language: &str,
-        _model: &str,
-        _context: &ExecutionContext,
+        model: &str,
+        context: &ExecutionContext,
     ) -> Result<ImplementationResult> {
-        // TODO: Implement actual implementation agent
-        // For now, return placeholder code
-        warn!("Code implementation not yet implemented - using placeholder");
+        use llmspell_agents::factory::{AgentConfig, ModelConfig, ResourceLimits};
+        use llmspell_core::types::AgentInput;
 
-        let code = match language {
-            "rust" => format!(
-                "// Generated Rust code based on specification\n\
-                 // Spec length: {} lines\n\n\
-                 /// Main function implementing the specified functionality\n\
-                 pub fn main_function(input: &str) -> Result<String, Box<dyn std::error::Error>> {{\n    \
-                     // Placeholder implementation\n    \
-                     println!(\"Processing input: {{}}\", input);\n    \
-                     Ok(format!(\"Processed: {{}}\", input))\n\
-                 }}\n\n\
-                 /// Helper function\n\
-                 fn helper_function(data: &str) -> String {{\n    \
-                     // Placeholder helper\n    \
-                     data.to_uppercase()\n\
-                 }}\n",
-                spec.content.lines().count()
-            ),
-            "python" => format!(
-                "# Generated Python code based on specification\n\
-                 # Spec length: {} lines\n\n\
-                 def main_function(input_data: str) -> str:\n    \
-                     \"\"\"Main function implementing the specified functionality\"\"\"\n    \
-                     # Placeholder implementation\n    \
-                     print(f\"Processing input: {{input_data}}\")\n    \
-                     return f\"Processed: {{input_data}}\"\n\n\
-                 def helper_function(data: str) -> str:\n    \
-                     \"\"\"Helper function\"\"\"\n    \
-                     # Placeholder helper\n    \
-                     return data.upper()\n",
-                spec.content.lines().count()
-            ),
-            "javascript" => format!(
-                "// Generated JavaScript code based on specification\n\
-                 // Spec length: {} lines\n\n\
-                 /**\n \
-                  * Main function implementing the specified functionality\n \
-                  * @param {{string}} input - Input data\n \
-                  * @returns {{string}} Processed result\n \
-                  */\n\
-                 function mainFunction(input) {{\n    \
-                     // Placeholder implementation\n    \
-                     console.log(`Processing input: ${{input}}`);\n    \
-                     return `Processed: ${{input}}`;\n\
-                 }}\n\n\
-                 /**\n \
-                  * Helper function\n \
-                  * @param {{string}} data - Input data\n \
-                  * @returns {{string}} Processed data\n \
-                  */\n\
-                 function helperFunction(data) {{\n    \
-                     // Placeholder helper\n    \
-                     return data.toUpperCase();\n\
-                 }}\n\n\
-                 module.exports = {{ mainFunction, helperFunction }};\n",
-                spec.content.lines().count()
-            ),
-            _ => format!(
-                "// Generated {} code based on specification\n\
-                 // Spec length: {} lines\n\n\
-                 // Placeholder implementation for {}\n\
-                 // [Code would be generated here]\n",
-                language,
-                spec.content.lines().count(),
+        info!("Creating implementation agent for {} code", language);
+
+        // Parse model string (provider/model format)
+        let (provider, model_id) = if let Some(slash_pos) = model.find('/') {
+            (
+                model[..slash_pos].to_string(),
+                model[slash_pos + 1..].to_string(),
+            )
+        } else {
+            ("ollama".to_string(), model.to_string())
+        };
+
+        // Create agent config for code implementation
+        let agent_config = AgentConfig {
+            name: "code-impl-agent".to_string(),
+            description: format!(
+                "Implementation agent for {} code generation",
                 language
             ),
+            agent_type: "llm".to_string(),
+            model: Some(ModelConfig {
+                provider,
+                model_id,
+                temperature: Some(0.5), // Higher than spec (0.3) for implementation creativity
+                max_tokens: Some(3000), // More tokens for actual code
+                settings: serde_json::Map::new(),
+            }),
+            allowed_tools: vec![],
+            custom_config: serde_json::Map::new(),
+            resource_limits: ResourceLimits {
+                max_execution_time_secs: 180, // 3 minutes for implementation
+                max_memory_mb: 512,
+                max_tool_calls: 0,
+                max_recursion_depth: 1,
+            },
         };
+
+        // Create the agent
+        let agent = context
+            .agent_registry()
+            .create_agent(agent_config)
+            .await
+            .map_err(|e| {
+                warn!("Failed to create implementation agent: {}", e);
+                TemplateError::ExecutionFailed(format!("Agent creation failed: {}", e))
+            })?;
+
+        // Build the implementation request with spec as context
+        let impl_prompt = format!(
+            "You are an expert {} programmer. Implement complete, production-ready code based on the following specification.\n\n\
+             **Language**: {}\n\n\
+             **SPECIFICATION**:\n{}\n\n\
+             **INSTRUCTIONS**:\n\
+             1. Implement ALL components described in the specification\n\
+             2. Follow {}-idiomatic patterns and best practices\n\
+             3. Include proper error handling as specified\n\
+             4. Add comprehensive documentation (docstrings/comments)\n\
+             5. Implement all public APIs with correct signatures\n\
+             6. Include internal helper functions as needed\n\
+             7. Make code production-ready, not just a stub\n\
+             8. Use type annotations where applicable\n\n\
+             Provide ONLY the code implementation (no explanations), ready to save to a file:",
+            language, language, spec.content, language
+        );
+
+        // Execute the agent
+        info!("Executing implementation agent...");
+        let agent_input = AgentInput::builder().text(impl_prompt).build();
+        let agent_output = agent
+            .execute(agent_input, llmspell_core::ExecutionContext::default())
+            .await
+            .map_err(|e| {
+                warn!("Implementation agent execution failed: {}", e);
+                TemplateError::ExecutionFailed(format!("Agent execution failed: {}", e))
+            })?;
+
+        // Extract implementation code
+        let code = agent_output.text;
+
+        info!(
+            "Implementation generated ({} lines)",
+            code.lines().count()
+        );
 
         Ok(ImplementationResult { code })
     }
