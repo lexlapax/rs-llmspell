@@ -77,6 +77,7 @@ print(result.result)
 | `system_prompt` | String | `"You are a helpful AI assistant..."` | System instructions defining AI behavior and personality |
 | `max_turns` | Integer | `10` | Maximum conversation turns (range: 1-100). Enforced in interactive mode only |
 | `tools` | Array | `[]` | Tool names to enable (e.g., `["calculator", "web-searcher"]`). Tools validated via ToolRegistry before agent creation |
+| `session_id` | String | (none) | Optional session UUID for reusing existing conversation. Enables multi-turn context across separate CLI invocations. If not provided, creates new session. See Example 4 for session reuse workflow |
 | `enable_memory` | Boolean | `false` | Long-term memory integration (Phase 13 placeholder - not yet active) |
 
 **Inspect Full Schema:**
@@ -259,21 +260,34 @@ Returns after conversation ends with full transcript:
   --param tools='["calculator"]'
 ```
 
-#### 4. Multi-Turn Context (Interactive Mode)
+#### 4. Session Reuse - Multi-Turn Context Across CLI Invocations
 ```bash
-# Interactive mode maintains conversation history across turns
-./target/debug/llmspell template exec interactive-chat
+# First call: Introduce yourself and capture session_id from JSON output
+./target/debug/llmspell template exec interactive-chat \
+  --param model=ollama/llama3.2:3b \
+  --param message="My name is Alice" \
+  --output json > /tmp/chat1.json
 
-# Example session demonstrating context persistence:
-# You> My name is Alice
-# Assistant> Nice to meet you, Alice! How can I help you today?
-#
-# You> What's my name?
-# Assistant> Your name is Alice.
-#
-# You> exit
-# [Session ends with full conversation history saved]
+# Extract session_id from output
+SESSION_ID=$(jq -r '.metrics.custom_metrics.session_id' /tmp/chat1.json)
+echo "Session ID: $SESSION_ID"
+
+# Second call: Reuse the session to test conversation history
+./target/debug/llmspell template exec interactive-chat \
+  --param model=ollama/llama3.2:3b \
+  --param message="What is my name?" \
+  --param session_id="$SESSION_ID" \
+  --output json
+
+# Output: "Nice to see you again, Alice!"
+# ✓ Session persistence working - conversation history maintained across CLI calls
 ```
+
+**How it works:**
+- Sessions are persisted to `./sessions/` using SledBackend (embedded database)
+- Session state includes full conversation history
+- `session_id` parameter enables context continuity across separate executions
+- Useful for stateful CLI workflows and automation scripts
 
 ### Lua Examples
 
@@ -316,9 +330,15 @@ print(result.result)
 
 ## Session Management
 
-### Automatic Session Creation
+### Session Creation & Persistence
 
-Sessions are **automatically created** with UUID identifiers. No manual session_id parameter required.
+**Default Behavior**: Sessions are **automatically created** with UUID identifiers.
+
+**Session Reuse** (v0.11.2+): Provide `session_id` parameter to reuse existing conversation:
+- Sessions persisted to `./sessions/` directory (SledBackend embedded database)
+- Conversation history and state maintained across separate CLI invocations
+- Enables stateful workflows and automation scripts
+- See **Example 4** for session reuse workflow
 
 **Session State Storage**:
 - `conversation_history`: Array of `ConversationTurn` objects
@@ -337,12 +357,16 @@ Sessions are **automatically created** with UUID identifiers. No manual session_
 
 ### History Persistence
 
-**Storage Location**: `Session.state["conversation_history"]`
+**Storage Location**:
+- In-session: `Session.state["conversation_history"]`
+- On-disk: `./sessions/` (MessagePack format with optional LZ4 compression)
 
 **Behavior**:
 - **Programmatic mode**: Loads history → adds user message → calls LLM → adds assistant response → saves history
 - **Interactive mode**: Each turn updates history via programmatic mode logic
 - **History command**: Displays all turns with colored output
+- **Session reuse**: Auto-loads conversation history when `session_id` provided
+- **Persistence**: Immediate save on session creation + periodic auto-persist (300s interval)
 
 ---
 

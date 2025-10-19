@@ -231,7 +231,8 @@ async fn create_full_infrastructure(
 
     // Create SessionManager BEFORE ScriptRuntime (Phase 12.8.2.11)
     let state_manager = Arc::new(llmspell_kernel::state::StateManager::new().await?);
-    let session_storage_backend = Arc::new(llmspell_storage::MemoryBackend::new());
+    let session_storage_backend =
+        Arc::new(llmspell_storage::SledBackend::new_with_path("./sessions")?);
     let hook_registry = Arc::new(llmspell_hooks::HookRegistry::new());
     let hook_executor = Arc::new(llmspell_hooks::HookExecutor::new());
     let event_bus = Arc::new(llmspell_events::bus::EventBus::new());

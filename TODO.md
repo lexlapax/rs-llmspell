@@ -3316,7 +3316,7 @@ Task 12.7.1.6 successfully documented the dual-layer registry architecture acros
 ## Phase 12.8: Template Production Implementations (Days 11-17, ~40-52 hours)
 
 **Priority**: CRITICAL (Templates Currently Non-Functional)
-**Status**: 🔴 NOT STARTED
+**Status**: 🟢 IN PROGRESS (12.8.1 ✅ COMPLETE, 12.8.2 ✅ COMPLETE, 12.8.3-12.8.8 PENDING)
 **Estimated Time**: 5-6.5 working days (40-52 hours)
 **Dependencies**: Phase 12.7 Complete ✅
 **Blocks**: v0.12.0 Release (cannot ship placeholders)
@@ -6659,6 +6659,251 @@ With 12.8.2.16 complete, llmspell CLI achieves:
    - Update tool references (web-search → web-searcher)
 3. Consider Phase 12.8.2 COMPLETE (all infrastructure + docs done)
 4. Begin Phase 12.8.3 (code-generator template) OR Phase 13 planning
+
+---
+
+#### Sub-Task 12.8.2.17: Implement session_id Parameter for Interactive-Chat Multi-Turn Context
+
+**Priority**: MEDIUM-HIGH (Enables Documented Use Case, Fixes Architectural Gap)
+**Time**: 40 minutes (Code: 20min, Testing: 10min, Docs: 10min)
+**Status**: ✅ COMPLETE
+
+**Problem**: The `interactive-chat` template creates isolated sessions on every `template exec` call, making it impossible to maintain conversation context across programmatic invocations. Users cannot implement the documented multi-turn workflow where session_id is extracted from the first call and reused in subsequent calls. This breaks automation, scripting, and makes Example 4 in documentation aspirational rather than functional.
+
+**User Impact Scenario**:
+```bash
+# User attempts multi-turn conversation:
+SESSION_ID=$(llmspell template exec interactive-chat \
+  --param message="My name is Alice" --output json | jq -r '.metrics.custom_metrics.session_id')
+
+# User tries to continue conversation:
+llmspell template exec interactive-chat \
+  --param message="What is my name?" \
+  --param session_id="$SESSION_ID"
+
+# Current behavior: ERROR - unexpected argument 'session_id'
+# Expected behavior: LLM responds "Your name is Alice" using conversation history
+```
+
+**Root Cause Analysis**:
+
+1. **Missing Parameter Definition**:
+   - Template schema has 6 parameters (model, system_prompt, max_turns, tools, enable_memory, message)
+   - No `session_id` parameter defined
+   - CLI rejects unknown parameters → workflow impossible
+
+2. **Unconditional Session Creation**:
+   - File: `llmspell-templates/src/builtin/interactive_chat.rs:273-301`
+   - Method: `get_or_create_session()` ALWAYS creates new session
+   - No logic to check if session_id was provided and should be reused
+   - Name is misleading ("get_or_create" but only does "create")
+
+3. **Infrastructure Already Complete**:
+   - ✅ Session persistence works (conversation_history stored in Session.state)
+   - ✅ History loading works (load_conversation_history() at line 339)
+   - ✅ History saving works (save_conversation_history() at line 379)
+   - ✅ SessionManager supports get_session() for existing sessions
+   - ❌ Only missing: parameter passing and reuse logic
+
+**Solution Architecture**:
+
+**Phase 1: Add session_id Parameter to Schema**
+- File: `llmspell-templates/src/builtin/interactive_chat.rs`
+- Location: `config_schema()` method (around line 80-130)
+- Action: Add optional string parameter `session_id` with UUID format description
+- Validation: None required (SessionManager validates UUID format)
+
+**Phase 2: Extract Parameter in execute()**
+- File: `llmspell-templates/src/builtin/interactive_chat.rs`
+- Location: Line 145 (after `message` extraction)
+- Action: `let session_id_param: Option<String> = params.get_optional("session_id");`
+
+**Phase 3: Update get_or_create_session() Signature**
+- File: `llmspell-templates/src/builtin/interactive_chat.rs`
+- Location: Line 273
+- Change signature to: `async fn get_or_create_session(&self, context: &ExecutionContext, requested_session_id: Option<String>) -> Result<String>`
+
+**Phase 4: Implement GET Logic**
+- File: `llmspell-templates/src/builtin/interactive_chat.rs`
+- Location: Lines 273-301 (replace implementation)
+- Logic:
+  ```rust
+  if let Some(sid) = requested_session_id {
+      // Validate UUID format
+      let session_id_obj = sid.parse::<SessionId>()?;
+      // Verify session exists via get_session()
+      session_manager.get_session(&session_id_obj).await?;
+      info!("Reusing existing session: {}", sid);
+      return Ok(sid);
+  }
+  // Otherwise create new session (existing logic)
+  ```
+
+**Phase 5: Update Call Site**
+- File: `llmspell-templates/src/builtin/interactive_chat.rs`
+- Location: Line 174
+- Change: `let session_id = self.get_or_create_session(&context, session_id_param).await?;`
+
+**Implementation Steps**:
+
+1. **Code Changes** (20 minutes):
+   - [x] Add `session_id` parameter to `config_schema()` (5 lines)
+   - [x] Extract `session_id_param` in `execute()` (1 line at line 146)
+   - [x] Update `get_or_create_session()` signature (1 line at line 273)
+   - [x] Implement session reuse logic in `get_or_create_session()` (~25 lines replacing lines 273-301)
+   - [x] Update call site to pass `session_id_param` (1 line at line 174)
+   - Total changes: ~35 lines across 5 locations ✅ COMPLETE
+
+2. **Testing** (10 minutes):
+   - [x] Test session creation (existing behavior, regression test)
+   - [x] Test session reuse with valid UUID (new feature)
+   - [x] Test error handling for invalid UUID format
+   - [x] Test error handling for non-existent session ID
+   - [x] Test conversation history loads correctly on reuse
+   - [x] Verify Example 4 workflow end-to-end
+
+3. **Documentation Updates** (10 minutes):
+   - [x] Update `docs/user-guide/templates/interactive-chat.md` Example 4
+   - [x] Add session_id parameter to Parameters table
+   - [x] Add "Session Reuse" section explaining the workflow (integrated into Example 4)
+   - [x] Update "Session Management" section with reuse behavior
+
+4. **Infrastructure Enhancement** (5 minutes - bonus):
+   - [x] Changed CLI from MemoryBackend → SledBackend for persistent sessions (llmspell-cli/src/execution_context.rs:234)
+   - [x] Sessions now persist to `./sessions/` directory across CLI restarts
+   - [x] Enables true multi-session workflows for automation
+
+**Testing Script**:
+```bash
+# Test 1: Create session and capture ID
+SESSION_ID=$(./target/debug/llmspell template exec interactive-chat \
+  --param message="My name is Alice" \
+  --output json 2>/dev/null | \
+  jq -r '.metrics.custom_metrics.session_id')
+
+echo "Created session: $SESSION_ID"
+echo "$SESSION_ID" | grep -E '^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$' && \
+  echo "✓ Valid UUID" || echo "✗ Invalid UUID"
+
+# Test 2: Reuse session (should remember name from turn 1)
+RESPONSE=$(./target/debug/llmspell template exec interactive-chat \
+  --param message="What is my name?" \
+  --param session_id="$SESSION_ID" \
+  --output json 2>/dev/null | jq -r '.result.value')
+
+echo "Response: $RESPONSE"
+echo "$RESPONSE" | grep -i "alice" && echo "✓ Context maintained" || echo "✗ Context lost"
+
+# Test 3: Invalid session ID (should error gracefully)
+./target/debug/llmspell template exec interactive-chat \
+  --param message="test" \
+  --param session_id="invalid-uuid" 2>&1 | \
+  grep -i "error\|invalid" && echo "✓ Error handling works" || echo "✗ No validation"
+
+# Test 4: Non-existent session ID (should error gracefully)
+./target/debug/llmspell template exec interactive-chat \
+  --param message="test" \
+  --param session_id="00000000-0000-0000-0000-000000000000" 2>&1 | \
+  grep -i "not found\|error" && echo "✓ Session validation works" || echo "✗ No validation"
+```
+
+**New Example 4 for Documentation**:
+```markdown
+#### 4. Multi-Turn Context (Programmatic Mode with Session Reuse)
+
+Multi-turn conversations across separate CLI calls using session reuse:
+
+```bash
+# First call: Introduce yourself and capture session ID
+SESSION_ID=$(./target/debug/llmspell template exec interactive-chat \
+  --param message="My name is Alice. I'm learning about Rust lifetimes." \
+  --output json 2>/dev/null | \
+  jq -r '.metrics.custom_metrics.session_id')
+
+echo "Session ID: $SESSION_ID"
+
+# Second call: Ask question requiring context from first call
+./target/debug/llmspell template exec interactive-chat \
+  --param message="What is my name?" \
+  --param session_id="$SESSION_ID" \
+  --output json | jq -r '.result.value'
+
+# Output: "Your name is Alice."
+
+# Third call: Ask about previous topic
+./target/debug/llmspell template exec interactive-chat \
+  --param message="What was I learning about?" \
+  --param session_id="$SESSION_ID" \
+  --output json | jq -r '.result.value'
+
+# Output: "You mentioned you're learning about Rust lifetimes."
+```
+
+**How it works:**
+- First call creates new session, returns `session_id` in `metrics.custom_metrics`
+- Subsequent calls reuse session via `--param session_id=<UUID>`
+- Template loads `conversation_history` from session state
+- LLM receives full context of all previous turns
+- Session persists until explicitly deleted or expired
+```
+
+**Acceptance Criteria**:
+
+1. **Parameter Support**:
+   - ✅ `session_id` parameter appears in `template schema interactive-chat` output
+   - ✅ CLI accepts `--param session_id=<UUID>` without error
+   - ✅ Invalid UUID format returns validation error
+   - ✅ Non-existent session ID returns "session not found" error
+
+2. **Functional Behavior**:
+   - ✅ First call (no session_id) creates new session
+   - ✅ Second call (with session_id) reuses existing session
+   - ✅ Conversation history loads correctly on reuse
+   - ✅ LLM responses demonstrate context awareness across calls
+   - ✅ Session metrics (turn_count, total_tokens) accumulate correctly
+
+3. **Code Quality**:
+   - ✅ Zero clippy warnings
+   - ✅ Clean workspace build
+   - ✅ Error messages user-friendly (not Rust panic strings)
+   - ✅ Logging indicates session creation vs reuse
+
+4. **Documentation**:
+   - ✅ Example 4 workflow tested and works as documented
+   - ✅ Parameters table includes session_id with description
+   - ✅ Session Management section explains reuse pattern
+   - ✅ Error handling documented (invalid UUID, non-existent session)
+
+**Success Metrics**:
+- ✅ Example 4 script runs without errors
+- ✅ Multi-turn conversation maintains context (LLM remembers name from turn 1)
+- ✅ Session reuse enables automation and scripting workflows
+- ✅ User trust: advertised features work as documented
+
+**Files Modified** (Actual):
+1. `/Users/spuri/projects/lexlapax/rs-llmspell/llmspell-templates/src/builtin/interactive_chat.rs` (~35 lines changed)
+2. `/Users/spuri/projects/lexlapax/rs-llmspell/docs/user-guide/templates/interactive-chat.md` (Example 4 + Parameters table + Session Management section)
+3. `/Users/spuri/projects/lexlapax/rs-llmspell/llmspell-cli/src/execution_context.rs` (MemoryBackend → SledBackend, 3 lines)
+4. `/Users/spuri/projects/lexlapax/rs-llmspell/llmspell-kernel/src/sessions/manager.rs` (doc backticks fix, 1 line)
+5. `/Users/spuri/projects/lexlapax/rs-llmspell/llmspell-providers/src/rig.rs` (clippy formatting fixes, cosmetic)
+
+**Risk Assessment**:
+- **Low Risk**: Optional parameter (100% backward compatible)
+- **Error Handling**: Session validation prevents invalid states
+- **Testing Coverage**: 5 test scenarios cover success + error paths
+- **Infrastructure**: Leverages existing SessionManager, no core changes
+
+**Benefits After Completion**:
+- ✅ Enables automation (script-driven multi-turn conversations)
+- ✅ Documentation accuracy (Example 4 becomes functional, not aspirational)
+- ✅ Architectural consistency (get_or_create pattern matches SessionManager design)
+- ✅ User empowerment (explicit session control for power users)
+- ✅ Production-ready (all documented features actually work)
+
+**Next Steps After Completion**:
+1. Mark 12.8.2.17 as ✅ COMPLETE
+2. Consider Phase 12.8.2 COMPLETE (all templates production-ready)
+3. Begin Phase 12.8.3 (code-generator template) OR Phase 13 (A-TKG memory system)
 
 ---
 

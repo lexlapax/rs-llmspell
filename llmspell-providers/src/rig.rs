@@ -67,7 +67,10 @@ impl RigProvider {
 
                 let client = providers::openai::Client::new(api_key);
                 let model = client.completion_model(&config.model);
-                info!("OpenAI client created successfully for model: {}", config.model);
+                info!(
+                    "OpenAI client created successfully for model: {}",
+                    config.model
+                );
                 RigModel::OpenAI(model)
             }
             "anthropic" => {
@@ -89,18 +92,19 @@ impl RigProvider {
                     client_builder = client_builder.base_url(base_url);
                 }
 
-                let client = client_builder
-                    .build()
-                    .map_err(|e| {
-                        warn!("Failed to create Anthropic client: {}", e);
-                        LLMSpellError::Configuration {
-                            message: format!("Failed to create Anthropic client: {}", e),
-                            source: Some(Box::new(e)),
-                        }
-                    })?;
+                let client = client_builder.build().map_err(|e| {
+                    warn!("Failed to create Anthropic client: {}", e);
+                    LLMSpellError::Configuration {
+                        message: format!("Failed to create Anthropic client: {}", e),
+                        source: Some(Box::new(e)),
+                    }
+                })?;
 
                 let model = client.completion_model(&config.model);
-                info!("Anthropic client created successfully for model: {}", config.model);
+                info!(
+                    "Anthropic client created successfully for model: {}",
+                    config.model
+                );
                 RigModel::Anthropic(model)
             }
             "cohere" => {
@@ -116,7 +120,10 @@ impl RigProvider {
 
                 let client = providers::cohere::Client::new(api_key);
                 let model = client.completion_model(&config.model);
-                info!("Cohere client created successfully for model: {}", config.model);
+                info!(
+                    "Cohere client created successfully for model: {}",
+                    config.model
+                );
                 RigModel::Cohere(model)
             }
             "ollama" => {
@@ -141,7 +148,10 @@ impl RigProvider {
                 RigModel::Ollama(model)
             }
             _ => {
-                warn!("Unsupported provider type requested: {}", config.provider_type);
+                warn!(
+                    "Unsupported provider type requested: {}",
+                    config.provider_type
+                );
                 return Err(LLMSpellError::Configuration {
                     message: format!("Unsupported provider type: {}", config.provider_type),
                     source: None,
@@ -314,7 +324,10 @@ impl RigProvider {
                 })
                 .and_then(|response| {
                     use rig::completion::AssistantContent;
-                    trace!("{} response received, processing variant", self.config.provider_type);
+                    trace!(
+                        "{} response received, processing variant",
+                        self.config.provider_type
+                    );
                     match response.choice.first() {
                         AssistantContent::Text(text) => {
                             debug!(
@@ -327,9 +340,7 @@ impl RigProvider {
                         AssistantContent::ToolCall(call) => {
                             debug!(
                                 "{} returned ToolCall response: function={}, id={}",
-                                self.config.provider_type,
-                                call.function.name,
-                                call.id
+                                self.config.provider_type, call.function.name, call.id
                             );
                             warn!(
                                 "Unexpected tool call in non-tool context: {}",
@@ -370,7 +381,10 @@ impl RigProvider {
                 })
                 .and_then(|response| {
                     use rig::completion::AssistantContent;
-                    trace!("{} response received, processing variant", self.config.provider_type);
+                    trace!(
+                        "{} response received, processing variant",
+                        self.config.provider_type
+                    );
                     match response.choice.first() {
                         AssistantContent::Text(text) => {
                             debug!(
@@ -383,9 +397,7 @@ impl RigProvider {
                         AssistantContent::ToolCall(call) => {
                             debug!(
                                 "{} returned ToolCall response: function={}, id={}",
-                                self.config.provider_type,
-                                call.function.name,
-                                call.id
+                                self.config.provider_type, call.function.name, call.id
                             );
                             warn!(
                                 "Unexpected tool call in non-tool context: {}",
@@ -426,7 +438,10 @@ impl RigProvider {
                 })
                 .and_then(|response| {
                     use rig::completion::AssistantContent;
-                    trace!("{} response received, processing variant", self.config.provider_type);
+                    trace!(
+                        "{} response received, processing variant",
+                        self.config.provider_type
+                    );
                     match response.choice.first() {
                         AssistantContent::Text(text) => {
                             debug!(
@@ -439,9 +454,7 @@ impl RigProvider {
                         AssistantContent::ToolCall(call) => {
                             debug!(
                                 "{} returned ToolCall response: function={}, id={}",
-                                self.config.provider_type,
-                                call.function.name,
-                                call.id
+                                self.config.provider_type, call.function.name, call.id
                             );
                             warn!(
                                 "Unexpected tool call in non-tool context: {}",

@@ -313,24 +313,52 @@ impl SessionManager {
             }
         }
 
+        // Save immediately if auto-persist enabled (for CLI/short-lived processes)
+        if self.config.auto_persist {
+            self.save_session(&session).await?;
+        }
+
         info!("Created new session: {session_id}");
         Ok(session_id)
     }
 
     /// Get an active session
     ///
+    /// If the session is not in `active_sessions` and persistence is enabled,
+    /// attempts to load it from storage.
+    ///
     /// # Errors
     ///
     /// Returns `SessionError::SessionNotFound` if the session does not exist
     pub async fn get_session(&self, session_id: &SessionId) -> Result<Session> {
-        self.active_sessions
-            .read()
-            .await
-            .get(session_id)
-            .cloned()
-            .ok_or_else(|| SessionError::SessionNotFound {
-                id: session_id.to_string(),
-            })
+        // Check active sessions first
+        if let Some(session) = self.active_sessions.read().await.get(session_id).cloned() {
+            return Ok(session);
+        }
+
+        // If not in memory and persistence enabled, try loading from storage
+        if self.config.auto_persist {
+            debug!("Attempting to load session {} from storage", session_id);
+            match self.load_session(session_id).await {
+                Ok(session) => {
+                    // Add to active sessions
+                    self.active_sessions
+                        .write()
+                        .await
+                        .insert(*session_id, session.clone());
+                    info!("Loaded session {} from storage", session_id);
+                    return Ok(session);
+                }
+                Err(e) => {
+                    warn!("Failed to load session {} from storage: {}", session_id, e);
+                    // Fall through to not found error
+                }
+            }
+        }
+
+        Err(SessionError::SessionNotFound {
+            id: session_id.to_string(),
+        })
     }
 
     /// List sessions matching query
@@ -691,12 +719,13 @@ impl SessionManager {
             }
         }
 
-        // Serialize snapshot
+        // Serialize snapshot (using rmp-serde for dynamic type support)
         let data = if self.config.enable_compression {
-            let serialized = bincode::serialize(&snapshot)?;
+            let serialized = rmp_serde::to_vec(&snapshot)
+                .map_err(|e| SessionError::Serialization(e.to_string()))?;
             lz4_flex::compress_prepend_size(&serialized)
         } else {
-            bincode::serialize(&snapshot)?
+            rmp_serde::to_vec(&snapshot).map_err(|e| SessionError::Serialization(e.to_string()))?
         };
 
         // Store in backend
@@ -760,13 +789,15 @@ impl SessionManager {
                 id: session_id.to_string(),
             })?;
 
-        // Deserialize
+        // Deserialize (using rmp-serde for dynamic type support)
         let snapshot: SessionSnapshot = if self.config.enable_compression {
             let decompressed = lz4_flex::decompress_size_prepended(&data)
                 .map_err(|e| SessionError::Deserialization(e.to_string()))?;
-            bincode::deserialize(&decompressed)?
+            rmp_serde::from_slice(&decompressed)
+                .map_err(|e| SessionError::Deserialization(e.to_string()))?
         } else {
-            bincode::deserialize(&data)?
+            rmp_serde::from_slice(&data)
+                .map_err(|e| SessionError::Deserialization(e.to_string()))?
         };
 
         // Check version compatibility

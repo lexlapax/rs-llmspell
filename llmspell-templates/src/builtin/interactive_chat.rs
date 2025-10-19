@@ -122,6 +122,13 @@ impl crate::core::Template for InteractiveChatTemplate {
                 ParameterType::String,
                 json!(null),
             ),
+            // session_id (optional - for session reuse across calls)
+            ParameterSchema::optional(
+                "session_id",
+                "Optional session ID to reuse existing conversation (UUID format). If not provided, creates new session.",
+                ParameterType::String,
+                json!(null),
+            ),
         ])
     }
 
@@ -143,6 +150,7 @@ impl crate::core::Template for InteractiveChatTemplate {
         let tools: Vec<String> = params.get_or("tools", Vec::new());
         let enable_memory: bool = params.get_or("enable_memory", false);
         let message: Option<String> = params.get_optional("message");
+        let session_id_param: Option<String> = params.get_optional("session_id");
 
         info!(
             "Starting interactive chat (model={}, max_turns={}, tools={}, memory={})",
@@ -171,7 +179,9 @@ impl crate::core::Template for InteractiveChatTemplate {
 
         // Phase 1: Create/restore session
         info!("Phase 1: Creating/restoring session...");
-        let session_id = self.get_or_create_session(&context).await?;
+        let session_id = self
+            .get_or_create_session(&context, session_id_param)
+            .await?;
         output.add_metric("session_id", json!(session_id));
 
         // Phase 2: Load tools (if specified)
@@ -270,10 +280,14 @@ impl crate::core::Template for InteractiveChatTemplate {
 
 impl InteractiveChatTemplate {
     /// Phase 1: Get or create session
-    async fn get_or_create_session(&self, context: &ExecutionContext) -> Result<String> {
+    async fn get_or_create_session(
+        &self,
+        context: &ExecutionContext,
+        requested_session_id: Option<String>,
+    ) -> Result<String> {
         use llmspell_kernel::sessions::types::CreateSessionOptions;
-
-        info!("Getting or creating interactive chat session");
+        use llmspell_kernel::sessions::SessionId;
+        use std::str::FromStr;
 
         // Get session manager from context
         let session_manager = context.require_sessions().map_err(|e| {
@@ -281,7 +295,32 @@ impl InteractiveChatTemplate {
             TemplateError::InfrastructureUnavailable("sessions".to_string())
         })?;
 
-        // Create new session with chat-specific metadata
+        // If session_id provided, attempt to reuse existing session
+        if let Some(sid) = requested_session_id {
+            info!("Attempting to reuse existing session: {}", sid);
+
+            // Parse session ID (validate UUID format)
+            let session_id_obj = SessionId::from_str(&sid).map_err(|e| {
+                warn!("Invalid session_id format: {}", e);
+                TemplateError::ExecutionFailed(format!("Invalid session_id format: {}", e))
+            })?;
+
+            // Verify session exists (SessionManager handles auto-load from storage)
+            session_manager
+                .get_session(&session_id_obj)
+                .await
+                .map_err(|e| {
+                    warn!("Session {} not found: {}", sid, e);
+                    TemplateError::ExecutionFailed(format!("Session not found: {}", sid))
+                })?;
+
+            info!("Successfully reusing session: {}", sid);
+            return Ok(sid);
+        }
+
+        // Otherwise create new session
+        info!("Creating new interactive chat session");
+
         let options = CreateSessionOptions::builder()
             .name("Interactive Chat Session")
             .description("Session-based conversational AI with tool integration")
@@ -290,13 +329,12 @@ impl InteractiveChatTemplate {
             .add_tag("template:interactive-chat")
             .build();
 
-        // Create session
         let session_id = session_manager.create_session(options).await.map_err(|e| {
             warn!("Failed to create session: {}", e);
             TemplateError::ExecutionFailed(format!("Session creation failed: {}", e))
         })?;
 
-        info!("Created chat session: {}", session_id);
+        info!("Created new chat session: {}", session_id);
         Ok(session_id.to_string())
     }
 
@@ -1121,7 +1159,7 @@ mod tests {
         let template = InteractiveChatTemplate::new();
         let context = ExecutionContext::builder().build();
         if let Ok(context) = context {
-            let session_id = template.get_or_create_session(&context).await;
+            let session_id = template.get_or_create_session(&context, None).await;
             if let Ok(session_id) = session_id {
                 // New implementation returns UUID, not "chat-" prefix
                 assert!(!session_id.is_empty());
@@ -1204,7 +1242,7 @@ mod tests {
         let template = InteractiveChatTemplate::new();
         let context = ExecutionContext::builder().build();
         if let Ok(context) = context {
-            let session_id = template.get_or_create_session(&context).await.ok();
+            let session_id = template.get_or_create_session(&context, None).await.ok();
             if let Some(session_id) = session_id {
                 // Turn 1
                 let _ = template
