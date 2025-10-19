@@ -231,34 +231,146 @@ impl crate::core::Template for DataAnalysisTemplate {
 impl DataAnalysisTemplate {
     /// Phase 1: Load data from file
     async fn load_data(&self, file_path: &str, _context: &ExecutionContext) -> Result<DataSet> {
-        // TODO: Implement actual data loading using data-loader tool
-        // For now, return placeholder dataset
-        warn!(
-            "Data loading not yet implemented - using placeholder for file: {}",
-            file_path
-        );
+        use std::fs;
+        use std::path::Path;
 
-        // Mock dataset based on file extension
-        let extension = std::path::Path::new(file_path)
+        info!("Loading data from file: {}", file_path);
+
+        // Check if file exists
+        if !Path::new(file_path).exists() {
+            return Err(TemplateError::ExecutionFailed(format!(
+                "Data file not found: {}",
+                file_path
+            )));
+        }
+
+        // Determine file format from extension
+        let extension = Path::new(file_path)
             .extension()
             .and_then(|e| e.to_str())
-            .unwrap_or("csv");
+            .unwrap_or("txt");
+
+        // Read file contents
+        let contents = fs::read_to_string(file_path).map_err(|e| {
+            TemplateError::ExecutionFailed(format!("Failed to read file {}: {}", file_path, e))
+        })?;
+
+        // Parse based on format
+        let (rows, columns, preview) = match extension {
+            "csv" | "tsv" => self.parse_csv_data(&contents, extension)?,
+            "json" => self.parse_json_data(&contents)?,
+            _ => {
+                // Fallback: treat as plain text data
+                warn!("Unknown format '{}', treating as plain text", extension);
+                let lines: Vec<&str> = contents.lines().collect();
+                let preview = if lines.len() > 10 {
+                    format!(
+                        "# Data Preview (text)\n\n{}\n...\n({} more lines)",
+                        lines[..10].join("\n"),
+                        lines.len() - 10
+                    )
+                } else {
+                    format!("# Data Preview (text)\n\n{}", contents)
+                };
+                (lines.len(), 1, preview)
+            }
+        };
+
+        info!(
+            "Data loaded successfully: {} rows x {} columns ({})",
+            rows, columns, extension
+        );
 
         Ok(DataSet {
-            rows: 100,
-            columns: 5,
+            rows,
+            columns,
             format: extension.to_string(),
-            preview: format!(
-                "# Data Preview ({})\n\n\
-                 [Placeholder data from {}]\n\n\
-                 Columns: column_1, column_2, column_3, column_4, column_5\n\
-                 Sample rows:\n\
-                   Row 1: value_1_1, value_1_2, value_1_3, value_1_4, value_1_5\n\
-                   Row 2: value_2_1, value_2_2, value_2_3, value_2_4, value_2_5\n\
-                   ...\n",
-                extension, file_path
-            ),
+            preview,
         })
+    }
+
+    /// Parse CSV/TSV data (simple implementation without external crates)
+    fn parse_csv_data(&self, contents: &str, format: &str) -> Result<(usize, usize, String)> {
+        let delimiter = if format == "tsv" { '\t' } else { ',' };
+
+        let lines: Vec<&str> = contents.lines().filter(|l| !l.trim().is_empty()).collect();
+
+        if lines.is_empty() {
+            return Err(TemplateError::ExecutionFailed("Empty CSV file".to_string()));
+        }
+
+        // Parse header (first line)
+        let header: Vec<&str> = lines[0].split(delimiter).map(|s| s.trim()).collect();
+        let columns = header.len();
+
+        // Count data rows (excluding header)
+        let rows = lines.len() - 1;
+
+        // Create preview with header + first 5 data rows
+        let preview_lines = if lines.len() > 6 {
+            &lines[..6]
+        } else {
+            &lines[..]
+        };
+
+        let preview = format!(
+            "# Data Preview ({})\n\n\
+             Columns: {}\n\
+             Rows: {}\n\n\
+             {}\n\
+             {}",
+            format,
+            header.join(", "),
+            rows,
+            preview_lines.join("\n"),
+            if lines.len() > 6 {
+                format!("... ({} more rows)", rows - 5)
+            } else {
+                String::new()
+            }
+        );
+
+        Ok((rows, columns, preview))
+    }
+
+    /// Parse JSON data (simple implementation)
+    fn parse_json_data(&self, contents: &str) -> Result<(usize, usize, String)> {
+        // Try to parse as JSON value
+        let json_value: serde_json::Value = serde_json::from_str(contents)
+            .map_err(|e| TemplateError::ExecutionFailed(format!("Failed to parse JSON: {}", e)))?;
+
+        let (rows, columns) = match &json_value {
+            serde_json::Value::Array(arr) => {
+                // Array of objects
+                let row_count = arr.len();
+                let col_count = if let Some(serde_json::Value::Object(obj)) = arr.first() {
+                    obj.len()
+                } else {
+                    1
+                };
+                (row_count, col_count)
+            }
+            serde_json::Value::Object(obj) => {
+                // Single object
+                (1, obj.len())
+            }
+            _ => (1, 1),
+        };
+
+        // Create preview
+        let preview_text =
+            serde_json::to_string_pretty(&json_value).unwrap_or_else(|_| contents.to_string());
+
+        let preview = if preview_text.len() > 500 {
+            format!(
+                "# Data Preview (json)\n\n{}...\n(truncated)",
+                &preview_text[..500]
+            )
+        } else {
+            format!("# Data Preview (json)\n\n{}", preview_text)
+        };
+
+        Ok((rows, columns, preview))
     }
 
     /// Phase 2: Run statistical analysis with analyzer agent
@@ -266,83 +378,151 @@ impl DataAnalysisTemplate {
         &self,
         dataset: &DataSet,
         analysis_type: &str,
-        _model: &str,
-        _context: &ExecutionContext,
+        model: &str,
+        context: &ExecutionContext,
     ) -> Result<AnalysisResult> {
-        // TODO: Implement actual agent-based analysis
-        // For now, return placeholder analysis
-        warn!(
-            "Statistical analysis not yet implemented - using placeholder for type: {}",
+        use llmspell_agents::factory::{AgentConfig, ModelConfig, ResourceLimits};
+        use llmspell_core::types::AgentInput;
+
+        info!(
+            "Creating statistical analysis agent (type: {})",
             analysis_type
         );
 
-        let analysis_text = match analysis_type {
-            "descriptive" => format!(
-                "# Descriptive Statistics Analysis\n\n\
-                 ## Dataset Summary\n\
-                 - Total Rows: {}\n\
-                 - Total Columns: {}\n\
-                 - Format: {}\n\n\
-                 ## Statistical Measures (Placeholder)\n\
-                 - Mean: 45.2\n\
-                 - Median: 42.0\n\
-                 - Std Dev: 12.3\n\
-                 - Min: 10.0\n\
-                 - Max: 95.0\n\n\
-                 ## Key Insights\n\
-                 - Data distribution appears roughly normal\n\
-                 - No significant outliers detected\n\
-                 - Correlation between column_1 and column_2: 0.75\n",
-                dataset.rows, dataset.columns, dataset.format
-            ),
-            "correlation" => format!(
-                "# Correlation Analysis\n\n\
-                 ## Correlation Matrix (Placeholder)\n\
-                 - column_1 ↔ column_2: 0.75 (strong positive)\n\
-                 - column_1 ↔ column_3: -0.32 (weak negative)\n\
-                 - column_2 ↔ column_3: 0.15 (very weak positive)\n\n\
-                 Dataset: {} rows, {} columns\n",
-                dataset.rows, dataset.columns
-            ),
-            "regression" => format!(
-                "# Regression Analysis\n\n\
-                 ## Linear Regression Model (Placeholder)\n\
-                 - R²: 0.82\n\
-                 - Adjusted R²: 0.80\n\
-                 - P-value: < 0.001 (significant)\n\
-                 - Coefficients: β₀=12.5, β₁=3.2\n\n\
-                 Dataset: {} rows, {} columns\n",
-                dataset.rows, dataset.columns
-            ),
-            "timeseries" => format!(
-                "# Time Series Analysis\n\n\
-                 ## Trend Analysis (Placeholder)\n\
-                 - Overall trend: Upward\n\
-                 - Seasonality: Detected (period=7)\n\
-                 - Autocorrelation: 0.68\n\n\
-                 Dataset: {} rows, {} columns\n",
-                dataset.rows, dataset.columns
-            ),
-            "clustering" => format!(
-                "# Clustering Analysis\n\n\
-                 ## K-Means Clustering (Placeholder)\n\
-                 - Optimal clusters: 3\n\
-                 - Silhouette score: 0.72\n\
-                 - Cluster sizes: 35, 42, 23\n\n\
-                 Dataset: {} rows, {} columns\n",
-                dataset.rows, dataset.columns
-            ),
-            _ => format!(
-                "# Custom Analysis: {}\n\n\
-                 Dataset: {} rows, {} columns\n\
-                 [Placeholder analysis results]\n",
-                analysis_type, dataset.rows, dataset.columns
-            ),
+        // Parse model string (provider/model format)
+        let (provider, model_id) = if let Some(slash_pos) = model.find('/') {
+            (
+                model[..slash_pos].to_string(),
+                model[slash_pos + 1..].to_string(),
+            )
+        } else {
+            ("ollama".to_string(), model.to_string())
         };
+
+        // Create agent config for statistical analysis
+        let agent_config = AgentConfig {
+            name: "data-analyst-agent".to_string(),
+            description: format!("Statistical analysis agent for {} analysis", analysis_type),
+            agent_type: "llm".to_string(),
+            model: Some(ModelConfig {
+                provider,
+                model_id,
+                temperature: Some(0.4), // Balanced for analytical reasoning
+                max_tokens: Some(2000),
+                settings: serde_json::Map::new(),
+            }),
+            allowed_tools: vec![],
+            custom_config: serde_json::Map::new(),
+            resource_limits: ResourceLimits {
+                max_execution_time_secs: 120,
+                max_memory_mb: 512,
+                max_tool_calls: 0,
+                max_recursion_depth: 1,
+            },
+        };
+
+        // Create the agent
+        let agent = context
+            .agent_registry()
+            .create_agent(agent_config)
+            .await
+            .map_err(|e| {
+                warn!("Failed to create analysis agent: {}", e);
+                TemplateError::ExecutionFailed(format!("Agent creation failed: {}", e))
+            })?;
+
+        // Build analysis instructions based on type
+        let analysis_instructions = match analysis_type {
+            "descriptive" => {
+                "Provide descriptive statistics including:\n\
+                - Central tendency measures (mean, median, mode)\n\
+                - Dispersion measures (std dev, variance, range)\n\
+                - Distribution characteristics\n\
+                - Data quality observations (outliers, missing values)"
+            }
+            "correlation" => {
+                "Analyze correlations between variables:\n\
+                - Correlation coefficients between all variable pairs\n\
+                - Strength and direction of relationships\n\
+                - Statistical significance\n\
+                - Interpretation of findings"
+            }
+            "regression" => {
+                "Perform regression analysis:\n\
+                - Model fit statistics (R², adjusted R²)\n\
+                - Coefficients and their significance\n\
+                - Residual analysis\n\
+                - Predictive insights"
+            }
+            "timeseries" => {
+                "Analyze time series patterns:\n\
+                - Trend identification\n\
+                - Seasonality detection\n\
+                - Autocorrelation patterns\n\
+                - Forecasting insights"
+            }
+            "clustering" => {
+                "Perform clustering analysis:\n\
+                - Optimal number of clusters\n\
+                - Cluster characteristics\n\
+                - Quality metrics (silhouette score, inertia)\n\
+                - Pattern interpretation"
+            }
+            _ => "Perform comprehensive data analysis with appropriate statistical methods",
+        };
+
+        // Build the analysis prompt with data context
+        let analysis_prompt = format!(
+            "You are an expert data analyst. Analyze the following dataset using {} analysis methods.\n\n\
+             **DATASET INFORMATION**:\n\
+             - Rows: {}\n\
+             - Columns: {}\n\
+             - Format: {}\n\n\
+             **DATA PREVIEW**:\n{}\n\n\
+             **ANALYSIS TYPE**: {}\n\n\
+             **INSTRUCTIONS**:\n{}\n\n\
+             **REQUIREMENTS**:\n\
+             1. Base your analysis on the data preview shown above\n\
+             2. Provide specific numerical insights where possible\n\
+             3. Identify patterns, trends, and anomalies\n\
+             4. Explain statistical significance of findings\n\
+             5. Offer actionable insights for decision-making\n\
+             6. Structure your report with clear sections and bullet points\n\n\
+             Generate a comprehensive statistical analysis report now:",
+            analysis_type,
+            dataset.rows,
+            dataset.columns,
+            dataset.format,
+            dataset.preview,
+            analysis_type,
+            analysis_instructions
+        );
+
+        // Execute the agent
+        info!("Executing statistical analysis agent...");
+        let agent_input = AgentInput::builder().text(analysis_prompt).build();
+        let agent_output = agent
+            .execute(agent_input, llmspell_core::ExecutionContext::default())
+            .await
+            .map_err(|e| {
+                warn!("Analysis agent execution failed: {}", e);
+                TemplateError::ExecutionFailed(format!("Agent execution failed: {}", e))
+            })?;
+
+        // Extract analysis text
+        let analysis_text = agent_output.text;
+
+        info!(
+            "Statistical analysis complete ({} characters)",
+            analysis_text.len()
+        );
 
         Ok(AnalysisResult {
             text: analysis_text,
-            metrics: vec![("rows".to_string(), dataset.rows as f64)],
+            metrics: vec![
+                ("rows".to_string(), dataset.rows as f64),
+                ("columns".to_string(), dataset.columns as f64),
+            ],
         })
     }
 
@@ -350,75 +530,165 @@ impl DataAnalysisTemplate {
     async fn generate_chart(
         &self,
         dataset: &DataSet,
-        _analysis: &AnalysisResult,
+        analysis: &AnalysisResult,
         chart_type: &str,
-        _model: &str,
-        _context: &ExecutionContext,
+        model: &str,
+        context: &ExecutionContext,
     ) -> Result<ChartResult> {
-        // TODO: Implement actual chart generation with visualizer agent
-        // For now, return placeholder chart description
-        warn!(
-            "Chart generation not yet implemented - using placeholder for type: {}",
-            chart_type
+        use llmspell_agents::factory::{AgentConfig, ModelConfig, ResourceLimits};
+        use llmspell_core::types::AgentInput;
+
+        info!("Creating visualization agent (type: {})", chart_type);
+
+        // Parse model parameter
+        let (provider, model_id) = if let Some(slash_pos) = model.find('/') {
+            (
+                model[..slash_pos].to_string(),
+                model[slash_pos + 1..].to_string(),
+            )
+        } else {
+            ("ollama".to_string(), model.to_string())
+        };
+
+        // Create visualizer agent config
+        let agent_config = AgentConfig {
+            name: "data-visualizer-agent".to_string(),
+            description: format!("Visualization agent for {} chart generation", chart_type),
+            agent_type: "llm".to_string(),
+            model: Some(ModelConfig {
+                provider,
+                model_id,
+                temperature: Some(0.5), // Creative for chart design
+                max_tokens: Some(2000),
+                settings: serde_json::Map::new(),
+            }),
+            allowed_tools: vec![],
+            custom_config: serde_json::Map::new(),
+            resource_limits: ResourceLimits {
+                max_execution_time_secs: 120,
+                max_memory_mb: 512,
+                max_tool_calls: 0,
+                max_recursion_depth: 1,
+            },
+        };
+
+        // Create the agent
+        let agent = context
+            .agent_registry()
+            .create_agent(agent_config)
+            .await
+            .map_err(|e| {
+                warn!("Failed to create visualizer agent: {}", e);
+                TemplateError::ExecutionFailed(format!("Agent creation failed: {}", e))
+            })?;
+
+        // Build visualization prompt with chart type-specific instructions
+        let viz_instructions = match chart_type {
+            "bar" => {
+                "Create a text-based BAR CHART showing:\n\
+                - Horizontal bars with ASCII characters (█ for full blocks)\n\
+                - Labels for each category\n\
+                - Scale/legend showing value ranges\n\
+                - Title and axis labels"
+            }
+            "line" => {
+                "Create a text-based LINE CHART showing:\n\
+                - Trend line using ASCII characters (*, -, |)\n\
+                - X-axis (time/sequence) and Y-axis (values)\n\
+                - Data points marked clearly\n\
+                - Title and axis labels"
+            }
+            "scatter" => {
+                "Create a text-based SCATTER PLOT showing:\n\
+                - Points plotted using * or • characters\n\
+                - X and Y axes with scale markers\n\
+                - Relationship between two variables\n\
+                - Title and axis labels"
+            }
+            "histogram" => {
+                "Create a text-based HISTOGRAM showing:\n\
+                - Vertical bars representing frequency bins\n\
+                - ASCII characters (█, ▓, ▒, ░) for bar heights\n\
+                - Bin ranges on X-axis\n\
+                - Frequency counts on Y-axis"
+            }
+            "heatmap" => {
+                "Create a text-based HEATMAP showing:\n\
+                - Grid of values with color/shade indicators\n\
+                - Characters representing intensity (█ ▓ ▒ ░ ·)\n\
+                - Row and column labels\n\
+                - Legend explaining intensity mapping"
+            }
+            "box" => {
+                "Create a text-based BOX PLOT showing:\n\
+                - Box-and-whisker diagram using ASCII (├─┼─┤)\n\
+                - Median line, quartile boxes, whiskers\n\
+                - Outliers marked with ○\n\
+                - Labels for each variable"
+            }
+            _ => {
+                "Create a text-based CHART showing:\n\
+                - Clear visual representation of the data\n\
+                - ASCII characters for visualization\n\
+                - Title, labels, and legend"
+            }
+        };
+
+        let viz_prompt = format!(
+            "You are an expert data visualizer. Generate a text-based visualization for the following dataset.\n\n\
+             **DATASET INFORMATION**:\n\
+             - Rows: {}\n\
+             - Columns: {}\n\
+             - Format: {}\n\n\
+             **DATA PREVIEW**:\n{}\n\n\
+             **STATISTICAL ANALYSIS RESULTS**:\n{}\n\n\
+             **CHART TYPE**: {}\n\n\
+             **INSTRUCTIONS**:\n{}\n\n\
+             **OUTPUT REQUIREMENTS**:\n\
+             - Generate actual ASCII-based chart (not just a description)\n\
+             - Use box-drawing characters and block elements for visual appeal\n\
+             - Include title, axis labels, and legend\n\
+             - Make the chart readable and informative\n\
+             - Width should be 60-80 characters max for terminal display\n\
+             - Height should be 15-25 lines for readability\n",
+            dataset.rows,
+            dataset.columns,
+            dataset.format,
+            dataset.preview,
+            analysis.text,
+            chart_type,
+            viz_instructions
         );
 
-        let chart_description = match chart_type {
-            "bar" => format!(
-                "Bar Chart ({} x {})\n\
-                 - X-axis: Categories (columns)\n\
-                 - Y-axis: Values\n\
-                 - Shows distribution across {} columns\n",
-                dataset.columns, dataset.rows, dataset.columns
-            ),
-            "line" => format!(
-                "Line Chart ({} points)\n\
-                 - X-axis: Sequential index\n\
-                 - Y-axis: Value\n\
-                 - Shows trend over {} data points\n",
-                dataset.rows, dataset.rows
-            ),
-            "scatter" => format!(
-                "Scatter Plot ({} points)\n\
-                 - X-axis: column_1\n\
-                 - Y-axis: column_2\n\
-                 - Shows relationship between two variables\n",
-                dataset.rows
-            ),
-            "histogram" => format!(
-                "Histogram ({} bins)\n\
-                 - X-axis: Value ranges\n\
-                 - Y-axis: Frequency\n\
-                 - Shows distribution of values\n",
-                (dataset.rows as f64).sqrt().ceil() as usize
-            ),
-            "heatmap" => format!(
-                "Heatmap ({} x {})\n\
-                 - Rows: {} data points\n\
-                 - Columns: {} variables\n\
-                 - Color intensity represents values\n",
-                dataset.rows, dataset.columns, dataset.rows, dataset.columns
-            ),
-            "box" => format!(
-                "Box Plot ({} variables)\n\
-                 - Shows quartiles, median, and outliers\n\
-                 - Useful for distribution comparison\n",
-                dataset.columns
-            ),
-            _ => format!(
-                "Custom Chart: {}\n\
-                 Dataset: {} rows x {} columns\n",
-                chart_type, dataset.rows, dataset.columns
-            ),
-        };
+        // Execute the agent
+        info!("Executing visualization agent...");
+        let agent_input = AgentInput::builder().text(viz_prompt).build();
+        let agent_output = agent
+            .execute(agent_input, llmspell_core::ExecutionContext::default())
+            .await
+            .map_err(|e| {
+                warn!("Visualizer agent execution failed: {}", e);
+                TemplateError::ExecutionFailed(format!("Agent execution failed: {}", e))
+            })?;
+
+        // Extract chart from agent output
+        let chart_content = agent_output.text;
+
+        info!(
+            "Visualization complete ({} characters)",
+            chart_content.len()
+        );
+
+        // Build chart description from visualization
+        let description = format!(
+            "{} Chart\nDataset: {} rows x {} columns\nFormat: {}",
+            chart_type, dataset.rows, dataset.columns, dataset.format
+        );
 
         Ok(ChartResult {
             chart_type: chart_type.to_string(),
-            description: chart_description,
-            chart_data: format!(
-                "[Placeholder {} chart data for visualization]\n\
-                 In production, this would be actual chart image or data",
-                chart_type
-            ),
+            description,
+            chart_data: chart_content,
         })
     }
 
@@ -442,9 +712,15 @@ impl DataAnalysisTemplate {
              ---\n\n\
              ## Visualization\n\n\
              {}\n\n\
+             {}\n\n\
              ---\n\n\
              Generated by LLMSpell Data Analysis Template\n",
-            data_file, analysis_type, chart_type, analysis.text, chart.description
+            data_file,
+            analysis_type,
+            chart_type,
+            analysis.text,
+            chart.description,
+            chart.chart_data
         )
     }
 
