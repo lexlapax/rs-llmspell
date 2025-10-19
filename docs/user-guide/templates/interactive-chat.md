@@ -20,7 +20,7 @@ Production-ready conversational AI template with two execution modes: **interact
 
 - Interactive CLI chatbots and REPL interfaces
 - Scripted single-message Q&A automation
-- Customer support agents with tool access (calculator, web-search, etc.)
+- Customer support agents with tool access (calculator, web-searcher, etc.)
 - Technical documentation assistants
 - Multi-turn conversational workflows with session persistence
 
@@ -37,7 +37,7 @@ Production-ready conversational AI template with two execution modes: **interact
 # With custom model and tools
 ./target/debug/llmspell template exec interactive-chat \
   --param model=ollama/mistral:7b \
-  --param tools='["calculator", "web-search"]'
+  --param tools='["calculator", "web-searcher"]'
 ```
 
 ### CLI - Programmatic Mode (Single Message)
@@ -76,7 +76,7 @@ print(result.result)
 | `model` | String | `"ollama/llama3.2:3b"` | LLM model specification. Format: `provider/model-id`<br>Examples: `ollama/llama3.2:3b`, `anthropic/claude-3-7-sonnet-latest`, `openai/gpt-5-mini` |
 | `system_prompt` | String | `"You are a helpful AI assistant..."` | System instructions defining AI behavior and personality |
 | `max_turns` | Integer | `10` | Maximum conversation turns (range: 1-100). Enforced in interactive mode only |
-| `tools` | Array | `[]` | Tool names to enable (e.g., `["calculator", "web-search"]`). Tools validated via ToolRegistry before agent creation |
+| `tools` | Array | `[]` | Tool names to enable (e.g., `["calculator", "web-searcher"]`). Tools validated via ToolRegistry before agent creation |
 | `enable_memory` | Boolean | `false` | Long-term memory integration (Phase 13 placeholder - not yet active) |
 
 **Inspect Full Schema:**
@@ -247,10 +247,10 @@ Returns after conversation ends with full transcript:
 
 #### 3. With Tools Integration
 ```bash
-# Interactive chat with calculator and web-search
+# Interactive chat with calculator and web-searcher
 ./target/debug/llmspell template exec interactive-chat \
   --param model=ollama/llama3.2:3b \
-  --param tools='["calculator", "web-search"]'
+  --param tools='["calculator", "web-searcher"]'
 
 # Programmatic with tools
 ./target/debug/llmspell template exec interactive-chat \
@@ -259,17 +259,20 @@ Returns after conversation ends with full transcript:
   --param tools='["calculator"]'
 ```
 
-#### 4. Multi-Turn Context (Programmatic)
+#### 4. Multi-Turn Context (Interactive Mode)
 ```bash
-# Session auto-created on first call, persisted for subsequent calls
-# Turn 1
-SESSION_ID=$(./target/debug/llmspell template exec interactive-chat \
-  --param message="My name is Alice" | jq -r '.metrics.session_id')
+# Interactive mode maintains conversation history across turns
+./target/debug/llmspell template exec interactive-chat
 
-# Turn 2 - reuses same session (remembers context)
-./target/debug/llmspell template exec interactive-chat \
-  --param message="What's my name?" \
-  # AI response will reference "Alice" from conversation history
+# Example session demonstrating context persistence:
+# You> My name is Alice
+# Assistant> Nice to meet you, Alice! How can I help you today?
+#
+# You> What's my name?
+# Assistant> Your name is Alice.
+#
+# You> exit
+# [Session ends with full conversation history saved]
 ```
 
 ### Lua Examples
@@ -303,7 +306,7 @@ local turn2 = Template.execute("interactive-chat", {
 ```lua
 local result = Template.execute("interactive-chat", {
     message = "Calculate 25 * 17 and search for Rust async tutorials",
-    tools = {"calculator", "web-search"}
+    tools = {"calculator", "web-searcher"}
 })
 
 print(result.result)
