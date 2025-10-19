@@ -1400,6 +1400,7 @@ impl ScriptExecutor for ScriptRuntime {
                 "agents_invoked": output.metrics.agents_invoked,
                 "tools_invoked": output.metrics.tools_invoked,
                 "rag_queries": output.metrics.rag_queries,
+                "custom_metrics": output.metrics.custom_metrics,
             }
         }))
     }

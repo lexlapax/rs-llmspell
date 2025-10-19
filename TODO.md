@@ -6136,10 +6136,529 @@ With 12.8.2.15 complete, interactive-chat template achieves:
 
 **Next Steps After Completion**:
 1. Mark 12.8.2.15 as ✅ COMPLETE
-2. Create 12.8.2.16 for documentation updates
-3. Update interactive-chat.md with reasoning model guidance
+2. Create 12.8.2.16 for --output json CLI architecture fix
+3. Create 12.8.2.17 for documentation updates (reasoning model guidance + interactive-chat.md fixes)
 4. Consider Phase 12.8.2 COMPLETE (all subtasks done)
 5. Begin Phase 12.8.3 (code-generator template) OR Phase 13 planning
+
+---
+
+#### Sub-Task 12.8.2.16: Fix --output json CLI Architecture Gap in `template exec`
+
+**Priority**: HIGH (User-Hostile Inconsistency, Blocks Scripting/Automation)
+**Time**: 15 minutes (Trivial 10-line fix)
+**Status**: ✅ COMPLETE
+
+**Problem**: The `--output json` flag is globally available across all llmspell CLI commands but is **completely ignored** by the `template exec` handler, creating a user-hostile inconsistency. Users expect JSON output when using `--output json`, but receive text output with no warning or error. This silently breaks automation, jq piping, and Example 4 in interactive-chat.md documentation.
+
+**User Impact Scenario**:
+```bash
+# User tries Example 4 from docs (expecting JSON for session_id extraction)
+$ SESSION_ID=$(./target/debug/llmspell template exec interactive-chat \
+    --param message="My name is Alice" \
+    --output json | jq -r '.metrics.session_id')
+
+# ACTUAL BEHAVIOR:
+# - Flag accepted without warning ✅
+# - Kernel returns full JSON to CLI ✅
+# - CLI ignores output_format parameter ❌
+# - CLI hardcodes text formatting ❌
+# - jq parse error: "Invalid numeric literal at line 2, column 4" ❌
+
+# Expected: Valid JSON with extractable session_id
+# Actual: Text output causes jq to fail
+```
+
+**Root Cause Analysis** (Ultrathink):
+
+**The Architectural Inconsistency**:
+
+```
+CLI Command Architecture Overview:
+├─ llmspell exec --output json         ✅ Works (56 lines, match output_format)
+├─ llmspell run --output json          ✅ Works (similar pattern)
+├─ llmspell state show --output json   ✅ Works (77 lines, match output_format)
+├─ llmspell state clear --output json  ✅ Works (91 lines, match output_format)
+├─ llmspell session list --output json ✅ Works (match output_format)
+├─ llmspell config show --output json  ✅ Works (match output_format)
+├─ llmspell template list --output json    ✅ Works (81-86 lines, OutputFormatter)
+├─ llmspell template info --output json    ✅ Works (159-161 lines, OutputFormatter)
+├─ llmspell template search --output json  ✅ Works (452-454 lines, OutputFormatter)
+├─ llmspell template schema --output json  ✅ Works (507-512 lines, OutputFormatter)
+└─ llmspell template exec --output json    ❌ BROKEN (222-419 lines, IGNORES FLAG)
+```
+
+**Failure Chain** (llmspell-cli/src/commands/template.rs):
+
+```rust
+// Line 17-21: Function signature includes output_format
+async fn handle_template_embedded(
+    command: TemplateCommands,
+    mut handle: Box<llmspell_kernel::api::KernelHandle>,
+    _config: Box<LLMSpellConfig>,
+    output_format: OutputFormat,  // ← PARAMETER PASSED IN
+) -> Result<()> {
+
+    // Lines 222-253: Template exec handler begins
+    TemplateCommands::Exec { name, params, output_dir } => {
+        // Line 246: Kernel returns COMPLETE JSON
+        let response = handle.send_template_request(request_content).await?;
+
+        // Line 250-252: Check for errors (works correctly)
+        if let Some(error) = response.get("error") {
+            return Err(anyhow!("Template execution error: {}", error));
+        }
+
+        // ❌ CRITICAL GAP: output_format NEVER CHECKED
+        // Lines 254-418: 165 lines of hardcoded text formatting
+
+        // Line 255-259: Hardcoded text header
+        println!("\n✓ Template execution completed in {:.2}s", ...);
+        println!("{}", "=".repeat(80));
+
+        // Lines 261-313: Manual text extraction from JSON
+        if let Some(result) = response.get("result") {
+            match result_type {
+                "text" => println!("\nResult:\n{}", text),
+                "structured" => println!("\nResult (JSON):\n{}", ...),
+                "file" => println!("\nResult file: {}", path),
+                "multiple" => println!("\nMultiple results..."),
+            }
+        }
+
+        // Lines 316-387: Manual artifact text formatting
+        if let Some(artifacts) = response.get("artifacts") { ... }
+
+        // Lines 389-416: Manual metrics text formatting
+        if let Some(metrics) = response.get("metrics") { ... }
+
+        // Line 418: Return (no JSON ever output)
+        Ok(())
+    }
+
+    // Lines 422-486: Other template commands DO check output_format ✅
+    TemplateCommands::List { category, format } => {
+        let fmt = format.unwrap_or(output_format);  // ← USES PARAMETER
+        match fmt {
+            OutputFormat::Json => formatter.print_json(...),
+            OutputFormat::Text | OutputFormat::Pretty => { /* text output */ }
+        }
+    }
+}
+```
+
+**Kernel JSON Structure** (What's Available but Unused):
+
+The kernel at line 246 returns this complete JSON via `handle.send_template_request()`:
+
+```json
+{
+  "msg_type": "template_reply",
+  "content": {
+    "status": "ok",
+    "result": {
+      "type": "text",           // TemplateResult enum variant
+      "value": "..."            // Actual response content
+    },
+    "artifacts": [
+      {
+        "filename": "conversation-{session_id}.txt",
+        "content": "...",
+        "mime_type": "text/plain",
+        "metadata": {}
+      }
+    ],
+    "metrics": {
+      "duration_ms": 1234,
+      "tokens_used": 428,
+      "cost_usd": 0.0021,
+      "agents_invoked": 1,
+      "tools_invoked": 0,
+      "rag_queries": 0,
+      "custom_metrics": {
+        "session_id": "550e8400-e29b-41d4-a716-446655440000",
+        "turn_count": 1,
+        "total_tokens": 428
+      }
+    },
+    "metadata": {
+      "template_id": "interactive-chat",
+      "template_version": "0.1.0",
+      "executed_at": "2025-10-19T04:00:00Z",
+      "parameters": {
+        "message": "My name is Alice",
+        "model": "ollama/llama3.2:3b"
+      }
+    }
+  }
+}
+```
+
+**Source**: llmspell-kernel/src/execution/integrated.rs:2647-2663 (kernel constructs this)
+**Destination**: llmspell-cli/src/commands/template.rs:246 (CLI receives as serde_json::Value)
+**Current Usage**: CLI manually extracts fields for text formatting
+**Missing**: Check `output_format` and print JSON when requested
+
+**Why This Happened** (Historical Context):
+
+1. **Implementation Timeline**:
+   - `template exec` implemented first (before --output json standardization)
+   - Complex text formatting logic written inline (197 lines)
+   - Other commands added later, using standardized pattern
+   - No refactoring pass to align template exec with new pattern
+
+2. **Code Volume Deterrent**:
+   - 197 lines of text formatting creates psychological barrier to refactoring
+   - Developers add new commands using new pattern, don't touch old code
+   - Technical debt accumulates
+
+3. **Lack of Integration Tests**:
+   - No CI test verifying `--output json` works across all commands
+   - Bug unnoticed until user testing (Example 4 documentation failure)
+
+**Strategic Impact**:
+
+**User Experience**:
+- ❌ Violates Principle of Least Surprise (flag accepted, behavior unchanged)
+- ❌ Silent failure (no warning when flag ignored)
+- ❌ Inconsistent CLI interface (all other commands work correctly)
+- ❌ Breaks automation/scripting (jq, shell scripts, CI/CD pipelines)
+- ❌ Documentation lies (Example 4 claims JSON output works)
+
+**Developer Experience**:
+- ❌ Code duplication (197 lines vs ~10 lines for other commands)
+- ❌ Maintenance burden (two code paths to maintain)
+- ❌ Bug magnet (manual JSON field extraction prone to errors)
+
+**Phase 12.8.2 Goals**:
+- Production-ready interactive-chat template ⚠️ (not production-ready with broken CLI)
+- User-friendly automation ❌ (scripting broken without JSON output)
+- Documentation accuracy ❌ (Example 4 doesn't work as written)
+
+**Solution: Minimal 10-Line Fix** (Option A from Analysis):
+
+**File**: `llmspell-cli/src/commands/template.rs`
+**Line**: 253 (immediately after error check, before text formatting)
+**Impact**: Zero breaking changes (default remains text)
+
+**Code Addition**:
+```rust
+// Line 249-252: Existing error check
+if let Some(error) = response.get("error") {
+    return Err(anyhow!("Template execution error: {}", error));
+}
+
+// ← INSERT HERE (10 lines)
+// Check output format BEFORE text formatting
+match output_format {
+    OutputFormat::Json => {
+        // Print complete kernel response as JSON (all fields preserved)
+        let formatter = OutputFormatter::new(OutputFormat::Json);
+        formatter.print_json(&response)?;
+        return Ok(());  // Early return, skip text formatting
+    }
+    OutputFormat::Text | OutputFormat::Pretty => {
+        // Continue with existing text formatting (lines 255-418)
+    }
+}
+
+// Line 255-418: Existing text formatting (unchanged, wrapped in match arm)
+println!("\n✓ Template execution completed in {:.2}s", ...);
+```
+
+**Why This Works**:
+
+1. **Early Return Pattern**:
+   - JSON path: Extract `response` → print JSON → return
+   - Text path: Fall through to existing 165-line formatting logic
+   - No duplication, no deletions required
+
+2. **Preserves All Data**:
+   - JSON output includes: result, artifacts, metrics, metadata
+   - Users can extract: `.metrics.session_id`, `.result.value`, `.artifacts[0].filename`
+   - No information loss vs text output
+
+3. **Backward Compatible**:
+   - Default (no flag): text output (unchanged)
+   - Explicit `--output text`: text output (unchanged)
+   - Explicit `--output json`: JSON output (NEW, expected behavior)
+   - Zero risk to existing users
+
+4. **Consistent with Codebase**:
+   - Same pattern as `exec`, `state`, `session` commands
+   - Uses existing `OutputFormatter` utility (DRY principle)
+   - Aligns with CLI architecture conventions
+
+**Alternatives Considered and Rejected**:
+
+❌ **Option B: Remove --output Flag from Global Options**
+```rust
+// Remove --output from template subcommand entirely
+```
+- **Problem**: User confusion ("why doesn't this command have the flag?")
+- **Problem**: Inconsistent CLI (other commands have it)
+- **Problem**: Breaks existing users who try to use flag (even if it's broken now)
+- **Verdict**: Breaking change, worse user experience
+
+❌ **Option C: Add Warning Message**
+```rust
+if output_format == OutputFormat::Json {
+    eprintln!("Warning: --output json not yet supported for template exec");
+}
+// ... continue with text formatting
+```
+- **Problem**: Acknowledges the bug but doesn't fix it
+- **Problem**: Users still confused ("when will it be supported?")
+- **Problem**: Technical debt remains
+- **Verdict**: Band-aid, not a solution
+
+❌ **Option D: Major Refactoring** (Extract formatting to separate function)
+```rust
+fn format_template_response(response: &Value, format: OutputFormat) -> Result<String> {
+    // 200+ lines of refactoring
+}
+```
+- **Problem**: High risk, extensive testing required
+- **Problem**: Out of scope for Phase 12.8.2 (infrastructure, not features)
+- **Problem**: 10x more work for same user-facing result
+- **Verdict**: Over-engineering, defer to Phase 13
+
+✅ **Option A: Minimal Early-Return Fix (SELECTED)**
+- ✅ 10 lines added, zero lines deleted
+- ✅ Zero risk (early return prevents text path execution)
+- ✅ Backward compatible (default unchanged)
+- ✅ Immediate user value (enables automation)
+- ✅ Consistent with codebase patterns
+- ✅ 15-minute implementation time
+
+**Modified Files**:
+
+1. **llmspell-cli/src/commands/template.rs:253** - Add output format check with early return (10 lines)
+
+**Verification Steps**:
+
+**1. Test Default Behavior (Regression Check)**:
+```bash
+# Should output text (unchanged)
+./target/debug/llmspell template exec interactive-chat \
+  --param message="What is 2+2?"
+
+# Expected: Text output with headers, metrics, etc.
+# Verify: No change from current behavior
+```
+
+**2. Test Explicit Text Flag (Regression Check)**:
+```bash
+# Should output text (unchanged)
+./target/debug/llmspell template exec interactive-chat \
+  --param message="What is 2+2?" \
+  --output text
+
+# Expected: Text output (identical to default)
+# Verify: No change from current behavior
+```
+
+**3. Test JSON Flag (New Functionality)**:
+```bash
+# Should output JSON (NEW)
+./target/debug/llmspell template exec interactive-chat \
+  --param message="What is 2+2?" \
+  --output json
+
+# Expected: Valid JSON output
+# Verify: Entire kernel response printed as JSON
+# Verify: jq parsing succeeds
+```
+
+**4. Test JSON with jq Extraction (User Workflow)**:
+```bash
+# Extract session_id (Example 4 use case)
+SESSION_ID=$(./target/debug/llmspell template exec interactive-chat \
+  --param message="My name is Alice" \
+  --output json | jq -r '.content.metrics.custom_metrics.session_id')
+
+echo "Session ID: $SESSION_ID"
+
+# Expected: Valid UUID printed
+# Verify: No jq parse errors
+# Verify: UUID format (8-4-4-4-12)
+```
+
+**5. Test JSON Structure Completeness**:
+```bash
+./target/debug/llmspell template exec interactive-chat \
+  --param message="test" \
+  --output json | jq '
+    .content | keys | sort
+  '
+
+# Expected output:
+# [
+#   "artifacts",
+#   "metadata",
+#   "metrics",
+#   "result",
+#   "status"
+# ]
+
+# Verify all fields present
+```
+
+**6. Verify Other Template Commands Still Work**:
+```bash
+# Regression: template list
+./target/debug/llmspell template list --output json | jq -r '.templates[0].id'
+
+# Regression: template schema
+./target/debug/llmspell template schema interactive-chat | jq '.parameters | length'
+
+# Expected: Both work correctly (no regression)
+```
+
+**7. Quality Gates**:
+```bash
+# Zero warnings policy
+cargo clippy --workspace --all-features --all-targets
+
+# Clean compilation
+cargo build --workspace --all-features
+
+# All tests pass
+cargo test --workspace --all-features
+```
+
+**Acceptance Criteria**:
+
+**Functional Requirements**:
+- [ ] Default behavior unchanged (no --output flag → text output)
+- [ ] Explicit `--output text` → text output (regression test)
+- [ ] Explicit `--output json` → valid JSON output (NEW)
+- [ ] JSON output includes: `content.status`, `content.result`, `content.artifacts`, `content.metrics`, `content.metadata`
+- [ ] jq can parse JSON output (no syntax errors)
+- [ ] Session ID extraction works: `jq -r '.content.metrics.custom_metrics.session_id'`
+- [ ] All other template commands still work correctly (list, info, search, schema)
+
+**Quality Gates**:
+- [ ] Zero clippy warnings: `cargo clippy --workspace --all-features --all-targets`
+- [ ] Zero compiler warnings: `cargo build --workspace --all-features`
+- [ ] All tests pass: `cargo test --workspace --all-features`
+- [ ] Code change minimal: 10 lines added, 0 lines deleted, 2 lines modified (match arm wrapping)
+
+**Architecture Validation**:
+- [ ] Consistent with other CLI commands (exec, state, session use same pattern)
+- [ ] Uses existing OutputFormatter utility (no new code)
+- [ ] Early return pattern prevents code duplication
+- [ ] Backward compatible (default unchanged)
+- [ ] No breaking changes to API or behavior
+
+**Documentation**:
+- [ ] Inline code comment explains early return pattern
+- [ ] Comment notes JSON output includes full kernel response
+- [ ] TODO comment for Phase 13: Consider refactoring text formatting to function
+
+**User Experience**:
+- [ ] `--output json` works as expected (principle of least surprise)
+- [ ] No warnings needed (flag actually works)
+- [ ] Automation enabled (jq, shell scripts, CI/CD)
+- [ ] Example 4 in interactive-chat.md can be updated to work correctly
+
+**Remediation Plan**:
+
+**Immediate (This Task - 12.8.2.16)**:
+1. Read existing code context (lines 240-260 in template.rs)
+2. Add match statement after error check (line 253)
+3. Move existing text formatting into match arm (wrap lines 255-418)
+4. Test default behavior (regression)
+5. Test --output json (new functionality)
+6. Test jq extraction workflow
+7. Run quality gates (clippy, build, tests)
+
+**Short-term (Phase 12.8.2.17 - Documentation Update)**:
+1. Update `docs/user-guide/templates/interactive-chat.md` Example 4:
+   - Change to use `--output json` flag
+   - Update jq path to `.content.metrics.custom_metrics.session_id`
+   - Test command actually works as documented
+2. Add troubleshooting entry: "How do I extract session_id from template output?"
+   - Solution: Use `--output json` flag with jq
+   - Example: Full working command with correct jq path
+3. Update CLI reference documentation to confirm --output json works for all commands
+
+**Long-term (Phase 13 - Optional Refactoring)**:
+1. Extract text formatting logic to separate function:
+   ```rust
+   fn format_template_text_output(response: &Value) -> Result<String> { ... }
+   ```
+2. Reduce template.rs from 600 lines → ~450 lines (25% reduction)
+3. Make text formatting reusable across other commands
+4. Add integration tests for output format consistency
+
+**Key Insights**:
+
+1. **User-Hostile Inconsistency**:
+   - Accepting a flag silently and ignoring it violates user trust
+   - Users assume flags work unless they get an error
+   - Silent failures break automation (jq scripts, CI/CD)
+   - This is worse than not having the flag at all
+
+2. **The Outlier Pattern**:
+   - 11 out of 12 template/CLI commands: ✅ Use output_format correctly
+   - 1 out of 12 template/CLI commands: ❌ Ignores output_format
+   - `template exec` is architectural outlier, not intentional design
+
+3. **Kernel Already Provides JSON**:
+   - No data serialization needed (kernel returns serde_json::Value)
+   - No API changes needed (response already complete)
+   - Fix is pure CLI presentation layer (10 lines)
+
+4. **Technical Debt vs Feature Work**:
+   - 197 lines of manual formatting = technical debt
+   - Users don't care about implementation complexity
+   - Users care about: "Does --output json work?"
+   - Fix user-facing issue now, refactor internals later
+
+5. **Documentation Drives Discovery**:
+   - Example 4 tried to use --output json
+   - Testing revealed flag doesn't work
+   - This task fixes both the bug AND the documentation
+
+6. **Backward Compatibility is Free**:
+   - Early return pattern: zero risk to existing behavior
+   - Default unchanged (no flag → text output)
+   - Only new code path added (--output json)
+   - No deletions, no modifications to text path
+
+7. **Phase Scope Discipline**:
+   - Phase 12.8.2: Production-ready interactive-chat ✅
+   - Blocked by broken CLI → fix CLI
+   - Don't refactor entire template.rs → fix one issue
+   - Defer major refactoring → Phase 13
+
+**Phase 12.8.2 Completion Criteria Updated**:
+
+With 12.8.2.16 complete, llmspell CLI achieves:
+- ✅ Consistent --output json support across ALL commands
+- ✅ Automation-friendly template execution (jq, scripting)
+- ✅ Documentation accuracy (Example 4 works as written)
+- ✅ User trust (flags work as expected, no silent failures)
+- ✅ Production-ready CLI interface (zero user-hostile behaviors)
+
+**Completion Summary** (2025-10-19):
+- ✅ CLI Fix: Added output_format match at llmspell-cli/src/commands/template.rs:254-265 (early return for JSON)
+- ✅ Bridge Fix: Added custom_metrics to JSON serialization at llmspell-bridge/src/runtime.rs:1403
+- ✅ Root Cause: Bridge was filtering out custom_metrics when building template exec response
+- ✅ Testing: Verified JSON output, jq extraction, session_id UUID format validation
+- ✅ Quality: Zero clippy warnings, clean workspace build
+- ✅ Impact: template exec --output json now works consistently with all other CLI commands
+- ✅ Files Modified: 2 (template.rs +12 lines, runtime.rs +1 line)
+
+**Next Steps After Completion**:
+1. Mark 12.8.2.16 as ✅ COMPLETE [DONE]
+2. Create 12.8.2.17 for documentation updates:
+   - Fix Example 4 in interactive-chat.md to use --output json correctly
+   - Add reasoning model guidance (from 12.8.2.15)
+   - Update tool references (web-search → web-searcher)
+3. Consider Phase 12.8.2 COMPLETE (all infrastructure + docs done)
+4. Begin Phase 12.8.3 (code-generator template) OR Phase 13 planning
 
 ---
 

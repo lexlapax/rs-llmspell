@@ -251,6 +251,19 @@ async fn handle_template_embedded(
                 return Err(anyhow!("Template execution error: {}", error));
             }
 
+            // Check output format before formatting response
+            match output_format {
+                OutputFormat::Json => {
+                    // Print complete kernel response as JSON (preserves all fields)
+                    let formatter = OutputFormatter::new(OutputFormat::Json);
+                    formatter.print_json(&response)?;
+                    return Ok(());
+                }
+                OutputFormat::Text | OutputFormat::Pretty => {
+                    // Continue with text formatting below
+                }
+            }
+
             // Display results
             println!(
                 "\n✓ Template execution completed in {:.2}s",
