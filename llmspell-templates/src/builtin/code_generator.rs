@@ -462,76 +462,103 @@ impl CodeGeneratorTemplate {
         &self,
         implementation: &ImplementationResult,
         language: &str,
-        _model: &str,
-        _context: &ExecutionContext,
+        model: &str,
+        context: &ExecutionContext,
     ) -> Result<TestResult> {
-        // TODO: Implement actual test agent
-        // For now, return placeholder tests
-        warn!("Test generation not yet implemented - using placeholder");
+        use llmspell_agents::factory::{AgentConfig, ModelConfig, ResourceLimits};
+        use llmspell_core::types::AgentInput;
 
-        let code = match language {
-            "rust" => format!(
-                "// Generated Rust tests\n\
-                 // Implementation size: {} lines\n\n\
-                 #[cfg(test)]\n\
-                 mod tests {{\n    \
-                     use super::*;\n\n    \
-                     #[test]\n    \
-                     fn test_main_function() {{\n        \
-                         let result = main_function(\"test input\").unwrap();\n        \
-                         assert!(result.contains(\"Processed\"));\n    \
-                     }}\n\n    \
-                     #[test]\n    \
-                     fn test_helper_function() {{\n        \
-                         let result = helper_function(\"hello\");\n        \
-                         assert_eq!(result, \"HELLO\");\n    \
-                     }}\n\
-                 }}\n",
-                implementation.code.lines().count()
-            ),
-            "python" => format!(
-                "# Generated Python tests\n\
-                 # Implementation size: {} lines\n\n\
-                 import unittest\n\n\
-                 class TestMainFunction(unittest.TestCase):\n    \
-                     def test_main_function(self):\n        \
-                         result = main_function(\"test input\")\n        \
-                         self.assertIn(\"Processed\", result)\n\n    \
-                     def test_helper_function(self):\n        \
-                         result = helper_function(\"hello\")\n        \
-                         self.assertEqual(result, \"HELLO\")\n\n\
-                 if __name__ == '__main__':\n    \
-                     unittest.main()\n",
-                implementation.code.lines().count()
-            ),
-            "javascript" => format!(
-                "// Generated JavaScript tests\n\
-                 // Implementation size: {} lines\n\n\
-                 const {{ mainFunction, helperFunction }} = require('./implementation');\n\n\
-                 describe('mainFunction', () => {{\n    \
-                     test('processes input correctly', () => {{\n        \
-                         const result = mainFunction('test input');\n        \
-                         expect(result).toContain('Processed');\n    \
-                     }});\n\
-                 }});\n\n\
-                 describe('helperFunction', () => {{\n    \
-                     test('converts to uppercase', () => {{\n        \
-                         const result = helperFunction('hello');\n        \
-                         expect(result).toBe('HELLO');\n    \
-                     }});\n\
-                 }});\n",
-                implementation.code.lines().count()
-            ),
-            _ => format!(
-                "// Generated {} tests\n\
-                 // Implementation size: {} lines\n\n\
-                 // Placeholder tests for {}\n\
-                 // [Tests would be generated here]\n",
-                language,
-                implementation.code.lines().count(),
-                language
-            ),
+        info!("Creating test agent for {} code", language);
+
+        // Parse model string (provider/model format)
+        let (provider, model_id) = if let Some(slash_pos) = model.find('/') {
+            (
+                model[..slash_pos].to_string(),
+                model[slash_pos + 1..].to_string(),
+            )
+        } else {
+            ("ollama".to_string(), model.to_string())
         };
+
+        // Create agent config for test generation
+        let agent_config = AgentConfig {
+            name: "code-test-agent".to_string(),
+            description: format!("Test generation agent for {} code", language),
+            agent_type: "llm".to_string(),
+            model: Some(ModelConfig {
+                provider,
+                model_id,
+                temperature: Some(0.4), // Creative for edge cases, structured for test syntax
+                max_tokens: Some(2500),
+                settings: serde_json::Map::new(),
+            }),
+            allowed_tools: vec![],
+            custom_config: serde_json::Map::new(),
+            resource_limits: ResourceLimits {
+                max_execution_time_secs: 150, // 2.5 minutes for test generation
+                max_memory_mb: 512,
+                max_tool_calls: 0,
+                max_recursion_depth: 1,
+            },
+        };
+
+        // Create the agent
+        let agent = context
+            .agent_registry()
+            .create_agent(agent_config)
+            .await
+            .map_err(|e| {
+                warn!("Failed to create test agent: {}", e);
+                TemplateError::ExecutionFailed(format!("Agent creation failed: {}", e))
+            })?;
+
+        // Determine test framework by language
+        let test_framework = match language {
+            "rust" => "Rust's built-in test framework with #[test]",
+            "python" => "unittest or pytest",
+            "javascript" | "typescript" => "Jest or Mocha",
+            "go" => "Go's testing package",
+            "java" => "JUnit",
+            _ => "appropriate testing framework",
+        };
+
+        // Build the test generation request
+        let test_prompt = format!(
+            "You are an expert {} test engineer. Generate comprehensive unit tests for the following code implementation.\n\n\
+             **Language**: {}\n\
+             **Test Framework**: {}\n\n\
+             **IMPLEMENTATION CODE**:\n{}\n\n\
+             **INSTRUCTIONS**:\n\
+             1. Generate comprehensive unit tests covering:\n\
+                - Happy path scenarios (normal inputs)\n\
+                - Edge cases (empty, null, boundary values)\n\
+                - Error conditions (invalid inputs, exceptions)\n\
+             2. Use {} for all tests\n\
+             3. Test ALL public functions/methods in the implementation\n\
+             4. Include descriptive test names that explain what is being tested\n\
+             5. Use proper assertions matching the test framework\n\
+             6. Add test setup/teardown if needed\n\
+             7. Aim for >80% code coverage\n\
+             8. Include comments explaining complex test scenarios\n\n\
+             Provide ONLY the test code (no explanations), ready to save to a test file:",
+            language, language, test_framework, implementation.code, test_framework
+        );
+
+        // Execute the agent
+        info!("Executing test agent...");
+        let agent_input = AgentInput::builder().text(test_prompt).build();
+        let agent_output = agent
+            .execute(agent_input, llmspell_core::ExecutionContext::default())
+            .await
+            .map_err(|e| {
+                warn!("Test agent execution failed: {}", e);
+                TemplateError::ExecutionFailed(format!("Agent execution failed: {}", e))
+            })?;
+
+        // Extract test code
+        let code = agent_output.text;
+
+        info!("Tests generated ({} lines)", code.lines().count());
 
         Ok(TestResult { code })
     }
@@ -543,28 +570,82 @@ impl CodeGeneratorTemplate {
         language: &str,
         _context: &ExecutionContext,
     ) -> Result<LintResult> {
-        // TODO: Implement actual linting with code-tools
-        // For now, return placeholder lint result
-        warn!("Code quality checks not yet implemented - using placeholder");
+        info!("Running code quality checks for {} code", language);
 
-        let report = format!(
-            "# Code Quality Report ({})\n\n\
-             ## Linting\n\
-             - Total lines: {}\n\
-             - Warnings: 0\n\
-             - Errors: 0\n\
-             - Status: ✓ Clean\n\n\
-             ## Formatting\n\
-             - Status: ✓ Properly formatted\n\n\
-             ## Best Practices\n\
-             - Documentation: ✓ Present\n\
-             - Error handling: ✓ Implemented\n\
-             - Code style: ✓ Consistent\n",
-            language,
-            implementation.code.lines().count()
-        );
+        // Use static code analysis
+        // Note: Tool-based linting (clippy, pylint, eslint) requires file system access
+        // and external process execution, which is beyond template scope.
+        // Static analysis provides meaningful metrics without external dependencies.
+        let report = self.static_code_analysis(&implementation.code, language);
 
         Ok(LintResult { report })
+    }
+
+    /// Static code analysis (fallback when linter tools unavailable)
+    fn static_code_analysis(&self, code: &str, language: &str) -> String {
+        let total_lines = code.lines().count();
+        let non_empty_lines = code.lines().filter(|l| !l.trim().is_empty()).count();
+        let comment_lines = code
+            .lines()
+            .filter(|l| {
+                let trimmed = l.trim();
+                trimmed.starts_with("//")
+                    || trimmed.starts_with('#')
+                    || trimmed.starts_with("/*")
+                    || trimmed.starts_with('*')
+            })
+            .count();
+
+        // Basic pattern detection
+        let has_error_handling = code.contains("Error")
+            || code.contains("error")
+            || code.contains("Exception")
+            || code.contains("try")
+            || code.contains("Result");
+
+        let has_documentation = match language {
+            "rust" => code.contains("///") || code.contains("//!"),
+            "python" => code.contains("\"\"\"") || code.contains("'''"),
+            "javascript" | "typescript" => code.contains("/**"),
+            _ => comment_lines > 0,
+        };
+
+        // Generate report
+        format!(
+            "# Code Quality Report ({})\n\n\
+             ## Metrics\n\
+             - Total lines: {}\n\
+             - Non-empty lines: {}\n\
+             - Comment lines: {} ({:.1}%)\n\
+             - Lines of code: {}\n\n\
+             ## Static Analysis\n\
+             - Error handling: {}\n\
+             - Documentation: {}\n\
+             - Code density: {:.1}% (non-empty/total)\n\n\
+             ## Notes\n\
+             - Static analysis performed (linter tools not available)\n\
+             - For comprehensive checks, install language-specific linters:\n\
+               - Rust: cargo clippy\n\
+               - Python: pylint, flake8\n\
+               - JavaScript: eslint\n",
+            language,
+            total_lines,
+            non_empty_lines,
+            comment_lines,
+            (comment_lines as f64 / total_lines as f64 * 100.0),
+            non_empty_lines - comment_lines,
+            if has_error_handling {
+                "✓ Present"
+            } else {
+                "⚠ Not detected"
+            },
+            if has_documentation {
+                "✓ Present"
+            } else {
+                "⚠ Minimal"
+            },
+            (non_empty_lines as f64 / total_lines as f64 * 100.0)
+        )
     }
 
     /// Format final report
