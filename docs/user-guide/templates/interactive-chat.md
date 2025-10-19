@@ -451,11 +451,25 @@ AgentConfig {
 # Just omit the parameter
 ```
 
-#### Session history not persisting
+#### Session history not persisting across separate CLI calls
 
-**Cause**: Session not being reused across calls
+**Cause**: Not providing `session_id` parameter to reuse existing session
 
-**Solution**: Extract session_id from first response, not yet implemented for automatic reuse across CLI calls. Sessions persist within single interactive session or programmatic calls to same session_id.
+**Solution**: Extract `session_id` from first call's JSON output and provide it in subsequent calls:
+
+```bash
+# First call - creates new session
+SESSION_ID=$(./target/debug/llmspell template exec interactive-chat \
+  --param message="My name is Alice" \
+  --output json | jq -r '.metrics.custom_metrics.session_id')
+
+# Second call - reuses session
+./target/debug/llmspell template exec interactive-chat \
+  --param message="What is my name?" \
+  --param session_id="$SESSION_ID"
+```
+
+See **Example 4** for complete session reuse workflow. Sessions automatically persist to `./sessions/` directory using SledBackend.
 
 ---
 

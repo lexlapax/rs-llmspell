@@ -3,6 +3,7 @@
 
 use assert_cmd::Command;
 use predicates::prelude::*;
+use serial_test::serial;
 use std::fs;
 use tempfile::tempdir;
 #[test]
@@ -44,6 +45,7 @@ fn test_invalid_engine() {
         .stderr(predicate::str::contains("invalid value 'ruby'"));
 }
 #[test]
+#[serial]
 fn test_javascript_not_implemented() {
     let dir = tempdir().unwrap();
     let script_path = dir.path().join("test.js");
@@ -59,6 +61,7 @@ fn test_javascript_not_implemented() {
         .stderr(predicate::str::contains("not available yet"));
 }
 #[test]
+#[serial]
 fn test_python_not_implemented() {
     let dir = tempdir().unwrap();
     let script_path = dir.path().join("test.py");
@@ -74,6 +77,7 @@ fn test_python_not_implemented() {
         .stderr(predicate::str::contains("not available yet"));
 }
 #[test]
+#[serial]
 fn test_run_missing_file() {
     let mut cmd = Command::cargo_bin("llmspell").unwrap();
     cmd.arg("run")
@@ -83,6 +87,7 @@ fn test_run_missing_file() {
         .stderr(predicate::str::contains("Script file not found"));
 }
 #[test]
+#[serial]
 fn test_run_simple_lua_script() {
     let dir = tempdir().unwrap();
     let script_path = dir.path().join("test.lua");
@@ -92,6 +97,7 @@ fn test_run_simple_lua_script() {
     cmd.arg("run").arg(&script_path).assert().success();
 }
 #[test]
+#[serial]
 fn test_exec_inline_code() {
     let mut cmd = Command::cargo_bin("llmspell").unwrap();
     cmd.arg("exec")
@@ -101,6 +107,7 @@ fn test_exec_inline_code() {
         .stdout(predicate::str::contains("Inline execution works!"));
 }
 #[test]
+#[serial]
 fn test_output_format_json() {
     let mut cmd = Command::cargo_bin("llmspell").unwrap();
     cmd.arg("--output")

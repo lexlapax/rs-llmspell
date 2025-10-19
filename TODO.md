@@ -7180,7 +7180,7 @@ Spec Agent → Implementation Agent → Test Agent → Linter (tool)
 - [x] Real code generation (not placeholders) ✅ (all agents use LLM, not mock data)
 - [x] Integration test: description → spec → code → tests ✅ (full pipeline implemented)
 - [x] Artifacts: spec.md, implementation.[lang], tests.[lang] ✅ (saved if output_dir provided)
-- [x] Language support: Rust, Python, JavaScript (via agent prompts) ✅ (+ TypeScript, Go, Java, C++)
+- [x] Language support: Rust, Python, JavaScript (via agent prompts) ✅ (+ TypeScript, Go, Java, C++, Lua)
 
 ---
 
@@ -7309,6 +7309,19 @@ Output: 3-section report (Data Source → Statistical Analysis → Visualization
 Stats Quality: Mean, median, mode, std dev, variance, range, outliers, actionable insights
 Chart Quality: ASCII bar chart with █ blocks, sales values, revenue labels
 ```
+
+**Documentation Updated**: ✅
+- `docs/user-guide/templates/data-analysis.md` rewritten (213 → 371 lines)
+- Fixed parameter names (dataset → data_file)
+- Added chart_type parameter documentation
+- Corrected analysis types (5 types, not 4)
+- Corrected chart types (6 types documented)
+- Added implementation details for all 3 phases
+- Added performance metrics from actual test
+- Added troubleshooting section
+- Added architecture insights
+- Removed all "placeholder" warnings
+- Status changed from "Placeholder" to "Production Ready"
 
 ---
 

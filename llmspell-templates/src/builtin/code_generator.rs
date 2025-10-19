@@ -99,6 +99,7 @@ impl crate::core::Template for CodeGeneratorTemplate {
                     json!("go"),
                     json!("java"),
                     json!("cpp"),
+                    json!("lua"),
                 ]),
                 ..Default::default()
             }),
@@ -282,10 +283,7 @@ impl CodeGeneratorTemplate {
         // Create agent config for specification generation
         let agent_config = AgentConfig {
             name: "code-spec-agent".to_string(),
-            description: format!(
-                "Specification agent for {} code generation",
-                language
-            ),
+            description: format!("Specification agent for {} code generation", language),
             agent_type: "llm".to_string(),
             model: Some(ModelConfig {
                 provider,
@@ -385,10 +383,7 @@ impl CodeGeneratorTemplate {
         // Create agent config for code implementation
         let agent_config = AgentConfig {
             name: "code-impl-agent".to_string(),
-            description: format!(
-                "Implementation agent for {} code generation",
-                language
-            ),
+            description: format!("Implementation agent for {} code generation", language),
             agent_type: "llm".to_string(),
             model: Some(ModelConfig {
                 provider,
@@ -449,10 +444,7 @@ impl CodeGeneratorTemplate {
         // Extract implementation code
         let code = agent_output.text;
 
-        info!(
-            "Implementation generated ({} lines)",
-            code.lines().count()
-        );
+        info!("Implementation generated ({} lines)", code.lines().count());
 
         Ok(ImplementationResult { code })
     }
@@ -519,6 +511,7 @@ impl CodeGeneratorTemplate {
             "javascript" | "typescript" => "Jest or Mocha",
             "go" => "Go's testing package",
             "java" => "JUnit",
+            "lua" => "busted or luaunit",
             _ => "appropriate testing framework",
         };
 
@@ -607,6 +600,7 @@ impl CodeGeneratorTemplate {
             "rust" => code.contains("///") || code.contains("//!"),
             "python" => code.contains("\"\"\"") || code.contains("'''"),
             "javascript" | "typescript" => code.contains("/**"),
+            "lua" => code.contains("---") || code.contains("--[["),
             _ => comment_lines > 0,
         };
 
@@ -733,6 +727,7 @@ impl CodeGeneratorTemplate {
             "go" => "go",
             "java" => "java",
             "cpp" => "cpp",
+            "lua" => "lua",
             _ => "txt",
         };
         let code_path = output_dir.join(format!("implementation.{}", ext));

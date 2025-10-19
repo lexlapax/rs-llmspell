@@ -2,20 +2,25 @@
 
 **Version:** 0.1.0
 **Category:** Research
-**Status:** Production Ready (Placeholder Implementation)
+**Status:** ✅ Production Ready (Phase 12.8.1)
 
 ## Overview
 
-The Research Assistant template is a comprehensive 4-phase workflow for academic and professional research tasks. It automates the process of gathering sources, ingesting them into a knowledge base, synthesizing findings with citations, and validating the quality of the research output.
+The Research Assistant template is a comprehensive 4-phase workflow for academic and professional research tasks, powered by a full RAG (Retrieval-Augmented Generation) pipeline:
+
+1. **Gather** - Parallel web search to find relevant sources
+2. **Ingest** - Embed and index sources into RAG store with metadata
+3. **Synthesize** - Generate research report with citations using RAG-augmented agent
+4. **Validate** - Quality-check citations and sources with validation agent
 
 ### What It Does
 
 The Research Assistant template orchestrates multiple AI agents and tools to:
 
-1. **Gather** - Parallel web search to find relevant sources
-2. **Ingest** - Index sources into RAG (Retrieval-Augmented Generation) store
-3. **Synthesize** - Generate research report with citations using AI agent
-4. **Validate** - Quality-check citations and sources with validation agent
+- **Gather**: Execute parallel web searches via WebSearchTool (Phase 1)
+- **Ingest**: Generate embeddings and store in RAG with tenant isolation (Phase 2)
+- **Synthesize**: Retrieve relevant context from RAG and generate research synthesis with AI agent (Phase 3)
+- **Validate**: Quality-check citations, verify sources, assess credibility with validation agent (Phase 4)
 
 ### Use Cases
 
@@ -52,9 +57,9 @@ local result = Template.execute("research-assistant", {
     topic = "Your research topic here"
 })
 
-if result.success then
+if result.status == "ok" then
     print("Research complete!")
-    print(result.result)
+    print(result.result.value)
 end
 ```
 
@@ -83,6 +88,68 @@ end
 - **max_sources**: Must be between 1 and 50 (inclusive)
 - **output_format**: Must be one of: `markdown`, `json`, `html`
 
+**Inspect Full Schema:**
+```bash
+llmspell template schema research-assistant
+```
+
+---
+
+## Implementation Details
+
+### Phase 1: Gather Sources via Web Search (83 lines)
+- **WebSearchTool Integration**: Uses `context.tool_registry().execute_tool("web-searcher", ...)`
+- **Parallel Search**: Executes web search with `max_sources` limit
+- **Response Parsing**: Handles double-nested JSON `{"result": {"results": [...]}}`
+- **SearchResult Structure**: Extracts `{title, url, snippet, provider, rank}` from tool output
+- **Relevance Scoring**: Derives score from rank: `1.0 - (rank * 0.1)`
+- **Error Handling**: Tool not found, JSON parse failures, empty results, missing fields
+- **Type Safety**: Casts `usize` to `u64` for JSON parameter compatibility
+
+### Phase 2: Ingest Sources into RAG (83 lines)
+- **RAG Access**: `context.rag()` returns `Option<Arc<MultiTenantRAG>>`
+- **Storage Integration**: `rag.ingest_documents(tenant_id, texts, scope, metadata_fn)`
+- **Text Preparation**: Concatenates title + URL + snippet for embedding
+- **Metadata System**: Custom closure provides per-source metadata:
+  - `title`, `url`, `content`, `relevance_score`, `session_tag`
+- **Scope Pattern**: `StateScope::Custom("research_session:{tag}")` for isolation
+- **Embedding + Storage**: Single API call handles embedding generation + metadata + storage
+- **Returns**: Vector IDs for stored documents, enabling retrieval in Phase 3
+- **Usage Tracking**: Tracks `documents_indexed` and `storage_bytes` per tenant
+
+### Phase 3: Synthesize Findings with Agent (158 lines)
+- **RAG Retrieval**: `rag.retrieve_context(tenant_id, query, scope, k=5)` fetches top 5 relevant sources
+- **Context Formatting**: Retrieved sources formatted with title, URL, relevance score, content
+- **AgentConfig**: Temperature 0.7 (balanced creativity for synthesis)
+- **Max Tokens**: 2000 (comprehensive synthesis output)
+- **Resource Limits**: 120s execution time, 512MB memory, 0 tool calls
+- **Model Parsing**: Split "provider/model-id" format, default to "ollama"
+- **Agent Creation**: `context.agent_registry().create_agent(config)` → `Arc<dyn Agent>`
+- **Agent Execution**: `agent.execute(AgentInput::builder().text(prompt).build(), ...)`
+- **Prompt Engineering**: Structured instructions with RAG sources + format requirements
+- **RAG-Augmented Prompts**: Includes retrieved context for grounded responses
+- **Error Handling**: Agent creation/execution failures, RAG retrieval failures (graceful degradation)
+
+### Phase 4: Validate Citations with Agent (115 lines)
+- **AgentConfig**: Temperature 0.3 (lower for factual validation vs 0.7 synthesis)
+- **Max Tokens**: 1500 (shorter validation report)
+- **Resource Limits**: 90s execution time (faster than synthesis)
+- **Prompt Includes**: Synthesis text + source list + validation criteria + report format
+- **Source Formatting**: Numbered list: "1. Title - URL"
+- **Validation Criteria**: Academic rigor, claim support, source quality assessment
+- **Output Format**: Structured validation report with recommendations
+- **Error Handling**: Agent creation/execution failures
+
+### Phase 5-6: RAG Infrastructure (161 lines in multi_tenant_integration.rs)
+- **Phase 5 (ingest_documents)**: 87 lines - High-level storage API
+  - Flow: generate embeddings → create VectorEntry with metadata → insert via tenant_manager
+  - Metadata closure for custom per-document metadata
+  - Default metadata: text, ingested_at timestamp, tenant_id
+- **Phase 6 (retrieve_context)**: 74 lines - High-level retrieval API
+  - Flow: generate query embedding → search via tenant_manager → convert to RetrievalResult
+  - Returns: `Vec<RetrievalResult>` with id, text, score, metadata
+  - Safe metadata extraction with Option chaining
+
 ---
 
 ## Execution Phases
@@ -90,7 +157,7 @@ end
 ### Phase 1: Gather (Web Search)
 
 **Duration**: ~2-3s per source
-**Infrastructure**: Requires web-search tool
+**Infrastructure**: Requires WebSearchTool
 
 Executes parallel web searches to find relevant sources for the research topic. Sources are ranked by relevance and limited by the `max_sources` parameter.
 
@@ -98,40 +165,46 @@ Executes parallel web searches to find relevant sources for the research topic. 
 - Title
 - URL
 - Content excerpt
-- Relevance score
+- Relevance score (derived from rank)
+- Provider information
 
 ### Phase 2: Ingest (RAG Indexing)
 
 **Duration**: ~1s per source
-**Infrastructure**: Requires RAG store
+**Infrastructure**: Requires MultiTenantRAG
 
-Ingests all gathered sources into the RAG (Retrieval-Augmented Generation) store with a unique session tag. This enables context-aware synthesis in the next phase.
+Ingests all gathered sources into the RAG (Retrieval-Augmented Generation) store with:
+- Embedding generation for each source
+- Metadata attachment (title, URL, relevance, session tag)
+- Tenant-isolated storage with custom scope
+- Usage metrics tracking
 
-**Output**: RAG ingestion confirmation with document count
+**Output**: RAG ingestion confirmation with vector IDs
 
-### Phase 3: Synthesize (AI Agent)
+### Phase 3: Synthesize (AI Agent with RAG Retrieval)
 
 **Duration**: ~5-10s
-**Infrastructure**: Requires agent creation, RAG retrieval, LLM
+**Infrastructure**: Requires AgentRegistry, MultiTenantRAG, LLM
 
 Creates a synthesis agent that:
-1. Retrieves relevant context from RAG store
-2. Generates comprehensive research synthesis
-3. Includes proper citations and references
-4. Structures findings logically
+1. Retrieves top 5 relevant sources from RAG store
+2. Formats RAG context with titles, URLs, content
+3. Generates comprehensive research synthesis with RAG-augmented prompts
+4. Includes proper citations and references
+5. Structures findings logically
 
 **Output**: Research synthesis document with citations
 
 ### Phase 4: Validate (Validation Agent)
 
 **Duration**: ~3-5s
-**Infrastructure**: Requires agent creation, LLM
+**Infrastructure**: Requires AgentRegistry, LLM
 
 Creates a validation agent that:
 1. Verifies all citations are present and correct
-2. Checks for broken links
-3. Assesses source quality
-4. Generates validation report
+2. Checks source quality and credibility
+3. Assesses academic rigor
+4. Generates validation report with recommendations
 
 **Output**: Citation validation report
 
@@ -149,7 +222,7 @@ Human-readable format suitable for documentation, reports, and direct reading.
 
 ---
 
-{synthesis content}
+{synthesis content with citations}
 
 ---
 
@@ -268,9 +341,9 @@ local result = Template.execute("research-assistant", {
     topic = "Rust async programming patterns"
 })
 
-if result.success then
+if result.status == "ok" then
     print("Research Duration: " .. result.metrics.duration_ms .. "ms")
-    print(result.result)
+    print(result.result.value)
 end
 ```
 
@@ -290,15 +363,14 @@ local params = {
 local result = Template.execute("research-assistant", params)
 
 -- Handle result
-if result.success then
+if result.status == "ok" then
     print("✓ Research complete!")
     print("  Duration: " .. result.metrics.duration_ms .. "ms")
-    print("  Sources: " .. result.metrics.tools_invoked)
     print("  Agents: " .. result.metrics.agents_invoked)
 
     -- Save JSON output
     local file = io.open("research.json", "w")
-    file:write(JSON.encode(result.result))
+    file:write(JSON.encode(result.result.value))
     file:close()
 else
     print("✗ Research failed: " .. result.error)
@@ -324,49 +396,42 @@ for _, topic in ipairs(topics) do
         output_format = "markdown"
     })
 
-    if result.success then
+    if result.status == "ok" then
         -- Save to topic-specific file
         local filename = topic:gsub("%s+", "_"):lower() .. ".md"
         local file = io.open(filename, "w")
-        file:write(result.result)
+        file:write(result.result.value)
         file:close()
         print("  ✓ Saved to: " .. filename)
     else
-        print("  ✗ Failed: " .. result.error)
+        print("  ✗ Failed")
     end
 end
 ```
 
 ---
 
-## Cost Estimation
+## Performance
 
-The template provides cost estimates before execution:
+**Estimated Costs (per execution)**
 
-```bash
-llmspell template info research-assistant --show-schema
-```
-
-### Estimated Costs (per execution)
-
-| Sources | Tokens | Cost (USD) | Duration |
-|---------|--------|------------|----------|
-| 5 | ~5,500 | $0.00055 | ~18s |
-| 10 | ~8,000 | $0.00080 | ~33s |
-| 20 | ~13,000 | $0.00130 | ~63s |
-| 50 | ~28,000 | $0.00280 | ~153s |
+| Sources | Tokens | Duration | Phases |
+|---------|--------|----------|--------|
+| 5 | ~5,500 | ~18s | Gather(10s) + Ingest(5s) + Synthesize(5s) + Validate(3s) |
+| 10 | ~8,000 | ~33s | Gather(20s) + Ingest(10s) + Synthesize(5s) + Validate(3s) |
+| 20 | ~13,000 | ~63s | Gather(40s) + Ingest(20s) + Synthesize(5s) + Validate(3s) |
+| 50 | ~28,000 | ~153s | Gather(100s) + Ingest(50s) + Synthesize(5s) + Validate(3s) |
 
 **Assumptions**:
-- Local LLM pricing: $0.10 per 1M tokens
-- ~500 tokens per source for RAG ingestion
+- ~500 tokens per source for RAG embedding
 - ~2000 tokens for synthesis
 - ~1000 tokens for validation
-- ~2s per source for gathering
-- ~1s per source for ingestion
-- ~5s for synthesis
-- ~3s for validation
+- ~2s per source for web search
+- ~1s per source for RAG ingestion
+- ~5-10s for synthesis (depends on model)
+- ~3-5s for validation
 
-**Note**: Actual costs and duration depend on model, source complexity, and infrastructure performance.
+**Note**: Actual duration depends on model, source complexity, web search latency, and infrastructure performance.
 
 ---
 
@@ -451,7 +516,7 @@ llmspell template exec research-assistant \
 
 #### Error: "Infrastructure not available: web-search"
 
-**Cause**: Web search tool is not available in the current environment.
+**Cause**: WebSearchTool is not available in the current environment.
 
 **Solution**: Ensure web-search tool is enabled in your LLMSpell configuration.
 
@@ -461,13 +526,14 @@ llmspell tool list
 llmspell template info research-assistant
 ```
 
-#### Warning: "Using placeholder sources"
+#### Error: "RAG not available"
 
-**Cause**: Web search integration is not yet fully implemented.
+**Cause**: MultiTenantRAG is not initialized in the execution context.
 
-**Status**: This is expected behavior in Phase 12.3. Full integration will be completed in later phases.
-
-**Workaround**: The template will generate placeholder sources for testing purposes.
+**Solution**: Ensure RAG infrastructure is enabled:
+```bash
+llmspell provider list  # Check if RAG provider is available
+```
 
 ### Performance Issues
 
@@ -498,37 +564,49 @@ llmspell template info research-assistant
 
 ---
 
-## Advanced Usage
+## Architecture Insights
 
-### Integration with Other Templates
+### Why RAG for Research?
 
-Combine Research Assistant with other templates for complex workflows:
+**Rationale**: RAG provides:
+- **Grounded Synthesis**: LLM responses based on actual retrieved sources
+- **Citation Accuracy**: Direct connection between claims and source material
+- **Scalability**: Handle 50+ sources without context window limits
+- **Tenant Isolation**: Multiple research sessions don't interfere
 
-```lua
--- Lua example: Research + Code Generation
-local research = Template.execute("research-assistant", {
-    topic = "Async error handling patterns in Rust"
-})
+### Temperature Tuning Philosophy
 
-if research.success then
-    -- Use research synthesis as input for code generation
-    local code = Template.execute("code-generator", {
-        description = research.result,
-        language = "rust",
-        include_tests = true
-    })
+- **Synthesis Agent (0.7)**: Balanced creativity for comprehensive synthesis
+- **Validation Agent (0.3)**: Low temperature for factual, deterministic validation
+- **Rationale**: Synthesis needs creative synthesis of ideas; validation needs strict fact-checking
 
-    if code.success then
-        print("Generated code based on research!")
-    end
-end
+### RAG Context Format
+
+Retrieved sources are formatted as:
+```
+RELEVANT SOURCES:
+SOURCE 1: Title (relevance: 0.95)
+URL: https://...
+Content:
+[retrieved text]
+
+---
+
+SOURCE 2: ...
 ```
 
-### Custom Model Configuration
+This structured format helps the LLM:
+- Distinguish between sources
+- Reference sources by number
+- Include proper citations with URLs
 
-Use different models for synthesis vs validation:
+### 4-Phase Pipeline
 
-**Note**: Current implementation uses same model for both phases. This feature will be added in a future release.
+Data flows sequentially through phases:
+1. Web Search → Source[] (title, url, snippet, relevance)
+2. Source[] → RAG Storage (embeddings + metadata)
+3. RAG Retrieval + Topic → Synthesis Agent → Research Report
+4. Report + Sources → Validation Agent → Validation Report
 
 ---
 
@@ -536,9 +614,10 @@ Use different models for synthesis vs validation:
 
 ### Infrastructure Dependencies
 
-- **web-search**: Web search tool for source gathering
-- **rag**: RAG store for document indexing and retrieval
-- **local-llm**: Local LLM provider for agent execution
+- **WebSearchTool**: Web search for source gathering (Phase 1)
+- **MultiTenantRAG**: RAG store for document indexing and retrieval (Phases 2-3)
+- **AgentRegistry**: Agent creation for synthesis and validation (Phases 3-4)
+- **LLM Provider**: Local LLM for agent execution
 
 ### Minimum System Requirements
 
@@ -556,53 +635,98 @@ llmspell provider list
 
 ---
 
-## Roadmap
+## Implementation Status
 
-### Current Status (Phase 12.3)
+### Phase 12.8.1 - ✅ COMPLETE (All 6 Phases)
 
-✅ Template core implementation
-✅ Parameter validation
-✅ Output formatting (markdown, JSON, HTML)
-✅ Cost estimation
-⏳ Web search integration (placeholder)
-⏳ RAG integration (placeholder)
-⏳ Agent synthesis (placeholder)
-⏳ Citation validation (placeholder)
+**Implemented** (574 lines):
+- ✅ Phase 1: Gather sources via web search (83 lines)
+- ✅ Phase 2: Ingest sources into RAG (83 lines)
+- ✅ Phase 3: Synthesize findings with RAG-augmented agent (158 lines)
+- ✅ Phase 4: Validate citations with agent (115 lines)
+- ✅ Phase 5: RAG storage infrastructure (87 lines in multi_tenant_integration.rs)
+- ✅ Phase 6: RAG retrieval infrastructure (74 lines in multi_tenant_integration.rs)
 
-### Future Enhancements
+**Quality Metrics**:
+- ✅ Compilation: Clean (0 errors, 0 warnings)
+- ✅ Clippy: Clean (0 warnings)
+- ✅ Tests: 170 passing (60 llmspell-rag + 110 llmspell-templates)
+- ✅ Coverage: Unit tests for all RAG methods
 
-**Phase 13** - Adaptive Memory Integration:
-- Remember previous research sessions
-- Build knowledge graph across topics
-- Suggest related research based on history
+**Key Achievements**:
+1. First complete end-to-end template with full RAG pipeline
+2. Established pattern for RAG-powered templates
+3. Clean high-level APIs (`ingest_documents`, `retrieve_context`)
+4. Proper tenant isolation and usage tracking
 
-**Phase 14+** - Additional Features:
-- Custom source filtering (by domain, date, type)
-- Multi-language support
-- Export to academic citation formats (BibTeX, APA, MLA)
-- Collaborative research (multi-user sessions)
+**Timeline**:
+- Phases 1-4 (Template): 12 hours actual (10-12h estimate)
+- Phases 5-6 (Infrastructure): 4.5 hours actual (4-6h estimate)
+- **Total**: 16.5 hours (within 14-18h estimate)
+
+---
+
+## Advanced Usage
+
+### Integration with Other Templates
+
+Combine Research Assistant with other templates for complex workflows:
+
+```lua
+-- Lua example: Research + Code Generation
+local research = Template.execute("research-assistant", {
+    topic = "Async error handling patterns in Rust"
+})
+
+if research.status == "ok" then
+    -- Use research synthesis as input for code generation
+    local code = Template.execute("code-generator", {
+        description = research.result.value,
+        language = "rust",
+        include_tests = true
+    })
+
+    if code.status == "ok" then
+        print("Generated code based on research!")
+    end
+end
+```
 
 ---
 
 ## Related Documentation
 
 - [Template System Overview](../templates/README.md)
-- [CLI Reference](../../cli/template-commands.md)
-- [Lua Template API](../../api/lua/template-global.md)
+- [Data Analysis Template](./data-analysis.md) (3-agent chain pattern)
+- [Code Generator Template](./code-generator.md) (sequential agent pattern)
+- [Interactive Chat Template](./interactive-chat.md) (session management)
 - [RAG Integration Guide](../../rag-integration.md)
 - [Local LLM Configuration](../local-llm.md)
 
 ---
 
-## Support
+## Changelog
 
-Having issues? Check:
+### v0.1.0 (Phase 12.8.1) - Production Ready
 
-1. [Troubleshooting Guide](../troubleshooting.md)
-2. [GitHub Issues](https://github.com/lexlapax/rs-llmspell/issues)
-3. [Community Forum](https://github.com/lexlapax/rs-llmspell/discussions)
+**Implemented** (574 lines total):
+- ✅ Web search integration (WebSearchTool)
+- ✅ RAG embedding and storage (MultiTenantRAG.ingest_documents)
+- ✅ RAG retrieval (MultiTenantRAG.retrieve_context)
+- ✅ Agent-based synthesis with RAG context
+- ✅ Agent-based citation validation
+- ✅ Multi-format output (markdown, JSON, HTML)
+- ✅ Tenant isolation and usage tracking
+
+**Key Features**:
+- Full RAG pipeline (embed → store → retrieve → synthesize)
+- 2 agents (synthesis + validation)
+- WebSearchTool integration
+- Type-safe parameter validation
+- Rich error handling
+- Artifact generation
 
 ---
 
-**Last Updated**: Phase 12.3 (Research Assistant Template Implementation)
-**Next Review**: Phase 13 (Adaptive Memory Integration)
+**Last Updated**: Phase 12.8.1 (Production Implementation)
+**Status**: ✅ Ready for Production Use

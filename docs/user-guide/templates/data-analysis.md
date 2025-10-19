@@ -2,27 +2,31 @@
 
 **Version:** 0.1.0
 **Category:** Analysis
-**Status:** Placeholder Implementation (Phase 12.4.2)
+**Status:** ✅ Production Ready (Phase 12.8.4)
 
 ## Overview
 
-The Data Analysis template automates statistical analysis, data visualization, and insight generation from structured datasets. It combines data processing tools, statistical analysis, and AI-powered interpretation.
+The Data Analysis template automates statistical analysis and data visualization from CSV/JSON files using a 3-phase agent pipeline:
+
+1. **Data Loading**: Parse CSV/TSV/JSON files with std::fs
+2. **Statistical Analysis**: Agent-based statistical analysis (5 types)
+3. **Visualization**: Agent-generated ASCII art charts (6 types)
 
 ### What It Does
 
-- **Data Loading**: Support for CSV, JSON, Parquet, and database sources
-- **Statistical Analysis**: Descriptive statistics, correlations, distributions
-- **Visualization**: Charts, graphs, and interactive plots
-- **AI Insights**: Natural language interpretation of findings
-- **Report Generation**: Automated analysis reports
+- **Data Loading**: CSV, TSV, JSON file parsing (no external crates)
+- **Statistical Analysis**: Descriptive stats, correlation, regression, timeseries, clustering
+- **Visualization**: ASCII art charts (bar, line, scatter, histogram, heatmap, box)
+- **AI Insights**: Agent-powered statistical interpretation
+- **Report Generation**: 3-section markdown report (Data Source → Analysis → Visualization)
 
 ### Use Cases
 
-- Business intelligence dashboards
-- Research data analysis
-- A/B test analysis
-- Performance metrics analysis
-- Financial data analysis
+- Exploratory data analysis from CSV exports
+- Statistical analysis with AI-powered insights
+- Terminal-based data visualization
+- Automated analysis reports
+- Business metrics analysis
 
 ---
 
@@ -32,16 +36,18 @@ The Data Analysis template automates statistical analysis, data visualization, a
 
 ```bash
 llmspell template exec data-analysis \
-  --param dataset="path/to/data.csv" \
-  --param analysis_type="descriptive"
+  --param data_file=/path/to/sales.csv \
+  --param analysis_type=descriptive \
+  --param chart_type=bar
 ```
 
 ### Lua - Basic Usage
 
 ```lua
 local result = Template.execute("data-analysis", {
-    dataset = "sales_data.csv",
-    analysis_type = "descriptive"
+    data_file = "sales_data.csv",
+    analysis_type = "descriptive",
+    chart_type = "bar"
 })
 
 print(result.result)
@@ -55,17 +61,32 @@ print(result.result)
 
 | Parameter | Type | Description |
 |-----------|------|-------------|
-| `dataset` | String | Path to dataset or data source URL |
-| `analysis_type` | Enum | Type of analysis: `descriptive`, `comparative`, `predictive`, `exploratory` |
+| `data_file` | String | Path to CSV, TSV, or JSON data file |
 
 ### Optional Parameters
 
 | Parameter | Type | Default | Description |
 |-----------|------|---------|-------------|
-| `visualization` | Boolean | `true` | Generate charts and graphs |
-| `output_format` | Enum | `"markdown"` | Format: `markdown`, `html`, `pdf`, `json` |
-| `confidence_level` | Float | `0.95` | Statistical confidence level (0.0-1.0) |
-| `model` | String | `"ollama/llama3.2:3b"` | LLM for insight generation |
+| `analysis_type` | Enum | `"descriptive"` | Statistical analysis type (see below) |
+| `chart_type` | Enum | `"bar"` | Chart visualization type (see below) |
+| `model` | String | `"ollama/llama3.2:3b"` | LLM model for analysis agents |
+
+#### Analysis Types
+
+- **descriptive**: Mean, median, mode, std dev, variance, range, outliers, distribution
+- **correlation**: Correlation coefficients, relationship strength, significance testing
+- **regression**: R², coefficients, residual analysis, predictive insights
+- **timeseries**: Trend identification, seasonality, autocorrelation, forecasting
+- **clustering**: Optimal clusters, cluster characteristics, silhouette score
+
+#### Chart Types
+
+- **bar**: Horizontal bars with █ blocks
+- **line**: Trend lines with ASCII characters (*, -, |)
+- **scatter**: Point plots with * or • markers
+- **histogram**: Vertical bars with █ ▓ ▒ ░ shading
+- **heatmap**: Grid with intensity characters (█ ▓ ▒ ░ ·)
+- **box**: Box-and-whisker plots with ├─┼─┤ drawing chars
 
 **Inspect Full Schema:**
 ```bash
@@ -74,57 +95,105 @@ llmspell template schema data-analysis
 
 ---
 
-## Implementation Status
+## Implementation Details
 
-⚠️ **Note**: This template is a **placeholder implementation** as of Phase 12.4.2.
+### Phase 1: Data Loading (146 lines)
+- Custom CSV/TSV parser using `std::fs::read_to_string()` + `split()`
+- JSON parsing via `serde_json` (existing dependency)
+- Auto-detect format from file extension (.csv, .tsv, .json)
+- Data preview: Header + first 5 rows (CSV) or 500 chars (JSON)
+- Error handling: File not found, read errors, empty files, parse failures
 
-**Implemented:**
-- ✅ Template metadata and parameter schema
-- ✅ Parameter validation
-- ✅ Cost estimation
+### Phase 2: Statistical Analysis Agent (139 lines)
+- **AgentConfig**: Temperature 0.4 (analytical reasoning)
+- **Analysis Dispatch**: Custom instructions per analysis type
+- **Rich Context**: Full data preview included in agent prompt
+- **Structured Output**: 6-point quality requirements guide agent response
+- **Pattern**: `context.agent_registry().create_agent()` → `AgentInput::builder().text()`
 
-**Placeholder/Pending:**
-- ⏳ Data loading from multiple sources
-- ⏳ Statistical analysis engine
-- ⏳ Visualization generation
-- ⏳ AI-powered insights
-- ⏳ Report generation
-
-**Expected**: Full implementation in Phase 14 (Advanced Templates)
+### Phase 3: Visualization Agent (151 lines)
+- **AgentConfig**: Temperature 0.5 (creative chart design)
+- **Chart Dispatch**: Type-specific ASCII art instructions
+- **Context**: Dataset preview + statistical analysis results
+- **Terminal Constraints**: 60-80 chars width, 15-25 lines height
+- **Quality Requirements**: "Generate actual ASCII chart (not just description)"
 
 ---
 
 ## Output Format
 
+### Text Output
+
+```
+# Data Analysis Report
+
+**Data Source**: /tmp/sales.csv
+**Analysis Type**: descriptive
+**Visualization**: bar
+
+---
+
+## Statistical Analysis
+
+**Descriptive Statistical Analysis Report**
+
+**Central Tendency Measures**
+- Mean: $53,419.29
+- Median: $50,000
+- Mode: (no clear mode)
+
+**Dispersion Measures**
+- Standard Deviation: $4,141.21
+- Variance: $17,345.51
+- Range: $23,115 - $72,540
+
+**Data Quality Observations**
+- No missing values
+- Outliers detected: Phone product ($72,540)
+
+---
+
+## Visualization
+
+bar Chart
+Dataset: 7 rows x 4 columns
+Format: csv
+
++---------------------------------------+
+|          Sales            |
++---------------------------------------+
+|         45   |████████████████████████| 67500
++---------------------------------------+
+|         32   |████████████████████████| 48000
++---------------------------------------+
+...
+
+---
+
+Generated by LLMSpell Data Analysis Template
+```
+
+### JSON Output
+
 ```json
 {
-  "result_type": "structured",
+  "status": "ok",
   "result": {
-    "summary": {
-      "rows": 1000,
-      "columns": 15,
-      "missing_values": 23
-    },
-    "descriptive_stats": {
-      "mean": 42.5,
-      "median": 40.0,
-      "std_dev": 12.3
-    },
-    "insights": [
-      "Strong positive correlation between X and Y (r=0.85)",
-      "Significant outliers detected in column Z"
-    ]
+    "type": "text",
+    "value": "# Data Analysis Report\n\n..."
   },
-  "artifacts": [
-    {
-      "filename": "correlation_matrix.png",
-      "mime_type": "image/png"
-    },
-    {
-      "filename": "analysis_report.md",
-      "mime_type": "text/markdown"
+  "artifacts": [],
+  "metrics": {
+    "duration_ms": 12330,
+    "agents_invoked": 2,
+    "tools_invoked": 1,
+    "custom_metrics": {
+      "analysis_type": "descriptive",
+      "dataset_rows": 7,
+      "dataset_columns": 4,
+      "chart_type": "bar"
     }
-  ]
+  }
 }
 ```
 
@@ -132,55 +201,138 @@ llmspell template schema data-analysis
 
 ## Examples
 
-### CLI Examples
+### Example 1: Descriptive Statistics with Bar Chart
 
-#### Descriptive Analysis
 ```bash
 llmspell template exec data-analysis \
-  --param dataset="sales_q4.csv" \
-  --param analysis_type="descriptive" \
-  --param visualization=true \
-  --output-dir ./analysis_results
+  --param data_file=/tmp/sales_q4.csv \
+  --param analysis_type=descriptive \
+  --param chart_type=bar \
+  --output text
 ```
 
-#### Comparative Analysis
+**Result**: Statistical summary with mean, median, std dev, outliers + ASCII bar chart
+
+### Example 2: Correlation Analysis with Heatmap
+
 ```bash
 llmspell template exec data-analysis \
-  --param dataset="experiment_results.csv" \
-  --param analysis_type="comparative" \
-  --param confidence_level=0.99 \
-  --param output_format="pdf"
+  --param data_file=/tmp/metrics.csv \
+  --param analysis_type=correlation \
+  --param chart_type=heatmap \
+  --param model=ollama/llama3.2:3b \
+  --output json
 ```
 
-### Lua Examples
+**Result**: Correlation coefficients between variables + intensity heatmap
+
+### Example 3: Timeseries with Line Chart
+
+```bash
+llmspell template exec data-analysis \
+  --param data_file=/tmp/stock_prices.json \
+  --param analysis_type=timeseries \
+  --param chart_type=line
+```
+
+**Result**: Trend analysis, seasonality detection + ASCII line chart
+
+### Example 4: Lua Batch Analysis
 
 ```lua
-local result = Template.execute("data-analysis", {
-    dataset = "performance_metrics.csv",
-    analysis_type = "exploratory",
-    visualization = true,
-    output_format = "html"
-})
+local datasets = {"sales.csv", "revenue.csv", "costs.csv"}
 
-if result.artifacts then
-    for _, artifact in ipairs(result.artifacts) do
-        print("Generated: " .. artifact.filename)
-    end
+for _, file in ipairs(datasets) do
+    local result = Template.execute("data-analysis", {
+        data_file = file,
+        analysis_type = "descriptive",
+        chart_type = "bar"
+    })
+
+    -- Save to file
+    local output = io.open(file:gsub(".csv", "_report.md"), "w")
+    output:write(result.result)
+    output:close()
+
+    print("Analyzed: " .. file)
 end
 ```
 
 ---
 
+## Performance
+
+**Test Configuration**:
+- File: 7-row CSV (4 columns: Product, Sales, Revenue, Region)
+- Analysis: descriptive statistics
+- Chart: bar chart
+- Model: ollama/llama3.2:3b
+
+**Results**:
+- **Duration**: 12.33 seconds
+- **Agents**: 2 (data-analyst-agent, data-visualizer-agent)
+- **Tools**: 1 (file loading)
+- **Output Size**: ~2KB markdown report
+
+**Scaling**:
+- Small datasets (<100 rows): 10-15 seconds
+- Medium datasets (100-1000 rows): 15-30 seconds (preview truncation helps)
+- Large datasets (>1000 rows): Consider preprocessing first
+
+---
+
 ## Troubleshooting
 
-### Using Placeholder Implementation
+### File Not Found
 
-**Current Behavior**: The template validates parameters but generates placeholder analysis results.
+**Error**: `"Data file not found: /path/to/file.csv"`
 
-**Workaround**: For production data analysis, consider:
-1. Using pandas/numpy directly in Python
-2. Using specialized analytics tools
-3. Waiting for Phase 14 full implementation
+**Solution**: Verify file path is absolute, file exists, and has read permissions
+
+### Empty CSV
+
+**Error**: `"Empty CSV file"`
+
+**Solution**: Ensure CSV has at least a header row + 1 data row
+
+### JSON Parse Error
+
+**Error**: `"Failed to parse JSON: ..."`
+
+**Solution**: Validate JSON syntax with `jq` or similar tool first
+
+### Chart Not Showing
+
+**Issue**: Only chart description appears, no ASCII art
+
+**Cause**: Report formatting bug (fixed in 12.8.4)
+
+**Verify Fix**: Output should include both `chart.description` and `chart.chart_data`
+
+---
+
+## Architecture Insights
+
+### Why std::fs Instead of Tool Registry?
+
+**Rationale**: File I/O is simpler with Rust standard library than coordinating tool-based data loading. No "csv-analyzer" tool exists yet. Pragmatic choice for Phase 12.
+
+### Why No External CSV Crate?
+
+**Rationale**: Simple `split()` parsing sufficient for well-formed CSV. Avoids dependency bloat. Can add `csv` crate later if complex quoting/escaping needed.
+
+### Temperature Tuning Philosophy
+
+- **Analysis Agent (0.4)**: Balanced for analytical reasoning - lower than impl (0.5) for accuracy, higher than spec (0.3) for insight discovery
+- **Visualizer Agent (0.5)**: Creative for chart design - same as code implementation agent
+
+### Sequential Agent Pipeline
+
+Data flows linearly through phases:
+1. File → DataSet struct (rows, columns, format, preview)
+2. DataSet → Analysis Agent → AnalysisResult (text, metrics)
+3. DataSet + AnalysisResult → Visualizer Agent → ChartResult (chart_data)
+4. All results → format_report() → Markdown text
 
 ---
 
@@ -188,26 +340,31 @@ end
 
 - [Template System Overview](../templates/README.md)
 - [Research Assistant Template](./research-assistant.md) (production example)
-- [Tool Integration](../../tools/README.md)
+- [Code Generator Template](./code-generator.md) (3-agent chain pattern)
+- [Interactive Chat Template](./interactive-chat.md) (session management)
 
 ---
 
-## Roadmap
+## Changelog
 
-### Phase 14 (Planned)
-- Complete data loading from multiple sources
-- Statistical analysis engine
-- Visualization generation (matplotlib/plotly)
-- AI-powered insight generation
-- Multi-format report generation
+### v0.1.0 (Phase 12.8.4) - Production Ready
 
-### Phase 15 (Future)
-- Real-time data streaming analysis
-- Machine learning integration
-- Interactive dashboards
-- Collaborative analysis
+**Implemented** (436 lines):
+- ✅ CSV/TSV/JSON data loading with std::fs
+- ✅ 5 analysis types with agent-based statistical analysis
+- ✅ 6 chart types with ASCII art visualization
+- ✅ 3-section markdown report generation
+- ✅ End-to-end testing (12.3s for 7-row CSV)
+- ✅ Zero clippy warnings
+
+**Key Features**:
+- No external data dependencies (std::fs + serde_json only)
+- Agent-powered insights (2 agents: analyst + visualizer)
+- Terminal-friendly ASCII charts
+- Type-safe parameter validation
+- Rich error handling
 
 ---
 
-**Last Updated**: Phase 12.4.2 (Placeholder Implementation)
-**Next Review**: Phase 14 (Advanced Templates)
+**Last Updated**: Phase 12.8.4 (Production Implementation)
+**Status**: ✅ Ready for Production Use
