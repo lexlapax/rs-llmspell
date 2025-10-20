@@ -40,7 +40,7 @@ pub struct ScriptExecutionMetadata {
 /// allowing the kernel to execute scripts without depending on specific
 /// script runtime implementations.
 #[async_trait]
-pub trait ScriptExecutor: Send + Sync {
+pub trait ScriptExecutor: Send + Sync + 'static {
     /// Execute a script and return the output
     ///
     /// # Arguments
@@ -255,6 +255,23 @@ pub trait ScriptExecutor: Send + Sync {
             source: None,
         })
     }
+
+    /// Downcast support for accessing concrete executor implementations (Phase 12.8.fix)
+    ///
+    /// Enables downcasting from `Arc<dyn ScriptExecutor>` to concrete types like `ScriptRuntime`.
+    /// This is needed for wiring infrastructure components that aren't part of the trait
+    /// (like RAG, state manager) without creating circular dependencies.
+    ///
+    /// Implementers must return `self` to enable downcasting.
+    ///
+    /// # Examples
+    ///
+    /// ```rust,ignore
+    /// fn as_any(&self) -> &dyn std::any::Any {
+    ///     self
+    /// }
+    /// ```
+    fn as_any(&self) -> &dyn std::any::Any;
 }
 
 /// Factory trait for creating script executors

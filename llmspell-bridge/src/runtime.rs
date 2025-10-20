@@ -259,6 +259,20 @@ pub struct ScriptRuntime {
     /// **Wiring flow:** Kernel creates → downcasts `ScriptRuntime` → calls `set_session_manager()`
     session_manager: Arc<RwLock<Option<Arc<llmspell_kernel::sessions::SessionManager>>>>,
 
+    /// RAG (Retrieval-Augmented Generation) infrastructure for template execution (Phase 12.8.fix)
+    ///
+    /// Wired from kernel after initialization to provide RAG capabilities to templates.
+    /// Uses interior mutability (`RwLock`) to allow setting after `ScriptRuntime` creation.
+    /// Optional to support standalone `ScriptRuntime` usage without RAG.
+    ///
+    /// **Why needed:**
+    /// - research-assistant template requires RAG for document ingestion and synthesis
+    /// - Multi-tenant vector storage for knowledge base operations
+    /// - Templates need RAG access via ExecutionContext
+    ///
+    /// **Wiring flow:** Kernel creates → downcasts `ScriptRuntime` → calls `set_rag()`
+    rag: Arc<RwLock<Option<Arc<llmspell_rag::multi_tenant_integration::MultiTenantRAG>>>>,
+
     /// Execution context
     execution_context: Arc<RwLock<crate::engine::ExecutionContext>>,
     /// Debug context for debugging support (uses interior mutability)
@@ -595,6 +609,7 @@ impl ScriptRuntime {
             agent_registry,   // NEW - infrastructure for templates
             workflow_factory, // NEW - infrastructure for templates
             session_manager: Arc::new(RwLock::new(None)), // Phase 12.8.2.5 - wired from kernel later
+            rag: Arc::new(RwLock::new(None)), // Phase 12.8.fix - wired from kernel later for RAG templates
             execution_context,
             debug_context: Arc::new(RwLock::new(None)),
             _config: config,
@@ -711,6 +726,7 @@ impl ScriptRuntime {
             agent_registry,
             workflow_factory,
             session_manager: Arc::new(RwLock::new(Some(session_manager))), // Wired during construction
+            rag: Arc::new(RwLock::new(None)), // Phase 12.8.fix - wired from kernel later for RAG templates
             execution_context,
             debug_context: Arc::new(RwLock::new(None)),
             _config: config,
@@ -825,6 +841,7 @@ impl ScriptRuntime {
             agent_registry,   // NEW - infrastructure for templates
             workflow_factory, // NEW - infrastructure for templates
             session_manager: Arc::new(RwLock::new(None)), // Phase 12.8.2.5 - wired from kernel later
+            rag: Arc::new(RwLock::new(None)), // Phase 12.8.fix - wired from kernel later for RAG templates
             execution_context,
             debug_context: Arc::new(RwLock::new(None)),
             _config: config,
@@ -1004,6 +1021,29 @@ impl ScriptRuntime {
         if let Ok(mut sm) = self.session_manager.write() {
             *sm = Some(session_manager);
             debug!("Session manager wired to ScriptRuntime");
+        }
+    }
+
+    /// Wire RAG infrastructure to `ScriptRuntime` for template execution (Phase 12.8.fix)
+    ///
+    /// This method is called by the kernel after `ScriptRuntime` initialization to wire in
+    /// the `MultiTenantRAG` for research-assistant and other RAG-dependent templates.
+    ///
+    /// # Examples
+    ///
+    /// ```rust,ignore
+    /// // In kernel initialization:
+    /// if let Some(runtime) = script_executor.as_any().downcast_ref::<ScriptRuntime>() {
+    ///     runtime.set_rag(multi_tenant_rag);
+    /// }
+    /// ```
+    pub fn set_rag(
+        &self,
+        rag: Arc<llmspell_rag::multi_tenant_integration::MultiTenantRAG>,
+    ) {
+        if let Ok(mut r) = self.rag.write() {
+            *r = Some(rag);
+            debug!("RAG infrastructure wired to ScriptRuntime");
         }
     }
 
@@ -1363,6 +1403,13 @@ impl ScriptExecutor for ScriptRuntime {
             .ok()
             .and_then(|guard| guard.clone());
 
+        // Get RAG if available (Phase 12.8.fix)
+        let rag = self
+            .rag
+            .read()
+            .ok()
+            .and_then(|guard| guard.clone());
+
         let mut builder = llmspell_templates::context::ExecutionContext::builder()
             .with_tool_registry(self.tool_registry.clone())
             .with_agent_registry(self.agent_registry.clone())
@@ -1373,6 +1420,12 @@ impl ScriptExecutor for ScriptRuntime {
         if let Some(sm) = session_manager {
             builder = builder.with_session_manager(sm);
             debug!("Session manager added to template execution context");
+        }
+
+        // Add RAG if wired from kernel (Phase 12.8.fix)
+        if let Some(r) = rag {
+            builder = builder.with_rag(r);
+            debug!("RAG infrastructure added to template execution context");
         }
 
         let context = builder.build().map_err(|e| LLMSpellError::Component {
@@ -1504,6 +1557,10 @@ impl ScriptExecutor for ScriptRuntime {
             message: format!("Failed to serialize schema: {e}"),
             source: None,
         })
+    }
+
+    fn as_any(&self) -> &dyn std::any::Any {
+        self
     }
 }
 

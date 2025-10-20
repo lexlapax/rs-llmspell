@@ -21,6 +21,8 @@ llmspell-utils = { path = "../llmspell-utils" }
 llmspell-storage = { path = "../llmspell-storage" }
 llmspell-events = { path = "../llmspell-events" }
 llmspell-hooks = { path = "../llmspell-hooks" }
+llmspell-tenancy = { path = "../llmspell-tenancy" }
+llmspell-rag = { path = "../llmspell-rag" }
 # llmspell-templates removed - templates now accessed via kernel message protocol
 llmspell-agents = { path = "../llmspell-agents" }
 llmspell-tools = { path = "../llmspell-tools" }

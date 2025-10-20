@@ -859,6 +859,10 @@ impl ScriptExecutor for StubExecutor {
     fn component_registry(&self) -> Option<Arc<dyn llmspell_core::ComponentLookup>> {
         None
     }
+
+    fn as_any(&self) -> &dyn std::any::Any {
+        self
+    }
 }
 
 /// Start embedded kernel with full infrastructure (Phase 12.8.2.11 - Unified Path)
@@ -1636,6 +1640,10 @@ pub async fn start_kernel_service(port: u16, config: LLMSpellConfig) -> Result<S
 
         fn component_registry(&self) -> Option<Arc<dyn ComponentLookup>> {
             Some(self.component_registry.clone())
+        }
+
+        fn as_any(&self) -> &dyn std::any::Any {
+            self
         }
     }
 

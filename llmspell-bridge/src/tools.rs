@@ -531,16 +531,12 @@ async fn register_search_tools(
     web_search_config: &llmspell_config::tools::WebSearchConfig,
 ) -> Result<(), Box<dyn std::error::Error>> {
     // Web searcher: register with kebab-case primary name - manual dual-registration (create separate instances)
-    // Convert from llmspell_config WebSearchConfig to llmspell_tools WebSearchConfig
-    // Note: Config structures have different fields - using defaults for missing ones
-    let tool_config = WebSearchConfig {
-        default_provider: "duckduckgo".to_string(), // Default provider
-        providers: HashMap::new(),                  // TODO: Add provider configuration
-        max_results: web_search_config.max_results,
-        safe_search: true,                              // Default to safe search
-        language: None,                                 // Default language
-        fallback_chain: vec!["duckduckgo".to_string()], // Default fallback
-    };
+    // Load config from environment to pick up API keys (BRAVE_API_KEY, SERPAPI_API_KEY, SERPERDEV_API_KEY, etc.)
+    // This sets up the full fallback chain: duckduckgo → serperdev → brave → google → serpapi
+    let mut tool_config = WebSearchConfig::from_env();
+
+    // Override with user-specified max_results if provided
+    tool_config.max_results = web_search_config.max_results;
     component_registry.register_tool(
         "web-searcher".to_string(),
         Arc::new(WebSearchTool::new(tool_config.clone())?),

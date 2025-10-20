@@ -15,6 +15,7 @@ llmspell-agents = { path = "../llmspell-agents" }
 llmspell-workflows = { path = "../llmspell-workflows" }
 llmspell-tools = { path = "../llmspell-tools" }
 llmspell-rag = { path = "../llmspell-rag" }
+llmspell-tenancy = { path = "../llmspell-tenancy" }
 llmspell-providers = { path = "../llmspell-providers" }
 llmspell-utils = { path = "../llmspell-utils" }
 

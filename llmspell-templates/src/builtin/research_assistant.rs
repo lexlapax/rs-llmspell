@@ -19,7 +19,7 @@ use crate::{
 use async_trait::async_trait;
 use serde_json::json;
 use std::time::Instant;
-use tracing::{info, warn};
+use tracing::{debug, info, warn};
 
 /// Research Assistant Template
 ///
@@ -267,12 +267,17 @@ impl ResearchAssistantTemplate {
         // Get tool registry from context
         let tool_registry = context.tool_registry();
 
-        // Create input for web-searcher tool with parameters
+        // Create input for web-searcher tool with properly nested parameters
+        // Note: extract_parameters() expects { "parameters": { ... } } structure
+        let nested_params = serde_json::json!({
+            "input": topic,
+            "max_results": max_sources,
+            "search_type": "web"
+        });
+
         let input = AgentInput::builder()
             .text("") // Empty text, using parameters instead
-            .parameter("input", topic)
-            .parameter("max_results", max_sources as u64)
-            .parameter("search_type", "web")
+            .parameter("parameters", nested_params)
             .build();
 
         // Execute web search
@@ -344,6 +349,7 @@ impl ResearchAssistantTemplate {
     ) -> Result<RagIngestionResult> {
         use llmspell_core::state::StateScope;
         use std::collections::HashMap;
+        use std::time::SystemTime;
 
         info!(
             "Ingesting {} sources into RAG with tag: '{}'",
@@ -355,6 +361,24 @@ impl ResearchAssistantTemplate {
         let rag = context.rag().ok_or_else(|| {
             TemplateError::InfrastructureUnavailable("RAG not available".to_string())
         })?;
+
+        // Create tenant if it doesn't exist (auto-provisioning for research sessions)
+        // Uses session_tag as tenant ID for isolation
+        let tenant_config = llmspell_tenancy::TenantConfig {
+            tenant_id: session_tag.to_string(),
+            name: format!("Research Session: {}", session_tag),
+            limits: llmspell_tenancy::TenantLimits::default(),
+            active: true,
+            metadata: std::collections::HashMap::new(),
+            created_at: SystemTime::now(),
+            last_accessed: SystemTime::now(),
+            custom_config: None,
+        };
+
+        // Create tenant (ignore error if already exists)
+        if let Err(e) = rag.tenant_manager().create_tenant(tenant_config).await {
+            debug!("Tenant creation skipped (may already exist): {}", e);
+        }
 
         // Create session scope for isolation
         let scope = StateScope::Custom(format!("research_session:{}", session_tag));

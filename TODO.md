@@ -3492,7 +3492,7 @@ context.state_manager()      // Option<Arc<StateManager>> - state persistence
 **File**: `llmspell-templates/src/builtin/research_assistant.rs` + `llmspell-rag/src/multi_tenant_integration.rs`
 **Current Status**: ✅ ALL 6 PHASES COMPLETE - Full RAG pipeline: web search → embed → store → retrieve → synthesize → validate
 
-**Phase 1: Gather Sources via Web Search** ✅ COMPLETE (2-3 hours)
+#### Subtask 12.8.1.1: Gather Sources via Web Search** ✅ COMPLETE (2-3 hours)
 - **Replaced**: lines 252-334 (`gather_sources` placeholder → real implementation)
 - **Implementation Insights**:
   - ✅ AgentInput API: Uses **builder pattern** `.builder().parameter(k, v).build()`, NOT `with_parameters()`
@@ -3506,7 +3506,7 @@ context.state_manager()      // Option<Arc<StateManager>> - state persistence
 - **Testing**: Compilation verified with `cargo check -p llmspell-templates` ✅
 - **Error Handling**: Tool not found, JSON parse failures, empty results, missing fields
 
-**Phase 2: Ingest Sources into RAG** ✅ COMPLETE (2-3 hours)
+#### Subtask 12.8.1.2: Ingest Sources into RAG** ✅ COMPLETE (2-3 hours)
 - **Replaced**: lines 334-416 (`ingest_sources` placeholder → real RAG storage integration)
 - **Implementation Insights**:
   - ✅ RAG access: `context.rag()` returns `Option<Arc<MultiTenantRAG>>`, check availability with `.ok_or_else()`
@@ -3521,7 +3521,7 @@ context.state_manager()      // Option<Arc<StateManager>> - state persistence
 - **Testing**: Compilation verified ✅, full storage pipeline tested, 60 RAG unit tests passing
 - **Architecture**: Clean high-level API for RAG storage - single method call handles embedding + metadata + storage
 
-**Phase 3: Synthesize Findings with Agent** ✅ COMPLETE (3-4 hours)
+#### Subtask 12.8.1.3: Synthesize Findings with Agent** ✅ COMPLETE (3-4 hours)
 - **Replaced**: lines 418-575 (`synthesize_findings` placeholder → real agent with RAG retrieval)
 - **Implementation Insights**:
   - ✅ RAG retrieval integration: `rag.retrieve_context(tenant_id, query, scope, k)` retrieves top 5 relevant sources
@@ -3540,7 +3540,7 @@ context.state_manager()      // Option<Arc<StateManager>> - state persistence
 - **Testing**: Compilation verified ✅, RAG retrieval tested, context formatting verified
 - **Key Learning**: AgentConfig and Agent trait patterns + RAG-augmented prompt engineering
 
-**Phase 4: Validate Citations with Agent** ✅ COMPLETE (2-3 hours)
+#### Subtask 12.8.1.4: Validate Citations with Agent** ✅ COMPLETE (2-3 hours)
 - **Replaced**: lines 583-697 (`validate_citations` placeholder → validation agent)
 - **Implementation Insights**:
   - ✅ Similar agent creation pattern as Phase 3
@@ -3555,7 +3555,7 @@ context.state_manager()      // Option<Arc<StateManager>> - state persistence
 - **Files Modified**: `llmspell-templates/src/builtin/research_assistant.rs:551-665` (115 lines)
 - **Testing**: Compilation verified ✅
 
-**Phase 5: RAG Storage Integration** ✅ COMPLETE (2.5 hours actual)
+#### Subtask 12.8.1.5: RAG Storage Integration** ✅ COMPLETE (2.5 hours actual)
 **Priority**: CRITICAL (Blocked Phase 2 completion) → RESOLVED
 **Problem**: Phase 2 generated embeddings but couldn't store them - no high-level storage API exposed
 **Solution Implemented**: Option A - Added `MultiTenantRAG.ingest_documents()` high-level API
@@ -3590,7 +3590,7 @@ context.state_manager()      // Option<Arc<StateManager>> - state persistence
 - `llmspell-rag/src/multi_tenant_integration.rs` (+87 lines: new method + RetrievalResult struct)
 - `llmspell-templates/src/builtin/research_assistant.rs` (net -22 lines: cleaner API)
 
-**Phase 6: RAG Retrieval Integration** ✅ COMPLETE (2 hours actual)
+#### Subtask 12.8.1.6: RAG Retrieval Integration** ✅ COMPLETE (2 hours actual)
 **Priority**: CRITICAL (Blocked Phase 3 completion) → RESOLVED
 **Problem**: Phase 3 synthesized without RAG context - no search/retrieval method exposed
 **Solution Implemented**: Added `MultiTenantRAG.retrieve_context()` + `RetrievalResult` struct
@@ -3649,7 +3649,7 @@ SOURCE 2: ...
 - [x] Unit tests: 170 passing (60 RAG + 110 templates) ✅
 - [x] Clippy: Clean (0 warnings) ✅
 
-**Phase 12.8.1 Summary**: ✅ COMPLETE (All 6 phases done)
+#### Phase 12.8.1 Summary**: ✅ COMPLETE (All 6 phases done)
 - **Status**: COMPLETE - Full research-assistant template with RAG pipeline (16 hours actual vs 14-18h estimate)
 - **Completed Work**:
   - **Phases 1-4** (Template Implementation): 413 lines in research_assistant.rs
@@ -3683,6 +3683,117 @@ SOURCE 2: ...
   - Phases 5-6: 4.5 hours actual (estimate: 4-6h)
   - Total: 16.5 hours (within 14-18h estimate)
 - **Next**: Task 12.8.2 (interactive-chat template) or CLI integration testing
+
+#### Subtask 12.8.1.7: Production Integration & Testing** (2025-10-20) ⏳ IN PROGRESS
+- [x] **Issue**: RAG infrastructure not wired to ExecutionContext for templates
+  - Root Cause: ScriptRuntime had no `rag` field (llmspell-bridge/src/runtime.rs)
+  - Solution: Added rag field, set_rag() method, wired in handle_template_exec()
+  - Files: llmspell-bridge/src/runtime.rs:274,612,729,843,1040-1047,1405-1428,1562-1564
+  - CLI: llmspell-cli/src/execution_context.rs:250-269 (creates HNSWVectorStorage + MultiTenantRAG)
+  - Trait: llmspell-core/src/traits/script_executor.rs:43,272-274 (added as_any() method)
+  - Result: ✅ Research-assistant now progresses past RAG check
+- [x] **Issue**: Web search providers not configured (empty HashMap)
+  - Root Cause: llmspell-bridge/src/tools.rs:536-542 used hardcoded empty config
+  - Solution: Changed to `WebSearchConfig::from_env()` to load API keys
+  - API Keys Active: BRAVE_API_KEY, SERPAPI_API_KEY, SERPERDEV_API_KEY
+  - Fallback Chain: duckduckgo → serperdev → brave → google → serpapi
+  - Result: ✅ SerperDev succeeded (0.6s), DuckDuckGo failed gracefully
+  - File: llmspell-bridge/src/tools.rs:533-539
+- [x] **Issue**: RAG multi-tenancy requires pre-created tenants
+  - Error: "Tenant research-{uuid} not found"
+  - Solution: Auto-create tenant in research-assistant before RAG ingestion
+  - Implementation: Added tenant_manager() accessor to MultiTenantRAG
+  - File: llmspell-rag/src/multi_tenant_integration.rs:128-135
+  - File: llmspell-templates/src/builtin/research_assistant.rs:365-381
+  - Result: ✅ Tenant auto-provisioning works
+- [x] **Test**: Verify research-assistant end-to-end with real LLM
+  - Steps: Web search → RAG ingest → Synthesis → Validation
+  - Result: ✅ SUCCESS (11.35s) - Full research report with citations
+  - Provider: SerperDev (2 sources)
+- [x] **Test**: Verify other web search providers (Brave, SerpApi)
+  - Brave: ✅ SUCCESS (10s, 2 sources)
+  - SerpApi: ✅ SUCCESS (8.51s, 2 sources)
+  - Result: All 3 commercial APIs verified working
+- [x] **Research**: Additional web search providers
+  - Candidates: Tavily (AI-optimized RAG), Bing (1k/month free), DuckDuckGo HTML scraping
+  - Findings: See Phase 7.1 sub-tasks below
+  - Decision: Add Tavily + Bing + DuckDuckGo scraping
+
+#### Subtask 12.8.1.7.1: Web Search Provider Enhancements** ⏳ IN PROGRESS
+Research findings and implementation plan for enhanced web search capabilities.
+
+**Research Summary**:
+- **DuckDuckGo**: Current Instant Answer API only returns knowledge answers (Wikipedia-style), not actual web search results
+  - Solution: Replace with HTML scraping using duckduckgo_rs crate (updated Jan 2025) or custom scraper
+  - Free tier: No limits (rate limit: ~20 req/sec)
+- **Tavily AI**: AI-optimized search designed specifically for RAG/LLM workflows
+  - Features: Aggregates 20 sites/call, returns filtered/ranked results optimized for LLM context
+  - Free tier: 1,000 searches/month (User has TAVILY_API_KEY)
+  - Best fit for research-assistant use case (higher quality than generic search)
+- **Bing Search API**: Microsoft Azure search with free tier
+  - Free tier: 1,000 transactions/month, 3 TPS limit
+  - Note: Prices increased 3-10x in 2023 due to AI improvements
+
+**Implementation Sub-Tasks**:
+- [ ] **Subtask 12.8.1.7.1.1**: Implement Tavily search provider (~2 hours)
+  - Create: llmspell-tools/src/search/providers/tavily.rs (~120 lines following brave.rs pattern)
+  - API: POST https://api.tavily.com/search with {query, max_results, search_depth}
+  - Response: {results: [{title, url, content, score}], answer: string}
+  - Rate limit: None specified (1k/month limit)
+  - Integration: Update web_search.rs:71-131 (from_env), :193-273 (provider init)
+  - Re-export: Update providers/mod.rs:9-20
+  - Env var: TAVILY_API_KEY (already available)
+- [ ] **Subtask 12.8.1.7.1.2**: Implement Bing search provider (~2 hours)
+  - Create: llmspell-tools/src/search/providers/bing.rs (~150 lines, similar to brave.rs)
+  - API: GET https://api.bing.microsoft.com/v7.0/search?q={query}&count={max}
+  - Headers: Ocp-Apim-Subscription-Key for authentication
+  - Response: {webPages: {value: [{name, url, snippet}]}}
+  - Rate limit: 3 TPS for free tier
+  - Integration: Update web_search.rs:71-131 (from_env), :193-273 (provider init)
+  - Re-export: Update providers/mod.rs
+  - Env vars: BING_API_KEY or WEBSEARCH_BING_API_KEY
+- [ ] **Subtask 12.8.1.7.1.3**: Replace DuckDuckGo Instant Answer API with HTML scraping (~3 hours)
+  - Option A: Use duckduckgo_rs crate (if compatible with our architecture)
+  - Option B: Custom implementation using reqwest + scraper crate
+  - Scraping target: https://html.duckduckgo.com/html/?q={query}
+  - Parsing: Extract title/url/snippet from result divs
+  - Rate limiting: Respect ~20 req/sec unofficial limit
+  - File: llmspell-tools/src/search/providers/duckduckgo.rs (replace 191 lines)
+  - Challenge: May require user-agent rotation, anti-bot evasion
+  - Fallback: Keep current API as backup if scraping fails
+- [ ] **Subtask 12.8.1.7.1.4**: Update web search fallback chain priorities (~30 min)
+  - New priority order: tavily → serperdev → brave → bing → serpapi → duckduckgo
+  - Rationale: AI-optimized (Tavily) → High free tier (SerperDev 2.5k) → Brave (2k) → Bing (1k) → SerpApi (100) → DuckDuckGo (backup)
+  - File: llmspell-tools/src/search/web_search.rs:52-58 (WebSearchConfig::default fallback_chain)
+  - Update: Default provider from "duckduckgo" → "tavily" for research-assistant quality
+- [ ] **Subtask 12.8.1.7.1.5**: Test all providers end-to-end (~1 hour)
+  - Test matrix: 6 providers × 3 search types (web/news/images where supported)
+  - Verify: API key loading, rate limiting, fallback behavior, response parsing
+  - Commands:
+    - Tavily: `./target/debug/llmspell template exec research-assistant --param topic="Rust macros" --param max_sources=2 --param model=ollama/llama3.2:3b`
+    - Bing: Same with SERPERDEV_API_KEY="" BRAVE_API_KEY="" to force fallback
+    - DuckDuckGo scraping: Disable all commercial APIs to test
+  - Expected: All providers return valid SearchResult structs
+- [ ] **Subtask 12.8.1.7.1.6**: Update documentation (~1 hour)
+  - File: docs/user-guide/templates/research-assistant.md (add provider comparison table)
+  - File: docs/technical/environment-variables.md (add TAVILY_API_KEY, BING_API_KEY)
+  - File: llmspell-tools/src/search/web_search.rs (update doc comments with new providers)
+  - Add: Provider comparison (cost, free tier, quality, latency)
+  - Add: Recommendation matrix (RAG use case → Tavily, general → SerperDev, self-hosted → DuckDuckGo)
+
+**Estimated Total Time**: 9.5 hours (Tavily 2h + Bing 2h + DuckDuckGo 3h + Chain 0.5h + Testing 1h + Docs 1h)
+
+**Files Modified (#### Subtask 12.8.1.7 + 7.1 )**:
+- llmspell-core/src/traits/script_executor.rs (added as_any() trait method)
+- llmspell-bridge/src/runtime.rs (added rag field + set_rag() + wiring)
+- llmspell-bridge/src/tools.rs (web search config from env)
+- llmspell-cli/Cargo.toml (added llmspell-tenancy, llmspell-rag)
+- llmspell-cli/src/execution_context.rs (create RAG infrastructure)
+- llmspell-kernel/src/api.rs (as_any() for stub executors)
+- llmspell-templates/src/builtin/research_assistant.rs (fixed parameter wrapping + auto-tenant creation)
+- llmspell-templates/Cargo.toml (added llmspell-tenancy dependency)
+- llmspell-rag/src/multi_tenant_integration.rs (added tenant_manager() accessor)
+- llmspell-tools/src/search/web_search_old.rs (DELETED - 480 lines technical debt)
 
 ---
 
@@ -7658,10 +7769,18 @@ Chart Quality: ASCII bar chart with █ blocks, sales values, revenue labels
   - code-generator: ✅ 19.24s, 3 agents (spec, implementation, test) - Full fibonacci function generated
   - data-analysis: ✅ 9.31s, 2 agents (analyst, visualizer) - Statistical analysis + ASCII chart
   - interactive-chat: ✅ 1.78s, 1 agent - Answered "capital of France" correctly
-  - research-assistant: ⚠️ Requires web-searcher tool (external dependency) - Expected limitation
+  - research-assistant: ⚠️ Requires RAG infrastructure (ExecutionContext.rag()) - Expected limitation
   - workflow-orchestrator: ✅ 0.85s, 2 agents - Sequential workflow executed
   - document-processor: ✅ 5.61s, 1 agent - AI-powered summarization
-- [x] **5 out of 6 templates work completely** (research-assistant requires external tool setup)
+- [x] **5 out of 6 templates work completely** (research-assistant requires RAG infrastructure)
+- [x] **Research-assistant parameter bug fixed & technical debt cleanup** (2025-10-20):
+  - **Bug Fix**: Fixed parameter nesting in research_assistant.rs:280
+    - Changed: `.parameter("parameters", nested_params)` instead of flat structure
+    - Web-searcher tool now called correctly (verified by error progressing to RAG check)
+  - **Technical Debt**: Deleted obsolete llmspell-tools/src/search/web_search_old.rs (480 lines)
+  - **Verification**: Build + clippy + 122 tests pass with zero warnings
+  - **RAG Requirement**: Expected limitation - template designed for Phase 13 (Adaptive Memory System)
+  - **File**: llmspell-templates/src/builtin/research_assistant.rs:270-283
 - [x] **No placeholder warnings** in any working template execution
 
 **Sub-Task 12.8.7.3: Quality Gates** (1 hour) ✅ COMPLETE
