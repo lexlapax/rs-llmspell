@@ -252,8 +252,12 @@ async fn create_full_infrastructure(
     use llmspell_storage::HNSWConfig;
     let hnsw_config = HNSWConfig::default();
     let vector_storage = Arc::new(HNSWVectorStorage::new(384, hnsw_config)); // 384 dimensions for default embedding model
-    let tenant_manager = Arc::new(llmspell_tenancy::MultiTenantVectorManager::new(vector_storage));
-    let multi_tenant_rag = Arc::new(llmspell_rag::multi_tenant_integration::MultiTenantRAG::new(tenant_manager));
+    let tenant_manager = Arc::new(llmspell_tenancy::MultiTenantVectorManager::new(
+        vector_storage,
+    ));
+    let multi_tenant_rag = Arc::new(llmspell_rag::multi_tenant_integration::MultiTenantRAG::new(
+        tenant_manager,
+    ));
 
     // Create ScriptRuntime WITH SessionManager passed to inject_apis()
     let script_executor = llmspell_bridge::create_script_executor_with_provider_and_session(
@@ -265,7 +269,10 @@ async fn create_full_infrastructure(
 
     // Wire RAG to ScriptRuntime (Phase 12.8.fix)
     // Downcast to ScriptRuntime to call set_rag()
-    if let Some(runtime) = script_executor.as_any().downcast_ref::<llmspell_bridge::ScriptRuntime>() {
+    if let Some(runtime) = script_executor
+        .as_any()
+        .downcast_ref::<llmspell_bridge::ScriptRuntime>()
+    {
         runtime.set_rag(multi_tenant_rag);
         debug!("RAG infrastructure wired to ScriptRuntime");
     }

@@ -1,5 +1,5 @@
 //! ABOUTME: Enhanced web search tool implementation with multiple provider support
-//! ABOUTME: Supports `DuckDuckGo`, Google, Brave, `SerpApi`, and `SerperDev` with rate limiting
+//! ABOUTME: Supports Tavily, Bing, `DuckDuckGo`, Google, Brave, `SerpApi`, and `SerperDev` with rate limiting
 
 use async_trait::async_trait;
 use llmspell_core::{
@@ -25,8 +25,9 @@ use tracing::{debug, error, info, instrument, warn};
 use crate::api_key_integration::{get_api_key, ApiKeyConfig, RequiresApiKey};
 
 use crate::search::providers::{
-    BraveSearchProvider, DuckDuckGoProvider, GoogleSearchProvider, ProviderConfig, SearchOptions,
-    SearchProvider, SearchResult, SearchType, SerpApiProvider, SerperDevProvider,
+    BingSearchProvider, BraveSearchProvider, DuckDuckGoProvider, GoogleSearchProvider,
+    ProviderConfig, SearchOptions, SearchProvider, SearchResult, SearchType, SerpApiProvider,
+    SerperDevProvider, TavilySearchProvider,
 };
 
 /// Web search configuration
@@ -48,17 +49,18 @@ pub struct WebSearchConfig {
 
 impl Default for WebSearchConfig {
     fn default() -> Self {
-        // Default fallback chain prioritizes free/high-limit providers
+        // Fallback chain prioritizes AI-optimized quality then high free tiers
         let fallback_chain = vec![
-            "duckduckgo".to_string(), // No API key required
+            "tavily".to_string(),     // 1,000/month free - AI-optimized for RAG
             "serperdev".to_string(),  // 2,500/month free
             "brave".to_string(),      // 2,000/month free
-            "google".to_string(),     // 100/day free
+            "bing".to_string(),       // 1,000/month free
             "serpapi".to_string(),    // 100/month free
+            "duckduckgo".to_string(), // No API key (backup)
         ];
 
         Self {
-            default_provider: "duckduckgo".to_string(),
+            default_provider: "tavily".to_string(), // AI-optimized for research-assistant quality
             providers: HashMap::new(),
             max_results: 10,
             safe_search: true,
@@ -130,6 +132,30 @@ impl WebSearchConfig {
             providers.insert("serperdev".to_string(), serperdev_config);
         }
 
+        // Tavily configuration - use API key manager with fallback to env vars
+        if let Some(api_key) = get_api_key("tavily")
+            .or_else(|| std::env::var("WEBSEARCH_TAVILY_API_KEY").ok())
+            .or_else(|| std::env::var("TAVILY_API_KEY").ok())
+        {
+            let tavily_config = ProviderConfig {
+                api_key: Some(api_key),
+                ..Default::default()
+            };
+            providers.insert("tavily".to_string(), tavily_config);
+        }
+
+        // Bing configuration - use API key manager with fallback to env vars
+        if let Some(api_key) = get_api_key("bing")
+            .or_else(|| std::env::var("WEBSEARCH_BING_API_KEY").ok())
+            .or_else(|| std::env::var("BING_API_KEY").ok())
+        {
+            let bing_config = ProviderConfig {
+                api_key: Some(api_key),
+                ..Default::default()
+            };
+            providers.insert("bing".to_string(), bing_config);
+        }
+
         // DuckDuckGo doesn't need configuration
         providers.insert("duckduckgo".to_string(), ProviderConfig::default());
 
@@ -164,6 +190,8 @@ impl RequiresApiKey for WebSearchTool {
             ApiKeyConfig::new("brave_search").required(false),
             ApiKeyConfig::new("serpapi").required(false),
             ApiKeyConfig::new("serperdev").required(false),
+            ApiKeyConfig::new("tavily").required(false),
+            ApiKeyConfig::new("bing").required(false),
         ]
     }
 }
@@ -259,6 +287,46 @@ impl WebSearchTool {
                             rate_limiter: Some(
                                 RateLimiterBuilder::default()
                                     .per_minute(80) // ~2500/month spread evenly
+                                    .sliding_window()
+                                    .build()
+                                    .map_err(|e| LLMSpellError::Internal {
+                                        message: format!("Failed to create rate limiter: {e}"),
+                                        source: None,
+                                    })?,
+                            ),
+                        })
+                    } else {
+                        None
+                    }
+                }
+                "tavily" => {
+                    let provider = TavilySearchProvider::new(provider_config.clone());
+                    if provider.is_available() {
+                        Some(ProviderWrapper {
+                            provider: Box::new(provider),
+                            rate_limiter: Some(
+                                RateLimiterBuilder::default()
+                                    .per_minute(30) // ~1000/month conservative
+                                    .sliding_window()
+                                    .build()
+                                    .map_err(|e| LLMSpellError::Internal {
+                                        message: format!("Failed to create rate limiter: {e}"),
+                                        source: None,
+                                    })?,
+                            ),
+                        })
+                    } else {
+                        None
+                    }
+                }
+                "bing" => {
+                    let provider = BingSearchProvider::new(provider_config.clone());
+                    if provider.is_available() {
+                        Some(ProviderWrapper {
+                            provider: Box::new(provider),
+                            rate_limiter: Some(
+                                RateLimiterBuilder::default()
+                                    .per_minute(30) // ~1000/month conservative, 3 TPS = ~180/min but be conservative
                                     .sliding_window()
                                     .build()
                                     .map_err(|e| LLMSpellError::Internal {
@@ -421,7 +489,7 @@ impl Tool for WebSearchTool {
             name: "provider".to_string(),
             param_type: ParameterType::String,
             description:
-                "Search provider: google, brave, duckduckgo, serpapi, or serperdev (optional)"
+                "Search provider: tavily, bing, google, brave, duckduckgo, serpapi, or serperdev (optional)"
                     .to_string(),
             required: false,
             default: Some(serde_json::json!(self.config.default_provider)),
