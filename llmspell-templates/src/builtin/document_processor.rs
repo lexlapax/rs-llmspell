@@ -239,39 +239,62 @@ impl crate::core::Template for DocumentProcessorTemplate {
 }
 
 impl DocumentProcessorTemplate {
+    /// Helper: Read document file from path (supports .txt, .md files)
+    fn read_document_file(path: &str) -> Result<ExtractedDocument> {
+        use std::fs;
+
+        // Read file content
+        let content = fs::read_to_string(path).map_err(|e| {
+            TemplateError::ExecutionFailed(format!("Failed to read file '{}': {}", path, e))
+        })?;
+
+        // Count words (split on whitespace)
+        let word_count = content.split_whitespace().count();
+
+        // Calculate "pages" (500 words per page)
+        let page_count = (word_count as f64 / 500.0).ceil() as usize;
+        let page_count = if page_count == 0 { 1 } else { page_count };
+
+        Ok(ExtractedDocument {
+            source_path: path.to_string(),
+            extracted_text: content,
+            page_count,
+            word_count,
+        })
+    }
+
     /// Phase 1: Extract text from documents in parallel
     async fn extract_parallel(
         &self,
         document_paths: &[String],
         _context: &ExecutionContext,
     ) -> Result<Vec<ExtractedDocument>> {
-        // TODO: Implement actual parallel extraction with pdf-reader and ocr tools
-        // For now, return placeholder extracted documents
-        warn!(
-            "Parallel document extraction not yet implemented - using placeholders for {} docs",
+        // Real file extraction for text/markdown files
+        // Note: PDF/OCR support deferred to Phase 14
+        info!(
+            "Extracting text from {} documents (text/markdown files supported)",
             document_paths.len()
         );
 
         let mut extracted = Vec::new();
         for (idx, path) in document_paths.iter().enumerate() {
-            extracted.push(ExtractedDocument {
-                source_path: path.clone(),
-                extracted_text: format!(
-                    "# Extracted Text from Document {}\n\n\
-                     Source: {}\n\n\
-                     ## Page 1\n\
-                     [Placeholder extracted text from page 1]\n\
-                     Lorem ipsum dolor sit amet, consectetur adipiscing elit...\n\n\
-                     ## Page 2\n\
-                     [Placeholder extracted text from page 2]\n\
-                     Sed do eiusmod tempor incididunt ut labore...\n\n\
-                     Total pages: 2\n",
-                    idx + 1,
-                    path
-                ),
-                page_count: 2,
-                word_count: 150,
-            });
+            match Self::read_document_file(path) {
+                Ok(doc) => {
+                    info!(
+                        "Extracted document {}/{}: {} ({} words, {} pages)",
+                        idx + 1,
+                        document_paths.len(),
+                        path,
+                        doc.word_count,
+                        doc.page_count
+                    );
+                    extracted.push(doc);
+                }
+                Err(e) => {
+                    warn!("Failed to extract document {}: {}", path, e);
+                    return Err(e);
+                }
+            }
         }
 
         Ok(extracted)
@@ -283,7 +306,8 @@ impl DocumentProcessorTemplate {
         document_paths: &[String],
         context: &ExecutionContext,
     ) -> Result<Vec<ExtractedDocument>> {
-        // Sequential extraction is same as parallel in placeholder
+        // Note: Currently same as parallel (both read synchronously)
+        // Future Phase 14: Use tokio::spawn for true parallel file I/O
         self.extract_parallel(document_paths, context).await
     }
 
@@ -292,99 +316,151 @@ impl DocumentProcessorTemplate {
         &self,
         documents: &[ExtractedDocument],
         transformation_type: &str,
-        _model: &str,
-        _context: &ExecutionContext,
+        model: &str,
+        context: &ExecutionContext,
     ) -> Result<Vec<TransformedDocument>> {
-        // TODO: Implement actual agent-based transformation
-        // For now, return placeholder transformations
-        warn!(
-            "Content transformation not yet implemented - using placeholder for type: {}",
+        use llmspell_agents::factory::{AgentConfig, ModelConfig, ResourceLimits};
+        use llmspell_core::types::AgentInput;
+
+        info!(
+            "Transforming {} documents with agent (type: {})",
+            documents.len(),
             transformation_type
         );
 
+        // Parse model string (provider/model format)
+        let (provider, model_id) = if let Some(slash_pos) = model.find('/') {
+            (
+                model[..slash_pos].to_string(),
+                model[slash_pos + 1..].to_string(),
+            )
+        } else {
+            ("ollama".to_string(), model.to_string())
+        };
+
+        // Create agent config for document transformation
+        let agent_config = AgentConfig {
+            name: "doc-transformer-agent".to_string(),
+            description: format!("Document transformation agent for {} transformation", transformation_type),
+            agent_type: "llm".to_string(),
+            model: Some(ModelConfig {
+                provider,
+                model_id,
+                temperature: Some(0.5), // Balanced for creative yet accurate transformation
+                max_tokens: Some(2000),
+                settings: serde_json::Map::new(),
+            }),
+            allowed_tools: vec![],
+            custom_config: serde_json::Map::new(),
+            resource_limits: ResourceLimits {
+                max_execution_time_secs: 120,
+                max_memory_mb: 512,
+                max_tool_calls: 0,
+                max_recursion_depth: 1,
+            },
+        };
+
+        // Create the transformation agent
+        let agent = context
+            .agent_registry()
+            .create_agent(agent_config)
+            .await
+            .map_err(|e| {
+                warn!("Failed to create transformation agent: {}", e);
+                TemplateError::ExecutionFailed(format!("Agent creation failed: {}", e))
+            })?;
+
+        // Transform each document with the agent
         let mut transformed = Vec::new();
-        for doc in documents {
-            let content = match transformation_type {
-                "summarize" => format!(
-                    "# Summary: {}\n\n\
-                     ## Executive Summary\n\
-                     This document contains {} words across {} pages. \
-                     Key points have been extracted and summarized below.\n\n\
-                     ## Extracted Content Preview\n\
-                     {}\n\n\
-                     ## Key Points\n\
-                     1. Main topic discussed in section 1\n\
-                     2. Important findings from section 2\n\
-                     3. Conclusions and recommendations\n\n\
-                     ## Source\n\
-                     Original document: {}\n",
-                    doc.source_path,
-                    doc.word_count,
-                    doc.page_count,
-                    doc.extracted_text
-                        .lines()
-                        .take(5)
-                        .collect::<Vec<_>>()
-                        .join("\n"),
-                    doc.source_path
-                ),
-                "extract_key_points" => format!(
-                    "# Key Points: {}\n\n\
-                     ## Original Content\n\
-                     {}\n\n\
-                     ## Extracted Key Points\n\
-                     - Point 1: [Extracted from page 1]\n\
-                     - Point 2: [Extracted from page 1]\n\
-                     - Point 3: [Extracted from page 2]\n\
-                     - Point 4: [Extracted from page 2]\n\n\
-                     Total pages analyzed: {}\n",
-                    doc.source_path,
-                    doc.extracted_text
-                        .lines()
-                        .take(3)
-                        .collect::<Vec<_>>()
-                        .join("\n"),
-                    doc.page_count
-                ),
-                "translate" => format!(
-                    "# Translated Content: {}\n\n\
-                     [Placeholder translation of extracted text]\n\
-                     This would contain the translated version of the {} words \
-                     from the original document.\n\n\
-                     Source: {}\n",
-                    doc.source_path, doc.word_count, doc.source_path
-                ),
-                "reformat" => format!(
-                    "# Reformatted Document: {}\n\n\
-                     [Placeholder reformatted version]\n\
-                     Content has been restructured and formatted for better readability.\n\n\
-                     Original pages: {}, Words: {}\n",
-                    doc.source_path, doc.page_count, doc.word_count
-                ),
-                "classify" => format!(
-                    "# Document Classification: {}\n\n\
-                     ## Classification Results\n\
-                     - Category: Technical Documentation\n\
-                     - Confidence: 0.85\n\
-                     - Language: English\n\
-                     - Content Type: Informational\n\n\
-                     Pages: {}, Words: {}\n",
-                    doc.source_path, doc.page_count, doc.word_count
-                ),
-                _ => format!(
-                    "# Processed Document: {}\n\n\
-                     Transformation type: {}\n\
-                     [Placeholder transformed content]\n",
-                    doc.source_path, transformation_type
-                ),
+        for (idx, doc) in documents.iter().enumerate() {
+            info!(
+                "Transforming document {}/{}: {} ({} words)",
+                idx + 1,
+                documents.len(),
+                doc.source_path,
+                doc.word_count
+            );
+
+            // Build transformation instructions based on type
+            let transformation_instructions = match transformation_type {
+                "summarize" => "Create a concise summary with:\n\
+                    - Executive summary (2-3 sentences)\n\
+                    - Main topics and key points (bullet points)\n\
+                    - Conclusions and takeaways\n\
+                    Keep the summary informative yet brief.",
+                "extract_key_points" => "Extract and list the key points from the document:\n\
+                    - Identify main arguments or findings\n\
+                    - List each key point as a bullet\n\
+                    - Include supporting evidence where relevant\n\
+                    Focus on the most important information.",
+                "translate" => "Translate this document to Spanish:\n\
+                    - Maintain the original structure and formatting\n\
+                    - Preserve technical terms appropriately\n\
+                    - Ensure natural language flow\n\
+                    Provide accurate translation.",
+                "reformat" => "Reformat this document for better readability:\n\
+                    - Use clear headings and sections\n\
+                    - Add bullet points for lists\n\
+                    - Improve paragraph structure\n\
+                    - Maintain all original information\n\
+                    Make it easier to scan and read.",
+                "classify" => "Classify this document:\n\
+                    - Category (technical, business, academic, etc.)\n\
+                    - Content type (informational, instructional, etc.)\n\
+                    - Primary topics\n\
+                    - Confidence level\n\
+                    Provide structured classification.",
+                _ => "Process and transform this document according to best practices.",
             };
+
+            // Build the transformation prompt
+            let transformation_prompt = format!(
+                "You are an expert document processor specializing in {} transformations.\n\n\
+                 **SOURCE DOCUMENT**: {}\n\
+                 **DOCUMENT STATISTICS**: {} words, {} pages\n\n\
+                 **DOCUMENT CONTENT**:\n{}\n\n\
+                 **TRANSFORMATION TYPE**: {}\n\n\
+                 **INSTRUCTIONS**:\n{}\n\n\
+                 **REQUIREMENTS**:\n\
+                 1. Base your transformation on the document content above\n\
+                 2. Maintain accuracy and preserve important details\n\
+                 3. Structure your output clearly with headings/sections\n\
+                 4. Be thorough yet concise\n\n\
+                 Perform the {} transformation now:",
+                transformation_type,
+                doc.source_path,
+                doc.word_count,
+                doc.page_count,
+                doc.extracted_text,
+                transformation_type,
+                transformation_instructions,
+                transformation_type
+            );
+
+            // Execute the transformation agent
+            let agent_input = AgentInput::builder().text(transformation_prompt).build();
+            let agent_output = agent
+                .execute(agent_input, llmspell_core::ExecutionContext::default())
+                .await
+                .map_err(|e| {
+                    warn!("Transformation agent execution failed for {}: {}", doc.source_path, e);
+                    TemplateError::ExecutionFailed(format!("Agent execution failed: {}", e))
+                })?;
+
+            // Extract transformed content from agent output
+            let transformed_content = agent_output.text;
 
             transformed.push(TransformedDocument {
                 source_path: doc.source_path.clone(),
-                transformed_content: content,
+                transformed_content,
             });
         }
 
+        info!(
+            "Successfully transformed {} documents with {} transformation",
+            documents.len(),
+            transformation_type
+        );
         Ok(transformed)
     }
 
@@ -726,5 +802,85 @@ mod tests {
 
         let result = template.format_documents(&docs, "xml");
         assert!(result.is_err());
+    }
+
+    // Integration tests for real file I/O and agent execution
+
+    #[test]
+    fn test_read_document_file_with_real_file() {
+        use std::fs;
+
+        // Create temp file with test content
+        let temp_dir = std::env::temp_dir();
+        let test_file = temp_dir.join("llmspell_test_doc.txt");
+        let test_content = "This is a test document.\n\nIt has multiple paragraphs.\n\nAnd some more content here.\n\nTotal word count should be calculated correctly.";
+
+        fs::write(&test_file, test_content).expect("Failed to write test file");
+
+        // Test reading the file
+        let result = DocumentProcessorTemplate::read_document_file(
+            test_file.to_str().unwrap()
+        );
+
+        assert!(result.is_ok(), "Failed to read test file");
+        let doc = result.unwrap();
+        assert_eq!(doc.source_path, test_file.to_string_lossy().to_string());
+        assert!(!doc.extracted_text.is_empty());
+        assert!(doc.word_count > 0);
+        assert!(doc.page_count > 0);
+
+        // Verify word count is correct
+        assert_eq!(doc.word_count, test_content.split_whitespace().count());
+
+        // Cleanup
+        fs::remove_file(&test_file).ok();
+    }
+
+    #[tokio::test]
+    async fn test_extract_with_real_files() {
+        use std::fs;
+
+        let template = DocumentProcessorTemplate::new();
+        let context = ExecutionContext::builder().build();
+        if context.is_err() {
+            return;
+        }
+        let context = context.unwrap();
+
+        // Create temp files
+        let temp_dir = std::env::temp_dir();
+        let file1 = temp_dir.join("llmspell_test1.txt");
+        let file2 = temp_dir.join("llmspell_test2.md");
+
+        fs::write(&file1, "First test document with some content.").expect("Write failed");
+        fs::write(&file2, "# Second Document\n\nMarkdown content here.").expect("Write failed");
+
+        let paths = vec![
+            file1.to_string_lossy().to_string(),
+            file2.to_string_lossy().to_string(),
+        ];
+
+        // Test extraction
+        let result = template.extract_parallel(&paths, &context).await;
+        assert!(result.is_ok(), "Extraction failed");
+
+        let docs = result.unwrap();
+        assert_eq!(docs.len(), 2);
+        assert!(docs[0].word_count > 0);
+        assert!(docs[1].word_count > 0);
+
+        // Cleanup
+        fs::remove_file(&file1).ok();
+        fs::remove_file(&file2).ok();
+    }
+
+    #[tokio::test]
+    #[ignore = "Requires full infrastructure (AgentRegistry, ProviderManager) for real LLM execution"]
+    async fn test_end_to_end_with_real_agent() {
+        // Note: This test is ignored by default as it requires full infrastructure
+        // Run with: cargo test --lib -- --ignored test_end_to_end_with_real_agent
+        //
+        // This is a placeholder for CLI-based integration testing
+        // See Sub-Task 12.8.6.6 for CLI testing approach
     }
 }
