@@ -212,6 +212,10 @@ async fn test_tool_kernel_message_protocol() {
         fn language(&self) -> &'static str {
             "test"
         }
+
+        fn as_any(&self) -> &dyn std::any::Any {
+            self
+        }
     }
 
     // Start an embedded kernel with test executor

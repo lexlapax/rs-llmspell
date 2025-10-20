@@ -130,7 +130,7 @@ impl MultiTenantRAG {
     /// Provides access to tenant lifecycle operations like `create_tenant()`, `list_tenants()`, etc.
     /// Used by templates to auto-provision tenants before RAG operations.
     #[must_use]
-    pub fn tenant_manager(&self) -> &Arc<MultiTenantVectorManager> {
+    pub const fn tenant_manager(&self) -> &Arc<MultiTenantVectorManager> {
         &self.tenant_manager
     }
 

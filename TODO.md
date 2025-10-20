@@ -3735,23 +3735,25 @@ Research findings and implementation plan for enhanced web search capabilities.
   - Note: Prices increased 3-10x in 2023 due to AI improvements
 
 **Implementation Sub-Tasks**:
-- [ ] **Subtask 12.8.1.7.1.1**: Implement Tavily search provider (~2 hours)
-  - Create: llmspell-tools/src/search/providers/tavily.rs (~120 lines following brave.rs pattern)
+- [x] **Subtask 12.8.1.7.1.1**: Implement Tavily search provider (~2 hours) ✅ COMPLETE
+  - File: llmspell-tools/src/search/providers/tavily.rs (189 lines)
   - API: POST https://api.tavily.com/search with {query, max_results, search_depth}
   - Response: {results: [{title, url, content, score}], answer: string}
-  - Rate limit: None specified (1k/month limit)
-  - Integration: Update web_search.rs:71-131 (from_env), :193-273 (provider init)
-  - Re-export: Update providers/mod.rs:9-20
-  - Env var: TAVILY_API_KEY (already available)
-- [ ] **Subtask 12.8.1.7.1.2**: Implement Bing search provider (~2 hours)
-  - Create: llmspell-tools/src/search/providers/bing.rs (~150 lines, similar to brave.rs)
+  - Rate limit: 1,000/month free tier
+  - Integration: web_search.rs:135-144,193,302-307 (from_env + provider init)
+  - Re-export: providers/mod.rs:15,24
+  - Env var: TAVILY_API_KEY
+  - Result: ✅ Full integration complete, AI-optimized search for RAG
+- [x] **Subtask 12.8.1.7.1.2**: Implement Bing search provider (~2 hours) ✅ COMPLETE
+  - File: llmspell-tools/src/search/providers/bing.rs (271 lines)
   - API: GET https://api.bing.microsoft.com/v7.0/search?q={query}&count={max}
   - Headers: Ocp-Apim-Subscription-Key for authentication
   - Response: {webPages: {value: [{name, url, snippet}]}}
-  - Rate limit: 3 TPS for free tier
-  - Integration: Update web_search.rs:71-131 (from_env), :193-273 (provider init)
-  - Re-export: Update providers/mod.rs
+  - Rate limit: 1,000/month free tier, 3 TPS
+  - Integration: web_search.rs:147-156,194,322-327 (from_env + provider init)
+  - Re-export: providers/mod.rs:9,18
   - Env vars: BING_API_KEY or WEBSEARCH_BING_API_KEY
+  - Result: ✅ Full integration complete with web/news/images support
 - [ ] **Subtask 12.8.1.7.1.3**: Replace DuckDuckGo Instant Answer API with HTML scraping (~3 hours)
   - Option A: Use duckduckgo_rs crate (if compatible with our architecture)
   - Option B: Custom implementation using reqwest + scraper crate
@@ -3761,11 +3763,12 @@ Research findings and implementation plan for enhanced web search capabilities.
   - File: llmspell-tools/src/search/providers/duckduckgo.rs (replace 191 lines)
   - Challenge: May require user-agent rotation, anti-bot evasion
   - Fallback: Keep current API as backup if scraping fails
-- [ ] **Subtask 12.8.1.7.1.4**: Update web search fallback chain priorities (~30 min)
-  - New priority order: tavily → serperdev → brave → bing → serpapi → duckduckgo
+- [x] **Subtask 12.8.1.7.1.4**: Update web search fallback chain priorities (~30 min) ✅ COMPLETE
+  - Priority order: tavily → serperdev → brave → bing → serpapi → duckduckgo
   - Rationale: AI-optimized (Tavily) → High free tier (SerperDev 2.5k) → Brave (2k) → Bing (1k) → SerpApi (100) → DuckDuckGo (backup)
-  - File: llmspell-tools/src/search/web_search.rs:52-58 (WebSearchConfig::default fallback_chain)
-  - Update: Default provider from "duckduckgo" → "tavily" for research-assistant quality
+  - File: llmspell-tools/src/search/web_search.rs:53-60 (WebSearchConfig::default fallback_chain)
+  - Default provider: "tavily" (line 63) for research-assistant quality
+  - Result: ✅ Optimal fallback chain configured
 - [ ] **Subtask 12.8.1.7.1.5**: Test all providers end-to-end (~1 hour)
   - Test matrix: 6 providers × 3 search types (web/news/images where supported)
   - Verify: API key loading, rate limiting, fallback behavior, response parsing

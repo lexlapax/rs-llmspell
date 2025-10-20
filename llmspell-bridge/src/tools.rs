@@ -57,7 +57,6 @@ use llmspell_tools::system::{
 use llmspell_tools::util::{HashCalculatorConfig, TextManipulatorConfig, UuidGeneratorConfig};
 use llmspell_tools::web::web_scraper::WebScraperConfig;
 use serde::{Deserialize, Serialize};
-use std::collections::HashMap;
 use std::sync::Arc;
 
 /// Initialize and register all Phase 2 tools with BOTH registries (dual-registration)

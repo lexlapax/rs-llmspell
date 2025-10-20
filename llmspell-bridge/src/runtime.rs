@@ -268,7 +268,7 @@ pub struct ScriptRuntime {
     /// **Why needed:**
     /// - research-assistant template requires RAG for document ingestion and synthesis
     /// - Multi-tenant vector storage for knowledge base operations
-    /// - Templates need RAG access via ExecutionContext
+    /// - Templates need RAG access via `ExecutionContext`
     ///
     /// **Wiring flow:** Kernel creates → downcasts `ScriptRuntime` → calls `set_rag()`
     rag: Arc<RwLock<Option<Arc<llmspell_rag::multi_tenant_integration::MultiTenantRAG>>>>,
@@ -1037,10 +1037,7 @@ impl ScriptRuntime {
     ///     runtime.set_rag(multi_tenant_rag);
     /// }
     /// ```
-    pub fn set_rag(
-        &self,
-        rag: Arc<llmspell_rag::multi_tenant_integration::MultiTenantRAG>,
-    ) {
+    pub fn set_rag(&self, rag: Arc<llmspell_rag::multi_tenant_integration::MultiTenantRAG>) {
         if let Ok(mut r) = self.rag.write() {
             *r = Some(rag);
             debug!("RAG infrastructure wired to ScriptRuntime");
@@ -1404,11 +1401,7 @@ impl ScriptExecutor for ScriptRuntime {
             .and_then(|guard| guard.clone());
 
         // Get RAG if available (Phase 12.8.fix)
-        let rag = self
-            .rag
-            .read()
-            .ok()
-            .and_then(|guard| guard.clone());
+        let rag = self.rag.read().ok().and_then(|guard| guard.clone());
 
         let mut builder = llmspell_templates::context::ExecutionContext::builder()
             .with_tool_registry(self.tool_registry.clone())

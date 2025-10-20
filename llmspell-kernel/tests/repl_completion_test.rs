@@ -79,6 +79,10 @@ mod repl_completion_tests {
                 .cloned()
                 .collect()
         }
+
+        fn as_any(&self) -> &dyn std::any::Any {
+            self
+        }
     }
 
     #[test]

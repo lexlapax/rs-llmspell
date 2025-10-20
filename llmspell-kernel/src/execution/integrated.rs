@@ -3434,6 +3434,10 @@ mod tests {
         fn language(&self) -> &'static str {
             "test"
         }
+
+        fn as_any(&self) -> &dyn std::any::Any {
+            self
+        }
     }
 
     // Mock protocol for testing
