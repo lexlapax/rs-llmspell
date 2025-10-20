@@ -7,8 +7,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+- **Production Template Implementations (Phase 12.8)**: Implemented real agent execution for all 6 built-in templates with Ollama/local LLM support. Templates transition from placeholder to production-ready with multi-agent workflows, real file I/O, and comprehensive testing. See [RELEASE_NOTES_v0.12.0.md](RELEASE_NOTES_v0.12.0.md#phase-128-production-templates) for full details.
+  - **code-generator**: 3-agent pipeline (specification → implementation → tests) generates complete code with quality metrics
+  - **data-analysis**: Statistical analysis + visualization with CSV/JSON support
+  - **document-processor**: AI-powered text transformation (summarize, extract, translate, reformat, classify) for .txt/.md files
+  - **interactive-chat**: Session-based conversation with tool integration
+  - **workflow-orchestrator**: 4 execution modes (sequential, parallel, conditional, loop) with real agent coordination
+  - **research-assistant**: Web-based research synthesis (requires web-searcher tool)
+
 ### Fixed
 - **Template Execution Infrastructure Gap (Phase 12.7.1)**: Fixed critical "tool_registry is required" error blocking all template execution. Implemented dual-layer registry architecture separating script access (ComponentRegistry) from template infrastructure (ToolRegistry, AgentRegistry, WorkflowFactory). All 6 built-in templates now execute successfully. See [RELEASE_NOTES_v0.12.0.md](RELEASE_NOTES_v0.12.0.md#phase-1271-critical-fix) for detailed analysis.
+- **Workflow Orchestrator (Phase 12.8.5)**: Fixed parallel workflow state dependency bug causing silent failures with fake results. Removed unnecessary state requirement bringing consistency with sequential/conditional/loop workflows.
 
 ## [0.11.2] - 2025-10-12 - Local LLM Cleanup & Enhancement 🧹
 

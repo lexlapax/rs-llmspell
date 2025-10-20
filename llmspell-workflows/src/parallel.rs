@@ -737,10 +737,18 @@ impl BaseAgent for ParallelWorkflow {
             self.state_manager.start_execution().await?;
 
             // Execute parallel branches inline
-            debug!("ParallelWorkflow::execute() starting with {} branches", self.branches.len());
+            debug!(
+                "ParallelWorkflow::execute() starting with {} branches",
+                self.branches.len()
+            );
             for (idx, branch) in self.branches.iter().enumerate() {
-                debug!("  Branch {}: name='{}', {} steps, required={}",
-                       idx, branch.name, branch.steps.len(), branch.required);
+                debug!(
+                    "  Branch {}: name='{}', {} steps, required={}",
+                    idx,
+                    branch.name,
+                    branch.steps.len(),
+                    branch.required
+                );
             }
 
             let semaphore = Arc::new(Semaphore::new(self.config.max_concurrency));
@@ -752,7 +760,10 @@ impl BaseAgent for ParallelWorkflow {
             let mut steps_executed = 0usize;
             let mut steps_failed = 0usize;
 
-            debug!("Starting branch execution loop over {} branches", self.branches.len());
+            debug!(
+                "Starting branch execution loop over {} branches",
+                self.branches.len()
+            );
             for branch in &self.branches {
                 let branch = branch.clone();
                 let semaphore = semaphore.clone();
@@ -1223,9 +1234,17 @@ impl ParallelWorkflowBuilder {
 
     /// Build the parallel workflow
     pub fn build(self) -> Result<ParallelWorkflow> {
-        debug!("ParallelWorkflowBuilder::build() called with {} branches", self.branches.len());
+        debug!(
+            "ParallelWorkflowBuilder::build() called with {} branches",
+            self.branches.len()
+        );
         for (idx, branch) in self.branches.iter().enumerate() {
-            debug!("  Branch {}: name='{}', {} steps", idx, branch.name, branch.steps.len());
+            debug!(
+                "  Branch {}: name='{}', {} steps",
+                idx,
+                branch.name,
+                branch.steps.len()
+            );
         }
 
         if self.branches.is_empty() {
@@ -1242,8 +1261,11 @@ impl ParallelWorkflowBuilder {
             });
         }
 
-        debug!("Building parallel workflow with executor={}, registry={}",
-               self.workflow_executor.is_some(), self.registry.is_some());
+        debug!(
+            "Building parallel workflow with executor={}, registry={}",
+            self.workflow_executor.is_some(),
+            self.registry.is_some()
+        );
 
         match (self.workflow_executor, self.registry) {
             (Some(workflow_executor), Some(registry)) => {

@@ -341,7 +341,10 @@ impl DocumentProcessorTemplate {
         // Create agent config for document transformation
         let agent_config = AgentConfig {
             name: "doc-transformer-agent".to_string(),
-            description: format!("Document transformation agent for {} transformation", transformation_type),
+            description: format!(
+                "Document transformation agent for {} transformation",
+                transformation_type
+            ),
             agent_type: "llm".to_string(),
             model: Some(ModelConfig {
                 provider,
@@ -383,33 +386,43 @@ impl DocumentProcessorTemplate {
 
             // Build transformation instructions based on type
             let transformation_instructions = match transformation_type {
-                "summarize" => "Create a concise summary with:\n\
+                "summarize" => {
+                    "Create a concise summary with:\n\
                     - Executive summary (2-3 sentences)\n\
                     - Main topics and key points (bullet points)\n\
                     - Conclusions and takeaways\n\
-                    Keep the summary informative yet brief.",
-                "extract_key_points" => "Extract and list the key points from the document:\n\
+                    Keep the summary informative yet brief."
+                }
+                "extract_key_points" => {
+                    "Extract and list the key points from the document:\n\
                     - Identify main arguments or findings\n\
                     - List each key point as a bullet\n\
                     - Include supporting evidence where relevant\n\
-                    Focus on the most important information.",
-                "translate" => "Translate this document to Spanish:\n\
+                    Focus on the most important information."
+                }
+                "translate" => {
+                    "Translate this document to Spanish:\n\
                     - Maintain the original structure and formatting\n\
                     - Preserve technical terms appropriately\n\
                     - Ensure natural language flow\n\
-                    Provide accurate translation.",
-                "reformat" => "Reformat this document for better readability:\n\
+                    Provide accurate translation."
+                }
+                "reformat" => {
+                    "Reformat this document for better readability:\n\
                     - Use clear headings and sections\n\
                     - Add bullet points for lists\n\
                     - Improve paragraph structure\n\
                     - Maintain all original information\n\
-                    Make it easier to scan and read.",
-                "classify" => "Classify this document:\n\
+                    Make it easier to scan and read."
+                }
+                "classify" => {
+                    "Classify this document:\n\
                     - Category (technical, business, academic, etc.)\n\
                     - Content type (informational, instructional, etc.)\n\
                     - Primary topics\n\
                     - Confidence level\n\
-                    Provide structured classification.",
+                    Provide structured classification."
+                }
                 _ => "Process and transform this document according to best practices.",
             };
 
@@ -443,7 +456,10 @@ impl DocumentProcessorTemplate {
                 .execute(agent_input, llmspell_core::ExecutionContext::default())
                 .await
                 .map_err(|e| {
-                    warn!("Transformation agent execution failed for {}: {}", doc.source_path, e);
+                    warn!(
+                        "Transformation agent execution failed for {}: {}",
+                        doc.source_path, e
+                    );
                     TemplateError::ExecutionFailed(format!("Agent execution failed: {}", e))
                 })?;
 
@@ -818,9 +834,7 @@ mod tests {
         fs::write(&test_file, test_content).expect("Failed to write test file");
 
         // Test reading the file
-        let result = DocumentProcessorTemplate::read_document_file(
-            test_file.to_str().unwrap()
-        );
+        let result = DocumentProcessorTemplate::read_document_file(test_file.to_str().unwrap());
 
         assert!(result.is_ok(), "Failed to read test file");
         let doc = result.unwrap();

@@ -565,7 +565,10 @@ impl WorkflowOrchestratorTemplate {
             }
             WorkflowType::Parallel => {
                 // Create branches directly from workflow_steps (each step becomes a branch)
-                debug!("Creating parallel workflow with {} workflow_steps", workflow_steps.len());
+                debug!(
+                    "Creating parallel workflow with {} workflow_steps",
+                    workflow_steps.len()
+                );
                 let mut builder = ParallelWorkflowBuilder::new(plan.workflow_name.clone())
                     .with_workflow_config(workflow_config.clone())
                     .with_max_concurrency(4)
@@ -575,8 +578,10 @@ impl WorkflowOrchestratorTemplate {
                 // Each workflow step becomes a separate parallel branch
                 for (idx, step) in workflow_steps.iter().enumerate() {
                     let branch_name = format!("branch-{}", idx + 1);
-                    debug!("Creating branch '{}' with step: name={}, step_type={:?}",
-                           branch_name, step.name, step.step_type);
+                    debug!(
+                        "Creating branch '{}' with step: name={}, step_type={:?}",
+                        branch_name, step.name, step.step_type
+                    );
                     let branch = ParallelBranch::new(branch_name.clone())
                         .with_description(step.name.clone())
                         .add_step(step.clone());
