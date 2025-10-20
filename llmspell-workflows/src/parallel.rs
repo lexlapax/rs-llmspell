@@ -703,9 +703,9 @@ impl BaseAgent for ParallelWorkflow {
         // Validate input first
         self.validate_input(&input).await?;
 
-        // Execute the workflow - inline execute_with_state body
-        let (workflow_result, execution_id_for_outputs) = if context.state.is_some() {
-            // Start of inlined execute_with_state
+        // Execute the workflow - always execute branches (state is optional like in sequential workflow)
+        let (workflow_result, execution_id_for_outputs) = {
+            // Start of workflow execution
             let start_time = Instant::now();
             // Generate ComponentId once and use it consistently
             let execution_component_id = ComponentId::new();
@@ -737,6 +737,12 @@ impl BaseAgent for ParallelWorkflow {
             self.state_manager.start_execution().await?;
 
             // Execute parallel branches inline
+            debug!("ParallelWorkflow::execute() starting with {} branches", self.branches.len());
+            for (idx, branch) in self.branches.iter().enumerate() {
+                debug!("  Branch {}: name='{}', {} steps, required={}",
+                       idx, branch.name, branch.steps.len(), branch.required);
+            }
+
             let semaphore = Arc::new(Semaphore::new(self.config.max_concurrency));
             let results = Arc::new(Mutex::new(Vec::<BranchResult>::new()));
             let should_stop = Arc::new(tokio::sync::RwLock::new(false));
@@ -746,6 +752,7 @@ impl BaseAgent for ParallelWorkflow {
             let mut steps_executed = 0usize;
             let mut steps_failed = 0usize;
 
+            debug!("Starting branch execution loop over {} branches", self.branches.len());
             for branch in &self.branches {
                 let branch = branch.clone();
                 let semaphore = semaphore.clone();
@@ -908,28 +915,15 @@ impl BaseAgent for ParallelWorkflow {
             };
 
             (legacy_result, Some(exec_id))
-        } else {
-            // Fall back to legacy implementation when no state is available
-            // Create a simple result when state is not available
-            let legacy_result = ParallelWorkflowResult {
-                workflow_name: self.name.clone(),
-                success: true,
-                branch_results: vec![],
-                duration: Duration::from_secs(0),
-                successful_branches: 0,
-                failed_branches: 0,
-                stopped_early: false,
-                error: None,
-            };
-            (legacy_result, None)
         };
 
         // Convert ParallelWorkflowResult to AgentOutput
+        let total_branches = workflow_result.successful_branches + workflow_result.failed_branches;
         let output_text = if workflow_result.success {
             format!(
                 "Parallel workflow '{}' completed successfully. {} branches executed, {} succeeded, {} failed. Duration: {:?}",
                 workflow_result.workflow_name,
-                workflow_result.branch_results.len(),
+                total_branches,
                 workflow_result.successful_branches,
                 workflow_result.failed_branches,
                 workflow_result.duration
@@ -939,7 +933,7 @@ impl BaseAgent for ParallelWorkflow {
                 "Parallel workflow '{}' failed: {}. {} branches executed, {} succeeded, {} failed. Duration: {:?}",
                 workflow_result.workflow_name,
                 workflow_result.error.as_deref().unwrap_or("Unknown error"),
-                workflow_result.branch_results.len(),
+                total_branches,
                 workflow_result.successful_branches,
                 workflow_result.failed_branches,
                 workflow_result.duration
@@ -1229,6 +1223,11 @@ impl ParallelWorkflowBuilder {
 
     /// Build the parallel workflow
     pub fn build(self) -> Result<ParallelWorkflow> {
+        debug!("ParallelWorkflowBuilder::build() called with {} branches", self.branches.len());
+        for (idx, branch) in self.branches.iter().enumerate() {
+            debug!("  Branch {}: name='{}', {} steps", idx, branch.name, branch.steps.len());
+        }
+
         if self.branches.is_empty() {
             return Err(llmspell_core::LLMSpellError::Configuration {
                 message: "Parallel workflow must have at least one branch".to_string(),
@@ -1243,8 +1242,12 @@ impl ParallelWorkflowBuilder {
             });
         }
 
+        debug!("Building parallel workflow with executor={}, registry={}",
+               self.workflow_executor.is_some(), self.registry.is_some());
+
         match (self.workflow_executor, self.registry) {
             (Some(workflow_executor), Some(registry)) => {
+                debug!("Creating ParallelWorkflow with hooks and registry");
                 Ok(ParallelWorkflow::new_with_hooks_and_registry(
                     self.name,
                     self.branches,

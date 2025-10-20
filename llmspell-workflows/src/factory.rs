@@ -2,7 +2,7 @@
 //! ABOUTME: Provides standardized workflow creation matching agent factory pattern
 
 use crate::{
-    conditional::ConditionalWorkflow,
+    conditional::{ConditionalBranch, ConditionalWorkflowBuilder},
     parallel::{ParallelConfig, ParallelWorkflow},
     r#loop::{LoopConfig, LoopWorkflow},
     sequential::SequentialWorkflowBuilder,
@@ -156,20 +156,39 @@ impl WorkflowFactory for DefaultWorkflowFactory {
                 Ok(Arc::new(workflow))
             }
             WorkflowType::Parallel => {
-                let config: ParallelConfig =
-                    serde_json::from_value(params.type_config).map_err(|e| {
-                        LLMSpellError::Validation {
-                            message: format!("Invalid parallel config: {}", e),
-                            field: Some("type_config".to_string()),
-                        }
+                let config: ParallelConfig = serde_json::from_value(params.type_config.clone())
+                    .map_err(|e| LLMSpellError::Validation {
+                        message: format!("Invalid parallel config: {}", e),
+                        field: Some("type_config".to_string()),
                     })?;
-                let workflow = ParallelWorkflow::new(params.name, vec![], config, params.config);
+
+                // Extract branches from type_config if present (extra field ignored by ParallelConfig)
+                let branches_json = params
+                    .type_config
+                    .get("branches")
+                    .cloned()
+                    .unwrap_or_else(|| serde_json::json!([]));
+                let branches = serde_json::from_value(branches_json).unwrap_or_else(|_| vec![]);
+
+                let workflow = ParallelWorkflow::new(params.name, branches, config, params.config);
                 Ok(Arc::new(workflow))
             }
             WorkflowType::Conditional => {
-                // Note: ConditionalWorkflowConfig would need to be set via builder pattern
-                // For now, we create with default conditional config
-                let workflow = ConditionalWorkflow::new(params.name, params.config);
+                // Extract branches from type_config if present
+                let branches_json = params
+                    .type_config
+                    .get("branches")
+                    .cloned()
+                    .unwrap_or_else(|| serde_json::json!([]));
+                let branches: Vec<ConditionalBranch> =
+                    serde_json::from_value(branches_json).unwrap_or_else(|_| vec![]);
+
+                // Use builder to create workflow with branches
+                let workflow = ConditionalWorkflowBuilder::new(params.name)
+                    .with_workflow_config(params.config)
+                    .add_branches(branches)
+                    .build();
+
                 Ok(Arc::new(workflow))
             }
             WorkflowType::Loop => {
