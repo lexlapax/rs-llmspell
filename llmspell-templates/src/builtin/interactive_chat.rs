@@ -623,6 +623,55 @@ impl InteractiveChatTemplate {
         session = session.with_tools(tools.to_vec()).await;
         session = session.with_initial_agent(agent).await;
 
+        // Create agent creator callback for auto-recreation (Subtask 12.9.5)
+        let agent_registry_clone = agent_registry.clone();
+        let agent_creator: llmspell_kernel::repl::session::AgentCreator = std::sync::Arc::new(
+            move |model: String, _system_prompt: String, tools: Vec<String>| {
+                let registry = agent_registry_clone.clone();
+                Box::pin(async move {
+                    use llmspell_agents::factory::{AgentConfig, ModelConfig, ResourceLimits};
+
+                    // Parse model (format: provider/model or just model)
+                    let (provider, model_id) = if let Some(slash_pos) = model.find('/') {
+                        (model[..slash_pos].to_string(), model[slash_pos + 1..].to_string())
+                    } else {
+                        ("ollama".to_string(), model)
+                    };
+
+                    let agent_config = AgentConfig {
+                        name: "repl-chat-agent".to_string(),
+                        description: format!("Chat agent for model {provider}/{model_id}"),
+                        agent_type: "llm".to_string(),
+                        model: Some(ModelConfig {
+                            provider,
+                            model_id,
+                            temperature: Some(0.7),
+                            max_tokens: Some(1000),
+                            settings: serde_json::Map::new(),
+                        }),
+                        allowed_tools: tools.clone(),
+                        custom_config: serde_json::Map::new(),
+                        resource_limits: ResourceLimits {
+                            max_execution_time_secs: 120,
+                            max_memory_mb: 256,
+                            max_tool_calls: if tools.is_empty() { 0 } else { 10 },
+                            max_recursion_depth: 1,
+                        },
+                    };
+
+                    registry
+                        .create_agent(agent_config)
+                        .await
+                        .map_err(|e| llmspell_core::LLMSpellError::Component {
+                            message: format!("Failed to create agent: {e}"),
+                            source: None,
+                        })
+                })
+            },
+        );
+
+        session = session.with_agent_creator(agent_creator);
+
         // Print welcome message
         println!("\n╔══════════════════════════════════════════════╗");
         println!("║   Interactive REPL Chat Session Started     ║");

@@ -24,6 +24,16 @@ use std::time::Instant;
 use tokio::sync::{mpsc, RwLock};
 use tracing::{debug, error, info, warn};
 
+/// Agent creator callback for auto-creating agents when needed (Subtask 12.9.5)
+///
+/// Takes current model, system_prompt, and tools and returns a new agent
+pub type AgentCreator = Arc<
+    dyn Fn(String, String, Vec<String>) -> std::pin::Pin<
+        Box<dyn std::future::Future<Output = Result<Arc<dyn Agent>, LLMSpellError>> + Send>,
+    > + Send
+        + Sync,
+>;
+
 /// REPL session configuration
 #[derive(Debug, Clone)]
 pub struct ReplSessionConfig {
@@ -225,6 +235,8 @@ pub struct InteractiveSession {
     /// RAG system (optional - for chat mode)
     #[allow(dead_code)] // Will be used in Subtask 12.9.4
     rag: Option<Arc<dyn std::any::Any + Send + Sync>>,
+    /// Agent creator callback (optional - for auto-creating agents)
+    agent_creator: Option<AgentCreator>,
 }
 
 impl InteractiveSession {
@@ -310,6 +322,7 @@ impl InteractiveSession {
             system_prompt: Arc::new(RwLock::new("You are a helpful AI assistant.".to_string())),
             allowed_tools: Arc::new(RwLock::new(Vec::new())),
             rag: None,
+            agent_creator: None,
         })
     }
 
@@ -356,6 +369,13 @@ impl InteractiveSession {
     #[must_use]
     pub async fn with_initial_agent(self, agent: Arc<dyn Agent>) -> Self {
         *self.current_agent.write().await = Some(agent);
+        self
+    }
+
+    /// Set agent creator callback for auto-creating agents (Subtask 12.9.5)
+    #[must_use]
+    pub fn with_agent_creator(mut self, creator: AgentCreator) -> Self {
+        self.agent_creator = Some(creator);
         self
     }
 
@@ -1496,17 +1516,38 @@ impl InteractiveSession {
         // Add user message to history
         self.add_to_history("user", &message, None).await;
 
-        // Get current agent (must be set by template layer via with_initial_agent())
+        // Get or create agent using callback
         let agent_opt = self.current_agent.read().await;
-        if agent_opt.is_none() {
-            let fallback = "Chat agent not initialized. \
-                           Template must create agent and pass via with_initial_agent().";
-            self.add_to_history("assistant", fallback, None).await;
-            println!("\n\x1b[1;31mError>\x1b[0m {fallback}\n");
-            return Ok(());
-        }
-        let agent = agent_opt.as_ref().unwrap().clone();
-        drop(agent_opt); // Release read lock
+        let agent = if let Some(ref existing_agent) = *agent_opt {
+            existing_agent.clone()
+        } else {
+            drop(agent_opt); // Release read lock
+
+            // Try to create agent using callback
+            if let Some(ref creator) = self.agent_creator {
+                // Get current settings
+                let model = self.current_model.read().await.clone();
+                let system_prompt = self.system_prompt.read().await.clone();
+                let tools = self.allowed_tools.read().await.clone();
+
+                // Call creator callback
+                let new_agent = creator(model, system_prompt, tools).await.map_err(|e| {
+                    anyhow::anyhow!("Failed to create agent: {e}")
+                })?;
+
+                // Store for reuse
+                *self.current_agent.write().await = Some(new_agent.clone());
+
+                new_agent
+            } else {
+                // No agent creator - return error
+                let fallback =
+                    "Chat agent not initialized. Use .model command or template must provide agent.";
+                self.add_to_history("assistant", fallback, None).await;
+                println!("\n\x1b[1;31mError>\x1b[0m {fallback}\n");
+                return Ok(());
+            }
+        };
 
         // Build prompt with conversation context
         let system_prompt = self.get_system_prompt().await;
@@ -1930,8 +1971,11 @@ mod tests {
         assert_eq!(history[0].role, "user");
         assert_eq!(history[0].content, "Hello, AI!");
         assert_eq!(history[1].role, "assistant");
-        assert!(history[1].content.contains("Chat agent not initialized"));
-        assert!(history[1].content.contains("with_initial_agent"));
+        assert!(
+            history[1].content.contains("Chat agent not initialized"),
+            "Expected error message, got: {}",
+            history[1].content
+        );
     }
 
     #[tokio::test]
