@@ -9341,4 +9341,763 @@ All dependencies are internal workspace crates:
 
 ---
 
+## Phase 12.10: Code Review Template - Multi-Aspect Analysis (Day 11)
+
+**Strategic Rationale**: Code review is a universal developer need with clear quality gates. Current script application (examples/script-users/applications/code-review-assistant/main.lua, 585 LOC) demonstrates proven 7-aspect analysis pattern. Generalized template enables configurable review aspects, quality scoring, and fix generation - filling critical gap in existing template library.
+
+**Generalization Opportunities**:
+- Configurable review aspects (security, quality, performance, practices, dependencies, architecture, documentation)
+- Severity-based filtering (critical, high, medium, low)
+- Language-specific rulesets (Rust, Python, JavaScript, Go, etc.)
+- Output formats (markdown report, JSON findings, diff patches)
+- Integration with CI/CD pipelines via --output json
+
+### Task 12.10.1: Implement CodeReviewTemplate Core
+**Priority**: HIGH
+**Estimated Time**: 3 hours
+**Assignee**: Templates Team
+
+**Description**: Create code-review template with multi-aspect analysis pattern. Implements configurable review agents for security, quality, performance, best practices, dependencies, architecture, and documentation analysis.
+
+**Acceptance Criteria:**
+- [ ] File created: `llmspell-templates/src/builtin/code_review.rs` (~600-800 LOC)
+- [ ] Implements Template trait with metadata
+- [ ] Parameter schema validation with serde
+- [ ] 7 specialized review agents configurable via aspects parameter
+- [ ] Severity filtering (critical/high/medium/low)
+- [ ] Language-specific review rules (Rust, Python, JavaScript, Go, TypeScript, Java)
+- [ ] Compiles without warnings
+
+**Parameter Schema**:
+```rust
+pub struct CodeReviewParams {
+    pub code_path: String,                    // File or directory path
+    pub language: String,                     // rust, python, javascript, go, typescript, java
+    pub aspects: Vec<String>,                 // security, quality, performance, practices, dependencies, architecture, docs
+    pub severity_filter: Option<String>,      // critical, high, medium, low, all (default: all)
+    pub generate_fixes: bool,                 // Generate fix suggestions (default: false)
+    pub output_format: String,                // markdown, json, diff (default: markdown)
+    pub model: Option<String>,                // LLM model override
+    pub temperature: Option<f32>,             // 0.0-1.0, default 0.2 for consistency
+}
+```
+
+**Implementation Steps:**
+1. Create `llmspell-templates/src/builtin/code_review.rs`
+2. Define CodeReviewParams with validation (language enum, aspects validation)
+3. Implement agent creation for each review aspect:
+   - `create_security_reviewer()` - OWASP, CVE patterns, secrets detection
+   - `create_quality_reviewer()` - Code smells, complexity, maintainability
+   - `create_performance_reviewer()` - Algorithm efficiency, memory usage, async patterns
+   - `create_practices_reviewer()` - Naming, documentation, error handling
+   - `create_dependency_reviewer()` - Outdated deps, security advisories, license issues
+   - `create_architecture_reviewer()` - Design patterns, SOLID principles, modularity
+   - `create_documentation_reviewer()` - API docs, comments, README completeness
+4. Implement severity aggregation and filtering
+5. Add fix generator agent (conditional on generate_fixes param)
+6. Implement output formatters (markdown report, JSON findings, diff patches)
+
+**Definition of Done:**
+- [ ] All 7 review aspects implemented with specialized prompts
+- [ ] Severity scoring works (0-10 scale mapped to critical/high/medium/low)
+- [ ] Language-specific rules applied (e.g., Rust clippy patterns, Python PEP8)
+- [ ] JSON output schema documented
+- [ ] Compiles without clippy warnings
+
+### Task 12.10.2: Add Code Review Template to Registry
+**Priority**: HIGH
+**Estimated Time**: 30 minutes
+**Assignee**: Templates Team
+
+**Description**: Register code-review template in TemplateRegistry with proper metadata and categorization.
+
+**Acceptance Criteria:**
+- [ ] Template registered in `llmspell-templates/src/registry.rs`
+- [ ] Metadata complete: name, description, category, version, parameters
+- [ ] Category: "Development" or "CodeQuality"
+- [ ] Tags: ["code-review", "quality", "security", "performance"]
+- [ ] Listed in `template list --category Development`
+
+**Definition of Done:**
+- [ ] `template list` shows code-review template
+- [ ] `template info code-review` displays full metadata
+- [ ] `template schema code-review` returns valid JSON schema
+
+### Task 12.10.3: Code Review Template Testing
+**Priority**: HIGH
+**Estimated Time**: 2 hours
+**Assignee**: QA Team
+
+**Description**: Comprehensive testing of code-review template across languages, aspects, and output formats.
+
+**Test Scenarios:**
+- [ ] Rust code review with all 7 aspects (using llmspell-core sample)
+- [ ] Python code review with security + quality aspects only
+- [ ] JavaScript code review with severity_filter=critical
+- [ ] Generate fixes for simple quality issues
+- [ ] JSON output format validation
+- [ ] Invalid language parameter error handling
+- [ ] Invalid aspects parameter error handling
+- [ ] Empty code path error handling
+
+**Acceptance Criteria:**
+- [ ] Unit tests in `llmspell-templates/src/builtin/code_review.rs` (5+ tests)
+- [ ] Integration test: `cargo test -p llmspell-templates code_review_integration`
+- [ ] CLI test: `./target/debug/llmspell template exec code-review --param code_path=llmspell-core/src/lib.rs --param language=rust --output json`
+- [ ] Performance: <500ms initialization, <5s per aspect analysis (depends on LLM)
+- [ ] All tests pass with >90% coverage
+
+**Definition of Done:**
+- [ ] All 8 test scenarios passing
+- [ ] Test coverage >90% for code_review.rs
+- [ ] No memory leaks in multi-aspect analysis
+- [ ] Documented in user guide with examples
+
+### Task 12.10.4: Code Review Template Documentation & Examples
+**Priority**: MEDIUM
+**Estimated Time**: 1.5 hours
+**Assignee**: Documentation Team
+
+**Description**: User guide, API documentation, and practical examples for code-review template.
+
+**Acceptance Criteria:**
+- [ ] User guide section: `docs/user-guide/templates/code-review.md`
+- [ ] CLI examples (3+ scenarios): basic review, security-focused, CI/CD integration
+- [ ] Lua example: `examples/templates/code-review-example.lua`
+- [ ] API documentation: rustdoc comments >95% coverage
+- [ ] JSON schema documented with example output
+
+**Examples to Create:**
+1. **Basic Review** (CLI):
+   ```bash
+   llmspell template exec code-review \
+     --param code_path=src/main.rs \
+     --param language=rust \
+     --param aspects='["security","quality","performance"]'
+   ```
+
+2. **CI/CD Integration** (JSON output):
+   ```bash
+   llmspell template exec code-review \
+     --param code_path=. \
+     --param language=python \
+     --param severity_filter=critical \
+     --output json > review-results.json
+   ```
+
+3. **Lua Script** (Automated fixes):
+   ```lua
+   local result = Template.execute("code-review", {
+       code_path = "src/",
+       language = "rust",
+       aspects = {"quality", "performance"},
+       generate_fixes = true,
+       output_format = "diff"
+   })
+   ```
+
+**Definition of Done:**
+- [ ] All documentation committed
+- [ ] Examples tested and verified
+- [ ] User guide includes troubleshooting section
+- [ ] API docs build without warnings: `cargo doc -p llmspell-templates --no-deps`
+
+---
+
+## Phase 12.11: Content Generation Template - Quality-Driven Iteration (Day 12)
+
+**Strategic Rationale**: Content creation with quality thresholds addresses writing, documentation, and marketing needs. Current script (examples/script-users/applications/content-creator/main.lua, 502 LOC) demonstrates 4-stage pipeline with conditional editing. Generalized template enables configurable content types, quality scoring, and iterative refinement.
+
+**Generalization Opportunities**:
+- Content type templates (blog, documentation, marketing, technical, creative)
+- Quality threshold configuration (0.0-1.0 scoring)
+- Max iteration limits to prevent infinite loops
+- Multi-format output (markdown, HTML, plain text, JSON)
+- Tone/style presets (professional, casual, technical, persuasive)
+
+### Task 12.11.1: Implement ContentGenerationTemplate Core
+**Priority**: HIGH
+**Estimated Time**: 4 hours
+**Assignee**: Templates Team
+
+**Description**: Create content-generation template with quality-driven iteration pattern. Implements plan → write → edit → format pipeline with configurable quality thresholds and max iterations.
+
+**Acceptance Criteria:**
+- [ ] File created: `llmspell-templates/src/builtin/content_generation.rs` (~700-900 LOC)
+- [ ] Implements Template trait with metadata
+- [ ] 4-agent pipeline: planner, writer, editor, formatter
+- [ ] Quality scoring (0.0-1.0) with threshold-based editing
+- [ ] Iteration limit enforcement (default: 3, max: 10)
+- [ ] Content type presets (blog, docs, marketing, technical, creative)
+- [ ] Tone/style configuration
+- [ ] Compiles without warnings
+
+**Parameter Schema**:
+```rust
+pub struct ContentGenerationParams {
+    pub topic: String,                           // Content topic or title
+    pub content_type: String,                    // blog, documentation, marketing, technical, creative, general
+    pub target_length: Option<usize>,            // Word count target (optional)
+    pub tone: Option<String>,                    // professional, casual, technical, persuasive, friendly (default: professional)
+    pub style_guide: Option<String>,             // Custom style guidelines
+    pub quality_threshold: f32,                  // 0.0-1.0, default 0.8
+    pub max_iterations: usize,                   // Max editing iterations, default 3, max 10
+    pub output_format: String,                   // markdown, html, text, json (default: markdown)
+    pub include_outline: bool,                   // Include planning outline in output (default: false)
+    pub model: Option<String>,                   // LLM model override
+}
+```
+
+**Implementation Steps:**
+1. Create `llmspell-templates/src/builtin/content_generation.rs`
+2. Define ContentGenerationParams with validation
+3. Implement content type presets with specialized prompts:
+   - Blog: engaging intro, structured sections, call-to-action
+   - Documentation: clear structure, code examples, troubleshooting
+   - Marketing: benefit-focused, persuasive language, SEO keywords
+   - Technical: precise terminology, citations, diagrams
+   - Creative: narrative flow, descriptive language, character development
+4. Implement 4-agent pipeline:
+   - `create_content_planner()` - Outline, structure, key points
+   - `create_content_writer()` - Draft content based on plan
+   - `create_content_editor()` - Quality scoring + improvement suggestions
+   - `create_content_formatter()` - Final formatting (markdown/HTML/text)
+5. Implement quality scoring logic:
+   - Editor agent outputs score 0.0-1.0
+   - If score < quality_threshold: iterate (up to max_iterations)
+   - Track iteration count and improvements
+6. Add output formatters for markdown, HTML, plain text, JSON
+
+**Definition of Done:**
+- [ ] All 5 content types implemented with type-specific prompts
+- [ ] Quality iteration loop works (score → edit → rescore)
+- [ ] Iteration limit enforced (prevents infinite loops)
+- [ ] Tone/style configuration applied correctly
+- [ ] All output formats generate valid output
+- [ ] Compiles without clippy warnings
+
+### Task 12.11.2: Add Content Generation Template to Registry
+**Priority**: HIGH
+**Estimated Time**: 30 minutes
+**Assignee**: Templates Team
+
+**Description**: Register content-generation template in TemplateRegistry with proper metadata.
+
+**Acceptance Criteria:**
+- [ ] Template registered in `llmspell-templates/src/registry.rs`
+- [ ] Metadata complete with parameter descriptions
+- [ ] Category: "Content" or "Productivity"
+- [ ] Tags: ["content", "writing", "documentation", "marketing"]
+- [ ] Quality threshold parameter documented (0.8 recommended)
+
+**Definition of Done:**
+- [ ] `template list --category Content` shows template
+- [ ] `template info content-generation` displays all parameters
+- [ ] `template schema content-generation` includes validation rules
+
+### Task 12.11.3: Content Generation Template Testing
+**Priority**: HIGH
+**Estimated Time**: 2.5 hours
+**Assignee**: QA Team
+
+**Description**: Test content-generation template across content types, quality thresholds, and iteration scenarios.
+
+**Test Scenarios:**
+- [ ] Blog post generation with quality_threshold=0.8 (should iterate if needed)
+- [ ] Technical documentation with target_length=500
+- [ ] Marketing content with tone=persuasive
+- [ ] Quality iteration: threshold=0.9, max_iterations=2 (verify stops at 2)
+- [ ] Low quality threshold: 0.5 (should complete in 1-2 iterations)
+- [ ] High quality threshold: 0.95 (may hit max_iterations)
+- [ ] All output formats (markdown, HTML, text, JSON)
+- [ ] Invalid content_type error handling
+- [ ] Quality threshold validation (0.0-1.0 range)
+
+**Acceptance Criteria:**
+- [ ] Unit tests for quality scoring logic (5+ tests)
+- [ ] Integration tests for each content type (5 tests)
+- [ ] CLI test: blog post generation end-to-end
+- [ ] Performance: <10s for 500-word content (depends on LLM speed)
+- [ ] Iteration count logged in output
+
+**Definition of Done:**
+- [ ] All 9 test scenarios passing
+- [ ] Test coverage >90% for content_generation.rs
+- [ ] Quality iteration loop verified (manual inspection of test output)
+- [ ] Documented iteration behavior in user guide
+
+### Task 12.11.4: Content Generation Documentation & Examples
+**Priority**: MEDIUM
+**Estimated Time**: 1.5 hours
+**Assignee**: Documentation Team
+
+**Description**: User guide, examples, and quality threshold tuning guidance.
+
+**Acceptance Criteria:**
+- [ ] User guide: `docs/user-guide/templates/content-generation.md`
+- [ ] Quality threshold tuning guide (0.6-0.7 permissive, 0.8 balanced, 0.9+ strict)
+- [ ] CLI examples for each content type (5 examples)
+- [ ] Lua example with iteration monitoring
+- [ ] Troubleshooting: infinite iterations, low quality output
+
+**Examples to Create:**
+1. **Blog Post** (CLI):
+   ```bash
+   llmspell template exec content-generation \
+     --param topic="Rust async programming best practices" \
+     --param content_type=blog \
+     --param target_length=800 \
+     --param quality_threshold=0.85
+   ```
+
+2. **Technical Documentation** (JSON output):
+   ```bash
+   llmspell template exec content-generation \
+     --param topic="API authentication guide" \
+     --param content_type=documentation \
+     --param tone=technical \
+     --output json
+   ```
+
+3. **Lua with Iteration Monitoring**:
+   ```lua
+   local result = Template.execute("content-generation", {
+       topic = "Product launch announcement",
+       content_type = "marketing",
+       tone = "persuasive",
+       quality_threshold = 0.9,
+       max_iterations = 5
+   })
+
+   -- Check iteration count
+   print("Iterations: " .. result.metadata.iterations)
+   print("Final quality: " .. result.metadata.quality_score)
+   ```
+
+**Definition of Done:**
+- [ ] Quality threshold guidance documented
+- [ ] All examples tested and working
+- [ ] User guide includes best practices section
+- [ ] API docs complete with examples
+
+---
+
+## Phase 12.12: File Classification Template - Scan-Classify-Act Pattern (Day 13)
+
+**Strategic Rationale**: File organization is a universal task with clear automation potential. Current script (examples/script-users/applications/file-organizer/main.lua, 343 LOC) demonstrates simple loop-based classification. Generalized template enables customizable categories, bulk operations, and dry-run mode - ideal for document management, media libraries, and code refactoring.
+
+**Generalization Opportunities**:
+- Configurable classification categories (dynamic, not hardcoded)
+- Multiple classification strategies (extension, content, metadata, AI-based)
+- Bulk operations with progress reporting
+- Dry-run mode (preview without executing)
+- Integration with file system tools (move, copy, tag, delete)
+
+### Task 12.12.1: Implement FileClassificationTemplate Core
+**Priority**: MEDIUM
+**Estimated Time**: 2.5 hours
+**Assignee**: Templates Team
+
+**Description**: Create file-classification template with scan-classify-act pattern. Implements configurable category schemes, multiple classification strategies, and safe bulk operations.
+
+**Acceptance Criteria:**
+- [ ] File created: `llmspell-templates/src/builtin/file_classification.rs` (~400-600 LOC)
+- [ ] Implements Template trait with metadata
+- [ ] 3 classification strategies: extension-based, content-based, AI-based
+- [ ] Configurable category definitions (user-provided or preset)
+- [ ] Dry-run mode for safe previews
+- [ ] Action types: move, copy, tag, report-only
+- [ ] Progress reporting for bulk operations
+- [ ] Compiles without warnings
+
+**Parameter Schema**:
+```rust
+pub struct FileClassificationParams {
+    pub source_path: String,                     // Directory or file glob pattern
+    pub classification_strategy: String,         // extension, content, ai, hybrid (default: extension)
+    pub categories: Option<Vec<Category>>,       // Custom categories or use presets
+    pub category_preset: Option<String>,         // documents, media, code, downloads (optional)
+    pub action: String,                          // move, copy, tag, report (default: report)
+    pub destination_base: Option<String>,        // Base path for move/copy actions
+    pub dry_run: bool,                           // Preview without executing (default: true)
+    pub recursive: bool,                         // Scan subdirectories (default: false)
+    pub model: Option<String>,                   // For AI-based classification
+}
+
+pub struct Category {
+    pub name: String,                            // Category name (e.g., "Invoices")
+    pub extensions: Option<Vec<String>>,         // File extensions (e.g., [".pdf", ".docx"])
+    pub keywords: Option<Vec<String>>,           // Content keywords
+    pub destination: Option<String>,             // Custom destination path
+}
+```
+
+**Implementation Steps:**
+1. Create `llmspell-templates/src/builtin/file_classification.rs`
+2. Define FileClassificationParams and Category structs with validation
+3. Implement category presets:
+   - Documents: pdf, docx, txt, md → Documents/{Invoices, Contracts, Reports}
+   - Media: jpg, png, mp4, mp3 → Media/{Photos, Videos, Audio}
+   - Code: rs, py, js, go → Code/{Rust, Python, JavaScript, Go}
+   - Downloads: Organize by date or file type
+4. Implement classification strategies:
+   - Extension-based: Fast, simple pattern matching
+   - Content-based: Read file headers, grep for keywords
+   - AI-based: Use LLM to analyze file content (slow but accurate)
+   - Hybrid: Extension first, AI for unknowns
+5. Implement scan-classify-act pipeline:
+   - `scan_files()` - Collect files matching source_path
+   - `classify_file()` - Determine category using strategy
+   - `execute_action()` - Move/copy/tag based on action param
+   - `generate_report()` - Summary of classifications
+6. Add dry-run safety: log actions without executing
+7. Add progress reporting for bulk operations (>10 files)
+
+**Definition of Done:**
+- [ ] All 4 classification strategies implemented
+- [ ] Category presets cover common use cases
+- [ ] Dry-run mode prevents accidental modifications
+- [ ] Progress reporting works for large directories
+- [ ] Safe error handling (permission errors, disk space)
+- [ ] Compiles without clippy warnings
+
+### Task 12.12.2: Add File Classification Template to Registry
+**Priority**: MEDIUM
+**Estimated Time**: 30 minutes
+**Assignee**: Templates Team
+
+**Description**: Register file-classification template in TemplateRegistry.
+
+**Acceptance Criteria:**
+- [ ] Template registered in `llmspell-templates/src/registry.rs`
+- [ ] Metadata includes dry_run=true default warning
+- [ ] Category: "Productivity" or "FileManagement"
+- [ ] Tags: ["files", "organization", "classification", "automation"]
+- [ ] Example categories documented
+
+**Definition of Done:**
+- [ ] `template list --category Productivity` shows template
+- [ ] `template info file-classification` explains dry-run mode
+- [ ] `template schema file-classification` includes Category schema
+
+### Task 12.12.3: File Classification Template Testing
+**Priority**: MEDIUM
+**Estimated Time**: 2 hours
+**Assignee**: QA Team
+
+**Description**: Test file-classification template with real file scenarios and bulk operations.
+
+**Test Scenarios:**
+- [ ] Extension-based classification with documents preset
+- [ ] Content-based classification (grep for keywords in files)
+- [ ] AI-based classification (small sample, verify LLM usage)
+- [ ] Dry-run mode (verify no files moved)
+- [ ] Move action with destination_base
+- [ ] Report-only action (JSON output)
+- [ ] Recursive directory scanning
+- [ ] Error handling: permission denied, disk full, invalid path
+- [ ] Large directory performance (100+ files)
+
+**Acceptance Criteria:**
+- [ ] Unit tests for each classification strategy (4 tests)
+- [ ] Integration test with test directory (/tmp/file_classification_test)
+- [ ] CLI test: classify downloads directory with dry-run
+- [ ] Performance: <1s for 100 files (extension-based), <10s (AI-based)
+- [ ] Progress reporting verified (manual check for 50+ files)
+
+**Definition of Done:**
+- [ ] All 9 test scenarios passing
+- [ ] Test cleanup (delete test files)
+- [ ] Test coverage >90%
+- [ ] Performance benchmarks documented
+
+### Task 12.12.4: File Classification Documentation & Examples
+**Priority**: MEDIUM
+**Estimated Time**: 1 hour
+**Assignee**: Documentation Team
+
+**Description**: User guide with safety warnings, dry-run workflow, and practical examples.
+
+**Acceptance Criteria:**
+- [ ] User guide: `docs/user-guide/templates/file-classification.md`
+- [ ] Safety section: ALWAYS use dry-run first
+- [ ] CLI examples for each preset category (4 examples)
+- [ ] Lua example with custom categories
+- [ ] Troubleshooting: permission errors, disk space
+
+**Examples to Create:**
+1. **Dry-Run Preview** (CLI):
+   ```bash
+   llmspell template exec file-classification \
+     --param source_path=~/Downloads \
+     --param category_preset=documents \
+     --param dry_run=true
+   ```
+
+2. **Execute Organization** (CLI):
+   ```bash
+   llmspell template exec file-classification \
+     --param source_path=~/Downloads \
+     --param category_preset=documents \
+     --param action=move \
+     --param destination_base=~/Documents/Organized \
+     --param dry_run=false
+   ```
+
+3. **Custom Categories** (Lua):
+   ```lua
+   local categories = {
+       { name = "Invoices", extensions = {".pdf"}, keywords = {"invoice", "bill"} },
+       { name = "Contracts", extensions = {".pdf", ".docx"}, keywords = {"contract", "agreement"} }
+   }
+
+   local result = Template.execute("file-classification", {
+       source_path = "/Users/me/Documents",
+       classification_strategy = "hybrid",
+       categories = categories,
+       action = "report",
+       recursive = true
+   })
+   ```
+
+**Definition of Done:**
+- [ ] Safety warnings prominently displayed
+- [ ] All examples tested with real files
+- [ ] Dry-run workflow documented step-by-step
+- [ ] Category customization guide complete
+
+---
+
+## Phase 12.13: Knowledge Management Template - RAG-Centric Workflow (Day 14)
+
+**Strategic Rationale**: Knowledge bases with semantic search are critical for research, documentation, and learning workflows. Current script (examples/script-users/applications/knowledge-base/main.lua, 525 LOC) demonstrates RAG-centric pattern with ingest-query-synthesize pipeline. Generalized template enables multi-collection knowledge management with CRUD operations and citation support.
+
+**Generalization Opportunities**:
+- Multi-collection support (projects, research, personal, work)
+- CRUD operations: ingest, query, update, delete, list
+- Multiple ingest formats (text, markdown, PDF, web URLs)
+- Citation tracking (source attribution in responses)
+- Knowledge graph visualization (export relationships)
+
+### Task 12.13.1: Implement KnowledgeManagementTemplate Core
+**Priority**: MEDIUM
+**Estimated Time**: 3.5 hours
+**Assignee**: Templates Team
+
+**Description**: Create knowledge-management template with RAG-centric workflow. Implements ingest-query-synthesize pipeline with multi-collection support and CRUD operations.
+
+**Acceptance Criteria:**
+- [ ] File created: `llmspell-templates/src/builtin/knowledge_management.rs` (~500-700 LOC)
+- [ ] Implements Template trait with metadata
+- [ ] RAG integration via llmspell-rag crate
+- [ ] 5 operations: ingest, query, update, delete, list
+- [ ] Multi-collection support (user-defined collections)
+- [ ] 3-agent pipeline: ingestion, query, synthesis
+- [ ] Citation tracking in query results
+- [ ] Compiles without warnings
+
+**Parameter Schema**:
+```rust
+pub struct KnowledgeManagementParams {
+    pub operation: String,                       // ingest, query, update, delete, list
+    pub collection: String,                      // Collection name (e.g., "rust-research")
+    pub content: Option<String>,                 // For ingest/update: text content or file path
+    pub query: Option<String>,                   // For query: semantic search query
+    pub document_id: Option<String>,             // For update/delete: document identifier
+    pub source_type: Option<String>,             // text, markdown, pdf, url (default: text)
+    pub max_results: usize,                      // For query: max results (default: 5)
+    pub include_citations: bool,                 // Include source citations (default: true)
+    pub embedding_model: Option<String>,         // Override embedding model
+    pub model: Option<String>,                   // LLM for synthesis
+}
+```
+
+**Implementation Steps:**
+1. Create `llmspell-templates/src/builtin/knowledge_management.rs`
+2. Define KnowledgeManagementParams with operation-specific validation
+3. Implement RAG integration:
+   - Initialize RAG provider (OpenAI, local embeddings)
+   - Collection management (create, list, delete collections)
+   - Document chunking for large content
+4. Implement 5 CRUD operations:
+   - **Ingest**: Parse content → chunk → embed → store with metadata
+   - **Query**: Embed query → semantic search → retrieve top-k
+   - **Update**: Re-embed document → update vector store
+   - **Delete**: Remove document from collection
+   - **List**: Show all documents in collection with metadata
+5. Implement 3-agent pipeline:
+   - `create_ingestion_agent()` - Parse, chunk, extract metadata
+   - `create_query_agent()` - Formulate search, retrieve relevant chunks
+   - `create_synthesis_agent()` - Generate answer with citations
+6. Add citation tracking:
+   - Store source metadata (file path, URL, timestamp)
+   - Include citations in synthesis output
+7. Support multiple source types:
+   - Text: Direct string content
+   - Markdown: Parse headers, code blocks
+   - PDF: Extract text (requires pdf-extract crate)
+   - URL: Fetch and parse web content
+
+**Definition of Done:**
+- [ ] All 5 operations functional (ingest, query, update, delete, list)
+- [ ] Multi-collection support tested (3+ collections)
+- [ ] Citation tracking works (sources included in output)
+- [ ] RAG integration stable (embedding + retrieval)
+- [ ] Source type handling (text, markdown tested; PDF/URL optional)
+- [ ] Compiles without clippy warnings
+
+### Task 12.13.2: Add Knowledge Management Template to Registry
+**Priority**: MEDIUM
+**Estimated Time**: 30 minutes
+**Assignee**: Templates Team
+
+**Description**: Register knowledge-management template in TemplateRegistry.
+
+**Acceptance Criteria:**
+- [ ] Template registered in `llmspell-templates/src/registry.rs`
+- [ ] Metadata includes operation parameter options
+- [ ] Category: "Research" or "Knowledge"
+- [ ] Tags: ["rag", "knowledge-base", "semantic-search", "research"]
+- [ ] RAG provider requirements documented
+
+**Definition of Done:**
+- [ ] `template list --category Research` shows template
+- [ ] `template info knowledge-management` explains RAG setup
+- [ ] `template schema knowledge-management` includes operation enum
+
+### Task 12.13.3: Knowledge Management Template Testing
+**Priority**: MEDIUM
+**Estimated Time**: 3 hours
+**Assignee**: QA Team
+
+**Description**: Test knowledge-management template across operations, collections, and RAG scenarios.
+
+**Test Scenarios:**
+- [ ] Ingest operation: add 10 documents to collection
+- [ ] Query operation: semantic search with top-5 results
+- [ ] Update operation: modify existing document
+- [ ] Delete operation: remove document from collection
+- [ ] List operation: show all documents with metadata
+- [ ] Multi-collection: create 3 collections, query each
+- [ ] Citation tracking: verify sources in synthesis output
+- [ ] Large document ingestion (>10,000 words, chunking)
+- [ ] Error handling: duplicate IDs, missing collections, invalid operations
+
+**Acceptance Criteria:**
+- [ ] Unit tests for each operation (5 tests)
+- [ ] Integration test: full ingest → query → update → delete cycle
+- [ ] CLI test: research workflow with real documents
+- [ ] Performance: <2s ingest per document, <1s query (depends on embedding speed)
+- [ ] RAG retrieval accuracy (manual verification of top-k results)
+
+**Definition of Done:**
+- [ ] All 9 test scenarios passing
+- [ ] Test data cleanup (delete test collections)
+- [ ] Test coverage >85% (RAG integration harder to test)
+- [ ] Citation accuracy verified manually
+
+### Task 12.13.4: Knowledge Management Documentation & Examples
+**Priority**: MEDIUM
+**Estimated Time**: 2 hours
+**Assignee**: Documentation Team
+
+**Description**: User guide with RAG setup instructions, workflow examples, and troubleshooting.
+
+**Acceptance Criteria:**
+- [ ] User guide: `docs/user-guide/templates/knowledge-management.md`
+- [ ] RAG setup guide (embedding provider configuration)
+- [ ] CLI examples for all 5 operations
+- [ ] Lua example: research workflow with multi-step queries
+- [ ] Troubleshooting: embedding errors, collection not found, slow queries
+
+**Examples to Create:**
+1. **Ingest Documents** (CLI):
+   ```bash
+   llmspell template exec knowledge-management \
+     --param operation=ingest \
+     --param collection=rust-docs \
+     --param content="path/to/rust-book.md" \
+     --param source_type=markdown
+   ```
+
+2. **Query Knowledge Base** (CLI):
+   ```bash
+   llmspell template exec knowledge-management \
+     --param operation=query \
+     --param collection=rust-docs \
+     --param query="How does async/await work in Rust?" \
+     --param max_results=3 \
+     --param include_citations=true
+   ```
+
+3. **Research Workflow** (Lua):
+   ```lua
+   -- Ingest research papers
+   Template.execute("knowledge-management", {
+       operation = "ingest",
+       collection = "ai-research",
+       content = "papers/transformer-architecture.pdf",
+       source_type = "pdf"
+   })
+
+   -- Query with citations
+   local answer = Template.execute("knowledge-management", {
+       operation = "query",
+       collection = "ai-research",
+       query = "What are the key components of transformer architecture?",
+       max_results = 5,
+       include_citations = true
+   })
+
+   print(answer.result)           -- Synthesized answer
+   print(answer.citations)        -- Source documents
+   ```
+
+**Definition of Done:**
+- [ ] RAG setup documented (OpenAI API key, local embeddings)
+- [ ] All examples tested with real documents
+- [ ] User guide includes workflow diagrams
+- [ ] Troubleshooting covers common RAG issues
+
+---
+
+## Phase 12.10-12.13: Summary and Integration
+
+**Total Estimated Time**: 4 days (Days 11-14)
+**Total LOC Addition**: ~2,200-3,100 lines across 4 new templates
+**Total Tests**: 24+ new test scenarios
+
+**Integration Checklist:**
+- [ ] All 4 templates registered in TemplateRegistry
+- [ ] `template list` shows 10 templates total (6 original + 4 new)
+- [ ] Category distribution:
+  - Development: code-review
+  - Content: content-generation
+  - Productivity: file-classification
+  - Research: knowledge-management (+ research-assistant)
+- [ ] Zero clippy warnings across all new templates
+- [ ] Quality gates pass: `./scripts/quality/quality-check-fast.sh`
+- [ ] User guide updated with 4 new template sections
+- [ ] Release notes drafted for v0.12.1 (template expansion)
+
+**Phase 12.10-12.13 Success Criteria:**
+- [ ] All 16 subtasks completed (4 templates × 4 tasks each)
+- [ ] Test coverage >90% for new templates
+- [ ] API documentation >95% for new templates
+- [ ] All CLI examples functional
+- [ ] All Lua examples functional
+- [ ] Template count increased from 6 to 10 (67% expansion)
+- [ ] Template library covers 5 major categories (Research, Chat, Content, Development, Productivity)
+- [ ] Zero breaking changes to existing templates
+- [ ] Performance targets met for all new templates
+
+**Post-Phase 12.13 Handoff:**
+- [ ] Update TODO.md with completion status
+- [ ] Update RELEASE_NOTES_v0.12.1.md with template expansion details
+- [ ] Update docs/technical/template-system-architecture.md with new template patterns
+- [ ] Tag commit: `git tag v0.12.1-templates-expanded`
+- [ ] Prepare Phase 13 (Adaptive Memory) with template-memory integration notes
+
+---
+
 **END OF PHASE 12 TODO DOCUMENT**
