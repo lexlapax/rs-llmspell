@@ -359,7 +359,19 @@ impl InteractiveSession {
     async fn handle_command(&mut self, command: ReplCommand) -> Result<()> {
         match command {
             ReplCommand::Execute(code) => self.execute_code(&code).await,
+            ReplCommand::Chat(message) => {
+                // TODO: Implement in Subtask 12.9.4
+                warn!("Chat command not yet implemented: {}", message);
+                println!("Chat functionality will be implemented in Subtask 12.9.4");
+                Ok(())
+            }
             ReplCommand::Meta(meta) => self.handle_meta_command(meta).await,
+            ReplCommand::ChatMeta(chat_meta) => {
+                // TODO: Implement in Subtask 12.9.4
+                warn!("Chat meta command not yet implemented: {:?}", chat_meta);
+                println!("Chat meta commands (.system, .model, .tools, .context, .clearchat) will be implemented in Subtask 12.9.4");
+                Ok(())
+            }
             ReplCommand::Debug(debug) => self.handle_debug_command(debug).await,
             ReplCommand::Empty => Ok(()),
         }

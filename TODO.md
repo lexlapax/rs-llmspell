@@ -7973,10 +7973,10 @@ Full REPL integration provides production-grade UX:
 
 ---
 
-#### Subtask 12.9.1: Extend ReplCommand Enum for Chat Commands
-**File**: `llmspell-kernel/src/repl/commands.rs`
-**Effort**: 2-3 hours
-**Status**: ⏳ PENDING
+#### Subtask 12.9.1: Extend ReplCommand Enum for Chat Commands ✅ COMPLETE
+**File**: `llmspell-kernel/src/repl/commands.rs`, `llmspell-kernel/src/repl/session.rs`, `llmspell-kernel/src/protocols/repl.rs`
+**Effort**: 2-3 hours → Actual: 2.5 hours
+**Status**: ✅ COMPLETE - Extended ReplCommand with Chat/ChatMeta variants, auto-detection heuristics, 29 passing tests
 
 **Changes**:
 1. Add `Chat(String)` variant to ReplCommand enum
@@ -8019,6 +8019,62 @@ pub enum ChatMetaCommand {
 - Unit test: Detect `What is 2+2?` → Chat (natural language)
 - Unit test: Detect `local x = 5` → Execute (code)
 - Unit test: Detect `Explain Rust ownership` → Chat (natural language)
+
+**Completion Summary**:
+✅ **ReplCommand Enum Extended** (llmspell-kernel/src/repl/commands.rs:41-49):
+  - Added `Chat(String)` variant for LLM chat messages
+  - Added `ChatMeta(ChatMetaCommand)` variant for chat-specific meta commands
+
+✅ **ChatMetaCommand Enum Created** (lines 282-291):
+  - System(String) - Update system prompt: `.system "You are helpful"`
+  - Model(String) - Switch LLM model: `.model ollama/llama3.2:3b`
+  - Tools(Vec<String>) - Configure tools: `.tools web-searcher,calculator`
+  - Context - Show conversation state: `.context`
+  - ClearChat - Clear chat history: `.clearchat`
+
+✅ **ChatMetaCommand::parse() Implemented** (lines 316-385):
+  - Parses chat meta commands (strips leading `.` already removed by caller)
+  - Handles multi-word tool lists with comma+space separation (`.tools web-searcher, calculator`)
+  - Comprehensive error messages with usage examples
+  - Help text documentation for all chat meta commands
+
+✅ **ReplCommand::parse() Updated** (lines 442-485):
+  - Priority order: Empty → Chat meta (`.system`, `.model`, etc.) → Explicit `.chat` → Regular meta → Debug → Auto-detect
+  - Auto-detection via detect_input_mode() for code vs chat
+  - Defaults to Chat for ambiguous input (safer UX)
+
+✅ **Auto-Detection Heuristics** (lines 75-134):
+  - Strong chat indicators (checked first): Question mark, chat phrases ("what is", "how do", "can you", "i need", "understanding")
+  - Code symbols: `{`, `}`, `==`, `!=`, `||`, `&&`, `=>`
+  - Assignment operators: ` = `, `= `
+  - Code keywords: function, local, if, async, etc. (checked after chat phrases to avoid false positives)
+  - Word count heuristic: 5+ words without code symbols = likely chat
+  - InputMode enum: Code/Chat/Ambiguous
+
+✅ **Placeholder Handlers Added**:
+  - llmspell-kernel/src/repl/session.rs:378-387 - handle_command() match arms for Chat and ChatMeta
+  - llmspell-kernel/src/protocols/repl.rs:378-385 - handle_text_command() match arms for Chat and ChatMeta
+  - Both return user-friendly messages indicating implementation in Subtask 12.9.4
+
+✅ **Comprehensive Test Suite** (29 tests, all passing):
+  - ChatMetaCommand parsing: system, model, tools (with spaces), context, clearchat, invalid commands
+  - ReplCommand chat parsing: `.system`, `.model`, `.chat` explicit
+  - Auto-detection: code keywords (function, local, if), code symbols ({, =), assignment
+  - Auto-detection: chat phrases (what is, can you, explain, i need), question marks, long sentences
+  - Ambiguous input (defaults to chat)
+  - Integration: existing commands (.exit, .help, debug:) still work correctly
+
+✅ **Quality Gates Passed**:
+  - Compilation: Zero errors, zero warnings
+  - Clippy: Zero warnings with `-D warnings`
+  - Tests: 29/29 passing (llmspell-kernel repl::commands module)
+  - Code added: +235 lines (including tests)
+  - Files modified: 3 (commands.rs, session.rs, protocols/repl.rs)
+
+**Files Modified**:
+1. llmspell-kernel/src/repl/commands.rs (+235 lines) - Core chat command implementation
+2. llmspell-kernel/src/repl/session.rs (+9 lines) - Placeholder chat handlers
+3. llmspell-kernel/src/protocols/repl.rs (+8 lines) - Network mode placeholders
 
 ---
 

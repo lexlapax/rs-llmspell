@@ -375,6 +375,14 @@ impl REPLServer {
             Ok(ReplCommand::Debug(_)) => {
                 Ok("Debug commands not supported in network mode".to_string())
             }
+            Ok(ReplCommand::Chat(_)) => {
+                // TODO: Implement in Subtask 12.9.4
+                Ok("Chat commands not yet supported in network mode".to_string())
+            }
+            Ok(ReplCommand::ChatMeta(_)) => {
+                // TODO: Implement in Subtask 12.9.4
+                Ok("Chat meta commands not yet supported in network mode".to_string())
+            }
             Ok(ReplCommand::Empty) => Ok(String::new()),
             Err(e) => Ok(format!("Parse error: {e}")),
         }
