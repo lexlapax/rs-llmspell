@@ -6,17 +6,17 @@
 //! | Provider | API Key | Free Tier | Best For | Search Types |
 //! |----------|---------|-----------|----------|--------------|
 //! | **Tavily** | `TAVILY_API_KEY` | 1,000/month | RAG/LLM workflows (AI-optimized) | Web |
-//! | **SerperDev** | `SERPERDEV_API_KEY` | 2,500/month | General purpose | Web, News, Images |
+//! | **`SerperDev`** | `SERPERDEV_API_KEY` | 2,500/month | General purpose | Web, News, Images |
 //! | **Brave** | `BRAVE_API_KEY` | 2,000/month | Privacy-focused | Web |
 //! | **Bing** | `BING_API_KEY` | 1,000/month, 3 TPS | General purpose | Web, News, Images |
-//! | **SerpApi** | `SERPAPI_API_KEY` | 100/month | General purpose | Web, News, Images |
-//! | **DuckDuckGo** | None | Unlimited | Backup (no API key) | Web |
+//! | **`SerpApi`** | `SERPAPI_API_KEY` | 100/month | General purpose | Web, News, Images |
+//! | **`DuckDuckGo`** | None | Unlimited | Backup (no API key) | Web |
 //! | **Google** | `GOOGLE_CUSTOM_SEARCH_API_KEY` | 100/day | Google results | Web, Images |
 //!
 //! # Provider Recommendations
 //!
 //! - **RAG/Research Use Cases**: Use Tavily (AI-optimized content aggregation)
-//! - **General Web Search**: Use SerperDev or Brave (high free tiers)
+//! - **General Web Search**: Use `SerperDev` or Brave (high free tiers)
 //! - **No API Key**: Use `DuckDuckGo` (free, no limits, but lower quality)
 //! - **Enterprise**: Use Bing or Google (reliable, comprehensive)
 //!
