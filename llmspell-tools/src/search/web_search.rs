@@ -17,14 +17,14 @@
 //!
 //! - **RAG/Research Use Cases**: Use Tavily (AI-optimized content aggregation)
 //! - **General Web Search**: Use SerperDev or Brave (high free tiers)
-//! - **No API Key**: Use DuckDuckGo (free, no limits, but lower quality)
+//! - **No API Key**: Use `DuckDuckGo` (free, no limits, but lower quality)
 //! - **Enterprise**: Use Bing or Google (reliable, comprehensive)
 //!
 //! # Default Fallback Chain
 //!
 //! tavily → serperdev → brave → bing → serpapi → duckduckgo
 //!
-//! Prioritizes AI-optimized quality (Tavily) first, then high free tiers, then backup (DuckDuckGo).
+//! Prioritizes AI-optimized quality (Tavily) first, then high free tiers, then backup (`DuckDuckGo`).
 
 use async_trait::async_trait;
 use llmspell_core::{

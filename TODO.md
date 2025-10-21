@@ -3754,15 +3754,17 @@ Research findings and implementation plan for enhanced web search capabilities.
   - Re-export: providers/mod.rs:9,18
   - Env vars: BING_API_KEY or WEBSEARCH_BING_API_KEY
   - Result: ✅ Full integration complete with web/news/images support
-- [ ] **Subtask 12.8.1.7.1.3**: Replace DuckDuckGo Instant Answer API with HTML scraping (~3 hours)
-  - Option A: Use duckduckgo_rs crate (if compatible with our architecture)
-  - Option B: Custom implementation using reqwest + scraper crate
-  - Scraping target: https://html.duckduckgo.com/html/?q={query}
-  - Parsing: Extract title/url/snippet from result divs
-  - Rate limiting: Respect ~20 req/sec unofficial limit
-  - File: llmspell-tools/src/search/providers/duckduckgo.rs (replace 191 lines)
-  - Challenge: May require user-agent rotation, anti-bot evasion
-  - Fallback: Keep current API as backup if scraping fails
+- [x] **Subtask 12.8.1.7.1.3**: Replace DuckDuckGo Instant Answer API with HTML scraping (~3 hours) ✅ COMPLETE
+  - Implementation: Option B - Custom implementation using existing infrastructure
+  - File: llmspell-tools/src/search/providers/duckduckgo.rs (334 lines, +143 net)
+  - Method: HTML scraping of https://html.duckduckgo.com/html/?q={query}
+  - Anti-CAPTCHA: Browser-like headers (User-Agent, Accept, Accept-Language, Referer)
+  - CSS Selectors: .result.results_links (container), .result__a (link), .result__snippet (description)
+  - URL Decoding: Handles DuckDuckGo redirect URLs (/l/?uddg=...)
+  - Fallback: Instant Answer API if HTML scraping fails
+  - Rate Limiting: 5 req/sec (300/min) - conservative vs unofficial 20/sec limit
+  - Dependency: Added urlencoding = "2.1" to Cargo.toml
+  - Result: ✅ Works end-to-end, returns actual web search results (not just knowledge answers)
 - [x] **Subtask 12.8.1.7.1.4**: Update web search fallback chain priorities (~30 min) ✅ COMPLETE
   - Priority order: tavily → serperdev → brave → bing → serpapi → duckduckgo
   - Rationale: AI-optimized (Tavily) → High free tier (SerperDev 2.5k) → Brave (2k) → Bing (1k) → SerpApi (100) → DuckDuckGo (backup)
