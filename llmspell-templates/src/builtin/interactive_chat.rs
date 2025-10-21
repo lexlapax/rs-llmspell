@@ -636,9 +636,10 @@ impl InteractiveChatTemplate {
         println!("  • .tools tool1,tool2 - configure available tools");
         println!("  • .context - show conversation history");
         println!("  • .clearchat - clear conversation history");
-        println!("\n💻 You can also execute Lua/JavaScript code - it auto-detects!");
-        println!("  • function foo() return 42 end; print(foo()) - runs Lua");
-        println!("  • What is the capital of France? - sends to chat agent");
+        println!("\n💬 Chat Mode:");
+        println!("  • Type naturally - What is the capital of France?");
+        println!("  • Multi-turn conversations with context retention");
+        println!("  • Tool integration (if enabled)");
         println!("\n✨ REPL Features: Arrow keys, history (↑↓), multi-line, Ctrl-C interrupt\n");
 
         // Run REPL - this handles all input/output, readline, history, multi-line, Ctrl-C
