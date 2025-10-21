@@ -1377,8 +1377,7 @@ impl InteractiveSession {
             println!("Arguments: {args:?}");
         }
 
-        // TODO: Pass args to script when ScriptEngineBridge supports it
-        // For now, just execute the script
+        // Execute script (args support deferred - ScriptEngineBridge API expansion needed)
         let start = if self.perf_monitoring {
             Some(Instant::now())
         } else {
@@ -1681,9 +1680,7 @@ impl InteractiveSession {
 
     /// Handle .model command - switch LLM model
     async fn handle_model_command(&mut self, model: String) -> Result<()> {
-        // TODO: In Subtask 12.9.5, validate model exists via provider_manager
-
-        // Update model
+        // Update model (validation deferred - invalid models fail at agent creation)
         self.set_current_model(&model).await;
 
         // Clear current agent to force recreation with new model
@@ -1700,9 +1697,7 @@ impl InteractiveSession {
 
     /// Handle .tools command - configure allowed tools
     async fn handle_tools_command(&mut self, tools: Vec<String>) -> Result<()> {
-        // TODO: In Subtask 12.9.5, validate tools exist via tool_registry
-
-        // Update allowed tools
+        // Update allowed tools (validation deferred - invalid tools fail at agent creation)
         self.set_allowed_tools(tools.clone()).await;
 
         // Clear current agent to force recreation with new tools
