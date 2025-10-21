@@ -8078,10 +8078,10 @@ pub enum ChatMetaCommand {
 
 ---
 
-#### Subtask 12.9.2: Add Agent Infrastructure to InteractiveSession
+#### Subtask 12.9.2: Add Agent Infrastructure to InteractiveSession ✅ COMPLETE
 **File**: `llmspell-kernel/src/repl/session.rs`
-**Effort**: 3-4 hours
-**Status**: ⏳ PENDING
+**Effort**: 3-4 hours → Actual: 3 hours
+**Status**: ✅ COMPLETE - Added agent infrastructure fields, conversation management methods, 7 passing tests
 
 **Changes**:
 1. Add fields to InteractiveSession:
@@ -8131,6 +8131,73 @@ struct ConversationTurn {
 - Unit test: get_conversation_context() formats multi-turn history
 - Unit test: clear_conversation() resets history
 - Unit test: get_token_count() sums tokens correctly
+
+**Completion Summary**:
+✅ **ConversationTurn Struct Created** (llmspell-kernel/src/repl/session.rs:162-173):
+  - role: String ("user" or "assistant")
+  - content: String (message text)
+  - token_count: Option<usize>
+  - timestamp: DateTime<Utc>
+  - Implements Clone, Debug, Serialize, Deserialize
+
+✅ **InteractiveSession Fields Added** (lines 205-225):
+  - agent_registry: Option<Arc<dyn Any>> - Agent factory (for chat mode)
+  - provider_manager: Option<Arc<dyn Any>> - LLM provider manager
+  - conversation_history: Arc<RwLock<Vec<ConversationTurn>>> - Chat history
+  - current_agent: Arc<RwLock<Option<Arc<dyn Agent>>>> - Active agent
+  - current_model: Arc<RwLock<String>> - Current LLM model (default: "ollama/llama3.2:3b")
+  - system_prompt: Arc<RwLock<String>> - Agent system prompt (default: "You are a helpful AI assistant.")
+  - allowed_tools: Arc<RwLock<Vec<String>>> - Enabled tools
+  - rag: Option<Arc<dyn Any>> - RAG system (for chat mode)
+  - All fields marked with #[allow(dead_code)] for Subtask 12.9.4 usage
+
+✅ **InteractiveSession::new() Updated** (lines 298-309):
+  - Initializes all agent infrastructure fields with default values
+  - agent_registry, provider_manager, rag: None (code-only mode by default)
+  - conversation_history: Empty Vec
+  - current_agent: None
+  - current_model: "ollama/llama3.2:3b"
+  - system_prompt: "You are a helpful AI assistant."
+  - allowed_tools: Empty Vec
+
+✅ **Conversation Management Methods** (lines 1341-1437):
+  1. add_to_history(role, content, token_count) → async - Append turn with timestamp
+  2. get_conversation_context() → async String - Format history for LLM prompt (using write! for efficiency)
+  3. clear_conversation() → async - Reset history, keep session
+  4. get_token_count() → async usize - Sum tokens from all turns
+  5. get_system_prompt() → async String - Retrieve system prompt
+  6. set_system_prompt(prompt) → async - Update system prompt
+  7. get_current_model() → async String - Retrieve model
+  8. set_current_model(model) → async - Update model with logging
+  9. get_allowed_tools() → async Vec<String> - Retrieve tools
+  10. set_allowed_tools(tools) → async - Update tools with logging
+
+✅ **Imports Added** (lines 13-18):
+  - chrono::{DateTime, Utc} - Timestamp support
+  - llmspell_core::traits::agent::Agent - Agent trait
+  - serde::{Deserialize, Serialize} - ConversationTurn serialization
+  - std::fmt::Write - Efficient string formatting
+
+✅ **Comprehensive Test Suite** (7 tests, all passing - lines 1551-1776):
+  - test_add_to_history: Verify turn appending with role, content, tokens
+  - test_get_conversation_context: Format multi-turn history as string
+  - test_clear_conversation: Reset history while keeping session active
+  - test_get_token_count: Sum tokens across multiple turns
+  - test_system_prompt_get_set: Get/set system prompt
+  - test_current_model_get_set: Get/set model (default verification)
+  - test_allowed_tools_get_set: Get/set tool list
+  - Helper functions: create_test_kernel(), create_test_session_manager()
+  - Mock ScriptExecutor with proper ScriptExecutionOutput structure
+
+✅ **Quality Gates Passed**:
+  - Compilation: Zero errors, zero warnings
+  - Clippy: Zero warnings with `-D warnings`
+  - Tests: 7/7 passing (llmspell-kernel repl::session::tests module)
+  - Code added: +280 lines (including tests and helpers)
+  - Files modified: 1 (session.rs)
+
+**Files Modified**:
+1. llmspell-kernel/src/repl/session.rs (+280 lines) - Agent infrastructure + conversation management
 
 ---
 
