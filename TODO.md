@@ -7937,6 +7937,620 @@ Chart Quality: ASCII bar chart with █ blocks, sales values, revenue labels
 
 ---
 
+### Task 12.9: Full REPL Integration for interactive-chat Template ⏳ PENDING
+**Priority**: HIGH (User Experience Enhancement)
+**Estimated Time**: 19-28 hours (median: 23 hours)
+**Dependencies**: Task 12.8.2 complete ✅, Agent/Provider/RAG infrastructure from 12.8.1 ✅
+
+**Objective**: Upgrade interactive-chat from simple stdin loop to full `InteractiveSession.run_repl()` integration with readline support, chat-specific commands, and dual-mode execution (code vs chat).
+
+**Strategic Rationale**:
+Current implementation (12.8.2) uses simple stdin loop with limitations:
+- ⚠️ NO readline features (arrow keys, history navigation)
+- ⚠️ NO Ctrl-C handling (process terminates)
+- ⚠️ NO multi-line input (Enter to submit)
+
+Full REPL integration provides production-grade UX:
+- ✅ Readline: Arrow keys, Ctrl-A/E, Ctrl-K/U
+- ✅ History: Up/Down navigation, searchable history
+- ✅ Multi-line: Smart detection, ... continuation prompt
+- ✅ Ctrl-C: Graceful interrupt (show new prompt)
+- ✅ Tab completion: Commands, tools, models
+- ✅ Dual-mode: Execute Lua/JS code OR chat with agents
+
+**Architectural Challenge**: `InteractiveSession` designed for Lua/JS code execution, NOT LLM chat
+- ReplCommand enum: Execute/Meta/Debug (script-focused)
+- handle_command(): Routes to execute_code() (Lua/JS VM)
+- Multi-line buffer: Detects code blocks (function, if, etc.)
+- Readline completion: Script variables, functions
+
+**Solution**: Extend REPL for dual-mode operation
+1. Add Chat command variant to ReplCommand
+2. Add agent infrastructure to InteractiveSession
+3. Detect input type: Lua/JS code vs chat message
+4. Route to execute_code() or handle_chat() accordingly
+5. Chat-specific meta commands (.system, .model, .tools)
+
+---
+
+#### Subtask 12.9.1: Extend ReplCommand Enum for Chat Commands
+**File**: `llmspell-kernel/src/repl/commands.rs`
+**Effort**: 2-3 hours
+**Status**: ⏳ PENDING
+
+**Changes**:
+1. Add `Chat(String)` variant to ReplCommand enum
+2. Add ChatMetaCommand enum:
+   - System(String) → Update system prompt
+   - Model(String) → Switch LLM model
+   - Tools(Vec<String>) → Configure allowed tools
+   - Context → Show conversation window/token count
+   - ClearChat → Clear conversation history (keep session)
+3. Update ReplCommand::parse() to detect `.chat`, `.system`, `.model`, `.tools`, `.context`
+4. Add heuristic to auto-detect chat vs code:
+   - Code patterns: `function`, `local`, `if`, `{`, `=`, `;`
+   - Chat patterns: Natural language questions, `?`, conversational tone
+
+**Implementation**:
+```rust
+pub enum ReplCommand {
+    Execute(String),           // Lua/JS code execution
+    Chat(String),             // NEW: Chat with LLM agent
+    Meta(MetaCommand),        // Existing file/session commands
+    ChatMeta(ChatMetaCommand), // NEW: Chat-specific commands
+    Debug(DebugCommand),      // Code debugging
+    Empty,
+}
+
+pub enum ChatMetaCommand {
+    System(String),        // .system "You are a helpful assistant"
+    Model(String),         // .model ollama/llama3.2:3b
+    Tools(Vec<String>),    // .tools web-searcher,calculator
+    Context,               // .context (show conversation window)
+    ClearChat,             // .clearchat (reset conversation)
+}
+```
+
+**Testing**:
+- Unit test: Parse `.system "new prompt"` → ChatMeta(System("new prompt"))
+- Unit test: Parse `.model gpt-4` → ChatMeta(Model("gpt-4"))
+- Unit test: Parse `.tools web-searcher` → ChatMeta(Tools(vec!["web-searcher"]))
+- Unit test: Detect `function foo() end` → Execute (code)
+- Unit test: Detect `What is 2+2?` → Chat (natural language)
+- Unit test: Detect `local x = 5` → Execute (code)
+- Unit test: Detect `Explain Rust ownership` → Chat (natural language)
+
+---
+
+#### Subtask 12.9.2: Add Agent Infrastructure to InteractiveSession
+**File**: `llmspell-kernel/src/repl/session.rs`
+**Effort**: 3-4 hours
+**Status**: ⏳ PENDING
+
+**Changes**:
+1. Add fields to InteractiveSession:
+   - `agent_registry: Option<Arc<FactoryRegistry>>`
+   - `provider_manager: Option<Arc<ProviderManager>>`
+   - `conversation_history: Arc<RwLock<Vec<ConversationTurn>>>`
+   - `current_agent: Arc<RwLock<Option<Arc<dyn Agent>>>>`
+   - `current_model: Arc<RwLock<String>>`
+   - `system_prompt: Arc<RwLock<String>>`
+   - `allowed_tools: Arc<RwLock<Vec<String>>>`
+   - `rag: Option<Arc<MultiTenantRAG>>`
+2. Update `InteractiveSession::new()` to accept agent/provider/rag dependencies
+3. Add conversation management methods:
+   - `add_to_history(role, content, tokens)` → Append turn
+   - `get_conversation_context()` → Format history for LLM prompt
+   - `clear_conversation()` → Reset history (keep session)
+   - `get_token_count()` → Sum conversation tokens
+
+**Implementation**:
+```rust
+pub struct InteractiveSession {
+    kernel: IntegratedKernel<JupyterProtocol>,
+    // ... existing fields ...
+
+    // NEW: Agent infrastructure
+    agent_registry: Option<Arc<FactoryRegistry>>,
+    provider_manager: Option<Arc<ProviderManager>>,
+    conversation_history: Arc<RwLock<Vec<ConversationTurn>>>,
+    current_agent: Arc<RwLock<Option<Arc<dyn Agent>>>>,
+    current_model: Arc<RwLock<String>>,
+    system_prompt: Arc<RwLock<String>>,
+    allowed_tools: Arc<RwLock<Vec<String>>>,
+    rag: Option<Arc<MultiTenantRAG>>,
+}
+
+#[derive(Clone, Serialize, Deserialize)]
+struct ConversationTurn {
+    role: String,           // "user" or "assistant"
+    content: String,
+    token_count: Option<usize>,
+    timestamp: DateTime<Utc>,
+}
+```
+
+**Testing**:
+- Unit test: add_to_history() appends turns
+- Unit test: get_conversation_context() formats multi-turn history
+- Unit test: clear_conversation() resets history
+- Unit test: get_token_count() sums tokens correctly
+
+---
+
+#### Subtask 12.9.3: Implement Dual-Mode Detection
+**File**: `llmspell-kernel/src/repl/session.rs`
+**Effort**: 2-3 hours
+**Status**: ⏳ PENDING
+
+**Changes**:
+1. Add `detect_input_mode(input: &str) -> InputMode` enum:
+   - Code: Lua/JS syntax patterns detected
+   - Chat: Natural language detected
+   - Ambiguous: Could be either (prompt user)
+2. Heuristics for code detection:
+   - Keywords: `function`, `local`, `let`, `const`, `if`, `for`, `while`
+   - Symbols: `{`, `}`, `;`, `=`, `==`, `!=`, `||`, `&&`
+   - Lua patterns: `end`, `then`, `do`
+   - JS patterns: `=>`, `async`, `await`
+3. Heuristics for chat detection:
+   - Questions: Ends with `?`
+   - Conversational: `please`, `can you`, `what is`, `how do`
+   - Natural sentences: Spaces > 5 words, no code symbols
+4. Ambiguous handling:
+   - Prompt user: `[Code or Chat?] (c/h): `
+   - Default: Chat mode (safer for UX)
+
+**Implementation**:
+```rust
+enum InputMode {
+    Code,
+    Chat,
+    Ambiguous,
+}
+
+fn detect_input_mode(&self, input: &str) -> InputMode {
+    let trimmed = input.trim();
+
+    // Code patterns (high confidence)
+    if CODE_KEYWORDS.iter().any(|kw| trimmed.contains(kw)) {
+        return InputMode::Code;
+    }
+
+    // Chat patterns (high confidence)
+    if trimmed.ends_with('?') || CHAT_PHRASES.iter().any(|p| trimmed.contains(p)) {
+        return InputMode::Chat;
+    }
+
+    // Ambiguous
+    if trimmed.split_whitespace().count() > 3 && !trimmed.contains('{') {
+        InputMode::Chat  // Default to chat for natural sentences
+    } else {
+        InputMode::Ambiguous
+    }
+}
+```
+
+**Testing**:
+- Unit test: `function foo() end` → Code
+- Unit test: `What is Rust?` → Chat
+- Unit test: `local x = 5` → Code
+- Unit test: `Explain async programming` → Chat
+- Unit test: `result = 2 + 2` → Ambiguous (could be code or math question)
+
+---
+
+#### Subtask 12.9.4: Implement Chat Command Handlers
+**File**: `llmspell-kernel/src/repl/session.rs`
+**Effort**: 3-4 hours
+**Status**: ⏳ PENDING
+
+**Changes**:
+1. `handle_chat_command(message: String)`:
+   - Get/create agent with current_model
+   - Load conversation history
+   - Build prompt: system_prompt + history + user_message
+   - Execute agent with allowed_tools
+   - Extract assistant response
+   - Add user + assistant turns to history
+   - Save history to session state
+   - Display assistant response with color
+2. `handle_system_command(prompt: String)`:
+   - Update system_prompt in RwLock
+   - Recreate agent with new prompt
+   - Display confirmation
+3. `handle_model_command(model: String)`:
+   - Validate model exists via provider_manager
+   - Update current_model
+   - Recreate agent
+   - Display confirmation
+4. `handle_tools_command(tools: Vec<String>)`:
+   - Validate tools exist via tool_registry
+   - Update allowed_tools
+   - Recreate agent
+   - Display confirmation
+5. `handle_context_command()`:
+   - Display conversation history
+   - Show token count
+   - Show current settings (model, system prompt, tools)
+
+**Implementation**:
+```rust
+async fn handle_chat_command(&mut self, message: String) -> Result<()> {
+    // Get or create agent
+    let agent = self.get_or_create_agent().await?;
+
+    // Add user message to history
+    self.add_to_history("user", &message, None).await;
+
+    // Build prompt with conversation context
+    let prompt = self.build_chat_prompt(&message).await?;
+
+    // Execute agent
+    let input = AgentInput::builder().text(prompt).build();
+    let result = agent.execute(input, ExecutionContext::default()).await?;
+
+    // Extract response
+    let response = result.output;
+
+    // Add to history
+    self.add_to_history("assistant", &response, Some(result.token_count)).await;
+
+    // Display
+    println!("\n\x1b[1;34mAssistant>\x1b[0m {}\n", response);
+
+    Ok(())
+}
+```
+
+**Testing**:
+- Integration test: Chat command creates agent and gets response
+- Integration test: System command updates prompt and recreates agent
+- Integration test: Model command switches LLM
+- Integration test: Tools command updates allowed tools
+- Integration test: Context command displays history
+
+---
+
+#### Subtask 12.9.5: Update interactive-chat Template to Use Full REPL
+**File**: `llmspell-templates/src/builtin/interactive_chat.rs`
+**Effort**: 2-3 hours
+**Status**: ⏳ PENDING
+
+**Changes**:
+1. Remove `run_interactive_mode()` stdin loop (lines 464-600, ~143 lines deleted)
+2. Add `create_interactive_session()`:
+   - Create `IntegratedKernel<JupyterProtocol>`
+   - Create `ReplSessionConfig`
+   - Pass agent_registry, provider_manager, rag from ExecutionContext
+   - Create `InteractiveSession::new()` with all dependencies
+   - Set initial system_prompt, model, tools
+3. Update execute() method:
+   - Call `create_interactive_session()`
+   - Call `session.run_repl().await`
+   - Return conversation result from session state
+4. Keep `run_programmatic_mode()` unchanged (still used for single-turn API)
+
+**Implementation**:
+```rust
+async fn create_interactive_session(
+    &self,
+    context: &ExecutionContext,
+    model: &str,
+    system_prompt: &str,
+    tools: &[String],
+) -> Result<InteractiveSession> {
+    // Create kernel
+    let kernel = IntegratedKernel::<JupyterProtocol>::new()?;
+
+    // Create REPL config
+    let config = ReplSessionConfig {
+        enable_performance_monitoring: true,
+        history_file: Some(PathBuf::from(".llmspell_chat_history")),
+        ..Default::default()
+    };
+
+    // Create session
+    let mut session = InteractiveSession::new(kernel, config).await?;
+
+    // Add agent infrastructure
+    session.set_agent_registry(context.agent_registry.clone());
+    session.set_provider_manager(context.providers.clone());
+    session.set_rag(context.rag.clone());
+    session.set_model(model.to_string());
+    session.set_system_prompt(system_prompt.to_string());
+    session.set_tools(tools.to_vec());
+
+    Ok(session)
+}
+```
+
+**Testing**:
+- Integration test: create_interactive_session() returns valid session
+- Integration test: Session has agent_registry wired
+- Integration test: Session has provider_manager wired
+- Integration test: Initial model/system_prompt/tools set correctly
+
+---
+
+#### Subtask 12.9.6: Integration Testing - REPL + Chat
+**File**: `llmspell-kernel/tests/repl_chat_integration_test.rs` (NEW)
+**Effort**: 3-4 hours
+**Status**: ⏳ PENDING
+
+**Test Scenarios** (15+ tests):
+1. **Code Execution Still Works**:
+   - Execute Lua: `local x = 5; print(x)` → Output: 5
+   - Execute multi-line Lua: `function foo() return 42 end; print(foo())` → 42
+2. **Chat Execution with Real LLM**:
+   - Chat: `What is 2+2?` → Agent responds with answer
+   - Multi-turn: User → Assistant → User → Assistant (context retained)
+3. **Mode Switching**:
+   - Code → Chat → Code (session maintains both script variables and conversation)
+   - Verify script vars persist after chat
+   - Verify chat history persists after code execution
+4. **Meta Commands**:
+   - `.exit` → Session ends gracefully
+   - `.help` → Shows both code and chat commands
+   - `.history` → Shows code execution history
+   - `.save` / `.load` → Save/restore session
+5. **Chat Commands**:
+   - `.system "new prompt"` → Updates system prompt
+   - `.model ollama/llama3.2:3b` → Switches model
+   - `.tools web-searcher` → Configures tools
+   - `.context` → Shows conversation + settings
+   - `.clearchat` → Resets conversation (keeps code vars)
+6. **Readline Features**:
+   - Up/Down arrows → Navigate history
+   - Ctrl-C → Interrupt without exit
+   - Multi-line code → ... continuation prompt
+7. **Error Handling**:
+   - Invalid Lua code → Parse error, show new prompt
+   - Invalid chat (no agent) → Error message, don't crash
+   - Model switch to invalid model → Error, keep current
+
+**Effort Breakdown**:
+- Test setup/fixtures: 1 hour
+- 15 test scenarios: 2-3 hours
+- Mock LLM for faster tests: 30 min
+
+---
+
+#### Subtask 12.9.7: Re-validate 12.8.2 Tests
+**File**: `llmspell-templates/src/builtin/interactive_chat.rs` (tests section)
+**Effort**: 1-2 hours
+**Status**: ⏳ PENDING
+
+**Test Coverage** (Existing 23 tests from 12.8.2):
+1. ✅ Verify all 23 existing tests still pass
+2. ✅ Programmatic mode unchanged (single-turn API still works)
+3. ✅ Session persistence still works
+4. ✅ Conversation history integrity maintained
+5. ✅ Tool validation still works
+6. ✅ Model parsing still works
+7. ✅ Error handling still works
+
+**Regression Checks**:
+- Run full test suite: `cargo test -p llmspell-templates interactive_chat`
+- Verify programmatic mode: Test single-turn chat via API (no REPL)
+- Verify session state: Load/save conversation history
+- Check zero clippy warnings
+- Check test coverage >90%
+
+**Fix Any Regressions**:
+- If REPL changes broke programmatic mode → Fix integration
+- If session state format changed → Migration logic
+- If tests fail → Debug and fix
+
+**Acceptance Criteria**:
+- All 23 original tests pass ✅
+- Zero new clippy warnings ✅
+- Programmatic mode API unchanged ✅
+- Session persistence backward compatible ✅
+
+---
+
+#### Subtask 12.9.8: Documentation Updates
+**File**: `docs/user-guide/templates/interactive-chat.md`
+**Effort**: 1-2 hours
+**Status**: ⏳ PENDING
+
+**Sections to Add/Update**:
+1. **Quick Start** → Add REPL features note
+2. **Interactive Mode** (NEW section):
+   - Readline features (arrow keys, Ctrl-A/E, history)
+   - Multi-line input (... continuation)
+   - Ctrl-C handling (interrupt, not exit)
+3. **Commands** (NEW section):
+   - Chat commands: `.system`, `.model`, `.tools`, `.context`, `.clearchat`
+   - Code commands: Existing meta commands (`.exit`, `.help`, `.save`, `.load`)
+   - Dual-mode: Auto-detect code vs chat
+4. **Dual-Mode Usage** (NEW section):
+   - Examples: Mix Lua/JS code execution with chat
+   - Use case: Calculate with code, explain with chat
+   - Script variables accessible in both modes
+5. **Troubleshooting**:
+   - "Input detected as code when I meant chat" → Use `.chat <message>` explicitly
+   - "Input detected as chat when I meant code" → Start with code keyword
+   - "Model switch failed" → Check provider availability
+
+**Effort**: 1-2 hours (write + review)
+
+---
+
+#### Subtask 12.9.9: End-to-End Testing with Real LLM
+**Effort**: 2-3 hours
+**Status**: ⏳ PENDING
+
+**Manual Test Scenarios**:
+1. **Basic Chat Flow**:
+   - Start: `llmspell template exec interactive-chat`
+   - Chat: "What is Rust?" → Verify response
+   - Multi-turn: "Explain ownership" → Verify context retained
+   - Exit: `.exit` → Verify graceful shutdown
+2. **Readline Features**:
+   - Type message, press ↑ → Verify previous message shown
+   - Edit with Ctrl-A, Ctrl-E → Verify cursor movement
+   - Multi-line: Type long paragraph with Enter → Verify ... continuation
+3. **Ctrl-C Handling**:
+   - Start chat, press Ctrl-C mid-response → Verify interrupt
+   - Press Ctrl-C at prompt → Verify new prompt (don't exit)
+4. **Chat Commands**:
+   - `.system "You are a Rust expert"` → Verify updated
+   - `.model ollama/llama3.2:3b` → Verify switched
+   - `.tools web-searcher` → Verify tools enabled
+   - `.context` → Verify shows history + settings
+   - `.clearchat` → Verify conversation reset
+5. **Dual-Mode**:
+   - Execute Lua: `local x = 42`
+   - Chat: "What is x?" → Verify agent responds (note: won't see Lua var)
+   - Execute Lua: `print(x)` → Verify 42 printed
+   - Verify both histories maintained
+6. **Integration with Tools**:
+   - `.tools web-searcher`
+   - Chat: "Search for Rust async programming"
+   - Verify web search executed + results in response
+7. **Integration with RAG** (if available):
+   - Load documents into RAG
+   - Chat: "What does the document say about X?"
+   - Verify RAG retrieval + synthesis
+
+**Performance Testing**:
+- Response latency: <10s for chat (LLM-dependent)
+- Readline responsiveness: <50ms for key press
+- History navigation: <10ms per up/down
+
+**UX Validation**:
+- ANSI colors render correctly (green user, blue assistant)
+- Multi-line input formatted properly
+- Error messages clear and actionable
+- Help text comprehensive
+
+**Acceptance Criteria**:
+- All 7 manual scenarios pass ✅
+- Zero crashes or hangs ✅
+- Readline features work smoothly ✅
+- UX feels production-ready ✅
+
+---
+
+**Acceptance Criteria (Task 12.9 Complete)**:
+
+**Code Quality**:
+- [ ] Zero TODO comments
+- [ ] Zero clippy warnings across llmspell-kernel + llmspell-templates
+- [ ] All tests passing (23 existing + 15 new integration tests)
+
+**Functionality**:
+- [ ] Full REPL integration working (readline, multi-line, Ctrl-C)
+- [ ] Chat commands functional (.system, .model, .tools, .context, .clearchat)
+- [ ] Dual-mode detection working (code vs chat)
+- [ ] Programmatic mode API unchanged (backward compatible)
+
+**Testing**:
+- [ ] 15+ integration tests in repl_chat_integration_test.rs
+- [ ] All 23 existing tests from 12.8.2 still pass
+- [ ] 7 manual test scenarios validated
+
+**Documentation**:
+- [ ] interactive-chat.md updated with REPL features
+- [ ] Chat commands documented
+- [ ] Dual-mode usage examples
+- [ ] Troubleshooting section
+
+**Impact**:
+- [ ] Production-grade UX for interactive chat (vs basic stdin loop)
+- [ ] Parity with industry-standard REPLs (readline, history, multi-line)
+- [ ] Enables advanced workflows (mix code + chat in one session)
+
+---
+
+**Files to Modify**:
+1. `llmspell-kernel/src/repl/commands.rs` (+100 lines)
+2. `llmspell-kernel/src/repl/session.rs` (+300 lines)
+3. `llmspell-templates/src/builtin/interactive_chat.rs` (-143 stdin loop, +50 REPL integration)
+4. `llmspell-kernel/tests/repl_chat_integration_test.rs` (+400 lines NEW)
+5. `docs/user-guide/templates/interactive-chat.md` (+150 lines)
+
+**Total Net Lines**: ~+900 lines
+
+---
+
+**Risk Assessment**:
+
+**HIGH Risk**:
+- Modifying production REPL code (llmspell-kernel) could break Lua/JS execution
+- **Mitigation**: Comprehensive integration tests (12.9.6), re-run all kernel tests
+
+**MEDIUM Risk**:
+- Dual-mode detection heuristics may misclassify input (code vs chat)
+- **Mitigation**: Explicit `.chat` command for forcing chat mode, ambiguity prompt
+
+**MEDIUM Risk**:
+- Agent infrastructure added to kernel creates new dependency (kernel → agents/providers)
+- **Mitigation**: Make fields `Option<Arc<>>`, kernel still works without agents
+
+**LOW Risk**:
+- Template integration straightforward (just API usage)
+- **Mitigation**: Re-validate 12.8.2 tests (12.9.7)
+
+---
+
+**Timeline & Milestones**:
+
+**Week 1** (12 hours):
+- Day 1-2: Subtasks 12.9.1, 12.9.2 (extend REPL infrastructure)
+- Day 3: Subtask 12.9.3 (dual-mode detection)
+
+**Week 2** (11 hours):
+- Day 1-2: Subtask 12.9.4 (chat handlers)
+- Day 3: Subtask 12.9.5 (template integration)
+
+**Week 3** (remaining hours):
+- Day 1-2: Subtasks 12.9.6, 12.9.7 (testing + regression)
+- Day 3: Subtasks 12.9.8, 12.9.9 (docs + end-to-end)
+
+**Total**: 23 hours median (19-28 hour range)
+
+---
+
+**Dependencies on Other Tasks**:
+
+**Requires Complete**:
+- ✅ Task 12.8.2 (interactive-chat v1 with stdin loop)
+- ✅ Task 12.8.1 (agent/provider/RAG infrastructure)
+
+**Blocks**:
+- None (isolated enhancement to interactive-chat UX)
+
+---
+
+**Success Metrics**:
+
+**Before (12.8.2 - Current)**:
+- ⚠️ Basic stdin loop (no readline)
+- ⚠️ Single-line input only
+- ⚠️ Ctrl-C kills process
+- ⚠️ No command history navigation
+- ✅ Programmatic mode works
+- ✅ Session persistence works
+
+**After (12.9 - Target)**:
+- ✅ Full REPL with readline (arrow keys, Ctrl-A/E, history)
+- ✅ Multi-line input with smart detection
+- ✅ Ctrl-C interrupt (doesn't exit)
+- ✅ Command history searchable (Ctrl-R)
+- ✅ Chat commands (.system, .model, .tools, .context)
+- ✅ Dual-mode (code + chat in one session)
+- ✅ Programmatic mode still works (backward compatible)
+- ✅ Session persistence still works
+
+**User Experience Improvement**:
+- From: "Feels like a toy prototype"
+- To: "Feels like production-grade CLI (IPython/Node.js REPL quality)"
+
+---
+
 ## Phase 12.8 Definition of Done
 
 **Code Quality**:
