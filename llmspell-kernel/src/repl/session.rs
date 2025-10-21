@@ -407,21 +407,19 @@ impl InteractiveSession {
 
     /// Handle a parsed command
     async fn handle_command(&mut self, command: ReplCommand) -> Result<()> {
+        use crate::repl::commands::ChatMetaCommand;
+
         match command {
             ReplCommand::Execute(code) => self.execute_code(&code).await,
-            ReplCommand::Chat(message) => {
-                // TODO: Implement in Subtask 12.9.4
-                warn!("Chat command not yet implemented: {}", message);
-                println!("Chat functionality will be implemented in Subtask 12.9.4");
-                Ok(())
-            }
+            ReplCommand::Chat(message) => self.handle_chat_message(message).await,
             ReplCommand::Meta(meta) => self.handle_meta_command(meta).await,
-            ReplCommand::ChatMeta(chat_meta) => {
-                // TODO: Implement in Subtask 12.9.4
-                warn!("Chat meta command not yet implemented: {:?}", chat_meta);
-                println!("Chat meta commands (.system, .model, .tools, .context, .clearchat) will be implemented in Subtask 12.9.4");
-                Ok(())
-            }
+            ReplCommand::ChatMeta(chat_meta) => match chat_meta {
+                ChatMetaCommand::System(prompt) => self.handle_system_command(prompt).await,
+                ChatMetaCommand::Model(model) => self.handle_model_command(model).await,
+                ChatMetaCommand::Tools(tools) => self.handle_tools_command(tools).await,
+                ChatMetaCommand::Context => self.handle_context_command().await,
+                ChatMetaCommand::ClearChat => self.handle_clearchat_command().await,
+            },
             ReplCommand::Debug(debug) => self.handle_debug_command(debug).await,
             ReplCommand::Empty => Ok(()),
         }
@@ -1441,6 +1439,146 @@ impl InteractiveSession {
         *allowed_tools = tools;
         debug!("Allowed tools updated: {:?}", allowed_tools);
     }
+
+    // ===== Chat Command Handlers (Subtask 12.9.4) =====
+
+    /// Handle chat message from user
+    ///
+    /// This is a placeholder implementation that demonstrates the flow.
+    /// Full agent integration will be added in Subtask 12.9.5.
+    async fn handle_chat_message(&mut self, message: String) -> Result<()> {
+        // Add user message to history
+        self.add_to_history("user", &message, None).await;
+
+        // For now, provide a placeholder response
+        // TODO: In Subtask 12.9.5, this will:
+        // 1. Get/create agent from agent_registry
+        // 2. Build prompt with conversation context
+        // 3. Execute agent with allowed_tools
+        // 4. Extract response and token count
+        let response = format!(
+            "Chat functionality is ready! (agent integration in Subtask 12.9.5)\n\
+             Your message: \"{message}\""
+        );
+
+        // Add assistant response to history
+        self.add_to_history("assistant", &response, None).await;
+
+        // Display response
+        println!("\n\x1b[1;34mAssistant>\x1b[0m {response}\n");
+
+        Ok(())
+    }
+
+    /// Handle .system command - update system prompt
+    async fn handle_system_command(&mut self, prompt: String) -> Result<()> {
+        // Update system prompt
+        self.set_system_prompt(&prompt).await;
+
+        // Clear current agent to force recreation with new prompt
+        {
+            let mut agent = self.current_agent.write().await;
+            *agent = None;
+        }
+
+        println!("\x1b[1;32m✓\x1b[0m System prompt updated");
+        println!("  New prompt: {prompt}");
+        println!("  Agent will be recreated on next chat message\n");
+
+        Ok(())
+    }
+
+    /// Handle .model command - switch LLM model
+    async fn handle_model_command(&mut self, model: String) -> Result<()> {
+        // TODO: In Subtask 12.9.5, validate model exists via provider_manager
+
+        // Update model
+        self.set_current_model(&model).await;
+
+        // Clear current agent to force recreation with new model
+        {
+            let mut agent = self.current_agent.write().await;
+            *agent = None;
+        }
+
+        println!("\x1b[1;32m✓\x1b[0m Model switched to: {model}");
+        println!("  Agent will be recreated on next chat message\n");
+
+        Ok(())
+    }
+
+    /// Handle .tools command - configure allowed tools
+    async fn handle_tools_command(&mut self, tools: Vec<String>) -> Result<()> {
+        // TODO: In Subtask 12.9.5, validate tools exist via tool_registry
+
+        // Update allowed tools
+        self.set_allowed_tools(tools.clone()).await;
+
+        // Clear current agent to force recreation with new tools
+        {
+            let mut agent = self.current_agent.write().await;
+            *agent = None;
+        }
+
+        println!("\x1b[1;32m✓\x1b[0m Allowed tools updated");
+        println!("  Tools: {}", tools.join(", "));
+        println!("  Agent will be recreated on next chat message\n");
+
+        Ok(())
+    }
+
+    /// Handle .context command - show conversation state
+    async fn handle_context_command(&self) -> Result<()> {
+        println!("\n\x1b[1;36m=== Conversation Context ===\x1b[0m\n");
+
+        // Show current settings
+        let model = self.get_current_model().await;
+        let prompt = self.get_system_prompt().await;
+        let tools = self.get_allowed_tools().await;
+        let token_count = self.get_token_count().await;
+
+        println!("\x1b[1mModel:\x1b[0m {model}");
+        println!("\x1b[1mSystem Prompt:\x1b[0m {prompt}");
+        let tools_str = if tools.is_empty() {
+            "(none)".to_string()
+        } else {
+            tools.join(", ")
+        };
+        println!("\x1b[1mAllowed Tools:\x1b[0m {tools_str}");
+        println!("\x1b[1mTotal Tokens:\x1b[0m {token_count}\n");
+
+        // Show conversation history
+        let history = self.conversation_history.read().await;
+        if history.is_empty() {
+            println!("\x1b[1mConversation History:\x1b[0m (empty)\n");
+        } else {
+            let history_len = history.len();
+            println!("\x1b[1mConversation History:\x1b[0m ({history_len} turns)\n");
+            for (i, turn) in history.iter().enumerate() {
+                let role_color = if turn.role == "user" { "33" } else { "34" };
+                let token_str = turn
+                    .token_count
+                    .map_or_else(String::new, |t| format!(" [{t}t]"));
+                let idx = i + 1;
+                let role = &turn.role;
+                let content = &turn.content;
+                println!(
+                    "  {idx}. \x1b[1;{role_color}m{role}\x1b[0m{token_str}: {content}"
+                );
+            }
+            println!();
+        }
+
+        Ok(())
+    }
+
+    /// Handle .clearchat command - clear conversation history
+    async fn handle_clearchat_command(&self) -> Result<()> {
+        self.clear_conversation().await;
+        println!("\x1b[1;32m✓\x1b[0m Conversation history cleared");
+        println!("  Code session and variables are preserved\n");
+        Ok(())
+    }
 }
 
 /// Detect value type based on string content
@@ -1706,6 +1844,130 @@ mod tests {
         // Verify update
         let tools = session.get_allowed_tools().await;
         assert_eq!(tools, vec!["web-searcher", "calculator"]);
+    }
+
+    // ===== Chat Command Handler Tests (Subtask 12.9.4) =====
+
+    #[tokio::test]
+    async fn test_handle_chat_message() {
+        let kernel = create_test_kernel().await;
+        let config = ReplSessionConfig::default();
+        let mut session = InteractiveSession::new(kernel, config).await.unwrap();
+
+        // Send chat message
+        let result = session.handle_chat_message("Hello, AI!".to_string()).await;
+        assert!(result.is_ok());
+
+        // Verify history has 2 turns (user + assistant)
+        let history = session.conversation_history.read().await;
+        assert_eq!(history.len(), 2);
+        assert_eq!(history[0].role, "user");
+        assert_eq!(history[0].content, "Hello, AI!");
+        assert_eq!(history[1].role, "assistant");
+        assert!(history[1].content.contains("Hello, AI!"));
+    }
+
+    #[tokio::test]
+    async fn test_handle_system_command() {
+        let kernel = create_test_kernel().await;
+        let config = ReplSessionConfig::default();
+        let mut session = InteractiveSession::new(kernel, config).await.unwrap();
+
+        // Update system prompt
+        let result = session
+            .handle_system_command("You are a Rust expert.".to_string())
+            .await;
+        assert!(result.is_ok());
+
+        // Verify prompt updated
+        let prompt = session.get_system_prompt().await;
+        assert_eq!(prompt, "You are a Rust expert.");
+
+        // Verify agent cleared
+        let agent = session.current_agent.read().await;
+        assert!(agent.is_none());
+    }
+
+    #[tokio::test]
+    async fn test_handle_model_command() {
+        let kernel = create_test_kernel().await;
+        let config = ReplSessionConfig::default();
+        let mut session = InteractiveSession::new(kernel, config).await.unwrap();
+
+        // Switch model
+        let result = session
+            .handle_model_command("gpt-4".to_string())
+            .await;
+        assert!(result.is_ok());
+
+        // Verify model updated
+        let model = session.get_current_model().await;
+        assert_eq!(model, "gpt-4");
+
+        // Verify agent cleared
+        let agent = session.current_agent.read().await;
+        assert!(agent.is_none());
+    }
+
+    #[tokio::test]
+    async fn test_handle_tools_command() {
+        let kernel = create_test_kernel().await;
+        let config = ReplSessionConfig::default();
+        let mut session = InteractiveSession::new(kernel, config).await.unwrap();
+
+        // Update tools
+        let result = session
+            .handle_tools_command(vec!["web-searcher".to_string(), "calculator".to_string()])
+            .await;
+        assert!(result.is_ok());
+
+        // Verify tools updated
+        let tools = session.get_allowed_tools().await;
+        assert_eq!(tools, vec!["web-searcher", "calculator"]);
+
+        // Verify agent cleared
+        let agent = session.current_agent.read().await;
+        assert!(agent.is_none());
+    }
+
+    #[tokio::test]
+    async fn test_handle_context_command() {
+        let kernel = create_test_kernel().await;
+        let config = ReplSessionConfig::default();
+        let session = InteractiveSession::new(kernel, config).await.unwrap();
+
+        // Add some history
+        session.add_to_history("user", "Hello", Some(5)).await;
+        session.add_to_history("assistant", "Hi!", Some(3)).await;
+
+        // Display context (should not error)
+        let result = session.handle_context_command().await;
+        assert!(result.is_ok());
+    }
+
+    #[tokio::test]
+    async fn test_handle_clearchat_command() {
+        let kernel = create_test_kernel().await;
+        let config = ReplSessionConfig::default();
+        let session = InteractiveSession::new(kernel, config).await.unwrap();
+
+        // Add history
+        session.add_to_history("user", "Hello", None).await;
+        session.add_to_history("assistant", "Hi!", None).await;
+
+        // Verify not empty
+        {
+            let history = session.conversation_history.read().await;
+            assert_eq!(history.len(), 2);
+        }
+
+        // Clear chat
+        let result = session.handle_clearchat_command().await;
+        assert!(result.is_ok());
+
+        // Verify empty
+        let history = session.conversation_history.read().await;
+        assert!(history.is_empty());
     }
 
     /// Helper to create a test kernel
