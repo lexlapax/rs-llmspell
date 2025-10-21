@@ -37,14 +37,18 @@ impl ReplCommand {
 
         // Check for meta commands (start with .)
         if let Some(stripped) = trimmed.strip_prefix('.') {
-            // Try chat meta commands first
-            if let Ok(chat_cmd) = ChatMetaCommand::parse(stripped) {
-                return Ok(ReplCommand::ChatMeta(chat_cmd));
-            }
-            // Try explicit .chat command
+            // Try explicit .chat command first
             if let Some(message) = stripped.strip_prefix("chat ") {
                 return Ok(ReplCommand::Chat(message.to_string()));
             }
+
+            // Check if it's a chat meta command (preserve specific errors for better UX)
+            let first_word = stripped.split_whitespace().next().unwrap_or("");
+            if matches!(first_word, "system" | "model" | "tools" | "context" | "clearchat") {
+                // Parse as chat meta command (returns specific error messages)
+                return ChatMetaCommand::parse(stripped).map(ReplCommand::ChatMeta);
+            }
+
             // Fall back to regular meta commands
             return MetaCommand::parse(stripped).map(ReplCommand::Meta);
         }
