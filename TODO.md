@@ -3803,6 +3803,88 @@ Research findings and implementation plan for enhanced web search capabilities.
 - llmspell-rag/src/multi_tenant_integration.rs (added tenant_manager() accessor)
 - llmspell-tools/src/search/web_search_old.rs (DELETED - 480 lines technical debt)
 
+**Implementation Insights & Lessons Learned (12.8.1.7)**:
+
+**Architecture Decisions**:
+- **Fallback Chain Priority**: AI-optimized (Tavily) → high free tier (SerperDev 2.5k) → privacy-focused (Brave 2k) → enterprise (Bing 1k) → limited (SerpApi 100) → backup (DuckDuckGo unlimited)
+  - Rationale: Prioritize quality (AI-optimized for RAG) before falling back to quantity (free tier limits)
+  - Default provider: Tavily provides best results for research-assistant use case
+- **Rate Limiting Strategy**: Conservative limits (5 req/sec for DuckDuckGo vs 20/sec unofficial) to avoid anti-bot detection
+  - Applied to all providers: Tavily (30/min), Bing (3 TPS), SerperDev (30/min)
+  - Prevents CAPTCHA challenges and account throttling
+- **Dual-Method Pattern**: Primary method (HTML scraping) with API fallback (Instant Answer)
+  - DuckDuckGo: HTML scraping returns actual web results, Instant Answer API returns knowledge answers
+  - Graceful degradation: If HTML scraping fails (CAPTCHA, network), fallback to API
+  - Enables zero-API-key operation with degraded but functional results
+
+**Technical Challenges & Solutions**:
+- **DuckDuckGo CAPTCHA Evasion**: Direct curl triggered anomaly-modal (CAPTCHA challenge)
+  - Root Cause: Missing browser-like headers exposed bot signature
+  - Solution: Added 4 critical headers (User-Agent: Chrome 131, Accept: text/html, Accept-Language: en-US, Referer: duckduckgo.com)
+  - Implementation: llmspell-tools/src/search/providers/duckduckgo.rs:101-107
+  - Result: ✅ Zero CAPTCHA challenges in testing (research-assistant 13.45s, 3 sources)
+- **DuckDuckGo URL Decoding**: Redirect URLs like `/l/?uddg=https%3A%2F%2F...` instead of direct URLs
+  - Root Cause: DuckDuckGo uses redirect wrapper for click tracking
+  - Solution: Extract uddg parameter, URL decode with urlencoding crate, fallback to original if extraction fails
+  - Implementation: duckduckgo.rs:187-196
+  - Dependency: Added urlencoding = "2.1" to Cargo.toml
+- **Code Complexity Reduction**: Clippy warnings (cognitive_complexity 34/25, too_many_lines 118/100, map_unwrap_or)
+  - Root Cause: Monolithic `search_instant_answer` function handling fetch + 3 result types
+  - Solution: Extracted 4 focused functions (fetch_instant_answer_api, parse_abstract_result, parse_instant_results, parse_related_topics)
+  - Benefits: Reduced main function to 18 lines, improved testability, maintained functionality
+  - Clippy Fix: Changed `.map().unwrap_or_else()` to `.map_or_else()` for idiomatic Rust
+  - Implementation: duckduckgo.rs:216-359 (refactored into 4 functions)
+
+**Code Quality Achievements**:
+- **Zero Warnings Policy**: ✅ cargo clippy --workspace --all-features --all-targets passes
+  - Fixed across 5 crates: llmspell-tools, llmspell-rag, llmspell-bridge, llmspell-cli, llmspell-kernel
+  - Types: missing_const_for_fn (1), unused_imports (1), doc_markdown (4), map_unwrap_or (1), cognitive_complexity (1), too_many_lines (1)
+- **Function Decomposition Pattern**: Split large functions by responsibility (fetch vs parse, result types)
+  - Benefits: Single Responsibility Principle, easier unit testing, reduced cognitive load
+  - Applied to: duckduckgo.rs:search_instant_answer (118→18 lines)
+- **Existing Infrastructure Reuse**: Leveraged scraper crate already in Cargo.toml (llmspell-tools/Cargo.toml:74)
+  - Avoided adding duckduckgo_rs dependency (would add 5+ transitive deps)
+  - Custom implementation: 143 net lines for full control and maintainability
+
+**Testing Strategy**:
+- **End-to-End Validation**: research-assistant template with real Ollama LLM (llama3.2:3b)
+  - Tavily: ✅ 15.36s, 2 sources, AI-optimized content for RAG
+  - DuckDuckGo: ✅ 13.45s, 3 sources, HTML scraping successful (all other providers disabled)
+  - SerperDev/Brave/SerpApi: ✅ Verified in previous session (12.8.1.7 notes)
+- **API Key Loading**: ✅ Verified TAVILY_API_KEY, BING_API_KEY environment variables working
+  - Pattern: WebSearchConfig::from_env() centralizes API key loading (web_search.rs:135-156)
+- **Fallback Chain Testing**: Default chain tavily→serperdev→brave→bing→serpapi→duckduckgo
+  - Verified by disabling providers sequentially in research-assistant runs
+
+**Documentation Completeness**:
+- **Provider Comparison Table**: Added to web_search.rs module docs (rustdoc format)
+  - Columns: Provider, API Key, Free Tier, Best For, Search Types
+  - All 7 providers: Tavily, SerperDev, Brave, Bing, SerpApi, DuckDuckGo, Google
+- **Environment Variables**: Documented all 8 API key variables with fallback patterns
+  - Example: BING_API_KEY or WEBSEARCH_BING_API_KEY (bing.rs:53-55)
+- **Use Case Recommendations**: RAG workflows → Tavily, general purpose → SerperDev, no API key → DuckDuckGo
+
+**Performance Characteristics**:
+- **Provider Response Times** (research-assistant, 2 sources, Ollama llama3.2:3b):
+  - Tavily: 15.36s (AI-optimized, slowest but highest quality)
+  - DuckDuckGo: 13.45s (HTML scraping, fastest free option)
+  - SerperDev: 10s (previous session)
+  - Brave: 10s (previous session)
+  - SerpApi: 8.51s (previous session, fastest but lowest free tier)
+- **Rate Limiting Overhead**: <5ms per request (jitter calculation, token bucket check)
+  - Implementation: llmspell-tools/src/search/web_search.rs:185-200 (rate limiter integration)
+
+**Future Enhancements** (Deferred):
+- **DuckDuckGo Images/News Support**: Current HTML scraping only supports web search
+  - Rationale: Instant Answer API doesn't provide images/news, HTML structure differs by search type
+  - Effort: ~2 hours to add CSS selectors for images/news tabs
+- **CAPTCHA Retry Logic**: Current implementation fails immediately on CAPTCHA detection
+  - Rationale: Retry with exponential backoff could reduce failure rate
+  - Effort: ~1 hour to add retry mechanism with jittered delays
+- **Provider Health Monitoring**: Track success/failure rates per provider for adaptive fallback
+  - Rationale: Could auto-skip consistently failing providers
+  - Effort: ~3 hours to add metrics collection and health checks
+
 ---
 
 ### Task 12.8.2: Implement interactive-chat Template ✅ 100% COMPLETE
