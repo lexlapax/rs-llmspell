@@ -335,27 +335,27 @@ impl InteractiveSession {
     }
 
     #[must_use]
-    pub fn with_model(self, model: impl Into<String>) -> Self {
-        *self.current_model.blocking_write() = model.into();
+    pub async fn with_model(self, model: impl Into<String>) -> Self {
+        *self.current_model.write().await = model.into();
         self
     }
 
     #[must_use]
-    pub fn with_system_prompt(self, prompt: impl Into<String>) -> Self {
-        *self.system_prompt.blocking_write() = prompt.into();
+    pub async fn with_system_prompt(self, prompt: impl Into<String>) -> Self {
+        *self.system_prompt.write().await = prompt.into();
         self
     }
 
     #[must_use]
-    pub fn with_tools(self, tools: Vec<String>) -> Self {
-        *self.allowed_tools.blocking_write() = tools;
+    pub async fn with_tools(self, tools: Vec<String>) -> Self {
+        *self.allowed_tools.write().await = tools;
         self
     }
 
     /// Set the initial agent for chat mode (template layer creates agent)
     #[must_use]
-    pub fn with_initial_agent(self, agent: Arc<dyn Agent>) -> Self {
-        *self.current_agent.blocking_write() = Some(agent);
+    pub async fn with_initial_agent(self, agent: Arc<dyn Agent>) -> Self {
+        *self.current_agent.write().await = Some(agent);
         self
     }
 

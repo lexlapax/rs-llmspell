@@ -616,11 +616,12 @@ impl InteractiveChatTemplate {
         // Wire up agent infrastructure using builder methods
         session = session
             .with_agent_registry(std::sync::Arc::new(agent_registry.clone()))
-            .with_provider_manager(std::sync::Arc::new(provider_manager))
-            .with_model(model)
-            .with_system_prompt(system_prompt)
-            .with_tools(tools.to_vec())
-            .with_initial_agent(agent);
+            .with_provider_manager(std::sync::Arc::new(provider_manager));
+
+        session = session.with_model(model).await;
+        session = session.with_system_prompt(system_prompt).await;
+        session = session.with_tools(tools.to_vec()).await;
+        session = session.with_initial_agent(agent).await;
 
         // Print welcome message
         println!("\n╔══════════════════════════════════════════════╗");
