@@ -3778,12 +3778,14 @@ Research findings and implementation plan for enhanced web search capabilities.
   - Rate limiting: ✅ 30/min conservative limits configured
   - Response parsing: ✅ SearchResult structs validated
   - Fallback behavior: ✅ Default chain tavily→serperdev→brave→bing→serpapi→duckduckgo
-- [ ] **Subtask 12.8.1.7.1.6**: Update documentation (~1 hour)
-  - File: docs/user-guide/templates/research-assistant.md (add provider comparison table)
-  - File: docs/technical/environment-variables.md (add TAVILY_API_KEY, BING_API_KEY)
-  - File: llmspell-tools/src/search/web_search.rs (update doc comments with new providers)
-  - Add: Provider comparison (cost, free tier, quality, latency)
-  - Add: Recommendation matrix (RAG use case → Tavily, general → SerperDev, self-hosted → DuckDuckGo)
+- [x] **Subtask 12.8.1.7.1.6**: Update documentation (~1 hour) ✅ COMPLETE
+  - File: llmspell-tools/src/search/web_search.rs (module-level doc comments added)
+  - Added: Provider comparison table (7 providers: Tavily, SerperDev, Brave, Bing, SerpApi, DuckDuckGo, Google)
+  - Added: API key environment variables for each provider
+  - Added: Free tier limits and best use cases
+  - Added: Provider recommendations (RAG → Tavily, general → SerperDev, no-key → DuckDuckGo)
+  - Added: Default fallback chain explanation
+  - Result: ✅ Comprehensive provider documentation in rustdoc format
 
 **Estimated Total Time**: 9.5 hours (Tavily 2h + Bing 2h + DuckDuckGo 3h + Chain 0.5h + Testing 1h + Docs 1h)
 
