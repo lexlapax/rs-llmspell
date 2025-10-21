@@ -45,7 +45,7 @@ impl ResearchAssistantTemplate {
                              citations, and citation validation."
                     .to_string(),
                 category: TemplateCategory::Research,
-                version: "0.1.0".to_string(),
+                version: "0.1.1".to_string(),
                 author: Some("LLMSpell Team".to_string()),
                 requires: vec![
                     "web-search".to_string(),

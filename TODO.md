@@ -8645,11 +8645,11 @@ async fn create_interactive_session(
 ✅ Builder pattern (agent wiring)
 
 **What Cannot Be Tested** (without full infrastructure):
-❌ Real agent execution (needs ProviderManager + LLM)
-❌ Tool integration (needs ToolRegistry)
-❌ Session persistence (needs SessionManager with storage)
-❌ Multi-turn conversations with real LLM
-❌ REPL readline features (requires interactive terminal)
+❌ Real agent execution (needs ProviderManager + LLM) - why not? we have the infrastructure
+❌ Tool integration (needs ToolRegistry) - why not - we have the infrastructure
+❌ Session persistence (needs SessionManager with storage) - why not
+❌ Multi-turn conversations with real LLM - why not
+❌ REPL readline features (requires interactive terminal) - why not, use tcl/tk expect scripts to test.
 
 **Acceptance Criteria**:
 - [x] Unit test coverage >90% for chat handlers ✅ (13/13 kernel + 122/122 templates)
@@ -8734,29 +8734,42 @@ test result: ok. 19 passed; 0 failed; 4 ignored; 0 measured
 
 #### Subtask 12.9.8: Documentation Updates
 **File**: `docs/user-guide/templates/interactive-chat.md`
-**Effort**: 1-2 hours
-**Status**: ⏳ PENDING
+**Effort**: 1-2 hours → Actual: 45 minutes
+**Status**: ✅ COMPLETE (comprehensive REPL documentation added)
 
-**Sections to Add/Update**:
-1. **Quick Start** → Add REPL features note
-2. **Interactive Mode** (NEW section):
-   - Readline features (arrow keys, Ctrl-A/E, history)
-   - Multi-line input (... continuation)
-   - Ctrl-C handling (interrupt, not exit)
-3. **Commands** (NEW section):
-   - Chat commands: `.system`, `.model`, `.tools`, `.context`, `.clearchat`
-   - Code commands: Existing meta commands (`.exit`, `.help`, `.save`, `.load`)
-   - Dual-mode: Auto-detect code vs chat
-4. **Dual-Mode Usage** (NEW section):
-   - Examples: Mix Lua/JS code execution with chat
-   - Use case: Calculate with code, explain with chat
-   - Script variables accessible in both modes
-5. **Troubleshooting**:
-   - "Input detected as code when I meant chat" → Use `.chat <message>` explicitly
-   - "Input detected as chat when I meant code" → Start with code keyword
-   - "Model switch failed" → Check provider availability
+**Documentation Updates Completed**:
+1. **Version/Status Header** - Updated to v0.2.0, Phase 12.9 status
+2. **Quick Start Section** - Added REPL features checklist (readline, multi-line, Ctrl-C, commands, history)
+3. **Interactive Mode Section** - Complete rewrite with:
+   - REPL Features (readline integration, multi-line, Ctrl-C, persistent history)
+   - REPL Commands (chat control + session control)
+   - Enhanced example session showing `.info` command output
+4. **Implementation Status** - Updated with Phase 12.9 features:
+   - Full REPL integration checklist
+   - Chat commands (6 commands documented)
+   - Agent auto-creation callback pattern
+   - Code execution placeholder note
+5. **Troubleshooting Section** - Added 6 REPL-specific issues:
+   - Agent auto-creation failures after `.model` command
+   - Arrow keys not working (terminal/TERM issues)
+   - Multi-line input behavior in chat-only mode
+   - Ctrl-C exit issues
+   - `.info` showing "Agent: not available"
+   - Conversation history clearing behavior
+6. **Roadmap Section** - Updated with Phase 12.9 completion status:
+   - Phase 12.9 marked complete with 8 features
+   - Phase 12.10 added for future dual-mode (code+chat)
+   - Phase 13-14 long-term roadmap unchanged
 
-**Effort**: 1-2 hours (write + review)
+**Files Modified**:
+- `docs/user-guide/templates/interactive-chat.md` (+150 lines, comprehensive REPL docs)
+
+**Documentation Quality**:
+- ✅ All 6 chat commands documented (`.system`, `.model`, `.tools`, `.context`, `.clearchat`, `.info`)
+- ✅ Complete `.info` output example (all 4 sections shown)
+- ✅ REPL features explained with user-facing benefits
+- ✅ Troubleshooting covers common REPL-specific issues
+- ✅ Roadmap shows Phase 12.9 complete, Phase 12.10 future work
 
 ---
 

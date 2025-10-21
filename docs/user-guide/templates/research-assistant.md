@@ -235,6 +235,12 @@ Ingests all gathered sources into the RAG (Retrieval-Augmented Generation) store
 - Tenant-isolated storage with custom scope
 - Usage metrics tracking
 
+**Tenant Management** (Phase 12.8.1.7):
+- Tenants are automatically created if they don't exist
+- Tenant ID format: `research-{session_uuid}`
+- Ensures isolation between concurrent research sessions
+- No manual tenant provisioning required
+
 **Output**: RAG ingestion confirmation with vector IDs
 
 ### Phase 3: Synthesize (AI Agent with RAG Retrieval)
