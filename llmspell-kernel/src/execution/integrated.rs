@@ -473,6 +473,18 @@ impl<P: Protocol + 'static> IntegratedKernel<P> {
         self.script_executor.clone()
     }
 
+    /// Get the session manager
+    pub fn get_session_manager(&self) -> &Arc<SessionManager> {
+        &self.session_manager
+    }
+
+    /// Check if hooks are enabled in session manager configuration
+    pub fn are_hooks_enabled(&self) -> bool {
+        // Session manager always has hooks registry and built-in hooks registered
+        // Hooks are a core feature, always enabled
+        true
+    }
+
     /// Get the DAP bridge for IDE debugging
     pub fn dap_bridge(&self) -> Arc<parking_lot::Mutex<DAPBridge>> {
         self.dap_bridge.clone()

@@ -26,7 +26,7 @@ use tracing::{debug, error, info, warn};
 
 /// Agent creator callback for auto-creating agents when needed (Subtask 12.9.5)
 ///
-/// Takes current model, system_prompt, and tools and returns a new agent
+/// Takes current model, `system_prompt`, and tools and returns a new agent
 pub type AgentCreator = Arc<
     dyn Fn(String, String, Vec<String>) -> std::pin::Pin<
         Box<dyn std::future::Future<Output = Result<Arc<dyn Agent>, LLMSpellError>> + Send>,
@@ -1015,6 +1015,74 @@ impl InteractiveSession {
         println!();
     }
 
+    /// Print configuration section
+    fn print_configuration_section(&self) {
+        println!("\n⚙️ Configuration:");
+        println!("  Execution timeout: {}s", self.config.execution_timeout_secs);
+        println!("  Performance monitoring: {}", if self.config.enable_performance_monitoring { "enabled" } else { "disabled" });
+        println!("  Debug commands: {}", if self.config.enable_debug_commands { "enabled" } else { "disabled" });
+        println!("  Session persistence: {}", if self.config.enable_persistence { "enabled" } else { "disabled" });
+        if let Some(ref history_file) = self.config.history_file {
+            println!("  History file: {}", history_file.display());
+        } else {
+            println!("  History file: none");
+        }
+    }
+
+    /// Print infrastructure section
+    fn print_infrastructure_section(&self) {
+        let script_executor = self.kernel.get_script_executor();
+        println!("\n🔧 Script Executor:");
+        println!("  Language: {}", script_executor.language());
+
+        println!("\n🏗️ Infrastructure:");
+        println!("  Session manager: enabled");
+        println!("  Hooks: {}", if self.kernel.are_hooks_enabled() { "enabled" } else { "disabled" });
+        println!("  Provider manager: {}", if self.provider_manager.is_some() { "enabled" } else { "disabled" });
+        println!("  Agent registry: {}", if self.agent_registry.is_some() { "enabled" } else { "disabled" });
+        println!("  RAG system: {}", if self.rag.is_some() { "enabled" } else { "disabled" });
+    }
+
+    /// Print chat mode section
+    async fn print_chat_mode_section(&self) {
+        let conversation_history = self.conversation_history.read().await;
+        if !conversation_history.is_empty() || self.agent_registry.is_some() {
+            println!("\n💬 Chat Mode:");
+            let model = self.current_model.read().await;
+            println!("  Model: {model}");
+
+            let system_prompt = self.system_prompt.read().await;
+            let prompt_preview = if system_prompt.len() > 60 {
+                format!("{}...", &system_prompt[..57])
+            } else {
+                system_prompt.clone()
+            };
+            println!("  System prompt: {prompt_preview}");
+
+            let agent_status = if self.current_agent.read().await.is_some() {
+                "initialized"
+            } else if self.agent_creator.is_some() {
+                "auto-create enabled"
+            } else {
+                "not available"
+            };
+            println!("  Agent: {agent_status}");
+
+            let tools = self.allowed_tools.read().await;
+            if tools.is_empty() {
+                println!("  Tools: none");
+            } else {
+                println!("  Tools: {}", tools.join(", "));
+            }
+
+            println!("  Conversation turns: {}", conversation_history.len());
+            let total_tokens = self.get_token_count().await;
+            if total_tokens > 0 {
+                println!("  Total tokens: {total_tokens}");
+            }
+        }
+    }
+
     /// Print session info
     async fn print_session_info(&self) {
         let uptime = self.start_time.elapsed();
@@ -1031,6 +1099,11 @@ impl InteractiveSession {
         println!("  Variables: {}", state.variables.len());
         println!("  Breakpoints: {}", state.breakpoints.len());
         println!("  Debug mode: {}", self.debug_session.is_some());
+
+        // Configuration, infrastructure, and chat mode sections
+        self.print_configuration_section();
+        self.print_infrastructure_section();
+        self.print_chat_mode_section().await;
 
         // Performance statistics
         if self.session_stats.commands_executed > 0 {

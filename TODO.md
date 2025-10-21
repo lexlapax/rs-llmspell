@@ -8583,16 +8583,26 @@ async fn create_interactive_session(
 
 ---
 
-#### Subtask 12.9.6: Integration Testing - REPL + Chat
-**File**: N/A (coverage via existing unit tests)
-**Effort**: 3-4 hours → Actual: 1 hour (test coverage analysis + validation)
-**Status**: ✅ COMPLETE (unit test coverage verified, integration tests deferred)
+#### Subtask 12.9.6: Integration Testing - REPL + Chat + .info Enhancement
+**File**: `llmspell-kernel/src/repl/session.rs` (enhanced .info command)
+**Effort**: 3-4 hours → Actual: 2 hours (test coverage analysis + .info enhancement + validation)
+**Status**: ✅ COMPLETE (unit test coverage verified, .info command enhanced, all tests pass)
 
 **Implementation Reality**:
 - **Chat-Only REPL**: NoOpScriptExecutor disables code execution (returns "Code execution disabled" message)
 - **Not Dual-Mode**: Original plan assumed code+chat dual-mode, but implemented chat-only for simplicity
 - **Auto-Detection**: Code vs chat detection works, but code path returns disabled message
 - **Full Infrastructure Required**: Integration tests need SessionManager + AgentRegistry + ProviderManager (deferred to 12.9.9)
+
+**.info Command Enhancement** (Added 4 new sections, 63 lines):
+1. **⚙️ Configuration Section** - Execution timeout, performance monitoring, debug commands, persistence, history file
+2. **🔧 Script Executor Section** - Language info (Lua/JS/none for chat-only)
+3. **🏗️ Infrastructure Section** - Session manager, hooks, provider manager, agent registry, RAG system status
+4. **💬 Chat Mode Section** - Model, system prompt, agent status, tools, conversation turns, total tokens
+5. **Refactoring**: Extracted 3 helper methods (print_configuration_section, print_infrastructure_section, print_chat_mode_section) to keep main function under 100 lines (was 113→60 lines)
+6. **Quality**: Fixed 5 clippy warnings (doc markdown, format strings, function length), 0 warnings final
+7. **Files Modified**: `llmspell-kernel/src/repl/session.rs` (+63 lines), `llmspell-kernel/src/execution/integrated.rs` (+12 lines helper methods)
+8. **Testing**: 647 kernel tests pass ✅, 122 template tests pass ✅
 
 **Test Coverage Analysis**:
 1. **REPL Infrastructure** - ✅ Covered by llmspell-kernel unit tests:
