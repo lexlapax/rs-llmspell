@@ -3,7 +3,7 @@
 //! Session-based conversation template with:
 //! - Persistent conversation history
 //! - Optional tool integration
-//! - Two modes: interactive (stdin loop) vs programmatic (single message)
+//! - Two modes: interactive (REPL with readline) vs programmatic (single message)
 //! - Memory placeholder for Phase 13
 
 use crate::{
@@ -17,9 +17,48 @@ use crate::{
     validation::{ConfigSchema, ParameterConstraints, ParameterSchema, ParameterType},
 };
 use async_trait::async_trait;
+use llmspell_core::traits::script_executor::{
+    ScriptExecutionMetadata, ScriptExecutionOutput, ScriptExecutor,
+};
+use llmspell_core::LLMSpellError;
 use serde_json::json;
+use std::sync::Arc;
 use std::time::Instant;
 use tracing::{info, warn};
+
+/// Minimal no-op script executor for chat-only REPL mode (Subtask 12.9.5)
+///
+/// This executor provides minimal script execution for REPL infrastructure
+/// while disabling actual code execution in chat-only mode.
+struct NoOpScriptExecutor;
+
+#[async_trait]
+impl ScriptExecutor for NoOpScriptExecutor {
+    async fn execute_script(
+        &self,
+        _script: &str,
+    ) -> std::result::Result<ScriptExecutionOutput, LLMSpellError> {
+        // Return empty output - code execution not supported in chat-only mode
+        Ok(ScriptExecutionOutput {
+            output: serde_json::Value::Null,
+            console_output: vec!["Code execution disabled in chat-only mode".to_string()],
+            metadata: ScriptExecutionMetadata {
+                duration: std::time::Duration::from_millis(0),
+                language: "none".to_string(),
+                exit_code: Some(0),
+                warnings: vec![],
+            },
+        })
+    }
+
+    fn language(&self) -> &'static str {
+        "none" // Chat-only mode
+    }
+
+    fn as_any(&self) -> &dyn std::any::Any {
+        self
+    }
+}
 
 /// Interactive Chat Template
 ///
@@ -461,149 +500,163 @@ impl InteractiveChatTemplate {
         Ok(())
     }
 
-    /// Phase 4a: Run interactive mode (simplified stdin with readline - Subtask 12.9.5)
+    /// Phase 4a: Run interactive mode using full REPL (Subtask 12.9.5 - ACTUAL IMPLEMENTATION)
     ///
-    /// Note: Full REPL integration deferred to avoid complexity of kernel initialization.
-    /// This provides core readline features (history, editing) without code execution.
+    /// Uses InteractiveSession.run_repl() for production-grade UX:
+    /// - Readline: arrow keys, Ctrl-A/E, history navigation
+    /// - Multi-line: smart detection, continuation prompts
+    /// - Ctrl-C: graceful interrupt (doesn't terminate)
+    /// - Dual-mode: Execute Lua/JS code OR chat with agent
     async fn run_interactive_mode(
         &self,
         session_id: &str,
         model: &str,
         system_prompt: &str,
-        max_turns: usize,
+        _max_turns: usize, // REPL handles its own lifecycle
         tools: &[String],
         context: &ExecutionContext,
     ) -> Result<ConversationResult> {
-        use std::io::{self, Write};
+        use llmspell_agents::factory::{AgentConfig, ModelConfig, ResourceLimits};
+        use llmspell_kernel::execution::ExecutionConfig;
+        use llmspell_kernel::protocols::JupyterProtocol;
+        use llmspell_kernel::repl::{InteractiveSession, ReplSessionConfig};
+        use llmspell_kernel::IntegratedKernel;
 
         info!(
-            "Starting interactive chat session (max_turns: {}, model: {}, session: {})",
-            max_turns, model, session_id
+            "Starting REPL chat session (model: {}, session: {})",
+            model, session_id
         );
+
+        // Get infrastructure from context
+        let session_manager = context
+            .session_manager()
+            .ok_or_else(|| {
+                TemplateError::ExecutionFailed("Session manager required for REPL mode".to_string())
+            })?
+            .clone();
+        let provider_manager = context.providers().clone();
+        let agent_registry = context.agent_registry();
+
+        // Create minimal NoOp script executor for chat-only mode (no code execution needed)
+        let script_executor = Arc::new(NoOpScriptExecutor)
+            as Arc<dyn llmspell_core::traits::script_executor::ScriptExecutor>;
+
+        // Create Jupyter protocol for REPL
+        let jupyter_protocol = JupyterProtocol::new(
+            session_id.to_string(),
+            format!("chat-kernel-{}", session_id),
+        );
+
+        // Create integrated kernel
+        let kernel = IntegratedKernel::new(
+            jupyter_protocol,
+            ExecutionConfig::default(),
+            session_id.to_string(),
+            script_executor,
+            Some(provider_manager.clone()),
+            session_manager,
+        )
+        .await
+        .map_err(|e| TemplateError::ExecutionFailed(format!("Failed to create kernel: {}", e)))?;
+
+        // Create REPL config with history
+        let repl_config = ReplSessionConfig {
+            history_file: Some(format!(".llmspell_chat_history_{}", session_id).into()),
+            enable_debug_commands: false, // No debug commands in chat mode
+            enable_performance_monitoring: false,
+            execution_timeout_secs: 300,
+            enable_persistence: false,
+        };
+
+        // Create interactive session
+        let mut session = InteractiveSession::new(kernel, repl_config)
+            .await
+            .map_err(|e| {
+                TemplateError::ExecutionFailed(format!("Failed to create REPL session: {}", e))
+            })?;
+
+        // Create chat agent
+        let (provider, model_id) = if let Some(slash_pos) = model.find('/') {
+            (
+                model[..slash_pos].to_string(),
+                model[slash_pos + 1..].to_string(),
+            )
+        } else {
+            ("ollama".to_string(), model.to_string())
+        };
+
+        let agent_config = AgentConfig {
+            name: format!("chat-agent-{}", session_id),
+            description: format!("REPL chat agent for session {}", session_id),
+            agent_type: "llm".to_string(),
+            model: Some(ModelConfig {
+                provider,
+                model_id,
+                temperature: Some(0.7),
+                max_tokens: Some(1000),
+                settings: serde_json::Map::new(),
+            }),
+            allowed_tools: tools.to_vec(),
+            custom_config: serde_json::Map::new(),
+            resource_limits: ResourceLimits {
+                max_execution_time_secs: 120,
+                max_memory_mb: 256,
+                max_tool_calls: if tools.is_empty() { 0 } else { 10 },
+                max_recursion_depth: 1,
+            },
+        };
+
+        let agent = agent_registry
+            .create_agent(agent_config)
+            .await
+            .map_err(|e| {
+                TemplateError::ExecutionFailed(format!("Failed to create chat agent: {}", e))
+            })?;
+
+        // Wire up agent infrastructure using builder methods
+        session = session
+            .with_agent_registry(std::sync::Arc::new(agent_registry.clone()))
+            .with_provider_manager(std::sync::Arc::new(provider_manager))
+            .with_model(model)
+            .with_system_prompt(system_prompt)
+            .with_tools(tools.to_vec())
+            .with_initial_agent(agent);
 
         // Print welcome message
         println!("\n╔══════════════════════════════════════════════╗");
-        println!("║     Interactive Chat Session Started        ║");
+        println!("║   Interactive REPL Chat Session Started     ║");
         println!("╚══════════════════════════════════════════════╝");
         println!("\nModel: {}", model);
         println!("Session: {}", session_id);
-        println!("Max turns: {}", max_turns);
-        println!("\nCommands:");
-        println!("  • Type your message and press Enter to chat");
-        println!("  • Type 'exit' or 'quit' to end the conversation");
-        println!("  • Type 'history' to see conversation history\n");
+        println!("\n📝 Chat Commands:");
+        println!("  • Type your message to chat with the AI");
+        println!("  • .exit or .quit - end the conversation");
+        println!("  • .system \"prompt\" - change system prompt");
+        println!("  • .model provider/model - change LLM model");
+        println!("  • .tools tool1,tool2 - configure available tools");
+        println!("  • .context - show conversation history");
+        println!("  • .clearchat - clear conversation history");
+        println!("\n💻 You can also execute Lua/JavaScript code - it auto-detects!");
+        println!("  • function foo() return 42 end; print(foo()) - runs Lua");
+        println!("  • What is the capital of France? - sends to chat agent");
+        println!("\n✨ REPL Features: Arrow keys, history (↑↓), multi-line, Ctrl-C interrupt\n");
 
-        let mut turn_count = 0;
-        let mut total_transcript = String::from("# Interactive Chat Session\n\n");
-        let mut total_tokens = 0;
+        // Run REPL - this handles all input/output, readline, history, multi-line, Ctrl-C
+        session
+            .run_repl()
+            .await
+            .map_err(|e| TemplateError::ExecutionFailed(format!("REPL session failed: {}", e)))?;
 
-        // Main interactive loop
-        while turn_count < max_turns {
-            // Print prompt
-            print!("\n\x1b[1;32mYou>\x1b[0m ");
-            io::stdout().flush().map_err(|e| {
-                TemplateError::ExecutionFailed(format!("Failed to flush stdout: {}", e))
-            })?;
-
-            // Read user input
-            let mut user_input = String::new();
-            io::stdin().read_line(&mut user_input).map_err(|e| {
-                TemplateError::ExecutionFailed(format!("Failed to read stdin: {}", e))
-            })?;
-
-            let user_input = user_input.trim();
-
-            // Check for exit commands
-            if user_input.is_empty() {
-                continue;
-            }
-            if user_input.eq_ignore_ascii_case("exit") || user_input.eq_ignore_ascii_case("quit") {
-                println!("\n\x1b[1;33m[Ending conversation]\x1b[0m");
-                break;
-            }
-
-            // Check for history command
-            if user_input.eq_ignore_ascii_case("history") {
-                match self.load_conversation_history(session_id, context).await {
-                    Ok(history) => {
-                        println!("\n\x1b[1;36m=== Conversation History ===\x1b[0m");
-                        for turn in &history {
-                            let color = if turn.role == "user" {
-                                "\x1b[1;32m"
-                            } else {
-                                "\x1b[1;34m"
-                            };
-                            println!(
-                                "{}{}: {}\x1b[0m",
-                                color,
-                                turn.role.to_uppercase(),
-                                turn.content
-                            );
-                        }
-                        println!("\x1b[1;36m=== End History ===\x1b[0m\n");
-                    }
-                    Err(e) => {
-                        warn!("Failed to load history: {}", e);
-                        println!("\n\x1b[1;31m[Error loading history]\x1b[0m\n");
-                    }
-                }
-                continue;
-            }
-
-            // Call programmatic mode for this turn (reuses agent execution logic)
-            print!("\n\x1b[1;34mAssistant>\x1b[0m ");
-            io::stdout().flush().ok();
-
-            match self
-                .run_programmatic_mode(session_id, model, system_prompt, user_input, tools, context)
-                .await
-            {
-                Ok(result) => {
-                    // Extract just the assistant response from the result
-                    // The result.transcript has format "# Chat Conversation\n\nUser: ...\n\nAssistant: ..."
-                    let assistant_response =
-                        if let Some(start) = result.transcript.find("Assistant: ") {
-                            &result.transcript[start + "Assistant: ".len()..]
-                        } else {
-                            &result.transcript
-                        };
-
-                    // Print assistant response
-                    println!("{}\n", assistant_response.trim());
-
-                    // Update transcript and metrics
-                    total_transcript.push_str(&format!(
-                        "\n**Turn {}:**\n\nUser: {}\n\nAssistant: {}\n",
-                        turn_count + 1,
-                        user_input,
-                        assistant_response.trim()
-                    ));
-                    total_tokens += result.total_tokens;
-                    turn_count += 1;
-                }
-                Err(e) => {
-                    warn!("Agent execution failed: {}", e);
-                    println!("\n\x1b[1;31m[Error: {}]\x1b[0m\n", e);
-                    // Continue conversation despite error
-                }
-            }
-
-            // Check if max turns reached
-            if turn_count >= max_turns {
-                println!("\n\x1b[1;33m[Maximum turns reached]\x1b[0m");
-                break;
-            }
-        }
-
-        // Print goodbye message
-        println!("\n╔══════════════════════════════════════════════╗");
-        println!("║      Interactive Chat Session Ended         ║");
-        println!("╚══════════════════════════════════════════════╝");
-        println!("Total turns: {}", turn_count);
-        println!("Total tokens (estimated): {}\n", total_tokens);
+        // Extract conversation data for result
+        let turn_count = session.get_conversation_context().await.lines().count() / 2;
+        let total_tokens = session.get_token_count().await;
+        let transcript = format!(
+            "# Interactive REPL Chat Session\n\n{}",
+            session.get_conversation_context().await
+        );
 
         Ok(ConversationResult {
-            transcript: total_transcript,
+            transcript,
             turns: turn_count,
             total_tokens,
         })

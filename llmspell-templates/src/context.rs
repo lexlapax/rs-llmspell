@@ -31,6 +31,9 @@ pub struct ExecutionContext {
     /// Provider manager for LLM access (from llmspell-providers)
     pub providers: Arc<llmspell_providers::ProviderManager>,
 
+    /// Kernel handle for REPL/interactive sessions (optional, Subtask 12.9.5)
+    pub kernel_handle: Option<Arc<llmspell_kernel::api::KernelHandle>>,
+
     /// Session ID for scoped operations (optional)
     pub session_id: Option<String>,
 
@@ -79,6 +82,11 @@ impl ExecutionContext {
     /// Get provider manager
     pub fn providers(&self) -> &Arc<llmspell_providers::ProviderManager> {
         &self.providers
+    }
+
+    /// Get kernel handle for REPL/interactive sessions (Subtask 12.9.5)
+    pub fn kernel_handle(&self) -> Option<&Arc<llmspell_kernel::api::KernelHandle>> {
+        self.kernel_handle.as_ref()
     }
 
     /// Get session ID
@@ -144,6 +152,7 @@ pub struct ExecutionContextBuilder {
     workflow_factory: Option<Arc<dyn llmspell_workflows::WorkflowFactory>>,
     rag: Option<Arc<llmspell_rag::multi_tenant_integration::MultiTenantRAG>>,
     providers: Option<Arc<llmspell_providers::ProviderManager>>,
+    kernel_handle: Option<Arc<llmspell_kernel::api::KernelHandle>>,
     session_id: Option<String>,
     output_dir: Option<PathBuf>,
 }
@@ -211,6 +220,15 @@ impl ExecutionContextBuilder {
         self
     }
 
+    /// Set kernel handle (Subtask 12.9.5)
+    pub fn with_kernel_handle(
+        mut self,
+        kernel_handle: Arc<llmspell_kernel::api::KernelHandle>,
+    ) -> Self {
+        self.kernel_handle = Some(kernel_handle);
+        self
+    }
+
     /// Set session ID
     pub fn with_session_id(mut self, session_id: impl Into<String>) -> Self {
         self.session_id = Some(session_id.into());
@@ -253,6 +271,7 @@ impl ExecutionContextBuilder {
                     "providers is required".to_string(),
                 )
             })?,
+            kernel_handle: self.kernel_handle,
             session_id: self.session_id,
             output_dir: self.output_dir,
         })
