@@ -15,11 +15,11 @@ fn test_registry_initialization() {
     let registry = TemplateRegistry::with_builtin_templates()
         .expect("Failed to create registry with builtin templates");
 
-    // Should have all 6 builtin templates
+    // Should have all 7 builtin templates
     let templates = registry.list_metadata();
     assert!(
-        templates.len() >= 6,
-        "Expected at least 6 builtin templates, found {}",
+        templates.len() >= 7,
+        "Expected at least 7 builtin templates, found {}",
         templates.len()
     );
 
@@ -31,6 +31,7 @@ fn test_registry_initialization() {
         "code-generator",
         "document-processor",
         "workflow-orchestrator",
+        "code-review",
     ];
 
     for template_id in &expected_templates {
