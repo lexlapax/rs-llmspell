@@ -73,17 +73,30 @@ impl ReplCommand {
     fn detect_input_mode(input: &str) -> InputMode {
         // Strong code indicators (keywords and symbols)
         const CODE_KEYWORDS: &[&str] = &[
-            "function", "local", "let", "const", "var", "if", "for", "while", "return",
-            "end", "then", "do", "async", "await", "class", "import", "export",
+            "function", "local", "let", "const", "var", "if", "for", "while", "return", "end",
+            "then", "do", "async", "await", "class", "import", "export",
         ];
 
         const CODE_SYMBOLS: &[&str] = &["{", "}", "==", "!=", "||", "&&", "=>"];
 
         // Strong chat indicators (conversational phrases)
         const CHAT_PHRASES: &[&str] = &[
-            "what is", "how do", "can you", "please", "explain", "tell me",
-            "why", "when", "where", "who", "could you", "would you",
-            "i need", "help me", "need help", "understanding",
+            "what is",
+            "how do",
+            "can you",
+            "please",
+            "explain",
+            "tell me",
+            "why",
+            "when",
+            "where",
+            "who",
+            "could you",
+            "would you",
+            "i need",
+            "help me",
+            "need help",
+            "understanding",
         ];
 
         let lower = input.to_lowercase();
@@ -661,10 +674,7 @@ mod tests {
         assert!(result.is_ok());
         match result.unwrap() {
             ChatMetaCommand::Tools(tools) => {
-                assert_eq!(
-                    tools,
-                    vec!["web-searcher", "calculator", "data-analyzer"]
-                );
+                assert_eq!(tools, vec!["web-searcher", "calculator", "data-analyzer"]);
             }
             _ => panic!("Expected Tools variant"),
         }

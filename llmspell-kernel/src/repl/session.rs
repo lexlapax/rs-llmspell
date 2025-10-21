@@ -14,6 +14,7 @@ use chrono::{DateTime, Utc};
 use llmspell_core::traits::agent::Agent;
 use llmspell_core::traits::debug_context::DebugContext;
 use llmspell_core::traits::script_executor::ScriptExecutor;
+use llmspell_core::LLMSpellError;
 use serde::{Deserialize, Serialize};
 use std::fmt::Write as _;
 use std::path::PathBuf;
@@ -306,12 +307,56 @@ impl InteractiveSession {
             conversation_history: Arc::new(RwLock::new(Vec::new())),
             current_agent: Arc::new(RwLock::new(None)),
             current_model: Arc::new(RwLock::new("ollama/llama3.2:3b".to_string())),
-            system_prompt: Arc::new(RwLock::new(
-                "You are a helpful AI assistant.".to_string(),
-            )),
+            system_prompt: Arc::new(RwLock::new("You are a helpful AI assistant.".to_string())),
             allowed_tools: Arc::new(RwLock::new(Vec::new())),
             rag: None,
         })
+    }
+
+    /// Configure agent infrastructure for chat mode (Subtask 12.9.5)
+    ///
+    /// Builder-style methods to wire up `agent_registry`, `provider_manager`, RAG, and initial settings
+    #[must_use]
+    pub fn with_agent_registry(mut self, registry: Arc<dyn std::any::Any + Send + Sync>) -> Self {
+        self.agent_registry = Some(registry);
+        self
+    }
+
+    #[must_use]
+    pub fn with_provider_manager(mut self, manager: Arc<dyn std::any::Any + Send + Sync>) -> Self {
+        self.provider_manager = Some(manager);
+        self
+    }
+
+    #[must_use]
+    pub fn with_rag(mut self, rag: Arc<dyn std::any::Any + Send + Sync>) -> Self {
+        self.rag = Some(rag);
+        self
+    }
+
+    #[must_use]
+    pub fn with_model(self, model: impl Into<String>) -> Self {
+        *self.current_model.blocking_write() = model.into();
+        self
+    }
+
+    #[must_use]
+    pub fn with_system_prompt(self, prompt: impl Into<String>) -> Self {
+        *self.system_prompt.blocking_write() = prompt.into();
+        self
+    }
+
+    #[must_use]
+    pub fn with_tools(self, tools: Vec<String>) -> Self {
+        *self.allowed_tools.blocking_write() = tools;
+        self
+    }
+
+    /// Set the initial agent for chat mode (template layer creates agent)
+    #[must_use]
+    pub fn with_initial_agent(self, agent: Arc<dyn Agent>) -> Self {
+        *self.current_agent.blocking_write() = Some(agent);
+        self
     }
 
     /// Run the REPL loop
@@ -1365,7 +1410,10 @@ impl InteractiveSession {
 
         let mut history = self.conversation_history.write().await;
         history.push(turn);
-        debug!("Added conversation turn (role={}, tokens={:?})", role_str, token_count);
+        debug!(
+            "Added conversation turn (role={}, tokens={:?})",
+            role_str, token_count
+        );
     }
 
     /// Get formatted conversation context for LLM prompt
@@ -1398,10 +1446,7 @@ impl InteractiveSession {
     /// token counts are not available.
     pub async fn get_token_count(&self) -> usize {
         let history = self.conversation_history.read().await;
-        history
-            .iter()
-            .filter_map(|turn| turn.token_count)
-            .sum()
+        history.iter().filter_map(|turn| turn.token_count).sum()
     }
 
     /// Get system prompt
@@ -1442,27 +1487,59 @@ impl InteractiveSession {
 
     // ===== Chat Command Handlers (Subtask 12.9.4) =====
 
-    /// Handle chat message from user
+    /// Handle chat message from user (Subtask 12.9.5)
     ///
-    /// This is a placeholder implementation that demonstrates the flow.
-    /// Full agent integration will be added in Subtask 12.9.5.
+    /// Executes LLM agent with full conversation context and tools
     async fn handle_chat_message(&mut self, message: String) -> Result<()> {
+        use llmspell_core::types::AgentInput;
+
         // Add user message to history
         self.add_to_history("user", &message, None).await;
 
-        // For now, provide a placeholder response
-        // TODO: In Subtask 12.9.5, this will:
-        // 1. Get/create agent from agent_registry
-        // 2. Build prompt with conversation context
-        // 3. Execute agent with allowed_tools
-        // 4. Extract response and token count
-        let response = format!(
-            "Chat functionality is ready! (agent integration in Subtask 12.9.5)\n\
-             Your message: \"{message}\""
-        );
+        // Get current agent (must be set by template layer via with_initial_agent())
+        let agent_opt = self.current_agent.read().await;
+        if agent_opt.is_none() {
+            let fallback = "Chat agent not initialized. \
+                           Template must create agent and pass via with_initial_agent().";
+            self.add_to_history("assistant", fallback, None).await;
+            println!("\n\x1b[1;31mError>\x1b[0m {fallback}\n");
+            return Ok(());
+        }
+        let agent = agent_opt.as_ref().unwrap().clone();
+        drop(agent_opt); // Release read lock
+
+        // Build prompt with conversation context
+        let system_prompt = self.get_system_prompt().await;
+        let conversation_context = self.get_conversation_context().await;
+        let prompt = if conversation_context.is_empty() {
+            format!("{system_prompt}\n\nRespond to the user's message naturally and helpfully.")
+        } else {
+            format!(
+                "{system_prompt}\n\nConversation History:\n{conversation_context}\n\n\
+                 Respond to the user's latest message naturally and helpfully."
+            )
+        };
+
+        // Execute agent
+        let prompt_len = prompt.len(); // Save length before moving
+        let agent_input = AgentInput::builder().text(prompt).build();
+        let output = agent
+            .execute(agent_input, llmspell_core::ExecutionContext::default())
+            .await
+            .map_err(|e| LLMSpellError::Component {
+                message: format!("Chat agent execution failed: {e}"),
+                source: Some(Box::new(e)),
+            })?;
+
+        // Extract response
+        let response = output.text.trim().to_string();
+
+        // Estimate token count (rough: ~4 chars per token)
+        let token_count = Some((prompt_len + response.len()) / 4);
 
         // Add assistant response to history
-        self.add_to_history("assistant", &response, None).await;
+        self.add_to_history("assistant", &response, token_count)
+            .await;
 
         // Display response
         println!("\n\x1b[1;34mAssistant>\x1b[0m {response}\n");
@@ -1562,9 +1639,7 @@ impl InteractiveSession {
                 let idx = i + 1;
                 let role = &turn.role;
                 let content = &turn.content;
-                println!(
-                    "  {idx}. \x1b[1;{role_color}m{role}\x1b[0m{token_str}: {content}"
-                );
+                println!("  {idx}. \x1b[1;{role_color}m{role}\x1b[0m{token_str}: {content}");
             }
             println!();
         }
@@ -1728,11 +1803,7 @@ mod tests {
         // Add turns
         session.add_to_history("user", "What is Rust?", None).await;
         session
-            .add_to_history(
-                "assistant",
-                "Rust is a systems programming language.",
-                None,
-            )
+            .add_to_history("assistant", "Rust is a systems programming language.", None)
             .await;
 
         // Get context
@@ -1796,9 +1867,7 @@ mod tests {
         assert_eq!(prompt, "You are a helpful AI assistant.");
 
         // Update
-        session
-            .set_system_prompt("You are a Rust expert.")
-            .await;
+        session.set_system_prompt("You are a Rust expert.").await;
 
         // Verify update
         let prompt = session.get_system_prompt().await;
@@ -1835,10 +1904,7 @@ mod tests {
 
         // Update
         session
-            .set_allowed_tools(vec![
-                "web-searcher".to_string(),
-                "calculator".to_string(),
-            ])
+            .set_allowed_tools(vec!["web-searcher".to_string(), "calculator".to_string()])
             .await;
 
         // Verify update
@@ -1854,17 +1920,18 @@ mod tests {
         let config = ReplSessionConfig::default();
         let mut session = InteractiveSession::new(kernel, config).await.unwrap();
 
-        // Send chat message
+        // Send chat message (without agent - should get error)
         let result = session.handle_chat_message("Hello, AI!".to_string()).await;
-        assert!(result.is_ok());
+        assert!(result.is_ok()); // Error is handled gracefully, not returned
 
-        // Verify history has 2 turns (user + assistant)
+        // Verify history has 2 turns (user + error message)
         let history = session.conversation_history.read().await;
         assert_eq!(history.len(), 2);
         assert_eq!(history[0].role, "user");
         assert_eq!(history[0].content, "Hello, AI!");
         assert_eq!(history[1].role, "assistant");
-        assert!(history[1].content.contains("Hello, AI!"));
+        assert!(history[1].content.contains("Chat agent not initialized"));
+        assert!(history[1].content.contains("with_initial_agent"));
     }
 
     #[tokio::test]
@@ -1895,9 +1962,7 @@ mod tests {
         let mut session = InteractiveSession::new(kernel, config).await.unwrap();
 
         // Switch model
-        let result = session
-            .handle_model_command("gpt-4".to_string())
-            .await;
+        let result = session.handle_model_command("gpt-4".to_string()).await;
         assert!(result.is_ok());
 
         // Verify model updated
@@ -1982,8 +2047,13 @@ mod tests {
             async fn execute_script(
                 &self,
                 _script: &str,
-            ) -> Result<llmspell_core::traits::script_executor::ScriptExecutionOutput, llmspell_core::LLMSpellError> {
-                use llmspell_core::traits::script_executor::{ScriptExecutionOutput, ScriptExecutionMetadata};
+            ) -> Result<
+                llmspell_core::traits::script_executor::ScriptExecutionOutput,
+                llmspell_core::LLMSpellError,
+            > {
+                use llmspell_core::traits::script_executor::{
+                    ScriptExecutionMetadata, ScriptExecutionOutput,
+                };
                 Ok(ScriptExecutionOutput {
                     output: serde_json::Value::Null,
                     console_output: vec![],

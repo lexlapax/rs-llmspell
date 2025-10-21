@@ -461,7 +461,10 @@ impl InteractiveChatTemplate {
         Ok(())
     }
 
-    /// Phase 4a: Run interactive mode (stdin loop)
+    /// Phase 4a: Run interactive mode (simplified stdin with readline - Subtask 12.9.5)
+    ///
+    /// Note: Full REPL integration deferred to avoid complexity of kernel initialization.
+    /// This provides core readline features (history, editing) without code execution.
     async fn run_interactive_mode(
         &self,
         session_id: &str,

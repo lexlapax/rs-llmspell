@@ -235,7 +235,11 @@ impl DuckDuckGoProvider {
     }
 
     /// Fetch response from Instant Answer API
-    async fn fetch_instant_answer_api(&self, query: &str, options: &SearchOptions) -> Result<Value> {
+    async fn fetch_instant_answer_api(
+        &self,
+        query: &str,
+        options: &SearchOptions,
+    ) -> Result<Value> {
         let url = "https://api.duckduckgo.com/";
         let mut params = vec![
             ("q", query),
@@ -274,12 +278,18 @@ impl DuckDuckGoProvider {
         })?;
 
         if response_text.is_empty() {
-            warn!("DuckDuckGo API returned empty response for query: {}", query);
+            warn!(
+                "DuckDuckGo API returned empty response for query: {}",
+                query
+            );
             return Ok(serde_json::json!({}));
         }
 
         serde_json::from_str(&response_text).map_err(|e| {
-            warn!("Failed to parse DuckDuckGo JSON. Response text: {}", response_text);
+            warn!(
+                "Failed to parse DuckDuckGo JSON. Response text: {}",
+                response_text
+            );
             LLMSpellError::Network {
                 message: format!("Failed to parse DuckDuckGo response: {e}"),
                 source: Some(Box::new(e)),
@@ -288,7 +298,12 @@ impl DuckDuckGoProvider {
     }
 
     /// Parse abstract result from API response
-    fn parse_abstract_result(&self, response_json: &Value, results: &mut Vec<SearchResult>, rank: &mut usize) {
+    fn parse_abstract_result(
+        &self,
+        response_json: &Value,
+        results: &mut Vec<SearchResult>,
+        rank: &mut usize,
+    ) {
         if let (Some(text), Some(url)) = (
             response_json.get("Abstract").and_then(|v| v.as_str()),
             response_json.get("AbstractURL").and_then(|v| v.as_str()),
@@ -311,7 +326,13 @@ impl DuckDuckGoProvider {
     }
 
     /// Parse instant answer results from API response
-    fn parse_instant_results(&self, response_json: &Value, results: &mut Vec<SearchResult>, rank: &mut usize, max_results: usize) {
+    fn parse_instant_results(
+        &self,
+        response_json: &Value,
+        results: &mut Vec<SearchResult>,
+        rank: &mut usize,
+        max_results: usize,
+    ) {
         if let Some(instant_results) = response_json.get("Results").and_then(|v| v.as_array()) {
             for result in instant_results
                 .iter()
@@ -335,8 +356,17 @@ impl DuckDuckGoProvider {
     }
 
     /// Parse related topics from API response
-    fn parse_related_topics(&self, response_json: &Value, results: &mut Vec<SearchResult>, rank: &mut usize, max_results: usize) {
-        if let Some(topics) = response_json.get("RelatedTopics").and_then(|v| v.as_array()) {
+    fn parse_related_topics(
+        &self,
+        response_json: &Value,
+        results: &mut Vec<SearchResult>,
+        rank: &mut usize,
+        max_results: usize,
+    ) {
+        if let Some(topics) = response_json
+            .get("RelatedTopics")
+            .and_then(|v| v.as_array())
+        {
             for topic in topics
                 .iter()
                 .take(max_results.saturating_sub(results.len()))

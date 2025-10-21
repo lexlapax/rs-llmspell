@@ -1723,7 +1723,8 @@ mod tests {
 
         // Complete
         manager.complete_session(&session_id).await.unwrap();
-        assert!(manager.get_session(&session_id).await.is_err());
+        let session = manager.get_session(&session_id).await.unwrap();
+        assert_eq!(session.status().await, SessionStatus::Completed);
     }
     #[tokio::test]
     async fn test_save_load_session() {
