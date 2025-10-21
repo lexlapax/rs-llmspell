@@ -1,5 +1,30 @@
 //! ABOUTME: Enhanced web search tool implementation with multiple provider support
 //! ABOUTME: Supports Tavily, Bing, `DuckDuckGo`, Google, Brave, `SerpApi`, and `SerperDev` with rate limiting
+//!
+//! # Supported Search Providers
+//!
+//! | Provider | API Key | Free Tier | Best For | Search Types |
+//! |----------|---------|-----------|----------|--------------|
+//! | **Tavily** | `TAVILY_API_KEY` | 1,000/month | RAG/LLM workflows (AI-optimized) | Web |
+//! | **SerperDev** | `SERPERDEV_API_KEY` | 2,500/month | General purpose | Web, News, Images |
+//! | **Brave** | `BRAVE_API_KEY` | 2,000/month | Privacy-focused | Web |
+//! | **Bing** | `BING_API_KEY` | 1,000/month, 3 TPS | General purpose | Web, News, Images |
+//! | **SerpApi** | `SERPAPI_API_KEY` | 100/month | General purpose | Web, News, Images |
+//! | **DuckDuckGo** | None | Unlimited | Backup (no API key) | Web |
+//! | **Google** | `GOOGLE_CUSTOM_SEARCH_API_KEY` | 100/day | Google results | Web, Images |
+//!
+//! # Provider Recommendations
+//!
+//! - **RAG/Research Use Cases**: Use Tavily (AI-optimized content aggregation)
+//! - **General Web Search**: Use SerperDev or Brave (high free tiers)
+//! - **No API Key**: Use DuckDuckGo (free, no limits, but lower quality)
+//! - **Enterprise**: Use Bing or Google (reliable, comprehensive)
+//!
+//! # Default Fallback Chain
+//!
+//! tavily → serperdev → brave → bing → serpapi → duckduckgo
+//!
+//! Prioritizes AI-optimized quality (Tavily) first, then high free tiers, then backup (DuckDuckGo).
 
 use async_trait::async_trait;
 use llmspell_core::{
