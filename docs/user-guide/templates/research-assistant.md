@@ -32,6 +32,57 @@ The Research Assistant template orchestrates multiple AI agents and tools to:
 
 ---
 
+## Web Search Providers
+
+The Research Assistant uses intelligent multi-provider web search with automatic fallback. **7 search providers** are available:
+
+### Available Providers
+
+| Provider | API Key Required | Free Tier | Best For | Speed |
+|----------|-----------------|-----------|----------|-------|
+| **Tavily** (Default) | `TAVILY_API_KEY` | 1,000/month | AI-optimized for RAG/LLM workflows | ~15s |
+| **SerperDev** | `SERPERDEV_API_KEY` | 2,500/month | General purpose research | ~10s |
+| **Brave** | `BRAVE_API_KEY` | 2,000/month | Privacy-focused search | ~10s |
+| **Bing** | `BING_API_KEY` or `WEBSEARCH_BING_API_KEY` | 1,000/month, 3 TPS | Enterprise-grade results | ~10s |
+| **SerpApi** | `SERPAPI_API_KEY` | 100/month | Limited free tier | ~8.5s |
+| **DuckDuckGo** | None (No API key) | Unlimited | Backup/no-key operation | ~13s |
+| **Google** | `GOOGLE_CUSTOM_SEARCH_API_KEY` + `GOOGLE_CSE_ID` | 100/day | Google search quality | ~10s |
+
+### Provider Selection Strategy
+
+**Default Provider**: **Tavily** - AI-optimized search designed specifically for RAG/LLM workflows
+- Aggregates 20+ sites per query
+- Returns filtered/ranked results optimized for LLM context
+- Generates AI-powered answer summaries
+- Best quality for research synthesis
+
+**Fallback Chain**: tavily → serperdev → brave → bing → serpapi → duckduckgo
+- Automatically tries next provider if current fails
+- Prioritizes quality (AI-optimized) → quantity (free tier limits)
+- DuckDuckGo as final fallback (no API key required)
+
+### Configuration
+
+**Recommended Setup** (Set at least one API key):
+```bash
+export TAVILY_API_KEY="your_tavily_key"        # Recommended for best results
+export SERPERDEV_API_KEY="your_serperdev_key"  # High free tier backup
+export BRAVE_API_KEY="your_brave_key"          # Privacy-focused backup
+```
+
+**Minimal Setup** (No API keys required):
+```bash
+# DuckDuckGo HTML scraping works without API keys
+# Degrades gracefully to knowledge answers if scraping fails
+```
+
+**Check Active Providers**:
+```bash
+llmspell tool list | grep web-searcher
+```
+
+---
+
 ## Quick Start
 
 ### CLI - Basic Usage
@@ -156,17 +207,22 @@ llmspell template schema research-assistant
 
 ### Phase 1: Gather (Web Search)
 
-**Duration**: ~2-3s per source
-**Infrastructure**: Requires WebSearchTool
+**Duration**: ~8-15s total (provider-dependent: Tavily 15s, DuckDuckGo 13s, SerpApi 8.5s)
+**Infrastructure**: Requires WebSearchTool with at least one configured provider (or DuckDuckGo fallback)
 
-Executes parallel web searches to find relevant sources for the research topic. Sources are ranked by relevance and limited by the `max_sources` parameter.
+Executes web searches using the provider fallback chain to find relevant sources for the research topic. Sources are ranked by relevance and limited by the `max_sources` parameter.
+
+**Provider Selection**:
+- Default: Tavily (AI-optimized for RAG)
+- Automatic fallback if provider fails or quota exceeded
+- DuckDuckGo as final fallback (no API key required)
 
 **Output**: Array of source documents with:
 - Title
 - URL
 - Content excerpt
 - Relevance score (derived from rank)
-- Provider information
+- Provider information (which search engine was used)
 
 ### Phase 2: Ingest (RAG Indexing)
 
@@ -417,21 +473,25 @@ end
 
 | Sources | Tokens | Duration | Phases |
 |---------|--------|----------|--------|
-| 5 | ~5,500 | ~18s | Gather(10s) + Ingest(5s) + Synthesize(5s) + Validate(3s) |
-| 10 | ~8,000 | ~33s | Gather(20s) + Ingest(10s) + Synthesize(5s) + Validate(3s) |
-| 20 | ~13,000 | ~63s | Gather(40s) + Ingest(20s) + Synthesize(5s) + Validate(3s) |
-| 50 | ~28,000 | ~153s | Gather(100s) + Ingest(50s) + Synthesize(5s) + Validate(3s) |
+| 5 | ~5,500 | ~18-25s | Gather(8-15s) + Ingest(5s) + Synthesize(5s) + Validate(3s) |
+| 10 | ~8,000 | ~28-35s | Gather(8-15s) + Ingest(10s) + Synthesize(5s) + Validate(3s) |
+| 20 | ~13,000 | ~38-45s | Gather(8-15s) + Ingest(20s) + Synthesize(5s) + Validate(3s) |
+| 50 | ~28,000 | ~68-75s | Gather(8-15s) + Ingest(50s) + Synthesize(5s) + Validate(3s) |
 
 **Assumptions**:
 - ~500 tokens per source for RAG embedding
 - ~2000 tokens for synthesis
 - ~1000 tokens for validation
-- ~2s per source for web search
+- **8-15s total for web search** (provider-dependent: Tavily 15s, DuckDuckGo 13s, SerpApi 8.5s)
 - ~1s per source for RAG ingestion
 - ~5-10s for synthesis (depends on model)
 - ~3-5s for validation
 
-**Note**: Actual duration depends on model, source complexity, web search latency, and infrastructure performance.
+**Note**: Actual duration depends on:
+- **Web search provider** (Tavily slowest but highest quality, SerpApi fastest)
+- Model performance (llama3.2:1b faster than 3b)
+- Source complexity and web search latency
+- Infrastructure performance (RAG embedding speed)
 
 ---
 
@@ -526,6 +586,32 @@ llmspell tool list
 llmspell template info research-assistant
 ```
 
+#### Error: "Web search failed: All providers exhausted"
+
+**Cause**: All configured web search providers failed (API key invalid, quota exceeded, or network issues).
+
+**Solution**: Configure at least one working API key or rely on DuckDuckGo:
+
+```bash
+# Option 1: Set API key for any provider
+export TAVILY_API_KEY="your_key"        # Recommended (AI-optimized)
+export SERPERDEV_API_KEY="your_key"     # High free tier (2,500/month)
+export BRAVE_API_KEY="your_key"         # Privacy-focused
+
+# Option 2: DuckDuckGo works without API keys (automatic fallback)
+# No configuration needed - just run the template
+
+# Verify provider configuration
+llmspell tool info web-searcher
+```
+
+**Debug**: Check which provider failed and why:
+```bash
+# Enable debug logging to see provider fallback chain
+RUST_LOG=llmspell_tools::search=debug llmspell template exec research-assistant \
+  --param topic="Test topic"
+```
+
 #### Error: "RAG not available"
 
 **Cause**: MultiTenantRAG is not initialized in the execution context.
@@ -574,6 +660,27 @@ llmspell provider list  # Check if RAG provider is available
 - **Scalability**: Handle 50+ sources without context window limits
 - **Tenant Isolation**: Multiple research sessions don't interfere
 
+### Why Tavily as Default Provider?
+
+**Rationale**: Tavily is AI-optimized specifically for RAG/LLM workflows:
+- **Aggregation**: Searches 20+ sites per query (vs single-source APIs)
+- **AI Filtering**: Pre-filters and ranks results for LLM context relevance
+- **Answer Summaries**: Generates AI-powered summaries for faster synthesis
+- **Context Optimization**: Returns content structured for LLM consumption
+- **Quality vs Speed**: 15s response time (slowest) but highest synthesis quality
+
+**Trade-offs**:
+- Slower than SerpApi (8.5s) or DuckDuckGo (13s)
+- Lower free tier (1k/month) vs SerperDev (2.5k/month)
+- **Worth it**: Higher quality synthesis with fewer hallucinations
+
+**Fallback Strategy**: If Tavily quota exhausted or unavailable:
+1. SerperDev (2.5k/month, general purpose)
+2. Brave (2k/month, privacy-focused)
+3. Bing (1k/month, enterprise-grade)
+4. SerpApi (100/month, fastest)
+5. DuckDuckGo (unlimited, no API key)
+
 ### Temperature Tuning Philosophy
 
 - **Synthesis Agent (0.7)**: Balanced creativity for comprehensive synthesis
@@ -615,9 +722,12 @@ Data flows sequentially through phases:
 ### Infrastructure Dependencies
 
 - **WebSearchTool**: Web search for source gathering (Phase 1)
+  - **Recommended**: At least one API key configured (TAVILY_API_KEY, SERPERDEV_API_KEY, BRAVE_API_KEY, BING_API_KEY, SERPAPI_API_KEY)
+  - **Minimal**: DuckDuckGo fallback (no API key required, unlimited usage)
+  - See "Web Search Providers" section above for configuration details
 - **MultiTenantRAG**: RAG store for document indexing and retrieval (Phases 2-3)
 - **AgentRegistry**: Agent creation for synthesis and validation (Phases 3-4)
-- **LLM Provider**: Local LLM for agent execution
+- **LLM Provider**: Local LLM for agent execution (Ollama recommended)
 
 ### Minimum System Requirements
 
@@ -707,6 +817,29 @@ end
 
 ## Changelog
 
+### v0.1.1 (Phase 12.8.1.7) - Web Search Provider Enhancements
+
+**Added** (Task 12.8.1.7):
+- ✅ **7 Web Search Providers**: Tavily (AI-optimized), SerperDev, Brave, Bing, SerpApi, DuckDuckGo (HTML scraping), Google
+- ✅ **Intelligent Fallback Chain**: tavily → serperdev → brave → bing → serpapi → duckduckgo
+- ✅ **Tavily as Default**: AI-optimized search designed specifically for RAG/LLM workflows
+- ✅ **DuckDuckGo HTML Scraping**: Zero-API-key fallback with anti-CAPTCHA headers
+- ✅ **Provider Configuration**: Environment variable support for all 7 providers
+- ✅ **Rate Limiting**: Conservative limits to prevent API throttling and CAPTCHA challenges
+
+**Files Modified** (Phase 12.8.1.7):
+- llmspell-tools/src/search/providers/tavily.rs (189 lines, NEW)
+- llmspell-tools/src/search/providers/bing.rs (271 lines, NEW)
+- llmspell-tools/src/search/providers/duckduckgo.rs (334 lines, +143 enhanced)
+- llmspell-tools/src/search/web_search.rs (provider comparison table, fallback chain)
+- docs/user-guide/templates/research-assistant.md (provider documentation)
+
+**Performance**:
+- Tavily: ~15s (AI-optimized, highest quality for RAG synthesis)
+- DuckDuckGo: ~13s (HTML scraping, no API key required)
+- SerperDev/Brave/Bing: ~10s (general purpose)
+- SerpApi: ~8.5s (fastest, lowest free tier)
+
 ### v0.1.0 (Phase 12.8.1) - Production Ready
 
 **Implemented** (574 lines total):
@@ -728,5 +861,5 @@ end
 
 ---
 
-**Last Updated**: Phase 12.8.1 (Production Implementation)
+**Last Updated**: Phase 12.8.1.7 (Web Search Provider Enhancements)
 **Status**: ✅ Ready for Production Use
