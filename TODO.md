@@ -8429,7 +8429,7 @@ async fn handle_chat_command(&mut self, message: String) -> Result<()> {
 #### Subtask 12.9.5: Update interactive-chat Template to Use Full REPL
 **File**: `llmspell-templates/src/builtin/interactive_chat.rs`, `llmspell-kernel/src/repl/session.rs`, `llmspell-templates/src/context.rs`
 **Effort**: 2-3 hours → Actual: 4 hours (full REPL integration with NoOpScriptExecutor)
-**Status**: ✅ COMPLETE (full REPL integration with readline, multi-line, Ctrl-C)
+**Status**: ✅ COMPLETE (full REPL integration with readline, multi-line, Ctrl-C, agent auto-creation callback)
 
 **Changes**:
 1. Remove `run_interactive_mode()` stdin loop (lines 464-600, ~143 lines deleted)
@@ -8546,6 +8546,38 @@ async fn create_interactive_session(
    - Added kernel_handle field, getter, builder method (future-proofing)
 
 **Key Achievement**: Full REPL integration without circular dependency via NoOpScriptExecutor pattern
+
+✅ **Agent Auto-Creation Callback Pattern** (2025-10-21 - Final Implementation):
+  - **AgentCreator Type** (llmspell-kernel/src/repl/session.rs:27-35):
+    * Type alias for Arc<dyn Fn(model, system_prompt, tools) -> Future<Agent>>
+    * Callback signature: takes current settings, returns new agent
+    * Enables dependency inversion (kernel defines interface, template implements)
+  - **InteractiveSession.agent_creator Field** (session.rs:239):
+    * Optional callback for on-demand agent creation
+    * Set via with_agent_creator() builder method (session.rs:375-380)
+    * Used when agent is None but infrastructure available
+  - **handle_chat_message() Auto-Creation** (session.rs:1519-1550):
+    * Checks if agent exists, uses it if available
+    * If agent is None, calls agent_creator callback with current settings
+    * Auto-creates agent after .model command without manual intervention
+    * Stores new agent for reuse (avoids recreation on every message)
+  - **Template Callback Implementation** (interactive_chat.rs:626-673):
+    * Creates closure with agent_registry captured
+    * Parses model string (provider/model format)
+    * Builds AgentConfig with current settings + resource limits
+    * Calls registry.create_agent() inside async block
+    * Wired via with_agent_creator() before run_repl()
+  - **Architecture Benefits**:
+    * No circular dependency (kernel doesn't depend on agents crate)
+    * Dependency inversion principle (kernel defines callback interface)
+    * Template has full llmspell-agents knowledge for agent creation
+    * Seamless UX: .model switch → next chat auto-creates agent
+  - **Testing**:
+    * Manual test: .model ollama/llama3.2:3b → auto-creation successful
+    * Unit test: test_handle_chat_message() updated for new error message
+    * 647 kernel tests passing ✅
+    * 122 template tests passing ✅
+    * 769 total tests passing ✅
 
 **Next Steps**: Subtask 12.9.6 (Integration Testing) - test REPL + chat with real LLM
 
