@@ -8644,25 +8644,29 @@ async fn create_interactive_session(
 ✅ Session state management
 ✅ Builder pattern (agent wiring)
 
-**What Cannot Be Tested** (without full infrastructure):
-❌ Real agent execution (needs ProviderManager + LLM) - why not? we have the infrastructure
-❌ Tool integration (needs ToolRegistry) - why not - we have the infrastructure
-❌ Session persistence (needs SessionManager with storage) - why not
-❌ Multi-turn conversations with real LLM - why not
-❌ REPL readline features (requires interactive terminal) - why not, use tcl/tk expect scripts to test.
+**What Was NOT Tested** (deferred to 12.9.9):
+⏭️ Real agent execution (ProviderManager + Ollama) - Infrastructure available, deferred
+⏭️ Tool integration (ToolRegistry with real tools) - Infrastructure available, deferred
+⏭️ Session persistence (SessionManager + storage) - Infrastructure available, deferred
+⏭️ Multi-turn conversations with real LLM - Infrastructure available, deferred
+⏭️ REPL readline features (expect scripts) - Automation possible, deferred
+
+**NOTE**: The original "cannot be tested" assessment was INCORRECT. All infrastructure exists and these items CAN be tested. They were deferred to avoid test complexity in 12.9.6, not due to technical limitations. See 12.9.9 Part A for automated integration tests covering all 5 areas.
 
 **Acceptance Criteria**:
 - [x] Unit test coverage >90% for chat handlers ✅ (13/13 kernel + 122/122 templates)
 - [x] All existing tests pass ✅ (135 total passing)
 - [x] Error handling verified ✅ (test_handle_chat_message without agent)
 - [x] Chat commands functional ✅ (6 handlers implemented + tested)
-- [ ] Integration tests with real infrastructure - Deferred to 12.9.9 (end-to-end testing)
+- [x] .info command enhanced ✅ (4 new sections added)
+- [ ] Integration tests with real infrastructure → Moved to 12.9.9 Part A (automated)
+- [ ] End-to-end validation → Moved to 12.9.9 Part B (manual)
 
 **Completion Rationale**:
-- **Unit Test Coverage**: Comprehensive (135 passing tests)
-- **Integration Testing**: Requires full kernel infrastructure (SessionManager, AgentRegistry, ProviderManager)
-- **End-to-End Testing**: Covered by Subtask 12.9.9 with real LLM
-- **Trade-off**: Deferred integration tests to avoid duplicating infrastructure setup complexity
+- **Unit Test Coverage**: Comprehensive (769 passing tests: 647 kernel + 122 templates)
+- **Integration Testing**: Infrastructure exists, deferred to 12.9.9 Part A for proper test framework
+- **End-to-End Testing**: Manual validation in 12.9.9 Part B with real LLM
+- **Decision**: Focus 12.9.6 on unit tests + .info enhancement, consolidate integration + E2E in 12.9.9
 
 ---
 
@@ -8773,11 +8777,108 @@ test result: ok. 19 passed; 0 failed; 4 ignored; 0 measured
 
 ---
 
-#### Subtask 12.9.9: End-to-End Testing with Real LLM
-**Effort**: 2-3 hours
+#### Subtask 12.9.9: Integration & End-to-End Testing with Real LLM
+**Effort**: 3-5 hours (1-2h automated integration + 2-3h manual E2E)
 **Status**: ⏳ PENDING
 
-**Manual Test Scenarios**:
+**Scope Expansion Rationale**:
+- 12.9.6 deferred integration testing incorrectly (infrastructure exists)
+- "What Cannot Be Tested" section was WRONG - all items CAN be tested
+- Infrastructure available: SessionManager, ProviderManager, ToolRegistry, Ollama LLM
+- Splitting into: Automated Integration Tests + Manual E2E Validation
+
+---
+
+**Part A: Automated Integration Tests** (1-2 hours)
+
+**Test Infrastructure**:
+- Use existing infrastructure: Ollama + SessionManager + ToolRegistry
+- Can be Rust integration tests or expect scripts
+- Should run in CI eventually
+
+**5 Integration Test Scenarios**:
+
+1. **Real Agent Execution Test**:
+   - Start interactive-chat template programmatically
+   - Send message: "What is 2+2?"
+   - Verify: Agent response received (not placeholder)
+   - Verify: ollama/llama3.2:3b executed
+   - Script: Rust integration test or bash + expect
+   ```bash
+   timeout 60 ./target/debug/llmspell template exec interactive-chat \
+     --param model=ollama/llama3.2:3b \
+     --param message="What is 2+2?" \
+     --output json | jq -r '.result'
+   ```
+
+2. **Tool Integration Test**:
+   - Start interactive-chat with tools: `["calculator"]`
+   - Send message: "What is 15 * 847?"
+   - Verify: Calculator tool executed
+   - Verify: Correct result in response (12705)
+   - Script: Rust integration test checking tool invocation
+
+3. **Session Persistence Test**:
+   - First call: Send "My name is Alice", capture session_id
+   - Second call: Send "What is my name?" with same session_id
+   - Verify: Response mentions "Alice"
+   - Verify: Context from first turn retained
+   - Script: Two sequential CLI calls with session_id extraction
+   ```bash
+   SESSION_ID=$(./target/debug/llmspell template exec interactive-chat \
+     --param message="My name is Alice" --output json | jq -r '.metrics.session_id')
+
+   ./target/debug/llmspell template exec interactive-chat \
+     --param message="What is my name?" \
+     --param session_id="$SESSION_ID" --output text
+   ```
+
+4. **Multi-Turn Conversation Test**:
+   - Turn 1: "I'm building a web server in Rust"
+   - Turn 2: "What framework should I use?" (same session)
+   - Verify: Response references turn 1 context
+   - Script: Session reuse pattern from test 3
+
+5. **REPL Features Test** (expect script):
+   - Use tcl/tk expect for interactive terminal testing
+   - Test arrow key history (↑↓)
+   - Test Ctrl-C interrupt (doesn't exit)
+   - Test `.info` command output
+   - Script: expect script with send/expect pairs
+   ```tcl
+   spawn ./target/debug/llmspell template exec interactive-chat
+   expect "You>"
+   send "Hello\r"
+   expect "Assistant>"
+   send "\003"  # Ctrl-C
+   expect "You>"  # Should NOT exit
+   send ".exit\r"
+   expect eof
+   ```
+
+**Acceptance Criteria (Part A)**:
+- [x] All 5 integration tests pass ✅
+- [x] Real LLM execution verified (not placeholders) ✅ (deepseek-r1:8b)
+- [x] Infrastructure wiring validated (Session + Tools + Provider) ✅
+- [x] Tests can run headless (CI-ready) ✅ (expect script)
+
+**Test Results Summary (Part A)**:
+✅ **Test 1**: Real agent execution - PASS (deepseek-r1:8b answered "4" to "2+2")
+✅ **Test 2**: Tool integration - PASS (calculator: 15*847=12705, tools_invoked=1)
+✅ **Test 3**: Session persistence - PASS (remembered "Alice" across 2 calls)
+✅ **Test 4**: Multi-turn conversation - PASS (context retained: web server → Actix-web)
+✅ **Test 5**: REPL features - PASS (prompt, .info, Ctrl-C, .exit all working)
+
+**Test Artifacts**:
+- `/tmp/test1_deepseek.txt` - Agent execution output
+- `/tmp/test2_tool_integration.json` - Tool integration JSON
+- `/tmp/test3_turn1.json`, `/tmp/test3_turn2.txt` - Session persistence
+- `/tmp/test4_turn1.json`, `/tmp/test4_turn2.txt` - Multi-turn conversation
+- `/tmp/test5_repl_fixed.exp`, `/tmp/test5_output.txt` - REPL expect test
+
+---
+
+**Part B: Manual End-to-End Test Scenarios** (2-3 hours)
 1. **Basic Chat Flow**:
    - Start: `llmspell template exec interactive-chat`
    - Chat: "What is Rust?" → Verify response
@@ -8821,11 +8922,36 @@ test result: ok. 19 passed; 0 failed; 4 ignored; 0 measured
 - Error messages clear and actionable
 - Help text comprehensive
 
-**Acceptance Criteria**:
-- All 7 manual scenarios pass ✅
-- Zero crashes or hangs ✅
-- Readline features work smoothly ✅
-- UX feels production-ready ✅
+**Acceptance Criteria (Part B)**:
+- [ ] All 7 manual scenarios pass ✅
+- [ ] Zero crashes or hangs ✅
+- [ ] Readline features work smoothly ✅
+- [ ] UX feels production-ready ✅
+
+---
+
+**Overall 12.9.9 Acceptance Criteria**:
+
+**Part A - Integration Tests** (Automated): ✅ COMPLETE
+- [x] Test 1: Real agent execution verified ✅
+- [x] Test 2: Tool integration working (calculator) ✅
+- [x] Test 3: Session persistence across calls ✅
+- [x] Test 4: Multi-turn conversation context ✅
+- [x] Test 5: REPL features (expect script) ✅
+- [x] All 5 integration tests pass without manual intervention ✅
+- [x] Can run in CI environment (headless) ✅
+
+**Part B - E2E Validation** (Manual):
+- [ ] 7 manual test scenarios completed ✅
+- [ ] Performance acceptable (<10s response latency)
+- [ ] UX feels production-ready (IPython/Node.js REPL quality)
+- [ ] No critical bugs or crashes
+
+**Combined Success Criteria**:
+- [ ] Infrastructure integration validated (Session + Tools + Provider + LLM)
+- [ ] REPL features production-ready (readline, history, Ctrl-C, commands)
+- [ ] Documentation matches implementation (interactive-chat.md accurate)
+- [ ] Ready for Phase 12.9 completion and git commit
 
 ---
 
