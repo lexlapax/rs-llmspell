@@ -133,7 +133,7 @@ pub trait ScriptEngineBridge: Send + Sync {
 
     /// Downcast support for accessing concrete engine types (Phase 12.8.2.10)
     ///
-    /// Enables downcasting Box<dyn ScriptEngineBridge> to concrete engine types
+    /// Enables downcasting `Box<dyn ScriptEngineBridge>` to concrete engine types
     /// for calling engine-specific methods not in the trait.
     fn as_any(&self) -> &dyn std::any::Any;
 }

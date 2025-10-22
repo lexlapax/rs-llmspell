@@ -61,6 +61,13 @@ pub enum TemplateError {
     Other(#[from] anyhow::Error),
 }
 
+/// Convert StateError to TemplateError
+impl From<llmspell_core::state::StateError> for TemplateError {
+    fn from(err: llmspell_core::state::StateError) -> Self {
+        TemplateError::ExecutionFailed(format!("State operation failed: {}", err))
+    }
+}
+
 /// Parameter validation errors with detailed context
 #[derive(Debug, Error)]
 pub enum ValidationError {

@@ -2,7 +2,9 @@
 //! ABOUTME: End-to-end testing of template execution with mocked infrastructure
 
 use llmspell_agents::FactoryRegistry;
+use llmspell_kernel::state::StateManager;
 use llmspell_providers::ProviderManager;
+use llmspell_templates::core::TemplateResult;
 use llmspell_templates::{ExecutionContext, TemplateCategory, TemplateError, TemplateRegistry};
 use llmspell_tools::ToolRegistry;
 use llmspell_workflows::factory::DefaultWorkflowFactory;
@@ -15,11 +17,11 @@ fn test_registry_initialization() {
     let registry = TemplateRegistry::with_builtin_templates()
         .expect("Failed to create registry with builtin templates");
 
-    // Should have all 9 builtin templates
+    // Should have all 10 builtin templates
     let templates = registry.list_metadata();
     assert!(
-        templates.len() >= 9,
-        "Expected at least 9 builtin templates, found {}",
+        templates.len() >= 10,
+        "Expected at least 10 builtin templates, found {}",
         templates.len()
     );
 
@@ -34,6 +36,7 @@ fn test_registry_initialization() {
         "code-review",
         "content-generation",
         "file-classification",
+        "knowledge-management",
     ];
 
     for template_id in &expected_templates {
@@ -417,5 +420,509 @@ fn test_registry_clear() {
     assert!(
         registry.list_metadata().is_empty(),
         "Registry should be empty after clear"
+    );
+}
+
+// ============================================================================
+// Knowledge Management Template Tests
+// ============================================================================
+
+/// Helper function to extract text from TemplateResult
+fn extract_text(result: &TemplateResult) -> String {
+    match result {
+        TemplateResult::Text(s) => s.clone(),
+        _ => panic!("Expected Text result"),
+    }
+}
+
+/// Test knowledge management template ingest operation
+#[tokio::test]
+async fn test_knowledge_management_ingest() {
+    let registry = TemplateRegistry::with_builtin_templates().expect("Failed to create registry");
+    let template = registry
+        .get("knowledge-management")
+        .expect("Failed to get knowledge-management template");
+
+    // Create execution context with StateManager
+    let state_manager = Arc::new(
+        StateManager::new()
+            .await
+            .expect("Failed to create StateManager"),
+    );
+    let tool_registry = Arc::new(ToolRegistry::new());
+    let agent_registry = Arc::new(FactoryRegistry::new());
+    let workflow_factory = Arc::new(DefaultWorkflowFactory::new());
+    let provider_manager = Arc::new(ProviderManager::new());
+
+    let context = ExecutionContext::builder()
+        .with_tool_registry(tool_registry)
+        .with_agent_registry(agent_registry)
+        .with_workflow_factory(workflow_factory)
+        .with_providers(provider_manager)
+        .with_state_manager(state_manager)
+        .build()
+        .expect("Failed to build execution context");
+
+    // Test ingest operation
+    let params = json!({
+        "operation": "ingest",
+        "collection": "test-collection",
+        "content": "This is a test document about Rust programming language. Rust is a systems programming language.",
+        "source_type": "text",
+        "chunk_size": 100,
+        "chunk_overlap": 20
+    });
+
+    let result = template
+        .execute(params.into(), context)
+        .await
+        .expect("Ingest operation failed");
+
+    assert!(extract_text(&result.result).contains("Document ingested successfully"));
+    assert!(result.metrics.custom_metrics.contains_key("document_id"));
+    assert!(result.metrics.custom_metrics.contains_key("chunks_created"));
+}
+
+/// Test knowledge management template query operation
+#[tokio::test]
+async fn test_knowledge_management_query() {
+    let registry = TemplateRegistry::with_builtin_templates().expect("Failed to create registry");
+    let template = registry
+        .get("knowledge-management")
+        .expect("Failed to get knowledge-management template");
+
+    let state_manager = Arc::new(
+        StateManager::new()
+            .await
+            .expect("Failed to create StateManager"),
+    );
+    let tool_registry = Arc::new(ToolRegistry::new());
+    let agent_registry = Arc::new(FactoryRegistry::new());
+    let workflow_factory = Arc::new(DefaultWorkflowFactory::new());
+    let provider_manager = Arc::new(ProviderManager::new());
+
+    let context = ExecutionContext::builder()
+        .with_tool_registry(tool_registry)
+        .with_agent_registry(agent_registry)
+        .with_workflow_factory(workflow_factory)
+        .with_providers(provider_manager)
+        .with_state_manager(state_manager.clone())
+        .build()
+        .expect("Failed to build execution context");
+
+    // First ingest a document
+    let ingest_params = json!({
+        "operation": "ingest",
+        "collection": "test-query-collection",
+        "content": "Rust is a systems programming language that runs blazingly fast, prevents segfaults, and guarantees thread safety.",
+        "source_type": "text"
+    });
+
+    template
+        .execute(ingest_params.into(), context.clone())
+        .await
+        .expect("Ingest failed");
+
+    // Then query it
+    let query_params = json!({
+        "operation": "query",
+        "collection": "test-query-collection",
+        "query": "Rust programming language",
+        "max_results": 5,
+        "include_citations": true
+    });
+
+    let result = template
+        .execute(query_params.into(), context)
+        .await
+        .expect("Query operation failed");
+
+    let output = extract_text(&result.result);
+    assert!(output.contains("KNOWLEDGE QUERY RESULTS"));
+    assert!(output.contains("Rust"));
+}
+
+/// Test knowledge management template update operation
+#[tokio::test]
+async fn test_knowledge_management_update() {
+    let registry = TemplateRegistry::with_builtin_templates().expect("Failed to create registry");
+    let template = registry
+        .get("knowledge-management")
+        .expect("Failed to get knowledge-management template");
+
+    let state_manager = Arc::new(
+        StateManager::new()
+            .await
+            .expect("Failed to create StateManager"),
+    );
+    let tool_registry = Arc::new(ToolRegistry::new());
+    let agent_registry = Arc::new(FactoryRegistry::new());
+    let workflow_factory = Arc::new(DefaultWorkflowFactory::new());
+    let provider_manager = Arc::new(ProviderManager::new());
+
+    let context = ExecutionContext::builder()
+        .with_tool_registry(tool_registry)
+        .with_agent_registry(agent_registry)
+        .with_workflow_factory(workflow_factory)
+        .with_providers(provider_manager)
+        .with_state_manager(state_manager.clone())
+        .build()
+        .expect("Failed to build execution context");
+
+    // Ingest original document
+    let ingest_result = template
+        .execute(
+            json!({
+                "operation": "ingest",
+                "collection": "test-update-collection",
+                "content": "Original content about Python",
+                "source_type": "text"
+            })
+            .into(),
+            context.clone(),
+        )
+        .await
+        .expect("Ingest failed");
+
+    let doc_id = ingest_result
+        .metrics
+        .custom_metrics
+        .get("document_id")
+        .unwrap()
+        .as_str()
+        .unwrap()
+        .to_string();
+
+    // Update the document
+    let update_result = template
+        .execute(
+            json!({
+                "operation": "update",
+                "collection": "test-update-collection",
+                "document_id": doc_id,
+                "content": "Updated content about Rust",
+                "source_type": "text"
+            })
+            .into(),
+            context,
+        )
+        .await
+        .expect("Update operation failed");
+
+    assert!(extract_text(&update_result.result).contains("Document updated successfully"));
+}
+
+/// Test knowledge management template delete operation
+#[tokio::test]
+async fn test_knowledge_management_delete() {
+    let registry = TemplateRegistry::with_builtin_templates().expect("Failed to create registry");
+    let template = registry
+        .get("knowledge-management")
+        .expect("Failed to get knowledge-management template");
+
+    let state_manager = Arc::new(
+        StateManager::new()
+            .await
+            .expect("Failed to create StateManager"),
+    );
+    let tool_registry = Arc::new(ToolRegistry::new());
+    let agent_registry = Arc::new(FactoryRegistry::new());
+    let workflow_factory = Arc::new(DefaultWorkflowFactory::new());
+    let provider_manager = Arc::new(ProviderManager::new());
+
+    let context = ExecutionContext::builder()
+        .with_tool_registry(tool_registry)
+        .with_agent_registry(agent_registry)
+        .with_workflow_factory(workflow_factory)
+        .with_providers(provider_manager)
+        .with_state_manager(state_manager.clone())
+        .build()
+        .expect("Failed to build execution context");
+
+    // Ingest document
+    let ingest_result = template
+        .execute(
+            json!({
+                "operation": "ingest",
+                "collection": "test-delete-collection",
+                "content": "Document to be deleted",
+                "source_type": "text"
+            })
+            .into(),
+            context.clone(),
+        )
+        .await
+        .expect("Ingest failed");
+
+    let doc_id = ingest_result
+        .metrics
+        .custom_metrics
+        .get("document_id")
+        .unwrap()
+        .as_str()
+        .unwrap()
+        .to_string();
+
+    // Delete the document
+    let delete_result = template
+        .execute(
+            json!({
+                "operation": "delete",
+                "collection": "test-delete-collection",
+                "document_id": doc_id
+            })
+            .into(),
+            context,
+        )
+        .await
+        .expect("Delete operation failed");
+
+    assert!(extract_text(&delete_result.result).contains("Document deleted successfully"));
+}
+
+/// Test knowledge management template list operation
+#[tokio::test]
+async fn test_knowledge_management_list() {
+    let registry = TemplateRegistry::with_builtin_templates().expect("Failed to create registry");
+    let template = registry
+        .get("knowledge-management")
+        .expect("Failed to get knowledge-management template");
+
+    let state_manager = Arc::new(
+        StateManager::new()
+            .await
+            .expect("Failed to create StateManager"),
+    );
+    let tool_registry = Arc::new(ToolRegistry::new());
+    let agent_registry = Arc::new(FactoryRegistry::new());
+    let workflow_factory = Arc::new(DefaultWorkflowFactory::new());
+    let provider_manager = Arc::new(ProviderManager::new());
+
+    let context = ExecutionContext::builder()
+        .with_tool_registry(tool_registry)
+        .with_agent_registry(agent_registry)
+        .with_workflow_factory(workflow_factory)
+        .with_providers(provider_manager)
+        .with_state_manager(state_manager.clone())
+        .build()
+        .expect("Failed to build execution context");
+
+    // Ingest multiple documents
+    for i in 1..=3 {
+        template
+            .execute(
+                json!({
+                    "operation": "ingest",
+                    "collection": "test-list-collection",
+                    "content": format!("Document {} about Rust", i),
+                    "source_type": "text"
+                })
+                .into(),
+                context.clone(),
+            )
+            .await
+            .expect("Ingest failed");
+    }
+
+    // List documents
+    let list_result = template
+        .execute(
+            json!({
+                "operation": "list",
+                "collection": "test-list-collection",
+                "output_format": "text"
+            })
+            .into(),
+            context,
+        )
+        .await
+        .expect("List operation failed");
+
+    let output = extract_text(&list_result.result);
+    assert!(output.contains("KNOWLEDGE BASE: test-list-collection"));
+    assert!(output.contains("Total Documents: 3"));
+}
+
+/// Test knowledge management full CRUD cycle
+#[tokio::test]
+async fn test_knowledge_management_full_cycle() {
+    let registry = TemplateRegistry::with_builtin_templates().expect("Failed to create registry");
+    let template = registry
+        .get("knowledge-management")
+        .expect("Failed to get knowledge-management template");
+
+    let state_manager = Arc::new(
+        StateManager::new()
+            .await
+            .expect("Failed to create StateManager"),
+    );
+    let tool_registry = Arc::new(ToolRegistry::new());
+    let agent_registry = Arc::new(FactoryRegistry::new());
+    let workflow_factory = Arc::new(DefaultWorkflowFactory::new());
+    let provider_manager = Arc::new(ProviderManager::new());
+
+    let context = ExecutionContext::builder()
+        .with_tool_registry(tool_registry)
+        .with_agent_registry(agent_registry)
+        .with_workflow_factory(workflow_factory)
+        .with_providers(provider_manager)
+        .with_state_manager(state_manager.clone())
+        .build()
+        .expect("Failed to build execution context");
+
+    // 1. Ingest
+    let ingest_result = template
+        .execute(
+            json!({
+                "operation": "ingest",
+                "collection": "test-full-cycle",
+                "content": "Rust is a systems programming language",
+                "source_type": "text"
+            })
+            .into(),
+            context.clone(),
+        )
+        .await
+        .expect("Ingest failed");
+
+    let doc_id = ingest_result
+        .metrics
+        .custom_metrics
+        .get("document_id")
+        .unwrap()
+        .as_str()
+        .unwrap()
+        .to_string();
+
+    // 2. Query
+    let query_result = template
+        .execute(
+            json!({
+                "operation": "query",
+                "collection": "test-full-cycle",
+                "query": "Rust programming",
+                "max_results": 5
+            })
+            .into(),
+            context.clone(),
+        )
+        .await
+        .expect("Query failed");
+
+    assert!(extract_text(&query_result.result).contains("Rust"));
+
+    // 3. Update
+    let update_result = template
+        .execute(
+            json!({
+                "operation": "update",
+                "collection": "test-full-cycle",
+                "document_id": doc_id.clone(),
+                "content": "Rust is a memory-safe systems programming language",
+                "source_type": "text"
+            })
+            .into(),
+            context.clone(),
+        )
+        .await
+        .expect("Update failed");
+
+    assert!(extract_text(&update_result.result).contains("Document updated successfully"));
+
+    // 4. Query again to verify update
+    let query_result2 = template
+        .execute(
+            json!({
+                "operation": "query",
+                "collection": "test-full-cycle",
+                "query": "memory-safe",
+                "max_results": 5
+            })
+            .into(),
+            context.clone(),
+        )
+        .await
+        .expect("Query failed");
+
+    assert!(extract_text(&query_result2.result).contains("memory-safe"));
+
+    // 5. Delete
+    let delete_result = template
+        .execute(
+            json!({
+                "operation": "delete",
+                "collection": "test-full-cycle",
+                "document_id": doc_id
+            })
+            .into(),
+            context,
+        )
+        .await
+        .expect("Delete failed");
+
+    assert!(extract_text(&delete_result.result).contains("Document deleted successfully"));
+}
+
+/// Test knowledge management error handling
+#[tokio::test]
+async fn test_knowledge_management_error_handling() {
+    let registry = TemplateRegistry::with_builtin_templates().expect("Failed to create registry");
+    let template = registry
+        .get("knowledge-management")
+        .expect("Failed to get knowledge-management template");
+
+    let state_manager = Arc::new(
+        StateManager::new()
+            .await
+            .expect("Failed to create StateManager"),
+    );
+    let tool_registry = Arc::new(ToolRegistry::new());
+    let agent_registry = Arc::new(FactoryRegistry::new());
+    let workflow_factory = Arc::new(DefaultWorkflowFactory::new());
+    let provider_manager = Arc::new(ProviderManager::new());
+
+    let context = ExecutionContext::builder()
+        .with_tool_registry(tool_registry)
+        .with_agent_registry(agent_registry)
+        .with_workflow_factory(workflow_factory)
+        .with_providers(provider_manager)
+        .with_state_manager(state_manager)
+        .build()
+        .expect("Failed to build execution context");
+
+    // Test query on empty collection
+    let query_result = template
+        .execute(
+            json!({
+                "operation": "query",
+                "collection": "nonexistent-collection",
+                "query": "test query"
+            })
+            .into(),
+            context.clone(),
+        )
+        .await;
+
+    assert!(
+        query_result.is_err(),
+        "Should fail querying empty collection"
+    );
+
+    // Test delete nonexistent document
+    let delete_result = template
+        .execute(
+            json!({
+                "operation": "delete",
+                "collection": "nonexistent-collection",
+                "document_id": "nonexistent-doc"
+            })
+            .into(),
+            context,
+        )
+        .await;
+
+    assert!(
+        delete_result.is_err(),
+        "Should fail deleting nonexistent document"
     );
 }

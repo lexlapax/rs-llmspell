@@ -215,11 +215,7 @@ impl FileClassificationTemplate {
                 },
                 Category {
                     name: "Documents".to_string(),
-                    extensions: vec![
-                        ".pdf".to_string(),
-                        ".doc".to_string(),
-                        ".docx".to_string(),
-                    ],
+                    extensions: vec![".pdf".to_string(), ".doc".to_string(), ".docx".to_string()],
                     keywords: vec![],
                     destination: Some("Downloads/Documents".to_string()),
                 },
@@ -240,7 +236,8 @@ impl FileClassificationTemplate {
             return Err(ValidationError::invalid_value(
                 "source_path",
                 format!("Source path does not exist: {}", source_path),
-            ).into());
+            )
+            .into());
         }
 
         let mut files = Vec::new();
@@ -255,7 +252,8 @@ impl FileClassificationTemplate {
             return Err(ValidationError::invalid_value(
                 "source_path",
                 format!("Invalid path (not file or directory): {}", source_path),
-            ).into());
+            )
+            .into());
         }
 
         Ok(files)
@@ -473,11 +471,7 @@ impl FileClassificationTemplate {
                     TemplateError::ExecutionFailed(format!("Failed to move file: {}", e))
                 })?;
 
-                Ok(format!(
-                    "Moved {} to {}",
-                    file_path.display(),
-                    final_dest
-                ))
+                Ok(format!("Moved {} to {}", file_path.display(), final_dest))
             }
             "copy" => {
                 // Create destination directory
@@ -503,11 +497,7 @@ impl FileClassificationTemplate {
                     TemplateError::ExecutionFailed(format!("Failed to copy file: {}", e))
                 })?;
 
-                Ok(format!(
-                    "Copied {} to {}",
-                    file_path.display(),
-                    final_dest
-                ))
+                Ok(format!("Copied {} to {}", file_path.display(), final_dest))
             }
             "report" => {
                 // Report-only mode: just log classification
@@ -520,7 +510,8 @@ impl FileClassificationTemplate {
             _ => Err(ValidationError::invalid_value(
                 "action",
                 format!("Unknown action: {}", action),
-            ).into()),
+            )
+            .into()),
         }
     }
 
@@ -538,7 +529,10 @@ impl FileClassificationTemplate {
     }
 
     /// Format report as JSON
-    fn format_json_report(&self, results: &[ClassificationResult]) -> Result<String, TemplateError> {
+    fn format_json_report(
+        &self,
+        results: &[ClassificationResult],
+    ) -> Result<String, TemplateError> {
         let mut category_counts: HashMap<String, usize> = HashMap::new();
         for result in results {
             *category_counts.entry(result.category.clone()).or_insert(0) += 1;
@@ -640,11 +634,7 @@ impl crate::core::Template for FileClassificationTemplate {
                 json!("extension"),
             )
             .with_constraints(ParameterConstraints {
-                allowed_values: Some(vec![
-                    json!("extension"),
-                    json!("content"),
-                    json!("hybrid"),
-                ]),
+                allowed_values: Some(vec![json!("extension"), json!("content"), json!("hybrid")]),
                 ..Default::default()
             }),
             // category_preset (optional enum)
@@ -671,11 +661,7 @@ impl crate::core::Template for FileClassificationTemplate {
                 json!("report"),
             )
             .with_constraints(ParameterConstraints {
-                allowed_values: Some(vec![
-                    json!("move"),
-                    json!("copy"),
-                    json!("report"),
-                ]),
+                allowed_values: Some(vec![json!("move"), json!("copy"), json!("report")]),
                 ..Default::default()
             }),
             // destination_base (optional)
@@ -707,11 +693,7 @@ impl crate::core::Template for FileClassificationTemplate {
                 json!("text"),
             )
             .with_constraints(ParameterConstraints {
-                allowed_values: Some(vec![
-                    json!("text"),
-                    json!("markdown"),
-                    json!("json"),
-                ]),
+                allowed_values: Some(vec![json!("text"), json!("markdown"), json!("json")]),
                 ..Default::default()
             }),
         ])
@@ -732,7 +714,8 @@ impl crate::core::Template for FileClassificationTemplate {
 
         // Extract parameters
         let source_path: String = params.get("source_path")?;
-        let classification_strategy: String = params.get_or("classification_strategy", "extension".to_string());
+        let classification_strategy: String =
+            params.get_or("classification_strategy", "extension".to_string());
         let category_preset: Option<String> = params.get_optional("category_preset");
         let action: String = params.get_or("action", "report".to_string());
         let destination_base: Option<String> = params.get_optional("destination_base");
@@ -757,7 +740,8 @@ impl crate::core::Template for FileClassificationTemplate {
             return Err(ValidationError::invalid_value(
                 "category_preset",
                 "No categories defined (invalid preset or no custom categories)",
-            ).into());
+            )
+            .into());
         }
 
         info!(
@@ -772,7 +756,10 @@ impl crate::core::Template for FileClassificationTemplate {
         info!("Found {} files to classify", files.len());
 
         // Phase 2: Classify files
-        info!("Phase 2: Classifying files using {} strategy", classification_strategy);
+        info!(
+            "Phase 2: Classifying files using {} strategy",
+            classification_strategy
+        );
         let mut results = Vec::new();
 
         for (index, file_path) in files.iter().enumerate() {
@@ -795,11 +782,17 @@ impl crate::core::Template for FileClassificationTemplate {
             });
         }
 
-        info!("Classification complete: {} files classified", results.len());
+        info!(
+            "Classification complete: {} files classified",
+            results.len()
+        );
 
         // Phase 3: Execute actions (if not report-only)
         if action != "report" {
-            info!("Phase 3: Executing {} actions (dry_run={})", action, dry_run);
+            info!(
+                "Phase 3: Executing {} actions (dry_run={})",
+                action, dry_run
+            );
 
             for result in &results {
                 let file_path = Path::new(&result.file_path);
@@ -851,9 +844,9 @@ impl crate::core::Template for FileClassificationTemplate {
         // Estimate based on strategy
         let strategy: String = params.get_or("classification_strategy", "extension".to_string());
         let estimated_tokens = match strategy.as_str() {
-            "extension" => base_tokens, // Fast, no content reading
+            "extension" => base_tokens,     // Fast, no content reading
             "content" => base_tokens + 500, // Content reading overhead
-            "hybrid" => base_tokens + 250, // Mix of both
+            "hybrid" => base_tokens + 250,  // Mix of both
             _ => base_tokens,
         };
 
@@ -931,7 +924,10 @@ mod tests {
         assert!(source_path.unwrap().required);
 
         // Verify optional parameters with defaults
-        let strategy = schema.parameters.iter().find(|p| p.name == "classification_strategy");
+        let strategy = schema
+            .parameters
+            .iter()
+            .find(|p| p.name == "classification_strategy");
         assert!(strategy.is_some());
         assert!(!strategy.unwrap().required);
 
@@ -1004,7 +1000,9 @@ mod tests {
         let pdf_file = temp_dir.path().join("test.pdf");
         fs::write(&pdf_file, b"PDF content").unwrap();
 
-        let (category, confidence) = template.classify_extension_based(&pdf_file, &categories).unwrap();
+        let (category, confidence) = template
+            .classify_extension_based(&pdf_file, &categories)
+            .unwrap();
         assert_eq!(category, "PDFs");
         assert_eq!(confidence, 1.0);
     }
@@ -1038,7 +1036,9 @@ mod tests {
         let invoice_file = temp_dir.path().join("document.txt");
         fs::write(&invoice_file, b"This is an invoice for payment").unwrap();
 
-        let (category, confidence) = template.classify_content_based(&invoice_file, &categories).unwrap();
+        let (category, confidence) = template
+            .classify_content_based(&invoice_file, &categories)
+            .unwrap();
         assert_eq!(category, "Invoices");
         assert!(confidence > 0.0);
     }
@@ -1078,7 +1078,9 @@ mod tests {
         let test_file = temp_dir.path().join("test.txt");
         fs::write(&test_file, b"content").unwrap();
 
-        let files = template.scan_files(&test_file.to_string_lossy(), false).unwrap();
+        let files = template
+            .scan_files(&test_file.to_string_lossy(), false)
+            .unwrap();
         assert_eq!(files.len(), 1);
         assert_eq!(files[0], test_file);
     }
@@ -1088,11 +1090,15 @@ mod tests {
         let temp_dir = create_test_directory();
         let template = FileClassificationTemplate::new();
 
-        let files = template.scan_files(&temp_dir.path().to_string_lossy(), false).unwrap();
+        let files = template
+            .scan_files(&temp_dir.path().to_string_lossy(), false)
+            .unwrap();
 
         // Should find 11 files in root (not including subdirectory files)
         assert!(files.len() >= 10);
-        assert!(files.iter().any(|f| f.file_name().unwrap() == "document.pdf"));
+        assert!(files
+            .iter()
+            .any(|f| f.file_name().unwrap() == "document.pdf"));
         assert!(files.iter().any(|f| f.file_name().unwrap() == "script.rs"));
 
         // Should NOT include nested files
@@ -1104,7 +1110,9 @@ mod tests {
         let temp_dir = create_test_directory();
         let template = FileClassificationTemplate::new();
 
-        let files = template.scan_files(&temp_dir.path().to_string_lossy(), true).unwrap();
+        let files = template
+            .scan_files(&temp_dir.path().to_string_lossy(), true)
+            .unwrap();
 
         // Should find all files including subdirectory
         assert!(files.len() >= 12); // 11 root + 2 nested
@@ -1120,7 +1128,10 @@ mod tests {
         let result = template.scan_files("/nonexistent/path/to/nowhere", false);
 
         assert!(result.is_err());
-        assert!(matches!(result.unwrap_err(), TemplateError::ValidationFailed(_)));
+        assert!(matches!(
+            result.unwrap_err(),
+            TemplateError::ValidationFailed(_)
+        ));
     }
 
     #[test]
