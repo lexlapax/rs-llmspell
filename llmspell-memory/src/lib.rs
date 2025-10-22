@@ -54,6 +54,7 @@ pub mod error;
 pub mod prelude;
 
 // Re-exports for convenience
+pub use episodic::InMemoryEpisodicMemory;
 pub use error::{MemoryError, Result};
 pub use traits::{
     ConsolidationDecision, Entity, EpisodicMemory, MemoryManager, ProceduralMemory,
