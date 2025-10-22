@@ -1,7 +1,7 @@
 # Developer Guide
 
-✅ **CURRENT**: Phase 10 Complete - Service Integration & IDE Connectivity
-**Version**: 0.10.0 | **Crates**: 17 | **Tools**: 40+ | **Examples**: 60+ | **Feature Flags**: Modular builds (19-35MB)
+✅ **CURRENT**: Phase 12 Complete - Production-Ready AI Agent Templates
+**Version**: 0.12.0 | **Crates**: 18 | **Tools**: 40+ | **Templates**: 10 | **Examples**: 60+ | **Feature Flags**: Modular builds (19-35MB)
 
 **Build and extend rs-llmspell with comprehensive developer documentation**
 
@@ -38,13 +38,13 @@
 *Essential for all developers: Build commands changed from Phase 10.17.5*
 
 ### 1. **[Developer Guide](developer-guide.md)** 📘
-**Foundation - Start Here (Phase 10 updated)**
+**Foundation - Start Here (Phase 12 updated)**
 - ✅ Quick start setup in 5 minutes
-- ✅ Phase 10 architecture (17 crates including Kernel)
+- ✅ Phase 12 architecture (18 crates including Templates)
 - ✅ Core patterns: BaseAgent, sync bridge, **llmspell-utils**
 - ✅ Testing with llmspell-testing helpers
 - ✅ Common tasks and workflows
-- ✅ Performance requirements (<10ms tools, <8ms vector search)
+- ✅ Performance requirements (<10ms tools, <8ms vector search, <2ms templates)
 
 *Consolidates: main guide + synchronous-api-patterns + test-development-guide*
 
@@ -125,9 +125,31 @@
 
 ---
 
-## 🆕 What's New in Phase 10
+## 🆕 What's New in Phase 12
 
-### Service Integration & IDE Connectivity (Complete)
+### Production-Ready AI Agent Templates (Complete) ⭐
+- **10 Built-in Templates**: 6 base + 4 advanced workflows solving real AI problems
+- **Template System**: llmspell-templates crate (2,651 LOC, 149 tests)
+- **Template CLI**: 5 subcommands (list, info, exec, search, schema) for instant productivity
+- **Template Global**: 16th of 18 Lua globals with 6 methods
+- **TemplateRegistry**: DashMap-based concurrent template storage with Arc sharing
+- **ExecutionContext**: Builder pattern for infrastructure dependency injection
+- **Parameter Validation**: Declarative schema with type-safe constraints
+- **Cost Estimation**: Pre-execution LLM usage budget planning
+- **20-50x Performance**: <2ms init, <1ms lookup, <0.1ms validation
+
+### By the Numbers
+| Metric | Phase 10 | Phase 12 | Change |
+|--------|----------|----------|--------|
+| Crates | 17 | 18 | +1 templates crate |
+| Lua Globals | 17 | 18 | +1 Template global |
+| Templates | 0 | 10 | NEW |
+| Tests | 486 | 635 | +149 template tests |
+| Template Init | N/A | <2ms | NEW |
+| Template Execute Overhead | N/A | <2ms | NEW (50x target) |
+| Parameter Validation | N/A | <0.1ms | NEW (50x target) |
+
+### Phase 10 Highlights (Service Integration & IDE Connectivity)
 - **Unix Daemon Infrastructure**: Double-fork daemonization, PID management, log rotation, graceful shutdown
 - **Signal Handling**: SIGTERM/SIGINT → Jupyter messages, atomic operations, resource cleanup
 - **Tool CLI Commands**: 5 subcommands (list, info, invoke, search, test) for direct tool access
@@ -136,17 +158,6 @@
 - **Jupyter Protocol**: Wire protocol v5.3 with 5-channel ZeroMQ, message correlation, heartbeat
 - **Debug Adapter Protocol**: 10 DAP commands (kernel-side), execution state machine, breakpoint support
 - **Feature Flags**: Modular build system with minimal/common/full configurations (Phase 10.17.5+)
-
-### By the Numbers
-| Metric | Phase 9 | Phase 10 | Change |
-|--------|---------|----------|--------|
-| Crates | 16 | 17 | +1 kernel crate |
-| Tools | 37+ | 40+ | +3 tools |
-| Binary Size (minimal) | N/A | 19MB | NEW |
-| Binary Size (common) | N/A | 25MB | NEW |
-| Binary Size (full) | ~33.6MB | 35MB | +4% |
-| Daemon Startup | N/A | 1.8s | NEW |
-| Message Handling | N/A | 3.8ms | NEW |
 
 ---
 
@@ -192,6 +203,9 @@ cargo build --release                       # Minimal (19MB, core only)
 | Hook overhead | <2% | ✅ | Performance tests |
 | Vector search | <8ms @ 100K | ✅ | `cargo bench -p llmspell-storage` |
 | Multi-tenant | 3% overhead | ✅ | Integration tests |
+| Template init ⭐ | <2ms | ✅ | `cargo bench -p llmspell-templates` |
+| Template execute | <2ms overhead | ✅ | `cargo bench -p llmspell-templates` |
+| Parameter validation ⭐ | <0.1ms | ✅ | Unit tests |
 
 ---
 
@@ -229,11 +243,20 @@ cargo build --release                       # Minimal (19MB, core only)
 4. Implement typed bridge method
 ```
 
+### 🎯 Template Developer (3-4 hours) ⭐ Phase 12
+```
+1. developer-guide.md → Core Patterns
+2. template-creation.md → All sections
+3. Review 10 built-in templates in llmspell-templates/src/builtin/
+4. Implement custom template following patterns
+5. Add to TemplateRegistry and test with CLI/Lua
+```
+
 ---
 
-## 🏗 Current Architecture (Phase 10)
+## 🏗 Current Architecture (Phase 12)
 
-### 17 Crates Structure
+### 18 Crates Structure
 ```
 Foundation Layer (8 crates):
 ├── llmspell-core         - BaseAgent trait, types
@@ -245,16 +268,17 @@ Foundation Layer (8 crates):
 ├── llmspell-tenancy      - Multi-tenant (Phase 8)
 └── llmspell-testing      - Test utilities
 
-Application Layer (9 crates):
+Application Layer (10 crates): ⭐
 ├── llmspell-kernel       - Daemon, signals, Jupyter, DAP (Phase 10)
 ├── llmspell-tools        - 40+ built-in tools (feature flags)
+├── llmspell-templates    - 10 built-in workflow templates (Phase 12) ⭐ NEW
 ├── llmspell-agents       - Agent infrastructure
 ├── llmspell-workflows    - 4 workflow types
-├── llmspell-bridge       - Script integration
+├── llmspell-bridge       - Script integration (18 globals)
 ├── llmspell-hooks        - 40+ hook points
 ├── llmspell-events       - Event bus
 ├── llmspell-providers    - LLM providers
-└── llmspell-cli          - CLI interface + tool commands
+└── llmspell-cli          - CLI interface + tool/template commands
 ```
 
 ### Key Patterns
@@ -316,14 +340,21 @@ let result = block_on_async::<_, T, E>("operation", async move { ... }, timeout)
 - Debug Adapter Protocol (DAP)
 - Feature flags for modular builds (Phase 10.17.5+)
 
-### Phase 11 (Next)
-- Adaptive Memory System
-- Working, episodic, semantic memory types
-- Adaptive Temporal Knowledge Graph (A-TKG)
-- Context-aware retrieval
-- LLM-driven consolidation
+### Phase 11 (✅ Complete)
+- Local LLM Integration (Ollama + Candle)
+- Bridge Consolidation (87% compile speedup)
+- API Standardization (Tool.execute consistency)
+- Documentation Completeness (Security 40%→95%, Env Vars 0%→100%)
 
-### Phase 12+ (Vision)
+### Phase 12 (✅ Complete)
+- Production-Ready AI Agent Templates
+- 10 built-in templates (6 base + 4 advanced)
+- Template CLI with 5 subcommands
+- Template Lua API (Template global, 16th of 18)
+- 20-50x performance vs targets
+
+### Phase 13+ (Vision)
+- Adaptive Memory System (A-TKG)
 - Model Context Protocol (MCP) integration
 - Language Server Protocol (LSP)
 - Agent-to-Agent (A2A) communication
@@ -342,13 +373,14 @@ let result = block_on_async::<_, T, E>("operation", async move { ... }, timeout)
 
 ## Summary
 
-**Phase 10 Complete** with comprehensive developer documentation:
+**Phase 12 Complete** with comprehensive developer documentation:
 
-✅ **6 Essential Guides** including feature flags migration and tracing best practices
-✅ **17 Crates** with Kernel, RAG, storage, and multi-tenancy
+✅ **8 Essential Guides** including template creation and bridge pattern guides
+✅ **18 Crates** with Templates, Kernel, RAG, storage, and multi-tenancy
 ✅ **40+ Tools** with feature flag modularity (19-35MB builds)
+✅ **10 Built-in Templates** solving real AI workflow problems ⭐
 ✅ **60+ Examples** with learning paths
-✅ **All Performance Targets Exceeded** (10-40% faster than targets)
+✅ **All Performance Targets Exceeded** (20-50x faster for templates)
 
 Start with [developer-guide.md](developer-guide.md) for complete onboarding.
 

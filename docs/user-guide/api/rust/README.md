@@ -8,9 +8,9 @@
 
 ## Overview
 
-> **🦀 Rust API**: Comprehensive documentation for all 17 LLMSpell crates, covering traits, implementations, and extension patterns for building custom components.
+> **🦀 Rust API**: Comprehensive documentation for all 18 LLMSpell crates, covering traits, implementations, and extension patterns for building custom components.
 
-**Version**: 0.11.1 | **Status**: Phase 11a Complete | **Last Updated**: October 2025
+**Version**: 0.12.0 | **Status**: Phase 12 Complete | **Last Updated**: October 2025
 
 ## 📚 Crate Documentation
 
@@ -63,7 +63,7 @@
 - Data isolation
 - Cross-tenant operations
 
-### AI and RAG Components (3 crates)
+### AI and RAG Components (4 crates)
 
 #### 7. [llmspell-rag](llmspell-rag.md) ⭐ **Phase 8**
 **Retrieval-Augmented Generation**
@@ -90,6 +90,15 @@
 - Health checks and status
 - Streaming support
 - Rate limiting
+
+#### 10. [llmspell-templates](llmspell-templates.md) ⭐ **Phase 12**
+**Production-Ready AI Workflow Templates**
+- Template trait and registry
+- 10 built-in templates (research, chat, analysis, code generation, document processing, workflow orchestration)
+- ExecutionContext for infrastructure access
+- Parameter validation and cost estimation
+- Template discovery and search
+- CLI and Lua API integration
 
 ### Execution and Orchestration (4 crates)
 

@@ -19,8 +19,9 @@ This document provides comprehensive documentation of all Lua globals available 
 13. [Replay](#replay) - Hook replay and testing
 14. [Debug](#debug) - Debugging and profiling utilities
 15. [JSON](#json) - JSON parsing and serialization
-16. [ARGS](#args) - Command-line argument access
-17. [Streaming](#streaming) - Streaming and coroutine utilities
+16. [Template](#template) - Production-ready AI workflow templates
+17. [ARGS](#args) - Command-line argument access
+18. [Streaming](#streaming) - Streaming and coroutine utilities
 
 ---
 
@@ -2565,6 +2566,671 @@ local json = JSON.stringify({
 
 ---
 
+## Template
+
+The `Template` global provides production-ready AI workflow templates combining agents, tools, RAG, and LocalLLM into turn-key solutions (Phase 12).
+
+### Core Methods
+
+#### Template.list([category])
+Lists available templates, optionally filtered by category.
+
+```lua
+-- List all templates
+local all_templates = Template.list()
+for _, template in ipairs(all_templates) do
+    print(template.name .. " (" .. template.category .. "): " .. template.description)
+end
+
+-- List by category
+local research_templates = Template.list("research")
+local chat_templates = Template.list("chat")
+local analysis_templates = Template.list("analysis")
+local codegen_templates = Template.list("codegen")
+local document_templates = Template.list("document")
+local workflow_templates = Template.list("workflow")
+```
+
+**Categories**:
+- `"research"` - Research workflows (research-assistant, knowledge-management)
+- `"chat"` - Conversational AI (interactive-chat)
+- `"analysis"` - Data analysis (data-analysis)
+- `"codegen"` - Code generation and review (code-generator, code-review)
+- `"document"` - Document processing (document-processor, content-generation)
+- `"workflow"` - Multi-step orchestration (workflow-orchestrator, file-classification)
+
+#### Template.info(name, [show_schema])
+Gets detailed information about a template.
+
+```lua
+-- Basic info
+local info = Template.info("research-assistant")
+print("Name:", info.metadata.name)
+print("Description:", info.metadata.description)
+print("Version:", info.metadata.version)
+print("Category:", info.metadata.category)
+
+-- With schema
+local info_with_schema = Template.info("research-assistant", true)
+if info_with_schema.schema then
+    print("\nParameters:")
+    for _, param in ipairs(info_with_schema.schema.parameters) do
+        local required = param.required and "required" or "optional"
+        print(string.format("  - %s (%s, %s)", param.name, param.param_type, required))
+        if param.description then
+            print("    " .. param.description)
+        end
+    end
+end
+```
+
+#### Template.execute(name, params)
+Executes a template with parameters (async operation).
+
+```lua
+-- Basic execution
+local result = Template.execute("research-assistant", {
+    topic = "Rust async programming",
+    max_sources = 10
+})
+
+-- Check result
+if result.success then
+    print("Result:", result.result)
+
+    -- Access artifacts
+    for _, artifact in ipairs(result.artifacts) do
+        print("Generated:", artifact.filename)
+        print("Type:", artifact.artifact_type)
+        print("Size:", #artifact.content, "bytes")
+    end
+
+    -- Access metrics
+    if result.metrics then
+        print("Duration:", result.metrics.duration_ms, "ms")
+        print("Tokens:", result.metrics.tokens_used)
+        print("Cost:", result.metrics.cost_usd, "USD")
+    end
+else
+    print("Error:", result.error)
+end
+```
+
+#### Template.search(query, [category])
+Searches templates by keyword query.
+
+```lua
+-- Search all templates
+local results = Template.search("research")
+for _, template in ipairs(results) do
+    print(template.name)
+end
+
+-- Search within category
+local code_results = Template.search("review", "codegen")
+local doc_results = Template.search("content", "document")
+```
+
+#### Template.schema(name)
+Gets the parameter schema for a template.
+
+```lua
+local schema = Template.schema("code-generator")
+
+-- Inspect parameters
+for _, param in ipairs(schema.parameters) do
+    print("\nParameter:", param.name)
+    print("  Type:", param.param_type)
+    print("  Required:", param.required)
+    print("  Description:", param.description or "N/A")
+
+    -- Constraints
+    if param.constraints then
+        if param.constraints.min_value then
+            print("  Min value:", param.constraints.min_value)
+        end
+        if param.constraints.max_value then
+            print("  Max value:", param.constraints.max_value)
+        end
+        if param.constraints.min_length then
+            print("  Min length:", param.constraints.min_length)
+        end
+        if param.constraints.max_length then
+            print("  Max length:", param.constraints.max_length)
+        end
+        if param.constraints.pattern then
+            print("  Pattern:", param.constraints.pattern)
+        end
+        if param.constraints.allowed_values then
+            print("  Allowed values:", table.concat(param.constraints.allowed_values, ", "))
+        end
+    end
+end
+```
+
+#### Template.estimate_cost(name, params)
+Estimates execution cost (tokens, USD, duration) before running (async, bonus method).
+
+```lua
+local estimate = Template.estimate_cost("research-assistant", {
+    topic = "Climate change impacts",
+    max_sources = 20
+})
+
+if estimate then
+    if estimate.estimated_tokens then
+        print("Estimated tokens:", estimate.estimated_tokens)
+    end
+    if estimate.estimated_cost_usd then
+        print("Estimated cost:", string.format("$%.4f", estimate.estimated_cost_usd))
+    end
+    if estimate.estimated_duration_ms then
+        print("Estimated duration:", estimate.estimated_duration_ms / 1000, "seconds")
+    end
+    print("Confidence:", estimate.confidence)  -- "low", "medium", "high"
+else
+    print("Cost estimation not available for this template")
+end
+```
+
+### Built-in Templates (10 Total)
+
+#### 1. research-assistant (Research)
+**Status**: ✅ Production Ready
+
+Multi-phase research workflow with web search, analysis, synthesis, and validation.
+
+```lua
+local result = Template.execute("research-assistant", {
+    topic = "Rust async/await patterns",       -- required: Research topic
+    max_sources = 10,                           -- optional: Max web sources (default: 10)
+    min_quality_score = 0.7,                    -- optional: Quality threshold (default: 0.7)
+    research_depth = "comprehensive",           -- optional: "basic", "standard", "comprehensive"
+    enable_validation = true,                   -- optional: Enable fact-checking (default: true)
+    output_format = "markdown",                 -- optional: "markdown", "json", "html"
+    model = "openai/gpt-4o",                    -- optional: LLM model (default: from config)
+    save_sources = true                         -- optional: Save source list (default: true)
+})
+
+-- Output: Research report (Markdown) + source list (JSON)
+print(result.result)  -- Full research report
+```
+
+**4-Phase Pipeline**:
+1. **Discovery** - Web search across multiple sources
+2. **Analysis** - Content extraction and quality scoring
+3. **Synthesis** - Intelligent synthesis with citations
+4. **Validation** - Fact-checking and verification
+
+**Performance**: ~45s for 10 sources, ~2,500 tokens, ~$0.05 cost
+
+#### 2. interactive-chat (Chat)
+**Status**: ✅ Production Ready
+
+Session-based conversational AI with context management and REPL interface.
+
+```lua
+local result = Template.execute("interactive-chat", {
+    message = "Explain dependency injection",  -- required: User message or "repl" for REPL mode
+    session_name = "my-chat",                  -- optional: Session name for persistence
+    system_prompt = "You are a helpful coding assistant",  -- optional: System prompt
+    model = "openai/gpt-4o",                   -- optional: LLM model
+    enable_memory = true,                      -- optional: Use conversation memory (default: true)
+    max_history = 10,                          -- optional: Max conversation turns (default: 10)
+    temperature = 0.7                          -- optional: Response randomness (default: 0.7)
+})
+
+-- REPL mode (Phase 12.9)
+local chat = Template.execute("interactive-chat", {
+    message = "repl",  -- Special value for REPL mode
+    session_name = "coding-help",
+    model = "ollama/llama3.2:3b"
+})
+
+-- REPL commands:
+-- .system <text>    - Change system prompt
+-- .model <name>     - Switch LLM model
+-- .tools <list>     - Enable tool access (comma-separated)
+-- .context <data>   - Add context data
+-- .clearchat        - Clear conversation history
+-- .info             - Show session info
+-- Ctrl-C            - Exit REPL
+```
+
+**Features**: Multi-turn context, session persistence, streaming responses, REPL mode
+
+#### 3. data-analysis (Analysis)
+**Status**: ✅ Production Ready
+
+Automated data analysis with statistics, visualization, and LLM insights.
+
+```lua
+local result = Template.execute("data-analysis", {
+    data_file = "/path/to/data.csv",           -- required: Data file path
+    analysis_type = "descriptive",             -- required: "descriptive", "correlation", "regression", "timeseries"
+    chart_type = "bar",                        -- optional: "bar", "line", "scatter", "heatmap", "none"
+    model = "openai/gpt-4o",                   -- optional: LLM model for insights
+    output_format = "markdown",                -- optional: "markdown", "json", "html"
+    include_visualizations = true              -- optional: Generate charts (default: true)
+})
+
+-- Output: Analysis report + generated charts
+```
+
+**Supported Formats**: CSV, Excel (.xlsx), JSON, Parquet
+**Analysis Types**:
+- `descriptive` - Summary statistics, distributions
+- `correlation` - Correlation matrices, relationships
+- `regression` - Linear/polynomial regression
+- `timeseries` - Trend analysis, forecasting
+
+#### 4. code-generator (CodeGen)
+**Status**: ✅ Production Ready
+
+Multi-language code generation with tests, documentation, and quality validation.
+
+```lua
+local result = Template.execute("code-generator", {
+    description = "A function to calculate Fibonacci numbers",  -- required: Code description
+    language = "rust",                         -- required: "rust", "python", "javascript", "typescript", "go", etc.
+    model = "openai/gpt-4o",                   -- optional: LLM model
+    generate_tests = true,                     -- optional: Generate unit tests (default: true)
+    generate_docs = true,                      -- optional: Generate documentation (default: true)
+    code_style = "idiomatic",                  -- optional: "idiomatic", "simple", "production"
+    include_examples = true                    -- optional: Include usage examples (default: true)
+})
+
+-- Output: Generated code + tests + documentation
+print(result.artifacts[1].content)  -- Main code file
+print(result.artifacts[2].content)  -- Test file
+print(result.artifacts[3].content)  -- Documentation
+```
+
+**3-Agent Pipeline**:
+1. **Code Generator** - Generates implementation
+2. **Test Generator** - Creates comprehensive tests
+3. **Doc Generator** - Writes API documentation
+
+**Supported Languages**: 10+ (Rust, Python, JavaScript, TypeScript, Go, Java, C++, C#, Ruby, PHP)
+
+#### 5. document-processor (Document)
+**Status**: ✅ Production Ready
+
+Document transformation with extraction, translation, and format conversion.
+
+```lua
+local result = Template.execute("document-processor", {
+    document_paths = {"/path/to/doc1.pdf", "/path/to/doc2.txt"},  -- required: Document paths (array)
+    transformation_type = "summarize",         -- required: "extract", "summarize", "translate", "transform"
+    target_language = "es",                    -- optional: For translation (ISO 639-1)
+    model = "openai/gpt-4o",                   -- optional: LLM model
+    output_format = "markdown",                -- optional: "markdown", "json", "text", "html"
+    ocr_enabled = true                         -- optional: Enable OCR for images (default: true)
+})
+
+-- Output: Transformed documents
+```
+
+**Transformation Types**:
+- `extract` - Extract key information, entities
+- `summarize` - Generate concise summaries
+- `translate` - Translate to target language
+- `transform` - Custom transformation with instructions
+
+**Supported Formats**: PDF, TXT, DOCX, HTML, Markdown, Images (with OCR)
+
+#### 6. workflow-orchestrator (Workflow)
+**Status**: ✅ Production Ready
+
+Custom multi-step workflows with parallel/sequential/conditional/loop execution.
+
+```lua
+local result = Template.execute("workflow-orchestrator", {
+    workflow_config = {                        -- required: Workflow configuration
+        name = "data-pipeline",
+        steps = {
+            {
+                name = "fetch",
+                step_type = "tool",
+                description = "Fetch data from API",
+                tool_name = "http-request",
+                params = {method = "GET", url = "https://api.example.com/data"}
+            },
+            {
+                name = "analyze",
+                step_type = "agent",
+                description = "Analyze fetched data",
+                agent_config = {model = "openai/gpt-4o", system_prompt = "Analyze this data"}
+            },
+            {
+                name = "save",
+                step_type = "tool",
+                description = "Save results",
+                tool_name = "file-operations",
+                params = {operation = "write", path = "./output.json"}
+            }
+        }
+    },
+    execution_mode = "sequential",             -- required: "sequential", "parallel", "conditional", "loop"
+    model = "openai/gpt-4o",                   -- optional: Default LLM model for agents
+    collect_intermediate_results = true        -- optional: Save intermediate outputs (default: false)
+})
+
+-- Access step outputs
+if result.metadata and result.metadata.extra and result.metadata.extra.agent_outputs then
+    for step_name, output in pairs(result.metadata.extra.agent_outputs) do
+        print("Step:", step_name)
+        print("Output:", output)
+    end
+end
+```
+
+**Execution Modes**:
+- `sequential` - Steps run one after another
+- `parallel` - Steps run concurrently
+- `conditional` - If/else branching based on conditions
+- `loop` - Iterative execution with termination condition
+
+**Step Types**: `tool`, `agent`, `workflow` (nested)
+
+#### 7. code-review (CodeGen)
+**Status**: ✅ Production Ready (Phase 12.10)
+
+Multi-aspect code analysis with configurable review aspects and quality scoring.
+
+```lua
+local result = Template.execute("code-review", {
+    code_path = "src/main.rs",                 -- required: File or directory path
+    aspects = {"security", "quality", "performance"},  -- required: Review aspects (array)
+    language = "rust",                         -- optional: Programming language (auto-detect if omitted)
+    model = "openai/gpt-4o",                   -- optional: LLM model
+    generate_fixes = true,                     -- optional: Generate fix suggestions (default: false)
+    quality_threshold = 7.0                    -- optional: Minimum quality score (0-10, default: 7.0)
+})
+
+-- Output: Multi-aspect analysis + quality scores + fix suggestions
+```
+
+**Available Aspects** (7 total):
+- `security` - Security vulnerabilities, injection risks, auth issues
+- `quality` - Code quality, maintainability, readability
+- `performance` - Performance bottlenecks, algorithmic complexity
+- `practices` - Best practices, language idioms, patterns
+- `dependencies` - Dependency management, versioning, licenses
+- `architecture` - Design patterns, modularity, coupling
+- `documentation` - Code comments, API docs, examples
+
+**Output**: Per-aspect analysis with findings, severity, scores, and optional fix suggestions
+
+#### 8. content-generation (Document)
+**Status**: ✅ Production Ready (Phase 12.11)
+
+Quality-driven content creation with iterative refinement and multi-format output.
+
+```lua
+local result = Template.execute("content-generation", {
+    topic = "Product launch announcement",     -- required: Content topic
+    content_type = "marketing",                -- required: "blog", "documentation", "marketing", "technical", "creative"
+    target_audience = "developers",            -- optional: Target audience description
+    tone = "professional",                     -- optional: "professional", "casual", "formal", "friendly"
+    word_count = 800,                          -- optional: Target word count (default: 500)
+    model = "openai/gpt-4o",                   -- optional: LLM model
+    quality_threshold = 8.0,                   -- optional: Quality score threshold (0-10, default: 7.5)
+    max_iterations = 3,                        -- optional: Max refinement iterations (default: 3)
+    style_guide = "Follow AP style"            -- optional: Custom style guidelines
+})
+
+-- Output: Final content + quality scores + revision history
+```
+
+**Content Types** (5 presets):
+- `blog` - Blog posts, articles
+- `documentation` - Technical documentation, guides
+- `marketing` - Marketing copy, announcements
+- `technical` - Technical writing, specifications
+- `creative` - Creative writing, stories
+
+**4-Stage Pipeline**:
+1. **Generate** - Initial content creation
+2. **Evaluate** - Quality scoring (clarity, relevance, grammar, style)
+3. **Edit** - Iterative refinement if below threshold
+4. **Finalize** - Final content with metadata
+
+#### 9. file-classification (Workflow)
+**Status**: ✅ Production Ready (Phase 12.12)
+
+Bulk file organization with customizable categories and dry-run mode.
+
+```lua
+local result = Template.execute("file-classification", {
+    source_path = "/Users/me/Documents",       -- required: Directory to scan
+    classification_strategy = "hybrid",        -- required: "rule-based", "llm", "hybrid"
+    categories = {"work", "personal", "archive"},  -- optional: Custom categories (auto-detect if omitted)
+    dry_run = true,                            -- optional: Preview without moving (default: false)
+    model = "openai/gpt-4o",                   -- optional: LLM model for classification
+    create_destination_dirs = true,            -- optional: Auto-create category dirs (default: true)
+    file_extensions = {".pdf", ".docx", ".txt"}  -- optional: Filter by extensions
+})
+
+-- Output: Classification plan + moved files summary
+```
+
+**Classification Strategies**:
+- `rule-based` - File extension + name pattern rules (fast, no LLM)
+- `llm` - LLM content analysis (accurate, slower)
+- `hybrid` - Rules first, LLM for ambiguous files (balanced)
+
+**4 Category Presets**:
+- `documents` - Work documents, personal files, finance, media
+- `code` - Source code, configs, docs, tests
+- `media` - Photos, videos, audio, designs
+- `general` - General-purpose organization
+
+**Scan-Classify-Act Pattern**: Scan files → Classify into categories → Execute actions (move/copy/report)
+
+#### 10. knowledge-management (Research)
+**Status**: ✅ Production Ready (Phase 12.13)
+
+RAG-based knowledge base with CRUD operations and semantic search.
+
+```lua
+-- Ingest documents
+local ingest_result = Template.execute("knowledge-management", {
+    operation = "ingest",                      -- required: "ingest", "query", "update", "delete"
+    collection = "ai-research",                -- required: Collection name
+    document_paths = {"/path/to/paper1.pdf", "/path/to/paper2.pdf"},  -- for ingest
+    model = "openai/gpt-4o",                   -- optional: LLM model
+    chunk_size = 512,                          -- optional: Chunking size (default: 512)
+    chunk_overlap = 50                         -- optional: Chunk overlap (default: 50)
+})
+
+-- Query with citations
+local query_result = Template.execute("knowledge-management", {
+    operation = "query",
+    collection = "ai-research",
+    query = "What are the benefits of async Rust?",
+    top_k = 5,                                 -- optional: Number of results (default: 5)
+    include_citations = true,                  -- optional: Include source citations (default: true)
+    model = "openai/gpt-4o"
+})
+
+-- Update documents
+local update_result = Template.execute("knowledge-management", {
+    operation = "update",
+    collection = "ai-research",
+    document_id = "doc-123",                   -- required for update
+    updated_content = "Updated content here"
+})
+
+-- Delete documents
+local delete_result = Template.execute("knowledge-management", {
+    operation = "delete",
+    collection = "ai-research",
+    document_ids = {"doc-123", "doc-456"}      -- required for delete (array)
+})
+```
+
+**CRUD Operations**:
+- `ingest` - Add new documents to collection
+- `query` - Semantic search with LLM-generated answers
+- `update` - Update existing documents
+- `delete` - Remove documents from collection
+
+**Features**: Multi-collection support, semantic chunking, citation tracking, metadata search
+
+### Template Result Structure
+
+All templates return a standardized `TemplateOutput` structure:
+
+```lua
+{
+    success = true,                            -- Execution success status
+    result = "Main result text/data",          -- Primary output
+    artifacts = {                              -- Generated files/data
+        {
+            filename = "research_report.md",
+            artifact_type = "document",
+            content = "...",
+            metadata = {source = "research", format = "markdown"}
+        }
+    },
+    metadata = {                               -- Execution metadata
+        template_id = "research-assistant",
+        template_version = "1.0.0",
+        execution_id = "uuid...",
+        started_at = 1234567890,
+        completed_at = 1234567900,
+        extra = {                              -- Template-specific data
+            agent_outputs = {},                -- Workflow agent outputs
+            phase_results = {}                 -- Multi-phase results
+        }
+    },
+    metrics = {                                -- Performance metrics
+        duration_ms = 45123,
+        tokens_used = 2500,
+        cost_usd = 0.05,
+        api_calls = 3
+    },
+    error = nil                                -- Error message if failed
+}
+```
+
+### Error Handling
+
+Templates use the standard error pattern:
+
+```lua
+local success, result = pcall(function()
+    return Template.execute("research-assistant", {
+        topic = "Invalid topic"
+    })
+end)
+
+if not success then
+    print("Execution failed:", result)
+elseif result.error then
+    print("Template error:", result.error)
+elseif not result.success then
+    print("Template execution was not successful")
+else
+    print("Success:", result.result)
+end
+```
+
+### Common Template Patterns
+
+#### Pattern 1: Template Discovery
+
+```lua
+-- Find templates by capability
+local search_templates = Template.search("search")
+local code_templates = Template.search("code", "codegen")
+
+-- List by category
+for _, category in ipairs({"research", "chat", "analysis", "codegen", "document", "workflow"}) do
+    local templates = Template.list(category)
+    print(category .. ": " .. #templates .. " templates")
+end
+```
+
+#### Pattern 2: Schema Introspection
+
+```lua
+-- Check required parameters before execution
+local schema = Template.schema("research-assistant")
+local required_params = {}
+
+for _, param in ipairs(schema.parameters) do
+    if param.required then
+        table.insert(required_params, param.name)
+    end
+end
+
+print("Required parameters:", table.concat(required_params, ", "))
+```
+
+#### Pattern 3: Cost-Aware Execution
+
+```lua
+-- Estimate before executing
+local estimate = Template.estimate_cost("research-assistant", {
+    topic = "Large topic with many sources",
+    max_sources = 50
+})
+
+if estimate and estimate.estimated_cost_usd and estimate.estimated_cost_usd > 1.0 then
+    print("Warning: High cost estimated ($" .. estimate.estimated_cost_usd .. ")")
+    print("Continue? (y/n)")
+    local answer = io.read()
+    if answer ~= "y" then
+        return
+    end
+end
+
+local result = Template.execute("research-assistant", {...})
+```
+
+#### Pattern 4: Artifact Processing
+
+```lua
+local result = Template.execute("code-generator", {
+    description = "REST API handler",
+    language = "rust"
+})
+
+-- Save artifacts to files
+for _, artifact in ipairs(result.artifacts) do
+    local file = io.open("output/" .. artifact.filename, "w")
+    if file then
+        file:write(artifact.content)
+        file:close()
+        print("Saved:", artifact.filename)
+    end
+end
+```
+
+#### Pattern 5: Multi-Template Workflows
+
+```lua
+-- Research → Analyze → Generate
+local research = Template.execute("research-assistant", {
+    topic = "Modern web frameworks"
+})
+
+local analysis = Template.execute("data-analysis", {
+    data_file = research.artifacts[2].filename,  -- Use research output
+    analysis_type = "descriptive"
+})
+
+local content = Template.execute("content-generation", {
+    topic = "Blog post about " .. research.result,
+    content_type = "blog",
+    tone = "professional"
+})
+```
+
+---
+
 ## ARGS
 
 The `ARGS` global provides command-line argument access.
@@ -2718,6 +3384,29 @@ local result = Tool.execute("web-search", {
 })
 ```
 
+### Template Patterns
+
+Templates provide turn-key workflows:
+
+```lua
+-- Discovery and introspection
+local templates = Template.list("research")
+local schema = Template.schema("research-assistant")
+
+-- Cost-aware execution
+local estimate = Template.estimate_cost("research-assistant", {topic = "AI", max_sources = 20})
+if estimate and estimate.estimated_cost_usd < 0.10 then
+    local result = Template.execute("research-assistant", {topic = "AI", max_sources = 20})
+end
+
+-- Multi-template workflows
+local research = Template.execute("research-assistant", {topic = "Rust"})
+local content = Template.execute("content-generation", {
+    topic = research.result,
+    content_type = "blog"
+})
+```
+
 ## Best Practices
 
 1. **Always check for nil/false returns** - Operations may fail
@@ -2730,3 +3419,8 @@ local result = Tool.execute("web-search", {
 8. **Batch operations when possible** - Tool.batch() for multiple operations
 9. **Set timeouts for external calls** - Prevent hanging on network/LLM calls
 10. **Use session artifacts for persistence** - Better than global state for user data
+11. **Inspect template schemas before execution** - Template.schema() shows required parameters and constraints
+12. **Estimate costs for expensive templates** - Template.estimate_cost() helps budget LLM usage
+13. **Use templates for common workflows** - 10 built-in templates cover research, chat, analysis, code generation, document processing, and orchestration
+14. **Handle template artifacts properly** - Save artifacts to files, process results incrementally
+15. **Chain templates for complex tasks** - research-assistant → data-analysis → content-generation for end-to-end workflows

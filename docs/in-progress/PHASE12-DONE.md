@@ -2,7 +2,7 @@
 
 **Version**: 1.0
 **Date**: October 2025
-**Status**: ✅ COMPLETE - All tasks finished, Phase 12 ready for release
+**Status**: ✅ COMPLETE - All implementation finished, v0.12.0 release prepared
 **Phase**: 12 (Production-Ready AI Agent Templates)
 **Timeline**: Weeks 42-43 (10 working days) - **Actual: Completed in 10 days**
 **Priority**: CRITICAL (Adoption Baseline - Industry Standard Requirement)
@@ -42,9 +42,97 @@
 
 **Strategic Context:**
 - **Problem**: Users face "what do I do?" after installation (0-day retention failure)
-- **Solution**: 6 production templates provide immediate value + learning by example
+- **Solution**: 10 production templates provide immediate value + learning by example
 - **Industry Requirement**: All competing frameworks ship templates (LangChain 50+, AutoGen ~10, CrewAI ~15)
 - **Phase 13 Synergy**: Templates work now, enhanced by memory later (zero breaking changes)
+
+---
+
+## Phase 12 Release Preparation (Oct 22, 2025)
+
+### v0.12.0 Release Tasks ✅ COMPLETE
+
+All release preparation completed for v0.12.0:
+
+#### Task: Update Cargo.toml Version ✅
+- [x] Updated workspace version from 0.11.2 → 0.12.0
+- [x] Verified edition = "2021" (fixed auto-formatter changing to "2025")
+- [x] All workspace members inherit correct version
+
+#### Task: Update CHANGELOG.md ✅
+- [x] Added comprehensive [0.12.0] entry with release date 2025-10-22
+- [x] Documented all 10 production templates by category:
+  - Research: research-assistant, knowledge-management
+  - Development: code-generator, code-review
+  - Content: content-generation, document-processor
+  - Productivity: file-classification, interactive-chat
+  - Workflow: workflow-orchestrator, data-analysis
+- [x] Documented template system core (2,847 lines, trait-based architecture)
+- [x] Documented CLI commands + Lua Template API (16th global)
+- [x] Documented template implementations with performance metrics
+- [x] Documented fixes (Phase 12.7.1 infrastructure, Phase 12.8.5 workflow bug)
+- [x] Documented performance: <2ms overhead (50x faster than target)
+- [x] Documented statistics: 149 tests, 3,655 lines docs, 20 days completion
+- [x] Moved previous [Unreleased] content to [0.12.0] section
+
+#### Task: Update README.md ✅
+- [x] Updated version badge: 0.11.2 → 0.12.0
+- [x] Updated quick links to v0.12.0 release notes and template architecture
+- [x] Updated intro paragraph highlighting template system solving "0-day retention problem"
+- [x] Added "Production Template System" feature section:
+  - 10 turn-key templates with categories
+  - Template CLI commands
+  - Lua Template API (16th global)
+  - Multi-agent workflows with real LLM integration
+  - <2ms overhead (50x faster than target)
+  - 149 tests passing
+- [x] Added template usage examples (CLI + Lua) in Quick Example section
+- [x] Updated roadmap:
+  - Current: Phase 12 ✅ (was Phase 11)
+  - Next: Phase 13 - Adaptive Memory System (A-TKG, template memory)
+  - Updated near-term phases (14: Advanced Templates, 15: MCP)
+- [x] Added template documentation links:
+  - Template System Architecture (new)
+  - Template User Guides (10 guides, new)
+- [x] Updated bottom release note with v0.12.0 achievements
+- [x] Updated production stability note: v0.12.0 with templates + local LLM
+
+#### Task: Update CLAUDE.md ✅
+- [x] Updated Current Status: v0.11.1 → v0.12.0
+- [x] Updated phase references to Phase 12 design doc and template architecture
+- [x] Added Phase 11b and Phase 12 to Recent Completion Status
+- [x] Updated Phase 13 as next phase (Adaptive Memory System)
+- [x] Added llmspell-templates to Crate Structure
+- [x] Replaced v0.11.1 achievements with v0.12.0 achievements:
+  - 10 production templates solving "0-day retention problem"
+  - Template system core (2,847 lines)
+  - CLI + Lua integration (16th global)
+  - Multi-agent workflows with real LLM
+  - <2ms overhead (50x faster)
+  - 149 tests passing, 3,655 lines docs
+  - 5 template categories
+
+#### Task: Update GEMINI.md ✅
+- [x] Updated Current Status: v0.11.1 → v0.12.0
+- [x] Updated key documents to Phase 12 and template architecture
+- [x] Added Phase 11b and Phase 12 to Recent Completion Status
+- [x] Updated Phase 13 as next phase
+- [x] Added llmspell-templates to Crate Structure
+- [x] Replaced v0.11.1 achievements with v0.12.0 achievements
+- [x] Added "Using Templates" section with CLI and Lua examples
+- [x] Added template note to Important Notes section
+
+#### Release Readiness Summary ✅
+- [x] All version numbers updated to 0.12.0
+- [x] CHANGELOG.md has complete v0.12.0 entry
+- [x] README.md highlights template system as headline feature
+- [x] CLAUDE.md updated for AI assistant context
+- [x] GEMINI.md updated for AI assistant context
+- [x] Documentation accurately reflects 10 templates (not 6)
+- [x] Performance metrics documented (<2ms overhead)
+- [x] All 149 tests passing (100% pass rate)
+- [x] Zero clippy warnings across workspace
+- [x] Ready for: git commit + git tag v0.12.0 + git push
 
 ---
 

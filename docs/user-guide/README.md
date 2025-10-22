@@ -8,7 +8,7 @@
 
 ## Overview
 
-> **📚 Central Hub**: Your starting point for all LLMSpell documentation. Everything you need is organized into 12 essential documents, plus comprehensive API references for both Lua and Rust. Now with Unix daemon infrastructure, tool CLI commands, fleet management, feature flags, and 6 production-ready AI agent templates!
+> **📚 Central Hub**: Your starting point for all LLMSpell documentation. Everything you need is organized into 12 essential documents, plus comprehensive API references for both Lua and Rust. Now with Unix daemon infrastructure, tool CLI commands, fleet management, feature flags, and 10 production-ready AI agent templates!
 
 **Version**: 0.12.0 | **Status**: Phase 12 Complete - Production-Ready AI Agent Templates | **Last Updated**: October 2025
 
@@ -68,13 +68,14 @@
 
 ### 6. [AI Agent Templates](templates/README.md) ⭐ Phase 12
 **Production-ready AI workflows - Installation to productive AI in <5 minutes**
-- 6 turn-key templates (1 production, 5 structure complete)
+- 10 built-in templates (6 base + 4 advanced)
 - Research Assistant: 4-phase research workflow (web search, analysis, synthesis, validation)
 - Interactive Chat, Data Analysis, Code Generator, Document Processor, Workflow Orchestrator
+- Code Review, Content Generation, File Classification, Knowledge Management (advanced)
 - CLI commands: `template list|info|exec|search|schema`
-- Lua API: Template global (17th global) with 5 methods
-- 10-50x faster than performance targets
-- Complete user guides for all 6 templates
+- Lua API: Template global (16th of 18 globals) with 6 methods
+- 20-50x faster than performance targets
+- Complete user guides for all 10 templates
 
 ### 7. [Service Deployment](service-deployment.md) ⭐ Phase 10
 **Production deployment with system services**
@@ -97,7 +98,7 @@
 
 ### 9. [API Documentation](api/README.md)
 **Comprehensive API reference**
-- **[Lua API](api/lua/README.md)** - All 17 globals with 200+ methods
+- **[Lua API](api/lua/README.md)** - All 18 globals with 200+ methods
 - **[Rust API](api/rust/README.md)** - 18 crates with traits, builders, and extension guide
 - Unified `llmspell-kernel` crate with daemon, state, sessions, and debugging
 - New `llmspell-templates` crate with Template trait and registry
@@ -233,27 +234,32 @@ launchctl load ~/Library/LaunchAgents/com.llmspell.kernel.plist  # macOS
 ## 🆕 Phase 12 Features (Complete) ⭐
 
 ### AI Agent Templates - Turn-key Workflows
-- **6 Built-in Templates**: 1 production-ready, 5 with complete structure
-- **Research Assistant (Production)**: 4-phase research workflow with web search, analysis, synthesis, validation
-- **Interactive Chat**: Session-based conversation with context and memory (structure complete)
-- **Data Analysis**: CSV/Excel/JSON analysis with visualizations (structure complete)
-- **Code Generator**: Multi-language code generation with tests (production structure)
-- **Document Processor**: PDF/OCR extraction and transformation (structure complete)
-- **Workflow Orchestrator**: Custom agent/tool/template composition (structure complete)
+- **10 Built-in Templates**: 6 base templates + 4 advanced workflows
+- **Research Assistant**: 4-phase research workflow with web search, analysis, synthesis, validation
+- **Interactive Chat**: Session-based conversation with context and memory
+- **Data Analysis**: CSV/Excel/JSON analysis with visualizations
+- **Code Generator**: Multi-language code generation with tests
+- **Document Processor**: PDF/OCR extraction and transformation
+- **Workflow Orchestrator**: Custom agent/tool/template composition
+- **Code Review**: Multi-aspect code analysis (structure, security, performance, best practices)
+- **Content Generation**: Quality-driven iterative content creation
+- **File Classification**: Scan-classify-act pattern for file organization
+- **Knowledge Management**: Document ingestion, RAG integration, query interface
 
 ### Template CLI Commands (5 Subcommands)
-- **`llmspell template list`**: Discover all 6 built-in templates with category filtering
+- **`llmspell template list`**: Discover all 10 built-in templates with category filtering
 - **`llmspell template info <name>`**: Get detailed template documentation and parameters
 - **`llmspell template exec <name> --param key=value`**: Direct template execution
 - **`llmspell template search <query>`**: Find templates by keyword
 - **`llmspell template schema <name>`**: Get parameter schema and validation rules
 
-### Template Lua API (Template Global - 17th Global)
+### Template Lua API (Template Global - 16th of 18 Globals)
 - **`Template.list([category])`**: List templates with optional category filter
 - **`Template.info(name, [with_schema])`**: Get template metadata and optional schema
 - **`Template.execute(name, params)`**: Execute template with parameters
 - **`Template.search(query, [category])`**: Search templates by keyword
 - **`Template.schema(name)`**: Get template configuration schema
+- **`Template.estimate_cost(name, params)`**: Pre-execution cost estimation
 
 ### Template System Architecture
 - **TemplateRegistry**: DashMap-based concurrent template storage with Arc sharing
@@ -264,13 +270,13 @@ launchctl load ~/Library/LaunchAgents/com.llmspell.kernel.plist  # macOS
 - **Performance**: 10-50x faster than targets (0.5ms list, 2ms execute overhead, 0.1ms validation)
 
 ### Quality Metrics (Phase 12)
-- **126 Tests**: 110 unit + 16 integration, 100% passing
+- **149 Tests**: 122 unit + 27 integration, 100% passing
 - **Zero Warnings**: Clippy clean with `-D warnings` across workspace
 - **>90% Coverage**: All modules tested with mocks
-- **2,738 Lines Docs**: Complete user guides for all 6 templates
+- **3,655 Lines Docs**: Complete user guides for all 10 templates
 - **Production Quality**: Format 100%, API docs >95%, comprehensive architecture docs
 
-## 🧩 Available Globals (17)
+## 🧩 Available Globals (18)
 
 All globals are pre-injected - no `require()` needed!
 
@@ -409,7 +415,7 @@ Execution Layer (6 crates) ⭐ Phase 12
 ├── llmspell-agents
 ├── llmspell-tools (40+ tools with feature flags)
 ├── llmspell-workflows
-├── llmspell-templates (6 turn-key templates) ⭐ NEW
+├── llmspell-templates (10 built-in templates) ⭐ NEW
 ├── llmspell-hooks (40+ points)
 └── llmspell-events
 

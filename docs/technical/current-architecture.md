@@ -1,22 +1,25 @@
-# Current Architecture (v0.11.2-rc1 - Phase 11b Near Complete)
+# Current Architecture (v0.12.0 - Phase 12 Complete)
 
-**Status**: Production-Ready with Local LLM Enhancement + Cleanup (7/8 complete, 95%)
-**Last Updated**: October 2025
-**Implementation**: Phases 0-11a Complete, Phase 11b 95% Complete (7/8 sub-phases)
-**Enhancement**: Phase 11b cleanup (-120 net LOC, unified profiles, T5 architecture, Metal detection)
+**Status**: Production-Ready with Template System, Local LLM, and IDE Connectivity
+**Last Updated**: October 24, 2025
+**Implementation**: Phases 0-12 Complete (12/12 major phases)
+**Latest**: Phase 12 - Production-Ready AI Agent Templates (10 templates, 149 tests, 20 days)
 **Validation**: Cross-referenced with phase design documents and codebase
 
-> **📋 Single Source of Truth**: This document reflects the ACTUAL implementation as evolved through 11+ development phases, validated against phase design documents (phase-01 through phase-11b) and current codebase. **Phase 11 adds local LLM support via dual-backend implementation (Ollama + Candle) for cost-free, offline AI operations. Phase 11a consolidates bridge layer with 87% compile speedup, API standardization, and documentation completeness (security 40%→95%, env vars 0%→100%). Phase 11b enhances local LLM with cleanup (-120 LOC), unified profile system (10 builtins), T5 safetensors support (dual-architecture), and platform-aware Metal GPU detection.**
+> **📋 Single Source of Truth**: This document reflects the ACTUAL implementation as evolved through 12 development phases, validated against phase design documents (phase-01 through phase-12) and current codebase. **Phase 11 adds local LLM support via dual-backend implementation (Ollama + Candle) for cost-free, offline AI operations. Phase 11a consolidates bridge layer with 87% compile speedup, API standardization, and documentation completeness (security 40%→95%, env vars 0%→100%). Phase 11b enhances local LLM with cleanup (-120 LOC), unified profile system (10 builtins), T5 safetensors support (dual-architecture), and platform-aware Metal GPU detection. Phase 12 solves the "0-day retention problem" with 10 production-ready AI workflow templates (6 base + 4 advanced patterns), enabling immediate user value post-installation with CLI-direct execution and comprehensive template library covering 9 categories.**
 
 ## Related Documentation
 
 This overview document is supported by detailed guides:
-- **[Architecture Decisions](./architecture-decisions.md)**: All ADRs from Phase 0-11b
+- **[Architecture Decisions](./architecture-decisions.md)**: All ADRs from Phase 0-12
 - **[Operational Guide](./operational-guide.md)**: Performance benchmarks and security model
 - **[RAG System Guide](./rag-system-guide.md)**: Complete RAG documentation including HNSW tuning
 - **[Kernel Protocol Architecture](./kernel-protocol-architecture.md)**: Kernel design and protocol/transport layers
+- **[Template System Architecture](./template-system-architecture.md)**: Template trait system, 10 built-in templates, advanced patterns (Phase 12)
+- **[CLI Command Architecture](./cli-command-architecture.md)**: Complete CLI reference including template commands
 - **[Phase 11a Design Document](../in-progress/phase-11a-design-doc.md)**: Bridge consolidation comprehensive documentation
 - **[Phase 11b Design Document](../in-progress/phase-11b-design-doc.md)**: Local LLM cleanup & enhancement (2,645 lines, 8 sub-phases)
+- **[Phase 12 Design Document](../in-progress/phase-12-design-doc.md)**: Template system design and actual implementation (2,900 lines)
 
 ---
 
@@ -49,7 +52,8 @@ This overview document is supported by detailed guides:
 - **Phase 10**: Production Deployment - Daemon support (systemd/launchd), signal handling, PID management, multi-protocol servers, consolidated state/sessions into kernel
 - **Phase 11**: Local LLM Integration - Dual-backend (Ollama via rig + Candle embedded), LocalProviderInstance trait, model CLI commands, 2.5K LOC provider implementation, 40 tok/s inference
 - **Phase 11a**: Bridge Consolidation & Documentation Completeness - Feature gates (87% compile speedup: 38s→5s bridge-only), workflow introspection (agent output collection), Tool.execute API standardization (40+ tools), Custom steps removal (876 LOC cleanup), security docs (40%→95% coverage), environment variables (0%→100%, 41+ security vars), Config global bug fix (critical), 1,866 LOC documentation added
-- **Phase 11b**: Local LLM Cleanup & Enhancement (7/8 complete, 95%) - LocalLLM registration fix (14→15 globals), binary removal (-675 LOC, enforced single-binary), unified profile system (10 builtin TOML profiles replacing CLI hack), config consolidation (40+ Lua files updated), model discovery UX (URLs in help), auto-load profile (improved errors), Metal GPU detection (platform-aware device selection), T5 safetensors support (dual-architecture: LLaMA GGUF + T5 safetensors, ModelArchitecture enum, Metal blocked by Candle v0.9), net -120 LOC (+755 new, -875 deleted), 72 tests passing, 0 warnings
+- **Phase 11b**: Local LLM Cleanup & Enhancement ✅ COMPLETE - LocalLLM registration fix (14→15 globals), binary removal (-675 LOC, enforced single-binary), unified profile system (10 builtin TOML profiles replacing CLI hack), config consolidation (40+ Lua files updated), model discovery UX (URLs in help), auto-load profile (improved errors), Metal GPU detection (platform-aware device selection), T5 safetensors support (dual-architecture: LLaMA GGUF + T5 safetensors, ModelArchitecture enum, Metal blocked by Candle v0.9), net -120 LOC (+755 new, -875 deleted), 72 tests passing, 0 warnings
+- **Phase 12**: Production-Ready AI Agent Templates ✅ COMPLETE (Oct 5-24, 2025) - Template trait system (Template/TemplateRegistry/ExecutionContext/TemplateParams/TemplateOutput), 10 production templates (research-assistant, interactive-chat, data-analysis, code-generator, document-processor, workflow-orchestrator, code-review, content-generation, file-classification, knowledge-management), 2,651 LOC template code, 5 CLI commands (list/info/exec/search/schema), Template global (16th global, 6 methods), 149 tests (122 unit + 27 integration), 3,655 lines documentation, 4 advanced patterns (multi-aspect analysis, quality-driven iteration, scan-classify-act, RAG CRUD), performance targets exceeded 20-50x, zero warnings
 
 ### Key Architectural Decisions (Evolved Through Phases)
 
@@ -87,6 +91,13 @@ This overview document is supported by detailed guides:
 - **Phase 11b**: Platform-aware device selection (macOS Metal → fallback CPU, Linux/Windows CUDA → fallback CPU)
 - **Phase 11b**: Backend specifier precedence (--profile > -c > discovery > default)
 - **Phase 11b**: Profile auto-loading with improved error messages (missing profile → clearer guidance)
+- **Phase 12**: Template trait system over monolithic orchestration (composable workflow patterns)
+- **Phase 12**: Dual-layer registry (ComponentRegistry for scripts + ToolRegistry for templates)
+- **Phase 12**: ExecutionContext dependency injection (testability and flexibility)
+- **Phase 12**: Parameter schema validation before execution (fail-fast design)
+- **Phase 12**: Template global (16th global) following established GlobalObject pattern
+- **Phase 12**: CLI-first template design (direct execution without scripting required)
+- **Phase 12**: Advanced template patterns (multi-aspect, quality-driven, scan-classify-act, RAG CRUD)
 
 ---
 
@@ -394,8 +405,8 @@ pub struct ConnectionInfo {
 │                     User Scripts (Lua)                      │
 │  RAG.search(), LocalLLM.list(), Agent.create({model="local/llama3.1:8b@ollama"}) │
 ├─────────────────────────────────────────────────────────────┤
-│               Script Bridge Layer (Phase 1-11)              │
-│  18+ Global Objects with Zero-Import Pattern (incl. LocalLLM) │
+│               Script Bridge Layer (Phase 1-12)              │
+│  19 Global Objects with Zero-Import Pattern (incl. Template) │
 ├─────────────────────────────────────────────────────────────┤
 │          Kernel Execution Layer (Phase 9-11)                │
 │  ├── IntegratedKernel - No-spawn execution model           │
@@ -446,6 +457,18 @@ pub struct ConnectionInfo {
 │  │   ├── Ollama Provider - rig + ollama-rs hybrid          │
 │  │   └── Candle Provider - Embedded GGUF inference         │
 │  │                                                           │
+│  Template Layer (Phase 12):                                │
+│  └── llmspell-templates - Production-ready workflow templates │
+│      ├── Template Trait - Interface for all templates       │
+│      ├── TemplateRegistry - Discovery, search, execution    │
+│      ├── ExecutionContext - Infrastructure dependency injection │
+│      └── Built-in Templates - 10 production templates       │
+│          ├── Base (6): research-assistant, interactive-chat, │
+│          │             data-analysis, code-generator,        │
+│          │             document-processor, workflow-orchestrator │
+│          └── Advanced (4): code-review, content-generation, │
+│                           file-classification, knowledge-management │
+│                                                              │
 │  Support Layer:                                             │
 │  ├── llmspell-security  - RLS policies, access control     │
 │  ├── llmspell-config    - Multi-layer configuration        │
@@ -1122,9 +1145,10 @@ Core Layer → DebugManager (global singleton)
 
 ## API Surface
 
-### Lua Global Objects (18+)
+### Lua Global Objects (19)
 **Phase 2 Decision**: Global injection pattern for zero-import scripts
 **Phase 11a Consistency**: Tool.execute() standardization
+**Phase 12 Addition**: Template global for workflow execution
 
 1. **Agent** - Agent creation with builder pattern (Phase 7 standardization)
 2. **Tool** - Tool discovery and execution via Tool.execute() (37+ tools, Phase 11a standardization)
@@ -1144,6 +1168,7 @@ Core Layer → DebugManager (global singleton)
 16. **RAG** - Vector storage and retrieval with multi-tenant support (Phase 8)
 17. **Metrics** - Performance metrics collection and monitoring
 18. **LocalLLM** - Local model management (list, pull, info, status) (Phase 11)
+19. **Template** - Production-ready workflow templates (list, info, execute, search, schema) (Phase 12)
 
 ### RAG API (Phase 8)
 **Simplified Two-Parameter Pattern**:
@@ -1189,6 +1214,50 @@ local agent = Agent.create({
 local ollama = Agent.create({model = "local/phi3:3.8b@ollama"})   -- Force Ollama
 local candle = Agent.create({model = "local/mistral:7b@candle"})  -- Force Candle
 local auto = Agent.create({model = "local/llama3.1:8b"})          -- Auto (prefers Ollama)
+```
+
+### Template API (Phase 12)
+**Production-Ready Workflow Templates**:
+```lua
+-- List available templates
+local templates = Template.list()  -- [{id, name, description, category, version, tags}, ...]
+local research = Template.list("Research")  -- Filter by category
+
+-- Get template info
+local info = Template.info("research-assistant")
+-- {metadata, config_schema: {parameters: [{name, type, required, default, constraints}]}}
+
+local info_with_schema = Template.info("research-assistant", true)  -- Include full schema
+
+-- Execute template
+local result = Template.execute("research-assistant", {
+    topic = "Rust async programming",
+    max_sources = 5,
+    model = "ollama/llama3.2:3b"
+})
+-- Returns: {result: {text|structured|file}, artifacts: [], metadata: {...}, metrics: {duration_ms, tokens_used}}
+
+-- Advanced templates
+local code_review = Template.execute("code-review", {
+    code_path = "src/main.rs",
+    aspects = {"security", "quality", "performance"},
+    model = "ollama/llama3.2:3b"
+})
+
+local content = Template.execute("content-generation", {
+    topic = "Introduction to Rust",
+    content_type = "blog_post",
+    quality_threshold = 8,
+    max_iterations = 5,
+    model = "ollama/llama3.2:3b"
+})
+
+-- Search templates
+local matches = Template.search("RAG")  -- [{id, name, description, category}, ...]
+
+-- Get parameter schema
+local schema = Template.schema("knowledge-management")
+-- {version, parameters: [{name, description, param_type, required, default, constraints}]}
 ```
 
 ### Core Rust Traits

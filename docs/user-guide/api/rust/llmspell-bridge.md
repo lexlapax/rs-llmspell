@@ -63,8 +63,10 @@ let result = engine.execute(r#"
 
 ## Global Registration
 
+**Phase 12**: Template global added as 16th global (now 18 total with ARGS and Streaming).
+
 ```rust
-// Register all standard globals
+// Register all standard globals (18 total - Phase 12)
 engine.register_globals(vec![
     ("Agent", Box::new(AgentGlobal)),
     ("Tool", Box::new(ToolGlobal)),
@@ -72,6 +74,18 @@ engine.register_globals(vec![
     ("State", Box::new(StateGlobal)),
     ("Session", Box::new(SessionGlobal)),
     ("RAG", Box::new(RAGGlobal)),
+    ("Hook", Box::new(HookGlobal)),
+    ("Event", Box::new(EventGlobal)),
+    ("Config", Box::new(ConfigGlobal)),
+    ("Provider", Box::new(ProviderGlobal)),
+    ("Debug", Box::new(DebugGlobal)),
+    ("JSON", Box::new(JSONGlobal)),
+    ("Template", Box::new(TemplateGlobal)),  // Phase 12
+    ("ARGS", Box::new(ARGSGlobal)),
+    ("Streaming", Box::new(StreamingGlobal)),
+    ("Artifact", Box::new(ArtifactGlobal)),
+    ("Replay", Box::new(ReplayGlobal)),
+    ("Metrics", Box::new(MetricsGlobal)),
 ])?;
 
 // Register custom global
@@ -250,6 +264,128 @@ local results = RAG.search("recent updates", {
     -- Future: event_time_range, exclude_expired
 })
 ```
+
+## Template Bridge ⭐ **Phase 12**
+
+**Production-Ready AI Workflow Templates** - The Template global provides Lua access to 10 built-in templates and custom template execution.
+
+### TemplateBridge Implementation
+
+The Template bridge follows the 4-layer bridge pattern (Agent/Workflow style, not Tool style):
+
+```rust
+use llmspell_bridge::lua::globals::template::TemplateBridge;
+use llmspell_templates::{TemplateRegistry, TemplateParams, ExecutionContext};
+
+pub struct TemplateBridge {
+    registry: Arc<TemplateRegistry>,
+}
+
+impl TemplateBridge {
+    /// List templates, optionally filtered by category
+    pub fn list_templates(&self, category: Option<TemplateCategory>) -> Vec<TemplateMetadata> {
+        self.registry.list(category)
+    }
+
+    /// Get template information
+    pub fn get_template_info(&self, name: &str, show_schema: bool) -> Result<serde_json::Value> {
+        let template = self.registry.get(name)?;
+        let mut info = json!({
+            "name": template.metadata().name,
+            "description": template.metadata().description,
+            "category": template.metadata().category,
+            "version": template.metadata().version,
+        });
+
+        if show_schema {
+            info["schema"] = json!(template.config_schema());
+        }
+
+        Ok(info)
+    }
+
+    /// Execute template
+    pub async fn execute_template(
+        &self,
+        name: &str,
+        params: TemplateParams,
+        context: ExecutionContext,
+    ) -> Result<TemplateOutput> {
+        let template = self.registry.get(name)?;
+        template.execute(params, context).await
+    }
+}
+```
+
+### Lua Template Global
+
+From Lua scripts, templates are accessed via the `Template` global (16th global):
+
+```lua
+-- List all templates
+local templates = Template.list()
+for _, t in ipairs(templates) do
+    print(t.name .. " - " .. t.description)
+end
+
+-- List by category
+local research_templates = Template.list("research")
+
+-- Get template info with schema
+local info = Template.info("research-assistant", true)
+print("Parameters: " .. JSON.encode(info.schema.parameters))
+
+-- Execute template
+local result = Template.execute("research-assistant", {
+    topic = "Rust async programming",
+    max_sources = 10,
+    model = "ollama/llama3.2:3b"
+})
+
+-- Search templates
+local matches = Template.search("code", "codegen")
+for _, t in ipairs(matches) do
+    print("Found: " .. t.name)
+end
+
+-- Get parameter schema
+local schema = Template.schema("data-analysis")
+print("Required params: " .. JSON.encode(schema.required))
+
+-- Estimate cost before execution
+local estimate = Template.estimate_cost("research-assistant", {
+    topic = "AI research",
+    max_sources = 20
+})
+print("Estimated cost: $" .. estimate.estimated_cost_usd)
+```
+
+### Template Categories
+
+The bridge supports 6 template categories plus custom:
+
+```rust
+pub enum TemplateCategory {
+    Research,    // research-assistant, knowledge-management
+    Chat,        // interactive-chat
+    Analysis,    // data-analysis
+    CodeGen,     // code-generator, code-review
+    Document,    // document-processor, content-generation
+    Workflow,    // workflow-orchestrator, file-classification
+    Custom(String),
+}
+```
+
+### Template Methods
+
+| Method | Signature | Description |
+|--------|-----------|-------------|
+| `list` | `([category]) -> table[]` | List templates, optionally filtered |
+| `info` | `(name, [show_schema]) -> table` | Get template metadata and schema |
+| `execute` | `(name, params) -> table` | Execute template with parameters |
+| `search` | `(query, [category]) -> table[]` | Search templates by text |
+| `schema` | `(name) -> table` | Get parameter schema |
+| `estimate_cost` | `(name, params) -> table` | Estimate execution cost |
 
 ## Typed Configuration Pattern ⭐ **Phase 11a.8**
 

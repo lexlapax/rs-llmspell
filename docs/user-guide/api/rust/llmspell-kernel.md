@@ -4,16 +4,19 @@
 
 The unified kernel crate providing integrated execution runtime, state management, session handling, debugging infrastructure, and daemon/service capabilities. This crate consolidates what were previously separate crates (llmspell-sessions, llmspell-state-persistence, llmspell-state-traits) and adds new Phase 10 daemon and protocol server features.
 
+**Phase 12 Enhancements**: KernelHandle extended with template protocol support for interactive workflows and REPL integration.
+
 ## Core Concepts
 
 - **Integrated Kernel**: Central execution runtime managing script execution with debugging support
 - **Daemon Management**: System service deployment with signal handling and PID management
 - **State Management**: Hierarchical state with multiple backends (memory, Sled, vector stores)
 - **Session Management**: Session lifecycle with artifact storage and replay capabilities
-- **Protocol Support**: Multi-protocol transport (Jupyter, DAP, LSP) with unified interface
+- **Protocol Support**: Multi-protocol transport (Jupyter, DAP, LSP) with unified interface (Phase 12: template_request/template_reply)
 - **Debug Infrastructure**: Complete debugging support with breakpoints, stepping, and variable inspection
 - **Event Correlation**: Distributed tracing and event correlation across components
 - **Global IO Runtime**: Shared Tokio runtime preventing "dispatch task is gone" errors
+- **Template Integration**: Infrastructure access for production-ready AI workflow templates (Phase 12)
 
 ## Primary Structs/Modules
 
@@ -232,6 +235,81 @@ let artifact_id = session.store_artifact(
 
 // Retrieve artifact
 let artifact = session.get_artifact(&artifact_id).await?;
+```
+
+### KernelHandle ⭐ **Phase 12**
+
+**Purpose**: Handle for embedded kernel providing programmatic access to kernel operations including templates.
+
+**When to use**: When templates need REPL/interactive kernel access or for embedded kernel execution.
+
+**Key features**:
+- Template protocol support (template_request/template_reply)
+- Tool and model management protocol
+- Code execution via Jupyter protocol
+- In-process transport for embedded kernels
+
+**Phase 12 Enhancement**: Added `send_template_request()` for interactive workflows (Subtask 12.9.5).
+
+```rust
+use llmspell_kernel::api::{KernelHandle, start_embedded_kernel_with_infrastructure};
+use llmspell_config::LLMSpellConfig;
+use serde_json::json;
+
+// Start embedded kernel with full infrastructure
+let config = LLMSpellConfig::load_from_file("llmspell.toml")?;
+let script_executor = create_script_executor()?;
+let session_manager = create_session_manager().await?;
+
+let mut kernel_handle = start_embedded_kernel_with_infrastructure(
+    config,
+    script_executor,
+    session_manager,
+).await?;
+
+// Execute template via kernel (Phase 12)
+let template_params = json!({
+    "template_name": "research-assistant",
+    "params": {
+        "topic": "Rust async programming",
+        "max_sources": 10
+    }
+});
+
+let result = kernel_handle.send_template_request(template_params).await?;
+println!("Template result: {}", result);
+
+// Execute code
+let code_result = kernel_handle.execute("print('Hello from kernel')").await?;
+
+// Send tool request
+let tool_request = json!({
+    "tool_name": "calculator",
+    "parameters": {"operation": "add", "a": 5, "b": 3}
+});
+let tool_result = kernel_handle.send_tool_request(tool_request).await?;
+```
+
+**Integration with llmspell-templates**:
+
+Templates use KernelHandle via `ExecutionContext.kernel_handle` for interactive sessions:
+
+```rust
+use llmspell_templates::{Template, ExecutionContext, TemplateParams};
+
+// In template implementation
+async fn execute(
+    &self,
+    params: TemplateParams,
+    context: ExecutionContext,
+) -> Result<TemplateOutput> {
+    // Access kernel for REPL operations
+    if let Some(kernel) = context.kernel_handle() {
+        let result = kernel.send_template_request(request).await?;
+        // Process result...
+    }
+    Ok(output)
+}
 ```
 
 ### ExecutionManager

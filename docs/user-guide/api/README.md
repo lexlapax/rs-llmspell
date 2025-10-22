@@ -10,7 +10,7 @@
 
 > **🔍 API Hub**: Comprehensive documentation for both Lua scripting APIs and Rust extension APIs. Choose your path based on whether you're writing scripts or building components.
 
-**Version**: 0.9.0 | **Status**: Phase 10 Complete | **Last Updated**: December 2024
+**Version**: 0.12.0 | **Status**: Phase 12 Complete | **Last Updated**: October 2025
 
 ## Documentation Structure
 
@@ -18,7 +18,7 @@
 **Complete Lua API Reference** - Comprehensive documentation for all Lua scripting capabilities.
 
 **Coverage:**
-- 17 Global objects (Agent, Tool, Workflow, State, Session, Hook, Event, Config, Provider, Debug, JSON, Args, Streaming, Artifact, Replay, RAG, Metrics)
+- 18 Global objects (Agent, Tool, Workflow, State, Session, Hook, Event, Config, Provider, Debug, JSON, Template, ARGS, Streaming, Artifact, Replay, RAG, Metrics)
 - 200+ Methods with full type signatures
 - Complete parameter and return type documentation
 - Error conditions and handling patterns
@@ -28,6 +28,7 @@
 - `Agent` - LLM agent creation and execution (25+ methods)
 - `Tool` - Tool invocation and management (15+ methods)
 - `Workflow` - Workflow orchestration patterns (20+ methods)
+- `Template` - Production-ready AI workflow templates (6 methods) **Phase 12**
 - `RAG` - Retrieval-Augmented Generation (9+ methods) **Phase 8**
 - `State` - Persistent state management (15+ methods)
 - `Session` - Session and artifact handling (20+ methods)
@@ -39,8 +40,8 @@
 **Complete Rust API Reference** - Comprehensive documentation for extending LLMSpell with Rust.
 
 **Coverage:**
-- 17 crates fully documented with traits, implementations, and examples
-- Core traits (BaseAgent, Executable, Agent, Tool, Workflow)
+- 18 crates fully documented with traits, implementations, and examples
+- Core traits (BaseAgent, Executable, Agent, Tool, Workflow, Template)
 - Builder patterns for all components
 - Component Registry system
 - Complete error type hierarchy
@@ -50,10 +51,20 @@
 
 **Key Crates by Phase:**
 
+**Phase 12 - Production-Ready AI Workflow Templates:**
+- `llmspell-templates` - Template system with 10 built-in workflows
+  - Template trait and registry for discovery and execution
+  - ExecutionContext for infrastructure dependency injection
+  - TemplateParams and TemplateOutput for standardized interfaces
+  - 6 template categories (Research, Chat, Analysis, CodeGen, Document, Workflow)
+  - Cost estimation and parameter validation
+  - CLI and Lua API integration via TemplateBridge
+
 **Phase 10 - Production Kernel with Daemon Support:**
 - `llmspell-kernel` - Unified kernel with integrated state, sessions, debugging, and daemon support
   - IntegratedKernel architecture with global IO runtime
   - Daemon management with double-fork and signal handling
+  - KernelHandle with template protocol support (Phase 12)
   - Protocol servers (Jupyter, DAP) with multi-client support
   - Consolidated state persistence and session management
   - Debug infrastructure with DAP bridge
@@ -85,26 +96,39 @@
 - `llmspell-config` - Configuration system
 - `llmspell-cli` - Command-line interface with daemon support
 
-## 🆕 What's New in Phase 10
+## 🆕 What's New in Phase 12
 
-### Production-Ready Daemon Support
+### Production-Ready AI Workflow Templates
+- **10 Built-in Templates**: research-assistant, interactive-chat, data-analysis, code-generator, document-processor, workflow-orchestrator, code-review, content-generation, file-classification, knowledge-management
+- **Template Registry**: Discovery, search, and execution infrastructure
+- **ExecutionContext**: Dependency injection for templates (tools, agents, workflows, RAG, state, sessions)
+- **Template Global**: 16th Lua global with 6 methods (list, info, execute, search, schema, estimate_cost)
+- **CLI Commands**: `llmspell template list|info|exec|search|schema`
+- **KernelHandle Integration**: Interactive/REPL support via kernel protocol (template_request/template_reply)
+
+### Template System Architecture
+- **llmspell-templates**: New 18th crate (2,651 LOC template code, 149 tests)
+- **6 Template Categories**: Research, Chat, Analysis, CodeGen, Document, Workflow
+- **Performance**: 20-50x faster than targets (template init <2ms, registry lookup <1ms)
+- **Zero-Day Productivity**: Solve "0-day retention problem" with immediate-use templates
+- **Cost Estimation**: Pre-execution cost estimation for LLM usage budgeting
+
+### Phase 12 Statistics
+- **Timeline**: 20 days (Oct 5-24, 2025) vs 10 planned
+- **Code**: 2,651 LOC template implementations
+- **Tests**: 149 total (122 unit + 27 integration)
+- **Documentation**: 3,655 lines (Rust API + Lua API + user guides)
+- **Templates**: 10 production-ready workflows solving real problems
+
+---
+
+## 🏛️ Previous Milestones
+
+### Phase 10: Production-Ready Daemon Support
 - **System Service Deployment**: Deploy as systemd (Linux) or launchd (macOS) service
 - **Signal Handling**: SIGTERM/SIGINT for graceful shutdown, SIGHUP for config reload
-- **PID Management**: Proper PID file handling for service managers
-- **Double-Fork Daemonization**: True background process with TTY detachment
-- **Health Monitoring**: HTTP endpoints for health checks and metrics
-
-### Integrated Kernel Architecture
-- **Unified Crate**: `llmspell-kernel` consolidates state, sessions, and debugging
-- **Global IO Runtime**: Eliminates "dispatch task is gone" errors
-- **Protocol Servers**: Built-in Jupyter and DAP protocol support
-- **Multi-Client Support**: MessageRouter handles concurrent connections
-- **Debug Infrastructure**: Complete debugging with breakpoints and stepping
-
-### Consolidated Architecture
-- **17 Crates Total**: Down from 20 (merged state-persistence, state-traits, sessions into kernel)
-- **Simplified Dependencies**: Cleaner architecture with unified kernel
-- **Production Features**: Idle timeout, connection limits, resource management
+- **Integrated Kernel Architecture**: Unified crate with global IO runtime
+- **18 Crates Total**: Now includes llmspell-templates (Phase 12)
 
 ## Quick Start
 
@@ -384,8 +408,6 @@ Both API documentations include extensive code examples for every function and p
 - **Import Changes**: Update imports from separate crates to `llmspell_kernel`
 - **API Unchanged**: All public APIs remain compatible
 - **New Features**: Daemon mode, signal handling, service integration
-
-See [CHANGELOG.md](../../../CHANGELOG.md) for detailed migration instructions.
 
 ## License
 
