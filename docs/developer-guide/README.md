@@ -25,7 +25,7 @@
 
 ---
 
-## 📖 The 7 Essential Guides (Fully Consolidated)
+## 📖 The 8 Essential Guides (Fully Consolidated)
 
 ### 0. **[Feature Flags Migration](feature-flags-migration.md)** ⚠️
 **BREAKING CHANGES - Read First (Phase 10.17.5+)**
@@ -102,7 +102,16 @@
 
 *Essential for maintaining consistent, performant instrumentation across the codebase*
 
-### 6. **[Bridge Pattern Guide](bridge-pattern-guide.md)** 🌉
+### 6. **[Template Creation Guide](template-creation.md)** 🎯
+**Build Production-Ready AI Workflow Templates (Phase 12.10-12.13)**
+- ✅ Quick start: minimum viable template in 50 LOC
+- ✅ 4 proven patterns (code-review, content-generation, file-classification, knowledge-management)
+- ✅ Best practices: validation, agent creation, error handling, testing
+- ✅ Template categories and documentation requirements
+
+*New in Phase 12: Comprehensive guide for creating custom templates with real-world patterns*
+
+### 7. **[Bridge Pattern Guide](bridge-pattern-guide.md)** 🌉
 **Typed Rust Structs for Script-to-Rust Configuration (Phase 11a.8)**
 - ✅ Core principles: typed structs, parser separation, zero serialization overhead
 - ✅ Anti-patterns eliminated (JSON → HashMap chains)
