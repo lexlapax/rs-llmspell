@@ -1,0 +1,56 @@
+[package]
+name = "llmspell-memory"
+version.workspace = true
+edition.workspace = true
+authors.workspace = true
+repository.workspace = true
+license.workspace = true
+keywords = ["memory", "episodic", "semantic", "knowledge-graph", "llm"]
+categories = ["memory-management", "database", "data-structures"]
+description = "Adaptive memory system with episodic, semantic, and procedural memory for llmspell"
+
+[dependencies]
+# Core dependencies
+llmspell-core = { path = "../llmspell-core" }
+llmspell-utils = { path = "../llmspell-utils" }
+llmspell-rag = { path = "../llmspell-rag" }
+llmspell-kernel = { path = "../llmspell-kernel" }
+
+# Async runtime
+tokio = { workspace = true }
+async-trait = { workspace = true }
+
+# Serialization
+serde = { workspace = true }
+serde_json = { workspace = true }
+
+# Time handling
+chrono = { workspace = true }
+
+# Error handling
+anyhow = { workspace = true }
+thiserror = { workspace = true }
+
+# Logging
+tracing = { workspace = true }
+
+# Concurrency
+parking_lot = "0.12"
+dashmap = "5.5"
+
+# UUID generation
+uuid = { workspace = true }
+
+[dev-dependencies]
+llmspell-testing = { path = "../llmspell-testing" }
+tokio-test = "0.4"
+mockall = { workspace = true }
+criterion = { workspace = true }
+tempfile = "3.9"
+
+[[bench]]
+name = "episodic_bench"
+harness = false
+
+[lints]
+workspace = true
