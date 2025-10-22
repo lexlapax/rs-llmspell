@@ -55,5 +55,8 @@ pub mod prelude;
 
 // Re-exports for convenience
 pub use error::{MemoryError, Result};
-pub use traits::{EpisodicMemory, MemoryManager, SemanticMemory};
-pub use types::{ConsolidationMode, EpisodicEntry};
+pub use traits::{
+    ConsolidationDecision, Entity, EpisodicMemory, MemoryManager, ProceduralMemory,
+    Relationship, SemanticMemory,
+};
+pub use types::{ConsolidationMode, ConsolidationResult, EpisodicEntry};
