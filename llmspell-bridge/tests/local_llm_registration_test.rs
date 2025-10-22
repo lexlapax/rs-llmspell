@@ -19,7 +19,18 @@ mod local_llm_registration {
                 .await
                 .expect("Failed to create ProviderManager"),
         );
-        let context = Arc::new(GlobalContext::new(registry, providers));
+
+        // Create infrastructure registries (Phase 12.8.2.13)
+        let tool_registry = Arc::new(llmspell_tools::ToolRegistry::new());
+        let agent_registry = Arc::new(llmspell_agents::FactoryRegistry::new());
+        let workflow_factory: Arc<dyn llmspell_workflows::WorkflowFactory> =
+            Arc::new(llmspell_workflows::factory::DefaultWorkflowFactory::new());
+
+        let context = GlobalContext::new(registry, providers);
+        context.set_bridge("tool_registry", tool_registry);
+        context.set_bridge("agent_registry", agent_registry);
+        context.set_bridge("workflow_factory", Arc::new(workflow_factory));
+        let context = Arc::new(context);
 
         // Act: Create standard registry (what inject_apis does)
         let global_registry = create_standard_registry(context.clone())
@@ -35,11 +46,11 @@ mod local_llm_registration {
              (regression: Phase 11b bug fix - was conditionally skipped)"
         );
 
-        // Verify total globals count (should be 15, not 14)
+        // Verify total globals count (should be 16 in Phase 12, includes Template)
         let global_count = global_registry.list_globals().len();
         assert_eq!(
-            global_count, 15,
-            "Expected 15 globals (including LocalLLM), got {global_count}"
+            global_count, 16,
+            "Expected 16 globals (including LocalLLM and Template), got {global_count}"
         );
     }
 
@@ -52,7 +63,18 @@ mod local_llm_registration {
                 .await
                 .expect("Failed to create ProviderManager"),
         );
-        let context = Arc::new(GlobalContext::new(registry, providers.clone()));
+
+        // Create infrastructure registries (Phase 12.8.2.13)
+        let tool_registry = Arc::new(llmspell_tools::ToolRegistry::new());
+        let agent_registry = Arc::new(llmspell_agents::FactoryRegistry::new());
+        let workflow_factory: Arc<dyn llmspell_workflows::WorkflowFactory> =
+            Arc::new(llmspell_workflows::factory::DefaultWorkflowFactory::new());
+
+        let context = GlobalContext::new(registry, providers.clone());
+        context.set_bridge("tool_registry", tool_registry);
+        context.set_bridge("agent_registry", agent_registry);
+        context.set_bridge("workflow_factory", Arc::new(workflow_factory));
+        let context = Arc::new(context);
 
         // Act
         let global_registry = create_standard_registry(context.clone())

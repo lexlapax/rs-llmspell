@@ -39,10 +39,19 @@ mod registry_tests {
             .unwrap(),
         );
 
+        // Create infrastructure registries (Phase 12.8.2.13)
+        let tool_registry = Arc::new(llmspell_tools::ToolRegistry::new());
+        let agent_registry = Arc::new(llmspell_agents::FactoryRegistry::new());
+        let workflow_factory: Arc<dyn llmspell_workflows::WorkflowFactory> =
+            Arc::new(llmspell_workflows::factory::DefaultWorkflowFactory::new());
+
         // Create context with necessary bridges
         let context = GlobalContext::new(registry, providers);
         context.set_bridge("session_manager", session_manager);
         context.set_bridge("state_manager", state_manager);
+        context.set_bridge("tool_registry", tool_registry);
+        context.set_bridge("agent_registry", agent_registry);
+        context.set_bridge("workflow_factory", Arc::new(workflow_factory));
 
         let context = Arc::new(context);
 
@@ -99,11 +108,22 @@ mod registry_tests {
     }
     #[tokio::test]
     async fn test_registry_without_session_manager() {
+        // Create infrastructure registries (Phase 12.8.2.13)
+        let tool_registry = Arc::new(llmspell_tools::ToolRegistry::new());
+        let agent_registry = Arc::new(llmspell_agents::FactoryRegistry::new());
+        let workflow_factory: Arc<dyn llmspell_workflows::WorkflowFactory> =
+            Arc::new(llmspell_workflows::factory::DefaultWorkflowFactory::new());
+
         // Create context without session manager
         let registry = Arc::new(ComponentRegistry::new());
         let config = ProviderManagerConfig::default();
         let providers = Arc::new(ProviderManager::new(config).await.unwrap());
-        let context = Arc::new(GlobalContext::new(registry, providers));
+
+        let context = GlobalContext::new(registry, providers);
+        context.set_bridge("tool_registry", tool_registry);
+        context.set_bridge("agent_registry", agent_registry);
+        context.set_bridge("workflow_factory", Arc::new(workflow_factory));
+        let context = Arc::new(context);
 
         // Create standard registry
         let registry = create_standard_registry(context).await.unwrap();

@@ -12,7 +12,7 @@ use serde_json::json;
 use std::collections::HashMap;
 use std::sync::atomic::{AtomicU64, Ordering};
 use std::time::Instant;
-use tracing::{debug, info, instrument, span, warn, Level};
+use tracing::{debug, info, instrument, span, trace, warn, Level};
 
 /// Enum to hold different provider models
 enum RigModel {
@@ -39,9 +39,23 @@ pub struct RigProvider {
 impl RigProvider {
     /// Create a new Rig provider instance
     pub fn new(config: ProviderConfig) -> Result<Self, LLMSpellError> {
+        info!(
+            "Creating RigProvider: provider={}, model={}, has_endpoint={}",
+            config.provider_type,
+            config.model,
+            config.endpoint.is_some()
+        );
+        debug!(
+            "Provider config details: name={}, has_api_key={}, custom_config_keys={}",
+            config.name,
+            config.api_key.is_some(),
+            config.custom_config.keys().len()
+        );
+
         // Create the appropriate model based on provider type
         let model = match config.provider_type.as_str() {
             "openai" => {
+                trace!("Initializing OpenAI client via rig");
                 let api_key =
                     config
                         .api_key
@@ -53,9 +67,14 @@ impl RigProvider {
 
                 let client = providers::openai::Client::new(api_key);
                 let model = client.completion_model(&config.model);
+                info!(
+                    "OpenAI client created successfully for model: {}",
+                    config.model
+                );
                 RigModel::OpenAI(model)
             }
             "anthropic" => {
+                trace!("Initializing Anthropic client via rig");
                 let api_key =
                     config
                         .api_key
@@ -69,20 +88,27 @@ impl RigProvider {
                 let mut client_builder = providers::anthropic::Client::builder(api_key);
 
                 if let Some(base_url) = config.endpoint.as_deref() {
+                    debug!("Using custom Anthropic endpoint: {}", base_url);
                     client_builder = client_builder.base_url(base_url);
                 }
 
-                let client = client_builder
-                    .build()
-                    .map_err(|e| LLMSpellError::Configuration {
+                let client = client_builder.build().map_err(|e| {
+                    warn!("Failed to create Anthropic client: {}", e);
+                    LLMSpellError::Configuration {
                         message: format!("Failed to create Anthropic client: {}", e),
                         source: Some(Box::new(e)),
-                    })?;
+                    }
+                })?;
 
                 let model = client.completion_model(&config.model);
+                info!(
+                    "Anthropic client created successfully for model: {}",
+                    config.model
+                );
                 RigModel::Anthropic(model)
             }
             "cohere" => {
+                trace!("Initializing Cohere client via rig");
                 let api_key =
                     config
                         .api_key
@@ -94,6 +120,10 @@ impl RigProvider {
 
                 let client = providers::cohere::Client::new(api_key);
                 let model = client.completion_model(&config.model);
+                info!(
+                    "Cohere client created successfully for model: {}",
+                    config.model
+                );
                 RigModel::Cohere(model)
             }
             "ollama" => {
@@ -118,6 +148,10 @@ impl RigProvider {
                 RigModel::Ollama(model)
             }
             _ => {
+                warn!(
+                    "Unsupported provider type requested: {}",
+                    config.provider_type
+                );
                 return Err(LLMSpellError::Configuration {
                     message: format!("Unsupported provider type: {}", config.provider_type),
                     source: None,
@@ -125,6 +159,7 @@ impl RigProvider {
             }
         };
 
+        trace!("Setting provider capabilities for {}", config.provider_type);
         // Set capabilities based on provider type and model
         let capabilities = ProviderCapabilities {
             supports_streaming: false, // Rig doesn't expose streaming yet
@@ -158,6 +193,20 @@ impl RigProvider {
                 "anthropic" => 4096, // Anthropic requires max_tokens
                 _ => 2048,           // Default for others
             });
+
+        debug!(
+            "Provider capabilities: streaming={}, multimodal={}, max_context={:?}, max_output={:?}",
+            capabilities.supports_streaming,
+            capabilities.supports_multimodal,
+            capabilities.max_context_tokens,
+            capabilities.max_output_tokens
+        );
+        debug!("Max tokens configured: {}", max_tokens);
+
+        info!(
+            "RigProvider created successfully: provider={}, model={}, max_tokens={}",
+            config.provider_type, config.model, max_tokens
+        );
 
         Ok(Self {
             config,
@@ -275,21 +324,49 @@ impl RigProvider {
                 })
                 .and_then(|response| {
                     use rig::completion::AssistantContent;
+                    trace!(
+                        "{} response received, processing variant",
+                        self.config.provider_type
+                    );
                     match response.choice.first() {
-                        AssistantContent::Text(text) => Ok(text.text.clone()),
-                        AssistantContent::ToolCall(call) => Err(LLMSpellError::Provider {
-                            message: format!(
-                                "Unexpected tool call response: {}",
+                        AssistantContent::Text(text) => {
+                            debug!(
+                                "{} returned Text response: {} chars",
+                                self.config.provider_type,
+                                text.text.len()
+                            );
+                            Ok(text.text.clone())
+                        }
+                        AssistantContent::ToolCall(call) => {
+                            debug!(
+                                "{} returned ToolCall response: function={}, id={}",
+                                self.config.provider_type, call.function.name, call.id
+                            );
+                            warn!(
+                                "Unexpected tool call in non-tool context: {}",
                                 call.function.name
-                            ),
-                            provider: Some(self.config.name.clone()),
-                            source: None,
-                        }),
-                        AssistantContent::Reasoning(_) => Err(LLMSpellError::Provider {
-                            message: "Unexpected reasoning response".to_string(),
-                            provider: Some(self.config.name.clone()),
-                            source: None,
-                        }),
+                            );
+                            Err(LLMSpellError::Provider {
+                                message: format!(
+                                    "Unexpected tool call response: {}",
+                                    call.function.name
+                                ),
+                                provider: Some(self.config.name.clone()),
+                                source: None,
+                            })
+                        }
+                        AssistantContent::Reasoning(reasoning) => {
+                            // OpenAI reasoning models (gpt-5-mini, o1-series) return thought traces
+                            // Join all reasoning steps with double newline for readability
+                            // Phase 13 TODO: Extract to AgentOutput.metadata for A-TKG analysis
+                            debug!(
+                                "Received reasoning response from {} with {} steps",
+                                self.config.provider_type,
+                                reasoning.reasoning.len()
+                            );
+                            trace!("Reasoning steps: {:?}", reasoning.reasoning);
+                            Ok(reasoning.reasoning.join("\n\n"))
+                        }
                     }
                 }),
             RigModel::Anthropic(model) => model
@@ -304,21 +381,49 @@ impl RigProvider {
                 })
                 .and_then(|response| {
                     use rig::completion::AssistantContent;
+                    trace!(
+                        "{} response received, processing variant",
+                        self.config.provider_type
+                    );
                     match response.choice.first() {
-                        AssistantContent::Text(text) => Ok(text.text.clone()),
-                        AssistantContent::ToolCall(call) => Err(LLMSpellError::Provider {
-                            message: format!(
-                                "Unexpected tool call response: {}",
+                        AssistantContent::Text(text) => {
+                            debug!(
+                                "{} returned Text response: {} chars",
+                                self.config.provider_type,
+                                text.text.len()
+                            );
+                            Ok(text.text.clone())
+                        }
+                        AssistantContent::ToolCall(call) => {
+                            debug!(
+                                "{} returned ToolCall response: function={}, id={}",
+                                self.config.provider_type, call.function.name, call.id
+                            );
+                            warn!(
+                                "Unexpected tool call in non-tool context: {}",
                                 call.function.name
-                            ),
-                            provider: Some(self.config.name.clone()),
-                            source: None,
-                        }),
-                        AssistantContent::Reasoning(_) => Err(LLMSpellError::Provider {
-                            message: "Unexpected reasoning response".to_string(),
-                            provider: Some(self.config.name.clone()),
-                            source: None,
-                        }),
+                            );
+                            Err(LLMSpellError::Provider {
+                                message: format!(
+                                    "Unexpected tool call response: {}",
+                                    call.function.name
+                                ),
+                                provider: Some(self.config.name.clone()),
+                                source: None,
+                            })
+                        }
+                        AssistantContent::Reasoning(reasoning) => {
+                            // OpenAI reasoning models (gpt-5-mini, o1-series) return thought traces
+                            // Join all reasoning steps with double newline for readability
+                            // Phase 13 TODO: Extract to AgentOutput.metadata for A-TKG analysis
+                            debug!(
+                                "Received reasoning response from {} with {} steps",
+                                self.config.provider_type,
+                                reasoning.reasoning.len()
+                            );
+                            trace!("Reasoning steps: {:?}", reasoning.reasoning);
+                            Ok(reasoning.reasoning.join("\n\n"))
+                        }
                     }
                 }),
             RigModel::Cohere(model) => model
@@ -333,21 +438,49 @@ impl RigProvider {
                 })
                 .and_then(|response| {
                     use rig::completion::AssistantContent;
+                    trace!(
+                        "{} response received, processing variant",
+                        self.config.provider_type
+                    );
                     match response.choice.first() {
-                        AssistantContent::Text(text) => Ok(text.text.clone()),
-                        AssistantContent::ToolCall(call) => Err(LLMSpellError::Provider {
-                            message: format!(
-                                "Unexpected tool call response: {}",
+                        AssistantContent::Text(text) => {
+                            debug!(
+                                "{} returned Text response: {} chars",
+                                self.config.provider_type,
+                                text.text.len()
+                            );
+                            Ok(text.text.clone())
+                        }
+                        AssistantContent::ToolCall(call) => {
+                            debug!(
+                                "{} returned ToolCall response: function={}, id={}",
+                                self.config.provider_type, call.function.name, call.id
+                            );
+                            warn!(
+                                "Unexpected tool call in non-tool context: {}",
                                 call.function.name
-                            ),
-                            provider: Some(self.config.name.clone()),
-                            source: None,
-                        }),
-                        AssistantContent::Reasoning(_) => Err(LLMSpellError::Provider {
-                            message: "Unexpected reasoning response".to_string(),
-                            provider: Some(self.config.name.clone()),
-                            source: None,
-                        }),
+                            );
+                            Err(LLMSpellError::Provider {
+                                message: format!(
+                                    "Unexpected tool call response: {}",
+                                    call.function.name
+                                ),
+                                provider: Some(self.config.name.clone()),
+                                source: None,
+                            })
+                        }
+                        AssistantContent::Reasoning(reasoning) => {
+                            // OpenAI reasoning models (gpt-5-mini, o1-series) return thought traces
+                            // Join all reasoning steps with double newline for readability
+                            // Phase 13 TODO: Extract to AgentOutput.metadata for A-TKG analysis
+                            debug!(
+                                "Received reasoning response from {} with {} steps",
+                                self.config.provider_type,
+                                reasoning.reasoning.len()
+                            );
+                            trace!("Reasoning steps: {:?}", reasoning.reasoning);
+                            Ok(reasoning.reasoning.join("\n\n"))
+                        }
                     }
                 }),
             RigModel::Ollama(model) => {
@@ -374,11 +507,17 @@ impl RigProvider {
                                 provider: Some(self.config.name.clone()),
                                 source: None,
                             }),
-                            AssistantContent::Reasoning(_) => Err(LLMSpellError::Provider {
-                                message: "Unexpected reasoning response".to_string(),
-                                provider: Some(self.config.name.clone()),
-                                source: None,
-                            }),
+                            AssistantContent::Reasoning(reasoning) => {
+                                // OpenAI reasoning models (gpt-5-mini, o1-series) return thought traces
+                                // Join all reasoning steps with double newline for readability
+                                // Phase 13 TODO: Extract to AgentOutput.metadata for A-TKG analysis
+                                debug!(
+                                    "Received reasoning response from {} with {} steps",
+                                    self.config.provider_type,
+                                    reasoning.reasoning.len()
+                                );
+                                Ok(reasoning.reasoning.join("\n\n"))
+                            }
                         }
                     })
             }
@@ -535,16 +674,35 @@ impl ProviderInstance for RigProvider {
         model = %self.config.model
     ))]
     async fn validate(&self) -> Result<(), LLMSpellError> {
-        info!("Validating provider configuration");
+        info!(
+            "Validating provider configuration: provider={}, model={}",
+            self.config.provider_type, self.config.model
+        );
+        debug!("Running validation completion with test input");
+
         // Try a simple completion to validate the configuration
         let test_input = AgentInput::text("Say 'test'");
 
         match self.complete(&test_input).await {
-            Ok(_) => Ok(()),
-            Err(e) => Err(LLMSpellError::Configuration {
-                message: format!("Provider validation failed: {}", e),
-                source: Some(Box::new(e)),
-            }),
+            Ok(output) => {
+                info!(
+                    "Provider validation successful: provider={}, response_len={}",
+                    self.config.provider_type,
+                    output.text.len()
+                );
+                debug!("Validation response: {}", output.text);
+                Ok(())
+            }
+            Err(e) => {
+                warn!(
+                    "Provider validation failed: provider={}, error={}",
+                    self.config.provider_type, e
+                );
+                Err(LLMSpellError::Configuration {
+                    message: format!("Provider validation failed: {}", e),
+                    source: Some(Box::new(e)),
+                })
+            }
         }
     }
 

@@ -122,7 +122,7 @@ impl KernelHandle {
 
         // Wait for tool_reply
         let start_time = std::time::Instant::now();
-        let timeout = std::time::Duration::from_secs(30);
+        let timeout = std::time::Duration::from_secs(900);
 
         loop {
             if start_time.elapsed() > timeout {
@@ -187,6 +187,95 @@ impl KernelHandle {
         }
     }
 
+    /// Send a template request to the kernel and return the response
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the request fails or communication with kernel fails
+    pub async fn send_template_request(
+        &mut self,
+        content: serde_json::Value,
+    ) -> Result<serde_json::Value> {
+        debug!("Sending template request to kernel {}", self.kernel_id);
+
+        // Create template_request message
+        let request = self.protocol.create_request("template_request", content)?;
+
+        debug!(
+            "Sending template_request on shell channel, message size: {}",
+            request.len()
+        );
+
+        // Send request through transport
+        self.transport.send("shell", vec![request]).await?;
+
+        // Wait for template_reply
+        let start_time = std::time::Instant::now();
+        let timeout = std::time::Duration::from_secs(900);
+
+        loop {
+            if start_time.elapsed() > timeout {
+                return Err(anyhow::anyhow!("Timeout waiting for template_reply"));
+            }
+
+            if let Some(reply_parts) = self.transport.recv("shell").await? {
+                trace!(
+                    "Client received {} parts on shell channel",
+                    reply_parts.len()
+                );
+
+                // Handle multipart Jupyter wire protocol format
+                let delimiter = b"<IDS|MSG>";
+                let delimiter_idx = reply_parts
+                    .iter()
+                    .position(|part| part.as_slice() == delimiter);
+
+                let reply_msg: HashMap<String, serde_json::Value> = if let Some(idx) = delimiter_idx
+                {
+                    // Parse multipart message (header at idx+2, content at idx+5)
+                    if reply_parts.len() > idx + 5 {
+                        let header =
+                            serde_json::from_slice::<serde_json::Value>(&reply_parts[idx + 2])?;
+                        let content =
+                            serde_json::from_slice::<serde_json::Value>(&reply_parts[idx + 5])?;
+
+                        let mut msg = HashMap::new();
+                        msg.insert("header".to_string(), header);
+                        msg.insert("content".to_string(), content);
+                        msg
+                    } else {
+                        continue; // Incomplete message, wait for next
+                    }
+                } else if let Some(first_part) = reply_parts.first() {
+                    // Try parsing as simple JSON message for backward compatibility
+                    match self.protocol.parse_message(first_part) {
+                        Ok(msg) => msg,
+                        Err(_) => continue, // Not a valid message, wait for next
+                    }
+                } else {
+                    continue; // No parts, wait for next
+                };
+
+                // Check if this is a template_reply
+                if let Some(header) = reply_msg.get("header") {
+                    if let Some(msg_type) = header.get("msg_type") {
+                        if msg_type == "template_reply" {
+                            // Extract and return the content's content field
+                            if let Some(content_wrapper) = reply_msg.get("content") {
+                                // The content contains the actual response nested in a "content" field
+                                if let Some(actual_content) = content_wrapper.get("content") {
+                                    return Ok(actual_content.clone());
+                                }
+                                return Ok(content_wrapper.clone());
+                            }
+                        }
+                    }
+                }
+            }
+            tokio::time::sleep(tokio::time::Duration::from_millis(10)).await;
+        }
+    }
+
     /// Send a model management request to the kernel and return the response
     ///
     /// # Errors
@@ -211,7 +300,7 @@ impl KernelHandle {
 
         // Wait for model_reply
         let start_time = std::time::Instant::now();
-        let timeout = std::time::Duration::from_secs(30);
+        let timeout = std::time::Duration::from_secs(900);
 
         loop {
             if start_time.elapsed() > timeout {
@@ -357,7 +446,7 @@ impl ClientHandle {
 
         // Wait for tool_reply
         let start_time = std::time::Instant::now();
-        let timeout = std::time::Duration::from_secs(30);
+        let timeout = std::time::Duration::from_secs(900);
 
         loop {
             if start_time.elapsed() > timeout {
@@ -422,6 +511,90 @@ impl ClientHandle {
         }
     }
 
+    /// Send a template request to the remote kernel and return the response
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the request fails or communication with kernel fails
+    pub async fn send_template_request(
+        &mut self,
+        content: serde_json::Value,
+    ) -> Result<serde_json::Value> {
+        debug!("Sending template request to remote kernel");
+
+        // Create template_request message
+        let request = self.protocol.create_request("template_request", content)?;
+
+        // Send request through transport
+        self.transport.send("shell", vec![request]).await?;
+
+        // Wait for template_reply
+        let start_time = std::time::Instant::now();
+        let timeout = std::time::Duration::from_secs(900);
+
+        loop {
+            if start_time.elapsed() > timeout {
+                return Err(anyhow::anyhow!("Timeout waiting for template_reply"));
+            }
+
+            if let Some(reply_parts) = self.transport.recv("shell").await? {
+                trace!(
+                    "Client received {} parts on shell channel",
+                    reply_parts.len()
+                );
+
+                // Handle multipart Jupyter wire protocol format
+                let delimiter = b"<IDS|MSG>";
+                let delimiter_idx = reply_parts
+                    .iter()
+                    .position(|part| part.as_slice() == delimiter);
+
+                let reply_msg: HashMap<String, serde_json::Value> = if let Some(idx) = delimiter_idx
+                {
+                    // Parse multipart message (header at idx+2, content at idx+5)
+                    if reply_parts.len() > idx + 5 {
+                        let header =
+                            serde_json::from_slice::<serde_json::Value>(&reply_parts[idx + 2])?;
+                        let content =
+                            serde_json::from_slice::<serde_json::Value>(&reply_parts[idx + 5])?;
+
+                        let mut msg = HashMap::new();
+                        msg.insert("header".to_string(), header);
+                        msg.insert("content".to_string(), content);
+                        msg
+                    } else {
+                        continue; // Incomplete message, wait for next
+                    }
+                } else if let Some(first_part) = reply_parts.first() {
+                    // Try parsing as simple JSON message for backward compatibility
+                    match self.protocol.parse_message(first_part) {
+                        Ok(msg) => msg,
+                        Err(_) => continue, // Not a valid message, wait for next
+                    }
+                } else {
+                    continue; // No parts, wait for next
+                };
+
+                // Check if this is a template_reply
+                if let Some(header) = reply_msg.get("header") {
+                    if let Some(msg_type) = header.get("msg_type") {
+                        if msg_type == "template_reply" {
+                            // Extract and return the content's content field
+                            if let Some(content_wrapper) = reply_msg.get("content") {
+                                // The content contains the actual response nested in a "content" field
+                                if let Some(actual_content) = content_wrapper.get("content") {
+                                    return Ok(actual_content.clone());
+                                }
+                                return Ok(content_wrapper.clone());
+                            }
+                        }
+                    }
+                }
+            }
+            tokio::time::sleep(tokio::time::Duration::from_millis(10)).await;
+        }
+    }
+
     /// Send a model management request to the remote kernel and return the response
     ///
     /// # Errors
@@ -441,7 +614,7 @@ impl ClientHandle {
 
         // Wait for model_reply
         let start_time = std::time::Instant::now();
-        let timeout = std::time::Duration::from_secs(30);
+        let timeout = std::time::Duration::from_secs(900);
 
         loop {
             if start_time.elapsed() > timeout {
@@ -563,7 +736,33 @@ pub async fn start_embedded_kernel_with_executor(
     config: LLMSpellConfig,
     script_executor: Arc<dyn ScriptExecutor>,
 ) -> Result<KernelHandle> {
-    start_embedded_kernel_with_executor_and_provider(config, script_executor, None).await
+    // Create provider manager for this executor
+    let provider_manager = create_provider_manager(&config).await?;
+
+    // Create SessionManager
+    let state_manager = Arc::new(crate::state::StateManager::new().await?);
+    let session_storage_backend = Arc::new(llmspell_storage::MemoryBackend::new());
+    let hook_registry = Arc::new(llmspell_hooks::HookRegistry::new());
+    let hook_executor = Arc::new(llmspell_hooks::HookExecutor::new());
+    let event_bus = Arc::new(llmspell_events::bus::EventBus::new());
+    let session_config = crate::sessions::SessionManagerConfig::default();
+
+    let session_manager = Arc::new(crate::sessions::SessionManager::new(
+        state_manager,
+        session_storage_backend,
+        hook_registry,
+        hook_executor,
+        &event_bus,
+        session_config,
+    )?);
+
+    start_embedded_kernel_with_executor_and_provider_internal(
+        config,
+        script_executor,
+        Some(provider_manager),
+        session_manager,
+    )
+    .await
 }
 
 /// Create and initialize a provider manager from config (Phase 11.FIX.1)
@@ -631,18 +830,119 @@ pub async fn create_provider_manager(
     Ok(pm)
 }
 
-/// Start embedded kernel with script executor and optional provider manager (Phase 11.FIX.1)
+/// Stub executor for backwards compatibility when no `ScriptRuntime` is available
+struct StubExecutor;
+
+#[async_trait]
+impl ScriptExecutor for StubExecutor {
+    async fn execute_script(
+        &self,
+        _script: &str,
+    ) -> Result<
+        llmspell_core::traits::script_executor::ScriptExecutionOutput,
+        llmspell_core::error::LLMSpellError,
+    > {
+        Err(llmspell_core::error::LLMSpellError::Script {
+            message:
+                "No script executor configured - use start_embedded_kernel_with_infrastructure()"
+                    .to_string(),
+            language: None,
+            line: None,
+            source: None,
+        })
+    }
+
+    fn language(&self) -> &'static str {
+        "none"
+    }
+
+    fn component_registry(&self) -> Option<Arc<dyn llmspell_core::ComponentLookup>> {
+        None
+    }
+
+    fn as_any(&self) -> &dyn std::any::Any {
+        self
+    }
+}
+
+/// Start embedded kernel with full infrastructure (Phase 12.8.2.11 - Unified Path)
 ///
-/// If `provider_manager` is provided, it will be used. Otherwise, a new one will be created.
-/// This enables sharing a single `ProviderManager` between kernel and script runtime.
+/// Accepts pre-created `ScriptExecutor` and `SessionManager` from caller (typically CLI layer).
+/// This is the unified execution path for all CLI commands.
+///
+/// # Errors
+///
+/// Returns an error if kernel initialization fails
+pub async fn start_embedded_kernel_with_infrastructure(
+    config: LLMSpellConfig,
+    script_executor: Arc<dyn ScriptExecutor>,
+    session_manager: Arc<crate::sessions::SessionManager>,
+) -> Result<KernelHandle> {
+    // Create provider manager
+    let provider_manager = create_provider_manager(&config).await?;
+
+    // Call internal function with all infrastructure
+    start_embedded_kernel_with_executor_and_provider_internal(
+        config,
+        script_executor,
+        Some(provider_manager),
+        session_manager,
+    )
+    .await
+}
+
+/// Start embedded kernel - convenience function for backwards compatibility
+///
+/// Creates minimal infrastructure for basic execution.
+/// For full infrastructure support, use `start_embedded_kernel_with_infrastructure()`.
+///
+/// # Errors
+///
+/// Returns an error if kernel initialization fails
+pub async fn start_embedded_kernel(config: LLMSpellConfig) -> Result<KernelHandle> {
+    // Create minimal infrastructure
+    let provider_manager = create_provider_manager(&config).await?;
+    let state_manager = Arc::new(crate::state::StateManager::new().await?);
+    let session_storage_backend = Arc::new(llmspell_storage::MemoryBackend::new());
+    let hook_registry = Arc::new(llmspell_hooks::HookRegistry::new());
+    let hook_executor = Arc::new(llmspell_hooks::HookExecutor::new());
+    let event_bus = Arc::new(llmspell_events::bus::EventBus::new());
+    let session_config = crate::sessions::SessionManagerConfig::default();
+
+    let session_manager = Arc::new(crate::sessions::SessionManager::new(
+        state_manager,
+        session_storage_backend,
+        hook_registry,
+        hook_executor,
+        &event_bus,
+        session_config,
+    )?);
+
+    // Create stub executor (caller should use start_embedded_kernel_with_infrastructure for real ScriptRuntime)
+    let script_executor = Arc::new(StubExecutor) as Arc<dyn ScriptExecutor>;
+
+    start_embedded_kernel_with_executor_and_provider_internal(
+        config,
+        script_executor,
+        Some(provider_manager),
+        session_manager,
+    )
+    .await
+}
+
+/// Internal kernel creation with all infrastructure (Phase 12.8.2.11)
+///
+/// This is the internal function that actually creates the kernel.
+/// External callers should use `start_embedded_kernel()` instead.
 ///
 /// # Errors
 ///
 /// Returns an error if the kernel fails to start or transport setup fails
-pub async fn start_embedded_kernel_with_executor_and_provider(
+async fn start_embedded_kernel_with_executor_and_provider_internal(
     config: LLMSpellConfig,
     script_executor: Arc<dyn ScriptExecutor>,
     provider_manager: Option<Arc<llmspell_providers::ProviderManager>>,
+    session_manager: Arc<crate::sessions::SessionManager>,
 ) -> Result<KernelHandle> {
     let kernel_id = format!("embedded-{}", Uuid::new_v4());
     let session_id = format!("session-{}", Uuid::new_v4());
@@ -706,17 +1006,27 @@ pub async fn start_embedded_kernel_with_executor_and_provider(
         create_provider_manager(&config).await?
     };
 
+    // SessionManager already created and wired by caller (Phase 12.8.2.11)
+    // Create a session for this kernel instance
+    let session_options = crate::sessions::CreateSessionOptions::builder()
+        .name(format!("kernel-session-{session_id}"))
+        .build();
+
+    let _session_id_obj = session_manager.create_session(session_options).await?;
+
     // Use the provided script executor (clone it for sharing between kernels)
     let script_executor_clone = script_executor.clone();
     let provider_manager_clone = provider_manager.clone();
+    let session_manager_clone = session_manager.clone();
 
-    // Create integrated kernel with the provided executor
+    // Create integrated kernel with the provided executor and shared SessionManager
     let mut kernel = IntegratedKernel::new(
         protocol.clone(),
         exec_config.clone(),
         session_id.clone(),
         script_executor,
         Some(provider_manager),
+        session_manager,
     )
     .await?;
 
@@ -739,12 +1049,14 @@ pub async fn start_embedded_kernel_with_executor_and_provider(
 
     // For embedded mode, create a minimal kernel handle that only contains what's needed for message sending
     // The actual kernel is running in the background spawn
+    // IMPORTANT: Use the same shared SessionManager - DO NOT create a new one!
     let dummy_kernel = IntegratedKernel::new(
         protocol.clone(),
         exec_config.clone(),
         format!("dummy-{session_id}"),
         script_executor_clone,
         Some(provider_manager_clone),
+        session_manager_clone,
     )
     .await?;
 
@@ -844,266 +1156,6 @@ impl Tool for StubTool {
             returns: Some(llmspell_core::traits::tool::ParameterType::String),
         }
     }
-}
-
-/// Start an embedded kernel that runs in-process
-///
-/// This is used when the CLI runs without --connect flag.
-/// The kernel runs in the same process as the CLI.
-///
-/// # Errors
-///
-/// Returns an error if the kernel fails to start or transport setup fails
-#[allow(clippy::too_many_lines)]
-pub async fn start_embedded_kernel(config: LLMSpellConfig) -> Result<KernelHandle> {
-    // Create a default executor with stub component registry for backward compatibility
-    struct DefaultExecutor {
-        component_registry: Arc<DefaultStubComponentRegistry>,
-    }
-
-    // Reuse stub component registry for embedded mode
-    struct DefaultStubComponentRegistry;
-
-    #[async_trait]
-    impl ComponentLookup for DefaultStubComponentRegistry {
-        async fn list_tools(&self) -> Vec<String> {
-            // Return all placeholder tools for embedded testing
-            vec![
-                "calculator",
-                "file-operations",
-                "web-scraper",
-                "json-processor",
-                "text-analyzer",
-                "data-converter",
-                "image-processor",
-                "api-tester",
-                "base64-encoder",
-                "citation-formatter",
-                "sitemap-crawler",
-                "graphql-query",
-                "url-analyzer",
-                "http-requester",
-                "video-processor",
-                "webpage-monitor",
-                "service-checker",
-                "environment-reader",
-                "uuid-generator",
-                "hash-calculator",
-                "data-validator",
-                "web-searcher",
-                "webhook-caller",
-                "process-executor",
-                "datetime-handler",
-                "file-search",
-                "file-watcher",
-                "audio-processor",
-                "diff-calculator",
-                "system-monitor",
-                "graph-builder",
-                "text-manipulator",
-                "file-converter",
-            ]
-            .into_iter()
-            .map(String::from)
-            .collect()
-        }
-
-        #[allow(clippy::too_many_lines)]
-        async fn get_tool(&self, name: &str) -> Option<Arc<dyn Tool>> {
-            // Return actual stub tools for embedded testing
-            use llmspell_core::traits::tool::ToolCategory;
-
-            let tool = match name {
-                "calculator" => StubTool::new(
-                    "calculator",
-                    "Perform mathematical calculations",
-                    ToolCategory::Utility,
-                ),
-                "file-operations" => StubTool::new(
-                    "file-operations",
-                    "Read and write files",
-                    ToolCategory::Filesystem,
-                ),
-                "web-scraper" => {
-                    StubTool::new("web-scraper", "Scrape web pages", ToolCategory::Web)
-                }
-                "json-processor" => {
-                    StubTool::new("json-processor", "Process JSON data", ToolCategory::Data)
-                }
-                "text-analyzer" => StubTool::new(
-                    "text-analyzer",
-                    "Analyze text content",
-                    ToolCategory::Analysis,
-                ),
-                "data-converter" => StubTool::new(
-                    "data-converter",
-                    "Convert between data formats",
-                    ToolCategory::Data,
-                ),
-                "image-processor" => {
-                    StubTool::new("image-processor", "Process images", ToolCategory::Media)
-                }
-                "api-tester" => {
-                    StubTool::new("api-tester", "Test API endpoints", ToolCategory::Api)
-                }
-                "base64-encoder" => StubTool::new(
-                    "base64-encoder",
-                    "Encode/decode base64",
-                    ToolCategory::Utility,
-                ),
-                "citation-formatter" => StubTool::new(
-                    "citation-formatter",
-                    "Format citations",
-                    ToolCategory::Utility,
-                ),
-                "sitemap-crawler" => StubTool::new(
-                    "sitemap-crawler",
-                    "Crawl website sitemaps",
-                    ToolCategory::Web,
-                ),
-                "graphql-query" => StubTool::new(
-                    "graphql-query",
-                    "Execute GraphQL queries",
-                    ToolCategory::Api,
-                ),
-                "url-analyzer" => {
-                    StubTool::new("url-analyzer", "Analyze URL components", ToolCategory::Web)
-                }
-                "http-requester" => {
-                    StubTool::new("http-requester", "Make HTTP requests", ToolCategory::Web)
-                }
-                "video-processor" => StubTool::new(
-                    "video-processor",
-                    "Process video files",
-                    ToolCategory::Media,
-                ),
-                "webpage-monitor" => StubTool::new(
-                    "webpage-monitor",
-                    "Monitor webpage changes",
-                    ToolCategory::Web,
-                ),
-                "service-checker" => StubTool::new(
-                    "service-checker",
-                    "Check service status",
-                    ToolCategory::System,
-                ),
-                "environment-reader" => StubTool::new(
-                    "environment-reader",
-                    "Read environment variables",
-                    ToolCategory::System,
-                ),
-                "uuid-generator" => {
-                    StubTool::new("uuid-generator", "Generate UUIDs", ToolCategory::Utility)
-                }
-                "hash-calculator" => {
-                    StubTool::new("hash-calculator", "Calculate hashes", ToolCategory::Utility)
-                }
-                "data-validator" => {
-                    StubTool::new("data-validator", "Validate data", ToolCategory::Data)
-                }
-                "web-searcher" => {
-                    StubTool::new("web-searcher", "Search the web", ToolCategory::Web)
-                }
-                "webhook-caller" => {
-                    StubTool::new("webhook-caller", "Call webhooks", ToolCategory::Api)
-                }
-                "process-executor" => StubTool::new(
-                    "process-executor",
-                    "Execute processes",
-                    ToolCategory::System,
-                ),
-                "datetime-handler" => StubTool::new(
-                    "datetime-handler",
-                    "Handle dates and times",
-                    ToolCategory::Utility,
-                ),
-                "file-search" => {
-                    StubTool::new("file-search", "Search files", ToolCategory::Filesystem)
-                }
-                "file-watcher" => StubTool::new(
-                    "file-watcher",
-                    "Watch file changes",
-                    ToolCategory::Filesystem,
-                ),
-                "audio-processor" => StubTool::new(
-                    "audio-processor",
-                    "Process audio files",
-                    ToolCategory::Media,
-                ),
-                "diff-calculator" => StubTool::new(
-                    "diff-calculator",
-                    "Calculate differences",
-                    ToolCategory::Analysis,
-                ),
-                "system-monitor" => StubTool::new(
-                    "system-monitor",
-                    "Monitor system resources",
-                    ToolCategory::System,
-                ),
-                "graph-builder" => {
-                    StubTool::new("graph-builder", "Build graphs", ToolCategory::Data)
-                }
-                "text-manipulator" => {
-                    StubTool::new("text-manipulator", "Manipulate text", ToolCategory::Utility)
-                }
-                "file-converter" => {
-                    StubTool::new("file-converter", "Convert file formats", ToolCategory::Data)
-                }
-                _ => return None,
-            };
-            Some(Arc::new(tool))
-        }
-
-        async fn list_agents(&self) -> Vec<String> {
-            vec![]
-        }
-
-        async fn get_agent(&self, _name: &str) -> Option<Arc<dyn Agent>> {
-            None
-        }
-
-        async fn list_workflows(&self) -> Vec<String> {
-            vec![]
-        }
-
-        async fn get_workflow(&self, _name: &str) -> Option<Arc<dyn Workflow>> {
-            None
-        }
-    }
-
-    #[async_trait]
-    impl ScriptExecutor for DefaultExecutor {
-        async fn execute_script(
-            &self,
-            _script: &str,
-        ) -> Result<ScriptExecutionOutput, llmspell_core::error::LLMSpellError> {
-            Ok(ScriptExecutionOutput {
-                output: serde_json::json!(
-                    "Default executor - use start_embedded_kernel_with_executor for real execution"
-                ),
-                console_output: vec![],
-                metadata: ScriptExecutionMetadata {
-                    duration: std::time::Duration::from_millis(0),
-                    language: "lua".to_string(),
-                    exit_code: Some(0),
-                    warnings: vec![],
-                },
-            })
-        }
-
-        fn language(&self) -> &'static str {
-            "lua"
-        }
-
-        fn component_registry(&self) -> Option<Arc<dyn ComponentLookup>> {
-            Some(self.component_registry.clone())
-        }
-    }
-
-    let script_executor = Arc::new(DefaultExecutor {
-        component_registry: Arc::new(DefaultStubComponentRegistry),
-    }) as Arc<dyn ScriptExecutor>;
-    start_embedded_kernel_with_executor(config, script_executor).await
 }
 
 /// Connect to an existing kernel service as a client
@@ -1252,6 +1304,30 @@ pub async fn start_kernel_service_with_config(
     let transport = setup_kernel_transport(config.port, &mut conn_manager).await?;
     info!("Transport setup complete");
 
+    // Create SessionManager for this service kernel
+    let state_manager = Arc::new(crate::state::StateManager::new().await?);
+    let session_storage_backend = Arc::new(llmspell_storage::MemoryBackend::new());
+    let hook_registry = Arc::new(llmspell_hooks::HookRegistry::new());
+    let hook_executor = Arc::new(llmspell_hooks::HookExecutor::new());
+    let event_bus = Arc::new(llmspell_events::bus::EventBus::new());
+    let session_config = crate::sessions::SessionManagerConfig::default();
+
+    let session_manager = Arc::new(crate::sessions::SessionManager::new(
+        state_manager,
+        session_storage_backend,
+        hook_registry,
+        hook_executor,
+        &event_bus,
+        session_config,
+    )?);
+
+    // Create a session for this kernel instance
+    let session_options = crate::sessions::CreateSessionOptions::builder()
+        .name(format!("kernel-session-{session_id}"))
+        .build();
+
+    let _session_id_obj = session_manager.create_session(session_options).await?;
+
     // Create integrated kernel with protocol that has the HMAC key
     let mut kernel = IntegratedKernel::new(
         protocol.clone(),
@@ -1259,6 +1335,7 @@ pub async fn start_kernel_service_with_config(
         session_id,
         config.script_executor,
         None,
+        session_manager,
     )
     .await?;
 
@@ -1564,6 +1641,10 @@ pub async fn start_kernel_service(port: u16, config: LLMSpellConfig) -> Result<S
         fn component_registry(&self) -> Option<Arc<dyn ComponentLookup>> {
             Some(self.component_registry.clone())
         }
+
+        fn as_any(&self) -> &dyn std::any::Any {
+            self
+        }
     }
 
     let kernel_id = format!("service-{}", Uuid::new_v4());
@@ -1581,9 +1662,40 @@ pub async fn start_kernel_service(port: u16, config: LLMSpellConfig) -> Result<S
         component_registry: Arc::new(StubComponentRegistry),
     }) as Arc<dyn ScriptExecutor>;
 
+    // Create SessionManager for this service kernel (legacy function)
+    let state_manager = Arc::new(crate::state::StateManager::new().await?);
+    let session_storage_backend = Arc::new(llmspell_storage::MemoryBackend::new());
+    let hook_registry = Arc::new(llmspell_hooks::HookRegistry::new());
+    let hook_executor = Arc::new(llmspell_hooks::HookExecutor::new());
+    let event_bus = Arc::new(llmspell_events::bus::EventBus::new());
+    let session_config = crate::sessions::SessionManagerConfig::default();
+
+    let session_manager = Arc::new(crate::sessions::SessionManager::new(
+        state_manager,
+        session_storage_backend,
+        hook_registry,
+        hook_executor,
+        &event_bus,
+        session_config,
+    )?);
+
+    // Create a session for this kernel instance
+    let session_options = crate::sessions::CreateSessionOptions::builder()
+        .name(format!("kernel-session-{session_id}"))
+        .build();
+
+    let _session_id_obj = session_manager.create_session(session_options).await?;
+
     // Create integrated kernel
-    let kernel =
-        IntegratedKernel::new(protocol, exec_config, session_id, script_executor, None).await?;
+    let kernel = IntegratedKernel::new(
+        protocol,
+        exec_config,
+        session_id,
+        script_executor,
+        None,
+        session_manager,
+    )
+    .await?;
     // Note: Service kernels don't need transport set here as they use external connections
 
     // Write connection file for clients

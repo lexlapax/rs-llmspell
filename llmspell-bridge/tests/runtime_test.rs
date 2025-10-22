@@ -10,7 +10,7 @@ async fn test_runtime_with_lua_engine() {
     let config = LLMSpellConfig::default();
     assert_eq!(config.default_engine, "lua");
 
-    let runtime = ScriptRuntime::new_with_lua(config).await;
+    let runtime = Box::pin(ScriptRuntime::new_with_lua(config)).await;
     assert!(runtime.is_ok(), "Failed to create runtime with Lua engine");
 
     let runtime = runtime.unwrap();
@@ -39,7 +39,7 @@ async fn test_runtime_with_engine_name() {
 #[cfg(feature = "lua")]
 async fn test_runtime_execute_script() {
     let config = LLMSpellConfig::default();
-    let runtime = ScriptRuntime::new_with_lua(config).await.unwrap();
+    let runtime = Box::pin(ScriptRuntime::new_with_lua(config)).await.unwrap();
 
     // Execute a simple script
     let result = runtime.execute_script("return 1 + 1").await;
@@ -56,7 +56,7 @@ async fn test_runtime_execute_script() {
 #[cfg(feature = "lua")]
 async fn test_runtime_capability_detection() {
     let config = LLMSpellConfig::default();
-    let runtime = ScriptRuntime::new_with_lua(config).await.unwrap();
+    let runtime = Box::pin(ScriptRuntime::new_with_lua(config)).await.unwrap();
 
     // Test capability detection
     let features = runtime.get_engine_features();
@@ -84,7 +84,7 @@ async fn test_runtime_configuration() {
     config.engines.lua.enable_debug = true;
     config.engines.javascript.strict_mode = false;
 
-    let runtime = ScriptRuntime::new_with_lua(config).await.unwrap();
+    let runtime = Box::pin(ScriptRuntime::new_with_lua(config)).await.unwrap();
     assert_eq!(runtime.get_engine_name(), "lua");
 }
 
@@ -92,7 +92,7 @@ async fn test_runtime_configuration() {
 #[cfg(feature = "lua")]
 async fn test_runtime_execution_context() {
     let config = LLMSpellConfig::default();
-    let runtime = ScriptRuntime::new_with_lua(config).await.unwrap();
+    let runtime = Box::pin(ScriptRuntime::new_with_lua(config)).await.unwrap();
 
     // Get initial context
     let context = runtime.get_execution_context();
@@ -120,14 +120,16 @@ async fn test_runtime_engine_switching_placeholder() {
     // Create with Lua
     #[cfg(feature = "lua")]
     {
-        let lua_runtime = ScriptRuntime::new_with_lua(config.clone()).await.unwrap();
+        let lua_runtime = Box::pin(ScriptRuntime::new_with_lua(config.clone()))
+            .await
+            .unwrap();
         assert_eq!(lua_runtime.get_engine_name(), "lua");
     }
 
     // Attempt to create with JavaScript
     #[cfg(feature = "javascript")]
     {
-        let js_runtime = ScriptRuntime::new_with_javascript(config).await;
+        let js_runtime = Box::pin(ScriptRuntime::new_with_javascript(config)).await;
         // When JavaScript feature is enabled, it should create successfully
         assert!(js_runtime.is_ok());
         if let Ok(runtime) = js_runtime {

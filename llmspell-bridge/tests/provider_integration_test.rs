@@ -36,7 +36,7 @@ async fn test_lua_agent_creation_with_mock_provider() {
     };
 
     // Create runtime with Lua engine
-    let runtime = ScriptRuntime::new_with_lua(runtime_config).await;
+    let runtime = Box::pin(ScriptRuntime::new_with_lua(runtime_config)).await;
 
     // For now, we expect this to fail since we don't have a mock provider implementation
     assert!(runtime.is_err());
@@ -45,7 +45,9 @@ async fn test_lua_agent_creation_with_mock_provider() {
 #[tokio::test(flavor = "multi_thread")]
 async fn test_lua_script_provider_access() {
     let runtime_config = LLMSpellConfig::default();
-    let runtime = ScriptRuntime::new_with_lua(runtime_config).await.unwrap();
+    let runtime = Box::pin(ScriptRuntime::new_with_lua(runtime_config))
+        .await
+        .unwrap();
 
     // Test script that tries to create an agent
     let script = r#"

@@ -32,15 +32,11 @@ use crate::io::manager::EnhancedIOManager;
 use crate::io::router::MessageRouter;
 use crate::monitoring::{HealthMonitor, HealthReport, HealthStatus, HealthThresholds};
 use crate::runtime::tracing::{OperationCategory, TracingInstrumentation};
-use crate::sessions::{CreateSessionOptions, SessionManager, SessionManagerConfig};
+use crate::sessions::SessionManager;
 use crate::state::{KernelState, StorageBackend};
 use crate::traits::{Protocol, Transport};
 
 // Session dependencies
-use crate::state::StateManager;
-use llmspell_events::bus::EventBus;
-use llmspell_hooks::{HookExecutor, HookRegistry};
-use llmspell_storage::MemoryBackend as SessionMemoryBackend;
 
 /// I/O configuration
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -131,7 +127,7 @@ pub struct IntegratedKernel<P: Protocol> {
     state: Arc<KernelState>,
     /// Session manager
     #[allow(dead_code)] // Will be used when session integration is fully implemented
-    session_manager: SessionManager,
+    session_manager: Arc<SessionManager>,
     /// Execution manager for debugging
     execution_manager: Arc<ExecutionManager>,
     /// DAP bridge for IDE debugging
@@ -175,6 +171,7 @@ impl<P: Protocol + 'static> IntegratedKernel<P> {
         session_id: String,
         script_executor: Arc<dyn ScriptExecutor>,
         provider_manager: Option<Arc<llmspell_providers::ProviderManager>>,
+        session_manager: Arc<SessionManager>,
     ) -> Result<Self> {
         info!("Creating IntegratedKernel for session {}", session_id);
 
@@ -242,31 +239,8 @@ impl<P: Protocol + 'static> IntegratedKernel<P> {
             crate::state::KernelMemoryBackend::new(),
         )))?);
 
-        // Create session manager dependencies
-        let state_manager = Arc::new(StateManager::new().await?);
-
-        let session_storage_backend = Arc::new(SessionMemoryBackend::new());
-        let hook_registry = Arc::new(HookRegistry::new());
-        let hook_executor = Arc::new(HookExecutor::new());
-        let event_bus = Arc::new(EventBus::new());
-        let session_config = SessionManagerConfig::default();
-
-        // Create session manager with proper dependencies
-        let session_manager = SessionManager::new(
-            state_manager,
-            session_storage_backend,
-            hook_registry,
-            hook_executor,
-            &event_bus,
-            session_config,
-        )?;
-
-        // Create a session for this kernel instance
-        let session_options = CreateSessionOptions::builder()
-            .name(format!("kernel-session-{session_id}"))
-            .build();
-
-        let _session_id_obj = session_manager.create_session(session_options).await?;
+        // SessionManager is now provided as a parameter (shared across kernel instances)
+        // No need to create it here - it's created once in api.rs and shared
 
         // Initialize session state
         state.update_session(|session| {
@@ -287,6 +261,9 @@ impl<P: Protocol + 'static> IntegratedKernel<P> {
             debug!("Wiring debug context to script executor");
             script_executor.set_debug_context(Some(execution_manager.clone()));
         }
+
+        // Note: SessionManager wiring to script_executor is now done ONCE in api.rs
+        // before creating any kernel instances, to avoid duplicate wiring
 
         // Create shutdown coordinator
         let shutdown_config = ShutdownConfig::default();
@@ -494,6 +471,18 @@ impl<P: Protocol + 'static> IntegratedKernel<P> {
     /// Get the script executor
     pub fn get_script_executor(&self) -> Arc<dyn ScriptExecutor> {
         self.script_executor.clone()
+    }
+
+    /// Get the session manager
+    pub fn get_session_manager(&self) -> &Arc<SessionManager> {
+        &self.session_manager
+    }
+
+    /// Check if hooks are enabled in session manager configuration
+    pub fn are_hooks_enabled(&self) -> bool {
+        // Session manager always has hooks registry and built-in hooks registered
+        // Hooks are a core feature, always enabled
+        true
     }
 
     /// Get the DAP bridge for IDE debugging
@@ -805,6 +794,7 @@ impl<P: Protocol + 'static> IntegratedKernel<P> {
                                     || msg_type == "comm_info_request"
                                     || msg_type == "history_request"
                                     || msg_type == "tool_request"
+                                    || msg_type == "template_request"
                                     || msg_type == "model_request"
                                 {
                                     trace!("Received shell message: {}", msg_type);
@@ -986,6 +976,7 @@ impl<P: Protocol + 'static> IntegratedKernel<P> {
             "interrupt_request" => self.handle_interrupt_request(&message)?,
             "debug_request" => self.handle_debug_request(message).await?,
             "tool_request" => self.handle_tool_request(message).await?,
+            "template_request" => self.handle_template_request(message).await?,
             "model_request" => self.handle_model_request(message).await?,
             _ => {
                 warn!("Unhandled message type: {}", msg_type);
@@ -1885,6 +1876,51 @@ impl<P: Protocol + 'static> IntegratedKernel<P> {
         }
     }
 
+    /// Send template reply back to client
+    async fn send_template_reply(&mut self, content: serde_json::Value) -> Result<()> {
+        debug!("Sending template reply through message protocol");
+
+        // Ensure we have client identity for routing
+        let client_identity = self
+            .current_client_identity
+            .clone()
+            .ok_or_else(|| anyhow!("No client identity available for template reply routing"))?;
+
+        // Ensure we have message header for correlation
+        if self.current_msg_header.is_none() {
+            return Err(anyhow!(
+                "No message header available for template reply correlation"
+            ));
+        }
+
+        // Create multipart response using existing infrastructure
+        let multipart_response =
+            self.create_multipart_response(&client_identity, "template_reply", &content)?;
+
+        debug!(
+            "template_reply multipart created, {} parts",
+            multipart_response.len()
+        );
+
+        // Send via shell channel (same as other command replies)
+        if let Some(ref mut transport) = self.transport {
+            match transport.send("shell", multipart_response).await {
+                Ok(()) => {
+                    debug!("template_reply sent successfully via shell channel");
+                    Ok(())
+                }
+                Err(e) => {
+                    error!("Failed to send template_reply: {}", e);
+                    Err(anyhow!("Failed to send template reply: {}", e))
+                }
+            }
+        } else {
+            warn!("No transport available for template_reply - falling back to stdout");
+            // Fallback to stdout if no transport (for embedded scenarios)
+            self.io_manager.write_stdout(&content.to_string()).await
+        }
+    }
+
     /// Handle `shutdown_request`
     ///
     /// # Errors
@@ -2496,6 +2532,248 @@ impl<P: Protocol + 'static> IntegratedKernel<P> {
         });
 
         self.send_tool_reply(error).await
+    }
+
+    /// Handle template request for template discovery and execution
+    async fn handle_template_request(&mut self, message: HashMap<String, Value>) -> Result<()> {
+        info!("Handling template_request");
+
+        let content = message
+            .get("content")
+            .ok_or_else(|| anyhow!("No content in template_request"))?;
+
+        let command = content
+            .get("command")
+            .and_then(|v| v.as_str())
+            .ok_or_else(|| anyhow!("No command in template_request"))?;
+
+        // Handle template commands
+        match command {
+            "list" => self.handle_template_list(content).await,
+            "info" => self.handle_template_info(content).await,
+            "exec" => self.handle_template_exec(content).await,
+            "search" => self.handle_template_search(content).await,
+            "schema" => self.handle_template_schema(content).await,
+            _ => self.handle_unknown_template_command(command).await,
+        }
+    }
+
+    /// Handle template list command
+    async fn handle_template_list(&mut self, content: &Value) -> Result<()> {
+        debug!("Listing templates via ScriptExecutor");
+
+        // Check for category filter in the request
+        let category_filter = content.get("category").and_then(|v| v.as_str());
+
+        // Use ScriptExecutor trait method (avoids concrete template types)
+        match self.script_executor.handle_template_list(category_filter) {
+            Ok(templates_json) => {
+                let response = json!({
+                    "msg_type": "template_reply",
+                    "content": {
+                        "status": "ok",
+                        "templates": templates_json,
+                        "category": category_filter
+                    }
+                });
+                self.send_template_reply(response).await
+            }
+            Err(e) => {
+                let error = json!({
+                    "msg_type": "template_reply",
+                    "content": {
+                        "status": "error",
+                        "error": format!("Failed to list templates: {}", e)
+                    }
+                });
+                self.send_template_reply(error).await
+            }
+        }
+    }
+
+    /// Handle template info command
+    async fn handle_template_info(&mut self, content: &Value) -> Result<()> {
+        let template_name = content
+            .get("name")
+            .and_then(|v| v.as_str())
+            .ok_or_else(|| anyhow!("No name in template info request"))?;
+
+        let show_schema = content
+            .get("show_schema")
+            .and_then(serde_json::Value::as_bool)
+            .unwrap_or(false);
+
+        debug!(
+            "Getting info for template: {} (show_schema: {})",
+            template_name, show_schema
+        );
+
+        // Use ScriptExecutor trait method (avoids concrete template types)
+        match self
+            .script_executor
+            .handle_template_info(template_name, show_schema)
+        {
+            Ok(template_json) => {
+                let response = json!({
+                    "msg_type": "template_reply",
+                    "content": {
+                        "status": "ok",
+                        "template": template_json
+                    }
+                });
+                self.send_template_reply(response).await
+            }
+            Err(e) => {
+                let error = json!({
+                    "msg_type": "template_reply",
+                    "content": {
+                        "status": "error",
+                        "error": format!("Failed to get template info: {}", e)
+                    }
+                });
+                self.send_template_reply(error).await
+            }
+        }
+    }
+
+    /// Handle template exec command
+    async fn handle_template_exec(&mut self, content: &Value) -> Result<()> {
+        let template_name = content
+            .get("name")
+            .and_then(|v| v.as_str())
+            .ok_or_else(|| anyhow!("No name in template exec request"))?;
+
+        let params_json = content
+            .get("params")
+            .cloned()
+            .unwrap_or(Value::Object(serde_json::Map::new()));
+
+        debug!("Executing template: {}", template_name);
+
+        // Use ScriptExecutor trait method (avoids concrete template types)
+        match self
+            .script_executor
+            .handle_template_exec(template_name, params_json)
+            .await
+        {
+            Ok(result_json) => {
+                // Merge result_json fields directly into content (avoid double-nesting)
+                // result_json already contains: {"result": {...}, "artifacts": [...], "metrics": {...}}
+                let mut content = serde_json::Map::new();
+                content.insert("status".to_string(), json!("ok"));
+
+                if let Some(obj) = result_json.as_object() {
+                    for (k, v) in obj {
+                        content.insert(k.clone(), v.clone());
+                    }
+                }
+
+                let response = json!({
+                    "msg_type": "template_reply",
+                    "content": content
+                });
+                self.send_template_reply(response).await
+            }
+            Err(e) => {
+                let error = json!({
+                    "msg_type": "template_reply",
+                    "content": {
+                        "status": "error",
+                        "error": format!("Template execution failed: {}", e)
+                    }
+                });
+                self.send_template_reply(error).await
+            }
+        }
+    }
+
+    /// Handle template search command
+    async fn handle_template_search(&mut self, content: &Value) -> Result<()> {
+        let query = content
+            .get("query")
+            .and_then(|v| v.as_str())
+            .ok_or_else(|| anyhow!("No query in template search request"))?;
+
+        let category_filter = content.get("category").and_then(|v| v.as_str());
+
+        debug!("Searching templates with query: {}", query);
+
+        // Use ScriptExecutor trait method (avoids concrete template types)
+        match self
+            .script_executor
+            .handle_template_search(query, category_filter)
+        {
+            Ok(results_json) => {
+                let response = json!({
+                    "msg_type": "template_reply",
+                    "content": {
+                        "status": "ok",
+                        "query": query,
+                        "results": results_json,
+                        "category": category_filter
+                    }
+                });
+                self.send_template_reply(response).await
+            }
+            Err(e) => {
+                let error = json!({
+                    "msg_type": "template_reply",
+                    "content": {
+                        "status": "error",
+                        "error": format!("Template search failed: {}", e)
+                    }
+                });
+                self.send_template_reply(error).await
+            }
+        }
+    }
+
+    /// Handle template schema command
+    async fn handle_template_schema(&mut self, content: &Value) -> Result<()> {
+        let template_name = content
+            .get("name")
+            .and_then(|v| v.as_str())
+            .ok_or_else(|| anyhow!("No name in template schema request"))?;
+
+        debug!("Getting schema for template: {}", template_name);
+
+        // Use ScriptExecutor trait method (avoids concrete template types)
+        match self.script_executor.handle_template_schema(template_name) {
+            Ok(schema_json) => {
+                let response = json!({
+                    "msg_type": "template_reply",
+                    "content": {
+                        "status": "ok",
+                        "schema": schema_json
+                    }
+                });
+                self.send_template_reply(response).await
+            }
+            Err(e) => {
+                let error = json!({
+                    "msg_type": "template_reply",
+                    "content": {
+                        "status": "error",
+                        "error": format!("Failed to get template schema: {}", e)
+                    }
+                });
+                self.send_template_reply(error).await
+            }
+        }
+    }
+
+    /// Handle unknown template command
+    async fn handle_unknown_template_command(&mut self, command: &str) -> Result<()> {
+        warn!("Unknown template command: {}", command);
+        let error = json!({
+            "msg_type": "template_reply",
+            "content": {
+                "status": "error",
+                "error": format!("Unknown template command: {command}")
+            }
+        });
+
+        self.send_template_reply(error).await
     }
 
     /// Handle model request for local model management
@@ -3168,6 +3446,10 @@ mod tests {
         fn language(&self) -> &'static str {
             "test"
         }
+
+        fn as_any(&self) -> &dyn std::any::Any {
+            self
+        }
     }
 
     // Mock protocol for testing
@@ -3201,15 +3483,43 @@ mod tests {
         }
     }
 
+    /// Helper to create a test `SessionManager` with minimal infrastructure
+    async fn create_test_session_manager() -> Arc<crate::sessions::SessionManager> {
+        let state_manager = Arc::new(crate::state::StateManager::new().await.unwrap());
+        let session_storage_backend = Arc::new(llmspell_storage::MemoryBackend::new());
+        let hook_registry = Arc::new(llmspell_hooks::HookRegistry::new());
+        let hook_executor = Arc::new(llmspell_hooks::HookExecutor::new());
+        let event_bus = Arc::new(llmspell_events::bus::EventBus::new());
+        let session_config = crate::sessions::SessionManagerConfig::default();
+
+        Arc::new(
+            crate::sessions::SessionManager::new(
+                state_manager,
+                session_storage_backend,
+                hook_registry,
+                hook_executor,
+                &event_bus,
+                session_config,
+            )
+            .unwrap(),
+        )
+    }
+
     #[tokio::test]
     async fn test_integrated_kernel_creation() {
         let protocol = MockProtocol;
         let config = ExecutionConfig::default();
         let executor = Arc::new(MockScriptExecutor) as Arc<dyn ScriptExecutor>;
 
-        let kernel =
-            IntegratedKernel::new(protocol, config, "test-session".to_string(), executor, None)
-                .await;
+        let kernel = IntegratedKernel::new(
+            protocol,
+            config,
+            "test-session".to_string(),
+            executor,
+            None,
+            create_test_session_manager().await,
+        )
+        .await;
 
         assert!(kernel.is_ok());
     }
@@ -3223,10 +3533,16 @@ mod tests {
         let config = ExecutionConfig::default();
         let executor = Arc::new(MockScriptExecutor) as Arc<dyn ScriptExecutor>;
 
-        let mut kernel =
-            IntegratedKernel::new(protocol, config, "test-session".to_string(), executor, None)
-                .await
-                .unwrap();
+        let mut kernel = IntegratedKernel::new(
+            protocol,
+            config,
+            "test-session".to_string(),
+            executor,
+            None,
+            create_test_session_manager().await,
+        )
+        .await
+        .unwrap();
 
         // Set up shutdown signal
         let (shutdown_tx, shutdown_rx) = mpsc::channel(1);
@@ -3262,9 +3578,16 @@ mod tests {
         let session_id = "test-session".to_string();
         let executor = Arc::new(MockScriptExecutor);
 
-        let kernel = IntegratedKernel::new(protocol, config, session_id, executor, None)
-            .await
-            .unwrap();
+        let kernel = IntegratedKernel::new(
+            protocol,
+            config,
+            session_id,
+            executor,
+            None,
+            create_test_session_manager().await,
+        )
+        .await
+        .unwrap();
 
         // Test Shell channel accepts execute_request
         let execute_msg = json!({
@@ -3325,9 +3648,16 @@ mod tests {
         let session_id = "test-session".to_string();
         let executor = Arc::new(MockScriptExecutor);
 
-        let mut kernel = IntegratedKernel::new(protocol, config, session_id, executor, None)
-            .await
-            .unwrap();
+        let mut kernel = IntegratedKernel::new(
+            protocol,
+            config,
+            session_id,
+            executor,
+            None,
+            create_test_session_manager().await,
+        )
+        .await
+        .unwrap();
 
         // Simulate an input request
         let (tx, rx) = tokio::sync::oneshot::channel();
@@ -3364,9 +3694,16 @@ mod tests {
         let session_id = "test-session".to_string();
         let executor = Arc::new(MockScriptExecutor);
 
-        let kernel = IntegratedKernel::new(protocol, config, session_id, executor, None)
-            .await
-            .unwrap();
+        let kernel = IntegratedKernel::new(
+            protocol,
+            config,
+            session_id,
+            executor,
+            None,
+            create_test_session_manager().await,
+        )
+        .await
+        .unwrap();
 
         // Update channel activity timestamps
         {
@@ -3425,9 +3762,16 @@ mod tests {
         let session_id = "test-session".to_string();
         let executor = Arc::new(MockScriptExecutor);
 
-        let kernel = IntegratedKernel::new(protocol, config, session_id, executor, None)
-            .await
-            .unwrap();
+        let kernel = IntegratedKernel::new(
+            protocol,
+            config,
+            session_id,
+            executor,
+            None,
+            create_test_session_manager().await,
+        )
+        .await
+        .unwrap();
 
         // Test that shell messages update shell activity
         let before_shell = kernel
@@ -3491,9 +3835,16 @@ mod tests {
         let session_id = "test-session".to_string();
         let executor = Arc::new(MockScriptExecutor);
 
-        let _kernel = IntegratedKernel::new(protocol, config, session_id, executor, None)
-            .await
-            .unwrap();
+        let _kernel = IntegratedKernel::new(
+            protocol,
+            config,
+            session_id,
+            executor,
+            None,
+            create_test_session_manager().await,
+        )
+        .await
+        .unwrap();
 
         // Test extracting msg_type from various message structures
         let msg1 = json!({
@@ -3536,9 +3887,16 @@ mod tests {
         let session_id = "test-session".to_string();
         let executor = Arc::new(MockScriptExecutor);
 
-        let kernel = IntegratedKernel::new(protocol, config, session_id, executor, None)
-            .await
-            .unwrap();
+        let kernel = IntegratedKernel::new(
+            protocol,
+            config,
+            session_id,
+            executor,
+            None,
+            create_test_session_manager().await,
+        )
+        .await
+        .unwrap();
 
         // In a real scenario, control messages would be processed first in the main loop
         // Here we just verify the validation works correctly for priority messages
@@ -3562,6 +3920,29 @@ mod tests {
     }
 }
 
+/// Helper to create a test `SessionManager` with minimal infrastructure (module-level for all tests)
+#[cfg(test)]
+async fn create_test_session_manager() -> Arc<crate::sessions::SessionManager> {
+    let state_manager = Arc::new(crate::state::StateManager::new().await.unwrap());
+    let session_storage_backend = Arc::new(llmspell_storage::MemoryBackend::new());
+    let hook_registry = Arc::new(llmspell_hooks::HookRegistry::new());
+    let hook_executor = Arc::new(llmspell_hooks::HookExecutor::new());
+    let event_bus = Arc::new(llmspell_events::bus::EventBus::new());
+    let session_config = crate::sessions::SessionManagerConfig::default();
+
+    Arc::new(
+        crate::sessions::SessionManager::new(
+            state_manager,
+            session_storage_backend,
+            hook_registry,
+            hook_executor,
+            &event_bus,
+            session_config,
+        )
+        .unwrap(),
+    )
+}
+
 #[tokio::test]
 async fn test_message_handling_performance() -> Result<()> {
     use std::collections::HashMap;
@@ -3576,8 +3957,15 @@ async fn test_message_handling_performance() -> Result<()> {
     let session_id = "test-session".to_string();
     let script_executor = Arc::new(tests::MockScriptExecutor) as Arc<dyn ScriptExecutor>;
 
-    let mut kernel =
-        IntegratedKernel::new(protocol, config, session_id, script_executor, None).await?;
+    let mut kernel = IntegratedKernel::new(
+        protocol,
+        config,
+        session_id,
+        script_executor,
+        None,
+        create_test_session_manager().await,
+    )
+    .await?;
 
     // Create a simple kernel_info_request message (faster than execute_request)
     let mut message = HashMap::new();
@@ -3686,6 +4074,7 @@ mod daemon_tests {
             "test-session".to_string(),
             script_executor,
             None,
+            create_test_session_manager().await,
         )
         .await
         .unwrap();
@@ -3714,6 +4103,7 @@ mod daemon_tests {
             "test-session".to_string(),
             script_executor,
             None,
+            create_test_session_manager().await,
         )
         .await
         .unwrap();
@@ -3748,6 +4138,7 @@ mod daemon_tests {
             "test-session".to_string(),
             script_executor,
             None,
+            create_test_session_manager().await,
         )
         .await
         .unwrap();
@@ -3832,6 +4223,7 @@ mod daemon_tests {
             "test-session".to_string(),
             script_executor,
             None,
+            create_test_session_manager().await,
         )
         .await
         .unwrap();
@@ -3863,6 +4255,7 @@ mod multi_protocol_tests {
             "coexist-test".to_string(),
             script_executor.clone(),
             None,
+            create_test_session_manager().await,
         )
         .await
         .unwrap();
@@ -3903,6 +4296,7 @@ mod multi_protocol_tests {
             "switch-test".to_string(),
             script_executor.clone(),
             None,
+            create_test_session_manager().await,
         )
         .await
         .unwrap();
@@ -3944,14 +4338,21 @@ mod multi_protocol_tests {
             "iso1".to_string(),
             script_executor.clone(),
             None,
+            create_test_session_manager().await,
         )
         .await
         .unwrap();
 
-        let kernel2 =
-            IntegratedKernel::new(protocol2, config, "iso2".to_string(), script_executor, None)
-                .await
-                .unwrap();
+        let kernel2 = IntegratedKernel::new(
+            protocol2,
+            config,
+            "iso2".to_string(),
+            script_executor,
+            None,
+            create_test_session_manager().await,
+        )
+        .await
+        .unwrap();
 
         // Sessions should be isolated
         assert_ne!(kernel1.session_id, kernel2.session_id);
@@ -3975,6 +4376,7 @@ mod multi_protocol_tests {
                 "concurrent-test".to_string(),
                 script_executor.clone(),
                 None,
+                create_test_session_manager().await,
             )
             .await
             .unwrap(),
@@ -4026,6 +4428,7 @@ mod multi_protocol_tests {
             "error-test".to_string(),
             script_executor.clone(),
             None,
+            create_test_session_manager().await,
         )
         .await
         .unwrap();
@@ -4061,6 +4464,7 @@ mod multi_protocol_tests {
             "state-test".to_string(),
             script_executor.clone(),
             None,
+            create_test_session_manager().await,
         )
         .await
         .unwrap();
@@ -4100,6 +4504,7 @@ mod multi_protocol_tests {
             "share-test".to_string(),
             script_executor.clone(),
             None,
+            create_test_session_manager().await,
         )
         .await
         .unwrap();
@@ -4138,6 +4543,7 @@ mod performance_tests {
             "perf-test".to_string(),
             script_executor,
             None,
+            create_test_session_manager().await,
         )
         .await
         .unwrap();
@@ -4230,6 +4636,7 @@ mod performance_tests {
             "mem-test".to_string(),
             script_executor.clone(),
             None,
+            create_test_session_manager().await,
         )
         .await
         .unwrap();
@@ -4275,6 +4682,7 @@ mod performance_tests {
                 "throughput-test".to_string(),
                 script_executor,
                 None,
+                create_test_session_manager().await,
             )
             .await
             .unwrap(),
@@ -4330,6 +4738,7 @@ mod performance_tests {
             "state-perf-test".to_string(),
             script_executor,
             None,
+            create_test_session_manager().await,
         )
         .await
         .unwrap();
@@ -4372,6 +4781,7 @@ mod performance_tests {
             "timeout-test".to_string(),
             script_executor,
             None,
+            create_test_session_manager().await,
         )
         .await
         .unwrap();
@@ -4472,6 +4882,7 @@ mod security_tests {
             "validation-test".to_string(),
             script_executor,
             None,
+            create_test_session_manager().await,
         )
         .await
         .unwrap();
@@ -4616,6 +5027,7 @@ mod security_tests {
             "sanitize-test".to_string(),
             script_executor,
             None,
+            create_test_session_manager().await,
         )
         .await
         .unwrap();
@@ -4671,6 +5083,7 @@ mod security_tests {
             "limits-test".to_string(),
             script_executor,
             None,
+            create_test_session_manager().await,
         )
         .await
         .unwrap();
@@ -4723,6 +5136,7 @@ mod security_tests {
             "isolation-test".to_string(),
             script_executor,
             None,
+            create_test_session_manager().await,
         )
         .await
         .unwrap();

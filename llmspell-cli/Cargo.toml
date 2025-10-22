@@ -19,6 +19,14 @@ llmspell-kernel = { path = "../llmspell-kernel" }
 llmspell-providers = { path = "../llmspell-providers" }
 llmspell-utils = { path = "../llmspell-utils" }
 llmspell-storage = { path = "../llmspell-storage" }
+llmspell-events = { path = "../llmspell-events" }
+llmspell-hooks = { path = "../llmspell-hooks" }
+llmspell-tenancy = { path = "../llmspell-tenancy" }
+llmspell-rag = { path = "../llmspell-rag" }
+# llmspell-templates removed - templates now accessed via kernel message protocol
+llmspell-agents = { path = "../llmspell-agents" }
+llmspell-tools = { path = "../llmspell-tools" }
+llmspell-workflows = { path = "../llmspell-workflows" }
 tokio.workspace = true
 clap = { workspace = true, features = ["derive", "env"] }
 serde.workspace = true

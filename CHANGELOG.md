@@ -7,6 +7,64 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.12.0] - 2025-10-22 - Production Template System 🎯
+
+Complete turn-key AI workflow templates solving the "0-day retention problem" with 10 production-ready templates matching industry baseline. See [RELEASE_NOTES_v0.12.0.md](RELEASE_NOTES_v0.12.0.md) for full details.
+
+### Added
+
+#### Production Template System (Phase 12)
+- **10 Production Templates**: All with real LLM integration, multi-agent workflows, and comprehensive testing
+  - **Research**: research-assistant (4-phase RAG workflow), knowledge-management (RAG-centric CRUD)
+  - **Development**: code-generator (3-agent pipeline), code-review (7-aspect analysis)
+  - **Content**: content-generation (quality-driven iteration), document-processor (5 AI transformations)
+  - **Productivity**: file-classification (scan-classify-act pattern), interactive-chat (session-based)
+  - **Workflow**: workflow-orchestrator (4 execution modes), data-analysis (statistics + visualization)
+- **Template System Core** (llmspell-templates crate, 2,847 lines):
+  - Template trait with async execution, validation, cost estimation
+  - TemplateRegistry with thread-safe discovery (DashMap, Arc sharing)
+  - ExecutionContext builder for infrastructure dependency injection
+  - Comprehensive parameter validation with ConfigSchema
+  - Artifact generation with structured multi-file output
+- **CLI Commands**: `template list|info|exec|search|schema` with JSON parameter support
+- **Lua Template API**: Template global (16th global) with complete discovery and execution methods
+- **4-Layer Bridge Pattern**: TemplateBridge → TemplateGlobal → Lua/JS injection → Examples
+
+#### Template Implementations
+- **code-generator** (Phase 12.8.3): 3-agent pipeline (spec → impl → test), 5 language support, ~19s execution
+- **data-analysis** (Phase 12.8.4): 2-agent workflow (analysis → visualization), CSV/JSON, ~9s execution
+- **workflow-orchestrator** (Phase 12.8.5): 4 modes (sequential, parallel, conditional, loop), 0.85s execution
+- **document-processor** (Phase 12.8.6): 5 transformations (summarize, extract, translate, reformat, classify)
+- **interactive-chat**: Session-based conversation, tool integration, ~1.8s per response
+- **research-assistant**: 4-phase workflow (gather → ingest → synthesize → validate), requires web-searcher tool
+- **code-review** (Phase 12.10): 7-aspect analysis (security, quality, performance, best practices, dependencies, architecture, docs)
+- **content-generation** (Phase 12.11): 4-stage pipeline (draft → evaluate → edit → finalize), quality thresholds
+- **file-classification** (Phase 12.12): Bulk file organization, customizable categories, dry-run mode
+- **knowledge-management** (Phase 12.13): CRUD operations, multi-collection RAG, document chunking, citation tracking
+
+### Changed
+- **Global Count**: 16 globals (was 15) - added Template global
+- **Template Architecture**: Trait-based polymorphism with DashMap for lock-free access
+- **Documentation**: 3,655 lines added (10 user guides + architecture docs + examples)
+
+### Fixed
+- **Template Execution Infrastructure** (Phase 12.7.1): Fixed "tool_registry is required" error blocking all execution. Dual-layer registry architecture separates script access from template infrastructure.
+- **Workflow Orchestrator** (Phase 12.8.5): Fixed parallel workflow state bug causing silent failures. Consistent behavior across all 4 modes.
+
+### Performance
+- Template overhead <2ms (target <100ms, 50x faster)
+- All 10 templates with production LLM integration
+- 149 tests (100% pass rate), zero clippy warnings
+- Execution times: 0.85s (workflow) to ~19s (code-gen)
+
+### Statistics
+- **Templates**: 10 production-ready (6 initial + 4 expansion)
+- **Code**: ~7,150 lines (templates + bridge + CLI)
+- **Tests**: 149 (122 unit + 27 integration), 100% passing
+- **Documentation**: 3,655 lines (architecture + user guides + examples)
+- **Time**: 20 days (Phases 12.1-12.13)
+- **Categories**: 5 major workflow areas covered
+
 ## [0.11.2] - 2025-10-12 - Local LLM Cleanup & Enhancement 🧹
 
 Critical bug fixes and architecture cleanup for Local LLM integration. See [RELEASE_NOTES_v0.11.2.md](RELEASE_NOTES_v0.11.2.md) for full details.

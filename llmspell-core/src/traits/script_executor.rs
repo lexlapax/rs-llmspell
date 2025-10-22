@@ -40,7 +40,7 @@ pub struct ScriptExecutionMetadata {
 /// allowing the kernel to execute scripts without depending on specific
 /// script runtime implementations.
 #[async_trait]
-pub trait ScriptExecutor: Send + Sync {
+pub trait ScriptExecutor: Send + Sync + 'static {
     /// Execute a script and return the output
     ///
     /// # Arguments
@@ -104,6 +104,32 @@ pub trait ScriptExecutor: Send + Sync {
         None
     }
 
+    /// Set session manager for template infrastructure (Phase 12.8.2.5)
+    ///
+    /// Uses type erasure to avoid circular dependency between llmspell-core and llmspell-kernel.
+    /// The session manager is passed as `Arc<dyn Any>` and implementations should downcast it
+    /// to the concrete `SessionManager` type.
+    ///
+    /// Default implementation does nothing for backward compatibility.
+    /// Executors with session support should override this method.
+    ///
+    /// # Type Erasure Pattern
+    ///
+    /// ```rust,ignore
+    /// use std::any::Any;
+    /// use std::sync::Arc;
+    /// use llmspell_kernel::sessions::SessionManager;
+    ///
+    /// // In kernel initialization:
+    /// let session_manager = Arc::new(SessionManager::new(...)?);
+    /// script_executor.set_session_manager_any(
+    ///     session_manager as Arc<dyn Any + Send + Sync>
+    /// );
+    /// ```
+    fn set_session_manager_any(&self, _manager: Arc<dyn std::any::Any + Send + Sync>) {
+        // Default: ignore (for backward compatibility)
+    }
+
     /// Access to component registry for tool discovery and invocation
     ///
     /// Returns the ComponentLookup implementation that provides access to
@@ -113,6 +139,31 @@ pub trait ScriptExecutor: Send + Sync {
     /// Default returns None for backward compatibility.
     /// Executors with component registry should override this method.
     fn component_registry(&self) -> Option<Arc<dyn ComponentLookup>> {
+        None
+    }
+
+    /// Access to template registry for template discovery and execution
+    ///
+    /// Returns the TemplateRegistry as a type-erased `Arc<dyn Any>` to avoid
+    /// circular dependencies (llmspell-core can't depend on llmspell-templates).
+    /// Callers should downcast to `Arc<TemplateRegistry>` using `Arc::downcast`.
+    ///
+    /// Default returns None for backward compatibility.
+    /// Executors with template registry should override this method.
+    ///
+    /// # Type Erasure Pattern
+    ///
+    /// ```rust,ignore
+    /// use std::any::Any;
+    /// use llmspell_templates::registry::TemplateRegistry;
+    ///
+    /// if let Some(reg_any) = executor.template_registry_any() {
+    ///     if let Ok(template_registry) = Arc::downcast::<TemplateRegistry>(reg_any.clone()) {
+    ///         // Use template_registry
+    ///     }
+    /// }
+    /// ```
+    fn template_registry_any(&self) -> Option<Arc<dyn std::any::Any + Send + Sync>> {
         None
     }
 
@@ -135,6 +186,92 @@ pub trait ScriptExecutor: Send + Sync {
     fn get_completion_candidates(&self, _line: &str, _cursor_pos: usize) -> Vec<(String, String)> {
         Vec::new()
     }
+
+    // === Template Operations (JSON-based API to avoid circular dependencies) ===
+
+    /// List templates, optionally filtered by category
+    ///
+    /// Returns JSON array of template metadata. Category filter is string-based
+    /// to avoid importing template types (e.g., "research", "chat", "analysis").
+    ///
+    /// Default returns empty array for backward compatibility.
+    fn handle_template_list(&self, _category: Option<&str>) -> Result<Value, LLMSpellError> {
+        Ok(serde_json::json!([]))
+    }
+
+    /// Get template information by ID, optionally including schema
+    ///
+    /// Returns JSON object with template metadata and optionally config schema.
+    ///
+    /// Default returns error for backward compatibility.
+    fn handle_template_info(
+        &self,
+        _template_id: &str,
+        _with_schema: bool,
+    ) -> Result<Value, LLMSpellError> {
+        Err(LLMSpellError::Component {
+            message: "Template operations not supported by this executor".to_string(),
+            source: None,
+        })
+    }
+
+    /// Execute a template with given parameters
+    ///
+    /// Returns JSON object with execution result including output, metrics, and metadata.
+    ///
+    /// Default returns error for backward compatibility.
+    async fn handle_template_exec(
+        &self,
+        _template_id: &str,
+        _params: Value,
+    ) -> Result<Value, LLMSpellError> {
+        Err(LLMSpellError::Component {
+            message: "Template execution not supported by this executor".to_string(),
+            source: None,
+        })
+    }
+
+    /// Search templates by query string, optionally filtered by category
+    ///
+    /// Returns JSON array of matching template metadata.
+    ///
+    /// Default returns empty array for backward compatibility.
+    fn handle_template_search(
+        &self,
+        _query: &str,
+        _category: Option<&str>,
+    ) -> Result<Value, LLMSpellError> {
+        Ok(serde_json::json!([]))
+    }
+
+    /// Get template configuration schema by ID
+    ///
+    /// Returns JSON object describing the template's parameter schema.
+    ///
+    /// Default returns error for backward compatibility.
+    fn handle_template_schema(&self, _template_id: &str) -> Result<Value, LLMSpellError> {
+        Err(LLMSpellError::Component {
+            message: "Template schema not supported by this executor".to_string(),
+            source: None,
+        })
+    }
+
+    /// Downcast support for accessing concrete executor implementations (Phase 12.8.fix)
+    ///
+    /// Enables downcasting from `Arc<dyn ScriptExecutor>` to concrete types like `ScriptRuntime`.
+    /// This is needed for wiring infrastructure components that aren't part of the trait
+    /// (like RAG, state manager) without creating circular dependencies.
+    ///
+    /// Implementers must return `self` to enable downcasting.
+    ///
+    /// # Examples
+    ///
+    /// ```rust,ignore
+    /// fn as_any(&self) -> &dyn std::any::Any {
+    ///     self
+    /// }
+    /// ```
+    fn as_any(&self) -> &dyn std::any::Any;
 }
 
 /// Factory trait for creating script executors

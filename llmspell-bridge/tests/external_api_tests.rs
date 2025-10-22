@@ -2,6 +2,9 @@
 //! ABOUTME: Tests LLM-based workflows using actual OpenAI/Anthropic APIs
 //! ABOUTME: All tests marked with #[ignore = "external"] to skip in CI without API keys
 
+mod test_helpers;
+use test_helpers::create_test_infrastructure;
+
 use llmspell_bridge::engine::factory::LuaConfig;
 use llmspell_bridge::engine::ScriptEngineBridge;
 use llmspell_bridge::lua::LuaEngine;
@@ -42,7 +45,18 @@ async fn test_real_llm_content_classification() {
     let providers = create_real_providers().await;
 
     let mut engine = create_test_engine();
-    engine.inject_apis(&registry, &providers).unwrap();
+    let (tool_registry, agent_registry, workflow_factory) = create_test_infrastructure();
+
+    engine
+        .inject_apis(
+            &registry,
+            &providers,
+            &tool_registry,
+            &agent_registry,
+            &workflow_factory,
+            None,
+        )
+        .unwrap();
 
     // Test with real LLM agent for classification
     let script = r#"
@@ -124,7 +138,18 @@ async fn test_multi_model_classification_routing() {
     let providers = create_real_providers().await;
 
     let mut engine = create_test_engine();
-    engine.inject_apis(&registry, &providers).unwrap();
+    let (tool_registry, agent_registry, workflow_factory) = create_test_infrastructure();
+
+    engine
+        .inject_apis(
+            &registry,
+            &providers,
+            &tool_registry,
+            &agent_registry,
+            &workflow_factory,
+            None,
+        )
+        .unwrap();
 
     // Test with multiple LLM models for robust classification
     let script = r#"
@@ -208,7 +233,18 @@ async fn test_production_content_pipeline() {
     let providers = create_real_providers().await;
 
     let mut engine = create_test_engine();
-    engine.inject_apis(&registry, &providers).unwrap();
+    let (tool_registry, agent_registry, workflow_factory) = create_test_infrastructure();
+
+    engine
+        .inject_apis(
+            &registry,
+            &providers,
+            &tool_registry,
+            &agent_registry,
+            &workflow_factory,
+            None,
+        )
+        .unwrap();
 
     // Full production-like content generation pipeline
     let script = r#"

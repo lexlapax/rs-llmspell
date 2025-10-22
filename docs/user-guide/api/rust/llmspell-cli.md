@@ -49,6 +49,18 @@ llmspell app info file-organizer         # Show app details
 llmspell app run file-organizer         # Run an application
 llmspell app search --tag productivity   # Search by criteria
 
+# Template management and execution ⭐ Phase 12
+llmspell template list                         # List all templates
+llmspell template list --category research     # List by category
+llmspell template info research-assistant      # Show template details
+llmspell template schema research-assistant    # Show parameter schema
+llmspell template exec research-assistant \
+    --param topic="Rust async" \
+    --param max_sources=10 \
+    --param model="ollama/llama3.2:3b" \
+    --output json                              # Execute with JSON output
+llmspell template search "code" --category codegen  # Search templates
+
 # Note: Tools and agents are accessed via script API (Tool.*, Agent.*), not CLI commands
 ```
 
@@ -77,27 +89,70 @@ pub struct Cli {
 pub enum Commands {
     /// Execute inline code
     Exec { code: String },
-    
+
     /// Run script file
-    Run { 
+    Run {
         script: PathBuf,
         #[arg(trailing_var_arg = true)]
         args: Vec<String>,
     },
-    
+
     /// Start interactive REPL
     Repl,
-    
+
     /// Configuration management
     Config {
         #[command(subcommand)]
         action: ConfigAction,
     },
-    
+
     /// Tool management
     Tools {
         #[command(subcommand)]
         action: ToolAction,
+    },
+
+    /// Template management (Phase 12)
+    Template {
+        #[command(subcommand)]
+        action: TemplateAction,
+    },
+}
+
+#[derive(Subcommand)]
+pub enum TemplateAction {
+    /// List available templates
+    List {
+        #[arg(short, long)]
+        category: Option<String>,
+    },
+
+    /// Show template information
+    Info {
+        name: String,
+        #[arg(short, long)]
+        show_schema: bool,
+    },
+
+    /// Execute template
+    Exec {
+        name: String,
+        #[arg(short, long)]
+        param: Vec<String>,  // key=value format
+        #[arg(short, long)]
+        output: Option<String>,  // json or text
+    },
+
+    /// Search templates
+    Search {
+        query: String,
+        #[arg(short, long)]
+        category: Option<String>,
+    },
+
+    /// Show parameter schema
+    Schema {
+        name: String,
     },
 }
 ```

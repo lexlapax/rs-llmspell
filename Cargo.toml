@@ -7,6 +7,7 @@ members = [
     "llmspell-agents",
     "llmspell-tools",
     "llmspell-workflows",
+    "llmspell-templates",
     "llmspell-bridge",
     "llmspell-providers",
     "llmspell-storage",
@@ -24,11 +25,11 @@ members = [
     "examples/rust-developers/custom-tool-example",
     "examples/rust-developers/custom-agent-example",
     "examples/rust-developers/async-patterns-example",
-    "examples/rust-developers/integration-test-example"
+    "examples/rust-developers/integration-test-example",
 ]
 
 [workspace.package]
-version = "0.11.2"
+version = "0.12.0"
 edition = "2021"
 authors = ["Lex Lapax<lexlapax@gmail.com>"]
 repository = "https://github.com/lexlapax/rs-llmspell"
@@ -71,7 +72,12 @@ thiserror = "1.0"
 
 # Logging and tracing
 tracing = "0.1"
-tracing-subscriber = { version = "0.3", features = ["json", "env-filter", "fmt", "time"] }
+tracing-subscriber = { version = "0.3", features = [
+    "json",
+    "env-filter",
+    "fmt",
+    "time",
+] }
 tracing-futures = "0.2"
 
 # Configuration management
@@ -92,7 +98,13 @@ sled = "0.34"
 rocksdb = "0.22"
 
 # Scripting engines
-mlua = { version = "0.9", features = ["lua54", "async", "serialize", "send", "parking_lot"] }
+mlua = { version = "0.9", features = [
+    "lua54",
+    "async",
+    "serialize",
+    "send",
+    "parking_lot",
+] }
 boa_engine = "0.20"
 quickjs_runtime = "0.12"
 
@@ -172,4 +184,3 @@ debug-assertions = true
 overflow-checks = true
 incremental = true
 codegen-units = 256
-

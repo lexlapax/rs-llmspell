@@ -53,6 +53,7 @@ pub mod repl;
 pub mod run;
 pub mod session;
 pub mod state;
+pub mod template;
 pub mod tool;
 pub mod version;
 
@@ -214,6 +215,10 @@ pub async fn execute_command(
 
         Commands::Model { command } => {
             model::handle_model_command(command, runtime_config, output_format).await
+        }
+
+        Commands::Template { command } => {
+            template::handle_template_command(command, runtime_config, output_format).await
         }
 
         Commands::Version(version_cmd) => version::execute(version_cmd, output_format).await,

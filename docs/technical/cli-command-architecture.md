@@ -1,13 +1,13 @@
 # CLI Command Architecture
 
-**Version**: v0.11.1 (Phase 11b Complete)
-**Status**: Production-Ready with Daemon Support, Service Integration, Tool Commands, and Local LLM Integration
-**Last Updated**: October 2025
-**Phase**: 11b Complete (Unified Profile System with Ollama + Candle Local LLM Support)
+**Version**: v0.12.0 (Phase 12 Complete)
+**Status**: Production-Ready with Template System, Daemon Support, Service Integration, Tool Commands, and Local LLM Integration
+**Last Updated**: October 24, 2025
+**Phase**: 12 Complete (Production-Ready AI Agent Templates)
 
 ## Executive Summary
 
-This document describes the CLI command architecture implemented in LLMSpell v0.11.1 with integrated kernel architecture, full daemon support, direct tool invocation capabilities, and local LLM support. Phase 9 achieved a unified kernel architecture eliminating runtime isolation issues, Phase 10 added Unix daemon mode with service integration and tool commands, and Phase 11 completed local LLM integration with a unified profile system.
+This document describes the CLI command architecture implemented in LLMSpell v0.12.0 with integrated kernel architecture, full daemon support, direct tool invocation capabilities, local LLM support, and production-ready AI agent templates. Phase 9 achieved a unified kernel architecture eliminating runtime isolation issues, Phase 10 added Unix daemon mode with service integration and tool commands, Phase 11 completed local LLM integration with a unified profile system, and Phase 12 delivered the template system solving the "0-day retention problem."
 
 **Phase 9 Achievements**: Integrated kernel with global IO runtime, protocol/transport abstraction, DAP bridge for debugging, and comprehensive tracing.
 
@@ -27,6 +27,15 @@ This document describes the CLI command architecture implemented in LLMSpell v0.
 - **Model Discovery UX (11b.5)** - Dual-tier discovery with `model available` command and web URLs (Ollama library + HuggingFace) in help text
 - **Model Management CLI** - Complete model lifecycle management with pull/list/remove/info/available/status subcommands
 - **87% Compile Speedup** - Bridge-only builds improved from 38s to 5s via Cargo feature gates
+
+**Phase 12 Achievements**:
+- **Template System** - Production-ready AI workflow templates solving 0-day retention problem
+- **10 Built-in Templates** - 6 base templates + 4 advanced pattern templates (code-review, content-generation, file-classification, knowledge-management)
+- **Template CLI Commands** - 5 subcommands (list, info, exec, search, schema) for template discovery and execution
+- **Lua Bridge Integration** - Template global (16th global) with 6 methods for script access
+- **149 Tests** - 122 unit + 27 integration tests, 100% passing
+- **2,651 LOC** - Production template code (research-assistant, interactive-chat, data-analysis, code-generator, document-processor, workflow-orchestrator, code-review, content-generation, file-classification, knowledge-management)
+- **Performance Targets Exceeded** - 20-50x faster than planned targets (<2ms overhead, <0.5ms discovery)
 
 ---
 
@@ -69,6 +78,7 @@ Primary Commands:
 
 Subcommand Groups:
   kernel            # Kernel management (start/stop/status/connect/install-service)
+  template          # AI workflow template management and execution (Phase 12)
   tool              # Tool management and direct invocation (Phase 10.22)
   model             # Local LLM model management (Phase 11)
   state             # State management
@@ -96,6 +106,12 @@ llmspell
 │   ├── connect [address]
 │   └── install-service [--service-type] [--system] [--name] [--port] [--id]
 │                       [--log-file] [--pid-file] [--enable] [--start] [--force]
+├── template                                    # Phase 12
+│   ├── list [--category] [--format]
+│   ├── info <id> [--show-schema]
+│   ├── exec <id> --param key=value... [--output-dir] [--stream]
+│   ├── search <query> [--category]
+│   └── schema <id> [--format]
 ├── tool                                        # Phase 10.22
 │   ├── list [--category] [--format]
 │   ├── info <name> [--show-schema]
@@ -402,7 +418,112 @@ Connection File:  ~/.llmspell/kernels/abc123.json
 llmspell kernel status --watch --interval 2
 ```
 
-### 4.2 Tool Management (Phase 10.22)
+### 4.2 Template Management (Phase 12)
+
+**Architecture Note**: Templates execute in the runtime process with access to full infrastructure (ToolRegistry, AgentRegistry, WorkflowFactory, ProviderManager). The CLI creates ExecutionContext and invokes templates directly via TemplateBridge, returning structured TemplateOutput (result + artifacts + metrics).
+
+```bash
+llmspell template <SUBCOMMAND>
+
+SUBCOMMANDS:
+    list       List available templates with category filtering
+    info       Show detailed template information and schema
+    exec       Execute template with parameters
+    search     Search templates by query (name, description, tags)
+    schema     Show template parameter schema
+
+LIST OPTIONS:
+    --category <CATEGORY>  Filter by template category (Research, Chat, Analysis, Development, Productivity, Document, Workflow, Content)
+    --format <FORMAT>      Output format (overrides global) [text|json|pretty]
+
+INFO OPTIONS:
+    --show-schema          Show detailed parameter schema with constraints
+
+EXEC OPTIONS:
+    --param key=value      Template parameters (repeatable, supports JSON values)
+    --output-dir <DIR>     Directory for output artifacts
+    --stream              Enable streaming output (if template supports)
+
+SEARCH OPTIONS:
+    --category <CATEGORY>  Filter by template category
+
+SCHEMA OPTIONS:
+    --format <FORMAT>      Output format [text|json|pretty]
+
+ARCHITECTURE:
+    - Templates execute in runtime with full infrastructure access
+    - ExecutionContext provides ToolRegistry, AgentRegistry, WorkflowFactory, ProviderManager
+    - Parameter validation against ConfigSchema before execution
+    - Structured output: TemplateOutput{result, artifacts, metadata, metrics}
+    - Dual-layer registry: ComponentRegistry (scripts) + ToolRegistry (templates)
+    - Templates accessible from CLI, Lua scripts, JavaScript (future)
+
+EXAMPLES:
+    # List all 10 templates
+    llmspell template list
+
+    # Filter by category
+    llmspell template list --category Research
+
+    # Show template details with schema
+    llmspell template info research-assistant --show-schema
+
+    # Execute research assistant template
+    llmspell template exec research-assistant \
+        --param topic="Rust async programming" \
+        --param max_sources=5 \
+        --param model="ollama/llama3.2:3b"
+
+    # Execute code review template with selective aspects
+    llmspell template exec code-review \
+        --param code_path="src/main.rs" \
+        --param aspects='["security","quality","performance"]' \
+        --param model="ollama/llama3.2:3b"
+
+    # Execute content generation with quality threshold
+    llmspell template exec content-generation \
+        --param topic="Introduction to Rust" \
+        --param content_type="blog_post" \
+        --param quality_threshold=8 \
+        --param max_iterations=5 \
+        --param model="ollama/llama3.2:3b"
+
+    # File classification with dry-run preview
+    llmspell template exec file-classification \
+        --param files_paths='["/tmp/file1.txt", "/tmp/file2.txt"]' \
+        --param categories='{"technical":"docs/tech", "personal":"docs/personal"}' \
+        --param dry_run=true \
+        --param model="ollama/llama3.2:3b"
+
+    # Knowledge management - ingest documents
+    llmspell template exec knowledge-management \
+        --param operation="ingest" \
+        --param collection="rust-docs" \
+        --param content="Rust is a systems programming language..."
+
+    # Search templates
+    llmspell template search "RAG"
+
+    # Show schema for parameter reference
+    llmspell template schema research-assistant
+
+AVAILABLE TEMPLATES (10 Total):
+    Base Templates (Phase 12.1-12.8):
+      1. research-assistant     - 4-phase RAG pipeline (gather → ingest → synthesize → validate)
+      2. interactive-chat       - REPL-based conversation with session management
+      3. data-analysis          - Stats + visualization agents
+      4. code-generator         - 3-agent chain (spec → impl → test)
+      5. document-processor     - PDF/text processing with transformation
+      6. workflow-orchestrator  - Custom parallel/sequential agent orchestration
+
+    Advanced Templates (Phase 12.10-12.13):
+      7. code-review            - Multi-aspect analysis (security, quality, performance)
+      8. content-generation     - Quality-driven iteration with eval/edit loop
+      9. file-classification    - Scan-classify-act pattern with dry-run
+     10. knowledge-management   - RAG-centric CRUD (ingest, query, update, delete, list)
+```
+
+### 4.3 Tool Management (Phase 10.22)
 
 **Architecture Note**: Tools execute in the kernel process, not the CLI. The CLI is a thin client that sends `tool_request` messages to the kernel via the message protocol. The kernel accesses the ComponentRegistry and executes tools with proper context, returning results via `tool_reply` messages.
 
@@ -483,7 +604,7 @@ CODE REFERENCES:
     Registry: llmspell-core/src/traits/script_executor.rs (component_registry method)
 ```
 
-### 4.3 State Management
+### 4.4 State Management
 
 ```bash
 llmspell state <SUBCOMMAND> [OPTIONS]
@@ -515,7 +636,7 @@ EXAMPLES:
     llmspell state import state.json --kernel abc123 --merge
 ```
 
-### 4.4 Session Management
+### 4.5 Session Management
 
 ```bash
 llmspell session <SUBCOMMAND> [OPTIONS]
@@ -548,7 +669,7 @@ EXAMPLES:
     llmspell session delete old_session --kernel abc123
 ```
 
-### 4.5 Configuration Management
+### 4.6 Configuration Management
 
 ```bash
 llmspell config <SUBCOMMAND>
@@ -580,7 +701,7 @@ EXAMPLES:
     llmspell config list-profiles --detailed     # Show detailed information
 ```
 
-### 4.6 Application Management
+### 4.7 Application Management
 
 ```bash
 llmspell app [--search-path PATH]... <SUBCOMMAND>
@@ -617,7 +738,7 @@ EXAMPLES:
     llmspell app search --complexity Simple
 ```
 
-### 4.7 Version Information
+### 4.8 Version Information
 
 ```bash
 llmspell version [OPTIONS]
@@ -649,7 +770,7 @@ VERSION OUTPUT INCLUDES:
     - Enabled feature flags
 ```
 
-### 4.8 Model Management (Phase 11)
+### 4.9 Model Management (Phase 11)
 
 **Architecture Note**: Model management provides complete lifecycle operations for local LLMs via both Ollama and Candle backends. Models are downloaded, cached, and made available to scripts through provider configuration.
 

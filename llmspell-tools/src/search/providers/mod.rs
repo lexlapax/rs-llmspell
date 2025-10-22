@@ -1,23 +1,27 @@
 //! ABOUTME: Search provider abstraction and implementations
-//! ABOUTME: Defines common interface for all search providers (Google, Bing, `DuckDuckGo`, `SerpApi`, `SerperDev`)
+//! ABOUTME: Defines common interface for all search providers (Tavily, Bing, Google, Brave, `DuckDuckGo`, `SerpApi`, `SerperDev`)
 
 use async_trait::async_trait;
 use llmspell_core::Result;
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 
+pub mod bing;
 pub mod brave;
 pub mod duckduckgo;
 pub mod google;
 pub mod serpapi;
 pub mod serperdev;
+pub mod tavily;
 
 // Re-export providers
+pub use bing::BingSearchProvider;
 pub use brave::BraveSearchProvider;
 pub use duckduckgo::DuckDuckGoProvider;
 pub use google::GoogleSearchProvider;
 pub use serpapi::SerpApiProvider;
 pub use serperdev::SerperDevProvider;
+pub use tavily::TavilySearchProvider;
 
 /// Search result structure
 #[derive(Debug, Clone, Serialize, Deserialize)]

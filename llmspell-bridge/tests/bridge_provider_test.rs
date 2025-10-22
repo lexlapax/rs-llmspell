@@ -1,6 +1,9 @@
 //! ABOUTME: Tests for provider access through the script engine bridge
 //! ABOUTME: Validates that scripts can access and use providers correctly
 
+mod test_helpers;
+use test_helpers::create_test_infrastructure;
+
 use llmspell_bridge::{
     engine::factory::{EngineFactory, LuaConfig},
     providers::ProviderManager,
@@ -31,7 +34,16 @@ async fn test_inject_providers() {
     let providers = Arc::new(ProviderManager::new(provider_config).await.unwrap());
 
     // Should inject successfully
-    let result = engine.inject_apis(&registry, &providers);
+    let (tool_registry, agent_registry, workflow_factory) = create_test_infrastructure();
+
+    let result = engine.inject_apis(
+        &registry,
+        &providers,
+        &tool_registry,
+        &agent_registry,
+        &workflow_factory,
+        None,
+    );
     assert!(result.is_ok(), "API injection should succeed");
 }
 
@@ -45,7 +57,18 @@ async fn test_script_provider_access() {
     let provider_config = ProviderManagerConfig::default();
     let providers = Arc::new(ProviderManager::new(provider_config).await.unwrap());
 
-    engine.inject_apis(&registry, &providers).unwrap();
+    let (tool_registry, agent_registry, workflow_factory) = create_test_infrastructure();
+
+    engine
+        .inject_apis(
+            &registry,
+            &providers,
+            &tool_registry,
+            &agent_registry,
+            &workflow_factory,
+            None,
+        )
+        .unwrap();
 
     // Check that Agent API exists (providers are accessed through agents)
     let script = "return type(Agent) == 'table'";
@@ -67,7 +90,18 @@ async fn test_script_list_providers() {
     let provider_config = ProviderManagerConfig::default();
     let providers = Arc::new(ProviderManager::new(provider_config).await.unwrap());
 
-    engine.inject_apis(&registry, &providers).unwrap();
+    let (tool_registry, agent_registry, workflow_factory) = create_test_infrastructure();
+
+    engine
+        .inject_apis(
+            &registry,
+            &providers,
+            &tool_registry,
+            &agent_registry,
+            &workflow_factory,
+            None,
+        )
+        .unwrap();
 
     // Agent.create should be available
     let script = "return type(Agent.create) == 'function'";
@@ -152,7 +186,18 @@ async fn test_concurrent_provider_access() {
     let provider_config = ProviderManagerConfig::default();
     let providers = Arc::new(ProviderManager::new(provider_config).await.unwrap());
 
-    engine.inject_apis(&registry, &providers).unwrap();
+    let (tool_registry, agent_registry, workflow_factory) = create_test_infrastructure();
+
+    engine
+        .inject_apis(
+            &registry,
+            &providers,
+            &tool_registry,
+            &agent_registry,
+            &workflow_factory,
+            None,
+        )
+        .unwrap();
 
     // Create multiple tasks that access providers
     let engine = Arc::new(engine);
@@ -184,7 +229,18 @@ async fn test_script_provider_error_handling() {
     let provider_config = ProviderManagerConfig::default();
     let providers = Arc::new(ProviderManager::new(provider_config).await.unwrap());
 
-    engine.inject_apis(&registry, &providers).unwrap();
+    let (tool_registry, agent_registry, workflow_factory) = create_test_infrastructure();
+
+    engine
+        .inject_apis(
+            &registry,
+            &providers,
+            &tool_registry,
+            &agent_registry,
+            &workflow_factory,
+            None,
+        )
+        .unwrap();
 
     // Try to create an agent without a provider configured
     let script = r#"

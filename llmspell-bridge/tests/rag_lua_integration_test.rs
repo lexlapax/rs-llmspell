@@ -63,10 +63,19 @@ mod rag_lua_tests {
         let tenant_manager = Arc::new(MultiTenantVectorManager::new(vector_storage.clone()));
         let multi_tenant_rag = Arc::new(MultiTenantRAG::new(tenant_manager));
 
+        // Create infrastructure registries (Phase 12.8.2.13)
+        let tool_registry = Arc::new(llmspell_tools::ToolRegistry::new());
+        let agent_registry = Arc::new(llmspell_agents::FactoryRegistry::new());
+        let workflow_factory: Arc<dyn llmspell_workflows::WorkflowFactory> =
+            Arc::new(llmspell_workflows::factory::DefaultWorkflowFactory::new());
+
         let context = GlobalContext::new(registry, providers.clone());
         context.set_bridge("session_manager", session_manager.clone());
         context.set_bridge("state_manager", state_manager.clone());
         context.set_bridge("multi_tenant_rag", multi_tenant_rag.clone());
+        context.set_bridge("tool_registry", tool_registry);
+        context.set_bridge("agent_registry", agent_registry);
+        context.set_bridge("workflow_factory", Arc::new(workflow_factory));
 
         let context = Arc::new(context);
         let lua = Lua::new();
@@ -432,7 +441,7 @@ mod rag_lua_tests {
         config.rag.vector_storage.backend = llmspell_config::VectorBackend::HNSW;
         config.rag.vector_storage.dimensions = 384;
 
-        let runtime = ScriptRuntime::new_with_lua(config).await.unwrap();
+        let runtime = Box::pin(ScriptRuntime::new_with_lua(config)).await.unwrap();
 
         let script = r#"
             -- Use RAG through runtime
@@ -467,7 +476,7 @@ mod rag_lua_tests {
         config.rag.vector_storage.backend = llmspell_config::VectorBackend::HNSW;
         config.rag.vector_storage.dimensions = 384; // Use consistent dimensions
 
-        let runtime = ScriptRuntime::new_with_lua(config).await.unwrap();
+        let runtime = Box::pin(ScriptRuntime::new_with_lua(config)).await.unwrap();
 
         let script = r#"
             -- Verify RAG is available with Mock backend
@@ -498,7 +507,7 @@ mod rag_lua_tests {
         };
         config.rag.enabled = false; // RAG disabled
 
-        let runtime = ScriptRuntime::new_with_lua(config).await.unwrap();
+        let runtime = Box::pin(ScriptRuntime::new_with_lua(config)).await.unwrap();
 
         let script = r"
             -- RAG should be nil when disabled

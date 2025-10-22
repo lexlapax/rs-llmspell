@@ -493,6 +493,33 @@ EXAMPLES:
         command: ModelCommands,
     },
 
+    /// Manage and execute templates
+    #[command(
+        long_about = "Discover, configure, and execute production-ready AI agent templates.
+
+Templates provide turn-key solutions for common workflows by combining agents, tools,
+RAG, and workflows into pre-configured patterns. Available templates include:
+- Research Assistant (4-phase: gather → ingest → synthesize → validate)
+- Interactive Chat (session-based conversation)
+- Data Analysis (stats + visualization)
+- Code Generator (spec → impl → test)
+- Document Processor (PDF/OCR + transformation)
+- Workflow Orchestrator (custom patterns)
+
+EXAMPLES:
+    llmspell template list                       # List all available templates
+    llmspell template list --category Research   # Filter by category
+    llmspell template info research-assistant    # Show template details
+    llmspell template info research-assistant --show-schema  # Include parameter schema
+    llmspell template exec research-assistant --param topic=\"Rust async\" --param max_sources=15
+    llmspell template search \"research\" \"citations\"  # Search templates
+    llmspell template schema research-assistant  # Show JSON schema"
+    )]
+    Template {
+        #[command(subcommand)]
+        command: TemplateCommands,
+    },
+
     /// Display version information
     #[command(long_about = "Display detailed version and build information.
 
@@ -1194,6 +1221,121 @@ impl Cli {
             }
         })
     }
+}
+
+/// Template management subcommands
+#[derive(Subcommand, Debug)]
+pub enum TemplateCommands {
+    /// List available templates
+    #[command(long_about = "List all templates with optional category filtering.
+
+EXAMPLES:
+    llmspell template list                       # List all templates
+    llmspell template list --category Research   # Filter by category
+    llmspell template list --format json         # Output as JSON")]
+    List {
+        /// Filter by template category (Research, Chat, Analysis, CodeGen, Document, Workflow)
+        #[arg(long)]
+        category: Option<String>,
+
+        /// Output format (overrides global format)
+        #[arg(long)]
+        format: Option<OutputFormat>,
+    },
+
+    /// Show detailed template information
+    #[command(long_about = "Display detailed information about a specific template.
+
+EXAMPLES:
+    llmspell template info research-assistant    # Show template details
+    llmspell template info research-assistant --show-schema  # Include parameter schema
+    llmspell template info interactive-chat --format json    # JSON output")]
+    Info {
+        /// Template ID to show information for
+        name: String,
+
+        /// Show detailed parameter schema
+        #[arg(long)]
+        show_schema: bool,
+    },
+
+    /// Execute template with parameters
+    #[command(long_about = "Execute a template with specified parameters.
+
+Parameters can be provided as --param key=value flags. Values are parsed as JSON first,
+falling back to strings. Complex values should use JSON syntax.
+
+EXAMPLES:
+    llmspell template exec research-assistant --param topic=\"Rust async runtime design\"
+    llmspell template exec research-assistant --param topic=\"AI safety\" --param max_sources=20
+    llmspell template exec data-analysis --param data_file=\"data.csv\" --param chart_type=\"bar\"
+    llmspell template exec research-assistant --param topic=\"Quantum\" --output-dir /tmp/results")]
+    Exec {
+        /// Template ID to execute
+        name: String,
+
+        /// Template parameters in key=value format (repeatable)
+        #[arg(long = "param", value_parser = parse_key_val::<String, String>)]
+        params: Vec<(String, String)>,
+
+        /// Output directory for artifacts
+        #[arg(long, short = 'o')]
+        output_dir: Option<std::path::PathBuf>,
+    },
+
+    /// Search templates by keywords
+    #[command(
+        long_about = "Search for templates by keywords in name, description, or tags.
+
+EXAMPLES:
+    llmspell template search \"research\"         # Search for research templates
+    llmspell template search \"code\" \"generator\" # Multiple keywords
+    llmspell template search \"data\" --category Analysis  # Filter by category"
+    )]
+    Search {
+        /// Search keywords (can specify multiple)
+        query: Vec<String>,
+
+        /// Filter by template category
+        #[arg(long)]
+        category: Option<String>,
+    },
+
+    /// Show template parameter schema
+    #[command(
+        long_about = "Display the parameter schema for a template in JSON format.
+
+The schema shows parameter types, defaults, constraints, and validation rules.
+
+EXAMPLES:
+    llmspell template schema research-assistant  # Show parameter schema
+    llmspell template schema interactive-chat > schema.json  # Save to file"
+    )]
+    Schema {
+        /// Template ID to show schema for
+        name: String,
+    },
+}
+
+/// Parse key=value pairs from command line
+fn parse_key_val<T, U>(s: &str) -> Result<(T, U), String>
+where
+    T: std::str::FromStr,
+    T::Err: std::fmt::Display,
+    U: std::str::FromStr,
+    U::Err: std::fmt::Display,
+{
+    let pos = s
+        .find('=')
+        .ok_or_else(|| format!("Invalid KEY=value: no '=' found in `{}`", s))?;
+    Ok((
+        s[..pos]
+            .parse()
+            .map_err(|e| format!("Invalid key in `{}`: {}", s, e))?,
+        s[pos + 1..]
+            .parse()
+            .map_err(|e| format!("Invalid value in `{}`: {}", s, e))?,
+    ))
 }
 
 /// Parse JSON value from command line argument

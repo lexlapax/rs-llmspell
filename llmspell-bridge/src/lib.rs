@@ -275,6 +275,9 @@ pub mod orchestration;
 pub mod workflow_performance;
 pub mod workflows; // Includes WorkflowBridge, WorkflowRegistry, and StandardizedWorkflowFactory (consolidated)
 
+// Template bridge module
+pub mod template_bridge;
+
 // Language-specific implementations (feature-gated)
 #[cfg(feature = "lua")]
 pub mod lua;
@@ -293,6 +296,7 @@ pub use llmspell_config::LLMSpellConfig;
 pub use providers::ProviderManager;
 pub use registry::ComponentRegistry;
 pub use runtime::ScriptRuntime;
+pub use template_bridge::{TemplateBridge, TemplateInfo};
 
 #[cfg(feature = "lua")]
 use llmspell_core::traits::script_executor::ScriptExecutor;
@@ -311,7 +315,7 @@ use std::sync::Arc;
 pub async fn create_script_executor(
     config: LLMSpellConfig,
 ) -> Result<Arc<dyn ScriptExecutor>, llmspell_core::error::LLMSpellError> {
-    let runtime = ScriptRuntime::new_with_lua(config).await?;
+    let runtime = Box::pin(ScriptRuntime::new_with_lua(config)).await?;
     Ok(Arc::new(runtime) as Arc<dyn ScriptExecutor>)
 }
 
@@ -324,11 +328,36 @@ pub async fn create_script_executor(
 ///
 /// Returns an error if the script runtime fails to initialize.
 #[cfg(feature = "lua")]
-#[allow(clippy::unused_async)]
 pub async fn create_script_executor_with_provider(
     config: LLMSpellConfig,
     provider_manager: Arc<ProviderManager>,
 ) -> Result<Arc<dyn ScriptExecutor>, llmspell_core::error::LLMSpellError> {
-    let runtime = ScriptRuntime::new_with_lua_and_provider(config, provider_manager)?;
+    let runtime = ScriptRuntime::new_with_lua_and_provider(config, provider_manager).await?;
+    Ok(Arc::new(runtime) as Arc<dyn ScriptExecutor>)
+}
+
+/// Create script executor with provider manager AND `SessionManager` (Phase 12.8.2.11 - Unified Path)
+///
+/// This ensures `SessionManager` is available during `inject_apis()` so templates can access it.
+/// Used by kernel initialization to provide full infrastructure to script runtime.
+///
+/// Accepts the core `llmspell_providers::ProviderManager` to avoid type conversion issues
+/// when called from the CLI layer which uses the kernel API.
+///
+/// # Errors
+///
+/// Returns an error if the script runtime fails to initialize.
+#[cfg(feature = "lua")]
+pub async fn create_script_executor_with_provider_and_session(
+    config: LLMSpellConfig,
+    provider_manager: Arc<llmspell_providers::ProviderManager>,
+    session_manager: Arc<llmspell_kernel::sessions::SessionManager>,
+) -> Result<Arc<dyn ScriptExecutor>, llmspell_core::error::LLMSpellError> {
+    let runtime = Box::pin(ScriptRuntime::new_with_lua_core_provider_and_session(
+        config,
+        provider_manager,
+        session_manager,
+    ))
+    .await?;
     Ok(Arc::new(runtime) as Arc<dyn ScriptExecutor>)
 }

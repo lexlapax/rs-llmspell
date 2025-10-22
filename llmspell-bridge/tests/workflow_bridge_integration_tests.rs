@@ -1,6 +1,9 @@
 //! ABOUTME: Integration tests for Lua workflow builder to Rust workflow conversion
 //! ABOUTME: Tests agent classification condition parsing and workflow execution
 
+mod test_helpers;
+use test_helpers::create_test_infrastructure;
+
 use llmspell_bridge::engine::factory::LuaConfig;
 use llmspell_bridge::engine::ScriptEngineBridge;
 use llmspell_bridge::lua::LuaEngine;
@@ -40,7 +43,18 @@ async fn test_lua_builder_to_rust_workflow_conversion() {
     let providers = create_test_providers().await;
 
     let mut engine = create_test_engine();
-    engine.inject_apis(&registry, &providers).unwrap();
+    let (tool_registry, agent_registry, workflow_factory) = create_test_infrastructure();
+
+    engine
+        .inject_apis(
+            &registry,
+            &providers,
+            &tool_registry,
+            &agent_registry,
+            &workflow_factory,
+            None,
+        )
+        .unwrap();
 
     // Test that Lua builder creates proper workflow structure
     let script = r#"
@@ -100,7 +114,18 @@ async fn test_agent_classification_condition_parsing() {
     let providers = create_test_providers().await;
 
     let mut engine = create_test_engine();
-    engine.inject_apis(&registry, &providers).unwrap();
+    let (tool_registry, agent_registry, workflow_factory) = create_test_infrastructure();
+
+    engine
+        .inject_apis(
+            &registry,
+            &providers,
+            &tool_registry,
+            &agent_registry,
+            &workflow_factory,
+            None,
+        )
+        .unwrap();
 
     // Test that agent classification conditions are properly parsed
     let script = r#"
@@ -150,7 +175,18 @@ async fn test_nested_workflow_step_conversion() {
     let providers = create_test_providers().await;
 
     let mut engine = create_test_engine();
-    engine.inject_apis(&registry, &providers).unwrap();
+    let (tool_registry, agent_registry, workflow_factory) = create_test_infrastructure();
+
+    engine
+        .inject_apis(
+            &registry,
+            &providers,
+            &tool_registry,
+            &agent_registry,
+            &workflow_factory,
+            None,
+        )
+        .unwrap();
 
     // Test nested workflow steps are properly converted
     let script = r#"
@@ -205,7 +241,18 @@ async fn test_multi_branch_condition_conversion() {
     let providers = create_test_providers().await;
 
     let mut engine = create_test_engine();
-    engine.inject_apis(&registry, &providers).unwrap();
+    let (tool_registry, agent_registry, workflow_factory) = create_test_infrastructure();
+
+    engine
+        .inject_apis(
+            &registry,
+            &providers,
+            &tool_registry,
+            &agent_registry,
+            &workflow_factory,
+            None,
+        )
+        .unwrap();
 
     // Test multiple else branches are properly handled
     let script = r#"

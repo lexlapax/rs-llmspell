@@ -58,7 +58,7 @@ async fn execute_code_embedded(
             println!(
                 "{}",
                 serde_json::json!({
-                    "status": "success",
+                    "status": "executed",
                     "mode": "embedded",
                     "code_length": code.len(),
                     "result": result
@@ -94,7 +94,7 @@ async fn execute_code_connected(
             println!(
                 "{}",
                 serde_json::json!({
-                    "status": "success",
+                    "status": "executed",
                     "mode": "connected",
                     "code_length": code.len(),
                     "result": result

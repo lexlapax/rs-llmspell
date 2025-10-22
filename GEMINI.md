@@ -12,9 +12,10 @@ The platform is highly modular and can be built with different feature sets to c
 
 *   **Architecture**: `/docs/technical/master-architecture-vision.md`
 *   **Implementation Phases**: `/docs/in-progress/implementation-phases.md` (23+ phase roadmap)
-*   **Current Status**: v0.11.1 - Phase 11a Complete, Ready for Phase 12 (Adaptive Memory System)
-*   **Phase 11a Design**: `/docs/in-progress/phase-11a-design-doc.md` (1,685-line consolidation doc)
-*   **Release Notes**: `/RELEASE_NOTES_v0.11.1.md` (comprehensive v0.11.1 changelog)
+*   **Current Status**: v0.12.0 - Phase 12 Complete, Ready for Phase 13 (Adaptive Memory System)
+*   **Phase 12 Design**: `/docs/in-progress/phase-12-design-doc.md` (Production Template System)
+*   **Template Architecture**: `/docs/technical/template-system-architecture.md` (Complete template system design)
+*   **Release Notes**: `/RELEASE_NOTES_v0.12.0.md` (comprehensive v0.12.0 changelog)
 *   **Current Work**: Always read `/TODO.md` for active tasks.
 
 ## Recent Completion Status
@@ -23,7 +24,9 @@ The platform is highly modular and can be built with different feature sets to c
 *   ✅ **Phase 10**: Service Integration & IDE Connectivity (kernel, Jupyter, VS Code, LSP)
 *   ✅ **Phase 11**: Local LLM Integration (Ollama + Candle dual-path) - COMPLETE
 *   ✅ **Phase 11a**: Bridge Consolidation (87% compile speedup, API standardization, docs completeness) - COMPLETE
-*   🚧 **Phase 12**: Starting - Adaptive Memory System (A-TKG temporal knowledge graph)
+*   ✅ **Phase 11b**: Local LLM Cleanup (unified profiles, dual-architecture models, platform-aware GPU) - COMPLETE
+*   ✅ **Phase 12**: Production Template System (10 templates, CLI + Lua API, multi-agent workflows) - COMPLETE
+*   🚧 **Phase 13**: Next - Adaptive Memory System (A-TKG temporal knowledge graph, template memory integration)
 
 ## Development Philosophy
 
@@ -47,6 +50,7 @@ The platform is highly modular and can be built with different feature sets to c
 *   `llmspell-tools`: Tool implementations
 *   `llmspell-agents`: Agent infrastructure
 *   `llmspell-workflows`: Workflow patterns
+*   `llmspell-templates`: Production AI workflow templates (NEW in v0.12.0)
 *   `llmspell-bridge`: Script language integration
 *   `llmspell-utils`: Shared utilities (use for ALL shared code)
 *   `llmspell-state-persistence`: State with persistence
@@ -95,6 +99,36 @@ You can also run applications directly with the `llmspell` binary:
 llmspell app run <application-name>
 ```
 
+### Using Templates (NEW in v0.12.0)
+
+Templates provide turn-key AI workflows accessible via CLI or Lua:
+
+**CLI Usage:**
+```bash
+# List available templates
+llmspell template list
+
+# Generate code with 3-agent pipeline
+llmspell template exec code-generator \
+  --param description="Fibonacci function" \
+  --param language="rust" \
+  --param model="ollama/llama3.2:3b"
+
+# Research assistant with RAG
+llmspell template exec research-assistant \
+  --param topic="Rust async patterns" \
+  --param max_sources=10
+```
+
+**Lua Usage:**
+```lua
+local result = Template.execute("code-generator", {
+    description = "Calculate prime numbers",
+    language = "rust",
+    model = "ollama/llama3.2:3b"
+})
+```
+
 ## Development Workflow
 
 1.  Read the relevant phase documentation and `TODO.md`.
@@ -127,18 +161,21 @@ The following scripts are mandatory to run before committing:
 *   **State operations**: <5ms write, <1ms read
 *   **Zero warnings policy**: `cargo clippy --workspace --all-target --all-features`
 
-## v0.11.1 Key Achievements (Phase 11a)
+## v0.12.0 Key Achievements (Phase 12)
 
-*   **87% Compile Speedup**: Bridge-only builds 38s→5s via Cargo feature gates (optional language runtimes)
-*   **API Standardization**: Tool.execute() consistent across all 40+ tools (zero ambiguity)
-*   **Workflow Introspection**: WorkflowResult.agent_outputs for debugging multi-step workflows
-*   **Documentation Completeness**: Security coverage 40%→95%, Environment variables 0%→100% (41+ documented)
-*   **Code Simplification**: 876 lines removed (StepType::Custom variant cleanup)
-*   **Lua API Documentation**: 100% accurate against llmspell-bridge implementation
-*   **Deployment Patterns**: GitHub Actions, GitLab CI, Docker, Docker Compose, systemd, Kubernetes ready
+*   **10 Production Templates**: Turn-key AI workflows solving "0-day retention problem"
+*   **Template System Core**: 2,847 lines (trait-based, DashMap registry, ExecutionContext builder)
+*   **CLI + Lua Integration**: `template list|info|exec|search|schema` commands + Template global (16th global)
+*   **Multi-Agent Workflows**: Real LLM integration (code-generator: 3 agents, data-analysis: 2 agents)
+*   **<2ms Overhead**: 50x faster than target (<100ms), production-grade performance
+*   **149 Tests Passing**: 100% pass rate, zero warnings, comprehensive validation
+*   **3,655 Lines Docs**: Complete architecture + 10 user guides + examples
+*   **5 Template Categories**: Research, Development, Content, Productivity, Workflow
+*   **Template Examples**: research-assistant, code-generator, content-generation, workflow-orchestrator, etc.
 
 ## Important Notes
 
 *   When writing Lua scripts, always refer to `docs/user-guide/api/lua/README.md` for accurate API method names. **Do not guess**.
 *   All tool calls use `Tool.execute(name, params)` - no alternative methods.
+*   Template system (NEW v0.12.0): Use `Template.execute(name, params)` for turn-key workflows. See `docs/user-guide/templates/` for all 10 template guides.
 *   Environment variables are now fully documented in `docs/user-guide/configuration.md` and `docs/user-guide/security-and-permissions.md`.

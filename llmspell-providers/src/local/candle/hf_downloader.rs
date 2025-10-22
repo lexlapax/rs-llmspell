@@ -204,9 +204,9 @@ impl HFDownloader {
         let config_url = format!("{}/config.json", base_url);
         debug!("Config URL: {}", config_url);
 
-        let response = ureq::get(&config_url).call().map_err(|e| {
-            anyhow!("Failed to download config.json: {}", e)
-        })?;
+        let response = ureq::get(&config_url)
+            .call()
+            .map_err(|e| anyhow!("Failed to download config.json: {}", e))?;
 
         let dest_config = dest_dir.join("config.json");
         let mut file = std::fs::File::create(&dest_config)?;

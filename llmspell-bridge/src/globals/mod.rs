@@ -21,6 +21,7 @@ pub mod session_infrastructure;
 pub mod state_global;
 pub mod state_infrastructure;
 pub mod streaming_global;
+pub mod template_global;
 pub mod tool_api_standard;
 pub mod tool_global;
 pub mod types;
@@ -29,6 +30,7 @@ pub mod workflow_global;
 // Re-exports
 pub use injection::{GlobalInjector, InjectionCache};
 pub use registry::{GlobalRegistry, GlobalRegistryBuilder};
+pub use template_global::TemplateGlobal;
 pub use types::{GlobalContext, GlobalMetadata, GlobalObject};
 
 use llmspell_core::Result;
@@ -174,6 +176,90 @@ async fn register_agent_workflow(
     Ok(())
 }
 
+/// Register template global
+async fn register_template_global(
+    builder: &mut GlobalRegistryBuilder,
+    context: &Arc<GlobalContext>,
+) -> Result<()> {
+    // Create template registry with builtin templates
+    let template_registry = Arc::new(
+        llmspell_templates::TemplateRegistry::with_builtin_templates().map_err(|e| {
+            llmspell_core::LLMSpellError::Component {
+                message: format!("Failed to create template registry: {e}"),
+                source: None,
+            }
+        })?,
+    );
+
+    // Get core provider manager (TemplateBridge needs core, not bridge wrapper)
+    let core_providers = context.providers.create_core_manager_arc().await?;
+
+    // Get infrastructure registries from GlobalContext (Phase 12.8.2.13)
+    // These were registered by inject_apis and contain the fully-configured infrastructure
+    let tool_registry = context
+        .get_bridge::<llmspell_tools::ToolRegistry>("tool_registry")
+        .expect("tool_registry must be available in GlobalContext");
+    let agent_registry = context
+        .get_bridge::<llmspell_agents::FactoryRegistry>("agent_registry")
+        .expect("agent_registry must be available in GlobalContext");
+    // Note: workflow_factory is stored as Arc<T> in GlobalContext, so get_bridge returns Arc<Arc<T>>
+    // We need to extract the inner Arc
+    let workflow_factory: Arc<dyn llmspell_workflows::WorkflowFactory> = context
+        .get_bridge::<Arc<dyn llmspell_workflows::WorkflowFactory>>("workflow_factory")
+        .map(|arc_arc| (*arc_arc).clone())
+        .expect("workflow_factory must be available in GlobalContext");
+
+    // Create template bridge with optional state and session managers
+    let template_bridge = if let (Some(state_manager), Some(session_manager)) = (
+        context.get_bridge::<llmspell_kernel::state::StateManager>("state_manager"),
+        context.get_bridge::<llmspell_kernel::sessions::manager::SessionManager>("session_manager"),
+    ) {
+        let managers = crate::template_bridge::Managers {
+            state_manager,
+            session_manager,
+        };
+        Arc::new(
+            crate::template_bridge::TemplateBridge::with_state_and_session(
+                template_registry,
+                context.registry.clone(),
+                core_providers,
+                tool_registry,
+                agent_registry,
+                workflow_factory,
+                managers,
+            ),
+        )
+    } else if let Some(state_manager) =
+        context.get_bridge::<llmspell_kernel::state::StateManager>("state_manager")
+    {
+        Arc::new(crate::template_bridge::TemplateBridge::with_state_manager(
+            template_registry,
+            context.registry.clone(),
+            core_providers,
+            tool_registry,
+            agent_registry,
+            workflow_factory.clone(),
+            state_manager,
+        ))
+    } else {
+        Arc::new(crate::template_bridge::TemplateBridge::new(
+            template_registry,
+            context.registry.clone(),
+            core_providers,
+            tool_registry,
+            agent_registry,
+            workflow_factory,
+        ))
+    };
+
+    // Register template global
+    builder.register(Arc::new(template_global::TemplateGlobal::new(
+        template_bridge,
+    )));
+
+    Ok(())
+}
+
 /// Create `StateGlobal` with migration support if configured
 async fn create_state_global(context: &Arc<GlobalContext>) -> Arc<state_global::StateGlobal> {
     if let Some(runtime_config) =
@@ -238,6 +324,9 @@ pub async fn create_standard_registry(context: Arc<GlobalContext>) -> Result<Glo
 
     // Register agent and workflow globals
     register_agent_workflow(&mut builder, &context).await?;
+
+    // Register template global
+    register_template_global(&mut builder, &context).await?;
 
     builder.register(Arc::new(streaming_global::StreamingGlobal::new()));
 

@@ -1,9 +1,9 @@
 # Getting Started
 
-**Version**: 0.9.0
-**Time Required**: 10 minutes
+**Version**: 0.12.0
+**Time Required**: 10 minutes (or <5 minutes with AI Agent Templates!)
 
-> **🚀 Quick Start**: Get LLMSpell kernel running in under 5 minutes with this focused guide.
+> **🚀 Quick Start**: Get LLMSpell kernel running in under 5 minutes with this focused guide. **NEW in Phase 12**: Use production-ready AI workflow templates for instant productivity!
 
 **🔗 Navigation**: [← User Guide](README.md) | [Core Concepts →](concepts.md) | [Service Deployment →](service-deployment.md)
 
@@ -83,6 +83,26 @@ Run it:
 ```bash
 # Needs provider configuration
 ./target/release/llmspell -c examples/script-users/configs/example-providers.toml run hello.lua
+```
+
+### Option 4: Template One-liner ⭐ **Phase 12** (Fastest!)
+```bash
+# Execute research assistant template
+./target/release/llmspell template exec research-assistant \
+    --param topic="Rust async programming" \
+    --param max_sources=5 \
+    --param model="openai/gpt-4o-mini" \
+    --output text
+
+# Execute code generator template
+./target/release/llmspell template exec code-generator \
+    --param description="A function to calculate fibonacci numbers" \
+    --param language="rust" \
+    --param model="openai/gpt-4o-mini" \
+    --output text
+
+# List all available templates
+./target/release/llmspell template list
 ```
 
 ## Core Patterns
@@ -181,6 +201,38 @@ local prefs = State.load("user", "preferences")
 local scopes = State.list_scopes()
 ```
 
+### 6. Using Templates ⭐ **Phase 12**
+```lua
+-- List all available templates
+local templates = Template.list()
+for _, tmpl in ipairs(templates) do
+    print(tmpl.name .. " (" .. tmpl.category .. "): " .. tmpl.description)
+end
+
+-- Get template information
+local info = Template.info("research-assistant")
+print("Parameters:", JSON.encode(info.config_schema))
+
+-- Execute template from Lua
+local result = Template.execute("code-generator", {
+    description = "A function to parse JSON",
+    language = "lua",
+    model = "openai/gpt-4o-mini"
+})
+
+if result.success then
+    print("Generated code:", result.result.result)
+else
+    print("Error:", result.error)
+end
+
+-- Search templates by keyword
+local found = Template.search("research", "research")
+for _, tmpl in ipairs(found) do
+    print("Found:", tmpl.name)
+end
+```
+
 ## Command Line Usage
 
 ### Basic Execution (Embedded Kernel)
@@ -239,6 +291,49 @@ systemctl --user start llmspell-kernel  # Linux
 launchctl start com.llmspell.kernel     # macOS
 ```
 
+### Template Management (Phase 12)
+
+```bash
+# List all templates
+./target/release/llmspell template list
+
+# List by category
+./target/release/llmspell template list --category research
+./target/release/llmspell template list --category codegen
+
+# Show template details
+./target/release/llmspell template info research-assistant
+./target/release/llmspell template info code-generator
+
+# Show parameter schema
+./target/release/llmspell template schema research-assistant
+
+# Execute template with parameters
+./target/release/llmspell template exec research-assistant \
+    --param topic="Rust async programming" \
+    --param max_sources=10 \
+    --param model="openai/gpt-4o-mini" \
+    --output json
+
+# Execute code generator
+./target/release/llmspell template exec code-generator \
+    --param description="A function to validate email addresses" \
+    --param language="rust" \
+    --param model="openai/gpt-4o-mini" \
+    --output text
+
+# Execute data analysis
+./target/release/llmspell template exec data-analysis \
+    --param data_file="/path/to/data.csv" \
+    --param analysis_type="descriptive" \
+    --param chart_type="bar" \
+    --param model="openai/gpt-4o-mini"
+
+# Search templates
+./target/release/llmspell template search "code" --category codegen
+./target/release/llmspell template search "research"
+```
+
 ## Progressive Learning Path
 
 Follow the getting-started examples in order for best results:
@@ -263,6 +358,13 @@ Follow the getting-started examples in order for best results:
 # 6. First RAG System (15 seconds, needs RAG config)
 ./target/release/llmspell -c examples/script-users/configs/rag-basic.toml \
   run examples/script-users/getting-started/05-first-rag.lua
+
+# 7. First Template ⭐ **Phase 12** (5 seconds)
+./target/release/llmspell template exec code-generator \
+    --param description="A function to reverse a string" \
+    --param language="lua" \
+    --param model="openai/gpt-4o-mini" \
+    --output text
 ```
 
 ## Quick Examples
@@ -346,32 +448,68 @@ else
 end
 ```
 
+### Research Assistant with Template ⭐ **Phase 12**
+```lua
+-- research.lua - Use template for instant research capability
+local result = Template.execute("research-assistant", {
+    topic = ARGS[1] or "Rust async programming",
+    max_sources = 5,
+    model = "openai/gpt-4o-mini"
+})
+
+if result.success then
+    local output = result.result
+    print("=== Research Summary ===")
+    print(output.result)
+
+    -- Access metadata
+    if output.metadata then
+        print("\n=== Sources ===")
+        for i, source in ipairs(output.metadata.sources or {}) do
+            print(i .. ". " .. source)
+        end
+    end
+
+    -- Check metrics
+    if output.metrics then
+        print("\n=== Metrics ===")
+        print("Duration:", output.metrics.duration_ms, "ms")
+        print("Tokens used:", output.metrics.tokens_used or "N/A")
+    end
+else
+    print("❌ Error:", result.error)
+end
+```
+
 ## What's Next?
 
 ### Immediate Next Steps
-1. **Try the 6 progressive examples** → `examples/script-users/getting-started/`
-2. **Configure your providers** → [Configuration Guide](configuration.md)
-3. **Set up RAG (Phase 8.10.6)** → Use `configs/rag-basic.toml`
+1. **Try the 7 progressive examples** → `examples/script-users/getting-started/` (including templates!)
+2. **Explore templates** → Run `./target/release/llmspell template list` to see 10 built-in workflows
+3. **Configure your providers** → [Configuration Guide](configuration.md)
+4. **Set up RAG (Phase 8.10.6)** → Use `configs/rag-basic.toml`
 
-### Deeper Learning 
-4. **Understand the architecture** → [Core Concepts](concepts.md) (RAG, HNSW, Multi-tenancy)
-5. **Production patterns** → [Cookbook](../../examples/script-users/cookbook/) (11 examples)
-6. **Real applications** → [Applications](../../examples/script-users/applications/) (9 complete apps)
-7. **Complete API reference** → [Lua API](api/lua/README.md) (17+ globals)
+### Deeper Learning
+5. **Understand the architecture** → [Core Concepts](concepts.md) (RAG, HNSW, Multi-tenancy, Templates)
+6. **Template documentation** → [Template User Guide](templates/) (10 production-ready workflows)
+7. **Production patterns** → [Cookbook](../../examples/script-users/cookbook/) (11 examples)
+8. **Real applications** → [Applications](../../examples/script-users/applications/) (9 complete apps)
+9. **Complete API reference** → [Lua API](api/lua/README.md) (18 globals including Template)
 
 ### Advanced Topics
-8. **Multi-tenant RAG** → `configs/rag-multi-tenant.toml` 
-9. **Vector storage optimization** → [RAG Configuration](configuration.md#rag-configuration)
-10. **Debug and troubleshoot** → [Troubleshooting](troubleshooting.md)
+10. **Multi-tenant RAG** → `configs/rag-multi-tenant.toml`
+11. **Vector storage optimization** → [RAG Configuration](configuration.md#rag-configuration)
+12. **Debug and troubleshoot** → [Troubleshooting](troubleshooting.md)
 
 ## Quick Tips
 
 ### Core Tips
-- **17+ globals pre-injected** (no `require()` needed): `Agent`, `Tool`, `RAG`, `State`, `Debug`, etc.
+- **18 globals pre-injected** (no `require()` needed): `Agent`, `Tool`, `Template`, `RAG`, `State`, `Debug`, etc.
 - **Configuration required** for agents and RAG (use `-c config.toml`)
 - **Provider setup**: Add API keys to config files or environment variables
 - **Tool discovery**: `Tool.list()` shows all 40+ available tools
-- **Error handling**: Always check `.success` field on agent/tool results
+- **Template discovery**: `Template.list()` shows all 10 built-in workflow templates
+- **Error handling**: Always check `.success` field on agent/tool/template results
 - **Timeouts**: Scripts timeout after 5 minutes by default
 - **State scoping**: State operations require scope parameter (`"global"`, `"user"`, etc.)
 
@@ -390,20 +528,34 @@ end
 - **HNSW performance**: <10ms search for 1M vectors with proper configuration
 - **Multi-tenancy**: Use `multi_tenant = true` in config for isolation
 
+### Phase 12 Template Features
+- **10 built-in templates**: Instant productivity from day 0 with production-ready workflows
+- **6 template categories**: Research, Chat, Analysis, CodeGen, Document, Workflow
+- **Zero configuration**: Templates work out-of-the-box with just API keys
+- **CLI and Lua APIs**: Use templates from command line or scripts
+- **Template performance**: <2ms initialization, <1ms registry lookup
+- **Cost estimation**: Pre-execution cost estimation with `Template.estimate_cost()`
+- **Extensible system**: Create custom templates using Template trait
+- **Template discovery**: Search by name, category, or keywords with `Template.search()`
+- **Parameter validation**: Automatic schema validation before execution
+- **Rich metadata**: Every template includes description, parameters, examples, and usage
+
 ---
 
 ## Quick Start Checklist
 
 - [ ] ✅ Install Rust and build LLMSpell (`cargo build --release`)
-- [ ] 🔑 Set up OpenAI API key (`export OPENAI_API_KEY="sk-..."`)  
+- [ ] 🔑 Set up OpenAI API key (`export OPENAI_API_KEY="sk-..."`)
 - [ ] 📂 Try hello world (`./target/release/llmspell exec 'print("Hello!")'`)
 - [ ] 🤖 Create first agent with config file
+- [ ] 📋 Try first template (`./target/release/llmspell template exec code-generator --param...`)
 - [ ] 📚 Try RAG example with `rag-basic.toml`
-- [ ] 🛠️ Explore 37+ tools with `Tool.list()`
+- [ ] 🛠️ Explore 40+ tools with `Tool.list()`
+- [ ] 📝 Explore 10 templates with `Template.list()`
 - [ ] 🔄 Build your first workflow
-- [ ] 📖 Read [Core Concepts](concepts.md) to understand RAG and HNSW
+- [ ] 📖 Read [Core Concepts](concepts.md) to understand RAG, HNSW, and Templates
 
-**Phase 9-10 Ready!** Kernel architecture with service deployment, DAP debugging, and multi-protocol support.
+**Phase 12 Ready!** Production-ready AI workflow templates for instant productivity from day 0.
 
 ---
 

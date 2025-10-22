@@ -2,9 +2,9 @@
 
 **Production-Ready AI Workflow Orchestration Platform** - Script-driven LLM coordination with RAG at scale
 
-**🚀 Version 0.11.2 - Local LLM Cleanup & Enhancement**
+**🚀 Version 0.12.0 - Production Template System**
 
-**🔗 Quick Links**: [📘 User Guide](docs/user-guide/) | [🔧 Developer Guide](docs/developer-guide/) | [📚 Examples](examples/) | [🛠️ Scripts](scripts/) | [🚀 Get Started](#-quick-start) | [📖 Release Notes](RELEASE_NOTES_v0.11.0.md) | [🔧 Phase 11a](docs/in-progress/phase-11a-design-doc.md) | [🧹 Phase 11b](docs/in-progress/phase-11b-design-doc.md)
+**🔗 Quick Links**: [📘 User Guide](docs/user-guide/) | [🔧 Developer Guide](docs/developer-guide/) | [📚 Examples](examples/) | [🛠️ Scripts](scripts/) | [🚀 Get Started](#-quick-start) | [📖 Release Notes](RELEASE_NOTES_v0.12.0.md) | [🎯 Templates](docs/technical/template-system-architecture.md)
 
 ---
 
@@ -12,13 +12,22 @@
 
 ---
 
-## 🌟 Production Ready with Local LLM Enhancement & Cleanup
+## 🌟 Production Ready with Turn-Key AI Templates
 
-rs-llmspell v0.11.2 delivers **Phase 11b local LLM cleanup** with single-binary architecture (removed unused llmspell-test), unified profile system (10 builtin TOML files), dual-architecture model support (LLaMA GGUF + T5 Safetensors), and platform-aware GPU detection (Metal/CUDA with graceful CPU fallback). Net code reduction of 120 LOC while adding T5 support, plus **Phase 11a bridge consolidation** with 87% compile speedup (38s→5s bridge-only), 95% security documentation coverage, and API standardization. Run agents entirely on your hardware with zero API keys, no cloud dependencies, and full data privacy—all while maintaining production Unix service infrastructure with daemon mode, tool CLI commands, and modular builds (19-35MB).
+rs-llmspell v0.12.0 delivers **Phase 12 Production Template System** solving the "0-day retention problem" with 10 production-ready AI workflow templates accessible via simple CLI commands. From installation to productive AI usage in <5 minutes. Templates combine agents, tools, RAG, and local LLMs into turn-key solutions (research assistant, code generator, content creator, workflow orchestrator, etc.). Built on **Phase 11 local LLM integration** (Ollama + Candle, 100% offline, zero API keys), **Phase 11a bridge consolidation** (87% compile speedup), and **Phase 11b cleanup** (unified profiles, dual-architecture models). Production Unix service infrastructure with daemon mode, tool CLI, and modular builds (19-35MB).
 
 ## ✨ Key Features
 
-### 🧹 Local LLM Cleanup & Enhancement (NEW in v0.11.2)
+### 🎯 Production Template System (NEW in v0.12.0)
+- **10 Turn-Key Templates**: Production-ready workflows from installation to AI productivity in <5 minutes
+- **Template CLI**: `template list|info|exec|search|schema` - Simple command-line template access
+- **Lua Template API**: Template global (16th global) for script-based template orchestration
+- **Multi-Agent Workflows**: Real LLM integration with Ollama/local models (code-generator: 3 agents, data-analysis: 2 agents)
+- **Template Categories**: Research (research-assistant, knowledge-management), Development (code-generator, code-review), Content (content-generation, document-processor), Productivity (file-classification, interactive-chat), Workflow (workflow-orchestrator, data-analysis)
+- **<2ms Overhead**: 50x faster than target (<100ms), production-grade performance
+- **149 Tests Passing**: 100% pass rate, zero warnings, comprehensive validation
+
+### 🧹 Local LLM Cleanup & Enhancement (v0.11.2)
 - **Single-Binary Architecture**: Removed unused llmspell-test binary (-675 LOC, enforced philosophy)
 - **Unified Profile System**: 10 builtin TOML profiles replace 100+ lines CLI mutations
 - **Dual-Architecture Models**: LLaMA (GGUF) + T5 (Safetensors) support via ModelArchitecture enum
@@ -126,8 +135,33 @@ Progressive complexity with RAG capabilities:
 
 ## Quick Example
 
+### Template Usage (NEW in v0.12.0)
+```bash
+# List available templates
+llmspell template list
+
+# Generate code with 3-agent pipeline
+llmspell template exec code-generator \
+  --param description="Fibonacci function in Rust" \
+  --param language="rust" \
+  --param model="ollama/llama3.2:3b"
+
+# Research assistant with RAG workflow
+llmspell template exec research-assistant \
+  --param topic="Rust async patterns" \
+  --param max_sources=10
+
+# Or use Lua Template API
+local result = Template.execute("code-generator", {
+    description = "Calculate prime numbers",
+    language = "rust",
+    model = "ollama/llama3.2:3b"
+})
+```
+
+### Agent & Tool Usage
 ```lua
--- Create an agent with local model (NEW in v0.11.0)
+-- Create an agent with local model (v0.11.0)
 local local_agent = Agent.create({
     model = "local/llama3.1:8b@ollama",  -- 100% offline, zero API keys
     system_prompt = "You are a helpful assistant"
@@ -376,47 +410,49 @@ cargo build --release --features csv-parquet,archives
 
 ## 🎯 Roadmap
 
-### Current: v0.11.0 - Local LLM Integration ✅
-- **Phase 11 Completed**: Privacy-first local inference with Ollama + Candle
-- Dual-backend architecture: Ollama (100+ models) + Candle (native GGUF)
-- Complete model management: list, pull, status, info CLI commands
-- Zero API keys required: 100% offline AI workflows
-- HuggingFace integration: Automatic model downloads
-- 21 crates with 800+ tests total
-- All 7 performance targets exceeded by 25-33%
+### Current: v0.12.0 - Production Template System ✅
+- **Phase 12 Completed**: 10 production-ready AI workflow templates
+- Turn-key solutions: research-assistant, code-generator, content-generation, workflow-orchestrator, etc.
+- Template CLI commands: list, info, exec, search, schema
+- Lua Template API: Template global for script-based orchestration
+- Multi-agent workflows: Real LLM integration with Ollama/local models
+- 149 tests passing (100% pass rate), <2ms overhead (50x faster than target)
+- Complete documentation: 3,655 lines (architecture + user guides + examples)
 
-### Next: Phase 12 - Multi-Agent Orchestration (Q4 2024)
-- **Complex Agent Collaboration**: Multi-agent workflows with state sharing
-- **Role-Based Agents**: Specialized agents with distinct capabilities
-- **Agent Communication**: Direct agent-to-agent messaging
-- **Workflow Templates**: Pre-built patterns for common orchestration scenarios
-- **Performance Optimization**: Parallel agent execution and batching
-- **Monitoring & Observability**: Agent execution tracing and debugging
+### Next: Phase 13 - Adaptive Memory System (Q4 2025)
+- **A-TKG Integration**: Adaptive Temporal Knowledge Graph for context management
+- **Template Memory**: Opt-in memory for all templates with zero-config integration
+- **Knowledge Graph**: Cross-topic knowledge graphs with pattern learning
+- **Session History**: Automatic context from previous template executions
+- **Suggested Actions**: AI-powered follow-up suggestions based on history
+- **Zero Breaking Changes**: Templates work WITHOUT memory (Phase 12 remains valid)
 
 ### Upcoming Feature Additions (Phases 13-18)
 
 #### Near Term (2025)
-- **Phase 13**: Adaptive Memory System - Working memory, episodic memory, semantic knowledge graphs
-- **Phase 14**: Model Context Protocol (MCP) - External tool integration
-- **Phase 15**: Security Hardening - Advanced threat protection
+- **Phase 13**: Adaptive Memory System - A-TKG temporal knowledge graphs, opt-in template memory
+- **Phase 14**: Advanced Template Features - Template composition, custom workflows
+- **Phase 15**: Model Context Protocol (MCP) - External tool integration
 
 #### Medium Term (2025-2026)
 - **Phase 16**: Production Orchestration - Kubernetes, autoscaling, monitoring
 - **Phase 17**: Distributed Execution - Multi-node orchestration
 - **Phase 18**: Cloud Platform - Managed service offering
 
-*Note: From v0.11.0 onwards, infrastructure is production-stable with local LLM support. Updates add features without breaking existing functionality. Feature flags ensure backward compatibility.*
+*Note: From v0.12.0 onwards, infrastructure is production-stable with templates + local LLM support. Updates add features without breaking existing functionality.*
 
 ## Documentation
 
 - **[Quick Start Guide](docs/user-guide/getting-started.md)** - Get started in 5 minutes
 - **[Documentation Hub](docs/README.md)** - Complete documentation index (10 user guides, 6 developer guides, 13 technical docs)
-- **[Local LLM Guide](docs/user-guide/local-llm.md)** - Ollama + Candle setup, model management, privacy-first workflows ⭐ NEW
+- **[Template System Architecture](docs/technical/template-system-architecture.md)** - Complete template system design, extension guide ⭐ NEW
+- **[Template User Guides](docs/user-guide/templates/)** - 10 template guides with examples ⭐ NEW
+- **[Local LLM Guide](docs/user-guide/local-llm.md)** - Ollama + Candle setup, model management, privacy-first workflows
 - **[Service Deployment](docs/user-guide/service-deployment.md)** - systemd/launchd deployment with daemon mode
 - **[IDE Integration](docs/user-guide/ide-integration.md)** - VS Code, Jupyter Lab, vim/neovim setup
 - **[Feature Flags Migration](docs/developer-guide/feature-flags-migration.md)** - Modular builds guide
 - **[RAG System Guide](docs/technical/rag-system-guide.md)** - Complete RAG documentation
-- **[Examples](examples/)** - 60+ working examples with RAG patterns, local LLM, and tool CLI
+- **[Examples](examples/)** - 60+ working examples with RAG patterns, local LLM, templates, and tool CLI
 
 ## Scripts & Automation
 
@@ -455,4 +491,4 @@ This project is licensed under the Apache License, Version 2.0. See [LICENSE-APA
 
 ---
 
-**🚀 v0.11.0 Released**: Local LLM Integration & Privacy-First AI with dual backends (Ollama + Candle), 100% offline inference, zero API keys, complete model management CLI, and HuggingFace integration. All 7 performance targets exceeded by 25-33%. Phase 11 completed in 4.5 days (77% faster than planned). See [Release Notes](RELEASE_NOTES_v0.11.0.md) for complete details.
+**🚀 v0.12.0 Released**: Production Template System with 10 turn-key AI workflows solving the "0-day retention problem." Templates combine agents, tools, RAG, and local LLMs into production-ready solutions accessible via simple CLI commands or Lua API. From installation to productive AI usage in <5 minutes. Built on Phases 11-11b (local LLM, bridge consolidation, cleanup). 149 tests passing, <2ms overhead (50x faster than target), 3,655 lines of documentation. See [Release Notes](RELEASE_NOTES_v0.12.0.md) for complete details.

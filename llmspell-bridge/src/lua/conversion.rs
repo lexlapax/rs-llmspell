@@ -7,6 +7,10 @@ use llmspell_core::types::{
     OutputMetadata, ToolOutput,
 };
 use llmspell_core::{LLMSpellError, Result};
+use llmspell_templates::core::{
+    ExecutionMetrics, OutputMetadata as TemplateOutputMetadata, TemplateResult,
+};
+use llmspell_templates::validation::{ParameterConstraints, ParameterSchema};
 use mlua::{Error as LuaError, Lua, Table, Value as LuaValue};
 use serde_json::Value as JsonValue;
 use std::collections::HashMap;
@@ -592,4 +596,345 @@ impl FromScriptValue<LuaValue<'_>> for ScriptValue {
             }),
         }
     }
+}
+
+// ===== Template conversions =====
+
+/// Convert Lua table to template parameters
+///
+/// # Errors
+///
+/// Returns an error if:
+/// - Table iteration fails
+/// - Value conversion fails
+#[instrument(level = "debug", skip(_lua, table), fields(
+    conversion_id = %uuid::Uuid::new_v4()
+))]
+pub fn lua_table_to_template_params(
+    _lua: &Lua,
+    table: Table,
+) -> mlua::Result<llmspell_templates::TemplateParams> {
+    debug!("Converting Lua table to TemplateParams");
+    let mut params = HashMap::new();
+
+    for pair in table.pairs::<LuaValue, LuaValue>() {
+        let (key, value) = pair?;
+        let key_str = match key {
+            LuaValue::String(s) => s.to_str()?.to_string(),
+            LuaValue::Integer(i) => i.to_string(),
+            LuaValue::Number(n) => n.to_string(),
+            _ => continue, // Skip non-string-convertible keys
+        };
+        params.insert(key_str, lua_value_to_json(value)?);
+    }
+
+    Ok(params.into())
+}
+
+/// Convert template output to Lua table
+///
+/// # Errors
+///
+/// Returns an error if:
+/// - Table creation fails
+/// - JSON to Lua conversion fails
+/// - Setting table values fails
+#[instrument(level = "debug", skip(lua, output), fields(
+    template_id = %output.metadata.template_id,
+    conversion_id = %uuid::Uuid::new_v4()
+))]
+pub fn template_output_to_lua_table<'lua>(
+    lua: &'lua Lua,
+    output: &llmspell_templates::TemplateOutput,
+) -> mlua::Result<Table<'lua>> {
+    debug!("Converting TemplateOutput to Lua table");
+    let table = lua.create_table()?;
+
+    // Convert result based on type
+    convert_template_result_to_lua(lua, &table, &output.result)?;
+
+    // Convert artifacts
+    if !output.artifacts.is_empty() {
+        convert_artifacts_array_to_lua(lua, &table, &output.artifacts)?;
+    }
+
+    // Convert metadata
+    convert_output_metadata_to_lua(lua, &table, &output.metadata)?;
+
+    // Convert metrics
+    convert_output_metrics_to_lua(lua, &table, &output.metrics)?;
+
+    Ok(table)
+}
+
+/// Convert `TemplateResult` enum to Lua table fields
+fn convert_template_result_to_lua<'lua>(
+    lua: &'lua Lua,
+    table: &Table<'lua>,
+    result: &TemplateResult,
+) -> mlua::Result<()> {
+    match result {
+        TemplateResult::Text(text) => {
+            table.set("result_type", "text")?;
+            table.set("result", text.clone())?;
+        }
+        TemplateResult::Structured(json) => {
+            table.set("result_type", "structured")?;
+            table.set("result", json_to_lua_value(lua, json)?)?;
+        }
+        TemplateResult::File(path) => {
+            table.set("result_type", "file")?;
+            table.set("result", path.to_string_lossy().to_string())?;
+        }
+        TemplateResult::Multiple(results) => {
+            table.set("result_type", "multiple")?;
+            let results_array = convert_multiple_results_to_lua(lua, results)?;
+            table.set("result", results_array)?;
+        }
+    }
+    Ok(())
+}
+
+/// Convert multiple template results to Lua array
+fn convert_multiple_results_to_lua<'lua>(
+    lua: &'lua Lua,
+    results: &[TemplateResult],
+) -> mlua::Result<Table<'lua>> {
+    let results_array = lua.create_table()?;
+    for (i, result) in results.iter().enumerate() {
+        let result_table = lua.create_table()?;
+        match result {
+            TemplateResult::Text(text) => {
+                result_table.set("type", "text")?;
+                result_table.set("value", text.clone())?;
+            }
+            TemplateResult::Structured(json) => {
+                result_table.set("type", "structured")?;
+                result_table.set("value", json_to_lua_value(lua, json)?)?;
+            }
+            TemplateResult::File(path) => {
+                result_table.set("type", "file")?;
+                result_table.set("value", path.to_string_lossy().to_string())?;
+            }
+            TemplateResult::Multiple(_) => {
+                // Nested multiple not supported
+                result_table.set("type", "unsupported")?;
+                result_table.set("value", "nested multiple results")?;
+            }
+        }
+        results_array.set(i + 1, result_table)?;
+    }
+    Ok(results_array)
+}
+
+/// Convert artifacts array to Lua table
+fn convert_artifacts_array_to_lua<'lua>(
+    lua: &'lua Lua,
+    table: &Table<'lua>,
+    artifacts: &[llmspell_templates::Artifact],
+) -> mlua::Result<()> {
+    let artifacts_array = lua.create_table()?;
+    for (i, artifact) in artifacts.iter().enumerate() {
+        let artifact_table = lua.create_table()?;
+        artifact_table.set("filename", artifact.filename.clone())?;
+        artifact_table.set("content", artifact.content.clone())?;
+        artifact_table.set("mime_type", artifact.mime_type.clone())?;
+
+        // Convert metadata
+        if !artifact.metadata.is_empty() {
+            let metadata_table = lua.create_table()?;
+            for (key, value) in &artifact.metadata {
+                metadata_table.set(key.as_str(), json_to_lua_value(lua, value)?)?;
+            }
+            artifact_table.set("metadata", metadata_table)?;
+        }
+
+        artifacts_array.set(i + 1, artifact_table)?;
+    }
+    table.set("artifacts", artifacts_array)?;
+    Ok(())
+}
+
+/// Convert output metadata to Lua table
+fn convert_output_metadata_to_lua<'lua>(
+    lua: &'lua Lua,
+    table: &Table<'lua>,
+    metadata: &TemplateOutputMetadata,
+) -> mlua::Result<()> {
+    let metadata_table = lua.create_table()?;
+    metadata_table.set("template_id", metadata.template_id.clone())?;
+    metadata_table.set("template_version", metadata.template_version.clone())?;
+    metadata_table.set("executed_at", metadata.executed_at.to_rfc3339())?;
+
+    // Convert parameters
+    let params_table = lua.create_table()?;
+    for (key, value) in &metadata.parameters.values {
+        params_table.set(key.as_str(), json_to_lua_value(lua, value)?)?;
+    }
+    metadata_table.set("parameters", params_table)?;
+    table.set("metadata", metadata_table)?;
+    Ok(())
+}
+
+/// Convert output metrics to Lua table
+fn convert_output_metrics_to_lua<'lua>(
+    lua: &'lua Lua,
+    table: &Table<'lua>,
+    metrics: &ExecutionMetrics,
+) -> mlua::Result<()> {
+    let metrics_table = lua.create_table()?;
+    metrics_table.set("duration_ms", metrics.duration_ms)?;
+    if let Some(tokens) = metrics.tokens_used {
+        metrics_table.set("tokens_used", tokens)?;
+    }
+    if let Some(cost) = metrics.cost_usd {
+        metrics_table.set("cost_usd", cost)?;
+    }
+    metrics_table.set("agents_invoked", metrics.agents_invoked)?;
+    table.set("metrics", metrics_table)?;
+    Ok(())
+}
+
+/// Convert template metadata to Lua table
+///
+/// # Errors
+///
+/// Returns an error if:
+/// - Table creation fails
+/// - Setting table values fails
+#[instrument(level = "debug", skip(lua, metadata), fields(
+    template_id = %metadata.id,
+    conversion_id = %uuid::Uuid::new_v4()
+))]
+pub fn template_metadata_to_lua_table<'lua>(
+    lua: &'lua Lua,
+    metadata: &llmspell_templates::TemplateMetadata,
+) -> mlua::Result<Table<'lua>> {
+    debug!("Converting TemplateMetadata to Lua table");
+    let table = lua.create_table()?;
+
+    // Basic fields
+    table.set("id", metadata.id.clone())?;
+    table.set("name", metadata.name.clone())?;
+    table.set("description", metadata.description.clone())?;
+    table.set("category", format!("{:?}", metadata.category))?;
+    table.set("version", metadata.version.clone())?;
+
+    // Optional author
+    if let Some(author) = &metadata.author {
+        table.set("author", author.clone())?;
+    }
+
+    // Requires array
+    if !metadata.requires.is_empty() {
+        let requires_array = lua.create_table()?;
+        for (i, req) in metadata.requires.iter().enumerate() {
+            requires_array.set(i + 1, req.clone())?;
+        }
+        table.set("requires", requires_array)?;
+    }
+
+    // Tags array
+    if !metadata.tags.is_empty() {
+        let tags_array = lua.create_table()?;
+        for (i, tag) in metadata.tags.iter().enumerate() {
+            tags_array.set(i + 1, tag.clone())?;
+        }
+        table.set("tags", tags_array)?;
+    }
+
+    Ok(table)
+}
+
+/// Convert config schema to Lua table
+///
+/// # Errors
+///
+/// Returns an error if:
+/// - Table creation fails
+/// - Setting table values fails
+#[instrument(level = "debug", skip(lua, schema), fields(
+    param_count = schema.parameters.len(),
+    conversion_id = %uuid::Uuid::new_v4()
+))]
+pub fn config_schema_to_lua_table<'lua>(
+    lua: &'lua Lua,
+    schema: &llmspell_templates::ConfigSchema,
+) -> mlua::Result<Table<'lua>> {
+    debug!("Converting ConfigSchema to Lua table");
+    let table = lua.create_table()?;
+
+    table.set("version", schema.version.clone())?;
+
+    // Convert parameters array
+    let parameters_array = lua.create_table()?;
+    for (i, param) in schema.parameters.iter().enumerate() {
+        let param_table = convert_parameter_to_lua(lua, param)?;
+        parameters_array.set(i + 1, param_table)?;
+    }
+    table.set("parameters", parameters_array)?;
+
+    Ok(table)
+}
+
+/// Convert a single parameter to Lua table
+fn convert_parameter_to_lua<'lua>(
+    lua: &'lua Lua,
+    param: &ParameterSchema,
+) -> mlua::Result<Table<'lua>> {
+    let param_table = lua.create_table()?;
+
+    // Basic fields
+    param_table.set("name", param.name.clone())?;
+    param_table.set("description", param.description.clone())?;
+    param_table.set("param_type", format!("{:?}", param.param_type))?;
+    param_table.set("required", param.required)?;
+
+    // Optional default value
+    if let Some(default) = &param.default {
+        param_table.set("default", json_to_lua_value(lua, default)?)?;
+    }
+
+    // Optional constraints
+    if let Some(constraints) = &param.constraints {
+        set_parameter_constraints(lua, &param_table, constraints)?;
+    }
+
+    Ok(param_table)
+}
+
+/// Set parameter constraints on Lua table
+fn set_parameter_constraints<'lua>(
+    lua: &'lua Lua,
+    param_table: &Table<'lua>,
+    constraints: &ParameterConstraints,
+) -> mlua::Result<()> {
+    if let Some(min) = constraints.min {
+        param_table.set("min", min)?;
+    }
+    if let Some(max) = constraints.max {
+        param_table.set("max", max)?;
+    }
+    if let Some(min_length) = constraints.min_length {
+        #[allow(clippy::cast_precision_loss)]
+        param_table.set("min_length", min_length as f64)?;
+    }
+    if let Some(max_length) = constraints.max_length {
+        #[allow(clippy::cast_precision_loss)]
+        param_table.set("max_length", max_length as f64)?;
+    }
+    if let Some(pattern) = &constraints.pattern {
+        param_table.set("pattern", pattern.clone())?;
+    }
+
+    // Allowed values array
+    if let Some(allowed_values) = &constraints.allowed_values {
+        let allowed_array = lua.create_table()?;
+        for (j, value) in allowed_values.iter().enumerate() {
+            allowed_array.set(j + 1, json_to_lua_value(lua, value)?)?;
+        }
+        param_table.set("allowed_values", allowed_array)?;
+    }
+
+    Ok(())
 }

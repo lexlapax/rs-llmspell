@@ -1015,7 +1015,7 @@ llmspell template exec research-assistant \
     --param topic="Rust async runtime design" \
     --param max_sources=15 \
     --param model="ollama/llama3.2:3b" \
-    --output ./research-output
+    --output-dir ./research-output
 
 # Search templates
 llmspell template search "research"

@@ -20,6 +20,7 @@ Thumbs.db
 # Environment
 .env
 .env.local
+.llmspell_chat_history*
 
 # Build artifacts
 /dist/
@@ -33,3 +34,4 @@ __pycache__/
 .pytest_cache
 
 
+sessions/

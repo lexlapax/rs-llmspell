@@ -66,17 +66,25 @@ impl ScriptEngineBridge for JSEngine {
         &mut self,
         _registry: &Arc<ComponentRegistry>,
         _providers: &Arc<ProviderManager>,
+        _tool_registry: &Arc<llmspell_tools::ToolRegistry>,
+        _agent_registry: &Arc<llmspell_agents::FactoryRegistry>,
+        _workflow_factory: &Arc<dyn llmspell_workflows::WorkflowFactory>,
+        _session_manager: Option<Arc<dyn std::any::Any + Send + Sync>>,
     ) -> Result<(), LLMSpellError> {
         #[cfg(feature = "javascript")]
         {
             // TODO (Phase 12): When JavaScript engine is implemented:
             // 1. Create JavaScript context/engine instance
             // 2. Inject globals using the new system (similar to Lua implementation)
-            // 3. Remove this placeholder and add actual implementation
+            // 3. Store infrastructure registries in GlobalContext (tool_registry, agent_registry, workflow_factory)
+            // 4. Remove this placeholder and add actual implementation
 
             // Placeholder implementation following Lua pattern:
             // use crate::globals::{create_standard_registry, GlobalContext, GlobalInjector};
             // let global_context = Arc::new(GlobalContext::new(_registry.clone(), _providers.clone()));
+            // global_context.set_bridge("tool_registry", _tool_registry.clone());
+            // global_context.set_bridge("agent_registry", _agent_registry.clone());
+            // global_context.set_bridge("workflow_factory", _workflow_factory.clone());
             // let global_registry = futures::executor::block_on(create_standard_registry(global_context.clone()))?;
             // let injector = GlobalInjector::new(Arc::new(global_registry));
             // injector.inject_javascript(&mut js_context, &global_context)?;
@@ -128,5 +136,9 @@ impl ScriptEngineBridge for JSEngine {
         // Example future implementation:
         // self.js_context.set_global("args", convert_to_js_object(args))?;
         Ok(())
+    }
+
+    fn as_any(&self) -> &dyn std::any::Any {
+        self
     }
 }

@@ -332,7 +332,33 @@ async fn test_hook_integration_with_multiple_tool_types() {
     let executor = ToolExecutor::new(config, None, None);
 
     // Test different tool categories and security levels
-    let mut test_cases = vec![(
+    #[cfg(feature = "json-query")]
+    let test_cases = vec![
+        (
+            Box::new(CalculatorTool::new()) as Box<dyn Tool>,
+            "calculator",
+            json!({
+                "operation": "evaluate",
+                "input": "2 + 2"
+            }),
+            ToolCategory::Utility,
+            SecurityLevel::Safe,
+        ),
+        (
+            Box::new(JsonProcessorTool::default()) as Box<dyn Tool>,
+            "json_processor",
+            json!({
+                "operation": "query",
+                "input": r#"{"test": 123}"#,
+                "query": ".test"
+            }),
+            ToolCategory::Data,
+            SecurityLevel::Safe,
+        ),
+    ];
+
+    #[cfg(not(feature = "json-query"))]
+    let test_cases = vec![(
         Box::new(CalculatorTool::new()) as Box<dyn Tool>,
         "calculator",
         json!({
@@ -342,19 +368,6 @@ async fn test_hook_integration_with_multiple_tool_types() {
         ToolCategory::Utility,
         SecurityLevel::Safe,
     )];
-
-    #[cfg(feature = "json-query")]
-    test_cases.push((
-        Box::new(JsonProcessorTool::default()) as Box<dyn Tool>,
-        "json_processor",
-        json!({
-            "operation": "query",
-            "input": r#"{"test": 123}"#,
-            "query": ".test"
-        }),
-        ToolCategory::Data,
-        SecurityLevel::Safe,
-    ));
 
     for (tool, name, params, expected_category, expected_security) in test_cases {
         let input = AgentInput::text(format!("Test {name}")).with_parameter("parameters", params);

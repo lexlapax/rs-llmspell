@@ -106,13 +106,173 @@ use tracing::{debug, info, instrument};
 /// # Ok(())
 /// # }
 /// ```
+///
+/// # Dual-Layer Registry Architecture
+///
+/// `ScriptRuntime` maintains two parallel registry layers for different purposes.
+/// This architecture was introduced in Phase 12.7.1 to fix template execution
+/// infrastructure gaps while maintaining optimal performance for script access.
+///
+/// ## Layer 1: Script Access (`ComponentRegistry`)
+///
+/// - **Purpose**: Fast tool/agent/workflow lookups for Lua/JavaScript scripts
+/// - **Implementation**: Lightweight `HashMap<String, Arc<dyn Trait>>` pattern
+/// - **Used by**: Script engines via bridge APIs (`Tool.execute()` in Lua)
+/// - **Size**: 266 lines of code, optimized for speed
+/// - **Features**: Simple name→component mapping, O(1) lookup
+///
+/// ## Layer 2: Infrastructure (`ToolRegistry` + `FactoryRegistry` + `WorkflowFactory`)
+///
+/// - **Purpose**: Template execution with discovery, validation, hooks, metrics
+/// - **Implementation**: Full-featured registries with caching, indexing, categorization
+/// - **Used by**: Template system via `ExecutionContext`
+/// - **Size**: 1571 lines (`ToolRegistry` alone), comprehensive features
+/// - **Features**: Discovery by category, validation hooks, execution metrics, dependency tracking
+///
+/// ## Why Both Layers Are Necessary
+///
+/// The two layers cannot be merged or converted between each other because:
+///
+/// 1. **Different Data Structures**:
+///    - `ComponentRegistry`: Simple `HashMap` for O(1) lookups
+///    - `ToolRegistry`: Complex indexes, hooks, validation chains
+///
+/// 2. **Different Use Cases**:
+///    - Scripts need: Fast `get_tool("calculator")` → execute
+///    - Templates need: Discovery, validation, `list_tools_by_category()`, metrics
+///
+/// 3. **Performance vs Features Trade-off**:
+///    - Scripts require minimal overhead (<1ms lookup)
+///    - Templates require comprehensive infrastructure (hooks, validation, discovery)
+///
+/// 4. **Memory Cost is Minimal**:
+///    - Both layers hold `Arc` references to the same tool instances
+///    - Only the index structures are duplicated (~few KB)
+///
+/// ## Dual-Registration Pattern
+///
+/// Tools are registered to both layers simultaneously during runtime initialization:
+///
+/// ```rust,ignore
+/// // Step 1: Create both registries
+/// let tool_registry = Arc::new(ToolRegistry::new());         // Infrastructure
+/// let component_registry = Arc::new(ComponentRegistry::new()); // Script access
+///
+/// // Step 2: Register tools to BOTH (dual-registration)
+/// let calculator = CalculatorTool::new();
+/// tool_registry.register("calculator", calculator.clone()).await?;
+/// component_registry.register_tool("calculator", Arc::new(calculator))?;
+/// ```
+///
+/// This pattern ensures:
+/// - Scripts get fast `HashMap` lookups via `ComponentRegistry`
+/// - Templates get full infrastructure via `ToolRegistry`
+/// - Both share the same tool instances (`Arc`), no memory waste
+///
+/// ## Data Flow
+///
+/// ```text
+/// ┌─────────────────────────────────────────────┐
+/// │ CLI Command / User Script                   │
+/// └────────────┬────────────────────────────────┘
+///              │
+///              ├──► Scripts (Lua/JS)
+///              │    └──► ComponentRegistry (HashMap)
+///              │         └──► Tool.execute() [Fast path]
+///              │
+///              └──► Templates
+///                   └──► ExecutionContext
+///                        ├──► ToolRegistry (full-featured)
+///                        ├──► AgentRegistry (factories)
+///                        ├──► WorkflowFactory (creation)
+///                        └──► ProviderManager (LLMs)
+/// ```
+///
+/// ## Historical Context (Phase 12.7.1)
+///
+/// **Problem**: Template execution failed with "`tool_registry` is required" error
+/// because `ExecutionContext::builder()` expected 4 infrastructure components
+/// (`ToolRegistry`, `AgentRegistry`, `WorkflowFactory`, `ProviderManager`) but
+/// `ScriptRuntime` only had `ComponentRegistry`.
+///
+/// **Root Cause Analysis**: `ComponentRegistry` (266-line `HashMap` wrapper) serves
+/// a fundamentally different purpose than `ToolRegistry` (1571-line infrastructure).
+/// They cannot be converted or merged without losing critical features.
+///
+/// **Solution**: Add infrastructure registries alongside `ComponentRegistry`,
+/// implement dual-registration for all tools, wire 4 components into
+/// `ExecutionContext` builder. See TODO.md Phase 12.7.1 for 180+ line analysis.
+///
+/// This is not a temporary workaround but the correct architectural design,
+/// following the same pattern as `provider_manager` which also exists separately
+/// from `ComponentRegistry`.
 pub struct ScriptRuntime {
     /// Language-agnostic script engine
     engine: Box<dyn ScriptEngineBridge>,
-    /// Component registry for agents, tools, workflows
+
+    /// Component registry for agents, tools, workflows (**script access layer** - Layer 1)
+    ///
+    /// Lightweight `HashMap`-based registry providing O(1) lookups for script engines.
+    /// Used by: Lua/JS scripts via `Tool.execute()`, `Agent.create()`, `Workflow.run()`
+    ///
+    /// **Not used by templates** - templates use the infrastructure registries below.
     registry: Arc<ComponentRegistry>,
-    /// Provider manager for LLM access
+
+    /// Provider manager for LLM access (infrastructure layer)
+    ///
+    /// Shared by both scripts and templates. Provides access to configured LLM providers
+    /// (`OpenAI`, Anthropic, Ollama, etc.)
     provider_manager: Arc<ProviderManager>,
+
+    /// Tool registry for template infrastructure (**infrastructure layer** - Layer 2)
+    ///
+    /// Full-featured registry with hooks, discovery, validation, and metrics.
+    /// Separate from `ComponentRegistry` which serves script access.
+    /// Used by: Template system via `ExecutionContext`, CLI discovery commands.
+    ///
+    /// Tools exist in BOTH this registry AND `ComponentRegistry` (dual-registration).
+    tool_registry: Arc<llmspell_tools::ToolRegistry>,
+
+    /// Agent factory registry for template infrastructure (**infrastructure layer** - Layer 2)
+    ///
+    /// Provides agent creation and discovery capabilities for templates.
+    /// Used by: Template system via `ExecutionContext` for dynamic agent instantiation.
+    agent_registry: Arc<llmspell_agents::FactoryRegistry>,
+
+    /// Workflow factory for template infrastructure (**infrastructure layer** - Layer 2)
+    ///
+    /// Provides workflow creation capabilities for templates.
+    /// Used by: Template system via `ExecutionContext` for workflow orchestration.
+    workflow_factory: Arc<dyn llmspell_workflows::WorkflowFactory>,
+
+    /// Session manager for template infrastructure (Phase 12.8.2.5)
+    ///
+    /// Wired from kernel after initialization to provide session management to templates.
+    /// Uses interior mutability (`RwLock`) to allow setting after `ScriptRuntime` creation.
+    /// Optional to support standalone `ScriptRuntime` usage without kernel.
+    ///
+    /// **Why separate from `ComponentRegistry`:**
+    /// - `SessionManager` is kernel-specific infrastructure (lifecycle, persistence, hooks)
+    /// - Templates need full session management (create, save, restore, artifacts)
+    /// - Scripts don't directly access sessions (use state instead)
+    ///
+    /// **Wiring flow:** Kernel creates → downcasts `ScriptRuntime` → calls `set_session_manager()`
+    session_manager: Arc<RwLock<Option<Arc<llmspell_kernel::sessions::SessionManager>>>>,
+
+    /// RAG (Retrieval-Augmented Generation) infrastructure for template execution (Phase 12.8.fix)
+    ///
+    /// Wired from kernel after initialization to provide RAG capabilities to templates.
+    /// Uses interior mutability (`RwLock`) to allow setting after `ScriptRuntime` creation.
+    /// Optional to support standalone `ScriptRuntime` usage without RAG.
+    ///
+    /// **Why needed:**
+    /// - research-assistant template requires RAG for document ingestion and synthesis
+    /// - Multi-tenant vector storage for knowledge base operations
+    /// - Templates need RAG access via `ExecutionContext`
+    ///
+    /// **Wiring flow:** Kernel creates → downcasts `ScriptRuntime` → calls `set_rag()`
+    rag: Arc<RwLock<Option<Arc<llmspell_rag::multi_tenant_integration::MultiTenantRAG>>>>,
+
     /// Execution context
     execution_context: Arc<RwLock<crate::engine::ExecutionContext>>,
     /// Debug context for debugging support (uses interior mutability)
@@ -187,7 +347,7 @@ impl ScriptRuntime {
     ///
     /// Returns an error if runtime initialization fails
     #[cfg(feature = "lua")]
-    pub fn new_with_lua_and_provider(
+    pub async fn new_with_lua_and_provider(
         config: LLMSpellConfig,
         provider_manager: Arc<ProviderManager>,
     ) -> Result<Self, LLMSpellError> {
@@ -197,7 +357,60 @@ impl ScriptRuntime {
             &lua_config,
             Some(Arc::new(config.clone())),
         )?;
-        Self::new_with_engine_and_provider(engine, config, provider_manager)
+        Self::new_with_engine_and_provider(engine, config, provider_manager).await
+    }
+
+    /// Create Lua runtime with provider manager AND `SessionManager` (Phase 12.8.2.11)
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if runtime initialization fails
+    #[cfg(feature = "lua")]
+    pub async fn new_with_lua_provider_and_session(
+        config: LLMSpellConfig,
+        provider_manager: Arc<ProviderManager>,
+        session_manager: Arc<llmspell_kernel::sessions::SessionManager>,
+    ) -> Result<Self, LLMSpellError> {
+        info!("Creating Lua script runtime with provider manager and session manager");
+        let lua_config = LuaConfig::default();
+        let engine = EngineFactory::create_lua_engine_with_runtime(
+            &lua_config,
+            Some(Arc::new(config.clone())),
+        )?;
+        Self::new_with_engine_provider_and_session(
+            engine,
+            config,
+            provider_manager,
+            session_manager,
+        )
+        .await
+    }
+
+    /// Create Lua runtime with core provider manager AND `SessionManager` (Phase 12.8.2.11)
+    ///
+    /// Accepts `llmspell_providers::ProviderManager` from kernel layer to avoid re-initialization.
+    /// Wraps it in bridge `ProviderManager` for script access.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if runtime initialization fails
+    #[cfg(feature = "lua")]
+    pub async fn new_with_lua_core_provider_and_session(
+        config: LLMSpellConfig,
+        core_provider_manager: Arc<llmspell_providers::ProviderManager>,
+        session_manager: Arc<llmspell_kernel::sessions::SessionManager>,
+    ) -> Result<Self, LLMSpellError> {
+        info!("Creating Lua script runtime with core provider manager and session manager");
+
+        // Wrap core manager in bridge ProviderManager
+        // Clone the core manager (cheap - uses Arc internally)
+        let bridge_provider_manager = Arc::new(ProviderManager::from_core_manager(
+            (*core_provider_manager).clone(),
+            config.providers.clone(),
+        ));
+
+        Self::new_with_lua_provider_and_session(config, bridge_provider_manager, session_manager)
+            .await
     }
 
     /// Create JavaScript runtime with existing provider manager (Phase 11.FIX.1)
@@ -206,14 +419,14 @@ impl ScriptRuntime {
     ///
     /// Returns an error if runtime initialization fails
     #[cfg(feature = "javascript")]
-    pub fn new_with_javascript_and_provider(
+    pub async fn new_with_javascript_and_provider(
         config: LLMSpellConfig,
         provider_manager: Arc<ProviderManager>,
     ) -> Result<Self, LLMSpellError> {
         info!("Creating JavaScript script runtime with existing provider manager");
         let js_config = JSConfig::default();
         let engine = EngineFactory::create_javascript_engine(&js_config)?;
-        Self::new_with_engine_and_provider(engine, config, provider_manager)
+        Self::new_with_engine_and_provider(engine, config, provider_manager).await
     }
 
     /// Create a new runtime with a specific engine by name
@@ -233,9 +446,9 @@ impl ScriptRuntime {
         info!("Creating script runtime with engine: {}", engine_name);
         match engine_name {
             #[cfg(feature = "lua")]
-            "lua" => Self::new_with_lua(config).await,
+            "lua" => Box::pin(Self::new_with_lua(config)).await,
             #[cfg(feature = "javascript")]
-            "javascript" | "js" => Self::new_with_javascript(config).await,
+            "javascript" | "js" => Box::pin(Self::new_with_javascript(config)).await,
             _ => Err(LLMSpellError::Validation {
                 field: Some("engine".to_string()),
                 message: format!(
@@ -286,7 +499,16 @@ impl ScriptRuntime {
         config: LLMSpellConfig,
     ) -> Result<Self, LLMSpellError> {
         debug!("Initializing script runtime with engine");
-        // Create component registry with event support based on config
+
+        // Create infrastructure registries BEFORE ComponentRegistry (Phase 12.7.1.2 Step 1)
+        // These provide full-featured infrastructure for templates (hooks, discovery, validation)
+        let tool_registry = Arc::new(llmspell_tools::ToolRegistry::new());
+        let agent_registry = Arc::new(llmspell_agents::FactoryRegistry::new());
+        let workflow_factory: Arc<dyn llmspell_workflows::WorkflowFactory> =
+            Arc::new(llmspell_workflows::factory::DefaultWorkflowFactory::new());
+
+        // Create component registry with event support and templates based on config
+        // This provides lightweight script access layer (HashMap-based)
         let registry = if config.events.enabled {
             // Create EventBus with default configuration
             // Note: Buffer size is hardcoded to 10000 in EventBus implementation
@@ -303,23 +525,63 @@ impl ScriptRuntime {
                 max_events_per_second: config.events.max_events_per_second,
             };
 
-            Arc::new(ComponentRegistry::with_event_bus(event_bus, event_config))
+            Arc::new(
+                ComponentRegistry::with_event_bus_and_templates(event_bus, event_config).map_err(
+                    |e| LLMSpellError::Component {
+                        message: format!("Failed to initialize component registry: {e}"),
+                        source: None,
+                    },
+                )?,
+            )
         } else {
-            // Events disabled, create registry without event bus
-            Arc::new(ComponentRegistry::new())
+            // Events disabled, create registry with built-in templates
+            Arc::new(
+                ComponentRegistry::with_templates().map_err(|e| LLMSpellError::Component {
+                    message: format!("Failed to initialize component registry: {e}"),
+                    source: None,
+                })?,
+            )
         };
 
-        // Register all Phase 2 tools with the registry using configuration
-        register_all_tools(&registry, &config.tools).map_err(|e| LLMSpellError::Component {
-            message: format!("Failed to register tools: {e}"),
-            source: None,
-        })?;
+        // Register all Phase 2 tools with BOTH registries using dual-registration (Phase 12.7.1.2 Step 5)
+        register_all_tools(&registry, &tool_registry, &config.tools)
+            .await
+            .map_err(|e| LLMSpellError::Component {
+                message: format!("Failed to register tools: {e}"),
+                source: None,
+            })?;
 
         // Create provider manager using config from llmspell-config
         let provider_manager = Arc::new(ProviderManager::new(config.providers.clone()).await?);
 
-        // Inject APIs into the engine
-        engine.inject_apis(&registry, &provider_manager)?;
+        // Register default agent factory with AgentRegistry (Phase 12.8.2.6)
+        // This provides agent creation capability for templates (interactive-chat, code-generator, etc.)
+        debug!("Registering default agent factory");
+        let core_provider_manager = provider_manager.create_core_manager_arc().await?;
+        let default_agent_factory = Arc::new(llmspell_agents::DefaultAgentFactory::new(
+            core_provider_manager,
+        ));
+
+        agent_registry
+            .register_factory("default".to_string(), default_agent_factory)
+            .await
+            .map_err(|e| LLMSpellError::Component {
+                message: format!("Failed to register default agent factory: {e}"),
+                source: None,
+            })?;
+
+        debug!("Default agent factory registered successfully");
+
+        // Inject APIs into the engine (no SessionManager for standalone mode)
+        // Pass infrastructure registries for template execution (Phase 12.8.2.13)
+        engine.inject_apis(
+            &registry,
+            &provider_manager,
+            &tool_registry,
+            &agent_registry,
+            &workflow_factory,
+            None,
+        )?;
 
         // Create execution context
         let execution_context = Arc::new(RwLock::new(crate::engine::ExecutionContext {
@@ -338,26 +600,41 @@ impl ScriptRuntime {
             },
         }));
 
+        // Phase 12.7.1.2 Step 6: Initialize struct with infrastructure registries
         Ok(Self {
             engine,
             registry,
             provider_manager,
+            tool_registry,    // NEW - infrastructure for templates
+            agent_registry,   // NEW - infrastructure for templates
+            workflow_factory, // NEW - infrastructure for templates
+            session_manager: Arc::new(RwLock::new(None)), // Phase 12.8.2.5 - wired from kernel later
+            rag: Arc::new(RwLock::new(None)), // Phase 12.8.fix - wired from kernel later for RAG templates
             execution_context,
             debug_context: Arc::new(RwLock::new(None)),
             _config: config,
         })
     }
 
-    /// Create runtime with existing provider manager (Phase 11.FIX.1)
-    /// This ensures a single `ProviderManager` instance is shared between kernel and script runtime
+    /// Create runtime with `SessionManager` (Phase 12.8.2.11 - Unified Kernel Path)
+    /// Used by kernel to ensure `SessionManager` is available during `inject_apis()`
     #[cfg(any(feature = "lua", feature = "javascript"))]
-    fn new_with_engine_and_provider(
+    #[allow(clippy::cognitive_complexity)]
+    async fn new_with_engine_provider_and_session(
         mut engine: Box<dyn ScriptEngineBridge>,
         config: LLMSpellConfig,
         provider_manager: Arc<ProviderManager>,
+        session_manager: Arc<llmspell_kernel::sessions::SessionManager>,
     ) -> Result<Self, LLMSpellError> {
-        debug!("Initializing script runtime with engine and existing provider manager");
-        // Create component registry with event support based on config
+        debug!("Initializing script runtime with provider manager AND session manager");
+
+        // Create infrastructure registries
+        let tool_registry = Arc::new(llmspell_tools::ToolRegistry::new());
+        let agent_registry = Arc::new(llmspell_agents::FactoryRegistry::new());
+        let workflow_factory: Arc<dyn llmspell_workflows::WorkflowFactory> =
+            Arc::new(llmspell_workflows::factory::DefaultWorkflowFactory::new());
+
+        // Create component registry
         let registry = if config.events.enabled {
             let event_bus = Arc::new(llmspell_events::EventBus::new());
             let event_config = llmspell_core::traits::event::EventConfig {
@@ -369,18 +646,60 @@ impl ScriptRuntime {
                 emit_debug_events: config.events.emit_debug_events,
                 max_events_per_second: config.events.max_events_per_second,
             };
-            Arc::new(ComponentRegistry::with_event_bus(event_bus, event_config))
+            Arc::new(
+                ComponentRegistry::with_event_bus_and_templates(event_bus, event_config).map_err(
+                    |e| LLMSpellError::Component {
+                        message: format!("Failed to initialize component registry: {e}"),
+                        source: None,
+                    },
+                )?,
+            )
         } else {
-            Arc::new(ComponentRegistry::new())
+            Arc::new(
+                ComponentRegistry::with_templates().map_err(|e| LLMSpellError::Component {
+                    message: format!("Failed to initialize component registry: {e}"),
+                    source: None,
+                })?,
+            )
         };
 
-        register_all_tools(&registry, &config.tools).map_err(|e| LLMSpellError::Component {
-            message: format!("Failed to register tools: {e}"),
-            source: None,
-        })?;
+        // Register all tools with BOTH registries
+        register_all_tools(&registry, &tool_registry, &config.tools)
+            .await
+            .map_err(|e| LLMSpellError::Component {
+                message: format!("Failed to register tools: {e}"),
+                source: None,
+            })?;
 
-        // Use provided provider manager instead of creating new one
-        engine.inject_apis(&registry, &provider_manager)?;
+        // Register default agent factory
+        debug!("Registering default agent factory with existing provider manager");
+        let core_provider_manager = provider_manager.create_core_manager_arc().await?;
+        let default_agent_factory = Arc::new(llmspell_agents::DefaultAgentFactory::new(
+            core_provider_manager,
+        ));
+
+        agent_registry
+            .register_factory("default".to_string(), default_agent_factory)
+            .await
+            .map_err(|e| LLMSpellError::Component {
+                message: format!("Failed to register default agent factory: {e}"),
+                source: None,
+            })?;
+
+        debug!("Default agent factory registered successfully");
+
+        // Inject APIs with SessionManager (Phase 12.8.2.11)
+        // Type-erase SessionManager to avoid circular dependencies
+        // Pass infrastructure registries for template execution (Phase 12.8.2.13)
+        let session_manager_any: Arc<dyn std::any::Any + Send + Sync> = session_manager.clone();
+        engine.inject_apis(
+            &registry,
+            &provider_manager,
+            &tool_registry,
+            &agent_registry,
+            &workflow_factory,
+            Some(session_manager_any),
+        )?;
 
         let execution_context = Arc::new(RwLock::new(crate::engine::ExecutionContext {
             working_directory: std::env::current_dir()
@@ -398,10 +717,131 @@ impl ScriptRuntime {
             },
         }));
 
+        // Initialize struct with SessionManager already wired
         Ok(Self {
             engine,
             registry,
             provider_manager,
+            tool_registry,
+            agent_registry,
+            workflow_factory,
+            session_manager: Arc::new(RwLock::new(Some(session_manager))), // Wired during construction
+            rag: Arc::new(RwLock::new(None)), // Phase 12.8.fix - wired from kernel later for RAG templates
+            execution_context,
+            debug_context: Arc::new(RwLock::new(None)),
+            _config: config,
+        })
+    }
+
+    /// Create runtime with existing provider manager (Phase 11.FIX.1)
+    /// This ensures a single `ProviderManager` instance is shared between kernel and script runtime
+    #[cfg(any(feature = "lua", feature = "javascript"))]
+    #[allow(clippy::cognitive_complexity)] // Initialization code with sequential setup steps
+    async fn new_with_engine_and_provider(
+        mut engine: Box<dyn ScriptEngineBridge>,
+        config: LLMSpellConfig,
+        provider_manager: Arc<ProviderManager>,
+    ) -> Result<Self, LLMSpellError> {
+        debug!("Initializing script runtime with engine and existing provider manager");
+
+        // Create infrastructure registries (Phase 12.7.1.2 Step 7)
+        let tool_registry = Arc::new(llmspell_tools::ToolRegistry::new());
+        let agent_registry = Arc::new(llmspell_agents::FactoryRegistry::new());
+        let workflow_factory: Arc<dyn llmspell_workflows::WorkflowFactory> =
+            Arc::new(llmspell_workflows::factory::DefaultWorkflowFactory::new());
+
+        // Create component registry with event support and templates based on config
+        let registry = if config.events.enabled {
+            let event_bus = Arc::new(llmspell_events::EventBus::new());
+            let event_config = llmspell_core::traits::event::EventConfig {
+                enabled: config.events.enabled,
+                include_types: config.events.filtering.include_types.clone(),
+                exclude_types: config.events.filtering.exclude_types.clone(),
+                emit_timing_events: config.events.emit_timing_events,
+                emit_state_events: config.events.emit_state_events,
+                emit_debug_events: config.events.emit_debug_events,
+                max_events_per_second: config.events.max_events_per_second,
+            };
+            Arc::new(
+                ComponentRegistry::with_event_bus_and_templates(event_bus, event_config).map_err(
+                    |e| LLMSpellError::Component {
+                        message: format!("Failed to initialize component registry: {e}"),
+                        source: None,
+                    },
+                )?,
+            )
+        } else {
+            Arc::new(
+                ComponentRegistry::with_templates().map_err(|e| LLMSpellError::Component {
+                    message: format!("Failed to initialize component registry: {e}"),
+                    source: None,
+                })?,
+            )
+        };
+
+        // Register all Phase 2 tools with BOTH registries using dual-registration (Phase 12.7.1.2 Step 7)
+        register_all_tools(&registry, &tool_registry, &config.tools)
+            .await
+            .map_err(|e| LLMSpellError::Component {
+                message: format!("Failed to register tools: {e}"),
+                source: None,
+            })?;
+
+        // Register default agent factory with AgentRegistry (Phase 12.8.2.6)
+        // This provides agent creation capability for templates (interactive-chat, code-generator, etc.)
+        debug!("Registering default agent factory with existing provider manager");
+        let core_provider_manager = provider_manager.create_core_manager_arc().await?;
+        let default_agent_factory = Arc::new(llmspell_agents::DefaultAgentFactory::new(
+            core_provider_manager,
+        ));
+
+        agent_registry
+            .register_factory("default".to_string(), default_agent_factory)
+            .await
+            .map_err(|e| LLMSpellError::Component {
+                message: format!("Failed to register default agent factory: {e}"),
+                source: None,
+            })?;
+
+        debug!("Default agent factory registered successfully");
+
+        // Use provided provider manager instead of creating new one (no SessionManager for now)
+        // Pass infrastructure registries for template execution (Phase 12.8.2.13)
+        engine.inject_apis(
+            &registry,
+            &provider_manager,
+            &tool_registry,
+            &agent_registry,
+            &workflow_factory,
+            None,
+        )?;
+
+        let execution_context = Arc::new(RwLock::new(crate::engine::ExecutionContext {
+            working_directory: std::env::current_dir()
+                .unwrap_or_default()
+                .to_string_lossy()
+                .to_string(),
+            environment: std::env::vars().collect(),
+            state: serde_json::Value::Object(serde_json::Map::new()),
+            security: crate::engine::SecurityContext {
+                allow_file_access: config.runtime.security.allow_file_access,
+                allow_network_access: config.runtime.security.allow_network_access,
+                allow_process_spawn: config.runtime.security.allow_process_spawn,
+                max_memory_bytes: config.runtime.security.max_memory_bytes,
+                max_execution_time_ms: config.runtime.security.max_execution_time_ms,
+            },
+        }));
+
+        // Phase 12.7.1.2 Step 7: Initialize struct with infrastructure registries
+        Ok(Self {
+            engine,
+            registry,
+            provider_manager,
+            tool_registry,    // NEW - infrastructure for templates
+            agent_registry,   // NEW - infrastructure for templates
+            workflow_factory, // NEW - infrastructure for templates
+            session_manager: Arc::new(RwLock::new(None)), // Phase 12.8.2.5 - wired from kernel later
+            rag: Arc::new(RwLock::new(None)), // Phase 12.8.fix - wired from kernel later for RAG templates
             execution_context,
             debug_context: Arc::new(RwLock::new(None)),
             _config: config,
@@ -527,6 +967,99 @@ impl ScriptRuntime {
     #[must_use]
     pub const fn provider_manager(&self) -> &Arc<ProviderManager> {
         &self.provider_manager
+    }
+
+    /// Get the tool registry (Phase 12.7.1.2 Step 8)
+    /// Used by template execution infrastructure for hooks, discovery, validation
+    #[must_use]
+    pub const fn tool_registry(&self) -> &Arc<llmspell_tools::ToolRegistry> {
+        &self.tool_registry
+    }
+
+    /// Get the agent factory registry (Phase 12.7.1.2 Step 8)
+    /// Used by template execution infrastructure for agent creation
+    #[must_use]
+    pub const fn agent_registry(&self) -> &Arc<llmspell_agents::FactoryRegistry> {
+        &self.agent_registry
+    }
+
+    /// Get the workflow factory (Phase 12.7.1.2 Step 8)
+    /// Used by template execution infrastructure for workflow creation
+    #[must_use]
+    pub fn workflow_factory(&self) -> &Arc<dyn llmspell_workflows::WorkflowFactory> {
+        &self.workflow_factory
+    }
+
+    /// Set session manager for template infrastructure (Phase 12.8.2.5)
+    ///
+    /// This method is called by the kernel after `ScriptRuntime` initialization to wire in
+    /// the `SessionManager`. The kernel creates the `SessionManager` with full dependencies
+    /// (state manager, storage backend, hooks, events) and passes it here.
+    ///
+    /// # Examples
+    ///
+    /// ```rust,ignore
+    /// // In kernel initialization (integrated.rs):
+    /// let session_manager = SessionManager::new(...)?;
+    /// if let Some(runtime) = script_executor.as_any().downcast_ref::<ScriptRuntime>() {
+    ///     runtime.set_session_manager(Arc::new(session_manager.clone()));
+    /// }
+    /// ```
+    ///
+    /// # Design Note
+    ///
+    /// This method is NOT part of `ScriptExecutor` trait to avoid circular dependency:
+    /// - `ScriptExecutor` trait is in `llmspell-core`
+    /// - `SessionManager` type is in `llmspell-kernel`
+    /// - Adding session manager to trait would create `core` → `kernel` dependency
+    ///
+    /// Instead, kernel uses `as_any()` downcasting to access this concrete method.
+    pub fn set_session_manager(
+        &self,
+        session_manager: Arc<llmspell_kernel::sessions::SessionManager>,
+    ) {
+        if let Ok(mut sm) = self.session_manager.write() {
+            *sm = Some(session_manager);
+            debug!("Session manager wired to ScriptRuntime");
+        }
+    }
+
+    /// Wire RAG infrastructure to `ScriptRuntime` for template execution (Phase 12.8.fix)
+    ///
+    /// This method is called by the kernel after `ScriptRuntime` initialization to wire in
+    /// the `MultiTenantRAG` for research-assistant and other RAG-dependent templates.
+    ///
+    /// # Examples
+    ///
+    /// ```rust,ignore
+    /// // In kernel initialization:
+    /// if let Some(runtime) = script_executor.as_any().downcast_ref::<ScriptRuntime>() {
+    ///     runtime.set_rag(multi_tenant_rag);
+    /// }
+    /// ```
+    pub fn set_rag(&self, rag: Arc<llmspell_rag::multi_tenant_integration::MultiTenantRAG>) {
+        if let Ok(mut r) = self.rag.write() {
+            *r = Some(rag);
+            debug!("RAG infrastructure wired to ScriptRuntime");
+        }
+    }
+
+    /// Downcast support for kernel to access concrete `ScriptRuntime` methods (Phase 12.8.2.5)
+    ///
+    /// Enables kernel to downcast `Arc<dyn ScriptExecutor>` to `&ScriptRuntime` for
+    /// calling methods not in the trait (like `set_session_manager()`).
+    ///
+    /// # Examples
+    ///
+    /// ```rust,ignore
+    /// // In kernel initialization:
+    /// if let Some(runtime) = script_executor.as_any().downcast_ref::<ScriptRuntime>() {
+    ///     runtime.set_session_manager(session_manager);
+    /// }
+    /// ```
+    #[must_use]
+    pub fn as_any(&self) -> &dyn std::any::Any {
+        self
     }
 
     /// Get the current execution context
@@ -680,9 +1213,27 @@ impl ScriptExecutor for ScriptRuntime {
         debug_context.clone()
     }
 
+    fn set_session_manager_any(&self, manager: Arc<dyn std::any::Any + Send + Sync>) {
+        // Downcast from type-erased Any to concrete SessionManager
+        if let Ok(session_manager) =
+            Arc::downcast::<llmspell_kernel::sessions::SessionManager>(manager)
+        {
+            self.set_session_manager(session_manager);
+        } else {
+            tracing::warn!("Failed to downcast session manager from Any");
+        }
+    }
+
     fn component_registry(&self) -> Option<Arc<dyn ComponentLookup>> {
         // Return the component registry as ComponentLookup trait
         Some(Arc::clone(&self.registry) as Arc<dyn ComponentLookup>)
+    }
+
+    fn template_registry_any(&self) -> Option<Arc<dyn std::any::Any + Send + Sync>> {
+        // Return the template registry as type-erased Any to avoid circular dependencies
+        self.registry
+            .template_registry()
+            .map(|reg| reg as Arc<dyn std::any::Any + Send + Sync>)
     }
 
     fn get_completion_candidates(&self, line: &str, cursor_pos: usize) -> Vec<(String, String)> {
@@ -698,6 +1249,424 @@ impl ScriptExecutor for ScriptRuntime {
             .map(|candidate| {
                 let display = format!("{:?}", candidate.kind).to_lowercase();
                 (candidate.text, display)
+            })
+            .collect()
+    }
+
+    // === Template Operations (JSON-based API to avoid circular dependencies) ===
+
+    fn handle_template_list(
+        &self,
+        category: Option<&str>,
+    ) -> Result<serde_json::Value, LLMSpellError> {
+        use serde_json::json;
+
+        // Get TemplateRegistry via type erasure
+        let registry_any =
+            self.template_registry_any()
+                .ok_or_else(|| LLMSpellError::Component {
+                    message: "Template registry not available".to_string(),
+                    source: None,
+                })?;
+
+        // Downcast to concrete TemplateRegistry
+        let template_registry = std::sync::Arc::downcast::<
+            llmspell_templates::registry::TemplateRegistry,
+        >(registry_any)
+        .map_err(|_| LLMSpellError::Component {
+            message: "Failed to access template registry".to_string(),
+            source: None,
+        })?;
+
+        // Get templates by category or all
+        let templates_metadata = if let Some(cat_str) = category {
+            // Parse category string
+            use llmspell_templates::core::TemplateCategory;
+            let category = match cat_str.to_lowercase().as_str() {
+                "research" => TemplateCategory::Research,
+                "chat" => TemplateCategory::Chat,
+                "analysis" => TemplateCategory::Analysis,
+                "codegen" => TemplateCategory::CodeGen,
+                "document" => TemplateCategory::Document,
+                "workflow" => TemplateCategory::Workflow,
+                _ => {
+                    return Err(LLMSpellError::Validation {
+                        field: Some("category".to_string()),
+                        message: format!("Invalid category: {cat_str}"),
+                    });
+                }
+            };
+            template_registry.discover_by_category(&category)
+        } else {
+            template_registry.list_metadata()
+        };
+
+        // Convert to JSON
+        let templates_json: Vec<serde_json::Value> = templates_metadata
+            .iter()
+            .map(|meta| {
+                json!({
+                    "id": meta.id,
+                    "name": meta.name,
+                    "description": meta.description,
+                    "category": format!("{:?}", meta.category),
+                    "version": meta.version,
+                    "author": meta.author,
+                    "tags": meta.tags,
+                })
+            })
+            .collect();
+
+        Ok(json!(templates_json))
+    }
+
+    fn handle_template_info(
+        &self,
+        template_id: &str,
+        with_schema: bool,
+    ) -> Result<serde_json::Value, LLMSpellError> {
+        use serde_json::json;
+
+        // Get TemplateRegistry via type erasure
+        let registry_any =
+            self.template_registry_any()
+                .ok_or_else(|| LLMSpellError::Component {
+                    message: "Template registry not available".to_string(),
+                    source: None,
+                })?;
+
+        // Downcast to concrete TemplateRegistry
+        let template_registry = std::sync::Arc::downcast::<
+            llmspell_templates::registry::TemplateRegistry,
+        >(registry_any)
+        .map_err(|_| LLMSpellError::Component {
+            message: "Failed to access template registry".to_string(),
+            source: None,
+        })?;
+
+        // Get template
+        let template =
+            template_registry
+                .get(template_id)
+                .map_err(|e| LLMSpellError::Component {
+                    message: format!("Template not found: {e}"),
+                    source: None,
+                })?;
+
+        let metadata = template.metadata();
+        let mut info_json = json!({
+            "id": metadata.id,
+            "name": metadata.name,
+            "description": metadata.description,
+            "category": format!("{:?}", metadata.category),
+            "version": metadata.version,
+            "author": metadata.author,
+            "requires": metadata.requires,
+            "tags": metadata.tags,
+        });
+
+        // Add schema if requested
+        if with_schema {
+            let schema = template.config_schema();
+            if let Ok(schema_json) = serde_json::to_value(schema) {
+                info_json["schema"] = schema_json;
+            }
+        }
+
+        Ok(info_json)
+    }
+
+    async fn handle_template_exec(
+        &self,
+        template_id: &str,
+        params: serde_json::Value,
+    ) -> Result<serde_json::Value, LLMSpellError> {
+        use serde_json::json;
+
+        // Get template from registry
+        let template = self.get_template_from_registry(template_id)?;
+
+        // Convert and validate params
+        let template_params = Self::convert_and_validate_params(&template, &params)?;
+
+        // Build execution context with infrastructure registries (Phase 12.7.1.3 + 12.8.2.5)
+        // Wire in the 5 required components for template execution
+        let core_provider_manager = self.provider_manager.create_core_manager_arc().await?;
+
+        // Get session manager if available (Phase 12.8.2.5)
+        let session_manager = self
+            .session_manager
+            .read()
+            .ok()
+            .and_then(|guard| guard.clone());
+
+        // Get RAG if available (Phase 12.8.fix)
+        let rag = self.rag.read().ok().and_then(|guard| guard.clone());
+
+        let mut builder = llmspell_templates::context::ExecutionContext::builder()
+            .with_tool_registry(self.tool_registry.clone())
+            .with_agent_registry(self.agent_registry.clone())
+            .with_workflow_factory(self.workflow_factory.clone())
+            .with_providers(core_provider_manager);
+
+        // Add session manager if wired from kernel (Phase 12.8.2.5)
+        if let Some(sm) = session_manager {
+            builder = builder.with_session_manager(sm);
+            debug!("Session manager added to template execution context");
+        }
+
+        // Add RAG if wired from kernel (Phase 12.8.fix)
+        if let Some(r) = rag {
+            builder = builder.with_rag(r);
+            debug!("RAG infrastructure added to template execution context");
+        }
+
+        let context = builder.build().map_err(|e| LLMSpellError::Component {
+            message: format!("Failed to build execution context: {e}"),
+            source: None,
+        })?;
+
+        // Execute template
+        let output = template
+            .execute(template_params, context)
+            .await
+            .map_err(|e| LLMSpellError::Component {
+                message: format!("Template execution failed: {e}"),
+                source: None,
+            })?;
+
+        // Convert output to JSON response
+        Ok(json!({
+            "result": Self::convert_template_result_to_json(&output.result),
+            "artifacts": Self::convert_artifacts_to_json(&output.artifacts),
+            "metrics": {
+                "duration_ms": output.metrics.duration_ms,
+                "tokens_used": output.metrics.tokens_used,
+                "cost_usd": output.metrics.cost_usd,
+                "agents_invoked": output.metrics.agents_invoked,
+                "tools_invoked": output.metrics.tools_invoked,
+                "rag_queries": output.metrics.rag_queries,
+                "custom_metrics": output.metrics.custom_metrics,
+            }
+        }))
+    }
+
+    fn handle_template_search(
+        &self,
+        query: &str,
+        category: Option<&str>,
+    ) -> Result<serde_json::Value, LLMSpellError> {
+        use serde_json::json;
+
+        // Get TemplateRegistry via type erasure
+        let registry_any =
+            self.template_registry_any()
+                .ok_or_else(|| LLMSpellError::Component {
+                    message: "Template registry not available".to_string(),
+                    source: None,
+                })?;
+
+        // Downcast to concrete TemplateRegistry
+        let template_registry = std::sync::Arc::downcast::<
+            llmspell_templates::registry::TemplateRegistry,
+        >(registry_any)
+        .map_err(|_| LLMSpellError::Component {
+            message: "Failed to access template registry".to_string(),
+            source: None,
+        })?;
+
+        // Search templates
+        let mut results = template_registry.search(query);
+
+        // Filter by category if specified
+        if let Some(cat_str) = category {
+            use llmspell_templates::core::TemplateCategory;
+            let category = match cat_str.to_lowercase().as_str() {
+                "research" => TemplateCategory::Research,
+                "chat" => TemplateCategory::Chat,
+                "analysis" => TemplateCategory::Analysis,
+                "codegen" => TemplateCategory::CodeGen,
+                "document" => TemplateCategory::Document,
+                "workflow" => TemplateCategory::Workflow,
+                _ => {
+                    return Err(LLMSpellError::Validation {
+                        field: Some("category".to_string()),
+                        message: format!("Invalid category: {cat_str}"),
+                    });
+                }
+            };
+            results.retain(|m| m.category == category);
+        }
+
+        // Convert to JSON
+        let results_json: Vec<serde_json::Value> = results
+            .iter()
+            .map(|meta| {
+                json!({
+                    "id": meta.id,
+                    "name": meta.name,
+                    "description": meta.description,
+                    "category": format!("{:?}", meta.category),
+                    "tags": meta.tags,
+                })
+            })
+            .collect();
+
+        Ok(json!(results_json))
+    }
+
+    fn handle_template_schema(
+        &self,
+        template_id: &str,
+    ) -> Result<serde_json::Value, LLMSpellError> {
+        // Get TemplateRegistry via type erasure
+        let registry_any =
+            self.template_registry_any()
+                .ok_or_else(|| LLMSpellError::Component {
+                    message: "Template registry not available".to_string(),
+                    source: None,
+                })?;
+
+        // Downcast to concrete TemplateRegistry
+        let template_registry = std::sync::Arc::downcast::<
+            llmspell_templates::registry::TemplateRegistry,
+        >(registry_any)
+        .map_err(|_| LLMSpellError::Component {
+            message: "Failed to access template registry".to_string(),
+            source: None,
+        })?;
+
+        // Get template
+        let template =
+            template_registry
+                .get(template_id)
+                .map_err(|e| LLMSpellError::Component {
+                    message: format!("Template not found: {e}"),
+                    source: None,
+                })?;
+
+        let schema = template.config_schema();
+        serde_json::to_value(schema).map_err(|e| LLMSpellError::Component {
+            message: format!("Failed to serialize schema: {e}"),
+            source: None,
+        })
+    }
+
+    fn as_any(&self) -> &dyn std::any::Any {
+        self
+    }
+}
+
+/// Helper methods for template execution
+impl ScriptRuntime {
+    /// Helper to get template from registry with type erasure
+    fn get_template_from_registry(
+        &self,
+        template_id: &str,
+    ) -> Result<std::sync::Arc<dyn llmspell_templates::core::Template>, LLMSpellError> {
+        let registry_any =
+            self.template_registry_any()
+                .ok_or_else(|| LLMSpellError::Component {
+                    message: "Template registry not available".to_string(),
+                    source: None,
+                })?;
+
+        let template_registry = std::sync::Arc::downcast::<
+            llmspell_templates::registry::TemplateRegistry,
+        >(registry_any)
+        .map_err(|_| LLMSpellError::Component {
+            message: "Failed to access template registry".to_string(),
+            source: None,
+        })?;
+
+        template_registry
+            .get(template_id)
+            .map_err(|e| LLMSpellError::Component {
+                message: format!("Template not found: {e}"),
+                source: None,
+            })
+    }
+
+    /// Helper to convert and validate JSON params to `TemplateParams`
+    fn convert_and_validate_params(
+        template: &std::sync::Arc<dyn llmspell_templates::core::Template>,
+        params: &serde_json::Value,
+    ) -> Result<llmspell_templates::core::TemplateParams, LLMSpellError> {
+        let params_obj = params
+            .as_object()
+            .ok_or_else(|| LLMSpellError::Validation {
+                field: Some("params".to_string()),
+                message: "Parameters must be a JSON object".to_string(),
+            })?;
+
+        let mut template_params = llmspell_templates::core::TemplateParams::new();
+        for (key, value) in params_obj {
+            template_params.insert(key.clone(), value.clone());
+        }
+
+        template
+            .validate(&template_params)
+            .map_err(|e| LLMSpellError::Validation {
+                field: Some("params".to_string()),
+                message: format!("Parameter validation failed: {e}"),
+            })?;
+
+        Ok(template_params)
+    }
+
+    /// Helper to convert `TemplateResult` to JSON
+    fn convert_template_result_to_json(
+        result: &llmspell_templates::core::TemplateResult,
+    ) -> serde_json::Value {
+        use serde_json::json;
+
+        match result {
+            llmspell_templates::core::TemplateResult::Text(text) => {
+                json!({"type": "text", "value": text})
+            }
+            llmspell_templates::core::TemplateResult::Structured(value) => {
+                json!({"type": "structured", "value": value})
+            }
+            llmspell_templates::core::TemplateResult::File(path) => {
+                json!({"type": "file", "path": path.display().to_string()})
+            }
+            llmspell_templates::core::TemplateResult::Multiple(results) => {
+                let results_json: Vec<serde_json::Value> = results
+                    .iter()
+                    .map(|r| match r {
+                        llmspell_templates::core::TemplateResult::Text(t) => {
+                            json!({"type": "text", "value": t})
+                        }
+                        llmspell_templates::core::TemplateResult::File(p) => {
+                            json!({"type": "file", "path": p.display().to_string()})
+                        }
+                        llmspell_templates::core::TemplateResult::Structured(v) => {
+                            json!({"type": "structured", "value": v})
+                        }
+                        llmspell_templates::core::TemplateResult::Multiple(_) => {
+                            json!({"type": "nested_multiple"})
+                        }
+                    })
+                    .collect();
+                json!({"type": "multiple", "results": results_json})
+            }
+        }
+    }
+
+    /// Helper to convert artifacts to JSON
+    fn convert_artifacts_to_json(
+        artifacts: &[llmspell_templates::artifacts::Artifact],
+    ) -> Vec<serde_json::Value> {
+        use serde_json::json;
+
+        artifacts
+            .iter()
+            .map(|a| {
+                json!({
+                    "filename": a.filename,
+                    "mime_type": a.mime_type,
+                    "size": a.size()
+                })
             })
             .collect()
     }

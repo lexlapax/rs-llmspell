@@ -1,4 +1,4 @@
-//! ABOUTME: Component registry for managing agents, tools, and workflows
+//! ABOUTME: Component registry for managing agents, tools, workflows, and templates
 //! ABOUTME: Central registry for all scriptable components accessible from engines
 
 use crate::event_bus_adapter::EventBusAdapter;
@@ -8,6 +8,7 @@ use llmspell_core::{
     Agent, BaseAgent, ComponentLookup, ExecutionContext, LLMSpellError, Tool, Workflow,
 };
 use llmspell_events::EventBus;
+use llmspell_templates::registry::TemplateRegistry;
 use std::collections::HashMap;
 use std::sync::{Arc, RwLock};
 
@@ -16,6 +17,7 @@ pub struct ComponentRegistry {
     agents: Arc<RwLock<HashMap<String, Arc<dyn Agent>>>>,
     tools: Arc<RwLock<HashMap<String, Arc<dyn Tool>>>>,
     workflows: Arc<RwLock<HashMap<String, Arc<dyn Workflow>>>>,
+    template_registry: Option<Arc<TemplateRegistry>>,
     event_bus: Option<Arc<EventBus>>,
     event_config: EventConfig,
 }
@@ -28,6 +30,7 @@ impl ComponentRegistry {
             agents: Arc::new(RwLock::new(HashMap::new())),
             tools: Arc::new(RwLock::new(HashMap::new())),
             workflows: Arc::new(RwLock::new(HashMap::new())),
+            template_registry: None,
             event_bus: None,
             event_config: EventConfig::default(),
         }
@@ -40,15 +43,69 @@ impl ComponentRegistry {
             agents: Arc::new(RwLock::new(HashMap::new())),
             tools: Arc::new(RwLock::new(HashMap::new())),
             workflows: Arc::new(RwLock::new(HashMap::new())),
+            template_registry: None,
             event_bus: Some(event_bus),
             event_config: config,
         }
+    }
+
+    /// Create a new registry with templates initialized
+    ///
+    /// # Errors
+    ///
+    /// Returns error if built-in template registration fails
+    pub fn with_templates() -> Result<Self, LLMSpellError> {
+        let template_registry =
+            TemplateRegistry::with_builtin_templates().map_err(|e| LLMSpellError::Component {
+                message: format!("Failed to initialize built-in templates: {e}"),
+                source: None,
+            })?;
+
+        Ok(Self {
+            agents: Arc::new(RwLock::new(HashMap::new())),
+            tools: Arc::new(RwLock::new(HashMap::new())),
+            workflows: Arc::new(RwLock::new(HashMap::new())),
+            template_registry: Some(Arc::new(template_registry)),
+            event_bus: None,
+            event_config: EventConfig::default(),
+        })
+    }
+
+    /// Create a new registry with both `EventBus` and templates initialized
+    ///
+    /// # Errors
+    ///
+    /// Returns error if built-in template registration fails
+    pub fn with_event_bus_and_templates(
+        event_bus: Arc<EventBus>,
+        config: EventConfig,
+    ) -> Result<Self, LLMSpellError> {
+        let template_registry =
+            TemplateRegistry::with_builtin_templates().map_err(|e| LLMSpellError::Component {
+                message: format!("Failed to initialize built-in templates: {e}"),
+                source: None,
+            })?;
+
+        Ok(Self {
+            agents: Arc::new(RwLock::new(HashMap::new())),
+            tools: Arc::new(RwLock::new(HashMap::new())),
+            workflows: Arc::new(RwLock::new(HashMap::new())),
+            template_registry: Some(Arc::new(template_registry)),
+            event_bus: Some(event_bus),
+            event_config: config,
+        })
     }
 
     /// Get the `EventBus` if available
     #[must_use]
     pub fn event_bus(&self) -> Option<Arc<EventBus>> {
         self.event_bus.clone()
+    }
+
+    /// Get the `TemplateRegistry` if available
+    #[must_use]
+    pub fn template_registry(&self) -> Option<Arc<TemplateRegistry>> {
+        self.template_registry.clone()
     }
 
     /// Create an `ExecutionContext` with registry services (state, events, etc.)

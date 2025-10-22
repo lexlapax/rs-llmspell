@@ -2,9 +2,11 @@
 
 use assert_cmd::Command;
 use predicates::prelude::*;
+use serial_test::serial;
 use std::fs;
 
 #[test]
+#[serial]
 fn test_trace_level_off() {
     let mut cmd = Command::cargo_bin("llmspell").unwrap();
     let output = cmd
@@ -23,6 +25,7 @@ fn test_trace_level_off() {
 }
 
 #[test]
+#[serial]
 fn test_trace_level_error() {
     let mut cmd = Command::cargo_bin("llmspell").unwrap();
     let output = cmd
@@ -41,6 +44,7 @@ fn test_trace_level_error() {
 }
 
 #[test]
+#[serial]
 fn test_trace_level_warn() {
     let mut cmd = Command::cargo_bin("llmspell").unwrap();
     let output = cmd
@@ -62,6 +66,7 @@ fn test_trace_level_warn() {
 }
 
 #[test]
+#[serial]
 fn test_trace_level_info() {
     let mut cmd = Command::cargo_bin("llmspell").unwrap();
     let output = cmd
@@ -82,6 +87,7 @@ fn test_trace_level_info() {
 }
 
 #[test]
+#[serial]
 fn test_trace_level_debug() {
     let mut cmd = Command::cargo_bin("llmspell").unwrap();
     let output = cmd
@@ -102,6 +108,7 @@ fn test_trace_level_debug() {
 }
 
 #[test]
+#[serial]
 fn test_trace_level_trace() {
     let mut cmd = Command::cargo_bin("llmspell").unwrap();
     let output = cmd
@@ -122,6 +129,7 @@ fn test_trace_level_trace() {
 }
 
 #[test]
+#[serial]
 fn test_trace_on_all_commands() {
     // Create test file
     let test_file = "/tmp/test_trace_9_4_5.lua";
@@ -160,6 +168,7 @@ fn test_trace_on_all_commands() {
 }
 
 #[test]
+#[serial]
 fn test_debug_command_timeout() {
     use std::time::Duration;
 
@@ -186,6 +195,7 @@ fn test_debug_command_timeout() {
 }
 
 #[test]
+#[serial]
 fn test_repl_command_timeout() {
     use std::time::Duration;
 
@@ -208,6 +218,7 @@ fn test_repl_command_timeout() {
 }
 
 #[test]
+#[serial]
 fn test_span_propagation() {
     let mut cmd = Command::cargo_bin("llmspell").unwrap();
     let output = cmd
@@ -227,6 +238,7 @@ fn test_span_propagation() {
 }
 
 #[test]
+#[serial]
 fn test_stderr_stdout_separation() {
     // Test that trace output goes to stderr and program output goes to stdout
     let mut cmd = Command::cargo_bin("llmspell").unwrap();

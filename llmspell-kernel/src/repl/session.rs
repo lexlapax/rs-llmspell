@@ -10,14 +10,33 @@ use crate::repl::commands::{DebugCommand, MetaCommand, ReplCommand};
 use crate::repl::readline::{ReplReadline, ScriptExecutorCompletionAdapter};
 use crate::repl::state::{Breakpoint, ReplState};
 use anyhow::Result;
+use chrono::{DateTime, Utc};
+use llmspell_core::traits::agent::Agent;
 use llmspell_core::traits::debug_context::DebugContext;
 use llmspell_core::traits::script_executor::ScriptExecutor;
+use llmspell_core::LLMSpellError;
+use serde::{Deserialize, Serialize};
+use std::fmt::Write as _;
 use std::path::PathBuf;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
 use std::time::Instant;
 use tokio::sync::{mpsc, RwLock};
 use tracing::{debug, error, info, warn};
+
+/// Agent creator callback for auto-creating agents when needed (Subtask 12.9.5)
+///
+/// Takes current model, `system_prompt`, and tools and returns a new agent
+pub type AgentCreator = Arc<
+    dyn Fn(
+            String,
+            String,
+            Vec<String>,
+        ) -> std::pin::Pin<
+            Box<dyn std::future::Future<Output = Result<Arc<dyn Agent>, LLMSpellError>> + Send>,
+        > + Send
+        + Sync,
+>;
 
 /// REPL session configuration
 #[derive(Debug, Clone)]
@@ -156,6 +175,19 @@ impl Default for SessionStatistics {
     }
 }
 
+/// Conversation turn for LLM chat history
+#[derive(Clone, Debug, Serialize, Deserialize)]
+pub struct ConversationTurn {
+    /// Role: "user" or "assistant"
+    pub role: String,
+    /// Message content
+    pub content: String,
+    /// Token count (if available)
+    pub token_count: Option<usize>,
+    /// Timestamp
+    pub timestamp: DateTime<Utc>,
+}
+
 /// Interactive session combining REPL and debug
 pub struct InteractiveSession {
     /// Integrated kernel
@@ -185,6 +217,30 @@ pub struct InteractiveSession {
     multiline_buffer: Vec<String>,
     /// Flag to track if we're executing
     executing: Arc<AtomicBool>,
+
+    // Agent infrastructure for chat mode (Subtask 12.9.2)
+    /// Agent registry (optional - for chat mode)
+    #[allow(dead_code)] // Will be used in Subtask 12.9.4
+    agent_registry: Option<Arc<dyn std::any::Any + Send + Sync>>,
+    /// Provider manager (optional - for chat mode)
+    #[allow(dead_code)] // Will be used in Subtask 12.9.4
+    provider_manager: Option<Arc<dyn std::any::Any + Send + Sync>>,
+    /// Conversation history for LLM chat
+    conversation_history: Arc<RwLock<Vec<ConversationTurn>>>,
+    /// Current active agent for chat
+    #[allow(dead_code)] // Will be used in Subtask 12.9.4
+    current_agent: Arc<RwLock<Option<Arc<dyn Agent>>>>,
+    /// Current LLM model
+    current_model: Arc<RwLock<String>>,
+    /// System prompt for agent
+    system_prompt: Arc<RwLock<String>>,
+    /// Allowed tools for agent
+    allowed_tools: Arc<RwLock<Vec<String>>>,
+    /// RAG system (optional - for chat mode)
+    #[allow(dead_code)] // Will be used in Subtask 12.9.4
+    rag: Option<Arc<dyn std::any::Any + Send + Sync>>,
+    /// Agent creator callback (optional - for auto-creating agents)
+    agent_creator: Option<AgentCreator>,
 }
 
 impl InteractiveSession {
@@ -261,7 +317,70 @@ impl InteractiveSession {
             multiline_buffer: Vec::new(),
             executing: Arc::new(AtomicBool::new(false)),
             config,
+            // Agent infrastructure (Subtask 12.9.2) - defaults for code-only mode
+            agent_registry: None,
+            provider_manager: None,
+            conversation_history: Arc::new(RwLock::new(Vec::new())),
+            current_agent: Arc::new(RwLock::new(None)),
+            current_model: Arc::new(RwLock::new("ollama/llama3.2:3b".to_string())),
+            system_prompt: Arc::new(RwLock::new("You are a helpful AI assistant.".to_string())),
+            allowed_tools: Arc::new(RwLock::new(Vec::new())),
+            rag: None,
+            agent_creator: None,
         })
+    }
+
+    /// Configure agent infrastructure for chat mode (Subtask 12.9.5)
+    ///
+    /// Builder-style methods to wire up `agent_registry`, `provider_manager`, RAG, and initial settings
+    #[must_use]
+    pub fn with_agent_registry(mut self, registry: Arc<dyn std::any::Any + Send + Sync>) -> Self {
+        self.agent_registry = Some(registry);
+        self
+    }
+
+    #[must_use]
+    pub fn with_provider_manager(mut self, manager: Arc<dyn std::any::Any + Send + Sync>) -> Self {
+        self.provider_manager = Some(manager);
+        self
+    }
+
+    #[must_use]
+    pub fn with_rag(mut self, rag: Arc<dyn std::any::Any + Send + Sync>) -> Self {
+        self.rag = Some(rag);
+        self
+    }
+
+    #[must_use]
+    pub async fn with_model(self, model: impl Into<String>) -> Self {
+        *self.current_model.write().await = model.into();
+        self
+    }
+
+    #[must_use]
+    pub async fn with_system_prompt(self, prompt: impl Into<String>) -> Self {
+        *self.system_prompt.write().await = prompt.into();
+        self
+    }
+
+    #[must_use]
+    pub async fn with_tools(self, tools: Vec<String>) -> Self {
+        *self.allowed_tools.write().await = tools;
+        self
+    }
+
+    /// Set the initial agent for chat mode (template layer creates agent)
+    #[must_use]
+    pub async fn with_initial_agent(self, agent: Arc<dyn Agent>) -> Self {
+        *self.current_agent.write().await = Some(agent);
+        self
+    }
+
+    /// Set agent creator callback for auto-creating agents (Subtask 12.9.5)
+    #[must_use]
+    pub fn with_agent_creator(mut self, creator: AgentCreator) -> Self {
+        self.agent_creator = Some(creator);
+        self
     }
 
     /// Run the REPL loop
@@ -357,9 +476,19 @@ impl InteractiveSession {
 
     /// Handle a parsed command
     async fn handle_command(&mut self, command: ReplCommand) -> Result<()> {
+        use crate::repl::commands::ChatMetaCommand;
+
         match command {
             ReplCommand::Execute(code) => self.execute_code(&code).await,
+            ReplCommand::Chat(message) => self.handle_chat_message(message).await,
             ReplCommand::Meta(meta) => self.handle_meta_command(meta).await,
+            ReplCommand::ChatMeta(chat_meta) => match chat_meta {
+                ChatMetaCommand::System(prompt) => self.handle_system_command(prompt).await,
+                ChatMetaCommand::Model(model) => self.handle_model_command(model).await,
+                ChatMetaCommand::Tools(tools) => self.handle_tools_command(tools).await,
+                ChatMetaCommand::Context => self.handle_context_command().await,
+                ChatMetaCommand::ClearChat => self.handle_clearchat_command().await,
+            },
             ReplCommand::Debug(debug) => self.handle_debug_command(debug).await,
             ReplCommand::Empty => Ok(()),
         }
@@ -890,6 +1019,126 @@ impl InteractiveSession {
         println!();
     }
 
+    /// Print configuration section
+    fn print_configuration_section(&self) {
+        println!("\n⚙️ Configuration:");
+        println!(
+            "  Execution timeout: {}s",
+            self.config.execution_timeout_secs
+        );
+        println!(
+            "  Performance monitoring: {}",
+            if self.config.enable_performance_monitoring {
+                "enabled"
+            } else {
+                "disabled"
+            }
+        );
+        println!(
+            "  Debug commands: {}",
+            if self.config.enable_debug_commands {
+                "enabled"
+            } else {
+                "disabled"
+            }
+        );
+        println!(
+            "  Session persistence: {}",
+            if self.config.enable_persistence {
+                "enabled"
+            } else {
+                "disabled"
+            }
+        );
+        if let Some(ref history_file) = self.config.history_file {
+            println!("  History file: {}", history_file.display());
+        } else {
+            println!("  History file: none");
+        }
+    }
+
+    /// Print infrastructure section
+    fn print_infrastructure_section(&self) {
+        let script_executor = self.kernel.get_script_executor();
+        println!("\n🔧 Script Executor:");
+        println!("  Language: {}", script_executor.language());
+
+        println!("\n🏗️ Infrastructure:");
+        println!("  Session manager: enabled");
+        println!(
+            "  Hooks: {}",
+            if self.kernel.are_hooks_enabled() {
+                "enabled"
+            } else {
+                "disabled"
+            }
+        );
+        println!(
+            "  Provider manager: {}",
+            if self.provider_manager.is_some() {
+                "enabled"
+            } else {
+                "disabled"
+            }
+        );
+        println!(
+            "  Agent registry: {}",
+            if self.agent_registry.is_some() {
+                "enabled"
+            } else {
+                "disabled"
+            }
+        );
+        println!(
+            "  RAG system: {}",
+            if self.rag.is_some() {
+                "enabled"
+            } else {
+                "disabled"
+            }
+        );
+    }
+
+    /// Print chat mode section
+    async fn print_chat_mode_section(&self) {
+        let conversation_history = self.conversation_history.read().await;
+        if !conversation_history.is_empty() || self.agent_registry.is_some() {
+            println!("\n💬 Chat Mode:");
+            let model = self.current_model.read().await;
+            println!("  Model: {model}");
+
+            let system_prompt = self.system_prompt.read().await;
+            let prompt_preview = if system_prompt.len() > 60 {
+                format!("{}...", &system_prompt[..57])
+            } else {
+                system_prompt.clone()
+            };
+            println!("  System prompt: {prompt_preview}");
+
+            let agent_status = if self.current_agent.read().await.is_some() {
+                "initialized"
+            } else if self.agent_creator.is_some() {
+                "auto-create enabled"
+            } else {
+                "not available"
+            };
+            println!("  Agent: {agent_status}");
+
+            let tools = self.allowed_tools.read().await;
+            if tools.is_empty() {
+                println!("  Tools: none");
+            } else {
+                println!("  Tools: {}", tools.join(", "));
+            }
+
+            println!("  Conversation turns: {}", conversation_history.len());
+            let total_tokens = self.get_token_count().await;
+            if total_tokens > 0 {
+                println!("  Total tokens: {total_tokens}");
+            }
+        }
+    }
+
     /// Print session info
     async fn print_session_info(&self) {
         let uptime = self.start_time.elapsed();
@@ -906,6 +1155,11 @@ impl InteractiveSession {
         println!("  Variables: {}", state.variables.len());
         println!("  Breakpoints: {}", state.breakpoints.len());
         println!("  Debug mode: {}", self.debug_session.is_some());
+
+        // Configuration, infrastructure, and chat mode sections
+        self.print_configuration_section();
+        self.print_infrastructure_section();
+        self.print_chat_mode_section().await;
 
         // Performance statistics
         if self.session_stats.commands_executed > 0 {
@@ -1179,8 +1433,7 @@ impl InteractiveSession {
             println!("Arguments: {args:?}");
         }
 
-        // TODO: Pass args to script when ScriptEngineBridge supports it
-        // For now, just execute the script
+        // Execute script (args support deferred - ScriptEngineBridge API expansion needed)
         let start = if self.perf_monitoring {
             Some(Instant::now())
         } else {
@@ -1279,6 +1532,292 @@ impl InteractiveSession {
         } else {
             "... ".to_string()
         }
+    }
+
+    // ===== Conversation Management Methods (Subtask 12.9.2) =====
+
+    /// Add a turn to conversation history
+    ///
+    /// # Arguments
+    /// * `role` - "user" or "assistant"
+    /// * `content` - Message content
+    /// * `token_count` - Optional token count
+    pub async fn add_to_history(
+        &self,
+        role: impl Into<String>,
+        content: impl Into<String>,
+        token_count: Option<usize>,
+    ) {
+        let role_str = role.into();
+        let turn = ConversationTurn {
+            role: role_str.clone(),
+            content: content.into(),
+            token_count,
+            timestamp: Utc::now(),
+        };
+
+        let mut history = self.conversation_history.write().await;
+        history.push(turn);
+        debug!(
+            "Added conversation turn (role={}, tokens={:?})",
+            role_str, token_count
+        );
+    }
+
+    /// Get formatted conversation context for LLM prompt
+    ///
+    /// Returns the conversation history formatted as a string suitable for
+    /// including in LLM prompts.
+    pub async fn get_conversation_context(&self) -> String {
+        let history = self.conversation_history.read().await;
+        if history.is_empty() {
+            return String::new();
+        }
+
+        let mut context = String::new();
+        for turn in history.iter() {
+            let _ = writeln!(context, "{}: {}", turn.role, turn.content);
+        }
+        context
+    }
+
+    /// Clear conversation history (keeps session active)
+    pub async fn clear_conversation(&self) {
+        let mut history = self.conversation_history.write().await;
+        history.clear();
+        info!("Conversation history cleared");
+    }
+
+    /// Get total token count from conversation history
+    ///
+    /// Returns the sum of all tokens in the conversation history, or 0 if
+    /// token counts are not available.
+    pub async fn get_token_count(&self) -> usize {
+        let history = self.conversation_history.read().await;
+        history.iter().filter_map(|turn| turn.token_count).sum()
+    }
+
+    /// Get system prompt
+    pub async fn get_system_prompt(&self) -> String {
+        self.system_prompt.read().await.clone()
+    }
+
+    /// Set system prompt
+    pub async fn set_system_prompt(&self, prompt: impl Into<String>) {
+        let mut system_prompt = self.system_prompt.write().await;
+        *system_prompt = prompt.into();
+        debug!("System prompt updated");
+    }
+
+    /// Get current model
+    pub async fn get_current_model(&self) -> String {
+        self.current_model.read().await.clone()
+    }
+
+    /// Set current model
+    pub async fn set_current_model(&self, model: impl Into<String>) {
+        let mut current_model = self.current_model.write().await;
+        *current_model = model.into();
+        debug!("Current model updated to: {}", current_model);
+    }
+
+    /// Get allowed tools
+    pub async fn get_allowed_tools(&self) -> Vec<String> {
+        self.allowed_tools.read().await.clone()
+    }
+
+    /// Set allowed tools
+    pub async fn set_allowed_tools(&self, tools: Vec<String>) {
+        let mut allowed_tools = self.allowed_tools.write().await;
+        *allowed_tools = tools;
+        debug!("Allowed tools updated: {:?}", allowed_tools);
+    }
+
+    // ===== Chat Command Handlers (Subtask 12.9.4) =====
+
+    /// Handle chat message from user (Subtask 12.9.5)
+    ///
+    /// Executes LLM agent with full conversation context and tools
+    async fn handle_chat_message(&mut self, message: String) -> Result<()> {
+        use llmspell_core::types::AgentInput;
+
+        // Add user message to history
+        self.add_to_history("user", &message, None).await;
+
+        // Get or create agent using callback
+        let agent_opt = self.current_agent.read().await;
+        let agent = if let Some(ref existing_agent) = *agent_opt {
+            existing_agent.clone()
+        } else {
+            drop(agent_opt); // Release read lock
+
+            // Try to create agent using callback
+            if let Some(ref creator) = self.agent_creator {
+                // Get current settings
+                let model = self.current_model.read().await.clone();
+                let system_prompt = self.system_prompt.read().await.clone();
+                let tools = self.allowed_tools.read().await.clone();
+
+                // Call creator callback
+                let new_agent = creator(model, system_prompt, tools)
+                    .await
+                    .map_err(|e| anyhow::anyhow!("Failed to create agent: {e}"))?;
+
+                // Store for reuse
+                *self.current_agent.write().await = Some(new_agent.clone());
+
+                new_agent
+            } else {
+                // No agent creator - return error
+                let fallback =
+                    "Chat agent not initialized. Use .model command or template must provide agent.";
+                self.add_to_history("assistant", fallback, None).await;
+                println!("\n\x1b[1;31mError>\x1b[0m {fallback}\n");
+                return Ok(());
+            }
+        };
+
+        // Build prompt with conversation context
+        let system_prompt = self.get_system_prompt().await;
+        let conversation_context = self.get_conversation_context().await;
+        let prompt = if conversation_context.is_empty() {
+            format!("{system_prompt}\n\nRespond to the user's message naturally and helpfully.")
+        } else {
+            format!(
+                "{system_prompt}\n\nConversation History:\n{conversation_context}\n\n\
+                 Respond to the user's latest message naturally and helpfully."
+            )
+        };
+
+        // Execute agent
+        let prompt_len = prompt.len(); // Save length before moving
+        let agent_input = AgentInput::builder().text(prompt).build();
+        let output = agent
+            .execute(agent_input, llmspell_core::ExecutionContext::default())
+            .await
+            .map_err(|e| LLMSpellError::Component {
+                message: format!("Chat agent execution failed: {e}"),
+                source: Some(Box::new(e)),
+            })?;
+
+        // Extract response
+        let response = output.text.trim().to_string();
+
+        // Estimate token count (rough: ~4 chars per token)
+        let token_count = Some((prompt_len + response.len()) / 4);
+
+        // Add assistant response to history
+        self.add_to_history("assistant", &response, token_count)
+            .await;
+
+        // Display response
+        println!("\n\x1b[1;34mAssistant>\x1b[0m {response}\n");
+
+        Ok(())
+    }
+
+    /// Handle .system command - update system prompt
+    async fn handle_system_command(&mut self, prompt: String) -> Result<()> {
+        // Update system prompt
+        self.set_system_prompt(&prompt).await;
+
+        // Clear current agent to force recreation with new prompt
+        {
+            let mut agent = self.current_agent.write().await;
+            *agent = None;
+        }
+
+        println!("\x1b[1;32m✓\x1b[0m System prompt updated");
+        println!("  New prompt: {prompt}");
+        println!("  Agent will be recreated on next chat message\n");
+
+        Ok(())
+    }
+
+    /// Handle .model command - switch LLM model
+    async fn handle_model_command(&mut self, model: String) -> Result<()> {
+        // Update model (validation deferred - invalid models fail at agent creation)
+        self.set_current_model(&model).await;
+
+        // Clear current agent to force recreation with new model
+        {
+            let mut agent = self.current_agent.write().await;
+            *agent = None;
+        }
+
+        println!("\x1b[1;32m✓\x1b[0m Model switched to: {model}");
+        println!("  Agent will be recreated on next chat message\n");
+
+        Ok(())
+    }
+
+    /// Handle .tools command - configure allowed tools
+    async fn handle_tools_command(&mut self, tools: Vec<String>) -> Result<()> {
+        // Update allowed tools (validation deferred - invalid tools fail at agent creation)
+        self.set_allowed_tools(tools.clone()).await;
+
+        // Clear current agent to force recreation with new tools
+        {
+            let mut agent = self.current_agent.write().await;
+            *agent = None;
+        }
+
+        println!("\x1b[1;32m✓\x1b[0m Allowed tools updated");
+        println!("  Tools: {}", tools.join(", "));
+        println!("  Agent will be recreated on next chat message\n");
+
+        Ok(())
+    }
+
+    /// Handle .context command - show conversation state
+    async fn handle_context_command(&self) -> Result<()> {
+        println!("\n\x1b[1;36m=== Conversation Context ===\x1b[0m\n");
+
+        // Show current settings
+        let model = self.get_current_model().await;
+        let prompt = self.get_system_prompt().await;
+        let tools = self.get_allowed_tools().await;
+        let token_count = self.get_token_count().await;
+
+        println!("\x1b[1mModel:\x1b[0m {model}");
+        println!("\x1b[1mSystem Prompt:\x1b[0m {prompt}");
+        let tools_str = if tools.is_empty() {
+            "(none)".to_string()
+        } else {
+            tools.join(", ")
+        };
+        println!("\x1b[1mAllowed Tools:\x1b[0m {tools_str}");
+        println!("\x1b[1mTotal Tokens:\x1b[0m {token_count}\n");
+
+        // Show conversation history
+        let history = self.conversation_history.read().await;
+        if history.is_empty() {
+            println!("\x1b[1mConversation History:\x1b[0m (empty)\n");
+        } else {
+            let history_len = history.len();
+            println!("\x1b[1mConversation History:\x1b[0m ({history_len} turns)\n");
+            for (i, turn) in history.iter().enumerate() {
+                let role_color = if turn.role == "user" { "33" } else { "34" };
+                let token_str = turn
+                    .token_count
+                    .map_or_else(String::new, |t| format!(" [{t}t]"));
+                let idx = i + 1;
+                let role = &turn.role;
+                let content = &turn.content;
+                println!("  {idx}. \x1b[1;{role_color}m{role}\x1b[0m{token_str}: {content}");
+            }
+            println!();
+        }
+
+        Ok(())
+    }
+
+    /// Handle .clearchat command - clear conversation history
+    async fn handle_clearchat_command(&self) -> Result<()> {
+        self.clear_conversation().await;
+        println!("\x1b[1;32m✓\x1b[0m Conversation history cleared");
+        println!("  Code session and variables are preserved\n");
+        Ok(())
     }
 }
 
@@ -1385,4 +1924,359 @@ fn get_current_memory_usage() -> u64 {
 
     // Fallback: return 0 if we can't get memory stats
     0
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[tokio::test]
+    async fn test_add_to_history() {
+        let kernel = create_test_kernel().await;
+        let config = ReplSessionConfig::default();
+        let session = InteractiveSession::new(kernel, config).await.unwrap();
+
+        // Add a user turn
+        session.add_to_history("user", "Hello", Some(5)).await;
+
+        // Add an assistant turn
+        session
+            .add_to_history("assistant", "Hi there!", Some(10))
+            .await;
+
+        // Verify history
+        let history = session.conversation_history.read().await;
+        assert_eq!(history.len(), 2);
+        assert_eq!(history[0].role, "user");
+        assert_eq!(history[0].content, "Hello");
+        assert_eq!(history[0].token_count, Some(5));
+        assert_eq!(history[1].role, "assistant");
+        assert_eq!(history[1].content, "Hi there!");
+        assert_eq!(history[1].token_count, Some(10));
+    }
+
+    #[tokio::test]
+    async fn test_get_conversation_context() {
+        let kernel = create_test_kernel().await;
+        let config = ReplSessionConfig::default();
+        let session = InteractiveSession::new(kernel, config).await.unwrap();
+
+        // Empty history
+        let context = session.get_conversation_context().await;
+        assert!(context.is_empty());
+
+        // Add turns
+        session.add_to_history("user", "What is Rust?", None).await;
+        session
+            .add_to_history("assistant", "Rust is a systems programming language.", None)
+            .await;
+
+        // Get context
+        let context = session.get_conversation_context().await;
+        assert!(context.contains("user: What is Rust?"));
+        assert!(context.contains("assistant: Rust is a systems programming language."));
+    }
+
+    #[tokio::test]
+    async fn test_clear_conversation() {
+        let kernel = create_test_kernel().await;
+        let config = ReplSessionConfig::default();
+        let session = InteractiveSession::new(kernel, config).await.unwrap();
+
+        // Add turns
+        session.add_to_history("user", "Hello", None).await;
+        session.add_to_history("assistant", "Hi!", None).await;
+
+        // Verify not empty
+        {
+            let history = session.conversation_history.read().await;
+            assert_eq!(history.len(), 2);
+        }
+
+        // Clear
+        session.clear_conversation().await;
+
+        // Verify empty
+        let history = session.conversation_history.read().await;
+        assert!(history.is_empty());
+    }
+
+    #[tokio::test]
+    async fn test_get_token_count() {
+        let kernel = create_test_kernel().await;
+        let config = ReplSessionConfig::default();
+        let session = InteractiveSession::new(kernel, config).await.unwrap();
+
+        // Initial count
+        assert_eq!(session.get_token_count().await, 0);
+
+        // Add turns with token counts
+        session.add_to_history("user", "Hello", Some(5)).await;
+        session.add_to_history("assistant", "Hi!", Some(3)).await;
+        session
+            .add_to_history("user", "How are you?", Some(7))
+            .await;
+
+        // Verify sum
+        assert_eq!(session.get_token_count().await, 15);
+    }
+
+    #[tokio::test]
+    async fn test_system_prompt_get_set() {
+        let kernel = create_test_kernel().await;
+        let config = ReplSessionConfig::default();
+        let session = InteractiveSession::new(kernel, config).await.unwrap();
+
+        // Default value
+        let prompt = session.get_system_prompt().await;
+        assert_eq!(prompt, "You are a helpful AI assistant.");
+
+        // Update
+        session.set_system_prompt("You are a Rust expert.").await;
+
+        // Verify update
+        let prompt = session.get_system_prompt().await;
+        assert_eq!(prompt, "You are a Rust expert.");
+    }
+
+    #[tokio::test]
+    async fn test_current_model_get_set() {
+        let kernel = create_test_kernel().await;
+        let config = ReplSessionConfig::default();
+        let session = InteractiveSession::new(kernel, config).await.unwrap();
+
+        // Default value
+        let model = session.get_current_model().await;
+        assert_eq!(model, "ollama/llama3.2:3b");
+
+        // Update
+        session.set_current_model("gpt-4").await;
+
+        // Verify update
+        let model = session.get_current_model().await;
+        assert_eq!(model, "gpt-4");
+    }
+
+    #[tokio::test]
+    async fn test_allowed_tools_get_set() {
+        let kernel = create_test_kernel().await;
+        let config = ReplSessionConfig::default();
+        let session = InteractiveSession::new(kernel, config).await.unwrap();
+
+        // Default value
+        let tools = session.get_allowed_tools().await;
+        assert!(tools.is_empty());
+
+        // Update
+        session
+            .set_allowed_tools(vec!["web-searcher".to_string(), "calculator".to_string()])
+            .await;
+
+        // Verify update
+        let tools = session.get_allowed_tools().await;
+        assert_eq!(tools, vec!["web-searcher", "calculator"]);
+    }
+
+    // ===== Chat Command Handler Tests (Subtask 12.9.4) =====
+
+    #[tokio::test]
+    async fn test_handle_chat_message() {
+        let kernel = create_test_kernel().await;
+        let config = ReplSessionConfig::default();
+        let mut session = InteractiveSession::new(kernel, config).await.unwrap();
+
+        // Send chat message (without agent - should get error)
+        let result = session.handle_chat_message("Hello, AI!".to_string()).await;
+        assert!(result.is_ok()); // Error is handled gracefully, not returned
+
+        // Verify history has 2 turns (user + error message)
+        let history = session.conversation_history.read().await;
+        assert_eq!(history.len(), 2);
+        assert_eq!(history[0].role, "user");
+        assert_eq!(history[0].content, "Hello, AI!");
+        assert_eq!(history[1].role, "assistant");
+        assert!(
+            history[1].content.contains("Chat agent not initialized"),
+            "Expected error message, got: {}",
+            history[1].content
+        );
+    }
+
+    #[tokio::test]
+    async fn test_handle_system_command() {
+        let kernel = create_test_kernel().await;
+        let config = ReplSessionConfig::default();
+        let mut session = InteractiveSession::new(kernel, config).await.unwrap();
+
+        // Update system prompt
+        let result = session
+            .handle_system_command("You are a Rust expert.".to_string())
+            .await;
+        assert!(result.is_ok());
+
+        // Verify prompt updated
+        let prompt = session.get_system_prompt().await;
+        assert_eq!(prompt, "You are a Rust expert.");
+
+        // Verify agent cleared
+        let agent = session.current_agent.read().await;
+        assert!(agent.is_none());
+    }
+
+    #[tokio::test]
+    async fn test_handle_model_command() {
+        let kernel = create_test_kernel().await;
+        let config = ReplSessionConfig::default();
+        let mut session = InteractiveSession::new(kernel, config).await.unwrap();
+
+        // Switch model
+        let result = session.handle_model_command("gpt-4".to_string()).await;
+        assert!(result.is_ok());
+
+        // Verify model updated
+        let model = session.get_current_model().await;
+        assert_eq!(model, "gpt-4");
+
+        // Verify agent cleared
+        let agent = session.current_agent.read().await;
+        assert!(agent.is_none());
+    }
+
+    #[tokio::test]
+    async fn test_handle_tools_command() {
+        let kernel = create_test_kernel().await;
+        let config = ReplSessionConfig::default();
+        let mut session = InteractiveSession::new(kernel, config).await.unwrap();
+
+        // Update tools
+        let result = session
+            .handle_tools_command(vec!["web-searcher".to_string(), "calculator".to_string()])
+            .await;
+        assert!(result.is_ok());
+
+        // Verify tools updated
+        let tools = session.get_allowed_tools().await;
+        assert_eq!(tools, vec!["web-searcher", "calculator"]);
+
+        // Verify agent cleared
+        let agent = session.current_agent.read().await;
+        assert!(agent.is_none());
+    }
+
+    #[tokio::test]
+    async fn test_handle_context_command() {
+        let kernel = create_test_kernel().await;
+        let config = ReplSessionConfig::default();
+        let session = InteractiveSession::new(kernel, config).await.unwrap();
+
+        // Add some history
+        session.add_to_history("user", "Hello", Some(5)).await;
+        session.add_to_history("assistant", "Hi!", Some(3)).await;
+
+        // Display context (should not error)
+        let result = session.handle_context_command().await;
+        assert!(result.is_ok());
+    }
+
+    #[tokio::test]
+    async fn test_handle_clearchat_command() {
+        let kernel = create_test_kernel().await;
+        let config = ReplSessionConfig::default();
+        let session = InteractiveSession::new(kernel, config).await.unwrap();
+
+        // Add history
+        session.add_to_history("user", "Hello", None).await;
+        session.add_to_history("assistant", "Hi!", None).await;
+
+        // Verify not empty
+        {
+            let history = session.conversation_history.read().await;
+            assert_eq!(history.len(), 2);
+        }
+
+        // Clear chat
+        let result = session.handle_clearchat_command().await;
+        assert!(result.is_ok());
+
+        // Verify empty
+        let history = session.conversation_history.read().await;
+        assert!(history.is_empty());
+    }
+
+    /// Helper to create a test kernel
+    async fn create_test_kernel() -> IntegratedKernel<JupyterProtocol> {
+        use crate::execution::ExecutionConfig;
+        use llmspell_core::traits::script_executor::ScriptExecutor;
+
+        // Mock script executor
+        struct MockScriptExecutor;
+        #[async_trait::async_trait]
+        impl ScriptExecutor for MockScriptExecutor {
+            async fn execute_script(
+                &self,
+                _script: &str,
+            ) -> Result<
+                llmspell_core::traits::script_executor::ScriptExecutionOutput,
+                llmspell_core::LLMSpellError,
+            > {
+                use llmspell_core::traits::script_executor::{
+                    ScriptExecutionMetadata, ScriptExecutionOutput,
+                };
+                Ok(ScriptExecutionOutput {
+                    output: serde_json::Value::Null,
+                    console_output: vec![],
+                    metadata: ScriptExecutionMetadata {
+                        duration: std::time::Duration::from_millis(0),
+                        language: "lua".to_string(),
+                        exit_code: Some(0),
+                        warnings: vec![],
+                    },
+                })
+            }
+            fn language(&self) -> &'static str {
+                "lua"
+            }
+            fn as_any(&self) -> &dyn std::any::Any {
+                self
+            }
+        }
+
+        let protocol = JupyterProtocol::new("test-session".to_string(), "test-kernel".to_string());
+        let config = ExecutionConfig::default();
+        let executor = Arc::new(MockScriptExecutor) as Arc<dyn ScriptExecutor>;
+        let session_manager = create_test_session_manager().await;
+
+        IntegratedKernel::new(
+            protocol,
+            config,
+            "test-session".to_string(),
+            executor,
+            None,
+            session_manager,
+        )
+        .await
+        .unwrap()
+    }
+
+    /// Helper to create a test `SessionManager` with minimal infrastructure
+    async fn create_test_session_manager() -> Arc<crate::sessions::SessionManager> {
+        let state_manager = Arc::new(crate::state::StateManager::new().await.unwrap());
+        let session_storage_backend = Arc::new(llmspell_storage::MemoryBackend::new());
+        let hook_registry = Arc::new(llmspell_hooks::HookRegistry::new());
+        let hook_executor = Arc::new(llmspell_hooks::HookExecutor::new());
+        let event_bus = Arc::new(llmspell_events::bus::EventBus::new());
+        let session_config = crate::sessions::SessionManagerConfig::default();
+
+        Arc::new(
+            crate::sessions::SessionManager::new(
+                state_manager,
+                session_storage_backend,
+                hook_registry,
+                hook_executor,
+                &event_bus,
+                session_config,
+            )
+            .unwrap(),
+        )
+    }
 }

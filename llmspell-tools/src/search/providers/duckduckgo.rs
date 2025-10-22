@@ -1,5 +1,8 @@
 //! ABOUTME: `DuckDuckGo` search provider implementation
-//! ABOUTME: Uses `DuckDuckGo` Instant Answer API (no API key required)
+//! ABOUTME: Uses HTML scraping for actual web results (no API key required)
+//!
+//! Primary method: HTML scraping of `html.duckduckgo.com`
+//! Fallback: Instant Answer API for knowledge queries
 use tracing::instrument;
 
 use super::{SearchOptions, SearchProvider, SearchResult, SearchType};
@@ -7,6 +10,7 @@ use async_trait::async_trait;
 use llmspell_core::{LLMSpellError, Result};
 use llmspell_kernel::runtime::create_io_bound_resource;
 use reqwest::Client;
+use scraper::{Html, Selector};
 use serde_json::Value;
 use tracing::{debug, info, warn};
 
@@ -42,13 +46,13 @@ impl SearchProvider for DuckDuckGoProvider {
     }
 
     fn rate_limit(&self) -> Option<u32> {
-        None // No official rate limit, but we should be respectful
+        Some(300) // 5 req/sec (conservative, unofficial limit is ~20/sec)
     }
 
     #[allow(clippy::too_many_lines)]
     #[instrument(skip(self))]
     async fn search(&self, query: &str, options: &SearchOptions) -> Result<Vec<SearchResult>> {
-        // DuckDuckGo Instant Answer API only supports web search
+        // DuckDuckGo HTML scraping only supports web search
         if options.search_type != SearchType::Web {
             return Err(LLMSpellError::Validation {
                 message: "DuckDuckGo only supports web search".to_string(),
@@ -56,6 +60,186 @@ impl SearchProvider for DuckDuckGoProvider {
             });
         }
 
+        debug!("Searching DuckDuckGo (HTML) for: {}", query);
+
+        // Try HTML scraping first (actual web results)
+        match self.search_html(query, options).await {
+            Ok(results) if !results.is_empty() => {
+                info!(
+                    "DuckDuckGo HTML scraping returned {} results",
+                    results.len()
+                );
+                return Ok(results);
+            }
+            Ok(_) => {
+                warn!("DuckDuckGo HTML scraping returned no results, trying Instant Answer API");
+            }
+            Err(e) => {
+                warn!(
+                    "DuckDuckGo HTML scraping failed: {}, trying Instant Answer API",
+                    e
+                );
+            }
+        }
+
+        // Fallback to Instant Answer API (knowledge queries)
+        self.search_instant_answer(query, options).await
+    }
+}
+
+impl DuckDuckGoProvider {
+    /// Search using HTML scraping (primary method for web results)
+    async fn search_html(&self, query: &str, options: &SearchOptions) -> Result<Vec<SearchResult>> {
+        let url = format!(
+            "https://html.duckduckgo.com/html/?q={}",
+            urlencoding::encode(query)
+        );
+
+        debug!("Fetching DuckDuckGo HTML: {}", url);
+
+        // Use browser-like headers to avoid CAPTCHA
+        let response = self
+            .client
+            .get(&url)
+            .header("User-Agent", "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36")
+            .header("Accept", "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8")
+            .header("Accept-Language", "en-US,en;q=0.9")
+            .header("Referer", "https://duckduckgo.com/")
+            .send()
+            .await
+            .map_err(|e| LLMSpellError::Network {
+                message: format!("DuckDuckGo HTML request failed: {e}"),
+                source: Some(Box::new(e)),
+            })?;
+
+        if !response.status().is_success() {
+            return Err(LLMSpellError::Network {
+                message: format!("DuckDuckGo returned status: {}", response.status()),
+                source: None,
+            });
+        }
+
+        let html_text = response.text().await.map_err(|e| LLMSpellError::Network {
+            message: format!("Failed to read DuckDuckGo HTML: {e}"),
+            source: Some(Box::new(e)),
+        })?;
+
+        // Check for CAPTCHA
+        if html_text.contains("anomaly-modal") || html_text.contains("captcha") {
+            return Err(LLMSpellError::Network {
+                message: "DuckDuckGo CAPTCHA detected - anti-bot protection triggered".to_string(),
+                source: None,
+            });
+        }
+
+        self.parse_html_results(&html_text, options.max_results)
+    }
+
+    /// Parse HTML and extract search results
+    fn parse_html_results(&self, html: &str, max_results: usize) -> Result<Vec<SearchResult>> {
+        let document = Html::parse_document(html);
+
+        // Selectors for DuckDuckGo HTML structure
+        let result_selector = Selector::parse(
+            ".result.results_links.results_links_deep.web-result",
+        )
+        .map_err(|e| LLMSpellError::Component {
+            message: format!("Failed to create result selector: {e:?}"),
+            source: None,
+        })?;
+
+        let link_selector =
+            Selector::parse(".result__a").map_err(|e| LLMSpellError::Component {
+                message: format!("Failed to create link selector: {e:?}"),
+                source: None,
+            })?;
+
+        let snippet_selector =
+            Selector::parse(".result__snippet").map_err(|e| LLMSpellError::Component {
+                message: format!("Failed to create snippet selector: {e:?}"),
+                source: None,
+            })?;
+
+        let mut results = Vec::new();
+        let mut rank = 1;
+
+        for result_elem in document.select(&result_selector).take(max_results) {
+            // Extract title and URL from link
+            let link = result_elem.select(&link_selector).next();
+            if let Some(link_elem) = link {
+                let title = link_elem
+                    .text()
+                    .collect::<Vec<_>>()
+                    .join(" ")
+                    .trim()
+                    .to_string();
+                let url = link_elem.value().attr("href").unwrap_or("");
+
+                // Extract snippet
+                let snippet = result_elem
+                    .select(&snippet_selector)
+                    .next()
+                    .map(|s| s.text().collect::<Vec<_>>().join(" ").trim().to_string())
+                    .unwrap_or_default();
+
+                // DuckDuckGo uses relative URLs like /l/?uddg=...
+                // Need to extract actual URL from redirect parameter
+                let actual_url = if url.starts_with("/l/?") {
+                    // Extract uddg parameter which contains the actual URL
+                    url.split("uddg=")
+                        .nth(1)
+                        .and_then(|s| s.split('&').next())
+                        .and_then(|encoded| urlencoding::decode(encoded).ok())
+                        .map_or_else(|| url.to_string(), |decoded| decoded.to_string())
+                } else {
+                    url.to_string()
+                };
+
+                if !title.is_empty() && !actual_url.is_empty() {
+                    results.push(SearchResult {
+                        title,
+                        url: actual_url,
+                        snippet,
+                        provider: self.name().to_string(),
+                        rank,
+                    });
+                    rank += 1;
+                }
+            }
+        }
+
+        debug!("Parsed {} results from DuckDuckGo HTML", results.len());
+        Ok(results)
+    }
+
+    /// Search using Instant Answer API (fallback for knowledge queries)
+    async fn search_instant_answer(
+        &self,
+        query: &str,
+        options: &SearchOptions,
+    ) -> Result<Vec<SearchResult>> {
+        let response_json = self.fetch_instant_answer_api(query, options).await?;
+        let mut results = Vec::new();
+        let mut rank = 1;
+
+        // Parse different result types
+        self.parse_abstract_result(&response_json, &mut results, &mut rank);
+        self.parse_instant_results(&response_json, &mut results, &mut rank, options.max_results);
+        self.parse_related_topics(&response_json, &mut results, &mut rank, options.max_results);
+
+        if results.is_empty() {
+            warn!("DuckDuckGo API returned no results for query: {}", query);
+        }
+
+        Ok(results)
+    }
+
+    /// Fetch response from Instant Answer API
+    async fn fetch_instant_answer_api(
+        &self,
+        query: &str,
+        options: &SearchOptions,
+    ) -> Result<Value> {
         let url = "https://api.duckduckgo.com/";
         let mut params = vec![
             ("q", query),
@@ -68,8 +252,7 @@ impl SearchProvider for DuckDuckGoProvider {
             params.push(("safe_search", "1"));
         }
 
-        debug!("Searching DuckDuckGo for: {}", query);
-        info!("DuckDuckGo search query: '{}', params: {:?}", query, params);
+        debug!("Searching DuckDuckGo Instant Answer API for: {}", query);
 
         let response = self
             .client
@@ -95,11 +278,14 @@ impl SearchProvider for DuckDuckGoProvider {
         })?;
 
         if response_text.is_empty() {
-            warn!("DuckDuckGo returned empty response for query: {}", query);
-            return Ok(vec![]);
+            warn!(
+                "DuckDuckGo API returned empty response for query: {}",
+                query
+            );
+            return Ok(serde_json::json!({}));
         }
 
-        let response_json: Value = serde_json::from_str(&response_text).map_err(|e| {
+        serde_json::from_str(&response_text).map_err(|e| {
             warn!(
                 "Failed to parse DuckDuckGo JSON. Response text: {}",
                 response_text
@@ -108,12 +294,16 @@ impl SearchProvider for DuckDuckGoProvider {
                 message: format!("Failed to parse DuckDuckGo response: {e}"),
                 source: Some(Box::new(e)),
             }
-        })?;
+        })
+    }
 
-        let mut results = Vec::new();
-        let mut rank = 1;
-
-        // Add abstract result if available
+    /// Parse abstract result from API response
+    fn parse_abstract_result(
+        &self,
+        response_json: &Value,
+        results: &mut Vec<SearchResult>,
+        rank: &mut usize,
+    ) {
         if let (Some(text), Some(url)) = (
             response_json.get("Abstract").and_then(|v| v.as_str()),
             response_json.get("AbstractURL").and_then(|v| v.as_str()),
@@ -128,17 +318,25 @@ impl SearchProvider for DuckDuckGoProvider {
                     url: url.to_string(),
                     snippet: text.to_string(),
                     provider: self.name().to_string(),
-                    rank,
+                    rank: *rank,
                 });
-                rank += 1;
+                *rank += 1;
             }
         }
+    }
 
-        // Add instant answer results
+    /// Parse instant answer results from API response
+    fn parse_instant_results(
+        &self,
+        response_json: &Value,
+        results: &mut Vec<SearchResult>,
+        rank: &mut usize,
+        max_results: usize,
+    ) {
         if let Some(instant_results) = response_json.get("Results").and_then(|v| v.as_array()) {
             for result in instant_results
                 .iter()
-                .take(options.max_results.saturating_sub(results.len()))
+                .take(max_results.saturating_sub(results.len()))
             {
                 if let (Some(text), Some(url)) = (
                     result.get("Text").and_then(|v| v.as_str()),
@@ -149,21 +347,29 @@ impl SearchProvider for DuckDuckGoProvider {
                         url: url.to_string(),
                         snippet: text.to_string(),
                         provider: self.name().to_string(),
-                        rank,
+                        rank: *rank,
                     });
-                    rank += 1;
+                    *rank += 1;
                 }
             }
         }
+    }
 
-        // Add related topics
+    /// Parse related topics from API response
+    fn parse_related_topics(
+        &self,
+        response_json: &Value,
+        results: &mut Vec<SearchResult>,
+        rank: &mut usize,
+        max_results: usize,
+    ) {
         if let Some(topics) = response_json
             .get("RelatedTopics")
             .and_then(|v| v.as_array())
         {
             for topic in topics
                 .iter()
-                .take(options.max_results.saturating_sub(results.len()))
+                .take(max_results.saturating_sub(results.len()))
             {
                 if let (Some(text), Some(url)) = (
                     topic.get("Text").and_then(|v| v.as_str()),
@@ -174,17 +380,11 @@ impl SearchProvider for DuckDuckGoProvider {
                         url: url.to_string(),
                         snippet: text.to_string(),
                         provider: self.name().to_string(),
-                        rank,
+                        rank: *rank,
                     });
-                    rank += 1;
+                    *rank += 1;
                 }
             }
         }
-
-        if results.is_empty() {
-            warn!("DuckDuckGo returned no results for query: {}", query);
-        }
-
-        Ok(results)
     }
 }

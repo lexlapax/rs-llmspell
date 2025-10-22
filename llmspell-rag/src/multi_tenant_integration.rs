@@ -125,6 +125,15 @@ impl MultiTenantRAG {
         }
     }
 
+    /// Access the tenant manager for tenant creation/management operations
+    ///
+    /// Provides access to tenant lifecycle operations like `create_tenant()`, `list_tenants()`, etc.
+    /// Used by templates to auto-provision tenants before RAG operations.
+    #[must_use]
+    pub const fn tenant_manager(&self) -> &Arc<MultiTenantVectorManager> {
+        &self.tenant_manager
+    }
+
     /// Get tenant usage metrics
     ///
     /// # Errors
@@ -255,6 +264,195 @@ impl MultiTenantRAG {
     pub fn create_tenant_scope(&self, tenant_id: &str) -> StateScope {
         StateScope::Custom(format!("tenant:{tenant_id}"))
     }
+
+    /// Ingest documents with embeddings into vector storage
+    ///
+    /// This method combines embedding generation and storage insertion in a single operation.
+    /// It generates embeddings for the provided texts, creates `VectorEntry` structs with metadata,
+    /// and stores them in the vector storage with proper tenant isolation.
+    ///
+    /// # Arguments
+    /// * `tenant_id` - Tenant identifier for isolation and billing
+    /// * `texts` - Text documents to embed and store
+    /// * `scope` - `StateScope` for organizing vectors (e.g., session, project)
+    /// * `metadata_fn` - Optional function to add custom metadata to each vector
+    ///
+    /// # Returns
+    /// Vector of IDs for the stored vectors
+    ///
+    /// # Errors
+    /// Returns error if embedding generation fails or storage insertion fails
+    pub async fn ingest_documents<F>(
+        &self,
+        tenant_id: &str,
+        texts: &[String],
+        scope: StateScope,
+        metadata_fn: Option<F>,
+    ) -> Result<Vec<String>>
+    where
+        F: Fn(usize, &str) -> HashMap<String, serde_json::Value>,
+    {
+        info!(
+            "Ingesting {} documents for tenant {} with scope {:?}",
+            texts.len(),
+            tenant_id,
+            scope
+        );
+
+        // Generate embeddings
+        let embeddings = self.generate_tenant_embeddings(tenant_id, texts).await?;
+
+        // Create VectorEntry structs
+        let mut vectors = Vec::new();
+        for (i, (text, embedding)) in texts.iter().zip(embeddings.iter()).enumerate() {
+            let id = uuid::Uuid::new_v4().to_string();
+
+            // Build metadata
+            let mut metadata = metadata_fn
+                .as_ref()
+                .map_or_else(HashMap::new, |meta_fn| meta_fn(i, text));
+
+            // Add default metadata
+            metadata.insert("text".to_string(), serde_json::Value::String(text.clone()));
+            metadata.insert(
+                "ingested_at".to_string(),
+                serde_json::Value::String(
+                    std::time::SystemTime::now()
+                        .duration_since(std::time::UNIX_EPOCH)
+                        .unwrap_or_default()
+                        .as_secs()
+                        .to_string(),
+                ),
+            );
+            metadata.insert(
+                "tenant_id".to_string(),
+                serde_json::Value::String(tenant_id.to_string()),
+            );
+
+            // Create vector entry
+            let entry = llmspell_storage::VectorEntry::new(id, embedding.clone())
+                .with_scope(scope.clone())
+                .with_metadata(metadata);
+
+            vectors.push(entry);
+        }
+
+        // Calculate storage size for metrics
+        let storage_bytes: u64 = vectors.iter().map(|v| (v.embedding.len() * 4) as u64).sum();
+
+        // Insert into storage
+        let ids = self
+            .tenant_manager
+            .insert_for_tenant(tenant_id, vectors)
+            .await?;
+
+        // Update usage metrics
+        self.update_usage_metrics(tenant_id, |metrics| {
+            metrics.add_document_usage(storage_bytes);
+        })
+        .await?;
+
+        info!(
+            "Successfully ingested {} documents for tenant {} (ids: {:?})",
+            texts.len(),
+            tenant_id,
+            ids
+        );
+
+        Ok(ids)
+    }
+
+    /// Retrieve context from RAG storage based on query
+    ///
+    /// This method generates an embedding for the query text and performs similarity search
+    /// to find the most relevant documents from the vector storage.
+    ///
+    /// # Arguments
+    /// * `tenant_id` - Tenant identifier for isolation
+    /// * `query` - Query text to search for
+    /// * `scope` - `StateScope` to restrict search (e.g., specific session)
+    /// * `k` - Number of results to return
+    ///
+    /// # Returns
+    /// Vector of retrieval results with text, score, and metadata
+    ///
+    /// # Errors
+    /// Returns error if embedding generation fails or search fails
+    pub async fn retrieve_context(
+        &self,
+        tenant_id: &str,
+        query: &str,
+        scope: StateScope,
+        k: usize,
+    ) -> Result<Vec<RetrievalResult>> {
+        info!(
+            "Retrieving context for tenant {} with query '{}' (k={}, scope={:?})",
+            tenant_id, query, k, scope
+        );
+
+        // Generate query embedding
+        let query_embeddings = self
+            .generate_tenant_embeddings(tenant_id, &[query.to_string()])
+            .await?;
+
+        let query_embedding = query_embeddings
+            .first()
+            .ok_or_else(|| anyhow::anyhow!("Failed to generate query embedding"))?;
+
+        // Create vector query
+        let vector_query = llmspell_storage::VectorQuery::new(query_embedding.clone(), k)
+            .with_scope(scope.clone());
+
+        // Perform search
+        let results = self
+            .tenant_manager
+            .search_for_tenant(tenant_id, vector_query)
+            .await?;
+
+        // Convert to retrieval results
+        let retrieval_results: Vec<RetrievalResult> = results
+            .into_iter()
+            .map(|r| RetrievalResult {
+                id: r.id,
+                text: r
+                    .metadata
+                    .as_ref()
+                    .and_then(|m| m.get("text"))
+                    .and_then(|v| v.as_str())
+                    .unwrap_or("")
+                    .to_string(),
+                score: r.score,
+                metadata: r.metadata.unwrap_or_default(),
+            })
+            .collect();
+
+        // Update search metrics
+        self.update_usage_metrics(tenant_id, |metrics| {
+            metrics.add_search_usage();
+        })
+        .await?;
+
+        info!(
+            "Retrieved {} results for tenant {} query",
+            retrieval_results.len(),
+            tenant_id
+        );
+
+        Ok(retrieval_results)
+    }
+}
+
+/// Result from RAG retrieval operation
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct RetrievalResult {
+    /// Vector ID
+    pub id: String,
+    /// Retrieved text content
+    pub text: String,
+    /// Similarity score (higher is better)
+    pub score: f32,
+    /// Associated metadata
+    pub metadata: HashMap<String, serde_json::Value>,
 }
 
 #[cfg(test)]

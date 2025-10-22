@@ -74,6 +74,7 @@ pub mod replay;
 pub mod session;
 pub mod state;
 pub mod streaming;
+pub mod template;
 pub mod tool;
 pub mod workflow;
 
@@ -91,5 +92,6 @@ pub use replay::inject_replay_global;
 pub use session::inject_session_global;
 pub use state::inject_state_global;
 pub use streaming::inject_streaming_global;
+pub use template::inject_template_global;
 pub use tool::inject_tool_global;
 pub use workflow::inject_workflow_global;

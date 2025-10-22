@@ -39,6 +39,21 @@ impl ProviderManager {
         Ok(manager)
     }
 
+    /// Create from existing core provider manager (Phase 12.8.2.11)
+    ///
+    /// Used when the kernel layer has already created and configured a `ProviderManager`.
+    /// Wraps it without re-initializing to avoid duplicate provider registration.
+    #[must_use]
+    pub const fn from_core_manager(
+        core_manager: CoreProviderManager,
+        config: ProviderManagerConfig,
+    ) -> Self {
+        Self {
+            core_manager,
+            config,
+        }
+    }
+
     /// Register the rig provider factory
     async fn register_rig_provider(&self) -> Result<(), LLMSpellError> {
         self.core_manager

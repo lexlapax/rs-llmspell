@@ -189,12 +189,18 @@ impl CandleProvider {
             // T5 model requires config.json
             let config_path = model_path.join("config.json");
             let exists = config_path.exists();
-            debug!("T5 model completeness check: config.json exists = {}", exists);
+            debug!(
+                "T5 model completeness check: config.json exists = {}",
+                exists
+            );
             Ok(exists)
         } else {
             // GGUF model requires .gguf file
             let has_gguf = self.find_gguf_file(model_path).is_ok();
-            debug!("GGUF model completeness check: .gguf file exists = {}", has_gguf);
+            debug!(
+                "GGUF model completeness check: .gguf file exists = {}",
+                has_gguf
+            );
             Ok(has_gguf)
         }
     }
@@ -360,7 +366,10 @@ impl CandleProvider {
         let gen_start = std::time::Instant::now();
 
         // Extract T5 config and device (immutable borrows)
-        let decoder_start_token_id = model_wrapper.t5_config().decoder_start_token_id.unwrap_or(0);
+        let decoder_start_token_id = model_wrapper
+            .t5_config()
+            .decoder_start_token_id
+            .unwrap_or(0);
         let eos_token_id = model_wrapper.t5_config().eos_token_id;
         let device = model_wrapper.device().clone();
 
@@ -402,7 +411,8 @@ impl CandleProvider {
         // Autoregressive generation from decoder
         for index in 0..max_tokens {
             // Create decoder input tensor [batch_size=1, decoder_seq_len]
-            let decoder_tensor = Tensor::new(decoder_token_ids.as_slice(), &device)?.unsqueeze(0)?;
+            let decoder_tensor =
+                Tensor::new(decoder_token_ids.as_slice(), &device)?.unsqueeze(0)?;
 
             // Decode step
             let logits = model_wrapper
@@ -698,10 +708,7 @@ impl LocalProviderInstance for CandleProvider {
         }
         // Try T5 models (safetensors format)
         else if let Some(repo_id) = HFModelRepo::get_t5_repo_info(model_name) {
-            info!(
-                "Downloading T5 model from HuggingFace: repo={}",
-                repo_id
-            );
+            info!("Downloading T5 model from HuggingFace: repo={}", repo_id);
 
             let downloader = HFDownloader::new()?;
             downloader.download_safetensors_model(repo_id, &model_dir)?;
@@ -714,7 +721,10 @@ impl LocalProviderInstance for CandleProvider {
                 }
             }
 
-            info!("T5 model {} downloaded successfully ({} bytes)", model_id, total_size);
+            info!(
+                "T5 model {} downloaded successfully ({} bytes)",
+                model_id, total_size
+            );
 
             Ok(PullProgress {
                 model_id: model_id.clone(),
