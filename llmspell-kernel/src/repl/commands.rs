@@ -44,7 +44,10 @@ impl ReplCommand {
 
             // Check if it's a chat meta command (preserve specific errors for better UX)
             let first_word = stripped.split_whitespace().next().unwrap_or("");
-            if matches!(first_word, "system" | "model" | "tools" | "context" | "clearchat") {
+            if matches!(
+                first_word,
+                "system" | "model" | "tools" | "context" | "clearchat"
+            ) {
                 // Parse as chat meta command (returns specific error messages)
                 return ChatMetaCommand::parse(stripped).map(ReplCommand::ChatMeta);
             }

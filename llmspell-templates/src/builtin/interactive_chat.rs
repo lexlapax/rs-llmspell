@@ -633,7 +633,10 @@ impl InteractiveChatTemplate {
 
                     // Parse model (format: provider/model or just model)
                     let (provider, model_id) = if let Some(slash_pos) = model.find('/') {
-                        (model[..slash_pos].to_string(), model[slash_pos + 1..].to_string())
+                        (
+                            model[..slash_pos].to_string(),
+                            model[slash_pos + 1..].to_string(),
+                        )
                     } else {
                         ("ollama".to_string(), model)
                     };
@@ -659,13 +662,12 @@ impl InteractiveChatTemplate {
                         },
                     };
 
-                    registry
-                        .create_agent(agent_config)
-                        .await
-                        .map_err(|e| llmspell_core::LLMSpellError::Component {
+                    registry.create_agent(agent_config).await.map_err(|e| {
+                        llmspell_core::LLMSpellError::Component {
                             message: format!("Failed to create agent: {e}"),
                             source: None,
-                        })
+                        }
+                    })
                 })
             },
         );

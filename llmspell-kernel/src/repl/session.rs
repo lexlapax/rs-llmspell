@@ -28,9 +28,13 @@ use tracing::{debug, error, info, warn};
 ///
 /// Takes current model, `system_prompt`, and tools and returns a new agent
 pub type AgentCreator = Arc<
-    dyn Fn(String, String, Vec<String>) -> std::pin::Pin<
-        Box<dyn std::future::Future<Output = Result<Arc<dyn Agent>, LLMSpellError>> + Send>,
-    > + Send
+    dyn Fn(
+            String,
+            String,
+            Vec<String>,
+        ) -> std::pin::Pin<
+            Box<dyn std::future::Future<Output = Result<Arc<dyn Agent>, LLMSpellError>> + Send>,
+        > + Send
         + Sync,
 >;
 
@@ -1018,10 +1022,34 @@ impl InteractiveSession {
     /// Print configuration section
     fn print_configuration_section(&self) {
         println!("\n⚙️ Configuration:");
-        println!("  Execution timeout: {}s", self.config.execution_timeout_secs);
-        println!("  Performance monitoring: {}", if self.config.enable_performance_monitoring { "enabled" } else { "disabled" });
-        println!("  Debug commands: {}", if self.config.enable_debug_commands { "enabled" } else { "disabled" });
-        println!("  Session persistence: {}", if self.config.enable_persistence { "enabled" } else { "disabled" });
+        println!(
+            "  Execution timeout: {}s",
+            self.config.execution_timeout_secs
+        );
+        println!(
+            "  Performance monitoring: {}",
+            if self.config.enable_performance_monitoring {
+                "enabled"
+            } else {
+                "disabled"
+            }
+        );
+        println!(
+            "  Debug commands: {}",
+            if self.config.enable_debug_commands {
+                "enabled"
+            } else {
+                "disabled"
+            }
+        );
+        println!(
+            "  Session persistence: {}",
+            if self.config.enable_persistence {
+                "enabled"
+            } else {
+                "disabled"
+            }
+        );
         if let Some(ref history_file) = self.config.history_file {
             println!("  History file: {}", history_file.display());
         } else {
@@ -1037,10 +1065,38 @@ impl InteractiveSession {
 
         println!("\n🏗️ Infrastructure:");
         println!("  Session manager: enabled");
-        println!("  Hooks: {}", if self.kernel.are_hooks_enabled() { "enabled" } else { "disabled" });
-        println!("  Provider manager: {}", if self.provider_manager.is_some() { "enabled" } else { "disabled" });
-        println!("  Agent registry: {}", if self.agent_registry.is_some() { "enabled" } else { "disabled" });
-        println!("  RAG system: {}", if self.rag.is_some() { "enabled" } else { "disabled" });
+        println!(
+            "  Hooks: {}",
+            if self.kernel.are_hooks_enabled() {
+                "enabled"
+            } else {
+                "disabled"
+            }
+        );
+        println!(
+            "  Provider manager: {}",
+            if self.provider_manager.is_some() {
+                "enabled"
+            } else {
+                "disabled"
+            }
+        );
+        println!(
+            "  Agent registry: {}",
+            if self.agent_registry.is_some() {
+                "enabled"
+            } else {
+                "disabled"
+            }
+        );
+        println!(
+            "  RAG system: {}",
+            if self.rag.is_some() {
+                "enabled"
+            } else {
+                "disabled"
+            }
+        );
     }
 
     /// Print chat mode section
@@ -1603,9 +1659,9 @@ impl InteractiveSession {
                 let tools = self.allowed_tools.read().await.clone();
 
                 // Call creator callback
-                let new_agent = creator(model, system_prompt, tools).await.map_err(|e| {
-                    anyhow::anyhow!("Failed to create agent: {e}")
-                })?;
+                let new_agent = creator(model, system_prompt, tools)
+                    .await
+                    .map_err(|e| anyhow::anyhow!("Failed to create agent: {e}"))?;
 
                 // Store for reuse
                 *self.current_agent.write().await = Some(new_agent.clone());

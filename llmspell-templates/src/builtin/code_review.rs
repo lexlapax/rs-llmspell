@@ -234,9 +234,7 @@ impl crate::core::Template for CodeReviewTemplate {
                 model: &model,
                 temperature,
             };
-            let review = self
-                .execute_aspect_review(&review_config, &context)
-                .await?;
+            let review = self.execute_aspect_review(&review_config, &context).await?;
             all_reviews.push(review);
             output.metrics.agents_invoked += 1;
         }
@@ -275,11 +273,17 @@ impl crate::core::Template for CodeReviewTemplate {
         output.add_metric("language", json!(language));
         output.add_metric("aspects_analyzed", json!(aspects.len()));
         output.add_metric("total_issues", json!(aggregated.issues.len()));
-        output.add_metric("critical_issues", json!(aggregated.severity_counts.critical));
+        output.add_metric(
+            "critical_issues",
+            json!(aggregated.severity_counts.critical),
+        );
         output.add_metric("high_issues", json!(aggregated.severity_counts.high));
         output.add_metric("medium_issues", json!(aggregated.severity_counts.medium));
         output.add_metric("low_issues", json!(aggregated.severity_counts.low));
-        output.add_metric("fixes_generated", json!(fixes.as_ref().map(|f| f.fixes.len()).unwrap_or(0)));
+        output.add_metric(
+            "fixes_generated",
+            json!(fixes.as_ref().map(|f| f.fixes.len()).unwrap_or(0)),
+        );
 
         info!(
             "Code review complete (duration: {}ms, issues: {}, agents: {})",
@@ -291,15 +295,18 @@ impl crate::core::Template for CodeReviewTemplate {
     }
 
     async fn estimate_cost(&self, params: &TemplateParams) -> CostEstimate {
-        let aspects: Vec<String> = params.get_or("aspects", vec![
-            "security".to_string(),
-            "quality".to_string(),
-            "performance".to_string(),
-            "practices".to_string(),
-            "dependencies".to_string(),
-            "architecture".to_string(),
-            "docs".to_string(),
-        ]);
+        let aspects: Vec<String> = params.get_or(
+            "aspects",
+            vec![
+                "security".to_string(),
+                "quality".to_string(),
+                "performance".to_string(),
+                "practices".to_string(),
+                "dependencies".to_string(),
+                "architecture".to_string(),
+                "docs".to_string(),
+            ],
+        );
         let generate_fixes: bool = params.get_or("generate_fixes", false);
 
         // Each review aspect: ~800 tokens (code + review output)
@@ -404,8 +411,7 @@ impl CodeReviewTemplate {
         use llmspell_core::types::AgentInput;
 
         // Get aspect-specific configuration
-        let (agent_name, system_prompt) =
-            self.get_aspect_config(config.aspect, config.language);
+        let (agent_name, system_prompt) = self.get_aspect_config(config.aspect, config.language);
 
         // Parse model string (provider/model format)
         let (provider, model_id) = if let Some(slash_pos) = config.model.find('/') {
@@ -466,8 +472,8 @@ impl CodeReviewTemplate {
             })?;
 
         // Parse JSON output
-        let review_data: serde_json::Value =
-            serde_json::from_str(&agent_output.text).unwrap_or_else(|_| {
+        let review_data: serde_json::Value = serde_json::from_str(&agent_output.text)
+            .unwrap_or_else(|_| {
                 // Fallback: treat as plain text summary
                 json!({
                     "issues": [],
@@ -480,24 +486,19 @@ impl CodeReviewTemplate {
             .as_array()
             .map(|arr| {
                 arr.iter()
-                    .map(|issue| {
-                        ReviewIssue {
-                            severity: issue["severity"]
-                                .as_str()
-                                .unwrap_or("medium")
-                                .to_string(),
-                            aspect: config.aspect.to_string(),
-                            line: issue["line"].as_u64().map(|l| l as usize),
-                            description: issue["description"]
-                                .as_str()
-                                .unwrap_or("No description")
-                                .to_string(),
-                            recommendation: issue["recommendation"]
-                                .as_str()
-                                .or_else(|| issue["suggestion"].as_str())
-                                .unwrap_or("No recommendation")
-                                .to_string(),
-                        }
+                    .map(|issue| ReviewIssue {
+                        severity: issue["severity"].as_str().unwrap_or("medium").to_string(),
+                        aspect: config.aspect.to_string(),
+                        line: issue["line"].as_u64().map(|l| l as usize),
+                        description: issue["description"]
+                            .as_str()
+                            .unwrap_or("No description")
+                            .to_string(),
+                        recommendation: issue["recommendation"]
+                            .as_str()
+                            .or_else(|| issue["suggestion"].as_str())
+                            .unwrap_or("No recommendation")
+                            .to_string(),
                     })
                     .collect()
             })
@@ -874,16 +875,14 @@ impl CodeReviewTemplate {
             .as_array()
             .map(|arr| {
                 arr.iter()
-                    .map(|fix| {
-                        Fix {
-                            issue: fix["issue"].as_str().unwrap_or("Unknown").to_string(),
-                            original_code: fix["original_code"].as_str().map(|s| s.to_string()),
-                            fixed_code: fix["fixed_code"].as_str().map(|s| s.to_string()),
-                            explanation: fix["explanation"]
-                                .as_str()
-                                .unwrap_or("No explanation")
-                                .to_string(),
-                        }
+                    .map(|fix| Fix {
+                        issue: fix["issue"].as_str().unwrap_or("Unknown").to_string(),
+                        original_code: fix["original_code"].as_str().map(|s| s.to_string()),
+                        fixed_code: fix["fixed_code"].as_str().map(|s| s.to_string()),
+                        explanation: fix["explanation"]
+                            .as_str()
+                            .unwrap_or("No explanation")
+                            .to_string(),
                     })
                     .collect()
             })
@@ -922,14 +921,24 @@ impl CodeReviewTemplate {
     }
 
     /// Format output as plain text
-    fn format_text_output(&self, aggregated: &AggregatedReview, fixes: &Option<FixResult>) -> String {
+    fn format_text_output(
+        &self,
+        aggregated: &AggregatedReview,
+        fixes: &Option<FixResult>,
+    ) -> String {
         let mut output = String::new();
 
         output.push_str("=== CODE REVIEW RESULTS ===\n\n");
         output.push_str(&format!("Total Issues: {}\n", aggregated.issues.len()));
-        output.push_str(&format!("  Critical: {}\n", aggregated.severity_counts.critical));
+        output.push_str(&format!(
+            "  Critical: {}\n",
+            aggregated.severity_counts.critical
+        ));
         output.push_str(&format!("  High: {}\n", aggregated.severity_counts.high));
-        output.push_str(&format!("  Medium: {}\n", aggregated.severity_counts.medium));
+        output.push_str(&format!(
+            "  Medium: {}\n",
+            aggregated.severity_counts.medium
+        ));
         output.push_str(&format!("  Low: {}\n\n", aggregated.severity_counts.low));
 
         output.push_str("=== ISSUES BY ASPECT ===\n\n");
@@ -938,7 +947,10 @@ impl CodeReviewTemplate {
                 "[{}] {} ({})\n",
                 issue.severity.to_uppercase(),
                 issue.aspect,
-                issue.line.map(|l| format!("line {}", l)).unwrap_or_else(|| "location unknown".to_string())
+                issue
+                    .line
+                    .map(|l| format!("line {}", l))
+                    .unwrap_or_else(|| "location unknown".to_string())
             ));
             output.push_str(&format!("  Description: {}\n", issue.description));
             output.push_str(&format!("  Recommendation: {}\n\n", issue.recommendation));
@@ -973,10 +985,19 @@ impl CodeReviewTemplate {
         output.push_str("---\n\n");
 
         output.push_str("## Summary\n\n");
-        output.push_str(&format!("- **Total Issues**: {}\n", aggregated.issues.len()));
-        output.push_str(&format!("  - Critical: {}\n", aggregated.severity_counts.critical));
+        output.push_str(&format!(
+            "- **Total Issues**: {}\n",
+            aggregated.issues.len()
+        ));
+        output.push_str(&format!(
+            "  - Critical: {}\n",
+            aggregated.severity_counts.critical
+        ));
         output.push_str(&format!("  - High: {}\n", aggregated.severity_counts.high));
-        output.push_str(&format!("  - Medium: {}\n", aggregated.severity_counts.medium));
+        output.push_str(&format!(
+            "  - Medium: {}\n",
+            aggregated.severity_counts.medium
+        ));
         output.push_str(&format!("  - Low: {}\n\n", aggregated.severity_counts.low));
 
         // Aspect summaries
@@ -1011,10 +1032,14 @@ impl CodeReviewTemplate {
                     output.push_str(&format!("### Fix {}: {}\n\n", idx + 1, fix.issue));
                     output.push_str(&format!("**Explanation**: {}\n\n", fix.explanation));
                     if let Some(original) = &fix.original_code {
-                        output.push_str(&format!("**Original**:\n```{}\n{}\n```\n\n", language, original));
+                        output.push_str(&format!(
+                            "**Original**:\n```{}\n{}\n```\n\n",
+                            language, original
+                        ));
                     }
                     if let Some(fixed) = &fix.fixed_code {
-                        output.push_str(&format!("**Fixed**:\n```{}\n{}\n```\n\n", language, fixed));
+                        output
+                            .push_str(&format!("**Fixed**:\n```{}\n{}\n```\n\n", language, fixed));
                     }
                     output.push_str("---\n\n");
                 }
@@ -1411,10 +1436,7 @@ mod tests {
                 description: "Potential SQL injection".to_string(),
                 recommendation: "Use parameterized queries".to_string(),
             }],
-            summaries: vec![(
-                "security".to_string(),
-                "Found 1 security issue".to_string(),
-            )],
+            summaries: vec![("security".to_string(), "Found 1 security issue".to_string())],
             severity_counts: SeverityCounts {
                 critical: 0,
                 high: 1,
@@ -1440,7 +1462,10 @@ mod tests {
                 description: "Code complexity too high".to_string(),
                 recommendation: "Refactor into smaller functions".to_string(),
             }],
-            summaries: vec![("quality".to_string(), "Code quality needs improvement".to_string())],
+            summaries: vec![(
+                "quality".to_string(),
+                "Code quality needs improvement".to_string(),
+            )],
             severity_counts: SeverityCounts {
                 critical: 0,
                 high: 0,

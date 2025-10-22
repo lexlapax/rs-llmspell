@@ -15,11 +15,11 @@ fn test_registry_initialization() {
     let registry = TemplateRegistry::with_builtin_templates()
         .expect("Failed to create registry with builtin templates");
 
-    // Should have all 7 builtin templates
+    // Should have all 8 builtin templates
     let templates = registry.list_metadata();
     assert!(
-        templates.len() >= 7,
-        "Expected at least 7 builtin templates, found {}",
+        templates.len() >= 8,
+        "Expected at least 8 builtin templates, found {}",
         templates.len()
     );
 
@@ -32,6 +32,7 @@ fn test_registry_initialization() {
         "document-processor",
         "workflow-orchestrator",
         "code-review",
+        "content-generation",
     ];
 
     for template_id in &expected_templates {
@@ -310,7 +311,7 @@ fn test_multi_template_discovery_workflow() {
 
     // 1. List all templates
     let all_templates = registry.list_metadata();
-    assert!(all_templates.len() >= 6, "Should have at least 6 templates");
+    assert!(all_templates.len() >= 8, "Should have at least 8 templates");
 
     // 2. Search for research-related templates
     let research_results = registry.search("research");
