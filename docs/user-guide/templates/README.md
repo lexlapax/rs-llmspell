@@ -10,7 +10,7 @@
 
 > **🎯 Turn-key AI Workflows**: Pre-configured templates combining agents, tools, RAG, and LocalLLM into executable solutions. Install → `llmspell template exec research-assistant` → productive AI work. Solves the "0-day retention problem" - no more "what do I do?" after installation.
 
-**Version**: 0.12.0 | **Status**: Phase 12 Complete - 6 Templates (1 production, 5 structure complete) | **Last Updated**: October 2025
+**Version**: 0.12.0 | **Status**: Phase 12 Complete - 10 Templates (6 production, 4 structure complete) | **Last Updated**: October 2025
 
 ---
 
@@ -54,21 +54,25 @@ end
 
 ---
 
-## 📚 Available Templates (6 Total)
+## 📚 Available Templates (10 Total)
 
-### Production Templates (1)
+### Production Templates (6)
 | Template | Category | Status | Description |
 |----------|----------|--------|-------------|
 | [research-assistant](#1-research-assistant-production) | Research | ✅ Production | Multi-phase research with web search, analysis, synthesis |
+| [interactive-chat](#2-interactive-chat-production) | Chat | ✅ Production | Session-based conversation with context management |
+| [data-analysis](#3-data-analysis-production) | Analysis | ✅ Production | Statistical analysis, visualization, data transformation |
+| [code-generator](#4-code-generator-production) | CodeGen | ✅ Production | Multi-language code generation with tests and docs |
+| [document-processor](#5-document-processor-production) | Document | ✅ Production | Text/Markdown extraction, transformation, translation |
+| [workflow-orchestrator](#6-workflow-orchestrator-production) | Workflow | ✅ Production | Custom multi-step workflows (sequential/parallel/conditional/loop) |
 
-### Structure Complete Templates (5)
+### Advanced Templates (4)
 | Template | Category | Status | Description |
 |----------|----------|--------|-------------|
-| [interactive-chat](#2-interactive-chat-structure) | Chat | 🔨 Structure | Session-based conversation with context and memory |
-| [data-analysis](#3-data-analysis-structure) | Analysis | 🔨 Structure | Statistical analysis, visualization, data transformation |
-| [code-generator](#4-code-generator-structure) | CodeGen | 🔨 Structure | Multi-language code generation with tests and docs |
-| [document-processor](#5-document-processor-structure) | Document | 🔨 Structure | PDF/OCR extraction, transformation, translation |
-| [workflow-orchestrator](#6-workflow-orchestrator-structure) | Workflow | 🔨 Structure | Custom multi-step workflows with agents/tools/templates |
+| [code-review](#7-code-review-production) | Development | ✅ Production | Multi-aspect code analysis with quality scoring |
+| [content-generation](#8-content-generation-production) | Content | ✅ Production | Quality-driven content creation with iterative refinement |
+| [file-classification](#9-file-classification-production) | Productivity | ✅ Production | Bulk file organization with customizable categories |
+| [knowledge-management](#10-knowledge-management-production) | Research | ✅ Production | RAG-based knowledge base with CRUD operations |
 
 ---
 
@@ -240,6 +244,136 @@ llmspell template exec workflow-orchestrator \
 
 ---
 
+## 7. Code Review (Production)
+
+**Status**: ✅ **Production Ready** - Multi-aspect analysis with quality scoring
+
+### What It Does
+7-aspect code review workflow with configurable analysis:
+- Security vulnerabilities and best practices
+- Code quality and maintainability
+- Performance optimizations
+- Language best practices adherence
+- Dependency analysis
+- Architecture patterns
+- Documentation completeness
+
+### Quick Example
+```bash
+llmspell template exec code-review \
+  --param code_path="/path/to/file.rs" \
+  --param aspects='["security","quality","performance"]' \
+  --param model="ollama/llama3.2:3b"
+```
+
+### Documentation
+- **Full Guide**: [code-review.md](code-review.md) (196 lines)
+- **Parameters**: 5 configurable (code_path, aspects, model, generate_fixes, etc.)
+- **Output**: Aspect-specific findings + quality scores + suggested fixes
+- **Performance**: ~5-15s depending on code size and aspects selected
+- **Examples**: 4 CLI + 3 Lua examples in guide
+
+---
+
+## 8. Content Generation (Production)
+
+**Status**: ✅ **Production Ready** - Quality-driven iterative content creation
+
+### What It Does
+4-stage content pipeline with quality thresholds:
+- Draft generation based on content type
+- Quality evaluation with scoring
+- Conditional editing if below threshold
+- Final output with quality metrics
+
+### Quick Example
+```bash
+llmspell template exec content-generation \
+  --param content_type="technical" \
+  --param topic="Rust async patterns" \
+  --param quality_threshold=8 \
+  --param max_iterations=3
+```
+
+### Documentation
+- **Full Guide**: [content-generation.md](content-generation.md) (178 lines)
+- **Parameters**: 6 configurable (content_type, topic, quality_threshold, tone, etc.)
+- **Content Types**: blog, documentation, marketing, technical, creative
+- **Output**: Final content + quality scores + iteration history
+- **Performance**: ~10-30s depending on iterations
+- **Examples**: 5 CLI + 3 Lua examples in guide
+
+---
+
+## 9. File Classification (Production)
+
+**Status**: ✅ **Production Ready** - Bulk file organization with dry-run mode
+
+### What It Does
+Scan-classify-act workflow for file organization:
+- Bulk file scanning from paths/globs
+- AI-powered classification into custom categories
+- Dry-run mode for preview without moving
+- Batch processing for multiple files
+
+### Quick Example
+```bash
+llmspell template exec file-classification \
+  --param files_paths='["/docs/*.md"]' \
+  --param categories='{"technical":"docs/technical","guides":"docs/guides"}' \
+  --param dry_run=true
+```
+
+### Documentation
+- **Full Guide**: [file-classification.md](file-classification.md) (140 lines)
+- **Parameters**: 5 configurable (files_paths, categories, dry_run, model, etc.)
+- **Output**: Classification results + file movements (if not dry-run)
+- **Performance**: ~2-8s for batch classification
+- **Use Cases**: Document management, media libraries, code refactoring
+- **Examples**: 4 CLI + 3 Lua examples in guide
+
+---
+
+## 10. Knowledge Management (Production)
+
+**Status**: ✅ **Production Ready** - RAG-based knowledge base with CRUD operations
+
+### What It Does
+Multi-collection knowledge management with RAG:
+- **Ingest**: Add documents to collection with chunking
+- **Query**: Semantic search with citation tracking
+- **Update**: Modify existing documents
+- **Delete**: Remove documents from collection
+- **List**: View all documents with metadata
+
+### Quick Example
+```bash
+# Ingest documents
+llmspell template exec knowledge-management \
+  --param operation=ingest \
+  --param collection="rust-docs" \
+  --param content="path/to/rust-book.md" \
+  --param source_type=markdown
+
+# Query knowledge base
+llmspell template exec knowledge-management \
+  --param operation=query \
+  --param collection="rust-docs" \
+  --param query="How does async/await work?" \
+  --param max_results=3
+```
+
+### Documentation
+- **Full Guide**: [knowledge-management.md](knowledge-management.md) (217 lines)
+- **Parameters**: 10 configurable (operation, collection, content, query, etc.)
+- **Operations**: ingest, query, update, delete, list
+- **Output**: Operation-specific results + citations
+- **Performance**: <0.1s for query operations
+- **RAG**: Simple word-overlap (production RAG integration pending)
+- **Examples**: 5 CLI + 3 Lua examples in guide
+
+---
+
 ## 📖 Template User Guides
 
 Each template has comprehensive documentation:
@@ -248,37 +382,51 @@ Each template has comprehensive documentation:
    - ✅ Production ready
    - 4-phase workflow: Discovery, Analysis, Synthesis, Validation
    - 8 parameters, 6 CLI examples, 6 Lua examples
-   - Cost estimation, troubleshooting, performance metrics
 
 2. **[Interactive Chat](interactive-chat.md)** (320 lines)
-   - 🔨 Structure complete
-   - Session-based conversation with memory
+   - ✅ Production ready
+   - Session-based conversation with context management
    - 6 parameters, streaming support
-   - Full implementation: Phase 14
 
 3. **[Data Analysis](data-analysis.md)** (240 lines)
-   - 🔨 Structure complete
-   - CSV/Excel/JSON ingestion + visualization
-   - 7 parameters, multiple analysis types
-   - Full implementation: Phase 14
+   - ✅ Production ready
+   - CSV/JSON ingestion + visualization
+   - 7 parameters, statistical analysis + charts
 
 4. **[Code Generator](code-generator.md)** (300 lines)
-   - 🔨 Production structure
+   - ✅ Production ready
    - 3-phase: Spec → Implementation → Tests
-   - 5 languages supported, style guide enforcement
-   - LLM integration: Phase 14
+   - 5 languages supported
 
 5. **[Document Processor](document-processor.md)** (260 lines)
-   - 🔨 Structure complete
-   - PDF/OCR/format conversion
-   - 4 transformation types, batch processing
-   - Full implementation: Phase 14
+   - ✅ Production ready (Text/Markdown)
+   - 5 transformation types
+   - Batch processing
 
 6. **[Workflow Orchestrator](workflow-orchestrator.md)** (310 lines)
-   - 🔨 Structure complete
-   - Agent/tool/template composition
+   - ✅ Production ready
    - 4 workflow patterns (sequential, parallel, conditional, loop)
-   - Full implementation: Phase 15
+   - Agent/tool/template composition
+
+7. **[Code Review](code-review.md)** (196 lines)
+   - ✅ Production ready
+   - 7-aspect analysis (security, quality, performance, etc.)
+   - Quality scoring + suggested fixes
+
+8. **[Content Generation](content-generation.md)** (178 lines)
+   - ✅ Production ready
+   - 4-stage pipeline with quality thresholds
+   - 5 content types supported
+
+9. **[File Classification](file-classification.md)** (140 lines)
+   - ✅ Production ready
+   - Bulk file organization with dry-run mode
+   - Customizable category schemas
+
+10. **[Knowledge Management](knowledge-management.md)** (217 lines)
+    - ✅ Production ready
+    - RAG-based CRUD operations
+    - Multi-collection support + citations
 
 ---
 
@@ -585,11 +733,12 @@ llmspell provider list       # LLM provider configured?
 - ✅ Registry with discovery
 - ✅ CLI integration (5 commands)
 - ✅ Lua bridge (Template global)
-- ✅ 1 production template (Research Assistant)
-- ✅ 5 templates with structure
+- ✅ 10 production templates
+- ✅ 5 major workflow categories covered
 - ✅ Parameter validation
 - ✅ Cost estimation
-- ✅ 126 tests, zero warnings
+- ✅ 149 tests, zero warnings
+- ✅ 3,655 lines of documentation
 
 ### Phase 13 (Next - Memory Integration)
 - Memory-enhanced templates

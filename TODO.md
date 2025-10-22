@@ -10077,7 +10077,7 @@ pub struct KnowledgeManagementParams {
 - [x] Zero clippy warnings across all new templates
 - [x] Quality gates pass: `./scripts/quality/quality-check-fast.sh`
 - [x] User guide updated with 4 new template sections
-- [ ] Release notes drafted for v0.12.1 (template expansion)
+- [ ] Release notes drafted for v0.12.0 (template expansion)
 
 **Phase 12.10-12.13 Success Criteria:**
 - [x] All 16 subtasks completed (4 templates × 4 tasks each)
@@ -10097,8 +10097,6 @@ pub struct KnowledgeManagementParams {
 - [ ] Create /update a developers full guide for creating templates in docs/developer-guide/template-creation.md and update the README.md in the directory
 - [ ] Create/Update docs/technical/template-system-architecture.md with new template patterns
 - [ ] Update docs/technical/cli-command-architecture.md holistically with phase 12 additions and changes.
-- [ ] Tag commit: `git tag v0.12.0`
-- [ ] Prepare Phase 13 (Adaptive Memory) with template-memory integration notes
 
 ---
 
