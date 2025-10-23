@@ -121,6 +121,23 @@ impl ConsolidationResponse {
     /// Returns `MemoryError::InvalidInput` if JSON parsing fails completely,
     /// including partial parsing attempts.
     pub fn from_json(json_str: &str) -> Result<Self> {
+        // Strip markdown code fences if present (```json ... ``` or ``` ... ```)
+        let json_str = json_str.trim();
+        let json_str = if json_str.starts_with("```") {
+            // Find start and end of code block
+            let start = if json_str.starts_with("```json") {
+                json_str.find('\n').map_or(7, |i| i + 1)
+            } else if json_str.starts_with("```") {
+                json_str.find('\n').map_or(3, |i| i + 1)
+            } else {
+                0
+            };
+            let end = json_str.rfind("```").unwrap_or(json_str.len());
+            json_str[start..end].trim()
+        } else {
+            json_str
+        };
+
         // Try full JSON parsing first
         match serde_json::from_str::<Self>(json_str) {
             Ok(response) => Ok(response),

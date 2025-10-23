@@ -52,15 +52,21 @@ async fn test_add_decision() {
         .await
         .unwrap();
 
-    // TODO: Verify consolidation ran (currently returns 0 entries_processed)
-    // TODO: assert_eq!(result.entries_processed, 1);
-    // TODO: assert!(result.entities_added > 0, "Should add at least one entity");
+    // Verify consolidation ran
+    assert_eq!(result.entries_processed, 1, "Should process exactly 1 entry");
+    assert!(result.entities_added > 0, "Should add at least one entity");
+    assert!(entries[0].processed, "Entry should be marked as processed");
 
-    // TODO: Extract actual decisions from LLM response
-    // TODO: Calculate DMR
-    // TODO: Verify metrics
+    // Verify entity exists in knowledge graph
+    // Note: The LLM created entity "rust-lang", which may not match our ground truth "rust"
+    // This is expected since we haven't constrained the LLM's entity ID generation yet
+    // For now, just verify that *an* entity was created
 
-    eprintln!("✓ test_add_decision infrastructure validated");
+    // TODO: Extract actual decisions from LLM response and calculate DMR
+    // TODO: Verify metrics integration
+    // TODO: Assert entity properties match expectations
+
+    eprintln!("✓ test_add_decision passed");
     eprintln!("  Entries processed: {}", result.entries_processed);
     eprintln!("  Entities added: {}", result.entities_added);
     eprintln!("  Duration: {}ms", result.duration_ms);
