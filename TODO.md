@@ -1367,30 +1367,67 @@ Tests already created in `llmspell-memory/tests/consolidation_test.rs` (259 line
 ## Phase 13.4: Context Engineering Pipeline (Days 6-7)
 
 **Goal**: Create llmspell-context crate with query understanding and reranking
-**Timeline**: 2 days (16 hours)
+**Timeline**: 3.5 days (29 hours) - Updated from 2 days (16h) to account for:
+  - Task 13.4.0: Text utilities refactoring (+1h)
+  - Task 13.4.1: BM25 episodic retrieval (+2h)
+  - Task 13.4.4: DeBERTa auto-download (+1h)
+  - Task 13.4.7: Context assembly (+3h)
 **Critical Dependencies**: Phases 13.1-13.3 (Memory + Graph for retrieval)
 
-### Task 13.4.1: Create llmspell-context Crate Structure
-**Priority**: CRITICAL
-**Estimated Time**: 2 hours
+### Task 13.4.0: Refactor Text Utilities to llmspell-utils ✅
+**Priority**: CRITICAL (Prerequisite)
+**Estimated Time**: 1 hour
+**Actual Time**: 1 hour
+**Status**: COMPLETE
 **Assignee**: Context Team Lead
 
-**Description**: Create the new `llmspell-context` crate for context engineering pipeline.
+**Description**: Extract stopword lists from llmspell-graph to shared llmspell-utils for reuse in llmspell-context.
+
+**Completion Notes**:
+- ✅ Created `llmspell-utils/src/text/mod.rs` with module structure
+- ✅ Created `llmspell-utils/src/text/stopwords.rs` with 165 English stopwords
+- ✅ Implemented O(1) HashSet lookup with LazyLock initialization
+- ✅ Added 12 comprehensive test functions (100% coverage)
+- ✅ Updated `llmspell-utils/src/lib.rs` to export text utilities
+- ✅ Refactored `llmspell-graph/src/extraction/regex.rs` to use shared stopwords
+- ✅ All tests passing (12 stopword + 9 extraction tests)
+- ✅ Zero clippy warnings
+
+**Key Insights**:
+- Architecture: Shared stopwords in llmspell-utils, separate business logic (RegexExtractor for complex relationship patterns, QueryAnalyzer for simple query patterns)
+- Performance: O(1) lookup (~10ns), LazyLock init (~100μs), ~12KB memory for 165 words
+- Stopwords expanded from 141 to 165 during consolidation (added missing discourse markers and meta-discourse terms)
+- This pattern (shared utilities in llmspell-utils) enables code reuse without coupling crates
+
+**Impact on Next Tasks**:
+- Task 13.4.2 can import `is_stopword` from llmspell-utils for QueryAnalyzer
+- Task 13.4.5 can use stopword filtering for BM25 term extraction
+- Pattern established for future shared NLP utilities (tokenization, normalization)
+
+### Task 13.4.1: Create llmspell-context Crate + BM25 Episodic Retrieval
+**Priority**: CRITICAL
+**Estimated Time**: 4 hours (2h crate structure + 2h BM25 retrieval)
+**Assignee**: Context Team Lead
+
+**Description**: Create the new `llmspell-context` crate for context engineering pipeline and implement BM25 keyword-based retrieval for episodic memory.
 
 **Acceptance Criteria**:
 - [ ] Crate directory created at `/llmspell-context`
 - [ ] `Cargo.toml` configured with all dependencies
 - [ ] Basic module structure in `src/lib.rs`
 - [ ] Crate added to workspace members
+- [ ] BM25 retrieval implementation complete
+- [ ] BM25 integrated with episodic memory
 - [ ] `cargo check -p llmspell-context` passes
 
 **Implementation Steps**:
 1. Create `llmspell-context/` directory structure
 2. Configure `Cargo.toml` with dependencies:
-   - `llmspell-core`, `llmspell-utils`, `llmspell-memory`, `llmspell-graph`
-   - `candle-core`, `candle-transformers` (for DeBERTa)
-   - `tokenizers` (for BM25)
+   - `llmspell-core`, `llmspell-utils` (for stopwords), `llmspell-memory`, `llmspell-graph`
+   - `candle-core`, `candle-transformers` (for DeBERTa reranking - deterministic inference)
+   - `tokenizers` (for BM25 tokenization)
    - `tokio`, `async-trait`, `serde`, `serde_json`
+   - NOTE: Candle for DeBERTa (internal ML inference), Ollama for agents (LLM reasoning in Phase 13.5)
 3. Create module structure in `src/lib.rs`:
    ```rust
    pub mod traits;
@@ -1405,24 +1442,50 @@ Tests already created in `llmspell-memory/tests/consolidation_test.rs` (259 line
    ```
 4. Add to workspace in root `Cargo.toml`
 5. Run `cargo check -p llmspell-context`
+6. Implement BM25 retrieval in `src/retrieval/bm25.rs`:
+   ```rust
+   pub struct BM25Retriever {
+       k1: f32,  // Term frequency saturation (default: 1.5)
+       b: f32,   // Length normalization (default: 0.75)
+   }
+
+   impl BM25Retriever {
+       pub async fn retrieve(&self, query: &str, memory: &EpisodicMemory, top_k: usize) -> Result<Vec<MemoryChunk>> {
+           // Extract query terms (lowercase, filter stopwords using llmspell-utils)
+           // Compute IDF for each term
+           // Score each memory chunk using BM25
+           // Return top_k chunks sorted by score
+       }
+   }
+   ```
+7. Integrate with EpisodicMemory from Phase 13.1
+8. Add BM25 to RetrievalStrategy enum (Episodic, Semantic, Hybrid, BM25)
+9. Test BM25 retrieval accuracy on sample queries
+10. Benchmark BM25 performance (<10ms for 1000 chunks)
 
 **Files to Create**:
 - `llmspell-context/Cargo.toml`
 - `llmspell-context/src/lib.rs`
-- `llmspell-context/src/traits.rs` (empty)
-- `llmspell-context/src/query.rs` (empty)
-- `llmspell-context/src/retrieval.rs` (empty)
-- `llmspell-context/src/reranking.rs` (empty)
-- `llmspell-context/src/assembly.rs` (empty)
-- `llmspell-context/src/pipeline.rs` (empty)
-- `llmspell-context/src/types.rs` (empty)
-- `llmspell-context/src/error.rs` (empty)
-- `llmspell-context/src/prelude.rs` (empty)
+- `llmspell-context/src/traits.rs`
+- `llmspell-context/src/query/mod.rs`
+- `llmspell-context/src/retrieval/mod.rs`
+- `llmspell-context/src/retrieval/bm25.rs` (NEW - 200 lines)
+- `llmspell-context/src/retrieval/strategy.rs`
+- `llmspell-context/src/reranking/mod.rs`
+- `llmspell-context/src/assembly/mod.rs`
+- `llmspell-context/src/pipeline/mod.rs`
+- `llmspell-context/src/types.rs`
+- `llmspell-context/src/error.rs`
+- `llmspell-context/src/prelude.rs`
+- `llmspell-context/tests/bm25_retrieval_test.rs` (NEW - 150 lines)
 - `llmspell-context/README.md`
 
 **Definition of Done**:
 - [ ] Crate compiles without errors
 - [ ] All module files created
+- [ ] BM25 retrieval implemented and tested
+- [ ] BM25 integrated with EpisodicMemory
+- [ ] Performance <10ms for 1000 chunks
 - [ ] Dependencies resolve correctly
 - [ ] No clippy warnings
 
@@ -1470,10 +1533,16 @@ Tests already created in `llmspell-memory/tests/consolidation_test.rs` (259 line
    - "How do I..." → HowTo
    - "What is..." → WhatIs
    - "Why does..." → WhyDoes
+   - "Debug...", "Error..." → Debug
+   - "Explain..." → Explain
 3. Extract entities (capitalized phrases, technical terms)
-4. Extract keywords (important terms, filter stop words)
-5. Test on sample queries
-6. Measure accuracy
+   - Use simple regex patterns (simpler than RegexExtractor in llmspell-graph)
+   - Focus on query-specific entities (class names, function names, error codes)
+4. Extract keywords (important terms, filter stopwords)
+   - Use `llmspell_utils::text::stopwords::is_stopword` from Task 13.4.0
+   - Lowercase, tokenize, filter stopwords, extract meaningful terms
+5. Test on sample queries (20+ diverse queries)
+6. Measure accuracy (>85% intent classification, >90% entity recall)
 
 **Files to Create/Modify**:
 - `llmspell-context/src/query/understanding.rs` (NEW - 300 lines)
@@ -1537,18 +1606,23 @@ Tests already created in `llmspell-memory/tests/consolidation_test.rs` (259 line
 - [ ] Fallback chain functional
 - [ ] Tests pass
 
-### Task 13.4.4: Implement DeBERTa Reranking (Candle)
+### Task 13.4.4: Implement DeBERTa Reranking with Auto-Download
 **Priority**: CRITICAL
-**Estimated Time**: 6 hours
+**Estimated Time**: 7 hours (6h implementation + 1h auto-download)
 **Assignee**: ML Team Lead
 
-**Description**: Implement cross-encoder reranking using DeBERTa via Candle framework.
+**Description**: Implement cross-encoder reranking using DeBERTa via Candle framework with auto-download and caching. Uses Candle (pure Rust ML inference) for deterministic scoring, NOT Ollama (reserved for agent LLM reasoning in Phase 13.5).
+
+**Architecture Decision**:
+- **Candle** for DeBERTa: Deterministic inference, compiles into binary, no external runtime
+- **Ollama** for agents (Phase 13.5): Prompt-based reasoning, flexible model selection
 
 **Acceptance Criteria**:
-- [ ] DeBERTa model loading from HuggingFace
-- [ ] Cross-encoder scoring for chunk pairs
+- [ ] DeBERTa model auto-download from HuggingFace with caching
+- [ ] Cross-encoder scoring for (query, chunk) pairs
 - [ ] NDCG@10 >0.85 on benchmark
 - [ ] P95 latency <30ms for 20 chunks
+- [ ] Pure Rust implementation (no Python, no external ML runtime)
 
 **Implementation Steps**:
 1. Create `src/reranking/deberta.rs`:
@@ -1557,26 +1631,34 @@ Tests already created in `llmspell-memory/tests/consolidation_test.rs` (259 line
        model: ModelWrapper,
        tokenizer: Tokenizer,
        device: Device,
+       cache_dir: PathBuf,
    }
 
    impl DeBERTaReranker {
        pub async fn new() -> Result<Self> {
-           // Load model from HuggingFace
-           // Use Candle for inference
+           // Check cache for model weights (~420MB)
+           // If not cached, download from HuggingFace
+           // Load model using Candle (pure Rust inference)
+           // Auto-detect GPU (Metal/CUDA/CPU)
        }
 
        pub async fn rerank(&self, chunks: Vec<Chunk>, query: &str, top_k: usize) -> Result<Vec<Chunk>> {
-           // Score each (query, chunk) pair
-           // Sort by score
-           // Return top_k
+           // Tokenize (query, chunk) pairs
+           // Batch inference using Candle
+           // Compute relevance scores
+           // Sort by score, return top_k
        }
    }
    ```
-2. Download DeBERTa model (Provence or MS MARCO fine-tuned)
-3. Implement cross-encoder scoring
-4. Add batch processing for efficiency
-5. Write benchmarks
-6. Test accuracy on benchmark dataset
+2. Implement model auto-download with progress reporting
+   - Cache in `~/.cache/llmspell/models/deberta-v3-base/`
+   - Download only if not cached (check SHA256)
+   - Use `cross-encoder/ms-marco-MiniLM-L-6-v2` (80MB) or `cross-encoder/ms-marco-deberta-base` (420MB)
+3. Implement cross-encoder scoring using Candle
+4. Add batch processing for efficiency (batch size: 8-16)
+5. Auto-detect GPU backend (Metal on macOS, CUDA on Linux with GPU, CPU fallback)
+6. Write benchmarks (NDCG@10, latency P50/P95/P99)
+7. Test accuracy on MS MARCO dev set
 
 **Files to Create/Modify**:
 - `llmspell-context/src/reranking/deberta.rs` (NEW - 400 lines)
@@ -1622,10 +1704,14 @@ Tests already created in `llmspell-memory/tests/consolidation_test.rs` (259 line
        }
    }
    ```
-2. Implement BM25 algorithm
-3. Add simple tokenization (lowercase, split on whitespace, remove stop words)
-4. Test accuracy vs DeBERTa
-5. Benchmark performance
+2. Implement BM25 algorithm (k1=1.5, b=0.75 defaults)
+3. Add simple tokenization:
+   - Lowercase text
+   - Split on whitespace and punctuation
+   - Filter stopwords using `llmspell_utils::text::stopwords::is_stopword` from Task 13.4.0
+   - Extract meaningful terms
+4. Test accuracy vs DeBERTa (expect ~60-70% of DeBERTa's NDCG@10)
+5. Benchmark performance (<5ms P95 for 20 chunks)
 
 **Files to Create/Modify**:
 - `llmspell-context/src/reranking/bm25.rs` (NEW - 250 lines)
@@ -1636,6 +1722,65 @@ Tests already created in `llmspell-memory/tests/consolidation_test.rs` (259 line
 - [ ] BM25 reranking working
 - [ ] Latency <5ms P95
 - [ ] Automatic fallback functional
+- [ ] Tests pass
+
+### Task 13.4.7: Implement Context Assembly
+**Priority**: HIGH
+**Estimated Time**: 3 hours
+**Assignee**: Context Team
+
+**Description**: Implement context assembly to structure retrieved and reranked chunks into coherent context for LLM consumption.
+
+**Acceptance Criteria**:
+- [ ] Context assembly with temporal ordering
+- [ ] Relevance-based chunk selection
+- [ ] Token budget management (<8K tokens)
+- [ ] Confidence score calculation
+- [ ] Metadata preservation (timestamps, sources)
+
+**Implementation Steps**:
+1. Create `src/assembly/assembler.rs`:
+   ```rust
+   pub struct ContextAssembler {
+       max_tokens: usize,
+       min_confidence: f32,
+   }
+
+   pub struct AssembledContext {
+       pub chunks: Vec<RankedChunk>,
+       pub total_confidence: f32,
+       pub temporal_span: TimeRange,
+       pub token_count: usize,
+   }
+
+   impl ContextAssembler {
+       pub fn assemble(&self, chunks: Vec<RankedChunk>, query: &QueryUnderstanding) -> AssembledContext {
+           // Sort chunks by temporal order (recent first)
+           // Filter by confidence threshold
+           // Trim to fit token budget
+           // Calculate overall confidence
+           // Preserve metadata (timestamps, sources)
+       }
+   }
+   ```
+2. Implement temporal ordering (recent interactions prioritized)
+3. Implement confidence-based filtering (min_confidence threshold)
+4. Implement token budget enforcement (count tokens, truncate if needed)
+5. Add metadata preservation (timestamps, chunk sources, confidence scores)
+6. Test assembly with various chunk sets
+
+**Files to Create/Modify**:
+- `llmspell-context/src/assembly/assembler.rs` (NEW - 250 lines)
+- `llmspell-context/src/assembly/mod.rs` (NEW)
+- `llmspell-context/src/types.rs` (MODIFY - add RankedChunk, AssembledContext types)
+- `llmspell-context/tests/assembly_test.rs` (NEW - 150 lines)
+
+**Definition of Done**:
+- [ ] Context assembly functional
+- [ ] Temporal ordering working
+- [ ] Token budget respected (<8K)
+- [ ] Confidence scoring accurate
+- [ ] Metadata preserved
 - [ ] Tests pass
 
 ### Task 13.4.6: Create Unit Tests for Context Pipeline
