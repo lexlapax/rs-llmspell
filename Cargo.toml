@@ -20,6 +20,7 @@ members = [
     "llmspell-rag",
     "llmspell-memory",
     "llmspell-graph",
+    "llmspell-context",
     "llmspell-tenancy",
     "llmspell-kernel",
     "examples/rust-developers/extension-pattern-example",
