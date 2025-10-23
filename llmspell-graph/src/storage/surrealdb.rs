@@ -17,24 +17,24 @@ use surrealdb::Surreal;
 /// `SurrealDB` backend for knowledge graph (embedded mode)
 ///
 /// # Architecture
-/// - Uses `SurrealDB` embedded mode with RocksDB storage
+/// - Uses `SurrealDB` embedded mode with `RocksDB` storage
 /// - File-based persistence at `<data_dir>/llmspell-graph.db`
 /// - Thread-safe with Arc wrapper (clone-safe)
 /// - CI-friendly (uses temp dirs for tests)
 ///
 /// # Bi-Temporal Schema
-/// - `entities` table: id, name, entity_type, properties, event_time, ingestion_time
-/// - `relationships` table: id, from_entity, to_entity, relationship_type, properties, event_time, ingestion_time
-/// - Indexes on name, entity_type, timestamps for fast queries
+/// - `entities` table: id, name, `entity_type`, properties, `event_time`, `ingestion_time`
+/// - `relationships` table: id, `from_entity`, `to_entity`, `relationship_type`, properties, `event_time`, `ingestion_time`
+/// - Indexes on name, `entity_type`, timestamps for fast queries
 #[derive(Debug, Clone)]
 pub struct SurrealDBBackend {
-    /// SurrealDB connection (embedded RocksDB)
+    /// `SurrealDB` connection (embedded `RocksDB`)
     db: Surreal<Db>,
     /// Path to data directory
     data_dir: PathBuf,
 }
 
-/// Internal entity representation for SurrealDB storage
+/// Internal entity representation for `SurrealDB` storage
 #[derive(Debug, Serialize, Deserialize)]
 struct EntityRecord {
     #[serde(skip_serializing)]
@@ -42,19 +42,117 @@ struct EntityRecord {
     name: String,
     entity_type: String,
     properties: serde_json::Value,
+    #[serde(
+        default,
+        serialize_with = "optional_datetime::serialize",
+        deserialize_with = "optional_datetime::deserialize"
+    )]
     event_time: Option<surrealdb::sql::Datetime>,
+    #[serde(
+        serialize_with = "datetime_serde::serialize",
+        deserialize_with = "datetime_serde::deserialize"
+    )]
     ingestion_time: surrealdb::sql::Datetime,
 }
 
-/// Internal relationship representation for SurrealDB storage
+/// Custom serde module for datetime fields
+mod datetime_serde {
+    use chrono::{DateTime, Utc};
+    use serde::{Deserialize, Deserializer, Serialize, Serializer};
+    use surrealdb::sql::Datetime;
+
+    pub fn serialize<S>(dt: &Datetime, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: Serializer,
+    {
+        dt.serialize(serializer)
+    }
+
+    pub fn deserialize<'de, D>(deserializer: D) -> Result<Datetime, D::Error>
+    where
+        D: Deserializer<'de>,
+    {
+        #[derive(Deserialize)]
+        #[serde(untagged)]
+        enum DatetimeOrString {
+            Datetime(Datetime),
+            String(String),
+        }
+
+        match DatetimeOrString::deserialize(deserializer)? {
+            DatetimeOrString::Datetime(dt) => Ok(dt),
+            DatetimeOrString::String(s) => {
+                // Remove SurrealDB datetime prefix if present
+                let clean = s.trim_start_matches("d'").trim_end_matches('\'');
+                let chrono_dt: DateTime<Utc> = clean.parse().map_err(serde::de::Error::custom)?;
+                Ok(chrono_dt.into())
+            }
+        }
+    }
+}
+
+/// Custom serde module for optional datetime fields
+mod optional_datetime {
+    use chrono::{DateTime, Utc};
+    use serde::{Deserialize, Deserializer, Serializer};
+    use surrealdb::sql::Datetime;
+
+    // Note: serde's serialize_with requires &FieldType, which is &Option<T> here.
+    // Using Option<&T> would break serde's API contract, so we allow ref_option.
+    #[allow(clippy::ref_option)]
+    pub fn serialize<S>(dt: &Option<Datetime>, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: Serializer,
+    {
+        match dt.as_ref() {
+            Some(d) => serializer.serialize_some(d),
+            None => serializer.serialize_none(),
+        }
+    }
+
+    pub fn deserialize<'de, D>(deserializer: D) -> Result<Option<Datetime>, D::Error>
+    where
+        D: Deserializer<'de>,
+    {
+        #[derive(Deserialize)]
+        #[serde(untagged)]
+        enum DatetimeOrString {
+            Datetime(Datetime),
+            String(String),
+        }
+
+        let opt = Option::<DatetimeOrString>::deserialize(deserializer)?;
+        match opt {
+            Some(DatetimeOrString::Datetime(dt)) => Ok(Some(dt)),
+            Some(DatetimeOrString::String(s)) => {
+                let clean = s.trim_start_matches("d'").trim_end_matches('\'');
+                let chrono_dt: DateTime<Utc> = clean.parse().map_err(serde::de::Error::custom)?;
+                Ok(Some(chrono_dt.into()))
+            }
+            None => Ok(None),
+        }
+    }
+}
+
+/// Internal relationship representation for `SurrealDB` storage
 #[derive(Debug, Serialize, Deserialize)]
 struct RelationshipRecord {
-    id: String,
+    #[serde(skip_serializing)]
+    id: Option<surrealdb::sql::Thing>,
     from_entity: String,
     to_entity: String,
     relationship_type: String,
     properties: serde_json::Value,
+    #[serde(
+        default,
+        serialize_with = "optional_datetime::serialize",
+        deserialize_with = "optional_datetime::deserialize"
+    )]
     event_time: Option<surrealdb::sql::Datetime>,
+    #[serde(
+        serialize_with = "datetime_serde::serialize",
+        deserialize_with = "datetime_serde::deserialize"
+    )]
     ingestion_time: surrealdb::sql::Datetime,
 }
 
@@ -65,7 +163,7 @@ impl From<Entity> for EntityRecord {
             name: e.name,
             entity_type: e.entity_type,
             properties: e.properties,
-            event_time: e.event_time.map(|dt| dt.into()),
+            event_time: e.event_time.map(std::convert::Into::into),
             ingestion_time: e.ingestion_time.into(),
         }
     }
@@ -75,13 +173,11 @@ impl From<EntityRecord> for Entity {
     fn from(r: EntityRecord) -> Self {
         Self {
             id: r
-                .id
-                .map(|thing| thing.id.to_string())
-                .unwrap_or_else(|| uuid::Uuid::new_v4().to_string()),
+                .id.map_or_else(|| uuid::Uuid::new_v4().to_string(), |thing| thing.id.to_string()),
             name: r.name,
             entity_type: r.entity_type,
             properties: r.properties,
-            event_time: r.event_time.map(|dt| dt.into()),
+            event_time: r.event_time.map(std::convert::Into::into),
             ingestion_time: r.ingestion_time.into(),
         }
     }
@@ -90,12 +186,12 @@ impl From<EntityRecord> for Entity {
 impl From<Relationship> for RelationshipRecord {
     fn from(r: Relationship) -> Self {
         Self {
-            id: r.id,
+            id: None, // Will be set by SurrealDB
             from_entity: r.from_entity,
             to_entity: r.to_entity,
             relationship_type: r.relationship_type,
             properties: r.properties,
-            event_time: r.event_time.map(|dt| dt.into()),
+            event_time: r.event_time.map(std::convert::Into::into),
             ingestion_time: r.ingestion_time.into(),
         }
     }
@@ -104,12 +200,13 @@ impl From<Relationship> for RelationshipRecord {
 impl From<RelationshipRecord> for Relationship {
     fn from(r: RelationshipRecord) -> Self {
         Self {
-            id: r.id,
+            id: r
+                .id.map_or_else(|| uuid::Uuid::new_v4().to_string(), |thing| thing.id.to_string()),
             from_entity: r.from_entity,
             to_entity: r.to_entity,
             relationship_type: r.relationship_type,
             properties: r.properties,
-            event_time: r.event_time.map(|dt| dt.into()),
+            event_time: r.event_time.map(std::convert::Into::into),
             ingestion_time: r.ingestion_time.into(),
         }
     }
@@ -240,13 +337,24 @@ impl KnowledgeGraph for SurrealDBBackend {
         }
 
         // Update ingestion_time to reflect the update
-        entity.ingestion_time = Utc::now().into();
+        let new_ingestion_time: surrealdb::sql::Datetime = Utc::now().into();
 
-        // Update in database
+        // Build struct for merge (not JSON)
+        #[derive(Serialize)]
+        struct UpdatePatch {
+            properties: serde_json::Value,
+            ingestion_time: surrealdb::sql::Datetime,
+        }
+
+        let patch = UpdatePatch {
+            properties: entity.properties,
+            ingestion_time: new_ingestion_time,
+        };
+
         let _: Option<EntityRecord> = self
             .db
             .update(("entities", id))
-            .content(entity)
+            .merge(patch)
             .await?;
 
         Ok(())
@@ -264,21 +372,15 @@ impl KnowledgeGraph for SurrealDBBackend {
         // Query for entity valid at the given event_time
         // Return entity where ingestion_time <= query_time AND (event_time is None OR event_time <= query_time)
         let query = format!(
-            "SELECT * FROM entities:{} WHERE ingestion_time <= $time AND (event_time IS NONE OR event_time <= $time) LIMIT 1",
-            id
+            "SELECT * FROM entities:{id} WHERE ingestion_time <= $time AND (event_time IS NONE OR event_time <= $time) LIMIT 1"
         );
 
-        #[derive(Deserialize)]
-        struct QueryResult {
-            #[allow(dead_code)]
-            result: Vec<EntityRecord>,
-        }
-
         let mut response = self.db.query(query).bind(("time", event_time)).await?;
-        let result: Option<QueryResult> = response.take(0)?;
+        let entities: Vec<EntityRecord> = response.take(0)?;
 
-        result
-            .and_then(|r| r.result.into_iter().next())
+        entities
+            .into_iter()
+            .next()
             .map(Entity::from)
             .ok_or_else(|| {
                 GraphError::EntityNotFound(format!("Entity not found at time {event_time}: {id}"))
@@ -303,12 +405,6 @@ impl KnowledgeGraph for SurrealDBBackend {
         // Query relationships where from_entity matches and type matches
         let query = "SELECT * FROM relationships WHERE from_entity = $entity_id AND relationship_type = $rel_type";
 
-        #[derive(Deserialize)]
-        struct QueryResult {
-            #[allow(dead_code)]
-            result: Vec<RelationshipRecord>,
-        }
-
         // Convert to owned strings for bind (SurrealDB requirement)
         let entity_id_owned = entity_id.to_string();
         let rel_type_owned = relationship_type.to_string();
@@ -320,8 +416,7 @@ impl KnowledgeGraph for SurrealDBBackend {
             .bind(("rel_type", rel_type_owned))
             .await?;
 
-        let result: Option<QueryResult> = response.take(0)?;
-        let relationships = result.map(|r| r.result).unwrap_or_default();
+        let relationships: Vec<RelationshipRecord> = response.take(0)?;
 
         // Get all target entities
         let mut entities = Vec::new();
@@ -371,34 +466,20 @@ impl KnowledgeGraph for SurrealDBBackend {
         // Execute query
         let sql = format!("SELECT * FROM entities{where_clause}{limit_clause}");
 
-        #[derive(Deserialize)]
-        struct QueryResult {
-            #[allow(dead_code)]
-            result: Vec<EntityRecord>,
-        }
-
         let mut response = self.db.query(sql).await?;
-        let result: Option<QueryResult> = response.take(0)?;
+        let entities: Vec<EntityRecord> = response.take(0)?;
 
-        Ok(result
-            .map(|r| r.result.into_iter().map(Entity::from).collect())
-            .unwrap_or_default())
+        Ok(entities.into_iter().map(Entity::from).collect())
     }
 
     async fn delete_before(&self, timestamp: DateTime<Utc>) -> Result<usize> {
         // Delete entities where ingestion_time < timestamp
         let query = "DELETE FROM entities WHERE ingestion_time < $timestamp";
 
-        #[derive(Deserialize)]
-        struct DeleteResult {
-            #[allow(dead_code)]
-            result: Vec<EntityRecord>,
-        }
-
         let mut response = self.db.query(query).bind(("timestamp", timestamp)).await?;
-        let result: Option<DeleteResult> = response.take(0)?;
+        let deleted: Vec<EntityRecord> = response.take(0)?;
 
-        let count = result.map(|r| r.result.len()).unwrap_or(0);
+        let count = deleted.len();
 
         // Also delete orphaned relationships
         let _query = "DELETE FROM relationships WHERE ingestion_time < $timestamp";

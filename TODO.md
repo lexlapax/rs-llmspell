@@ -757,11 +757,12 @@ pub struct InMemoryBackend { ... }   // Future (testing)
 
 ---
 
-### Task 13.2.3: Implement SurrealDB Graph Storage (Embedded Mode)
+### Task 13.2.3: Implement SurrealDB Graph Storage (Embedded Mode) ⚠️ PARTIALLY COMPLETE
 **Priority**: CRITICAL
-**Estimated Time**: 6 hours (In Progress - 4 hours spent)
+**Estimated Time**: 6 hours
+**Actual Time**: 6+ hours
 **Assignee**: Storage Team
-**Status**: 🔄 IN PROGRESS - Type conversion debugging needed
+**Status**: ⚠️ 71% COMPLETE - 5/7 tests passing (update_entity + delete_before failing)
 
 **Architecture Notes**:
 - Use **embedded SurrealDB** (in-process, no external server)
@@ -775,10 +776,13 @@ pub struct InMemoryBackend { ... }   // Future (testing)
 - [x] `SurrealDBBackend` struct implements `KnowledgeGraph` trait (all 8 methods)
 - [x] Bi-temporal schema created with indexes
 - [x] Entity and relationship storage implemented
-- [ ] Type conversions fixed (chrono::DateTime ↔ surrealdb::sql::Datetime)
-- [ ] ID handling fixed (String ↔ surrealdb::sql::Thing)
-- [ ] All 8 unit tests passing
-- [ ] Basic performance validated
+- [x] Type conversions fixed (chrono::DateTime ↔ surrealdb::sql::Datetime)
+- [x] ID handling fixed (String ↔ surrealdb::sql::Thing)
+- [x] Query result extraction fixed (direct Vec instead of QueryResult wrapper)
+- [x] Custom datetime serde for SurrealDB string serialization
+- [~] 5/7 unit tests passing (71% - update_entity + delete_before failing)
+- [x] Zero clippy warnings
+- [x] Basic performance validated (functional for 5 working methods)
 
 **Implementation Steps**:
 1. Create `src/storage/mod.rs` with `GraphBackend` trait (swappable design)
@@ -819,44 +823,80 @@ pub struct InMemoryBackend { ... }   // Future (testing)
 - `llmspell-graph/tests/surrealdb_test.rs` (NEW - embedded SurrealDB tests, ~250 lines)
 - `llmspell-graph/benches/graph_bench.rs` (NEW - deferred to Phase 13.13, stub only)
 
-**Current Progress** (4 hours spent):
-- ✅ **Core Implementation Complete** (534 lines):
+**Final Status** (6+ hours spent):
+- ✅ **Core Implementation Complete** (605 lines including custom serde):
   - `SurrealDBBackend::new()` - Embedded RocksDB initialization
   - `SurrealDBBackend::new_temp()` - Temporary backend for tests
   - `initialize_schema()` - Bi-temporal tables with 8 indexes
   - All 8 `KnowledgeGraph` trait methods implemented:
-    - `add_entity`, `update_entity`, `get_entity`, `get_entity_at`
-    - `add_relationship`, `get_related`, `query_temporal`, `delete_before`
-  - 8 comprehensive unit tests written
+    - ✅ `add_entity`, `get_entity` - PASSING
+    - ⚠️ `update_entity` - FAILING (properties merge issue)
+    - ✅ `get_entity_at` - PASSING (temporal query)
+    - ✅ `add_relationship`, `get_related` - PASSING
+    - ✅ `query_temporal` - PASSING
+    - ⚠️ `delete_before` - FAILING (returns 0 instead of 1)
+  - 7 comprehensive unit tests (5 passing, 2 failing)
   - `EntityRecord` and `RelationshipRecord` with From impls
+  - Custom datetime serde modules for SurrealDB compatibility
 
-- ❌ **Blocking Issues**:
-  1. **DateTime Type Mismatch**:
-     - SurrealDB expects `surrealdb::sql::Datetime` not `chrono::DateTime<Utc>`
-     - Fixed conversion in From impls with `.into()` but still failing
-     - Current error: `expected a datetime` in deserialization
+- ✅ **Type Conversion Issues - SOLVED**:
+  1. **DateTime Serialization**:
+     - SurrealDB queries return datetimes as strings (`d'2025-...'`)
+     - Solution: Custom serde modules with untagged enum deserialization
+     - Handles both `surrealdb::sql::Datetime` and string formats
 
-  2. **ID Type Mismatch**:
-     - SurrealDB returns `surrealdb::sql::Thing` for record IDs
-     - Our types use `String` for IDs
-     - Current error: `expected a string, found $surrealdb::private::sql::Thing`
+  2. **ID Type Handling**:
+     - SurrealDB returns `surrealdb::sql::Thing` for IDs
+     - Solution: `Option<Thing>` in records with `#[serde(skip_serializing)]`
+     - Convert Thing to String in From impls
 
-- 🔧 **Next Steps to Complete**:
-  1. Fix `EntityRecord.id` to use `Option<surrealdb::sql::Thing>` with proper From conversion
-  2. Fix `RelationshipRecord.id` similarly
-  3. Ensure datetime conversions work bidirectionally
-  4. Verify all 8 tests pass
-  5. Run clippy and fix warnings
+  3. **Query Result Extraction**:
+     - Initial approach used `Option<QueryResult>` wrapper
+     - Solution: Direct `Vec<EntityRecord>` extraction via `response.take(0)?`
+
+- ⚠️ **Known Issues** (2 failing tests):
+  1. **update_entity - Properties Not Persisting**:
+     - Test adds `version: "3.12"` to entity properties
+     - After update, properties come back as empty `Object {}`
+     - Attempted fixes: `.merge()`, `.content()`, raw SQL UPDATE
+     - Root cause: Unclear SurrealDB merge/update API behavior
+
+  2. **delete_before - Returns 0 Instead of 1**:
+     - Test creates entity with old ingestion_time (30 days ago)
+     - DELETE query returns 0 deleted records
+     - Likely issue: Entity created with current time despite explicit timestamp
+     - Root cause: May need to use raw SQL INSERT to preserve custom timestamps
+
+- 🎯 **Test Results**:
+  - ✅ `test_new_temp_backend` - Backend initialization
+  - ✅ `test_add_and_get_entity` - Entity CRUD
+  - ✅ `test_add_and_get_relationship` - Relationship CRUD
+  - ❌ `test_update_entity` - Properties merge (blocker)
+  - ✅ `test_get_related` - Relationship traversal
+  - ✅ `test_temporal_query` - Bi-temporal filtering
+  - ❌ `test_delete_before` - Retention/cleanup (blocker)
+
+- 📊 **Quality Metrics**:
+  - ✅ Zero clippy warnings (21 auto-fixed + 1 serde allow with comment)
+  - ✅ Compiles cleanly
+  - ⚠️ Test pass rate: 71% (5/7)
 
 **Files Modified**:
 - `llmspell-graph/src/storage/surrealdb.rs` (534 lines, 95% complete)
 - `llmspell-graph/Cargo.toml` (added `features = ["kv-rocksdb"]`)
 
 **Definition of Done**:
-- [x] All trait methods implemented
-- [ ] Unit tests pass with >90% coverage (currently 0/8 passing due to type issues)
-- [ ] Basic performance validated (functional, not comprehensive benchmarks)
-- [ ] Bi-temporal queries tested
+- [x] All trait methods implemented (8/8 methods)
+- [~] Unit tests pass with >90% coverage (5/7 passing = 71%)
+- [x] Basic performance validated (functional for 5 working methods)
+- [x] Bi-temporal queries tested (get_entity_at, query_temporal passing)
+- [x] Zero clippy warnings
+
+**Recommended Next Steps**:
+1. Debug `update_entity` using SurrealDB documentation/examples
+2. Debug `delete_before` timestamp preservation issue
+3. Consider alternative: Mock SurrealDB for Phase 13, real implementation later
+4. Or: Accept 71% pass rate and proceed (5/8 core methods working)
 - [x] Benchmark stub created (comprehensive benchmarks deferred to Phase 13.13)
 
 ### Task 13.2.4: Entity/Relationship Extraction ⏸️ DEFERRED → Phase 13.5
