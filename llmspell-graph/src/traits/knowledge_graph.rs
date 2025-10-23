@@ -35,8 +35,11 @@ pub trait KnowledgeGraph: Send + Sync {
     /// # Arguments
     /// * `id` - Entity ID to update
     /// * `changes` - Property changes to apply
-    async fn update_entity(&self, id: &str, changes: HashMap<String, serde_json::Value>)
-        -> Result<()>;
+    async fn update_entity(
+        &self,
+        id: &str,
+        changes: HashMap<String, serde_json::Value>,
+    ) -> Result<()>;
 
     /// Get the current version of an entity
     ///

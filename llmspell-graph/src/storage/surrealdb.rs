@@ -172,8 +172,10 @@ impl From<Entity> for EntityRecord {
 impl From<EntityRecord> for Entity {
     fn from(r: EntityRecord) -> Self {
         Self {
-            id: r
-                .id.map_or_else(|| uuid::Uuid::new_v4().to_string(), |thing| thing.id.to_string()),
+            id: r.id.map_or_else(
+                || uuid::Uuid::new_v4().to_string(),
+                |thing| thing.id.to_string(),
+            ),
             name: r.name,
             entity_type: r.entity_type,
             properties: r.properties,
@@ -200,8 +202,10 @@ impl From<Relationship> for RelationshipRecord {
 impl From<RelationshipRecord> for Relationship {
     fn from(r: RelationshipRecord) -> Self {
         Self {
-            id: r
-                .id.map_or_else(|| uuid::Uuid::new_v4().to_string(), |thing| thing.id.to_string()),
+            id: r.id.map_or_else(
+                || uuid::Uuid::new_v4().to_string(),
+                |thing| thing.id.to_string(),
+            ),
             from_entity: r.from_entity,
             to_entity: r.to_entity,
             relationship_type: r.relationship_type,
@@ -253,7 +257,8 @@ impl SurrealDBBackend {
     /// # Errors
     /// Returns error if temp directory creation or initialization fails
     pub async fn new_temp() -> Result<Self> {
-        let temp_dir = std::env::temp_dir().join(format!("llmspell-graph-{}", uuid::Uuid::new_v4()));
+        let temp_dir =
+            std::env::temp_dir().join(format!("llmspell-graph-{}", uuid::Uuid::new_v4()));
         Self::new(&temp_dir).await
     }
 
@@ -325,9 +330,8 @@ impl KnowledgeGraph for SurrealDBBackend {
         // Get existing entity
         let existing: Option<EntityRecord> = self.db.select(("entities", id)).await?;
 
-        let mut entity = existing.ok_or_else(|| {
-            GraphError::EntityNotFound(format!("Entity not found: {id}"))
-        })?;
+        let mut entity = existing
+            .ok_or_else(|| GraphError::EntityNotFound(format!("Entity not found: {id}")))?;
 
         // Apply changes to properties
         if let serde_json::Value::Object(props) = &mut entity.properties {

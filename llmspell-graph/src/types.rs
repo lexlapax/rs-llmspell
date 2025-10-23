@@ -165,11 +165,7 @@ impl TemporalQuery {
 
     /// Filter by event time range
     #[must_use]
-    pub const fn with_event_time_range(
-        mut self,
-        start: DateTime<Utc>,
-        end: DateTime<Utc>,
-    ) -> Self {
+    pub const fn with_event_time_range(mut self, start: DateTime<Utc>, end: DateTime<Utc>) -> Self {
         self.event_time_start = Some(start);
         self.event_time_end = Some(end);
         self
