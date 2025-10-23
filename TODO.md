@@ -2688,6 +2688,12 @@ Created comprehensive integration tests (285 lines) covering end-to-end pipeline
 
 **Description**: Create comprehensive E2E test suite with real LLM (Ollama) covering all decision types, multi-turn scenarios, and error cases.
 
+**Architecture Decisions**:
+1. **Ollama Availability**: Check `OLLAMA_HOST` env var (default: `http://localhost:11434`), skip tests if not set or unreachable
+2. **Metrics Integration**: Yes - integrate ConsolidationMetrics in all E2E tests to validate metrics collection with real LLM
+3. **Ground Truth for DMR**: Yes - manually annotate each test case with expected decisions for DMR calculation
+4. **Test Organization**: Yes - create `tests/e2e/` directory structure separate from unit tests
+
 **Acceptance Criteria**:
 - [ ] ADD decision test (new entities from episodic)
 - [ ] UPDATE decision test (merge new facts into existing entities)
@@ -2696,65 +2702,110 @@ Created comprehensive integration tests (285 lines) covering end-to-end pipeline
 - [ ] Multi-turn consolidation test (sequential dependencies)
 - [ ] Error recovery test (malformed JSON, invalid IDs, LLM unavailable)
 - [ ] Test runs in <2 minutes with small model
+- [ ] Metrics tracked for all tests (decision distribution, latency, parse success)
+- [ ] DMR calculated and reported (target: >70%)
 
 **Subtasks**:
+0. **13.5.5.0**: Test infrastructure setup (0.5h)
+   - [ ] Create `tests/e2e/` directory structure
+   - [ ] Create `tests/e2e/mod.rs` with Ollama availability check helper
+   - [ ] Create `tests/e2e/helpers.rs` with test utilities
+   - [ ] Ollama check: test OLLAMA_HOST connectivity, skip if unavailable
+   - [ ] Helper: `create_test_engine()` - returns LLMConsolidationEngine + ConsolidationMetrics
+   - [ ] Helper: `assert_entity_exists(graph, entity_id, expected_properties)`
+   - [ ] Helper: `assert_relationship_exists(graph, from, to, rel_type)`
+   - [ ] Helper: `calculate_dmr(actual_decisions, expected_decisions) -> f64`
+
 1. **13.5.5a**: ADD decision test (1h)
    - [ ] Episodic: "Rust is a systems programming language"
+   - [ ] Ground Truth: Expected decisions = [ADD(entity_id="rust", type="language"), ADD(entity_id="systems_programming", type="concept"), ADD_RELATIONSHIP(rust, is_a, language)]
    - [ ] Expected: Entity(Rust, type=language), Entity(systems programming, type=concept)
    - [ ] Validation: Entities exist in KnowledgeGraph with correct properties
    - [ ] Verify: Relationship(Rust, is_a, language)
+   - [ ] Metrics: Record consolidation with ConsolidationMetrics, verify parse_success=true
+   - [ ] DMR: Calculate DMR from ground truth, assert DMR >= 0.7
 
 2. **13.5.5b**: UPDATE decision test (1h)
    - [ ] Episodic 1: "Rust has memory safety"
    - [ ] Episodic 2: "Rust also has zero-cost abstractions"
+   - [ ] Ground Truth: [ADD(rust), ADD(memory_safety), UPDATE(rust, add_feature="zero-cost abstractions")]
    - [ ] Expected: UPDATE Rust entity with new property (properties["features"] += "zero-cost abstractions")
    - [ ] Validation: Entity has both features, timestamps updated
+   - [ ] Metrics: Record both consolidations, verify parse_success=true for both
+   - [ ] DMR: Calculate DMR, assert >= 0.7
 
 3. **13.5.5c**: DELETE decision test (1h)
    - [ ] Episodic 1: "Python 2.7 is supported"
    - [ ] Episodic 2: "Python 2.7 is deprecated and unsupported"
+   - [ ] Ground Truth: [ADD(python_2.7), DELETE(python_2.7, reason="deprecated")]
    - [ ] Expected: DELETE Python 2.7 entity (tombstone with valid_until)
    - [ ] Validation: Entity marked as deleted, not returned in queries
+   - [ ] Metrics: Record consolidations, verify parse_success
+   - [ ] DMR: Calculate DMR, assert >= 0.7
 
 4. **13.5.5d**: NOOP decision test (0.5h)
    - [ ] Episodic: "The weather is nice today"
+   - [ ] Ground Truth: [NOOP(reason="irrelevant to knowledge domain")]
    - [ ] Expected: NOOP (no knowledge graph changes)
    - [ ] Validation: No entities added, no relationships created
+   - [ ] Metrics: Record consolidation, verify parse_success=true
+   - [ ] DMR: Calculate DMR, assert = 1.0 (trivial case)
 
 5. **13.5.5e**: Multi-turn consolidation (1h)
    - [ ] Sequential entries with dependencies (Entity A → Relationship A-B → Entity B properties)
+   - [ ] Ground Truth: [ADD(alice), ADD(acme), ADD_REL(alice, works_at, acme), ADD(sf), ADD_REL(acme, located_in, sf), UPDATE(alice, status="remote")]
    - [ ] Validate: Correct ordering, no missing entities, relationships point to valid entities
    - [ ] Test scenario: "Alice works at Acme" → "Acme is in SF" → "Alice moved to remote work"
+   - [ ] Metrics: Record all consolidations, aggregate decision distribution
+   - [ ] DMR: Calculate aggregate DMR across all turns, assert >= 0.7
 
 6. **13.5.5f**: Error recovery test (0.5h)
    - [ ] LLM returns malformed JSON → parser recovers with natural language fallback
    - [ ] LLM returns invalid entity ID → validator rejects, consolidation continues
    - [ ] LLM unavailable → consolidation deferred, entries marked retry_later
+   - [ ] Metrics: Record parse_failures, validation_errors
+   - [ ] Validation: No data corruption, graceful degradation
 
 **Implementation Steps**:
-1. Create `llmspell-memory/tests/e2e/consolidation_llm_test.rs`
-2. Setup test infrastructure:
-   - Initialize ProviderManager with Ollama (llama3.2:3b)
-   - Create InMemoryEpisodicMemory + SurrealDB KnowledgeGraph
-   - Build LLMConsolidationEngine with test configuration
-3. Implement 6 test scenarios (ADD/UPDATE/DELETE/NOOP/multi-turn/errors)
-4. Add decision distribution tracking
-5. Calculate baseline DMR (compare to ground truth)
-6. Create test helpers (add_episodic, assert_entity_exists, assert_relationship_exists)
+1. **13.5.5.0**: Create test infrastructure
+   - Create `tests/e2e/` directory
+   - Create `tests/e2e/mod.rs` with Ollama connectivity check
+   - Create `tests/e2e/helpers.rs` with test utilities
+   - Implement `check_ollama_available() -> bool`
+   - Implement `create_test_engine() -> (LLMConsolidationEngine, ConsolidationMetrics, ...)`
+   - Implement assertion helpers (entity_exists, relationship_exists)
+   - Implement `calculate_dmr(actual, expected) -> f64`
+
+2. **13.5.5a-f**: Implement test scenarios
+   - Create `tests/e2e/consolidation_llm_test.rs`
+   - Each test:
+     - Check Ollama availability, skip if unavailable
+     - Define ground truth decisions
+     - Create episodic entries
+     - Run consolidation with metrics
+     - Validate knowledge graph state
+     - Calculate DMR from ground truth
+     - Assert DMR >= 0.7 (or 1.0 for NOOP)
+     - Verify metrics (parse_success, decision_distribution)
 
 **Files to Create/Modify**:
-- `llmspell-memory/tests/e2e/consolidation_llm_test.rs` (NEW - 600 lines)
-- `llmspell-memory/tests/e2e/mod.rs` (MODIFY - add consolidation_llm_test)
-- `llmspell-memory/tests/e2e/test_helpers.rs` (NEW - 200 lines)
+- `llmspell-memory/tests/e2e/mod.rs` (NEW - 50 lines) - Ollama check, module exports
+- `llmspell-memory/tests/e2e/helpers.rs` (NEW - 250 lines) - Test utilities, DMR calculation
+- `llmspell-memory/tests/e2e/consolidation_llm_test.rs` (NEW - 700 lines) - 6 test scenarios
 
 **Definition of Done**:
+- [ ] Test infrastructure complete (e2e/ directory, helpers, Ollama check)
 - [ ] All 6 test scenarios pass with real LLM
-- [ ] ADD/UPDATE/DELETE/NOOP decisions validated
+- [ ] ADD/UPDATE/DELETE/NOOP decisions validated against ground truth
 - [ ] Multi-turn consolidation maintains consistency
 - [ ] Error recovery prevents data corruption
-- [ ] Decision distribution measured (expected: ~40% ADD, ~30% UPDATE, ~20% NOOP, ~10% DELETE)
-- [ ] Test runs in CI with Ollama available (or skipped with #[ignore] if unavailable)
+- [ ] DMR calculated for all tests, baseline >= 70% achieved
+- [ ] Metrics integration validated (decision distribution, latency, parse success)
+- [ ] Decision distribution measured and logged
+- [ ] Tests skip gracefully if OLLAMA_HOST unavailable
+- [ ] Test runs in <2 minutes with llama3.2:3b
 - [ ] Zero clippy warnings
+- [ ] TODO.md updated with completion status and DMR baselines
 
 ---
 
