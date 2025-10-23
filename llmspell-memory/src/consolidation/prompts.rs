@@ -2,11 +2,46 @@
 //!
 //! Provides system and user prompts for extracting entities, relationships,
 //! and making consolidation decisions (ADD/UPDATE/DELETE/NOOP).
+//!
+//! # Prompt Versioning
+//!
+//! Prompts are versioned for A/B testing and iterative improvement:
+//! - **V1**: Initial implementation (JSON schema, few-shot examples)
+//! - **V2+**: Future enhancements (longer examples, refined instructions, etc.)
+//!
+//! Use `PromptVersion` to select prompt version, tracked in metrics (Phase 13.5.4).
 
 use crate::error::Result;
 use crate::types::EpisodicEntry;
+use serde::{Deserialize, Serialize};
 
 use super::prompt_schema::{ConsolidationResponse, OutputFormat};
+
+/// Prompt version for A/B testing and iterative improvement
+///
+/// Each version represents a distinct prompt template iteration.
+/// Tracked in consolidation metrics for performance comparison.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
+#[serde(rename_all = "UPPERCASE")]
+pub enum PromptVersion {
+    /// Initial implementation (JSON schema, 4 few-shot examples)
+    V1,
+    // Future versions: V2, V3, etc.
+}
+
+impl Default for PromptVersion {
+    fn default() -> Self {
+        Self::V1
+    }
+}
+
+impl std::fmt::Display for PromptVersion {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Self::V1 => write!(f, "V1"),
+        }
+    }
+}
 
 /// Token budget allocation for prompt components
 #[derive(Debug, Clone, Copy)]
@@ -40,6 +75,8 @@ pub struct ConsolidationPromptConfig {
     pub temperature: f32,
     /// Token budget allocation
     pub token_budget: TokenBudget,
+    /// Prompt version for A/B testing
+    pub version: PromptVersion,
 }
 
 impl Default for ConsolidationPromptConfig {
@@ -49,6 +86,7 @@ impl Default for ConsolidationPromptConfig {
             model: "ollama/llama3.2:3b".to_string(),
             temperature: 0.0,
             token_budget: TokenBudget::default(),
+            version: PromptVersion::default(),
         }
     }
 }
@@ -96,16 +134,37 @@ impl ConsolidationPromptBuilder {
         self
     }
 
+    /// Set prompt version
+    #[must_use]
+    pub const fn with_version(mut self, version: PromptVersion) -> Self {
+        self.config.version = version;
+        self
+    }
+
+    /// Get current prompt version
+    #[must_use]
+    pub const fn version(&self) -> PromptVersion {
+        self.config.version
+    }
+
     /// Build system prompt
+    ///
+    /// Selects prompt template based on output format and version.
+    /// Currently only V1 is implemented; future versions will have
+    /// version-specific logic here.
     ///
     /// # Errors
     ///
     /// Returns error if prompt generation fails.
     pub fn build_system_prompt(&self) -> Result<String> {
-        Ok(match self.config.output_format {
-            OutputFormat::Json => Self::system_prompt_json(),
-            OutputFormat::NaturalLanguage => Self::system_prompt_natural_language(),
-        })
+        // Version selection (currently only V1)
+        match self.config.version {
+            PromptVersion::V1 => Ok(match self.config.output_format {
+                OutputFormat::Json => Self::system_prompt_json(),
+                OutputFormat::NaturalLanguage => Self::system_prompt_natural_language(),
+            }),
+            // Future versions: add version-specific prompt selection
+        }
     }
 
     /// Build user prompt from episodic entry and semantic context
@@ -462,5 +521,48 @@ mod tests {
         assert!(examples.contains("Example 4: NOOP"));
         assert!(examples.contains("Rust"));
         assert!(examples.contains("Python 2.7"));
+    }
+
+    #[test]
+    fn test_prompt_version_default() {
+        assert_eq!(PromptVersion::default(), PromptVersion::V1);
+    }
+
+    #[test]
+    fn test_prompt_version_display() {
+        assert_eq!(PromptVersion::V1.to_string(), "V1");
+    }
+
+    #[test]
+    fn test_builder_with_version() {
+        let builder = ConsolidationPromptBuilder::new().with_version(PromptVersion::V1);
+        assert_eq!(builder.version(), PromptVersion::V1);
+    }
+
+    #[test]
+    fn test_config_includes_version() {
+        let config = ConsolidationPromptConfig::default();
+        assert_eq!(config.version, PromptVersion::V1);
+    }
+
+    #[test]
+    fn test_system_prompt_with_version() {
+        let builder = ConsolidationPromptBuilder::new().with_version(PromptVersion::V1);
+        let prompt = builder.build_system_prompt().unwrap();
+
+        // V1 prompt should contain JSON schema
+        assert!(prompt.contains("valid JSON"));
+        assert!(prompt.contains("Example 1"));
+    }
+
+    #[test]
+    fn test_version_serialization() {
+        use serde_json;
+        let version = PromptVersion::V1;
+        let json = serde_json::to_string(&version).unwrap();
+        assert_eq!(json, "\"V1\"");
+
+        let deserialized: PromptVersion = serde_json::from_str(&json).unwrap();
+        assert_eq!(deserialized, PromptVersion::V1);
     }
 }

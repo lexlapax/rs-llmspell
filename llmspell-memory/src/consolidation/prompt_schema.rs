@@ -2,6 +2,11 @@
 //!
 //! Defines structured output format for LLM-driven consolidation decisions.
 //! Supports JSON parsing with error recovery and natural language fallback.
+//!
+//! # Versioning
+//!
+//! Responses include optional `prompt_version` metadata for tracking which
+//! prompt template generated the response (A/B testing, metrics analysis).
 
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
@@ -73,6 +78,10 @@ pub struct ConsolidationResponse {
     /// Optional reasoning from LLM (for debugging/explainability)
     #[serde(skip_serializing_if = "Option::is_none")]
     pub reasoning: Option<String>,
+
+    /// Prompt version that generated this response (for A/B testing)
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub prompt_version: Option<String>,
 }
 
 impl ConsolidationResponse {
@@ -84,7 +93,15 @@ impl ConsolidationResponse {
             relationships: Vec::new(),
             decisions: Vec::new(),
             reasoning: None,
+            prompt_version: None,
         }
+    }
+
+    /// Set prompt version metadata
+    #[must_use]
+    pub fn with_prompt_version(mut self, version: String) -> Self {
+        self.prompt_version = Some(version);
+        self
     }
 
     /// Check if response contains any decisions
@@ -271,6 +288,7 @@ pub mod examples {
                 entity_id: "rust-lang-001".to_string(),
             }],
             reasoning: Some("New programming language entity extracted from episodic content.".to_string()),
+            prompt_version: None,
         }
     }
 
@@ -294,6 +312,7 @@ pub mod examples {
             reasoning: Some(
                 "Updating existing Rust entity with additional feature information.".to_string(),
             ),
+            prompt_version: None,
         }
     }
 
@@ -307,6 +326,7 @@ pub mod examples {
                 entity_id: "python27-deprecated".to_string(),
             }],
             reasoning: Some("Python 2.7 is deprecated and unsupported.".to_string()),
+            prompt_version: None,
         }
     }
 
@@ -318,6 +338,7 @@ pub mod examples {
             relationships: vec![],
             decisions: vec![DecisionPayload::Noop],
             reasoning: Some("Episodic content contains no extractable knowledge.".to_string()),
+            prompt_version: None,
         }
     }
 }
@@ -469,5 +490,37 @@ mod tests {
         let json = response.to_json().unwrap();
         assert!(json.contains("\"name\": \"Rust\""));
         assert!(json.contains("\"type\": \"ADD\""));
+    }
+
+    #[test]
+    fn test_response_with_prompt_version() {
+        let response = ConsolidationResponse::empty().with_prompt_version("V1".to_string());
+        assert_eq!(response.prompt_version, Some("V1".to_string()));
+    }
+
+    #[test]
+    fn test_parse_with_prompt_version() {
+        let json = r#"{
+            "entities": [],
+            "relationships": [],
+            "decisions": [{"type": "NOOP"}],
+            "reasoning": "Test",
+            "prompt_version": "V1"
+        }"#;
+
+        let response = ConsolidationResponse::from_json(json).unwrap();
+        assert_eq!(response.prompt_version, Some("V1".to_string()));
+    }
+
+    #[test]
+    fn test_version_field_optional() {
+        let json = r#"{
+            "entities": [],
+            "relationships": [],
+            "decisions": [{"type": "NOOP"}]
+        }"#;
+
+        let response = ConsolidationResponse::from_json(json).unwrap();
+        assert!(response.prompt_version.is_none());
     }
 }
