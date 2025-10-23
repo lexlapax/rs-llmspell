@@ -144,7 +144,9 @@ impl DeBERTaReranker {
     fn get_cache_dir() -> Result<PathBuf> {
         let home = std::env::var("HOME")
             .or_else(|_| std::env::var("USERPROFILE"))
-            .map_err(|_| ContextError::ConfigError("Cannot determine home directory".to_string()))?;
+            .map_err(|_| {
+                ContextError::ConfigError("Cannot determine home directory".to_string())
+            })?;
 
         Ok(PathBuf::from(home)
             .join(".cache")
@@ -189,10 +191,9 @@ impl DeBERTaReranker {
                 .await
                 .map_err(|e| ContextError::ModelDownloadError(format!("Download failed: {e}")))?;
 
-            let bytes = response
-                .bytes()
-                .await
-                .map_err(|e| ContextError::ModelDownloadError(format!("Failed to read bytes: {e}")))?;
+            let bytes = response.bytes().await.map_err(|e| {
+                ContextError::ModelDownloadError(format!("Failed to read bytes: {e}"))
+            })?;
 
             std::fs::write(&dest, bytes)?;
             debug!("Downloaded {} ({} bytes)", file, dest.metadata()?.len());
@@ -223,9 +224,13 @@ impl DeBERTaReranker {
             .map_err(|e| ContextError::RerankingError(format!("Unsqueeze failed: {e}")))?;
 
         // Run inference (BERT forward takes input_ids, token_type_ids, position_ids)
-        let seq_len = input_ids.dim(1).map_err(|e| ContextError::RerankingError(format!("Failed to get seq_len: {e}")))?;
+        let seq_len = input_ids
+            .dim(1)
+            .map_err(|e| ContextError::RerankingError(format!("Failed to get seq_len: {e}")))?;
         let token_type_ids = Tensor::zeros((1, seq_len), candle_core::DType::U32, &self.device)
-            .map_err(|e| ContextError::RerankingError(format!("Failed to create token_type_ids: {e}")))?;
+            .map_err(|e| {
+                ContextError::RerankingError(format!("Failed to create token_type_ids: {e}"))
+            })?;
 
         let output = self
             .model
@@ -268,7 +273,12 @@ impl DeBERTaReranker {
 
 #[async_trait]
 impl Reranker for DeBERTaReranker {
-    async fn rerank(&self, chunks: Vec<Chunk>, query: &str, top_k: usize) -> Result<Vec<RankedChunk>> {
+    async fn rerank(
+        &self,
+        chunks: Vec<Chunk>,
+        query: &str,
+        top_k: usize,
+    ) -> Result<Vec<RankedChunk>> {
         if chunks.is_empty() {
             return Ok(Vec::new());
         }
@@ -307,7 +317,8 @@ mod tests {
         vec![
             Chunk {
                 id: "1".to_string(),
-                content: "Rust is a systems programming language focused on safety and performance".to_string(),
+                content: "Rust is a systems programming language focused on safety and performance"
+                    .to_string(),
                 source: "test".to_string(),
                 timestamp: Utc::now(),
                 metadata: None,
@@ -321,7 +332,8 @@ mod tests {
             },
             Chunk {
                 id: "3".to_string(),
-                content: "Rust's ownership system ensures memory safety without garbage collection".to_string(),
+                content: "Rust's ownership system ensures memory safety without garbage collection"
+                    .to_string(),
                 source: "test".to_string(),
                 timestamp: Utc::now(),
                 metadata: None,
@@ -330,19 +342,26 @@ mod tests {
     }
 
     #[tokio::test]
-    #[ignore] // Requires model download, run with --ignored
+    #[ignore = "Requires model download, run with --ignored"]
     async fn test_deberta_initialization() {
         let reranker = DeBERTaReranker::new().await;
-        assert!(reranker.is_ok(), "DeBERTa initialization failed: {:?}", reranker.err());
+        assert!(
+            reranker.is_ok(),
+            "DeBERTa initialization failed: {:?}",
+            reranker.err()
+        );
     }
 
     #[tokio::test]
-    #[ignore] // Requires model download, run with --ignored
+    #[ignore = "Requires model download, run with --ignored"]
     async fn test_deberta_reranking() {
         let reranker = DeBERTaReranker::new().await.unwrap();
         let chunks = create_test_chunks();
 
-        let ranked = reranker.rerank(chunks, "Rust memory safety", 2).await.unwrap();
+        let ranked = reranker
+            .rerank(chunks, "Rust memory safety", 2)
+            .await
+            .unwrap();
 
         // Should return 2 chunks
         assert_eq!(ranked.len(), 2);
@@ -360,7 +379,7 @@ mod tests {
     }
 
     #[tokio::test]
-    #[ignore] // Requires model download
+    #[ignore = "Requires model download"]
     async fn test_empty_chunks() {
         let reranker = DeBERTaReranker::new().await.unwrap();
         let ranked = reranker.rerank(vec![], "test query", 10).await.unwrap();

@@ -10,6 +10,8 @@
 //! - T5 sequence-to-sequence
 //! - LLM-based scoring (Ollama/OpenAI)
 
+pub mod bm25;
 pub mod deberta;
 
+pub use bm25::BM25Reranker;
 pub use deberta::DeBERTaReranker;
