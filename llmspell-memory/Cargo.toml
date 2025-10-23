@@ -43,6 +43,9 @@ dashmap = "5.5"
 # UUID generation
 uuid = { workspace = true }
 
+# Regex for natural language parsing
+regex = "1.10"
+
 [dev-dependencies]
 llmspell-testing = { path = "../llmspell-testing" }
 tokio-test = "0.4"

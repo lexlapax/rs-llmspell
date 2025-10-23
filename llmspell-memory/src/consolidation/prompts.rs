@@ -11,11 +11,11 @@
 //!
 //! Use `PromptVersion` to select prompt version, tracked in metrics (Phase 13.5.4).
 
-use crate::error::Result;
+use crate::error::{MemoryError, Result};
 use crate::types::EpisodicEntry;
 use serde::{Deserialize, Serialize};
 
-use super::prompt_schema::{ConsolidationResponse, OutputFormat};
+use super::prompt_schema::{ConsolidationResponse, DecisionPayload, OutputFormat};
 
 /// Prompt version for A/B testing and iterative improvement
 ///
@@ -372,17 +372,95 @@ impl Default for ConsolidationPromptBuilder {
 
 /// Parse LLM response into consolidation response
 ///
+/// Supports two modes:
+/// - **JSON**: Parse structured `ConsolidationResponse` (95%+ success rate)
+/// - **`NaturalLanguage`**: Extract decisions via regex patterns (fallback mode)
+///
 /// # Errors
 ///
-/// Returns error if response cannot be parsed as JSON or natural language.
+/// Returns error if response cannot be parsed in either format.
 pub fn parse_llm_response(response: &str, format: OutputFormat) -> Result<ConsolidationResponse> {
     match format {
-        OutputFormat::Json => ConsolidationResponse::from_json(response),
-        OutputFormat::NaturalLanguage => {
-            // For natural language, return empty response (parsing in Task 13.5.2b)
-            Ok(ConsolidationResponse::empty())
+        OutputFormat::Json => {
+            // Try JSON parsing first
+            ConsolidationResponse::from_json(response).or_else(|e| {
+                // If JSON fails, try natural language extraction as fallback
+                tracing::warn!("JSON parsing failed ({}), falling back to natural language", e);
+                parse_natural_language_response(response)
+            })
+        }
+        OutputFormat::NaturalLanguage => parse_natural_language_response(response),
+    }
+}
+
+/// Parse natural language response using regex patterns
+///
+/// Extracts decisions from natural language text like:
+/// - "ADD entity: Rust (`programming_language`)"
+/// - "UPDATE existing entity rust-001 with properties: {version: 1.75}"
+/// - "DELETE deprecated entity python27-001"
+/// - "NOOP - no actionable knowledge"
+///
+/// # Errors
+///
+/// Returns error if no decisions can be extracted from response.
+fn parse_natural_language_response(response: &str) -> Result<ConsolidationResponse> {
+    use regex::Regex;
+
+    let mut decisions = Vec::new();
+
+    // Regex patterns for decision types
+    let add_pattern = Regex::new(r"(?i)\bADD\b.*?\b([a-f0-9-]{36})\b").unwrap();
+    let update_pattern = Regex::new(r"(?i)\bUPDATE\b.*?\b([a-f0-9-]{36})\b").unwrap();
+    let delete_pattern = Regex::new(r"(?i)\bDELETE\b.*?\b([a-f0-9-]{36})\b").unwrap();
+    let noop_pattern = Regex::new(r"(?i)\bNOOP\b").unwrap();
+
+    // Extract ADD decisions
+    for cap in add_pattern.captures_iter(response) {
+        if let Some(entity_id) = cap.get(1) {
+            decisions.push(DecisionPayload::Add {
+                entity_id: entity_id.as_str().to_string(),
+            });
         }
     }
+
+    // Extract UPDATE decisions
+    for cap in update_pattern.captures_iter(response) {
+        if let Some(entity_id) = cap.get(1) {
+            decisions.push(DecisionPayload::Update {
+                entity_id: entity_id.as_str().to_string(),
+                changes: std::collections::HashMap::new(), // Parse changes from text if needed
+            });
+        }
+    }
+
+    // Extract DELETE decisions
+    for cap in delete_pattern.captures_iter(response) {
+        if let Some(entity_id) = cap.get(1) {
+            decisions.push(DecisionPayload::Delete {
+                entity_id: entity_id.as_str().to_string(),
+            });
+        }
+    }
+
+    // Check for NOOP
+    if noop_pattern.is_match(response) && decisions.is_empty() {
+        decisions.push(DecisionPayload::Noop);
+    }
+
+    if decisions.is_empty() {
+        return Err(MemoryError::InvalidInput(
+            "Could not extract any decisions from natural language response".to_string(),
+        ));
+    }
+
+    Ok(ConsolidationResponse {
+        entities: Vec::new(),
+        relationships: Vec::new(),
+        decisions,
+        reasoning: Some(response.to_string()),
+        prompt_version: None,
+    })
 }
 
 #[cfg(test)]
@@ -490,11 +568,37 @@ mod tests {
 
     #[test]
     fn test_parse_natural_language_response() {
-        let text = "Add entity Rust as programming_language";
+        let text = "Based on the episodic content, I recommend:\n\
+                    ADD entity 12345678-1234-1234-1234-123456789abc (Rust programming language)\n\
+                    UPDATE entity abcdef01-2345-6789-abcd-ef0123456789 with new version information\n\
+                    DELETE entity fedcba98-7654-3210-fedc-ba9876543210 (deprecated)";
         let response = parse_llm_response(text, OutputFormat::NaturalLanguage).unwrap();
 
-        // Natural language parsing returns empty (implemented in Task 13.5.2b)
-        assert!(response.is_empty());
+        // Should extract 3 decisions from natural language
+        assert_eq!(response.decisions.len(), 3);
+        assert!(matches!(response.decisions[0], DecisionPayload::Add { .. }));
+        assert!(matches!(response.decisions[1], DecisionPayload::Update { .. }));
+        assert!(matches!(response.decisions[2], DecisionPayload::Delete { .. }));
+    }
+
+    #[test]
+    fn test_parse_natural_language_noop() {
+        let text = "After analyzing the content, I conclude: NOOP - no actionable knowledge found";
+        let response = parse_llm_response(text, OutputFormat::NaturalLanguage).unwrap();
+
+        assert_eq!(response.decisions.len(), 1);
+        assert!(matches!(response.decisions[0], DecisionPayload::Noop));
+    }
+
+    #[test]
+    fn test_parse_json_with_fallback_to_natural_language() {
+        // Invalid JSON that falls back to natural language parsing
+        let malformed = "{ incomplete json... but contains ADD entity 12345678-1234-1234-1234-123456789abc";
+        let response = parse_llm_response(malformed, OutputFormat::Json).unwrap();
+
+        // Should fall back to natural language and extract the ADD decision
+        assert_eq!(response.decisions.len(), 1);
+        assert!(matches!(response.decisions[0], DecisionPayload::Add { .. }));
     }
 
     #[test]

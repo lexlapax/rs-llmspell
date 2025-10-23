@@ -216,22 +216,42 @@ impl LLMConsolidationEngine {
             .call_llm_with_retry(&system_prompt, &user_prompt)
             .await?;
 
-        // Step 4: Parse response (TODO: Task 13.5.2b)
-        debug!("LLM response: {}", llm_response);
+        // Step 4: Parse response with error recovery (JSON with fallback to natural language)
+        let consolidation_response = super::prompts::parse_llm_response(
+            &llm_response,
+            super::OutputFormat::Json, // JSON mode automatically falls back to natural language on parse failure
+        )?;
+
+        debug!(
+            "Parsed {} decisions from LLM response",
+            consolidation_response.decisions.len()
+        );
 
         // Step 5: Validate decisions (TODO: Task 13.5.2c)
 
         // Step 6: Execute decisions (TODO: Task 13.5.2d)
 
-        // Placeholder: return empty result for now
-        Ok(ConsolidationResult {
+        // Placeholder: return metrics based on parsed decisions
+        let mut result = ConsolidationResult {
             entries_processed: 1,
             entities_added: 0,
             entities_updated: 0,
             entities_deleted: 0,
             entries_skipped: 0,
             duration_ms: 0,
-        })
+        };
+
+        // Count decisions for metrics (will be replaced with actual execution in 13.5.2d)
+        for decision in &consolidation_response.decisions {
+            match decision {
+                super::DecisionPayload::Add { .. } => result.entities_added += 1,
+                super::DecisionPayload::Update { .. } => result.entities_updated += 1,
+                super::DecisionPayload::Delete { .. } => result.entities_deleted += 1,
+                super::DecisionPayload::Noop => result.entries_skipped += 1,
+            }
+        }
+
+        Ok(result)
     }
 
     /// Call LLM with retry logic

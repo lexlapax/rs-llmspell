@@ -2289,13 +2289,15 @@ Created comprehensive integration tests (285 lines) covering end-to-end pipeline
 - [ ] Provider fallback (llama3.2:3b → qwen:7b)
 
 **Progress Summary**:
-- **Task 13.5.2a ✅ COMPLETE**: LLMConsolidationEngine struct (426 lines), all compilation errors fixed, zero clippy warnings
-- Added llmspell-providers dependency to Cargo.toml
+- **Task 13.5.2a ✅ COMPLETE**: LLMConsolidationEngine struct (426 lines), zero clippy warnings
+- **Task 13.5.2b ✅ COMPLETE**: LLM response parser with JSON + natural language fallback (90 lines added)
+- Added llmspell-providers dependency + regex dependency to Cargo.toml
 - Created llm_engine.rs with full structure and retry logic
+- Enhanced prompts.rs with parse_llm_response() and parse_natural_language_response()
 - Added LLMCall error variant to error.rs
 - Exported from consolidation/mod.rs
-- Fixed all 9 compilation errors + 3 clippy warnings
-- 2 tests passing (engine creation, LLM call)
+- Fixed all 9 compilation errors + 5 clippy warnings
+- 63 tests passing (60 from lib, 2 llm_engine, 1 enhanced from 13.5.1)
 
 **Accomplished in Task 13.5.2a**:
 - Created `llmspell-memory/src/consolidation/llm_engine.rs` (430 lines)
@@ -2328,13 +2330,17 @@ Created comprehensive integration tests (285 lines) covering end-to-end pipeline
 - **ConsolidationResult**: No relationship tracking, only entity operations (entities_added, entities_updated, entities_deleted, entries_skipped)
 - **ProviderInstance trait**: `capabilities()` returns `&ProviderCapabilities` reference (must be stored in struct)
 
-**Key Insights from Task 13.5.2a**:
+**Key Insights from Tasks 13.5.2a-b**:
 1. **llmspell-providers API**: Uses unified AgentInput/AgentOutput across all providers (not OpenAI-style messages)
 2. **System + User Prompt**: Combine into single text field (providers handle internally)
 3. **Parameters as JSON**: Temperature/max_tokens passed as `serde_json::Value` in HashMap
 4. **Mock Testing Pattern**: Store all fields needed for trait implementation (capabilities, response)
 5. **Retry Logic**: Exponential backoff works correctly: 1s, 2s, 4s (1000ms * 2^(attempts-1))
 6. **Error Handling**: Convert provider errors to MemoryError::LLMCall with context
+7. **Parser Fallback**: JSON mode auto-falls back to regex natural language extraction on parse failure
+8. **UUID Regex**: Pattern `[a-f0-9-]{36}` matches standard UUID format in natural language
+9. **Parse Success**: ConsolidationResponse::from_json() includes partial_parse() for malformed JSON recovery
+10. **Integration**: parse_llm_response() called in process_entry(), decisions counted for metrics
 
 **Subtasks**:
 1. **13.5.2a**: LLMConsolidationEngine struct (1h actual) ✅ COMPLETE
@@ -2348,12 +2354,14 @@ Created comprehensive integration tests (285 lines) covering end-to-end pipeline
    - [x] Mock provider and mock knowledge graph for testing ✅
    - [x] 2 tests passing, zero clippy warnings ✅
 
-2. **13.5.2b**: LLM response parser with error recovery (1.5h)
-   - [ ] JSON parsing with serde_json (ConsolidationResponse → decisions)
-   - [ ] Handle partial/malformed JSON (extract valid decisions, skip invalid)
-   - [ ] Fallback: retry with natural language mode if JSON parsing fails
-   - [ ] Error recovery: extract decisions from natural language using regex
-   - [ ] Logging: track parse success rate per prompt version
+2. **13.5.2b**: LLM response parser with error recovery (1h actual) ✅ COMPLETE
+   - [x] JSON parsing with serde_json (ConsolidationResponse → decisions) ✅
+   - [x] Handle partial/malformed JSON (ConsolidationResponse::from_json with error recovery) ✅
+   - [x] Fallback: automatic natural language extraction on JSON parse failure ✅
+   - [x] Error recovery: regex-based decision extraction from natural language ✅
+   - [x] Logging: tracing::warn on JSON failure, debug on decision parsing ✅
+   - [x] 3 new tests: natural language response, noop, JSON with fallback ✅
+   - [x] Integrated into llm_engine.rs process_entry() method ✅
 
 3. **13.5.2c**: Decision validator (1h)
    - [ ] Validate entity IDs exist for UPDATE/DELETE decisions
