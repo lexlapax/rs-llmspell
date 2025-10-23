@@ -29,7 +29,7 @@ fn test_trait_types_compile() {
         entity_type: "person".into(),
         name: "Test Person".into(),
         properties: json!({"key": "value"}),
-        event_time: Utc::now(),
+        event_time: Some(Utc::now()),
         ingestion_time: Utc::now(),
     };
     assert_eq!(entity.id, "test-123");
@@ -42,7 +42,7 @@ fn test_trait_types_compile() {
         to_entity: "company-1".into(),
         relationship_type: "works_at".into(),
         properties: json!({}),
-        event_time: Utc::now(),
+        event_time: Some(Utc::now()),
         ingestion_time: Utc::now(),
     };
     assert_eq!(relationship.from_entity, "person-1");
@@ -110,7 +110,7 @@ fn test_entity_serialization() {
         entity_type: "person".into(),
         name: "Test Person".into(),
         properties: json!({"role": "engineer"}),
-        event_time: Utc::now(),
+        event_time: Some(Utc::now()),
         ingestion_time: Utc::now(),
     };
 
@@ -134,7 +134,7 @@ fn test_relationship_serialization() {
         to_entity: "company-1".into(),
         relationship_type: "works_at".into(),
         properties: json!({"since": "2024"}),
-        event_time: Utc::now(),
+        event_time: Some(Utc::now()),
         ingestion_time: Utc::now(),
     };
 

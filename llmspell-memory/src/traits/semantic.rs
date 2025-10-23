@@ -17,131 +17,36 @@
 //!                 (when we learned)
 //! ```
 //!
-//! # Implementation Status
+//! # Types
 //!
-//! This trait is a **placeholder** for Phase 13.2 (Graph Layer Foundation).
-//! The full implementation will use `SurrealDB` or `Neo4j` for graph storage.
+//! Entity and Relationship types are re-exported from `llmspell-graph` to avoid
+//! duplication and ensure consistency across the memory system.
 
 use async_trait::async_trait;
 use chrono::{DateTime, Utc};
-use serde::{Deserialize, Serialize};
-use serde_json::Value;
 
 use crate::error::Result;
 
-/// Entity in the knowledge graph
-///
-/// Represents a real-world entity (person, place, concept, etc.)
-/// with bi-temporal tracking.
-///
-/// # Example
-///
-/// ```rust,ignore
-/// use llmspell_memory::traits::Entity;
-/// use serde_json::json;
-/// use chrono::Utc;
-///
-/// let entity = Entity {
-///     id: "person-123".into(),
-///     entity_type: "person".into(),
-///     name: "Alice".into(),
-///     properties: json!({
-///         "role": "software engineer",
-///         "company": "Acme Corp"
-///     }),
-///     event_time: Utc::now(),
-///     ingestion_time: Utc::now(),
-/// };
-/// ```
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct Entity {
-    /// Unique entity identifier
-    pub id: String,
-
-    /// Entity type (person, place, concept, etc.)
-    pub entity_type: String,
-
-    /// Primary name/label for the entity
-    pub name: String,
-
-    /// Additional properties as JSON
-    pub properties: Value,
-
-    /// When this fact was true in the real world
-    pub event_time: DateTime<Utc>,
-
-    /// When we learned about this fact
-    pub ingestion_time: DateTime<Utc>,
-}
-
-/// Relationship between entities in the knowledge graph
-///
-/// Represents a directed edge between two entities with bi-temporal tracking.
-///
-/// # Example
-///
-/// ```rust,ignore
-/// use llmspell_memory::traits::Relationship;
-/// use serde_json::json;
-/// use chrono::Utc;
-///
-/// let relationship = Relationship {
-///     id: "rel-456".into(),
-///     from_entity: "person-123".into(),
-///     to_entity: "company-789".into(),
-///     relationship_type: "works_at".into(),
-///     properties: json!({
-///         "start_date": "2023-01-01",
-///         "position": "engineer"
-///     }),
-///     event_time: Utc::now(),
-///     ingestion_time: Utc::now(),
-/// };
-/// ```
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct Relationship {
-    /// Unique relationship identifier
-    pub id: String,
-
-    /// Source entity ID
-    pub from_entity: String,
-
-    /// Target entity ID
-    pub to_entity: String,
-
-    /// Relationship type (`works_at`, knows, `located_in`, etc.)
-    pub relationship_type: String,
-
-    /// Additional properties as JSON
-    pub properties: Value,
-
-    /// When this relationship was true in the real world
-    pub event_time: DateTime<Utc>,
-
-    /// When we learned about this relationship
-    pub ingestion_time: DateTime<Utc>,
-}
+// Re-export graph types as canonical types for semantic memory
+pub use llmspell_graph::types::{Entity, Relationship};
 
 /// Semantic memory stores bi-temporal knowledge graph
 ///
-/// **Status**: Placeholder for Phase 13.2 implementation.
+/// Implemented by `GraphSemanticMemory` which wraps `llmspell-graph::KnowledgeGraph`.
 ///
-/// # Example (Future)
+/// # Example
 ///
 /// ```rust,ignore
 /// use llmspell_memory::prelude::*;
 ///
-/// let semantic = SurrealDBSemanticMemory::new(config).await?;
+/// let semantic = GraphSemanticMemory::new(graph_backend);
 ///
 /// // Add an entity
-/// semantic.upsert_entity(Entity {
-///     id: "person-123".into(),
-///     entity_type: "person".into(),
-///     name: "Alice".into(),
-///     properties: json!({"role": "engineer"}),
-///     event_time: Utc::now(),
-///     ingestion_time: Utc::now(),
-/// }).await?;
+/// semantic.upsert_entity(Entity::new(
+///     "Alice".into(),
+///     "person".into(),
+///     json!({"role": "engineer"}),
+/// )).await?;
 ///
 /// // Query at a specific time
 /// let entity = semantic.get_entity_at("person-123", past_time).await?;

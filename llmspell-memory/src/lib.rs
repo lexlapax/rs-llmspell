@@ -56,6 +56,8 @@ pub mod types;
 // Re-exports for convenience
 pub use episodic::InMemoryEpisodicMemory;
 pub use error::{MemoryError, Result};
+pub use manager::DefaultMemoryManager;
+pub use semantic::GraphSemanticMemory;
 pub use traits::{
     ConsolidationDecision, Entity, EpisodicMemory, MemoryManager, ProceduralMemory, Relationship,
     SemanticMemory,
