@@ -40,7 +40,10 @@ pub use context_assembly::ContextAssembler;
 pub use daemon::{ConsolidationDaemon, DaemonConfig, DaemonMetrics};
 pub use llm_engine::{LLMConsolidationConfig, LLMConsolidationEngine};
 pub use manual::ManualConsolidationEngine;
-pub use metrics::{ConsolidationMetrics, CoreMetrics, DecisionDistribution, DecisionType, LatencyStats};
+pub use metrics::{
+    AutoPromotionConfig, ConsolidationMetrics, CoreMetrics, DecisionDistribution, DecisionType,
+    LatencyStats, PromptMetrics, VersionSelectionStrategy,
+};
 pub use noop::NoopConsolidationEngine;
 pub use prompt_schema::{
     ConsolidationResponse, DecisionPayload, EntityPayload, OutputFormat, RelationshipPayload,

@@ -21,9 +21,10 @@
 //! println!("DMR: {:.2}%", snapshot.dmr.unwrap_or(0.0) * 100.0);
 //! ```
 
-use crate::consolidation::DecisionPayload;
+use crate::consolidation::{DecisionPayload, PromptVersion};
 use crate::types::ConsolidationResult;
 use serde::{Deserialize, Serialize};
+use std::collections::HashMap;
 use std::sync::Arc;
 use std::time::Duration;
 use tokio::sync::RwLock;
@@ -153,6 +154,73 @@ impl LatencyStats {
     }
 }
 
+/// Prompt version selection strategy for A/B testing
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+pub enum VersionSelectionStrategy {
+    /// Always use specified version (no A/B testing)
+    Fixed(PromptVersion),
+    /// Random selection per consolidation (50/50 V1/V2)
+    RandomPerConsolidation,
+    /// Random selection per session (sticky within session)
+    RandomPerSession,
+}
+
+impl Default for VersionSelectionStrategy {
+    fn default() -> Self {
+        Self::Fixed(PromptVersion::V1)
+    }
+}
+
+/// Per-version prompt performance metrics
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
+pub struct PromptMetrics {
+    /// Total consolidations with this version
+    pub consolidations: u64,
+    /// Successful parses (JSON parsed correctly)
+    pub parse_successes: u64,
+    /// Parse failures (fell back to natural language)
+    pub parse_failures: u64,
+    /// Decision distribution for this version
+    pub decision_distribution: DecisionDistribution,
+    /// Average DMR (if ground truth available)
+    pub avg_dmr: Option<f64>,
+}
+
+impl PromptMetrics {
+    /// Calculate parse success rate (0.0 to 1.0)
+    #[must_use]
+    #[allow(clippy::cast_precision_loss)]
+    pub fn parse_success_rate(&self) -> f64 {
+        let total = self.consolidations;
+        if total == 0 {
+            0.0
+        } else {
+            self.parse_successes as f64 / total as f64
+        }
+    }
+}
+
+/// Auto-promotion configuration for prompt versions
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct AutoPromotionConfig {
+    /// Minimum sample size before considering promotion
+    pub min_sample_size: u64,
+    /// Required parse success rate improvement (e.g., 0.05 = 5% improvement)
+    pub min_parse_improvement: f64,
+    /// Enable automatic promotion (vs recommendation only)
+    pub enabled: bool,
+}
+
+impl Default for AutoPromotionConfig {
+    fn default() -> Self {
+        Self {
+            min_sample_size: 100,
+            min_parse_improvement: 0.05,
+            enabled: false, // Disabled by default, require manual confirmation
+        }
+    }
+}
+
 /// Core consolidation metrics
 ///
 /// Tracks entries processed, decision distribution, and latency statistics.
@@ -170,6 +238,8 @@ pub struct CoreMetrics {
     pub parse_failures: u64,
     /// Number of validation errors
     pub validation_errors: u64,
+    /// Per-version prompt metrics
+    pub prompt_metrics: HashMap<PromptVersion, PromptMetrics>,
 }
 
 /// Consolidation metrics collector
@@ -178,6 +248,10 @@ pub struct CoreMetrics {
 pub struct ConsolidationMetrics {
     core: Arc<RwLock<CoreMetrics>>,
     latencies: Arc<RwLock<Vec<f64>>>, // For percentile calculation
+    version_strategy: Arc<RwLock<VersionSelectionStrategy>>,
+    auto_promotion: Arc<RwLock<AutoPromotionConfig>>,
+    #[allow(clippy::zero_sized_map_values)] // PromptVersion zero-sized until V2 added
+    session_versions: Arc<RwLock<HashMap<String, PromptVersion>>>, // session_id -> version
 }
 
 impl Default for ConsolidationMetrics {
@@ -189,10 +263,51 @@ impl Default for ConsolidationMetrics {
 impl ConsolidationMetrics {
     /// Create new metrics collector
     #[must_use]
+    #[allow(clippy::zero_sized_map_values)] // PromptVersion zero-sized until V2 added
     pub fn new() -> Self {
         Self {
             core: Arc::new(RwLock::new(CoreMetrics::default())),
             latencies: Arc::new(RwLock::new(Vec::new())),
+            version_strategy: Arc::new(RwLock::new(VersionSelectionStrategy::default())),
+            auto_promotion: Arc::new(RwLock::new(AutoPromotionConfig::default())),
+            session_versions: Arc::new(RwLock::new(HashMap::new())),
+        }
+    }
+
+    /// Set version selection strategy
+    pub async fn set_version_strategy(&self, strategy: VersionSelectionStrategy) {
+        *self.version_strategy.write().await = strategy;
+    }
+
+    /// Set auto-promotion configuration
+    pub async fn set_auto_promotion(&self, config: AutoPromotionConfig) {
+        *self.auto_promotion.write().await = config;
+    }
+
+    /// Select prompt version for consolidation
+    ///
+    /// Uses configured strategy (Fixed/RandomPerConsolidation/RandomPerSession).
+    pub async fn select_version(&self, session_id: &str) -> PromptVersion {
+        let strategy = *self.version_strategy.read().await;
+
+        match strategy {
+            VersionSelectionStrategy::Fixed(version) => version,
+            VersionSelectionStrategy::RandomPerConsolidation => {
+                // Random 50/50 split (currently only V1 exists)
+                // TODO: When V2 is added, implement: if rand() < 0.5 { V1 } else { V2 }
+                PromptVersion::V1
+            }
+            VersionSelectionStrategy::RandomPerSession => {
+                // Get or create session-sticky version
+                let mut session_versions = self.session_versions.write().await;
+                *session_versions
+                    .entry(session_id.to_string())
+                    .or_insert_with(|| {
+                        // Random selection on first use
+                        // TODO: When V2 is added, implement random selection
+                        PromptVersion::V1
+                    })
+            }
         }
     }
 
@@ -203,11 +318,14 @@ impl ConsolidationMetrics {
     /// # Panics
     ///
     /// Panics if latency values contain NaN (not expected in normal operation).
+    #[allow(clippy::significant_drop_tightening)] // Intentional lock scope for atomicity
     pub async fn record_consolidation(
         &self,
         result: &ConsolidationResult,
         decisions: &[DecisionPayload],
         duration: Duration,
+        version: PromptVersion,
+        parse_success: bool,
     ) {
         let duration_ms = duration.as_secs_f64() * 1000.0;
 
@@ -219,13 +337,33 @@ impl ConsolidationMetrics {
             core.entries_processed += result.entries_processed as u64;
             core.consolidations += 1;
 
-            // Update decision distribution
+            // Update global decision distribution
             for decision in decisions {
                 match DecisionType::from(decision) {
                     DecisionType::Add => core.decision_distribution.add_count += 1,
                     DecisionType::Update => core.decision_distribution.update_count += 1,
                     DecisionType::Delete => core.decision_distribution.delete_count += 1,
                     DecisionType::Noop => core.decision_distribution.noop_count += 1,
+                }
+            }
+
+            // Update per-version metrics
+            let version_metrics = core.prompt_metrics.entry(version).or_default();
+            version_metrics.consolidations += 1;
+
+            if parse_success {
+                version_metrics.parse_successes += 1;
+            } else {
+                version_metrics.parse_failures += 1;
+            }
+
+            // Update per-version decision distribution
+            for decision in decisions {
+                match DecisionType::from(decision) {
+                    DecisionType::Add => version_metrics.decision_distribution.add_count += 1,
+                    DecisionType::Update => version_metrics.decision_distribution.update_count += 1,
+                    DecisionType::Delete => version_metrics.decision_distribution.delete_count += 1,
+                    DecisionType::Noop => version_metrics.decision_distribution.noop_count += 1,
                 }
             }
 
@@ -278,6 +416,53 @@ impl ConsolidationMetrics {
     pub async fn reset(&self) {
         *self.core.write().await = CoreMetrics::default();
         self.latencies.write().await.clear();
+        self.session_versions.write().await.clear();
+    }
+
+    /// Check if auto-promotion should occur
+    ///
+    /// Compares performance of available versions and returns promotion recommendation.
+    /// Returns `Some(version)` if promotion criteria met, `None` otherwise.
+    #[allow(clippy::significant_drop_tightening)] // Read locks held for full comparison
+    pub async fn check_auto_promotion(&self) -> Option<PromptVersion> {
+        let core = self.core.read().await;
+        let config = self.auto_promotion.read().await;
+
+        // Need at least 2 versions to compare
+        if core.prompt_metrics.len() < 2 {
+            return None;
+        }
+
+        // Find baseline version (currently V1)
+        let baseline = core.prompt_metrics.get(&PromptVersion::V1)?;
+
+        // Check each candidate version
+        for (version, metrics) in &core.prompt_metrics {
+            if *version == PromptVersion::V1 {
+                continue; // Skip baseline
+            }
+
+            // Check sample size
+            if metrics.consolidations < config.min_sample_size {
+                continue;
+            }
+
+            // Check parse success rate improvement
+            let baseline_rate = baseline.parse_success_rate();
+            let candidate_rate = metrics.parse_success_rate();
+            let improvement = candidate_rate - baseline_rate;
+
+            if improvement >= config.min_parse_improvement {
+                return Some(*version);
+            }
+        }
+
+        None
+    }
+
+    /// Get prompt metrics for specific version
+    pub async fn get_prompt_metrics(&self, version: PromptVersion) -> Option<PromptMetrics> {
+        self.core.read().await.prompt_metrics.get(&version).cloned()
     }
 }
 
@@ -415,7 +600,13 @@ mod tests {
         ];
 
         metrics
-            .record_consolidation(&result, &decisions, Duration::from_millis(100))
+            .record_consolidation(
+                &result,
+                &decisions,
+                Duration::from_millis(100),
+                PromptVersion::V1,
+                true,
+            )
             .await;
 
         let snapshot = metrics.snapshot().await;
@@ -426,6 +617,13 @@ mod tests {
         assert_eq!(snapshot.decision_distribution.delete_count, 1);
         assert_eq!(snapshot.decision_distribution.noop_count, 1);
         assert!(snapshot.latency.avg_ms() > 0.0);
+
+        // Check per-version metrics
+        let v1_metrics = snapshot.prompt_metrics.get(&PromptVersion::V1).unwrap();
+        assert_eq!(v1_metrics.consolidations, 1);
+        assert_eq!(v1_metrics.parse_successes, 1);
+        assert_eq!(v1_metrics.parse_failures, 0);
+        assert!((v1_metrics.parse_success_rate() - 1.0).abs() < 0.01);
     }
 
     #[tokio::test]
@@ -465,7 +663,13 @@ mod tests {
         };
 
         metrics
-            .record_consolidation(&result, &[], Duration::from_millis(50))
+            .record_consolidation(
+                &result,
+                &[],
+                Duration::from_millis(50),
+                PromptVersion::V1,
+                true,
+            )
             .await;
 
         metrics.reset().await;
@@ -473,5 +677,103 @@ mod tests {
         let snapshot = metrics.snapshot().await;
         assert_eq!(snapshot.entries_processed, 0);
         assert_eq!(snapshot.consolidations, 0);
+        assert!(snapshot.prompt_metrics.is_empty());
+    }
+
+    #[tokio::test]
+    async fn test_prompt_metrics_per_version() {
+        let metrics = ConsolidationMetrics::new();
+
+        let result = ConsolidationResult {
+            entries_processed: 5,
+            entities_added: 2,
+            entities_updated: 1,
+            entities_deleted: 0,
+            entries_skipped: 2,
+            duration_ms: 50,
+        };
+
+        // Record successful parse
+        metrics
+            .record_consolidation(
+                &result,
+                &[],
+                Duration::from_millis(50),
+                PromptVersion::V1,
+                true,
+            )
+            .await;
+
+        // Record failed parse
+        metrics
+            .record_consolidation(
+                &result,
+                &[],
+                Duration::from_millis(60),
+                PromptVersion::V1,
+                false,
+            )
+            .await;
+
+        let v1_metrics = metrics.get_prompt_metrics(PromptVersion::V1).await.unwrap();
+        assert_eq!(v1_metrics.consolidations, 2);
+        assert_eq!(v1_metrics.parse_successes, 1);
+        assert_eq!(v1_metrics.parse_failures, 1);
+        assert!((v1_metrics.parse_success_rate() - 0.5).abs() < 0.01);
+    }
+
+    #[tokio::test]
+    async fn test_version_selection_fixed() {
+        let metrics = ConsolidationMetrics::new();
+        metrics
+            .set_version_strategy(VersionSelectionStrategy::Fixed(PromptVersion::V1))
+            .await;
+
+        let version = metrics.select_version("session-1").await;
+        assert_eq!(version, PromptVersion::V1);
+    }
+
+    #[tokio::test]
+    async fn test_version_selection_random_per_consolidation() {
+        let metrics = ConsolidationMetrics::new();
+        metrics
+            .set_version_strategy(VersionSelectionStrategy::RandomPerConsolidation)
+            .await;
+
+        // Currently only V1 exists, so should always return V1
+        let version = metrics.select_version("session-1").await;
+        assert_eq!(version, PromptVersion::V1);
+    }
+
+    #[tokio::test]
+    async fn test_version_selection_random_per_session() {
+        let metrics = ConsolidationMetrics::new();
+        metrics
+            .set_version_strategy(VersionSelectionStrategy::RandomPerSession)
+            .await;
+
+        // Same session should get same version
+        let version1 = metrics.select_version("session-1").await;
+        let version2 = metrics.select_version("session-1").await;
+        assert_eq!(version1, version2);
+
+        // Currently only V1 exists
+        assert_eq!(version1, PromptVersion::V1);
+    }
+
+    #[tokio::test]
+    async fn test_auto_promotion_not_enough_samples() {
+        let metrics = ConsolidationMetrics::new();
+
+        let config = AutoPromotionConfig {
+            min_sample_size: 100,
+            min_parse_improvement: 0.05,
+            enabled: true,
+        };
+        metrics.set_auto_promotion(config).await;
+
+        // No promotion with only one version
+        let promotion = metrics.check_auto_promotion().await;
+        assert!(promotion.is_none());
     }
 }
