@@ -30,6 +30,7 @@ pub mod context_assembly;
 pub mod daemon;
 pub mod llm_engine;
 pub mod manual;
+pub mod metrics;
 pub mod noop;
 pub mod prompt_schema;
 pub mod prompts;
@@ -39,6 +40,7 @@ pub use context_assembly::ContextAssembler;
 pub use daemon::{ConsolidationDaemon, DaemonConfig, DaemonMetrics};
 pub use llm_engine::{LLMConsolidationConfig, LLMConsolidationEngine};
 pub use manual::ManualConsolidationEngine;
+pub use metrics::{ConsolidationMetrics, CoreMetrics, DecisionDistribution, DecisionType, LatencyStats};
 pub use noop::NoopConsolidationEngine;
 pub use prompt_schema::{
     ConsolidationResponse, DecisionPayload, EntityPayload, OutputFormat, RelationshipPayload,
