@@ -1671,18 +1671,20 @@ Tests already created in `llmspell-memory/tests/consolidation_test.rs` (259 line
 | **Location** | llmspell-context/query | llmspell-graph/extraction |
 | **Evolution** | → LLMQueryAnalyzer | → unchanged |
 
-### Task 13.4.3: Implement Retrieval Strategy Selection
+### Task 13.4.3: Implement Retrieval Strategy Selection ✅
 **Priority**: HIGH
 **Estimated Time**: 3 hours
+**Actual Time**: 1.5 hours
 **Assignee**: Retrieval Team
+**Status**: ✅ COMPLETE
 
 **Description**: Implement retrieval strategy selection based on query understanding.
 
 **Acceptance Criteria**:
-- [ ] Strategy selection (episodic vs semantic vs hybrid)
-- [ ] Query-based routing working
-- [ ] Configurable fallback strategies
-- [ ] Tests pass
+- [x] Strategy selection (episodic vs semantic vs hybrid)
+- [x] Query-based routing working
+- [x] Configurable fallback strategies
+- [x] Tests pass
 
 **Implementation Steps**:
 1. Create `src/retrieval/strategy.rs`:
@@ -1717,10 +1719,43 @@ Tests already created in `llmspell-memory/tests/consolidation_test.rs` (259 line
 - `llmspell-context/tests/strategy_test.rs` (NEW - 150 lines)
 
 **Definition of Done**:
-- [ ] Strategy selection working
-- [ ] Rules tested
-- [ ] Fallback chain functional
-- [ ] Tests pass
+- [x] Strategy selection working
+- [x] Rules tested
+- [x] Fallback chain functional
+- [x] Tests pass
+
+**Completion Notes**:
+- ✅ Created `StrategySelector` with 7 rule-based routing strategies (280 lines including tests)
+- ✅ Implemented primary strategy selection via `select()` method
+- ✅ Implemented fallback chain via `select_with_fallback()` method
+- ✅ 14 test functions covering all selection rules and fallback chains
+- ✅ 37 tests passing, 0 failures, 0 warnings
+- ✅ Configurable via `with_config()` for hybrid enable/disable and semantic threshold tuning
+
+**Key Insights**:
+- **Rule-Based Architecture**: 7 selection rules in priority order (HowTo→Episodic, WhatIs+entities→Semantic, Debug→Hybrid, etc.)
+- **Intent-First Strategy**: Early rules check intent, later rules check entity count or keyword count
+- **Rule 6 Fix**: Simple queries (<2 keywords) route to Episodic ONLY for Unknown intent, preventing override of classified intents
+- **Fallback Chains**: Each strategy has 1-2 fallbacks (Hybrid→[Episodic,BM25], Semantic→[BM25], etc.)
+- **Configuration Flexibility**: `enable_hybrid` flag and `semantic_entity_threshold` allow tuning
+- **Test Discipline**: Fixed 2 test failures by adding intent check to Rule 6 (hybrid_disabled, semantic_threshold tests)
+
+**Selection Rules** (in order):
+1. **HowTo intent** → Episodic (recent interaction examples)
+2. **WhatIs/Explain intent + 2+ entities** → Semantic (knowledge graph)
+3. **Debug intent** → Hybrid (recent errors + known solutions)
+4. **WhyDoes intent + entities** → Hybrid (concepts + history)
+5. **Complex queries (3+ entities)** → Hybrid
+6. **Simple queries (<2 keywords, Unknown intent)** → Episodic
+7. **Default fallback** → BM25
+
+**Files Created** (1 file, 280 lines):
+- `llmspell-context/src/retrieval/strategy.rs` (280 lines - 130 impl + 150 tests)
+
+**Impact on Next Tasks**:
+- Task 13.4.4 (DeBERTa) benefits from unified `Reranker` trait abstraction
+- Task 13.4.7 (Context Assembly) can use `StrategySelector` to choose retrieval approach
+- Future Phase 13.5: Easy swap to ML-based strategy selection via `StrategySelector` trait
 
 ### Task 13.4.4: Implement DeBERTa Reranking with Auto-Download
 **Priority**: CRITICAL

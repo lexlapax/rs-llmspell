@@ -1,5 +1,15 @@
 //! Reranking algorithms for relevance scoring
 //!
-//! Provides DeBERTa cross-encoder (Candle) and BM25 fallback reranking.
+//! Provides pluggable reranking via the `Reranker` trait.
+//! Current implementations:
+//! - `DeBERTaReranker`: Neural cross-encoder (Candle, ~30ms)
+//! - `BM25Reranker`: Lexical keyword matching (fast, <5ms)
+//!
+//! Future implementations can be added by implementing the `Reranker` trait:
+//! - ColBERT late interaction
+//! - T5 sequence-to-sequence
+//! - LLM-based scoring (Ollama/OpenAI)
 
-// Modules will be implemented in Tasks 13.4.4 and 13.4.5
+pub mod deberta;
+
+pub use deberta::DeBERTaReranker;
