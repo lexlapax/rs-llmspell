@@ -2385,13 +2385,17 @@ Created comprehensive integration tests (285 lines) covering end-to-end pipeline
    - [x] DELETE: Tombstone approach (_deleted + _deleted_at metadata) ✅
    - [x] Zero clippy warnings ✅
 
-5. **13.5.2e**: Retry logic for LLM failures ✅ ALREADY COMPLETE
-   - [x] Exponential backoff (1s, 2s, 4s) implemented in call_llm_with_retry (Task 13.5.2a) ✅
-   - [x] Configurable max_retries (default 3) ✅
-   - [x] Graceful error handling with tracing::warn ✅
-   - [ ] Provider fallback (ollama/llama3.2:3b → qwen:7b) - DEFERRED to Phase 13.6
-   - [ ] Circuit breaker - DEFERRED to Phase 13.6
-   - [ ] Health check before retries - DEFERRED to Phase 13.6
+5. **13.5.2e**: Retry logic for LLM failures (1h actual) ✅ COMPLETE
+   - [x] Exponential backoff (1s, 2s, 4s) for each model attempt ✅
+   - [x] Configurable max_retries (default 3 per model) ✅
+   - [x] Provider fallback (ollama/llama3.2:3b → qwen:7b chain) ✅
+   - [x] Circuit breaker (threshold: 5 consecutive failures, fail-fast when open) ✅
+   - [x] Health check before retries (provider.validate() before each retry) ✅
+   - [x] AtomicU32 for thread-safe failure tracking ✅
+   - [x] Graceful error handling with comprehensive logging ✅
+   - [x] Model parameter passed in AgentInput for runtime model switching ✅
+   - [x] Reset circuit breaker on successful call ✅
+   - [x] Increment circuit breaker only after all models exhausted ✅
 
 **Implementation Steps**:
 1. Create `llmspell-memory/src/consolidation/llm_engine.rs`

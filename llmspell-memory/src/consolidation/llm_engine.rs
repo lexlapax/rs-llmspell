@@ -3,6 +3,7 @@
 //! Implements LLM-based entity extraction and consolidation decisions.
 //! Uses LLM providers to make ADD/UPDATE/DELETE/NOOP decisions on episodic content.
 
+use std::sync::atomic::{AtomicU32, Ordering};
 use std::sync::Arc;
 use std::time::{Duration, Instant};
 
@@ -27,14 +28,18 @@ use super::ConsolidationEngine;
 pub struct LLMConsolidationConfig {
     /// LLM model to use (e.g., "ollama/llama3.2:3b")
     pub model: String,
+    /// Fallback models to try if primary fails (e.g., `["ollama/qwen:7b", "ollama/mistral:7b"]`)
+    pub fallback_models: Vec<String>,
     /// Temperature for sampling (0.0 = deterministic)
     pub temperature: f32,
     /// Maximum tokens for completion
     pub max_tokens: usize,
     /// Request timeout in seconds
     pub timeout_secs: u64,
-    /// Maximum retry attempts on LLM failure
+    /// Maximum retry attempts on LLM failure per model
     pub max_retries: u32,
+    /// Circuit breaker threshold (consecutive failures before circuit opens)
+    pub circuit_breaker_threshold: u32,
     /// Prompt version to use
     pub version: PromptVersion,
 }
@@ -43,10 +48,12 @@ impl Default for LLMConsolidationConfig {
     fn default() -> Self {
         Self {
             model: "ollama/llama3.2:3b".to_string(),
+            fallback_models: vec!["ollama/qwen:7b".to_string()],
             temperature: 0.0,
             max_tokens: 2000,
             timeout_secs: 30,
             max_retries: 3,
+            circuit_breaker_threshold: 5,
             version: PromptVersion::default(),
         }
     }
@@ -70,6 +77,8 @@ pub struct LLMConsolidationEngine {
     prompt_builder: ConsolidationPromptBuilder,
     /// Decision validator
     validator: DecisionValidator,
+    /// Circuit breaker: consecutive failure counter
+    consecutive_failures: AtomicU32,
     /// Configuration
     config: LLMConsolidationConfig,
 }
@@ -100,6 +109,7 @@ impl LLMConsolidationEngine {
             context_assembler,
             prompt_builder,
             validator,
+            consecutive_failures: AtomicU32::new(0),
             config,
         }
     }
@@ -268,46 +278,109 @@ impl LLMConsolidationEngine {
         Ok(result)
     }
 
-    /// Call LLM with retry logic
+    /// Call LLM with retry logic, circuit breaker, and provider fallback
     async fn call_llm_with_retry(&self, system_prompt: &str, user_prompt: &str) -> Result<String> {
-        let mut attempts = 0;
+        // Circuit breaker: check if we've had too many consecutive failures
+        let failures = self.consecutive_failures.load(Ordering::Relaxed);
+        if failures >= self.config.circuit_breaker_threshold {
+            warn!(
+                "Circuit breaker OPEN: {} consecutive failures (threshold: {})",
+                failures, self.config.circuit_breaker_threshold
+            );
+            return Err(MemoryError::LLMCall(format!(
+                "Circuit breaker open after {failures} consecutive failures"
+            )));
+        }
+
+        // Build model fallback chain: primary + fallbacks
+        let mut models = vec![self.config.model.clone()];
+        models.extend(self.config.fallback_models.clone());
+
         let mut last_error = None;
 
-        while attempts < self.config.max_retries {
-            attempts += 1;
+        // Try each model in fallback chain
+        for (model_idx, model) in models.iter().enumerate() {
+            if model_idx > 0 {
+                info!("Trying fallback model: {}", model);
+            }
 
-            debug!("LLM call attempt {}/{}", attempts, self.config.max_retries);
+            // Try current model with retries
+            let mut attempts = 0;
+            while attempts < self.config.max_retries {
+                attempts += 1;
 
-            match self.call_llm(system_prompt, user_prompt).await {
-                Ok(response) => return Ok(response),
-                Err(e) => {
-                    warn!("LLM call failed (attempt {}): {}", attempts, e);
-                    last_error = Some(e);
+                debug!(
+                    "LLM call attempt {}/{} (model: {})",
+                    attempts, self.config.max_retries, model
+                );
 
-                    if attempts < self.config.max_retries {
-                        // Exponential backoff: 1s, 2s, 4s
-                        let backoff_ms = 1000 * (1 << (attempts - 1));
-                        debug!("Retrying after {}ms backoff", backoff_ms);
-                        tokio::time::sleep(Duration::from_millis(backoff_ms)).await;
+                // Health check before retry (skip on first attempt)
+                if attempts > 1 {
+                    match self.provider.validate().await {
+                        Ok(()) => debug!("Provider health check passed"),
+                        Err(e) => {
+                            warn!("Provider unhealthy, skipping retry: {}", e);
+                            last_error = Some(MemoryError::LLMCall(format!(
+                                "Provider health check failed: {e}"
+                            )));
+                            break; // Skip remaining retries for this model
+                        }
+                    }
+                }
+
+                match self.call_llm(system_prompt, user_prompt, model).await {
+                    Ok(response) => {
+                        // Success! Reset circuit breaker
+                        self.consecutive_failures.store(0, Ordering::Relaxed);
+                        if model_idx > 0 {
+                            info!("Fallback model {} succeeded", model);
+                        }
+                        return Ok(response);
+                    }
+                    Err(e) => {
+                        warn!("LLM call failed (attempt {}/{}): {}", attempts, self.config.max_retries, e);
+                        last_error = Some(e);
+
+                        if attempts < self.config.max_retries {
+                            // Exponential backoff: 1s, 2s, 4s
+                            let backoff_ms = 1000 * (1 << (attempts - 1));
+                            debug!("Retrying after {}ms backoff", backoff_ms);
+                            tokio::time::sleep(Duration::from_millis(backoff_ms)).await;
+                        }
                     }
                 }
             }
+
+            // All retries for this model failed, try next model
+            warn!(
+                "All {} attempts failed for model {}, trying next model",
+                self.config.max_retries, model
+            );
         }
+
+        // All models exhausted - increment circuit breaker and fail
+        let new_failures = self.consecutive_failures.fetch_add(1, Ordering::Relaxed) + 1;
+        warn!(
+            "All models failed, circuit breaker counter: {}/{}",
+            new_failures, self.config.circuit_breaker_threshold
+        );
 
         Err(last_error.unwrap_or_else(|| {
             MemoryError::LLMCall(format!(
-                "LLM call failed after {} attempts",
+                "LLM call failed after trying {} models with {} retries each",
+                models.len(),
                 self.config.max_retries
             ))
         }))
     }
 
-    /// Call LLM provider
-    async fn call_llm(&self, system_prompt: &str, user_prompt: &str) -> Result<String> {
+    /// Call LLM provider with specified model
+    async fn call_llm(&self, system_prompt: &str, user_prompt: &str, model: &str) -> Result<String> {
         // Combine system and user prompts into single text field
         let combined_prompt = format!("{system_prompt}\n\n{user_prompt}");
 
         let input = AgentInput::text(combined_prompt)
+            .with_parameter("model", json!(model))
             .with_parameter("temperature", json!(self.config.temperature))
             .with_parameter("max_tokens", json!(self.config.max_tokens));
 
@@ -592,7 +665,7 @@ mod tests {
         let engine = LLMConsolidationEngine::with_defaults(provider, graph);
 
         let response = engine
-            .call_llm("system prompt", "user prompt")
+            .call_llm("system prompt", "user prompt", "ollama/llama3.2:3b")
             .await
             .unwrap();
 
