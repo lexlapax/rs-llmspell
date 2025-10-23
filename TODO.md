@@ -1535,64 +1535,92 @@ Tests already created in `llmspell-memory/tests/consolidation_test.rs` (259 line
 
 **Description**: Implement query understanding with intent classification and entity extraction.
 
+**Architectural Decision**:
+**Pattern Separation Strategy** (Option 1: Keep Separate Implementations)
+- **RegexQueryAnalyzer** (llmspell-context): Simple intent classification for real-time queries (<1ms, hot path)
+- **RegexExtractor** (llmspell-graph): Complex entity extraction for consolidation (<5ms, background daemon)
+- **Zero Pattern Overlap**: Query intent patterns (^how do i) ≠ domain entity patterns (fn|struct|impl)
+- **Independent Evolution**: QueryAnalyzer → LLMQueryAnalyzer (Phase 13.5), RegexExtractor → unchanged
+- **Rule of Three**: Extract to llmspell-utils ONLY when 3+ duplicate patterns proven (not speculative)
+- **Performance Justification**: Different hot paths require different optimization strategies
+- **Rationale**: Modularity (SRP), Scalability (trait-based), Maintainability (no coupling), Alignment (less code principle)
+
 **Acceptance Criteria**:
 - [ ] Intent classification (HowTo, WhatIs, Debug, etc.)
 - [ ] Entity extraction from queries
 - [ ] Keyword detection
 - [ ] >85% classification accuracy on test queries
+- [ ] <1ms P99 latency (hot path requirement)
 
 **Implementation Steps**:
-1. Create `src/query/understanding.rs`:
+1. Create `src/query/analyzer.rs` (renamed from understanding.rs):
    ```rust
-   pub struct QueryUnderstanding {
-       pub intent: QueryIntent,
-       pub entities: Vec<String>,
-       pub keywords: Vec<String>,
-   }
-
-   pub enum QueryIntent {
-       HowTo,
-       WhatIs,
-       WhyDoes,
-       Debug,
-       Explain,
-       Unknown,
-   }
-
-   pub struct QueryAnalyzer {
+   pub struct RegexQueryAnalyzer {
        intent_patterns: Vec<(Regex, QueryIntent)>,
-       entity_extractor: EntityExtractor,
    }
 
-   impl QueryAnalyzer {
-       pub fn understand(&self, query: &str) -> QueryUnderstanding { ... }
+   impl RegexQueryAnalyzer {
+       pub fn new() -> Self {
+           // Lazy static compiled regexes for <1ms performance
+           let patterns = vec![
+               (Regex::new(r"^(?i)how (?:do|can|to)").unwrap(), QueryIntent::HowTo),
+               (Regex::new(r"^(?i)what (?:is|are|does)").unwrap(), QueryIntent::WhatIs),
+               // ... other patterns
+           ];
+           Self { intent_patterns: patterns.into() }
+       }
+   }
+
+   #[async_trait]
+   impl QueryAnalyzer for RegexQueryAnalyzer {
+       async fn understand(&self, query: &str) -> Result<QueryUnderstanding> {
+           // Early-exit on first match for <1ms performance
+       }
    }
    ```
-2. Define intent patterns:
+   NOTE: QueryIntent and QueryUnderstanding types already defined in src/types.rs ✅
+   NOTE: QueryAnalyzer trait already defined in src/traits.rs ✅
+2. Define intent patterns (simple, fast, NOT domain-specific like RegexExtractor):
    - "How do I..." → HowTo
    - "What is..." → WhatIs
    - "Why does..." → WhyDoes
    - "Debug...", "Error..." → Debug
    - "Explain..." → Explain
 3. Extract entities (capitalized phrases, technical terms)
-   - Use simple regex patterns (simpler than RegexExtractor in llmspell-graph)
+   - Simple patterns ONLY: `[A-Z][a-z]+(?:[A-Z][a-z]+)*` (CamelCase), `[a-z_][a-z0-9_]*` (snake_case)
    - Focus on query-specific entities (class names, function names, error codes)
+   - NO complex domain patterns like RegexExtractor (fn|struct|impl|SELECT|etc)
 4. Extract keywords (important terms, filter stopwords)
    - Use `llmspell_utils::text::stopwords::is_stopword` from Task 13.4.0
    - Lowercase, tokenize, filter stopwords, extract meaningful terms
 5. Test on sample queries (20+ diverse queries)
 6. Measure accuracy (>85% intent classification, >90% entity recall)
+7. Benchmark performance (<1ms P99 latency)
 
 **Files to Create/Modify**:
-- `llmspell-context/src/query/understanding.rs` (NEW - 300 lines)
-- `llmspell-context/src/query/mod.rs` (NEW)
-- `llmspell-context/tests/query_test.rs` (NEW - 200 lines)
+- `llmspell-context/src/query/analyzer.rs` (NEW - 300 lines)
+- `llmspell-context/src/query/mod.rs` (UPDATE - export RegexQueryAnalyzer)
+- `llmspell-context/tests/query_analyzer_test.rs` (NEW - 200 lines)
 
 **Definition of Done**:
 - [ ] Intent classification working
 - [ ] Entity extraction functional
 - [ ] >85% accuracy on test set
+- [ ] <1ms P99 latency achieved
 - [ ] Tests pass
+- [ ] No clippy warnings
+
+**Comparison with RegexExtractor** (for clarity):
+
+| Feature | RegexQueryAnalyzer (13.4.2) | RegexExtractor (13.2.4) |
+|---------|----------------------------|------------------------|
+| **Purpose** | Intent classification | Entity/relationship extraction |
+| **Input** | 10-100 word query | 1KB+ conversation text |
+| **Patterns** | Simple intent (`^how do i`) | Complex domain (`fn\s+(\w+)`) |
+| **Performance** | <1ms (hot path) | <5ms (batch) |
+| **Accuracy** | >85% intent | >50% recall |
+| **Location** | llmspell-context/query | llmspell-graph/extraction |
+| **Evolution** | → LLMQueryAnalyzer | → unchanged |
 
 ### Task 13.4.3: Implement Retrieval Strategy Selection
 **Priority**: HIGH
