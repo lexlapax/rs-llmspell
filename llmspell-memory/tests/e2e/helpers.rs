@@ -15,6 +15,7 @@ use std::sync::Arc;
 use tempfile::TempDir;
 
 /// Ground truth decision for DMR calculation
+#[allow(dead_code)] // Used in future tests
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum GroundTruthDecision {
     /// ADD entity with expected ID
@@ -27,6 +28,7 @@ pub enum GroundTruthDecision {
     Noop,
 }
 
+#[allow(dead_code)] // Used in future tests
 impl GroundTruthDecision {
     /// Get decision type
     pub fn decision_type(&self) -> DecisionType {

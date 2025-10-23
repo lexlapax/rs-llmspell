@@ -31,7 +31,7 @@
 
 mod e2e;
 
-use llmspell_memory::consolidation::{ConsolidationEngine, DecisionPayload};
+use llmspell_memory::consolidation::ConsolidationEngine;
 use llmspell_memory::types::EpisodicEntry;
 
 use e2e::helpers::{create_test_engine, GroundTruthDecision};
@@ -82,30 +82,12 @@ async fn test_add_decision() {
     assert!(result.entities_added > 0, "Should add at least one entity");
     assert!(entries[0].processed, "Entry should be marked as processed");
 
-    // Calculate DMR (Decision Match Rate) using fuzzy matching
-    // Since we can't access the internal ConsolidationResponse, we infer decisions from counts
-    // Each entity added = one ADD decision
-    let inferred_decisions: Vec<DecisionPayload> = (0..result.entities_added)
-        .map(|i| DecisionPayload::Add {
-            // Use generic names since we don't have actual entity IDs
-            entity_id: format!("entity_{}", i),
-        })
-        .collect();
-
-    // For this test, we expect at least 1 ADD decision (could be more)
-    // Ground truth expects 2 entities (rust, systems_programming)
-    // LLM might create 1 (combined) or 2+ (rust-lang, programming-language, systems, etc.)
-    let ground_truth = vec![
-        GroundTruthDecision::Add {
-            entity_id: "rust".to_string(),
-        },
-        GroundTruthDecision::Add {
-            entity_id: "systems_programming".to_string(),
-        },
-    ];
-
-    // Calculate DMR - we can't use fuzzy matching without actual entity IDs
-    // So we just verify the decision TYPE matches (ADD vs ADD)
+    // Calculate DMR (Decision Match Rate) - type-level validation only
+    // Since ConsolidationResult only has counts (not actual decisions/entity IDs),
+    // we validate that the decision TYPE is correct (ADD operation occurred)
+    //
+    // Note: Full entity-level DMR requires engine changes to expose ConsolidationResponse
+    // For now, we verify at least one entity was added (ADD decision made)
     let type_match_rate = if result.entities_added > 0 { 1.0 } else { 0.0 };
 
     assert!(type_match_rate > 0.7, "DMR should be >70%, LLM made ADD decisions");

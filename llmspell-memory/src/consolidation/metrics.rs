@@ -849,8 +849,6 @@ mod tests {
 
     #[tokio::test]
     async fn test_metrics_reset() {
-        use std::collections::HashMap;
-
         let metrics = ConsolidationMetrics::new();
 
         let result = ConsolidationResult {
