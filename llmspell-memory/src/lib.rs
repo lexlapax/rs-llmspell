@@ -43,21 +43,21 @@
 //! let results = memory.episodic().search("Rust", 5).await?;
 //! ```
 
-pub mod traits;
-pub mod episodic;
-pub mod semantic;
-pub mod procedural;
 pub mod consolidation;
-pub mod manager;
-pub mod types;
+pub mod episodic;
 pub mod error;
+pub mod manager;
 pub mod prelude;
+pub mod procedural;
+pub mod semantic;
+pub mod traits;
+pub mod types;
 
 // Re-exports for convenience
 pub use episodic::InMemoryEpisodicMemory;
 pub use error::{MemoryError, Result};
 pub use traits::{
-    ConsolidationDecision, Entity, EpisodicMemory, MemoryManager, ProceduralMemory,
-    Relationship, SemanticMemory,
+    ConsolidationDecision, Entity, EpisodicMemory, MemoryManager, ProceduralMemory, Relationship,
+    SemanticMemory,
 };
 pub use types::{ConsolidationMode, ConsolidationResult, EpisodicEntry};

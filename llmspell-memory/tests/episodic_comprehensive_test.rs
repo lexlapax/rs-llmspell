@@ -322,11 +322,7 @@ async fn test_list_unprocessed_mixed() {
     // Add 5 entries
     let mut ids = vec![];
     for i in 0..5 {
-        let entry = EpisodicEntry::new(
-            "session-1".into(),
-            "user".into(),
-            format!("content {i}"),
-        );
+        let entry = EpisodicEntry::new("session-1".into(), "user".into(), format!("content {i}"));
         let id = memory.add(entry).await.unwrap();
         ids.push(id);
     }
@@ -461,10 +457,13 @@ async fn test_mark_processed_already_processed() {
     let id = memory.add(entry).await.unwrap();
 
     // Mark once
-    memory.mark_processed(&[id.clone()]).await.unwrap();
+    memory
+        .mark_processed(std::slice::from_ref(&id))
+        .await
+        .unwrap();
 
     // Mark again (idempotent)
-    let result = memory.mark_processed(&[id.clone()]).await;
+    let result = memory.mark_processed(std::slice::from_ref(&id)).await;
     assert!(result.is_ok());
 
     let retrieved = memory.get(&id).await.unwrap();
@@ -478,11 +477,7 @@ async fn test_mark_processed_large_batch() {
     // Add 100 entries
     let mut ids = vec![];
     for i in 0..100 {
-        let entry = EpisodicEntry::new(
-            "session-1".into(),
-            "user".into(),
-            format!("entry {i}"),
-        );
+        let entry = EpisodicEntry::new("session-1".into(), "user".into(), format!("entry {i}"));
         let id = memory.add(entry).await.unwrap();
         ids.push(id);
     }
@@ -548,7 +543,8 @@ async fn test_delete_before_exact_boundary() {
     old_entry.timestamp = Utc::now() - chrono::Duration::hours(2);
     memory.add(old_entry).await.unwrap();
 
-    let mut boundary_entry = EpisodicEntry::new("session-1".into(), "user".into(), "boundary".into());
+    let mut boundary_entry =
+        EpisodicEntry::new("session-1".into(), "user".into(), "boundary".into());
     boundary_entry.timestamp = Utc::now() - chrono::Duration::hours(1);
     memory.add(boundary_entry.clone()).await.unwrap();
 
@@ -556,7 +552,10 @@ async fn test_delete_before_exact_boundary() {
     memory.add(new_entry).await.unwrap();
 
     // Delete before the boundary timestamp
-    let deleted = memory.delete_before(boundary_entry.timestamp).await.unwrap();
+    let deleted = memory
+        .delete_before(boundary_entry.timestamp)
+        .await
+        .unwrap();
 
     assert_eq!(deleted, 1); // Only the old entry
     let remaining = memory.get_session("session-1").await.unwrap();
@@ -581,7 +580,11 @@ async fn test_full_consolidation_workflow() {
 
     // 1. Add entries
     let entry1 = EpisodicEntry::new("session-1".into(), "user".into(), "First message".into());
-    let entry2 = EpisodicEntry::new("session-1".into(), "assistant".into(), "First response".into());
+    let entry2 = EpisodicEntry::new(
+        "session-1".into(),
+        "assistant".into(),
+        "First response".into(),
+    );
     let entry3 = EpisodicEntry::new("session-1".into(), "user".into(), "Second message".into());
 
     memory.add(entry1).await.unwrap();
@@ -629,7 +632,10 @@ async fn test_multi_session_operations() {
 
     // Verify each session has 5 entries
     for session_num in 1..=3 {
-        let session = memory.get_session(&format!("session-{session_num}")).await.unwrap();
+        let session = memory
+            .get_session(&format!("session-{session_num}"))
+            .await
+            .unwrap();
         assert_eq!(session.len(), 5);
     }
 
@@ -713,7 +719,11 @@ async fn test_search_performance_acceptable() {
     let elapsed = start.elapsed();
 
     // Should be < 10ms for 100 entries (very generous threshold)
-    assert!(elapsed.as_millis() < 10, "Search took {}ms", elapsed.as_millis());
+    assert!(
+        elapsed.as_millis() < 10,
+        "Search took {}ms",
+        elapsed.as_millis()
+    );
 }
 
 // ============================================================================
@@ -762,11 +772,8 @@ async fn test_concurrent_read_write() {
     for i in 0..10 {
         let mem = memory.clone();
         let handle = tokio::spawn(async move {
-            let entry = EpisodicEntry::new(
-                "session-1".into(),
-                "user".into(),
-                format!("writer {i}"),
-            );
+            let entry =
+                EpisodicEntry::new("session-1".into(), "user".into(), format!("writer {i}"));
             mem.add(entry).await
         });
         writer_handles.push(handle);
@@ -830,7 +837,7 @@ async fn test_bi_temporal_semantics() {
     let mut entry = EpisodicEntry::new("session-1".into(), "user".into(), "past event".into());
     let past_time = Utc::now() - Duration::hours(1);
     entry.timestamp = past_time; // Event time (when it happened)
-    // ingestion_time is set to now by default
+                                 // ingestion_time is set to now by default
 
     let id = memory.add(entry.clone()).await.unwrap();
     let retrieved = memory.get(&id).await.unwrap();

@@ -8,7 +8,7 @@
 pub use crate::episodic::InMemoryEpisodicMemory;
 pub use crate::error::{MemoryError, Result};
 pub use crate::traits::{
-    ConsolidationDecision, Entity, EpisodicMemory, MemoryManager, ProceduralMemory,
-    Relationship, SemanticMemory,
+    ConsolidationDecision, Entity, EpisodicMemory, MemoryManager, ProceduralMemory, Relationship,
+    SemanticMemory,
 };
 pub use crate::types::{ConsolidationMode, ConsolidationResult, EpisodicEntry};

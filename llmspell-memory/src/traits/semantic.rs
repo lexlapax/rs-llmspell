@@ -184,8 +184,7 @@ pub trait SemanticMemory: Send + Sync {
     /// # Returns
     ///
     /// The entity state at that time, if it existed
-    async fn get_entity_at(&self, id: &str, event_time: DateTime<Utc>)
-        -> Result<Option<Entity>>;
+    async fn get_entity_at(&self, id: &str, event_time: DateTime<Utc>) -> Result<Option<Entity>>;
 
     /// Add a relationship between entities
     ///

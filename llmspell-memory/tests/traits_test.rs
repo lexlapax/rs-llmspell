@@ -97,8 +97,7 @@ fn test_serialization() {
     assert!(json.contains("test content"));
 
     // Deserialize back
-    let deserialized: EpisodicEntry =
-        serde_json::from_str(&json).expect("deserialization failed");
+    let deserialized: EpisodicEntry = serde_json::from_str(&json).expect("deserialization failed");
     assert_eq!(deserialized.session_id, entry.session_id);
     assert_eq!(deserialized.content, entry.content);
 }
@@ -145,10 +144,12 @@ fn test_relationship_serialization() {
     assert!(json.contains("works_at"));
 
     // Deserialize
-    let deserialized: Relationship =
-        serde_json::from_str(&json).expect("deserialization failed");
+    let deserialized: Relationship = serde_json::from_str(&json).expect("deserialization failed");
     assert_eq!(deserialized.id, relationship.id);
-    assert_eq!(deserialized.relationship_type, relationship.relationship_type);
+    assert_eq!(
+        deserialized.relationship_type,
+        relationship.relationship_type
+    );
 }
 
 /// Test Clone semantics for `InMemoryEpisodicMemory`

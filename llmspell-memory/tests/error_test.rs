@@ -106,6 +106,11 @@ fn test_error_display_messages() {
 /// Test error propagation through async boundaries
 #[tokio::test]
 async fn test_error_propagation() {
+    // Define nested function before statements to avoid clippy warning
+    async fn nested_get(memory: &InMemoryEpisodicMemory, id: &str) -> Result<EpisodicEntry> {
+        memory.get(id).await
+    }
+
     let memory = InMemoryEpisodicMemory::new();
 
     // Test NotFound error propagation
@@ -117,10 +122,6 @@ async fn test_error_propagation() {
     assert!(err.to_string().contains("Entry not found"));
 
     // Error should propagate through multiple async layers
-    async fn nested_get(memory: &InMemoryEpisodicMemory, id: &str) -> Result<EpisodicEntry> {
-        memory.get(id).await
-    }
-
     let result = nested_get(&memory, "another-nonexistent").await;
     assert!(result.is_err());
     assert!(matches!(result.unwrap_err(), MemoryError::NotFound(_)));

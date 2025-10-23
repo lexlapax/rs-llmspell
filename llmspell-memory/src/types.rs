@@ -43,7 +43,7 @@ pub struct EpisodicEntry {
 
 impl EpisodicEntry {
     /// Create a new episodic entry
-    #[must_use] 
+    #[must_use]
     pub fn new(session_id: String, role: String, content: String) -> Self {
         Self {
             id: generate_id(),
@@ -99,7 +99,7 @@ pub struct ConsolidationResult {
 
 impl ConsolidationResult {
     /// Create empty result
-    #[must_use] 
+    #[must_use]
     pub const fn empty() -> Self {
         Self {
             entries_processed: 0,

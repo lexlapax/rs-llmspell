@@ -152,7 +152,11 @@ impl EpisodicMemory for InMemoryEpisodicMemory {
         results.sort_by(|a, b| b.0.partial_cmp(&a.0).unwrap_or(std::cmp::Ordering::Equal));
 
         // Take top_k results
-        Ok(results.into_iter().take(top_k).map(|(_, entry)| entry).collect())
+        Ok(results
+            .into_iter()
+            .take(top_k)
+            .map(|(_, entry)| entry)
+            .collect())
     }
 
     async fn list_unprocessed(&self, session_id: &str) -> Result<Vec<EpisodicEntry>> {
@@ -160,9 +164,7 @@ impl EpisodicMemory for InMemoryEpisodicMemory {
 
         Ok(entries
             .values()
-            .filter(|entry| {
-                entry.session_id == session_id && !entry.processed
-            })
+            .filter(|entry| entry.session_id == session_id && !entry.processed)
             .cloned()
             .collect())
     }
@@ -317,7 +319,10 @@ mod tests {
         assert_eq!(unprocessed.len(), 1);
 
         // Mark as processed
-        memory.mark_processed(&[id.clone()]).await.unwrap();
+        memory
+            .mark_processed(std::slice::from_ref(&id))
+            .await
+            .unwrap();
 
         // Should now be empty
         let unprocessed = memory.list_unprocessed("session-1").await.unwrap();
