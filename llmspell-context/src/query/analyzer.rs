@@ -318,8 +318,7 @@ mod tests {
             assert_eq!(
                 understanding.intent,
                 QueryIntent::Debug,
-                "Failed for query: {}",
-                query
+                "Failed for query: {query}"
             );
         }
     }

@@ -77,16 +77,16 @@ async fn test_end_to_end_pipeline_howto_query() {
     assert_eq!(strategy, RetrievalStrategy::Episodic); // HowTo → Episodic
 
     // Step 3: Retrieval
-    let retrieved = retriever.retrieve_from_chunks(query, &corpus, 10);
-    assert!(!retrieved.is_empty());
+    let retrieved_chunks = retriever.retrieve_from_chunks(query, &corpus, 10);
+    assert!(!retrieved_chunks.is_empty());
 
     // Step 4: Reranking
-    let reranked = reranker.rerank(retrieved, query, 5).await.unwrap();
-    assert!(!reranked.is_empty());
-    assert!(reranked.len() <= 5);
+    let ranked_chunks = reranker.rerank(retrieved_chunks, query, 5).await.unwrap();
+    assert!(!ranked_chunks.is_empty());
+    assert!(ranked_chunks.len() <= 5);
 
     // Step 5: Assembly
-    let context = assembler.assemble(reranked, &understanding);
+    let context = assembler.assemble(ranked_chunks, &understanding);
     assert!(!context.chunks.is_empty());
     assert!(context.total_confidence > 0.0);
     assert!(context.token_count > 0);
@@ -114,13 +114,13 @@ async fn test_end_to_end_pipeline_whatis_query() {
     assert!(strategy == RetrievalStrategy::Semantic || strategy == RetrievalStrategy::BM25);
 
     // Retrieval
-    let retrieved = retriever.retrieve_from_chunks(query, &corpus, 10);
+    let retrieved_chunks = retriever.retrieve_from_chunks(query, &corpus, 10);
 
     // Reranking
-    let reranked = reranker.rerank(retrieved, query, 3).await.unwrap();
+    let ranked_chunks = reranker.rerank(retrieved_chunks, query, 3).await.unwrap();
 
     // Assembly
-    let context = assembler.assemble(reranked, &understanding);
+    let context = assembler.assemble(ranked_chunks, &understanding);
     assert!(!context.chunks.is_empty());
 
     // Verify most relevant chunk is about borrow checker (chunk 4)
@@ -148,9 +148,9 @@ async fn test_end_to_end_pipeline_debug_query() {
     assert_eq!(strategy, RetrievalStrategy::Hybrid);
 
     // Full pipeline
-    let retrieved = retriever.retrieve_from_chunks(query, &corpus, 10);
-    let reranked = reranker.rerank(retrieved, query, 5).await.unwrap();
-    let context = assembler.assemble(reranked, &understanding);
+    let retrieved_chunks = retriever.retrieve_from_chunks(query, &corpus, 10);
+    let ranked_chunks = reranker.rerank(retrieved_chunks, query, 5).await.unwrap();
+    let context = assembler.assemble(ranked_chunks, &understanding);
 
     assert!(!context.chunks.is_empty());
 }
@@ -168,13 +168,13 @@ async fn test_pipeline_with_confidence_filtering() {
     let query = "Rust ownership";
 
     let understanding = analyzer.understand(query).await.unwrap();
-    let retrieved = retriever.retrieve_from_chunks(query, &corpus, 10);
-    let reranked = reranker.rerank(retrieved, query, 10).await.unwrap();
-    let reranked_len = reranked.len();
-    let context = assembler.assemble(reranked, &understanding);
+    let retrieved_chunks = retriever.retrieve_from_chunks(query, &corpus, 10);
+    let ranked_chunks = reranker.rerank(retrieved_chunks, query, 10).await.unwrap();
+    let ranked_chunks_len = ranked_chunks.len();
+    let context = assembler.assemble(ranked_chunks, &understanding);
 
     // High threshold should filter out low-confidence chunks
-    assert!(context.chunks.is_empty() || context.chunks.len() < reranked_len);
+    assert!(context.chunks.is_empty() || context.chunks.len() < ranked_chunks_len);
 }
 
 #[tokio::test]
@@ -190,9 +190,9 @@ async fn test_pipeline_with_token_budget() {
     let query = "Rust memory safety";
 
     let understanding = analyzer.understand(query).await.unwrap();
-    let retrieved = retriever.retrieve_from_chunks(query, &corpus, 10);
-    let reranked = reranker.rerank(retrieved, query, 10).await.unwrap();
-    let context = assembler.assemble(reranked, &understanding);
+    let retrieved_chunks = retriever.retrieve_from_chunks(query, &corpus, 10);
+    let ranked_chunks = reranker.rerank(retrieved_chunks, query, 10).await.unwrap();
+    let context = assembler.assemble(ranked_chunks, &understanding);
 
     // Token budget should be respected
     assert!(context.token_count <= 100);
@@ -208,9 +208,9 @@ async fn test_pipeline_with_empty_corpus() {
     let query = "How do I use Rust?";
 
     let understanding = analyzer.understand(query).await.unwrap();
-    let retrieved = retriever.retrieve_from_chunks(query, &[], 10);
-    let reranked = reranker.rerank(retrieved, query, 10).await.unwrap();
-    let context = assembler.assemble(reranked, &understanding);
+    let retrieved_chunks = retriever.retrieve_from_chunks(query, &[], 10);
+    let ranked_chunks = reranker.rerank(retrieved_chunks, query, 10).await.unwrap();
+    let context = assembler.assemble(ranked_chunks, &understanding);
 
     // Empty corpus should produce empty context
     assert!(context.chunks.is_empty());
@@ -230,9 +230,9 @@ async fn test_pipeline_with_no_matching_chunks() {
     let query = "quantum physics black holes";
 
     let understanding = analyzer.understand(query).await.unwrap();
-    let retrieved = retriever.retrieve_from_chunks(query, &corpus, 10);
-    let reranked = reranker.rerank(retrieved, query, 5).await.unwrap();
-    let context = assembler.assemble(reranked, &understanding);
+    let retrieved_chunks = retriever.retrieve_from_chunks(query, &corpus, 10);
+    let ranked_chunks = reranker.rerank(retrieved_chunks, query, 5).await.unwrap();
+    let context = assembler.assemble(ranked_chunks, &understanding);
 
     // Should return something (BM25 fallback) but with low confidence
     if !context.chunks.is_empty() {
@@ -251,9 +251,9 @@ async fn test_temporal_ordering_in_pipeline() {
     let query = "Rust memory";
 
     let understanding = analyzer.understand(query).await.unwrap();
-    let retrieved = retriever.retrieve_from_chunks(query, &corpus, 10);
-    let reranked = reranker.rerank(retrieved, query, 10).await.unwrap();
-    let context = assembler.assemble(reranked, &understanding);
+    let retrieved_chunks = retriever.retrieve_from_chunks(query, &corpus, 10);
+    let ranked_chunks = reranker.rerank(retrieved_chunks, query, 10).await.unwrap();
+    let context = assembler.assemble(ranked_chunks, &understanding);
 
     // Verify temporal ordering (recent first)
     if context.chunks.len() >= 2 {
@@ -274,9 +274,9 @@ async fn test_metadata_preservation() {
     let query = "Rust ownership";
 
     let understanding = analyzer.understand(query).await.unwrap();
-    let retrieved = retriever.retrieve_from_chunks(query, &corpus, 10);
-    let reranked = reranker.rerank(retrieved, query, 5).await.unwrap();
-    let context = assembler.assemble(reranked, &understanding);
+    let retrieved_chunks = retriever.retrieve_from_chunks(query, &corpus, 10);
+    let ranked_chunks = reranker.rerank(retrieved_chunks, query, 5).await.unwrap();
+    let context = assembler.assemble(ranked_chunks, &understanding);
 
     // Verify metadata preserved
     for ranked_chunk in &context.chunks {

@@ -20,7 +20,7 @@
 //! ```
 
 use crate::types::{AssembledContext, QueryUnderstanding, RankedChunk};
-use chrono::Utc;
+use chrono::{DateTime, Utc};
 use tracing::{debug, trace};
 
 /// Context assembler for structuring chunks into LLM-ready context
@@ -84,22 +84,23 @@ impl ContextAssembler {
     ///
     /// Will not panic - uses safe unwrap on non-empty chunks after validation
     #[must_use]
-    pub fn assemble(&self, mut chunks: Vec<RankedChunk>, _query: &QueryUnderstanding) -> AssembledContext {
+    pub fn assemble(
+        &self,
+        mut chunks: Vec<RankedChunk>,
+        _query: &QueryUnderstanding,
+    ) -> AssembledContext {
         debug!("Assembling context from {} chunks", chunks.len());
 
         // Step 1: Filter by confidence threshold
         chunks.retain(|chunk| chunk.score >= self.min_confidence);
-        debug!("After confidence filter: {} chunks (min: {})", chunks.len(), self.min_confidence);
+        debug!(
+            "After confidence filter: {} chunks (min: {})",
+            chunks.len(),
+            self.min_confidence
+        );
 
         if chunks.is_empty() {
-            let now = Utc::now();
-            return AssembledContext {
-                chunks: Vec::new(),
-                total_confidence: 0.0,
-                temporal_span: (now, now),
-                token_count: 0,
-                formatted: String::new(),
-            };
+            return Self::empty_context();
         }
 
         // Step 2: Sort by timestamp (recent first)
@@ -108,33 +109,23 @@ impl ContextAssembler {
 
         // Step 3: Enforce token budget
         let (selected_chunks, token_count) = self.enforce_token_budget(chunks);
-        debug!("After token budget: {} chunks ({} tokens, max: {})",
-               selected_chunks.len(), token_count, self.max_tokens);
+        debug!(
+            "After token budget: {} chunks ({} tokens, max: {})",
+            selected_chunks.len(),
+            token_count,
+            self.max_tokens
+        );
 
-        // Step 4: Calculate temporal span (oldest, newest)
-        let temporal_span = if selected_chunks.len() >= 2 {
-            let oldest = selected_chunks.last().unwrap().chunk.timestamp;
-            let newest = selected_chunks.first().unwrap().chunk.timestamp;
-            (oldest, newest)
-        } else if selected_chunks.len() == 1 {
-            let timestamp = selected_chunks[0].chunk.timestamp;
-            (timestamp, timestamp)
-        } else {
-            let now = Utc::now();
-            (now, now)
-        };
+        // Step 4: Calculate metadata
+        let temporal_span = Self::calculate_temporal_span(&selected_chunks);
+        let total_confidence = Self::calculate_average_confidence(&selected_chunks);
 
-        // Step 5: Calculate total confidence (average of chunk scores)
-        let total_confidence = if selected_chunks.is_empty() {
-            0.0
-        } else {
-            let sum: f32 = selected_chunks.iter().map(|c| c.score).sum();
-            let count = u16::try_from(selected_chunks.len()).unwrap_or(10_000);
-            sum / f32::from(count)
-        };
-
-        debug!("Assembly complete: {} chunks, {:.2} avg confidence, {} tokens",
-               selected_chunks.len(), total_confidence, token_count);
+        debug!(
+            "Assembly complete: {} chunks, {:.2} avg confidence, {} tokens",
+            selected_chunks.len(),
+            total_confidence,
+            token_count
+        );
 
         // Format chunks into context string
         let formatted = Self::format_context(&selected_chunks);
@@ -146,6 +137,53 @@ impl ContextAssembler {
             token_count,
             formatted,
         }
+    }
+
+    /// Create empty context for when no chunks pass filtering
+    fn empty_context() -> AssembledContext {
+        let now = Utc::now();
+        AssembledContext {
+            chunks: Vec::new(),
+            total_confidence: 0.0,
+            temporal_span: (now, now),
+            token_count: 0,
+            formatted: String::new(),
+        }
+    }
+
+    /// Calculate temporal span from chunk timestamps
+    ///
+    /// Returns (oldest, newest) timestamp tuple. For empty chunks or single chunk,
+    /// returns appropriate boundary values.
+    fn calculate_temporal_span(chunks: &[RankedChunk]) -> (DateTime<Utc>, DateTime<Utc>) {
+        match chunks.len() {
+            0 => {
+                let now = Utc::now();
+                (now, now)
+            }
+            1 => {
+                let timestamp = chunks[0].chunk.timestamp;
+                (timestamp, timestamp)
+            }
+            _ => {
+                let oldest = chunks.last().unwrap().chunk.timestamp;
+                let newest = chunks.first().unwrap().chunk.timestamp;
+                (oldest, newest)
+            }
+        }
+    }
+
+    /// Calculate average confidence score across chunks
+    ///
+    /// Returns 0.0 for empty chunks, otherwise computes mean of chunk scores.
+    fn calculate_average_confidence(chunks: &[RankedChunk]) -> f32 {
+        if chunks.is_empty() {
+            return 0.0;
+        }
+
+        let sum: f32 = chunks.iter().map(|c| c.score).sum();
+        let count = u16::try_from(chunks.len()).unwrap_or(10_000);
+        sum / f32::from(count)
     }
 
     /// Format chunks into readable context string
@@ -179,8 +217,12 @@ impl ContextAssembler {
                 token_count += chunk_tokens;
                 selected.push(chunk);
             } else {
-                trace!("Skipping chunk (would exceed budget): {} tokens + {} > {}",
-                      token_count, chunk_tokens, self.max_tokens);
+                trace!(
+                    "Skipping chunk (would exceed budget): {} tokens + {} > {}",
+                    token_count,
+                    chunk_tokens,
+                    self.max_tokens
+                );
                 break;
             }
         }

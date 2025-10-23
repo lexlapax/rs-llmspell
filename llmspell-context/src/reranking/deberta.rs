@@ -24,7 +24,7 @@ use async_trait::async_trait;
 use candle_core::{Device, Tensor};
 use candle_nn::VarBuilder;
 use candle_transformers::models::bert::{BertModel, Config as BertConfig};
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 use tokenizers::Tokenizer;
 use tracing::{debug, info};
 
@@ -75,27 +75,9 @@ impl DeBERTaReranker {
         // Download model if not cached
         Self::ensure_model_downloaded(&cache_dir).await?;
 
-        // Load tokenizer
-        let tokenizer_path = cache_dir.join("tokenizer.json");
-        let tokenizer = Tokenizer::from_file(&tokenizer_path)
-            .map_err(|e| ContextError::ModelLoadError(format!("Failed to load tokenizer: {e}")))?;
-
-        // Load model
-        let config_path = cache_dir.join("config.json");
-        let weights_path = cache_dir.join("model.safetensors");
-
-        let config: BertConfig = serde_json::from_reader(std::fs::File::open(&config_path)?)
-            .map_err(|e| ContextError::ModelLoadError(format!("Failed to parse config: {e}")))?;
-
-        // Note: using unsafe for memory-mapped file loading (required by Candle)
-        #[allow(unsafe_code)]
-        let vb = unsafe {
-            VarBuilder::from_mmaped_safetensors(&[weights_path], candle_core::DType::F32, &device)
-                .map_err(|e| ContextError::ModelLoadError(format!("Failed to load weights: {e}")))?
-        };
-
-        let model = BertModel::load(vb, &config)
-            .map_err(|e| ContextError::ModelLoadError(format!("Failed to create model: {e}")))?;
+        // Load tokenizer and model
+        let tokenizer = Self::load_tokenizer(&cache_dir)?;
+        let model = Self::load_model(&cache_dir, &device)?;
 
         info!("DeBERTa reranker initialized successfully");
 
@@ -155,51 +137,92 @@ impl DeBERTaReranker {
             .join("deberta-minilm-l6"))
     }
 
+    /// Load tokenizer from cache directory
+    fn load_tokenizer(cache_dir: &Path) -> Result<Tokenizer> {
+        let tokenizer_path = cache_dir.join("tokenizer.json");
+        Tokenizer::from_file(&tokenizer_path)
+            .map_err(|e| ContextError::ModelLoadError(format!("Failed to load tokenizer: {e}")))
+    }
+
+    /// Load BERT model from cache directory
+    fn load_model(cache_dir: &Path, device: &Device) -> Result<BertModel> {
+        let config_path = cache_dir.join("config.json");
+        let weights_path = cache_dir.join("model.safetensors");
+
+        let config: BertConfig = serde_json::from_reader(std::fs::File::open(&config_path)?)
+            .map_err(|e| ContextError::ModelLoadError(format!("Failed to parse config: {e}")))?;
+
+        // Note: using unsafe for memory-mapped file loading (required by Candle)
+        #[allow(unsafe_code)]
+        let vb = unsafe {
+            VarBuilder::from_mmaped_safetensors(&[weights_path], candle_core::DType::F32, device)
+                .map_err(|e| ContextError::ModelLoadError(format!("Failed to load weights: {e}")))?
+        };
+
+        BertModel::load(vb, &config)
+            .map_err(|e| ContextError::ModelLoadError(format!("Failed to create model: {e}")))
+    }
+
     /// Ensure model is downloaded and cached
     async fn ensure_model_downloaded(cache_dir: &PathBuf) -> Result<()> {
-        // Check if model files exist
-        let required_files = ["config.json", "tokenizer.json", "model.safetensors"];
-        let all_exist = required_files
-            .iter()
-            .all(|file| cache_dir.join(file).exists());
+        const REQUIRED_FILES: &[&str] = &["config.json", "tokenizer.json", "model.safetensors"];
 
-        if all_exist {
+        // Check if all model files exist
+        if Self::all_files_cached(cache_dir, REQUIRED_FILES) {
             debug!("Model already cached");
             return Ok(());
         }
 
         info!("Model not cached, downloading from HuggingFace...");
-
-        // Create cache directory
         std::fs::create_dir_all(cache_dir)?;
 
-        // Download files from HuggingFace
-        let repo = "cross-encoder/ms-marco-MiniLM-L-6-v2";
-        let base_url = format!("https://huggingface.co/{repo}/resolve/main");
+        // Download missing files
+        Self::download_model_files(cache_dir, REQUIRED_FILES).await?;
 
-        for file in &required_files {
-            let url = format!("{base_url}/{file}");
+        info!("Model download complete");
+        Ok(())
+    }
+
+    /// Check if all required files are cached
+    fn all_files_cached(cache_dir: &Path, files: &[&str]) -> bool {
+        files.iter().all(|file| cache_dir.join(file).exists())
+    }
+
+    /// Download model files from `HuggingFace`
+    async fn download_model_files(cache_dir: &Path, files: &[&str]) -> Result<()> {
+        const REPO: &str = "cross-encoder/ms-marco-MiniLM-L-6-v2";
+        let base_url = format!("https://huggingface.co/{REPO}/resolve/main");
+
+        for file in files {
             let dest = cache_dir.join(file);
-
             if dest.exists() {
                 debug!("File already exists: {}", file);
                 continue;
             }
 
-            info!("Downloading {}", file);
-            let response = reqwest::get(&url)
-                .await
-                .map_err(|e| ContextError::ModelDownloadError(format!("Download failed: {e}")))?;
-
-            let bytes = response.bytes().await.map_err(|e| {
-                ContextError::ModelDownloadError(format!("Failed to read bytes: {e}"))
-            })?;
-
-            std::fs::write(&dest, bytes)?;
-            debug!("Downloaded {} ({} bytes)", file, dest.metadata()?.len());
+            Self::download_file(&base_url, file, &dest).await?;
         }
 
-        info!("Model download complete");
+        Ok(())
+    }
+
+    /// Download a single file from `HuggingFace`
+    async fn download_file(base_url: &str, filename: &str, dest: &Path) -> Result<()> {
+        info!("Downloading {}", filename);
+
+        let url = format!("{base_url}/{filename}");
+        let response = reqwest::get(&url)
+            .await
+            .map_err(|e| ContextError::ModelDownloadError(format!("Download failed: {e}")))?;
+
+        let bytes = response
+            .bytes()
+            .await
+            .map_err(|e| ContextError::ModelDownloadError(format!("Failed to read bytes: {e}")))?;
+
+        std::fs::write(dest, bytes)?;
+        debug!("Downloaded {} ({} bytes)", filename, dest.metadata()?.len());
+
         Ok(())
     }
 
