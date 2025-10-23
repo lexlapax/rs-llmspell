@@ -53,6 +53,7 @@ mockall = { workspace = true }
 criterion = { workspace = true }
 tempfile = "3.9"
 reqwest = "0.11"
+strsim = "0.11"
 
 [[bench]]
 name = "episodic_bench"

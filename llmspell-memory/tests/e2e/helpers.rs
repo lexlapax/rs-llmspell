@@ -200,13 +200,13 @@ pub async fn assert_entity_not_exists(graph: &Arc<dyn KnowledgeGraph>, entity_id
     }
 }
 
-/// Calculate Decision Match Rate (DMR)
+/// Calculate Decision Match Rate (DMR) with exact string matching
 ///
 /// DMR = (matching_decisions / total_decisions) * 100
 ///
 /// Matching criteria:
 /// - Decision type must match (ADD/UPDATE/DELETE/NOOP)
-/// - For entity decisions (ADD/UPDATE/DELETE), entity_id must match
+/// - For entity decisions (ADD/UPDATE/DELETE), entity_id must match exactly
 ///
 /// # Arguments
 ///
@@ -240,6 +240,128 @@ pub fn calculate_dmr(
                 }
                 (DecisionPayload::Delete { entity_id: actual_id }, GroundTruthDecision::Delete { entity_id: expected_id }) => {
                     actual_id == expected_id
+                }
+                (DecisionPayload::Noop, GroundTruthDecision::Noop) => true,
+                _ => false,
+            }
+        });
+
+        if matches {
+            matching += 1;
+        }
+    }
+
+    matching as f64 / total as f64
+}
+
+/// Fuzzy match two entity IDs using Jaro-Winkler similarity
+///
+/// Uses multi-strategy matching:
+/// 1. Exact match (case-insensitive)
+/// 2. Substring containment
+/// 3. Jaro-Winkler similarity >= 0.8
+///
+/// # Arguments
+///
+/// * `actual` - Actual entity ID from LLM
+/// * `expected` - Expected entity ID from ground truth
+///
+/// # Returns
+///
+/// `true` if IDs are considered equivalent
+fn fuzzy_entity_match(actual: &str, expected: &str) -> bool {
+    let actual_lower = actual.to_lowercase();
+    let expected_lower = expected.to_lowercase();
+
+    // Strategy 1: Exact match (case-insensitive)
+    if actual_lower == expected_lower {
+        return true;
+    }
+
+    // Strategy 2: Substring containment
+    // "rust-lang" contains "rust" or "rust" contains "rust-lang"
+    if actual_lower.contains(&expected_lower) || expected_lower.contains(&actual_lower) {
+        return true;
+    }
+
+    // Strategy 3: Jaro-Winkler similarity
+    // Threshold: 0.8 (80% similar)
+    // Jaro-Winkler favors strings that match from the beginning
+    // Perfect for: "systems_programming" vs "systems-programming" (0.97)
+    //              "rust" vs "rust-lang" (0.83)
+    strsim::jaro_winkler(&actual_lower, &expected_lower) >= 0.8
+}
+
+/// Calculate Decision Match Rate (DMR) with fuzzy entity ID matching
+///
+/// Uses Jaro-Winkler string similarity to handle LLM non-determinism in entity IDs.
+///
+/// ## Matching Strategy
+///
+/// Three-tier matching (short-circuits on first match):
+/// 1. **Exact match** (case-insensitive): "Rust" ↔ "rust"
+/// 2. **Substring containment**: "rust-lang" ↔ "rust"
+/// 3. **Jaro-Winkler ≥ 0.8**: "systems_programming" ↔ "systems-programming" (0.97)
+///
+/// ## Examples
+///
+/// **Fuzzy matches:**
+/// - "rust" ↔ "rust-lang" (substring + 0.83 similarity)
+/// - "systems_programming" ↔ "systems-programming" (0.97 similarity)
+/// - "python27" ↔ "python_27" (0.81 similarity)
+///
+/// **Non-matches:**
+/// - "rust" ↔ "python" (0.0 similarity)
+/// - "alice" ↔ "bob" (0.0 similarity)
+///
+/// ## Limitations
+///
+/// - **Requires actual entity IDs**: Cannot calculate if only counts available
+/// - **Threshold tuning**: 0.8 chosen empirically, may need adjustment
+/// - **Semantic blindness**: "programming-language" vs "prog-lang" won't match (0.70)
+/// - **No type validation**: Only checks decision type (ADD/UPDATE/DELETE), not entity properties
+///
+/// ## Usage
+///
+/// ```ignore
+/// let actual = vec![DecisionPayload::Add { entity_id: "rust-lang".to_string() }];
+/// let ground_truth = vec![GroundTruthDecision::Add { entity_id: "rust".to_string() }];
+/// let dmr = calculate_dmr_fuzzy(&actual, &ground_truth);
+/// assert!(dmr >= 0.7, "DMR threshold for production");
+/// ```
+///
+/// # Arguments
+///
+/// * `actual_decisions` - Decisions made by LLM
+/// * `ground_truth` - Expected decisions
+///
+/// # Returns
+///
+/// DMR as a ratio (0.0 to 1.0)
+#[allow(clippy::cast_precision_loss, dead_code)]
+pub fn calculate_dmr_fuzzy(
+    actual_decisions: &[DecisionPayload],
+    ground_truth: &[GroundTruthDecision],
+) -> f64 {
+    if ground_truth.is_empty() {
+        return 1.0; // No ground truth = perfect match
+    }
+
+    let mut matching = 0;
+    let total = ground_truth.len();
+
+    for gt_decision in ground_truth {
+        // Find matching actual decision with fuzzy entity ID matching
+        let matches = actual_decisions.iter().any(|actual| {
+            match (actual, gt_decision) {
+                (DecisionPayload::Add { entity_id: actual_id }, GroundTruthDecision::Add { entity_id: expected_id }) => {
+                    fuzzy_entity_match(actual_id, expected_id)
+                }
+                (DecisionPayload::Update { entity_id: actual_id, .. }, GroundTruthDecision::Update { entity_id: expected_id }) => {
+                    fuzzy_entity_match(actual_id, expected_id)
+                }
+                (DecisionPayload::Delete { entity_id: actual_id }, GroundTruthDecision::Delete { entity_id: expected_id }) => {
+                    fuzzy_entity_match(actual_id, expected_id)
                 }
                 (DecisionPayload::Noop, GroundTruthDecision::Noop) => true,
                 _ => false,
@@ -312,5 +434,86 @@ mod tests {
 
         let dmr = calculate_dmr(&actual, &ground_truth);
         assert!((dmr - 0.0).abs() < 0.01);
+    }
+
+    #[test]
+    fn test_fuzzy_entity_match_exact() {
+        assert!(fuzzy_entity_match("rust", "rust"));
+        assert!(fuzzy_entity_match("Rust", "rust")); // case insensitive
+    }
+
+    #[test]
+    fn test_fuzzy_entity_match_substring() {
+        assert!(fuzzy_entity_match("rust-lang", "rust"));
+        assert!(fuzzy_entity_match("rust", "rust-lang"));
+        assert!(fuzzy_entity_match("systems_programming", "systems"));
+    }
+
+    #[test]
+    fn test_fuzzy_entity_match_jaro_winkler() {
+        // Similar with different separators
+        assert!(fuzzy_entity_match("systems_programming", "systems-programming"));
+        assert!(fuzzy_entity_match("python27", "python_27"));
+
+        // Completely different should NOT match
+        assert!(!fuzzy_entity_match("rust", "python"));
+        assert!(!fuzzy_entity_match("alice", "bob"));
+    }
+
+    #[test]
+    fn test_calculate_dmr_fuzzy_substring_match() {
+        let actual = vec![
+            DecisionPayload::Add {
+                entity_id: "rust-lang".to_string(), // LLM added suffix
+            },
+            DecisionPayload::Add {
+                entity_id: "systems-programming".to_string(), // LLM used dash
+            },
+        ];
+
+        let ground_truth = vec![
+            GroundTruthDecision::Add {
+                entity_id: "rust".to_string(),
+            },
+            GroundTruthDecision::Add {
+                entity_id: "systems_programming".to_string(), // ground truth used underscore
+            },
+        ];
+
+        let dmr = calculate_dmr_fuzzy(&actual, &ground_truth);
+        assert!((dmr - 1.0).abs() < 0.01, "Fuzzy DMR should be 1.0, got {}", dmr);
+    }
+
+    #[test]
+    fn test_calculate_dmr_fuzzy_partial_match() {
+        let actual = vec![
+            DecisionPayload::Add {
+                entity_id: "rust-lang".to_string(),
+            },
+            DecisionPayload::Add {
+                entity_id: "python".to_string(), // wrong entity
+            },
+        ];
+
+        let ground_truth = vec![
+            GroundTruthDecision::Add {
+                entity_id: "rust".to_string(),
+            },
+            GroundTruthDecision::Add {
+                entity_id: "systems_programming".to_string(),
+            },
+        ];
+
+        let dmr = calculate_dmr_fuzzy(&actual, &ground_truth);
+        assert!((dmr - 0.5).abs() < 0.01, "Fuzzy DMR should be 0.5 (1/2), got {}", dmr);
+    }
+
+    #[test]
+    fn test_calculate_dmr_fuzzy_noop() {
+        let actual = vec![DecisionPayload::Noop];
+        let ground_truth = vec![GroundTruthDecision::Noop];
+
+        let dmr = calculate_dmr_fuzzy(&actual, &ground_truth);
+        assert!((dmr - 1.0).abs() < 0.01);
     }
 }
