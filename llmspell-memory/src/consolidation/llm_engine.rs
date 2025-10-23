@@ -18,6 +18,7 @@ use crate::types::{ConsolidationResult, EpisodicEntry};
 
 use super::context_assembly::ContextAssembler;
 use super::prompts::{ConsolidationPromptBuilder, PromptVersion};
+use super::validator::DecisionValidator;
 use super::ConsolidationEngine;
 
 /// Configuration for LLM consolidation
@@ -67,6 +68,8 @@ pub struct LLMConsolidationEngine {
     context_assembler: ContextAssembler,
     /// Prompt builder for LLM requests
     prompt_builder: ConsolidationPromptBuilder,
+    /// Decision validator
+    validator: DecisionValidator,
     /// Configuration
     config: LLMConsolidationConfig,
 }
@@ -85,6 +88,7 @@ impl LLMConsolidationEngine {
         config: LLMConsolidationConfig,
     ) -> Self {
         let context_assembler = ContextAssembler::new(Arc::clone(&knowledge_graph));
+        let validator = DecisionValidator::new(Arc::clone(&knowledge_graph));
         let prompt_builder = ConsolidationPromptBuilder::new()
             .with_model(config.model.clone())
             .with_temperature(config.temperature)
@@ -95,6 +99,7 @@ impl LLMConsolidationEngine {
             knowledge_graph,
             context_assembler,
             prompt_builder,
+            validator,
             config,
         }
     }
@@ -227,7 +232,8 @@ impl LLMConsolidationEngine {
             consolidation_response.decisions.len()
         );
 
-        // Step 5: Validate decisions (TODO: Task 13.5.2c)
+        // Step 5: Validate decisions
+        self.validator.validate(&consolidation_response).await?;
 
         // Step 6: Execute decisions (TODO: Task 13.5.2d)
 

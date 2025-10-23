@@ -32,6 +32,7 @@ pub mod manual;
 pub mod noop;
 pub mod prompt_schema;
 pub mod prompts;
+pub mod validator;
 
 pub use context_assembly::ContextAssembler;
 pub use llm_engine::{LLMConsolidationConfig, LLMConsolidationEngine};
@@ -44,6 +45,7 @@ pub use prompts::{
     ConsolidationPromptBuilder, ConsolidationPromptConfig, PromptVersion, TokenBudget,
     parse_llm_response,
 };
+pub use validator::DecisionValidator;
 
 /// Trait for consolidation engines that convert episodic entries to semantic knowledge
 ///
