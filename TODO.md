@@ -2706,15 +2706,27 @@ Created comprehensive integration tests (285 lines) covering end-to-end pipeline
 - [ ] DMR calculated and reported (target: >70%)
 
 **Subtasks**:
-0. **13.5.5.0**: Test infrastructure setup (0.5h)
-   - [ ] Create `tests/e2e/` directory structure
-   - [ ] Create `tests/e2e/mod.rs` with Ollama availability check helper
-   - [ ] Create `tests/e2e/helpers.rs` with test utilities
-   - [ ] Ollama check: test OLLAMA_HOST connectivity, skip if unavailable
-   - [ ] Helper: `create_test_engine()` - returns LLMConsolidationEngine + ConsolidationMetrics
-   - [ ] Helper: `assert_entity_exists(graph, entity_id, expected_properties)`
-   - [ ] Helper: `assert_relationship_exists(graph, from, to, rel_type)`
-   - [ ] Helper: `calculate_dmr(actual_decisions, expected_decisions) -> f64`
+0. **13.5.5.0**: Test infrastructure setup (0.5h) - ✅ COMPLETE
+   - [x] Create `tests/e2e/` directory structure
+   - [x] Create `tests/e2e/mod.rs` with Ollama availability check helper (async reqwest)
+   - [x] Create `tests/e2e/helpers.rs` with test utilities
+   - [x] Ollama check: test OLLAMA_HOST connectivity, skip if unavailable
+   - [x] Helper: `create_test_engine()` - returns LLMConsolidationEngine + ConsolidationMetrics
+   - [x] Helper: `assert_entity_exists(graph, entity_id, expected_properties)`
+   - [x] Helper: `assert_relationship_exists(graph, from, to, rel_type)` - uses get_related()
+   - [x] Helper: `calculate_dmr(actual_decisions, expected_decisions) -> f64`
+   - [x] Helper: `GroundTruthDecision` enum with decision_type() method
+   - [x] Create placeholder test file `tests/consolidation_llm_test.rs` with 6 test stubs
+   - [x] All tests compile and run (9 passing: 3 DMR unit tests + 6 E2E placeholders)
+   - [x] Ollama connectivity check succeeds (async client, no runtime panic)
+
+**Implementation Insights**:
+- **Async Reqwest**: Changed from `reqwest::blocking::Client` to async `reqwest::Client` to avoid runtime panic when calling from async context
+- **SurrealDB Backend**: Used `SurrealDBBackend::new_temp()` for clean temp directory management
+- **OllamaProvider Factory**: Used `create_ollama_provider()` factory function with `ProviderConfig` instead of direct constructor
+- **Graph API**: `get_entity()` returns `Result<Entity>` not `Result<Option<Entity>>`, `get_related()` returns entities not relationships
+- **Test Duration**: test_add_decision runs in ~1.3s with Ollama connection (well under 2min target)
+- **Dead Code Warnings**: Added `#[allow(dead_code)]` to test helpers since they'll be used in subsequent subtasks
 
 1. **13.5.5a**: ADD decision test (1h)
    - [ ] Episodic: "Rust is a systems programming language"
