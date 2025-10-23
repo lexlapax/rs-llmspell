@@ -9,7 +9,8 @@
 //! - Model: `cross-encoder/ms-marco-MiniLM-L-6-v2` (80MB, fast)
 //! - Fallback: `cross-encoder/ms-marco-deberta-base` (420MB, accurate)
 //! - Inference: Pure Rust via Candle (no Python, no external ML runtime)
-//! - Device: Auto-detect (Metal on macOS, CUDA on Linux+GPU, CPU fallback)
+//! - Device: Auto-detect (CUDA on Linux+GPU, CPU fallback)
+//! - Note: Metal support disabled due to missing layer-norm in Candle
 //!
 //! # Abstraction
 //!
@@ -25,7 +26,7 @@ use candle_nn::VarBuilder;
 use candle_transformers::models::bert::{BertModel, Config as BertConfig};
 use std::path::PathBuf;
 use tokenizers::Tokenizer;
-use tracing::{debug, info, warn};
+use tracing::{debug, info};
 
 /// DeBERTa-based reranker using Candle for inference
 ///
@@ -54,9 +55,8 @@ impl DeBERTaReranker {
     ///
     /// # Device Selection
     ///
-    /// - macOS: Metal GPU (if available)
     /// - Linux: CUDA GPU (if available)
-    /// - Fallback: CPU
+    /// - macOS/Fallback: CPU (Metal layer-norm not yet supported)
     ///
     /// # Errors
     ///
@@ -121,16 +121,13 @@ impl DeBERTaReranker {
         Ok(reranker)
     }
 
-    /// Detect optimal device (Metal > CUDA > CPU)
+    /// Detect optimal device (CUDA > CPU)
+    ///
+    /// Note: Metal support disabled due to missing layer-norm implementation.
+    /// Will be re-enabled once Candle adds Metal layer-norm support.
     fn detect_device() -> Device {
-        // Try Metal (macOS GPU)
-        #[cfg(target_os = "macos")]
-        {
-            if let Ok(device) = Device::new_metal(0) {
-                info!("Using Metal GPU acceleration");
-                return device;
-            }
-        }
+        // Note: Metal disabled - layer-norm not supported
+        // https://github.com/huggingface/candle/issues/metal-layer-norm
 
         // Try CUDA (Linux/Windows GPU)
         if let Ok(device) = Device::new_cuda(0) {
@@ -139,7 +136,7 @@ impl DeBERTaReranker {
         }
 
         // Fallback to CPU
-        warn!("GPU not available, using CPU");
+        info!("Using CPU (Metal layer-norm not yet supported)");
         Device::Cpu
     }
 
