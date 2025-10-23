@@ -2036,11 +2036,36 @@ Created comprehensive integration tests (285 lines) covering end-to-end pipeline
 
 ---
 
-## Phase 13.5: LLM-Driven Consolidation (Days 8-9)
+## Phase 13.5: LLM-Driven Consolidation (Days 8-10)
 
 **Goal**: Implement LLM-driven consolidation with ADD/UPDATE/DELETE/NOOP decisions
-**Timeline**: 2 days (16 hours)
+**Timeline**: 3 days (23 hours) - Enhanced from 2 days (16h) to include production-grade features
 **Critical Dependencies**: Phases 13.1-13.4 (Memory + Graph + Context)
+**Status**: 🚧 READY TO START
+
+**Architecture Decisions** (from Phase 13.1-13.4 analysis):
+1. **Prompt Output Format**: JSON (default, configurable to natural language via parameters)
+2. **Context Window Strategy**: Dynamic BM25-based retrieval from Phase 13.4
+3. **Batch Processing**: Sequential initially (Task 13.5.1-13.5.2) → adaptive batch in daemon (Task 13.5.3)
+4. **LLM Model**: ollama/llama3.2:3b (default, configurable)
+5. **Temperature**: 0.0 (deterministic, configurable)
+6. **Consolidation Trigger**: Daemon-only (no immediate mode)
+
+**Key Enhancements**:
+- +7 hours for production features: error recovery, prompt versioning, cost tracking, adaptive scheduling
+- JSON schema for reliable parsing (95%+ success vs 60% natural language)
+- Dynamic context assembly with BM25 retrieval from llmspell-context
+- Retry/fallback logic with exponential backoff
+- Adaptive daemon intervals based on queue depth
+- Prompt performance tracking for A/B testing
+
+**Phase 13.5 Summary**:
+- Task 13.5.1: Prompt templates (5h) - JSON schema, BM25 context, versioning
+- Task 13.5.2: LLMConsolidationEngine (6h) - parser, validator, retry logic
+- Task 13.5.3: Background daemon (4h) - adaptive intervals, session priority, health checks
+- Task 13.5.4: Metrics (3h) - core, prompt performance, cost tracking, lag
+- Task 13.5.5: E2E tests (5h) - ADD/UPDATE/DELETE/NOOP/multi-turn/errors
+- **Total**: 23 hours (3 days) vs original 16 hours (2 days)
 
 **Includes Deferred Work**:
 - ⏸️ Task 13.2.4: Entity/Relationship Extraction from Episodic Records
@@ -2052,101 +2077,212 @@ Created comprehensive integration tests (285 lines) covering end-to-end pipeline
 ### Task 13.5.1: Implement LLM Consolidation Prompt Templates
 
 **Priority**: CRITICAL
-**Estimated Time**: 3 hours
+**Estimated Time**: 5 hours (enhanced from 3h)
 **Assignee**: Memory Team
+**Status**: PENDING
 
-**Description**: Create prompt templates for ADD/UPDATE/DELETE/NOOP decision-making using LLM consolidation (Mem0 architecture).
+**Description**: Create prompt templates with JSON schema, context assembly, and versioning for ADD/UPDATE/DELETE/NOOP decision-making using LLM consolidation (Mem0 architecture).
 
 **Acceptance Criteria**:
-- [ ] ConsolidationPrompt trait defined for prompt template abstraction
+- [ ] JSON schema design for structured output (ConsolidationResponse)
+- [ ] Prompt templates support JSON (default) and natural language modes
+- [ ] Dynamic context assembly using BM25 retrieval (Phase 13.4 integration)
+- [ ] Prompt versioning infrastructure (V1, V2, ...) for A/B testing
 - [ ] Four decision prompts (ADD, UPDATE, DELETE, NOOP) implemented
-- [ ] Prompt includes: current semantic graph context, new episodic memory, existing entities/relationships
-- [ ] Structured output format (JSON) for LLM decisions
+- [ ] Few-shot examples (3-5 per decision type)
+- [ ] Token budget allocation (40% episodic, 40% semantic, 20% instructions)
+
+**Subtasks**:
+1. **13.5.1a**: JSON schema design for structured output (1h)
+   - [ ] Define ConsolidationResponse schema (entities[], relationships[], decisions[])
+   - [ ] Add examples for all 4 decision types (ADD/UPDATE/DELETE/NOOP)
+   - [ ] Create serde deserialization with error recovery
+   - [ ] Support natural language fallback mode (configurable)
+
+2. **13.5.1b**: Prompt template implementation (2h)
+   - [ ] System prompt: role definition, output format, decision criteria
+   - [ ] User prompt: episodic content + semantic context
+   - [ ] Few-shot examples (3-5 examples per decision type)
+   - [ ] Parameter support: output_format (json|text), temperature, model
+
+3. **13.5.1c**: Context assembly strategy (1h)
+   - [ ] BM25 retrieval of relevant semantic entities (use Phase 13.4 QueryAnalyzer)
+   - [ ] Token budget allocation (40% episodic, 40% semantic, 20% instructions)
+   - [ ] Temporal context (include event_time for bi-temporal reasoning)
+   - [ ] Semantic context truncation with priority (recent entities first)
+
+4. **13.5.1d**: Prompt versioning infrastructure (1h)
+   - [ ] PromptVersion enum (V1, V2, ...) for A/B testing
+   - [ ] Metrics per prompt version (DMR, decision distribution)
+   - [ ] Migration path for prompt upgrades
+   - [ ] Configuration: default_version, enable_ab_testing
 
 **Implementation Steps**:
 1. Create `llmspell-memory/src/consolidation/prompts.rs`
-2. Define ConsolidationPrompt trait:
+2. Create `llmspell-memory/src/consolidation/prompt_schema.rs` (JSON schema)
+3. Create `llmspell-memory/src/consolidation/context_assembly.rs` (BM25 integration)
+4. Define ConsolidationPromptBuilder:
    ```rust
-   pub trait ConsolidationPrompt {
-       fn format_decision_prompt(&self, episodic: &EpisodicRecord, semantic_context: &GraphContext) -> String;
-       fn parse_decision(&self, llm_response: &str) -> Result<ConsolidationDecision>;
+   pub struct ConsolidationPromptBuilder {
+       output_format: OutputFormat,  // Json | NaturalLanguage
+       temperature: f32,
+       model: String,
+       version: PromptVersion,
+       token_budget: TokenBudget,
    }
    ```
-3. Implement AddEntityPrompt, UpdateEntityPrompt, DeleteEntityPrompt, NoopPrompt
-4. Add JSON schema validation for structured output
-5. Create prompt template tests
+5. Implement prompt generation with dynamic context
+6. Add JSON parsing with serde_json (handle partial/malformed JSON)
+7. Create prompt template tests (12 tests: 4 decisions × 3 modes)
 
 **Files to Create/Modify**:
-- `llmspell-memory/src/consolidation/prompts.rs` (NEW - 400 lines)
-- `llmspell-memory/src/consolidation/mod.rs` (MODIFY - add prompts module)
-- `llmspell-memory/tests/consolidation/prompt_test.rs` (NEW - 200 lines)
+- `llmspell-memory/src/consolidation/prompts.rs` (NEW - 500 lines)
+- `llmspell-memory/src/consolidation/prompt_schema.rs` (NEW - 200 lines)
+- `llmspell-memory/src/consolidation/context_assembly.rs` (NEW - 300 lines)
+- `llmspell-memory/src/consolidation/mod.rs` (MODIFY - add prompts, schema, context modules)
+- `llmspell-memory/tests/consolidation/prompt_test.rs` (NEW - 300 lines)
 
 **Definition of Done**:
-- [ ] All four decision prompts implemented and tested
-- [ ] Prompt templates include entity extraction and relationship inference
-- [ ] JSON schema validation passes for all decision types
-- [ ] Unit tests verify prompt generation and parsing
+- [ ] JSON schema implemented with serde validation
+- [ ] All four decision prompts working (ADD/UPDATE/DELETE/NOOP)
+- [ ] Context assembly retrieves relevant entities via BM25
+- [ ] Prompt versioning infrastructure complete
+- [ ] Tests verify: JSON parsing, natural language fallback, context assembly, versioning
+- [ ] Zero clippy warnings
 
-### Task 13.5.2: Implement ADD/UPDATE/DELETE Decision Logic
+### Task 13.5.2: Implement LLMConsolidationEngine with Decision Logic
 
 **Priority**: CRITICAL
-**Estimated Time**: 4 hours
+**Estimated Time**: 6 hours (enhanced from 4h)
 **Assignee**: Memory Team
+**Status**: PENDING
 
-**Description**: Implement the core consolidation decision engine that uses LLM to decide how to integrate episodic memories into semantic graph.
+**Description**: Implement LLMConsolidationEngine with LLM-based decision making, JSON parser with error recovery, decision validator, and retry logic.
 
 **Acceptance Criteria**:
-- [ ] ConsolidationEngine trait implementation using LLM provider
+- [ ] LLMConsolidationEngine implements ConsolidationEngine trait
 - [ ] ADD logic: create new entities/relationships
 - [ ] UPDATE logic: merge new facts into existing nodes
-- [ ] DELETE logic: remove outdated/contradictory information
+- [ ] DELETE logic: remove outdated/contradictory information (tombstone with valid_until)
 - [ ] NOOP logic: skip irrelevant episodic records
-- [ ] Batch processing support (consolidate multiple records)
+- [ ] JSON parser with error recovery (fallback to natural language on parse failure)
+- [ ] Decision validator (check entity IDs, prevent duplicates)
+- [ ] Retry logic with exponential backoff (1s, 2s, 4s)
+- [ ] Provider fallback (llama3.2:3b → qwen:7b)
+
+**Subtasks**:
+1. **13.5.2a**: LLMConsolidationEngine struct (1h)
+   - [ ] Dependencies: ProviderManager (from ExecutionContext), KnowledgeGraph, PromptBuilder
+   - [ ] Configuration: model, temperature, max_tokens, timeout, max_retries
+   - [ ] Initialization with provider validation (check model availability)
+   - [ ] Support configurable parameters (model, temperature via builder)
+
+2. **13.5.2b**: LLM response parser with error recovery (1.5h)
+   - [ ] JSON parsing with serde_json (ConsolidationResponse → decisions)
+   - [ ] Handle partial/malformed JSON (extract valid decisions, skip invalid)
+   - [ ] Fallback: retry with natural language mode if JSON parsing fails
+   - [ ] Error recovery: extract decisions from natural language using regex
+   - [ ] Logging: track parse success rate per prompt version
+
+3. **13.5.2c**: Decision validator (1h)
+   - [ ] Validate entity IDs exist for UPDATE/DELETE decisions
+   - [ ] Check relationship source/target entities exist
+   - [ ] Prevent duplicate ADD decisions (query KnowledgeGraph first)
+   - [ ] Validate entity types match schema (if schema available)
+   - [ ] Return validation errors with actionable messages
+
+4. **13.5.2d**: ConsolidationEngine trait implementation (1.5h)
+   - [ ] `consolidate()` method: entry → prompt → LLM → parse → validate → execute
+   - [ ] Graph operation execution (add_entity, update_entity, add_relationship, delete_entity)
+   - [ ] Transaction-like behavior: rollback on failure (mark entry as failed, not processed)
+   - [ ] Audit trail: log all decisions with timestamps, LLM response, execution result
+   - [ ] Metrics emission: latency, decisions_by_type, parse_success_rate
+
+5. **13.5.2e**: Retry logic for LLM failures (1h)
+   - [ ] Exponential backoff (1s, 2s, 4s) on LLM errors
+   - [ ] Provider fallback (try ollama/llama3.2:3b → ollama/qwen:7b)
+   - [ ] Circuit breaker (stop retrying after 3 consecutive failures)
+   - [ ] Graceful degradation: mark entry as "retry_later" on circuit break
+   - [ ] Health check: test provider availability before retries
 
 **Implementation Steps**:
-1. Create `llmspell-memory/src/consolidation/engine.rs`
-2. Implement LLMConsolidationEngine:
+1. Create `llmspell-memory/src/consolidation/llm_engine.rs`
+2. Create `llmspell-memory/src/consolidation/parser.rs` (JSON + natural language)
+3. Create `llmspell-memory/src/consolidation/validator.rs` (decision validation)
+4. Implement LLMConsolidationEngine:
    ```rust
    pub struct LLMConsolidationEngine {
-       llm_provider: Arc<dyn Provider>,
+       providers: Arc<ProviderManager>,
        knowledge_graph: Arc<dyn KnowledgeGraph>,
-       prompts: ConsolidationPrompts,
+       prompt_builder: ConsolidationPromptBuilder,
+       config: ConsolidationConfig,
    }
    impl ConsolidationEngine for LLMConsolidationEngine {
-       async fn consolidate(&self, episodic: EpisodicRecord) -> Result<ConsolidationDecision>;
-       async fn consolidate_batch(&self, records: Vec<EpisodicRecord>) -> Result<Vec<ConsolidationDecision>>;
+       async fn consolidate(&self, session_ids: &[&str], entries: &mut [EpisodicEntry]) -> Result<ConsolidationResult>;
    }
    ```
-3. Implement decision execution (apply ADD/UPDATE/DELETE to knowledge graph)
-4. Add decision logging and audit trail
-5. Create consolidation tests with mock LLM responses
+5. Implement decision execution with rollback on failure
+6. Add retry logic with circuit breaker
+7. Create tests with mock LLM responses (15 tests: 4 decisions × 3 scenarios + 3 error cases)
 
 **Files to Create/Modify**:
-- `llmspell-memory/src/consolidation/engine.rs` (NEW - 600 lines)
-- `llmspell-memory/src/consolidation/decisions.rs` (NEW - 200 lines)
-- `llmspell-memory/src/consolidation/mod.rs` (MODIFY - add engine and decisions)
-- `llmspell-memory/tests/consolidation/engine_test.rs` (NEW - 400 lines)
+- `llmspell-memory/src/consolidation/llm_engine.rs` (NEW - 700 lines)
+- `llmspell-memory/src/consolidation/parser.rs` (NEW - 300 lines)
+- `llmspell-memory/src/consolidation/validator.rs` (NEW - 250 lines)
+- `llmspell-memory/src/consolidation/mod.rs` (MODIFY - add llm_engine, parser, validator)
+- `llmspell-memory/tests/consolidation/llm_engine_test.rs` (NEW - 500 lines)
 
 **Definition of Done**:
+- [ ] LLMConsolidationEngine implements ConsolidationEngine trait
 - [ ] All four decision types (ADD/UPDATE/DELETE/NOOP) functional
-- [ ] Batch consolidation supports >100 records per call
-- [ ] Audit trail logs all consolidation decisions
-- [ ] Tests verify decision logic with mock LLM responses
+- [ ] JSON parser handles malformed responses gracefully
+- [ ] Decision validator prevents invalid operations
+- [ ] Retry logic tested with simulated failures
+- [ ] Audit trail logs all decisions
+- [ ] Tests verify: decision execution, parser recovery, validator checks, retry logic
+- [ ] Zero clippy warnings
 
 ### Task 13.5.3: Implement Background Consolidation Daemon
 
 **Priority**: HIGH
-**Estimated Time**: 3 hours
+**Estimated Time**: 4 hours (enhanced from 3h)
 **Assignee**: Memory Team
+**Status**: PENDING
 
-**Description**: Create a background daemon that periodically consolidates episodic memories into semantic graph.
+**Description**: Create background daemon with adaptive intervals, session prioritization, and health monitoring for reliable consolidation processing.
 
 **Acceptance Criteria**:
 - [ ] ConsolidationDaemon spawns background tokio task
-- [ ] Configurable interval (default: 5 minutes)
-- [ ] Graceful shutdown support
-- [ ] Error handling and retry logic
-- [ ] Metrics emission (records processed, decisions made)
+- [ ] Adaptive intervals based on queue depth (30s fast, 5m normal, 30m slow)
+- [ ] Session-aware consolidation (prioritize active sessions)
+- [ ] Graceful shutdown with in-flight completion
+- [ ] Health monitoring with LLM provider checks
+- [ ] Metrics emission (records processed, decisions made, lag)
+
+**Subtasks**:
+1. **13.5.3a**: ConsolidationDaemon struct (1h)
+   - [ ] Tokio task with interval-based trigger (tokio::time::interval)
+   - [ ] Graceful shutdown with tokio::select! (shutdown_rx channel)
+   - [ ] Configuration: interval, batch_size, max_concurrent
+   - [ ] Shared state: running (AtomicBool), metrics (Arc<Mutex>)
+
+2. **13.5.3b**: Session-aware consolidation (1h)
+   - [ ] Prioritize active sessions (last activity < 5 min)
+   - [ ] Batch by session to maintain context coherence
+   - [ ] Fairness: round-robin across sessions to prevent starvation
+   - [ ] Query EpisodicMemory for unprocessed entries by session
+
+3. **13.5.3c**: Adaptive interval scheduling (1h)
+   - [ ] Fast mode: 30s interval when >100 unprocessed entries
+   - [ ] Normal mode: 5min interval when 10-100 entries
+   - [ ] Slow mode: 30min interval when <10 entries
+   - [ ] Dynamic adjustment: check queue depth every interval
+
+4. **13.5.3d**: Health monitoring (1h)
+   - [ ] LLM provider health check before consolidation (is_ready())
+   - [ ] Backoff on repeated LLM failures (pause daemon for 5min)
+   - [ ] Alerting: emit warning after 10 consecutive failures
+   - [ ] Circuit breaker integration (respect engine circuit breaker)
 
 **Implementation Steps**:
 1. Create `llmspell-memory/src/consolidation/daemon.rs`
@@ -2154,97 +2290,174 @@ Created comprehensive integration tests (285 lines) covering end-to-end pipeline
    ```rust
    pub struct ConsolidationDaemon {
        engine: Arc<LLMConsolidationEngine>,
-       interval: Duration,
+       episodic_memory: Arc<dyn EpisodicMemory>,
+       config: DaemonConfig,
        running: Arc<AtomicBool>,
+       shutdown_tx: watch::Sender<()>,
    }
    impl ConsolidationDaemon {
-       pub async fn start(&self) -> Result<JoinHandle<()>>;
+       pub async fn start(self) -> Result<JoinHandle<()>>;
        pub async fn stop(&self) -> Result<()>;
+       fn select_interval(&self, queue_depth: usize) -> Duration;
    }
    ```
-3. Add interval-based processing loop (select! with shutdown signal)
-4. Implement error recovery (exponential backoff)
-5. Add daemon tests with controlled intervals
+3. Add processing loop with adaptive intervals
+4. Implement session prioritization (active first)
+5. Add health checks and circuit breaker integration
+6. Create daemon tests (8 tests: start/stop, adaptive intervals, session prioritization, health checks)
 
 **Files to Create/Modify**:
-- `llmspell-memory/src/consolidation/daemon.rs` (NEW - 300 lines)
+- `llmspell-memory/src/consolidation/daemon.rs` (NEW - 400 lines)
 - `llmspell-memory/src/consolidation/mod.rs` (MODIFY - add daemon module)
-- `llmspell-memory/tests/consolidation/daemon_test.rs` (NEW - 200 lines)
+- `llmspell-memory/tests/consolidation/daemon_test.rs` (NEW - 300 lines)
 
 **Definition of Done**:
 - [ ] Daemon starts and runs in background successfully
+- [ ] Adaptive intervals adjust based on queue depth
+- [ ] Session prioritization tested (active sessions processed first)
 - [ ] Graceful shutdown completes all in-flight consolidations
-- [ ] Interval configuration tested (1s, 5m, 1h)
-- [ ] Error recovery verified with simulated failures
+- [ ] Health monitoring pauses daemon on LLM failures
+- [ ] Tests verify: start/stop, intervals, prioritization, health checks
+- [ ] Zero clippy warnings
 
 ### Task 13.5.4: Add Consolidation Metrics and Monitoring
 
 **Priority**: MEDIUM
-**Estimated Time**: 2 hours
+**Estimated Time**: 3 hours (enhanced from 2h)
 **Assignee**: Memory Team
+**Status**: PENDING
 
-**Description**: Add metrics collection for consolidation performance and decision tracking.
+**Description**: Add comprehensive metrics for consolidation performance, prompt effectiveness, cost tracking, and consolidation lag.
 
 **Acceptance Criteria**:
-- [ ] Metrics for: total_records_processed, decisions_by_type (ADD/UPDATE/DELETE/NOOP), consolidation_duration_ms, errors_total
-- [ ] DMR (Decision Match Rate) tracking
+- [ ] Core metrics: entries_processed, decisions_by_type, dmr, latency_p95
+- [ ] Prompt performance tracking per PromptVersion (DMR, parse success rate)
+- [ ] Cost tracking (tokens used, LLM cost by model)
+- [ ] Consolidation lag (time from episodic add → processed, P50/P95/P99)
+- [ ] A/B testing infrastructure for prompt versions
 - [ ] Integration with existing llmspell-core metrics system
-- [ ] Exportable to Prometheus/JSON
+
+**Subtasks**:
+1. **13.5.4a**: Core metrics struct (1h)
+   - [ ] ConsolidationMetrics: entries_processed, decisions_by_type, dmr, latency_p95
+   - [ ] Decision distribution tracking (ADD: ~40%, UPDATE: ~30%, NOOP: ~20%, DELETE: ~10%)
+   - [ ] DMR calculation (compare LLM decisions vs ground truth if available)
+   - [ ] Histograms for latency distribution (P50, P95, P99)
+
+2. **13.5.4b**: Prompt performance tracking (1h)
+   - [ ] Metrics per PromptVersion (DMR, decision quality, parse success rate)
+   - [ ] A/B testing infrastructure (50/50 split between V1/V2)
+   - [ ] Auto-promotion (upgrade to better-performing prompt version)
+   - [ ] Track: prompt_version, parse_success_rate, avg_dmr, decision_distribution
+
+3. **13.5.4c**: Cost and lag metrics (1h)
+   - [ ] LLM cost tracking (tokens used × price per model, aggregate by model)
+   - [ ] Token usage: prompt_tokens, completion_tokens, total_tokens
+   - [ ] Consolidation lag (timestamp from episodic add → processed, P50/P95/P99)
+   - [ ] Throughput metrics (entries/sec, decisions/sec)
+   - [ ] Provider health metrics (availability, error rate)
 
 **Implementation Steps**:
 1. Create `llmspell-memory/src/consolidation/metrics.rs`
-2. Define ConsolidationMetrics struct with counters
-3. Add metrics emission in ConsolidationEngine and Daemon
-4. Implement DMR calculation (compare LLM decisions vs ground truth)
-5. Add metrics serialization for export
+2. Define ConsolidationMetrics struct with counters and histograms
+3. Add metrics emission in LLMConsolidationEngine (latency, decisions, tokens)
+4. Add metrics emission in ConsolidationDaemon (throughput, lag, health)
+5. Implement prompt version tracking (A/B testing)
+6. Add cost calculation based on model pricing
+7. Create metrics tests (10 tests: core, prompt, cost, lag, export)
 
 **Files to Create/Modify**:
-- `llmspell-memory/src/consolidation/metrics.rs` (NEW - 250 lines)
-- `llmspell-memory/src/consolidation/engine.rs` (MODIFY - add metrics emission)
+- `llmspell-memory/src/consolidation/metrics.rs` (NEW - 350 lines)
+- `llmspell-memory/src/consolidation/llm_engine.rs` (MODIFY - add metrics emission)
 - `llmspell-memory/src/consolidation/daemon.rs` (MODIFY - add metrics emission)
-- `llmspell-memory/tests/consolidation/metrics_test.rs` (NEW - 150 lines)
+- `llmspell-memory/tests/consolidation/metrics_test.rs` (NEW - 200 lines)
 
 **Definition of Done**:
-- [ ] All key metrics tracked and exportable
-- [ ] DMR calculation verified with test data
-- [ ] Metrics integration with llmspell-core confirmed
-- [ ] Prometheus export format validated
+- [ ] Core metrics tracked (entries, decisions, dmr, latency)
+- [ ] Prompt performance tracking working (per version)
+- [ ] Cost tracking accurate (tokens × price)
+- [ ] Consolidation lag calculated (P50/P95/P99)
+- [ ] A/B testing infrastructure functional
+- [ ] Metrics exportable to JSON (Prometheus deferred to Phase 13.13)
+- [ ] Tests verify: metric collection, aggregation, export
+- [ ] Zero clippy warnings
 
 ### Task 13.5.5: E2E Consolidation Test with Real LLM
 
 **Priority**: HIGH
-**Estimated Time**: 4 hours
+**Estimated Time**: 5 hours (enhanced from 4h)
 **Assignee**: QA + Memory Team
+**Status**: PENDING
 
-**Description**: Create end-to-end test with real LLM (Ollama) for consolidation validation.
+**Description**: Create comprehensive E2E test suite with real LLM (Ollama) covering all decision types, multi-turn scenarios, and error cases.
 
 **Acceptance Criteria**:
-- [ ] Test uses real Ollama model for consolidation decisions
-- [ ] Verifies: episodic → LLM decision → graph update
-- [ ] Measures: DMR baseline, decision distribution (ADD/UPDATE/DELETE/NOOP)
+- [ ] ADD decision test (new entities from episodic)
+- [ ] UPDATE decision test (merge new facts into existing entities)
+- [ ] DELETE decision test (tombstone outdated entities)
+- [ ] NOOP decision test (skip irrelevant content)
+- [ ] Multi-turn consolidation test (sequential dependencies)
+- [ ] Error recovery test (malformed JSON, invalid IDs, LLM unavailable)
 - [ ] Test runs in <2 minutes with small model
+
+**Subtasks**:
+1. **13.5.5a**: ADD decision test (1h)
+   - [ ] Episodic: "Rust is a systems programming language"
+   - [ ] Expected: Entity(Rust, type=language), Entity(systems programming, type=concept)
+   - [ ] Validation: Entities exist in KnowledgeGraph with correct properties
+   - [ ] Verify: Relationship(Rust, is_a, language)
+
+2. **13.5.5b**: UPDATE decision test (1h)
+   - [ ] Episodic 1: "Rust has memory safety"
+   - [ ] Episodic 2: "Rust also has zero-cost abstractions"
+   - [ ] Expected: UPDATE Rust entity with new property (properties["features"] += "zero-cost abstractions")
+   - [ ] Validation: Entity has both features, timestamps updated
+
+3. **13.5.5c**: DELETE decision test (1h)
+   - [ ] Episodic 1: "Python 2.7 is supported"
+   - [ ] Episodic 2: "Python 2.7 is deprecated and unsupported"
+   - [ ] Expected: DELETE Python 2.7 entity (tombstone with valid_until)
+   - [ ] Validation: Entity marked as deleted, not returned in queries
+
+4. **13.5.5d**: NOOP decision test (0.5h)
+   - [ ] Episodic: "The weather is nice today"
+   - [ ] Expected: NOOP (no knowledge graph changes)
+   - [ ] Validation: No entities added, no relationships created
+
+5. **13.5.5e**: Multi-turn consolidation (1h)
+   - [ ] Sequential entries with dependencies (Entity A → Relationship A-B → Entity B properties)
+   - [ ] Validate: Correct ordering, no missing entities, relationships point to valid entities
+   - [ ] Test scenario: "Alice works at Acme" → "Acme is in SF" → "Alice moved to remote work"
+
+6. **13.5.5f**: Error recovery test (0.5h)
+   - [ ] LLM returns malformed JSON → parser recovers with natural language fallback
+   - [ ] LLM returns invalid entity ID → validator rejects, consolidation continues
+   - [ ] LLM unavailable → consolidation deferred, entries marked retry_later
 
 **Implementation Steps**:
 1. Create `llmspell-memory/tests/e2e/consolidation_llm_test.rs`
-2. Setup test with Ollama (llama3.2:3b or similar small model)
-3. Create test scenario:
-   - Add episodic: "Rust is a systems programming language"
-   - Add episodic: "Rust has memory safety without garbage collection"
-   - Trigger consolidation with LLM
-   - Verify entities: Rust, memory safety, garbage collection
-   - Verify relationships: Rust has_feature memory_safety
-4. Measure decision distribution
-5. Calculate baseline DMR (if ground truth available)
+2. Setup test infrastructure:
+   - Initialize ProviderManager with Ollama (llama3.2:3b)
+   - Create InMemoryEpisodicMemory + SurrealDB KnowledgeGraph
+   - Build LLMConsolidationEngine with test configuration
+3. Implement 6 test scenarios (ADD/UPDATE/DELETE/NOOP/multi-turn/errors)
+4. Add decision distribution tracking
+5. Calculate baseline DMR (compare to ground truth)
+6. Create test helpers (add_episodic, assert_entity_exists, assert_relationship_exists)
 
 **Files to Create/Modify**:
-- `llmspell-memory/tests/e2e/consolidation_llm_test.rs` (NEW - 350 lines)
+- `llmspell-memory/tests/e2e/consolidation_llm_test.rs` (NEW - 600 lines)
 - `llmspell-memory/tests/e2e/mod.rs` (MODIFY - add consolidation_llm_test)
+- `llmspell-memory/tests/e2e/test_helpers.rs` (NEW - 200 lines)
 
 **Definition of Done**:
-- [ ] E2E test passes with real LLM
-- [ ] Entities and relationships created correctly
-- [ ] Decision distribution measured (expect ~40% ADD, ~30% UPDATE, ~20% NOOP, ~10% DELETE)
-- [ ] Test runs in CI with Ollama available
+- [ ] All 6 test scenarios pass with real LLM
+- [ ] ADD/UPDATE/DELETE/NOOP decisions validated
+- [ ] Multi-turn consolidation maintains consistency
+- [ ] Error recovery prevents data corruption
+- [ ] Decision distribution measured (expected: ~40% ADD, ~30% UPDATE, ~20% NOOP, ~10% DELETE)
+- [ ] Test runs in CI with Ollama available (or skipped with #[ignore] if unavailable)
+- [ ] Zero clippy warnings
 
 ---
 
