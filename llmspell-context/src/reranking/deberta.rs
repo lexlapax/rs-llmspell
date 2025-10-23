@@ -64,20 +64,14 @@ impl DeBERTaReranker {
     pub async fn new() -> Result<Self> {
         info!("Initializing DeBERTa reranker");
 
-        // Auto-detect device
-        let device = Self::detect_device();
-        debug!("Selected device: {:?}", device);
+        let device = Self::setup_device();
+        let cache_dir = Self::setup_cache_dir()?;
 
-        // Get cache directory
-        let cache_dir = Self::get_cache_dir()?;
-        debug!("Model cache directory: {:?}", cache_dir);
-
-        // Download model if not cached
+        // Ensure model is downloaded
         Self::ensure_model_downloaded(&cache_dir).await?;
 
-        // Load tokenizer and model
-        let tokenizer = Self::load_tokenizer(&cache_dir)?;
-        let model = Self::load_model(&cache_dir, &device)?;
+        // Load components
+        let (tokenizer, model) = Self::load_components(&cache_dir, &device)?;
 
         info!("DeBERTa reranker initialized successfully");
 
@@ -88,6 +82,27 @@ impl DeBERTaReranker {
             max_length: 512,
             batch_size: 8,
         })
+    }
+
+    /// Setup device with logging
+    fn setup_device() -> Device {
+        let device = Self::detect_device();
+        debug!("Selected device: {:?}", device);
+        device
+    }
+
+    /// Setup cache directory with logging
+    fn setup_cache_dir() -> Result<PathBuf> {
+        let cache_dir = Self::get_cache_dir()?;
+        debug!("Model cache directory: {:?}", cache_dir);
+        Ok(cache_dir)
+    }
+
+    /// Load tokenizer and model together
+    fn load_components(cache_dir: &Path, device: &Device) -> Result<(Tokenizer, BertModel)> {
+        let tokenizer = Self::load_tokenizer(cache_dir)?;
+        let model = Self::load_model(cache_dir, device)?;
+        Ok((tokenizer, model))
     }
 
     /// Create `DeBERTa` reranker with custom batch size

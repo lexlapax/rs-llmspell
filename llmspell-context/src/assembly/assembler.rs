@@ -86,11 +86,24 @@ impl ContextAssembler {
     #[must_use]
     pub fn assemble(
         &self,
-        mut chunks: Vec<RankedChunk>,
+        chunks: Vec<RankedChunk>,
         _query: &QueryUnderstanding,
     ) -> AssembledContext {
         debug!("Assembling context from {} chunks", chunks.len());
 
+        // Filter and sort chunks
+        let filtered_chunks = self.filter_and_sort_chunks(chunks);
+
+        if filtered_chunks.is_empty() {
+            return Self::empty_context();
+        }
+
+        // Build final context
+        self.build_context(filtered_chunks)
+    }
+
+    /// Filter by confidence and sort by timestamp
+    fn filter_and_sort_chunks(&self, mut chunks: Vec<RankedChunk>) -> Vec<RankedChunk> {
         // Step 1: Filter by confidence threshold
         chunks.retain(|chunk| chunk.score >= self.min_confidence);
         debug!(
@@ -99,14 +112,15 @@ impl ContextAssembler {
             self.min_confidence
         );
 
-        if chunks.is_empty() {
-            return Self::empty_context();
-        }
-
         // Step 2: Sort by timestamp (recent first)
         chunks.sort_by(|a, b| b.chunk.timestamp.cmp(&a.chunk.timestamp));
         trace!("Sorted {} chunks by timestamp (descending)", chunks.len());
 
+        chunks
+    }
+
+    /// Build final assembled context from filtered chunks
+    fn build_context(&self, chunks: Vec<RankedChunk>) -> AssembledContext {
         // Step 3: Enforce token budget
         let (selected_chunks, token_count) = self.enforce_token_budget(chunks);
         debug!(
@@ -119,6 +133,7 @@ impl ContextAssembler {
         // Step 4: Calculate metadata
         let temporal_span = Self::calculate_temporal_span(&selected_chunks);
         let total_confidence = Self::calculate_average_confidence(&selected_chunks);
+        let formatted = Self::format_context(&selected_chunks);
 
         debug!(
             "Assembly complete: {} chunks, {:.2} avg confidence, {} tokens",
@@ -126,9 +141,6 @@ impl ContextAssembler {
             total_confidence,
             token_count
         );
-
-        // Format chunks into context string
-        let formatted = Self::format_context(&selected_chunks);
 
         AssembledContext {
             chunks: selected_chunks,
