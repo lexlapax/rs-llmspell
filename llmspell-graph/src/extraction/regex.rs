@@ -44,13 +44,13 @@ static IN_PATTERN: LazyLock<Regex> = LazyLock::new(|| {
 });
 
 static OF_PATTERN: LazyLock<Regex> = LazyLock::new(|| {
-    Regex::new(r"(?i)([a-z]+(?:\s+[a-z]+)*)\s+of\s+([A-Z][a-zA-Z0-9]+(?:\s+[A-Z][a-zA-Z0-9]+)*)").unwrap()
+    Regex::new(r"(?i)([a-z]+(?:\s+[a-z]+)*)\s+of\s+([A-Z][a-zA-Z0-9]+(?:\s+[A-Z][a-zA-Z0-9]+)*)")
+        .unwrap()
 });
 
 /// Entity mention extraction pattern (capitalized words/phrases)
-static ENTITY_PATTERN: LazyLock<Regex> = LazyLock::new(|| {
-    Regex::new(r"\b([A-Z][a-zA-Z0-9]*(?:\s+[A-Z][a-zA-Z0-9]*)*)\b").unwrap()
-});
+static ENTITY_PATTERN: LazyLock<Regex> =
+    LazyLock::new(|| Regex::new(r"\b([A-Z][a-zA-Z0-9]*(?:\s+[A-Z][a-zA-Z0-9]*)*)\b").unwrap());
 
 /// Regex-based entity and relationship extractor
 ///
@@ -261,11 +261,11 @@ impl RegexExtractor {
 
         // Check for type indicators near the entity name
         // Use regex-like matching to catch variations
-        if context.contains(&name_lower) && (
-            context.contains(&format!("{name_lower} is a")) && context.contains("language")
-            || context.contains(&format!("{name_lower} language"))
-            || (context.contains(&name_lower) && context.contains("programming language"))
-        ) {
+        if context.contains(&name_lower)
+            && (context.contains(&format!("{name_lower} is a")) && context.contains("language")
+                || context.contains(&format!("{name_lower} language"))
+                || (context.contains(&name_lower) && context.contains("programming language")))
+        {
             return "programming_language".to_string();
         }
 
@@ -438,7 +438,10 @@ mod tests {
         assert!(entities.iter().any(|e| e.name == "Tokio"));
 
         // Should find relationships
-        let is_a_count = rels.iter().filter(|r| r.relationship_type == "is_a").count();
+        let is_a_count = rels
+            .iter()
+            .filter(|r| r.relationship_type == "is_a")
+            .count();
         let has_count = rels
             .iter()
             .filter(|r| r.relationship_type == "has_feature")

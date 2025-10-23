@@ -97,8 +97,8 @@ impl SemanticMemory for GraphSemanticMemory {
     }
 
     async fn query_by_type(&self, entity_type: &str) -> Result<Vec<Entity>> {
-        let query = llmspell_graph::types::TemporalQuery::new()
-            .with_entity_type(entity_type.to_string());
+        let query =
+            llmspell_graph::types::TemporalQuery::new().with_entity_type(entity_type.to_string());
 
         self.graph
             .query_temporal(query)
@@ -163,20 +163,12 @@ mod tests {
         let memory = GraphSemanticMemory::new_temp().await.unwrap();
 
         memory
-            .upsert_entity(Entity::new(
-                "Rust".into(),
-                "language".into(),
-                json!({}),
-            ))
+            .upsert_entity(Entity::new("Rust".into(), "language".into(), json!({})))
             .await
             .unwrap();
 
         memory
-            .upsert_entity(Entity::new(
-                "Python".into(),
-                "language".into(),
-                json!({}),
-            ))
+            .upsert_entity(Entity::new("Python".into(), "language".into(), json!({})))
             .await
             .unwrap();
 

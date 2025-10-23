@@ -18,12 +18,18 @@ fn test_technical_documentation_extraction() {
     let rels = extractor.extract_relationships(text);
 
     // Verify entity extraction
-    assert!(entities.iter().any(|e| e.name == "Rust"), "Should find Rust");
+    assert!(
+        entities.iter().any(|e| e.name == "Rust"),
+        "Should find Rust"
+    );
     assert!(
         entities.iter().any(|e| e.name == "Cargo"),
         "Should find Cargo"
     );
-    assert!(entities.iter().any(|e| e.name == "LLVM"), "Should find LLVM");
+    assert!(
+        entities.iter().any(|e| e.name == "LLVM"),
+        "Should find LLVM"
+    );
 
     // Verify relationship extraction
     let is_a_rels: Vec<_> = rels
@@ -36,7 +42,10 @@ fn test_technical_documentation_extraction() {
         .iter()
         .filter(|r| r.relationship_type == "has_feature")
         .collect();
-    assert!(!has_rels.is_empty(), "Should find has_feature relationships");
+    assert!(
+        !has_rels.is_empty(),
+        "Should find has_feature relationships"
+    );
 
     // Check specific relationships
     assert!(
@@ -246,7 +255,11 @@ fn test_performance_target() {
 
     // Performance target: <5ms for 1KB
     println!("Extraction took {duration:?} for 1KB text");
-    println!("Found {} entities, {} relationships", entities.len(), rels.len());
+    println!(
+        "Found {} entities, {} relationships",
+        entities.len(),
+        rels.len()
+    );
 
     assert!(
         duration.as_millis() < 5,
