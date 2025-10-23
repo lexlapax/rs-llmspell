@@ -225,6 +225,55 @@ fn test_recall_benchmark() {
 }
 
 #[test]
+#[allow(clippy::cast_precision_loss)] // Test metrics with small counts
+fn test_precision_benchmark() {
+    let extractor = RegexExtractor::new();
+
+    // Text with known true/false positives for precision measurement
+    let text = "Rust is a systems programming language. \
+                However, Python is also a language. \
+                The Rust compiler is fast. \
+                Many developers use Python for scripting. \
+                When comparing languages, each has benefits. \
+                Docker is a platform for containers. \
+                Some prefer Java while others prefer Go.";
+
+    let entities = extractor.extract_entities(text);
+
+    // Expected true positives: Rust, Python, Docker, Java, Go = 5
+    let true_positives = ["Rust", "Python", "Docker", "Java", "Go"];
+    let tp_count = true_positives
+        .iter()
+        .filter(|name| entities.iter().any(|e| &e.name == *name))
+        .count();
+
+    // Common false positives (stopwords that might slip through): The, However, When, Many, Some
+    let common_false_positives = ["The", "However", "When", "Many", "Some", "Each"];
+    let fp_count = common_false_positives
+        .iter()
+        .filter(|name| entities.iter().any(|e| &e.name == *name))
+        .count();
+
+    // Precision = TP / (TP + FP)
+    let precision = tp_count as f64 / (tp_count + fp_count) as f64;
+
+    println!("True positives found: {tp_count}/{}", true_positives.len());
+    println!("False positives found: {fp_count} (stopwords leaked)");
+    println!("Precision: {:.1}%", precision * 100.0);
+    println!("Extracted entities: {:?}", entities.iter().map(|e| &e.name).collect::<Vec<_>>());
+
+    // Assert >60% precision (better than original 30-40%)
+    assert!(
+        precision >= 0.6,
+        "Precision should be >60% with stopword filtering, got {:.1}%",
+        precision * 100.0
+    );
+
+    // Also verify no common stopwords leaked
+    assert_eq!(fp_count, 0, "No common stopwords should be extracted as entities");
+}
+
+#[test]
 fn test_performance_target() {
     let extractor = RegexExtractor::new();
 
