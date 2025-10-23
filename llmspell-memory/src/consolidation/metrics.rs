@@ -23,6 +23,7 @@
 
 use crate::consolidation::{DecisionPayload, PromptVersion};
 use crate::types::ConsolidationResult;
+use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::sync::Arc;
@@ -221,6 +222,86 @@ impl Default for AutoPromotionConfig {
     }
 }
 
+/// Model pricing (cost per token)
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ModelPricing {
+    /// Cost per input token (in USD)
+    pub input_cost_per_token: f64,
+    /// Cost per output token (in USD)
+    pub output_cost_per_token: f64,
+}
+
+impl Default for ModelPricing {
+    fn default() -> Self {
+        Self {
+            input_cost_per_token: 0.0,
+            output_cost_per_token: 0.0,
+        }
+    }
+}
+
+/// Token usage for a single consolidation
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
+pub struct TokenUsage {
+    /// Tokens in prompt
+    pub prompt_tokens: u64,
+    /// Tokens in completion
+    pub completion_tokens: u64,
+    /// Total tokens (prompt + completion)
+    pub total_tokens: u64,
+}
+
+impl TokenUsage {
+    /// Calculate cost based on model pricing
+    #[must_use]
+    #[allow(clippy::cast_precision_loss)]
+    pub fn calculate_cost(&self, pricing: &ModelPricing) -> f64 {
+        (self.prompt_tokens as f64).mul_add(
+            pricing.input_cost_per_token,
+            self.completion_tokens as f64 * pricing.output_cost_per_token,
+        )
+    }
+}
+
+/// Per-model cost and token metrics
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
+pub struct ModelMetrics {
+    /// Total consolidations with this model
+    pub consolidations: u64,
+    /// Total token usage
+    pub token_usage: TokenUsage,
+    /// Total cost (USD)
+    pub total_cost: f64,
+    /// Number of errors
+    pub errors: u64,
+}
+
+/// Consolidation lag statistics (episodic add → processed)
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
+pub struct LagStats {
+    /// Number of measurements
+    pub count: u64,
+    /// P50 lag (milliseconds)
+    pub p50_ms: f64,
+    /// P95 lag (milliseconds)
+    pub p95_ms: f64,
+    /// P99 lag (milliseconds)
+    pub p99_ms: f64,
+}
+
+/// Throughput metrics
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
+pub struct ThroughputMetrics {
+    /// Entries processed per second
+    pub entries_per_sec: f64,
+    /// Decisions made per second
+    pub decisions_per_sec: f64,
+    /// Window start timestamp
+    pub window_start: Option<DateTime<Utc>>,
+    /// Window end timestamp
+    pub window_end: Option<DateTime<Utc>>,
+}
+
 /// Core consolidation metrics
 ///
 /// Tracks entries processed, decision distribution, and latency statistics.
@@ -240,6 +321,12 @@ pub struct CoreMetrics {
     pub validation_errors: u64,
     /// Per-version prompt metrics
     pub prompt_metrics: HashMap<PromptVersion, PromptMetrics>,
+    /// Per-model cost and token metrics
+    pub model_metrics: HashMap<String, ModelMetrics>,
+    /// Consolidation lag statistics
+    pub lag: LagStats,
+    /// Throughput metrics
+    pub throughput: ThroughputMetrics,
 }
 
 /// Consolidation metrics collector
@@ -248,10 +335,12 @@ pub struct CoreMetrics {
 pub struct ConsolidationMetrics {
     core: Arc<RwLock<CoreMetrics>>,
     latencies: Arc<RwLock<Vec<f64>>>, // For percentile calculation
+    lags: Arc<RwLock<Vec<f64>>>,      // For lag percentile calculation
     version_strategy: Arc<RwLock<VersionSelectionStrategy>>,
     auto_promotion: Arc<RwLock<AutoPromotionConfig>>,
     #[allow(clippy::zero_sized_map_values)] // PromptVersion zero-sized until V2 added
     session_versions: Arc<RwLock<HashMap<String, PromptVersion>>>, // session_id -> version
+    model_pricing: Arc<RwLock<HashMap<String, ModelPricing>>>,     // model -> pricing
 }
 
 impl Default for ConsolidationMetrics {
@@ -268,10 +357,22 @@ impl ConsolidationMetrics {
         Self {
             core: Arc::new(RwLock::new(CoreMetrics::default())),
             latencies: Arc::new(RwLock::new(Vec::new())),
+            lags: Arc::new(RwLock::new(Vec::new())),
             version_strategy: Arc::new(RwLock::new(VersionSelectionStrategy::default())),
             auto_promotion: Arc::new(RwLock::new(AutoPromotionConfig::default())),
             session_versions: Arc::new(RwLock::new(HashMap::new())),
+            model_pricing: Arc::new(RwLock::new(HashMap::new())),
         }
+    }
+
+    /// Set model pricing for cost calculation
+    pub async fn set_model_pricing(&self, model: String, pricing: ModelPricing) {
+        self.model_pricing.write().await.insert(model, pricing);
+    }
+
+    /// Get model pricing
+    pub async fn get_model_pricing(&self, model: &str) -> Option<ModelPricing> {
+        self.model_pricing.read().await.get(model).cloned()
     }
 
     /// Set version selection strategy
@@ -319,6 +420,7 @@ impl ConsolidationMetrics {
     ///
     /// Panics if latency values contain NaN (not expected in normal operation).
     #[allow(clippy::significant_drop_tightening)] // Intentional lock scope for atomicity
+    #[allow(clippy::too_many_arguments)] // Metrics collection requires many parameters
     pub async fn record_consolidation(
         &self,
         result: &ConsolidationResult,
@@ -326,6 +428,9 @@ impl ConsolidationMetrics {
         duration: Duration,
         version: PromptVersion,
         parse_success: bool,
+        model: Option<&str>,
+        token_usage: Option<TokenUsage>,
+        episodic_timestamps: &[DateTime<Utc>],
     ) {
         let duration_ms = duration.as_secs_f64() * 1000.0;
 
@@ -367,6 +472,28 @@ impl ConsolidationMetrics {
                 }
             }
 
+            // Update per-model metrics (token usage, cost)
+            if let (Some(model_name), Some(usage)) = (model, token_usage.clone()) {
+                let model_metrics = core.model_metrics.entry(model_name.to_string()).or_default();
+                model_metrics.consolidations += 1;
+                model_metrics.token_usage.prompt_tokens += usage.prompt_tokens;
+                model_metrics.token_usage.completion_tokens += usage.completion_tokens;
+                model_metrics.token_usage.total_tokens += usage.total_tokens;
+
+                // Calculate cost if pricing available
+                if let Some(pricing) = self.model_pricing.read().await.get(model_name) {
+                    let cost = usage.calculate_cost(pricing);
+                    model_metrics.total_cost += cost;
+                }
+            }
+
+            // Update throughput window
+            let now = Utc::now();
+            if core.throughput.window_start.is_none() {
+                core.throughput.window_start = Some(now);
+            }
+            core.throughput.window_end = Some(now);
+
             // Track latency and clone
             let cloned = {
                 let mut latencies = self.latencies.write().await;
@@ -376,6 +503,33 @@ impl ConsolidationMetrics {
 
             cloned
         }; // Core lock dropped here
+
+        // Calculate consolidation lag (episodic timestamp → now)
+        if !episodic_timestamps.is_empty() {
+            let now = Utc::now();
+            let mut lag_values = self.lags.write().await;
+
+            #[allow(clippy::cast_precision_loss)] // Milliseconds precision acceptable for lag metrics
+            for timestamp in episodic_timestamps {
+                let lag_ms = (now - *timestamp).num_milliseconds() as f64;
+                lag_values.push(lag_ms);
+            }
+
+            // Update lag stats
+            if !lag_values.is_empty() {
+                let mut sorted_lags = lag_values.clone();
+                sorted_lags.sort_by(|a, b| a.partial_cmp(b).unwrap());
+
+                let mut core = self.core.write().await;
+                #[allow(clippy::cast_precision_loss)]
+                {
+                    core.lag.count = sorted_lags.len() as u64;
+                    core.lag.p50_ms = percentile(&sorted_lags, 50.0);
+                    core.lag.p95_ms = percentile(&sorted_lags, 95.0);
+                    core.lag.p99_ms = percentile(&sorted_lags, 99.0);
+                }
+            }
+        }
 
         // Sort for percentile calculation (outside locks)
         sorted.sort_by(|a, b| a.partial_cmp(b).unwrap());
@@ -416,7 +570,49 @@ impl ConsolidationMetrics {
     pub async fn reset(&self) {
         *self.core.write().await = CoreMetrics::default();
         self.latencies.write().await.clear();
+        self.lags.write().await.clear();
         self.session_versions.write().await.clear();
+    }
+
+    /// Calculate current throughput metrics
+    ///
+    /// Returns entries/sec and decisions/sec based on accumulated data and time window.
+    /// Also updates core.throughput with calculated values.
+    pub async fn calculate_throughput(&self) -> ThroughputMetrics {
+        let mut core = self.core.write().await;
+
+        #[allow(clippy::cast_precision_loss)] // Milliseconds precision acceptable for throughput
+        let window_duration_secs = if let (Some(start), Some(end)) =
+            (core.throughput.window_start, core.throughput.window_end)
+        {
+            (end - start).num_milliseconds() as f64 / 1000.0
+        } else {
+            0.0
+        };
+
+        if window_duration_secs > 0.0 {
+            #[allow(clippy::cast_precision_loss)]
+            {
+                core.throughput.entries_per_sec = core.entries_processed as f64 / window_duration_secs;
+                core.throughput.decisions_per_sec =
+                    core.decision_distribution.total() as f64 / window_duration_secs;
+            }
+        }
+
+        core.throughput.clone()
+    }
+
+    /// Record model error
+    #[allow(clippy::significant_drop_tightening)] // Short operation, lock scope acceptable
+    pub async fn record_model_error(&self, model: &str) {
+        let mut core = self.core.write().await;
+        let model_metrics = core.model_metrics.entry(model.to_string()).or_default();
+        model_metrics.errors += 1;
+    }
+
+    /// Get model metrics
+    pub async fn get_model_metrics(&self, model: &str) -> Option<ModelMetrics> {
+        self.core.read().await.model_metrics.get(model).cloned()
     }
 
     /// Check if auto-promotion should occur
@@ -606,6 +802,9 @@ mod tests {
                 Duration::from_millis(100),
                 PromptVersion::V1,
                 true,
+                None,
+                None,
+                &[],
             )
             .await;
 
@@ -669,6 +868,9 @@ mod tests {
                 Duration::from_millis(50),
                 PromptVersion::V1,
                 true,
+                None,
+                None,
+                &[],
             )
             .await;
 
@@ -701,6 +903,9 @@ mod tests {
                 Duration::from_millis(50),
                 PromptVersion::V1,
                 true,
+                None,
+                None,
+                &[],
             )
             .await;
 
@@ -712,6 +917,9 @@ mod tests {
                 Duration::from_millis(60),
                 PromptVersion::V1,
                 false,
+                None,
+                None,
+                &[],
             )
             .await;
 
@@ -775,5 +983,182 @@ mod tests {
         // No promotion with only one version
         let promotion = metrics.check_auto_promotion().await;
         assert!(promotion.is_none());
+    }
+
+    #[tokio::test]
+    async fn test_token_usage_and_cost() {
+        let metrics = ConsolidationMetrics::new();
+
+        // Set pricing
+        let pricing = ModelPricing {
+            input_cost_per_token: 0.000001,  // $1 per million tokens
+            output_cost_per_token: 0.000002, // $2 per million tokens
+        };
+        metrics
+            .set_model_pricing("ollama/llama3.2:3b".to_string(), pricing)
+            .await;
+
+        let result = ConsolidationResult {
+            entries_processed: 5,
+            entities_added: 2,
+            entities_updated: 1,
+            entities_deleted: 0,
+            entries_skipped: 2,
+            duration_ms: 50,
+        };
+
+        let usage = TokenUsage {
+            prompt_tokens: 1000,
+            completion_tokens: 500,
+            total_tokens: 1500,
+        };
+
+        metrics
+            .record_consolidation(
+                &result,
+                &[],
+                Duration::from_millis(50),
+                PromptVersion::V1,
+                true,
+                Some("ollama/llama3.2:3b"),
+                Some(usage.clone()),
+                &[],
+            )
+            .await;
+
+        let model_metrics = metrics
+            .get_model_metrics("ollama/llama3.2:3b")
+            .await
+            .unwrap();
+        assert_eq!(model_metrics.consolidations, 1);
+        assert_eq!(model_metrics.token_usage.prompt_tokens, 1000);
+        assert_eq!(model_metrics.token_usage.completion_tokens, 500);
+        assert_eq!(model_metrics.token_usage.total_tokens, 1500);
+
+        // Cost: (1000 * 0.000001) + (500 * 0.000002) = 0.001 + 0.001 = 0.002
+        assert!((model_metrics.total_cost - 0.002).abs() < 0.0001);
+    }
+
+    #[tokio::test]
+    async fn test_consolidation_lag() {
+        use chrono::Duration as ChronoDuration;
+
+        let metrics = ConsolidationMetrics::new();
+
+        let result = ConsolidationResult {
+            entries_processed: 3,
+            entities_added: 1,
+            entities_updated: 0,
+            entities_deleted: 0,
+            entries_skipped: 2,
+            duration_ms: 50,
+        };
+
+        // Simulate episodic entries added 100ms, 200ms, 300ms ago
+        let now = Utc::now();
+        let timestamps = vec![
+            now - ChronoDuration::milliseconds(100),
+            now - ChronoDuration::milliseconds(200),
+            now - ChronoDuration::milliseconds(300),
+        ];
+
+        metrics
+            .record_consolidation(
+                &result,
+                &[],
+                Duration::from_millis(50),
+                PromptVersion::V1,
+                true,
+                None,
+                None,
+                &timestamps,
+            )
+            .await;
+
+        let snapshot = metrics.snapshot().await;
+        assert_eq!(snapshot.lag.count, 3);
+        // P50 should be around 200ms
+        assert!(snapshot.lag.p50_ms > 150.0 && snapshot.lag.p50_ms < 250.0);
+        // P95 should be around 300ms
+        assert!(snapshot.lag.p95_ms > 250.0 && snapshot.lag.p95_ms < 350.0);
+    }
+
+    #[tokio::test]
+    async fn test_throughput_calculation() {
+        let metrics = ConsolidationMetrics::new();
+
+        let result = ConsolidationResult {
+            entries_processed: 100,
+            entities_added: 50,
+            entities_updated: 30,
+            entities_deleted: 10,
+            entries_skipped: 10,
+            duration_ms: 1000,
+        };
+
+        let decisions = vec![
+            DecisionPayload::Add {
+                entity_id: "e1".to_string(),
+            },
+            DecisionPayload::Add {
+                entity_id: "e2".to_string(),
+            },
+            DecisionPayload::Update {
+                entity_id: "e3".to_string(),
+                changes: HashMap::new(),
+            },
+        ];
+
+        // Record first consolidation
+        metrics
+            .record_consolidation(
+                &result,
+                &decisions,
+                Duration::from_millis(1000),
+                PromptVersion::V1,
+                true,
+                None,
+                None,
+                &[],
+            )
+            .await;
+
+        // Wait to create time window
+        tokio::time::sleep(Duration::from_millis(100)).await;
+
+        // Record second consolidation (extends window)
+        metrics
+            .record_consolidation(
+                &result,
+                &decisions,
+                Duration::from_millis(1000),
+                PromptVersion::V1,
+                true,
+                None,
+                None,
+                &[],
+            )
+            .await;
+
+        let throughput = metrics.calculate_throughput().await;
+        // Should process 200 entries over ~100ms window = ~2000 entries/sec
+        assert!(throughput.entries_per_sec > 0.0);
+        assert!(throughput.decisions_per_sec > 0.0);
+        assert!(throughput.window_start.is_some());
+        assert!(throughput.window_end.is_some());
+    }
+
+    #[tokio::test]
+    async fn test_model_error_tracking() {
+        let metrics = ConsolidationMetrics::new();
+
+        metrics.record_model_error("ollama/llama3.2:3b").await;
+        metrics.record_model_error("ollama/llama3.2:3b").await;
+
+        let model_metrics = metrics
+            .get_model_metrics("ollama/llama3.2:3b")
+            .await
+            .unwrap();
+        assert_eq!(model_metrics.errors, 2);
     }
 }

@@ -42,7 +42,8 @@ pub use llm_engine::{LLMConsolidationConfig, LLMConsolidationEngine};
 pub use manual::ManualConsolidationEngine;
 pub use metrics::{
     AutoPromotionConfig, ConsolidationMetrics, CoreMetrics, DecisionDistribution, DecisionType,
-    LatencyStats, PromptMetrics, VersionSelectionStrategy,
+    LagStats, LatencyStats, ModelMetrics, ModelPricing, PromptMetrics, ThroughputMetrics,
+    TokenUsage, VersionSelectionStrategy,
 };
 pub use noop::NoopConsolidationEngine;
 pub use prompt_schema::{
