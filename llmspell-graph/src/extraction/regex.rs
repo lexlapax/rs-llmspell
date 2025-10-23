@@ -419,6 +419,7 @@ mod tests {
     }
 
     #[test]
+    #[allow(clippy::cast_precision_loss)] // Test values < 100, precision loss impossible
     fn test_recall_common_patterns() {
         let extractor = RegexExtractor::new();
         let text = "Rust is a systems programming language. \

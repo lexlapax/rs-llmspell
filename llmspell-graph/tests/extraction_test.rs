@@ -1,6 +1,6 @@
 //! Integration tests for entity and relationship extraction
 //!
-//! Tests the RegexExtractor against real-world text samples to verify
+//! Tests the `RegexExtractor` against real-world text samples to verify
 //! >50% recall and <5ms performance targets.
 
 use llmspell_graph::extraction::RegexExtractor;
@@ -154,6 +154,7 @@ fn test_geographical_relationships() {
 }
 
 #[test]
+#[allow(clippy::cast_precision_loss)] // Test metrics with small counts
 fn test_recall_benchmark() {
     let extractor = RegexExtractor::new();
 
