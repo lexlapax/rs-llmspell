@@ -14,8 +14,8 @@ description = "Bi-temporal knowledge graph with swappable backends for llmspell"
 llmspell-core = { path = "../llmspell-core" }
 llmspell-utils = { path = "../llmspell-utils" }
 
-# SurrealDB for graph storage (embedded mode)
-surrealdb = "2.0"
+# SurrealDB for graph storage (embedded mode with RocksDB)
+surrealdb = { version = "2.0", features = ["kv-rocksdb"] }
 
 # Async runtime
 tokio = { workspace = true }

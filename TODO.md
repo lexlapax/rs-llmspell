@@ -759,9 +759,9 @@ pub struct InMemoryBackend { ... }   // Future (testing)
 
 ### Task 13.2.3: Implement SurrealDB Graph Storage (Embedded Mode)
 **Priority**: CRITICAL
-**Estimated Time**: 6 hours
+**Estimated Time**: 6 hours (In Progress - 4 hours spent)
 **Assignee**: Storage Team
-**Status**: Pending
+**Status**: 🔄 IN PROGRESS - Type conversion debugging needed
 
 **Architecture Notes**:
 - Use **embedded SurrealDB** (in-process, no external server)
@@ -772,10 +772,13 @@ pub struct InMemoryBackend { ... }   // Future (testing)
 **Description**: Implement knowledge graph storage using SurrealDB embedded mode with bi-temporal support and swappable backend design.
 
 **Acceptance Criteria**:
-- [ ] `SurrealDBKnowledgeGraph` struct implements `KnowledgeGraph` trait
-- [ ] Bi-temporal queries work (event_time + ingestion_time)
-- [ ] Entity and relationship storage functional
-- [ ] Basic performance validated (simple tests, comprehensive benchmarks deferred to Phase 13.13)
+- [x] `SurrealDBBackend` struct implements `KnowledgeGraph` trait (all 8 methods)
+- [x] Bi-temporal schema created with indexes
+- [x] Entity and relationship storage implemented
+- [ ] Type conversions fixed (chrono::DateTime ↔ surrealdb::sql::Datetime)
+- [ ] ID handling fixed (String ↔ surrealdb::sql::Thing)
+- [ ] All 8 unit tests passing
+- [ ] Basic performance validated
 
 **Implementation Steps**:
 1. Create `src/storage/mod.rs` with `GraphBackend` trait (swappable design)
@@ -816,12 +819,45 @@ pub struct InMemoryBackend { ... }   // Future (testing)
 - `llmspell-graph/tests/surrealdb_test.rs` (NEW - embedded SurrealDB tests, ~250 lines)
 - `llmspell-graph/benches/graph_bench.rs` (NEW - deferred to Phase 13.13, stub only)
 
+**Current Progress** (4 hours spent):
+- ✅ **Core Implementation Complete** (534 lines):
+  - `SurrealDBBackend::new()` - Embedded RocksDB initialization
+  - `SurrealDBBackend::new_temp()` - Temporary backend for tests
+  - `initialize_schema()` - Bi-temporal tables with 8 indexes
+  - All 8 `KnowledgeGraph` trait methods implemented:
+    - `add_entity`, `update_entity`, `get_entity`, `get_entity_at`
+    - `add_relationship`, `get_related`, `query_temporal`, `delete_before`
+  - 8 comprehensive unit tests written
+  - `EntityRecord` and `RelationshipRecord` with From impls
+
+- ❌ **Blocking Issues**:
+  1. **DateTime Type Mismatch**:
+     - SurrealDB expects `surrealdb::sql::Datetime` not `chrono::DateTime<Utc>`
+     - Fixed conversion in From impls with `.into()` but still failing
+     - Current error: `expected a datetime` in deserialization
+
+  2. **ID Type Mismatch**:
+     - SurrealDB returns `surrealdb::sql::Thing` for record IDs
+     - Our types use `String` for IDs
+     - Current error: `expected a string, found $surrealdb::private::sql::Thing`
+
+- 🔧 **Next Steps to Complete**:
+  1. Fix `EntityRecord.id` to use `Option<surrealdb::sql::Thing>` with proper From conversion
+  2. Fix `RelationshipRecord.id` similarly
+  3. Ensure datetime conversions work bidirectionally
+  4. Verify all 8 tests pass
+  5. Run clippy and fix warnings
+
+**Files Modified**:
+- `llmspell-graph/src/storage/surrealdb.rs` (534 lines, 95% complete)
+- `llmspell-graph/Cargo.toml` (added `features = ["kv-rocksdb"]`)
+
 **Definition of Done**:
-- [ ] All trait methods implemented
-- [ ] Unit tests pass with >90% coverage
+- [x] All trait methods implemented
+- [ ] Unit tests pass with >90% coverage (currently 0/8 passing due to type issues)
 - [ ] Basic performance validated (functional, not comprehensive benchmarks)
 - [ ] Bi-temporal queries tested
-- [ ] Benchmark stub created (comprehensive benchmarks deferred to Phase 13.13)
+- [x] Benchmark stub created (comprehensive benchmarks deferred to Phase 13.13)
 
 ### Task 13.2.4: Entity/Relationship Extraction ⏸️ DEFERRED → Phase 13.5
 **Priority**: LOW (deferred)

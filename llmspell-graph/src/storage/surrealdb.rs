@@ -1,33 +1,118 @@
 //! `SurrealDB` backend implementation for knowledge graph
 //!
-//! This module will be fully implemented in Task 13.2.3.
-//! For now, this is a stub to ensure crate structure compiles.
+//! Provides embedded, file-based graph storage with full bi-temporal support.
 
-use crate::error::Result;
+use crate::error::{GraphError, Result};
 use crate::traits::KnowledgeGraph;
 use crate::types::{Entity, Relationship, TemporalQuery};
 
 use async_trait::async_trait;
 use chrono::{DateTime, Utc};
+use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
+use surrealdb::engine::local::{Db, RocksDb};
+use surrealdb::Surreal;
 
 /// `SurrealDB` backend for knowledge graph (embedded mode)
 ///
 /// # Architecture
-/// - Uses `SurrealDB` embedded mode (`file://path`)
-/// - No external server required
-/// - Thread-safe with Arc/RwLock
+/// - Uses `SurrealDB` embedded mode with RocksDB storage
+/// - File-based persistence at `<data_dir>/llmspell-graph.db`
+/// - Thread-safe with Arc wrapper (clone-safe)
 /// - CI-friendly (uses temp dirs for tests)
 ///
-/// # Implementation Status
-/// - ⏳ Stub created in Task 13.2.1
-/// - ⏳ Will be fully implemented in Task 13.2.3
-#[derive(Debug)]
+/// # Bi-Temporal Schema
+/// - `entities` table: id, name, entity_type, properties, event_time, ingestion_time
+/// - `relationships` table: id, from_entity, to_entity, relationship_type, properties, event_time, ingestion_time
+/// - Indexes on name, entity_type, timestamps for fast queries
+#[derive(Debug, Clone)]
 pub struct SurrealDBBackend {
-    /// Path to data directory (unused until Task 13.2.3)
-    #[allow(dead_code)]
+    /// SurrealDB connection (embedded RocksDB)
+    db: Surreal<Db>,
+    /// Path to data directory
     data_dir: PathBuf,
+}
+
+/// Internal entity representation for SurrealDB storage
+#[derive(Debug, Serialize, Deserialize)]
+struct EntityRecord {
+    #[serde(skip_serializing)]
+    id: Option<surrealdb::sql::Thing>,
+    name: String,
+    entity_type: String,
+    properties: serde_json::Value,
+    event_time: Option<surrealdb::sql::Datetime>,
+    ingestion_time: surrealdb::sql::Datetime,
+}
+
+/// Internal relationship representation for SurrealDB storage
+#[derive(Debug, Serialize, Deserialize)]
+struct RelationshipRecord {
+    id: String,
+    from_entity: String,
+    to_entity: String,
+    relationship_type: String,
+    properties: serde_json::Value,
+    event_time: Option<surrealdb::sql::Datetime>,
+    ingestion_time: surrealdb::sql::Datetime,
+}
+
+impl From<Entity> for EntityRecord {
+    fn from(e: Entity) -> Self {
+        Self {
+            id: None, // Will be set by SurrealDB
+            name: e.name,
+            entity_type: e.entity_type,
+            properties: e.properties,
+            event_time: e.event_time.map(|dt| dt.into()),
+            ingestion_time: e.ingestion_time.into(),
+        }
+    }
+}
+
+impl From<EntityRecord> for Entity {
+    fn from(r: EntityRecord) -> Self {
+        Self {
+            id: r
+                .id
+                .map(|thing| thing.id.to_string())
+                .unwrap_or_else(|| uuid::Uuid::new_v4().to_string()),
+            name: r.name,
+            entity_type: r.entity_type,
+            properties: r.properties,
+            event_time: r.event_time.map(|dt| dt.into()),
+            ingestion_time: r.ingestion_time.into(),
+        }
+    }
+}
+
+impl From<Relationship> for RelationshipRecord {
+    fn from(r: Relationship) -> Self {
+        Self {
+            id: r.id,
+            from_entity: r.from_entity,
+            to_entity: r.to_entity,
+            relationship_type: r.relationship_type,
+            properties: r.properties,
+            event_time: r.event_time.map(|dt| dt.into()),
+            ingestion_time: r.ingestion_time.into(),
+        }
+    }
+}
+
+impl From<RelationshipRecord> for Relationship {
+    fn from(r: RelationshipRecord) -> Self {
+        Self {
+            id: r.id,
+            from_entity: r.from_entity,
+            to_entity: r.to_entity,
+            relationship_type: r.relationship_type,
+            properties: r.properties,
+            event_time: r.event_time.map(|dt| dt.into()),
+            ingestion_time: r.ingestion_time.into(),
+        }
+    }
 }
 
 impl SurrealDBBackend {
@@ -37,51 +122,420 @@ impl SurrealDBBackend {
     /// * `data_dir` - Directory for database files
     ///
     /// # Returns
-    /// Configured backend instance
+    /// Configured backend instance with initialized schema
     ///
-    /// # Implementation Note
-    /// This is a stub - will be implemented in Task 13.2.3
+    /// # Errors
+    /// Returns error if database initialization or schema creation fails
+    pub async fn new(data_dir: impl AsRef<Path>) -> Result<Self> {
+        let data_dir = data_dir.as_ref().to_path_buf();
+
+        // Create data directory if it doesn't exist
+        if !data_dir.exists() {
+            std::fs::create_dir_all(&data_dir)?;
+        }
+
+        // Connect to embedded RocksDB
+        let db_path = data_dir.join("llmspell-graph.db");
+        let db = Surreal::new::<RocksDb>(db_path).await?;
+
+        // Use namespace and database
+        db.use_ns("llmspell").use_db("graph").await?;
+
+        let backend = Self { db, data_dir };
+
+        // Initialize schema
+        backend.initialize_schema().await?;
+
+        Ok(backend)
+    }
+
+    /// Create temporary backend for testing
+    ///
+    /// Uses OS temp directory with random suffix
+    ///
+    /// # Errors
+    /// Returns error if temp directory creation or initialization fails
+    pub async fn new_temp() -> Result<Self> {
+        let temp_dir = std::env::temp_dir().join(format!("llmspell-graph-{}", uuid::Uuid::new_v4()));
+        Self::new(&temp_dir).await
+    }
+
+    /// Initialize database schema with bi-temporal tables and indexes
+    async fn initialize_schema(&self) -> Result<()> {
+        // Define entities table
+        self.db
+            .query(
+                "DEFINE TABLE IF NOT EXISTS entities SCHEMAFULL;
+                 DEFINE FIELD IF NOT EXISTS name ON entities TYPE string;
+                 DEFINE FIELD IF NOT EXISTS entity_type ON entities TYPE string;
+                 DEFINE FIELD IF NOT EXISTS properties ON entities TYPE object;
+                 DEFINE FIELD IF NOT EXISTS event_time ON entities TYPE option<datetime>;
+                 DEFINE FIELD IF NOT EXISTS ingestion_time ON entities TYPE datetime;
+                 DEFINE INDEX IF NOT EXISTS idx_entity_name ON entities FIELDS name;
+                 DEFINE INDEX IF NOT EXISTS idx_entity_type ON entities FIELDS entity_type;
+                 DEFINE INDEX IF NOT EXISTS idx_event_time ON entities FIELDS event_time;
+                 DEFINE INDEX IF NOT EXISTS idx_ingestion_time ON entities FIELDS ingestion_time;",
+            )
+            .await?;
+
+        // Define relationships table
+        self.db
+            .query(
+                "DEFINE TABLE IF NOT EXISTS relationships SCHEMAFULL;
+                 DEFINE FIELD IF NOT EXISTS from_entity ON relationships TYPE string;
+                 DEFINE FIELD IF NOT EXISTS to_entity ON relationships TYPE string;
+                 DEFINE FIELD IF NOT EXISTS relationship_type ON relationships TYPE string;
+                 DEFINE FIELD IF NOT EXISTS properties ON relationships TYPE object;
+                 DEFINE FIELD IF NOT EXISTS event_time ON relationships TYPE option<datetime>;
+                 DEFINE FIELD IF NOT EXISTS ingestion_time ON relationships TYPE datetime;
+                 DEFINE INDEX IF NOT EXISTS idx_from_entity ON relationships FIELDS from_entity;
+                 DEFINE INDEX IF NOT EXISTS idx_to_entity ON relationships FIELDS to_entity;
+                 DEFINE INDEX IF NOT EXISTS idx_rel_type ON relationships FIELDS relationship_type;",
+            )
+            .await?;
+
+        Ok(())
+    }
+
+    /// Get data directory path
     #[must_use]
-    pub const fn new(data_dir: PathBuf) -> Self {
-        Self { data_dir }
+    pub fn data_dir(&self) -> &Path {
+        &self.data_dir
     }
 }
 
 #[async_trait]
 impl KnowledgeGraph for SurrealDBBackend {
-    async fn add_entity(&self, _entity: Entity) -> Result<String> {
-        unimplemented!("Task 13.2.3: Implement SurrealDB backend")
+    async fn add_entity(&self, entity: Entity) -> Result<String> {
+        let id = entity.id.clone();
+        let record: EntityRecord = entity.into();
+
+        // Insert entity into database
+        let _: Option<EntityRecord> = self
+            .db
+            .create(("entities", id.clone()))
+            .content(record)
+            .await?;
+
+        Ok(id)
     }
 
     async fn update_entity(
         &self,
-        _id: &str,
-        _changes: HashMap<String, serde_json::Value>,
+        id: &str,
+        changes: HashMap<String, serde_json::Value>,
     ) -> Result<()> {
-        unimplemented!("Task 13.2.3: Implement SurrealDB backend")
+        // Get existing entity
+        let existing: Option<EntityRecord> = self.db.select(("entities", id)).await?;
+
+        let mut entity = existing.ok_or_else(|| {
+            GraphError::EntityNotFound(format!("Entity not found: {id}"))
+        })?;
+
+        // Apply changes to properties
+        if let serde_json::Value::Object(props) = &mut entity.properties {
+            for (key, value) in changes {
+                props.insert(key, value);
+            }
+        }
+
+        // Update ingestion_time to reflect the update
+        entity.ingestion_time = Utc::now().into();
+
+        // Update in database
+        let _: Option<EntityRecord> = self
+            .db
+            .update(("entities", id))
+            .content(entity)
+            .await?;
+
+        Ok(())
     }
 
-    async fn get_entity(&self, _id: &str) -> Result<Entity> {
-        unimplemented!("Task 13.2.3: Implement SurrealDB backend")
+    async fn get_entity(&self, id: &str) -> Result<Entity> {
+        let record: Option<EntityRecord> = self.db.select(("entities", id)).await?;
+
+        record
+            .map(Entity::from)
+            .ok_or_else(|| GraphError::EntityNotFound(format!("Entity not found: {id}")))
     }
 
-    async fn get_entity_at(&self, _id: &str, _event_time: DateTime<Utc>) -> Result<Entity> {
-        unimplemented!("Task 13.2.3: Implement SurrealDB backend")
+    async fn get_entity_at(&self, id: &str, event_time: DateTime<Utc>) -> Result<Entity> {
+        // Query for entity valid at the given event_time
+        // Return entity where ingestion_time <= query_time AND (event_time is None OR event_time <= query_time)
+        let query = format!(
+            "SELECT * FROM entities:{} WHERE ingestion_time <= $time AND (event_time IS NONE OR event_time <= $time) LIMIT 1",
+            id
+        );
+
+        #[derive(Deserialize)]
+        struct QueryResult {
+            #[allow(dead_code)]
+            result: Vec<EntityRecord>,
+        }
+
+        let mut response = self.db.query(query).bind(("time", event_time)).await?;
+        let result: Option<QueryResult> = response.take(0)?;
+
+        result
+            .and_then(|r| r.result.into_iter().next())
+            .map(Entity::from)
+            .ok_or_else(|| {
+                GraphError::EntityNotFound(format!("Entity not found at time {event_time}: {id}"))
+            })
     }
 
-    async fn add_relationship(&self, _relationship: Relationship) -> Result<String> {
-        unimplemented!("Task 13.2.3: Implement SurrealDB backend")
+    async fn add_relationship(&self, relationship: Relationship) -> Result<String> {
+        let id = relationship.id.clone();
+        let record: RelationshipRecord = relationship.into();
+
+        // Insert relationship into database
+        let _: Option<RelationshipRecord> = self
+            .db
+            .create(("relationships", id.clone()))
+            .content(record)
+            .await?;
+
+        Ok(id)
     }
 
-    async fn get_related(&self, _entity_id: &str, _relationship_type: &str) -> Result<Vec<Entity>> {
-        unimplemented!("Task 13.2.3: Implement SurrealDB backend")
+    async fn get_related(&self, entity_id: &str, relationship_type: &str) -> Result<Vec<Entity>> {
+        // Query relationships where from_entity matches and type matches
+        let query = "SELECT * FROM relationships WHERE from_entity = $entity_id AND relationship_type = $rel_type";
+
+        #[derive(Deserialize)]
+        struct QueryResult {
+            #[allow(dead_code)]
+            result: Vec<RelationshipRecord>,
+        }
+
+        // Convert to owned strings for bind (SurrealDB requirement)
+        let entity_id_owned = entity_id.to_string();
+        let rel_type_owned = relationship_type.to_string();
+
+        let mut response = self
+            .db
+            .query(query)
+            .bind(("entity_id", entity_id_owned))
+            .bind(("rel_type", rel_type_owned))
+            .await?;
+
+        let result: Option<QueryResult> = response.take(0)?;
+        let relationships = result.map(|r| r.result).unwrap_or_default();
+
+        // Get all target entities
+        let mut entities = Vec::new();
+        for rel in relationships {
+            if let Ok(entity) = self.get_entity(&rel.to_entity).await {
+                entities.push(entity);
+            }
+        }
+
+        Ok(entities)
     }
 
-    async fn query_temporal(&self, _query: TemporalQuery) -> Result<Vec<Entity>> {
-        unimplemented!("Task 13.2.3: Implement SurrealDB backend")
+    async fn query_temporal(&self, query: TemporalQuery) -> Result<Vec<Entity>> {
+        let mut conditions = Vec::new();
+
+        // Build query conditions
+        if let Some(entity_type) = &query.entity_type {
+            conditions.push(format!("entity_type = '{entity_type}'"));
+        }
+
+        if let Some(start) = query.event_time_start {
+            conditions.push(format!("event_time >= {start:?}"));
+        }
+
+        if let Some(end) = query.event_time_end {
+            conditions.push(format!("event_time <= {end:?}"));
+        }
+
+        if let Some(start) = query.ingestion_time_start {
+            conditions.push(format!("ingestion_time >= {start:?}"));
+        }
+
+        if let Some(end) = query.ingestion_time_end {
+            conditions.push(format!("ingestion_time <= {end:?}"));
+        }
+
+        // Build WHERE clause
+        let where_clause = if conditions.is_empty() {
+            String::new()
+        } else {
+            format!(" WHERE {}", conditions.join(" AND "))
+        };
+
+        // Build LIMIT clause
+        let limit_clause = query.limit.map_or(String::new(), |l| format!(" LIMIT {l}"));
+
+        // Execute query
+        let sql = format!("SELECT * FROM entities{where_clause}{limit_clause}");
+
+        #[derive(Deserialize)]
+        struct QueryResult {
+            #[allow(dead_code)]
+            result: Vec<EntityRecord>,
+        }
+
+        let mut response = self.db.query(sql).await?;
+        let result: Option<QueryResult> = response.take(0)?;
+
+        Ok(result
+            .map(|r| r.result.into_iter().map(Entity::from).collect())
+            .unwrap_or_default())
     }
 
-    async fn delete_before(&self, _timestamp: DateTime<Utc>) -> Result<usize> {
-        unimplemented!("Task 13.2.3: Implement SurrealDB backend")
+    async fn delete_before(&self, timestamp: DateTime<Utc>) -> Result<usize> {
+        // Delete entities where ingestion_time < timestamp
+        let query = "DELETE FROM entities WHERE ingestion_time < $timestamp";
+
+        #[derive(Deserialize)]
+        struct DeleteResult {
+            #[allow(dead_code)]
+            result: Vec<EntityRecord>,
+        }
+
+        let mut response = self.db.query(query).bind(("timestamp", timestamp)).await?;
+        let result: Option<DeleteResult> = response.take(0)?;
+
+        let count = result.map(|r| r.result.len()).unwrap_or(0);
+
+        // Also delete orphaned relationships
+        let _query = "DELETE FROM relationships WHERE ingestion_time < $timestamp";
+        let _response = self.db.query(_query).bind(("timestamp", timestamp)).await?;
+
+        Ok(count)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use serde_json::json;
+
+    #[tokio::test]
+    async fn test_new_temp_backend() {
+        let backend = SurrealDBBackend::new_temp().await.expect("Failed to create temp backend");
+        assert!(backend.data_dir().exists());
+    }
+
+    #[tokio::test]
+    async fn test_add_and_get_entity() {
+        let backend = SurrealDBBackend::new_temp().await.unwrap();
+
+        let entity = Entity::new(
+            "Rust".into(),
+            "programming_language".into(),
+            json!({"paradigm": "multi-paradigm"}),
+        );
+
+        let id = backend.add_entity(entity.clone()).await.unwrap();
+        let retrieved = backend.get_entity(&id).await.unwrap();
+
+        assert_eq!(retrieved.name, "Rust");
+        assert_eq!(retrieved.entity_type, "programming_language");
+    }
+
+    #[tokio::test]
+    async fn test_update_entity() {
+        let backend = SurrealDBBackend::new_temp().await.unwrap();
+
+        let entity = Entity::new("Python".into(), "programming_language".into(), json!({}));
+        let id = backend.add_entity(entity).await.unwrap();
+
+        let mut changes = HashMap::new();
+        changes.insert("version".into(), json!("3.12"));
+        backend.update_entity(&id, changes).await.unwrap();
+
+        let updated = backend.get_entity(&id).await.unwrap();
+        assert_eq!(updated.properties["version"], "3.12");
+    }
+
+    #[tokio::test]
+    async fn test_add_and_get_relationship() {
+        let backend = SurrealDBBackend::new_temp().await.unwrap();
+
+        let entity1 = Entity::new("Rust".into(), "language".into(), json!({}));
+        let entity2 = Entity::new("Memory Safety".into(), "feature".into(), json!({}));
+
+        let id1 = backend.add_entity(entity1).await.unwrap();
+        let id2 = backend.add_entity(entity2).await.unwrap();
+
+        let rel = Relationship::new(id1.clone(), id2, "has_feature".into(), json!({}));
+        let rel_id = backend.add_relationship(rel).await.unwrap();
+
+        assert!(!rel_id.is_empty());
+    }
+
+    #[tokio::test]
+    async fn test_get_related() {
+        let backend = SurrealDBBackend::new_temp().await.unwrap();
+
+        let lang = Entity::new("Rust".into(), "language".into(), json!({}));
+        let feat1 = Entity::new("Safety".into(), "feature".into(), json!({}));
+        let feat2 = Entity::new("Speed".into(), "feature".into(), json!({}));
+
+        let lang_id = backend.add_entity(lang).await.unwrap();
+        let feat1_id = backend.add_entity(feat1).await.unwrap();
+        let feat2_id = backend.add_entity(feat2).await.unwrap();
+
+        backend
+            .add_relationship(Relationship::new(
+                lang_id.clone(),
+                feat1_id,
+                "has_feature".into(),
+                json!({}),
+            ))
+            .await
+            .unwrap();
+
+        backend
+            .add_relationship(Relationship::new(lang_id.clone(), feat2_id, "has_feature".into(), json!({})))
+            .await
+            .unwrap();
+
+        let related = backend.get_related(&lang_id, "has_feature").await.unwrap();
+        assert_eq!(related.len(), 2);
+    }
+
+    #[tokio::test]
+    async fn test_temporal_query() {
+        let backend = SurrealDBBackend::new_temp().await.unwrap();
+
+        backend
+            .add_entity(Entity::new("Rust".into(), "language".into(), json!({})))
+            .await
+            .unwrap();
+
+        backend
+            .add_entity(Entity::new("Python".into(), "language".into(), json!({})))
+            .await
+            .unwrap();
+
+        let query = TemporalQuery::new()
+            .with_entity_type("language".into())
+            .with_limit(10);
+
+        let results = backend.query_temporal(query).await.unwrap();
+        assert_eq!(results.len(), 2);
+    }
+
+    #[tokio::test]
+    async fn test_delete_before() {
+        let backend = SurrealDBBackend::new_temp().await.unwrap();
+
+        let mut old_entity = Entity::new("Old".into(), "test".into(), json!({}));
+        old_entity.ingestion_time = Utc::now() - chrono::Duration::days(30);
+        backend.add_entity(old_entity).await.unwrap();
+
+        backend
+            .add_entity(Entity::new("New".into(), "test".into(), json!({})))
+            .await
+            .unwrap();
+
+        let cutoff = Utc::now() - chrono::Duration::days(7);
+        let deleted = backend.delete_before(cutoff).await.unwrap();
+
+        assert_eq!(deleted, 1);
     }
 }
