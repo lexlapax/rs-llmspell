@@ -218,6 +218,42 @@ impl EpisodicMemory for InMemoryEpisodicMemory {
 
         Ok(count)
     }
+
+    #[allow(clippy::significant_drop_tightening)]
+    async fn list_sessions_with_unprocessed(&self) -> Result<Vec<String>> {
+        use std::collections::HashMap;
+
+        let session_info: HashMap<String, DateTime<Utc>> = {
+            let entries = self.entries.read();
+
+            // Collect sessions with unprocessed entries + last activity time
+            let mut info: HashMap<String, DateTime<Utc>> = HashMap::new();
+
+            for entry in entries.values() {
+                if !entry.processed {
+                    let last_activity = info
+                        .get(&entry.session_id)
+                        .copied()
+                        .unwrap_or(entry.timestamp);
+
+                    // Update to most recent timestamp
+                    if entry.timestamp > last_activity {
+                        info.insert(entry.session_id.clone(), entry.timestamp);
+                    } else {
+                        info.entry(entry.session_id.clone()).or_insert(entry.timestamp);
+                    }
+                }
+            }
+
+            info
+        }; // Read lock dropped here
+
+        // Sort by last activity (descending - most recent first)
+        let mut sessions: Vec<(String, DateTime<Utc>)> = session_info.into_iter().collect();
+        sessions.sort_by(|a, b| b.1.cmp(&a.1)); // Descending by timestamp
+
+        Ok(sessions.into_iter().map(|(session_id, _)| session_id).collect())
+    }
 }
 
 #[cfg(test)]

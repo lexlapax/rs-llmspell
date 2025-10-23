@@ -27,6 +27,7 @@ use crate::error::Result;
 use crate::types::{ConsolidationResult, EpisodicEntry};
 
 pub mod context_assembly;
+pub mod daemon;
 pub mod llm_engine;
 pub mod manual;
 pub mod noop;
@@ -35,6 +36,7 @@ pub mod prompts;
 pub mod validator;
 
 pub use context_assembly::ContextAssembler;
+pub use daemon::{ConsolidationDaemon, DaemonConfig, DaemonMetrics};
 pub use llm_engine::{LLMConsolidationConfig, LLMConsolidationEngine};
 pub use manual::ManualConsolidationEngine;
 pub use noop::NoopConsolidationEngine;

@@ -135,4 +135,14 @@ pub trait EpisodicMemory: Send + Sync {
     ///
     /// Number of entries deleted
     async fn delete_before(&self, timestamp: DateTime<Utc>) -> Result<usize>;
+
+    /// List all sessions with unprocessed entries
+    ///
+    /// Returns session IDs that have at least one unprocessed entry.
+    /// Used by consolidation daemon for session-aware processing.
+    ///
+    /// # Returns
+    ///
+    /// Session IDs with unprocessed entries, ordered by last activity (descending)
+    async fn list_sessions_with_unprocessed(&self) -> Result<Vec<String>>;
 }
