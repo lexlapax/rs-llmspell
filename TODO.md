@@ -1769,11 +1769,11 @@ Tests already created in `llmspell-memory/tests/consolidation_test.rs` (259 line
 - **Ollama** for agents (Phase 13.5): Prompt-based reasoning, flexible model selection
 
 **Acceptance Criteria**:
-- [ ] DeBERTa model auto-download from HuggingFace with caching
-- [ ] Cross-encoder scoring for (query, chunk) pairs
-- [ ] NDCG@10 >0.85 on benchmark
-- [ ] P95 latency <30ms for 20 chunks
-- [ ] Pure Rust implementation (no Python, no external ML runtime)
+- [x] DeBERTa model auto-download from HuggingFace with caching
+- [x] Cross-encoder scoring for (query, chunk) pairs
+- [ ] NDCG@10 >0.85 on benchmark (deferred to Phase 13.13)
+- [ ] P95 latency <30ms for 20 chunks (not validated - see notes)
+- [x] Pure Rust implementation (no Python, no external ML runtime)
 
 **Implementation Steps**:
 1. Create `src/reranking/deberta.rs`:
@@ -1820,7 +1820,7 @@ Tests already created in `llmspell-memory/tests/consolidation_test.rs` (259 line
 **Definition of Done**:
 - [x] DeBERTa reranking working
 - [ ] NDCG@10 >0.85 (deferred to Phase 13.13 benchmark suite)
-- [x] Latency <30ms P95 (0.13s for 3 chunks, validates <30ms target)
+- [ ] Latency <30ms P95 (not validated: 130ms for 3 chunks, target is 30ms for 20 chunks)
 - [x] Tests pass
 
 **Completion Notes**:
@@ -1831,7 +1831,7 @@ Tests already created in `llmspell-memory/tests/consolidation_test.rs` (259 line
 - ✅ Cross-encoder scoring with batch processing infrastructure
 - ✅ 3 DeBERTa tests passing (initialization, reranking, empty chunks)
 - ✅ 40 total tests passing, 0 failures, 0 warnings
-- ✅ Latency: 0.13s for 3 chunks on CPU (validates <30ms P95 target for 20 chunks)
+- ⚠️ Latency: 130ms for 3 chunks on CPU (target: <30ms P95 for 20 chunks - NOT validated)
 
 **Key Insights**:
 - **Trait Abstraction Success**: `Reranker` trait enables swappable implementations (DeBERTa, BM25, ColBERT, T5, LLM-based)
@@ -1844,7 +1844,7 @@ Tests already created in `llmspell-memory/tests/consolidation_test.rs` (259 line
 **Device Auto-Detection**:
 1. **CUDA** (Linux/Windows GPU) - preferred
 2. **CPU** - fallback (Metal disabled until Candle adds layer-norm support)
-3. **Performance**: 0.13s latency on macOS CPU validates <30ms P95 target
+3. **Performance**: 130ms for 3 chunks on macOS CPU (latency optimization deferred to Phase 13.13)
 
 **Files Created** (2 files, 369 lines):
 - `llmspell-context/src/reranking/deberta.rs` (369 lines - 240 impl + 129 tests/docs)
