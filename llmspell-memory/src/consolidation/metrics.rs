@@ -778,6 +778,7 @@ mod tests {
             entities_updated: 3,
             entities_deleted: 1,
             entries_skipped: 1,
+            entries_failed: 0,
             duration_ms: 100,
         };
 
@@ -858,6 +859,7 @@ mod tests {
             entities_updated: 1,
             entities_deleted: 0,
             entries_skipped: 2,
+            entries_failed: 0,
             duration_ms: 50,
         };
 
@@ -892,6 +894,7 @@ mod tests {
             entities_updated: 1,
             entities_deleted: 0,
             entries_skipped: 2,
+            entries_failed: 0,
             duration_ms: 50,
         };
 
@@ -1004,6 +1007,7 @@ mod tests {
             entities_updated: 1,
             entities_deleted: 0,
             entries_skipped: 2,
+            entries_failed: 0,
             duration_ms: 50,
         };
 
@@ -1051,6 +1055,7 @@ mod tests {
             entities_updated: 0,
             entities_deleted: 0,
             entries_skipped: 2,
+            entries_failed: 0,
             duration_ms: 50,
         };
 
@@ -1093,6 +1098,7 @@ mod tests {
             entities_updated: 30,
             entities_deleted: 10,
             entries_skipped: 10,
+            entries_failed: 0,
             duration_ms: 1000,
         };
 

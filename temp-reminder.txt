@@ -1,2 +1,13 @@
+- ultrathink, analyze all code created in phase 13 upto now 13.1 through 13.5 including all subtasks - look at git logs. 
+  phase 13 is hardcoding a lot of config references.. they need to be combined into the config objects in llmspell-config 
+  and code changed to leverage the config objects add explicit tasks in the upcoming tasks after 13.5 to make sure we 
+  add the use of config objects from llmspell-config.
+
+- ultrathink, analyze all code created in phase 13 upto now 13.1 through 13.5 including all subtasks - look at git logs. 
+  find where we need to add trace!, debug!, info!, warn!. These macros need to be added to all critical runtime code paths 
+  to leverage runtime tracing infrastructure   add explicit tasks in the upcoming tasks after 13.5 to make sure we add 
+  the tracing macros to runtime code.
+
+
 - add postgres vector store backend in llmspell-storage, https://github.com/tensorchord/pgvecto.rs or https://github.com/tensorchord/VectorChord/ or pgvector
 

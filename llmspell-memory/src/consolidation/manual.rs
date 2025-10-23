@@ -163,6 +163,7 @@ impl ConsolidationEngine for ManualConsolidationEngine {
                 entities_updated: 0,
                 entities_deleted: 0,
                 entries_skipped: 0,
+                entries_failed: 0,
                 duration_ms: u64::try_from(start.elapsed().as_millis()).unwrap_or(u64::MAX),
             });
         }
@@ -203,6 +204,7 @@ impl ConsolidationEngine for ManualConsolidationEngine {
             entities_updated: 0, // Regex extractor doesn't update existing entities
             entities_deleted: 0, // Regex extractor doesn't delete entities
             entries_skipped: 0,
+            entries_failed: 0,
             duration_ms,
         })
     }

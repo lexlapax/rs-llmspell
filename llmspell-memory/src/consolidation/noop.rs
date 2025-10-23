@@ -40,6 +40,7 @@ impl ConsolidationEngine for NoopConsolidationEngine {
             entities_updated: 0,
             entities_deleted: 0,
             entries_skipped: 0,
+            entries_failed: 0,
             duration_ms: 0,
         })
     }

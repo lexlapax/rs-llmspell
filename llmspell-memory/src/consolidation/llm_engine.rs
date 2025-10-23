@@ -137,6 +137,7 @@ impl ConsolidationEngine for LLMConsolidationEngine {
             entities_updated: 0,
             entities_deleted: 0,
             entries_skipped: 0,
+            entries_failed: 0,
             duration_ms: 0,
         };
 
@@ -176,6 +177,7 @@ impl ConsolidationEngine for LLMConsolidationEngine {
                 }
                 Err(e) => {
                     warn!("Failed to process entry: {}", e);
+                    result.entries_failed += 1;
                     // Continue processing other entries
                 }
             }
@@ -252,6 +254,7 @@ impl LLMConsolidationEngine {
             entities_updated: 0,
             entities_deleted: 0,
             entries_skipped: 0,
+            entries_failed: 0,
             duration_ms: 0,
         };
 

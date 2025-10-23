@@ -93,6 +93,9 @@ pub struct ConsolidationResult {
     /// Number of entries skipped (NOOP)
     pub entries_skipped: usize,
 
+    /// Number of entries that failed to process
+    pub entries_failed: usize,
+
     /// Duration in milliseconds
     pub duration_ms: u64,
 }
@@ -107,6 +110,7 @@ impl ConsolidationResult {
             entities_updated: 0,
             entities_deleted: 0,
             entries_skipped: 0,
+            entries_failed: 0,
             duration_ms: 0,
         }
     }
