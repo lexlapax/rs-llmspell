@@ -324,7 +324,7 @@ pub mod examples {
 
 #[cfg(test)]
 mod tests {
-    use super::{ConsolidationResponse, DecisionPayload, EntityPayload, OutputFormat, examples};
+    use super::{ConsolidationResponse, DecisionPayload, OutputFormat, examples};
 
     #[test]
     fn test_parse_add_decision() {
