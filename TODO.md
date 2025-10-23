@@ -1938,64 +1938,49 @@ Tests already created in `llmspell-memory/tests/consolidation_test.rs` (259 line
 - Pipeline can dynamically choose reranker based on availability, latency requirements, or query characteristics
 - Future Phase 13.5: Add LLM-based reranker via same trait
 
-### Task 13.4.7: Implement Context Assembly
+### Task 13.4.7: Implement Context Assembly ✅ COMPLETE
 **Priority**: HIGH
 **Estimated Time**: 3 hours
+**Actual Time**: 2.5 hours
 **Assignee**: Context Team
+**Status**: ✅ COMPLETE
 
 **Description**: Implement context assembly to structure retrieved and reranked chunks into coherent context for LLM consumption.
 
 **Acceptance Criteria**:
-- [ ] Context assembly with temporal ordering
-- [ ] Relevance-based chunk selection
-- [ ] Token budget management (<8K tokens)
-- [ ] Confidence score calculation
-- [ ] Metadata preservation (timestamps, sources)
+- [x] Context assembly with temporal ordering
+- [x] Relevance-based chunk selection
+- [x] Token budget management (<8K tokens)
+- [x] Confidence score calculation
+- [x] Metadata preservation (timestamps, sources)
 
-**Implementation Steps**:
-1. Create `src/assembly/assembler.rs`:
-   ```rust
-   pub struct ContextAssembler {
-       max_tokens: usize,
-       min_confidence: f32,
-   }
+**Implementation**:
+Created `ContextAssembler` (363 lines) with:
+- Temporal ordering: Recent chunks first (timestamp descending)
+- Confidence filtering: Configurable threshold (default: 0.3)
+- Token budget: Enforced via `enforce_token_budget()` (default: 8000 tokens)
+- Token estimation: 4 chars ≈ 1 token using `div_ceil(4)`
+- Formatted output: Timestamped chunks with scores and sources
+- Precision-safe casting: u16 + f32::from() pattern for confidence calculation
 
-   pub struct AssembledContext {
-       pub chunks: Vec<RankedChunk>,
-       pub total_confidence: f32,
-       pub temporal_span: TimeRange,
-       pub token_count: usize,
-   }
+**Files Created/Modified**:
+- `llmspell-context/src/assembly/assembler.rs` (NEW - 363 lines)
+- `llmspell-context/src/assembly/mod.rs` (NEW - 9 lines)
+- `llmspell-context/src/types.rs` (EXISTING - AssembledContext already defined)
 
-   impl ContextAssembler {
-       pub fn assemble(&self, chunks: Vec<RankedChunk>, query: &QueryUnderstanding) -> AssembledContext {
-           // Sort chunks by temporal order (recent first)
-           // Filter by confidence threshold
-           // Trim to fit token budget
-           // Calculate overall confidence
-           // Preserve metadata (timestamps, sources)
-       }
-   }
-   ```
-2. Implement temporal ordering (recent interactions prioritized)
-3. Implement confidence-based filtering (min_confidence threshold)
-4. Implement token budget enforcement (count tokens, truncate if needed)
-5. Add metadata preservation (timestamps, chunk sources, confidence scores)
-6. Test assembly with various chunk sets
-
-**Files to Create/Modify**:
-- `llmspell-context/src/assembly/assembler.rs` (NEW - 250 lines)
-- `llmspell-context/src/assembly/mod.rs` (NEW)
-- `llmspell-context/src/types.rs` (MODIFY - add RankedChunk, AssembledContext types)
-- `llmspell-context/tests/assembly_test.rs` (NEW - 150 lines)
+**Tests**:
+- 6 tests in assembler.rs: basic assembly, confidence filtering, token budget, empty chunks, temporal span, token estimation
+- All tests passing (47 total in llmspell-context)
+- Zero clippy warnings
 
 **Definition of Done**:
-- [ ] Context assembly functional
-- [ ] Temporal ordering working
-- [ ] Token budget respected (<8K)
-- [ ] Confidence scoring accurate
-- [ ] Metadata preserved
-- [ ] Tests pass
+- [x] Context assembly functional
+- [x] Temporal ordering working (newest first)
+- [x] Token budget respected (<8K default, configurable)
+- [x] Confidence scoring accurate (average of chunk scores)
+- [x] Metadata preserved (timestamps, sources, confidence)
+- [x] Tests pass (6/6 assembly tests, 47/47 total)
+- [x] Zero clippy warnings
 
 ### Task 13.4.6: Create Unit Tests for Context Pipeline
 **Priority**: HIGH
