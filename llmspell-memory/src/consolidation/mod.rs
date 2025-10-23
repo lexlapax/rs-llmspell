@@ -28,9 +28,13 @@ use crate::types::{ConsolidationResult, EpisodicEntry};
 
 pub mod manual;
 pub mod noop;
+pub mod prompt_schema;
 
 pub use manual::ManualConsolidationEngine;
 pub use noop::NoopConsolidationEngine;
+pub use prompt_schema::{
+    ConsolidationResponse, DecisionPayload, EntityPayload, OutputFormat, RelationshipPayload,
+};
 
 /// Trait for consolidation engines that convert episodic entries to semantic knowledge
 ///

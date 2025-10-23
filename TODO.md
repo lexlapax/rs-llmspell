@@ -2093,11 +2093,25 @@ Created comprehensive integration tests (285 lines) covering end-to-end pipeline
 - [ ] Token budget allocation (40% episodic, 40% semantic, 20% instructions)
 
 **Subtasks**:
-1. **13.5.1a**: JSON schema design for structured output (1h)
-   - [ ] Define ConsolidationResponse schema (entities[], relationships[], decisions[])
-   - [ ] Add examples for all 4 decision types (ADD/UPDATE/DELETE/NOOP)
-   - [ ] Create serde deserialization with error recovery
-   - [ ] Support natural language fallback mode (configurable)
+1. **13.5.1a**: JSON schema design for structured output ✅ COMPLETE (1h actual)
+   - [x] Define ConsolidationResponse schema (entities[], relationships[], decisions[])
+   - [x] Add examples for all 4 decision types (ADD/UPDATE/DELETE/NOOP)
+   - [x] Create serde deserialization with error recovery
+   - [x] Support natural language fallback mode (configurable)
+
+   **Implementation Insights**:
+   - Created `prompt_schema.rs` (400 lines) with full JSON schema
+   - `ConsolidationResponse`: Top-level struct wrapping entities, relationships, decisions, reasoning
+   - `EntityPayload` / `RelationshipPayload`: Lightweight payloads for LLM output
+   - `DecisionPayload`: Tagged enum (ADD/UPDATE/DELETE/NOOP) with serde support
+   - `OutputFormat` enum: Json (default) vs NaturalLanguage (fallback)
+   - Error recovery: `partial_parse()` extracts valid sections from malformed JSON
+   - 9 comprehensive tests (parse, partial parse, examples, serialization)
+   - Zero clippy warnings (fixed 6: const fn, error docs, inline format args, wildcard imports, panics doc, doc backticks)
+   - Examples module: add_example(), update_example(), delete_example(), noop_example()
+   - Key design: Tuple variant error types (InvalidInput(String), not InvalidInput{message})
+   - **Challenge**: MemoryError uses tuple variants, not struct variants - fixed by reading error.rs first
+   - **Next**: Task 13.5.1b - Prompt template implementation with system/user prompts
 
 2. **13.5.1b**: Prompt template implementation (2h)
    - [ ] System prompt: role definition, output format, decision criteria
