@@ -50,10 +50,10 @@ fn test_trait_types_compile() {
 
     // ConsolidationDecision
     let _decision = ConsolidationDecision::Noop;
-    let _decision2 = ConsolidationDecision::Add(entity.clone());
+    let _decision2 = ConsolidationDecision::Add(entity);
 }
 
-/// Test EpisodicEntry mutation methods
+/// Test `EpisodicEntry` mutation methods
 #[test]
 fn test_episodic_entry_methods() {
     let mut entry = EpisodicEntry::new("session-1".into(), "user".into(), "test".into());
@@ -63,7 +63,7 @@ fn test_episodic_entry_methods() {
     assert!(entry.processed);
 }
 
-/// Test ConsolidationResult methods
+/// Test `ConsolidationResult` methods
 #[test]
 fn test_consolidation_result() {
     let result = ConsolidationResult::empty();
@@ -149,4 +149,68 @@ fn test_relationship_serialization() {
         serde_json::from_str(&json).expect("deserialization failed");
     assert_eq!(deserialized.id, relationship.id);
     assert_eq!(deserialized.relationship_type, relationship.relationship_type);
+}
+
+/// Test Clone semantics for `InMemoryEpisodicMemory`
+#[tokio::test]
+async fn test_clone_semantics() {
+    let memory1 = InMemoryEpisodicMemory::new();
+
+    // Add entry to original
+    let entry = EpisodicEntry::new("session-1".into(), "user".into(), "test content".into());
+    let id = memory1.add(entry).await.unwrap();
+
+    // Clone the memory
+    let memory2 = memory1.clone();
+
+    // Both should access the same underlying data (Arc-counted)
+    let retrieved1 = memory1.get(&id).await.unwrap();
+    let retrieved2 = memory2.get(&id).await.unwrap();
+
+    assert_eq!(retrieved1.content, retrieved2.content);
+    assert_eq!(retrieved1.id, retrieved2.id);
+
+    // Add entry to clone
+    let entry2 = EpisodicEntry::new("session-2".into(), "user".into(), "clone content".into());
+    let id2 = memory2.add(entry2).await.unwrap();
+
+    // Original should see the new entry (shared state via Arc)
+    let retrieved_from_original = memory1.get(&id2).await.unwrap();
+    assert_eq!(retrieved_from_original.content, "clone content");
+}
+
+/// Test Default trait for `InMemoryEpisodicMemory`
+#[test]
+fn test_default_trait() {
+    let memory = InMemoryEpisodicMemory::default();
+
+    // Should be empty initially
+    let result = tokio_test::block_on(memory.get_session("any-session"));
+    assert!(result.is_ok());
+    assert_eq!(result.unwrap().len(), 0);
+}
+
+/// Test Send/Sync bounds by spawning in 'static thread
+#[test]
+fn test_send_sync_bounds() {
+    use std::thread;
+
+    let memory = InMemoryEpisodicMemory::new();
+
+    // Clone for thread (verifies Send)
+    let mem_clone = memory;
+
+    // Spawn in 'static thread (requires Send + Sync)
+    let handle = thread::spawn(move || {
+        // Use tokio runtime in thread
+        let rt = tokio::runtime::Runtime::new().unwrap();
+        rt.block_on(async {
+            let entry = EpisodicEntry::new("session-1".into(), "user".into(), "thread test".into());
+            mem_clone.add(entry).await
+        })
+    });
+
+    // Should complete successfully
+    let result = handle.join().unwrap();
+    assert!(result.is_ok());
 }
