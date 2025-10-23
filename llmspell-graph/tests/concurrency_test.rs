@@ -5,9 +5,7 @@
 //! - Concurrent relationship traversal
 //! - Thread-safe backend access
 
-use llmspell_graph::{
-    storage::surrealdb::SurrealDBBackend, traits::KnowledgeGraph, types::Entity,
-};
+use llmspell_graph::{storage::surrealdb::SurrealDBBackend, traits::KnowledgeGraph, types::Entity};
 use serde_json::json;
 use std::sync::Arc;
 
@@ -22,7 +20,7 @@ async fn test_concurrent_entity_creation() {
         let backend_clone = Arc::clone(&backend);
         let handle = tokio::spawn(async move {
             let entity = Entity::new(
-                format!("Entity{}", i),
+                format!("Entity{i}"),
                 "concurrent_test".into(),
                 json!({"index": i}),
             );
@@ -55,7 +53,7 @@ async fn test_concurrent_relationship_traversal() {
 
     // Add 5 related entities
     for i in 0..5 {
-        let entity = Entity::new(format!("Related{}", i), "spoke".into(), json!({}));
+        let entity = Entity::new(format!("Related{i}"), "spoke".into(), json!({}));
         let entity_id = backend.add_entity(entity).await.unwrap();
 
         let rel = llmspell_graph::types::Relationship::new(
@@ -73,16 +71,18 @@ async fn test_concurrent_relationship_traversal() {
     for _ in 0..10 {
         let backend_clone = Arc::clone(&backend);
         let id_clone = central_id.clone();
-        let handle = tokio::spawn(async move {
-            backend_clone.get_related(&id_clone, "connects_to").await
-        });
+        let handle =
+            tokio::spawn(async move { backend_clone.get_related(&id_clone, "connects_to").await });
         handles.push(handle);
     }
 
     // Verify all concurrent reads succeed and return correct count
     for handle in handles {
         let result = handle.await.unwrap();
-        assert!(result.is_ok(), "Concurrent relationship reads should succeed");
+        assert!(
+            result.is_ok(),
+            "Concurrent relationship reads should succeed"
+        );
         let related = result.unwrap();
         assert_eq!(
             related.len(),
@@ -116,7 +116,7 @@ async fn test_concurrent_mixed_operations() {
     for i in 0..5 {
         let backend_clone = Arc::clone(&backend);
         let handle = tokio::spawn(async move {
-            let entity = Entity::new(format!("Concurrent{}", i), "test".into(), json!({}));
+            let entity = Entity::new(format!("Concurrent{i}"), "test".into(), json!({}));
             backend_clone.add_entity(entity).await
         });
         write_handles.push(handle);

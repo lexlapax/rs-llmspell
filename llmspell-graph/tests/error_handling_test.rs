@@ -18,12 +18,14 @@ async fn test_get_nonexistent_entity() {
 
     let result = backend.get_entity("nonexistent-id").await;
 
-    assert!(result.is_err(), "Should return error for nonexistent entity");
+    assert!(
+        result.is_err(),
+        "Should return error for nonexistent entity"
+    );
     let err_msg = result.unwrap_err().to_string();
     assert!(
         err_msg.contains("not found") || err_msg.contains("No entity"),
-        "Error should indicate entity not found: {}",
-        err_msg
+        "Error should indicate entity not found: {err_msg}"
     );
 }
 
@@ -64,8 +66,7 @@ async fn test_relationship_with_invalid_entity_references() {
         let err_msg = result.unwrap_err().to_string();
         assert!(
             err_msg.contains("not found") || err_msg.contains("foreign key"),
-            "Error should indicate invalid reference: {}",
-            err_msg
+            "Error should indicate invalid reference: {err_msg}"
         );
     }
 }
@@ -84,7 +85,11 @@ async fn test_query_with_no_matches() {
     let query = TemporalQuery::new().with_entity_type("nonexistent_type".into());
     let results = backend.query_temporal(query).await.unwrap();
 
-    assert_eq!(results.len(), 0, "Should return empty results for no matches");
+    assert_eq!(
+        results.len(),
+        0,
+        "Should return empty results for no matches"
+    );
 }
 
 #[tokio::test]

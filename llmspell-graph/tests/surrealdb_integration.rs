@@ -1,10 +1,10 @@
-//! Integration tests for SurrealDB knowledge graph backend
+//! Integration tests for `SurrealDB` knowledge graph backend
 //!
 //! Tests cover:
 //! - Basic CRUD operations (create, read)
 //! - Bi-temporal queries (temporal filtering)
 //! - Relationship traversal
-//! - Known limitations (update_entity, delete_before with SurrealDB 2.0)
+//! - Known limitations (`update_entity`, `delete_before` with `SurrealDB` 2.0)
 
 use chrono::Utc;
 use llmspell_graph::{
@@ -40,16 +40,14 @@ async fn test_entity_create_and_read() {
     assert_eq!(retrieved.entity_type, "programming_language");
     // ID may have angle brackets from SurrealDB Thing format
     assert!(
-        retrieved.id == id || retrieved.id == format!("⟨{}⟩", id),
-        "ID should match: got '{}', expected '{}' or '⟨{}⟩'",
-        retrieved.id,
-        id,
-        id
+        retrieved.id == id || retrieved.id == format!("⟨{id}⟩"),
+        "ID should match: got '{}', expected '{id}' or '⟨{id}⟩'",
+        retrieved.id
     );
 }
 
 #[tokio::test]
-#[ignore] // KNOWN ISSUE: SurrealDB 2.0 properties field not persisting on update
+#[ignore = "SurrealDB 2.0 properties field not persisting on update"]
 async fn test_entity_update() {
     let backend = SurrealDBBackend::new_temp().await.unwrap();
 
@@ -145,7 +143,7 @@ async fn test_temporal_query_by_type() {
 }
 
 #[tokio::test]
-#[ignore] // KNOWN ISSUE: SurrealDB 2.0 may not preserve custom timestamps
+#[ignore = "SurrealDB 2.0 may not preserve custom timestamps"]
 async fn test_delete_before_retention() {
     let backend = SurrealDBBackend::new_temp().await.unwrap();
 
@@ -191,11 +189,7 @@ async fn test_query_with_limit() {
 
     for i in 0..5 {
         backend
-            .add_entity(Entity::new(
-                format!("Entity{}", i),
-                "test".into(),
-                json!({}),
-            ))
+            .add_entity(Entity::new(format!("Entity{i}"), "test".into(), json!({})))
             .await
             .unwrap();
     }
