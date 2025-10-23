@@ -2273,12 +2273,12 @@ Created comprehensive integration tests (285 lines) covering end-to-end pipeline
 **Priority**: CRITICAL
 **Estimated Time**: 6 hours (enhanced from 4h)
 **Assignee**: Memory Team
-**Status**: 🚧 IN PROGRESS (Task 13.5.2a partially complete, fixing compilation errors)
+**Status**: 🚧 IN PROGRESS (Task 13.5.2a complete, ready for 13.5.2b)
 
 **Description**: Implement LLMConsolidationEngine with LLM-based decision making, JSON parser with error recovery, decision validator, and retry logic.
 
 **Acceptance Criteria**:
-- [x] LLMConsolidationEngine implements ConsolidationEngine trait ✅ (has compilation errors to fix)
+- [x] LLMConsolidationEngine implements ConsolidationEngine trait ✅
 - [ ] ADD logic: create new entities/relationships
 - [ ] UPDATE logic: merge new facts into existing nodes
 - [ ] DELETE logic: remove outdated/contradictory information (tombstone with valid_until)
@@ -2289,11 +2289,13 @@ Created comprehensive integration tests (285 lines) covering end-to-end pipeline
 - [ ] Provider fallback (llama3.2:3b → qwen:7b)
 
 **Progress Summary**:
-- **Task 13.5.2a IN PROGRESS**: LLMConsolidationEngine struct created (430 lines), has 9 compilation errors
+- **Task 13.5.2a ✅ COMPLETE**: LLMConsolidationEngine struct (426 lines), all compilation errors fixed, zero clippy warnings
 - Added llmspell-providers dependency to Cargo.toml
 - Created llm_engine.rs with full structure and retry logic
 - Added LLMCall error variant to error.rs
 - Exported from consolidation/mod.rs
+- Fixed all 9 compilation errors + 3 clippy warnings
+- 2 tests passing (engine creation, LLM call)
 
 **Accomplished in Task 13.5.2a**:
 - Created `llmspell-memory/src/consolidation/llm_engine.rs` (430 lines)
@@ -2309,35 +2311,42 @@ Created comprehensive integration tests (285 lines) covering end-to-end pipeline
 - Added `LLMCall(String)` error variant to error.rs
 - Exported `LLMConsolidationEngine` and `LLMConsolidationConfig` from mod.rs
 
-**Compilation Errors to Fix** (9 errors identified):
-1. **Unused imports**: `Message`, `Role` from llmspell_core::types (not needed)
-2. **AgentInput construction**: Field is `text: String`, not `messages: Vec<Message>`
-3. **AgentInput parameters**: `temperature` and `max_tokens` go in `parameters: HashMap<String, Value>`
-4. **AgentOutput access**: Field is `text: String`, not `content: String`
-5. **ConsolidationResult field**: No `relationships_added` field exists (only entities_added, entities_updated, entities_deleted, entries_skipped, duration_ms)
-6. **Mock provider capabilities**: Returns temporary value, need to store in struct
+**Compilation Errors Fixed** (9 errors + 3 clippy warnings) ✅:
+1. ✅ **Unused imports**: Removed `Message`, `Role` from llmspell_core::types, added `serde_json::json`
+2. ✅ **AgentInput construction**: Changed to `text` field (combined system + user prompt)
+3. ✅ **AgentInput parameters**: Moved temperature/max_tokens to `parameters` HashMap via `.with_parameter()`
+4. ✅ **AgentOutput access**: Changed from `.content` to `.text`
+5. ✅ **ConsolidationResult field**: Removed all `relationships_added` references, used `entries_skipped`
+6. ✅ **Mock provider capabilities**: Stored as struct field instead of returning temporary
+7. ✅ **Clippy: dead_code**: Added `#[allow(dead_code)]` to knowledge_graph field (used in Task 13.5.2d)
+8. ✅ **Clippy: duration casting**: Used `u64::try_from(...).unwrap_or(u64::MAX)` for safe conversion
+9. ✅ **Clippy: format string**: Changed to direct string interpolation `format!("{system_prompt}\n\n{user_prompt}")`
 
-**Root Cause**: Used incorrect AgentInput/AgentOutput API from llmspell-core. Correct API:
-- AgentInput: `text` field for prompt, `parameters` HashMap for temperature/max_tokens
-- AgentOutput: `text` field for response
-- ConsolidationResult: No relationships tracking (only entity operations)
+**Root Cause Analysis**: Used incorrect AgentInput/AgentOutput API from llmspell-core. Correct API:
+- **AgentInput**: `text: String` field for prompt, `parameters: HashMap<String, Value>` for temperature/max_tokens
+- **AgentOutput**: `text: String` field for response (not `content`)
+- **ConsolidationResult**: No relationship tracking, only entity operations (entities_added, entities_updated, entities_deleted, entries_skipped)
+- **ProviderInstance trait**: `capabilities()` returns `&ProviderCapabilities` reference (must be stored in struct)
 
-**Next Steps for 13.5.2a**:
-1. Remove unused imports (Message, Role)
-2. Fix AgentInput construction: combine system + user prompt in `text` field
-3. Move temperature/max_tokens to `parameters` HashMap
-4. Fix AgentOutput access: use `.text` not `.content`
-5. Remove all `relationships_added` references
-6. Fix mock provider to store capabilities as field
-7. Run tests to verify compilation
-8. Commit Task 13.5.2a completion
+**Key Insights from Task 13.5.2a**:
+1. **llmspell-providers API**: Uses unified AgentInput/AgentOutput across all providers (not OpenAI-style messages)
+2. **System + User Prompt**: Combine into single text field (providers handle internally)
+3. **Parameters as JSON**: Temperature/max_tokens passed as `serde_json::Value` in HashMap
+4. **Mock Testing Pattern**: Store all fields needed for trait implementation (capabilities, response)
+5. **Retry Logic**: Exponential backoff works correctly: 1s, 2s, 4s (1000ms * 2^(attempts-1))
+6. **Error Handling**: Convert provider errors to MemoryError::LLMCall with context
 
 **Subtasks**:
-1. **13.5.2a**: LLMConsolidationEngine struct (1h)
-   - [ ] Dependencies: ProviderManager (from ExecutionContext), KnowledgeGraph, PromptBuilder
-   - [ ] Configuration: model, temperature, max_tokens, timeout, max_retries
-   - [ ] Initialization with provider validation (check model availability)
-   - [ ] Support configurable parameters (model, temperature via builder)
+1. **13.5.2a**: LLMConsolidationEngine struct (1h actual) ✅ COMPLETE
+   - [x] Dependencies: ProviderInstance, KnowledgeGraph, ContextAssembler, PromptBuilder ✅
+   - [x] Configuration: model, temperature, max_tokens, timeout_secs, max_retries, version ✅
+   - [x] Initialization with provider validation (is_ready() method) ✅
+   - [x] Support configurable parameters (LLMConsolidationConfig with defaults) ✅
+   - [x] ConsolidationEngine trait implementation (consolidate, is_ready) ✅
+   - [x] Retry logic with exponential backoff (call_llm_with_retry) ✅
+   - [x] LLM provider integration (call_llm with AgentInput/AgentOutput) ✅
+   - [x] Mock provider and mock knowledge graph for testing ✅
+   - [x] 2 tests passing, zero clippy warnings ✅
 
 2. **13.5.2b**: LLM response parser with error recovery (1.5h)
    - [ ] JSON parsing with serde_json (ConsolidationResponse → decisions)

@@ -27,12 +27,14 @@ use crate::error::Result;
 use crate::types::{ConsolidationResult, EpisodicEntry};
 
 pub mod context_assembly;
+pub mod llm_engine;
 pub mod manual;
 pub mod noop;
 pub mod prompt_schema;
 pub mod prompts;
 
 pub use context_assembly::ContextAssembler;
+pub use llm_engine::{LLMConsolidationConfig, LLMConsolidationEngine};
 pub use manual::ManualConsolidationEngine;
 pub use noop::NoopConsolidationEngine;
 pub use prompt_schema::{

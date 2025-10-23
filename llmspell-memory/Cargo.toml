@@ -16,6 +16,7 @@ llmspell-utils = { path = "../llmspell-utils" }
 llmspell-rag = { path = "../llmspell-rag" }
 llmspell-kernel = { path = "../llmspell-kernel" }
 llmspell-graph = { path = "../llmspell-graph" }
+llmspell-providers = { path = "../llmspell-providers" }
 
 # Async runtime
 tokio = { workspace = true }
