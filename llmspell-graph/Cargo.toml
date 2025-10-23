@@ -42,6 +42,10 @@ dashmap = "5.5"
 # UUID generation
 uuid = { workspace = true }
 
+# Regex for extraction
+regex = "1.10"
+once_cell = "1.19"
+
 [dev-dependencies]
 llmspell-testing = { path = "../llmspell-testing" }
 tokio-test = "0.4"

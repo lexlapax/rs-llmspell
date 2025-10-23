@@ -92,6 +92,7 @@
 //! - ⏳ Phase 13.2.5: Unit tests and benchmarks (pending)
 
 pub mod error;
+pub mod extraction;
 pub mod prelude;
 pub mod storage;
 pub mod traits;

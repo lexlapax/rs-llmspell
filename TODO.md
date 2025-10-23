@@ -556,20 +556,21 @@ Add to `traits_test.rs`:
 **Goal**: Create llmspell-graph crate with bi-temporal knowledge graph storage
 **Timeline**: 2 days (16 hours)
 **Critical Dependencies**: Phase 13.1 (Memory traits for integration)
-**Status**: ✅ COMPLETE (Task 13.2.4 deferred to Phase 13.5)
+**Status**: ✅ COMPLETE
 
 **Phase 13.2 Summary**:
 - ✅ **Task 13.2.1**: Create llmspell-graph Crate Structure - COMPLETE
 - ✅ **Task 13.2.2**: Define Core Knowledge Graph Traits - MERGED into 13.2.1
 - ✅ **Task 13.2.3**: Implement SurrealDB Graph Storage - 71% COMPLETE (5/7 methods working, 2 SurrealDB limitations accepted)
-- ⏸️ **Task 13.2.4**: Entity Extraction (Regex-Based) - DEFERRED to Phase 13.5
+- ✅ **Task 13.2.4**: Entity Extraction (Regex-Based) - COMPLETE (19 tests passing, zero clippy warnings)
 - ✅ **Task 13.2.5**: Create Unit Tests for Knowledge Graph - COMPLETE (15 tests passing)
 
 **Key Deliverables**:
-- 11 source files created (1,744 lines including tests)
+- 13 source files created (2,200+ lines including tests)
 - Bi-temporal knowledge graph with 8 trait methods
 - SurrealDB embedded backend (71% functional - core operations working)
-- 15 integration tests (organized into 3 thematic files)
+- Regex-based entity/relationship extraction (>50% recall, <5ms/1KB)
+- 34 tests passing (15 graph tests + 19 extraction tests)
 - Zero clippy warnings
 - Comprehensive documentation
 
@@ -927,30 +928,27 @@ pub struct InMemoryBackend { ... }   // Future (testing)
 3. Or: Implement alternative backend (Neo4j, ArangoDB) via GraphBackend trait
 - [x] Benchmark stub created (comprehensive benchmarks deferred to Phase 13.13)
 
-### Task 13.2.4: Entity/Relationship Extraction ⏸️ DEFERRED → Phase 13.5
-**Priority**: LOW (deferred)
-**Estimated Time**: N/A (deferred)
-**Assignee**: Consolidation Team
-**Status**: ⏸️ DEFERRED to Phase 13.5 (Consolidation Engine)
+### Task 13.2.4: Entity/Relationship Extraction ✅ COMPLETE
+**Priority**: MEDIUM
+**Estimated Time**: 2 hours (actual: 1.5 hours)
+**Assignee**: Graph Team
+**Status**: ✅ COMPLETE
 
-**Rationale for Deferral**:
-- Entity/relationship extraction is part of **consolidation** (episodic → semantic)
-- Phase 13.5 implements full LLM-based extraction (not regex)
-- Phase 13.2 focus: **storage infrastructure only**
-- Extraction tested in Phase 13.5 integration
+**Implementation**:
+- Regex-based entity and relationship extraction
+- 5 regex patterns: IS_A, HAS, IN, OF, ENTITY
+- Support for hyphenated terms (e.g., "high-level", "zero-cost")
+- Type inference for programming languages, systems, tools, frameworks
+- Performance target: <5ms for 1KB text ✅
+- Recall target: >50% on common patterns ✅
 
-**Original Scope** (moved to Phase 13.5):
-- LLM-based entity extraction from episodic memories
-- Consolidation decisions (ADD/UPDATE/DELETE/NOOP)
-- Integration with knowledge graph
-
-**Description**: ~~Implement basic entity and relationship extraction using regex patterns (LLM-based v2 in Phase 13.5).~~ **DEFERRED**
+**Description**: Implement basic entity and relationship extraction using regex patterns (LLM-based v2 in Phase 13.5).
 
 **Acceptance Criteria**:
-- [ ] Extract common entity types (Person, Place, Organization, Concept)
-- [ ] Extract relationships (is_a, has_feature, located_in, etc.)
-- [ ] Pattern-based extraction working
-- [ ] >50% recall on simple text
+- [x] Extract common entity types (Person, Place, Organization, Concept)
+- [x] Extract relationships (is_a, has_feature, located_in, etc.)
+- [x] Pattern-based extraction working
+- [x] >50% recall on simple text
 
 **Implementation Steps**:
 1. Create `src/extraction/regex.rs`:
@@ -976,16 +974,16 @@ pub struct InMemoryBackend { ... }   // Future (testing)
 4. Test on sample texts
 5. Measure recall
 
-**Files to Create/Modify**:
-- `llmspell-graph/src/extraction/regex.rs` (NEW - 300 lines)
-- `llmspell-graph/src/extraction/mod.rs` (NEW)
-- `llmspell-graph/tests/extraction_test.rs` (NEW - 200 lines)
+**Files Created**:
+- `llmspell-graph/src/extraction/regex.rs` (455 lines - 10 unit tests)
+- `llmspell-graph/src/extraction/mod.rs` (24 lines)
+- `llmspell-graph/tests/extraction_test.rs` (336 lines - 10 integration tests)
 
 **Definition of Done**:
-- [ ] Extraction working on test texts
-- [ ] >50% recall measured
-- [ ] Tests cover common patterns
-- [ ] Performance <5ms for 1KB text
+- [x] Extraction working on test texts
+- [x] >50% recall measured (62.5% in recall benchmark test)
+- [x] Tests cover common patterns (19 tests total)
+- [x] Performance <5ms for 1KB text (validated in performance test)
 
 ### Task 13.2.5: Create Unit Tests for Knowledge Graph
 **Priority**: HIGH
@@ -1059,6 +1057,23 @@ pub struct InMemoryBackend { ... }   // Future (testing)
 **Timeline**: 1 day (8 hours)
 **Critical Dependencies**: Phases 13.1-13.2 (Memory + Graph crates)
 **Status**: 🚧 IN PROGRESS
+
+**Task Execution Decision - Option A**: Complete Phase 13.2 → Phase 13.3 Properly
+- **Decision**: Do Task 13.2.4 first (prerequisite for 13.3.2), then complete all Phase 13.3 tasks
+- **Rationale**:
+  - Task 13.3.2 (Consolidation) depends on 13.2.4 (Entity Extraction)
+  - Completing both phases properly prevents technical debt
+  - Aligns with "do not jump ahead, do not take shortcuts" principle
+- **Execution Order**:
+  1. Task 13.2.4: Entity Extraction (Regex-Based) - 2 hours
+  2. Task 13.3.2: Consolidation Engine Stub - 2 hours
+  3. Task 13.3.3: ADR Documentation - 2 hours
+  4. Task 13.3.4: Integration Tests - 1 hour
+- **Total**: 7 hours estimated
+- **Alternatives Rejected**:
+  - Option B: Minimal extraction (incomplete)
+  - Option C: Split work (partial progress)
+  - Option D: Defer to Phase 13.5 (violates dependency chain)
 
 **Architecture Decision**: Type Consolidation
 - **Decision**: Use `llmspell-graph` types as single source of truth for Entity/Relationship
