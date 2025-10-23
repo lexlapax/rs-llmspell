@@ -1,7 +1,7 @@
 //! Trait definitions for pluggable components in the context engineering pipeline
 
 use crate::error::Result;
-use crate::types::{QueryUnderstanding, RankedChunk, Chunk};
+use crate::types::{Chunk, QueryUnderstanding, RankedChunk};
 use async_trait::async_trait;
 
 /// Trait for query understanding components
@@ -22,7 +22,12 @@ pub trait Retriever: Send + Sync {
 #[async_trait]
 pub trait Reranker: Send + Sync {
     /// Rerank chunks based on relevance to query
-    async fn rerank(&self, chunks: Vec<Chunk>, query: &str, top_k: usize) -> Result<Vec<RankedChunk>>;
+    async fn rerank(
+        &self,
+        chunks: Vec<Chunk>,
+        query: &str,
+        top_k: usize,
+    ) -> Result<Vec<RankedChunk>>;
 }
 
 /// Trait for context assembly components

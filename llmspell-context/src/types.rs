@@ -1,7 +1,7 @@
 //! Shared types for the context engineering pipeline
 
-use serde::{Deserialize, Serialize};
 use chrono::{DateTime, Utc};
+use serde::{Deserialize, Serialize};
 
 /// Query intent classification
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -96,9 +96,6 @@ pub struct BM25Config {
 
 impl Default for BM25Config {
     fn default() -> Self {
-        Self {
-            k1: 1.5,
-            b: 0.75,
-        }
+        Self { k1: 1.5, b: 0.75 }
     }
 }

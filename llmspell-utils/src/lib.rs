@@ -258,7 +258,4 @@ pub use resource_monitoring::{
 };
 
 // Re-export text processing utilities
-pub use text::{
-    stopwords::{is_stopword, STOPWORDS},
-};
-
+pub use text::stopwords::{is_stopword, STOPWORDS};

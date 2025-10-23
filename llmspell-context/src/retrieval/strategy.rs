@@ -99,27 +99,25 @@ impl StrategySelector {
     /// Vector of strategies in preference order:
     /// - `[primary, fallback1, fallback2]`
     #[must_use]
-    pub fn select_with_fallback(&self, understanding: &QueryUnderstanding) -> Vec<RetrievalStrategy> {
+    pub fn select_with_fallback(
+        &self,
+        understanding: &QueryUnderstanding,
+    ) -> Vec<RetrievalStrategy> {
         let primary = self.select(understanding);
 
         match primary {
-            RetrievalStrategy::Episodic => vec![
-                RetrievalStrategy::Episodic,
-                RetrievalStrategy::BM25,
-            ],
-            RetrievalStrategy::Semantic => vec![
-                RetrievalStrategy::Semantic,
-                RetrievalStrategy::BM25,
-            ],
+            RetrievalStrategy::Episodic => {
+                vec![RetrievalStrategy::Episodic, RetrievalStrategy::BM25]
+            }
+            RetrievalStrategy::Semantic => {
+                vec![RetrievalStrategy::Semantic, RetrievalStrategy::BM25]
+            }
             RetrievalStrategy::Hybrid => vec![
                 RetrievalStrategy::Hybrid,
                 RetrievalStrategy::Episodic,
                 RetrievalStrategy::BM25,
             ],
-            RetrievalStrategy::BM25 => vec![
-                RetrievalStrategy::BM25,
-                RetrievalStrategy::Episodic,
-            ],
+            RetrievalStrategy::BM25 => vec![RetrievalStrategy::BM25, RetrievalStrategy::Episodic],
         }
     }
 }
@@ -228,7 +226,11 @@ mod tests {
         let understanding = QueryUnderstanding {
             intent: QueryIntent::Unknown,
             entities: vec![],
-            keywords: vec!["query".to_string(), "search".to_string(), "find".to_string()],
+            keywords: vec![
+                "query".to_string(),
+                "search".to_string(),
+                "find".to_string(),
+            ],
         };
 
         assert_eq!(selector.select(&understanding), RetrievalStrategy::BM25);
@@ -270,7 +272,10 @@ mod tests {
         };
 
         let fallbacks = selector.select_with_fallback(&understanding);
-        assert_eq!(fallbacks, vec![RetrievalStrategy::Episodic, RetrievalStrategy::BM25]);
+        assert_eq!(
+            fallbacks,
+            vec![RetrievalStrategy::Episodic, RetrievalStrategy::BM25]
+        );
     }
 
     #[test]
@@ -283,7 +288,10 @@ mod tests {
         };
 
         let fallbacks = selector.select_with_fallback(&understanding);
-        assert_eq!(fallbacks, vec![RetrievalStrategy::Semantic, RetrievalStrategy::BM25]);
+        assert_eq!(
+            fallbacks,
+            vec![RetrievalStrategy::Semantic, RetrievalStrategy::BM25]
+        );
     }
 
     #[test]
@@ -316,6 +324,9 @@ mod tests {
         };
 
         let fallbacks = selector.select_with_fallback(&understanding);
-        assert_eq!(fallbacks, vec![RetrievalStrategy::BM25, RetrievalStrategy::Episodic]);
+        assert_eq!(
+            fallbacks,
+            vec![RetrievalStrategy::BM25, RetrievalStrategy::Episodic]
+        );
     }
 }

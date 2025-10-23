@@ -44,7 +44,8 @@ static INTENT_PATTERNS: LazyLock<Vec<(Regex, QueryIntent)>> = LazyLock::new(|| {
         // Debug: error, bug, broken, fail, crash, exception
         // Matches variations: crash/crashed/crashes, fail/fails/failed, etc.
         (
-            Regex::new(r"(?i)\b(?:error|bug|broken|fail|crash|exception|panic)(?:s|ed|ing)?\b").unwrap(),
+            Regex::new(r"(?i)\b(?:error|bug|broken|fail|crash|exception|panic)(?:s|ed|ing)?\b")
+                .unwrap(),
             QueryIntent::Debug,
         ),
         // Explain: "Explain...", "Describe...", "Tell me about..."
@@ -166,11 +167,9 @@ impl QueryAnalyzer for RegexQueryAnalyzer {
 #[inline]
 fn capitalize(s: &str) -> String {
     let mut chars = s.chars();
-    chars
-        .next()
-        .map_or_else(String::new, |first| {
-            first.to_uppercase().chain(chars).collect()
-        })
+    chars.next().map_or_else(String::new, |first| {
+        first.to_uppercase().chain(chars).collect()
+    })
 }
 
 #[cfg(test)]
@@ -194,7 +193,10 @@ mod tests {
     #[tokio::test]
     async fn test_intent_why_does() {
         let analyzer = RegexQueryAnalyzer::new();
-        let understanding = analyzer.understand("Why does Rust use move semantics?").await.unwrap();
+        let understanding = analyzer
+            .understand("Why does Rust use move semantics?")
+            .await
+            .unwrap();
         assert_eq!(understanding.intent, QueryIntent::WhyDoes);
     }
 
@@ -208,7 +210,10 @@ mod tests {
     #[tokio::test]
     async fn test_intent_explain() {
         let analyzer = RegexQueryAnalyzer::new();
-        let understanding = analyzer.understand("Explain lifetimes in Rust").await.unwrap();
+        let understanding = analyzer
+            .understand("Explain lifetimes in Rust")
+            .await
+            .unwrap();
         assert_eq!(understanding.intent, QueryIntent::Explain);
     }
 
@@ -222,7 +227,10 @@ mod tests {
     #[tokio::test]
     async fn test_entity_extraction_camelcase() {
         let analyzer = RegexQueryAnalyzer::new();
-        let understanding = analyzer.understand("How do I use HashMap and VecDeque?").await.unwrap();
+        let understanding = analyzer
+            .understand("How do I use HashMap and VecDeque?")
+            .await
+            .unwrap();
         assert!(understanding.entities.contains(&"HashMap".to_string()));
         assert!(understanding.entities.contains(&"VecDeque".to_string()));
     }
@@ -230,14 +238,20 @@ mod tests {
     #[tokio::test]
     async fn test_entity_extraction_snake_case() {
         let analyzer = RegexQueryAnalyzer::new();
-        let understanding = analyzer.understand("What is hash_map in Rust?").await.unwrap();
+        let understanding = analyzer
+            .understand("What is hash_map in Rust?")
+            .await
+            .unwrap();
         assert!(understanding.entities.contains(&"hash_map".to_string()));
     }
 
     #[tokio::test]
     async fn test_keyword_extraction() {
         let analyzer = RegexQueryAnalyzer::new();
-        let understanding = analyzer.understand("How do I implement concurrency in Rust?").await.unwrap();
+        let understanding = analyzer
+            .understand("How do I implement concurrency in Rust?")
+            .await
+            .unwrap();
 
         // Should extract meaningful keywords
         assert!(understanding.keywords.contains(&"implement".to_string()));
@@ -253,10 +267,20 @@ mod tests {
     #[tokio::test]
     async fn test_deduplication() {
         let analyzer = RegexQueryAnalyzer::new();
-        let understanding = analyzer.understand("HashMap HashMap HashMap").await.unwrap();
+        let understanding = analyzer
+            .understand("HashMap HashMap HashMap")
+            .await
+            .unwrap();
 
         // Should deduplicate entities
-        assert_eq!(understanding.entities.iter().filter(|e| *e == "HashMap").count(), 1);
+        assert_eq!(
+            understanding
+                .entities
+                .iter()
+                .filter(|e| *e == "HashMap")
+                .count(),
+            1
+        );
     }
 
     #[tokio::test]
@@ -291,7 +315,12 @@ mod tests {
 
         for query in test_cases {
             let understanding = analyzer.understand(query).await.unwrap();
-            assert_eq!(understanding.intent, QueryIntent::Debug, "Failed for query: {}", query);
+            assert_eq!(
+                understanding.intent,
+                QueryIntent::Debug,
+                "Failed for query: {}",
+                query
+            );
         }
     }
 

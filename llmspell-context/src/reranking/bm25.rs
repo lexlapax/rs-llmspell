@@ -99,8 +99,9 @@ impl Reranker for BM25Reranker {
             .enumerate()
             .map(|(rank, chunk)| {
                 // Score based on rank position (1.0 for top, decreasing)
-                #[allow(clippy::cast_precision_loss)]
-                let score = 1.0 / (rank + 1) as f32;
+                // Clamp rank to max 10000 to ensure f32 precision safety
+                let clamped_rank = std::cmp::min(rank + 1, 10_000);
+                let score = 1.0 / f32::from(u16::try_from(clamped_rank).unwrap_or(10_000));
                 RankedChunk {
                     chunk,
                     score,

@@ -30,8 +30,8 @@
 //! ```
 
 use crate::error::{ContextError, Result};
-use crate::types::{BM25Config, Chunk};
 use crate::traits::Retriever;
+use crate::types::{BM25Config, Chunk};
 use async_trait::async_trait;
 use llmspell_memory::traits::EpisodicMemory;
 use llmspell_utils::text::stopwords::is_stopword;
@@ -197,8 +197,8 @@ impl BM25Retriever {
             .map(|chunk| Self::tokenize_text(&chunk.content))
             .collect();
 
-        let avg_doc_len = doc_tokens.iter().map(Vec::len).sum::<usize>() as f32
-            / doc_tokens.len() as f32;
+        let avg_doc_len =
+            doc_tokens.iter().map(Vec::len).sum::<usize>() as f32 / doc_tokens.len() as f32;
 
         // Score each document
         let mut scored_chunks: Vec<(usize, f32)> = doc_tokens
@@ -283,11 +283,9 @@ impl Default for BM25Retriever {
 /// Capitalize first character of string (for stopword checking)
 fn capitalize(s: &str) -> String {
     let mut chars = s.chars();
-    chars
-        .next()
-        .map_or_else(String::new, |first| {
-            first.to_uppercase().chain(chars).collect()
-        })
+    chars.next().map_or_else(String::new, |first| {
+        first.to_uppercase().chain(chars).collect()
+    })
 }
 
 #[async_trait]
@@ -295,7 +293,8 @@ impl Retriever for BM25Retriever {
     async fn retrieve(&self, _query: &str, _top_k: usize) -> Result<Vec<Chunk>> {
         // This will be implemented when we integrate with EpisodicMemory in a future step
         Err(ContextError::RetrievalError(
-            "BM25 retrieval requires memory integration - use retrieve_from_chunks for now".to_string(),
+            "BM25 retrieval requires memory integration - use retrieve_from_chunks for now"
+                .to_string(),
         ))
     }
 }
