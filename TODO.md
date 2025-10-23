@@ -1155,49 +1155,74 @@ pub struct InMemoryBackend { ... }   // Future (testing)
 - [x] Constructor patterns working (new + new_in_memory)
 - [x] Documentation complete
 
-### Task 13.3.2: Implement Consolidation Engine Stub
+### Task 13.3.2: Implement Consolidation Engine Stub ✅ COMPLETE
 **Priority**: HIGH
-**Estimated Time**: 2 hours
+**Estimated Time**: 2 hours (actual: 2.5 hours)
 **Assignee**: Consolidation Team
+**Status**: ✅ COMPLETE
 
-**Description**: Create consolidation engine stub with manual trigger (LLM-driven logic in Phase 13.5).
+**Description**: Create consolidation engine with manual trigger using regex extraction (LLM-driven logic in Phase 13.5).
+
+**Implementation**:
+- **ConsolidationEngine trait**: Async trait for consolidation strategies (manual, immediate, background)
+- **ManualConsolidationEngine**: Regex-based entity/relationship extraction → KnowledgeGraph storage
+- **NoopConsolidationEngine**: Placeholder for disabled consolidation
+- **DefaultMemoryManager integration**: Consolidate method orchestrates episodic → semantic flow
+- **Metadata tracking**: entries_processed, entities_added, duration_ms
+- **Session filtering**: Consolidate specific sessions, mark entries as processed
 
 **Acceptance Criteria**:
-- [ ] `ManualConsolidationEngine` struct with trigger method
-- [ ] Basic episodic → semantic conversion
-- [ ] Consolidation metadata tracked
-- [ ] Manual trigger working
+- [x] `ManualConsolidationEngine` struct with trigger method
+- [x] Basic episodic → semantic conversion (via regex extraction)
+- [x] Consolidation metadata tracked (ConsolidationResult)
+- [x] Manual trigger working (MemoryManager::consolidate)
 
-**Implementation Steps**:
-1. Create `llmspell-memory/src/consolidation/manual.rs`:
-   ```rust
-   pub struct ManualConsolidationEngine {
-       extractor: Arc<RegexExtractor>,
-       knowledge_graph: Arc<dyn KnowledgeGraph>,
-   }
+**Files Created**:
+- `llmspell-memory/src/consolidation/mod.rs` (70 lines - ConsolidationEngine trait)
+- `llmspell-memory/src/consolidation/manual.rs` (326 lines - ManualConsolidationEngine + 5 tests)
+- `llmspell-memory/src/consolidation/noop.rs` (75 lines - NoopConsolidationEngine + 1 test)
+- `llmspell-memory/tests/consolidation_test.rs` (259 lines - 8 integration tests)
 
-   impl ManualConsolidationEngine {
-       pub async fn trigger(&self, session_id: &str, entries: Vec<EpisodicEntry>) -> Result<ConsolidationResult> {
-           // Extract entities/relationships using regex
-           // Add to knowledge graph
-           // Mark entries as processed
-       }
-   }
+**Files Modified**:
+- `llmspell-memory/src/manager.rs` (updated consolidate method, added with_consolidation constructor)
+- Removed: `llmspell-memory/src/consolidation.rs` (refactored into module structure)
+
+**Test Results**:
+- **91 tests passing** in llmspell-memory (21 lib + 8 consolidation + 46 traits + 6 manager + 10 semantic)
+- 14 new tests added (6 consolidation unit + 8 integration)
+- Zero clippy warnings
+- Proper error handling: `u64::try_from().unwrap_or(u64::MAX)` for duration conversions
+
+**Key Insights**:
+1. **Trait-based design**: ConsolidationEngine trait enables hot-swappable strategies
+   - NoopConsolidationEngine for disabled mode
+   - ManualConsolidationEngine for testing/development
+   - Future: LLM-driven engine in Phase 13.5
+
+2. **Episodic → Semantic flow**:
    ```
-2. Implement basic extraction → graph storage flow
-3. Track consolidation metadata (timestamp, entries processed, entities added)
-4. Write unit tests
+   EpisodicMemory::get_session → filter unprocessed →
+   ConsolidationEngine::consolidate → RegexExtractor →
+   KnowledgeGraph::add_entity/relationship →
+   EpisodicMemory::mark_processed
+   ```
 
-**Files to Create/Modify**:
-- `llmspell-memory/src/consolidation/manual.rs` (NEW - 200 lines)
-- `llmspell-memory/src/consolidation/mod.rs` (NEW)
-- `llmspell-memory/tests/consolidation_test.rs` (NEW - 150 lines)
+3. **Session isolation**: Consolidation filters by session_id, preventing cross-session pollution
+
+4. **Idempotence**: Already-processed entries are skipped (second consolidation returns 0 processed)
+
+5. **Integration complete**: DefaultMemoryManager.consolidate() method fully functional
+   - Retrieves unprocessed entries for session
+   - Delegates to consolidation engine
+   - Marks processed entries in episodic storage
+   - Returns ConsolidationResult with metrics
 
 **Definition of Done**:
-- [ ] Manual consolidation working
-- [ ] Entities extracted and stored
-- [ ] Metadata tracking functional
-- [ ] Tests pass
+- [x] Manual consolidation working (ManualConsolidationEngine)
+- [x] Entities extracted and stored (via RegexExtractor → KnowledgeGraph)
+- [x] Metadata tracking functional (ConsolidationResult with 6 metrics)
+- [x] Tests pass (14 tests, 91 total passing)
+- [x] Zero clippy warnings (proper u64::try_from for duration conversion)
 
 ### Task 13.3.3: Create ADR Documentation for Bi-Temporal Design
 **Priority**: MEDIUM

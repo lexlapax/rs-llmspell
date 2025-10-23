@@ -6,13 +6,13 @@
 use async_trait::async_trait;
 use std::sync::Arc;
 
-use crate::consolidation::NoopConsolidationEngine;
+use crate::consolidation::{ConsolidationEngine, NoopConsolidationEngine};
 use crate::episodic::InMemoryEpisodicMemory;
 use crate::error::Result;
 use crate::procedural::NoopProceduralMemory;
 use crate::semantic::GraphSemanticMemory;
 use crate::traits::{EpisodicMemory, MemoryManager, ProceduralMemory, SemanticMemory};
-use crate::types::{ConsolidationMode, ConsolidationResult};
+use crate::types::{ConsolidationMode, ConsolidationResult, EpisodicEntry};
 
 /// Default memory manager implementation
 ///
@@ -25,7 +25,7 @@ use crate::types::{ConsolidationMode, ConsolidationResult};
 /// ├── Episodic: InMemoryEpisodicMemory (HNSW vector search)
 /// ├── Semantic: GraphSemanticMemory (wraps SurrealDB)
 /// ├── Procedural: NoopProceduralMemory (placeholder)
-/// └── Consolidation: NoopConsolidationEngine (stub for Phase 13.3.2)
+/// └── Consolidation: ConsolidationEngine (NoopConsolidationEngine by default)
 /// ```
 ///
 /// # Example
@@ -47,8 +47,7 @@ pub struct DefaultMemoryManager {
     episodic: Arc<dyn EpisodicMemory>,
     semantic: Arc<dyn SemanticMemory>,
     procedural: Arc<dyn ProceduralMemory>,
-    #[allow(dead_code)] // Will be used in Task 13.3.2
-    consolidation: Arc<NoopConsolidationEngine>,
+    consolidation: Arc<dyn ConsolidationEngine>,
 }
 
 impl DefaultMemoryManager {
@@ -80,7 +79,40 @@ impl DefaultMemoryManager {
             episodic,
             semantic,
             procedural,
-            consolidation: Arc::new(NoopConsolidationEngine),
+            consolidation: Arc::new(NoopConsolidationEngine::new()),
+        }
+    }
+
+    /// Create new memory manager with custom consolidation engine
+    ///
+    /// Allows overriding the default no-op consolidation with a real implementation.
+    ///
+    /// # Arguments
+    ///
+    /// * `episodic` - Episodic memory implementation
+    /// * `semantic` - Semantic memory implementation
+    /// * `procedural` - Procedural memory implementation
+    /// * `consolidation` - Consolidation engine implementation
+    ///
+    /// # Example
+    ///
+    /// ```rust,ignore
+    /// let engine = Arc::new(ManualConsolidationEngine::new(extractor, graph));
+    /// let manager = DefaultMemoryManager::with_consolidation(
+    ///     episodic, semantic, procedural, engine
+    /// );
+    /// ```
+    pub fn with_consolidation(
+        episodic: Arc<dyn EpisodicMemory>,
+        semantic: Arc<dyn SemanticMemory>,
+        procedural: Arc<dyn ProceduralMemory>,
+        consolidation: Arc<dyn ConsolidationEngine>,
+    ) -> Self {
+        Self {
+            episodic,
+            semantic,
+            procedural,
+            consolidation,
         }
     }
 
@@ -128,10 +160,45 @@ impl MemoryManager for DefaultMemoryManager {
         session_id: &str,
         mode: ConsolidationMode,
     ) -> Result<ConsolidationResult> {
-        // Stub implementation - full consolidation in Task 13.3.2
-        // For now, just return empty result
-        let _ = (session_id, mode);
-        Ok(ConsolidationResult::empty())
+        // Get all entries for the session
+        let entries = self.episodic.get_session(session_id).await?;
+
+        // Filter to only unprocessed entries
+        let mut unprocessed: Vec<EpisodicEntry> =
+            entries.into_iter().filter(|e| !e.processed).collect();
+
+        if unprocessed.is_empty() {
+            return Ok(ConsolidationResult::empty());
+        }
+
+        // Run consolidation based on mode
+        let result = match mode {
+            ConsolidationMode::Manual | ConsolidationMode::Immediate => {
+                self.consolidation
+                    .consolidate(&[session_id], &mut unprocessed)
+                    .await?
+            }
+            ConsolidationMode::Background => {
+                // Background mode not yet implemented
+                // For now, treat as manual trigger
+                self.consolidation
+                    .consolidate(&[session_id], &mut unprocessed)
+                    .await?
+            }
+        };
+
+        // Mark processed entries in episodic storage
+        let processed_ids: Vec<String> = unprocessed
+            .iter()
+            .filter(|e| e.processed)
+            .map(|e| e.id.clone())
+            .collect();
+
+        if !processed_ids.is_empty() {
+            self.episodic.mark_processed(&processed_ids).await?;
+        }
+
+        Ok(result)
     }
 
     async fn shutdown(&self) -> Result<()> {
