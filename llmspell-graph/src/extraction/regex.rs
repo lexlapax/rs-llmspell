@@ -26,9 +26,9 @@
 //! ```
 
 use crate::types::{Entity, Relationship};
+use llmspell_utils::text::stopwords::is_stopword;
 use regex::Regex;
 use serde_json::json;
-use std::collections::HashSet;
 use std::sync::LazyLock;
 
 /// Regex patterns for relationship extraction
@@ -52,184 +52,6 @@ static OF_PATTERN: LazyLock<Regex> = LazyLock::new(|| {
 /// Entity mention extraction pattern (capitalized words/phrases)
 static ENTITY_PATTERN: LazyLock<Regex> =
     LazyLock::new(|| Regex::new(r"\b([A-Z][a-zA-Z0-9]*(?:\s+[A-Z][a-zA-Z0-9]*)*)\b").unwrap());
-
-/// Stopwords set for fast O(1) lookup
-static STOPWORDS: LazyLock<HashSet<&'static str>> = LazyLock::new(|| {
-    HashSet::from([
-        // Determiners & demonstratives
-        "The",
-        "This",
-        "That",
-        "These",
-        "Those",
-        "A",
-        "An",
-        // Pronouns
-        "It",
-        "They",
-        "We",
-        "You",
-        "I",
-        "He",
-        "She",
-        "My",
-        "Your",
-        "Their",
-        "Our",
-        "His",
-        "Her",
-        "Its",
-        "Who",
-        "What",
-        "Which",
-        "Where",
-        "When",
-        "Why",
-        "How",
-        // Conjunctions
-        "And",
-        "Or",
-        "But",
-        "So",
-        "Yet",
-        "For",
-        "Nor",
-        "If",
-        "Because",
-        "Although",
-        "Unless",
-        "While",
-        "Since",
-        "Before",
-        "After",
-        // Prepositions & common verbs
-        "In",
-        "On",
-        "At",
-        "To",
-        "From",
-        "By",
-        "With",
-        "Without",
-        "Through",
-        "During",
-        "About",
-        "Above",
-        "Below",
-        "Between",
-        "Among",
-        "Under",
-        "Over",
-        "Into",
-        "Onto",
-        "Is",
-        "Are",
-        "Was",
-        "Were",
-        "Be",
-        "Been",
-        "Being",
-        "Have",
-        "Has",
-        "Had",
-        "Do",
-        "Does",
-        "Did",
-        "Will",
-        "Would",
-        "Could",
-        "Should",
-        "May",
-        "Might",
-        "Must",
-        "Can",
-        "Cannot",
-        "Get",
-        "Got",
-        "Make",
-        "Made",
-        "Take",
-        "Taken",
-        // Temporal & quantifiers
-        "Now",
-        "Then",
-        "Today",
-        "Tomorrow",
-        "Yesterday",
-        "Always",
-        "Never",
-        "Sometimes",
-        "Often",
-        "Usually",
-        "Recently",
-        "Currently",
-        "Previously",
-        "Next",
-        "Last",
-        "All",
-        "Some",
-        "Many",
-        "Few",
-        "Several",
-        "Most",
-        "Any",
-        "No",
-        "None",
-        "Each",
-        "Every",
-        "Other",
-        "Another",
-        "Such",
-        "Same",
-        "Different",
-        // Common adverbs & discourse markers
-        "Very",
-        "Really",
-        "Quite",
-        "Too",
-        "Also",
-        "Just",
-        "Only",
-        "Even",
-        "Still",
-        "However",
-        "Therefore",
-        "Thus",
-        "Hence",
-        "Moreover",
-        "Furthermore",
-        "Nevertheless",
-        "Nonetheless",
-        "Otherwise",
-        "Indeed",
-        "Actually",
-        "Basically",
-        "Essentially",
-        "Specifically",
-        "Particularly",
-        "Generally",
-        "Typically",
-        // Meta-discourse
-        "Example",
-        "Examples",
-        "Note",
-        "Notes",
-        "Important",
-        "Summary",
-        "Conclusion",
-        "Introduction",
-        "Background",
-        "Overview",
-        "Details",
-        "Section",
-        "Chapter",
-        "Figure",
-        "Table",
-        "Appendix",
-        "Reference",
-        "References",
-    ])
-});
 
 /// Regex-based entity and relationship extractor
 ///
@@ -311,7 +133,7 @@ impl RegexExtractor {
             }
 
             // Skip common non-entity words (stopwords)
-            if Self::is_stopword(name) {
+            if is_stopword(name) {
                 continue;
             }
 
@@ -327,7 +149,7 @@ impl RegexExtractor {
 
             // Skip multi-word entities that start with stopwords (e.g., "The Rust", "However Python")
             if let Some(first_word) = name.split_whitespace().next() {
-                if Self::is_stopword(first_word) {
+                if is_stopword(first_word) {
                     continue;
                 }
             }
@@ -434,23 +256,6 @@ impl RegexExtractor {
         }
 
         relationships
-    }
-
-    /// Check if a word is a common stopword (non-entity)
-    ///
-    /// Filters out determiners, pronouns, conjunctions, prepositions, and temporal words
-    /// that are often capitalized but not meaningful entities. Uses O(1) `HashSet` lookup.
-    ///
-    /// # Arguments
-    ///
-    /// * `word` - Word to check
-    ///
-    /// # Returns
-    ///
-    /// `true` if word is a stopword, `false` otherwise
-    #[inline]
-    fn is_stopword(word: &str) -> bool {
-        STOPWORDS.contains(word)
     }
 
     /// Infer entity type from context
