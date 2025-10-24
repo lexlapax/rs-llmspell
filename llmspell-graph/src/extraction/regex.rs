@@ -179,7 +179,7 @@ impl RegexExtractor {
     }
 
     /// Helper: Check basic length requirements
-    fn passes_length_filters(&self, name: &str) -> bool {
+    const fn passes_length_filters(&self, name: &str) -> bool {
         // Filter out short/common words
         if name.len() < self.min_entity_length {
             return false;
@@ -219,11 +219,11 @@ impl RegexExtractor {
 
     /// Helper: Check deduplication
     fn is_not_duplicate(name: &str, seen_names: &mut std::collections::HashSet<String>) -> bool {
-        if !seen_names.insert(name.to_string()) {
+        if seen_names.insert(name.to_string()) {
+            true
+        } else {
             trace!("Filtered duplicate: '{}'", name);
             false
-        } else {
-            true
         }
     }
 
