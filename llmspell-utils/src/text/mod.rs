@@ -6,7 +6,7 @@
 //!
 //! # Modules
 //!
-//! - [`stopwords`]: Common stopword lists for entity extraction filtering
+//! - [`stopwords`](crate::text::stopwords): Common stopword lists for entity extraction filtering
 //!
 //! # Usage
 //!
