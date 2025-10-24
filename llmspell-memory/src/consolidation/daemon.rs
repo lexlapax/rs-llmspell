@@ -174,11 +174,22 @@ impl ConsolidationDaemon {
         }
 
         info!("Stopping consolidation daemon gracefully");
+        self.send_shutdown_signal()?;
+        self.wait_for_in_flight_operations().await;
+        self.running.store(false, Ordering::SeqCst);
+        info!("Consolidation daemon stopped");
+        Ok(())
+    }
+
+    /// Helper: Send shutdown signal
+    fn send_shutdown_signal(&self) -> Result<()> {
         self.shutdown_tx.send(true).map_err(|e| {
             MemoryError::InvalidInput(format!("Failed to send shutdown signal: {e}"))
-        })?;
+        })
+    }
 
-        // Wait for in-flight operations to complete (max 30s)
+    /// Helper: Wait for in-flight operations to complete with timeout
+    async fn wait_for_in_flight_operations(&self) {
         let start = std::time::Instant::now();
         let max_wait = Duration::from_secs(30);
 
@@ -192,10 +203,6 @@ impl ConsolidationDaemon {
             }
             tokio::time::sleep(Duration::from_millis(100)).await;
         }
-
-        self.running.store(false, Ordering::SeqCst);
-        info!("Consolidation daemon stopped");
-        Ok(())
     }
 
     /// Check if daemon is running
@@ -220,14 +227,7 @@ impl ConsolidationDaemon {
         loop {
             tokio::select! {
                 _ = interval.tick() => {
-                    debug!("Daemon tick");
-
-                    if !self.engine.is_ready() {
-                        warn!("LLM engine not ready, skipping consolidation");
-                        continue;
-                    }
-
-                    interval = self.handle_batch_processing(interval).await;
+                    interval = self.handle_tick(interval).await;
                 }
                 _ = shutdown_rx.changed() => {
                     info!("Shutdown signal received");
@@ -237,6 +237,18 @@ impl ConsolidationDaemon {
         }
 
         info!("Daemon loop exited");
+    }
+
+    /// Helper: Handle daemon tick event
+    async fn handle_tick(&self, interval: tokio::time::Interval) -> tokio::time::Interval {
+        debug!("Daemon tick");
+
+        if !self.engine.is_ready() {
+            warn!("LLM engine not ready, skipping consolidation");
+            return interval;
+        }
+
+        self.handle_batch_processing(interval).await
     }
 
     /// Handle batch processing and interval adjustment
@@ -298,12 +310,23 @@ impl ConsolidationDaemon {
             return Ok(0);
         }
 
-        // Prioritize active sessions
+        // Prioritize active sessions and process them
         let prioritized_sessions = Self::prioritize_sessions(sessions);
+        let total_processed = self.process_prioritized_sessions(&prioritized_sessions).await;
 
-        // Process up to batch_size entries across sessions (round-robin)
+        // Update metrics
+        self.update_batch_metrics(total_processed).await;
+
+        // Calculate remaining queue depth
+        let remaining = self.count_unprocessed_total().await?;
+        Ok(remaining)
+    }
+
+    /// Helper: Process prioritized sessions
+    async fn process_prioritized_sessions(&self, sessions: &[String]) -> usize {
         let mut total_processed = 0;
-        for session_id in prioritized_sessions.iter().take(self.config.batch_size) {
+
+        for session_id in sessions.iter().take(self.config.batch_size) {
             match self.consolidate_session(session_id).await {
                 Ok(count) => {
                     total_processed += count;
@@ -315,16 +338,14 @@ impl ConsolidationDaemon {
             }
         }
 
-        // Update metrics
-        {
-            let mut metrics = self.metrics.lock().await;
-            metrics.consolidations += 1;
-            metrics.entries_processed += total_processed as u64;
-        }
+        total_processed
+    }
 
-        // Calculate remaining queue depth
-        let remaining = self.count_unprocessed_total().await?;
-        Ok(remaining)
+    /// Helper: Update batch processing metrics
+    async fn update_batch_metrics(&self, total_processed: usize) {
+        let mut metrics = self.metrics.lock().await;
+        metrics.consolidations += 1;
+        metrics.entries_processed += total_processed as u64;
     }
 
     /// Consolidate unprocessed entries for a session
