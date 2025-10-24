@@ -2809,12 +2809,358 @@ Created comprehensive integration tests (285 lines) covering end-to-end pipeline
 - [x] TODO.md updated with completion status and DMR baselines ✅
 
 ---
+## Phase 13.5.6: Clean up previous code to add debug! style macros across runtime codebase
+
+**Goal**: Add comprehensive tracing to all Phase 13 crates for production debugging and monitoring
+**Timeline**: 1 day (8 hours)
+**Critical Issue**: llmspell-graph (0%), llmspell-memory (35%), llmspell-context (25%) tracing coverage
+
+### Task 13.5.6a: Add comprehensive tracing to llmspell-graph (CRITICAL - 0% coverage)
+
+**Priority**: CRITICAL
+**Estimated Time**: 2 hours
+**Current Coverage**: 0% (ZERO trace/debug/info/warn/error calls)
+
+**Description**: Add tracing to all database operations, entity extraction, and temporal queries in llmspell-graph.
+
+**Acceptance Criteria**:
+- [ ] `storage/surrealdb.rs` (740 lines) - Database operations
+  - [ ] info!: Database init, entity/relationship creation, schema setup
+  - [ ] debug!: Query execution, temporal lookups, point-in-time queries
+  - [ ] warn!: Missing entities, failed updates, tombstone operations
+  - [ ] error!: DB connection failures, query errors, schema failures
+  - [ ] trace!: SurrealDB query strings, entity details, relationship data
+- [ ] `extraction/regex.rs` (450 lines) - Entity/relationship extraction
+  - [ ] info!: Extraction initiated, pattern matching complete
+  - [ ] debug!: Regex patterns applied, confidence scores calculated
+  - [ ] warn!: Low confidence extractions (<0.5), pattern mismatches
+  - [ ] error!: Regex compilation failures, extraction errors
+  - [ ] trace!: Matched text spans, entity details, relationship tuples
+- [ ] `traits/knowledge_graph.rs` - Trait documentation (no runtime tracing needed)
+
+**Implementation Steps**:
+1. Add `tracing` dependency to `llmspell-graph/Cargo.toml`
+2. Add `use tracing::{trace, debug, info, warn, error};` to relevant files
+3. `storage/surrealdb.rs`:
+   - Entry: `info!("Initializing SurrealDB storage: namespace={}, database={}", ns, db)`
+   - Operations: `debug!("Adding entity: id={}, entity_type={}", id, entity_type)`
+   - Queries: `trace!("Executing temporal query: {}", query_str)`
+   - Errors: `error!("Failed to connect to SurrealDB: {}", err)`
+4. `extraction/regex.rs`:
+   - Entry: `info!("Starting entity extraction: {} patterns", patterns.len())`
+   - Extraction: `debug!("Extracted {} entities, {} relationships", entities.len(), rels.len())`
+   - Confidence: `warn!("Low confidence entity: {:?}, confidence={:.2}", entity, conf)`
+   - Trace: `trace!("Regex match: pattern={}, text='{}', span={:?}", pattern, text, span)`
+
+**Files to Modify**:
+- `llmspell-graph/Cargo.toml` - Add tracing dependency
+- `llmspell-graph/src/storage/surrealdb.rs` - ~30 tracing calls
+- `llmspell-graph/src/extraction/regex.rs` - ~20 tracing calls
+
+**Definition of Done**:
+- [ ] All 3 files have appropriate tracing levels (info/debug/warn/error/trace)
+- [ ] Critical operations (DB init, entity CRUD, queries) have info! logs
+- [ ] Intermediate results (query params, extraction counts) have debug! logs
+- [ ] Error paths have error! logs with context
+- [ ] Detailed data (query strings, entity details) have trace! logs
+- [ ] Zero clippy warnings after changes
+- [ ] `cargo test -p llmspell-graph` passes
+
+---
+
+### Task 13.5.6b: Add missing tracing to llmspell-memory (HIGH - 35% coverage)
+
+**Priority**: HIGH
+**Estimated Time**: 2.5 hours
+**Current Coverage**: 35% (6/17 files have tracing)
+
+**Description**: Add tracing to coordination layer, episodic storage, semantic graph wrapper, and metrics collection.
+
+**Files WITH tracing (SKIP)**:
+- ✅ consolidation/daemon.rs - Good coverage (13 calls)
+- ✅ consolidation/llm_engine.rs - Excellent coverage (37 calls)
+- ✅ consolidation/validator.rs, prompts.rs, context_assembly.rs, manual.rs - Some coverage
+
+**Files with NO tracing (CRITICAL GAPS)**:
+- [ ] `manager.rs` (200 lines) - COORDINATION LAYER - CRITICAL
+  - [ ] info!: Manager initialization (`new_in_memory`), shutdown
+  - [ ] debug!: Consolidation orchestration, component coordination
+  - [ ] warn!: Shutdown failures, consolidation delays
+  - [ ] error!: Manager initialization failures, coordination errors
+- [ ] `episodic.rs` (500+ lines) - MEMORY STORAGE - CRITICAL
+  - [ ] info!: Episodic entry creation (`add`), session queries
+  - [ ] debug!: Vector search params, similarity scores, consolidation status updates
+  - [ ] warn!: Low similarity scores (<0.5), empty search results
+  - [ ] error!: Vector store failures, search errors
+  - [ ] trace!: Episodic entry details, vector embeddings, search results
+- [ ] `semantic.rs` (300 lines) - GRAPH WRAPPER - HIGH PRIORITY
+  - [ ] info!: Entity upserts, graph backend initialization
+  - [ ] debug!: Query by type, graph delegation operations
+  - [ ] warn!: Entity not found, query empty results
+  - [ ] error!: Graph backend failures, upsert errors
+  - [ ] trace!: Entity details, relationship data, query results
+- [ ] `consolidation/metrics.rs` (900 lines) - METRICS COLLECTION
+  - [ ] info!: Consolidation metrics recorded, snapshot retrieved
+  - [ ] debug!: Metrics deltas (entities_added, decisions distribution)
+  - [ ] trace!: Full metrics snapshot, performance counters
+- [ ] `consolidation/prompt_schema.rs` (520 lines) - JSON PARSING
+  - [ ] info!: JSON parsing initiated, schema validation
+  - [ ] debug!: Parsed decision types, entity counts
+  - [ ] warn!: Partial parse success, validation warnings
+  - [ ] error!: JSON parse failures, schema validation errors
+  - [ ] trace!: Raw JSON response, parsed structure
+- [ ] `consolidation/noop.rs` (100 lines) - STUB ENGINE (LOW PRIORITY)
+
+**Implementation Steps**:
+1. Add `use tracing::{trace, debug, info, warn, error};` to relevant files
+2. `manager.rs`:
+   - `info!("Initializing MemoryManager: backend={}", backend_type)`
+   - `debug!("Triggering consolidation for session_id={}", session_id)`
+   - `error!("Manager shutdown failed: {}", err)`
+3. `episodic.rs`:
+   - `info!("Adding episodic entry: session_id={}, content_len={}", id, content.len())`
+   - `debug!("Vector search: query_len={}, top_k={}, min_similarity={:.2}", query.len(), k, min_sim)`
+   - `trace!("Search results: {} entries, scores={:?}", results.len(), scores)`
+4. `semantic.rs`:
+   - `info!("Upserting entity: id={}, entity_type={}", id, entity_type)`
+   - `debug!("Querying by type: entity_type={}", entity_type)`
+   - `error!("Graph operation failed: {}", err)`
+5. `consolidation/metrics.rs`:
+   - `info!("Recording consolidation metrics: entities_added={}, decisions={:?}", added, dist)`
+   - `debug!("Metrics snapshot: total_consolidations={}, avg_duration={:.0}ms", total, avg_ms)`
+6. `consolidation/prompt_schema.rs`:
+   - `debug!("Parsing LLM JSON response: {} bytes", json.len())`
+   - `warn!("Partial parse recovered: {} decisions, errors={}", decisions.len(), errors)`
+   - `error!("JSON parse failed: {}", err)`
+   - `trace!("Raw LLM response: {}", json)`
+
+**Files to Modify**:
+- `llmspell-memory/src/manager.rs` - ~10 tracing calls
+- `llmspell-memory/src/episodic.rs` - ~25 tracing calls
+- `llmspell-memory/src/semantic.rs` - ~15 tracing calls
+- `llmspell-memory/src/consolidation/metrics.rs` - ~12 tracing calls
+- `llmspell-memory/src/consolidation/prompt_schema.rs` - ~15 tracing calls
+- `llmspell-memory/src/consolidation/noop.rs` - ~5 tracing calls (low priority)
+
+**Definition of Done**:
+- [ ] All 5 critical files have comprehensive tracing (manager, episodic, semantic, metrics, prompt_schema)
+- [ ] Coordination operations (manager init, consolidation trigger) have info! logs
+- [ ] Storage operations (episodic add/search, semantic upsert) have debug! logs
+- [ ] Error paths have error! logs with full context
+- [ ] Detailed data (metrics snapshots, parsed JSON) have trace! logs
+- [ ] Zero clippy warnings after changes
+- [ ] `cargo test -p llmspell-memory` passes
+
+---
+
+### Task 13.5.6c: Add missing tracing to llmspell-context (MEDIUM - 25% coverage)
+
+**Priority**: MEDIUM
+**Estimated Time**: 1.5 hours
+**Current Coverage**: 25% (4/16 files have tracing)
+
+**Description**: Add tracing to query analysis, strategy selection, and pipeline orchestration.
+
+**Files WITH tracing (SKIP)**:
+- ✅ reranking/deberta.rs - Model download/initialization
+- ✅ assembly/assembler.rs - Context assembly
+- ✅ reranking/bm25.rs, retrieval/bm25.rs - BM25 scoring/retrieval
+
+**Files with NO tracing (GAPS)**:
+- [ ] `query/analyzer.rs` (400 lines) - QUERY UNDERSTANDING - HIGH
+  - [ ] info!: Query analysis started, intent classification complete
+  - [ ] debug!: Extracted entities, keywords, intent confidence
+  - [ ] warn!: Low confidence intent (<0.5), no entities extracted
+  - [ ] error!: Analysis failures, entity extraction errors
+  - [ ] trace!: Query details, extracted keywords, entity spans
+- [ ] `retrieval/strategy.rs` (300 lines) - STRATEGY SELECTION - HIGH
+  - [ ] info!: Strategy selected, execution started
+  - [ ] debug!: Strategy decision reasoning, fallback triggered
+  - [ ] warn!: No strategy matched, fallback to default
+  - [ ] error!: Strategy execution failed
+  - [ ] trace!: Strategy scores, candidate strategies
+- [ ] `pipeline/mod.rs` (250 lines) - PIPELINE ORCHESTRATION - CRITICAL
+  - [ ] info!: Pipeline execution started, stages completed
+  - [ ] debug!: Stage transitions, component coordination
+  - [ ] warn!: Stage timeout, partial results
+  - [ ] error!: Pipeline failures, stage errors
+  - [ ] trace!: Intermediate results, stage timing
+
+**Implementation Steps**:
+1. Add `use tracing::{trace, debug, info, warn, error};` to relevant files
+2. `query/analyzer.rs`:
+   - `info!("Analyzing query: '{}'", query.truncate(50))`
+   - `debug!("Intent classified: {:?}, confidence={:.2}", intent, confidence)`
+   - `warn!("Low confidence intent: {:?}, confidence={:.2}", intent, confidence)`
+   - `trace!("Extracted keywords: {:?}, entities: {:?}", keywords, entities)`
+3. `retrieval/strategy.rs`:
+   - `info!("Selected strategy: {:?}", strategy_type)`
+   - `debug!("Strategy decision: {} candidates, top_score={:.2}", candidates.len(), top_score)`
+   - `warn!("Fallback to default strategy: reason={}", reason)`
+   - `error!("Strategy execution failed: {:?}, error={}", strategy, err)`
+4. `pipeline/mod.rs`:
+   - `info!("Starting context pipeline: stages={}", stages.len())`
+   - `debug!("Pipeline stage complete: stage={}, duration={:.0}ms", stage, duration_ms)`
+   - `warn!("Pipeline stage timeout: stage={}, timeout={:.0}ms", stage, timeout_ms)`
+   - `error!("Pipeline failed: stage={}, error={}", stage, err)`
+
+**Files to Modify**:
+- `llmspell-context/src/query/analyzer.rs` - ~15 tracing calls
+- `llmspell-context/src/retrieval/strategy.rs` - ~12 tracing calls
+- `llmspell-context/src/pipeline/mod.rs` - ~10 tracing calls
+
+**Definition of Done**:
+- [ ] All 3 files have appropriate tracing levels
+- [ ] Pipeline orchestration has info! logs for start/complete
+- [ ] Query analysis and strategy selection have debug! logs
+- [ ] Error paths have error! logs with context
+- [ ] Detailed results (keywords, strategy scores) have trace! logs
+- [ ] Zero clippy warnings after changes
+- [ ] `cargo test -p llmspell-context` passes
+
+---
+
+### Task 13.5.6d: Create trace verification tests for all three crates
+
+**Priority**: HIGH
+**Estimated Time**: 1.5 hours
+
+**Description**: Create tests to verify tracing output is produced at correct levels for critical operations.
+
+**Acceptance Criteria**:
+- [ ] **llmspell-graph tests** - Verify database and extraction tracing
+  - [ ] Test: SurrealDB init produces info! log with namespace/database
+  - [ ] Test: Entity creation produces debug! log with entity_type
+  - [ ] Test: Temporal query produces trace! log with query string
+  - [ ] Test: Connection failure produces error! log
+- [ ] **llmspell-memory tests** - Verify manager, episodic, semantic tracing
+  - [ ] Test: Manager init produces info! log with backend type
+  - [ ] Test: Episodic add produces info! log with session_id
+  - [ ] Test: Vector search produces debug! log with params
+  - [ ] Test: Consolidation metrics produces info! log with entity count
+  - [ ] Test: JSON parse error produces error! log
+- [ ] **llmspell-context tests** - Verify pipeline, query, strategy tracing
+  - [ ] Test: Pipeline start produces info! log with stage count
+  - [ ] Test: Query analysis produces debug! log with intent
+  - [ ] Test: Strategy selection produces info! log with strategy type
+  - [ ] Test: Pipeline failure produces error! log with stage
+
+**Implementation Steps**:
+1. Add `tracing-subscriber` and `tracing-test` to dev-dependencies (if not present)
+2. Create trace verification helpers:
+   ```rust
+   use tracing_test::traced_test;
+
+   #[traced_test]
+   #[test]
+   fn test_entity_creation_logs() {
+       // Perform operation
+       let kg = KnowledgeGraph::new(...);
+       kg.add_entity(...);
+
+       // Verify logs
+       assert!(logs_contain("Adding entity"));
+   }
+   ```
+3. Create test files:
+   - `llmspell-graph/tests/tracing_test.rs` - ~200 lines
+   - `llmspell-memory/tests/tracing_test.rs` - ~300 lines
+   - `llmspell-context/tests/tracing_test.rs` - ~200 lines
+4. Test critical paths: init, normal operations, error paths
+5. Verify log levels match best practices (info for ops, debug for details, error for failures)
+
+**Files to Create/Modify**:
+- `llmspell-graph/tests/tracing_test.rs` (NEW - 200 lines)
+- `llmspell-memory/tests/tracing_test.rs` (NEW - 300 lines)
+- `llmspell-context/tests/tracing_test.rs` (NEW - 200 lines)
+- `llmspell-graph/Cargo.toml` - Add tracing-test dev-dependency
+- `llmspell-memory/Cargo.toml` - Add tracing-test dev-dependency
+- `llmspell-context/Cargo.toml` - Add tracing-test dev-dependency
+
+**Definition of Done**:
+- [ ] All trace verification tests pass
+- [ ] Tests verify info! logs for critical operations
+- [ ] Tests verify debug! logs for intermediate results
+- [ ] Tests verify error! logs for failure paths
+- [ ] Tests verify trace! logs for detailed data
+- [ ] Zero clippy warnings in test code
+- [ ] All tests run in <30 seconds
+
+---
+
+### Task 13.5.6e: Validate tracing with quality gates and documentation
+
+**Priority**: MEDIUM
+**Estimated Time**: 0.5 hours
+
+**Description**: Run quality checks, verify no warnings, update documentation with tracing coverage.
+
+**Acceptance Criteria**:
+- [ ] `./scripts/quality/quality-check-fast.sh` passes
+- [ ] Zero clippy warnings across all 3 crates
+- [ ] All existing tests still pass (no regressions)
+- [ ] Update phase-13-design-doc.md with tracing coverage metrics
+- [ ] Document tracing best practices for Phase 13 code
+
+**Implementation Steps**:
+1. Run quality check: `./scripts/quality/quality-check-fast.sh`
+2. Fix any clippy warnings from new tracing code
+3. Verify test coverage maintained (>90%)
+4. Update `docs/in-progress/phase-13-design-doc.md`:
+   - Section: "Tracing and Observability"
+   - Coverage metrics: llmspell-graph (0% → 90%), llmspell-memory (35% → 95%), llmspell-context (25% → 85%)
+   - Best practices: info/debug/warn/error/trace usage
+   - Example RUST_LOG configurations for debugging
+5. Create tracing examples:
+   ```bash
+   # Debug consolidation
+   RUST_LOG=llmspell_memory::consolidation=debug cargo run
+
+   # Trace knowledge graph queries
+   RUST_LOG=llmspell_graph::storage=trace cargo run
+
+   # Monitor pipeline execution
+   RUST_LOG=llmspell_context::pipeline=info cargo run
+   ```
+
+**Files to Modify**:
+- `docs/in-progress/phase-13-design-doc.md` - Add tracing section (~200 lines)
+
+**Definition of Done**:
+- [ ] Quality check passes with zero warnings
+- [ ] All 149 existing tests pass
+- [ ] Test coverage >90% maintained
+- [ ] Design doc updated with tracing coverage and examples
+- [ ] TODO.md updated with completion status
+
+---
+
+**Phase 13.5.6 Overall Definition of Done**:
+- [ ] llmspell-graph: 0% → 90% tracing coverage (surrealdb.rs, regex.rs instrumented)
+- [ ] llmspell-memory: 35% → 95% tracing coverage (manager, episodic, semantic, metrics, prompt_schema)
+- [ ] llmspell-context: 25% → 85% tracing coverage (analyzer, strategy, pipeline)
+- [ ] 70+ new tracing calls added across 11 files
+- [ ] 15+ trace verification tests passing
+- [ ] Zero clippy warnings
+- [ ] Quality gates pass (quality-check-fast.sh)
+- [ ] Documentation updated with tracing examples
+- [ ] TODO.md updated
+
+---
 
 ## Phase 13.6: E2E Memory Flow & Documentation (Day 10)
 
 **Goal**: Validate complete memory lifecycle and document consolidation algorithm
 **Timeline**: 1 day (8 hours)
 **Critical Dependencies**: Phases 13.1-13.5 complete
+
+**⚠️ TRACING REQUIREMENT**: ALL new runtime code in Phase 13.6+ MUST include comprehensive tracing instrumentation:
+- `info!` for high-level operations (test start/complete, benchmark runs, documentation generation)
+- `debug!` for intermediate results (test assertions, metrics collection, diagram generation)
+- `warn!` for recoverable issues (test timeouts, missing data, fallback behavior)
+- `error!` for failures (test failures, benchmark errors, validation failures)
+- `trace!` for detailed debugging (test data, query results, detailed metrics)
+- See Phase 13.5.6 tracing coverage targets: graph (90%), memory (95%), context (85%)
 
 ### Task 13.6.1: E2E Integration Test (Episodic → Consolidation → Semantic → Retrieval)
 
@@ -2829,6 +3175,7 @@ Created comprehensive integration tests (285 lines) covering end-to-end pipeline
 - [ ] Verifies: EpisodicMemory, ConsolidationEngine, KnowledgeGraph, ContextPipeline integration
 - [ ] Uses real ChromaDB/Qdrant (embedded), SurrealDB (in-memory), DeBERTa (Candle)
 - [ ] Assertions on: entities created, relationships formed, retrieval accuracy
+- [ ] **TRACING**: Test harness logs test progress (info!), stage transitions (debug!), failures (error!)
 
 **Implementation Steps**:
 1. Create `llmspell-memory/tests/e2e/memory_flow_test.rs`
@@ -2868,6 +3215,7 @@ Created comprehensive integration tests (285 lines) covering end-to-end pipeline
 - [ ] NDCG@10 baseline measured (target: >0.70 with DeBERTa reranking)
 - [ ] Baseline metrics documented in design doc
 - [ ] Comparison script for future benchmarking
+- [ ] **TRACING**: Benchmark logs dataset loading (info!), calculation progress (debug!), final metrics (info!), errors (error!)
 
 **Implementation Steps**:
 1. Create `llmspell-memory/benches/baseline_measurement.rs`
@@ -2930,6 +3278,13 @@ Created comprehensive integration tests (285 lines) covering end-to-end pipeline
 **Timeline**: 2 days (16 hours)
 **Critical Dependencies**: Phases 13.1-13.6 complete
 
+**⚠️ TRACING REQUIREMENT**: ALL kernel integration code MUST include tracing:
+- `info!` for lifecycle events (memory manager init/shutdown, daemon start/stop, config loading)
+- `debug!` for component coordination (context builder, health checks, configuration validation)
+- `warn!` for degraded operation (daemon restart, graceful degradation, missing config)
+- `error!` for critical failures (initialization failure, shutdown timeout, daemon crash)
+- `trace!` for detailed state (config values, context state, daemon status)
+
 ### Task 13.7.1: Add MemoryManager to Kernel Context
 
 **Priority**: CRITICAL
@@ -2943,6 +3298,7 @@ Created comprehensive integration tests (285 lines) covering end-to-end pipeline
 - [ ] Lifecycle management (init, shutdown) integrated
 - [ ] Configuration loading from runtime config
 - [ ] Backward compatibility maintained (memory opt-in)
+- [ ] **TRACING**: Context init (info!), builder operations (debug!), shutdown sequence (info!), errors (error!)
 
 **Implementation Steps**:
 1. Modify `llmspell-kernel/src/context.rs`:
@@ -2990,6 +3346,7 @@ Created comprehensive integration tests (285 lines) covering end-to-end pipeline
 - [ ] Daemon shutdown gracefully on kernel shutdown
 - [ ] Configuration: enable_daemon, consolidation_interval, batch_size
 - [ ] Error handling for daemon failures
+- [ ] **TRACING**: Daemon start (info!), health checks (debug!), restart attempts (warn!), failures (error!)
 
 **Implementation Steps**:
 1. Modify `llmspell-kernel/src/lifecycle.rs`
@@ -3153,6 +3510,13 @@ Created comprehensive integration tests (285 lines) covering end-to-end pipeline
 **Timeline**: 2 days (16 hours)
 **Critical Dependencies**: Phase 13.7 complete
 
+**⚠️ TRACING REQUIREMENT**: ALL bridge/global code MUST include tracing:
+- `info!` for API calls (episodic_add, semantic_query, assemble, global injection)
+- `debug!` for conversions (async→blocking, Rust↔Lua, JSON serialization)
+- `warn!` for validation failures (invalid params, strategy not found, budget exceeded)
+- `error!` for bridge failures (runtime errors, conversion failures, API errors)
+- `trace!` for detailed data (params, return values, Lua stack state)
+
 ### Task 13.8.1: Create MemoryBridge
 
 **Priority**: CRITICAL
@@ -3166,6 +3530,7 @@ Created comprehensive integration tests (285 lines) covering end-to-end pipeline
 - [ ] Methods: episodic_add, episodic_search, semantic_query, consolidate, get_stats
 - [ ] Async methods converted to blocking for script compatibility
 - [ ] Error handling with user-friendly messages
+- [ ] **TRACING**: API calls (info!), async conversions (debug!), errors (error!), params/results (trace!)
 
 **Implementation Steps**:
 1. Create `llmspell-bridge/src/memory_bridge.rs`:
@@ -3210,6 +3575,7 @@ Created comprehensive integration tests (285 lines) covering end-to-end pipeline
 - [ ] Methods: assemble, test_query, get_strategy_stats, configure_reranking
 - [ ] Token budget enforcement
 - [ ] Strategy override support
+- [ ] **TRACING**: Assemble calls (info!), strategy selection (debug!), budget enforcement (warn!), errors (error!)
 
 **Implementation Steps**:
 1. Create `llmspell-bridge/src/context_bridge.rs`:
@@ -3253,6 +3619,7 @@ Created comprehensive integration tests (285 lines) covering end-to-end pipeline
 - [ ] Lua API: Memory.episodic.add(), Memory.episodic.search(), Memory.semantic.query(), Memory.consolidate(), Memory.stats()
 - [ ] All methods tested in Lua
 - [ ] Documentation with examples
+- [ ] **TRACING**: Global injection (info!), Lua calls (debug!), type conversions (debug!), errors (error!)
 
 **Implementation Steps**:
 1. Create `llmspell-bridge/src/globals/memory_global.rs`:
@@ -3304,6 +3671,7 @@ Created comprehensive integration tests (285 lines) covering end-to-end pipeline
 - [ ] Lua API: Context.assemble(), Context.test(), Context.strategy_stats(), Context.configure_reranking()
 - [ ] All methods tested in Lua
 - [ ] Documentation with examples
+- [ ] **TRACING**: Global injection (info!), Lua calls (debug!), type conversions (debug!), errors (error!)
 
 **Implementation Steps**:
 1. Create `llmspell-bridge/src/globals/context_global.rs`
@@ -3357,19 +3725,46 @@ Created comprehensive integration tests (285 lines) covering end-to-end pipeline
 
 ## Phase 13.9-13.15: Remaining Implementation Phases
 
+**⚠️ TRACING REQUIREMENT FOR ALL REMAINING PHASES**: Every task in Phases 13.9-13.15 MUST include comprehensive tracing instrumentation in ALL new runtime code:
+
+### Tracing Standards (Mandatory):
+- **info!**: High-level operations (API calls, CLI commands, template execution, test start/complete)
+- **debug!**: Intermediate results (strategy selection, metrics calculation, validation checks)
+- **warn!**: Recoverable issues (fallback behavior, validation warnings, performance degradation)
+- **error!**: Failures (API errors, CLI failures, benchmark failures, validation errors)
+- **trace!**: Detailed debugging (params, results, internal state, performance counters)
+
+### Coverage Targets (Enforced):
+- **Production code**: >90% of functions with at least 1 tracing call
+- **Critical paths**: 100% coverage (init, shutdown, API calls, error handling)
+- **Performance**: <1% overhead from tracing infrastructure
+
+### Verification:
+- Every task's "Definition of Done" includes: "Tracing instrumentation verified with tracing_test"
+- Quality gates enforce zero "missing tracing" clippy warnings (custom lint)
+
+---
+
 Due to document length, the remaining phases (13.9: Lua API Validation through 13.15: Release Readiness) follow the same structure as outlined in the original analysis. Each phase includes:
 
 - **Phase 13.9** (Day 15): Lua API Validation - Examples, documentation, integration tests
+  - TRACING: Script execution (info!), API calls (debug!), validation errors (warn!), failures (error!)
 - **Phase 13.10** (Days 16-17): RAG Integration - Memory-enhanced retrieval, chunking, reranking
+  - TRACING: Retrieval requests (info!), chunk assembly (debug!), reranking (debug!), errors (error!)
 - **Phase 13.11** (Days 18-19): Template Integration - Memory parameters for templates
+  - TRACING: Template exec (info!), memory lookups (debug!), param validation (warn!), errors (error!)
 - **Phase 13.12** (Day 20): CLI + UX - `llmspell memory/graph/context` commands
+  - TRACING: CLI commands (info!), subcommand routing (debug!), output formatting (debug!), errors (error!)
 - **Phase 13.13** (Days 21-22): Performance Optimization - Benchmarking, DeBERTa optimization
+  - TRACING: Benchmark runs (info!), performance metrics (debug!), optimization attempts (debug!), regressions (warn!)
   - **Includes Deferred Work**:
     - ⏸️ Task 13.1.6: Episodic memory benchmarks (P50/P95/P99, throughput, concurrency)
     - ⏸️ Task 13.2.3: Knowledge graph benchmarks (query latency, indexing performance)
     - Rationale: Comprehensive benchmarking requires full memory+consolidation+context system
 - **Phase 13.14** (Days 23-24): Accuracy Validation - DMR/NDCG@10 evaluation and tuning
+  - TRACING: Evaluation runs (info!), DMR/NDCG calculations (debug!), tuning iterations (debug!), regressions (error!)
 - **Phase 13.15** (Day 25): Release Readiness - Final integration, documentation audit, Phase 14 handoff
+  - TRACING: Integration tests (info!), doc generation (debug!), release validation (info!), blockers (error!)
 
 **Note**: For detailed task breakdowns of phases 13.9-13.15, refer to the comprehensive design document: `/docs/in-progress/phase-13-design-doc.md` (5,628 lines) which provides complete specifications for each task.
 
