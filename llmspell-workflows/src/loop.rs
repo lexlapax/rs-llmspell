@@ -754,146 +754,97 @@ impl LoopWorkflow {
         }
     }
 
-    /// Execute the loop workflow with state-based output
-    ///
-    /// This method executes the loop workflow and writes all outputs directly to state.
-    /// Each iteration's outputs are stored with keys following the pattern:
-    /// - `workflow:{execution_id}:iteration_{n}:{step_name}` for individual step outputs
-    /// - `workflow:{execution_id}:aggregated` for aggregated results (if applicable)
-    ///
-    /// # Arguments
-    ///
-    /// * `context` - The execution context containing state access
-    ///
-    /// # Returns
-    ///
-    /// A `WorkflowResult` containing only execution metadata, with state keys
-    /// indicating where the actual outputs have been written.
-    pub async fn execute_with_state(&self, context: &ExecutionContext) -> Result<WorkflowResult> {
-        let start_time = Instant::now();
-        // Generate ComponentId once and use it consistently
-        let execution_component_id = ComponentId::new();
-        let execution_id = format!("loop_{}", execution_component_id);
+    /// Helper: Setup iteration context in state manager
+    async fn setup_iteration_context(
+        &self,
+        iteration: usize,
+        value: Value,
+        total_iterations: usize,
+    ) -> Result<()> {
+        self.state_manager
+            .set_shared_data("iteration".to_string(), Value::Number(iteration.into()))
+            .await?;
+        self.state_manager
+            .set_shared_data("iteration_value".to_string(), value)
+            .await?;
+        self.state_manager
+            .set_shared_data(
+                "total_iterations".to_string(),
+                Value::Number(total_iterations.into()),
+            )
+            .await?;
+        Ok(())
+    }
 
-        // Get state access or return error
-        let state = context
-            .state
-            .as_ref()
-            .ok_or_else(|| LLMSpellError::Workflow {
-                message: "State access not available in context".to_string(),
-                step: None,
-                source: None,
-            })?;
+    /// Helper: Check if break conditions are met
+    async fn check_break_conditions_met(
+        &self,
+        workflow_state: &WorkflowState,
+        iteration: usize,
+        total_iterations: usize,
+    ) -> Result<Option<(String, usize)>> {
+        for break_condition in &self.config.break_conditions {
+            if self
+                .evaluate_condition(&break_condition.expression, workflow_state, iteration)
+                .await?
+            {
+                let reason = break_condition.message.clone().unwrap_or_else(|| {
+                    format!("Break condition met: {}", break_condition.expression)
+                });
+                let skipped = total_iterations.saturating_sub(iteration + 1);
+                return Ok(Some((reason, skipped)));
+            }
+        }
+        Ok(None)
+    }
 
-        info!(
-            "Starting state-based loop workflow: {} with execution_id: {}",
-            self.name, execution_id
-        );
+    /// Helper: Check if timeout has been exceeded
+    fn check_timeout_exceeded(
+        &self,
+        start_time: Instant,
+        iteration: usize,
+    ) -> Option<WorkflowError> {
+        if let Some(timeout) = self.config.timeout {
+            if start_time.elapsed() > timeout {
+                return Some(WorkflowError::Timeout {
+                    duration: timeout,
+                    message: format!("Loop workflow timed out after {} iterations", iteration),
+                });
+            }
+        }
+        None
+    }
 
-        // Initialize workflow state
-        self.state_manager.start_execution().await?;
-
-        // Track state keys where we write outputs
+    /// Helper: Execute all steps for a single iteration
+    async fn execute_iteration_steps(
+        &self,
+        execution_id: &str,
+        iteration: usize,
+        initial_value: Value,
+        workflow_state: &WorkflowState,
+        state: &ExecutionContext,
+    ) -> Result<(bool, Value, Vec<String>)> {
+        let mut iteration_succeeded = true;
+        let mut last_step_output = initial_value;
         let mut state_keys = Vec::new();
 
-        // Generate iterator values
-        let iterator_values = self.generate_iterator_values().await?;
-        let total_iterations = iterator_values.len();
+        for (step_idx, step) in self.config.body.iter().enumerate() {
+            let step_name = format!("step_{}", step_idx);
+            let state_key =
+                WorkflowResult::generate_iteration_key(execution_id, iteration, &step_name);
 
-        let mut completed_iterations = 0;
-        let mut failed_iterations = 0;
-        let mut skipped_iterations = 0;
-        let mut aggregated_results = HashMap::new();
-        let mut break_reason = None;
-        let mut last_error = None;
+            let step_context = StepExecutionContext::new(workflow_state.clone(), self.config.timeout);
 
-        for (iteration, value) in iterator_values {
-            debug!(
-                "Loop workflow '{}' iteration {}: Processing",
-                self.name, iteration
-            );
-
-            // Add iteration context to workflow state
-            self.state_manager
-                .set_shared_data("iteration".to_string(), Value::Number(iteration.into()))
-                .await?;
-            self.state_manager
-                .set_shared_data("iteration_value".to_string(), value.clone())
-                .await?;
-            self.state_manager
-                .set_shared_data(
-                    "total_iterations".to_string(),
-                    Value::Number(total_iterations.into()),
-                )
-                .await?;
-
-            // Get current workflow state for evaluation
-            let workflow_state = self.state_manager.get_state_snapshot().await?;
-
-            // Check break conditions
-            for break_condition in &self.config.break_conditions {
-                if self
-                    .evaluate_condition(&break_condition.expression, &workflow_state, iteration)
-                    .await?
-                {
-                    let reason = break_condition.message.clone().unwrap_or_else(|| {
-                        format!("Break condition met: {}", break_condition.expression)
+            match self.step_executor.execute_step(step, step_context).await {
+                Ok(result) => {
+                    let output_value = serde_json::to_value(&result.output).unwrap_or_else(|_| {
+                        Value::String("Failed to serialize output".to_string())
                     });
-                    debug!(
-                        "Loop workflow '{}' breaking at iteration {}: {}",
-                        self.name, iteration, reason
-                    );
-                    break_reason = Some(reason);
-                    skipped_iterations = total_iterations.saturating_sub(iteration + 1);
-                    break;
-                }
-            }
 
-            if break_reason.is_some() {
-                break;
-            }
-
-            // Check timeout if configured
-            if let Some(timeout) = self.config.timeout {
-                if start_time.elapsed() > timeout {
-                    let error = WorkflowError::Timeout {
-                        duration: timeout,
-                        message: format!("Loop workflow timed out after {} iterations", iteration),
-                    };
-                    last_error = Some(error.clone());
-                    failed_iterations += 1;
-                    break;
-                }
-            }
-
-            // Execute loop body steps
-            let mut iteration_succeeded = true;
-            let mut last_step_output = value.clone();
-
-            for (step_idx, step) in self.config.body.iter().enumerate() {
-                let step_name = format!("step_{}", step_idx);
-                let state_key =
-                    WorkflowResult::generate_iteration_key(&execution_id, iteration, &step_name);
-
-                // Create execution context for the step
-                let step_context =
-                    StepExecutionContext::new(workflow_state.clone(), self.config.timeout);
-
-                match self.step_executor.execute_step(step, step_context).await {
-                    Ok(result) => {
-                        // Write step output to state
-                        let output_value =
-                            serde_json::to_value(&result.output).unwrap_or_else(|_| {
-                                Value::String("Failed to serialize output".to_string())
-                            });
-
-                        if let Err(e) = state.write(&state_key, output_value.clone()).await {
+                    if let Some(state_ref) = state.state.as_ref() {
+                        if let Err(e) = state_ref.write(&state_key, output_value.clone()).await {
                             warn!("Failed to write step output to state: {}", e);
                             if !self.config.continue_on_error {
-                                last_error = Some(WorkflowError::StateAccessFailed {
-                                    operation: "write".to_string(),
-                                    error: e.to_string(),
-                                });
                                 iteration_succeeded = false;
                                 break;
                             }
@@ -904,156 +855,86 @@ impl LoopWorkflow {
                                 self.name, iteration, step_idx, state_key
                             );
                         }
-
-                        // Update last step output for aggregation
-                        last_step_output = output_value;
-
-                        // Update workflow state with step result
-                        self.state_manager
-                            .record_step_result(result.clone())
-                            .await?;
                     }
-                    Err(e) => {
-                        warn!(
-                            "Loop workflow '{}' iteration {} step {} failed: {}",
-                            self.name, iteration, step_idx, e
-                        );
 
-                        if !self.config.continue_on_error {
-                            last_error = Some(WorkflowError::StepExecutionFailed {
-                                step_name: step_name.clone(),
-                                reason: e.to_string(),
-                            });
-                            iteration_succeeded = false;
-                            break;
-                        }
+                    last_step_output = output_value;
+                    self.state_manager.record_step_result(result.clone()).await?;
+                }
+                Err(e) => {
+                    warn!(
+                        "Loop workflow '{}' iteration {} step {} failed: {}",
+                        self.name, iteration, step_idx, e
+                    );
+
+                    if !self.config.continue_on_error {
+                        iteration_succeeded = false;
+                        break;
                     }
                 }
-            }
-
-            if iteration_succeeded {
-                completed_iterations += 1;
-
-                // Aggregate results based on strategy
-                match &self.config.aggregation {
-                    ResultAggregation::CollectAll => {
-                        aggregated_results
-                            .insert(format!("iteration_{}", iteration), last_step_output);
-                    }
-                    ResultAggregation::LastOnly => {
-                        aggregated_results.clear();
-                        aggregated_results.insert("last".to_string(), last_step_output);
-                    }
-                    ResultAggregation::FirstN(n) if completed_iterations <= *n => {
-                        aggregated_results
-                            .insert(format!("iteration_{}", iteration), last_step_output);
-                    }
-                    ResultAggregation::LastN(n) => {
-                        // Keep only last N results
-                        if aggregated_results.len() >= *n {
-                            // Remove oldest
-                            let oldest_key = format!("iteration_{}", iteration.saturating_sub(*n));
-                            aggregated_results.remove(&oldest_key);
-                        }
-                        aggregated_results
-                            .insert(format!("iteration_{}", iteration), last_step_output);
-                    }
-                    ResultAggregation::None => {
-                        // No aggregation
-                    }
-                    _ => {}
-                }
-            } else {
-                failed_iterations += 1;
-                if !self.config.continue_on_error {
-                    break;
-                }
-            }
-
-            // Apply iteration delay if configured
-            if let Some(delay) = self.config.iteration_delay {
-                tokio::time::sleep(delay).await;
             }
         }
 
-        // Write aggregated results to state if we have any
-        if !aggregated_results.is_empty() {
-            let aggregated_key = WorkflowResult::generate_aggregated_key(&execution_id);
-            let aggregated_value = Value::Object(aggregated_results.into_iter().collect());
+        Ok((iteration_succeeded, last_step_output, state_keys))
+    }
 
-            if let Err(e) = state.write(&aggregated_key, aggregated_value).await {
-                warn!("Failed to write aggregated results to state: {}", e);
-            } else {
-                state_keys.push(aggregated_key.clone());
-                debug!(
-                    "Loop workflow '{}' aggregated results written to: {}",
-                    self.name, aggregated_key
-                );
+    /// Helper: Aggregate iteration result based on strategy
+    fn aggregate_iteration_result(
+        &self,
+        aggregated_results: &mut HashMap<String, Value>,
+        iteration: usize,
+        completed_iterations: usize,
+        last_step_output: Value,
+    ) {
+        match &self.config.aggregation {
+            ResultAggregation::CollectAll => {
+                aggregated_results.insert(format!("iteration_{}", iteration), last_step_output);
             }
-        }
-
-        let duration = start_time.elapsed();
-
-        // Determine overall success
-        let success = failed_iterations == 0 && last_error.is_none();
-
-        if success {
-            if let Some(reason) = break_reason {
-                info!(
-                    "Loop workflow '{}' completed with early break: {} ({}/{} iterations, {:?})",
-                    self.name, reason, completed_iterations, total_iterations, duration
-                );
-            } else {
-                info!(
-                    "Loop workflow '{}' completed successfully: {}/{} iterations in {:?}",
-                    self.name, completed_iterations, total_iterations, duration
-                );
+            ResultAggregation::LastOnly => {
+                aggregated_results.clear();
+                aggregated_results.insert("last".to_string(), last_step_output);
             }
-
-            Ok(WorkflowResult::partial(
-                execution_id,
-                WorkflowType::Loop,
-                self.name.clone(),
-                state_keys,
-                completed_iterations,
-                failed_iterations,
-                skipped_iterations,
-                duration,
-                None,
-            ))
-        } else {
-            warn!(
-                "Loop workflow '{}' failed: {}/{} iterations completed, {} failed in {:?}",
-                self.name, completed_iterations, total_iterations, failed_iterations, duration
-            );
-
-            Ok(WorkflowResult::failure(
-                execution_id,
-                WorkflowType::Loop,
-                self.name.clone(),
-                last_error.unwrap_or_else(|| WorkflowError::General {
-                    message: "Loop workflow failed".to_string(),
-                }),
-                state_keys,
-                completed_iterations,
-                failed_iterations,
-                duration,
-            ))
+            ResultAggregation::FirstN(n) if completed_iterations <= *n => {
+                aggregated_results.insert(format!("iteration_{}", iteration), last_step_output);
+            }
+            ResultAggregation::LastN(n) => {
+                if aggregated_results.len() >= *n {
+                    let oldest_key = format!("iteration_{}", iteration.saturating_sub(*n));
+                    aggregated_results.remove(&oldest_key);
+                }
+                aggregated_results.insert(format!("iteration_{}", iteration), last_step_output);
+            }
+            ResultAggregation::None => {}
+            _ => {}
         }
     }
 
-    /// Execute the loop workflow
-    pub async fn execute_workflow(&self) -> Result<LoopWorkflowResult> {
-        let start_time = Instant::now();
-        // Generate ComponentId once and use it consistently
-        let execution_component_id = ComponentId::new();
-        let execution_id = execution_component_id.to_string();
-        info!(
-            "Starting loop workflow: {} (execution: {})",
-            self.name, execution_id
-        );
+    /// Helper: Write aggregated results to state
+    async fn write_aggregated_results(
+        &self,
+        aggregated_results: HashMap<String, Value>,
+        execution_id: &str,
+        state: &ExecutionContext,
+        state_keys: &mut Vec<String>,
+    ) {
+        if aggregated_results.is_empty() {
+            return;
+        }
 
-        // Execute workflow start hooks
+        let aggregated_key = WorkflowResult::generate_aggregated_key(execution_id);
+        let aggregated_value = Value::Object(aggregated_results.into_iter().collect());
+
+        if let Some(state_ref) = state.state.as_ref() {
+            if let Err(e) = state_ref.write(&aggregated_key, aggregated_value).await {
+                warn!("Failed to write aggregated results to state: {}", e);
+            } else {
+                state_keys.push(aggregated_key.clone());
+                debug!("Loop workflow '{}' aggregated results written to: {}", self.name, aggregated_key);
+            }
+        }
+    }
+
+    /// Helper: Execute workflow start hooks
+    async fn execute_workflow_start_hooks(&self) -> Result<()> {
         if let Some(workflow_executor) = &self.workflow_executor {
             let component_id = llmspell_hooks::ComponentId::new(
                 llmspell_hooks::ComponentType::Workflow,
@@ -1069,189 +950,168 @@ impl LoopWorkflow {
             );
             let _ = workflow_executor.execute_workflow_hooks(hook_ctx).await;
         }
+        Ok(())
+    }
 
-        // Start execution tracking
-        self.state_manager.start_execution().await?;
+    /// Helper: Execute loop iteration start hooks
+    async fn execute_loop_iteration_start_hooks(&self, iteration: usize, value: &Value) -> Result<()> {
+        if let Some(workflow_executor) = &self.workflow_executor {
+            let component_id = llmspell_hooks::ComponentId::new(
+                llmspell_hooks::ComponentType::Workflow,
+                format!("workflow_{}", self.name),
+            );
+            let workflow_state = self.state_manager.get_state_snapshot().await?;
+            let mut hook_ctx = WorkflowHookContext::new(
+                component_id,
+                self.metadata.clone(),
+                workflow_state,
+                "loop".to_string(),
+                WorkflowExecutionPhase::LoopIterationStart,
+            );
+            hook_ctx = hook_ctx.with_pattern_context(
+                "iteration".to_string(),
+                serde_json::Value::Number(iteration.into()),
+            );
+            hook_ctx = hook_ctx.with_pattern_context("value".to_string(), value.clone());
+            let _ = workflow_executor.execute_workflow_hooks(hook_ctx).await;
+        }
+        Ok(())
+    }
 
-        // Generate iterator values
-        let iterator_values = self.generate_iterator_values().await?;
-        let total_iterations = iterator_values.len();
-
-        let mut all_results = Vec::new();
-        let mut completed_iterations = 0;
-        let mut break_reason = None;
-
-        for (iteration, value) in iterator_values {
-            // Execute loop iteration start hooks
-            if let Some(workflow_executor) = &self.workflow_executor {
-                let component_id = llmspell_hooks::ComponentId::new(
-                    llmspell_hooks::ComponentType::Workflow,
-                    format!("workflow_{}", self.name),
-                );
-                let workflow_state = self.state_manager.get_state_snapshot().await?;
-                let mut hook_ctx = WorkflowHookContext::new(
-                    component_id,
-                    self.metadata.clone(),
-                    workflow_state,
-                    "loop".to_string(),
-                    WorkflowExecutionPhase::LoopIterationStart,
-                );
-                hook_ctx = hook_ctx.with_pattern_context(
-                    "iteration".to_string(),
-                    serde_json::Value::Number(iteration.into()),
-                );
-                hook_ctx = hook_ctx.with_pattern_context("value".to_string(), value.clone());
-                let _ = workflow_executor.execute_workflow_hooks(hook_ctx).await;
+    /// Helper: Check if iteration timeouts have been exceeded
+    async fn check_iteration_timeouts(&self, start_time: Instant, completed_iterations: usize) -> Result<Option<String>> {
+        if let Some(timeout) = self.config.timeout {
+            if start_time.elapsed() > timeout {
+                warn!("Loop workflow timeout after {} iterations", completed_iterations);
+                return Ok(Some("Workflow timeout exceeded".to_string()));
             }
+        }
 
-            // Check timeout
-            if let Some(timeout) = self.config.timeout {
-                if start_time.elapsed() > timeout {
-                    warn!(
-                        "Loop workflow timeout after {} iterations",
-                        completed_iterations
+        if self.state_manager.check_execution_timeout().await? {
+            warn!("Loop workflow '{}' exceeded maximum execution time", self.name);
+            return Ok(Some("Maximum execution time exceeded".to_string()));
+        }
+
+        Ok(None)
+    }
+
+    /// Helper: Setup workflow state for current iteration
+    async fn setup_workflow_state_for_iteration(&self, execution_component_id: ComponentId) -> Result<WorkflowState> {
+        let shared_data = self.state_manager.get_all_shared_data().await?;
+        let mut workflow_state = WorkflowState::new();
+        workflow_state.execution_id = execution_component_id;
+        workflow_state.shared_data = shared_data;
+        Ok(workflow_state)
+    }
+
+    /// Helper: Process iteration result (success or error) and execute related hooks
+    async fn process_iteration_result(
+        &self,
+        result: Result<Vec<StepResult>>,
+        iteration: usize,
+        completed_iterations: usize,
+        all_results: &mut Vec<Vec<StepResult>>,
+        start_time: Instant,
+        total_iterations: usize,
+    ) -> Result<Option<LoopWorkflowResult>> {
+        match result {
+            Ok(results) => {
+                all_results.push(results);
+                self.state_manager.advance_step().await?;
+
+                if let Some(workflow_executor) = &self.workflow_executor {
+                    let component_id = llmspell_hooks::ComponentId::new(
+                        llmspell_hooks::ComponentType::Workflow,
+                        format!("workflow_{}", self.name),
                     );
-                    break_reason = Some("Workflow timeout exceeded".to_string());
-                    break;
+                    let workflow_state = self.state_manager.get_state_snapshot().await?;
+                    let mut hook_ctx = WorkflowHookContext::new(
+                        component_id,
+                        self.metadata.clone(),
+                        workflow_state,
+                        "loop".to_string(),
+                        WorkflowExecutionPhase::LoopIterationComplete,
+                    );
+                    hook_ctx = hook_ctx.with_pattern_context(
+                        "iteration".to_string(),
+                        serde_json::Value::Number(iteration.into()),
+                    );
+                    hook_ctx = hook_ctx.with_pattern_context(
+                        "completed_iterations".to_string(),
+                        serde_json::Value::Number((completed_iterations + 1).into()),
+                    );
+                    let _ = workflow_executor.execute_workflow_hooks(hook_ctx).await;
                 }
+                Ok(None)
             }
-
-            // Check for execution timeout from state manager
-            if self.state_manager.check_execution_timeout().await? {
-                warn!(
-                    "Loop workflow '{}' exceeded maximum execution time",
-                    self.name
-                );
-                break_reason = Some("Maximum execution time exceeded".to_string());
-                break;
-            }
-
-            // Get current state
-            let shared_data = self.state_manager.get_all_shared_data().await?;
-            let mut workflow_state = WorkflowState::new();
-            // CRITICAL: Use the workflow's execution_component_id, not a new one!
-            workflow_state.execution_id = execution_component_id;
-            workflow_state.shared_data = shared_data;
-
-            // For while conditions, check if we should continue
-            if let LoopIterator::WhileCondition { condition, .. } = &self.config.iterator {
-                if !self
-                    .evaluate_condition(condition, &workflow_state, iteration)
-                    .await?
-                {
-                    debug!("While condition false at iteration {}", iteration);
-                    break;
+            Err(e) => {
+                if self.config.continue_on_error {
+                    warn!("Error in iteration {}: {}", iteration, e);
+                    let error_result = StepResult::failure(
+                        ComponentId::new(),
+                        format!("iteration_{}", iteration),
+                        e.to_string(),
+                        start_time.elapsed(),
+                        0,
+                    );
+                    all_results.push(vec![error_result]);
+                    Ok(None)
+                } else {
+                    self.state_manager.complete_execution(false).await?;
+                    Ok(Some(LoopWorkflowResult::failure(
+                        self.name.clone(),
+                        total_iterations,
+                        completed_iterations,
+                        self.aggregate_results(all_results.clone()),
+                        start_time.elapsed(),
+                        e.to_string(),
+                    )))
                 }
-            }
-
-            // Check break conditions
-            if let Some(reason) = self.should_break(&workflow_state, iteration).await? {
-                info!("Breaking loop: {}", reason);
-                break_reason = Some(reason);
-                break;
-            }
-
-            // Execute iteration
-            match self
-                .execute_iteration(iteration, value.clone(), execution_component_id)
-                .await
-            {
-                Ok(results) => {
-                    all_results.push(results);
-                    completed_iterations += 1;
-                    self.state_manager.advance_step().await?;
-
-                    // Execute loop iteration complete hooks
-                    if let Some(workflow_executor) = &self.workflow_executor {
-                        let component_id = llmspell_hooks::ComponentId::new(
-                            llmspell_hooks::ComponentType::Workflow,
-                            format!("workflow_{}", self.name),
-                        );
-                        let workflow_state = self.state_manager.get_state_snapshot().await?;
-                        let mut hook_ctx = WorkflowHookContext::new(
-                            component_id,
-                            self.metadata.clone(),
-                            workflow_state,
-                            "loop".to_string(),
-                            WorkflowExecutionPhase::LoopIterationComplete,
-                        );
-                        hook_ctx = hook_ctx.with_pattern_context(
-                            "iteration".to_string(),
-                            serde_json::Value::Number(iteration.into()),
-                        );
-                        hook_ctx = hook_ctx.with_pattern_context(
-                            "completed_iterations".to_string(),
-                            serde_json::Value::Number(completed_iterations.into()),
-                        );
-                        let _ = workflow_executor.execute_workflow_hooks(hook_ctx).await;
-                    }
-                }
-                Err(e) => {
-                    if self.config.continue_on_error {
-                        warn!("Error in iteration {}: {}", iteration, e);
-                        let error_result = StepResult::failure(
-                            ComponentId::new(),
-                            format!("iteration_{}", iteration),
-                            e.to_string(),
-                            start_time.elapsed(),
-                            0,
-                        );
-                        all_results.push(vec![error_result]);
-                        completed_iterations += 1;
-                    } else {
-                        self.state_manager.complete_execution(false).await?;
-                        return Ok(LoopWorkflowResult::failure(
-                            self.name.clone(),
-                            total_iterations,
-                            completed_iterations,
-                            self.aggregate_results(all_results),
-                            start_time.elapsed(),
-                            e.to_string(),
-                        ));
-                    }
-                }
-            }
-
-            // Apply iteration delay if configured
-            if let Some(delay) = self.config.iteration_delay {
-                tokio::time::sleep(delay).await;
             }
         }
+    }
 
-        // Execute loop termination hooks if break occurred
-        if break_reason.is_some() {
-            if let Some(workflow_executor) = &self.workflow_executor {
-                let component_id = llmspell_hooks::ComponentId::new(
-                    llmspell_hooks::ComponentType::Workflow,
-                    format!("workflow_{}", self.name),
-                );
-                let workflow_state = self.state_manager.get_state_snapshot().await?;
-                let mut hook_ctx = WorkflowHookContext::new(
-                    component_id,
-                    self.metadata.clone(),
-                    workflow_state,
-                    "loop".to_string(),
-                    WorkflowExecutionPhase::LoopTermination,
-                );
-                hook_ctx = hook_ctx.with_pattern_context(
-                    "break_reason".to_string(),
-                    serde_json::Value::String(break_reason.clone().unwrap_or_default()),
-                );
-                hook_ctx = hook_ctx.with_pattern_context(
-                    "completed_iterations".to_string(),
-                    serde_json::Value::Number(completed_iterations.into()),
-                );
-                let _ = workflow_executor.execute_workflow_hooks(hook_ctx).await;
-            }
+    /// Helper: Execute loop termination hooks
+    async fn execute_loop_termination_hooks(&self, break_reason: &str, completed_iterations: usize) -> Result<()> {
+        if let Some(workflow_executor) = &self.workflow_executor {
+            let component_id = llmspell_hooks::ComponentId::new(
+                llmspell_hooks::ComponentType::Workflow,
+                format!("workflow_{}", self.name),
+            );
+            let workflow_state = self.state_manager.get_state_snapshot().await?;
+            let mut hook_ctx = WorkflowHookContext::new(
+                component_id,
+                self.metadata.clone(),
+                workflow_state,
+                "loop".to_string(),
+                WorkflowExecutionPhase::LoopTermination,
+            );
+            hook_ctx = hook_ctx.with_pattern_context(
+                "break_reason".to_string(),
+                serde_json::Value::String(break_reason.to_string()),
+            );
+            hook_ctx = hook_ctx.with_pattern_context(
+                "completed_iterations".to_string(),
+                serde_json::Value::Number(completed_iterations.into()),
+            );
+            let _ = workflow_executor.execute_workflow_hooks(hook_ctx).await;
         }
+        Ok(())
+    }
 
-        // Complete execution
+    /// Helper: Finalize workflow result with metadata and completion hooks
+    async fn finalize_workflow_result(
+        &self,
+        all_results: Vec<Vec<StepResult>>,
+        total_iterations: usize,
+        completed_iterations: usize,
+        break_reason: Option<String>,
+        start_time: Instant,
+    ) -> Result<LoopWorkflowResult> {
         self.state_manager.complete_execution(true).await?;
 
-        // Aggregate results
         let mut aggregated_results = self.aggregate_results(all_results);
 
-        // Add loop metadata
         aggregated_results.insert(
             "loop_metadata".to_string(),
             serde_json::json!({
@@ -1262,7 +1122,6 @@ impl LoopWorkflow {
             }),
         );
 
-        // Execute workflow completion hooks
         if let Some(workflow_executor) = &self.workflow_executor {
             let component_id = llmspell_hooks::ComponentId::new(
                 llmspell_hooks::ComponentType::Workflow,
@@ -1287,6 +1146,218 @@ impl LoopWorkflow {
             break_reason,
             start_time.elapsed(),
         ))
+    }
+
+    /// Execute the loop workflow with state-based output
+    ///
+    /// This method executes the loop workflow and writes all outputs directly to state.
+    /// Each iteration's outputs are stored with keys following the pattern:
+    /// - `workflow:{execution_id}:iteration_{n}:{step_name}` for individual step outputs
+    /// - `workflow:{execution_id}:aggregated` for aggregated results (if applicable)
+    ///
+    /// # Arguments
+    ///
+    /// * `context` - The execution context containing state access
+    ///
+    /// # Returns
+    ///
+    /// A `WorkflowResult` containing only execution metadata, with state keys
+    /// indicating where the actual outputs have been written.
+    pub async fn execute_with_state(&self, context: &ExecutionContext) -> Result<WorkflowResult> {
+        let start_time = Instant::now();
+        let execution_component_id = ComponentId::new();
+        let execution_id = format!("loop_{}", execution_component_id);
+
+        context.state.as_ref().ok_or_else(|| LLMSpellError::Workflow {
+            message: "State access not available in context".to_string(),
+            step: None,
+            source: None,
+        })?;
+
+        info!("Starting state-based loop workflow: {} with execution_id: {}", self.name, execution_id);
+
+        self.state_manager.start_execution().await?;
+
+        let mut state_keys = Vec::new();
+        let iterator_values = self.generate_iterator_values().await?;
+        let total_iterations = iterator_values.len();
+
+        let mut completed_iterations = 0;
+        let mut failed_iterations = 0;
+        let mut skipped_iterations = 0;
+        let mut aggregated_results = HashMap::new();
+        let mut break_reason = None;
+        let mut last_error = None;
+
+        for (iteration, value) in iterator_values {
+            debug!("Loop workflow '{}' iteration {}: Processing", self.name, iteration);
+
+            // Setup iteration context
+            self.setup_iteration_context(iteration, value.clone(), total_iterations).await?;
+
+            let workflow_state = self.state_manager.get_state_snapshot().await?;
+
+            // Check break conditions
+            if let Some((reason, skipped)) = self.check_break_conditions_met(&workflow_state, iteration, total_iterations).await? {
+                debug!("Loop workflow '{}' breaking at iteration {}: {}", self.name, iteration, reason);
+                break_reason = Some(reason);
+                skipped_iterations = skipped;
+                break;
+            }
+
+            // Check timeout
+            if let Some(error) = self.check_timeout_exceeded(start_time, iteration) {
+                last_error = Some(error);
+                failed_iterations += 1;
+                break;
+            }
+
+            // Execute iteration steps
+            let (iteration_succeeded, last_step_output, mut iteration_keys) = 
+                self.execute_iteration_steps(&execution_id, iteration, value.clone(), &workflow_state, context).await?;
+
+            state_keys.append(&mut iteration_keys);
+
+            if iteration_succeeded {
+                completed_iterations += 1;
+                self.aggregate_iteration_result(&mut aggregated_results, iteration, completed_iterations, last_step_output);
+            } else {
+                failed_iterations += 1;
+                if !self.config.continue_on_error {
+                    break;
+                }
+            }
+
+            if let Some(delay) = self.config.iteration_delay {
+                tokio::time::sleep(delay).await;
+            }
+        }
+
+        // Write aggregated results
+        self.write_aggregated_results(aggregated_results, &execution_id, context, &mut state_keys).await;
+
+        let duration = start_time.elapsed();
+        let success = failed_iterations == 0 && last_error.is_none();
+
+        if success {
+            if let Some(reason) = break_reason {
+                info!("Loop workflow '{}' completed with early break: {} ({}/{} iterations, {:?})",
+                    self.name, reason, completed_iterations, total_iterations, duration);
+            } else {
+                info!("Loop workflow '{}' completed successfully: {}/{} iterations in {:?}",
+                    self.name, completed_iterations, total_iterations, duration);
+            }
+
+            Ok(WorkflowResult::partial(
+                execution_id,
+                WorkflowType::Loop,
+                self.name.clone(),
+                state_keys,
+                completed_iterations,
+                failed_iterations,
+                skipped_iterations,
+                duration,
+                None,
+            ))
+        } else {
+            warn!("Loop workflow '{}' failed: {}/{} iterations completed, {} failed in {:?}",
+                self.name, completed_iterations, total_iterations, failed_iterations, duration);
+
+            Ok(WorkflowResult::failure(
+                execution_id,
+                WorkflowType::Loop,
+                self.name.clone(),
+                last_error.unwrap_or_else(|| WorkflowError::General {
+                    message: "Loop workflow failed".to_string(),
+                }),
+                state_keys,
+                completed_iterations,
+                failed_iterations,
+                duration,
+            ))
+        }
+    }
+
+
+    /// Execute the loop workflow
+    pub async fn execute_workflow(&self) -> Result<LoopWorkflowResult> {
+        let start_time = Instant::now();
+        let execution_component_id = ComponentId::new();
+        let execution_id = execution_component_id.to_string();
+        info!("Starting loop workflow: {} (execution: {})", self.name, execution_id);
+
+        self.execute_workflow_start_hooks().await?;
+        self.state_manager.start_execution().await?;
+
+        // Generate iterator values
+        let iterator_values = self.generate_iterator_values().await?;
+        let total_iterations = iterator_values.len();
+
+        let mut all_results = Vec::new();
+        let mut completed_iterations = 0;
+        let mut break_reason = None;
+
+        for (iteration, value) in iterator_values {
+            self.execute_loop_iteration_start_hooks(iteration, &value).await?;
+
+            if let Some(reason) = self.check_iteration_timeouts(start_time, completed_iterations).await? {
+                break_reason = Some(reason);
+                break;
+            }
+
+            let workflow_state = self.setup_workflow_state_for_iteration(execution_component_id).await?;
+
+            // For while conditions, check if we should continue
+            if let LoopIterator::WhileCondition { condition, .. } = &self.config.iterator {
+                if !self
+                    .evaluate_condition(condition, &workflow_state, iteration)
+                    .await?
+                {
+                    debug!("While condition false at iteration {}", iteration);
+                    break;
+                }
+            }
+
+            // Check break conditions
+            if let Some(reason) = self.should_break(&workflow_state, iteration).await? {
+                info!("Breaking loop: {}", reason);
+                break_reason = Some(reason);
+                break;
+            }
+
+            let iteration_result = self
+                .execute_iteration(iteration, value.clone(), execution_component_id)
+                .await;
+
+            if let Some(failure) = self.process_iteration_result(
+                iteration_result,
+                iteration,
+                completed_iterations,
+                &mut all_results,
+                start_time,
+                total_iterations,
+            ).await? {
+                return Ok(failure);
+            }
+            completed_iterations += 1;
+
+            // Apply iteration delay if configured
+            if let Some(delay) = self.config.iteration_delay {
+                tokio::time::sleep(delay).await;
+            }
+        }
+
+        if let Some(ref reason) = break_reason {
+            self.execute_loop_termination_hooks(reason, completed_iterations).await?;
+        }
+
+        self.finalize_workflow_result(
+            all_results,
+            total_iterations,
+            completed_iterations,
+            break_reason,
+            start_time,
+        ).await
     }
 }
 
