@@ -674,6 +674,87 @@ impl ConsolidationMetrics {
         self.core.read().await.model_metrics.get(model).cloned()
     }
 
+    /// Helper: Check if version has sufficient sample size
+    fn has_sufficient_samples(
+        metrics: &PromptMetrics,
+        config: &AutoPromotionConfig,
+        version: &PromptVersion,
+    ) -> bool {
+        if metrics.consolidations >= config.min_sample_size {
+            true
+        } else {
+            trace!(
+                "Version {:?}: insufficient samples ({} < {})",
+                version,
+                metrics.consolidations,
+                config.min_sample_size
+            );
+            false
+        }
+    }
+
+    /// Helper: Calculate parse rate improvement from baseline to candidate
+    fn calculate_parse_improvement(baseline: &PromptMetrics, candidate: &PromptMetrics) -> f64 {
+        let baseline_rate = baseline.parse_success_rate();
+        let candidate_rate = candidate.parse_success_rate();
+        candidate_rate - baseline_rate
+    }
+
+    /// Helper: Check if improvement meets promotion threshold
+    fn meets_promotion_threshold(
+        improvement: f64,
+        config: &AutoPromotionConfig,
+        version: &PromptVersion,
+    ) -> bool {
+        if improvement >= config.min_parse_improvement {
+            info!(
+                "Auto-promotion recommended: version {:?} shows {:.2}% improvement (threshold={:.2}%)",
+                version,
+                improvement * 100.0,
+                config.min_parse_improvement * 100.0
+            );
+            true
+        } else {
+            false
+        }
+    }
+
+    /// Helper: Evaluate candidate version against baseline
+    fn evaluate_candidate(
+        version: &PromptVersion,
+        metrics: &PromptMetrics,
+        baseline: &PromptMetrics,
+        config: &AutoPromotionConfig,
+    ) -> Option<PromptVersion> {
+        if *version == PromptVersion::V1 {
+            return None; // Skip baseline itself
+        }
+
+        trace!("Evaluating version {:?} for auto-promotion", version);
+
+        if !Self::has_sufficient_samples(metrics, config, version) {
+            return None;
+        }
+
+        let improvement = Self::calculate_parse_improvement(baseline, metrics);
+        let baseline_rate = baseline.parse_success_rate();
+        let candidate_rate = metrics.parse_success_rate();
+
+        debug!(
+            "Version {:?}: baseline_rate={:.2}%, candidate_rate={:.2}%, improvement={:.2}%",
+            version,
+            baseline_rate * 100.0,
+            candidate_rate * 100.0,
+            improvement * 100.0
+        );
+
+        if Self::meets_promotion_threshold(improvement, config, version) {
+            Some(*version)
+        } else {
+            None
+        }
+    }
+
     /// Check if auto-promotion should occur
     ///
     /// Compares performance of available versions and returns promotion recommendation.
@@ -698,44 +779,8 @@ impl ConsolidationMetrics {
 
         // Check each candidate version
         for (version, metrics) in &core.prompt_metrics {
-            if *version == PromptVersion::V1 {
-                continue; // Skip baseline
-            }
-
-            trace!("Evaluating version {:?} for auto-promotion", version);
-
-            // Check sample size
-            if metrics.consolidations < config.min_sample_size {
-                trace!(
-                    "Version {:?}: insufficient samples ({} < {})",
-                    version,
-                    metrics.consolidations,
-                    config.min_sample_size
-                );
-                continue;
-            }
-
-            // Check parse success rate improvement
-            let baseline_rate = baseline.parse_success_rate();
-            let candidate_rate = metrics.parse_success_rate();
-            let improvement = candidate_rate - baseline_rate;
-
-            debug!(
-                "Version {:?}: baseline_rate={:.2}%, candidate_rate={:.2}%, improvement={:.2}%",
-                version,
-                baseline_rate * 100.0,
-                candidate_rate * 100.0,
-                improvement * 100.0
-            );
-
-            if improvement >= config.min_parse_improvement {
-                info!(
-                    "Auto-promotion recommended: version {:?} shows {:.2}% improvement (threshold={:.2}%)",
-                    version,
-                    improvement * 100.0,
-                    config.min_parse_improvement * 100.0
-                );
-                return Some(*version);
+            if let Some(promoted) = Self::evaluate_candidate(version, metrics, baseline, &config) {
+                return Some(promoted);
             }
         }
 
