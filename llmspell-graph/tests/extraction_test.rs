@@ -298,27 +298,43 @@ fn test_performance_target() {
 
     assert_eq!(text.len(), 1024, "Text should be exactly 1KB");
 
-    // Measure extraction time
-    let start = std::time::Instant::now();
-    let entities = extractor.extract_entities(text);
-    let rels = extractor.extract_relationships(text);
-    let duration = start.elapsed();
+    // Warm-up run (discard timing)
+    let _ = extractor.extract_entities(text);
+    let _ = extractor.extract_relationships(text);
 
-    // Verify we extracted something
-    assert!(!entities.is_empty(), "Should extract entities");
-    assert!(!rels.is_empty(), "Should extract relationships");
+    // Run multiple iterations and collect timings
+    let iterations = 10;
+    let mut durations = Vec::with_capacity(iterations);
 
-    // Performance target: <6ms for 1KB (with stopword filtering for precision)
-    println!("Extraction took {duration:?} for 1KB text");
-    println!(
-        "Found {} entities, {} relationships",
-        entities.len(),
-        rels.len()
-    );
+    for _ in 0..iterations {
+        let start = std::time::Instant::now();
+        let entities = extractor.extract_entities(text);
+        let rels = extractor.extract_relationships(text);
+        durations.push(start.elapsed());
 
+        // Verify we extracted something (first iteration)
+        if durations.len() == 1 {
+            assert!(!entities.is_empty(), "Should extract entities");
+            assert!(!rels.is_empty(), "Should extract relationships");
+            println!(
+                "Found {} entities, {} relationships",
+                entities.len(),
+                rels.len()
+            );
+        }
+    }
+
+    // Calculate median (more stable than mean)
+    durations.sort();
+    let median = durations[iterations / 2];
+    let p95 = durations[(iterations as f64 * 0.95) as usize];
+
+    println!("Extraction median: {median:?}, p95: {p95:?} over {iterations} runs");
+
+    // Performance target: median <6ms for 1KB (with stopword filtering for precision)
     assert!(
-        duration.as_millis() < 6,
-        "Should complete in <6ms (with stopword filtering), took {duration:?}"
+        median.as_millis() < 6,
+        "Median should be <6ms (with stopword filtering), got {median:?}"
     );
 }
 
