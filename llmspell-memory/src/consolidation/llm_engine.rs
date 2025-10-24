@@ -216,6 +216,20 @@ impl LLMConsolidationEngine {
             entry.session_id, entry.role
         );
 
+        // Step 1-3: Get LLM response
+        let llm_response = self.get_llm_response(entry).await?;
+
+        // Step 4-5: Parse and validate
+        let consolidation_response = self.parse_and_validate(&llm_response).await?;
+
+        // Step 6: Execute decisions and relationships
+        let result = self.execute_consolidation(&consolidation_response).await?;
+
+        Ok(result)
+    }
+
+    /// Helper: Get LLM response for entry
+    async fn get_llm_response(&self, entry: &EpisodicEntry) -> Result<String> {
         // Step 1: Assemble semantic context
         let semantic_context = self
             .context_assembler
@@ -230,13 +244,18 @@ impl LLMConsolidationEngine {
             .build_user_prompt(entry, &semantic_context)?;
 
         // Step 3: Call LLM with retry logic
-        let llm_response = self
-            .call_llm_with_retry(&system_prompt, &user_prompt)
-            .await?;
+        self.call_llm_with_retry(&system_prompt, &user_prompt)
+            .await
+    }
 
-        // Step 4: Parse response with error recovery (JSON with fallback to natural language)
+    /// Helper: Parse and validate LLM response
+    async fn parse_and_validate(
+        &self,
+        llm_response: &str,
+    ) -> Result<super::ConsolidationResponse> {
+        // Parse response with error recovery (JSON with fallback to natural language)
         let consolidation_response = super::prompts::parse_llm_response(
-            &llm_response,
+            llm_response,
             super::OutputFormat::Json, // JSON mode automatically falls back to natural language on parse failure
         )?;
 
@@ -245,10 +264,17 @@ impl LLMConsolidationEngine {
             consolidation_response.decisions.len()
         );
 
-        // Step 5: Validate decisions
+        // Validate decisions
         self.validator.validate(&consolidation_response).await?;
 
-        // Step 6: Execute decisions
+        Ok(consolidation_response)
+    }
+
+    /// Helper: Execute consolidation decisions and relationships
+    async fn execute_consolidation(
+        &self,
+        response: &super::ConsolidationResponse,
+    ) -> Result<ConsolidationResult> {
         let mut result = ConsolidationResult {
             entries_processed: 1,
             entities_added: 0,
@@ -259,11 +285,9 @@ impl LLMConsolidationEngine {
             duration_ms: 0,
         };
 
-        for (idx, decision) in consolidation_response.decisions.iter().enumerate() {
-            match self
-                .execute_decision(decision, &consolidation_response, idx)
-                .await
-            {
+        // Execute decisions
+        for (idx, decision) in response.decisions.iter().enumerate() {
+            match self.execute_decision(decision, response, idx).await {
                 Ok(metrics) => {
                     result.entities_added += metrics.0;
                     result.entities_updated += metrics.1;
@@ -278,9 +302,8 @@ impl LLMConsolidationEngine {
         }
 
         // Execute relationships after all entities
-        if !consolidation_response.relationships.is_empty() {
-            self.execute_relationships(&consolidation_response.relationships)
-                .await?;
+        if !response.relationships.is_empty() {
+            self.execute_relationships(&response.relationships).await?;
         }
 
         Ok(result)
@@ -373,23 +396,10 @@ impl LLMConsolidationEngine {
 
             match self.call_llm(system_prompt, user_prompt, model).await {
                 Ok(response) => {
-                    // Success! Reset circuit breaker
-                    self.consecutive_failures.store(0, Ordering::Relaxed);
-                    if model_idx > 0 {
-                        info!("Fallback model {} succeeded", model);
-                    }
-                    return Ok(response);
+                    return self.handle_successful_call(response, model_idx, model);
                 }
                 Err(e) => {
-                    warn!(
-                        "LLM call failed (attempt {}/{}): {}",
-                        attempts, self.config.max_retries, e
-                    );
-                    last_error = Some(e);
-
-                    if attempts < self.config.max_retries {
-                        self.exponential_backoff(attempts).await;
-                    }
+                    last_error = self.handle_failed_call(e, attempts).await;
                 }
             }
         }
@@ -397,6 +407,35 @@ impl LLMConsolidationEngine {
         Err(last_error.unwrap_or_else(|| {
             MemoryError::LLMCall(format!("All {} attempts failed", self.config.max_retries))
         }))
+    }
+
+    /// Helper: Handle successful LLM call
+    fn handle_successful_call(
+        &self,
+        response: String,
+        model_idx: usize,
+        model: &str,
+    ) -> Result<String> {
+        // Success! Reset circuit breaker
+        self.consecutive_failures.store(0, Ordering::Relaxed);
+        if model_idx > 0 {
+            info!("Fallback model {} succeeded", model);
+        }
+        Ok(response)
+    }
+
+    /// Helper: Handle failed LLM call
+    async fn handle_failed_call(&self, error: MemoryError, attempts: u32) -> Option<MemoryError> {
+        warn!(
+            "LLM call failed (attempt {}/{}): {}",
+            attempts, self.config.max_retries, error
+        );
+
+        if attempts < self.config.max_retries {
+            self.exponential_backoff(attempts).await;
+        }
+
+        Some(error)
     }
 
     /// Check provider health
@@ -465,31 +504,59 @@ impl LLMConsolidationEngine {
     ) -> Result<(usize, usize, usize, usize)> {
         match decision {
             super::DecisionPayload::Add { entity_id } => {
-                info!("Decision {}: Executing ADD for entity {}", idx, entity_id);
-                self.execute_add(entity_id, response).await?;
-                Ok((1, 0, 0, 0))
+                self.execute_add_decision(idx, entity_id, response).await
             }
             super::DecisionPayload::Update { entity_id, changes } => {
-                info!(
-                    "Decision {}: Executing UPDATE for entity {}",
-                    idx, entity_id
-                );
-                self.execute_update(entity_id, changes).await?;
-                Ok((0, 1, 0, 0))
+                self.execute_update_decision(idx, entity_id, changes).await
             }
             super::DecisionPayload::Delete { entity_id } => {
-                info!(
-                    "Decision {}: Executing DELETE for entity {}",
-                    idx, entity_id
-                );
-                self.execute_delete(entity_id).await?;
-                Ok((0, 0, 1, 0))
+                self.execute_delete_decision(idx, entity_id).await
             }
             super::DecisionPayload::Noop => {
-                debug!("Decision {}: Executing NOOP (skip)", idx);
-                Ok((0, 0, 0, 1))
+                self.execute_noop_decision(idx)
             }
         }
+    }
+
+    /// Helper: Execute ADD decision
+    async fn execute_add_decision(
+        &self,
+        idx: usize,
+        entity_id: &str,
+        response: &super::ConsolidationResponse,
+    ) -> Result<(usize, usize, usize, usize)> {
+        info!("Decision {}: Executing ADD for entity {}", idx, entity_id);
+        self.execute_add(entity_id, response).await?;
+        Ok((1, 0, 0, 0))
+    }
+
+    /// Helper: Execute UPDATE decision
+    async fn execute_update_decision(
+        &self,
+        idx: usize,
+        entity_id: &str,
+        changes: &std::collections::HashMap<String, serde_json::Value>,
+    ) -> Result<(usize, usize, usize, usize)> {
+        info!("Decision {}: Executing UPDATE for entity {}", idx, entity_id);
+        self.execute_update(entity_id, changes).await?;
+        Ok((0, 1, 0, 0))
+    }
+
+    /// Helper: Execute DELETE decision
+    async fn execute_delete_decision(
+        &self,
+        idx: usize,
+        entity_id: &str,
+    ) -> Result<(usize, usize, usize, usize)> {
+        info!("Decision {}: Executing DELETE for entity {}", idx, entity_id);
+        self.execute_delete(entity_id).await?;
+        Ok((0, 0, 1, 0))
+    }
+
+    /// Helper: Execute NOOP decision
+    fn execute_noop_decision(&self, idx: usize) -> Result<(usize, usize, usize, usize)> {
+        debug!("Decision {}: Executing NOOP (skip)", idx);
+        Ok((0, 0, 0, 1))
     }
 
     /// Execute ADD decision
