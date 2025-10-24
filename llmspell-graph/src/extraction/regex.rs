@@ -30,6 +30,7 @@ use llmspell_utils::text::stopwords::is_stopword;
 use regex::Regex;
 use serde_json::json;
 use std::sync::LazyLock;
+use tracing::{debug, info, trace};
 
 /// Regex patterns for relationship extraction
 static IS_A_PATTERN: LazyLock<Regex> = LazyLock::new(|| {
@@ -121,46 +122,60 @@ impl RegexExtractor {
     /// assert!(entities.len() >= 2);
     /// ```
     pub fn extract_entities(&self, text: &str) -> Vec<Entity> {
+        info!("Starting entity extraction: text_len={} bytes", text.len());
+        trace!("Extraction text: {}", text.chars().take(100).collect::<String>());
+
         let mut entities = Vec::new();
         let mut seen_names = std::collections::HashSet::new();
+        let mut filtered_count = 0;
 
         for cap in ENTITY_PATTERN.captures_iter(text) {
             let name = cap[1].trim();
 
             // Filter out short/common words
             if name.len() < self.min_entity_length {
+                filtered_count += 1;
                 continue;
             }
 
             // Skip common non-entity words (stopwords)
             if is_stopword(name) {
+                trace!("Filtered stopword: '{}'", name);
+                filtered_count += 1;
                 continue;
             }
 
             // Skip single-letter entities (usually noise)
             if name.len() == 1 {
+                filtered_count += 1;
                 continue;
             }
 
             // Skip all-caps words shorter than 3 chars (often acronyms used as stopwords: "TO", "IN", "AT")
             if name.chars().all(char::is_uppercase) && name.len() < 3 {
+                filtered_count += 1;
                 continue;
             }
 
             // Skip multi-word entities that start with stopwords (e.g., "The Rust", "However Python")
             if let Some(first_word) = name.split_whitespace().next() {
                 if is_stopword(first_word) {
+                    trace!("Filtered entity starting with stopword: '{}'", name);
+                    filtered_count += 1;
                     continue;
                 }
             }
 
             // Deduplicate
             if !seen_names.insert(name.to_string()) {
+                trace!("Filtered duplicate: '{}'", name);
+                filtered_count += 1;
                 continue;
             }
 
             // Infer entity type from context
             let entity_type = Self::infer_entity_type(text, name);
+            debug!("Extracted entity: name='{}', type={}", name, entity_type);
 
             entities.push(Entity::new(
                 name.to_string(),
@@ -168,6 +183,9 @@ impl RegexExtractor {
                 json!({"source": "regex_extraction"}),
             ));
         }
+
+        info!("Entity extraction complete: {} entities extracted, {} filtered", entities.len(), filtered_count);
+        trace!("Extracted entities: {:?}", entities.iter().map(|e| &e.name).collect::<Vec<_>>());
 
         entities
     }
@@ -201,12 +219,17 @@ impl RegexExtractor {
     /// assert!(rels.iter().any(|r| r.relationship_type == "is_a"));
     /// ```
     pub fn extract_relationships(&self, text: &str) -> Vec<Relationship> {
+        info!("Starting relationship extraction: text_len={} bytes", text.len());
+
         let mut relationships = Vec::new();
 
         // Pattern: "X is a Y"
+        let is_a_count = IS_A_PATTERN.captures_iter(text).count();
+        debug!("Found {} 'is_a' pattern matches", is_a_count);
         for cap in IS_A_PATTERN.captures_iter(text) {
             let from = cap[1].trim();
             let to = cap[2].trim();
+            trace!("Matched is_a: '{}' is_a '{}'", from, to);
 
             relationships.push(Relationship::new(
                 from.to_string(),
@@ -217,9 +240,12 @@ impl RegexExtractor {
         }
 
         // Pattern: "X has Y"
+        let has_count = HAS_PATTERN.captures_iter(text).count();
+        debug!("Found {} 'has_feature' pattern matches", has_count);
         for cap in HAS_PATTERN.captures_iter(text) {
             let from = cap[1].trim();
             let to = cap[2].trim();
+            trace!("Matched has_feature: '{}' has '{}'", from, to);
 
             relationships.push(Relationship::new(
                 from.to_string(),
@@ -230,9 +256,12 @@ impl RegexExtractor {
         }
 
         // Pattern: "X in Y"
+        let in_count = IN_PATTERN.captures_iter(text).count();
+        debug!("Found {} 'located_in' pattern matches", in_count);
         for cap in IN_PATTERN.captures_iter(text) {
             let from = cap[1].trim();
             let to = cap[2].trim();
+            trace!("Matched located_in: '{}' in '{}'", from, to);
 
             relationships.push(Relationship::new(
                 from.to_string(),
@@ -243,9 +272,12 @@ impl RegexExtractor {
         }
 
         // Pattern: "X of Y"
+        let of_count = OF_PATTERN.captures_iter(text).count();
+        debug!("Found {} 'part_of' pattern matches", of_count);
         for cap in OF_PATTERN.captures_iter(text) {
             let from = cap[1].trim();
             let to = cap[2].trim();
+            trace!("Matched part_of: '{}' of '{}'", from, to);
 
             relationships.push(Relationship::new(
                 from.to_string(),
@@ -254,6 +286,11 @@ impl RegexExtractor {
                 json!({"source": "regex_extraction", "pattern": "of"}),
             ));
         }
+
+        info!("Relationship extraction complete: {} relationships extracted (is_a={}, has={}, in={}, of={})",
+            relationships.len(), is_a_count, has_count, in_count, of_count);
+        trace!("Extracted relationships: {:?}",
+            relationships.iter().map(|r| format!("{}->{}({})", r.from_entity, r.to_entity, r.relationship_type)).collect::<Vec<_>>());
 
         relationships
     }

@@ -13,6 +13,7 @@ use std::collections::HashMap;
 use std::path::{Path, PathBuf};
 use surrealdb::engine::local::{Db, RocksDb};
 use surrealdb::Surreal;
+use tracing::{debug, error, info, trace, warn};
 
 /// `SurrealDB` backend for knowledge graph (embedded mode)
 ///
@@ -230,22 +231,38 @@ impl SurrealDBBackend {
     pub async fn new(data_dir: impl AsRef<Path>) -> Result<Self> {
         let data_dir = data_dir.as_ref().to_path_buf();
 
+        info!("Initializing SurrealDB backend: data_dir={}", data_dir.display());
+
         // Create data directory if it doesn't exist
         if !data_dir.exists() {
-            std::fs::create_dir_all(&data_dir)?;
+            debug!("Creating data directory: {}", data_dir.display());
+            std::fs::create_dir_all(&data_dir).map_err(|e| {
+                error!("Failed to create data directory: {}", e);
+                e
+            })?;
         }
 
         // Connect to embedded RocksDB
         let db_path = data_dir.join("llmspell-graph.db");
-        let db = Surreal::new::<RocksDb>(db_path).await?;
+        debug!("Connecting to SurrealDB at: {}", db_path.display());
+        let db = Surreal::new::<RocksDb>(db_path).await.map_err(|e| {
+            error!("Failed to connect to SurrealDB: {}", e);
+            e
+        })?;
 
         // Use namespace and database
-        db.use_ns("llmspell").use_db("graph").await?;
+        debug!("Using namespace=llmspell, database=graph");
+        db.use_ns("llmspell").use_db("graph").await.map_err(|e| {
+            error!("Failed to use namespace/database: {}", e);
+            e
+        })?;
 
-        let backend = Self { db, data_dir };
+        let backend = Self { db, data_dir: data_dir.clone() };
 
         // Initialize schema
         backend.initialize_schema().await?;
+
+        info!("SurrealDB backend initialized successfully at {}", data_dir.display());
 
         Ok(backend)
     }
@@ -259,12 +276,16 @@ impl SurrealDBBackend {
     pub async fn new_temp() -> Result<Self> {
         let temp_dir =
             std::env::temp_dir().join(format!("llmspell-graph-{}", uuid::Uuid::new_v4()));
+        info!("Creating temporary SurrealDB backend at: {}", temp_dir.display());
         Self::new(&temp_dir).await
     }
 
     /// Initialize database schema with bi-temporal tables and indexes
     async fn initialize_schema(&self) -> Result<()> {
+        info!("Initializing SurrealDB schema (entities and relationships tables)");
+
         // Define entities table
+        debug!("Creating entities table with bi-temporal indexes");
         self.db
             .query(
                 "DEFINE TABLE IF NOT EXISTS entities SCHEMAFULL;
@@ -278,9 +299,14 @@ impl SurrealDBBackend {
                  DEFINE INDEX IF NOT EXISTS idx_event_time ON entities FIELDS event_time;
                  DEFINE INDEX IF NOT EXISTS idx_ingestion_time ON entities FIELDS ingestion_time;",
             )
-            .await?;
+            .await
+            .map_err(|e| {
+                error!("Failed to create entities table: {}", e);
+                e
+            })?;
 
         // Define relationships table
+        debug!("Creating relationships table with relationship indexes");
         self.db
             .query(
                 "DEFINE TABLE IF NOT EXISTS relationships SCHEMAFULL;
@@ -294,8 +320,13 @@ impl SurrealDBBackend {
                  DEFINE INDEX IF NOT EXISTS idx_to_entity ON relationships FIELDS to_entity;
                  DEFINE INDEX IF NOT EXISTS idx_rel_type ON relationships FIELDS relationship_type;",
             )
-            .await?;
+            .await
+            .map_err(|e| {
+                error!("Failed to create relationships table: {}", e);
+                e
+            })?;
 
+        info!("Schema initialization complete");
         Ok(())
     }
 
@@ -310,6 +341,9 @@ impl SurrealDBBackend {
 impl KnowledgeGraph for SurrealDBBackend {
     async fn add_entity(&self, entity: Entity) -> Result<String> {
         let id = entity.id.clone();
+        debug!("Adding entity: id={}, entity_type={}, name={}", id, entity.entity_type, entity.name);
+        trace!("Entity details: {:?}", entity);
+
         let record: EntityRecord = entity.into();
 
         // Insert entity into database
@@ -317,8 +351,13 @@ impl KnowledgeGraph for SurrealDBBackend {
             .db
             .create(("entities", id.clone()))
             .content(record)
-            .await?;
+            .await
+            .map_err(|e| {
+                error!("Failed to insert entity {}: {}", id, e);
+                e
+            })?;
 
+        debug!("Entity {} added successfully", id);
         Ok(id)
     }
 
@@ -327,11 +366,21 @@ impl KnowledgeGraph for SurrealDBBackend {
         id: &str,
         changes: HashMap<String, serde_json::Value>,
     ) -> Result<()> {
+        debug!("Updating entity: id={}, changes_count={}", id, changes.len());
+        trace!("Update changes: {:?}", changes);
+
         // Get existing entity
-        let existing: Option<EntityRecord> = self.db.select(("entities", id)).await?;
+        let existing: Option<EntityRecord> = self.db.select(("entities", id)).await
+            .map_err(|e| {
+                error!("Failed to retrieve entity {} for update: {}", id, e);
+                e
+            })?;
 
         let mut entity = existing
-            .ok_or_else(|| GraphError::EntityNotFound(format!("Entity not found: {id}")))?;
+            .ok_or_else(|| {
+                warn!("Entity not found for update: {}", id);
+                GraphError::EntityNotFound(format!("Entity not found: {id}"))
+            })?;
 
         // Apply changes to properties
         if let serde_json::Value::Object(props) = &mut entity.properties {
@@ -352,6 +401,7 @@ impl KnowledgeGraph for SurrealDBBackend {
         // This appears to be a SurrealDB 2.0 bug or API quirk.
         // For now, this method is marked as partially functional.
         // Workaround for production: recreate entity instead of update.
+        warn!("SurrealDB 2.0 update has known properties persistence issue - properties may not be correctly updated");
 
         #[derive(Serialize)]
         struct EntityUpdate {
@@ -384,40 +434,78 @@ impl KnowledgeGraph for SurrealDBBackend {
             .db
             .update(("entities", id))
             .content(update_data)
-            .await?;
+            .await
+            .map_err(|e| {
+                error!("Failed to update entity {}: {}", id, e);
+                e
+            })?;
 
+        debug!("Entity {} update attempted (see known issue warning)", id);
         Ok(())
     }
 
     async fn get_entity(&self, id: &str) -> Result<Entity> {
-        let record: Option<EntityRecord> = self.db.select(("entities", id)).await?;
+        debug!("Retrieving entity: id={}", id);
+
+        let record: Option<EntityRecord> = self.db.select(("entities", id)).await
+            .map_err(|e| {
+                error!("Failed to retrieve entity {}: {}", id, e);
+                e
+            })?;
 
         record
-            .map(Entity::from)
-            .ok_or_else(|| GraphError::EntityNotFound(format!("Entity not found: {id}")))
+            .map(|r| {
+                trace!("Retrieved entity: {:?}", r);
+                Entity::from(r)
+            })
+            .ok_or_else(|| {
+                warn!("Entity not found: {}", id);
+                GraphError::EntityNotFound(format!("Entity not found: {id}"))
+            })
     }
 
     async fn get_entity_at(&self, id: &str, event_time: DateTime<Utc>) -> Result<Entity> {
+        debug!("Retrieving entity at point-in-time: id={}, event_time={}", id, event_time);
+
         // Query for entity valid at the given event_time
         // Return entity where ingestion_time <= query_time AND (event_time is None OR event_time <= query_time)
         let query = format!(
             "SELECT * FROM entities:{id} WHERE ingestion_time <= $time AND (event_time IS NONE OR event_time <= $time) LIMIT 1"
         );
+        trace!("Temporal query: {}", query);
 
-        let mut response = self.db.query(query).bind(("time", event_time)).await?;
-        let entities: Vec<EntityRecord> = response.take(0)?;
+        let mut response = self.db.query(&query).bind(("time", event_time)).await
+            .map_err(|e| {
+                error!("Failed to execute temporal query for entity {}: {}", id, e);
+                e
+            })?;
+        let entities: Vec<EntityRecord> = response.take(0)
+            .map_err(|e| {
+                error!("Failed to parse temporal query results for entity {}: {}", id, e);
+                e
+            })?;
 
         entities
             .into_iter()
             .next()
-            .map(Entity::from)
+            .map(|e| {
+                trace!("Retrieved entity at time: {:?}", e);
+                Entity::from(e)
+            })
             .ok_or_else(|| {
+                warn!("Entity not found at time {}: {}", event_time, id);
                 GraphError::EntityNotFound(format!("Entity not found at time {event_time}: {id}"))
             })
     }
 
     async fn add_relationship(&self, relationship: Relationship) -> Result<String> {
         let id = relationship.id.clone();
+        debug!(
+            "Adding relationship: id={}, type={}, from={}, to={}",
+            id, relationship.relationship_type, relationship.from_entity, relationship.to_entity
+        );
+        trace!("Relationship details: {:?}", relationship);
+
         let record: RelationshipRecord = relationship.into();
 
         // Insert relationship into database
@@ -425,14 +513,22 @@ impl KnowledgeGraph for SurrealDBBackend {
             .db
             .create(("relationships", id.clone()))
             .content(record)
-            .await?;
+            .await
+            .map_err(|e| {
+                error!("Failed to insert relationship {}: {}", id, e);
+                e
+            })?;
 
+        debug!("Relationship {} added successfully", id);
         Ok(id)
     }
 
     async fn get_related(&self, entity_id: &str, relationship_type: &str) -> Result<Vec<Entity>> {
+        debug!("Querying related entities: entity_id={}, relationship_type={}", entity_id, relationship_type);
+
         // Query relationships where from_entity matches and type matches
         let query = "SELECT * FROM relationships WHERE from_entity = $entity_id AND relationship_type = $rel_type";
+        trace!("Relationship query: {}", query);
 
         // Convert to owned strings for bind (SurrealDB requirement)
         let entity_id_owned = entity_id.to_string();
@@ -443,22 +539,38 @@ impl KnowledgeGraph for SurrealDBBackend {
             .query(query)
             .bind(("entity_id", entity_id_owned))
             .bind(("rel_type", rel_type_owned))
-            .await?;
+            .await
+            .map_err(|e| {
+                error!("Failed to query relationships for {}: {}", entity_id, e);
+                e
+            })?;
 
-        let relationships: Vec<RelationshipRecord> = response.take(0)?;
+        let relationships: Vec<RelationshipRecord> = response.take(0)
+            .map_err(|e| {
+                error!("Failed to parse relationship query results: {}", e);
+                e
+            })?;
+
+        debug!("Found {} relationships", relationships.len());
 
         // Get all target entities
         let mut entities = Vec::new();
         for rel in relationships {
             if let Ok(entity) = self.get_entity(&rel.to_entity).await {
                 entities.push(entity);
+            } else {
+                warn!("Failed to retrieve related entity: {}", rel.to_entity);
             }
         }
 
+        debug!("Retrieved {} related entities", entities.len());
+        trace!("Related entities: {:?}", entities.iter().map(|e| &e.id).collect::<Vec<_>>());
         Ok(entities)
     }
 
     async fn query_temporal(&self, query: TemporalQuery) -> Result<Vec<Entity>> {
+        info!("Executing temporal query: {:?}", query);
+
         let mut conditions = Vec::new();
 
         // Build query conditions
@@ -482,6 +594,8 @@ impl KnowledgeGraph for SurrealDBBackend {
             conditions.push(format!("ingestion_time <= {end:?}"));
         }
 
+        debug!("Query conditions: {:?}", conditions);
+
         // Build WHERE clause
         let where_clause = if conditions.is_empty() {
             String::new()
@@ -494,23 +608,39 @@ impl KnowledgeGraph for SurrealDBBackend {
 
         // Execute query
         let sql = format!("SELECT * FROM entities{where_clause}{limit_clause}");
+        trace!("Temporal SQL query: {}", sql);
 
-        let mut response = self.db.query(sql).await?;
-        let entities: Vec<EntityRecord> = response.take(0)?;
+        let mut response = self.db.query(&sql).await
+            .map_err(|e| {
+                error!("Failed to execute temporal query: {}", e);
+                e
+            })?;
+        let entities: Vec<EntityRecord> = response.take(0)
+            .map_err(|e| {
+                error!("Failed to parse temporal query results: {}", e);
+                e
+            })?;
+
+        info!("Temporal query returned {} entities", entities.len());
+        trace!("Query results: {:?}", entities.iter().map(|e| &e.name).collect::<Vec<_>>());
 
         Ok(entities.into_iter().map(Entity::from).collect())
     }
 
     async fn delete_before(&self, timestamp: DateTime<Utc>) -> Result<usize> {
+        info!("Deleting entities before timestamp: {}", timestamp);
+
         // KNOWN ISSUE: When entities are created with custom ingestion_time
         // (e.g., backdated for testing), SurrealDB may not preserve the custom
         // timestamp, instead using the current time. This causes this delete
         // operation to return 0 even when it should delete records.
         // This is likely a SurrealDB 2.0 timestamp handling quirk.
         // For production use, entities should use natural ingestion times.
+        warn!("SurrealDB 2.0 may not preserve custom ingestion_time - delete may not work for backdated entities");
 
         // Delete entities where ingestion_time < timestamp
         let query = "DELETE FROM entities WHERE ingestion_time < $timestamp";
+        trace!("Delete query: {}", query);
 
         // Convert chrono DateTime to SurrealDB Datetime for proper comparison
         let surreal_timestamp: surrealdb::sql::Datetime = timestamp.into();
@@ -519,19 +649,35 @@ impl KnowledgeGraph for SurrealDBBackend {
             .db
             .query(query)
             .bind(("timestamp", surreal_timestamp.clone()))
-            .await?;
-        let deleted: Vec<EntityRecord> = response.take(0)?;
+            .await
+            .map_err(|e| {
+                error!("Failed to execute delete query: {}", e);
+                e
+            })?;
+        let deleted: Vec<EntityRecord> = response.take(0)
+            .map_err(|e| {
+                error!("Failed to parse delete query results: {}", e);
+                e
+            })?;
 
         let count = deleted.len();
+        debug!("Deleted {} entities", count);
 
         // Also delete orphaned relationships
         let rel_query = "DELETE FROM relationships WHERE ingestion_time < $timestamp";
-        let _response = self
+        let mut rel_response = self
             .db
             .query(rel_query)
             .bind(("timestamp", surreal_timestamp))
-            .await?;
+            .await
+            .map_err(|e| {
+                error!("Failed to delete orphaned relationships: {}", e);
+                e
+            })?;
+        let deleted_rels: Vec<RelationshipRecord> = rel_response.take(0)?;
+        debug!("Deleted {} orphaned relationships", deleted_rels.len());
 
+        info!("Deletion complete: {} entities, {} relationships", count, deleted_rels.len());
         Ok(count)
     }
 }
