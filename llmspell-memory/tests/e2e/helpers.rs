@@ -80,7 +80,7 @@ pub async fn create_test_engine() -> TestEngine {
         timeout_secs: 60,
         max_retries: 2,
         circuit_breaker_threshold: 5,
-        version: Default::default(),
+        version: PromptVersion::default(),
     };
 
     // Create LLM engine
@@ -227,17 +227,15 @@ pub fn calculate_dmr(
                 (
                     DecisionPayload::Add {
                         entity_id: actual_id,
-                    },
-                    GroundTruthDecision::Add {
-                        entity_id: expected_id,
-                    },
-                ) => actual_id == expected_id,
-                (
-                    DecisionPayload::Update {
+                    }
+                    | DecisionPayload::Update {
                         entity_id: actual_id,
                         ..
                     },
-                    GroundTruthDecision::Update {
+                    GroundTruthDecision::Add {
+                        entity_id: expected_id,
+                    }
+                    | GroundTruthDecision::Update {
                         entity_id: expected_id,
                     },
                 ) => actual_id == expected_id,
@@ -365,17 +363,15 @@ pub fn calculate_dmr_fuzzy(
                 (
                     DecisionPayload::Add {
                         entity_id: actual_id,
-                    },
-                    GroundTruthDecision::Add {
-                        entity_id: expected_id,
-                    },
-                ) => fuzzy_entity_match(actual_id, expected_id),
-                (
-                    DecisionPayload::Update {
+                    }
+                    | DecisionPayload::Update {
                         entity_id: actual_id,
                         ..
                     },
-                    GroundTruthDecision::Update {
+                    GroundTruthDecision::Add {
+                        entity_id: expected_id,
+                    }
+                    | GroundTruthDecision::Update {
                         entity_id: expected_id,
                     },
                 ) => fuzzy_entity_match(actual_id, expected_id),
