@@ -267,7 +267,7 @@ impl SurrealDBBackend {
         Ok(())
     }
 
-    /// Connect to embedded RocksDB
+    /// Connect to embedded `RocksDB`
     async fn connect_database(data_dir: &Path) -> Result<Surreal<Db>> {
         let db_path = data_dir.join("llmspell-graph.db");
         debug!("Connecting to SurrealDB at: {}", db_path.display());
