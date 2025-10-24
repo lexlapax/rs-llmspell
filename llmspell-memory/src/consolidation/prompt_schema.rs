@@ -169,39 +169,13 @@ impl ConsolidationResponse {
     /// Extracts as many valid fields as possible, skipping invalid sections.
     fn partial_parse(json_str: &str) -> Option<Self> {
         debug!("Attempting partial parse of malformed JSON");
-        // Try to parse individual sections independently
         let mut response = Self::empty();
 
-        // Extract entities array
         if let Ok(value) = serde_json::from_str::<Value>(json_str) {
-            if let Some(entities) = value.get("entities").and_then(Value::as_array) {
-                response.entities = entities
-                    .iter()
-                    .filter_map(|v| serde_json::from_value::<EntityPayload>(v.clone()).ok())
-                    .collect();
-                debug!("Partial parse: extracted {} entities", response.entities.len());
-            }
-
-            if let Some(relationships) = value.get("relationships").and_then(Value::as_array) {
-                response.relationships = relationships
-                    .iter()
-                    .filter_map(|v| serde_json::from_value::<RelationshipPayload>(v.clone()).ok())
-                    .collect();
-                debug!("Partial parse: extracted {} relationships", response.relationships.len());
-            }
-
-            if let Some(decisions) = value.get("decisions").and_then(Value::as_array) {
-                response.decisions = decisions
-                    .iter()
-                    .filter_map(|v| serde_json::from_value::<DecisionPayload>(v.clone()).ok())
-                    .collect();
-                debug!("Partial parse: extracted {} decisions", response.decisions.len());
-            }
-
-            if let Some(reasoning) = value.get("reasoning").and_then(Value::as_str) {
-                response.reasoning = Some(reasoning.to_string());
-                trace!("Partial parse: extracted reasoning");
-            }
+            Self::extract_entities(&value, &mut response);
+            Self::extract_relationships(&value, &mut response);
+            Self::extract_decisions(&value, &mut response);
+            Self::extract_reasoning(&value, &mut response);
         }
 
         if response.is_empty() {
@@ -215,6 +189,47 @@ impl ConsolidationResponse {
                 response.decisions.len()
             );
             Some(response)
+        }
+    }
+
+    /// Extract entities array from parsed JSON
+    fn extract_entities(value: &Value, response: &mut ConsolidationResponse) {
+        if let Some(entities) = value.get("entities").and_then(Value::as_array) {
+            response.entities = entities
+                .iter()
+                .filter_map(|v| serde_json::from_value::<EntityPayload>(v.clone()).ok())
+                .collect();
+            debug!("Partial parse: extracted {} entities", response.entities.len());
+        }
+    }
+
+    /// Extract relationships array from parsed JSON
+    fn extract_relationships(value: &Value, response: &mut ConsolidationResponse) {
+        if let Some(relationships) = value.get("relationships").and_then(Value::as_array) {
+            response.relationships = relationships
+                .iter()
+                .filter_map(|v| serde_json::from_value::<RelationshipPayload>(v.clone()).ok())
+                .collect();
+            debug!("Partial parse: extracted {} relationships", response.relationships.len());
+        }
+    }
+
+    /// Extract decisions array from parsed JSON
+    fn extract_decisions(value: &Value, response: &mut ConsolidationResponse) {
+        if let Some(decisions) = value.get("decisions").and_then(Value::as_array) {
+            response.decisions = decisions
+                .iter()
+                .filter_map(|v| serde_json::from_value::<DecisionPayload>(v.clone()).ok())
+                .collect();
+            debug!("Partial parse: extracted {} decisions", response.decisions.len());
+        }
+    }
+
+    /// Extract reasoning string from parsed JSON
+    fn extract_reasoning(value: &Value, response: &mut ConsolidationResponse) {
+        if let Some(reasoning) = value.get("reasoning").and_then(Value::as_str) {
+            response.reasoning = Some(reasoning.to_string());
+            trace!("Partial parse: extracted reasoning");
         }
     }
 
