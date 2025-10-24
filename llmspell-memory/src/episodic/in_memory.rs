@@ -114,9 +114,16 @@ impl Default for InMemoryEpisodicMemory {
 #[async_trait]
 impl EpisodicMemory for InMemoryEpisodicMemory {
     async fn add(&self, mut entry: EpisodicEntry) -> Result<String> {
-        info!("Adding episodic entry: session_id={}, role={}, content_len={}",
-            entry.session_id, entry.role, entry.content.len());
-        trace!("Entry content: {}", entry.content.chars().take(100).collect::<String>());
+        info!(
+            "Adding episodic entry: session_id={}, role={}, content_len={}",
+            entry.session_id,
+            entry.role,
+            entry.content.len()
+        );
+        trace!(
+            "Entry content: {}",
+            entry.content.chars().take(100).collect::<String>()
+        );
 
         // Generate embedding if not provided
         if entry.embedding.is_none() {
@@ -140,8 +147,15 @@ impl EpisodicMemory for InMemoryEpisodicMemory {
     }
 
     async fn search(&self, query: &str, top_k: usize) -> Result<Vec<EpisodicEntry>> {
-        debug!("Searching episodic memory: query_len={}, top_k={}", query.len(), top_k);
-        trace!("Search query: {}", query.chars().take(50).collect::<String>());
+        debug!(
+            "Searching episodic memory: query_len={}, top_k={}",
+            query.len(),
+            top_k
+        );
+        trace!(
+            "Search query: {}",
+            query.chars().take(50).collect::<String>()
+        );
 
         let query_embedding = Self::text_to_embedding(query);
 
@@ -160,13 +174,20 @@ impl EpisodicMemory for InMemoryEpisodicMemory {
         }; // Lock dropped here
 
         if results.is_empty() {
-            warn!("Search returned no results for query: {}", query.chars().take(50).collect::<String>());
+            warn!(
+                "Search returned no results for query: {}",
+                query.chars().take(50).collect::<String>()
+            );
         }
 
         // Sort by similarity (descending)
         results.sort_by(|a, b| b.0.partial_cmp(&a.0).unwrap_or(std::cmp::Ordering::Equal));
 
-        debug!("Search found {} results, returning top {}", results.len(), top_k);
+        debug!(
+            "Search found {} results, returning top {}",
+            results.len(),
+            top_k
+        );
         if !results.is_empty() {
             trace!("Top result similarity: {:.3}", results[0].0);
         }
@@ -219,7 +240,10 @@ impl EpisodicMemory for InMemoryEpisodicMemory {
             }
         }
 
-        debug!("Successfully marked {} entries as processed", entry_ids.len());
+        debug!(
+            "Successfully marked {} entries as processed",
+            entry_ids.len()
+        );
         Ok(())
     }
 
@@ -268,7 +292,8 @@ impl EpisodicMemory for InMemoryEpisodicMemory {
                     if entry.timestamp > last_activity {
                         info.insert(entry.session_id.clone(), entry.timestamp);
                     } else {
-                        info.entry(entry.session_id.clone()).or_insert(entry.timestamp);
+                        info.entry(entry.session_id.clone())
+                            .or_insert(entry.timestamp);
                     }
                 }
             }
@@ -281,9 +306,15 @@ impl EpisodicMemory for InMemoryEpisodicMemory {
         sessions.sort_by(|a, b| b.1.cmp(&a.1)); // Descending by timestamp
 
         info!("Found {} sessions with unprocessed entries", sessions.len());
-        trace!("Sessions with unprocessed: {:?}", sessions.iter().map(|(s, _)| s).collect::<Vec<_>>());
+        trace!(
+            "Sessions with unprocessed: {:?}",
+            sessions.iter().map(|(s, _)| s).collect::<Vec<_>>()
+        );
 
-        Ok(sessions.into_iter().map(|(session_id, _)| session_id).collect())
+        Ok(sessions
+            .into_iter()
+            .map(|(session_id, _)| session_id)
+            .collect())
     }
 }
 

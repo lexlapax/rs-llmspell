@@ -140,8 +140,8 @@ impl DefaultMemoryManager {
         let episodic: Arc<dyn EpisodicMemory> = Arc::new(InMemoryEpisodicMemory::new());
 
         debug!("Creating temporary GraphSemanticMemory (SurrealDB)");
-        let semantic: Arc<dyn SemanticMemory> = Arc::new(GraphSemanticMemory::new_temp().await
-            .map_err(|e| {
+        let semantic: Arc<dyn SemanticMemory> =
+            Arc::new(GraphSemanticMemory::new_temp().await.map_err(|e| {
                 error!("Failed to initialize semantic memory: {}", e);
                 e
             })?);
@@ -173,27 +173,42 @@ impl MemoryManager for DefaultMemoryManager {
         session_id: &str,
         mode: ConsolidationMode,
     ) -> Result<ConsolidationResult> {
-        info!("Triggering consolidation: session_id={}, mode={:?}", session_id, mode);
+        info!(
+            "Triggering consolidation: session_id={}, mode={:?}",
+            session_id, mode
+        );
 
         // Get all entries for the session
-        let entries = self.episodic.get_session(session_id).await
-            .map_err(|e| {
-                error!("Failed to retrieve session entries for {}: {}", session_id, e);
-                e
-            })?;
+        let entries = self.episodic.get_session(session_id).await.map_err(|e| {
+            error!(
+                "Failed to retrieve session entries for {}: {}",
+                session_id, e
+            );
+            e
+        })?;
 
-        debug!("Retrieved {} total entries for session {}", entries.len(), session_id);
+        debug!(
+            "Retrieved {} total entries for session {}",
+            entries.len(),
+            session_id
+        );
 
         // Filter to only unprocessed entries
         let mut unprocessed: Vec<EpisodicEntry> =
             entries.into_iter().filter(|e| !e.processed).collect();
 
         if unprocessed.is_empty() {
-            info!("No unprocessed entries for session {}, skipping consolidation", session_id);
+            info!(
+                "No unprocessed entries for session {}, skipping consolidation",
+                session_id
+            );
             return Ok(ConsolidationResult::empty());
         }
 
-        debug!("Found {} unprocessed entries to consolidate", unprocessed.len());
+        debug!(
+            "Found {} unprocessed entries to consolidate",
+            unprocessed.len()
+        );
 
         // Run consolidation based on mode
         let result = match mode {
@@ -213,8 +228,10 @@ impl MemoryManager for DefaultMemoryManager {
             }
         };
 
-        debug!("Consolidation complete: entities_added={}, entries_processed={}",
-            result.entities_added, result.entries_processed);
+        debug!(
+            "Consolidation complete: entities_added={}, entries_processed={}",
+            result.entities_added, result.entries_processed
+        );
 
         // Mark processed entries in episodic storage
         let processed_ids: Vec<String> = unprocessed
@@ -225,15 +242,19 @@ impl MemoryManager for DefaultMemoryManager {
 
         if !processed_ids.is_empty() {
             debug!("Marking {} entries as processed", processed_ids.len());
-            self.episodic.mark_processed(&processed_ids).await
+            self.episodic
+                .mark_processed(&processed_ids)
+                .await
                 .map_err(|e| {
                     error!("Failed to mark entries as processed: {}", e);
                     e
                 })?;
         }
 
-        info!("Consolidation succeeded: {} entities added, {} entries processed",
-            result.entities_added, result.entries_processed);
+        info!(
+            "Consolidation succeeded: {} entities added, {} entries processed",
+            result.entities_added, result.entries_processed
+        );
 
         Ok(result)
     }

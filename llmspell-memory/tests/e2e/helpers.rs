@@ -57,11 +57,8 @@ pub struct TestEngine {
 /// Test engine bundle with LLM engine, metrics, knowledge graph, and temp directory
 pub async fn create_test_engine() -> TestEngine {
     // Create knowledge graph with temp directory
-    let knowledge_graph = Arc::new(
-        SurrealDBBackend::new_temp()
-            .await
-            .unwrap(),
-    ) as Arc<dyn KnowledgeGraph>;
+    let knowledge_graph =
+        Arc::new(SurrealDBBackend::new_temp().await.unwrap()) as Arc<dyn KnowledgeGraph>;
 
     // Create temp dir for test cleanup
     let temp_dir = TempDir::new().unwrap();
@@ -72,9 +69,7 @@ pub async fn create_test_engine() -> TestEngine {
     provider_config.endpoint = Some(ollama_host);
     provider_config.timeout_secs = Some(60);
 
-    let provider = Arc::from(
-        create_ollama_provider(provider_config).unwrap()
-    );
+    let provider = Arc::from(create_ollama_provider(provider_config).unwrap());
 
     // Create LLM consolidation config
     let config = LLMConsolidationConfig {
@@ -89,11 +84,8 @@ pub async fn create_test_engine() -> TestEngine {
     };
 
     // Create LLM engine
-    let llm_engine = LLMConsolidationEngine::new(
-        Arc::clone(&provider),
-        Arc::clone(&knowledge_graph),
-        config,
-    );
+    let llm_engine =
+        LLMConsolidationEngine::new(Arc::clone(&provider), Arc::clone(&knowledge_graph), config);
 
     // Create metrics
     let metrics = Arc::new(ConsolidationMetrics::new());
@@ -194,7 +186,10 @@ pub async fn assert_entity_not_exists(graph: &Arc<dyn KnowledgeGraph>, entity_id
                     return;
                 }
             }
-            panic!("Entity '{}' should not exist or should be deleted", entity_id);
+            panic!(
+                "Entity '{}' should not exist or should be deleted",
+                entity_id
+            );
         }
         Err(_) => {
             // Entity not found - expected
@@ -232,21 +227,37 @@ pub fn calculate_dmr(
 
     for gt_decision in ground_truth {
         // Find matching actual decision
-        let matches = actual_decisions.iter().any(|actual| {
-            match (actual, gt_decision) {
-                (DecisionPayload::Add { entity_id: actual_id }, GroundTruthDecision::Add { entity_id: expected_id }) => {
-                    actual_id == expected_id
-                }
-                (DecisionPayload::Update { entity_id: actual_id, .. }, GroundTruthDecision::Update { entity_id: expected_id }) => {
-                    actual_id == expected_id
-                }
-                (DecisionPayload::Delete { entity_id: actual_id }, GroundTruthDecision::Delete { entity_id: expected_id }) => {
-                    actual_id == expected_id
-                }
+        let matches = actual_decisions
+            .iter()
+            .any(|actual| match (actual, gt_decision) {
+                (
+                    DecisionPayload::Add {
+                        entity_id: actual_id,
+                    },
+                    GroundTruthDecision::Add {
+                        entity_id: expected_id,
+                    },
+                ) => actual_id == expected_id,
+                (
+                    DecisionPayload::Update {
+                        entity_id: actual_id,
+                        ..
+                    },
+                    GroundTruthDecision::Update {
+                        entity_id: expected_id,
+                    },
+                ) => actual_id == expected_id,
+                (
+                    DecisionPayload::Delete {
+                        entity_id: actual_id,
+                    },
+                    GroundTruthDecision::Delete {
+                        entity_id: expected_id,
+                    },
+                ) => actual_id == expected_id,
                 (DecisionPayload::Noop, GroundTruthDecision::Noop) => true,
                 _ => false,
-            }
-        });
+            });
 
         if matches {
             matching += 1;
@@ -354,21 +365,37 @@ pub fn calculate_dmr_fuzzy(
 
     for gt_decision in ground_truth {
         // Find matching actual decision with fuzzy entity ID matching
-        let matches = actual_decisions.iter().any(|actual| {
-            match (actual, gt_decision) {
-                (DecisionPayload::Add { entity_id: actual_id }, GroundTruthDecision::Add { entity_id: expected_id }) => {
-                    fuzzy_entity_match(actual_id, expected_id)
-                }
-                (DecisionPayload::Update { entity_id: actual_id, .. }, GroundTruthDecision::Update { entity_id: expected_id }) => {
-                    fuzzy_entity_match(actual_id, expected_id)
-                }
-                (DecisionPayload::Delete { entity_id: actual_id }, GroundTruthDecision::Delete { entity_id: expected_id }) => {
-                    fuzzy_entity_match(actual_id, expected_id)
-                }
+        let matches = actual_decisions
+            .iter()
+            .any(|actual| match (actual, gt_decision) {
+                (
+                    DecisionPayload::Add {
+                        entity_id: actual_id,
+                    },
+                    GroundTruthDecision::Add {
+                        entity_id: expected_id,
+                    },
+                ) => fuzzy_entity_match(actual_id, expected_id),
+                (
+                    DecisionPayload::Update {
+                        entity_id: actual_id,
+                        ..
+                    },
+                    GroundTruthDecision::Update {
+                        entity_id: expected_id,
+                    },
+                ) => fuzzy_entity_match(actual_id, expected_id),
+                (
+                    DecisionPayload::Delete {
+                        entity_id: actual_id,
+                    },
+                    GroundTruthDecision::Delete {
+                        entity_id: expected_id,
+                    },
+                ) => fuzzy_entity_match(actual_id, expected_id),
                 (DecisionPayload::Noop, GroundTruthDecision::Noop) => true,
                 _ => false,
-            }
-        });
+            });
 
         if matches {
             matching += 1;
@@ -454,7 +481,10 @@ mod tests {
     #[test]
     fn test_fuzzy_entity_match_jaro_winkler() {
         // Similar with different separators
-        assert!(fuzzy_entity_match("systems_programming", "systems-programming"));
+        assert!(fuzzy_entity_match(
+            "systems_programming",
+            "systems-programming"
+        ));
         assert!(fuzzy_entity_match("python27", "python_27"));
 
         // Completely different should NOT match
@@ -483,7 +513,11 @@ mod tests {
         ];
 
         let dmr = calculate_dmr_fuzzy(&actual, &ground_truth);
-        assert!((dmr - 1.0).abs() < 0.01, "Fuzzy DMR should be 1.0, got {}", dmr);
+        assert!(
+            (dmr - 1.0).abs() < 0.01,
+            "Fuzzy DMR should be 1.0, got {}",
+            dmr
+        );
     }
 
     #[test]
@@ -507,7 +541,11 @@ mod tests {
         ];
 
         let dmr = calculate_dmr_fuzzy(&actual, &ground_truth);
-        assert!((dmr - 0.5).abs() < 0.01, "Fuzzy DMR should be 0.5 (1/2), got {}", dmr);
+        assert!(
+            (dmr - 0.5).abs() < 0.01,
+            "Fuzzy DMR should be 0.5 (1/2), got {}",
+            dmr
+        );
     }
 
     #[test]

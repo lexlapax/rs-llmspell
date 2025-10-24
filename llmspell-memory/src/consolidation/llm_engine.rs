@@ -211,16 +211,17 @@ impl LLMConsolidationEngine {
     ///
     /// Returns error if LLM call fails or graph operations fail.
     async fn process_entry(&self, entry: &EpisodicEntry) -> Result<ConsolidationResult> {
-        debug!("Processing entry: session={}, role={}", entry.session_id, entry.role);
+        debug!(
+            "Processing entry: session={}, role={}",
+            entry.session_id, entry.role
+        );
 
         // Step 1: Assemble semantic context
         let semantic_context = self
             .context_assembler
             .assemble_context(entry)
             .await
-            .map_err(|e| {
-                MemoryError::Consolidation(format!("Failed to assemble context: {e}"))
-            })?;
+            .map_err(|e| MemoryError::Consolidation(format!("Failed to assemble context: {e}")))?;
 
         // Step 2: Build prompts
         let system_prompt = self.prompt_builder.build_system_prompt()?;
@@ -259,7 +260,10 @@ impl LLMConsolidationEngine {
         };
 
         for (idx, decision) in consolidation_response.decisions.iter().enumerate() {
-            match self.execute_decision(decision, &consolidation_response, idx).await {
+            match self
+                .execute_decision(decision, &consolidation_response, idx)
+                .await
+            {
                 Ok(metrics) => {
                     result.entities_added += metrics.0;
                     result.entities_updated += metrics.1;
@@ -275,7 +279,8 @@ impl LLMConsolidationEngine {
 
         // Execute relationships after all entities
         if !consolidation_response.relationships.is_empty() {
-            self.execute_relationships(&consolidation_response.relationships).await?;
+            self.execute_relationships(&consolidation_response.relationships)
+                .await?;
         }
 
         Ok(result)
@@ -341,7 +346,10 @@ impl LLMConsolidationEngine {
                         return Ok(response);
                     }
                     Err(e) => {
-                        warn!("LLM call failed (attempt {}/{}): {}", attempts, self.config.max_retries, e);
+                        warn!(
+                            "LLM call failed (attempt {}/{}): {}",
+                            attempts, self.config.max_retries, e
+                        );
                         last_error = Some(e);
 
                         if attempts < self.config.max_retries {
@@ -378,7 +386,12 @@ impl LLMConsolidationEngine {
     }
 
     /// Call LLM provider with specified model
-    async fn call_llm(&self, system_prompt: &str, user_prompt: &str, model: &str) -> Result<String> {
+    async fn call_llm(
+        &self,
+        system_prompt: &str,
+        user_prompt: &str,
+        model: &str,
+    ) -> Result<String> {
         // Combine system and user prompts into single text field
         let combined_prompt = format!("{system_prompt}\n\n{user_prompt}");
 
@@ -412,12 +425,18 @@ impl LLMConsolidationEngine {
                 Ok((1, 0, 0, 0))
             }
             super::DecisionPayload::Update { entity_id, changes } => {
-                info!("Decision {}: Executing UPDATE for entity {}", idx, entity_id);
+                info!(
+                    "Decision {}: Executing UPDATE for entity {}",
+                    idx, entity_id
+                );
                 self.execute_update(entity_id, changes).await?;
                 Ok((0, 1, 0, 0))
             }
             super::DecisionPayload::Delete { entity_id } => {
-                info!("Decision {}: Executing DELETE for entity {}", idx, entity_id);
+                info!(
+                    "Decision {}: Executing DELETE for entity {}",
+                    idx, entity_id
+                );
                 self.execute_delete(entity_id).await?;
                 Ok((0, 0, 1, 0))
             }
@@ -485,7 +504,9 @@ impl LLMConsolidationEngine {
             .knowledge_graph
             .get_entity(entity_id)
             .await
-            .map_err(|e| MemoryError::KnowledgeGraph(format!("Failed to get entity for deletion: {e}")))?;
+            .map_err(|e| {
+                MemoryError::KnowledgeGraph(format!("Failed to get entity for deletion: {e}"))
+            })?;
 
         // Set valid_until to now (tombstone approach)
         entity.event_time = Some(chrono::Utc::now());
@@ -493,7 +514,10 @@ impl LLMConsolidationEngine {
         // Update entity with tombstone
         let mut changes = std::collections::HashMap::new();
         changes.insert("_deleted".to_string(), serde_json::json!(true));
-        changes.insert("_deleted_at".to_string(), serde_json::json!(chrono::Utc::now()));
+        changes.insert(
+            "_deleted_at".to_string(),
+            serde_json::json!(chrono::Utc::now()),
+        );
 
         self.knowledge_graph
             .update_entity(entity_id, changes)
@@ -569,7 +593,10 @@ mod tests {
             &self.capabilities
         }
 
-        async fn complete(&self, _input: &AgentInput) -> std::result::Result<AgentOutput, LLMSpellError> {
+        async fn complete(
+            &self,
+            _input: &AgentInput,
+        ) -> std::result::Result<AgentOutput, LLMSpellError> {
             Ok(AgentOutput::text(self.response.clone()))
         }
 

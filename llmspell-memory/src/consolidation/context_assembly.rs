@@ -134,7 +134,11 @@ impl ContextAssembler {
 
     /// Calculate relevance score for entity based on keyword matches
     fn calculate_relevance_score(entity: &Entity, keywords: &[String]) -> f32 {
-        let entity_text = format!("{} {} {:?}", entity.name, entity.entity_type, entity.properties).to_lowercase();
+        let entity_text = format!(
+            "{} {} {:?}",
+            entity.name, entity.entity_type, entity.properties
+        )
+        .to_lowercase();
 
         let mut score = 0.0;
         for keyword in keywords {
@@ -192,7 +196,9 @@ mod tests {
         }
 
         async fn get_entity(&self, _id: &str) -> llmspell_graph::error::Result<Entity> {
-            Err(llmspell_graph::error::GraphError::EntityNotFound("mock".to_string()))
+            Err(llmspell_graph::error::GraphError::EntityNotFound(
+                "mock".to_string(),
+            ))
         }
 
         async fn get_entity_at(
@@ -200,7 +206,9 @@ mod tests {
             _id: &str,
             _event_time: chrono::DateTime<Utc>,
         ) -> llmspell_graph::error::Result<Entity> {
-            Err(llmspell_graph::error::GraphError::EntityNotFound("mock".to_string()))
+            Err(llmspell_graph::error::GraphError::EntityNotFound(
+                "mock".to_string(),
+            ))
         }
 
         async fn add_relationship(
@@ -311,7 +319,11 @@ mod tests {
             ingestion_time: Utc::now(),
         };
 
-        let keywords = vec!["rust".to_string(), "memory".to_string(), "safety".to_string()];
+        let keywords = vec![
+            "rust".to_string(),
+            "memory".to_string(),
+            "safety".to_string(),
+        ];
         let score = ContextAssembler::calculate_relevance_score(&entity, &keywords);
 
         assert!(score >= 3.0); // All 3 keywords match

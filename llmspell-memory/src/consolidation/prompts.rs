@@ -177,8 +177,10 @@ impl ConsolidationPromptBuilder {
         episodic: &EpisodicEntry,
         semantic_context: &str,
     ) -> Result<String> {
-        let episodic_text = Self::truncate_to_tokens(&episodic.content, self.config.token_budget.episodic_tokens);
-        let semantic_text = Self::truncate_to_tokens(semantic_context, self.config.token_budget.semantic_tokens);
+        let episodic_text =
+            Self::truncate_to_tokens(&episodic.content, self.config.token_budget.episodic_tokens);
+        let semantic_text =
+            Self::truncate_to_tokens(semantic_context, self.config.token_budget.semantic_tokens);
 
         Ok(format!(
             "# Episodic Memory Entry\n\n\
@@ -385,7 +387,10 @@ pub fn parse_llm_response(response: &str, format: OutputFormat) -> Result<Consol
             // Try JSON parsing first
             ConsolidationResponse::from_json(response).or_else(|e| {
                 // If JSON fails, try natural language extraction as fallback
-                tracing::warn!("JSON parsing failed ({}), falling back to natural language", e);
+                tracing::warn!(
+                    "JSON parsing failed ({}), falling back to natural language",
+                    e
+                );
                 parse_natural_language_response(response)
             })
         }
@@ -502,8 +507,8 @@ mod tests {
 
     #[test]
     fn test_system_prompt_natural_language() {
-        let builder = ConsolidationPromptBuilder::new()
-            .with_output_format(OutputFormat::NaturalLanguage);
+        let builder =
+            ConsolidationPromptBuilder::new().with_output_format(OutputFormat::NaturalLanguage);
         let prompt = builder.build_system_prompt().unwrap();
 
         assert!(prompt.contains("natural language"));
@@ -577,8 +582,14 @@ mod tests {
         // Should extract 3 decisions from natural language
         assert_eq!(response.decisions.len(), 3);
         assert!(matches!(response.decisions[0], DecisionPayload::Add { .. }));
-        assert!(matches!(response.decisions[1], DecisionPayload::Update { .. }));
-        assert!(matches!(response.decisions[2], DecisionPayload::Delete { .. }));
+        assert!(matches!(
+            response.decisions[1],
+            DecisionPayload::Update { .. }
+        ));
+        assert!(matches!(
+            response.decisions[2],
+            DecisionPayload::Delete { .. }
+        ));
     }
 
     #[test]
@@ -593,7 +604,8 @@ mod tests {
     #[test]
     fn test_parse_json_with_fallback_to_natural_language() {
         // Invalid JSON that falls back to natural language parsing
-        let malformed = "{ incomplete json... but contains ADD entity 12345678-1234-1234-1234-123456789abc";
+        let malformed =
+            "{ incomplete json... but contains ADD entity 12345678-1234-1234-1234-123456789abc";
         let response = parse_llm_response(malformed, OutputFormat::Json).unwrap();
 
         // Should fall back to natural language and extract the ADD decision

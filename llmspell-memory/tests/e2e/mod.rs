@@ -18,7 +18,8 @@ use std::time::Duration;
 ///
 /// `true` if Ollama is available, `false` otherwise
 pub async fn check_ollama_available() -> bool {
-    let ollama_host = env::var("OLLAMA_HOST").unwrap_or_else(|_| "http://localhost:11434".to_string());
+    let ollama_host =
+        env::var("OLLAMA_HOST").unwrap_or_else(|_| "http://localhost:11434".to_string());
 
     // Try to connect to Ollama API
     let client = reqwest::Client::builder()
@@ -33,7 +34,10 @@ pub async fn check_ollama_available() -> bool {
             true
         }
         _ => {
-            eprintln!("✗ Ollama unavailable at {} - skipping E2E tests", ollama_host);
+            eprintln!(
+                "✗ Ollama unavailable at {} - skipping E2E tests",
+                ollama_host
+            );
             eprintln!("  To run E2E tests: Start Ollama and ensure llama3.2:3b model is available");
             eprintln!("  Set OLLAMA_HOST env var if using non-default host");
             false

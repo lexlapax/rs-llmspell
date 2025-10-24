@@ -50,8 +50,8 @@ pub use prompt_schema::{
     ConsolidationResponse, DecisionPayload, EntityPayload, OutputFormat, RelationshipPayload,
 };
 pub use prompts::{
-    ConsolidationPromptBuilder, ConsolidationPromptConfig, PromptVersion, TokenBudget,
-    parse_llm_response,
+    parse_llm_response, ConsolidationPromptBuilder, ConsolidationPromptConfig, PromptVersion,
+    TokenBudget,
 };
 pub use validator::DecisionValidator;
 

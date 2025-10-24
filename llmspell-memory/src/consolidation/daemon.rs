@@ -174,9 +174,9 @@ impl ConsolidationDaemon {
         }
 
         info!("Stopping consolidation daemon gracefully");
-        self.shutdown_tx
-            .send(true)
-            .map_err(|e| MemoryError::InvalidInput(format!("Failed to send shutdown signal: {e}")))?;
+        self.shutdown_tx.send(true).map_err(|e| {
+            MemoryError::InvalidInput(format!("Failed to send shutdown signal: {e}"))
+        })?;
 
         // Wait for in-flight operations to complete (max 30s)
         let start = std::time::Instant::now();
@@ -212,7 +212,8 @@ impl ConsolidationDaemon {
     /// Main daemon loop (runs in background task)
     async fn run(self: Arc<Self>) {
         let mut shutdown_rx = self.shutdown_rx.clone();
-        let mut interval = tokio::time::interval(Duration::from_secs(self.config.fast_interval_secs));
+        let mut interval =
+            tokio::time::interval(Duration::from_secs(self.config.fast_interval_secs));
 
         info!("Daemon loop started");
 
@@ -332,10 +333,7 @@ impl ConsolidationDaemon {
         }
 
         // Consolidate (engine marks entries as processed)
-        let result = self
-            .engine
-            .consolidate(&[session_id], &mut entries)
-            .await?;
+        let result = self.engine.consolidate(&[session_id], &mut entries).await?;
 
         // Update metrics
         {
@@ -427,16 +425,16 @@ impl Drop for OperationGuard {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::consolidation::LLMConsolidationConfig;
     use crate::consolidation::prompts::PromptVersion;
+    use crate::consolidation::LLMConsolidationConfig;
     use crate::types::EpisodicEntry;
+    use async_trait::async_trait;
+    use chrono::Utc;
     use llmspell_graph::traits::KnowledgeGraph;
     use llmspell_graph::types::{Entity, Relationship, TemporalQuery};
     use llmspell_providers::{ProviderCapabilities, ProviderInstance};
-    use async_trait::async_trait;
     use std::collections::HashMap;
     use std::pin::Pin;
-    use chrono::Utc;
 
     // Mock episodic memory
     struct MockEpisodicMemory {
@@ -528,7 +526,9 @@ mod tests {
         }
 
         async fn get_entity(&self, id: &str) -> llmspell_graph::error::Result<Entity> {
-            Err(llmspell_graph::error::GraphError::EntityNotFound(id.to_string()))
+            Err(llmspell_graph::error::GraphError::EntityNotFound(
+                id.to_string(),
+            ))
         }
 
         async fn get_entity_at(
@@ -536,7 +536,9 @@ mod tests {
             _id: &str,
             _event_time: chrono::DateTime<Utc>,
         ) -> llmspell_graph::error::Result<Entity> {
-            Err(llmspell_graph::error::GraphError::EntityNotFound("mock".to_string()))
+            Err(llmspell_graph::error::GraphError::EntityNotFound(
+                "mock".to_string(),
+            ))
         }
 
         async fn add_relationship(
@@ -577,7 +579,14 @@ mod tests {
         fn complete<'life0, 'life1, 'async_trait>(
             &'life0 self,
             _input: &'life1 llmspell_core::types::AgentInput,
-        ) -> Pin<Box<dyn std::future::Future<Output = llmspell_core::error::Result<llmspell_core::types::AgentOutput>> + Send + 'async_trait>>
+        ) -> Pin<
+            Box<
+                dyn std::future::Future<
+                        Output = llmspell_core::error::Result<llmspell_core::types::AgentOutput>,
+                    > + Send
+                    + 'async_trait,
+            >,
+        >
         where
             'life0: 'async_trait,
             'life1: 'async_trait,

@@ -123,7 +123,10 @@ impl RegexExtractor {
     /// ```
     pub fn extract_entities(&self, text: &str) -> Vec<Entity> {
         info!("Starting entity extraction: text_len={} bytes", text.len());
-        trace!("Extraction text: {}", text.chars().take(100).collect::<String>());
+        trace!(
+            "Extraction text: {}",
+            text.chars().take(100).collect::<String>()
+        );
 
         let mut entities = Vec::new();
         let mut seen_names = std::collections::HashSet::new();
@@ -184,8 +187,15 @@ impl RegexExtractor {
             ));
         }
 
-        info!("Entity extraction complete: {} entities extracted, {} filtered", entities.len(), filtered_count);
-        trace!("Extracted entities: {:?}", entities.iter().map(|e| &e.name).collect::<Vec<_>>());
+        info!(
+            "Entity extraction complete: {} entities extracted, {} filtered",
+            entities.len(),
+            filtered_count
+        );
+        trace!(
+            "Extracted entities: {:?}",
+            entities.iter().map(|e| &e.name).collect::<Vec<_>>()
+        );
 
         entities
     }
@@ -219,7 +229,10 @@ impl RegexExtractor {
     /// assert!(rels.iter().any(|r| r.relationship_type == "is_a"));
     /// ```
     pub fn extract_relationships(&self, text: &str) -> Vec<Relationship> {
-        info!("Starting relationship extraction: text_len={} bytes", text.len());
+        info!(
+            "Starting relationship extraction: text_len={} bytes",
+            text.len()
+        );
 
         let mut relationships = Vec::new();
 
@@ -289,8 +302,16 @@ impl RegexExtractor {
 
         info!("Relationship extraction complete: {} relationships extracted (is_a={}, has={}, in={}, of={})",
             relationships.len(), is_a_count, has_count, in_count, of_count);
-        trace!("Extracted relationships: {:?}",
-            relationships.iter().map(|r| format!("{}->{}({})", r.from_entity, r.to_entity, r.relationship_type)).collect::<Vec<_>>());
+        trace!(
+            "Extracted relationships: {:?}",
+            relationships
+                .iter()
+                .map(|r| format!(
+                    "{}->{}({})",
+                    r.from_entity, r.to_entity, r.relationship_type
+                ))
+                .collect::<Vec<_>>()
+        );
 
         relationships
     }

@@ -107,9 +107,7 @@ impl ConsolidationResponse {
     /// Check if response contains any decisions
     #[must_use]
     pub const fn is_empty(&self) -> bool {
-        self.entities.is_empty()
-            && self.relationships.is_empty()
-            && self.decisions.is_empty()
+        self.entities.is_empty() && self.relationships.is_empty() && self.decisions.is_empty()
     }
 
     /// Parse from JSON string with error recovery
@@ -144,7 +142,9 @@ impl ConsolidationResponse {
             Err(e) => {
                 // Try partial parsing with lenient mode
                 Self::partial_parse(json_str).ok_or_else(|| {
-                    MemoryError::InvalidInput(format!("Failed to parse consolidation response: {e}"))
+                    MemoryError::InvalidInput(format!(
+                        "Failed to parse consolidation response: {e}"
+                    ))
                 })
             }
         }
@@ -304,7 +304,9 @@ pub mod examples {
             decisions: vec![DecisionPayload::Add {
                 entity_id: "rust-lang-001".to_string(),
             }],
-            reasoning: Some("New programming language entity extracted from episodic content.".to_string()),
+            reasoning: Some(
+                "New programming language entity extracted from episodic content.".to_string(),
+            ),
             prompt_version: None,
         }
     }
@@ -362,7 +364,7 @@ pub mod examples {
 
 #[cfg(test)]
 mod tests {
-    use super::{ConsolidationResponse, DecisionPayload, OutputFormat, examples};
+    use super::{examples, ConsolidationResponse, DecisionPayload, OutputFormat};
 
     #[test]
     fn test_parse_add_decision() {

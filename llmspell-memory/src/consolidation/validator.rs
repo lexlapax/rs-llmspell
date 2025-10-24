@@ -39,7 +39,10 @@ impl DecisionValidator {
             self.validate_decision(decision, response, idx).await?;
         }
 
-        debug!("All {} decisions validated successfully", response.decisions.len());
+        debug!(
+            "All {} decisions validated successfully",
+            response.decisions.len()
+        );
         Ok(())
     }
 
@@ -51,15 +54,9 @@ impl DecisionValidator {
         idx: usize,
     ) -> Result<()> {
         match decision {
-            DecisionPayload::Add { entity_id } => {
-                self.validate_add(entity_id, response, idx).await
-            }
-            DecisionPayload::Update { entity_id, .. } => {
-                self.validate_update(entity_id, idx).await
-            }
-            DecisionPayload::Delete { entity_id } => {
-                self.validate_delete(entity_id, idx).await
-            }
+            DecisionPayload::Add { entity_id } => self.validate_add(entity_id, response, idx).await,
+            DecisionPayload::Update { entity_id, .. } => self.validate_update(entity_id, idx).await,
+            DecisionPayload::Delete { entity_id } => self.validate_delete(entity_id, idx).await,
             DecisionPayload::Noop => {
                 debug!("Decision {}: NOOP (no validation needed)", idx);
                 Ok(())
@@ -115,11 +112,17 @@ impl DecisionValidator {
     ///
     /// Checks if entity exists before allowing update.
     async fn validate_update(&self, entity_id: &str, idx: usize) -> Result<()> {
-        debug!("Decision {}: Validating UPDATE for entity {}", idx, entity_id);
+        debug!(
+            "Decision {}: Validating UPDATE for entity {}",
+            idx, entity_id
+        );
 
         match self.knowledge_graph.get_entity(entity_id).await {
             Ok(_) => {
-                debug!("Decision {}: UPDATE validation passed for {}", idx, entity_id);
+                debug!(
+                    "Decision {}: UPDATE validation passed for {}",
+                    idx, entity_id
+                );
                 Ok(())
             }
             Err(llmspell_graph::error::GraphError::EntityNotFound(_)) => {
@@ -131,11 +134,9 @@ impl DecisionValidator {
                     "Decision {idx}: Cannot UPDATE entity {entity_id} - does not exist in knowledge graph"
                 )))
             }
-            Err(e) => {
-                Err(MemoryError::KnowledgeGraph(format!(
-                    "Decision {idx}: Failed to validate UPDATE for entity {entity_id}: {e}"
-                )))
-            }
+            Err(e) => Err(MemoryError::KnowledgeGraph(format!(
+                "Decision {idx}: Failed to validate UPDATE for entity {entity_id}: {e}"
+            ))),
         }
     }
 
@@ -143,11 +144,17 @@ impl DecisionValidator {
     ///
     /// Checks if entity exists before allowing deletion.
     async fn validate_delete(&self, entity_id: &str, idx: usize) -> Result<()> {
-        debug!("Decision {}: Validating DELETE for entity {}", idx, entity_id);
+        debug!(
+            "Decision {}: Validating DELETE for entity {}",
+            idx, entity_id
+        );
 
         match self.knowledge_graph.get_entity(entity_id).await {
             Ok(_) => {
-                debug!("Decision {}: DELETE validation passed for {}", idx, entity_id);
+                debug!(
+                    "Decision {}: DELETE validation passed for {}",
+                    idx, entity_id
+                );
                 Ok(())
             }
             Err(llmspell_graph::error::GraphError::EntityNotFound(_)) => {
@@ -159,11 +166,9 @@ impl DecisionValidator {
                     "Decision {idx}: Cannot DELETE entity {entity_id} - does not exist in knowledge graph"
                 )))
             }
-            Err(e) => {
-                Err(MemoryError::KnowledgeGraph(format!(
-                    "Decision {idx}: Failed to validate DELETE for entity {entity_id}: {e}"
-                )))
-            }
+            Err(e) => Err(MemoryError::KnowledgeGraph(format!(
+                "Decision {idx}: Failed to validate DELETE for entity {entity_id}: {e}"
+            ))),
         }
     }
 
@@ -174,10 +179,7 @@ impl DecisionValidator {
     /// # Errors
     ///
     /// Returns error if source or target entity does not exist in knowledge graph.
-    pub async fn validate_relationships(
-        &self,
-        response: &ConsolidationResponse,
-    ) -> Result<()> {
+    pub async fn validate_relationships(&self, response: &ConsolidationResponse) -> Result<()> {
         for (idx, relationship) in response.relationships.iter().enumerate() {
             debug!(
                 "Validating relationship {}: {} -> {}",
@@ -219,12 +221,12 @@ impl DecisionValidator {
 
 #[cfg(test)]
 mod tests {
+    use super::super::EntityPayload;
     use super::*;
     use async_trait::async_trait;
     use chrono::Utc;
     use llmspell_graph::types::{Entity, TemporalQuery};
     use std::collections::HashMap;
-    use super::super::EntityPayload;
 
     // Mock knowledge graph for testing
     struct MockKnowledgeGraph {
@@ -399,10 +401,7 @@ mod tests {
 
         let result = validator.validate(&response).await;
         assert!(result.is_err());
-        assert!(result
-            .unwrap_err()
-            .to_string()
-            .contains("does not exist"));
+        assert!(result.unwrap_err().to_string().contains("does not exist"));
     }
 
     #[tokio::test]
@@ -441,10 +440,7 @@ mod tests {
 
         let result = validator.validate(&response).await;
         assert!(result.is_err());
-        assert!(result
-            .unwrap_err()
-            .to_string()
-            .contains("does not exist"));
+        assert!(result.unwrap_err().to_string().contains("does not exist"));
     }
 
     #[tokio::test]

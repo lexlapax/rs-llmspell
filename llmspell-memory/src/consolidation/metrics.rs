@@ -340,7 +340,7 @@ pub struct ConsolidationMetrics {
     auto_promotion: Arc<RwLock<AutoPromotionConfig>>,
     #[allow(clippy::zero_sized_map_values)] // PromptVersion zero-sized until V2 added
     session_versions: Arc<RwLock<HashMap<String, PromptVersion>>>, // session_id -> version
-    model_pricing: Arc<RwLock<HashMap<String, ModelPricing>>>,     // model -> pricing
+    model_pricing: Arc<RwLock<HashMap<String, ModelPricing>>>, // model -> pricing
 }
 
 impl Default for ConsolidationMetrics {
@@ -474,7 +474,10 @@ impl ConsolidationMetrics {
 
             // Update per-model metrics (token usage, cost)
             if let (Some(model_name), Some(usage)) = (model, token_usage.clone()) {
-                let model_metrics = core.model_metrics.entry(model_name.to_string()).or_default();
+                let model_metrics = core
+                    .model_metrics
+                    .entry(model_name.to_string())
+                    .or_default();
                 model_metrics.consolidations += 1;
                 model_metrics.token_usage.prompt_tokens += usage.prompt_tokens;
                 model_metrics.token_usage.completion_tokens += usage.completion_tokens;
@@ -509,7 +512,8 @@ impl ConsolidationMetrics {
             let now = Utc::now();
             let mut lag_values = self.lags.write().await;
 
-            #[allow(clippy::cast_precision_loss)] // Milliseconds precision acceptable for lag metrics
+            #[allow(clippy::cast_precision_loss)]
+            // Milliseconds precision acceptable for lag metrics
             for timestamp in episodic_timestamps {
                 let lag_ms = (now - *timestamp).num_milliseconds() as f64;
                 lag_values.push(lag_ms);
@@ -593,7 +597,8 @@ impl ConsolidationMetrics {
         if window_duration_secs > 0.0 {
             #[allow(clippy::cast_precision_loss)]
             {
-                core.throughput.entries_per_sec = core.entries_processed as f64 / window_duration_secs;
+                core.throughput.entries_per_sec =
+                    core.entries_processed as f64 / window_duration_secs;
                 core.throughput.decisions_per_sec =
                     core.decision_distribution.total() as f64 / window_duration_secs;
             }

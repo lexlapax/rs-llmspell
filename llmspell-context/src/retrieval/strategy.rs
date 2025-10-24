@@ -50,8 +50,12 @@ impl StrategySelector {
     /// 7. **Default** → BM25 (keyword fallback)
     #[must_use]
     pub fn select(&self, understanding: &QueryUnderstanding) -> RetrievalStrategy {
-        info!("Selecting retrieval strategy: intent={:?}, entities={}, keywords={}",
-            understanding.intent, understanding.entities.len(), understanding.keywords.len());
+        info!(
+            "Selecting retrieval strategy: intent={:?}, entities={}, keywords={}",
+            understanding.intent,
+            understanding.entities.len(),
+            understanding.keywords.len()
+        );
         trace!("Query understanding: {:?}", understanding);
 
         // Rule 1: HowTo queries -> recent interaction examples
@@ -65,8 +69,10 @@ impl StrategySelector {
             || understanding.intent == QueryIntent::Explain)
             && understanding.entities.len() >= self.semantic_entity_threshold
         {
-            debug!("Selected Semantic strategy (Rule 2: WhatIs/Explain with {} entities)",
-                understanding.entities.len());
+            debug!(
+                "Selected Semantic strategy (Rule 2: WhatIs/Explain with {} entities)",
+                understanding.entities.len()
+            );
             return RetrievalStrategy::Semantic;
         }
 
@@ -87,16 +93,20 @@ impl StrategySelector {
 
         // Rule 5: Complex queries (many entities) -> hybrid
         if understanding.entities.len() >= 3 && self.enable_hybrid {
-            debug!("Selected Hybrid strategy (Rule 5: Complex query with {} entities)",
-                understanding.entities.len());
+            debug!(
+                "Selected Hybrid strategy (Rule 5: Complex query with {} entities)",
+                understanding.entities.len()
+            );
             return RetrievalStrategy::Hybrid;
         }
 
         // Rule 6: Simple queries (few keywords) -> recent interactions
         // Only for Unknown intent (otherwise fall through to BM25)
         if understanding.keywords.len() < 2 && understanding.intent == QueryIntent::Unknown {
-            debug!("Selected Episodic strategy (Rule 6: Simple query with {} keywords)",
-                understanding.keywords.len());
+            debug!(
+                "Selected Episodic strategy (Rule 6: Simple query with {} keywords)",
+                understanding.keywords.len()
+            );
             return RetrievalStrategy::Episodic;
         }
 

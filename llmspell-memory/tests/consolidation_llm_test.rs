@@ -78,7 +78,10 @@ async fn test_add_decision() {
         .unwrap();
 
     // Verify consolidation ran
-    assert_eq!(result.entries_processed, 1, "Should process exactly 1 entry");
+    assert_eq!(
+        result.entries_processed, 1,
+        "Should process exactly 1 entry"
+    );
     assert!(result.entities_added > 0, "Should add at least one entity");
     assert!(entries[0].processed, "Entry should be marked as processed");
 
@@ -90,7 +93,10 @@ async fn test_add_decision() {
     // For now, we verify at least one entity was added (ADD decision made)
     let type_match_rate = if result.entities_added > 0 { 1.0 } else { 0.0 };
 
-    assert!(type_match_rate > 0.7, "DMR should be >70%, LLM made ADD decisions");
+    assert!(
+        type_match_rate > 0.7,
+        "DMR should be >70%, LLM made ADD decisions"
+    );
 
     // TODO: For full DMR validation, need to modify engine to return ConsolidationResponse
     // TODO: Verify metrics integration
@@ -137,9 +143,14 @@ async fn test_update_decision() {
 
     // Note: entries_processed might be 0 if LLM decides content is not actionable (NOOP)
     // This is acceptable behavior - the entry is still processed, just skipped
-    assert!(result1.entries_processed == 1 || result1.entries_skipped > 0,
-            "First consolidation should process or skip entry");
-    assert!(result1.entities_added > 0, "First consolidation should add at least one entity");
+    assert!(
+        result1.entries_processed == 1 || result1.entries_skipped > 0,
+        "First consolidation should process or skip entry"
+    );
+    assert!(
+        result1.entities_added > 0,
+        "First consolidation should add at least one entity"
+    );
 
     // Small delay between consolidation calls to avoid overwhelming Ollama
     tokio::time::sleep(tokio::time::Duration::from_millis(2000)).await;
@@ -158,7 +169,10 @@ async fn test_update_decision() {
         .await
         .unwrap();
 
-    assert_eq!(result2.entries_processed, 1, "Second consolidation should process 1 entry");
+    assert_eq!(
+        result2.entries_processed, 1,
+        "Second consolidation should process 1 entry"
+    );
 
     // The LLM might either UPDATE the existing entity OR ADD a new relationship/property
     // Both are valid consolidation strategies, so we just verify processing succeeded
@@ -175,9 +189,14 @@ async fn test_update_decision() {
     // TODO: Calculate DMR with fuzzy matching
 
     eprintln!("✓ test_update_decision passed");
-    eprintln!("  First consolidation: {} entries, {} added", result1.entries_processed, result1.entities_added);
-    eprintln!("  Second consolidation: {} entries, {} updated, {} added",
-              result2.entries_processed, result2.entities_updated, result2.entities_added);
+    eprintln!(
+        "  First consolidation: {} entries, {} added",
+        result1.entries_processed, result1.entities_added
+    );
+    eprintln!(
+        "  Second consolidation: {} entries, {} updated, {} added",
+        result2.entries_processed, result2.entities_updated, result2.entities_added
+    );
 }
 
 /// Test DELETE decision: Remove outdated/contradictory information
@@ -214,20 +233,29 @@ async fn test_delete_decision() {
         .await
         .unwrap();
 
-    eprintln!("First result: processed={}, added={}, updated={}, deleted={}, skipped={}",
-              result1.entries_processed, result1.entities_added, result1.entities_updated,
-              result1.entities_deleted, result1.entries_skipped);
+    eprintln!(
+        "First result: processed={}, added={}, updated={}, deleted={}, skipped={}",
+        result1.entries_processed,
+        result1.entities_added,
+        result1.entities_updated,
+        result1.entities_deleted,
+        result1.entries_skipped
+    );
 
     // Note: entries_processed might be 0 if LLM decides content is not actionable (NOOP)
     // This is acceptable behavior - the entry is still processed, just skipped
-    assert!(result1.entries_processed == 1 || result1.entries_skipped > 0,
-            "First consolidation should process or skip entry");
+    assert!(
+        result1.entries_processed == 1 || result1.entries_skipped > 0,
+        "First consolidation should process or skip entry"
+    );
 
     // LLM might decide "Python 2.7 is supported" is not actionable knowledge (NOOP)
     // Or it might create an entity - both are valid
     if result1.entities_added == 0 {
-        eprintln!("⚠ First consolidation returned NOOP (skipped={}) - using simplified DELETE test",
-                  result1.entries_skipped);
+        eprintln!(
+            "⚠ First consolidation returned NOOP (skipped={}) - using simplified DELETE test",
+            result1.entries_skipped
+        );
         eprintln!("  Testing DELETE without pre-existing entity");
     }
 
@@ -248,9 +276,14 @@ async fn test_delete_decision() {
         .await
         .unwrap();
 
-    eprintln!("Second result: processed={}, added={}, updated={}, deleted={}, skipped={}",
-              result2.entries_processed, result2.entities_added, result2.entities_updated,
-              result2.entities_deleted, result2.entries_skipped);
+    eprintln!(
+        "Second result: processed={}, added={}, updated={}, deleted={}, skipped={}",
+        result2.entries_processed,
+        result2.entities_added,
+        result2.entities_updated,
+        result2.entities_deleted,
+        result2.entries_skipped
+    );
 
     // If first was NOOP, second might also be NOOP (no entity to delete)
     // This is acceptable - the LLM correctly identified there's no actionable knowledge
@@ -260,7 +293,10 @@ async fn test_delete_decision() {
         return;
     }
 
-    assert!(result2.entries_processed > 0, "Second consolidation should process 1 entry");
+    assert!(
+        result2.entries_processed > 0,
+        "Second consolidation should process 1 entry"
+    );
 
     // The LLM might DELETE the entity OR UPDATE it with deprecation status OR skip (NOOP)
     // All are valid strategies depending on context
@@ -274,9 +310,14 @@ async fn test_delete_decision() {
     // TODO: Calculate DMR
 
     eprintln!("✓ test_delete_decision passed");
-    eprintln!("  First consolidation: {} entries, {} added", result1.entries_processed, result1.entities_added);
-    eprintln!("  Second consolidation: {} entries, {} deleted, {} updated",
-              result2.entries_processed, result2.entities_deleted, result2.entities_updated);
+    eprintln!(
+        "  First consolidation: {} entries, {} added",
+        result1.entries_processed, result1.entities_added
+    );
+    eprintln!(
+        "  Second consolidation: {} entries, {} deleted, {} updated",
+        result2.entries_processed, result2.entities_deleted, result2.entities_updated
+    );
 }
 
 /// Test NOOP decision: Skip irrelevant content
@@ -318,9 +359,18 @@ async fn test_noop_decision() {
     );
 
     // Verify no knowledge graph changes
-    assert_eq!(result.entities_added, 0, "Should not add entities for irrelevant content");
-    assert_eq!(result.entities_updated, 0, "Should not update entities for irrelevant content");
-    assert_eq!(result.entities_deleted, 0, "Should not delete entities for irrelevant content");
+    assert_eq!(
+        result.entities_added, 0,
+        "Should not add entities for irrelevant content"
+    );
+    assert_eq!(
+        result.entities_updated, 0,
+        "Should not update entities for irrelevant content"
+    );
+    assert_eq!(
+        result.entities_deleted, 0,
+        "Should not delete entities for irrelevant content"
+    );
 
     eprintln!("✓ test_noop_decision passed");
     eprintln!("  Entries processed: {}", result.entries_processed);
@@ -354,7 +404,11 @@ async fn test_multi_turn_consolidation() {
     );
 
     let mut entries1 = vec![entry1];
-    let result1 = engine.llm_engine.consolidate(&["test-session"], &mut entries1).await.unwrap();
+    let result1 = engine
+        .llm_engine
+        .consolidate(&["test-session"], &mut entries1)
+        .await
+        .unwrap();
 
     // Small delay between consolidation calls to avoid overwhelming Ollama
     tokio::time::sleep(tokio::time::Duration::from_millis(2000)).await;
@@ -367,7 +421,11 @@ async fn test_multi_turn_consolidation() {
     );
 
     let mut entries2 = vec![entry2];
-    let result2 = engine.llm_engine.consolidate(&["test-session"], &mut entries2).await.unwrap();
+    let result2 = engine
+        .llm_engine
+        .consolidate(&["test-session"], &mut entries2)
+        .await
+        .unwrap();
 
     // Small delay between consolidation calls to avoid overwhelming Ollama
     tokio::time::sleep(tokio::time::Duration::from_millis(2000)).await;
@@ -380,29 +438,49 @@ async fn test_multi_turn_consolidation() {
     );
 
     let mut entries3 = vec![entry3];
-    let result3 = engine.llm_engine.consolidate(&["test-session"], &mut entries3).await.unwrap();
+    let result3 = engine
+        .llm_engine
+        .consolidate(&["test-session"], &mut entries3)
+        .await
+        .unwrap();
 
     // Verify all turns processed
-    assert_eq!(result1.entries_processed + result2.entries_processed + result3.entries_processed, 3,
-               "Should process all 3 turns");
+    assert_eq!(
+        result1.entries_processed + result2.entries_processed + result3.entries_processed,
+        3,
+        "Should process all 3 turns"
+    );
 
     // At least some entities should be created or updated across turns
     let total_entities = result1.entities_added + result2.entities_added + result3.entities_added;
-    let total_updates = result1.entities_updated + result2.entities_updated + result3.entities_updated;
+    let total_updates =
+        result1.entities_updated + result2.entities_updated + result3.entities_updated;
 
-    assert!(total_entities > 0 || total_updates > 0,
-            "Multi-turn consolidation should create or update entities");
+    assert!(
+        total_entities > 0 || total_updates > 0,
+        "Multi-turn consolidation should create or update entities"
+    );
 
     // TODO: Verify relationships between entities (Alice -> works_at -> Acme, etc.)
     // TODO: Verify temporal ordering of updates
 
     eprintln!("✓ test_multi_turn_consolidation passed");
-    eprintln!("  Turn 1: {} processed, {} added", result1.entries_processed, result1.entities_added);
-    eprintln!("  Turn 2: {} processed, {} added, {} updated",
-              result2.entries_processed, result2.entities_added, result2.entities_updated);
-    eprintln!("  Turn 3: {} processed, {} added, {} updated",
-              result3.entries_processed, result3.entities_added, result3.entities_updated);
-    eprintln!("  Total: {} entities added, {} updated", total_entities, total_updates);
+    eprintln!(
+        "  Turn 1: {} processed, {} added",
+        result1.entries_processed, result1.entities_added
+    );
+    eprintln!(
+        "  Turn 2: {} processed, {} added, {} updated",
+        result2.entries_processed, result2.entities_added, result2.entities_updated
+    );
+    eprintln!(
+        "  Turn 3: {} processed, {} added, {} updated",
+        result3.entries_processed, result3.entities_added, result3.entities_updated
+    );
+    eprintln!(
+        "  Total: {} entities added, {} updated",
+        total_entities, total_updates
+    );
 }
 
 /// Test error recovery: Graceful handling of edge cases
@@ -432,7 +510,10 @@ async fn test_error_recovery() {
     );
 
     let mut entries1 = vec![entry1];
-    let result1 = engine.llm_engine.consolidate(&["test-session"], &mut entries1).await;
+    let result1 = engine
+        .llm_engine
+        .consolidate(&["test-session"], &mut entries1)
+        .await;
     assert!(result1.is_ok(), "Should handle empty content gracefully");
 
     // Test 2: Whitespace only
@@ -443,8 +524,14 @@ async fn test_error_recovery() {
     );
 
     let mut entries2 = vec![entry2];
-    let result2 = engine.llm_engine.consolidate(&["test-session"], &mut entries2).await;
-    assert!(result2.is_ok(), "Should handle whitespace-only content gracefully");
+    let result2 = engine
+        .llm_engine
+        .consolidate(&["test-session"], &mut entries2)
+        .await;
+    assert!(
+        result2.is_ok(),
+        "Should handle whitespace-only content gracefully"
+    );
 
     // Test 3: Special characters
     let entry3 = EpisodicEntry::new(
@@ -454,8 +541,14 @@ async fn test_error_recovery() {
     );
 
     let mut entries3 = vec![entry3];
-    let result3 = engine.llm_engine.consolidate(&["test-session"], &mut entries3).await;
-    assert!(result3.is_ok(), "Should handle special characters gracefully");
+    let result3 = engine
+        .llm_engine
+        .consolidate(&["test-session"], &mut entries3)
+        .await;
+    assert!(
+        result3.is_ok(),
+        "Should handle special characters gracefully"
+    );
 
     eprintln!("✓ test_error_recovery passed");
     eprintln!("  All edge cases handled gracefully");

@@ -55,18 +55,18 @@ impl GraphSemanticMemory {
 #[async_trait]
 impl SemanticMemory for GraphSemanticMemory {
     async fn upsert_entity(&self, entity: Entity) -> Result<()> {
-        info!("Upserting entity: id={}, type={}, name={}", entity.id, entity.entity_type, entity.name);
+        info!(
+            "Upserting entity: id={}, type={}, name={}",
+            entity.id, entity.entity_type, entity.name
+        );
         trace!("Entity properties: {:?}", entity.properties);
 
         // For upsert semantics, we use add_entity which creates new entity
         // In the future, this could check if entity exists and update
-        self.graph
-            .add_entity(entity)
-            .await
-            .map_err(|e| {
-                error!("Failed to upsert entity: {}", e);
-                MemoryError::Storage(e.to_string())
-            })?;
+        self.graph.add_entity(entity).await.map_err(|e| {
+            error!("Failed to upsert entity: {}", e);
+            MemoryError::Storage(e.to_string())
+        })?;
 
         debug!("Entity upserted successfully");
         Ok(())
@@ -77,7 +77,11 @@ impl SemanticMemory for GraphSemanticMemory {
 
         match self.graph.get_entity(id).await {
             Ok(entity) => {
-                trace!("Entity found: name={}, type={}", entity.name, entity.entity_type);
+                trace!(
+                    "Entity found: name={}, type={}",
+                    entity.name,
+                    entity.entity_type
+                );
                 Ok(Some(entity))
             }
             Err(llmspell_graph::error::GraphError::EntityNotFound(_)) => {
@@ -100,8 +104,10 @@ impl SemanticMemory for GraphSemanticMemory {
     }
 
     async fn add_relationship(&self, relationship: Relationship) -> Result<()> {
-        info!("Adding relationship: type={}, from={}, to={}",
-            relationship.relationship_type, relationship.from_entity, relationship.to_entity);
+        info!(
+            "Adding relationship: type={}, from={}, to={}",
+            relationship.relationship_type, relationship.from_entity, relationship.to_entity
+        );
         trace!("Relationship properties: {:?}", relationship.properties);
 
         self.graph
@@ -134,16 +140,16 @@ impl SemanticMemory for GraphSemanticMemory {
         let query =
             llmspell_graph::types::TemporalQuery::new().with_entity_type(entity_type.to_string());
 
-        let entities = self.graph
-            .query_temporal(query)
-            .await
-            .map_err(|e| {
-                error!("Failed to query entities by type {}: {}", entity_type, e);
-                MemoryError::Storage(e.to_string())
-            })?;
+        let entities = self.graph.query_temporal(query).await.map_err(|e| {
+            error!("Failed to query entities by type {}: {}", entity_type, e);
+            MemoryError::Storage(e.to_string())
+        })?;
 
         info!("Query by type returned {} entities", entities.len());
-        trace!("Entity names: {:?}", entities.iter().map(|e| &e.name).collect::<Vec<_>>());
+        trace!(
+            "Entity names: {:?}",
+            entities.iter().map(|e| &e.name).collect::<Vec<_>>()
+        );
 
         Ok(entities)
     }

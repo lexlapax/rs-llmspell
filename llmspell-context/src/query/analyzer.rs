@@ -150,7 +150,10 @@ impl Default for RegexQueryAnalyzer {
 impl QueryAnalyzer for RegexQueryAnalyzer {
     async fn understand(&self, query: &str) -> Result<QueryUnderstanding> {
         info!("Analyzing query: len={} bytes", query.len());
-        trace!("Query text: {}", query.chars().take(100).collect::<String>());
+        trace!(
+            "Query text: {}",
+            query.chars().take(100).collect::<String>()
+        );
 
         // Fast path: early-exit intent classification
         let intent = Self::classify_intent(query);
@@ -160,7 +163,11 @@ impl QueryAnalyzer for RegexQueryAnalyzer {
         let entities = Self::extract_entities(query);
         let keywords = Self::extract_keywords(query);
 
-        debug!("Extracted {} entities, {} keywords", entities.len(), keywords.len());
+        debug!(
+            "Extracted {} entities, {} keywords",
+            entities.len(),
+            keywords.len()
+        );
         trace!("Entities: {:?}, Keywords: {:?}", entities, keywords);
 
         Ok(QueryUnderstanding {
