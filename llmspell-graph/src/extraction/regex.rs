@@ -121,6 +121,43 @@ impl RegexExtractor {
     /// let entities = extractor.extract_entities("Rust is a language. Python is also a language.");
     /// assert!(entities.len() >= 2);
     /// ```
+    /// Helper: Process single entity match and add to results
+    fn process_entity_match(
+        &self,
+        name: &str,
+        text: &str,
+        entities: &mut Vec<Entity>,
+        seen_names: &mut std::collections::HashSet<String>,
+        filtered_count: &mut usize,
+    ) {
+        if !self.should_keep_entity(name, seen_names) {
+            *filtered_count += 1;
+            return;
+        }
+
+        let entity_type = Self::infer_entity_type(text, name);
+        debug!("Extracted entity: name='{}', type={}", name, entity_type);
+
+        entities.push(Entity::new(
+            name.to_string(),
+            entity_type,
+            json!({"source": "regex_extraction"}),
+        ));
+    }
+
+    /// Helper: Log extraction summary
+    fn log_extraction_summary(entities: &[Entity], filtered_count: usize) {
+        info!(
+            "Entity extraction complete: {} entities extracted, {} filtered",
+            entities.len(),
+            filtered_count
+        );
+        trace!(
+            "Extracted entities: {:?}",
+            entities.iter().map(|e| &e.name).collect::<Vec<_>>()
+        );
+    }
+
     pub fn extract_entities(&self, text: &str) -> Vec<Entity> {
         info!("Starting entity extraction: text_len={} bytes", text.len());
         trace!(
@@ -134,33 +171,10 @@ impl RegexExtractor {
 
         for cap in ENTITY_PATTERN.captures_iter(text) {
             let name = cap[1].trim();
-
-            if !self.should_keep_entity(name, &mut seen_names) {
-                filtered_count += 1;
-                continue;
-            }
-
-            // Infer entity type from context
-            let entity_type = Self::infer_entity_type(text, name);
-            debug!("Extracted entity: name='{}', type={}", name, entity_type);
-
-            entities.push(Entity::new(
-                name.to_string(),
-                entity_type,
-                json!({"source": "regex_extraction"}),
-            ));
+            self.process_entity_match(name, text, &mut entities, &mut seen_names, &mut filtered_count);
         }
 
-        info!(
-            "Entity extraction complete: {} entities extracted, {} filtered",
-            entities.len(),
-            filtered_count
-        );
-        trace!(
-            "Extracted entities: {:?}",
-            entities.iter().map(|e| &e.name).collect::<Vec<_>>()
-        );
-
+        Self::log_extraction_summary(&entities, filtered_count);
         entities
     }
 
