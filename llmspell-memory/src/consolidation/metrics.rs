@@ -407,15 +407,17 @@ impl ConsolidationMetrics {
             }
             VersionSelectionStrategy::RandomPerSession => {
                 // Get or create session-sticky version
-                let mut session_versions = self.session_versions.write().await;
-                let version = *session_versions
-                    .entry(session_id.to_string())
-                    .or_insert_with(|| {
-                        // Random selection on first use
-                        // TODO: When V2 is added, implement random selection
-                        trace!("RandomPerSession strategy: first use for session, using V1");
-                        PromptVersion::V1
-                    });
+                let version = {
+                    let mut session_versions = self.session_versions.write().await;
+                    *session_versions
+                        .entry(session_id.to_string())
+                        .or_insert_with(|| {
+                            // Random selection on first use
+                            // TODO: When V2 is added, implement random selection
+                            trace!("RandomPerSession strategy: first use for session, using V1");
+                            PromptVersion::V1
+                        })
+                }; // Lock dropped here
                 trace!("RandomPerSession strategy: session sticky version {:?}", version);
                 version
             }
@@ -534,33 +536,8 @@ impl ConsolidationMetrics {
             cloned
         }; // Core lock dropped here
 
-        // Calculate consolidation lag (episodic timestamp → now)
-        if !episodic_timestamps.is_empty() {
-            let now = Utc::now();
-            let mut lag_values = self.lags.write().await;
-
-            #[allow(clippy::cast_precision_loss)]
-            // Milliseconds precision acceptable for lag metrics
-            for timestamp in episodic_timestamps {
-                let lag_ms = (now - *timestamp).num_milliseconds() as f64;
-                lag_values.push(lag_ms);
-            }
-
-            // Update lag stats
-            if !lag_values.is_empty() {
-                let mut sorted_lags = lag_values.clone();
-                sorted_lags.sort_by(|a, b| a.partial_cmp(b).unwrap());
-
-                let mut core = self.core.write().await;
-                #[allow(clippy::cast_precision_loss)]
-                {
-                    core.lag.count = sorted_lags.len() as u64;
-                    core.lag.p50_ms = percentile(&sorted_lags, 50.0);
-                    core.lag.p95_ms = percentile(&sorted_lags, 95.0);
-                    core.lag.p99_ms = percentile(&sorted_lags, 99.0);
-                }
-            }
-        }
+        // Update lag metrics from episodic timestamps
+        self.update_lag_metrics(episodic_timestamps).await;
 
         // Sort for percentile calculation (outside locks)
         sorted.sort_by(|a, b| a.partial_cmp(b).unwrap());
@@ -590,6 +567,39 @@ impl ConsolidationMetrics {
     /// Record a validation error
     pub async fn record_validation_error(&self) {
         self.core.write().await.validation_errors += 1;
+    }
+
+    /// Update consolidation lag metrics from episodic timestamps
+    async fn update_lag_metrics(&self, episodic_timestamps: &[DateTime<Utc>]) {
+        if episodic_timestamps.is_empty() {
+            return;
+        }
+
+        let now = Utc::now();
+        let mut lag_values = self.lags.write().await;
+
+        #[allow(clippy::cast_precision_loss)]
+        // Milliseconds precision acceptable for lag metrics
+        for timestamp in episodic_timestamps {
+            let lag_ms = (now - *timestamp).num_milliseconds() as f64;
+            lag_values.push(lag_ms);
+        }
+
+        // Update lag stats
+        if !lag_values.is_empty() {
+            let mut sorted_lags = lag_values.clone();
+            drop(lag_values); // Release lock before sorting and stats update
+            sorted_lags.sort_by(|a, b| a.partial_cmp(b).unwrap());
+
+            let mut core = self.core.write().await;
+            #[allow(clippy::cast_precision_loss)]
+            {
+                core.lag.count = sorted_lags.len() as u64;
+                core.lag.p50_ms = percentile(&sorted_lags, 50.0);
+                core.lag.p95_ms = percentile(&sorted_lags, 95.0);
+                core.lag.p99_ms = percentile(&sorted_lags, 99.0);
+            }
+        }
     }
 
     /// Get current metrics snapshot
