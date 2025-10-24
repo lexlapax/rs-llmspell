@@ -289,16 +289,7 @@ impl LLMConsolidationEngine {
     /// Call LLM with retry logic, circuit breaker, and provider fallback
     async fn call_llm_with_retry(&self, system_prompt: &str, user_prompt: &str) -> Result<String> {
         // Circuit breaker: check if we've had too many consecutive failures
-        let failures = self.consecutive_failures.load(Ordering::Relaxed);
-        if failures >= self.config.circuit_breaker_threshold {
-            warn!(
-                "Circuit breaker OPEN: {} consecutive failures (threshold: {})",
-                failures, self.config.circuit_breaker_threshold
-            );
-            return Err(MemoryError::LLMCall(format!(
-                "Circuit breaker open after {failures} consecutive failures"
-            )));
-        }
+        self.check_circuit_breaker()?;
 
         // Build model fallback chain: primary + fallbacks
         let mut models = vec![self.config.model.clone()];
@@ -312,69 +303,20 @@ impl LLMConsolidationEngine {
                 info!("Trying fallback model: {}", model);
             }
 
-            // Try current model with retries
-            let mut attempts = 0;
-            while attempts < self.config.max_retries {
-                attempts += 1;
-
-                debug!(
-                    "LLM call attempt {}/{} (model: {})",
-                    attempts, self.config.max_retries, model
-                );
-
-                // Health check before retry (skip on first attempt)
-                if attempts > 1 {
-                    match self.provider.validate().await {
-                        Ok(()) => debug!("Provider health check passed"),
-                        Err(e) => {
-                            warn!("Provider unhealthy, skipping retry: {}", e);
-                            last_error = Some(MemoryError::LLMCall(format!(
-                                "Provider health check failed: {e}"
-                            )));
-                            break; // Skip remaining retries for this model
-                        }
-                    }
-                }
-
-                match self.call_llm(system_prompt, user_prompt, model).await {
-                    Ok(response) => {
-                        // Success! Reset circuit breaker
-                        self.consecutive_failures.store(0, Ordering::Relaxed);
-                        if model_idx > 0 {
-                            info!("Fallback model {} succeeded", model);
-                        }
-                        return Ok(response);
-                    }
-                    Err(e) => {
-                        warn!(
-                            "LLM call failed (attempt {}/{}): {}",
-                            attempts, self.config.max_retries, e
-                        );
-                        last_error = Some(e);
-
-                        if attempts < self.config.max_retries {
-                            // Exponential backoff: 1s, 2s, 4s
-                            let backoff_ms = 1000 * (1 << (attempts - 1));
-                            debug!("Retrying after {}ms backoff", backoff_ms);
-                            tokio::time::sleep(Duration::from_millis(backoff_ms)).await;
-                        }
-                    }
+            match self.try_model_with_retries(system_prompt, user_prompt, model, model_idx).await {
+                Ok(response) => return Ok(response),
+                Err(e) => {
+                    last_error = Some(e);
+                    warn!(
+                        "All {} attempts failed for model {}, trying next model",
+                        self.config.max_retries, model
+                    );
                 }
             }
-
-            // All retries for this model failed, try next model
-            warn!(
-                "All {} attempts failed for model {}, trying next model",
-                self.config.max_retries, model
-            );
         }
 
         // All models exhausted - increment circuit breaker and fail
-        let new_failures = self.consecutive_failures.fetch_add(1, Ordering::Relaxed) + 1;
-        warn!(
-            "All models failed, circuit breaker counter: {}/{}",
-            new_failures, self.config.circuit_breaker_threshold
-        );
+        self.record_failure();
 
         Err(last_error.unwrap_or_else(|| {
             MemoryError::LLMCall(format!(
@@ -383,6 +325,106 @@ impl LLMConsolidationEngine {
                 self.config.max_retries
             ))
         }))
+    }
+
+    /// Check circuit breaker state
+    fn check_circuit_breaker(&self) -> Result<()> {
+        let failures = self.consecutive_failures.load(Ordering::Relaxed);
+        if failures >= self.config.circuit_breaker_threshold {
+            warn!(
+                "Circuit breaker OPEN: {} consecutive failures (threshold: {})",
+                failures, self.config.circuit_breaker_threshold
+            );
+            return Err(MemoryError::LLMCall(format!(
+                "Circuit breaker open after {failures} consecutive failures"
+            )));
+        }
+        Ok(())
+    }
+
+    /// Try a model with retries
+    async fn try_model_with_retries(
+        &self,
+        system_prompt: &str,
+        user_prompt: &str,
+        model: &str,
+        model_idx: usize,
+    ) -> Result<String> {
+        let mut attempts = 0;
+        let mut last_error = None;
+
+        while attempts < self.config.max_retries {
+            attempts += 1;
+
+            debug!(
+                "LLM call attempt {}/{} (model: {})",
+                attempts, self.config.max_retries, model
+            );
+
+            // Health check before retry (skip on first attempt)
+            if attempts > 1 && !self.provider_is_healthy().await {
+                return Err(last_error.unwrap_or_else(|| {
+                    MemoryError::LLMCall("Provider health check failed".to_string())
+                }));
+            }
+
+            match self.call_llm(system_prompt, user_prompt, model).await {
+                Ok(response) => {
+                    // Success! Reset circuit breaker
+                    self.consecutive_failures.store(0, Ordering::Relaxed);
+                    if model_idx > 0 {
+                        info!("Fallback model {} succeeded", model);
+                    }
+                    return Ok(response);
+                }
+                Err(e) => {
+                    warn!(
+                        "LLM call failed (attempt {}/{}): {}",
+                        attempts, self.config.max_retries, e
+                    );
+                    last_error = Some(e);
+
+                    if attempts < self.config.max_retries {
+                        self.exponential_backoff(attempts).await;
+                    }
+                }
+            }
+        }
+
+        Err(last_error.unwrap_or_else(|| {
+            MemoryError::LLMCall(format!("All {} attempts failed", self.config.max_retries))
+        }))
+    }
+
+    /// Check provider health
+    async fn provider_is_healthy(&self) -> bool {
+        match self.provider.validate().await {
+            Ok(()) => {
+                debug!("Provider health check passed");
+                true
+            }
+            Err(e) => {
+                warn!("Provider unhealthy, skipping retry: {}", e);
+                false
+            }
+        }
+    }
+
+    /// Exponential backoff delay
+    async fn exponential_backoff(&self, attempt: u32) {
+        // Exponential backoff: 1s, 2s, 4s
+        let backoff_ms = 1000 * (1 << (attempt - 1));
+        debug!("Retrying after {}ms backoff", backoff_ms);
+        tokio::time::sleep(Duration::from_millis(backoff_ms)).await;
+    }
+
+    /// Record failure and update circuit breaker
+    fn record_failure(&self) {
+        let new_failures = self.consecutive_failures.fetch_add(1, Ordering::Relaxed) + 1;
+        warn!(
+            "All models failed, circuit breaker counter: {}/{}",
+            new_failures, self.config.circuit_breaker_threshold
+        );
     }
 
     /// Call LLM provider with specified model
