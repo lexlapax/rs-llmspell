@@ -503,7 +503,7 @@ impl LLMConsolidationEngine {
             super::DecisionPayload::Delete { entity_id } => {
                 self.execute_delete_decision(idx, entity_id).await
             }
-            super::DecisionPayload::Noop => Self::execute_noop_decision(idx),
+            super::DecisionPayload::Noop => Ok(Self::execute_noop_decision(idx)),
         }
     }
 
@@ -549,9 +549,9 @@ impl LLMConsolidationEngine {
     }
 
     /// Helper: Execute NOOP decision
-    fn execute_noop_decision(idx: usize) -> Result<(usize, usize, usize, usize)> {
+    fn execute_noop_decision(idx: usize) -> (usize, usize, usize, usize) {
         debug!("Decision {}: Executing NOOP (skip)", idx);
-        Ok((0, 0, 0, 1))
+        (0, 0, 0, 1)
     }
 
     /// Execute ADD decision

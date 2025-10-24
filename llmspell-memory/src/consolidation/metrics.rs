@@ -31,7 +31,7 @@ use std::time::Duration;
 use tokio::sync::RwLock;
 use tracing::{debug, info, trace};
 
-/// Parameters for update_core_metrics helper
+/// Parameters for `update_core_metrics` helper
 struct CoreMetricsParams<'a> {
     result: &'a ConsolidationResult,
     decisions: &'a [DecisionPayload],
@@ -668,9 +668,9 @@ impl ConsolidationMetrics {
         core.latency.max_ms = sorted[sorted.len() - 1];
 
         // Calculate percentiles
-        core.latency.p50_ms = percentile(&sorted, 50.0);
-        core.latency.p95_ms = percentile(&sorted, 95.0);
-        core.latency.p99_ms = percentile(&sorted, 99.0);
+        core.latency.p50_ms = percentile(sorted, 50.0);
+        core.latency.p95_ms = percentile(sorted, 95.0);
+        core.latency.p99_ms = percentile(sorted, 99.0);
     }
 
     /// Record a parse failure
