@@ -22,6 +22,7 @@ use async_trait::async_trait;
 use llmspell_utils::text::stopwords::is_stopword;
 use regex::Regex;
 use std::sync::LazyLock;
+use tracing::{debug, info, trace};
 
 /// Compiled intent patterns for fast matching
 static INTENT_PATTERNS: LazyLock<Vec<(Regex, QueryIntent)>> = LazyLock::new(|| {
@@ -148,12 +149,19 @@ impl Default for RegexQueryAnalyzer {
 #[async_trait]
 impl QueryAnalyzer for RegexQueryAnalyzer {
     async fn understand(&self, query: &str) -> Result<QueryUnderstanding> {
+        info!("Analyzing query: len={} bytes", query.len());
+        trace!("Query text: {}", query.chars().take(100).collect::<String>());
+
         // Fast path: early-exit intent classification
         let intent = Self::classify_intent(query);
+        debug!("Intent classified: {:?}", intent);
 
         // Extract entities and keywords
         let entities = Self::extract_entities(query);
         let keywords = Self::extract_keywords(query);
+
+        debug!("Extracted {} entities, {} keywords", entities.len(), keywords.len());
+        trace!("Entities: {:?}, Keywords: {:?}", entities, keywords);
 
         Ok(QueryUnderstanding {
             intent,
