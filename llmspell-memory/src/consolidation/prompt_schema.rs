@@ -146,7 +146,7 @@ impl ConsolidationResponse {
     }
 
     /// Helper: Handle parse error with fallback
-    fn handle_parse_error(json_str: &str, e: serde_json::Error) -> Result<Self> {
+    fn handle_parse_error(json_str: &str, e: &serde_json::Error) -> Result<Self> {
         warn!("Full JSON parsing failed: {}, attempting partial parse", e);
         Self::partial_parse(json_str).ok_or_else(|| {
             MemoryError::InvalidInput(format!("Failed to parse consolidation response: {e}"))
@@ -178,7 +178,7 @@ impl ConsolidationResponse {
                 Self::log_parse_success(&response);
                 Ok(response)
             }
-            Err(e) => Self::handle_parse_error(json_str, e),
+            Err(e) => Self::handle_parse_error(json_str, &e),
         }
     }
 

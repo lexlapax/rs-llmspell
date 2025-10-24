@@ -691,7 +691,7 @@ impl ConsolidationMetrics {
     fn has_sufficient_samples(
         metrics: &PromptMetrics,
         config: &AutoPromotionConfig,
-        version: &PromptVersion,
+        version: PromptVersion,
     ) -> bool {
         if metrics.consolidations >= config.min_sample_size {
             true
@@ -717,7 +717,7 @@ impl ConsolidationMetrics {
     fn meets_promotion_threshold(
         improvement: f64,
         config: &AutoPromotionConfig,
-        version: &PromptVersion,
+        version: PromptVersion,
     ) -> bool {
         if improvement >= config.min_parse_improvement {
             info!(
@@ -734,12 +734,12 @@ impl ConsolidationMetrics {
 
     /// Helper: Evaluate candidate version against baseline
     fn evaluate_candidate(
-        version: &PromptVersion,
+        version: PromptVersion,
         metrics: &PromptMetrics,
         baseline: &PromptMetrics,
         config: &AutoPromotionConfig,
     ) -> Option<PromptVersion> {
-        if *version == PromptVersion::V1 {
+        if version == PromptVersion::V1 {
             return None; // Skip baseline itself
         }
 
@@ -762,7 +762,7 @@ impl ConsolidationMetrics {
         );
 
         if Self::meets_promotion_threshold(improvement, config, version) {
-            Some(*version)
+            Some(version)
         } else {
             None
         }
@@ -792,7 +792,7 @@ impl ConsolidationMetrics {
 
         // Check each candidate version
         for (version, metrics) in &core.prompt_metrics {
-            if let Some(promoted) = Self::evaluate_candidate(version, metrics, baseline, &config) {
+            if let Some(promoted) = Self::evaluate_candidate(*version, metrics, baseline, &config) {
                 return Some(promoted);
             }
         }
