@@ -6,7 +6,7 @@ use llmspell_graph::storage::surrealdb::SurrealDBBackend;
 use llmspell_graph::traits::KnowledgeGraph;
 use llmspell_memory::consolidation::{
     ConsolidationMetrics, DecisionPayload, DecisionType, LLMConsolidationConfig,
-    LLMConsolidationEngine,
+    LLMConsolidationEngine, PromptVersion,
 };
 use llmspell_providers::abstraction::ProviderConfig;
 use llmspell_providers::local::create_ollama_provider;
@@ -205,7 +205,7 @@ pub async fn assert_entity_not_exists(graph: &Arc<dyn KnowledgeGraph>, entity_id
 /// # Returns
 ///
 /// DMR as a ratio (0.0 to 1.0)
-#[allow(clippy::cast_precision_loss, dead_code)]
+#[allow(clippy::cast_precision_loss, clippy::match_same_arms, dead_code)]
 pub fn calculate_dmr(
     actual_decisions: &[DecisionPayload],
     ground_truth: &[GroundTruthDecision],
@@ -341,7 +341,7 @@ fn fuzzy_entity_match(actual: &str, expected: &str) -> bool {
 /// # Returns
 ///
 /// DMR as a ratio (0.0 to 1.0)
-#[allow(clippy::cast_precision_loss, dead_code)]
+#[allow(clippy::cast_precision_loss, clippy::match_same_arms, dead_code)]
 pub fn calculate_dmr_fuzzy(
     actual_decisions: &[DecisionPayload],
     ground_truth: &[GroundTruthDecision],

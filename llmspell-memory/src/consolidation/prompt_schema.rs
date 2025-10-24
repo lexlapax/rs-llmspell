@@ -199,7 +199,7 @@ impl ConsolidationResponse {
     }
 
     /// Extract entities array from parsed JSON
-    fn extract_entities(value: &Value, response: &mut ConsolidationResponse) {
+    fn extract_entities(value: &Value, response: &mut Self) {
         if let Some(entities) = value.get("entities").and_then(Value::as_array) {
             response.entities = entities
                 .iter()
@@ -213,7 +213,7 @@ impl ConsolidationResponse {
     }
 
     /// Extract relationships array from parsed JSON
-    fn extract_relationships(value: &Value, response: &mut ConsolidationResponse) {
+    fn extract_relationships(value: &Value, response: &mut Self) {
         if let Some(relationships) = value.get("relationships").and_then(Value::as_array) {
             response.relationships = relationships
                 .iter()
@@ -227,7 +227,7 @@ impl ConsolidationResponse {
     }
 
     /// Extract decisions array from parsed JSON
-    fn extract_decisions(value: &Value, response: &mut ConsolidationResponse) {
+    fn extract_decisions(value: &Value, response: &mut Self) {
         if let Some(decisions) = value.get("decisions").and_then(Value::as_array) {
             response.decisions = decisions
                 .iter()
@@ -241,7 +241,7 @@ impl ConsolidationResponse {
     }
 
     /// Extract reasoning string from parsed JSON
-    fn extract_reasoning(value: &Value, response: &mut ConsolidationResponse) {
+    fn extract_reasoning(value: &Value, response: &mut Self) {
         if let Some(reasoning) = value.get("reasoning").and_then(Value::as_str) {
             response.reasoning = Some(reasoning.to_string());
             trace!("Partial parse: extracted reasoning");
