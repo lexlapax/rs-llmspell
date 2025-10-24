@@ -178,25 +178,26 @@ impl RegexExtractor {
         entities
     }
 
-    /// Check if entity should be kept after applying filters
-    fn should_keep_entity(
-        &self,
-        name: &str,
-        seen_names: &mut std::collections::HashSet<String>,
-    ) -> bool {
+    /// Helper: Check basic length requirements
+    fn passes_length_filters(&self, name: &str) -> bool {
         // Filter out short/common words
         if name.len() < self.min_entity_length {
             return false;
         }
 
-        // Skip common non-entity words (stopwords)
-        if is_stopword(name) {
-            trace!("Filtered stopword: '{}'", name);
+        // Skip single-letter entities (usually noise)
+        if name.len() == 1 {
             return false;
         }
 
-        // Skip single-letter entities (usually noise)
-        if name.len() == 1 {
+        true
+    }
+
+    /// Helper: Check stopword filters
+    fn passes_stopword_filters(name: &str) -> bool {
+        // Skip common non-entity words (stopwords)
+        if is_stopword(name) {
+            trace!("Filtered stopword: '{}'", name);
             return false;
         }
 
@@ -213,13 +214,28 @@ impl RegexExtractor {
             }
         }
 
-        // Deduplicate
+        true
+    }
+
+    /// Helper: Check deduplication
+    fn is_not_duplicate(name: &str, seen_names: &mut std::collections::HashSet<String>) -> bool {
         if !seen_names.insert(name.to_string()) {
             trace!("Filtered duplicate: '{}'", name);
-            return false;
+            false
+        } else {
+            true
         }
+    }
 
-        true
+    /// Check if entity should be kept after applying filters
+    fn should_keep_entity(
+        &self,
+        name: &str,
+        seen_names: &mut std::collections::HashSet<String>,
+    ) -> bool {
+        self.passes_length_filters(name)
+            && Self::passes_stopword_filters(name)
+            && Self::is_not_duplicate(name, seen_names)
     }
 
     /// Extract relationships from text
