@@ -236,36 +236,15 @@ impl SurrealDBBackend {
             data_dir.display()
         );
 
-        // Create data directory if it doesn't exist
-        if !data_dir.exists() {
-            debug!("Creating data directory: {}", data_dir.display());
-            std::fs::create_dir_all(&data_dir).map_err(|e| {
-                error!("Failed to create data directory: {}", e);
-                e
-            })?;
-        }
-
-        // Connect to embedded RocksDB
-        let db_path = data_dir.join("llmspell-graph.db");
-        debug!("Connecting to SurrealDB at: {}", db_path.display());
-        let db = Surreal::new::<RocksDb>(db_path).await.map_err(|e| {
-            error!("Failed to connect to SurrealDB: {}", e);
-            e
-        })?;
-
-        // Use namespace and database
-        debug!("Using namespace=llmspell, database=graph");
-        db.use_ns("llmspell").use_db("graph").await.map_err(|e| {
-            error!("Failed to use namespace/database: {}", e);
-            e
-        })?;
+        Self::ensure_data_directory(&data_dir)?;
+        let db = Self::connect_database(&data_dir).await?;
+        Self::configure_namespace(&db).await?;
 
         let backend = Self {
             db,
             data_dir: data_dir.clone(),
         };
 
-        // Initialize schema
         backend.initialize_schema().await?;
 
         info!(
@@ -274,6 +253,37 @@ impl SurrealDBBackend {
         );
 
         Ok(backend)
+    }
+
+    /// Ensure data directory exists
+    fn ensure_data_directory(data_dir: &Path) -> Result<()> {
+        if !data_dir.exists() {
+            debug!("Creating data directory: {}", data_dir.display());
+            std::fs::create_dir_all(data_dir).map_err(|e| {
+                error!("Failed to create data directory: {}", e);
+                e
+            })?;
+        }
+        Ok(())
+    }
+
+    /// Connect to embedded RocksDB
+    async fn connect_database(data_dir: &Path) -> Result<Surreal<Db>> {
+        let db_path = data_dir.join("llmspell-graph.db");
+        debug!("Connecting to SurrealDB at: {}", db_path.display());
+        Surreal::new::<RocksDb>(db_path).await.map_err(|e| {
+            error!("Failed to connect to SurrealDB: {}", e);
+            GraphError::from(e)
+        })
+    }
+
+    /// Configure namespace and database
+    async fn configure_namespace(db: &Surreal<Db>) -> Result<()> {
+        debug!("Using namespace=llmspell, database=graph");
+        db.use_ns("llmspell").use_db("graph").await.map_err(|e| {
+            error!("Failed to use namespace/database: {}", e);
+            GraphError::from(e)
+        })
     }
 
     /// Create temporary backend for testing
@@ -295,8 +305,14 @@ impl SurrealDBBackend {
     /// Initialize database schema with bi-temporal tables and indexes
     async fn initialize_schema(&self) -> Result<()> {
         info!("Initializing SurrealDB schema (entities and relationships tables)");
+        self.create_entities_table().await?;
+        self.create_relationships_table().await?;
+        info!("Schema initialization complete");
+        Ok(())
+    }
 
-        // Define entities table
+    /// Create entities table with bi-temporal indexes
+    async fn create_entities_table(&self) -> Result<()> {
         debug!("Creating entities table with bi-temporal indexes");
         self.db
             .query(
@@ -314,10 +330,13 @@ impl SurrealDBBackend {
             .await
             .map_err(|e| {
                 error!("Failed to create entities table: {}", e);
-                e
+                GraphError::from(e)
             })?;
+        Ok(())
+    }
 
-        // Define relationships table
+    /// Create relationships table with indexes
+    async fn create_relationships_table(&self) -> Result<()> {
         debug!("Creating relationships table with relationship indexes");
         self.db
             .query(
@@ -335,10 +354,8 @@ impl SurrealDBBackend {
             .await
             .map_err(|e| {
                 error!("Failed to create relationships table: {}", e);
-                e
+                GraphError::from(e)
             })?;
-
-        info!("Schema initialization complete");
         Ok(())
     }
 
