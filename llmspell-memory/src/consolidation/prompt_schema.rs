@@ -111,6 +111,48 @@ impl ConsolidationResponse {
         self.entities.is_empty() && self.relationships.is_empty() && self.decisions.is_empty()
     }
 
+    /// Helper: Calculate start position after markdown fence
+    fn fence_start_position(json_str: &str) -> usize {
+        if json_str.starts_with("```json") {
+            json_str.find('\n').map_or(7, |i| i + 1)
+        } else if json_str.starts_with("```") {
+            json_str.find('\n').map_or(3, |i| i + 1)
+        } else {
+            0
+        }
+    }
+
+    /// Helper: Strip markdown code fences from input
+    fn strip_markdown_fences(json_str: &str) -> &str {
+        let json_str = json_str.trim();
+        if json_str.starts_with("```") {
+            debug!("Detected markdown code fence, stripping");
+            let start = Self::fence_start_position(json_str);
+            let end = json_str.rfind("```").unwrap_or(json_str.len());
+            json_str[start..end].trim()
+        } else {
+            json_str
+        }
+    }
+
+    /// Helper: Log successful parse result
+    fn log_parse_success(response: &Self) {
+        info!(
+            "Successfully parsed consolidation response: entities={}, relationships={}, decisions={}",
+            response.entities.len(),
+            response.relationships.len(),
+            response.decisions.len()
+        );
+    }
+
+    /// Helper: Handle parse error with fallback
+    fn handle_parse_error(json_str: &str, e: serde_json::Error) -> Result<Self> {
+        warn!("Full JSON parsing failed: {}, attempting partial parse", e);
+        Self::partial_parse(json_str).ok_or_else(|| {
+            MemoryError::InvalidInput(format!("Failed to parse consolidation response: {e}"))
+        })
+    }
+
     /// Parse from JSON string with error recovery
     ///
     /// Attempts to extract valid decisions even if JSON is partially malformed.
@@ -129,44 +171,14 @@ impl ConsolidationResponse {
             json_str.chars().take(200).collect::<String>()
         );
 
-        // Strip markdown code fences if present (```json ... ``` or ``` ... ```)
-        let json_str = json_str.trim();
-        let json_str = if json_str.starts_with("```") {
-            debug!("Detected markdown code fence, stripping");
-            // Find start and end of code block
-            let start = if json_str.starts_with("```json") {
-                json_str.find('\n').map_or(7, |i| i + 1)
-            } else if json_str.starts_with("```") {
-                json_str.find('\n').map_or(3, |i| i + 1)
-            } else {
-                0
-            };
-            let end = json_str.rfind("```").unwrap_or(json_str.len());
-            json_str[start..end].trim()
-        } else {
-            json_str
-        };
+        let json_str = Self::strip_markdown_fences(json_str);
 
-        // Try full JSON parsing first
         match serde_json::from_str::<Self>(json_str) {
             Ok(response) => {
-                info!(
-                    "Successfully parsed consolidation response: entities={}, relationships={}, decisions={}",
-                    response.entities.len(),
-                    response.relationships.len(),
-                    response.decisions.len()
-                );
+                Self::log_parse_success(&response);
                 Ok(response)
             }
-            Err(e) => {
-                warn!("Full JSON parsing failed: {}, attempting partial parse", e);
-                // Try partial parsing with lenient mode
-                Self::partial_parse(json_str).ok_or_else(|| {
-                    MemoryError::InvalidInput(format!(
-                        "Failed to parse consolidation response: {e}"
-                    ))
-                })
-            }
+            Err(e) => Self::handle_parse_error(json_str, e),
         }
     }
 
