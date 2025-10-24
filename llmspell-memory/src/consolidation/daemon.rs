@@ -222,48 +222,12 @@ impl ConsolidationDaemon {
                 _ = interval.tick() => {
                     debug!("Daemon tick");
 
-                    // Check health before processing
                     if !self.engine.is_ready() {
                         warn!("LLM engine not ready, skipping consolidation");
                         continue;
                     }
 
-                    // Process batch
-                    match self.process_batch().await {
-                        Ok(queue_depth) => {
-                            // Update metrics
-                            {
-                                let mut metrics = self.metrics.lock().await;
-                                metrics.queue_depth = queue_depth as u64;
-                                metrics.consecutive_failures = 0;
-                            }
-
-                            // Adjust interval based on queue depth
-                            let new_interval = self.select_interval(queue_depth);
-                            interval = tokio::time::interval(new_interval);
-
-                            debug!("Queue depth: {}, next interval: {:?}", queue_depth, new_interval);
-                        }
-                        Err(e) => {
-                            error!("Consolidation batch failed: {}", e);
-
-                            // Update failure metrics
-                            {
-                                let mut metrics = self.metrics.lock().await;
-                                metrics.consecutive_failures += 1;
-                            }
-
-                            // Check if we should pause daemon on repeated failures
-                            let failures = {
-                                let metrics = self.metrics.lock().await;
-                                metrics.consecutive_failures
-                            };
-                            if failures >= 10 {
-                                warn!("10+ consecutive failures, pausing daemon for 5 minutes");
-                                tokio::time::sleep(Duration::from_secs(300)).await;
-                            }
-                        }
-                    }
+                    interval = self.handle_batch_processing(interval).await;
                 }
                 _ = shutdown_rx.changed() => {
                     info!("Shutdown signal received");
@@ -273,6 +237,47 @@ impl ConsolidationDaemon {
         }
 
         info!("Daemon loop exited");
+    }
+
+    /// Handle batch processing and interval adjustment
+    async fn handle_batch_processing(
+        &self,
+        _current_interval: tokio::time::Interval,
+    ) -> tokio::time::Interval {
+        match self.process_batch().await {
+            Ok(queue_depth) => {
+                self.handle_batch_success(queue_depth).await;
+                let new_interval = self.select_interval(queue_depth);
+                debug!("Queue depth: {}, next interval: {:?}", queue_depth, new_interval);
+                tokio::time::interval(new_interval)
+            }
+            Err(e) => {
+                self.handle_batch_failure(e).await;
+                tokio::time::interval(Duration::from_secs(self.config.fast_interval_secs))
+            }
+        }
+    }
+
+    /// Handle successful batch processing
+    async fn handle_batch_success(&self, queue_depth: usize) {
+        let mut metrics = self.metrics.lock().await;
+        metrics.queue_depth = queue_depth as u64;
+        metrics.consecutive_failures = 0;
+    }
+
+    /// Handle batch processing failure
+    async fn handle_batch_failure(&self, error: MemoryError) {
+        error!("Consolidation batch failed: {}", error);
+
+        let mut metrics = self.metrics.lock().await;
+        metrics.consecutive_failures += 1;
+        let failures = metrics.consecutive_failures;
+        drop(metrics);
+
+        if failures >= 10 {
+            warn!("10+ consecutive failures, pausing daemon for 5 minutes");
+            tokio::time::sleep(Duration::from_secs(300)).await;
+        }
     }
 
     /// Process a batch of unprocessed entries
