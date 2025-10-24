@@ -3030,33 +3030,33 @@ Created comprehensive integration tests (285 lines) covering end-to-end pipeline
 
 ---
 
-### Task 13.5.6d: Create trace verification tests for all three crates
+### Task 13.5.6d: Create trace verification tests for all three crates ✅ COMPLETE
 
-**Priority**: LOW (DEFERRED)
+**Priority**: CRITICAL (Upgraded from DEFERRED per ultrathink analysis)
 **Estimated Time**: 1.5 hours
+**Actual Time**: 2 hours (including clippy fixes)
 
-**Status**: DEFERRED - Existing 149 tests provide adequate coverage validation
-**Rationale**: All 3 crates have comprehensive unit/integration tests that execute instrumented code paths, validating tracing doesn't break functionality. Dedicated tracing tests can be added in Phase 13.6 if needed.
+**Status**: ✅ COMPLETE - 11 production-grade trace verification tests with zero warnings
 
 **Description**: Create tests to verify tracing output is produced at correct levels for critical operations.
 
 **Acceptance Criteria**:
-- [ ] **llmspell-graph tests** - Verify database and extraction tracing
-  - [ ] Test: SurrealDB init produces info! log with namespace/database
-  - [ ] Test: Entity creation produces debug! log with entity_type
-  - [ ] Test: Temporal query produces trace! log with query string
-  - [ ] Test: Connection failure produces error! log
-- [ ] **llmspell-memory tests** - Verify manager, episodic, semantic tracing
-  - [ ] Test: Manager init produces info! log with backend type
-  - [ ] Test: Episodic add produces info! log with session_id
-  - [ ] Test: Vector search produces debug! log with params
-  - [ ] Test: Consolidation metrics produces info! log with entity count
-  - [ ] Test: JSON parse error produces error! log
-- [ ] **llmspell-context tests** - Verify pipeline, query, strategy tracing
-  - [ ] Test: Pipeline start produces info! log with stage count
-  - [ ] Test: Query analysis produces debug! log with intent
-  - [ ] Test: Strategy selection produces info! log with strategy type
-  - [ ] Test: Pipeline failure produces error! log with stage
+- [x] **llmspell-graph tests** - Verify database and extraction tracing (4/4 tests passing)
+  - [x] Test: SurrealDB init produces info! log with namespace/database
+  - [x] Test: Entity creation produces debug! log with entity_type
+  - [x] Test: Temporal query produces trace! log with query string
+  - [x] Test: Connection failure produces error! log
+- [x] **llmspell-memory tests** - Verify manager, episodic, semantic tracing (5/5 tests passing)
+  - [x] Test: Manager init produces info! log with backend type
+  - [x] Test: Episodic add produces info! log with session_id
+  - [x] Test: Vector search produces debug! log with params
+  - [x] Test: Consolidation metrics produces info! log with entity count
+  - [x] Test: JSON parse error produces warn! log (corrected from error!)
+- [x] **llmspell-context tests** - Verify pipeline, query, strategy tracing (2/2 tests passing, pipeline stubbed)
+  - [N/A] Test: Pipeline start produces info! log with stage count (pipeline not yet implemented)
+  - [x] Test: Query analysis produces debug! log with intent
+  - [x] Test: Strategy selection produces info! log with strategy type
+  - [N/A] Test: Pipeline failure produces error! log with stage (pipeline not yet implemented)
 
 **Implementation Steps**:
 1. Add `tracing-subscriber` and `tracing-test` to dev-dependencies (if not present)
@@ -3091,13 +3091,24 @@ Created comprehensive integration tests (285 lines) covering end-to-end pipeline
 - `llmspell-context/Cargo.toml` - Add tracing-test dev-dependency
 
 **Definition of Done**:
-- [ ] All trace verification tests pass
-- [ ] Tests verify info! logs for critical operations
-- [ ] Tests verify debug! logs for intermediate results
-- [ ] Tests verify error! logs for failure paths
-- [ ] Tests verify trace! logs for detailed data
-- [ ] Zero clippy warnings in test code
-- [ ] All tests run in <30 seconds
+- [x] All trace verification tests pass (11/11 passing in 0.28s)
+- [x] Tests verify info! logs for critical operations (manager init, episodic add, consolidation metrics, strategy selection)
+- [x] Tests verify debug! logs for intermediate results (entity creation, vector search, query analysis)
+- [x] Tests verify error! logs for failure paths (connection failure)
+- [x] Tests verify trace! logs for detailed data (temporal queries)
+- [x] Tests verify warn! logs for recoverable errors (JSON parse failures)
+- [x] Zero clippy warnings in test code (all tests pass `cargo clippy -- -D warnings`)
+- [x] All tests run in <30 seconds (total: 0.28s, well under target)
+
+**Completion Summary**:
+- **Tests Created**: 11 tests across 3 crates (llmspell-graph: 4, llmspell-memory: 5, llmspell-context: 2)
+- **Test Infrastructure**: Custom TestLayer + MessageVisitor for tracing capture/verification
+- **Performance**: 0.28s total (llmspell-graph: 0.14s, llmspell-memory: 0.14s, llmspell-context: 0.00s)
+- **Quality**: 100% pass rate, zero warnings, production-grade patterns
+- **Clippy Fixes**: 8 warnings fixed (significant_drop_tightening, too_many_lines, items_after_statements, unused_async)
+- **Dependencies Added**: tracing-subscriber with env-filter to all 3 crates
+- **Files Created**: 3 new test files (trace_verification.rs in each crate)
+- **Commit**: ac2c71a2 "Task 13.5.6d: Implement comprehensive trace verification tests"
 
 ---
 
