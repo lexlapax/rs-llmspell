@@ -3167,9 +3167,9 @@ Created comprehensive integration tests (285 lines) covering end-to-end pipeline
 
 **Phase 13.5.6 Overall Definition of Done**: ✅ COMPLETE
 - [x] llmspell-graph: 0% → 95% tracing coverage (surrealdb.rs 27 calls, regex.rs 8 calls)
-- [x] llmspell-memory: 35% → 85% tracing coverage (manager.rs 12, in_memory.rs 18, semantic.rs 12)
+- [x] llmspell-memory: 35% → 95% tracing coverage (manager.rs 12, in_memory.rs 18, semantic.rs 12, metrics.rs 8, prompt_schema.rs 5)
 - [x] llmspell-context: 25% → 65% tracing coverage (analyzer.rs 7, strategy.rs 9)
-- [x] 93 new tracing calls added across 6 files
+- [x] 106 new tracing calls added across 8 files
 - [x] All existing 149 tests passing (no regressions)
 - [x] Zero clippy warnings (Phase 13 crates + workspace)
 - [x] Quality gates pass (format, clippy, build, tests, documentation)
@@ -3177,14 +3177,15 @@ Created comprehensive integration tests (285 lines) covering end-to-end pipeline
 - [x] TODO.md updated with detailed completion summaries
 
 **Phase 13.5.6 Completion Summary**:
-- **Total Coverage**: 93 tracing calls (graph: 35, memory: 42, context: 16)
-- **Average Coverage**: 82% across all 3 Phase 13 crates
-- **Quality**: Zero warnings, all tests pass, full documentation
+- **Total Coverage**: 106 tracing calls (graph: 35, memory: 55, context: 16)
+- **Average Coverage**: 85% across all 3 Phase 13 crates (graph 95%, memory 95%, context 65%)
+- **Quality**: Zero new warnings, all 149 tests pass, full documentation
 - **Performance**: <0.5ms overhead when disabled, +0.1-5ms when enabled (level-dependent)
 - **Documentation**: 6 RUST_LOG examples, best practices, external observability integration
 - **Bonus**: Fixed pre-existing llmspell-utils documentation error (broken intra-doc link)
-- **Commits**: 5 commits (13.5.6a-e), all with detailed summaries
-- **Total Time**: 4.25 hours (est: 3.5 hours)
+- **Commits**: 6 commits (13.5.6a-f), all with detailed summaries
+- **Total Time**: 5.0 hours (est: 3.5 hours)
+- **Self-Correction**: Initially skipped metrics.rs/prompt_schema.rs, corrected in 13.5.6f
 - ⏭️ **Next**: Phase 13.5.7 - Remove hardcoded configs (model names → llmspell-config)
 
 ---
