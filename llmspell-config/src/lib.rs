@@ -14,6 +14,7 @@ pub use crate::debug::DebugConfig;
 pub use crate::engines::{EngineConfigs, JSConfig, LuaConfig};
 pub use crate::env::{EnvCategory, EnvRegistry, EnvVarDef, EnvVarDefBuilder, IsolationMode};
 pub use crate::providers::{ProviderConfig, ProviderManagerConfig, ProviderManagerConfigBuilder};
+pub use crate::memory::{ConsolidationConfig, DaemonConfig, MemoryConfig};
 pub use crate::rag::{
     ChunkingConfig, ChunkingStrategy, DistanceMetric, EmbeddingConfig, HNSWConfig, RAGCacheConfig,
     RAGConfig, RAGConfigBuilder, VectorBackend, VectorStorageConfig,
@@ -24,6 +25,7 @@ pub mod debug;
 pub mod engines;
 pub mod env;
 pub mod env_registry;
+pub mod memory;
 pub mod providers;
 pub mod rag;
 pub mod tools;
@@ -253,6 +255,57 @@ impl LLMSpellConfig {
                 }
                 if let Some(backend) = sessions.get("storage_backend").and_then(|v| v.as_str()) {
                     self.runtime.sessions.storage_backend = backend.to_string();
+                }
+            }
+
+            // Merge memory settings
+            if let Some(memory) = runtime.get("memory").and_then(|v| v.as_object()) {
+                if let Some(enabled) = memory.get("enabled").and_then(|v| v.as_bool()) {
+                    self.runtime.memory.enabled = enabled;
+                }
+
+                // Merge consolidation settings
+                if let Some(consolidation) = memory.get("consolidation").and_then(|v| v.as_object()) {
+                    if let Some(provider) = consolidation.get("provider_name").and_then(|v| v.as_str()) {
+                        self.runtime.memory.consolidation.provider_name = Some(provider.to_string());
+                    }
+                    if let Some(batch_size) = consolidation.get("batch_size").and_then(|v| v.as_u64()) {
+                        self.runtime.memory.consolidation.batch_size = batch_size as usize;
+                    }
+                    if let Some(max_concurrent) = consolidation.get("max_concurrent").and_then(|v| v.as_u64()) {
+                        self.runtime.memory.consolidation.max_concurrent = max_concurrent as usize;
+                    }
+                    if let Some(threshold) = consolidation.get("active_session_threshold_secs").and_then(|v| v.as_u64()) {
+                        self.runtime.memory.consolidation.active_session_threshold_secs = threshold;
+                    }
+                }
+
+                // Merge daemon settings
+                if let Some(daemon) = memory.get("daemon").and_then(|v| v.as_object()) {
+                    if let Some(enabled) = daemon.get("enabled").and_then(|v| v.as_bool()) {
+                        self.runtime.memory.daemon.enabled = enabled;
+                    }
+                    if let Some(fast) = daemon.get("fast_interval_secs").and_then(|v| v.as_u64()) {
+                        self.runtime.memory.daemon.fast_interval_secs = fast;
+                    }
+                    if let Some(normal) = daemon.get("normal_interval_secs").and_then(|v| v.as_u64()) {
+                        self.runtime.memory.daemon.normal_interval_secs = normal;
+                    }
+                    if let Some(slow) = daemon.get("slow_interval_secs").and_then(|v| v.as_u64()) {
+                        self.runtime.memory.daemon.slow_interval_secs = slow;
+                    }
+                    if let Some(threshold_fast) = daemon.get("queue_threshold_fast").and_then(|v| v.as_u64()) {
+                        self.runtime.memory.daemon.queue_threshold_fast = threshold_fast as usize;
+                    }
+                    if let Some(threshold_slow) = daemon.get("queue_threshold_slow").and_then(|v| v.as_u64()) {
+                        self.runtime.memory.daemon.queue_threshold_slow = threshold_slow as usize;
+                    }
+                    if let Some(shutdown) = daemon.get("shutdown_max_wait_secs").and_then(|v| v.as_u64()) {
+                        self.runtime.memory.daemon.shutdown_max_wait_secs = shutdown;
+                    }
+                    if let Some(health) = daemon.get("health_check_interval_secs").and_then(|v| v.as_u64()) {
+                        self.runtime.memory.daemon.health_check_interval_secs = health;
+                    }
                 }
             }
         }
@@ -1371,6 +1424,8 @@ pub struct GlobalRuntimeConfig {
     pub state_persistence: StatePersistenceConfig,
     /// Session management settings
     pub sessions: SessionConfig,
+    /// Memory system configuration
+    pub memory: MemoryConfig,
 }
 
 impl Default for GlobalRuntimeConfig {
@@ -1382,6 +1437,7 @@ impl Default for GlobalRuntimeConfig {
             security: SecurityConfig::default(),
             state_persistence: StatePersistenceConfig::default(),
             sessions: SessionConfig::default(),
+            memory: MemoryConfig::default(),
         }
     }
 }
@@ -1448,6 +1504,13 @@ impl GlobalRuntimeConfigBuilder {
     #[must_use]
     pub fn sessions(mut self, sessions: SessionConfig) -> Self {
         self.config.sessions = sessions;
+        self
+    }
+
+    /// Set the memory configuration
+    #[must_use]
+    pub fn memory(mut self, memory: MemoryConfig) -> Self {
+        self.config.memory = memory;
         self
     }
 

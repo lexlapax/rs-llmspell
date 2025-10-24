@@ -20,6 +20,9 @@ pub fn register_standard_vars(registry: &EnvRegistry) -> Result<(), String> {
     // Session/Hook Variables
     register_session_hook_vars(registry)?;
 
+    // Memory System Variables
+    register_memory_vars(registry)?;
+
     // Path Discovery Variables
     register_path_vars(registry)?;
 
@@ -919,6 +922,157 @@ fn register_session_hook_vars(registry: &EnvRegistry) -> Result<(), String> {
                 v.parse::<u32>()
                     .map(|_| ())
                     .map_err(|e| format!("Invalid rate limit: {}", e))
+            })
+            .build(),
+    )?;
+
+    Ok(())
+}
+
+/// Register memory system environment variables
+fn register_memory_vars(registry: &EnvRegistry) -> Result<(), String> {
+    registry.register_var(
+        EnvVarDefBuilder::new("LLMSPELL_MEMORY_ENABLED")
+            .description("Enable memory system functionality")
+            .category(EnvCategory::Runtime)
+            .config_path("runtime.memory.enabled")
+            .default("false")
+            .validator(|v| match v {
+                "true" | "false" => Ok(()),
+                _ => Err("Value must be 'true' or 'false'".to_string()),
+            })
+            .build(),
+    )?;
+
+    registry.register_var(
+        EnvVarDefBuilder::new("LLMSPELL_MEMORY_CONSOLIDATION_PROVIDER_NAME")
+            .description("Provider name for memory consolidation LLM")
+            .category(EnvCategory::Runtime)
+            .config_path("runtime.memory.consolidation.provider_name")
+            .build(),
+    )?;
+
+    registry.register_var(
+        EnvVarDefBuilder::new("LLMSPELL_MEMORY_CONSOLIDATION_BATCH_SIZE")
+            .description("Number of episodes to consolidate in one batch")
+            .category(EnvCategory::Runtime)
+            .config_path("runtime.memory.consolidation.batch_size")
+            .default("10")
+            .validator(|v| {
+                v.parse::<usize>()
+                    .map(|_| ())
+                    .map_err(|e| format!("Invalid batch size: {}", e))
+            })
+            .build(),
+    )?;
+
+    registry.register_var(
+        EnvVarDefBuilder::new("LLMSPELL_MEMORY_CONSOLIDATION_MAX_CONCURRENT")
+            .description("Maximum concurrent consolidation operations")
+            .category(EnvCategory::Runtime)
+            .config_path("runtime.memory.consolidation.max_concurrent")
+            .default("3")
+            .validator(|v| {
+                v.parse::<usize>()
+                    .map(|_| ())
+                    .map_err(|e| format!("Invalid count: {}", e))
+            })
+            .build(),
+    )?;
+
+    registry.register_var(
+        EnvVarDefBuilder::new("LLMSPELL_MEMORY_CONSOLIDATION_ACTIVE_SESSION_THRESHOLD_SECS")
+            .description("Active session threshold in seconds")
+            .category(EnvCategory::Runtime)
+            .config_path("runtime.memory.consolidation.active_session_threshold_secs")
+            .default("300")
+            .validator(|v| {
+                v.parse::<u64>()
+                    .map(|_| ())
+                    .map_err(|e| format!("Invalid threshold: {}", e))
+            })
+            .build(),
+    )?;
+
+    registry.register_var(
+        EnvVarDefBuilder::new("LLMSPELL_MEMORY_DAEMON_ENABLED")
+            .description("Enable background consolidation daemon")
+            .category(EnvCategory::Runtime)
+            .config_path("runtime.memory.daemon.enabled")
+            .default("true")
+            .validator(|v| match v {
+                "true" | "false" => Ok(()),
+                _ => Err("Value must be 'true' or 'false'".to_string()),
+            })
+            .build(),
+    )?;
+
+    registry.register_var(
+        EnvVarDefBuilder::new("LLMSPELL_MEMORY_DAEMON_FAST_INTERVAL_SECS")
+            .description("Fast consolidation interval in seconds")
+            .category(EnvCategory::Runtime)
+            .config_path("runtime.memory.daemon.fast_interval_secs")
+            .default("30")
+            .validator(|v| {
+                v.parse::<u64>()
+                    .map(|_| ())
+                    .map_err(|e| format!("Invalid interval: {}", e))
+            })
+            .build(),
+    )?;
+
+    registry.register_var(
+        EnvVarDefBuilder::new("LLMSPELL_MEMORY_DAEMON_NORMAL_INTERVAL_SECS")
+            .description("Normal consolidation interval in seconds")
+            .category(EnvCategory::Runtime)
+            .config_path("runtime.memory.daemon.normal_interval_secs")
+            .default("300")
+            .validator(|v| {
+                v.parse::<u64>()
+                    .map(|_| ())
+                    .map_err(|e| format!("Invalid interval: {}", e))
+            })
+            .build(),
+    )?;
+
+    registry.register_var(
+        EnvVarDefBuilder::new("LLMSPELL_MEMORY_DAEMON_SLOW_INTERVAL_SECS")
+            .description("Slow consolidation interval in seconds")
+            .category(EnvCategory::Runtime)
+            .config_path("runtime.memory.daemon.slow_interval_secs")
+            .default("600")
+            .validator(|v| {
+                v.parse::<u64>()
+                    .map(|_| ())
+                    .map_err(|e| format!("Invalid interval: {}", e))
+            })
+            .build(),
+    )?;
+
+    registry.register_var(
+        EnvVarDefBuilder::new("LLMSPELL_MEMORY_DAEMON_QUEUE_THRESHOLD_FAST")
+            .description("Queue size threshold for fast interval")
+            .category(EnvCategory::Runtime)
+            .config_path("runtime.memory.daemon.queue_threshold_fast")
+            .default("10")
+            .validator(|v| {
+                v.parse::<usize>()
+                    .map(|_| ())
+                    .map_err(|e| format!("Invalid threshold: {}", e))
+            })
+            .build(),
+    )?;
+
+    registry.register_var(
+        EnvVarDefBuilder::new("LLMSPELL_MEMORY_DAEMON_QUEUE_THRESHOLD_SLOW")
+            .description("Queue size threshold for slow interval")
+            .category(EnvCategory::Runtime)
+            .config_path("runtime.memory.daemon.queue_threshold_slow")
+            .default("3")
+            .validator(|v| {
+                v.parse::<usize>()
+                    .map(|_| ())
+                    .map_err(|e| format!("Invalid threshold: {}", e))
             })
             .build(),
     )?;

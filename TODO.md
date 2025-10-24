@@ -3339,17 +3339,19 @@ impl ProviderConfigBuilder {
 
 **Rationale**: ConsolidationConfig should reference provider by name, NOT duplicate LLM parameters. This eliminates duplication, enforces single source of truth, enables centralized LLM config management.
 
+**Status**: ✅ COMPLETE
+
 **Acceptance Criteria**:
-- [ ] Create `llmspell-config/src/memory.rs` with config structures
-- [ ] ConsolidationConfig has `provider_name: Option<String>` (falls back to default_provider)
-- [ ] ConsolidationConfig has NO LLM fields (no model, temperature, max_tokens, timeout, retries)
-- [ ] ConsolidationConfig has ONLY consolidation-specific fields (batch_size, max_concurrent, active_session_threshold_secs)
-- [ ] Extend `GlobalRuntimeConfig` with `pub memory: MemoryConfig` field
-- [ ] Add environment variable support in `env_registry.rs` (LLMSPELL_MEMORY_ENABLED, etc.)
-- [ ] Add merge logic for `runtime.memory` in `lib.rs::merge_from_json_impl()`
-- [ ] Write unit tests for default values, TOML deserialization, env overrides
-- [ ] All tests pass: `cargo test -p llmspell-config`
-- [ ] Zero clippy warnings
+- [x] Create `llmspell-config/src/memory.rs` with config structures ✅
+- [x] ConsolidationConfig has `provider_name: Option<String>` (falls back to default_provider) ✅
+- [x] ConsolidationConfig has NO LLM fields (no model, temperature, max_tokens, timeout, retries) ✅
+- [x] ConsolidationConfig has ONLY consolidation-specific fields (batch_size, max_concurrent, active_session_threshold_secs) ✅
+- [x] Extend `GlobalRuntimeConfig` with `pub memory: MemoryConfig` field ✅
+- [x] Add environment variable support in `env_registry.rs` (LLMSPELL_MEMORY_ENABLED, etc.) ✅
+- [x] Add merge logic for `runtime.memory` in `lib.rs::merge_from_json_impl()` ✅
+- [x] Write unit tests for default values, TOML deserialization, env overrides ✅
+- [x] All tests pass: `cargo test -p llmspell-config` ✅
+- [x] Zero clippy warnings ✅
 
 **Config Structures**:
 ```rust
@@ -3401,6 +3403,48 @@ impl Default for ConsolidationConfig {
 - cargo test -p llmspell-config passes
 - TOML deserialization works: runtime.memory.consolidation.provider_name = "consolidation-llm"
 - Env override works: LLMSPELL_MEMORY_ENABLED=true
+
+**Implementation Summary**:
+**Files Created**:
+- `llmspell-config/src/memory.rs` (427 lines)
+  - MemoryConfig, ConsolidationConfig, DaemonConfig structures
+  - Builders: MemoryConfigBuilder, ConsolidationConfigBuilder, DaemonConfigBuilder
+  - 8 unit tests covering default values, builders, and serialization
+  - ConsolidationConfig strictly enforces provider reference pattern (provider_name only, NO inline LLM fields)
+
+**Files Modified**:
+- `llmspell-config/src/lib.rs` (+55 lines)
+  - Added memory module exports (line 135-136)
+  - Extended GlobalRuntimeConfig with `pub memory: MemoryConfig` field (line 1377)
+  - Added memory() builder method (line 1461)
+  - Added merge logic for runtime.memory in merge_from_json_impl() (lines 261-310)
+  - Handles 3-level nesting: memory.enabled, memory.consolidation.*, memory.daemon.*
+- `llmspell-config/src/env_registry.rs` (+36 lines)
+  - Added register_memory_vars() function with 10 environment variables
+  - Covers all memory config fields: enabled, consolidation (4 vars), daemon (6 vars)
+
+**Test Results**:
+- All 84 tests passing (8 new memory tests added)
+- Zero clippy warnings
+- Full TOML serialization/deserialization support
+- Environment variable overrides functional
+
+**Key Architectural Decisions**:
+1. **Provider Reference Pattern**: ConsolidationConfig has ONLY `provider_name: Option<String>`, NO inline LLM fields
+2. **Fallback Chain**: provider_name → global default_provider → error (enforces explicit configuration)
+3. **Adaptive Scheduling**: DaemonConfig supports 3 interval levels (fast/normal/slow) with queue-based thresholds
+4. **Builder Pattern**: Consistent fluent API for all three config structures
+5. **Environment Overrides**: All 10 memory fields configurable via LLMSPELL_MEMORY_* env vars
+
+**Config Defaults**:
+- MemoryConfig.enabled: false (opt-in)
+- ConsolidationConfig: batch_size=10, max_concurrent=3, active_session_threshold_secs=300, provider_name=None
+- DaemonConfig: enabled=true, fast=30s, normal=300s, slow=600s, queue thresholds 10/3, shutdown wait 30s
+
+**Integration Points**:
+- Ready for llmspell-memory integration (Task 13.5.7c)
+- Provider lookup pattern established for Task 13.5.7d (templates)
+- Environment registry complete for daemon configuration
 
 ### Task 13.5.7c: Migrate llmspell-memory to Provider System
 
