@@ -18,6 +18,7 @@ use async_trait::async_trait;
 use chrono::{DateTime, Utc};
 use std::collections::HashMap;
 use std::sync::Arc;
+use tracing::{debug, error, info, trace, warn};
 
 use crate::error::{MemoryError, Result};
 use crate::traits::SemanticMemory;
@@ -54,20 +55,39 @@ impl GraphSemanticMemory {
 #[async_trait]
 impl SemanticMemory for GraphSemanticMemory {
     async fn upsert_entity(&self, entity: Entity) -> Result<()> {
+        info!("Upserting entity: id={}, type={}, name={}", entity.id, entity.entity_type, entity.name);
+        trace!("Entity properties: {:?}", entity.properties);
+
         // For upsert semantics, we use add_entity which creates new entity
         // In the future, this could check if entity exists and update
         self.graph
             .add_entity(entity)
             .await
-            .map_err(|e| MemoryError::Storage(e.to_string()))?;
+            .map_err(|e| {
+                error!("Failed to upsert entity: {}", e);
+                MemoryError::Storage(e.to_string())
+            })?;
+
+        debug!("Entity upserted successfully");
         Ok(())
     }
 
     async fn get_entity(&self, id: &str) -> Result<Option<Entity>> {
+        debug!("Retrieving entity: id={}", id);
+
         match self.graph.get_entity(id).await {
-            Ok(entity) => Ok(Some(entity)),
-            Err(llmspell_graph::error::GraphError::EntityNotFound(_)) => Ok(None),
-            Err(e) => Err(MemoryError::Storage(e.to_string())),
+            Ok(entity) => {
+                trace!("Entity found: name={}, type={}", entity.name, entity.entity_type);
+                Ok(Some(entity))
+            }
+            Err(llmspell_graph::error::GraphError::EntityNotFound(_)) => {
+                debug!("Entity not found: {}", id);
+                Ok(None)
+            }
+            Err(e) => {
+                error!("Failed to retrieve entity {}: {}", id, e);
+                Err(MemoryError::Storage(e.to_string()))
+            }
         }
     }
 
@@ -80,14 +100,26 @@ impl SemanticMemory for GraphSemanticMemory {
     }
 
     async fn add_relationship(&self, relationship: Relationship) -> Result<()> {
+        info!("Adding relationship: type={}, from={}, to={}",
+            relationship.relationship_type, relationship.from_entity, relationship.to_entity);
+        trace!("Relationship properties: {:?}", relationship.properties);
+
         self.graph
             .add_relationship(relationship)
             .await
-            .map_err(|e| MemoryError::Storage(e.to_string()))?;
+            .map_err(|e| {
+                error!("Failed to add relationship: {}", e);
+                MemoryError::Storage(e.to_string())
+            })?;
+
+        debug!("Relationship added successfully");
         Ok(())
     }
 
     async fn get_relationships(&self, entity_id: &str) -> Result<Vec<Relationship>> {
+        debug!("Getting relationships for entity: id={}", entity_id);
+        warn!("get_relationships not fully implemented - KnowledgeGraph trait needs expansion");
+
         // Get outgoing relationships
         // Note: Current KnowledgeGraph trait only has get_related which returns entities
         // For now, we'll return empty vec as full relationship API needs expansion
@@ -97,13 +129,23 @@ impl SemanticMemory for GraphSemanticMemory {
     }
 
     async fn query_by_type(&self, entity_type: &str) -> Result<Vec<Entity>> {
+        debug!("Querying entities by type: entity_type={}", entity_type);
+
         let query =
             llmspell_graph::types::TemporalQuery::new().with_entity_type(entity_type.to_string());
 
-        self.graph
+        let entities = self.graph
             .query_temporal(query)
             .await
-            .map_err(|e| MemoryError::Storage(e.to_string()))
+            .map_err(|e| {
+                error!("Failed to query entities by type {}: {}", entity_type, e);
+                MemoryError::Storage(e.to_string())
+            })?;
+
+        info!("Query by type returned {} entities", entities.len());
+        trace!("Entity names: {:?}", entities.iter().map(|e| &e.name).collect::<Vec<_>>());
+
+        Ok(entities)
     }
 
     async fn delete_entity(&self, id: &str) -> Result<()> {

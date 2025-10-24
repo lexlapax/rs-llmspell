@@ -5,6 +5,7 @@
 
 use async_trait::async_trait;
 use std::sync::Arc;
+use tracing::{debug, error, info};
 
 use crate::consolidation::{ConsolidationEngine, NoopConsolidationEngine};
 use crate::episodic::InMemoryEpisodicMemory;
@@ -133,10 +134,22 @@ impl DefaultMemoryManager {
     /// let manager = DefaultMemoryManager::new_in_memory().await?;
     /// ```
     pub async fn new_in_memory() -> Result<Self> {
+        info!("Initializing DefaultMemoryManager with in-memory backends");
+
+        debug!("Creating InMemoryEpisodicMemory");
         let episodic: Arc<dyn EpisodicMemory> = Arc::new(InMemoryEpisodicMemory::new());
-        let semantic: Arc<dyn SemanticMemory> = Arc::new(GraphSemanticMemory::new_temp().await?);
+
+        debug!("Creating temporary GraphSemanticMemory (SurrealDB)");
+        let semantic: Arc<dyn SemanticMemory> = Arc::new(GraphSemanticMemory::new_temp().await
+            .map_err(|e| {
+                error!("Failed to initialize semantic memory: {}", e);
+                e
+            })?);
+
+        debug!("Creating NoopProceduralMemory");
         let procedural: Arc<dyn ProceduralMemory> = Arc::new(NoopProceduralMemory);
 
+        info!("DefaultMemoryManager initialized successfully");
         Ok(Self::new(episodic, semantic, procedural))
     }
 }
@@ -160,20 +173,32 @@ impl MemoryManager for DefaultMemoryManager {
         session_id: &str,
         mode: ConsolidationMode,
     ) -> Result<ConsolidationResult> {
+        info!("Triggering consolidation: session_id={}, mode={:?}", session_id, mode);
+
         // Get all entries for the session
-        let entries = self.episodic.get_session(session_id).await?;
+        let entries = self.episodic.get_session(session_id).await
+            .map_err(|e| {
+                error!("Failed to retrieve session entries for {}: {}", session_id, e);
+                e
+            })?;
+
+        debug!("Retrieved {} total entries for session {}", entries.len(), session_id);
 
         // Filter to only unprocessed entries
         let mut unprocessed: Vec<EpisodicEntry> =
             entries.into_iter().filter(|e| !e.processed).collect();
 
         if unprocessed.is_empty() {
+            info!("No unprocessed entries for session {}, skipping consolidation", session_id);
             return Ok(ConsolidationResult::empty());
         }
+
+        debug!("Found {} unprocessed entries to consolidate", unprocessed.len());
 
         // Run consolidation based on mode
         let result = match mode {
             ConsolidationMode::Manual | ConsolidationMode::Immediate => {
+                debug!("Running consolidation in {:?} mode", mode);
                 self.consolidation
                     .consolidate(&[session_id], &mut unprocessed)
                     .await?
@@ -181,11 +206,15 @@ impl MemoryManager for DefaultMemoryManager {
             ConsolidationMode::Background => {
                 // Background mode not yet implemented
                 // For now, treat as manual trigger
+                debug!("Background mode not yet implemented, treating as manual");
                 self.consolidation
                     .consolidate(&[session_id], &mut unprocessed)
                     .await?
             }
         };
+
+        debug!("Consolidation complete: entities_added={}, entries_processed={}",
+            result.entities_added, result.entries_processed);
 
         // Mark processed entries in episodic storage
         let processed_ids: Vec<String> = unprocessed
@@ -195,15 +224,25 @@ impl MemoryManager for DefaultMemoryManager {
             .collect();
 
         if !processed_ids.is_empty() {
-            self.episodic.mark_processed(&processed_ids).await?;
+            debug!("Marking {} entries as processed", processed_ids.len());
+            self.episodic.mark_processed(&processed_ids).await
+                .map_err(|e| {
+                    error!("Failed to mark entries as processed: {}", e);
+                    e
+                })?;
         }
+
+        info!("Consolidation succeeded: {} entities added, {} entries processed",
+            result.entities_added, result.entries_processed);
 
         Ok(result)
     }
 
     async fn shutdown(&self) -> Result<()> {
+        info!("Shutting down DefaultMemoryManager");
         // Graceful shutdown - could flush pending writes, close connections
         // For now, no-op as in-memory backends don't need cleanup
+        debug!("Shutdown complete (no cleanup needed for in-memory backends)");
         Ok(())
     }
 }

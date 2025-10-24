@@ -14,6 +14,7 @@ use std::sync::Arc;
 use async_trait::async_trait;
 use chrono::{DateTime, Utc};
 use parking_lot::RwLock;
+use tracing::{debug, info, trace, warn};
 
 use crate::error::{MemoryError, Result};
 use crate::traits::EpisodicMemory;
@@ -113,14 +114,20 @@ impl Default for InMemoryEpisodicMemory {
 #[async_trait]
 impl EpisodicMemory for InMemoryEpisodicMemory {
     async fn add(&self, mut entry: EpisodicEntry) -> Result<String> {
+        info!("Adding episodic entry: session_id={}, role={}, content_len={}",
+            entry.session_id, entry.role, entry.content.len());
+        trace!("Entry content: {}", entry.content.chars().take(100).collect::<String>());
+
         // Generate embedding if not provided
         if entry.embedding.is_none() {
+            debug!("Generating embedding for entry (no embedding provided)");
             entry.embedding = Some(Self::text_to_embedding(&entry.content));
         }
 
         let id = entry.id.clone();
         self.entries.write().insert(id.clone(), entry);
 
+        debug!("Episodic entry added successfully: id={}", id);
         Ok(id)
     }
 
@@ -133,10 +140,14 @@ impl EpisodicMemory for InMemoryEpisodicMemory {
     }
 
     async fn search(&self, query: &str, top_k: usize) -> Result<Vec<EpisodicEntry>> {
+        debug!("Searching episodic memory: query_len={}, top_k={}", query.len(), top_k);
+        trace!("Search query: {}", query.chars().take(50).collect::<String>());
+
         let query_embedding = Self::text_to_embedding(query);
 
         let mut results: Vec<(f32, EpisodicEntry)> = {
             let entries = self.entries.read();
+            debug!("Searching across {} entries", entries.len());
             entries
                 .values()
                 .filter_map(|entry| {
@@ -148,8 +159,17 @@ impl EpisodicMemory for InMemoryEpisodicMemory {
                 .collect()
         }; // Lock dropped here
 
+        if results.is_empty() {
+            warn!("Search returned no results for query: {}", query.chars().take(50).collect::<String>());
+        }
+
         // Sort by similarity (descending)
         results.sort_by(|a, b| b.0.partial_cmp(&a.0).unwrap_or(std::cmp::Ordering::Equal));
+
+        debug!("Search found {} results, returning top {}", results.len(), top_k);
+        if !results.is_empty() {
+            trace!("Top result similarity: {:.3}", results[0].0);
+        }
 
         // Take top_k results
         Ok(results
@@ -186,14 +206,20 @@ impl EpisodicMemory for InMemoryEpisodicMemory {
     }
 
     async fn mark_processed(&self, entry_ids: &[String]) -> Result<()> {
+        debug!("Marking {} entries as processed", entry_ids.len());
+        trace!("Entry IDs to mark: {:?}", entry_ids);
+
         let mut entries = self.entries.write();
 
         for id in entry_ids {
             if let Some(entry) = entries.get_mut(id) {
                 entry.mark_processed();
+            } else {
+                warn!("Attempted to mark non-existent entry as processed: {}", id);
             }
         }
 
+        debug!("Successfully marked {} entries as processed", entry_ids.len());
         Ok(())
     }
 
@@ -223,6 +249,8 @@ impl EpisodicMemory for InMemoryEpisodicMemory {
     async fn list_sessions_with_unprocessed(&self) -> Result<Vec<String>> {
         use std::collections::HashMap;
 
+        debug!("Listing sessions with unprocessed entries");
+
         let session_info: HashMap<String, DateTime<Utc>> = {
             let entries = self.entries.read();
 
@@ -251,6 +279,9 @@ impl EpisodicMemory for InMemoryEpisodicMemory {
         // Sort by last activity (descending - most recent first)
         let mut sessions: Vec<(String, DateTime<Utc>)> = session_info.into_iter().collect();
         sessions.sort_by(|a, b| b.1.cmp(&a.1)); // Descending by timestamp
+
+        info!("Found {} sessions with unprocessed entries", sessions.len());
+        trace!("Sessions with unprocessed: {:?}", sessions.iter().map(|(s, _)| s).collect::<Vec<_>>());
 
         Ok(sessions.into_iter().map(|(session_id, _)| session_id).collect())
     }
