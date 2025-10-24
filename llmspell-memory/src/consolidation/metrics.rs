@@ -466,6 +466,31 @@ impl ConsolidationMetrics {
         token_usage: Option<TokenUsage>,
         episodic_timestamps: &[DateTime<Utc>],
     ) {
+        self.log_consolidation_info(result, decisions, version, parse_success, model, duration, episodic_timestamps);
+
+        let duration_ms = duration.as_secs_f64() * 1000.0;
+
+        // Update core metrics and get sorted latencies
+        let sorted = self.update_core_metrics(result, decisions, version, parse_success, model, token_usage, duration_ms).await;
+
+        // Update lag metrics from episodic timestamps
+        self.update_lag_metrics(episodic_timestamps).await;
+
+        // Update latency stats
+        self.update_latency_stats(sorted).await;
+    }
+
+    /// Helper: Log consolidation information
+    fn log_consolidation_info(
+        &self,
+        result: &ConsolidationResult,
+        decisions: &[DecisionPayload],
+        version: PromptVersion,
+        parse_success: bool,
+        model: Option<&str>,
+        duration: Duration,
+        episodic_timestamps: &[DateTime<Utc>],
+    ) {
         info!(
             "Recording consolidation: entries_processed={}, decisions={}, version={:?}, parse_success={}, model={}",
             result.entries_processed,
@@ -479,103 +504,150 @@ impl ConsolidationMetrics {
             duration,
             episodic_timestamps.len()
         );
+    }
 
-        let duration_ms = duration.as_secs_f64() * 1000.0;
+    /// Helper: Update core metrics and return sorted latencies
+    async fn update_core_metrics(
+        &self,
+        result: &ConsolidationResult,
+        decisions: &[DecisionPayload],
+        version: PromptVersion,
+        parse_success: bool,
+        model: Option<&str>,
+        token_usage: Option<TokenUsage>,
+        duration_ms: f64,
+    ) -> Vec<f64> {
+        let mut core = self.core.write().await;
 
-        // Update core metrics and push latency
-        let mut sorted = {
-            let mut core = self.core.write().await;
+        // Update basic metrics
+        core.entries_processed += result.entries_processed as u64;
+        core.consolidations += 1;
 
-            // Update core metrics
-            core.entries_processed += result.entries_processed as u64;
-            core.consolidations += 1;
+        // Update decision distributions
+        self.update_decision_distributions(&mut core, decisions, version);
 
-            // Update global decision distribution
-            for decision in decisions {
-                match DecisionType::from(decision) {
-                    DecisionType::Add => core.decision_distribution.add_count += 1,
-                    DecisionType::Update => core.decision_distribution.update_count += 1,
-                    DecisionType::Delete => core.decision_distribution.delete_count += 1,
-                    DecisionType::Noop => core.decision_distribution.noop_count += 1,
-                }
-            }
+        // Update version metrics
+        self.update_version_metrics(&mut core, version, parse_success);
 
-            // Update per-version metrics
-            let version_metrics = core.prompt_metrics.entry(version).or_default();
-            version_metrics.consolidations += 1;
+        // Update model metrics
+        self.update_model_metrics_locked(&mut core, model, token_usage).await;
 
-            if parse_success {
-                version_metrics.parse_successes += 1;
-            } else {
-                version_metrics.parse_failures += 1;
-            }
+        // Update throughput window
+        self.update_throughput_window(&mut core);
 
-            // Update per-version decision distribution
-            for decision in decisions {
-                match DecisionType::from(decision) {
-                    DecisionType::Add => version_metrics.decision_distribution.add_count += 1,
-                    DecisionType::Update => version_metrics.decision_distribution.update_count += 1,
-                    DecisionType::Delete => version_metrics.decision_distribution.delete_count += 1,
-                    DecisionType::Noop => version_metrics.decision_distribution.noop_count += 1,
-                }
-            }
+        // Track latency and clone
+        let cloned = {
+            let mut latencies = self.latencies.write().await;
+            latencies.push(duration_ms);
+            latencies.clone()
+        };
 
-            // Update per-model metrics (token usage, cost)
-            if let (Some(model_name), Some(usage)) = (model, token_usage.clone()) {
-                let model_metrics = core
-                    .model_metrics
-                    .entry(model_name.to_string())
-                    .or_default();
-                model_metrics.consolidations += 1;
-                model_metrics.token_usage.prompt_tokens += usage.prompt_tokens;
-                model_metrics.token_usage.completion_tokens += usage.completion_tokens;
-                model_metrics.token_usage.total_tokens += usage.total_tokens;
+        drop(core); // Release lock before sorting
 
-                // Calculate cost if pricing available
-                if let Some(pricing) = self.model_pricing.read().await.get(model_name) {
-                    let cost = usage.calculate_cost(pricing);
-                    model_metrics.total_cost += cost;
-                }
-            }
-
-            // Update throughput window
-            let now = Utc::now();
-            if core.throughput.window_start.is_none() {
-                core.throughput.window_start = Some(now);
-            }
-            core.throughput.window_end = Some(now);
-
-            // Track latency and clone
-            let cloned = {
-                let mut latencies = self.latencies.write().await;
-                latencies.push(duration_ms);
-                latencies.clone()
-            }; // Latencies lock dropped here
-
-            cloned
-        }; // Core lock dropped here
-
-        // Update lag metrics from episodic timestamps
-        self.update_lag_metrics(episodic_timestamps).await;
-
-        // Sort for percentile calculation (outside locks)
+        // Sort for percentile calculation
+        let mut sorted = cloned;
         sorted.sort_by(|a, b| a.partial_cmp(b).unwrap());
+        sorted
+    }
 
-        // Update latency stats (outside lock to minimize hold time)
-        #[allow(clippy::cast_precision_loss)]
-        if !sorted.is_empty() {
-            let mut core = self.core.write().await;
-
-            core.latency.count = sorted.len() as u64;
-            core.latency.sum_ms = sorted.iter().sum();
-            core.latency.min_ms = sorted[0];
-            core.latency.max_ms = sorted[sorted.len() - 1];
-
-            // Calculate percentiles
-            core.latency.p50_ms = percentile(&sorted, 50.0);
-            core.latency.p95_ms = percentile(&sorted, 95.0);
-            core.latency.p99_ms = percentile(&sorted, 99.0);
+    /// Helper: Update decision distributions
+    fn update_decision_distributions(
+        &self,
+        core: &mut CoreMetrics,
+        decisions: &[DecisionPayload],
+        version: PromptVersion,
+    ) {
+        // Update global decision distribution
+        for decision in decisions {
+            match DecisionType::from(decision) {
+                DecisionType::Add => core.decision_distribution.add_count += 1,
+                DecisionType::Update => core.decision_distribution.update_count += 1,
+                DecisionType::Delete => core.decision_distribution.delete_count += 1,
+                DecisionType::Noop => core.decision_distribution.noop_count += 1,
+            }
         }
+
+        // Update per-version decision distribution
+        let version_metrics = core.prompt_metrics.entry(version).or_default();
+        for decision in decisions {
+            match DecisionType::from(decision) {
+                DecisionType::Add => version_metrics.decision_distribution.add_count += 1,
+                DecisionType::Update => version_metrics.decision_distribution.update_count += 1,
+                DecisionType::Delete => version_metrics.decision_distribution.delete_count += 1,
+                DecisionType::Noop => version_metrics.decision_distribution.noop_count += 1,
+            }
+        }
+    }
+
+    /// Helper: Update version metrics
+    fn update_version_metrics(
+        &self,
+        core: &mut CoreMetrics,
+        version: PromptVersion,
+        parse_success: bool,
+    ) {
+        let version_metrics = core.prompt_metrics.entry(version).or_default();
+        version_metrics.consolidations += 1;
+
+        if parse_success {
+            version_metrics.parse_successes += 1;
+        } else {
+            version_metrics.parse_failures += 1;
+        }
+    }
+
+    /// Helper: Update model metrics with core lock held
+    async fn update_model_metrics_locked(
+        &self,
+        core: &mut CoreMetrics,
+        model: Option<&str>,
+        token_usage: Option<TokenUsage>,
+    ) {
+        if let (Some(model_name), Some(usage)) = (model, token_usage) {
+            let model_metrics = core
+                .model_metrics
+                .entry(model_name.to_string())
+                .or_default();
+            model_metrics.consolidations += 1;
+            model_metrics.token_usage.prompt_tokens += usage.prompt_tokens;
+            model_metrics.token_usage.completion_tokens += usage.completion_tokens;
+            model_metrics.token_usage.total_tokens += usage.total_tokens;
+
+            // Calculate cost if pricing available
+            if let Some(pricing) = self.model_pricing.read().await.get(model_name) {
+                let cost = usage.calculate_cost(pricing);
+                model_metrics.total_cost += cost;
+            }
+        }
+    }
+
+    /// Helper: Update throughput window timestamps
+    fn update_throughput_window(&self, core: &mut CoreMetrics) {
+        let now = Utc::now();
+        if core.throughput.window_start.is_none() {
+            core.throughput.window_start = Some(now);
+        }
+        core.throughput.window_end = Some(now);
+    }
+
+    /// Helper: Update latency stats from sorted values
+    #[allow(clippy::cast_precision_loss)]
+    async fn update_latency_stats(&self, sorted: Vec<f64>) {
+        if sorted.is_empty() {
+            return;
+        }
+
+        let mut core = self.core.write().await;
+
+        core.latency.count = sorted.len() as u64;
+        core.latency.sum_ms = sorted.iter().sum();
+        core.latency.min_ms = sorted[0];
+        core.latency.max_ms = sorted[sorted.len() - 1];
+
+        // Calculate percentiles
+        core.latency.p50_ms = percentile(&sorted, 50.0);
+        core.latency.p95_ms = percentile(&sorted, 95.0);
+        core.latency.p99_ms = percentile(&sorted, 99.0);
     }
 
     /// Record a parse failure
@@ -778,12 +850,8 @@ impl ConsolidationMetrics {
         let core = self.core.read().await;
         let config = self.auto_promotion.read().await;
 
-        // Need at least 2 versions to compare
-        if core.prompt_metrics.len() < 2 {
-            debug!(
-                "Auto-promotion: not enough versions ({} < 2)",
-                core.prompt_metrics.len()
-            );
+        // Check if we have enough versions
+        if !Self::has_enough_versions(&core) {
             return None;
         }
 
@@ -791,8 +859,30 @@ impl ConsolidationMetrics {
         let baseline = core.prompt_metrics.get(&PromptVersion::V1)?;
 
         // Check each candidate version
-        for (version, metrics) in &core.prompt_metrics {
-            if let Some(promoted) = Self::evaluate_candidate(*version, metrics, baseline, &config) {
+        Self::find_promotable_version(&core.prompt_metrics, baseline, &config)
+    }
+
+    /// Helper: Check if we have enough versions to compare
+    fn has_enough_versions(core: &CoreMetrics) -> bool {
+        if core.prompt_metrics.len() < 2 {
+            debug!(
+                "Auto-promotion: not enough versions ({} < 2)",
+                core.prompt_metrics.len()
+            );
+            false
+        } else {
+            true
+        }
+    }
+
+    /// Helper: Find promotable version among candidates
+    fn find_promotable_version(
+        prompt_metrics: &HashMap<PromptVersion, PromptMetrics>,
+        baseline: &PromptMetrics,
+        config: &AutoPromotionConfig,
+    ) -> Option<PromptVersion> {
+        for (version, metrics) in prompt_metrics {
+            if let Some(promoted) = Self::evaluate_candidate(*version, metrics, baseline, config) {
                 return Some(promoted);
             }
         }
