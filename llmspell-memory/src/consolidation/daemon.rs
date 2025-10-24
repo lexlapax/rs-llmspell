@@ -114,6 +114,14 @@ pub struct ConsolidationDaemon {
     in_flight_operations: Arc<AtomicU64>,
 }
 
+/// Result of a single daemon iteration
+enum IterationResult {
+    /// Continue with new interval
+    Continue(tokio::time::Interval),
+    /// Shutdown requested
+    Shutdown,
+}
+
 impl ConsolidationDaemon {
     /// Create new consolidation daemon
     pub fn new(
@@ -183,9 +191,9 @@ impl ConsolidationDaemon {
 
     /// Helper: Send shutdown signal
     fn send_shutdown_signal(&self) -> Result<()> {
-        self.shutdown_tx.send(true).map_err(|e| {
-            MemoryError::InvalidInput(format!("Failed to send shutdown signal: {e}"))
-        })
+        self.shutdown_tx
+            .send(true)
+            .map_err(|e| MemoryError::InvalidInput(format!("Failed to send shutdown signal: {e}")))
     }
 
     /// Helper: Wait for in-flight operations to complete with timeout
@@ -224,19 +232,31 @@ impl ConsolidationDaemon {
 
         info!("Daemon loop started");
 
-        loop {
-            tokio::select! {
-                _ = interval.tick() => {
-                    interval = self.handle_tick(interval).await;
-                }
-                _ = shutdown_rx.changed() => {
-                    info!("Shutdown signal received");
-                    break;
-                }
-            }
+        while let IterationResult::Continue(new_interval) =
+            self.run_iteration(&mut shutdown_rx, interval).await
+        {
+            interval = new_interval;
         }
 
         info!("Daemon loop exited");
+    }
+
+    /// Helper: Run single daemon iteration
+    async fn run_iteration(
+        &self,
+        shutdown_rx: &mut watch::Receiver<bool>,
+        mut interval: tokio::time::Interval,
+    ) -> IterationResult {
+        tokio::select! {
+            _ = interval.tick() => {
+                let new_interval = self.handle_tick(interval).await;
+                IterationResult::Continue(new_interval)
+            }
+            _ = shutdown_rx.changed() => {
+                info!("Shutdown signal received");
+                IterationResult::Shutdown
+            }
+        }
     }
 
     /// Helper: Handle daemon tick event
@@ -263,7 +283,10 @@ impl ConsolidationDaemon {
     }
 
     /// Helper: Handle batch success and create new interval
-    async fn handle_success_and_create_interval(&self, queue_depth: usize) -> tokio::time::Interval {
+    async fn handle_success_and_create_interval(
+        &self,
+        queue_depth: usize,
+    ) -> tokio::time::Interval {
         self.handle_batch_success(queue_depth).await;
         let new_interval = self.select_interval(queue_depth);
         debug!(
@@ -318,7 +341,9 @@ impl ConsolidationDaemon {
 
         // Prioritize active sessions and process them
         let prioritized_sessions = Self::prioritize_sessions(sessions);
-        let total_processed = self.process_prioritized_sessions(&prioritized_sessions).await;
+        let total_processed = self
+            .process_prioritized_sessions(&prioritized_sessions)
+            .await;
 
         // Update metrics
         self.update_batch_metrics(total_processed).await;

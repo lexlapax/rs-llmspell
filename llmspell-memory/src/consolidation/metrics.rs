@@ -31,6 +31,17 @@ use std::time::Duration;
 use tokio::sync::RwLock;
 use tracing::{debug, info, trace};
 
+/// Parameters for update_core_metrics helper
+struct CoreMetricsParams<'a> {
+    result: &'a ConsolidationResult,
+    decisions: &'a [DecisionPayload],
+    version: PromptVersion,
+    parse_success: bool,
+    model: Option<&'a str>,
+    token_usage: Option<TokenUsage>,
+    duration_ms: f64,
+}
+
 /// Decision type for metrics tracking
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
 pub enum DecisionType {
@@ -466,23 +477,40 @@ impl ConsolidationMetrics {
         token_usage: Option<TokenUsage>,
         episodic_timestamps: &[DateTime<Utc>],
     ) {
-        self.log_consolidation_info(result, decisions, version, parse_success, model, duration, episodic_timestamps);
+        Self::log_consolidation_info(
+            result,
+            decisions,
+            version,
+            parse_success,
+            model,
+            duration,
+            episodic_timestamps,
+        );
 
         let duration_ms = duration.as_secs_f64() * 1000.0;
 
         // Update core metrics and get sorted latencies
-        let sorted = self.update_core_metrics(result, decisions, version, parse_success, model, token_usage, duration_ms).await;
+        let sorted = self
+            .update_core_metrics(CoreMetricsParams {
+                result,
+                decisions,
+                version,
+                parse_success,
+                model,
+                token_usage,
+                duration_ms,
+            })
+            .await;
 
         // Update lag metrics from episodic timestamps
         self.update_lag_metrics(episodic_timestamps).await;
 
         // Update latency stats
-        self.update_latency_stats(sorted).await;
+        self.update_latency_stats(&sorted).await;
     }
 
     /// Helper: Log consolidation information
     fn log_consolidation_info(
-        &self,
         result: &ConsolidationResult,
         decisions: &[DecisionPayload],
         version: PromptVersion,
@@ -507,16 +535,16 @@ impl ConsolidationMetrics {
     }
 
     /// Helper: Update core metrics and return sorted latencies
-    async fn update_core_metrics(
-        &self,
-        result: &ConsolidationResult,
-        decisions: &[DecisionPayload],
-        version: PromptVersion,
-        parse_success: bool,
-        model: Option<&str>,
-        token_usage: Option<TokenUsage>,
-        duration_ms: f64,
-    ) -> Vec<f64> {
+    async fn update_core_metrics(&self, core_update_params: CoreMetricsParams<'_>) -> Vec<f64> {
+        let CoreMetricsParams {
+            result,
+            decisions,
+            version,
+            parse_success,
+            model,
+            token_usage,
+            duration_ms,
+        } = core_update_params;
         let mut core = self.core.write().await;
 
         // Update basic metrics
@@ -524,16 +552,17 @@ impl ConsolidationMetrics {
         core.consolidations += 1;
 
         // Update decision distributions
-        self.update_decision_distributions(&mut core, decisions, version);
+        Self::update_decision_distributions(&mut core, decisions, version);
 
         // Update version metrics
-        self.update_version_metrics(&mut core, version, parse_success);
+        Self::update_version_metrics(&mut core, version, parse_success);
 
         // Update model metrics
-        self.update_model_metrics_locked(&mut core, model, token_usage).await;
+        self.update_model_metrics_locked(&mut core, model, token_usage)
+            .await;
 
         // Update throughput window
-        self.update_throughput_window(&mut core);
+        Self::update_throughput_window(&mut core);
 
         // Track latency and clone
         let cloned = {
@@ -552,7 +581,6 @@ impl ConsolidationMetrics {
 
     /// Helper: Update decision distributions
     fn update_decision_distributions(
-        &self,
         core: &mut CoreMetrics,
         decisions: &[DecisionPayload],
         version: PromptVersion,
@@ -580,12 +608,7 @@ impl ConsolidationMetrics {
     }
 
     /// Helper: Update version metrics
-    fn update_version_metrics(
-        &self,
-        core: &mut CoreMetrics,
-        version: PromptVersion,
-        parse_success: bool,
-    ) {
+    fn update_version_metrics(core: &mut CoreMetrics, version: PromptVersion, parse_success: bool) {
         let version_metrics = core.prompt_metrics.entry(version).or_default();
         version_metrics.consolidations += 1;
 
@@ -622,7 +645,7 @@ impl ConsolidationMetrics {
     }
 
     /// Helper: Update throughput window timestamps
-    fn update_throughput_window(&self, core: &mut CoreMetrics) {
+    fn update_throughput_window(core: &mut CoreMetrics) {
         let now = Utc::now();
         if core.throughput.window_start.is_none() {
             core.throughput.window_start = Some(now);
@@ -632,7 +655,7 @@ impl ConsolidationMetrics {
 
     /// Helper: Update latency stats from sorted values
     #[allow(clippy::cast_precision_loss)]
-    async fn update_latency_stats(&self, sorted: Vec<f64>) {
+    async fn update_latency_stats(&self, sorted: &[f64]) {
         if sorted.is_empty() {
             return;
         }

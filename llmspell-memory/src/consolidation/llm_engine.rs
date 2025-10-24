@@ -244,15 +244,11 @@ impl LLMConsolidationEngine {
             .build_user_prompt(entry, &semantic_context)?;
 
         // Step 3: Call LLM with retry logic
-        self.call_llm_with_retry(&system_prompt, &user_prompt)
-            .await
+        self.call_llm_with_retry(&system_prompt, &user_prompt).await
     }
 
     /// Helper: Parse and validate LLM response
-    async fn parse_and_validate(
-        &self,
-        llm_response: &str,
-    ) -> Result<super::ConsolidationResponse> {
+    async fn parse_and_validate(&self, llm_response: &str) -> Result<super::ConsolidationResponse> {
         // Parse response with error recovery (JSON with fallback to natural language)
         let consolidation_response = super::prompts::parse_llm_response(
             llm_response,
@@ -396,7 +392,7 @@ impl LLMConsolidationEngine {
 
             match self.call_llm(system_prompt, user_prompt, model).await {
                 Ok(response) => {
-                    return self.handle_successful_call(response, model_idx, model);
+                    return Ok(self.handle_successful_call(response, model_idx, model));
                 }
                 Err(e) => {
                     last_error = self.handle_failed_call(e, attempts).await;
@@ -410,18 +406,13 @@ impl LLMConsolidationEngine {
     }
 
     /// Helper: Handle successful LLM call
-    fn handle_successful_call(
-        &self,
-        response: String,
-        model_idx: usize,
-        model: &str,
-    ) -> Result<String> {
+    fn handle_successful_call(&self, response: String, model_idx: usize, model: &str) -> String {
         // Success! Reset circuit breaker
         self.consecutive_failures.store(0, Ordering::Relaxed);
         if model_idx > 0 {
             info!("Fallback model {} succeeded", model);
         }
-        Ok(response)
+        response
     }
 
     /// Helper: Handle failed LLM call
@@ -512,9 +503,7 @@ impl LLMConsolidationEngine {
             super::DecisionPayload::Delete { entity_id } => {
                 self.execute_delete_decision(idx, entity_id).await
             }
-            super::DecisionPayload::Noop => {
-                self.execute_noop_decision(idx)
-            }
+            super::DecisionPayload::Noop => Self::execute_noop_decision(idx),
         }
     }
 
@@ -526,7 +515,7 @@ impl LLMConsolidationEngine {
         response: &super::ConsolidationResponse,
     ) -> Result<(usize, usize, usize, usize)> {
         info!("Decision {}: Executing ADD for entity {}", idx, entity_id);
-        self.execute_add(entity_id, response).await?;
+        Self::execute_add(entity_id, response, &self.knowledge_graph).await?;
         Ok((1, 0, 0, 0))
     }
 
@@ -537,7 +526,10 @@ impl LLMConsolidationEngine {
         entity_id: &str,
         changes: &std::collections::HashMap<String, serde_json::Value>,
     ) -> Result<(usize, usize, usize, usize)> {
-        info!("Decision {}: Executing UPDATE for entity {}", idx, entity_id);
+        info!(
+            "Decision {}: Executing UPDATE for entity {}",
+            idx, entity_id
+        );
         self.execute_update(entity_id, changes).await?;
         Ok((0, 1, 0, 0))
     }
@@ -548,22 +540,25 @@ impl LLMConsolidationEngine {
         idx: usize,
         entity_id: &str,
     ) -> Result<(usize, usize, usize, usize)> {
-        info!("Decision {}: Executing DELETE for entity {}", idx, entity_id);
+        info!(
+            "Decision {}: Executing DELETE for entity {}",
+            idx, entity_id
+        );
         self.execute_delete(entity_id).await?;
         Ok((0, 0, 1, 0))
     }
 
     /// Helper: Execute NOOP decision
-    fn execute_noop_decision(&self, idx: usize) -> Result<(usize, usize, usize, usize)> {
+    fn execute_noop_decision(idx: usize) -> Result<(usize, usize, usize, usize)> {
         debug!("Decision {}: Executing NOOP (skip)", idx);
         Ok((0, 0, 0, 1))
     }
 
     /// Execute ADD decision
     async fn execute_add(
-        &self,
         entity_id: &str,
         response: &super::ConsolidationResponse,
+        knowledge_graph: &Arc<dyn llmspell_graph::traits::KnowledgeGraph>,
     ) -> Result<()> {
         // Find entity payload
         let entity_payload = response
@@ -585,7 +580,7 @@ impl LLMConsolidationEngine {
         };
 
         // Add to knowledge graph
-        self.knowledge_graph
+        knowledge_graph
             .add_entity(entity)
             .await
             .map_err(|e| MemoryError::KnowledgeGraph(format!("Failed to add entity: {e}")))?;
