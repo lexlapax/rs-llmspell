@@ -127,6 +127,8 @@ pub struct ProviderConfig {
     pub max_tokens: Option<u32>,
     /// Request timeout in seconds
     pub timeout_seconds: Option<u64>,
+    /// Temperature for LLM sampling (0.0-2.0)
+    pub temperature: Option<f32>,
     /// Rate limiting configuration
     pub rate_limit: Option<RateLimitConfig>,
     /// Retry configuration
@@ -150,6 +152,7 @@ impl Default for ProviderConfig {
             default_model: None,
             max_tokens: None,
             timeout_seconds: None,
+            temperature: None,
             rate_limit: None,
             retry: None,
             max_retries: None,
@@ -211,6 +214,7 @@ impl ProviderConfigBuilder {
                 default_model: None,
                 max_tokens: None,
                 timeout_seconds: Some(60),
+                temperature: None,
                 rate_limit: None,
                 retry: None,
                 max_retries: None,
@@ -272,6 +276,13 @@ impl ProviderConfigBuilder {
     #[must_use]
     pub const fn timeout_seconds(mut self, seconds: u64) -> Self {
         self.config.timeout_seconds = Some(seconds);
+        self
+    }
+
+    /// Set the temperature for LLM sampling
+    #[must_use]
+    pub const fn temperature(mut self, temp: f32) -> Self {
+        self.config.temperature = Some(temp);
         self
     }
 
@@ -365,12 +376,31 @@ mod tests {
             .api_key_env("OPENAI_API_KEY")
             .model("gpt-4")
             .max_tokens(4096)
+            .temperature(0.7)
             .build();
 
         assert_eq!(config.provider_type, "openai");
         assert_eq!(config.api_key_env, Some("OPENAI_API_KEY".to_string()));
         assert_eq!(config.default_model, Some("gpt-4".to_string()));
         assert_eq!(config.max_tokens, Some(4096));
+        assert_eq!(config.temperature, Some(0.7));
+    }
+
+    #[test]
+    fn test_provider_config_temperature_builder() {
+        let config = ProviderConfig::builder()
+            .provider_type("ollama")
+            .temperature(0.0)
+            .build();
+
+        assert_eq!(config.temperature, Some(0.0));
+
+        let config_high_temp = ProviderConfig::builder()
+            .provider_type("ollama")
+            .temperature(2.0)
+            .build();
+
+        assert_eq!(config_high_temp.temperature, Some(2.0));
     }
 
     #[test]
@@ -446,7 +476,8 @@ mod tests {
             .provider_type("anthropic")
             .api_key_env("ANTHROPIC_API_KEY")
             .model("claude-3-5-haiku-latest")
-            .option("temperature".to_string(), serde_json::json!(0.7))
+            .temperature(0.7)
+            .option("custom_option".to_string(), serde_json::json!("custom_value"))
             .build();
 
         let serialized = serde_json::to_string(&config).expect("Serialization should work");
@@ -458,6 +489,7 @@ mod tests {
             deserialized.default_model,
             Some("claude-3-5-haiku-latest".to_string())
         );
-        assert!(deserialized.options.contains_key("temperature"));
+        assert_eq!(deserialized.temperature, Some(0.7));
+        assert!(deserialized.options.contains_key("custom_option"));
     }
 }

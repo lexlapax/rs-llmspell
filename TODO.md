@@ -3256,7 +3256,685 @@ Created comprehensive integration tests (285 lines) covering end-to-end pipeline
 
 ---
 
-## Phase 13.5.7: Remove/refactor code to use configs from llmspell-config instead of hardcoding e.g. model names
+## Phase 13.5.7: Direct Provider Integration - Eliminate ALL Hardcoded LLM Configs
+
+**Goal**: Eliminate 100+ hardcoded LLM configuration values across memory, templates, and context by migrating to centralized provider system
+**Timeline**: 2-3 days (24 hours)
+**Status**: READY TO START
+**Critical Dependencies**: Phase 13.5.6 complete (tracing infrastructure)
+
+**Architecture Decision**: Direct provider integration with **smart dual-path support**. All LLM configs can use EITHER `provider_name` (config-based) OR `model` (ad-hoc). Memory config under `runtime.memory` contains ONLY non-LLM settings (intervals, thresholds). ConsolidationConfig references provider by name, does NOT duplicate LLM fields.
+
+**Non-Breaking Changes**:
+- ✅ Templates support BOTH `--param provider_name=` (recommended) AND `--param model=` (backward compat)
+- ✅ Scripts continue using `model` strings via Agent.builder()
+- ✅ Clear precedence: provider_name > model > default_provider
+- ⚠️ Internal API change: LlmEngineConfig::default() replaced with from_provider() (no external users)
+
+### Task 13.5.7a: Extend Provider Config for LLM Temperature ✅ COMPLETE
+
+**Priority**: CRITICAL
+**Estimated Time**: 2 hours
+**Dependencies**: None
+**Actual Time**: 1.5 hours
+**Status**: COMPLETE
+
+**Description**: Add explicit `temperature` field to ProviderConfig for type-safe LLM parameter access.
+
+**Rationale**: ProviderConfig already has max_tokens, timeout_seconds as explicit fields. Temperature currently buried in options HashMap lacks type safety and discoverability. Explicit field matches existing pattern.
+
+**Acceptance Criteria**:
+- [x] Add `pub temperature: Option<f32>` field to ProviderConfig struct (llmspell-config/src/providers.rs:131)
+- [x] Update ProviderConfigBuilder with `temperature()` method (providers.rs:284)
+- [x] Update Default impl to include temperature: None (providers.rs:155, 217)
+- [x] Update serialization tests (fixed test_provider_config_serialization to use explicit field)
+- [x] Add validation: temperature must be 0.0-2.0 if present (validation.rs:173-184)
+- [x] All tests pass: `cargo test -p llmspell-config` (76 tests passed)
+- [x] Zero clippy warnings
+
+**Implementation Insights**:
+- Added temperature field after timeout_seconds for logical grouping with other LLM params
+- Builder method uses `const fn` for consistency with max_tokens/timeout_seconds methods
+- Validation uses inclusive range check `(0.0..=2.0).contains(&temperature)`
+- Added 4 new validation tests: valid, too_low, too_high, boundary_values
+- Fixed serialization test conflict: temperature was in both options HashMap AND dedicated field (caused duplicate field error)
+- Test fix: replaced `.option("temperature", ...)` with `.temperature(0.7)` + different custom option
+
+**Implementation Details**:
+```rust
+// llmspell-config/src/providers.rs
+pub struct ProviderConfig {
+    // ... existing fields ...
+    pub max_tokens: Option<u32>,
+    pub timeout_seconds: Option<u64>,
+    pub temperature: Option<f32>,  // NEW - explicit field for type safety
+    pub rate_limit: Option<RateLimitConfig>,
+    // ...
+}
+
+impl ProviderConfigBuilder {
+    pub fn temperature(mut self, temp: f32) -> Self {
+        self.config.temperature = Some(temp);
+        self
+    }
+}
+```
+
+**Files to Modify**:
+- `llmspell-config/src/providers.rs` (MODIFY - add field, builder method, validation, ~30 lines)
+- `llmspell-config/src/validation.rs` (MODIFY - add temperature range validation, ~15 lines)
+
+**Quality Gates**:
+- cargo test -p llmspell-config passes
+- cargo clippy -p llmspell-config --all-features passes
+- All existing provider tests pass with new field
+
+### Task 13.5.7b: Create Memory Config Infrastructure (Provider Reference Only)
+
+**Priority**: CRITICAL
+**Estimated Time**: 3 hours
+**Dependencies**: 13.5.7a complete
+
+**Description**: Create memory.rs module with MemoryConfig, ConsolidationConfig (provider_name ONLY), DaemonConfig. NO inline LLM fields.
+
+**Rationale**: ConsolidationConfig should reference provider by name, NOT duplicate LLM parameters. This eliminates duplication, enforces single source of truth, enables centralized LLM config management.
+
+**Acceptance Criteria**:
+- [ ] Create `llmspell-config/src/memory.rs` with config structures
+- [ ] ConsolidationConfig has `provider_name: Option<String>` (falls back to default_provider)
+- [ ] ConsolidationConfig has NO LLM fields (no model, temperature, max_tokens, timeout, retries)
+- [ ] ConsolidationConfig has ONLY consolidation-specific fields (batch_size, max_concurrent, active_session_threshold_secs)
+- [ ] Extend `GlobalRuntimeConfig` with `pub memory: MemoryConfig` field
+- [ ] Add environment variable support in `env_registry.rs` (LLMSPELL_MEMORY_ENABLED, etc.)
+- [ ] Add merge logic for `runtime.memory` in `lib.rs::merge_from_json_impl()`
+- [ ] Write unit tests for default values, TOML deserialization, env overrides
+- [ ] All tests pass: `cargo test -p llmspell-config`
+- [ ] Zero clippy warnings
+
+**Config Structures**:
+```rust
+pub struct MemoryConfig {
+    pub enabled: bool,
+    pub consolidation: ConsolidationConfig,
+    pub daemon: DaemonConfig,
+}
+
+pub struct ConsolidationConfig {
+    /// Provider name for LLM consolidation (falls back to global default_provider)
+    pub provider_name: Option<String>,
+
+    // ONLY consolidation-specific config (NO LLM parameters)
+    pub batch_size: usize,
+    pub max_concurrent: usize,
+    pub active_session_threshold_secs: u64,
+}
+
+pub struct DaemonConfig {
+    pub enabled: bool,
+    pub fast_interval_secs: u64,
+    pub normal_interval_secs: u64,
+    pub slow_interval_secs: u64,
+    pub queue_threshold_fast: usize,
+    pub queue_threshold_slow: usize,
+    pub shutdown_max_wait_secs: u64,
+    pub health_check_interval_secs: u64,
+}
+
+impl Default for ConsolidationConfig {
+    fn default() -> Self {
+        Self {
+            provider_name: None,  // Falls back to default_provider
+            batch_size: 10,
+            max_concurrent: 3,
+            active_session_threshold_secs: 300,
+        }
+    }
+}
+```
+
+**Files to Create/Modify**:
+- `llmspell-config/src/memory.rs` (NEW - 280 lines: structs + builders + defaults + tests)
+- `llmspell-config/src/lib.rs` (MODIFY - add memory module, extend GlobalRuntimeConfig, ~40 lines)
+- `llmspell-config/src/env_registry.rs` (MODIFY - add memory env vars, ~25 lines)
+
+**Quality Gates**:
+- cargo test -p llmspell-config passes
+- TOML deserialization works: runtime.memory.consolidation.provider_name = "consolidation-llm"
+- Env override works: LLMSPELL_MEMORY_ENABLED=true
+
+### Task 13.5.7c: Migrate llmspell-memory to Provider System
+
+**Priority**: CRITICAL
+**Estimated Time**: 4 hours
+**Dependencies**: 13.5.7b complete
+
+**Description**: Replace 30+ hardcoded LLM values in daemon.rs, llm_engine.rs, prompts.rs with provider lookups.
+
+**Acceptance Criteria**:
+- [ ] Add `LlmEngineConfig::from_provider(provider: &ProviderConfig) -> Result<Self>` factory method
+- [ ] Remove hardcoded defaults from LlmEngineConfig::default() (make it build-time only for tests)
+- [ ] Update daemon.rs to use ConsolidationConfig for intervals/thresholds
+- [ ] Update daemon.rs to lookup provider for LLM config
+- [ ] Update prompts.rs to use provider config
+- [ ] Update all test fixtures to use test_provider_config() helper
+- [ ] Add test helper: `test_provider_config() -> ProviderConfig` returning standard test config
+- [ ] Verify zero hardcoded "ollama/llama3.2:3b" strings remain (except in tests)
+- [ ] All tests pass: `cargo test -p llmspell-memory`
+- [ ] Zero clippy warnings
+
+**Implementation Pattern**:
+```rust
+// llmspell-memory/src/consolidation/llm_engine.rs
+impl LlmEngineConfig {
+    /// Create config from provider (PRIMARY factory method)
+    pub fn from_provider(provider: &ProviderConfig) -> Result<Self, MemoryError> {
+        Ok(Self {
+            model: provider.default_model.clone()
+                .ok_or_else(|| MemoryError::Config("provider missing default_model".into()))?,
+            fallback_models: vec![],  // TODO: provider.fallback_models field in future
+            temperature: provider.temperature.unwrap_or(0.0),
+            max_tokens: provider.max_tokens.unwrap_or(2000) as usize,
+            timeout_secs: provider.timeout_seconds.unwrap_or(30),
+            max_retries: provider.max_retries.unwrap_or(3),
+        })
+    }
+}
+
+// Usage in daemon.rs
+let provider = config.providers.get_provider(
+    memory_config.consolidation.provider_name.as_deref()
+        .or(config.providers.default_provider.as_deref())
+        .ok_or_else(|| MemoryError::Config("no provider for consolidation".into()))?
+)?;
+let llm_config = LlmEngineConfig::from_provider(provider)?;
+```
+
+**Hardcoded Values to Replace**:
+- llm_engine.rs: model (1x), fallback_models (1x), temperature (1x), max_tokens (1x), timeout_secs (1x), max_retries (1x)
+- daemon.rs: intervals (3x), thresholds (2x), shutdown timeout (1x)
+- prompts.rs: model (1x in default, keep for test helpers)
+- Tests: ~15 files with hardcoded "ollama/llama3.2:3b" → use test_provider_config()
+
+**Files to Modify**:
+- `llmspell-memory/src/consolidation/llm_engine.rs` (MODIFY - add from_provider(), ~60 lines)
+- `llmspell-memory/src/consolidation/daemon.rs` (MODIFY - use ConsolidationConfig, ~50 lines)
+- `llmspell-memory/src/consolidation/prompts.rs` (MODIFY - minimal changes, ~10 lines)
+- `llmspell-memory/tests/common/mod.rs` (MODIFY - add test_provider_config() helper, ~25 lines)
+- `llmspell-memory/tests/*.rs` (MODIFY - 15+ test files, update fixtures, ~200 lines)
+
+**Quality Gates**:
+- cargo test -p llmspell-memory passes
+- grep -r "ollama/llama3.2:3b" llmspell-memory/src returns 0 matches (source code)
+- grep -r 'temperature.*0\.0' llmspell-memory/src returns 0 matches in runtime code
+- All LLM config sourced from providers
+
+### Task 13.5.7d: Migrate llmspell-templates to Smart Dual-Path Provider System
+
+**Priority**: CRITICAL
+**Estimated Time**: 6 hours
+**Dependencies**: 13.5.7c complete
+
+**Description**: Migrate 10 templates (~80 LLM call sites) to support BOTH provider_name (recommended) AND model (backward compat) params with smart resolution logic.
+
+**Rationale**: Templates should support centralized provider config (production) AND ad-hoc model strings (experimentation). Dual-path maintains backward compatibility with scripts while enabling provider system benefits. Non-breaking change.
+
+**Acceptance Criteria**:
+- [ ] Add `ExecutionContext::get_provider(&self, name: &str) -> Result<ProviderConfig>` helper method
+- [ ] Migrate all 10 templates to smart dual-path resolution (provider_name OR model):
+  - code-generator.rs (~8 LLM calls)
+  - data-analysis.rs (~6 LLM calls)
+  - research-assistant.rs (~8 LLM calls)
+  - interactive-chat.rs (~10 LLM calls)
+  - content-generation.rs (~15 LLM calls)
+  - workflow-orchestrator.rs (~4 LLM calls)
+  - code-review.rs (~10 LLM calls)
+  - document-processor.rs (~6 LLM calls)
+  - (2 more templates)
+- [ ] Update template parameter schemas (model → provider_name)
+- [ ] Update all template tests to use provider fixtures
+- [ ] Add test helper: `test_execution_context_with_provider() -> ExecutionContext`
+- [ ] Update template metadata.json files
+- [ ] All tests pass: `cargo test -p llmspell-templates`
+- [ ] Zero clippy warnings
+
+**Implementation Pattern**:
+```rust
+// llmspell-templates/src/context.rs
+impl ExecutionContext {
+    /// Get provider config by name (with fallback to default)
+    pub fn get_provider(&self, name: &str) -> crate::error::Result<ProviderConfig> {
+        let provider = self.providers.get_provider(name)
+            .ok_or_else(|| TemplateError::Config(format!("provider '{}' not found", name)))?;
+        Ok(provider.clone())
+    }
+
+    /// Smart resolution: provider_name OR model with precedence
+    pub fn resolve_llm_config(&self, params: &TemplateParams) -> crate::error::Result<ProviderConfig> {
+        // 1. Check for provider_name (PREFERRED - centralized config)
+        if let Some(provider_name) = params.get_string("provider_name") {
+            if params.contains("model") {
+                return Err(TemplateError::Config(
+                    "Cannot specify both provider_name and model - use one or the other".into()
+                ));
+            }
+            return self.get_provider(&provider_name);
+        }
+
+        // 2. Check for model (AD-HOC - ephemeral provider)
+        if let Some(model) = params.get_string("model") {
+            return Ok(ProviderConfig {
+                default_model: Some(model),
+                temperature: params.get_f32("temperature"),      // Allow inline override
+                max_tokens: params.get_u32("max_tokens"),        // Allow inline override
+                timeout_seconds: params.get_u64("timeout_seconds"),
+                ..Default::default()
+            });
+        }
+
+        // 3. Fallback to default provider
+        let default_name = self.providers.default_provider
+            .as_ref()
+            .ok_or_else(|| TemplateError::Config(
+                "No provider_name or model specified, and no default provider configured".into()
+            ))?;
+        self.get_provider(default_name)
+    }
+}
+
+// OLD PATTERN (code-generator.rs)
+let model: String = params.get_or("model", "ollama/llama3.2:3b".to_string());
+let req = LLMRequestBuilder::new(model)
+    .temperature(Some(0.3))
+    .max_tokens(Some(2000))
+    .build()?;
+
+// NEW PATTERN (smart dual-path)
+let provider = ctx.resolve_llm_config(&params)?;
+let req = LLMRequestBuilder::new(
+    provider.default_model.clone()
+        .ok_or_else(|| TemplateError::Config("provider missing model".into()))?
+)
+    .temperature(provider.temperature)
+    .max_tokens(provider.max_tokens.map(|t| t as usize))
+    .build()?;
+```
+
+**Backward Compatible Usage**:
+```bash
+# OPTION 1: Provider-based (RECOMMENDED for production)
+llmspell template exec code-generator \
+  --param provider_name="production-llm" \
+  --param description="factorial function"
+
+# OPTION 2: Ad-hoc model (backward compat + experimentation)
+llmspell template exec code-generator \
+  --param model="ollama/llama3.2:3b" \
+  --param temperature=0.5 \
+  --param description="factorial function"
+
+# OPTION 3: Default provider (config fallback)
+llmspell template exec code-generator \
+  --param description="factorial function"
+```
+
+**Files to Modify**:
+- `llmspell-templates/src/context.rs` (MODIFY - add get_provider() helper, ~20 lines)
+- `llmspell-templates/src/builtin/code_generator.rs` (MODIFY - 8 call sites, ~80 lines)
+- `llmspell-templates/src/builtin/data_analysis.rs` (MODIFY - 6 call sites, ~60 lines)
+- `llmspell-templates/src/builtin/research_assistant.rs` (MODIFY - 8 call sites, ~80 lines)
+- `llmspell-templates/src/builtin/interactive_chat.rs` (MODIFY - 10 call sites, ~100 lines)
+- `llmspell-templates/src/builtin/content_generation.rs` (MODIFY - 15 call sites, ~150 lines)
+- `llmspell-templates/src/builtin/workflow_orchestrator.rs` (MODIFY - 4 call sites, ~40 lines)
+- `llmspell-templates/src/builtin/code_review.rs` (MODIFY - 10 call sites, ~100 lines)
+- `llmspell-templates/src/builtin/document_processor.rs` (MODIFY - 6 call sites, ~60 lines)
+- `llmspell-templates/tests/*.rs` (MODIFY - 10+ test files, ~300 lines)
+- `llmspell-templates/metadata/*.json` (MODIFY - update param schemas, ~10 files)
+
+**Quality Gates**:
+- cargo test -p llmspell-templates passes
+- All 3 resolution paths tested: provider_name, model, default_provider
+- Validation: both params specified → error
+- Backward compat: old `--param model=` invocations still work
+- Template schema validation passes (accepts both params)
+
+### Task 13.5.7e: Create Builtin Profiles with Providers
+
+**Priority**: HIGH
+**Estimated Time**: 2 hours
+**Dependencies**: 13.5.7d complete
+
+**Description**: Add provider definitions to builtin profiles and create dedicated memory.toml profile.
+
+**Acceptance Criteria**:
+- [ ] Add "default" provider to `llmspell-config/builtins/default.toml`
+- [ ] Create `llmspell-config/builtins/memory.toml` with full memory + provider config
+- [ ] Add "memory" to `list_builtin_profiles()`
+- [ ] Add metadata for "memory" profile in `get_profile_metadata()`
+- [ ] Write test: `test_load_builtin_profile_memory()`
+- [ ] Profile loads successfully: `LLMSpellConfig::load_with_profile(None, Some("memory"))`
+- [ ] Validate provider referenced by memory config exists
+- [ ] Test passes
+
+**Profile Content**:
+```toml
+# llmspell-config/builtins/default.toml (ADD)
+[providers.default]
+provider_type = "ollama"
+default_model = "llama3.2:3b"
+temperature = 0.7
+max_tokens = 4096
+timeout_seconds = 30
+max_retries = 3
+
+# llmspell-config/builtins/memory.toml (NEW)
+[providers.default]
+provider_type = "ollama"
+default_model = "llama3.2:3b"
+temperature = 0.7
+max_tokens = 4096
+
+[providers.consolidation-llm]
+provider_type = "ollama"
+default_model = "llama3.2:3b"
+temperature = 0.0  # Low temperature for consistent consolidation
+max_tokens = 2000
+timeout_seconds = 30
+
+[runtime.memory]
+enabled = true
+
+[runtime.memory.consolidation]
+provider_name = "consolidation-llm"
+batch_size = 10
+max_concurrent = 3
+active_session_threshold_secs = 300
+
+[runtime.memory.daemon]
+enabled = true
+fast_interval_secs = 30
+normal_interval_secs = 300
+slow_interval_secs = 600
+queue_threshold_fast = 5
+queue_threshold_slow = 20
+```
+
+**Profile Metadata**:
+- Name: "memory"
+- Category: "Memory System"
+- Description: "Adaptive memory system with LLM consolidation and temporal knowledge graph"
+- Use Cases: ["Long-running agents", "Knowledge accumulation", "RAG with episodic memory"]
+- Features: ["Episodic memory storage", "LLM-driven consolidation", "Bi-temporal knowledge graph", "Context-aware retrieval"]
+
+**Files to Create/Modify**:
+- `llmspell-config/builtins/default.toml` (MODIFY - add default provider, ~15 lines)
+- `llmspell-config/builtins/memory.toml` (NEW - complete config with 2 providers + memory settings, ~90 lines)
+- `llmspell-config/src/lib.rs` (MODIFY - add "memory" profile to list, metadata, ~40 lines)
+- `llmspell-config/tests/profiles_test.rs` (MODIFY - add memory profile test, ~30 lines)
+
+**Quality Gates**:
+- Profile loads without errors
+- Providers validate successfully
+- Memory config references valid provider
+- cargo test -p llmspell-config::test_load_builtin_profile_memory passes
+
+### Task 13.5.7f: Documentation & Provider Best Practices Guide
+
+**Priority**: HIGH
+**Estimated Time**: 3 hours
+**Dependencies**: 13.5.7e complete
+
+**Description**: Document memory configuration, provider integration, and best practices for choosing provider_name vs model.
+
+**Acceptance Criteria**:
+- [ ] Create `docs/user-guide/configuration/memory.md` with complete config reference
+- [ ] Create `docs/user-guide/best-practices/provider-usage.md` for dual-path guidance
+- [ ] Update `docs/user-guide/configuration/README.md` to link memory section
+- [ ] Update `docs/technical/phase-13-design-doc.md` with dual-path provider architecture
+- [ ] Add CHANGELOG.md entry for v0.13.x new features (provider_name support)
+- [ ] Documentation builds without errors
+- [ ] All config fields documented with examples
+- [ ] Performance tuning guide included
+- [ ] Troubleshooting section added
+
+**Best Practices Guide Sections**:
+1. Overview of dual-path architecture (provider_name OR model)
+2. When to use provider_name (RECOMMENDED):
+   - Production workflows
+   - Repeated invocations
+   - Version-controlled configs
+   - Centralized LLM settings management
+3. When to use model (AD-HOC):
+   - Quick experiments
+   - One-off testing
+   - Model comparison
+   - Scripts with explicit control
+4. Parameter precedence: provider_name > model > default_provider
+5. Examples: Both approaches with pros/cons
+6. Internal API changes (LlmEngineConfig::from_provider())
+
+**Memory.md Sections**:
+- Overview of memory configuration
+- Provider integration (how memory uses providers)
+- Configuration reference (all fields)
+- Basic setup example
+- Use cases (conversational agents, knowledge accumulation)
+- Performance tuning (fast iteration, memory-constrained, high throughput)
+- Troubleshooting
+
+**Files to Create/Modify**:
+- `docs/user-guide/configuration/memory.md` (NEW - 350 lines: overview + reference + examples)
+- `docs/user-guide/best-practices/provider-usage.md` (NEW - 280 lines: dual-path guidance + examples)
+- `docs/user-guide/configuration/README.md` (MODIFY - add memory link, ~10 lines)
+- `docs/technical/phase-13-design-doc.md` (MODIFY - add dual-path provider architecture, ~120 lines)
+- `CHANGELOG.md` (MODIFY - add v0.13.x new features entry, ~40 lines)
+
+**Quality Gates**:
+- All markdown files render correctly
+- Internal links work
+- Code examples are correct
+- Migration guide tested with real config changes
+
+### Task 13.5.7g: Integration Testing & Validation
+
+**Priority**: CRITICAL
+**Estimated Time**: 4 hours
+**Dependencies**: 13.5.7f complete
+
+**Description**: Create integration tests verifying provider system works E2E and all hardcoded values eliminated.
+
+**Acceptance Criteria**:
+- [ ] Create `llmspell-memory/tests/provider_integration_test.rs`
+- [ ] Create `llmspell-templates/tests/provider_integration_test.rs`
+- [ ] Test: MemoryManager uses provider config (not hardcoded)
+- [ ] Test: Template execution uses provider config
+- [ ] Test: TOML file with custom provider loads successfully
+- [ ] Test: Environment variable overrides work
+- [ ] Test: Provider fallback (consolidation.provider_name=None → default_provider)
+- [ ] All integration tests pass
+- [ ] E2E test: template exec with custom provider works
+
+**Hardcoded Value Audit**:
+```bash
+# Source code should have ZERO hardcoded LLM configs
+grep -r "ollama/llama3.2:3b" llmspell-memory/src          # Expected: 0 matches
+grep -r "ollama/llama3.2:3b" llmspell-templates/src      # Expected: 0 matches
+grep -r 'temperature.*0\.[0-9]' llmspell-memory/src      # Expected: 0 matches in runtime code
+grep -r 'max_tokens.*[0-9]' llmspell-memory/src          # Expected: 0 matches in runtime code
+
+# Tests can have hardcoded values in fixtures
+grep -r "ollama/llama3.2:3b" llmspell-memory/tests       # OK (test fixtures)
+```
+
+**Integration Test Scenarios**:
+1. Memory with custom provider config
+2. Template with provider_name param
+3. Template with model param (backward compat)
+4. Template with neither param → default_provider fallback
+5. Template with BOTH params → error (validation)
+6. Provider missing required field → error
+7. TOML config loading + provider resolution
+8. Env var override: LLMSPELL_MEMORY_CONSOLIDATION_PROVIDER_NAME
+9. Inline param overrides: model + temperature + max_tokens
+
+**Files to Create**:
+- `llmspell-memory/tests/provider_integration_test.rs` (NEW - 250 lines)
+- `llmspell-templates/tests/provider_integration_test.rs` (NEW - 200 lines)
+- `llmspell-config/tests/memory_config_test.rs` (NEW - 150 lines)
+
+**Quality Gates**:
+- All integration tests pass
+- Hardcoded value audit returns 0 matches in source code
+- cargo test -p llmspell-config -p llmspell-memory -p llmspell-templates passes
+- ./scripts/quality/quality-check-fast.sh passes
+- Zero clippy warnings workspace-wide
+
+### Task 13.5.7h: Fix Agent Provider Config Lookup (Bridge/Kernel Gap)
+
+**Priority**: HIGH
+**Estimated Time**: 2 hours
+**Dependencies**: 13.5.7a complete (ProviderConfig extended)
+
+**Description**: Fix `ProviderManager.create_agent_from_spec()` to lookup existing provider config from registry BEFORE creating ephemeral config. Currently, Lua Agent.builder() creates fresh configs ignoring temperature/max_tokens from config file.
+
+**Architectural Gap Discovered**:
+- Templates/Memory: Use provider config from registry (temperature, max_tokens work) ✅
+- Agents (Lua scripts): Create ephemeral config (ignore registry, only load API key/endpoint) ❌
+
+**Root Cause**:
+llmspell-providers/src/abstraction.rs:474 always calls `ProviderConfig::new_with_type()` instead of checking `self.instances` first.
+
+**Acceptance Criteria**:
+- [ ] Modify `ProviderManager.create_agent_from_spec()` to check initialized providers registry FIRST
+- [ ] If provider_name exists in registry → clone and return existing provider instance
+- [ ] If provider_name NOT in registry → create ephemeral config (current fallback behavior)
+- [ ] Inline ModelConfig params (temperature, max_tokens) override config values
+- [ ] Add test: Agent created from config provider uses config temperature
+- [ ] Add test: Agent created without config provider falls back to ephemeral
+- [ ] Add test: Inline params override config values
+- [ ] All tests pass: `cargo test -p llmspell-providers -p llmspell-agents`
+- [ ] Zero clippy warnings
+
+**Implementation Pattern**:
+```rust
+// llmspell-providers/src/abstraction.rs - create_agent_from_spec()
+// BEFORE line 474 (creating new config)
+
+// 1. Check if provider is already initialized from config
+let instance_lookup_name = format!("{}:{}", provider_name, spec.model);
+{
+    let instances = self.instances.read().await;
+    if let Some(existing) = instances.get(&instance_lookup_name) {
+        info!(
+            "Reusing initialized provider '{}' from config (has temperature/max_tokens)",
+            instance_lookup_name
+        );
+        return Ok(existing.clone());
+    }
+}
+
+// 2. Try to find ANY instance with matching provider_type (even if different model)
+// This allows config providers to be reused with override model
+{
+    let instances = self.instances.read().await;
+    let matching_provider = instances
+        .iter()
+        .find(|(name, _)| name.starts_with(&format!("{}:", provider_name)));
+
+    if let Some((config_name, provider_instance)) = matching_provider {
+        info!(
+            "Found config provider '{}', will clone config and override model to '{}'",
+            config_name, spec.model
+        );
+        // TODO: Clone provider config and override model
+        // This ensures temperature/max_tokens from config are preserved
+    }
+}
+
+// 3. Fallback to ephemeral config (current behavior)
+info!("No config provider found for '{}', creating ephemeral config", provider_name);
+let mut config = ProviderConfig::new_with_type(...);  // Existing code continues
+```
+
+**Edge Cases**:
+1. **Config has openai provider, script uses openai/gpt-4** → Use config temperature ✅
+2. **Config has openai/gpt-3.5, script uses openai/gpt-4** → Clone config, override model ✅
+3. **Config has NO openai, script uses openai/gpt-4** → Ephemeral config (env API key only) ✅
+4. **Script specifies inline temperature** → Override config value ✅
+
+**Files to Modify**:
+- `llmspell-providers/src/abstraction.rs` (MODIFY - create_agent_from_spec(), ~60 lines added)
+- `llmspell-providers/tests/provider_config_lookup_test.rs` (NEW - 150 lines)
+- `llmspell-agents/tests/agent_provider_config_test.rs` (NEW - 120 lines)
+
+**Quality Gates**:
+- cargo test -p llmspell-providers passes
+- cargo test -p llmspell-agents passes
+- Backward compat: Agents without config providers still work
+- Config reuse: Agents with config providers use temperature/max_tokens from config
+- Inline override: Agent.builder().temperature() overrides config
+
+**Rationale**: This closes the architectural gap where Lua agents bypass provider config registry. After this fix:
+- **Consistent**: All components (templates, memory, agents) use provider config the same way
+- **Non-breaking**: Falls back to ephemeral config if not in registry
+- **Flexible**: Inline params override config (experimentation-friendly)
+
+### Task 13.5.7i: Final Validation & Quality Gates
+
+**Priority**: CRITICAL
+**Estimated Time**: 2 hours
+**Dependencies**: 13.5.7g, 13.5.7h complete
+
+**Description**: Final end-to-end validation that provider migration is complete and production-ready.
+
+**Acceptance Criteria**:
+- [ ] Audit: Zero hardcoded LLM values in source code (tests OK)
+  ```bash
+  grep -r "ollama/llama3.2:3b" llmspell-memory/src llmspell-templates/src  # 0 matches
+  grep -r "temperature: 0\." llmspell-memory/src   # 0 matches (outside tests)
+  grep -r "max_tokens: [0-9]" llmspell-memory/src  # 0 matches (outside tests)
+  ```
+- [ ] All tests pass: `cargo test -p llmspell-config -p llmspell-memory -p llmspell-templates -p llmspell-context`
+- [ ] Quality check passes: `./scripts/quality/quality-check-fast.sh`
+- [ ] Zero clippy warnings workspace-wide
+- [ ] Documentation builds: `cargo doc --no-deps`
+- [ ] Builtin profiles load: "default", "memory"
+- [ ] Best practices guide complete and accurate
+- [ ] New features documented in CHANGELOG (provider_name support)
+- [ ] CLI help updated to show both params (provider_name and model)
+
+**Quality Checks**:
+1. ✅ Zero hardcoded LLM config values in runtime code (100+ eliminated)
+2. ✅ All tests pass (200+ tests across 6 packages: config, memory, templates, context, providers, agents)
+3. ✅ Zero warnings/errors from quality-check-fast.sh
+4. ✅ Documentation complete with best practices guide
+5. ✅ Builtin profiles work ("default", "memory")
+6. ✅ Provider system functional with dual-path support
+7. ✅ Backward compatibility: 100% of existing `--param model=` and `Agent.builder().model()` invocations work
+8. ✅ Agent provider lookup: Lua scripts respect config temperature/max_tokens
+
+**Definition of Done**:
+- [ ] All 9 subtasks (13.5.7a-i) complete
+- [ ] Zero hardcoded LLM configuration values in source code
+- [ ] Provider system fully integrated (memory + templates + agents) with dual-path support
+- [ ] All tests passing (config + memory + templates + context + providers + agents)
+- [ ] Documentation complete (memory.md + best practices guide)
+- [ ] Backward compatibility verified (100% of existing invocations work)
+- [ ] Agent provider lookup fixed (Lua scripts use config temperature/max_tokens)
+- [ ] Quality gates passed
+- [ ] Ready for Phase 13.6
+
+**Summary**:
+- **Architecture**: Direct provider integration with smart dual-path support + agent provider lookup fix
+- **Hardcoded Values Eliminated**: 100+ (memory: 30+, templates: 60+, context: 4+, agents: now use config, tests: fixtures only)
+- **Files Created**: 11 (memory.rs, 4 integration tests, memory.toml, memory.md, provider-usage.md, memory_config_test.rs, provider_config_lookup_test.rs, agent_provider_config_test.rs, context helper mods)
+- **Files Modified**: 36+ (providers.rs abstraction, lib.rs, 10 templates, llm_engine.rs, daemon.rs, 15+ test files, builtin profiles, docs)
+- **Breaking Changes**: NONE (templates support BOTH provider_name and model, agents use config if available)
+- **Internal API Changes**: LlmEngineConfig::from_provider() replaces ::default(), create_agent_from_spec() checks registry first (no external users)
+- **Lines Changed**: ~1320 (config: 350, memory: 250, templates: 450, agents: 70, tests: 200)
+- **Timeline**: 26 hours across 9 tasks (realistic for scope including agent fix)
+- **Provider Architecture**: 3-tier resolution (provider_name > model > default_provider) → ProviderConfig (single source of truth)
+- **Backward Compatibility**: 100% - all existing `--param model=` and `Agent.builder().model()` invocations continue working
+- **Architectural Consistency**: Templates, Memory, AND Agents all use provider config registry (no more dual systems)
 
 
 ---
