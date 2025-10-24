@@ -92,13 +92,11 @@ async fn test_manager_init_produces_info_log() {
 
     let _manager = DefaultMemoryManager::new_in_memory().await.unwrap();
 
-    let info_logs: Vec<_> = {
-        let logs = events.lock().unwrap();
-        logs.iter()
-            .filter(|e| e.level == Level::INFO)
-            .cloned()
-            .collect()
-    };
+    let info_logs: Vec<_> = events.lock().unwrap()
+        .iter()
+        .filter(|e| e.level == Level::INFO)
+        .cloned()
+        .collect();
 
     assert!(
         info_logs.iter().any(|e| e.message.contains("Initializing DefaultMemoryManager") || e.message.contains("in-memory")),
@@ -119,13 +117,11 @@ async fn test_episodic_add_produces_info_log() {
 
     manager.episodic().add(entry).await.unwrap();
 
-    let info_logs: Vec<_> = {
-        let logs = events.lock().unwrap();
-        logs.iter()
-            .filter(|e| e.level == Level::INFO)
-            .cloned()
-            .collect()
-    };
+    let info_logs: Vec<_> = events.lock().unwrap()
+        .iter()
+        .filter(|e| e.level == Level::INFO)
+        .cloned()
+        .collect();
 
     assert!(
         info_logs.iter().any(|e| e.message.contains("Adding episodic entry") && e.message.contains("session_id")),
@@ -150,13 +146,11 @@ async fn test_vector_search_produces_debug_log() {
     // Now search
     manager.episodic().search("Rust", 5).await.unwrap();
 
-    let debug_logs: Vec<_> = {
-        let logs = events.lock().unwrap();
-        logs.iter()
-            .filter(|e| e.level == Level::DEBUG)
-            .cloned()
-            .collect()
-    };
+    let debug_logs: Vec<_> = events.lock().unwrap()
+        .iter()
+        .filter(|e| e.level == Level::DEBUG)
+        .cloned()
+        .collect();
 
     assert!(
         debug_logs.iter().any(|e| e.message.contains("Searching episodic memory") && e.message.contains("top_k")),
@@ -191,13 +185,11 @@ async fn test_consolidation_metrics_produces_info_log() {
         &[],
     ).await;
 
-    let info_logs: Vec<_> = {
-        let logs = events.lock().unwrap();
-        logs.iter()
-            .filter(|e| e.level == Level::INFO)
-            .cloned()
-            .collect()
-    };
+    let info_logs: Vec<_> = events.lock().unwrap()
+        .iter()
+        .filter(|e| e.level == Level::INFO)
+        .cloned()
+        .collect();
 
     assert!(
         info_logs.iter().any(|e| e.message.contains("Recording consolidation") && e.message.contains("entries_processed")),
@@ -213,13 +205,11 @@ async fn test_json_parse_error_produces_warn_log() {
     let invalid_json = "{invalid json";
     let _result = ConsolidationResponse::from_json(invalid_json);
 
-    let warn_logs: Vec<_> = {
-        let logs = events.lock().unwrap();
-        logs.iter()
-            .filter(|e| e.level == Level::WARN)
-            .cloned()
-            .collect()
-    };
+    let warn_logs: Vec<_> = events.lock().unwrap()
+        .iter()
+        .filter(|e| e.level == Level::WARN)
+        .cloned()
+        .collect();
 
     assert!(
         warn_logs.iter().any(|e| e.message.contains("Full JSON parsing failed") || e.message.contains("Partial parse failed")),

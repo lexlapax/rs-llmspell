@@ -1,10 +1,10 @@
 //! E2E tests for LLM-driven consolidation with real Ollama instance
 //!
 //! These tests require:
-//! - Running Ollama instance (default: http://localhost:11434)
+//! - Running Ollama instance (default: <http://localhost:11434>)
 //! - llama3.2:3b model available
 //!
-//! Set OLLAMA_HOST environment variable to override default.
+//! Set `OLLAMA_HOST` environment variable to override default.
 //! Tests skip gracefully if Ollama is unavailable.
 //!
 //! ## Test Flakiness and Ollama Rate Limiting
@@ -13,7 +13,7 @@
 //! internal rate limiting and request queuing. Symptoms include:
 //! - `entries_processed=0, entries_failed=0, entries_skipped=0` (requests silently dropped)
 //! - Non-deterministic failures that pass when run individually
-//! - Failures in tests with multiple sequential LLM calls (test_multi_turn, test_delete)
+//! - Failures in tests with multiple sequential LLM calls (`test_multi_turn`, `test_delete`)
 //!
 //! **Root Cause**: Ollama (as of 2025) cannot reliably handle rapid-fire LLM requests
 //! without delays between calls. The consolidation engine is correct - individual tests
@@ -39,7 +39,7 @@ use e2e::helpers::{create_test_engine, GroundTruthDecision};
 /// Test ADD decision: Create new entities from episodic content
 ///
 /// Scenario: "Rust is a systems programming language"
-/// Expected: ADD(rust), ADD(systems_programming), ADD_RELATIONSHIP(rust, is_a, language)
+/// Expected: ADD(rust), `ADD(systems_programming)`, `ADD_RELATIONSHIP(rust`, `is_a`, language)
 #[tokio::test]
 async fn test_add_decision() {
     if !e2e::check_ollama_available().await {
@@ -60,14 +60,12 @@ async fn test_add_decision() {
     );
 
     // Ground truth: Expected decisions
-    let _ground_truth = vec![
-        GroundTruthDecision::Add {
+    let _ground_truth = [GroundTruthDecision::Add {
             entity_id: "rust".to_string(),
         },
         GroundTruthDecision::Add {
             entity_id: "systems_programming".to_string(),
-        },
-    ];
+        }];
 
     // Run consolidation
     let mut entries = vec![entry];
@@ -478,8 +476,7 @@ async fn test_multi_turn_consolidation() {
         result3.entries_processed, result3.entities_added, result3.entities_updated
     );
     eprintln!(
-        "  Total: {} entities added, {} updated",
-        total_entities, total_updates
+        "  Total: {total_entities} entities added, {total_updates} updated"
     );
 }
 
@@ -506,7 +503,7 @@ async fn test_error_recovery() {
     let entry1 = EpisodicEntry::new(
         "test-session".to_string(),
         "user".to_string(),
-        "".to_string(),
+        String::new(),
     );
 
     let mut entries1 = vec![entry1];

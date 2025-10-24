@@ -91,13 +91,11 @@ async fn test_surrealdb_init_produces_info_log() {
     let temp_dir = TempDir::new().unwrap();
     let _backend = SurrealDBBackend::new(temp_dir.path()).await.unwrap();
 
-    let info_logs: Vec<_> = {
-        let logs = events.lock().unwrap();
-        logs.iter()
-            .filter(|e| e.level == Level::INFO)
-            .cloned()
-            .collect()
-    };
+    let info_logs: Vec<_> = events.lock().unwrap()
+        .iter()
+        .filter(|e| e.level == Level::INFO)
+        .cloned()
+        .collect();
 
     assert!(
         info_logs.iter().any(|e| e.message.contains("Initializing SurrealDB backend")),
@@ -120,13 +118,11 @@ async fn test_entity_creation_produces_debug_log() {
 
     backend.add_entity(entity).await.unwrap();
 
-    let debug_logs: Vec<_> = {
-        let logs = events.lock().unwrap();
-        logs.iter()
-            .filter(|e| e.level == Level::DEBUG)
-            .cloned()
-            .collect()
-    };
+    let debug_logs: Vec<_> = events.lock().unwrap()
+        .iter()
+        .filter(|e| e.level == Level::DEBUG)
+        .cloned()
+        .collect();
 
     assert!(
         debug_logs.iter().any(|e| e.message.contains("entity_type") || e.message.contains("Adding entity")),
@@ -153,13 +149,11 @@ async fn test_temporal_query_produces_trace_log() {
     let query = TemporalQuery::new().with_entity_type("language".to_string());
     let _ = backend.query_temporal(query).await;
 
-    let trace_logs: Vec<_> = {
-        let logs = events.lock().unwrap();
-        logs.iter()
-            .filter(|e| e.level == Level::TRACE)
-            .cloned()
-            .collect()
-    };
+    let trace_logs: Vec<_> = events.lock().unwrap()
+        .iter()
+        .filter(|e| e.level == Level::TRACE)
+        .cloned()
+        .collect();
 
     assert!(
         trace_logs.iter().any(|e| e.message.contains("query") || e.message.contains("Temporal")),
@@ -176,13 +170,11 @@ async fn test_connection_failure_produces_error_log() {
 
     assert!(result.is_err(), "Expected connection to fail");
 
-    let error_logs: Vec<_> = {
-        let logs = events.lock().unwrap();
-        logs.iter()
-            .filter(|e| e.level == Level::ERROR)
-            .cloned()
-            .collect()
-    };
+    let error_logs: Vec<_> = events.lock().unwrap()
+        .iter()
+        .filter(|e| e.level == Level::ERROR)
+        .cloned()
+        .collect();
 
     assert!(
         error_logs.iter().any(|e| e.message.contains("Failed") || e.message.contains("error")),

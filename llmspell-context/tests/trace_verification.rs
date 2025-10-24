@@ -90,13 +90,11 @@ async fn test_query_analysis_produces_debug_log() {
     let analyzer = RegexQueryAnalyzer::new();
     let _ = analyzer.understand("How do I use HashMap?").await.unwrap();
 
-    let debug_logs: Vec<_> = {
-        let logs = events.lock().unwrap();
-        logs.iter()
-            .filter(|e| e.level == Level::DEBUG)
-            .cloned()
-            .collect()
-    };
+    let debug_logs: Vec<_> = events.lock().unwrap()
+        .iter()
+        .filter(|e| e.level == Level::DEBUG)
+        .cloned()
+        .collect();
 
     assert!(
         debug_logs.iter().any(|e| e.message.contains("Intent classified") || e.message.contains("Extracted")),
@@ -119,13 +117,11 @@ async fn test_strategy_selection_produces_info_log() {
 
     assert_eq!(strategy, RetrievalStrategy::Episodic);
 
-    let info_logs: Vec<_> = {
-        let logs = events.lock().unwrap();
-        logs.iter()
-            .filter(|e| e.level == Level::INFO)
-            .cloned()
-            .collect()
-    };
+    let info_logs: Vec<_> = events.lock().unwrap()
+        .iter()
+        .filter(|e| e.level == Level::INFO)
+        .cloned()
+        .collect();
 
     assert!(
         info_logs.iter().any(|e| e.message.contains("Selecting retrieval strategy") && e.message.contains("intent")),

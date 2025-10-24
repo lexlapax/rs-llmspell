@@ -497,8 +497,7 @@ mod tests {
         async fn list_sessions_with_unprocessed(&self) -> Result<Vec<String>> {
             use std::collections::HashSet;
 
-            let entries = self.entries.lock().await;
-            let sessions: HashSet<String> = entries
+            let sessions: HashSet<String> = self.entries.lock().await
                 .iter()
                 .filter(|e| !e.processed)
                 .map(|e| e.session_id.clone())
@@ -599,11 +598,11 @@ mod tests {
             Ok(())
         }
 
-        fn name(&self) -> &str {
+        fn name(&self) -> &'static str {
             "mock"
         }
 
-        fn model(&self) -> &str {
+        fn model(&self) -> &'static str {
             "mock-model"
         }
 

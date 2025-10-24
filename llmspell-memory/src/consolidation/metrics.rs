@@ -407,17 +407,14 @@ impl ConsolidationMetrics {
             }
             VersionSelectionStrategy::RandomPerSession => {
                 // Get or create session-sticky version
-                let version = {
-                    let mut session_versions = self.session_versions.write().await;
-                    *session_versions
-                        .entry(session_id.to_string())
-                        .or_insert_with(|| {
-                            // Random selection on first use
-                            // TODO: When V2 is added, implement random selection
-                            trace!("RandomPerSession strategy: first use for session, using V1");
-                            PromptVersion::V1
-                        })
-                }; // Lock dropped here
+                let version = *self.session_versions.write().await
+                    .entry(session_id.to_string())
+                    .or_insert_with(|| {
+                        // Random selection on first use
+                        // TODO: When V2 is added, implement random selection
+                        trace!("RandomPerSession strategy: first use for session, using V1");
+                        PromptVersion::V1
+                    });
                 trace!("RandomPerSession strategy: session sticky version {:?}", version);
                 version
             }
@@ -774,11 +771,12 @@ mod tests {
 
     #[test]
     fn test_decision_distribution() {
-        let mut dist = DecisionDistribution::default();
-        dist.add_count = 40;
-        dist.update_count = 30;
-        dist.delete_count = 10;
-        dist.noop_count = 20;
+        let dist = DecisionDistribution {
+            add_count: 40,
+            update_count: 30,
+            delete_count: 10,
+            noop_count: 20,
+        };
 
         assert_eq!(dist.total(), 100);
         assert!((dist.add_percentage() - 40.0).abs() < 0.01);
@@ -840,8 +838,8 @@ mod tests {
         assert!((percentile(&values, 99.0) - 99.1).abs() < 0.01);
 
         // Edge cases
-        assert_eq!(percentile(&values, 0.0), 10.0);
-        assert_eq!(percentile(&values, 100.0), 100.0);
+        assert!((percentile(&values, 0.0) - 10.0).abs() < 0.01);
+        assert!((percentile(&values, 100.0) - 100.0).abs() < 0.01);
     }
 
     #[tokio::test]
@@ -1070,8 +1068,8 @@ mod tests {
 
         // Set pricing
         let pricing = ModelPricing {
-            input_cost_per_token: 0.000001,  // $1 per million tokens
-            output_cost_per_token: 0.000002, // $2 per million tokens
+            input_cost_per_token: 0.000_001,  // $1 per million tokens
+            output_cost_per_token: 0.000_002, // $2 per million tokens
         };
         metrics
             .set_model_pricing("ollama/llama3.2:3b".to_string(), pricing)

@@ -604,11 +604,11 @@ mod tests {
             Ok(())
         }
 
-        fn name(&self) -> &str {
+        fn name(&self) -> &'static str {
             "mock"
         }
 
-        fn model(&self) -> &str {
+        fn model(&self) -> &'static str {
             "mock-model"
         }
     }

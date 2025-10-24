@@ -477,7 +477,7 @@ mod tests {
         let config = ConsolidationPromptConfig::default();
         assert_eq!(config.output_format, OutputFormat::Json);
         assert_eq!(config.model, "ollama/llama3.2:3b");
-        assert_eq!(config.temperature, 0.0);
+        assert!((config.temperature - 0.0).abs() < f32::EPSILON);
         assert_eq!(config.token_budget.episodic_tokens, 1600);
     }
 
@@ -488,7 +488,7 @@ mod tests {
             .with_temperature(0.3);
 
         assert_eq!(builder.config.output_format, OutputFormat::Json);
-        assert_eq!(builder.config.temperature, 0.3);
+        assert!((builder.config.temperature - 0.3).abs() < f32::EPSILON);
     }
 
     #[test]

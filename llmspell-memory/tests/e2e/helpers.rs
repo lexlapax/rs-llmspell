@@ -31,7 +31,7 @@ pub enum GroundTruthDecision {
 #[allow(dead_code)] // Used in future tests
 impl GroundTruthDecision {
     /// Get decision type
-    pub fn decision_type(&self) -> DecisionType {
+    pub const fn decision_type(&self) -> DecisionType {
         match self {
             Self::Add { .. } => DecisionType::Add,
             Self::Update { .. } => DecisionType::Update,
@@ -118,18 +118,17 @@ pub async fn assert_entity_exists(
     let entity = graph
         .get_entity(entity_id)
         .await
-        .unwrap_or_else(|_| panic!("Entity '{}' not found", entity_id));
+        .unwrap_or_else(|_| panic!("Entity '{entity_id}' not found"));
 
     if let Some(expected) = expected_properties {
         for (key, expected_value) in expected {
             let actual_value = entity
                 .properties
                 .get(key)
-                .unwrap_or_else(|| panic!("Entity '{}' missing property '{}'", entity_id, key));
+                .unwrap_or_else(|| panic!("Entity '{entity_id}' missing property '{key}'"));
             assert_eq!(
                 actual_value, expected_value,
-                "Entity '{}' property '{}' mismatch",
-                entity_id, key
+                "Entity '{entity_id}' property '{key}' mismatch"
             );
         }
     }
@@ -158,14 +157,13 @@ pub async fn assert_relationship_exists(
     let related = graph
         .get_related(from_id, rel_type)
         .await
-        .unwrap_or_else(|_| panic!("Failed to get related entities for '{}'", from_id));
+        .unwrap_or_else(|_| panic!("Failed to get related entities for '{from_id}'"));
 
     let found = related.iter().any(|entity| entity.id == to_id);
 
     assert!(
         found,
-        "Relationship '{}' -[{}]-> '{}' not found",
-        from_id, rel_type, to_id
+        "Relationship '{from_id}' -[{rel_type}]-> '{to_id}' not found"
     );
 }
 
@@ -177,33 +175,29 @@ pub async fn assert_relationship_exists(
 /// * `entity_id` - Entity ID that should not exist
 #[allow(dead_code)]
 pub async fn assert_entity_not_exists(graph: &Arc<dyn KnowledgeGraph>, entity_id: &str) {
-    match graph.get_entity(entity_id).await {
-        Ok(entity) => {
-            // Check if entity is tombstoned (has _deleted metadata)
-            if let Some(deleted) = entity.properties.get("_deleted") {
-                if deleted == "true" {
-                    // Entity properly tombstoned - acceptable
-                    return;
-                }
+    if let Ok(entity) = graph.get_entity(entity_id).await {
+        // Check if entity is tombstoned (has _deleted metadata)
+        if let Some(deleted) = entity.properties.get("_deleted") {
+            if deleted == "true" {
+                // Entity properly tombstoned - acceptable
+                return;
             }
-            panic!(
-                "Entity '{}' should not exist or should be deleted",
-                entity_id
-            );
         }
-        Err(_) => {
-            // Entity not found - expected
-        }
+        panic!(
+            "Entity '{entity_id}' should not exist or should be deleted"
+        );
+    } else {
+        // Entity not found - expected
     }
 }
 
 /// Calculate Decision Match Rate (DMR) with exact string matching
 ///
-/// DMR = (matching_decisions / total_decisions) * 100
+/// DMR = (`matching_decisions` / `total_decisions`) * 100
 ///
 /// Matching criteria:
 /// - Decision type must match (ADD/UPDATE/DELETE/NOOP)
-/// - For entity decisions (ADD/UPDATE/DELETE), entity_id must match exactly
+/// - For entity decisions (ADD/UPDATE/DELETE), `entity_id` must match exactly
 ///
 /// # Arguments
 ///
@@ -264,7 +258,7 @@ pub fn calculate_dmr(
         }
     }
 
-    matching as f64 / total as f64
+    f64::from(matching) / total as f64
 }
 
 /// Fuzzy match two entity IDs using Jaro-Winkler similarity
@@ -314,14 +308,14 @@ fn fuzzy_entity_match(actual: &str, expected: &str) -> bool {
 /// Three-tier matching (short-circuits on first match):
 /// 1. **Exact match** (case-insensitive): "Rust" ↔ "rust"
 /// 2. **Substring containment**: "rust-lang" ↔ "rust"
-/// 3. **Jaro-Winkler ≥ 0.8**: "systems_programming" ↔ "systems-programming" (0.97)
+/// 3. **Jaro-Winkler ≥ 0.8**: "`systems_programming`" ↔ "systems-programming" (0.97)
 ///
 /// ## Examples
 ///
 /// **Fuzzy matches:**
 /// - "rust" ↔ "rust-lang" (substring + 0.83 similarity)
-/// - "systems_programming" ↔ "systems-programming" (0.97 similarity)
-/// - "python27" ↔ "python_27" (0.81 similarity)
+/// - "`systems_programming`" ↔ "systems-programming" (0.97 similarity)
+/// - "python27" ↔ "`python_27`" (0.81 similarity)
 ///
 /// **Non-matches:**
 /// - "rust" ↔ "python" (0.0 similarity)
@@ -402,7 +396,7 @@ pub fn calculate_dmr_fuzzy(
         }
     }
 
-    matching as f64 / total as f64
+    f64::from(matching) / total as f64
 }
 
 #[cfg(test)]
@@ -515,8 +509,7 @@ mod tests {
         let dmr = calculate_dmr_fuzzy(&actual, &ground_truth);
         assert!(
             (dmr - 1.0).abs() < 0.01,
-            "Fuzzy DMR should be 1.0, got {}",
-            dmr
+            "Fuzzy DMR should be 1.0, got {dmr}"
         );
     }
 
@@ -543,8 +536,7 @@ mod tests {
         let dmr = calculate_dmr_fuzzy(&actual, &ground_truth);
         assert!(
             (dmr - 0.5).abs() < 0.01,
-            "Fuzzy DMR should be 0.5 (1/2), got {}",
-            dmr
+            "Fuzzy DMR should be 0.5 (1/2), got {dmr}"
         );
     }
 

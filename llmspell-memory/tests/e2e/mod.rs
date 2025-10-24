@@ -1,7 +1,7 @@
 //! End-to-end tests for memory consolidation with real LLM
 //!
 //! These tests require a running Ollama instance with llama3.2:3b model.
-//! Set OLLAMA_HOST environment variable (default: http://localhost:11434).
+//! Set `OLLAMA_HOST` environment variable (default: <http://localhost:11434>).
 //! Tests will skip gracefully if Ollama is unavailable.
 
 pub mod helpers;
@@ -11,7 +11,7 @@ use std::time::Duration;
 
 /// Check if Ollama is available for testing
 ///
-/// Checks OLLAMA_HOST environment variable (default: http://localhost:11434).
+/// Checks `OLLAMA_HOST` environment variable (default: <http://localhost:11434>).
 /// Attempts to connect and verify the service is responsive.
 ///
 /// # Returns
@@ -28,15 +28,14 @@ pub async fn check_ollama_available() -> bool {
         .unwrap();
 
     // Check /api/tags endpoint to verify Ollama is running
-    match client.get(format!("{}/api/tags", ollama_host)).send().await {
+    match client.get(format!("{ollama_host}/api/tags")).send().await {
         Ok(response) if response.status().is_success() => {
-            eprintln!("✓ Ollama available at {}", ollama_host);
+            eprintln!("✓ Ollama available at {ollama_host}");
             true
         }
         _ => {
             eprintln!(
-                "✗ Ollama unavailable at {} - skipping E2E tests",
-                ollama_host
+                "✗ Ollama unavailable at {ollama_host} - skipping E2E tests"
             );
             eprintln!("  To run E2E tests: Start Ollama and ensure llama3.2:3b model is available");
             eprintln!("  Set OLLAMA_HOST env var if using non-default host");
