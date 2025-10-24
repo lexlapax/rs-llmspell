@@ -37,8 +37,8 @@ impl StrategySelector {
         }
     }
 
-    /// Helper: Check Rule 1 - HowTo intent
-    fn check_howto_rule(&self, understanding: &QueryUnderstanding) -> Option<RetrievalStrategy> {
+    /// Helper: Check Rule 1 - `HowTo` intent
+    fn check_howto_rule(understanding: &QueryUnderstanding) -> Option<RetrievalStrategy> {
         if understanding.intent == QueryIntent::HowTo {
             debug!("Selected Episodic strategy (Rule 1: HowTo intent)");
             Some(RetrievalStrategy::Episodic)
@@ -72,7 +72,7 @@ impl StrategySelector {
         }
     }
 
-    /// Helper: Check Rule 4 - WhyDoes with entities
+    /// Helper: Check Rule 4 - `WhyDoes` with entities
     fn check_whydoes_rule(&self, understanding: &QueryUnderstanding) -> Option<RetrievalStrategy> {
         if understanding.intent == QueryIntent::WhyDoes
             && !understanding.entities.is_empty()
@@ -99,7 +99,7 @@ impl StrategySelector {
     }
 
     /// Helper: Check Rule 6 - Simple queries (few keywords)
-    fn check_simple_query_rule(&self, understanding: &QueryUnderstanding) -> Option<RetrievalStrategy> {
+    fn check_simple_query_rule(understanding: &QueryUnderstanding) -> Option<RetrievalStrategy> {
         if understanding.keywords.len() < 2 && understanding.intent == QueryIntent::Unknown {
             debug!(
                 "Selected Episodic strategy (Rule 6: Simple query with {} keywords)",
@@ -133,7 +133,7 @@ impl StrategySelector {
         trace!("Query understanding: {:?}", understanding);
 
         // Apply rules in order, return first match
-        if let Some(strategy) = self.check_howto_rule(understanding) {
+        if let Some(strategy) = Self::check_howto_rule(understanding) {
             return strategy;
         }
         if let Some(strategy) = self.check_whatis_explain_rule(understanding) {
@@ -148,7 +148,7 @@ impl StrategySelector {
         if let Some(strategy) = self.check_complex_query_rule(understanding) {
             return strategy;
         }
-        if let Some(strategy) = self.check_simple_query_rule(understanding) {
+        if let Some(strategy) = Self::check_simple_query_rule(understanding) {
             return strategy;
         }
 

@@ -393,7 +393,7 @@ impl ConsolidationMetrics {
         version
     }
 
-    /// Helper: Select version using RandomPerConsolidation strategy
+    /// Helper: Select version using `RandomPerConsolidation` strategy
     fn select_random_per_consolidation() -> PromptVersion {
         // Random 50/50 split (currently only V1 exists)
         // TODO: When V2 is added, implement: if rand() < 0.5 { V1 } else { V2 }
@@ -401,7 +401,7 @@ impl ConsolidationMetrics {
         PromptVersion::V1
     }
 
-    /// Helper: Select version using RandomPerSession strategy
+    /// Helper: Select version using `RandomPerSession` strategy
     async fn select_random_per_session(&self, session_id: &str) -> PromptVersion {
         // Get or create session-sticky version
         let version = *self
