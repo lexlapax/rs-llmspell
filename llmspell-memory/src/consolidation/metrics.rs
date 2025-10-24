@@ -29,6 +29,7 @@ use std::collections::HashMap;
 use std::sync::Arc;
 use std::time::Duration;
 use tokio::sync::RwLock;
+use tracing::{debug, info, trace};
 
 /// Decision type for metrics tracking
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
@@ -354,6 +355,7 @@ impl ConsolidationMetrics {
     #[must_use]
     #[allow(clippy::zero_sized_map_values)] // PromptVersion zero-sized until V2 added
     pub fn new() -> Self {
+        info!("Creating new ConsolidationMetrics collector");
         Self {
             core: Arc::new(RwLock::new(CoreMetrics::default())),
             latencies: Arc::new(RwLock::new(Vec::new())),
@@ -390,26 +392,37 @@ impl ConsolidationMetrics {
     /// Uses configured strategy (Fixed/RandomPerConsolidation/RandomPerSession).
     pub async fn select_version(&self, session_id: &str) -> PromptVersion {
         let strategy = *self.version_strategy.read().await;
+        debug!("Selecting prompt version: strategy={:?}, session_id={}", strategy, session_id);
 
-        match strategy {
-            VersionSelectionStrategy::Fixed(version) => version,
+        let version = match strategy {
+            VersionSelectionStrategy::Fixed(version) => {
+                trace!("Fixed strategy: using version {:?}", version);
+                version
+            }
             VersionSelectionStrategy::RandomPerConsolidation => {
                 // Random 50/50 split (currently only V1 exists)
                 // TODO: When V2 is added, implement: if rand() < 0.5 { V1 } else { V2 }
+                trace!("RandomPerConsolidation strategy: using V1 (only version available)");
                 PromptVersion::V1
             }
             VersionSelectionStrategy::RandomPerSession => {
                 // Get or create session-sticky version
                 let mut session_versions = self.session_versions.write().await;
-                *session_versions
+                let version = *session_versions
                     .entry(session_id.to_string())
                     .or_insert_with(|| {
                         // Random selection on first use
                         // TODO: When V2 is added, implement random selection
+                        trace!("RandomPerSession strategy: first use for session, using V1");
                         PromptVersion::V1
-                    })
+                    });
+                trace!("RandomPerSession strategy: session sticky version {:?}", version);
+                version
             }
-        }
+        };
+
+        debug!("Selected prompt version: {:?}", version);
+        version
     }
 
     /// Record a consolidation result
@@ -432,6 +445,20 @@ impl ConsolidationMetrics {
         token_usage: Option<TokenUsage>,
         episodic_timestamps: &[DateTime<Utc>],
     ) {
+        info!(
+            "Recording consolidation: entries_processed={}, decisions={}, version={:?}, parse_success={}, model={}",
+            result.entries_processed,
+            decisions.len(),
+            version,
+            parse_success,
+            model.unwrap_or("none")
+        );
+        trace!(
+            "Consolidation details: duration={:?}, episodic_timestamps={}",
+            duration,
+            episodic_timestamps.len()
+        );
+
         let duration_ms = duration.as_secs_f64() * 1000.0;
 
         // Update core metrics and push latency
@@ -572,10 +599,12 @@ impl ConsolidationMetrics {
 
     /// Reset all metrics
     pub async fn reset(&self) {
+        info!("Resetting all consolidation metrics");
         *self.core.write().await = CoreMetrics::default();
         self.latencies.write().await.clear();
         self.lags.write().await.clear();
         self.session_versions.write().await.clear();
+        debug!("All metrics cleared");
     }
 
     /// Calculate current throughput metrics
@@ -583,6 +612,7 @@ impl ConsolidationMetrics {
     /// Returns entries/sec and decisions/sec based on accumulated data and time window.
     /// Also updates core.throughput with calculated values.
     pub async fn calculate_throughput(&self) -> ThroughputMetrics {
+        debug!("Calculating throughput metrics");
         let mut core = self.core.write().await;
 
         #[allow(clippy::cast_precision_loss)] // Milliseconds precision acceptable for throughput
@@ -602,6 +632,14 @@ impl ConsolidationMetrics {
                 core.throughput.decisions_per_sec =
                     core.decision_distribution.total() as f64 / window_duration_secs;
             }
+            debug!(
+                "Throughput calculated: entries/sec={:.2}, decisions/sec={:.2}, window={:.2}s",
+                core.throughput.entries_per_sec,
+                core.throughput.decisions_per_sec,
+                window_duration_secs
+            );
+        } else {
+            debug!("Throughput: no time window available");
         }
 
         core.throughput.clone()
@@ -626,11 +664,13 @@ impl ConsolidationMetrics {
     /// Returns `Some(version)` if promotion criteria met, `None` otherwise.
     #[allow(clippy::significant_drop_tightening)] // Read locks held for full comparison
     pub async fn check_auto_promotion(&self) -> Option<PromptVersion> {
+        debug!("Checking auto-promotion criteria");
         let core = self.core.read().await;
         let config = self.auto_promotion.read().await;
 
         // Need at least 2 versions to compare
         if core.prompt_metrics.len() < 2 {
+            debug!("Auto-promotion: not enough versions ({} < 2)", core.prompt_metrics.len());
             return None;
         }
 
@@ -643,8 +683,16 @@ impl ConsolidationMetrics {
                 continue; // Skip baseline
             }
 
+            trace!("Evaluating version {:?} for auto-promotion", version);
+
             // Check sample size
             if metrics.consolidations < config.min_sample_size {
+                trace!(
+                    "Version {:?}: insufficient samples ({} < {})",
+                    version,
+                    metrics.consolidations,
+                    config.min_sample_size
+                );
                 continue;
             }
 
@@ -653,11 +701,26 @@ impl ConsolidationMetrics {
             let candidate_rate = metrics.parse_success_rate();
             let improvement = candidate_rate - baseline_rate;
 
+            debug!(
+                "Version {:?}: baseline_rate={:.2}%, candidate_rate={:.2}%, improvement={:.2}%",
+                version,
+                baseline_rate * 100.0,
+                candidate_rate * 100.0,
+                improvement * 100.0
+            );
+
             if improvement >= config.min_parse_improvement {
+                info!(
+                    "Auto-promotion recommended: version {:?} shows {:.2}% improvement (threshold={:.2}%)",
+                    version,
+                    improvement * 100.0,
+                    config.min_parse_improvement * 100.0
+                );
                 return Some(*version);
             }
         }
 
+        debug!("Auto-promotion: no version meets criteria");
         None
     }
 

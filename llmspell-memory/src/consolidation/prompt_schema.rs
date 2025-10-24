@@ -12,6 +12,7 @@ use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use std::collections::HashMap;
+use tracing::{debug, info, trace, warn};
 
 use crate::error::{MemoryError, Result};
 
@@ -119,9 +120,13 @@ impl ConsolidationResponse {
     /// Returns `MemoryError::InvalidInput` if JSON parsing fails completely,
     /// including partial parsing attempts.
     pub fn from_json(json_str: &str) -> Result<Self> {
+        info!("Parsing consolidation response: len={} bytes", json_str.len());
+        trace!("Raw JSON input: {}", json_str.chars().take(200).collect::<String>());
+
         // Strip markdown code fences if present (```json ... ``` or ``` ... ```)
         let json_str = json_str.trim();
         let json_str = if json_str.starts_with("```") {
+            debug!("Detected markdown code fence, stripping");
             // Find start and end of code block
             let start = if json_str.starts_with("```json") {
                 json_str.find('\n').map_or(7, |i| i + 1)
@@ -138,8 +143,17 @@ impl ConsolidationResponse {
 
         // Try full JSON parsing first
         match serde_json::from_str::<Self>(json_str) {
-            Ok(response) => Ok(response),
+            Ok(response) => {
+                info!(
+                    "Successfully parsed consolidation response: entities={}, relationships={}, decisions={}",
+                    response.entities.len(),
+                    response.relationships.len(),
+                    response.decisions.len()
+                );
+                Ok(response)
+            }
             Err(e) => {
+                warn!("Full JSON parsing failed: {}, attempting partial parse", e);
                 // Try partial parsing with lenient mode
                 Self::partial_parse(json_str).ok_or_else(|| {
                     MemoryError::InvalidInput(format!(
@@ -154,6 +168,7 @@ impl ConsolidationResponse {
     ///
     /// Extracts as many valid fields as possible, skipping invalid sections.
     fn partial_parse(json_str: &str) -> Option<Self> {
+        debug!("Attempting partial parse of malformed JSON");
         // Try to parse individual sections independently
         let mut response = Self::empty();
 
@@ -164,6 +179,7 @@ impl ConsolidationResponse {
                     .iter()
                     .filter_map(|v| serde_json::from_value::<EntityPayload>(v.clone()).ok())
                     .collect();
+                debug!("Partial parse: extracted {} entities", response.entities.len());
             }
 
             if let Some(relationships) = value.get("relationships").and_then(Value::as_array) {
@@ -171,6 +187,7 @@ impl ConsolidationResponse {
                     .iter()
                     .filter_map(|v| serde_json::from_value::<RelationshipPayload>(v.clone()).ok())
                     .collect();
+                debug!("Partial parse: extracted {} relationships", response.relationships.len());
             }
 
             if let Some(decisions) = value.get("decisions").and_then(Value::as_array) {
@@ -178,16 +195,25 @@ impl ConsolidationResponse {
                     .iter()
                     .filter_map(|v| serde_json::from_value::<DecisionPayload>(v.clone()).ok())
                     .collect();
+                debug!("Partial parse: extracted {} decisions", response.decisions.len());
             }
 
             if let Some(reasoning) = value.get("reasoning").and_then(Value::as_str) {
                 response.reasoning = Some(reasoning.to_string());
+                trace!("Partial parse: extracted reasoning");
             }
         }
 
         if response.is_empty() {
+            warn!("Partial parse failed: no valid sections extracted");
             None
         } else {
+            info!(
+                "Partial parse succeeded: entities={}, relationships={}, decisions={}",
+                response.entities.len(),
+                response.relationships.len(),
+                response.decisions.len()
+            );
             Some(response)
         }
     }
@@ -198,7 +224,15 @@ impl ConsolidationResponse {
     ///
     /// Returns `MemoryError::Serialization` if JSON serialization fails.
     pub fn to_json(&self) -> Result<String> {
-        serde_json::to_string_pretty(self).map_err(MemoryError::Serialization)
+        debug!(
+            "Serializing consolidation response: entities={}, relationships={}, decisions={}",
+            self.entities.len(),
+            self.relationships.len(),
+            self.decisions.len()
+        );
+        let json = serde_json::to_string_pretty(self).map_err(MemoryError::Serialization)?;
+        trace!("Serialized JSON (first 200 chars): {}", json.chars().take(200).collect::<String>());
+        Ok(json)
     }
 }
 
