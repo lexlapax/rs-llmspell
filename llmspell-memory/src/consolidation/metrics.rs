@@ -387,6 +387,41 @@ impl ConsolidationMetrics {
         *self.auto_promotion.write().await = config;
     }
 
+    /// Helper: Select version using Fixed strategy
+    fn select_fixed_version(version: PromptVersion) -> PromptVersion {
+        trace!("Fixed strategy: using version {:?}", version);
+        version
+    }
+
+    /// Helper: Select version using RandomPerConsolidation strategy
+    fn select_random_per_consolidation() -> PromptVersion {
+        // Random 50/50 split (currently only V1 exists)
+        // TODO: When V2 is added, implement: if rand() < 0.5 { V1 } else { V2 }
+        trace!("RandomPerConsolidation strategy: using V1 (only version available)");
+        PromptVersion::V1
+    }
+
+    /// Helper: Select version using RandomPerSession strategy
+    async fn select_random_per_session(&self, session_id: &str) -> PromptVersion {
+        // Get or create session-sticky version
+        let version = *self
+            .session_versions
+            .write()
+            .await
+            .entry(session_id.to_string())
+            .or_insert_with(|| {
+                // Random selection on first use
+                // TODO: When V2 is added, implement random selection
+                trace!("RandomPerSession strategy: first use for session, using V1");
+                PromptVersion::V1
+            });
+        trace!(
+            "RandomPerSession strategy: session sticky version {:?}",
+            version
+        );
+        version
+    }
+
     /// Select prompt version for consolidation
     ///
     /// Uses configured strategy (Fixed/RandomPerConsolidation/RandomPerSession).
@@ -398,34 +433,12 @@ impl ConsolidationMetrics {
         );
 
         let version = match strategy {
-            VersionSelectionStrategy::Fixed(version) => {
-                trace!("Fixed strategy: using version {:?}", version);
-                version
-            }
+            VersionSelectionStrategy::Fixed(version) => Self::select_fixed_version(version),
             VersionSelectionStrategy::RandomPerConsolidation => {
-                // Random 50/50 split (currently only V1 exists)
-                // TODO: When V2 is added, implement: if rand() < 0.5 { V1 } else { V2 }
-                trace!("RandomPerConsolidation strategy: using V1 (only version available)");
-                PromptVersion::V1
+                Self::select_random_per_consolidation()
             }
             VersionSelectionStrategy::RandomPerSession => {
-                // Get or create session-sticky version
-                let version = *self
-                    .session_versions
-                    .write()
-                    .await
-                    .entry(session_id.to_string())
-                    .or_insert_with(|| {
-                        // Random selection on first use
-                        // TODO: When V2 is added, implement random selection
-                        trace!("RandomPerSession strategy: first use for session, using V1");
-                        PromptVersion::V1
-                    });
-                trace!(
-                    "RandomPerSession strategy: session sticky version {:?}",
-                    version
-                );
-                version
+                self.select_random_per_session(session_id).await
             }
         };
 
