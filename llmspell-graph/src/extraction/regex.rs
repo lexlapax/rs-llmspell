@@ -236,69 +236,42 @@ impl RegexExtractor {
 
         let mut relationships = Vec::new();
 
-        // Pattern: "X is a Y"
-        let is_a_count = IS_A_PATTERN.captures_iter(text).count();
-        debug!("Found {} 'is_a' pattern matches", is_a_count);
-        for cap in IS_A_PATTERN.captures_iter(text) {
-            let from = cap[1].trim();
-            let to = cap[2].trim();
-            trace!("Matched is_a: '{}' is_a '{}'", from, to);
+        // Extract each pattern type
+        let (is_a_rels, is_a_count) = Self::extract_pattern_relationships(
+            text,
+            &IS_A_PATTERN,
+            "is_a",
+            "is_a",
+            "is_a",
+        );
+        relationships.extend(is_a_rels);
 
-            relationships.push(Relationship::new(
-                from.to_string(),
-                to.to_string(),
-                "is_a".to_string(),
-                json!({"source": "regex_extraction", "pattern": "is_a"}),
-            ));
-        }
+        let (has_rels, has_count) = Self::extract_pattern_relationships(
+            text,
+            &HAS_PATTERN,
+            "has_feature",
+            "has",
+            "has",
+        );
+        relationships.extend(has_rels);
 
-        // Pattern: "X has Y"
-        let has_count = HAS_PATTERN.captures_iter(text).count();
-        debug!("Found {} 'has_feature' pattern matches", has_count);
-        for cap in HAS_PATTERN.captures_iter(text) {
-            let from = cap[1].trim();
-            let to = cap[2].trim();
-            trace!("Matched has_feature: '{}' has '{}'", from, to);
+        let (in_rels, in_count) = Self::extract_pattern_relationships(
+            text,
+            &IN_PATTERN,
+            "located_in",
+            "in",
+            "in",
+        );
+        relationships.extend(in_rels);
 
-            relationships.push(Relationship::new(
-                from.to_string(),
-                to.to_string(),
-                "has_feature".to_string(),
-                json!({"source": "regex_extraction", "pattern": "has"}),
-            ));
-        }
-
-        // Pattern: "X in Y"
-        let in_count = IN_PATTERN.captures_iter(text).count();
-        debug!("Found {} 'located_in' pattern matches", in_count);
-        for cap in IN_PATTERN.captures_iter(text) {
-            let from = cap[1].trim();
-            let to = cap[2].trim();
-            trace!("Matched located_in: '{}' in '{}'", from, to);
-
-            relationships.push(Relationship::new(
-                from.to_string(),
-                to.to_string(),
-                "located_in".to_string(),
-                json!({"source": "regex_extraction", "pattern": "in"}),
-            ));
-        }
-
-        // Pattern: "X of Y"
-        let of_count = OF_PATTERN.captures_iter(text).count();
-        debug!("Found {} 'part_of' pattern matches", of_count);
-        for cap in OF_PATTERN.captures_iter(text) {
-            let from = cap[1].trim();
-            let to = cap[2].trim();
-            trace!("Matched part_of: '{}' of '{}'", from, to);
-
-            relationships.push(Relationship::new(
-                from.to_string(),
-                to.to_string(),
-                "part_of".to_string(),
-                json!({"source": "regex_extraction", "pattern": "of"}),
-            ));
-        }
+        let (of_rels, of_count) = Self::extract_pattern_relationships(
+            text,
+            &OF_PATTERN,
+            "part_of",
+            "of",
+            "of",
+        );
+        relationships.extend(of_rels);
 
         info!("Relationship extraction complete: {} relationships extracted (is_a={}, has={}, in={}, of={})",
             relationships.len(), is_a_count, has_count, in_count, of_count);
@@ -314,6 +287,36 @@ impl RegexExtractor {
         );
 
         relationships
+    }
+
+    /// Extract relationships matching a specific regex pattern
+    fn extract_pattern_relationships(
+        text: &str,
+        pattern: &Regex,
+        relationship_type: &str,
+        pattern_name: &str,
+        trace_verb: &str,
+    ) -> (Vec<Relationship>, usize) {
+        let count = pattern.captures_iter(text).count();
+        debug!("Found {} '{}' pattern matches", count, relationship_type);
+
+        let relationships: Vec<Relationship> = pattern
+            .captures_iter(text)
+            .map(|cap| {
+                let from = cap[1].trim();
+                let to = cap[2].trim();
+                trace!("Matched {}: '{}' {} '{}'", relationship_type, from, trace_verb, to);
+
+                Relationship::new(
+                    from.to_string(),
+                    to.to_string(),
+                    relationship_type.to_string(),
+                    json!({"source": "regex_extraction", "pattern": pattern_name}),
+                )
+            })
+            .collect();
+
+        (relationships, count)
     }
 
     /// Infer entity type from context
