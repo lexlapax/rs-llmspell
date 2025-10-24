@@ -37,6 +37,80 @@ impl StrategySelector {
         }
     }
 
+    /// Helper: Check Rule 1 - HowTo intent
+    fn check_howto_rule(&self, understanding: &QueryUnderstanding) -> Option<RetrievalStrategy> {
+        if understanding.intent == QueryIntent::HowTo {
+            debug!("Selected Episodic strategy (Rule 1: HowTo intent)");
+            Some(RetrievalStrategy::Episodic)
+        } else {
+            None
+        }
+    }
+
+    /// Helper: Check Rule 2 - WhatIs/Explain with entities
+    fn check_whatis_explain_rule(&self, understanding: &QueryUnderstanding) -> Option<RetrievalStrategy> {
+        if (understanding.intent == QueryIntent::WhatIs || understanding.intent == QueryIntent::Explain)
+            && understanding.entities.len() >= self.semantic_entity_threshold
+        {
+            debug!(
+                "Selected Semantic strategy (Rule 2: WhatIs/Explain with {} entities)",
+                understanding.entities.len()
+            );
+            Some(RetrievalStrategy::Semantic)
+        } else {
+            None
+        }
+    }
+
+    /// Helper: Check Rule 3 - Debug intent
+    fn check_debug_rule(&self, understanding: &QueryUnderstanding) -> Option<RetrievalStrategy> {
+        if understanding.intent == QueryIntent::Debug && self.enable_hybrid {
+            debug!("Selected Hybrid strategy (Rule 3: Debug intent)");
+            Some(RetrievalStrategy::Hybrid)
+        } else {
+            None
+        }
+    }
+
+    /// Helper: Check Rule 4 - WhyDoes with entities
+    fn check_whydoes_rule(&self, understanding: &QueryUnderstanding) -> Option<RetrievalStrategy> {
+        if understanding.intent == QueryIntent::WhyDoes
+            && !understanding.entities.is_empty()
+            && self.enable_hybrid
+        {
+            debug!("Selected Hybrid strategy (Rule 4: WhyDoes with entities)");
+            Some(RetrievalStrategy::Hybrid)
+        } else {
+            None
+        }
+    }
+
+    /// Helper: Check Rule 5 - Complex queries (many entities)
+    fn check_complex_query_rule(&self, understanding: &QueryUnderstanding) -> Option<RetrievalStrategy> {
+        if understanding.entities.len() >= 3 && self.enable_hybrid {
+            debug!(
+                "Selected Hybrid strategy (Rule 5: Complex query with {} entities)",
+                understanding.entities.len()
+            );
+            Some(RetrievalStrategy::Hybrid)
+        } else {
+            None
+        }
+    }
+
+    /// Helper: Check Rule 6 - Simple queries (few keywords)
+    fn check_simple_query_rule(&self, understanding: &QueryUnderstanding) -> Option<RetrievalStrategy> {
+        if understanding.keywords.len() < 2 && understanding.intent == QueryIntent::Unknown {
+            debug!(
+                "Selected Episodic strategy (Rule 6: Simple query with {} keywords)",
+                understanding.keywords.len()
+            );
+            Some(RetrievalStrategy::Episodic)
+        } else {
+            None
+        }
+    }
+
     /// Select retrieval strategy based on query understanding
     ///
     /// # Strategy Selection Rules
@@ -58,59 +132,27 @@ impl StrategySelector {
         );
         trace!("Query understanding: {:?}", understanding);
 
-        // Rule 1: HowTo queries -> recent interaction examples
-        if understanding.intent == QueryIntent::HowTo {
-            debug!("Selected Episodic strategy (Rule 1: HowTo intent)");
-            return RetrievalStrategy::Episodic;
+        // Apply rules in order, return first match
+        if let Some(strategy) = self.check_howto_rule(understanding) {
+            return strategy;
+        }
+        if let Some(strategy) = self.check_whatis_explain_rule(understanding) {
+            return strategy;
+        }
+        if let Some(strategy) = self.check_debug_rule(understanding) {
+            return strategy;
+        }
+        if let Some(strategy) = self.check_whydoes_rule(understanding) {
+            return strategy;
+        }
+        if let Some(strategy) = self.check_complex_query_rule(understanding) {
+            return strategy;
+        }
+        if let Some(strategy) = self.check_simple_query_rule(understanding) {
+            return strategy;
         }
 
-        // Rule 2: WhatIs/Explain with entities -> knowledge graph
-        if (understanding.intent == QueryIntent::WhatIs
-            || understanding.intent == QueryIntent::Explain)
-            && understanding.entities.len() >= self.semantic_entity_threshold
-        {
-            debug!(
-                "Selected Semantic strategy (Rule 2: WhatIs/Explain with {} entities)",
-                understanding.entities.len()
-            );
-            return RetrievalStrategy::Semantic;
-        }
-
-        // Rule 3: Debug queries -> hybrid (recent errors + known solutions)
-        if understanding.intent == QueryIntent::Debug && self.enable_hybrid {
-            debug!("Selected Hybrid strategy (Rule 3: Debug intent)");
-            return RetrievalStrategy::Hybrid;
-        }
-
-        // Rule 4: WhyDoes with entities -> hybrid (concepts + interaction history)
-        if understanding.intent == QueryIntent::WhyDoes
-            && !understanding.entities.is_empty()
-            && self.enable_hybrid
-        {
-            debug!("Selected Hybrid strategy (Rule 4: WhyDoes with entities)");
-            return RetrievalStrategy::Hybrid;
-        }
-
-        // Rule 5: Complex queries (many entities) -> hybrid
-        if understanding.entities.len() >= 3 && self.enable_hybrid {
-            debug!(
-                "Selected Hybrid strategy (Rule 5: Complex query with {} entities)",
-                understanding.entities.len()
-            );
-            return RetrievalStrategy::Hybrid;
-        }
-
-        // Rule 6: Simple queries (few keywords) -> recent interactions
-        // Only for Unknown intent (otherwise fall through to BM25)
-        if understanding.keywords.len() < 2 && understanding.intent == QueryIntent::Unknown {
-            debug!(
-                "Selected Episodic strategy (Rule 6: Simple query with {} keywords)",
-                understanding.keywords.len()
-            );
-            return RetrievalStrategy::Episodic;
-        }
-
-        // Rule 7: Default fallback -> BM25 keyword search
+        // Rule 7: Default fallback
         debug!("Selected BM25 strategy (Rule 7: Default fallback)");
         RetrievalStrategy::BM25
     }
