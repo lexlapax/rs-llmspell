@@ -135,43 +135,7 @@ impl RegexExtractor {
         for cap in ENTITY_PATTERN.captures_iter(text) {
             let name = cap[1].trim();
 
-            // Filter out short/common words
-            if name.len() < self.min_entity_length {
-                filtered_count += 1;
-                continue;
-            }
-
-            // Skip common non-entity words (stopwords)
-            if is_stopword(name) {
-                trace!("Filtered stopword: '{}'", name);
-                filtered_count += 1;
-                continue;
-            }
-
-            // Skip single-letter entities (usually noise)
-            if name.len() == 1 {
-                filtered_count += 1;
-                continue;
-            }
-
-            // Skip all-caps words shorter than 3 chars (often acronyms used as stopwords: "TO", "IN", "AT")
-            if name.chars().all(char::is_uppercase) && name.len() < 3 {
-                filtered_count += 1;
-                continue;
-            }
-
-            // Skip multi-word entities that start with stopwords (e.g., "The Rust", "However Python")
-            if let Some(first_word) = name.split_whitespace().next() {
-                if is_stopword(first_word) {
-                    trace!("Filtered entity starting with stopword: '{}'", name);
-                    filtered_count += 1;
-                    continue;
-                }
-            }
-
-            // Deduplicate
-            if !seen_names.insert(name.to_string()) {
-                trace!("Filtered duplicate: '{}'", name);
+            if !self.should_keep_entity(name, &mut seen_names) {
                 filtered_count += 1;
                 continue;
             }
@@ -198,6 +162,50 @@ impl RegexExtractor {
         );
 
         entities
+    }
+
+    /// Check if entity should be kept after applying filters
+    fn should_keep_entity(
+        &self,
+        name: &str,
+        seen_names: &mut std::collections::HashSet<String>,
+    ) -> bool {
+        // Filter out short/common words
+        if name.len() < self.min_entity_length {
+            return false;
+        }
+
+        // Skip common non-entity words (stopwords)
+        if is_stopword(name) {
+            trace!("Filtered stopword: '{}'", name);
+            return false;
+        }
+
+        // Skip single-letter entities (usually noise)
+        if name.len() == 1 {
+            return false;
+        }
+
+        // Skip all-caps words shorter than 3 chars (often acronyms used as stopwords: "TO", "IN", "AT")
+        if name.chars().all(char::is_uppercase) && name.len() < 3 {
+            return false;
+        }
+
+        // Skip multi-word entities that start with stopwords (e.g., "The Rust", "However Python")
+        if let Some(first_word) = name.split_whitespace().next() {
+            if is_stopword(first_word) {
+                trace!("Filtered entity starting with stopword: '{}'", name);
+                return false;
+            }
+        }
+
+        // Deduplicate
+        if !seen_names.insert(name.to_string()) {
+            trace!("Filtered duplicate: '{}'", name);
+            return false;
+        }
+
+        true
     }
 
     /// Extract relationships from text
