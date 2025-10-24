@@ -42,11 +42,7 @@ impl<S> Layer<S> for TestLayer
 where
     S: tracing::Subscriber,
 {
-    fn on_event(
-        &self,
-        event: &tracing::Event<'_>,
-        _ctx: Context<'_, S>,
-    ) {
+    fn on_event(&self, event: &tracing::Event<'_>, _ctx: Context<'_, S>) {
         let mut visitor = MessageVisitor::default();
         event.record(&mut visitor);
 
@@ -92,14 +88,19 @@ async fn test_manager_init_produces_info_log() {
 
     let _manager = DefaultMemoryManager::new_in_memory().await.unwrap();
 
-    let info_logs: Vec<_> = events.lock().unwrap()
+    let info_logs: Vec<_> = events
+        .lock()
+        .unwrap()
         .iter()
         .filter(|e| e.level == Level::INFO)
         .cloned()
         .collect();
 
     assert!(
-        info_logs.iter().any(|e| e.message.contains("Initializing DefaultMemoryManager") || e.message.contains("in-memory")),
+        info_logs
+            .iter()
+            .any(|e| e.message.contains("Initializing DefaultMemoryManager")
+                || e.message.contains("in-memory")),
         "Expected info! log for manager initialization, got: {info_logs:?}"
     );
 }
@@ -117,14 +118,18 @@ async fn test_episodic_add_produces_info_log() {
 
     manager.episodic().add(entry).await.unwrap();
 
-    let info_logs: Vec<_> = events.lock().unwrap()
+    let info_logs: Vec<_> = events
+        .lock()
+        .unwrap()
         .iter()
         .filter(|e| e.level == Level::INFO)
         .cloned()
         .collect();
 
     assert!(
-        info_logs.iter().any(|e| e.message.contains("Adding episodic entry") && e.message.contains("session_id")),
+        info_logs.iter().any(
+            |e| e.message.contains("Adding episodic entry") && e.message.contains("session_id")
+        ),
         "Expected info! log for episodic add with session_id, got: {info_logs:?}"
     );
 }
@@ -146,7 +151,9 @@ async fn test_vector_search_produces_debug_log() {
     // Now search
     manager.episodic().search("Rust", 5).await.unwrap();
 
-    let debug_logs: Vec<_> = events.lock().unwrap()
+    let debug_logs: Vec<_> = events
+        .lock()
+        .unwrap()
         .iter()
         .filter(|e| e.level == Level::DEBUG)
         .cloned()
@@ -174,25 +181,32 @@ async fn test_consolidation_metrics_produces_info_log() {
         duration_ms: 100,
     };
 
-    metrics.record_consolidation(
-        &result,
-        &[],
-        Duration::from_millis(100),
-        PromptVersion::V1,
-        true,
-        None,
-        None,
-        &[],
-    ).await;
+    metrics
+        .record_consolidation(
+            &result,
+            &[],
+            Duration::from_millis(100),
+            PromptVersion::V1,
+            true,
+            None,
+            None,
+            &[],
+        )
+        .await;
 
-    let info_logs: Vec<_> = events.lock().unwrap()
+    let info_logs: Vec<_> = events
+        .lock()
+        .unwrap()
         .iter()
         .filter(|e| e.level == Level::INFO)
         .cloned()
         .collect();
 
     assert!(
-        info_logs.iter().any(|e| e.message.contains("Recording consolidation") && e.message.contains("entries_processed")),
+        info_logs
+            .iter()
+            .any(|e| e.message.contains("Recording consolidation")
+                && e.message.contains("entries_processed")),
         "Expected info! log for consolidation metrics, got: {info_logs:?}"
     );
 }
@@ -205,14 +219,19 @@ async fn test_json_parse_error_produces_warn_log() {
     let invalid_json = "{invalid json";
     let _result = ConsolidationResponse::from_json(invalid_json);
 
-    let warn_logs: Vec<_> = events.lock().unwrap()
+    let warn_logs: Vec<_> = events
+        .lock()
+        .unwrap()
         .iter()
         .filter(|e| e.level == Level::WARN)
         .cloned()
         .collect();
 
     assert!(
-        warn_logs.iter().any(|e| e.message.contains("Full JSON parsing failed") || e.message.contains("Partial parse failed")),
+        warn_logs
+            .iter()
+            .any(|e| e.message.contains("Full JSON parsing failed")
+                || e.message.contains("Partial parse failed")),
         "Expected warn! log for JSON parse error, got: {warn_logs:?}"
     );
 }

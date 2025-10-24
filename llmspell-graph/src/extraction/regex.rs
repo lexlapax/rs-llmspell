@@ -245,40 +245,20 @@ impl RegexExtractor {
         let mut relationships = Vec::new();
 
         // Extract each pattern type
-        let (is_a_rels, is_a_count) = Self::extract_pattern_relationships(
-            text,
-            &IS_A_PATTERN,
-            "is_a",
-            "is_a",
-            "is_a",
-        );
+        let (is_a_rels, is_a_count) =
+            Self::extract_pattern_relationships(text, &IS_A_PATTERN, "is_a", "is_a", "is_a");
         relationships.extend(is_a_rels);
 
-        let (has_rels, has_count) = Self::extract_pattern_relationships(
-            text,
-            &HAS_PATTERN,
-            "has_feature",
-            "has",
-            "has",
-        );
+        let (has_rels, has_count) =
+            Self::extract_pattern_relationships(text, &HAS_PATTERN, "has_feature", "has", "has");
         relationships.extend(has_rels);
 
-        let (in_rels, in_count) = Self::extract_pattern_relationships(
-            text,
-            &IN_PATTERN,
-            "located_in",
-            "in",
-            "in",
-        );
+        let (in_rels, in_count) =
+            Self::extract_pattern_relationships(text, &IN_PATTERN, "located_in", "in", "in");
         relationships.extend(in_rels);
 
-        let (of_rels, of_count) = Self::extract_pattern_relationships(
-            text,
-            &OF_PATTERN,
-            "part_of",
-            "of",
-            "of",
-        );
+        let (of_rels, of_count) =
+            Self::extract_pattern_relationships(text, &OF_PATTERN, "part_of", "of", "of");
         relationships.extend(of_rels);
 
         info!("Relationship extraction complete: {} relationships extracted (is_a={}, has={}, in={}, of={})",
@@ -313,7 +293,13 @@ impl RegexExtractor {
             .map(|cap| {
                 let from = cap[1].trim();
                 let to = cap[2].trim();
-                trace!("Matched {}: '{}' {} '{}'", relationship_type, from, trace_verb, to);
+                trace!(
+                    "Matched {}: '{}' {} '{}'",
+                    relationship_type,
+                    from,
+                    trace_verb,
+                    to
+                );
 
                 Relationship::new(
                     from.to_string(),

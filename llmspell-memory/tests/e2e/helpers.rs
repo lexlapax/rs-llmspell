@@ -183,9 +183,7 @@ pub async fn assert_entity_not_exists(graph: &Arc<dyn KnowledgeGraph>, entity_id
                 return;
             }
         }
-        panic!(
-            "Entity '{entity_id}' should not exist or should be deleted"
-        );
+        panic!("Entity '{entity_id}' should not exist or should be deleted");
     } else {
         // Entity not found - expected
     }

@@ -34,9 +34,7 @@ pub async fn check_ollama_available() -> bool {
             true
         }
         _ => {
-            eprintln!(
-                "✗ Ollama unavailable at {ollama_host} - skipping E2E tests"
-            );
+            eprintln!("✗ Ollama unavailable at {ollama_host} - skipping E2E tests");
             eprintln!("  To run E2E tests: Start Ollama and ensure llama3.2:3b model is available");
             eprintln!("  Set OLLAMA_HOST env var if using non-default host");
             false

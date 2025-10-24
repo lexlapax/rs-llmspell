@@ -120,8 +120,14 @@ impl ConsolidationResponse {
     /// Returns `MemoryError::InvalidInput` if JSON parsing fails completely,
     /// including partial parsing attempts.
     pub fn from_json(json_str: &str) -> Result<Self> {
-        info!("Parsing consolidation response: len={} bytes", json_str.len());
-        trace!("Raw JSON input: {}", json_str.chars().take(200).collect::<String>());
+        info!(
+            "Parsing consolidation response: len={} bytes",
+            json_str.len()
+        );
+        trace!(
+            "Raw JSON input: {}",
+            json_str.chars().take(200).collect::<String>()
+        );
 
         // Strip markdown code fences if present (```json ... ``` or ``` ... ```)
         let json_str = json_str.trim();
@@ -199,7 +205,10 @@ impl ConsolidationResponse {
                 .iter()
                 .filter_map(|v| serde_json::from_value::<EntityPayload>(v.clone()).ok())
                 .collect();
-            debug!("Partial parse: extracted {} entities", response.entities.len());
+            debug!(
+                "Partial parse: extracted {} entities",
+                response.entities.len()
+            );
         }
     }
 
@@ -210,7 +219,10 @@ impl ConsolidationResponse {
                 .iter()
                 .filter_map(|v| serde_json::from_value::<RelationshipPayload>(v.clone()).ok())
                 .collect();
-            debug!("Partial parse: extracted {} relationships", response.relationships.len());
+            debug!(
+                "Partial parse: extracted {} relationships",
+                response.relationships.len()
+            );
         }
     }
 
@@ -221,7 +233,10 @@ impl ConsolidationResponse {
                 .iter()
                 .filter_map(|v| serde_json::from_value::<DecisionPayload>(v.clone()).ok())
                 .collect();
-            debug!("Partial parse: extracted {} decisions", response.decisions.len());
+            debug!(
+                "Partial parse: extracted {} decisions",
+                response.decisions.len()
+            );
         }
     }
 
@@ -246,7 +261,10 @@ impl ConsolidationResponse {
             self.decisions.len()
         );
         let json = serde_json::to_string_pretty(self).map_err(MemoryError::Serialization)?;
-        trace!("Serialized JSON (first 200 chars): {}", json.chars().take(200).collect::<String>());
+        trace!(
+            "Serialized JSON (first 200 chars): {}",
+            json.chars().take(200).collect::<String>()
+        );
         Ok(json)
     }
 }

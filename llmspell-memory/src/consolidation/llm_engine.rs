@@ -303,7 +303,10 @@ impl LLMConsolidationEngine {
                 info!("Trying fallback model: {}", model);
             }
 
-            match self.try_model_with_retries(system_prompt, user_prompt, model, model_idx).await {
+            match self
+                .try_model_with_retries(system_prompt, user_prompt, model, model_idx)
+                .await
+            {
                 Ok(response) => return Ok(response),
                 Err(e) => {
                     last_error = Some(e);

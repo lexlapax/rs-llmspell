@@ -60,12 +60,14 @@ async fn test_add_decision() {
     );
 
     // Ground truth: Expected decisions
-    let _ground_truth = [GroundTruthDecision::Add {
+    let _ground_truth = [
+        GroundTruthDecision::Add {
             entity_id: "rust".to_string(),
         },
         GroundTruthDecision::Add {
             entity_id: "systems_programming".to_string(),
-        }];
+        },
+    ];
 
     // Run consolidation
     let mut entries = vec![entry];
@@ -475,9 +477,7 @@ async fn test_multi_turn_consolidation() {
         "  Turn 3: {} processed, {} added, {} updated",
         result3.entries_processed, result3.entities_added, result3.entities_updated
     );
-    eprintln!(
-        "  Total: {total_entities} entities added, {total_updates} updated"
-    );
+    eprintln!("  Total: {total_entities} entities added, {total_updates} updated");
 }
 
 /// Test error recovery: Graceful handling of edge cases

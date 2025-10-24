@@ -392,7 +392,10 @@ impl ConsolidationMetrics {
     /// Uses configured strategy (Fixed/RandomPerConsolidation/RandomPerSession).
     pub async fn select_version(&self, session_id: &str) -> PromptVersion {
         let strategy = *self.version_strategy.read().await;
-        debug!("Selecting prompt version: strategy={:?}, session_id={}", strategy, session_id);
+        debug!(
+            "Selecting prompt version: strategy={:?}, session_id={}",
+            strategy, session_id
+        );
 
         let version = match strategy {
             VersionSelectionStrategy::Fixed(version) => {
@@ -407,7 +410,10 @@ impl ConsolidationMetrics {
             }
             VersionSelectionStrategy::RandomPerSession => {
                 // Get or create session-sticky version
-                let version = *self.session_versions.write().await
+                let version = *self
+                    .session_versions
+                    .write()
+                    .await
                     .entry(session_id.to_string())
                     .or_insert_with(|| {
                         // Random selection on first use
@@ -415,7 +421,10 @@ impl ConsolidationMetrics {
                         trace!("RandomPerSession strategy: first use for session, using V1");
                         PromptVersion::V1
                     });
-                trace!("RandomPerSession strategy: session sticky version {:?}", version);
+                trace!(
+                    "RandomPerSession strategy: session sticky version {:?}",
+                    version
+                );
                 version
             }
         };
@@ -677,7 +686,10 @@ impl ConsolidationMetrics {
 
         // Need at least 2 versions to compare
         if core.prompt_metrics.len() < 2 {
-            debug!("Auto-promotion: not enough versions ({} < 2)", core.prompt_metrics.len());
+            debug!(
+                "Auto-promotion: not enough versions ({} < 2)",
+                core.prompt_metrics.len()
+            );
             return None;
         }
 

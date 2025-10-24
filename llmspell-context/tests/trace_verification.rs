@@ -39,11 +39,7 @@ impl<S> Layer<S> for TestLayer
 where
     S: tracing::Subscriber,
 {
-    fn on_event(
-        &self,
-        event: &tracing::Event<'_>,
-        _ctx: Context<'_, S>,
-    ) {
+    fn on_event(&self, event: &tracing::Event<'_>, _ctx: Context<'_, S>) {
         let mut visitor = MessageVisitor::default();
         event.record(&mut visitor);
 
@@ -90,14 +86,18 @@ async fn test_query_analysis_produces_debug_log() {
     let analyzer = RegexQueryAnalyzer::new();
     let _ = analyzer.understand("How do I use HashMap?").await.unwrap();
 
-    let debug_logs: Vec<_> = events.lock().unwrap()
+    let debug_logs: Vec<_> = events
+        .lock()
+        .unwrap()
         .iter()
         .filter(|e| e.level == Level::DEBUG)
         .cloned()
         .collect();
 
     assert!(
-        debug_logs.iter().any(|e| e.message.contains("Intent classified") || e.message.contains("Extracted")),
+        debug_logs
+            .iter()
+            .any(|e| e.message.contains("Intent classified") || e.message.contains("Extracted")),
         "Expected debug! log for query analysis with intent/extraction info, got: {debug_logs:?}"
     );
 }
@@ -117,14 +117,19 @@ async fn test_strategy_selection_produces_info_log() {
 
     assert_eq!(strategy, RetrievalStrategy::Episodic);
 
-    let info_logs: Vec<_> = events.lock().unwrap()
+    let info_logs: Vec<_> = events
+        .lock()
+        .unwrap()
         .iter()
         .filter(|e| e.level == Level::INFO)
         .cloned()
         .collect();
 
     assert!(
-        info_logs.iter().any(|e| e.message.contains("Selecting retrieval strategy") && e.message.contains("intent")),
+        info_logs
+            .iter()
+            .any(|e| e.message.contains("Selecting retrieval strategy")
+                && e.message.contains("intent")),
         "Expected info! log for strategy selection with intent, got: {info_logs:?}"
     );
 }

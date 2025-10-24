@@ -248,7 +248,10 @@ impl ConsolidationDaemon {
             Ok(queue_depth) => {
                 self.handle_batch_success(queue_depth).await;
                 let new_interval = self.select_interval(queue_depth);
-                debug!("Queue depth: {}, next interval: {:?}", queue_depth, new_interval);
+                debug!(
+                    "Queue depth: {}, next interval: {:?}",
+                    queue_depth, new_interval
+                );
                 tokio::time::interval(new_interval)
             }
             Err(e) => {
@@ -502,7 +505,10 @@ mod tests {
         async fn list_sessions_with_unprocessed(&self) -> Result<Vec<String>> {
             use std::collections::HashSet;
 
-            let sessions: HashSet<String> = self.entries.lock().await
+            let sessions: HashSet<String> = self
+                .entries
+                .lock()
+                .await
                 .iter()
                 .filter(|e| !e.processed)
                 .map(|e| e.session_id.clone())

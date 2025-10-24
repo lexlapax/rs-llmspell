@@ -40,11 +40,7 @@ impl<S> Layer<S> for TestLayer
 where
     S: tracing::Subscriber,
 {
-    fn on_event(
-        &self,
-        event: &tracing::Event<'_>,
-        _ctx: Context<'_, S>,
-    ) {
+    fn on_event(&self, event: &tracing::Event<'_>, _ctx: Context<'_, S>) {
         let mut visitor = MessageVisitor::default();
         event.record(&mut visitor);
 
@@ -91,14 +87,18 @@ async fn test_surrealdb_init_produces_info_log() {
     let temp_dir = TempDir::new().unwrap();
     let _backend = SurrealDBBackend::new(temp_dir.path()).await.unwrap();
 
-    let info_logs: Vec<_> = events.lock().unwrap()
+    let info_logs: Vec<_> = events
+        .lock()
+        .unwrap()
         .iter()
         .filter(|e| e.level == Level::INFO)
         .cloned()
         .collect();
 
     assert!(
-        info_logs.iter().any(|e| e.message.contains("Initializing SurrealDB backend")),
+        info_logs
+            .iter()
+            .any(|e| e.message.contains("Initializing SurrealDB backend")),
         "Expected info! log for SurrealDB initialization, got: {info_logs:?}"
     );
 }
@@ -118,14 +118,18 @@ async fn test_entity_creation_produces_debug_log() {
 
     backend.add_entity(entity).await.unwrap();
 
-    let debug_logs: Vec<_> = events.lock().unwrap()
+    let debug_logs: Vec<_> = events
+        .lock()
+        .unwrap()
         .iter()
         .filter(|e| e.level == Level::DEBUG)
         .cloned()
         .collect();
 
     assert!(
-        debug_logs.iter().any(|e| e.message.contains("entity_type") || e.message.contains("Adding entity")),
+        debug_logs
+            .iter()
+            .any(|e| e.message.contains("entity_type") || e.message.contains("Adding entity")),
         "Expected debug! log for entity creation with entity_type, got: {debug_logs:?}"
     );
 }
@@ -138,25 +142,25 @@ async fn test_temporal_query_produces_trace_log() {
     let backend = SurrealDBBackend::new(temp_dir.path()).await.unwrap();
 
     // Add an entity first
-    let entity = Entity::new(
-        "Python".to_string(),
-        "language".to_string(),
-        json!({}),
-    );
+    let entity = Entity::new("Python".to_string(), "language".to_string(), json!({}));
     backend.add_entity(entity).await.unwrap();
 
     // Now query
     let query = TemporalQuery::new().with_entity_type("language".to_string());
     let _ = backend.query_temporal(query).await;
 
-    let trace_logs: Vec<_> = events.lock().unwrap()
+    let trace_logs: Vec<_> = events
+        .lock()
+        .unwrap()
         .iter()
         .filter(|e| e.level == Level::TRACE)
         .cloned()
         .collect();
 
     assert!(
-        trace_logs.iter().any(|e| e.message.contains("query") || e.message.contains("Temporal")),
+        trace_logs
+            .iter()
+            .any(|e| e.message.contains("query") || e.message.contains("Temporal")),
         "Expected trace! log for temporal query, got: {trace_logs:?}"
     );
 }
@@ -170,14 +174,18 @@ async fn test_connection_failure_produces_error_log() {
 
     assert!(result.is_err(), "Expected connection to fail");
 
-    let error_logs: Vec<_> = events.lock().unwrap()
+    let error_logs: Vec<_> = events
+        .lock()
+        .unwrap()
         .iter()
         .filter(|e| e.level == Level::ERROR)
         .cloned()
         .collect();
 
     assert!(
-        error_logs.iter().any(|e| e.message.contains("Failed") || e.message.contains("error")),
+        error_logs
+            .iter()
+            .any(|e| e.message.contains("Failed") || e.message.contains("error")),
         "Expected error! log for connection failure, got: {error_logs:?}"
     );
 }
