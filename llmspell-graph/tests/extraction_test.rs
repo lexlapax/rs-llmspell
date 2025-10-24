@@ -327,7 +327,8 @@ fn test_performance_target() {
     // Calculate median (more stable than mean)
     durations.sort();
     let median = durations[iterations / 2];
-    let p95 = durations[(iterations as f64 * 0.95) as usize];
+    let p95_idx = (iterations * 95) / 100; // 95th percentile index
+    let p95 = durations[p95_idx];
 
     println!("Extraction median: {median:?}, p95: {p95:?} over {iterations} runs");
 

@@ -171,7 +171,13 @@ impl RegexExtractor {
 
         for cap in ENTITY_PATTERN.captures_iter(text) {
             let name = cap[1].trim();
-            self.process_entity_match(name, text, &mut entities, &mut seen_names, &mut filtered_count);
+            self.process_entity_match(
+                name,
+                text,
+                &mut entities,
+                &mut seen_names,
+                &mut filtered_count,
+            );
         }
 
         Self::log_extraction_summary(&entities, filtered_count);

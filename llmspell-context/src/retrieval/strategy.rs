@@ -48,8 +48,12 @@ impl StrategySelector {
     }
 
     /// Helper: Check Rule 2 - WhatIs/Explain with entities
-    fn check_whatis_explain_rule(&self, understanding: &QueryUnderstanding) -> Option<RetrievalStrategy> {
-        if (understanding.intent == QueryIntent::WhatIs || understanding.intent == QueryIntent::Explain)
+    fn check_whatis_explain_rule(
+        &self,
+        understanding: &QueryUnderstanding,
+    ) -> Option<RetrievalStrategy> {
+        if (understanding.intent == QueryIntent::WhatIs
+            || understanding.intent == QueryIntent::Explain)
             && understanding.entities.len() >= self.semantic_entity_threshold
         {
             debug!(
@@ -86,7 +90,10 @@ impl StrategySelector {
     }
 
     /// Helper: Check Rule 5 - Complex queries (many entities)
-    fn check_complex_query_rule(&self, understanding: &QueryUnderstanding) -> Option<RetrievalStrategy> {
+    fn check_complex_query_rule(
+        &self,
+        understanding: &QueryUnderstanding,
+    ) -> Option<RetrievalStrategy> {
         if understanding.entities.len() >= 3 && self.enable_hybrid {
             debug!(
                 "Selected Hybrid strategy (Rule 5: Complex query with {} entities)",

@@ -136,21 +136,34 @@ impl DefaultMemoryManager {
     pub async fn new_in_memory() -> Result<Self> {
         info!("Initializing DefaultMemoryManager with in-memory backends");
 
-        debug!("Creating InMemoryEpisodicMemory");
-        let episodic: Arc<dyn EpisodicMemory> = Arc::new(InMemoryEpisodicMemory::new());
-
-        debug!("Creating temporary GraphSemanticMemory (SurrealDB)");
-        let semantic: Arc<dyn SemanticMemory> =
-            Arc::new(GraphSemanticMemory::new_temp().await.map_err(|e| {
-                error!("Failed to initialize semantic memory: {}", e);
-                e
-            })?);
-
-        debug!("Creating NoopProceduralMemory");
-        let procedural: Arc<dyn ProceduralMemory> = Arc::new(NoopProceduralMemory);
+        let episodic = Self::create_episodic_memory();
+        let semantic = Self::create_semantic_memory().await?;
+        let procedural = Self::create_procedural_memory();
 
         info!("DefaultMemoryManager initialized successfully");
         Ok(Self::new(episodic, semantic, procedural))
+    }
+
+    /// Helper: Create in-memory episodic memory
+    fn create_episodic_memory() -> Arc<dyn EpisodicMemory> {
+        debug!("Creating InMemoryEpisodicMemory");
+        Arc::new(InMemoryEpisodicMemory::new())
+    }
+
+    /// Helper: Create temporary semantic memory with `SurrealDB`
+    async fn create_semantic_memory() -> Result<Arc<dyn SemanticMemory>> {
+        debug!("Creating temporary GraphSemanticMemory (SurrealDB)");
+        let semantic = GraphSemanticMemory::new_temp().await.map_err(|e| {
+            error!("Failed to initialize semantic memory: {}", e);
+            e
+        })?;
+        Ok(Arc::new(semantic))
+    }
+
+    /// Helper: Create no-op procedural memory
+    fn create_procedural_memory() -> Arc<dyn ProceduralMemory> {
+        debug!("Creating NoopProceduralMemory");
+        Arc::new(NoopProceduralMemory)
     }
 }
 
