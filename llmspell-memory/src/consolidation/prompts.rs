@@ -80,10 +80,12 @@ pub struct ConsolidationPromptConfig {
 }
 
 impl Default for ConsolidationPromptConfig {
+    /// Default config for build-time testing only
+    /// Production code should set model explicitly via builder
     fn default() -> Self {
         Self {
             output_format: OutputFormat::Json,
-            model: "ollama/llama3.2:3b".to_string(),
+            model: "test-model".to_string(),
             temperature: 0.0,
             token_budget: TokenBudget::default(),
             version: PromptVersion::default(),
@@ -476,7 +478,7 @@ mod tests {
     fn test_default_config() {
         let config = ConsolidationPromptConfig::default();
         assert_eq!(config.output_format, OutputFormat::Json);
-        assert_eq!(config.model, "ollama/llama3.2:3b");
+        assert_eq!(config.model, "test-model");
         assert!((config.temperature - 0.0).abs() < f32::EPSILON);
         assert_eq!(config.token_budget.episodic_tokens, 1600);
     }

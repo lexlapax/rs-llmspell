@@ -13,6 +13,7 @@ description = "Adaptive memory system with episodic, semantic, and procedural me
 # Core dependencies
 llmspell-core = { path = "../llmspell-core" }
 llmspell-utils = { path = "../llmspell-utils" }
+llmspell-config = { path = "../llmspell-config" }
 llmspell-rag = { path = "../llmspell-rag" }
 llmspell-kernel = { path = "../llmspell-kernel" }
 llmspell-graph = { path = "../llmspell-graph" }

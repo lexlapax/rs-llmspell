@@ -45,10 +45,12 @@ pub struct LLMConsolidationConfig {
 }
 
 impl Default for LLMConsolidationConfig {
+    /// Default config for build-time testing only
+    /// Production code should use `from_provider()` instead
     fn default() -> Self {
         Self {
-            model: "ollama/llama3.2:3b".to_string(),
-            fallback_models: vec!["ollama/qwen:7b".to_string()],
+            model: "test-model".to_string(),
+            fallback_models: vec![],
             temperature: 0.0,
             max_tokens: 2000,
             timeout_secs: 30,
@@ -56,6 +58,39 @@ impl Default for LLMConsolidationConfig {
             circuit_breaker_threshold: 5,
             version: PromptVersion::default(),
         }
+    }
+}
+
+impl LLMConsolidationConfig {
+    /// Create config from provider (PRIMARY factory method for production)
+    ///
+    /// # Arguments
+    ///
+    /// * `provider` - Provider configuration from llmspell-config
+    ///
+    /// # Returns
+    ///
+    /// `LLMConsolidationConfig` with values from provider, using sensible defaults for missing fields
+    ///
+    /// # Errors
+    ///
+    /// Returns `MemoryError::Consolidation` if provider is missing required `default_model` field
+    pub fn from_provider(provider: &llmspell_config::ProviderConfig) -> Result<Self> {
+        let model = provider
+            .default_model
+            .clone()
+            .ok_or_else(|| MemoryError::Consolidation("provider missing default_model".into()))?;
+
+        Ok(Self {
+            model,
+            fallback_models: vec![], // TODO: Add provider.fallback_models field in future
+            temperature: provider.temperature.unwrap_or(0.0),
+            max_tokens: provider.max_tokens.map_or(2000, |t| t as usize),
+            timeout_secs: provider.timeout_seconds.unwrap_or(30),
+            max_retries: provider.max_retries.unwrap_or(3),
+            circuit_breaker_threshold: 5, // Not provider-configurable, consolidation-specific
+            version: PromptVersion::default(),
+        })
     }
 }
 
