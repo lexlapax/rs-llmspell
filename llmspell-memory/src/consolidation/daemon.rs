@@ -257,20 +257,26 @@ impl ConsolidationDaemon {
         _current_interval: tokio::time::Interval,
     ) -> tokio::time::Interval {
         match self.process_batch().await {
-            Ok(queue_depth) => {
-                self.handle_batch_success(queue_depth).await;
-                let new_interval = self.select_interval(queue_depth);
-                debug!(
-                    "Queue depth: {}, next interval: {:?}",
-                    queue_depth, new_interval
-                );
-                tokio::time::interval(new_interval)
-            }
-            Err(e) => {
-                self.handle_batch_failure(e).await;
-                tokio::time::interval(Duration::from_secs(self.config.fast_interval_secs))
-            }
+            Ok(queue_depth) => self.handle_success_and_create_interval(queue_depth).await,
+            Err(e) => self.handle_error_and_create_interval(e).await,
         }
+    }
+
+    /// Helper: Handle batch success and create new interval
+    async fn handle_success_and_create_interval(&self, queue_depth: usize) -> tokio::time::Interval {
+        self.handle_batch_success(queue_depth).await;
+        let new_interval = self.select_interval(queue_depth);
+        debug!(
+            "Queue depth: {}, next interval: {:?}",
+            queue_depth, new_interval
+        );
+        tokio::time::interval(new_interval)
+    }
+
+    /// Helper: Handle batch error and create fallback interval
+    async fn handle_error_and_create_interval(&self, error: MemoryError) -> tokio::time::Interval {
+        self.handle_batch_failure(error).await;
+        tokio::time::interval(Duration::from_secs(self.config.fast_interval_secs))
     }
 
     /// Handle successful batch processing
