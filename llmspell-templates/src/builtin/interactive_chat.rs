@@ -1041,6 +1041,18 @@ impl ConversationTurn {
 mod tests {
     use super::*;
     use crate::core::Template;
+    /// Test helper: Create a provider config for tests
+    fn test_provider_config() -> llmspell_config::ProviderConfig {
+        llmspell_config::ProviderConfig {
+            default_model: Some("ollama/llama3.2:3b".to_string()),
+            provider_type: "ollama".to_string(),
+            temperature: Some(0.3),
+            max_tokens: Some(2000),
+            timeout_seconds: Some(120),
+            ..Default::default()
+        }
+    }
+
 
     #[test]
     fn test_template_metadata() {
@@ -1227,7 +1239,7 @@ mod tests {
                 model[slash_pos + 1..].to_string(),
             )
         } else {
-            (provider_config.provider_type.clone(), model.to_string())
+            ("ollama".to_string(), model.to_string())
         };
 
         assert_eq!(provider, "anthropic");
@@ -1244,7 +1256,7 @@ mod tests {
                 model[slash_pos + 1..].to_string(),
             )
         } else {
-            (provider_config.provider_type.clone(), model.to_string())
+            ("ollama".to_string(), model.to_string())
         };
 
         assert_eq!(provider, "ollama");
@@ -1339,7 +1351,7 @@ mod tests {
             let result = template
                 .run_programmatic_mode(
                     "test-session-uuid",
-                    "ollama/llama3.2:3b",
+                    &test_provider_config(),
                     "You are helpful",
                     "Hello, how are you?",
                     &[],
@@ -1377,7 +1389,7 @@ mod tests {
                 let _ = template
                     .run_programmatic_mode(
                         &session_id,
-                        "ollama/llama3.2:3b",
+                        &test_provider_config(),
                         "System",
                         "Message 1",
                         &[],
@@ -1389,7 +1401,7 @@ mod tests {
                 let _ = template
                     .run_programmatic_mode(
                         &session_id,
-                        "ollama/llama3.2:3b",
+                        &test_provider_config(),
                         "System",
                         "Message 2",
                         &[],

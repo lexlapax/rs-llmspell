@@ -408,7 +408,8 @@ mod tests {
         );
         let component_registry = Arc::new(crate::registry::ComponentRegistry::new());
         let providers = Arc::new(llmspell_providers::ProviderManager::new());
-        let provider_config = Arc::new(llmspell_config::providers::ProviderManagerConfig::default());
+        let provider_config =
+            Arc::new(llmspell_config::providers::ProviderManagerConfig::default());
         let (tool_registry, agent_registry, workflow_factory) = create_test_infrastructure();
 
         let infra = InfraConfig {
@@ -437,7 +438,8 @@ mod tests {
         );
         let component_registry = Arc::new(crate::registry::ComponentRegistry::new());
         let providers = Arc::new(llmspell_providers::ProviderManager::new());
-        let provider_config = Arc::new(llmspell_config::providers::ProviderManagerConfig::default());
+        let provider_config =
+            Arc::new(llmspell_config::providers::ProviderManagerConfig::default());
         let (tool_registry, agent_registry, workflow_factory) = create_test_infrastructure();
 
         let infra = InfraConfig {
@@ -470,7 +472,8 @@ mod tests {
         );
         let component_registry = Arc::new(crate::registry::ComponentRegistry::new());
         let providers = Arc::new(llmspell_providers::ProviderManager::new());
-        let provider_config = Arc::new(llmspell_config::providers::ProviderManagerConfig::default());
+        let provider_config =
+            Arc::new(llmspell_config::providers::ProviderManagerConfig::default());
         let (tool_registry, agent_registry, workflow_factory) = create_test_infrastructure();
 
         let infra = InfraConfig {
@@ -514,7 +517,8 @@ mod tests {
         );
         let component_registry = Arc::new(crate::registry::ComponentRegistry::new());
         let providers = Arc::new(llmspell_providers::ProviderManager::new());
-        let provider_config = Arc::new(llmspell_config::providers::ProviderManagerConfig::default());
+        let provider_config =
+            Arc::new(llmspell_config::providers::ProviderManagerConfig::default());
         let (tool_registry, agent_registry, workflow_factory) = create_test_infrastructure();
 
         let infra = InfraConfig {
@@ -546,7 +550,8 @@ mod tests {
         );
         let component_registry = Arc::new(crate::registry::ComponentRegistry::new());
         let providers = Arc::new(llmspell_providers::ProviderManager::new());
-        let provider_config = Arc::new(llmspell_config::providers::ProviderManagerConfig::default());
+        let provider_config =
+            Arc::new(llmspell_config::providers::ProviderManagerConfig::default());
         let (tool_registry, agent_registry, workflow_factory) = create_test_infrastructure();
 
         let infra = InfraConfig {

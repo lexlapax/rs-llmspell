@@ -203,7 +203,8 @@ impl crate::core::Template for CodeReviewTemplate {
 
         // Smart dual-path provider resolution (Task 13.5.7d)
         let provider_config = context.resolve_llm_config(&params)?;
-        let model_str = provider_config.default_model
+        let model_str = provider_config
+            .default_model
             .as_ref()
             .ok_or_else(|| TemplateError::Config("provider missing model".into()))?;
 
@@ -250,7 +251,13 @@ impl crate::core::Template for CodeReviewTemplate {
         let fixes = if generate_fixes && !aggregated.issues.is_empty() {
             info!("Generating fixes for {} issues...", aggregated.issues.len());
             let fix_result = self
-                .generate_fixes(&aggregated, &code_content, &language, &provider_config, &context)
+                .generate_fixes(
+                    &aggregated,
+                    &code_content,
+                    &language,
+                    &provider_config,
+                    &context,
+                )
                 .await?;
             output.metrics.agents_invoked += 1; // Fix generator agent
             Some(fix_result)
@@ -417,7 +424,9 @@ impl CodeReviewTemplate {
         let (agent_name, system_prompt) = self.get_aspect_config(config.aspect, config.language);
 
         // Extract model from provider config
-        let model = config.provider_config.default_model
+        let model = config
+            .provider_config
+            .default_model
             .as_ref()
             .ok_or_else(|| TemplateError::Config("provider missing model".into()))?;
 
@@ -428,7 +437,10 @@ impl CodeReviewTemplate {
                 model[slash_pos + 1..].to_string(),
             )
         } else {
-            (config.provider_config.provider_type.clone(), model.to_string())
+            (
+                config.provider_config.provider_type.clone(),
+                model.to_string(),
+            )
         };
 
         // Create agent config
@@ -788,7 +800,8 @@ impl CodeReviewTemplate {
         use llmspell_core::types::AgentInput;
 
         // Extract model from provider config
-        let model = provider_config.default_model
+        let model = provider_config
+            .default_model
             .as_ref()
             .ok_or_else(|| TemplateError::Config("provider missing model".into()))?;
 

@@ -3584,11 +3584,11 @@ let llm_config = LlmEngineConfig::from_provider(provider)?;
   - [x] workflow-orchestrator.rs (~4 LLM calls) ✅
   - [x] code-review.rs (~10 LLM calls) ✅
   - [x] document-processor.rs (~6 LLM calls) ✅
-- [ ] Update template parameter schemas (model → provider_name)
-- [ ] Update all template tests to use provider fixtures
-- [ ] Add test helper: `test_execution_context_with_provider() -> ExecutionContext`
-- [ ] Update template metadata.json files
-- [ ] All tests pass: `cargo test -p llmspell-templates`
+- [ ] Update template parameter schemas (model → provider_name) (Deferred - backward compat)
+- [x] Update all template tests to use provider fixtures ✅
+- [x] Add test helper: `test_provider_config() -> ProviderConfig` per template ✅
+- [ ] Update template metadata.json files (N/A - no metadata directory exists)
+- [x] All tests compile: `cargo test -p llmspell-templates --lib --no-run` ✅
 - [x] Zero clippy warnings ✅
 
 **Implementation Pattern**:

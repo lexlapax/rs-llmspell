@@ -134,7 +134,8 @@ impl crate::core::Template for CodeGeneratorTemplate {
 
         // Smart dual-path provider resolution (Task 13.5.7d)
         let provider_config = context.resolve_llm_config(&params)?;
-        let model_str = provider_config.default_model
+        let model_str = provider_config
+            .default_model
             .as_ref()
             .ok_or_else(|| TemplateError::Config("provider missing model".into()))?;
 
@@ -276,7 +277,8 @@ impl CodeGeneratorTemplate {
         info!("Creating specification agent for {} code", language);
 
         // Extract model from provider config
-        let model = provider_config.default_model
+        let model = provider_config
+            .default_model
             .as_ref()
             .ok_or_else(|| TemplateError::Config("provider missing model".into()))?;
 
@@ -381,7 +383,8 @@ impl CodeGeneratorTemplate {
         info!("Creating implementation agent for {} code", language);
 
         // Extract model from provider config
-        let model = provider_config.default_model
+        let model = provider_config
+            .default_model
             .as_ref()
             .ok_or_else(|| TemplateError::Config("provider missing model".into()))?;
 
@@ -478,7 +481,8 @@ impl CodeGeneratorTemplate {
         info!("Creating test agent for {} code", language);
 
         // Extract model from provider config
-        let model = provider_config.default_model
+        let model = provider_config
+            .default_model
             .as_ref()
             .ok_or_else(|| TemplateError::Config("provider missing model".into()))?;
 
@@ -810,6 +814,18 @@ mod tests {
     use super::*;
     use crate::core::Template;
 
+    /// Test helper: Create a provider config for tests
+    fn test_provider_config() -> llmspell_config::ProviderConfig {
+        llmspell_config::ProviderConfig {
+            default_model: Some("ollama/llama3.2:3b".to_string()),
+            provider_type: "ollama".to_string(),
+            temperature: Some(0.3),
+            max_tokens: Some(2000),
+            timeout_seconds: Some(120),
+            ..Default::default()
+        }
+    }
+
     #[test]
     fn test_template_metadata() {
         let template = CodeGeneratorTemplate::new();
@@ -920,7 +936,7 @@ mod tests {
         let context = context.unwrap();
 
         let result = template
-            .generate_specification("Test function", "rust", "ollama/llama3.2:3b", &context)
+            .generate_specification("Test function", "rust", &test_provider_config(), &context)
             .await;
         assert!(result.is_ok());
         let result = result.unwrap();
@@ -943,7 +959,7 @@ mod tests {
         };
 
         let result = template
-            .generate_implementation(&spec, "rust", "ollama/llama3.2:3b", &context)
+            .generate_implementation(&spec, "rust", &test_provider_config(), &context)
             .await;
         assert!(result.is_ok());
         let result = result.unwrap();
@@ -966,7 +982,7 @@ mod tests {
         };
 
         let result = template
-            .generate_tests(&implementation, "rust", "ollama/llama3.2:3b", &context)
+            .generate_tests(&implementation, "rust", &test_provider_config(), &context)
             .await;
         assert!(result.is_ok());
         let result = result.unwrap();

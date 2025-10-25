@@ -645,6 +645,18 @@ struct TransformedDocument {
 mod tests {
     use super::*;
     use crate::core::Template;
+    /// Test helper: Create a provider config for tests
+    fn test_provider_config() -> llmspell_config::ProviderConfig {
+        llmspell_config::ProviderConfig {
+            default_model: Some("ollama/llama3.2:3b".to_string()),
+            provider_type: "ollama".to_string(),
+            temperature: Some(0.3),
+            max_tokens: Some(2000),
+            timeout_seconds: Some(120),
+            ..Default::default()
+        }
+    }
+
 
     #[test]
     fn test_template_metadata() {
@@ -780,7 +792,7 @@ mod tests {
         }];
 
         let result = template
-            .transform_content(&extracted, "summarize", "ollama/llama3.2:3b", &context)
+            .transform_content(&extracted, "summarize", &test_provider_config(), &context)
             .await;
         assert!(result.is_ok());
         let docs = result.unwrap();

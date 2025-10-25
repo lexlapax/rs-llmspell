@@ -824,6 +824,18 @@ mod tests {
     use super::*;
     use crate::core::Template;
 
+    /// Test helper: Create a provider config for tests
+    fn test_provider_config() -> llmspell_config::ProviderConfig {
+        llmspell_config::ProviderConfig {
+            default_model: Some("ollama/llama3.2:3b".to_string()),
+            provider_type: "ollama".to_string(),
+            temperature: Some(0.3),
+            max_tokens: Some(2000),
+            timeout_seconds: Some(120),
+            ..Default::default()
+        }
+    }
+
     #[test]
     fn test_template_metadata() {
         let template = DataAnalysisTemplate::new();
@@ -951,7 +963,7 @@ mod tests {
         };
 
         let result = template
-            .run_analysis(&dataset, "descriptive", "ollama/llama3.2:3b", &context)
+            .run_analysis(&dataset, "descriptive", &test_provider_config(), &context)
             .await;
         assert!(result.is_ok());
         let result = result.unwrap();
@@ -981,7 +993,7 @@ mod tests {
         };
 
         let result = template
-            .generate_chart(&dataset, &analysis, "bar", "ollama/llama3.2:3b", &context)
+            .generate_chart(&dataset, &analysis, "bar", &test_provider_config(), &context)
             .await;
         assert!(result.is_ok());
         let result = result.unwrap();

@@ -101,7 +101,8 @@ mod tests {
         };
 
         // Create default provider config for testing
-        let provider_config = Arc::new(llmspell_config::providers::ProviderManagerConfig::default());
+        let provider_config =
+            Arc::new(llmspell_config::providers::ProviderManagerConfig::default());
 
         let bridge = Arc::new(TemplateBridge::new(
             template_registry,
@@ -138,7 +139,8 @@ mod tests {
         };
 
         // Create default provider config for testing
-        let provider_config = Arc::new(llmspell_config::providers::ProviderManagerConfig::default());
+        let provider_config =
+            Arc::new(llmspell_config::providers::ProviderManagerConfig::default());
 
         let bridge = Arc::new(TemplateBridge::new(
             template_registry,

@@ -937,6 +937,18 @@ struct ExecutionResult {
 mod tests {
     use super::*;
     use crate::core::Template;
+    /// Test helper: Create a provider config for tests
+    fn test_provider_config() -> llmspell_config::ProviderConfig {
+        llmspell_config::ProviderConfig {
+            default_model: Some("ollama/llama3.2:3b".to_string()),
+            provider_type: "ollama".to_string(),
+            temperature: Some(0.3),
+            max_tokens: Some(2000),
+            timeout_seconds: Some(120),
+            ..Default::default()
+        }
+    }
+
 
     #[test]
     fn test_template_metadata() {
@@ -1154,7 +1166,7 @@ mod tests {
         };
 
         let result = template
-            .execute_workflow(&plan, "ollama/llama3.2:3b", true, &context)
+            .execute_workflow(&plan, &test_provider_config(), true, &context)
             .await;
         assert!(result.is_ok());
         let execution = result.unwrap();
