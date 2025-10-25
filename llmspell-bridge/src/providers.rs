@@ -191,7 +191,7 @@ impl ProviderManager {
     /// Get a provider configuration by name (from llmspell-config)
     ///
     /// Returns the provider config from `ProviderManagerConfig`, not the runtime instance.
-    /// Use this when you need provider settings like temperature, max_tokens, etc.
+    /// Use this when you need provider settings like temperature, `max_tokens`, etc.
     #[must_use]
     pub fn get_provider_config(&self, name: &str) -> Option<&ProviderConfig> {
         self.config.providers.get(name)

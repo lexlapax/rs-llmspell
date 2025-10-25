@@ -200,15 +200,20 @@ impl crate::core::Template for CodeReviewTemplate {
         let severity_filter: String = params.get_or("severity_filter", "all".to_string());
         let generate_fixes: bool = params.get_or("generate_fixes", false);
         let output_format: String = params.get_or("output_format", "markdown".to_string());
-        let model: String = params.get_or("model", "ollama/llama3.2:3b".to_string());
-        let temperature: f32 = params.get_or("temperature", 0.2);
+
+        // Smart dual-path provider resolution (Task 13.5.7d)
+        let provider_config = context.resolve_llm_config(&params)?;
+        let model_str = provider_config.default_model
+            .as_ref()
+            .ok_or_else(|| TemplateError::Config("provider missing model".into()))?;
 
         info!(
-            "Starting code review (path={}, language={}, aspects={}, severity_filter={})",
+            "Starting code review (path={}, language={}, aspects={}, severity_filter={}, model={})",
             code_path,
             language,
             aspects.len(),
-            severity_filter
+            severity_filter,
+            model_str
         );
 
         // Read code from path
@@ -231,8 +236,7 @@ impl crate::core::Template for CodeReviewTemplate {
                 code: &code_content,
                 language: &language,
                 code_path: &code_path,
-                model: &model,
-                temperature,
+                provider_config: &provider_config,
             };
             let review = self.execute_aspect_review(&review_config, &context).await?;
             all_reviews.push(review);
@@ -246,7 +250,7 @@ impl crate::core::Template for CodeReviewTemplate {
         let fixes = if generate_fixes && !aggregated.issues.is_empty() {
             info!("Generating fixes for {} issues...", aggregated.issues.len());
             let fix_result = self
-                .generate_fixes(&aggregated, &code_content, &language, &model, &context)
+                .generate_fixes(&aggregated, &code_content, &language, &provider_config, &context)
                 .await?;
             output.metrics.agents_invoked += 1; // Fix generator agent
             Some(fix_result)
@@ -385,8 +389,7 @@ struct ReviewConfig<'a> {
     code: &'a str,
     language: &'a str,
     code_path: &'a str,
-    model: &'a str,
-    temperature: f32,
+    provider_config: &'a llmspell_config::ProviderConfig,
 }
 
 impl CodeReviewTemplate {
@@ -413,14 +416,19 @@ impl CodeReviewTemplate {
         // Get aspect-specific configuration
         let (agent_name, system_prompt) = self.get_aspect_config(config.aspect, config.language);
 
+        // Extract model from provider config
+        let model = config.provider_config.default_model
+            .as_ref()
+            .ok_or_else(|| TemplateError::Config("provider missing model".into()))?;
+
         // Parse model string (provider/model format)
-        let (provider, model_id) = if let Some(slash_pos) = config.model.find('/') {
+        let (provider, model_id) = if let Some(slash_pos) = model.find('/') {
             (
-                config.model[..slash_pos].to_string(),
-                config.model[slash_pos + 1..].to_string(),
+                model[..slash_pos].to_string(),
+                model[slash_pos + 1..].to_string(),
             )
         } else {
-            ("ollama".to_string(), config.model.to_string())
+            (config.provider_config.provider_type.clone(), model.to_string())
         };
 
         // Create agent config
@@ -431,8 +439,8 @@ impl CodeReviewTemplate {
             model: Some(ModelConfig {
                 provider,
                 model_id,
-                temperature: Some(config.temperature),
-                max_tokens: Some(2000),
+                temperature: config.provider_config.temperature.or(Some(0.2)),
+                max_tokens: config.provider_config.max_tokens.or(Some(2000)),
                 settings: serde_json::Map::new(),
             }),
             allowed_tools: vec![],
@@ -773,11 +781,16 @@ impl CodeReviewTemplate {
         aggregated: &AggregatedReview,
         code: &str,
         language: &str,
-        model: &str,
+        provider_config: &llmspell_config::ProviderConfig,
         context: &ExecutionContext,
     ) -> Result<FixResult> {
         use llmspell_agents::factory::{AgentConfig, ModelConfig, ResourceLimits};
         use llmspell_core::types::AgentInput;
+
+        // Extract model from provider config
+        let model = provider_config.default_model
+            .as_ref()
+            .ok_or_else(|| TemplateError::Config("provider missing model".into()))?;
 
         // Parse model string
         let (provider, model_id) = if let Some(slash_pos) = model.find('/') {
@@ -786,7 +799,7 @@ impl CodeReviewTemplate {
                 model[slash_pos + 1..].to_string(),
             )
         } else {
-            ("ollama".to_string(), model.to_string())
+            (provider_config.provider_type.clone(), model.to_string())
         };
 
         // Create fix generator agent config
@@ -797,8 +810,8 @@ impl CodeReviewTemplate {
             model: Some(ModelConfig {
                 provider,
                 model_id,
-                temperature: Some(0.4), // Balanced creativity
-                max_tokens: Some(3000),
+                temperature: provider_config.temperature.or(Some(0.4)), // Balanced creativity
+                max_tokens: provider_config.max_tokens.or(Some(3000)),
                 settings: serde_json::Map::new(),
             }),
             allowed_tools: vec![],

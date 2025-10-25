@@ -86,7 +86,7 @@ fn parse_model_spec(model: &str) -> (String, String) {
             model[slash_pos + 1..].to_string(),
         )
     } else {
-        (provider_config.provider_type.clone(), model.to_string())
+        ("ollama".to_string(), model.to_string())
     }
 }
 
@@ -211,11 +211,16 @@ impl crate::core::Template for WorkflowOrchestratorTemplate {
         let execution_mode: String = params.get_or("execution_mode", "sequential".to_string());
         let collect_intermediate: bool = params.get_or("collect_intermediate", true);
         let max_steps: i64 = params.get_or("max_steps", 10);
-        let model: String = params.get_or("model", "ollama/llama3.2:3b".to_string());
+
+        // Smart dual-path provider resolution (Task 13.5.7d)
+        let provider_config = context.resolve_llm_config(&params)?;
+        let model_str = provider_config.default_model
+            .as_ref()
+            .ok_or_else(|| TemplateError::Config("provider missing model".into()))?;
 
         info!(
             "Starting workflow orchestration (mode={}, max_steps={}, model={})",
-            execution_mode, max_steps, model
+            execution_mode, max_steps, model_str
         );
 
         // Initialize output
@@ -240,7 +245,7 @@ impl crate::core::Template for WorkflowOrchestratorTemplate {
         // Phase 3: Execute workflow
         info!("Phase 3: Executing workflow...");
         let execution_result = self
-            .execute_workflow(&execution_plan, &model, collect_intermediate, &context)
+            .execute_workflow(&execution_plan, &provider_config, collect_intermediate, &context)
             .await?;
         output.metrics.agents_invoked = execution_result.agents_executed;
         output.metrics.tools_invoked = execution_result.tools_executed;

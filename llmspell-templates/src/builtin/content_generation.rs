@@ -213,11 +213,16 @@ impl crate::core::Template for ContentGenerationTemplate {
         let max_iterations: i64 = params.get_or("max_iterations", 3);
         let output_format: String = params.get_or("output_format", "markdown".to_string());
         let include_outline: bool = params.get_or("include_outline", false);
-        let model: String = params.get_or("model", "ollama/llama3.2:3b".to_string());
+
+        // Smart dual-path provider resolution (Task 13.5.7d)
+        let provider_config = context.resolve_llm_config(&params)?;
+        let model_str = provider_config.default_model
+            .as_ref()
+            .ok_or_else(|| TemplateError::Config("provider missing model".into()))?;
 
         info!(
-            "Starting content generation (topic='{}', type={}, quality_threshold={}, max_iterations={})",
-            topic, content_type, quality_threshold, max_iterations
+            "Starting content generation (topic='{}', type={}, quality_threshold={}, max_iterations={}, model={})",
+            topic, content_type, quality_threshold, max_iterations, model_str
         );
 
         // Initialize output
@@ -236,7 +241,7 @@ impl crate::core::Template for ContentGenerationTemplate {
                 &content_type,
                 target_length,
                 &tone,
-                &model,
+                &provider_config,
                 &context,
             )
             .await?;
@@ -250,7 +255,7 @@ impl crate::core::Template for ContentGenerationTemplate {
                 target_length,
                 &tone,
                 style_guide.as_deref(),
-                &model,
+                &provider_config,
                 &context,
             )
             .await?;
@@ -265,7 +270,7 @@ impl crate::core::Template for ContentGenerationTemplate {
         while iteration_count < max_iterations {
             // Get quality score and feedback
             let review = self
-                .review_content(&draft, &content_type, &tone, &model, &context)
+                .review_content(&draft, &content_type, &tone, &provider_config, &context)
                 .await?;
             output.metrics.agents_invoked += 1;
 
@@ -289,7 +294,7 @@ impl crate::core::Template for ContentGenerationTemplate {
             if iteration_count < max_iterations - 1 {
                 info!("Improving content based on feedback...");
                 draft = self
-                    .improve_content(&draft, &review.feedback, &model, &context)
+                    .improve_content(&draft, &review.feedback, &provider_config, &context)
                     .await?;
                 output.metrics.agents_invoked += 1;
             }
@@ -300,7 +305,7 @@ impl crate::core::Template for ContentGenerationTemplate {
         // Phase 4: Format final content
         info!("Phase 4: Formatting final content...");
         let formatted = self
-            .format_content(&draft, &output_format, &model, &context)
+            .format_content(&draft, &output_format, &provider_config, &context)
             .await?;
         output.metrics.agents_invoked += 1;
 
@@ -429,11 +434,16 @@ impl ContentGenerationTemplate {
         content_type: &str,
         target_length: Option<i64>,
         tone: &str,
-        model: &str,
+        provider_config: &llmspell_config::ProviderConfig,
         context: &ExecutionContext,
     ) -> Result<ContentPlan> {
         use llmspell_agents::factory::{AgentConfig, ModelConfig, ResourceLimits};
         use llmspell_core::types::AgentInput;
+
+        // Extract model from provider config
+        let model = provider_config.default_model
+            .as_ref()
+            .ok_or_else(|| TemplateError::Config("provider missing model".into()))?;
 
         let (provider, model_id) = Self::parse_model(model);
 
@@ -447,8 +457,8 @@ impl ContentGenerationTemplate {
             model: Some(ModelConfig {
                 provider,
                 model_id,
-                temperature: Some(0.3), // Lower temperature for structured planning
-                max_tokens: Some(1500),
+                temperature: provider_config.temperature.or(Some(0.3)), // Lower temperature for structured planning
+                max_tokens: provider_config.max_tokens.or(Some(1500)),
                 settings: serde_json::Map::new(),
             }),
             allowed_tools: vec![],
@@ -540,11 +550,16 @@ impl ContentGenerationTemplate {
         target_length: Option<i64>,
         tone: &str,
         style_guide: Option<&str>,
-        model: &str,
+        provider_config: &llmspell_config::ProviderConfig,
         context: &ExecutionContext,
     ) -> Result<String> {
         use llmspell_agents::factory::{AgentConfig, ModelConfig, ResourceLimits};
         use llmspell_core::types::AgentInput;
+
+        // Extract model from provider config
+        let model = provider_config.default_model
+            .as_ref()
+            .ok_or_else(|| TemplateError::Config("provider missing model".into()))?;
 
         let (provider, model_id) = Self::parse_model(model);
 
@@ -555,8 +570,8 @@ impl ContentGenerationTemplate {
             model: Some(ModelConfig {
                 provider,
                 model_id,
-                temperature: Some(0.5), // Higher temperature for creative writing
-                max_tokens: Some(3000),
+                temperature: provider_config.temperature.or(Some(0.5)), // Higher temperature for creative writing
+                max_tokens: provider_config.max_tokens.or(Some(3000)),
                 settings: serde_json::Map::new(),
             }),
             allowed_tools: vec![],
@@ -621,11 +636,16 @@ impl ContentGenerationTemplate {
         content: &str,
         content_type: &str,
         tone: &str,
-        model: &str,
+        provider_config: &llmspell_config::ProviderConfig,
         context: &ExecutionContext,
     ) -> Result<ContentReview> {
         use llmspell_agents::factory::{AgentConfig, ModelConfig, ResourceLimits};
         use llmspell_core::types::AgentInput;
+
+        // Extract model from provider config
+        let model = provider_config.default_model
+            .as_ref()
+            .ok_or_else(|| TemplateError::Config("provider missing model".into()))?;
 
         let (provider, model_id) = Self::parse_model(model);
 
@@ -636,8 +656,8 @@ impl ContentGenerationTemplate {
             model: Some(ModelConfig {
                 provider,
                 model_id,
-                temperature: Some(0.3), // Lower temperature for consistent evaluation
-                max_tokens: Some(2000),
+                temperature: provider_config.temperature.or(Some(0.3)), // Lower temperature for consistent evaluation
+                max_tokens: provider_config.max_tokens.or(Some(2000)),
                 settings: serde_json::Map::new(),
             }),
             allowed_tools: vec![],
@@ -730,11 +750,16 @@ impl ContentGenerationTemplate {
         &self,
         content: &str,
         feedback: &str,
-        model: &str,
+        provider_config: &llmspell_config::ProviderConfig,
         context: &ExecutionContext,
     ) -> Result<String> {
         use llmspell_agents::factory::{AgentConfig, ModelConfig, ResourceLimits};
         use llmspell_core::types::AgentInput;
+
+        // Extract model from provider config
+        let model = provider_config.default_model
+            .as_ref()
+            .ok_or_else(|| TemplateError::Config("provider missing model".into()))?;
 
         let (provider, model_id) = Self::parse_model(model);
 
@@ -745,8 +770,8 @@ impl ContentGenerationTemplate {
             model: Some(ModelConfig {
                 provider,
                 model_id,
-                temperature: Some(0.4),
-                max_tokens: Some(3000),
+                temperature: provider_config.temperature.or(Some(0.4)),
+                max_tokens: provider_config.max_tokens.or(Some(3000)),
                 settings: serde_json::Map::new(),
             }),
             allowed_tools: vec![],
@@ -793,11 +818,16 @@ impl ContentGenerationTemplate {
         &self,
         content: &str,
         output_format: &str,
-        model: &str,
+        provider_config: &llmspell_config::ProviderConfig,
         context: &ExecutionContext,
     ) -> Result<String> {
         use llmspell_agents::factory::{AgentConfig, ModelConfig, ResourceLimits};
         use llmspell_core::types::AgentInput;
+
+        // Extract model from provider config
+        let model = provider_config.default_model
+            .as_ref()
+            .ok_or_else(|| TemplateError::Config("provider missing model".into()))?;
 
         let (provider, model_id) = Self::parse_model(model);
 
@@ -808,8 +838,8 @@ impl ContentGenerationTemplate {
             model: Some(ModelConfig {
                 provider,
                 model_id,
-                temperature: Some(0.2), // Low temperature for consistent formatting
-                max_tokens: Some(3000),
+                temperature: provider_config.temperature.or(Some(0.2)), // Low temperature for consistent formatting
+                max_tokens: provider_config.max_tokens.or(Some(3000)),
                 settings: serde_json::Map::new(),
             }),
             allowed_tools: vec![],

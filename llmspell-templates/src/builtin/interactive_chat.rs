@@ -179,7 +179,6 @@ impl crate::core::Template for InteractiveChatTemplate {
         let start_time = Instant::now();
 
         // Extract and validate parameters
-        let model: String = params.get_or("model", "ollama/llama3.2:3b".to_string());
         let system_prompt: String = params.get_or(
             "system_prompt",
             "You are a helpful AI assistant. Provide clear, accurate, and concise responses."
@@ -191,9 +190,15 @@ impl crate::core::Template for InteractiveChatTemplate {
         let message: Option<String> = params.get_optional("message");
         let session_id_param: Option<String> = params.get_optional("session_id");
 
+        // Smart dual-path provider resolution (Task 13.5.7d)
+        let provider_config = context.resolve_llm_config(&params)?;
+        let model_str = provider_config.default_model
+            .as_ref()
+            .ok_or_else(|| TemplateError::Config("provider missing model".into()))?;
+
         info!(
             "Starting interactive chat (model={}, max_turns={}, tools={}, memory={})",
-            model,
+            model_str,
             max_turns,
             tools.len(),
             enable_memory
@@ -241,7 +246,7 @@ impl crate::core::Template for InteractiveChatTemplate {
             ExecutionMode::Interactive => {
                 self.run_interactive_mode(
                     &session_id,
-                    &model,
+                    &provider_config,
                     &system_prompt,
                     max_turns as usize,
                     &loaded_tools,
@@ -252,7 +257,7 @@ impl crate::core::Template for InteractiveChatTemplate {
             ExecutionMode::Programmatic => {
                 self.run_programmatic_mode(
                     &session_id,
-                    &model,
+                    &provider_config,
                     &system_prompt,
                     message.as_deref().unwrap(),
                     &loaded_tools,
@@ -510,7 +515,7 @@ impl InteractiveChatTemplate {
     async fn run_interactive_mode(
         &self,
         session_id: &str,
-        model: &str,
+        provider_config: &llmspell_config::ProviderConfig,
         system_prompt: &str,
         _max_turns: usize, // REPL handles its own lifecycle
         tools: &[String],
@@ -521,6 +526,11 @@ impl InteractiveChatTemplate {
         use llmspell_kernel::protocols::JupyterProtocol;
         use llmspell_kernel::repl::{InteractiveSession, ReplSessionConfig};
         use llmspell_kernel::IntegratedKernel;
+
+        // Extract model from provider config
+        let model = provider_config.default_model
+            .as_ref()
+            .ok_or_else(|| TemplateError::Config("provider missing model".into()))?;
 
         info!(
             "Starting REPL chat session (model: {}, session: {})",
@@ -582,7 +592,7 @@ impl InteractiveChatTemplate {
                 model[slash_pos + 1..].to_string(),
             )
         } else {
-            ("ollama".to_string(), model.to_string())
+            (provider_config.provider_type.clone(), model.to_string())
         };
 
         let agent_config = AgentConfig {
@@ -592,8 +602,8 @@ impl InteractiveChatTemplate {
             model: Some(ModelConfig {
                 provider,
                 model_id,
-                temperature: Some(0.7),
-                max_tokens: Some(1000),
+                temperature: provider_config.temperature.or(Some(0.7)),
+                max_tokens: provider_config.max_tokens.or(Some(1000)),
                 settings: serde_json::Map::new(),
             }),
             allowed_tools: tools.to_vec(),
@@ -624,10 +634,15 @@ impl InteractiveChatTemplate {
         session = session.with_initial_agent(agent).await;
 
         // Create agent creator callback for auto-recreation (Subtask 12.9.5)
+        // Clone values from provider_config to move into 'static closure
+        let temperature = provider_config.temperature.or(Some(0.7));
+        let max_tokens = provider_config.max_tokens.or(Some(1000));
         let agent_registry_clone = agent_registry.clone();
         let agent_creator: llmspell_kernel::repl::session::AgentCreator = std::sync::Arc::new(
             move |model: String, _system_prompt: String, tools: Vec<String>| {
                 let registry = agent_registry_clone.clone();
+                let temp = temperature;
+                let max_tok = max_tokens;
                 Box::pin(async move {
                     use llmspell_agents::factory::{AgentConfig, ModelConfig, ResourceLimits};
 
@@ -648,8 +663,8 @@ impl InteractiveChatTemplate {
                         model: Some(ModelConfig {
                             provider,
                             model_id,
-                            temperature: Some(0.7),
-                            max_tokens: Some(1000),
+                            temperature: temp,
+                            max_tokens: max_tok,
                             settings: serde_json::Map::new(),
                         }),
                         allowed_tools: tools.clone(),
@@ -719,7 +734,7 @@ impl InteractiveChatTemplate {
     async fn run_programmatic_mode(
         &self,
         session_id: &str,
-        model: &str,
+        provider_config: &llmspell_config::ProviderConfig,
         system_prompt: &str,
         user_message: &str,
         tools: &[String],
@@ -727,6 +742,11 @@ impl InteractiveChatTemplate {
     ) -> Result<ConversationResult> {
         use llmspell_agents::factory::{AgentConfig, ModelConfig, ResourceLimits};
         use llmspell_core::types::AgentInput;
+
+        // Extract model from provider config
+        let model = provider_config.default_model
+            .as_ref()
+            .ok_or_else(|| TemplateError::Config("provider missing model".into()))?;
 
         info!(
             "Running programmatic mode (session: {}, model: {}, message_len: {}, tools: {})",
@@ -751,7 +771,7 @@ impl InteractiveChatTemplate {
                 model[slash_pos + 1..].to_string(),
             )
         } else {
-            ("ollama".to_string(), model.to_string())
+            (provider_config.provider_type.clone(), model.to_string())
         };
 
         info!(
@@ -770,8 +790,8 @@ impl InteractiveChatTemplate {
             model: Some(ModelConfig {
                 provider,
                 model_id,
-                temperature: Some(0.7), // Balanced creativity for conversation
-                max_tokens: Some(1000),
+                temperature: provider_config.temperature.or(Some(0.7)), // Balanced creativity for conversation
+                max_tokens: provider_config.max_tokens.or(Some(1000)),
                 settings: serde_json::Map::new(),
             }),
             allowed_tools: tools.to_vec(),
@@ -1207,7 +1227,7 @@ mod tests {
                 model[slash_pos + 1..].to_string(),
             )
         } else {
-            ("ollama".to_string(), model.to_string())
+            (provider_config.provider_type.clone(), model.to_string())
         };
 
         assert_eq!(provider, "anthropic");
@@ -1224,7 +1244,7 @@ mod tests {
                 model[slash_pos + 1..].to_string(),
             )
         } else {
-            ("ollama".to_string(), model.to_string())
+            (provider_config.provider_type.clone(), model.to_string())
         };
 
         assert_eq!(provider, "ollama");

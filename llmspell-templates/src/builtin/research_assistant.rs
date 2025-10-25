@@ -134,13 +134,18 @@ impl crate::core::Template for ResearchAssistantTemplate {
         // Extract and validate parameters
         let topic: String = params.get("topic")?;
         let max_sources: i64 = params.get_or("max_sources", 10);
-        let model: String = params.get_or("model", "ollama/llama3.2:3b".to_string());
         let output_format: String = params.get_or("output_format", "markdown".to_string());
         let include_citations: bool = params.get_or("include_citations", true);
 
+        // Smart dual-path provider resolution (Task 13.5.7d)
+        let provider_config = context.resolve_llm_config(&params)?;
+        let model_str = provider_config.default_model
+            .as_ref()
+            .ok_or_else(|| TemplateError::Config("provider missing model".into()))?;
+
         info!(
             "Starting research assistant for topic: '{}' (max_sources={}, model={})",
-            topic, max_sources, model
+            topic, max_sources, model_str
         );
 
         // Initialize output
@@ -169,14 +174,14 @@ impl crate::core::Template for ResearchAssistantTemplate {
         // Phase 3: Synthesize findings with agent
         info!("Phase 3: Synthesizing findings...");
         let synthesis = self
-            .synthesize_findings(&topic, &session_tag, &model, &context)
+            .synthesize_findings(&topic, &session_tag, &provider_config, &context)
             .await?;
         output.metrics.agents_invoked += 1;
 
         // Phase 4: Validate citations
         info!("Phase 4: Validating citations...");
         let validation = self
-            .validate_citations(&synthesis, &sources, &model, &context)
+            .validate_citations(&synthesis, &sources, &provider_config, &context)
             .await?;
         output.metrics.agents_invoked += 1;
 
@@ -456,12 +461,17 @@ impl ResearchAssistantTemplate {
         &self,
         topic: &str,
         session_tag: &str,
-        model: &str,
+        provider_config: &llmspell_config::ProviderConfig,
         context: &ExecutionContext,
     ) -> Result<String> {
         use llmspell_agents::factory::{AgentConfig, ModelConfig, ResourceLimits};
         use llmspell_core::state::StateScope;
         use llmspell_core::types::AgentInput;
+
+        // Extract model from provider config
+        let model = provider_config.default_model
+            .as_ref()
+            .ok_or_else(|| TemplateError::Config("provider missing model".into()))?;
 
         info!(
             "Synthesizing findings for topic: '{}' (session: {}, model: {})",
@@ -527,7 +537,7 @@ impl ResearchAssistantTemplate {
                 model[slash_pos + 1..].to_string(),
             )
         } else {
-            ("ollama".to_string(), model.to_string())
+            (provider_config.provider_type.clone(), model.to_string())
         };
 
         // Get agent registry
@@ -541,8 +551,8 @@ impl ResearchAssistantTemplate {
             model: Some(ModelConfig {
                 provider,
                 model_id,
-                temperature: Some(0.7), // Balanced creativity for synthesis
-                max_tokens: Some(2000),
+                temperature: provider_config.temperature.or(Some(0.7)), // Balanced creativity for synthesis
+                max_tokens: provider_config.max_tokens.or(Some(2000)),
                 settings: serde_json::Map::new(),
             }),
             allowed_tools: vec![],
@@ -619,11 +629,16 @@ impl ResearchAssistantTemplate {
         &self,
         synthesis: &str,
         sources: &[Source],
-        model: &str,
+        provider_config: &llmspell_config::ProviderConfig,
         context: &ExecutionContext,
     ) -> Result<String> {
         use llmspell_agents::factory::{AgentConfig, ModelConfig, ResourceLimits};
         use llmspell_core::types::AgentInput;
+
+        // Extract model from provider config
+        let model = provider_config.default_model
+            .as_ref()
+            .ok_or_else(|| TemplateError::Config("provider missing model".into()))?;
 
         info!(
             "Validating citations in synthesis ({} chars, {} sources, model: {})",
@@ -639,7 +654,7 @@ impl ResearchAssistantTemplate {
                 model[slash_pos + 1..].to_string(),
             )
         } else {
-            ("ollama".to_string(), model.to_string())
+            (provider_config.provider_type.clone(), model.to_string())
         };
 
         // Get agent registry
@@ -653,8 +668,8 @@ impl ResearchAssistantTemplate {
             model: Some(ModelConfig {
                 provider,
                 model_id,
-                temperature: Some(0.3), // Lower temperature for factual validation
-                max_tokens: Some(1500),
+                temperature: provider_config.temperature.or(Some(0.3)), // Lower temperature for factual validation
+                max_tokens: provider_config.max_tokens.or(Some(1500)),
                 settings: serde_json::Map::new(),
             }),
             allowed_tools: vec![],

@@ -148,7 +148,12 @@ impl crate::core::Template for DocumentProcessorTemplate {
             params.get_or("transformation_type", "summarize".to_string());
         let output_format: String = params.get_or("output_format", "markdown".to_string());
         let parallel_processing: bool = params.get_or("parallel_processing", true);
-        let model: String = params.get_or("model", "ollama/llama3.2:3b".to_string());
+
+        // Smart dual-path provider resolution (Task 13.5.7d)
+        let provider_config = context.resolve_llm_config(&params)?;
+        let model_str = provider_config.default_model
+            .as_ref()
+            .ok_or_else(|| TemplateError::Config("provider missing model".into()))?;
 
         info!(
             "Starting document processing ({} docs, transformation={}, format={}, parallel={}, model={})",
@@ -156,7 +161,7 @@ impl crate::core::Template for DocumentProcessorTemplate {
             transformation_type,
             output_format,
             parallel_processing,
-            model
+            model_str
         );
 
         // Initialize output
@@ -182,7 +187,7 @@ impl crate::core::Template for DocumentProcessorTemplate {
         // Phase 2: Transform content with transformer agent
         info!("Phase 2: Transforming extracted content...");
         let transformed_docs = self
-            .transform_content(&extracted_docs, &transformation_type, &model, &context)
+            .transform_content(&extracted_docs, &transformation_type, &provider_config, &context)
             .await?;
         output.metrics.agents_invoked += extracted_docs.len(); // one agent per document
 
@@ -316,7 +321,7 @@ impl DocumentProcessorTemplate {
         &self,
         documents: &[ExtractedDocument],
         transformation_type: &str,
-        model: &str,
+        provider_config: &llmspell_config::ProviderConfig,
         context: &ExecutionContext,
     ) -> Result<Vec<TransformedDocument>> {
         use llmspell_agents::factory::{AgentConfig, ModelConfig, ResourceLimits};
@@ -328,6 +333,11 @@ impl DocumentProcessorTemplate {
             transformation_type
         );
 
+        // Extract model from provider config
+        let model = provider_config.default_model
+            .as_ref()
+            .ok_or_else(|| TemplateError::Config("provider missing model".into()))?;
+
         // Parse model string (provider/model format)
         let (provider, model_id) = if let Some(slash_pos) = model.find('/') {
             (
@@ -335,7 +345,7 @@ impl DocumentProcessorTemplate {
                 model[slash_pos + 1..].to_string(),
             )
         } else {
-            ("ollama".to_string(), model.to_string())
+            (provider_config.provider_type.clone(), model.to_string())
         };
 
         // Create agent config for document transformation
@@ -349,8 +359,8 @@ impl DocumentProcessorTemplate {
             model: Some(ModelConfig {
                 provider,
                 model_id,
-                temperature: Some(0.5), // Balanced for creative yet accurate transformation
-                max_tokens: Some(2000),
+                temperature: provider_config.temperature.or(Some(0.5)), // Balanced for creative yet accurate transformation
+                max_tokens: provider_config.max_tokens.or(Some(2000)),
                 settings: serde_json::Map::new(),
             }),
             allowed_tools: vec![],
