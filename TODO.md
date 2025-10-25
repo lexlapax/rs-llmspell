@@ -3703,18 +3703,19 @@ llmspell template exec code-generator \
 **Priority**: HIGH
 **Estimated Time**: 2 hours
 **Dependencies**: 13.5.7d complete
+**Status**: ✅ COMPLETE
 
 **Description**: Add provider definitions to builtin profiles and create dedicated memory.toml profile.
 
 **Acceptance Criteria**:
-- [ ] Add "default" provider to `llmspell-config/builtins/default.toml`
-- [ ] Create `llmspell-config/builtins/memory.toml` with full memory + provider config
-- [ ] Add "memory" to `list_builtin_profiles()`
-- [ ] Add metadata for "memory" profile in `get_profile_metadata()`
-- [ ] Write test: `test_load_builtin_profile_memory()`
-- [ ] Profile loads successfully: `LLMSpellConfig::load_with_profile(None, Some("memory"))`
-- [ ] Validate provider referenced by memory config exists
-- [ ] Test passes
+- [x] Add "default" provider to `llmspell-config/builtins/default.toml` ✅
+- [x] Create `llmspell-config/builtins/memory.toml` with full memory + provider config ✅
+- [x] Add "memory" to `list_builtin_profiles()` ✅
+- [x] Add metadata for "memory" profile in `get_profile_metadata()` ✅
+- [x] Write test: `test_load_builtin_profile_memory()` ✅
+- [x] Profile loads successfully: `LLMSpellConfig::load_with_profile(None, Some("memory"))` ✅
+- [x] Validate provider referenced by memory config exists ✅
+- [x] Test passes ✅
 
 **Profile Content**:
 ```toml
@@ -3773,10 +3774,47 @@ queue_threshold_slow = 20
 - `llmspell-config/tests/profiles_test.rs` (MODIFY - add memory profile test, ~30 lines)
 
 **Quality Gates**:
-- Profile loads without errors
-- Providers validate successfully
-- Memory config references valid provider
-- cargo test -p llmspell-config::test_load_builtin_profile_memory passes
+- Profile loads without errors ✅
+- Providers validate successfully ✅
+- Memory config references valid provider ✅
+- cargo test -p llmspell-config::test_load_builtin_profile_memory passes ✅
+
+**Implementation Summary**:
+**Files Created**:
+- `llmspell-config/builtins/default.toml` (22 lines) - Simple Ollama-based default provider
+- `llmspell-config/builtins/memory.toml` (58 lines) - Memory system profile with 2 providers + full memory config
+
+**Files Modified**:
+- `llmspell-config/src/lib.rs` (+51 lines)
+  - Added "default" and "memory" to list_builtin_profiles() (lines 1144, 1150)
+  - Added include_str!() for both profiles in load_builtin_profile() (lines 1089, 1101)
+  - Added metadata for both profiles in get_profile_metadata() (lines 1197-1211, 1285-1300)
+  - Added test_load_builtin_profile_default() test (lines 2320-2344)
+  - Added test_load_builtin_profile_memory() test (lines 2346-2387)
+  - Updated test_list_builtin_profiles() count: 10→12 (line 2120)
+  - Updated doctests: list_builtin_profiles() and list_profile_metadata() (lines 1139, 1372)
+  - Updated error message with new profiles (lines 1114, 1117)
+
+**Test Results**:
+- All 86 unit tests passing
+- All 8 integration tests passing
+- All 3 doc tests passing (1 ignored)
+- Zero clippy warnings
+
+**Key Architectural Decisions**:
+1. **Default Profile Design**: Simple, standalone config suitable for general scripting - no memory system
+2. **Memory Profile Design**: Production-ready memory system with:
+   - Two providers: "default" (0.7 temp) and "consolidation-llm" (0.0 temp for deterministic consolidation)
+   - Full memory config: enabled=true, daemon enabled with 3-tier intervals (30s/300s/600s)
+   - Consolidation config: batch_size=10, max_concurrent=3, 5-minute active threshold
+3. **Provider Separation**: Consolidation uses dedicated low-temperature provider to ensure consistent, deterministic memory operations
+4. **Metadata Organization**: Profiles categorized by function (Core, Local LLM, Memory, RAG)
+
+**Profile Comparison**:
+| Profile  | Providers | Memory | Use Case |
+|----------|-----------|--------|----------|
+| default  | 1 (default) | Disabled | General scripting, templates |
+| memory   | 2 (default + consolidation) | Enabled | Long-running agents, knowledge accumulation |
 
 ### Task 13.5.7f: Documentation & Provider Best Practices Guide
 
