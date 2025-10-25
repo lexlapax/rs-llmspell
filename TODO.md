@@ -3584,7 +3584,11 @@ let llm_config = LlmEngineConfig::from_provider(provider)?;
   - [x] workflow-orchestrator.rs (~4 LLM calls) ✅
   - [x] code-review.rs (~10 LLM calls) ✅
   - [x] document-processor.rs (~6 LLM calls) ✅
-- [ ] Update template parameter schemas (model → provider_name) (Deferred - backward compat)
+- [ ] Update template parameter schemas (model → provider_name) ⏸️ **Deferred to Phase 13.12**
+  - **Reason**: Non-critical UX polish - templates work correctly with dual-path (provider_name OR model), runtime validation enforces mutual exclusivity, no user impact
+  - **Scope**: Add provider_name to 10 config_schema() methods, update docs, add schema tests
+  - **Timing**: Phase 13.12 (CLI + UX) when touching template CLI code anyway
+  - **See**: Phase 13.12 "Includes Deferred Work from Task 13.5.7d" section (line 4647-4655)
 - [x] Update all template tests to use provider fixtures ✅
 - [x] Add test helper: `test_provider_config() -> ProviderConfig` per template ✅
 - [x] Template metadata architecture confirmed (code-first, not JSON files) ✅
@@ -4644,6 +4648,15 @@ Due to document length, the remaining phases (13.9: Lua API Validation through 1
   - TRACING: Template exec (info!), memory lookups (debug!), param validation (warn!), errors (error!)
 - **Phase 13.12** (Day 20): CLI + UX - `llmspell memory/graph/context` commands
   - TRACING: CLI commands (info!), subcommand routing (debug!), output formatting (debug!), errors (error!)
+  - **Includes Deferred Work from Task 13.5.7d**:
+    - ⏸️ Update template parameter schemas to document dual-path provider resolution
+    - Add `provider_name` parameter to all 10 template config_schema() methods
+    - Update 10 template user guides (docs/user-guide/templates/*.md) with provider_name examples
+    - Add mutual exclusivity documentation (provider_name XOR model)
+    - Update CLI examples in template docs to show both provider_name and model usage
+    - Add schema validation tests for dual-path parameter combinations
+    - Consider ConfigSchema enhancement for parameter relationships (mutually_exclusive constraint)
+    - Rationale: Schema update is non-critical UX polish deferred to CLI integration phase when touching template CLI code
 - **Phase 13.13** (Days 21-22): Performance Optimization - Benchmarking, DeBERTa optimization
   - TRACING: Benchmark runs (info!), performance metrics (debug!), optimization attempts (debug!), regressions (warn!)
   - **Includes Deferred Work**:
