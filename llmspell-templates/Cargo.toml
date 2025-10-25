@@ -10,6 +10,7 @@ license.workspace = true
 [dependencies]
 # Internal dependencies
 llmspell-core = { path = "../llmspell-core" }
+llmspell-config = { path = "../llmspell-config" }
 llmspell-kernel = { path = "../llmspell-kernel" }
 llmspell-agents = { path = "../llmspell-agents" }
 llmspell-workflows = { path = "../llmspell-workflows" }

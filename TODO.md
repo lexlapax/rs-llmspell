@@ -3559,13 +3559,20 @@ let llm_config = LlmEngineConfig::from_provider(provider)?;
 **Priority**: CRITICAL
 **Estimated Time**: 6 hours
 **Dependencies**: 13.5.7c complete
+**Status**: 🚧 IN PROGRESS
 
 **Description**: Migrate 10 templates (~80 LLM call sites) to support BOTH provider_name (recommended) AND model (backward compat) params with smart resolution logic.
 
 **Rationale**: Templates should support centralized provider config (production) AND ad-hoc model strings (experimentation). Dual-path maintains backward compatibility with scripts while enabling provider system benefits. Non-breaking change.
 
 **Acceptance Criteria**:
-- [ ] Add `ExecutionContext::get_provider(&self, name: &str) -> Result<ProviderConfig>` helper method
+- [x] Add `ExecutionContext::get_provider_config(&self, name: &str) -> Result<ProviderConfig>` helper method ✅
+- [x] Add `ExecutionContext::resolve_llm_config(&self, params: &TemplateParams) -> Result<ProviderConfig>` smart dual-path resolution ✅
+- [x] Add `provider_config` field to ExecutionContext for config access ✅
+- [x] Add `provider_config` field to TemplateBridge ✅
+- [x] Add `ProviderManager::get_provider_config()` and `config()` methods ✅
+- [x] Add `TemplateError::Config` variant ✅
+- [ ] Update all TemplateBridge constructors to accept provider_config
 - [ ] Migrate all 10 templates to smart dual-path resolution (provider_name OR model):
   - code-generator.rs (~8 LLM calls)
   - data-analysis.rs (~6 LLM calls)

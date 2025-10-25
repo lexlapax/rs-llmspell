@@ -35,6 +35,8 @@ pub struct TemplateBridge {
     registry: Arc<crate::registry::ComponentRegistry>,
     /// Provider manager for LLM access
     providers: Arc<llmspell_providers::ProviderManager>,
+    /// Provider configuration for smart dual-path resolution (Task 13.5.7d)
+    provider_config: Arc<llmspell_config::providers::ProviderManagerConfig>,
     /// Tool registry from `ScriptRuntime` (infrastructure layer)
     tool_registry: Arc<llmspell_tools::ToolRegistry>,
     /// Agent factory registry from `ScriptRuntime` (infrastructure layer)

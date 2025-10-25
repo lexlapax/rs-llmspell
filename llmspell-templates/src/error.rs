@@ -48,6 +48,10 @@ pub enum TemplateError {
     #[error("LLM provider error: {0}")]
     ProviderError(String),
 
+    /// Configuration error (Task 13.5.7d)
+    #[error("Configuration error: {0}")]
+    Config(String),
+
     /// Serialization/deserialization error
     #[error("Serialization error: {0}")]
     SerializationError(String),

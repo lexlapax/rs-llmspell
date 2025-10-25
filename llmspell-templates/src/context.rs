@@ -31,6 +31,9 @@ pub struct ExecutionContext {
     /// Provider manager for LLM access (from llmspell-providers)
     pub providers: Arc<llmspell_providers::ProviderManager>,
 
+    /// Provider configuration for smart dual-path resolution (Task 13.5.7d)
+    pub provider_config: Arc<llmspell_config::providers::ProviderManagerConfig>,
+
     /// Kernel handle for REPL/interactive sessions (optional, Subtask 12.9.5)
     pub kernel_handle: Option<Arc<llmspell_kernel::api::KernelHandle>>,
 
@@ -140,6 +143,83 @@ impl ExecutionContext {
             crate::error::TemplateError::InfrastructureUnavailable("rag".to_string())
         })
     }
+
+    /// Get provider configuration by name (Task 13.5.7d)
+    ///
+    /// # Errors
+    ///
+    /// Returns error if provider name not found in configuration
+    pub fn get_provider_config(
+        &self,
+        name: &str,
+    ) -> crate::error::Result<llmspell_config::ProviderConfig> {
+        self.provider_config
+            .get_provider(name)
+            .cloned()
+            .ok_or_else(|| {
+                crate::error::TemplateError::Config(format!("provider '{}' not found", name))
+            })
+    }
+
+    /// Smart dual-path LLM config resolution: provider_name (preferred) OR model (ad-hoc)
+    ///
+    /// Supports three resolution paths (Task 13.5.7d):
+    /// 1. `provider_name` param → centralized provider config (RECOMMENDED)
+    /// 2. `model` param → ephemeral provider with inline overrides (backward compat)
+    /// 3. Default provider → fallback from `ProviderManagerConfig`
+    ///
+    /// # Errors
+    ///
+    /// Returns error if:
+    /// - Both provider_name and model specified (mutually exclusive)
+    /// - Neither specified and no default provider configured
+    /// - Provider name not found in configuration
+    pub fn resolve_llm_config(
+        &self,
+        params: &crate::TemplateParams,
+    ) -> crate::error::Result<llmspell_config::ProviderConfig> {
+        // 1. Check for provider_name (PREFERRED - centralized config)
+        if let Some(provider_name) = params.get_optional::<String>("provider_name") {
+            if params.contains("model") {
+                return Err(crate::error::TemplateError::Config(
+                    "Cannot specify both provider_name and model - use one or the other".into(),
+                ));
+            }
+            return self.get_provider_config(&provider_name);
+        }
+
+        // 2. Check for model (AD-HOC - ephemeral provider)
+        if let Some(model) = params.get_optional::<String>("model") {
+            use llmspell_config::ProviderConfig;
+            return Ok(ProviderConfig {
+                name: "ephemeral".to_string(),
+                provider_type: "ephemeral".to_string(),
+                enabled: true,
+                base_url: params.get_optional::<String>("base_url"),
+                api_key_env: None,
+                api_key: None,
+                default_model: Some(model),
+                max_tokens: params.get_optional::<u32>("max_tokens"),
+                timeout_seconds: params.get_optional::<u64>("timeout_seconds"),
+                temperature: params.get_optional::<f32>("temperature"),
+                rate_limit: None,
+                retry: None,
+                max_retries: params.get_optional::<u32>("max_retries"),
+                options: std::collections::HashMap::new(),
+            });
+        }
+
+        // 3. Fallback to default provider
+        self.provider_config
+            .get_default_provider()
+            .cloned()
+            .ok_or_else(|| {
+                crate::error::TemplateError::Config(
+                    "No provider_name or model specified, and no default provider configured"
+                        .into(),
+                )
+            })
+    }
 }
 
 /// Builder for ExecutionContext
@@ -152,6 +232,7 @@ pub struct ExecutionContextBuilder {
     workflow_factory: Option<Arc<dyn llmspell_workflows::WorkflowFactory>>,
     rag: Option<Arc<llmspell_rag::multi_tenant_integration::MultiTenantRAG>>,
     providers: Option<Arc<llmspell_providers::ProviderManager>>,
+    provider_config: Option<Arc<llmspell_config::providers::ProviderManagerConfig>>,
     kernel_handle: Option<Arc<llmspell_kernel::api::KernelHandle>>,
     session_id: Option<String>,
     output_dir: Option<PathBuf>,
@@ -220,6 +301,15 @@ impl ExecutionContextBuilder {
         self
     }
 
+    /// Set provider configuration (Task 13.5.7d)
+    pub fn with_provider_config(
+        mut self,
+        provider_config: Arc<llmspell_config::providers::ProviderManagerConfig>,
+    ) -> Self {
+        self.provider_config = Some(provider_config);
+        self
+    }
+
     /// Set kernel handle (Subtask 12.9.5)
     pub fn with_kernel_handle(
         mut self,
@@ -269,6 +359,11 @@ impl ExecutionContextBuilder {
             providers: self.providers.ok_or_else(|| {
                 crate::error::TemplateError::InfrastructureUnavailable(
                     "providers is required".to_string(),
+                )
+            })?,
+            provider_config: self.provider_config.ok_or_else(|| {
+                crate::error::TemplateError::InfrastructureUnavailable(
+                    "provider_config is required".to_string(),
                 )
             })?,
             kernel_handle: self.kernel_handle,

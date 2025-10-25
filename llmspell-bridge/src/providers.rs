@@ -188,7 +188,16 @@ impl ProviderManager {
         Ok(provider_config)
     }
 
-    /// Get a provider by name
+    /// Get a provider configuration by name (from llmspell-config)
+    ///
+    /// Returns the provider config from `ProviderManagerConfig`, not the runtime instance.
+    /// Use this when you need provider settings like temperature, max_tokens, etc.
+    #[must_use]
+    pub fn get_provider_config(&self, name: &str) -> Option<&ProviderConfig> {
+        self.config.providers.get(name)
+    }
+
+    /// Get a provider instance by name (from llmspell-providers runtime)
     ///
     /// # Errors
     ///
@@ -200,7 +209,13 @@ impl ProviderManager {
         self.core_manager.get_provider(name).await
     }
 
-    /// Get the default provider
+    /// Get the default provider configuration (from llmspell-config)
+    #[must_use]
+    pub fn get_default_provider_config(&self) -> Option<&ProviderConfig> {
+        self.config.get_default_provider()
+    }
+
+    /// Get the default provider instance (from llmspell-providers runtime)
     ///
     /// # Errors
     ///
@@ -305,6 +320,12 @@ impl ProviderManager {
     #[must_use]
     pub const fn core_manager(&self) -> &CoreProviderManager {
         &self.core_manager
+    }
+
+    /// Get the provider manager configuration (Task 13.5.7d)
+    #[must_use]
+    pub const fn config(&self) -> &ProviderManagerConfig {
+        &self.config
     }
 
     /// Create an Arc to a new core provider manager with the same configuration
