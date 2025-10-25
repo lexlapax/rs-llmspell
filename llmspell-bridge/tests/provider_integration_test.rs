@@ -19,6 +19,7 @@ async fn test_lua_agent_creation_with_mock_provider() {
             default_model: Some("test-model".to_string()),
             max_tokens: None,
             timeout_seconds: None,
+            temperature: None,
             max_retries: None,
             rate_limit: None,
             retry: None,
