@@ -3572,7 +3572,9 @@ let llm_config = LlmEngineConfig::from_provider(provider)?;
 - [x] Add `provider_config` field to TemplateBridge ✅
 - [x] Add `ProviderManager::get_provider_config()` and `config()` methods ✅
 - [x] Add `TemplateError::Config` variant ✅
-- [ ] Update all TemplateBridge constructors to accept provider_config
+- [x] Update all TemplateBridge constructors to accept provider_config ✅
+- [x] Create InfraConfig struct to bundle infrastructure parameters ✅
+- [x] Wire provider_config through globals/mod.rs to all constructor variants ✅
 - [ ] Migrate all 10 templates to smart dual-path resolution (provider_name OR model):
   - code-generator.rs (~8 LLM calls)
   - data-analysis.rs (~6 LLM calls)
