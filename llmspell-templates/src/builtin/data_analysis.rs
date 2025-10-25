@@ -140,11 +140,16 @@ impl crate::core::Template for DataAnalysisTemplate {
         let data_file: String = params.get("data_file")?;
         let analysis_type: String = params.get_or("analysis_type", "descriptive".to_string());
         let chart_type: String = params.get_or("chart_type", "bar".to_string());
-        let model: String = params.get_or("model", "ollama/llama3.2:3b".to_string());
+
+        // Smart dual-path provider resolution (Task 13.5.7d)
+        let provider_config = context.resolve_llm_config(&params)?;
+        let model_str = provider_config.default_model
+            .as_ref()
+            .ok_or_else(|| TemplateError::Config("provider missing model".into()))?;
 
         info!(
             "Starting data analysis (file={}, analysis={}, chart={}, model={})",
-            data_file, analysis_type, chart_type, model
+            data_file, analysis_type, chart_type, model_str
         );
 
         // Initialize output
@@ -163,14 +168,14 @@ impl crate::core::Template for DataAnalysisTemplate {
         // Phase 2: Statistical analysis with analyzer agent
         info!("Phase 2: Running statistical analysis...");
         let analysis_result = self
-            .run_analysis(&dataset, &analysis_type, &model, &context)
+            .run_analysis(&dataset, &analysis_type, &provider_config, &context)
             .await?;
         output.metrics.agents_invoked += 1; // analyzer agent
 
         // Phase 3: Visualization with visualizer agent
         info!("Phase 3: Generating visualizations...");
         let chart_result = self
-            .generate_chart(&dataset, &analysis_result, &chart_type, &model, &context)
+            .generate_chart(&dataset, &analysis_result, &chart_type, &provider_config, &context)
             .await?;
         output.metrics.agents_invoked += 1; // visualizer agent
 
@@ -378,7 +383,7 @@ impl DataAnalysisTemplate {
         &self,
         dataset: &DataSet,
         analysis_type: &str,
-        model: &str,
+        provider_config: &llmspell_config::ProviderConfig,
         context: &ExecutionContext,
     ) -> Result<AnalysisResult> {
         use llmspell_agents::factory::{AgentConfig, ModelConfig, ResourceLimits};
@@ -389,6 +394,11 @@ impl DataAnalysisTemplate {
             analysis_type
         );
 
+        // Extract model from provider config
+        let model = provider_config.default_model
+            .as_ref()
+            .ok_or_else(|| TemplateError::Config("provider missing model".into()))?;
+
         // Parse model string (provider/model format)
         let (provider, model_id) = if let Some(slash_pos) = model.find('/') {
             (
@@ -396,7 +406,7 @@ impl DataAnalysisTemplate {
                 model[slash_pos + 1..].to_string(),
             )
         } else {
-            ("ollama".to_string(), model.to_string())
+            (provider_config.provider_type.clone(), model.to_string())
         };
 
         // Create agent config for statistical analysis
@@ -407,8 +417,8 @@ impl DataAnalysisTemplate {
             model: Some(ModelConfig {
                 provider,
                 model_id,
-                temperature: Some(0.4), // Balanced for analytical reasoning
-                max_tokens: Some(2000),
+                temperature: provider_config.temperature.or(Some(0.4)), // Balanced for analytical reasoning
+                max_tokens: provider_config.max_tokens.or(Some(2000)),
                 settings: serde_json::Map::new(),
             }),
             allowed_tools: vec![],
@@ -532,13 +542,18 @@ impl DataAnalysisTemplate {
         dataset: &DataSet,
         analysis: &AnalysisResult,
         chart_type: &str,
-        model: &str,
+        provider_config: &llmspell_config::ProviderConfig,
         context: &ExecutionContext,
     ) -> Result<ChartResult> {
         use llmspell_agents::factory::{AgentConfig, ModelConfig, ResourceLimits};
         use llmspell_core::types::AgentInput;
 
         info!("Creating visualization agent (type: {})", chart_type);
+
+        // Extract model from provider config
+        let model = provider_config.default_model
+            .as_ref()
+            .ok_or_else(|| TemplateError::Config("provider missing model".into()))?;
 
         // Parse model parameter
         let (provider, model_id) = if let Some(slash_pos) = model.find('/') {
@@ -547,7 +562,7 @@ impl DataAnalysisTemplate {
                 model[slash_pos + 1..].to_string(),
             )
         } else {
-            ("ollama".to_string(), model.to_string())
+            (provider_config.provider_type.clone(), model.to_string())
         };
 
         // Create visualizer agent config
@@ -558,8 +573,8 @@ impl DataAnalysisTemplate {
             model: Some(ModelConfig {
                 provider,
                 model_id,
-                temperature: Some(0.5), // Creative for chart design
-                max_tokens: Some(2000),
+                temperature: provider_config.temperature.or(Some(0.5)), // Creative for chart design
+                max_tokens: provider_config.max_tokens.or(Some(2000)),
                 settings: serde_json::Map::new(),
             }),
             allowed_tools: vec![],

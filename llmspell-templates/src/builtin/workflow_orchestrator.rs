@@ -86,7 +86,7 @@ fn parse_model_spec(model: &str) -> (String, String) {
             model[slash_pos + 1..].to_string(),
         )
     } else {
-        ("ollama".to_string(), model.to_string())
+        (provider_config.provider_type.clone(), model.to_string())
     }
 }
 
@@ -452,7 +452,7 @@ impl WorkflowOrchestratorTemplate {
     async fn execute_workflow(
         &self,
         plan: &ExecutionPlan,
-        model: &str,
+        provider_config: &llmspell_config::ProviderConfig,
         collect_intermediate: bool,
         context: &ExecutionContext,
     ) -> Result<ExecutionResult> {
@@ -462,6 +462,11 @@ impl WorkflowOrchestratorTemplate {
             plan.steps.len(),
             plan.mode
         );
+
+        // Extract model from provider config
+        let model = provider_config.default_model
+            .as_ref()
+            .ok_or_else(|| TemplateError::Config("provider missing model".into()))?;
 
         // Convert execution mode to WorkflowType
         let workflow_type = match plan.mode.as_str() {
@@ -492,8 +497,8 @@ impl WorkflowOrchestratorTemplate {
                     model: Some(ModelConfig {
                         provider,
                         model_id,
-                        temperature: Some(0.7),
-                        max_tokens: Some(1000),
+                        temperature: provider_config.temperature.or(Some(0.7)),
+                        max_tokens: provider_config.max_tokens.or(Some(1000)),
                         settings: serde_json::Map::new(),
                     }),
                     allowed_tools: vec![],
