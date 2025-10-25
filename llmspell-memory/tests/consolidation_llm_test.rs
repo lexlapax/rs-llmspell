@@ -444,11 +444,16 @@ async fn test_multi_turn_consolidation() {
         .await
         .unwrap();
 
-    // Verify all turns processed
+    // Verify all turns processed (including skipped/NOOP decisions)
+    let total_handled = result1.entries_processed + result1.entries_skipped
+        + result2.entries_processed + result2.entries_skipped
+        + result3.entries_processed + result3.entries_skipped;
     assert_eq!(
-        result1.entries_processed + result2.entries_processed + result3.entries_processed,
+        total_handled,
         3,
-        "Should process all 3 turns"
+        "Should process all 3 turns (processed={}, skipped={})",
+        result1.entries_processed + result2.entries_processed + result3.entries_processed,
+        result1.entries_skipped + result2.entries_skipped + result3.entries_skipped
     );
 
     // At least some entities should be created or updated across turns

@@ -6,10 +6,8 @@ use llmspell_graph::storage::surrealdb::SurrealDBBackend;
 use llmspell_graph::traits::KnowledgeGraph;
 use llmspell_memory::consolidation::{
     ConsolidationMetrics, DecisionPayload, DecisionType, LLMConsolidationConfig,
-    LLMConsolidationEngine, PromptVersion,
+    LLMConsolidationEngine,
 };
-use llmspell_providers::abstraction::ProviderConfig;
-use llmspell_providers::local::create_ollama_provider;
 use std::collections::HashMap;
 use std::sync::Arc;
 use tempfile::TempDir;
@@ -63,25 +61,37 @@ pub async fn create_test_engine() -> TestEngine {
     // Create temp dir for test cleanup
     let temp_dir = TempDir::new().unwrap();
 
-    // Create Ollama provider
+    // Create Ollama provider using llmspell-config ProviderConfig
     let ollama_host = super::get_ollama_host();
-    let mut provider_config = ProviderConfig::new_with_type("ollama", "local", "llama3.2:3b");
-    provider_config.endpoint = Some(ollama_host);
-    provider_config.timeout_secs = Some(60);
 
-    let provider = Arc::from(create_ollama_provider(provider_config).unwrap());
+    // Use llmspell-config ProviderConfig (NEW provider system)
+    let provider_config = llmspell_config::ProviderConfig::builder()
+        .provider_type("ollama")
+        .default_model("llama3.2:3b")
+        .base_url(&ollama_host)
+        .temperature(0.0)  // Deterministic for testing
+        .max_tokens(2000)
+        .timeout_seconds(60)
+        .build();
 
-    // Create LLM consolidation config
-    let config = LLMConsolidationConfig {
-        model: "llama3.2:3b".to_string(),
-        fallback_models: vec![],
-        temperature: 0.0, // Deterministic for testing
-        max_tokens: 2000,
-        timeout_secs: 60,
-        max_retries: 2,
-        circuit_breaker_threshold: 5,
-        version: PromptVersion::default(),
-    };
+    // Create provider from config using llmspell-providers abstraction layer
+    let abstraction_config = llmspell_providers::abstraction::ProviderConfig::new_with_type(
+        "ollama",
+        "local",
+        "llama3.2:3b"
+    );
+    let mut abstraction_config = abstraction_config;
+    abstraction_config.endpoint = Some(ollama_host);
+    abstraction_config.timeout_secs = Some(60);
+
+    let provider = Arc::from(
+        llmspell_providers::local::create_ollama_provider(abstraction_config).unwrap()
+    );
+
+    // Create LLM consolidation config from provider (NEW pattern)
+    let mut config = LLMConsolidationConfig::from_provider(&provider_config).unwrap();
+    config.max_retries = 2;  // Lower retries for faster test failure
+    config.circuit_breaker_threshold = 5;
 
     // Create LLM engine
     let llm_engine =
