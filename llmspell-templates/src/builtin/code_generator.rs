@@ -131,11 +131,16 @@ impl crate::core::Template for CodeGeneratorTemplate {
         let description: String = params.get("description")?;
         let language: String = params.get_or("language", "rust".to_string());
         let include_tests: bool = params.get_or("include_tests", true);
-        let model: String = params.get_or("model", "ollama/llama3.2:3b".to_string());
+
+        // Smart dual-path provider resolution (Task 13.5.7d)
+        let provider_config = context.resolve_llm_config(&params)?;
+        let model_str = provider_config.default_model
+            .as_ref()
+            .ok_or_else(|| TemplateError::Config("provider missing model".into()))?;
 
         info!(
             "Starting code generation (language={}, tests={}, model={})",
-            language, include_tests, model
+            language, include_tests, model_str
         );
 
         // Initialize output
@@ -149,14 +154,14 @@ impl crate::core::Template for CodeGeneratorTemplate {
         // Phase 1: Generate specification with spec agent
         info!("Phase 1: Generating specification...");
         let spec_result = self
-            .generate_specification(&description, &language, &model, &context)
+            .generate_specification(&description, &language, &provider_config, &context)
             .await?;
         output.metrics.agents_invoked += 1; // spec agent
 
         // Phase 2: Generate implementation with implementation agent
         info!("Phase 2: Generating implementation...");
         let impl_result = self
-            .generate_implementation(&spec_result, &language, &model, &context)
+            .generate_implementation(&spec_result, &language, &provider_config, &context)
             .await?;
         output.metrics.agents_invoked += 1; // implementation agent
 
@@ -164,7 +169,7 @@ impl crate::core::Template for CodeGeneratorTemplate {
         let test_result = if include_tests {
             info!("Phase 3: Generating tests...");
             let result = self
-                .generate_tests(&impl_result, &language, &model, &context)
+                .generate_tests(&impl_result, &language, &provider_config, &context)
                 .await?;
             output.metrics.agents_invoked += 1; // test agent
             Some(result)
@@ -262,13 +267,18 @@ impl CodeGeneratorTemplate {
         &self,
         description: &str,
         language: &str,
-        model: &str,
+        provider_config: &llmspell_config::ProviderConfig,
         context: &ExecutionContext,
     ) -> Result<SpecificationResult> {
         use llmspell_agents::factory::{AgentConfig, ModelConfig, ResourceLimits};
         use llmspell_core::types::AgentInput;
 
         info!("Creating specification agent for {} code", language);
+
+        // Extract model from provider config
+        let model = provider_config.default_model
+            .as_ref()
+            .ok_or_else(|| TemplateError::Config("provider missing model".into()))?;
 
         // Parse model string (provider/model format)
         let (provider, model_id) = if let Some(slash_pos) = model.find('/') {
@@ -277,7 +287,7 @@ impl CodeGeneratorTemplate {
                 model[slash_pos + 1..].to_string(),
             )
         } else {
-            ("ollama".to_string(), model.to_string())
+            (provider_config.provider_type.clone(), model.to_string())
         };
 
         // Create agent config for specification generation
@@ -288,8 +298,8 @@ impl CodeGeneratorTemplate {
             model: Some(ModelConfig {
                 provider,
                 model_id,
-                temperature: Some(0.3), // Lower temperature for structured specs
-                max_tokens: Some(2000),
+                temperature: provider_config.temperature.or(Some(0.3)), // Lower temperature for structured specs
+                max_tokens: provider_config.max_tokens.or(Some(2000)),
                 settings: serde_json::Map::new(),
             }),
             allowed_tools: vec![],
@@ -362,13 +372,18 @@ impl CodeGeneratorTemplate {
         &self,
         spec: &SpecificationResult,
         language: &str,
-        model: &str,
+        provider_config: &llmspell_config::ProviderConfig,
         context: &ExecutionContext,
     ) -> Result<ImplementationResult> {
         use llmspell_agents::factory::{AgentConfig, ModelConfig, ResourceLimits};
         use llmspell_core::types::AgentInput;
 
         info!("Creating implementation agent for {} code", language);
+
+        // Extract model from provider config
+        let model = provider_config.default_model
+            .as_ref()
+            .ok_or_else(|| TemplateError::Config("provider missing model".into()))?;
 
         // Parse model string (provider/model format)
         let (provider, model_id) = if let Some(slash_pos) = model.find('/') {
@@ -377,7 +392,7 @@ impl CodeGeneratorTemplate {
                 model[slash_pos + 1..].to_string(),
             )
         } else {
-            ("ollama".to_string(), model.to_string())
+            (provider_config.provider_type.clone(), model.to_string())
         };
 
         // Create agent config for code implementation
@@ -388,8 +403,8 @@ impl CodeGeneratorTemplate {
             model: Some(ModelConfig {
                 provider,
                 model_id,
-                temperature: Some(0.5), // Higher than spec (0.3) for implementation creativity
-                max_tokens: Some(3000), // More tokens for actual code
+                temperature: provider_config.temperature.or(Some(0.5)), // Higher than spec (0.3) for implementation creativity
+                max_tokens: provider_config.max_tokens.or(Some(3000)), // More tokens for actual code
                 settings: serde_json::Map::new(),
             }),
             allowed_tools: vec![],
@@ -454,13 +469,18 @@ impl CodeGeneratorTemplate {
         &self,
         implementation: &ImplementationResult,
         language: &str,
-        model: &str,
+        provider_config: &llmspell_config::ProviderConfig,
         context: &ExecutionContext,
     ) -> Result<TestResult> {
         use llmspell_agents::factory::{AgentConfig, ModelConfig, ResourceLimits};
         use llmspell_core::types::AgentInput;
 
         info!("Creating test agent for {} code", language);
+
+        // Extract model from provider config
+        let model = provider_config.default_model
+            .as_ref()
+            .ok_or_else(|| TemplateError::Config("provider missing model".into()))?;
 
         // Parse model string (provider/model format)
         let (provider, model_id) = if let Some(slash_pos) = model.find('/') {
@@ -469,7 +489,7 @@ impl CodeGeneratorTemplate {
                 model[slash_pos + 1..].to_string(),
             )
         } else {
-            ("ollama".to_string(), model.to_string())
+            (provider_config.provider_type.clone(), model.to_string())
         };
 
         // Create agent config for test generation
@@ -480,8 +500,8 @@ impl CodeGeneratorTemplate {
             model: Some(ModelConfig {
                 provider,
                 model_id,
-                temperature: Some(0.4), // Creative for edge cases, structured for test syntax
-                max_tokens: Some(2500),
+                temperature: provider_config.temperature.or(Some(0.4)), // Creative for edge cases, structured for test syntax
+                max_tokens: provider_config.max_tokens.or(Some(2500)),
                 settings: serde_json::Map::new(),
             }),
             allowed_tools: vec![],
