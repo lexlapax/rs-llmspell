@@ -69,7 +69,7 @@ pub async fn create_test_engine() -> TestEngine {
         .provider_type("ollama")
         .default_model("llama3.2:3b")
         .base_url(&ollama_host)
-        .temperature(0.0)  // Deterministic for testing
+        .temperature(0.0) // Deterministic for testing
         .max_tokens(2000)
         .timeout_seconds(60)
         .build();
@@ -78,19 +78,18 @@ pub async fn create_test_engine() -> TestEngine {
     let abstraction_config = llmspell_providers::abstraction::ProviderConfig::new_with_type(
         "ollama",
         "local",
-        "llama3.2:3b"
+        "llama3.2:3b",
     );
     let mut abstraction_config = abstraction_config;
     abstraction_config.endpoint = Some(ollama_host);
     abstraction_config.timeout_secs = Some(60);
 
-    let provider = Arc::from(
-        llmspell_providers::local::create_ollama_provider(abstraction_config).unwrap()
-    );
+    let provider =
+        Arc::from(llmspell_providers::local::create_ollama_provider(abstraction_config).unwrap());
 
     // Create LLM consolidation config from provider (NEW pattern)
     let mut config = LLMConsolidationConfig::from_provider(&provider_config).unwrap();
-    config.max_retries = 2;  // Lower retries for faster test failure
+    config.max_retries = 2; // Lower retries for faster test failure
     config.circuit_breaker_threshold = 5;
 
     // Create LLM engine

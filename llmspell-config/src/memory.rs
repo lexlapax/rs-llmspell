@@ -94,12 +94,12 @@ impl Default for DaemonConfig {
     fn default() -> Self {
         Self {
             enabled: true,
-            fast_interval_secs: 30,       // 30 seconds when queue is high
-            normal_interval_secs: 300,    // 5 minutes normal operation
-            slow_interval_secs: 600,      // 10 minutes when queue is low
-            queue_threshold_fast: 10,     // Fast mode when queue > 10
-            queue_threshold_slow: 3,      // Slow mode when queue < 3
-            shutdown_max_wait_secs: 30,   // Wait up to 30 seconds for graceful shutdown
+            fast_interval_secs: 30,         // 30 seconds when queue is high
+            normal_interval_secs: 300,      // 5 minutes normal operation
+            slow_interval_secs: 600,        // 10 minutes when queue is low
+            queue_threshold_fast: 10,       // Fast mode when queue > 10
+            queue_threshold_slow: 3,        // Slow mode when queue < 3
+            shutdown_max_wait_secs: 30,     // Wait up to 30 seconds for graceful shutdown
             health_check_interval_secs: 60, // Health check every minute
         }
     }
@@ -398,7 +398,10 @@ mod tests {
         let deserialized: ConsolidationConfig =
             serde_json::from_str(&serialized).expect("Deserialization should work");
 
-        assert_eq!(deserialized.provider_name, Some("test-provider".to_string()));
+        assert_eq!(
+            deserialized.provider_name,
+            Some("test-provider".to_string())
+        );
         assert_eq!(deserialized.batch_size, 25);
     }
 

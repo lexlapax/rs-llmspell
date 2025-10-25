@@ -25,13 +25,13 @@
 //!
 //! **Recommended Usage**:
 //! - **PRIMARY**: Run tests individually: `cargo test --test consolidation_llm_test test_add_decision` (reliable, fast)
-//! - **CI/CD**: These tests are marked `#[ignore]` - skip in automated testing
+//! - **CI/CD**: These tests are marked `#[ignore = "Ollama rate limiting - run individually"]` - skip in automated testing
 //! - **Full suite**: Run with `cargo test --test consolidation_llm_test --include-ignored`
 //!   Accept ~10-20% flake rate, re-run on failure
 //!
 //! All tests validate correctly when run in isolation.
 //!
-//! **Test Status**: These tests are now marked `#[ignore]` by default. Run individual tests
+//! **Test Status**: These tests are now marked `#[ignore = "Ollama rate limiting - run individually"]` by default. Run individual tests
 //! or use `--include-ignored` flag. The consolidation engine itself is thoroughly tested
 //! via unit tests in `src/consolidation/*.rs`.
 
@@ -47,7 +47,7 @@ use e2e::helpers::{create_test_engine, GroundTruthDecision};
 ///
 /// Scenario: "Rust is a systems programming language"
 /// Expected: ADD(rust), `ADD(systems_programming)`, `ADD_RELATIONSHIP(rust`, `is_a`, language)
-#[ignore]
+#[ignore = "Ollama rate limiting - run individually"]
 #[tokio::test]
 #[serial]
 async fn test_add_decision() {
@@ -124,7 +124,7 @@ async fn test_add_decision() {
 /// - First: "Rust has memory safety"
 /// - Second: "Rust also has zero-cost abstractions"
 /// Expected: UPDATE existing Rust entity with new feature
-#[ignore]
+#[ignore = "Ollama rate limiting - run individually"]
 #[tokio::test]
 #[serial]
 async fn test_update_decision() {
@@ -216,7 +216,7 @@ async fn test_update_decision() {
 /// - First: "Python 2.7 is supported"
 /// - Second: "Python 2.7 is deprecated and no longer supported"
 /// Expected: DELETE Python 2.7 entity (tombstone)
-#[ignore]
+#[ignore = "Ollama rate limiting - run individually"]
 #[tokio::test]
 #[serial]
 async fn test_delete_decision() {
@@ -337,7 +337,7 @@ async fn test_delete_decision() {
 ///
 /// Scenario: "The weather is nice today"
 /// Expected: NOOP (no knowledge graph changes)
-#[ignore]
+#[ignore = "Ollama rate limiting - run individually"]
 #[tokio::test]
 #[serial]
 async fn test_noop_decision() {
@@ -399,7 +399,7 @@ async fn test_noop_decision() {
 /// - Turn 2: "Acme Corp is located in San Francisco"
 /// - Turn 3: "Alice recently moved to remote work"
 /// Expected: Entities and relationships created in correct order
-#[ignore]
+#[ignore = "Ollama rate limiting - run individually"]
 #[tokio::test]
 #[serial]
 async fn test_multi_turn_consolidation() {
@@ -462,9 +462,12 @@ async fn test_multi_turn_consolidation() {
         .unwrap();
 
     // Verify all turns processed (including skipped/NOOP decisions)
-    let total_handled = result1.entries_processed + result1.entries_skipped
-        + result2.entries_processed + result2.entries_skipped
-        + result3.entries_processed + result3.entries_skipped;
+    let total_handled = result1.entries_processed
+        + result1.entries_skipped
+        + result2.entries_processed
+        + result2.entries_skipped
+        + result3.entries_processed
+        + result3.entries_skipped;
     assert_eq!(
         total_handled,
         3,
@@ -509,7 +512,7 @@ async fn test_multi_turn_consolidation() {
 /// - Very long content
 /// - Special characters
 /// Expected: No crashes, graceful degradation
-#[ignore]
+#[ignore = "Ollama rate limiting - run individually"]
 #[tokio::test]
 #[serial]
 async fn test_error_recovery() {

@@ -477,7 +477,10 @@ mod tests {
             .api_key_env("ANTHROPIC_API_KEY")
             .model("claude-3-5-haiku-latest")
             .temperature(0.7)
-            .option("custom_option".to_string(), serde_json::json!("custom_value"))
+            .option(
+                "custom_option".to_string(),
+                serde_json::json!("custom_value"),
+            )
             .build();
 
         let serialized = serde_json::to_string(&config).expect("Serialization should work");
