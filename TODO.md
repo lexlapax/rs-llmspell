@@ -3587,7 +3587,11 @@ let llm_config = LlmEngineConfig::from_provider(provider)?;
 - [ ] Update template parameter schemas (model → provider_name) (Deferred - backward compat)
 - [x] Update all template tests to use provider fixtures ✅
 - [x] Add test helper: `test_provider_config() -> ProviderConfig` per template ✅
-- [ ] Update template metadata.json files (N/A - no metadata directory exists)
+- [x] Template metadata architecture confirmed (code-first, not JSON files) ✅
+  - **Note**: TemplatMetadata is Rust struct (llmspell-templates/src/core.rs:42-71) instantiated in each template's new() constructor
+  - No external metadata/*.json files by design - code-first architecture provides type safety, eliminates sync issues
+  - Metadata dynamically serialized to JSON when needed (CLI commands, Lua API) via serde
+  - This is architecturally superior to file-based metadata and consistent with Agent/Tool/Workflow patterns
 - [x] All tests compile: `cargo test -p llmspell-templates --lib --no-run` ✅
 - [x] Zero clippy warnings ✅
 
@@ -3682,7 +3686,6 @@ llmspell template exec code-generator \
 - `llmspell-templates/src/builtin/code_review.rs` (MODIFY - 10 call sites, ~100 lines)
 - `llmspell-templates/src/builtin/document_processor.rs` (MODIFY - 6 call sites, ~60 lines)
 - `llmspell-templates/tests/*.rs` (MODIFY - 10+ test files, ~300 lines)
-- `llmspell-templates/metadata/*.json` (MODIFY - update param schemas, ~10 files)
 
 **Quality Gates**:
 - cargo test -p llmspell-templates passes
