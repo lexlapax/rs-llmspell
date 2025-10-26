@@ -940,7 +940,100 @@ impl Reranker {
 }
 ```
 
-#### Decision 6: Memory Storage (SQLite vs Postgres vs Custom)
+#### Decision 6: Dual-Path Provider Architecture (`provider_name` vs `model`)
+
+**Context**: Phase 13.5.7 integrates provider system with templates and memory consolidation. Two parameter approaches exist:
+1. **`provider_name`**: Reference centrally-defined provider in config.toml
+2. **`model`**: Ad-hoc model string for quick experiments
+
+**Options**:
+1. **Provider-Only**: Force all LLM calls to use `provider_name` (consistent but inflexible)
+2. **Model-Only**: Keep existing `model` parameter (flexible but no centralized config)
+3. **Dual-Path**: Support both with clear precedence rules (best of both worlds)
+
+**Decision**: **Dual-Path with `provider_name` Precedence**
+
+**Rationale**:
+- **Production Workflows**: Need centralized provider config for model rotation, parameter tuning, version control
+- **Quick Experiments**: Developers need fast model swapping without config.toml changes
+- **Zero Breaking Changes**: Existing template calls with `model` parameter continue working
+- **Clear Precedence**: `provider_name` > `model` > `default_provider` > error (no ambiguity)
+- **Memory Integration**: Consolidation uses dedicated provider (low temp=0.0) separate from general tasks (temp=0.7)
+
+**Parameter Precedence Rules**:
+```rust
+// resolve_llm_config() in ExecutionContext
+pub fn resolve_llm_config(&self, params: &TemplateParams) -> Result<ProviderConfig> {
+    // 1. provider_name takes precedence (if provided)
+    if let Some(provider_name) = params.get::<String>("provider_name") {
+        return self.config.providers.get_provider(&provider_name);
+    }
+
+    // 2. model parameter (ad-hoc specification)
+    if let Some(model) = params.get::<String>("model") {
+        return Ok(ProviderConfig::from_model_string(&model));
+    }
+
+    // 3. default_provider from config.toml
+    if let Some(default_name) = &self.config.providers.default_provider {
+        return self.config.providers.get_provider(default_name);
+    }
+
+    // 4. Error - no provider specified
+    Err(LLMSpellError::ProviderNotFound("No provider or model specified".into()))
+}
+```
+
+**Use Cases**:
+
+*Production Template Execution*:
+```lua
+-- config.toml: [providers.production-llm]
+Template.execute("research-assistant", {
+    provider_name = "production-llm",  -- Centralized config
+    topic = "Rust async runtime"
+})
+```
+
+*Quick Model Comparison*:
+```lua
+-- No config changes needed
+for _, model in ipairs({"ollama/llama3.2:3b", "ollama/mistral:7b"}) do
+    Template.execute("code-generator", {
+        model = model,  -- Ad-hoc specification
+        description = "factorial function"
+    })
+end
+```
+
+*Memory Consolidation with Dedicated Provider*:
+```toml
+# config.toml
+[providers.default]
+temperature = 0.7  # General tasks
+
+[providers.consolidation-llm]
+temperature = 0.0  # Deterministic consolidation
+max_tokens = 2000
+
+[runtime.memory.consolidation]
+provider_name = "consolidation-llm"  # References provider
+```
+
+**Benefits**:
+- **Flexibility**: Supports both production (provider_name) and experimentation (model) workflows
+- **Consistency**: Single `resolve_llm_config()` method handles all cases
+- **Safety**: Error on conflict when both parameters provided
+- **Migration**: Existing `model` users can gradually adopt `provider_name`
+- **Documentation**: Clear best practices guide (docs/user-guide/provider-best-practices.md)
+
+**Implementation Status**: ✅ Complete (Phase 13.5.7e)
+- Templates: All 10 templates use `resolve_llm_config()`
+- Memory: Consolidation uses `provider_name` with fallback to default_provider
+- Profiles: `default` and `memory` builtin profiles demonstrate both patterns
+- Documentation: 950+ lines of user guides (provider-best-practices.md, memory-configuration.md)
+
+#### Decision 7: Memory Storage (SQLite vs Postgres vs Custom)
 
 **Options**:
 1. **SQLite**: File-based, simple, no server (current `llmspell-state-persistence` backend)

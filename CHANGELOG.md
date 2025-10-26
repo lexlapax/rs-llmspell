@@ -7,6 +7,37 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+#### Phase 13.5.7: Direct Provider Integration
+
+- **Dual-Path Provider Architecture**: Templates and memory system now support both `provider_name` (centralized config) and `model` (ad-hoc) parameters
+  - `provider_name`: References provider defined in config.toml for production use, centralized management, and version control
+  - `model`: Ad-hoc model specification for quick experiments and model comparison
+  - Automatic fallback to `default_provider` when neither specified
+  - Error on conflict when both parameters provided
+
+- **Memory System Provider Integration**:
+  - `runtime.memory.consolidation.provider_name` for LLM-driven consolidation
+  - Dedicated `consolidation-llm` provider with low temperature (0.0) for deterministic consolidation
+  - Separation of general-purpose providers (temp=0.7) from consolidation providers (temp=0.0)
+  - Automatic provider resolution with fallback to default_provider
+
+- **Builtin Configuration Profiles** (2 new profiles):
+  - **`default` profile**: Simple Ollama-based general purpose configuration (Lua stdlib, llama3.2:3b, 4096 tokens)
+  - **`memory` profile**: Production memory system with dual providers (default + consolidation-llm), adaptive daemon scheduling, episodic memory enabled
+
+- **Documentation**:
+  - **[Provider Best Practices Guide](docs/user-guide/provider-best-practices.md)** (500+ lines): Comprehensive guide for choosing provider_name vs model, migration patterns, common use cases
+  - **[Memory Configuration Guide](docs/user-guide/memory-configuration.md)** (450+ lines): Complete memory system configuration with provider integration, performance tuning, troubleshooting
+
+### Changed
+
+- **Template System**: All 10 templates now support dual-path provider resolution via `resolve_llm_config()`
+- **Memory System**: Consolidation configuration changed from hardcoded model to provider_name reference
+- **Profile Count**: 10 → 12 builtin profiles (added default, memory)
+- **Documentation Structure**: Added Phase 13 documentation links to user guide README
+
 ## [0.12.0] - 2025-10-22 - Production Template System 🎯
 
 Complete turn-key AI workflow templates solving the "0-day retention problem" with 10 production-ready templates matching industry baseline. See [RELEASE_NOTES_v0.12.0.md](RELEASE_NOTES_v0.12.0.md) for full details.

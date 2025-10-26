@@ -47,6 +47,23 @@
 - Security settings and deployment profiles
 - Environment variables
 
+### 3a. [Provider Best Practices](provider-best-practices.md) ⭐ Phase 13
+**Dual-path provider architecture guide**
+- When to use `provider_name` vs `model` parameter
+- Production patterns (environment-specific, task-specific, cost-optimized)
+- Migration guide from ad-hoc model strings to centralized providers
+- Common patterns and best practices
+- Internal API changes for developers
+
+### 3b. [Memory Configuration](memory-configuration.md) ⭐ Phase 13
+**Memory system configuration and provider integration**
+- Quick start with memory profile
+- Complete configuration reference (consolidation, daemon, providers)
+- Provider integration and requirements
+- Use cases (conversational agents, knowledge accumulation, long-running agents)
+- Performance tuning and troubleshooting
+- Environment variables for memory system
+
 ### 4. [Security & Permissions](security-and-permissions.md) ⭐ Phase 11a.13
 **Comprehensive security sandbox guide for safe tool execution**
 - Three-level security model (Safe/Restricted/Privileged)

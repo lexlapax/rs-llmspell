@@ -3816,24 +3816,26 @@ queue_threshold_slow = 20
 | default  | 1 (default) | Disabled | General scripting, templates |
 | memory   | 2 (default + consolidation) | Enabled | Long-running agents, knowledge accumulation |
 
-### Task 13.5.7f: Documentation & Provider Best Practices Guide
+### Task 13.5.7f: Documentation & Provider Best Practices Guide ✅ COMPLETE
 
 **Priority**: HIGH
 **Estimated Time**: 3 hours
+**Actual Time**: 2.5 hours
 **Dependencies**: 13.5.7e complete
+**Status**: ✅ COMPLETE
 
 **Description**: Document memory configuration, provider integration, and best practices for choosing provider_name vs model.
 
 **Acceptance Criteria**:
-- [ ] Create `docs/user-guide/configuration/memory.md` with complete config reference
-- [ ] Create `docs/user-guide/best-practices/provider-usage.md` for dual-path guidance
-- [ ] Update `docs/user-guide/configuration/README.md` to link memory section
-- [ ] Update `docs/technical/phase-13-design-doc.md` with dual-path provider architecture
-- [ ] Add CHANGELOG.md entry for v0.13.x new features (provider_name support)
-- [ ] Documentation builds without errors
-- [ ] All config fields documented with examples
-- [ ] Performance tuning guide included
-- [ ] Troubleshooting section added
+- [x] Create `docs/user-guide/memory-configuration.md` with complete config reference (450 lines)
+- [x] Create `docs/user-guide/provider-best-practices.md` for dual-path guidance (500 lines)
+- [x] Update `docs/user-guide/README.md` to link new sections (added 3a, 3b)
+- [x] Update `docs/technical/phase-13-design-doc.md` with dual-path provider architecture (Decision 6)
+- [x] Add CHANGELOG.md entry for v0.13.x new features (Phase 13.5.7 section)
+- [x] Documentation builds without errors
+- [x] All config fields documented with examples
+- [x] Performance tuning guide included
+- [x] Troubleshooting section added
 
 **Best Practices Guide Sections**:
 1. Overview of dual-path architecture (provider_name OR model)
@@ -3872,6 +3874,33 @@ queue_threshold_slow = 20
 - Internal links work
 - Code examples are correct
 - Migration guide tested with real config changes
+
+**Implementation Insights**:
+- ✅ Created comprehensive 950-line documentation suite (450 + 500 lines)
+- ✅ Provider Best Practices Guide covers dual-path architecture comprehensively:
+  - Quick comparison table (provider_name vs model)
+  - When to use each approach (production, experiments, one-off)
+  - Parameter precedence rules with examples
+  - Migration guide from model to provider_name
+  - Common patterns (environment-specific, task-specific, cost-optimized)
+  - Internal API changes for developers
+  - FAQ section with 6 common questions
+- ✅ Memory Configuration Guide provides complete reference:
+  - Quick start with memory profile
+  - Full configuration reference (memory, consolidation, daemon)
+  - Provider integration explanation and requirements
+  - Use cases (conversational agents, knowledge accumulation, long-running)
+  - Performance tuning (fast iteration, memory-constrained, high throughput, production defaults)
+  - Troubleshooting (5 common problems with solutions)
+  - Environment variables reference (13 variables)
+- ✅ Updated docs/user-guide/README.md with new sections (3a Provider Best Practices, 3b Memory Configuration)
+- ✅ Added Decision 6 to phase-13-design-doc.md (90 lines on dual-path architecture)
+- ✅ CHANGELOG.md updated with comprehensive Phase 13.5.7 entry
+- ✅ All documentation cross-referenced (provider-best-practices ↔ memory-configuration)
+- ✅ Examples cover both TOML configuration and Lua/Bash usage patterns
+- 📊 **Documentation Structure**: Maintained flat structure (not subdirectories) per CLAUDE.md guidance
+- 📊 **Cross-References**: 8 internal links between docs (configuration.md, local-llm.md, performance-tuning.md, troubleshooting.md)
+- 📊 **Completion**: All 5 acceptance criteria met, zero breaking changes
 
 ### Task 13.5.7g: Integration Testing & Validation
 
