@@ -11,6 +11,7 @@
 
 use llmspell_config::{LLMSpellConfig, ProviderConfig, ProviderManagerConfig};
 use llmspell_memory::consolidation::LLMConsolidationConfig;
+use serial_test::serial;
 use std::sync::Arc;
 
 /// Test `LLMConsolidationConfig::from_provider()` factory method
@@ -199,6 +200,7 @@ fn test_default_provider_fallback() {
 ///
 /// Verifies that `LLMSPELL_MEMORY_CONSOLIDATION_PROVIDER_NAME` can override config
 #[tokio::test]
+#[serial]
 async fn test_env_var_override_consolidation_provider() {
     // Clean up first to avoid pollution from parallel tests
     std::env::remove_var("LLMSPELL_MEMORY_CONSOLIDATION_PROVIDER_NAME");
@@ -234,6 +236,7 @@ async fn test_env_var_override_consolidation_provider() {
 ///
 /// Verifies that TOML files can define custom providers for consolidation
 #[tokio::test]
+#[serial]
 async fn test_toml_config_with_custom_provider() {
     // Clean up any env vars from other tests (tests may run in parallel)
     std::env::remove_var("LLMSPELL_MEMORY_CONSOLIDATION_PROVIDER_NAME");
