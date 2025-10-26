@@ -4859,13 +4859,13 @@ All subtasks (13.5.7a through 13.5.7i) are complete. Provider migration successf
 - Bridge provides script APIs (Memory.recall(), Memory.search()) for query
 
 **Acceptance Criteria**:
-- [ ] Add `hook_system: Option<Arc<KernelHookSystem>>` field to IntegratedKernel struct
-- [ ] Initialize in `new()` with optional parameter (backward compat: None = no hooks)
-- [ ] Fire `PreCodeExecution` hook before script execution in `execute_direct_with_args()`
-- [ ] Fire `PostCodeExecution` hook after script execution with result in context
-- [ ] Update all 31 test call sites with None for hook_system parameter
-- [ ] Performance overhead <5% (verified via benchmarks)
-- [ ] **TRACING**: Hook system init (info!), hook execution (debug!), errors (error!)
+- [x] Add `hook_system: Option<Arc<KernelHookSystem>>` field to IntegratedKernel struct
+- [x] Initialize in `new()` with optional parameter (backward compat: None = no hooks)
+- [x] Fire `PreCodeExecution` hook before script execution in `execute_direct_with_args()`
+- [x] Fire `PostCodeExecution` hook after script execution with result in context
+- [x] Update all 37 test call sites with None for hook_system parameter (not 31)
+- [ ] Performance overhead <5% (verified via benchmarks) - DEFERRED to 13.7.5
+- [x] **TRACING**: Hook system init (info!), hook execution (debug!), errors (error!)
 
 **Implementation Steps**:
 1. Add field to IntegratedKernel struct:
