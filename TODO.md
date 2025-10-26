@@ -4834,80 +4834,105 @@ All subtasks (13.5.7a through 13.5.7i) are complete. Provider migration successf
 
 **Time**: ~1.5 hours (3 compilation error fixes: Deserialize, episodic_arc trait method, Arc wrapping)
 
-### Task 13.7.3: Session-Memory Linking via Hook Pattern
+### Task 13.7.3: Kernel Execution-Memory Linking via Hook Pattern
 
 **Priority**: HIGH
-**Estimated Time**: 3 hours (reduced from 4h - hook infrastructure exists)
-**Assignee**: Sessions Team + Memory Team
+**Estimated Time**: 2 hours (reduced - simpler than original session-based design)
+**Assignee**: Kernel Team + Memory Team
 **Status**: READY TO START
 
-**Description**: Link Session events with MemoryManager for automatic episodic memory creation (use existing hook pattern, NOT context field access).
+**Description**: Capture kernel executions as episodic memories via hook pattern (execution = user code + assistant result).
 
-**Changes from Original Plan**:
-- ✅ **Session hook infrastructure exists** (llmspell-kernel/src/sessions/hooks.rs, policies.rs, middleware.rs)
-- ✅ **No context.memory_manager field** - Session doesn't have direct memory_manager access
-- ✅ **Pattern to follow**: Use SessionEvent + hook system like sessions/analytics.rs
-- ✅ **InMemoryEpisodicMemory sufficient** - no ChromaDB dependency needed (Phase 13.1 has in-memory)
+**Architecture Correction from Original Plan**:
+- ❌ **Sessions don't track "interactions"** - they only track lifecycle (start/end/checkpoint)
+- ❌ **No SessionEvent::InteractionAdded** - this doesn't exist in the architecture
+- ✅ **Correct integration point**: `IntegratedKernel::execute()` - where code executions happen
+- ✅ **Use HookPoint::AfterExecution** - existing hook infrastructure in llmspell-hooks
+- ✅ **One execution = one interaction pair**: user code input → assistant execution result
+
+**What is an "Interaction"?**
+- User entry: Code/command submitted to kernel
+- Assistant entry: Execution result (stdout, stderr, return value)
+- NOT chat messages (kernel doesn't do chat, it executes code)
+- NOT session lifecycle events (too high-level, no content)
 
 **Acceptance Criteria**:
-- [ ] SessionEvent::InteractionAdded triggers episodic memory creation via hook
+- [ ] Kernel executions captured as episodic memory pairs (input + output) via HookPoint::AfterExecution
 - [ ] Session metadata (session_id, timestamp) included in episodic records
-- [ ] Opt-in design: SessionConfig.enable_memory flag
-- [ ] Session artifacts NOT linked (separate concerns - artifacts are for storage, memory is for retrieval)
-- [ ] **TRACING**: Session events (debug!), memory writes (debug!), hook execution (trace!), errors (error!)
+- [ ] Opt-in design: Only when memory_manager present in IntegratedKernel
+- [ ] Embedding generation deferred to ConsolidationDaemon (async, not in execute() hot path)
+- [ ] **TRACING**: Hook registration (info!), memory writes (debug!), errors (error!)
 
 **Implementation Steps**:
-1. Create `llmspell-kernel/src/sessions/memory_hook.rs` (follows pattern from analytics.rs):
+1. Create `llmspell-kernel/src/execution/memory_hook.rs`:
    ```rust
-   /// Hook that captures session interactions as episodic memories
-   pub struct MemoryHook {
+   /// Hook that captures kernel executions as episodic memories
+   pub struct ExecutionMemoryHook {
        memory_manager: Arc<dyn llmspell_memory::MemoryManager>,
    }
-   impl SessionHook for MemoryHook {
-       async fn on_event(&self, event: &SessionEvent) -> Result<()> {
-           if let SessionEvent::InteractionAdded { session_id, interaction } = event {
-               debug!("Recording interaction as episodic memory for session {}", session_id);
-               self.memory_manager.episodic().add(EpisodicEntry {
-                   session_id: session_id.clone(),
-                   role: interaction.role.clone(),
-                   content: interaction.content.clone(),
-                   timestamp: Utc::now(),
-                   metadata: interaction.metadata.clone(),
-               }).await?;
-           }
+   impl Hook for ExecutionMemoryHook {
+       async fn execute(&self, ctx: &mut HookContext) -> Result<()> {
+           if ctx.point != HookPoint::AfterExecution { return Ok(()); }
+
+           let session_id = ctx.data.get("session_id")?.as_str()?;
+           let code = ctx.data.get("code")?.as_str()?;
+           let result = ctx.data.get("result")?;
+
+           // User entry (input)
+           self.memory_manager.episodic().add(EpisodicEntry {
+               session_id: session_id.to_string(),
+               role: "user".to_string(),
+               content: code.to_string(),
+               timestamp: Utc::now(),
+               metadata: json!({"type": "execution_input"}),
+               embedding: None, // Generated async by daemon
+               processed: false,
+           }).await?;
+
+           // Assistant entry (output)
+           self.memory_manager.episodic().add(EpisodicEntry {
+               session_id: session_id.to_string(),
+               role: "assistant".to_string(),
+               content: serde_json::to_string(result)?,
+               timestamp: Utc::now(),
+               metadata: json!({"type": "execution_output"}),
+               embedding: None,
+               processed: false,
+           }).await?;
+
+           debug!("Captured execution as episodic memory for session {}", session_id);
            Ok(())
        }
    }
    ```
-2. Register MemoryHook in SessionManager initialization (when memory_manager present):
-   ```rust
-   if let Some(memory_mgr) = memory_manager {
-       session_manager.register_hook(Arc::new(MemoryHook::new(memory_mgr)))?;
-   }
-   ```
-3. Add enable_memory flag to SessionConfig (llmspell-kernel/src/sessions/config.rs)
-4. Create session-memory integration tests
+2. Find/verify hook_registry in IntegratedKernel (investigate current structure)
+3. Register ExecutionMemoryHook in IntegratedKernel::new() after memory_manager init
+4. Populate hook context in IntegratedKernel::execute() with session_id, code, result
+5. Create execution-memory integration tests
 
 **Files to Create/Modify**:
-- `llmspell-kernel/src/sessions/memory_hook.rs` (NEW - 120 lines)
-  - MemoryHook struct implementing SessionHook trait
-  - on_event() handler for InteractionAdded events
-- `llmspell-kernel/src/sessions/mod.rs` (MODIFY - add memory_hook module, ~2 lines)
-- `llmspell-kernel/src/sessions/config.rs` (MODIFY - add enable_memory: bool flag, ~5 lines)
-- `llmspell-memory/src/episodic/in_memory.rs` (MODIFY - add session_id filtering, ~20 lines)
-- `llmspell-kernel/tests/session_memory_integration_test.rs` (NEW - 250 lines)
-  - test_session_interaction_creates_episodic_memory() - verify hook triggers
-  - test_session_without_memory() - verify opt-in design
-  - test_session_memory_filtering_by_session_id() - verify isolation
+- `llmspell-kernel/src/execution/memory_hook.rs` (NEW - ~150 lines)
+  - ExecutionMemoryHook implementing Hook trait
+  - Captures code input + execution result as episodic pair
+- `llmspell-kernel/src/execution/mod.rs` (MODIFY - add memory_hook module, ~2 lines)
+- `llmspell-kernel/src/execution/integrated.rs` (MODIFY - register hook + populate context, ~30 lines)
+  - Register hook in ::new() when memory_manager present
+  - Add hook context data in execute() method
+- `llmspell-kernel/tests/execution_memory_test.rs` (NEW - ~200 lines)
+  - test_execution_creates_episodic_memory() - verify hook captures input/output
+  - test_execution_without_memory() - verify opt-in design
+  - test_multiple_executions_same_session() - verify session_id isolation
 
 **Definition of Done**:
-- [ ] Session interactions automatically create episodic memories when MemoryHook registered
-- [ ] Session metadata correctly propagated to episodic records
-- [ ] Opt-in design verified (sessions work without memory_manager/MemoryHook)
-- [ ] Integration tests pass with InMemoryEpisodicMemory (no external DB)
-- [ ] Hook respects existing session hook patterns (async, error handling)
+- [ ] Kernel executions automatically create episodic memory pairs when memory_manager present
+- [ ] Session_id, timestamps, metadata correctly propagated
+- [ ] Opt-in design verified (kernel works without memory_manager)
+- [ ] Integration tests pass with InMemoryEpisodicMemory
+- [ ] Hook respects existing llmspell-hooks patterns (HookPoint, HookContext)
 - [ ] Zero clippy warnings
-- [ ] Comprehensive tracing with debug!/trace!/error!
+- [ ] Comprehensive tracing with info!/debug!/error!
+
+**Key Insight**: Kernel executions ARE the interactions in llmspell (code in → result out), not chat messages. This aligns episodic memory with actual kernel operations.
 
 ### Task 13.7.4: State-Memory Synchronization via Hook Pattern
 
