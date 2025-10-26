@@ -49,6 +49,7 @@ regex = "1.10"
 
 [dev-dependencies]
 llmspell-testing = { path = "../llmspell-testing" }
+llmspell-context = { path = "../llmspell-context" }
 tokio-test = "0.4"
 mockall = { workspace = true }
 criterion = { workspace = true }

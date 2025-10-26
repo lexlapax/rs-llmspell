@@ -4,6 +4,7 @@
 //! Set `OLLAMA_HOST` environment variable (default: <http://localhost:11434>).
 //! Tests will skip gracefully if Ollama is unavailable.
 
+pub mod full_pipeline_test;
 pub mod helpers;
 
 use std::env;
