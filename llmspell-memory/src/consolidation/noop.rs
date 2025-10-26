@@ -48,6 +48,10 @@ impl ConsolidationEngine for NoopConsolidationEngine {
     fn is_ready(&self) -> bool {
         false // No-op engine is never "ready" for real consolidation
     }
+
+    fn is_noop(&self) -> bool {
+        true // This IS a no-op engine
+    }
 }
 
 #[cfg(test)]
@@ -72,5 +76,6 @@ mod tests {
         assert_eq!(result.entries_processed, 0);
         assert_eq!(result.entities_added, 0);
         assert!(!engine.is_ready());
+        assert!(engine.is_noop());
     }
 }

@@ -206,6 +206,114 @@ impl DefaultMemoryManager {
         debug!("Creating NoopProceduralMemory");
         Arc::new(NoopProceduralMemory)
     }
+
+    // ========== Phase 13.6.4: Kernel Integration API Helpers ==========
+
+    /// Check if real consolidation is enabled (not using no-op engine)
+    ///
+    /// Returns `true` if a real consolidation engine (manual or LLM-driven) is configured,
+    /// `false` if using `NoopConsolidationEngine`.
+    ///
+    /// Used by kernel integration to determine if consolidation daemon should be started.
+    ///
+    /// # Example
+    ///
+    /// ```rust
+    /// # use llmspell_memory::DefaultMemoryManager;
+    /// # async fn example() {
+    /// let manager = DefaultMemoryManager::new_in_memory().await.unwrap();
+    /// if manager.has_consolidation() {
+    ///     println!("Real consolidation engine enabled");
+    /// }
+    /// # }
+    /// ```
+    #[must_use]
+    pub fn has_consolidation(&self) -> bool {
+        !self.consolidation.is_noop()
+    }
+
+    /// Check if episodic memory is present
+    ///
+    /// Always returns `true` in current design (episodic memory always present).
+    ///
+    /// # Example
+    ///
+    /// ```rust
+    /// # use llmspell_memory::DefaultMemoryManager;
+    /// # async fn example() {
+    /// let manager = DefaultMemoryManager::new_in_memory().await.unwrap();
+    /// assert!(manager.has_episodic());
+    /// # }
+    /// ```
+    #[must_use]
+    pub const fn has_episodic(&self) -> bool {
+        true
+    }
+
+    /// Check if semantic memory is present
+    ///
+    /// Always returns `true` in current design (semantic memory always present).
+    ///
+    /// # Example
+    ///
+    /// ```rust
+    /// # use llmspell_memory::DefaultMemoryManager;
+    /// # async fn example() {
+    /// let manager = DefaultMemoryManager::new_in_memory().await.unwrap();
+    /// assert!(manager.has_semantic());
+    /// # }
+    /// ```
+    #[must_use]
+    pub const fn has_semantic(&self) -> bool {
+        true
+    }
+
+    /// Get consolidation engine as Arc for daemon construction
+    ///
+    /// Returns `None` if using `NoopConsolidationEngine` (no real consolidation).
+    /// Returns `Some(Arc<dyn ConsolidationEngine>)` if real engine configured.
+    ///
+    /// Used by kernel integration to construct `ConsolidationDaemon`.
+    ///
+    /// # Example
+    ///
+    /// ```rust
+    /// # use llmspell_memory::DefaultMemoryManager;
+    /// # async fn example() {
+    /// let manager = DefaultMemoryManager::new_in_memory().await.unwrap();
+    /// if let Some(engine) = manager.consolidation_engine_arc() {
+    ///     println!("Consolidation engine available for daemon");
+    /// }
+    /// # }
+    /// ```
+    #[must_use]
+    pub fn consolidation_engine_arc(&self) -> Option<Arc<dyn ConsolidationEngine>> {
+        if self.has_consolidation() {
+            Some(self.consolidation.clone())
+        } else {
+            None
+        }
+    }
+
+    /// Get episodic memory as Arc for daemon construction
+    ///
+    /// Returns owned `Arc` to episodic memory implementation.
+    /// Used by kernel integration to construct `ConsolidationDaemon`.
+    ///
+    /// # Example
+    ///
+    /// ```rust
+    /// # use llmspell_memory::DefaultMemoryManager;
+    /// # async fn example() {
+    /// let manager = DefaultMemoryManager::new_in_memory().await.unwrap();
+    /// let episodic = manager.episodic_arc();
+    /// println!("Episodic memory Arc obtained");
+    /// # }
+    /// ```
+    #[must_use]
+    pub fn episodic_arc(&self) -> Arc<dyn EpisodicMemory> {
+        self.episodic.clone()
+    }
 }
 
 #[async_trait]
@@ -387,5 +495,50 @@ mod tests {
     async fn test_shutdown() {
         let manager = DefaultMemoryManager::new_in_memory().await.unwrap();
         manager.shutdown().await.unwrap();
+    }
+
+    // ========== Phase 13.6.4: API Helper Tests ==========
+
+    #[tokio::test]
+    async fn test_has_consolidation_with_noop() {
+        let mgr = DefaultMemoryManager::new_in_memory().await.unwrap();
+        assert!(!mgr.has_consolidation()); // Uses noop by default
+        assert!(mgr.has_episodic());
+        assert!(mgr.has_semantic());
+        assert!(mgr.consolidation_engine_arc().is_none()); // Should return None for noop
+    }
+
+    #[tokio::test]
+    async fn test_has_consolidation_with_real_engine() {
+        use crate::consolidation::ManualConsolidationEngine;
+        use llmspell_graph::extraction::RegexExtractor;
+        use llmspell_graph::storage::surrealdb::SurrealDBBackend;
+        use tempfile::TempDir;
+
+        let temp = TempDir::new().unwrap();
+        let episodic = Arc::new(InMemoryEpisodicMemory::new());
+        let semantic = Arc::new(GraphSemanticMemory::new_temp().await.unwrap());
+        let procedural = Arc::new(NoopProceduralMemory);
+
+        let extractor = Arc::new(RegexExtractor::new());
+        let graph = Arc::new(
+            SurrealDBBackend::new(temp.path().to_path_buf())
+                .await
+                .unwrap(),
+        );
+        let engine = Arc::new(ManualConsolidationEngine::new(extractor, graph));
+
+        let mgr = DefaultMemoryManager::with_consolidation(episodic, semantic, procedural, engine);
+
+        assert!(mgr.has_consolidation()); // Real engine should return true
+        assert!(mgr.consolidation_engine_arc().is_some()); // Should return Some for real engine
+    }
+
+    #[tokio::test]
+    async fn test_episodic_arc_returns_same_instance() {
+        let mgr = DefaultMemoryManager::new_in_memory().await.unwrap();
+        let arc1 = mgr.episodic_arc();
+        let arc2 = mgr.episodic_arc();
+        assert!(Arc::ptr_eq(&arc1, &arc2)); // Should be same Arc instance
     }
 }

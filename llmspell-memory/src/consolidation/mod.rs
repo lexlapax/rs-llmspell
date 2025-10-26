@@ -121,4 +121,17 @@ pub trait ConsolidationEngine: Send + Sync {
     fn is_ready(&self) -> bool {
         true
     }
+
+    /// Check if this is a no-op consolidation engine
+    ///
+    /// Returns true for engines that don't actually perform consolidation (e.g., `NoopConsolidationEngine`).
+    /// Used by kernel integration to determine if consolidation daemon should be started.
+    ///
+    /// # Default Implementation
+    ///
+    /// Returns `false` for real consolidation engines (manual, LLM-driven).
+    /// Override to return `true` only in `NoopConsolidationEngine`.
+    fn is_noop(&self) -> bool {
+        false
+    }
 }
