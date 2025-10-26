@@ -499,16 +499,75 @@ impl ProviderManager {
             }
         }
 
-        // Create a unique instance name
+        // 3-tier provider lookup strategy:
+        // 1. Exact match: Check if instance already exists (cache hit)
+        // 2. Provider type match: Find initialized provider with matching type, clone config
+        // 3. Ephemeral config: Create new instance (current fallback behavior)
+
         let instance_name = format!("{}:{}", provider_name, spec.model);
 
-        // Check if we already have this instance
+        // Tier 1: Check if we already have this exact instance (cache hit)
         {
             let instances = self.instances.read().await;
             if let Some(existing) = instances.get(&instance_name) {
+                debug!(
+                    "Reusing cached provider instance '{}' (exact match)",
+                    instance_name
+                );
                 return Ok(existing.clone());
             }
         }
+
+        // Tier 2: Find ANY initialized provider with matching provider_type
+        // This allows config providers to be reused with temperature/max_tokens
+        {
+            let instances = self.instances.read().await;
+
+            // Search for provider with matching provider_type
+            // Format: "{name}/{provider_type}/{model}"
+            // We want to match on provider_type (second segment)
+            let matching_provider = instances.iter().find(|(name, _)| {
+                let parts: Vec<&str> = name.split('/').collect();
+                if parts.len() >= 2 {
+                    parts[1] == provider_name
+                } else {
+                    false
+                }
+            });
+
+            if let Some((config_instance_name, provider_instance)) = matching_provider {
+                info!(
+                    "Found initialized provider '{}' with matching type '{}', reusing config (temperature/max_tokens from config)",
+                    config_instance_name, provider_name
+                );
+
+                // Reuse existing provider instance if model matches
+                let parts: Vec<&str> = config_instance_name.split('/').collect();
+                if parts.len() >= 3 && parts[2] == spec.model {
+                    debug!("Model matches, reusing existing provider instance");
+                    return Ok(provider_instance.clone());
+                }
+
+                // Model differs - we need to create new instance but preserve config
+                // Note: We cannot extract ProviderConfig from ProviderInstance trait
+                // So we log this case and fall through to ephemeral config
+                // Future enhancement: Store original ProviderConfig alongside instances
+                debug!(
+                    "Model mismatch (config: {}, requested: {}), falling back to ephemeral config",
+                    parts.get(2).unwrap_or(&"unknown"),
+                    spec.model
+                );
+            }
+        }
+
+        // Tier 3: Create ephemeral provider configuration
+        // This happens when:
+        // - No provider in config for this provider_type
+        // - Model differs from config provider's model (future: should clone config)
+        info!(
+            "No matching initialized provider found for '{}', creating ephemeral config",
+            provider_name
+        );
 
         // Create the provider instance
         let registry = self.registry.read().await;
