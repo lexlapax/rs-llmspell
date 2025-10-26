@@ -4786,7 +4786,7 @@ All subtasks (13.5.7a through 13.5.7i) are complete. Provider migration successf
 ## Phase 13.8: Bridge + Globals (Days 13-14)
 
 **Goal**: Expose memory and context APIs to script engines via bridges and globals
-**Timeline**: 1.5 days (13 hours) - Reduced from 16h due to 16 existing globals + established patterns
+**Timeline**: 1.5 days (13 hours) - Reduced from 16h (3h savings from established patterns)
 **Critical Dependencies**: Phase 13.7 complete
 **Status**: READY TO START
 
@@ -4797,90 +4797,307 @@ All subtasks (13.5.7a through 13.5.7i) are complete. Provider migration successf
 - `error!` for bridge failures (runtime errors, conversion failures, API errors)
 - `trace!` for detailed data (params, return values, Lua stack state)
 
-**Phase 13.8 Summary of Changes vs Original Plan**:
-- **16 Globals Exist**: JSON, Logger, Config, Debug, Session, Artifact, RAG, Hook, Replay, Tool, Provider, Agent, Workflow, Template, Utils, Event, Streaming, LocalLLM
-- **GlobalRegistry Complete**: llmspell-bridge/src/globals/registry.rs with dependency resolution
-- **Bridge Patterns Established**: session_bridge.rs, artifact_bridge.rs show async→blocking conversion
-- **Registration Pattern**: mod.rs registers globals via builder.register(Arc::new(...))
-- **Memory + Context = 17th + 18th Globals**
+**Phase 13.8 Architectural Findings & Time Reductions**:
 
-### Task 13.8.1: Create MemoryBridge
+**Bridge Patterns** (llmspell-bridge/src/):
+- ✅ **SessionBridge Pattern**: session_bridge.rs shows async→blocking via runtime.block_on()
+  - Stores Arc<Manager> + tokio::runtime::Handle
+  - Pattern: `self.runtime.block_on(async { self.manager.method().await })`
+  - Returns serde_json::Value for complex types
+- ✅ **ArtifactBridge Pattern**: artifact_bridge.rs for simpler sync-like operations
+- ✅ **Global IO Runtime**: llmspell_kernel::global_io_runtime() provides shared runtime
+- 📝 **MemoryBridge**: Follows SessionBridge pattern (double-async: manager.episodic().add().await)
+- 📝 **ContextBridge**: Component composition (NO ContextPipeline, compose BM25Retriever + Assembler)
+
+**Global Registry Infrastructure** (llmspell-bridge/src/globals/):
+- ✅ **17 Globals Exist**: JSON, Logger, Config, Debug, Session, Artifact, RAG, Hook, Replay, Tool, Provider, Agent, Workflow, Template, Utils, Event, Streaming, LocalLLM
+- ✅ **GlobalObject Trait**: metadata() + inject_lua() + inject_javascript()
+- ✅ **Registration Pattern**: mod.rs create_standard_registry() with builder.register(Arc::new(...))
+- ✅ **Dependency Resolution**: GlobalMetadata.dependencies field, registry validates
+- ✅ **Lua Injection Pattern**: Delegate to lua/globals/<name>.rs with lua.create_table() + lua.create_function()
+- 📝 **Memory = 18th Global**: Wraps MemoryBridge, no dependencies
+- 📝 **Context = 19th Global**: Wraps ContextBridge, depends on "Memory"
+
+**Context Architecture Reality** (llmspell-context/src/):
+- ❌ **NO ContextPipeline struct exists** (lib.rs has no pipeline.rs, modular architecture)
+- ✅ **Component Architecture**:
+  - retrieval/bm25.rs: BM25Retriever with retrieve_from_memory()
+  - assembly/mod.rs: ContextAssembler with assemble()
+  - reranking/bm25_fallback.rs: BM25Reranker (DeBERTa in Phase 13.13)
+  - query/analyzer.rs: RegexQueryAnalyzer (intent classification)
+- 📝 **ContextBridge Must Compose**: Create components on demand, NOT store pipeline
+
+**Time Reductions vs Original**:
+- Task 13.8.1: 3h (MemoryBridge - unchanged, new bridge, established pattern)
+- Task 13.8.2: 2.5h (ContextBridge - reduced from 3h, simpler than MemoryBridge)
+- Task 13.8.3: 3h (MemoryGlobal - reduced from 4h, follows SessionGlobal exactly)
+- Task 13.8.4: 2.5h (ContextGlobal - reduced from 3h, simpler API than MemoryGlobal)
+- Task 13.8.5: 2h (Integration Tests - reduced from 3h, unit tests in each task)
+- **Total**: 13h (reduced from 16h, 3h savings)
+
+### Task 13.8.1: Create MemoryBridge (Async→Blocking Conversion)
 
 **Priority**: CRITICAL
 **Estimated Time**: 3 hours
 **Assignee**: Bridge Team
+**Status**: READY TO START
 
-**Description**: Create MemoryBridge to expose MemoryManager functionality to script engines.
+**Description**: Create MemoryBridge to expose MemoryManager functionality to script engines using async→blocking conversion pattern from SessionBridge.
+
+**Architectural Analysis**:
+- **SessionBridge Pattern** (llmspell-bridge/src/session_bridge.rs):
+  - Stores `Arc<SessionManager>` + `tokio::runtime::Handle`
+  - Methods use `self.runtime.block_on(async { self.manager.method().await })`
+  - Returns serde_json::Value for complex types
+  - Implements Display for user-friendly errors
+- **MemoryManager Trait** (llmspell-memory/src/traits.rs):
+  - `episodic() -> Arc<dyn EpisodicMemory>` (async methods: add, search)
+  - `semantic() -> Arc<dyn SemanticMemory>` (async methods: query, get_entity)
+  - `consolidation_engine() -> Arc<dyn ConsolidationEngine>` (async consolidate)
+- **Global IO Runtime** (llmspell-kernel/src/runtime/io_runtime.rs):
+  - `global_io_runtime() -> &'static Arc<Runtime>` provides runtime
+  - `.handle().clone()` for Handle storage
+- **Key Challenge**: MemoryManager methods return trait objects with async methods - need double async→blocking conversion
 
 **Acceptance Criteria**:
-- [ ] MemoryBridge wraps MemoryManager with script-friendly API
-- [ ] Methods: episodic_add, episodic_search, semantic_query, consolidate, get_stats
-- [ ] Async methods converted to blocking for script compatibility
-- [ ] Error handling with user-friendly messages
-- [ ] **TRACING**: API calls (info!), async conversions (debug!), errors (error!), params/results (trace!)
+- [ ] MemoryBridge stores Arc<dyn MemoryManager> + runtime Handle (like SessionBridge)
+- [ ] 5 blocking methods: episodic_add, episodic_search, semantic_query, consolidate, get_stats
+- [ ] Each method: runtime.block_on(async { manager.subsystem().method().await })
+- [ ] Returns serde_json::Value for search results, stats (Vec<EpisodicEntry> → Vec<Value>)
+- [ ] Error conversion: MemoryError → user-friendly string via Display
+- [ ] **TRACING**: API entry (info!), async enter (debug!), async complete (debug!), errors (error!), JSON serialization (trace!)
 
-**Implementation Steps**:
+**Implementation Steps** (Architectural Pattern from SessionBridge):
 1. Create `llmspell-bridge/src/memory_bridge.rs`:
    ```rust
    pub struct MemoryBridge {
-       memory_manager: Arc<dyn MemoryManager>,
+       memory_manager: Arc<dyn llmspell_memory::MemoryManager>,
        runtime: tokio::runtime::Handle,
    }
    impl MemoryBridge {
-       pub fn episodic_add(&self, session_id: String, role: String, content: String, metadata: Value) -> Result<()>;
-       pub fn episodic_search(&self, query: String, top_k: usize, filters: Value) -> Result<Vec<Value>>;
-       pub fn semantic_query(&self, query: String) -> Result<Value>;
-       pub fn consolidate(&self, mode: String, session_id: Option<String>) -> Result<Value>;
-       pub fn get_stats(&self, session_id: Option<String>) -> Result<Value>;
+       pub fn new(memory_manager: Arc<dyn llmspell_memory::MemoryManager>) -> Self {
+           Self {
+               memory_manager,
+               runtime: llmspell_kernel::global_io_runtime().handle().clone(),
+           }
+       }
+
+       // Pattern: runtime.block_on(async { ... })
+       pub fn episodic_add(&self, session_id: String, role: String, content: String, metadata: Value) -> Result<(), String> {
+           info!("MemoryBridge::episodic_add called for session={}", session_id);
+           self.runtime.block_on(async {
+               debug!("Entering async episodic_add");
+               let entry = llmspell_memory::EpisodicEntry {
+                   session_id, role, content,
+                   timestamp: chrono::Utc::now(),
+                   metadata,
+               };
+               self.memory_manager.episodic().add(entry).await
+                   .map_err(|e| format!("Failed to add episodic memory: {}", e))
+           })
+       }
+
+       // Similar pattern for other methods: episodic_search, semantic_query, consolidate, get_stats
    }
    ```
-2. Add async→blocking conversion using runtime.block_on()
-3. Add JSON serialization for script consumption
-4. Create bridge tests
+2. Implement 5 methods following double-async pattern (manager.subsystem().method())
+3. Add JSON conversion: `serde_json::to_value(result)?` for complex returns
+4. Implement Display for MemoryBridgeError wrapping MemoryError
+5. Create comprehensive tests with InMemoryEpisodicMemory
 
 **Files to Create/Modify**:
-- `llmspell-bridge/src/memory_bridge.rs` (NEW - 500 lines)
-- `llmspell-bridge/src/lib.rs` (MODIFY - add memory_bridge module)
-- `llmspell-bridge/tests/memory_bridge_test.rs` (NEW - 300 lines)
+- `llmspell-bridge/src/memory_bridge.rs` (NEW - 420 lines)
+  - MemoryBridge struct (30 lines)
+  - 5 blocking methods (300 lines - ~60 each)
+  - Error types (40 lines)
+  - Tests module (50 lines)
+- `llmspell-bridge/src/lib.rs` (MODIFY - add `pub mod memory_bridge;`)
+- `llmspell-bridge/tests/memory_bridge_test.rs` (NEW - 280 lines)
+  - test_episodic_add_blocking() - verify runtime.block_on works
+  - test_episodic_search_json_conversion() - verify Vec<Entry> → Vec<Value>
+  - test_semantic_query_async_chain() - verify double-async (episodic→semantic)
+  - test_consolidate_modes() - test immediate/batch/scheduled
+  - test_error_display() - verify user-friendly error messages
 
 **Definition of Done**:
-- [ ] MemoryBridge compiles and all methods functional
-- [ ] Async conversion tested with tokio runtime
-- [ ] JSON serialization verified for all return types
-- [ ] Error handling tested with invalid inputs
+- [ ] MemoryBridge compiles with correct double-async pattern (manager.episodic().add().await)
+- [ ] runtime.block_on() tested - verify blocks current thread until async complete
+- [ ] JSON serialization tested - EpisodicEntry/Entity → serde_json::Value
+- [ ] Error handling tested - MemoryError → Display string
+- [ ] No panics on async→blocking conversion (verified with tokio::test)
+- [ ] Matches SessionBridge architectural pattern (code review confirmation)
+- [ ] Zero clippy warnings
+- [ ] Comprehensive tracing verified with tracing_test
 
-### Task 13.8.2: Create ContextBridge
+### Task 13.8.2: Create ContextBridge (Component Composition Pattern)
 
 **Priority**: CRITICAL
-**Estimated Time**: 3 hours
+**Estimated Time**: 2.5 hours
 **Assignee**: Bridge Team
+**Status**: READY TO START
 
-**Description**: Create ContextBridge to expose ContextPipeline functionality to scripts.
+**Description**: Create ContextBridge to expose context assembly functionality - **CRITICAL**: NO ContextPipeline struct exists, must compose from BM25Retriever + ContextAssembler + MemoryManager.
+
+**Architectural Analysis**:
+- **ContextPipeline DOES NOT EXIST** (llmspell-context has no pipeline.rs with unified struct)
+- **Component Architecture** (llmspell-context/src/):
+  - `retrieval/bm25.rs`: BM25Retriever with retrieve_from_memory()
+  - `assembly/mod.rs`: ContextAssembler with assemble()
+  - `query/analyzer.rs`: RegexQueryAnalyzer (intent classification)
+  - `reranking/bm25_fallback.rs`: BM25Reranker (no DeBERTa needed for Phase 13)
+- **Integration Pattern**: ContextBridge must compose these components
+  - Store Arc<dyn MemoryManager> (provides episodic/semantic access)
+  - Create BM25Retriever on demand (stateless, cheap to construct)
+  - Create ContextAssembler on demand (stateless)
+- **Strategy Validation Critical**:
+  - Valid: "episodic", "semantic", "hybrid" (case-sensitive)
+  - Invalid: reject with clear error "Unknown strategy 'foo'. Valid: episodic, semantic, hybrid"
+- **Token Budget**: Default 8192, warn if >8192
 
 **Acceptance Criteria**:
-- [ ] ContextBridge wraps ContextPipeline with script API
-- [ ] Methods: assemble, test_query, get_strategy_stats, configure_reranking
-- [ ] Token budget enforcement
-- [ ] Strategy override support
-- [ ] **TRACING**: Assemble calls (info!), strategy selection (debug!), budget enforcement (warn!), errors (error!)
+- [ ] ContextBridge stores Arc<dyn MemoryManager> + runtime Handle (NOT ContextPipeline)
+- [ ] assemble() method composes: BM25Retriever → retrieve → BM25Reranker → ContextAssembler
+- [ ] Strategy enum: Episodic (episodic only), Semantic (semantic only), Hybrid (both)
+- [ ] Token budget validation: error if <100, warn if >8192, default 8192
+- [ ] Returns AssembledContext as serde_json::Value (chunks, metadata, confidence)
+- [ ] **TRACING**: assemble entry (info!), strategy choice (debug!), component calls (debug!), budget warn (warn!), errors (error!)
 
 **Implementation Steps**:
-1. Create `llmspell-bridge/src/context_bridge.rs`:
+1. Create `llmspell-bridge/src/context_bridge.rs` (~380 lines):
    ```rust
+   use llmspell_memory::MemoryManager;
+   use llmspell_context::{BM25Retriever, ContextAssembler, BM25Reranker, RetrievalStrategy};
+   use std::sync::Arc;
+   use serde_json::Value;
+   use tracing::{info, debug, warn, error};
+
    pub struct ContextBridge {
-       context_pipeline: Arc<ContextPipeline>,
+       memory_manager: Arc<dyn MemoryManager>,
        runtime: tokio::runtime::Handle,
    }
+
    impl ContextBridge {
-       pub fn assemble(&self, query: String, max_tokens: usize, strategies: Vec<String>, session_id: Option<String>) -> Result<Value>;
-       pub fn test_query(&self, query: String, session_id: Option<String>) -> Result<Value>;
-       pub fn get_strategy_stats(&self) -> Result<Value>;
-       pub fn configure_reranking(&self, model: String, top_k: usize) -> Result<()>;
+       pub fn new(memory_manager: Arc<dyn MemoryManager>) -> Self {
+           Self {
+               memory_manager,
+               runtime: llmspell_kernel::global_io_runtime().handle().clone(),
+           }
+       }
+
+       pub fn assemble(&self, query: String, strategy: String, max_tokens: usize, session_id: Option<String>) -> Result<Value, String> {
+           info!("ContextBridge::assemble called with query='{}', strategy='{}', max_tokens={}", query, strategy, max_tokens);
+
+           // Validate token budget
+           if max_tokens < 100 {
+               error!("Token budget too low: {}", max_tokens);
+               return Err(format!("Token budget must be >=100, got {}", max_tokens));
+           }
+           if max_tokens > 8192 {
+               warn!("Large token budget: {} (consider reducing for performance)", max_tokens);
+           }
+
+           // Validate strategy
+           let strategy_enum = match strategy.as_str() {
+               "episodic" => {
+                   debug!("Using Episodic retrieval strategy");
+                   RetrievalStrategy::Episodic
+               },
+               "semantic" => {
+                   debug!("Using Semantic retrieval strategy");
+                   RetrievalStrategy::Semantic
+               },
+               "hybrid" => {
+                   debug!("Using Hybrid retrieval strategy");
+                   RetrievalStrategy::Hybrid
+               },
+               _ => {
+                   error!("Invalid strategy: '{}'", strategy);
+                   return Err(format!("Unknown strategy '{}'. Valid: episodic, semantic, hybrid", strategy));
+               }
+           };
+
+           self.runtime.block_on(async {
+               debug!("Entering async context assembly");
+
+               // Component 1: BM25Retriever (stateless, create on demand)
+               let retriever = BM25Retriever::new();
+               debug!("Created BM25Retriever");
+
+               // Retrieve chunks from memory (double-async pattern)
+               let chunks = retriever.retrieve_from_memory(
+                   &query,
+                   &*self.memory_manager,
+                   strategy_enum,
+                   session_id.clone(),
+                   max_tokens / 2, // Reserve half budget for retrieval
+               ).await.map_err(|e| format!("Retrieval failed: {}", e))?;
+
+               debug!("Retrieved {} chunks", chunks.len());
+
+               // Component 2: BM25Reranker (stateless, Phase 13 uses BM25-only)
+               let reranker = BM25Reranker::new();
+               let reranked = reranker.rerank(&query, chunks, max_tokens / 2)
+                   .map_err(|e| format!("Reranking failed: {}", e))?;
+
+               debug!("Reranked to {} top chunks", reranked.len());
+
+               // Component 3: ContextAssembler (stateless, create on demand)
+               let assembler = ContextAssembler::new(max_tokens);
+               let assembled = assembler.assemble(&query, reranked)
+                   .await.map_err(|e| format!("Assembly failed: {}", e))?;
+
+               debug!("Assembled context with {} chunks, {} tokens", assembled.chunks.len(), assembled.total_tokens);
+
+               // Convert to JSON for bridge return
+               let result = serde_json::to_value(&assembled)
+                   .map_err(|e| format!("JSON conversion failed: {}", e))?;
+
+               Ok(result)
+           })
+       }
    }
    ```
-2. Add strategy validation (episodic, semantic, hybrid)
-3. Add token budget calculations
-4. Create bridge tests
+
+2. Add helper methods for Lua API (~100 lines):
+   ```rust
+   impl ContextBridge {
+       pub fn test_query(&self, query: String, session_id: Option<String>) -> Result<Value, String> {
+           debug!("ContextBridge::test_query called");
+           // Quick test with hybrid strategy, 2000 tokens
+           self.assemble(query, "hybrid".to_string(), 2000, session_id)
+       }
+
+       pub fn get_strategy_stats(&self) -> Result<Value, String> {
+           debug!("ContextBridge::get_strategy_stats called");
+           // Return stats from memory manager
+           self.runtime.block_on(async {
+               let episodic_count = self.memory_manager.episodic().count().await
+                   .unwrap_or(0);
+               let semantic_count = self.memory_manager.semantic().count().await
+                   .unwrap_or(0);
+
+               serde_json::json!({
+                   "episodic_records": episodic_count,
+                   "semantic_records": semantic_count,
+                   "strategies": ["episodic", "semantic", "hybrid"]
+               })
+           }).map_err(|e: String| e)
+       }
+   }
+   ```
+
+3. Create bridge tests `llmspell-bridge/tests/context_bridge_test.rs` (~280 lines):
+   - Test component composition (BM25Retriever + Reranker + Assembler)
+   - Test strategy validation (valid: episodic/semantic/hybrid, invalid: reject)
+   - Test token budget (error <100, warn >8192, default 8192)
+   - Test session_id filtering (episodic strategy uses session_id)
+   - Test double-async pattern (retriever.retrieve_from_memory().await)
+
+4. Update `llmspell-bridge/src/lib.rs` (+1 line):
+   ```rust
+   pub mod context_bridge;
+   pub use context_bridge::ContextBridge;
+   ```
 
 **Files to Create/Modify**:
 - `llmspell-bridge/src/context_bridge.rs` (NEW - 450 lines)
@@ -4896,42 +5113,247 @@ All subtasks (13.5.7a through 13.5.7i) are complete. Provider migration successf
 ### Task 13.8.3: Create MemoryGlobal (17th Global)
 
 **Priority**: CRITICAL
-**Estimated Time**: 4 hours
+**Estimated Time**: 3 hours (reduced from 4h - follows SessionGlobal pattern exactly)
 **Assignee**: Bridge Team
+**Status**: READY TO START
 
-**Description**: Create MemoryGlobal exposing Memory namespace to Lua/JS scripts.
+**Description**: Create MemoryGlobal exposing Memory namespace to Lua/JS scripts - follows SessionGlobal wrapping pattern (session_global.rs:16-62).
+
+**Architectural Analysis**:
+- **Pattern Reference**: session_global.rs wraps Arc<SessionBridge>, same pattern for Arc<MemoryBridge>
+- **GlobalObject Trait** (registry.rs):
+  - metadata() returns GlobalMetadata with name, version, description, dependencies, required
+  - inject_lua() delegates to lua/globals/memory.rs injection function
+  - inject_javascript() returns Ok(()) for Phase 13 (TODO for later)
+- **Registration Pattern** (mod.rs:78):
+  ```rust
+  builder.register(Arc::new(session_global::SessionGlobal::new(session_bridge)));
+  // Similar: builder.register(Arc::new(memory_global::MemoryGlobal::new(memory_bridge)));
+  ```
+- **Lua Injection Pattern** (lua/globals/session.rs:172-216):
+  - Create memory_table with lua.create_table()
+  - Create nested tables for episodic/semantic/consolidate namespaces
+  - Each method: clone bridge, lua.create_function(), use block_on_async()
+  - Convert between Lua types and Rust types (lua_value_to_json, json_to_lua_value)
+- **Dependencies**: None (MemoryManager is self-contained)
 
 **Acceptance Criteria**:
-- [ ] MemoryGlobal implements GlobalObject trait
-- [ ] Lua API: Memory.episodic.add(), Memory.episodic.search(), Memory.semantic.query(), Memory.consolidate(), Memory.stats()
-- [ ] All methods tested in Lua
-- [ ] Documentation with examples
-- [ ] **TRACING**: Global injection (info!), Lua calls (debug!), type conversions (debug!), errors (error!)
+- [ ] MemoryGlobal implements GlobalObject trait with metadata() returning "Memory" v1.0.0
+- [ ] Lua API structure:
+  ```lua
+  Memory.episodic.add(session_id, role, content, metadata) -> nil or error
+  Memory.episodic.search(session_id, query, limit) -> {results: [{role, content, metadata, timestamp}]}
+  Memory.semantic.query(query, limit) -> {results: [{content, metadata, score}]}
+  Memory.consolidate(session_id, force) -> {updated: n, deleted: m}
+  Memory.stats() -> {episodic_count, semantic_count, consolidation_pending}
+  ```
+- [ ] All methods tested in Lua with InMemoryEpisodicMemory
+- [ ] Documentation with examples in user guide
+- [ ] **TRACING**: inject_lua (info!), Lua method calls (debug!), bridge calls (debug!), errors (error!)
 
 **Implementation Steps**:
-1. Create `llmspell-bridge/src/globals/memory_global.rs`:
+1. Create `llmspell-bridge/src/globals/memory_global.rs` (~180 lines):
    ```rust
+   //! ABOUTME: Memory global object providing memory management for scripts
+   //! ABOUTME: Integrates with `MemoryManager` via `MemoryBridge` for language-specific bindings
+
+   #[cfg(any(feature = "lua", feature = "javascript"))]
+   use crate::globals::types::GlobalContext;
+   use crate::globals::types::{GlobalMetadata, GlobalObject};
+   use crate::memory_bridge::MemoryBridge;
+   #[cfg(any(feature = "lua", feature = "javascript"))]
+   use llmspell_core::error::LLMSpellError;
+   use std::sync::Arc;
+
+   /// Memory global object providing memory management for scripts
+   ///
+   /// This wraps `MemoryBridge` and provides language-specific bindings,
+   /// converting between async Rust operations and synchronous script calls.
    pub struct MemoryGlobal {
-       bridge: Arc<MemoryBridge>,
+       /// Memory bridge for core operations
+       pub memory_bridge: Arc<MemoryBridge>,
    }
+
+   impl MemoryGlobal {
+       /// Create a new Memory global
+       #[must_use]
+       pub const fn new(memory_bridge: Arc<MemoryBridge>) -> Self {
+           Self { memory_bridge }
+       }
+   }
+
    impl GlobalObject for MemoryGlobal {
-       fn name(&self) -> &str { "Memory" }
-       fn inject_lua(&self, lua: &Lua) -> Result<()> {
-           let memory_table = lua.create_table()?;
+       fn metadata(&self) -> GlobalMetadata {
+           GlobalMetadata {
+               name: "Memory".to_string(),
+               version: "1.0.0".to_string(),
+               description: "Adaptive memory system with episodic, semantic, and procedural storage".to_string(),
+               dependencies: vec![], // Self-contained
+               required: false,
+           }
+       }
 
-           // Memory.episodic.add(...)
-           let episodic_table = lua.create_table()?;
-           episodic_table.set("add", lua.create_function(...)?)?;
+       #[cfg(feature = "lua")]
+       fn inject_lua(&self, lua: &mlua::Lua, context: &GlobalContext) -> Result<(), LLMSpellError> {
+           crate::lua::globals::memory::inject_memory_global(
+               lua,
+               context,
+               self.memory_bridge.clone(),
+           )
+           .map_err(|e| LLMSpellError::Component {
+               message: format!("Failed to inject Memory global: {e}"),
+               source: None,
+           })
+       }
 
-           memory_table.set("episodic", episodic_table)?;
-           lua.globals().set("Memory", memory_table)?;
+       #[cfg(feature = "javascript")]
+       fn inject_javascript(
+           &self,
+           _ctx: &mut boa_engine::Context,
+           _context: &GlobalContext,
+       ) -> Result<(), LLMSpellError> {
+           // TODO: Implement JavaScript bindings for Memory global
            Ok(())
        }
    }
    ```
-2. Add mlua type conversions
-3. Register MemoryGlobal in create_standard_registry()
-4. Create Lua integration tests
+
+2. Create `llmspell-bridge/src/lua/globals/memory.rs` (~420 lines):
+   ```rust
+   //! ABOUTME: Lua-specific Memory global implementation
+   //! ABOUTME: Provides Lua bindings for memory management functionality
+
+   use crate::globals::GlobalContext;
+   use crate::lua::conversion::{json_to_lua_value, lua_value_to_json};
+   use crate::lua::sync_utils::block_on_async;
+   use crate::memory_bridge::MemoryBridge;
+   use mlua::{Error as LuaError, Lua, Table, Value};
+   use std::sync::Arc;
+   use tracing::{info, debug, error};
+
+   /// Inject Memory global API into Lua
+   pub fn inject_memory_global(
+       lua: &Lua,
+       _context: &GlobalContext,
+       memory_bridge: Arc<MemoryBridge>,
+   ) -> mlua::Result<()> {
+       info!("Injecting Memory global API");
+       let memory_table = lua.create_table()?;
+
+       // Memory.episodic namespace
+       let episodic_table = lua.create_table()?;
+
+       // Memory.episodic.add(session_id, role, content, metadata)
+       let add_bridge = memory_bridge.clone();
+       episodic_table.set("add", lua.create_function(move |lua, (session_id, role, content, metadata): (String, String, String, Option<Table>)| {
+           debug!("Memory.episodic.add called for session={}", session_id);
+           let metadata_json = if let Some(meta) = metadata {
+               lua_value_to_json(Value::Table(meta))?
+           } else {
+               serde_json::json!({})
+           };
+
+           add_bridge.episodic_add(session_id, role, content, metadata_json)
+               .map_err(|e| {
+                   error!("Memory.episodic.add failed: {}", e);
+                   LuaError::RuntimeError(e)
+               })
+       })?)?;
+
+       // Memory.episodic.search(session_id, query, limit)
+       let search_bridge = memory_bridge.clone();
+       episodic_table.set("search", lua.create_function(move |lua, (session_id, query, limit): (String, String, Option<usize>)| {
+           debug!("Memory.episodic.search called for session={}, query='{}'", session_id, query);
+           let limit = limit.unwrap_or(10);
+
+           let results = search_bridge.episodic_search(session_id, query, limit)
+               .map_err(|e| {
+                   error!("Memory.episodic.search failed: {}", e);
+                   LuaError::RuntimeError(e)
+               })?;
+
+           json_to_lua_value(lua, &results)
+       })?)?;
+
+       memory_table.set("episodic", episodic_table)?;
+
+       // Memory.semantic namespace
+       let semantic_table = lua.create_table()?;
+
+       // Memory.semantic.query(query, limit)
+       let query_bridge = memory_bridge.clone();
+       semantic_table.set("query", lua.create_function(move |lua, (query, limit): (String, Option<usize>)| {
+           debug!("Memory.semantic.query called with query='{}'", query);
+           let limit = limit.unwrap_or(10);
+
+           let results = query_bridge.semantic_query(query, limit)
+               .map_err(|e| {
+                   error!("Memory.semantic.query failed: {}", e);
+                   LuaError::RuntimeError(e)
+               })?;
+
+           json_to_lua_value(lua, &results)
+       })?)?;
+
+       memory_table.set("semantic", semantic_table)?;
+
+       // Memory.consolidate(session_id, force)
+       let consolidate_bridge = memory_bridge.clone();
+       memory_table.set("consolidate", lua.create_function(move |lua, (session_id, force): (Option<String>, Option<bool>)| {
+           debug!("Memory.consolidate called");
+           let force = force.unwrap_or(false);
+
+           let result = consolidate_bridge.consolidate(session_id, force)
+               .map_err(|e| {
+                   error!("Memory.consolidate failed: {}", e);
+                   LuaError::RuntimeError(e)
+               })?;
+
+           json_to_lua_value(lua, &result)
+       })?)?;
+
+       // Memory.stats()
+       let stats_bridge = memory_bridge.clone();
+       memory_table.set("stats", lua.create_function(move |lua, ()| {
+           debug!("Memory.stats called");
+           let stats = stats_bridge.stats()
+               .map_err(|e| {
+                   error!("Memory.stats failed: {}", e);
+                   LuaError::RuntimeError(e)
+               })?;
+
+           json_to_lua_value(lua, &stats)
+       })?)?;
+
+       // Inject Memory global
+       lua.globals().set("Memory", memory_table)?;
+       info!("Memory global injected successfully");
+       Ok(())
+   }
+   ```
+
+3. Update `llmspell-bridge/src/globals/mod.rs`:
+   - Add module export: `pub mod memory_global;` (~line 20)
+   - Register in create_standard_registry() after LocalLLM (~line 345):
+   ```rust
+   // Register Memory global if memory_manager available
+   if let Some(memory_manager) = context.get_bridge::<Arc<dyn llmspell_memory::MemoryManager>>("memory_manager") {
+       let memory_bridge = Arc::new(crate::memory_bridge::MemoryBridge::new(memory_manager));
+       builder.register(Arc::new(memory_global::MemoryGlobal::new(memory_bridge)));
+   }
+   ```
+
+4. Update `llmspell-bridge/src/lua/globals/mod.rs`:
+   - Add module: `pub mod memory;` (~1 line)
+
+5. Create `llmspell-bridge/tests/lua/memory_global_test.rs` (~320 lines):
+   - Test Memory global injection
+   - Test Memory.episodic.add() with InMemoryEpisodicMemory
+   - Test Memory.episodic.search() with session filtering
+   - Test Memory.semantic.query() (returns empty for Phase 13, graph comes in 13.9)
+   - Test Memory.consolidate() (noop for Phase 13, LLM consolidation comes in 13.10)
+   - Test Memory.stats() returns counts
+   - Test error handling (invalid session_id, query failures)
 
 **Files to Create/Modify**:
 - `llmspell-bridge/src/globals/memory_global.rs` (NEW - 600 lines)
@@ -4948,23 +5370,212 @@ All subtasks (13.5.7a through 13.5.7i) are complete. Provider migration successf
 ### Task 13.8.4: Create ContextGlobal (18th Global)
 
 **Priority**: CRITICAL
-**Estimated Time**: 3 hours
+**Estimated Time**: 2.5 hours (reduced from 3h - simpler API than MemoryGlobal)
 **Assignee**: Bridge Team
+**Status**: READY TO START
 
-**Description**: Create ContextGlobal exposing Context namespace to Lua/JS scripts.
+**Description**: Create ContextGlobal exposing Context namespace to Lua/JS scripts - follows MemoryGlobal pattern (memory_global.rs) with simpler flat API.
+
+**Architectural Analysis**:
+- **Pattern Reference**: Identical to MemoryGlobal (Task 13.8.3), wraps Arc<ContextBridge>
+- **Simpler than MemoryGlobal**: No nested namespaces (episodic/semantic), just flat methods
+- **API Surface**:
+  ```lua
+  Context.assemble(query, strategy, max_tokens, session_id) -> {chunks, metadata, total_tokens}
+  Context.test(query, session_id) -> {chunks} (uses hybrid strategy, 2000 tokens)
+  Context.strategy_stats() -> {episodic_count, semantic_count, strategies}
+  ```
+- **ContextBridge Methods** (from Task 13.8.2):
+  - assemble() - main context assembly with component composition
+  - test_query() - quick test with defaults
+  - get_strategy_stats() - returns memory stats
+- **Dependencies**: Depends on "Memory" global (needs MemoryManager for retrieval)
 
 **Acceptance Criteria**:
-- [ ] ContextGlobal implements GlobalObject trait
-- [ ] Lua API: Context.assemble(), Context.test(), Context.strategy_stats(), Context.configure_reranking()
-- [ ] All methods tested in Lua
-- [ ] Documentation with examples
-- [ ] **TRACING**: Global injection (info!), Lua calls (debug!), type conversions (debug!), errors (error!)
+- [ ] ContextGlobal implements GlobalObject trait with metadata() returning "Context" v1.0.0
+- [ ] metadata() declares dependency on "Memory" global
+- [ ] Lua API structure:
+  ```lua
+  Context.assemble(query, strategy, max_tokens, session_id) -> table
+  -- query: string
+  -- strategy: "episodic" | "semantic" | "hybrid"
+  -- max_tokens: number (default 8192, min 100)
+  -- session_id: string or nil
+  -- Returns: {chunks: [{text, metadata, score}], total_tokens: number, strategy_used: string}
+
+  Context.test(query, session_id) -> table
+  -- Quick test with hybrid strategy, 2000 tokens
+
+  Context.strategy_stats() -> table
+  -- Returns: {episodic_count, semantic_count, strategies: ["episodic", "semantic", "hybrid"]}
+  ```
+- [ ] Strategy validation: error on invalid strategy with clear message
+- [ ] Token budget validation: error if <100, warn if >8192
+- [ ] All methods tested in Lua with InMemoryEpisodicMemory
+- [ ] Documentation with examples in user guide
+- [ ] **TRACING**: inject_lua (info!), Lua method calls (debug!), bridge calls (debug!), errors (error!)
 
 **Implementation Steps**:
-1. Create `llmspell-bridge/src/globals/context_global.rs`
-2. Implement ContextGlobal similar to MemoryGlobal
-3. Register ContextGlobal in create_standard_registry()
-4. Create Lua integration tests
+1. Create `llmspell-bridge/src/globals/context_global.rs` (~160 lines):
+   ```rust
+   //! ABOUTME: Context global object providing context assembly for scripts
+   //! ABOUTME: Integrates with context retrieval via `ContextBridge` for language-specific bindings
+
+   #[cfg(any(feature = "lua", feature = "javascript"))]
+   use crate::globals::types::GlobalContext;
+   use crate::globals::types::{GlobalMetadata, GlobalObject};
+   use crate::context_bridge::ContextBridge;
+   #[cfg(any(feature = "lua", feature = "javascript"))]
+   use llmspell_core::error::LLMSpellError;
+   use std::sync::Arc;
+
+   /// Context global object providing context assembly for scripts
+   ///
+   /// This wraps `ContextBridge` and provides language-specific bindings,
+   /// converting between async Rust operations and synchronous script calls.
+   pub struct ContextGlobal {
+       /// Context bridge for core operations
+       pub context_bridge: Arc<ContextBridge>,
+   }
+
+   impl ContextGlobal {
+       /// Create a new Context global
+       #[must_use]
+       pub const fn new(context_bridge: Arc<ContextBridge>) -> Self {
+           Self { context_bridge }
+       }
+   }
+
+   impl GlobalObject for ContextGlobal {
+       fn metadata(&self) -> GlobalMetadata {
+           GlobalMetadata {
+               name: "Context".to_string(),
+               version: "1.0.0".to_string(),
+               description: "Context assembly and retrieval with BM25 ranking".to_string(),
+               dependencies: vec!["Memory".to_string()], // Requires Memory for retrieval
+               required: false,
+           }
+       }
+
+       #[cfg(feature = "lua")]
+       fn inject_lua(&self, lua: &mlua::Lua, context: &GlobalContext) -> Result<(), LLMSpellError> {
+           crate::lua::globals::context::inject_context_global(
+               lua,
+               context,
+               self.context_bridge.clone(),
+           )
+           .map_err(|e| LLMSpellError::Component {
+               message: format!("Failed to inject Context global: {e}"),
+               source: None,
+           })
+       }
+
+       #[cfg(feature = "javascript")]
+       fn inject_javascript(
+           &self,
+           _ctx: &mut boa_engine::Context,
+           _context: &GlobalContext,
+       ) -> Result<(), LLMSpellError> {
+           // TODO: Implement JavaScript bindings for Context global
+           Ok(())
+       }
+   }
+   ```
+
+2. Create `llmspell-bridge/src/lua/globals/context.rs` (~280 lines):
+   ```rust
+   //! ABOUTME: Lua-specific Context global implementation
+   //! ABOUTME: Provides Lua bindings for context assembly functionality
+
+   use crate::globals::GlobalContext;
+   use crate::lua::conversion::json_to_lua_value;
+   use crate::context_bridge::ContextBridge;
+   use mlua::{Error as LuaError, Lua, Table};
+   use std::sync::Arc;
+   use tracing::{info, debug, error};
+
+   /// Inject Context global API into Lua
+   pub fn inject_context_global(
+       lua: &Lua,
+       _context: &GlobalContext,
+       context_bridge: Arc<ContextBridge>,
+   ) -> mlua::Result<()> {
+       info!("Injecting Context global API");
+       let context_table = lua.create_table()?;
+
+       // Context.assemble(query, strategy, max_tokens, session_id)
+       let assemble_bridge = context_bridge.clone();
+       context_table.set("assemble", lua.create_function(move |lua, (query, strategy, max_tokens, session_id): (String, String, Option<usize>, Option<String>)| {
+           debug!("Context.assemble called with query='{}', strategy='{}'", query, strategy);
+           let max_tokens = max_tokens.unwrap_or(8192);
+
+           let result = assemble_bridge.assemble(query, strategy, max_tokens, session_id)
+               .map_err(|e| {
+                   error!("Context.assemble failed: {}", e);
+                   LuaError::RuntimeError(e)
+               })?;
+
+           json_to_lua_value(lua, &result)
+       })?)?;
+
+       // Context.test(query, session_id)
+       let test_bridge = context_bridge.clone();
+       context_table.set("test", lua.create_function(move |lua, (query, session_id): (String, Option<String>)| {
+           debug!("Context.test called with query='{}'", query);
+
+           let result = test_bridge.test_query(query, session_id)
+               .map_err(|e| {
+                   error!("Context.test failed: {}", e);
+                   LuaError::RuntimeError(e)
+               })?;
+
+           json_to_lua_value(lua, &result)
+       })?)?;
+
+       // Context.strategy_stats()
+       let stats_bridge = context_bridge.clone();
+       context_table.set("strategy_stats", lua.create_function(move |lua, ()| {
+           debug!("Context.strategy_stats called");
+
+           let stats = stats_bridge.get_strategy_stats()
+               .map_err(|e| {
+                   error!("Context.strategy_stats failed: {}", e);
+                   LuaError::RuntimeError(e)
+               })?;
+
+           json_to_lua_value(lua, &stats)
+       })?)?;
+
+       // Inject Context global
+       lua.globals().set("Context", context_table)?;
+       info!("Context global injected successfully");
+       Ok(())
+   }
+   ```
+
+3. Update `llmspell-bridge/src/globals/mod.rs`:
+   - Add module export: `pub mod context_global;` (~line 21)
+   - Register in create_standard_registry() after MemoryGlobal (~line 350):
+   ```rust
+   // Register Context global if memory_manager available (Context depends on Memory)
+   if let Some(memory_manager) = context.get_bridge::<Arc<dyn llmspell_memory::MemoryManager>>("memory_manager") {
+       let context_bridge = Arc::new(crate::context_bridge::ContextBridge::new(memory_manager));
+       builder.register(Arc::new(context_global::ContextGlobal::new(context_bridge)));
+   }
+   ```
+
+4. Update `llmspell-bridge/src/lua/globals/mod.rs`:
+   - Add module: `pub mod context;` (~1 line)
+
+5. Create `llmspell-bridge/tests/lua/context_global_test.rs` (~280 lines):
+   - Test Context global injection
+   - Test Context.assemble() with episodic/semantic/hybrid strategies
+   - Test strategy validation (error on invalid strategy)
+   - Test token budget validation (error <100, warn >8192)
+   - Test Context.test() with defaults (hybrid, 2000 tokens)
+   - Test Context.strategy_stats() returns memory counts
+   - Test session_id filtering with episodic strategy
+   - Test error handling (empty memory, invalid parameters)
 
 **Files to Create/Modify**:
 - `llmspell-bridge/src/globals/context_global.rs` (NEW - 500 lines)
@@ -4981,32 +5592,180 @@ All subtasks (13.5.7a through 13.5.7i) are complete. Provider migration successf
 ### Task 13.8.5: Bridge Integration Tests
 
 **Priority**: HIGH
-**Estimated Time**: 3 hours
+**Estimated Time**: 2 hours (reduced from 3h - individual tests in 13.8.1-13.8.4, integration tests simpler)
 **Assignee**: QA + Bridge Team
+**Status**: READY TO START
 
-**Description**: Comprehensive integration tests for bridges and globals.
+**Description**: Cross-component integration tests verifying bridge+global interaction and E2E Lua workflows - complements unit tests in Tasks 13.8.1-13.8.4.
+
+**Architectural Analysis**:
+- **Unit Tests Already Exist** (per task):
+  - Task 13.8.1: MemoryBridge unit tests (episodic_add, semantic_query, consolidate)
+  - Task 13.8.2: ContextBridge unit tests (assemble, strategy validation, token budget)
+  - Task 13.8.3: MemoryGlobal Lua tests (Memory.episodic.*, Memory.semantic.*, Memory.stats())
+  - Task 13.8.4: ContextGlobal Lua tests (Context.assemble(), Context.test(), Context.strategy_stats())
+- **Integration Tests Focus**:
+  - **Cross-component interaction**: MemoryGlobal → ContextGlobal dependency
+  - **E2E Lua workflows**: Multi-step scripts using Memory + Context together
+  - **Bridge-Global consistency**: Rust bridge methods match Lua global API
+  - **Error propagation**: Rust errors → Lua RuntimeError with clear messages
+- **Test Infrastructure**: Use llmspell-testing helpers for Lua execution
+- **Memory Backend**: InMemoryEpisodicMemory for fast tests (no SurrealDB required)
 
 **Acceptance Criteria**:
-- [ ] Test MemoryBridge with all methods
-- [ ] Test ContextBridge with all methods
-- [ ] Test MemoryGlobal in Lua
-- [ ] Test ContextGlobal in Lua
+- [ ] E2E test: Lua script adds episodic memories → Context.assemble() retrieves them
+- [ ] Cross-global test: ContextGlobal depends on MemoryGlobal (verify dependency resolution)
+- [ ] Bridge-Global consistency: MemoryBridge.episodic_add() == Memory.episodic.add() behavior
+- [ ] Error propagation: Rust MemoryError → Lua RuntimeError with original message
+- [ ] Strategy routing: Lua Context.assemble("query", "episodic") only queries episodic memory
+- [ ] Session filtering: Lua with session_id only retrieves that session's data
+- [ ] **TRACING**: Integration test start (info!), component interactions (debug!), verification (debug!), failures (error!)
 
 **Implementation Steps**:
-1. Test MemoryBridge: episodic operations, semantic queries, consolidation
-2. Test ContextBridge: context assembly, strategy selection, reranking
-3. Test MemoryGlobal: Lua API coverage
-4. Test ContextGlobal: Lua API coverage
+1. Create `llmspell-bridge/tests/integration/memory_context_integration.rs` (~320 lines):
+   ```rust
+   //! Integration tests for Memory + Context bridge and global interaction
+
+   use llmspell_memory::{DefaultMemoryManager, InMemoryEpisodicMemory, EpisodicEntry};
+   use llmspell_bridge::{MemoryBridge, ContextBridge, globals::{MemoryGlobal, ContextGlobal}};
+   use std::sync::Arc;
+   use mlua::Lua;
+   use tracing::{info, debug};
+
+   #[test]
+   fn test_e2e_lua_memory_context_workflow() {
+       info!("Starting E2E Lua Memory+Context integration test");
+
+       // Setup: Create memory manager + bridges
+       let episodic = Arc::new(InMemoryEpisodicMemory::new());
+       let memory_manager = Arc::new(DefaultMemoryManager::new(episodic.clone(), /* semantic */ None));
+       let memory_bridge = Arc::new(MemoryBridge::new(memory_manager.clone()));
+       let context_bridge = Arc::new(ContextBridge::new(memory_manager.clone()));
+
+       // Create Lua environment
+       let lua = Lua::new();
+
+       // Inject globals
+       let memory_global = MemoryGlobal::new(memory_bridge);
+       let context_global = ContextGlobal::new(context_bridge);
+       memory_global.inject_lua(&lua, &global_context).unwrap();
+       context_global.inject_lua(&lua, &global_context).unwrap();
+
+       // E2E Lua script: add memories → assemble context
+       let script = r#"
+           -- Add conversation to episodic memory
+           Memory.episodic.add("session-123", "user", "What is Rust?", {topic = "programming"})
+           Memory.episodic.add("session-123", "assistant", "Rust is a systems programming language", {topic = "programming"})
+           Memory.episodic.add("session-123", "user", "Tell me about ownership", {topic = "rust"})
+
+           -- Assemble context with episodic strategy
+           local result = Context.assemble("ownership in Rust", "episodic", 2000, "session-123")
+
+           -- Verify results
+           assert(result.chunks ~= nil, "Should return chunks")
+           assert(#result.chunks > 0, "Should retrieve at least 1 chunk")
+           assert(result.total_tokens > 0, "Should calculate token count")
+
+           return result
+       "#;
+
+       let result: mlua::Value = lua.load(script).eval().expect("E2E script should succeed");
+       debug!("E2E test result: {:?}", result);
+   }
+
+   #[test]
+   fn test_strategy_routing() {
+       info!("Testing strategy routing (episodic vs semantic vs hybrid)");
+       // Verify episodic strategy only queries episodic memory
+       // Verify semantic strategy only queries semantic memory
+       // Verify hybrid queries both
+   }
+
+   #[test]
+   fn test_session_filtering() {
+       info!("Testing session_id filtering in episodic retrieval");
+       // Add memories to session-A and session-B
+       // Verify Context.assemble() with session-A only returns session-A data
+   }
+
+   #[test]
+   fn test_error_propagation() {
+       info!("Testing Rust error → Lua RuntimeError propagation");
+       // Trigger MemoryBridge error (e.g., invalid session_id format)
+       // Verify Lua receives RuntimeError with original message
+   }
+
+   #[test]
+   fn test_bridge_global_api_consistency() {
+       info!("Testing MemoryBridge methods match Memory.* Lua API");
+       // Call MemoryBridge.episodic_add() directly
+       // Call Memory.episodic.add() via Lua
+       // Verify both produce same result in memory
+   }
+   ```
+
+2. Create `llmspell-bridge/tests/integration/global_dependency_test.rs` (~180 lines):
+   ```rust
+   //! Test GlobalRegistry dependency resolution for Memory → Context
+
+   use llmspell_bridge::globals::{GlobalRegistry, GlobalRegistryBuilder, MemoryGlobal, ContextGlobal};
+   use tracing::info;
+
+   #[test]
+   fn test_context_depends_on_memory() {
+       info!("Testing Context global dependency on Memory global");
+
+       let mut builder = GlobalRegistryBuilder::new();
+
+       // Register Context BEFORE Memory (dependency order)
+       builder.register(Arc::new(context_global));
+       builder.register(Arc::new(memory_global));
+
+       // Build should succeed (registry resolves dependencies)
+       let registry = builder.build().expect("Should resolve dependencies");
+
+       // Verify both globals registered
+       assert!(registry.get_global("Memory").is_some());
+       assert!(registry.get_global("Context").is_some());
+   }
+
+   #[test]
+   fn test_context_fails_without_memory() {
+       info!("Testing Context global fails without Memory dependency");
+
+       // Register Context alone (missing Memory dependency)
+       // Verify clear error message about missing "Memory" global
+   }
+   ```
+
+3. Update `llmspell-bridge/tests/integration/mod.rs` (or create if needed):
+   ```rust
+   mod memory_context_integration;
+   mod global_dependency_test;
+   ```
+
+4. Add integration test scenarios to existing test files:
+   - `llmspell-bridge/tests/memory_bridge_test.rs`: Add async→blocking runtime test
+   - `llmspell-bridge/tests/context_bridge_test.rs`: Add component composition validation
+   - `llmspell-bridge/tests/lua/memory_global_test.rs`: Add JSON conversion edge cases
+   - `llmspell-bridge/tests/lua/context_global_test.rs`: Add token budget warning capture
 
 **Files to Create/Modify**:
-- `llmspell-bridge/tests/integration/bridge_test.rs` (NEW - 400 lines)
-- `llmspell-bridge/tests/integration/lua_global_test.rs` (NEW - 350 lines)
+- `llmspell-bridge/tests/integration/memory_context_integration.rs` (NEW - 320 lines)
+- `llmspell-bridge/tests/integration/global_dependency_test.rs` (NEW - 180 lines)
+- `llmspell-bridge/tests/integration/mod.rs` (NEW or MODIFY - 2 lines)
+- `llmspell-bridge/tests/memory_bridge_test.rs` (MODIFY - add 1 runtime test, ~40 lines)
+- `llmspell-bridge/tests/context_bridge_test.rs` (MODIFY - add 1 composition test, ~50 lines)
 
 **Definition of Done**:
-- [ ] All bridge tests pass
-- [ ] All global tests pass
-- [ ] Test coverage >90%
-- [ ] CI integration complete
+- [ ] E2E Lua workflow test passes (Memory.episodic.add → Context.assemble)
+- [ ] Strategy routing test passes (episodic/semantic/hybrid query correct memories)
+- [ ] Session filtering test passes (session_id isolates data)
+- [ ] Error propagation test passes (Rust errors → Lua RuntimeError)
+- [ ] Bridge-Global API consistency test passes (methods match)
+- [ ] Global dependency test passes (Context depends on Memory)
+- [ ] All integration tests run in <5 seconds (InMemoryEpisodicMemory fast)
+- [ ] CI integration complete (cargo test --package llmspell-bridge --test integration)
 
 ---
 
