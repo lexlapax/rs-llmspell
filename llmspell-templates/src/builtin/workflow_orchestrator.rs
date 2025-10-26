@@ -214,7 +214,8 @@ impl crate::core::Template for WorkflowOrchestratorTemplate {
 
         // Smart dual-path provider resolution (Task 13.5.7d)
         let provider_config = context.resolve_llm_config(&params)?;
-        let model_str = provider_config.default_model
+        let model_str = provider_config
+            .default_model
             .as_ref()
             .ok_or_else(|| TemplateError::Config("provider missing model".into()))?;
 
@@ -245,7 +246,12 @@ impl crate::core::Template for WorkflowOrchestratorTemplate {
         // Phase 3: Execute workflow
         info!("Phase 3: Executing workflow...");
         let execution_result = self
-            .execute_workflow(&execution_plan, &provider_config, collect_intermediate, &context)
+            .execute_workflow(
+                &execution_plan,
+                &provider_config,
+                collect_intermediate,
+                &context,
+            )
             .await?;
         output.metrics.agents_invoked = execution_result.agents_executed;
         output.metrics.tools_invoked = execution_result.tools_executed;
@@ -469,7 +475,8 @@ impl WorkflowOrchestratorTemplate {
         );
 
         // Extract model from provider config
-        let model = provider_config.default_model
+        let model = provider_config
+            .default_model
             .as_ref()
             .ok_or_else(|| TemplateError::Config("provider missing model".into()))?;
 
@@ -948,7 +955,6 @@ mod tests {
             ..Default::default()
         }
     }
-
 
     #[test]
     fn test_template_metadata() {

@@ -2329,12 +2329,18 @@ timeout_seconds = 300
         let config = LLMSpellConfig::load_builtin_profile("default").unwrap();
 
         // Verify default provider exists and is configured
-        assert_eq!(config.providers.default_provider, Some("default".to_string()));
+        assert_eq!(
+            config.providers.default_provider,
+            Some("default".to_string())
+        );
         assert!(config.providers.providers.contains_key("default"));
 
         let default_provider = config.providers.providers.get("default").unwrap();
         assert_eq!(default_provider.provider_type, "ollama");
-        assert_eq!(default_provider.default_model, Some("llama3.2:3b".to_string()));
+        assert_eq!(
+            default_provider.default_model,
+            Some("llama3.2:3b".to_string())
+        );
         assert_eq!(default_provider.temperature, Some(0.7));
         assert_eq!(default_provider.max_tokens, Some(4096));
         assert_eq!(default_provider.timeout_seconds, Some(30));
@@ -2355,21 +2361,30 @@ timeout_seconds = 300
         let config = LLMSpellConfig::load_builtin_profile("memory").unwrap();
 
         // Verify two providers exist
-        assert_eq!(config.providers.default_provider, Some("default".to_string()));
+        assert_eq!(
+            config.providers.default_provider,
+            Some("default".to_string())
+        );
         assert!(config.providers.providers.contains_key("default"));
         assert!(config.providers.providers.contains_key("consolidation-llm"));
 
         // Verify default provider config
         let default_provider = config.providers.providers.get("default").unwrap();
         assert_eq!(default_provider.provider_type, "ollama");
-        assert_eq!(default_provider.default_model, Some("llama3.2:3b".to_string()));
+        assert_eq!(
+            default_provider.default_model,
+            Some("llama3.2:3b".to_string())
+        );
         assert_eq!(default_provider.temperature, Some(0.7));
         assert_eq!(default_provider.max_tokens, Some(4096));
 
         // Verify consolidation provider config (low temperature for deterministic consolidation)
         let consolidation_provider = config.providers.providers.get("consolidation-llm").unwrap();
         assert_eq!(consolidation_provider.provider_type, "ollama");
-        assert_eq!(consolidation_provider.default_model, Some("llama3.2:3b".to_string()));
+        assert_eq!(
+            consolidation_provider.default_model,
+            Some("llama3.2:3b".to_string())
+        );
         assert_eq!(consolidation_provider.temperature, Some(0.0));
         assert_eq!(consolidation_provider.max_tokens, Some(2000));
 
@@ -2377,10 +2392,20 @@ timeout_seconds = 300
         assert!(config.runtime.memory.enabled);
 
         // Verify consolidation config
-        assert_eq!(config.runtime.memory.consolidation.provider_name, Some("consolidation-llm".to_string()));
+        assert_eq!(
+            config.runtime.memory.consolidation.provider_name,
+            Some("consolidation-llm".to_string())
+        );
         assert_eq!(config.runtime.memory.consolidation.batch_size, 10);
         assert_eq!(config.runtime.memory.consolidation.max_concurrent, 3);
-        assert_eq!(config.runtime.memory.consolidation.active_session_threshold_secs, 300);
+        assert_eq!(
+            config
+                .runtime
+                .memory
+                .consolidation
+                .active_session_threshold_secs,
+            300
+        );
 
         // Verify daemon config
         assert!(config.runtime.memory.daemon.enabled);

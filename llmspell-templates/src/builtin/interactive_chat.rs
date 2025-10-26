@@ -192,7 +192,8 @@ impl crate::core::Template for InteractiveChatTemplate {
 
         // Smart dual-path provider resolution (Task 13.5.7d)
         let provider_config = context.resolve_llm_config(&params)?;
-        let model_str = provider_config.default_model
+        let model_str = provider_config
+            .default_model
             .as_ref()
             .ok_or_else(|| TemplateError::Config("provider missing model".into()))?;
 
@@ -528,7 +529,8 @@ impl InteractiveChatTemplate {
         use llmspell_kernel::IntegratedKernel;
 
         // Extract model from provider config
-        let model = provider_config.default_model
+        let model = provider_config
+            .default_model
             .as_ref()
             .ok_or_else(|| TemplateError::Config("provider missing model".into()))?;
 
@@ -744,7 +746,8 @@ impl InteractiveChatTemplate {
         use llmspell_core::types::AgentInput;
 
         // Extract model from provider config
-        let model = provider_config.default_model
+        let model = provider_config
+            .default_model
             .as_ref()
             .ok_or_else(|| TemplateError::Config("provider missing model".into()))?;
 
@@ -1052,7 +1055,6 @@ mod tests {
             ..Default::default()
         }
     }
-
 
     #[test]
     fn test_template_metadata() {

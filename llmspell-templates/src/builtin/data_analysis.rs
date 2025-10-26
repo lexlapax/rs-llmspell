@@ -143,7 +143,8 @@ impl crate::core::Template for DataAnalysisTemplate {
 
         // Smart dual-path provider resolution (Task 13.5.7d)
         let provider_config = context.resolve_llm_config(&params)?;
-        let model_str = provider_config.default_model
+        let model_str = provider_config
+            .default_model
             .as_ref()
             .ok_or_else(|| TemplateError::Config("provider missing model".into()))?;
 
@@ -175,7 +176,13 @@ impl crate::core::Template for DataAnalysisTemplate {
         // Phase 3: Visualization with visualizer agent
         info!("Phase 3: Generating visualizations...");
         let chart_result = self
-            .generate_chart(&dataset, &analysis_result, &chart_type, &provider_config, &context)
+            .generate_chart(
+                &dataset,
+                &analysis_result,
+                &chart_type,
+                &provider_config,
+                &context,
+            )
             .await?;
         output.metrics.agents_invoked += 1; // visualizer agent
 
@@ -395,7 +402,8 @@ impl DataAnalysisTemplate {
         );
 
         // Extract model from provider config
-        let model = provider_config.default_model
+        let model = provider_config
+            .default_model
             .as_ref()
             .ok_or_else(|| TemplateError::Config("provider missing model".into()))?;
 
@@ -551,7 +559,8 @@ impl DataAnalysisTemplate {
         info!("Creating visualization agent (type: {})", chart_type);
 
         // Extract model from provider config
-        let model = provider_config.default_model
+        let model = provider_config
+            .default_model
             .as_ref()
             .ok_or_else(|| TemplateError::Config("provider missing model".into()))?;
 
@@ -993,7 +1002,13 @@ mod tests {
         };
 
         let result = template
-            .generate_chart(&dataset, &analysis, "bar", &test_provider_config(), &context)
+            .generate_chart(
+                &dataset,
+                &analysis,
+                "bar",
+                &test_provider_config(),
+                &context,
+            )
             .await;
         assert!(result.is_ok());
         let result = result.unwrap();
