@@ -24,23 +24,27 @@
 //!
 //! ## Usage
 //!
-//! ```rust,ignore
+//! ```rust,no_run
 //! use llmspell_memory::prelude::*;
+//! use llmspell_memory::DefaultMemoryManager;
 //!
-//! // Create memory manager
-//! let memory = DefaultMemoryManager::new_in_memory().await?;
+//! #[tokio::main]
+//! async fn main() -> Result<()> {
+//!     // Create memory manager
+//!     let memory = DefaultMemoryManager::new_in_memory().await?;
 //!
-//! // Add episodic memory
-//! memory.episodic().add(EpisodicEntry {
-//!     session_id: "session-1".into(),
-//!     role: "user".into(),
-//!     content: "What is Rust?".into(),
-//!     timestamp: Utc::now(),
-//!     metadata: json!({}),
-//! }).await?;
+//!     // Add episodic memory
+//!     let entry = EpisodicEntry::new(
+//!         "session-1".into(),
+//!         "user".into(),
+//!         "What is Rust?".into(),
+//!     );
+//!     memory.episodic().add(entry).await?;
 //!
-//! // Search episodic memories
-//! let results = memory.episodic().search("Rust", 5).await?;
+//!     // Search episodic memories
+//!     let results = memory.episodic().search("Rust", 5).await?;
+//!     Ok(())
+//! }
 //! ```
 
 pub mod consolidation;

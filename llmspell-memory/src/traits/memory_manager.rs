@@ -16,12 +16,18 @@ use crate::types::{ConsolidationMode, ConsolidationResult};
 ///
 /// # Example
 ///
-/// ```rust,ignore
+/// ```rust,no_run
 /// use llmspell_memory::prelude::*;
+/// use llmspell_memory::DefaultMemoryManager;
 ///
-/// let memory = DefaultMemoryManager::new_in_memory().await?;
-/// memory.episodic().add(entry).await?;
-/// memory.consolidate("session-1", ConsolidationMode::Immediate).await?;
+/// #[tokio::main]
+/// async fn main() -> Result<()> {
+///     let memory = DefaultMemoryManager::new_in_memory().await?;
+///     let entry = EpisodicEntry::new("session-1".into(), "user".into(), "Hello".into());
+///     memory.episodic().add(entry).await?;
+///     memory.consolidate("session-1", ConsolidationMode::Immediate).await?;
+///     Ok(())
+/// }
 /// ```
 #[async_trait]
 pub trait MemoryManager: Send + Sync {

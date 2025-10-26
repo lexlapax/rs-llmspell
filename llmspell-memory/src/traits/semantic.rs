@@ -36,20 +36,28 @@ pub use llmspell_graph::types::{Entity, Relationship};
 ///
 /// # Example
 ///
-/// ```rust,ignore
+/// ```rust,no_run
 /// use llmspell_memory::prelude::*;
+/// use llmspell_memory::semantic::GraphSemanticMemory;
+/// use serde_json::json;
+/// use chrono::Utc;
 ///
-/// let semantic = GraphSemanticMemory::new(graph_backend);
+/// #[tokio::main]
+/// async fn main() -> Result<()> {
+///     let semantic = GraphSemanticMemory::new_temp().await?;
 ///
-/// // Add an entity
-/// semantic.upsert_entity(Entity::new(
-///     "Alice".into(),
-///     "person".into(),
-///     json!({"role": "engineer"}),
-/// )).await?;
+///     // Add an entity
+///     semantic.upsert_entity(Entity::new(
+///         "Alice".into(),
+///         "person".into(),
+///         json!({"role": "engineer"}),
+///     )).await?;
 ///
-/// // Query at a specific time
-/// let entity = semantic.get_entity_at("person-123", past_time).await?;
+///     // Query at a specific time
+///     let past_time = Utc::now();
+///     let entity = semantic.get_entity_at("person-123", past_time).await?;
+///     Ok(())
+/// }
 /// ```
 #[async_trait]
 pub trait SemanticMemory: Send + Sync {

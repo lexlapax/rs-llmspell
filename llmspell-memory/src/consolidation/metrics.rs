@@ -12,13 +12,28 @@
 //!
 //! # Example
 //!
-//! ```rust,ignore
-//! use llmspell_memory::consolidation::ConsolidationMetrics;
+//! ```rust,no_run
+//! use std::time::Duration;
+//! use llmspell_memory::consolidation::{ConsolidationMetrics, PromptVersion};
+//! use llmspell_memory::types::ConsolidationResult;
 //!
-//! let metrics = ConsolidationMetrics::new();
-//! metrics.record_consolidation(result, duration).await;
-//! let snapshot = metrics.snapshot().await;
-//! println!("DMR: {:.2}%", snapshot.dmr.unwrap_or(0.0) * 100.0);
+//! #[tokio::main]
+//! async fn main() {
+//!     let metrics = ConsolidationMetrics::new();
+//!     let result = ConsolidationResult {
+//!         entries_processed: 10,
+//!         entities_added: 5,
+//!         entities_updated: 2,
+//!         entities_deleted: 1,
+//!         entries_skipped: 2,
+//!         entries_failed: 0,
+//!         duration_ms: 100,
+//!     };
+//!     let duration = Duration::from_millis(100);
+//!     metrics.record_consolidation(&result, &[], duration, PromptVersion::V1, true, None, None, &[]).await;
+//!     let snapshot = metrics.snapshot().await;
+//!     println!("Entries processed: {}", snapshot.entries_processed);
+//! }
 //! ```
 
 use crate::consolidation::{DecisionPayload, PromptVersion};

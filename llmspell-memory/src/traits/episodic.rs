@@ -21,23 +21,27 @@ use crate::types::EpisodicEntry;
 ///
 /// # Example
 ///
-/// ```rust,ignore
+/// ```rust,no_run
 /// use llmspell_memory::prelude::*;
 ///
-/// let episodic = HnswEpisodicMemory::new_in_memory().await?;
+/// #[tokio::main]
+/// async fn main() -> Result<()> {
+///     let episodic = InMemoryEpisodicMemory::new();
 ///
-/// // Add an interaction
-/// let id = episodic.add(EpisodicEntry::new(
-///     "session-1".into(),
-///     "user".into(),
-///     "What is Rust?".into(),
-/// )).await?;
+///     // Add an interaction
+///     let id = episodic.add(EpisodicEntry::new(
+///         "session-1".into(),
+///         "user".into(),
+///         "What is Rust?".into(),
+///     )).await?;
 ///
-/// // Search by semantic similarity
-/// let results = episodic.search("programming languages", 5).await?;
+///     // Search by semantic similarity
+///     let results = episodic.search("programming languages", 5).await?;
 ///
-/// // Get all session interactions
-/// let session = episodic.get_session("session-1").await?;
+///     // Get all session interactions
+///     let session = episodic.get_session("session-1").await?;
+///     Ok(())
+/// }
 /// ```
 #[async_trait]
 pub trait EpisodicMemory: Send + Sync {

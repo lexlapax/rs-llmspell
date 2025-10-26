@@ -97,7 +97,9 @@ async fn test_add_decision() {
 
     // If entry failed, skip entity assertions (LLM produced invalid response)
     if result.entries_failed > 0 {
-        eprintln!("⚠ Consolidation failed (LLM produced invalid response) - skipping entity checks");
+        eprintln!(
+            "⚠ Consolidation failed (LLM produced invalid response) - skipping entity checks"
+        );
         eprintln!("  This is acceptable behavior with llama3.2:3b");
         return;
     }

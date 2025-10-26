@@ -21,24 +21,56 @@
 //!
 //! # Example
 //!
-//! ```rust,ignore
-//! use llmspell_memory::consolidation::{ConsolidationDaemon, DaemonConfig};
+//! ```rust,no_run
+//! use std::sync::Arc;
+//! use llmspell_memory::consolidation::{ConsolidationDaemon, DaemonConfig, LLMConsolidationEngine, LLMConsolidationConfig};
+//! use llmspell_memory::consolidation::prompts::PromptVersion;
+//! use llmspell_memory::InMemoryEpisodicMemory;
+//! use llmspell_providers::{ProviderConfig, rig::RigProvider};
+//! use llmspell_graph::storage::surrealdb::SurrealDBBackend;
+//! use tempfile::TempDir;
 //!
-//! let config = DaemonConfig {
-//!     fast_interval_secs: 30,
-//!     normal_interval_secs: 300,
-//!     slow_interval_secs: 1800,
-//!     batch_size: 10,
-//!     max_concurrent: 1,
-//! };
+//! #[tokio::main]
+//! async fn main() -> llmspell_memory::Result<()> {
+//!     let config = DaemonConfig {
+//!         fast_interval_secs: 30,
+//!         normal_interval_secs: 300,
+//!         slow_interval_secs: 1800,
+//!         batch_size: 10,
+//!         max_concurrent: 1,
+//!         active_session_threshold_secs: 300,
+//!     };
 //!
-//! let daemon = ConsolidationDaemon::new(engine, episodic_memory, config);
-//! let handle = daemon.start().await?;
+//!     let temp = TempDir::new().unwrap();
+//!     let provider_config = ProviderConfig::new_with_type(
+//!         "test-provider",
+//!         "ollama",
+//!         "llama3.2:3b",
+//!     );
+//!     let provider = Arc::new(RigProvider::new(provider_config).unwrap());
+//!     let graph = Arc::new(SurrealDBBackend::new(temp.path().to_path_buf()).await.unwrap());
+//!     let llm_config = LLMConsolidationConfig {
+//!         model: "ollama/llama3.2:3b".into(),
+//!         fallback_models: vec![],
+//!         temperature: 0.0,
+//!         max_tokens: 2000,
+//!         timeout_secs: 30,
+//!         max_retries: 2,
+//!         circuit_breaker_threshold: 5,
+//!         version: PromptVersion::V1,
+//!     };
+//!     let engine = Arc::new(LLMConsolidationEngine::new(provider, graph, llm_config));
+//!     let episodic_memory = Arc::new(InMemoryEpisodicMemory::new());
 //!
-//! // ... daemon runs in background ...
+//!     let daemon = Arc::new(ConsolidationDaemon::new(engine, episodic_memory, config));
+//!     let handle = Arc::clone(&daemon).start()?;
 //!
-//! daemon.stop().await?;
-//! handle.await?;
+//!     // ... daemon runs in background ...
+//!
+//!     daemon.stop().await?;
+//!     handle.await.unwrap();
+//!     Ok(())
+//! }
 //! ```
 
 use crate::error::{MemoryError, Result};

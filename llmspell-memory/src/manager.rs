@@ -31,18 +31,24 @@ use crate::types::{ConsolidationMode, ConsolidationResult, EpisodicEntry};
 ///
 /// # Example
 ///
-/// ```rust,ignore
+/// ```rust,no_run
 /// use llmspell_memory::prelude::*;
+/// use llmspell_memory::DefaultMemoryManager;
 ///
-/// // Create manager with in-memory backends (testing)
-/// let manager = DefaultMemoryManager::new_in_memory().await?;
+/// #[tokio::main]
+/// async fn main() -> Result<()> {
+///     // Create manager with in-memory backends (testing)
+///     let manager = DefaultMemoryManager::new_in_memory().await?;
 ///
-/// // Access subsystems
-/// manager.episodic().add(entry).await?;
-/// let results = manager.episodic().search("query", 5).await?;
+///     // Access subsystems
+///     let entry = EpisodicEntry::new("session-1".into(), "user".into(), "Hello".into());
+///     manager.episodic().add(entry).await?;
+///     let results = manager.episodic().search("query", 5).await?;
 ///
-/// // Consolidation (Phase 13.3.2)
-/// manager.consolidate("session-1", ConsolidationMode::Immediate).await?;
+///     // Consolidation (Phase 13.3.2)
+///     manager.consolidate("session-1", ConsolidationMode::Immediate).await?;
+///     Ok(())
+/// }
 /// ```
 pub struct DefaultMemoryManager {
     episodic: Arc<dyn EpisodicMemory>,
@@ -64,12 +70,21 @@ impl DefaultMemoryManager {
     ///
     /// # Example
     ///
-    /// ```rust,ignore
-    /// let episodic = Arc::new(InMemoryEpisodicMemory::new());
-    /// let semantic = Arc::new(GraphSemanticMemory::new(graph_backend));
-    /// let procedural = Arc::new(NoopProceduralMemory);
+    /// ```rust,no_run
+    /// use std::sync::Arc;
+    /// use llmspell_memory::{DefaultMemoryManager, InMemoryEpisodicMemory};
+    /// use llmspell_memory::semantic::GraphSemanticMemory;
+    /// use llmspell_memory::procedural::NoopProceduralMemory;
     ///
-    /// let manager = DefaultMemoryManager::new(episodic, semantic, procedural);
+    /// #[tokio::main]
+    /// async fn main() -> llmspell_memory::Result<()> {
+    ///     let episodic = Arc::new(InMemoryEpisodicMemory::new());
+    ///     let semantic = Arc::new(GraphSemanticMemory::new_temp().await?);
+    ///     let procedural = Arc::new(NoopProceduralMemory);
+    ///
+    ///     let manager = DefaultMemoryManager::new(episodic, semantic, procedural);
+    ///     Ok(())
+    /// }
     /// ```
     pub fn new(
         episodic: Arc<dyn EpisodicMemory>,
@@ -97,11 +112,31 @@ impl DefaultMemoryManager {
     ///
     /// # Example
     ///
-    /// ```rust,ignore
-    /// let engine = Arc::new(ManualConsolidationEngine::new(extractor, graph));
-    /// let manager = DefaultMemoryManager::with_consolidation(
-    ///     episodic, semantic, procedural, engine
-    /// );
+    /// ```rust,no_run
+    /// use std::sync::Arc;
+    /// use llmspell_memory::{DefaultMemoryManager, InMemoryEpisodicMemory};
+    /// use llmspell_memory::semantic::GraphSemanticMemory;
+    /// use llmspell_memory::procedural::NoopProceduralMemory;
+    /// use llmspell_memory::consolidation::ManualConsolidationEngine;
+    /// use llmspell_graph::extraction::RegexExtractor;
+    /// use llmspell_graph::storage::surrealdb::SurrealDBBackend;
+    /// use tempfile::TempDir;
+    ///
+    /// #[tokio::main]
+    /// async fn main() -> llmspell_memory::Result<()> {
+    ///     let temp = TempDir::new().unwrap();
+    ///     let episodic = Arc::new(InMemoryEpisodicMemory::new());
+    ///     let semantic = Arc::new(GraphSemanticMemory::new_temp().await?);
+    ///     let procedural = Arc::new(NoopProceduralMemory);
+    ///
+    ///     let extractor = Arc::new(RegexExtractor::new());
+    ///     let graph = Arc::new(SurrealDBBackend::new(temp.path().to_path_buf()).await.unwrap());
+    ///     let engine = Arc::new(ManualConsolidationEngine::new(extractor, graph));
+    ///     let manager = DefaultMemoryManager::with_consolidation(
+    ///         episodic, semantic, procedural, engine
+    ///     );
+    ///     Ok(())
+    /// }
     /// ```
     pub fn with_consolidation(
         episodic: Arc<dyn EpisodicMemory>,
@@ -130,8 +165,14 @@ impl DefaultMemoryManager {
     ///
     /// # Example
     ///
-    /// ```rust,ignore
-    /// let manager = DefaultMemoryManager::new_in_memory().await?;
+    /// ```rust,no_run
+    /// use llmspell_memory::DefaultMemoryManager;
+    ///
+    /// #[tokio::main]
+    /// async fn main() -> llmspell_memory::Result<()> {
+    ///     let manager = DefaultMemoryManager::new_in_memory().await?;
+    ///     Ok(())
+    /// }
     /// ```
     pub async fn new_in_memory() -> Result<Self> {
         info!("Initializing DefaultMemoryManager with in-memory backends");

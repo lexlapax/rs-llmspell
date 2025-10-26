@@ -12,13 +12,27 @@
 //!
 //! # Example
 //!
-//! ```rust,ignore
-//! use llmspell_memory::consolidation::ManualConsolidationEngine;
+//! ```rust,no_run
+//! use std::sync::Arc;
+//! use llmspell_memory::consolidation::{ManualConsolidationEngine, ConsolidationEngine};
+//! use llmspell_memory::types::EpisodicEntry;
+//! use llmspell_graph::extraction::RegexExtractor;
+//! use llmspell_graph::storage::surrealdb::SurrealDBBackend;
+//! use tempfile::TempDir;
 //!
-//! let engine = ManualConsolidationEngine::new(extractor, graph);
-//! let result = engine.consolidate(&["session-123"], &mut entries).await?;
-//! println!("Processed {} entries, added {} entities",
-//!          result.entries_processed, result.entities_added);
+//! #[tokio::main]
+//! async fn main() -> llmspell_memory::Result<()> {
+//!     let temp = TempDir::new().unwrap();
+//!     let extractor = Arc::new(RegexExtractor::new());
+//!     let graph = Arc::new(SurrealDBBackend::new(temp.path().to_path_buf()).await.unwrap());
+//!     let engine = ManualConsolidationEngine::new(extractor, graph);
+//!
+//!     let mut entries = vec![EpisodicEntry::new("session-123".into(), "user".into(), "test".into())];
+//!     let result = engine.consolidate(&["session-123"], &mut entries).await?;
+//!     println!("Processed {} entries, added {} entities",
+//!              result.entries_processed, result.entities_added);
+//!     Ok(())
+//! }
 //! ```
 
 use async_trait::async_trait;
@@ -74,9 +88,26 @@ pub trait ConsolidationEngine: Send + Sync {
     ///
     /// # Example
     ///
-    /// ```rust,ignore
-    /// let result = engine.consolidate(&["session-123"], &mut entries).await?;
-    /// assert!(result.entries_processed > 0);
+    /// ```rust,no_run
+    /// use std::sync::Arc;
+    /// use llmspell_memory::consolidation::{ConsolidationEngine, ManualConsolidationEngine};
+    /// use llmspell_memory::types::EpisodicEntry;
+    /// use llmspell_graph::extraction::RegexExtractor;
+    /// use llmspell_graph::storage::surrealdb::SurrealDBBackend;
+    /// use tempfile::TempDir;
+    ///
+    /// #[tokio::main]
+    /// async fn main() -> llmspell_memory::Result<()> {
+    ///     let temp = TempDir::new().unwrap();
+    ///     let extractor = Arc::new(RegexExtractor::new());
+    ///     let graph = Arc::new(SurrealDBBackend::new(temp.path().to_path_buf()).await.unwrap());
+    ///     let engine = ManualConsolidationEngine::new(extractor, graph);
+    ///
+    ///     let mut entries = vec![EpisodicEntry::new("session-123".into(), "user".into(), "test".into())];
+    ///     let result = engine.consolidate(&["session-123"], &mut entries).await?;
+    ///     assert!(result.entries_processed >= 0);
+    ///     Ok(())
+    /// }
     /// ```
     async fn consolidate(
         &self,

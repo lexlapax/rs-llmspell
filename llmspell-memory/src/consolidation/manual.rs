@@ -26,16 +26,25 @@ use crate::types::{ConsolidationResult, EpisodicEntry};
 ///
 /// # Example
 ///
-/// ```rust,ignore
-/// use llmspell_memory::consolidation::ManualConsolidationEngine;
+/// ```rust,no_run
+/// use std::sync::Arc;
+/// use llmspell_memory::consolidation::{ManualConsolidationEngine, ConsolidationEngine};
+/// use llmspell_memory::types::EpisodicEntry;
 /// use llmspell_graph::extraction::RegexExtractor;
 /// use llmspell_graph::storage::surrealdb::SurrealDBBackend;
+/// use tempfile::TempDir;
 ///
-/// let extractor = Arc::new(RegexExtractor::new());
-/// let graph = Arc::new(SurrealDBBackend::new("./data".into()));
-/// let engine = ManualConsolidationEngine::new(extractor, graph);
+/// #[tokio::main]
+/// async fn main() -> llmspell_memory::Result<()> {
+///     let temp = TempDir::new().unwrap();
+///     let extractor = Arc::new(RegexExtractor::new());
+///     let graph = Arc::new(SurrealDBBackend::new(temp.path().to_path_buf()).await.unwrap());
+///     let engine = ManualConsolidationEngine::new(extractor, graph);
 ///
-/// let result = engine.consolidate(&["session-123"], &mut entries).await?;
+///     let mut entries = vec![EpisodicEntry::new("session-123".into(), "user".into(), "test".into())];
+///     let result = engine.consolidate(&["session-123"], &mut entries).await?;
+///     Ok(())
+/// }
 /// ```
 pub struct ManualConsolidationEngine {
     /// Regex-based entity/relationship extractor
@@ -55,11 +64,22 @@ impl ManualConsolidationEngine {
     ///
     /// # Example
     ///
-    /// ```rust,ignore
-    /// let engine = ManualConsolidationEngine::new(
-    ///     Arc::new(RegexExtractor::new()),
-    ///     Arc::new(SurrealDBBackend::new("./data".into()))
-    /// );
+    /// ```rust,no_run
+    /// use std::sync::Arc;
+    /// use llmspell_memory::consolidation::ManualConsolidationEngine;
+    /// use llmspell_graph::extraction::RegexExtractor;
+    /// use llmspell_graph::storage::surrealdb::SurrealDBBackend;
+    /// use tempfile::TempDir;
+    ///
+    /// #[tokio::main]
+    /// async fn main() -> llmspell_memory::Result<()> {
+    ///     let temp = TempDir::new().unwrap();
+    ///     let engine = ManualConsolidationEngine::new(
+    ///         Arc::new(RegexExtractor::new()),
+    ///         Arc::new(SurrealDBBackend::new(temp.path().to_path_buf()).await.unwrap())
+    ///     );
+    ///     Ok(())
+    /// }
     /// ```
     #[must_use]
     pub fn new(extractor: Arc<RegexExtractor>, knowledge_graph: Arc<dyn KnowledgeGraph>) -> Self {

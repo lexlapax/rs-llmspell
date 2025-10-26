@@ -32,28 +32,24 @@ use super::semantic::Entity;
 ///
 /// # Example
 ///
-/// ```rust,ignore
+/// ```rust,no_run
 /// use llmspell_memory::traits::ConsolidationDecision;
+/// use llmspell_graph::types::Entity;
 /// use serde_json::json;
+/// use chrono::Utc;
 ///
 /// // From "Alice works at Acme Corp", extract:
 /// let decisions = vec![
-///     ConsolidationDecision::Add(Entity {
-///         id: "person-alice".into(),
-///         entity_type: "person".into(),
-///         name: "Alice".into(),
-///         properties: json!({}),
-///         event_time: Utc::now(),
-///         ingestion_time: Utc::now(),
-///     }),
-///     ConsolidationDecision::Add(Entity {
-///         id: "company-acme".into(),
-///         entity_type: "company".into(),
-///         name: "Acme Corp".into(),
-///         properties: json!({}),
-///         event_time: Utc::now(),
-///         ingestion_time: Utc::now(),
-///     }),
+///     ConsolidationDecision::Add(Entity::new(
+///         "Alice".into(),
+///         "person".into(),
+///         json!({"employer": "Acme Corp"}),
+///     )),
+///     ConsolidationDecision::Add(Entity::new(
+///         "Acme Corp".into(),
+///         "company".into(),
+///         json!({}),
+///     )),
 ///     // Relationship handled separately
 /// ];
 /// ```
