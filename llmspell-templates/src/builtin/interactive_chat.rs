@@ -568,6 +568,7 @@ impl InteractiveChatTemplate {
             Some(provider_manager.clone()),
             session_manager,
             None, // memory_manager (Phase 13.7.1 - opt-in)
+            None, // hook_system (Phase 13.7.3a - opt-in)
         )
         .await
         .map_err(|e| TemplateError::ExecutionFailed(format!("Failed to create kernel: {}", e)))?;

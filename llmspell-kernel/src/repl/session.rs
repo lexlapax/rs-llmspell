@@ -2254,6 +2254,7 @@ mod tests {
             None,
             session_manager,
             None, // memory_manager (Phase 13.7.1 - opt-in)
+            None, // hook_system (Phase 13.7.3a - opt-in)
         )
         .await
         .unwrap()

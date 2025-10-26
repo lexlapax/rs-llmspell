@@ -161,6 +161,8 @@ pub struct IntegratedKernel<P: Protocol> {
         Arc<llmspell_memory::consolidation::ConsolidationDaemon>,
         tokio::task::JoinHandle<()>,
     )>,
+    /// Hook system for kernel execution events (Phase 13.7.3a)
+    hook_system: Option<Arc<crate::hooks::KernelHookSystem>>,
 }
 
 #[allow(dead_code)] // These methods will be used when transport is fully integrated
@@ -184,6 +186,7 @@ impl<P: Protocol + 'static> IntegratedKernel<P> {
         provider_manager: Option<Arc<llmspell_providers::ProviderManager>>,
         session_manager: Arc<SessionManager>,
         memory_manager: Option<Arc<dyn llmspell_memory::MemoryManager>>,
+        hook_system: Option<Arc<crate::hooks::KernelHookSystem>>,
     ) -> Result<Self> {
         info!("Creating IntegratedKernel for session {}", session_id);
 
@@ -349,6 +352,13 @@ impl<P: Protocol + 'static> IntegratedKernel<P> {
             None
         };
 
+        // Log hook system status (Phase 13.7.3a)
+        if hook_system.is_some() {
+            info!("KernelHookSystem enabled for execution event hooks");
+        } else {
+            debug!("KernelHookSystem disabled (None)");
+        }
+
         Ok(Self {
             script_executor,
             protocol,
@@ -377,6 +387,7 @@ impl<P: Protocol + 'static> IntegratedKernel<P> {
             provider_manager,
             memory_manager,
             consolidation_daemon,
+            hook_system,
         })
     }
 
@@ -1718,11 +1729,44 @@ impl<P: Protocol + 'static> IntegratedKernel<P> {
 
         // Update state for tracking
         self.state.update_execution(|exec| {
-            exec.start_execution(exec_id, code.to_string());
+            exec.start_execution(exec_id.clone(), code.to_string());
             Ok(())
         })?;
 
+        // Fire PreCodeExecution hook (Phase 13.7.3a)
+        if let Some(ref hooks) = self.hook_system {
+            use crate::hooks::{ComponentId, ComponentType, HookContext, HookPoint};
+            let component_id =
+                ComponentId::new(ComponentType::System, "integrated_kernel".to_string());
+            let mut ctx = HookContext::new(HookPoint::SystemStartup, component_id); // KernelHookPoint converts to HookPoint
+            ctx.data
+                .insert("code".to_string(), serde_json::json!(code));
+            ctx.data
+                .insert("session_id".to_string(), serde_json::json!(self.session_id));
+            ctx.data.insert(
+                "execution_id".to_string(),
+                serde_json::json!(exec_id.clone()),
+            );
+            ctx.data
+                .insert("args".to_string(), serde_json::json!(&args));
+
+            match hooks
+                .execute_hooks(crate::hooks::KernelHookPoint::PreCodeExecution, &mut ctx)
+                .await
+            {
+                Ok(_) => {
+                    debug!("PreCodeExecution hooks executed successfully");
+                }
+                Err(e) => {
+                    error!("PreCodeExecution hook failed: {}", e);
+                    // Continue execution despite hook failure
+                }
+            }
+        }
+
         // Execute code with arguments if provided
+        // Clone args for PostCodeExecution hook (Phase 13.7.3a)
+        let args_clone = args.clone();
         let result = if args.is_empty() {
             // Execute code using the internal method as before
             self.execute_code_in_context(code).await
@@ -1762,6 +1806,51 @@ impl<P: Protocol + 'static> IntegratedKernel<P> {
                     exec.complete_execution(None, Some(e.to_string()));
                     Ok(())
                 })?;
+            }
+        }
+
+        // Fire PostCodeExecution hook (Phase 13.7.3a)
+        if let Some(ref hooks) = self.hook_system {
+            use crate::hooks::{ComponentId, ComponentType, HookContext, HookPoint};
+            let component_id =
+                ComponentId::new(ComponentType::System, "integrated_kernel".to_string());
+            let mut ctx = HookContext::new(HookPoint::SystemStartup, component_id);
+            ctx.data
+                .insert("code".to_string(), serde_json::json!(code));
+            ctx.data
+                .insert("session_id".to_string(), serde_json::json!(self.session_id));
+            ctx.data.insert(
+                "execution_id".to_string(),
+                serde_json::json!(exec_id),
+            );
+            ctx.data
+                .insert("args".to_string(), serde_json::json!(&args_clone));
+            // Add result to context
+            match &result {
+                Ok(output) => {
+                    ctx.data
+                        .insert("result".to_string(), serde_json::json!(output));
+                    ctx.data.insert("success".to_string(), serde_json::json!(true));
+                }
+                Err(e) => {
+                    ctx.data
+                        .insert("error".to_string(), serde_json::json!(e.to_string()));
+                    ctx.data
+                        .insert("success".to_string(), serde_json::json!(false));
+                }
+            }
+
+            match hooks
+                .execute_hooks(crate::hooks::KernelHookPoint::PostCodeExecution, &mut ctx)
+                .await
+            {
+                Ok(_) => {
+                    debug!("PostCodeExecution hooks executed successfully");
+                }
+                Err(e) => {
+                    error!("PostCodeExecution hook failed: {}", e);
+                    // Don't fail the execution if hook fails
+                }
             }
         }
 
@@ -3611,6 +3700,7 @@ mod tests {
             None,
             create_test_session_manager().await,
             None, // memory_manager (Phase 13.7.1 - opt-in)
+            None, // hook_system (Phase 13.7.3a - opt-in)
         )
         .await;
 
@@ -3634,6 +3724,7 @@ mod tests {
             None,
             create_test_session_manager().await,
             None, // memory_manager (Phase 13.7.1 - opt-in)
+            None, // hook_system (Phase 13.7.3a - opt-in)
         )
         .await
         .unwrap();
@@ -3680,6 +3771,7 @@ mod tests {
             None,
             create_test_session_manager().await,
             None, // memory_manager (Phase 13.7.1 - opt-in)
+            None, // hook_system (Phase 13.7.3a - opt-in)
         )
         .await
         .unwrap();
@@ -3751,6 +3843,7 @@ mod tests {
             None,
             create_test_session_manager().await,
             None, // memory_manager (Phase 13.7.1 - opt-in)
+            None, // hook_system (Phase 13.7.3a - opt-in)
         )
         .await
         .unwrap();
@@ -3798,6 +3891,7 @@ mod tests {
             None,
             create_test_session_manager().await,
             None, // memory_manager (Phase 13.7.1 - opt-in)
+            None, // hook_system (Phase 13.7.3a - opt-in)
         )
         .await
         .unwrap();
@@ -3867,6 +3961,7 @@ mod tests {
             None,
             create_test_session_manager().await,
             None, // memory_manager (Phase 13.7.1 - opt-in)
+            None, // hook_system (Phase 13.7.3a - opt-in)
         )
         .await
         .unwrap();
@@ -3941,6 +4036,7 @@ mod tests {
             None,
             create_test_session_manager().await,
             None, // memory_manager (Phase 13.7.1 - opt-in)
+            None, // hook_system (Phase 13.7.3a - opt-in)
         )
         .await
         .unwrap();
@@ -3994,6 +4090,7 @@ mod tests {
             None,
             create_test_session_manager().await,
             None, // memory_manager (Phase 13.7.1 - opt-in)
+            None, // hook_system (Phase 13.7.3a - opt-in)
         )
         .await
         .unwrap();
@@ -4065,6 +4162,7 @@ async fn test_message_handling_performance() -> Result<()> {
         None,
         create_test_session_manager().await,
             None, // memory_manager (Phase 13.7.1 - opt-in)
+            None, // hook_system (Phase 13.7.3a - opt-in)
     )
     .await?;
 
@@ -4177,6 +4275,7 @@ mod daemon_tests {
             None,
             create_test_session_manager().await,
             None, // memory_manager (Phase 13.7.1 - opt-in)
+            None, // hook_system (Phase 13.7.3a - opt-in)
         )
         .await
         .unwrap();
@@ -4207,6 +4306,7 @@ mod daemon_tests {
             None,
             create_test_session_manager().await,
             None, // memory_manager (Phase 13.7.1 - opt-in)
+            None, // hook_system (Phase 13.7.3a - opt-in)
         )
         .await
         .unwrap();
@@ -4243,6 +4343,7 @@ mod daemon_tests {
             None,
             create_test_session_manager().await,
             None, // memory_manager (Phase 13.7.1 - opt-in)
+            None, // hook_system (Phase 13.7.3a - opt-in)
         )
         .await
         .unwrap();
@@ -4329,6 +4430,7 @@ mod daemon_tests {
             None,
             create_test_session_manager().await,
             None, // memory_manager (Phase 13.7.1 - opt-in)
+            None, // hook_system (Phase 13.7.3a - opt-in)
         )
         .await
         .unwrap();
@@ -4362,6 +4464,7 @@ mod multi_protocol_tests {
             None,
             create_test_session_manager().await,
             None, // memory_manager (Phase 13.7.1 - opt-in)
+            None, // hook_system (Phase 13.7.3a - opt-in)
         )
         .await
         .unwrap();
@@ -4404,6 +4507,7 @@ mod multi_protocol_tests {
             None,
             create_test_session_manager().await,
             None, // memory_manager (Phase 13.7.1 - opt-in)
+            None, // hook_system (Phase 13.7.3a - opt-in)
         )
         .await
         .unwrap();
@@ -4447,6 +4551,7 @@ mod multi_protocol_tests {
             None,
             create_test_session_manager().await,
             None, // memory_manager (Phase 13.7.1 - opt-in)
+            None, // hook_system (Phase 13.7.3a - opt-in)
         )
         .await
         .unwrap();
@@ -4459,6 +4564,7 @@ mod multi_protocol_tests {
             None,
             create_test_session_manager().await,
             None, // memory_manager (Phase 13.7.1 - opt-in)
+            None, // hook_system (Phase 13.7.3a - opt-in)
         )
         .await
         .unwrap();
@@ -4487,6 +4593,7 @@ mod multi_protocol_tests {
                 None,
                 create_test_session_manager().await,
             None, // memory_manager (Phase 13.7.1 - opt-in)
+            None, // hook_system (Phase 13.7.3a - opt-in)
             )
             .await
             .unwrap(),
@@ -4540,6 +4647,7 @@ mod multi_protocol_tests {
             None,
             create_test_session_manager().await,
             None, // memory_manager (Phase 13.7.1 - opt-in)
+            None, // hook_system (Phase 13.7.3a - opt-in)
         )
         .await
         .unwrap();
@@ -4577,6 +4685,7 @@ mod multi_protocol_tests {
             None,
             create_test_session_manager().await,
             None, // memory_manager (Phase 13.7.1 - opt-in)
+            None, // hook_system (Phase 13.7.3a - opt-in)
         )
         .await
         .unwrap();
@@ -4618,6 +4727,7 @@ mod multi_protocol_tests {
             None,
             create_test_session_manager().await,
             None, // memory_manager (Phase 13.7.1 - opt-in)
+            None, // hook_system (Phase 13.7.3a - opt-in)
         )
         .await
         .unwrap();
@@ -4658,6 +4768,7 @@ mod performance_tests {
             None,
             create_test_session_manager().await,
             None, // memory_manager (Phase 13.7.1 - opt-in)
+            None, // hook_system (Phase 13.7.3a - opt-in)
         )
         .await
         .unwrap();
@@ -4752,6 +4863,7 @@ mod performance_tests {
             None,
             create_test_session_manager().await,
             None, // memory_manager (Phase 13.7.1 - opt-in)
+            None, // hook_system (Phase 13.7.3a - opt-in)
         )
         .await
         .unwrap();
@@ -4799,6 +4911,7 @@ mod performance_tests {
                 None,
                 create_test_session_manager().await,
             None, // memory_manager (Phase 13.7.1 - opt-in)
+            None, // hook_system (Phase 13.7.3a - opt-in)
             )
             .await
             .unwrap(),
@@ -4856,6 +4969,7 @@ mod performance_tests {
             None,
             create_test_session_manager().await,
             None, // memory_manager (Phase 13.7.1 - opt-in)
+            None, // hook_system (Phase 13.7.3a - opt-in)
         )
         .await
         .unwrap();
@@ -4900,6 +5014,7 @@ mod performance_tests {
             None,
             create_test_session_manager().await,
             None, // memory_manager (Phase 13.7.1 - opt-in)
+            None, // hook_system (Phase 13.7.3a - opt-in)
         )
         .await
         .unwrap();
@@ -5002,6 +5117,7 @@ mod security_tests {
             None,
             create_test_session_manager().await,
             None, // memory_manager (Phase 13.7.1 - opt-in)
+            None, // hook_system (Phase 13.7.3a - opt-in)
         )
         .await
         .unwrap();
@@ -5148,6 +5264,7 @@ mod security_tests {
             None,
             create_test_session_manager().await,
             None, // memory_manager (Phase 13.7.1 - opt-in)
+            None, // hook_system (Phase 13.7.3a - opt-in)
         )
         .await
         .unwrap();
@@ -5205,6 +5322,7 @@ mod security_tests {
             None,
             create_test_session_manager().await,
             None, // memory_manager (Phase 13.7.1 - opt-in)
+            None, // hook_system (Phase 13.7.3a - opt-in)
         )
         .await
         .unwrap();
@@ -5259,6 +5377,7 @@ mod security_tests {
             None,
             create_test_session_manager().await,
             None, // memory_manager (Phase 13.7.1 - opt-in)
+            None, // hook_system (Phase 13.7.3a - opt-in)
         )
         .await
         .unwrap();
