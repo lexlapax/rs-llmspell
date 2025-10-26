@@ -4834,21 +4834,113 @@ All subtasks (13.5.7a through 13.5.7i) are complete. Provider migration successf
 
 **Time**: ~1.5 hours (3 compilation error fixes: Deserialize, episodic_arc trait method, Arc wrapping)
 
-### Task 13.7.3: Kernel Execution-Memory Linking via Hook Pattern
+### Task 13.7.3a: Add KernelHookSystem to IntegratedKernel
 
 **Priority**: HIGH
-**Estimated Time**: 2 hours (reduced - simpler than original session-based design)
-**Assignee**: Kernel Team + Memory Team
+**Estimated Time**: 1.5 hours (infrastructure setup before memory hooks)
+**Assignee**: Kernel Team
 **Status**: READY TO START
 
-**Description**: Capture kernel executions as episodic memories via hook pattern (execution = user code + assistant result).
+**Description**: Wire existing `KernelHookSystem` infrastructure into `IntegratedKernel` execution flow to enable hook-based memory integration.
 
-**Architecture Correction from Original Plan**:
-- ❌ **Sessions don't track "interactions"** - they only track lifecycle (start/end/checkpoint)
-- ❌ **No SessionEvent::InteractionAdded** - this doesn't exist in the architecture
-- ✅ **Correct integration point**: `IntegratedKernel::execute()` - where code executions happen
-- ✅ **Use HookPoint::AfterExecution** - existing hook infrastructure in llmspell-hooks
+**Architecture Discovery**:
+- ✅ **KernelHookSystem ALREADY EXISTS** in `llmspell-kernel/src/hooks/mod.rs` (lines 142-253)
+- ✅ **Hook points ALREADY DEFINED**: `PreCodeExecution`, `PostCodeExecution` (lines 55-57)
+- ❌ **IntegratedKernel has NO hooks** - executes `script_executor.execute_script_with_args()` directly (line 1691-1769)
+- ✅ **Pattern exists**: SessionManager uses hooks for lifecycle, kernel should for execution
+
+**Why This Task is Needed**:
+- `KernelHookSystem` exists but isn't used by `IntegratedKernel`
+- Task 13.7.3 (ExecutionMemoryHook) needs hook infrastructure to attach to
+- Option B architecture decision: hooks belong in kernel, not bridge
+
+**Acceptance Criteria**:
+- [ ] Add `hook_system: Option<Arc<KernelHookSystem>>` field to IntegratedKernel struct
+- [ ] Initialize in `new()` with optional parameter (backward compat: None = no hooks)
+- [ ] Fire `PreCodeExecution` hook before script execution in `execute_direct_with_args()`
+- [ ] Fire `PostCodeExecution` hook after script execution with result in context
+- [ ] Update all 31 test call sites with None for hook_system parameter
+- [ ] Performance overhead <5% (verified via benchmarks)
+- [ ] **TRACING**: Hook system init (info!), hook execution (debug!), errors (error!)
+
+**Implementation Steps**:
+1. Add field to IntegratedKernel struct:
+   ```rust
+   /// Hook system for kernel execution events (Phase 13.7.3a)
+   hook_system: Option<Arc<KernelHookSystem>>,
+   ```
+2. Update `IntegratedKernel::new()` signature:
+   ```rust
+   pub fn new(
+       // ... existing params ...
+       memory_manager: Option<Arc<dyn llmspell_memory::MemoryManager>>,
+       hook_system: Option<Arc<KernelHookSystem>>, // NEW
+   ) -> Result<Self>
+   ```
+3. Modify `execute_direct_with_args()` to fire hooks:
+   ```rust
+   // Before execution
+   if let Some(hooks) = &self.hook_system {
+       let mut ctx = HookContext::new(/* ... */);
+       ctx.data.insert("code".into(), json!(code));
+       ctx.data.insert("session_id".into(), json!(session_id));
+       hooks.execute_hooks(KernelHookPoint::PreCodeExecution, &mut ctx).await?;
+   }
+
+   // Execute
+   let result = self.script_executor.execute_script_with_args(code, args).await?;
+
+   // After execution
+   if let Some(hooks) = &self.hook_system {
+       let mut ctx = HookContext::new(/* ... */);
+       ctx.data.insert("code".into(), json!(code));
+       ctx.data.insert("result".into(), json!(&result));
+       ctx.data.insert("session_id".into(), json!(session_id));
+       hooks.execute_hooks(KernelHookPoint::PostCodeExecution, &mut ctx).await?;
+   }
+   ```
+4. Update all 31 IntegratedKernel::new() call sites with `None` parameter
+5. Create hook infrastructure tests
+
+**Files to Create/Modify**:
+- `llmspell-kernel/src/execution/integrated.rs` (MODIFY - ~50 lines)
+  - Add hook_system field (line ~160)
+  - Update new() signature (line ~268)
+  - Fire PreCodeExecution/PostCodeExecution hooks in execute_direct_with_args() (line ~1691)
+  - Update 31 test call sites with None parameter
+- `llmspell-kernel/tests/hook_infrastructure_test.rs` (NEW - ~150 lines)
+  - test_hooks_fire_during_execution() - verify PreCodeExecution/PostCodeExecution
+  - test_hook_context_data() - verify code/result/session_id in context
+  - test_kernel_without_hooks() - verify backward compat (None parameter)
+  - test_hook_performance_overhead() - verify <5% overhead
+
+**Definition of Done**:
+- [ ] KernelHookSystem wired into IntegratedKernel with Optional field
+- [ ] PreCodeExecution/PostCodeExecution hooks fire during script execution
+- [ ] HookContext populated with code, result, session_id
+- [ ] Backward compatibility: IntegratedKernel works with hook_system=None
+- [ ] All 31 test call sites updated with None parameter
+- [ ] Performance overhead <5% verified via benchmarks
+- [ ] Zero clippy warnings
+- [ ] Comprehensive tracing with info!/debug!/error!
+
+**Next Task**: 13.7.3 will register ExecutionMemoryHook with this infrastructure.
+
+### Task 13.7.3: Kernel Execution-Memory Linking via Hook
+
+**Priority**: HIGH
+**Estimated Time**: 1.5 hours (hook registration, simpler with 13.7.3a infrastructure)
+**Assignee**: Kernel Team + Memory Team
+**Status**: BLOCKED by 13.7.3a
+
+**Description**: Register `ExecutionMemoryHook` that captures kernel executions as episodic memories (execution = user code + assistant result).
+
+**Architecture from Ultrathink Analysis**:
+- ✅ **Hook infrastructure ready** (from 13.7.3a) - KernelHookSystem wired into IntegratedKernel
+- ✅ **Use KernelHookPoint::PostCodeExecution** - existing hook point for capturing results
 - ✅ **One execution = one interaction pair**: user code input → assistant execution result
+- ✅ **HookContext provides data**: code, result, session_id available
+- ❌ **Sessions don't track "interactions"** - they only track lifecycle (start/end/checkpoint)
 
 **What is an "Interaction"?**
 - User entry: Code/command submitted to kernel
@@ -4857,23 +4949,22 @@ All subtasks (13.5.7a through 13.5.7i) are complete. Provider migration successf
 - NOT session lifecycle events (too high-level, no content)
 
 **Acceptance Criteria**:
-- [ ] Kernel executions captured as episodic memory pairs (input + output) via HookPoint::AfterExecution
+- [ ] ExecutionMemoryHook registered with KernelHookSystem in IntegratedKernel::new()
+- [ ] Hook captures PostCodeExecution events and creates 2 episodic entries (input + output)
 - [ ] Session metadata (session_id, timestamp) included in episodic records
 - [ ] Opt-in design: Only when memory_manager present in IntegratedKernel
 - [ ] Embedding generation deferred to ConsolidationDaemon (async, not in execute() hot path)
 - [ ] **TRACING**: Hook registration (info!), memory writes (debug!), errors (error!)
 
 **Implementation Steps**:
-1. Create `llmspell-kernel/src/execution/memory_hook.rs`:
+1. Create `llmspell-kernel/src/hooks/execution_memory.rs`:
    ```rust
    /// Hook that captures kernel executions as episodic memories
    pub struct ExecutionMemoryHook {
        memory_manager: Arc<dyn llmspell_memory::MemoryManager>,
    }
    impl Hook for ExecutionMemoryHook {
-       async fn execute(&self, ctx: &mut HookContext) -> Result<()> {
-           if ctx.point != HookPoint::AfterExecution { return Ok(()); }
-
+       async fn execute(&self, ctx: &mut HookContext) -> Result<HookResult> {
            let session_id = ctx.data.get("session_id")?.as_str()?;
            let code = ctx.data.get("code")?.as_str()?;
            let result = ctx.data.get("result")?;
@@ -4901,23 +4992,26 @@ All subtasks (13.5.7a through 13.5.7i) are complete. Provider migration successf
            }).await?;
 
            debug!("Captured execution as episodic memory for session {}", session_id);
-           Ok(())
+           Ok(HookResult::Continue)
        }
    }
    ```
-2. Find/verify hook_registry in IntegratedKernel (investigate current structure)
-3. Register ExecutionMemoryHook in IntegratedKernel::new() after memory_manager init
-4. Populate hook context in IntegratedKernel::execute() with session_id, code, result
-5. Create execution-memory integration tests
+2. Register hook in IntegratedKernel::new() when both memory_manager AND hook_system present:
+   ```rust
+   if let (Some(mm), Some(hooks)) = (&memory_manager, &mut hook_system) {
+       let exec_hook = ExecutionMemoryHook::new(mm.clone());
+       hooks.register_kernel_hook(KernelHook::ExecutionMemory(exec_hook))?;
+       info!("ExecutionMemoryHook registered for episodic memory capture");
+   }
+   ```
+3. Create execution-memory integration tests
 
 **Files to Create/Modify**:
-- `llmspell-kernel/src/execution/memory_hook.rs` (NEW - ~150 lines)
+- `llmspell-kernel/src/hooks/execution_memory.rs` (NEW - ~120 lines)
   - ExecutionMemoryHook implementing Hook trait
   - Captures code input + execution result as episodic pair
-- `llmspell-kernel/src/execution/mod.rs` (MODIFY - add memory_hook module, ~2 lines)
-- `llmspell-kernel/src/execution/integrated.rs` (MODIFY - register hook + populate context, ~30 lines)
-  - Register hook in ::new() when memory_manager present
-  - Add hook context data in execute() method
+- `llmspell-kernel/src/hooks/mod.rs` (MODIFY - export execution_memory module, ~2 lines)
+- `llmspell-kernel/src/execution/integrated.rs` (MODIFY - register hook in ::new(), ~15 lines)
 - `llmspell-kernel/tests/execution_memory_test.rs` (NEW - ~200 lines)
   - test_execution_creates_episodic_memory() - verify hook captures input/output
   - test_execution_without_memory() - verify opt-in design
@@ -4926,9 +5020,9 @@ All subtasks (13.5.7a through 13.5.7i) are complete. Provider migration successf
 **Definition of Done**:
 - [ ] Kernel executions automatically create episodic memory pairs when memory_manager present
 - [ ] Session_id, timestamps, metadata correctly propagated
-- [ ] Opt-in design verified (kernel works without memory_manager)
+- [ ] Opt-in design verified (kernel works without memory_manager OR hook_system)
 - [ ] Integration tests pass with InMemoryEpisodicMemory
-- [ ] Hook respects existing llmspell-hooks patterns (HookPoint, HookContext)
+- [ ] Hook uses KernelHookSystem from 13.7.3a
 - [ ] Zero clippy warnings
 - [ ] Comprehensive tracing with info!/debug!/error!
 
