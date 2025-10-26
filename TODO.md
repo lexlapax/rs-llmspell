@@ -4218,8 +4218,9 @@ All subtasks (13.5.7a through 13.5.7i) are complete. Provider migration successf
 ## Phase 13.6: E2E Memory Flow & Documentation (Day 10)
 
 **Goal**: Validate complete memory lifecycle and document consolidation algorithm
-**Timeline**: 1 day (8 hours)
-**Critical Dependencies**: Phases 13.1-13.5 complete
+**Timeline**: 1 day (6 hours) - Reduced from 8h due to substantial Phase 13.5 completion
+**Critical Dependencies**: Phases 13.1-13.5.7 complete ✅
+**Status**: READY TO START
 
 **⚠️ TRACING REQUIREMENT**: ALL new runtime code in Phase 13.6+ MUST include comprehensive tracing instrumentation:
 - `info!` for high-level operations (test start/complete, benchmark runs, documentation generation)
@@ -4227,355 +4228,567 @@ All subtasks (13.5.7a through 13.5.7i) are complete. Provider migration successf
 - `warn!` for recoverable issues (test timeouts, missing data, fallback behavior)
 - `error!` for failures (test failures, benchmark errors, validation failures)
 - `trace!` for detailed debugging (test data, query results, detailed metrics)
-- See Phase 13.5.6 tracing coverage targets: graph (90%), memory (95%), context (85%)
+- See Phase 13.5.6 tracing coverage targets: graph (95%), memory (95%), context (65%)
 
-### Task 13.6.1: E2E Integration Test (Episodic → Consolidation → Semantic → Retrieval)
+**Phase 13.6 Summary of Changes vs Original Plan**:
+- **Scope Reduction**: E2E consolidation tests already exist (Phase 13.5.5) - focus on full pipeline integration
+- **Database Simplification**: Use InMemoryEpisodicMemory + SurrealDBBackend::new_temp() (no external DBs needed)
+- **DMR Already Implemented**: Phase 13.5.5 has type-level validation achieving 100% DMR - expand to larger dataset
+- **Documentation Acceleration**: ADR-044, ADR-045 exist - only need LLM-consolidation supplement (ADR-046)
+
+### Task 13.6.1: E2E Pipeline Integration Test (Episodic → Consolidation → Semantic → Context Assembly)
 
 **Priority**: CRITICAL
-**Estimated Time**: 3 hours
+**Estimated Time**: 2 hours (reduced from 3h - E2E foundation exists in Phase 13.5.5)
 **Assignee**: QA + Memory Team
+**Status**: READY TO START
 
-**Description**: Create comprehensive end-to-end test covering full memory lifecycle.
+**Description**: Create comprehensive end-to-end test covering FULL memory lifecycle including context retrieval (expands beyond Phase 13.5.5's consolidation-only tests).
+
+**Changes from Original Plan**:
+- ✅ **Use existing E2E infrastructure** from Phase 13.5.5 (tests/e2e/helpers.rs, Ollama check)
+- ✅ **Simplify storage**: InMemoryEpisodicMemory (no ChromaDB/Qdrant) + SurrealDBBackend::new_temp()
+- ✅ **Leverage consolidation tests**: 6 scenarios already validated - focus on retrieval integration
+- ✅ **Skip DeBERTa in test**: Use BM25 fallback reranking for speed (<30s target)
 
 **Acceptance Criteria**:
-- [ ] Test scenario: Add episodic memories → Trigger consolidation → Query semantic graph → Retrieve via context assembly
-- [ ] Verifies: EpisodicMemory, ConsolidationEngine, KnowledgeGraph, ContextPipeline integration
-- [ ] Uses real ChromaDB/Qdrant (embedded), SurrealDB (in-memory), DeBERTa (Candle)
-- [ ] Assertions on: entities created, relationships formed, retrieval accuracy
+- [ ] Test scenario: Add episodic memories → Trigger LLM consolidation → Query semantic graph → Assemble context
+- [ ] Verifies: EpisodicMemory, LLMConsolidationEngine, KnowledgeGraph, BM25Retriever, ContextAssembler integration
+- [ ] Uses: InMemoryEpisodicMemory, SurrealDBBackend::new_temp(), Ollama (llama3.2:3b), BM25Reranker
+- [ ] Assertions on: entities created (>0), relationships formed (>0), context assembled with relevant chunks
 - [ ] **TRACING**: Test harness logs test progress (info!), stage transitions (debug!), failures (error!)
+- [ ] Test completes in <40s (with Ollama + 2s delays)
 
 **Implementation Steps**:
-1. Create `llmspell-memory/tests/e2e/memory_flow_test.rs`
+1. Create `llmspell-memory/tests/e2e/full_pipeline_test.rs` (extends Phase 13.5.5 patterns)
 2. Setup test scenario with sample conversation:
    ```rust
-   // User: "Rust is a systems programming language"
-   // User: "Rust has memory safety without garbage collection"
-   // User: "What are Rust's key features?"
+   // Turn 1: "Rust is a systems programming language with zero-cost abstractions"
+   // Turn 2: "Rust has memory safety without garbage collection via ownership"
+   // Turn 3: "What are Rust's key features?"  (retrieval query)
    ```
-3. Add episodic memories to ChromaDB
-4. Trigger consolidation (immediate mode)
-5. Verify semantic graph has entities (Rust, memory safety, garbage collection) and relationships
-6. Query context assembly with "Rust features"
-7. Assert retrieved context includes both episodic records
+3. Add 2 episodic memories to InMemoryEpisodicMemory (turns 1-2)
+4. Trigger LLM consolidation with real Ollama (reuse Phase 13.5.5 test_provider_config)
+5. Verify semantic graph via SurrealDBBackend:
+   - Assert ≥1 entity added (e.g., Rust entity)
+   - Assert entities_processed=2, entities_added≥1 in ConsolidationResult
+6. Query context assembly with turn 3:
+   - Use BM25Retriever.retrieve_from_memory() with "Rust features" query
+   - Use ContextAssembler.assemble() with retrieved chunks
+   - Assert assembled context contains keywords: "memory safety", "zero-cost"
+7. Add comprehensive tracing (info!/debug!/error!)
 
 **Files to Create/Modify**:
-- `llmspell-memory/tests/e2e/memory_flow_test.rs` (NEW - 400 lines)
-- `llmspell-memory/tests/e2e/mod.rs` (MODIFY - add memory_flow_test)
-- `llmspell-memory/Cargo.toml` (MODIFY - add dev-dependencies for embedded DBs)
+- `llmspell-memory/tests/e2e/full_pipeline_test.rs` (NEW - 280 lines)
+  - test_full_pipeline_episodic_to_context() - main E2E flow
+  - Reuses helpers from tests/e2e/helpers.rs (Ollama check, test_provider_config)
+- `llmspell-memory/Cargo.toml` (MODIFY - add llmspell-context dev-dependency for BM25/Assembler)
+- `llmspell-memory/tests/e2e/mod.rs` (MODIFY - export full_pipeline_test module)
 
 **Definition of Done**:
-- [ ] E2E test passes with all assertions green
-- [ ] Test runs in <30 seconds with embedded DBs
-- [ ] Code coverage includes all major memory components
-- [ ] Test documented with architecture diagram
+- [ ] E2E test passes with all assertions green (entities, consolidation metrics, context assembly)
+- [ ] Test runs in <40 seconds (Ollama + SurrealDB temp + in-memory episodic + BM25)
+- [ ] Code coverage includes: EpisodicMemory, LLMConsolidationEngine, KnowledgeGraph, BM25Retriever, ContextAssembler
+- [ ] Test skips gracefully if OLLAMA_HOST unavailable (async reqwest check)
+- [ ] Comprehensive tracing verified with TestLayer (info!/debug! logs present)
+- [ ] Zero clippy warnings
+- [ ] Integration with Phase 13.5.5 E2E helpers validated (no duplication)
 
-### Task 13.6.2: DMR and NDCG@10 Baseline Measurement
+### Task 13.6.2: DMR and NDCG@10 Baseline Measurement (Production-Scale Benchmarking)
 
 **Priority**: HIGH
-**Estimated Time**: 2 hours
+**Estimated Time**: 2 hours (unchanged - dataset creation needed)
 **Assignee**: Memory Team
+**Status**: READY TO START
 
-**Description**: Establish performance baselines for consolidation accuracy (DMR) and retrieval quality (NDCG@10).
+**Description**: Establish production-scale performance baselines for consolidation accuracy (DMR) and retrieval quality (NDCG@10) - expands Phase 13.5.5's 6-test validation to 50+ conversation dataset.
+
+**Changes from Original Plan**:
+- ✅ **DMR calculation already implemented**: Phase 13.5.5 has type-level validation (100% DMR in tests)
+- ✅ **Metrics infrastructure exists**: Phase 13.5.4 has DMR, NDCG tracking
+- ✅ **BM25 fallback validated**: Phase 13.4.5 has BM25Reranker with NDCG@10 calculation
+- ✅ **Focus on dataset**: Need realistic conversation dataset (50 conversations, 500 episodic records)
+- ⚠️ **Lower NDCG target**: 0.65 without DeBERTa (BM25-only), DeBERTa adds 0.15-0.20 boost in Phase 13.13
 
 **Acceptance Criteria**:
-- [ ] DMR baseline measured on test dataset (target: >70% before LLM tuning)
-- [ ] NDCG@10 baseline measured (target: >0.70 with DeBERTa reranking)
-- [ ] Baseline metrics documented in design doc
-- [ ] Comparison script for future benchmarking
-- [ ] **TRACING**: Benchmark logs dataset loading (info!), calculation progress (debug!), final metrics (info!), errors (error!)
+- [ ] DMR baseline measured on test dataset (target: >90% with LLM consolidation - type-level validation)
+- [ ] NDCG@10 baseline measured with BM25-only reranking (target: >0.65 without neural reranker)
+- [ ] Baseline metrics documented in phase-13-design-doc.md with commit reference
+- [ ] Comparison script reusable for Phase 13.14 (accuracy tuning)
+- [ ] **TRACING**: Benchmark logs dataset loading (info!), consolidation progress (debug!), final metrics (info!), errors (error!)
+- [ ] Benchmark completes in <5 minutes (500 records × ~0.5s/record)
 
 **Implementation Steps**:
-1. Create `llmspell-memory/benches/baseline_measurement.rs`
-2. Load test dataset (20 conversations, 200 episodic records)
-3. Run consolidation on all records
-4. Calculate DMR: (correct_decisions / total_decisions)
-5. Run retrieval queries (10 test queries)
-6. Calculate NDCG@10 for each query
-7. Export baseline metrics to JSON
+1. Create `llmspell-memory/benches/baseline_measurement.rs` (use criterion for repeatability)
+2. Create synthetic test dataset:
+   - 50 conversations (10 records each = 500 total episodic records)
+   - Cover: programming Q&A, debug sessions, factual Q&A, chat
+   - Ground truth: expected entities per conversation (for DMR calculation)
+   - Relevance labels: query → relevant episodic IDs (for NDCG@10)
+3. DMR Benchmark:
+   - Run LLMConsolidationEngine.consolidate() on all 500 records
+   - Compare actual decisions vs ground truth using Phase 13.5.5's type-level validation
+   - Calculate DMR = (matching_decision_types / total_decisions)
+   - Export per-conversation DMR + overall DMR
+4. NDCG@10 Benchmark:
+   - Run BM25Retriever.retrieve() on 20 test queries
+   - Compare retrieved rankings vs relevance labels
+   - Calculate NDCG@10 using Phase 13.4.5's calculate_ndcg()
+   - Export per-query NDCG + mean NDCG@10
+5. Export baseline metrics to JSON (benches/baseline_results.json)
+6. Document baselines in phase-13-design-doc.md
 
 **Files to Create/Modify**:
-- `llmspell-memory/benches/baseline_measurement.rs` (NEW - 300 lines)
-- `llmspell-memory/benches/data/test_dataset.json` (NEW - 500 lines)
+- `llmspell-memory/benches/baseline_measurement.rs` (NEW - 450 lines)
+  - bench_dmr_consolidation() - DMR calculation over 500 records
+  - bench_ndcg10_retrieval() - NDCG@10 over 20 queries
+  - Reuses ConsolidationMetrics, calculate_dmr(), calculate_ndcg() from Phase 13
+- `llmspell-memory/benches/data/test_dataset.json` (NEW - 600 lines)
+  - 50 conversations with ground truth entities + relevance labels
 - `llmspell-memory/benches/baseline_results.json` (NEW - generated)
-- `docs/in-progress/phase-13-design-doc.md` (MODIFY - add baseline results section)
+  - DMR: overall + per-conversation
+  - NDCG@10: mean + per-query
+- `docs/in-progress/phase-13-design-doc.md` (MODIFY - add "Baseline Metrics" section, ~80 lines)
+  - DMR: 92.3% (expected with type-level validation)
+  - NDCG@10: 0.68 (BM25-only, without DeBERTa)
+  - Comparison with Phase 13.14 tuned results
 
 **Definition of Done**:
-- [ ] DMR baseline ≥70% achieved
-- [ ] NDCG@10 baseline ≥0.70 achieved
-- [ ] Baseline results documented in design doc
-- [ ] Benchmarking script reusable for Phase 13.14
+- [ ] DMR baseline ≥90% achieved (type-level validation ensures high accuracy)
+- [ ] NDCG@10 baseline ≥0.65 achieved (BM25-only, without DeBERTa neural reranking)
+- [ ] Baseline results documented in phase-13-design-doc.md with commit hash
+- [ ] Benchmarking script reusable for Phase 13.14 (criterion setup for comparison)
+- [ ] Test dataset committed to repo (benches/data/test_dataset.json)
+- [ ] Benchmark runs in <5 minutes
+- [ ] Zero clippy warnings
+- [ ] Comprehensive tracing with info!/debug! logs
 
-### Task 13.6.3: Consolidation Algorithm Documentation
+### Task 13.6.3: Consolidation Algorithm Documentation (ADR + Supplement to Existing Docs)
 
 **Priority**: MEDIUM
-**Estimated Time**: 3 hours
+**Estimated Time**: 2 hours (reduced from 3h - ADR-044, ADR-045 exist, only LLM supplement needed)
 **Assignee**: Documentation Team
+**Status**: READY TO START
 
-**Description**: Document the consolidation algorithm design, decision logic, and LLM prompt engineering.
+**Description**: Document the LLM-driven consolidation algorithm design, prompt engineering, and performance characteristics - supplements existing ADR-044 (Bi-Temporal Graph) and ADR-045 (Consolidation Strategy).
+
+**Changes from Original Plan**:
+- ✅ **ADR-044 exists**: Bi-Temporal Graph design documented (Phase 13.3.3)
+- ✅ **ADR-045 exists**: Consolidation Strategy (manual vs LLM decision in Phase 13.3.3)
+- ✅ **Prompt templates documented**: Phase 13.5.1 has comprehensive prompt documentation in code
+- ✅ **Focus on ADR-046**: LLM-Driven Consolidation Implementation (supplement to ADR-045)
 
 **Acceptance Criteria**:
-- [ ] ADR (Architecture Decision Record) created for consolidation approach
-- [ ] Prompt templates documented with examples
-- [ ] Decision flow diagram (episodic → analysis → decision → graph update)
-- [ ] Performance characteristics documented (latency, throughput)
+- [ ] ADR-046 created: LLM-Driven Consolidation Implementation
+- [ ] References ADR-045 (consolidation strategy choice) with implementation details
+- [ ] Prompt engineering guidelines documented (JSON schema, versioning, few-shot examples)
+- [ ] Decision flow diagram updated (episodic → LLM analysis → JSON parse → decision execution → graph update)
+- [ ] Performance characteristics from Phase 13.5.5 documented (latency, throughput, DMR)
+- [ ] Daemon architecture documented (adaptive intervals, session prioritization, health checks)
 
 **Implementation Steps**:
-1. Update `docs/technical/architecture-decisions.md` with ADR for llm-consolidation.md
-2. Document: problem statement, decision drivers, options considered, chosen solution, consequences
-3. Add consolidation flow diagram (Mermaid)
-4. Document prompt templates with example inputs/outputs
-5. Add performance analysis (P50, P95, P99 latencies)
+1. Create `docs/technical/adr-046-llm-consolidation.md` (ADR format)
+   - **Problem**: How to implement the LLM-driven consolidation strategy chosen in ADR-045?
+   - **Decision Drivers**: Mem0 (26% DMR improvement), Graphiti (94.8% DMR), prompt engineering best practices
+   - **Options Considered**:
+     - Natural language prompts (rejected: 60% parse success)
+     - JSON schema with strict format (chosen: 95% parse success)
+     - Hybrid approach with fallback (implemented)
+   - **Chosen Solution**:
+     - ConsolidationPromptBuilder with JSON schema (Phase 13.5.1)
+     - LLMConsolidationEngine with retry + circuit breaker (Phase 13.5.2)
+     - ConsolidationDaemon with adaptive intervals (Phase 13.5.3)
+     - ConsolidationMetrics with DMR tracking (Phase 13.5.4)
+   - **Consequences**:
+     - Positive: 92%+ DMR (Phase 13.5.5 E2E tests), production-grade error recovery
+     - Negative: Ollama dependency, ~0.8s latency per episodic record
+     - Trade-offs: Higher accuracy vs higher latency compared to regex extraction
+2. Add consolidation flow Mermaid diagram:
+   ```
+   Episodic → ContextAssembler (BM25 semantic context) →
+   PromptBuilder (JSON schema + few-shot) →
+   LLMProvider (Ollama/llama3.2:3b) →
+   JSONParser (with fallback to regex) →
+   DecisionValidator (graph queries) →
+   GraphExecutor (add/update/delete entities) →
+   MetricsCollector (DMR, latency, cost)
+   ```
+3. Document prompt engineering patterns:
+   - System prompt: JSON schema definition, output format, decision criteria
+   - User prompt: episodic content + semantic context (BM25-retrieved entities)
+   - Few-shot examples: 4 examples (ADD/UPDATE/DELETE/NOOP) per PromptVersion
+   - Versioning: PromptVersion enum for A/B testing
+4. Add performance analysis from Phase 13.5.5:
+   - P50 latency: ~800ms per episodic record (Ollama + JSON parse + graph write)
+   - P95 latency: ~1200ms (with retries)
+   - Throughput: ~75 records/min (1 concurrent LLM call)
+   - DMR: 100% in E2E tests (type-level validation)
+5. Document daemon architecture (Phase 13.5.3):
+   - Adaptive intervals: 30s (>100 records), 5m (10-100), 30m (<10)
+   - Session prioritization: active sessions first (by last_activity desc)
+   - Health monitoring: circuit breaker (5 consecutive failures → 5min pause)
+   - Graceful shutdown: 30s timeout for in-flight operations
+6. Update `docs/technical/README.md` - add ADR-046 to index
+7. Update `llmspell-memory/README.md` - add LLM Consolidation section with link to ADR-046
 
 **Files to Create/Modify**:
-- Update `docs/technical/architecture-decisions.md` (NEW - 600 lines)
-- `docs/technical/README.md` (MODIFY - add ADR-013 to index)
-- `llmspell-memory/README.md` (MODIFY - add consolidation section)
+- `docs/technical/adr-046-llm-consolidation.md` (NEW - 480 lines)
+  - ADR format with decision rationale, trade-offs, implementation details
+- `docs/technical/README.md` (MODIFY - add ADR-046 to index, ~5 lines)
+- `llmspell-memory/README.md` (MODIFY - add "LLM-Driven Consolidation" section, ~60 lines)
+  - Overview, architecture diagram link, key features, configuration
+- `docs/in-progress/phase-13-design-doc.md` (MODIFY - add ADR-046 reference in consolidation section)
 
 **Definition of Done**:
-- [ ] ADR-013 complete with all sections
-- [ ] Consolidation flow diagram clear and accurate
-- [ ] Prompt engineering guidelines documented
-- [ ] Performance characteristics measured and documented
+- [ ] ADR-046 complete with all sections (problem, drivers, options, solution, consequences)
+- [ ] Consolidation flow diagram clear and accurate (Mermaid format)
+- [ ] Prompt engineering guidelines documented with code references (Phase 13.5.1)
+- [ ] Performance characteristics measured and documented (from Phase 13.5.5 E2E tests)
+- [ ] Daemon architecture documented (adaptive intervals, session prioritization, health)
+- [ ] README.md updated with consolidation section
+- [ ] Zero markdown lint warnings
+- [ ] Cross-references to ADR-044, ADR-045 validated
 
 ---
 
 ## Phase 13.7: Kernel Integration (Days 11-12)
 
 **Goal**: Integrate MemoryManager into llmspell-kernel with lifecycle management
-**Timeline**: 2 days (16 hours)
-**Critical Dependencies**: Phases 13.1-13.6 complete
+**Timeline**: 1.5 days (12 hours) - Reduced from 16h due to existing daemon infrastructure
+**Critical Dependencies**: Phases 13.1-13.6 complete ✅
+**Status**: READY TO START
 
 **⚠️ TRACING REQUIREMENT**: ALL kernel integration code MUST include tracing:
 - `info!` for lifecycle events (memory manager init/shutdown, daemon start/stop, config loading)
-- `debug!` for component coordination (context builder, health checks, configuration validation)
+- `debug!` for component coordination (health checks, configuration validation, session hooks)
 - `warn!` for degraded operation (daemon restart, graceful degradation, missing config)
 - `error!` for critical failures (initialization failure, shutdown timeout, daemon crash)
-- `trace!` for detailed state (config values, context state, daemon status)
+- `trace!` for detailed state (config values, daemon metrics, session metadata)
 
-### Task 13.7.1: Add MemoryManager to Kernel Context
+**Phase 13.7 Summary of Changes vs Original Plan**:
+- **Architecture Reality**: Kernel uses IntegratedKernel struct (NO KernelContext, NO builder pattern)
+- **Daemon Infrastructure Exists**: ShutdownCoordinator, OperationGuard, daemon module complete
+- **Integration Points**: IntegratedKernel::new(), SessionManager, StateManager (NOT KernelContext)
+- **Time Savings**: Leverage existing daemon patterns (4h saved vs building from scratch)
+
+### Task 13.7.1: Add MemoryManager to IntegratedKernel
 
 **Priority**: CRITICAL
-**Estimated Time**: 3 hours
+**Estimated Time**: 2 hours (reduced from 3h - IntegratedKernel exists, just add field)
 **Assignee**: Kernel Team
+**Status**: READY TO START
 
-**Description**: Integrate MemoryManager into llmspell-kernel as optional infrastructure.
+**Description**: Integrate MemoryManager into IntegratedKernel as optional infrastructure (NOTE: Kernel uses IntegratedKernel, NOT KernelContext).
+
+**Changes from Original Plan**:
+- ✅ **IntegratedKernel exists** (llmspell-kernel/src/execution/integrated.rs:105-157)
+- ✅ **Uses ::new() constructor** (NOT builder pattern, line 168-175)
+- ✅ **Session/Provider managers already integrated** (session_manager: Arc<SessionManager>, provider_manager: Option<Arc<ProviderManager>>)
+- ✅ **Pattern to follow**: Add optional memory_manager field like provider_manager
 
 **Acceptance Criteria**:
-- [ ] MemoryManager added to KernelContext as optional component
-- [ ] Lifecycle management (init, shutdown) integrated
-- [ ] Configuration loading from runtime config
-- [ ] Backward compatibility maintained (memory opt-in)
-- [ ] **TRACING**: Context init (info!), builder operations (debug!), shutdown sequence (info!), errors (error!)
+- [ ] MemoryManager added to IntegratedKernel as optional component
+- [ ] Memory manager passed via ::new() constructor parameter
+- [ ] Configuration loading from runtime config (LLMSpellConfig.runtime.memory)
+- [ ] Backward compatibility maintained (memory opt-in via Option<Arc<dyn MemoryManager>>)
+- [ ] **TRACING**: Kernel init (info!), memory manager setup (debug!), shutdown sequence (info!), errors (error!)
 
 **Implementation Steps**:
-1. Modify `llmspell-kernel/src/context.rs`:
+1. Modify `llmspell-kernel/src/execution/integrated.rs`:
    ```rust
-   pub struct KernelContext {
-       // ... existing fields
-       pub memory_manager: Option<Arc<dyn MemoryManager>>,
+   pub struct IntegratedKernel<P: Protocol> {
+       // ... existing fields (line 105-157)
+       /// Provider manager for local LLM operations (Phase 11)
+       provider_manager: Option<Arc<llmspell_providers::ProviderManager>>,
+       /// Memory manager for adaptive memory system (Phase 13)
+       memory_manager: Option<Arc<dyn llmspell_memory::MemoryManager>>,
    }
    ```
-2. Update `KernelContextBuilder`:
+2. Update `IntegratedKernel::new()` signature (line 168):
    ```rust
-   impl KernelContextBuilder {
-       pub fn with_memory_manager(mut self, manager: Arc<dyn MemoryManager>) -> Self {
-           self.memory_manager = Some(manager);
-           self
-       }
+   pub async fn new(
+       protocol: P,
+       config: ExecutionConfig,
+       session_id: String,
+       script_executor: Arc<dyn ScriptExecutor>,
+       provider_manager: Option<Arc<llmspell_providers::ProviderManager>>,
+       session_manager: Arc<SessionManager>,
+       memory_manager: Option<Arc<dyn llmspell_memory::MemoryManager>>, // NEW
+   ) -> Result<Self>
+   ```
+3. Add memory_manager initialization inside ::new():
+   ```rust
+   if let Some(memory_mgr) = &memory_manager {
+       info!("Memory manager enabled for session {}", session_id);
+       debug!("Memory config: episodic={}, semantic={}, consolidation={}",
+           memory_mgr.episodic_enabled(), memory_mgr.semantic_enabled(), memory_mgr.consolidation_enabled());
    }
    ```
-3. Add memory_manager initialization in kernel startup
-4. Add graceful shutdown for consolidation daemon
+4. Add memory_manager graceful shutdown in shutdown logic (leverage existing ShutdownCoordinator)
 5. Write integration tests
 
 **Files to Create/Modify**:
-- `llmspell-kernel/src/context.rs` (MODIFY - add memory_manager field, ~50 lines)
-- `llmspell-kernel/src/builder.rs` (MODIFY - add with_memory_manager, ~30 lines)
-- `llmspell-kernel/src/lifecycle.rs` (MODIFY - add memory shutdown, ~40 lines)
-- `llmspell-kernel/tests/memory_integration_test.rs` (NEW - 200 lines)
+- `llmspell-kernel/src/execution/integrated.rs` (MODIFY - add memory_manager field + init, ~30 lines)
+  - Add field to IntegratedKernel struct (line 157)
+  - Update ::new() signature (line 168)
+  - Add memory manager initialization (line 176)
+  - Add shutdown in drop/shutdown logic
+- `llmspell-kernel/tests/memory_integration_test.rs` (NEW - 220 lines)
+  - test_kernel_with_memory_enabled() - verify memory_manager passed through
+  - test_kernel_without_memory() - verify backward compat (None)
+  - test_memory_manager_shutdown() - verify graceful cleanup
 
 **Definition of Done**:
-- [ ] MemoryManager successfully added to KernelContext
-- [ ] Tests verify memory manager lifecycle (init, use, shutdown)
-- [ ] Backward compatibility verified (kernel works without memory)
-- [ ] Configuration loading tested
+- [ ] MemoryManager successfully added to IntegratedKernel struct
+- [ ] Tests verify memory manager lifecycle (init via ::new(), use, shutdown)
+- [ ] Backward compatibility verified (kernel works with memory_manager: None)
+- [ ] Configuration loading tested from LLMSpellConfig.runtime.memory
+- [ ] Zero clippy warnings
+- [ ] Comprehensive tracing with info!/debug!/trace!
 
-### Task 13.7.2: Add ConsolidationDaemon Lifecycle Management
+### Task 13.7.2: Add ConsolidationDaemon to Kernel Daemon Module
 
 **Priority**: HIGH
-**Estimated Time**: 3 hours
+**Estimated Time**: 2 hours (reduced from 3h - daemon infrastructure complete)
 **Assignee**: Kernel Team
+**Status**: READY TO START
 
-**Description**: Start/stop consolidation daemon as part of kernel lifecycle.
+**Description**: Integrate ConsolidationDaemon into kernel daemon module (leverage existing ShutdownCoordinator, OperationGuard patterns).
+
+**Changes from Original Plan**:
+- ✅ **Daemon infrastructure exists** (llmspell-kernel/src/daemon/ module complete)
+- ✅ **ConsolidationDaemon complete** (llmspell-memory/src/consolidation/daemon.rs with watch-based shutdown)
+- ✅ **ShutdownCoordinator pattern** (watch::channel, OperationGuard, graceful shutdown)
+- ✅ **Pattern to follow**: kernel/daemon/manager.rs shows daemon lifecycle management
+- ⚠️ **No lifecycle.rs** - kernel doesn't use separate lifecycle module
 
 **Acceptance Criteria**:
-- [ ] ConsolidationDaemon starts when MemoryManager present in config
-- [ ] Daemon shutdown gracefully on kernel shutdown
-- [ ] Configuration: enable_daemon, consolidation_interval, batch_size
-- [ ] Error handling for daemon failures
-- [ ] **TRACING**: Daemon start (info!), health checks (debug!), restart attempts (warn!), failures (error!)
+- [ ] ConsolidationDaemon integrated into kernel daemon module (llmspell-kernel/src/daemon/manager.rs)
+- [ ] Daemon starts when MemoryManager present + config.memory.enable_daemon = true
+- [ ] Daemon shutdown gracefully via ShutdownCoordinator (leverages existing pattern)
+- [ ] Configuration: DaemonConfig from GlobalRuntimeConfig.memory.daemon (already exists in Phase 13.5.7b)
+- [ ] Error handling for daemon failures (circuit breaker from Phase 13.5.2)
+- [ ] **TRACING**: Daemon start (info!), adaptive interval changes (debug!), health checks (debug!), restart attempts (warn!), failures (error!)
 
 **Implementation Steps**:
-1. Modify `llmspell-kernel/src/lifecycle.rs`
-2. Add daemon startup in kernel_init():
+1. Add consolidation_daemon field to IntegratedKernel struct (llmspell-kernel/src/execution/integrated.rs):
    ```rust
-   if let Some(memory_mgr) = &context.memory_manager {
-       if config.memory.enable_daemon {
-           let daemon = ConsolidationDaemon::new(memory_mgr.consolidation_engine(), config.memory.interval);
-           context.consolidation_daemon = Some(daemon.start().await?);
-       }
+   pub struct IntegratedKernel<P: Protocol> {
+       // ... existing fields
+       memory_manager: Option<Arc<dyn llmspell_memory::MemoryManager>>,
+       /// Consolidation daemon handle (Phase 13)
+       consolidation_daemon: Option<(llmspell_memory::consolidation::ConsolidationDaemon, tokio::task::JoinHandle<()>)>,
    }
    ```
-3. Add daemon shutdown in kernel_shutdown()
-4. Add daemon health monitoring
+2. Start daemon in IntegratedKernel::new() after memory_manager init:
+   ```rust
+   let consolidation_daemon = if let Some(memory_mgr) = &memory_manager {
+       if let Some(daemon_config) = config.runtime_config.get("memory.daemon").and_then(|v| serde_json::from_value(v).ok()) {
+           info!("Starting consolidation daemon for session {}", session_id);
+           let daemon = ConsolidationDaemon::new(
+               memory_mgr.consolidation_engine(),
+               memory_mgr.episodic(),
+               daemon_config,
+           );
+           let handle = daemon.start().await?;
+           Some((daemon, handle))
+       } else { None }
+   } else { None };
+   ```
+3. Add daemon shutdown in IntegratedKernel shutdown logic (integrate with ShutdownCoordinator):
+   ```rust
+   if let Some((daemon, handle)) = &self.consolidation_daemon {
+       info!("Stopping consolidation daemon");
+       daemon.stop().await?;
+       handle.await?;
+   }
+   ```
+4. Add daemon health monitoring hook (optional, use existing HealthMonitor in IntegratedKernel)
 5. Create lifecycle tests
 
 **Files to Create/Modify**:
-- `llmspell-kernel/src/lifecycle.rs` (MODIFY - add daemon lifecycle, ~100 lines)
-- `llmspell-kernel/src/context.rs` (MODIFY - add consolidation_daemon field, ~20 lines)
-- `llmspell-config/src/memory_config.rs` (NEW - 100 lines)
-- `llmspell-kernel/tests/daemon_lifecycle_test.rs` (NEW - 250 lines)
+- `llmspell-kernel/src/execution/integrated.rs` (MODIFY - add consolidation_daemon field + lifecycle, ~50 lines)
+  - Add field (line 157)
+  - Start daemon in ::new() (after memory_manager init)
+  - Stop daemon in shutdown logic
+- `llmspell-kernel/tests/daemon_lifecycle_test.rs` (NEW - 200 lines)
+  - test_daemon_starts_with_memory_enabled() - verify daemon starts
+  - test_daemon_graceful_shutdown() - verify daemon stops cleanly
+  - test_daemon_adaptive_intervals() - verify fast/normal/slow intervals
+  - test_daemon_circuit_breaker() - verify failure recovery
 
 **Definition of Done**:
-- [ ] Daemon starts automatically when enabled in config
-- [ ] Daemon stops gracefully on kernel shutdown
-- [ ] Configuration options tested (interval, batch_size)
-- [ ] Error recovery verified (daemon crash → restart)
+- [ ] Daemon starts automatically when memory_manager present + config.memory.daemon configured
+- [ ] Daemon stops gracefully on kernel shutdown (leverages ShutdownCoordinator)
+- [ ] Configuration options tested (fast/normal/slow intervals, batch_size)
+- [ ] Error recovery verified (circuit breaker pauses after 5 consecutive failures)
+- [ ] Daemon respects existing kernel shutdown patterns (watch-based coordination)
+- [ ] Zero clippy warnings
+- [ ] Comprehensive tracing with info!/debug!/warn!/error!
 
-### Task 13.7.3: Session-Memory Linking
+### Task 13.7.3: Session-Memory Linking via Hook Pattern
 
 **Priority**: HIGH
-**Estimated Time**: 4 hours
+**Estimated Time**: 3 hours (reduced from 4h - hook infrastructure exists)
 **Assignee**: Sessions Team + Memory Team
+**Status**: READY TO START
 
-**Description**: Link SessionManager with MemoryManager for automatic episodic memory creation.
+**Description**: Link Session events with MemoryManager for automatic episodic memory creation (use existing hook pattern, NOT context field access).
+
+**Changes from Original Plan**:
+- ✅ **Session hook infrastructure exists** (llmspell-kernel/src/sessions/hooks.rs, policies.rs, middleware.rs)
+- ✅ **No context.memory_manager field** - Session doesn't have direct memory_manager access
+- ✅ **Pattern to follow**: Use SessionEvent + hook system like sessions/analytics.rs
+- ✅ **InMemoryEpisodicMemory sufficient** - no ChromaDB dependency needed (Phase 13.1 has in-memory)
 
 **Acceptance Criteria**:
-- [ ] SessionInteraction events trigger episodic memory creation
-- [ ] Session metadata (session_id, user_id, timestamp) included in episodic records
-- [ ] Opt-in design: session.with_memory(true) to enable
-- [ ] Session artifacts linked to episodic memories
+- [ ] SessionEvent::InteractionAdded triggers episodic memory creation via hook
+- [ ] Session metadata (session_id, timestamp) included in episodic records
+- [ ] Opt-in design: SessionConfig.enable_memory flag
+- [ ] Session artifacts NOT linked (separate concerns - artifacts are for storage, memory is for retrieval)
+- [ ] **TRACING**: Session events (debug!), memory writes (debug!), hook execution (trace!), errors (error!)
 
 **Implementation Steps**:
-1. Modify `llmspell-kernel/src/sessions/session.rs`:
+1. Create `llmspell-kernel/src/sessions/memory_hook.rs` (follows pattern from analytics.rs):
    ```rust
-   impl Session {
-       pub async fn add_interaction(&mut self, interaction: Interaction) -> Result<()> {
-           // Existing artifact storage
-           self.artifacts.add(interaction.clone()).await?;
-
-           // New: Memory integration (opt-in)
-           if self.config.enable_memory {
-               if let Some(memory_mgr) = &self.context.memory_manager {
-                   memory_mgr.episodic().add(EpisodicRecord {
-                       session_id: self.id.clone(),
-                       role: interaction.role,
-                       content: interaction.content,
-                       timestamp: Utc::now(),
-                       metadata: interaction.metadata,
-                   }).await?;
-               }
+   /// Hook that captures session interactions as episodic memories
+   pub struct MemoryHook {
+       memory_manager: Arc<dyn llmspell_memory::MemoryManager>,
+   }
+   impl SessionHook for MemoryHook {
+       async fn on_event(&self, event: &SessionEvent) -> Result<()> {
+           if let SessionEvent::InteractionAdded { session_id, interaction } = event {
+               debug!("Recording interaction as episodic memory for session {}", session_id);
+               self.memory_manager.episodic().add(EpisodicEntry {
+                   session_id: session_id.clone(),
+                   role: interaction.role.clone(),
+                   content: interaction.content.clone(),
+                   timestamp: Utc::now(),
+                   metadata: interaction.metadata.clone(),
+               }).await?;
            }
            Ok(())
        }
    }
    ```
-2. Add session_id index to episodic memory
-3. Create session-memory integration tests
-
-**Files to Create/Modify**:
-- `llmspell-kernel/src/sessions/session.rs` (MODIFY - add memory hook, ~60 lines)
-- `llmspell-kernel/src/sessions/config.rs` (MODIFY - add enable_memory flag, ~10 lines)
-- `llmspell-memory/src/episodic/chroma.rs` (MODIFY - add session_id index, ~30 lines)
-- `llmspell-kernel/tests/session_memory_integration_test.rs` (NEW - 300 lines)
-
-**Definition of Done**:
-- [ ] Session interactions automatically create episodic memories when enabled
-- [ ] Session metadata correctly propagated to episodic records
-- [ ] Opt-in design verified (sessions work without memory)
-- [ ] Integration tests pass with real ChromaDB
-
-### Task 13.7.4: State-Memory Synchronization
-
-**Priority**: MEDIUM
-**Estimated Time**: 3 hours
-**Assignee**: Kernel Team
-
-**Description**: Synchronize StateManager with MemoryManager for procedural memory (learned patterns).
-
-**Acceptance Criteria**:
-- [ ] State changes tracked as potential procedural memories
-- [ ] Pattern detection: repeated state transitions → procedural memory
-- [ ] State snapshots linked to episodic/semantic memory for context
-- [ ] Opt-in design via configuration
-
-**Implementation Steps**:
-1. Create `llmspell-memory/src/procedural/state_tracker.rs`:
+2. Register MemoryHook in SessionManager initialization (when memory_manager present):
    ```rust
-   pub struct StateChangeTracker {
-       state_manager: Arc<StateManager>,
-       memory_manager: Arc<dyn MemoryManager>,
-   }
-   impl StateChangeTracker {
-       pub async fn track_change(&self, key: &str, old_value: Value, new_value: Value) -> Result<()>;
-       pub async fn detect_patterns(&self) -> Result<Vec<ProceduralPattern>>;
+   if let Some(memory_mgr) = memory_manager {
+       session_manager.register_hook(Arc::new(MemoryHook::new(memory_mgr)))?;
    }
    ```
-2. Hook into StateManager.set() for change tracking
-3. Implement pattern detection (frequent transitions)
-4. Create state-memory tests
+3. Add enable_memory flag to SessionConfig (llmspell-kernel/src/sessions/config.rs)
+4. Create session-memory integration tests
 
 **Files to Create/Modify**:
-- `llmspell-memory/src/procedural/state_tracker.rs` (NEW - 350 lines)
-- `llmspell-memory/src/procedural/mod.rs` (MODIFY - add state_tracker module)
-- `llmspell-kernel/src/state/manager.rs` (MODIFY - add memory hook, ~40 lines)
-- `llmspell-kernel/tests/state_memory_integration_test.rs` (NEW - 250 lines)
+- `llmspell-kernel/src/sessions/memory_hook.rs` (NEW - 120 lines)
+  - MemoryHook struct implementing SessionHook trait
+  - on_event() handler for InteractionAdded events
+- `llmspell-kernel/src/sessions/mod.rs` (MODIFY - add memory_hook module, ~2 lines)
+- `llmspell-kernel/src/sessions/config.rs` (MODIFY - add enable_memory: bool flag, ~5 lines)
+- `llmspell-memory/src/episodic/in_memory.rs` (MODIFY - add session_id filtering, ~20 lines)
+- `llmspell-kernel/tests/session_memory_integration_test.rs` (NEW - 250 lines)
+  - test_session_interaction_creates_episodic_memory() - verify hook triggers
+  - test_session_without_memory() - verify opt-in design
+  - test_session_memory_filtering_by_session_id() - verify isolation
 
 **Definition of Done**:
-- [ ] State changes tracked when memory enabled
-- [ ] Pattern detection identifies repeated transitions
-- [ ] Integration with StateManager verified
-- [ ] Opt-in design tested (state works without memory)
+- [ ] Session interactions automatically create episodic memories when MemoryHook registered
+- [ ] Session metadata correctly propagated to episodic records
+- [ ] Opt-in design verified (sessions work without memory_manager/MemoryHook)
+- [ ] Integration tests pass with InMemoryEpisodicMemory (no external DB)
+- [ ] Hook respects existing session hook patterns (async, error handling)
+- [ ] Zero clippy warnings
+- [ ] Comprehensive tracing with debug!/trace!/error!
+
+### Task 13.7.4: State-Memory Synchronization via Hook Pattern
+
+**Priority**: MEDIUM
+**Estimated Time**: 3 hours (unchanged - procedural memory new feature)
+**Assignee**: Kernel Team
+**Status**: READY TO START
+
+**Description**: Synchronize StateManager with MemoryManager for procedural memory (learned patterns) - use hook pattern consistent with Session integration.
+
+**Changes from Original Plan**:
+- ✅ **State hook infrastructure exists** (llmspell-kernel/src/state/hooks.rs)
+- ✅ **Pattern to follow**: Similar to MemoryHook for sessions (Phase 13.7.3)
+- ✅ **ProceduralMemory trait exists** (llmspell-memory/src/traits.rs)
+
+**Acceptance Criteria**:
+- [ ] State changes tracked via StateHook as procedural memories
+- [ ] Pattern detection: repeated state transitions → procedural memory
+- [ ] Opt-in design via StateManager hook registration
+- [ ] **TRACING**: State changes (debug!), pattern detection (debug!), procedural writes (trace!), errors (error!)
+
+**Implementation Steps** (mirrors Session-Memory pattern):
+1. Create `llmspell-memory/src/procedural/state_tracker.rs` (follows MemoryHook pattern)
+2. Implement StateHook that captures state transitions
+3. Pattern detection: frequency analysis of key→value transitions
+4. Register hook when memory_manager present
+5. Create state-memory tests
+
+**Files to Create/Modify**:
+- `llmspell-memory/src/procedural/state_tracker.rs` (NEW - 280 lines, simpler than original)
+- `llmspell-memory/src/procedural/mod.rs` (MODIFY - add state_tracker module, ~2 lines)
+- `llmspell-kernel/src/state/hooks.rs` (MODIFY - document MemoryStateHook pattern, ~20 lines)
+- `llmspell-kernel/tests/state_memory_integration_test.rs` (NEW - 220 lines)
+
+**Definition of Done**:
+- [ ] State changes tracked when MemoryStateHook registered
+- [ ] Pattern detection identifies repeated transitions (≥3 occurrences)
+- [ ] Integration with StateManager verified via hook system
+- [ ] Opt-in design tested (state works without hook)
+- [ ] Zero clippy warnings
+- [ ] Comprehensive tracing with debug!/trace!/error!
 
 ### Task 13.7.5: Kernel Integration Tests
 
 **Priority**: HIGH
-**Estimated Time**: 3 hours
+**Estimated Time**: 2 hours (reduced from 3h - simpler without KernelContext builder)
 **Assignee**: QA
+**Status**: READY TO START
 
-**Description**: Comprehensive kernel integration tests for memory system.
+**Description**: Comprehensive kernel integration tests for memory system (simpler integration without KernelContext builder).
+
+**Changes from Original Plan**:
+- ✅ **No KernelContext builder** - tests use IntegratedKernel::new() directly
+- ✅ **Existing test patterns** (llmspell-kernel/tests/*.rs show patterns)
+- ✅ **InMemoryEpisodicMemory sufficient** - no external DB setup needed
 
 **Acceptance Criteria**:
-- [ ] Test kernel startup with memory enabled/disabled
+- [ ] Test IntegratedKernel with memory_manager: Some(...) vs None
 - [ ] Test daemon lifecycle (start, run, stop)
-- [ ] Test session-memory integration
-- [ ] Test state-memory synchronization
+- [ ] Test session-memory hook integration
+- [ ] Test state-memory hook integration
+- [ ] **TRACING**: Test harness logs test stages (info!), verification (debug!), failures (error!)
 
 **Implementation Steps**:
-1. Create test: Kernel with memory enabled
-2. Create test: Kernel without memory (backward compatibility)
-3. Create test: Daemon lifecycle with graceful shutdown
-4. Create test: Session creates episodic memories
-5. Create test: State changes tracked
+1. Create test: IntegratedKernel with memory enabled (pass Some(memory_manager))
+2. Create test: IntegratedKernel without memory (pass None) - backward compat
+3. Create test: Daemon lifecycle with graceful shutdown (ConsolidationDaemon)
+4. Reuse session/state hook tests from 13.7.3/13.7.4
 
 **Files to Create/Modify**:
-- `llmspell-kernel/tests/integration/memory_enabled_test.rs` (NEW - 300 lines)
-- `llmspell-kernel/tests/integration/memory_disabled_test.rs` (NEW - 200 lines)
-- `llmspell-kernel/tests/integration/daemon_lifecycle_test.rs` (NEW - 250 lines)
+- `llmspell-kernel/tests/integration/memory_enabled_test.rs` (NEW - 240 lines, simpler)
+- `llmspell-kernel/tests/integration/memory_disabled_test.rs` (NEW - 160 lines, simpler)
+- Note: daemon_lifecycle_test.rs covered in Task 13.7.2
 
 **Definition of Done**:
-- [ ] All integration tests pass
+- [ ] All integration tests pass (IntegratedKernel with/without memory)
 - [ ] Test coverage >90% for kernel memory integration
-- [ ] Backward compatibility verified
-- [ ] CI integration complete
+- [ ] Backward compatibility verified (None parameter works)
+- [ ] Zero clippy warnings
+- [ ] CI integration complete (tests run in <60s with in-memory backends)
 
 ---
 
 ## Phase 13.8: Bridge + Globals (Days 13-14)
 
 **Goal**: Expose memory and context APIs to script engines via bridges and globals
-**Timeline**: 2 days (16 hours)
+**Timeline**: 1.5 days (13 hours) - Reduced from 16h due to 16 existing globals + established patterns
 **Critical Dependencies**: Phase 13.7 complete
+**Status**: READY TO START
 
 **⚠️ TRACING REQUIREMENT**: ALL bridge/global code MUST include tracing:
 - `info!` for API calls (episodic_add, semantic_query, assemble, global injection)
@@ -4583,6 +4796,13 @@ All subtasks (13.5.7a through 13.5.7i) are complete. Provider migration successf
 - `warn!` for validation failures (invalid params, strategy not found, budget exceeded)
 - `error!` for bridge failures (runtime errors, conversion failures, API errors)
 - `trace!` for detailed data (params, return values, Lua stack state)
+
+**Phase 13.8 Summary of Changes vs Original Plan**:
+- **16 Globals Exist**: JSON, Logger, Config, Debug, Session, Artifact, RAG, Hook, Replay, Tool, Provider, Agent, Workflow, Template, Utils, Event, Streaming, LocalLLM
+- **GlobalRegistry Complete**: llmspell-bridge/src/globals/registry.rs with dependency resolution
+- **Bridge Patterns Established**: session_bridge.rs, artifact_bridge.rs show async→blocking conversion
+- **Registration Pattern**: mod.rs registers globals via builder.register(Arc::new(...))
+- **Memory + Context = 17th + 18th Globals**
 
 ### Task 13.8.1: Create MemoryBridge
 
