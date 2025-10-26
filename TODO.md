@@ -4852,7 +4852,11 @@ All subtasks (13.5.7a through 13.5.7i) are complete. Provider migration successf
 **Why This Task is Needed**:
 - `KernelHookSystem` exists but isn't used by `IntegratedKernel`
 - Task 13.7.3 (ExecutionMemoryHook) needs hook infrastructure to attach to
-- Option B architecture decision: hooks belong in kernel, not bridge
+- **Kernel vs Bridge Architecture**: TWO separate concerns:
+  - **Kernel (Phase 13.7 - CAPTURE)**: Hooks capture executions → write to memory (THIS TASK + 13.7.3)
+  - **Bridge (Phase 13.8 - QUERY)**: Memory global for scripts to read memory (DEFERRED)
+- Kernel has session context (session_id) needed for capture
+- Bridge provides script APIs (Memory.recall(), Memory.search()) for query
 
 **Acceptance Criteria**:
 - [ ] Add `hook_system: Option<Arc<KernelHookSystem>>` field to IntegratedKernel struct
@@ -5095,6 +5099,8 @@ All subtasks (13.5.7a through 13.5.7i) are complete. Provider migration successf
 
 **Key Insight**: State transitions reveal learned user behaviors. Tracking transition frequencies creates procedural memory of "how the user typically configures the system".
 
+**Note**: Like 13.7.3, this is CAPTURE-only (kernel writes to memory). Script query API deferred to Phase 13.8.
+
 ### Task 13.7.5: Kernel Integration Tests
 
 **Priority**: HIGH
@@ -5173,9 +5179,23 @@ All subtasks (13.5.7a through 13.5.7i) are complete. Provider migration successf
 
 **Key Insight**: Integration tests validate the three memory integration points: (1) kernel executions → episodic, (2) state transitions → procedural, (3) daemon consolidates episodic → semantic.
 
+**Note**: Phase 13.7 is CAPTURE-only (kernel writes to memory). Script QUERY API (Memory global) comes in Phase 13.8.
+
 ---
 
-## Phase 13.8: Bridge + Globals (Days 13-14)
+## Phase 13.8: Bridge + Globals (Days 13-14) - Script Memory API
+
+**Phase 13.7 vs 13.8 Architecture**:
+- **Phase 13.7 (CAPTURE)**: Kernel-level hooks write to memory (JUST COMPLETED)
+  - IntegratedKernel fires PreCodeExecution/PostCodeExecution hooks
+  - ExecutionMemoryHook captures executions → episodic memory
+  - StateMemoryHook captures transitions → procedural memory
+  - Kernel has session context (session_id) for capture
+- **Phase 13.8 (QUERY)**: Bridge-level globals read from memory (THIS PHASE)
+  - Memory global: `Memory.recall(10)`, `Memory.search("topic")`
+  - Context global: `Context.assemble({k=5, budget=2000})`
+  - memory_manager wired to ScriptRuntime (like session_manager/rag pattern)
+  - Scripts can query memory, kernel cannot (different concerns)
 
 **Goal**: Expose memory and context APIs to script engines via bridges and globals
 **Timeline**: 1.5 days (13 hours) - Reduced from 16h (3h savings from established patterns)
