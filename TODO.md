@@ -4937,82 +4937,147 @@ All subtasks (13.5.7a through 13.5.7i) are complete. Provider migration successf
 ### Task 13.7.4: State-Memory Synchronization via Hook Pattern
 
 **Priority**: MEDIUM
-**Estimated Time**: 3 hours (unchanged - procedural memory new feature)
+**Estimated Time**: 3 hours (pattern detection + procedural memory extension)
 **Assignee**: Kernel Team
 **Status**: READY TO START
 
-**Description**: Synchronize StateManager with MemoryManager for procedural memory (learned patterns) - use hook pattern consistent with Session integration.
+**Description**: Capture state change patterns as procedural memory by tracking repeated state transitions via state hooks (e.g., user always sets X=Y before Z=W = learned pattern).
 
-**Changes from Original Plan**:
-- ✅ **State hook infrastructure exists** (llmspell-kernel/src/state/hooks.rs)
-- ✅ **Pattern to follow**: Similar to MemoryHook for sessions (Phase 13.7.3)
-- ✅ **ProceduralMemory trait exists** (llmspell-memory/src/traits.rs)
+**Architecture Correction from Original Plan**:
+- ❌ **Don't reference "session-memory pattern"** - that was rewritten to execution-memory
+- ✅ **State hooks exist** (llmspell-kernel/src/state/hooks.rs with StateChangeEvent)
+- ✅ **Real data available**: scope, key, old_value, new_value, operation, timestamp
+- ⚠️ **ProceduralMemory is placeholder** - needs extension for pattern storage
+- ✅ **Pattern concept valid**: Repeated state transitions reveal learned behaviors
+
+**What is a "Pattern"?**
+- Frequency of specific key→value transitions across sessions
+- Example: `config.theme: "light" → "dark"` occurs 10 times = learned preference
+- Threshold: ≥3 occurrences = stored as procedural memory pattern
+- NOT individual state changes (too noisy), but aggregated transition frequencies
 
 **Acceptance Criteria**:
-- [ ] State changes tracked via StateHook as procedural memories
-- [ ] Pattern detection: repeated state transitions → procedural memory
-- [ ] Opt-in design via StateManager hook registration
-- [ ] **TRACING**: State changes (debug!), pattern detection (debug!), procedural writes (trace!), errors (error!)
+- [ ] State changes captured via Hook implementing StateChangeEvent handling
+- [ ] Pattern detection: frequency analysis of (scope, key, value) transitions
+- [ ] Extend ProceduralMemory trait with pattern storage (add/get/query methods)
+- [ ] Opt-in design: Only when memory_manager present in StateManager
+- [ ] **TRACING**: State transitions (debug!), pattern detection (debug!), procedural writes (trace!), errors (error!)
 
-**Implementation Steps** (mirrors Session-Memory pattern):
-1. Create `llmspell-memory/src/procedural/state_tracker.rs` (follows MemoryHook pattern)
-2. Implement StateHook that captures state transitions
-3. Pattern detection: frequency analysis of key→value transitions
-4. Register hook when memory_manager present
-5. Create state-memory tests
+**Implementation Steps**:
+1. Extend ProceduralMemory trait with pattern methods:
+   ```rust
+   async fn record_transition(&self, scope: &str, key: &str, from: Option<&str>, to: &str) -> Result<()>;
+   async fn get_pattern_frequency(&self, scope: &str, key: &str, value: &str) -> Result<u32>;
+   async fn get_learned_patterns(&self, min_frequency: u32) -> Result<Vec<Pattern>>;
+   ```
+2. Create StateMemoryHook that implements Hook trait from llmspell-hooks
+3. Hook captures StateChangeEvent and records transitions via procedural memory
+4. Pattern detection: Query frequency, store as pattern when ≥3 occurrences
+5. Register hook in StateManager when memory_manager present
+6. Create state-memory integration tests
 
 **Files to Create/Modify**:
-- `llmspell-memory/src/procedural/state_tracker.rs` (NEW - 280 lines, simpler than original)
-- `llmspell-memory/src/procedural/mod.rs` (MODIFY - add state_tracker module, ~2 lines)
-- `llmspell-kernel/src/state/hooks.rs` (MODIFY - document MemoryStateHook pattern, ~20 lines)
-- `llmspell-kernel/tests/state_memory_integration_test.rs` (NEW - 220 lines)
+- `llmspell-memory/src/traits/procedural.rs` (MODIFY - extend trait with pattern methods, ~30 lines)
+- `llmspell-memory/src/procedural/pattern_tracker.rs` (NEW - ~250 lines)
+  - InMemoryPatternTracker implementing ProceduralMemory with HashMap frequency counters
+  - Pattern struct with scope, key, value, frequency, first_seen, last_seen
+- `llmspell-kernel/src/state/memory_hook.rs` (NEW - ~150 lines)
+  - StateMemoryHook implementing Hook trait
+  - Captures StateChangeEvent and calls procedural.record_transition()
+- `llmspell-kernel/src/state/mod.rs` (MODIFY - add memory_hook module, ~2 lines)
+- `llmspell-kernel/tests/state_memory_test.rs` (NEW - ~200 lines)
+  - test_state_transitions_create_patterns() - verify frequency tracking
+  - test_pattern_threshold() - verify ≥3 occurrences triggers pattern storage
+  - test_state_without_memory() - verify opt-in design
 
 **Definition of Done**:
-- [ ] State changes tracked when MemoryStateHook registered
-- [ ] Pattern detection identifies repeated transitions (≥3 occurrences)
+- [ ] ProceduralMemory trait extended with transition recording and pattern query methods
+- [ ] State changes tracked via StateMemoryHook when memory_manager present
+- [ ] Pattern detection: repeated transitions (≥3 occurrences) identified as learned patterns
 - [ ] Integration with StateManager verified via hook system
-- [ ] Opt-in design tested (state works without hook)
+- [ ] Opt-in design tested (state works without memory_manager)
 - [ ] Zero clippy warnings
 - [ ] Comprehensive tracing with debug!/trace!/error!
+
+**Key Insight**: State transitions reveal learned user behaviors. Tracking transition frequencies creates procedural memory of "how the user typically configures the system".
 
 ### Task 13.7.5: Kernel Integration Tests
 
 **Priority**: HIGH
-**Estimated Time**: 2 hours (reduced from 3h - simpler without KernelContext builder)
+**Estimated Time**: 2 hours (execution-memory + state-memory + daemon tests)
 **Assignee**: QA
 **Status**: READY TO START
 
-**Description**: Comprehensive kernel integration tests for memory system (simpler integration without KernelContext builder).
+**Description**: Comprehensive kernel integration tests for memory system: execution-memory capture, state-memory patterns, daemon lifecycle, backward compatibility.
 
-**Changes from Original Plan**:
-- ✅ **No KernelContext builder** - tests use IntegratedKernel::new() directly
-- ✅ **Existing test patterns** (llmspell-kernel/tests/*.rs show patterns)
-- ✅ **InMemoryEpisodicMemory sufficient** - no external DB setup needed
+**Architecture Correction from Original Plan**:
+- ❌ **No "session-memory" tests** - sessions don't track interactions, replaced with execution-memory
+- ✅ **Execution-memory integration** (from rewritten 13.7.3) - kernel executions → episodic entries
+- ✅ **State-memory integration** (from rewritten 13.7.4) - state transitions → procedural patterns
+- ✅ **Daemon lifecycle tests** (from 13.7.2) - ConsolidationDaemon startup/shutdown
+- ✅ **Backward compatibility** - IntegratedKernel works with None memory_manager
+
+**Test Coverage**:
+
+1. **Execution-Memory Integration** (validates 13.7.3):
+   - Kernel execution creates two episodic entries (user code + assistant result)
+   - Session_id isolation verified
+   - Opt-in: kernel works without memory_manager
+
+2. **State-Memory Integration** (validates 13.7.4):
+   - State transitions recorded as procedural patterns
+   - Pattern frequency threshold (≥3) detected
+   - Opt-in: state works without memory_manager
+
+3. **Daemon Lifecycle** (validates 13.7.2):
+   - ConsolidationDaemon starts when memory_manager + engine present
+   - Daemon stops gracefully on kernel shutdown
+   - Watch-based coordination verified
+
+4. **Backward Compatibility**:
+   - IntegratedKernel::new() with None memory_manager parameter
+   - All existing tests still pass
 
 **Acceptance Criteria**:
-- [ ] Test IntegratedKernel with memory_manager: Some(...) vs None
-- [ ] Test daemon lifecycle (start, run, stop)
-- [ ] Test session-memory hook integration
-- [ ] Test state-memory hook integration
-- [ ] **TRACING**: Test harness logs test stages (info!), verification (debug!), failures (error!)
+- [ ] Test execution-memory: code input + result output captured as episodic pair
+- [ ] Test state-memory: repeated transitions create procedural patterns
+- [ ] Test daemon lifecycle: start, run, graceful stop
+- [ ] Test backward compat: IntegratedKernel with memory_manager=None works
+- [ ] **TRACING**: Test stages (info!), verification (debug!), failures (error!)
 
 **Implementation Steps**:
-1. Create test: IntegratedKernel with memory enabled (pass Some(memory_manager))
-2. Create test: IntegratedKernel without memory (pass None) - backward compat
-3. Create test: Daemon lifecycle with graceful shutdown (ConsolidationDaemon)
-4. Reuse session/state hook tests from 13.7.3/13.7.4
+1. Create test: Execution creates episodic memory (ExecutionMemoryHook from 13.7.3)
+2. Create test: State transitions create procedural patterns (StateMemoryHook from 13.7.4)
+3. Create test: Daemon starts/stops with memory_manager (ConsolidationDaemon from 13.7.2)
+4. Create test: Kernel without memory_manager (backward compat)
+5. Verify all tests pass with in-memory backends (<60s runtime)
 
 **Files to Create/Modify**:
-- `llmspell-kernel/tests/integration/memory_enabled_test.rs` (NEW - 240 lines, simpler)
-- `llmspell-kernel/tests/integration/memory_disabled_test.rs` (NEW - 160 lines, simpler)
-- Note: daemon_lifecycle_test.rs covered in Task 13.7.2
+- `llmspell-kernel/tests/execution_memory_integration_test.rs` (NEW - ~200 lines)
+  - test_execution_creates_episodic_pair() - code input + result output
+  - test_multiple_executions_same_session() - session_id isolation
+  - test_execution_without_memory() - opt-in design
+- `llmspell-kernel/tests/state_memory_integration_test.rs` (NEW - ~180 lines)
+  - test_state_transitions_create_patterns() - frequency tracking
+  - test_pattern_threshold_detection() - ≥3 occurrences
+  - test_state_without_memory() - opt-in design
+- `llmspell-kernel/tests/memory_daemon_integration_test.rs` (NEW - ~150 lines)
+  - test_daemon_starts_with_memory_and_engine() - conditional startup
+  - test_daemon_graceful_shutdown() - watch coordination
+  - test_daemon_config_from_runtime() - config loading
+- `llmspell-kernel/tests/memory_backward_compat_test.rs` (NEW - ~100 lines)
+  - test_kernel_without_memory_manager() - None parameter
+  - test_existing_tests_still_pass() - regression check
 
 **Definition of Done**:
-- [ ] All integration tests pass (IntegratedKernel with/without memory)
-- [ ] Test coverage >90% for kernel memory integration
-- [ ] Backward compatibility verified (None parameter works)
+- [ ] All integration tests pass (execution-memory, state-memory, daemon, backward-compat)
+- [ ] Test coverage >90% for kernel memory integration points
+- [ ] Backward compatibility verified (None memory_manager parameter works)
 - [ ] Zero clippy warnings
 - [ ] CI integration complete (tests run in <60s with in-memory backends)
+- [ ] Tests demonstrate Phase 13.7 completion (execution capture, pattern detection, daemon lifecycle)
+
+**Key Insight**: Integration tests validate the three memory integration points: (1) kernel executions → episodic, (2) state transitions → procedural, (3) daemon consolidates episodic → semantic.
 
 ---
 
