@@ -69,6 +69,34 @@ pub trait MemoryManager: Send + Sync {
         mode: ConsolidationMode,
     ) -> Result<ConsolidationResult>;
 
+    // ========== Phase 13.7.1: Kernel Integration Helpers ==========
+
+    /// Check if episodic memory is present
+    ///
+    /// Returns `true` if episodic memory subsystem is available.
+    /// Always returns `true` in current design (episodic memory always present).
+    fn has_episodic(&self) -> bool {
+        true
+    }
+
+    /// Check if semantic memory is present
+    ///
+    /// Returns `true` if semantic memory subsystem is available.
+    /// Always returns `true` in current design (semantic memory always present).
+    fn has_semantic(&self) -> bool {
+        true
+    }
+
+    /// Check if real consolidation is enabled (not using no-op engine)
+    ///
+    /// Returns `true` if a real consolidation engine (manual or LLM-driven) is configured,
+    /// `false` if using `NoopConsolidationEngine`.
+    ///
+    /// Used by kernel integration to determine if consolidation daemon should be started.
+    fn has_consolidation(&self) -> bool {
+        false // Default: no consolidation (override in concrete implementations)
+    }
+
     /// Shutdown and cleanup resources
     ///
     /// Gracefully shuts down all memory subsystems, flushing any

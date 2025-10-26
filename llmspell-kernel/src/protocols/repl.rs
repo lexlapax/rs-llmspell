@@ -655,6 +655,7 @@ mod tests {
                 script_executor,
                 None,
                 create_test_session_manager().await,
+                None, // memory_manager (Phase 13.7.1 - opt-in)
             )
             .await
             .unwrap(),

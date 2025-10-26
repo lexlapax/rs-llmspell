@@ -19,6 +19,7 @@ llmspell-events = { path = "../llmspell-events" }
 llmspell-hooks = { path = "../llmspell-hooks" }
 llmspell-storage = { path = "../llmspell-storage" }
 llmspell-providers = { path = "../llmspell-providers" }
+llmspell-memory = { path = "../llmspell-memory" }
 
 # State dependencies now consolidated internally
 

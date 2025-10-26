@@ -2253,6 +2253,7 @@ mod tests {
             executor,
             None,
             session_manager,
+            None, // memory_manager (Phase 13.7.1 - opt-in)
         )
         .await
         .unwrap()

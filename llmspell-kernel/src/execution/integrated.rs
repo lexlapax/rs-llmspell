@@ -154,6 +154,8 @@ pub struct IntegratedKernel<P: Protocol> {
     current_msg_header: Option<serde_json::Value>,
     /// Provider manager for local LLM operations (Phase 11)
     provider_manager: Option<Arc<llmspell_providers::ProviderManager>>,
+    /// Memory manager for adaptive memory system (Phase 13)
+    memory_manager: Option<Arc<dyn llmspell_memory::MemoryManager>>,
 }
 
 #[allow(dead_code)] // These methods will be used when transport is fully integrated
@@ -172,6 +174,7 @@ impl<P: Protocol + 'static> IntegratedKernel<P> {
         script_executor: Arc<dyn ScriptExecutor>,
         provider_manager: Option<Arc<llmspell_providers::ProviderManager>>,
         session_manager: Arc<SessionManager>,
+        memory_manager: Option<Arc<dyn llmspell_memory::MemoryManager>>,
     ) -> Result<Self> {
         info!("Creating IntegratedKernel for session {}", session_id);
 
@@ -281,6 +284,19 @@ impl<P: Protocol + 'static> IntegratedKernel<P> {
         // Create health monitor with configured thresholds
         let health_monitor = Arc::new(HealthMonitor::new(config.health_thresholds.clone()));
 
+        // Initialize memory manager (Phase 13.7.1)
+        if let Some(memory_mgr) = &memory_manager {
+            info!("Memory manager enabled for session {}", session_id);
+            debug!(
+                "Memory config: episodic={}, semantic={}, consolidation={}",
+                memory_mgr.has_episodic(),
+                memory_mgr.has_semantic(),
+                memory_mgr.has_consolidation()
+            );
+        } else {
+            debug!("Memory manager not configured for session {}", session_id);
+        }
+
         Ok(Self {
             script_executor,
             protocol,
@@ -307,6 +323,7 @@ impl<P: Protocol + 'static> IntegratedKernel<P> {
             current_client_identity: None,
             current_msg_header: None,
             provider_manager,
+            memory_manager,
         })
     }
 
@@ -947,6 +964,16 @@ impl<P: Protocol + 'static> IntegratedKernel<P> {
             "kernel_shutdown",
             Some(&self.session_id),
         );
+
+        // Shutdown memory manager (Phase 13.7.1)
+        if let Some(memory_mgr) = &self.memory_manager {
+            info!("Shutting down memory manager for session {}", self.session_id);
+            if let Err(e) = memory_mgr.shutdown().await {
+                error!("Failed to shutdown memory manager: {}", e);
+            } else {
+                debug!("Memory manager shutdown complete");
+            }
+        }
 
         info!("IntegratedKernel shutdown complete");
         Ok(())
