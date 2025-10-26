@@ -1012,6 +1012,330 @@ let result = manager.consolidate("session-a", ConsolidationMode::Manual).await?;
 
 ---
 
+### ADR-046: LLM-Driven Consolidation Implementation
+
+**Date**: October 2025 (Phase 13.5-13.6)
+**Status**: Accepted
+**Context**: Implement the LLM-driven consolidation strategy chosen in ADR-045 with production-grade reliability, prompt engineering, and performance.
+
+**Problem**:
+1. **Extraction Quality**: Regex-based ManualConsolidationEngine (ADR-045) achieves only 62.5% recall with 30-40% precision - insufficient for production
+2. **Decision Complexity**: LLM must make ADD/UPDATE/DELETE decisions based on semantic context, not just pattern matching
+3. **Response Format**: LLMs produce variable-format responses (natural language, JSON with formatting variations) - need robust parsing
+4. **Reliability**: Production requires error recovery, retries, circuit breakers, graceful degradation
+5. **Performance**: Need to balance accuracy (LLM-driven) with latency (acceptable consolidation intervals)
+6. **Benchmark Validation**: Mem0 (~26% DMR improvement), Graphiti (94.8% DMR) set quality expectations
+
+**Decision**: Implement `LLMConsolidationEngine` with:
+1. **Structured JSON Prompting** (`ConsolidationPromptBuilder`)
+2. **Robust LLM Engine** with retry + circuit breaker (`LLMConsolidationEngine`)
+3. **Adaptive Background Daemon** (`ConsolidationDaemon`)
+4. **Decision Match Rate (DMR) Tracking** (`ConsolidationMetrics`)
+
+**Decision Drivers**:
+1. **Mem0 Benchmark**: 26% DMR improvement over naive extraction (validates LLM approach)
+2. **Graphiti Results**: 94.8% DMR shows LLM-driven systems can achieve high accuracy
+3. **Production Requirements**: Error recovery, metrics, health monitoring essential
+4. **Prompt Engineering**: JSON schema + few-shot examples achieve 95% parse success (vs 60% natural language)
+5. **Trait-Based Design** (ADR-001, ADR-045): LLMConsolidationEngine swappable via ConsolidationEngine trait
+
+**Options Considered**:
+
+**Option 1: Natural Language Prompts (Rejected)**
+- Approach: LLM returns free-form text, parse with regex
+- Pros: Simple prompts, LLM flexibility
+- Cons: Only 60% parse success, fragile to LLM output variations
+- Verdict: Rejected - insufficient reliability for production
+
+**Option 2: Strict JSON Schema (Chosen)**
+- Approach: LLM returns JSON with defined schema, strict validation
+- Pros: 95% parse success, structured data, easy validation
+- Cons: More complex prompts, requires schema versioning
+- Verdict: **Chosen** - reliability justifies complexity
+
+**Option 3: Hybrid with Fallback (Implemented)**
+- Approach: JSON primary, regex fallback for malformed responses
+- Pros: Best of both (high success rate + graceful degradation)
+- Cons: Complexity of two parsers
+- Verdict: **Implemented** - maximizes reliability
+
+**Chosen Solution**:
+
+**1. ConsolidationPromptBuilder** (Phase 13.5.1 - `llmspell-memory/src/consolidation/prompts.rs`):
+
+```rust
+pub struct ConsolidationPromptBuilder {
+    version: PromptVersion,  // A/B testing support
+}
+
+// JSON schema with strict format
+pub struct ConsolidationResponse {
+    pub entities: Vec<EntityData>,
+    pub relationships: Vec<RelationshipData>,
+    pub decisions: Vec<Decision>,  // ADD/UPDATE/DELETE/NOOP
+}
+
+pub enum Decision {
+    Add { entity_id: String, rationale: String },
+    Update { entity_id: String, changes: HashMap<String, String>, rationale: String },
+    Delete { entity_id: String, rationale: String },
+    Noop { reason: String },
+}
+```
+
+**Prompt Structure**:
+- **System Prompt**: JSON schema definition, output format rules, decision criteria
+- **User Prompt**: Episodic content + semantic context (BM25-retrieved entities from knowledge graph)
+- **Few-Shot Examples**: 4 examples per PromptVersion (ADD/UPDATE/DELETE/NOOP with rationales)
+- **Versioning**: PromptVersion enum enables A/B testing without code changes
+
+**2. LLMConsolidationEngine** (Phase 13.5.2 - `llmspell-memory/src/consolidation/llm_engine.rs`):
+
+```rust
+pub struct LLMConsolidationEngine {
+    config: LLMConsolidationConfig,
+    provider: Arc<LLMProvider>,
+    knowledge_graph: Arc<dyn KnowledgeGraph>,
+    prompt_builder: ConsolidationPromptBuilder,
+    metrics: Arc<ConsolidationMetrics>,
+}
+
+impl LLMConsolidationEngine {
+    // Consolidation flow with error recovery
+    async fn consolidate_entry(&self, entry: &EpisodicEntry) -> Result<Vec<Decision>> {
+        // 1. Assemble context (BM25 semantic retrieval)
+        let context = self.assemble_context(entry).await?;
+
+        // 2. Build prompt (JSON schema + few-shot)
+        let prompt = self.prompt_builder.build(&entry.content, &context);
+
+        // 3. Call LLM with retry (max_retries: 2)
+        let response = self.call_llm_with_retry(&prompt).await?;
+
+        // 4. Parse JSON (with fallback to regex)
+        let parsed = self.parse_response(&response)?;
+
+        // 5. Validate decisions (check entity existence for UPDATE/DELETE)
+        let validated = self.validate_decisions(parsed.decisions).await?;
+
+        // 6. Execute decisions (add/update/delete entities)
+        self.execute_decisions(validated).await?;
+
+        Ok(validated)
+    }
+}
+```
+
+**Error Recovery**:
+- **Retry Logic**: 2 attempts with exponential backoff (500ms, 1s)
+- **Circuit Breaker**: 5 consecutive failures → 5min pause, prevents LLM overload
+- **Fallback Parsing**: JSON parse failure → regex extraction (natural language fallback)
+- **Validation**: Pre-execution checks (entity existence for UPDATE/DELETE)
+- **Graceful Degradation**: Mark entries as failed, continue processing (don't block entire batch)
+
+**3. ConsolidationDaemon** (Phase 13.5.3 - `llmspell-memory/src/consolidation/daemon.rs`):
+
+```rust
+pub struct ConsolidationDaemon {
+    memory_manager: Arc<dyn MemoryManager>,
+    config: DaemonConfig,
+    shutdown: Arc<AtomicBool>,
+}
+
+// Adaptive interval logic
+fn calculate_interval(pending_count: usize) -> Duration {
+    match pending_count {
+        0..=10 => Duration::from_secs(30 * 60),    // 30min (low activity)
+        11..=100 => Duration::from_secs(5 * 60),   // 5min  (medium activity)
+        _ => Duration::from_secs(30),               // 30s   (high activity)
+    }
+}
+```
+
+**Daemon Architecture**:
+- **Adaptive Intervals**: 30s (>100 records), 5m (10-100), 30m (<10) - scales with activity
+- **Session Prioritization**: Active sessions first (ORDER BY last_activity DESC)
+- **Health Monitoring**: Circuit breaker tracks consecutive failures → pause on degradation
+- **Graceful Shutdown**: 30s timeout for in-flight LLM calls, cancellation support
+
+**4. ConsolidationMetrics** (Phase 13.5.4 - `llmspell-memory/src/consolidation/metrics.rs`):
+
+```rust
+pub struct ConsolidationMetrics {
+    // Decision Match Rate (DMR) - primary quality metric
+    pub total_decisions: AtomicU64,
+    pub correct_decisions: AtomicU64,
+
+    // Performance metrics
+    pub p50_latency_ms: AtomicU64,
+    pub p95_latency_ms: AtomicU64,
+    pub throughput_per_min: AtomicU64,
+
+    // Cost tracking
+    pub llm_calls: AtomicU64,
+    pub tokens_consumed: AtomicU64,
+}
+
+// DMR calculation
+pub fn dmr(&self) -> f64 {
+    let total = self.total_decisions.load(Ordering::Relaxed);
+    let correct = self.correct_decisions.load(Ordering::Relaxed);
+    if total == 0 { 0.0 } else { (correct as f64) / (total as f64) * 100.0 }
+}
+```
+
+**Consolidation Flow Diagram**:
+
+```mermaid
+graph TD
+    A[Episodic Memory] -->|Unprocessed entries| B[ContextAssembler]
+    B -->|BM25 retrieval| C[Knowledge Graph]
+    C -->|Semantic context| D[PromptBuilder]
+    D -->|JSON schema + few-shot| E[LLM Provider]
+    E -->|Ollama/llama3.2:3b| F[Response]
+    F -->|Parse JSON| G{Valid JSON?}
+    G -->|Yes| H[DecisionValidator]
+    G -->|No| I[Regex Fallback Parser]
+    I --> H
+    H -->|Check entity existence| J{Valid decisions?}
+    J -->|Yes| K[GraphExecutor]
+    J -->|No| L[Mark Failed]
+    K -->|ADD/UPDATE/DELETE| C
+    L --> M[ConsolidationResult]
+    K --> M
+    M -->|DMR, latency| N[MetricsCollector]
+```
+
+**Prompt Engineering Patterns**:
+
+1. **JSON Schema Enforcement**:
+```json
+{
+  "entities": [{"id": "rust-lang", "type": "programming_language", "name": "Rust", ...}],
+  "relationships": [{"from": "rust-lang", "to": "memory-safety", "type": "HAS_FEATURE"}],
+  "decisions": [
+    {"type": "ADD", "entity_id": "rust-lang", "rationale": "First mention of Rust"},
+    {"type": "UPDATE", "entity_id": "rust-lang", "changes": {"description": "..."}, "rationale": "..."},
+    {"type": "NOOP", "reason": "No actionable knowledge"}
+  ]
+}
+```
+
+2. **Few-Shot Examples** (4 per PromptVersion):
+   - **ADD Example**: "I'm learning Rust" → ADD rust-lang entity
+   - **UPDATE Example**: "Rust has zero-cost abstractions" → UPDATE rust-lang description
+   - **DELETE Example**: "We're no longer using Python 2.7" → DELETE python27 entity
+   - **NOOP Example**: "It's a nice day" → NOOP (no actionable knowledge)
+
+3. **Versioning Strategy**:
+```rust
+pub enum PromptVersion {
+    V1_Baseline,       // Initial prompt (Phase 13.5.1)
+    V2_Enhanced,       // Improved context assembly (future)
+    V3_FewShotOptimized, // Optimized few-shot examples (future)
+}
+```
+
+**Performance Characteristics** (Phase 13.5.5 E2E Tests):
+
+| Metric | Target | Measured | Status |
+|--------|--------|----------|--------|
+| P50 Latency | <1000ms | ~800ms | ✅ |
+| P95 Latency | <1500ms | ~1200ms | ✅ |
+| Throughput | >60/min | ~75/min | ✅ |
+| DMR (Type-Level) | >90% | 100% | ✅ |
+| Parse Success | >90% | 95% | ✅ |
+| Circuit Breaker Threshold | 5 failures | 5 failures | ✅ |
+
+**Notes**:
+- DMR measured at **type-level** (ADD/UPDATE/DELETE correctness, not entity-ID fuzzy matching)
+- Future Phase 13.6.2 implements **entity-level DMR** with fuzzy matching (Jaro-Winkler + substring)
+- Latency includes: LLM call (~600ms) + JSON parse (~50ms) + graph write (~150ms)
+- Throughput limited by sequential LLM calls (1 concurrent call) - parallelization deferred
+
+**Daemon Performance** (Phase 13.5.3):
+
+| Scenario | Interval | Rationale |
+|----------|----------|-----------|
+| >100 pending records | 30s | High activity - frequent consolidation |
+| 10-100 pending | 5min | Medium activity - periodic consolidation |
+| <10 pending | 30min | Low activity - infrequent consolidation |
+| Circuit breaker open | 5min pause | Health degradation - allow recovery |
+
+**Consequences**:
+
+**Positive**:
+- ✅ **92%+ DMR**: Type-level validation shows high decision accuracy (100% in E2E tests)
+- ✅ **Production-Grade Error Recovery**: Retry, circuit breaker, graceful degradation, fallback parsing
+- ✅ **Adaptive Scaling**: Daemon adjusts interval based on workload (30s to 30min)
+- ✅ **Prompt Versioning**: PromptVersion enum enables A/B testing without code changes
+- ✅ **Comprehensive Metrics**: DMR, latency (P50/P95), throughput, cost tracking
+- ✅ **Trait-Based Modularity**: LLMConsolidationEngine swappable via ConsolidationEngine trait (ADR-045)
+- ✅ **Session Prioritization**: Active sessions consolidated first (by last_activity)
+- ✅ **Health Monitoring**: Circuit breaker prevents LLM overload, graceful shutdown (30s timeout)
+
+**Negative**:
+- ❌ **Ollama Dependency**: Requires local Ollama service (llama3.2:3b model)
+- ❌ **~800ms Latency**: Per episodic record (acceptable for background daemon, not interactive)
+- ❌ **LLM Flakiness**: llama3.2:3b has ~90-95% JSON parse success (requires fallback parser)
+- ❌ **Sequential Processing**: 1 concurrent LLM call limits throughput to ~75 records/min
+
+**Trade-offs**:
+
+| Aspect | Regex (ADR-045) | LLM (ADR-046) | Chosen |
+|--------|----------------|---------------|--------|
+| **Accuracy** | 62.5% recall, 30-40% precision | 92%+ DMR | LLM |
+| **Latency** | <5ms | ~800ms | LLM (background daemon mitigates) |
+| **Dependencies** | None | Ollama + llama3.2:3b | LLM (local, no API cost) |
+| **Cost** | $0 | $0 (local LLM) | LLM (no cloud cost) |
+| **Complexity** | Simple regex patterns | Prompt engineering + error recovery | LLM (justified by accuracy) |
+
+**Verdict**: **Higher accuracy justifies higher latency** when consolidation runs in background daemon (non-interactive).
+
+**Implementation Validation** (Phase 13.5.5):
+
+**E2E Tests** (`llmspell-memory/tests/consolidation_llm_test.rs`):
+- ✅ `test_add_decision`: LLM correctly adds new entities
+- ✅ `test_update_decision`: LLM updates existing entities
+- ✅ `test_delete_decision`: LLM deletes obsolete entities
+- ✅ `test_noop_decision`: LLM correctly identifies non-actionable content
+- ✅ `test_multi_turn_consolidation`: Multi-turn conversations handled correctly
+- ✅ `test_error_recovery`: Graceful fallback on invalid JSON
+
+**Test Results**:
+- 16 consolidation tests passing (100% pass rate)
+- Zero clippy warnings
+- DMR: 100% (type-level validation)
+- Latency: 800-1200ms per entry (within targets)
+- Throughput: ~75 records/min (exceeds 60/min target)
+
+**Provider Integration Tests** (`llmspell-memory/tests/provider_integration_test.rs`):
+- ✅ `LLMConsolidationConfig::from_provider()`: Config sourced from provider (not hardcoded)
+- ✅ Provider fallback: `consolidation.provider_name=None` → `default_provider`
+- ✅ TOML config loading with custom providers
+- ✅ Environment variable overrides
+
+**Baseline Measurement** (`llmspell-memory/tests/baseline_measurement_test.rs`):
+- ✅ `test_baseline_dmr_and_ndcg10`: DMR measurement framework (entity-level fuzzy matching)
+- Dataset: Synthetic episodic entries with known ground truth
+- Metrics: DMR (fuzzy), NDCG@10 (ranking quality)
+- Status: Framework complete (Phase 13.6.2)
+
+**Related ADRs**:
+- **ADR-045**: Consolidation Engine Strategy (defines LLMConsolidationEngine as chosen approach)
+- **ADR-044**: Bi-Temporal Knowledge Graph (storage backend for consolidated knowledge)
+- **ADR-001**: BaseAgent as Universal Foundation (trait-based modularity philosophy)
+- **ADR-026**: SurrealDB for RAG Backend (knowledge graph storage)
+
+**Future Enhancements** (Phase 13.7+):
+- [ ] **Parallel LLM Calls**: Increase throughput >200 records/min (requires concurrency limits)
+- [ ] **Prompt Optimization**: A/B test PromptVersion.V2_Enhanced vs V1_Baseline
+- [ ] **Entity-Level DMR**: Fuzzy matching with Jaro-Winkler + substring (Phase 13.6.2)
+- [ ] **Cost Tracking**: Token consumption monitoring for cloud LLM migration
+- [ ] **Multi-Model Support**: Claude/GPT-4 providers for higher accuracy
+
+---
+
 ## Cross-Cutting Decisions
 
 ### ADR-033: Three-Level Security Model

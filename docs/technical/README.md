@@ -49,9 +49,9 @@
 - Service installation (systemd/launchd)
 - PID file and log rotation management
 
-### 4. 🎯 [Architecture Decisions](architecture-decisions.md) ✅ v0.10.0
+### 4. 🎯 [Architecture Decisions](architecture-decisions.md) ✅ v0.12.1
 **Purpose**: All architectural decisions and rationale
-**Coverage**: 40+ ADRs from Phase 0-10
+**Coverage**: 46+ ADRs from Phase 0-13
 **Key Content**:
 - Foundation decisions (BaseAgent, async-first, trait-based modularity)
 - Phase evolution and key reversals
@@ -59,6 +59,7 @@
 - Daemon and service architecture (Phase 10)
 - Feature flags and modular builds (Phase 10.17.5+)
 - Fleet management via OS processes vs internal runtime
+- Adaptive memory system (Phase 13: ADR-044 Bi-Temporal Graph, ADR-045 Consolidation Strategy, ADR-046 LLM-Driven Consolidation)
 
 ### 5. ⚡ [Operational Guide](operational-guide.md) ✅ v0.10.0
 **Purpose**: Performance, security, and operations unified
