@@ -4474,6 +4474,138 @@ All subtasks (13.5.7a through 13.5.7i) are complete. Provider migration successf
 - [x] Zero markdown lint warnings ✅
 - [x] Cross-references to ADR-044, ADR-045 validated ✅
 
+### Task 13.6.4: Add Kernel Integration API Helpers to DefaultMemoryManager
+
+**Priority**: CRITICAL (BLOCKING 13.7)
+**Estimated Time**: 45 minutes
+**Assignee**: Memory Team
+**Status**: READY TO START
+
+**Description**: Add missing API methods to DefaultMemoryManager needed for Phase 13.7 kernel integration (discovered during architectural gap analysis after 13.6.3).
+
+**Architectural Gap Analysis**: Phase 13.7 tasks expect API methods that don't exist in current DefaultMemoryManager:
+- Task 13.7.1 expects: `has_episodic()`, `has_semantic()`, `has_consolidation()` for logging
+- Task 13.7.2 expects: `consolidation_engine_arc()` for daemon construction
+- Task 13.7.2 expects: `episodic_arc()` for daemon construction (ConsolidationDaemon needs Arc<dyn EpisodicMemory>)
+- Current MemoryManager trait returns `&dyn EpisodicMemory` but daemon needs `Arc<dyn>`
+
+**Acceptance Criteria**:
+- [ ] `has_consolidation() -> bool` method checks if real consolidation engine (not noop)
+- [ ] `has_episodic() -> bool` method (always true in current design)
+- [ ] `has_semantic() -> bool` method (always true in current design)
+- [ ] `consolidation_engine_arc() -> Option<Arc<dyn ConsolidationEngine>>` for daemon
+- [ ] `episodic_arc() -> Arc<dyn EpisodicMemory>` for daemon
+- [ ] Add `is_noop() -> bool` to ConsolidationEngine trait for type checking
+- [ ] Unit tests verify all capability check methods
+- [ ] Zero clippy warnings
+
+**Implementation Steps**:
+1. Add `is_noop()` method to `ConsolidationEngine` trait (llmspell-memory/src/traits/consolidation.rs):
+   ```rust
+   #[async_trait]
+   pub trait ConsolidationEngine: Send + Sync {
+       // ... existing methods
+
+       /// Returns true if this is a no-op consolidation engine
+       fn is_noop(&self) -> bool {
+           false // Override in NoopConsolidationEngine
+       }
+   }
+   ```
+2. Implement `is_noop()` in NoopConsolidationEngine (llmspell-memory/src/consolidation/noop.rs):
+   ```rust
+   impl ConsolidationEngine for NoopConsolidationEngine {
+       fn is_noop(&self) -> bool { true }
+   }
+   ```
+3. Add helper methods to DefaultMemoryManager (llmspell-memory/src/manager.rs):
+   ```rust
+   impl DefaultMemoryManager {
+       /// Check if real consolidation is enabled (not noop)
+       pub fn has_consolidation(&self) -> bool {
+           !self.consolidation.is_noop()
+       }
+
+       /// Check if episodic memory is present (always true in current design)
+       pub fn has_episodic(&self) -> bool {
+           true
+       }
+
+       /// Check if semantic memory is present (always true in current design)
+       pub fn has_semantic(&self) -> bool {
+           true
+       }
+
+       /// Get consolidation engine as Arc for daemon construction
+       /// Returns None if using NoopConsolidationEngine
+       pub fn consolidation_engine_arc(&self) -> Option<Arc<dyn ConsolidationEngine>> {
+           if self.has_consolidation() {
+               Some(self.consolidation.clone())
+           } else {
+               None
+           }
+       }
+
+       /// Get episodic memory as Arc for daemon construction
+       pub fn episodic_arc(&self) -> Arc<dyn EpisodicMemory> {
+           self.episodic.clone()
+       }
+   }
+   ```
+4. Update Phase 13.7.1 expectations in TODO.md (line 4548):
+   - Change `episodic_enabled()` → `has_episodic()`
+   - Change `semantic_enabled()` → `has_semantic()`
+   - Change `consolidation_enabled()` → `has_consolidation()`
+5. Update Phase 13.7.2 expectations in TODO.md (lines 4614-4615):
+   - Change `consolidation_engine()` → `consolidation_engine_arc()`
+   - Change `memory_mgr.episodic()` → `memory_mgr.episodic_arc()`
+6. Add unit tests (llmspell-memory/src/manager.rs):
+   ```rust
+   #[cfg(test)]
+   mod tests {
+       #[tokio::test]
+       async fn test_has_consolidation_with_noop() {
+           let mgr = DefaultMemoryManager::new_in_memory().await.unwrap();
+           assert!(!mgr.has_consolidation()); // Uses noop by default
+       }
+
+       #[tokio::test]
+       async fn test_has_consolidation_with_real_engine() {
+           // ... with real LLMConsolidationEngine
+           assert!(mgr.has_consolidation());
+       }
+
+       #[tokio::test]
+       async fn test_episodic_arc_returns_same_instance() {
+           let mgr = DefaultMemoryManager::new_in_memory().await.unwrap();
+           let arc1 = mgr.episodic_arc();
+           let arc2 = mgr.episodic_arc();
+           assert!(Arc::ptr_eq(&arc1, &arc2));
+       }
+   }
+   ```
+
+**Files to Create/Modify**:
+- `llmspell-memory/src/traits/consolidation.rs` (MODIFY - add is_noop() default method, ~5 lines)
+- `llmspell-memory/src/consolidation/noop.rs` (MODIFY - override is_noop() = true, ~3 lines)
+- `llmspell-memory/src/manager.rs` (MODIFY - add 5 helper methods + tests, ~60 lines)
+- `TODO.md` (MODIFY - update 13.7.1 and 13.7.2 code examples, ~10 lines)
+
+**Definition of Done**:
+- [ ] All 5 helper methods added and tested
+- [ ] is_noop() trait method works correctly
+- [ ] Unit tests pass (3 new tests)
+- [ ] Phase 13.7.1 and 13.7.2 code examples updated in TODO.md
+- [ ] Zero clippy warnings
+- [ ] cargo test -p llmspell-memory passes
+
+**Why This is Critical**:
+- **Blocking**: Phase 13.7.1 cannot log memory config without has_*() methods
+- **Blocking**: Phase 13.7.2 cannot construct ConsolidationDaemon without *_arc() methods
+- **Type Safety**: Arc<dyn> vs &dyn mismatch prevents compilation
+- **Design Flaw**: MemoryManager trait returns references but daemon needs owned Arc
+- **Estimated Impact**: 30 min implementation + 15 min testing = 45 min total
+
 ---
 
 ## Phase 13.7: Kernel Integration (Days 11-12)
@@ -4545,8 +4677,9 @@ All subtasks (13.5.7a through 13.5.7i) are complete. Provider migration successf
    ```rust
    if let Some(memory_mgr) = &memory_manager {
        info!("Memory manager enabled for session {}", session_id);
+       // Note: Requires Task 13.6.4 API additions (has_episodic, has_semantic, has_consolidation)
        debug!("Memory config: episodic={}, semantic={}, consolidation={}",
-           memory_mgr.episodic_enabled(), memory_mgr.semantic_enabled(), memory_mgr.consolidation_enabled());
+           memory_mgr.has_episodic(), memory_mgr.has_semantic(), memory_mgr.has_consolidation());
    }
    ```
 4. Add memory_manager graceful shutdown in shutdown logic (leverage existing ShutdownCoordinator)
@@ -4608,15 +4741,18 @@ All subtasks (13.5.7a through 13.5.7i) are complete. Provider migration successf
 2. Start daemon in IntegratedKernel::new() after memory_manager init:
    ```rust
    let consolidation_daemon = if let Some(memory_mgr) = &memory_manager {
-       if let Some(daemon_config) = config.runtime_config.get("memory.daemon").and_then(|v| serde_json::from_value(v).ok()) {
-           info!("Starting consolidation daemon for session {}", session_id);
-           let daemon = ConsolidationDaemon::new(
-               memory_mgr.consolidation_engine(),
-               memory_mgr.episodic(),
-               daemon_config,
-           );
-           let handle = daemon.start().await?;
-           Some((daemon, handle))
+       // Note: Requires Task 13.6.4 API additions (consolidation_engine_arc, episodic_arc)
+       if let Some(engine) = memory_mgr.consolidation_engine_arc() {
+           if let Some(daemon_config) = config.runtime_config.get("memory.daemon").and_then(|v| serde_json::from_value(v).ok()) {
+               info!("Starting consolidation daemon for session {}", session_id);
+               let daemon = ConsolidationDaemon::new(
+                   engine,
+                   memory_mgr.episodic_arc(),
+                   daemon_config,
+               );
+               let handle = daemon.start().await?;
+               Some((daemon, handle))
+           } else { None }
        } else { None }
    } else { None };
    ```
