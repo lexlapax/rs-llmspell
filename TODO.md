@@ -4188,15 +4188,15 @@ All subtasks (13.5.7a through 13.5.7i) are complete. Provider migration successf
 8. ✅ Agent provider lookup: Lua scripts respect config temperature/max_tokens
 
 **Definition of Done**:
-- [ ] All 9 subtasks (13.5.7a-i) complete
-- [ ] Zero hardcoded LLM configuration values in source code
-- [ ] Provider system fully integrated (memory + templates + agents) with dual-path support
-- [ ] All tests passing (config + memory + templates + context + providers + agents)
-- [ ] Documentation complete (memory.md + best practices guide)
-- [ ] Backward compatibility verified (100% of existing invocations work)
-- [ ] Agent provider lookup fixed (Lua scripts use config temperature/max_tokens)
-- [ ] Quality gates passed
-- [ ] Ready for Phase 13.6
+- [x] All 9 subtasks (13.5.7a-i) complete
+- [x] Zero hardcoded LLM configuration values in source code
+- [x] Provider system fully integrated (memory + templates + agents) with dual-path support
+- [x] All tests passing (config + memory + templates + context + providers + agents)
+- [x] Documentation complete (memory.md + best practices guide)
+- [x] Backward compatibility verified (100% of existing invocations work)
+- [x] Agent provider lookup fixed (Lua scripts use config temperature/max_tokens)
+- [x] Quality gates passed
+- [x] Ready for Phase 13.6
 
 **Summary**:
 - **Architecture**: Direct provider integration with smart dual-path support + agent provider lookup fix
