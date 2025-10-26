@@ -8,9 +8,12 @@
 //! It also coordinates consolidation (episodic → semantic transformation).
 
 use async_trait::async_trait;
+use std::sync::Arc;
 
+use crate::consolidation::ConsolidationEngine;
 use crate::error::Result;
 use crate::types::{ConsolidationMode, ConsolidationResult};
+use crate::EpisodicMemory;
 
 /// Memory manager coordinates all memory subsystems
 ///
@@ -95,6 +98,30 @@ pub trait MemoryManager: Send + Sync {
     /// Used by kernel integration to determine if consolidation daemon should be started.
     fn has_consolidation(&self) -> bool {
         false // Default: no consolidation (override in concrete implementations)
+    }
+
+    /// Get Arc reference to episodic memory (Phase 13.7.2 - daemon integration)
+    ///
+    /// Returns an Arc-wrapped reference to the episodic memory component,
+    /// required by `ConsolidationDaemon` for background processing.
+    ///
+    /// # Returns
+    ///
+    /// `None` if episodic memory not available (should not happen in current design).
+    fn episodic_arc(&self) -> Option<Arc<dyn EpisodicMemory>> {
+        None
+    }
+
+    /// Get Arc reference to consolidation engine (Phase 13.7.2 - daemon integration)
+    ///
+    /// Returns an Arc-wrapped reference to the consolidation engine,
+    /// required by `ConsolidationDaemon` for background processing.
+    ///
+    /// # Returns
+    ///
+    /// `None` if consolidation engine not available or is no-op.
+    fn consolidation_engine_arc(&self) -> Option<Arc<dyn ConsolidationEngine>> {
+        None
     }
 
     /// Shutdown and cleanup resources

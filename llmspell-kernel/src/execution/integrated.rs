@@ -156,6 +156,11 @@ pub struct IntegratedKernel<P: Protocol> {
     provider_manager: Option<Arc<llmspell_providers::ProviderManager>>,
     /// Memory manager for adaptive memory system (Phase 13)
     memory_manager: Option<Arc<dyn llmspell_memory::MemoryManager>>,
+    /// Consolidation daemon handle (Phase 13.7.2)
+    consolidation_daemon: Option<(
+        Arc<llmspell_memory::consolidation::ConsolidationDaemon>,
+        tokio::task::JoinHandle<()>,
+    )>,
 }
 
 #[allow(dead_code)] // These methods will be used when transport is fully integrated
@@ -165,6 +170,10 @@ impl<P: Protocol + 'static> IntegratedKernel<P> {
     /// # Errors
     ///
     /// Returns an error if the script runtime cannot be created
+    ///
+    /// # Panics
+    ///
+    /// Panics if episodic memory is not available when starting consolidation daemon (should never happen)
     #[instrument(level = "info", skip_all)]
     #[allow(clippy::too_many_lines)]
     pub async fn new(
@@ -297,6 +306,49 @@ impl<P: Protocol + 'static> IntegratedKernel<P> {
             debug!("Memory manager not configured for session {}", session_id);
         }
 
+        // Start consolidation daemon (Phase 13.7.2)
+        let consolidation_daemon = if let Some(memory_mgr) = &memory_manager {
+            if let Some(engine) = memory_mgr.consolidation_engine_arc() {
+                // Try to get daemon config from runtime_config, use default if not found
+                let daemon_config: llmspell_memory::consolidation::DaemonConfig = config
+                    .runtime_config
+                    .get("memory.daemon")
+                    .and_then(|v| serde_json::from_value(v.clone()).ok())
+                    .unwrap_or_default();
+
+                info!("Starting consolidation daemon for session {}", session_id);
+                debug!(
+                    "Daemon config: fast={}s, normal={}s, slow={}s, batch={}",
+                    daemon_config.fast_interval_secs,
+                    daemon_config.normal_interval_secs,
+                    daemon_config.slow_interval_secs,
+                    daemon_config.batch_size
+                );
+
+                let episodic = memory_mgr
+                    .episodic_arc()
+                    .expect("Episodic memory must be present");
+                let daemon = Arc::new(
+                    llmspell_memory::consolidation::ConsolidationDaemon::new(
+                        engine,
+                        episodic,
+                        daemon_config,
+                    ),
+                );
+                let handle = daemon.clone().start().map_err(|e| {
+                    error!("Failed to start consolidation daemon: {}", e);
+                    e
+                })?;
+                info!("Consolidation daemon started successfully");
+                Some((daemon, handle))
+            } else {
+                debug!("No consolidation engine available, daemon not started");
+                None
+            }
+        } else {
+            None
+        };
+
         Ok(Self {
             script_executor,
             protocol,
@@ -324,6 +376,7 @@ impl<P: Protocol + 'static> IntegratedKernel<P> {
             current_msg_header: None,
             provider_manager,
             memory_manager,
+            consolidation_daemon,
         })
     }
 
@@ -964,6 +1017,18 @@ impl<P: Protocol + 'static> IntegratedKernel<P> {
             "kernel_shutdown",
             Some(&self.session_id),
         );
+
+        // Shutdown consolidation daemon (Phase 13.7.2)
+        if let Some((daemon, _handle)) = &self.consolidation_daemon {
+            info!("Stopping consolidation daemon for session {}", self.session_id);
+            if let Err(e) = daemon.stop().await {
+                error!("Failed to stop consolidation daemon: {}", e);
+            } else {
+                debug!("Consolidation daemon stopped, waiting for task completion");
+                // Note: We can't await the handle here because we only have a reference
+                // The handle will be cleaned up when IntegratedKernel is dropped
+            }
+        }
 
         // Shutdown memory manager (Phase 13.7.1)
         if let Some(memory_mgr) = &self.memory_manager {
@@ -3545,6 +3610,7 @@ mod tests {
             executor,
             None,
             create_test_session_manager().await,
+            None, // memory_manager (Phase 13.7.1 - opt-in)
         )
         .await;
 
@@ -3567,6 +3633,7 @@ mod tests {
             executor,
             None,
             create_test_session_manager().await,
+            None, // memory_manager (Phase 13.7.1 - opt-in)
         )
         .await
         .unwrap();
@@ -3612,6 +3679,7 @@ mod tests {
             executor,
             None,
             create_test_session_manager().await,
+            None, // memory_manager (Phase 13.7.1 - opt-in)
         )
         .await
         .unwrap();
@@ -3682,6 +3750,7 @@ mod tests {
             executor,
             None,
             create_test_session_manager().await,
+            None, // memory_manager (Phase 13.7.1 - opt-in)
         )
         .await
         .unwrap();
@@ -3728,6 +3797,7 @@ mod tests {
             executor,
             None,
             create_test_session_manager().await,
+            None, // memory_manager (Phase 13.7.1 - opt-in)
         )
         .await
         .unwrap();
@@ -3796,6 +3866,7 @@ mod tests {
             executor,
             None,
             create_test_session_manager().await,
+            None, // memory_manager (Phase 13.7.1 - opt-in)
         )
         .await
         .unwrap();
@@ -3869,6 +3940,7 @@ mod tests {
             executor,
             None,
             create_test_session_manager().await,
+            None, // memory_manager (Phase 13.7.1 - opt-in)
         )
         .await
         .unwrap();
@@ -3921,6 +3993,7 @@ mod tests {
             executor,
             None,
             create_test_session_manager().await,
+            None, // memory_manager (Phase 13.7.1 - opt-in)
         )
         .await
         .unwrap();
@@ -3991,6 +4064,7 @@ async fn test_message_handling_performance() -> Result<()> {
         script_executor,
         None,
         create_test_session_manager().await,
+            None, // memory_manager (Phase 13.7.1 - opt-in)
     )
     .await?;
 
@@ -4102,6 +4176,7 @@ mod daemon_tests {
             script_executor,
             None,
             create_test_session_manager().await,
+            None, // memory_manager (Phase 13.7.1 - opt-in)
         )
         .await
         .unwrap();
@@ -4131,6 +4206,7 @@ mod daemon_tests {
             script_executor,
             None,
             create_test_session_manager().await,
+            None, // memory_manager (Phase 13.7.1 - opt-in)
         )
         .await
         .unwrap();
@@ -4166,6 +4242,7 @@ mod daemon_tests {
             script_executor,
             None,
             create_test_session_manager().await,
+            None, // memory_manager (Phase 13.7.1 - opt-in)
         )
         .await
         .unwrap();
@@ -4251,6 +4328,7 @@ mod daemon_tests {
             script_executor,
             None,
             create_test_session_manager().await,
+            None, // memory_manager (Phase 13.7.1 - opt-in)
         )
         .await
         .unwrap();
@@ -4283,6 +4361,7 @@ mod multi_protocol_tests {
             script_executor.clone(),
             None,
             create_test_session_manager().await,
+            None, // memory_manager (Phase 13.7.1 - opt-in)
         )
         .await
         .unwrap();
@@ -4324,6 +4403,7 @@ mod multi_protocol_tests {
             script_executor.clone(),
             None,
             create_test_session_manager().await,
+            None, // memory_manager (Phase 13.7.1 - opt-in)
         )
         .await
         .unwrap();
@@ -4366,6 +4446,7 @@ mod multi_protocol_tests {
             script_executor.clone(),
             None,
             create_test_session_manager().await,
+            None, // memory_manager (Phase 13.7.1 - opt-in)
         )
         .await
         .unwrap();
@@ -4377,6 +4458,7 @@ mod multi_protocol_tests {
             script_executor,
             None,
             create_test_session_manager().await,
+            None, // memory_manager (Phase 13.7.1 - opt-in)
         )
         .await
         .unwrap();
@@ -4404,6 +4486,7 @@ mod multi_protocol_tests {
                 script_executor.clone(),
                 None,
                 create_test_session_manager().await,
+            None, // memory_manager (Phase 13.7.1 - opt-in)
             )
             .await
             .unwrap(),
@@ -4456,6 +4539,7 @@ mod multi_protocol_tests {
             script_executor.clone(),
             None,
             create_test_session_manager().await,
+            None, // memory_manager (Phase 13.7.1 - opt-in)
         )
         .await
         .unwrap();
@@ -4492,6 +4576,7 @@ mod multi_protocol_tests {
             script_executor.clone(),
             None,
             create_test_session_manager().await,
+            None, // memory_manager (Phase 13.7.1 - opt-in)
         )
         .await
         .unwrap();
@@ -4532,6 +4617,7 @@ mod multi_protocol_tests {
             script_executor.clone(),
             None,
             create_test_session_manager().await,
+            None, // memory_manager (Phase 13.7.1 - opt-in)
         )
         .await
         .unwrap();
@@ -4571,6 +4657,7 @@ mod performance_tests {
             script_executor,
             None,
             create_test_session_manager().await,
+            None, // memory_manager (Phase 13.7.1 - opt-in)
         )
         .await
         .unwrap();
@@ -4664,6 +4751,7 @@ mod performance_tests {
             script_executor.clone(),
             None,
             create_test_session_manager().await,
+            None, // memory_manager (Phase 13.7.1 - opt-in)
         )
         .await
         .unwrap();
@@ -4710,6 +4798,7 @@ mod performance_tests {
                 script_executor,
                 None,
                 create_test_session_manager().await,
+            None, // memory_manager (Phase 13.7.1 - opt-in)
             )
             .await
             .unwrap(),
@@ -4766,6 +4855,7 @@ mod performance_tests {
             script_executor,
             None,
             create_test_session_manager().await,
+            None, // memory_manager (Phase 13.7.1 - opt-in)
         )
         .await
         .unwrap();
@@ -4809,6 +4899,7 @@ mod performance_tests {
             script_executor,
             None,
             create_test_session_manager().await,
+            None, // memory_manager (Phase 13.7.1 - opt-in)
         )
         .await
         .unwrap();
@@ -4910,6 +5001,7 @@ mod security_tests {
             script_executor,
             None,
             create_test_session_manager().await,
+            None, // memory_manager (Phase 13.7.1 - opt-in)
         )
         .await
         .unwrap();
@@ -5055,6 +5147,7 @@ mod security_tests {
             script_executor,
             None,
             create_test_session_manager().await,
+            None, // memory_manager (Phase 13.7.1 - opt-in)
         )
         .await
         .unwrap();
@@ -5111,6 +5204,7 @@ mod security_tests {
             script_executor,
             None,
             create_test_session_manager().await,
+            None, // memory_manager (Phase 13.7.1 - opt-in)
         )
         .await
         .unwrap();
@@ -5164,6 +5258,7 @@ mod security_tests {
             script_executor,
             None,
             create_test_session_manager().await,
+            None, // memory_manager (Phase 13.7.1 - opt-in)
         )
         .await
         .unwrap();

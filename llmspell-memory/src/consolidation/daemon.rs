@@ -76,7 +76,6 @@
 use crate::error::{MemoryError, Result};
 use crate::traits::EpisodicMemory;
 
-use super::llm_engine::LLMConsolidationEngine;
 use super::ConsolidationEngine;
 
 use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
@@ -87,7 +86,7 @@ use tokio::task::JoinHandle;
 use tracing::{debug, error, info, warn};
 
 /// Daemon configuration
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, serde::Deserialize)]
 pub struct DaemonConfig {
     /// Fast interval when >100 unprocessed entries (default: 30s)
     pub fast_interval_secs: u64,
@@ -134,9 +133,9 @@ pub struct DaemonMetrics {
 /// Background consolidation daemon
 ///
 /// Runs in background tokio task, processes unprocessed episodic entries using
-/// LLM consolidation engine with adaptive scheduling and session prioritization.
+/// consolidation engine with adaptive scheduling and session prioritization.
 pub struct ConsolidationDaemon {
-    engine: Arc<LLMConsolidationEngine>,
+    engine: Arc<dyn ConsolidationEngine>,
     episodic_memory: Arc<dyn EpisodicMemory>,
     config: DaemonConfig,
     running: Arc<AtomicBool>,
@@ -157,7 +156,7 @@ enum IterationResult {
 impl ConsolidationDaemon {
     /// Create new consolidation daemon
     pub fn new(
-        engine: Arc<LLMConsolidationEngine>,
+        engine: Arc<dyn ConsolidationEngine>,
         episodic_memory: Arc<dyn EpisodicMemory>,
         config: DaemonConfig,
     ) -> Self {
@@ -517,6 +516,7 @@ impl Drop for OperationGuard {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::consolidation::llm_engine::LLMConsolidationEngine;
     use crate::consolidation::prompts::PromptVersion;
     use crate::consolidation::LLMConsolidationConfig;
     use crate::types::EpisodicEntry;

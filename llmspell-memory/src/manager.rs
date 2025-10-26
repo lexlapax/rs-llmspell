@@ -428,6 +428,24 @@ impl MemoryManager for DefaultMemoryManager {
         debug!("Shutdown complete (no cleanup needed for in-memory backends)");
         Ok(())
     }
+
+    // ========== Phase 13.7.2: Daemon Integration Trait Methods ==========
+
+    fn has_consolidation(&self) -> bool {
+        !self.consolidation.is_noop()
+    }
+
+    fn episodic_arc(&self) -> Option<Arc<dyn EpisodicMemory>> {
+        Some(self.episodic.clone())
+    }
+
+    fn consolidation_engine_arc(&self) -> Option<Arc<dyn ConsolidationEngine>> {
+        if self.has_consolidation() {
+            Some(self.consolidation.clone())
+        } else {
+            None
+        }
+    }
 }
 
 #[cfg(test)]
