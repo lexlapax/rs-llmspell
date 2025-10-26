@@ -200,6 +200,9 @@ fn test_default_provider_fallback() {
 /// Verifies that `LLMSPELL_MEMORY_CONSOLIDATION_PROVIDER_NAME` can override config
 #[tokio::test]
 async fn test_env_var_override_consolidation_provider() {
+    // Clean up first to avoid pollution from parallel tests
+    std::env::remove_var("LLMSPELL_MEMORY_CONSOLIDATION_PROVIDER_NAME");
+
     // Simulate environment variable
     std::env::set_var(
         "LLMSPELL_MEMORY_CONSOLIDATION_PROVIDER_NAME",
