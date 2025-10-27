@@ -61,9 +61,10 @@ pub mod types;
 pub use episodic::InMemoryEpisodicMemory;
 pub use error::{MemoryError, Result};
 pub use manager::DefaultMemoryManager;
+pub use procedural::{InMemoryPatternTracker, NoopProceduralMemory};
 pub use semantic::GraphSemanticMemory;
 pub use traits::{
-    ConsolidationDecision, Entity, EpisodicMemory, MemoryManager, ProceduralMemory, Relationship,
-    SemanticMemory,
+    ConsolidationDecision, Entity, EpisodicMemory, MemoryManager, Pattern, ProceduralMemory,
+    Relationship, SemanticMemory,
 };
 pub use types::{ConsolidationMode, ConsolidationResult, EpisodicEntry};
