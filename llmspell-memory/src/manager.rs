@@ -10,7 +10,7 @@ use tracing::{debug, error, info};
 use crate::consolidation::{ConsolidationEngine, NoopConsolidationEngine};
 use crate::episodic::InMemoryEpisodicMemory;
 use crate::error::Result;
-use crate::procedural::NoopProceduralMemory;
+use crate::procedural::{InMemoryPatternTracker, NoopProceduralMemory};
 use crate::semantic::GraphSemanticMemory;
 use crate::traits::{EpisodicMemory, MemoryManager, ProceduralMemory, SemanticMemory};
 use crate::types::{ConsolidationMode, ConsolidationResult, EpisodicEntry};
@@ -203,8 +203,8 @@ impl DefaultMemoryManager {
 
     /// Helper: Create no-op procedural memory
     fn create_procedural_memory() -> Arc<dyn ProceduralMemory> {
-        debug!("Creating NoopProceduralMemory");
-        Arc::new(NoopProceduralMemory)
+        debug!("Creating InMemoryPatternTracker for procedural memory");
+        Arc::new(InMemoryPatternTracker::new())
     }
 
     // ========== Phase 13.6.4: Kernel Integration API Helpers ==========
