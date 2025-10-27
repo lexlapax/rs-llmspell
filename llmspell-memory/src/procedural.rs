@@ -30,8 +30,9 @@ impl InMemoryPatternTracker {
     }
 
     /// Generate pattern key from scope, key, value
+    /// Uses '|' as delimiter to support scopes with colons (e.g., "session:test-session")
     fn pattern_key(scope: &str, key: &str, value: &str) -> String {
-        format!("{scope}:{key}:{value}")
+        format!("{scope}|{key}|{value}")
     }
 
     /// Get current timestamp in milliseconds since epoch
@@ -91,8 +92,8 @@ impl ProceduralMemory for InMemoryPatternTracker {
                 .iter()
                 .filter(|(_, (freq, _, _))| *freq >= min_frequency)
                 .map(|(key, (freq, first, last))| {
-                    // Parse "scope:key:value" back into components
-                    let parts: Vec<&str> = key.splitn(3, ':').collect();
+                    // Parse "scope|key|value" back into components
+                    let parts: Vec<&str> = key.splitn(3, '|').collect();
                     Pattern {
                         scope: parts[0].to_string(),
                         key: parts[1].to_string(),
