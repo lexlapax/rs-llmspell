@@ -11,19 +11,22 @@ use mlua::Lua;
 use std::sync::Arc;
 
 /// Create a minimal `GlobalContext` for testing
-async fn create_test_context() -> GlobalContext {
+fn create_test_context() -> GlobalContext {
     let registry = Arc::new(ComponentRegistry::new());
     let provider_config = ProviderManagerConfig::default();
-    let providers = Arc::new(ProviderManager::new(provider_config).await.unwrap());
+    let providers = llmspell_kernel::global_io_runtime()
+        .block_on(async { Arc::new(ProviderManager::new(provider_config).await.unwrap()) });
     GlobalContext::new(registry, providers)
 }
 
-#[tokio::test]
-async fn test_memory_global_injection() {
-    // Create memory manager
-    let memory_manager = DefaultMemoryManager::new_in_memory()
-        .await
-        .expect("Failed to create memory manager");
+#[test]
+fn test_memory_global_injection() {
+    // Create memory manager using global runtime
+    let memory_manager = llmspell_kernel::global_io_runtime().block_on(async {
+        DefaultMemoryManager::new_in_memory()
+            .await
+            .expect("Failed to create memory manager")
+    });
 
     // Create bridge
     let memory_bridge = Arc::new(MemoryBridge::new(Arc::new(memory_manager)));
@@ -32,7 +35,7 @@ async fn test_memory_global_injection() {
     let lua = Lua::new();
 
     // Inject Memory global
-    let context = create_test_context().await;
+    let context = create_test_context();
     inject_memory_global(&lua, &context, &memory_bridge).expect("Failed to inject Memory global");
 
     // Verify Memory global exists
@@ -61,14 +64,16 @@ async fn test_memory_global_injection() {
         .expect("Memory.stats should be a function");
 }
 
-#[tokio::test]
-async fn test_memory_episodic_add() {
-    let memory_manager = DefaultMemoryManager::new_in_memory()
-        .await
-        .expect("Failed to create memory manager");
+#[test]
+fn test_memory_episodic_add() {
+    let memory_manager = llmspell_kernel::global_io_runtime().block_on(async {
+        DefaultMemoryManager::new_in_memory()
+            .await
+            .expect("Failed to create memory manager")
+    });
     let memory_bridge = Arc::new(MemoryBridge::new(Arc::new(memory_manager)));
     let lua = Lua::new();
-    let context = create_test_context().await;
+    let context = create_test_context();
 
     inject_memory_global(&lua, &context, &memory_bridge).expect("Failed to inject Memory global");
 
@@ -87,14 +92,16 @@ async fn test_memory_episodic_add() {
     assert!(!id.is_empty(), "ID should not be empty");
 }
 
-#[tokio::test]
-async fn test_memory_episodic_search() {
-    let memory_manager = DefaultMemoryManager::new_in_memory()
-        .await
-        .expect("Failed to create memory manager");
+#[test]
+fn test_memory_episodic_search() {
+    let memory_manager = llmspell_kernel::global_io_runtime().block_on(async {
+        DefaultMemoryManager::new_in_memory()
+            .await
+            .expect("Failed to create memory manager")
+    });
     let memory_bridge = Arc::new(MemoryBridge::new(Arc::new(memory_manager)));
     let lua = Lua::new();
-    let context = create_test_context().await;
+    let context = create_test_context();
 
     inject_memory_global(&lua, &context, &memory_bridge).expect("Failed to inject Memory global");
 
@@ -114,14 +121,16 @@ async fn test_memory_episodic_search() {
     assert!(count > 0, "Should find at least one result");
 }
 
-#[tokio::test]
-async fn test_memory_semantic_query() {
-    let memory_manager = DefaultMemoryManager::new_in_memory()
-        .await
-        .expect("Failed to create memory manager");
+#[test]
+fn test_memory_semantic_query() {
+    let memory_manager = llmspell_kernel::global_io_runtime().block_on(async {
+        DefaultMemoryManager::new_in_memory()
+            .await
+            .expect("Failed to create memory manager")
+    });
     let memory_bridge = Arc::new(MemoryBridge::new(Arc::new(memory_manager)));
     let lua = Lua::new();
-    let context = create_test_context().await;
+    let context = create_test_context();
 
     inject_memory_global(&lua, &context, &memory_bridge).expect("Failed to inject Memory global");
 
@@ -140,14 +149,16 @@ async fn test_memory_semantic_query() {
     assert_eq!(count, 0, "Semantic memory should be empty initially");
 }
 
-#[tokio::test]
-async fn test_memory_consolidate() {
-    let memory_manager = DefaultMemoryManager::new_in_memory()
-        .await
-        .expect("Failed to create memory manager");
+#[test]
+fn test_memory_consolidate() {
+    let memory_manager = llmspell_kernel::global_io_runtime().block_on(async {
+        DefaultMemoryManager::new_in_memory()
+            .await
+            .expect("Failed to create memory manager")
+    });
     let memory_bridge = Arc::new(MemoryBridge::new(Arc::new(memory_manager)));
     let lua = Lua::new();
-    let context = create_test_context().await;
+    let context = create_test_context();
 
     inject_memory_global(&lua, &context, &memory_bridge).expect("Failed to inject Memory global");
 
@@ -164,14 +175,16 @@ async fn test_memory_consolidate() {
     assert_eq!(processed, 0, "No entries to consolidate");
 }
 
-#[tokio::test]
-async fn test_memory_stats() {
-    let memory_manager = DefaultMemoryManager::new_in_memory()
-        .await
-        .expect("Failed to create memory manager");
+#[test]
+fn test_memory_stats() {
+    let memory_manager = llmspell_kernel::global_io_runtime().block_on(async {
+        DefaultMemoryManager::new_in_memory()
+            .await
+            .expect("Failed to create memory manager")
+    });
     let memory_bridge = Arc::new(MemoryBridge::new(Arc::new(memory_manager)));
     let lua = Lua::new();
-    let context = create_test_context().await;
+    let context = create_test_context();
 
     inject_memory_global(&lua, &context, &memory_bridge).expect("Failed to inject Memory global");
 
