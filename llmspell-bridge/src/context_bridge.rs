@@ -240,7 +240,10 @@ impl ContextBridge {
     }
 
     /// Assemble final context from ranked chunks
-    fn assemble_final_context(ranked_chunks: Vec<RankedChunk>, max_tokens: usize) -> AssembledContext {
+    fn assemble_final_context(
+        ranked_chunks: Vec<RankedChunk>,
+        max_tokens: usize,
+    ) -> AssembledContext {
         debug!("Creating ContextAssembler with max_tokens={}", max_tokens);
         let assembler = ContextAssembler::with_config(max_tokens, 0.3);
 
@@ -277,9 +280,7 @@ impl ContextBridge {
             RetrievalStrategy::Episodic | RetrievalStrategy::BM25 => {
                 self.retrieve_episodic(query, max_tokens).await
             }
-            RetrievalStrategy::Semantic => {
-                self.retrieve_semantic(query, max_tokens).await
-            }
+            RetrievalStrategy::Semantic => self.retrieve_semantic(query, max_tokens).await,
             RetrievalStrategy::Hybrid => self.retrieve_hybrid(query, max_tokens).await,
         }
     }
@@ -366,7 +367,10 @@ impl ContextBridge {
     }
 
     /// Convert entities to chunks
-    fn convert_entities_to_chunks(entities: Vec<llmspell_memory::Entity>, max_tokens: usize) -> Vec<Chunk> {
+    fn convert_entities_to_chunks(
+        entities: Vec<llmspell_memory::Entity>,
+        max_tokens: usize,
+    ) -> Vec<Chunk> {
         let chunks: Vec<Chunk> = entities
             .into_iter()
             .take(max_tokens)
