@@ -1752,6 +1752,97 @@ impl<P: Protocol + 'static> IntegratedKernel<P> {
     /// # Errors
     ///
     /// Returns an error if code execution fails
+    /// Fire `PreCodeExecution` hook
+    async fn fire_pre_execution_hook(
+        &self,
+        code: &str,
+        exec_id: &str,
+        args: &HashMap<String, String>,
+    ) {
+        if let Some(ref hooks) = self.hook_system {
+            use crate::hooks::{ComponentId, ComponentType, HookContext, HookPoint};
+            let component_id =
+                ComponentId::new(ComponentType::System, "integrated_kernel".to_string());
+            let mut ctx = HookContext::new(HookPoint::SystemStartup, component_id);
+            ctx.data.insert("code".to_string(), serde_json::json!(code));
+            ctx.data
+                .insert("session_id".to_string(), serde_json::json!(self.session_id));
+            ctx.data
+                .insert("execution_id".to_string(), serde_json::json!(exec_id));
+            ctx.data.insert("args".to_string(), serde_json::json!(args));
+
+            match hooks
+                .execute_hooks(crate::hooks::KernelHookPoint::PreCodeExecution, &mut ctx)
+                .await
+            {
+                Ok(_) => {
+                    debug!("PreCodeExecution hooks executed successfully");
+                }
+                Err(e) => {
+                    error!("PreCodeExecution hook failed: {}", e);
+                    // Continue execution despite hook failure
+                }
+            }
+        }
+    }
+
+    /// Fire `PostCodeExecution` hook
+    async fn fire_post_execution_hook(
+        &self,
+        code: &str,
+        exec_id: &str,
+        args: &HashMap<String, String>,
+        result: &Result<String>,
+    ) {
+        if let Some(ref hooks) = self.hook_system {
+            use crate::hooks::{ComponentId, ComponentType, HookContext, HookPoint};
+            let component_id =
+                ComponentId::new(ComponentType::System, "integrated_kernel".to_string());
+            let mut ctx = HookContext::new(HookPoint::SystemStartup, component_id);
+            ctx.data.insert("code".to_string(), serde_json::json!(code));
+            ctx.data
+                .insert("session_id".to_string(), serde_json::json!(self.session_id));
+            ctx.data
+                .insert("execution_id".to_string(), serde_json::json!(exec_id));
+            ctx.data.insert("args".to_string(), serde_json::json!(args));
+
+            // Add result to context
+            match result {
+                Ok(output) => {
+                    ctx.data
+                        .insert("result".to_string(), serde_json::json!(output));
+                    ctx.data
+                        .insert("success".to_string(), serde_json::json!(true));
+                }
+                Err(e) => {
+                    ctx.data
+                        .insert("error".to_string(), serde_json::json!(e.to_string()));
+                    ctx.data
+                        .insert("success".to_string(), serde_json::json!(false));
+                }
+            }
+
+            match hooks
+                .execute_hooks(crate::hooks::KernelHookPoint::PostCodeExecution, &mut ctx)
+                .await
+            {
+                Ok(_) => {
+                    debug!("PostCodeExecution hooks executed successfully");
+                }
+                Err(e) => {
+                    error!("PostCodeExecution hook failed: {}", e);
+                    // Don't fail the execution if hook fails
+                }
+            }
+        }
+    }
+
+    /// Execute code directly with script arguments
+    /// Used for embedded mode when kernel is not running
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if code execution fails
     pub async fn execute_direct_with_args(
         &mut self,
         code: &str,
@@ -1777,34 +1868,7 @@ impl<P: Protocol + 'static> IntegratedKernel<P> {
         })?;
 
         // Fire PreCodeExecution hook (Phase 13.7.3a)
-        if let Some(ref hooks) = self.hook_system {
-            use crate::hooks::{ComponentId, ComponentType, HookContext, HookPoint};
-            let component_id =
-                ComponentId::new(ComponentType::System, "integrated_kernel".to_string());
-            let mut ctx = HookContext::new(HookPoint::SystemStartup, component_id); // KernelHookPoint converts to HookPoint
-            ctx.data.insert("code".to_string(), serde_json::json!(code));
-            ctx.data
-                .insert("session_id".to_string(), serde_json::json!(self.session_id));
-            ctx.data.insert(
-                "execution_id".to_string(),
-                serde_json::json!(exec_id.clone()),
-            );
-            ctx.data
-                .insert("args".to_string(), serde_json::json!(&args));
-
-            match hooks
-                .execute_hooks(crate::hooks::KernelHookPoint::PreCodeExecution, &mut ctx)
-                .await
-            {
-                Ok(_) => {
-                    debug!("PreCodeExecution hooks executed successfully");
-                }
-                Err(e) => {
-                    error!("PreCodeExecution hook failed: {}", e);
-                    // Continue execution despite hook failure
-                }
-            }
-        }
+        self.fire_pre_execution_hook(code, &exec_id, &args).await;
 
         // Execute code with arguments if provided
         // Clone args for PostCodeExecution hook (Phase 13.7.3a)
@@ -1852,47 +1916,8 @@ impl<P: Protocol + 'static> IntegratedKernel<P> {
         }
 
         // Fire PostCodeExecution hook (Phase 13.7.3a)
-        if let Some(ref hooks) = self.hook_system {
-            use crate::hooks::{ComponentId, ComponentType, HookContext, HookPoint};
-            let component_id =
-                ComponentId::new(ComponentType::System, "integrated_kernel".to_string());
-            let mut ctx = HookContext::new(HookPoint::SystemStartup, component_id);
-            ctx.data.insert("code".to_string(), serde_json::json!(code));
-            ctx.data
-                .insert("session_id".to_string(), serde_json::json!(self.session_id));
-            ctx.data
-                .insert("execution_id".to_string(), serde_json::json!(exec_id));
-            ctx.data
-                .insert("args".to_string(), serde_json::json!(&args_clone));
-            // Add result to context
-            match &result {
-                Ok(output) => {
-                    ctx.data
-                        .insert("result".to_string(), serde_json::json!(output));
-                    ctx.data
-                        .insert("success".to_string(), serde_json::json!(true));
-                }
-                Err(e) => {
-                    ctx.data
-                        .insert("error".to_string(), serde_json::json!(e.to_string()));
-                    ctx.data
-                        .insert("success".to_string(), serde_json::json!(false));
-                }
-            }
-
-            match hooks
-                .execute_hooks(crate::hooks::KernelHookPoint::PostCodeExecution, &mut ctx)
-                .await
-            {
-                Ok(_) => {
-                    debug!("PostCodeExecution hooks executed successfully");
-                }
-                Err(e) => {
-                    error!("PostCodeExecution hook failed: {}", e);
-                    // Don't fail the execution if hook fails
-                }
-            }
-        }
+        self.fire_post_execution_hook(code, &exec_id, &args_clone, &result)
+            .await;
 
         result
     }
@@ -3733,17 +3758,15 @@ mod tests {
         let executor = Arc::new(MockScriptExecutor) as Arc<dyn ScriptExecutor>;
 
         let kernel = IntegratedKernel::new(IntegratedKernelParams {
-            protocol: protocol,
-            config: config,
+            protocol,
+            config,
             session_id: "test-session".to_string(),
             script_executor: executor,
             provider_manager: None,
             session_manager: create_test_session_manager().await,
             memory_manager: None,
-            hook_system: // memory_manager (Phase 13.7.1 - opt-in,
+            hook_system: None,
         })
-            None, // hook_system (Phase 13.7.3a - opt-in)
-        )
         .await;
 
         assert!(kernel.is_ok());
@@ -3759,17 +3782,15 @@ mod tests {
         let executor = Arc::new(MockScriptExecutor) as Arc<dyn ScriptExecutor>;
 
         let mut kernel = IntegratedKernel::new(IntegratedKernelParams {
-            protocol: protocol,
-            config: config,
+            protocol,
+            config,
             session_id: "test-session".to_string(),
             script_executor: executor,
             provider_manager: None,
             session_manager: create_test_session_manager().await,
             memory_manager: None,
-            hook_system: // memory_manager (Phase 13.7.1 - opt-in,
+            hook_system: None,
         })
-            None, // hook_system (Phase 13.7.3a - opt-in)
-        )
         .await
         .unwrap();
 
@@ -3808,17 +3829,15 @@ mod tests {
         let executor = Arc::new(MockScriptExecutor);
 
         let kernel = IntegratedKernel::new(IntegratedKernelParams {
-            protocol: protocol,
-            config: config,
-            session_id: session_id,
+            protocol,
+            config,
+            session_id,
             script_executor: executor,
             provider_manager: None,
             session_manager: create_test_session_manager().await,
             memory_manager: None,
-            hook_system: // memory_manager (Phase 13.7.1 - opt-in,
+            hook_system: None,
         })
-            None, // hook_system (Phase 13.7.3a - opt-in)
-        )
         .await
         .unwrap();
 
@@ -3882,17 +3901,15 @@ mod tests {
         let executor = Arc::new(MockScriptExecutor);
 
         let mut kernel = IntegratedKernel::new(IntegratedKernelParams {
-            protocol: protocol,
-            config: config,
-            session_id: session_id,
+            protocol,
+            config,
+            session_id,
             script_executor: executor,
             provider_manager: None,
             session_manager: create_test_session_manager().await,
             memory_manager: None,
-            hook_system: // memory_manager (Phase 13.7.1 - opt-in,
+            hook_system: None,
         })
-            None, // hook_system (Phase 13.7.3a - opt-in)
-        )
         .await
         .unwrap();
 
@@ -3932,17 +3949,15 @@ mod tests {
         let executor = Arc::new(MockScriptExecutor);
 
         let kernel = IntegratedKernel::new(IntegratedKernelParams {
-            protocol: protocol,
-            config: config,
-            session_id: session_id,
+            protocol,
+            config,
+            session_id,
             script_executor: executor,
             provider_manager: None,
             session_manager: create_test_session_manager().await,
             memory_manager: None,
-            hook_system: // memory_manager (Phase 13.7.1 - opt-in,
+            hook_system: None,
         })
-            None, // hook_system (Phase 13.7.3a - opt-in)
-        )
         .await
         .unwrap();
 
@@ -4004,17 +4019,15 @@ mod tests {
         let executor = Arc::new(MockScriptExecutor);
 
         let kernel = IntegratedKernel::new(IntegratedKernelParams {
-            protocol: protocol,
-            config: config,
-            session_id: session_id,
+            protocol,
+            config,
+            session_id,
             script_executor: executor,
             provider_manager: None,
             session_manager: create_test_session_manager().await,
             memory_manager: None,
-            hook_system: // memory_manager (Phase 13.7.1 - opt-in,
+            hook_system: None,
         })
-            None, // hook_system (Phase 13.7.3a - opt-in)
-        )
         .await
         .unwrap();
 
@@ -4081,17 +4094,15 @@ mod tests {
         let executor = Arc::new(MockScriptExecutor);
 
         let _kernel = IntegratedKernel::new(IntegratedKernelParams {
-            protocol: protocol,
-            config: config,
-            session_id: session_id,
+            protocol,
+            config,
+            session_id,
             script_executor: executor,
             provider_manager: None,
             session_manager: create_test_session_manager().await,
             memory_manager: None,
-            hook_system: // memory_manager (Phase 13.7.1 - opt-in,
+            hook_system: None,
         })
-            None, // hook_system (Phase 13.7.3a - opt-in)
-        )
         .await
         .unwrap();
 
@@ -4137,17 +4148,15 @@ mod tests {
         let executor = Arc::new(MockScriptExecutor);
 
         let kernel = IntegratedKernel::new(IntegratedKernelParams {
-            protocol: protocol,
-            config: config,
-            session_id: session_id,
+            protocol,
+            config,
+            session_id,
             script_executor: executor,
             provider_manager: None,
             session_manager: create_test_session_manager().await,
             memory_manager: None,
-            hook_system: // memory_manager (Phase 13.7.1 - opt-in,
+            hook_system: None,
         })
-            None, // hook_system (Phase 13.7.3a - opt-in)
-        )
         .await
         .unwrap();
 
@@ -4211,17 +4220,15 @@ async fn test_message_handling_performance() -> Result<()> {
     let script_executor = Arc::new(tests::MockScriptExecutor) as Arc<dyn ScriptExecutor>;
 
     let mut kernel = IntegratedKernel::new(IntegratedKernelParams {
-            protocol: protocol,
-            config: config,
-            session_id: session_id,
-            script_executor: script_executor,
-            provider_manager: None,
-            session_manager: create_test_session_manager().await,
-            memory_manager: None,
-            hook_system: // memory_manager (Phase 13.7.1 - opt-in,
-        })
-        None, // hook_system (Phase 13.7.3a - opt-in)
-    )
+        protocol,
+        config,
+        session_id,
+        script_executor,
+        provider_manager: None,
+        session_manager: create_test_session_manager().await,
+        memory_manager: None,
+        hook_system: None,
+    })
     .await?;
 
     // Create a simple kernel_info_request message (faster than execute_request)
@@ -4326,17 +4333,15 @@ mod daemon_tests {
         );
 
         let mut kernel = IntegratedKernel::new(IntegratedKernelParams {
-            protocol: protocol,
-            config: config,
+            protocol,
+            config,
             session_id: "test-session".to_string(),
-            script_executor: script_executor,
+            script_executor,
             provider_manager: None,
             session_manager: create_test_session_manager().await,
             memory_manager: None,
-            hook_system: // memory_manager (Phase 13.7.1 - opt-in,
+            hook_system: None,
         })
-            None, // hook_system (Phase 13.7.3a - opt-in)
-        )
         .await
         .unwrap();
 
@@ -4359,17 +4364,15 @@ mod daemon_tests {
         );
 
         let mut kernel = IntegratedKernel::new(IntegratedKernelParams {
-            protocol: protocol,
-            config: config,
+            protocol,
+            config,
             session_id: "test-session".to_string(),
-            script_executor: script_executor,
+            script_executor,
             provider_manager: None,
             session_manager: create_test_session_manager().await,
             memory_manager: None,
-            hook_system: // memory_manager (Phase 13.7.1 - opt-in,
+            hook_system: None,
         })
-            None, // hook_system (Phase 13.7.3a - opt-in)
-        )
         .await
         .unwrap();
 
@@ -4398,17 +4401,15 @@ mod daemon_tests {
         );
 
         let kernel = IntegratedKernel::new(IntegratedKernelParams {
-            protocol: protocol,
-            config: config,
+            protocol,
+            config,
             session_id: "test-session".to_string(),
-            script_executor: script_executor,
+            script_executor,
             provider_manager: None,
             session_manager: create_test_session_manager().await,
             memory_manager: None,
-            hook_system: // memory_manager (Phase 13.7.1 - opt-in,
+            hook_system: None,
         })
-            None, // hook_system (Phase 13.7.3a - opt-in)
-        )
         .await
         .unwrap();
 
@@ -4487,17 +4488,15 @@ mod daemon_tests {
         );
 
         let kernel = IntegratedKernel::new(IntegratedKernelParams {
-            protocol: protocol,
-            config: config,
+            protocol,
+            config,
             session_id: "test-session".to_string(),
-            script_executor: script_executor,
+            script_executor,
             provider_manager: None,
             session_manager: create_test_session_manager().await,
             memory_manager: None,
-            hook_system: // memory_manager (Phase 13.7.1 - opt-in,
+            hook_system: None,
         })
-            None, // hook_system (Phase 13.7.3a - opt-in)
-        )
         .await
         .unwrap();
 
@@ -4530,10 +4529,8 @@ mod multi_protocol_tests {
             provider_manager: None,
             session_manager: create_test_session_manager().await,
             memory_manager: None,
-            hook_system: // memory_manager (Phase 13.7.1 - opt-in,
+            hook_system: None,
         })
-            None, // hook_system (Phase 13.7.3a - opt-in)
-        )
         .await
         .unwrap();
 
@@ -4575,10 +4572,8 @@ mod multi_protocol_tests {
             provider_manager: None,
             session_manager: create_test_session_manager().await,
             memory_manager: None,
-            hook_system: // memory_manager (Phase 13.7.1 - opt-in,
+            hook_system: None,
         })
-            None, // hook_system (Phase 13.7.3a - opt-in)
-        )
         .await
         .unwrap();
 
@@ -4621,25 +4616,21 @@ mod multi_protocol_tests {
             provider_manager: None,
             session_manager: create_test_session_manager().await,
             memory_manager: None,
-            hook_system: // memory_manager (Phase 13.7.1 - opt-in,
+            hook_system: None,
         })
-            None, // hook_system (Phase 13.7.3a - opt-in)
-        )
         .await
         .unwrap();
 
         let kernel2 = IntegratedKernel::new(IntegratedKernelParams {
             protocol: protocol2,
-            config: config,
+            config,
             session_id: "iso2".to_string(),
-            script_executor: script_executor,
+            script_executor,
             provider_manager: None,
             session_manager: create_test_session_manager().await,
             memory_manager: None,
-            hook_system: // memory_manager (Phase 13.7.1 - opt-in,
+            hook_system: None,
         })
-            None, // hook_system (Phase 13.7.3a - opt-in)
-        )
         .await
         .unwrap();
 
@@ -4660,17 +4651,15 @@ mod multi_protocol_tests {
 
         let kernel = Arc::new(tokio::sync::Mutex::new(
             IntegratedKernel::new(IntegratedKernelParams {
-            protocol: protocol,
-            config: config,
-            session_id: "concurrent-test".to_string(),
-            script_executor: script_executor.clone(),
-            provider_manager: None,
-            session_manager: create_test_session_manager().await,
-            memory_manager: None,
-            hook_system: // memory_manager (Phase 13.7.1 - opt-in,
-        })
-                None, // hook_system (Phase 13.7.3a - opt-in)
-            )
+                protocol,
+                config,
+                session_id: "concurrent-test".to_string(),
+                script_executor: script_executor.clone(),
+                provider_manager: None,
+                session_manager: create_test_session_manager().await,
+                memory_manager: None,
+                hook_system: None,
+            })
             .await
             .unwrap(),
         ));
@@ -4716,17 +4705,15 @@ mod multi_protocol_tests {
         );
 
         let mut kernel = IntegratedKernel::new(IntegratedKernelParams {
-            protocol: protocol,
-            config: config,
+            protocol,
+            config,
             session_id: "error-test".to_string(),
             script_executor: script_executor.clone(),
             provider_manager: None,
             session_manager: create_test_session_manager().await,
             memory_manager: None,
-            hook_system: // memory_manager (Phase 13.7.1 - opt-in,
+            hook_system: None,
         })
-            None, // hook_system (Phase 13.7.3a - opt-in)
-        )
         .await
         .unwrap();
 
@@ -4757,16 +4744,14 @@ mod multi_protocol_tests {
 
         let mut kernel = IntegratedKernel::new(IntegratedKernelParams {
             protocol: protocol.clone(),
-            config: config,
+            config,
             session_id: "state-test".to_string(),
             script_executor: script_executor.clone(),
             provider_manager: None,
             session_manager: create_test_session_manager().await,
             memory_manager: None,
-            hook_system: // memory_manager (Phase 13.7.1 - opt-in,
+            hook_system: None,
         })
-            None, // hook_system (Phase 13.7.3a - opt-in)
-        )
         .await
         .unwrap();
 
@@ -4801,16 +4786,14 @@ mod multi_protocol_tests {
 
         let kernel = IntegratedKernel::new(IntegratedKernelParams {
             protocol: jupyter_protocol,
-            config: config,
+            config,
             session_id: "share-test".to_string(),
             script_executor: script_executor.clone(),
             provider_manager: None,
             session_manager: create_test_session_manager().await,
             memory_manager: None,
-            hook_system: // memory_manager (Phase 13.7.1 - opt-in,
+            hook_system: None,
         })
-            None, // hook_system (Phase 13.7.3a - opt-in)
-        )
         .await
         .unwrap();
 
@@ -4843,17 +4826,15 @@ mod performance_tests {
         );
 
         let mut kernel = IntegratedKernel::new(IntegratedKernelParams {
-            protocol: protocol,
-            config: config,
+            protocol,
+            config,
             session_id: "perf-test".to_string(),
-            script_executor: script_executor,
+            script_executor,
             provider_manager: None,
             session_manager: create_test_session_manager().await,
             memory_manager: None,
-            hook_system: // memory_manager (Phase 13.7.1 - opt-in,
+            hook_system: None,
         })
-            None, // hook_system (Phase 13.7.3a - opt-in)
-        )
         .await
         .unwrap();
 
@@ -4940,17 +4921,15 @@ mod performance_tests {
         );
 
         let kernel = IntegratedKernel::new(IntegratedKernelParams {
-            protocol: protocol,
+            protocol,
             config: config.clone(),
             session_id: "mem-test".to_string(),
             script_executor: script_executor.clone(),
             provider_manager: None,
             session_manager: create_test_session_manager().await,
             memory_manager: None,
-            hook_system: // memory_manager (Phase 13.7.1 - opt-in,
+            hook_system: None,
         })
-            None, // hook_system (Phase 13.7.3a - opt-in)
-        )
         .await
         .unwrap();
 
@@ -4990,17 +4969,15 @@ mod performance_tests {
 
         let kernel = Arc::new(tokio::sync::Mutex::new(
             IntegratedKernel::new(IntegratedKernelParams {
-            protocol: protocol,
-            config: config,
-            session_id: "throughput-test".to_string(),
-            script_executor: script_executor,
-            provider_manager: None,
-            session_manager: create_test_session_manager().await,
-            memory_manager: None,
-            hook_system: // memory_manager (Phase 13.7.1 - opt-in,
-        })
-                None, // hook_system (Phase 13.7.3a - opt-in)
-            )
+                protocol,
+                config,
+                session_id: "throughput-test".to_string(),
+                script_executor,
+                provider_manager: None,
+                session_manager: create_test_session_manager().await,
+                memory_manager: None,
+                hook_system: None,
+            })
             .await
             .unwrap(),
         ));
@@ -5050,17 +5027,15 @@ mod performance_tests {
         );
 
         let mut kernel = IntegratedKernel::new(IntegratedKernelParams {
-            protocol: protocol,
-            config: config,
+            protocol,
+            config,
             session_id: "state-perf-test".to_string(),
-            script_executor: script_executor,
+            script_executor,
             provider_manager: None,
             session_manager: create_test_session_manager().await,
             memory_manager: None,
-            hook_system: // memory_manager (Phase 13.7.1 - opt-in,
+            hook_system: None,
         })
-            None, // hook_system (Phase 13.7.3a - opt-in)
-        )
         .await
         .unwrap();
 
@@ -5097,17 +5072,15 @@ mod performance_tests {
         );
 
         let mut kernel = IntegratedKernel::new(IntegratedKernelParams {
-            protocol: protocol,
-            config: config,
+            protocol,
+            config,
             session_id: "timeout-test".to_string(),
-            script_executor: script_executor,
+            script_executor,
             provider_manager: None,
             session_manager: create_test_session_manager().await,
             memory_manager: None,
-            hook_system: // memory_manager (Phase 13.7.1 - opt-in,
+            hook_system: None,
         })
-            None, // hook_system (Phase 13.7.3a - opt-in)
-        )
         .await
         .unwrap();
 
@@ -5202,17 +5175,15 @@ mod security_tests {
         );
 
         let mut kernel = IntegratedKernel::new(IntegratedKernelParams {
-            protocol: protocol,
-            config: config,
+            protocol,
+            config,
             session_id: "validation-test".to_string(),
-            script_executor: script_executor,
+            script_executor,
             provider_manager: None,
             session_manager: create_test_session_manager().await,
             memory_manager: None,
-            hook_system: // memory_manager (Phase 13.7.1 - opt-in,
+            hook_system: None,
         })
-            None, // hook_system (Phase 13.7.3a - opt-in)
-        )
         .await
         .unwrap();
 
@@ -5351,17 +5322,15 @@ mod security_tests {
         );
 
         let mut kernel = IntegratedKernel::new(IntegratedKernelParams {
-            protocol: protocol,
-            config: config,
+            protocol,
+            config,
             session_id: "sanitize-test".to_string(),
-            script_executor: script_executor,
+            script_executor,
             provider_manager: None,
             session_manager: create_test_session_manager().await,
             memory_manager: None,
-            hook_system: // memory_manager (Phase 13.7.1 - opt-in,
+            hook_system: None,
         })
-            None, // hook_system (Phase 13.7.3a - opt-in)
-        )
         .await
         .unwrap();
 
@@ -5411,17 +5380,15 @@ mod security_tests {
         );
 
         let mut kernel = IntegratedKernel::new(IntegratedKernelParams {
-            protocol: protocol,
-            config: config,
+            protocol,
+            config,
             session_id: "limits-test".to_string(),
-            script_executor: script_executor,
+            script_executor,
             provider_manager: None,
             session_manager: create_test_session_manager().await,
             memory_manager: None,
-            hook_system: // memory_manager (Phase 13.7.1 - opt-in,
+            hook_system: None,
         })
-            None, // hook_system (Phase 13.7.3a - opt-in)
-        )
         .await
         .unwrap();
 
@@ -5468,17 +5435,15 @@ mod security_tests {
         );
 
         let kernel = IntegratedKernel::new(IntegratedKernelParams {
-            protocol: protocol,
-            config: config,
+            protocol,
+            config,
             session_id: "isolation-test".to_string(),
-            script_executor: script_executor,
+            script_executor,
             provider_manager: None,
             session_manager: create_test_session_manager().await,
             memory_manager: None,
-            hook_system: // memory_manager (Phase 13.7.1 - opt-in,
+            hook_system: None,
         })
-            None, // hook_system (Phase 13.7.3a - opt-in)
-        )
         .await
         .unwrap();
 
@@ -5506,7 +5471,7 @@ mod security_tests {
         assert!(
             kernel.validate_message_for_channel(
                 "control",
-                &json!({"msg_type": "shutdown_request", "content": {"restart": false}})
+                &json!({"msg_type": "shutdown_request", "content": {"restart": false}}),
             ),
             "Control channel should accept control messages"
         );

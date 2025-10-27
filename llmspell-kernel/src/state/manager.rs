@@ -176,7 +176,6 @@ pub struct StateManager {
 }
 
 impl std::fmt::Debug for StateManager {
-    #[allow(clippy::missing_fields_in_debug)]
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         f.debug_struct("StateManager")
             .field("persistence_enabled", &self.persistence_config.enabled)
@@ -189,7 +188,7 @@ impl std::fmt::Debug for StateManager {
                 "hook_count_after",
                 &self.after_state_change_hooks.read().len(),
             )
-            .finish()
+            .finish_non_exhaustive()
     }
 }
 
@@ -268,7 +267,7 @@ impl StateManager {
     ///
     /// # Arguments
     ///
-    /// * `backend_type` - Storage backend type (Memory, Sled, RocksDB)
+    /// * `backend_type` - Storage backend type (Memory, Sled, `RocksDB`)
     /// * `config` - Persistence configuration
     /// * `memory_manager` - Optional memory manager for state-memory synchronization (Phase 13.7.4)
     ///

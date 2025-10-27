@@ -1020,16 +1020,16 @@ async fn start_embedded_kernel_with_executor_and_provider_internal(
     let session_manager_clone = session_manager.clone();
 
     // Create integrated kernel with the provided executor and shared SessionManager
-    let mut kernel = IntegratedKernel::new(
-        protocol.clone(),
-        exec_config.clone(),
-        session_id.clone(),
+    let mut kernel = IntegratedKernel::new(crate::execution::IntegratedKernelParams {
+        protocol: protocol.clone(),
+        config: exec_config.clone(),
+        session_id: session_id.clone(),
         script_executor,
-        Some(provider_manager),
+        provider_manager: Some(provider_manager),
         session_manager,
-        None, // memory_manager (Phase 13.7.1 - opt-in)
-        None, // hook_system (Phase 13.7.3a - opt-in)
-    )
+        memory_manager: None, // memory_manager (Phase 13.7.1 - opt-in)
+        hook_system: None,    // hook_system (Phase 13.7.3a - opt-in)
+    })
     .await?;
 
     // Set kernel transport for kernel message processing
@@ -1052,16 +1052,16 @@ async fn start_embedded_kernel_with_executor_and_provider_internal(
     // For embedded mode, create a minimal kernel handle that only contains what's needed for message sending
     // The actual kernel is running in the background spawn
     // IMPORTANT: Use the same shared SessionManager - DO NOT create a new one!
-    let dummy_kernel = IntegratedKernel::new(
-        protocol.clone(),
-        exec_config.clone(),
-        format!("dummy-{session_id}"),
-        script_executor_clone,
-        Some(provider_manager_clone),
-        session_manager_clone,
-        None, // memory_manager (Phase 13.7.1 - opt-in)
-        None, // hook_system (Phase 13.7.3a - opt-in)
-    )
+    let dummy_kernel = IntegratedKernel::new(crate::execution::IntegratedKernelParams {
+        protocol: protocol.clone(),
+        config: exec_config.clone(),
+        session_id: format!("dummy-{session_id}"),
+        script_executor: script_executor_clone,
+        provider_manager: Some(provider_manager_clone),
+        session_manager: session_manager_clone,
+        memory_manager: None, // memory_manager (Phase 13.7.1 - opt-in)
+        hook_system: None,    // hook_system (Phase 13.7.3a - opt-in)
+    })
     .await?;
 
     let transport_arc = Arc::new(client_transport);
@@ -1333,16 +1333,16 @@ pub async fn start_kernel_service_with_config(
     let _session_id_obj = session_manager.create_session(session_options).await?;
 
     // Create integrated kernel with protocol that has the HMAC key
-    let mut kernel = IntegratedKernel::new(
-        protocol.clone(),
-        config.exec_config.clone(),
+    let mut kernel = IntegratedKernel::new(crate::execution::IntegratedKernelParams {
+        protocol: protocol.clone(),
+        config: config.exec_config.clone(),
         session_id,
-        config.script_executor,
-        None,
+        script_executor: config.script_executor,
+        provider_manager: None,
         session_manager,
-        None, // memory_manager (Phase 13.7.1 - opt-in)
-        None, // hook_system (Phase 13.7.3a - opt-in)
-    )
+        memory_manager: None, // memory_manager (Phase 13.7.1 - opt-in)
+        hook_system: None,    // hook_system (Phase 13.7.3a - opt-in)
+    })
     .await?;
 
     // Set the transport on the kernel
@@ -1693,16 +1693,16 @@ pub async fn start_kernel_service(port: u16, config: LLMSpellConfig) -> Result<S
     let _session_id_obj = session_manager.create_session(session_options).await?;
 
     // Create integrated kernel
-    let kernel = IntegratedKernel::new(
+    let kernel = IntegratedKernel::new(crate::execution::IntegratedKernelParams {
         protocol,
-        exec_config,
+        config: exec_config,
         session_id,
         script_executor,
-        None,
+        provider_manager: None,
         session_manager,
-        None, // memory_manager (Phase 13.7.1 - opt-in)
-        None, // hook_system (Phase 13.7.3a - opt-in)
-    )
+        memory_manager: None, // memory_manager (Phase 13.7.1 - opt-in)
+        hook_system: None,    // hook_system (Phase 13.7.3a - opt-in)
+    })
     .await?;
     // Note: Service kernels don't need transport set here as they use external connections
 

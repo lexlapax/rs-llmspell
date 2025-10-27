@@ -158,6 +158,5 @@ fn test_backward_compat_documented() {
     //
     // All existing code passing None continues to work unchanged.
 
-    // This is a documentation test - always passes
-    assert!(true, "Backward compatibility design documented");
+    // This is a documentation test that validates by compiling successfully
 }

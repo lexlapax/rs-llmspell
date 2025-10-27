@@ -6,4 +6,4 @@
 
 pub mod integrated;
 
-pub use integrated::{ExecutionConfig, IOConfig, IntegratedKernel};
+pub use integrated::{ExecutionConfig, IOConfig, IntegratedKernel, IntegratedKernelParams};

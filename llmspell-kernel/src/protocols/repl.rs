@@ -648,16 +648,16 @@ mod tests {
         let protocol = JupyterProtocol::new("test-session".to_string(), "test-kernel".to_string());
         let exec_config = ExecutionConfig::default();
         let kernel = Arc::new(
-            IntegratedKernel::new(
+            IntegratedKernel::new(crate::execution::IntegratedKernelParams {
                 protocol,
-                exec_config,
-                "test-session".to_string(),
+                config: exec_config,
+                session_id: "test-session".to_string(),
                 script_executor,
-                None,
-                create_test_session_manager().await,
-                None, // memory_manager (Phase 13.7.1 - opt-in)
-                None, // hook_system (Phase 13.7.3a - opt-in)
-            )
+                provider_manager: None,
+                session_manager: create_test_session_manager().await,
+                memory_manager: None, // memory_manager (Phase 13.7.1 - opt-in)
+                hook_system: None,    // hook_system (Phase 13.7.3a - opt-in)
+            })
             .await
             .unwrap(),
         );
