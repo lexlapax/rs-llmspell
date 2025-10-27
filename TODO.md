@@ -6442,6 +6442,8 @@ cargo test -p llmspell-bridge memory_global_test --features common
 **Definition of Done**:
 - [ ] ContextGlobal registered as 18th global
 - [ ] All Lua API methods functional and tested
+- [ ] All existing Tests in llmspell-bridge for all-features run (regression test)
+- [ ] Zero Clippy warnings (proper fixes, no allows if possible)
 - [ ] Documentation generated from Rust docs
 - [ ] Examples added to user guide
 
@@ -6622,6 +6624,7 @@ cargo test -p llmspell-bridge memory_global_test --features common
 - [ ] Global dependency test passes (Context depends on Memory)
 - [ ] All integration tests run in <5 seconds (InMemoryEpisodicMemory fast)
 - [ ] CI integration complete (cargo test --package llmspell-bridge --test integration)
+- [ ] Zero Clippy warnings (proper fixes, no allows if possible)
 
 ---
 

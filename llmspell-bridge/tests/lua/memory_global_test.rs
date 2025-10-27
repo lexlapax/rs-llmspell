@@ -10,7 +10,7 @@ use llmspell_memory::DefaultMemoryManager;
 use mlua::Lua;
 use std::sync::Arc;
 
-/// Create a minimal GlobalContext for testing
+/// Create a minimal `GlobalContext` for testing
 async fn create_test_context() -> GlobalContext {
     let registry = Arc::new(ComponentRegistry::new());
     let provider_config = ProviderManagerConfig::default();

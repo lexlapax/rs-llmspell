@@ -5,7 +5,7 @@ use llmspell_context::{
     assembly::ContextAssembler,
     reranking::BM25Reranker,
     traits::Reranker,
-    types::{Chunk, QueryIntent, QueryUnderstanding},
+    types::{AssembledContext, Chunk, QueryIntent, QueryUnderstanding, RankedChunk},
 };
 use llmspell_memory::MemoryManager;
 use serde_json::Value;
@@ -130,7 +130,17 @@ impl ContextBridge {
             query, strategy, max_tokens, session_id
         );
 
-        // Validate token budget
+        Self::validate_token_budget(max_tokens)?;
+        let strategy_enum = Self::parse_strategy(strategy)?;
+
+        self.runtime.block_on(async {
+            self.assemble_context_async(query, strategy_enum, max_tokens, session_id)
+                .await
+        })
+    }
+
+    /// Validate token budget constraints
+    fn validate_token_budget(max_tokens: usize) -> Result<(), String> {
         if max_tokens < 100 {
             error!("Token budget too low: {}", max_tokens);
             return Err(format!("Token budget must be >=100, got {max_tokens}"));
@@ -141,85 +151,114 @@ impl ContextBridge {
                 max_tokens
             );
         }
+        Ok(())
+    }
 
-        // Validate and parse strategy
-        let strategy_enum = match strategy {
-            "episodic" => {
-                debug!("Using Episodic retrieval strategy");
-                RetrievalStrategy::Episodic
-            }
-            "semantic" => {
-                debug!("Using Semantic retrieval strategy");
-                RetrievalStrategy::Semantic
-            }
-            "hybrid" => {
-                debug!("Using Hybrid retrieval strategy");
-                RetrievalStrategy::Hybrid
-            }
+    /// Parse and validate retrieval strategy string
+    fn parse_strategy(strategy: &str) -> Result<RetrievalStrategy, String> {
+        let result = match strategy {
+            "episodic" => Ok(RetrievalStrategy::Episodic),
+            "semantic" => Ok(RetrievalStrategy::Semantic),
+            "hybrid" => Ok(RetrievalStrategy::Hybrid),
             _ => {
                 error!("Invalid strategy: '{}'", strategy);
-                return Err(format!(
+                Err(format!(
                     "Unknown strategy '{strategy}'. Valid: episodic, semantic, hybrid"
-                ));
+                ))
             }
         };
 
-        self.runtime.block_on(async {
-            debug!("Entering async context assembly");
+        if let Ok(ref strat) = result {
+            debug!("Using {:?} retrieval strategy", strat);
+        }
 
-            // Retrieve chunks based on strategy
-            let chunks = self
-                .retrieve_chunks(query, strategy_enum, max_tokens, session_id)
-                .await?;
+        result
+    }
 
-            debug!("Retrieved {} chunks", chunks.len());
+    /// Async context assembly pipeline
+    async fn assemble_context_async(
+        &self,
+        query: &str,
+        strategy: RetrievalStrategy,
+        max_tokens: usize,
+        session_id: Option<&str>,
+    ) -> Result<Value, String> {
+        debug!("Entering async context assembly");
 
-            if chunks.is_empty() {
-                warn!("No chunks retrieved for query '{}'", query);
-                return Ok(serde_json::json!({
-                    "chunks": [],
-                    "total_confidence": 0.0,
-                    "temporal_span": [null, null],
-                    "token_count": 0,
-                    "formatted": ""
-                }));
-            }
+        let chunks = self
+            .retrieve_chunks(query, strategy, max_tokens, session_id)
+            .await?;
 
-            // Component 2: BM25Reranker (stateless, Phase 13 uses BM25-only)
-            debug!("Creating BM25Reranker for reranking");
-            let reranker = BM25Reranker::new();
-            let ranked_chunks = reranker
-                .rerank(chunks, query, max_tokens / 2)
-                .await
-                .map_err(|e| format!("Reranking failed: {e}"))?;
+        debug!("Retrieved {} chunks", chunks.len());
 
-            debug!("Reranked to {} top chunks", ranked_chunks.len());
+        if chunks.is_empty() {
+            return Ok(Self::create_empty_context(query));
+        }
 
-            // Component 3: ContextAssembler (stateless, token budget management)
-            debug!("Creating ContextAssembler with max_tokens={}", max_tokens);
-            let assembler = ContextAssembler::with_config(max_tokens, 0.3);
+        self.rerank_and_assemble(chunks, query, max_tokens).await
+    }
 
-            // Create dummy query understanding (not used in Phase 13)
-            let query_understanding = QueryUnderstanding {
-                intent: QueryIntent::Unknown,
-                entities: vec![],
-                keywords: vec![],
-            };
-
-            let context = assembler.assemble(ranked_chunks, &query_understanding);
-
-            debug!(
-                "Assembled context with {} chunks, {} tokens",
-                context.chunks.len(),
-                context.token_count
-            );
-
-            // Convert to JSON for bridge return
-            let result = serde_json::to_value(&context)
-                .map_err(|e| format!("JSON conversion failed: {e}"))?;
-
-            Ok(result)
+    /// Create empty context response
+    fn create_empty_context(query: &str) -> Value {
+        warn!("No chunks retrieved for query '{}'", query);
+        serde_json::json!({
+            "chunks": [],
+            "total_confidence": 0.0,
+            "temporal_span": [null, null],
+            "token_count": 0,
+            "formatted": ""
         })
+    }
+
+    /// Rerank chunks and assemble final context
+    async fn rerank_and_assemble(
+        &self,
+        chunks: Vec<Chunk>,
+        query: &str,
+        max_tokens: usize,
+    ) -> Result<Value, String> {
+        let ranked_chunks = Self::rerank_chunks(chunks, query, max_tokens).await?;
+        let context = Self::assemble_final_context(ranked_chunks, max_tokens);
+        serde_json::to_value(&context).map_err(|e| format!("JSON conversion failed: {e}"))
+    }
+
+    /// Rerank chunks using BM25
+    async fn rerank_chunks(
+        chunks: Vec<Chunk>,
+        query: &str,
+        max_tokens: usize,
+    ) -> Result<Vec<RankedChunk>, String> {
+        debug!("Creating BM25Reranker for reranking");
+        let reranker = BM25Reranker::new();
+        let ranked_chunks = reranker
+            .rerank(chunks, query, max_tokens / 2)
+            .await
+            .map_err(|e| format!("Reranking failed: {e}"))?;
+
+        debug!("Reranked to {} top chunks", ranked_chunks.len());
+        Ok(ranked_chunks)
+    }
+
+    /// Assemble final context from ranked chunks
+    fn assemble_final_context(ranked_chunks: Vec<RankedChunk>, max_tokens: usize) -> AssembledContext {
+        debug!("Creating ContextAssembler with max_tokens={}", max_tokens);
+        let assembler = ContextAssembler::with_config(max_tokens, 0.3);
+
+        let query_understanding = QueryUnderstanding {
+            intent: QueryIntent::Unknown,
+            entities: vec![],
+            keywords: vec![],
+        };
+
+        let context = assembler.assemble(ranked_chunks, &query_understanding);
+
+        debug!(
+            "Assembled context with {} chunks, {} tokens",
+            context.chunks.len(),
+            context.token_count
+        );
+
+        context
     }
 
     /// Retrieve chunks from memory based on strategy
@@ -232,36 +271,34 @@ impl ContextBridge {
         max_tokens: usize,
         _session_id: Option<&str>,
     ) -> Result<Vec<Chunk>, String> {
+        debug!("Retrieving chunks using {:?} strategy", strategy);
+
         match strategy {
-            RetrievalStrategy::Episodic => {
-                debug!("Retrieving from episodic memory");
+            RetrievalStrategy::Episodic | RetrievalStrategy::BM25 => {
                 self.retrieve_episodic(query, max_tokens).await
             }
             RetrievalStrategy::Semantic => {
-                debug!("Retrieving from semantic memory");
                 self.retrieve_semantic(query, max_tokens).await
             }
-            RetrievalStrategy::Hybrid => {
-                debug!("Retrieving from both episodic and semantic memory (hybrid strategy)");
-                let mut episodic_chunks = self.retrieve_episodic(query, max_tokens / 2).await?;
-                let semantic_chunks = self.retrieve_semantic(query, max_tokens / 2).await?;
-
-                debug!(
-                    "Hybrid: {} episodic + {} semantic chunks",
-                    episodic_chunks.len(),
-                    semantic_chunks.len()
-                );
-
-                // Combine both
-                episodic_chunks.extend(semantic_chunks);
-                Ok(episodic_chunks)
-            }
-            RetrievalStrategy::BM25 => {
-                // BM25 strategy falls back to episodic
-                debug!("BM25 strategy falling back to episodic retrieval");
-                self.retrieve_episodic(query, max_tokens).await
-            }
+            RetrievalStrategy::Hybrid => self.retrieve_hybrid(query, max_tokens).await,
         }
+    }
+
+    /// Retrieve chunks using hybrid strategy (episodic + semantic)
+    async fn retrieve_hybrid(&self, query: &str, max_tokens: usize) -> Result<Vec<Chunk>, String> {
+        debug!("Retrieving from both episodic and semantic memory (hybrid strategy)");
+
+        let mut episodic_chunks = self.retrieve_episodic(query, max_tokens / 2).await?;
+        let semantic_chunks = self.retrieve_semantic(query, max_tokens / 2).await?;
+
+        debug!(
+            "Hybrid: {} episodic + {} semantic chunks",
+            episodic_chunks.len(),
+            semantic_chunks.len()
+        );
+
+        episodic_chunks.extend(semantic_chunks);
+        Ok(episodic_chunks)
     }
 
     /// Retrieve chunks from episodic memory using vector search
@@ -305,12 +342,19 @@ impl ContextBridge {
         _query: &str,
         max_tokens: usize,
     ) -> Result<Vec<Chunk>, String> {
+        let entities = Self::query_entities(&self.memory_manager).await?;
+        let chunks = Self::convert_entities_to_chunks(entities, max_tokens);
+        Ok(chunks)
+    }
+
+    /// Query all entities from semantic memory
+    async fn query_entities(
+        memory_manager: &Arc<dyn MemoryManager>,
+    ) -> Result<Vec<llmspell_memory::Entity>, String> {
         debug!("Querying semantic memory for entities");
 
-        // Get semantic memory reference
-        let semantic = self.memory_manager.semantic();
+        let semantic = memory_manager.semantic();
 
-        // Query all entities (empty type = all types)
         // TODO: Phase 13.9 - Add semantic vector search instead of query_by_type()
         let entities = semantic.query_by_type("").await.map_err(|e| {
             error!("Semantic query failed: {}", e);
@@ -318,34 +362,39 @@ impl ContextBridge {
         })?;
 
         debug!("Retrieved {} entities from semantic memory", entities.len());
+        Ok(entities)
+    }
 
-        // Convert entities to chunks
+    /// Convert entities to chunks
+    fn convert_entities_to_chunks(entities: Vec<llmspell_memory::Entity>, max_tokens: usize) -> Vec<Chunk> {
         let chunks: Vec<Chunk> = entities
             .into_iter()
-            .take(max_tokens) // Rough limit
-            .map(|entity| {
-                // Format entity as chunk content
-                let content = format!(
-                    "{} ({})\nProperties: {}",
-                    entity.name,
-                    entity.entity_type,
-                    serde_json::to_string_pretty(&entity.properties).unwrap_or_default()
-                );
-
-                Chunk {
-                    id: entity.id.clone(),
-                    content,
-                    source: format!("semantic:{}", entity.entity_type),
-                    timestamp: entity.event_time.unwrap_or(entity.ingestion_time),
-                    metadata: Some(entity.properties),
-                }
-            })
+            .take(max_tokens)
+            .map(Self::entity_to_chunk)
             .collect();
 
         debug!("Converted {} entities to chunks", chunks.len());
         trace!("Semantic chunks: {:?}", chunks);
 
-        Ok(chunks)
+        chunks
+    }
+
+    /// Convert semantic entity to chunk
+    fn entity_to_chunk(entity: llmspell_memory::Entity) -> Chunk {
+        let content = format!(
+            "{} ({})\nProperties: {}",
+            entity.name,
+            entity.entity_type,
+            serde_json::to_string_pretty(&entity.properties).unwrap_or_default()
+        );
+
+        Chunk {
+            id: entity.id.clone(),
+            content,
+            source: format!("semantic:{}", entity.entity_type),
+            timestamp: entity.event_time.unwrap_or(entity.ingestion_time),
+            metadata: Some(entity.properties),
+        }
     }
 }
 
