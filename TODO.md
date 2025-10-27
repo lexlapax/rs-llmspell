@@ -6166,13 +6166,16 @@ cargo test -p llmspell-bridge --lib memory_bridge
 **Test Results**:
 ```bash
 cargo test -p llmspell-bridge memory_global_test --features common
-# Result: 1 passed; 5 failed (nested runtime issue)
+# Result: 6 passed; 0 failed ✅
 # - test_memory_global_injection: PASSING ✅
-# - test_memory_episodic_add: FAILING (nested runtime)
-# - test_memory_episodic_search: FAILING (nested runtime)
-# - test_memory_semantic_query: FAILING (nested runtime)
-# - test_memory_consolidate: FAILING (nested runtime)
-# - test_memory_stats: FAILING (nested runtime)
+# - test_memory_episodic_add: PASSING ✅ (fixed: use global_io_runtime)
+# - test_memory_episodic_search: PASSING ✅ (fixed: use global_io_runtime)
+# - test_memory_semantic_query: PASSING ✅ (fixed: use global_io_runtime + SurrealDB connection)
+# - test_memory_consolidate: PASSING ✅ (fixed: use global_io_runtime)
+# - test_memory_stats: PASSING ✅ (fixed: use global_io_runtime)
+
+# Full regression: cargo test -p llmspell-bridge --all-features
+# Result: 227 tests passed (all llmspell-bridge tests)
 ```
 
 **Key Implementation Decisions**:
@@ -6186,11 +6189,12 @@ cargo test -p llmspell-bridge memory_global_test --features common
 
 3. **Registration Deferred**: Registration in `create_standard_registry()` commented out because kernel doesn't yet provide memory_manager in GlobalContext. Will be enabled when kernel integration complete (Phase 13.9+).
 
-4. **Nested Runtime Test Issue**: Tests fail with "Cannot start a runtime from within a runtime" because:
-   - Tests use `#[tokio::test]` which creates runtime
-   - MemoryBridge methods use `runtime.block_on()` which blocks within test runtime
-   - **NOT A BUG**: Production code works fine (no nested runtime), this is testing environment artifact
-   - Acceptable for now - injection test passes, bridge unit tests pass separately
+4. **Nested Runtime Test Issue** (FIXED): Initial tests failed with "Cannot start a runtime from within a runtime" because:
+   - Tests used `#[tokio::test]` which created separate runtime
+   - MemoryBridge uses global_io_runtime() Handle which can't block_on() from within another runtime
+   - **FIX**: Changed tests to `#[test]` (non-async) and use `llmspell_kernel::global_io_runtime()` consistently for both ProviderManager and DefaultMemoryManager initialization
+   - **ROOT CAUSE**: SurrealDB connections tied to runtime - must use same runtime throughout
+   - Result: All 6 tests passing, full regression (227 tests) passing
 
 5. **Lua API Returns**: episodic.add() returns entry ID (string), not nil. Other methods return tables/arrays as expected.
 
@@ -6202,15 +6206,26 @@ cargo test -p llmspell-bridge memory_global_test --features common
 
 3. **Lua Closure Bridge Capture**: Each Lua closure needs its own `bridge.clone()` because closure moves ownership. This is correct Rust/Lua FFI pattern.
 
-4. **Testing Strategy for Bridges**: Unit tests at bridge level (sync tests, no nested runtime) + integration tests at global level (can use tokio::test for async setup, but avoid calling bridge methods). Current setup is backwards but acceptable.
+4. **Testing Strategy for Bridges**: Tests for bridges that use global_io_runtime() must:
+   - Use `#[test]` (not `#[tokio::test]`)
+   - Use `llmspell_kernel::global_io_runtime()` for ALL async setup
+   - Never create temporary runtimes (breaks SurrealDB and other runtime-bound resources)
+   - This mirrors production: scripts run outside tokio runtime, bridge uses global runtime
 
-5. **18th Global Verified**: Memory is confirmed 18th global (17th was LocalLLM per create_standard_registry line 351).
+5. **Runtime Consistency Critical**: When using MemoryBridge/ContextBridge with SurrealDB:
+   - Must use same runtime for both initialization and operation
+   - SurrealDB connection channel tied to runtime's executor
+   - Temporary runtime → closed channel error on query
+   - Always use global_io_runtime() consistently
+
+6. **18th Global Verified**: Memory is confirmed 18th global (17th was LocalLLM per create_standard_registry line 351).
 
 **Performance Observations**:
-- Compilation time: ~0.33s (incremental, very fast)
-- Test execution: ~0.06s for 6 tests (1 passing, 5 failing)
-- Zero compilation errors after clippy fixes
-- Zero clippy warnings (verified with cargo clippy -p llmspell-bridge --lib --features common)
+- Compilation time: ~2.7s (after test fixes, including llmspell-memory recompile)
+- Test execution: ~0.14s for 6 tests (all passing ✅)
+- Full regression: ~325s (227 tests across all bridge components)
+- Zero compilation errors after all fixes
+- Zero clippy warnings (verified with cargo clippy -p llmspell-bridge --all-features --all-targets)
 
 **Tracing Coverage**:
 - info!: Injection entry ("Injecting Memory global API"), injection complete ("Memory global injected successfully")
