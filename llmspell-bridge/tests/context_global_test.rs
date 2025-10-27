@@ -1,5 +1,5 @@
 //! ABOUTME: Tests for Context global Lua API
-//! ABOUTME: Verifies Context.assemble, Context.test, Context.strategy_stats
+//! ABOUTME: Verifies `Context.assemble`, `Context.test`, `Context.strategy_stats`
 
 use llmspell_bridge::lua::globals::context::inject_context_global;
 use llmspell_bridge::{

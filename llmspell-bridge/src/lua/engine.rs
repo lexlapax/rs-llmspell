@@ -733,6 +733,7 @@ mod tests {
             self.breakpoints.write().push((file.to_string(), line));
         }
 
+        #[allow(dead_code)]
         fn resume(&self) {
             let mut resumed = self.resume_mutex.lock().unwrap();
             *resumed = true;
