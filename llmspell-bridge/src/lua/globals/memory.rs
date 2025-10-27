@@ -28,10 +28,17 @@ use tracing::{debug, error, info};
 /// -- Stats
 /// Memory.stats() -> {episodic_count, semantic_count, ...}
 /// ```
+///
+/// # Errors
+///
+/// Returns an error if:
+/// - Lua table creation fails
+/// - Function injection into Lua fails
+/// - Global injection fails
 pub fn inject_memory_global(
     lua: &Lua,
     _context: &GlobalContext,
-    memory_bridge: Arc<MemoryBridge>,
+    memory_bridge: &Arc<MemoryBridge>,
 ) -> mlua::Result<()> {
     info!("Injecting Memory global API");
     let memory_table = lua.create_table()?;
@@ -44,7 +51,13 @@ pub fn inject_memory_global(
     episodic_table.set(
         "add",
         lua.create_function(
-            move |_lua, (session_id, role, content, metadata): (String, String, String, Option<Table>)| {
+            move |_lua,
+                  (session_id, role, content, metadata): (
+                String,
+                String,
+                String,
+                Option<Table>,
+            )| {
                 debug!("Memory.episodic.add called for session={}", session_id);
                 let metadata_json = if let Some(meta) = metadata {
                     lua_value_to_json(Value::Table(meta))?

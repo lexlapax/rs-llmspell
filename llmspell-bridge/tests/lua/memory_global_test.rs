@@ -2,7 +2,9 @@
 //! ABOUTME: Verifies Memory.episodic, Memory.semantic, Memory.consolidate, Memory.stats
 
 use llmspell_bridge::lua::globals::memory::inject_memory_global;
-use llmspell_bridge::{globals::types::GlobalContext, MemoryBridge, ComponentRegistry, ProviderManager};
+use llmspell_bridge::{
+    globals::types::GlobalContext, ComponentRegistry, MemoryBridge, ProviderManager,
+};
 use llmspell_config::ProviderManagerConfig;
 use llmspell_memory::DefaultMemoryManager;
 use mlua::Lua;
@@ -31,8 +33,7 @@ async fn test_memory_global_injection() {
 
     // Inject Memory global
     let context = create_test_context().await;
-    inject_memory_global(&lua, &context, memory_bridge)
-        .expect("Failed to inject Memory global");
+    inject_memory_global(&lua, &context, &memory_bridge).expect("Failed to inject Memory global");
 
     // Verify Memory global exists
     lua.load("assert(Memory ~= nil, 'Memory global not injected')")
@@ -69,8 +70,7 @@ async fn test_memory_episodic_add() {
     let lua = Lua::new();
     let context = create_test_context().await;
 
-    inject_memory_global(&lua, &context, memory_bridge)
-        .expect("Failed to inject Memory global");
+    inject_memory_global(&lua, &context, &memory_bridge).expect("Failed to inject Memory global");
 
     // Test Memory.episodic.add
     let script = r#"
@@ -80,7 +80,10 @@ async fn test_memory_episodic_add() {
         return id
     "#;
 
-    let id: String = lua.load(script).eval().expect("episodic.add should succeed");
+    let id: String = lua
+        .load(script)
+        .eval()
+        .expect("episodic.add should succeed");
     assert!(!id.is_empty(), "ID should not be empty");
 }
 
@@ -93,8 +96,7 @@ async fn test_memory_episodic_search() {
     let lua = Lua::new();
     let context = create_test_context().await;
 
-    inject_memory_global(&lua, &context, memory_bridge)
-        .expect("Failed to inject Memory global");
+    inject_memory_global(&lua, &context, &memory_bridge).expect("Failed to inject Memory global");
 
     // Add an entry then search
     let script = r#"
@@ -105,7 +107,10 @@ async fn test_memory_episodic_search() {
         return #results
     "#;
 
-    let count: usize = lua.load(script).eval().expect("episodic.search should succeed");
+    let count: usize = lua
+        .load(script)
+        .eval()
+        .expect("episodic.search should succeed");
     assert!(count > 0, "Should find at least one result");
 }
 
@@ -118,8 +123,7 @@ async fn test_memory_semantic_query() {
     let lua = Lua::new();
     let context = create_test_context().await;
 
-    inject_memory_global(&lua, &context, memory_bridge)
-        .expect("Failed to inject Memory global");
+    inject_memory_global(&lua, &context, &memory_bridge).expect("Failed to inject Memory global");
 
     // Query semantic memory (should be empty initially)
     let script = r#"
@@ -128,7 +132,10 @@ async fn test_memory_semantic_query() {
         return #results
     "#;
 
-    let count: usize = lua.load(script).eval().expect("semantic.query should succeed");
+    let count: usize = lua
+        .load(script)
+        .eval()
+        .expect("semantic.query should succeed");
     // Empty is OK for now - semantic memory is not populated in this test
     assert_eq!(count, 0, "Semantic memory should be empty initially");
 }
@@ -142,8 +149,7 @@ async fn test_memory_consolidate() {
     let lua = Lua::new();
     let context = create_test_context().await;
 
-    inject_memory_global(&lua, &context, memory_bridge)
-        .expect("Failed to inject Memory global");
+    inject_memory_global(&lua, &context, &memory_bridge).expect("Failed to inject Memory global");
 
     // Test consolidation
     let script = r#"
@@ -167,8 +173,7 @@ async fn test_memory_stats() {
     let lua = Lua::new();
     let context = create_test_context().await;
 
-    inject_memory_global(&lua, &context, memory_bridge)
-        .expect("Failed to inject Memory global");
+    inject_memory_global(&lua, &context, &memory_bridge).expect("Failed to inject Memory global");
 
     // Test stats
     let script = r#"

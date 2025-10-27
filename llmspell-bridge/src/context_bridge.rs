@@ -393,12 +393,7 @@ mod tests {
         assert!(result.is_ok());
 
         // Invalid strategy should error
-        let result = bridge.assemble(
-            "test query",
-            "invalid_strategy",
-            1000,
-            None,
-        );
+        let result = bridge.assemble("test query", "invalid_strategy", 1000, None);
         assert!(result.is_err());
         assert!(result
             .unwrap_err()

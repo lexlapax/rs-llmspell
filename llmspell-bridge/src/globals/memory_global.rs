@@ -40,15 +40,11 @@ impl GlobalObject for MemoryGlobal {
 
     #[cfg(feature = "lua")]
     fn inject_lua(&self, lua: &mlua::Lua, context: &GlobalContext) -> Result<(), LLMSpellError> {
-        crate::lua::globals::memory::inject_memory_global(
-            lua,
-            context,
-            self.memory_bridge.clone(),
-        )
-        .map_err(|e| LLMSpellError::Component {
-            message: format!("Failed to inject Memory global: {e}"),
-            source: None,
-        })
+        crate::lua::globals::memory::inject_memory_global(lua, context, &self.memory_bridge)
+            .map_err(|e| LLMSpellError::Component {
+                message: format!("Failed to inject Memory global: {e}"),
+                source: None,
+            })
     }
 
     #[cfg(feature = "javascript")]
