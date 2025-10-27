@@ -17,6 +17,7 @@
 //! kernel-specific contexts and execution flow integration.
 
 pub mod conditional;
+pub mod execution_memory;
 pub mod kernel_hooks;
 pub mod performance;
 
@@ -32,6 +33,7 @@ pub use llmspell_hooks::{
 
 // Re-export kernel-specific types
 pub use conditional::{Condition, ConditionBuilder, ConditionalHook};
+pub use execution_memory::ExecutionMemoryHook;
 pub use kernel_hooks::{
     DebugContext, ExecutionContext, KernelHook, KernelHookManager, PostExecuteHook, PreDebugHook,
     PreExecuteHook, StateChangeHook, StateContext,
@@ -164,6 +166,20 @@ impl KernelHookSystem {
     /// Returns an error if the hook registration fails.
     pub fn register_kernel_hook(&mut self, hook: KernelHook) -> Result<()> {
         let hook_point = hook.hook_point();
+        self.registry.register(hook_point, hook)?;
+        Ok(())
+    }
+
+    /// Register any hook implementing the Hook trait
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the hook registration fails.
+    pub fn register_hook<H: Hook + 'static>(
+        &mut self,
+        hook_point: HookPoint,
+        hook: H,
+    ) -> Result<()> {
         self.registry.register(hook_point, hook)?;
         Ok(())
     }

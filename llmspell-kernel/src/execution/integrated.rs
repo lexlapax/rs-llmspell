@@ -352,12 +352,38 @@ impl<P: Protocol + 'static> IntegratedKernel<P> {
             None
         };
 
-        // Log hook system status (Phase 13.7.3a)
-        if hook_system.is_some() {
-            info!("KernelHookSystem enabled for execution event hooks");
-        } else {
-            debug!("KernelHookSystem disabled (None)");
-        }
+        // Log hook system status and register execution memory hook (Phase 13.7.3a + 13.7.3)
+        let hook_system = match (memory_manager.as_ref(), hook_system) {
+            (Some(mm), Some(mut hooks_arc)) => {
+                info!("KernelHookSystem enabled for execution event hooks");
+
+                // Get mutable reference to register hook (Phase 13.7.3)
+                if let Some(hooks) = Arc::get_mut(&mut hooks_arc) {
+                    let exec_hook = crate::hooks::ExecutionMemoryHook::new(mm.clone());
+                    hooks
+                        .register_hook(
+                            crate::hooks::KernelHookPoint::PostCodeExecution.into(),
+                            exec_hook,
+                        )
+                        .map_err(|e| {
+                            error!("Failed to register ExecutionMemoryHook: {}", e);
+                            e
+                        })?;
+                    info!("ExecutionMemoryHook registered for episodic memory capture");
+                } else {
+                    warn!("KernelHookSystem has multiple Arc references, cannot register ExecutionMemoryHook");
+                }
+                Some(hooks_arc)
+            }
+            (None, Some(hooks)) => {
+                info!("KernelHookSystem enabled but no memory_manager, ExecutionMemoryHook not registered");
+                Some(hooks)
+            }
+            (_, None) => {
+                debug!("KernelHookSystem disabled (None)");
+                None
+            }
+        };
 
         Ok(Self {
             script_executor,
