@@ -5067,7 +5067,7 @@ All subtasks (13.5.7a through 13.5.7i) are complete. Provider migration successf
 **Priority**: MEDIUM
 **Estimated Time**: 3 hours (pattern detection + procedural memory extension)
 **Assignee**: Kernel Team
-**Status**: READY TO START
+**Status**: IN PROGRESS (13.7.4a ✅ 13.7.4b ✅ → 13.7.4c)
 
 **Description**: Capture state change patterns as procedural memory by tracking repeated state transitions via state hooks (e.g., user always sets X=Y before Z=W = learned pattern).
 
@@ -5130,6 +5130,34 @@ All subtasks (13.5.7a through 13.5.7i) are complete. Provider migration successf
 **Key Insight**: State transitions reveal learned user behaviors. Tracking transition frequencies creates procedural memory of "how the user typically configures the system".
 
 **Note**: Like 13.7.3, this is CAPTURE-only (kernel writes to memory). Script query API deferred to Phase 13.8.
+
+---
+
+**Implementation Insights (Tasks 13.7.4a-b)**:
+
+**Task 13.7.4a (commit 2c7ef034)**:
+- Extended `ProceduralMemory` trait with 3 async methods: `record_transition()`, `get_pattern_frequency()`, `get_learned_patterns()`
+- Added `Pattern` struct with `Eq` derive for pattern matching/comparison
+- Created `InMemoryPatternTracker` with `HashMap<String, (u32, u64, u64)>` for (frequency, first_seen, last_seen)
+- RwLock for thread safety with explicit `drop()` for early lock release
+- Pattern key format: `"{scope}:{key}:{value}"` for efficient lookup
+- Timestamp tracking via `SystemTime::duration_since(UNIX_EPOCH).as_millis()`
+- 3 unit tests: pattern tracking, threshold filtering, frequency sorting
+- Clippy fixes: #[must_use], map_or(), backticks, cast_possible_truncation annotation
+- Files: `llmspell-memory/src/traits/procedural.rs` (+60 lines), `llmspell-memory/src/procedural.rs` (242 lines)
+
+**Task 13.7.4b (commit 3ae98a6d)**:
+- Created `StateMemoryHook` implementing `Hook` trait with `memory_manager` and `pattern_threshold` fields
+- Context extraction: scope, key, old_value (optional), new_value (required) from `HookContext.data`
+- JSON value handling: proper lifetime management with temporary variables (`old_value_str`, `new_value_owned`) to avoid borrow checker issues
+- Threshold logging: debug! message when `frequency == pattern_threshold` (default 3)
+- Graceful degradation: warn! and continue on missing context data instead of erroring
+- Critical fix: Changed `DefaultMemoryManager::create_procedural_memory()` from `NoopProceduralMemory` to `InMemoryPatternTracker::new()` (manager.rs:206)
+- 3 unit tests: transition tracking (3 transitions → frequency 3), custom threshold (2), missing data graceful handling
+- Files: `llmspell-kernel/src/state/memory_hook.rs` (244 lines NEW), `llmspell-kernel/src/state/mod.rs` (+3 lines), `llmspell-memory/src/manager.rs` (+2 lines)
+- Zero clippy warnings, all tests passing
+
+**Next**: Task 13.7.4c - Register hook in StateManager (opt-in when memory_manager present)
 
 ### Task 13.7.5: Kernel Integration Tests
 
