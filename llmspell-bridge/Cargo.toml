@@ -27,6 +27,7 @@ llmspell-rag = { path = "../llmspell-rag" }
 llmspell-tenancy = { path = "../llmspell-tenancy" }
 llmspell-templates = { path = "../llmspell-templates" }
 llmspell-memory = { path = "../llmspell-memory" }
+llmspell-context = { path = "../llmspell-context" }
 tokio.workspace = true
 tokio-stream.workspace = true
 async-trait.workspace = true
