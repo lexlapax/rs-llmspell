@@ -103,7 +103,10 @@ async fn test_multiple_scopes_without_memory() {
 
     // Verify all scopes work
     assert_eq!(
-        state_manager.get(StateScope::Global, "global_key").await.unwrap(),
+        state_manager
+            .get(StateScope::Global, "global_key")
+            .await
+            .unwrap(),
         Some(json!("global_value"))
     );
 

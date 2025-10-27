@@ -107,9 +107,12 @@ impl StateManagerAdapter {
         };
 
         // Create state manager
-        let state_manager =
-            StateManager::with_backend(persistence_config.backend_type.clone(), persistence_config, None)
-                .await?;
+        let state_manager = StateManager::with_backend(
+            persistence_config.backend_type.clone(),
+            persistence_config,
+            None,
+        )
+        .await?;
 
         Ok(Self {
             state_manager: Arc::new(state_manager),

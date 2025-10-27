@@ -331,13 +331,11 @@ impl<P: Protocol + 'static> IntegratedKernel<P> {
                 let episodic = memory_mgr
                     .episodic_arc()
                     .expect("Episodic memory must be present");
-                let daemon = Arc::new(
-                    llmspell_memory::consolidation::ConsolidationDaemon::new(
-                        engine,
-                        episodic,
-                        daemon_config,
-                    ),
-                );
+                let daemon = Arc::new(llmspell_memory::consolidation::ConsolidationDaemon::new(
+                    engine,
+                    episodic,
+                    daemon_config,
+                ));
                 let handle = daemon.clone().start().map_err(|e| {
                     error!("Failed to start consolidation daemon: {}", e);
                     e
@@ -1057,7 +1055,10 @@ impl<P: Protocol + 'static> IntegratedKernel<P> {
 
         // Shutdown consolidation daemon (Phase 13.7.2)
         if let Some((daemon, _handle)) = &self.consolidation_daemon {
-            info!("Stopping consolidation daemon for session {}", self.session_id);
+            info!(
+                "Stopping consolidation daemon for session {}",
+                self.session_id
+            );
             if let Err(e) = daemon.stop().await {
                 error!("Failed to stop consolidation daemon: {}", e);
             } else {
@@ -1069,7 +1070,10 @@ impl<P: Protocol + 'static> IntegratedKernel<P> {
 
         // Shutdown memory manager (Phase 13.7.1)
         if let Some(memory_mgr) = &self.memory_manager {
-            info!("Shutting down memory manager for session {}", self.session_id);
+            info!(
+                "Shutting down memory manager for session {}",
+                self.session_id
+            );
             if let Err(e) = memory_mgr.shutdown().await {
                 error!("Failed to shutdown memory manager: {}", e);
             } else {
@@ -1765,8 +1769,7 @@ impl<P: Protocol + 'static> IntegratedKernel<P> {
             let component_id =
                 ComponentId::new(ComponentType::System, "integrated_kernel".to_string());
             let mut ctx = HookContext::new(HookPoint::SystemStartup, component_id); // KernelHookPoint converts to HookPoint
-            ctx.data
-                .insert("code".to_string(), serde_json::json!(code));
+            ctx.data.insert("code".to_string(), serde_json::json!(code));
             ctx.data
                 .insert("session_id".to_string(), serde_json::json!(self.session_id));
             ctx.data.insert(
@@ -1841,14 +1844,11 @@ impl<P: Protocol + 'static> IntegratedKernel<P> {
             let component_id =
                 ComponentId::new(ComponentType::System, "integrated_kernel".to_string());
             let mut ctx = HookContext::new(HookPoint::SystemStartup, component_id);
-            ctx.data
-                .insert("code".to_string(), serde_json::json!(code));
+            ctx.data.insert("code".to_string(), serde_json::json!(code));
             ctx.data
                 .insert("session_id".to_string(), serde_json::json!(self.session_id));
-            ctx.data.insert(
-                "execution_id".to_string(),
-                serde_json::json!(exec_id),
-            );
+            ctx.data
+                .insert("execution_id".to_string(), serde_json::json!(exec_id));
             ctx.data
                 .insert("args".to_string(), serde_json::json!(&args_clone));
             // Add result to context
@@ -1856,7 +1856,8 @@ impl<P: Protocol + 'static> IntegratedKernel<P> {
                 Ok(output) => {
                     ctx.data
                         .insert("result".to_string(), serde_json::json!(output));
-                    ctx.data.insert("success".to_string(), serde_json::json!(true));
+                    ctx.data
+                        .insert("success".to_string(), serde_json::json!(true));
                 }
                 Err(e) => {
                     ctx.data
@@ -4187,8 +4188,8 @@ async fn test_message_handling_performance() -> Result<()> {
         script_executor,
         None,
         create_test_session_manager().await,
-            None, // memory_manager (Phase 13.7.1 - opt-in)
-            None, // hook_system (Phase 13.7.3a - opt-in)
+        None, // memory_manager (Phase 13.7.1 - opt-in)
+        None, // hook_system (Phase 13.7.3a - opt-in)
     )
     .await?;
 
@@ -4618,8 +4619,8 @@ mod multi_protocol_tests {
                 script_executor.clone(),
                 None,
                 create_test_session_manager().await,
-            None, // memory_manager (Phase 13.7.1 - opt-in)
-            None, // hook_system (Phase 13.7.3a - opt-in)
+                None, // memory_manager (Phase 13.7.1 - opt-in)
+                None, // hook_system (Phase 13.7.3a - opt-in)
             )
             .await
             .unwrap(),
@@ -4936,8 +4937,8 @@ mod performance_tests {
                 script_executor,
                 None,
                 create_test_session_manager().await,
-            None, // memory_manager (Phase 13.7.1 - opt-in)
-            None, // hook_system (Phase 13.7.3a - opt-in)
+                None, // memory_manager (Phase 13.7.1 - opt-in)
+                None, // hook_system (Phase 13.7.3a - opt-in)
             )
             .await
             .unwrap(),

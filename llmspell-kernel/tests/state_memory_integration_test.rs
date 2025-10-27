@@ -27,13 +27,10 @@ async fn test_state_transitions_create_patterns() {
         ..Default::default()
     };
 
-    let state_manager = StateManager::with_backend(
-        StorageBackendType::Memory,
-        config,
-        Some(memory_arc.clone()),
-    )
-    .await
-    .expect("Failed to create state manager");
+    let state_manager =
+        StateManager::with_backend(StorageBackendType::Memory, config, Some(memory_arc.clone()))
+            .await
+            .expect("Failed to create state manager");
 
     // Perform same state transition 3 times
     for _ in 0..3 {
@@ -66,13 +63,10 @@ async fn test_pattern_threshold_detection() {
         ..Default::default()
     };
 
-    let state_manager = StateManager::with_backend(
-        StorageBackendType::Memory,
-        config,
-        Some(memory_arc.clone()),
-    )
-    .await
-    .expect("Failed to create state manager");
+    let state_manager =
+        StateManager::with_backend(StorageBackendType::Memory, config, Some(memory_arc.clone()))
+            .await
+            .expect("Failed to create state manager");
 
     // Transition 1: Should record but not yet a pattern
     state_manager
@@ -181,13 +175,10 @@ async fn test_multiple_scopes_and_keys() {
         ..Default::default()
     };
 
-    let state_manager = StateManager::with_backend(
-        StorageBackendType::Memory,
-        config,
-        Some(memory_arc.clone()),
-    )
-    .await
-    .expect("Failed to create state manager");
+    let state_manager =
+        StateManager::with_backend(StorageBackendType::Memory, config, Some(memory_arc.clone()))
+            .await
+            .expect("Failed to create state manager");
 
     // Set different keys in different scopes
     for _ in 0..3 {
@@ -263,13 +254,10 @@ async fn test_state_value_changes_tracked() {
         ..Default::default()
     };
 
-    let state_manager = StateManager::with_backend(
-        StorageBackendType::Memory,
-        config,
-        Some(memory_arc.clone()),
-    )
-    .await
-    .expect("Failed to create state manager");
+    let state_manager =
+        StateManager::with_backend(StorageBackendType::Memory, config, Some(memory_arc.clone()))
+            .await
+            .expect("Failed to create state manager");
 
     // Initial state: light mode
     state_manager

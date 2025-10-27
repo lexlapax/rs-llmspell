@@ -196,8 +196,7 @@ mod tests {
         ctx.data
             .insert("session_id".to_string(), json!("test-session"));
         ctx.data.insert("code".to_string(), json!("bad code"));
-        ctx.data
-            .insert("error".to_string(), json!("Syntax error"));
+        ctx.data.insert("error".to_string(), json!("Syntax error"));
         ctx.data.insert("success".to_string(), json!(false));
         ctx.data
             .insert("execution_id".to_string(), json!("exec-456"));

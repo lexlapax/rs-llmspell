@@ -2262,7 +2262,7 @@ mod tests {
 
     /// Helper to create a test `SessionManager` with minimal infrastructure
     async fn create_test_session_manager() -> Arc<crate::sessions::SessionManager> {
-        let state_manager = Arc::new(crate::state::StateManager::new().await.unwrap());
+        let state_manager = Arc::new(crate::state::StateManager::new(None).await.unwrap());
         let session_storage_backend = Arc::new(llmspell_storage::MemoryBackend::new());
         let hook_registry = Arc::new(llmspell_hooks::HookRegistry::new());
         let hook_executor = Arc::new(llmspell_hooks::HookExecutor::new());

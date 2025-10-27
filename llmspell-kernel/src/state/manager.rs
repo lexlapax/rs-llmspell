@@ -181,8 +181,14 @@ impl std::fmt::Debug for StateManager {
         f.debug_struct("StateManager")
             .field("persistence_enabled", &self.persistence_config.enabled)
             .field("memory_enabled", &self.memory_manager.is_some())
-            .field("hook_count_before", &self.before_state_change_hooks.read().len())
-            .field("hook_count_after", &self.after_state_change_hooks.read().len())
+            .field(
+                "hook_count_before",
+                &self.before_state_change_hooks.read().len(),
+            )
+            .field(
+                "hook_count_after",
+                &self.after_state_change_hooks.read().len(),
+            )
             .finish()
     }
 }
@@ -334,7 +340,9 @@ impl StateManager {
         let after_state_change_hooks = Arc::new(RwLock::new(Vec::new()));
         if let Some(mm) = &memory_manager {
             let state_memory_hook = super::memory_hook::StateMemoryHook::new(mm.clone());
-            after_state_change_hooks.write().push(Arc::new(state_memory_hook) as Arc<dyn Hook>);
+            after_state_change_hooks
+                .write()
+                .push(Arc::new(state_memory_hook) as Arc<dyn Hook>);
             debug!("StateMemoryHook registered for procedural memory pattern tracking");
         }
 
@@ -593,12 +601,9 @@ impl StateManager {
         // Publish the event (if event bus is configured for publishing)
         // Note: We don't call publish directly as it might not be set up for external publishing
 
-        // Execute post-state-change hooks
-        hook_context.insert_metadata("success".to_string(), "true".to_string());
-        hook_context.insert_metadata(
-            "final_value".to_string(),
-            serde_json::to_string(&final_value).unwrap(),
-        );
+        // Execute post-state-change hooks (Phase 13.7.4)
+        hook_context.insert_data("success".to_string(), json!(true));
+        hook_context.insert_data("final_value".to_string(), final_value.clone());
 
         let hooks_to_execute = {
             let hooks = self.after_state_change_hooks.read();

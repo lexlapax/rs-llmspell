@@ -1028,7 +1028,7 @@ async fn start_embedded_kernel_with_executor_and_provider_internal(
         Some(provider_manager),
         session_manager,
         None, // memory_manager (Phase 13.7.1 - opt-in)
-            None, // hook_system (Phase 13.7.3a - opt-in)
+        None, // hook_system (Phase 13.7.3a - opt-in)
     )
     .await?;
 
@@ -1060,7 +1060,7 @@ async fn start_embedded_kernel_with_executor_and_provider_internal(
         Some(provider_manager_clone),
         session_manager_clone,
         None, // memory_manager (Phase 13.7.1 - opt-in)
-            None, // hook_system (Phase 13.7.3a - opt-in)
+        None, // hook_system (Phase 13.7.3a - opt-in)
     )
     .await?;
 
@@ -1341,7 +1341,7 @@ pub async fn start_kernel_service_with_config(
         None,
         session_manager,
         None, // memory_manager (Phase 13.7.1 - opt-in)
-            None, // hook_system (Phase 13.7.3a - opt-in)
+        None, // hook_system (Phase 13.7.3a - opt-in)
     )
     .await?;
 
@@ -1701,7 +1701,7 @@ pub async fn start_kernel_service(port: u16, config: LLMSpellConfig) -> Result<S
         None,
         session_manager,
         None, // memory_manager (Phase 13.7.1 - opt-in)
-            None, // hook_system (Phase 13.7.3a - opt-in)
+        None, // hook_system (Phase 13.7.3a - opt-in)
     )
     .await?;
     // Note: Service kernels don't need transport set here as they use external connections

@@ -51,7 +51,7 @@ mod replay_tests {
     }
 
     async fn create_test_session_manager() -> SessionManager {
-        let state_manager = Arc::new(StateManager::new().await.unwrap());
+        let state_manager = Arc::new(StateManager::new(None).await.unwrap());
         let storage_backend = Arc::new(MemoryBackend::new());
         let hook_registry = Arc::new(HookRegistry::new());
         let hook_executor = Arc::new(HookExecutor::new());
@@ -604,7 +604,7 @@ mod replay_tests {
     #[tokio::test]
     async fn test_storage_key_patterns() {
         // Test that our key patterns are correct and compatible
-        let state_manager = Arc::new(StateManager::new().await.unwrap());
+        let state_manager = Arc::new(StateManager::new(None).await.unwrap());
         let storage_backend = Arc::new(MemoryBackend::new());
         let hook_registry = Arc::new(HookRegistry::new());
         let hook_executor = Arc::new(HookExecutor::new());
@@ -650,7 +650,7 @@ mod replay_tests {
     #[tokio::test]
     async fn test_storage_integration_with_existing_infrastructure() {
         // Test that we're using existing storage infrastructure correctly
-        let state_manager = Arc::new(StateManager::new().await.unwrap());
+        let state_manager = Arc::new(StateManager::new(None).await.unwrap());
         let storage_backend = Arc::new(MemoryBackend::new());
         let hook_registry = Arc::new(HookRegistry::new());
         let hook_executor = Arc::new(HookExecutor::new());

@@ -232,7 +232,7 @@ mod tests {
         // Create dependencies
         let storage = Arc::new(MemoryBackend::new());
         let state_manager = Arc::new(
-            StateManager::new()
+            StateManager::new(None)
                 .await
                 .expect("Failed to create state manager"),
         );
