@@ -5031,12 +5031,33 @@ All subtasks (13.5.7a through 13.5.7i) are complete. Provider migration successf
   - test_multiple_executions_same_session() - verify session_id isolation
 
 **Definition of Done**:
-- [ ] Kernel executions automatically create episodic memory pairs when memory_manager present
-- [ ] Session_id, timestamps, metadata correctly propagated
-- [ ] Opt-in design verified (kernel works without memory_manager OR hook_system)
-- [ ] Integration tests pass with InMemoryEpisodicMemory
-- [ ] Hook uses KernelHookSystem from 13.7.3a
-- [ ] Zero clippy warnings
+- [x] Kernel executions automatically create episodic memory pairs when memory_manager present ✅
+- [x] Session_id, timestamps, metadata correctly propagated ✅
+- [x] Opt-in design verified (kernel works without memory_manager OR hook_system) ✅
+- [x] Integration tests pass with `InMemoryEpisodicMemory` ✅
+- [x] Hook uses `KernelHookSystem` from 13.7.3a ✅
+- [x] Zero clippy warnings ✅
+
+**TASK 13.7.3 COMPLETE** ✅ (commit: 19228683)
+
+**Implementation Insights** (1.5h actual):
+- Created `execution_memory.rs` (145 lines) implementing `ExecutionMemoryHook`
+- Hook captures `PostCodeExecution` events via `Hook::execute()` trait method
+- Extracts `session_id`, `code`, `success`, `result/error` from `HookContext`
+- Creates 2 episodic entries using `EpisodicEntry::new()`:
+  1. User entry: `{"type": "execution_input", "execution_id": ...}`
+  2. Assistant entry: `{"type": "execution_output", "success": bool, "execution_id": ...}`
+- **Key challenge**: Result JSON stringification - `v.to_string()` produced `"\"hello\""`, fixed with `v.as_str()` extraction
+- **Registration pattern**: Used `Arc::get_mut(&mut hooks_arc)` in `IntegratedKernel::new()` during initialization
+- **Match pattern**: Consumed `hook_system` once to avoid E0382 move errors
+- **Tracing**: Debug logs for entry additions, errors on failures, warnings on missing context data
+- Unit tests: 3 tests (success, error, missing session_id) all passing
+- Clippy fixes: let-else patterns, `ConsolidationDaemon` backticks, `map_or_else`, `format!("{s}")`
+- **Files modified**: 3 files (~160 lines added)
+  - NEW: `llmspell-kernel/src/hooks/execution_memory.rs` (145 lines)
+  - MOD: `llmspell-kernel/src/hooks/mod.rs` (added `register_hook()` method, exports)
+  - MOD: `llmspell-kernel/src/execution/integrated.rs` (registration logic, ~30 lines)
+- **Next**: Task 13.7.4 - State-Memory Synchronization Hook (state transitions → procedural patterns)
 - [ ] Comprehensive tracing with info!/debug!/error!
 
 **Key Insight**: Kernel executions ARE the interactions in llmspell (code in → result out), not chat messages. This aligns episodic memory with actual kernel operations.
