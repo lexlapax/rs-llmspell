@@ -262,6 +262,9 @@ pub mod hook_bridge;
 pub mod artifact_bridge;
 pub mod session_bridge;
 
+// Memory bridge (Phase 13.8.1)
+pub mod memory_bridge;
+
 // Agent bridge modules
 pub mod agent_bridge;
 pub mod agents;
@@ -293,6 +296,7 @@ pub use engine::{
 };
 
 pub use llmspell_config::LLMSpellConfig;
+pub use memory_bridge::MemoryBridge;
 pub use providers::ProviderManager;
 pub use registry::ComponentRegistry;
 pub use runtime::ScriptRuntime;
