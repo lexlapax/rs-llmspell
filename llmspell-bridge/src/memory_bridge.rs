@@ -96,27 +96,26 @@ impl MemoryBridge {
         );
         trace!("episodic_add metadata: {:?}", metadata);
 
-        self.runtime
-            .block_on(async {
-                debug!("Entering async episodic_add");
+        self.runtime.block_on(async {
+            debug!("Entering async episodic_add");
 
-                // Create episodic entry with metadata
-                let mut entry = EpisodicEntry::new(session_id, role, content);
-                entry.metadata = metadata;
+            // Create episodic entry with metadata
+            let mut entry = EpisodicEntry::new(session_id, role, content);
+            entry.metadata = metadata;
 
-                let id = self
-                    .memory_manager
-                    .episodic()
-                    .add(entry)
-                    .await
-                    .map_err(|e| {
-                        error!("episodic_add failed: {}", e);
-                        format!("Failed to add episodic memory: {e}")
-                    })?;
+            let id = self
+                .memory_manager
+                .episodic()
+                .add(entry)
+                .await
+                .map_err(|e| {
+                    error!("episodic_add failed: {}", e);
+                    format!("Failed to add episodic memory: {e}")
+                })?;
 
-                debug!("episodic_add completed with id={}", id);
-                Ok(id)
-            })
+            debug!("episodic_add completed with id={}", id);
+            Ok(id)
+        })
     }
 
     /// Search episodic memory
@@ -151,8 +150,8 @@ impl MemoryBridge {
     /// ```
     pub fn episodic_search(
         &self,
-        session_id: String,
-        query: String,
+        session_id: &str,
+        query: &str,
         limit: usize,
     ) -> Result<Value, String> {
         info!(
@@ -160,51 +159,50 @@ impl MemoryBridge {
             session_id, query, limit
         );
 
-        self.runtime
-            .block_on(async {
-                debug!("Entering async episodic_search");
+        self.runtime.block_on(async {
+            debug!("Entering async episodic_search");
 
-                // If session_id is provided, get session-specific entries
-                let entries = if session_id.is_empty() {
-                    // Search all sessions
-                    self.memory_manager
-                        .episodic()
-                        .search(&query, limit)
-                        .await
-                        .map_err(|e| {
-                            error!("episodic_search failed: {}", e);
-                            format!("Failed to search episodic memory: {e}")
-                        })?
-                } else {
-                    // Get session entries first, then filter/rank
-                    // Note: This is a simplified approach. For production, we'd want
-                    // the backend to support session-filtered vector search.
-                    let session_entries = self
-                        .memory_manager
-                        .episodic()
-                        .get_session(&session_id)
-                        .await
-                        .map_err(|e| {
-                            error!("get_session failed: {}", e);
-                            format!("Failed to get session: {e}")
-                        })?;
+            // If session_id is provided, get session-specific entries
+            let entries = if session_id.is_empty() {
+                // Search all sessions
+                self.memory_manager
+                    .episodic()
+                    .search(query, limit)
+                    .await
+                    .map_err(|e| {
+                        error!("episodic_search failed: {}", e);
+                        format!("Failed to search episodic memory: {e}")
+                    })?
+            } else {
+                // Get session entries first, then filter/rank
+                // Note: This is a simplified approach. For production, we'd want
+                // the backend to support session-filtered vector search.
+                let session_entries = self
+                    .memory_manager
+                    .episodic()
+                    .get_session(session_id)
+                    .await
+                    .map_err(|e| {
+                        error!("get_session failed: {}", e);
+                        format!("Failed to get session: {e}")
+                    })?;
 
-                    // For now, return the session entries (up to limit)
-                    // TODO: Phase 13.9 - Add session-filtered vector search in episodic backend
-                    session_entries.into_iter().take(limit).collect()
-                };
+                // For now, return the session entries (up to limit)
+                // TODO: Phase 13.9 - Add session-filtered vector search in episodic backend
+                session_entries.into_iter().take(limit).collect()
+            };
 
-                debug!("episodic_search found {} results", entries.len());
-                trace!("episodic_search results: {:?}", entries);
+            debug!("episodic_search found {} results", entries.len());
+            trace!("episodic_search results: {:?}", entries);
 
-                // Convert entries to JSON
-                let json_entries = serde_json::to_value(&entries).map_err(|e| {
-                    error!("JSON conversion failed: {}", e);
-                    format!("Failed to convert results to JSON: {e}")
-                })?;
+            // Convert entries to JSON
+            let json_entries = serde_json::to_value(&entries).map_err(|e| {
+                error!("JSON conversion failed: {}", e);
+                format!("Failed to convert results to JSON: {e}")
+            })?;
 
-                Ok(json_entries)
-            })
+            Ok(json_entries)
+        })
     }
 
     /// Query semantic memory (knowledge graph)
@@ -234,43 +232,42 @@ impl MemoryBridge {
     ///     10
     /// )?;
     /// ```
-    pub fn semantic_query(&self, query: String, limit: usize) -> Result<Value, String> {
+    pub fn semantic_query(&self, query: &str, limit: usize) -> Result<Value, String> {
         info!(
             "MemoryBridge::semantic_query called with query='{}', limit={}",
             query, limit
         );
 
-        self.runtime
-            .block_on(async {
-                debug!("Entering async semantic_query");
+        self.runtime.block_on(async {
+            debug!("Entering async semantic_query");
 
-                // Note: SemanticMemory doesn't have a general query() method yet.
-                // For Phase 13.8, we'll use query_by_type() with empty type to get all entities,
-                // then filter/limit in memory. Full semantic query comes in Phase 13.9.
-                let entities = self
-                    .memory_manager
-                    .semantic()
-                    .query_by_type("")
-                    .await
-                    .map_err(|e| {
-                        error!("semantic_query failed: {}", e);
-                        format!("Failed to query semantic memory: {e}")
-                    })?;
-
-                // Apply limit
-                let limited_entities: Vec<_> = entities.into_iter().take(limit).collect();
-
-                debug!("semantic_query found {} entities", limited_entities.len());
-                trace!("semantic_query results: {:?}", limited_entities);
-
-                // Convert to JSON
-                let json_entities = serde_json::to_value(&limited_entities).map_err(|e| {
-                    error!("JSON conversion failed: {}", e);
-                    format!("Failed to convert results to JSON: {e}")
+            // Note: SemanticMemory doesn't have a general query() method yet.
+            // For Phase 13.8, we'll use query_by_type() with empty type to get all entities,
+            // then filter/limit in memory. Full semantic query comes in Phase 13.9.
+            let entities = self
+                .memory_manager
+                .semantic()
+                .query_by_type("")
+                .await
+                .map_err(|e| {
+                    error!("semantic_query failed: {}", e);
+                    format!("Failed to query semantic memory: {e}")
                 })?;
 
-                Ok(json_entities)
-            })
+            // Apply limit
+            let limited_entities: Vec<_> = entities.into_iter().take(limit).collect();
+
+            debug!("semantic_query found {} entities", limited_entities.len());
+            trace!("semantic_query results: {:?}", limited_entities);
+
+            // Convert to JSON
+            let json_entities = serde_json::to_value(&limited_entities).map_err(|e| {
+                error!("JSON conversion failed: {}", e);
+                format!("Failed to convert results to JSON: {e}")
+            })?;
+
+            Ok(json_entities)
+        })
     }
 
     /// Consolidate episodic memories into semantic knowledge
@@ -302,11 +299,7 @@ impl MemoryBridge {
     /// )?;
     /// println!("Processed {} entries", stats["entries_processed"]);
     /// ```
-    pub fn consolidate(
-        &self,
-        session_id: Option<String>,
-        force: bool,
-    ) -> Result<Value, String> {
+    pub fn consolidate(&self, session_id: Option<&str>, force: bool) -> Result<Value, String> {
         info!(
             "MemoryBridge::consolidate called for session={:?}, force={}",
             session_id, force
@@ -326,7 +319,7 @@ impl MemoryBridge {
                 debug!("Using consolidation mode: {:?}", mode);
 
                 // Run consolidation
-                let session_str = session_id.as_deref().unwrap_or("");
+                let session_str = session_id.unwrap_or("");
                 let result = self
                     .memory_manager
                     .consolidate(session_str, mode)
@@ -384,54 +377,53 @@ impl MemoryBridge {
     pub fn stats(&self) -> Result<Value, String> {
         info!("MemoryBridge::stats called");
 
-        self.runtime
-            .block_on(async {
-                debug!("Entering async stats");
+        self.runtime.block_on(async {
+            debug!("Entering async stats");
 
-                // Get episodic count by searching with large limit
-                // TODO: Phase 13.9 - Add count() method to EpisodicMemory trait
-                let episodic_count = self
-                    .memory_manager
-                    .episodic()
-                    .search("", 10000)
-                    .await
-                    .map(|entries| entries.len())
-                    .unwrap_or(0);
+            // Get episodic count by searching with large limit
+            // TODO: Phase 13.9 - Add count() method to EpisodicMemory trait
+            let episodic_count = self
+                .memory_manager
+                .episodic()
+                .search("", 10000)
+                .await
+                .map(|entries| entries.len())
+                .unwrap_or(0);
 
-                // Get semantic count
-                let semantic_count = self
-                    .memory_manager
-                    .semantic()
-                    .query_by_type("")
-                    .await
-                    .map(|entities| entities.len())
-                    .unwrap_or(0);
+            // Get semantic count
+            let semantic_count = self
+                .memory_manager
+                .semantic()
+                .query_by_type("")
+                .await
+                .map(|entities| entities.len())
+                .unwrap_or(0);
 
-                // Get unprocessed sessions
-                let sessions_with_unprocessed = self
-                    .memory_manager
-                    .episodic()
-                    .list_sessions_with_unprocessed()
-                    .await
-                    .map(|sessions| sessions.len())
-                    .unwrap_or(0);
+            // Get unprocessed sessions
+            let sessions_with_unprocessed = self
+                .memory_manager
+                .episodic()
+                .list_sessions_with_unprocessed()
+                .await
+                .map(|sessions| sessions.len())
+                .unwrap_or(0);
 
-                debug!(
-                    "stats: episodic={}, semantic={}, unprocessed_sessions={}",
-                    episodic_count, semantic_count, sessions_with_unprocessed
-                );
+            debug!(
+                "stats: episodic={}, semantic={}, unprocessed_sessions={}",
+                episodic_count, semantic_count, sessions_with_unprocessed
+            );
 
-                let stats = serde_json::json!({
-                    "episodic_count": episodic_count,
-                    "semantic_count": semantic_count,
-                    "sessions_with_unprocessed": sessions_with_unprocessed,
-                    "has_episodic": self.memory_manager.has_episodic(),
-                    "has_semantic": self.memory_manager.has_semantic(),
-                    "has_consolidation": self.memory_manager.has_consolidation(),
-                });
+            let stats = serde_json::json!({
+                "episodic_count": episodic_count,
+                "semantic_count": semantic_count,
+                "sessions_with_unprocessed": sessions_with_unprocessed,
+                "has_episodic": self.memory_manager.has_episodic(),
+                "has_semantic": self.memory_manager.has_semantic(),
+                "has_consolidation": self.memory_manager.has_consolidation(),
+            });
 
-                Ok(stats)
-            })
+            Ok(stats)
+        })
     }
 }
 
@@ -483,7 +475,7 @@ mod tests {
 
         // Search (should find the entry)
         let results = bridge
-            .episodic_search("session-test".to_string(), "hello".to_string(), 5)
+            .episodic_search("session-test", "hello", 5)
             .expect("episodic_search should succeed");
 
         let results_array = results.as_array().expect("results should be array");
@@ -503,7 +495,7 @@ mod tests {
 
         // Query semantic (should be empty)
         let results = bridge
-            .semantic_query("test".to_string(), 5)
+            .semantic_query("test", 5)
             .expect("semantic_query should succeed");
 
         let results_array = results.as_array().expect("results should be array");
@@ -533,7 +525,7 @@ mod tests {
 
         // Consolidate
         let result = bridge
-            .consolidate(Some("session-test".to_string()), true)
+            .consolidate(Some("session-test"), true)
             .expect("consolidate should succeed");
 
         // Should have processed entries (even if no entities extracted)

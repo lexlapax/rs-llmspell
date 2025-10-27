@@ -1,5 +1,5 @@
 //! ABOUTME: Context bridge providing language-agnostic context assembly operations
-//! ABOUTME: Composes BM25Retriever + ContextAssembler + MemoryManager for RAG workflows
+//! ABOUTME: Composes `BM25Retriever` + `ContextAssembler` + `MemoryManager` for RAG workflows
 
 use llmspell_context::{
     assembly::ContextAssembler,
@@ -14,15 +14,15 @@ use tracing::{debug, error, info, trace, warn};
 
 /// Context bridge for language-agnostic context assembly operations
 ///
-/// This bridge composes context engineering components (BM25Retriever, BM25Reranker,
-/// ContextAssembler) with MemoryManager to provide blocking interfaces for script languages.
+/// This bridge composes context engineering components (`BM25Retriever`, `BM25Reranker`,
+/// `ContextAssembler`) with `MemoryManager` to provide blocking interfaces for script languages.
 ///
 /// # Component Composition Pattern
 ///
-/// No ContextPipeline struct exists - bridge composes components directly:
-/// 1. **BM25Retriever** - Keyword-based retrieval from memory (stateless, created on demand)
-/// 2. **BM25Reranker** - Fast lexical reranking (stateless, <5ms for 20 chunks)
-/// 3. **ContextAssembler** - Token budget management and temporal ordering (stateless)
+/// No `ContextPipeline` struct exists - bridge composes components directly:
+/// 1. **`BM25Retriever`** - Keyword-based retrieval from memory (stateless, created on demand)
+/// 2. **`BM25Reranker`** - Fast lexical reranking (stateless, <5ms for 20 chunks)
+/// 3. **`ContextAssembler`** - Token budget management and temporal ordering (stateless)
 ///
 /// # Strategy Support
 ///
@@ -32,7 +32,7 @@ use tracing::{debug, error, info, trace, warn};
 ///
 /// # Pattern
 ///
-/// Follows async→blocking conversion like MemoryBridge:
+/// Follows async→blocking conversion like `MemoryBridge`:
 /// ```ignore
 /// self.runtime.block_on(async {
 ///     let retriever = BM25Retriever::new();
@@ -120,10 +120,10 @@ impl ContextBridge {
     /// ```
     pub fn assemble(
         &self,
-        query: String,
-        strategy: String,
+        query: &str,
+        strategy: &str,
         max_tokens: usize,
-        session_id: Option<String>,
+        session_id: Option<&str>,
     ) -> Result<Value, String> {
         info!(
             "ContextBridge::assemble called with query='{}', strategy='{}', max_tokens={}, session_id={:?}",
@@ -143,7 +143,7 @@ impl ContextBridge {
         }
 
         // Validate and parse strategy
-        let strategy_enum = match strategy.as_str() {
+        let strategy_enum = match strategy {
             "episodic" => {
                 debug!("Using Episodic retrieval strategy");
                 RetrievalStrategy::Episodic
@@ -169,7 +169,7 @@ impl ContextBridge {
 
             // Retrieve chunks based on strategy
             let chunks = self
-                .retrieve_chunks(&query, strategy_enum, max_tokens, session_id.as_deref())
+                .retrieve_chunks(query, strategy_enum, max_tokens, session_id)
                 .await?;
 
             debug!("Retrieved {} chunks", chunks.len());
@@ -188,12 +188,12 @@ impl ContextBridge {
             // Component 2: BM25Reranker (stateless, Phase 13 uses BM25-only)
             debug!("Creating BM25Reranker for reranking");
             let reranker = BM25Reranker::new();
-            let reranked = reranker
-                .rerank(chunks, &query, max_tokens / 2)
+            let ranked_chunks = reranker
+                .rerank(chunks, query, max_tokens / 2)
                 .await
                 .map_err(|e| format!("Reranking failed: {e}"))?;
 
-            debug!("Reranked to {} top chunks", reranked.len());
+            debug!("Reranked to {} top chunks", ranked_chunks.len());
 
             // Component 3: ContextAssembler (stateless, token budget management)
             debug!("Creating ContextAssembler with max_tokens={}", max_tokens);
@@ -206,17 +206,17 @@ impl ContextBridge {
                 keywords: vec![],
             };
 
-            let assembled = assembler.assemble(reranked, &query_understanding);
+            let context = assembler.assemble(ranked_chunks, &query_understanding);
 
             debug!(
                 "Assembled context with {} chunks, {} tokens",
-                assembled.chunks.len(),
-                assembled.token_count
+                context.chunks.len(),
+                context.token_count
             );
 
             // Convert to JSON for bridge return
-            let result =
-                serde_json::to_value(&assembled).map_err(|e| format!("JSON conversion failed: {e}"))?;
+            let result = serde_json::to_value(&context)
+                .map_err(|e| format!("JSON conversion failed: {e}"))?;
 
             Ok(result)
         })
@@ -242,9 +242,7 @@ impl ContextBridge {
                 self.retrieve_semantic(query, max_tokens).await
             }
             RetrievalStrategy::Hybrid => {
-                debug!(
-                    "Retrieving from both episodic and semantic memory (hybrid strategy)"
-                );
+                debug!("Retrieving from both episodic and semantic memory (hybrid strategy)");
                 let mut episodic_chunks = self.retrieve_episodic(query, max_tokens / 2).await?;
                 let semantic_chunks = self.retrieve_semantic(query, max_tokens / 2).await?;
 
@@ -267,7 +265,11 @@ impl ContextBridge {
     }
 
     /// Retrieve chunks from episodic memory using vector search
-    async fn retrieve_episodic(&self, query: &str, max_tokens: usize) -> Result<Vec<Chunk>, String> {
+    async fn retrieve_episodic(
+        &self,
+        query: &str,
+        max_tokens: usize,
+    ) -> Result<Vec<Chunk>, String> {
         debug!("Retrieving from episodic memory via vector search");
 
         // Get episodic memory reference
@@ -298,7 +300,11 @@ impl ContextBridge {
     }
 
     /// Retrieve chunks from semantic memory by converting entities to chunks
-    async fn retrieve_semantic(&self, _query: &str, max_tokens: usize) -> Result<Vec<Chunk>, String> {
+    async fn retrieve_semantic(
+        &self,
+        _query: &str,
+        max_tokens: usize,
+    ) -> Result<Vec<Chunk>, String> {
         debug!("Querying semantic memory for entities");
 
         // Get semantic memory reference
@@ -343,7 +349,7 @@ impl ContextBridge {
     }
 }
 
-/// Internal strategy enum matching llmspell-context RetrievalStrategy
+/// Internal strategy enum matching llmspell-context `RetrievalStrategy`
 #[derive(Debug, Clone, Copy)]
 enum RetrievalStrategy {
     Episodic,
@@ -383,18 +389,13 @@ mod tests {
         let bridge = ContextBridge::new(Arc::new(memory_manager));
 
         // Valid strategies should work
-        let result = bridge.assemble(
-            "test query".to_string(),
-            "episodic".to_string(),
-            1000,
-            None,
-        );
+        let result = bridge.assemble("test query", "episodic", 1000, None);
         assert!(result.is_ok());
 
         // Invalid strategy should error
         let result = bridge.assemble(
-            "test query".to_string(),
-            "invalid_strategy".to_string(),
+            "test query",
+            "invalid_strategy",
             1000,
             None,
         );
@@ -416,22 +417,12 @@ mod tests {
         let bridge = ContextBridge::new(Arc::new(memory_manager));
 
         // Token budget < 100 should error
-        let result = bridge.assemble(
-            "test query".to_string(),
-            "episodic".to_string(),
-            50,
-            None,
-        );
+        let result = bridge.assemble("test query", "episodic", 50, None);
         assert!(result.is_err());
         assert!(result.unwrap_err().contains("Token budget must be >=100"));
 
         // Token budget >= 100 should work
-        let result = bridge.assemble(
-            "test query".to_string(),
-            "episodic".to_string(),
-            100,
-            None,
-        );
+        let result = bridge.assemble("test query", "episodic", 100, None);
         assert!(result.is_ok());
     }
 
@@ -448,12 +439,7 @@ mod tests {
 
         // Query with no data should return empty context
         let result = bridge
-            .assemble(
-                "test query".to_string(),
-                "episodic".to_string(),
-                1000,
-                None,
-            )
+            .assemble("test query", "episodic", 1000, None)
             .expect("assemble should succeed");
 
         assert_eq!(result["chunks"].as_array().unwrap().len(), 0);
@@ -474,12 +460,7 @@ mod tests {
 
         // Query semantic memory (empty initially)
         let result = bridge
-            .assemble(
-                "test query".to_string(),
-                "semantic".to_string(),
-                1000,
-                None,
-            )
+            .assemble("test query", "semantic", 1000, None)
             .expect("assemble should succeed");
 
         assert_eq!(result["chunks"].as_array().unwrap().len(), 0);
@@ -498,7 +479,7 @@ mod tests {
 
         // Hybrid strategy combines both (both empty initially)
         let result = bridge
-            .assemble("test query".to_string(), "hybrid".to_string(), 1000, None)
+            .assemble("test query", "hybrid", 1000, None)
             .expect("assemble should succeed");
 
         assert_eq!(result["chunks"].as_array().unwrap().len(), 0);
