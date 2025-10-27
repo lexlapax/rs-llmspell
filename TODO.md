@@ -4617,12 +4617,12 @@ All subtasks (13.5.7a through 13.5.7i) are complete. Provider migration successf
 
 ---
 
-## Phase 13.7: Kernel Integration (Days 11-12)
+## Phase 13.7: Kernel Integration (Days 11-12) ✅ COMPLETE
 
 **Goal**: Integrate MemoryManager into llmspell-kernel with lifecycle management
 **Timeline**: 1.5 days (12 hours) - Reduced from 16h due to existing daemon infrastructure
 **Critical Dependencies**: Phases 13.1-13.6 complete ✅
-**Status**: READY TO START
+**Status**: ✅ COMPLETE
 
 **⚠️ TRACING REQUIREMENT**: ALL kernel integration code MUST include tracing:
 - `info!` for lifecycle events (memory manager init/shutdown, daemon start/stop, config loading)
@@ -4834,12 +4834,12 @@ All subtasks (13.5.7a through 13.5.7i) are complete. Provider migration successf
 
 **Time**: ~1.5 hours (3 compilation error fixes: Deserialize, episodic_arc trait method, Arc wrapping)
 
-### Task 13.7.3a: Add KernelHookSystem to IntegratedKernel
+### Task 13.7.3a: Add KernelHookSystem to IntegratedKernel ✅ COMPLETE
 
 **Priority**: HIGH
 **Estimated Time**: 1.5 hours (infrastructure setup before memory hooks)
 **Assignee**: Kernel Team
-**Status**: READY TO START
+**Status**: ✅ COMPLETE
 
 **Description**: Wire existing `KernelHookSystem` infrastructure into `IntegratedKernel` execution flow to enable hook-based memory integration.
 
