@@ -4962,12 +4962,12 @@ All subtasks (13.5.7a through 13.5.7i) are complete. Provider migration successf
 - NOT session lifecycle events (too high-level, no content)
 
 **Acceptance Criteria**:
-- [ ] ExecutionMemoryHook registered with KernelHookSystem in IntegratedKernel::new()
-- [ ] Hook captures PostCodeExecution events and creates 2 episodic entries (input + output)
-- [ ] Session metadata (session_id, timestamp) included in episodic records
-- [ ] Opt-in design: Only when memory_manager present in IntegratedKernel
-- [ ] Embedding generation deferred to ConsolidationDaemon (async, not in execute() hot path)
-- [ ] **TRACING**: Hook registration (info!), memory writes (debug!), errors (error!)
+- [x] ExecutionMemoryHook registered with KernelHookSystem in IntegratedKernel::new() ✅
+- [x] Hook captures PostCodeExecution events and creates 2 episodic entries (input + output) ✅
+- [x] Session metadata (session_id, timestamp) included in episodic records ✅
+- [x] Opt-in design: Only when memory_manager present in IntegratedKernel ✅
+- [x] Embedding generation deferred to `ConsolidationDaemon` (async, not in execute() hot path) ✅
+- [x] **TRACING**: Hook registration (info!), memory writes (debug!), errors (error!) ✅
 
 **Implementation Steps**:
 1. Create `llmspell-kernel/src/hooks/execution_memory.rs`:
