@@ -90,7 +90,7 @@ async fn get_or_create_state_manager(context: &GlobalContext) -> Result<Arc<Stat
     warn!("StateManager not found, creating in-memory instance for SessionManager");
     let state_manager =
         Arc::new(
-            StateManager::new()
+            StateManager::new(None)
                 .await
                 .map_err(|e| LLMSpellError::Component {
                     message: format!("Failed to create StateManager: {e}"),

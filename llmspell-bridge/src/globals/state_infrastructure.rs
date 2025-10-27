@@ -62,7 +62,7 @@ pub async fn get_or_create_state_infrastructure(
     };
 
     let state_manager = Arc::new(
-        StateManager::with_backend(backend_type.clone(), persistence_config.clone())
+        StateManager::with_backend(backend_type.clone(), persistence_config.clone(), None)
             .await
             .map_err(|e| LLMSpellError::Component {
                 message: format!("Failed to create StateManager: {e}"),

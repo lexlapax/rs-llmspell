@@ -19,7 +19,7 @@ mod tests {
         std::fs::create_dir_all(&backup_dir).unwrap();
 
         let state_manager = Arc::new(
-            StateManager::with_backend(StorageBackendType::Memory, PersistenceConfig::default())
+            StateManager::with_backend(StorageBackendType::Memory, PersistenceConfig::default(), None)
                 .await
                 .unwrap(),
         );

@@ -740,7 +740,7 @@ pub async fn start_embedded_kernel_with_executor(
     let provider_manager = create_provider_manager(&config).await?;
 
     // Create SessionManager
-    let state_manager = Arc::new(crate::state::StateManager::new().await?);
+    let state_manager = Arc::new(crate::state::StateManager::new(None).await?);
     let session_storage_backend = Arc::new(llmspell_storage::MemoryBackend::new());
     let hook_registry = Arc::new(llmspell_hooks::HookRegistry::new());
     let hook_executor = Arc::new(llmspell_hooks::HookExecutor::new());
@@ -902,7 +902,7 @@ pub async fn start_embedded_kernel_with_infrastructure(
 pub async fn start_embedded_kernel(config: LLMSpellConfig) -> Result<KernelHandle> {
     // Create minimal infrastructure
     let provider_manager = create_provider_manager(&config).await?;
-    let state_manager = Arc::new(crate::state::StateManager::new().await?);
+    let state_manager = Arc::new(crate::state::StateManager::new(None).await?);
     let session_storage_backend = Arc::new(llmspell_storage::MemoryBackend::new());
     let hook_registry = Arc::new(llmspell_hooks::HookRegistry::new());
     let hook_executor = Arc::new(llmspell_hooks::HookExecutor::new());
@@ -1309,7 +1309,7 @@ pub async fn start_kernel_service_with_config(
     info!("Transport setup complete");
 
     // Create SessionManager for this service kernel
-    let state_manager = Arc::new(crate::state::StateManager::new().await?);
+    let state_manager = Arc::new(crate::state::StateManager::new(None).await?);
     let session_storage_backend = Arc::new(llmspell_storage::MemoryBackend::new());
     let hook_registry = Arc::new(llmspell_hooks::HookRegistry::new());
     let hook_executor = Arc::new(llmspell_hooks::HookExecutor::new());
@@ -1669,7 +1669,7 @@ pub async fn start_kernel_service(port: u16, config: LLMSpellConfig) -> Result<S
     }) as Arc<dyn ScriptExecutor>;
 
     // Create SessionManager for this service kernel (legacy function)
-    let state_manager = Arc::new(crate::state::StateManager::new().await?);
+    let state_manager = Arc::new(crate::state::StateManager::new(None).await?);
     let session_storage_backend = Arc::new(llmspell_storage::MemoryBackend::new());
     let hook_registry = Arc::new(llmspell_hooks::HookRegistry::new());
     let hook_executor = Arc::new(llmspell_hooks::HookExecutor::new());

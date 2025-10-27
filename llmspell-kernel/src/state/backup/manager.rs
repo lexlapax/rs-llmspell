@@ -836,7 +836,7 @@ mod tests {
     async fn test_backup_id_generation() {
         let _config = BackupConfig::default();
         // TODO: Create proper test with mock StateManager
-        // let state_manager = Arc::new(RwLock::new(StateManager::new()));
+        // let state_manager = Arc::new(RwLock::new(StateManager::new(None)));
         // let hook_registry = Arc::new(RwLock::new(HookRegistry::new()));
         // let manager = BackupManager::new(config, state_manager, hook_registry).unwrap();
 

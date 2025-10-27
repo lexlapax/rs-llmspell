@@ -10,7 +10,7 @@ use tracing::{debug, error, info};
 use crate::consolidation::{ConsolidationEngine, NoopConsolidationEngine};
 use crate::episodic::InMemoryEpisodicMemory;
 use crate::error::Result;
-use crate::procedural::{InMemoryPatternTracker, NoopProceduralMemory};
+use crate::procedural::{InMemoryPatternTracker};
 use crate::semantic::GraphSemanticMemory;
 use crate::traits::{EpisodicMemory, MemoryManager, ProceduralMemory, SemanticMemory};
 use crate::types::{ConsolidationMode, ConsolidationResult, EpisodicEntry};

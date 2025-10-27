@@ -132,7 +132,6 @@ impl HookReplayManager {
 }
 
 /// Enhanced `StateManager` with persistent backend
-#[derive(Debug)]
 pub struct StateManager {
     // In-memory cache for fast access
     in_memory: Arc<RwLock<HashMap<String, Value>>>,
@@ -171,21 +170,43 @@ pub struct StateManager {
 
     // Artifact correlation tracking
     artifact_correlation_manager: Arc<ArtifactCorrelationManager>,
+
+    // Memory manager for state-memory synchronization (Phase 13.7.4)
+    memory_manager: Option<Arc<dyn llmspell_memory::MemoryManager>>,
+}
+
+impl std::fmt::Debug for StateManager {
+    #[allow(clippy::missing_fields_in_debug)]
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("StateManager")
+            .field("persistence_enabled", &self.persistence_config.enabled)
+            .field("memory_enabled", &self.memory_manager.is_some())
+            .field("hook_count_before", &self.before_state_change_hooks.read().len())
+            .field("hook_count_after", &self.after_state_change_hooks.read().len())
+            .finish()
+    }
 }
 
 impl StateManager {
     /// Create a new state manager with default in-memory backend
+    ///
+    /// # Arguments
+    ///
+    /// * `memory_manager` - Optional memory manager for state-memory synchronization (Phase 13.7.4)
     ///
     /// # Errors
     ///
     /// Returns `StateError` if:
     /// - Failed to create storage backend
     /// - Failed to initialize state manager components
-    #[instrument(level = "debug")]
-    pub async fn new() -> StateResult<Self> {
+    #[instrument(level = "debug", skip(memory_manager))]
+    pub async fn new(
+        memory_manager: Option<Arc<dyn llmspell_memory::MemoryManager>>,
+    ) -> StateResult<Self> {
         Self::with_backend(
             crate::state::config::StorageBackendType::Memory,
             PersistenceConfig::default(),
+            memory_manager,
         )
         .await
     }
@@ -233,23 +254,32 @@ impl StateManager {
             fast_agent_ops: FastAgentStateOps::new(),
             async_hook_processor: None,
             artifact_correlation_manager: Arc::new(ArtifactCorrelationManager::new()),
+            memory_manager: None, // No memory manager for benchmarks
         })
     }
 
     /// Create a new state manager with specified backend
+    ///
+    /// # Arguments
+    ///
+    /// * `backend_type` - Storage backend type (Memory, Sled, RocksDB)
+    /// * `config` - Persistence configuration
+    /// * `memory_manager` - Optional memory manager for state-memory synchronization (Phase 13.7.4)
     ///
     /// # Errors
     ///
     /// Returns `StateError` if:
     /// - Failed to create specified storage backend
     /// - Failed to initialize state manager components
-    #[instrument(level = "info", fields(
+    #[instrument(level = "info", skip(memory_manager), fields(
         backend_type = ?backend_type,
-        persistence_enabled = config.enabled
+        persistence_enabled = config.enabled,
+        memory_enabled = memory_manager.is_some()
     ))]
     pub async fn with_backend(
         backend_type: crate::state::config::StorageBackendType,
         config: PersistenceConfig,
+        memory_manager: Option<Arc<dyn llmspell_memory::MemoryManager>>,
     ) -> StateResult<Self> {
         let storage_backend = create_storage_backend(&backend_type).await?;
         let storage_adapter = Arc::new(StateStorageAdapter::new(
@@ -300,6 +330,14 @@ impl StateManager {
             None
         };
 
+        // Register StateMemoryHook if memory_manager is present (Phase 13.7.4)
+        let after_state_change_hooks = Arc::new(RwLock::new(Vec::new()));
+        if let Some(mm) = &memory_manager {
+            let state_memory_hook = super::memory_hook::StateMemoryHook::new(mm.clone());
+            after_state_change_hooks.write().push(Arc::new(state_memory_hook) as Arc<dyn Hook>);
+            debug!("StateMemoryHook registered for procedural memory pattern tracking");
+        }
+
         Ok(Self {
             in_memory,
             storage_backend,
@@ -312,12 +350,13 @@ impl StateManager {
             hook_history: Arc::new(RwLock::new(Vec::new())),
             replay_manager,
             before_state_change_hooks: Arc::new(RwLock::new(Vec::new())),
-            after_state_change_hooks: Arc::new(RwLock::new(Vec::new())),
+            after_state_change_hooks,
             agent_state_locks: Arc::new(RwLock::new(HashMap::new())),
             fast_path_manager: FastPathManager::new(FastPathConfig::default()),
             fast_agent_ops: FastAgentStateOps::new(),
             async_hook_processor,
             artifact_correlation_manager: Arc::new(ArtifactCorrelationManager::new()),
+            memory_manager,
         })
     }
 
@@ -373,18 +412,14 @@ impl StateManager {
             HookContext::new(HookPoint::Custom("state_change".to_string()), component_id);
         hook_context = hook_context.with_correlation_id(correlation_id);
 
-        // Add metadata
-        hook_context.insert_metadata("operation".to_string(), "state_set".to_string());
-        hook_context.insert_metadata("scope".to_string(), serde_json::to_string(&scope).unwrap());
-        hook_context.insert_metadata("key".to_string(), key.to_string());
-        hook_context.insert_metadata(
-            "old_value".to_string(),
-            serde_json::to_string(&old_value).unwrap(),
-        );
-        hook_context.insert_metadata(
-            "new_value".to_string(),
-            serde_json::to_string(&value).unwrap(),
-        );
+        // Add data for StateMemoryHook (Phase 13.7.4)
+        hook_context.insert_data("operation".to_string(), json!("state_set"));
+        hook_context.insert_data("scope".to_string(), json!(scope.to_string()));
+        hook_context.insert_data("key".to_string(), json!(key));
+        if let Some(ref old_val) = old_value {
+            hook_context.insert_data("old_value".to_string(), old_val.clone());
+        }
+        hook_context.insert_data("new_value".to_string(), value.clone());
 
         // Get hooks to execute
         let before_hooks = {
@@ -435,12 +470,9 @@ impl StateManager {
         };
 
         if !after_hooks.is_empty() {
-            // Update context for post-processing
-            hook_context.insert_metadata("success".to_string(), "true".to_string());
-            hook_context.insert_metadata(
-                "final_value".to_string(),
-                serde_json::to_string(&final_value).unwrap(),
-            );
+            // Update context for post-processing (Phase 13.7.4)
+            hook_context.insert_data("success".to_string(), json!(true));
+            hook_context.insert_data("final_value".to_string(), final_value.clone());
 
             // Queue hooks for async processing
             if let Some(processor) = &self.async_hook_processor {
@@ -499,18 +531,14 @@ impl StateManager {
             HookContext::new(HookPoint::Custom("state_change".to_string()), component_id);
         hook_context = hook_context.with_correlation_id(correlation_id);
 
-        // Add metadata as string values
-        hook_context.insert_metadata("operation".to_string(), "state_set".to_string());
-        hook_context.insert_metadata("scope".to_string(), serde_json::to_string(&scope).unwrap());
-        hook_context.insert_metadata("key".to_string(), key.to_string());
-        hook_context.insert_metadata(
-            "old_value".to_string(),
-            serde_json::to_string(&old_value).unwrap(),
-        );
-        hook_context.insert_metadata(
-            "new_value".to_string(),
-            serde_json::to_string(&value).unwrap(),
-        );
+        // Add data for StateMemoryHook (Phase 13.7.4)
+        hook_context.insert_data("operation".to_string(), json!("state_set"));
+        hook_context.insert_data("scope".to_string(), json!(scope.to_string()));
+        hook_context.insert_data("key".to_string(), json!(key));
+        if let Some(ref old_val) = old_value {
+            hook_context.insert_data("old_value".to_string(), old_val.clone());
+        }
+        hook_context.insert_data("new_value".to_string(), value.clone());
 
         // Execute pre-state-change hooks
         let hooks_to_execute = {
@@ -2026,7 +2054,7 @@ mod tests {
     use serde_json::json;
     #[tokio::test]
     async fn test_state_manager_basic_operations() {
-        let manager = StateManager::new().await.unwrap();
+        let manager = StateManager::new(None).await.unwrap();
 
         // Set and get
         manager
@@ -2049,7 +2077,7 @@ mod tests {
     }
     #[tokio::test]
     async fn test_state_scoping() {
-        let manager = StateManager::new().await.unwrap();
+        let manager = StateManager::new(None).await.unwrap();
 
         // Set values in different scopes
         manager
@@ -2091,7 +2119,7 @@ mod tests {
     }
     #[tokio::test]
     async fn test_key_validation() {
-        let manager = StateManager::new().await.unwrap();
+        let manager = StateManager::new(None).await.unwrap();
 
         // Empty key
         let result = manager.set(StateScope::Global, "", json!("value")).await;
@@ -2113,7 +2141,7 @@ mod tests {
     async fn test_agent_state_persistence() {
         use crate::state::agent_state::{MessageRole, PersistentAgentState};
 
-        let manager = StateManager::new().await.unwrap();
+        let manager = StateManager::new(None).await.unwrap();
 
         // Create a test agent state
         let mut agent_state =
@@ -2152,7 +2180,7 @@ mod tests {
     async fn test_agent_metadata_retrieval() {
         use crate::state::agent_state::PersistentAgentState;
 
-        let manager = StateManager::new().await.unwrap();
+        let manager = StateManager::new(None).await.unwrap();
 
         // Create a test agent state with metadata
         let mut agent_state =
