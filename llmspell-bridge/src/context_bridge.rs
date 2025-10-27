@@ -383,6 +383,94 @@ impl ContextBridge {
         chunks
     }
 
+    /// Quick test query with hybrid strategy and 2000 token budget
+    ///
+    /// Convenience method for testing context retrieval without specifying strategy/budget.
+    ///
+    /// # Arguments
+    ///
+    /// * `query` - Query string
+    /// * `session_id` - Optional session ID for episodic filtering
+    ///
+    /// # Returns
+    ///
+    /// JSON representation of `AssembledContext` (same as `assemble()`)
+    ///
+    /// # Errors
+    ///
+    /// Returns error if context assembly fails
+    ///
+    /// # Example
+    ///
+    /// ```ignore
+    /// let context = bridge.test_query("test query", Some("session-123"))?;
+    /// ```
+    pub fn test_query(&self, query: &str, session_id: Option<&str>) -> Result<Value, String> {
+        debug!("ContextBridge::test_query called with query='{}'", query);
+        // Quick test with hybrid strategy, 2000 tokens
+        self.assemble(query, "hybrid", 2000, session_id)
+    }
+
+    /// Get strategy statistics from memory manager
+    ///
+    /// Returns counts of episodic and semantic records, plus list of available strategies.
+    ///
+    /// # Returns
+    ///
+    /// JSON object with:
+    /// - `episodic_count`: Number of episodic memory entries
+    /// - `semantic_count`: Number of semantic entities
+    /// - `strategies`: Array of available strategies `["episodic", "semantic", "hybrid"]`
+    ///
+    /// # Errors
+    ///
+    /// Returns error if memory manager queries fail
+    ///
+    /// # Example
+    ///
+    /// ```ignore
+    /// let stats = bridge.get_strategy_stats()?;
+    /// println!("Episodic: {}", stats["episodic_count"]);
+    /// ```
+    pub fn get_strategy_stats(&self) -> Result<Value, String> {
+        debug!("ContextBridge::get_strategy_stats called");
+
+        self.runtime.block_on(async {
+            debug!("Entering async get_strategy_stats");
+
+            // Get episodic count (same pattern as MemoryBridge::stats)
+            let episodic_count = self
+                .memory_manager
+                .episodic()
+                .search("", 10000)
+                .await
+                .map(|entries| entries.len())
+                .unwrap_or(0);
+
+            // Get semantic count
+            let semantic_count = self
+                .memory_manager
+                .semantic()
+                .query_by_type("")
+                .await
+                .map(|entities| entities.len())
+                .unwrap_or(0);
+
+            debug!(
+                "get_strategy_stats: episodic={}, semantic={}",
+                episodic_count, semantic_count
+            );
+
+            let stats = serde_json::json!({
+                "episodic_count": episodic_count,
+                "semantic_count": semantic_count,
+                "strategies": ["episodic", "semantic", "hybrid"]
+            });
+
+            Ok(stats)
+        })
+    }
+
     /// Convert semantic entity to chunk
     fn entity_to_chunk(entity: llmspell_memory::Entity) -> Chunk {
         let content = format!(

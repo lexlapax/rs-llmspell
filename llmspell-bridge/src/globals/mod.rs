@@ -4,6 +4,7 @@
 pub mod agent_global;
 pub mod artifact_global;
 pub mod config_global;
+pub mod context_global;
 pub mod core;
 pub mod debug_global;
 pub mod event_global;
