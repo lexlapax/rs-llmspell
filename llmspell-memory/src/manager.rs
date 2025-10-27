@@ -451,6 +451,7 @@ impl MemoryManager for DefaultMemoryManager {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::procedural::NoopProceduralMemory;
     use crate::types::EpisodicEntry;
     use serde_json::json;
 

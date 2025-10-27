@@ -16,7 +16,7 @@ use tokio::time::sleep;
 async fn test_session_lifecycle_correlation() -> Result<()> {
     // Create infrastructure
     let storage_backend = Arc::new(MemoryBackend::new());
-    let state_manager = Arc::new(StateManager::new().await.unwrap());
+    let state_manager = Arc::new(StateManager::new(None).await.unwrap());
     let hook_registry = Arc::new(HookRegistry::new());
     let hook_executor = Arc::new(HookExecutor::new());
     let event_bus = Arc::new(EventBus::new());
@@ -79,7 +79,7 @@ async fn test_session_lifecycle_correlation() -> Result<()> {
 async fn test_artifact_event_correlation() -> Result<()> {
     // Create infrastructure
     let storage_backend = Arc::new(MemoryBackend::new());
-    let state_manager = Arc::new(StateManager::new().await.unwrap());
+    let state_manager = Arc::new(StateManager::new(None).await.unwrap());
     let hook_registry = Arc::new(HookRegistry::new());
     let hook_executor = Arc::new(HookExecutor::new());
     let event_bus = Arc::new(EventBus::new());
@@ -140,7 +140,7 @@ async fn test_artifact_event_correlation() -> Result<()> {
 async fn test_session_lifecycle_with_multiple_operations() -> Result<()> {
     // Create infrastructure
     let storage_backend = Arc::new(MemoryBackend::new());
-    let state_manager = Arc::new(StateManager::new().await.unwrap());
+    let state_manager = Arc::new(StateManager::new(None).await.unwrap());
     let hook_registry = Arc::new(HookRegistry::new());
     let hook_executor = Arc::new(HookExecutor::new());
     let event_bus = Arc::new(EventBus::new());
@@ -208,7 +208,7 @@ async fn test_session_lifecycle_with_multiple_operations() -> Result<()> {
 async fn test_multiple_sessions_correlation_isolation() -> Result<()> {
     // Create infrastructure
     let storage_backend = Arc::new(MemoryBackend::new());
-    let state_manager = Arc::new(StateManager::new().await.unwrap());
+    let state_manager = Arc::new(StateManager::new(None).await.unwrap());
     let hook_registry = Arc::new(HookRegistry::new());
     let hook_executor = Arc::new(HookExecutor::new());
     let event_bus = Arc::new(EventBus::new());

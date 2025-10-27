@@ -16,7 +16,7 @@ use std::sync::Arc;
 
 async fn setup_test_bridge() -> Arc<RAGBridge> {
     // Setup state manager
-    let state_manager = Arc::new(StateManager::new().await.unwrap());
+    let state_manager = Arc::new(StateManager::new(None).await.unwrap());
 
     // Setup session manager
     let storage_backend = Arc::new(MemoryBackend::new());

@@ -25,7 +25,7 @@ use tokio::time::sleep;
 #[tokio::test]
 async fn test_save_on_pause() -> Result<()> {
     // Create state manager
-    let state_manager = Arc::new(StateManager::new().await?);
+    let state_manager = Arc::new(StateManager::new(None).await?);
 
     // Create persistence config
     let config = PersistenceConfigBuilder::new()
@@ -109,7 +109,7 @@ async fn test_save_on_pause() -> Result<()> {
 #[tokio::test]
 async fn test_save_on_stop() -> Result<()> {
     // Create state manager
-    let state_manager = Arc::new(StateManager::new().await?);
+    let state_manager = Arc::new(StateManager::new(None).await?);
 
     // Create persistence config
     let config = PersistenceConfigBuilder::new()
@@ -193,7 +193,7 @@ async fn test_save_on_stop() -> Result<()> {
 #[tokio::test]
 async fn test_auto_save() -> Result<()> {
     // Create state manager
-    let state_manager = Arc::new(StateManager::new().await?);
+    let state_manager = Arc::new(StateManager::new(None).await?);
 
     // Create persistence config with fast auto-save
     let config = PersistenceConfigBuilder::new()
@@ -246,7 +246,7 @@ async fn test_auto_save() -> Result<()> {
 #[tokio::test]
 async fn test_circuit_breaker() -> Result<()> {
     // Create state manager
-    let state_manager = Arc::new(StateManager::new().await?);
+    let state_manager = Arc::new(StateManager::new(None).await?);
 
     // Create persistence config with low failure threshold
     let config = PersistenceConfigBuilder::new()
@@ -314,7 +314,7 @@ async fn test_circuit_breaker() -> Result<()> {
 #[tokio::test]
 async fn test_non_blocking_saves() -> Result<()> {
     // Create state manager
-    let state_manager = Arc::new(StateManager::new().await?);
+    let state_manager = Arc::new(StateManager::new(None).await?);
 
     // Create persistence config with non-blocking saves
     let config = PersistenceConfigBuilder::new()

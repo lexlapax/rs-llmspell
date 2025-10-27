@@ -227,7 +227,7 @@ async fn test_policy_composition_voting() -> Result<()> {
 async fn test_policy_integration_with_session_manager() -> Result<()> {
     // Create infrastructure
     let storage_backend = Arc::new(MemoryBackend::new());
-    let state_manager = Arc::new(StateManager::new().await.unwrap());
+    let state_manager = Arc::new(StateManager::new(None).await.unwrap());
     let hook_registry = Arc::new(HookRegistry::new());
     let hook_executor = Arc::new(HookExecutor::new());
     let event_bus = Arc::new(EventBus::new());

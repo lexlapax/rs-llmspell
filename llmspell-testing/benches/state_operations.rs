@@ -70,6 +70,7 @@ fn bench_state_save_by_size(c: &mut Criterion) {
                                 use_compression: true,
                             }),
                             PersistenceConfig::default(),
+                            None, // No memory manager
                         )
                         .await
                         .unwrap();
@@ -345,6 +346,7 @@ fn bench_compression_effectiveness(c: &mut Criterion) {
                         use_compression: true,
                     }),
                     PersistenceConfig::default(),
+                    None, // No memory manager
                 )
                 .await
                 .unwrap();
@@ -382,6 +384,7 @@ fn bench_compression_effectiveness(c: &mut Criterion) {
                         use_compression: true,
                     }),
                     PersistenceConfig::default(),
+                    None, // No memory manager
                 )
                 .await
                 .unwrap();

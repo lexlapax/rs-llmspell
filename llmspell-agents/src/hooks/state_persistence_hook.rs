@@ -351,7 +351,7 @@ mod tests {
     }
     #[tokio::test]
     async fn test_state_persistence_hook_creation() {
-        let state_manager = Arc::new(StateManager::new().await.unwrap());
+        let state_manager = Arc::new(StateManager::new(None).await.unwrap());
         let config = PersistenceConfig::default();
         let hook = StatePersistenceHook::new(state_manager, config);
 

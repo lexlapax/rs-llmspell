@@ -51,6 +51,7 @@ async fn test_basic_agent_state_persistence() -> Result<()> {
                 backup: None,
                 performance: PerformanceConfig::default(),
             },
+            None, // No memory manager for this test
         )
         .await?,
     );
@@ -134,7 +135,7 @@ async fn test_mock_agent_state_persistence() -> Result<()> {
     let mut agent = MockAgent::new(mock_config);
 
     // Create state manager
-    let state_manager = Arc::new(StateManager::new().await?);
+    let state_manager = Arc::new(StateManager::new(None).await?);
     agent.set_state_manager(state_manager.clone());
 
     // Initialize and start
@@ -179,7 +180,7 @@ async fn test_mock_agent_state_persistence() -> Result<()> {
 #[tokio::test]
 async fn test_state_persistence_with_multiple_agents() -> Result<()> {
     // Create state manager
-    let state_manager = Arc::new(StateManager::new().await?);
+    let state_manager = Arc::new(StateManager::new(None).await?);
 
     // Create multiple agents
     let config1 = AgentBuilder::basic("agent-1")

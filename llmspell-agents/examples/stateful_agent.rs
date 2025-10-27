@@ -42,6 +42,7 @@ async fn main() -> Result<()> {
                 backup: None,
                 performance: PerformanceConfig::default(),
             },
+            None, // No memory manager for this example
         )
         .await?,
     );

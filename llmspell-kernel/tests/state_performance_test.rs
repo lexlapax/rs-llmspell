@@ -5,7 +5,7 @@ use std::time::Instant;
 #[tokio::test]
 async fn test_state_performance_targets() {
     // Create state manager with memory backend
-    let state_manager = StateManager::new().await.unwrap();
+    let state_manager = StateManager::new(None).await.unwrap();
 
     // Test write performance
     let write_start = Instant::now();

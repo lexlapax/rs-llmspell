@@ -55,6 +55,7 @@ impl ProviderTestContext {
                     backup: None,
                     performance: PerformanceConfig::default(),
                 },
+                None, // No memory manager for this test
             )
             .await?,
         );

@@ -560,16 +560,16 @@ impl InteractiveChatTemplate {
         );
 
         // Create integrated kernel
-        let kernel = IntegratedKernel::new(
-            jupyter_protocol,
-            ExecutionConfig::default(),
-            session_id.to_string(),
+        let kernel = IntegratedKernel::new(llmspell_kernel::execution::IntegratedKernelParams {
+            protocol: jupyter_protocol,
+            config: ExecutionConfig::default(),
+            session_id: session_id.to_string(),
             script_executor,
-            Some(provider_manager.clone()),
+            provider_manager: Some(provider_manager.clone()),
             session_manager,
-            None, // memory_manager (Phase 13.7.1 - opt-in)
-            None, // hook_system (Phase 13.7.3a - opt-in)
-        )
+            memory_manager: None,
+            hook_system: None,
+        })
         .await
         .map_err(|e| TemplateError::ExecutionFailed(format!("Failed to create kernel: {}", e)))?;
 

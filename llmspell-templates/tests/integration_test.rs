@@ -477,7 +477,7 @@ async fn test_knowledge_management_ingest() {
 
     // Create execution context with StateManager
     let state_manager = Arc::new(
-        StateManager::new()
+        StateManager::new(None)
             .await
             .expect("Failed to create StateManager"),
     );
@@ -526,7 +526,7 @@ async fn test_knowledge_management_query() {
         .expect("Failed to get knowledge-management template");
 
     let state_manager = Arc::new(
-        StateManager::new()
+        StateManager::new(None)
             .await
             .expect("Failed to create StateManager"),
     );
@@ -587,7 +587,7 @@ async fn test_knowledge_management_update() {
         .expect("Failed to get knowledge-management template");
 
     let state_manager = Arc::new(
-        StateManager::new()
+        StateManager::new(None)
             .await
             .expect("Failed to create StateManager"),
     );
@@ -659,7 +659,7 @@ async fn test_knowledge_management_delete() {
         .expect("Failed to get knowledge-management template");
 
     let state_manager = Arc::new(
-        StateManager::new()
+        StateManager::new(None)
             .await
             .expect("Failed to create StateManager"),
     );
@@ -729,7 +729,7 @@ async fn test_knowledge_management_list() {
         .expect("Failed to get knowledge-management template");
 
     let state_manager = Arc::new(
-        StateManager::new()
+        StateManager::new(None)
             .await
             .expect("Failed to create StateManager"),
     );
@@ -794,7 +794,7 @@ async fn test_knowledge_management_full_cycle() {
         .expect("Failed to get knowledge-management template");
 
     let state_manager = Arc::new(
-        StateManager::new()
+        StateManager::new(None)
             .await
             .expect("Failed to create StateManager"),
     );
@@ -916,7 +916,7 @@ async fn test_knowledge_management_error_handling() {
         .expect("Failed to get knowledge-management template");
 
     let state_manager = Arc::new(
-        StateManager::new()
+        StateManager::new(None)
             .await
             .expect("Failed to create StateManager"),
     );

@@ -2246,16 +2246,16 @@ mod tests {
         let executor = Arc::new(MockScriptExecutor) as Arc<dyn ScriptExecutor>;
         let session_manager = create_test_session_manager().await;
 
-        IntegratedKernel::new(
+        IntegratedKernel::new(crate::execution::IntegratedKernelParams {
             protocol,
             config,
-            "test-session".to_string(),
-            executor,
-            None,
+            session_id: "test-session".to_string(),
+            script_executor: executor,
+            provider_manager: None,
             session_manager,
-            None, // memory_manager (Phase 13.7.1 - opt-in)
-            None, // hook_system (Phase 13.7.3a - opt-in)
-        )
+            memory_manager: None,
+            hook_system: None,
+        })
         .await
         .unwrap()
     }

@@ -16,7 +16,7 @@ mod tests {
 
     /// Create a test session manager with default configuration
     async fn create_test_session_manager() -> SessionManager {
-        let state_manager = Arc::new(StateManager::new().await.unwrap());
+        let state_manager = Arc::new(StateManager::new(None).await.unwrap());
         let storage_backend = Arc::new(MemoryBackend::new());
         let hook_registry = Arc::new(HookRegistry::new());
         let hook_executor = Arc::new(HookExecutor::new());

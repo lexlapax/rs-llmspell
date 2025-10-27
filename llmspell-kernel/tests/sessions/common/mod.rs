@@ -32,7 +32,7 @@ impl TestFixture {
     /// Create a new test fixture with custom configuration
     pub async fn with_config(config: SessionManagerConfig) -> Result<Self> {
         let storage_backend = Arc::new(MemoryBackend::new());
-        let state_manager = Arc::new(StateManager::new().await?);
+        let state_manager = Arc::new(StateManager::new(None).await?);
         let event_bus = Arc::new(EventBus::new());
         let hook_registry = Arc::new(HookRegistry::new());
         let hook_executor = Arc::new(HookExecutor::new());
