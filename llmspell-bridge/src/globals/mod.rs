@@ -11,6 +11,7 @@ pub mod hook_global;
 pub mod injection;
 pub mod json_global;
 pub mod local_llm_global;
+pub mod memory_global;
 pub mod provider_global;
 pub mod rag_global;
 pub mod rag_infrastructure;
@@ -80,6 +81,14 @@ fn register_session_artifacts(
             artifact_bridge,
         )));
     }
+
+    // Register Memory global if memory_manager available
+    // TODO(Phase 13): Enable when kernel provides memory_manager in context
+    // Expected type: Arc<dyn llmspell_memory::MemoryManager>
+    // if let Some(memory_manager) = context.get_bridge::<Arc<dyn llmspell_memory::MemoryManager>>("memory_manager") {
+    //     let memory_bridge = Arc::new(crate::memory_bridge::MemoryBridge::new(memory_manager));
+    //     builder.register(Arc::new(memory_global::MemoryGlobal::new(memory_bridge)));
+    // }
 
     session_manager_opt
 }

@@ -120,6 +120,11 @@ name = "globals_test"
 required-features = ["common"]
 
 [[test]]
+name = "memory_global_test"
+path = "tests/lua/memory_global_test.rs"
+required-features = ["common"]
+
+[[test]]
 name = "integration_test"
 required-features = ["common"]
 
