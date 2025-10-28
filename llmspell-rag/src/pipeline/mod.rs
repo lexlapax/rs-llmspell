@@ -11,7 +11,9 @@ pub mod builder;
 pub mod config;
 pub mod ingestion;
 pub mod rag_pipeline;
+pub mod rag_trait;
 pub mod retrieval_flow;
+pub mod session_adapter;
 
 // Re-export main types
 pub use builder::{RAGPipelineBuilder, RAGPipelineBuilderError};
@@ -20,6 +22,8 @@ pub use ingestion::{
     DocumentMetadata, DocumentProcessor, IngestionFlow, IngestionResult, ProcessedDocument,
 };
 pub use rag_pipeline::{RAGPipeline, RAGPipelineError};
+pub use rag_trait::{RAGResult, RAGRetriever};
 pub use retrieval_flow::{
     RerankingStrategy, RetrievalFlow, RetrievalResult, ScoreFusion, SearchResult,
 };
+pub use session_adapter::SessionRAGAdapter;
