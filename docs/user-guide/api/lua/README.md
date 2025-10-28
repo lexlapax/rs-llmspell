@@ -9,19 +9,21 @@ This document provides comprehensive documentation of all Lua globals available 
 3. [Workflow](#workflow) - Workflow orchestration
 4. [Session](#session) - Session management and persistence
 5. [State](#state) - Global state management
-6. [Event](#event) - Event publishing and subscription
-7. [Hook](#hook) - Hook registration and management
-8. [RAG](#rag) - Retrieval-Augmented Generation with vector storage
-9. [LocalLLM](#localllm) - Local model management (Ollama, Candle)
-10. [Config](#config) - Configuration access and management
-11. [Provider](#provider) - LLM provider information
-12. [Artifact](#artifact) - Artifact storage and retrieval
-13. [Replay](#replay) - Hook replay and testing
-14. [Debug](#debug) - Debugging and profiling utilities
-15. [JSON](#json) - JSON parsing and serialization
-16. [Template](#template) - Production-ready AI workflow templates
-17. [ARGS](#args) - Command-line argument access
-18. [Streaming](#streaming) - Streaming and coroutine utilities
+6. [Memory](#memory) - Adaptive memory system (episodic, semantic, consolidation)
+7. [Context](#context) - Context assembly and retrieval strategies
+8. [Event](#event) - Event publishing and subscription
+9. [Hook](#hook) - Hook registration and management
+10. [RAG](#rag) - Retrieval-Augmented Generation with vector storage
+11. [LocalLLM](#localllm) - Local model management (Ollama, Candle)
+12. [Config](#config) - Configuration access and management
+13. [Provider](#provider) - LLM provider information
+14. [Artifact](#artifact) - Artifact storage and retrieval
+15. [Replay](#replay) - Hook replay and testing
+16. [Debug](#debug) - Debugging and profiling utilities
+17. [JSON](#json) - JSON parsing and serialization
+18. [Template](#template) - Production-ready AI workflow templates
+19. [ARGS](#args) - Command-line argument access
+20. [Streaming](#streaming) - Streaming and coroutine utilities
 
 ---
 
@@ -1271,6 +1273,302 @@ Gets storage usage statistics.
 ```lua
 local usage = State.get_storage_usage()
 print(usage.bytes_used, usage.entries_count)
+```
+
+---
+
+## Memory
+
+The `Memory` global provides access to LLMSpell's adaptive memory system with three subsystems:
+- **Episodic**: Conversation history and interactions (temporal memory)
+- **Semantic**: Knowledge graph with entities and relationships (conceptual memory)
+- **Consolidation**: LLM-driven extraction of knowledge from conversations
+
+**Examples**: See `examples/script-users/getting-started/06-episodic-memory-basic.lua`
+
+### Episodic Memory
+
+Stores conversation exchanges with automatic timestamping and embedding generation.
+
+####
+
+ Memory.episodic.add(session_id, role, content, metadata)
+
+Adds a conversation exchange to episodic memory.
+
+**Parameters**:
+- `session_id` (string): Session identifier for isolation
+- `role` (string): Speaker role (`"user"`, `"assistant"`, `"system"`)
+- `content` (string): Message content
+- `metadata` (table, optional): Additional metadata as key-value pairs
+
+**Returns**: String (entry ID)
+
+**Example**:
+```lua
+local id = Memory.episodic.add(
+    "session-123",
+    "user",
+    "What is Rust?",
+    {topic = "programming", priority = "high"}
+)
+print("Added entry: " .. id)
+```
+
+**Notes**:
+- Session IDs enable conversation isolation
+- Metadata is stored and searchable
+- Entries are automatically timestamped
+- Embeddings are generated asynchronously
+
+#### Memory.episodic.search(session_id, query, limit)
+
+Searches episodic memory using semantic similarity.
+
+**Parameters**:
+- `session_id` (string): Session ID to filter by (empty string = all sessions)
+- `query` (string): Search query text
+- `limit` (number, optional): Maximum results (default: 10)
+
+**Returns**: Array of entry tables
+
+**Entry Structure**:
+```lua
+{
+    id = "entry-uuid",
+    session_id = "session-123",
+    role = "user",
+    content = "What is Rust?",
+    metadata = {topic = "programming"},
+    created_at = "2025-01-27T10:30:00Z"
+}
+```
+
+**Example**:
+```lua
+local entries = Memory.episodic.search("session-123", "ownership", 5)
+for i, entry in ipairs(entries) do
+    print(string.format("[%s] %s", entry.role, entry.content))
+end
+```
+
+**Notes**:
+- Returns entries sorted by relevance
+- Empty session_id searches all sessions
+- Combines vector similarity + metadata filtering
+
+### Semantic Memory
+
+Stores structured knowledge as entities in a knowledge graph.
+
+#### Memory.semantic.query(query, limit)
+
+Queries the knowledge graph for relevant entities.
+
+**Parameters**:
+- `query` (string): Query text
+- `limit` (number, optional): Maximum results (default: 10)
+
+**Returns**: Array of entity tables
+
+**Example**:
+```lua
+local entities = Memory.semantic.query("Rust programming", 5)
+for _, entity in ipairs(entities) do
+    print(entity.name .. ": " .. entity.description)
+end
+```
+
+**Notes**:
+- Entities are populated via consolidation
+- Semantic memory is global (not session-specific)
+
+### Consolidation
+
+Converts episodic memories into semantic knowledge using LLM analysis.
+
+#### Memory.consolidate(session_id, force)
+
+Runs consolidation to extract knowledge from conversations.
+
+**Parameters**:
+- `session_id` (string, optional): Session to consolidate (nil = all sessions)
+- `force` (boolean, optional): Force immediate consolidation (default: false)
+
+**Returns**: Table with consolidation statistics
+
+**Example**:
+```lua
+local stats = Memory.consolidate("session-123", true)
+print(string.format("Processed %d entries", stats.entries_processed))
+print(string.format("Extracted %d entities", stats.entities_added))
+```
+
+**Notes**:
+- Background mode processes periodically
+- Immediate mode blocks until complete
+- Requires LLM provider for entity extraction
+
+### Statistics
+
+#### Memory.stats()
+
+Returns memory system statistics.
+
+**Returns**: Table with counts and status
+
+**Example**:
+```lua
+local stats = Memory.stats()
+print(string.format("Episodic: %d entries", stats.episodic_count))
+print(string.format("Semantic: %d entities", stats.semantic_count))
+print(string.format("Pending: %d sessions", stats.sessions_with_unprocessed))
+```
+
+**Returned Fields**:
+- `episodic_count`: Number of conversation entries
+- `semantic_count`: Number of knowledge entities
+- `sessions_with_unprocessed`: Sessions awaiting consolidation
+- `has_episodic`: Boolean indicating episodic availability
+- `has_semantic`: Boolean indicating semantic availability
+- `has_consolidation`: Boolean indicating consolidation availability
+
+---
+
+## Context
+
+The `Context` global provides intelligent context assembly from memory using retrieval strategies.
+
+**Examples**: See `examples/script-users/getting-started/07-context-assembly-basic.lua`
+
+### Context Assembly
+
+#### Context.assemble(query, strategy, max_tokens, session_id)
+
+Assembles relevant context from memory for a query.
+
+**Parameters**:
+- `query` (string): Query text to find relevant context for
+- `strategy` (string): Retrieval strategy (`"episodic"`, `"semantic"`, or `"hybrid"`)
+- `max_tokens` (number, optional): Token budget for context (default: 8192)
+- `session_id` (string, optional): Session to filter by (episodic strategy only)
+
+**Returns**: Table with assembled context
+
+**Result Structure**:
+```lua
+{
+    chunks = {           -- Array of ranked chunks
+        {
+            chunk = {
+                role = "user",
+                content = "What is Rust?",
+                source = "session-123",
+                timestamp = "2025-01-27T10:30:00Z",
+                metadata = {}
+            },
+            score = 0.95,     -- Relevance score 0-1
+            ranker = "bm25"   -- Reranking method used
+        }
+    },
+    total_confidence = 0.87,  -- Average relevance
+    temporal_span = {         -- Time range of chunks
+        "2025-01-27T10:00:00Z",
+        "2025-01-27T11:00:00Z"
+    },
+    token_count = 1234,       -- Total tokens in context
+    formatted = "..."         -- LLM-ready formatted context
+}
+```
+
+**Example**:
+```lua
+local context = Context.assemble(
+    "How does ownership work in Rust?",
+    "episodic",
+    2000,
+    "session-123"
+)
+
+print(string.format("Retrieved %d chunks using %d tokens",
+    #context.chunks, context.token_count))
+
+-- Use formatted context in LLM prompt
+local prompt = context.formatted .. "\\n\\nUser: " .. user_query
+```
+
+**Strategies**:
+- `"episodic"`: Recent conversation history (fast, temporal)
+- `"semantic"`: Knowledge graph entities (conceptual, global)
+- `"hybrid"`: Combined episodic + semantic (comprehensive)
+
+**Notes**:
+- Token budget enforced via truncation
+- Chunks are reranked by relevance (BM25)
+- Formatted context ready for LLM prompting
+- Min token budget: 100, warn if >8192
+
+#### Context.test(query, session_id)
+
+Quick test of context assembly with hybrid strategy and 2000 token budget.
+
+**Parameters**:
+- `query` (string): Test query
+- `session_id` (string, optional): Session filter
+
+**Returns**: Same as `Context.assemble()`
+
+**Example**:
+```lua
+local result = Context.test("test query", "session-123")
+print(string.format("Test retrieved %d chunks", #result.chunks))
+```
+
+### Strategy Statistics
+
+#### Context.strategy_stats()
+
+Returns statistics about available retrieval strategies.
+
+**Returns**: Table with strategy information
+
+**Example**:
+```lua
+local stats = Context.strategy_stats()
+print(string.format("Episodic: %d entries", stats.episodic_count))
+print(string.format("Semantic: %d entities", stats.semantic_count))
+print("Strategies: " .. table.concat(stats.strategies, ", "))
+```
+
+**Returned Fields**:
+- `episodic_count`: Number of episodic entries available
+- `semantic_count`: Number of semantic entities available
+- `strategies`: Array of available strategy names
+
+### Integration Pattern
+
+Typical workflow combining Memory and Context:
+
+```lua
+-- 1. Store conversation
+Memory.episodic.add(session_id, "user", user_message, {})
+
+-- 2. Assemble relevant context
+local context = Context.assemble(
+    user_message,
+    "episodic",
+    4000,
+    session_id
+)
+
+-- 3. Build LLM prompt with context
+local prompt = context.formatted .. "\\n\\nUser: " .. user_message
+
+-- 4. Call LLM (Agent, Tool, or direct API)
+local response = Agent.create("gpt-4"):prompt(prompt)
+
+-- 5. Store response
+Memory.episodic.add(session_id, "assistant", response, {})
 ```
 
 ---

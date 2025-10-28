@@ -622,14 +622,24 @@ For 13.1 to 13.8 see `TODO-TEMP-ARCHIVE.md`
 
 ---
 
-### Task 13.9.3: API Documentation - Memory & Context Globals
+### Task 13.9.3: API Documentation - Memory & Context Globals ✅ COMPLETE
 
 **Priority**: HIGH
 **Estimated Time**: 2 hours
 **Assignee**: Documentation Team
-**Status**: READY TO START
+**Status**: ✅ COMPLETE
 
 **Description**: Add comprehensive API documentation for Memory and Context globals to Lua API reference guide.
+
+**Implementation Insights**:
+- Added ~300 lines of API documentation to `docs/user-guide/api/lua/README.md`
+- Memory section (17th global): 5 methods documented with full signatures, parameters, returns, examples
+- Context section (18th global): 3 methods documented with assembly strategies, chunk structure, workflow pattern
+- Updated Table of Contents to add Memory (#6) and Context (#7), renumbered Event-Streaming to #8-20
+- Included best practices: session isolation, token budgets, strategy selection
+- Added integration pattern showing complete Memory → Context → LLM workflow
+- Cross-referenced example files (06-episodic-memory-basic.lua, 07-context-assembly-basic.lua, cookbook examples)
+- All examples working in production, integration tests passing (5/5)
 
 **Architectural Analysis**:
 - **Existing Docs**: `docs/user-guide/api/lua/README.md` (~1500 lines)
