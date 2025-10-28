@@ -520,11 +520,12 @@ mod tests {
         let bridge = ContextBridge::new(Arc::new(memory_manager));
 
         // Valid strategies should work
-        let result = bridge.assemble("test query", "episodic", 1000, None);
+        let result = runtime.block_on(bridge.assemble("test query", "episodic", 1000, None));
         assert!(result.is_ok());
 
         // Invalid strategy should error
-        let result = bridge.assemble("test query", "invalid_strategy", 1000, None);
+        let result =
+            runtime.block_on(bridge.assemble("test query", "invalid_strategy", 1000, None));
         assert!(result.is_err());
         assert!(result
             .unwrap_err()

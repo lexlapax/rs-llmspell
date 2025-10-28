@@ -21,6 +21,116 @@ impl std::fmt::Display for StringError {
 
 impl std::error::Error for StringError {}
 
+/// Create episodic namespace with `add()` and `search()` functions
+fn create_episodic_namespace<'lua>(
+    lua: &'lua Lua,
+    memory_bridge: &Arc<MemoryBridge>,
+) -> mlua::Result<Table<'lua>> {
+    let episodic_table = lua.create_table()?;
+
+    // Memory.episodic.add
+    let add_bridge = memory_bridge.clone();
+    episodic_table.set(
+        "add",
+        lua.create_function(
+            move |_lua,
+                  (session_id, role, content, metadata): (
+                String,
+                String,
+                String,
+                Option<Table>,
+            )| {
+                debug!("Memory.episodic.add called for session={}", session_id);
+                let metadata_json = metadata
+                    .map(|m| lua_value_to_json(Value::Table(m)))
+                    .transpose()?
+                    .unwrap_or_else(|| serde_json::json!({}));
+
+                let bridge = add_bridge.clone();
+                block_on_async(
+                    "memory_episodic_add",
+                    async move {
+                        bridge
+                            .episodic_add(session_id, role, content, metadata_json)
+                            .await
+                            .map_err(StringError)
+                    },
+                    None,
+                )
+                .map_err(|e| {
+                    error!("Memory.episodic.add failed: {}", e);
+                    e
+                })
+            },
+        )?,
+    )?;
+
+    // Memory.episodic.search
+    let search_bridge = memory_bridge.clone();
+    episodic_table.set(
+        "search",
+        lua.create_function(
+            move |lua, (session_id, query, limit): (String, String, Option<usize>)| {
+                debug!(
+                    "Memory.episodic.search called for session={}, query='{}'",
+                    session_id, query
+                );
+                let limit = limit.unwrap_or(10);
+
+                let bridge = search_bridge.clone();
+                let results = block_on_async(
+                    "memory_episodic_search",
+                    async move {
+                        bridge
+                            .episodic_search(&session_id, &query, limit)
+                            .await
+                            .map_err(StringError)
+                    },
+                    None,
+                )?;
+
+                json_to_lua_value(lua, &results)
+            },
+        )?,
+    )?;
+
+    Ok(episodic_table)
+}
+
+/// Create semantic namespace with `query()` function
+fn create_semantic_namespace<'lua>(
+    lua: &'lua Lua,
+    memory_bridge: &Arc<MemoryBridge>,
+) -> mlua::Result<Table<'lua>> {
+    let semantic_table = lua.create_table()?;
+
+    // Memory.semantic.query
+    let query_bridge = memory_bridge.clone();
+    semantic_table.set(
+        "query",
+        lua.create_function(move |lua, (query, limit): (String, Option<usize>)| {
+            debug!("Memory.semantic.query called with query='{}'", query);
+            let limit = limit.unwrap_or(10);
+
+            let bridge = query_bridge.clone();
+            let results = block_on_async(
+                "memory_semantic_query",
+                async move {
+                    bridge
+                        .semantic_query(&query, limit)
+                        .await
+                        .map_err(StringError)
+                },
+                None,
+            )?;
+
+            json_to_lua_value(lua, &results)
+        })?,
+    )?;
+
+    Ok(semantic_table)
+}
+
 /// Inject Memory global API into Lua
 ///
 /// Provides the `Memory` namespace with episodic, semantic, consolidation, and stats operations.
@@ -56,108 +166,11 @@ pub fn inject_memory_global(
     info!("Injecting Memory global API");
     let memory_table = lua.create_table()?;
 
-    // Memory.episodic namespace
-    let episodic_table = lua.create_table()?;
+    // Create namespaces
+    memory_table.set("episodic", create_episodic_namespace(lua, memory_bridge)?)?;
+    memory_table.set("semantic", create_semantic_namespace(lua, memory_bridge)?)?;
 
-    // Memory.episodic.add(session_id, role, content, metadata)
-    let add_bridge = memory_bridge.clone();
-    episodic_table.set(
-        "add",
-        lua.create_function(
-            move |_lua,
-                  (session_id, role, content, metadata): (
-                String,
-                String,
-                String,
-                Option<Table>,
-            )| {
-                debug!("Memory.episodic.add called for session={}", session_id);
-                let metadata_json = if let Some(meta) = metadata {
-                    lua_value_to_json(Value::Table(meta))?
-                } else {
-                    serde_json::json!({})
-                };
-
-                let bridge = add_bridge.clone();
-                block_on_async(
-                    "memory_episodic_add",
-                    async move {
-                        bridge
-                            .episodic_add(session_id, role, content, metadata_json)
-                            .await
-                            .map_err(StringError)
-                    },
-                    None,
-                )
-                .map_err(|e| {
-                    error!("Memory.episodic.add failed: {}", e);
-                    e
-                })
-            },
-        )?,
-    )?;
-
-    // Memory.episodic.search(session_id, query, limit)
-    let search_bridge = memory_bridge.clone();
-    episodic_table.set(
-        "search",
-        lua.create_function(
-            move |lua, (session_id, query, limit): (String, String, Option<usize>)| {
-                debug!(
-                    "Memory.episodic.search called for session={}, query='{}'",
-                    session_id, query
-                );
-                let limit = limit.unwrap_or(10);
-
-                let bridge = search_bridge.clone();
-                let results = block_on_async(
-                    "memory_episodic_search",
-                    async move {
-                        bridge
-                            .episodic_search(&session_id, &query, limit)
-                            .await
-                            .map_err(StringError)
-                    },
-                    None,
-                )?;
-
-                json_to_lua_value(lua, &results)
-            },
-        )?,
-    )?;
-
-    memory_table.set("episodic", episodic_table)?;
-
-    // Memory.semantic namespace
-    let semantic_table = lua.create_table()?;
-
-    // Memory.semantic.query(query, limit)
-    let query_bridge = memory_bridge.clone();
-    semantic_table.set(
-        "query",
-        lua.create_function(move |lua, (query, limit): (String, Option<usize>)| {
-            debug!("Memory.semantic.query called with query='{}'", query);
-            let limit = limit.unwrap_or(10);
-
-            let bridge = query_bridge.clone();
-            let results = block_on_async(
-                "memory_semantic_query",
-                async move {
-                    bridge
-                        .semantic_query(&query, limit)
-                        .await
-                        .map_err(StringError)
-                },
-                None,
-            )?;
-
-            json_to_lua_value(lua, &results)
-        })?,
-    )?;
-
-    memory_table.set("semantic", semantic_table)?;
-
-    // Memory.consolidate(session_id, force)
+    // Memory.consolidate
     let consolidate_bridge = memory_bridge.clone();
     memory_table.set(
         "consolidate",
@@ -184,7 +197,7 @@ pub fn inject_memory_global(
         )?,
     )?;
 
-    // Memory.stats()
+    // Memory.stats
     let stats_bridge = memory_bridge.clone();
     memory_table.set(
         "stats",
