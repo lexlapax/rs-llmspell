@@ -5,7 +5,6 @@
 mod test_helpers;
 
 use llmspell_bridge::lua::globals::memory::inject_memory_global;
-use test_helpers::with_runtime_context;
 use llmspell_bridge::{
     globals::types::GlobalContext, ComponentRegistry, MemoryBridge, ProviderManager,
 };
@@ -13,6 +12,7 @@ use llmspell_config::ProviderManagerConfig;
 use llmspell_memory::DefaultMemoryManager;
 use mlua::Lua;
 use std::sync::Arc;
+use test_helpers::with_runtime_context;
 
 /// Create a minimal `GlobalContext` for testing
 fn create_test_context() -> GlobalContext {
@@ -80,7 +80,8 @@ fn test_memory_episodic_add() {
         let lua = Lua::new();
         let context = create_test_context();
 
-        inject_memory_global(&lua, &context, &memory_bridge).expect("Failed to inject Memory global");
+        inject_memory_global(&lua, &context, &memory_bridge)
+            .expect("Failed to inject Memory global");
 
         // Test Memory.episodic.add
         let script = r#"
@@ -110,7 +111,8 @@ fn test_memory_episodic_search() {
         let lua = Lua::new();
         let context = create_test_context();
 
-        inject_memory_global(&lua, &context, &memory_bridge).expect("Failed to inject Memory global");
+        inject_memory_global(&lua, &context, &memory_bridge)
+            .expect("Failed to inject Memory global");
 
         // Add an entry then search
         let script = r#"
@@ -141,7 +143,8 @@ fn test_memory_semantic_query() {
         let lua = Lua::new();
         let context = create_test_context();
 
-        inject_memory_global(&lua, &context, &memory_bridge).expect("Failed to inject Memory global");
+        inject_memory_global(&lua, &context, &memory_bridge)
+            .expect("Failed to inject Memory global");
 
         // Query semantic memory (should be empty initially)
         let script = r#"
@@ -171,7 +174,8 @@ fn test_memory_consolidate() {
         let lua = Lua::new();
         let context = create_test_context();
 
-        inject_memory_global(&lua, &context, &memory_bridge).expect("Failed to inject Memory global");
+        inject_memory_global(&lua, &context, &memory_bridge)
+            .expect("Failed to inject Memory global");
 
         // Test consolidation
         let script = r#"
@@ -199,7 +203,8 @@ fn test_memory_stats() {
         let lua = Lua::new();
         let context = create_test_context();
 
-        inject_memory_global(&lua, &context, &memory_bridge).expect("Failed to inject Memory global");
+        inject_memory_global(&lua, &context, &memory_bridge)
+            .expect("Failed to inject Memory global");
 
         // Test stats
         let script = r#"
