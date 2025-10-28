@@ -1350,7 +1350,7 @@ For 13.1 to 13.8 see `TODO-TEMP-ARCHIVE.md`
 **Goal**: Integrate Memory system with RAG pipeline for context-aware document retrieval and chunking
 **Timeline**: 2 days (16 hours)
 **Critical Dependencies**: Phase 13.8 complete (Memory + Context globals), Phase 13.9 complete (Documentation)
-**Status**: READY TO START
+**Status**: IN PROGRESS
 
 **⚠️ TRACING REQUIREMENT**: ALL RAG integration code MUST include tracing:
 - `info!` for retrieval requests, ingestion operations, pipeline initialization
@@ -1359,38 +1359,92 @@ For 13.1 to 13.8 see `TODO-TEMP-ARCHIVE.md`
 - `error!` for retrieval failures, embedding errors, storage errors
 - `trace!` for detailed scores, intermediate results, performance metrics
 
-**Phase 13.10 Architecture**:
+**🏗️ ARCHITECTURAL DECISION RECORD - Phase 13.10**
 
-**Existing RAG Infrastructure** (llmspell-rag/src/):
-- ✅ **RAGPipeline**: Orchestrates document ingestion + retrieval (pipeline/rag_pipeline.rs)
-  - Components: storage, embedding_factory, embedding_cache
-  - Methods: `ingest_document()`, `search()`
-  - Uses: DocumentProcessor, IngestionFlow, RetrievalFlow
-- ✅ **RetrievalFlow**: Hybrid search with BM25 + vector (pipeline/retrieval_flow.rs)
-- ✅ **Chunking**: SlidingWindowChunker, SemanticChunker (chunking/)
-- ✅ **SessionAwareRAGPipeline**: Session integration (session_integration.rs)
-- ❌ **Missing**: No Memory integration for context-aware retrieval
+**Decision**: Place RAG+Memory integration in **llmspell-context**, NOT llmspell-rag
+
+**Rationale - Dependency Analysis**:
+```
+Current Layering:
+  llmspell-core (traits, StateScope)
+      ↑
+  llmspell-rag (vector storage, document retrieval - NO memory dependency)
+  llmspell-memory (episodic/semantic storage - NO rag dependency)
+      ↑
+  llmspell-context (BM25 retrieval FROM memory, reranking - depends on memory, NOT rag)
+      ↑
+  llmspell-bridge (Lua/JS APIs - depends on rag, memory, context)
+```
+
+**Problem with Original Plan**:
+- Wanted `MemoryAwareRAGPipeline` in llmspell-rag
+- Would require: llmspell-rag → llmspell-memory + llmspell-bridge
+- Creates circular dependency (bridge → rag → bridge) ❌
+
+**Solution - Option 1 Selected**:
+- Add `llmspell-rag` dependency to `llmspell-context`
+- Create `HybridRetriever` in llmspell-context/src/retrieval/hybrid_rag_memory.rs
+- Combines:
+  - RAG pipeline vector search (ingested documents)
+  - BM25/episodic memory search (conversation history)
+  - Unified reranking and assembly (existing ContextAssembler)
+- Update `ContextBridge` to optionally use `HybridRetriever` when RAGPipeline available
+
+**New Layering**:
+```
+  llmspell-rag (documents) ─┐
+                             ├→ llmspell-context (hybrid retrieval) → llmspell-bridge
+  llmspell-memory (memory) ──┘
+```
+
+**Benefits**:
+- ✅ No circular dependencies
+- ✅ Natural fit - context layer already does retrieval strategy composition
+- ✅ ContextBridge becomes more powerful without API changes
+- ✅ Clean separation of concerns
+- ✅ Backward compatible - context works without RAG
+
+**Trade-offs**:
+- Makes llmspell-context slightly heavier (acceptable - it's an integration layer)
+- RAGPipeline can't directly use memory (not needed - composition via ContextBridge)
+
+**Alternative Options Considered**:
+- Option 2: New crate llmspell-hybrid-retrieval (overkill, too many crates)
+- Option 3: Integration in llmspell-bridge only (bridge becomes too heavy with business logic)
+
+---
+
+**Phase 13.10 Implementation Location** (Updated):
+
+**Target Crate**: `llmspell-context` (NOT llmspell-rag)
+**New Modules**:
+- `llmspell-context/src/retrieval/hybrid_rag_memory.rs` - Main hybrid retriever
+- `llmspell-context/src/retrieval/rag_adapter.rs` - RAGPipeline → RetrievalSource adapter
+- Update `llmspell-context/src/retrieval/strategy.rs` - Add RAG strategy option
+- Update `llmspell-bridge/src/context_bridge.rs` - Add optional RAGPipeline parameter
 
 **Integration Points**:
-1. **Context-Aware Chunking**: Use episodic memory to inform chunk boundaries
-   - Example: Split on conversation turns, maintain context continuity
-   - Retrieve recent context from memory → influence chunking strategy
-2. **Memory-Enhanced Retrieval**: Combine RAG vector search + episodic memory
-   - Hybrid: RAG results + Memory.episodic.search()
-   - Rerank combined results using relevance + recency
-3. **Session Context**: Pass session_id through RAG → Memory queries
-4. **Consolidation Feedback**: RAG query patterns → consolidation priorities
+1. **Hybrid Retrieval**: Combine RAG vector search + episodic memory
+   - HybridRetriever accepts both MemoryManager AND RAGPipeline
+   - Weighted merge: RAG results (40%) + Memory results (60%) - configurable
+   - Unified BM25 reranking across both sources
+2. **ContextBridge Enhancement**: Optional RAG integration
+   - New method: `with_rag_pipeline(rag: Arc<RAGPipeline>)`
+   - Assembler uses hybrid retrieval when RAG available
+   - Falls back to memory-only when RAG not provided (backward compatible)
+3. **Session Context**: Pass session_id through retrieval layers
+4. **Token Budget Management**: Allocate budget across RAG + Memory sources
 
 **Key Design Decisions**:
-- **Composition over Modification**: Wrap existing RAGPipeline, don't change it
-- **Optional Memory**: RAG works without memory (backward compatible)
-- **Memory as Retrieval Source**: Memory is another retrieval strategy alongside vector/BM25
-- **Context Global Integration**: Use Context.assemble() for memory retrieval in RAG
+- **Composition over Modification**: Don't change RAGPipeline or MemoryManager
+- **Optional RAG**: Context works without RAG (backward compatible)
+- **RAG as Retrieval Source**: RAG is another retrieval strategy alongside BM25/episodic
+- **Unified Reranking**: Single BM25Reranker operates on combined RAG + Memory results
 
-**Time Breakdown**:
-- Task 13.10.1: 4h (Memory-Enhanced RAG Pipeline Wrapper)
-- Task 13.10.2: 4h (Context-Aware Chunking Strategy)
-- Task 13.10.3: 4h (Hybrid Retrieval with Memory)
+**Time Breakdown** (Updated):
+- Task 13.10.1: 4h (Hybrid RAG+Memory Retriever in llmspell-context)
+- Task 13.10.2: 4h (ContextBridge Enhancement with Optional RAG)
+- Task 13.10.3: 4h (RAG Adapter + Unified Reranking)
 - Task 13.10.4: 4h (Integration Tests + Examples)
 - **Total**: 16h
 
