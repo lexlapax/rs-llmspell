@@ -85,7 +85,7 @@ for i, exchange in ipairs(alpha_exchanges) do
         exchange.content,
         exchange.metadata
     )
-    if result and result.success then
+    if result then
         alpha_added = alpha_added + 1
         print(string.format("   ✓ Added exchange %d to Alpha", i))
     end
@@ -114,7 +114,7 @@ for i, exchange in ipairs(beta_exchanges) do
         exchange.content,
         exchange.metadata
     )
-    if result and result.success then
+    if result then
         beta_added = beta_added + 1
         print(string.format("   ✓ Added exchange %d to Beta", i))
     end
@@ -132,14 +132,14 @@ local alpha_query = "analytics and exports"
 print(string.format("   Query: '%s'", alpha_query))
 
 local alpha_results = Memory.episodic.search(
+    session_alpha,  -- Session filter for Alpha only
     alpha_query,
-    10,
-    session_alpha  -- Session filter for Alpha only
+    10
 )
 
-if alpha_results and alpha_results.success and alpha_results.entries then
-    print(string.format("   Found %d results in Alpha:", #alpha_results.entries))
-    for i, entry in ipairs(alpha_results.entries) do
+if alpha_results and type(alpha_results) == "table" and #alpha_results > 0 then
+    print(string.format("   Found %d results in Alpha:", #alpha_results))
+    for i, entry in ipairs(alpha_results) do
         local snippet = string.sub(entry.content, 1, 60)
         if #entry.content > 60 then snippet = snippet .. "..." end
         print(string.format("   %d. [%s] %s", i, entry.role, snippet))
@@ -147,7 +147,7 @@ if alpha_results and alpha_results.success and alpha_results.entries then
 
     -- Verify no Beta data leaked in
     local has_beta_data = false
-    for _, entry in ipairs(alpha_results.entries) do
+    for _, entry in ipairs(alpha_results) do
         if entry.metadata and entry.metadata.project == "beta" then
             has_beta_data = true
             break
@@ -175,14 +175,14 @@ local beta_query = "authentication timeout"
 print(string.format("   Query: '%s'", beta_query))
 
 local beta_results = Memory.episodic.search(
+    session_beta,  -- Session filter for Beta only
     beta_query,
-    10,
-    session_beta  -- Session filter for Beta only
+    10
 )
 
-if beta_results and beta_results.success and beta_results.entries then
-    print(string.format("   Found %d results in Beta:", #beta_results.entries))
-    for i, entry in ipairs(beta_results.entries) do
+if beta_results and type(beta_results) == "table" and #beta_results > 0 then
+    print(string.format("   Found %d results in Beta:", #beta_results))
+    for i, entry in ipairs(beta_results) do
         local snippet = string.sub(entry.content, 1, 60)
         if #entry.content > 60 then snippet = snippet .. "..." end
         print(string.format("   %d. [%s] %s", i, entry.role, snippet))
@@ -190,7 +190,7 @@ if beta_results and beta_results.success and beta_results.entries then
 
     -- Verify no Alpha data leaked in
     local has_alpha_data = false
-    for _, entry in ipairs(beta_results.entries) do
+    for _, entry in ipairs(beta_results) do
         if entry.metadata and entry.metadata.project == "alpha" then
             has_alpha_data = true
             break
@@ -218,20 +218,20 @@ local global_query = "project"
 print(string.format("   Query: '%s' (no session filter)", global_query))
 
 local global_results = Memory.episodic.search(
+    "",  -- Empty string = search all sessions
     global_query,
-    20,
-    nil  -- No session filter = search all sessions
+    20
 )
 
-if global_results and global_results.success and global_results.entries then
-    print(string.format("   Found %d results across all sessions:", #global_results.entries))
+if global_results and type(global_results) == "table" and #global_results > 0 then
+    print(string.format("   Found %d results across all sessions:", #global_results))
 
     -- Count results by session
     local alpha_count = 0
     local beta_count = 0
     local other_count = 0
 
-    for _, entry in ipairs(global_results.entries) do
+    for _, entry in ipairs(global_results) do
         if entry.metadata and entry.metadata.project == "alpha" then
             alpha_count = alpha_count + 1
         elseif entry.metadata and entry.metadata.project == "beta" then
@@ -263,7 +263,7 @@ if stats then
     print("📊 Overall memory state:")
     print(string.format("   Total episodic entries: %d", stats.episodic_count or 0))
     print(string.format("   Expected from this script: %d", alpha_added + beta_added))
-    print(string.format("   (Note: May include entries from previous runs)")
+    print(string.format("   (Note: May include entries from previous runs)"))
 
     if stats.sessions_with_unprocessed then
         print(string.format("   Sessions tracked: %d", stats.sessions_with_unprocessed))

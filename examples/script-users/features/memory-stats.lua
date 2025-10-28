@@ -94,6 +94,9 @@ local exchanges_to_add = 20
 print(string.format("   Creating session with %d exchanges...", exchanges_to_add))
 
 local added_count = 0
+local episodic_growth = 0
+local semantic_growth = 0
+
 for i = 1, exchanges_to_add do
     local user_result = Memory.episodic.add(
         session,
@@ -109,8 +112,7 @@ for i = 1, exchanges_to_add do
         {test = true, iteration = i}
     )
 
-    if user_result and user_result.success and
-       assistant_result and assistant_result.success then
+    if user_result and assistant_result then
         added_count = added_count + 2
     end
 end
@@ -132,8 +134,8 @@ if stats_after then
     print(string.format("   Semantic entries: %d", stats_after.semantic_count or 0))
 
     -- Calculate growth
-    local episodic_growth = (stats_after.episodic_count or 0) - (stats_before.episodic_count or 0)
-    local semantic_growth = (stats_after.semantic_count or 0) - (stats_before.semantic_count or 0)
+    episodic_growth = (stats_after.episodic_count or 0) - (stats_before.episodic_count or 0)
+    semantic_growth = (stats_after.semantic_count or 0) - (stats_before.semantic_count or 0)
 
     print("\n📈 Growth metrics:")
     print(string.format("   Episodic entries added: +%d", episodic_growth))
@@ -195,13 +197,13 @@ print("5. Session activity tracking...")
 
 -- Search for our test session to verify it exists
 local session_check = Memory.episodic.search(
+    session,
     "memory statistics",
-    5,
-    session
+    5
 )
 
-if session_check and session_check.success and session_check.entries then
-    local entry_count = #session_check.entries
+if session_check and type(session_check) == "table" and #session_check > 0 then
+    local entry_count = #session_check
 
     print(string.format("   Session '%s' found", session:sub(1, 30) .. "..."))
     print(string.format("   Entries in session: %d", entry_count))
@@ -209,7 +211,7 @@ if session_check and session_check.success and session_check.entries then
 
     -- Show sample entry
     if entry_count > 0 then
-        local sample = session_check.entries[1]
+        local sample = session_check[1]
         local snippet = string.sub(sample.content, 1, 60)
         if #sample.content > 60 then snippet = snippet .. "..." end
         print(string.format("   Sample: [%s] %s", sample.role, snippet))

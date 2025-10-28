@@ -4,8 +4,7 @@
 use llmspell_bridge::lua::globals::context::inject_context_global;
 use llmspell_bridge::lua::globals::memory::inject_memory_global;
 use llmspell_bridge::{
-    globals::types::GlobalContext, ComponentRegistry, ContextBridge, MemoryBridge,
-    ProviderManager,
+    globals::types::GlobalContext, ComponentRegistry, ContextBridge, MemoryBridge, ProviderManager,
 };
 use llmspell_config::ProviderManagerConfig;
 use llmspell_memory::DefaultMemoryManager;
@@ -29,8 +28,7 @@ async fn setup_lua_with_memory_context() -> (Lua, Arc<DefaultMemoryManager>) {
 
     let lua = Lua::new();
     let context = create_global_context().await;
-    inject_memory_global(&lua, &context, &memory_bridge)
-        .expect("Failed to inject Memory global");
+    inject_memory_global(&lua, &context, &memory_bridge).expect("Failed to inject Memory global");
     inject_context_global(&lua, &context, &context_bridge)
         .expect("Failed to inject Context global");
 

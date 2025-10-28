@@ -398,11 +398,7 @@ impl ContextBridge {
     /// ```ignore
     /// let context = bridge.test_query("test query", Some("session-123"))?;
     /// ```
-    pub async fn test_query(
-        &self,
-        query: &str,
-        session_id: Option<&str>,
-    ) -> Result<Value, String> {
+    pub async fn test_query(&self, query: &str, session_id: Option<&str>) -> Result<Value, String> {
         debug!("ContextBridge::test_query called with query='{}'", query);
         // Quick test with hybrid strategy, 2000 tokens
         self.assemble(query, "hybrid", 2000, session_id).await

@@ -125,31 +125,21 @@ local entities = {
     }
 }
 
-print(string.format("   Adding %d entities to knowledge graph...", #entities))
-
-local added_entities = 0
+print("   ℹ️ Semantic entities are typically added via Memory.consolidate():")
+print("     1. Add conversations to episodic memory")
+print("     2. Run Memory.consolidate(session_id) to extract entities")
+print("     3. Entities automatically populate semantic graph")
+print()
+print(string.format("   Conceptual entities (%d total):", #entities))
 for i, entity in ipairs(entities) do
-    -- Note: Semantic memory API may vary based on implementation
-    -- This demonstrates the conceptual usage pattern
-    local result = Memory.semantic.add(entity)
-
-    if result and result.success then
-        added_entities = added_entities + 1
-        print(string.format("   ✓ Entity %d: %s (%s)",
-            i, entity.metadata.name, entity.type))
-    else
-        -- If direct add not available, document it
-        print(string.format("   ℹ️ Entity %d: %s (requires consolidation)",
-            i, entity.metadata.name))
-    end
+    print(string.format("     • %s (%s) - %s",
+        entity.metadata.name,
+        entity.type,
+        entity.metadata.category or "general"))
 end
-
-if added_entities > 0 then
-    print(string.format("\n   📝 Added %d entities directly", added_entities))
-else
-    print("\n   ℹ️ Note: Entities typically added via episodic→semantic consolidation")
-    print("   See consolidation examples for automated knowledge extraction")
-end
+print()
+print("   Note: This example focuses on querying existing semantic memory.")
+print("   For consolidation workflow, see Memory.consolidate() documentation.")
 
 print()
 
@@ -171,36 +161,32 @@ for i, query in ipairs(queries) do
 
     local result = Memory.semantic.query(query, 5)
 
-    if result and result.success and result.entities then
-        if #result.entities > 0 then
-            print(string.format("   Found %d entities:", #result.entities))
+    if result and type(result) == "table" and #result > 0 then
+        print(string.format("   Found %d entities:", #result))
 
-            for j, entity in ipairs(result.entities) do
-                local name = "Unknown"
-                local entity_type = "unknown"
+        for j, entity in ipairs(result) do
+            local name = "Unknown"
+            local entity_type = "unknown"
 
-                if entity.metadata and entity.metadata.name then
-                    name = entity.metadata.name
-                end
-                if entity.type then
-                    entity_type = entity.type
-                end
-
-                print(string.format("   %d. %s [%s]", j, name, entity_type))
-
-                -- Show snippet if available
-                if entity.content then
-                    local snippet = string.sub(entity.content, 1, 60)
-                    if #entity.content > 60 then snippet = snippet .. "..." end
-                    print(string.format("      %s", snippet))
-                end
+            if entity.metadata and entity.metadata.name then
+                name = entity.metadata.name
             end
-        else
-            print("   No entities found")
-            print("   Tip: Add data via consolidation or direct entity storage")
+            if entity.type then
+                entity_type = entity.type
+            end
+
+            print(string.format("   %d. %s [%s]", j, name, entity_type))
+
+            -- Show snippet if available
+            if entity.content then
+                local snippet = string.sub(entity.content, 1, 60)
+                if #entity.content > 60 then snippet = snippet .. "..." end
+                print(string.format("      %s", snippet))
+            end
         end
     else
-        print("   ℹ️ Semantic query not available or no results")
+        print("   No entities found")
+        print("   Tip: Semantic memory populated via Memory.consolidate()")
         print("   This is normal if no consolidation has run yet")
     end
 end

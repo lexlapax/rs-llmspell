@@ -8,7 +8,7 @@ echo "=== Validating Lua API Examples ==="
 echo ""
 
 EXAMPLES_DIR="examples/script-users"
-LLMSPELL="${LLMSPELL:-./target/debug/llmspell}"
+LLMSPELL="${LLMSPELL:-./target/release/llmspell}"
 
 # Check if llmspell binary exists
 if [ ! -f "$LLMSPELL" ]; then
