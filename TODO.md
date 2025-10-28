@@ -1462,59 +1462,127 @@ Current Layering:
 **Architectural Analysis**:
 - **Target Crate**: llmspell-context (NOT llmspell-rag - see Phase 13.10 ADR)
 - **New Dependency**: Add llmspell-rag to llmspell-context/Cargo.toml
-- **Components**: HybridRetriever + RAG Adapter + RetrievalWeights + Session filtering
-- **RAG Results**: `RetrievalResult` from llmspell-rag (VectorSearchResult format)
-- **Context Results**: `RankedChunk` from llmspell-context (with timestamps)
-- **Adapter**: Converts RAG format → Context format, preserves scores/metadata
+- **RAGPipeline Trait** (NEW in llmspell-rag):
+  - Abstract interface: `async fn retrieve(&self, query, k, scope) -> Result<Vec<RAGResult>>`
+  - Session-agnostic: no SessionManager dependency at interface level
+  - Scope-based filtering: `StateScope::Custom("session:xyz")` encodes session when needed
+- **SessionRAGAdapter** (NEW in llmspell-rag):
+  - Implements `RAGPipeline` trait
+  - Wraps existing `SessionAwareRAGPipeline`
+  - Extracts session_id from `StateScope::Custom("session:...")` or uses default
+  - Converts `SessionVectorResult` → `RAGResult` format
+- **HybridRetriever** (llmspell-context):
+  - Field: `rag_pipeline: Option<Arc<dyn RAGPipeline>>`
+  - Field: `memory_manager: Arc<dyn MemoryManager>`
+  - Combines both sources with weighted merge
+- **RAGResult** type (NEW in llmspell-rag):
+  - Simple struct: `{ id, content, score, metadata, timestamp }`
+  - Bridge format between RAG and Context
 - **Token Budget**: Allocates budget across sources (e.g., 2000 tokens → 800 RAG + 1200 Memory)
-- **Session Context**: Pass session_id through both RAG and Memory queries for filtering
-- **Backward Compatible**: Optional<RAGPipeline> - context works without RAG
+- **Backward Compatible**: Optional<Arc<dyn RAGPipeline>> - context works without RAG
 
 **Acceptance Criteria**:
+- [ ] **RAGPipeline trait** defined in llmspell-rag/src/pipeline/rag_trait.rs
+- [ ] **RAGResult struct** defined (id, content, score, metadata, timestamp)
+- [ ] **SessionRAGAdapter** implements RAGPipeline trait
+- [ ] Adapter extracts session_id from StateScope::Custom("session:...")
+- [ ] Adapter converts SessionVectorResult → RAGResult format
 - [ ] llmspell-rag dependency added to llmspell-context/Cargo.toml
 - [ ] `HybridRetriever` struct in llmspell-context/src/retrieval/hybrid_rag_memory.rs
-- [ ] `RAGAdapter` module in llmspell-context/src/retrieval/rag_adapter.rs
+- [ ] `RAGAdapter` module in llmspell-context/src/retrieval/rag_adapter.rs (RAGResult → RankedChunk)
 - [ ] `RetrievalWeights` struct with validation (weights sum to 1.0 ±0.01)
 - [ ] Weighted merge: RAG results (40%) + Memory results (60%) - configurable presets
 - [ ] Token budget allocation splits correctly (respects source limits)
-- [ ] Session-aware: session_id passed to both RAG and Memory queries
+- [ ] Session-aware: session_id encoded in StateScope for RAG, direct param for Memory
 - [ ] Fallback: Works with rag_pipeline = None (memory-only)
-- [ ] Unit tests: weighted merge, format conversion, budget allocation, session filtering
+- [ ] Unit tests: trait, adapter, weighted merge, format conversion, budget allocation, session filtering
 - [ ] **TRACING**: Retrieval start (info!), source queries (debug!), adapter (debug!), merge (debug!), errors (error!)
-- [ ] Zero clippy warnings
-- [ ] Compiles: `cargo check -p llmspell-context`
+- [ ] Zero clippy warnings: `cargo clippy -p llmspell-rag -p llmspell-context`
+- [ ] Compiles: `cargo check -p llmspell-rag -p llmspell-context`
 
 **Implementation Steps**:
 
-1. Add llmspell-rag dependency to `llmspell-context/Cargo.toml`:
+1. Create `llmspell-rag/src/pipeline/rag_trait.rs` - RAGPipeline trait:
+   ```rust
+   /// Result from RAG retrieval
+   pub struct RAGResult {
+       pub id: String,
+       pub content: String,
+       pub score: f32,
+       pub metadata: HashMap<String, serde_json::Value>,
+       pub timestamp: DateTime<Utc>,
+   }
+
+   /// Abstract RAG pipeline interface (session-agnostic)
+   #[async_trait]
+   pub trait RAGPipeline: Send + Sync {
+       async fn retrieve(&self, query: &str, k: usize, scope: Option<StateScope>)
+           -> Result<Vec<RAGResult>>;
+   }
+   ```
+
+2. Create `llmspell-rag/src/pipeline/session_adapter.rs` - SessionRAGAdapter:
+   ```rust
+   pub struct SessionRAGAdapter {
+       inner: Arc<SessionAwareRAGPipeline>,
+       default_session: SessionId,
+   }
+
+   impl RAGPipeline for SessionRAGAdapter {
+       async fn retrieve(&self, query: &str, k: usize, scope: Option<StateScope>) -> Result<Vec<RAGResult>> {
+           // Extract session from scope: "session:abc123" → SessionId("abc123")
+           let session_id = extract_session_from_scope(scope).unwrap_or(self.default_session);
+           // Call SessionAwareRAGPipeline
+           let results = self.inner.retrieve_in_session(query, session_id, k).await?;
+           // Convert SessionVectorResult → RAGResult
+           Ok(results.into_iter().map(convert_to_rag_result).collect())
+       }
+   }
+   ```
+   - Helper: `extract_session_from_scope(scope)` parses StateScope::Custom("session:...")
+   - Helper: `convert_to_rag_result(SessionVectorResult)` → RAGResult
+   - Tracing: debug!("SessionRAGAdapter: extracted session_id={}")
+
+3. Update `llmspell-rag/src/pipeline/mod.rs`:
+   - Add: `pub mod rag_trait;`
+   - Add: `pub mod session_adapter;`
+   - Re-export: `pub use rag_trait::{RAGPipeline, RAGResult};`
+   - Re-export: `pub use session_adapter::SessionRAGAdapter;`
+
+4. Add llmspell-rag dependency to `llmspell-context/Cargo.toml`:
    ```toml
    llmspell-rag = { path = "../llmspell-rag" }
    ```
 
-2. Create `llmspell-context/src/retrieval/rag_adapter.rs`:
-   - Function: `pub fn adapt_rag_results(results: RetrievalResult) -> Vec<RankedChunk>`
-   - Convert VectorSearchResult → RankedChunk format
-   - Preserve scores, metadata, add timestamps
-   - Tracing: debug!(converting N results)
+5. Create `llmspell-context/src/retrieval/rag_adapter.rs`:
+   - Function: `pub fn adapt_rag_results(results: Vec<RAGResult>) -> Vec<RankedChunk>`
+   - Convert RAGResult → RankedChunk format
+   - Preserve scores, metadata, timestamps
+   - Tracing: debug!("Converting {} RAG results to RankedChunks", results.len())
 
-3. Create `llmspell-context/src/retrieval/hybrid_rag_memory.rs`:
+6. Create `llmspell-context/src/retrieval/hybrid_rag_memory.rs`:
    - Struct: `RetrievalWeights` with validation + presets (balanced, rag_focused, memory_focused)
-   - Struct: `HybridRetriever` with memory_manager + Optional<rag_pipeline> + weights
+   - Struct: `HybridRetriever { rag_pipeline: Option<Arc<dyn RAGPipeline>>, memory_manager, weights }`
    - Method: `retrieve_hybrid(query, session_id, token_budget) -> Result<Vec<RankedChunk>>`
      * Allocate budget: e.g., 2000 tokens × 0.4 = 800 RAG, × 0.6 = 1200 Memory
-     * Query RAG with session scope (if available)
+     * Query RAG with StateScope::Custom(format!("session:{session_id}")) if available
      * Query Memory BM25 with session_id
-     * Adapter: Convert RAG results
+     * Adapter: Convert RAG results to RankedChunk
      * Weighted merge: Apply weights to scores
      * BM25 rerank combined results
      * Truncate to token budget
    - Tracing: info!(start), debug!(RAG results, Memory results), debug!(merged), trace!(scores)
 
-4. Update `llmspell-context/src/retrieval/mod.rs`:
+7. Update `llmspell-context/src/retrieval/mod.rs`:
    - Export: `pub mod hybrid_rag_memory;` `pub mod rag_adapter;`
    - Re-export: `pub use hybrid_rag_memory::{HybridRetriever, RetrievalWeights};`
 
-5. Create unit tests in `llmspell-context/tests/hybrid_retrieval_test.rs`:
+8. Create unit tests in `llmspell-rag/tests/rag_trait_test.rs`:
+   - Test: SessionRAGAdapter extracts session_id from scope correctly
+   - Test: SessionRAGAdapter uses default_session when scope=None
+   - Test: SessionRAGAdapter converts SessionVectorResult → RAGResult correctly
+
+9. Create unit tests in `llmspell-context/tests/hybrid_retrieval_test.rs`:
    - Test: RAG adapter format conversion (scores preserved)
    - Test: RetrievalWeights validation (sum to 1.0, error otherwise)
    - Test: Token budget allocation (800/1200 split for 40/60 weights)
@@ -1523,24 +1591,33 @@ Current Layering:
    - Test: Session filtering (results only from specified session)
 
 **Files to Create/Modify**:
+- `llmspell-rag/src/pipeline/rag_trait.rs` (NEW - ~80 lines)
+- `llmspell-rag/src/pipeline/session_adapter.rs` (NEW - ~120 lines)
+- `llmspell-rag/src/pipeline/mod.rs` (MODIFY - export trait + adapter)
+- `llmspell-rag/tests/rag_trait_test.rs` (NEW - ~100 lines)
 - `llmspell-context/Cargo.toml` (MODIFY - add llmspell-rag dependency)
-- `llmspell-context/src/retrieval/rag_adapter.rs` (NEW - ~100 lines)
+- `llmspell-context/src/retrieval/rag_adapter.rs` (NEW - ~80 lines)
 - `llmspell-context/src/retrieval/hybrid_rag_memory.rs` (NEW - ~250 lines)
 - `llmspell-context/src/retrieval/mod.rs` (MODIFY - export modules)
 - `llmspell-context/tests/hybrid_retrieval_test.rs` (NEW - ~200 lines)
 
 **Definition of Done**:
-- [ ] llmspell-rag dependency added
-- [ ] RAG adapter converts formats correctly
-- [ ] HybridRetriever implemented with all features
-- [ ] Token budget allocation works
-- [ ] Weighted merge validated
-- [ ] Session-aware filtering functional
-- [ ] Backward compatible (memory-only fallback)
-- [ ] All unit tests pass (6+ tests)
+- [ ] RAGPipeline trait defined with async retrieve() method
+- [ ] RAGResult struct implements all required fields
+- [ ] SessionRAGAdapter wraps SessionAwareRAGPipeline correctly
+- [ ] Session extraction from StateScope works
+- [ ] SessionVectorResult → RAGResult conversion preserves data
+- [ ] llmspell-rag dependency added to llmspell-context
+- [ ] RAGResult → RankedChunk adapter converts formats correctly
+- [ ] HybridRetriever implemented with Optional<Arc<dyn RAGPipeline>>
+- [ ] Token budget allocation works (respects weights)
+- [ ] Weighted merge validated (scores multiplied correctly)
+- [ ] Session-aware filtering functional (StateScope encoding)
+- [ ] Backward compatible (memory-only fallback when RAG = None)
+- [ ] All unit tests pass (9+ tests across both crates)
 - [ ] Tracing verified (info!, debug!, trace!)
-- [ ] Zero clippy warnings: `cargo clippy -p llmspell-context`
-- [ ] Compiles: `cargo check -p llmspell-context`
+- [ ] Zero clippy warnings: `cargo clippy -p llmspell-rag -p llmspell-context`
+- [ ] Compiles: `cargo check -p llmspell-rag -p llmspell-context`
 
 ---
 
