@@ -72,8 +72,11 @@ fn test_context_assemble_episodic() {
 
     // Add some episodic memory entries first
     llmspell_kernel::global_io_runtime().block_on(async {
-        let entry =
-            llmspell_memory::EpisodicEntry::new("test-session".to_string(), "user".to_string(), "Hello world".to_string());
+        let entry = llmspell_memory::EpisodicEntry::new(
+            "test-session".to_string(),
+            "user".to_string(),
+            "Hello world".to_string(),
+        );
         memory_manager
             .episodic()
             .add(entry)
