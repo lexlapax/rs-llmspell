@@ -15,6 +15,7 @@ llmspell-core = { path = "../llmspell-core" }
 llmspell-utils = { path = "../llmspell-utils" }
 llmspell-memory = { path = "../llmspell-memory" }
 llmspell-graph = { path = "../llmspell-graph" }
+llmspell-rag = { path = "../llmspell-rag" }
 
 # ML inference (Candle for DeBERTa reranking)
 candle-core = "0.9"
