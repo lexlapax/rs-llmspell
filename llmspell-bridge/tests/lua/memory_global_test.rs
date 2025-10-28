@@ -1,7 +1,11 @@
 //! ABOUTME: Tests for Memory global Lua API
 //! ABOUTME: Verifies Memory.episodic, Memory.semantic, Memory.consolidate, Memory.stats
 
+#[path = "../test_helpers.rs"]
+mod test_helpers;
+
 use llmspell_bridge::lua::globals::memory::inject_memory_global;
+use test_helpers::with_runtime_context;
 use llmspell_bridge::{
     globals::types::GlobalContext, ComponentRegistry, MemoryBridge, ProviderManager,
 };
@@ -66,137 +70,147 @@ fn test_memory_global_injection() {
 
 #[test]
 fn test_memory_episodic_add() {
-    let memory_manager = llmspell_kernel::global_io_runtime().block_on(async {
-        DefaultMemoryManager::new_in_memory()
-            .await
-            .expect("Failed to create memory manager")
+    with_runtime_context(|| {
+        let memory_manager = llmspell_kernel::global_io_runtime().block_on(async {
+            DefaultMemoryManager::new_in_memory()
+                .await
+                .expect("Failed to create memory manager")
+        });
+        let memory_bridge = Arc::new(MemoryBridge::new(Arc::new(memory_manager)));
+        let lua = Lua::new();
+        let context = create_test_context();
+
+        inject_memory_global(&lua, &context, &memory_bridge).expect("Failed to inject Memory global");
+
+        // Test Memory.episodic.add
+        let script = r#"
+            local id = Memory.episodic.add("test-session", "user", "Hello world", {topic = "greeting"})
+            assert(type(id) == "string", "add should return a string ID")
+            assert(#id > 0, "ID should not be empty")
+            return id
+        "#;
+
+        let id: String = lua
+            .load(script)
+            .eval()
+            .expect("episodic.add should succeed");
+        assert!(!id.is_empty(), "ID should not be empty");
     });
-    let memory_bridge = Arc::new(MemoryBridge::new(Arc::new(memory_manager)));
-    let lua = Lua::new();
-    let context = create_test_context();
-
-    inject_memory_global(&lua, &context, &memory_bridge).expect("Failed to inject Memory global");
-
-    // Test Memory.episodic.add
-    let script = r#"
-        local id = Memory.episodic.add("test-session", "user", "Hello world", {topic = "greeting"})
-        assert(type(id) == "string", "add should return a string ID")
-        assert(#id > 0, "ID should not be empty")
-        return id
-    "#;
-
-    let id: String = lua
-        .load(script)
-        .eval()
-        .expect("episodic.add should succeed");
-    assert!(!id.is_empty(), "ID should not be empty");
 }
 
 #[test]
 fn test_memory_episodic_search() {
-    let memory_manager = llmspell_kernel::global_io_runtime().block_on(async {
-        DefaultMemoryManager::new_in_memory()
-            .await
-            .expect("Failed to create memory manager")
+    with_runtime_context(|| {
+        let memory_manager = llmspell_kernel::global_io_runtime().block_on(async {
+            DefaultMemoryManager::new_in_memory()
+                .await
+                .expect("Failed to create memory manager")
+        });
+        let memory_bridge = Arc::new(MemoryBridge::new(Arc::new(memory_manager)));
+        let lua = Lua::new();
+        let context = create_test_context();
+
+        inject_memory_global(&lua, &context, &memory_bridge).expect("Failed to inject Memory global");
+
+        // Add an entry then search
+        let script = r#"
+            Memory.episodic.add("test-session", "user", "Hello world", {})
+            local results = Memory.episodic.search("test-session", "hello", 10)
+            assert(type(results) == "table", "search should return a table")
+            assert(#results > 0, "search should find the added entry")
+            return #results
+        "#;
+
+        let count: usize = lua
+            .load(script)
+            .eval()
+            .expect("episodic.search should succeed");
+        assert!(count > 0, "Should find at least one result");
     });
-    let memory_bridge = Arc::new(MemoryBridge::new(Arc::new(memory_manager)));
-    let lua = Lua::new();
-    let context = create_test_context();
-
-    inject_memory_global(&lua, &context, &memory_bridge).expect("Failed to inject Memory global");
-
-    // Add an entry then search
-    let script = r#"
-        Memory.episodic.add("test-session", "user", "Hello world", {})
-        local results = Memory.episodic.search("test-session", "hello", 10)
-        assert(type(results) == "table", "search should return a table")
-        assert(#results > 0, "search should find the added entry")
-        return #results
-    "#;
-
-    let count: usize = lua
-        .load(script)
-        .eval()
-        .expect("episodic.search should succeed");
-    assert!(count > 0, "Should find at least one result");
 }
 
 #[test]
 fn test_memory_semantic_query() {
-    let memory_manager = llmspell_kernel::global_io_runtime().block_on(async {
-        DefaultMemoryManager::new_in_memory()
-            .await
-            .expect("Failed to create memory manager")
+    with_runtime_context(|| {
+        let memory_manager = llmspell_kernel::global_io_runtime().block_on(async {
+            DefaultMemoryManager::new_in_memory()
+                .await
+                .expect("Failed to create memory manager")
+        });
+        let memory_bridge = Arc::new(MemoryBridge::new(Arc::new(memory_manager)));
+        let lua = Lua::new();
+        let context = create_test_context();
+
+        inject_memory_global(&lua, &context, &memory_bridge).expect("Failed to inject Memory global");
+
+        // Query semantic memory (should be empty initially)
+        let script = r#"
+            local results = Memory.semantic.query("test query", 10)
+            assert(type(results) == "table", "semantic.query should return a table")
+            return #results
+        "#;
+
+        let count: usize = lua
+            .load(script)
+            .eval()
+            .expect("semantic.query should succeed");
+        // Empty is OK for now - semantic memory is not populated in this test
+        assert_eq!(count, 0, "Semantic memory should be empty initially");
     });
-    let memory_bridge = Arc::new(MemoryBridge::new(Arc::new(memory_manager)));
-    let lua = Lua::new();
-    let context = create_test_context();
-
-    inject_memory_global(&lua, &context, &memory_bridge).expect("Failed to inject Memory global");
-
-    // Query semantic memory (should be empty initially)
-    let script = r#"
-        local results = Memory.semantic.query("test query", 10)
-        assert(type(results) == "table", "semantic.query should return a table")
-        return #results
-    "#;
-
-    let count: usize = lua
-        .load(script)
-        .eval()
-        .expect("semantic.query should succeed");
-    // Empty is OK for now - semantic memory is not populated in this test
-    assert_eq!(count, 0, "Semantic memory should be empty initially");
 }
 
 #[test]
 fn test_memory_consolidate() {
-    let memory_manager = llmspell_kernel::global_io_runtime().block_on(async {
-        DefaultMemoryManager::new_in_memory()
-            .await
-            .expect("Failed to create memory manager")
+    with_runtime_context(|| {
+        let memory_manager = llmspell_kernel::global_io_runtime().block_on(async {
+            DefaultMemoryManager::new_in_memory()
+                .await
+                .expect("Failed to create memory manager")
+        });
+        let memory_bridge = Arc::new(MemoryBridge::new(Arc::new(memory_manager)));
+        let lua = Lua::new();
+        let context = create_test_context();
+
+        inject_memory_global(&lua, &context, &memory_bridge).expect("Failed to inject Memory global");
+
+        // Test consolidation
+        let script = r#"
+            local result = Memory.consolidate(nil, false)
+            assert(type(result) == "table", "consolidate should return a table")
+            assert(type(result.entries_processed) == "number", "should have entries_processed")
+            return result.entries_processed
+        "#;
+
+        let processed: usize = lua.load(script).eval().expect("consolidate should succeed");
+        // Should be 0 since no entries were added
+        assert_eq!(processed, 0, "No entries to consolidate");
     });
-    let memory_bridge = Arc::new(MemoryBridge::new(Arc::new(memory_manager)));
-    let lua = Lua::new();
-    let context = create_test_context();
-
-    inject_memory_global(&lua, &context, &memory_bridge).expect("Failed to inject Memory global");
-
-    // Test consolidation
-    let script = r#"
-        local result = Memory.consolidate(nil, false)
-        assert(type(result) == "table", "consolidate should return a table")
-        assert(type(result.entries_processed) == "number", "should have entries_processed")
-        return result.entries_processed
-    "#;
-
-    let processed: usize = lua.load(script).eval().expect("consolidate should succeed");
-    // Should be 0 since no entries were added
-    assert_eq!(processed, 0, "No entries to consolidate");
 }
 
 #[test]
 fn test_memory_stats() {
-    let memory_manager = llmspell_kernel::global_io_runtime().block_on(async {
-        DefaultMemoryManager::new_in_memory()
-            .await
-            .expect("Failed to create memory manager")
+    with_runtime_context(|| {
+        let memory_manager = llmspell_kernel::global_io_runtime().block_on(async {
+            DefaultMemoryManager::new_in_memory()
+                .await
+                .expect("Failed to create memory manager")
+        });
+        let memory_bridge = Arc::new(MemoryBridge::new(Arc::new(memory_manager)));
+        let lua = Lua::new();
+        let context = create_test_context();
+
+        inject_memory_global(&lua, &context, &memory_bridge).expect("Failed to inject Memory global");
+
+        // Test stats
+        let script = r#"
+            local stats = Memory.stats()
+            assert(type(stats) == "table", "stats should return a table")
+            assert(type(stats.episodic_count) == "number", "should have episodic_count")
+            assert(type(stats.semantic_count) == "number", "should have semantic_count")
+            return stats.episodic_count
+        "#;
+
+        let count: usize = lua.load(script).eval().expect("stats should succeed");
+        assert_eq!(count, 0, "No episodic entries initially");
     });
-    let memory_bridge = Arc::new(MemoryBridge::new(Arc::new(memory_manager)));
-    let lua = Lua::new();
-    let context = create_test_context();
-
-    inject_memory_global(&lua, &context, &memory_bridge).expect("Failed to inject Memory global");
-
-    // Test stats
-    let script = r#"
-        local stats = Memory.stats()
-        assert(type(stats) == "table", "stats should return a table")
-        assert(type(stats.episodic_count) == "number", "should have episodic_count")
-        assert(type(stats.semantic_count) == "number", "should have semantic_count")
-        return stats.episodic_count
-    "#;
-
-    let count: usize = lua.load(script).eval().expect("stats should succeed");
-    assert_eq!(count, 0, "No episodic entries initially");
 }
