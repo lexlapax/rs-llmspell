@@ -1,6 +1,8 @@
 //! ABOUTME: Tests for Context global Lua API
 //! ABOUTME: Verifies `Context.assemble`, `Context.test`, `Context.strategy_stats`
 
+mod test_helpers;
+
 use llmspell_bridge::lua::globals::context::inject_context_global;
 use llmspell_bridge::{
     globals::types::GlobalContext, ComponentRegistry, ContextBridge, ProviderManager,
@@ -9,6 +11,7 @@ use llmspell_config::ProviderManagerConfig;
 use llmspell_memory::{DefaultMemoryManager, MemoryManager};
 use mlua::Lua;
 use std::sync::Arc;
+use test_helpers::with_runtime_context;
 
 /// Create a minimal `GlobalContext` for testing
 fn create_test_context() -> GlobalContext {
@@ -64,47 +67,50 @@ fn test_context_global_injection() {
 
 #[test]
 fn test_context_assemble_episodic() {
-    let memory_manager = llmspell_kernel::global_io_runtime().block_on(async {
-        DefaultMemoryManager::new_in_memory()
-            .await
-            .expect("Failed to create memory manager")
-    });
+    with_runtime_context(|| {
+        let memory_manager = llmspell_kernel::global_io_runtime().block_on(async {
+            DefaultMemoryManager::new_in_memory()
+                .await
+                .expect("Failed to create memory manager")
+        });
 
-    // Add some episodic memory entries first
-    llmspell_kernel::global_io_runtime().block_on(async {
-        let entry = llmspell_memory::EpisodicEntry::new(
-            "test-session".to_string(),
-            "user".to_string(),
-            "Hello world".to_string(),
-        );
-        memory_manager
-            .episodic()
-            .add(entry)
-            .await
-            .expect("Failed to add entry");
-    });
+        // Add some episodic memory entries first
+        llmspell_kernel::global_io_runtime().block_on(async {
+            let entry = llmspell_memory::EpisodicEntry::new(
+                "test-session".to_string(),
+                "user".to_string(),
+                "Hello world".to_string(),
+            );
+            memory_manager
+                .episodic()
+                .add(entry)
+                .await
+                .expect("Failed to add entry");
+        });
 
-    let context_bridge = Arc::new(ContextBridge::new(Arc::new(memory_manager)));
-    let lua = Lua::new();
-    let context = create_test_context();
+        let context_bridge = Arc::new(ContextBridge::new(Arc::new(memory_manager)));
+        let lua = Lua::new();
+        let context = create_test_context();
 
-    inject_context_global(&lua, &context, &context_bridge)
-        .expect("Failed to inject Context global");
+        inject_context_global(&lua, &context, &context_bridge)
+            .expect("Failed to inject Context global");
 
-    // Test Context.assemble with episodic strategy
-    let script = r#"
-        local result = Context.assemble("hello", "episodic", 1000, "test-session")
-        assert(type(result) == "table", "assemble should return a table")
-        assert(type(result.chunks) == "table", "result should have chunks")
-        return result
-    "#;
+        // Test Context.assemble with episodic strategy
+        let script = r#"
+            local result = Context.assemble("hello", "episodic", 1000, "test-session")
+            assert(type(result) == "table", "assemble should return a table")
+            assert(type(result.chunks) == "table", "result should have chunks")
+            return result
+        "#;
 
-    let result: mlua::Table = lua.load(script).eval().expect("assemble should succeed");
-    assert!(result.contains_key("chunks").unwrap());
+        let result: mlua::Table = lua.load(script).eval().expect("assemble should succeed");
+        assert!(result.contains_key("chunks").unwrap());
+    })
 }
 
 #[test]
 fn test_context_assemble_semantic() {
+    with_runtime_context(|| {
     let memory_manager = llmspell_kernel::global_io_runtime().block_on(async {
         DefaultMemoryManager::new_in_memory()
             .await
@@ -128,10 +134,12 @@ fn test_context_assemble_semantic() {
 
     let result: mlua::Table = lua.load(script).eval().expect("assemble should succeed");
     assert!(result.contains_key("chunks").unwrap());
+    })
 }
 
 #[test]
 fn test_context_assemble_hybrid() {
+    with_runtime_context(|| {
     let memory_manager = llmspell_kernel::global_io_runtime().block_on(async {
         DefaultMemoryManager::new_in_memory()
             .await
@@ -155,10 +163,12 @@ fn test_context_assemble_hybrid() {
 
     let result: mlua::Table = lua.load(script).eval().expect("assemble should succeed");
     assert!(result.contains_key("chunks").unwrap());
+    })
 }
 
 #[test]
 fn test_context_strategy_validation() {
+    with_runtime_context(|| {
     let memory_manager = llmspell_kernel::global_io_runtime().block_on(async {
         DefaultMemoryManager::new_in_memory()
             .await
@@ -184,10 +194,12 @@ fn test_context_strategy_validation() {
     "#;
 
     let _err: String = lua.load(script).eval().expect("Should capture error");
+    })
 }
 
 #[test]
 fn test_context_token_budget_validation() {
+    with_runtime_context(|| {
     let memory_manager = llmspell_kernel::global_io_runtime().block_on(async {
         DefaultMemoryManager::new_in_memory()
             .await
@@ -216,10 +228,12 @@ fn test_context_token_budget_validation() {
         .load(script)
         .eval()
         .expect("Should capture token budget error");
+    })
 }
 
 #[test]
 fn test_context_test() {
+    with_runtime_context(|| {
     let memory_manager = llmspell_kernel::global_io_runtime().block_on(async {
         DefaultMemoryManager::new_in_memory()
             .await
@@ -243,10 +257,12 @@ fn test_context_test() {
 
     let result: mlua::Table = lua.load(script).eval().expect("test should succeed");
     assert!(result.contains_key("chunks").unwrap());
+    })
 }
 
 #[test]
 fn test_context_strategy_stats() {
+    with_runtime_context(|| {
     let memory_manager = llmspell_kernel::global_io_runtime().block_on(async {
         DefaultMemoryManager::new_in_memory()
             .await
@@ -277,4 +293,5 @@ fn test_context_strategy_stats() {
         .expect("strategy_stats should succeed");
     let episodic_count: usize = stats.get("episodic_count").unwrap();
     assert_eq!(episodic_count, 0, "No episodic entries initially");
+    })
 }

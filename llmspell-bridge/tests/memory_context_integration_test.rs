@@ -1,6 +1,8 @@
 //! ABOUTME: Integration tests for Memory + Context bridge and global interaction
 //! ABOUTME: Verifies E2E workflows, cross-component dependencies, error propagation, API consistency
 
+mod test_helpers;
+
 use llmspell_bridge::lua::globals::context::inject_context_global;
 use llmspell_bridge::lua::globals::memory::inject_memory_global;
 use llmspell_bridge::{
@@ -10,6 +12,7 @@ use llmspell_config::ProviderManagerConfig;
 use llmspell_memory::{DefaultMemoryManager, EpisodicEntry, MemoryManager};
 use mlua::Lua;
 use std::sync::Arc;
+use test_helpers::with_runtime_context;
 use tracing::{debug, info};
 
 /// Create a minimal `GlobalContext` for testing
@@ -241,15 +244,18 @@ fn verify_e2e_result_has_chunks(result: &mlua::Table) {
 
 #[test]
 fn test_e2e_lua_memory_context_workflow() {
+    with_runtime_context(|| {
     info!("Starting E2E Lua Memory+Context integration test");
     let (lua, _memory_manager) = setup_integrated_lua_env();
     let result = execute_e2e_workflow(&lua);
     verify_e2e_result_has_chunks(&result);
     info!("E2E workflow test completed successfully");
+    })
 }
 
 #[test]
 fn test_strategy_routing() {
+    with_runtime_context(|| {
     info!("Testing strategy routing (episodic vs semantic vs hybrid)");
     let (lua, memory_manager) = setup_integrated_lua_env();
 
@@ -277,10 +283,12 @@ fn test_strategy_routing() {
     test_strategy(&lua, hybrid_script, "Hybrid");
 
     info!("Strategy routing tests completed successfully");
+    })
 }
 
 #[test]
 fn test_session_filtering() {
+    with_runtime_context(|| {
     info!("Testing session_id filtering in episodic retrieval");
     let (lua, memory_manager) = setup_integrated_lua_env();
 
@@ -314,10 +322,12 @@ fn test_session_filtering() {
     debug!("Session filtering result: {:?}", result);
     verify_chunk_count(&result, 1, "session-A");
     info!("Session filtering test completed successfully");
+    })
 }
 
 #[test]
 fn test_error_propagation() {
+    with_runtime_context(|| {
     info!("Testing Rust error → Lua RuntimeError propagation");
     let (lua, _memory_manager) = setup_integrated_lua_env();
 
@@ -349,6 +359,7 @@ fn test_error_propagation() {
     test_lua_error(&lua, token_budget_script, "must be >=100", "Token budget");
 
     info!("Error propagation test completed successfully");
+    })
 }
 
 /// Helper: Add entry via Rust `MemoryBridge`
@@ -380,6 +391,7 @@ fn add_via_lua_global(lua: &Lua, session_id: &str, message: &str) {
 
 #[test]
 fn test_bridge_global_api_consistency() {
+    with_runtime_context(|| {
     info!("Testing MemoryBridge methods match Memory.* Lua API");
     let (lua, memory_manager) = setup_integrated_lua_env();
 
@@ -394,4 +406,5 @@ fn test_bridge_global_api_consistency() {
     verify_lua_stats(&lua, 2);
 
     info!("Bridge-Global API consistency test completed successfully");
+    })
 }

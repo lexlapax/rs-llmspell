@@ -1252,6 +1252,99 @@ For 13.1 to 13.8 see `TODO-TEMP-ARCHIVE.md`
 
 ---
 
+### Task 13.9.5: Fix Async Runtime Context in Integration Tests
+
+**Priority**: HIGH
+**Estimated Time**: 1 hour
+**Status**: ✅ COMPLETE
+
+**Description**: Fix 12 failing integration tests (context_global_test.rs: 7 failures, memory_context_integration_test.rs: 5 failures) caused by missing tokio runtime context when calling async bridge methods from Lua.
+
+**Root Cause Analysis**:
+- Commit `3f442f31` (Task 13.9.2) converted MemoryBridge to async, removing `runtime: Handle` field
+- Bridge methods now use `block_on_async()` helper which calls `tokio::runtime::Handle::try_current()`
+- Test threads have no runtime context → error: "no reactor running, must be called from the context of a Tokio 1.x runtime"
+- Unit tests in memory_bridge.rs/context_bridge.rs work (create their own Runtime)
+- Integration tests fail because they use Lua which doesn't provide runtime context
+
+**Architectural Solution**: Create reusable `with_runtime_context()` helper that provides tokio context for Lua tests.
+
+**Implementation Steps**:
+
+1. Add runtime context wrapper to `llmspell-bridge/tests/test_helpers.rs`:
+   ```rust
+   /// Execute test function with tokio runtime context
+   ///
+   /// Provides runtime context needed for async operations in Lua tests.
+   /// Use this wrapper for any test that creates Lua environments with
+   /// Memory/Context/RAG globals that perform async operations.
+   ///
+   /// # Example
+   ///
+   /// ```rust
+   /// #[test]
+   /// fn test_context_assemble() {
+   ///     with_runtime_context(|| {
+   ///         let (lua, bridges) = setup_lua_env();
+   ///         // ... test code
+   ///     })
+   /// }
+   /// ```
+   pub fn with_runtime_context<F, R>(f: F) -> R
+   where
+       F: FnOnce() -> R,
+   {
+       let _guard = llmspell_kernel::global_io_runtime().enter();
+       f()
+   }
+   ```
+
+2. Wrap 7 failing tests in `context_global_test.rs`:
+   - test_context_test
+   - test_context_assemble_episodic
+   - test_context_assemble_semantic
+   - test_context_assemble_hybrid
+   - test_context_strategy_validation
+   - test_context_token_budget_validation
+   - test_context_strategy_stats
+
+3. Wrap 5 failing tests in `memory_context_integration_test.rs`:
+   - test_e2e_lua_memory_context_workflow
+   - test_strategy_routing
+   - test_session_filtering
+   - test_error_propagation
+   - test_bridge_global_api_consistency
+
+**Why This Solution**:
+- ✅ **Architecturally clean**: Tests reflect production runtime context
+- ✅ **Reusable**: Single helper for all async Lua tests (44+ integration tests)
+- ✅ **No bridge changes**: Maintains current async architecture
+- ✅ **Production fidelity**: Tests run in same context as real llmspell usage
+- ✅ **Scalable**: Extends to future async Lua APIs, other script languages
+- ✅ **Consistent**: Follows existing `llmspell_kernel::global_io_runtime()` pattern used in 100+ places
+
+**Alternative Options Rejected**:
+- ❌ `#[tokio::test]` conversion: Philosophically wrong for sync Lua tests
+- ❌ Dependency injection (pass runtime to bridges): Against project architecture, API breakage
+- ❌ Restore runtime field: Regression, wrong direction architecturally
+- ❌ mlua async integration: Phase 14+ scope, major refactor
+
+**Files to Modify**:
+- `llmspell-bridge/tests/test_helpers.rs` (~15 lines added)
+- `llmspell-bridge/tests/context_global_test.rs` (7 tests wrapped)
+- `llmspell-bridge/tests/memory_context_integration_test.rs` (5 tests wrapped)
+
+**Definition of Done**:
+- [✅] `with_runtime_context()` helper added to test_helpers.rs
+- [✅] All 7 context_global_test.rs tests wrapped and passing
+- [✅] All 5 memory_context_integration_test.rs tests wrapped and passing
+- [✅] Helper documented with usage example
+- [✅] All 13 tests pass: `cargo test -p llmspell-bridge --test context_global_test --test memory_context_integration_test` (8 + 5 = 13 passing)
+- [✅] Zero test failures in llmspell-bridge test suite
+- [✅] Pattern documented for future async Lua tests
+
+---
+
 ## Phase 13.10: RAG Integration - Memory-Enhanced Retrieval (Days 16-17)
 
 **Goal**: Integrate Memory system with RAG pipeline for context-aware document retrieval and chunking
