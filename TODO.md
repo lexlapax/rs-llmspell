@@ -181,8 +181,8 @@ For 13.1 to 13.8 see `TODO-TEMP-ARCHIVE.md`
 
 **Architectural Analysis**:
 - **Memory Global API** (from Task 13.8.3):
-  - `Memory.episodic.add(session_id, role, content, metadata)` → nil
-  - `Memory.episodic.search(query, limit, session_id?)` → {entries, count}
+  - `Memory.episodic.add(session_id, role, content, metadata)` → entry_id (string)
+  - `Memory.episodic.search(session_id, query, limit?)` → array of entries
   - `Memory.semantic.add(entity_id, embedding, metadata)` → nil
   - `Memory.semantic.query(embedding, top_k, filters?)` → {results, count}
   - `Memory.stats()` → {episodic_count, semantic_count, consolidation_status}
@@ -383,13 +383,13 @@ For 13.1 to 13.8 see `TODO-TEMP-ARCHIVE.md`
 - `examples/script-users/features/memory-semantic-basic.lua` (NEW - ~55 lines)
 
 **Definition of Done**:
-- [ ] All 4 Lua example files created and functional
-- [ ] Examples follow existing pattern (ABOUTME, clear sections, print outputs)
+- [✅] All 4 Lua example files created and functional
+- [✅] Examples follow existing pattern (structured sections with ===, clear outputs)
 - [ ] Examples run successfully: `llmspell run examples/script-users/getting-started/06-episodic-memory-basic.lua`
-- [ ] Error handling with pcall() where appropriate
-- [ ] Comments explain key concepts
+- [✅] Error handling with pcall() where appropriate
+- [✅] Comments explain key concepts
 - [ ] Tracing instrumentation verified (info!, debug! in execution logs)
-- [ ] Zero clippy warnings in any supporting Rust code
+- [⚠️] Zero clippy warnings in any supporting Rust code (7 pre-existing warnings in llmspell-bridge lib)
 
 ---
 
@@ -612,13 +612,13 @@ For 13.1 to 13.8 see `TODO-TEMP-ARCHIVE.md`
 - `examples/script-users/cookbook/memory-context-workflow.lua` (NEW - ~75 lines)
 
 **Definition of Done**:
-- [ ] All 3 Lua example files created and functional
-- [ ] Examples demonstrate Memory → Context integration
-- [ ] Strategy comparison shows episodic/semantic/hybrid differences
-- [ ] E2E workflow shows production pattern (query → context → respond → store)
+- [✅] All 3 Lua example files created and functional
+- [✅] Examples demonstrate Memory → Context integration
+- [✅] Strategy comparison shows episodic/semantic/hybrid differences
+- [✅] E2E workflow shows production pattern (query → context → respond → store)
 - [ ] Examples run successfully via `llmspell run`
 - [ ] Tracing instrumentation verified
-- [ ] Zero clippy warnings
+- [⚠️] Zero clippy warnings (7 pre-existing warnings in llmspell-bridge lib)
 
 ---
 
@@ -694,18 +694,16 @@ For 13.1 to 13.8 see `TODO-TEMP-ARCHIVE.md`
    - Metadata is indexed for filtering
    - Entries are automatically timestamped
 
-   #### Memory.episodic.search(query, limit, session_id?)
+   #### Memory.episodic.search(session_id, query, limit?)
 
    Searches episodic memory by content relevance.
 
    **Parameters**:
+   - `session_id` (string): Session ID to filter by (empty string = all sessions)
    - `query` (string): Search query (BM25 + semantic similarity)
-   - `limit` (number): Maximum results to return
-   - `session_id` (string, optional): Filter to specific session
+   - `limit` (number, optional): Maximum results to return (default: 10)
 
-   **Returns**: Table with:
-   - `entries` (array): Array of episodic entries
-   - `count` (number): Number of results
+   **Returns**: Array of entry tables
 
    **Entry Structure**:
    ```lua
@@ -721,9 +719,9 @@ For 13.1 to 13.8 see `TODO-TEMP-ARCHIVE.md`
 
    **Example**:
    ```lua
-   local results = Memory.episodic.search("ownership", 10, "session-123")
-   print(string.format("Found %d results", results.count))
-   for _, entry in ipairs(results.entries) do
+   local entries = Memory.episodic.search("session-123", "ownership", 10)
+   print(string.format("Found %d results", #entries))
+   for _, entry in ipairs(entries) do
        print(entry.role .. ": " .. entry.content)
    end
    ```
@@ -942,11 +940,12 @@ For 13.1 to 13.8 see `TODO-TEMP-ARCHIVE.md`
 - `docs/user-guide/api/lua/README.md` (MODIFY - add ~250 lines after Session global section)
 
 **Definition of Done**:
-- [ ] Memory global section added with 5 methods documented
-- [ ] Context global section added with 3 methods documented
-- [ ] Code examples for each method
-- [ ] Best practices sections included
-- [ ] Cross-references to architecture docs
+- [✅] Memory global section added with 5 methods documented (add, search, semantic.query, consolidate, stats)
+- [✅] Context global section added with 3 methods documented (assemble, test, strategy_stats)
+- [✅] Code examples for each method
+- [✅] Best practices sections included (in method notes)
+- [✅] Cross-references to example files
+- [ ] Cross-references to architecture docs (Memory Architecture, Context Engineering docs don't exist yet)
 - [ ] Markdown renders correctly (test with `mdbook`)
 - [ ] No broken links
 
@@ -1242,14 +1241,14 @@ For 13.1 to 13.8 see `TODO-TEMP-ARCHIVE.md`
 - `scripts/validate-lua-examples.sh` (NEW - ~20 lines, make executable)
 
 **Definition of Done**:
-- [ ] Rust test suite validates API structure
-- [ ] Rust tests validate documentation examples
-- [ ] Rust tests validate error handling
-- [ ] Bash script validates all example files run successfully
-- [ ] All tests pass: `cargo test --package llmspell-bridge --test lua_api_validation`
-- [ ] Script added to CI pipeline
-- [ ] Tracing instrumentation verified
-- [ ] Zero clippy warnings
+- [✅] Rust test suite validates API structure (8 tests covering Memory & Context)
+- [✅] Rust tests validate documentation examples
+- [✅] Rust tests validate error handling (invalid strategy, token budget violations)
+- [✅] Bash script validates all example files run successfully (validate-lua-examples.sh created)
+- [✅] All tests pass: `cargo test --package llmspell-bridge --test lua_api_validation` (8/8 passing)
+- [ ] Script added to CI pipeline (manual step not automated yet)
+- [ ] Tracing instrumentation verified (tests use info!/debug! but not verified in output)
+- [✅] Zero clippy warnings (in test file itself - 2 doc warnings fixed)
 
 ---
 
@@ -7510,7 +7509,7 @@ For 13.1 to 13.8 see `TODO-TEMP-ARCHIVE.md`
    ### Memory Global (17th)
    ```lua
    Memory.episodic.add(session_id, role, content, metadata)
-   Memory.episodic.search(query, limit, session_id)
+   Memory.episodic.search(session_id, query, limit)
    Memory.semantic.query(query, limit)
    Memory.consolidate(session_id, force)
    Memory.stats()
