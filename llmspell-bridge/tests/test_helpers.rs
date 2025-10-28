@@ -7,6 +7,7 @@ use std::sync::Arc;
 /// Returns `(tool_registry, agent_registry, workflow_factory)` tuple with
 /// empty registries that can be passed to `inject_apis()`.
 #[must_use]
+#[allow(dead_code)] // Used in other test files
 pub fn create_test_infrastructure() -> (
     Arc<llmspell_tools::ToolRegistry>,
     Arc<llmspell_agents::FactoryRegistry>,
@@ -27,7 +28,7 @@ pub fn create_test_infrastructure() -> (
 ///
 /// # Why This Is Needed
 ///
-/// When bridges (MemoryBridge, ContextBridge) call async methods, they use
+/// When bridges (`MemoryBridge`, `ContextBridge`) call async methods, they use
 /// `block_on_async()` which requires an active tokio runtime context.
 /// Tests that directly create their own `tokio::runtime::Runtime` have this context,
 /// but integration tests that just call Lua functions don't.
@@ -37,13 +38,12 @@ pub fn create_test_infrastructure() -> (
 ///
 /// # Example
 ///
-/// ```rust
-/// #[test]
+/// ```no_run
+/// # use llmspell_bridge::tests::test_helpers::with_runtime_context;
 /// fn test_context_assemble() {
 ///     with_runtime_context(|| {
-///         let (lua, bridges) = setup_lua_env();
+///         // Setup Lua environment
 ///         // Lua calls to Memory.episodic.add, Context.assemble, etc. will work
-///         let result: mlua::Table = lua.load("return Context.assemble(...)").eval().unwrap();
 ///     })
 /// }
 /// ```
@@ -55,6 +55,7 @@ pub fn create_test_infrastructure() -> (
 /// - ❌ Dependency injection: Against project architecture, breaks API
 /// - ❌ Restore runtime field to bridges: Architectural regression
 /// - ✅ Runtime context wrapper: Clean, reusable, production-realistic
+#[allow(dead_code)] // Used in context_global_test, memory_context_integration_test
 pub fn with_runtime_context<F, R>(f: F) -> R
 where
     F: FnOnce() -> R,

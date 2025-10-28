@@ -245,72 +245,72 @@ fn verify_e2e_result_has_chunks(result: &mlua::Table) {
 #[test]
 fn test_e2e_lua_memory_context_workflow() {
     with_runtime_context(|| {
-    info!("Starting E2E Lua Memory+Context integration test");
-    let (lua, _memory_manager) = setup_integrated_lua_env();
-    let result = execute_e2e_workflow(&lua);
-    verify_e2e_result_has_chunks(&result);
-    info!("E2E workflow test completed successfully");
-    })
+        info!("Starting E2E Lua Memory+Context integration test");
+        let (lua, _memory_manager) = setup_integrated_lua_env();
+        let result = execute_e2e_workflow(&lua);
+        verify_e2e_result_has_chunks(&result);
+        info!("E2E workflow test completed successfully");
+    });
 }
 
 #[test]
 fn test_strategy_routing() {
     with_runtime_context(|| {
-    info!("Testing strategy routing (episodic vs semantic vs hybrid)");
-    let (lua, memory_manager) = setup_integrated_lua_env();
+        info!("Testing strategy routing (episodic vs semantic vs hybrid)");
+        let (lua, memory_manager) = setup_integrated_lua_env();
 
-    add_episodic_conversation(&memory_manager, "session-abc");
+        add_episodic_conversation(&memory_manager, "session-abc");
 
-    let episodic_script = r#"
+        let episodic_script = r#"
         local result = Context.assemble("episodic", "episodic", 1000, "session-abc")
         assert(result.chunks ~= nil, "Should return chunks")
         return result
     "#;
-    test_strategy(&lua, episodic_script, "Episodic");
+        test_strategy(&lua, episodic_script, "Episodic");
 
-    let semantic_script = r#"
+        let semantic_script = r#"
         local result = Context.assemble("semantic", "semantic", 1000, nil)
         assert(result.chunks ~= nil, "Should return chunks (even if empty)")
         return result
     "#;
-    test_strategy(&lua, semantic_script, "Semantic");
+        test_strategy(&lua, semantic_script, "Semantic");
 
-    let hybrid_script = r#"
+        let hybrid_script = r#"
         local result = Context.assemble("hybrid query", "hybrid", 2000, nil)
         assert(result.chunks ~= nil, "Should return chunks")
         return result
     "#;
-    test_strategy(&lua, hybrid_script, "Hybrid");
+        test_strategy(&lua, hybrid_script, "Hybrid");
 
-    info!("Strategy routing tests completed successfully");
-    })
+        info!("Strategy routing tests completed successfully");
+    });
 }
 
 #[test]
 fn test_session_filtering() {
     with_runtime_context(|| {
-    info!("Testing session_id filtering in episodic retrieval");
-    let (lua, memory_manager) = setup_integrated_lua_env();
+        info!("Testing session_id filtering in episodic retrieval");
+        let (lua, memory_manager) = setup_integrated_lua_env();
 
-    let sessions = &[
-        (
-            "session-A",
-            &[
-                ("user", "Message in session A"),
-                ("assistant", "Response in session A"),
-            ][..],
-        ),
-        (
-            "session-B",
-            &[
-                ("user", "Message in session B"),
-                ("assistant", "Response in session B"),
-            ][..],
-        ),
-    ];
-    add_session_memories(&memory_manager, sessions);
+        let sessions = &[
+            (
+                "session-A",
+                &[
+                    ("user", "Message in session A"),
+                    ("assistant", "Response in session A"),
+                ][..],
+            ),
+            (
+                "session-B",
+                &[
+                    ("user", "Message in session B"),
+                    ("assistant", "Response in session B"),
+                ][..],
+            ),
+        ];
+        add_session_memories(&memory_manager, sessions);
 
-    let script = r#"
+        let script = r#"
         local result = Context.assemble("session", "episodic", 2000, "session-A")
         assert(result.chunks ~= nil, "Should return chunks")
         local chunks = result.chunks
@@ -318,20 +318,20 @@ fn test_session_filtering() {
         return result
     "#;
 
-    let result = exec_lua_script_table(&lua, script, "Session filtering");
-    debug!("Session filtering result: {:?}", result);
-    verify_chunk_count(&result, 1, "session-A");
-    info!("Session filtering test completed successfully");
-    })
+        let result = exec_lua_script_table(&lua, script, "Session filtering");
+        debug!("Session filtering result: {:?}", result);
+        verify_chunk_count(&result, 1, "session-A");
+        info!("Session filtering test completed successfully");
+    });
 }
 
 #[test]
 fn test_error_propagation() {
     with_runtime_context(|| {
-    info!("Testing Rust error → Lua RuntimeError propagation");
-    let (lua, _memory_manager) = setup_integrated_lua_env();
+        info!("Testing Rust error → Lua RuntimeError propagation");
+        let (lua, _memory_manager) = setup_integrated_lua_env();
 
-    let invalid_strategy_script = r#"
+        let invalid_strategy_script = r#"
         local success, err = pcall(function()
             Context.assemble("test", "invalid_strategy", 1000, nil)
         end)
@@ -340,14 +340,14 @@ fn test_error_propagation() {
         assert(string.find(err_str, "Unknown strategy"), "Error should mention unknown strategy")
         return err_str
     "#;
-    test_lua_error(
-        &lua,
-        invalid_strategy_script,
-        "Unknown strategy",
-        "Invalid strategy",
-    );
+        test_lua_error(
+            &lua,
+            invalid_strategy_script,
+            "Unknown strategy",
+            "Invalid strategy",
+        );
 
-    let token_budget_script = r#"
+        let token_budget_script = r#"
         local success, err = pcall(function()
             Context.assemble("test", "episodic", 50, nil)
         end)
@@ -356,10 +356,10 @@ fn test_error_propagation() {
         assert(string.find(err_str, "must be >=100"), "Error should mention minimum budget")
         return err_str
     "#;
-    test_lua_error(&lua, token_budget_script, "must be >=100", "Token budget");
+        test_lua_error(&lua, token_budget_script, "must be >=100", "Token budget");
 
-    info!("Error propagation test completed successfully");
-    })
+        info!("Error propagation test completed successfully");
+    });
 }
 
 /// Helper: Add entry via Rust `MemoryBridge`
@@ -392,19 +392,19 @@ fn add_via_lua_global(lua: &Lua, session_id: &str, message: &str) {
 #[test]
 fn test_bridge_global_api_consistency() {
     with_runtime_context(|| {
-    info!("Testing MemoryBridge methods match Memory.* Lua API");
-    let (lua, memory_manager) = setup_integrated_lua_env();
+        info!("Testing MemoryBridge methods match Memory.* Lua API");
+        let (lua, memory_manager) = setup_integrated_lua_env();
 
-    add_via_rust_bridge(
-        memory_manager.clone(),
-        "session-rust",
-        "Message added via Rust bridge",
-    );
-    add_via_lua_global(&lua, "session-lua", "Message added via Lua");
+        add_via_rust_bridge(
+            memory_manager.clone(),
+            "session-rust",
+            "Message added via Rust bridge",
+        );
+        add_via_lua_global(&lua, "session-lua", "Message added via Lua");
 
-    verify_entries_exist(&memory_manager, &["session-rust", "session-lua"]);
-    verify_lua_stats(&lua, 2);
+        verify_entries_exist(&memory_manager, &["session-rust", "session-lua"]);
+        verify_lua_stats(&lua, 2);
 
-    info!("Bridge-Global API consistency test completed successfully");
-    })
+        info!("Bridge-Global API consistency test completed successfully");
+    });
 }

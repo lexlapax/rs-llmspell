@@ -105,85 +105,85 @@ fn test_context_assemble_episodic() {
 
         let result: mlua::Table = lua.load(script).eval().expect("assemble should succeed");
         assert!(result.contains_key("chunks").unwrap());
-    })
+    });
 }
 
 #[test]
 fn test_context_assemble_semantic() {
     with_runtime_context(|| {
-    let memory_manager = llmspell_kernel::global_io_runtime().block_on(async {
-        DefaultMemoryManager::new_in_memory()
-            .await
-            .expect("Failed to create memory manager")
-    });
+        let memory_manager = llmspell_kernel::global_io_runtime().block_on(async {
+            DefaultMemoryManager::new_in_memory()
+                .await
+                .expect("Failed to create memory manager")
+        });
 
-    let context_bridge = Arc::new(ContextBridge::new(Arc::new(memory_manager)));
-    let lua = Lua::new();
-    let context = create_test_context();
+        let context_bridge = Arc::new(ContextBridge::new(Arc::new(memory_manager)));
+        let lua = Lua::new();
+        let context = create_test_context();
 
-    inject_context_global(&lua, &context, &context_bridge)
-        .expect("Failed to inject Context global");
+        inject_context_global(&lua, &context, &context_bridge)
+            .expect("Failed to inject Context global");
 
-    // Test Context.assemble with semantic strategy (empty memory OK)
-    let script = r#"
+        // Test Context.assemble with semantic strategy (empty memory OK)
+        let script = r#"
         local result = Context.assemble("test query", "semantic", 1000, nil)
         assert(type(result) == "table", "assemble should return a table")
         assert(type(result.chunks) == "table", "result should have chunks")
         return result
     "#;
 
-    let result: mlua::Table = lua.load(script).eval().expect("assemble should succeed");
-    assert!(result.contains_key("chunks").unwrap());
-    })
+        let result: mlua::Table = lua.load(script).eval().expect("assemble should succeed");
+        assert!(result.contains_key("chunks").unwrap());
+    });
 }
 
 #[test]
 fn test_context_assemble_hybrid() {
     with_runtime_context(|| {
-    let memory_manager = llmspell_kernel::global_io_runtime().block_on(async {
-        DefaultMemoryManager::new_in_memory()
-            .await
-            .expect("Failed to create memory manager")
-    });
+        let memory_manager = llmspell_kernel::global_io_runtime().block_on(async {
+            DefaultMemoryManager::new_in_memory()
+                .await
+                .expect("Failed to create memory manager")
+        });
 
-    let context_bridge = Arc::new(ContextBridge::new(Arc::new(memory_manager)));
-    let lua = Lua::new();
-    let context = create_test_context();
+        let context_bridge = Arc::new(ContextBridge::new(Arc::new(memory_manager)));
+        let lua = Lua::new();
+        let context = create_test_context();
 
-    inject_context_global(&lua, &context, &context_bridge)
-        .expect("Failed to inject Context global");
+        inject_context_global(&lua, &context, &context_bridge)
+            .expect("Failed to inject Context global");
 
-    // Test Context.assemble with hybrid strategy
-    let script = r#"
+        // Test Context.assemble with hybrid strategy
+        let script = r#"
         local result = Context.assemble("test query", "hybrid", 2000, nil)
         assert(type(result) == "table", "assemble should return a table")
         assert(type(result.chunks) == "table", "result should have chunks")
         return result
     "#;
 
-    let result: mlua::Table = lua.load(script).eval().expect("assemble should succeed");
-    assert!(result.contains_key("chunks").unwrap());
-    })
+        let result: mlua::Table = lua.load(script).eval().expect("assemble should succeed");
+        assert!(result.contains_key("chunks").unwrap());
+    });
 }
 
 #[test]
 fn test_context_strategy_validation() {
     with_runtime_context(|| {
-    let memory_manager = llmspell_kernel::global_io_runtime().block_on(async {
-        DefaultMemoryManager::new_in_memory()
-            .await
-            .expect("Failed to create memory manager")
-    });
+        let memory_manager = llmspell_kernel::global_io_runtime().block_on(async {
+            DefaultMemoryManager::new_in_memory()
+                .await
+                .expect("Failed to create memory manager")
+        });
 
-    let context_bridge = Arc::new(ContextBridge::new(Arc::new(memory_manager)));
-    let lua = Lua::new();
-    let context = create_test_context();
+        let context_bridge = Arc::new(ContextBridge::new(Arc::new(memory_manager)));
+        let lua = Lua::new();
+        let context = create_test_context();
 
-    inject_context_global(&lua, &context, &context_bridge)
-        .expect("Failed to inject Context global");
+        inject_context_global(&lua, &context, &context_bridge)
+            .expect("Failed to inject Context global");
 
-    // Test invalid strategy error
-    let script = r#"
+        // Test invalid strategy error
+        let script = r#"
         local success, err = pcall(function()
             Context.assemble("test", "invalid_strategy", 1000, nil)
         end)
@@ -193,28 +193,28 @@ fn test_context_strategy_validation() {
         return err_str
     "#;
 
-    let _err: String = lua.load(script).eval().expect("Should capture error");
-    })
+        let _err: String = lua.load(script).eval().expect("Should capture error");
+    });
 }
 
 #[test]
 fn test_context_token_budget_validation() {
     with_runtime_context(|| {
-    let memory_manager = llmspell_kernel::global_io_runtime().block_on(async {
-        DefaultMemoryManager::new_in_memory()
-            .await
-            .expect("Failed to create memory manager")
-    });
+        let memory_manager = llmspell_kernel::global_io_runtime().block_on(async {
+            DefaultMemoryManager::new_in_memory()
+                .await
+                .expect("Failed to create memory manager")
+        });
 
-    let context_bridge = Arc::new(ContextBridge::new(Arc::new(memory_manager)));
-    let lua = Lua::new();
-    let context = create_test_context();
+        let context_bridge = Arc::new(ContextBridge::new(Arc::new(memory_manager)));
+        let lua = Lua::new();
+        let context = create_test_context();
 
-    inject_context_global(&lua, &context, &context_bridge)
-        .expect("Failed to inject Context global");
+        inject_context_global(&lua, &context, &context_bridge)
+            .expect("Failed to inject Context global");
 
-    // Test token budget < 100 error
-    let script = r#"
+        // Test token budget < 100 error
+        let script = r#"
         local success, err = pcall(function()
             Context.assemble("test", "episodic", 50, nil)
         end)
@@ -224,60 +224,60 @@ fn test_context_token_budget_validation() {
         return err_str
     "#;
 
-    let _err: String = lua
-        .load(script)
-        .eval()
-        .expect("Should capture token budget error");
-    })
+        let _err: String = lua
+            .load(script)
+            .eval()
+            .expect("Should capture token budget error");
+    });
 }
 
 #[test]
 fn test_context_test() {
     with_runtime_context(|| {
-    let memory_manager = llmspell_kernel::global_io_runtime().block_on(async {
-        DefaultMemoryManager::new_in_memory()
-            .await
-            .expect("Failed to create memory manager")
-    });
+        let memory_manager = llmspell_kernel::global_io_runtime().block_on(async {
+            DefaultMemoryManager::new_in_memory()
+                .await
+                .expect("Failed to create memory manager")
+        });
 
-    let context_bridge = Arc::new(ContextBridge::new(Arc::new(memory_manager)));
-    let lua = Lua::new();
-    let context = create_test_context();
+        let context_bridge = Arc::new(ContextBridge::new(Arc::new(memory_manager)));
+        let lua = Lua::new();
+        let context = create_test_context();
 
-    inject_context_global(&lua, &context, &context_bridge)
-        .expect("Failed to inject Context global");
+        inject_context_global(&lua, &context, &context_bridge)
+            .expect("Failed to inject Context global");
 
-    // Test Context.test (uses hybrid, 2000 tokens)
-    let script = r#"
+        // Test Context.test (uses hybrid, 2000 tokens)
+        let script = r#"
         local result = Context.test("test query", nil)
         assert(type(result) == "table", "test should return a table")
         assert(type(result.chunks) == "table", "result should have chunks")
         return result
     "#;
 
-    let result: mlua::Table = lua.load(script).eval().expect("test should succeed");
-    assert!(result.contains_key("chunks").unwrap());
-    })
+        let result: mlua::Table = lua.load(script).eval().expect("test should succeed");
+        assert!(result.contains_key("chunks").unwrap());
+    });
 }
 
 #[test]
 fn test_context_strategy_stats() {
     with_runtime_context(|| {
-    let memory_manager = llmspell_kernel::global_io_runtime().block_on(async {
-        DefaultMemoryManager::new_in_memory()
-            .await
-            .expect("Failed to create memory manager")
-    });
+        let memory_manager = llmspell_kernel::global_io_runtime().block_on(async {
+            DefaultMemoryManager::new_in_memory()
+                .await
+                .expect("Failed to create memory manager")
+        });
 
-    let context_bridge = Arc::new(ContextBridge::new(Arc::new(memory_manager)));
-    let lua = Lua::new();
-    let context = create_test_context();
+        let context_bridge = Arc::new(ContextBridge::new(Arc::new(memory_manager)));
+        let lua = Lua::new();
+        let context = create_test_context();
 
-    inject_context_global(&lua, &context, &context_bridge)
-        .expect("Failed to inject Context global");
+        inject_context_global(&lua, &context, &context_bridge)
+            .expect("Failed to inject Context global");
 
-    // Test Context.strategy_stats
-    let script = r#"
+        // Test Context.strategy_stats
+        let script = r#"
         local stats = Context.strategy_stats()
         assert(type(stats) == "table", "strategy_stats should return a table")
         assert(type(stats.episodic_count) == "number", "should have episodic_count")
@@ -287,11 +287,11 @@ fn test_context_strategy_stats() {
         return stats
     "#;
 
-    let stats: mlua::Table = lua
-        .load(script)
-        .eval()
-        .expect("strategy_stats should succeed");
-    let episodic_count: usize = stats.get("episodic_count").unwrap();
-    assert_eq!(episodic_count, 0, "No episodic entries initially");
-    })
+        let stats: mlua::Table = lua
+            .load(script)
+            .eval()
+            .expect("strategy_stats should succeed");
+        let episodic_count: usize = stats.get("episodic_count").unwrap();
+        assert_eq!(episodic_count, 0, "No episodic entries initially");
+    });
 }
