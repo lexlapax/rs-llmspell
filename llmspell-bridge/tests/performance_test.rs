@@ -422,7 +422,7 @@ async fn test_large_script_memory() {
 /// - Per-global overhead: ~2-3ms × 18 = 36-54ms baseline
 /// - Debug build overhead (release builds ~50% faster)
 ///
-/// Note: This measures ONLY inject_apis() time, not ProviderManager creation.
+/// Note: This measures ONLY `inject_apis()` time, not `ProviderManager` creation.
 #[tokio::test(flavor = "multi_thread")]
 async fn test_api_injection_overhead() {
     let lua_config = LuaConfig::default();
