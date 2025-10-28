@@ -147,7 +147,35 @@ For 13.1 to 13.8 see `TODO-TEMP-ARCHIVE.md`
 **Priority**: HIGH
 **Estimated Time**: 2 hours
 **Assignee**: Documentation Team
-**Status**: READY TO START
+**Status**: ✅ COMPLETE
+
+**Architecture Decision** (Hybrid Memory Registration):
+- Option 3 selected: Hybrid approach with in-memory fallback
+- Memory/Context globals always available (auto-create DefaultMemoryManager::new_in_memory if not in GlobalContext)
+- Allows examples to work without explicit configuration
+- Production deployments can provide configured memory_manager via GlobalContext
+
+**Implementation Insights**:
+- Memory Global API returns direct values/arrays, not `{success, error}` wrappers
+- Use `pcall()` for error handling in Lua examples
+- API signature: `Memory.episodic.search(session_id, query, limit)` (session_id first, not last)
+- MemoryBridge converted from sync-with-runtime to async pattern matching SessionBridge
+- Used `block_on_async()` helper in Lua bindings to safely execute async code from sync context
+- Search returns JSON array directly, converted to Lua table by json_to_lua_value
+
+**Files Created**:
+- examples/script-users/getting-started/06-episodic-memory-basic.lua (306 lines)
+- examples/script-users/cookbook/memory-session-isolation.lua (~200 lines)
+- examples/script-users/features/memory-stats.lua (~200 lines)
+- examples/script-users/features/memory-semantic-basic.lua (316 lines)
+
+**Files Modified**:
+- llmspell-bridge/src/globals/mod.rs - Added register_memory_context_globals() with hybrid approach
+- llmspell-bridge/src/memory_bridge.rs - Converted to async methods (removed runtime field)
+- llmspell-bridge/src/lua/globals/memory.rs - Added block_on_async calls, StringError wrapper
+- llmspell-bridge/src/globals/memory_global.rs - No changes needed (already existed)
+
+**Tests**: All 5 memory_context_integration tests passing (0.14s)
 
 **Description**: Create practical Lua examples demonstrating Memory global usage patterns for episodic and semantic memory operations.
 
@@ -166,12 +194,12 @@ For 13.1 to 13.8 see `TODO-TEMP-ARCHIVE.md`
   - Summary/results section
 
 **Acceptance Criteria**:
-- [ ] Example 1: Basic episodic memory (add conversation → search → display) - `06-episodic-memory-basic.lua`
-- [ ] Example 2: Session isolation (multi-session data → query with session_id filter) - `memory-session-isolation.lua`
-- [ ] Example 3: Memory stats and monitoring - `memory-stats.lua`
-- [ ] Example 4: Semantic memory basics (entity storage → query) - `memory-semantic-basic.lua`
-- [ ] All examples run successfully via `llmspell run <example.lua>`
-- [ ] **TRACING**: Script start (info!), API calls (debug!), results (debug!), errors (error!)
+- [✅] Example 1: Basic episodic memory (add conversation → search → display) - `06-episodic-memory-basic.lua`
+- [✅] Example 2: Session isolation (multi-session data → query with session_id filter) - `memory-session-isolation.lua`
+- [✅] Example 3: Memory stats and monitoring - `memory-stats.lua`
+- [✅] Example 4: Semantic memory basics (entity storage → query) - `memory-semantic-basic.lua`
+- [✅] All examples run successfully via `llmspell run <example.lua>`
+- [✅] **TRACING**: Script start (info!), API calls (debug!), results (debug!), errors (error!)
 
 **Implementation Steps**:
 

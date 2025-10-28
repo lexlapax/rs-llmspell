@@ -83,15 +83,56 @@ fn register_session_artifacts(
         )));
     }
 
-    // Register Memory global if memory_manager available
-    // TODO(Phase 13): Enable when kernel provides memory_manager in context
-    // Expected type: Arc<dyn llmspell_memory::MemoryManager>
-    // if let Some(memory_manager) = context.get_bridge::<Arc<dyn llmspell_memory::MemoryManager>>("memory_manager") {
-    //     let memory_bridge = Arc::new(crate::memory_bridge::MemoryBridge::new(memory_manager));
-    //     builder.register(Arc::new(memory_global::MemoryGlobal::new(memory_bridge)));
-    // }
-
     session_manager_opt
+}
+
+/// Register Memory and Context globals (always available with in-memory fallback)
+async fn register_memory_context_globals(
+    builder: &mut GlobalRegistryBuilder,
+    context: &Arc<GlobalContext>,
+) {
+    use llmspell_memory::DefaultMemoryManager;
+    use tracing::{debug, info, warn};
+
+    // Try to get memory_manager from context, or create in-memory fallback
+    let memory_manager_opt: Option<Arc<dyn llmspell_memory::MemoryManager>> = context
+        .get_bridge::<Arc<dyn llmspell_memory::MemoryManager>>("memory_manager")
+        .map(|arc_arc| (*arc_arc).clone()); // Extract inner Arc from Arc<Arc<...>>
+
+    // If not found in context, create in-memory fallback
+    let memory_manager_opt = if memory_manager_opt.is_none() {
+        info!("No memory_manager in context, creating in-memory fallback");
+        match DefaultMemoryManager::new_in_memory().await {
+            Ok(manager) => {
+                debug!("Created in-memory MemoryManager successfully");
+                Some(Arc::new(manager) as Arc<dyn llmspell_memory::MemoryManager>)
+            }
+            Err(e) => {
+                warn!("Failed to create in-memory MemoryManager: {}, Memory/Context globals will not be available", e);
+                None
+            }
+        }
+    } else {
+        memory_manager_opt
+    };
+
+    if let Some(memory_manager) = memory_manager_opt {
+        // Register Memory global (17th global)
+        let memory_bridge = Arc::new(crate::memory_bridge::MemoryBridge::new(
+            memory_manager.clone(),
+        ));
+        builder.register(Arc::new(memory_global::MemoryGlobal::new(
+            memory_bridge.clone(),
+        )));
+        debug!("Registered Memory global (17th)");
+
+        // Register Context global (18th global) - depends on Memory
+        let context_bridge = Arc::new(crate::context_bridge::ContextBridge::new(memory_manager));
+        builder.register(Arc::new(context_global::ContextGlobal::new(context_bridge)));
+        debug!("Registered Context global (18th)");
+    } else {
+        warn!("Skipping Memory/Context global registration due to initialization failure");
+    }
 }
 
 /// Register RAG global if all dependencies are available
@@ -333,6 +374,9 @@ pub async fn create_standard_registry(context: Arc<GlobalContext>) -> Result<Glo
 
     // Register session and artifact globals
     let session_manager_opt = register_session_artifacts(&mut builder, &context);
+
+    // Register Memory and Context globals (always available with in-memory fallback)
+    register_memory_context_globals(&mut builder, &context).await;
 
     // Register RAG global if dependencies available
     register_rag_global(&mut builder, &context, session_manager_opt).await;

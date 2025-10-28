@@ -3,10 +3,23 @@
 
 use crate::globals::GlobalContext;
 use crate::lua::conversion::{json_to_lua_value, lua_value_to_json};
+use crate::lua::sync_utils::block_on_async;
 use crate::memory_bridge::MemoryBridge;
-use mlua::{Error as LuaError, Lua, Table, Value};
+use mlua::{Lua, Table, Value};
 use std::sync::Arc;
 use tracing::{debug, error, info};
+
+// Wrapper to make String errors compatible with StdError trait bound
+#[derive(Debug)]
+struct StringError(String);
+
+impl std::fmt::Display for StringError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{}", self.0)
+    }
+}
+
+impl std::error::Error for StringError {}
 
 /// Inject Memory global API into Lua
 ///
@@ -65,12 +78,21 @@ pub fn inject_memory_global(
                     serde_json::json!({})
                 };
 
-                add_bridge
-                    .episodic_add(session_id, role, content, metadata_json)
-                    .map_err(|e| {
-                        error!("Memory.episodic.add failed: {}", e);
-                        LuaError::RuntimeError(e)
-                    })
+                let bridge = add_bridge.clone();
+                block_on_async(
+                    "memory_episodic_add",
+                    async move {
+                        bridge
+                            .episodic_add(session_id, role, content, metadata_json)
+                            .await
+                            .map_err(StringError)
+                    },
+                    None,
+                )
+                .map_err(|e| {
+                    error!("Memory.episodic.add failed: {}", e);
+                    e
+                })
             },
         )?,
     )?;
@@ -87,12 +109,17 @@ pub fn inject_memory_global(
                 );
                 let limit = limit.unwrap_or(10);
 
-                let results = search_bridge
-                    .episodic_search(&session_id, &query, limit)
-                    .map_err(|e| {
-                        error!("Memory.episodic.search failed: {}", e);
-                        LuaError::RuntimeError(e)
-                    })?;
+                let bridge = search_bridge.clone();
+                let results = block_on_async(
+                    "memory_episodic_search",
+                    async move {
+                        bridge
+                            .episodic_search(&session_id, &query, limit)
+                            .await
+                            .map_err(StringError)
+                    },
+                    None,
+                )?;
 
                 json_to_lua_value(lua, &results)
             },
@@ -112,10 +139,17 @@ pub fn inject_memory_global(
             debug!("Memory.semantic.query called with query='{}'", query);
             let limit = limit.unwrap_or(10);
 
-            let results = query_bridge.semantic_query(&query, limit).map_err(|e| {
-                error!("Memory.semantic.query failed: {}", e);
-                LuaError::RuntimeError(e)
-            })?;
+            let bridge = query_bridge.clone();
+            let results = block_on_async(
+                "memory_semantic_query",
+                async move {
+                    bridge
+                        .semantic_query(&query, limit)
+                        .await
+                        .map_err(StringError)
+                },
+                None,
+            )?;
 
             json_to_lua_value(lua, &results)
         })?,
@@ -133,12 +167,17 @@ pub fn inject_memory_global(
                 let force = force.unwrap_or(false);
                 let session_id_ref = session_id.as_deref();
 
-                let result = consolidate_bridge
-                    .consolidate(session_id_ref, force)
-                    .map_err(|e| {
-                        error!("Memory.consolidate failed: {}", e);
-                        LuaError::RuntimeError(e)
-                    })?;
+                let bridge = consolidate_bridge.clone();
+                let result = block_on_async(
+                    "memory_consolidate",
+                    async move {
+                        bridge
+                            .consolidate(session_id_ref, force)
+                            .await
+                            .map_err(StringError)
+                    },
+                    None,
+                )?;
 
                 json_to_lua_value(lua, &result)
             },
@@ -151,10 +190,12 @@ pub fn inject_memory_global(
         "stats",
         lua.create_function(move |lua, ()| {
             debug!("Memory.stats called");
-            let stats = stats_bridge.stats().map_err(|e| {
-                error!("Memory.stats failed: {}", e);
-                LuaError::RuntimeError(e)
-            })?;
+            let bridge = stats_bridge.clone();
+            let stats = block_on_async(
+                "memory_stats",
+                async move { bridge.stats().await.map_err(StringError) },
+                None,
+            )?;
 
             json_to_lua_value(lua, &stats)
         })?,
