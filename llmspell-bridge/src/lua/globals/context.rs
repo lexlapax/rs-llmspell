@@ -4,9 +4,22 @@
 use crate::context_bridge::ContextBridge;
 use crate::globals::GlobalContext;
 use crate::lua::conversion::json_to_lua_value;
+use crate::lua::sync_utils::block_on_async;
 use mlua::{Error as LuaError, Lua};
 use std::sync::Arc;
 use tracing::{debug, error, info};
+
+// Wrapper to make String errors compatible with StdError trait bound
+#[derive(Debug)]
+struct StringError(String);
+
+impl std::fmt::Display for StringError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{}", self.0)
+    }
+}
+
+impl std::error::Error for StringError {}
 
 /// Inject Context global API into Lua
 ///
@@ -54,12 +67,21 @@ pub fn inject_context_global(
                 let max_tokens = max_tokens.unwrap_or(8192);
                 let session_id_ref = session_id.as_deref();
 
-                let result = assemble_bridge
-                    .assemble(&query, &strategy, max_tokens, session_id_ref)
-                    .map_err(|e| {
-                        error!("Context.assemble failed: {}", e);
-                        LuaError::RuntimeError(e)
-                    })?;
+                let bridge = assemble_bridge.clone();
+                let result = block_on_async(
+                    "context_assemble",
+                    async move {
+                        bridge
+                            .assemble(&query, &strategy, max_tokens, session_id_ref)
+                            .await
+                            .map_err(StringError)
+                    },
+                    None,
+                )
+                .map_err(|e| {
+                    error!("Context.assemble failed: {}", e);
+                    LuaError::RuntimeError(e.to_string())
+                })?;
 
                 json_to_lua_value(lua, &result)
             },
@@ -74,12 +96,21 @@ pub fn inject_context_global(
             debug!("Context.test called with query='{}'", query);
             let session_id_ref = session_id.as_deref();
 
-            let result = test_bridge
-                .test_query(&query, session_id_ref)
-                .map_err(|e| {
-                    error!("Context.test failed: {}", e);
-                    LuaError::RuntimeError(e)
-                })?;
+            let bridge = test_bridge.clone();
+            let result = block_on_async(
+                "context_test",
+                async move {
+                    bridge
+                        .test_query(&query, session_id_ref)
+                        .await
+                        .map_err(StringError)
+                },
+                None,
+            )
+            .map_err(|e| {
+                error!("Context.test failed: {}", e);
+                LuaError::RuntimeError(e.to_string())
+            })?;
 
             json_to_lua_value(lua, &result)
         })?,
@@ -92,9 +123,15 @@ pub fn inject_context_global(
         lua.create_function(move |lua, ()| {
             debug!("Context.strategy_stats called");
 
-            let stats = stats_bridge.get_strategy_stats().map_err(|e| {
+            let bridge = stats_bridge.clone();
+            let stats = block_on_async(
+                "context_strategy_stats",
+                async move { bridge.get_strategy_stats().await.map_err(StringError) },
+                None,
+            )
+            .map_err(|e| {
                 error!("Context.strategy_stats failed: {}", e);
-                LuaError::RuntimeError(e)
+                LuaError::RuntimeError(e.to_string())
             })?;
 
             json_to_lua_value(lua, &stats)

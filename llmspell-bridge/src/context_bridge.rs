@@ -43,8 +43,6 @@ use tracing::{debug, error, info, trace, warn};
 pub struct ContextBridge {
     /// Reference to the memory manager
     memory_manager: Arc<dyn MemoryManager>,
-    /// Tokio runtime handle for async→blocking conversion
-    runtime: tokio::runtime::Handle,
 }
 
 impl ContextBridge {
@@ -67,10 +65,7 @@ impl ContextBridge {
     #[must_use]
     pub fn new(memory_manager: Arc<dyn MemoryManager>) -> Self {
         info!("Creating ContextBridge");
-        Self {
-            memory_manager,
-            runtime: llmspell_kernel::global_io_runtime().handle().clone(),
-        }
+        Self { memory_manager }
     }
 
     /// Assemble context from memory using specified retrieval strategy
@@ -118,7 +113,7 @@ impl ContextBridge {
     ///     Some("session-123".to_string())
     /// )?;
     /// ```
-    pub fn assemble(
+    pub async fn assemble(
         &self,
         query: &str,
         strategy: &str,
@@ -133,10 +128,8 @@ impl ContextBridge {
         Self::validate_token_budget(max_tokens)?;
         let strategy_enum = Self::parse_strategy(strategy)?;
 
-        self.runtime.block_on(async {
-            self.assemble_context_async(query, strategy_enum, max_tokens, session_id)
-                .await
-        })
+        self.assemble_context_async(query, strategy_enum, max_tokens, session_id)
+            .await
     }
 
     /// Validate token budget constraints
@@ -405,10 +398,14 @@ impl ContextBridge {
     /// ```ignore
     /// let context = bridge.test_query("test query", Some("session-123"))?;
     /// ```
-    pub fn test_query(&self, query: &str, session_id: Option<&str>) -> Result<Value, String> {
+    pub async fn test_query(
+        &self,
+        query: &str,
+        session_id: Option<&str>,
+    ) -> Result<Value, String> {
         debug!("ContextBridge::test_query called with query='{}'", query);
         // Quick test with hybrid strategy, 2000 tokens
-        self.assemble(query, "hybrid", 2000, session_id)
+        self.assemble(query, "hybrid", 2000, session_id).await
     }
 
     /// Get strategy statistics from memory manager
@@ -432,43 +429,40 @@ impl ContextBridge {
     /// let stats = bridge.get_strategy_stats()?;
     /// println!("Episodic: {}", stats["episodic_count"]);
     /// ```
-    pub fn get_strategy_stats(&self) -> Result<Value, String> {
+    pub async fn get_strategy_stats(&self) -> Result<Value, String> {
         debug!("ContextBridge::get_strategy_stats called");
+        debug!("Entering async get_strategy_stats");
 
-        self.runtime.block_on(async {
-            debug!("Entering async get_strategy_stats");
+        // Get episodic count (same pattern as MemoryBridge::stats)
+        let episodic_count = self
+            .memory_manager
+            .episodic()
+            .search("", 10000)
+            .await
+            .map(|entries| entries.len())
+            .unwrap_or(0);
 
-            // Get episodic count (same pattern as MemoryBridge::stats)
-            let episodic_count = self
-                .memory_manager
-                .episodic()
-                .search("", 10000)
-                .await
-                .map(|entries| entries.len())
-                .unwrap_or(0);
+        // Get semantic count
+        let semantic_count = self
+            .memory_manager
+            .semantic()
+            .query_by_type("")
+            .await
+            .map(|entities| entities.len())
+            .unwrap_or(0);
 
-            // Get semantic count
-            let semantic_count = self
-                .memory_manager
-                .semantic()
-                .query_by_type("")
-                .await
-                .map(|entities| entities.len())
-                .unwrap_or(0);
+        debug!(
+            "get_strategy_stats: episodic={}, semantic={}",
+            episodic_count, semantic_count
+        );
 
-            debug!(
-                "get_strategy_stats: episodic={}, semantic={}",
-                episodic_count, semantic_count
-            );
+        let stats = serde_json::json!({
+            "episodic_count": episodic_count,
+            "semantic_count": semantic_count,
+            "strategies": ["episodic", "semantic", "hybrid"]
+        });
 
-            let stats = serde_json::json!({
-                "episodic_count": episodic_count,
-                "semantic_count": semantic_count,
-                "strategies": ["episodic", "semantic", "hybrid"]
-            });
-
-            Ok(stats)
-        })
+        Ok(stats)
     }
 
     /// Convert semantic entity to chunk
@@ -553,12 +547,12 @@ mod tests {
         let bridge = ContextBridge::new(Arc::new(memory_manager));
 
         // Token budget < 100 should error
-        let result = bridge.assemble("test query", "episodic", 50, None);
+        let result = runtime.block_on(bridge.assemble("test query", "episodic", 50, None));
         assert!(result.is_err());
         assert!(result.unwrap_err().contains("Token budget must be >=100"));
 
         // Token budget >= 100 should work
-        let result = bridge.assemble("test query", "episodic", 100, None);
+        let result = runtime.block_on(bridge.assemble("test query", "episodic", 100, None));
         assert!(result.is_ok());
     }
 
@@ -574,8 +568,8 @@ mod tests {
         let bridge = ContextBridge::new(Arc::new(memory_manager));
 
         // Query with no data should return empty context
-        let result = bridge
-            .assemble("test query", "episodic", 1000, None)
+        let result = runtime
+            .block_on(bridge.assemble("test query", "episodic", 1000, None))
             .expect("assemble should succeed");
 
         assert_eq!(result["chunks"].as_array().unwrap().len(), 0);
@@ -595,8 +589,8 @@ mod tests {
         let bridge = ContextBridge::new(Arc::new(memory_manager));
 
         // Query semantic memory (empty initially)
-        let result = bridge
-            .assemble("test query", "semantic", 1000, None)
+        let result = runtime
+            .block_on(bridge.assemble("test query", "semantic", 1000, None))
             .expect("assemble should succeed");
 
         assert_eq!(result["chunks"].as_array().unwrap().len(), 0);
@@ -614,8 +608,8 @@ mod tests {
         let bridge = ContextBridge::new(Arc::new(memory_manager));
 
         // Hybrid strategy combines both (both empty initially)
-        let result = bridge
-            .assemble("test query", "hybrid", 1000, None)
+        let result = runtime
+            .block_on(bridge.assemble("test query", "hybrid", 1000, None))
             .expect("assemble should succeed");
 
         assert_eq!(result["chunks"].as_array().unwrap().len(), 0);

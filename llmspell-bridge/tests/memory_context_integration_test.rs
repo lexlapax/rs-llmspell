@@ -354,14 +354,17 @@ fn test_error_propagation() {
 /// Helper: Add entry via Rust `MemoryBridge`
 fn add_via_rust_bridge(memory_manager: Arc<DefaultMemoryManager>, session_id: &str, message: &str) {
     let memory_bridge = MemoryBridge::new(memory_manager);
-    memory_bridge
-        .episodic_add(
-            session_id.to_string(),
-            "user".to_string(),
-            message.to_string(),
-            serde_json::json!({"source": "rust"}),
-        )
-        .expect("Rust bridge add should succeed");
+    llmspell_kernel::global_io_runtime().block_on(async {
+        memory_bridge
+            .episodic_add(
+                session_id.to_string(),
+                "user".to_string(),
+                message.to_string(),
+                serde_json::json!({"source": "rust"}),
+            )
+            .await
+            .expect("Rust bridge add should succeed");
+    });
     debug!("Added entry via Rust MemoryBridge");
 }
 
