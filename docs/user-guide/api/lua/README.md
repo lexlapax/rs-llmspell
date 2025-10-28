@@ -1290,9 +1290,7 @@ The `Memory` global provides access to LLMSpell's adaptive memory system with th
 
 Stores conversation exchanges with automatic timestamping and embedding generation.
 
-####
-
- Memory.episodic.add(session_id, role, content, metadata)
+#### Memory.episodic.add(session_id, role, content, metadata)
 
 Adds a conversation exchange to episodic memory.
 
