@@ -1450,32 +1450,37 @@ Current Layering:
 
 ---
 
-### Task 13.10.1: Hybrid RAG+Memory Retriever in llmspell-context
+### Task 13.10.1: Hybrid RAG+Memory Retrieval Core
 
 **Priority**: CRITICAL
-**Estimated Time**: 4 hours
+**Estimated Time**: 6 hours
 **Assignee**: Context + RAG Team
 **Status**: READY TO START
 
-**Description**: Create `HybridRetriever` in llmspell-context that combines RAG vector search with episodic memory retrieval. Follows ADR: integration in llmspell-context, NOT llmspell-rag (avoids circular dependencies).
+**Description**: Create complete hybrid retrieval system in llmspell-context: `HybridRetriever` that combines RAG vector search with episodic memory, RAG adapter for format conversion, weighted merge with token budget allocation, and session-aware filtering. Follows ADR: integration in llmspell-context, NOT llmspell-rag (avoids circular dependencies).
 
 **Architectural Analysis**:
 - **Target Crate**: llmspell-context (NOT llmspell-rag - see Phase 13.10 ADR)
 - **New Dependency**: Add llmspell-rag to llmspell-context/Cargo.toml
-- **Existing Context Retrieval**: `BM25Retriever` from memory (llmspell-context/src/retrieval/strategy.rs)
-- **RAG Pipeline**: `RAGPipeline` search() returns `RetrievalResult` with vector + BM25 results
-- **Integration Pattern**: Composition - HybridRetriever composes both retrieval sources
+- **Components**: HybridRetriever + RAG Adapter + RetrievalWeights + Session filtering
+- **RAG Results**: `RetrievalResult` from llmspell-rag (VectorSearchResult format)
+- **Context Results**: `RankedChunk` from llmspell-context (with timestamps)
+- **Adapter**: Converts RAG format → Context format, preserves scores/metadata
+- **Token Budget**: Allocates budget across sources (e.g., 2000 tokens → 800 RAG + 1200 Memory)
+- **Session Context**: Pass session_id through both RAG and Memory queries for filtering
 - **Backward Compatible**: Optional<RAGPipeline> - context works without RAG
 
 **Acceptance Criteria**:
 - [ ] llmspell-rag dependency added to llmspell-context/Cargo.toml
-- [ ] `HybridRetriever` struct created in llmspell-context/src/retrieval/hybrid_rag_memory.rs
-- [ ] Fields: memory_manager, rag_pipeline: Option<Arc<RAGPipeline>>
-- [ ] Method: `retrieve_hybrid(query, strategy, session_id) -> Result<Vec<RankedChunk>>`
-- [ ] Combines RAG results + Memory BM25 results with weighted merge (40% RAG, 60% Memory default)
+- [ ] `HybridRetriever` struct in llmspell-context/src/retrieval/hybrid_rag_memory.rs
+- [ ] `RAGAdapter` module in llmspell-context/src/retrieval/rag_adapter.rs
+- [ ] `RetrievalWeights` struct with validation (weights sum to 1.0 ±0.01)
+- [ ] Weighted merge: RAG results (40%) + Memory results (60%) - configurable presets
+- [ ] Token budget allocation splits correctly (respects source limits)
+- [ ] Session-aware: session_id passed to both RAG and Memory queries
 - [ ] Fallback: Works with rag_pipeline = None (memory-only)
-- [ ] Unit tests for hybrid merge logic
-- [ ] **TRACING**: Retrieval start (info!), source queries (debug!), merge (debug!), errors (error!)
+- [ ] Unit tests: weighted merge, format conversion, budget allocation, session filtering
+- [ ] **TRACING**: Retrieval start (info!), source queries (debug!), adapter (debug!), merge (debug!), errors (error!)
 - [ ] Zero clippy warnings
 - [ ] Compiles: `cargo check -p llmspell-context`
 
@@ -1486,47 +1491,176 @@ Current Layering:
    llmspell-rag = { path = "../llmspell-rag" }
    ```
 
-2. Create `llmspell-context/src/retrieval/hybrid_rag_memory.rs`:
-   - Struct: `HybridRetriever` with memory_manager + Optional<rag_pipeline>
-   - Method: `retrieve_hybrid(query, session_id, rag_weight, memory_weight)` → Vec<RankedChunk>
-   - Logic: Query RAG (if available) + Query Memory BM25 → Weighted merge → BM25 rerank
-   - Tracing: info!(retrieval start), debug!(source results), trace!(scores)
+2. Create `llmspell-context/src/retrieval/rag_adapter.rs`:
+   - Function: `pub fn adapt_rag_results(results: RetrievalResult) -> Vec<RankedChunk>`
+   - Convert VectorSearchResult → RankedChunk format
+   - Preserve scores, metadata, add timestamps
+   - Tracing: debug!(converting N results)
 
-3. Update `llmspell-context/src/retrieval/mod.rs`:
-   - Export: `pub mod hybrid_rag_memory;`
-   - Re-export: `pub use hybrid_rag_memory::HybridRetriever;`
+3. Create `llmspell-context/src/retrieval/hybrid_rag_memory.rs`:
+   - Struct: `RetrievalWeights` with validation + presets (balanced, rag_focused, memory_focused)
+   - Struct: `HybridRetriever` with memory_manager + Optional<rag_pipeline> + weights
+   - Method: `retrieve_hybrid(query, session_id, token_budget) -> Result<Vec<RankedChunk>>`
+     * Allocate budget: e.g., 2000 tokens × 0.4 = 800 RAG, × 0.6 = 1200 Memory
+     * Query RAG with session scope (if available)
+     * Query Memory BM25 with session_id
+     * Adapter: Convert RAG results
+     * Weighted merge: Apply weights to scores
+     * BM25 rerank combined results
+     * Truncate to token budget
+   - Tracing: info!(start), debug!(RAG results, Memory results), debug!(merged), trace!(scores)
 
-4. Create unit test in `llmspell-context/tests/hybrid_retrieval_test.rs`:
-   - Test: Mock RAG + Mock Memory → HybridRetriever → Verify weighted merge
-   - Test: RAG = None → Falls back to memory-only retrieval
-   - Test: Configurable weights (balanced, rag_focused, memory_focused)
+4. Update `llmspell-context/src/retrieval/mod.rs`:
+   - Export: `pub mod hybrid_rag_memory;` `pub mod rag_adapter;`
+   - Re-export: `pub use hybrid_rag_memory::{HybridRetriever, RetrievalWeights};`
+
+5. Create unit tests in `llmspell-context/tests/hybrid_retrieval_test.rs`:
+   - Test: RAG adapter format conversion (scores preserved)
+   - Test: RetrievalWeights validation (sum to 1.0, error otherwise)
+   - Test: Token budget allocation (800/1200 split for 40/60 weights)
+   - Test: Weighted merge (RAG score 0.8 × 0.4 = 0.32, Memory score 0.6 × 0.6 = 0.36)
+   - Test: RAG = None → Falls back to memory-only
+   - Test: Session filtering (results only from specified session)
 
 **Files to Create/Modify**:
 - `llmspell-context/Cargo.toml` (MODIFY - add llmspell-rag dependency)
-- `llmspell-context/src/retrieval/hybrid_rag_memory.rs` (NEW - ~200 lines)
-- `llmspell-context/src/retrieval/mod.rs` (MODIFY - export hybrid module)
-- `llmspell-context/tests/hybrid_retrieval_test.rs` (NEW - ~100 lines)
+- `llmspell-context/src/retrieval/rag_adapter.rs` (NEW - ~100 lines)
+- `llmspell-context/src/retrieval/hybrid_rag_memory.rs` (NEW - ~250 lines)
+- `llmspell-context/src/retrieval/mod.rs` (MODIFY - export modules)
+- `llmspell-context/tests/hybrid_retrieval_test.rs` (NEW - ~200 lines)
 
 **Definition of Done**:
 - [ ] llmspell-rag dependency added
-- [ ] HybridRetriever implemented with Optional<RAGPipeline>
-- [ ] retrieve_hybrid() combines both sources with weighted merge
-- [ ] Backward compatible - works without RAG (memory-only fallback)
-- [ ] Unit tests pass (hybrid merge, fallback, weight validation)
+- [ ] RAG adapter converts formats correctly
+- [ ] HybridRetriever implemented with all features
+- [ ] Token budget allocation works
+- [ ] Weighted merge validated
+- [ ] Session-aware filtering functional
+- [ ] Backward compatible (memory-only fallback)
+- [ ] All unit tests pass (6+ tests)
 - [ ] Tracing verified (info!, debug!, trace!)
 - [ ] Zero clippy warnings: `cargo clippy -p llmspell-context`
 - [ ] Compiles: `cargo check -p llmspell-context`
 
 ---
 
-### Task 13.10.2: ContextBridge Enhancement with Optional RAG
+### Task 13.10.2: Context-Aware Chunking Strategy
+
+**Priority**: HIGH
+**Estimated Time**: 5 hours
+**Assignee**: RAG + Context Team
+**Status**: BLOCKED by Task 13.10.1
+
+**Description**: Create context-aware chunking that uses recent episodic memory to inform chunk boundaries. Memory provides conversation context hints to determine semantic boundaries, improving chunk quality for conversational RAG.
+
+**Architectural Analysis**:
+- **Target Crate**: llmspell-rag/src/chunking/
+- **Existing**: `ChunkingStrategy` trait with `chunk(text, metadata) -> Vec<Chunk>`
+- **New Strategy**: `MemoryAwareChunker` queries recent episodic memory for context hints
+- **Mechanism**: Before chunking, retrieve recent conversation context (last 5-10 turns)
+  - Identify conversation topics and boundaries
+  - Use topic shifts as chunk boundary hints
+  - Preserve semantic continuity across conversation flows
+- **Integration**: Optional - falls back to standard chunking when memory unavailable
+
+**Acceptance Criteria**:
+- [ ] `MemoryAwareChunker` struct in llmspell-rag/src/chunking/memory_aware.rs
+- [ ] Implements `ChunkingStrategy` trait
+- [ ] Queries episodic memory for recent context (configurable: default 10 turns)
+- [ ] Identifies conversation boundaries using timestamps + topics
+- [ ] Falls back to standard semantic chunking when memory unavailable
+- [ ] Unit tests: chunking with/without memory context
+- [ ] Integration test: Verify chunk boundaries respect conversation flow
+- [ ] **TRACING**: Chunking start (info!), memory query (debug!), boundaries detected (debug!), fallback (warn!)
+- [ ] Zero clippy warnings
+- [ ] Compiles: `cargo check -p llmspell-rag`
+
+**Implementation Steps**:
+
+1. Create `llmspell-rag/src/chunking/memory_aware.rs`:
+   ```rust
+   pub struct MemoryAwareChunker {
+       memory_manager: Option<Arc<dyn MemoryManager>>,
+       context_window_size: usize, // Default: 10 recent turns
+       fallback_chunker: Box<dyn ChunkingStrategy>,
+       session_id: Option<String>,
+   }
+
+   impl MemoryAwareChunker {
+       pub fn new(fallback: Box<dyn ChunkingStrategy>) -> Self { ... }
+       pub fn with_memory(mut self, memory: Arc<dyn MemoryManager>) -> Self { ... }
+       pub fn with_session_id(mut self, session_id: String) -> Self { ... }
+
+       async fn get_context_hints(&self) -> Option<Vec<ContextHint>> {
+           // Query recent episodic memory
+           // Identify conversation boundaries
+           // Return topic shifts and timestamps
+       }
+   }
+
+   impl ChunkingStrategy for MemoryAwareChunker {
+       async fn chunk(&self, text: String, metadata: ChunkMetadata) -> Result<Vec<Chunk>> {
+           info!("Memory-aware chunking: text_len={}", text.len());
+
+           let hints = self.get_context_hints().await;
+           if let Some(hints) = hints {
+               debug!("Using {} context hints for chunking", hints.len());
+               // Apply hints to influence chunk boundaries
+           } else {
+               warn!("No memory context available, using fallback chunker");
+               return self.fallback_chunker.chunk(text, metadata).await;
+           }
+
+           // Chunking logic with conversation-aware boundaries
+       }
+   }
+   ```
+
+2. Update `llmspell-rag/src/chunking/mod.rs`:
+   - Export: `pub mod memory_aware;`
+   - Re-export: `pub use memory_aware::MemoryAwareChunker;`
+
+3. Add optional memory dependency to `llmspell-rag/Cargo.toml`:
+   ```toml
+   llmspell-memory = { path = "../llmspell-memory", optional = true }
+
+   [features]
+   memory-chunking = ["llmspell-memory"]
+   ```
+
+4. Create unit tests in `llmspell-rag/tests/memory_chunking_test.rs`:
+   - Test: Chunking without memory → uses fallback
+   - Test: Chunking with memory → respects conversation boundaries
+   - Test: Topic shift detection → creates chunks at topic boundaries
+   - Test: Session filtering → only uses relevant session context
+
+**Files to Create/Modify**:
+- `llmspell-rag/Cargo.toml` (MODIFY - add optional memory dependency)
+- `llmspell-rag/src/chunking/memory_aware.rs` (NEW - ~200 lines)
+- `llmspell-rag/src/chunking/mod.rs` (MODIFY - export memory_aware)
+- `llmspell-rag/tests/memory_chunking_test.rs` (NEW - ~150 lines)
+
+**Definition of Done**:
+- [ ] MemoryAwareChunker implemented
+- [ ] Conversation boundary detection working
+- [ ] Fallback to standard chunking functional
+- [ ] Session-aware context queries
+- [ ] Unit tests pass (4+ tests)
+- [ ] Integration test validates conversation continuity
+- [ ] Tracing verified (info!, debug!, warn!)
+- [ ] Zero clippy warnings
+- [ ] Compiles: `cargo check -p llmspell-rag --features memory-chunking`
+
+---
+
+### Task 13.10.3: ContextBridge Enhancement with Optional RAG
 
 **Priority**: CRITICAL
 **Estimated Time**: 4 hours
 **Assignee**: Bridge Team
-**Status**: BLOCKED by Task 13.10.1
+**Status**: BLOCKED by Tasks 13.10.1, 13.10.2
 
-**Description**: Enhance `ContextBridge` to optionally use `HybridRetriever` when `RAGPipeline` is available. No API changes - backward compatible.
+**Description**: Enhance `ContextBridge` to optionally use `HybridRetriever` when `RAGPipeline` is available. Add "rag" strategy to Context.assemble() Lua API. Fully backward compatible.
 
 **Architectural Analysis**:
 - **Existing**: `ContextBridge` in llmspell-bridge/src/context_bridge.rs
@@ -1536,14 +1670,16 @@ Current Layering:
 - **Enhancement**: Add optional rag_pipeline field
   - Builder: `with_rag_pipeline(rag: Arc<RAGPipeline>)`
   - New strategy: "rag" - uses HybridRetriever when RAG available
-  - Falls back to memory-only when rag_pipeline = None
+  - Falls back to memory-only "hybrid" when rag_pipeline = None
 
 **Acceptance Criteria**:
 - [ ] ContextBridge has `rag_pipeline: Option<Arc<RAGPipeline>>` field
 - [ ] Constructor unchanged: `ContextBridge::new(memory_manager)`
 - [ ] Builder method: `with_rag_pipeline(rag) -> Self`
-- [ ] assemble() uses HybridRetriever when "rag" strategy + rag_pipeline available
+- [ ] assemble() supports "rag" strategy → uses HybridRetriever
+- [ ] Graceful fallback: "rag" strategy without pipeline → warns + uses "hybrid"
 - [ ] Backward compatible: existing code works without RAG
+- [ ] Lua API: Context.assemble(query, "rag", tokens, session_id) works
 - [ ] Tests updated in llmspell-bridge/tests/context_global_test.rs
 - [ ] Zero clippy warnings
 - [ ] All tests pass: `cargo test -p llmspell-bridge --test context_global_test`
@@ -1551,1244 +1687,294 @@ Current Layering:
 **Implementation Steps**:
 
 1. Update `ContextBridge` struct in llmspell-bridge/src/context_bridge.rs:
-   - Add field: `rag_pipeline: Option<Arc<RAGPipeline>>`
-   - Add builder: `pub fn with_rag_pipeline(mut self, rag: Arc<RAGPipeline>) -> Self`
+   ```rust
+   pub struct ContextBridge {
+       memory_manager: Arc<dyn MemoryManager>,
+       rag_pipeline: Option<Arc<RAGPipeline>>, // NEW
+   }
 
-2. Update `assemble()` method:
-   - Parse "rag" strategy option
-   - When strategy = "rag" AND rag_pipeline.is_some():
-     * Use HybridRetriever from llmspell-context
-     * Pass query, session_id, default weights
-   - When strategy = "rag" BUT rag_pipeline.is_none():
-     * Warn: "RAG strategy requested but no RAG pipeline configured"
-     * Fall back to "hybrid" memory strategy
+   impl ContextBridge {
+       pub fn with_rag_pipeline(mut self, rag: Arc<RAGPipeline>) -> Self {
+           self.rag_pipeline = Some(rag);
+           self
+       }
+   }
+   ```
+
+2. Update `assemble()` method to handle "rag" strategy:
+   ```rust
+   "rag" => {
+       if let Some(rag) = &self.rag_pipeline {
+           info!("Using hybrid RAG+Memory retrieval");
+           // Create HybridRetriever from llmspell-context
+           let hybrid = HybridRetriever::new(
+               rag.clone(),
+               self.memory_manager.clone(),
+               RetrievalWeights::default(),
+           );
+           hybrid.retrieve_hybrid(query, session_id, token_budget).await?
+       } else {
+           warn!("RAG strategy requested but no RAG pipeline configured, falling back to hybrid memory");
+           // Fall back to memory-only hybrid strategy
+           self.assemble(query, "hybrid".to_string(), max_tokens, session_id).await?
+       }
+   }
+   ```
 
 3. Add tests in llmspell-bridge/tests/context_global_test.rs:
-   - Test: ContextBridge with RAG → "rag" strategy works
+   - Test: ContextBridge with RAG → "rag" strategy returns hybrid results
    - Test: ContextBridge without RAG → "rag" strategy falls back gracefully
    - Test: Existing strategies still work (episodic, semantic, hybrid)
+   - Test: Lua API: Context.assemble(query, "rag", 2000, session_id)
 
 **Files to Create/Modify**:
 - `llmspell-bridge/src/context_bridge.rs` (MODIFY - add rag_pipeline field + logic)
-- `llmspell-bridge/tests/context_global_test.rs` (MODIFY - add RAG tests)
+- `llmspell-bridge/tests/context_global_test.rs` (MODIFY - add RAG strategy tests)
 
 **Definition of Done**:
 - [ ] ContextBridge enhanced with optional RAG support
-- [ ] "rag" strategy implemented
+- [ ] "rag" strategy implemented with fallback
 - [ ] Backward compatible - no breaking changes
-- [ ] Tests pass with and without RAG pipeline
-- [ ] Tracing verified (warn on missing RAG)
+- [ ] Lua API works: Context.assemble(query, "rag", tokens, session)
+- [ ] Tests pass with and without RAG pipeline (4+ new tests)
+- [ ] Tracing verified (info! on hybrid use, warn! on fallback)
 - [ ] Zero clippy warnings
 - [ ] Compiles: `cargo check -p llmspell-bridge`
 
 ---
 
-### Task 13.10.3: RAG Adapter + Token Budget Management
-
-**Priority**: HIGH
-**Estimated Time**: 4 hours
-**Assignee**: Context Team
-**Status**: BLOCKED by Task 13.10.1
-
-**Description**: Create adapter to convert RAGPipeline results to context retrieval format, implement token budget allocation across RAG + Memory sources.
-
-**Architectural Analysis**:
-- **RAG Results**: `RetrievalResult` from llmspell-rag (VectorSearchResult with scores)
-- **Context Results**: `RankedChunk` from llmspell-context (with content, score, timestamp)
-- **Adapter**: Convert between formats, preserve scores and metadata
-- **Budget Allocation**: Split token budget across sources (e.g., 2000 tokens → 800 RAG + 1200 Memory)
-
-**Acceptance Criteria**:
-- [ ] `rag_adapter.rs` created in llmspell-context/src/retrieval/
-- [ ] Function: `adapt_rag_results(rag_results) -> Vec<RankedChunk>`
-- [ ] Token budget allocation in HybridRetriever (split by weights)
-- [ ] `RetrievalWeights` struct with presets (balanced, rag_focused, memory_focused)
-- [ ] Weight validation (must sum to 1.0)
-- [ ] Integration test: Real RAG + Memory hybrid search
-- [ ] Zero clippy warnings
-- [ ] All tests pass: `cargo test -p llmspell-context`
-
-**Implementation Steps**:
-
-1. Create `llmspell-context/src/retrieval/rag_adapter.rs`:
-   - Function: `pub fn adapt_rag_results(results: llmspell_rag::RetrievalResult) -> Vec<RankedChunk>`
-   - Convert VectorSearchResult to RankedChunk format
-   - Preserve scores, metadata, add timestamps
-
-2. Update `HybridRetriever` in hybrid_rag_memory.rs:
-   - Add token budget allocation logic
-   - Example: budget=2000, rag_weight=0.4 → allocate 800 tokens to RAG, 1200 to Memory
-   - Respect individual source limits
-
-3. Create `RetrievalWeights` struct:
-   - Fields: rag_weight: f32, memory_weight: f32
-   - Default: 0.4 RAG, 0.6 Memory
-   - Presets: balanced(), rag_focused(), memory_focused()
-   - Validation: weights sum to 1.0 ±0.01
-
-4. Integration test in llmspell-context/tests/hybrid_retrieval_integration_test.rs:
-   - Setup: In-memory RAG + in-memory Memory
-   - Ingest documents into RAG
-   - Add conversations to Memory
-   - Query with hybrid retrieval
-   - Verify: Results include both sources with correct weights
-
-**Files to Create/Modify**:
-- `llmspell-context/src/retrieval/rag_adapter.rs` (NEW - ~100 lines)
-- `llmspell-context/src/retrieval/hybrid_rag_memory.rs` (MODIFY - add budget allocation)
-- `llmspell-context/tests/hybrid_retrieval_integration_test.rs` (NEW - ~150 lines)
-
-**Definition of Done**:
-- [ ] RAG adapter converts results correctly
-- [ ] Token budget splits across sources
-- [ ] RetrievalWeights with validation
-- [ ] Integration test passes
-- [ ] Tracing verified
-- [ ] Zero clippy warnings
-- [ ] All tests pass: `cargo test -p llmspell-context`
-
----
-
-### Task 13.10.4: End-to-End Integration Test + Examples
-
-**Priority**: HIGH
-**Estimated Time**: 4 hours
-**Assignee**: Integration Team
-**Status**: BLOCKED by Tasks 13.10.1-3
-
-**Description**: Create comprehensive end-to-end test and Lua example demonstrating RAG + Memory hybrid retrieval through ContextBridge.
-
-**Acceptance Criteria**:
-- [ ] E2E test in llmspell-bridge/tests/rag_memory_integration_test.rs
-- [ ] Lua example: examples/script-users/cookbook/rag-memory-hybrid.lua
-- [ ] API documentation updated with "rag" strategy
-- [ ] All Phase 13.10 tests pass
-- [ ] Example runs successfully via `llmspell run`
-- [ ] Tracing verified
-- [ ] Zero clippy warnings
-
-**Implementation Steps**:
-
-1. Create E2E test in llmspell-bridge/tests/rag_memory_integration_test.rs:
-   - Setup: In-memory RAG + in-memory Memory
-   - Ingest 3 documents into RAG
-   - Add 5 conversation turns to Memory
-   - Create ContextBridge with RAG
-   - Query with "rag" strategy
-   - Verify: Results include both RAG docs + Memory conversations
-   - Verify: Correct weighting applied
-
-2. Create Lua example `examples/script-users/cookbook/rag-memory-hybrid.lua`:
-   - Demonstrate RAG ingestion (if API available)
-   - Add conversation to Memory
-   - Use Context.assemble() with "rag" strategy
-   - Display hybrid results showing both sources
-
-3. Update `docs/user-guide/api/lua/README.md`:
-   - Add "rag" strategy to Context.assemble() documentation
-   - Explain when to use: "Combines ingested documents (RAG) with conversation memory"
-   - Add example snippet
-
-**Files to Create/Modify**:
-- `llmspell-bridge/tests/rag_memory_integration_test.rs` (NEW - ~150 lines)
-- `examples/script-users/cookbook/rag-memory-hybrid.lua` (NEW - ~80 lines)
-- `docs/user-guide/api/lua/README.md` (MODIFY - add "rag" strategy docs)
-
-**Definition of Done**:
-- [ ] E2E test passes
-- [ ] Lua example runs successfully
-- [ ] API documentation updated
-- [ ] All Phase 13.10 tests pass
-- [ ] Tracing verified
-- [ ] Zero clippy warnings
-
----
-
-### Task 13.10.2: Context-Aware Chunking Strategy
-
-**Priority**: DEFERRED
-**Estimated Time**: 4 hours (moved to Phase 13.11)
-**Assignee**: RAG Team
-**Status**: DEFERRED
-
-**Reason for Deferral**: Context-aware chunking is orthogonal to hybrid retrieval. Phase 13.10 focuses on retrieval integration. Chunking enhancements can be added in Phase 13.11 if needed.
-
----
-
-### OLD Task 13.10.2: Context-Aware Chunking Strategy
-
-**Priority**: HIGH
-**Estimated Time**: 4 hours
-**Assignee**: RAG Team
-**Status**: READY TO START
-
-**Description**: Create context-aware chunking strategy that uses episodic memory to inform chunk boundaries, maintaining conversational context continuity.
-
-**Architectural Analysis**:
-- **Existing Chunking** (llmspell-rag/src/chunking/):
-  - `ChunkingStrategy` trait: `chunk(&self, text, metadata) -> Vec<Chunk>`
-       /// Wrapped RAG pipeline (vector + BM25)
-       rag_pipeline: Arc<RAGPipeline>,
-
-       /// Memory manager for episodic/semantic memory
-       memory_manager: Arc<dyn MemoryManager>,
-
-       /// Context bridge for context assembly
-       context_bridge: Arc<ContextBridge>,
-
-       /// Default session ID for episodic queries
-       session_id: Option<String>,
-
-       /// Weights for hybrid retrieval (RAG vs Memory)
-       retrieval_weights: MemoryRetrievalWeights,
-   }
-
-   impl MemoryAwareRAGPipeline {
-       /// Create a new memory-aware RAG pipeline
-       pub fn new(
-           rag_pipeline: Arc<RAGPipeline>,
-           memory_manager: Arc<dyn MemoryManager>,
-           context_bridge: Arc<ContextBridge>,
-       ) -> Self {
-           info!("Creating MemoryAwareRAGPipeline");
-           Self {
-               rag_pipeline,
-               memory_manager,
-               context_bridge,
-               session_id: None,
-               retrieval_weights: MemoryRetrievalWeights::default(), // 40% RAG, 60% Memory
-           }
-       }
-
-       /// Set the default session ID for episodic memory queries
-       pub fn with_session_id(mut self, session_id: String) -> Self {
-           debug!("Setting default session_id: {}", session_id);
-           self.session_id = Some(session_id);
-           self
-       }
-
-       /// Set custom retrieval weights (RAG vs Memory)
-       pub fn with_retrieval_weights(mut self, weights: MemoryRetrievalWeights) -> Self {
-           debug!("Setting retrieval weights: RAG={:.2}, Memory={:.2}",
-               weights.rag_weight, weights.memory_weight);
-           self.retrieval_weights = weights;
-           self
-       }
-
-       /// Search with hybrid RAG + Memory retrieval
-       ///
-       /// Combines:
-       /// 1. RAG pipeline (vector + BM25 on ingested documents)
-       /// 2. Episodic memory (conversation history)
-       /// 3. Hybrid reranking (relevance + recency)
-       pub async fn search_with_memory(
-           &self,
-           query: String,
-           scope: Option<StateScope>,
-           config: Option<QueryConfig>,
-           session_id: Option<String>,
-       ) -> Result<HybridMemoryResult> {
-           info!("Starting hybrid RAG + Memory search: query=\"{}\"", query);
-
-           // 1. RAG retrieval (vector + BM25 on documents)
-           debug!("Phase 1: RAG pipeline search");
-           let rag_result = self.rag_pipeline
-               .search(query.clone(), scope.clone(), config)
-               .await
-               .map_err(|e| {
-                   error!("RAG search failed: {}", e);
-                   anyhow::anyhow!("RAG search failed: {}", e)
-               })?;
-           debug!("RAG returned {} results", rag_result.results.len());
-
-           // 2. Memory retrieval (episodic conversation history)
-           let session = session_id.or_else(|| self.session_id.clone());
-           debug!("Phase 2: Memory search (session_id={:?})", session);
-
-           let memory_results = if let Some(sid) = &session {
-               // Use ContextBridge to assemble relevant context
-               let context_result = self.context_bridge
-                   .assemble(
-                       query.clone(),
-                       "episodic".to_string(), // Use episodic strategy for conversation memory
-                       2000, // Token budget
-                       Some(sid.clone()),
-                   )
-                   .map_err(|e| {
-                       warn!("Memory retrieval failed, continuing with RAG only: {}", e);
-                       e
-                   })
-                   .ok();
-
-               if let Some(ctx) = context_result {
-                   debug!("Memory returned {} chunks", ctx.chunks.len());
-                   ctx.chunks
-               } else {
-                   vec![]
-               }
-           } else {
-               debug!("No session_id provided, skipping memory retrieval");
-               vec![]
-           };
-
-           // 3. Hybrid merge and rerank
-           debug!("Phase 3: Hybrid merge with weights RAG={:.2}, Memory={:.2}",
-               self.retrieval_weights.rag_weight,
-               self.retrieval_weights.memory_weight);
-
-           let hybrid_result = HybridMemoryResult::merge(
-               rag_result,
-               memory_results,
-               &self.retrieval_weights,
-           );
-
-           info!("Hybrid search complete: {} total results", hybrid_result.total_count());
-           Ok(hybrid_result)
-       }
-
-       /// Ingest document with memory context awareness
-       ///
-       /// Uses recent episodic memory to inform chunking decisions:
-       /// - Recent context helps determine semantic boundaries
-       /// - Conversation patterns influence chunk size
-       pub async fn ingest_with_memory_context(
-           &self,
-           document_id: String,
-           content: String,
-           metadata: Option<serde_json::Value>,
-           scope: Option<StateScope>,
-           session_id: Option<String>,
-       ) -> Result<crate::pipeline::IngestionResult> {
-           info!("Ingesting document with memory context: {}", document_id);
-
-           // Retrieve recent context if session provided
-           let context_hint = if let Some(sid) = session_id.or_else(|| self.session_id.clone()) {
-               debug!("Retrieving recent context for session {}", sid);
-               self.context_bridge
-                   .assemble(
-                       content.chars().take(100).collect(), // First 100 chars as hint
-                       "episodic".to_string(),
-                       500, // Small token budget for context hint
-                       Some(sid),
-                   )
-                   .ok()
-           } else {
-               None
-           };
-
-           if context_hint.is_some() {
-               debug!("Using memory context to inform chunking");
-               // TODO: Pass context_hint to context-aware chunker (Task 13.10.2)
-           }
-
-           // Delegate to wrapped RAG pipeline
-           self.rag_pipeline
-               .ingest_document(document_id, content, metadata, scope)
-               .await
-               .map_err(|e| {
-                   error!("Document ingestion failed: {}", e);
-                   anyhow::anyhow!("Ingestion failed: {}", e)
-               })
-       }
-
-       /// Get underlying RAG pipeline (for direct access if needed)
-       pub fn rag_pipeline(&self) -> &Arc<RAGPipeline> {
-           &self.rag_pipeline
-       }
-
-       /// Get memory manager
-       pub fn memory_manager(&self) -> &Arc<dyn MemoryManager> {
-           &self.memory_manager
-       }
-   }
-   ```
-
-3. Create `llmspell-rag/src/memory_integration/hybrid_retrieval.rs`:
-   ```rust
-   //! Hybrid retrieval combining RAG and Memory results
-
-   use serde::{Deserialize, Serialize};
-   use tracing::{debug, trace};
-
-   use crate::pipeline::RetrievalResult;
-
-   /// Weights for hybrid RAG + Memory retrieval
-   #[derive(Debug, Clone, Copy, Serialize, Deserialize)]
-   pub struct MemoryRetrievalWeights {
-       /// Weight for RAG results (vector + BM25) [0.0-1.0]
-       pub rag_weight: f32,
-       /// Weight for Memory results (episodic) [0.0-1.0]
-       pub memory_weight: f32,
-   }
-
-   impl Default for MemoryRetrievalWeights {
-       fn default() -> Self {
-           Self {
-               rag_weight: 0.4,
-               memory_weight: 0.6, // Favor recent conversation memory
-           }
-       }
-   }
-
-   impl MemoryRetrievalWeights {
-       /// Validate weights sum to 1.0
-       pub fn validate(&self) -> Result<(), String> {
-           let sum = self.rag_weight + self.memory_weight;
-           if (sum - 1.0).abs() > 0.01 {
-               return Err(format!(
-                   "Weights must sum to 1.0, got {} (rag={}, memory={})",
-                   sum, self.rag_weight, self.memory_weight
-               ));
-           }
-           Ok(())
-       }
-
-       /// Balanced weights (50/50)
-       pub fn balanced() -> Self {
-           Self {
-               rag_weight: 0.5,
-               memory_weight: 0.5,
-           }
-       }
-
-       /// RAG-focused (80/20)
-       pub fn rag_focused() -> Self {
-           Self {
-               rag_weight: 0.8,
-               memory_weight: 0.2,
-           }
-       }
-
-       /// Memory-focused (20/80) - emphasize recent conversation
-       pub fn memory_focused() -> Self {
-           Self {
-               rag_weight: 0.2,
-               memory_weight: 0.8,
-           }
-       }
-   }
-
-   /// Chunk from context assembly
-   #[derive(Debug, Clone, Serialize)]
-   pub struct ContextChunk {
-       pub role: String,
-       pub content: String,
-       pub score: f32,
-       pub token_count: usize,
-       pub source: String,
-   }
-
-   /// Hybrid result combining RAG and Memory
-   #[derive(Debug, Clone, Serialize)]
-   pub struct HybridMemoryResult {
-       /// Results from RAG pipeline (with applied weight)
-       pub rag_results: Vec<RagChunk>,
-       /// Results from Memory (with applied weight)
-       pub memory_results: Vec<MemoryChunk>,
-       /// Combined and reranked results
-       pub merged_results: Vec<HybridChunk>,
-       /// Retrieval metadata
-       pub metadata: HybridMetadata,
-   }
-
-   #[derive(Debug, Clone, Serialize)]
-   pub struct RagChunk {
-       pub content: String,
-       pub score: f32,
-       pub metadata: serde_json::Value,
-   }
-
-   #[derive(Debug, Clone, Serialize)]
-   pub struct MemoryChunk {
-       pub role: String,
-       pub content: String,
-       pub score: f32,
-       pub timestamp: String,
-   }
-
-   #[derive(Debug, Clone, Serialize)]
-   pub struct HybridChunk {
-       pub content: String,
-       pub final_score: f32,
-       pub source: String, // "rag" or "memory"
-       pub metadata: serde_json::Value,
-   }
-
-   #[derive(Debug, Clone, Serialize)]
-   pub struct HybridMetadata {
-       pub rag_count: usize,
-       pub memory_count: usize,
-       pub total_count: usize,
-       pub weights: MemoryRetrievalWeights,
-   }
-
-   impl HybridMemoryResult {
-       /// Merge RAG and Memory results with weighted reranking
-       pub fn merge(
-           rag_result: RetrievalResult,
-           memory_chunks: Vec<ContextChunk>,
-           weights: &MemoryRetrievalWeights,
-       ) -> Self {
-           debug!("Merging {} RAG + {} Memory results",
-               rag_result.results.len(), memory_chunks.len());
-
-           // Convert RAG results with weight
-           let rag_results: Vec<RagChunk> = rag_result
-               .results
-               .iter()
-               .map(|r| RagChunk {
-                   content: r.content.clone(),
-                   score: r.score * weights.rag_weight,
-                   metadata: r.metadata.clone(),
-               })
-               .collect();
-
-           // Convert Memory results with weight
-           let memory_results: Vec<MemoryChunk> = memory_chunks
-               .iter()
-               .map(|c| MemoryChunk {
-                   role: c.role.clone(),
-                   content: c.content.clone(),
-                   score: c.score * weights.memory_weight,
-                   timestamp: "2025-01-27T00:00:00Z".to_string(), // TODO: Real timestamp
-               })
-               .collect();
-
-           // Merge and rerank
-           let mut merged: Vec<HybridChunk> = Vec::new();
-
-           for rag in &rag_results {
-               merged.push(HybridChunk {
-                   content: rag.content.clone(),
-                   final_score: rag.score,
-                   source: "rag".to_string(),
-                   metadata: rag.metadata.clone(),
-               });
-           }
-
-           for mem in &memory_results {
-               merged.push(HybridChunk {
-                   content: mem.content.clone(),
-                   final_score: mem.score,
-                   source: "memory".to_string(),
-                   metadata: serde_json::json!({
-                       "role": mem.role,
-                       "timestamp": mem.timestamp,
-                   }),
-               });
-           }
-
-           // Sort by final_score descending
-           merged.sort_by(|a, b| {
-               b.final_score
-                   .partial_cmp(&a.final_score)
-                   .unwrap_or(std::cmp::Ordering::Equal)
-           });
-
-           trace!("Merged results sorted by score, top score: {:.3}",
-               merged.first().map(|c| c.final_score).unwrap_or(0.0));
-
-           let metadata = HybridMetadata {
-               rag_count: rag_results.len(),
-               memory_count: memory_results.len(),
-               total_count: merged.len(),
-               weights: *weights,
-           };
-
-           Self {
-               rag_results,
-               memory_results,
-               merged_results: merged,
-               metadata,
-           }
-       }
-
-       /// Get total result count
-       pub fn total_count(&self) -> usize {
-           self.metadata.total_count
-       }
-
-       /// Get top N results
-       pub fn top_n(&self, n: usize) -> &[HybridChunk] {
-           &self.merged_results[..n.min(self.merged_results.len())]
-       }
-   }
-   ```
-
-4. Update `llmspell-rag/src/lib.rs` to expose memory integration:
-   ```rust
-   /// Memory integration for context-aware RAG
-   #[cfg(feature = "memory")]
-   pub mod memory_integration;
-   ```
-
-5. Add to prelude:
-   ```rust
-   #[cfg(feature = "memory")]
-   pub use crate::memory_integration::{
-       HybridMemoryResult, MemoryAwareRAGPipeline, MemoryRetrievalWeights,
-   };
-   ```
-
-**Files to Create/Modify**:
-- `llmspell-rag/src/memory_integration/mod.rs` (NEW - ~20 lines)
-- `llmspell-rag/src/memory_integration/memory_aware_pipeline.rs` (NEW - ~180 lines)
-- `llmspell-rag/src/memory_integration/hybrid_retrieval.rs` (NEW - ~200 lines)
-- `llmspell-rag/src/lib.rs` (MODIFY - add memory_integration module)
-- `llmspell-rag/Cargo.toml` (MODIFY - add llmspell-memory, llmspell-bridge deps)
-
-**Definition of Done**:
-- [ ] MemoryAwareRAGPipeline compiles and wraps RAGPipeline
-- [ ] `search_with_memory()` combines RAG + Memory results
-- [ ] Hybrid weighting works (configurable RAG vs Memory ratio)
-- [ ] Session-aware episodic filtering functional
-- [ ] Unit tests for hybrid merge logic
-- [ ] Tracing instrumentation verified (info!, debug!, warn!, error!)
-- [ ] Zero clippy warnings
-- [ ] Documentation with examples
-
----
-
-### Task 13.10.2: Context-Aware Chunking Strategy
-
-**Priority**: HIGH
-**Estimated Time**: 4 hours
-**Assignee**: RAG Team
-**Status**: READY TO START
-
-**Description**: Create context-aware chunking strategy that uses episodic memory to inform chunk boundaries, maintaining conversational context continuity.
-
-**Architectural Analysis**:
-- **Existing Chunking** (llmspell-rag/src/chunking/):
-  - `ChunkingStrategy` trait: `chunk(&self, text, metadata) -> Vec<Chunk>`
-  - `SlidingWindowChunker`: Fixed-size overlapping windows
-  - `SemanticChunker`: Sentence-boundary aware
-- **Memory Integration**:
-  - Retrieve recent conversation context before chunking
-  - Identify topic shifts from episodic memory
-  - Align chunk boundaries with conversation turns
-- **Use Case**: When ingesting a long document/conversation, use memory to:
-  - Determine where topics change
-  - Preserve question-answer pairs in same chunk
-  - Maintain speaker context across chunks
-
-**Acceptance Criteria**:
-- [ ] `ContextAwareChunker` implements `ChunkingStrategy` trait
-- [ ] Retrieves recent episodic memory before chunking
-- [ ] Identifies conversation turn boundaries
-- [ ] Preserves Q&A pairs within single chunks
-- [ ] Falls back to SemanticChunker when no memory available
-- [ ] **TRACING**: Chunking start (info!), memory lookup (debug!), boundary detection (debug!), chunk count (info!)
-
-**Implementation Steps**:
-
-1. Create `llmspell-rag/src/memory_integration/context_chunking.rs`:
-   ```rust
-   //! Context-aware document chunking using episodic memory
-
-   use anyhow::Result;
-   use llmspell_bridge::ContextBridge;
-   use std::sync::Arc;
-   use tracing::{debug, info, trace, warn};
-
-   use crate::chunking::{Chunk, ChunkingStrategy, SemanticChunker};
-
-   /// Chunking strategy that uses episodic memory for context awareness
-   pub struct ContextAwareChunker {
-       /// Context bridge for memory access
-       context_bridge: Arc<ContextBridge>,
-
-       /// Session ID for episodic memory queries
-       session_id: Option<String>,
-
-       /// Fallback chunker when no memory available
-       fallback: SemanticChunker,
-
-       /// Target chunk size (characters)
-       target_chunk_size: usize,
-
-       /// Overlap size (characters)
-       overlap_size: usize,
-   }
-
-   impl ContextAwareChunker {
-       /// Create a new context-aware chunker
-       pub fn new(context_bridge: Arc<ContextBridge>) -> Self {
-           info!("Creating ContextAwareChunker");
-           Self {
-               context_bridge,
-               session_id: None,
-               fallback: SemanticChunker::new(),
-               target_chunk_size: 1000,
-               overlap_size: 200,
-           }
-       }
-
-       /// Set session ID for episodic memory queries
-       pub fn with_session_id(mut self, session_id: String) -> Self {
-           debug!("Setting session_id for context-aware chunking: {}", session_id);
-           self.session_id = Some(session_id);
-           self
-       }
-
-       /// Set target chunk size
-       pub fn with_chunk_size(mut self, size: usize) -> Self {
-           self.target_chunk_size = size;
-           self
-       }
-
-       /// Retrieve recent context to inform chunking
-       async fn get_conversation_context(&self, text_hint: &str) -> Option<Vec<String>> {
-           let session_id = self.session_id.as_ref()?;
-
-           debug!("Retrieving conversation context for session {}", session_id);
-
-           let context_result = self
-               .context_bridge
-               .assemble(
-                   text_hint.to_string(),
-                   "episodic".to_string(),
-                   500, // Small budget for context hint
-                   Some(session_id.clone()),
-               )
-               .ok()?;
-
-           trace!("Retrieved {} context chunks", context_result.chunks.len());
-
-           Some(
-               context_result
-                   .chunks
-                   .into_iter()
-                   .map(|c| c.content)
-                   .collect(),
-           )
-       }
-
-       /// Detect conversation turn boundaries in text
-       fn detect_turn_boundaries(&self, text: &str, context: &[String]) -> Vec<usize> {
-           debug!("Detecting conversation turn boundaries");
-
-           // Common conversation markers
-           let turn_markers = vec![
-               "User:", "Assistant:", "System:",
-               "\nQ:", "\nA:",
-               "Question:", "Answer:",
-           ];
-
-           let mut boundaries = vec![0]; // Start of text
-
-           for (idx, _) in text.char_indices() {
-               // Check if any marker starts at this position
-               let remaining = &text[idx..];
-               for marker in &turn_markers {
-                   if remaining.starts_with(marker) {
-                       trace!("Found turn boundary at position {}: {}", idx, marker);
-                       boundaries.push(idx);
-                       break;
-                   }
-               }
-           }
-
-           boundaries.push(text.len()); // End of text
-           boundaries.sort_unstable();
-           boundaries.dedup();
-
-           debug!("Detected {} turn boundaries", boundaries.len());
-           boundaries
-       }
-
-       /// Create chunks respecting conversation boundaries
-       fn chunk_with_boundaries(
-           &self,
-           text: &str,
-           boundaries: &[usize],
-           metadata: Option<serde_json::Value>,
-       ) -> Vec<Chunk> {
-           let mut chunks = Vec::new();
-           let mut current_start = 0;
-
-           for window in boundaries.windows(2) {
-               let start = window[0];
-               let end = window[1];
-
-               // Skip empty segments
-               if end <= start {
-                   continue;
-               }
-
-               // Extract segment
-               let segment = &text[start..end];
-
-               // If segment is larger than target, split it
-               if segment.len() > self.target_chunk_size {
-                   trace!("Segment too large ({}), splitting", segment.len());
-                   let sub_chunks = self.split_large_segment(segment, metadata.clone());
-                   chunks.extend(sub_chunks);
-               } else {
-                   chunks.push(Chunk {
-                       content: segment.to_string(),
-                       metadata: metadata.clone(),
-                       start_index: start,
-                       end_index: end,
-                   });
-               }
-
-               current_start = end;
-           }
-
-           info!("Created {} context-aware chunks", chunks.len());
-           chunks
-       }
-
-       /// Split a large segment into smaller chunks
-       fn split_large_segment(
-           &self,
-           segment: &str,
-           metadata: Option<serde_json::Value>,
-       ) -> Vec<Chunk> {
-           // Use fallback semantic chunker for large segments
-           trace!("Using semantic chunker for large segment");
-           self.fallback.chunk(segment, metadata)
-       }
-   }
-
-   impl ChunkingStrategy for ContextAwareChunker {
-       fn chunk(
-           &self,
-           text: &str,
-           metadata: Option<serde_json::Value>,
-       ) -> Result<Vec<Chunk>> {
-           info!("Starting context-aware chunking, text length: {}", text.len());
-
-           // Try to get conversation context
-           let context = llmspell_kernel::global_io_runtime().block_on(async {
-               self.get_conversation_context(&text[..text.len().min(200)])
-                   .await
-           });
-
-           if context.is_none() || self.session_id.is_none() {
-               warn!("No memory context available, falling back to semantic chunking");
-               return self.fallback.chunk(text, metadata);
-           }
-
-           let context = context.unwrap();
-           debug!("Using {} context entries for chunking", context.len());
-
-           // Detect conversation boundaries
-           let boundaries = self.detect_turn_boundaries(text, &context);
-
-           // Create chunks respecting boundaries
-           let chunks = self.chunk_with_boundaries(text, &boundaries, metadata);
-
-           Ok(chunks)
-       }
-
-       fn name(&self) -> &str {
-           "context_aware"
-       }
-   }
-
-   #[cfg(test)]
-   mod tests {
-       use super::*;
-
-       #[test]
-       fn test_turn_boundary_detection() {
-           let text = "User: What is Rust?\nAssistant: Rust is a programming language.\nUser: Tell me more.";
-
-           // Would need ContextBridge mock for full test
-           // This is a placeholder structure
-       }
-   }
-   ```
-
-2. Update `llmspell-rag/src/memory_integration/mod.rs`:
-   ```rust
-   pub use context_chunking::ContextAwareChunker;
-   ```
-
-**Files to Create/Modify**:
-- `llmspell-rag/src/memory_integration/context_chunking.rs` (NEW - ~200 lines)
-- `llmspell-rag/src/memory_integration/mod.rs` (MODIFY - export ContextAwareChunker)
-
-**Definition of Done**:
-- [ ] ContextAwareChunker implements ChunkingStrategy trait
-- [ ] Conversation turn detection works (User:, Assistant:, Q:, A:)
-- [ ] Falls back to SemanticChunker gracefully
-- [ ] Unit tests for boundary detection
-- [ ] Tracing instrumentation complete
-- [ ] Zero clippy warnings
-- [ ] Integration with MemoryAwareRAGPipeline
-
----
-
-### Task 13.10.3: Hybrid Retrieval with Memory Integration Tests
-
-**Priority**: HIGH
-**Estimated Time**: 4 hours
-**Assignee**: QA + RAG Team
-**Status**: READY TO START
-
-**Description**: Create comprehensive integration tests validating RAG + Memory hybrid retrieval, chunking, and reranking.
-
-**Architectural Analysis**:
-- **Test Scenarios**:
-  1. Hybrid search: RAG + Memory results merged correctly
-  2. Weighting: Different RAG/Memory ratios produce expected ranking
-  3. Session filtering: Memory results filtered by session_id
-  4. Fallback: RAG works when memory empty
-  5. Context chunking: Conversation boundaries preserved
-- **Test Infrastructure**:
-  - InMemoryVectorStorage for RAG
-  - InMemoryEpisodicMemory for Memory
-  - Mock ContextBridge or use real implementation
-
-**Acceptance Criteria**:
-- [ ] Test hybrid search merges RAG + Memory results
-- [ ] Test weighting adjustments change result ranking
-- [ ] Test session filtering isolates correct memory
-- [ ] Test RAG-only fallback when no memory
-- [ ] Test context-aware chunking preserves Q&A pairs
-- [ ] **TRACING**: Test start (info!), phase markers (debug!), assertions (debug!)
-
-**Implementation Steps**:
-
-1. Create `llmspell-rag/tests/memory_integration_test.rs`:
-   ```rust
-   //! Integration tests for RAG + Memory hybrid retrieval
-
-   use llmspell_bridge::{ContextBridge, MemoryBridge};
-   use llmspell_memory::{DefaultMemoryManager, EpisodicEntry};
-   use llmspell_rag::memory_integration::{
-       MemoryAwareRAGPipeline, MemoryRetrievalWeights,
-   };
-   use llmspell_rag::pipeline::RAGPipeline;
-   use std::sync::Arc;
-   use tracing::{debug, info};
-
-   async fn setup_test_environment() -> (
-       Arc<RAGPipeline>,
-       Arc<DefaultMemoryManager>,
-       Arc<ContextBridge>,
-   ) {
-       info!("Setting up test environment");
-
-       // Create memory manager
-       let memory_manager = DefaultMemoryManager::new_in_memory()
-           .await
-           .expect("Failed to create memory manager");
-       let memory_manager = Arc::new(memory_manager);
-
-       // Create bridges
-       let context_bridge = Arc::new(ContextBridge::new(memory_manager.clone()));
-
-       // Create RAG pipeline (simplified for testing)
-       // TODO: Real RAGPipeline setup with vector storage
-
-       (rag_pipeline, memory_manager, context_bridge)
-   }
-
-   #[tokio::test]
-   async fn test_hybrid_search_merges_rag_and_memory() {
-       info!("Testing hybrid search merging");
-
-       let (rag_pipeline, memory_manager, context_bridge) = setup_test_environment().await;
-
-       // Add conversation to memory
-       let session_id = "test-session-123";
-       memory_manager
-           .episodic()
-           .add(EpisodicEntry::new(
-               session_id.to_string(),
-               "user".to_string(),
-               "What is Rust ownership?".to_string(),
-           ))
-           .await
-           .unwrap();
-
-       memory_manager
-           .episodic()
-           .add(EpisodicEntry::new(
-               session_id.to_string(),
-               "assistant".to_string(),
-               "Ownership is Rust's memory management model.".to_string(),
-           ))
-           .await
-           .unwrap();
-
-       // Create memory-aware pipeline
-       let pipeline = MemoryAwareRAGPipeline::new(
-           Arc::new(rag_pipeline),
-           memory_manager,
-           context_bridge,
-       )
-       .with_session_id(session_id.to_string());
-
-       // Search with hybrid retrieval
-       let result = pipeline
-           .search_with_memory(
-               "Rust ownership".to_string(),
-               None,
-               None,
-               Some(session_id.to_string()),
-           )
-           .await
-           .unwrap();
-
-       debug!("Hybrid result: {} total results", result.total_count());
-
-       // Verify both RAG and Memory results present
-       assert!(
-           result.metadata.rag_count > 0 || result.metadata.memory_count > 0,
-           "Should have results from RAG or Memory"
-       );
-
-       info!("✓ Hybrid search merging test passed");
-   }
-
-   #[tokio::test]
-   async fn test_weighting_affects_ranking() {
-       info!("Testing retrieval weight adjustments");
-
-       // Test with Memory-focused weights
-       let weights_memory = MemoryRetrievalWeights::memory_focused(); // 20% RAG, 80% Memory
-       assert_eq!(weights_memory.rag_weight, 0.2);
-       assert_eq!(weights_memory.memory_weight, 0.8);
-
-       // Test with RAG-focused weights
-       let weights_rag = MemoryRetrievalWeights::rag_focused(); // 80% RAG, 20% Memory
-       assert_eq!(weights_rag.rag_weight, 0.8);
-       assert_eq!(weights_rag.memory_weight, 0.2);
-
-       // Verify validation
-       weights_memory.validate().unwrap();
-       weights_rag.validate().unwrap();
-
-       info!("✓ Weight adjustment test passed");
-   }
-
-   #[tokio::test]
-   async fn test_session_filtering() {
-       info!("Testing session-based memory filtering");
-
-       let (rag_pipeline, memory_manager, context_bridge) = setup_test_environment().await;
-
-       // Add memories to different sessions
-       memory_manager
-           .episodic()
-           .add(EpisodicEntry::new(
-               "session-A".to_string(),
-               "user".to_string(),
-               "Message in session A".to_string(),
-           ))
-           .await
-           .unwrap();
-
-       memory_manager
-           .episodic()
-           .add(EpisodicEntry::new(
-               "session-B".to_string(),
-               "user".to_string(),
-               "Message in session B".to_string(),
-           ))
-           .await
-           .unwrap();
-
-       // Query session A
-       let pipeline_a = MemoryAwareRAGPipeline::new(
-           Arc::new(rag_pipeline.clone()),
-           memory_manager.clone(),
-           context_bridge.clone(),
-       )
-       .with_session_id("session-A".to_string());
-
-       let result_a = pipeline_a
-           .search_with_memory("message".to_string(), None, None, None)
-           .await
-           .unwrap();
-
-       // Verify session A results don't include session B data
-       // (Would need more detailed assertion on result content)
-       debug!("Session A results: {}", result_a.total_count());
-
-       info!("✓ Session filtering test passed");
-   }
-
-   #[tokio::test]
-   async fn test_rag_fallback_without_memory() {
-       info!("Testing RAG fallback when memory empty");
-
-       let (rag_pipeline, memory_manager, context_bridge) = setup_test_environment().await;
-
-       // Create pipeline WITHOUT session_id (no memory context)
-       let pipeline = MemoryAwareRAGPipeline::new(
-           Arc::new(rag_pipeline),
-           memory_manager,
-           context_bridge,
-       );
-
-       // Search should still work (RAG only)
-       let result = pipeline
-           .search_with_memory("test query".to_string(), None, None, None)
-           .await
-           .unwrap();
-
-       debug!("RAG-only result: {} results", result.total_count());
-
-       // Should have RAG results, zero memory results
-       assert_eq!(result.metadata.memory_count, 0, "Should have no memory results");
-
-       info!("✓ RAG fallback test passed");
-   }
-   ```
-
-2. Create examples in `examples/rag/`:
-   ```lua
-   -- examples/rag/memory-enhanced-rag.lua
-   -- ABOUTME: Demonstrates RAG + Memory hybrid retrieval
-
-   print("=== Memory-Enhanced RAG Example ===\n")
-
-   local session_id = "rag-demo-" .. os.time()
-
-   -- Step 1: Add conversation to memory
-   print("Adding conversation to episodic memory...")
-   Memory.episodic.add(session_id, "user", "What are the benefits of Rust?", {topic = "rust"})
-   Memory.episodic.add(session_id, "assistant", "Rust provides memory safety without garbage collection.", {topic = "rust"})
-   Memory.episodic.add(session_id, "user", "How does ownership work?", {topic = "rust"})
-   Memory.episodic.add(session_id, "assistant", "Ownership ensures one variable owns each value.", {topic = "rust"})
-
-   -- Step 2: Ingest documents into RAG
-   print("Ingesting documents into RAG...")
-   RAG.ingest("rust-doc-1", "Rust ownership system prevents data races at compile time.", {source = "docs"})
-   RAG.ingest("rust-doc-2", "Borrowing allows temporary access to owned values.", {source = "docs"})
-
-   -- Step 3: Hybrid search (RAG + Memory)
-   print("\nSearching with hybrid retrieval...")
-   local results = RAG.search_with_memory("ownership and borrowing", session_id)
-
-   print(string.format("Found %d results:\n", #results))
-   for i, result in ipairs(results) do
-       print(string.format("[%d] Score: %.3f, Source: %s", i, result.score, result.source))
-       print(string.format("    %s\n", result.content:sub(1, 80) .. "..."))
-   end
-
-   print("✓ Hybrid RAG + Memory search complete")
-   ```
-
-**Files to Create**:
-- `llmspell-rag/tests/memory_integration_test.rs` (NEW - ~250 lines)
-- `examples/rag/memory-enhanced-rag.lua` (NEW - ~30 lines)
-
-**Definition of Done**:
-- [ ] All 4+ integration tests pass
-- [ ] Hybrid merge logic verified
-- [ ] Session filtering validated
-- [ ] Fallback behavior tested
-- [ ] Lua example runs successfully
-- [ ] Tracing instrumentation verified
-- [ ] Zero clippy warnings
-- [ ] Tests run in <5s (in-memory backends)
-
----
-
-### Task 13.10.4: Documentation & API Updates
+### Task 13.10.4: Consolidation Feedback Mechanism
 
 **Priority**: MEDIUM
 **Estimated Time**: 4 hours
-**Assignee**: Documentation Team
-**Status**: READY TO START
+**Assignee**: Memory + Context Team
+**Status**: BLOCKED by Task 13.10.1
 
-**Description**: Document memory-enhanced RAG capabilities in user guides, API docs, and architecture documentation.
+**Description**: Track query patterns in HybridRetriever and feed frequently-retrieved episodic content to consolidation priority queue. This informs which episodic memories should be consolidated to semantic memory first.
+
+**Architectural Analysis**:
+- **Query Pattern Tracking**: HybridRetriever logs which episodic entries are retrieved
+- **Frequency Counting**: Maintain in-memory counter of entry_id → retrieval_count
+- **Consolidation Priority**: Memory consolidation process queries retrieval counts
+- **Priority Queue**: Frequently-retrieved episodic → higher consolidation priority
+- **Threshold**: Entries retrieved 5+ times marked as "high-value" for consolidation
 
 **Acceptance Criteria**:
-- [ ] RAG user guide updated with Memory integration examples
-- [ ] API documentation for MemoryAwareRAGPipeline
-- [ ] Architecture doc explaining hybrid retrieval
-- [ ] Migration guide for existing RAG users
-- [ ] Lua API additions documented
+- [ ] HybridRetriever tracks retrieved episodic entry IDs
+- [ ] `QueryPatternTracker` struct maintains retrieval frequency
+- [ ] Method: `get_consolidation_candidates(min_retrievals: usize) -> Vec<EntryId>`
+- [ ] Memory consolidation accepts optional priority hints
+- [ ] Integration: HybridRetriever → QueryPatternTracker → Consolidation
+- [ ] Unit tests: frequency tracking, candidate selection
+- [ ] Integration test: Frequently-queried entries prioritized
+- [ ] **TRACING**: Pattern tracking (debug!), consolidation hints (info!)
+- [ ] Zero clippy warnings
 
 **Implementation Steps**:
 
-1. Update `docs/user-guide/rag/README.md`:
-   ```markdown
-   ## Memory-Enhanced RAG
-
-   Combine RAG's document retrieval with episodic memory for context-aware search.
-
-   ### Hybrid Retrieval
-
-   RAG pipeline can now integrate with the Memory system:
-
+1. Create `llmspell-context/src/retrieval/query_pattern_tracker.rs`:
    ```rust
-   use llmspell_rag::memory_integration::MemoryAwareRAGPipeline;
+   use std::collections::HashMap;
+   use std::sync::RwLock;
 
-   let memory_rag = MemoryAwareRAGPipeline::new(
-       rag_pipeline,
-       memory_manager,
-       context_bridge,
-   )
-   .with_session_id("session-123")
-   .with_retrieval_weights(MemoryRetrievalWeights::balanced());
+   pub struct QueryPatternTracker {
+       retrieval_counts: RwLock<HashMap<String, usize>>, // entry_id → count
+   }
 
-   let results = memory_rag
-       .search_with_memory("query", None, None, Some("session-123"))
-       .await?;
+   impl QueryPatternTracker {
+       pub fn new() -> Self { ... }
+
+       pub fn record_retrieval(&self, entry_ids: &[String]) {
+           let mut counts = self.retrieval_counts.write().unwrap();
+           for id in entry_ids {
+               *counts.entry(id.clone()).or_insert(0) += 1;
+           }
+           debug!("Recorded {} entry retrievals", entry_ids.len());
+       }
+
+       pub fn get_consolidation_candidates(&self, min_retrievals: usize) -> Vec<String> {
+           let counts = self.retrieval_counts.read().unwrap();
+           let candidates: Vec<_> = counts.iter()
+               .filter(|(_, count)| **count >= min_retrievals)
+               .map(|(id, count)| (id.clone(), *count))
+               .collect();
+
+           info!("Found {} consolidation candidates (min_retrievals={})",
+                 candidates.len(), min_retrievals);
+           candidates.into_iter().map(|(id, _)| id).collect()
+       }
+   }
    ```
 
-   ### Benefits
+2. Update `HybridRetriever` in hybrid_rag_memory.rs:
+   - Add field: `query_tracker: Arc<QueryPatternTracker>`
+   - After retrieval, call: `query_tracker.record_retrieval(&episodic_entry_ids)`
+   - Tracing: debug!("Tracking query pattern for {} entries", count)
 
-   - **Context continuity**: Recent conversation informs retrieval
-   - **Recency bias**: Fresh information weighted higher
-   - **Session awareness**: Results filtered to relevant session
-   - **Fallback**: Works without memory (RAG-only mode)
-
-   ### Configuration
-
-   Adjust RAG vs Memory weights:
-   - `balanced()`: 50/50 split
-   - `rag_focused()`: 80% RAG, 20% Memory
-   - `memory_focused()`: 20% RAG, 80% Memory
+3. Update `MemoryManager::consolidate()` to accept priority hints:
+   ```rust
+   pub async fn consolidate(
+       &self,
+       session_id: Option<String>,
+       priority_entries: Option<Vec<String>>, // NEW parameter
+       force: bool
+   ) -> Result<ConsolidationResult>
    ```
+   - Process priority_entries first before chronological consolidation
+   - Tracing: info!("Consolidating {} priority entries", priority_entries.len())
 
-2. Create architecture doc `docs/technical/rag-memory-integration.md`
+4. Create tests in llmspell-context/tests/query_pattern_test.rs:
+   - Test: QueryPatternTracker records retrievals correctly
+   - Test: Candidates selected based on min_retrievals threshold
+   - Test: HybridRetriever integration → patterns tracked
+   - Test: Consolidation uses priority hints
 
-3. Update Lua API docs in `docs/user-guide/api/lua/README.md`:
-   ```markdown
-   #### RAG.search_with_memory(query, session_id)
-
-   Hybrid search combining RAG vector search with episodic memory.
-
-   **Parameters**:
-   - `query` (string): Search query
-   - `session_id` (string): Session ID for memory filtering
-
-   **Returns**: Array of hybrid results with scores
-
-   **Example**:
-   ```lua
-   local results = RAG.search_with_memory("Rust ownership", session_id)
-   for _, result in ipairs(results) do
-       print(result.source .. ": " .. result.content)
-   end
-   ```
-   ```
-
-**Files to Modify**:
-- `docs/user-guide/rag/README.md` (MODIFY - add Memory integration section)
-- `docs/technical/rag-memory-integration.md` (NEW - ~100 lines)
-- `docs/user-guide/api/lua/README.md` (MODIFY - add RAG.search_with_memory)
+**Files to Create/Modify**:
+- `llmspell-context/src/retrieval/query_pattern_tracker.rs` (NEW - ~100 lines)
+- `llmspell-context/src/retrieval/hybrid_rag_memory.rs` (MODIFY - add tracking)
+- `llmspell-context/src/retrieval/mod.rs` (MODIFY - export tracker)
+- `llmspell-memory/src/manager.rs` (MODIFY - add priority_entries param)
+- `llmspell-context/tests/query_pattern_test.rs` (NEW - ~120 lines)
 
 **Definition of Done**:
-- [ ] User guide updated with examples
-- [ ] Architecture doc explains hybrid retrieval design
-- [ ] Lua API documented
-- [ ] Migration guide for existing users
-- [ ] All docs render correctly
-- [ ] No broken links
+- [ ] QueryPatternTracker tracks retrieval frequency
+- [ ] HybridRetriever records episodic retrievals
+- [ ] get_consolidation_candidates() returns high-frequency entries
+- [ ] Memory consolidation accepts priority hints
+- [ ] Unit tests pass (4+ tests)
+- [ ] Integration test validates prioritization
+- [ ] Tracing verified (debug! tracking, info! candidates)
+- [ ] Zero clippy warnings
+- [ ] Compiles: `cargo check -p llmspell-context -p llmspell-memory`
 
 ---
 
+### Task 13.10.5: End-to-End Integration Tests + Examples
+
+**Priority**: CRITICAL
+**Estimated Time**: 5 hours
+**Assignee**: Integration + Documentation Team
+**Status**: BLOCKED by Tasks 13.10.1-4
+
+**Description**: Create comprehensive E2E tests and Lua examples demonstrating full RAG+Memory integration: hybrid retrieval, context-aware chunking, and consolidation feedback. Update all API documentation.
+
+**Acceptance Criteria**:
+- [ ] E2E test: Full RAG+Memory workflow in llmspell-bridge/tests/rag_memory_e2e_test.rs
+- [ ] Lua example: examples/script-users/cookbook/rag-memory-hybrid.lua
+- [ ] API documentation updated: docs/user-guide/api/lua/README.md
+- [ ] Architecture doc: docs/technical/rag-memory-integration.md
+- [ ] All Phase 13.10 tests pass (15+ tests total)
+- [ ] Examples run successfully via `llmspell run`
+- [ ] Validation script updated for new examples
+- [ ] Tracing verified across all components
+- [ ] Zero clippy warnings workspace-wide
+
+**Implementation Steps**:
+
+1. Create E2E test in llmspell-bridge/tests/rag_memory_e2e_test.rs:
+   ```rust
+   #[tokio::test]
+   async fn test_full_rag_memory_integration() {
+       // Setup: In-memory RAG + Memory + Context
+       let rag = create_in_memory_rag();
+       let memory = create_in_memory_memory();
+       let context = ContextBridge::new(memory.clone())
+           .with_rag_pipeline(rag.clone());
+
+       // Step 1: Ingest documents with memory-aware chunking
+       let chunker = MemoryAwareChunker::new(...)
+           .with_memory(memory.clone())
+           .with_session_id("session-123");
+       rag.ingest_with_chunker("doc-1", content, chunker).await.unwrap();
+
+       // Step 2: Add conversation to episodic memory
+       memory.episodic().add(entry1).await.unwrap();
+       memory.episodic().add(entry2).await.unwrap();
+
+       // Step 3: Hybrid retrieval via ContextBridge
+       let result = context.assemble(
+           "query".to_string(),
+           "rag".to_string(),
+           2000,
+           Some("session-123".to_string())
+       ).await.unwrap();
+
+       // Verify: Results include both RAG docs + episodic memory
+       assert!(result.chunks.len() > 0);
+       // Verify: Correct weighting (40% RAG, 60% Memory)
+       // Verify: Session filtering applied
+
+       // Step 4: Check consolidation candidates
+       let tracker = hybrid_retriever.query_tracker();
+       let candidates = tracker.get_consolidation_candidates(2);
+       assert!(candidates.len() > 0);
+   }
+   ```
+
+2. Create Lua example `examples/script-users/cookbook/rag-memory-hybrid.lua`:
+   ```lua
+   -- Demonstrate full RAG+Memory integration
+
+   local session_id = "demo-session-" .. os.time()
+
+   -- Add conversation to episodic memory
+   Memory.episodic.add(session_id, "user", "Tell me about Rust ownership")
+   Memory.episodic.add(session_id, "assistant", "Rust ownership is...")
+
+   -- Query with hybrid RAG+Memory strategy
+   print("\\n=== Hybrid RAG+Memory Retrieval ===")
+   local result = Context.assemble("Rust ownership", "rag", 2000, session_id)
+
+   print(string.format("Found %d context chunks:", #result.chunks))
+   for i, chunk in ipairs(result.chunks) do
+       print(string.format("  [%d] score=%.3f source=%s",
+                           i, chunk.score, chunk.role))
+       print(string.format("      %s", chunk.content:sub(1, 80)))
+   end
+
+   -- Check memory stats
+   local stats = Memory.stats()
+   print(string.format("\\nMemory: %d episodic, %d semantic",
+                       stats.episodic_count, stats.semantic_count))
+   ```
+
+3. Update `docs/user-guide/api/lua/README.md`:
+   - Add "rag" strategy documentation to Context.assemble()
+   - Explain: "Combines ingested documents (RAG vector search) with conversation memory"
+   - Add example snippet showing hybrid retrieval
+   - Document weighting behavior (40% RAG, 60% Memory default)
+
+4. Create architecture doc `docs/technical/rag-memory-integration.md`:
+   - Phase 13.10 overview and motivation
+   - Component diagram: HybridRetriever, MemoryAwareChunker, ContextBridge
+   - Data flow: RAG → Adapter → Merge ← Memory
+   - Token budget allocation algorithm
+   - Consolidation feedback mechanism
+   - Performance characteristics
+
+5. Update validation script `scripts/validate-lua-examples.sh`:
+   - Add rag-memory-hybrid.lua to test suite
+   - Verify example executes without errors
+
+**Files to Create/Modify**:
+- `llmspell-bridge/tests/rag_memory_e2e_test.rs` (NEW - ~200 lines)
+- `examples/script-users/cookbook/rag-memory-hybrid.lua` (NEW - ~80 lines)
+- `docs/user-guide/api/lua/README.md` (MODIFY - add "rag" strategy docs)
+- `docs/technical/rag-memory-integration.md` (NEW - ~150 lines)
+- `scripts/validate-lua-examples.sh` (MODIFY - add new example)
+
+**Definition of Done**:
+- [ ] E2E test passes: Full RAG+Memory workflow validated
+- [ ] Lua example runs successfully: `llmspell run examples/script-users/cookbook/rag-memory-hybrid.lua`
+- [ ] API documentation updated with "rag" strategy
+- [ ] Architecture doc explains integration design
+- [ ] Validation script includes new example
+- [ ] All Phase 13.10 tests pass: `cargo test -p llmspell-context -p llmspell-bridge -p llmspell-rag`
+- [ ] Tracing verified across all components (info!, debug!, warn!)
+- [ ] Zero clippy warnings: `cargo clippy --workspace --all-targets --all-features`
+- [ ] Full workspace compiles: `cargo check --workspace`
+
+---
 ## Phase 13.11: Template Integration - Memory-Aware Workflows (Days 18-19)
 
 **Goal**: Add memory and context parameters to all 10 production templates for session-aware, context-enhanced workflows
