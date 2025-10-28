@@ -1,6 +1,6 @@
 //! RAG Retriever trait - session-agnostic retrieval interface
 //!
-//! Provides abstract interface for RAG retrieval without direct SessionManager dependency.
+//! Provides abstract interface for RAG retrieval without direct `SessionManager` dependency.
 //! Session context is encoded in `StateScope` when needed.
 //!
 //! Note: Named `RAGRetriever` (not `RAGPipeline`) to avoid confusion with the concrete
@@ -53,7 +53,7 @@ impl RAGResult {
 
     /// Set timestamp
     #[must_use]
-    pub fn with_timestamp(mut self, timestamp: DateTime<Utc>) -> Self {
+    pub const fn with_timestamp(mut self, timestamp: DateTime<Utc>) -> Self {
         self.timestamp = timestamp;
         self
     }
@@ -65,7 +65,7 @@ impl RAGResult {
 /// when needed (e.g., `StateScope::Custom("session:abc123")`).
 ///
 /// This trait allows:
-/// - Context crate to depend on RAG without SessionManager
+/// - Context crate to depend on RAG without `SessionManager`
 /// - Testing with mock implementations
 /// - Multiple RAG backend implementations
 #[async_trait]
