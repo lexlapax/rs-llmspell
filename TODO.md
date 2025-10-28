@@ -1450,84 +1450,283 @@ Current Layering:
 
 ---
 
-### Task 13.10.1: Memory-Enhanced RAG Pipeline Wrapper
+### Task 13.10.1: Hybrid RAG+Memory Retriever in llmspell-context
 
 **Priority**: CRITICAL
 **Estimated Time**: 4 hours
-**Assignee**: RAG + Memory Team
+**Assignee**: Context + RAG Team
 **Status**: READY TO START
 
-**Description**: Create `MemoryAwareRAGPipeline` wrapper that combines existing RAG capabilities with Memory system for context-aware retrieval.
+**Description**: Create `HybridRetriever` in llmspell-context that combines RAG vector search with episodic memory retrieval. Follows ADR: integration in llmspell-context, NOT llmspell-rag (avoids circular dependencies).
 
 **Architectural Analysis**:
-- **Existing**: `RAGPipeline` (llmspell-rag/src/pipeline/rag_pipeline.rs)
-  - `ingest_document(doc_id, content, metadata, scope)` → IngestionResult
-  - `search(query, scope, config)` → RetrievalResult
-  - Components: storage, embedding_factory, chunker, retrieval_flow
-- **Pattern**: SessionAwareRAGPipeline wraps RAGPipeline (session_integration.rs)
-  - Adds session context to RAG operations
-  - Delegates core operations to wrapped pipeline
-  - Enhances results with session metadata
-- **Memory Integration**:
-  - Store Arc<dyn MemoryManager> for memory access
-  - Store Arc<ContextBridge> for context assembly
-  - Optionally store session_id for episodic filtering
-- **Backward Compatible**: RAG works without memory (memory_manager = None)
+- **Target Crate**: llmspell-context (NOT llmspell-rag - see Phase 13.10 ADR)
+- **New Dependency**: Add llmspell-rag to llmspell-context/Cargo.toml
+- **Existing Context Retrieval**: `BM25Retriever` from memory (llmspell-context/src/retrieval/strategy.rs)
+- **RAG Pipeline**: `RAGPipeline` search() returns `RetrievalResult` with vector + BM25 results
+- **Integration Pattern**: Composition - HybridRetriever composes both retrieval sources
+- **Backward Compatible**: Optional<RAGPipeline> - context works without RAG
 
 **Acceptance Criteria**:
-- [ ] `MemoryAwareRAGPipeline` struct wraps RAGPipeline + MemoryManager + ContextBridge
-- [ ] `search_with_memory()` method combines RAG + Memory.episodic.search()
-- [ ] `ingest_with_memory_context()` uses memory context to inform chunking
-- [ ] Hybrid retrieval: RAG results (40%) + Memory results (60%) configurable
-- [ ] Session-aware: Uses session_id for episodic memory filtering
-- [ ] **TRACING**: Pipeline init (info!), memory lookup (debug!), hybrid merge (debug!), errors (error!)
+- [ ] llmspell-rag dependency added to llmspell-context/Cargo.toml
+- [ ] `HybridRetriever` struct created in llmspell-context/src/retrieval/hybrid_rag_memory.rs
+- [ ] Fields: memory_manager, rag_pipeline: Option<Arc<RAGPipeline>>
+- [ ] Method: `retrieve_hybrid(query, strategy, session_id) -> Result<Vec<RankedChunk>>`
+- [ ] Combines RAG results + Memory BM25 results with weighted merge (40% RAG, 60% Memory default)
+- [ ] Fallback: Works with rag_pipeline = None (memory-only)
+- [ ] Unit tests for hybrid merge logic
+- [ ] **TRACING**: Retrieval start (info!), source queries (debug!), merge (debug!), errors (error!)
+- [ ] Zero clippy warnings
+- [ ] Compiles: `cargo check -p llmspell-context`
 
 **Implementation Steps**:
 
-1. Create `llmspell-rag/src/memory_integration/mod.rs`:
-   ```rust
-   //! Memory-enhanced RAG pipeline integration
-   //!
-   //! Combines RAG vector/BM25 retrieval with episodic memory for context-aware search.
-
-   use anyhow::Result;
-   use llmspell_memory::MemoryManager;
-   use llmspell_bridge::ContextBridge;
-   use std::sync::Arc;
-   use tracing::{debug, error, info, trace};
-
-   use crate::pipeline::{RAGPipeline, RetrievalResult};
-   use llmspell_core::state::StateScope;
-
-   pub mod memory_aware_pipeline;
-   pub mod hybrid_retrieval;
-   pub mod context_chunking;
-
-   pub use memory_aware_pipeline::MemoryAwareRAGPipeline;
-   pub use hybrid_retrieval::{HybridMemoryResult, MemoryRetrievalWeights};
-   pub use context_chunking::ContextAwareChunker;
+1. Add llmspell-rag dependency to `llmspell-context/Cargo.toml`:
+   ```toml
+   llmspell-rag = { path = "../llmspell-rag" }
    ```
 
-2. Create `llmspell-rag/src/memory_integration/memory_aware_pipeline.rs`:
-   ```rust
-   //! Memory-aware RAG pipeline wrapper
-   //!
-   //! Wraps RAGPipeline to add episodic memory integration for context-aware retrieval.
+2. Create `llmspell-context/src/retrieval/hybrid_rag_memory.rs`:
+   - Struct: `HybridRetriever` with memory_manager + Optional<rag_pipeline>
+   - Method: `retrieve_hybrid(query, session_id, rag_weight, memory_weight)` → Vec<RankedChunk>
+   - Logic: Query RAG (if available) + Query Memory BM25 → Weighted merge → BM25 rerank
+   - Tracing: info!(retrieval start), debug!(source results), trace!(scores)
 
-   use anyhow::Result;
-   use llmspell_bridge::ContextBridge;
-   use llmspell_core::state::StateScope;
-   use llmspell_memory::MemoryManager;
-   use std::sync::Arc;
-   use tracing::{debug, info, warn};
+3. Update `llmspell-context/src/retrieval/mod.rs`:
+   - Export: `pub mod hybrid_rag_memory;`
+   - Re-export: `pub use hybrid_rag_memory::HybridRetriever;`
 
-   use crate::pipeline::{QueryConfig, RAGPipeline, RetrievalResult};
+4. Create unit test in `llmspell-context/tests/hybrid_retrieval_test.rs`:
+   - Test: Mock RAG + Mock Memory → HybridRetriever → Verify weighted merge
+   - Test: RAG = None → Falls back to memory-only retrieval
+   - Test: Configurable weights (balanced, rag_focused, memory_focused)
 
-   use super::hybrid_retrieval::{HybridMemoryResult, MemoryRetrievalWeights};
+**Files to Create/Modify**:
+- `llmspell-context/Cargo.toml` (MODIFY - add llmspell-rag dependency)
+- `llmspell-context/src/retrieval/hybrid_rag_memory.rs` (NEW - ~200 lines)
+- `llmspell-context/src/retrieval/mod.rs` (MODIFY - export hybrid module)
+- `llmspell-context/tests/hybrid_retrieval_test.rs` (NEW - ~100 lines)
 
-   /// RAG pipeline with episodic memory integration
-   #[derive(Debug)]
-   pub struct MemoryAwareRAGPipeline {
+**Definition of Done**:
+- [ ] llmspell-rag dependency added
+- [ ] HybridRetriever implemented with Optional<RAGPipeline>
+- [ ] retrieve_hybrid() combines both sources with weighted merge
+- [ ] Backward compatible - works without RAG (memory-only fallback)
+- [ ] Unit tests pass (hybrid merge, fallback, weight validation)
+- [ ] Tracing verified (info!, debug!, trace!)
+- [ ] Zero clippy warnings: `cargo clippy -p llmspell-context`
+- [ ] Compiles: `cargo check -p llmspell-context`
+
+---
+
+### Task 13.10.2: ContextBridge Enhancement with Optional RAG
+
+**Priority**: CRITICAL
+**Estimated Time**: 4 hours
+**Assignee**: Bridge Team
+**Status**: BLOCKED by Task 13.10.1
+
+**Description**: Enhance `ContextBridge` to optionally use `HybridRetriever` when `RAGPipeline` is available. No API changes - backward compatible.
+
+**Architectural Analysis**:
+- **Existing**: `ContextBridge` in llmspell-bridge/src/context_bridge.rs
+  - Current fields: memory_manager only
+  - Method: assemble(query, strategy, max_tokens, session_id)
+  - Strategies: "episodic", "semantic", "hybrid" (memory-only)
+- **Enhancement**: Add optional rag_pipeline field
+  - Builder: `with_rag_pipeline(rag: Arc<RAGPipeline>)`
+  - New strategy: "rag" - uses HybridRetriever when RAG available
+  - Falls back to memory-only when rag_pipeline = None
+
+**Acceptance Criteria**:
+- [ ] ContextBridge has `rag_pipeline: Option<Arc<RAGPipeline>>` field
+- [ ] Constructor unchanged: `ContextBridge::new(memory_manager)`
+- [ ] Builder method: `with_rag_pipeline(rag) -> Self`
+- [ ] assemble() uses HybridRetriever when "rag" strategy + rag_pipeline available
+- [ ] Backward compatible: existing code works without RAG
+- [ ] Tests updated in llmspell-bridge/tests/context_global_test.rs
+- [ ] Zero clippy warnings
+- [ ] All tests pass: `cargo test -p llmspell-bridge --test context_global_test`
+
+**Implementation Steps**:
+
+1. Update `ContextBridge` struct in llmspell-bridge/src/context_bridge.rs:
+   - Add field: `rag_pipeline: Option<Arc<RAGPipeline>>`
+   - Add builder: `pub fn with_rag_pipeline(mut self, rag: Arc<RAGPipeline>) -> Self`
+
+2. Update `assemble()` method:
+   - Parse "rag" strategy option
+   - When strategy = "rag" AND rag_pipeline.is_some():
+     * Use HybridRetriever from llmspell-context
+     * Pass query, session_id, default weights
+   - When strategy = "rag" BUT rag_pipeline.is_none():
+     * Warn: "RAG strategy requested but no RAG pipeline configured"
+     * Fall back to "hybrid" memory strategy
+
+3. Add tests in llmspell-bridge/tests/context_global_test.rs:
+   - Test: ContextBridge with RAG → "rag" strategy works
+   - Test: ContextBridge without RAG → "rag" strategy falls back gracefully
+   - Test: Existing strategies still work (episodic, semantic, hybrid)
+
+**Files to Create/Modify**:
+- `llmspell-bridge/src/context_bridge.rs` (MODIFY - add rag_pipeline field + logic)
+- `llmspell-bridge/tests/context_global_test.rs` (MODIFY - add RAG tests)
+
+**Definition of Done**:
+- [ ] ContextBridge enhanced with optional RAG support
+- [ ] "rag" strategy implemented
+- [ ] Backward compatible - no breaking changes
+- [ ] Tests pass with and without RAG pipeline
+- [ ] Tracing verified (warn on missing RAG)
+- [ ] Zero clippy warnings
+- [ ] Compiles: `cargo check -p llmspell-bridge`
+
+---
+
+### Task 13.10.3: RAG Adapter + Token Budget Management
+
+**Priority**: HIGH
+**Estimated Time**: 4 hours
+**Assignee**: Context Team
+**Status**: BLOCKED by Task 13.10.1
+
+**Description**: Create adapter to convert RAGPipeline results to context retrieval format, implement token budget allocation across RAG + Memory sources.
+
+**Architectural Analysis**:
+- **RAG Results**: `RetrievalResult` from llmspell-rag (VectorSearchResult with scores)
+- **Context Results**: `RankedChunk` from llmspell-context (with content, score, timestamp)
+- **Adapter**: Convert between formats, preserve scores and metadata
+- **Budget Allocation**: Split token budget across sources (e.g., 2000 tokens → 800 RAG + 1200 Memory)
+
+**Acceptance Criteria**:
+- [ ] `rag_adapter.rs` created in llmspell-context/src/retrieval/
+- [ ] Function: `adapt_rag_results(rag_results) -> Vec<RankedChunk>`
+- [ ] Token budget allocation in HybridRetriever (split by weights)
+- [ ] `RetrievalWeights` struct with presets (balanced, rag_focused, memory_focused)
+- [ ] Weight validation (must sum to 1.0)
+- [ ] Integration test: Real RAG + Memory hybrid search
+- [ ] Zero clippy warnings
+- [ ] All tests pass: `cargo test -p llmspell-context`
+
+**Implementation Steps**:
+
+1. Create `llmspell-context/src/retrieval/rag_adapter.rs`:
+   - Function: `pub fn adapt_rag_results(results: llmspell_rag::RetrievalResult) -> Vec<RankedChunk>`
+   - Convert VectorSearchResult to RankedChunk format
+   - Preserve scores, metadata, add timestamps
+
+2. Update `HybridRetriever` in hybrid_rag_memory.rs:
+   - Add token budget allocation logic
+   - Example: budget=2000, rag_weight=0.4 → allocate 800 tokens to RAG, 1200 to Memory
+   - Respect individual source limits
+
+3. Create `RetrievalWeights` struct:
+   - Fields: rag_weight: f32, memory_weight: f32
+   - Default: 0.4 RAG, 0.6 Memory
+   - Presets: balanced(), rag_focused(), memory_focused()
+   - Validation: weights sum to 1.0 ±0.01
+
+4. Integration test in llmspell-context/tests/hybrid_retrieval_integration_test.rs:
+   - Setup: In-memory RAG + in-memory Memory
+   - Ingest documents into RAG
+   - Add conversations to Memory
+   - Query with hybrid retrieval
+   - Verify: Results include both sources with correct weights
+
+**Files to Create/Modify**:
+- `llmspell-context/src/retrieval/rag_adapter.rs` (NEW - ~100 lines)
+- `llmspell-context/src/retrieval/hybrid_rag_memory.rs` (MODIFY - add budget allocation)
+- `llmspell-context/tests/hybrid_retrieval_integration_test.rs` (NEW - ~150 lines)
+
+**Definition of Done**:
+- [ ] RAG adapter converts results correctly
+- [ ] Token budget splits across sources
+- [ ] RetrievalWeights with validation
+- [ ] Integration test passes
+- [ ] Tracing verified
+- [ ] Zero clippy warnings
+- [ ] All tests pass: `cargo test -p llmspell-context`
+
+---
+
+### Task 13.10.4: End-to-End Integration Test + Examples
+
+**Priority**: HIGH
+**Estimated Time**: 4 hours
+**Assignee**: Integration Team
+**Status**: BLOCKED by Tasks 13.10.1-3
+
+**Description**: Create comprehensive end-to-end test and Lua example demonstrating RAG + Memory hybrid retrieval through ContextBridge.
+
+**Acceptance Criteria**:
+- [ ] E2E test in llmspell-bridge/tests/rag_memory_integration_test.rs
+- [ ] Lua example: examples/script-users/cookbook/rag-memory-hybrid.lua
+- [ ] API documentation updated with "rag" strategy
+- [ ] All Phase 13.10 tests pass
+- [ ] Example runs successfully via `llmspell run`
+- [ ] Tracing verified
+- [ ] Zero clippy warnings
+
+**Implementation Steps**:
+
+1. Create E2E test in llmspell-bridge/tests/rag_memory_integration_test.rs:
+   - Setup: In-memory RAG + in-memory Memory
+   - Ingest 3 documents into RAG
+   - Add 5 conversation turns to Memory
+   - Create ContextBridge with RAG
+   - Query with "rag" strategy
+   - Verify: Results include both RAG docs + Memory conversations
+   - Verify: Correct weighting applied
+
+2. Create Lua example `examples/script-users/cookbook/rag-memory-hybrid.lua`:
+   - Demonstrate RAG ingestion (if API available)
+   - Add conversation to Memory
+   - Use Context.assemble() with "rag" strategy
+   - Display hybrid results showing both sources
+
+3. Update `docs/user-guide/api/lua/README.md`:
+   - Add "rag" strategy to Context.assemble() documentation
+   - Explain when to use: "Combines ingested documents (RAG) with conversation memory"
+   - Add example snippet
+
+**Files to Create/Modify**:
+- `llmspell-bridge/tests/rag_memory_integration_test.rs` (NEW - ~150 lines)
+- `examples/script-users/cookbook/rag-memory-hybrid.lua` (NEW - ~80 lines)
+- `docs/user-guide/api/lua/README.md` (MODIFY - add "rag" strategy docs)
+
+**Definition of Done**:
+- [ ] E2E test passes
+- [ ] Lua example runs successfully
+- [ ] API documentation updated
+- [ ] All Phase 13.10 tests pass
+- [ ] Tracing verified
+- [ ] Zero clippy warnings
+
+---
+
+### Task 13.10.2: Context-Aware Chunking Strategy
+
+**Priority**: DEFERRED
+**Estimated Time**: 4 hours (moved to Phase 13.11)
+**Assignee**: RAG Team
+**Status**: DEFERRED
+
+**Reason for Deferral**: Context-aware chunking is orthogonal to hybrid retrieval. Phase 13.10 focuses on retrieval integration. Chunking enhancements can be added in Phase 13.11 if needed.
+
+---
+
+### OLD Task 13.10.2: Context-Aware Chunking Strategy
+
+**Priority**: HIGH
+**Estimated Time**: 4 hours
+**Assignee**: RAG Team
+**Status**: READY TO START
+
+**Description**: Create context-aware chunking strategy that uses episodic memory to inform chunk boundaries, maintaining conversational context continuity.
+
+**Architectural Analysis**:
+- **Existing Chunking** (llmspell-rag/src/chunking/):
+  - `ChunkingStrategy` trait: `chunk(&self, text, metadata) -> Vec<Chunk>`
        /// Wrapped RAG pipeline (vector + BM25)
        rag_pipeline: Arc<RAGPipeline>,
 
