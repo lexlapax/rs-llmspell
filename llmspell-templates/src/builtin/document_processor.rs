@@ -19,7 +19,7 @@ use crate::{
 use async_trait::async_trait;
 use serde_json::json;
 use std::time::Instant;
-use tracing::{info, warn};
+use tracing::{debug, info, warn};
 
 /// Document Processor Template
 ///
@@ -161,6 +161,11 @@ impl crate::core::Template for DocumentProcessorTemplate {
         let output_format: String = params.get_or("output_format", "markdown".to_string());
         let parallel_processing: bool = params.get_or("parallel_processing", true);
 
+        // Extract memory parameters (Task 13.11.2)
+        let session_id: Option<String> = params.get_optional("session_id").unwrap_or(None);
+        let memory_enabled: bool = params.get_or("memory_enabled", true);
+        let context_budget: i64 = params.get_or("context_budget", 2000);
+
         // Smart dual-path provider resolution (Task 13.5.7d)
         let provider_config = context.resolve_llm_config(&params)?;
         let model_str = provider_config
@@ -205,6 +210,9 @@ impl crate::core::Template for DocumentProcessorTemplate {
                 &transformation_type,
                 &provider_config,
                 &context,
+                session_id.as_deref(),
+                memory_enabled,
+                context_budget,
             )
             .await?;
         output.metrics.agents_invoked += extracted_docs.len(); // one agent per document
@@ -335,12 +343,16 @@ impl DocumentProcessorTemplate {
     }
 
     /// Phase 2: Transform content with transformer agent
+    #[allow(clippy::too_many_arguments)]
     async fn transform_content(
         &self,
         documents: &[ExtractedDocument],
         transformation_type: &str,
         provider_config: &llmspell_config::ProviderConfig,
         context: &ExecutionContext,
+        session_id: Option<&str>,
+        memory_enabled: bool,
+        context_budget: i64,
     ) -> Result<Vec<TransformedDocument>> {
         use llmspell_agents::factory::{AgentConfig, ModelConfig, ResourceLimits};
         use llmspell_core::types::AgentInput;
@@ -402,6 +414,33 @@ impl DocumentProcessorTemplate {
                 TemplateError::ExecutionFailed(format!("Agent creation failed: {}", e))
             })?;
 
+        // Assemble memory context (Task 13.11.2)
+        let memory_context = if let (true, Some(sid)) = (memory_enabled, session_id) {
+            if let Some(bridge) = context.context_bridge() {
+                debug!(
+                    "Assembling memory context: session={}, budget={}",
+                    sid, context_budget
+                );
+                crate::assemble_template_context(&bridge, transformation_type, sid, context_budget)
+                    .await
+            } else {
+                warn!("Memory enabled but ContextBridge unavailable");
+                vec![]
+            }
+        } else {
+            vec![]
+        };
+
+        let memory_context_str = if !memory_context.is_empty() {
+            memory_context
+                .iter()
+                .map(|msg| format!("{}: {}", msg.role, msg.content))
+                .collect::<Vec<_>>()
+                .join("\n\n")
+        } else {
+            String::new()
+        };
+
         // Transform each document with the agent
         let mut transformed = Vec::new();
         for (idx, doc) in documents.iter().enumerate() {
@@ -457,7 +496,8 @@ impl DocumentProcessorTemplate {
 
             // Build the transformation prompt
             let transformation_prompt = format!(
-                "You are an expert document processor specializing in {} transformations.\n\n\
+                "{}\
+                 You are an expert document processor specializing in {} transformations.\n\n\
                  **SOURCE DOCUMENT**: {}\n\
                  **DOCUMENT STATISTICS**: {} words, {} pages\n\n\
                  **DOCUMENT CONTENT**:\n{}\n\n\
@@ -469,6 +509,11 @@ impl DocumentProcessorTemplate {
                  3. Structure your output clearly with headings/sections\n\
                  4. Be thorough yet concise\n\n\
                  Perform the {} transformation now:",
+                if !memory_context_str.is_empty() {
+                    format!("{}\n\n", memory_context_str)
+                } else {
+                    String::new()
+                },
                 transformation_type,
                 doc.source_path,
                 doc.word_count,
@@ -810,7 +855,15 @@ mod tests {
         }];
 
         let result = template
-            .transform_content(&extracted, "summarize", &test_provider_config(), &context)
+            .transform_content(
+                &extracted,
+                "summarize",
+                &test_provider_config(),
+                &context,
+                None,
+                false,
+                2000,
+            )
             .await;
         assert!(result.is_ok());
         let docs = result.unwrap();
