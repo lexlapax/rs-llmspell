@@ -19,6 +19,7 @@ llmspell-rag = { path = "../llmspell-rag" }
 llmspell-tenancy = { path = "../llmspell-tenancy" }
 llmspell-providers = { path = "../llmspell-providers" }
 llmspell-utils = { path = "../llmspell-utils" }
+llmspell-memory = { path = "../llmspell-memory" }
 
 # Workspace dependencies
 tokio.workspace = true
