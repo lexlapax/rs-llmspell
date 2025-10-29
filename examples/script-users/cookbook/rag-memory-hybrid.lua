@@ -128,7 +128,7 @@ print(string.format("\\n   📝 Tracked %d conversation turns\\n", #conversation
 print("3. Performing hybrid retrieval...\\n")
 
 local query = "Explain Rust ownership and borrowing rules"
-print(string.format("   🔍 Query: \\"%s\\"\\n", query))
+print(string.format("   🔍 Query: \"%s\"\\n", query))
 
 -- Use "rag" strategy for hybrid RAG+Memory retrieval
 local result = Context.assemble(query, "rag", context_budget, session_id)

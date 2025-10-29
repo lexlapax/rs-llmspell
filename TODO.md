@@ -2177,20 +2177,20 @@ Implemented complete consolidation feedback mechanism in 3 phases over ~3 hours:
 **Priority**: CRITICAL
 **Estimated Time**: 5 hours
 **Assignee**: Integration + Documentation Team
-**Status**: BLOCKED by Tasks 13.10.1-4
+**Status**: ✅ COMPLETE
 
 **Description**: Create comprehensive E2E tests and Lua examples demonstrating full RAG+Memory integration: hybrid retrieval, context-aware chunking, and consolidation feedback. Update all API documentation.
 
 **Acceptance Criteria**:
-- [ ] E2E test: Full RAG+Memory workflow in llmspell-bridge/tests/rag_memory_e2e_test.rs
-- [ ] Lua example: examples/script-users/cookbook/rag-memory-hybrid.lua
-- [ ] API documentation updated: docs/user-guide/api/lua/README.md
-- [ ] Architecture doc: docs/technical/rag-memory-integration.md
-- [ ] All Phase 13.10 tests pass (15+ tests total)
-- [ ] Examples run successfully via `llmspell run`
-- [ ] Validation script updated for new examples
-- [ ] Tracing verified across all components
-- [ ] Zero clippy warnings workspace-wide
+- [x] E2E test: Full RAG+Memory workflow in llmspell-bridge/tests/rag_memory_e2e_test.rs
+- [x] Lua example: examples/script-users/cookbook/rag-memory-hybrid.lua
+- [x] API documentation updated: docs/user-guide/api/lua/README.md
+- [x] Architecture doc: docs/technical/rag-memory-integration.md
+- [x] All Phase 13.10 tests pass (94+ tests total: 60 lib + 29 integration + 5 E2E)
+- [x] Examples run successfully via `llmspell run`
+- [x] Validation script updated for new examples
+- [x] Tracing verified across all components
+- [x] Zero clippy warnings workspace-wide
 
 **Implementation Steps**:
 
@@ -2287,15 +2287,62 @@ Implemented complete consolidation feedback mechanism in 3 phases over ~3 hours:
 - `scripts/validate-lua-examples.sh` (MODIFY - add new example)
 
 **Definition of Done**:
-- [ ] E2E test passes: Full RAG+Memory workflow validated
-- [ ] Lua example runs successfully: `llmspell run examples/script-users/cookbook/rag-memory-hybrid.lua`
-- [ ] API documentation updated with "rag" strategy
-- [ ] Architecture doc explains integration design
-- [ ] Validation script includes new example
-- [ ] All Phase 13.10 tests pass: `cargo test -p llmspell-context -p llmspell-bridge -p llmspell-rag`
-- [ ] Tracing verified across all components (info!, debug!, warn!)
-- [ ] Zero clippy warnings: `cargo clippy --workspace --all-targets --all-features`
-- [ ] Full workspace compiles: `cargo check --workspace`
+- [x] E2E test passes: Full RAG+Memory workflow validated (5 tests passing)
+- [x] Lua example runs successfully: `llmspell run examples/script-users/cookbook/rag-memory-hybrid.lua`
+- [x] API documentation updated with "rag" strategy
+- [x] Architecture doc explains integration design (docs/technical/rag-memory-integration.md)
+- [x] Validation script includes new example (scripts/validate-lua-examples.sh: 8 examples)
+- [x] All Phase 13.10 tests pass: 94+ tests (60 lib + 29 integration + 5 E2E)
+- [x] Tracing verified across all components (info!, debug!, warn!)
+- [x] Zero clippy warnings: `cargo clippy --workspace --all-targets --all-features`
+- [x] Full workspace compiles: `cargo check --workspace`
+
+**Implementation Summary** (2025-10-29):
+
+**Deliverables**:
+- ✅ **E2E Test Suite**: llmspell-bridge/tests/rag_memory_e2e_test.rs (448 lines)
+  - 5 comprehensive tests covering hybrid retrieval, query tracking, session isolation, fallback behavior, and token budget allocation
+  - All tests passing in <0.3s
+  - MockRAGRetriever with realistic Rust content
+  - Helper functions for JSON navigation (get_chunks, get_token_count, get_chunk_source)
+- ✅ **Lua Example**: examples/script-users/cookbook/rag-memory-hybrid.lua (261 lines)
+  - Demonstrates full workflow: document ingestion, conversation tracking, hybrid retrieval, source analysis
+  - Follows established cookbook pattern with comprehensive comments
+  - Successfully validates with 8 examples total in validation script
+- ✅ **API Documentation**: docs/user-guide/api/lua/README.md
+  - Added "rag" strategy to Context.assemble() parameters
+  - Documented default weighting (40% RAG + 60% Memory)
+  - Explained fallback behavior when RAG pipeline not available
+- ✅ **Architecture Documentation**: docs/technical/rag-memory-integration.md (~400 lines)
+  - Component diagram showing HybridRetriever orchestration
+  - Complete data flow from query to assembled context
+  - 5 major design decisions with rationales
+  - Performance characteristics and testing coverage
+- ✅ **Validation Script**: scripts/validate-lua-examples.sh
+  - Updated to include rag-memory-hybrid.lua (8 examples total)
+  - Fixed Lua syntax error (escaped quotes)
+  - All examples passing
+
+**Test Results**:
+- llmspell-context lib: 60 tests passed ✅
+- llmspell-context integration: 29 tests passed (10+9+8+2) ✅
+- llmspell-bridge E2E: 5 RAG+Memory tests passed ✅
+- Lua examples: 8 validated (including new rag-memory-hybrid.lua) ✅
+- **Total**: 94+ tests passing, zero failures
+
+**Key Insights**:
+- Result structure from ContextBridge::assemble() is `serde_json::Value` with nested RankedChunk format
+- Source attribution: RAG chunks use metadata-based sources (e.g., "rust-docs"), Memory chunks use "memory:session-id" format
+- "rag" strategy gracefully falls back to "hybrid" when RAG pipeline is None
+- BM25 reranking provides unified scoring across both RAG and Memory sources
+- Session filtering works correctly for Memory while keeping RAG results session-agnostic
+
+**Files Modified**:
+- llmspell-bridge/tests/rag_memory_e2e_test.rs (NEW)
+- examples/script-users/cookbook/rag-memory-hybrid.lua (NEW)
+- docs/user-guide/api/lua/README.md (UPDATED)
+- docs/technical/rag-memory-integration.md (NEW)
+- scripts/validate-lua-examples.sh (UPDATED)
 
 ---
 ## Phase 13.11: Template Integration - Memory-Aware Workflows (Days 18-19)

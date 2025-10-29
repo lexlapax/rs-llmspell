@@ -41,8 +41,10 @@ echo "  • context-strategy-comparison.lua"
 $LLMSPELL run $EXAMPLES_DIR/cookbook/context-strategy-comparison.lua > /dev/null
 echo "  • memory-context-workflow.lua"
 $LLMSPELL run $EXAMPLES_DIR/cookbook/memory-context-workflow.lua > /dev/null
+echo "  • rag-memory-hybrid.lua"
+$LLMSPELL run $EXAMPLES_DIR/cookbook/rag-memory-hybrid.lua > /dev/null
 echo "  ✓ All Context examples passed"
 echo ""
 
 echo "✅ All Lua API examples executed successfully"
-echo "   Total examples tested: 7"
+echo "   Total examples tested: 8"
