@@ -149,6 +149,11 @@ impl crate::core::Template for ResearchAssistantTemplate {
         let output_format: String = params.get_or("output_format", "markdown".to_string());
         let include_citations: bool = params.get_or("include_citations", true);
 
+        // Extract memory parameters (Task 13.11.2)
+        let session_id: Option<String> = params.get_optional("session_id").unwrap_or(None);
+        let memory_enabled: bool = params.get_or("memory_enabled", true);
+        let context_budget: i64 = params.get_or("context_budget", 2000);
+
         // Smart dual-path provider resolution (Task 13.5.7d)
         let provider_config = context.resolve_llm_config(&params)?;
         let model_str = provider_config
@@ -187,7 +192,15 @@ impl crate::core::Template for ResearchAssistantTemplate {
         // Phase 3: Synthesize findings with agent
         info!("Phase 3: Synthesizing findings...");
         let synthesis = self
-            .synthesize_findings(&topic, &session_tag, &provider_config, &context)
+            .synthesize_findings(
+                &topic,
+                &session_tag,
+                &provider_config,
+                &context,
+                session_id.as_deref(),
+                memory_enabled,
+                context_budget,
+            )
             .await?;
         output.metrics.agents_invoked += 1;
 
@@ -469,13 +482,16 @@ impl ResearchAssistantTemplate {
         })
     }
 
-    /// Phase 3: Synthesize findings with agent using RAG context
+    /// Phase 3: Synthesize findings with agent using RAG context + memory
     async fn synthesize_findings(
         &self,
         topic: &str,
         session_tag: &str,
         provider_config: &llmspell_config::ProviderConfig,
         context: &ExecutionContext,
+        session_id: Option<&str>,
+        memory_enabled: bool,
+        context_budget: i64,
     ) -> Result<String> {
         use llmspell_agents::factory::{AgentConfig, ModelConfig, ResourceLimits};
         use llmspell_core::state::StateScope;
@@ -544,6 +560,25 @@ impl ResearchAssistantTemplate {
             String::new()
         };
 
+        // Assemble memory context (Task 13.11.2)
+        let memory_context = if memory_enabled && session_id.is_some() {
+            if let Some(bridge) = context.context_bridge() {
+                debug!(
+                    "Assembling memory context: session={:?}, budget={}",
+                    session_id, context_budget
+                );
+                crate::assemble_template_context(&bridge, topic, session_id.unwrap(), context_budget)
+                    .await
+            } else {
+                if memory_enabled {
+                    warn!("Memory enabled but ContextBridge unavailable");
+                }
+                vec![]
+            }
+        } else {
+            vec![]
+        };
+
         // Parse model specification (format: "provider/model-id" or just "model-id")
         let (provider, model_id) = if let Some(slash_pos) = model.find('/') {
             (
@@ -588,9 +623,20 @@ impl ResearchAssistantTemplate {
                 TemplateError::ExecutionFailed(format!("Agent creation failed: {}", e))
             })?;
 
-        // Build synthesis prompt with RAG context
+        // Build synthesis prompt with RAG context + memory
+        let memory_context_str = if !memory_context.is_empty() {
+            memory_context
+                .iter()
+                .map(|msg| format!("{}: {}", msg.role, msg.content))
+                .collect::<Vec<_>>()
+                .join("\n\n")
+        } else {
+            String::new()
+        };
+
         let synthesis_prompt = format!(
             "You are a research synthesis assistant. Your task is to create a comprehensive research report based on the provided sources.\n\n\
+             {}\
              RESEARCH TOPIC: {}{}\n\n\
              INSTRUCTIONS:\n\
              1. Provide an executive summary of the research topic based on the sources\n\
@@ -613,6 +659,11 @@ impl ResearchAssistantTemplate {
              ## Further Research\n\
              [Suggested areas for deeper investigation]\n\n\
              Please provide a well-structured synthesis now.",
+            if !memory_context_str.is_empty() {
+                format!("{}\n\n", memory_context_str)
+            } else {
+                String::new()
+            },
             topic,
             rag_context
         );
