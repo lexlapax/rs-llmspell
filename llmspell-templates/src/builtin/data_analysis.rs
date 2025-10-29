@@ -19,7 +19,7 @@ use crate::{
 use async_trait::async_trait;
 use serde_json::json;
 use std::time::Instant;
-use tracing::{info, warn};
+use tracing::{debug, info, warn};
 
 /// Data Analysis Template
 ///
@@ -165,6 +165,11 @@ impl crate::core::Template for DataAnalysisTemplate {
             data_file, analysis_type, chart_type, model_str
         );
 
+        // Extract memory parameters (Task 13.11.2)
+        let session_id: Option<String> = params.get_optional("session_id").unwrap_or(None);
+        let memory_enabled: bool = params.get_or("memory_enabled", true);
+        let context_budget: i64 = params.get_or("context_budget", 2000);
+
         // Initialize output
         let mut output = TemplateOutput::new(
             TemplateResult::text(""), // Will be replaced
@@ -181,7 +186,15 @@ impl crate::core::Template for DataAnalysisTemplate {
         // Phase 2: Statistical analysis with analyzer agent
         info!("Phase 2: Running statistical analysis...");
         let analysis_result = self
-            .run_analysis(&dataset, &analysis_type, &provider_config, &context)
+            .run_analysis(
+                &dataset,
+                &analysis_type,
+                &provider_config,
+                &context,
+                session_id.as_deref(),
+                memory_enabled,
+                context_budget,
+            )
             .await?;
         output.metrics.agents_invoked += 1; // analyzer agent
 
@@ -194,6 +207,9 @@ impl crate::core::Template for DataAnalysisTemplate {
                 &chart_type,
                 &provider_config,
                 &context,
+                session_id.as_deref(),
+                memory_enabled,
+                context_budget,
             )
             .await?;
         output.metrics.agents_invoked += 1; // visualizer agent
@@ -398,12 +414,16 @@ impl DataAnalysisTemplate {
     }
 
     /// Phase 2: Run statistical analysis with analyzer agent
+    #[allow(clippy::too_many_arguments)]
     async fn run_analysis(
         &self,
         dataset: &DataSet,
         analysis_type: &str,
         provider_config: &llmspell_config::ProviderConfig,
         context: &ExecutionContext,
+        session_id: Option<&str>,
+        memory_enabled: bool,
+        context_budget: i64,
     ) -> Result<AnalysisResult> {
         use llmspell_agents::factory::{AgentConfig, ModelConfig, ResourceLimits};
         use llmspell_core::types::AgentInput;
@@ -528,6 +548,40 @@ impl DataAnalysisTemplate {
             analysis_instructions
         );
 
+        // Assemble memory context (Task 13.11.2)
+        let memory_context = if let (true, Some(sid)) = (memory_enabled, session_id) {
+            if let Some(bridge) = context.context_bridge() {
+                debug!(
+                    "Assembling memory context: session={}, budget={}",
+                    sid, context_budget
+                );
+                crate::assemble_template_context(&bridge, &analysis_prompt, sid, context_budget)
+                    .await
+            } else {
+                warn!("Memory enabled but ContextBridge unavailable");
+                vec![]
+            }
+        } else {
+            vec![]
+        };
+
+        let memory_context_str = if !memory_context.is_empty() {
+            memory_context
+                .iter()
+                .map(|msg| format!("{}: {}", msg.role, msg.content))
+                .collect::<Vec<_>>()
+                .join("\n\n")
+        } else {
+            String::new()
+        };
+
+        // Prepend memory context to prompt
+        let analysis_prompt = if !memory_context_str.is_empty() {
+            format!("{}\n\n{}", memory_context_str, analysis_prompt)
+        } else {
+            analysis_prompt
+        };
+
         // Execute the agent
         info!("Executing statistical analysis agent...");
         let agent_input = AgentInput::builder().text(analysis_prompt).build();
@@ -557,6 +611,7 @@ impl DataAnalysisTemplate {
     }
 
     /// Phase 3: Generate chart with visualizer agent
+    #[allow(clippy::too_many_arguments)]
     async fn generate_chart(
         &self,
         dataset: &DataSet,
@@ -564,6 +619,9 @@ impl DataAnalysisTemplate {
         chart_type: &str,
         provider_config: &llmspell_config::ProviderConfig,
         context: &ExecutionContext,
+        session_id: Option<&str>,
+        memory_enabled: bool,
+        context_budget: i64,
     ) -> Result<ChartResult> {
         use llmspell_agents::factory::{AgentConfig, ModelConfig, ResourceLimits};
         use llmspell_core::types::AgentInput;
@@ -695,6 +753,39 @@ impl DataAnalysisTemplate {
             chart_type,
             viz_instructions
         );
+
+        // Assemble memory context (Task 13.11.2)
+        let memory_context = if let (true, Some(sid)) = (memory_enabled, session_id) {
+            if let Some(bridge) = context.context_bridge() {
+                debug!(
+                    "Assembling memory context: session={}, budget={}",
+                    sid, context_budget
+                );
+                crate::assemble_template_context(&bridge, &viz_prompt, sid, context_budget).await
+            } else {
+                warn!("Memory enabled but ContextBridge unavailable");
+                vec![]
+            }
+        } else {
+            vec![]
+        };
+
+        let memory_context_str = if !memory_context.is_empty() {
+            memory_context
+                .iter()
+                .map(|msg| format!("{}: {}", msg.role, msg.content))
+                .collect::<Vec<_>>()
+                .join("\n\n")
+        } else {
+            String::new()
+        };
+
+        // Prepend memory context to prompt
+        let viz_prompt = if !memory_context_str.is_empty() {
+            format!("{}\n\n{}", memory_context_str, viz_prompt)
+        } else {
+            viz_prompt
+        };
 
         // Execute the agent
         info!("Executing visualization agent...");
@@ -984,7 +1075,15 @@ mod tests {
         };
 
         let result = template
-            .run_analysis(&dataset, "descriptive", &test_provider_config(), &context)
+            .run_analysis(
+                &dataset,
+                "descriptive",
+                &test_provider_config(),
+                &context,
+                None,
+                false,
+                2000,
+            )
             .await;
         assert!(result.is_ok());
         let result = result.unwrap();
@@ -1020,6 +1119,9 @@ mod tests {
                 "bar",
                 &test_provider_config(),
                 &context,
+                None,
+                false,
+                2000,
             )
             .await;
         assert!(result.is_ok());
