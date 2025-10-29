@@ -1,13 +1,15 @@
 //! ABOUTME: Context bridge providing language-agnostic context assembly operations
 //! ABOUTME: Composes `BM25Retriever` + `ContextAssembler` + `MemoryManager` for RAG workflows
 
+use async_trait::async_trait;
 use llmspell_context::{
-    assembly::ContextAssembler,
+    assembly::ContextAssembler as ContextAssemblerImpl,
     reranking::BM25Reranker,
     retrieval::{HybridRetriever, RetrievalWeights},
     traits::Reranker,
     types::{AssembledContext, Chunk, QueryIntent, QueryUnderstanding, RankedChunk},
 };
+use llmspell_core::ContextAssembler;
 use llmspell_memory::MemoryManager;
 use llmspell_rag::pipeline::RAGRetriever;
 use serde_json::Value;
@@ -268,7 +270,7 @@ impl ContextBridge {
         max_tokens: usize,
     ) -> AssembledContext {
         debug!("Creating ContextAssembler with max_tokens={}", max_tokens);
-        let assembler = ContextAssembler::with_config(max_tokens, 0.3);
+        let assembler = ContextAssemblerImpl::with_config(max_tokens, 0.3);
 
         let query_understanding = QueryUnderstanding {
             intent: QueryIntent::Unknown,
@@ -582,6 +584,38 @@ enum RetrievalStrategy {
     Rag,
     #[allow(dead_code)]
     BM25,
+}
+
+// ============================================================================
+// ContextAssembler Trait Implementation (Task 13.11.1a)
+// ============================================================================
+
+/// Implement `ContextAssembler` trait from llmspell-core for `ContextBridge`
+///
+/// This enables type-safe context assembly without circular dependencies:
+/// - llmspell-core defines the trait
+/// - llmspell-bridge implements the trait
+/// - llmspell-templates depends on the trait (not the implementation)
+///
+/// This follows Dependency Inversion Principle - depend on abstractions, not concretions.
+#[async_trait]
+impl ContextAssembler for ContextBridge {
+    /// Assemble context from memory using specified retrieval strategy
+    ///
+    /// Delegates to existing `ContextBridge::assemble()` implementation.
+    /// The trait method signature matches the existing method, so this is a simple forwarding impl.
+    async fn assemble(
+        &self,
+        query: &str,
+        strategy: &str,
+        max_tokens: usize,
+        session_id: Option<&str>,
+    ) -> Result<Value, String> {
+        // Forward to existing implementation
+        // Note: This calls the inherent method on ContextBridge, not the trait method
+        // Rust resolves to inherent methods first, avoiding infinite recursion
+        self.assemble(query, strategy, max_tokens, session_id).await
+    }
 }
 
 #[cfg(test)]

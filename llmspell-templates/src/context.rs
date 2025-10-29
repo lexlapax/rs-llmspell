@@ -47,9 +47,9 @@ pub struct ExecutionContext {
     /// Memory manager for episodic and semantic memory (optional, Task 13.11.0)
     pub memory_manager: Option<Arc<dyn llmspell_memory::MemoryManager>>,
 
-    /// Context bridge for memory-enhanced context assembly (optional, Task 13.11.0)
-    /// Stored as type-erased Arc to avoid circular dependency with llmspell-bridge
-    pub context_bridge: Option<Arc<dyn std::any::Any + Send + Sync>>,
+    /// Context bridge for memory-enhanced context assembly (optional, Task 13.11.1a)
+    /// Uses ContextAssembler trait from llmspell-core for compile-time type safety
+    pub context_bridge: Option<Arc<dyn llmspell_core::ContextAssembler>>,
 }
 
 impl ExecutionContext {
@@ -236,9 +236,9 @@ impl ExecutionContext {
         self
     }
 
-    /// Add context bridge to context (Task 13.11.0)
-    /// Accepts any type that implements Send + Sync for type erasure
-    pub fn with_context_bridge<T: std::any::Any + Send + Sync>(mut self, bridge: Arc<T>) -> Self {
+    /// Add context bridge to context (Task 13.11.1a)
+    /// Uses ContextAssembler trait for compile-time type safety
+    pub fn with_context_bridge(mut self, bridge: Arc<dyn llmspell_core::ContextAssembler>) -> Self {
         debug!("ExecutionContext: Adding context bridge");
         self.context_bridge = Some(bridge);
         self
@@ -255,21 +255,11 @@ impl ExecutionContext {
         self.memory_manager.clone()
     }
 
-    /// Get context bridge if available (Task 13.11.0)
-    /// Returns type-erased Arc - caller must downcast to concrete type
-    pub fn context_bridge(&self) -> Option<Arc<dyn std::any::Any + Send + Sync>> {
+    /// Get context bridge if available (Task 13.11.1a)
+    /// Returns Arc<dyn ContextAssembler> for compile-time type safety
+    pub fn context_bridge(&self) -> Option<Arc<dyn llmspell_core::ContextAssembler>> {
         trace!("ExecutionContext: Accessing context bridge");
         self.context_bridge.clone()
-    }
-
-    /// Get context bridge as specific type (Task 13.11.0)
-    /// Downcasts the type-erased context bridge to the requested type
-    pub fn context_bridge_as<T: std::any::Any + Send + Sync>(&self) -> Option<Arc<T>> {
-        self.context_bridge
-            .as_ref()?
-            .clone()
-            .downcast::<T>()
-            .ok()
     }
 
     /// Require memory manager or return error (Task 13.11.0)
@@ -281,11 +271,11 @@ impl ExecutionContext {
         })
     }
 
-    /// Require context bridge or return error (Task 13.11.0)
-    /// Returns type-erased Arc - caller must downcast to concrete type
+    /// Require context bridge or return error (Task 13.11.1a)
+    /// Returns Arc<dyn ContextAssembler> for compile-time type safety
     pub fn require_context_bridge(
         &self,
-    ) -> crate::error::Result<Arc<dyn std::any::Any + Send + Sync>> {
+    ) -> crate::error::Result<Arc<dyn llmspell_core::ContextAssembler>> {
         self.context_bridge.clone().ok_or_else(|| {
             crate::error::TemplateError::InfrastructureUnavailable(
                 "Context bridge not available in ExecutionContext".to_string(),
@@ -293,17 +283,6 @@ impl ExecutionContext {
         })
     }
 
-    /// Require context bridge as specific type (Task 13.11.0)
-    /// Downcasts the type-erased context bridge to the requested type
-    pub fn require_context_bridge_as<T: std::any::Any + Send + Sync>(
-        &self,
-    ) -> crate::error::Result<Arc<T>> {
-        self.context_bridge_as::<T>().ok_or_else(|| {
-            crate::error::TemplateError::InfrastructureUnavailable(
-                "Context bridge not available or type mismatch in ExecutionContext".to_string(),
-            )
-        })
-    }
 }
 
 /// Builder for ExecutionContext
@@ -321,7 +300,7 @@ pub struct ExecutionContextBuilder {
     session_id: Option<String>,
     output_dir: Option<PathBuf>,
     memory_manager: Option<Arc<dyn llmspell_memory::MemoryManager>>,
-    context_bridge: Option<Arc<dyn std::any::Any + Send + Sync>>,
+    context_bridge: Option<Arc<dyn llmspell_core::ContextAssembler>>,
 }
 
 impl ExecutionContextBuilder {
@@ -426,11 +405,11 @@ impl ExecutionContextBuilder {
         self
     }
 
-    /// Set context bridge (Task 13.11.0)
-    /// Accepts any type that implements Send + Sync for type erasure
-    pub fn with_context_bridge<T: std::any::Any + Send + Sync>(
+    /// Set context bridge (Task 13.11.1a)
+    /// Uses ContextAssembler trait for compile-time type safety
+    pub fn with_context_bridge(
         mut self,
-        context_bridge: Arc<T>,
+        context_bridge: Arc<dyn llmspell_core::ContextAssembler>,
     ) -> Self {
         self.context_bridge = Some(context_bridge);
         self
@@ -566,41 +545,4 @@ mod tests {
         assert!(context.require_context_bridge().is_err());
     }
 
-    #[tokio::test]
-    async fn test_execution_context_type_erased_bridge() {
-        // Test type erasure for context_bridge field
-        // Create a mock type to test with
-        #[derive(Debug, Clone)]
-        struct MockBridge {
-            data: String,
-        }
-
-        let tool_registry = Arc::new(llmspell_tools::ToolRegistry::new());
-        let agent_registry = Arc::new(llmspell_agents::FactoryRegistry::new());
-        let workflow_factory: Arc<dyn llmspell_workflows::WorkflowFactory> =
-            Arc::new(llmspell_workflows::DefaultWorkflowFactory::new());
-        let providers = Arc::new(llmspell_providers::ProviderManager::new());
-        let provider_config =
-            Arc::new(llmspell_config::providers::ProviderManagerConfig::default());
-
-        let mock_bridge = Arc::new(MockBridge {
-            data: "test".to_string(),
-        });
-
-        let context = ExecutionContextBuilder::new()
-            .with_tool_registry(tool_registry)
-            .with_agent_registry(agent_registry)
-            .with_workflow_factory(workflow_factory)
-            .with_providers(providers)
-            .with_provider_config(provider_config)
-            .with_context_bridge(mock_bridge.clone())
-            .build()
-            .expect("Failed to build context");
-
-        assert!(context.context_bridge().is_some());
-        let bridge_any = context.context_bridge().unwrap();
-        let bridge_downcast = bridge_any.downcast::<MockBridge>();
-        assert!(bridge_downcast.is_ok());
-        assert_eq!(bridge_downcast.unwrap().data, "test");
-    }
 }

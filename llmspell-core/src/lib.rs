@@ -123,6 +123,7 @@ pub mod traits {
     pub mod agent;
     pub mod base_agent;
     pub mod component_lookup;
+    pub mod context_assembler;
     pub mod debug;
     pub mod debug_context;
     pub mod event;
@@ -143,6 +144,7 @@ pub use traits::{
     agent::Agent,
     base_agent::BaseAgent,
     component_lookup::ComponentLookup,
+    context_assembler::ContextAssembler,
     debug_context::{DebugContext, MockDebugContext, NoOpDebugContext},
     event::{EventConfig, EventData, EventEmitter},
     state::StateAccess,

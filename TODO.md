@@ -2830,15 +2830,184 @@ Implemented complete consolidation feedback mechanism in 3 phases over ~3 hours:
 
 ---
 
+### Task 13.11.1a: ContextAssembler Trait Extraction
+
+**Priority**: CRITICAL
+**Estimated Time**: 1 hour
+**Assignee**: Core Team
+**Status**: ✅ COMPLETE
+**Dependencies**: Task 13.11.0 (type-erased field) and Task 13.11.1 (parameters) MUST be complete
+
+**Description**: Extract ContextAssembler trait to llmspell-core to enable compile-time type safety for context assembly, replacing type-erased Arc<dyn Any> with Arc<dyn ContextAssembler>.
+
+**Architectural Decision** (from ultrathink analysis):
+- **Problem**: Task 13.11.0 used type erasure (Arc<dyn Any>) to avoid circular dependency llmspell-bridge ↔ llmspell-templates
+- **Solution**: Extract ContextAssembler trait to llmspell-core (Sub-Option 1a)
+- **Rationale**:
+  - ✅ Architecturally correct: Core traits live in llmspell-core (matches Tool, Agent, Workflow)
+  - ✅ Zero new crates: Uses existing infrastructure
+  - ✅ DIP compliance: Dependency Inversion Principle - depend on abstractions
+  - ✅ No circular deps: Both bridge and templates depend on core (clean layering)
+  - ✅ Type safety: Compile-time vs runtime downcasting
+  - ✅ CLAUDE.md: "Traits over dependencies" principle
+  - ✅ Timeline: 45-60 minutes vs 1.5 hours for types or 30 min for type erasure workaround
+
+**Implementation Steps**:
+
+1. Create trait in `llmspell-core/src/traits/context_assembler.rs`:
+   ```rust
+   //! Context assembly trait for memory-enhanced retrieval
+   //!
+   //! Provides abstraction for hybrid retrieval combining episodic memory,
+   //! semantic memory, and RAG. Implemented by ContextBridge in llmspell-bridge.
+
+   use async_trait::async_trait;
+   use serde_json::Value;
+
+   /// Context assembler for memory-enhanced retrieval
+   ///
+   /// Composes retrieval strategies (episodic, semantic, hybrid, RAG) with
+   /// memory manager and RAG pipeline for context-aware LLM interactions.
+   ///
+   /// # Strategies
+   /// - **episodic**: Recent interactions from episodic memory
+   /// - **semantic**: Knowledge graph entities from semantic memory
+   /// - **hybrid**: Combined episodic + semantic retrieval
+   /// - **rag**: RAG vector search + memory hybrid retrieval
+   ///
+   /// # Example
+   /// ```ignore
+   /// let context = assembler.assemble(
+   ///     "Rust ownership model",
+   ///     "hybrid",
+   ///     2000,
+   ///     Some("session-123")
+   /// ).await?;
+   /// ```
+   #[async_trait]
+   pub trait ContextAssembler: Send + Sync {
+       /// Assemble context from memory using specified retrieval strategy
+       ///
+       /// # Arguments
+       /// * `query` - Query string for retrieval
+       /// * `strategy` - Strategy: "episodic", "semantic", "hybrid", or "rag"
+       /// * `max_tokens` - Token budget (100-8192)
+       /// * `session_id` - Optional session for episodic filtering
+       ///
+       /// # Returns
+       /// JSON with: chunks, total_confidence, temporal_span, token_count, formatted
+       ///
+       /// # Errors
+       /// Returns error if strategy invalid, budget < 100, or retrieval fails
+       async fn assemble(
+           &self,
+           query: &str,
+           strategy: &str,
+           max_tokens: usize,
+           session_id: Option<&str>,
+       ) -> Result<Value, String>;
+   }
+   ```
+
+2. Export from `llmspell-core/src/traits/mod.rs`:
+   ```rust
+   pub mod context_assembler;
+   pub use context_assembler::ContextAssembler;
+   ```
+
+3. Export from `llmspell-core/src/lib.rs`:
+   ```rust
+   pub use traits::ContextAssembler;
+   ```
+
+4. Implement for ContextBridge in `llmspell-bridge/src/context_bridge.rs`:
+   ```rust
+   use llmspell_core::ContextAssembler;
+
+   #[async_trait]
+   impl ContextAssembler for ContextBridge {
+       async fn assemble(
+           &self,
+           query: &str,
+           strategy: &str,
+           max_tokens: usize,
+           session_id: Option<&str>,
+       ) -> Result<Value, String> {
+           // Existing implementation (already exists, just add trait impl)
+           self.assemble(query, strategy, max_tokens, session_id).await
+       }
+   }
+   ```
+
+5. Update ExecutionContext in `llmspell-templates/src/context.rs`:
+   ```rust
+   // OLD (type erasure):
+   pub context_bridge: Option<Arc<dyn std::any::Any + Send + Sync>>,
+
+   // NEW (trait object):
+   pub context_bridge: Option<Arc<dyn llmspell_core::ContextAssembler>>,
+
+   // Remove: context_bridge_as<T>() downcast methods
+   // Add: Direct accessor
+   pub fn context_bridge(&self) -> Option<Arc<dyn llmspell_core::ContextAssembler>> {
+       self.context_bridge.clone()
+   }
+   ```
+
+6. Update ExecutionContextBuilder:
+   ```rust
+   // OLD:
+   pub fn with_context_bridge<T: std::any::Any + Send + Sync>(
+       mut self,
+       context_bridge: Arc<T>,
+   ) -> Self
+
+   // NEW:
+   pub fn with_context_bridge(
+       mut self,
+       context_bridge: Arc<dyn llmspell_core::ContextAssembler>,
+   ) -> Self
+   ```
+
+**Acceptance Criteria**:
+- [x] ContextAssembler trait created in llmspell-core
+- [x] Trait exported from core public API
+- [x] ContextBridge implements ContextAssembler
+- [x] ExecutionContext uses Arc<dyn ContextAssembler> (no type erasure)
+- [x] Type-erased methods (context_bridge_as, require_context_bridge_as) removed
+- [x] Direct accessor context_bridge() returns trait object
+- [x] Zero clippy warnings
+- [x] All existing tests pass (220 tests)
+- [x] Compile-time type safety verified
+
+**Files to Modify**:
+- `llmspell-core/src/traits/context_assembler.rs` (CREATE - ~80 lines: trait definition with docs)
+- `llmspell-core/src/traits/mod.rs` (MODIFY - +2 lines: module and re-export)
+- `llmspell-core/src/lib.rs` (MODIFY - +1 line: public re-export)
+- `llmspell-bridge/src/context_bridge.rs` (MODIFY - +15 lines: trait impl block)
+- `llmspell-templates/src/context.rs` (MODIFY - replace type erasure with trait, ~30 lines changed)
+
+**Definition of Done**:
+- [x] Trait defined in llmspell-core with full documentation
+- [x] ContextBridge implements ContextAssembler
+- [x] ExecutionContext uses typed trait object (no Any)
+- [x] Type erasure code removed (context_bridge_as methods)
+- [x] All 220 tests pass
+- [x] Zero clippy warnings
+- [x] No circular dependencies (verified with cargo tree)
+- [x] Compile-time type checking works (no runtime downcasts)
+
+---
+
 ### Task 13.11.2: Context Integration - execute() Method Updates
 
 **Priority**: CRITICAL
-**Estimated Time**: 6 hours
+**Estimated Time**: 5 hours (reduced from 6h - simpler with trait)
 **Assignee**: Template Team
-**Status**: BLOCKED (requires Task 13.11.0 and 13.11.1)
-**Dependencies**: Task 13.11.0 (infrastructure) and Task 13.11.1 (parameters) MUST be complete
+**Status**: BLOCKED (requires Task 13.11.0, 13.11.1, and 13.11.1a)
+**Dependencies**: Task 13.11.0 (infrastructure), Task 13.11.1 (parameters), and Task 13.11.1a (trait) MUST be complete
 
-**Description**: Update execute() methods for all 10 templates to assemble context from memory before LLM calls, using ExecutionContext.context_bridge().assemble() for hybrid retrieval (infrastructure added in Task 13.11.0).
+**Description**: Update execute() methods for all 10 templates to assemble context from memory before LLM calls, using ContextAssembler trait for hybrid retrieval (cleaner than original type-erased approach).
 
 **Architectural Analysis**:
 - **Execution Pattern** (from templates):
