@@ -19,7 +19,7 @@ struct MockRAGRetriever {
 }
 
 impl MockRAGRetriever {
-    fn new(results: Vec<RAGResult>) -> Self {
+    const fn new(results: Vec<RAGResult>) -> Self {
         Self { results }
     }
 
@@ -31,21 +31,21 @@ impl MockRAGRetriever {
                 id: "doc-rust-1".to_string(),
                 content: "Rust is a systems programming language that runs blazingly fast, prevents segfaults, and guarantees thread safety.".to_string(),
                 score: 0.95,
-                metadata: [("source".to_string(), serde_json::json!("rust-book"))].into_iter().collect(),
+                metadata: std::iter::once(("source".to_string(), serde_json::json!("rust-book"))).collect(),
                 timestamp: now,
             },
             RAGResult {
                 id: "doc-rust-2".to_string(),
                 content: "Rust ownership system ensures memory safety without garbage collection. Each value has a single owner.".to_string(),
                 score: 0.88,
-                metadata: [("source".to_string(), serde_json::json!("rust-docs"))].into_iter().collect(),
+                metadata: std::iter::once(("source".to_string(), serde_json::json!("rust-docs"))).collect(),
                 timestamp: now,
             },
             RAGResult {
                 id: "doc-rust-3".to_string(),
                 content: "Rust borrowing rules allow multiple immutable references or one mutable reference at a time.".to_string(),
                 score: 0.82,
-                metadata: [("source".to_string(), serde_json::json!("rust-tutorial"))].into_iter().collect(),
+                metadata: std::iter::once(("source".to_string(), serde_json::json!("rust-tutorial"))).collect(),
                 timestamp: now,
             },
         ])
@@ -79,9 +79,12 @@ fn get_chunks(result: &Value) -> &Vec<Value> {
 
 /// Helper: Extract token count from context assembly result
 fn get_token_count(result: &Value) -> usize {
-    result["token_count"]
-        .as_u64()
-        .expect("Result should have token_count") as usize
+    usize::try_from(
+        result["token_count"]
+            .as_u64()
+            .expect("Result should have token_count"),
+    )
+    .expect("Token count should fit in usize")
 }
 
 /// Helper: Get source field from a ranked chunk
@@ -94,7 +97,10 @@ fn get_chunk_source(ranked_chunk: &Value) -> String {
 
 /// Helper: Create in-memory memory manager with test data
 async fn create_memory_with_test_data(session_id: &str) -> Arc<DefaultMemoryManager> {
-    info!("Creating memory manager with test data for session: {}", session_id);
+    info!(
+        "Creating memory manager with test data for session: {}",
+        session_id
+    );
 
     let memory = Arc::new(
         DefaultMemoryManager::new_in_memory()
@@ -151,9 +157,8 @@ async fn test_rag_memory_hybrid_retrieval() {
     let rag_pipeline = Arc::new(MockRAGRetriever::with_rust_content()) as Arc<dyn RAGRetriever>;
 
     // Setup: Create ContextBridge with RAG pipeline
-    let context_bridge = Arc::new(
-        ContextBridge::new(memory.clone()).with_rag_pipeline(rag_pipeline.clone()),
-    );
+    let context_bridge =
+        Arc::new(ContextBridge::new(memory.clone()).with_rag_pipeline(rag_pipeline.clone()));
 
     // Execute: Perform hybrid retrieval (RAG + Memory)
     info!("Executing hybrid retrieval with 'rag' strategy");
@@ -167,7 +172,10 @@ async fn test_rag_memory_hybrid_retrieval() {
     let chunks = get_chunks(&result);
     let token_count = get_token_count(&result);
 
-    assert!(!chunks.is_empty(), "Should return chunks from hybrid retrieval");
+    assert!(
+        !chunks.is_empty(),
+        "Should return chunks from hybrid retrieval"
+    );
     assert!(token_count > 0, "Should have non-zero token count");
     debug!("Result: {} chunks, {} tokens", chunks.len(), token_count);
 
@@ -292,9 +300,8 @@ async fn test_rag_memory_session_isolation() {
 
     // Setup: Create ContextBridge with RAG
     let rag_pipeline = Arc::new(MockRAGRetriever::with_rust_content()) as Arc<dyn RAGRetriever>;
-    let context_bridge = Arc::new(
-        ContextBridge::new(memory.clone()).with_rag_pipeline(rag_pipeline),
-    );
+    let context_bridge =
+        Arc::new(ContextBridge::new(memory.clone()).with_rag_pipeline(rag_pipeline));
 
     // Execute: Query Session A
     info!("Querying Session A");
@@ -330,27 +337,27 @@ async fn test_rag_memory_session_isolation() {
     assert!(rag_b > 0, "Session B should get RAG results");
 
     // Verify: Memory results are session-isolated
-    let memory_a_sources: Vec<_> = chunks_a
+    let alpha_memory: Vec<_> = chunks_a
         .iter()
         .filter(|c| get_chunk_source(c).starts_with("memory:"))
         .collect();
-    let memory_b_sources: Vec<_> = chunks_b
+    let beta_memory: Vec<_> = chunks_b
         .iter()
         .filter(|c| get_chunk_source(c).starts_with("memory:"))
         .collect();
 
-    debug!("Session A memory chunks: {}", memory_a_sources.len());
-    debug!("Session B memory chunks: {}", memory_b_sources.len());
+    debug!("Session A memory chunks: {}", alpha_memory.len());
+    debug!("Session B memory chunks: {}", beta_memory.len());
 
     // Each session should only see its own memory (if scoring allows)
-    for chunk in memory_a_sources {
+    for chunk in alpha_memory {
         let source = get_chunk_source(chunk);
         assert!(
             source.contains(session_a),
             "Session A memory should only contain session A entries"
         );
     }
-    for chunk in memory_b_sources {
+    for chunk in beta_memory {
         let source = get_chunk_source(chunk);
         assert!(
             source.contains(session_b),
@@ -392,7 +399,10 @@ async fn test_rag_memory_without_rag_pipeline() {
     // When RAG pipeline is None, the "rag" strategy falls back to "hybrid"
     // which queries episodic+semantic memory
     // So we may get chunks from memory with various source formats
-    info!("Fallback handled gracefully - returned {} chunks", chunks.len());
+    info!(
+        "Fallback handled gracefully - returned {} chunks",
+        chunks.len()
+    );
 
     info!("✅ RAG fallback test passed");
 }
@@ -406,9 +416,8 @@ async fn test_rag_memory_token_budget_allocation() {
     // Setup
     let memory = create_memory_with_test_data(session_id).await;
     let rag_pipeline = Arc::new(MockRAGRetriever::with_rust_content()) as Arc<dyn RAGRetriever>;
-    let context_bridge = Arc::new(
-        ContextBridge::new(memory.clone()).with_rag_pipeline(rag_pipeline),
-    );
+    let context_bridge =
+        Arc::new(ContextBridge::new(memory.clone()).with_rag_pipeline(rag_pipeline));
 
     // Test different token budgets
     for budget in [500, 1000, 2000, 4000] {
@@ -432,9 +441,7 @@ async fn test_rag_memory_token_budget_allocation() {
         // Verify: Token count respects budget
         assert!(
             token_count <= budget,
-            "Token count {} should not exceed budget {}",
-            token_count,
-            budget
+            "Token count {token_count} should not exceed budget {budget}"
         );
 
         // Verify: Larger budgets generally return more chunks (not strict due to chunking)
