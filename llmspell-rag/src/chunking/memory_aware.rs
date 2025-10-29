@@ -40,7 +40,7 @@ use super::strategies::{ChunkingConfig, ChunkingStrategy, DocumentChunk};
 /// - Adjusts chunk splits to respect semantic continuity
 /// - Enriches chunk metadata with context hints
 pub struct MemoryAwareChunker<S: ChunkingStrategy, M: EpisodicMemory> {
-    /// Base chunking strategy (e.g., SlidingWindowChunker)
+    /// Base chunking strategy (e.g., `SlidingWindowChunker`)
     base_strategy: S,
     /// Episodic memory for context hints
     memory: Arc<M>,
@@ -81,7 +81,7 @@ impl<S: ChunkingStrategy, M: EpisodicMemory> MemoryAwareChunker<S, M> {
     /// * `memory` - Episodic memory instance for context hints
     /// * `context_k` - Number of memory entries to retrieve for context
     #[must_use]
-    pub fn with_context_k(mut self, context_k: usize) -> Self {
+    pub const fn with_context_k(mut self, context_k: usize) -> Self {
         self.context_k = context_k;
         self
     }
@@ -120,7 +120,7 @@ impl<S: ChunkingStrategy, M: EpisodicMemory> MemoryAwareChunker<S, M> {
     /// - Semantic shifts indicated by context hints
     ///
     /// Returns byte positions of conversation boundaries.
-    fn detect_conversation_boundaries(&self, text: &str, _hints: &[String]) -> Vec<usize> {
+    fn detect_conversation_boundaries(text: &str, _hints: &[String]) -> Vec<usize> {
         let mut boundaries = Vec::new();
 
         // Strategy 1: Detect role markers (User:, Assistant:, etc.)
@@ -160,7 +160,6 @@ impl<S: ChunkingStrategy, M: EpisodicMemory> MemoryAwareChunker<S, M> {
     /// Takes base chunks and refines their boundaries to align with
     /// conversation breaks, ensuring chunks don't split mid-conversation.
     fn adjust_chunk_boundaries(
-        &self,
         mut chunks: Vec<DocumentChunk>,
         boundaries: &[usize],
     ) -> Vec<DocumentChunk> {
@@ -204,20 +203,20 @@ impl<S: ChunkingStrategy, M: EpisodicMemory> ChunkingStrategy for MemoryAwareChu
         let hints = self.fetch_context_hints(text).await?;
 
         // Step 2: Detect conversation boundaries
-        let boundaries = self.detect_conversation_boundaries(text, &hints);
+        let boundaries = Self::detect_conversation_boundaries(text, &hints);
 
         // Step 3: Perform base chunking
         let base_chunks = self.base_strategy.chunk(text, config).await?;
         debug!("Base strategy produced {} chunks", base_chunks.len());
 
         // Step 4: Adjust boundaries to respect conversations
-        let adjusted_chunks = self.adjust_chunk_boundaries(base_chunks, &boundaries);
+        let adjusted_chunks = Self::adjust_chunk_boundaries(base_chunks, &boundaries);
         debug!("Memory-aware chunking complete: {} chunks", adjusted_chunks.len());
 
         Ok(adjusted_chunks)
     }
 
-    fn name(&self) -> &str {
+    fn name(&self) -> &'static str {
         "memory_aware"
     }
 
@@ -251,12 +250,8 @@ mod tests {
 
     #[tokio::test]
     async fn test_conversation_boundary_detection() {
-        let base = SlidingWindowChunker::new();
-        let memory = Arc::new(InMemoryEpisodicMemory::default());
-        let chunker = MemoryAwareChunker::new(base, memory);
-
         let text = "User: Hello\n\nAssistant: Hi there!\n\nUser: How are you?";
-        let boundaries = chunker.detect_conversation_boundaries(text, &[]);
+        let boundaries = MemoryAwareChunker::<SlidingWindowChunker, InMemoryEpisodicMemory>::detect_conversation_boundaries(text, &[]);
 
         // Should detect role markers and paragraph breaks
         assert!(!boundaries.is_empty());
