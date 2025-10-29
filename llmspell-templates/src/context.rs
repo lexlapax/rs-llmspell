@@ -282,7 +282,6 @@ impl ExecutionContext {
             )
         })
     }
-
 }
 
 /// Builder for ExecutionContext
@@ -544,5 +543,4 @@ mod tests {
         assert!(context.require_memory().is_err());
         assert!(context.require_context_bridge().is_err());
     }
-
 }
