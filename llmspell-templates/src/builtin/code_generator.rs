@@ -18,7 +18,7 @@ use crate::{
 use async_trait::async_trait;
 use serde_json::json;
 use std::time::Instant;
-use tracing::{info, warn};
+use tracing::{debug, info, warn};
 
 /// Code Generator Template
 ///
@@ -144,6 +144,11 @@ impl crate::core::Template for CodeGeneratorTemplate {
         let language: String = params.get_or("language", "rust".to_string());
         let include_tests: bool = params.get_or("include_tests", true);
 
+        // Extract memory parameters (Task 13.11.2)
+        let session_id: Option<String> = params.get_optional("session_id").unwrap_or(None);
+        let memory_enabled: bool = params.get_or("memory_enabled", true);
+        let context_budget: i64 = params.get_or("context_budget", 2000);
+
         // Smart dual-path provider resolution (Task 13.5.7d)
         let provider_config = context.resolve_llm_config(&params)?;
         let model_str = provider_config
@@ -167,7 +172,15 @@ impl crate::core::Template for CodeGeneratorTemplate {
         // Phase 1: Generate specification with spec agent
         info!("Phase 1: Generating specification...");
         let spec_result = self
-            .generate_specification(&description, &language, &provider_config, &context)
+            .generate_specification(
+                &description,
+                &language,
+                &provider_config,
+                &context,
+                session_id.as_deref(),
+                memory_enabled,
+                context_budget,
+            )
             .await?;
         output.metrics.agents_invoked += 1; // spec agent
 
@@ -282,6 +295,9 @@ impl CodeGeneratorTemplate {
         language: &str,
         provider_config: &llmspell_config::ProviderConfig,
         context: &ExecutionContext,
+        session_id: Option<&str>,
+        memory_enabled: bool,
+        context_budget: i64,
     ) -> Result<SpecificationResult> {
         use llmspell_agents::factory::{AgentConfig, ModelConfig, ResourceLimits};
         use llmspell_core::types::AgentInput;
@@ -336,9 +352,39 @@ impl CodeGeneratorTemplate {
                 TemplateError::ExecutionFailed(format!("Agent creation failed: {}", e))
             })?;
 
+        // Assemble memory context (Task 13.11.2)
+        let memory_context = if memory_enabled && session_id.is_some() {
+            if let Some(bridge) = context.context_bridge() {
+                debug!(
+                    "Assembling memory context: session={:?}, budget={}",
+                    session_id, context_budget
+                );
+                crate::assemble_template_context(&bridge, description, session_id.unwrap(), context_budget)
+                    .await
+            } else {
+                if memory_enabled {
+                    warn!("Memory enabled but ContextBridge unavailable");
+                }
+                vec![]
+            }
+        } else {
+            vec![]
+        };
+
+        let memory_context_str = if !memory_context.is_empty() {
+            memory_context
+                .iter()
+                .map(|msg| format!("{}: {}", msg.role, msg.content))
+                .collect::<Vec<_>>()
+                .join("\n\n")
+        } else {
+            String::new()
+        };
+
         // Build the specification request with instructions in the prompt
         let spec_prompt = format!(
-            "You are an expert software architect specializing in {}. \
+            "{}\
+             You are an expert software architect specializing in {}. \
              Generate a detailed, well-structured technical specification from the following description.\n\n\
              **Description**: {}\n\
              **Language**: {}\n\n\
@@ -356,7 +402,15 @@ impl CodeGeneratorTemplate {
              - Include function signatures and type annotations\n\
              - Consider edge cases and error conditions\n\n\
              Provide the specification now:",
-            language, description, language, language
+            if !memory_context_str.is_empty() {
+                format!("{}\n\n", memory_context_str)
+            } else {
+                String::new()
+            },
+            language,
+            description,
+            language,
+            language
         );
 
         // Execute the agent
