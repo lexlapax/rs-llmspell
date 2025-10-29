@@ -1629,21 +1629,36 @@ Current Layering:
 ### Task 13.10.2: Context-Aware Chunking Strategy
 
 **Priority**: HIGH
-**Estimated Time**: 5 hours
+**Estimated Time**: 7 hours (updated from 5h due to async trait refactor)
 **Assignee**: RAG + Context Team
-**Status**: BLOCKED by Task 13.10.1
+**Status**: READY TO START (unblocked - 13.10.1 complete)
 
-**Description**: Create context-aware chunking that uses recent episodic memory to inform chunk boundaries. Memory provides conversation context hints to determine semantic boundaries, improving chunk quality for conversational RAG.
+**Description**: Create context-aware chunking that uses recent episodic memory to inform chunk boundaries. Memory provides conversation context hints to determine semantic boundaries, improving chunk quality for conversational RAG. **BREAKING CHANGE**: Makes `ChunkingStrategy` trait async to enable memory queries.
 
-**Architectural Analysis**:
+**Architectural Analysis - UPDATED WITH ASYNC TRAIT DECISION**:
 - **Target Crate**: llmspell-rag/src/chunking/
-- **Existing**: `ChunkingStrategy` trait with `chunk(text, metadata) -> Vec<Chunk>`
-- **New Strategy**: `MemoryAwareChunker` queries recent episodic memory for context hints
+- **Existing**: `ChunkingStrategy` trait with SYNC `fn chunk(text, config) -> Result<Vec<Chunk>>`
+- **Problem**: Memory API is async, trait is sync → incompatible
+- **Solution**: Make `ChunkingStrategy` async (breaking change, but manageable)
+- **Impact Analysis**:
+  - **Trait**: Add `#[async_trait]`, make `chunk()` async
+  - **Implementations**: Update `SlidingWindowChunker` + `SemanticChunker` to async (trivial - just signature)
+  - **Call Sites**: 1 production (already async), 5 tests (need `#[tokio::test]`)
+  - **Benefit**: Clean, idiomatic async Rust; enables future async chunking strategies
+
+**Breaking Change Justification**:
+- Before 1.0, breaking changes acceptable when they improve architecture
+- Production code (`ingestion.rs:78`) already async - just add `.await`
+- Test code easily updated to `#[tokio::test]`
+- Enables memory-aware chunking without workarounds
+- No circular dependencies created
+
+**New Strategy**: `MemoryAwareChunker` queries recent episodic memory for context hints
 - **Mechanism**: Before chunking, retrieve recent conversation context (last 5-10 turns)
   - Identify conversation topics and boundaries
   - Use topic shifts as chunk boundary hints
   - Preserve semantic continuity across conversation flows
-- **Integration**: Optional - falls back to standard chunking when memory unavailable
+- **Integration**: Optional feature-gated - falls back to standard chunking when memory unavailable
 
 **Acceptance Criteria**:
 - [ ] `MemoryAwareChunker` struct in llmspell-rag/src/chunking/memory_aware.rs
@@ -1657,10 +1672,101 @@ Current Layering:
 - [ ] Zero clippy warnings
 - [ ] Compiles: `cargo check -p llmspell-rag`
 
-**Implementation Steps**:
+**Implementation Steps** (Updated with Async Trait Migration):
 
-1. Create `llmspell-rag/src/chunking/memory_aware.rs`:
+**Phase 1: Make ChunkingStrategy Async (Breaking Change)**
+
+1. Update `llmspell-rag/src/chunking/strategies.rs` - Trait definition:
    ```rust
+   use async_trait::async_trait;
+
+   #[async_trait]  // ADD THIS
+   pub trait ChunkingStrategy: Send + Sync {
+       async fn chunk(&self, text: &str, config: &ChunkingConfig) -> Result<Vec<DocumentChunk>>;  // ADD async
+       fn name(&self) -> &str;  // Keep sync
+       fn estimate_tokens(&self, text: &str) -> usize;  // Keep sync
+   }
+   ```
+
+2. Update `SlidingWindowChunker` implementation (strategies.rs:171):
+   ```rust
+   #[async_trait]  // ADD THIS
+   impl ChunkingStrategy for SlidingWindowChunker {
+       async fn chunk(&self, text: &str, config: &ChunkingConfig) -> Result<Vec<DocumentChunk>> {
+           // Existing logic unchanged - just signature is async
+           // ...existing code...
+       }
+       // Other methods unchanged
+   }
+   ```
+
+3. Update `SemanticChunker` implementation (strategies.rs:333):
+   ```rust
+   #[async_trait]  // ADD THIS
+   impl ChunkingStrategy for SemanticChunker {
+       async fn chunk(&self, text: &str, config: &ChunkingConfig) -> Result<Vec<DocumentChunk>> {
+           let chunker = SlidingWindowChunker::new();
+           chunker.chunk(text, config).await  // ADD .await
+       }
+       // Other methods unchanged
+   }
+   ```
+
+4. Update test functions (strategies.rs:356, 380, 407, 435):
+   ```rust
+   #[tokio::test]  // CHANGE from #[test]
+   async fn test_sliding_window_chunking() {  // ADD async
+       let chunker = SlidingWindowChunker::new();
+       let chunks = chunker.chunk(text, &config).await.unwrap();  // ADD .await
+       // ...rest unchanged...
+   }
+   ```
+
+5. Update production call site (`llmspell-rag/src/pipeline/ingestion.rs:78`):
+   ```rust
+   // Before:
+   let chunks = self.chunker.chunk(&content, &self.config.chunking)?;
+
+   // After:
+   let chunks = self.chunker.chunk(&content, &self.config.chunking).await?;  // ADD .await
+   ```
+
+**Phase 2: Add Memory Dependency and Feature**
+
+6. Update `llmspell-rag/Cargo.toml` - Add optional memory dependency:
+   ```toml
+   [dependencies]
+   # ... existing dependencies ...
+   llmspell-memory = { path = "../llmspell-memory", optional = true }
+
+   [features]
+   memory-chunking = ["llmspell-memory"]
+   ```
+
+7. Update `llmspell-rag/src/chunking/mod.rs` - Export new module:
+   ```rust
+   pub mod strategies;
+   pub mod tokenizer;
+   #[cfg(feature = "memory-chunking")]
+   pub mod memory_aware;
+
+   pub use strategies::{
+       ChunkingConfig, ChunkingStrategy, DocumentChunk, SemanticChunker, SlidingWindowChunker,
+   };
+   pub use tokenizer::{TiktokenCounter, TokenCounter};
+   #[cfg(feature = "memory-chunking")]
+   pub use memory_aware::MemoryAwareChunker;
+   ```
+
+**Phase 3: Implement MemoryAwareChunker**
+
+8. Create `llmspell-rag/src/chunking/memory_aware.rs`:
+   ```rust
+   #[cfg(feature = "memory-chunking")]
+   use llmspell_memory::traits::MemoryManager;
+   use async_trait::async_trait;
+   use tracing::{info, debug, warn};
+
    pub struct MemoryAwareChunker {
        memory_manager: Option<Arc<dyn MemoryManager>>,
        context_window_size: usize, // Default: 10 recent turns
@@ -1680,8 +1786,9 @@ Current Layering:
        }
    }
 
+   #[async_trait]
    impl ChunkingStrategy for MemoryAwareChunker {
-       async fn chunk(&self, text: String, metadata: ChunkMetadata) -> Result<Vec<Chunk>> {
+       async fn chunk(&self, text: &str, config: &ChunkingConfig) -> Result<Vec<DocumentChunk>> {
            info!("Memory-aware chunking: text_len={}", text.len());
 
            let hints = self.get_context_hints().await;
@@ -1690,48 +1797,59 @@ Current Layering:
                // Apply hints to influence chunk boundaries
            } else {
                warn!("No memory context available, using fallback chunker");
-               return self.fallback_chunker.chunk(text, metadata).await;
+               return self.fallback_chunker.chunk(text, config).await;
            }
 
            // Chunking logic with conversation-aware boundaries
        }
+       // Implement name() and estimate_tokens()
    }
    ```
 
-2. Update `llmspell-rag/src/chunking/mod.rs`:
-   - Export: `pub mod memory_aware;`
-   - Re-export: `pub use memory_aware::MemoryAwareChunker;`
+**Phase 4: Testing**
 
-3. Add optional memory dependency to `llmspell-rag/Cargo.toml`:
-   ```toml
-   llmspell-memory = { path = "../llmspell-memory", optional = true }
-
-   [features]
-   memory-chunking = ["llmspell-memory"]
-   ```
-
-4. Create unit tests in `llmspell-rag/tests/memory_chunking_test.rs`:
+9. Create unit tests in `llmspell-rag/tests/memory_chunking_test.rs`:
    - Test: Chunking without memory → uses fallback
    - Test: Chunking with memory → respects conversation boundaries
    - Test: Topic shift detection → creates chunks at topic boundaries
    - Test: Session filtering → only uses relevant session context
 
-**Files to Create/Modify**:
-- `llmspell-rag/Cargo.toml` (MODIFY - add optional memory dependency)
+10. Verify async trait migration doesn't break existing tests:
+   - Run: `cargo test -p llmspell-rag`
+   - Confirm all existing chunking tests pass with async changes
+
+11. Verify feature-gated compilation:
+   - Test without feature: `cargo check -p llmspell-rag`
+   - Test with feature: `cargo check -p llmspell-rag --features memory-chunking`
+
+**Files to Create/Modify** (Updated with Async Migration):
+- `llmspell-rag/src/chunking/strategies.rs` (MODIFY - make trait async, update 2 impls, update 5 tests ~20 lines changed)
+- `llmspell-rag/src/pipeline/ingestion.rs` (MODIFY - add .await to chunk() call, 1 line)
+- `llmspell-rag/Cargo.toml` (MODIFY - add optional memory dependency, 4 lines)
+- `llmspell-rag/src/chunking/mod.rs` (MODIFY - feature-gated exports, ~5 lines)
 - `llmspell-rag/src/chunking/memory_aware.rs` (NEW - ~200 lines)
-- `llmspell-rag/src/chunking/mod.rs` (MODIFY - export memory_aware)
 - `llmspell-rag/tests/memory_chunking_test.rs` (NEW - ~150 lines)
 
-**Definition of Done**:
-- [ ] MemoryAwareChunker implemented
+**Definition of Done** (Updated):
+- [ ] **Phase 1 Complete**: ChunkingStrategy trait is async
+- [ ] SlidingWindowChunker updated to async (trivial signature change)
+- [ ] SemanticChunker updated to async (trivial signature change)
+- [ ] All 5 existing tests updated to `#[tokio::test]` and pass
+- [ ] Production code (ingestion.rs) updated with `.await`
+- [ ] **Phase 2 Complete**: Memory dependency added (feature-gated)
+- [ ] Cargo.toml has `memory-chunking` feature
+- [ ] Chunking mod.rs exports MemoryAwareChunker conditionally
+- [ ] **Phase 3 Complete**: MemoryAwareChunker implemented
 - [ ] Conversation boundary detection working
 - [ ] Fallback to standard chunking functional
 - [ ] Session-aware context queries
-- [ ] Unit tests pass (4+ tests)
-- [ ] Integration test validates conversation continuity
+- [ ] **Phase 4 Complete**: All tests pass
+- [ ] Unit tests pass (4+ new memory chunking tests)
+- [ ] Existing chunking tests still pass with async
 - [ ] Tracing verified (info!, debug!, warn!)
-- [ ] Zero clippy warnings
-- [ ] Compiles: `cargo check -p llmspell-rag --features memory-chunking`
+- [ ] Zero clippy warnings: `cargo clippy -p llmspell-rag --all-features`
+- [ ] Compiles without feature: `cargo check -p llmspell-rag`
+- [ ] Compiles with feature: `cargo check -p llmspell-rag --features memory-chunking`
 
 ---
 
