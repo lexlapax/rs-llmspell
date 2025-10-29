@@ -22,7 +22,7 @@ use async_trait::async_trait;
 use serde::{Deserialize, Serialize};
 use serde_json::json;
 use std::time::Instant;
-use tracing::{info, warn};
+use tracing::{debug, info, warn};
 
 /// Content Generation Template
 ///
@@ -226,6 +226,11 @@ impl crate::core::Template for ContentGenerationTemplate {
         let output_format: String = params.get_or("output_format", "markdown".to_string());
         let include_outline: bool = params.get_or("include_outline", false);
 
+        // Extract memory parameters (Task 13.11.2)
+        let session_id: Option<String> = params.get_optional("session_id").unwrap_or(None);
+        let memory_enabled: bool = params.get_or("memory_enabled", true);
+        let context_budget: i64 = params.get_or("context_budget", 2000);
+
         // Smart dual-path provider resolution (Task 13.5.7d)
         let provider_config = context.resolve_llm_config(&params)?;
         let model_str = provider_config
@@ -256,6 +261,9 @@ impl crate::core::Template for ContentGenerationTemplate {
                 &tone,
                 &provider_config,
                 &context,
+                session_id.as_deref(),
+                memory_enabled,
+                context_budget,
             )
             .await?;
         output.metrics.agents_invoked += 1;
@@ -270,6 +278,9 @@ impl crate::core::Template for ContentGenerationTemplate {
                 style_guide.as_deref(),
                 &provider_config,
                 &context,
+                session_id.as_deref(),
+                memory_enabled,
+                context_budget,
             )
             .await?;
         output.metrics.agents_invoked += 1;
@@ -283,7 +294,16 @@ impl crate::core::Template for ContentGenerationTemplate {
         while iteration_count < max_iterations {
             // Get quality score and feedback
             let review = self
-                .review_content(&draft, &content_type, &tone, &provider_config, &context)
+                .review_content(
+                    &draft,
+                    &content_type,
+                    &tone,
+                    &provider_config,
+                    &context,
+                    session_id.as_deref(),
+                    memory_enabled,
+                    context_budget,
+                )
                 .await?;
             output.metrics.agents_invoked += 1;
 
@@ -307,7 +327,15 @@ impl crate::core::Template for ContentGenerationTemplate {
             if iteration_count < max_iterations - 1 {
                 info!("Improving content based on feedback...");
                 draft = self
-                    .improve_content(&draft, &review.feedback, &provider_config, &context)
+                    .improve_content(
+                        &draft,
+                        &review.feedback,
+                        &provider_config,
+                        &context,
+                        session_id.as_deref(),
+                        memory_enabled,
+                        context_budget,
+                    )
                     .await?;
                 output.metrics.agents_invoked += 1;
             }
@@ -318,7 +346,15 @@ impl crate::core::Template for ContentGenerationTemplate {
         // Phase 4: Format final content
         info!("Phase 4: Formatting final content...");
         let formatted = self
-            .format_content(&draft, &output_format, &provider_config, &context)
+            .format_content(
+                &draft,
+                &output_format,
+                &provider_config,
+                &context,
+                session_id.as_deref(),
+                memory_enabled,
+                context_budget,
+            )
             .await?;
         output.metrics.agents_invoked += 1;
 
@@ -441,6 +477,7 @@ struct ContentReview {
 
 impl ContentGenerationTemplate {
     /// Phase 1: Create content plan with outline and structure
+    #[allow(clippy::too_many_arguments)]
     async fn create_content_plan(
         &self,
         topic: &str,
@@ -449,6 +486,9 @@ impl ContentGenerationTemplate {
         tone: &str,
         provider_config: &llmspell_config::ProviderConfig,
         context: &ExecutionContext,
+        session_id: Option<&str>,
+        memory_enabled: bool,
+        context_budget: i64,
     ) -> Result<ContentPlan> {
         use llmspell_agents::factory::{AgentConfig, ModelConfig, ResourceLimits};
         use llmspell_core::types::AgentInput;
@@ -498,8 +538,35 @@ impl ContentGenerationTemplate {
             .map(|l| format!("\n- Target length: {} words", l))
             .unwrap_or_default();
 
+        // Assemble memory context (Task 13.11.2)
+        let memory_context = if let (true, Some(sid)) = (memory_enabled, session_id) {
+            if let Some(bridge) = context.context_bridge() {
+                debug!(
+                    "Assembling memory context: session={}, budget={}",
+                    sid, context_budget
+                );
+                crate::assemble_template_context(&bridge, topic, sid, context_budget).await
+            } else {
+                warn!("Memory enabled but ContextBridge unavailable");
+                vec![]
+            }
+        } else {
+            vec![]
+        };
+
+        let memory_context_str = if !memory_context.is_empty() {
+            memory_context
+                .iter()
+                .map(|msg| format!("{}: {}", msg.role, msg.content))
+                .collect::<Vec<_>>()
+                .join("\n\n")
+        } else {
+            String::new()
+        };
+
         let planning_prompt = format!(
             "You are a content planning expert. Create a detailed plan for {} content.\n\n\
+             {}\
              **Topic**: {}\n\
              **Tone**: {}{}\n\n\
              {}\n\n\
@@ -509,7 +576,16 @@ impl ContentGenerationTemplate {
                \"key_points\": [\"point 1\", \"point 2\", ...],\n\
                \"target_audience\": \"description of target audience\"\n\
              }}",
-            content_type, topic, tone, length_guidance, type_guidance
+            content_type,
+            if !memory_context_str.is_empty() {
+                format!("{}\n\n", memory_context_str)
+            } else {
+                String::new()
+            },
+            topic,
+            tone,
+            length_guidance,
+            type_guidance
         );
 
         let agent_input = AgentInput::builder().text(planning_prompt).build();
@@ -558,6 +634,7 @@ impl ContentGenerationTemplate {
     }
 
     /// Phase 2: Write content based on plan
+    #[allow(clippy::too_many_arguments)]
     async fn write_content(
         &self,
         plan: &ContentPlan,
@@ -566,6 +643,9 @@ impl ContentGenerationTemplate {
         style_guide: Option<&str>,
         provider_config: &llmspell_config::ProviderConfig,
         context: &ExecutionContext,
+        session_id: Option<&str>,
+        memory_enabled: bool,
+        context_budget: i64,
     ) -> Result<String> {
         use llmspell_agents::factory::{AgentConfig, ModelConfig, ResourceLimits};
         use llmspell_core::types::AgentInput;
@@ -616,13 +696,45 @@ impl ContentGenerationTemplate {
             .map(|s| format!("\n- Follow these style guidelines: {}", s))
             .unwrap_or_default();
 
+        // Assemble memory context (Task 13.11.2)
+        let memory_context = if let (true, Some(sid)) = (memory_enabled, session_id) {
+            if let Some(bridge) = context.context_bridge() {
+                debug!(
+                    "Assembling memory context: session={}, budget={}",
+                    sid, context_budget
+                );
+                crate::assemble_template_context(&bridge, &plan.outline, sid, context_budget).await
+            } else {
+                warn!("Memory enabled but ContextBridge unavailable");
+                vec![]
+            }
+        } else {
+            vec![]
+        };
+
+        let memory_context_str = if !memory_context.is_empty() {
+            memory_context
+                .iter()
+                .map(|msg| format!("{}: {}", msg.role, msg.content))
+                .collect::<Vec<_>>()
+                .join("\n\n")
+        } else {
+            String::new()
+        };
+
         let writing_prompt = format!(
             "You are a professional content writer. Write engaging, high-quality content based on the plan below.\n\n\
+             {}\
              **Content Plan**:\n{}\n\n\
              **Key Points to Cover**:\n{}\n\n\
              **Target Audience**: {}\n\
              **Tone**: {}{}{}\n\n\
              Write complete, polished content that fully addresses the plan. Make it engaging and valuable.",
+            if !memory_context_str.is_empty() {
+                format!("{}\n\n", memory_context_str)
+            } else {
+                String::new()
+            },
             plan.outline,
             plan.key_points.join("\n- "),
             plan.target_audience,
@@ -646,6 +758,7 @@ impl ContentGenerationTemplate {
     }
 
     /// Phase 3: Review content and provide quality score + feedback
+    #[allow(clippy::too_many_arguments)]
     async fn review_content(
         &self,
         content: &str,
@@ -653,6 +766,9 @@ impl ContentGenerationTemplate {
         tone: &str,
         provider_config: &llmspell_config::ProviderConfig,
         context: &ExecutionContext,
+        session_id: Option<&str>,
+        memory_enabled: bool,
+        context_budget: i64,
     ) -> Result<ContentReview> {
         use llmspell_agents::factory::{AgentConfig, ModelConfig, ResourceLimits};
         use llmspell_core::types::AgentInput;
@@ -695,8 +811,35 @@ impl ContentGenerationTemplate {
                 TemplateError::ExecutionFailed(format!("Agent creation failed: {}", e))
             })?;
 
+        // Assemble memory context (Task 13.11.2)
+        let memory_context = if let (true, Some(sid)) = (memory_enabled, session_id) {
+            if let Some(bridge) = context.context_bridge() {
+                debug!(
+                    "Assembling memory context: session={}, budget={}",
+                    sid, context_budget
+                );
+                crate::assemble_template_context(&bridge, content, sid, context_budget).await
+            } else {
+                warn!("Memory enabled but ContextBridge unavailable");
+                vec![]
+            }
+        } else {
+            vec![]
+        };
+
+        let memory_context_str = if !memory_context.is_empty() {
+            memory_context
+                .iter()
+                .map(|msg| format!("{}: {}", msg.role, msg.content))
+                .collect::<Vec<_>>()
+                .join("\n\n")
+        } else {
+            String::new()
+        };
+
         let review_prompt = format!(
             "You are a content editor. Review this {} content with {} tone for quality.\n\n\
+             {}\
              **Content to Review**:\n{}\n\n\
              Evaluate the content on:\n\
              - Clarity and coherence\n\
@@ -711,7 +854,14 @@ impl ContentGenerationTemplate {
                \"strengths\": [\"strength 1\", \"strength 2\"],\n\
                \"improvements\": [\"improvement 1\", \"improvement 2\"]\n\
              }}",
-            content_type, tone, content
+            content_type,
+            tone,
+            if !memory_context_str.is_empty() {
+                format!("{}\n\n", memory_context_str)
+            } else {
+                String::new()
+            },
+            content
         );
 
         let agent_input = AgentInput::builder().text(review_prompt).build();
@@ -762,12 +912,16 @@ impl ContentGenerationTemplate {
     }
 
     /// Improve content based on editor feedback
+    #[allow(clippy::too_many_arguments)]
     async fn improve_content(
         &self,
         content: &str,
         feedback: &str,
         provider_config: &llmspell_config::ProviderConfig,
         context: &ExecutionContext,
+        session_id: Option<&str>,
+        memory_enabled: bool,
+        context_budget: i64,
     ) -> Result<String> {
         use llmspell_agents::factory::{AgentConfig, ModelConfig, ResourceLimits};
         use llmspell_core::types::AgentInput;
@@ -810,12 +964,45 @@ impl ContentGenerationTemplate {
                 TemplateError::ExecutionFailed(format!("Agent creation failed: {}", e))
             })?;
 
+        // Assemble memory context (Task 13.11.2)
+        let memory_context = if let (true, Some(sid)) = (memory_enabled, session_id) {
+            if let Some(bridge) = context.context_bridge() {
+                debug!(
+                    "Assembling memory context: session={}, budget={}",
+                    sid, context_budget
+                );
+                crate::assemble_template_context(&bridge, content, sid, context_budget).await
+            } else {
+                warn!("Memory enabled but ContextBridge unavailable");
+                vec![]
+            }
+        } else {
+            vec![]
+        };
+
+        let memory_context_str = if !memory_context.is_empty() {
+            memory_context
+                .iter()
+                .map(|msg| format!("{}: {}", msg.role, msg.content))
+                .collect::<Vec<_>>()
+                .join("\n\n")
+        } else {
+            String::new()
+        };
+
         let improvement_prompt = format!(
             "Improve this content based on the editor's feedback. Keep the core structure but enhance quality.\n\n\
+             {}\
              **Current Content**:\n{}\n\n\
              **Editor Feedback**:\n{}\n\n\
              Provide the improved version of the content.",
-            content, feedback
+            if !memory_context_str.is_empty() {
+                format!("{}\n\n", memory_context_str)
+            } else {
+                String::new()
+            },
+            content,
+            feedback
         );
 
         let agent_input = AgentInput::builder().text(improvement_prompt).build();
@@ -831,12 +1018,16 @@ impl ContentGenerationTemplate {
     }
 
     /// Phase 4: Format final content
+    #[allow(clippy::too_many_arguments)]
     async fn format_content(
         &self,
         content: &str,
         output_format: &str,
         provider_config: &llmspell_config::ProviderConfig,
         context: &ExecutionContext,
+        session_id: Option<&str>,
+        memory_enabled: bool,
+        context_budget: i64,
     ) -> Result<String> {
         use llmspell_agents::factory::{AgentConfig, ModelConfig, ResourceLimits};
         use llmspell_core::types::AgentInput;
@@ -888,11 +1079,44 @@ impl ContentGenerationTemplate {
             _ => "Format for publication with professional structure.",
         };
 
+        // Assemble memory context (Task 13.11.2)
+        let memory_context = if let (true, Some(sid)) = (memory_enabled, session_id) {
+            if let Some(bridge) = context.context_bridge() {
+                debug!(
+                    "Assembling memory context: session={}, budget={}",
+                    sid, context_budget
+                );
+                crate::assemble_template_context(&bridge, content, sid, context_budget).await
+            } else {
+                warn!("Memory enabled but ContextBridge unavailable");
+                vec![]
+            }
+        } else {
+            vec![]
+        };
+
+        let memory_context_str = if !memory_context.is_empty() {
+            memory_context
+                .iter()
+                .map(|msg| format!("{}: {}", msg.role, msg.content))
+                .collect::<Vec<_>>()
+                .join("\n\n")
+        } else {
+            String::new()
+        };
+
         let formatting_prompt = format!(
             "Format this content for publication. {}\n\n\
+             {}\
              **Content**:\n{}\n\n\
              Provide the formatted version.",
-            format_instructions, content
+            format_instructions,
+            if !memory_context_str.is_empty() {
+                format!("{}\n\n", memory_context_str)
+            } else {
+                String::new()
+            },
+            content
         );
 
         let agent_input = AgentInput::builder().text(formatting_prompt).build();
