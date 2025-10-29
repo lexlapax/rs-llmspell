@@ -1507,7 +1507,7 @@ Current Layering:
 
 **Implementation Steps**:
 
-1. Create `llmspell-rag/src/pipeline/rag_trait.rs` - RAGPipeline trait:
+1. Create `llmspell-rag/src/pipeline/rag_trait.rs` - RAGRetriever trait:
    ```rust
    /// Result from RAG retrieval
    pub struct RAGResult {
@@ -1518,9 +1518,9 @@ Current Layering:
        pub timestamp: DateTime<Utc>,
    }
 
-   /// Abstract RAG pipeline interface (session-agnostic)
+   /// Abstract RAG retriever interface (session-agnostic)
    #[async_trait]
-   pub trait RAGPipeline: Send + Sync {
+   pub trait RAGRetriever: Send + Sync {
        async fn retrieve(&self, query: &str, k: usize, scope: Option<StateScope>)
            -> Result<Vec<RAGResult>>;
    }
@@ -1533,7 +1533,7 @@ Current Layering:
        default_session: SessionId,
    }
 
-   impl RAGPipeline for SessionRAGAdapter {
+   impl RAGRetriever for SessionRAGAdapter {
        async fn retrieve(&self, query: &str, k: usize, scope: Option<StateScope>) -> Result<Vec<RAGResult>> {
            // Extract session from scope: "session:abc123" → SessionId("abc123")
            let session_id = extract_session_from_scope(scope).unwrap_or(self.default_session);
@@ -1551,7 +1551,7 @@ Current Layering:
 3. Update `llmspell-rag/src/pipeline/mod.rs`:
    - Add: `pub mod rag_trait;`
    - Add: `pub mod session_adapter;`
-   - Re-export: `pub use rag_trait::{RAGPipeline, RAGResult};`
+   - Re-export: `pub use rag_trait::{RAGRetriever, RAGResult};`
    - Re-export: `pub use session_adapter::SessionRAGAdapter;`
 
 4. Add llmspell-rag dependency to `llmspell-context/Cargo.toml`:
@@ -1567,7 +1567,7 @@ Current Layering:
 
 6. Create `llmspell-context/src/retrieval/hybrid_rag_memory.rs`:
    - Struct: `RetrievalWeights` with validation + presets (balanced, rag_focused, memory_focused)
-   - Struct: `HybridRetriever { rag_pipeline: Option<Arc<dyn RAGPipeline>>, memory_manager, weights }`
+   - Struct: `HybridRetriever { rag_pipeline: Option<Arc<dyn RAGRetriever>>, memory_manager, weights }`
    - Method: `retrieve_hybrid(query, session_id, token_budget) -> Result<Vec<RankedChunk>>`
      * Allocate budget: e.g., 2000 tokens × 0.4 = 800 RAG, × 0.6 = 1200 Memory
      * Query RAG with StateScope::Custom(format!("session:{session_id}")) if available
@@ -1607,22 +1607,22 @@ Current Layering:
 - `llmspell-context/tests/hybrid_retrieval_test.rs` (NEW - ~200 lines)
 
 **Definition of Done**:
-- [ ] RAGPipeline trait defined with async retrieve() method
-- [ ] RAGResult struct implements all required fields
-- [ ] SessionRAGAdapter wraps SessionAwareRAGPipeline correctly
-- [ ] Session extraction from StateScope works
-- [ ] SessionVectorResult → RAGResult conversion preserves data
-- [ ] llmspell-rag dependency added to llmspell-context
-- [ ] RAGResult → RankedChunk adapter converts formats correctly
-- [ ] HybridRetriever implemented with Optional<Arc<dyn RAGPipeline>>
-- [ ] Token budget allocation works (respects weights)
-- [ ] Weighted merge validated (scores multiplied correctly)
-- [ ] Session-aware filtering functional (StateScope encoding)
-- [ ] Backward compatible (memory-only fallback when RAG = None)
-- [ ] All unit tests pass (9+ tests across both crates)
-- [ ] Tracing verified (info!, debug!, trace!)
-- [ ] Zero clippy warnings: `cargo clippy -p llmspell-rag -p llmspell-context`
-- [ ] Compiles: `cargo check -p llmspell-rag -p llmspell-context`
+- [x] RAGRetriever trait defined with async retrieve() method ✅
+- [x] RAGResult struct implements all required fields ✅
+- [x] SessionRAGAdapter wraps SessionAwareRAGPipeline correctly ✅
+- [x] Session extraction from StateScope works ✅
+- [x] SessionVectorResult → RAGResult conversion preserves data ✅
+- [x] llmspell-rag dependency added to llmspell-context ✅
+- [x] RAGResult → RankedChunk adapter converts formats correctly ✅
+- [x] HybridRetriever implemented with Optional<Arc<dyn RAGRetriever>> ✅
+- [x] Token budget allocation works (respects weights) ✅
+- [x] Weighted merge validated (scores multiplied correctly) ✅
+- [x] Session-aware filtering functional (StateScope encoding) ✅
+- [x] Backward compatible (memory-only fallback when RAG = None) ✅
+- [x] All unit tests pass (17 tests across both crates) ✅
+- [x] Tracing verified (info!, debug!, trace!) ✅
+- [x] Zero clippy warnings: `cargo clippy -p llmspell-rag -p llmspell-context` ✅
+- [x] Compiles: `cargo check -p llmspell-rag -p llmspell-context` ✅
 
 ---
 
@@ -1742,7 +1742,7 @@ Current Layering:
 **Assignee**: Bridge Team
 **Status**: BLOCKED by Tasks 13.10.1, 13.10.2
 
-**Description**: Enhance `ContextBridge` to optionally use `HybridRetriever` when `RAGPipeline` is available. Add "rag" strategy to Context.assemble() Lua API. Fully backward compatible.
+**Description**: Enhance `ContextBridge` to optionally use `HybridRetriever` when `RAGRetriever` is available. Add "rag" strategy to Context.assemble() Lua API. Fully backward compatible.
 
 **Architectural Analysis**:
 - **Existing**: `ContextBridge` in llmspell-bridge/src/context_bridge.rs
@@ -1750,12 +1750,12 @@ Current Layering:
   - Method: assemble(query, strategy, max_tokens, session_id)
   - Strategies: "episodic", "semantic", "hybrid" (memory-only)
 - **Enhancement**: Add optional rag_pipeline field
-  - Builder: `with_rag_pipeline(rag: Arc<RAGPipeline>)`
+  - Builder: `with_rag_pipeline(rag: Arc<dyn RAGRetriever>)`
   - New strategy: "rag" - uses HybridRetriever when RAG available
   - Falls back to memory-only "hybrid" when rag_pipeline = None
 
 **Acceptance Criteria**:
-- [ ] ContextBridge has `rag_pipeline: Option<Arc<RAGPipeline>>` field
+- [ ] ContextBridge has `rag_pipeline: Option<Arc<dyn RAGRetriever>>` field
 - [ ] Constructor unchanged: `ContextBridge::new(memory_manager)`
 - [ ] Builder method: `with_rag_pipeline(rag) -> Self`
 - [ ] assemble() supports "rag" strategy → uses HybridRetriever
@@ -1772,11 +1772,11 @@ Current Layering:
    ```rust
    pub struct ContextBridge {
        memory_manager: Arc<dyn MemoryManager>,
-       rag_pipeline: Option<Arc<RAGPipeline>>, // NEW
+       rag_pipeline: Option<Arc<dyn RAGRetriever>>, // NEW
    }
 
    impl ContextBridge {
-       pub fn with_rag_pipeline(mut self, rag: Arc<RAGPipeline>) -> Self {
+       pub fn with_rag_pipeline(mut self, rag: Arc<dyn RAGRetriever>) -> Self {
            self.rag_pipeline = Some(rag);
            self
        }
