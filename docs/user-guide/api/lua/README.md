@@ -1447,9 +1447,9 @@ Assembles relevant context from memory for a query.
 
 **Parameters**:
 - `query` (string): Query text to find relevant context for
-- `strategy` (string): Retrieval strategy (`"episodic"`, `"semantic"`, or `"hybrid"`)
+- `strategy` (string): Retrieval strategy (`"episodic"`, `"semantic"`, `"hybrid"`, or `"rag"`)
 - `max_tokens` (number, optional): Token budget for context (default: 8192)
-- `session_id` (string, optional): Session to filter by (episodic strategy only)
+- `session_id` (string, optional): Session to filter by (episodic and rag strategies)
 
 **Returns**: Table with assembled context
 
@@ -1499,6 +1499,12 @@ local prompt = context.formatted .. "\\n\\nUser: " .. user_query
 - `"episodic"`: Recent conversation history (fast, temporal)
 - `"semantic"`: Knowledge graph entities (conceptual, global)
 - `"hybrid"`: Combined episodic + semantic (comprehensive)
+- `"rag"`: RAG vector search + episodic memory (document knowledge + conversation history)
+  - Requires RAG pipeline configured in config.toml
+  - Combines ingested documents with conversation memory
+  - Default weighting: 40% RAG + 60% Memory (configurable)
+  - Falls back to "hybrid" if RAG pipeline not available
+  - Session-aware: filters memory by session_id
 
 **Notes**:
 - Token budget enforced via truncation
