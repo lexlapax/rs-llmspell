@@ -1,10 +1,14 @@
 //! Core template trait and types
 
 use crate::{
-    artifacts::Artifact, context::ExecutionContext, error::Result, validation::ConfigSchema,
+    artifacts::Artifact,
+    context::ExecutionContext,
+    error::Result,
+    validation::{ConfigSchema, ParameterConstraints, ParameterSchema, ParameterType},
 };
 use async_trait::async_trait;
 use serde::{Deserialize, Serialize};
+use serde_json::json;
 use std::collections::HashMap;
 use std::path::PathBuf;
 
@@ -391,6 +395,89 @@ impl CostEstimate {
             confidence,
         }
     }
+}
+
+// ============================================================================
+// Parameter Schema Helpers (Task 13.11.1)
+// ============================================================================
+
+/// Standard memory parameters for templates
+///
+/// All templates support optional memory integration via three parameters:
+/// - `session_id` (String): Session identifier for memory filtering
+/// - `memory_enabled` (Boolean, default: true): Enable memory-enhanced execution
+/// - `context_budget` (Integer, default: 2000, range: 100-8000): Token budget for context assembly
+///
+/// These parameters enable context-aware template execution using episodic and semantic memory.
+///
+/// # Example
+///
+/// ```rust
+/// use llmspell_templates::core::memory_parameters;
+/// use llmspell_templates::validation::ConfigSchema;
+///
+/// // Add memory parameters to template schema
+/// let mut params = vec![/* template-specific params */];
+/// params.extend(memory_parameters());
+/// let schema = ConfigSchema::new(params);
+/// ```
+pub fn memory_parameters() -> Vec<ParameterSchema> {
+    vec![
+        // session_id (optional)
+        ParameterSchema::optional(
+            "session_id",
+            "Session ID for conversation memory filtering. Enables context-aware execution.",
+            ParameterType::String,
+            json!(null),
+        ),
+        // memory_enabled (optional with default)
+        ParameterSchema::optional(
+            "memory_enabled",
+            "Enable memory-enhanced execution. Uses episodic + semantic memory for context.",
+            ParameterType::Boolean,
+            json!(true),
+        ),
+        // context_budget (optional with default and constraints)
+        ParameterSchema::optional(
+            "context_budget",
+            "Token budget for context assembly (100-8000). Higher = more context.",
+            ParameterType::Integer,
+            json!(2000),
+        )
+        .with_constraints(ParameterConstraints {
+            min: Some(100.0),
+            max: Some(8000.0),
+            ..Default::default()
+        }),
+    ]
+}
+
+/// Provider resolution parameters (Task 13.5.7d)
+///
+/// Templates support dual-path provider resolution:
+/// - `provider_name` (String): Provider name (e.g., "ollama", "openai")
+///
+/// This parameter is mutually exclusive with the `model` parameter. Use `provider_name`
+/// to select a provider with its default model, or use `model` for explicit model selection.
+///
+/// # Example
+///
+/// ```rust
+/// use llmspell_templates::core::provider_parameters;
+/// use llmspell_templates::validation::ConfigSchema;
+///
+/// // Add provider parameters to template schema
+/// let mut params = vec![/* template-specific params */];
+/// params.extend(provider_parameters());
+/// let schema = ConfigSchema::new(params);
+/// ```
+pub fn provider_parameters() -> Vec<ParameterSchema> {
+    vec![ParameterSchema::optional(
+        "provider_name",
+        "Provider name (e.g., 'ollama', 'openai'). Mutually exclusive with 'model'.",
+        ParameterType::String,
+        json!(null),
+    )]
 }
 
 #[cfg(test)]

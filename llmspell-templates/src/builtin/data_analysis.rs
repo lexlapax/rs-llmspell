@@ -10,8 +10,8 @@ use crate::{
     artifacts::Artifact,
     context::ExecutionContext,
     core::{
-        CostEstimate, TemplateCategory, TemplateMetadata, TemplateOutput, TemplateParams,
-        TemplateResult,
+        memory_parameters, provider_parameters, CostEstimate, TemplateCategory, TemplateMetadata,
+        TemplateOutput, TemplateParams, TemplateResult,
     },
     error::{Result, TemplateError},
     validation::{ConfigSchema, ParameterConstraints, ParameterSchema, ParameterType},
@@ -73,7 +73,7 @@ impl crate::core::Template for DataAnalysisTemplate {
     }
 
     fn config_schema(&self) -> ConfigSchema {
-        ConfigSchema::new(vec![
+        let mut params = vec![
             // data_file (required)
             ParameterSchema::required(
                 "data_file",
@@ -126,7 +126,19 @@ impl crate::core::Template for DataAnalysisTemplate {
                 ParameterType::String,
                 json!("ollama/llama3.2:3b"),
             ),
-        ])
+        ];
+
+        // Add memory parameters (Task 13.11.1)
+        params.extend(memory_parameters());
+
+        // Add provider parameters (Task 13.5.7d)
+        params.extend(provider_parameters());
+
+        tracing::debug!(
+            "DataAnalysis: Generated config schema with {} parameters",
+            params.len()
+        );
+        ConfigSchema::new(params)
     }
 
     async fn execute(

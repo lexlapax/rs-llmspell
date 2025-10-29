@@ -37,6 +37,20 @@ llmspell template exec document-processor \
   --param transformation="extract"
 ```
 
+### CLI - With Memory and Provider
+
+Enable memory-enhanced execution with custom provider:
+
+```bash
+llmspell template exec document-processor \
+  --param documents='["invoice.pdf"]' \
+  --param transformation="extract" \
+  --param session-id="user-session-123" \
+  --param memory-enabled=true \
+  --param context-budget=3000 \
+  --param provider-name="ollama"
+```
+
 ### Lua - Basic Usage
 
 ```lua
@@ -46,6 +60,21 @@ local result = Template.execute("document-processor", {
 })
 
 print(result.result)
+```
+
+### Lua - With Memory and Provider
+
+Enable memory-enhanced execution:
+
+```lua
+local result = Template.execute("document-processor", {
+    documents = {"contract.pdf", "terms.pdf"},
+    transformation = "summarize",
+    session_id = "user-session-123",
+    memory_enabled = true,
+    context_budget = 3000,
+    provider_name = "ollama"
+})
 ```
 
 ---
@@ -67,6 +96,36 @@ print(result.result)
 | `language` | String | `"en"` | Target language for translation |
 | `parallel` | Boolean | `true` | Process documents in parallel |
 | `model` | String | `"ollama/llama3.2:3b"` | LLM for transformation |
+
+### Memory Parameters
+
+All templates support optional memory integration for context-aware execution:
+
+| Parameter | Type | Default | Range/Values | Description |
+|-----------|------|---------|--------------|-------------|
+| `session_id` | String | `null` | Any string | Session identifier for conversation memory filtering |
+| `memory_enabled` | Boolean | `true` | `true`, `false` | Enable memory-enhanced execution (uses episodic + semantic memory) |
+| `context_budget` | Integer | `2000` | `100-8000` | Token budget for context assembly (higher = more context) |
+
+**Memory Integration**: When `session_id` is provided and `memory_enabled` is `true`, the template will:
+- Retrieve relevant episodic memory from conversation history
+- Query semantic memory for related concepts
+- Assemble context within the `context_budget` token limit
+- Provide memory-enhanced context to LLM for better results
+
+### Provider Parameters
+
+Templates support dual-path provider resolution:
+
+| Parameter | Type | Default | Range/Values | Description |
+|-----------|------|---------|--------------|-------------|
+| `provider_name` | String | `null` | `"ollama"`, `"openai"`, etc. | Provider name (mutually exclusive with `model`) |
+
+**Provider Resolution**:
+- Use `provider_name` to select a provider with its default model (e.g., `provider_name: "ollama"`)
+- Use `model` for explicit model selection (e.g., `model: "gpt-4"`)
+- If both provided, `model` takes precedence
+- `provider_name` and `model` are mutually exclusive
 
 **Inspect Full Schema:**
 ```bash

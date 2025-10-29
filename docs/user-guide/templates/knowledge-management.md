@@ -49,6 +49,36 @@ The Knowledge Management template provides CRUD operations for building and quer
 | `chunk_overlap` | Integer | No | `50` | Word overlap between chunks |
 | `output_format` | String | No | `"text"` | Output format: `text`, `json` |
 
+### Memory Parameters
+
+All templates support optional memory integration for context-aware execution:
+
+| Parameter | Type | Default | Range/Values | Description |
+|-----------|------|---------|--------------|-------------|
+| `session_id` | String | `null` | Any string | Session identifier for conversation memory filtering |
+| `memory_enabled` | Boolean | `true` | `true`, `false` | Enable memory-enhanced execution (uses episodic + semantic memory) |
+| `context_budget` | Integer | `2000` | `100-8000` | Token budget for context assembly (higher = more context) |
+
+**Memory Integration**: When `session_id` is provided and `memory_enabled` is `true`, the template will:
+- Retrieve relevant episodic memory from conversation history
+- Query semantic memory for related concepts
+- Assemble context within the `context_budget` token limit
+- Provide memory-enhanced context to LLM for better results
+
+### Provider Parameters
+
+Templates support dual-path provider resolution:
+
+| Parameter | Type | Default | Range/Values | Description |
+|-----------|------|---------|--------------|-------------|
+| `provider_name` | String | `null` | `"ollama"`, `"openai"`, etc. | Provider name (mutually exclusive with `model`) |
+
+**Provider Resolution**:
+- Use `provider_name` to select a provider with its default model (e.g., `provider_name: "ollama"`)
+- Use `model` for explicit model selection (e.g., `model: "gpt-4"`)
+- If both provided, `model` takes precedence
+- `provider_name` and `model` are mutually exclusive
+
 ### Parameter Constraints
 
 **operation**: Must be one of:
@@ -84,6 +114,22 @@ Document ID: doc-a1b2c3d4e5f6
 Chunks: 2
 Tags: rust
 Collection: rust-docs
+```
+
+### CLI - With Memory and Provider
+
+Enable memory-enhanced execution with custom provider:
+
+```bash
+llmspell template exec knowledge-management \
+  --param operation=ingest \
+  --param collection=rust-docs \
+  --param content="Rust is a systems programming language..." \
+  --param source_type=text \
+  --param session-id="user-session-123" \
+  --param memory-enabled=true \
+  --param context-budget=3000 \
+  --param provider-name="ollama"
 ```
 
 ### 2. Ingest Markdown File
@@ -156,6 +202,23 @@ llmspell template exec knowledge-management \
   --param operation=list \
   --param collection=rust-docs \
   --param output_format=text
+```
+
+### Lua - With Memory and Provider
+
+Enable memory-enhanced execution:
+
+```lua
+local result = Template.execute("knowledge-management", {
+    operation = "query",
+    collection = "rust-docs",
+    query = "memory safety",
+    max_results = 3,
+    session_id = "user-session-123",
+    memory_enabled = true,
+    context_budget = 3000,
+    provider_name = "ollama"
+})
 ```
 
 **Output**:

@@ -6,8 +6,8 @@
 
 use crate::context::ExecutionContext;
 use crate::core::{
-    CostEstimate, TemplateCategory, TemplateMetadata, TemplateOutput, TemplateParams,
-    TemplateResult,
+    memory_parameters, provider_parameters, CostEstimate, TemplateCategory, TemplateMetadata,
+    TemplateOutput, TemplateParams, TemplateResult,
 };
 use crate::error::{TemplateError, ValidationError};
 use crate::validation::{ConfigSchema, ParameterConstraints, ParameterSchema, ParameterType};
@@ -280,7 +280,7 @@ impl crate::core::Template for KnowledgeManagementTemplate {
     }
 
     fn config_schema(&self) -> ConfigSchema {
-        ConfigSchema::new(vec![
+        let mut params = vec![
             // operation (required enum)
             ParameterSchema::required(
                 "operation",
@@ -389,7 +389,19 @@ impl crate::core::Template for KnowledgeManagementTemplate {
                 allowed_values: Some(vec![json!("text"), json!("json")]),
                 ..Default::default()
             }),
-        ])
+        ];
+
+        // Add memory parameters (Task 13.11.1)
+        params.extend(memory_parameters());
+
+        // Add provider parameters (Task 13.5.7d)
+        params.extend(provider_parameters());
+
+        tracing::debug!(
+            "KnowledgeManagement: Generated config schema with {} parameters",
+            params.len()
+        );
+        ConfigSchema::new(params)
     }
 
     async fn execute(

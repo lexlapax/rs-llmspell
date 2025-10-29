@@ -10,8 +10,8 @@ use crate::{
     artifacts::Artifact,
     context::ExecutionContext,
     core::{
-        CostEstimate, TemplateCategory, TemplateMetadata, TemplateOutput, TemplateParams,
-        TemplateResult,
+        memory_parameters, provider_parameters, CostEstimate, TemplateCategory, TemplateMetadata,
+        TemplateOutput, TemplateParams, TemplateResult,
     },
     error::{Result, TemplateError},
     validation::{ConfigSchema, ParameterConstraints, ParameterSchema, ParameterType},
@@ -77,7 +77,7 @@ impl crate::core::Template for ResearchAssistantTemplate {
     }
 
     fn config_schema(&self) -> ConfigSchema {
-        ConfigSchema::new(vec![
+        let mut params = vec![
             // topic (required)
             ParameterSchema::required("topic", "Research topic or question", ParameterType::String)
                 .with_constraints(ParameterConstraints {
@@ -121,7 +121,19 @@ impl crate::core::Template for ResearchAssistantTemplate {
                 ParameterType::Boolean,
                 json!(true),
             ),
-        ])
+        ];
+
+        // Add memory parameters (Task 13.11.1)
+        params.extend(memory_parameters());
+
+        // Add provider parameters (Task 13.5.7d)
+        params.extend(provider_parameters());
+
+        debug!(
+            "ResearchAssistant: Generated config schema with {} parameters",
+            params.len()
+        );
+        ConfigSchema::new(params)
     }
 
     async fn execute(

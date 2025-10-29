@@ -6,8 +6,8 @@
 
 use crate::context::ExecutionContext;
 use crate::core::{
-    CostEstimate, TemplateCategory, TemplateMetadata, TemplateOutput, TemplateParams,
-    TemplateResult,
+    memory_parameters, provider_parameters, CostEstimate, TemplateCategory, TemplateMetadata,
+    TemplateOutput, TemplateParams, TemplateResult,
 };
 use crate::error::{TemplateError, ValidationError};
 use crate::validation::{ConfigSchema, ParameterConstraints, ParameterSchema, ParameterType};
@@ -615,7 +615,7 @@ impl crate::core::Template for FileClassificationTemplate {
     }
 
     fn config_schema(&self) -> ConfigSchema {
-        ConfigSchema::new(vec![
+        let mut params = vec![
             // source_path (required)
             ParameterSchema::required(
                 "source_path",
@@ -696,7 +696,19 @@ impl crate::core::Template for FileClassificationTemplate {
                 allowed_values: Some(vec![json!("text"), json!("markdown"), json!("json")]),
                 ..Default::default()
             }),
-        ])
+        ];
+
+        // Add memory parameters (Task 13.11.1)
+        params.extend(memory_parameters());
+
+        // Add provider parameters (Task 13.5.7d)
+        params.extend(provider_parameters());
+
+        tracing::debug!(
+            "FileClassification: Generated config schema with {} parameters",
+            params.len()
+        );
+        ConfigSchema::new(params)
     }
 
     async fn execute(

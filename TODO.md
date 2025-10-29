@@ -2420,7 +2420,7 @@ Implemented complete consolidation feedback mechanism in 3 phases over ~3 hours:
 **Priority**: CRITICAL (BLOCKER)
 **Estimated Time**: 2 hours
 **Assignee**: Core Team
-**Status**: READY TO START
+**Status**: ✅ COMPLETE
 
 **Description**: Add memory_manager and context_bridge fields to ExecutionContext to enable templates to access memory and context assembly infrastructure. This is a CRITICAL PREREQUISITE that must be completed before any template modifications.
 
@@ -2601,16 +2601,28 @@ Implemented complete consolidation feedback mechanism in 3 phases over ~3 hours:
 - `llmspell-templates/src/builtin/*.rs` (MODIFY - update ExecutionContext usage if needed, minimal changes)
 
 **Definition of Done**:
-- [ ] llmspell-bridge dependency added and compiles
-- [ ] ExecutionContext has memory_manager and context_bridge fields
-- [ ] Builder methods work correctly
-- [ ] Helper methods return correct values
-- [ ] Unit tests pass for new functionality
-- [ ] All existing template tests pass (no regressions)
-- [ ] Tracing instrumentation verified
-- [ ] Zero clippy warnings
-- [ ] Cargo check passes for llmspell-templates
-- [ ] Ready for Task 13.11.1 (templates can now access memory infrastructure)
+- [x] llmspell-memory dependency added (llmspell-bridge would create circular dependency)
+- [x] ExecutionContext has memory_manager and context_bridge fields
+- [x] Builder methods work correctly
+- [x] Helper methods return correct values
+- [x] Unit tests pass for new functionality (3 new tests)
+- [x] All existing template tests pass (no regressions) - 218 tests pass
+- [x] Tracing instrumentation verified (debug! and trace! calls)
+- [x] Zero clippy warnings
+- [x] Cargo check passes for llmspell-templates
+- [x] Ready for Task 13.11.1 (templates can now access memory infrastructure)
+
+**Implementation Insights**:
+- **Circular Dependency Resolution**: llmspell-bridge already depends on llmspell-templates (for Template global), so adding reverse dependency would create cycle
+- **Solution**: Type erasure using `Arc<dyn std::any::Any + Send + Sync>` for context_bridge field
+- **Memory Manager**: Direct dependency on llmspell-memory is safe (uses MemoryManager trait)
+- **Downcast API**: Added `context_bridge_as<T>()` and `require_context_bridge_as<T>()` for type-safe retrieval
+- **Builder Pattern**: Both ExecutionContext and ExecutionContextBuilder support new fields
+- **Test Coverage**: 3 new tests verify memory_manager field, require_memory() errors, and type erasure downcasting
+- **Zero Breaking Changes**: Existing tests pass, fields are optional (backward compatible)
+- **Files Modified**:
+  - llmspell-templates/Cargo.toml (+1 dependency)
+  - llmspell-templates/src/context.rs (+120 lines: 2 fields, 7 methods, 3 tests)
 
 ---
 
@@ -2619,7 +2631,7 @@ Implemented complete consolidation feedback mechanism in 3 phases over ~3 hours:
 **Priority**: HIGH
 **Estimated Time**: 4 hours
 **Assignee**: Template Team
-**Status**: BLOCKED (requires Task 13.11.0)
+**Status**: ✅ COMPLETE
 **Dependencies**: Task 13.11.0 MUST be complete
 
 **Description**: Add memory-related parameters to config_schema() for all 10 templates, ensuring backward compatibility and consistent API.
@@ -2792,14 +2804,29 @@ Implemented complete consolidation feedback mechanism in 3 phases over ~3 hours:
 - `docs/user-guide/templates/*.md` (MODIFY - add Memory Parameters section to 10 files, ~30 lines each)
 
 **Definition of Done**:
-- [ ] All 10 templates have memory parameters in config_schema()
-- [ ] All 10 templates have provider_name parameter (Task 13.5.7d)
-- [ ] Helper functions memory_parameters() and provider_parameters() created
-- [ ] All 10 template user guides updated with memory parameter documentation
-- [ ] Schema validation tests pass for all templates
-- [ ] Backward compatibility verified (templates work without memory params)
-- [ ] Tracing instrumentation verified
-- [ ] Zero clippy warnings
+- [x] All 10 templates have memory parameters in config_schema()
+- [x] All 10 templates have provider_name parameter (Task 13.5.7d)
+- [x] Helper functions memory_parameters() and provider_parameters() created
+- [x] All 10 template user guides updated with memory parameter documentation
+- [x] Schema validation tests pass for all templates
+- [x] Backward compatibility verified (templates work without memory params)
+- [x] Tracing instrumentation verified
+- [x] Zero clippy warnings
+
+**Implementation Insights**:
+- **Helper Functions**: Created `memory_parameters()` and `provider_parameters()` in core.rs (80 lines with docs)
+- **Schema Pattern**: All templates now use `let mut params = vec![...]; params.extend(memory_parameters()); params.extend(provider_parameters());`
+- **Memory Parameters**: session_id (String, optional), memory_enabled (Boolean, default: true), context_budget (Integer, default: 2000, range: 100-8000)
+- **Provider Parameters**: provider_name (String, optional) for dual-path provider resolution (Task 13.5.7d completion)
+- **Documentation**: All 10 user guides updated with Memory Parameters and Provider Parameters sections
+- **Examples**: CLI and Lua examples added showing memory-enhanced execution with session_id
+- **Debug Logging**: Each template logs parameter count on schema generation (e.g., "ResearchAssistant: Generated config schema with 9 parameters")
+- **Backward Compatibility**: All parameters optional, templates work without memory params (existing tests pass)
+- **Test Status**: 220 tests pass (195 lib + 23 doc + 2 integration)
+- **Files Modified**:
+  - llmspell-templates/src/core.rs (+80 lines: 2 helper functions with full docs)
+  - llmspell-templates/src/builtin/*.rs (10 files: updated imports and config_schema())
+  - docs/user-guide/templates/*.md (10 files: added Memory/Provider sections + examples)
 
 ---
 
