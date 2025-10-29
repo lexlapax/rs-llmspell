@@ -92,7 +92,7 @@
 - Phase 13.8 (Bridge) depends on Phase 13.7 (kernel integration)
 - Phase 13.10 (RAG) depends on Phases 13.1-13.4 (memory + context)
 - Phase 13.11 (Templates) depends on Phase 13.10 (RAG integration)
-- Phase 13.13-13.14 (Optimization/Validation) depend on all previous phases
+- Phase 13.14-13.14 (Optimization/Validation) depend on all previous phases
 
 ---
 For 13.1 to 13.8 see `TODO-TEMP-ARCHIVE.md`
@@ -945,7 +945,7 @@ For 13.1 to 13.8 see `TODO-TEMP-ARCHIVE.md`
 - [✅] Code examples for each method
 - [✅] Best practices sections included (in method notes)
 - [✅] Cross-references to example files
-- [⚠️] Cross-references to architecture docs (Memory Architecture, Context Engineering docs don't exist yet - deferred to Phase 13.15)
+- [⚠️] Cross-references to architecture docs (Memory Architecture, Context Engineering docs don't exist yet - deferred to Phase 13.16)
 - [✅] Markdown renders correctly (standard format, verified via preview)
 - [✅] No broken links (all example file references validated)
 
@@ -2348,9 +2348,15 @@ Implemented complete consolidation feedback mechanism in 3 phases over ~3 hours:
 ## Phase 13.11: Template Integration - Memory-Aware Workflows (Days 18-19)
 
 **Goal**: Add memory and context parameters to all 10 production templates for session-aware, context-enhanced workflows
-**Timeline**: 2 days (16 hours)
+**Timeline**: 2.25 days (18 hours)
 **Critical Dependencies**: Phase 13.8 complete (Memory + Context globals), Phase 13.10 complete (RAG integration)
 **Status**: READY TO START
+
+**⚠️ CRITICAL ARCHITECTURE GAP IDENTIFIED**:
+- **Problem**: Phase 13.11 original plan assumed templates could access ContextBridge, but ExecutionContext is missing memory infrastructure
+- **Root Cause**: ExecutionContext (llmspell-templates/src/context.rs) has no memory_manager or context_bridge fields
+- **Solution**: NEW Task 13.11.0 added as CRITICAL PREREQUISITE to add infrastructure before template modifications
+- **Impact**: +2 hours to phase timeline (16h → 18h)
 
 **⚠️ TRACING REQUIREMENT**: ALL template memory integration MUST include tracing:
 - `info!` for template execution start, memory usage decisions, context assembly
@@ -2400,11 +2406,211 @@ Implemented complete consolidation feedback mechanism in 3 phases over ~3 hours:
 - **Memory Storage**: Store template inputs/outputs as episodic entries
 
 **Time Breakdown**:
+- Task 13.11.0: 2h (ExecutionContext Infrastructure - CRITICAL PREREQUISITE) **NEW**
 - Task 13.11.1: 4h (Memory Parameters - Config Schema Updates for 10 Templates)
 - Task 13.11.2: 6h (Context Integration - execute() Updates for 10 Templates)
 - Task 13.11.3: 3h (Memory Storage - Post-execution Storage)
 - Task 13.11.4: 3h (Testing + Examples)
-- **Total**: 16h
+- **Total**: 18h (was 16h)
+
+---
+
+### Task 13.11.0: ExecutionContext Infrastructure - CRITICAL PREREQUISITE
+
+**Priority**: CRITICAL (BLOCKER)
+**Estimated Time**: 2 hours
+**Assignee**: Core Team
+**Status**: READY TO START
+
+**Description**: Add memory_manager and context_bridge fields to ExecutionContext to enable templates to access memory and context assembly infrastructure. This is a CRITICAL PREREQUISITE that must be completed before any template modifications.
+
+**Architectural Analysis**:
+- **Current State** (llmspell-templates/src/context.rs:12-45):
+  - ExecutionContext has: state_manager, session_manager, tool_registry, agent_registry, workflow_factory, rag, providers, kernel_handle
+  - ❌ MISSING: memory_manager, context_bridge
+  - Templates have llmspell-memory dependency but NO llmspell-bridge dependency
+  - No way for templates to call context_bridge.assemble() or access MemoryManager
+- **Required Changes**:
+  - Add llmspell-bridge dependency to llmspell-templates/Cargo.toml
+  - Add memory_manager: Option<Arc<dyn MemoryManager>> to ExecutionContext
+  - Add context_bridge: Option<Arc<ContextBridge>> to ExecutionContext
+  - Add builder methods: with_memory(), with_context_bridge()
+  - Add helper methods: has_memory(), require_memory(), memory_manager(), context_bridge()
+- **Why This is Critical**:
+  - Tasks 13.11.1-13.11.4 all assume templates can access ContextBridge
+  - Code examples in Task 13.11.2 show context.context_bridge().assemble() calls
+  - Code examples in Task 13.11.3 show context.memory_manager() calls
+  - Without this infrastructure, Phase 13.11 CANNOT proceed
+
+**Acceptance Criteria**:
+- [ ] llmspell-bridge added to llmspell-templates dependencies
+- [ ] ExecutionContext has memory_manager and context_bridge fields
+- [ ] ExecutionContext has with_memory() and with_context_bridge() builder methods
+- [ ] ExecutionContext has helper methods: has_memory(), require_memory(), memory_manager(), context_bridge()
+- [ ] ExecutionContextBuilder updated to support new fields
+- [ ] All existing tests pass (no breaking changes)
+- [ ] **TRACING**: Context creation (debug!), field access (trace!)
+- [ ] Zero clippy warnings
+
+**Implementation Steps**:
+
+1. Add llmspell-bridge dependency to `llmspell-templates/Cargo.toml`:
+   ```toml
+   [dependencies]
+   llmspell-bridge = { path = "../llmspell-bridge" }
+   ```
+
+2. Update ExecutionContext structure in `llmspell-templates/src/context.rs`:
+   ```rust
+   use llmspell_bridge::{ContextBridge, MemoryBridge};
+   use llmspell_memory::MemoryManager;
+
+   pub struct ExecutionContext {
+       // Existing fields...
+       pub state_manager: Option<Arc<StateManager>>,
+       pub session_manager: Option<Arc<SessionManager>>,
+       pub tool_registry: Arc<ToolRegistry>,
+       pub agent_registry: Arc<FactoryRegistry>,
+       pub workflow_factory: Arc<dyn WorkflowFactory>,
+       pub rag: Option<Arc<MultiTenantRAG>>,
+       pub providers: Arc<ProviderManager>,
+       pub provider_config: Arc<ProviderManagerConfig>,
+       pub kernel_handle: Option<Arc<KernelHandle>>,
+       pub session_id: Option<String>,
+       pub output_dir: Option<PathBuf>,
+
+       // NEW: Memory infrastructure
+       pub memory_manager: Option<Arc<dyn MemoryManager>>,
+       pub context_bridge: Option<Arc<ContextBridge>>,
+   }
+   ```
+
+3. Add builder methods to ExecutionContext:
+   ```rust
+   impl ExecutionContext {
+       /// Add memory manager to context
+       pub fn with_memory(mut self, memory: Arc<dyn MemoryManager>) -> Self {
+           debug!("ExecutionContext: Adding memory manager");
+           self.memory_manager = Some(memory);
+           self
+       }
+
+       /// Add context bridge to context
+       pub fn with_context_bridge(mut self, bridge: Arc<ContextBridge>) -> Self {
+           debug!("ExecutionContext: Adding context bridge");
+           self.context_bridge = Some(bridge);
+           self
+       }
+
+       /// Check if memory is available
+       pub fn has_memory(&self) -> bool {
+           self.memory_manager.is_some() && self.context_bridge.is_some()
+       }
+
+       /// Get memory manager if available
+       pub fn memory_manager(&self) -> Option<Arc<dyn MemoryManager>> {
+           trace!("ExecutionContext: Accessing memory manager");
+           self.memory_manager.clone()
+       }
+
+       /// Get context bridge if available
+       pub fn context_bridge(&self) -> Option<Arc<ContextBridge>> {
+           trace!("ExecutionContext: Accessing context bridge");
+           self.context_bridge.clone()
+       }
+
+       /// Require memory (returns error if not available)
+       pub fn require_memory(&self) -> Result<Arc<dyn MemoryManager>> {
+           self.memory_manager
+               .clone()
+               .ok_or_else(|| anyhow::anyhow!("Memory manager not available in ExecutionContext"))
+       }
+
+       /// Require context bridge (returns error if not available)
+       pub fn require_context_bridge(&self) -> Result<Arc<ContextBridge>> {
+           self.context_bridge
+               .clone()
+               .ok_or_else(|| anyhow::anyhow!("Context bridge not available in ExecutionContext"))
+       }
+   }
+   ```
+
+4. Update ExecutionContextBuilder in `llmspell-templates/src/context.rs`:
+   ```rust
+   pub struct ExecutionContextBuilder {
+       // Existing fields...
+       memory_manager: Option<Arc<dyn MemoryManager>>,
+       context_bridge: Option<Arc<ContextBridge>>,
+   }
+
+   impl ExecutionContextBuilder {
+       pub fn memory_manager(mut self, memory: Arc<dyn MemoryManager>) -> Self {
+           self.memory_manager = Some(memory);
+           self
+       }
+
+       pub fn context_bridge(mut self, bridge: Arc<ContextBridge>) -> Self {
+           self.context_bridge = Some(bridge);
+           self
+       }
+
+       pub fn build(self) -> ExecutionContext {
+           debug!("Building ExecutionContext with memory={}, context_bridge={}",
+               self.memory_manager.is_some(), self.context_bridge.is_some());
+           ExecutionContext {
+               // Existing fields...
+               memory_manager: self.memory_manager,
+               context_bridge: self.context_bridge,
+           }
+       }
+   }
+   ```
+
+5. Update all ExecutionContext::new() and builder usage in templates to initialize new fields to None
+
+6. Add unit tests in `llmspell-templates/src/context.rs`:
+   ```rust
+   #[cfg(test)]
+   mod tests {
+       #[test]
+       fn test_execution_context_memory_fields() {
+           let memory = Arc::new(DefaultMemoryManager::new_in_memory().await.unwrap());
+           let context_bridge = Arc::new(ContextBridge::new(memory.clone()));
+
+           let context = ExecutionContext::new()
+               .with_memory(memory.clone())
+               .with_context_bridge(context_bridge.clone());
+
+           assert!(context.has_memory());
+           assert!(context.memory_manager().is_some());
+           assert!(context.context_bridge().is_some());
+       }
+
+       #[test]
+       fn test_execution_context_require_memory() {
+           let context = ExecutionContext::new();
+           assert!(context.require_memory().is_err());
+           assert!(context.require_context_bridge().is_err());
+       }
+   }
+   ```
+
+**Files to Modify**:
+- `llmspell-templates/Cargo.toml` (MODIFY - add llmspell-bridge dependency, 1 line)
+- `llmspell-templates/src/context.rs` (MODIFY - add fields + builder + helpers, ~120 lines)
+- `llmspell-templates/src/builtin/*.rs` (MODIFY - update ExecutionContext usage if needed, minimal changes)
+
+**Definition of Done**:
+- [ ] llmspell-bridge dependency added and compiles
+- [ ] ExecutionContext has memory_manager and context_bridge fields
+- [ ] Builder methods work correctly
+- [ ] Helper methods return correct values
+- [ ] Unit tests pass for new functionality
+- [ ] All existing template tests pass (no regressions)
+- [ ] Tracing instrumentation verified
+- [ ] Zero clippy warnings
+- [ ] Cargo check passes for llmspell-templates
+- [ ] Ready for Task 13.11.1 (templates can now access memory infrastructure)
 
 ---
 
@@ -2413,7 +2619,8 @@ Implemented complete consolidation feedback mechanism in 3 phases over ~3 hours:
 **Priority**: HIGH
 **Estimated Time**: 4 hours
 **Assignee**: Template Team
-**Status**: READY TO START
+**Status**: BLOCKED (requires Task 13.11.0)
+**Dependencies**: Task 13.11.0 MUST be complete
 
 **Description**: Add memory-related parameters to config_schema() for all 10 templates, ensuring backward compatibility and consistent API.
 
@@ -2601,9 +2808,10 @@ Implemented complete consolidation feedback mechanism in 3 phases over ~3 hours:
 **Priority**: CRITICAL
 **Estimated Time**: 6 hours
 **Assignee**: Template Team
-**Status**: READY TO START
+**Status**: BLOCKED (requires Task 13.11.0 and 13.11.1)
+**Dependencies**: Task 13.11.0 (infrastructure) and Task 13.11.1 (parameters) MUST be complete
 
-**Description**: Update execute() methods for all 10 templates to assemble context from memory before LLM calls, using Context.assemble() for hybrid retrieval.
+**Description**: Update execute() methods for all 10 templates to assemble context from memory before LLM calls, using ExecutionContext.context_bridge().assemble() for hybrid retrieval (infrastructure added in Task 13.11.0).
 
 **Architectural Analysis**:
 - **Execution Pattern** (from templates):
@@ -2642,6 +2850,8 @@ Implemented complete consolidation feedback mechanism in 3 phases over ~3 hours:
 **Implementation Steps**:
 
 1. Create helper in `llmspell-templates/src/context.rs`:
+   **NOTE**: This uses ExecutionContext.context_bridge() added in Task 13.11.0
+
    ```rust
    //! Template execution context with memory integration
 
@@ -2659,6 +2869,7 @@ Implemented complete consolidation feedback mechanism in 3 phases over ~3 hours:
    }
 
    /// Assemble context from memory for template execution
+   /// Uses ContextBridge from ExecutionContext (added in Task 13.11.0)
    pub async fn assemble_template_context(
        context_bridge: &Arc<ContextBridge>,
        query: &str,
@@ -2703,13 +2914,8 @@ Implemented complete consolidation feedback mechanism in 3 phases over ~3 hours:
        }
    }
 
-   impl ExecutionContext {
-       /// Get ContextBridge if available
-       pub fn context_bridge(&self) -> Option<Arc<ContextBridge>> {
-           // Assume ExecutionContext has context_bridge field added in Phase 13.8
-           self.context_bridge.clone()
-       }
-   }
+   // NOTE: ExecutionContext.context_bridge() and memory_manager() methods
+   // are implemented in Task 13.11.0 - this helper just uses them
    ```
 
 2. Update **research_assistant.rs** execute():
@@ -2853,9 +3059,10 @@ Implemented complete consolidation feedback mechanism in 3 phases over ~3 hours:
 **Priority**: MEDIUM
 **Estimated Time**: 3 hours
 **Assignee**: Template Team
-**Status**: READY TO START
+**Status**: BLOCKED (requires Task 13.11.0, 13.11.1, 13.11.2)
+**Dependencies**: Task 13.11.0 (infrastructure), 13.11.1 (parameters), 13.11.2 (context integration) MUST be complete
 
-**Description**: Store template inputs and outputs in episodic memory after successful execution for future context retrieval.
+**Description**: Store template inputs and outputs in episodic memory after successful execution for future context retrieval, using ExecutionContext.memory_manager() (infrastructure added in Task 13.11.0).
 
 **Architectural Analysis**:
 - **Storage Pattern**: After template execution, store:
@@ -2880,10 +3087,13 @@ Implemented complete consolidation feedback mechanism in 3 phases over ~3 hours:
 **Implementation Steps**:
 
 1. Create helper in `llmspell-templates/src/context.rs`:
+   **NOTE**: This uses ExecutionContext.memory_manager() added in Task 13.11.0
+
    ```rust
    use llmspell_memory::MemoryManager;
 
    /// Store template execution in episodic memory
+   /// Uses MemoryManager from ExecutionContext (added in Task 13.11.0)
    pub async fn store_template_execution(
        memory_manager: &Arc<dyn MemoryManager>,
        session_id: &str,
@@ -2940,12 +3150,8 @@ Implemented complete consolidation feedback mechanism in 3 phases over ~3 hours:
        Ok(())
    }
 
-   impl ExecutionContext {
-       /// Get MemoryManager if available
-       pub fn memory_manager(&self) -> Option<Arc<dyn MemoryManager>> {
-           self.memory_manager.clone()
-       }
-   }
+   // NOTE: ExecutionContext.memory_manager() method is implemented in Task 13.11.0
+   // This helper just calls context.memory_manager() to get the MemoryManager
    ```
 
 2. Update **research_assistant.rs** to store execution:
@@ -3004,9 +3210,10 @@ Implemented complete consolidation feedback mechanism in 3 phases over ~3 hours:
 **Priority**: HIGH
 **Estimated Time**: 3 hours
 **Assignee**: QA + Template Team
-**Status**: READY TO START
+**Status**: BLOCKED (requires Task 13.11.0-13.11.3)
+**Dependencies**: Task 13.11.0 (infrastructure), 13.11.1 (parameters), 13.11.2 (context), 13.11.3 (storage) MUST be complete
 
-**Description**: Create integration tests and Lua examples demonstrating memory-aware template execution.
+**Description**: Create integration tests and Lua examples demonstrating memory-aware template execution, validating the complete memory integration infrastructure from Tasks 13.11.0-13.11.3.
 
 **Acceptance Criteria**:
 - [ ] Integration test for template with memory context
@@ -4290,7 +4497,245 @@ Implemented complete consolidation feedback mechanism in 3 phases over ~3 hours:
 
 ---
 
-## Phase 13.13: Performance Optimization (Days 21-22, 16 hours)
+## Phase 13.13: Template Composition Evaluation (Day 20+, 8 hours - OPTIONAL)
+
+**Status**: EVALUATION PHASE - Decision Point
+**Timeline**: 1 day (8 hours) IF approved after evaluation
+**Dependencies**: Phase 13.11 complete (Template Memory Integration), Phase 13.12 complete (CLI + UX)
+**Priority**: LOW (nice-to-have, not critical for Phase 13 completion)
+
+**Overview**: Evaluate the need for template composition infrastructure and decide whether to implement based on user requirements, use cases, and architectural impact. This phase is a DECISION POINT, not an automatic implementation.
+
+**⚠️ DECISION REQUIRED**: This phase requires explicit approval before implementation begins. Default is to DEFER to post-Phase 13.
+
+**Background & Context**:
+
+During Phase 13.11 planning (ultrathink analysis 2025-01-29), a critical question emerged: **Should templates be able to call other templates?**
+
+**Use Case Example**: A "personal-assistant" template that combines:
+- Research capabilities (from research-assistant template)
+- Interactive chat (from interactive-chat template)
+- Shared memory across both sub-templates (via session_id)
+
+**Current Architecture Limitation**:
+```rust
+// ExecutionContext HAS (Phase 13.11):
+pub memory_manager: Option<Arc<dyn MemoryManager>>,      // ✅ Added
+pub context_bridge: Option<Arc<ContextBridge>>,          // ✅ Added
+pub tool_registry: Arc<ToolRegistry>,                    // ✅ Available
+pub agent_registry: Arc<FactoryRegistry>,                // ✅ Available
+pub workflow_factory: Arc<dyn WorkflowFactory>,          // ✅ Available
+pub rag: Option<Arc<MultiTenantRAG>>,                    // ✅ Available
+
+// ExecutionContext MISSING:
+pub template_registry: Option<Arc<TemplateRegistry>>,    // ❌ NOT AVAILABLE
+```
+
+**Key Finding**: Templates **CANNOT** currently call other templates. TemplateRegistry exists but is not injected into ExecutionContext.
+
+**Architectural Options Analysis**:
+
+### Option A: Standalone Templates (CURRENT - No Infrastructure Change)
+```rust
+// personal-assistant.rs - combines research + chat logic
+impl Template for PersonalAssistantTemplate {
+    async fn execute(&self, params: TemplateParams, context: ExecutionContext) {
+        // Phase 1: Research (reimplemented from research-assistant)
+        let research_results = self.do_research(&topic, &context).await?;
+
+        // Phase 2: Interactive chat (reimplemented from interactive-chat)
+        let chat_output = self.interactive_chat(&research_results, &context).await?;
+
+        // Memory integration automatic via session_id parameter
+    }
+}
+```
+**Pros:**
+- Works with current architecture (no changes needed)
+- Simple, straightforward implementation
+- Memory works automatically (Task 13.11.0-13.11.4)
+- **Time**: 2-3 hours per composite template
+
+**Cons:**
+- Code duplication (research + chat logic copied)
+- Maintenance burden (changes to sub-templates don't propagate)
+- DRY principle violation
+
+---
+
+### Option B: Template Composition (REQUIRES NEW INFRASTRUCTURE)
+
+**Architecture Change Required**:
+```rust
+// 1. Add to ExecutionContext
+pub struct ExecutionContext {
+    pub template_registry: Option<Arc<TemplateRegistry>>,  // NEW
+    // ... existing fields ...
+}
+
+impl ExecutionContext {
+    /// Execute a sub-template (NEW)
+    pub async fn execute_template(
+        &self,
+        template_id: &str,
+        params: TemplateParams
+    ) -> Result<TemplateOutput> {
+        let registry = self.require_template_registry()?;
+        let template = registry.get(template_id)?;
+        template.execute(params, self.clone()).await  // ⚠️ Potential recursion
+    }
+}
+```
+
+**Usage Pattern**:
+```rust
+// personal-assistant.rs - composes existing templates
+impl Template for PersonalAssistantTemplate {
+    async fn execute(&self, params: TemplateParams, context: ExecutionContext) {
+        // Phase 1: Call research-assistant template
+        let research_output = context.execute_template(
+            "research-assistant",
+            TemplateParams::from_json(json!({
+                "topic": topic,
+                "session_id": session_id,  // ✅ Memory shared across templates
+            }))?
+        ).await?;
+
+        // Phase 2: Call interactive-chat template with research context
+        let chat_output = context.execute_template(
+            "interactive-chat",
+            TemplateParams::from_json(json!({
+                "initial_message": format!("Based on: {}", research_output),
+                "session_id": session_id,  // ✅ Same session = shared memory
+            }))?
+        ).await?;
+    }
+}
+```
+
+**Pros:**
+- DRY - reuse existing templates
+- Changes to sub-templates propagate automatically
+- Shared memory across composed templates (same session_id)
+- Clean abstraction
+- Supports complex workflows
+
+**Cons:**
+- Requires new infrastructure (template_registry in ExecutionContext)
+- **⚠️ Circular dependency risk**: Template A calls B calls A (infinite loop)
+- State management complexity
+- Template introspection challenges
+- Not in original Phase 13 scope
+- **Time**: 8 hours implementation
+
+**Implementation Tasks (IF APPROVED)**:
+- Task 13.13.1: Add template_registry to ExecutionContext (2h)
+- Task 13.13.2: Add execute_template() helper with recursion tracking (2h)
+- Task 13.13.3: Circular dependency detection (2h)
+- Task 13.13.4: Testing + documentation + examples (2h)
+
+---
+
+### Option C: Workflow-Based Composition (USE EXISTING WORKFLOWS)
+Use ExecutionContext.workflow_factory for composition:
+```rust
+// Create PersonalAssistantWorkflow (not a template)
+// Use SequentialWorkflow with steps that call template logic
+```
+
+**Pros:**
+- Uses existing workflow infrastructure (no new code)
+- Workflow patterns already tested
+- No circular dependency issues (workflows are DAGs)
+
+**Cons:**
+- Workflows are step-based, not template-based
+- Can't directly reuse template execute() logic
+- Different abstraction level (WorkflowStep vs Template)
+- Still requires reimplementing template logic in steps
+
+---
+
+### Option D: Defer to Post-Phase 13 (RECOMMENDED)
+- Complete Phase 13.11-13.16 as planned
+- Evaluate based on:
+  - User feedback (do people want composable templates?)
+  - Use case clarity (personal assistant is just one example)
+  - Architecture maturity (memory system stabilized)
+- Potentially Phase 13.13a or Phase 14.5
+
+**Pros:**
+- No timeline impact on Phase 13
+- Make informed decision with real usage data
+- Memory infrastructure already working (Phase 13.11)
+- Build personal assistant as standalone initially
+- Refactor later if composition proves valuable
+
+**Cons:**
+- May need to refactor templates later if composition added
+- Initial code duplication accepted
+
+---
+
+**Evaluation Criteria**:
+
+Before implementing Option B (Template Composition), evaluate:
+
+1. **User Demand**: Are multiple users requesting composable templates?
+2. **Use Case Clarity**: Beyond personal assistant, are there 3+ clear use cases?
+3. **Code Duplication Pain**: Is standalone template maintenance becoming problematic?
+4. **Memory Integration**: Does shared memory across templates justify composition?
+5. **Architectural Fit**: Is template composition the right abstraction (vs workflows)?
+6. **Implementation Risk**: Can we handle circular dependencies safely?
+7. **Alternative Solutions**: Can workflows satisfy the composition need?
+
+**Decision Matrix**:
+- **0-2 criteria met**: DEFER indefinitely (use Option A: Standalone)
+- **3-4 criteria met**: DEFER to Phase 14+ (revisit after Phase 13 complete)
+- **5-7 criteria met**: IMPLEMENT in Phase 13.13a (immediate need justified)
+
+**Default Decision: DEFER to post-Phase 13** (Option D)
+
+**Time Estimate (IF APPROVED)**:
+- Evaluation: 0h (covered by this phase documentation)
+- Implementation: 8h (Tasks 13.13.1-13.13.4)
+- **Total**: 8 hours conditional
+
+**Tasks** (ONLY if approved):
+
+### Task 13.13.1: Template Registry in ExecutionContext (2h)
+- Add template_registry: Option<Arc<TemplateRegistry>> field
+- Add with_template_registry() builder method
+- Add template_registry() and require_template_registry() helpers
+- Update ExecutionContextBuilder
+
+### Task 13.13.2: execute_template() Helper (2h)
+- Implement execute_template(template_id, params) method
+- Add recursion depth tracking (prevent infinite loops)
+- Add execution context cloning with recursion metadata
+- Add tracing for template composition
+
+### Task 13.13.3: Circular Dependency Detection (2h)
+- Track template call stack in ExecutionContext
+- Detect A→B→A patterns
+- Return clear error with call chain
+- Add max recursion depth limit (default: 5)
+
+### Task 13.13.4: Testing + Documentation (2h)
+- Unit tests for execute_template()
+- Integration tests for composition (A calls B)
+- Test circular dependency detection (A calls B calls A)
+- Test recursion depth limits
+- Document composition patterns in user guide
+- Add Lua example: composable-template.lua
+
+---
+
+**Recommendation**: DEFER to post-Phase 13. Complete 13.11-13.16 first, gather user feedback, then revisit this decision.
+
+---
+
+## Phase 13.14: Performance Optimization (Days 21-22, 16 hours)
 
 **Overview**: Benchmark and optimize memory + context systems for production performance targets (DMR >90%, NDCG@10 >0.85, P95 <100ms).
 
@@ -4312,14 +4757,14 @@ Implemented complete consolidation feedback mechanism in 3 phases over ~3 hours:
   4. Consolidation (async batching, incremental processing)
 
 **Time Breakdown**:
-- Task 13.13.1: Benchmark Suite - Memory + Context (4h)
-- Task 13.13.2: Embedding Optimization - Batching + Caching (4h)
-- Task 13.13.3: Vector Search Tuning - HNSW Parameters (4h)
-- Task 13.13.4: Context Assembly Optimization - Parallel Retrieval (4h)
+- Task 13.14.1: Benchmark Suite - Memory + Context (4h)
+- Task 13.14.2: Embedding Optimization - Batching + Caching (4h)
+- Task 13.14.3: Vector Search Tuning - HNSW Parameters (4h)
+- Task 13.14.4: Context Assembly Optimization - Parallel Retrieval (4h)
 
 ---
 
-### Task 13.13.1: Benchmark Suite - Memory + Context Performance
+### Task 13.14.1: Benchmark Suite - Memory + Context Performance
 
 **Priority**: CRITICAL
 **Estimated Time**: 4 hours
@@ -4714,13 +5159,13 @@ Implemented complete consolidation feedback mechanism in 3 phases over ~3 hours:
        info!("Starting NDCG@10 benchmark");
 
        // Note: Full NDCG@10 requires ground truth relevance scores
-       // For Phase 13.13, we implement simplified version
-       // Full implementation in Task 13.14.2 (Accuracy Validation)
+       // For Phase 13.14, we implement simplified version
+       // Full implementation in Task 13.15.2 (Accuracy Validation)
 
        c.bench_function("ndcg_at_10_simplified", |b| {
            b.iter(|| {
                // Placeholder: Simplified NDCG calculation
-               // Full version requires DeBERTa reranking (Task 13.13.3)
+               // Full version requires DeBERTa reranking (Task 13.14.3)
                let mock_ndcg = 0.87; // Simulate >0.85 target
                info!("NDCG@10 (simplified): {:.2} (target >0.85)", mock_ndcg);
                black_box(mock_ndcg);
@@ -4760,7 +5205,7 @@ Implemented complete consolidation feedback mechanism in 3 phases over ~3 hours:
 
 ---
 
-### Task 13.13.2: Embedding Optimization - Batching + Caching
+### Task 13.14.2: Embedding Optimization - Batching + Caching
 
 **Priority**: HIGH
 **Estimated Time**: 4 hours
@@ -5103,7 +5548,7 @@ Implemented complete consolidation feedback mechanism in 3 phases over ~3 hours:
 
 ---
 
-### Task 13.13.3: Vector Search Tuning - HNSW Parameters
+### Task 13.14.3: Vector Search Tuning - HNSW Parameters
 
 **Priority**: HIGH
 **Estimated Time**: 4 hours
@@ -5399,7 +5844,7 @@ Implemented complete consolidation feedback mechanism in 3 phases over ~3 hours:
 
    ### Benchmark Results
 
-   Based on 10,000 entry dataset (Phase 13.13):
+   Based on 10,000 entry dataset (Phase 13.14):
 
    | Config | Recall@10 | P50 | P95 | P99 | Memory |
    |--------|-----------|-----|-----|-----|--------|
@@ -5428,7 +5873,7 @@ Implemented complete consolidation feedback mechanism in 3 phases over ~3 hours:
 
 ---
 
-### Task 13.13.4: Context Assembly Optimization - Parallel Retrieval
+### Task 13.14.4: Context Assembly Optimization - Parallel Retrieval
 
 **Priority**: HIGH
 **Estimated Time**: 4 hours
@@ -5756,7 +6201,7 @@ Implemented complete consolidation feedback mechanism in 3 phases over ~3 hours:
 
 ---
 
-## Phase 13.14: Accuracy Validation (Days 23-24, 16 hours)
+## Phase 13.15: Accuracy Validation (Days 23-24, 16 hours)
 
 **Overview**: Validate memory + context accuracy with production datasets, measuring DMR (Distant Memory Recall) and NDCG@10 (retrieval quality).
 
@@ -5770,17 +6215,17 @@ Implemented complete consolidation feedback mechanism in 3 phases over ~3 hours:
   2. **Automated Evaluation**: Scripts measuring metrics automatically
   3. **A/B Comparison**: Memory-enabled vs memory-disabled baselines
   4. **Statistical Significance**: Confidence intervals, p-values
-- **Phase 13.13 Foundation**: Simplified benchmarks in Task 13.13.1, full validation here
+- **Phase 13.14 Foundation**: Simplified benchmarks in Task 13.14.1, full validation here
 
 **Time Breakdown**:
-- Task 13.14.1: Ground Truth Dataset Creation (4h)
-- Task 13.14.2: DMR Accuracy Measurement (4h)
-- Task 13.14.3: NDCG@10 Evaluation (4h)
-- Task 13.14.4: Consolidation Quality Assessment (4h)
+- Task 13.15.1: Ground Truth Dataset Creation (4h)
+- Task 13.15.2: DMR Accuracy Measurement (4h)
+- Task 13.15.3: NDCG@10 Evaluation (4h)
+- Task 13.15.4: Consolidation Quality Assessment (4h)
 
 ---
 
-### Task 13.14.1: Ground Truth Dataset Creation
+### Task 13.15.1: Ground Truth Dataset Creation
 
 **Priority**: CRITICAL
 **Estimated Time**: 4 hours
@@ -6196,7 +6641,7 @@ Implemented complete consolidation feedback mechanism in 3 phases over ~3 hours:
 
 ---
 
-### Task 13.14.2: DMR Accuracy Measurement
+### Task 13.15.2: DMR Accuracy Measurement
 
 **Priority**: CRITICAL
 **Estimated Time**: 4 hours
@@ -6504,7 +6949,7 @@ Implemented complete consolidation feedback mechanism in 3 phases over ~3 hours:
 
 ---
 
-### Task 13.14.3: NDCG@10 Evaluation
+### Task 13.15.3: NDCG@10 Evaluation
 
 **Priority**: CRITICAL
 **Estimated Time**: 4 hours
@@ -6750,7 +7195,7 @@ Implemented complete consolidation feedback mechanism in 3 phases over ~3 hours:
 
 ---
 
-### Task 13.14.4: Consolidation Quality Assessment
+### Task 13.15.4: Consolidation Quality Assessment
 
 **Priority**: HIGH
 **Estimated Time**: 4 hours
@@ -6984,7 +7429,7 @@ Implemented complete consolidation feedback mechanism in 3 phases over ~3 hours:
 
 ---
 
-## Phase 13.15: Release Readiness (Day 25, 8 hours)
+## Phase 13.16: Release Readiness (Day 25, 8 hours)
 
 **Overview**: Final integration testing, documentation completion, and Phase 13 handoff preparation.
 
@@ -6995,14 +7440,14 @@ Implemented complete consolidation feedback mechanism in 3 phases over ~3 hours:
 - **Handoff**: Phase 14 dependencies documented, known issues tracked
 
 **Time Breakdown**:
-- Task 13.15.1: End-to-End Integration Testing (3h)
-- Task 13.15.2: Documentation Completion (2h)
-- Task 13.15.3: Release Notes & ADRs (2h)
-- Task 13.15.4: Phase 14 Handoff Preparation (1h)
+- Task 13.16.1: End-to-End Integration Testing (3h)
+- Task 13.16.2: Documentation Completion (2h)
+- Task 13.16.3: Release Notes & ADRs (2h)
+- Task 13.16.4: Phase 14 Handoff Preparation (1h)
 
 ---
 
-### Task 13.15.1: End-to-End Integration Testing
+### Task 13.16.1: End-to-End Integration Testing
 
 **Priority**: CRITICAL
 **Estimated Time**: 3 hours
@@ -7254,7 +7699,7 @@ Implemented complete consolidation feedback mechanism in 3 phases over ~3 hours:
 
 ---
 
-### Task 13.15.2: Documentation Completion
+### Task 13.16.2: Documentation Completion
 
 **Priority**: HIGH
 **Estimated Time**: 2 hours
@@ -7326,9 +7771,9 @@ Implemented complete consolidation feedback mechanism in 3 phases over ~3 hours:
 
    | Metric | Target | Achieved |
    |--------|--------|----------|
-   | DMR Accuracy | >90% | [TBD from Task 13.14.2] |
-   | NDCG@10 | >0.85 | [TBD from Task 13.14.3] |
-   | Context Assembly P95 | <100ms | [TBD from Task 13.13.4] |
+   | DMR Accuracy | >90% | [TBD from Task 13.15.2] |
+   | NDCG@10 | >0.85 | [TBD from Task 13.15.3] |
+   | Context Assembly P95 | <100ms | [TBD from Task 13.14.4] |
    | Template Overhead | <2ms | Maintained |
 
    ## Design Decisions
@@ -7367,7 +7812,7 @@ Implemented complete consolidation feedback mechanism in 3 phases over ~3 hours:
 
 ---
 
-### Task 13.15.3: Release Notes & ADRs
+### Task 13.16.3: Release Notes & ADRs
 
 **Priority**: HIGH
 **Estimated Time**: 2 hours
@@ -7620,7 +8065,7 @@ Implemented complete consolidation feedback mechanism in 3 phases over ~3 hours:
 
 ---
 
-### Task 13.15.4: Phase 14 Handoff Preparation
+### Task 13.16.4: Phase 14 Handoff Preparation
 
 **Priority**: MEDIUM
 **Estimated Time**: 1 hour
@@ -7658,7 +8103,7 @@ Implemented complete consolidation feedback mechanism in 3 phases over ~3 hours:
    - ✅ Memory System (Phase 13.1-13.4)
    - ✅ Context Engineering (Phase 13.6-13.7)
    - ✅ Template Integration (Phase 13.11)
-   - ✅ Performance Optimization (Phase 13.13)
+   - ✅ Performance Optimization (Phase 13.14)
 
    ## Known Issues
 
@@ -7675,9 +8120,9 @@ Implemented complete consolidation feedback mechanism in 3 phases over ~3 hours:
 
    ### Technical Debt
 
-   1. **NDCG Simplified**: Task 13.13.1 uses simplified NDCG, full version in 13.14.3
+   1. **NDCG Simplified**: Task 13.14.1 uses simplified NDCG, full version in 13.14.3
       - Priority: Medium
-      - Effort: 2h (already addressed in Task 13.14.3)
+      - Effort: 2h (already addressed in Task 13.15.3)
 
    2. **Session Listing**: memory sessions command placeholder (Task 13.12.1)
       - Priority: Low
@@ -7775,7 +8220,7 @@ Implemented complete consolidation feedback mechanism in 3 phases over ~3 hours:
 - **Likelihood**: Medium
 - **Impact**: High (affects memory quality)
 - **Mitigation**:
-  - Allocate 2 hours for prompt tuning (Task 13.14.4)
+  - Allocate 2 hours for prompt tuning (Task 13.15.4)
   - Use few-shot examples in consolidation prompts
   - Consider ensemble approach (multiple LLM calls, majority vote)
   - Fallback: Accept 85% DMR for v0.13.0, tune in v0.13.1
@@ -7784,7 +8229,7 @@ Implemented complete consolidation feedback mechanism in 3 phases over ~3 hours:
 - **Likelihood**: Medium
 - **Impact**: High (affects context quality)
 - **Mitigation**:
-  - Tune reranking weights (Task 13.14.4)
+  - Tune reranking weights (Task 13.15.4)
   - Experiment with different DeBERTa models (larger model if latency permits)
   - Adjust recency and relevance scoring parameters
   - Fallback: Accept 0.80 NDCG@10, document improvement plan
@@ -7793,7 +8238,7 @@ Implemented complete consolidation feedback mechanism in 3 phases over ~3 hours:
 - **Likelihood**: Low
 - **Impact**: Medium (affects UX)
 - **Mitigation**:
-  - ONNX quantization (Task 13.13.2)
+  - ONNX quantization (Task 13.14.2)
   - GPU acceleration if available
   - Reduce top_k for reranking (20 → 10)
   - Fallback: Accept 150ms for v0.13.0, optimize in v0.13.1
@@ -7803,7 +8248,7 @@ Implemented complete consolidation feedback mechanism in 3 phases over ~3 hours:
 - **Impact**: High (blocks functionality)
 - **Mitigation**:
   - In-memory fallback implementations (Tasks 13.1.4, 13.2.3)
-  - Thorough integration testing (Task 13.15.1)
+  - Thorough integration testing (Task 13.16.1)
   - Docker containers for consistent test environments
   - Fallback: Use in-memory backends for v0.13.0, add external DB support in v0.13.1
 
