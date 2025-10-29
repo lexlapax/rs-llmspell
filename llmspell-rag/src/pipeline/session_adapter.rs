@@ -10,7 +10,7 @@ use llmspell_kernel::sessions::SessionId;
 use std::sync::Arc;
 use tracing::{debug, warn};
 
-use super::rag_trait::{RAGRetriever, RAGResult};
+use super::rag_trait::{RAGResult, RAGRetriever};
 use crate::session_integration::{SessionAwareRAGPipeline, SessionVectorResult};
 
 /// Adapter wrapping `SessionAwareRAGPipeline` to implement `RAGRetriever` trait
@@ -71,10 +71,7 @@ impl RAGRetriever for SessionRAGAdapter {
         );
 
         // Convert SessionVectorResult → RAGResult
-        Ok(results
-            .into_iter()
-            .map(convert_to_rag_result)
-            .collect())
+        Ok(results.into_iter().map(convert_to_rag_result).collect())
     }
 }
 
@@ -125,7 +122,7 @@ mod tests {
     fn test_extract_session_from_scope() {
         // Valid session scope (SessionId wraps a UUID)
         let uuid_str = "550e8400-e29b-41d4-a716-446655440000";
-        let scope = StateScope::Custom(format!("session:{}", uuid_str));
+        let scope = StateScope::Custom(format!("session:{uuid_str}"));
         let session_id = extract_session_from_scope(Some(&scope));
         assert!(session_id.is_some());
         assert_eq!(session_id.unwrap().to_string(), uuid_str);

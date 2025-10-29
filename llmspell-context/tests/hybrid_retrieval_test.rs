@@ -1,9 +1,11 @@
 //! Integration tests for hybrid RAG + Memory retrieval
 //!
-//! Tests RetrievalWeights validation, RAG adapter conversion, and budget allocation.
+//! Tests `RetrievalWeights` validation, RAG adapter conversion, and budget allocation.
 
 use chrono::Utc;
-use llmspell_context::retrieval::{rag_result_to_ranked_chunk, rag_results_to_ranked_chunks, RetrievalWeights};
+use llmspell_context::retrieval::{
+    rag_result_to_ranked_chunk, rag_results_to_ranked_chunks, RetrievalWeights,
+};
 use llmspell_rag::pipeline::RAGResult;
 use std::collections::HashMap;
 
@@ -34,22 +36,24 @@ fn test_retrieval_weights_validation_invalid() {
 
 #[test]
 fn test_retrieval_weights_presets() {
+    const EPSILON: f32 = 0.001;
+
     let balanced = RetrievalWeights::balanced();
-    assert_eq!(balanced.rag_weight, 0.5);
-    assert_eq!(balanced.memory_weight, 0.5);
+    assert!((balanced.rag_weight - 0.5).abs() < EPSILON);
+    assert!((balanced.memory_weight - 0.5).abs() < EPSILON);
 
     let rag_focused = RetrievalWeights::rag_focused();
-    assert_eq!(rag_focused.rag_weight, 0.7);
-    assert_eq!(rag_focused.memory_weight, 0.3);
+    assert!((rag_focused.rag_weight - 0.7).abs() < EPSILON);
+    assert!((rag_focused.memory_weight - 0.3).abs() < EPSILON);
 
     let memory_focused = RetrievalWeights::memory_focused();
-    assert_eq!(memory_focused.rag_weight, 0.4);
-    assert_eq!(memory_focused.memory_weight, 0.6);
+    assert!((memory_focused.rag_weight - 0.4).abs() < EPSILON);
+    assert!((memory_focused.memory_weight - 0.6).abs() < EPSILON);
 
     // Verify default matches memory_focused
     let default = RetrievalWeights::default();
-    assert_eq!(default.rag_weight, memory_focused.rag_weight);
-    assert_eq!(default.memory_weight, memory_focused.memory_weight);
+    assert!((default.rag_weight - memory_focused.rag_weight).abs() < EPSILON);
+    assert!((default.memory_weight - memory_focused.memory_weight).abs() < EPSILON);
 }
 
 #[test]
@@ -60,7 +64,11 @@ fn test_token_budget_allocation() {
     let total_budget = 2000_usize;
     let weights = RetrievalWeights::new(0.4, 0.6).unwrap();
 
-    #[allow(clippy::cast_possible_truncation, clippy::cast_sign_loss, clippy::cast_precision_loss)]
+    #[allow(
+        clippy::cast_possible_truncation,
+        clippy::cast_sign_loss,
+        clippy::cast_precision_loss
+    )]
     let rag_budget = (total_budget as f32 * weights.rag_weight) as usize;
     let memory_budget = total_budget - rag_budget;
 
@@ -70,7 +78,11 @@ fn test_token_budget_allocation() {
     // 70/30 split (rag-focused)
     let weights_rag = RetrievalWeights::new(0.7, 0.3).unwrap();
 
-    #[allow(clippy::cast_possible_truncation, clippy::cast_sign_loss, clippy::cast_precision_loss)]
+    #[allow(
+        clippy::cast_possible_truncation,
+        clippy::cast_sign_loss,
+        clippy::cast_precision_loss
+    )]
     let rag_budget_2 = (total_budget as f32 * weights_rag.rag_weight) as usize;
     let memory_budget_2 = total_budget - rag_budget_2;
 
@@ -100,6 +112,8 @@ fn test_weighted_merge_calculation() {
 
 #[test]
 fn test_rag_adapter_format_conversion_preserves_scores() {
+    const EPSILON: f32 = 0.001;
+
     let mut metadata = HashMap::new();
     metadata.insert("source".to_string(), serde_json::json!("test.txt"));
 
@@ -111,10 +125,10 @@ fn test_rag_adapter_format_conversion_preserves_scores() {
         timestamp: Utc::now(),
     };
 
-    let ranked_chunk = rag_result_to_ranked_chunk(rag_result.clone());
+    let ranked_chunk = rag_result_to_ranked_chunk(rag_result);
 
     // Verify score preserved
-    assert_eq!(ranked_chunk.score, 0.92);
+    assert!((ranked_chunk.score - 0.92).abs() < EPSILON);
 
     // Verify ID and content
     assert_eq!(ranked_chunk.chunk.id, "test-1");
@@ -129,6 +143,8 @@ fn test_rag_adapter_format_conversion_preserves_scores() {
 
 #[test]
 fn test_rag_adapter_batch_conversion() {
+    const EPSILON: f32 = 0.001;
+
     let results = vec![
         RAGResult {
             id: "r1".to_string(),
@@ -158,9 +174,9 @@ fn test_rag_adapter_batch_conversion() {
     assert_eq!(chunks.len(), 3);
 
     // Verify scores preserved in order
-    assert_eq!(chunks[0].score, 0.9);
-    assert_eq!(chunks[1].score, 0.8);
-    assert_eq!(chunks[2].score, 0.7);
+    assert!((chunks[0].score - 0.9).abs() < EPSILON);
+    assert!((chunks[1].score - 0.8).abs() < EPSILON);
+    assert!((chunks[2].score - 0.7).abs() < EPSILON);
 
     // Verify IDs
     assert_eq!(chunks[0].chunk.id, "r1");

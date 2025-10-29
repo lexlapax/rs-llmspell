@@ -152,8 +152,27 @@ impl HybridRetriever {
             query, session_id, token_budget
         );
 
-        // Allocate token budget across sources based on weights
-        #[allow(clippy::cast_possible_truncation, clippy::cast_sign_loss, clippy::cast_precision_loss)]
+        let (rag_budget, memory_budget) = self.allocate_budget(token_budget);
+        let rag_chunks = self.query_rag(query, rag_budget, session_id).await;
+        let memory_chunks = self.query_memory(query, memory_budget, session_id).await?;
+        let merged = self.weighted_merge(rag_chunks, memory_chunks);
+        let finalized = Self::finalize_results(merged, token_budget);
+
+        info!(
+            "Hybrid retrieval complete: returning {} chunks",
+            finalized.len()
+        );
+
+        Ok(finalized)
+    }
+
+    /// Allocate token budget across RAG and Memory sources based on weights
+    fn allocate_budget(&self, token_budget: usize) -> (usize, usize) {
+        #[allow(
+            clippy::cast_possible_truncation,
+            clippy::cast_sign_loss,
+            clippy::cast_precision_loss
+        )]
         let rag_budget = if self.rag_pipeline.is_some() {
             (token_budget as f32 * self.weights.rag_weight) as usize
         } else {
@@ -166,31 +185,59 @@ impl HybridRetriever {
             rag_budget, memory_budget, token_budget
         );
 
-        // Query RAG if available
-        let mut rag_chunks = Vec::new();
-        if let Some(ref rag) = self.rag_pipeline {
-            debug!("Querying RAG pipeline...");
-            let scope = Some(StateScope::Custom(format!("session:{session_id}")));
+        (rag_budget, memory_budget)
+    }
 
-            // Estimate ~100 tokens per result for k calculation
-            let rag_k = (rag_budget / 100).max(1);
-
-            match rag.retrieve(query, rag_k, scope).await {
-                Ok(results) => {
-                    debug!("RAG returned {} results", results.len());
-                    rag_chunks = rag_results_to_ranked_chunks(results);
-                    debug!("Converted to {} RankedChunks", rag_chunks.len());
-                }
-                Err(e) => {
-                    error!("RAG retrieval failed: {}", e);
-                    // Continue with memory-only
-                }
-            }
-        } else {
+    /// Query RAG pipeline if available, return empty vec on failure or if not configured
+    async fn query_rag(
+        &self,
+        query: &str,
+        rag_budget: usize,
+        session_id: &str,
+    ) -> Vec<RankedChunk> {
+        let Some(ref rag) = self.rag_pipeline else {
             debug!("No RAG pipeline configured, using memory-only");
-        }
+            return Vec::new();
+        };
 
-        // Query episodic memory
+        Self::execute_rag_query(rag, query, rag_budget, session_id).await
+    }
+
+    /// Execute RAG retrieval and convert results
+    async fn execute_rag_query(
+        rag: &Arc<dyn RAGRetriever>,
+        query: &str,
+        rag_budget: usize,
+        session_id: &str,
+    ) -> Vec<RankedChunk> {
+        debug!("Querying RAG pipeline...");
+        let scope = Some(StateScope::Custom(format!("session:{session_id}")));
+        let rag_k = (rag_budget / 100).max(1);
+
+        match rag.retrieve(query, rag_k, scope).await {
+            Ok(results) => Self::process_rag_results(results),
+            Err(e) => {
+                error!("RAG retrieval failed: {}", e);
+                Vec::new()
+            }
+        }
+    }
+
+    /// Process RAG results into ranked chunks
+    fn process_rag_results(results: Vec<llmspell_rag::pipeline::RAGResult>) -> Vec<RankedChunk> {
+        debug!("RAG returned {} results", results.len());
+        let chunks = rag_results_to_ranked_chunks(results);
+        debug!("Converted to {} RankedChunks", chunks.len());
+        chunks
+    }
+
+    /// Query episodic memory and convert to ranked chunks
+    async fn query_memory(
+        &self,
+        query: &str,
+        memory_budget: usize,
+        session_id: &str,
+    ) -> Result<Vec<RankedChunk>> {
         debug!("Querying episodic memory...");
         let memory_k = (memory_budget / 100).max(1);
         let episodic_results = self
@@ -200,12 +247,25 @@ impl HybridRetriever {
             .await
             .map_err(|e| anyhow::anyhow!("Episodic search failed: {}", e))?;
 
-        debug!("Episodic memory returned {} results", episodic_results.len());
+        debug!(
+            "Episodic memory returned {} results",
+            episodic_results.len()
+        );
 
-        // Convert episodic entries to ranked chunks
-        let memory_chunks: Vec<RankedChunk> = episodic_results
+        let memory_chunks = Self::convert_episodic_to_chunks(episodic_results, session_id);
+        debug!("Converted to {} memory RankedChunks", memory_chunks.len());
+
+        Ok(memory_chunks)
+    }
+
+    /// Convert episodic entries to ranked chunks, filtering by session
+    fn convert_episodic_to_chunks(
+        episodic_results: Vec<llmspell_memory::EpisodicEntry>,
+        session_id: &str,
+    ) -> Vec<RankedChunk> {
+        episodic_results
             .into_iter()
-            .filter(|entry| entry.session_id == session_id) // Filter by session
+            .filter(|entry| entry.session_id == session_id)
             .map(|entry| {
                 let metadata = if entry.metadata.is_null() {
                     None
@@ -223,30 +283,31 @@ impl HybridRetriever {
 
                 RankedChunk {
                     chunk,
-                    score: 1.0, // Episodic search doesn't return scores, default to 1.0
+                    score: 1.0,
                     ranker: "episodic_vector_search".to_string(),
                 }
             })
-            .collect();
+            .collect()
+    }
 
-        debug!("Converted to {} memory RankedChunks", memory_chunks.len());
-
-        // Apply weighted merge
-        let mut merged = self.weighted_merge(rag_chunks, memory_chunks);
-
+    /// Finalize results: merge, sort, and truncate to token budget
+    fn finalize_results(mut merged: Vec<RankedChunk>, token_budget: usize) -> Vec<RankedChunk> {
         debug!("Merged results: {} chunks", merged.len());
-        trace!("Merged chunk scores: {:?}", merged.iter().map(|c| c.score).collect::<Vec<_>>());
+        trace!(
+            "Merged chunk scores: {:?}",
+            merged.iter().map(|c| c.score).collect::<Vec<_>>()
+        );
 
-        // Sort by score descending
-        merged.sort_by(|a, b| b.score.partial_cmp(&a.score).unwrap_or(std::cmp::Ordering::Equal));
+        merged.sort_by(|a, b| {
+            b.score
+                .partial_cmp(&a.score)
+                .unwrap_or(std::cmp::Ordering::Equal)
+        });
 
-        // Truncate to token budget (estimate ~100 tokens per chunk)
         let max_chunks = (token_budget / 100).max(1);
         merged.truncate(max_chunks);
 
-        info!("Hybrid retrieval complete: returning {} chunks", merged.len());
-
-        Ok(merged)
+        merged
     }
 
     /// Weighted merge of RAG and memory results
@@ -314,24 +375,27 @@ mod tests {
 
     #[test]
     fn test_retrieval_weights_presets() {
+        const EPSILON: f32 = 0.001;
+
         let balanced = RetrievalWeights::balanced();
-        assert_eq!(balanced.rag_weight, 0.5);
-        assert_eq!(balanced.memory_weight, 0.5);
+        assert!((balanced.rag_weight - 0.5).abs() < EPSILON);
+        assert!((balanced.memory_weight - 0.5).abs() < EPSILON);
 
         let rag_focused = RetrievalWeights::rag_focused();
-        assert_eq!(rag_focused.rag_weight, 0.7);
-        assert_eq!(rag_focused.memory_weight, 0.3);
+        assert!((rag_focused.rag_weight - 0.7).abs() < EPSILON);
+        assert!((rag_focused.memory_weight - 0.3).abs() < EPSILON);
 
         let memory_focused = RetrievalWeights::memory_focused();
-        assert_eq!(memory_focused.rag_weight, 0.4);
-        assert_eq!(memory_focused.memory_weight, 0.6);
+        assert!((memory_focused.rag_weight - 0.4).abs() < EPSILON);
+        assert!((memory_focused.memory_weight - 0.6).abs() < EPSILON);
     }
 
     #[test]
-    #[allow(clippy::float_cmp)] // Test needs exact equality
     fn test_default_weights() {
+        const EPSILON: f32 = 0.001;
+
         let default = RetrievalWeights::default();
-        assert_eq!(default.rag_weight, 0.4);
-        assert_eq!(default.memory_weight, 0.6);
+        assert!((default.rag_weight - 0.4).abs() < EPSILON);
+        assert!((default.memory_weight - 0.6).abs() < EPSILON);
     }
 }

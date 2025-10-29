@@ -1,6 +1,6 @@
 //! Integration tests for RAG Retriever trait
 //!
-//! Tests RAGRetriever trait behavior and implementation.
+//! Tests `RAGRetriever` trait behavior and implementation.
 
 use anyhow::Result;
 use async_trait::async_trait;
@@ -11,10 +11,18 @@ use llmspell_rag::pipeline::{RAGResult, RAGRetriever};
 use std::collections::HashMap;
 use std::sync::{Arc, Mutex};
 
-/// Mock RAGRetriever implementation for testing
+/// Query tracking enum - distinguishes never-called, called-with-None, called-with-Some(scope)
+#[derive(Debug, Clone)]
+enum ScopeQuery {
+    NeverCalled,
+    CalledWithNone,
+    CalledWithScope(StateScope),
+}
+
+/// Mock `RAGRetriever` implementation for testing
 struct MockRAGRetriever {
-    /// Track which scope was queried
-    last_scope_queried: Arc<Mutex<Option<Option<StateScope>>>>,
+    /// Track which scope was queried (None = never called, Some(None) = called with None, Some(Some(scope)) = called with scope)
+    last_scope_queried: Arc<Mutex<ScopeQuery>>,
     /// Track query parameters
     last_query: Arc<Mutex<Option<(String, usize)>>>,
     /// Mock results to return
@@ -24,13 +32,13 @@ struct MockRAGRetriever {
 impl MockRAGRetriever {
     fn new(mock_results: Vec<RAGResult>) -> Self {
         Self {
-            last_scope_queried: Arc::new(Mutex::new(None)),
+            last_scope_queried: Arc::new(Mutex::new(ScopeQuery::NeverCalled)),
             last_query: Arc::new(Mutex::new(None)),
             mock_results,
         }
     }
 
-    fn get_last_scope(&self) -> Option<Option<StateScope>> {
+    fn get_last_scope(&self) -> ScopeQuery {
         self.last_scope_queried.lock().unwrap().clone()
     }
 
@@ -48,7 +56,8 @@ impl RAGRetriever for MockRAGRetriever {
         scope: Option<StateScope>,
     ) -> Result<Vec<RAGResult>> {
         // Record query parameters
-        *self.last_scope_queried.lock().unwrap() = Some(scope);
+        *self.last_scope_queried.lock().unwrap() =
+            scope.map_or(ScopeQuery::CalledWithNone, ScopeQuery::CalledWithScope);
         *self.last_query.lock().unwrap() = Some((query.to_string(), k));
 
         // Return mock results
@@ -58,6 +67,8 @@ impl RAGRetriever for MockRAGRetriever {
 
 #[tokio::test]
 async fn test_rag_retriever_with_session_scope() {
+    const EPSILON: f32 = 0.001;
+
     let mut metadata = HashMap::new();
     metadata.insert("source".to_string(), serde_json::json!("test_doc.txt"));
 
@@ -73,13 +84,17 @@ async fn test_rag_retriever_with_session_scope() {
     let test_session = SessionId::new();
 
     // Create scope with session
-    let scope = Some(StateScope::Custom(format!("session:{test_session}")));
+    let scope_value = StateScope::Custom(format!("session:{test_session}"));
+    let scope = Some(scope_value.clone());
 
     // Query retriever
-    let results = retriever.retrieve("test query", 5, scope.clone()).await.unwrap();
+    let results = retriever.retrieve("test query", 5, scope).await.unwrap();
 
     // Verify scope was passed correctly
-    assert_eq!(retriever.get_last_scope(), Some(scope));
+    match retriever.get_last_scope() {
+        ScopeQuery::CalledWithScope(s) => assert_eq!(s, scope_value),
+        _ => panic!("Expected CalledWithScope"),
+    }
 
     // Verify query params
     let (query, k) = retriever.get_last_query().unwrap();
@@ -90,7 +105,7 @@ async fn test_rag_retriever_with_session_scope() {
     assert_eq!(results.len(), 1);
     assert_eq!(results[0].id, "result-1");
     assert_eq!(results[0].content, "test content");
-    assert_eq!(results[0].score, 0.85);
+    assert!((results[0].score - 0.85).abs() < EPSILON);
 }
 
 #[tokio::test]
@@ -109,7 +124,10 @@ async fn test_rag_retriever_with_no_scope() {
     let results = retriever.retrieve("test query", 10, None).await.unwrap();
 
     // Verify None scope was passed
-    assert_eq!(retriever.get_last_scope(), Some(None));
+    match retriever.get_last_scope() {
+        ScopeQuery::CalledWithNone => (),
+        _ => panic!("Expected CalledWithNone"),
+    }
 
     // Verify results
     assert_eq!(results.len(), 1);
@@ -122,15 +140,21 @@ async fn test_rag_retriever_with_global_scope() {
     let retriever = Arc::new(MockRAGRetriever::new(mock_results));
 
     // Query with Global scope
-    let scope = Some(StateScope::Global);
-    let _results = retriever.retrieve("test query", 5, scope.clone()).await.unwrap();
+    let scope_value = StateScope::Global;
+    let scope = Some(scope_value.clone());
+    let _results = retriever.retrieve("test query", 5, scope).await.unwrap();
 
     // Verify Global scope was passed
-    assert_eq!(retriever.get_last_scope(), Some(scope));
+    match retriever.get_last_scope() {
+        ScopeQuery::CalledWithScope(s) => assert_eq!(s, scope_value),
+        _ => panic!("Expected CalledWithScope"),
+    }
 }
 
 #[tokio::test]
 async fn test_rag_result_preserves_metadata() {
+    const EPSILON: f32 = 0.001;
+
     let mut metadata = HashMap::new();
     metadata.insert("doc_type".to_string(), serde_json::json!("technical"));
     metadata.insert("author".to_string(), serde_json::json!("test_user"));
@@ -154,7 +178,7 @@ async fn test_rag_result_preserves_metadata() {
 
     assert_eq!(result.id, "detailed-result");
     assert_eq!(result.content, "detailed content with metadata");
-    assert_eq!(result.score, 0.92);
+    assert!((result.score - 0.92).abs() < EPSILON);
     assert_eq!(result.timestamp, timestamp);
 
     // Verify metadata preserved
@@ -182,6 +206,8 @@ async fn test_rag_retriever_handles_empty_results() {
 
 #[tokio::test]
 async fn test_rag_retriever_handles_multiple_results() {
+    const EPSILON: f32 = 0.001;
+
     let mock_results = vec![
         RAGResult {
             id: "result-a".to_string(),
@@ -215,13 +241,15 @@ async fn test_rag_retriever_handles_multiple_results() {
     assert_eq!(results[2].id, "result-c");
 
     // Verify scores preserved
-    assert_eq!(results[0].score, 0.9);
-    assert_eq!(results[1].score, 0.8);
-    assert_eq!(results[2].score, 0.7);
+    assert!((results[0].score - 0.9).abs() < EPSILON);
+    assert!((results[1].score - 0.8).abs() < EPSILON);
+    assert!((results[2].score - 0.7).abs() < EPSILON);
 }
 
 #[tokio::test]
 async fn test_rag_result_builder_pattern() {
+    const EPSILON: f32 = 0.001;
+
     // Test RAGResult builder methods
     let result = RAGResult::new("test-id".to_string(), "test content".to_string(), 0.95)
         .with_metadata("key1".to_string(), serde_json::json!("value1"))
@@ -230,7 +258,10 @@ async fn test_rag_result_builder_pattern() {
 
     assert_eq!(result.id, "test-id");
     assert_eq!(result.content, "test content");
-    assert_eq!(result.score, 0.95);
-    assert_eq!(result.metadata.get("key1"), Some(&serde_json::json!("value1")));
+    assert!((result.score - 0.95).abs() < EPSILON);
+    assert_eq!(
+        result.metadata.get("key1"),
+        Some(&serde_json::json!("value1"))
+    );
     assert_eq!(result.metadata.get("key2"), Some(&serde_json::json!(42)));
 }

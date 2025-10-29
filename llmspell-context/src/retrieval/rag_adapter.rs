@@ -2,8 +2,8 @@
 //!
 //! Bridges between llmspell-rag's `RAGResult` and llmspell-context's `RankedChunk`.
 
-use llmspell_rag::pipeline::{RAGResult, RAGRetriever};
 use crate::types::{Chunk, RankedChunk};
+use llmspell_rag::pipeline::{RAGResult, RAGRetriever};
 
 /// Default source identifier for RAG results
 const DEFAULT_RAG_SOURCE: &str = "rag";
@@ -123,6 +123,8 @@ mod tests {
 
     #[test]
     fn test_rag_result_to_ranked_chunk_basic() {
+        const EPSILON: f32 = 0.001;
+
         let rag_result = RAGResult {
             id: "result-1".to_string(),
             content: "test content".to_string(),
@@ -131,12 +133,12 @@ mod tests {
             timestamp: Utc::now(),
         };
 
-        let ranked_chunk = rag_result_to_ranked_chunk(rag_result.clone());
+        let ranked_chunk = rag_result_to_ranked_chunk(rag_result);
 
         assert_eq!(ranked_chunk.chunk.id, "result-1");
         assert_eq!(ranked_chunk.chunk.content, "test content");
         assert_eq!(ranked_chunk.chunk.source, DEFAULT_RAG_SOURCE);
-        assert_eq!(ranked_chunk.score, 0.85);
+        assert!((ranked_chunk.score - 0.85).abs() < EPSILON);
         assert_eq!(ranked_chunk.ranker, RAG_RANKER_NAME);
         assert!(ranked_chunk.chunk.metadata.is_none());
     }
@@ -169,6 +171,8 @@ mod tests {
 
     #[test]
     fn test_rag_results_to_ranked_chunks() {
+        const EPSILON: f32 = 0.001;
+
         let results = vec![
             RAGResult {
                 id: "r1".to_string(),
@@ -191,7 +195,7 @@ mod tests {
         assert_eq!(chunks.len(), 2);
         assert_eq!(chunks[0].chunk.id, "r1");
         assert_eq!(chunks[1].chunk.id, "r2");
-        assert_eq!(chunks[0].score, 0.9);
-        assert_eq!(chunks[1].score, 0.7);
+        assert!((chunks[0].score - 0.9).abs() < EPSILON);
+        assert!((chunks[1].score - 0.7).abs() < EPSILON);
     }
 }
