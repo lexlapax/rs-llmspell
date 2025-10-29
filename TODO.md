@@ -1830,39 +1830,45 @@ Current Layering:
 - `llmspell-rag/src/chunking/memory_aware.rs` (NEW - ~200 lines)
 - `llmspell-rag/tests/memory_chunking_test.rs` (NEW - ~150 lines)
 
-**Definition of Done** (Updated):
-- [ ] **Phase 1 Complete**: ChunkingStrategy trait is async
-- [ ] SlidingWindowChunker updated to async (trivial signature change)
-- [ ] SemanticChunker updated to async (trivial signature change)
-- [ ] All 5 existing tests updated to `#[tokio::test]` and pass
-- [ ] Production code (ingestion.rs) updated with `.await`
-- [ ] **Phase 2 Complete**: Memory dependency added (feature-gated)
-- [ ] Cargo.toml has `memory-chunking` feature
-- [ ] Chunking mod.rs exports MemoryAwareChunker conditionally
-- [ ] **Phase 3 Complete**: MemoryAwareChunker implemented
-- [ ] Conversation boundary detection working
-- [ ] Fallback to standard chunking functional
-- [ ] Session-aware context queries
-- [ ] **Phase 4 Complete**: All tests pass
-- [ ] Unit tests pass (4+ new memory chunking tests)
-- [ ] Existing chunking tests still pass with async
-- [ ] Tracing verified (info!, debug!, warn!)
-- [ ] Zero clippy warnings: `cargo clippy -p llmspell-rag --all-features`
+**Definition of Done**:
+- [x] ✅ **Phase 1 Complete**: ChunkingStrategy trait is async
+- [x] ✅ SlidingWindowChunker updated to async (trivial signature change)
+- [x] ✅ SemanticChunker updated to async (trivial signature change)
+- [x] ✅ All 4 existing tests updated to `#[tokio::test]` and pass (was 4, not 5)
+- [x] ✅ Production code (ingestion.rs) updated with `.await`
+- [x] ✅ **Phase 2 Complete**: Memory dependency added (feature-gated)
+- [x] ✅ Cargo.toml has `memory-aware` feature (actual name used)
+- [x] ✅ Chunking mod.rs exports MemoryAwareChunker conditionally
+- [x] ✅ **Phase 3 Complete**: MemoryAwareChunker implemented
+- [x] ✅ Conversation boundary detection working (role markers + paragraph breaks)
+- [x] ✅ Composition pattern (wraps base strategy, no fallback needed)
+- [x] ✅ Session-aware context queries (via memory.search())
+- [x] ✅ **Phase 4 Complete**: All tests pass
+- [x] ✅ Unit tests pass (4 new memory-aware tests)
+- [x] ✅ Existing chunking tests still pass with async (62 base tests)
+- [x] ✅ Tracing verified (info!, debug!, trace! throughout)
+- [x] ✅ Zero clippy warnings: `cargo clippy --workspace --all-features --all-targets`
 - [x] ✅ Compiles without feature: `cargo check -p llmspell-rag`
 - [x] ✅ Compiles with feature: `cargo check -p llmspell-rag --features memory-aware`
 
 **Completion Summary** (2025-10-28):
 - **Actual Time**: ~6 hours (86% of 7h estimate)
 - **Implementation**:
-  - Phase 1 (Async Trait): 3 commits - trait + 2 impls + 4 tests + 1 production call site
+  - Phase 1 (Async Trait): trait + 2 impls + 4 tests + 1 production call site
   - Phase 2 (Dependencies): feature-gated llmspell-memory optional dependency
   - Phase 3 (MemoryAwareChunker): 300 lines, composition pattern, 4 tests
-  - Clippy fixes: 5 of 6 warnings resolved (1 false positive: Arc::new() not const)
+  - Clippy fixes: All warnings resolved (refactored complexity, documented false positive)
 - **Test Coverage**: 66 total tests (62 base + 4 memory-aware), 100% passing
 - **Architecture**: Clean async trait, no breaking changes for external consumers
 - **Feature Flag**: "memory-aware" - compiles with/without
-- **Files Changed**: 3 new, 2 modified (strategies.rs, ingestion.rs, mod.rs, Cargo.toml, memory_aware.rs)
-- **Commits**: 4 (async trait, dependencies, implementation, clippy fixes)
+- **Files Changed**: 2 modified (strategies.rs, ingestion.rs), 3 new/updated (mod.rs, Cargo.toml, memory_aware.rs)
+- **Commits**: 6 total
+  - `2f7138f5` Phase 1: async trait migration
+  - `4302185a` Phase 2: optional memory dependency
+  - `1239a2d0` Phase 3: MemoryAwareChunker implementation
+  - `e4c3308c` Clippy fixes (5 of 6)
+  - `45da4e53` Mark task complete in TODO.md
+  - `c8f75740` Fix remaining clippy warnings (cognitive complexity)
 
 ---
 
