@@ -18,6 +18,7 @@ llmspell-kernel = { path = "../llmspell-kernel" }
 llmspell-security = { path = "../llmspell-security" }
 llmspell-storage = { path = "../llmspell-storage" }
 llmspell-tenancy = { path = "../llmspell-tenancy" }
+llmspell-memory = { path = "../llmspell-memory", optional = true }
 
 # Vector storage
 # Note: Using hnsw_rs from llmspell-kernel instead
@@ -68,6 +69,10 @@ mockall = "0.12"
 # [[bench]]
 # name = "tenant_bench"
 # harness = false
+
+[features]
+# Memory-aware chunking: enables integration with llmspell-memory for context hints
+memory-aware = ["llmspell-memory"]
 
 [lints]
 workspace = true
