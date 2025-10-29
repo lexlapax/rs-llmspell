@@ -283,7 +283,7 @@ fn test_context_strategy_stats() {
         assert(type(stats.episodic_count) == "number", "should have episodic_count")
         assert(type(stats.semantic_count) == "number", "should have semantic_count")
         assert(type(stats.strategies) == "table", "should have strategies array")
-        assert(#stats.strategies == 3, "should have 3 strategies")
+        assert(#stats.strategies == 4, "should have 4 strategies (episodic, semantic, hybrid, rag)")
         return stats
     "#;
 
@@ -293,5 +293,99 @@ fn test_context_strategy_stats() {
             .expect("strategy_stats should succeed");
         let episodic_count: usize = stats.get("episodic_count").unwrap();
         assert_eq!(episodic_count, 0, "No episodic entries initially");
+    });
+}
+
+#[test]
+fn test_context_assemble_rag_without_pipeline() {
+    // Test RAG strategy without RAG pipeline configured - should fallback to hybrid
+    with_runtime_context(|| {
+        let memory_manager = llmspell_kernel::global_io_runtime().block_on(async {
+            DefaultMemoryManager::new_in_memory()
+                .await
+                .expect("Failed to create memory manager")
+        });
+
+        // Create ContextBridge WITHOUT RAG pipeline
+        let context_bridge = Arc::new(ContextBridge::new(Arc::new(memory_manager)));
+        let lua = Lua::new();
+        let context = create_test_context();
+
+        inject_context_global(&lua, &context, &context_bridge)
+            .expect("Failed to inject Context global");
+
+        // Test Context.assemble with rag strategy - should fallback to hybrid
+        let script = r#"
+        local result = Context.assemble("test query", "rag", 2000, nil)
+        assert(type(result) == "table", "assemble should return a table")
+        assert(type(result.chunks) == "table", "result should have chunks")
+        return result
+    "#;
+
+        let result: mlua::Table = lua.load(script).eval().expect("assemble should succeed");
+        assert!(result.contains_key("chunks").unwrap());
+    });
+}
+
+#[test]
+fn test_context_assemble_rag_with_pipeline() {
+    // Test RAG strategy with RAG pipeline configured
+    // Note: This test creates a mock RAG pipeline for testing
+    use llmspell_rag::pipeline::{RAGResult, RAGRetriever};
+    use async_trait::async_trait;
+    use llmspell_core::state::StateScope;
+
+    // Mock RAG pipeline for testing
+    struct MockRAGRetriever;
+
+    #[async_trait]
+    impl RAGRetriever for MockRAGRetriever {
+        async fn retrieve(
+            &self,
+            _query: &str,
+            k: usize,
+            _scope: Option<StateScope>,
+        ) -> anyhow::Result<Vec<RAGResult>> {
+            // Return mock results
+            Ok((0..k.min(3))
+                .map(|i| RAGResult {
+                    id: format!("rag-{}", i),
+                    content: format!("RAG result {}", i),
+                    score: 0.9 - (i as f32 * 0.1),
+                    metadata: Default::default(),
+                    timestamp: chrono::Utc::now(),
+                })
+                .collect())
+        }
+    }
+
+    with_runtime_context(|| {
+        let memory_manager = llmspell_kernel::global_io_runtime().block_on(async {
+            DefaultMemoryManager::new_in_memory()
+                .await
+                .expect("Failed to create memory manager")
+        });
+
+        // Create ContextBridge WITH mock RAG pipeline
+        let context_bridge = Arc::new(
+            ContextBridge::new(Arc::new(memory_manager))
+                .with_rag_pipeline(Arc::new(MockRAGRetriever)),
+        );
+        let lua = Lua::new();
+        let context = create_test_context();
+
+        inject_context_global(&lua, &context, &context_bridge)
+            .expect("Failed to inject Context global");
+
+        // Test Context.assemble with rag strategy - should use RAG+Memory hybrid
+        let script = r#"
+        local result = Context.assemble("test query", "rag", 2000, "test-session")
+        assert(type(result) == "table", "assemble should return a table")
+        assert(type(result.chunks) == "table", "result should have chunks")
+        return result
+    "#;
+
+        let result: mlua::Table = lua.load(script).eval().expect("assemble should succeed");
+        assert!(result.contains_key("chunks").unwrap());
     });
 }

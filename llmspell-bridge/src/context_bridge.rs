@@ -4,10 +4,12 @@
 use llmspell_context::{
     assembly::ContextAssembler,
     reranking::BM25Reranker,
+    retrieval::{HybridRetriever, RetrievalWeights},
     traits::Reranker,
     types::{AssembledContext, Chunk, QueryIntent, QueryUnderstanding, RankedChunk},
 };
 use llmspell_memory::MemoryManager;
+use llmspell_rag::pipeline::RAGRetriever;
 use serde_json::Value;
 use std::sync::Arc;
 use tracing::{debug, error, info, trace, warn};
@@ -43,6 +45,8 @@ use tracing::{debug, error, info, trace, warn};
 pub struct ContextBridge {
     /// Reference to the memory manager
     memory_manager: Arc<dyn MemoryManager>,
+    /// Optional RAG pipeline for hybrid RAG+Memory retrieval
+    rag_pipeline: Option<Arc<dyn RAGRetriever>>,
 }
 
 impl ContextBridge {
@@ -65,7 +69,32 @@ impl ContextBridge {
     #[must_use]
     pub fn new(memory_manager: Arc<dyn MemoryManager>) -> Self {
         info!("Creating ContextBridge");
-        Self { memory_manager }
+        Self {
+            memory_manager,
+            rag_pipeline: None,
+        }
+    }
+
+    /// Add RAG pipeline for hybrid RAG+Memory retrieval (builder pattern)
+    ///
+    /// # Arguments
+    ///
+    /// * `rag` - RAG pipeline implementing `RAGRetriever` trait
+    ///
+    /// # Example
+    ///
+    /// ```ignore
+    /// use llmspell_rag::pipeline::SessionRAGAdapter;
+    /// use std::sync::Arc;
+    ///
+    /// let bridge = ContextBridge::new(memory)
+    ///     .with_rag_pipeline(Arc::new(SessionRAGAdapter::new(rag_pipeline)));
+    /// ```
+    #[must_use]
+    pub fn with_rag_pipeline(mut self, rag: Arc<dyn RAGRetriever>) -> Self {
+        info!("Adding RAG pipeline to ContextBridge");
+        self.rag_pipeline = Some(rag);
+        self
     }
 
     /// Assemble context from memory using specified retrieval strategy
@@ -75,7 +104,7 @@ impl ContextBridge {
     /// # Arguments
     ///
     /// * `query` - Query string
-    /// * `strategy` - Retrieval strategy: "episodic", "semantic", or "hybrid" (case-sensitive)
+    /// * `strategy` - Retrieval strategy: "episodic", "semantic", "hybrid", or "rag" (case-sensitive)
     /// * `max_tokens` - Maximum tokens for assembled context (default: 8192)
     /// * `session_id` - Optional session ID for episodic filtering
     ///
@@ -91,7 +120,7 @@ impl ContextBridge {
     /// # Errors
     ///
     /// Returns error if:
-    /// - Strategy is invalid (not "episodic", "semantic", or "hybrid")
+    /// - Strategy is invalid (not "episodic", "semantic", "hybrid", or "rag")
     /// - Token budget < 100 (too small to be useful)
     /// - Memory retrieval fails
     /// - Reranking fails
@@ -153,10 +182,11 @@ impl ContextBridge {
             "episodic" => Ok(RetrievalStrategy::Episodic),
             "semantic" => Ok(RetrievalStrategy::Semantic),
             "hybrid" => Ok(RetrievalStrategy::Hybrid),
+            "rag" => Ok(RetrievalStrategy::Rag),
             _ => {
                 error!("Invalid strategy: '{}'", strategy);
                 Err(format!(
-                    "Unknown strategy '{strategy}'. Valid: episodic, semantic, hybrid"
+                    "Unknown strategy '{strategy}'. Valid: episodic, semantic, hybrid, rag"
                 ))
             }
         };
@@ -259,13 +289,13 @@ impl ContextBridge {
 
     /// Retrieve chunks from memory based on strategy
     ///
-    /// Handles episodic, semantic, and hybrid retrieval strategies.
+    /// Handles episodic, semantic, hybrid, and RAG retrieval strategies.
     async fn retrieve_chunks(
         &self,
         query: &str,
         strategy: RetrievalStrategy,
         max_tokens: usize,
-        _session_id: Option<&str>,
+        session_id: Option<&str>,
     ) -> Result<Vec<Chunk>, String> {
         debug!("Retrieving chunks using {:?} strategy", strategy);
 
@@ -274,25 +304,87 @@ impl ContextBridge {
                 self.retrieve_episodic(query, max_tokens).await
             }
             RetrievalStrategy::Semantic => self.retrieve_semantic(query, max_tokens).await,
-            RetrievalStrategy::Hybrid => self.retrieve_hybrid(query, max_tokens).await,
+            RetrievalStrategy::Hybrid => self.retrieve_hybrid_memory_only(query, max_tokens).await,
+            RetrievalStrategy::Rag => {
+                self.retrieve_rag_hybrid(query, max_tokens, session_id).await
+            }
         }
     }
 
-    /// Retrieve chunks using hybrid strategy (episodic + semantic)
-    async fn retrieve_hybrid(&self, query: &str, max_tokens: usize) -> Result<Vec<Chunk>, String> {
-        debug!("Retrieving from both episodic and semantic memory (hybrid strategy)");
+    /// Retrieve chunks using hybrid strategy (episodic + semantic, memory-only)
+    async fn retrieve_hybrid_memory_only(
+        &self,
+        query: &str,
+        max_tokens: usize,
+    ) -> Result<Vec<Chunk>, String> {
+        debug!("Retrieving from both episodic and semantic memory (hybrid memory-only strategy)");
 
         let mut episodic_chunks = self.retrieve_episodic(query, max_tokens / 2).await?;
         let semantic_chunks = self.retrieve_semantic(query, max_tokens / 2).await?;
 
         debug!(
-            "Hybrid: {} episodic + {} semantic chunks",
+            "Hybrid memory-only: {} episodic + {} semantic chunks",
             episodic_chunks.len(),
             semantic_chunks.len()
         );
 
         episodic_chunks.extend(semantic_chunks);
         Ok(episodic_chunks)
+    }
+
+    /// Retrieve chunks using RAG+Memory hybrid strategy via `HybridRetriever`
+    ///
+    /// Uses `HybridRetriever` from llmspell-context to combine RAG vector search
+    /// with episodic memory. Falls back to memory-only hybrid if RAG pipeline not configured.
+    #[allow(clippy::cognitive_complexity)]
+    async fn retrieve_rag_hybrid(
+        &self,
+        query: &str,
+        max_tokens: usize,
+        session_id: Option<&str>,
+    ) -> Result<Vec<Chunk>, String> {
+        if let Some(rag) = &self.rag_pipeline {
+            info!("Using hybrid RAG+Memory retrieval");
+            let session = session_id.unwrap_or("default");
+            debug!(
+                "Creating HybridRetriever for query='{}', max_tokens={}, session_id={}",
+                query, max_tokens, session
+            );
+
+            // Create HybridRetriever with default weights (memory-focused: 40/60)
+            let hybrid = HybridRetriever::new(
+                Some(rag.clone()),
+                self.memory_manager.clone(),
+                RetrievalWeights::default(),
+            );
+
+            // Retrieve hybrid results
+            let ranked_chunks = hybrid
+                .retrieve_hybrid(query, session, max_tokens)
+                .await
+                .map_err(|e| format!("Hybrid retrieval failed: {e}"))?;
+
+            // Convert RankedChunk to Chunk (already ranked, skip reranking)
+            let chunks: Vec<Chunk> = ranked_chunks
+                .into_iter()
+                .map(|rc| Chunk {
+                    id: rc.chunk.id,
+                    content: rc.chunk.content,
+                    source: rc.chunk.source,
+                    timestamp: rc.chunk.timestamp,
+                    metadata: rc.chunk.metadata,
+                })
+                .collect();
+
+            debug!("Retrieved {} chunks from RAG+Memory hybrid", chunks.len());
+            Ok(chunks)
+        } else {
+            warn!(
+                "RAG strategy requested but no RAG pipeline configured, falling back to hybrid memory"
+            );
+            // Fallback to memory-only hybrid
+            self.retrieve_hybrid_memory_only(query, max_tokens).await
+        }
     }
 
     /// Retrieve chunks from episodic memory using vector search
@@ -455,7 +547,7 @@ impl ContextBridge {
         let stats = serde_json::json!({
             "episodic_count": episodic_count,
             "semantic_count": semantic_count,
-            "strategies": ["episodic", "semantic", "hybrid"]
+            "strategies": ["episodic", "semantic", "hybrid", "rag"]
         });
 
         Ok(stats)
@@ -486,6 +578,7 @@ enum RetrievalStrategy {
     Episodic,
     Semantic,
     Hybrid,
+    Rag,
     #[allow(dead_code)]
     BM25,
 }
