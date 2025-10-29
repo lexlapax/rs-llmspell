@@ -277,6 +277,16 @@ impl HybridRetriever {
         );
 
         // Track query patterns for consolidation priority
+        self.track_retrieval_patterns(&episodic_results);
+
+        let memory_chunks = Self::convert_episodic_to_chunks(episodic_results, session_id);
+        debug!("Converted to {} memory RankedChunks", memory_chunks.len());
+
+        Ok(memory_chunks)
+    }
+
+    /// Track retrieval patterns for consolidation priority (if tracker configured)
+    fn track_retrieval_patterns(&self, episodic_results: &[llmspell_memory::EpisodicEntry]) {
         if let Some(ref tracker) = self.query_tracker {
             let entry_ids: Vec<String> = episodic_results.iter().map(|e| e.id.clone()).collect();
             tracker.record_retrieval(&entry_ids);
@@ -285,11 +295,6 @@ impl HybridRetriever {
                 entry_ids.len()
             );
         }
-
-        let memory_chunks = Self::convert_episodic_to_chunks(episodic_results, session_id);
-        debug!("Converted to {} memory RankedChunks", memory_chunks.len());
-
-        Ok(memory_chunks)
     }
 
     /// Convert episodic entries to ranked chunks, filtering by session

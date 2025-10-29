@@ -1,10 +1,10 @@
-//! Integration tests for QueryPatternTracker + MemoryManager consolidation priority
+//! Integration tests for `QueryPatternTracker` + `MemoryManager` consolidation priority
 //!
 //! Tests the full flow:
-//! 1. HybridRetriever retrieves episodic entries
-//! 2. QueryPatternTracker records retrieval frequency
-//! 3. get_consolidation_candidates() returns high-frequency entries
-//! 4. MemoryManager.consolidate() prioritizes those entries
+//! 1. `HybridRetriever` retrieves episodic entries
+//! 2. `QueryPatternTracker` records retrieval frequency
+//! 3. `get_consolidation_candidates()` returns high-frequency entries
+//! 4. `MemoryManager.consolidate()` prioritizes those entries
 
 use llmspell_context::retrieval::{HybridRetriever, QueryPatternTracker, RetrievalWeights};
 use llmspell_memory::{

@@ -334,6 +334,7 @@ fn test_context_assemble_rag_with_pipeline() {
     use llmspell_rag::pipeline::{RAGResult, RAGRetriever};
     use async_trait::async_trait;
     use llmspell_core::state::StateScope;
+    use std::collections::HashMap;
 
     // Mock RAG pipeline for testing
     struct MockRAGRetriever;
@@ -346,16 +347,39 @@ fn test_context_assemble_rag_with_pipeline() {
             k: usize,
             _scope: Option<StateScope>,
         ) -> anyhow::Result<Vec<RAGResult>> {
-            // Return mock results
-            Ok((0..k.min(3))
-                .map(|i| RAGResult {
-                    id: format!("rag-{}", i),
-                    content: format!("RAG result {}", i),
-                    score: 0.9 - (i as f32 * 0.1),
-                    metadata: Default::default(),
-                    timestamp: chrono::Utc::now(),
-                })
-                .collect())
+            // Return mock results (up to 3)
+            let now = chrono::Utc::now();
+            let mut results = Vec::new();
+
+            if k >= 1 {
+                results.push(RAGResult {
+                    id: "rag-0".to_string(),
+                    content: "RAG result 0".to_string(),
+                    score: 0.9,
+                    metadata: HashMap::default(),
+                    timestamp: now,
+                });
+            }
+            if k >= 2 {
+                results.push(RAGResult {
+                    id: "rag-1".to_string(),
+                    content: "RAG result 1".to_string(),
+                    score: 0.8,
+                    metadata: HashMap::default(),
+                    timestamp: now,
+                });
+            }
+            if k >= 3 {
+                results.push(RAGResult {
+                    id: "rag-2".to_string(),
+                    content: "RAG result 2".to_string(),
+                    score: 0.7,
+                    metadata: HashMap::default(),
+                    timestamp: now,
+                });
+            }
+
+            Ok(results)
         }
     }
 
