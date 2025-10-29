@@ -284,6 +284,108 @@ impl ExecutionContext {
     }
 }
 
+// ============================================================================
+// Context Assembly Helper (Task 13.11.2)
+// ============================================================================
+
+/// Message for LLM context (compatible with provider format)
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+pub struct ContextMessage {
+    pub role: String,
+    pub content: String,
+}
+
+/// Assemble context from memory for template execution
+///
+/// Uses ContextAssembler trait from ExecutionContext to retrieve and format
+/// context chunks from episodic/semantic memory using hybrid retrieval.
+///
+/// # Arguments
+///
+/// * `context_assembler` - ContextAssembler implementation (from ExecutionContext.context_bridge())
+/// * `query` - Query string for context retrieval
+/// * `session_id` - Session ID for episodic memory filtering
+/// * `context_budget` - Maximum tokens for assembled context (default: 2000)
+///
+/// # Returns
+///
+/// Vec of ContextMessage prepended to LLM input, or empty vec on failure.
+///
+/// # Errors
+///
+/// Returns empty vec with warning if assembly fails (graceful degradation).
+///
+/// # Example
+///
+/// ```ignore
+/// let messages = if let Some(bridge) = context.context_bridge() {
+///     assemble_template_context(&bridge, "topic", "session-123", 2000).await
+/// } else {
+///     vec![]
+/// };
+/// ```
+pub async fn assemble_template_context(
+    context_assembler: &Arc<dyn llmspell_core::ContextAssembler>,
+    query: &str,
+    session_id: &str,
+    context_budget: i64,
+) -> Vec<ContextMessage> {
+    use tracing::{debug, info, warn};
+
+    info!(
+        "Assembling context: session={}, budget={}, query={}",
+        session_id,
+        context_budget,
+        query.chars().take(50).collect::<String>()
+    );
+
+    // Call context assembler with hybrid strategy
+    let result = context_assembler
+        .assemble(query, "hybrid", context_budget as usize, Some(session_id))
+        .await;
+
+    match result {
+        Ok(ctx_json) => {
+            // Extract chunks from JSON
+            let chunks = ctx_json["chunks"].as_array();
+            let token_count = ctx_json["token_count"].as_u64().unwrap_or(0);
+            let formatted = ctx_json["formatted"].as_str().unwrap_or("");
+
+            if let Some(chunks) = chunks {
+                debug!(
+                    "Assembled {} chunks, {} tokens",
+                    chunks.len(),
+                    token_count
+                );
+
+                // Convert to ContextMessage format
+                let messages: Vec<ContextMessage> = vec![ContextMessage {
+                    role: "system".to_string(),
+                    content: format!(
+                        "Previous context from memory ({} chunks, {} tokens):\n\n{}",
+                        chunks.len(),
+                        token_count,
+                        formatted
+                    ),
+                }];
+
+                info!("Context ready: {} messages", messages.len());
+                messages
+            } else {
+                warn!("No chunks in assembled context, proceeding without memory");
+                vec![]
+            }
+        }
+        Err(e) => {
+            warn!(
+                "Context assembly failed: {}, continuing without context",
+                e
+            );
+            vec![]
+        }
+    }
+}
+
 /// Builder for ExecutionContext
 #[derive(Default)]
 pub struct ExecutionContextBuilder {
