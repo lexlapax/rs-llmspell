@@ -1,6 +1,7 @@
 //! Chunking strategies for document processing
 
 use anyhow::Result;
+use async_trait::async_trait;
 use serde::{Deserialize, Serialize};
 
 /// Configuration for chunking strategies
@@ -80,13 +81,14 @@ impl DocumentChunk {
 }
 
 /// Trait for chunking strategies
+#[async_trait]
 pub trait ChunkingStrategy: Send + Sync {
     /// Split text into chunks
     ///
     /// # Errors
     ///
     /// Returns an error if chunking fails due to invalid configuration or tokenization issues
-    fn chunk(&self, text: &str, config: &ChunkingConfig) -> Result<Vec<DocumentChunk>>;
+    async fn chunk(&self, text: &str, config: &ChunkingConfig) -> Result<Vec<DocumentChunk>>;
 
     /// Get strategy name
     fn name(&self) -> &str;
@@ -168,8 +170,9 @@ impl SlidingWindowChunker {
     }
 }
 
+#[async_trait]
 impl ChunkingStrategy for SlidingWindowChunker {
-    fn chunk(&self, text: &str, config: &ChunkingConfig) -> Result<Vec<DocumentChunk>> {
+    async fn chunk(&self, text: &str, config: &ChunkingConfig) -> Result<Vec<DocumentChunk>> {
         if text.is_empty() {
             return Ok(Vec::new());
         }
@@ -330,12 +333,13 @@ impl SemanticChunker {
     }
 }
 
+#[async_trait]
 impl ChunkingStrategy for SemanticChunker {
-    fn chunk(&self, text: &str, config: &ChunkingConfig) -> Result<Vec<DocumentChunk>> {
+    async fn chunk(&self, text: &str, config: &ChunkingConfig) -> Result<Vec<DocumentChunk>> {
         // For now, fall back to sliding window
         // TODO: Implement semantic chunking
         let chunker = SlidingWindowChunker::new();
-        chunker.chunk(text, config)
+        chunker.chunk(text, config).await
     }
 
     fn name(&self) -> &'static str {
@@ -352,8 +356,8 @@ impl ChunkingStrategy for SemanticChunker {
 mod tests {
     use super::*;
 
-    #[test]
-    fn test_sliding_window_chunking() {
+    #[tokio::test]
+    async fn test_sliding_window_chunking() {
         let chunker = SlidingWindowChunker::new();
         let config = ChunkingConfig {
             max_tokens: 10,
@@ -364,7 +368,7 @@ mod tests {
         };
 
         let text = "This is a test document with multiple words that should be chunked properly.";
-        let chunks = chunker.chunk(text, &config).unwrap();
+        let chunks = chunker.chunk(text, &config).await.unwrap();
 
         assert!(!chunks.is_empty());
         assert!(chunks.len() > 1);
@@ -376,8 +380,8 @@ mod tests {
         }
     }
 
-    #[test]
-    fn test_respect_sentence_boundaries() {
+    #[tokio::test]
+    async fn test_respect_sentence_boundaries() {
         let chunker = SlidingWindowChunker::new();
         let config = ChunkingConfig {
             max_tokens: 15,
@@ -388,7 +392,7 @@ mod tests {
         };
 
         let text = "This is sentence one. This is sentence two. This is sentence three.";
-        let chunks = chunker.chunk(text, &config).unwrap();
+        let chunks = chunker.chunk(text, &config).await.unwrap();
 
         // Check that chunks end at sentence boundaries
         for chunk in &chunks {
@@ -401,8 +405,8 @@ mod tests {
         }
     }
 
-    #[test]
-    fn test_respect_paragraph_boundaries() {
+    #[tokio::test]
+    async fn test_respect_paragraph_boundaries() {
         let chunker = SlidingWindowChunker::new();
         let config = ChunkingConfig {
             max_tokens: 8, // Smaller to ensure we split at paragraph boundaries
@@ -413,7 +417,7 @@ mod tests {
         };
 
         let text = "First paragraph here.\n\nSecond paragraph here.\n\nThird paragraph.";
-        let chunks = chunker.chunk(text, &config).unwrap();
+        let chunks = chunker.chunk(text, &config).await.unwrap();
 
         // Check that chunks respect paragraph boundaries
         // When respecting paragraphs, we should get one chunk per paragraph
@@ -433,12 +437,12 @@ mod tests {
         }
     }
 
-    #[test]
-    fn test_empty_text() {
+    #[tokio::test]
+    async fn test_empty_text() {
         let chunker = SlidingWindowChunker::new();
         let config = ChunkingConfig::default();
 
-        let chunks = chunker.chunk("", &config).unwrap();
+        let chunks = chunker.chunk("", &config).await.unwrap();
         assert!(chunks.is_empty());
     }
 

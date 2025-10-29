@@ -75,7 +75,7 @@ impl DocumentProcessor {
         let doc_metadata = self.extract_metadata(&content, metadata.as_ref());
 
         // Chunk the document
-        let chunks = self.chunker.chunk(&content, &self.config.chunking)?;
+        let chunks = self.chunker.chunk(&content, &self.config.chunking).await?;
         info!(
             "Document {} chunked into {} pieces",
             document_id,
