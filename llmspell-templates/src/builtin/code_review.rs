@@ -23,7 +23,7 @@ use async_trait::async_trait;
 use serde::{Deserialize, Serialize};
 use serde_json::json;
 use std::time::Instant;
-use tracing::{info, warn};
+use tracing::{debug, info, warn};
 
 /// Code Review Template
 ///
@@ -213,6 +213,11 @@ impl crate::core::Template for CodeReviewTemplate {
         let generate_fixes: bool = params.get_or("generate_fixes", false);
         let output_format: String = params.get_or("output_format", "markdown".to_string());
 
+        // Extract memory parameters (Task 13.11.2)
+        let session_id: Option<String> = params.get_optional("session_id").unwrap_or(None);
+        let memory_enabled: bool = params.get_or("memory_enabled", true);
+        let context_budget: i64 = params.get_or("context_budget", 2000);
+
         // Smart dual-path provider resolution (Task 13.5.7d)
         let provider_config = context.resolve_llm_config(&params)?;
         let model_str = provider_config
@@ -251,7 +256,15 @@ impl crate::core::Template for CodeReviewTemplate {
                 code_path: &code_path,
                 provider_config: &provider_config,
             };
-            let review = self.execute_aspect_review(&review_config, &context).await?;
+            let review = self
+                .execute_aspect_review(
+                    &review_config,
+                    &context,
+                    session_id.as_deref(),
+                    memory_enabled,
+                    context_budget,
+                )
+                .await?;
             all_reviews.push(review);
             output.metrics.agents_invoked += 1;
         }
@@ -423,11 +436,14 @@ impl CodeReviewTemplate {
         })
     }
 
-    /// Execute review for a specific aspect
+    /// Execute review for a specific aspect with memory context
     async fn execute_aspect_review(
         &self,
         config: &ReviewConfig<'_>,
         context: &ExecutionContext,
+        session_id: Option<&str>,
+        memory_enabled: bool,
+        context_budget: i64,
     ) -> Result<AspectReview> {
         use llmspell_agents::factory::{AgentConfig, ModelConfig, ResourceLimits};
         use llmspell_core::types::AgentInput;
@@ -487,10 +503,46 @@ impl CodeReviewTemplate {
                 TemplateError::ExecutionFailed(format!("Agent creation failed: {}", e))
             })?;
 
+        // Assemble memory context (Task 13.11.2)
+        let memory_context = if let (true, Some(sid)) = (memory_enabled, session_id) {
+            if let Some(bridge) = context.context_bridge() {
+                debug!(
+                    "Assembling memory context: session={}, budget={}",
+                    sid, context_budget
+                );
+                crate::assemble_template_context(&bridge, config.code_path, sid, context_budget)
+                    .await
+            } else {
+                warn!("Memory enabled but ContextBridge unavailable");
+                vec![]
+            }
+        } else {
+            vec![]
+        };
+
+        let memory_context_str = if !memory_context.is_empty() {
+            memory_context
+                .iter()
+                .map(|msg| format!("{}: {}", msg.role, msg.content))
+                .collect::<Vec<_>>()
+                .join("\n\n")
+        } else {
+            String::new()
+        };
+
         // Build review prompt
         let review_prompt = format!(
-            "{}\n\nReview the following {} code:\n\n**File**: {}\n\n```{}\n{}\n```",
-            system_prompt, config.language, config.code_path, config.language, config.code
+            "{}{}\n\nReview the following {} code:\n\n**File**: {}\n\n```{}\n{}\n```",
+            system_prompt,
+            if !memory_context_str.is_empty() {
+                format!("\n\n{}\n", memory_context_str)
+            } else {
+                String::new()
+            },
+            config.language,
+            config.code_path,
+            config.language,
+            config.code
         );
 
         // Execute the agent

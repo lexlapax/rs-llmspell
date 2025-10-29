@@ -483,6 +483,7 @@ impl ResearchAssistantTemplate {
     }
 
     /// Phase 3: Synthesize findings with agent using RAG context + memory
+    #[allow(clippy::too_many_arguments)]
     async fn synthesize_findings(
         &self,
         topic: &str,
@@ -561,18 +562,15 @@ impl ResearchAssistantTemplate {
         };
 
         // Assemble memory context (Task 13.11.2)
-        let memory_context = if memory_enabled && session_id.is_some() {
+        let memory_context = if let (true, Some(sid)) = (memory_enabled, session_id) {
             if let Some(bridge) = context.context_bridge() {
                 debug!(
-                    "Assembling memory context: session={:?}, budget={}",
-                    session_id, context_budget
+                    "Assembling memory context: session={}, budget={}",
+                    sid, context_budget
                 );
-                crate::assemble_template_context(&bridge, topic, session_id.unwrap(), context_budget)
-                    .await
+                crate::assemble_template_context(&bridge, topic, sid, context_budget).await
             } else {
-                if memory_enabled {
-                    warn!("Memory enabled but ContextBridge unavailable");
-                }
+                warn!("Memory enabled but ContextBridge unavailable");
                 vec![]
             }
         } else {
