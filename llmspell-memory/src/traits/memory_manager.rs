@@ -28,7 +28,7 @@ use crate::EpisodicMemory;
 ///     let memory = DefaultMemoryManager::new_in_memory().await?;
 ///     let entry = EpisodicEntry::new("session-1".into(), "user".into(), "Hello".into());
 ///     memory.episodic().add(entry).await?;
-///     memory.consolidate("session-1", ConsolidationMode::Immediate).await?;
+///     memory.consolidate("session-1", ConsolidationMode::Immediate, None).await?;
 ///     Ok(())
 /// }
 /// ```
@@ -61,15 +61,24 @@ pub trait MemoryManager: Send + Sync {
     ///
     /// * `session_id` - Session to consolidate (empty string = all sessions)
     /// * `mode` - Consolidation mode (Immediate, Background, or Manual)
+    /// * `priority_entries` - Optional list of entry IDs to prioritize (processed first)
     ///
     /// # Returns
     ///
     /// Statistics about the consolidation operation (entries processed,
     /// entities added/updated/deleted, duration).
+    ///
+    /// # Priority Processing
+    ///
+    /// If `priority_entries` is provided, those entries are consolidated first
+    /// before processing remaining entries chronologically. This enables
+    /// consolidation feedback where frequently-retrieved episodic entries
+    /// are prioritized for semantic memory promotion.
     async fn consolidate(
         &self,
         session_id: &str,
         mode: ConsolidationMode,
+        priority_entries: Option<&[String]>,
     ) -> Result<ConsolidationResult>;
 
     // ========== Phase 13.7.1: Kernel Integration Helpers ==========

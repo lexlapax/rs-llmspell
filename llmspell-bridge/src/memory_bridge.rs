@@ -374,7 +374,7 @@ impl MemoryBridge {
         mode: ConsolidationMode,
     ) -> Result<ConsolidationResult, String> {
         self.memory_manager
-            .consolidate(session_id, mode)
+            .consolidate(session_id, mode, None)
             .await
             .map_err(|e| {
                 error!("consolidate failed: {}", e);

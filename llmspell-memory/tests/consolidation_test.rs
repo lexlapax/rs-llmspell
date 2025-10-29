@@ -59,7 +59,7 @@ async fn test_episodic_to_semantic_flow() {
 
     // Trigger consolidation
     let result = manager
-        .consolidate("session-rust", ConsolidationMode::Manual)
+        .consolidate("session-rust", ConsolidationMode::Manual, None)
         .await
         .unwrap();
 
@@ -92,7 +92,7 @@ async fn test_consolidation_marks_entries_processed() {
 
     // Consolidate
     let result = manager
-        .consolidate("session-1", ConsolidationMode::Manual)
+        .consolidate("session-1", ConsolidationMode::Manual, None)
         .await
         .unwrap();
 
@@ -121,14 +121,14 @@ async fn test_consolidation_skips_processed_entries() {
 
     // First consolidation
     let result1 = manager
-        .consolidate("session-1", ConsolidationMode::Manual)
+        .consolidate("session-1", ConsolidationMode::Manual, None)
         .await
         .unwrap();
     assert_eq!(result1.entries_processed, 1);
 
     // Second consolidation should skip already-processed entries
     let result2 = manager
-        .consolidate("session-1", ConsolidationMode::Manual)
+        .consolidate("session-1", ConsolidationMode::Manual, None)
         .await
         .unwrap();
     assert_eq!(result2.entries_processed, 0, "Should not reprocess entries");
@@ -157,7 +157,7 @@ async fn test_consolidation_session_isolation() {
 
     // Consolidate only session-A
     let result = manager
-        .consolidate("session-A", ConsolidationMode::Manual)
+        .consolidate("session-A", ConsolidationMode::Manual, None)
         .await
         .unwrap();
 
@@ -173,7 +173,7 @@ async fn test_empty_session_consolidation() {
 
     // Consolidate non-existent session
     let result = manager
-        .consolidate("nonexistent-session", ConsolidationMode::Manual)
+        .consolidate("nonexistent-session", ConsolidationMode::Manual, None)
         .await
         .unwrap();
 
@@ -200,7 +200,7 @@ async fn test_multiple_relationship_extraction() {
 
     // Consolidate
     let result = manager
-        .consolidate("session-1", ConsolidationMode::Manual)
+        .consolidate("session-1", ConsolidationMode::Manual, None)
         .await
         .unwrap();
 
@@ -226,7 +226,7 @@ async fn test_consolidation_with_no_op_engine() {
 
     // Consolidation with no-op engine should return 0
     let result = manager
-        .consolidate("session-1", ConsolidationMode::Manual)
+        .consolidate("session-1", ConsolidationMode::Manual, None)
         .await
         .unwrap();
 
@@ -250,7 +250,7 @@ async fn test_consolidation_immediate_mode() {
 
     // Test immediate mode (should behave same as manual for now)
     let result = manager
-        .consolidate("session-1", ConsolidationMode::Immediate)
+        .consolidate("session-1", ConsolidationMode::Immediate, None)
         .await
         .unwrap();
 

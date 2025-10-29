@@ -314,6 +314,51 @@ impl DefaultMemoryManager {
     pub fn episodic_arc(&self) -> Arc<dyn EpisodicMemory> {
         self.episodic.clone()
     }
+
+    /// Reorder entries to prioritize specified entry IDs
+    ///
+    /// Partitions entries into priority (matching IDs) and rest,
+    /// returning priority entries first to enable consolidation feedback.
+    ///
+    /// # Arguments
+    ///
+    /// * `entries` - All unprocessed entries
+    /// * `priority_ids` - Entry IDs to prioritize
+    ///
+    /// # Returns
+    ///
+    /// Reordered vector with priority entries first, then remaining entries
+    fn reorder_by_priority(
+        entries: Vec<EpisodicEntry>,
+        priority_ids: &[String],
+    ) -> Vec<EpisodicEntry> {
+        use std::collections::HashSet;
+
+        let priority_set: HashSet<&str> = priority_ids.iter().map(String::as_str).collect();
+
+        // Partition: priority entries first, rest after
+        let mut priority = Vec::new();
+        let mut rest = Vec::new();
+
+        for entry in entries {
+            if priority_set.contains(entry.id.as_str()) {
+                priority.push(entry);
+            } else {
+                rest.push(entry);
+            }
+        }
+
+        debug!(
+            "Reordered {} total entries: {} priority, {} rest",
+            priority.len() + rest.len(),
+            priority.len(),
+            rest.len()
+        );
+
+        // Combine: priority first, then rest
+        priority.extend(rest);
+        priority
+    }
 }
 
 #[async_trait]
@@ -334,10 +379,13 @@ impl MemoryManager for DefaultMemoryManager {
         &self,
         session_id: &str,
         mode: ConsolidationMode,
+        priority_entries: Option<&[String]>,
     ) -> Result<ConsolidationResult> {
         info!(
-            "Triggering consolidation: session_id={}, mode={:?}",
-            session_id, mode
+            "Triggering consolidation: session_id={}, mode={:?}, priority_count={}",
+            session_id,
+            mode,
+            priority_entries.map_or(0, <[std::string::String]>::len)
         );
 
         // Get all entries for the session
@@ -365,6 +413,17 @@ impl MemoryManager for DefaultMemoryManager {
                 session_id
             );
             return Ok(ConsolidationResult::empty());
+        }
+
+        // Reorder entries if priority list provided
+        if let Some(priority_ids) = priority_entries {
+            if !priority_ids.is_empty() {
+                unprocessed = Self::reorder_by_priority(unprocessed, priority_ids);
+                info!(
+                    "Prioritized {} entries for consolidation based on retrieval frequency",
+                    priority_ids.len()
+                );
+            }
         }
 
         debug!(
@@ -501,7 +560,7 @@ mod tests {
         let manager = DefaultMemoryManager::new_in_memory().await.unwrap();
 
         let result = manager
-            .consolidate("test-session", ConsolidationMode::Immediate)
+            .consolidate("test-session", ConsolidationMode::Immediate, None)
             .await
             .unwrap();
 

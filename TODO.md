@@ -1982,27 +1982,80 @@ Current Layering:
 **Priority**: MEDIUM
 **Estimated Time**: 4 hours
 **Assignee**: Memory + Context Team
-**Status**: BLOCKED by Task 13.10.1
+**Status**: IN PROGRESS (Phase 1/3 Complete)
 
 **Description**: Track query patterns in HybridRetriever and feed frequently-retrieved episodic content to consolidation priority queue. This informs which episodic memories should be consolidated to semantic memory first.
 
-**Architectural Analysis**:
-- **Query Pattern Tracking**: HybridRetriever logs which episodic entries are retrieved
-- **Frequency Counting**: Maintain in-memory counter of entry_id → retrieval_count
-- **Consolidation Priority**: Memory consolidation process queries retrieval counts
-- **Priority Queue**: Frequently-retrieved episodic → higher consolidation priority
-- **Threshold**: Entries retrieved 5+ times marked as "high-value" for consolidation
+**Architectural Decision - Consolidation Priority API**:
+
+After comprehensive analysis of 5 integration options (see /tmp/consolidation-priority-analysis.md):
+- **Option 1 SELECTED**: Add optional parameter to MemoryManager::consolidate()
+- **Rationale**: Pre-1.0 breaking changes acceptable (v0.12.0), simplest implementation (2h), clean type-safe API
+- **Trade-off**: Requires updating ~20 test call sites (mechanical, compile errors catch all)
+- **Rejected alternatives**:
+  - Option 2 (engine-level): Over-engineered, unused flexibility
+  - Option 3 (enum variant): Backward compatible but conflates mode/data
+  - Option 4 (builder pattern): Overkill for single option, 5h effort
+  - Option 5 (separate method): API proliferation, 90% code duplication
+
+**API Change (Breaking but Pre-1.0)**:
+```rust
+// MemoryManager trait - BEFORE
+async fn consolidate(
+    &self,
+    session_id: &str,
+    mode: ConsolidationMode,
+) -> Result<ConsolidationResult>;
+
+// MemoryManager trait - AFTER (Option 1)
+async fn consolidate(
+    &self,
+    session_id: &str,
+    mode: ConsolidationMode,
+    priority_entries: Option<&[String]>,  // NEW - backward compat via Option
+) -> Result<ConsolidationResult>;
+```
+
+**Implementation Phases**:
+
+**Phase 1: Query Pattern Tracking** ✅ COMPLETE
+- [x] QueryPatternTracker struct (llmspell-context/src/retrieval/query_pattern_tracker.rs)
+- [x] HybridRetriever integration (with_query_tracker builder)
+- [x] Track episodic retrievals in query_memory()
+- [x] Unit tests: 7 tests passing
+- [x] Zero clippy warnings
+
+**Phase 2: MemoryManager API Update** ✅ COMPLETE
+- [x] 2.1: Update MemoryManager trait signature (+1 param) ✅
+- [x] 2.2: Update DefaultMemoryManager impl (reorder entries logic) ✅
+- [x] 2.3: Update MemoryBridge call sites (pass None) ✅
+- [x] 2.4: Update test call sites (~11 sites, mechanical) ✅
+- [x] 2.5: Add priority reordering logic with tracing ✅
+
+**Phase 2 Implementation Details**:
+- **Files Modified**: 4 (memory_manager.rs, manager.rs, memory_bridge.rs, consolidation_test.rs)
+- **Lines Changed**: ~70
+- **API Change**: Added `priority_entries: Option<&[String]>` to `MemoryManager::consolidate()`
+- **Reorder Logic**: `reorder_by_priority()` helper method partitions entries (priority first)
+- **Tracing**: `info!()` when priority entries provided, `debug!()` for partition details
+- **Clippy**: Zero warnings after auto-fix
+- **Backward Compat**: All call sites updated to pass `None` (future: HybridRetriever passes actual priorities)
+
+**Phase 3: Integration Tests**
+- [ ] 3.1: HybridRetriever + QueryPatternTracker integration test
+- [ ] 3.2: End-to-end: retrieval → tracking → consolidation priority
+- [ ] 3.3: Verify priority entries consolidated first
 
 **Acceptance Criteria**:
-- [ ] HybridRetriever tracks retrieved episodic entry IDs
-- [ ] `QueryPatternTracker` struct maintains retrieval frequency
-- [ ] Method: `get_consolidation_candidates(min_retrievals: usize) -> Vec<EntryId>`
-- [ ] Memory consolidation accepts optional priority hints
-- [ ] Integration: HybridRetriever → QueryPatternTracker → Consolidation
-- [ ] Unit tests: frequency tracking, candidate selection
-- [ ] Integration test: Frequently-queried entries prioritized
-- [ ] **TRACING**: Pattern tracking (debug!), consolidation hints (info!)
-- [ ] Zero clippy warnings
+- [x] HybridRetriever tracks retrieved episodic entry IDs ✅
+- [x] `QueryPatternTracker` struct maintains retrieval frequency ✅
+- [x] Method: `get_consolidation_candidates(min_retrievals: usize) -> Vec<EntryId>` ✅
+- [ ] Memory consolidation accepts optional priority hints (Phase 2)
+- [x] Integration: HybridRetriever → QueryPatternTracker ✅
+- [x] Unit tests: frequency tracking, candidate selection (7 tests) ✅
+- [ ] Integration test: Frequently-queried entries prioritized (Phase 3)
+- [x] **TRACING**: Pattern tracking (debug!), consolidation hints (info!) ✅
+- [x] Zero clippy warnings (QueryPatternTracker) ✅
 
 **Implementation Steps**:
 

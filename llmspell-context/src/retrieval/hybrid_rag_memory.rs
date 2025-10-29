@@ -10,6 +10,7 @@ use llmspell_rag::pipeline::RAGRetriever;
 use std::sync::Arc;
 use tracing::{debug, error, info, trace};
 
+use super::query_pattern_tracker::QueryPatternTracker;
 use super::rag_adapter::rag_results_to_ranked_chunks;
 use crate::types::{Chunk, RankedChunk};
 
@@ -99,6 +100,8 @@ pub struct HybridRetriever {
     memory_manager: Arc<dyn MemoryManager>,
     /// Weights for combining results
     weights: RetrievalWeights,
+    /// Optional query pattern tracker for consolidation priority
+    query_tracker: Option<Arc<QueryPatternTracker>>,
 }
 
 impl HybridRetriever {
@@ -126,7 +129,28 @@ impl HybridRetriever {
             rag_pipeline,
             memory_manager,
             weights,
+            query_tracker: None,
         }
+    }
+
+    /// Add query pattern tracker for consolidation priority (builder pattern)
+    ///
+    /// # Arguments
+    /// * `tracker` - Query pattern tracker
+    ///
+    /// # Example
+    /// ```ignore
+    /// use std::sync::Arc;
+    ///
+    /// let tracker = Arc::new(QueryPatternTracker::new());
+    /// let retriever = HybridRetriever::new(rag, memory, weights)
+    ///     .with_query_tracker(tracker);
+    /// ```
+    #[must_use]
+    pub fn with_query_tracker(mut self, tracker: Arc<QueryPatternTracker>) -> Self {
+        info!("Added query pattern tracker to HybridRetriever");
+        self.query_tracker = Some(tracker);
+        self
     }
 
     /// Retrieve and merge results from RAG + Memory with weighted scoring
@@ -251,6 +275,16 @@ impl HybridRetriever {
             "Episodic memory returned {} results",
             episodic_results.len()
         );
+
+        // Track query patterns for consolidation priority
+        if let Some(ref tracker) = self.query_tracker {
+            let entry_ids: Vec<String> = episodic_results.iter().map(|e| e.id.clone()).collect();
+            tracker.record_retrieval(&entry_ids);
+            debug!(
+                "Tracked query pattern for {} episodic entries",
+                entry_ids.len()
+            );
+        }
 
         let memory_chunks = Self::convert_episodic_to_chunks(episodic_results, session_id);
         debug!("Converted to {} memory RankedChunks", memory_chunks.len());
