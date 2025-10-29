@@ -23,7 +23,7 @@
 //!
 //! ## Usage
 //!
-//! ```rust,ignore
+//! ```text
 //! use llmspell_context::prelude::*;
 //!
 //! let pipeline = ContextPipeline::builder()

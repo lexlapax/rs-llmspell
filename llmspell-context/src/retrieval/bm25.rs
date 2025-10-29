@@ -21,12 +21,12 @@
 //!
 //! # Examples
 //!
-//! ```rust,ignore
+//! ```text
 //! use llmspell_context::retrieval::BM25Retriever;
-//! use llmspell_memory::EpisodicMemory;
+//! use llmspell_context::traits::Retriever;
 //!
-//! let retriever = BM25Retriever::new(k1, b);
-//! let chunks = retriever.retrieve("Rust memory safety", &memory, 10).await?;
+//! let retriever = BM25Retriever::new(); // Default: k1=1.5, b=0.75
+//! let chunks = retriever.retrieve("Rust memory safety", 10).await?;
 //! ```
 
 use crate::error::{ContextError, Result};

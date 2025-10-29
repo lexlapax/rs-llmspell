@@ -12,10 +12,10 @@
 //!
 //! # Example
 //!
-//! ```rust,ignore
+//! ```text
 //! use llmspell_context::assembly::ContextAssembler;
 //!
-//! let assembler = ContextAssembler::new(8000, 0.3); // 8K tokens, 30% min confidence
+//! let assembler = ContextAssembler::new(); // Default: 8K tokens, 30% min confidence
 //! let context = assembler.assemble(ranked_chunks, &query_understanding);
 //! ```
 
