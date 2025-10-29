@@ -226,7 +226,10 @@ async fn test_tracker_clear() {
 
     // Verify candidates are empty after clear
     let candidates = tracker.get_consolidation_candidates(1);
-    assert!(candidates.is_empty(), "Should have no candidates after clear");
+    assert!(
+        candidates.is_empty(),
+        "Should have no candidates after clear"
+    );
 }
 
 #[tokio::test]

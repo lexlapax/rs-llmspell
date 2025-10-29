@@ -331,9 +331,9 @@ fn test_context_assemble_rag_without_pipeline() {
 fn test_context_assemble_rag_with_pipeline() {
     // Test RAG strategy with RAG pipeline configured
     // Note: This test creates a mock RAG pipeline for testing
-    use llmspell_rag::pipeline::{RAGResult, RAGRetriever};
     use async_trait::async_trait;
     use llmspell_core::state::StateScope;
+    use llmspell_rag::pipeline::{RAGResult, RAGRetriever};
     use std::collections::HashMap;
 
     // Mock RAG pipeline for testing

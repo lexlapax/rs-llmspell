@@ -306,7 +306,8 @@ impl ContextBridge {
             RetrievalStrategy::Semantic => self.retrieve_semantic(query, max_tokens).await,
             RetrievalStrategy::Hybrid => self.retrieve_hybrid_memory_only(query, max_tokens).await,
             RetrievalStrategy::Rag => {
-                self.retrieve_rag_hybrid(query, max_tokens, session_id).await
+                self.retrieve_rag_hybrid(query, max_tokens, session_id)
+                    .await
             }
         }
     }
