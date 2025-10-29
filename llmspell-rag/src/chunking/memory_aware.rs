@@ -65,6 +65,8 @@ impl<S: ChunkingStrategy, M: EpisodicMemory> MemoryAwareChunker<S, M> {
     ///
     /// * `base_strategy` - Underlying chunking strategy to wrap
     /// * `memory` - Episodic memory instance for context hints
+    // Cannot be const: Arc::new() is not const (Rust limitation as of 1.83)
+    #[allow(clippy::missing_const_for_fn)]
     pub fn new(base_strategy: S, memory: Arc<M>) -> Self {
         Self {
             base_strategy,
@@ -91,7 +93,10 @@ impl<S: ChunkingStrategy, M: EpisodicMemory> MemoryAwareChunker<S, M> {
     /// Retrieves similar interactions from memory to inform chunking decisions.
     /// Returns conversation boundaries and topic markers.
     async fn fetch_context_hints(&self, text: &str) -> Result<Vec<String>> {
-        trace!("Fetching context hints from episodic memory (k={})", self.context_k);
+        trace!(
+            "Fetching context hints from episodic memory (k={})",
+            self.context_k
+        );
 
         // Query memory for similar content
         let entries = self.memory.search(text, self.context_k).await?;
@@ -112,6 +117,60 @@ impl<S: ChunkingStrategy, M: EpisodicMemory> MemoryAwareChunker<S, M> {
         Ok(hints)
     }
 
+    /// Detect role marker boundaries (User:, Assistant:, etc.)
+    fn detect_role_marker_boundaries(text: &str) -> Vec<usize> {
+        let mut boundaries = Vec::new();
+        let role_markers = [
+            "User:",
+            "Assistant:",
+            "System:",
+            "user:",
+            "assistant:",
+            "system:",
+        ];
+
+        for (idx, line) in text.lines().enumerate() {
+            if role_markers
+                .iter()
+                .any(|marker| line.trim().starts_with(marker))
+            {
+                // Find byte offset of this line
+                if let Some(byte_offset) = text
+                    .lines()
+                    .take(idx)
+                    .map(|l| l.len() + 1)
+                    .sum::<usize>()
+                    .checked_sub(0)
+                {
+                    trace!(
+                        "Found conversation boundary at byte {}: {}",
+                        byte_offset,
+                        &line[..line.len().min(50)]
+                    );
+                    boundaries.push(byte_offset);
+                }
+            }
+        }
+
+        boundaries
+    }
+
+    /// Detect paragraph boundaries (double newlines)
+    fn detect_paragraph_boundaries(text: &str) -> Vec<usize> {
+        let mut boundaries = Vec::new();
+        let mut current_pos = 0;
+
+        for segment in text.split("\n\n") {
+            if current_pos > 0 {
+                boundaries.push(current_pos);
+                trace!("Found paragraph boundary at byte {}", current_pos);
+            }
+            current_pos += segment.len() + 2; // +2 for "\n\n"
+        }
+
+        boundaries
+    }
+
     /// Detect conversation boundaries in text using context hints
     ///
     /// Analyzes text to find natural conversation breaks:
@@ -121,31 +180,11 @@ impl<S: ChunkingStrategy, M: EpisodicMemory> MemoryAwareChunker<S, M> {
     ///
     /// Returns byte positions of conversation boundaries.
     fn detect_conversation_boundaries(text: &str, _hints: &[String]) -> Vec<usize> {
-        let mut boundaries = Vec::new();
+        // Strategy 1: Detect role markers
+        let mut boundaries = Self::detect_role_marker_boundaries(text);
 
-        // Strategy 1: Detect role markers (User:, Assistant:, etc.)
-        let role_markers = ["User:", "Assistant:", "System:", "user:", "assistant:", "system:"];
-
-        for (idx, line) in text.lines().enumerate() {
-            // Check if line starts with a role marker
-            if role_markers.iter().any(|marker| line.trim().starts_with(marker)) {
-                // Find byte offset of this line
-                if let Some(byte_offset) = text.lines().take(idx).map(|l| l.len() + 1).sum::<usize>().checked_sub(0) {
-                    trace!("Found conversation boundary at byte {}: {}", byte_offset, &line[..line.len().min(50)]);
-                    boundaries.push(byte_offset);
-                }
-            }
-        }
-
-        // Strategy 2: Detect paragraph breaks (double newlines)
-        let mut current_pos = 0;
-        for segment in text.split("\n\n") {
-            if current_pos > 0 {
-                boundaries.push(current_pos);
-                trace!("Found paragraph boundary at byte {}", current_pos);
-            }
-            current_pos += segment.len() + 2; // +2 for "\n\n"
-        }
+        // Strategy 2: Detect paragraph breaks
+        boundaries.extend(Self::detect_paragraph_boundaries(text));
 
         // Remove duplicates and sort
         boundaries.sort_unstable();
@@ -167,7 +206,11 @@ impl<S: ChunkingStrategy, M: EpisodicMemory> MemoryAwareChunker<S, M> {
             return chunks;
         }
 
-        debug!("Adjusting {} chunks using {} boundaries", chunks.len(), boundaries.len());
+        debug!(
+            "Adjusting {} chunks using {} boundaries",
+            chunks.len(),
+            boundaries.len()
+        );
 
         // For each chunk, check if its end boundary is near a conversation boundary
         for chunk in &mut chunks {
@@ -184,7 +227,11 @@ impl<S: ChunkingStrategy, M: EpisodicMemory> MemoryAwareChunker<S, M> {
                     if new_len > chunk.content.len() / 2 {
                         // Only adjust if we're not cutting more than half the chunk
                         chunk.content.truncate(new_len);
-                        trace!("Adjusted chunk {} to end at conversation boundary (byte {})", chunk.chunk_index, boundary);
+                        trace!(
+                            "Adjusted chunk {} to end at conversation boundary (byte {})",
+                            chunk.chunk_index,
+                            boundary
+                        );
                     }
                 }
             }
@@ -211,7 +258,10 @@ impl<S: ChunkingStrategy, M: EpisodicMemory> ChunkingStrategy for MemoryAwareChu
 
         // Step 4: Adjust boundaries to respect conversations
         let adjusted_chunks = Self::adjust_chunk_boundaries(base_chunks, &boundaries);
-        debug!("Memory-aware chunking complete: {} chunks", adjusted_chunks.len());
+        debug!(
+            "Memory-aware chunking complete: {} chunks",
+            adjusted_chunks.len()
+        );
 
         Ok(adjusted_chunks)
     }
@@ -230,9 +280,9 @@ impl<S: ChunkingStrategy, M: EpisodicMemory> ChunkingStrategy for MemoryAwareChu
 mod tests {
     use super::*;
     use crate::chunking::strategies::SlidingWindowChunker;
+    use chrono::Utc;
     use llmspell_memory::episodic::InMemoryEpisodicMemory;
     use llmspell_memory::types::EpisodicEntry;
-    use chrono::Utc;
 
     #[tokio::test]
     async fn test_memory_aware_chunker_basic() {
