@@ -5128,26 +5128,30 @@ Assemble context for LLM prompts using retrieval strategies...
 
 ---
 
-### Task 13.12.4: Documentation + Task 13.5.7d Completion
+### Task 13.12.4: Comprehensive CLI User Guide + Task 13.5.7d Completion
 
 **Priority**: MEDIUM
-**Estimated Time**: 1 hour
+**Estimated Time**: 3 hours
 **Assignee**: Documentation Team
 **Status**: READY TO START
 
-**Description**: Document new CLI commands and verify Task 13.5.7d completion (template parameter schema documentation for provider_name).
+**Description**: Create comprehensive CLI user guide documentation for ALL commands (run, exec, repl, debug, kernel, state, session, config, keys, backup, app, tool, model, template, memory, context) and verify Task 13.5.7d completion (template parameter schema documentation for provider_name).
 
 **Architectural Analysis**:
 - **Task 13.5.7d Status**: ✅ COMPLETE (verified in Task 13.11.1 - provider_parameters() helper added)
-- **CLI Documentation**: Update `docs/technical/cli-command-architecture.md` with memory/context commands
-- **User Guide**: Add examples to `docs/user-guide/cli/`
+- **CLI Documentation Scope**: Create single comprehensive `docs/user-guide/cli.md` with ALL CLI commands
+- **Technical Architecture**: Update `docs/technical/cli-command-architecture.md` with memory/context command sections
 
 **Acceptance Criteria**:
-- [ ] CLI architecture doc updated with memory/context command sections
-- [ ] User guide examples created for all subcommands
+- [ ] `docs/user-guide/cli.md` created with comprehensive documentation for all 16 command groups
+- [ ] Each command group includes: description, subcommands, options, examples, use cases
+- [ ] Memory commands section (add, search, query, stats, consolidate) with kernel protocol explanation
+- [ ] Context commands section (assemble, strategies, analyze) with strategy recommendations
+- [ ] CLI architecture doc updated with memory/context sections and message flow diagrams
 - [ ] Task 13.5.7d marked complete in TODO.md
 - [ ] Template user guides verified for provider_name documentation
 - [ ] All documentation links working
+- [ ] Table of contents with command quick reference
 
 **Implementation Steps**:
 
@@ -5340,11 +5344,729 @@ Assemble context for LLM prompts using retrieval strategies...
    └── ... (existing commands)
    ```
 
-2. **Create `docs/user-guide/cli/memory-commands.md`**: (~200 lines with complete examples, architecture explanation, and related commands)
+2. **Create `docs/user-guide/cli.md`**: Comprehensive CLI user guide (~1200 lines) with all command groups:
 
-3. **Create `docs/user-guide/cli/context-commands.md`**: (~180 lines with complete examples, strategy recommendations, and architecture)
+   **File Structure**:
+   ```markdown
+   # LLMSpell CLI Reference
 
-4. **Verify Task 13.5.7d completion and mark complete**:
+   Complete user guide for all llmspell CLI commands.
+
+   ## Table of Contents
+
+   1. [Overview](#overview)
+   2. [Global Options](#global-options)
+   3. [Script Execution Commands](#script-execution-commands)
+      - [run](#run) - Execute script files
+      - [exec](#exec) - Execute inline code
+      - [repl](#repl) - Interactive REPL
+      - [debug](#debug) - Debug scripts
+   4. [Kernel Management](#kernel-management)
+      - [kernel](#kernel) - Manage kernel servers
+   5. [State Management](#state-management)
+      - [state](#state) - Persistent state operations
+      - [session](#session) - Session management
+   6. [Configuration](#configuration)
+      - [config](#config) - Configuration management
+      - [keys](#keys) - API key management
+      - [backup](#backup) - Backup/restore
+   7. [Scripting Resources](#scripting-resources)
+      - [app](#app) - Application management
+      - [tool](#tool) - Tool operations
+      - [model](#model) - Model management
+      - [template](#template) - Template execution (Phase 12)
+   8. [Memory & Context (Phase 13)](#memory--context)
+      - [memory](#memory) - Memory operations
+      - [context](#context) - Context assembly
+
+   ## Overview
+
+   LLMSpell provides scriptable LLM interactions via Lua/JavaScript. The CLI supports:
+   - Script execution (local or remote kernel)
+   - Interactive REPL with debug support
+   - Memory and context management for RAG workflows
+   - Template-based AI workflows
+   - State persistence across sessions
+
+   ## Global Options
+
+   Available for all commands:
+
+   ```bash
+   -c, --config <CONFIG>      Configuration file
+   -p, --profile <PROFILE>    Built-in profile (minimal, development, providers, etc.)
+   --trace <LEVEL>            Trace level (off, error, warn, info, debug, trace)
+   --output <FORMAT>          Output format (text, json, pretty)
+   -h, --help                 Print help
+   -V, --version              Print version
+   ```
+
+   ## Script Execution Commands
+
+   ### run
+
+   Execute a script file with the specified engine.
+
+   **Usage**:
+   ```bash
+   llmspell run <SCRIPT> [OPTIONS] [-- <ARGS>...]
+   ```
+
+   **Options**:
+   - `--engine <ENGINE>` - Script engine (lua, javascript, python) [default: lua]
+   - `--connect <ADDRESS>` - Connect to external kernel (e.g., "localhost:9555")
+   - `--stream` - Enable streaming output
+
+   **Examples**:
+   ```bash
+   # Execute Lua script
+   llmspell run script.lua
+
+   # Pass arguments to script
+   llmspell run script.lua -- arg1 arg2
+
+   # Use production RAG profile
+   llmspell -p rag-prod run ml.lua
+
+   # Execute on remote kernel
+   llmspell run script.lua --connect localhost:9555
+
+   # Enable streaming output
+   llmspell run script.lua --stream
+   ```
+
+   ### exec
+
+   Execute code directly from the command line.
+
+   **Usage**:
+   ```bash
+   llmspell exec <CODE> [OPTIONS]
+   ```
+
+   **Options**:
+   - `--engine <ENGINE>` - Script engine (lua, javascript, python) [default: lua]
+   - `--connect <ADDRESS>` - Connect to external kernel
+   - `--stream` - Enable streaming output
+
+   **Examples**:
+   ```bash
+   # Execute Lua code
+   llmspell exec "print('hello world')"
+
+   # Use development profile
+   llmspell -p development exec "agent.query('What is 2+2?')"
+
+   # Execute on remote kernel
+   llmspell exec "print('test')" --connect localhost:9555
+   ```
+
+   ### repl
+
+   Start an interactive REPL session.
+
+   **Usage**:
+   ```bash
+   llmspell repl [OPTIONS]
+   ```
+
+   **Options**:
+   - `--engine <ENGINE>` - Script engine [default: lua]
+   - `--connect <ADDRESS>` - Connect to external kernel
+   - `--history <PATH>` - Custom history file path
+
+   **Examples**:
+   ```bash
+   # Start Lua REPL
+   llmspell repl
+
+   # REPL with remote kernel
+   llmspell repl --connect localhost:9555
+
+   # Custom history file
+   llmspell repl --history ~/.llmspell_history
+   ```
+
+   **REPL Commands**:
+   - `.exit` or `.quit` - Exit REPL
+   - `.help` - Show help
+   - `.clear` - Clear screen
+
+   ### debug
+
+   Debug a script with interactive debugging.
+
+   **Usage**:
+   ```bash
+   llmspell debug <SCRIPT> [OPTIONS] [-- <ARGS>...]
+   ```
+
+   **Options**:
+   - `--engine <ENGINE>` - Script engine [default: lua]
+   - `--connect <ADDRESS>` - Connect to external kernel
+   - `--break-at <FILE:LINE>` - Set breakpoints (repeatable)
+   - `--watch <EXPR>` - Watch expressions (repeatable)
+   - `--step` - Start in step mode
+   - `--port <PORT>` - DAP server port for IDE attachment
+
+   **Examples**:
+   ```bash
+   # Start debug session
+   llmspell debug script.lua
+
+   # Set breakpoints
+   llmspell debug script.lua --break-at script.lua:10 --break-at script.lua:25
+
+   # Watch variables
+   llmspell debug script.lua --watch "count" --watch "result"
+
+   # Start in step mode
+   llmspell debug script.lua --step
+
+   # Enable DAP for IDE
+   llmspell debug script.lua --port 9229
+   ```
+
+   ## Kernel Management
+
+   ### kernel
+
+   Manage kernel processes for multi-client execution.
+
+   **Usage**:
+   ```bash
+   llmspell kernel <SUBCOMMAND>
+   ```
+
+   **Subcommands**:
+   - `start` - Start a kernel server
+   - `status` - Show kernel status
+   - `stop` - Stop a kernel
+   - `list` - List all running kernels
+   - `connect` - Connect to external kernel
+
+   **Examples**:
+   ```bash
+   # Start kernel server
+   llmspell kernel start --port 9555 --daemon
+
+   # List all running kernels
+   llmspell kernel list
+
+   # Show detailed status
+   llmspell kernel status abc123
+
+   # Stop specific kernel
+   llmspell kernel stop abc123
+
+   # Connect to external kernel
+   llmspell kernel connect localhost:9555
+   ```
+
+   ## State Management
+
+   ### state
+
+   Manage persistent state across script executions.
+
+   **Usage**:
+   ```bash
+   llmspell state <SUBCOMMAND>
+   ```
+
+   **Subcommands**:
+   - `get` - Get state value
+   - `set` - Set state value
+   - `delete` - Delete state value
+   - `list` - List all state keys
+   - `clear` - Clear all state
+
+   **Examples**:
+   ```bash
+   # Set state value
+   llmspell state set config.api_key "sk-..."
+
+   # Get state value
+   llmspell state get config.api_key
+
+   # List all keys
+   llmspell state list
+
+   # Clear all state
+   llmspell state clear
+   ```
+
+   ### session
+
+   Manage sessions for conversation history and context.
+
+   **Usage**:
+   ```bash
+   llmspell session <SUBCOMMAND>
+   ```
+
+   **Subcommands**:
+   - `list` - List all sessions
+   - `create` - Create new session
+   - `delete` - Delete session
+   - `show` - Show session details
+
+   **Examples**:
+   ```bash
+   # List all sessions
+   llmspell session list
+
+   # Create new session
+   llmspell session create --name "research-session"
+
+   # Show session details
+   llmspell session show session-123
+
+   # Delete session
+   llmspell session delete session-123
+   ```
+
+   ## Configuration
+
+   ### config
+
+   Manage configuration files and profiles.
+
+   **Usage**:
+   ```bash
+   llmspell config <SUBCOMMAND>
+   ```
+
+   **Subcommands**:
+   - `list-profiles` - List available profiles
+   - `show-profile` - Show profile details
+   - `validate` - Validate config file
+   - `generate` - Generate sample config
+
+   **Examples**:
+   ```bash
+   # List available profiles
+   llmspell config list-profiles
+
+   # Show profile details
+   llmspell config show-profile rag-prod
+
+   # Validate config file
+   llmspell config validate --file config.toml
+
+   # Generate sample config
+   llmspell config generate > my-config.toml
+   ```
+
+   ### keys
+
+   Manage API keys securely.
+
+   **Usage**:
+   ```bash
+   llmspell keys <SUBCOMMAND>
+   ```
+
+   **Subcommands**:
+   - `set` - Set API key
+   - `get` - Get API key
+   - `delete` - Delete API key
+   - `list` - List configured keys
+
+   **Examples**:
+   ```bash
+   # Set API key
+   llmspell keys set openai sk-...
+
+   # Get API key
+   llmspell keys get openai
+
+   # List all keys (masked)
+   llmspell keys list
+
+   # Delete key
+   llmspell keys delete openai
+   ```
+
+   ### backup
+
+   Backup and restore LLMSpell data.
+
+   **Usage**:
+   ```bash
+   llmspell backup <SUBCOMMAND>
+   ```
+
+   **Subcommands**:
+   - `create` - Create backup
+   - `restore` - Restore from backup
+   - `list` - List backups
+
+   **Examples**:
+   ```bash
+   # Create backup
+   llmspell backup create
+
+   # Create named backup
+   llmspell backup create --name "pre-upgrade"
+
+   # List backups
+   llmspell backup list
+
+   # Restore backup
+   llmspell backup restore backup-20250130.tar.gz
+   ```
+
+   ## Scripting Resources
+
+   ### app
+
+   Manage and execute embedded applications.
+
+   **Usage**:
+   ```bash
+   llmspell app <SUBCOMMAND>
+   ```
+
+   **Subcommands**:
+   - `list` - List available apps
+   - `info` - Show app information
+   - `run` - Run an app
+
+   **Examples**:
+   ```bash
+   # List available apps
+   llmspell app list
+
+   # Show app info
+   llmspell app info file-organizer
+
+   # Run app
+   llmspell app run file-organizer --path ~/Documents
+   ```
+
+   ### tool
+
+   Manage and execute tools.
+
+   **Usage**:
+   ```bash
+   llmspell tool <SUBCOMMAND>
+   ```
+
+   **Subcommands**:
+   - `list` - List available tools
+   - `info` - Show tool details
+   - `exec` - Execute a tool
+
+   **Examples**:
+   ```bash
+   # List available tools
+   llmspell tool list
+
+   # Show tool info
+   llmspell tool info web_search
+
+   # Execute tool
+   llmspell tool exec web_search --query "Rust programming"
+   ```
+
+   ### model
+
+   Manage LLM models.
+
+   **Usage**:
+   ```bash
+   llmspell model <SUBCOMMAND>
+   ```
+
+   **Subcommands**:
+   - `list` - List available models
+   - `info` - Show model details
+   - `test` - Test model connection
+
+   **Examples**:
+   ```bash
+   # List available models
+   llmspell model list
+
+   # Show model details
+   llmspell model info gpt-4
+
+   # Test model connection
+   llmspell model test gpt-4
+   ```
+
+   ### template
+
+   Execute AI workflow templates (Phase 12).
+
+   **Usage**:
+   ```bash
+   llmspell template <SUBCOMMAND>
+   ```
+
+   **Subcommands**:
+   - `list` - List available templates
+   - `info` - Show template details
+   - `exec` - Execute a template
+   - `search` - Search templates by keywords
+   - `schema` - Show template parameter schema
+
+   **Examples**:
+   ```bash
+   # List available templates
+   llmspell template list
+
+   # Show template info
+   llmspell template info research-assistant
+
+   # Execute template
+   llmspell template exec research-assistant \
+     --param topic="Rust async" \
+     --param max_sources=10
+
+   # Search templates
+   llmspell template search "research" "citations"
+
+   # Show parameter schema
+   llmspell template schema research-assistant
+   ```
+
+   **Template Categories**:
+   - Research: research-assistant, data-analysis
+   - Development: code-generator, code-review
+   - Content: content-generation, document-processor
+   - Productivity: interactive-chat, workflow-orchestrator
+   - Classification: file-classification
+
+   ## Memory & Context (Phase 13)
+
+   ### memory
+
+   Manage episodic and semantic memory systems.
+
+   Memory operations enable persistent conversation history (episodic) and knowledge graph
+   management (semantic). The system automatically consolidates episodic memories into
+   structured semantic knowledge.
+
+   **Architecture Note**: Memory commands use kernel message protocol. The CLI sends
+   `memory_request` messages to the kernel, which accesses MemoryBridge and returns
+   results via `memory_reply` messages. Works with both embedded and remote kernels.
+
+   **Usage**:
+   ```bash
+   llmspell memory <SUBCOMMAND>
+   ```
+
+   **Subcommands**:
+   - `add` - Add entry to episodic memory
+   - `search` - Search episodic memory
+   - `query` - Query semantic knowledge graph
+   - `stats` - Show memory statistics
+   - `consolidate` - Consolidate episodic to semantic memory
+
+   **ADD - Add episodic memory entry**:
+   ```bash
+   llmspell memory add <SESSION_ID> <ROLE> <CONTENT> [OPTIONS]
+
+   Arguments:
+     <SESSION_ID>        Session identifier
+     <ROLE>             Role (user, assistant, system)
+     <CONTENT>          Memory content
+
+   Options:
+     --metadata <JSON>  Optional metadata as JSON
+
+   Examples:
+     llmspell memory add session-1 user "What is Rust?"
+     llmspell memory add session-1 assistant "Rust is a systems programming language."
+     llmspell memory add session-1 user "Tell me more" --metadata '{"importance": 5}'
+   ```
+
+   **SEARCH - Search episodic memory**:
+   ```bash
+   llmspell memory search <QUERY> [OPTIONS]
+
+   Arguments:
+     <QUERY>            Search query
+
+   Options:
+     --session-id <ID>  Filter by session ID
+     --limit <N>        Maximum number of results [default: 10]
+     --format <FORMAT>  Output format (overrides global format)
+
+   Examples:
+     llmspell memory search "Rust programming"
+     llmspell memory search "async" --session-id session-1
+     llmspell memory search "error handling" --limit 20
+     llmspell memory search "vectors" --format json
+   ```
+
+   **QUERY - Query semantic knowledge graph**:
+   ```bash
+   llmspell memory query <QUERY> [OPTIONS]
+
+   Arguments:
+     <QUERY>            Query text
+
+   Options:
+     --limit <N>        Maximum number of results [default: 10]
+     --format <FORMAT>  Output format (overrides global format)
+
+   Examples:
+     llmspell memory query "Rust"
+     llmspell memory query "async patterns" --limit 15
+     llmspell memory query "types" --format json
+   ```
+
+   **STATS - Show memory statistics**:
+   ```bash
+   llmspell memory stats [OPTIONS]
+
+   Options:
+     --format <FORMAT>  Output format (overrides global format)
+
+   Examples:
+     llmspell memory stats
+     llmspell memory stats --format json
+   ```
+
+   **CONSOLIDATE - Consolidate episodic to semantic memory**:
+   ```bash
+   llmspell memory consolidate [OPTIONS]
+
+   Options:
+     --session-id <ID>  Session ID to consolidate (empty = all sessions)
+     --force           Force immediate consolidation
+
+   Examples:
+     llmspell memory consolidate
+     llmspell memory consolidate --session-id session-1
+     llmspell memory consolidate --force
+   ```
+
+   **Memory Message Flow**:
+   1. CLI parses memory command and parameters
+   2. CLI creates memory_request message with command/params
+   3. CLI sends via kernel handle (embedded) or connection (remote)
+   4. Kernel receives on shell channel
+   5. Kernel.handle_memory_request() processes request
+   6. Kernel accesses script_executor.memory_bridge()
+   7. MemoryBridge executes operation (episodic_add, search, etc.)
+   8. Kernel sends memory_reply with results
+   9. CLI receives and formats output
+
+   **Code References**:
+   - CLI: llmspell-cli/src/commands/memory.rs
+   - Handler: llmspell-kernel/src/execution/integrated.rs
+   - Bridge: llmspell-bridge/src/memory_bridge.rs
+   - API: llmspell-kernel/src/api.rs
+
+   ### context
+
+   Assemble context for LLM prompts using retrieval strategies.
+
+   Context assembly intelligently combines episodic memory (conversation history) and
+   semantic memory (knowledge graph) to build relevant context within token budgets.
+
+   **Architecture Note**: Context commands use kernel message protocol. The CLI sends
+   `context_request` messages to the kernel, which accesses ContextBridge and returns
+   assembled context via `context_reply` messages.
+
+   **Usage**:
+   ```bash
+   llmspell context <SUBCOMMAND>
+   ```
+
+   **Subcommands**:
+   - `assemble` - Assemble context for a query
+   - `strategies` - List available context strategies
+   - `analyze` - Analyze token usage by strategy
+
+   **ASSEMBLE - Assemble context with specified strategy**:
+   ```bash
+   llmspell context assemble <QUERY> [OPTIONS]
+
+   Arguments:
+     <QUERY>            Query for context assembly
+
+   Options:
+     --strategy <STRATEGY>  Retrieval strategy [default: hybrid]
+                           Options: hybrid, episodic, semantic, rag
+     --budget <N>          Token budget [default: 1000]
+     --session-id <ID>     Filter by session ID
+     --format <FORMAT>     Output format (overrides global format)
+
+   Examples:
+     llmspell context assemble "What is Rust?"
+     llmspell context assemble "async" --strategy episodic
+     llmspell context assemble "types" --budget 2000 --session-id session-1
+     llmspell context assemble "memory" --format json
+   ```
+
+   **Strategy Descriptions**:
+   - `hybrid` - Combines episodic and semantic memory (recommended)
+   - `episodic` - Conversation history only
+   - `semantic` - Knowledge graph entities only
+   - `rag` - Document retrieval only (if RAG enabled)
+
+   **STRATEGIES - List available context strategies**:
+   ```bash
+   llmspell context strategies [OPTIONS]
+
+   Options:
+     --format <FORMAT>  Output format (overrides global format)
+
+   Examples:
+     llmspell context strategies
+     llmspell context strategies --format json
+   ```
+
+   **ANALYZE - Analyze estimated token usage**:
+   ```bash
+   llmspell context analyze <QUERY> [OPTIONS]
+
+   Arguments:
+     <QUERY>            Query for analysis
+
+   Options:
+     --budget <N>       Token budget [default: 1000]
+     --format <FORMAT>  Output format (overrides global format)
+
+   Examples:
+     llmspell context analyze "Rust async" --budget 2000
+     llmspell context analyze "memory systems" --format json
+   ```
+
+   **Context Message Flow**:
+   1. CLI parses context command and parameters
+   2. CLI creates context_request message with command/params
+   3. CLI sends via kernel handle (embedded) or connection (remote)
+   4. Kernel receives on shell channel
+   5. Kernel.handle_context_request() processes request
+   6. Kernel accesses script_executor.context_bridge()
+   7. ContextBridge executes assembly/analysis
+   8. Kernel sends context_reply with results
+   9. CLI receives and formats output (chunks, token counts)
+
+   **Code References**:
+   - CLI: llmspell-cli/src/commands/context.rs
+   - Handler: llmspell-kernel/src/execution/integrated.rs
+   - Bridge: llmspell-bridge/src/context_bridge.rs
+   - API: llmspell-kernel/src/api.rs
+
+   ## See Also
+
+   - [Configuration Guide](configuration.md) - Detailed configuration options
+   - [Getting Started](getting-started.md) - Quick start guide
+   - [Template User Guides](templates/) - Template-specific documentation
+   - [API Reference](api/) - Lua/JavaScript API documentation
+   - [Memory Configuration](memory-configuration.md) - Memory system configuration
+   - [Technical Architecture](../technical/cli-command-architecture.md) - CLI architecture details
+   ```
+
+3. **Verify Task 13.5.7d completion and mark complete**:
    ```bash
    # Verify provider_name is documented in all template guides
    grep -l "provider_name" docs/user-guide/templates/*.md
@@ -5374,22 +6096,31 @@ Assemble context for LLM prompts using retrieval strategies...
    ```
 
 **Files to Create/Modify**:
+- `docs/user-guide/cli.md` - NEW file (~1200 lines: comprehensive CLI reference for all 16 command groups)
 - `docs/technical/cli-command-architecture.md` - Add sections 4.10, 4.11, update command tree (~250 lines NEW)
-- `docs/user-guide/cli/memory-commands.md` - NEW file (~200 lines)
-- `docs/user-guide/cli/context-commands.md` - NEW file (~180 lines)
 - `TODO.md` - Mark Task 13.5.7d complete (~10 lines MODIFIED)
 
 **Definition of Done**:
-- [ ] CLI architecture doc updated with memory/context sections
-- [ ] Memory commands user guide created with examples
-- [ ] Context commands user guide created with strategy recommendations
+- [ ] `docs/user-guide/cli.md` created with all 16 command groups documented
+- [ ] Table of contents with command quick reference included
+- [ ] Each command includes: description, usage, options, examples, use cases
+- [ ] Memory commands section with kernel protocol explanation
+- [ ] Context commands section with strategy recommendations and message flow
+- [ ] Script execution commands documented (run, exec, repl, debug)
+- [ ] Kernel management commands documented
+- [ ] State management commands documented (state, session)
+- [ ] Configuration commands documented (config, keys, backup)
+- [ ] Scripting resources documented (app, tool, model, template)
+- [ ] Global options section with profile/trace/output flags
+- [ ] CLI architecture doc updated with memory/context sections (technical)
 - [ ] Command tree diagram updated to include new commands
 - [ ] Task 13.5.7d verified and marked complete
 - [ ] All 10 template user guides verified for provider_name docs
 - [ ] All documentation reviewed for accuracy
 - [ ] Internal links verified (no broken references)
-- [ ] Documentation builds successfully
-- [ ] Examples tested and verified
+- [ ] "See Also" section links to related documentation
+- [ ] Examples follow consistent format across all commands
+- [ ] Documentation is user-friendly and comprehensive
 
 ---
 
@@ -5416,13 +6147,13 @@ Assemble context for LLM prompts using retrieval strategies...
 
 **Time Changes**:
 - **Original**: 8 hours (3h + 2h + 2h + 1h)
-- **Revised**: 5 hours (2h + 0h + 2h + 1h)
-- **Reduction**: 3 hours (removed graph commands + sessions subcommand)
+- **Revised**: 7 hours (2h + 0h + 2h + 3h)
+- **Change**: +2 hours for comprehensive CLI documentation (all 16 commands vs just 2)
 
 **Files Summary**:
-- **NEW files**: 8 (memory.rs, context.rs, 2 test files, 2 user guide docs)
+- **NEW files**: 8 (memory.rs, context.rs, 2 test files, 1 comprehensive CLI user guide)
 - **MODIFIED files**: 7 (kernel handler, API, trait, engine, CLI enum, commands/mod, cli-arch doc)
-- **Total lines**: ~1,600 new lines of production code + ~800 lines documentation
+- **Total lines**: ~1,600 new lines of production code + ~1,200 lines comprehensive CLI documentation
 
 **Ready for Implementation**: All tasks fully specified with complete code examples, clear acceptance criteria, and comprehensive documentation plan.
 
