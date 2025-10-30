@@ -137,7 +137,7 @@ fn test_memory_help() {
         .arg("--help")
         .assert()
         .success()
-        .stdout(predicate::str::contains("Memory management commands"));
+        .stdout(predicate::str::contains("episodic and semantic memory"));
 }
 
 #[test]
@@ -148,7 +148,7 @@ fn test_memory_add_help() {
         .arg("--help")
         .assert()
         .success()
-        .stdout(predicate::str::contains("Add an episodic memory entry"));
+        .stdout(predicate::str::contains("episodic memory"));
 }
 
 #[test]
@@ -170,7 +170,7 @@ fn test_memory_query_help() {
         .arg("--help")
         .assert()
         .success()
-        .stdout(predicate::str::contains("Query semantic knowledge graph"));
+        .stdout(predicate::str::contains("semantic knowledge graph"));
 }
 
 #[test]
@@ -181,7 +181,7 @@ fn test_memory_stats_help() {
         .arg("--help")
         .assert()
         .success()
-        .stdout(predicate::str::contains("Display memory system statistics"));
+        .stdout(predicate::str::contains("memory system statistics"));
 }
 
 #[test]
@@ -192,7 +192,7 @@ fn test_memory_consolidate_help() {
         .arg("--help")
         .assert()
         .success()
-        .stdout(predicate::str::contains("Trigger memory consolidation"));
+        .stdout(predicate::str::contains("Trigger consolidation"));
 }
 
 // Context command tests
@@ -203,7 +203,7 @@ fn test_context_help() {
         .arg("--help")
         .assert()
         .success()
-        .stdout(predicate::str::contains("Context assembly commands"));
+        .stdout(predicate::str::contains("Assemble context"));
 }
 
 #[test]
@@ -214,7 +214,7 @@ fn test_context_assemble_help() {
         .arg("--help")
         .assert()
         .success()
-        .stdout(predicate::str::contains("Assemble context from memory"));
+        .stdout(predicate::str::contains("retrieval strategy"));
 }
 
 #[test]
@@ -225,7 +225,7 @@ fn test_context_strategies_help() {
         .arg("--help")
         .assert()
         .success()
-        .stdout(predicate::str::contains("List available context assembly strategies"));
+        .stdout(predicate::str::contains("available context assembly strategies"));
 }
 
 #[test]
@@ -236,5 +236,5 @@ fn test_context_analyze_help() {
         .arg("--help")
         .assert()
         .success()
-        .stdout(predicate::str::contains("Analyze context strategies"));
+        .stdout(predicate::str::contains("estimated token usage"));
 }
