@@ -102,9 +102,13 @@ fn test_document_binary_size() {
             size_bytes, size_mb
         );
 
-        // Document for later comparison - now optimized to around 21MB after CLI app changes
+        // Document for later comparison
+        // Phase 11: ~21MB (base system)
+        // Phase 12: ~35MB (templates + multi-agent)
+        // Phase 13: ~47MB (memory + graph + context)
+        // Threshold updated to reflect Phase 13 memory system additions
         assert!(size_bytes > 15_000_000, "Expected binary > 15MB");
-        assert!(size_bytes < 30_000_000, "Expected binary < 30MB");
+        assert!(size_bytes < 55_000_000, "Expected binary < 55MB");
     } else {
         println!("BASELINE: Release binary not found - cannot measure current size");
     }
