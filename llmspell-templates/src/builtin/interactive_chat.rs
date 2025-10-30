@@ -24,7 +24,7 @@ use llmspell_core::LLMSpellError;
 use serde_json::json;
 use std::sync::Arc;
 use std::time::Instant;
-use tracing::{info, warn};
+use tracing::{debug, info, warn};
 
 /// Minimal no-op script executor for chat-only REPL mode (Subtask 12.9.5)
 ///
@@ -198,9 +198,12 @@ impl crate::core::Template for InteractiveChatTemplate {
         );
         let max_turns: i64 = params.get_or("max_turns", 10);
         let tools: Vec<String> = params.get_or("tools", Vec::new());
-        let enable_memory: bool = params.get_or("enable_memory", false);
         let message: Option<String> = params.get_optional("message");
         let session_id_param: Option<String> = params.get_optional("session_id");
+
+        // Extract memory parameters (Task 13.11.2)
+        let memory_enabled: bool = params.get_or("memory_enabled", true);
+        let context_budget: i64 = params.get_or("context_budget", 2000);
 
         // Smart dual-path provider resolution (Task 13.5.7d)
         let provider_config = context.resolve_llm_config(&params)?;
@@ -214,7 +217,7 @@ impl crate::core::Template for InteractiveChatTemplate {
             model_str,
             max_turns,
             tools.len(),
-            enable_memory
+            memory_enabled
         );
 
         // Initialize output
@@ -246,12 +249,9 @@ impl crate::core::Template for InteractiveChatTemplate {
         let loaded_tools = self.load_tools(&tools, &context).await?;
         output.metrics.tools_invoked = loaded_tools.len();
 
-        // Phase 3: Check memory (placeholder for Phase 13)
-        if enable_memory {
-            warn!("Long-term memory requested but not yet implemented - will be added in Phase 13");
-            output.add_metric("memory_enabled", json!(false));
-            output.add_metric("memory_status", json!("Phase 13 placeholder"));
-        }
+        // Phase 3: Memory configuration (Task 13.11.2)
+        output.add_metric("memory_enabled", json!(memory_enabled));
+        output.add_metric("context_budget", json!(context_budget));
 
         // Phase 4: Execute conversation
         info!("Phase 4: Executing conversation...");
@@ -264,6 +264,8 @@ impl crate::core::Template for InteractiveChatTemplate {
                     max_turns as usize,
                     &loaded_tools,
                     &context,
+                    memory_enabled,
+                    context_budget,
                 )
                 .await?
             }
@@ -275,6 +277,8 @@ impl crate::core::Template for InteractiveChatTemplate {
                     message.as_deref().unwrap(),
                     &loaded_tools,
                     &context,
+                    memory_enabled,
+                    context_budget,
                 )
                 .await?
             }
@@ -525,6 +529,7 @@ impl InteractiveChatTemplate {
     /// - Multi-line: smart detection, continuation prompts
     /// - Ctrl-C: graceful interrupt (doesn't terminate)
     /// - Dual-mode: Execute Lua/JS code OR chat with agent
+    #[allow(clippy::too_many_arguments)]
     async fn run_interactive_mode(
         &self,
         session_id: &str,
@@ -533,6 +538,8 @@ impl InteractiveChatTemplate {
         _max_turns: usize, // REPL handles its own lifecycle
         tools: &[String],
         context: &ExecutionContext,
+        _memory_enabled: bool, // Memory integration TODO: integrate at kernel level
+        _context_budget: i64,  // Memory integration TODO: integrate at kernel level
     ) -> Result<ConversationResult> {
         use llmspell_agents::factory::{AgentConfig, ModelConfig, ResourceLimits};
         use llmspell_kernel::execution::ExecutionConfig;
@@ -747,6 +754,7 @@ impl InteractiveChatTemplate {
     }
 
     /// Phase 4b: Run programmatic mode (single message)
+    #[allow(clippy::too_many_arguments)]
     async fn run_programmatic_mode(
         &self,
         session_id: &str,
@@ -755,6 +763,8 @@ impl InteractiveChatTemplate {
         user_message: &str,
         tools: &[String],
         context: &ExecutionContext,
+        memory_enabled: bool,
+        context_budget: i64,
     ) -> Result<ConversationResult> {
         use llmspell_agents::factory::{AgentConfig, ModelConfig, ResourceLimits};
         use llmspell_core::types::AgentInput;
@@ -772,6 +782,29 @@ impl InteractiveChatTemplate {
             user_message.len(),
             tools.len()
         );
+
+        // Assemble memory context (Task 13.11.2)
+        let memory_context =
+            if let (true, Some(bridge)) = (memory_enabled, context.context_bridge()) {
+                debug!(
+                    "Assembling memory context: session={}, budget={}",
+                    session_id, context_budget
+                );
+                crate::assemble_template_context(&bridge, user_message, session_id, context_budget)
+                    .await
+            } else {
+                vec![]
+            };
+
+        let memory_context_str = if !memory_context.is_empty() {
+            memory_context
+                .iter()
+                .map(|msg| format!("{}: {}", msg.role, msg.content))
+                .collect::<Vec<_>>()
+                .join("\n\n")
+        } else {
+            String::new()
+        };
 
         // Load conversation history from session
         let mut history = self.load_conversation_history(session_id, context).await?;
@@ -844,8 +877,14 @@ impl InteractiveChatTemplate {
         };
 
         let prompt = format!(
-            "{}{}\n\nRespond to the user's latest message naturally and helpfully.",
-            system_prompt, conversation_context
+            "{}{}{}\n\nRespond to the user's latest message naturally and helpfully.",
+            if !memory_context_str.is_empty() {
+                format!("Relevant Context from Memory:\n{}\n\n", memory_context_str)
+            } else {
+                String::new()
+            },
+            system_prompt,
+            conversation_context
         );
 
         // Create input for agent
@@ -1372,6 +1411,8 @@ mod tests {
                     "Hello, how are you?",
                     &[],
                     &context,
+                    false, // memory_enabled
+                    2000,  // context_budget
                 )
                 .await;
 
@@ -1410,6 +1451,8 @@ mod tests {
                         "Message 1",
                         &[],
                         &context,
+                        false, // memory_enabled
+                        2000,  // context_budget
                     )
                     .await;
 
@@ -1422,6 +1465,8 @@ mod tests {
                         "Message 2",
                         &[],
                         &context,
+                        false, // memory_enabled
+                        2000,  // context_budget
                     )
                     .await;
 

@@ -1000,7 +1000,15 @@ mod tests {
         let context = context.unwrap();
 
         let result = template
-            .generate_specification("Test function", "rust", &test_provider_config(), &context)
+            .generate_specification(
+                "Test function",
+                "rust",
+                &test_provider_config(),
+                &context,
+                None,  // session_id
+                false, // memory_enabled
+                2000,  // context_budget
+            )
             .await;
         assert!(result.is_ok());
         let result = result.unwrap();

@@ -224,6 +224,11 @@ impl crate::core::Template for WorkflowOrchestratorTemplate {
         let collect_intermediate: bool = params.get_or("collect_intermediate", true);
         let max_steps: i64 = params.get_or("max_steps", 10);
 
+        // Extract memory parameters (Task 13.11.2)
+        let session_id: Option<String> = params.get_optional("session_id");
+        let memory_enabled: bool = params.get_or("memory_enabled", true);
+        let context_budget: i64 = params.get_or("context_budget", 2000);
+
         // Smart dual-path provider resolution (Task 13.5.7d)
         let provider_config = context.resolve_llm_config(&params)?;
         let model_str = provider_config
@@ -263,6 +268,9 @@ impl crate::core::Template for WorkflowOrchestratorTemplate {
                 &provider_config,
                 collect_intermediate,
                 &context,
+                session_id.as_deref(),
+                memory_enabled,
+                context_budget,
             )
             .await?;
         output.metrics.agents_invoked = execution_result.agents_executed;
@@ -472,12 +480,16 @@ impl WorkflowOrchestratorTemplate {
     }
 
     /// Phase 3: Execute workflow
+    #[allow(clippy::too_many_arguments)]
     async fn execute_workflow(
         &self,
         plan: &ExecutionPlan,
         provider_config: &llmspell_config::ProviderConfig,
         collect_intermediate: bool,
         context: &ExecutionContext,
+        session_id: Option<&str>,
+        memory_enabled: bool,
+        context_budget: i64,
     ) -> Result<ExecutionResult> {
         info!(
             "Executing workflow '{}' with {} steps (mode: {})",
@@ -664,10 +676,44 @@ impl WorkflowOrchestratorTemplate {
             }
         };
 
+        // Assemble memory context (Task 13.11.2)
+        let memory_context = if let (true, Some(sid)) = (memory_enabled, session_id) {
+            if let Some(bridge) = context.context_bridge() {
+                debug!(
+                    "Assembling memory context for workflow: session={}, budget={}",
+                    sid, context_budget
+                );
+                crate::assemble_template_context(&bridge, &plan.workflow_name, sid, context_budget)
+                    .await
+            } else {
+                vec![]
+            }
+        } else {
+            vec![]
+        };
+
+        let memory_context_str = if !memory_context.is_empty() {
+            memory_context
+                .iter()
+                .map(|msg| format!("{}: {}", msg.role, msg.content))
+                .collect::<Vec<_>>()
+                .join("\n\n")
+        } else {
+            String::new()
+        };
+
         // Execute workflow with default ExecutionContext (registry already in workflow)
         info!("Executing workflow with real LLM agents");
         let workflow_input = AgentInput::builder()
-            .text(format!("Execute workflow: {}", plan.workflow_name))
+            .text(format!(
+                "{}Execute workflow: {}",
+                if !memory_context_str.is_empty() {
+                    format!("Relevant Context from Memory:\n{}\n\n", memory_context_str)
+                } else {
+                    String::new()
+                },
+                plan.workflow_name
+            ))
             .build();
 
         let workflow_output = workflow
@@ -1184,7 +1230,15 @@ mod tests {
         };
 
         let result = template
-            .execute_workflow(&plan, &test_provider_config(), true, &context)
+            .execute_workflow(
+                &plan,
+                &test_provider_config(),
+                true,
+                &context,
+                None,  // session_id
+                false, // memory_enabled
+                2000,  // context_budget
+            )
             .await;
         assert!(result.is_ok());
         let execution = result.unwrap();

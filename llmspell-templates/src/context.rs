@@ -352,11 +352,7 @@ pub async fn assemble_template_context(
             let formatted = ctx_json["formatted"].as_str().unwrap_or("");
 
             if let Some(chunks) = chunks {
-                debug!(
-                    "Assembled {} chunks, {} tokens",
-                    chunks.len(),
-                    token_count
-                );
+                debug!("Assembled {} chunks, {} tokens", chunks.len(), token_count);
 
                 // Convert to ContextMessage format
                 let messages: Vec<ContextMessage> = vec![ContextMessage {
@@ -377,10 +373,7 @@ pub async fn assemble_template_context(
             }
         }
         Err(e) => {
-            warn!(
-                "Context assembly failed: {}, continuing without context",
-                e
-            );
+            warn!("Context assembly failed: {}, continuing without context", e);
             vec![]
         }
     }
