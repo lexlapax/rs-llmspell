@@ -81,6 +81,8 @@ Subcommand Groups:
   template          # AI workflow template management and execution (Phase 12)
   tool              # Tool management and direct invocation (Phase 10.22)
   model             # Local LLM model management (Phase 11)
+  memory            # Memory operations (Phase 13.12.1)
+  context           # Context assembly (Phase 13.12.3)
   state             # State management
   session           # Session management
   config            # Configuration management
@@ -155,6 +157,16 @@ llmspell
 │   ├── info <name>
 │   ├── run <name> [-- app-args...]
 │   └── search [--tag TAG] [--complexity LEVEL] [--agents N]
+├── memory                                      # Phase 13.12.1
+│   ├── add <session-id> <role> <content> [--metadata]
+│   ├── search <query> [--session-id] [--limit] [--json]
+│   ├── query <text> [--limit] [--json]
+│   ├── stats [--json]
+│   └── consolidate [--session-id] [--force]
+├── context                                     # Phase 13.12.3
+│   ├── assemble <query> [--strategy] [--budget] [--session-id] [--json]
+│   ├── strategies [--json]
+│   └── analyze <query> [--budget] [--json]
 └── version [--verbose] [--component cli|kernel|bridge|all] [--short] [--client]
 ```
 
@@ -882,6 +894,172 @@ CODE REFERENCES:
     CLI: llmspell-cli/src/cli.rs:462-772 (ModelCommands enum)
     Handler: llmspell-cli/src/commands/model.rs (handle_model_command)
     Providers: llmspell-providers/src/{ollama,candle}/ (backend implementations)
+```
+
+### 4.10 Memory Management (Phase 13.12.1)
+
+**Architecture Note**: Memory commands use kernel message protocol, executing operations in the kernel process. The CLI sends `memory_request` messages to the kernel, which accesses MemoryBridge and returns results via `memory_reply` messages.
+
+```bash
+llmspell memory <SUBCOMMAND>
+
+SUBCOMMANDS:
+    add         Add episodic memory entry
+    search      Search episodic memory
+    query       Query semantic knowledge graph
+    stats       Show memory statistics
+    consolidate Consolidate episodic to semantic memory
+
+ADD OPTIONS:
+    <session-id>         Session identifier
+    <role>              Role (user, assistant, system)
+    <content>           Message content
+    --metadata <JSON>   Metadata as JSON string
+
+SEARCH OPTIONS:
+    <query>             Search query
+    --limit <N>         Limit results [default: 10]
+    --session-id <ID>   Filter by session ID
+    --format <FORMAT>   Output format (overrides global)
+
+QUERY OPTIONS:
+    <query>             Semantic query text
+    --limit <N>         Limit results [default: 10]
+    --format <FORMAT>   Output format (overrides global)
+
+STATS OPTIONS:
+    --format <FORMAT>   Output format (overrides global)
+
+CONSOLIDATE OPTIONS:
+    --session-id <ID>   Session to consolidate (all if omitted)
+    --force             Force immediate consolidation
+
+ARCHITECTURE:
+    - Commands execute via kernel message protocol
+    - CLI sends memory_request to kernel (embedded or remote)
+    - Kernel accesses MemoryBridge from GlobalContext
+    - Results returned via memory_reply messages
+    - Same protocol works for embedded and remote kernels
+
+EXAMPLES:
+    # Add episodic entry
+    llmspell memory add session-123 user "What is Rust?"
+
+    # Add with metadata
+    llmspell memory add session-123 assistant "Rust is a systems language" \
+        --metadata '{"topic": "programming"}'
+
+    # Search episodic memory
+    llmspell memory search "ownership" --limit 5
+    llmspell memory search "ownership" --session-id session-123 --format json
+
+    # Query semantic knowledge
+    llmspell memory query "programming concepts" --limit 10
+
+    # Show statistics
+    llmspell memory stats
+    llmspell memory stats --format json
+
+    # Consolidate memory
+    llmspell memory consolidate --session-id session-123 --force
+    llmspell memory consolidate  # Background consolidation all sessions
+
+MESSAGE FLOW (Phase 13.12.1):
+    1. CLI parses memory command and parameters
+    2. CLI creates memory_request message with command/params
+    3. CLI sends via kernel handle (embedded) or connection (remote)
+    4. Kernel receives on shell channel
+    5. Kernel.handle_memory_request() processes request
+    6. Kernel accesses script_executor.memory_bridge()
+    7. MemoryBridge executes operation (episodic_add, search, etc.)
+    8. Kernel sends memory_reply with results
+    9. CLI receives and formats output
+
+CODE REFERENCES:
+    CLI: llmspell-cli/src/commands/memory.rs (handle_memory_command)
+    Handler: llmspell-kernel/src/execution/integrated.rs (handle_memory_request)
+    Bridge: llmspell-bridge/src/memory_bridge.rs (MemoryBridge methods)
+    API: llmspell-kernel/src/api.rs (send_memory_request)
+```
+
+### 4.11 Context Assembly (Phase 13.12.3)
+
+**Architecture Note**: Context commands use kernel message protocol. The CLI sends `context_request` messages to the kernel, which accesses ContextBridge and returns assembled context via `context_reply` messages.
+
+```bash
+llmspell context <SUBCOMMAND>
+
+SUBCOMMANDS:
+    assemble    Assemble context with specified strategy
+    strategies  List available context strategies
+    analyze     Analyze token usage across strategies
+
+ASSEMBLE OPTIONS:
+    <query>             Query for context assembly
+    --strategy <STRATEGY>  Assembly strategy [default: hybrid]
+                          Options: hybrid, episodic, semantic, rag
+    --budget <N>        Token budget [default: 1000]
+    --session-id <ID>   Session ID for filtering
+    --format <FORMAT>   Output format (overrides global)
+
+STRATEGIES OPTIONS:
+    --format <FORMAT>   Output format (overrides global)
+
+ANALYZE OPTIONS:
+    <query>             Query to analyze
+    --budget <N>        Token budget [default: 1000]
+    --format <FORMAT>   Output format (overrides global)
+
+STRATEGY DESCRIPTIONS:
+    hybrid      Combines RAG, episodic, and semantic memory (recommended)
+    episodic    Conversation history only
+    semantic    Knowledge graph entities only
+    rag         Document retrieval only
+
+ARCHITECTURE:
+    - Commands execute via kernel message protocol
+    - CLI sends context_request to kernel (embedded or remote)
+    - Kernel accesses ContextBridge from GlobalContext
+    - ContextBridge assembles context using specified strategy
+    - Results returned via context_reply messages
+
+EXAMPLES:
+    # Assemble context with hybrid strategy
+    llmspell context assemble "What is Rust ownership?" --strategy hybrid --budget 2000
+
+    # Assemble with specific session
+    llmspell context assemble "ownership rules" --session-id session-123
+
+    # Use episodic strategy only
+    llmspell context assemble "previous discussion" --strategy episodic --budget 1000
+
+    # Get JSON output
+    llmspell context assemble "memory management" --format json
+
+    # List available strategies
+    llmspell context strategies
+    llmspell context strategies --format json
+
+    # Analyze token usage across strategies
+    llmspell context analyze "Explain Rust" --budget 1500
+    llmspell context analyze "memory safety" --budget 2000 --format json
+
+MESSAGE FLOW (Phase 13.12.3):
+    1. CLI parses context command and parameters
+    2. CLI creates context_request message with command/params
+    3. CLI sends via kernel handle (embedded) or connection (remote)
+    4. Kernel receives on shell channel
+    5. Kernel.handle_context_request() processes request
+    6. Kernel accesses script_executor.context_bridge()
+    7. ContextBridge executes assembly/analysis
+    8. Kernel sends context_reply with results
+    9. CLI receives and formats output (chunks, token counts)
+
+CODE REFERENCES:
+    CLI: llmspell-cli/src/commands/context.rs (handle_context_command)
+    Handler: llmspell-kernel/src/execution/integrated.rs (handle_context_request)
+    Bridge: llmspell-bridge/src/context_bridge.rs (ContextBridge methods)
+    API: llmspell-kernel/src/api.rs (send_context_request)
 ```
 
 ---
@@ -1659,8 +1837,42 @@ The CLI command architecture provides a production-ready interface with:
 7. **87% Compile Speedup** ✅ - Bridge-only builds: 38s→5s
 8. **API Standardization** ✅ - Tool.execute() consistent across all tools
 
-The architecture maintains backward compatibility for basic usage while providing robust service features for production deployments, comprehensive tool management for developer workflows, and flexible local LLM integration for privacy-focused and offline AI applications.
+### Phase 12 Enhancements (Completed)
+1. **Template System** ✅ - Production AI workflow templates
+2. **Template CLI Commands (12.5)** ✅ - Direct template execution via kernel protocol
+   - list, info, exec, search, schema subcommands
+   - CLI→Kernel message protocol with template_request/template_reply
+   - 10 production templates across 5 categories
+   - Parameter validation and JSON schema support
+   - Memory-aware template execution (Phase 13.11)
+3. **Template Categories** ✅ - Turn-key AI workflows
+   - Research: research-assistant, data-analysis
+   - Development: code-generator, code-review
+   - Content: content-generation, document-processor
+   - Productivity: interactive-chat, workflow-orchestrator
+   - Classification: file-classification, knowledge-management
+
+### Phase 13 Enhancements (Completed)
+1. **Memory System** ✅ - Adaptive memory with episodic and semantic storage
+2. **Context Assembly** ✅ - Intelligent context retrieval strategies
+3. **Memory CLI Commands (13.12.1)** ✅ - Direct memory operations via kernel protocol
+   - add, search, query, stats, consolidate subcommands
+   - CLI→Kernel message protocol with memory_request/memory_reply
+   - Dual-mode: embedded kernel + remote kernel support
+   - Interactive tables and JSON output formatting
+4. **Context CLI Commands (13.12.3)** ✅ - Context assembly operations via kernel protocol
+   - assemble, strategies, analyze subcommands
+   - CLI→Kernel message protocol with context_request/context_reply
+   - Strategy-based retrieval (hybrid, episodic, semantic, rag)
+   - Token budget estimation and analysis
+5. **Kernel Message Protocol Extensions** ✅ - Unified protocol for all operations
+   - memory_request/memory_reply for memory operations
+   - context_request/context_reply for context assembly
+   - Consistent with template_request/tool_request patterns
+   - Works seamlessly with both embedded and remote kernels
+
+The architecture maintains backward compatibility for basic usage while providing robust service features for production deployments, comprehensive tool management for developer workflows, flexible local LLM integration for privacy-focused and offline AI applications, and intelligent memory/context systems for RAG-enhanced workflows.
 
 ---
 
-*This document reflects the completed CLI command architecture from Phase 11b implementation including integrated kernel, daemon mode, service integration, tool commands, local LLM support with Ollama and Candle, and unified profile system.*
+*This document reflects the completed CLI command architecture from Phase 13.12 implementation including memory management commands, context assembly commands, kernel message protocol extensions, and comprehensive CLI documentation.*

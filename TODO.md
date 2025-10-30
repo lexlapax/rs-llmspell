@@ -5133,7 +5133,7 @@ Assemble context for LLM prompts using retrieval strategies...
 **Priority**: MEDIUM
 **Estimated Time**: 3 hours
 **Assignee**: Documentation Team
-**Status**: READY TO START
+**Status**: ✅ COMPLETE
 
 **Description**: Create comprehensive CLI user guide documentation for ALL commands (run, exec, repl, debug, kernel, state, session, config, keys, backup, app, tool, model, template, memory, context) and verify Task 13.5.7d completion (template parameter schema documentation for provider_name).
 
@@ -5143,15 +5143,15 @@ Assemble context for LLM prompts using retrieval strategies...
 - **Technical Architecture**: Update `docs/technical/cli-command-architecture.md` with memory/context command sections
 
 **Acceptance Criteria**:
-- [ ] `docs/user-guide/cli.md` created with comprehensive documentation for all 16 command groups
-- [ ] Each command group includes: description, subcommands, options, examples, use cases
-- [ ] Memory commands section (add, search, query, stats, consolidate) with kernel protocol explanation
-- [ ] Context commands section (assemble, strategies, analyze) with strategy recommendations
-- [ ] CLI architecture doc updated with memory/context sections and message flow diagrams
-- [ ] Task 13.5.7d marked complete in TODO.md
-- [ ] Template user guides verified for provider_name documentation
-- [ ] All documentation links working
-- [ ] Table of contents with command quick reference
+- [x] ✅ `docs/user-guide/cli.md` created with comprehensive documentation for all 16 command groups (1,244 lines)
+- [x] ✅ Each command group includes: description, subcommands, options, examples, use cases
+- [x] ✅ Memory commands section (add, search, query, stats, consolidate) with kernel protocol explanation
+- [x] ✅ Context commands section (assemble, strategies, analyze) with strategy recommendations
+- [x] ✅ CLI architecture doc updated with memory/context sections and message flow diagrams (sections 4.10, 4.11)
+- [x] ✅ Task 13.5.7d marked complete in TODO.md
+- [x] ✅ Template user guides verified for provider_name documentation (10/10 templates)
+- [x] ✅ All documentation links working
+- [x] ✅ Table of contents with command quick reference
 
 **Implementation Steps**:
 
@@ -6101,62 +6101,140 @@ Assemble context for LLM prompts using retrieval strategies...
 - `TODO.md` - Mark Task 13.5.7d complete (~10 lines MODIFIED)
 
 **Definition of Done**:
-- [ ] `docs/user-guide/cli.md` created with all 16 command groups documented
-- [ ] Table of contents with command quick reference included
-- [ ] Each command includes: description, usage, options, examples, use cases
-- [ ] Memory commands section with kernel protocol explanation
-- [ ] Context commands section with strategy recommendations and message flow
-- [ ] Script execution commands documented (run, exec, repl, debug)
-- [ ] Kernel management commands documented
-- [ ] State management commands documented (state, session)
-- [ ] Configuration commands documented (config, keys, backup)
-- [ ] Scripting resources documented (app, tool, model, template)
-- [ ] Global options section with profile/trace/output flags
-- [ ] CLI architecture doc updated with memory/context sections (technical)
-- [ ] Command tree diagram updated to include new commands
-- [ ] Task 13.5.7d verified and marked complete
-- [ ] All 10 template user guides verified for provider_name docs
-- [ ] All documentation reviewed for accuracy
-- [ ] Internal links verified (no broken references)
-- [ ] "See Also" section links to related documentation
-- [ ] Examples follow consistent format across all commands
-- [ ] Documentation is user-friendly and comprehensive
-- [ ] `docs/user-guide/README.md` is updated with new files
+- [x] `docs/user-guide/cli.md` created with all 16 command groups documented
+- [x] Table of contents with command quick reference included
+- [x] Each command includes: description, usage, options, examples, use cases
+- [x] Memory commands section with kernel protocol explanation
+- [x] Context commands section with strategy recommendations and message flow
+- [x] Script execution commands documented (run, exec, repl, debug)
+- [x] Kernel management commands documented
+- [x] State management commands documented (state, session)
+- [x] Configuration commands documented (config, keys, backup)
+- [x] Scripting resources documented (app, tool, model, template)
+- [x] Global options section with profile/trace/output flags
+- [x] CLI architecture doc updated with memory/context sections (technical)
+- [x] Command tree diagram updated to include new commands
+- [x] Task 13.5.7d verified and marked complete
+- [x] All 10 template user guides verified for provider_name docs
+- [x] All documentation reviewed for accuracy
+- [x] Internal links verified (no broken references)
+- [x] "See Also" section links to related documentation
+- [x] Examples follow consistent format across all commands
+- [x] Documentation is user-friendly and comprehensive
+- [x] `docs/user-guide/README.md` is updated with new files
 
 ---
 
-## Summary of Phase 13.12 Changes
+## Summary of Phase 13.12: CLI + UX Integration
 
-**Removed from Original Plan**:
-- ❌ `memory sessions` subcommand - No backend method (MemoryBridge.list_sessions() doesn't exist)
-- ❌ Entire Task 13.12.2 (graph commands) - Missing 3 backend methods, low CLI value
-- ❌ Direct bridge access pattern - Inconsistent with CLI architecture
+**Status**: ✅ **COMPLETE** - All 4 tasks implemented successfully (1 deleted)
 
-**Added to Plan**:
-- ✅ `memory query` subcommand - Semantic search using existing semantic_query() method
-- ✅ Kernel message protocol for all operations - Consistent with template/tool patterns
-- ✅ `handle_memory_request()` and `handle_context_request()` kernel handlers
-- ✅ `send_memory_request()` and `send_context_request()` in KernelHandle
-- ✅ Bridge accessor methods in ScriptExecutor trait (memory_bridge(), context_bridge())
+**Overview**: Added CLI commands for memory and context operations using kernel message protocol with interactive UX enhancements and comprehensive documentation.
 
-**Architectural Improvements**:
+### Tasks Completed
+
+1. **Task 13.12.1**: `llmspell memory` Command ✅
+   - 5 subcommands: add, search, query, stats, consolidate
+   - 437 lines CLI implementation (memory.rs)
+   - Dual-mode: embedded + remote kernel support
+   - Interactive tables and JSON output
+   - 10 integration tests passing
+
+2. **Task 13.12.2**: Graph Commands ❌ DELETED
+   - Removed due to missing backend methods
+   - No list_entities(), get_entity(), get_relationships()
+
+3. **Task 13.12.3**: `llmspell context` Command ✅
+   - 3 subcommands: assemble, strategies, analyze
+   - 278 lines CLI implementation (context.rs)
+   - Strategy-based retrieval (hybrid, episodic, semantic, rag)
+   - Token budget estimation and analysis
+
+4. **Task 13.12.4**: Comprehensive CLI Documentation ✅
+   - Created docs/user-guide/cli.md (1,244 lines)
+   - All 16 command groups documented
+   - Updated docs/technical/cli-command-architecture.md (sections 4.10, 4.11, Phase 13 summary)
+   - Verified Task 13.5.7d completion (provider_name in all 10 template guides)
+
+### Architecture Innovations
+
+**Kernel Message Protocol Extension**:
+- `memory_request` / `memory_reply` for memory operations
+- `context_request` / `context_reply` for context assembly
+- Consistent with `template_request` and `tool_request` patterns
+- Works seamlessly with both embedded and remote kernels
+
+**Enum-Based Abstraction Pattern**:
+- `MemoryHandle` and `ContextHandle` enums for dyn-safe async methods
+- Unified handler pattern eliminates embedded/remote code duplication
+- Type-safe without trait object limitations
+
+**Infrastructure Additions**:
+- `ScriptExecutor` trait: 8 new methods (5 memory + 3 context)
+- `KernelHandle` API: `send_memory_request()`, `send_context_request()`
+- `ClientHandle` API: Remote kernel support over ZeroMQ
+- `IntegratedKernel` handlers: 13 kernel message handlers
+
+### Code Statistics
+
+**Files Created** (4):
+- `llmspell-cli/src/commands/memory.rs` (437 lines)
+- `llmspell-cli/src/commands/context.rs` (278 lines)
+- `docs/user-guide/cli.md` (1,244 lines)
+- Integration tests (110 lines)
+
+**Files Modified** (10):
+- `llmspell-cli/src/cli.rs` (+168 lines: MemoryCommands + ContextCommands)
+- `llmspell-cli/src/commands/mod.rs` (+12 lines: routing)
+- `llmspell-cli/tests/cli_integration_test.rs` (+110 lines: 10 tests)
+- `llmspell-cli/tests/app_discovery_tests.rs` (binary size threshold update)
+- `llmspell-cli/tests/trace_levels_test.rs` (test assertion fix)
+- `llmspell-kernel/src/api.rs` (+168 lines: ClientHandle methods)
+- `llmspell-kernel/src/execution/integrated.rs` (+390 lines: 13 handlers)
+- `llmspell-core/src/traits/script_executor.rs` (+140 lines: 8 trait methods)
+- `llmspell-bridge/src/runtime.rs` (+478 lines: 8 trait implementations)
+- `docs/technical/cli-command-architecture.md` (+200 lines: sections 4.10, 4.11, Phase 12/13 summaries)
+
+**Total Lines**: ~2,800 new production code + ~1,400 documentation
+
+### Quality Metrics
+
+- ✅ **Zero clippy warnings** (9 warnings fixed)
+- ✅ **All tests passing** (21/21 integration tests, 11/11 trace tests, 6/6 app discovery tests)
+- ✅ **Binary size documented** (47MB Phase 13 vs 35MB Phase 12 vs 21MB Phase 11)
+- ✅ **10 integration tests** for memory/context CLI commands
+- ✅ **Comprehensive documentation** (1,244 lines user guide + 200 lines technical docs)
+
+### Architectural Benefits
+
 - ✅ Consistent with template/tool command patterns
 - ✅ Supports both embedded and remote kernels via unified protocol
-- ✅ Uses established kernel message protocol (memory_request/memory_reply, context_request/context_reply)
 - ✅ Proper separation of CLI (thin client) and kernel (execution)
 - ✅ Clear error handling and user-friendly output formatting
+- ✅ Zero breaking changes to existing codebase
+- ✅ Scalable to future CLI commands (hooks, events, RAG, etc.)
 
-**Time Changes**:
-- **Original**: 8 hours (3h + 2h + 2h + 1h)
-- **Revised**: 7 hours (2h + 0h + 2h + 3h)
-- **Change**: +2 hours for comprehensive CLI documentation (all 16 commands vs just 2)
+### Git Commits
 
-**Files Summary**:
-- **NEW files**: 8 (memory.rs, context.rs, 2 test files, 1 comprehensive CLI user guide)
-- **MODIFIED files**: 7 (kernel handler, API, trait, engine, CLI enum, commands/mod, cli-arch doc)
-- **Total lines**: ~1,600 new lines of production code + ~1,200 lines comprehensive CLI documentation
+1. `2e9586b1` - 13.12.1 Kernel protocol handlers and API methods
+2. `beaa9555` - 13.12.1 ScriptRuntime memory/context methods
+3. `864f5ec4` - Update TODO.md with Task 13.12.1 accomplishments
+4. `97a10c12` - 13.12.1 CLI Memory/Context Commands
+5. `8b40e6b3` - 13.12.1 Integration Tests + TODO Update
+6. `fab7e23e` - 13.12.1 & 13.12.3 TODO.md Definition of Done complete
+7. `ff49e1ba` - Fix binary size test threshold for Phase 13 (47MB)
+8. `8d084ae6` - Fix integration test assertions for help text
+9. `5a8aa11f` - Fix test_debug_command_timeout assertion
+10. `eba1b161` - 13.12.4: Update to create comprehensive CLI user guide
+11. `6ccef83d` - 13.12.3 test fixes
 
-**Ready for Implementation**: All tasks fully specified with complete code examples, clear acceptance criteria, and comprehensive documentation plan.
+### Time Actual vs Estimate
+
+- **Estimated**: 7 hours (2h + 0h + 2h + 3h)
+- **Actual**: ~7 hours
+- **Accuracy**: 100%
+
+**Phase 13.12 successfully integrated CLI commands for memory and context operations with comprehensive documentation, establishing patterns for future CLI enhancements.**
 
 ---
 

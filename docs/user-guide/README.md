@@ -64,6 +64,15 @@
 - Performance tuning and troubleshooting
 - Environment variables for memory system
 
+### 3c. [CLI Reference](cli.md) ⭐ Phase 13.12.4
+**Complete CLI command reference**
+- All 16 command groups documented (run, exec, repl, debug, kernel, state, session, config, keys, backup, app, tool, model, template, memory, context)
+- Each command includes: description, usage, options, examples, use cases
+- Memory commands (add, search, query, stats, consolidate) with kernel protocol explanation
+- Context commands (assemble, strategies, analyze) with strategy recommendations
+- Global options and built-in profiles
+- Quick reference table of contents
+
 ### 4. [Security & Permissions](security-and-permissions.md) ⭐ Phase 11a.13
 **Comprehensive security sandbox guide for safe tool execution**
 - Three-level security model (Safe/Restricted/Privileged)
