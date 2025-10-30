@@ -225,7 +225,9 @@ fn test_context_strategies_help() {
         .arg("--help")
         .assert()
         .success()
-        .stdout(predicate::str::contains("available context assembly strategies"));
+        .stdout(predicate::str::contains(
+            "available context assembly strategies",
+        ));
 }
 
 #[test]

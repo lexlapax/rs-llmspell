@@ -6121,6 +6121,7 @@ Assemble context for LLM prompts using retrieval strategies...
 - [ ] "See Also" section links to related documentation
 - [ ] Examples follow consistent format across all commands
 - [ ] Documentation is user-friendly and comprehensive
+- [ ] `docs/user-guide/README.md` is updated with new files
 
 ---
 
