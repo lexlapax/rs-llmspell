@@ -3564,9 +3564,15 @@ Implemented complete consolidation feedback mechanism in 3 phases over ~3 hours:
 
 **Architectural Changes from Original Plan**:
 - ✅ **Kernel Message Protocol**: All commands use kernel protocol (consistent with template/tool commands)
+- ✅ **Template Pattern Adopted**: Separate ScriptExecutor methods per operation (handle_memory_add, handle_memory_search, etc.) following existing template command pattern
 - ❌ **Graph Commands Removed**: No `llmspell graph` - missing backend methods (list_entities, get_entity, get_relationships)
 - ✅ **Memory Query Added**: `memory query` subcommand uses `MemoryBridge.semantic_query()` for semantic search
 - ✅ **Sessions Removed**: No `memory sessions` - stats() already provides `sessions_with_unprocessed` count
+
+**Pattern Analysis Complete**: Cross-checked with template/tool implementations. Memory/context commands now follow established pattern:
+- ScriptExecutor trait: Separate typed methods per operation
+- Kernel handlers: Extract typed params, call trait methods, wrap responses
+- ScriptRuntime impl: Downcast to concrete bridges, perform operations
 
 **Architectural Analysis**:
 - **Existing CLI Architecture** (from `llmspell-cli/src/`):

@@ -1124,6 +1124,8 @@ impl<P: Protocol + 'static> IntegratedKernel<P> {
             "tool_request" => self.handle_tool_request(message).await?,
             "template_request" => self.handle_template_request(message).await?,
             "model_request" => self.handle_model_request(message).await?,
+            "memory_request" => self.handle_memory_request(message).await?,
+            "context_request" => self.handle_context_request(message).await?,
             _ => {
                 warn!("Unhandled message type: {}", msg_type);
             }
@@ -2162,6 +2164,96 @@ impl<P: Protocol + 'static> IntegratedKernel<P> {
             }
         } else {
             warn!("No transport available for template_reply - falling back to stdout");
+            // Fallback to stdout if no transport (for embedded scenarios)
+            self.io_manager.write_stdout(&content.to_string()).await
+        }
+    }
+
+    /// Send memory reply back to client (Phase 13.12.1)
+    async fn send_memory_reply(&mut self, content: serde_json::Value) -> Result<()> {
+        debug!("Sending memory reply through message protocol");
+
+        // Ensure we have client identity for routing
+        let client_identity = self
+            .current_client_identity
+            .clone()
+            .ok_or_else(|| anyhow!("No client identity available for memory reply routing"))?;
+
+        // Ensure we have message header for correlation
+        if self.current_msg_header.is_none() {
+            return Err(anyhow!(
+                "No message header available for memory reply correlation"
+            ));
+        }
+
+        // Create multipart response using existing infrastructure
+        let multipart_response =
+            self.create_multipart_response(&client_identity, "memory_reply", &content)?;
+
+        debug!(
+            "memory_reply multipart created, {} parts",
+            multipart_response.len()
+        );
+
+        // Send via shell channel (same as other command replies)
+        if let Some(ref mut transport) = self.transport {
+            match transport.send("shell", multipart_response).await {
+                Ok(()) => {
+                    debug!("memory_reply sent successfully via shell channel");
+                    Ok(())
+                }
+                Err(e) => {
+                    error!("Failed to send memory_reply: {}", e);
+                    Err(anyhow!("Failed to send memory reply: {}", e))
+                }
+            }
+        } else {
+            warn!("No transport available for memory_reply - falling back to stdout");
+            // Fallback to stdout if no transport (for embedded scenarios)
+            self.io_manager.write_stdout(&content.to_string()).await
+        }
+    }
+
+    /// Send context reply back to client (Phase 13.12.3)
+    async fn send_context_reply(&mut self, content: serde_json::Value) -> Result<()> {
+        debug!("Sending context reply through message protocol");
+
+        // Ensure we have client identity for routing
+        let client_identity = self
+            .current_client_identity
+            .clone()
+            .ok_or_else(|| anyhow!("No client identity available for context reply routing"))?;
+
+        // Ensure we have message header for correlation
+        if self.current_msg_header.is_none() {
+            return Err(anyhow!(
+                "No message header available for context reply correlation"
+            ));
+        }
+
+        // Create multipart response using existing infrastructure
+        let multipart_response =
+            self.create_multipart_response(&client_identity, "context_reply", &content)?;
+
+        debug!(
+            "context_reply multipart created, {} parts",
+            multipart_response.len()
+        );
+
+        // Send via shell channel (same as other command replies)
+        if let Some(ref mut transport) = self.transport {
+            match transport.send("shell", multipart_response).await {
+                Ok(()) => {
+                    debug!("context_reply sent successfully via shell channel");
+                    Ok(())
+                }
+                Err(e) => {
+                    error!("Failed to send context_reply: {}", e);
+                    Err(anyhow!("Failed to send context reply: {}", e))
+                }
+            }
+        } else {
+            warn!("No transport available for context_reply - falling back to stdout");
             // Fallback to stdout if no transport (for embedded scenarios)
             self.io_manager.write_stdout(&content.to_string()).await
         }
@@ -3466,6 +3558,378 @@ impl<P: Protocol + 'static> IntegratedKernel<P> {
         }
 
         Ok(())
+    }
+
+    /// Handle memory request for memory operations (Phase 13.12.1)
+    async fn handle_memory_request(&mut self, message: HashMap<String, Value>) -> Result<()> {
+        info!("Handling memory_request");
+
+        let content = message
+            .get("content")
+            .ok_or_else(|| anyhow!("No content in memory_request"))?;
+
+        let command = content
+            .get("command")
+            .and_then(|v| v.as_str())
+            .ok_or_else(|| anyhow!("No command in memory_request"))?;
+
+        // Handle memory commands (follows template pattern)
+        match command {
+            "add" => self.handle_memory_add(content).await,
+            "search" => self.handle_memory_search(content).await,
+            "query" => self.handle_memory_query(content).await,
+            "stats" => self.handle_memory_stats(content).await,
+            "consolidate" => self.handle_memory_consolidate(content).await,
+            _ => self.handle_unknown_memory_command(command).await,
+        }
+    }
+
+    /// Handle memory add command
+    async fn handle_memory_add(&mut self, content: &Value) -> Result<()> {
+        let session_id = content["session_id"]
+            .as_str()
+            .ok_or_else(|| anyhow!("Missing session_id"))?;
+        let role = content["role"]
+            .as_str()
+            .ok_or_else(|| anyhow!("Missing role"))?;
+        let message_content = content["content"]
+            .as_str()
+            .ok_or_else(|| anyhow!("Missing content"))?;
+        let metadata = content.get("metadata").cloned().unwrap_or(json!({}));
+
+        debug!("Adding memory entry: session={}, role={}", session_id, role);
+
+        // Use ScriptExecutor trait method
+        match self
+            .script_executor
+            .handle_memory_add(session_id, role, message_content, metadata)
+        {
+            Ok(_result) => {
+                let response = json!({
+                    "msg_type": "memory_reply",
+                    "content": {
+                        "status": "success"
+                    }
+                });
+                self.send_memory_reply(response).await
+            }
+            Err(e) => {
+                let error = json!({
+                    "msg_type": "memory_reply",
+                    "content": {
+                        "status": "error",
+                        "error": format!("Failed to add memory: {}", e)
+                    }
+                });
+                self.send_memory_reply(error).await
+            }
+        }
+    }
+
+    /// Handle memory search command
+    async fn handle_memory_search(&mut self, content: &Value) -> Result<()> {
+        let query = content["query"]
+            .as_str()
+            .ok_or_else(|| anyhow!("Missing query"))?;
+        let limit = content
+            .get("limit")
+            .and_then(|l| l.as_u64())
+            .unwrap_or(10) as usize;
+        let session_id = content.get("session_id").and_then(|s| s.as_str());
+
+        debug!("Searching memory: query='{}', limit={}, session={:?}", query, limit, session_id);
+
+        // Use ScriptExecutor trait method
+        match self
+            .script_executor
+            .handle_memory_search(session_id, query, limit)
+        {
+            Ok(results) => {
+                let response = json!({
+                    "msg_type": "memory_reply",
+                    "content": {
+                        "status": "ok",
+                        "results": results
+                    }
+                });
+                self.send_memory_reply(response).await
+            }
+            Err(e) => {
+                let error = json!({
+                    "msg_type": "memory_reply",
+                    "content": {
+                        "status": "error",
+                        "error": format!("Failed to search memory: {}", e)
+                    }
+                });
+                self.send_memory_reply(error).await
+            }
+        }
+    }
+
+    /// Handle memory query command
+    async fn handle_memory_query(&mut self, content: &Value) -> Result<()> {
+        let query = content["query"]
+            .as_str()
+            .ok_or_else(|| anyhow!("Missing query"))?;
+        let limit = content
+            .get("limit")
+            .and_then(|l| l.as_u64())
+            .unwrap_or(10) as usize;
+
+        debug!("Querying semantic memory: query='{}', limit={}", query, limit);
+
+        // Use ScriptExecutor trait method
+        match self.script_executor.handle_memory_query(query, limit) {
+            Ok(entities) => {
+                let response = json!({
+                    "msg_type": "memory_reply",
+                    "content": {
+                        "status": "ok",
+                        "entities": entities
+                    }
+                });
+                self.send_memory_reply(response).await
+            }
+            Err(e) => {
+                let error = json!({
+                    "msg_type": "memory_reply",
+                    "content": {
+                        "status": "error",
+                        "error": format!("Failed to query memory: {}", e)
+                    }
+                });
+                self.send_memory_reply(error).await
+            }
+        }
+    }
+
+    /// Handle memory stats command
+    async fn handle_memory_stats(&mut self, _content: &Value) -> Result<()> {
+        debug!("Getting memory stats");
+
+        // Use ScriptExecutor trait method
+        match self.script_executor.handle_memory_stats() {
+            Ok(stats) => {
+                let response = json!({
+                    "msg_type": "memory_reply",
+                    "content": {
+                        "status": "ok",
+                        "stats": stats
+                    }
+                });
+                self.send_memory_reply(response).await
+            }
+            Err(e) => {
+                let error = json!({
+                    "msg_type": "memory_reply",
+                    "content": {
+                        "status": "error",
+                        "error": format!("Failed to get memory stats: {}", e)
+                    }
+                });
+                self.send_memory_reply(error).await
+            }
+        }
+    }
+
+    /// Handle memory consolidate command
+    async fn handle_memory_consolidate(&mut self, content: &Value) -> Result<()> {
+        let session_id = content.get("session_id").and_then(|s| s.as_str());
+        let force = content
+            .get("force")
+            .and_then(|f| f.as_bool())
+            .unwrap_or(false);
+
+        debug!("Consolidating memory: session={:?}, force={}", session_id, force);
+
+        // Use ScriptExecutor trait method
+        match self.script_executor.handle_memory_consolidate(session_id, force) {
+            Ok(result) => {
+                let response = json!({
+                    "msg_type": "memory_reply",
+                    "content": {
+                        "status": "ok",
+                        "result": result
+                    }
+                });
+                self.send_memory_reply(response).await
+            }
+            Err(e) => {
+                let error = json!({
+                    "msg_type": "memory_reply",
+                    "content": {
+                        "status": "error",
+                        "error": format!("Failed to consolidate memory: {}", e)
+                    }
+                });
+                self.send_memory_reply(error).await
+            }
+        }
+    }
+
+    /// Handle unknown memory command
+    async fn handle_unknown_memory_command(&mut self, command: &str) -> Result<()> {
+        warn!("Unknown memory command: {}", command);
+        let error = json!({
+            "msg_type": "memory_reply",
+            "content": {
+                "status": "error",
+                "error": format!("Unknown memory command: {command}")
+            }
+        });
+
+        self.send_memory_reply(error).await
+    }
+
+    /// Handle context request for context assembly operations (Phase 13.12.3)
+    async fn handle_context_request(&mut self, message: HashMap<String, Value>) -> Result<()> {
+        info!("Handling context_request");
+
+        let content = message
+            .get("content")
+            .ok_or_else(|| anyhow!("No content in context_request"))?;
+
+        let command = content
+            .get("command")
+            .and_then(|v| v.as_str())
+            .ok_or_else(|| anyhow!("No command in context_request"))?;
+
+        // Handle context commands (follows template pattern)
+        match command {
+            "assemble" => self.handle_context_assemble(content).await,
+            "strategies" => self.handle_context_strategies(content).await,
+            "analyze" => self.handle_context_analyze(content).await,
+            _ => self.handle_unknown_context_command(command).await,
+        }
+    }
+
+    /// Handle context assemble command
+    async fn handle_context_assemble(&mut self, content: &Value) -> Result<()> {
+        let query = content["query"]
+            .as_str()
+            .ok_or_else(|| anyhow!("Missing query"))?;
+        let strategy = content
+            .get("strategy")
+            .and_then(|s| s.as_str())
+            .unwrap_or("hybrid");
+        let budget = content
+            .get("budget")
+            .and_then(|b| b.as_u64())
+            .unwrap_or(2000) as usize;
+        let session_id = content.get("session_id").and_then(|s| s.as_str());
+
+        debug!(
+            "Assembling context: query='{}', strategy={}, budget={}",
+            query, strategy, budget
+        );
+
+        // Use ScriptExecutor trait method
+        match self
+            .script_executor
+            .handle_context_assemble(query, strategy, budget, session_id)
+        {
+            Ok(result) => {
+                let response = json!({
+                    "msg_type": "context_reply",
+                    "content": {
+                        "status": "ok",
+                        "result": result
+                    }
+                });
+                self.send_context_reply(response).await
+            }
+            Err(e) => {
+                let error = json!({
+                    "msg_type": "context_reply",
+                    "content": {
+                        "status": "error",
+                        "error": format!("Failed to assemble context: {}", e)
+                    }
+                });
+                self.send_context_reply(error).await
+            }
+        }
+    }
+
+    /// Handle context strategies command
+    async fn handle_context_strategies(&mut self, _content: &Value) -> Result<()> {
+        debug!("Listing context strategies");
+
+        // Use ScriptExecutor trait method
+        match self.script_executor.handle_context_strategies() {
+            Ok(strategies) => {
+                let response = json!({
+                    "msg_type": "context_reply",
+                    "content": {
+                        "status": "ok",
+                        "strategies": strategies
+                    }
+                });
+                self.send_context_reply(response).await
+            }
+            Err(e) => {
+                let error = json!({
+                    "msg_type": "context_reply",
+                    "content": {
+                        "status": "error",
+                        "error": format!("Failed to list strategies: {}", e)
+                    }
+                });
+                self.send_context_reply(error).await
+            }
+        }
+    }
+
+    /// Handle context analyze command
+    async fn handle_context_analyze(&mut self, content: &Value) -> Result<()> {
+        let query = content["query"]
+            .as_str()
+            .ok_or_else(|| anyhow!("Missing query"))?;
+        let budget = content
+            .get("budget")
+            .and_then(|b| b.as_u64())
+            .unwrap_or(2000) as usize;
+
+        debug!("Analyzing context: query='{}', budget={}", query, budget);
+
+        // Use ScriptExecutor trait method
+        match self.script_executor.handle_context_analyze(query, budget) {
+            Ok(analysis) => {
+                let response = json!({
+                    "msg_type": "context_reply",
+                    "content": {
+                        "status": "ok",
+                        "analysis": analysis
+                    }
+                });
+                self.send_context_reply(response).await
+            }
+            Err(e) => {
+                let error = json!({
+                    "msg_type": "context_reply",
+                    "content": {
+                        "status": "error",
+                        "error": format!("Failed to analyze context: {}", e)
+                    }
+                });
+                self.send_context_reply(error).await
+            }
+        }
+    }
+
+    /// Handle unknown context command
+    async fn handle_unknown_context_command(&mut self, command: &str) -> Result<()> {
+        warn!("Unknown context command: {}", command);
+        let error = json!({
+            "msg_type": "context_reply",
+            "content": {
+                "status": "error",
+                "error": format!("Unknown context command: {command}")
+            }
+        });
+
+        self.send_context_reply(error).await
     }
 
     /// Run kernel as daemon
