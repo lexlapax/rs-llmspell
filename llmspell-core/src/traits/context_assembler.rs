@@ -20,7 +20,7 @@
 //!
 //! # Design Decision
 //!
-//! Task 13.11.0 initially used type erasure (Arc<dyn Any>) to avoid circular dependency.
+//! Task 13.11.0 initially used type erasure (`Arc<dyn Any>`) to avoid circular dependency.
 //! Task 13.11.1a extracts this trait to enable compile-time type safety while maintaining
 //! clean layering.
 

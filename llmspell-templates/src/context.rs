@@ -256,7 +256,7 @@ impl ExecutionContext {
     }
 
     /// Get context bridge if available (Task 13.11.1a)
-    /// Returns Arc<dyn ContextAssembler> for compile-time type safety
+    /// Returns `Arc<dyn ContextAssembler>` for compile-time type safety
     pub fn context_bridge(&self) -> Option<Arc<dyn llmspell_core::ContextAssembler>> {
         trace!("ExecutionContext: Accessing context bridge");
         self.context_bridge.clone()
@@ -272,7 +272,7 @@ impl ExecutionContext {
     }
 
     /// Require context bridge or return error (Task 13.11.1a)
-    /// Returns Arc<dyn ContextAssembler> for compile-time type safety
+    /// Returns `Arc<dyn ContextAssembler>` for compile-time type safety
     pub fn require_context_bridge(
         &self,
     ) -> crate::error::Result<Arc<dyn llmspell_core::ContextAssembler>> {

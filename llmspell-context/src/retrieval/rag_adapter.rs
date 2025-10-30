@@ -17,7 +17,7 @@ const RAG_RANKER_NAME: &str = "rag_vector_search";
 /// - RAGResult.id → Chunk.id
 /// - RAGResult.content → Chunk.content
 /// - RAGResult.timestamp → Chunk.timestamp
-/// - RAGResult.metadata → Chunk.metadata (converts `HashMap` to Option<Value>)
+/// - RAGResult.metadata → Chunk.metadata (converts `HashMap` to `Option<Value>`)
 /// - RAGResult.score → RankedChunk.score
 ///
 /// # Arguments
