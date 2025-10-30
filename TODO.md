@@ -3558,88 +3558,572 @@ Implemented complete consolidation feedback mechanism in 3 phases over ~3 hours:
 
 ---
 
-## Phase 13.12: CLI + UX Integration (Day 20, 8 hours)
+## Phase 13.12: CLI + UX Integration (Day 20, REVISED: 5 hours)
 
-**Overview**: Add CLI commands for memory, graph, and context operations with interactive UX enhancements.
+**Overview**: Add CLI commands for memory and context operations using kernel message protocol with interactive UX enhancements.
+
+**Architectural Changes from Original Plan**:
+- ✅ **Kernel Message Protocol**: All commands use kernel protocol (consistent with template/tool commands)
+- ❌ **Graph Commands Removed**: No `llmspell graph` - missing backend methods (list_entities, get_entity, get_relationships)
+- ✅ **Memory Query Added**: `memory query` subcommand uses `MemoryBridge.semantic_query()` for semantic search
+- ✅ **Sessions Removed**: No `memory sessions` - stats() already provides `sessions_with_unprocessed` count
 
 **Architectural Analysis**:
 - **Existing CLI Architecture** (from `llmspell-cli/src/`):
   - Command structure: `llmspell <command> <subcommand> [flags]`
   - Handler pattern: `commands/<module>/mod.rs` with `handle_<subcommand>()`
-  - Bridge access: Via `GlobalContext` or direct component creation
+  - **Kernel protocol access**: Via `ExecutionContext` → `handle.send_memory_request()` / `handle.send_context_request()`
   - Output formatting: Plain text, JSON (`--json`), interactive tables
+  - **Established pattern**: `template.rs` and `tool.rs` use kernel message protocol for embedded/remote support
 - **New Commands**:
-  - `llmspell memory` - Memory operations (episodic, semantic, stats, consolidate)
-  - `llmspell graph` - Knowledge graph inspection (entities, relationships, query)
-  - `llmspell context` - Context assembly (assemble, strategies, budget)
+  - `llmspell memory` - Memory operations (add, search, query, stats, consolidate)
+  - `llmspell context` - Context assembly (assemble, strategies, analyze)
 - **Task 13.5.7d Completion**: Document template parameter schemas (provider_name)
 
 **Time Breakdown**:
-- Task 13.12.1: `llmspell memory` command (3h)
-- Task 13.12.2: `llmspell graph` command (2h)
-- Task 13.12.3: `llmspell context` command (2h)
+- Task 13.12.1: `llmspell memory` command (2h) - 5 subcommands via kernel protocol
+- Task 13.12.2: DELETED (graph commands removed - no backend support)
+- Task 13.12.3: `llmspell context` command (2h) - 3 subcommands via kernel protocol
 - Task 13.12.4: Documentation + Task 13.5.7d completion (1h)
+
+**Summary of Changes**:
+- **Removed**: `memory sessions` subcommand (no backend method), entire Task 13.12.2 (graph commands), direct bridge access pattern
+- **Added**: `memory query` subcommand, kernel message protocol, `handle_memory_request()` / `handle_context_request()` handlers
+- **Time Reduction**: 8h → 5h (3 hours saved)
 
 ---
 
 ### Task 13.12.1: `llmspell memory` Command - Memory Operations
 
 **Priority**: CRITICAL
-**Estimated Time**: 3 hours
+**Estimated Time**: 2 hours (reduced from 3h)
 **Assignee**: CLI Team
 **Status**: READY TO START
 
-**Description**: Implement CLI commands for memory inspection, adding entries, searching, and consolidation with interactive output formatting.
+**Description**: Implement CLI commands for memory operations using kernel message protocol for embedded/remote kernel support.
 
 **Architectural Analysis**:
 - **Command Structure**:
   ```bash
   llmspell memory add <session-id> <role> <content> [--metadata JSON]
   llmspell memory search <query> [--session-id ID] [--limit N] [--json]
+  llmspell memory query <text> [--limit N] [--json]    # NEW - semantic search
   llmspell memory stats [--json]
   llmspell memory consolidate [--session-id ID] [--force]
-  llmspell memory sessions [--with-unprocessed]
   ```
-- **Bridge Access**: Use `MemoryBridge` via `GlobalContext` or create directly
+- **Kernel Protocol**: Use `handle.send_memory_request()` (parallel to `send_template_request()` and `send_tool_request()`)
+- **Backend Methods**:
+  - `MemoryBridge.episodic_add()` - Add episodic entry
+  - `MemoryBridge.episodic_search()` - Search episodic memory
+  - `MemoryBridge.semantic_query()` - Query semantic knowledge (NEW for `memory query`)
+  - `MemoryBridge.stats()` - Memory statistics
+  - `MemoryBridge.consolidate()` - Consolidation
 - **Output Format**: Interactive tables for search results, JSON for stats
 
 **Acceptance Criteria**:
-- [ ] `memory add` command adds episodic entry with metadata
-- [ ] `memory search` searches episodic memory with filters
-- [ ] `memory stats` displays memory system statistics
-- [ ] `memory consolidate` triggers consolidation (immediate or background)
-- [ ] `memory sessions` lists sessions with unprocessed entries
+- [ ] `memory add` adds episodic entry with metadata via kernel protocol
+- [ ] `memory search` searches episodic memory with filters via kernel protocol
+- [ ] `memory query` searches semantic knowledge via kernel protocol (NEW)
+- [ ] `memory stats` displays memory system statistics via kernel protocol
+- [ ] `memory consolidate` triggers consolidation via kernel protocol
 - [ ] All commands support `--json` flag for machine-readable output
 - [ ] Interactive tables show search results with highlighting
+- [ ] Kernel message handlers implemented in `llmspell-kernel`
+- [ ] Works with both embedded and remote kernels
 - [ ] Error handling with clear messages
-- [ ] **TRACING**: Command start (info!), bridge calls (debug!), results (debug!), errors (error!)
+- [ ] **TRACING**: Command start (info!), kernel requests (debug!), results (debug!), errors (error!)
 
 **Implementation Steps**:
 
-1. Create `llmspell-cli/src/commands/memory/mod.rs`:
+1. **Add `memory_request` message type to kernel protocol** (`llmspell-kernel/src/execution/integrated.rs`):
    ```rust
-   //! ABOUTME: CLI commands for memory operations (episodic, semantic, consolidation)
-
-   use crate::error::Result;
-   use clap::{Args, Subcommand};
-   use llmspell_bridge::MemoryBridge;
-   use llmspell_memory::DefaultMemoryManager;
-   use serde_json::json;
-   use std::sync::Arc;
-   use tracing::{debug, error, info, warn};
-
-   #[derive(Debug, Args)]
-   pub struct MemoryCommand {
-       #[command(subcommand)]
-       pub command: MemorySubcommand,
-
-       /// Output JSON instead of human-readable format
-       #[arg(long, global = true)]
-       pub json: bool,
+   // In handle_shell_message() match statement (around line 500):
+   "memory_request" => {
+       self.handle_memory_request(message).await?;
+       Ok(())
    }
 
+   // Add new method to IntegratedKernel impl (around line 2500):
+   async fn handle_memory_request(&mut self, message: HashMap<String, Value>) -> Result<()> {
+       debug!("Handling memory_request");
+
+       let content = message.get("content").ok_or(anyhow!("No content in memory_request"))?;
+       let command = content.get("command")
+           .and_then(|c| c.as_str())
+           .ok_or(anyhow!("No command in memory_request"))?;
+
+       trace!("Memory command: {}", command);
+
+       // Get MemoryBridge from script_executor's GlobalContext
+       let bridge = self.script_executor
+           .memory_bridge()
+           .ok_or_else(|| anyhow!("No MemoryBridge available - memory system not initialized"))?;
+
+       match command {
+           "add" => {
+               info!("Memory add request");
+               let session_id = content["session_id"].as_str()
+                   .ok_or(anyhow!("Missing session_id"))?;
+               let role = content["role"].as_str()
+                   .ok_or(anyhow!("Missing role"))?;
+               let message_content = content["content"].as_str()
+                   .ok_or(anyhow!("Missing content"))?;
+               let metadata = content.get("metadata").unwrap_or(&json!({})).clone();
+
+               debug!("Adding episodic entry: session={}, role={}", session_id, role);
+
+               bridge.episodic_add(
+                   session_id.to_string(),
+                   role.to_string(),
+                   message_content.to_string(),
+                   metadata
+               ).await.map_err(|e| anyhow!("episodic_add failed: {}", e))?;
+
+               self.send_memory_reply(json!({"status": "success"})).await
+           }
+
+           "search" => {
+               info!("Memory search request");
+               let query = content["query"].as_str()
+                   .ok_or(anyhow!("Missing query"))?;
+               let limit = content.get("limit")
+                   .and_then(|l| l.as_u64())
+                   .unwrap_or(10) as usize;
+               let session_id = content.get("session_id")
+                   .and_then(|s| s.as_str())
+                   .unwrap_or("");
+
+               debug!("Searching episodic memory: query='{}', limit={}, session={}",
+                   query, limit, session_id);
+
+               let results = bridge.episodic_search(session_id, query, limit).await
+                   .map_err(|e| anyhow!("episodic_search failed: {}", e))?;
+
+               self.send_memory_reply(json!({"results": results})).await
+           }
+
+           "query" => {  // NEW - semantic search
+               info!("Memory semantic query request");
+               let query_text = content["query"].as_str()
+                   .ok_or(anyhow!("Missing query"))?;
+               let limit = content.get("limit")
+                   .and_then(|l| l.as_u64())
+                   .unwrap_or(10) as usize;
+
+               debug!("Querying semantic memory: query='{}', limit={}", query_text, limit);
+
+               let entities = bridge.semantic_query(query_text, limit).await
+                   .map_err(|e| anyhow!("semantic_query failed: {}", e))?;
+
+               self.send_memory_reply(json!({"entities": entities})).await
+           }
+
+           "stats" => {
+               info!("Memory stats request");
+
+               let stats = bridge.stats().await
+                   .map_err(|e| anyhow!("stats failed: {}", e))?;
+
+               debug!("Memory stats retrieved");
+               self.send_memory_reply(json!({"stats": stats})).await
+           }
+
+           "consolidate" => {
+               info!("Memory consolidate request");
+               let session_id = content.get("session_id").and_then(|s| s.as_str());
+               let force = content.get("force").and_then(|f| f.as_bool()).unwrap_or(false);
+
+               debug!("Consolidating: session={:?}, force={}", session_id, force);
+
+               let result = bridge.consolidate(session_id, force).await
+                   .map_err(|e| anyhow!("consolidate failed: {}", e))?;
+
+               self.send_memory_reply(json!({"result": result})).await
+           }
+
+           _ => {
+               error!("Unknown memory command: {}", command);
+               Err(anyhow!("Unknown memory command: {}", command))
+           }
+       }
+   }
+
+   async fn send_memory_reply(&mut self, content: Value) -> Result<()> {
+       debug!("Sending memory_reply");
+       let reply = json!({
+           "msg_type": "memory_reply",
+           "content": content,
+       });
+       self.send_shell_message(reply).await
+   }
+   ```
+
+2. **Add `send_memory_request()` to KernelHandle** (`llmspell-kernel/src/api.rs`):
+   ```rust
+   /// Send memory request and wait for response
+   ///
+   /// This sends a memory operation request to the kernel and waits for the reply.
+   /// Used by CLI memory commands to interact with the memory system via the kernel.
+   ///
+   /// # Arguments
+   /// * `content` - The memory request content (command, parameters)
+   ///
+   /// # Returns
+   /// The memory reply content as JSON value
+   ///
+   /// # Errors
+   /// Returns error if transport fails or response is invalid
+   pub async fn send_memory_request(&mut self, content: Value) -> Result<Value> {
+       trace!("Sending memory_request");
+
+       let msg = json!({
+           "msg_type": "memory_request",
+           "content": content,
+       });
+
+       self.transport.send_shell_message(msg).await?;
+
+       // Wait for memory_reply
+       loop {
+           let response = self.transport.recv_shell_message().await?;
+           if response.get("msg_type").and_then(|t| t.as_str()) == Some("memory_reply") {
+               debug!("Received memory_reply");
+               return Ok(response.get("content").cloned().unwrap_or(json!({})));
+           }
+           trace!("Skipping non-memory_reply message");
+       }
+   }
+   ```
+
+3. **Add memory_bridge() accessor to ScriptExecutor trait** (`llmspell-core/src/traits/script_executor.rs`):
+   ```rust
+   /// Get memory bridge for CLI access (Phase 13.12.1)
+   ///
+   /// Returns the memory bridge if available, allowing CLI commands to access
+   /// memory operations through the kernel protocol.
+   ///
+   /// # Returns
+   /// `Some(Arc<MemoryBridge>)` if memory system is initialized, `None` otherwise
+   fn memory_bridge(&self) -> Option<Arc<MemoryBridge>> {
+       None  // Default implementation - override in LuaEngine
+   }
+   ```
+
+4. **Implement memory_bridge() in LuaEngine** (`llmspell-bridge/src/lua/engine.rs`):
+   ```rust
+   // In impl ScriptExecutor for LuaEngine (around line 400):
+   fn memory_bridge(&self) -> Option<Arc<MemoryBridge>> {
+       trace!("Getting memory bridge from LuaEngine");
+
+       #[cfg(feature = "lua")]
+       {
+           self.global_context.read()
+               .as_ref()
+               .and_then(|ctx| ctx.memory_bridge.clone())
+       }
+
+       #[cfg(not(feature = "lua"))]
+       {
+           None
+       }
+   }
+   ```
+
+5. **Create `llmspell-cli/src/commands/memory.rs`**:
+   ```rust
+   //! ABOUTME: CLI commands for memory operations via kernel protocol
+   //! ABOUTME: Provides add, search, query, stats, and consolidate subcommands
+
+   use anyhow::{anyhow, Result};
+   use serde_json::json;
+   use tracing::{info, instrument, trace, debug};
+
+   use crate::cli::{MemoryCommands, OutputFormat};
+   use crate::execution_context::ExecutionContext;
+   use crate::output::OutputFormatter;
+   use llmspell_config::LLMSpellConfig;
+
+   /// Handle memory management commands via kernel protocol
+   ///
+   /// This function routes memory commands to the kernel using the message protocol.
+   /// Works with both embedded and remote kernels for consistent behavior.
+   #[instrument(skip(runtime_config), fields(command_type))]
+   pub async fn handle_memory_command(
+       command: MemoryCommands,
+       runtime_config: LLMSpellConfig,
+       output_format: OutputFormat,
+   ) -> Result<()> {
+       trace!("Handling memory command");
+
+       // Resolve execution context (embedded or connected)
+       let context = ExecutionContext::resolve(None, None, None, runtime_config.clone()).await?;
+
+       match context {
+           ExecutionContext::Embedded { handle, config } => {
+               handle_memory_embedded(command, handle, config, output_format).await
+           }
+           ExecutionContext::Connected { handle, address } => {
+               handle_memory_remote(command, handle, address, output_format).await
+           }
+       }
+   }
+
+   /// Handle memory commands in embedded mode
+   async fn handle_memory_embedded(
+       command: MemoryCommands,
+       mut handle: Box<llmspell_kernel::api::KernelHandle>,
+       _config: Box<LLMSpellConfig>,
+       output_format: OutputFormat,
+   ) -> Result<()> {
+       match command {
+           MemoryCommands::Add { session_id, role, content, metadata } => {
+               info!("Adding memory entry via kernel protocol");
+
+               let metadata_value = if let Some(meta_str) = metadata {
+                   serde_json::from_str(&meta_str)
+                       .map_err(|e| anyhow!("Invalid metadata JSON: {}", e))?
+               } else {
+                   json!({})
+               };
+
+               let request = json!({
+                   "command": "add",
+                   "session_id": session_id,
+                   "role": role,
+                   "content": content,
+                   "metadata": metadata_value,
+               });
+
+               let response = handle.send_memory_request(request).await?;
+
+               if response.get("status").and_then(|s| s.as_str()) == Some("success") {
+                   println!("✓ Memory entry added successfully");
+                   Ok(())
+               } else {
+                   Err(anyhow!("Failed to add memory entry"))
+               }
+           }
+
+           MemoryCommands::Search { query, limit, session_id, json: output_json } => {
+               info!("Searching memory via kernel protocol");
+
+               let request = json!({
+                   "command": "search",
+                   "query": query,
+                   "limit": limit,
+                   "session_id": session_id,
+               });
+
+               let response = handle.send_memory_request(request).await?;
+               let results = response.get("results")
+                   .ok_or_else(|| anyhow!("No results in response"))?;
+
+               let fmt = if output_json { OutputFormat::Json } else { output_format };
+               let formatter = OutputFormatter::new(fmt);
+
+               match fmt {
+                   OutputFormat::Json => {
+                       formatter.print_json(results)?;
+                   }
+                   OutputFormat::Pretty | OutputFormat::Text => {
+                       format_search_results(results)?;
+                   }
+               }
+               Ok(())
+           }
+
+           MemoryCommands::Query { query, limit, json: output_json } => {
+               info!("Querying semantic memory via kernel protocol");
+
+               let request = json!({
+                   "command": "query",
+                   "query": query,
+                   "limit": limit,
+               });
+
+               let response = handle.send_memory_request(request).await?;
+               let entities = response.get("entities")
+                   .ok_or_else(|| anyhow!("No entities in response"))?;
+
+               let fmt = if output_json { OutputFormat::Json } else { output_format };
+               let formatter = OutputFormatter::new(fmt);
+
+               match fmt {
+                   OutputFormat::Json => {
+                       formatter.print_json(entities)?;
+                   }
+                   OutputFormat::Pretty | OutputFormat::Text => {
+                       format_semantic_results(entities)?;
+                   }
+               }
+               Ok(())
+           }
+
+           MemoryCommands::Stats { json: output_json } => {
+               info!("Fetching memory stats via kernel protocol");
+
+               let request = json!({"command": "stats"});
+               let response = handle.send_memory_request(request).await?;
+               let stats = response.get("stats")
+                   .ok_or_else(|| anyhow!("No stats in response"))?;
+
+               let fmt = if output_json { OutputFormat::Json } else { output_format };
+               let formatter = OutputFormatter::new(fmt);
+
+               match fmt {
+                   OutputFormat::Json => {
+                       formatter.print_json(stats)?;
+                   }
+                   OutputFormat::Pretty | OutputFormat::Text => {
+                       format_stats(stats)?;
+                   }
+               }
+               Ok(())
+           }
+
+           MemoryCommands::Consolidate { session_id, force } => {
+               info!("Triggering consolidation via kernel protocol");
+
+               let request = json!({
+                   "command": "consolidate",
+                   "session_id": session_id,
+                   "force": force,
+               });
+
+               let response = handle.send_memory_request(request).await?;
+               let result = response.get("result")
+                   .ok_or_else(|| anyhow!("No result in response"))?;
+
+               let entities_created = result.get("entities_created")
+                   .and_then(|c| c.as_u64())
+                   .unwrap_or(0);
+
+               println!("✓ Consolidation complete: {} entities created", entities_created);
+               Ok(())
+           }
+       }
+   }
+
+   /// Handle memory commands in remote mode (same logic as embedded)
+   async fn handle_memory_remote(
+       command: MemoryCommands,
+       handle: Box<llmspell_kernel::api::KernelHandle>,
+       address: String,
+       output_format: OutputFormat,
+   ) -> Result<()> {
+       trace!("Handling memory command in remote mode: {}", address);
+       handle_memory_embedded(command, handle, Box::new(Default::default()), output_format).await
+   }
+
+   /// Format episodic search results for interactive display
+   fn format_search_results(results: &serde_json::Value) -> Result<()> {
+       if let Some(entries) = results.get("entries").and_then(|e| e.as_array()) {
+           println!("\nEpisodic Memory Search Results:");
+           println!("{}", "=".repeat(80));
+           println!("Found {} entries\n", entries.len());
+
+           for (i, entry) in entries.iter().enumerate() {
+               let role = entry.get("role").and_then(|r| r.as_str()).unwrap_or("unknown");
+               let content = entry.get("content").and_then(|c| c.as_str()).unwrap_or("");
+               let timestamp = entry.get("timestamp").and_then(|t| t.as_str()).unwrap_or("");
+
+               println!("{}. [{}] {} - {}", i + 1, role, timestamp, content);
+           }
+       } else {
+           println!("\nNo search results found");
+       }
+       Ok(())
+   }
+
+   /// Format semantic query results for interactive display
+   fn format_semantic_results(entities: &serde_json::Value) -> Result<()> {
+       if let Some(entity_list) = entities.get("entities").and_then(|e| e.as_array()) {
+           println!("\nSemantic Knowledge Query Results:");
+           println!("{}", "=".repeat(80));
+           println!("Found {} entities\n", entity_list.len());
+
+           for (i, entity) in entity_list.iter().enumerate() {
+               let name = entity.get("name").and_then(|n| n.as_str()).unwrap_or("unknown");
+               let entity_type = entity.get("entity_type")
+                   .and_then(|t| t.as_str())
+                   .unwrap_or("unknown");
+               let score = entity.get("similarity_score")
+                   .and_then(|s| s.as_f64())
+                   .unwrap_or(0.0);
+
+               println!("{}. {} (type: {}) - similarity: {:.2}", i + 1, name, entity_type, score);
+
+               if let Some(props) = entity.get("properties").and_then(|p| p.as_object()) {
+                   for (key, value) in props.iter() {
+                       println!("   {}: {}", key, value);
+                   }
+               }
+               println!();
+           }
+       } else {
+           println!("\nNo semantic entities found");
+       }
+       Ok(())
+   }
+
+   /// Format memory statistics for interactive display
+   fn format_stats(stats: &serde_json::Value) -> Result<()> {
+       println!("\n=== Memory Statistics ===\n");
+
+       if let Some(episodic) = stats.get("episodic_entries").and_then(|e| e.as_u64()) {
+           println!("Episodic entries: {}", episodic);
+       }
+       if let Some(semantic) = stats.get("semantic_entities").and_then(|e| e.as_u64()) {
+           println!("Semantic entities: {}", semantic);
+       }
+       if let Some(sessions) = stats.get("sessions_with_unprocessed").and_then(|s| s.as_u64()) {
+           println!("Sessions with unprocessed: {}", sessions);
+       }
+
+       if let Some(caps) = stats.get("capabilities").and_then(|c| c.as_object()) {
+           println!("\nCapabilities:");
+           for (key, value) in caps.iter() {
+               println!("  {}: {}", key, value);
+           }
+       }
+
+       println!();
+       Ok(())
+   }
+   ```
+
+6. **Update `llmspell-cli/src/cli.rs` to add Memory command**:
+   ```rust
+   // Add to Commands enum (around line 500):
+
+   /// Memory management (episodic, semantic, consolidation)
+   #[command(
+       long_about = "Manage episodic and semantic memory operations.
+
+   SUBCOMMANDS:
+       add         Add episodic memory entry
+       search      Search episodic memory
+       query       Query semantic knowledge graph
+       stats       Show memory statistics
+       consolidate Consolidate episodic to semantic memory
+
+   EXAMPLES:
+       llmspell memory add session-123 user \"What is Rust?\"
+       llmspell memory search \"ownership\" --limit 5
+       llmspell memory query \"programming concepts\" --limit 10
+       llmspell memory stats --json
+       llmspell memory consolidate --session-id session-123 --force"
+   )]
+   Memory {
+       #[command(subcommand)]
+       command: MemoryCommands,
+   },
+
+   // Add new enum after Commands (around line 700):
+
+   /// Memory command variants
    #[derive(Debug, Subcommand)]
-   pub enum MemorySubcommand {
+   pub enum MemoryCommands {
        /// Add episodic memory entry
        Add {
            /// Session ID
@@ -3668,10 +4152,32 @@ Implemented complete consolidation feedback mechanism in 3 phases over ~3 hours:
            /// Filter by session ID
            #[arg(long)]
            session_id: Option<String>,
+
+           /// Output JSON
+           #[arg(long)]
+           json: bool,
+       },
+
+       /// Query semantic knowledge graph
+       Query {
+           /// Semantic query text
+           query: String,
+
+           /// Limit results
+           #[arg(short, long, default_value = "10")]
+           limit: usize,
+
+           /// Output JSON
+           #[arg(long)]
+           json: bool,
        },
 
        /// Show memory statistics
-       Stats,
+       Stats {
+           /// Output JSON
+           #[arg(long)]
+           json: bool,
+       },
 
        /// Consolidate episodic to semantic memory
        Consolidate {
@@ -3683,504 +4189,154 @@ Implemented complete consolidation feedback mechanism in 3 phases over ~3 hours:
            #[arg(long)]
            force: bool,
        },
-
-       /// List sessions with memory
-       Sessions {
-           /// Show only sessions with unprocessed entries
-           #[arg(long)]
-           with_unprocessed: bool,
-       },
-   }
-
-   pub async fn handle_memory(cmd: MemoryCommand) -> Result<()> {
-       info!("Executing memory command: {:?}", cmd.command);
-
-       // Create memory bridge (in production, get from GlobalContext)
-       let memory_manager = DefaultMemoryManager::new_in_memory()
-           .await
-           .map_err(|e| {
-               error!("Failed to create memory manager: {}", e);
-               anyhow::anyhow!("Failed to create memory manager: {}", e)
-           })?;
-       let bridge = Arc::new(MemoryBridge::new(Arc::new(memory_manager)));
-
-       match cmd.command {
-           MemorySubcommand::Add { session_id, role, content, metadata } => {
-               handle_add(bridge, &session_id, &role, &content, metadata.as_deref(), cmd.json).await
-           }
-           MemorySubcommand::Search { query, limit, session_id } => {
-               handle_search(bridge, &query, limit, session_id.as_deref(), cmd.json).await
-           }
-           MemorySubcommand::Stats => {
-               handle_stats(bridge, cmd.json).await
-           }
-           MemorySubcommand::Consolidate { session_id, force } => {
-               handle_consolidate(bridge, session_id.as_deref(), force, cmd.json).await
-           }
-           MemorySubcommand::Sessions { with_unprocessed } => {
-               handle_sessions(bridge, with_unprocessed, cmd.json).await
-           }
-       }
-   }
-
-   async fn handle_add(
-       bridge: Arc<MemoryBridge>,
-       session_id: &str,
-       role: &str,
-       content: &str,
-       metadata_str: Option<&str>,
-       json_output: bool,
-   ) -> Result<()> {
-       info!("Adding episodic entry: session={}, role={}", session_id, role);
-
-       // Parse metadata
-       let metadata = if let Some(s) = metadata_str {
-           serde_json::from_str(s).map_err(|e| {
-               error!("Invalid metadata JSON: {}", e);
-               anyhow::anyhow!("Invalid metadata JSON: {}", e)
-           })?
-       } else {
-           json!({})
-       };
-
-       // Add entry
-       let id = bridge
-           .episodic_add(session_id.to_string(), role.to_string(), content.to_string(), metadata)
-           .map_err(|e| {
-               error!("Failed to add entry: {}", e);
-               anyhow::anyhow!("Failed to add entry: {}", e)
-           })?;
-
-       debug!("Entry added with ID: {}", id);
-
-       if json_output {
-           println!("{}", json!({"id": id, "status": "success"}));
-       } else {
-           println!("✓ Entry added: {}", id);
-       }
-
-       Ok(())
-   }
-
-   async fn handle_search(
-       bridge: Arc<MemoryBridge>,
-       query: &str,
-       limit: usize,
-       session_id: Option<&str>,
-       json_output: bool,
-   ) -> Result<()> {
-       info!("Searching memory: query='{}', limit={}, session={:?}", query, limit, session_id);
-
-       let results = bridge
-           .episodic_search(session_id.unwrap_or(""), query, limit)
-           .map_err(|e| {
-               error!("Search failed: {}", e);
-               anyhow::anyhow!("Search failed: {}", e)
-           })?;
-
-       if json_output {
-           println!("{}", serde_json::to_string_pretty(&results)?);
-       } else {
-           // Interactive table output
-           let entries = results.as_array().unwrap_or(&vec![]);
-           println!("\n{} results found:\n", entries.len());
-
-           for (i, entry) in entries.iter().enumerate() {
-               let role = entry["role"].as_str().unwrap_or("unknown");
-               let content = entry["content"].as_str().unwrap_or("");
-               let created_at = entry["created_at"].as_str().unwrap_or("");
-
-               println!("[{}] {} ({})", i + 1, role, created_at);
-               println!("    {}\n", content);
-           }
-       }
-
-       Ok(())
-   }
-
-   async fn handle_stats(bridge: Arc<MemoryBridge>, json_output: bool) -> Result<()> {
-       info!("Fetching memory stats");
-
-       let stats = bridge.stats().map_err(|e| {
-           error!("Failed to get stats: {}", e);
-           anyhow::anyhow!("Failed to get stats: {}", e)
-       })?;
-
-       if json_output {
-           println!("{}", serde_json::to_string_pretty(&stats)?);
-       } else {
-           println!("\n=== Memory Statistics ===\n");
-           println!("Episodic entries: {}", stats["episodic_count"]);
-           println!("Semantic entities: {}", stats["semantic_count"]);
-           println!("Sessions with unprocessed: {}", stats["sessions_with_unprocessed"]);
-           println!("\nCapabilities:");
-           println!("  Episodic: {}", stats["has_episodic"]);
-           println!("  Semantic: {}", stats["has_semantic"]);
-           println!("  Consolidation: {}", stats["has_consolidation"]);
-       }
-
-       Ok(())
-   }
-
-   async fn handle_consolidate(
-       bridge: Arc<MemoryBridge>,
-       session_id: Option<&str>,
-       force: bool,
-       json_output: bool,
-   ) -> Result<()> {
-       info!("Consolidating memory: session={:?}, force={}", session_id, force);
-
-       let result = bridge.consolidate(session_id, force).map_err(|e| {
-           error!("Consolidation failed: {}", e);
-           anyhow::anyhow!("Consolidation failed: {}", e)
-       })?;
-
-       if json_output {
-           println!("{}", serde_json::to_string_pretty(&result)?);
-       } else {
-           println!("\n=== Consolidation Complete ===\n");
-           println!("Entries processed: {}", result["entries_processed"]);
-           println!("Entities added: {}", result["entities_added"]);
-           println!("Entities updated: {}", result["entities_updated"]);
-           println!("Duration: {}ms", result["duration_ms"]);
-       }
-
-       Ok(())
-   }
-
-   async fn handle_sessions(
-       bridge: Arc<MemoryBridge>,
-       _with_unprocessed: bool,
-       json_output: bool,
-   ) -> Result<()> {
-       info!("Listing sessions");
-
-       // Note: This requires adding list_sessions() to MemoryBridge
-       // For Phase 13.12, we'll use stats to show sessions_with_unprocessed count
-       let stats = bridge.stats().map_err(|e| {
-           error!("Failed to get stats: {}", e);
-           anyhow::anyhow!("Failed to get stats: {}", e)
-       })?;
-
-       if json_output {
-           println!("{}", json!({"sessions_with_unprocessed": stats["sessions_with_unprocessed"]}));
-       } else {
-           println!("\nSessions with unprocessed entries: {}", stats["sessions_with_unprocessed"]);
-           warn!("Full session listing requires Phase 13.9 enhancements");
-       }
-
-       Ok(())
    }
    ```
 
-2. Register command in `llmspell-cli/src/commands/mod.rs`:
+7. **Update `llmspell-cli/src/commands/mod.rs`**:
    ```rust
-   pub mod memory;  // Add this line
+   // Add module declaration (around line 10):
+   pub mod memory;
 
-   // In the main CLI enum
-   #[derive(Debug, Subcommand)]
-   pub enum Commands {
-       // ... existing commands
-
-       /// Memory operations (episodic, semantic, consolidation)
-       #[command(name = "memory")]
-       Memory(memory::MemoryCommand),
+   // Add to execute_command() match statement (around line 50):
+   Commands::Memory { command } => {
+       memory::handle_memory_command(command, runtime_config, output_format).await
    }
-
-   // In the handler
-   Commands::Memory(cmd) => memory::handle_memory(cmd).await,
    ```
 
-**Files to Create**:
-- `llmspell-cli/src/commands/memory/mod.rs` (NEW - ~250 lines)
+8. **Add integration tests** (`llmspell-cli/tests/memory_cli_test.rs`):
+   ```rust
+   //! Integration tests for memory CLI commands via kernel protocol
 
-**Files to Modify**:
-- `llmspell-cli/src/commands/mod.rs` (MODIFY - add memory module, +3 lines)
-- `llmspell-cli/src/main.rs` (MODIFY - if needed for imports, +1 line)
+   use llmspell_testing::integration::test_with_embedded_kernel;
+
+   #[tokio::test]
+   async fn test_memory_add_via_cli() {
+       test_with_embedded_kernel(|handle| async move {
+           // Test that memory add command works through kernel protocol
+           let request = serde_json::json!({
+               "command": "add",
+               "session_id": "test-session",
+               "role": "user",
+               "content": "Test message",
+               "metadata": {}
+           });
+
+           let response = handle.send_memory_request(request).await?;
+           assert_eq!(response.get("status").and_then(|s| s.as_str()), Some("success"));
+
+           Ok(())
+       }).await.unwrap();
+   }
+
+   #[tokio::test]
+   async fn test_memory_search_via_cli() {
+       test_with_embedded_kernel(|handle| async move {
+           // Add entry first
+           let add_req = serde_json::json!({
+               "command": "add",
+               "session_id": "test-session",
+               "role": "user",
+               "content": "Rust ownership model",
+               "metadata": {}
+           });
+           handle.send_memory_request(add_req).await?;
+
+           // Search for it
+           let search_req = serde_json::json!({
+               "command": "search",
+               "query": "ownership",
+               "limit": 5,
+               "session_id": "test-session"
+           });
+
+           let response = handle.send_memory_request(search_req).await?;
+           let results = response.get("results").expect("Should have results");
+           assert!(results.get("entries").is_some());
+
+           Ok(())
+       }).await.unwrap();
+   }
+
+   #[tokio::test]
+   async fn test_memory_query_via_cli() {
+       test_with_embedded_kernel(|handle| async move {
+           // Test semantic query
+           let query_req = serde_json::json!({
+               "command": "query",
+               "query": "programming",
+               "limit": 10
+           });
+
+           let response = handle.send_memory_request(query_req).await?;
+           assert!(response.get("entities").is_some());
+
+           Ok(())
+       }).await.unwrap();
+   }
+
+   #[tokio::test]
+   async fn test_memory_stats_via_cli() {
+       test_with_embedded_kernel(|handle| async move {
+           // Test stats retrieval
+           let stats_req = serde_json::json!({"command": "stats"});
+
+           let response = handle.send_memory_request(stats_req).await?;
+           let stats = response.get("stats").expect("Should have stats");
+
+           assert!(stats.get("episodic_entries").is_some());
+           assert!(stats.get("semantic_entities").is_some());
+
+           Ok(())
+       }).await.unwrap();
+   }
+   ```
+
+**Files to Create/Modify**:
+- `llmspell-kernel/src/execution/integrated.rs` - Add `handle_memory_request()`, `send_memory_reply()` (~150 lines NEW)
+- `llmspell-kernel/src/api.rs` - Add `send_memory_request()` method (~25 lines NEW)
+- `llmspell-core/src/traits/script_executor.rs` - Add `memory_bridge()` accessor (~8 lines NEW)
+- `llmspell-bridge/src/lua/engine.rs` - Implement `memory_bridge()` (~15 lines NEW)
+- `llmspell-cli/src/commands/memory.rs` - NEW file (~350 lines)
+- `llmspell-cli/src/cli.rs` - Add Memory command enum (~80 lines NEW)
+- `llmspell-cli/src/commands/mod.rs` - Register memory module (~5 lines NEW)
+- `llmspell-cli/tests/memory_cli_test.rs` - NEW file (~100 lines)
 
 **Definition of Done**:
-- [ ] All 5 subcommands implemented and tested manually
-- [ ] JSON output mode works for all commands
-- [ ] Interactive output formatted with tables/highlighting
-- [ ] Error handling with user-friendly messages
-- [ ] Tracing instrumentation verified
+- [ ] `memory add` adds episodic entry via kernel protocol
+- [ ] `memory search` searches episodic memory via kernel protocol
+- [ ] `memory query` searches semantic knowledge via kernel protocol (NEW)
+- [ ] `memory stats` displays statistics via kernel protocol
+- [ ] `memory consolidate` triggers consolidation via kernel protocol
+- [ ] All commands work with embedded kernel
+- [ ] All commands work with remote kernel (--connect)
+- [ ] Interactive output with tables for search/query results
+- [ ] JSON output with --json flag
+- [ ] Error handling with clear messages
+- [ ] Integration tests pass (4/4 tests passing)
 - [ ] Zero clippy warnings
-- [ ] Compiles without errors
+- [ ] All tracing instrumentation verified
 
 ---
 
-### Task 13.12.2: `llmspell graph` Command - Knowledge Graph Inspection
+### Task 13.12.2: DELETED - Graph Command Group
 
-**Priority**: HIGH
-**Estimated Time**: 2 hours
-**Assignee**: CLI Team
-**Status**: READY TO START
+**Status**: ❌ REMOVED FROM PHASE 13.12
 
-**Description**: Implement CLI commands for inspecting the semantic knowledge graph (entities, relationships, queries).
+**Rationale**:
+- **Missing backend methods**: Would require adding 3 new methods to MemoryBridge:
+  - `list_entities(entity_type: Option<String>, limit: usize)` - List entities by type
+  - `get_entity(entity_id: String)` - Get single entity details
+  - `get_relationships(entity_id: String)` - Get entity relationships
+- **Low value for CLI usage**: Semantic knowledge graph inspection is primarily a debugging/dev tool, not production CLI operation
+- **Time savings**: Would require 6+ hours total (2h CLI implementation + 4h backend method implementation + testing)
+- **SemanticMemory encapsulation**: Internal APIs not meant to be exposed directly to CLI
 
-**Architectural Analysis**:
-- **Command Structure**:
-  ```bash
-  llmspell graph list [--type TYPE] [--limit N] [--json]
-  llmspell graph show <entity-id> [--json]
-  llmspell graph query <query> [--limit N] [--json]
-  llmspell graph relationships <entity-id> [--json]
-  ```
-- **Bridge Access**: Use `MemoryBridge.semantic_query()` or direct `SemanticMemory` access
-- **Output Format**: Entity tables with properties, relationship graphs (ASCII art or JSON)
+**Alternative Solution**: `memory query` subcommand in Task 13.12.1 provides semantic search functionality via existing `MemoryBridge.semantic_query()` method.
 
-**Acceptance Criteria**:
-- [ ] `graph list` lists entities by type with pagination
-- [ ] `graph show` displays single entity with all properties
-- [ ] `graph query` searches entities by semantic similarity
-- [ ] `graph relationships` shows entity relationships
-- [ ] All commands support `--json` flag
-- [ ] Interactive output with ASCII relationship trees
-- [ ] **TRACING**: Command start (info!), queries (debug!), results (debug!), errors (error!)
-
-**Implementation Steps**:
-
-1. Create `llmspell-cli/src/commands/graph/mod.rs`:
-   ```rust
-   //! ABOUTME: CLI commands for semantic knowledge graph inspection
-
-   use crate::error::Result;
-   use clap::{Args, Subcommand};
-   use llmspell_bridge::MemoryBridge;
-   use llmspell_memory::DefaultMemoryManager;
-   use std::sync::Arc;
-   use tracing::{debug, error, info};
-
-   #[derive(Debug, Args)]
-   pub struct GraphCommand {
-       #[command(subcommand)]
-       pub command: GraphSubcommand,
-
-       /// Output JSON instead of human-readable format
-       #[arg(long, global = true)]
-       pub json: bool,
-   }
-
-   #[derive(Debug, Subcommand)]
-   pub enum GraphSubcommand {
-       /// List entities in the knowledge graph
-       List {
-           /// Filter by entity type
-           #[arg(long)]
-           entity_type: Option<String>,
-
-           /// Limit results
-           #[arg(short, long, default_value = "20")]
-           limit: usize,
-       },
-
-       /// Show entity details
-       Show {
-           /// Entity ID
-           entity_id: String,
-       },
-
-       /// Query entities by semantic similarity
-       Query {
-           /// Search query
-           query: String,
-
-           /// Limit results
-           #[arg(short, long, default_value = "10")]
-           limit: usize,
-       },
-
-       /// Show entity relationships
-       Relationships {
-           /// Entity ID
-           entity_id: String,
-       },
-   }
-
-   pub async fn handle_graph(cmd: GraphCommand) -> Result<()> {
-       info!("Executing graph command: {:?}", cmd.command);
-
-       // Create memory bridge for semantic access
-       let memory_manager = DefaultMemoryManager::new_in_memory()
-           .await
-           .map_err(|e| {
-               error!("Failed to create memory manager: {}", e);
-               anyhow::anyhow!("Failed to create memory manager: {}", e)
-           })?;
-       let bridge = Arc::new(MemoryBridge::new(Arc::new(memory_manager)));
-
-       match cmd.command {
-           GraphSubcommand::List { entity_type, limit } => {
-               handle_list(bridge, entity_type.as_deref(), limit, cmd.json).await
-           }
-           GraphSubcommand::Show { entity_id } => {
-               handle_show(bridge, &entity_id, cmd.json).await
-           }
-           GraphSubcommand::Query { query, limit } => {
-               handle_query(bridge, &query, limit, cmd.json).await
-           }
-           GraphSubcommand::Relationships { entity_id } => {
-               handle_relationships(bridge, &entity_id, cmd.json).await
-           }
-       }
-   }
-
-   async fn handle_list(
-       bridge: Arc<MemoryBridge>,
-       entity_type: Option<&str>,
-       limit: usize,
-       json_output: bool,
-   ) -> Result<()> {
-       info!("Listing entities: type={:?}, limit={}", entity_type, limit);
-
-       // Query semantic memory (using empty query for listing)
-       let results = bridge
-           .semantic_query(entity_type.unwrap_or(""), limit)
-           .map_err(|e| {
-               error!("Failed to list entities: {}", e);
-               anyhow::anyhow!("Failed to list entities: {}", e)
-           })?;
-
-       if json_output {
-           println!("{}", serde_json::to_string_pretty(&results)?);
-       } else {
-           let entities = results.as_array().unwrap_or(&vec![]);
-           println!("\n{} entities found:\n", entities.len());
-
-           for (i, entity) in entities.iter().enumerate() {
-               let id = entity["id"].as_str().unwrap_or("unknown");
-               let ent_type = entity["type"].as_str().unwrap_or("unknown");
-               let name = entity["name"].as_str().unwrap_or("");
-
-               println!("[{}] {} ({})", i + 1, id, ent_type);
-               if !name.is_empty() {
-                   println!("    Name: {}", name);
-               }
-               println!();
-           }
-       }
-
-       Ok(())
-   }
-
-   async fn handle_show(
-       bridge: Arc<MemoryBridge>,
-       entity_id: &str,
-       json_output: bool,
-   ) -> Result<()> {
-       info!("Showing entity: {}", entity_id);
-
-       // Query for specific entity
-       let results = bridge.semantic_query(entity_id, 1).map_err(|e| {
-           error!("Failed to show entity: {}", e);
-           anyhow::anyhow!("Failed to show entity: {}", e)
-       })?;
-
-       if json_output {
-           println!("{}", serde_json::to_string_pretty(&results)?);
-       } else {
-           let entities = results.as_array().unwrap_or(&vec![]);
-           if entities.is_empty() {
-               println!("\nEntity not found: {}", entity_id);
-               return Ok(());
-           }
-
-           let entity = &entities[0];
-           println!("\n=== Entity: {} ===\n", entity_id);
-           println!("Type: {}", entity["type"].as_str().unwrap_or("unknown"));
-           println!("Properties:");
-           if let Some(props) = entity["properties"].as_object() {
-               for (key, value) in props {
-                   println!("  {}: {}", key, value);
-               }
-           }
-       }
-
-       Ok(())
-   }
-
-   async fn handle_query(
-       bridge: Arc<MemoryBridge>,
-       query: &str,
-       limit: usize,
-       json_output: bool,
-   ) -> Result<()> {
-       info!("Querying entities: query='{}', limit={}", query, limit);
-
-       let results = bridge.semantic_query(query, limit).map_err(|e| {
-           error!("Query failed: {}", e);
-           anyhow::anyhow!("Query failed: {}", e)
-       })?;
-
-       if json_output {
-           println!("{}", serde_json::to_string_pretty(&results)?);
-       } else {
-           let entities = results.as_array().unwrap_or(&vec![]);
-           println!("\n{} results found:\n", entities.len());
-
-           for (i, entity) in entities.iter().enumerate() {
-               let id = entity["id"].as_str().unwrap_or("unknown");
-               let ent_type = entity["type"].as_str().unwrap_or("unknown");
-               let score = entity["score"].as_f64().unwrap_or(0.0);
-
-               println!("[{}] {} ({}) - score: {:.3}", i + 1, id, ent_type, score);
-           }
-       }
-
-       Ok(())
-   }
-
-   async fn handle_relationships(
-       bridge: Arc<MemoryBridge>,
-       entity_id: &str,
-       json_output: bool,
-   ) -> Result<()> {
-       info!("Showing relationships for: {}", entity_id);
-
-       // Note: This requires relationship querying in SemanticMemory
-       // For Phase 13.12, we'll show a placeholder
-       if json_output {
-           println!("{}", serde_json::json!({"entity_id": entity_id, "relationships": []}));
-       } else {
-           println!("\n=== Relationships for {} ===\n", entity_id);
-           println!("(Relationship querying requires Phase 13.9 enhancements)");
-       }
-
-       Ok(())
-   }
-   ```
-
-2. Register command in `llmspell-cli/src/commands/mod.rs`:
-   ```rust
-   pub mod graph;  // Add this line
-
-   #[derive(Debug, Subcommand)]
-   pub enum Commands {
-       // ... existing commands
-
-       /// Knowledge graph operations (entities, relationships, queries)
-       #[command(name = "graph")]
-       Graph(graph::GraphCommand),
-   }
-
-   // In handler
-   Commands::Graph(cmd) => graph::handle_graph(cmd).await,
-   ```
-
-**Files to Create**:
-- `llmspell-cli/src/commands/graph/mod.rs` (NEW - ~180 lines)
-
-**Files to Modify**:
-- `llmspell-cli/src/commands/mod.rs` (MODIFY - add graph module, +3 lines)
-
-**Definition of Done**:
-- [ ] All 4 subcommands implemented
-- [ ] JSON output works for all commands
-- [ ] Interactive output with entity tables
-- [ ] Relationship display (ASCII tree or placeholder)
-- [ ] Tracing instrumentation verified
-- [ ] Zero clippy warnings
-- [ ] Compiles without errors
+**Impact on Phase 13**:
+- No impact on other tasks
+- Time saved: 2 hours
+- Cleaner architecture without unnecessary backend exposure
 
 ---
 
@@ -4191,7 +4347,7 @@ Implemented complete consolidation feedback mechanism in 3 phases over ~3 hours:
 **Assignee**: CLI Team
 **Status**: READY TO START
 
-**Description**: Implement CLI commands for context assembly inspection, strategy testing, and token budget analysis.
+**Description**: Implement CLI commands for context assembly inspection using kernel message protocol.
 
 **Architectural Analysis**:
 - **Command Structure**:
@@ -4200,42 +4356,481 @@ Implemented complete consolidation feedback mechanism in 3 phases over ~3 hours:
   llmspell context strategies [--json]
   llmspell context analyze <query> [--budget N] [--json]
   ```
-- **Bridge Access**: Use `ContextBridge.assemble()` directly
+- **Kernel Protocol**: Use `handle.send_context_request()` (parallel to memory/template/tool)
+- **Backend Methods**:
+  - `ContextBridge.assemble()` - Assemble context with strategy
+  - `ContextBridge.get_strategy_stats()` - Strategy metadata (if available)
+  - Hardcoded strategy list - 4 strategies (hybrid, episodic, semantic, rag)
 - **Output Format**: Assembled chunks with token counts, strategy comparisons
 
 **Acceptance Criteria**:
-- [ ] `context assemble` assembles context with specified strategy/budget
-- [ ] `context strategies` lists available strategies with descriptions
-- [ ] `context analyze` shows token usage breakdown across strategies
+- [ ] `context assemble` assembles context via kernel protocol
+- [ ] `context strategies` lists available strategies via kernel protocol
+- [ ] `context analyze` shows token usage across strategies via kernel protocol
 - [ ] All commands support `--json` flag
 - [ ] Interactive output shows chunk previews and token counts
-- [ ] **TRACING**: Command start (info!), assembly (debug!), results (debug!), errors (error!)
+- [ ] Kernel message handlers implemented
+- [ ] Works with both embedded and remote kernels
+- [ ] **TRACING**: Command start (info!), kernel requests (debug!), results (debug!), errors (error!)
 
 **Implementation Steps**:
 
-1. Create `llmspell-cli/src/commands/context/mod.rs`:
+1. **Add `context_request` message type to kernel protocol** (`llmspell-kernel/src/execution/integrated.rs`):
    ```rust
-   //! ABOUTME: CLI commands for context assembly and analysis
-
-   use crate::error::Result;
-   use clap::{Args, Subcommand};
-   use llmspell_bridge::ContextBridge;
-   use llmspell_memory::DefaultMemoryManager;
-   use std::sync::Arc;
-   use tracing::{debug, error, info};
-
-   #[derive(Debug, Args)]
-   pub struct ContextCommand {
-       #[command(subcommand)]
-       pub command: ContextSubcommand,
-
-       /// Output JSON instead of human-readable format
-       #[arg(long, global = true)]
-       pub json: bool,
+   // In handle_shell_message() match statement:
+   "context_request" => {
+       self.handle_context_request(message).await?;
+       Ok(())
    }
 
+   // Add new method to IntegratedKernel impl:
+   async fn handle_context_request(&mut self, message: HashMap<String, Value>) -> Result<()> {
+       debug!("Handling context_request");
+
+       let content = message.get("content").ok_or(anyhow!("No content in context_request"))?;
+       let command = content.get("command")
+           .and_then(|c| c.as_str())
+           .ok_or(anyhow!("No command in context_request"))?;
+
+       trace!("Context command: {}", command);
+
+       // Get ContextBridge from script_executor's GlobalContext
+       let bridge = self.script_executor
+           .context_bridge()
+           .ok_or_else(|| anyhow!("No ContextBridge available - context system not initialized"))?;
+
+       match command {
+           "assemble" => {
+               info!("Context assemble request");
+               let query = content["query"].as_str()
+                   .ok_or(anyhow!("Missing query"))?;
+               let strategy = content.get("strategy")
+                   .and_then(|s| s.as_str())
+                   .unwrap_or("hybrid");
+               let budget = content.get("budget")
+                   .and_then(|b| b.as_u64())
+                   .unwrap_or(2000) as usize;
+               let session_id = content.get("session_id")
+                   .and_then(|s| s.as_str())
+                   .map(String::from);
+
+               debug!("Assembling context: query='{}', strategy={}, budget={}",
+                   query, strategy, budget);
+
+               let result = bridge.assemble(
+                   query.to_string(),
+                   strategy.to_string(),
+                   budget,
+                   session_id,
+               ).await.map_err(|e| anyhow!("assemble failed: {}", e))?;
+
+               self.send_context_reply(json!({"result": result})).await
+           }
+
+           "strategies" => {
+               info!("Context strategies list request");
+
+               // Return hardcoded list of strategies with descriptions
+               let strategies = vec![
+                   json!({
+                       "name": "hybrid",
+                       "description": "Combines RAG, episodic, and semantic memory (recommended)"
+                   }),
+                   json!({
+                       "name": "episodic",
+                       "description": "Conversation history only"
+                   }),
+                   json!({
+                       "name": "semantic",
+                       "description": "Knowledge graph entities only"
+                   }),
+                   json!({
+                       "name": "rag",
+                       "description": "Document retrieval only"
+                   }),
+               ];
+
+               self.send_context_reply(json!({"strategies": strategies})).await
+           }
+
+           "analyze" => {
+               info!("Context analyze request");
+               let query = content["query"].as_str()
+                   .ok_or(anyhow!("Missing query"))?;
+               let budget = content.get("budget")
+                   .and_then(|b| b.as_u64())
+                   .unwrap_or(2000) as usize;
+
+               debug!("Analyzing context strategies: query='{}', budget={}", query, budget);
+
+               // Test each strategy and gather results
+               let strategies = vec!["hybrid", "episodic", "semantic", "rag"];
+               let mut analysis = Vec::new();
+
+               for strategy in strategies {
+                   if let Ok(result) = bridge.assemble(
+                       query.to_string(),
+                       strategy.to_string(),
+                       budget,
+                       None,
+                   ).await {
+                       analysis.push(json!({
+                           "strategy": strategy,
+                           "token_count": result.get("token_count"),
+                           "chunk_count": result.get("chunks").and_then(|c| c.as_array()).map(|a| a.len()),
+                           "utilization": (result.get("token_count").and_then(|t| t.as_u64()).unwrap_or(0) as f64
+                               / budget as f64) * 100.0
+                       }));
+                   }
+               }
+
+               self.send_context_reply(json!({"analysis": analysis})).await
+           }
+
+           _ => {
+               error!("Unknown context command: {}", command);
+               Err(anyhow!("Unknown context command: {}", command))
+           }
+       }
+   }
+
+   async fn send_context_reply(&mut self, content: Value) -> Result<()> {
+       debug!("Sending context_reply");
+       let reply = json!({
+           "msg_type": "context_reply",
+           "content": content,
+       });
+       self.send_shell_message(reply).await
+   }
+   ```
+
+2. **Add `send_context_request()` to KernelHandle** (`llmspell-kernel/src/api.rs`):
+   ```rust
+   /// Send context request and wait for response
+   ///
+   /// This sends a context operation request to the kernel and waits for the reply.
+   /// Used by CLI context commands to interact with the context assembly system.
+   ///
+   /// # Arguments
+   /// * `content` - The context request content (command, parameters)
+   ///
+   /// # Returns
+   /// The context reply content as JSON value
+   ///
+   /// # Errors
+   /// Returns error if transport fails or response is invalid
+   pub async fn send_context_request(&mut self, content: Value) -> Result<Value> {
+       trace!("Sending context_request");
+
+       let msg = json!({
+           "msg_type": "context_request",
+           "content": content,
+       });
+
+       self.transport.send_shell_message(msg).await?;
+
+       // Wait for context_reply
+       loop {
+           let response = self.transport.recv_shell_message().await?;
+           if response.get("msg_type").and_then(|t| t.as_str()) == Some("context_reply") {
+               debug!("Received context_reply");
+               return Ok(response.get("content").cloned().unwrap_or(json!({})));
+           }
+           trace!("Skipping non-context_reply message");
+       }
+   }
+   ```
+
+3. **Add context_bridge() accessor to ScriptExecutor trait** (`llmspell-core/src/traits/script_executor.rs`):
+   ```rust
+   /// Get context bridge for CLI access (Phase 13.12.3)
+   ///
+   /// Returns the context bridge if available, allowing CLI commands to access
+   /// context assembly operations through the kernel protocol.
+   ///
+   /// # Returns
+   /// `Some(Arc<ContextBridge>)` if context system is initialized, `None` otherwise
+   fn context_bridge(&self) -> Option<Arc<ContextBridge>> {
+       None  // Default implementation - override in LuaEngine
+   }
+   ```
+
+4. **Implement context_bridge() in LuaEngine** (`llmspell-bridge/src/lua/engine.rs`):
+   ```rust
+   // In impl ScriptExecutor for LuaEngine:
+   fn context_bridge(&self) -> Option<Arc<ContextBridge>> {
+       trace!("Getting context bridge from LuaEngine");
+
+       #[cfg(feature = "lua")]
+       {
+           self.global_context.read()
+               .as_ref()
+               .and_then(|ctx| ctx.context_bridge.clone())
+       }
+
+       #[cfg(not(feature = "lua"))]
+       {
+           None
+       }
+   }
+   ```
+
+5. **Create `llmspell-cli/src/commands/context.rs`**:
+   ```rust
+   //! ABOUTME: CLI commands for context assembly and analysis via kernel protocol
+   //! ABOUTME: Provides assemble, strategies, and analyze subcommands
+
+   use anyhow::{anyhow, Result};
+   use serde_json::json;
+   use tracing::{info, instrument, trace};
+
+   use crate::cli::{ContextCommands, OutputFormat};
+   use crate::execution_context::ExecutionContext;
+   use crate::output::OutputFormatter;
+   use llmspell_config::LLMSpellConfig;
+
+   /// Handle context assembly commands via kernel protocol
+   ///
+   /// This function routes context commands to the kernel using the message protocol.
+   /// Works with both embedded and remote kernels for consistent behavior.
+   #[instrument(skip(runtime_config), fields(command_type))]
+   pub async fn handle_context_command(
+       command: ContextCommands,
+       runtime_config: LLMSpellConfig,
+       output_format: OutputFormat,
+   ) -> Result<()> {
+       trace!("Handling context command");
+
+       // Resolve execution context (embedded or connected)
+       let context = ExecutionContext::resolve(None, None, None, runtime_config.clone()).await?;
+
+       match context {
+           ExecutionContext::Embedded { handle, config } => {
+               handle_context_embedded(command, handle, config, output_format).await
+           }
+           ExecutionContext::Connected { handle, address } => {
+               handle_context_remote(command, handle, address, output_format).await
+           }
+       }
+   }
+
+   /// Handle context commands in embedded mode
+   async fn handle_context_embedded(
+       command: ContextCommands,
+       mut handle: Box<llmspell_kernel::api::KernelHandle>,
+       _config: Box<LLMSpellConfig>,
+       output_format: OutputFormat,
+   ) -> Result<()> {
+       match command {
+           ContextCommands::Assemble { query, strategy, budget, session_id, json: output_json } => {
+               info!("Assembling context via kernel protocol");
+
+               let request = json!({
+                   "command": "assemble",
+                   "query": query,
+                   "strategy": strategy,
+                   "budget": budget,
+                   "session_id": session_id,
+               });
+
+               let response = handle.send_context_request(request).await?;
+               let result = response.get("result")
+                   .ok_or_else(|| anyhow!("No result in response"))?;
+
+               let fmt = if output_json { OutputFormat::Json } else { output_format };
+               let formatter = OutputFormatter::new(fmt);
+
+               match fmt {
+                   OutputFormat::Json => {
+                       formatter.print_json(result)?;
+                   }
+                   OutputFormat::Pretty | OutputFormat::Text => {
+                       format_assembly_result(result, &strategy, budget)?;
+                   }
+               }
+               Ok(())
+           }
+
+           ContextCommands::Strategies { json: output_json } => {
+               info!("Listing context strategies via kernel protocol");
+
+               let request = json!({"command": "strategies"});
+               let response = handle.send_context_request(request).await?;
+               let strategies = response.get("strategies")
+                   .ok_or_else(|| anyhow!("No strategies in response"))?;
+
+               let fmt = if output_json { OutputFormat::Json } else { output_format };
+               let formatter = OutputFormatter::new(fmt);
+
+               match fmt {
+                   OutputFormat::Json => {
+                       formatter.print_json(strategies)?;
+                   }
+                   OutputFormat::Pretty | OutputFormat::Text => {
+                       format_strategies(strategies)?;
+                   }
+               }
+               Ok(())
+           }
+
+           ContextCommands::Analyze { query, budget, json: output_json } => {
+               info!("Analyzing context strategies via kernel protocol");
+
+               let request = json!({
+                   "command": "analyze",
+                   "query": query,
+                   "budget": budget,
+               });
+
+               let response = handle.send_context_request(request).await?;
+               let analysis = response.get("analysis")
+                   .ok_or_else(|| anyhow!("No analysis in response"))?;
+
+               let fmt = if output_json { OutputFormat::Json } else { output_format };
+               let formatter = OutputFormatter::new(fmt);
+
+               match fmt {
+                   OutputFormat::Json => {
+                       formatter.print_json(analysis)?;
+                   }
+                   OutputFormat::Pretty | OutputFormat::Text => {
+                       format_analysis(analysis, &query, budget)?;
+                   }
+               }
+               Ok(())
+           }
+       }
+   }
+
+   /// Handle context commands in remote mode (same logic as embedded)
+   async fn handle_context_remote(
+       command: ContextCommands,
+       handle: Box<llmspell_kernel::api::KernelHandle>,
+       address: String,
+       output_format: OutputFormat,
+   ) -> Result<()> {
+       trace!("Handling context command in remote mode: {}", address);
+       handle_context_embedded(command, handle, Box::new(Default::default()), output_format).await
+   }
+
+   /// Format context assembly result for interactive display
+   fn format_assembly_result(
+       result: &serde_json::Value,
+       strategy: &str,
+       budget: usize,
+   ) -> Result<()> {
+       println!("\n=== Context Assembly ===\n");
+       println!("Strategy: {}", strategy);
+
+       let token_count = result.get("token_count")
+           .and_then(|t| t.as_u64())
+           .unwrap_or(0);
+       println!("Token count: {}/{}", token_count, budget);
+
+       if let Some(chunks) = result.get("chunks").and_then(|c| c.as_array()) {
+           println!("Chunks: {}\n", chunks.len());
+
+           for (i, chunk) in chunks.iter().enumerate() {
+               let role = chunk.get("role").and_then(|r| r.as_str()).unwrap_or("unknown");
+               let chunk_tokens = chunk.get("token_count").and_then(|t| t.as_u64()).unwrap_or(0);
+               let content = chunk.get("content").and_then(|c| c.as_str()).unwrap_or("");
+
+               println!("[{}] {} ({} tokens)", i + 1, role, chunk_tokens);
+
+               let preview = if content.len() > 100 {
+                   format!("{}...", &content[..100])
+               } else {
+                   content.to_string()
+               };
+               println!("    {}\n", preview);
+           }
+       }
+
+       Ok(())
+   }
+
+   /// Format strategy list for interactive display
+   fn format_strategies(strategies: &serde_json::Value) -> Result<()> {
+       println!("\n=== Available Context Strategies ===\n");
+
+       if let Some(strategy_list) = strategies.as_array() {
+           for strategy in strategy_list {
+               let name = strategy.get("name").and_then(|n| n.as_str()).unwrap_or("unknown");
+               let desc = strategy.get("description")
+                   .and_then(|d| d.as_str())
+                   .unwrap_or("");
+
+               println!("  {:<12} - {}", name, desc);
+           }
+       }
+
+       println!();
+       Ok(())
+   }
+
+   /// Format strategy analysis for interactive display
+   fn format_analysis(
+       analysis: &serde_json::Value,
+       query: &str,
+       budget: usize,
+   ) -> Result<()> {
+       println!("\n=== Context Strategy Analysis ===\n");
+       println!("Query: {}", query);
+       println!("Budget: {} tokens\n", budget);
+
+       if let Some(analysis_list) = analysis.as_array() {
+           for item in analysis_list {
+               let strategy = item.get("strategy")
+                   .and_then(|s| s.as_str())
+                   .unwrap_or("unknown");
+               let tokens = item.get("token_count")
+                   .and_then(|t| t.as_u64())
+                   .unwrap_or(0);
+               let chunks = item.get("chunk_count")
+                   .and_then(|c| c.as_u64())
+                   .unwrap_or(0);
+               let utilization = item.get("utilization")
+                   .and_then(|u| u.as_f64())
+                   .unwrap_or(0.0);
+
+               println!("  {:<12} - {} tokens ({:.1}%), {} chunks",
+                   strategy, tokens, utilization, chunks);
+           }
+       }
+
+       println!();
+       Ok(())
+   }
+   ```
+
+6. **Update `llmspell-cli/src/cli.rs` to add Context command**:
+   ```rust
+   // Add to Commands enum:
+
+   /// Context assembly operations (assemble, strategies, analyze)
+   #[command(
+       long_about = "Manage context assembly for LLM interactions.
+
+   SUBCOMMANDS:
+       assemble    Assemble context with specified strategy
+       strategies  List available context strategies
+       analyze     Analyze token usage across strategies
+
+   EXAMPLES:
+       llmspell context assemble \"What is Rust ownership?\" --strategy hybrid --budget 2000
+       llmspell context strategies --json
+       llmspell context analyze \"Explain Rust\" --budget 1500"
+   )]
+   Context {
+       #[command(subcommand)]
+       command: ContextCommands,
+   },
+
+   // Add new enum after MemoryCommands:
+
+   /// Context command variants
    #[derive(Debug, Subcommand)]
-   pub enum ContextSubcommand {
+   pub enum ContextCommands {
        /// Assemble context for a query
        Assemble {
            /// Query for context assembly
@@ -4252,10 +4847,18 @@ Implemented complete consolidation feedback mechanism in 3 phases over ~3 hours:
            /// Session ID for filtering
            #[arg(long)]
            session_id: Option<String>,
+
+           /// Output JSON
+           #[arg(long)]
+           json: bool,
        },
 
        /// List available context strategies
-       Strategies,
+       Strategies {
+           /// Output JSON
+           #[arg(long)]
+           json: bool,
+       },
 
        /// Analyze token usage across strategies
        Analyze {
@@ -4265,197 +4868,108 @@ Implemented complete consolidation feedback mechanism in 3 phases over ~3 hours:
            /// Token budget
            #[arg(short, long, default_value = "2000")]
            budget: usize,
+
+           /// Output JSON
+           #[arg(long)]
+           json: bool,
        },
    }
-
-   pub async fn handle_context(cmd: ContextCommand) -> Result<()> {
-       info!("Executing context command: {:?}", cmd.command);
-
-       match cmd.command {
-           ContextSubcommand::Assemble { query, strategy, budget, session_id } => {
-               handle_assemble(&query, &strategy, budget, session_id.as_deref(), cmd.json).await
-           }
-           ContextSubcommand::Strategies => {
-               handle_strategies(cmd.json).await
-           }
-           ContextSubcommand::Analyze { query, budget } => {
-               handle_analyze(&query, budget, cmd.json).await
-           }
-       }
-   }
-
-   async fn handle_assemble(
-       query: &str,
-       strategy: &str,
-       budget: usize,
-       session_id: Option<&str>,
-       json_output: bool,
-   ) -> Result<()> {
-       info!("Assembling context: query='{}', strategy={}, budget={}", query, strategy, budget);
-
-       // Create context bridge
-       let memory_manager = DefaultMemoryManager::new_in_memory()
-           .await
-           .map_err(|e| {
-               error!("Failed to create memory manager: {}", e);
-               anyhow::anyhow!("Failed to create memory manager: {}", e)
-           })?;
-       let bridge = Arc::new(ContextBridge::new(Arc::new(memory_manager)));
-
-       // Assemble context
-       let result = bridge
-           .assemble(
-               query.to_string(),
-               strategy.to_string(),
-               budget,
-               session_id.map(String::from),
-           )
-           .map_err(|e| {
-               error!("Context assembly failed: {}", e);
-               anyhow::anyhow!("Context assembly failed: {}", e)
-           })?;
-
-       if json_output {
-           println!("{}", serde_json::to_string_pretty(&result)?);
-       } else {
-           println!("\n=== Context Assembly ===\n");
-           println!("Strategy: {}", strategy);
-           println!("Token count: {}/{}", result.token_count, budget);
-           println!("Chunks: {}\n", result.chunks.len());
-
-           for (i, chunk) in result.chunks.iter().enumerate() {
-               println!("[{}] {} ({} tokens)", i + 1, chunk.role, chunk.token_count);
-               let preview = if chunk.content.len() > 100 {
-                   format!("{}...", &chunk.content[..100])
-               } else {
-                   chunk.content.clone()
-               };
-               println!("    {}\n", preview);
-           }
-       }
-
-       Ok(())
-   }
-
-   async fn handle_strategies(json_output: bool) -> Result<()> {
-       info!("Listing context strategies");
-
-       let strategies = vec![
-           ("hybrid", "Combines RAG, episodic, and semantic memory (recommended)"),
-           ("episodic", "Conversation history only"),
-           ("semantic", "Knowledge graph entities only"),
-           ("rag", "Document retrieval only"),
-           ("combined", "All sources with equal weighting"),
-       ];
-
-       if json_output {
-           let json_strategies: Vec<_> = strategies
-               .iter()
-               .map(|(name, desc)| serde_json::json!({"name": name, "description": desc}))
-               .collect();
-           println!("{}", serde_json::to_string_pretty(&json_strategies)?);
-       } else {
-           println!("\n=== Available Context Strategies ===\n");
-           for (name, desc) in strategies {
-               println!("  {:<12} - {}", name, desc);
-           }
-       }
-
-       Ok(())
-   }
-
-   async fn handle_analyze(
-       query: &str,
-       budget: usize,
-       json_output: bool,
-   ) -> Result<()> {
-       info!("Analyzing context usage: query='{}', budget={}", query, budget);
-
-       // Create context bridge
-       let memory_manager = DefaultMemoryManager::new_in_memory()
-           .await
-           .map_err(|e| {
-               error!("Failed to create memory manager: {}", e);
-               anyhow::anyhow!("Failed to create memory manager: {}", e)
-           })?;
-       let bridge = Arc::new(ContextBridge::new(Arc::new(memory_manager)));
-
-       // Test each strategy
-       let strategies = vec!["hybrid", "episodic", "semantic", "rag"];
-       let mut results = Vec::new();
-
-       for strategy in strategies {
-           debug!("Testing strategy: {}", strategy);
-           if let Ok(result) = bridge.assemble(
-               query.to_string(),
-               strategy.to_string(),
-               budget,
-               None,
-           ) {
-               results.push((strategy, result.token_count, result.chunks.len()));
-           }
-       }
-
-       if json_output {
-           let json_results: Vec<_> = results
-               .iter()
-               .map(|(strategy, tokens, chunks)| {
-                   serde_json::json!({
-                       "strategy": strategy,
-                       "tokens": tokens,
-                       "chunks": chunks,
-                       "utilization": (*tokens as f64 / budget as f64) * 100.0
-                   })
-               })
-               .collect();
-           println!("{}", serde_json::to_string_pretty(&json_results)?);
-       } else {
-           println!("\n=== Context Strategy Analysis ===\n");
-           println!("Query: {}", query);
-           println!("Budget: {} tokens\n", budget);
-
-           for (strategy, tokens, chunks) in results {
-               let utilization = (tokens as f64 / budget as f64) * 100.0;
-               println!("  {:<12} - {} tokens ({:.1}%), {} chunks",
-                   strategy, tokens, utilization, chunks);
-           }
-       }
-
-       Ok(())
-   }
    ```
 
-2. Register command in `llmspell-cli/src/commands/mod.rs`:
+7. **Update `llmspell-cli/src/commands/mod.rs`**:
    ```rust
-   pub mod context;  // Add this line
+   // Add module declaration:
+   pub mod context;
 
-   #[derive(Debug, Subcommand)]
-   pub enum Commands {
-       // ... existing commands
-
-       /// Context assembly operations (assemble, strategies, analyze)
-       #[command(name = "context")]
-       Context(context::ContextCommand),
+   // Add to execute_command() match statement:
+   Commands::Context { command } => {
+       context::handle_context_command(command, runtime_config, output_format).await
    }
-
-   // In handler
-   Commands::Context(cmd) => context::handle_context(cmd).await,
    ```
 
-**Files to Create**:
-- `llmspell-cli/src/commands/context/mod.rs` (NEW - ~200 lines)
+8. **Add integration tests** (`llmspell-cli/tests/context_cli_test.rs`):
+   ```rust
+   //! Integration tests for context CLI commands via kernel protocol
 
-**Files to Modify**:
-- `llmspell-cli/src/commands/mod.rs` (MODIFY - add context module, +3 lines)
+   use llmspell_testing::integration::test_with_embedded_kernel;
+
+   #[tokio::test]
+   async fn test_context_assemble_via_cli() {
+       test_with_embedded_kernel(|handle| async move {
+           let request = serde_json::json!({
+               "command": "assemble",
+               "query": "What is Rust?",
+               "strategy": "hybrid",
+               "budget": 2000,
+               "session_id": null
+           });
+
+           let response = handle.send_context_request(request).await?;
+           assert!(response.get("result").is_some());
+
+           Ok(())
+       }).await.unwrap();
+   }
+
+   #[tokio::test]
+   async fn test_context_strategies_via_cli() {
+       test_with_embedded_kernel(|handle| async move {
+           let request = serde_json::json!({"command": "strategies"});
+
+           let response = handle.send_context_request(request).await?;
+           let strategies = response.get("strategies")
+               .and_then(|s| s.as_array())
+               .expect("Should have strategies");
+
+           assert!(strategies.len() >= 4);  // At least 4 strategies
+
+           Ok(())
+       }).await.unwrap();
+   }
+
+   #[tokio::test]
+   async fn test_context_analyze_via_cli() {
+       test_with_embedded_kernel(|handle| async move {
+           let request = serde_json::json!({
+               "command": "analyze",
+               "query": "programming concepts",
+               "budget": 2000
+           });
+
+           let response = handle.send_context_request(request).await?;
+           let analysis = response.get("analysis")
+               .and_then(|a| a.as_array())
+               .expect("Should have analysis");
+
+           assert!(!analysis.is_empty());
+
+           Ok(())
+       }).await.unwrap();
+   }
+   ```
+
+**Files to Create/Modify**:
+- `llmspell-kernel/src/execution/integrated.rs` - Add `handle_context_request()`, `send_context_reply()` (~120 lines NEW)
+- `llmspell-kernel/src/api.rs` - Add `send_context_request()` method (~25 lines NEW)
+- `llmspell-core/src/traits/script_executor.rs` - Add `context_bridge()` accessor (~8 lines NEW)
+- `llmspell-bridge/src/lua/engine.rs` - Implement `context_bridge()` (~15 lines NEW)
+- `llmspell-cli/src/commands/context.rs` - NEW file (~300 lines)
+- `llmspell-cli/src/cli.rs` - Add Context command enum (~60 lines NEW)
+- `llmspell-cli/src/commands/mod.rs` - Register context module (~5 lines NEW)
+- `llmspell-cli/tests/context_cli_test.rs` - NEW file (~80 lines)
 
 **Definition of Done**:
-- [ ] All 3 subcommands implemented
-- [ ] JSON output works for all commands
-- [ ] Interactive output with token usage visualization
-- [ ] Strategy comparison shows utilization percentages
-- [ ] Tracing instrumentation verified
+- [ ] `context assemble` assembles context via kernel protocol
+- [ ] `context strategies` lists strategies via kernel protocol
+- [ ] `context analyze` analyzes strategies via kernel protocol
+- [ ] All commands work with embedded kernel
+- [ ] All commands work with remote kernel (--connect)
+- [ ] Interactive output with chunk previews and token counts
+- [ ] JSON output with --json flag
+- [ ] Error handling with clear messages
+- [ ] Integration tests pass (3/3 tests passing)
 - [ ] Zero clippy warnings
-- [ ] Compiles without errors
+- [ ] All tracing instrumentation verified
 
 ---
 
@@ -4466,271 +4980,296 @@ Implemented complete consolidation feedback mechanism in 3 phases over ~3 hours:
 **Assignee**: Documentation Team
 **Status**: READY TO START
 
-**Description**: Document new CLI commands and complete Task 13.5.7d (template parameter schema documentation for provider_name).
+**Description**: Document new CLI commands and verify Task 13.5.7d completion (template parameter schema documentation for provider_name).
 
 **Architectural Analysis**:
-- **Task 13.5.7d Deferred Work** (from Phase 13.5): Document provider_name parameter in template user guides
-- **CLI Documentation**: Add to `docs/user-guide/cli/` with command examples
-- **Template Schema Documentation**: Already completed in Task 13.11.1 (provider_parameters() helper)
+- **Task 13.5.7d Status**: ✅ COMPLETE (verified in Task 13.11.1 - provider_parameters() helper added)
+- **CLI Documentation**: Update `docs/technical/cli-command-architecture.md` with memory/context commands
+- **User Guide**: Add examples to `docs/user-guide/cli/`
 
 **Acceptance Criteria**:
-- [ ] CLI command reference updated with memory/graph/context commands
-- [ ] Examples added for each command with expected output
+- [ ] CLI architecture doc updated with memory/context command sections
+- [ ] User guide examples created for all subcommands
 - [ ] Task 13.5.7d marked complete in TODO.md
-- [ ] Template user guides verified for provider_name documentation (Task 13.11.1)
+- [ ] Template user guides verified for provider_name documentation
 - [ ] All documentation links working
-- [ ] **TRACING**: N/A (documentation task)
 
 **Implementation Steps**:
 
-1. Create `docs/user-guide/cli/memory-commands.md`:
+1. **Update `docs/technical/cli-command-architecture.md`**:
+
+   Add section 4.10 (after section 4.9 Model Management):
    ```markdown
-   # Memory Commands
+   ### 4.10 Memory Management (Phase 13.12.1)
 
-   ## Overview
-
-   The `llmspell memory` command provides CLI access to episodic and semantic memory operations.
-
-   ## Commands
-
-   ### Add Episodic Entry
+   **Architecture Note**: Memory commands use kernel message protocol, executing operations in the kernel process. The CLI sends `memory_request` messages to the kernel, which accesses MemoryBridge and returns results via `memory_reply` messages.
 
    ```bash
-   llmspell memory add <session-id> <role> <content> [--metadata JSON]
+   llmspell memory <SUBCOMMAND>
+
+   SUBCOMMANDS:
+       add         Add episodic memory entry
+       search      Search episodic memory
+       query       Query semantic knowledge graph
+       stats       Show memory statistics
+       consolidate Consolidate episodic to semantic memory
+
+   ADD OPTIONS:
+       <session-id>         Session identifier
+       <role>              Role (user, assistant, system)
+       <content>           Message content
+       --metadata <JSON>   Metadata as JSON string
+
+   SEARCH OPTIONS:
+       <query>             Search query
+       -l, --limit <N>     Limit results [default: 10]
+       --session-id <ID>   Filter by session ID
+       --json              Output JSON
+
+   QUERY OPTIONS:
+       <query>             Semantic query text
+       -l, --limit <N>     Limit results [default: 10]
+       --json              Output JSON
+
+   STATS OPTIONS:
+       --json              Output JSON
+
+   CONSOLIDATE OPTIONS:
+       --session-id <ID>   Session to consolidate (all if omitted)
+       --force             Force immediate consolidation
+
+   ARCHITECTURE:
+       - Commands execute via kernel message protocol
+       - CLI sends memory_request to kernel (embedded or remote)
+       - Kernel accesses MemoryBridge from GlobalContext
+       - Results returned via memory_reply messages
+       - Same protocol works for embedded and remote kernels
+
+   EXAMPLES:
+       # Add episodic entry
+       llmspell memory add session-123 user "What is Rust?"
+
+       # Add with metadata
+       llmspell memory add session-123 assistant "Rust is a systems language" \
+           --metadata '{"topic": "programming"}'
+
+       # Search episodic memory
+       llmspell memory search "ownership" --limit 5
+       llmspell memory search "ownership" --session-id session-123 --json
+
+       # Query semantic knowledge
+       llmspell memory query "programming concepts" --limit 10
+
+       # Show statistics
+       llmspell memory stats
+       llmspell memory stats --json
+
+       # Consolidate memory
+       llmspell memory consolidate --session-id session-123 --force
+       llmspell memory consolidate  # Background consolidation all sessions
+
+   MESSAGE FLOW (Phase 13.12.1):
+       1. CLI parses memory command and parameters
+       2. CLI creates memory_request message with command/params
+       3. CLI sends via kernel handle (embedded) or connection (remote)
+       4. Kernel receives on shell channel
+       5. Kernel.handle_memory_request() processes request
+       6. Kernel accesses script_executor.memory_bridge()
+       7. MemoryBridge executes operation (episodic_add, search, etc.)
+       8. Kernel sends memory_reply with results
+       9. CLI receives and formats output
+
+   CODE REFERENCES:
+       CLI: llmspell-cli/src/commands/memory.rs (handle_memory_command)
+       Handler: llmspell-kernel/src/execution/integrated.rs (handle_memory_request)
+       Bridge: llmspell-bridge/src/memory_bridge.rs (MemoryBridge methods)
+       API: llmspell-kernel/src/api.rs (send_memory_request)
    ```
 
-   **Examples**:
-   ```bash
-   # Basic usage
-   llmspell memory add session-123 user "What is Rust?"
-
-   # With metadata
-   llmspell memory add session-123 assistant "Rust is a systems programming language" \
-     --metadata '{"topic": "programming"}'
-   ```
-
-   ### Search Memory
-
-   ```bash
-   llmspell memory search <query> [--session-id ID] [--limit N] [--json]
-   ```
-
-   **Examples**:
-   ```bash
-   # Search all sessions
-   llmspell memory search "ownership" --limit 5
-
-   # Search specific session
-   llmspell memory search "ownership" --session-id session-123
-
-   # JSON output
-   llmspell memory search "ownership" --json > results.json
-   ```
-
-   ### Memory Statistics
-
-   ```bash
-   llmspell memory stats [--json]
-   ```
-
-   **Example Output**:
-   ```
-   === Memory Statistics ===
-
-   Episodic entries: 42
-   Semantic entities: 15
-   Sessions with unprocessed: 3
-
-   Capabilities:
-     Episodic: true
-     Semantic: true
-     Consolidation: true
-   ```
-
-   ### Consolidate Memory
-
-   ```bash
-   llmspell memory consolidate [--session-id ID] [--force]
-   ```
-
-   **Examples**:
-   ```bash
-   # Consolidate specific session (immediate)
-   llmspell memory consolidate --session-id session-123 --force
-
-   # Background consolidation (all sessions)
-   llmspell memory consolidate
-   ```
-
-   ## See Also
-
-   - [Context Commands](./context-commands.md)
-   - [Graph Commands](./graph-commands.md)
-   - [Memory System Architecture](../architecture/memory-system.md)
-   ```
-
-2. Create `docs/user-guide/cli/graph-commands.md`:
+   Add section 4.11 (after section 4.10):
    ```markdown
-   # Graph Commands
+   ### 4.11 Context Assembly (Phase 13.12.3)
 
-   ## Overview
-
-   The `llmspell graph` command provides CLI access to the semantic knowledge graph.
-
-   ## Commands
-
-   ### List Entities
+   **Architecture Note**: Context commands use kernel message protocol. The CLI sends `context_request` messages to the kernel, which accesses ContextBridge and returns assembled context via `context_reply` messages.
 
    ```bash
-   llmspell graph list [--type TYPE] [--limit N] [--json]
+   llmspell context <SUBCOMMAND>
+
+   SUBCOMMANDS:
+       assemble    Assemble context with specified strategy
+       strategies  List available context strategies
+       analyze     Analyze token usage across strategies
+
+   ASSEMBLE OPTIONS:
+       <query>             Query for context assembly
+       -s, --strategy <STRATEGY>  Assembly strategy [default: hybrid]
+                                 Options: hybrid, episodic, semantic, rag
+       -b, --budget <N>    Token budget [default: 2000]
+       --session-id <ID>   Session ID for filtering
+       --json              Output JSON
+
+   STRATEGIES OPTIONS:
+       --json              Output JSON
+
+   ANALYZE OPTIONS:
+       <query>             Query to analyze
+       -b, --budget <N>    Token budget [default: 2000]
+       --json              Output JSON
+
+   STRATEGY DESCRIPTIONS:
+       hybrid      Combines RAG, episodic, and semantic memory (recommended)
+       episodic    Conversation history only
+       semantic    Knowledge graph entities only
+       rag         Document retrieval only
+
+   ARCHITECTURE:
+       - Commands execute via kernel message protocol
+       - CLI sends context_request to kernel (embedded or remote)
+       - Kernel accesses ContextBridge from GlobalContext
+       - ContextBridge assembles context using specified strategy
+       - Results returned via context_reply messages
+
+   EXAMPLES:
+       # Assemble context with hybrid strategy
+       llmspell context assemble "What is Rust ownership?" --strategy hybrid --budget 2000
+
+       # Assemble with specific session
+       llmspell context assemble "ownership rules" --session-id session-123
+
+       # Use episodic strategy only
+       llmspell context assemble "previous discussion" --strategy episodic --budget 1000
+
+       # Get JSON output
+       llmspell context assemble "memory management" --json
+
+       # List available strategies
+       llmspell context strategies
+       llmspell context strategies --json
+
+       # Analyze token usage across strategies
+       llmspell context analyze "Explain Rust" --budget 1500
+       llmspell context analyze "memory safety" --budget 2000 --json
+
+   MESSAGE FLOW (Phase 13.12.3):
+       1. CLI parses context command and parameters
+       2. CLI creates context_request message with command/params
+       3. CLI sends via kernel handle (embedded) or connection (remote)
+       4. Kernel receives on shell channel
+       5. Kernel.handle_context_request() processes request
+       6. Kernel accesses script_executor.context_bridge()
+       7. ContextBridge executes assembly/analysis
+       8. Kernel sends context_reply with results
+       9. CLI receives and formats output (chunks, token counts)
+
+   CODE REFERENCES:
+       CLI: llmspell-cli/src/commands/context.rs (handle_context_command)
+       Handler: llmspell-kernel/src/execution/integrated.rs (handle_context_request)
+       Bridge: llmspell-bridge/src/context_bridge.rs (ContextBridge methods)
+       API: llmspell-kernel/src/api.rs (send_context_request)
    ```
 
-   **Examples**:
-   ```bash
-   # List all entities
-   llmspell graph list
-
-   # Filter by type
-   llmspell graph list --type "Person" --limit 10
-   ```
-
-   ### Show Entity
-
-   ```bash
-   llmspell graph show <entity-id> [--json]
-   ```
-
-   **Example**:
-   ```bash
-   llmspell graph show "entity-uuid-123"
-   ```
-
-   ### Query Entities
-
-   ```bash
-   llmspell graph query <query> [--limit N] [--json]
-   ```
-
-   **Example**:
-   ```bash
-   llmspell graph query "Rust programming concepts" --limit 5
-   ```
-
-   ### Show Relationships
-
-   ```bash
-   llmspell graph relationships <entity-id> [--json]
-   ```
-
-   ## See Also
-
-   - [Memory Commands](./memory-commands.md)
-   - [Knowledge Graph Architecture](../architecture/knowledge-graph.md)
-   ```
-
-3. Create `docs/user-guide/cli/context-commands.md`:
+   Update command tree diagram (section 1.2) to include memory and context commands:
    ```markdown
-   # Context Commands
+   llmspell
+   ├── ... (existing commands)
+   ├── memory                                      # Phase 13.12.1
+   │   ├── add <session-id> <role> <content> [--metadata]
+   │   ├── search <query> [--session-id] [--limit] [--json]
+   │   ├── query <text> [--limit] [--json]
+   │   ├── stats [--json]
+   │   └── consolidate [--session-id] [--force]
+   ├── context                                     # Phase 13.12.3
+   │   ├── assemble <query> [--strategy] [--budget] [--session-id] [--json]
+   │   ├── strategies [--json]
+   │   └── analyze <query> [--budget] [--json]
+   └── ... (existing commands)
+   ```
 
-   ## Overview
+2. **Create `docs/user-guide/cli/memory-commands.md`**: (~200 lines with complete examples, architecture explanation, and related commands)
 
-   The `llmspell context` command provides CLI tools for context assembly and analysis.
+3. **Create `docs/user-guide/cli/context-commands.md`**: (~180 lines with complete examples, strategy recommendations, and architecture)
 
-   ## Commands
-
-   ### Assemble Context
-
+4. **Verify Task 13.5.7d completion and mark complete**:
    ```bash
-   llmspell context assemble <query> [--strategy STRATEGY] [--budget N] [--session-id ID] [--json]
+   # Verify provider_name is documented in all template guides
+   grep -l "provider_name" docs/user-guide/templates/*.md
    ```
 
-   **Examples**:
-   ```bash
-   # Basic assembly
-   llmspell context assemble "What is Rust ownership?" --budget 2000
-
-   # With specific strategy
-   llmspell context assemble "Rust ownership" --strategy episodic --session-id session-123
-
-   # JSON output
-   llmspell context assemble "Rust ownership" --json
-   ```
-
-   ### List Strategies
-
-   ```bash
-   llmspell context strategies [--json]
-   ```
-
-   **Example Output**:
-   ```
-   === Available Context Strategies ===
-
-     hybrid       - Combines RAG, episodic, and semantic memory (recommended)
-     episodic     - Conversation history only
-     semantic     - Knowledge graph entities only
-     rag          - Document retrieval only
-     combined     - All sources with equal weighting
-   ```
-
-   ### Analyze Token Usage
-
-   ```bash
-   llmspell context analyze <query> [--budget N] [--json]
-   ```
-
-   **Example Output**:
-   ```
-   === Context Strategy Analysis ===
-
-   Query: What is Rust ownership?
-   Budget: 2000 tokens
-
-     hybrid       - 1850 tokens (92.5%), 12 chunks
-     episodic     - 650 tokens (32.5%), 4 chunks
-     semantic     - 420 tokens (21.0%), 3 chunks
-     rag          - 1200 tokens (60.0%), 8 chunks
-   ```
-
-   ## See Also
-
-   - [Memory Commands](./memory-commands.md)
-   - [Context Assembly Architecture](../architecture/context-assembly.md)
-   ```
-
-4. Mark Task 13.5.7d complete in TODO.md:
+   Update TODO.md to mark Task 13.5.7d complete:
    ```markdown
-   ### Task 13.5.7d: Template Parameter Schema Documentation
+   ### Task 13.5.7d: Template Parameter Schema Documentation (provider_name)
 
-   **Priority**: MEDIUM
-   **Estimated Time**: 1 hour
-   **Assignee**: Documentation Team
    **Status**: ✅ COMPLETE (completed in Task 13.11.1 + Task 13.12.4)
 
-   **Completion Summary**:
-   - Task 13.11.1 created `provider_parameters()` helper and added provider_name to all 10 templates
+   **Completion Notes**:
+   - Task 13.11.1 added provider_parameters() helper function to all templates
    - Task 13.12.4 verified documentation in all template user guides
-   - provider_name parameter properly documented with mutual exclusivity note
-
-   **Actual Time**: 0.5 hours (included in Task 13.11.1)
+   - All 10 templates now have consistent provider_name parameter documentation
+   - Schema validation ensures correct usage
    ```
 
-**Files to Create**:
-- `docs/user-guide/cli/memory-commands.md` (NEW - ~80 lines)
-- `docs/user-guide/cli/graph-commands.md` (NEW - ~60 lines)
-- `docs/user-guide/cli/context-commands.md` (NEW - ~80 lines)
+5. **Verify all documentation links**:
+   ```bash
+   # Check for broken internal links
+   find docs -name "*.md" -exec grep -H "\[.*\](.*\.md)" {} \; | \
+     while read line; do
+       # Extract and validate link targets
+       echo "$line"
+     done
+   ```
 
-**Files to Modify**:
-- `TODO.md` (MODIFY - mark Task 13.5.7d complete, +10 lines)
-- `docs/user-guide/cli/README.md` (MODIFY - add links to new command docs, +3 lines)
+**Files to Create/Modify**:
+- `docs/technical/cli-command-architecture.md` - Add sections 4.10, 4.11, update command tree (~250 lines NEW)
+- `docs/user-guide/cli/memory-commands.md` - NEW file (~200 lines)
+- `docs/user-guide/cli/context-commands.md` - NEW file (~180 lines)
+- `TODO.md` - Mark Task 13.5.7d complete (~10 lines MODIFIED)
 
 **Definition of Done**:
-- [ ] All 3 CLI documentation files created with examples
-- [ ] Task 13.5.7d marked complete in TODO.md
-- [ ] Template user guides verified for provider_name (from Task 13.11.1)
-- [ ] Links added to CLI README
-- [ ] All markdown properly formatted
-- [ ] Examples tested manually
+- [ ] CLI architecture doc updated with memory/context sections
+- [ ] Memory commands user guide created with examples
+- [ ] Context commands user guide created with strategy recommendations
+- [ ] Command tree diagram updated to include new commands
+- [ ] Task 13.5.7d verified and marked complete
+- [ ] All 10 template user guides verified for provider_name docs
+- [ ] All documentation reviewed for accuracy
+- [ ] Internal links verified (no broken references)
+- [ ] Documentation builds successfully
+- [ ] Examples tested and verified
+
+---
+
+## Summary of Phase 13.12 Changes
+
+**Removed from Original Plan**:
+- ❌ `memory sessions` subcommand - No backend method (MemoryBridge.list_sessions() doesn't exist)
+- ❌ Entire Task 13.12.2 (graph commands) - Missing 3 backend methods, low CLI value
+- ❌ Direct bridge access pattern - Inconsistent with CLI architecture
+
+**Added to Plan**:
+- ✅ `memory query` subcommand - Semantic search using existing semantic_query() method
+- ✅ Kernel message protocol for all operations - Consistent with template/tool patterns
+- ✅ `handle_memory_request()` and `handle_context_request()` kernel handlers
+- ✅ `send_memory_request()` and `send_context_request()` in KernelHandle
+- ✅ Bridge accessor methods in ScriptExecutor trait (memory_bridge(), context_bridge())
+
+**Architectural Improvements**:
+- ✅ Consistent with template/tool command patterns
+- ✅ Supports both embedded and remote kernels via unified protocol
+- ✅ Uses established kernel message protocol (memory_request/memory_reply, context_request/context_reply)
+- ✅ Proper separation of CLI (thin client) and kernel (execution)
+- ✅ Clear error handling and user-friendly output formatting
+
+**Time Changes**:
+- **Original**: 8 hours (3h + 2h + 2h + 1h)
+- **Revised**: 5 hours (2h + 0h + 2h + 1h)
+- **Reduction**: 3 hours (removed graph commands + sessions subcommand)
+
+**Files Summary**:
+- **NEW files**: 8 (memory.rs, context.rs, 2 test files, 2 user guide docs)
+- **MODIFIED files**: 7 (kernel handler, API, trait, engine, CLI enum, commands/mod, cli-arch doc)
+- **Total lines**: ~1,600 new lines of production code + ~800 lines documentation
+
+**Ready for Implementation**: All tasks fully specified with complete code examples, clear acceptance criteria, and comprehensive documentation plan.
 
 ---
 
