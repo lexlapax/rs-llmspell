@@ -39,6 +39,7 @@ once_cell.workspace = true
 
 [dev-dependencies]
 llmspell-testing = { path = "../llmspell-testing" }
+llmspell-bridge = { path = "../llmspell-bridge" }
 tokio = { workspace = true, features = ["test-util"] }
 tempfile.workspace = true
 criterion = { workspace = true, features = ["async_tokio"] }
