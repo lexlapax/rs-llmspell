@@ -3633,11 +3633,14 @@ impl<P: Protocol + 'static> IntegratedKernel<P> {
             .ok_or_else(|| anyhow!("Missing query"))?;
         let limit = content
             .get("limit")
-            .and_then(|l| l.as_u64())
+            .and_then(serde_json::Value::as_u64)
             .unwrap_or(10) as usize;
         let session_id = content.get("session_id").and_then(|s| s.as_str());
 
-        debug!("Searching memory: query='{}', limit={}, session={:?}", query, limit, session_id);
+        debug!(
+            "Searching memory: query='{}', limit={}, session={:?}",
+            query, limit, session_id
+        );
 
         // Use ScriptExecutor trait method
         match self
@@ -3674,10 +3677,13 @@ impl<P: Protocol + 'static> IntegratedKernel<P> {
             .ok_or_else(|| anyhow!("Missing query"))?;
         let limit = content
             .get("limit")
-            .and_then(|l| l.as_u64())
+            .and_then(serde_json::Value::as_u64)
             .unwrap_or(10) as usize;
 
-        debug!("Querying semantic memory: query='{}', limit={}", query, limit);
+        debug!(
+            "Querying semantic memory: query='{}', limit={}",
+            query, limit
+        );
 
         // Use ScriptExecutor trait method
         match self.script_executor.handle_memory_query(query, limit) {
@@ -3738,13 +3744,19 @@ impl<P: Protocol + 'static> IntegratedKernel<P> {
         let session_id = content.get("session_id").and_then(|s| s.as_str());
         let force = content
             .get("force")
-            .and_then(|f| f.as_bool())
+            .and_then(serde_json::Value::as_bool)
             .unwrap_or(false);
 
-        debug!("Consolidating memory: session={:?}, force={}", session_id, force);
+        debug!(
+            "Consolidating memory: session={:?}, force={}",
+            session_id, force
+        );
 
         // Use ScriptExecutor trait method
-        match self.script_executor.handle_memory_consolidate(session_id, force) {
+        match self
+            .script_executor
+            .handle_memory_consolidate(session_id, force)
+        {
             Ok(result) => {
                 let response = json!({
                     "msg_type": "memory_reply",
@@ -3815,7 +3827,7 @@ impl<P: Protocol + 'static> IntegratedKernel<P> {
             .unwrap_or("hybrid");
         let budget = content
             .get("budget")
-            .and_then(|b| b.as_u64())
+            .and_then(serde_json::Value::as_u64)
             .unwrap_or(2000) as usize;
         let session_id = content.get("session_id").and_then(|s| s.as_str());
 
@@ -3888,7 +3900,7 @@ impl<P: Protocol + 'static> IntegratedKernel<P> {
             .ok_or_else(|| anyhow!("Missing query"))?;
         let budget = content
             .get("budget")
-            .and_then(|b| b.as_u64())
+            .and_then(serde_json::Value::as_u64)
             .unwrap_or(2000) as usize;
 
         debug!("Analyzing context: query='{}', budget={}", query, budget);

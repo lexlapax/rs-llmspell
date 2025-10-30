@@ -29,7 +29,7 @@ use std::collections::HashMap;
 use std::fmt::Write;
 use std::sync::{Arc, RwLock};
 use std::time::Instant;
-use tracing::{debug, info, instrument};
+use tracing::{debug, info, instrument, warn};
 
 /// Central script runtime that uses `ScriptEngineBridge` abstraction
 ///
@@ -288,10 +288,10 @@ pub struct ScriptRuntime {
     /// Uses interior mutability (`RwLock`) to allow setting after `ScriptRuntime` creation.
     /// Optional to support standalone `ScriptRuntime` usage without context.
     ///
-    /// **Note**: Currently uses memory_manager directly for context assembly.
+    /// **Note**: Currently uses `memory_manager` directly for context assembly.
     /// Future: May integrate dedicated `ContextPipeline` from llmspell-context.
     ///
-    /// **Wiring flow:** Kernel creates → downcasts `ScriptRuntime` → (uses memory_manager)
+    /// **Wiring flow:** Kernel creates → downcasts `ScriptRuntime` → (uses `memory_manager`)
     context_enabled: Arc<RwLock<bool>>,
 
     /// Execution context
@@ -1273,7 +1273,7 @@ impl ScriptExecutor for ScriptRuntime {
         {
             self.set_session_manager(session_manager);
         } else {
-            tracing::warn!("Failed to downcast session manager from Any");
+            warn!("Failed to downcast session manager from Any");
         }
     }
 
@@ -1628,8 +1628,11 @@ impl ScriptExecutor for ScriptRuntime {
             })?;
 
         // Create episodic entry with metadata
-        let mut entry =
-            llmspell_memory::EpisodicEntry::new(session_id.to_string(), role.to_string(), content.to_string());
+        let mut entry = llmspell_memory::EpisodicEntry::new(
+            session_id.to_string(),
+            role.to_string(),
+            content.to_string(),
+        );
         entry.metadata = metadata;
 
         // Add to episodic memory
@@ -1666,9 +1669,8 @@ impl ScriptExecutor for ScriptRuntime {
 
         // Search episodic memory
         let mut results = tokio::task::block_in_place(|| {
-            tokio::runtime::Handle::current().block_on(async {
-                memory_manager.episodic().search(query, limit).await
-            })
+            tokio::runtime::Handle::current()
+                .block_on(async { memory_manager.episodic().search(query, limit).await })
         })
         .map_err(|e| LLMSpellError::Component {
             message: format!("Failed to search episodic memory: {e}"),
@@ -1834,12 +1836,7 @@ impl ScriptExecutor for ScriptRuntime {
         use serde_json::json;
 
         // Check if context is enabled
-        let context_enabled = self
-            .context_enabled
-            .read()
-            .ok()
-            .map(|guard| *guard)
-            .unwrap_or(false);
+        let context_enabled = self.context_enabled.read().ok().is_some_and(|guard| *guard);
 
         if !context_enabled {
             return Err(LLMSpellError::Component {
@@ -1893,8 +1890,9 @@ impl ScriptExecutor for ScriptRuntime {
                             "content": "Semantic memory text search requires context pipeline (Phase 13.12.3 full implementation)",
                         })])
                     }
-                    "hybrid" | _ => {
+                    _ => {
                         // Use episodic only for now (semantic text search not available)
+                        // This includes "hybrid" and any other strategy
                         let mut results = memory_manager.episodic().search(query, budget).await?;
 
                         // Filter by session if specified
@@ -1959,12 +1957,7 @@ impl ScriptExecutor for ScriptRuntime {
         use serde_json::json;
 
         // Check if context is enabled
-        let context_enabled = self
-            .context_enabled
-            .read()
-            .ok()
-            .map(|guard| *guard)
-            .unwrap_or(false);
+        let context_enabled = self.context_enabled.read().ok().is_some_and(|guard| *guard);
 
         if !context_enabled {
             return Err(LLMSpellError::Component {

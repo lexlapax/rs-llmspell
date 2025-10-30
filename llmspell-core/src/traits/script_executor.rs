@@ -298,11 +298,7 @@ pub trait ScriptExecutor: Send + Sync + 'static {
     /// Returns JSON array of matching entities.
     ///
     /// Default returns error for backward compatibility.
-    fn handle_memory_query(
-        &self,
-        _query: &str,
-        _limit: usize,
-    ) -> Result<Value, LLMSpellError> {
+    fn handle_memory_query(&self, _query: &str, _limit: usize) -> Result<Value, LLMSpellError> {
         Err(LLMSpellError::Component {
             message: "Memory query not supported by this executor".to_string(),
             source: None,
@@ -389,11 +385,7 @@ pub trait ScriptExecutor: Send + Sync + 'static {
     /// Returns JSON array with per-strategy analysis.
     ///
     /// Default returns error for backward compatibility.
-    fn handle_context_analyze(
-        &self,
-        _query: &str,
-        _budget: usize,
-    ) -> Result<Value, LLMSpellError> {
+    fn handle_context_analyze(&self, _query: &str, _budget: usize) -> Result<Value, LLMSpellError> {
         Err(LLMSpellError::Component {
             message: "Context analyze not supported by this executor".to_string(),
             source: None,

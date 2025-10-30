@@ -520,6 +520,47 @@ EXAMPLES:
         command: TemplateCommands,
     },
 
+    /// Memory management operations
+    #[command(long_about = "Manage episodic and semantic memory systems.
+
+Memory operations enable persistent conversation history (episodic) and knowledge graph
+management (semantic). The system automatically consolidates episodic memories into
+structured semantic knowledge.
+
+EXAMPLES:
+    llmspell memory add session-1 user \"What is Rust?\"  # Add memory entry
+    llmspell memory search \"async programming\"            # Search memories
+    llmspell memory query \"Rust types\"                    # Query knowledge graph
+    llmspell memory stats                                  # Show statistics
+    llmspell memory consolidate --session-id session-1     # Trigger consolidation")]
+    Memory {
+        #[command(subcommand)]
+        command: MemoryCommands,
+    },
+
+    /// Context assembly operations
+    #[command(
+        long_about = "Assemble context for LLM prompts using retrieval strategies.
+
+Context assembly intelligently combines episodic memory (conversation history) and
+semantic memory (knowledge graph) to build relevant context within token budgets.
+
+Strategies:
+  - hybrid:   Combines episodic and semantic (recommended)
+  - episodic: Conversation history only
+  - semantic: Knowledge graph entities only
+
+EXAMPLES:
+    llmspell context assemble \"What is Rust?\"            # Assemble context
+    llmspell context assemble \"async\" --strategy episodic  # Use specific strategy
+    llmspell context strategies                           # List available strategies
+    llmspell context analyze \"memory systems\" --budget 2000  # Analyze token usage"
+    )]
+    Context {
+        #[command(subcommand)]
+        command: ContextCommands,
+    },
+
     /// Display version information
     #[command(long_about = "Display detailed version and build information.
 
@@ -1314,6 +1355,177 @@ EXAMPLES:
     Schema {
         /// Template ID to show schema for
         name: String,
+    },
+}
+
+/// Memory management subcommands
+#[derive(Subcommand, Debug)]
+pub enum MemoryCommands {
+    /// Add entry to episodic memory
+    #[command(long_about = "Add a new entry to episodic memory.
+
+EXAMPLES:
+    llmspell memory add session-1 user \"What is Rust?\"
+    llmspell memory add session-1 assistant \"Rust is a systems programming language.\"
+    llmspell memory add session-1 user \"Tell me more\" --metadata '{\"importance\": 5}'")]
+    Add {
+        /// Session ID for this memory entry
+        session_id: String,
+
+        /// Role (user, assistant, system)
+        role: String,
+
+        /// Memory content
+        content: String,
+
+        /// Optional metadata as JSON
+        #[arg(long)]
+        metadata: Option<String>,
+    },
+
+    /// Search episodic memory
+    #[command(long_about = "Search episodic memory using vector similarity.
+
+EXAMPLES:
+    llmspell memory search \"Rust programming\"           # Search all sessions
+    llmspell memory search \"async\" --session-id session-1  # Search specific session
+    llmspell memory search \"error handling\" --limit 20    # Limit results
+    llmspell memory search \"vectors\" --format json        # JSON output")]
+    Search {
+        /// Search query
+        query: String,
+
+        /// Filter by session ID
+        #[arg(long)]
+        session_id: Option<String>,
+
+        /// Maximum number of results
+        #[arg(long, default_value = "10")]
+        limit: usize,
+
+        /// Output format (overrides global format)
+        #[arg(long)]
+        format: Option<OutputFormat>,
+    },
+
+    /// Query semantic knowledge graph
+    #[command(long_about = "Query the semantic knowledge graph for entities.
+
+EXAMPLES:
+    llmspell memory query \"Rust\"                  # Query for Rust entities
+    llmspell memory query \"async patterns\" --limit 15  # Limit results
+    llmspell memory query \"types\" --format json       # JSON output")]
+    Query {
+        /// Query text
+        query: String,
+
+        /// Maximum number of results
+        #[arg(long, default_value = "10")]
+        limit: usize,
+
+        /// Output format (overrides global format)
+        #[arg(long)]
+        format: Option<OutputFormat>,
+    },
+
+    /// Show memory statistics
+    #[command(long_about = "Display memory system statistics.
+
+EXAMPLES:
+    llmspell memory stats              # Show all statistics
+    llmspell memory stats --format json  # JSON output")]
+    Stats {
+        /// Output format (overrides global format)
+        #[arg(long)]
+        format: Option<OutputFormat>,
+    },
+
+    /// Consolidate episodic to semantic memory
+    #[command(
+        long_about = "Trigger consolidation of episodic memories into semantic knowledge.
+
+EXAMPLES:
+    llmspell memory consolidate                     # Consolidate all sessions
+    llmspell memory consolidate --session-id session-1  # Specific session
+    llmspell memory consolidate --force             # Force immediate consolidation"
+    )]
+    Consolidate {
+        /// Session ID to consolidate (empty = all sessions)
+        #[arg(long)]
+        session_id: Option<String>,
+
+        /// Force immediate consolidation
+        #[arg(long)]
+        force: bool,
+    },
+}
+
+/// Context assembly subcommands
+#[derive(Subcommand, Debug)]
+pub enum ContextCommands {
+    /// Assemble context for a query
+    #[command(long_about = "Assemble context using the specified retrieval strategy.
+
+Strategies:
+  - hybrid:   Combines episodic and semantic memory (recommended)
+  - episodic: Conversation history only
+  - semantic: Knowledge graph entities only
+
+EXAMPLES:
+    llmspell context assemble \"What is Rust?\"                     # Use hybrid strategy
+    llmspell context assemble \"async\" --strategy episodic          # Episodic only
+    llmspell context assemble \"types\" --budget 2000 --session-id session-1  # With budget and session
+    llmspell context assemble \"memory\" --format json               # JSON output")]
+    Assemble {
+        /// Query for context assembly
+        query: String,
+
+        /// Retrieval strategy (hybrid, episodic, semantic)
+        #[arg(long)]
+        strategy: Option<String>,
+
+        /// Token budget for context
+        #[arg(long, default_value = "1000")]
+        budget: usize,
+
+        /// Filter by session ID
+        #[arg(long)]
+        session_id: Option<String>,
+
+        /// Output format (overrides global format)
+        #[arg(long)]
+        format: Option<OutputFormat>,
+    },
+
+    /// List available context strategies
+    #[command(long_about = "List all available context assembly strategies.
+
+EXAMPLES:
+    llmspell context strategies              # List strategies
+    llmspell context strategies --format json  # JSON output")]
+    Strategies {
+        /// Output format (overrides global format)
+        #[arg(long)]
+        format: Option<OutputFormat>,
+    },
+
+    /// Analyze token usage by strategy
+    #[command(long_about = "Analyze estimated token usage for each strategy.
+
+EXAMPLES:
+    llmspell context analyze \"Rust async\" --budget 2000  # Analyze strategies
+    llmspell context analyze \"memory systems\" --format json  # JSON output")]
+    Analyze {
+        /// Query for analysis
+        query: String,
+
+        /// Token budget
+        #[arg(long, default_value = "1000")]
+        budget: usize,
+
+        /// Output format (overrides global format)
+        #[arg(long)]
+        format: Option<OutputFormat>,
     },
 }
 
