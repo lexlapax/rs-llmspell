@@ -301,6 +301,38 @@ impl crate::core::Template for WorkflowOrchestratorTemplate {
             "Workflow orchestration complete (duration: {}ms, steps: {})",
             output.metrics.duration_ms, execution_result.steps_executed
         );
+
+        // Store in memory if enabled (Task 13.11.3)
+        if memory_enabled && session_id.is_some() && context.memory_manager().is_some() {
+            let memory_mgr = context.memory_manager().unwrap();
+            let input_summary = format!(
+                "Workflow with {} steps in {} mode",
+                workflow.steps.len(),
+                execution_mode
+            );
+            let output_summary = format!(
+                "Executed {} steps ({} agents, {} tools)",
+                execution_result.steps_executed,
+                execution_result.agents_executed,
+                execution_result.tools_executed
+            );
+
+            crate::context::store_template_execution(
+                &memory_mgr,
+                session_id.as_ref().unwrap(),
+                &self.metadata.id,
+                &input_summary,
+                &output_summary,
+                json!({
+                    "execution_mode": execution_mode,
+                    "workflow_steps": workflow.steps.len(),
+                    "steps_executed": execution_result.steps_executed,
+                }),
+            )
+            .await
+            .ok(); // Don't fail execution if storage fails
+        }
+
         Ok(output)
     }
 

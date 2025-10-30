@@ -248,6 +248,34 @@ impl crate::core::Template for CodeGeneratorTemplate {
             "Code generation complete (duration: {}ms, agents: {})",
             output.metrics.duration_ms, output.metrics.agents_invoked
         );
+
+        // Store in memory if enabled (Task 13.11.3)
+        if memory_enabled && session_id.is_some() && context.memory_manager().is_some() {
+            let memory_mgr = context.memory_manager().unwrap();
+            let input_summary = format!("Generate {} code: {}", language, &description[..description.len().min(100)]);
+            let output_summary = format!(
+                "Generated {} implementation ({} lines) with {}",
+                language,
+                impl_result.code.lines().count(),
+                if include_tests { "tests" } else { "no tests" }
+            );
+
+            crate::context::store_template_execution(
+                &memory_mgr,
+                session_id.as_ref().unwrap(),
+                &self.metadata.id,
+                &input_summary,
+                &output_summary,
+                json!({
+                    "language": language,
+                    "include_tests": include_tests,
+                    "code_lines": impl_result.code.lines().count(),
+                }),
+            )
+            .await
+            .ok(); // Don't fail execution if storage fails
+        }
+
         Ok(output)
     }
 

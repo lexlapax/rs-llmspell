@@ -714,7 +714,7 @@ impl crate::core::Template for FileClassificationTemplate {
     async fn execute(
         &self,
         params: TemplateParams,
-        _context: ExecutionContext,
+        context: ExecutionContext,
     ) -> Result<TemplateOutput, TemplateError> {
         let start_time = std::time::Instant::now();
         let mut output = TemplateOutput::new(
@@ -734,6 +734,10 @@ impl crate::core::Template for FileClassificationTemplate {
         let dry_run: bool = params.get_or("dry_run", true);
         let recursive: bool = params.get_or("recursive", false);
         let output_format: String = params.get_or("output_format", "text".to_string());
+
+        // Extract memory parameters (Task 13.11.2)
+        let session_id: Option<String> = params.get_optional("session_id").unwrap_or(None);
+        let memory_enabled: bool = params.get_or("memory_enabled", true);
 
         info!(
             "Starting file classification: source={}, strategy={}, action={}, dry_run={}",
@@ -842,6 +846,36 @@ impl crate::core::Template for FileClassificationTemplate {
             output.metrics.duration_ms,
             results.len()
         );
+
+        // Store in memory if enabled (Task 13.11.3)
+        if memory_enabled && session_id.is_some() && context.memory_manager().is_some() {
+            let memory_mgr = context.memory_manager().unwrap();
+            let input_summary = format!(
+                "Classify files in {} using {} strategy",
+                source_path, classification_strategy
+            );
+            let output_summary = format!(
+                "Classified {} files into {} categories",
+                results.len(),
+                category_counts.len()
+            );
+
+            crate::context::store_template_execution(
+                &memory_mgr,
+                session_id.as_ref().unwrap(),
+                &self.metadata.id,
+                &input_summary,
+                &output_summary,
+                json!({
+                    "files_classified": results.len(),
+                    "strategy": classification_strategy,
+                    "action": action,
+                    "categories": category_counts.len(),
+                }),
+            )
+            .await
+            .ok(); // Don't fail execution if storage fails
+        }
 
         Ok(output)
     }

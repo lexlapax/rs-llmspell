@@ -3253,10 +3253,10 @@ Implemented complete consolidation feedback mechanism in 3 phases over ~3 hours:
 ### Task 13.11.3: Memory Storage - Post-Execution Storage
 
 **Priority**: MEDIUM
-**Estimated Time**: 3 hours
+**Estimated Time**: 3 hours → **Actual**: 2.5 hours
 **Assignee**: Template Team
-**Status**: BLOCKED (requires Task 13.11.0, 13.11.1, 13.11.2)
-**Dependencies**: Task 13.11.0 (infrastructure), 13.11.1 (parameters), 13.11.2 (context integration) MUST be complete
+**Status**: ✅ **COMPLETE** (Task 13.11.0, 13.11.1, 13.11.2)
+**Completed**: 2025-10-29
 
 **Description**: Store template inputs and outputs in episodic memory after successful execution for future context retrieval, using ExecutionContext.memory_manager() (infrastructure added in Task 13.11.0).
 
@@ -3274,11 +3274,11 @@ Implemented complete consolidation feedback mechanism in 3 phases over ~3 hours:
   - Metadata: template_id, category, duration
 
 **Acceptance Criteria**:
-- [ ] Helper function `store_template_execution()` created
-- [ ] All 10 templates call storage helper after execution
-- [ ] Stored entries include template metadata
-- [ ] Only stores when session_id provided and memory_enabled=true
-- [ ] **TRACING**: Storage attempts (debug!), success (info!), skipped (debug!), errors (warn!)
+- [x] Helper function `store_template_execution()` created
+- [x] All 10 templates call storage helper after execution
+- [x] Stored entries include template metadata
+- [x] Only stores when session_id provided and memory_enabled=true
+- [x] **TRACING**: Storage attempts (debug!), success (info!), skipped (debug!), errors (warn!)
 
 **Implementation Steps**:
 
@@ -3392,12 +3392,27 @@ Implemented complete consolidation feedback mechanism in 3 phases over ~3 hours:
 - All 10 template files (MODIFY - add storage call after execution, ~10 lines each)
 
 **Definition of Done**:
-- [ ] Storage helper created and tested
-- [ ] All 10 templates store execution in memory
-- [ ] Stored entries retrievable in future executions
-- [ ] Storage failures don't break template execution
-- [ ] Tracing shows storage operations
-- [ ] Zero clippy warnings
+- [x] Storage helper created and tested (context.rs:382-491, 110 lines)
+- [x] All 10 templates store execution in memory
+- [x] Stored entries retrievable in future executions (dual episodic entry pattern)
+- [x] Storage failures don't break template execution (.ok() pattern throughout)
+- [x] Tracing shows storage operations (debug!, info!, warn!)
+- [x] Zero clippy warnings (194 tests passing)
+
+**Implementation Insights**:
+- **Helper Function**: 110-line `store_template_execution()` in context.rs stores dual episodic entries (user+assistant roles) with template-specific metadata
+- **API Discovery**: EpisodicEntry uses direct field assignment (`entry.metadata = json!(...)`) not builder methods - required reading llmspell-memory/src/types.rs
+- **Import Path**: EpisodicEntry re-exported at crate root (`use llmspell_memory::EpisodicEntry`), not in episodic module
+- **Template Coverage**: All 10 templates updated with storage calls after execution, before Ok(output)
+- **Template-Specific Summaries**: Each template creates contextual summaries (e.g., code_generator: "Generate rust code: {desc}", content_generation: "{word_count} words, quality: {score}")
+- **Graceful Degradation**: Storage calls wrapped in .ok() to prevent execution failures from memory issues
+- **Missing Parameters**: file_classification.rs and knowledge_management.rs required adding memory parameter extraction (Task 13.11.2 incomplete for those templates)
+- **Parameter Name Fix**: file_classification.rs had `_context` parameter → renamed to `context` for memory_manager() access
+- **Zero Warnings**: Clean clippy pass, 194/194 tests passing (5 ignored infrastructure tests)
+
+**Files Modified**:
+- llmspell-templates/src/context.rs (+110 lines helper)
+- All 10 template files in llmspell-templates/src/builtin/ (+25-35 lines each for storage integration)
 
 ---
 

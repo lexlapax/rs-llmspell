@@ -409,6 +409,39 @@ impl crate::core::Template for ContentGenerationTemplate {
             iteration_count,
             output.metrics.agents_invoked
         );
+
+        // Store in memory if enabled (Task 13.11.3)
+        if memory_enabled && session_id.is_some() && context.memory_manager().is_some() {
+            let memory_mgr = context.memory_manager().unwrap();
+            let input_summary = format!(
+                "Generate {} content about: {}",
+                content_type,
+                &topic[..topic.len().min(100)]
+            );
+            let output_summary = format!(
+                "Generated content ({} words, quality: {:.2}, {} iterations)",
+                formatted.split_whitespace().count(),
+                current_quality,
+                iteration_count
+            );
+
+            crate::context::store_template_execution(
+                &memory_mgr,
+                session_id.as_ref().unwrap(),
+                &self.metadata.id,
+                &input_summary,
+                &output_summary,
+                json!({
+                    "content_type": content_type,
+                    "word_count": formatted.split_whitespace().count(),
+                    "quality_score": current_quality,
+                    "iterations": iteration_count,
+                }),
+            )
+            .await
+            .ok(); // Don't fail execution if storage fails
+        }
+
         Ok(output)
     }
 

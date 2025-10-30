@@ -379,6 +379,117 @@ pub async fn assemble_template_context(
     }
 }
 
+// ============================================================================
+// Memory Storage Helper (Task 13.11.3)
+// ============================================================================
+
+/// Store template execution in episodic memory
+///
+/// Stores both input and output as separate episodic entries for future context retrieval.
+/// Uses MemoryManager from ExecutionContext to persist template interactions.
+///
+/// # Arguments
+///
+/// * `memory_manager` - MemoryManager implementation (from ExecutionContext.memory_manager())
+/// * `session_id` - Session ID for episodic grouping
+/// * `template_id` - Template identifier
+/// * `input_summary` - Summary of template input
+/// * `output_summary` - Summary of template output
+/// * `metadata` - Additional metadata (duration, params, etc.)
+///
+/// # Returns
+///
+/// Ok(()) on success, or error if storage fails
+///
+/// # Errors
+///
+/// Returns error if episodic memory storage fails (logged as warning)
+///
+/// # Example
+///
+/// ```ignore
+/// if let Some(memory) = context.memory_manager() {
+///     store_template_execution(
+///         &memory,
+///         "session-123",
+///         "research-assistant",
+///         "Research topic: AI",
+///         "Found 10 sources",
+///         json!({"duration_ms": 1500})
+///     ).await.ok(); // Don't fail execution on storage error
+/// }
+/// ```
+pub async fn store_template_execution(
+    memory_manager: &Arc<dyn llmspell_memory::MemoryManager>,
+    session_id: &str,
+    template_id: &str,
+    input_summary: &str,
+    output_summary: &str,
+    metadata: serde_json::Value,
+) -> crate::error::Result<()> {
+    use llmspell_memory::EpisodicEntry;
+    use tracing::{debug, info, warn};
+
+    debug!(
+        "Storing template execution in memory: template={}, session={}",
+        template_id, session_id
+    );
+
+    // Store input (user role)
+    let mut input_entry = EpisodicEntry::new(
+        session_id.to_string(),
+        "user".to_string(),
+        format!("Template: {} - Input: {}", template_id, input_summary),
+    );
+    input_entry.metadata = serde_json::json!({
+        "template_id": template_id,
+        "type": "template_input",
+        "metadata": metadata,
+    });
+
+    memory_manager
+        .episodic()
+        .add(input_entry)
+        .await
+        .map_err(|e| {
+            warn!("Failed to store template input in memory: {}", e);
+            crate::error::TemplateError::ExecutionFailed(format!(
+                "Memory storage failed: {}",
+                e
+            ))
+        })?;
+
+    // Store output (assistant role)
+    let mut output_entry = EpisodicEntry::new(
+        session_id.to_string(),
+        "assistant".to_string(),
+        format!("Template: {} - Output: {}", template_id, output_summary),
+    );
+    output_entry.metadata = serde_json::json!({
+        "template_id": template_id,
+        "type": "template_output",
+        "metadata": metadata,
+    });
+
+    memory_manager
+        .episodic()
+        .add(output_entry)
+        .await
+        .map_err(|e| {
+            warn!("Failed to store template output in memory: {}", e);
+            crate::error::TemplateError::ExecutionFailed(format!(
+                "Memory storage failed: {}",
+                e
+            ))
+        })?;
+
+    info!(
+        "Template execution stored in memory: session={}, template={}",
+        session_id, template_id
+    );
+    Ok(())
+}
+
 /// Builder for ExecutionContext
 #[derive(Default)]
 pub struct ExecutionContextBuilder {
