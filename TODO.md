@@ -3627,17 +3627,99 @@ Implemented complete consolidation feedback mechanism in 3 phases over ~3 hours:
 - **Output Format**: Interactive tables for search results, JSON for stats
 
 **Acceptance Criteria**:
-- [ ] `memory add` adds episodic entry with metadata via kernel protocol
-- [ ] `memory search` searches episodic memory with filters via kernel protocol
-- [ ] `memory query` searches semantic knowledge via kernel protocol (NEW)
-- [ ] `memory stats` displays memory system statistics via kernel protocol
-- [ ] `memory consolidate` triggers consolidation via kernel protocol
-- [ ] All commands support `--json` flag for machine-readable output
+- [x] ✅ Kernel protocol handlers (memory_request/context_request) - commit d5a3e616
+- [x] ✅ ScriptExecutor trait methods (5 memory + 3 context) - commit d5a3e616
+- [x] ✅ KernelHandle API methods (send_memory_request, send_context_request) - commit d5a3e616
+- [x] ✅ ScriptRuntime trait implementations (all 8 methods) - commit a8a1b555
+- [ ] CLI memory commands module (~350 lines)
+- [ ] CLI context commands module (~250 lines)
+- [ ] Register commands in CLI enum
+- [ ] Integration tests
 - [ ] Interactive tables show search results with highlighting
-- [ ] Kernel message handlers implemented in `llmspell-kernel`
-- [ ] Works with both embedded and remote kernels
+- [ ] All commands support `--json` flag for machine-readable output
 - [ ] Error handling with clear messages
 - [ ] **TRACING**: Command start (info!), kernel requests (debug!), results (debug!), errors (error!)
+
+**Progress Update (Commits d5a3e616, a8a1b555)**:
+
+**✅ COMPLETED - Infrastructure Layer (4/8 tasks)**:
+
+1. **Kernel Protocol Handlers** (llmspell-kernel/src/execution/integrated.rs):
+   - Added `memory_request` and `context_request` to message router (lines 1127-1128)
+   - Implemented `handle_memory_request()` dispatcher with 5 command handlers (lines 3563-3933)
+   - Implemented `handle_context_request()` dispatcher with 3 command handlers
+   - Each handler extracts typed params, calls ScriptExecutor trait method, wraps JSON response
+   - Follows template pattern: type-safe extraction → trait call → response wrapping
+
+2. **ScriptExecutor Trait Extensions** (llmspell-core/src/traits/script_executor.rs):
+   - Added 5 memory methods (lines 259-338): `handle_memory_add`, `handle_memory_search`, `handle_memory_query`, `handle_memory_stats`, `handle_memory_consolidate`
+   - Added 3 context methods (lines 340-401): `handle_context_assemble`, `handle_context_strategies`, `handle_context_analyze`
+   - JSON-based API (returns `serde_json::Value`) to avoid circular dependencies
+   - Default implementations return errors for backward compatibility
+
+3. **KernelHandle API Methods** (llmspell-kernel/src/api.rs):
+   - Added `send_memory_request()` (lines 368-453): sends memory_request, waits for memory_reply
+   - Added `send_context_request()` (lines 455-560): sends context_request, waits for context_reply
+   - Multipart Jupyter wire protocol parsing (delimiter, header, content)
+   - 300-second timeout with proper error handling
+   - Follows template/tool request pattern (send → poll → parse → return)
+
+4. **ScriptRuntime Trait Implementations** (llmspell-bridge/src/runtime.rs):
+   - Added storage fields: `memory_manager: Arc<RwLock<Option<Arc<dyn MemoryManager>>>>` (line 283)
+   - Added storage fields: `context_enabled: Arc<RwLock<bool>>` (line 295)
+   - Added wiring method: `set_memory_manager()` (lines 1087-1098) - enables context when set
+   - Implemented 5 memory methods (lines 1610-1848):
+     - `handle_memory_add()`: Creates EpisodicEntry, adds to episodic memory
+     - `handle_memory_search()`: Vector search with session filtering
+     - `handle_memory_query()`: Placeholder (returns info message - requires context pipeline)
+     - `handle_memory_stats()`: Returns session stats via `list_sessions_with_unprocessed()`
+     - `handle_memory_consolidate()`: Immediate/Background modes, returns full stats
+   - Implemented 3 context methods (lines 1850-2085):
+     - `handle_context_assemble()`: Episodic/semantic/hybrid strategies (episodic-only for now)
+     - `handle_context_strategies()`: Returns available strategies list
+     - `handle_context_analyze()`: Token estimation per strategy (episodic-only for now)
+
+**Architectural Insights**:
+
+1. **API Limitations Discovered**:
+   - `EpisodicMemory::search()` doesn't have built-in session filtering → manual `retain()` after search
+   - `SemanticMemory` trait lacks text search → semantic/hybrid strategies use episodic-only (noted in responses)
+   - Memory traits don't expose count methods → use `list_sessions_with_unprocessed()` as proxy
+   - `ConsolidationResult` fields: `duration_ms` (not `duration`), `entries_skipped/failed` (not `relationships_added`)
+
+2. **Type Erasure Pattern Consistent**:
+   - ScriptRuntime stores `Arc<RwLock<Option<Arc<dyn MemoryManager>>>>` (matches RAG/SessionManager pattern)
+   - Kernel wires via downcasting: `script_executor.as_any().downcast_ref::<ScriptRuntime>()`
+   - Interior mutability allows setting after construction (no circular deps)
+
+3. **Async in Sync Context**:
+   - Used `tokio::task::block_in_place()` + `Handle::current().block_on()` for all memory operations
+   - Required because ScriptExecutor trait methods are synchronous (kernel compatibility)
+   - Pattern: `block_in_place(|| Handle::current().block_on(async { ... }))`
+
+4. **Error Handling Chain**:
+   - MemoryError → LLMSpellError::Component via `map_err(|e| LLMSpellError::Component { message: format!(...), source: None })`
+   - Kernel handlers catch LLMSpellError and send error responses via `send_memory_reply(json!({"status": "error", "error": "..."}))`
+   - Consistent with template/tool error handling
+
+5. **Semantic Memory Query Deferred**:
+   - `handle_memory_query()` returns informational message (requires context pipeline)
+   - `handle_context_assemble()` "semantic" strategy returns info message
+   - Full implementation requires llmspell-context integration (Phase 13.12.3 enhancement)
+
+**Files Modified**:
+- llmspell-core/src/traits/script_executor.rs (+140 lines: 8 trait methods + docs)
+- llmspell-kernel/src/execution/integrated.rs (+370 lines: 13 handlers + dispatcher logic)
+- llmspell-kernel/src/api.rs (+192 lines: 2 request methods)
+- llmspell-bridge/src/runtime.rs (+478 lines: 2 fields + 1 setter + 8 trait methods)
+
+**Compilation**: ✅ Zero errors, zero warnings across all crates
+
+**Next Steps**:
+- [ ] CLI memory commands module (llmspell-cli/src/commands/memory/mod.rs)
+- [ ] CLI context commands module (llmspell-cli/src/commands/context/mod.rs)
+- [ ] Register in llmspell-cli/src/main.rs enum
+- [ ] Integration tests
 
 **Implementation Steps**:
 
