@@ -128,3 +128,113 @@ fn test_validate_missing_config() {
         .assert()
         .failure();
 }
+
+// Memory command tests
+#[test]
+fn test_memory_help() {
+    let mut cmd = Command::cargo_bin("llmspell").unwrap();
+    cmd.arg("memory")
+        .arg("--help")
+        .assert()
+        .success()
+        .stdout(predicate::str::contains("Memory management commands"));
+}
+
+#[test]
+fn test_memory_add_help() {
+    let mut cmd = Command::cargo_bin("llmspell").unwrap();
+    cmd.arg("memory")
+        .arg("add")
+        .arg("--help")
+        .assert()
+        .success()
+        .stdout(predicate::str::contains("Add an episodic memory entry"));
+}
+
+#[test]
+fn test_memory_search_help() {
+    let mut cmd = Command::cargo_bin("llmspell").unwrap();
+    cmd.arg("memory")
+        .arg("search")
+        .arg("--help")
+        .assert()
+        .success()
+        .stdout(predicate::str::contains("Search episodic memory"));
+}
+
+#[test]
+fn test_memory_query_help() {
+    let mut cmd = Command::cargo_bin("llmspell").unwrap();
+    cmd.arg("memory")
+        .arg("query")
+        .arg("--help")
+        .assert()
+        .success()
+        .stdout(predicate::str::contains("Query semantic knowledge graph"));
+}
+
+#[test]
+fn test_memory_stats_help() {
+    let mut cmd = Command::cargo_bin("llmspell").unwrap();
+    cmd.arg("memory")
+        .arg("stats")
+        .arg("--help")
+        .assert()
+        .success()
+        .stdout(predicate::str::contains("Display memory system statistics"));
+}
+
+#[test]
+fn test_memory_consolidate_help() {
+    let mut cmd = Command::cargo_bin("llmspell").unwrap();
+    cmd.arg("memory")
+        .arg("consolidate")
+        .arg("--help")
+        .assert()
+        .success()
+        .stdout(predicate::str::contains("Trigger memory consolidation"));
+}
+
+// Context command tests
+#[test]
+fn test_context_help() {
+    let mut cmd = Command::cargo_bin("llmspell").unwrap();
+    cmd.arg("context")
+        .arg("--help")
+        .assert()
+        .success()
+        .stdout(predicate::str::contains("Context assembly commands"));
+}
+
+#[test]
+fn test_context_assemble_help() {
+    let mut cmd = Command::cargo_bin("llmspell").unwrap();
+    cmd.arg("context")
+        .arg("assemble")
+        .arg("--help")
+        .assert()
+        .success()
+        .stdout(predicate::str::contains("Assemble context from memory"));
+}
+
+#[test]
+fn test_context_strategies_help() {
+    let mut cmd = Command::cargo_bin("llmspell").unwrap();
+    cmd.arg("context")
+        .arg("strategies")
+        .arg("--help")
+        .assert()
+        .success()
+        .stdout(predicate::str::contains("List available context assembly strategies"));
+}
+
+#[test]
+fn test_context_analyze_help() {
+    let mut cmd = Command::cargo_bin("llmspell").unwrap();
+    cmd.arg("context")
+        .arg("analyze")
+        .arg("--help")
+        .assert()
+        .success()
+        .stdout(predicate::str::contains("Analyze context strategies"));
+}
