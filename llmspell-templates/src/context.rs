@@ -453,10 +453,7 @@ pub async fn store_template_execution(
         .await
         .map_err(|e| {
             warn!("Failed to store template input in memory: {}", e);
-            crate::error::TemplateError::ExecutionFailed(format!(
-                "Memory storage failed: {}",
-                e
-            ))
+            crate::error::TemplateError::ExecutionFailed(format!("Memory storage failed: {}", e))
         })?;
 
     // Store output (assistant role)
@@ -477,10 +474,7 @@ pub async fn store_template_execution(
         .await
         .map_err(|e| {
             warn!("Failed to store template output in memory: {}", e);
-            crate::error::TemplateError::ExecutionFailed(format!(
-                "Memory storage failed: {}",
-                e
-            ))
+            crate::error::TemplateError::ExecutionFailed(format!("Memory storage failed: {}", e))
         })?;
 
     info!(

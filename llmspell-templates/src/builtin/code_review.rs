@@ -331,11 +331,7 @@ impl crate::core::Template for CodeReviewTemplate {
         // Store in memory if enabled (Task 13.11.3)
         if memory_enabled && session_id.is_some() && context.memory_manager().is_some() {
             let memory_mgr = context.memory_manager().unwrap();
-            let input_summary = format!(
-                "Review {} code for {} aspects",
-                language,
-                aspects.len()
-            );
+            let input_summary = format!("Review {} code for {} aspects", language, aspects.len());
             let output_summary = format!(
                 "Found {} issues with {} fixes",
                 aggregated.issues.len(),

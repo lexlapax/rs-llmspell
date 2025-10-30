@@ -199,8 +199,8 @@ async fn test_context_bridge_creation() {
 fn test_templates_have_memory_parameters() {
     info!("=== Test: Templates Have Memory Parameters ===");
 
-    let registry = TemplateRegistry::with_builtin_templates()
-        .expect("Failed to create template registry");
+    let registry =
+        TemplateRegistry::with_builtin_templates().expect("Failed to create template registry");
 
     // Check a few templates for memory parameters
     let template_ids = vec!["research-assistant", "interactive-chat", "code-generator"];
@@ -238,8 +238,8 @@ fn test_templates_have_memory_parameters() {
 fn test_memory_parameter_types() {
     info!("=== Test: Memory Parameter Types ===");
 
-    let registry = TemplateRegistry::with_builtin_templates()
-        .expect("Failed to create template registry");
+    let registry =
+        TemplateRegistry::with_builtin_templates().expect("Failed to create template registry");
 
     let template = registry
         .get("research-assistant")
@@ -255,7 +255,10 @@ fn test_memory_parameter_types() {
                 debug!("session_id: optional string parameter ✓");
             }
             "memory_enabled" => {
-                assert!(!param.required, "memory_enabled should be optional (has default)");
+                assert!(
+                    !param.required,
+                    "memory_enabled should be optional (has default)"
+                );
                 debug!("memory_enabled: optional boolean parameter ✓");
             }
             "context_budget" => {

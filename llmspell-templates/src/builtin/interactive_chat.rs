@@ -304,11 +304,9 @@ impl crate::core::Template for InteractiveChatTemplate {
         // Store in memory if enabled (Task 13.11.3)
         if memory_enabled && context.memory_manager().is_some() {
             let memory_mgr = context.memory_manager().unwrap();
-            let input_summary = message
-                .as_deref()
-                .unwrap_or("interactive chat session");
-            let output_summary = &conversation_result.transcript
-                [..conversation_result.transcript.len().min(200)];
+            let input_summary = message.as_deref().unwrap_or("interactive chat session");
+            let output_summary =
+                &conversation_result.transcript[..conversation_result.transcript.len().min(200)];
 
             crate::context::store_template_execution(
                 &memory_mgr,
