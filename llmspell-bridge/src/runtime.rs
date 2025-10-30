@@ -273,6 +273,27 @@ pub struct ScriptRuntime {
     /// **Wiring flow:** Kernel creates → downcasts `ScriptRuntime` → calls `set_rag()`
     rag: Arc<RwLock<Option<Arc<llmspell_rag::multi_tenant_integration::MultiTenantRAG>>>>,
 
+    /// Memory manager for adaptive memory system (Phase 13.12.1)
+    ///
+    /// Wired from kernel after initialization to provide memory operations to CLI/Lua.
+    /// Uses interior mutability (`RwLock`) to allow setting after `ScriptRuntime` creation.
+    /// Optional to support standalone `ScriptRuntime` usage without memory.
+    ///
+    /// **Wiring flow:** Kernel creates → downcasts `ScriptRuntime` → calls `set_memory_manager()`
+    memory_manager: Arc<RwLock<Option<Arc<dyn llmspell_memory::MemoryManager>>>>,
+
+    /// Context assembly for query-based context retrieval (Phase 13.12.3)
+    ///
+    /// Wired from kernel after initialization to provide context operations to CLI/Lua.
+    /// Uses interior mutability (`RwLock`) to allow setting after `ScriptRuntime` creation.
+    /// Optional to support standalone `ScriptRuntime` usage without context.
+    ///
+    /// **Note**: Currently uses memory_manager directly for context assembly.
+    /// Future: May integrate dedicated `ContextPipeline` from llmspell-context.
+    ///
+    /// **Wiring flow:** Kernel creates → downcasts `ScriptRuntime` → (uses memory_manager)
+    context_enabled: Arc<RwLock<bool>>,
+
     /// Execution context
     execution_context: Arc<RwLock<crate::engine::ExecutionContext>>,
     /// Debug context for debugging support (uses interior mutability)
@@ -610,6 +631,8 @@ impl ScriptRuntime {
             workflow_factory, // NEW - infrastructure for templates
             session_manager: Arc::new(RwLock::new(None)), // Phase 12.8.2.5 - wired from kernel later
             rag: Arc::new(RwLock::new(None)), // Phase 12.8.fix - wired from kernel later for RAG templates
+            memory_manager: Arc::new(RwLock::new(None)), // Phase 13.12.1 - wired from kernel later
+            context_enabled: Arc::new(RwLock::new(false)), // Phase 13.12.3 - enabled when memory_manager set
             execution_context,
             debug_context: Arc::new(RwLock::new(None)),
             _config: config,
@@ -727,6 +750,8 @@ impl ScriptRuntime {
             workflow_factory,
             session_manager: Arc::new(RwLock::new(Some(session_manager))), // Wired during construction
             rag: Arc::new(RwLock::new(None)), // Phase 12.8.fix - wired from kernel later for RAG templates
+            memory_manager: Arc::new(RwLock::new(None)), // Phase 13.12.1 - wired from kernel later
+            context_enabled: Arc::new(RwLock::new(false)), // Phase 13.12.3 - enabled when memory_manager set
             execution_context,
             debug_context: Arc::new(RwLock::new(None)),
             _config: config,
@@ -842,6 +867,8 @@ impl ScriptRuntime {
             workflow_factory, // NEW - infrastructure for templates
             session_manager: Arc::new(RwLock::new(None)), // Phase 12.8.2.5 - wired from kernel later
             rag: Arc::new(RwLock::new(None)), // Phase 12.8.fix - wired from kernel later for RAG templates
+            memory_manager: Arc::new(RwLock::new(None)), // Phase 13.12.1 - wired from kernel later
+            context_enabled: Arc::new(RwLock::new(false)), // Phase 13.12.3 - enabled when memory_manager set
             execution_context,
             debug_context: Arc::new(RwLock::new(None)),
             _config: config,
@@ -1041,6 +1068,32 @@ impl ScriptRuntime {
         if let Ok(mut r) = self.rag.write() {
             *r = Some(rag);
             debug!("RAG infrastructure wired to ScriptRuntime");
+        }
+    }
+
+    /// Wire memory manager to `ScriptRuntime` for CLI/Lua memory operations (Phase 13.12.1)
+    ///
+    /// This method is called by the kernel after `ScriptRuntime` initialization to wire in
+    /// the `MemoryManager` for episodic/semantic memory access and consolidation.
+    ///
+    /// # Examples
+    ///
+    /// ```rust,ignore
+    /// // In kernel initialization:
+    /// if let Some(runtime) = script_executor.as_any().downcast_ref::<ScriptRuntime>() {
+    ///     runtime.set_memory_manager(memory_manager);
+    /// }
+    /// ```
+    pub fn set_memory_manager(&self, memory_manager: Arc<dyn llmspell_memory::MemoryManager>) {
+        if let Ok(mut mm) = self.memory_manager.write() {
+            *mm = Some(memory_manager);
+            debug!("Memory manager wired to ScriptRuntime");
+
+            // Enable context operations when memory is available
+            if let Ok(mut ctx) = self.context_enabled.write() {
+                *ctx = true;
+                debug!("Context operations enabled via memory_manager");
+            }
         }
     }
 
@@ -1550,6 +1603,431 @@ impl ScriptExecutor for ScriptRuntime {
             message: format!("Failed to serialize schema: {e}"),
             source: None,
         })
+    }
+
+    // === Memory Operations (Phase 13.12.1) ===
+
+    fn handle_memory_add(
+        &self,
+        session_id: &str,
+        role: &str,
+        content: &str,
+        metadata: serde_json::Value,
+    ) -> Result<serde_json::Value, LLMSpellError> {
+        use serde_json::json;
+
+        // Get memory manager
+        let memory_manager = self
+            .memory_manager
+            .read()
+            .ok()
+            .and_then(|guard| guard.clone())
+            .ok_or_else(|| LLMSpellError::Component {
+                message: "Memory manager not available".to_string(),
+                source: None,
+            })?;
+
+        // Create episodic entry with metadata
+        let mut entry =
+            llmspell_memory::EpisodicEntry::new(session_id.to_string(), role.to_string(), content.to_string());
+        entry.metadata = metadata;
+
+        // Add to episodic memory
+        let entry_id = tokio::task::block_in_place(|| {
+            tokio::runtime::Handle::current()
+                .block_on(async { memory_manager.episodic().add(entry).await })
+        })
+        .map_err(|e| LLMSpellError::Component {
+            message: format!("Failed to add episodic memory: {e}"),
+            source: None,
+        })?;
+
+        Ok(json!({"status": "success", "entry_id": entry_id}))
+    }
+
+    fn handle_memory_search(
+        &self,
+        session_id: Option<&str>,
+        query: &str,
+        limit: usize,
+    ) -> Result<serde_json::Value, LLMSpellError> {
+        use serde_json::json;
+
+        // Get memory manager
+        let memory_manager = self
+            .memory_manager
+            .read()
+            .ok()
+            .and_then(|guard| guard.clone())
+            .ok_or_else(|| LLMSpellError::Component {
+                message: "Memory manager not available".to_string(),
+                source: None,
+            })?;
+
+        // Search episodic memory
+        let mut results = tokio::task::block_in_place(|| {
+            tokio::runtime::Handle::current().block_on(async {
+                memory_manager.episodic().search(query, limit).await
+            })
+        })
+        .map_err(|e| LLMSpellError::Component {
+            message: format!("Failed to search episodic memory: {e}"),
+            source: None,
+        })?;
+
+        // Filter by session if specified
+        if let Some(sid) = session_id {
+            results.retain(|entry| entry.session_id == sid);
+        }
+
+        // Convert results to JSON
+        let results_json: Vec<serde_json::Value> = results
+            .into_iter()
+            .map(|entry| {
+                json!({
+                    "id": entry.id,
+                    "session_id": entry.session_id,
+                    "role": entry.role,
+                    "content": entry.content,
+                    "timestamp": entry.timestamp.to_rfc3339(),
+                    "metadata": entry.metadata,
+                })
+            })
+            .collect();
+
+        Ok(json!(results_json))
+    }
+
+    fn handle_memory_query(
+        &self,
+        query: &str,
+        limit: usize,
+    ) -> Result<serde_json::Value, LLMSpellError> {
+        use serde_json::json;
+
+        // Get memory manager
+        let _memory_manager = self
+            .memory_manager
+            .read()
+            .ok()
+            .and_then(|guard| guard.clone())
+            .ok_or_else(|| LLMSpellError::Component {
+                message: "Memory manager not available".to_string(),
+                source: None,
+            })?;
+
+        // Query semantic memory (knowledge graph)
+        // Note: SemanticMemory trait doesn't have text search, so we return empty for now
+        // Full implementation will come with dedicated context pipeline integration
+        Ok(json!({
+            "message": "Semantic memory query not yet implemented (requires context pipeline)",
+            "query": query,
+            "limit": limit,
+            "entities": []
+        }))
+    }
+
+    fn handle_memory_stats(&self) -> Result<serde_json::Value, LLMSpellError> {
+        use serde_json::json;
+
+        // Get memory manager
+        let memory_manager = self
+            .memory_manager
+            .read()
+            .ok()
+            .and_then(|guard| guard.clone())
+            .ok_or_else(|| LLMSpellError::Component {
+                message: "Memory manager not available".to_string(),
+                source: None,
+            })?;
+
+        // Get stats from episodic and semantic memory
+        // Note: Memory traits don't have count methods, so we get session lists as proxy
+        let sessions_with_unprocessed = tokio::task::block_in_place(|| {
+            tokio::runtime::Handle::current().block_on(async {
+                memory_manager
+                    .episodic()
+                    .list_sessions_with_unprocessed()
+                    .await
+            })
+        })
+        .map_err(|e| LLMSpellError::Component {
+            message: format!("Failed to get episodic stats: {e}"),
+            source: None,
+        })?;
+
+        Ok(json!({
+            "episodic": {
+                "sessions_with_unprocessed": sessions_with_unprocessed.len(),
+                "sessions": sessions_with_unprocessed
+            },
+            "semantic": {
+                "message": "Entity/relationship counts not exposed in current API"
+            },
+            "procedural": {
+                "patterns": 0
+            },
+            "consolidation": {
+                "enabled": memory_manager.has_consolidation()
+            }
+        }))
+    }
+
+    fn handle_memory_consolidate(
+        &self,
+        session_id: Option<&str>,
+        force: bool,
+    ) -> Result<serde_json::Value, LLMSpellError> {
+        use serde_json::json;
+
+        // Get memory manager
+        let memory_manager = self
+            .memory_manager
+            .read()
+            .ok()
+            .and_then(|guard| guard.clone())
+            .ok_or_else(|| LLMSpellError::Component {
+                message: "Memory manager not available".to_string(),
+                source: None,
+            })?;
+
+        // Determine consolidation mode
+        let mode = if force {
+            llmspell_memory::ConsolidationMode::Immediate
+        } else {
+            llmspell_memory::ConsolidationMode::Background
+        };
+
+        // Consolidate episodic to semantic memory
+        let result = tokio::task::block_in_place(|| {
+            tokio::runtime::Handle::current().block_on(async {
+                let sid = session_id.unwrap_or("");
+                memory_manager.consolidate(sid, mode, None).await
+            })
+        })
+        .map_err(|e| LLMSpellError::Component {
+            message: format!("Consolidation failed: {e}"),
+            source: None,
+        })?;
+
+        Ok(json!({
+            "status": "success",
+            "entries_processed": result.entries_processed,
+            "entities_added": result.entities_added,
+            "entities_updated": result.entities_updated,
+            "entities_deleted": result.entities_deleted,
+            "entries_skipped": result.entries_skipped,
+            "entries_failed": result.entries_failed,
+            "duration_ms": result.duration_ms,
+        }))
+    }
+
+    // === Context Operations (Phase 13.12.3) ===
+
+    fn handle_context_assemble(
+        &self,
+        query: &str,
+        strategy: &str,
+        budget: usize,
+        session_id: Option<&str>,
+    ) -> Result<serde_json::Value, LLMSpellError> {
+        use serde_json::json;
+
+        // Check if context is enabled
+        let context_enabled = self
+            .context_enabled
+            .read()
+            .ok()
+            .map(|guard| *guard)
+            .unwrap_or(false);
+
+        if !context_enabled {
+            return Err(LLMSpellError::Component {
+                message: "Context operations not available (memory manager not set)".to_string(),
+                source: None,
+            });
+        }
+
+        // Get memory manager
+        let memory_manager = self
+            .memory_manager
+            .read()
+            .ok()
+            .and_then(|guard| guard.clone())
+            .ok_or_else(|| LLMSpellError::Component {
+                message: "Memory manager not available".to_string(),
+                source: None,
+            })?;
+
+        // Simple context assembly based on strategy
+        let chunks = tokio::task::block_in_place(|| {
+            tokio::runtime::Handle::current().block_on(async {
+                match strategy {
+                    "episodic" => {
+                        // Get from episodic memory only
+                        let mut results = memory_manager.episodic().search(query, budget).await?;
+
+                        // Filter by session if specified
+                        if let Some(sid) = session_id {
+                            results.retain(|entry| entry.session_id == sid);
+                        }
+
+                        let chunks: Vec<serde_json::Value> = results
+                            .into_iter()
+                            .map(|entry| {
+                                json!({
+                                    "type": "episodic",
+                                    "content": entry.content,
+                                    "role": entry.role,
+                                    "timestamp": entry.timestamp.to_rfc3339(),
+                                    "session_id": entry.session_id,
+                                })
+                            })
+                            .collect();
+                        Ok::<_, llmspell_memory::MemoryError>(chunks)
+                    }
+                    "semantic" => {
+                        // Semantic memory text search not yet available in current API
+                        Ok(vec![json!({
+                            "type": "info",
+                            "content": "Semantic memory text search requires context pipeline (Phase 13.12.3 full implementation)",
+                        })])
+                    }
+                    "hybrid" | _ => {
+                        // Use episodic only for now (semantic text search not available)
+                        let mut results = memory_manager.episodic().search(query, budget).await?;
+
+                        // Filter by session if specified
+                        if let Some(sid) = session_id {
+                            results.retain(|entry| entry.session_id == sid);
+                        }
+
+                        let chunks: Vec<serde_json::Value> = results
+                            .into_iter()
+                            .map(|entry| {
+                                json!({
+                                    "type": "episodic",
+                                    "content": entry.content,
+                                    "role": entry.role,
+                                    "timestamp": entry.timestamp.to_rfc3339(),
+                                    "session_id": entry.session_id,
+                                })
+                            })
+                            .collect();
+
+                        Ok(chunks)
+                    }
+                }
+            })
+        })
+        .map_err(|e| LLMSpellError::Component {
+            message: format!("Context assembly failed: {e}"),
+            source: None,
+        })?;
+
+        Ok(json!({
+            "strategy": strategy,
+            "chunks": chunks,
+            "total_chunks": chunks.len(),
+        }))
+    }
+
+    fn handle_context_strategies(&self) -> Result<serde_json::Value, LLMSpellError> {
+        // Return list of available strategies (default implementation from trait)
+        use serde_json::json;
+        Ok(json!([
+            {
+                "name": "hybrid",
+                "description": "Combines episodic and semantic memory (recommended)"
+            },
+            {
+                "name": "episodic",
+                "description": "Conversation history only"
+            },
+            {
+                "name": "semantic",
+                "description": "Knowledge graph entities only"
+            }
+        ]))
+    }
+
+    fn handle_context_analyze(
+        &self,
+        query: &str,
+        budget: usize,
+    ) -> Result<serde_json::Value, LLMSpellError> {
+        use serde_json::json;
+
+        // Check if context is enabled
+        let context_enabled = self
+            .context_enabled
+            .read()
+            .ok()
+            .map(|guard| *guard)
+            .unwrap_or(false);
+
+        if !context_enabled {
+            return Err(LLMSpellError::Component {
+                message: "Context operations not available (memory manager not set)".to_string(),
+                source: None,
+            });
+        }
+
+        // Get memory manager
+        let memory_manager = self
+            .memory_manager
+            .read()
+            .ok()
+            .and_then(|guard| guard.clone())
+            .ok_or_else(|| LLMSpellError::Component {
+                message: "Memory manager not available".to_string(),
+                source: None,
+            })?;
+
+        // Analyze token usage for each strategy
+        let analysis = tokio::task::block_in_place(|| {
+            tokio::runtime::Handle::current().block_on(async {
+                // Episodic strategy
+                let episodic_results = memory_manager.episodic().search(query, budget).await?;
+                let episodic_tokens: usize = episodic_results
+                    .iter()
+                    .map(|entry| entry.content.split_whitespace().count())
+                    .sum();
+
+                // Semantic strategy analysis not available (requires text search)
+                let semantic_tokens: usize = 0;
+                let semantic_count: usize = 0;
+
+                // Hybrid uses episodic only for now
+                let hybrid_tokens = episodic_tokens;
+
+                Ok::<_, llmspell_memory::MemoryError>(json!([
+                    {
+                        "strategy": "episodic",
+                        "estimated_tokens": episodic_tokens,
+                        "chunks": episodic_results.len(),
+                    },
+                    {
+                        "strategy": "semantic",
+                        "estimated_tokens": semantic_tokens,
+                        "chunks": semantic_count,
+                        "message": "Requires context pipeline for text search"
+                    },
+                    {
+                        "strategy": "hybrid",
+                        "estimated_tokens": hybrid_tokens,
+                        "chunks": episodic_results.len(),
+                        "message": "Currently episodic-only (semantic search pending)"
+                    }
+                ]))
+            })
+        })
+        .map_err(|e| LLMSpellError::Component {
+            message: format!("Context analysis failed: {e}"),
+            source: None,
+        })?;
+
+        Ok(analysis)
     }
 
     fn as_any(&self) -> &dyn std::any::Any {
