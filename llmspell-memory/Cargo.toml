@@ -39,6 +39,10 @@ tracing = { workspace = true }
 parking_lot = "0.12"
 dashmap = "5.5"
 
+# Caching
+lru = "0.12"
+sha2 = "0.10"
+
 # UUID generation
 uuid = { workspace = true }
 

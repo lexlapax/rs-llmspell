@@ -8,6 +8,7 @@ use std::sync::Arc;
 use tracing::{debug, info};
 
 pub mod cached;
+pub use cached::{CachedEmbeddingService, CacheStats};
 
 /// Wrapper for embedding provider integration
 ///
