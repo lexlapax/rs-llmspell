@@ -8,12 +8,14 @@ use std::sync::Arc;
 use tracing::{debug, error, info};
 
 use crate::consolidation::{ConsolidationEngine, NoopConsolidationEngine};
-use crate::episodic::InMemoryEpisodicMemory;
 use crate::error::Result;
 use crate::procedural::InMemoryPatternTracker;
 use crate::semantic::GraphSemanticMemory;
 use crate::traits::{EpisodicMemory, MemoryManager, ProceduralMemory, SemanticMemory};
 use crate::types::{ConsolidationMode, ConsolidationResult, EpisodicEntry};
+
+#[cfg(test)]
+use crate::episodic::InMemoryEpisodicMemory;
 
 /// Default memory manager implementation
 ///
@@ -225,12 +227,13 @@ impl DefaultMemoryManager {
 
     /// Create memory manager with in-memory backends (for testing/development)
     ///
+    /// Uses `InMemory` episodic backend (simple `HashMap` with O(n) search).
+    /// For production use with HNSW and real embeddings, use `with_config()` or `new_in_memory_with_embeddings()`.
+    ///
     /// All memory subsystems use in-memory storage:
-    /// - Episodic: HNSW vector index (test embeddings)
+    /// - Episodic: `InMemory` backend (test embeddings, cosine similarity)
     /// - Semantic: Temporary `SurrealDB` instance
     /// - Procedural: No-op placeholder
-    ///
-    /// For production use with real embeddings, use `new_in_memory_with_embeddings()`.
     ///
     /// # Errors
     ///
@@ -248,17 +251,17 @@ impl DefaultMemoryManager {
     /// }
     /// ```
     pub async fn new_in_memory() -> Result<Self> {
-        info!("Initializing DefaultMemoryManager with in-memory backends");
+        info!("Initializing DefaultMemoryManager with InMemory backends (testing mode)");
 
-        let episodic = Self::create_episodic_memory(None);
-        let semantic = Self::create_semantic_memory().await?;
-        let procedural = Self::create_procedural_memory();
-
-        info!("DefaultMemoryManager initialized successfully");
-        Ok(Self::new(episodic, semantic, procedural))
+        // Use InMemory backend for testing
+        let config = crate::config::MemoryConfig::for_testing();
+        Self::with_config(config).await
     }
 
     /// Create memory manager with in-memory backends and real embeddings (production)
+    ///
+    /// Uses HNSW episodic backend (O(log n) vector search) with real embeddings.
+    /// This is the recommended production configuration.
     ///
     /// All memory subsystems use in-memory storage:
     /// - Episodic: HNSW vector index (real embeddings via `EmbeddingService`)
@@ -284,7 +287,7 @@ impl DefaultMemoryManager {
     /// # struct MyProvider;
     /// # #[async_trait]
     /// # impl EmbeddingProvider for MyProvider {
-    /// #     fn name(&self) -> &'static str { "test" }
+    /// #     fn name(&self) -> &str { "test" }
     /// #     async fn embed(&self, texts: &[String]) -> Result<Vec<Vec<f32>>, llmspell_core::LLMSpellError> {
     /// #         Ok(vec![])
     /// #     }
@@ -298,7 +301,7 @@ impl DefaultMemoryManager {
     ///     let provider: Arc<dyn EmbeddingProvider> = Arc::new(MyProvider);
     ///     let service = Arc::new(EmbeddingService::new(provider));
     ///
-    ///     // Create manager with real embeddings
+    ///     // Create manager with HNSW backend and real embeddings
     ///     let manager = DefaultMemoryManager::new_in_memory_with_embeddings(service).await?;
     ///     Ok(())
     /// }
@@ -307,35 +310,13 @@ impl DefaultMemoryManager {
         embedding_service: Arc<crate::embeddings::EmbeddingService>,
     ) -> Result<Self> {
         info!(
-            "Initializing DefaultMemoryManager with in-memory backends and embedding service: {}",
+            "Initializing DefaultMemoryManager with HNSW backend and embedding service: {}",
             embedding_service.provider_name()
         );
 
-        let episodic = Self::create_episodic_memory(Some(embedding_service));
-        let semantic = Self::create_semantic_memory().await?;
-        let procedural = Self::create_procedural_memory();
-
-        info!("DefaultMemoryManager initialized successfully with embeddings");
-        Ok(Self::new(episodic, semantic, procedural))
-    }
-
-    /// Helper: Create in-memory episodic memory
-    fn create_episodic_memory(
-        embedding_service: Option<Arc<crate::embeddings::EmbeddingService>>,
-    ) -> Arc<dyn EpisodicMemory> {
-        embedding_service.map_or_else(
-            || {
-                debug!("Creating InMemoryEpisodicMemory with test embeddings");
-                Arc::new(InMemoryEpisodicMemory::new())
-            },
-            |service| {
-                debug!(
-                    "Creating InMemoryEpisodicMemory with embedding service: {}",
-                    service.provider_name()
-                );
-                Arc::new(InMemoryEpisodicMemory::new_with_embeddings(service))
-            },
-        )
+        // Use HNSW backend for production
+        let config = crate::config::MemoryConfig::for_production(embedding_service);
+        Self::with_config(config).await
     }
 
     /// Helper: Create temporary semantic memory with `SurrealDB`
