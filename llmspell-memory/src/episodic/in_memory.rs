@@ -16,6 +16,7 @@ use chrono::{DateTime, Utc};
 use parking_lot::RwLock;
 use tracing::{debug, info, trace, warn};
 
+use crate::embeddings::EmbeddingService;
 use crate::error::{MemoryError, Result};
 use crate::traits::EpisodicMemory;
 use crate::types::EpisodicEntry;
@@ -52,14 +53,35 @@ use crate::types::EpisodicEntry;
 pub struct InMemoryEpisodicMemory {
     /// Entry storage indexed by ID
     entries: Arc<RwLock<HashMap<String, EpisodicEntry>>>,
+
+    /// Optional embedding service (if None, uses test embeddings)
+    embedding_service: Option<Arc<EmbeddingService>>,
 }
 
 impl InMemoryEpisodicMemory {
-    /// Create a new in-memory episodic memory instance
+    /// Create a new in-memory episodic memory instance (uses test embeddings)
+    ///
+    /// For production use, prefer `new_with_embeddings()` with a real embedding provider.
     #[must_use]
     pub fn new() -> Self {
         Self {
             entries: Arc::new(RwLock::new(HashMap::new())),
+            embedding_service: None,
+        }
+    }
+
+    /// Create a new in-memory episodic memory with embedding service
+    ///
+    /// Uses the provided embedding service for generating embeddings (production mode).
+    #[must_use]
+    pub fn new_with_embeddings(embedding_service: Arc<EmbeddingService>) -> Self {
+        info!(
+            "Creating InMemoryEpisodicMemory with embedding service: {}",
+            embedding_service.provider_name()
+        );
+        Self {
+            entries: Arc::new(RwLock::new(HashMap::new())),
+            embedding_service: Some(embedding_service),
         }
     }
 
@@ -128,7 +150,13 @@ impl EpisodicMemory for InMemoryEpisodicMemory {
         // Generate embedding if not provided
         if entry.embedding.is_none() {
             debug!("Generating embedding for entry (no embedding provided)");
-            entry.embedding = Some(Self::text_to_embedding(&entry.content));
+            if let Some(service) = &self.embedding_service {
+                debug!("Using embedding service: {}", service.provider_name());
+                entry.embedding = Some(service.embed_single(&entry.content).await?);
+            } else {
+                debug!("Using test embedding function (no service configured)");
+                entry.embedding = Some(Self::text_to_embedding(&entry.content));
+            }
         }
 
         let id = entry.id.clone();
@@ -157,7 +185,13 @@ impl EpisodicMemory for InMemoryEpisodicMemory {
             query.chars().take(50).collect::<String>()
         );
 
-        let query_embedding = Self::text_to_embedding(query);
+        let query_embedding = if let Some(service) = &self.embedding_service {
+            debug!("Generating query embedding with service: {}", service.provider_name());
+            service.embed_single(query).await?
+        } else {
+            debug!("Using test embedding function for query");
+            Self::text_to_embedding(query)
+        };
 
         let mut results: Vec<(f32, EpisodicEntry)> = {
             let entries = self.entries.read();

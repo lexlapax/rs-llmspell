@@ -48,6 +48,7 @@
 //! ```
 
 pub mod consolidation;
+pub mod embeddings;
 pub mod episodic;
 pub mod error;
 pub mod manager;

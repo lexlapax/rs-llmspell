@@ -126,6 +126,7 @@ pub mod traits {
     pub mod context_assembler;
     pub mod debug;
     pub mod debug_context;
+    pub mod embedding;
     pub mod event;
     pub mod memory;
     pub mod observability;
@@ -147,6 +148,7 @@ pub use traits::{
     component_lookup::ComponentLookup,
     context_assembler::ContextAssembler,
     debug_context::{DebugContext, MockDebugContext, NoOpDebugContext},
+    embedding::EmbeddingProvider,
     event::{EventConfig, EventData, EventEmitter},
     state::StateAccess,
     tool::Tool,

@@ -28,6 +28,10 @@ pub enum MemoryError {
     #[error("LLM call error: {0}")]
     LLMCall(String),
 
+    /// Embedding generation error
+    #[error("Embedding generation error: {0}")]
+    EmbeddingError(String),
+
     /// Serialization error
     #[error("Serialization error: {0}")]
     Serialization(#[from] serde_json::Error),

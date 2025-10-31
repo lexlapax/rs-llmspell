@@ -7451,38 +7451,126 @@ llmspell app run research-chat --topic "Rust async" --question "What are the key
 
 ---
 
-### Task 13.14.2: Embedding Optimization - Batching + Caching
+### Task 13.14.2: Embedding Optimization - RAG Integration + Caching
 
 **Priority**: HIGH
-**Estimated Time**: 4 hours
+**Estimated Time**: 7 hours (revised: +2h RAG integration, +1h circular dependency resolution)
 **Assignee**: Performance Team
-**Status**: READY TO START
+**Status**: IN PROGRESS (Sub-task 13.14.2a-pre: trait extraction)
 
-**Description**: Optimize embedding generation with batching (process multiple entries together) and caching (avoid regenerating identical embeddings).
+**Description**: Integrate llmspell-rag EmbeddingProvider (with native batching) and add LRU caching layer to avoid regenerating identical embeddings.
 
-**Architectural Analysis**:
-- **Current Embedding Flow** (from `llmspell-memory/src/embeddings/`):
-  - Single entry → generate embedding → store
-  - No batching (N entries = N LLM calls)
-  - No caching (repeated content = repeated generation)
-- **Optimization Strategies**:
-  1. **Batching**: Group entries, generate embeddings in parallel
-  2. **Caching**: Content hash → embedding lookup (LRU cache)
-  3. **Async Batching**: Queue entries, flush on interval/size threshold
-- **Target**: 5-10x throughput improvement for bulk operations
+**Architectural Analysis** (ultrathink):
+- **Current State** (`llmspell-memory/src/episodic/in_memory.rs:86`):
+  - Test function: `text_to_embedding(text: &str) -> Vec<f32>` (character-based, synchronous)
+  - Single entry generation, no caching
+  - N entries = N independent generations
+- **RAG Integration Discovery**:
+  - `llmspell-rag::EmbeddingProvider` trait **ALREADY supports batching**:
+    - `async fn embed(&self, texts: &[String]) -> Result<Vec<Vec<f32>>>`
+    - Takes slice of strings, returns batch of embeddings
+    - Already implemented by OpenAI, Ollama, local providers
+  - Phase 13 design doc (`docs/in-progress/phase-13-design-doc.md:4150`):
+    - Shows llmspell-memory SHOULD use llmspell-rag embeddings
+    - Architecture: `DefaultMemoryManager` receives `Arc<dyn EmbeddingProvider>`
+- **Optimization Strategy** (revised):
+  1. **Foundation** (Sub-task 13.14.2a): Integrate `llmspell-rag::EmbeddingProvider` into memory
+  2. **Caching** (Sub-task 13.14.2b): Add LRU cache wrapper with SHA-256 content hashing
+  3. **Batch Utilization** (Sub-task 13.14.2c): Use provider's native `embed(&[String])` for bulk operations
+  4. **Verification** (Sub-task 13.14.2d): Benchmark >5x improvement (caching + batching)
+- **Target**: 5-10x throughput improvement for bulk operations + cache hit rate >70%
+
+**Circular Dependency Discovery** (2025-10-31):
+- **Issue**: Adding `llmspell-rag` dependency to `llmspell-memory` creates cycle:
+  - `llmspell-kernel` → `llmspell-memory` → `llmspell-rag` → `llmspell-kernel`
+- **Root Cause**: `EmbeddingProvider` trait lives in `llmspell-rag`, which depends on kernel
+- **Decision**: Move `EmbeddingProvider` trait to `llmspell-core` (Sub-task 13.14.2a-pre)
+  - Matches existing pattern: `Tool`, `Agent`, `Workflow` traits in core
+  - Breaks cycle: both memory and rag depend on core (no circular path)
+  - llmspell-rag re-exports from core for backwards compatibility
+- **Impact**: +1 hour for trait extraction (5h total → 6h)
 
 **Acceptance Criteria**:
-- [ ] Embedding batch generator (1-100 entries per batch)
-- [ ] LRU embedding cache (configurable size, default 10k entries)
-- [ ] Content hashing for cache keys (SHA-256)
-- [ ] Async batch queue with configurable flush (500ms or 50 entries)
-- [ ] Benchmark shows >5x throughput improvement
-- [ ] Cache hit rate tracking
-- [ ] **TRACING**: Batch start (info!), cache hit/miss (debug!), generation (debug!)
+- [ ] **Sub-task 13.14.2a-pre**: EmbeddingProvider trait moved to llmspell-core (1h)
+- [ ] **Sub-task 13.14.2a**: llmspell-core EmbeddingProvider integrated into memory (1h)
+- [ ] **Sub-task 13.14.2b**: LRU cache wrapper (10k entries, SHA-256 hashing) (2h)
+- [ ] **Sub-task 13.14.2c**: Batch utilization via provider's `embed(&[String])` method (1h)
+- [ ] **Sub-task 13.14.2d**: Benchmark >5x improvement + cache hit rate >70% (1h)
+- [ ] InMemoryEpisodicMemory uses real embeddings (not test function)
+- [ ] DefaultMemoryManager accepts `Arc<dyn EmbeddingProvider>` parameter
+- [ ] Zero clippy warnings, all tests passing
+- [ ] **TRACING**: Provider integration (info!), cache hit/miss (debug!), batch operations (info!)
 
-**Implementation Steps**:
+**Implementation Steps** (revised after circular dependency discovery):
 
-1. Create `llmspell-memory/src/embeddings/batch.rs`:
+#### Sub-task 13.14.2a-pre: Move EmbeddingProvider Trait to llmspell-core (1h)
+
+**Goal**: Extract EmbeddingProvider trait from llmspell-rag to llmspell-core to break circular dependency.
+
+**Steps**:
+1. Create `llmspell-core/src/traits/embedding.rs`:
+   - Copy `EmbeddingProvider` trait from `llmspell-rag/src/embeddings/provider.rs`
+   - Keep all associated types and config structs
+   - Add re-exports to `llmspell-core/src/traits/mod.rs`
+
+2. Update `llmspell-rag/src/embeddings/provider.rs`:
+   - Delete local trait definition
+   - Re-export from core: `pub use llmspell_core::traits::EmbeddingProvider;`
+   - Keep implementations (OpenAI, Ollama, etc.) unchanged
+
+3. Update all llmspell-rag internal uses:
+   - Replace `use crate::embeddings::provider::EmbeddingProvider`
+   - With `use llmspell_core::traits::EmbeddingProvider`
+
+4. Verify backwards compatibility:
+   - External crates using `llmspell_rag::embeddings::provider::EmbeddingProvider` still work
+   - Zero breaking changes for existing code
+
+**Definition of Done**:
+- [ ] Trait in `llmspell-core/src/traits/embedding.rs`
+- [ ] llmspell-rag re-exports for backwards compat
+- [ ] All workspace tests pass
+- [ ] Zero clippy warnings
+
+---
+
+#### Sub-task 13.14.2a: Integrate llmspell-core EmbeddingProvider into Memory (1h)
+
+**Goal**: Replace test `text_to_embedding()` with real EmbeddingProvider integration (from core).
+
+**Steps**:
+1. NO llmspell-rag dependency needed (using trait from core, avoiding cycle)
+
+2. Create `llmspell-memory/src/embeddings/mod.rs`:
+   - `EmbeddingService` wrapper around `Arc<dyn EmbeddingProvider>` (from core)
+   - `embed_single(&str)` convenience method
+   - `embed_batch(&[String])` for bulk operations
+
+3. Update `InMemoryEpisodicMemory`:
+   - Add `embedding_service: Option<Arc<EmbeddingService>>` field
+   - Constructor `new_with_embeddings(service)` for production use
+   - Keep `new()` for tests (uses test embeddings)
+   - Update `add()` to use service if available (async)
+   - Update `search()` to use service if available (async)
+
+4. Update `DefaultMemoryManager`:
+   - Add `new_with_embeddings(embedding_service)` constructor
+   - Pass service to `InMemoryEpisodicMemory::new_with_embeddings()`
+
+**Definition of Done**:
+- [ ] EmbeddingService created and tested
+- [ ] InMemoryEpisodicMemory uses service (backwards compat: new() still works)
+- [ ] DefaultMemoryManager accepts service parameter
+- [ ] All tests pass (zero regressions)
+- [ ] Zero clippy warnings
+
+---
+
+#### Sub-task 13.14.2b: LRU Cache Wrapper (2h)
+
+**Goal**: Add caching layer with SHA-256 content hashing to avoid regenerating identical embeddings.
+
+**OLD IMPLEMENTATION PLAN** (for reference):
    ```rust
    //! ABOUTME: Batched embedding generation for improved throughput
 

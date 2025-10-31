@@ -2,49 +2,22 @@
 
 use anyhow::Result;
 use async_trait::async_trait;
-use llmspell_core::error::LLMSpellError;
 use llmspell_providers::abstraction::ProviderInstance;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 
-/// Trait for providers that support embedding generation
+// Re-export EmbeddingProvider trait from core for backwards compatibility
+pub use llmspell_core::traits::embedding::EmbeddingProvider;
+
+/// Extension trait for embedding providers that also implement ProviderInstance
 ///
-/// This extends the base `ProviderInstance` trait to add embedding-specific functionality,
-/// allowing providers like `OpenAI`, Google, and Cohere to generate vector embeddings.
+/// This trait is automatically implemented for types that implement both
+/// EmbeddingProvider and ProviderInstance, providing the full provider interface.
 #[async_trait]
-pub trait EmbeddingProvider: ProviderInstance {
-    /// Generate embeddings for text
-    async fn embed(&self, texts: &[String]) -> Result<Vec<Vec<f32>>, LLMSpellError>;
+pub trait EmbeddingProviderExt: EmbeddingProvider + ProviderInstance {}
 
-    /// Get the number of dimensions in the embeddings
-    fn embedding_dimensions(&self) -> usize;
-
-    /// Check if this provider supports dimension reduction (e.g., `OpenAI`'s Matryoshka)
-    fn supports_dimension_reduction(&self) -> bool {
-        false
-    }
-
-    /// Configure output dimensions if supported
-    ///
-    /// # Errors
-    ///
-    /// Returns an error if dimension configuration is not supported
-    fn set_embedding_dimensions(&mut self, _dims: usize) -> Result<(), LLMSpellError> {
-        Err(LLMSpellError::Provider {
-            message: "Dimension configuration not supported".to_string(),
-            provider: Some(self.name().to_string()),
-            source: None,
-        })
-    }
-
-    /// Get the name of the embedding model
-    fn embedding_model(&self) -> Option<&str>;
-
-    /// Get estimated cost per token for embeddings (in USD)
-    fn embedding_cost_per_token(&self) -> Option<f64> {
-        None
-    }
-}
+// Blanket implementation: any type implementing both traits gets EmbeddingProviderExt
+impl<T> EmbeddingProviderExt for T where T: EmbeddingProvider + ProviderInstance {}
 
 /// Configuration for embedding providers
 #[derive(Debug, Clone, Deserialize, Serialize)]
