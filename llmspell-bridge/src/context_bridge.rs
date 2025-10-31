@@ -315,18 +315,27 @@ impl ContextBridge {
     }
 
     /// Retrieve chunks using hybrid strategy (episodic + semantic, memory-only)
+    ///
+    /// **Performance Optimization**: Parallel retrieval from both sources using `tokio::join!`
+    /// to reduce latency (Task 13.14.4).
     async fn retrieve_hybrid_memory_only(
         &self,
         query: &str,
         max_tokens: usize,
     ) -> Result<Vec<Chunk>, String> {
-        debug!("Retrieving from both episodic and semantic memory (hybrid memory-only strategy)");
+        debug!("Retrieving from both episodic and semantic memory (hybrid memory-only strategy, parallel)");
 
-        let mut episodic_chunks = self.retrieve_episodic(query, max_tokens / 2).await?;
-        let semantic_chunks = self.retrieve_semantic(query, max_tokens / 2).await?;
+        // Parallel retrieval from both sources (Task 13.14.4 optimization)
+        let (episodic_result, semantic_result) = tokio::join!(
+            self.retrieve_episodic(query, max_tokens / 2),
+            self.retrieve_semantic(query, max_tokens / 2)
+        );
+
+        let mut episodic_chunks = episodic_result?;
+        let semantic_chunks = semantic_result?;
 
         debug!(
-            "Hybrid memory-only: {} episodic + {} semantic chunks",
+            "Hybrid memory-only (parallel): {} episodic + {} semantic chunks",
             episodic_chunks.len(),
             semantic_chunks.len()
         );
