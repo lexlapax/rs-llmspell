@@ -112,9 +112,30 @@ else
     fi
 fi
 
-# 5. Check documentation
+# 5. Run performance benchmarks (optional)
 echo ""
-echo "5. Building documentation..."
+echo "5. Running performance benchmarks..."
+if [ "$SKIP_BENCHMARKS" = "true" ]; then
+    print_warning "SKIP_BENCHMARKS is set - skipping performance benchmarks"
+else
+    print_info "Running quick benchmark suite (Task 13.14.1)..."
+    print_info "Set SKIP_BENCHMARKS=true to skip benchmarks"
+
+    if timeout 120s cargo bench --workspace --all-features -- --quick > /dev/null 2>&1; then
+        print_status 0 "Performance benchmarks passed"
+    else
+        if [ $? -eq 124 ]; then
+            print_warning "Benchmark suite timed out (>2 minutes)"
+        else
+            print_warning "Some benchmarks failed or completed with issues"
+        fi
+        # Don't fail overall for benchmark issues
+    fi
+fi
+
+# 6. Check documentation
+echo ""
+echo "6. Building documentation..."
 if RUSTDOCFLAGS="-D warnings" cargo doc --workspace --no-deps --all-features --document-private-items > /dev/null 2>&1; then
     print_status 0 "Documentation build successful"
 else
@@ -122,9 +143,9 @@ else
     OVERALL_SUCCESS=1
 fi
 
-# 6. Test coverage (optional - requires tarpaulin)
+# 7. Test coverage (optional - requires tarpaulin)
 echo ""
-echo "6. Checking test coverage (optional)..."
+echo "7. Checking test coverage (optional)..."
 if command -v cargo-tarpaulin >/dev/null 2>&1; then
     echo "   Running coverage analysis..."
     # Use the test-coverage script for unified coverage
@@ -153,9 +174,9 @@ else
     print_warning "cargo-tarpaulin not installed (install with: cargo install cargo-tarpaulin)"
 fi
 
-# 7. Security audit (optional - requires cargo-audit)
+# 8. Security audit (optional - requires cargo-audit)
 echo ""
-echo "7. Running security audit (optional)..."
+echo "8. Running security audit (optional)..."
 if command -v cargo-audit >/dev/null 2>&1; then
     if cargo audit > /dev/null 2>&1; then
         print_status 0 "Security audit passed"

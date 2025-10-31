@@ -90,6 +90,10 @@ harness = false
 name = "rag_bench"
 harness = false
 
+[[bench]]
+name = "context_assembly"
+harness = false
+
 [[test]]
 name = "session_workflow"
 path = "tests/integration/session_workflow.rs"
