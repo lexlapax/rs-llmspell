@@ -1,6 +1,7 @@
 //! ABOUTME: Business logic bridge for template operations
 //! ABOUTME: Centralizes `ExecutionContext` building, parameter validation, and template discovery
 
+use async_trait::async_trait;
 use llmspell_core::LLMSpellError;
 use llmspell_templates::{
     ConfigSchema, TemplateCategory, TemplateMetadata, TemplateOutput, TemplateParams,
@@ -382,6 +383,30 @@ pub struct TemplateInfo {
     pub metadata: TemplateMetadata,
     /// Parameter schema (optional, only if requested)
     pub schema: Option<ConfigSchema>,
+}
+
+// Implement TemplateExecutor trait for workflow-template delegation (Phase 13.13)
+#[async_trait]
+impl llmspell_core::traits::template_executor::TemplateExecutor for TemplateBridge {
+    async fn execute_template(
+        &self,
+        template_id: &str,
+        params: serde_json::Value,
+    ) -> llmspell_core::Result<serde_json::Value> {
+        // Convert serde_json::Value to TemplateParams
+        let template_params: TemplateParams = params.into();
+
+        // Execute template using existing method
+        let output = self.execute_template(template_id, template_params).await?;
+
+        // Convert TemplateOutput to serde_json::Value
+        // The TemplateOutput contains a `result` field which is already TemplateResult
+        // We need to serialize the entire TemplateOutput to JSON
+        serde_json::to_value(&output).map_err(|e| LLMSpellError::Component {
+            message: format!("Failed to serialize template output: {e}"),
+            source: Some(Box::new(e)),
+        })
+    }
 }
 
 #[cfg(test)]

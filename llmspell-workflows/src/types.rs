@@ -417,6 +417,10 @@ pub struct StepExecutionContext {
     pub events: Option<Arc<dyn llmspell_core::traits::event::EventEmitter>>,
     /// State access for persistent storage (from ExecutionContext)
     pub state: Option<Arc<dyn llmspell_core::traits::state::StateAccess>>,
+    /// Template executor for template step execution (Phase 13.13)
+    /// Uses trait to avoid circular dependency (workflows → bridge → workflows)
+    pub template_executor:
+        Option<Arc<dyn llmspell_core::traits::template_executor::TemplateExecutor>>,
 }
 
 impl StepExecutionContext {
@@ -430,6 +434,7 @@ impl StepExecutionContext {
             is_final_retry: false,
             events: None,
             state: None,
+            template_executor: None,
         }
     }
 
@@ -452,6 +457,32 @@ impl StepExecutionContext {
     pub fn with_state(mut self, state: Arc<dyn llmspell_core::traits::state::StateAccess>) -> Self {
         self.state = Some(state);
         self
+    }
+
+    /// Add template executor to the context
+    pub fn with_template_executor(
+        mut self,
+        executor: Arc<dyn llmspell_core::traits::template_executor::TemplateExecutor>,
+    ) -> Self {
+        self.template_executor = Some(executor);
+        self
+    }
+
+    /// Require template executor from the context
+    ///
+    /// Returns an error if template executor is not available.
+    pub fn require_template_executor(
+        &self,
+    ) -> Result<
+        &Arc<dyn llmspell_core::traits::template_executor::TemplateExecutor>,
+        llmspell_core::LLMSpellError,
+    > {
+        self.template_executor
+            .as_ref()
+            .ok_or_else(|| llmspell_core::LLMSpellError::Component {
+                message: "TemplateExecutor not available in StepExecutionContext".into(),
+                source: None,
+            })
     }
 
     /// Configure retry information for this execution

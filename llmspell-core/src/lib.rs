@@ -132,6 +132,7 @@ pub mod traits {
     pub mod script_executor;
     pub mod service;
     pub mod state;
+    pub mod template_executor;
     pub mod tool;
     pub mod tool_capable;
     pub mod workflow;

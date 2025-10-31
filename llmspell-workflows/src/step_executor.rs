@@ -400,20 +400,44 @@ impl StepExecutor {
                 self.execute_workflow_step(*workflow_id, input, context)
                     .await
             }
-            StepType::Template { template_id, .. } => {
-                // Template execution not yet implemented (Task 13.13.2)
-                warn!(
-                    "Template execution not yet implemented for template_id: '{}'",
-                    template_id
-                );
-                Err(LLMSpellError::Workflow {
-                    message: format!(
-                        "Template execution not yet implemented (template: {})",
-                        template_id
-                    ),
-                    step: Some(step.name.clone()),
-                    source: None,
-                })
+            StepType::Template {
+                template_id,
+                params,
+            } => {
+                debug!("Executing template step: {}", template_id);
+
+                // Get TemplateExecutor from context
+                let template_executor = context.require_template_executor()?;
+
+                // Execute template (params is already serde_json::Value)
+                let template_output = template_executor
+                    .execute_template(template_id, params.clone())
+                    .await
+                    .map_err(|e| LLMSpellError::Workflow {
+                        message: format!("Template execution failed: {}", e),
+                        step: Some(step.name.clone()),
+                        source: Some(Box::new(e)),
+                    })?;
+
+                // Extract duration from template output if available
+                let duration_ms = template_output
+                    .get("metrics")
+                    .and_then(|m| m.get("duration_ms"))
+                    .and_then(|d| d.as_u64())
+                    .unwrap_or(0);
+
+                info!("Template '{}' completed in {}ms", template_id, duration_ms);
+
+                // Convert template output to string for StepResult
+                let output_str = serde_json::to_string(&template_output).map_err(|e| {
+                    LLMSpellError::Workflow {
+                        message: format!("Failed to serialize template output: {}", e),
+                        step: Some(step.name.clone()),
+                        source: Some(Box::new(e)),
+                    }
+                })?;
+
+                Ok(output_str)
             }
         };
 
