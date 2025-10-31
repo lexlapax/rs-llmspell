@@ -332,7 +332,7 @@ impl LoopWorkflow {
             error_handler,
             error_strategy,
             workflow_executor: None,
-    template_executor: None,
+            template_executor: None,
             metadata,
             core_config,
             core_steps: Arc::new(RwLock::new(Vec::new())),
@@ -370,7 +370,7 @@ impl LoopWorkflow {
             error_handler,
             error_strategy,
             workflow_executor: Some(workflow_executor),
-    template_executor: None,
+            template_executor: None,
             metadata,
             core_config,
             core_steps: Arc::new(RwLock::new(Vec::new())),
@@ -410,7 +410,7 @@ impl LoopWorkflow {
             error_handler,
             error_strategy,
             workflow_executor: None,
-    template_executor: None,
+            template_executor: None,
             metadata,
             core_config,
             core_steps: Arc::new(RwLock::new(Vec::new())),
@@ -456,7 +456,7 @@ impl LoopWorkflow {
             error_handler,
             error_strategy,
             workflow_executor: Some(workflow_executor),
-    template_executor: None,
+            template_executor: None,
             metadata,
             core_config,
             core_steps: Arc::new(RwLock::new(Vec::new())),
@@ -1862,7 +1862,7 @@ impl LoopWorkflowBuilder {
             iteration_delay: None,
             workflow_config: WorkflowConfig::default(),
             workflow_executor: None,
-    template_executor: None,
+            template_executor: None,
             registry: None,
         }
     }
@@ -2025,12 +2025,9 @@ impl LoopWorkflowBuilder {
                 executor,
                 Some(registry),
             ),
-            (Some(executor), None) => LoopWorkflow::new_with_hooks(
-                self.name,
-                config,
-                self.workflow_config,
-                executor,
-            ),
+            (Some(executor), None) => {
+                LoopWorkflow::new_with_hooks(self.name, config, self.workflow_config, executor)
+            }
             (None, Some(registry)) => LoopWorkflow::new_with_registry(
                 self.name,
                 config,

@@ -986,7 +986,9 @@ impl WorkflowBridge {
     pub fn new(
         registry: &Arc<ComponentRegistry>,
         state_manager: Option<Arc<llmspell_kernel::state::StateManager>>,
-        template_executor: Option<Arc<dyn llmspell_core::traits::template_executor::TemplateExecutor>>,
+        template_executor: Option<
+            Arc<dyn llmspell_core::traits::template_executor::TemplateExecutor>,
+        >,
     ) -> Self {
         Self {
             discovery: Arc::new(WorkflowDiscovery::new()),

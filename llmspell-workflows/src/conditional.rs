@@ -1070,7 +1070,8 @@ impl ConditionalWorkflow {
 
             // Pass template_executor to step context if available
             if let Some(ref template_executor) = self.template_executor {
-                execution_context = execution_context.with_template_executor(template_executor.clone());
+                execution_context =
+                    execution_context.with_template_executor(template_executor.clone());
             }
 
             // Execute step with retry logic (with workflow metadata if hooks are enabled)

@@ -780,7 +780,13 @@ impl SequentialWorkflowBuilder {
         template_id: String,
         params: serde_json::Value,
     ) -> Self {
-        let step = WorkflowStep::new(name, StepType::Template { template_id, params });
+        let step = WorkflowStep::new(
+            name,
+            StepType::Template {
+                template_id,
+                params,
+            },
+        );
         self.steps.push(step);
         self
     }

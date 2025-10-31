@@ -550,7 +550,9 @@ impl ParallelWorkflow {
         workflow_metadata: Option<ComponentMetadata>,
         has_hooks: bool,
         execution_component_id: ComponentId,
-        template_executor: Option<Arc<dyn llmspell_core::traits::template_executor::TemplateExecutor>>,
+        template_executor: Option<
+            Arc<dyn llmspell_core::traits::template_executor::TemplateExecutor>,
+        >,
     ) -> BranchResult {
         let start_time = Instant::now();
         let branch_name = branch.name.clone();
@@ -1318,12 +1320,9 @@ impl ParallelWorkflowBuilder {
                 self.workflow_config,
                 Some(registry),
             ),
-            (None, None) => ParallelWorkflow::new(
-                self.name,
-                self.branches,
-                self.config,
-                self.workflow_config,
-            ),
+            (None, None) => {
+                ParallelWorkflow::new(self.name, self.branches, self.config, self.workflow_config)
+            }
         };
         workflow.template_executor = self.template_executor;
         Ok(workflow)
