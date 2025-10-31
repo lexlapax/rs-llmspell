@@ -165,16 +165,26 @@ This application validates the following Phase 13 requirements:
 
 **Workflow Creation**:
 ```lua
-local workflow = Workflow.sequential("research-chat")
+local workflow = Workflow.builder()
+    :name("research-chat")
+    :description("AI research with conversational follow-up")
+    :sequential()
 ```
 
 **Template Step Addition** (Phase 13 API):
 ```lua
-workflow:add_template_step("research", "research-assistant", {
-    topic = args.topic,
-    session_id = session_id,  -- Memory anchor
-    memory_enabled = true,
-})
+workflow = workflow
+    :add_template_step("research", "research-assistant", {
+        topic = args.topic,
+        session_id = session_id,  -- Memory anchor
+        memory_enabled = true,
+    })
+    :add_template_step("chat", "interactive-chat", {
+        message = args.question,
+        session_id = session_id,  -- Same session = shared memory
+        memory_enabled = true,
+    })
+    :build()
 ```
 
 **Session ID Generation**:

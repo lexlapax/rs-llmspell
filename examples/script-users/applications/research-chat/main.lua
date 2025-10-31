@@ -37,32 +37,31 @@ print("")
 print("1. Creating research workflow with template delegation...")
 
 -- Create sequential workflow using builder pattern
-local workflow = Workflow.sequential("research-chat")
+local workflow = Workflow.builder()
+    :name("research-chat")
+    :description("AI research with conversational follow-up")
+    :sequential()
 
--- Step 1: Research phase using research-assistant template
--- This step ingests web content and stores it in memory (RAG)
-workflow:add_template_step("research", "research-assistant", {
-    topic = args.topic or "Rust async programming",
-    max_sources = tonumber(args.max_sources) or 10,
-    session_id = session_id,              -- Memory anchor
-    memory_enabled = true,                -- Enable RAG storage
-    depth = "comprehensive",              -- Research depth
-})
+-- Add template steps using builder pattern
+workflow = workflow
+    :add_template_step("research", "research-assistant", {
+        topic = args.topic or "Rust async programming",
+        max_sources = tonumber(args.max_sources) or 10,
+        session_id = session_id,              -- Memory anchor
+        memory_enabled = true,                -- Enable RAG storage
+        depth = "comprehensive",              -- Research depth
+    })
+    :add_template_step("chat", "interactive-chat", {
+        system_prompt = "You are an expert assistant. Reference the research findings from the previous step to answer questions accurately and comprehensively.",
+        message = args.question or "Summarize the key findings from the research",
+        session_id = session_id,              -- Same session = shared memory
+        memory_enabled = true,                -- Enable RAG retrieval
+        max_turns = tonumber(args.max_turns) or 1,
+        temperature = 0.7,
+    })
+    :build()
 
-print("  ✅ Added research step (research-assistant template)")
-
--- Step 2: Interactive chat with research context
--- This step retrieves research findings from memory and enables Q&A
-workflow:add_template_step("chat", "interactive-chat", {
-    system_prompt = "You are an expert assistant. Reference the research findings from the previous step to answer questions accurately and comprehensively.",
-    message = args.question or "Summarize the key findings from the research",
-    session_id = session_id,              -- Same session = shared memory
-    memory_enabled = true,                -- Enable RAG retrieval
-    max_turns = tonumber(args.max_turns) or 1,
-    temperature = 0.7,
-})
-
-print("  ✅ Added chat step (interactive-chat template)")
+print("  ✅ Created workflow with 2 template steps (research + chat)")
 print("")
 
 -- ============================================================
