@@ -8099,16 +8099,543 @@ let generated = self.inner.embed_batch(&to_generate).await?;  // ← Batches cac
 
 ---
 
+### Task 13.14.3a: HNSW Integration - Core Implementation
+
+**Priority**: CRITICAL (Unblocks 13.14.3)
+**Estimated Time**: 6 hours
+**Assignee**: Performance Team
+**Status**: 🔴 BLOCKED → READY TO START (Embedding integration complete in 13.14.2)
+
+**Description**: Integrate production-ready HNSW vector storage from llmspell-storage into llmspell-memory episodic layer. Replace HashMap + linear scan with HNSW for 100x search speedup at scale.
+
+**Ultrathink Analysis - Root Cause**:
+```
+🔴 ARCHITECTURAL GAP DISCOVERED:
+- llmspell-storage/src/backends/vector/hnsw.rs: 1229 lines, production-ready, UNUSED
+- llmspell-memory/Cargo.toml: NO dependency on llmspell-storage
+- Current: HashMap + O(n) linear scan (works <1K entries, fails at 10K+)
+- Available: HNSW with O(log n) search, parallel insertion, persistence
+- Gap: Layers built in different phases, never integrated
+```
+
+**Performance Impact** (Projected):
+- **10K entries**: 470µs → 5µs search (94x faster)
+- **100K entries**: 4.7ms → 20µs search (235x faster)
+- **Add overhead**: 2.7µs → 50µs (20x slower, but acceptable)
+- **Memory**: 10MB → 30MB (3x increase, worth it for search)
+
+**Implementation Steps**:
+
+1. **Add Dependency** (llmspell-memory/Cargo.toml):
+   ```toml
+   [dependencies]
+   llmspell-storage = { path = "../llmspell-storage" }
+   ```
+
+2. **Create HNSW Wrapper** (llmspell-memory/src/episodic/hnsw_backend.rs):
+   ```rust
+   //! ABOUTME: HNSW-backed episodic memory for production vector search
+
+   use llmspell_storage::{HNSWVectorStorage, VectorEntry, VectorQuery, DistanceMetric};
+   use crate::embeddings::EmbeddingService;
+   use crate::traits::EpisodicMemory;
+   use crate::types::EpisodicEntry;
+
+   /// Production episodic memory using HNSW vector index
+   ///
+   /// **Performance**: O(log n) search, 100x faster than HashMap at 10K+ scale
+   #[derive(Clone)]
+   pub struct HNSWEpisodicMemory {
+       storage: Arc<HNSWVectorStorage>,
+       embedding_service: Arc<EmbeddingService>,
+   }
+
+   impl HNSWEpisodicMemory {
+       /// Create HNSW episodic memory with default config
+       pub fn new(embedding_service: Arc<EmbeddingService>) -> Result<Self> {
+           let config = HNSWConfig::default(); // m=16, ef_construct=200, ef_search=50
+           Self::with_config(embedding_service, config)
+       }
+
+       /// Create with custom HNSW parameters (for tuning)
+       pub fn with_config(
+           embedding_service: Arc<EmbeddingService>,
+           config: HNSWConfig,
+       ) -> Result<Self> {
+           let dimensions = embedding_service.dimensions();
+           let storage = HNSWVectorStorage::new(
+               dimensions,
+               DistanceMetric::Cosine,
+               config,
+           )?;
+
+           Ok(Self {
+               storage: Arc::new(storage),
+               embedding_service,
+           })
+       }
+   }
+
+   #[async_trait]
+   impl EpisodicMemory for HNSWEpisodicMemory {
+       async fn add(&self, entry: EpisodicEntry) -> Result<String> {
+           // Generate embedding
+           let embedding = self.embedding_service
+               .embed_single(&entry.content)
+               .await?;
+
+           // Convert to VectorEntry
+           let vector_entry = VectorEntry {
+               id: entry.id.clone(),
+               vector: embedding,
+               metadata: serde_json::to_value(&entry.metadata)?,
+               timestamp: Some(entry.timestamp),
+           };
+
+           // HNSW insertion (parallel, optimized)
+           self.storage.insert(vec![vector_entry]).await?;
+
+           debug!(
+               "Added entry to HNSW: id={}, session={}",
+               entry.id, entry.session_id
+           );
+
+           Ok(entry.id)
+       }
+
+       async fn search(&self, query: &str, top_k: usize) -> Result<Vec<EpisodicEntry>> {
+           // Generate query embedding
+           let query_embedding = self.embedding_service
+               .embed_single(query)
+               .await?;
+
+           // HNSW search (O(log n), fast!)
+           let results = self.storage.search(&VectorQuery {
+               vector: query_embedding,
+               k: top_k,
+               filter: None, // TODO: Add metadata filtering
+           }).await?;
+
+           // Convert VectorResult → EpisodicEntry
+           let entries = results.into_iter()
+               .map(|result| {
+                   // Deserialize metadata back to EpisodicEntry
+                   let entry: EpisodicEntry = serde_json::from_value(result.metadata)?;
+                   Ok(entry)
+               })
+               .collect::<Result<Vec<_>>>()?;
+
+           debug!("HNSW search: query_len={}, results={}", query.len(), entries.len());
+
+           Ok(entries)
+       }
+
+       // ... implement other EpisodicMemory methods
+   }
+   ```
+
+3. **Update Module** (llmspell-memory/src/episodic/mod.rs):
+   ```rust
+   pub mod in_memory;
+   pub mod hnsw_backend; // NEW
+
+   pub use in_memory::InMemoryEpisodicMemory;
+   pub use hnsw_backend::HNSWEpisodicMemory; // NEW
+   ```
+
+**Acceptance Criteria**:
+- [x] llmspell-storage dependency added
+- [ ] HNSWEpisodicMemory implements EpisodicMemory trait
+- [ ] EpisodicEntry ↔ VectorEntry conversion working
+- [ ] All EpisodicMemory trait methods implemented
+- [ ] Embedding service integration tested
+- [ ] Basic unit tests passing (add, get, search)
+- [ ] Tracing instrumentation (debug/info)
+- [ ] Zero clippy warnings
+
+**Files to Create**:
+- llmspell-memory/src/episodic/hnsw_backend.rs (~300 lines)
+
+**Files to Modify**:
+- llmspell-memory/Cargo.toml (+1 line dependency)
+- llmspell-memory/src/episodic/mod.rs (+2 lines exports)
+
+---
+
+### Task 13.14.3b: Configurable Backend Pattern
+
+**Priority**: HIGH
+**Estimated Time**: 4 hours
+**Assignee**: Performance Team
+**Status**: 🔴 BLOCKED (Requires 13.14.3a)
+
+**Description**: Implement configurable backend selection pattern with MemoryConfig, allowing users to choose between InMemory (testing) and HNSW (production) backends.
+
+**Architectural Goals**:
+1. **Flexibility**: Support multiple episodic backends via enum dispatch
+2. **Configuration**: Expose HNSW parameters for tuning (enables Task 13.14.3)
+3. **Migration**: Preserve InMemory for testing, HNSW for production
+4. **Extensibility**: Easy to add future backends (Qdrant, Pinecone, etc.)
+
+**Implementation Steps**:
+
+1. **Create Configuration Module** (llmspell-memory/src/config.rs):
+   ```rust
+   //! ABOUTME: Memory system configuration with backend selection
+
+   use llmspell_storage::HNSWConfig;
+
+   /// Episodic memory backend type
+   #[derive(Debug, Clone, Copy, PartialEq, Eq)]
+   pub enum EpisodicBackendType {
+       /// Simple HashMap (for testing, <1K entries)
+       InMemory,
+
+       /// HNSW vector index (for production, 10K+ entries)
+       HNSW,
+   }
+
+   impl Default for EpisodicBackendType {
+       fn default() -> Self {
+           Self::HNSW // HNSW is now the default!
+       }
+   }
+
+   /// Memory system configuration
+   #[derive(Debug, Clone)]
+   pub struct MemoryConfig {
+       /// Episodic backend selection
+       pub episodic_backend: EpisodicBackendType,
+
+       /// HNSW configuration (used if backend = HNSW)
+       pub hnsw_config: HNSWConfig,
+
+       /// Embedding service (required for HNSW)
+       pub embedding_service: Option<Arc<EmbeddingService>>,
+   }
+
+   impl Default for MemoryConfig {
+       fn default() -> Self {
+           Self {
+               episodic_backend: EpisodicBackendType::HNSW, // Production default
+               hnsw_config: HNSWConfig::default(),
+               embedding_service: None,
+           }
+       }
+   }
+
+   impl MemoryConfig {
+       /// Testing configuration (InMemory, no embeddings)
+       pub fn for_testing() -> Self {
+           Self {
+               episodic_backend: EpisodicBackendType::InMemory,
+               hnsw_config: HNSWConfig::default(),
+               embedding_service: None,
+           }
+       }
+
+       /// Production configuration (HNSW, requires embedding service)
+       pub fn for_production(embedding_service: Arc<EmbeddingService>) -> Self {
+           Self {
+               episodic_backend: EpisodicBackendType::HNSW,
+               hnsw_config: HNSWConfig::default(),
+               embedding_service: Some(embedding_service),
+           }
+       }
+
+       /// Custom HNSW tuning (for Task 13.14.3)
+       pub fn with_hnsw_config(mut self, config: HNSWConfig) -> Self {
+           self.hnsw_config = config;
+           self
+       }
+   }
+   ```
+
+2. **Create Backend Enum** (llmspell-memory/src/episodic/backend.rs):
+   ```rust
+   //! ABOUTME: Episodic memory backend abstraction with enum dispatch
+
+   /// Episodic memory backend (enum dispatch pattern)
+   #[derive(Clone)]
+   pub enum EpisodicBackend {
+       InMemory(Arc<InMemoryEpisodicMemory>),
+       HNSW(Arc<HNSWEpisodicMemory>),
+   }
+
+   #[async_trait]
+   impl EpisodicMemory for EpisodicBackend {
+       async fn add(&self, entry: EpisodicEntry) -> Result<String> {
+           match self {
+               Self::InMemory(backend) => backend.add(entry).await,
+               Self::HNSW(backend) => backend.add(entry).await,
+           }
+       }
+
+       async fn get(&self, id: &str) -> Result<EpisodicEntry> {
+           match self {
+               Self::InMemory(backend) => backend.get(id).await,
+               Self::HNSW(backend) => backend.get(id).await,
+           }
+       }
+
+       async fn search(&self, query: &str, top_k: usize) -> Result<Vec<EpisodicEntry>> {
+           match self {
+               Self::InMemory(backend) => backend.search(query, top_k).await,
+               Self::HNSW(backend) => backend.search(query, top_k).await,
+           }
+       }
+
+       // ... implement all trait methods with match dispatch
+   }
+
+   impl EpisodicBackend {
+       /// Create backend from configuration
+       pub fn from_config(config: &MemoryConfig) -> Result<Self> {
+           match config.episodic_backend {
+               EpisodicBackendType::InMemory => {
+                   info!("Creating InMemory episodic backend (testing mode)");
+                   Ok(Self::InMemory(Arc::new(InMemoryEpisodicMemory::new())))
+               }
+
+               EpisodicBackendType::HNSW => {
+                   info!("Creating HNSW episodic backend (production mode)");
+                   let service = config.embedding_service.as_ref()
+                       .ok_or_else(|| MemoryError::Configuration(
+                           "HNSW backend requires embedding service".to_string()
+                       ))?;
+
+                   let hnsw = HNSWEpisodicMemory::with_config(
+                       Arc::clone(service),
+                       config.hnsw_config.clone(),
+                   )?;
+
+                   Ok(Self::HNSW(Arc::new(hnsw)))
+               }
+           }
+       }
+   }
+   ```
+
+3. **Update DefaultMemoryManager** (llmspell-memory/src/manager.rs):
+   ```rust
+   impl DefaultMemoryManager {
+       /// Create with configuration (NEW: preferred method)
+       pub async fn with_config(config: MemoryConfig) -> Result<Self> {
+           let episodic = EpisodicBackend::from_config(&config)?;
+           let semantic = Self::create_semantic_memory().await?;
+           let procedural = Arc::new(NoopProceduralMemory);
+
+           Ok(Self::new(
+               Arc::new(episodic),
+               semantic,
+               procedural,
+           ))
+       }
+
+       /// Create in-memory (UPDATED: uses config)
+       pub async fn new_in_memory() -> Result<Self> {
+           // Default config uses HNSW if embedding service available
+           let config = if let Ok(service) = Self::try_create_embedding_service().await {
+               MemoryConfig::for_production(service)
+           } else {
+               warn!("No embedding service, falling back to InMemory backend");
+               MemoryConfig::for_testing()
+           };
+
+           Self::with_config(config).await
+       }
+   }
+   ```
+
+**Acceptance Criteria**:
+- [ ] MemoryConfig struct with backend selection
+- [ ] EpisodicBackend enum with dispatch logic
+- [ ] from_config() factory method working
+- [ ] DefaultMemoryManager::with_config() implemented
+- [ ] HNSW as default (with fallback to InMemory)
+- [ ] Configuration presets: for_testing(), for_production()
+- [ ] All tests updated to use new API
+- [ ] Documentation updated
+
+**Files to Create**:
+- llmspell-memory/src/config.rs (~150 lines)
+- llmspell-memory/src/episodic/backend.rs (~200 lines)
+
+**Files to Modify**:
+- llmspell-memory/src/lib.rs (+1 line: pub mod config)
+- llmspell-memory/src/manager.rs (~30 lines updated)
+
+---
+
+### Task 13.14.3c: Make HNSW Default & Migration
+
+**Priority**: HIGH
+**Estimated Time**: 3 hours
+**Assignee**: Performance Team
+**Status**: 🔴 BLOCKED (Requires 13.14.3a + 13.14.3b)
+
+**Description**: Make HNSW the default episodic backend across the codebase, update all tests to handle both backends, provide migration guide.
+
+**Migration Strategy**:
+1. **Default Behavior**: HNSW if embedding service available, else InMemory
+2. **Testing**: Parameterized tests run against both backends
+3. **Documentation**: Clear upgrade path for users
+4. **Backwards Compatibility**: InMemory still available via MemoryConfig::for_testing()
+
+**Implementation Steps**:
+
+1. **Update All Constructors**:
+   ```rust
+   // Before: Always InMemory
+   pub async fn new_in_memory() -> Result<Self> {
+       let episodic = Arc::new(InMemoryEpisodicMemory::new());
+       // ...
+   }
+
+   // After: HNSW default, InMemory fallback
+   pub async fn new_in_memory() -> Result<Self> {
+       let config = if let Ok(service) = Self::try_create_embedding_service().await {
+           MemoryConfig::for_production(service) // HNSW
+       } else {
+           MemoryConfig::for_testing() // InMemory fallback
+       };
+       Self::with_config(config).await
+   }
+   ```
+
+2. **Parameterized Test Suite**:
+   ```rust
+   // Test both backends
+   async fn test_episodic_add_and_get(backend: EpisodicBackendType) {
+       let config = match backend {
+           EpisodicBackendType::InMemory => MemoryConfig::for_testing(),
+           EpisodicBackendType::HNSW => {
+               let service = create_test_embedding_service().await;
+               MemoryConfig::for_production(service)
+           }
+       };
+
+       let manager = DefaultMemoryManager::with_config(config).await.unwrap();
+       // ... test logic
+   }
+
+   #[tokio::test]
+   async fn test_episodic_add_and_get_inmemory() {
+       test_episodic_add_and_get(EpisodicBackendType::InMemory).await;
+   }
+
+   #[tokio::test]
+   async fn test_episodic_add_and_get_hnsw() {
+       test_episodic_add_and_get(EpisodicBackendType::HNSW).await;
+   }
+   ```
+
+3. **Update Documentation**:
+   - README.md: Add HNSW backend section
+   - MIGRATION_GUIDE.md: Explain InMemory → HNSW upgrade
+   - manager.rs docs: Document backend selection
+
+**Acceptance Criteria**:
+- [ ] DefaultMemoryManager defaults to HNSW
+- [ ] All 105 tests passing with both backends
+- [ ] Parameterized test suite (run each test 2x)
+- [ ] Documentation updated (README, migration guide)
+- [ ] InMemory still available for testing
+- [ ] Benchmarks show expected speedup
+- [ ] Zero clippy warnings
+
+**Files to Modify**:
+- llmspell-memory/src/manager.rs (~50 lines)
+- llmspell-memory/tests/*.rs (~200 lines, parameterized tests)
+- llmspell-memory/README.md (new section)
+- MIGRATION_GUIDE.md (new file, ~100 lines)
+
+---
+
+### Task 13.14.3d: Comparative Benchmarks & Validation
+
+**Priority**: HIGH
+**Estimated Time**: 2 hours
+**Assignee**: Performance Team
+**Status**: 🔴 BLOCKED (Requires 13.14.3a + 13.14.3b + 13.14.3c)
+
+**Description**: Run comprehensive benchmarks comparing HashMap vs HNSW performance, validate 100x speedup claim, measure memory overhead.
+
+**Benchmark Scenarios**:
+
+1. **Search Performance** (10K entries):
+   ```rust
+   // memory_operations.rs benchmark
+   fn bench_episodic_search_comparison(c: &mut Criterion) {
+       let mut group = c.benchmark_group("episodic_search_comparison");
+
+       // InMemory baseline
+       group.bench_function("InMemory_10K", |b| {
+           let memory = create_inmemory_with_10k_entries();
+           b.iter(|| memory.search("query", 10));
+       });
+
+       // HNSW optimized
+       group.bench_function("HNSW_10K", |b| {
+           let memory = create_hnsw_with_10k_entries();
+           b.iter(|| memory.search("query", 10));
+       });
+
+       group.finish();
+   }
+   ```
+
+2. **Insert Performance**:
+   - Measure add() latency for both backends
+   - Batch insertion throughput
+   - Memory usage during insertion
+
+3. **Scale Testing**:
+   - 1K, 10K, 100K entry datasets
+   - Plot search latency vs dataset size
+   - Validate O(n) vs O(log n) complexity
+
+**Validation Targets**:
+- InMemory search @10K: ~470µs (baseline)
+- HNSW search @10K: <10µs (47x speedup minimum)
+- HNSW search @100K: <50µs (100x speedup vs projected InMemory)
+- Memory overhead: <3x (acceptable for performance gain)
+
+**Acceptance Criteria**:
+- [ ] Comparative benchmarks implemented
+- [ ] Speedup validated: >10x @10K, >50x @100K
+- [ ] Memory overhead measured: <3x
+- [ ] Performance regression tests added
+- [ ] Results documented in TODO.md
+- [ ] Graphs generated (latency vs size)
+
+**Files to Modify**:
+- llmspell-memory/benches/memory_operations.rs (+100 lines)
+- TODO.md (results section)
+
+**Expected Results** (to be validated):
+```
+Dataset   | InMemory Search | HNSW Search | Speedup
+----------|-----------------|-------------|--------
+1K        | ~47µs          | ~3µs        | 15x
+10K       | ~470µs         | ~5µs        | 94x
+100K      | ~4.7ms         | ~20µs       | 235x
+```
+
+---
+
 ### Task 13.14.3: Vector Search Tuning - HNSW Parameters
 
 **Priority**: HIGH
 **Estimated Time**: 4 hours
 **Assignee**: Performance Team
-**Status**: ⏭️ SKIPPED (Not Applicable - HNSW Not Yet Integrated)
+**Status**: 🔴 BLOCKED → ✅ READY (After 13.14.3a-d)
 
-**Skip Reason**: llmspell-memory currently uses HashMap + cosine similarity (llmspell-memory/src/episodic/in_memory.rs:88-100), not the HNSW backend from llmspell-storage. This task requires HNSW integration first (future phase).
+**Prerequisites**: Tasks 13.14.3a, 13.14.3b, 13.14.3c, 13.14.3d COMPLETE
 
 **Description**: Tune HNSW (Hierarchical Navigable Small World) vector index parameters for optimal search performance (recall vs latency tradeoff).
+
+**NOW POSSIBLE**: With HNSW integrated and configurable, we can tune m, ef_construct, ef_search parameters.
 
 **Architectural Analysis**:
 - **Current Vector Backend** (from `llmspell-storage/src/vector/`):
