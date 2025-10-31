@@ -176,7 +176,7 @@ impl crate::core::Template for InteractiveChatTemplate {
         // Add provider parameters (Task 13.5.7d)
         params.extend(provider_parameters());
 
-        tracing::debug!(
+        debug!(
             "InteractiveChat: Generated config schema with {} parameters",
             params.len()
         );

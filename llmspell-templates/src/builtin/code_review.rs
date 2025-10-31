@@ -180,7 +180,7 @@ impl crate::core::Template for CodeReviewTemplate {
         // Add provider parameters (Task 13.5.7d)
         params.extend(provider_parameters());
 
-        tracing::debug!(
+        debug!(
             "CodeReview: Generated config schema with {} parameters",
             params.len()
         );

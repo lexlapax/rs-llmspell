@@ -15,7 +15,7 @@ use async_trait::async_trait;
 use llmspell_core::state::StateScope;
 use serde::{Deserialize, Serialize};
 use serde_json::json;
-use tracing::{info, warn};
+use tracing::{debug, info, warn};
 
 /// Knowledge document with metadata
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -397,7 +397,7 @@ impl crate::core::Template for KnowledgeManagementTemplate {
         // Add provider parameters (Task 13.5.7d)
         params.extend(provider_parameters());
 
-        tracing::debug!(
+        debug!(
             "KnowledgeManagement: Generated config schema with {} parameters",
             params.len()
         );

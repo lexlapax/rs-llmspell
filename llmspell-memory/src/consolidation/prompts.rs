@@ -14,6 +14,7 @@
 use crate::error::{MemoryError, Result};
 use crate::types::EpisodicEntry;
 use serde::{Deserialize, Serialize};
+use tracing::warn;
 
 use super::prompt_schema::{ConsolidationResponse, DecisionPayload, OutputFormat};
 
@@ -389,7 +390,7 @@ pub fn parse_llm_response(response: &str, format: OutputFormat) -> Result<Consol
             // Try JSON parsing first
             ConsolidationResponse::from_json(response).or_else(|e| {
                 // If JSON fails, try natural language extraction as fallback
-                tracing::warn!(
+                warn!(
                     "JSON parsing failed ({}), falling back to natural language",
                     e
                 );

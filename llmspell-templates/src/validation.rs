@@ -4,6 +4,7 @@ use crate::error::{Result, ValidationError};
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use std::collections::HashMap;
+use tracing::warn;
 
 /// Configuration schema for template parameters
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -58,7 +59,7 @@ impl ConfigSchema {
             self.parameters.iter().map(|p| p.name.as_str()).collect();
         for param_name in params.keys() {
             if !schema_param_names.contains(param_name.as_str()) {
-                tracing::warn!("Unknown parameter provided: {}", param_name);
+                warn!("Unknown parameter provided: {}", param_name);
             }
         }
 

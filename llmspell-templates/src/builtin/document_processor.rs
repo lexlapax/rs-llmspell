@@ -140,7 +140,7 @@ impl crate::core::Template for DocumentProcessorTemplate {
         // Add provider parameters (Task 13.5.7d)
         params.extend(provider_parameters());
 
-        tracing::debug!(
+        debug!(
             "DocumentProcessor: Generated config schema with {} parameters",
             params.len()
         );

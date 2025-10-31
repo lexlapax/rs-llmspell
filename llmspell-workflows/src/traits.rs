@@ -241,7 +241,6 @@ mod tests {
 
         // Serialize to JSON
         let serialized = serde_json::to_string(&step_type).expect("Failed to serialize");
-        tracing::debug!("Serialized StepType::Template: {}", serialized);
 
         // Deserialize back
         let deserialized: StepType =

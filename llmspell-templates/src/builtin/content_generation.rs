@@ -201,7 +201,7 @@ impl crate::core::Template for ContentGenerationTemplate {
         // Add provider parameters (Task 13.5.7d)
         params.extend(provider_parameters());
 
-        tracing::debug!(
+        debug!(
             "ContentGeneration: Generated config schema with {} parameters",
             params.len()
         );

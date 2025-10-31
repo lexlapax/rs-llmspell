@@ -16,7 +16,7 @@ use serde::{Deserialize, Serialize};
 use serde_json::json;
 use std::collections::HashMap;
 use std::path::{Path, PathBuf};
-use tracing::{info, warn};
+use tracing::{debug, info, warn};
 
 /// Category definition for file classification
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -704,7 +704,7 @@ impl crate::core::Template for FileClassificationTemplate {
         // Add provider parameters (Task 13.5.7d)
         params.extend(provider_parameters());
 
-        tracing::debug!(
+        debug!(
             "FileClassification: Generated config schema with {} parameters",
             params.len()
         );
