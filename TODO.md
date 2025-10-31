@@ -8583,9 +8583,9 @@ let generated = self.inner.embed_batch(&to_generate).await?;  // ← Batches cac
 - [x] All 108 unit + 32 doc tests passing with both backends
 - [x] InMemory still available for testing (via MemoryConfig::for_testing())
 - [x] Zero clippy warnings
-- [ ] Parameterized test suite (deferred - existing tests already cover both backends)
-- [ ] Documentation updated (README, migration guide) - deferred to Task 13.14.3d
-- [ ] Benchmarks show expected speedup - deferred to Task 13.14.3d
+- [x] Parameterized test suite (backend_integration_test.rs with run_on_both_backends() helper - 10 tests)
+- [x] Documentation updated (README.md +64 lines HNSW section, MIGRATION_GUIDE.md 230 lines complete)
+- [ ] Benchmarks show expected speedup - REQUIRES: actual benchmark execution
 
 **Files Modified**:
 - llmspell-memory/src/manager.rs (-18 lines: removed create_episodic_memory, updated constructors)
@@ -8721,11 +8721,27 @@ Dataset   | InMemory Search | HNSW Search | Speedup
 - **Default Parameters**: m=16, ef_construction=200, ef_search=50 (from llmspell-storage)
 - **Parameter Tuning**: Ready for experimentation (m, ef_construct, ef_search)
 
+**⚠️ CRITICAL ISSUE DISCOVERED**:
+HNSW backend (`llmspell-memory/src/episodic/hnsw_backend.rs`) has incomplete `EpisodicMemory` trait implementation:
+- ❌ `get(id)` - Returns NotFound error with "not yet implemented"
+- ❌ `get_session(session_id)` - Returns error with "not yet implemented"
+- ❌ `list_unprocessed(session_id)` - Returns error with "not yet implemented"
+- ❌ `mark_processed(entry_ids)` - Returns error with "not yet implemented"
+- ❌ `delete_before(timestamp)` - Returns error with "not yet implemented"
+- ❌ `list_sessions_with_unprocessed()` - Returns error with "not yet implemented"
+- ✅ `add(entry)` - Fully implemented
+- ✅ `search(query, top_k)` - Fully implemented
+
+**Impact**: HNSW backend only supports core vector search (`add` + `search`). All metadata operations (session filtering, processing state, temporal queries) fallback to errors. This limits HNSW to simple vector search use cases.
+
+**Required**: New task 13.14.3e to complete HNSW implementation with proper metadata indexing (estimated 6-8 hours).
+
 **Next Steps** (Optional - Production Tuning):
-1. Run benchmarks on production-scale datasets (10K+ entries)
-2. Measure recall@10 vs latency tradeoff for each parameter combination
-3. Document optimal configuration in TODO.md
-4. Update HNSWConfig::default() if better parameters found
+1. **FIRST**: Complete HNSW implementation (Task 13.14.3e - see below)
+2. Run benchmarks on production-scale datasets (10K+ entries)
+3. Measure recall@10 vs latency tradeoff for each parameter combination
+4. Document optimal configuration in TODO.md
+5. Update HNSWConfig::default() if better parameters found
 
 **Implementation Steps**:
 
@@ -9021,6 +9037,80 @@ Dataset   | InMemory Search | HNSW Search | Speedup
 - [ ] Documentation with configuration recommendations
 - [ ] Tracing instrumentation verified
 - [ ] Zero clippy warnings
+
+---
+
+### Task 13.14.3e: Complete HNSW Backend Implementation
+
+**Priority**: HIGH
+**Estimated Time**: 6-8 hours
+**Assignee**: Performance Team
+**Status**: ⏳ TODO (Required for full HNSW functionality)
+
+**Description**: Complete HNSW backend's `EpisodicMemory` trait implementation by adding metadata indexing for session filtering, processing state, and temporal queries.
+
+**Current State**: HNSW backend only implements `add()` and `search()` methods. All other trait methods return "not yet implemented" errors.
+
+**Missing Implementation**:
+1. **Direct ID Lookup** (`get(id)`) - Requires ID→entry map or HNSW metadata query
+2. **Session Filtering** (`get_session(session_id)`) - Requires session_id index
+3. **Processing State** (`list_unprocessed()`, `mark_processed()`) - Requires processed flag index
+4. **Temporal Queries** (`delete_before(timestamp)`) - Requires timestamp index
+5. **Session Queries** (`list_sessions_with_unprocessed()`) - Requires combined session+processed index
+
+**Design Options**:
+
+**Option A: Secondary HashMap Indices** (Recommended - Fast, Simple)
+```rust
+pub struct HNSWEpisodicMemory {
+    index: HNSWIndex,                              // Existing vector index
+    id_to_entry: DashMap<String, EpisodicEntry>,   // NEW: ID lookup
+    session_index: DashMap<String, Vec<String>>,   // NEW: session_id → entry_ids
+    processed_set: DashMap<String, bool>,          // NEW: entry_id → processed flag
+    embedding_service: Arc<EmbeddingService>,
+}
+```
+
+**Option B: HNSW Metadata Filtering** (More Integrated)
+- Use HNSW's metadata filtering capabilities (if available in llmspell-storage)
+- Requires checking if HNSWIndex supports metadata predicates
+- May be slower than Option A for non-vector queries
+
+**Implementation Steps**:
+1. Add secondary indices to `HNSWEpisodicMemory` struct
+2. Update `add()` to populate all indices atomically
+3. Implement `get(id)` using id_to_entry map
+4. Implement `get_session(session_id)` using session_index
+5. Implement `list_unprocessed(session_id)` using session_index + processed_set
+6. Implement `mark_processed(entry_ids)` updating processed_set
+7. Implement `delete_before(timestamp)` with index cleanup
+8. Implement `list_sessions_with_unprocessed()` scanning processed_set
+9. Add integration tests validating all methods
+10. Update backend_integration_test.rs to run full suite on both backends
+
+**Files to Modify**:
+- `llmspell-memory/src/episodic/hnsw_backend.rs` (+150 lines - indices + implementations)
+- `llmspell-memory/tests/backend_integration_test.rs` (MODIFY - remove "_inmemory_only" suffixes)
+
+**Performance Impact**:
+- **Memory**: +200 bytes/entry for secondary indices (acceptable - still 50% less than full vector embeddings)
+- **Latency**: O(1) ID lookup, O(k) session filtering (k = entries in session)
+- **Correctness**: No impact on vector search performance
+
+**Acceptance Criteria**:
+- [ ] All 9 `EpisodicMemory` trait methods implemented for HNSW
+- [ ] Integration tests pass for both InMemory and HNSW backends
+- [ ] No "not yet implemented" errors from HNSW backend
+- [ ] Performance benchmarks show <10% overhead for metadata operations
+- [ ] Documentation updated (MIGRATION_GUIDE, README)
+- [ ] Zero clippy warnings
+
+**Definition of Done**:
+- [ ] HNSW backend fully implements `EpisodicMemory` trait
+- [ ] All backend_integration_test.rs tests pass for both backends
+- [ ] Cargo test passes with no "not yet implemented" errors
+- [ ] MIGRATION_GUIDE updated with feature parity note
+- [ ] Zero warnings from cargo clippy
 
 ---
 

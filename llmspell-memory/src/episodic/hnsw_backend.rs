@@ -111,10 +111,7 @@ impl HNSWEpisodicMemory {
     /// Serializes the entry (excluding embedding) into metadata field.
     async fn to_vector_entry(&self, entry: &EpisodicEntry) -> Result<VectorEntry> {
         // Generate embedding
-        let embedding = self
-            .embedding_service
-            .embed_single(&entry.content)
-            .await?;
+        let embedding = self.embedding_service.embed_single(&entry.content).await?;
 
         // Serialize entry as metadata (entire entry except embedding)
         let mut metadata = HashMap::new();
@@ -132,10 +129,7 @@ impl HNSWEpisodicMemory {
             "ingestion_time".to_string(),
             Value::String(entry.ingestion_time.to_rfc3339()),
         );
-        metadata.insert(
-            "processed".to_string(),
-            Value::Bool(entry.processed),
-        );
+        metadata.insert("processed".to_string(), Value::Bool(entry.processed));
         metadata.insert("metadata".to_string(), entry.metadata.clone());
 
         // Create VectorEntry with session-based scope
@@ -160,7 +154,10 @@ impl HNSWEpisodicMemory {
     /// Convert `VectorResult` back to `EpisodicEntry`
     ///
     /// Deserializes metadata back into full `EpisodicEntry` structure.
-    fn from_vector_metadata(id: String, metadata: &HashMap<String, Value>) -> Result<EpisodicEntry> {
+    fn from_vector_metadata(
+        id: String,
+        metadata: &HashMap<String, Value>,
+    ) -> Result<EpisodicEntry> {
         // Extract fields from metadata
         let session_id = metadata
             .get("session_id")
@@ -201,10 +198,7 @@ impl HNSWEpisodicMemory {
             .and_then(serde_json::Value::as_bool)
             .unwrap_or(false);
 
-        let entry_metadata = metadata
-            .get("metadata")
-            .cloned()
-            .unwrap_or(Value::Null);
+        let entry_metadata = metadata.get("metadata").cloned().unwrap_or(Value::Null);
 
         Ok(EpisodicEntry {
             id,
@@ -256,17 +250,10 @@ impl EpisodicMemory for HNSWEpisodicMemory {
     }
 
     async fn search(&self, query: &str, top_k: usize) -> Result<Vec<EpisodicEntry>> {
-        debug!(
-            "Searching HNSW: query_len={}, top_k={}",
-            query.len(),
-            top_k
-        );
+        debug!("Searching HNSW: query_len={}, top_k={}", query.len(), top_k);
 
         // Generate query embedding
-        let query_embedding = self
-            .embedding_service
-            .embed_single(query)
-            .await?;
+        let query_embedding = self.embedding_service.embed_single(query).await?;
 
         // HNSW search (O(log n), fast!)
         let vector_query = VectorQuery::new(query_embedding, top_k);
@@ -345,7 +332,7 @@ impl EpisodicMemory for HNSWEpisodicMemory {
         // This requires aggregating across sessions with metadata filter
         // Will be addressed in 13.14.3b with proper indexing
         Err(MemoryError::Other(
-            "list_sessions_with_unprocessed not yet implemented for HNSW backend".to_string()
+            "list_sessions_with_unprocessed not yet implemented for HNSW backend".to_string(),
         ))
     }
 }

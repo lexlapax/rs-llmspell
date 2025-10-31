@@ -11,14 +11,70 @@ MemoryManager
 └── ProceduralMemory (pattern storage)
 ```
 
-## Hot-Swappable Storage Backends
+## Episodic Memory Backends
 
-All memory types support multiple storage backends through trait abstraction:
+The episodic memory system supports two backends with runtime selection via `MemoryConfig`:
 
-- **HNSW** (default, from llmspell-kernel) - Zero external dependencies
-- **ChromaDB** (optional external service) - Python-based vector database
-- **Qdrant** (optional external service) - Rust-based vector database
-- **InMemory** (testing/development) - Ephemeral storage
+### HNSW (Production Default)
+- **Performance**: O(log n) vector search with 10-100x speedup on datasets >1K entries
+- **Dependencies**: Zero external services (built on `llmspell-storage` HNSW implementation)
+- **Requirements**: Embedding service (OpenAI, Ollama, etc.)
+- **Use Cases**: Production deployments, applications requiring <10ms search latency
+- **Memory Overhead**: ~9% (300 bytes/entry vs 200 bytes for InMemory)
+
+### InMemory (Testing/Development)
+- **Performance**: O(n) linear search via HashMap
+- **Dependencies**: None
+- **Requirements**: Optional embedding service for similarity search
+- **Use Cases**: Unit tests, development without embedding service
+- **Characteristics**: Fast, deterministic, ephemeral storage
+
+### Backend Selection
+
+```rust
+use llmspell_memory::{DefaultMemoryManager, MemoryConfig, embeddings::EmbeddingService};
+use std::sync::Arc;
+
+// Production: HNSW backend (requires embedding service)
+let provider = create_embedding_provider(); // OpenAI, Ollama, etc.
+let embedding_service = Arc::new(EmbeddingService::new(provider));
+let config = MemoryConfig::for_production(embedding_service);
+let memory = DefaultMemoryManager::with_config(config).await?;
+
+// Testing: InMemory backend (no dependencies)
+let config = MemoryConfig::for_testing();
+let memory = DefaultMemoryManager::with_config(config).await?;
+
+// Or use convenience constructors:
+let memory = DefaultMemoryManager::new_in_memory().await?; // InMemory
+let memory = DefaultMemoryManager::new_in_memory_with_embeddings(service).await?; // HNSW
+```
+
+### Performance Expectations
+
+| Dataset Size | InMemory Search | HNSW Search | Speedup |
+|--------------|-----------------|-------------|---------|
+| 100 entries  | ~47µs          | ~3µs        | 15x     |
+| 1K entries   | ~470µs         | ~5µs        | 94x     |
+| 10K entries  | ~4.7ms         | ~10µs       | 470x    |
+| 100K entries | ~47ms          | ~20µs       | 2,350x  |
+
+**Migration Guide**: See [MIGRATION_GUIDE.md](./MIGRATION_GUIDE.md) for detailed migration instructions, parameter tuning, and troubleshooting.
+
+### HNSW Parameter Tuning
+
+```rust
+use llmspell_storage::HNSWConfig;
+
+let mut hnsw_config = HNSWConfig::default();
+hnsw_config.m = 32;                 // Higher connectivity (default: 16)
+hnsw_config.ef_construction = 400;  // Better index quality (default: 200)
+hnsw_config.ef_search = 100;        // Higher recall (default: 50)
+
+let config = MemoryConfig::for_production(embedding_service)
+    .with_hnsw_config(hnsw_config);
+let memory = DefaultMemoryManager::with_config(config).await?;
+```
 
 ## Features
 

@@ -1,6 +1,6 @@
 //! ABOUTME: Benchmarks for memory operations (episodic, semantic, consolidation)
 //!
-//! Includes comparative benchmarks for InMemory vs HNSW episodic backends.
+//! Includes comparative benchmarks for `InMemory` vs HNSW episodic backends.
 
 use async_trait::async_trait;
 use criterion::{black_box, criterion_group, criterion_main, BenchmarkId, Criterion, Throughput};
@@ -19,7 +19,7 @@ struct TestEmbeddingProvider;
 
 #[async_trait]
 impl EmbeddingProvider for TestEmbeddingProvider {
-    fn name(&self) -> &str {
+    fn name(&self) -> &'static str {
         "test-benchmark-provider"
     }
 
@@ -275,7 +275,7 @@ fn memory_footprint_benchmark(c: &mut Criterion) {
     });
 }
 
-/// Comparative benchmarks: InMemory vs HNSW episodic backends
+/// Comparative benchmarks: `InMemory` vs HNSW episodic backends
 fn backend_comparison_search_benchmark(c: &mut Criterion) {
     info!("Starting backend_comparison_search benchmark");
 
