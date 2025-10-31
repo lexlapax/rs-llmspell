@@ -1,0 +1,80 @@
+# Research-Chat Application Configuration
+# Phase 13 Workflow-Template Delegation Example
+
+[app]
+name = "research-chat"
+description = "AI research assistant with conversational follow-up (Phase 13 composition demo)"
+version = "1.0.0"
+complexity = "medium"
+tags = ["research", "chat", "composition", "phase-13", "workflow-template-delegation"]
+
+# Application parameters (passed to main.lua as 'args' table)
+[parameters]
+topic = { type = "string", required = false, description = "Research topic to investigate", default = "Rust async programming" }
+max_sources = { type = "integer", required = false, description = "Maximum number of sources to research", default = 10, min = 1, max = 50 }
+question = { type = "string", required = false, description = "Initial question to ask about research findings", default = "Summarize the key findings" }
+max_turns = { type = "integer", required = false, description = "Maximum chat turns in interactive phase", default = 1, min = 1, max = 10 }
+
+# Multi-provider configuration for flexibility
+[providers.openai]
+name = "openai"
+api_key_env = "OPENAI_API_KEY"
+api_base = "https://api.openai.com/v1"
+default_model = "gpt-4o-mini"
+timeout_seconds = 120
+
+[providers.anthropic]
+name = "anthropic"
+api_key_env = "ANTHROPIC_API_KEY"
+api_base = "https://api.anthropic.com/v1"
+default_model = "claude-3-haiku-20240307"
+timeout_seconds = 120
+
+# Enable comprehensive tool set for templates
+[tools]
+file_operations = { enabled = true }
+text_manipulator = { enabled = true }
+web_search = { enabled = true }
+http_request = { enabled = true }
+datetime_handler = { enabled = true }
+calculator = { enabled = true }
+
+# Workflow configuration (required for workflow-template delegation)
+[workflows]
+enabled = true
+max_concurrent = 2
+timeout_seconds = 300
+
+# State management for workflow execution
+[state]
+enabled = true
+persistence_path = "/tmp/research-chat-state"
+
+# Session management for memory continuity
+[sessions]
+enabled = true
+auto_save = true
+max_sessions = 10
+
+# Events for execution tracking
+[events]
+enabled = true
+log_level = "info"
+
+# RAG for session-based memory sharing (CRITICAL for research-chat)
+[rag]
+enabled = true
+provider = "openai"
+embedding_model = "text-embedding-ada-002"
+vector_dimensions = 1536
+default_collection = "research_chat"
+chunk_size = 500
+chunk_overlap = 100
+persistence_path = "/tmp/research-chat-rag"
+max_vectors = 10000
+search_threshold = 0.70
+
+# Template system configuration (Phase 12)
+[templates]
+enabled = true
+registry_path = "llmspell-templates/src/builtin"
