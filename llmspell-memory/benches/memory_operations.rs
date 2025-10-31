@@ -1,10 +1,46 @@
 //! ABOUTME: Benchmarks for memory operations (episodic, semantic, consolidation)
+//!
+//! Includes comparative benchmarks for InMemory vs HNSW episodic backends.
 
+use async_trait::async_trait;
 use criterion::{black_box, criterion_group, criterion_main, BenchmarkId, Criterion, Throughput};
-use llmspell_memory::{ConsolidationMode, DefaultMemoryManager, EpisodicEntry, MemoryManager};
+use llmspell_core::traits::embedding::EmbeddingProvider;
+use llmspell_core::LLMSpellError;
+use llmspell_memory::{
+    embeddings::EmbeddingService, ConsolidationMode, DefaultMemoryManager, EpisodicEntry,
+    MemoryConfig, MemoryManager,
+};
 use std::sync::Arc;
 use tokio::runtime::Runtime;
 use tracing::info;
+
+/// Test embedding provider for benchmarks (generates random 384-dim vectors)
+struct TestEmbeddingProvider;
+
+#[async_trait]
+impl EmbeddingProvider for TestEmbeddingProvider {
+    fn name(&self) -> &str {
+        "test-benchmark-provider"
+    }
+
+    async fn embed(&self, texts: &[String]) -> Result<Vec<Vec<f32>>, LLMSpellError> {
+        // Generate random embeddings for benchmarking
+        use rand::Rng;
+        let mut rng = rand::thread_rng();
+        Ok(texts
+            .iter()
+            .map(|_| (0..384).map(|_| rng.gen::<f32>()).collect())
+            .collect())
+    }
+
+    fn embedding_dimensions(&self) -> usize {
+        384
+    }
+
+    fn embedding_model(&self) -> Option<&str> {
+        Some("test-model")
+    }
+}
 
 fn episodic_add_benchmark(c: &mut Criterion) {
     info!("Starting episodic_add benchmark");
@@ -239,12 +275,94 @@ fn memory_footprint_benchmark(c: &mut Criterion) {
     });
 }
 
+/// Comparative benchmarks: InMemory vs HNSW episodic backends
+fn backend_comparison_search_benchmark(c: &mut Criterion) {
+    info!("Starting backend_comparison_search benchmark");
+
+    let rt = Runtime::new().unwrap();
+
+    // Create test embedding service for HNSW
+    let embedding_service = {
+        let provider: Arc<dyn EmbeddingProvider> = Arc::new(TestEmbeddingProvider);
+        Arc::new(EmbeddingService::new(provider))
+    };
+
+    // Benchmark at different scales
+    for &dataset_size in &[100, 1000, 10000] {
+        let mut group = c.benchmark_group(format!("backend_search_{dataset_size}"));
+        group.sample_size(20); // Smaller sample size for large datasets
+
+        // InMemory backend
+        group.bench_function("InMemory", |b| {
+            let mm = rt.block_on(async {
+                let config = MemoryConfig::for_testing();
+                let mm = DefaultMemoryManager::with_config(config).await.unwrap();
+
+                // Preload entries
+                for i in 0..dataset_size {
+                    let entry = EpisodicEntry::new(
+                        "bench-session".to_string(),
+                        if i % 2 == 0 { "user" } else { "assistant" }.to_string(),
+                        format!("Message {i} about Rust programming and systems design"),
+                    );
+                    mm.episodic().add(entry).await.unwrap();
+                }
+
+                Arc::new(mm)
+            });
+
+            b.to_async(&rt).iter(|| {
+                let mm = mm.clone();
+                async move {
+                    mm.episodic()
+                        .search(black_box("Rust ownership"), black_box(10))
+                        .await
+                        .unwrap();
+                }
+            });
+        });
+
+        // HNSW backend
+        group.bench_function("HNSW", |b| {
+            let mm = rt.block_on(async {
+                let config = MemoryConfig::for_production(Arc::clone(&embedding_service));
+                let mm = DefaultMemoryManager::with_config(config).await.unwrap();
+
+                // Preload entries
+                for i in 0..dataset_size {
+                    let entry = EpisodicEntry::new(
+                        "bench-session".to_string(),
+                        if i % 2 == 0 { "user" } else { "assistant" }.to_string(),
+                        format!("Message {i} about Rust programming and systems design"),
+                    );
+                    mm.episodic().add(entry).await.unwrap();
+                }
+
+                Arc::new(mm)
+            });
+
+            b.to_async(&rt).iter(|| {
+                let mm = mm.clone();
+                async move {
+                    mm.episodic()
+                        .search(black_box("Rust ownership"), black_box(10))
+                        .await
+                        .unwrap();
+                }
+            });
+        });
+
+        group.finish();
+    }
+}
+
 criterion_group!(
     benches,
     episodic_add_benchmark,
     episodic_search_benchmark,
     consolidation_benchmark,
     semantic_query_benchmark,
-    memory_footprint_benchmark
+    memory_footprint_benchmark,
+    backend_comparison_search_benchmark
 );
 criterion_main!(benches);
