@@ -23,11 +23,13 @@ use tracing::{debug, info};
 /// ```rust
 /// use llmspell_memory::embeddings::{EmbeddingService, CachedEmbeddingService};
 /// use llmspell_core::traits::embedding::EmbeddingProvider;
+/// use async_trait::async_trait;
 /// use std::sync::Arc;
 ///
 /// # struct MockProvider;
+/// # #[async_trait]
 /// # impl EmbeddingProvider for MockProvider {
-/// #     fn name(&self) -> &str { "mock" }
+/// #     fn name(&self) -> &'static str { "mock" }
 /// #     async fn embed(&self, texts: &[String]) -> Result<Vec<Vec<f32>>, llmspell_core::LLMSpellError> {
 /// #         Ok(vec![])
 /// #     }

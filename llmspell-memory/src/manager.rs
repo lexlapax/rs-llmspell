@@ -207,11 +207,13 @@ impl DefaultMemoryManager {
     /// ```rust,no_run
     /// use llmspell_memory::{DefaultMemoryManager, embeddings::EmbeddingService};
     /// use llmspell_core::traits::embedding::EmbeddingProvider;
+    /// use async_trait::async_trait;
     /// use std::sync::Arc;
     ///
     /// # struct MyProvider;
+    /// # #[async_trait]
     /// # impl EmbeddingProvider for MyProvider {
-    /// #     fn name(&self) -> &str { "test" }
+    /// #     fn name(&self) -> &'static str { "test" }
     /// #     async fn embed(&self, texts: &[String]) -> Result<Vec<Vec<f32>>, llmspell_core::LLMSpellError> {
     /// #         Ok(vec![])
     /// #     }
