@@ -6623,38 +6623,124 @@ Implementation:
 
 ---
 
-#### Task 13.13.4: Bridge Integration (30min)
+#### Task 13.13.4: Bridge Integration (2h)
 
 **Priority**: CRITICAL (blocks 13.13.5)
-**Estimated Time**: 30 minutes
+**Estimated Time**: 2 hours (revised from 30min after ultrathink analysis)
 **Assignee**: Workflows Team + Bridge Team
-**Status**: BLOCKED (requires 13.13.2)
+**Status**: IN PROGRESS (architectural decision made: Option 2 - Explicit Context Building)
 
 **Description**: Wire `TemplateBridge` into workflow execution pipeline, ensuring template steps have access to template execution infrastructure.
 
-**Implementation**:
-- **File**: `llmspell-workflows/src/executor.rs` (or wherever `StepExecutionContext` is constructed)
-- **Change**: Pass `TemplateBridge` when building context
-  ```rust
-  // Before (Phase 13.12)
-  let step_context = StepExecutionContext {
-      tool_registry,
-      agent_registry,
-      workflow_factory,
-  };
+**Architectural Decision (Ultrathink Analysis)**:
 
-  // After (Phase 13.13)
-  let step_context = StepExecutionContext {
-      tool_registry,
-      agent_registry,
-      workflow_factory,
-      template_bridge: Some(template_bridge),  // ← ADD THIS
-  };
-  ```
+**Option 2 Selected: Explicit Context Building** (Wins 7/8 criteria)
+
+Pattern: Pass `template_executor` to workflows via builder, workflows inject into `StepExecutionContext` using `.with_template_executor()`
+
+**Rationale**:
+1. **Separation of Concerns**: StepExecutor handles HOW (execution strategy), StepExecutionContext handles WHAT (resources)
+2. **Consistency**: Matches existing patterns for events (.with_events()), state (.with_state())
+3. **Scalability**: Each new resource (memory, RAG, tools) follows same pattern
+4. **No God Object**: StepExecutor remains focused on execution logic
+5. **Resource Lifecycle**: Workflows control when/how resources are passed to steps
+6. **Testing**: Easy to test with mock resources via context builder
+7. **Explicitness**: Clear at call site what resources each step receives
+
+**Comprehensive Impact Analysis**:
+
+**Files to Modify (llmspell-workflows)**:
+
+1. **Workflow Structs** (4 files - add `template_executor` field):
+   - `llmspell-workflows/src/sequential.rs:29` - SequentialWorkflow
+   - `llmspell-workflows/src/parallel.rs:329` - ParallelWorkflow
+   - `llmspell-workflows/src/conditional.rs:229` - ConditionalWorkflow
+   - `llmspell-workflows/src/loop.rs:290` - LoopWorkflow
+
+   Pattern to add after `workflow_executor` field:
+   ```rust
+   /// Optional template executor for template step execution
+   template_executor: Option<Arc<dyn llmspell_core::traits::template_executor::TemplateExecutor>>,
+   ```
+
+2. **Workflow Builders** (4 files - add field + .with_template_executor() method):
+   - `llmspell-workflows/src/sequential.rs:690` - SequentialWorkflowBuilder
+   - `llmspell-workflows/src/parallel.rs:1157` - ParallelWorkflowBuilder
+   - `llmspell-workflows/src/conditional.rs:1478` - ConditionalWorkflowBuilder
+   - `llmspell-workflows/src/loop.rs:1818` - LoopWorkflowBuilder
+
+   Pattern:
+   ```rust
+   // Add field:
+   template_executor: Option<Arc<dyn TemplateExecutor>>,
+
+   // Add builder method:
+   pub fn with_template_executor(
+       mut self,
+       template_executor: Arc<dyn TemplateExecutor>
+   ) -> Self {
+       self.template_executor = Some(template_executor);
+       self
+   }
+   ```
+
+3. **StepExecutionContext Injection Points** (6 locations in 4 files):
+   - `llmspell-workflows/src/sequential.rs:299`
+   - `llmspell-workflows/src/parallel.rs:579`
+   - `llmspell-workflows/src/conditional.rs:601`
+   - `llmspell-workflows/src/conditional.rs:1058`
+   - `llmspell-workflows/src/loop.rs:631`
+   - `llmspell-workflows/src/loop.rs:837`
+
+   Pattern to add after `.with_events()` calls:
+   ```rust
+   // Pass template_executor to step context if available
+   if let Some(ref template_executor) = self.template_executor {
+       step_context = step_context.with_template_executor(template_executor.clone());
+   }
+   ```
+
+4. **Workflow Constructors** (4 files - pass template_executor from builder to struct):
+   - Sequential::new_with_*() methods (sequential.rs ~line 797-809)
+   - Parallel::new_with_*() methods (parallel.rs ~line 1273-1296)
+   - Conditional::new_with_*() methods (conditional.rs ~line 1553-1570)
+   - Loop::new_with_*() methods (loop.rs ~line 1994-2013)
+
+**Files to Modify (llmspell-bridge)**:
+
+5. **WorkflowBridge** (workflows.rs:924):
+   - Add field: `template_executor: Option<Arc<dyn TemplateExecutor>>`
+   - Update constructor (line 984) to accept template_executor parameter
+   - Pass to workflow builders in create_from_steps() (~line 1046):
+     - Line 1063: sequential builder.with_template_executor()
+     - Line 1079: parallel builder.with_template_executor()
+     - Line 1096: loop builder.with_template_executor()
+     - Line 1114: conditional builder.with_template_executor()
+   - Pass to create_conditional_workflow() builder (~line 1247)
+   - Pass to create_loop_workflow() builder (~line 1309)
+
+6. **WorkflowGlobal** (globals/workflow_global.rs):
+   - Line 27: Update WorkflowBridge::new() - pass None initially
+   - Line 41: Update WorkflowBridge::new() - pass template_executor from context
+
+7. **Global Context Setup** (globals/mod.rs):
+   - ~Line 321: After TemplateBridge creation, pass Arc<TemplateBridge> to WorkflowBridge::new()
+
+**No Changes Required**:
+- Lua examples (use high-level Workflow.builder() API)
+- Test files in step_executor.rs (test contexts don't need template_executor)
+- Existing workflow tests (template_executor is optional)
+
+**Estimated LOC Changes**: ~120 lines total across 8 files
 
 **Acceptance Criteria**:
-- [ ] `TemplateBridge` wired into `StepExecutionContext` construction
-- [ ] Available in all workflow types (sequential, parallel, conditional, loop)
+- [ ] `template_executor` field added to 4 workflow structs
+- [ ] `.with_template_executor()` method added to 4 workflow builders
+- [ ] 6 StepExecutionContext injection points updated
+- [ ] WorkflowBridge wired to receive and pass template_executor
+- [ ] All workflow constructors updated to accept template_executor
+- [ ] Zero clippy warnings
+- [ ] All existing tests pass (template_executor is optional)
 - [ ] End-to-end test: `test_sequential_workflow_with_template_step()`
   - Create workflow with 2 steps: tool + template
   - Execute workflow

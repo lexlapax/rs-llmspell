@@ -9,7 +9,7 @@ use std::sync::Arc;
 #[tokio::test]
 async fn test_workflow_bridge_creation() {
     let registry = Arc::new(ComponentRegistry::new());
-    let bridge = WorkflowBridge::new(&registry, None);
+    let bridge = WorkflowBridge::new(&registry, None, None);
 
     // Test listing workflow types
     let types = bridge.list_workflow_types();
@@ -22,7 +22,7 @@ async fn test_workflow_bridge_creation() {
 #[tokio::test]
 async fn test_workflow_info_retrieval() {
     let registry = Arc::new(ComponentRegistry::new());
-    let bridge = WorkflowBridge::new(&registry, None);
+    let bridge = WorkflowBridge::new(&registry, None, None);
 
     // Test getting specific workflow info
     let info = bridge.get_workflow_info("sequential").unwrap();
@@ -37,7 +37,7 @@ async fn test_workflow_info_retrieval() {
 #[tokio::test]
 async fn test_sequential_workflow_creation() {
     let registry = Arc::new(ComponentRegistry::new());
-    let bridge = WorkflowBridge::new(&registry, None);
+    let bridge = WorkflowBridge::new(&registry, None, None);
 
     let name = "test_sequential".to_string();
     let steps = vec![]; // Empty steps for now
@@ -57,7 +57,7 @@ async fn test_sequential_workflow_creation() {
 #[tokio::test]
 async fn test_workflow_metrics() {
     let registry = Arc::new(ComponentRegistry::new());
-    let bridge = WorkflowBridge::new(&registry, None);
+    let bridge = WorkflowBridge::new(&registry, None, None);
 
     // Get initial metrics
     let metrics = bridge.get_bridge_metrics();
@@ -81,7 +81,7 @@ async fn test_workflow_metrics() {
 #[tokio::test]
 async fn test_workflow_removal() {
     let registry = Arc::new(ComponentRegistry::new());
-    let bridge = WorkflowBridge::new(&registry, None);
+    let bridge = WorkflowBridge::new(&registry, None, None);
 
     let name = "removal_test".to_string();
     let steps = vec![];
@@ -115,7 +115,7 @@ async fn test_workflow_removal() {
 #[tokio::test]
 async fn test_workflow_discovery() {
     let registry = Arc::new(ComponentRegistry::new());
-    let bridge = WorkflowBridge::new(&registry, None);
+    let bridge = WorkflowBridge::new(&registry, None, None);
 
     let type_infos = bridge.get_all_workflow_info();
     assert_eq!(type_infos.len(), 4);
@@ -130,7 +130,7 @@ async fn test_workflow_discovery() {
 #[tokio::test]
 async fn test_parallel_workflow_creation() {
     let registry = Arc::new(ComponentRegistry::new());
-    let bridge = WorkflowBridge::new(&registry, None);
+    let bridge = WorkflowBridge::new(&registry, None, None);
 
     let name = "parallel_test".to_string();
     let steps = vec![]; // For parallel workflows, steps would be distributed across branches
@@ -148,7 +148,7 @@ async fn test_parallel_workflow_creation() {
 #[tokio::test]
 async fn test_conditional_workflow_creation() {
     let registry = Arc::new(ComponentRegistry::new());
-    let bridge = WorkflowBridge::new(&registry, None);
+    let bridge = WorkflowBridge::new(&registry, None, None);
 
     let name = "conditional_test".to_string();
     let steps = vec![]; // For conditional workflows, steps would be in branches
@@ -163,7 +163,7 @@ async fn test_conditional_workflow_creation() {
 #[tokio::test]
 async fn test_loop_workflow_creation() {
     let registry = Arc::new(ComponentRegistry::new());
-    let bridge = WorkflowBridge::new(&registry, None);
+    let bridge = WorkflowBridge::new(&registry, None, None);
 
     let name = "loop_test".to_string();
     let steps = vec![WorkflowStep {

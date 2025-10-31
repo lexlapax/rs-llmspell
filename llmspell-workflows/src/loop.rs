@@ -296,6 +296,8 @@ pub struct LoopWorkflow {
     error_strategy: ErrorStrategy,
     /// Optional workflow executor for hook integration
     workflow_executor: Option<Arc<WorkflowExecutor>>,
+    /// Optional template executor for template step execution
+    template_executor: Option<Arc<dyn llmspell_core::traits::template_executor::TemplateExecutor>>,
     /// Workflow metadata
     metadata: ComponentMetadata,
     /// Core workflow configuration for Workflow trait
@@ -330,6 +332,7 @@ impl LoopWorkflow {
             error_handler,
             error_strategy,
             workflow_executor: None,
+    template_executor: None,
             metadata,
             core_config,
             core_steps: Arc::new(RwLock::new(Vec::new())),
@@ -367,6 +370,7 @@ impl LoopWorkflow {
             error_handler,
             error_strategy,
             workflow_executor: Some(workflow_executor),
+    template_executor: None,
             metadata,
             core_config,
             core_steps: Arc::new(RwLock::new(Vec::new())),
@@ -406,6 +410,7 @@ impl LoopWorkflow {
             error_handler,
             error_strategy,
             workflow_executor: None,
+    template_executor: None,
             metadata,
             core_config,
             core_steps: Arc::new(RwLock::new(Vec::new())),
@@ -451,6 +456,7 @@ impl LoopWorkflow {
             error_handler,
             error_strategy,
             workflow_executor: Some(workflow_executor),
+    template_executor: None,
             metadata,
             core_config,
             core_steps: Arc::new(RwLock::new(Vec::new())),
@@ -628,7 +634,12 @@ impl LoopWorkflow {
             workflow_state.execution_id = execution_component_id;
             workflow_state.shared_data = shared_data;
             workflow_state.current_step = step_index;
-            let context = StepExecutionContext::new(workflow_state, None);
+            let mut context = StepExecutionContext::new(workflow_state, None);
+
+            // Pass template_executor to step context if available
+            if let Some(ref template_executor) = self.template_executor {
+                context = context.with_template_executor(template_executor.clone());
+            }
 
             // Execute step with retry logic (with workflow metadata if hooks are enabled)
             let step_result = if self.workflow_executor.is_some() {
@@ -833,8 +844,13 @@ impl LoopWorkflow {
             let state_key =
                 WorkflowResult::generate_iteration_key(execution_id, iteration, &step_name);
 
-            let step_context =
+            let mut step_context =
                 StepExecutionContext::new(workflow_state.clone(), self.config.timeout);
+
+            // Pass template_executor to step context if available
+            if let Some(ref template_executor) = self.template_executor {
+                step_context = step_context.with_template_executor(template_executor.clone());
+            }
 
             match self.step_executor.execute_step(step, step_context).await {
                 Ok(result) => {
@@ -1827,6 +1843,7 @@ pub struct LoopWorkflowBuilder {
     iteration_delay: Option<Duration>,
     workflow_config: WorkflowConfig,
     workflow_executor: Option<Arc<WorkflowExecutor>>,
+    template_executor: Option<Arc<dyn llmspell_core::traits::template_executor::TemplateExecutor>>,
     registry: Option<Arc<dyn ComponentLookup>>,
 }
 
@@ -1845,6 +1862,7 @@ impl LoopWorkflowBuilder {
             iteration_delay: None,
             workflow_config: WorkflowConfig::default(),
             workflow_executor: None,
+    template_executor: None,
             registry: None,
         }
     }
@@ -1949,6 +1967,15 @@ impl LoopWorkflowBuilder {
         self
     }
 
+    /// Set the template executor for template step execution
+    pub fn with_template_executor(
+        mut self,
+        template_executor: Arc<dyn llmspell_core::traits::template_executor::TemplateExecutor>,
+    ) -> Self {
+        self.template_executor = Some(template_executor);
+        self
+    }
+
     /// Build the loop workflow
     pub fn build(self) -> Result<LoopWorkflow> {
         let iterator =
@@ -1990,28 +2017,30 @@ impl LoopWorkflowBuilder {
             iteration_delay: self.iteration_delay,
         };
 
-        match (self.workflow_executor, self.registry) {
-            (Some(executor), Some(registry)) => Ok(LoopWorkflow::new_with_hooks_and_registry(
+        let mut workflow = match (self.workflow_executor, self.registry) {
+            (Some(executor), Some(registry)) => LoopWorkflow::new_with_hooks_and_registry(
                 self.name,
                 config,
                 self.workflow_config,
                 executor,
                 Some(registry),
-            )),
-            (Some(executor), None) => Ok(LoopWorkflow::new_with_hooks(
+            ),
+            (Some(executor), None) => LoopWorkflow::new_with_hooks(
                 self.name,
                 config,
                 self.workflow_config,
                 executor,
-            )),
-            (None, Some(registry)) => Ok(LoopWorkflow::new_with_registry(
+            ),
+            (None, Some(registry)) => LoopWorkflow::new_with_registry(
                 self.name,
                 config,
                 self.workflow_config,
                 Some(registry),
-            )),
-            (None, None) => Ok(LoopWorkflow::new(self.name, config, self.workflow_config)),
-        }
+            ),
+            (None, None) => LoopWorkflow::new(self.name, config, self.workflow_config),
+        };
+        workflow.template_executor = self.template_executor;
+        Ok(workflow)
     }
 }
 

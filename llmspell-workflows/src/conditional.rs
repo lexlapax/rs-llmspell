@@ -237,6 +237,8 @@ pub struct ConditionalWorkflow {
     error_strategy: ErrorStrategy,
     /// Optional workflow executor for hook integration
     workflow_executor: Option<Arc<WorkflowExecutor>>,
+    /// Optional template executor for template step execution
+    template_executor: Option<Arc<dyn llmspell_core::traits::template_executor::TemplateExecutor>>,
     /// Workflow metadata
     metadata: ComponentMetadata,
     /// Core workflow configuration for Workflow trait
@@ -277,6 +279,7 @@ impl ConditionalWorkflow {
             condition_evaluator,
             error_strategy,
             workflow_executor: None,
+            template_executor: None,
             metadata,
             core_config,
             core_steps: Arc::new(RwLock::new(Vec::new())),
@@ -320,6 +323,7 @@ impl ConditionalWorkflow {
             condition_evaluator,
             error_strategy,
             workflow_executor: Some(workflow_executor),
+            template_executor: None,
             metadata,
             core_config,
             core_steps: Arc::new(RwLock::new(Vec::new())),
@@ -364,6 +368,7 @@ impl ConditionalWorkflow {
             condition_evaluator,
             error_strategy,
             workflow_executor: None,
+            template_executor: None,
             metadata,
             core_config,
             core_steps: Arc::new(RwLock::new(Vec::new())),
@@ -415,6 +420,7 @@ impl ConditionalWorkflow {
             condition_evaluator,
             error_strategy,
             workflow_executor: Some(workflow_executor),
+            template_executor: None,
             metadata,
             core_config,
             core_steps: Arc::new(RwLock::new(Vec::new())),
@@ -598,7 +604,12 @@ impl ConditionalWorkflow {
                 workflow_state.execution_id = execution_component_id;
                 workflow_state.shared_data = self.state_manager.get_all_shared_data().await?;
                 workflow_state.current_step = index;
-                let step_context = StepExecutionContext::new(workflow_state, None);
+                let mut step_context = StepExecutionContext::new(workflow_state, None);
+
+                // Pass template_executor to step context if available
+                if let Some(ref template_executor) = self.template_executor {
+                    step_context = step_context.with_template_executor(template_executor.clone());
+                }
 
                 // Execute step with retry logic
                 let step_result = if self.workflow_executor.is_some() {
@@ -1055,7 +1066,12 @@ impl ConditionalWorkflow {
             workflow_state.execution_id = execution_component_id;
             workflow_state.shared_data = shared_data;
             workflow_state.current_step = step_results.len();
-            let execution_context = StepExecutionContext::new(workflow_state, None);
+            let mut execution_context = StepExecutionContext::new(workflow_state, None);
+
+            // Pass template_executor to step context if available
+            if let Some(ref template_executor) = self.template_executor {
+                execution_context = execution_context.with_template_executor(template_executor.clone());
+            }
 
             // Execute step with retry logic (with workflow metadata if hooks are enabled)
             let step_result = if self.workflow_executor.is_some() {
@@ -1482,6 +1498,7 @@ pub struct ConditionalWorkflowBuilder {
     branches: Vec<ConditionalBranch>,
     error_strategy: Option<ErrorStrategy>,
     workflow_executor: Option<Arc<WorkflowExecutor>>,
+    template_executor: Option<Arc<dyn llmspell_core::traits::template_executor::TemplateExecutor>>,
     registry: Option<Arc<dyn ComponentLookup>>,
 }
 
@@ -1495,6 +1512,7 @@ impl ConditionalWorkflowBuilder {
             branches: Vec::new(),
             error_strategy: None,
             workflow_executor: None,
+            template_executor: None,
             registry: None,
         }
     }
@@ -1541,6 +1559,15 @@ impl ConditionalWorkflowBuilder {
         self
     }
 
+    /// Set the template executor for template step execution
+    pub fn with_template_executor(
+        mut self,
+        template_executor: Arc<dyn llmspell_core::traits::template_executor::TemplateExecutor>,
+    ) -> Self {
+        self.template_executor = Some(template_executor);
+        self
+    }
+
     /// Build the conditional workflow
     pub fn build(mut self) -> ConditionalWorkflow {
         // Apply error strategy if provided
@@ -1571,6 +1598,7 @@ impl ConditionalWorkflowBuilder {
         };
         workflow.config = self.conditional_config;
         workflow.add_branches(self.branches);
+        workflow.template_executor = self.template_executor;
         workflow
     }
 }

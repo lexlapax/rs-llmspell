@@ -226,15 +226,22 @@ async fn register_agent_workflow(
     };
     builder.register(Arc::new(agent_global));
 
+    // Get template_executor from context if available
+    let template_executor = context
+        .get_bridge::<crate::template_bridge::TemplateBridge>("template_bridge")
+        .map(|bridge| Arc::clone(&bridge) as Arc<dyn llmspell_core::traits::template_executor::TemplateExecutor>);
+
     // Create workflow global with state manager if available
+    let template_executor_clone = template_executor.clone();
     let workflow_global = context
         .get_bridge::<llmspell_kernel::state::StateManager>("state_manager")
         .map_or_else(
-            || workflow_global::WorkflowGlobal::new(context.registry.clone()),
+            || workflow_global::WorkflowGlobal::new(context.registry.clone(), template_executor.clone()),
             |state_manager| {
                 workflow_global::WorkflowGlobal::with_state_manager(
                     context.registry.clone(),
                     state_manager,
+                    template_executor_clone,
                 )
             },
         );

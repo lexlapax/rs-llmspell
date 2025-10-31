@@ -35,6 +35,8 @@ pub struct SequentialWorkflow {
     error_strategy: ErrorStrategy,
     /// Optional workflow executor for hook integration
     workflow_executor: Option<Arc<WorkflowExecutor>>,
+    /// Optional template executor for template step execution
+    template_executor: Option<Arc<dyn llmspell_core::traits::template_executor::TemplateExecutor>>,
     /// Workflow metadata
     metadata: ComponentMetadata,
     /// Core workflow configuration for Workflow trait
@@ -82,6 +84,7 @@ impl SequentialWorkflow {
             error_handler,
             error_strategy,
             workflow_executor: None,
+            template_executor: None,
             metadata,
             core_config,
             core_steps: Arc::new(RwLock::new(Vec::new())),
@@ -135,6 +138,7 @@ impl SequentialWorkflow {
             error_handler,
             error_strategy,
             workflow_executor: Some(workflow_executor),
+            template_executor: None,
             metadata,
             core_config,
             core_steps: Arc::new(RwLock::new(Vec::new())),
@@ -319,6 +323,11 @@ impl BaseAgent for SequentialWorkflow {
                     "No state available in ExecutionContext for step {} - state is None!",
                     step.name
                 );
+            }
+
+            // Pass template_executor to step context if available
+            if let Some(ref template_executor) = self.template_executor {
+                step_context = step_context.with_template_executor(template_executor.clone());
             }
 
             // Execute step with retry logic
@@ -693,6 +702,7 @@ pub struct SequentialWorkflowBuilder {
     steps: Vec<WorkflowStep>,
     error_strategy: Option<ErrorStrategy>,
     workflow_executor: Option<Arc<WorkflowExecutor>>,
+    template_executor: Option<Arc<dyn llmspell_core::traits::template_executor::TemplateExecutor>>,
     registry: Option<Arc<dyn ComponentLookup>>,
 }
 
@@ -705,6 +715,7 @@ impl SequentialWorkflowBuilder {
             steps: Vec::new(),
             error_strategy: None,
             workflow_executor: None,
+            template_executor: None,
             registry: None,
         }
     }
@@ -786,6 +797,15 @@ impl SequentialWorkflowBuilder {
         self
     }
 
+    /// Set the template executor for template step execution
+    pub fn with_template_executor(
+        mut self,
+        template_executor: Arc<dyn llmspell_core::traits::template_executor::TemplateExecutor>,
+    ) -> Self {
+        self.template_executor = Some(template_executor);
+        self
+    }
+
     /// Build the sequential workflow
     pub fn build(mut self) -> SequentialWorkflow {
         // Apply error strategy if provided
@@ -809,6 +829,7 @@ impl SequentialWorkflowBuilder {
             (None, None) => SequentialWorkflow::new(self.name, self.config),
         };
         workflow.add_steps(self.steps);
+        workflow.template_executor = self.template_executor;
         workflow
     }
 }
