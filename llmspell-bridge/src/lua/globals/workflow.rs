@@ -15,110 +15,138 @@ use std::sync::Arc;
 use tracing::{debug, info, instrument};
 use uuid;
 
+/// Parse tool step from Lua table
+fn parse_tool_step(step_table: &Table, name: String) -> mlua::Result<WorkflowStep> {
+    let tool_name: String = step_table.get("tool")?;
+    let input: Option<Table> = step_table.get("input").ok();
+
+    let parameters = if let Some(input_table) = input {
+        lua_value_to_json(Value::Table(input_table))?
+    } else {
+        serde_json::json!({})
+    };
+
+    Ok(WorkflowStep::new(
+        name,
+        StepType::Tool {
+            tool_name,
+            parameters,
+        },
+    ))
+}
+
+/// Parse agent step from Lua table
+fn parse_agent_step(step_table: &Table, name: String) -> mlua::Result<WorkflowStep> {
+    let agent_id: String = step_table.get("agent")?;
+    let input: String = step_table.get("input").unwrap_or_default();
+
+    Ok(WorkflowStep::new(name, StepType::Agent { agent_id, input }))
+}
+
+/// Parse workflow step from Lua table
+fn parse_nested_workflow_step(step_table: &Table, name: String) -> mlua::Result<WorkflowStep> {
+    let workflow: mlua::AnyUserData = step_table.get("workflow")?;
+
+    // Get workflow info from the workflow userdata
+    let workflow_info: Table = workflow.call_method("get_info", ())?;
+    let workflow_id: String = workflow_info.get("id")?;
+
+    let input: Option<Table> = step_table.get("input").ok();
+    let input_value = if let Some(input_table) = input {
+        lua_value_to_json(Value::Table(input_table))?
+    } else {
+        serde_json::json!({})
+    };
+
+    // Parse the existing workflow ID - this extracts the UUID part
+    debug!("Parsing workflow ID for nested step: '{}'", workflow_id);
+
+    // Extract just the UUID part from "workflow_UUID" format
+    let uuid_str = workflow_id
+        .strip_prefix("workflow_")
+        .unwrap_or(&workflow_id);
+
+    debug!("Extracted UUID string: '{}'", uuid_str);
+
+    // Parse the UUID directly - don't create a new one!
+    let component_id = uuid::Uuid::parse_str(uuid_str).map_or_else(
+        |_| {
+            debug!("Failed to parse UUID, falling back to parse_or_from_name");
+            ComponentId::parse_or_from_name(&workflow_id)
+        },
+        |uuid| {
+            debug!("Successfully parsed existing UUID: {}", uuid);
+            ComponentId::from_uuid(uuid)
+        },
+    );
+
+    debug!("Final ComponentId: {}", component_id);
+
+    Ok(WorkflowStep::new(
+        name,
+        StepType::Workflow {
+            workflow_id: component_id,
+            input: input_value,
+        },
+    ))
+}
+
+/// Parse template step from Lua table
+fn parse_template_step(step_table: &Table, name: String) -> mlua::Result<WorkflowStep> {
+    let template_id: String = step_table.get("template_id")?;
+    let params_table: Option<Table> = step_table.get("params").ok();
+
+    let params = if let Some(table) = params_table {
+        lua_value_to_json(Value::Table(table))?
+    } else {
+        serde_json::json!({})
+    };
+
+    debug!(
+        "Creating template step '{}' with template_id '{}' and {} parameters",
+        name,
+        template_id,
+        params.as_object().map_or(0, serde_json::Map::len)
+    );
+
+    Ok(WorkflowStep::new(
+        name,
+        StepType::Template {
+            template_id,
+            params,
+        },
+    ))
+}
+
 /// Parse step configuration from Lua table
-#[allow(clippy::cognitive_complexity)]
 fn parse_workflow_step(_lua: &Lua, step_table: &Table) -> mlua::Result<WorkflowStep> {
     let name: String = step_table.get("name")?;
     let step_type: String = step_table.get("type")?;
 
-    let step = match step_type.as_str() {
-        "tool" => {
-            let tool_name: String = step_table.get("tool")?;
-            let input: Option<Table> = step_table.get("input").ok();
-
-            let parameters = if let Some(input_table) = input {
-                lua_value_to_json(Value::Table(input_table))?
-            } else {
-                serde_json::json!({})
-            };
-
-            WorkflowStep::new(
-                name,
-                StepType::Tool {
-                    tool_name,
-                    parameters,
-                },
-            )
-        }
-        "agent" => {
-            let agent_id: String = step_table.get("agent")?;
-            let input: String = step_table.get("input").unwrap_or_default();
-
-            WorkflowStep::new(
-                name,
-                StepType::Agent {
-                    agent_id, // Now uses String directly
-                    input,
-                },
-            )
-        }
-        "workflow" => {
-            let workflow: mlua::AnyUserData = step_table.get("workflow")?;
-
-            // Get workflow info from the workflow userdata
-            let workflow_info: Table = workflow.call_method("get_info", ())?;
-            let workflow_id: String = workflow_info.get("id")?;
-
-            let input: Option<Table> = step_table.get("input").ok();
-            let input_value = if let Some(input_table) = input {
-                lua_value_to_json(Value::Table(input_table))?
-            } else {
-                serde_json::json!({})
-            };
-
-            // Parse the existing workflow ID - this extracts the UUID part
-            debug!("Parsing workflow ID for nested step: '{}'", workflow_id);
-
-            // Extract just the UUID part from "workflow_UUID" format
-            let uuid_str = workflow_id
-                .strip_prefix("workflow_")
-                .unwrap_or(&workflow_id);
-
-            debug!("Extracted UUID string: '{}'", uuid_str);
-
-            // Parse the UUID directly - don't create a new one!
-            let component_id = uuid::Uuid::parse_str(uuid_str).map_or_else(
-                |_| {
-                    debug!("Failed to parse UUID, falling back to parse_or_from_name");
-                    ComponentId::parse_or_from_name(&workflow_id)
-                },
-                |uuid| {
-                    debug!("Successfully parsed existing UUID: {}", uuid);
-                    ComponentId::from_uuid(uuid)
-                },
-            );
-
-            debug!("Final ComponentId: {}", component_id);
-
-            WorkflowStep::new(
-                name,
-                StepType::Workflow {
-                    workflow_id: component_id,
-                    input: input_value,
-                },
-            )
-        }
+    let mut step = match step_type.as_str() {
+        "tool" => parse_tool_step(step_table, name)?,
+        "agent" => parse_agent_step(step_table, name)?,
+        "workflow" => parse_nested_workflow_step(step_table, name)?,
+        "template" => parse_template_step(step_table, name)?,
         _ => {
             return Err(mlua::Error::RuntimeError(format!(
-                "Unknown step type: '{step_type}'. Supported types: 'tool', 'agent', 'workflow'"
+                "Unknown step type: '{step_type}'. Supported types: 'tool', 'agent', 'workflow', 'template'"
             )))
         }
     };
 
     // Parse optional step configuration and apply to step
-    let mut final_step = step;
-
     if let Ok(timeout_ms) = step_table.get::<_, u64>("timeout_ms") {
         debug!("Step timeout requested: {}ms", timeout_ms);
-        final_step = final_step.with_timeout(std::time::Duration::from_millis(timeout_ms));
+        step = step.with_timeout(std::time::Duration::from_millis(timeout_ms));
     }
 
     if let Ok(retry_count) = step_table.get::<_, u32>("retry_count") {
         debug!("Step retry count: {}", retry_count);
-        final_step = final_step.with_retry(retry_count);
+        step = step.with_retry(retry_count);
     }
 
-    Ok(final_step)
+    Ok(step)
 }
 
 /// Parse error strategy from string
@@ -769,6 +797,35 @@ impl UserData for WorkflowBuilder {
             this.steps.push(step);
             Ok(this.clone())
         });
+
+        // Add template step (convenience method for StepType::Template)
+        methods.add_method_mut(
+            "add_template_step",
+            |_lua, this, (name, template_id, params_table): (String, String, Option<Table>)| {
+                let params = if let Some(table) = params_table {
+                    lua_value_to_json(Value::Table(table))?
+                } else {
+                    serde_json::json!({})
+                };
+
+                debug!(
+                    "Adding template step '{}' with template_id '{}' and {} parameters",
+                    name,
+                    template_id,
+                    params.as_object().map_or(0, serde_json::Map::len)
+                );
+
+                let step = WorkflowStep::new(
+                    name,
+                    StepType::Template {
+                        template_id,
+                        params,
+                    },
+                );
+                this.steps.push(step);
+                Ok(this.clone())
+            },
+        );
 
         // Conditional workflow specific methods
         methods.add_method_mut("condition", |_lua, this, condition_table: Table| {
