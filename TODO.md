@@ -6562,7 +6562,7 @@ Implementation:
 **Priority**: HIGH (quality-of-life improvement)
 **Estimated Time**: 30 minutes
 **Assignee**: Workflows Team
-**Status**: BLOCKED (requires 13.13.2)
+**Status**: ✅ COMPLETE
 
 **Description**: Add convenience method to `SequentialWorkflowBuilder` for adding template steps without manual `WorkflowStep` construction.
 
@@ -6607,11 +6607,19 @@ Implementation:
   ```
 
 **Acceptance Criteria**:
-- [ ] `add_template_step()` method added to `SequentialWorkflowBuilder`
-- [ ] Follows builder pattern (returns `self`)
-- [ ] Unit test: `test_add_template_step_builder()`
-- [ ] Rustdoc with usage example
-- [ ] Zero clippy warnings
+- [x] `add_template_step()` method added to `SequentialWorkflowBuilder`
+- [x] Follows builder pattern (returns `self`)
+- [x] Unit test: `test_add_template_step_builder()`
+- [x] Rustdoc with usage example
+- [x] Zero clippy warnings
+
+**Completion Insights**:
+- Added `add_template_step(name, template_id, params)` convenience method to SequentialWorkflowBuilder (sequential.rs:736-775)
+- Comprehensive rustdoc with 2-template research-chat example showing session_id sharing
+- Unit test validates: workflow creation, step count, Template step type, parameter preservation
+- All 73 workflow tests pass (1 new: test_add_template_step_builder)
+- Zero clippy warnings
+- Builder pattern: Takes ownership, returns Self for method chaining
 
 ---
 

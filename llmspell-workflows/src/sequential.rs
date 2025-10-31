@@ -733,6 +733,47 @@ impl SequentialWorkflowBuilder {
         self
     }
 
+    /// Add a template execution step to the workflow
+    ///
+    /// Convenience method for adding a `StepType::Template` step without manual construction.
+    ///
+    /// # Example
+    ///
+    /// ```
+    /// use llmspell_workflows::sequential::SequentialWorkflowBuilder;
+    /// use serde_json::json;
+    ///
+    /// let workflow = SequentialWorkflowBuilder::new("research-chat".to_string())
+    ///     .add_template_step(
+    ///         "research".to_string(),
+    ///         "research-assistant".to_string(),
+    ///         json!({
+    ///             "topic": "Rust async programming",
+    ///             "max_sources": 10,
+    ///             "session_id": "test-session",
+    ///         }),
+    ///     )
+    ///     .add_template_step(
+    ///         "chat".to_string(),
+    ///         "interactive-chat".to_string(),
+    ///         json!({
+    ///             "message": "Summarize the findings",
+    ///             "session_id": "test-session",
+    ///         }),
+    ///     )
+    ///     .build();
+    /// ```
+    pub fn add_template_step(
+        mut self,
+        name: String,
+        template_id: String,
+        params: serde_json::Value,
+    ) -> Self {
+        let step = WorkflowStep::new(name, StepType::Template { template_id, params });
+        self.steps.push(step);
+        self
+    }
+
     /// Enable hook integration with a WorkflowExecutor
     pub fn with_hooks(mut self, workflow_executor: Arc<WorkflowExecutor>) -> Self {
         self.workflow_executor = Some(workflow_executor);
@@ -803,6 +844,61 @@ mod tests {
         assert_eq!(workflow.name(), "test_workflow");
         assert_eq!(workflow.step_count(), 1);
     }
+
+    #[tokio::test]
+    async fn test_add_template_step_builder() {
+        use serde_json::json;
+
+        // Build workflow with template steps using convenience method
+        let workflow = SequentialWorkflow::builder("research-chat".to_string())
+            .add_template_step(
+                "research".to_string(),
+                "research-assistant".to_string(),
+                json!({
+                    "topic": "Rust async",
+                    "max_sources": 10,
+                }),
+            )
+            .add_template_step(
+                "chat".to_string(),
+                "interactive-chat".to_string(),
+                json!({
+                    "message": "Summarize findings",
+                }),
+            )
+            .build();
+
+        // Verify workflow created correctly
+        assert_eq!(workflow.name(), "research-chat");
+        assert_eq!(workflow.step_count(), 2);
+
+        // Verify first step is Template type with correct params
+        let steps = &workflow.steps;
+        match &steps[0].step_type {
+            StepType::Template {
+                template_id,
+                params,
+            } => {
+                assert_eq!(template_id, "research-assistant");
+                assert_eq!(params["topic"], "Rust async");
+                assert_eq!(params["max_sources"], 10);
+            }
+            _ => panic!("Expected Template step type"),
+        }
+
+        // Verify second step is Template type
+        match &steps[1].step_type {
+            StepType::Template {
+                template_id,
+                params,
+            } => {
+                assert_eq!(template_id, "interactive-chat");
+                assert_eq!(params["message"], "Summarize findings");
+            }
+            _ => panic!("Expected Template step type"),
+        }
+    }
+
     #[tokio::test]
     async fn test_sequential_workflow_execution_success() {
         let step1 = WorkflowStep::new(
