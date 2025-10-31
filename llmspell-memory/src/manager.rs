@@ -46,7 +46,7 @@ use crate::types::{ConsolidationMode, ConsolidationResult, EpisodicEntry};
 ///     let results = manager.episodic().search("query", 5).await?;
 ///
 ///     // Consolidation (Phase 13.3.2)
-///     manager.consolidate("session-1", ConsolidationMode::Immediate).await?;
+///     manager.consolidate("session-1", ConsolidationMode::Immediate, None).await?;
 ///     Ok(())
 /// }
 /// ```
