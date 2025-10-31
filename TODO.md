@@ -8104,7 +8104,9 @@ let generated = self.inner.embed_batch(&to_generate).await?;  // ← Batches cac
 **Priority**: HIGH
 **Estimated Time**: 4 hours
 **Assignee**: Performance Team
-**Status**: READY TO START
+**Status**: ⏭️ SKIPPED (Not Applicable - HNSW Not Yet Integrated)
+
+**Skip Reason**: llmspell-memory currently uses HashMap + cosine similarity (llmspell-memory/src/episodic/in_memory.rs:88-100), not the HNSW backend from llmspell-storage. This task requires HNSW integration first (future phase).
 
 **Description**: Tune HNSW (Hierarchical Navigable Small World) vector index parameters for optimal search performance (recall vs latency tradeoff).
 
