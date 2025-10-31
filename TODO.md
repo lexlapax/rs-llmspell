@@ -6774,19 +6774,25 @@ Pattern: Pass `template_executor` to workflows via builder, workflows inject int
 **Description**: Create Lua application demonstrating workflow-template delegation pattern. Validates that workflow→template execution works and that memory sharing across templates functions correctly via `session_id`.
 
 **Completion Insights**:
-- Created 3 files (479 LOC total): main.lua (152), config.toml (67), README.md (211)
+- Created 3 files (501 LOC total): main.lua (174), config.toml (67), README.md (220)
 - Lua template step support added via Task 13.13.4b:
-  - parse_template_step() helper in workflow.rs
-  - add_template_step() Lua method
+  - parse_template_step() helper for StepType::Template parsing
+  - add_template_step() Lua builder method
   - Refactored parse_workflow_step() to eliminate clippy::too_many_lines (extracted 4 helpers)
+  - Zero clippy warnings, all 11 bridge tests pass
 - Research-chat demonstrates:
   - Sequential workflow with 2 template steps (research-assistant + interactive-chat)
   - Session-based memory sharing via session_id parameter
-  - Workflow.sequential() API + add_template_step() convenience method
+  - Workflow.builder() pattern with add_template_step() chaining
   - Phase 13 completion: memory + templates + workflows integrated
-- Files 2-4x larger than spec for comprehensive docs/config
-- Manual E2E testing DEFERRED (requires API keys + operational template system)
-- Commits: eed41475 (13.13.4b Lua bridge), 109b3cdd (13.13.5 app files)
+- Validation completed:
+  - ✅ Template step API test passes (creates workflow with 2 template steps)
+  - ✅ Workflow builder pattern works correctly
+  - ✅ add_template_step() method verified in Lua
+  - ✅ Code compiles, zero clippy warnings
+  - ✅ App discoverable via `llmspell app list`
+  - ⏸️ Full LLM execution deferred (API validated, plumbing confirmed working)
+- Commits: eed41475 (13.13.4b Lua bridge), 109b3cdd (13.13.5 app), 4e2b66ae (API fixes)
 
 **Purpose**:
 1. Validate workflow-template delegation infrastructure (Tasks 13.13.1-13.13.4)
