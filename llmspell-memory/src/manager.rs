@@ -155,9 +155,11 @@ impl DefaultMemoryManager {
     /// Create memory manager with in-memory backends (for testing/development)
     ///
     /// All memory subsystems use in-memory storage:
-    /// - Episodic: HNSW vector index
+    /// - Episodic: HNSW vector index (test embeddings)
     /// - Semantic: Temporary `SurrealDB` instance
     /// - Procedural: No-op placeholder
+    ///
+    /// For production use with real embeddings, use `new_in_memory_with_embeddings()`.
     ///
     /// # Errors
     ///
@@ -177,7 +179,7 @@ impl DefaultMemoryManager {
     pub async fn new_in_memory() -> Result<Self> {
         info!("Initializing DefaultMemoryManager with in-memory backends");
 
-        let episodic = Self::create_episodic_memory();
+        let episodic = Self::create_episodic_memory(None);
         let semantic = Self::create_semantic_memory().await?;
         let procedural = Self::create_procedural_memory();
 
@@ -185,10 +187,82 @@ impl DefaultMemoryManager {
         Ok(Self::new(episodic, semantic, procedural))
     }
 
+    /// Create memory manager with in-memory backends and real embeddings (production)
+    ///
+    /// All memory subsystems use in-memory storage:
+    /// - Episodic: HNSW vector index (real embeddings via `EmbeddingService`)
+    /// - Semantic: Temporary `SurrealDB` instance
+    /// - Procedural: No-op placeholder
+    ///
+    /// # Arguments
+    ///
+    /// * `embedding_service` - Embedding service for generating vectors
+    ///
+    /// # Errors
+    ///
+    /// Returns error if temporary `SurrealDB` initialization fails
+    ///
+    /// # Example
+    ///
+    /// ```rust,no_run
+    /// use llmspell_memory::{DefaultMemoryManager, embeddings::EmbeddingService};
+    /// use llmspell_core::traits::embedding::EmbeddingProvider;
+    /// use std::sync::Arc;
+    ///
+    /// # struct MyProvider;
+    /// # impl EmbeddingProvider for MyProvider {
+    /// #     fn name(&self) -> &str { "test" }
+    /// #     async fn embed(&self, texts: &[String]) -> Result<Vec<Vec<f32>>, llmspell_core::LLMSpellError> {
+    /// #         Ok(vec![])
+    /// #     }
+    /// #     fn embedding_dimensions(&self) -> usize { 384 }
+    /// #     fn embedding_model(&self) -> Option<&str> { None }
+    /// # }
+    /// #
+    /// #[tokio::main]
+    /// async fn main() -> llmspell_memory::Result<()> {
+    ///     // Create embedding provider (e.g., OpenAI, Ollama, etc.)
+    ///     let provider: Arc<dyn EmbeddingProvider> = Arc::new(MyProvider);
+    ///     let service = Arc::new(EmbeddingService::new(provider));
+    ///
+    ///     // Create manager with real embeddings
+    ///     let manager = DefaultMemoryManager::new_in_memory_with_embeddings(service).await?;
+    ///     Ok(())
+    /// }
+    /// ```
+    pub async fn new_in_memory_with_embeddings(
+        embedding_service: Arc<crate::embeddings::EmbeddingService>,
+    ) -> Result<Self> {
+        info!(
+            "Initializing DefaultMemoryManager with in-memory backends and embedding service: {}",
+            embedding_service.provider_name()
+        );
+
+        let episodic = Self::create_episodic_memory(Some(embedding_service));
+        let semantic = Self::create_semantic_memory().await?;
+        let procedural = Self::create_procedural_memory();
+
+        info!("DefaultMemoryManager initialized successfully with embeddings");
+        Ok(Self::new(episodic, semantic, procedural))
+    }
+
     /// Helper: Create in-memory episodic memory
-    fn create_episodic_memory() -> Arc<dyn EpisodicMemory> {
-        debug!("Creating InMemoryEpisodicMemory");
-        Arc::new(InMemoryEpisodicMemory::new())
+    fn create_episodic_memory(
+        embedding_service: Option<Arc<crate::embeddings::EmbeddingService>>,
+    ) -> Arc<dyn EpisodicMemory> {
+        embedding_service.map_or_else(
+            || {
+                debug!("Creating InMemoryEpisodicMemory with test embeddings");
+                Arc::new(InMemoryEpisodicMemory::new())
+            },
+            |service| {
+                debug!(
+                    "Creating InMemoryEpisodicMemory with embedding service: {}",
+                    service.provider_name()
+                );
+                Arc::new(InMemoryEpisodicMemory::new_with_embeddings(service))
+            },
+        )
     }
 
     /// Helper: Create temporary semantic memory with `SurrealDB`
@@ -573,6 +647,72 @@ mod tests {
     async fn test_shutdown() {
         let manager = DefaultMemoryManager::new_in_memory().await.unwrap();
         manager.shutdown().await.unwrap();
+    }
+
+    #[tokio::test]
+    async fn test_create_in_memory_manager_with_embeddings() {
+        use crate::embeddings::EmbeddingService;
+        use async_trait::async_trait;
+        use llmspell_core::traits::embedding::EmbeddingProvider;
+        use llmspell_core::error::LLMSpellError;
+
+        // Mock embedding provider for testing
+        struct TestEmbeddingProvider;
+
+        #[async_trait]
+        impl EmbeddingProvider for TestEmbeddingProvider {
+            fn name(&self) -> &str {
+                "test-provider"
+            }
+
+            async fn embed(&self, texts: &[String]) -> std::result::Result<Vec<Vec<f32>>, LLMSpellError> {
+                Ok(texts.iter().map(|_| vec![0.1, 0.2, 0.3]).collect())
+            }
+
+            fn embedding_dimensions(&self) -> usize {
+                3
+            }
+
+            fn supports_dimension_reduction(&self) -> bool {
+                false
+            }
+
+            fn set_embedding_dimensions(&mut self, _dims: usize) -> std::result::Result<(), LLMSpellError> {
+                Err(LLMSpellError::Provider {
+                    message: "Dimension configuration not supported".to_string(),
+                    provider: Some(self.name().to_string()),
+                    source: None,
+                })
+            }
+
+            fn embedding_model(&self) -> Option<&str> {
+                Some("test-model")
+            }
+
+            fn embedding_cost_per_token(&self) -> Option<f64> {
+                None
+            }
+        }
+
+        // Create embedding service with mock provider
+        let provider = Arc::new(TestEmbeddingProvider);
+        let service = Arc::new(EmbeddingService::new(provider));
+
+        // Create manager with embeddings
+        let manager = DefaultMemoryManager::new_in_memory_with_embeddings(service).await.unwrap();
+
+        // Verify all subsystems are accessible
+        let _ = manager.episodic();
+        let _ = manager.semantic();
+        let _ = manager.procedural();
+
+        // Test episodic memory with embedding service
+        let entry = EpisodicEntry::new("test-session".into(), "user".into(), "Hello".into());
+        manager.episodic().add(entry).await.unwrap();
+
+        let results = manager.episodic().search("Hello", 5).await.unwrap();
+        assert_eq!(results.len(), 1);
+        assert_eq!(results[0].content, "Hello");
     }
 
     // ========== Phase 13.6.4: API Helper Tests ==========

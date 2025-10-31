@@ -1,6 +1,6 @@
 //! ABOUTME: Embedding generation integration with llmspell-rag providers
 //!
-//! This module integrates llmspell-rag's EmbeddingProvider trait into the memory system,
+//! This module integrates llmspell-rag's `EmbeddingProvider` trait into the memory system,
 //! providing a foundation for optimization layers (caching, batching).
 
 use llmspell_core::traits::embedding::EmbeddingProvider;
@@ -40,6 +40,10 @@ impl EmbeddingService {
     /// Generate embedding for single text
     ///
     /// Wraps the provider's batch API for convenience
+    ///
+    /// # Errors
+    ///
+    /// Returns error if embedding generation fails or provider is unavailable
     pub async fn embed_single(&self, text: &str) -> Result<Vec<f32>, crate::error::MemoryError> {
         debug!("Generating embedding for text (length: {})", text.len());
 
@@ -58,6 +62,10 @@ impl EmbeddingService {
     /// Generate embeddings for multiple texts in batch
     ///
     /// Uses provider's native batching for optimal performance
+    ///
+    /// # Errors
+    ///
+    /// Returns error if embedding generation fails or provider is unavailable
     pub async fn embed_batch(&self, texts: &[String]) -> Result<Vec<Vec<f32>>, crate::error::MemoryError> {
         info!("Generating batch of {} embeddings", texts.len());
 
@@ -68,11 +76,13 @@ impl EmbeddingService {
     }
 
     /// Get embedding dimensions
+    #[must_use] 
     pub fn dimensions(&self) -> usize {
         self.provider.embedding_dimensions()
     }
 
     /// Get provider name
+    #[must_use] 
     pub fn provider_name(&self) -> &str {
         self.provider.name()
     }

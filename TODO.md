@@ -7558,11 +7558,27 @@ llmspell app run research-chat --topic "Rust async" --question "What are the key
    - Pass service to `InMemoryEpisodicMemory::new_with_embeddings()`
 
 **Definition of Done**:
-- [ ] EmbeddingService created and tested
-- [ ] InMemoryEpisodicMemory uses service (backwards compat: new() still works)
-- [ ] DefaultMemoryManager accepts service parameter
-- [ ] All tests pass (zero regressions)
-- [ ] Zero clippy warnings
+- [✅] EmbeddingService created and tested
+- [✅] InMemoryEpisodicMemory uses service (backwards compat: new() still works)
+- [✅] DefaultMemoryManager accepts service parameter
+- [✅] All tests pass (99 passed, +1 from new test)
+- [✅] Zero clippy warnings
+
+**Implementation Summary**:
+- Created `DefaultMemoryManager::new_in_memory_with_embeddings(service)` constructor
+- Updated `create_episodic_memory()` helper to accept optional `EmbeddingService`
+- Added comprehensive test `test_create_in_memory_manager_with_embeddings()`
+- Maintains full backwards compatibility (existing `new_in_memory()` unchanged)
+
+**Key Insights**:
+- Clean API: Production code uses `new_in_memory_with_embeddings()`, test code uses `new_in_memory()`
+- Trait integration works perfectly with `Arc<dyn EmbeddingProvider>` from core
+- Zero regressions, all existing tests continue to pass
+- Documentation includes working example with custom provider
+
+**Files Modified**:
+- `llmspell-memory/src/manager.rs` (+66 lines): New constructor, updated helper, comprehensive test
+- `llmspell-memory/src/embeddings/mod.rs` (+6 lines): Added `# Errors` sections to docs
 
 ---
 
