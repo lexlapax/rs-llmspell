@@ -47,6 +47,7 @@
 //! }
 //! ```
 
+pub mod config;
 pub mod consolidation;
 pub mod embeddings;
 pub mod episodic;
@@ -59,7 +60,8 @@ pub mod traits;
 pub mod types;
 
 // Re-exports for convenience
-pub use episodic::{HNSWEpisodicMemory, InMemoryEpisodicMemory};
+pub use config::{EpisodicBackendType, MemoryConfig};
+pub use episodic::{EpisodicBackend, HNSWEpisodicMemory, InMemoryEpisodicMemory};
 pub use error::{MemoryError, Result};
 pub use manager::DefaultMemoryManager;
 pub use procedural::{InMemoryPatternTracker, NoopProceduralMemory};

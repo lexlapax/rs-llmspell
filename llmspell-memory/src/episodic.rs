@@ -3,11 +3,14 @@
 //! This module provides multiple storage backends for episodic memory:
 //! - `HNSWEpisodicMemory` (production default, O(log n) search via llmspell-storage)
 //! - `InMemoryEpisodicMemory` (testing/development, simple `HashMap` with O(n) search)
+//! - `EpisodicBackend` (enum dispatch over backends, selected via config)
 //! - `ChromaDBEpisodicMemory` (future, optional external service)
 //! - `QdrantEpisodicMemory` (future, optional external service)
 
+pub mod backend;
 pub mod hnsw_backend;
 pub mod in_memory;
 
+pub use backend::EpisodicBackend;
 pub use hnsw_backend::HNSWEpisodicMemory;
 pub use in_memory::InMemoryEpisodicMemory;

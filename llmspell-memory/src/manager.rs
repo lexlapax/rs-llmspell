@@ -152,6 +152,77 @@ impl DefaultMemoryManager {
         }
     }
 
+    /// Create memory manager with configuration (NEW: preferred method)
+    ///
+    /// Constructs memory manager using `MemoryConfig` to select episodic backend
+    /// (`InMemory` or `HNSW`) and configure parameters. This is the recommended way
+    /// to create a memory manager for both testing and production.
+    ///
+    /// # Arguments
+    ///
+    /// * `config` - Memory configuration specifying backend and parameters
+    ///
+    /// # Returns
+    ///
+    /// Configured memory manager with selected backends
+    ///
+    /// # Errors
+    ///
+    /// Returns error if:
+    /// - Backend initialization fails
+    /// - HNSW selected but no embedding service provided
+    /// - Semantic memory initialization fails
+    ///
+    /// # Example
+    ///
+    /// ```rust,no_run
+    /// use llmspell_memory::{DefaultMemoryManager, MemoryConfig};
+    ///
+    /// # async fn example() -> llmspell_memory::Result<()> {
+    /// // Testing configuration (InMemory backend, no embeddings)
+    /// let test_config = MemoryConfig::for_testing();
+    /// let test_manager = DefaultMemoryManager::with_config(test_config).await?;
+    ///
+    /// // Production configuration (HNSW backend with embeddings)
+    /// # use llmspell_memory::embeddings::EmbeddingService;
+    /// # use llmspell_core::traits::embedding::EmbeddingProvider;
+    /// # use std::sync::Arc;
+    /// # use async_trait::async_trait;
+    /// # struct MockProvider;
+    /// # #[async_trait]
+    /// # impl EmbeddingProvider for MockProvider {
+    /// #     fn name(&self) -> &str { "mock" }
+    /// #     async fn embed(&self, _texts: &[String]) -> Result<Vec<Vec<f32>>, llmspell_core::LLMSpellError> { Ok(vec![]) }
+    /// #     fn embedding_dimensions(&self) -> usize { 384 }
+    /// #     fn embedding_model(&self) -> Option<&str> { None }
+    /// # }
+    /// # let provider: Arc<dyn EmbeddingProvider> = Arc::new(MockProvider);
+    /// let service = Arc::new(EmbeddingService::new(provider));
+    /// let prod_config = MemoryConfig::for_production(service);
+    /// let prod_manager = DefaultMemoryManager::with_config(prod_config).await?;
+    /// # Ok(())
+    /// # }
+    /// ```
+    pub async fn with_config(config: crate::config::MemoryConfig) -> Result<Self> {
+        use crate::episodic::EpisodicBackend;
+
+        info!(
+            "Initializing DefaultMemoryManager with config: backend={:?}",
+            config.episodic_backend
+        );
+
+        // Create episodic backend from configuration
+        let episodic = EpisodicBackend::from_config(&config)?;
+        info!("Episodic backend created: {}", episodic.backend_name());
+
+        // Create other subsystems
+        let semantic = Self::create_semantic_memory().await?;
+        let procedural = Self::create_procedural_memory();
+
+        info!("DefaultMemoryManager initialized successfully with config");
+        Ok(Self::new(Arc::new(episodic), semantic, procedural))
+    }
+
     /// Create memory manager with in-memory backends (for testing/development)
     ///
     /// All memory subsystems use in-memory storage:
