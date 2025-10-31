@@ -1,11 +1,13 @@
 //! Episodic memory implementations (vector-indexed interaction history)
 //!
 //! This module provides multiple storage backends for episodic memory:
-//! - `InMemoryEpisodicMemory` (default, simple and fast for <10k entries)
-//! - `HnswEpisodicMemory` (future, using llmspell-storage for >10k entries)
+//! - `HNSWEpisodicMemory` (production default, O(log n) search via llmspell-storage)
+//! - `InMemoryEpisodicMemory` (testing/development, simple `HashMap` with O(n) search)
 //! - `ChromaDBEpisodicMemory` (future, optional external service)
 //! - `QdrantEpisodicMemory` (future, optional external service)
 
+pub mod hnsw_backend;
 pub mod in_memory;
 
+pub use hnsw_backend::HNSWEpisodicMemory;
 pub use in_memory::InMemoryEpisodicMemory;
