@@ -6238,241 +6238,547 @@ Assemble context for LLM prompts using retrieval strategies...
 
 ---
 
-## Phase 13.13: Template Composition Evaluation (Day 20+, 8 hours - OPTIONAL)
+## Phase 13.13: Workflow-Template Delegation (Day 21, 6 hours)
 
-**Status**: EVALUATION PHASE - Decision Point
-**Timeline**: 1 day (8 hours) IF approved after evaluation
+**Status**: READY TO START (ultrathink analysis complete 2025-01-30)
+**Timeline**: 6 hours (4h infrastructure + 2h validation)
 **Dependencies**: Phase 13.11 complete (Template Memory Integration), Phase 13.12 complete (CLI + UX)
-**Priority**: LOW (nice-to-have, not critical for Phase 13 completion)
+**Priority**: MEDIUM (Optional Phase 13 enhancement, enables template composition pattern)
 
-**Overview**: Evaluate the need for template composition infrastructure and decide whether to implement based on user requirements, use cases, and architectural impact. This phase is a DECISION POINT, not an automatic implementation.
-
-**⚠️ DECISION REQUIRED**: This phase requires explicit approval before implementation begins. Default is to DEFER to post-Phase 13.
-
-**Background & Context**:
-
-During Phase 13.11 planning (ultrathink analysis 2025-01-29), a critical question emerged: **Should templates be able to call other templates?**
-
-**Use Case Example**: A "personal-assistant" template that combines:
-- Research capabilities (from research-assistant template)
-- Interactive chat (from interactive-chat template)
-- Shared memory across both sub-templates (via session_id)
-
-**Current Architecture Limitation**:
-```rust
-// ExecutionContext HAS (Phase 13.11):
-pub memory_manager: Option<Arc<dyn MemoryManager>>,      // ✅ Added
-pub context_bridge: Option<Arc<ContextBridge>>,          // ✅ Added
-pub tool_registry: Arc<ToolRegistry>,                    // ✅ Available
-pub agent_registry: Arc<FactoryRegistry>,                // ✅ Available
-pub workflow_factory: Arc<dyn WorkflowFactory>,          // ✅ Available
-pub rag: Option<Arc<MultiTenantRAG>>,                    // ✅ Available
-
-// ExecutionContext MISSING:
-pub template_registry: Option<Arc<TemplateRegistry>>,    // ❌ NOT AVAILABLE
-```
-
-**Key Finding**: Templates **CANNOT** currently call other templates. TemplateRegistry exists but is not injected into ExecutionContext.
-
-**Architectural Options Analysis**:
-
-### Option A: Standalone Templates (CURRENT - No Infrastructure Change)
-```rust
-// personal-assistant.rs - combines research + chat logic
-impl Template for PersonalAssistantTemplate {
-    async fn execute(&self, params: TemplateParams, context: ExecutionContext) {
-        // Phase 1: Research (reimplemented from research-assistant)
-        let research_results = self.do_research(&topic, &context).await?;
-
-        // Phase 2: Interactive chat (reimplemented from interactive-chat)
-        let chat_output = self.interactive_chat(&research_results, &context).await?;
-
-        // Memory integration automatic via session_id parameter
-    }
-}
-```
-**Pros:**
-- Works with current architecture (no changes needed)
-- Simple, straightforward implementation
-- Memory works automatically (Task 13.11.0-13.11.4)
-- **Time**: 2-3 hours per composite template
-
-**Cons:**
-- Code duplication (research + chat logic copied)
-- Maintenance burden (changes to sub-templates don't propagate)
-- DRY principle violation
+**Overview**: Enable workflows to delegate execution to templates as workflow steps, establishing templates as composable building blocks. Validates Phase 13 memory system via cross-template session sharing.
 
 ---
 
-### Option B: Template Composition (REQUIRES NEW INFRASTRUCTURE)
+## Architectural Decision (Ultrathink Analysis 2025-01-30)
 
-**Architecture Change Required**:
+### Problem Statement
+
+**Question**: Should templates be able to compose other templates?
+
+**Use Case**: "research-chat" application combining:
+- Research phase (research-assistant template)
+- Chat phase (interactive-chat template)
+- Shared memory across both (via session_id)
+
+### Evaluation Results (7 Criteria, Decision Matrix)
+
+**Option B (Template→Template Composition): REJECTED**
+
+| Criterion | Score | Reason |
+|-----------|-------|--------|
+| 1. User Demand | ❌ 0/1 | Zero user requests (pre-1.0 project) |
+| 2. Use Case Clarity | ⚠️ 0.5/1 | Only 1 concrete use case (need 3+) |
+| 3. Code Duplication Pain | ❌ 0/1 | No pain at 10 templates (~250-500 LOC each) |
+| 4. Memory Integration | ❌ 0/1 | Memory ALREADY works via session_id (orthogonal) |
+| 5. Architectural Fit | ⚠️ 0.5/1 | Violates abstraction (Layer 4→4), workflows ARE composition layer |
+| 6. Implementation Risk | ⚠️ 0.5/1 | Circular deps, recursion tracking, ExecutionContext bloat |
+| 7. Alternative Solutions | ✅ 1/1 | Workflows CAN satisfy via StepType::Template |
+
+**Total**: 2.5/7 criteria met → **DEFER indefinitely** (per decision matrix: 0-2 = defer)
+
+### Architectural Analysis
+
+**Current Abstraction Hierarchy**:
+```
+Layer 4: Templates (end-to-end user solutions)    ← HIGH-LEVEL
+Layer 3: Workflows (composition primitives)       ← MID-LEVEL ← COMPOSITION LAYER
+Layer 2: Agents/Tools (building blocks)           ← LOW-LEVEL
+```
+
+**Option B Problem**: Template→Template creates Layer 4→4 dependency
+- Violates single-responsibility (templates become both solutions AND composition primitives)
+- Bypasses workflow layer (the designated composition mechanism)
+- Circular dependency risk at high abstraction level
+
+**Evidence**: `WorkflowStep` enum (llmspell-workflows/src/traits.rs:52)
 ```rust
-// 1. Add to ExecutionContext
-pub struct ExecutionContext {
-    pub template_registry: Option<Arc<TemplateRegistry>>,  // NEW
-    // ... existing fields ...
-}
-
-impl ExecutionContext {
-    /// Execute a sub-template (NEW)
-    pub async fn execute_template(
-        &self,
-        template_id: &str,
-        params: TemplateParams
-    ) -> Result<TemplateOutput> {
-        let registry = self.require_template_registry()?;
-        let template = registry.get(template_id)?;
-        template.execute(params, self.clone()).await  // ⚠️ Potential recursion
-    }
+pub enum StepType {
+    Tool { tool_name, parameters },     // ✅ Can call tools
+    Agent { agent_id, input },          // ✅ Can call agents
+    Workflow { workflow_id, input },    // ✅ Can call workflows
+    // ❌ Template { ... }                  MISSING ← THIS IS THE GAP
 }
 ```
+
+### Selected Solution: Option E (Workflow→Template Bridge)
+
+**Concept**: Enable workflows to delegate to templates via new `StepType::Template` variant.
+
+**Why Superior**:
+- Preserves architectural boundaries (Layer 3→4 delegation, not 4→4)
+- No circular dependency risk (workflows are DAGs by design)
+- Less code: ~100 LOC vs ~200 LOC (Option B)
+- Faster: 4h vs 8h implementation
+- Extends existing pattern (Tool/Agent/Workflow steps)
 
 **Usage Pattern**:
-```rust
-// personal-assistant.rs - composes existing templates
-impl Template for PersonalAssistantTemplate {
-    async fn execute(&self, params: TemplateParams, context: ExecutionContext) {
-        // Phase 1: Call research-assistant template
-        let research_output = context.execute_template(
-            "research-assistant",
-            TemplateParams::from_json(json!({
-                "topic": topic,
-                "session_id": session_id,  // ✅ Memory shared across templates
-            }))?
-        ).await?;
+```lua
+-- Lua API (user-facing)
+local workflow = Workflow.sequential("research-chat")
 
-        // Phase 2: Call interactive-chat template with research context
-        let chat_output = context.execute_template(
-            "interactive-chat",
-            TemplateParams::from_json(json!({
-                "initial_message": format!("Based on: {}", research_output),
-                "session_id": session_id,  // ✅ Same session = shared memory
-            }))?
-        ).await?;
-    }
-}
+-- Step 1: Execute research-assistant template
+workflow:add_template_step("research", "research-assistant", {
+    topic = "Rust async",
+    session_id = session_id,  -- Memory anchor
+})
+
+-- Step 2: Execute interactive-chat template (shares memory)
+workflow:add_template_step("chat", "interactive-chat", {
+    message = "Summarize findings",
+    session_id = session_id,  -- Same session = shared memory
+})
+
+workflow:execute()
 ```
 
-**Pros:**
-- DRY - reuse existing templates
-- Changes to sub-templates propagate automatically
-- Shared memory across composed templates (same session_id)
-- Clean abstraction
-- Supports complex workflows
+### Why Lua App (Not 11th Template)?
 
-**Cons:**
-- Requires new infrastructure (template_registry in ExecutionContext)
-- **⚠️ Circular dependency risk**: Template A calls B calls A (infinite loop)
-- State management complexity
-- Template introspection challenges
-- Not in original Phase 13 scope
-- **Time**: 8 hours implementation
+**Precedent Check**: All 10 existing templates implement **novel logic**:
+- research-assistant: 4-phase workflow (gather→ingest→synthesize→validate)
+- interactive-chat: REPL integration + session management
+- code-generator: 3-agent pipeline (spec→impl→test)
+- code-review: 7 specialized aspect reviewers
+- (etc.)
 
-**Implementation Tasks (IF APPROVED)**:
-- Task 13.13.1: Add template_registry to ExecutionContext (2h)
-- Task 13.13.2: Add execute_template() helper with recursion tracking (2h)
-- Task 13.13.3: Circular dependency detection (2h)
-- Task 13.13.4: Testing + documentation + examples (2h)
+**Research-chat pattern**: Pure composition (template A → template B → share memory)
+- **No novel logic** → doesn't fit template precedent
+- Better as **reference implementation** (shows HOW composition works)
+- Users can fork/extend (Lua is editable, templates are compiled)
+
+**Decision**: Implement as Lua app at `examples/script-users/applications/research-chat/`
 
 ---
 
-### Option C: Workflow-Based Composition (USE EXISTING WORKFLOWS)
-Use ExecutionContext.workflow_factory for composition:
-```rust
-// Create PersonalAssistantWorkflow (not a template)
-// Use SequentialWorkflow with steps that call template logic
+## Implementation Plan
+
+### Part A: Infrastructure (4 hours) - REQUIRED
+
+#### Task 13.13.1: Add StepType::Template Variant (1h)
+
+**Priority**: CRITICAL (blocks 13.13.2)
+**Estimated Time**: 1 hour
+**Assignee**: Workflows Team
+**Status**: ✅ COMPLETE
+
+**Description**: Extend `StepType` enum to support template execution as workflow step.
+
+**Implementation**:
+- **File**: `llmspell-workflows/src/traits.rs:76`
+- **Change**:
+  ```rust
+  pub enum StepType {
+      Tool { tool_name: String, parameters: serde_json::Value },
+      Agent { agent_id: String, input: String },
+      Workflow { workflow_id: ComponentId, input: serde_json::Value },
+      Template {                              // ← NEW
+          template_id: String,                // Template registry ID
+          params: serde_json::Value,          // Template parameters
+      },
+  }
+  ```
+
+**Acceptance Criteria**:
+- [x] `StepType::Template` variant added with `template_id` and `params` fields
+- [x] Serialization works (serde derives)
+- [x] Unit test: `test_step_type_template_serialization()`
+- [x] Zero clippy warnings
+- [x] **TRACING**: debug!("Added StepType::Template variant")
+
+**Implementation Notes**:
+- `template_id` is String (not ComponentId) for registry lookup
+- `params` is `serde_json::Value` for flexibility (matches TemplateParams)
+- Follows existing pattern (Tool/Agent/Workflow variants)
+
+**Completion Insights**:
+- Added Template variant to StepType enum in traits.rs:76
+- Created 2 comprehensive tests: serialization roundtrip + WorkflowStep integration
+- Updated 5 match statements in step_executor.rs with placeholder handling:
+  1. Event type name (line 306)
+  2. Debug logging (line 379)
+  3. Execution dispatch (line 403) - returns "not yet implemented" error
+  4. Pre-execution hook context (line 919)
+  5. Post-execution hook context (line 943)
+- Placeholder returns LLMSpellError::Workflow with clear message for Task 13.13.2
+- All 72 workflow tests pass (2 new + 70 existing)
+- Zero clippy warnings across entire workflows crate
+- Compilation verified across dependent crates (templates, bridge, testing)
+
+---
+
+#### Task 13.13.2: StepExecutor Template Handler (2h)
+
+**Priority**: CRITICAL (blocks 13.13.3, 13.13.4)
+**Estimated Time**: 2 hours
+**Assignee**: Workflows Team
+**Status**: BLOCKED (requires 13.13.1)
+
+**Description**: Implement template step execution in `StepExecutor`, enabling workflows to call templates with parameter forwarding and result conversion.
+
+**Implementation**:
+- **File**: `llmspell-workflows/src/step_executor.rs`
+- **Add TemplateBridge to Context**:
+  ```rust
+  pub struct StepExecutionContext {
+      pub tool_registry: Arc<ToolRegistry>,
+      pub agent_registry: Arc<FactoryRegistry>,
+      pub workflow_factory: Arc<dyn WorkflowFactory>,
+      pub template_bridge: Option<Arc<TemplateBridge>>,  // ← NEW
+  }
+
+  impl StepExecutionContext {
+      pub fn require_template_bridge(&self) -> Result<&Arc<TemplateBridge>> {
+          self.template_bridge.as_ref().ok_or_else(|| {
+              LLMSpellError::Infrastructure {
+                  message: "TemplateBridge not available in StepExecutionContext".into(),
+                  component: "step_executor".into(),
+              }
+          })
+      }
+  }
+  ```
+
+- **Add Template Execution Branch**:
+  ```rust
+  impl StepExecutor {
+      async fn execute_step(&self, step: &WorkflowStep, context: &StepExecutionContext) -> Result<StepResult> {
+          match &step.step_type {
+              // ... existing Tool/Agent/Workflow handlers ...
+
+              StepType::Template { template_id, params } => {
+                  debug!("Executing template step: {}", template_id);
+
+                  // Get TemplateBridge from context
+                  let template_bridge = context.require_template_bridge()?;
+
+                  // Execute template
+                  let start = Instant::now();
+                  let output = template_bridge
+                      .execute_template(template_id, params.clone())
+                      .await
+                      .context(format!("Template execution failed: {}", template_id))?;
+
+                  info!(
+                      "Template '{}' completed in {}ms",
+                      template_id,
+                      output.metrics.duration_ms
+                  );
+
+                  // Convert TemplateOutput → StepResult
+                  Ok(StepResult::success(
+                      step.id,
+                      step.name.clone(),
+                      serde_json::to_string(&output.result)?,
+                      start.elapsed(),
+                  ))
+              }
+          }
+      }
+  }
+  ```
+
+**Acceptance Criteria**:
+- [ ] `StepType::Template` execution branch implemented
+- [ ] `template_bridge` field added to `StepExecutionContext`
+- [ ] `require_template_bridge()` helper method
+- [ ] TemplateOutput → StepResult conversion
+- [ ] Error handling: template not found, execution failure, bridge unavailable
+- [ ] Unit test: `test_execute_template_step()` (mocked bridge)
+- [ ] Integration test: `test_workflow_with_template_step()` (real template)
+- [ ] Zero clippy warnings
+- [ ] **TRACING**:
+  - debug! before template execution (template_id)
+  - info! after completion (duration_ms)
+  - warn! on failure (error message)
+
+**Implementation Notes**:
+- Use `TemplateBridge::execute_template()` (NOT direct registry access)
+- Preserve template metrics in StepResult (duration_ms)
+- Forward errors with context (template_id in message)
+
+---
+
+#### Task 13.13.3: Workflow Builder Helpers (30min)
+
+**Priority**: HIGH (quality-of-life improvement)
+**Estimated Time**: 30 minutes
+**Assignee**: Workflows Team
+**Status**: BLOCKED (requires 13.13.2)
+
+**Description**: Add convenience method to `SequentialWorkflowBuilder` for adding template steps without manual `WorkflowStep` construction.
+
+**Implementation**:
+- **File**: `llmspell-workflows/src/sequential.rs`
+- **Add Builder Method**:
+  ```rust
+  impl SequentialWorkflowBuilder {
+      /// Add a template execution step to the workflow
+      ///
+      /// Convenience method for `add_step()` with `StepType::Template`.
+      ///
+      /// # Example
+      ///
+      /// ```rust
+      /// let workflow = SequentialWorkflowBuilder::new("research-chat")
+      ///     .add_template_step("research", "research-assistant", json!({
+      ///         "topic": "Rust async",
+      ///         "max_sources": 10,
+      ///     }))
+      ///     .add_template_step("chat", "interactive-chat", json!({
+      ///         "message": "Summarize findings",
+      ///     }))
+      ///     .build();
+      /// ```
+      pub fn add_template_step(
+          mut self,
+          name: impl Into<String>,
+          template_id: impl Into<String>,
+          params: serde_json::Value,
+      ) -> Self {
+          let step = WorkflowStep::new(
+              name.into(),
+              StepType::Template {
+                  template_id: template_id.into(),
+                  params,
+              },
+          );
+          self.add_step(step)
+      }
+  }
+  ```
+
+**Acceptance Criteria**:
+- [ ] `add_template_step()` method added to `SequentialWorkflowBuilder`
+- [ ] Follows builder pattern (returns `self`)
+- [ ] Unit test: `test_add_template_step_builder()`
+- [ ] Rustdoc with usage example
+- [ ] Zero clippy warnings
+
+---
+
+#### Task 13.13.4: Bridge Integration (30min)
+
+**Priority**: CRITICAL (blocks 13.13.5)
+**Estimated Time**: 30 minutes
+**Assignee**: Workflows Team + Bridge Team
+**Status**: BLOCKED (requires 13.13.2)
+
+**Description**: Wire `TemplateBridge` into workflow execution pipeline, ensuring template steps have access to template execution infrastructure.
+
+**Implementation**:
+- **File**: `llmspell-workflows/src/executor.rs` (or wherever `StepExecutionContext` is constructed)
+- **Change**: Pass `TemplateBridge` when building context
+  ```rust
+  // Before (Phase 13.12)
+  let step_context = StepExecutionContext {
+      tool_registry,
+      agent_registry,
+      workflow_factory,
+  };
+
+  // After (Phase 13.13)
+  let step_context = StepExecutionContext {
+      tool_registry,
+      agent_registry,
+      workflow_factory,
+      template_bridge: Some(template_bridge),  // ← ADD THIS
+  };
+  ```
+
+**Acceptance Criteria**:
+- [ ] `TemplateBridge` wired into `StepExecutionContext` construction
+- [ ] Available in all workflow types (sequential, parallel, conditional, loop)
+- [ ] End-to-end test: `test_sequential_workflow_with_template_step()`
+  - Create workflow with 2 steps: tool + template
+  - Execute workflow
+  - Verify both steps succeed
+  - Verify template output captured in StepResult
+- [ ] Zero clippy warnings
+- [ ] **TRACING**: debug!("StepExecutionContext: template_bridge available")
+
+**Implementation Notes**:
+- `TemplateBridge` comes from kernel/runtime context
+- May need to pass through `WorkflowExecutor` constructor
+- Ensure availability in nested workflows (workflow calls workflow)
+
+---
+
+### Part B: Validation Example (2 hours) - RECOMMENDED
+
+#### Task 13.13.5: Research-Chat Lua App (2h)
+
+**Priority**: MEDIUM (validation artifact)
+**Estimated Time**: 2 hours
+**Assignee**: Templates Team + Bridge Team
+**Status**: BLOCKED (requires 13.13.1-13.13.4)
+
+**Description**: Create Lua application demonstrating workflow-template delegation pattern. Validates that workflow→template execution works and that memory sharing across templates functions correctly via `session_id`.
+
+**Purpose**:
+1. Validate workflow-template delegation infrastructure (Tasks 13.13.1-13.13.4)
+2. Prove session-based memory sharing works across templates
+3. Provide reference implementation for users
+4. Demonstrate Phase 13 completion (memory + templates + workflows integrated)
+
+**Implementation**:
+
+**Location**: `examples/script-users/applications/research-chat/`
+
+**Files**:
+- `main.lua` (~100 LOC): Workflow implementation with 2 template steps
+- `config.toml` (~30 LOC): Application metadata and parameters
+- `README.md` (~50 lines): Architecture explanation and usage
+
+**main.lua** (summary - full code in task details):
+```lua
+-- Generate unique session ID for memory sharing
+local session_id = "research-chat-" .. os.date("%Y%m%d-%H%M%S")
+
+-- Create sequential workflow
+local workflow = Workflow.sequential("research-chat")
+
+-- Step 1: Research phase
+workflow:add_template_step("research", "research-assistant", {
+    topic = args.topic or "Rust async programming",
+    max_sources = args.max_sources or 10,
+    session_id = session_id,              -- Memory anchor
+    memory_enabled = true,
+})
+
+-- Step 2: Interactive chat with research context
+workflow:add_template_step("chat", "interactive-chat", {
+    system_prompt = "You are an expert. Reference the research findings.",
+    message = args.question or "Summarize the key findings",
+    session_id = session_id,              -- Same session = shared memory
+    memory_enabled = true,
+    max_turns = 1,
+})
+
+-- Execute workflow
+local result = workflow:execute()
+
+if result.success then
+    print("=== Research-Chat Complete ===")
+    print("Session ID:", session_id)
+    print("To continue: llmspell template exec interactive-chat --param session_id=" .. session_id)
+end
 ```
 
-**Pros:**
-- Uses existing workflow infrastructure (no new code)
-- Workflow patterns already tested
-- No circular dependency issues (workflows are DAGs)
+**config.toml**:
+```toml
+name = "research-chat"
+description = "AI research assistant with conversational follow-up (Phase 13 composition demo)"
+version = "1.0.0"
+complexity = "medium"
+tags = ["research", "chat", "composition", "phase-13", "workflow-template-delegation"]
 
-**Cons:**
-- Workflows are step-based, not template-based
-- Can't directly reuse template execute() logic
-- Different abstraction level (WorkflowStep vs Template)
-- Still requires reimplementing template logic in steps
+[parameters]
+topic = { type = "string", required = true, description = "Research topic", default = "Rust async programming" }
+max_sources = { type = "integer", required = false, description = "Max sources", default = 10, min = 1, max = 50 }
+question = { type = "string", required = false, description = "Initial question", default = "Summarize the key findings" }
+```
 
----
+**README.md** highlights:
+```markdown
+# Research-Chat v1.0 (Phase 13 Composition Example)
 
-### Option D: Defer to Post-Phase 13 (RECOMMENDED)
-- Complete Phase 13.11-13.16 as planned
-- Evaluate based on:
-  - User feedback (do people want composable templates?)
-  - Use case clarity (personal assistant is just one example)
-  - Architecture maturity (memory system stabilized)
-- Potentially Phase 13.13a or Phase 14.5
+Demonstrates workflow-template delegation pattern (Phase 13.13).
 
-**Pros:**
-- No timeline impact on Phase 13
-- Make informed decision with real usage data
-- Memory infrastructure already working (Phase 13.11)
-- Build personal assistant as standalone initially
-- Refactor later if composition proves valuable
+## Architecture
 
-**Cons:**
-- May need to refactor templates later if composition added
-- Initial code duplication accepted
+Sequential composition with shared memory:
+1. research-assistant template → RAG ingestion
+2. interactive-chat template → memory retrieval (same session_id)
 
----
+## Usage
 
-**Evaluation Criteria**:
+```bash
+llmspell app run research-chat --topic "Rust async" --question "What are the key concepts?"
+```
 
-Before implementing Option B (Template Composition), evaluate:
+## Key Concepts
 
-1. **User Demand**: Are multiple users requesting composable templates?
-2. **Use Case Clarity**: Beyond personal assistant, are there 3+ clear use cases?
-3. **Code Duplication Pain**: Is standalone template maintenance becoming problematic?
-4. **Memory Integration**: Does shared memory across templates justify composition?
-5. **Architectural Fit**: Is template composition the right abstraction (vs workflows)?
-6. **Implementation Risk**: Can we handle circular dependencies safely?
-7. **Alternative Solutions**: Can workflows satisfy the composition need?
+- **Workflow-Template Bridge**: Workflows delegate to templates via `StepType::Template`
+- **Session-Based Memory**: Templates share memory via identical `session_id`
+- **Reference Implementation**: Shows HOW composition works (extensible by users)
+```
 
-**Decision Matrix**:
-- **0-2 criteria met**: DEFER indefinitely (use Option A: Standalone)
-- **3-4 criteria met**: DEFER to Phase 14+ (revisit after Phase 13 complete)
-- **5-7 criteria met**: IMPLEMENT in Phase 13.13a (immediate need justified)
+**Acceptance Criteria**:
+- [ ] 3 files created in `examples/script-users/applications/research-chat/`
+  - [ ] `main.lua` (~100 LOC)
+  - [ ] `config.toml` (~30 LOC)
+  - [ ] `README.md` (~50 lines)
+- [ ] Manual execution test passes:
+  ```bash
+  llmspell app run research-chat --topic "Rust async" --question "What are tokio and async-std?"
+  ```
+- [ ] Verification criteria:
+  - [ ] Research phase executes (web search + RAG ingestion visible in logs)
+  - [ ] Chat phase executes with research context
+  - [ ] Response references research findings (memory retrieval confirmed)
+  - [ ] Session ID printed for continuation
+  - [ ] Exit code 0 on success
+- [ ] App discoverable via `llmspell app list`
+- [ ] **TRACING**:
+  - info! at workflow start (session_id)
+  - info! at each phase transition
+  - info! at completion (session_id, continuation command)
 
-**Default Decision: DEFER to post-Phase 13** (Option D)
-
-**Time Estimate (IF APPROVED)**:
-- Evaluation: 0h (covered by this phase documentation)
-- Implementation: 8h (Tasks 13.13.1-13.13.4)
-- **Total**: 8 hours conditional
-
-**Tasks** (ONLY if approved):
-
-### Task 13.13.1: Template Registry in ExecutionContext (2h)
-- Add template_registry: Option<Arc<TemplateRegistry>> field
-- Add with_template_registry() builder method
-- Add template_registry() and require_template_registry() helpers
-- Update ExecutionContextBuilder
-
-### Task 13.13.2: execute_template() Helper (2h)
-- Implement execute_template(template_id, params) method
-- Add recursion depth tracking (prevent infinite loops)
-- Add execution context cloning with recursion metadata
-- Add tracing for template composition
-
-### Task 13.13.3: Circular Dependency Detection (2h)
-- Track template call stack in ExecutionContext
-- Detect A→B→A patterns
-- Return clear error with call chain
-- Add max recursion depth limit (default: 5)
-
-### Task 13.13.4: Testing + Documentation (2h)
-- Unit tests for execute_template()
-- Integration tests for composition (A calls B)
-- Test circular dependency detection (A calls B calls A)
-- Test recursion depth limits
-- Document composition patterns in user guide
-- Add Lua example: composable-template.lua
+**Implementation Notes**:
+- **Naming**: "research-chat" avoids collision with Phase 8 "personal-assistant" (different use case)
+- **Simplicity**: Keep Lua code simple (pure workflow orchestration, no complex logic)
+- **Documentation**: README explains WHY this pattern matters (reference impl, not production)
 
 ---
 
-**Recommendation**: DEFER to post-Phase 13. Complete 13.11-13.16 first, gather user feedback, then revisit this decision.
+## Phase 13.13 Completion Criteria
+
+- [ ] All 5 tasks complete (13.13.1-13.13.5)
+- [ ] 149+ tests passing (add ~5 new tests for template steps)
+- [ ] Zero clippy warnings
+- [ ] Zero rustdoc warnings
+- [ ] `./scripts/quality/quality-check-fast.sh` passes
+- [ ] Manual validation:
+  ```bash
+  # Test workflow-template delegation
+  llmspell app run research-chat --topic "Rust ownership" --question "Explain borrowing"
+
+  # Verify memory sharing
+  llmspell template exec interactive-chat \
+    --param session_id=<session-id-from-above> \
+    --param message="What are the benefits?"
+  ```
+
+**Success Metrics**:
+- Workflow-template delegation works (research-chat executes)
+- Memory sharing confirmed (chat retrieves research context)
+- Option E validated (workflows compose templates)
+- Phase 13 completion proof (memory + templates + workflows integrated)
+
+---
+
+## Architectural Rationale Summary
+
+**Why Option E (Workflow→Template) over Option B (Template→Template)?**
+
+| Criterion | Option B | Option E |
+|-----------|----------|----------|
+| Abstraction | Violates (Layer 4→4) | Preserves (Layer 3→4) |
+| Circular Deps | Possible (A→B→A) | Impossible (DAG) |
+| Code Changes | ~200 LOC (4 files) | ~100 LOC (2 files) |
+| Time | 8 hours | 4 hours (+2h validation) |
+| Architecture | New pattern | Extends existing |
+| Evaluation Score | 2.5/7 (DEFER) | 6/7 (APPROVE) |
+
+**Why Lua App over 11th Template?**
+
+- All 10 templates implement **novel logic** (4-phase workflows, 3-agent pipelines, etc.)
+- Research-chat is **pure composition** (no novel logic, just orchestration)
+- Lua provides **extensibility** (users can fork/modify source)
+- Lower **maintenance burden** (example vs core infrastructure)
+- **Educational value** (shows HOW workflow-template delegation works)
+- Validates **Option E + memory sharing** (reference implementation)
+
+**Total Time**: 6 hours (vs 8h for Option B, 12h for Option B + 11th template)
 
 ---
 

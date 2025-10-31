@@ -73,6 +73,13 @@ pub enum StepType {
         /// Input to pass to the workflow
         input: serde_json::Value,
     },
+    /// Execute a template with given parameters
+    Template {
+        /// Template ID from registry (e.g., "research-assistant")
+        template_id: String,
+        /// Parameters to pass to the template
+        params: serde_json::Value,
+    },
 }
 
 /// Workflow execution result
@@ -212,5 +219,78 @@ pub trait Workflow: Send + Sync {
             });
         }
         Ok(())
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use serde_json::json;
+
+    #[test]
+    fn test_step_type_template_serialization() {
+        // Create a Template step type
+        let step_type = StepType::Template {
+            template_id: "research-assistant".to_string(),
+            params: json!({
+                "topic": "Rust async programming",
+                "max_sources": 10,
+                "session_id": "test-session-123"
+            }),
+        };
+
+        // Serialize to JSON
+        let serialized = serde_json::to_string(&step_type).expect("Failed to serialize");
+        tracing::debug!("Serialized StepType::Template: {}", serialized);
+
+        // Deserialize back
+        let deserialized: StepType =
+            serde_json::from_str(&serialized).expect("Failed to deserialize");
+
+        // Verify it's a Template variant
+        match deserialized {
+            StepType::Template {
+                template_id,
+                params,
+            } => {
+                assert_eq!(template_id, "research-assistant");
+                assert_eq!(params["topic"], "Rust async programming");
+                assert_eq!(params["max_sources"], 10);
+                assert_eq!(params["session_id"], "test-session-123");
+            }
+            _ => panic!("Expected Template variant"),
+        }
+    }
+
+    #[test]
+    fn test_workflow_step_with_template() {
+        // Create a WorkflowStep with Template step type
+        let step = WorkflowStep::new(
+            "research".to_string(),
+            StepType::Template {
+                template_id: "research-assistant".to_string(),
+                params: json!({"topic": "Rust"}),
+            },
+        );
+
+        assert_eq!(step.name, "research");
+        assert!(matches!(step.step_type, StepType::Template { .. }));
+
+        // Verify serialization roundtrip
+        let serialized = serde_json::to_string(&step).expect("Failed to serialize WorkflowStep");
+        let deserialized: WorkflowStep =
+            serde_json::from_str(&serialized).expect("Failed to deserialize WorkflowStep");
+
+        assert_eq!(deserialized.name, "research");
+        match deserialized.step_type {
+            StepType::Template {
+                template_id,
+                params,
+            } => {
+                assert_eq!(template_id, "research-assistant");
+                assert_eq!(params["topic"], "Rust");
+            }
+            _ => panic!("Expected Template variant"),
+        }
     }
 }

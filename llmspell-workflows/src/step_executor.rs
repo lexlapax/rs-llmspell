@@ -303,6 +303,7 @@ impl StepExecutor {
             StepType::Tool { .. } => "tool",
             StepType::Agent { .. } => "agent",
             StepType::Workflow { .. } => "workflow",
+            StepType::Template { .. } => "template",
         };
 
         // Emit step started event if events are available
@@ -375,6 +376,12 @@ impl StepExecutor {
                     step.name, workflow_id
                 );
             }
+            StepType::Template { template_id, .. } => {
+                debug!(
+                    "DEBUG: Step '{}' is Template type with template_id: '{}'",
+                    step.name, template_id
+                );
+            }
         }
 
         let result = match &step.step_type {
@@ -392,6 +399,21 @@ impl StepExecutor {
             StepType::Workflow { workflow_id, input } => {
                 self.execute_workflow_step(*workflow_id, input, context)
                     .await
+            }
+            StepType::Template { template_id, .. } => {
+                // Template execution not yet implemented (Task 13.13.2)
+                warn!(
+                    "Template execution not yet implemented for template_id: '{}'",
+                    template_id
+                );
+                Err(LLMSpellError::Workflow {
+                    message: format!(
+                        "Template execution not yet implemented (template: {})",
+                        template_id
+                    ),
+                    step: Some(step.name.clone()),
+                    source: None,
+                })
             }
         };
 
@@ -894,6 +916,7 @@ impl StepExecutor {
             StepType::Tool { .. } => "tool",
             StepType::Agent { .. } => "agent",
             StepType::Workflow { .. } => "workflow",
+            StepType::Template { .. } => "template",
         };
 
         StepContext {
@@ -917,6 +940,7 @@ impl StepExecutor {
             StepType::Tool { .. } => "tool",
             StepType::Agent { .. } => "agent",
             StepType::Workflow { .. } => "workflow",
+            StepType::Template { .. } => "template",
         };
 
         StepContext {
