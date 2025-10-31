@@ -8,7 +8,7 @@ use std::sync::Arc;
 use tracing::{debug, info};
 
 pub mod cached;
-pub use cached::{CachedEmbeddingService, CacheStats};
+pub use cached::{CacheStats, CachedEmbeddingService};
 
 /// Wrapper for embedding provider integration
 ///
@@ -55,9 +55,9 @@ impl EmbeddingService {
             .await
             .map_err(|e| crate::error::MemoryError::EmbeddingError(e.to_string()))?;
 
-        embeddings
-            .pop()
-            .ok_or_else(|| crate::error::MemoryError::EmbeddingError("No embedding returned".to_string()))
+        embeddings.pop().ok_or_else(|| {
+            crate::error::MemoryError::EmbeddingError("No embedding returned".to_string())
+        })
     }
 
     /// Generate embeddings for multiple texts in batch
@@ -67,7 +67,10 @@ impl EmbeddingService {
     /// # Errors
     ///
     /// Returns error if embedding generation fails or provider is unavailable
-    pub async fn embed_batch(&self, texts: &[String]) -> Result<Vec<Vec<f32>>, crate::error::MemoryError> {
+    pub async fn embed_batch(
+        &self,
+        texts: &[String],
+    ) -> Result<Vec<Vec<f32>>, crate::error::MemoryError> {
         info!("Generating batch of {} embeddings", texts.len());
 
         self.provider
@@ -77,13 +80,13 @@ impl EmbeddingService {
     }
 
     /// Get embedding dimensions
-    #[must_use] 
+    #[must_use]
     pub fn dimensions(&self) -> usize {
         self.provider.embedding_dimensions()
     }
 
     /// Get provider name
-    #[must_use] 
+    #[must_use]
     pub fn provider_name(&self) -> &str {
         self.provider.name()
     }
@@ -100,7 +103,7 @@ mod tests {
 
     #[async_trait]
     impl EmbeddingProvider for MockEmbeddingProvider {
-        fn name(&self) -> &str {
+        fn name(&self) -> &'static str {
             "mock"
         }
 

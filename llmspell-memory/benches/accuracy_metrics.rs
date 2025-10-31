@@ -21,20 +21,19 @@ fn dmr_benchmark(c: &mut Criterion) {
                         .await
                         .expect("Failed to create memory manager");
 
-                    let facts = [(1, "The capital of France is Paris"),
+                    let facts = [
+                        (1, "The capital of France is Paris"),
                         (25, "Rust was first released in 2010"),
                         (50, "The Eiffel Tower is 330 meters tall"),
                         (75, "Ferris is the Rust mascot"),
-                        (100, "Cargo is Rust's package manager")];
+                        (100, "Cargo is Rust's package manager"),
+                    ];
 
                     for i in 1..=100 {
-                        let content = facts
-                            .iter()
-                            .find(|(pos, _)| *pos == i)
-                            .map_or_else(
-                                || format!("Generic conversation message {i}"),
-                                |fact| fact.1.to_string(),
-                            );
+                        let content = facts.iter().find(|(pos, _)| *pos == i).map_or_else(
+                            || format!("Generic conversation message {i}"),
+                            |fact| fact.1.to_string(),
+                        );
 
                         let entry = EpisodicEntry::new(
                             "dmr-session".to_string(),

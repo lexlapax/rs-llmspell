@@ -65,8 +65,14 @@ fn param_parsing_benchmark(c: &mut Criterion) {
 
             // Extract parameters (typical template startup cost)
             let _session_id: Option<String> = params.get_optional("session_id").unwrap_or(None);
-            let _memory_enabled: bool = params.get_optional("memory_enabled").unwrap_or(Some(false)).unwrap_or(false);
-            let _context_budget: usize = params.get_optional("context_budget").unwrap_or(Some(2000)).unwrap_or(2000);
+            let _memory_enabled: bool = params
+                .get_optional("memory_enabled")
+                .unwrap_or(Some(false))
+                .unwrap_or(false);
+            let _context_budget: usize = params
+                .get_optional("context_budget")
+                .unwrap_or(Some(2000))
+                .unwrap_or(2000);
             let _query: String = params.get("query").unwrap();
 
             black_box(_session_id);

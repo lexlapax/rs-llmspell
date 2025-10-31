@@ -9,10 +9,10 @@ use std::collections::HashMap;
 // Re-export EmbeddingProvider trait from core for backwards compatibility
 pub use llmspell_core::traits::embedding::EmbeddingProvider;
 
-/// Extension trait for embedding providers that also implement ProviderInstance
+/// Extension trait for embedding providers that also implement `ProviderInstance`
 ///
 /// This trait is automatically implemented for types that implement both
-/// EmbeddingProvider and ProviderInstance, providing the full provider interface.
+/// `EmbeddingProvider` and `ProviderInstance`, providing the full provider interface.
 #[async_trait]
 pub trait EmbeddingProviderExt: EmbeddingProvider + ProviderInstance {}
 

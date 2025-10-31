@@ -110,13 +110,9 @@ fn consolidation_benchmark(c: &mut Criterion) {
             |mm| {
                 // Benchmark: Consolidate
                 rt.block_on(async {
-                    mm.consolidate(
-                        "consolidate-session",
-                        ConsolidationMode::Immediate,
-                        None,
-                    )
-                    .await
-                    .unwrap();
+                    mm.consolidate("consolidate-session", ConsolidationMode::Immediate, None)
+                        .await
+                        .unwrap();
                 });
             },
         );

@@ -186,7 +186,10 @@ impl EpisodicMemory for InMemoryEpisodicMemory {
         );
 
         let query_embedding = if let Some(service) = &self.embedding_service {
-            debug!("Generating query embedding with service: {}", service.provider_name());
+            debug!(
+                "Generating query embedding with service: {}",
+                service.provider_name()
+            );
             service.embed_single(query).await?
         } else {
             debug!("Using test embedding function for query");

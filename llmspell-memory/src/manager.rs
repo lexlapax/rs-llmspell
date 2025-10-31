@@ -653,19 +653,22 @@ mod tests {
     async fn test_create_in_memory_manager_with_embeddings() {
         use crate::embeddings::EmbeddingService;
         use async_trait::async_trait;
-        use llmspell_core::traits::embedding::EmbeddingProvider;
         use llmspell_core::error::LLMSpellError;
+        use llmspell_core::traits::embedding::EmbeddingProvider;
 
         // Mock embedding provider for testing
         struct TestEmbeddingProvider;
 
         #[async_trait]
         impl EmbeddingProvider for TestEmbeddingProvider {
-            fn name(&self) -> &str {
+            fn name(&self) -> &'static str {
                 "test-provider"
             }
 
-            async fn embed(&self, texts: &[String]) -> std::result::Result<Vec<Vec<f32>>, LLMSpellError> {
+            async fn embed(
+                &self,
+                texts: &[String],
+            ) -> std::result::Result<Vec<Vec<f32>>, LLMSpellError> {
                 Ok(texts.iter().map(|_| vec![0.1, 0.2, 0.3]).collect())
             }
 
@@ -677,7 +680,10 @@ mod tests {
                 false
             }
 
-            fn set_embedding_dimensions(&mut self, _dims: usize) -> std::result::Result<(), LLMSpellError> {
+            fn set_embedding_dimensions(
+                &mut self,
+                _dims: usize,
+            ) -> std::result::Result<(), LLMSpellError> {
                 Err(LLMSpellError::Provider {
                     message: "Dimension configuration not supported".to_string(),
                     provider: Some(self.name().to_string()),
@@ -699,7 +705,9 @@ mod tests {
         let service = Arc::new(EmbeddingService::new(provider));
 
         // Create manager with embeddings
-        let manager = DefaultMemoryManager::new_in_memory_with_embeddings(service).await.unwrap();
+        let manager = DefaultMemoryManager::new_in_memory_with_embeddings(service)
+            .await
+            .unwrap();
 
         // Verify all subsystems are accessible
         let _ = manager.episodic();

@@ -86,9 +86,9 @@ impl CachedEmbeddingService {
 
         Self {
             inner,
-            cache: Arc::new(Mutex::new(
-                LruCache::new(NonZeroUsize::new(capacity).expect("Cache capacity must be non-zero")),
-            )),
+            cache: Arc::new(Mutex::new(LruCache::new(
+                NonZeroUsize::new(capacity).expect("Cache capacity must be non-zero"),
+            ))),
             stats: Arc::new(Mutex::new(CacheStats::default())),
         }
     }
@@ -298,12 +298,16 @@ mod tests {
 
     #[async_trait]
     impl EmbeddingProvider for MockEmbeddingProvider {
-        fn name(&self) -> &str {
+        fn name(&self) -> &'static str {
             "mock-cached"
         }
 
-        async fn embed(&self, texts: &[String]) -> std::result::Result<Vec<Vec<f32>>, LLMSpellError> {
+        async fn embed(
+            &self,
+            texts: &[String],
+        ) -> std::result::Result<Vec<Vec<f32>>, LLMSpellError> {
             // Generate deterministic embeddings based on text length
+            #[allow(clippy::cast_precision_loss)]
             Ok(texts
                 .iter()
                 .map(|t| vec![t.len() as f32, (t.len() * 2) as f32, (t.len() * 3) as f32])
@@ -318,7 +322,10 @@ mod tests {
             false
         }
 
-        fn set_embedding_dimensions(&mut self, _dims: usize) -> std::result::Result<(), LLMSpellError> {
+        fn set_embedding_dimensions(
+            &mut self,
+            _dims: usize,
+        ) -> std::result::Result<(), LLMSpellError> {
             Err(LLMSpellError::Provider {
                 message: "Dimension configuration not supported".to_string(),
                 provider: Some(self.name().to_string()),
@@ -353,7 +360,7 @@ mod tests {
         let stats = cached.stats();
         assert_eq!(stats.hits, 1);
         assert_eq!(stats.misses, 1);
-        assert_eq!(stats.hit_rate(), 0.5);
+        assert!((stats.hit_rate() - 0.5).abs() < f64::EPSILON);
     }
 
     #[tokio::test]
@@ -424,16 +431,16 @@ mod tests {
     #[test]
     fn test_cache_stats() {
         let mut stats = CacheStats::default();
-        assert_eq!(stats.hit_rate(), 0.0);
+        assert!((stats.hit_rate() - 0.0).abs() < f64::EPSILON);
 
         stats.record_miss();
-        assert_eq!(stats.hit_rate(), 0.0);
+        assert!((stats.hit_rate() - 0.0).abs() < f64::EPSILON);
 
         stats.record_hit();
-        assert_eq!(stats.hit_rate(), 0.5);
+        assert!((stats.hit_rate() - 0.5).abs() < f64::EPSILON);
 
         stats.record_hit();
-        assert_eq!(stats.hit_rate(), 2.0 / 3.0);
+        assert!((stats.hit_rate() - 2.0 / 3.0).abs() < f64::EPSILON);
     }
 
     #[test]
