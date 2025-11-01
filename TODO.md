@@ -12247,3 +12247,1061 @@ let (episodic_result, semantic_result) = tokio::join!(
 
 **Note**: This TODO list provides the foundation for Phases 13.1-13.8. For complete task breakdowns of Phases 13.9-13.15 (Lua API, RAG, Templates, CLI, Performance, Accuracy, Release), see the comprehensive analysis provided earlier in this conversation or refer to `/docs/in-progress/phase-13-design-doc.md` for full specifications.
 
+
+---
+
+# Documentation Repositioning Initiative: Experimental Platform Messaging
+
+**Version**: 1.0
+**Date**: January 2025
+**Status**: Ready to Execute
+**Initiative**: Cross-Cutting Documentation Update
+**Timeline**: 5-7 working days (estimated 40-56 hours total)
+**Priority**: HIGH (Project Identity & Messaging)
+
+**Dependencies**:
+- Phase 13 Complete ✅ (all features implemented, accurate for documentation)
+- Current documentation baseline established ✅
+- Messaging analysis complete ✅
+
+**This-Document**: working copy /TODO.md (pristine/immutable copy to be created in docs/in-progress/DOCUMENTATION-REPOSITIONING-TODO.md upon start)
+
+> **📋 Initiative Overview**: Comprehensive repositioning of all project documentation (50+ files) to accurately reflect rs-llmspell as an **experimental platform for rapid AI concept exploration** with **production-ready engineering foundations** for painless extraction when concepts are validated. This addresses misalignment between current "production-ready platform" messaging and actual use case: script-first rapid iteration → validation → extraction to Rust.
+
+---
+
+## Executive Summary
+
+**Current State**: Documentation positions rs-llmspell as "production-ready AI workflow orchestration platform" with "enterprise-grade" capabilities and "turn-key solutions."
+
+**Target State**: Reposition as "experimental platform for rapid AI concept exploration" emphasizing:
+- Script-first velocity (Lua/JS) for quick iteration on AI ideas
+- Exploration of AI concepts (LLMs, transformers, diffusion, memory, learning)
+- Production-ready engineering (architecture, performance, testing) to ease transition
+- Extraction path: proven patterns → Rust → production deployment
+
+**Scope**: 50+ markdown files across:
+- Root level (5 files): README.md, CLAUDE.md, GEMINI.md, CHANGELOG.md, RELEASE_NOTES_v0.13.0.md
+- docs/ (4 hubs): README.md, technical/README.md, developer-guide/README.md, user-guide/README.md  
+- docs/technical/ (16 files): current-architecture.md, master-architecture-vision.md, etc.
+- docs/developer-guide/ (8 files): developer-guide.md, extending-llmspell.md, etc.
+- docs/user-guide/ (13 files): getting-started.md, concepts.md, templates/*.md, etc.
+- docs/in-progress/ (phase docs): implementation-phases.md, phase-XX-design-doc.md
+
+**Key Messaging Changes**:
+- "Production-ready" → "Experimental platform with production-ready foundations"
+- "Enterprise-grade" → "Production-quality engineering for future extraction"
+- "Turn-key solutions" → "Experimental workflows / rapid concept exploration"
+- "Deploy to production" → "Validate at scale / extract to production when ready"
+
+**Success Criteria**:
+- [ ] All 50+ documentation files updated with consistent experimental messaging
+- [ ] New tagline deployed everywhere: "Rapid AI Experimentation Platform"
+- [ ] Root README.md succinct (3-4 paragraphs), links to docs/README.md prominently
+- [ ] "From Experiment to Production" section added to key docs
+- [ ] CLAUDE.md and GEMINI.md aligned with experimental philosophy
+- [ ] All "production-ready" claims qualified with "foundations" or removed
+- [ ] Zero broken cross-references after updates
+- [ ] Messaging consistency verified across all documentation
+- [ ] Quality checks pass on all modified markdown files
+
+---
+
+## Messaging Framework
+
+### NEW Core Tagline (Deploy Everywhere)
+
+```markdown
+rs-llmspell: Rapid AI Experimentation Platform
+
+Cast scripting spells to explore AI concepts - Extract proven patterns to production-ready Rust
+```
+
+### NEW Core Positioning Statement
+
+```markdown
+## What is rs-llmspell?
+
+rs-llmspell is an **experimental platform for rapid AI concept exploration**.
+
+**The Experiment-Extract Workflow**:
+1. **Explore**: Script AI concepts in Lua/JS - iterate in minutes
+2. **Validate**: Test ideas with production-grade performance  
+3. **Extract**: Move proven patterns to Rust when ready
+4. **Scale**: Production deployment with minimal refactoring
+
+Built with **production-quality engineering** (architecture, performance, testing, observability) 
+to make the transition from experiment to production as painless as possible. Rust isn't chosen 
+because we're production-ready—it's chosen because proven patterns deserve a solid foundation 
+for extraction.
+
+### What This Is
+
+✅ Experimental AI concept playground  
+✅ Script-first rapid iteration (Lua/JS)  
+✅ Production-quality engineering foundations  
+✅ Clear extraction path to Rust  
+✅ Learning platform for AI patterns  
+
+### What This Is NOT
+
+❌ Production-ready out of the box  
+❌ Enterprise deployment platform  
+❌ Guaranteed stable APIs (pre-1.0)  
+❌ Support contracts or SLAs  
+```
+
+### Tone Shift Examples
+
+**BEFORE** → **AFTER** transformations to apply throughout:
+
+1. "Production-ready AI workflow orchestration platform"  
+   → "Experimental platform for rapid AI concept exploration"
+
+2. "Enterprise-grade performance, multi-tenancy, security"  
+   → "Production-quality engineering for painless extraction when validated"
+
+3. "10 turn-key templates solving real-world problems"  
+   → "10 experimental workflow templates for rapid AI concept exploration"
+
+4. "Phase 12 delivers production-ready templates solving the 0-day retention problem"  
+   → "Phase 12 adds 10 experimental workflows enabling rapid AI exploration from day 0"
+
+5. "Deploy to production with systemd/launchd integration"  
+   → "Validate experiments at scale with daemon support; deploy to production when concepts are proven"
+
+6. "Production Unix service infrastructure"  
+   → "Service infrastructure for scale validation and production extraction"
+
+---
+
+## Phase DR.1: Root-Level Project Messaging (Day 1)
+
+**Goal**: Update all root-level project files with new experimental positioning
+**Timeline**: 1 day (8 hours)
+**Critical Dependencies**: None (first phase)
+**Status**: PENDING
+
+**Files in Scope** (5 total):
+- README.md (major rewrite)
+- CLAUDE.md (moderate update)
+- GEMINI.md (moderate update)
+- CHANGELOG.md (minor update)
+- RELEASE_NOTES_v0.13.0.md (moderate update)
+
+**Success Criteria**:
+- [ ] New tagline deployed in all 5 files
+- [ ] README.md succinct (≤ 200 lines for overview, link to docs/)
+- [ ] "From Experiment to Production" section added to README.md
+- [ ] CLAUDE.md Project Identity updated with experimental messaging
+- [ ] GEMINI.md aligned with CLAUDE.md changes
+- [ ] CHANGELOG.md v0.13.0 entry reframed
+- [ ] RELEASE_NOTES_v0.13.0.md emphasizes experimental + production-ready foundations
+- [ ] Zero broken links after updates
+
+**Time Breakdown**:
+- Task DR.1.1: 3h (README.md major rewrite)
+- Task DR.1.2: 2h (CLAUDE.md + GEMINI.md updates)
+- Task DR.1.3: 1.5h (CHANGELOG.md + RELEASE_NOTES_v0.13.0.md)
+- Task DR.1.4: 1.5h (Cross-reference validation + QA)
+- **Total**: 8h
+
+---
+
+### Task DR.1.1: Rewrite Root README.md
+
+**Priority**: CRITICAL
+**Estimated Time**: 3 hours
+**Assignee**: Documentation Lead
+**Status**: PENDING
+
+**Description**: Completely restructure README.md to be succinct about project purpose (experimental platform), deploy new tagline, add "From Experiment to Production" section, and prominently link to docs/README.md for deep dives.
+
+**Current State Analysis**:
+- **Current**: 492 lines, production-focused, heavy on features/achievements
+- **Target**: ≤200 lines overview section, clear experimental messaging, link to docs/ for details
+- **Key Changes**:
+  - NEW tagline at top
+  - Succinct "What is rs-llmspell" (3-4 paragraphs)
+  - NEW "From Experiment to Production" section
+  - Reframe 13 phases as "exploration infrastructure evolution"
+  - Keep feature highlights but reframe as "experimentation capabilities"
+  - Prominent docs/README.md link for comprehensive documentation
+
+**Acceptance Criteria**:
+- [ ] New tagline deployed at top
+- [ ] Overview section ≤4 paragraphs explaining experimental platform
+- [ ] "From Experiment to Production" section (6-8 paragraphs) added
+- [ ] All "production-ready" in first 3 sections qualified or removed
+- [ ] docs/README.md linked prominently (3+ times)
+- [ ] Phase 13 achievements reframed as "exploration capabilities"
+- [ ] Templates described as "experimental workflows"
+- [ ] Local LLM positioned as "zero-cost exploration"
+- [ ] Service deployment framed as "scale validation"
+- [ ] Performance metrics kept but contextualized as "validation at scale"
+
+**Implementation Steps**:
+
+1. **Replace opening section** (lines 1-10):
+   ```markdown
+   # rs-llmspell
+   
+   **Rapid AI Experimentation Platform** - Cast scripting spells to explore AI concepts, extract proven patterns to production-ready Rust
+   
+   **🚀 Version 0.13.0 - Adaptive Memory & Context Engineering**
+   
+   **🔗 Quick Links**: [📘 Documentation Hub](docs/) | [🚀 Quick Start](#-quick-start) | [🎯 What This Is](#what-is-rs-llmspell) | [🏗️ Experiment → Production](#from-experiment-to-production) | [📖 Release Notes](RELEASE_NOTES_v0.13.0.md)
+   ```
+
+2. **Add "What is rs-llmspell" section** (new, after links):
+   ```markdown
+   ## What is rs-llmspell?
+   
+   rs-llmspell is an **experimental platform for rapid AI concept exploration**.
+   
+   **The Experiment-Extract Workflow**:
+   1. **Explore**: Script AI concepts in Lua/JS - iterate in minutes
+   2. **Validate**: Test ideas with production-grade performance
+   3. **Extract**: Move proven patterns to Rust when ready
+   4. **Scale**: Production deployment with minimal refactoring
+   
+   Built with **production-quality engineering** (architecture, performance, testing) to make 
+   the transition from experiment to production as painless as possible. We use Rust not because 
+   we're production-ready, but because proven patterns deserve solid foundations.
+   
+   **Current Status**: 13 development phases complete (v0.13.0). Experimental features include 
+   adaptive memory, context engineering, 10 workflow templates, local LLM support, and RAG. 
+   See [Documentation Hub](docs/) for comprehensive guides.
+   ```
+
+3. **Add "From Experiment to Production" section** (new, after overview):
+   ```markdown
+   ## From Experiment to Production
+   
+   ### Why Experimental + Rust?
+   
+   rs-llmspell prioritizes **rapid experimentation** while building **production-ready foundations**.
+   
+   **The Philosophy**:
+   - **Script Velocity**: Lua/JS for minute-level iteration on AI ideas
+   - **Concept Exploration**: Play with LLMs, transformers, diffusion, memory, learning
+   - **Validation at Scale**: Production-quality performance for thorough testing
+   - **Painless Extraction**: Clear path from validated experiments to Rust production code
+   
+   ### Production-Quality Foundations (While Experimental)
+   
+   Although experimental, rs-llmspell is built with production-grade engineering:
+   
+   - **Performance**: <2ms template overhead, 8.47x HNSW speedup, <100ms context assembly
+   - **Architecture**: Modular (21 crates), trait-based, SOLID principles, clear boundaries
+   - **Scalability**: Designed for growth (async-first, resource limits, multi-tenancy ready)
+   - **Testing**: >90% coverage (784 tests passing), zero warnings policy
+   - **Documentation**: >95% API docs (50+ guides across user/dev/technical)
+   - **Observability**: Full tracing with <2% overhead, structured logging
+   
+   **Result**: When your experiment succeeds, transitioning to production is **engineering work, not research work**.
+   
+   ### What This Is
+   
+   ✅ Experimental AI concept playground  
+   ✅ Script-first rapid iteration  
+   ✅ Production-quality engineering  
+   ✅ Clear extraction path to Rust  
+   ✅ Learning platform for AI patterns  
+   
+   ### What This Is NOT
+   
+   ❌ Production-ready out of the box  
+   ❌ Enterprise deployment platform  
+   ❌ Guaranteed stable APIs (pre-1.0)  
+   ❌ Support contracts or SLAs  
+   ```
+
+4. **Update "Key Features" section** (reframe existing):
+   - Change heading to "Experimentation Capabilities"
+   - Prefix each subsection with experimental framing
+   - Example: "### 🎯 Workflow Templates (Experimental)" instead of "Production Template System"
+   - Keep technical details, adjust positioning only
+
+5. **Update "Quick Start" section**:
+   - Change "Run your first application" → "Run your first experiment"
+   - "Try production applications" → "Try experimental workflows"
+   - Keep commands unchanged, adjust commentary
+
+6. **Trim or move detailed sections** to docs/:
+   - Move comprehensive features list to docs/README.md
+   - Keep only highlights in root README.md
+   - Add "(see [docs/](docs/) for full details)" after each section
+
+7. **Update footer**:
+   ```markdown
+   ---
+   
+   **📘 Full Documentation**: See [docs/](docs/) for comprehensive user guides, technical architecture, and developer resources.
+   
+   **🚀 v0.13.0 Released**: Experimental memory system with episodic/semantic/procedural memory, context engineering pipeline, and zero breaking changes. Built with production-quality engineering for painless extraction when validated. See [Release Notes](RELEASE_NOTES_v0.13.0.md).
+   ```
+
+**Files to Modify**:
+- `README.md` (MAJOR REWRITE - ~492 lines → ~200 lines overview)
+
+**Definition of Done**:
+- [ ] README.md updated with new structure and messaging
+- [ ] File length ≤250 lines (overview + links to docs/)
+- [ ] All acceptance criteria met
+- [ ] Links verified functional
+- [ ] Markdown formatting valid (run through linter if available)
+
+---
+
+### Task DR.1.2: Update CLAUDE.md and GEMINI.md
+
+**Priority**: HIGH
+**Estimated Time**: 2 hours
+**Assignee**: Documentation Lead
+**Status**: PENDING
+
+**Description**: Update AI assistant instruction files to reflect experimental platform positioning, script-first philosophy, and production-quality foundations for extraction.
+
+**Current State Analysis**:
+- **CLAUDE.md**: 109 lines, positions as "Production-ready AI workflow orchestration"
+- **GEMINI.md**: 181 lines, mirrors CLAUDE.md with more examples
+- **Key Sections**: Project Identity, Recent Completion Status, Code Philosophy, v0.12.0 Achievements
+
+**Acceptance Criteria**:
+- [ ] CLAUDE.md Project Identity updated with new tagline and experimental messaging
+- [ ] GEMINI.md Project Overview aligned with CLAUDE.md changes
+- [ ] Both files emphasize script-first → validate → extract workflow
+- [ ] Rust choice explained as "extraction readiness" not "production readiness"
+- [ ] Phase completion status reframed as "exploration infrastructure evolution"
+- [ ] Code philosophy updated to include experimental iteration patterns
+- [ ] Messaging consistent between both files
+
+**Implementation Steps**:
+
+1. **Update CLAUDE.md Project Identity section** (lines 3-6):
+   ```markdown
+   ## Project Identity
+   rs-llmspell: **Rapid AI Experimentation Platform** - Cast scripting spells to explore AI concepts, extract proven patterns to production-ready Rust
+   
+   Experimental platform for rapid AI concept exploration via Lua/JavaScript scripting. Built with production-quality engineering (architecture, performance, testing) to make the transition from validated experiments to Rust production code as painless as possible.
+   ```
+
+2. **Update CLAUDE.md "Recent Completion Status"** section:
+   - Change phase descriptions from "COMPLETE" to "COMPLETE (Experimental Infrastructure)"
+   - Phase 13: "Next - Adaptive Memory System" → "COMPLETE - Experimental Memory & Context Engineering"
+
+3. **Add to CLAUDE.md "Project-Specific Behavior Controls"**:
+   ```markdown
+   - **Experimental mindset**: This is a rapid iteration platform, not production deployment tool
+   - **Script-first philosophy**: Lua/JS for velocity, Rust for proven patterns
+   - **Extraction focus**: Document how experiments could transition to production
+   ```
+
+4. **Update CLAUDE.md "v0.12.0 Key Achievements"** heading:
+   ```markdown
+   ## v0.13.0 Key Achievements (Phase 13 - Experimental Infrastructure)
+   ```
+
+5. **Update GEMINI.md "Project Overview" section** (lines 3-10):
+   ```markdown
+   ## Project Overview
+   
+   **Project Identity:** rs-llmspell is a **Rapid AI Experimentation Platform** - Cast scripting spells to explore AI concepts, extract proven patterns to production-ready Rust.
+   
+   This project, `rs-llmspell`, is an experimental platform for rapid AI concept exploration via Lua/JavaScript scripting. It enables quick iteration on AI ideas (LLMs, transformers, diffusion, memory, learning) with production-quality engineering (architecture, performance, testing) to ease the transition from validated experiments to Rust production code.
+   
+   The platform is highly modular (21 crates) with feature flags for flexible builds. It supports multiple LLM providers and includes experimental multi-tenancy and security features.
+   ```
+
+6. **Update GEMINI.md "Recent Completion Status"** section:
+   - Mirror CLAUDE.md phase description changes
+   - Emphasize "experimental infrastructure evolution"
+
+7. **Update GEMINI.md "Development Philosophy" section**:
+   ```markdown
+   ## Development Philosophy
+   
+   *   **Experimental iteration focus**: Script-first rapid prototyping → validation → Rust extraction
+   *   **Less code is better**: REPLACE code, don't add (breaking changes acceptable until 1.0)
+   ...
+   ```
+
+8. **Update GEMINI.md "v0.13.0 Key Achievements"** section heading to match CLAUDE.md
+
+**Files to Modify**:
+- `CLAUDE.md` (MODERATE UPDATE - ~10 line changes across 5 sections)
+- `GEMINI.md` (MODERATE UPDATE - ~15 line changes across 6 sections)
+
+**Definition of Done**:
+- [ ] Both files updated with experimental messaging
+- [ ] CLAUDE.md and GEMINI.md messaging aligned
+- [ ] All acceptance criteria met
+- [ ] Files remain valid markdown
+
+---
+
+### Task DR.1.3: Update CHANGELOG.md and RELEASE_NOTES_v0.13.0.md
+
+**Priority**: MEDIUM
+**Estimated Time**: 1.5 hours
+**Assignee**: Documentation Lead
+**Status**: PENDING
+
+**Description**: Update release documentation to reflect experimental platform messaging while preserving technical accuracy.
+
+**Current State Analysis**:
+- **CHANGELOG.md**: Line 10 "production-ready adaptive memory"
+- **RELEASE_NOTES_v0.13.0.md**: 100 lines, "production-ready" appears 3 times in first 30 lines
+
+**Acceptance Criteria**:
+- [ ] CHANGELOG.md v0.13.0 entry reframed as experimental platform advancement
+- [ ] RELEASE_NOTES_v0.13.0.md "Executive Summary" updated with experimental messaging
+- [ ] All "production-ready" qualified with "foundations" or removed
+- [ ] Technical details preserved (performance metrics, test counts, etc.)
+- [ ] "From Experiment to Production" note added to release notes
+
+**Implementation Steps**:
+
+1. **Update CHANGELOG.md line 10**:
+   ```markdown
+   ## [0.13.0] - 2025-01-15 - Adaptive Memory & Context Engineering 🧠
+   
+   Experimental three-tier memory system with episodic, semantic, and procedural memory for long-term 
+   coherent understanding beyond context window limits. Built with production-quality engineering for 
+   painless extraction when validated. See [RELEASE_NOTES_v0.13.0.md](RELEASE_NOTES_v0.13.0.md) for full details.
+   ```
+
+2. **Update RELEASE_NOTES_v0.13.0.md Executive Summary** (lines 9-24):
+   ```markdown
+   ## Executive Summary
+   
+   Phase 13 delivers an **experimental adaptive memory and context engineering system** that enables 
+   rapid exploration of long-term AI memory patterns beyond context window limits. This release introduces 
+   three-tier memory (episodic, semantic, procedural) with intelligent context assembly strategies.
+   
+   Built with production-quality engineering (performance, architecture, testing) to enable painless 
+   extraction to production when memory patterns are validated.
+   
+   **Key Achievement**: From zero memory to experimental memory-aware AI applications with <2ms overhead 
+   and clear production extraction path.
+   ```
+
+3. **Add "From Experiment to Production" note** after Executive Summary:
+   ```markdown
+   ### Experimentation + Production Foundations
+   
+   While experimental, Phase 13 is built with production-grade engineering:
+   - **Performance**: <2ms overhead (50x faster than target), 8.47x HNSW speedup
+   - **Architecture**: Hot-swappable backends (InMemory/HNSW/SurrealDB), clean abstractions
+   - **Testing**: 149 tests passing (100% pass rate), zero warnings
+   - **Observability**: Full tracing, comprehensive metrics
+   
+   **Result**: When memory patterns are validated, transitioning to production is straightforward.
+   ```
+
+4. **Update "New Features" section headings**:
+   - Change "production-ready" → "experimental" in headings
+   - Keep all technical details unchanged
+   - Example: "1. Experimental Adaptive Memory System (Phase 13.1-13.4)"
+
+5. **Update "What's New" callout box** (lines 17-24):
+   ```markdown
+   🧠 **3 New Memory Crates** (`llmspell-memory`, `llmspell-graph`, `llmspell-context`)
+   📊 **149 Tests Passing** (100% pass rate, zero warnings)
+   ⚡ **<2ms Memory Overhead** (50x faster than target)
+   🔍 **8.47x HNSW Speedup** (at 10K entries vs linear scan)
+   🌐 **Bi-Temporal Knowledge Graph** (SurrealDB embedded, 71% functional)
+   🎯 **Zero Breaking Changes** (fully backward compatible, opt-in features)
+   📖 **1,300+ Lines of API Documentation** (3 new Rust API docs)
+   🏗️ **Experimental → Production Path** (clear extraction patterns documented)
+   ```
+
+**Files to Modify**:
+- `CHANGELOG.md` (MINOR UPDATE - 1 section change)
+- `RELEASE_NOTES_v0.13.0.md` (MODERATE UPDATE - 4 section changes)
+
+**Definition of Done**:
+- [ ] Both files updated with experimental messaging
+- [ ] Technical accuracy preserved
+- [ ] All acceptance criteria met
+
+---
+
+### Task DR.1.4: Cross-Reference Validation and QA
+
+**Priority**: MEDIUM
+**Estimated Time**: 1.5 hours
+**Assignee**: QA Team
+**Status**: PENDING
+
+**Description**: Validate all links still work after root file changes, check messaging consistency across all 5 files, and perform quality checks.
+
+**Acceptance Criteria**:
+- [ ] All internal links in updated files verified functional
+- [ ] All external links verified functional
+- [ ] Messaging consistency checked across all 5 root files
+- [ ] New tagline appears identically in all files
+- [ ] "Experimental" vs "production-ready" usage consistent
+- [ ] Markdown formatting valid (no broken syntax)
+- [ ] No spelling errors in new content
+
+**Implementation Steps**:
+
+1. **Run link checker** on all 5 files:
+   ```bash
+   # Verify all markdown links resolve
+   for file in README.md CLAUDE.md GEMINI.md CHANGELOG.md RELEASE_NOTES_v0.13.0.md; do
+       echo "Checking $file..."
+       # Check internal links: docs/, examples/, etc.
+       grep -o '\[.*\](.*\.md)' $file | grep -o '(.*)'
+   done
+   ```
+
+2. **Verify tagline consistency**:
+   ```bash
+   # Should appear identically in all 5 files
+   grep -n "Rapid AI Experimentation Platform" README.md CLAUDE.md GEMINI.md CHANGELOG.md RELEASE_NOTES_v0.13.0.md
+   ```
+
+3. **Check "production-ready" usage**:
+   ```bash
+   # All instances should be qualified or removed
+   grep -n "production-ready" README.md CLAUDE.md GEMINI.md CHANGELOG.md RELEASE_NOTES_v0.13.0.md
+   # Verify each is qualified with "foundations" or "when extracted" etc.
+   ```
+
+4. **Messaging consistency audit**:
+   - [ ] "Experimental platform" appears in all 5 files
+   - [ ] "Production-quality engineering" or "production-grade engineering" appears (not "production-ready")
+   - [ ] "Extract proven patterns to Rust" concept appears
+   - [ ] Phase 13 described consistently
+
+5. **Markdown validation**:
+   ```bash
+   # If markdownlint available
+   markdownlint README.md CLAUDE.md GEMINI.md CHANGELOG.md RELEASE_NOTES_v0.13.0.md
+   ```
+
+6. **Spell check new content**:
+   - [ ] Run spell checker on new sections
+   - [ ] Verify technical terms spelled correctly
+
+**Files to Validate**:
+- `README.md`
+- `CLAUDE.md`
+- `GEMINI.md`
+- `CHANGELOG.md`
+- `RELEASE_NOTES_v0.13.0.md`
+
+**Definition of Done**:
+- [ ] All acceptance criteria verified
+- [ ] Issues documented and fixed
+- [ ] Phase DR.1 ready to mark complete
+
+---
+
+## Phase DR.2: Documentation Hub Updates (Day 2)
+
+**Goal**: Update all documentation hub README files with experimental positioning and suggest/implement documentation hierarchy improvements
+**Timeline**: 1 day (8 hours)
+**Critical Dependencies**: Phase DR.1 complete (root messaging established)
+**Status**: PENDING
+
+**Files in Scope** (4 main hubs):
+- docs/README.md (major update - main hub)
+- docs/technical/README.md (moderate update)
+- docs/developer-guide/README.md (moderate update)
+- docs/user-guide/README.md (moderate update)
+
+**Success Criteria**:
+- [ ] docs/README.md updated with experimental platform framing
+- [ ] Documentation structure proposal created (if hierarchy changes accepted)
+- [ ] All 4 hub README files consistent with new messaging
+- [ ] Navigation paths emphasize: quick experiments → deep exploration → production extraction
+- [ ] "From Experiment to Production" sections added where relevant
+- [ ] Zero broken cross-references
+
+**Time Breakdown**:
+- Task DR.2.1: 3h (docs/README.md major update + hierarchy proposal)
+- Task DR.2.2: 1.5h (docs/technical/README.md update)
+- Task DR.2.3: 1.5h (docs/developer-guide/README.md update)
+- Task DR.2.4: 1.5h (docs/user-guide/README.md update)
+- Task DR.2.5: 0.5h (Cross-reference validation)
+- **Total**: 8h
+
+---
+
+### Task DR.2.1: Update docs/README.md with Hierarchy Proposal
+
+**Priority**: CRITICAL
+**Estimated Time**: 3 hours
+**Assignee**: Documentation Architect
+**Status**: PENDING
+
+**Description**: Update main documentation hub with experimental framing, propose documentation hierarchy changes to better reflect experiment → production workflow, and update navigation.
+
+**Current State Analysis**:
+- **Current**: 390 lines, "Production-Ready Features" emphasis, Phase 12 focus
+- **Target**: Experimental platform emphasis, clearer learning paths, optional hierarchy restructure
+
+**Acceptance Criteria**:
+- [ ] Opening section updated with experimental platform messaging
+- [ ] Documentation structure section reframed for experimentation workflow
+- [ ] NEW "Hierarchy Proposal" section added (optional restructure)
+- [ ] Quick Start Paths updated to emphasize experimentation
+- [ ] Phase 13 achievements reframed as experimental infrastructure
+- [ ] All "production-ready" qualified or removed
+- [ ] Prominent "From Experiment to Production" pathway
+
+**Implementation Steps**:
+
+1. **Update opening section** (lines 1-10):
+   ```markdown
+   # Rs-LLMSpell Documentation Hub
+   
+   **Complete documentation for experimental AI platform enabling rapid concept exploration with production-ready foundations**
+   
+   **🔗 Navigation**: [← Project Home](../README.md) | [Examples](../examples/) | [Contributing](../CONTRIBUTING.md)
+   
+   > **📖 Documentation Hub**: All documentation for rs-llmspell v0.13.0 (Phase 13 Complete - Experimental Memory & Context Engineering). Comprehensive guides for rapid AI experimentation with script-first velocity and clear production extraction path. **Learn → Experiment → Validate → Extract**.
+   ```
+
+2. **Add "Experiment → Production Workflow" section** (new, after overview):
+   ```markdown
+   ## Experiment → Production Workflow
+   
+   rs-llmspell documentation is organized around the **experiment-extract lifecycle**:
+   
+   1. **Quick Experiments** (5 minutes): Get started rapidly with simple scripts
+   2. **Deep Exploration** (hours-days): Understand capabilities and patterns
+   3. **Validation at Scale** (days-weeks): Test ideas with production-grade performance
+   4. **Production Extraction** (weeks-months): Move proven patterns to Rust
+   
+   ### Documentation Paths by Phase
+   
+   - **Exploring** → [User Guide](user-guide/) - Experiment with AI concepts via scripts
+   - **Understanding** → [Technical Docs](technical/) - Architecture enabling extraction
+   - **Contributing** → [Developer Guide](developer-guide/) - Build experimental components
+   - **Extracting** → [Production Transition](#production-transition) - Rust extraction patterns
+   ```
+
+3. **Update "Documentation Structure" section**:
+   - Change "📘 User Guide - *For Script Writers*" → "📘 User Guide - *For Experimenters*"
+   - Change "Status: ✅ Updated with Phase 13..." → "Status: ✅ Phase 13 Complete (Experimental Infrastructure)"
+   - Reframe each section's "Start here if" to emphasize experimentation
+
+4. **Add "Proposed Hierarchy Restructure" section** (optional, for discussion):
+   ```markdown
+   ## Proposed Documentation Hierarchy (Optional)
+   
+   **Current Structure**: user-guide/, technical/, developer-guide/, in-progress/
+   
+   **Proposed Alternative** (better reflects experiment → production workflow):
+   
+   ```
+   docs/
+   ├── README.md (hub - experimentation paths)
+   ├── quick-start/
+   │   ├── README.md (5-minute experiments)
+   │   ├── first-script.md
+   │   └── first-workflow.md
+   ├── experimentation/  (was user-guide/)
+   │   ├── README.md
+   │   ├── concepts.md
+   │   ├── scripting-patterns.md
+   │   ├── ai-concepts/
+   │   │   ├── llms.md
+   │   │   ├── memory-systems.md
+   │   │   ├── transformers.md
+   │   │   └── diffusion.md
+   │   └── workflows/  (was templates/)
+   │       └── *.md (10 experimental workflows)
+   ├── production-transition/  (NEW)
+   │   ├── README.md
+   │   ├── when-to-extract.md
+   │   ├── rust-patterns.md
+   │   ├── architecture-for-extraction.md
+   │   └── deployment.md (consolidate service-deployment)
+   ├── technical/  (keep as-is, adjust messaging)
+   │   └── ...
+   ├── developer-guide/  (keep as-is, adjust messaging)
+   │   └── ...
+   └── in-progress/  (keep as-is)
+       └── ...
+   ```
+   
+   **Decision**: Keep current structure, implement hierarchy changes in future phase if desired.
+   **For now**: Update all existing files in place with new messaging.
+   ```
+
+5. **Update "Quick Start Paths" section**:
+   - Change "🚀 **I want to use rs-llmspell**" → "🚀 **I want to experiment with AI**"
+   - Reframe all steps to emphasize experimentation
+   - Add NEW path: "🏗️ **I want to extract to production**"
+
+6. **Update "What Rs-LLMSpell Actually Is" section**:
+   - Change heading to "What Rs-LLMSpell Actually Is (Experimental Infrastructure)"
+   - Reframe "Production-Ready Features" as "Experimentation Capabilities"
+   - Keep all technical details, adjust positioning
+
+7. **Add "Production Transition" section** (new):
+   ```markdown
+   ## Production Transition
+   
+   When your experiments succeed, rs-llmspell's production-quality foundations ease the transition:
+   
+   1. **Architecture** → [Current Architecture](technical/current-architecture.md) - Clean abstractions for extraction
+   2. **Performance** → [Operational Guide](technical/operational-guide.md) - Validated at scale
+   3. **Patterns** → [Developer Guide](developer-guide/) - Rust patterns to adopt
+   4. **Deployment** → [Service Deployment](user-guide/service-deployment.md) - Production infrastructure
+   
+   **Philosophy**: Rust chosen not because we're production-ready, but because proven patterns deserve solid foundations.
+   ```
+
+**Files to Modify**:
+- `docs/README.md` (MAJOR UPDATE - restructure sections, add new content)
+
+**Definition of Done**:
+- [ ] docs/README.md updated with experimental messaging
+- [ ] Hierarchy proposal documented (for future decision)
+- [ ] All acceptance criteria met
+- [ ] Links verified functional
+
+---
+
+### Task DR.2.2: Update docs/technical/README.md
+
+**Priority**: HIGH  
+**Estimated Time**: 1.5 hours
+**Assignee**: Technical Writer
+**Status**: PENDING
+
+**Description**: Update technical documentation hub to emphasize experimental platform with production-quality foundations enabling extraction.
+
+**Acceptance Criteria**:
+- [ ] Opening reframed as "Technical foundations for experimental platform"
+- [ ] Architecture docs positioned as "why experiments can transition to production"
+- [ ] Phase 13 section updated with experimental memory messaging
+- [ ] Performance metrics contextualized as "validation at scale"
+
+**Implementation Steps**:
+
+1. **Update line 1 heading and line 10 Overview**:
+   ```markdown
+   # Technical Documentation - LLMSpell v0.13.0
+   
+   **Phase 13 Complete** - Experimental Memory & Context Engineering
+   
+   ...
+   
+   > **📊 Technical Reference**: Comprehensive technical documentation for LLMSpell v0.13.0. 
+   > Documentation optimized for 6 core guides covering the complete system from experimental 
+   > architecture through validation at scale. Production-quality engineering enables painless 
+   > extraction when concepts are proven.
+   ```
+
+2. **Update "Core Documentation" introductions**:
+   - Add "(Experimental Infrastructure)" to relevant headings
+   - Reframe architecture as "enabling extraction"
+   - Performance as "validation at scale"
+
+3. **Update "Phase 13 Achievements" section**:
+   - Change "production-ready" → "experimental infrastructure"
+   - Keep metrics, adjust context
+
+**Files to Modify**:
+- `docs/technical/README.md`
+
+**Definition of Done**:
+- [ ] File updated with experimental framing
+- [ ] All acceptance criteria met
+
+---
+
+### Task DR.2.3: Update docs/developer-guide/README.md
+
+**Priority**: HIGH
+**Estimated Time**: 1.5 hours  
+**Assignee**: Developer Documentation Lead
+**Status**: PENDING
+
+**Description**: Update developer guide hub to emphasize building experimental components with production-quality patterns.
+
+**Acceptance Criteria**:
+- [ ] Opening reframed as "Build experimental AI components"
+- [ ] Development workflow emphasizes rapid iteration
+- [ ] Code quality positioned as "enabling future extraction"
+- [ ] Learning paths updated for experimentation mindset
+
+**Implementation Steps**:
+
+1. **Update opening and quick start**:
+   ```markdown
+   # Developer Guide
+   
+   ✅ **CURRENT**: Phase 13 Complete - Experimental Memory & Context Engineering
+   **Version**: 0.13.0 | **Crates**: 21 | **Tools**: 40+ | **Templates**: 10 | **Examples**: 60+
+   
+   **Build experimental AI components with production-quality patterns for painless extraction**
+   ```
+
+2. **Update "Quick Start for Developers"**:
+   - Emphasize rapid iteration patterns
+   - Position quality as extraction enabler
+
+3. **Update "What's New" sections**:
+   - Reframe as "experimental infrastructure"
+   - Keep technical details
+
+**Files to Modify**:
+- `docs/developer-guide/README.md`
+
+**Definition of Done**:
+- [ ] File updated with experimental developer messaging
+- [ ] All acceptance criteria met
+
+---
+
+### Task DR.2.4: Update docs/user-guide/README.md
+
+**Priority**: HIGH
+**Estimated Time**: 1.5 hours
+**Assignee**: User Documentation Lead  
+**Status**: PENDING
+
+**Description**: Update user guide hub to reframe as experimentation guide.
+
+**Acceptance Criteria**:
+- [ ] Opening reframed as "Learn to experiment with AI via scripts"
+- [ ] Essential documentation list emphasizes experimentation
+- [ ] Templates positioned as "experimental workflows"
+- [ ] Learning path reframed for rapid concept exploration
+
+**Implementation Steps**:
+
+1. **Update opening**:
+   ```markdown
+   # LLMSpell User Guide
+   
+   **Learn to experiment with AI concepts through rapid scripting**
+   
+   ...
+   
+   > **📚 Central Hub**: Your starting point for AI experimentation with rs-llmspell. 
+   > Everything you need is organized into 13 essential guides for rapid concept exploration 
+   > with production-quality foundations for future extraction.
+   ```
+
+2. **Update section descriptions**:
+   - Reframe all sections for experimentation
+   - "AI Agent Templates" → "Experimental Workflow Templates"
+   - "Service Deployment" → "Scale Validation & Production Extraction"
+
+3. **Update "Phase 13 Features" to "Phase 13 Experimental Infrastructure"**
+
+**Files to Modify**:
+- `docs/user-guide/README.md`
+
+**Definition of Done**:
+- [ ] File updated with experimentation focus
+- [ ] All acceptance criteria met
+
+---
+
+### Task DR.2.5: Hub Cross-Reference Validation
+
+**Priority**: MEDIUM
+**Estimated Time**: 0.5 hours
+**Assignee**: QA Team
+**Status**: PENDING
+
+**Description**: Validate all links between hub files work correctly.
+
+**Acceptance Criteria**:
+- [ ] All inter-hub links verified functional
+- [ ] Messaging consistency verified across 4 hubs
+- [ ] "Experimental platform" appears consistently
+
+**Files to Validate**:
+- docs/README.md
+- docs/technical/README.md
+- docs/developer-guide/README.md
+- docs/user-guide/README.md
+
+**Definition of Done**:
+- [ ] All links verified
+- [ ] Consistency confirmed
+- [ ] Phase DR.2 complete
+
+---
+
+## Phase DR.3: Technical Documentation Updates (Days 3-4)
+
+**Goal**: Update all technical documentation files with experimental platform framing
+**Timeline**: 2 days (16 hours)
+**Critical Dependencies**: Phase DR.2 complete (hubs updated)
+**Status**: PENDING
+
+**Files in Scope** (16 files in docs/technical/):
+- current-architecture.md (major)
+- master-architecture-vision.md (major)
+- architecture-decisions.md (moderate)
+- operational-guide.md (moderate)
+- rag-system-guide.md (minor)
+- template-system-architecture.md (moderate)
+- 10 other technical docs (minor each)
+
+**Success Criteria**:
+- [ ] All 16 technical docs updated with experimental framing
+- [ ] Architecture positioned as "enabling extraction"
+- [ ] Performance as "validation at scale"
+- [ ] Zero broken references
+
+**Time Breakdown**:
+- Task DR.3.1: 4h (current-architecture.md)
+- Task DR.3.2: 4h (master-architecture-vision.md)
+- Task DR.3.3: 3h (architecture-decisions.md + operational-guide.md)
+- Task DR.3.4: 2h (template-system-architecture.md + rag-system-guide.md)
+- Task DR.3.5: 2h (10 remaining technical docs)
+- Task DR.3.6: 1h (Cross-reference validation)
+- **Total**: 16h
+
+---
+
+## Phase DR.4: Developer Guide Updates (Day 5)
+
+**Goal**: Update all developer guide files with experimental contribution patterns
+**Timeline**: 1 day (8 hours)
+**Critical Dependencies**: Phase DR.3 complete
+**Status**: PENDING
+
+**Files in Scope** (8 files in docs/developer-guide/)
+
+**Time Breakdown**: 8h total
+
+---
+
+## Phase DR.5: User Guide Updates (Days 6-7)
+
+**Goal**: Update all user guide files reframing as experimentation guide
+**Timeline**: 2 days (16 hours)  
+**Critical Dependencies**: Phase DR.4 complete
+**Status**: PENDING
+
+**Files in Scope** (13 files in docs/user-guide/ including templates/)
+
+**Time Breakdown**: 16h total
+
+---
+
+## Phase DR.6: In-Progress Documentation Updates (Day 7)
+
+**Goal**: Update phase documentation with experimental infrastructure messaging
+**Timeline**: 0.5 day (4 hours)
+**Critical Dependencies**: Phase DR.5 complete
+**Status**: PENDING
+
+**Files in Scope**: implementation-phases.md, phase design docs
+
+**Time Breakdown**: 4h total
+
+---
+
+## Phase DR.7: Final QA and Release (Day 7)
+
+**Goal**: Comprehensive quality assurance, consistency check, and release
+**Timeline**: 0.5 day (4 hours)
+**Critical Dependencies**: All phases DR.1-DR.6 complete
+**Status**: PENDING
+
+**Success Criteria**:
+- [ ] All 50+ files updated and validated
+- [ ] Zero broken links across all documentation
+- [ ] Messaging consistency verified
+- [ ] Quality checks passed
+- [ ] Git commit prepared with clear message
+
+**Time Breakdown**:
+- Task DR.7.1: 2h (Comprehensive link validation across all docs)
+- Task DR.7.2: 1h (Messaging consistency audit)
+- Task DR.7.3: 1h (Final review and commit)
+- **Total**: 4h
+
+---
+
+## Timeline Summary
+
+**Total Estimated Time**: 40-56 hours (5-7 working days)
+
+| Phase | Focus | Days | Hours | Status |
+|-------|-------|------|-------|--------|
+| DR.1 | Root-Level Files | 1 | 8 | PENDING |
+| DR.2 | Documentation Hubs | 1 | 8 | PENDING |
+| DR.3 | Technical Docs | 2 | 16 | PENDING |
+| DR.4 | Developer Guide | 1 | 8 | PENDING |
+| DR.5 | User Guide | 2 | 16 | PENDING |
+| DR.6 | In-Progress Docs | 0.5 | 4 | PENDING |
+| DR.7 | Final QA | 0.5 | 4 | PENDING |
+| **TOTAL** | **All Documentation** | **7** | **56** | **PENDING** |
+
+---
+
+## Success Metrics
+
+**Quantitative**:
+- [ ] 50+ markdown files updated
+- [ ] 0 broken links
+- [ ] 100% messaging consistency
+- [ ] New tagline in 50+ files
+- [ ] "Production-ready" → qualified or removed in all contexts
+
+**Qualitative**:
+- [ ] Clear experimental platform identity
+- [ ] Coherent experiment → production narrative
+- [ ] Script-first philosophy evident throughout
+- [ ] Production-quality foundations explained consistently
+
+---
+
+## Risk Mitigation
+
+**Risk: Broken cross-references after updates**
+- Mitigation: Comprehensive link validation in each phase (DR.1.4, DR.2.5, DR.3.6, DR.7.1)
+
+**Risk: Messaging inconsistency across 50+ files**
+- Mitigation: Clear tone guidelines, QA checks at each phase boundary, final consistency audit (DR.7.2)
+
+**Risk: Loss of technical accuracy during rewording**
+- Mitigation: Preserve all technical details unchanged, only adjust positioning/framing
+
+**Risk: Timeline underestimation**
+- Mitigation: Conservative estimates (1.5h for moderate tasks, 3-4h for major), buffer in 7-day plan
+
+---
+
+## Approval and Execution
+
+**Before Starting**:
+- [ ] Review this task list with stakeholders
+- [ ] Confirm hierarchy restructure decision (keep current vs. proposed)
+- [ ] Assign team members to phases
+- [ ] Set target completion date
+
+**During Execution**:
+- [ ] Mark each task complete as finished
+- [ ] Update status after each phase
+- [ ] Track actual vs estimated time
+- [ ] Document any issues/deviations
+
+**After Completion**:
+- [ ] Archive this task list to docs/in-progress/DOCUMENTATION-REPOSITIONING-TODO.md
+- [ ] Create summary report
+- [ ] Update project status
+
+---
+
+**END OF DOCUMENTATION REPOSITIONING INITIATIVE**
+
+**Note**: This initiative provides a comprehensive roadmap for repositioning rs-llmspell documentation from "production-ready platform" to "experimental platform with production-ready foundations." Each phase includes detailed task breakdowns with acceptance criteria, implementation steps, and time estimates. Execute phases sequentially to maintain consistency and minimize rework.
+

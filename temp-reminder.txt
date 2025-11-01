@@ -4,13 +4,3 @@
 - think about adding diffusion models as a fundamental provider. that means we have to start characterizing providers 
   with additional metadata - type of model - transformer model, diffusion model etc..
 
-- phase 13 readme
-ultrathink. analyze code-base and docs. we need to change the public facing information about this project.
--- this is not and should not be considered production ready. it's an experimental platform. 
-It's created to paly around with different ideas on AI quickly, hence the focus on scripting language bridges. This allows for
-playing and experimenting with concepts around AI (LLMs, transformer models, diffusion models, language, memory, learning),
-quickly in scripts, while retainging the ability to extract known / practiced paradigms to native code with Rust.
--- change the tag-line, the tone, and the messaging of the project, in this README.md and other README.md throughout the project
-to refect that .. specifically under docs/technical, docs/developer-guide, docs/user-guide
--- make the root README.md succinct about the purpose. make sure to link prominently the docs/ README.md files prominently for
-deeper dives. Suggest and change a different hierarchy for documentation if required. 
