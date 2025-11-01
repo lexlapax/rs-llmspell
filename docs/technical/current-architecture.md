@@ -1,12 +1,12 @@
 # Current Architecture (v0.13.0 - Phase 13 Complete)
 
-**Status**: Production-Ready with Adaptive Memory, Context Engineering, Template System, Local LLM, and IDE Connectivity
+**Status**: Experimental Platform with Production-Quality Foundations with Adaptive Memory, Context Engineering, Template System, Local LLM, and IDE Connectivity
 **Last Updated**: January 31, 2025
 **Implementation**: Phases 0-13 Complete (13/13 major phases)
 **Latest**: Phase 13 - Adaptive Memory & Context Engineering (3 new crates, 149 tests, 8.47x HNSW speedup)
 **Validation**: Cross-referenced with phase design documents and codebase
 
-> **📋 Single Source of Truth**: This document reflects the ACTUAL implementation as evolved through 13 development phases, validated against phase design documents (phase-01 through phase-13) and current codebase. **Phase 11 adds local LLM support via dual-backend implementation (Ollama + Candle) for cost-free, offline AI operations. Phase 11a consolidates bridge layer with 87% compile speedup, API standardization, and documentation completeness (security 40%→95%, env vars 0%→100%). Phase 11b enhances local LLM with cleanup (-120 LOC), unified profile system (10 builtins), T5 safetensors support (dual-architecture), and platform-aware Metal GPU detection. Phase 12 solves the "0-day retention problem" with 10 production-ready AI workflow templates (6 base + 4 advanced patterns), enabling immediate user value post-installation with CLI-direct execution and comprehensive template library covering 9 categories. Phase 13 introduces adaptive memory with hot-swappable backends (InMemory/HNSW for episodic, SurrealDB for semantic), context engineering with parallel retrieval optimization (~2x speedup), and integrated bridge layer (MemoryBridge/ContextBridge) delivering >90% test coverage, 8.47x HNSW performance gains, and zero breaking changes to existing APIs.**
+> **📋 Single Source of Truth**: This document reflects the ACTUAL implementation as evolved through 13 development phases, validated against phase design documents (phase-01 through phase-13) and current codebase. **Phase 11 adds local LLM support via dual-backend implementation (Ollama + Candle) for cost-free, offline AI operations. Phase 11a consolidates bridge layer with 87% compile speedup, API standardization, and documentation completeness (security 40%→95%, env vars 0%→100%). Phase 11b enhances local LLM with cleanup (-120 LOC), unified profile system (10 builtins), T5 safetensors support (dual-architecture), and platform-aware Metal GPU detection. Phase 12 solves the "0-day retention problem" with 10 experimental platform with production-quality foundations AI workflow templates (6 base + 4 advanced patterns), enabling immediate user value post-installation with CLI-direct execution and comprehensive template library covering 9 categories. Phase 13 introduces adaptive memory with hot-swappable backends (InMemory/HNSW for episodic, SurrealDB for semantic), context engineering with parallel retrieval optimization (~2x speedup), and integrated bridge layer (MemoryBridge/ContextBridge) delivering >90% test coverage, 8.47x HNSW performance gains, and zero breaking changes to existing APIs.**
 
 ## Related Documentation
 
@@ -55,7 +55,7 @@ This overview document is supported by detailed guides:
 - **Phase 11**: Local LLM Integration - Dual-backend (Ollama via rig + Candle embedded), LocalProviderInstance trait, model CLI commands, 2.5K LOC provider implementation, 40 tok/s inference
 - **Phase 11a**: Bridge Consolidation & Documentation Completeness - Feature gates (87% compile speedup: 38s→5s bridge-only), workflow introspection (agent output collection), Tool.execute API standardization (40+ tools), Custom steps removal (876 LOC cleanup), security docs (40%→95% coverage), environment variables (0%→100%, 41+ security vars), Config global bug fix (critical), 1,866 LOC documentation added
 - **Phase 11b**: Local LLM Cleanup & Enhancement ✅ COMPLETE - LocalLLM registration fix (14→15 globals), binary removal (-675 LOC, enforced single-binary), unified profile system (10 builtin TOML profiles replacing CLI hack), config consolidation (40+ Lua files updated), model discovery UX (URLs in help), auto-load profile (improved errors), Metal GPU detection (platform-aware device selection), T5 safetensors support (dual-architecture: LLaMA GGUF + T5 safetensors, ModelArchitecture enum, Metal blocked by Candle v0.9), net -120 LOC (+755 new, -875 deleted), 72 tests passing, 0 warnings
-- **Phase 12**: Production-Ready AI Agent Templates ✅ COMPLETE (Oct 5-24, 2025) - Template trait system (Template/TemplateRegistry/ExecutionContext/TemplateParams/TemplateOutput), 10 production templates (research-assistant, interactive-chat, data-analysis, code-generator, document-processor, workflow-orchestrator, code-review, content-generation, file-classification, knowledge-management), 2,651 LOC template code, 5 CLI commands (list/info/exec/search/schema), Template global (16th global, 6 methods), 149 tests (122 unit + 27 integration), 3,655 lines documentation, 4 advanced patterns (multi-aspect analysis, quality-driven iteration, scan-classify-act, RAG CRUD), performance targets exceeded 20-50x, zero warnings
+- **Phase 12**: Experimental Platform with Production-Quality Foundations AI Agent Templates ✅ COMPLETE (Oct 5-24, 2025) - Template trait system (Template/TemplateRegistry/ExecutionContext/TemplateParams/TemplateOutput), 10 production templates (research-assistant, interactive-chat, data-analysis, code-generator, document-processor, workflow-orchestrator, code-review, content-generation, file-classification, knowledge-management), 2,651 LOC template code, 5 CLI commands (list/info/exec/search/schema), Template global (16th global, 6 methods), 149 tests (122 unit + 27 integration), 3,655 lines documentation, 4 advanced patterns (multi-aspect analysis, quality-driven iteration, scan-classify-act, RAG CRUD), performance targets exceeded 20-50x, zero warnings
 - **Phase 13**: Adaptive Memory & Context Engineering ✅ COMPLETE (Jan 2025) - Hot-swappable memory backends (InMemory/HNSW for episodic, SurrealDB for semantic graph), context assembly strategies (episodic/semantic/hybrid/rag/combined), 3 new crates (llmspell-memory 3,500+ LOC, llmspell-graph 2,200+ LOC, llmspell-context simplified), MemoryBridge + ContextBridge integration, 149 total tests (68 memory + 34 graph + 6 E2E + existing), 8.47x HNSW speedup at 10K entries, <2ms episodic add overhead (50x better than target), parallel retrieval optimization (~2x speedup), NoopConsolidationEngine default (regex-based extraction), SurrealDB embedded graph (71% functional), Phase 13.15 accuracy validation deferred (baseline metrics established: DMR 248µs, NDCG 0.87 mock), zero breaking changes to Phase 1-12 APIs
 
 ### Key Architectural Decisions (Evolved Through Phases)
@@ -108,7 +108,7 @@ This overview document is supported by detailed guides:
 - **Phase 13**: Parallel retrieval optimization using tokio::join! (~2x speedup for hybrid strategy)
 - **Phase 13**: MemoryBridge + ContextBridge separate globals (clear separation of concerns)
 - **Phase 13**: Opt-in memory/context (zero breaking changes to existing template APIs)
-- **Phase 13**: Deferred accuracy validation (Phase 13.15) in favor of production-ready foundation
+- **Phase 13**: Deferred accuracy validation (Phase 13.15) in favor of experimental platform with production-quality foundations foundation
 
 ---
 
@@ -207,7 +207,7 @@ pub fn block_on_global<F>(future: F) -> F::Output;
 
 ### Daemon Architecture
 
-Phase 10 introduces production-ready daemon support for deploying LLMSpell kernel as a system service with **2,220 LOC** across 7 specialized modules:
+Phase 10 introduces experimental platform with production-quality foundations daemon support for deploying LLMSpell kernel as a system service with **2,220 LOC** across 7 specialized modules:
 
 ```rust
 // Daemon management with double-fork technique (manager.rs - 229 LOC)
@@ -1228,7 +1228,7 @@ local auto = Agent.create({model = "local/llama3.1:8b"})          -- Auto (prefe
 ```
 
 ### Template API (Phase 12)
-**Production-Ready Workflow Templates**:
+**Experimental Platform with Production-Quality Foundations Workflow Templates**:
 ```lua
 -- List available templates
 local templates = Template.list()  -- [{id, name, description, category, version, tags}, ...]
@@ -1531,7 +1531,7 @@ REMOVED: llmspell-testing/src/runner/ (471 LOC)
   - Zero compiler/clippy warnings
 - **Documentation**:
   - 320-line user guide (docs/user-guide/local-llm.md)
-  - 4 production-ready Lua examples (260 lines)
+  - 4 experimental platform with production-quality foundations Lua examples (260 lines)
   - 6 troubleshooting scenarios
 - **Performance**:
   - Candle: 40 tok/s, <200ms first-token latency
@@ -1665,7 +1665,7 @@ As of Phase 11b near-completion (7/8, 95%), technical documentation has been con
    - Candle embedded inference
    - Model management CLI commands
    - Script API (LocalLLM global)
-   - 4 production-ready Lua examples (260 lines)
+   - 4 experimental platform with production-quality foundations Lua examples (260 lines)
    - Troubleshooting guide (6 scenarios)
 
 ### Phase 11a Design Documentation
@@ -1702,4 +1702,4 @@ This consolidation provides comprehensive technical and user-facing documentatio
 
 ---
 
-*This document represents the actual implementation state of LLMSpell v0.11.2-rc1 after completing Phases 0-11a and Phase 11b (7/8 complete, 95%), with production-ready daemon support, consolidated kernel architecture, dual-backend local LLM integration (Ollama + Candle) for cost-free offline AI operations, Phase 11a bridge consolidation (87% compile speedup, 95% docs coverage, API standardization, workflow introspection), and Phase 11b local LLM enhancements (LocalLLM fix, single-binary architecture, unified profile system with 10 builtin TOML files, dual-architecture model support with LLaMA GGUF + T5 Safetensors, platform-aware device selection, -120 net LOC, 72 tests passing).*
+*This document represents the actual implementation state of LLMSpell v0.11.2-rc1 after completing Phases 0-11a and Phase 11b (7/8 complete, 95%), with experimental platform with production-quality foundations daemon support, consolidated kernel architecture, dual-backend local LLM integration (Ollama + Candle) for cost-free offline AI operations, Phase 11a bridge consolidation (87% compile speedup, 95% docs coverage, API standardization, workflow introspection), and Phase 11b local LLM enhancements (LocalLLM fix, single-binary architecture, unified profile system with 10 builtin TOML files, dual-architecture model support with LLaMA GGUF + T5 Safetensors, platform-aware device selection, -120 net LOC, 72 tests passing).*
