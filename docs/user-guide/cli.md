@@ -589,7 +589,7 @@ llmspell template schema research-assistant
 - **Classification**: file-classification, knowledge-management
 
 **Use Cases**:
-- Turn-key AI workflows
+- Experimental AI workflows
 - Standardized processes
 - Best-practice implementations
 - Rapid prototyping

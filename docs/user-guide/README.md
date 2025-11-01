@@ -273,7 +273,7 @@ launchctl load ~/Library/LaunchAgents/com.llmspell.kernel.plist  # macOS
 
 ## 🆕 Phase 12 Features (Complete) ⭐
 
-### AI Agent Templates - Turn-key Workflows
+### AI Agent Templates - Experimental Workflows
 - **10 Built-in Templates**: 6 base templates + 4 advanced workflows
 - **Research Assistant**: 4-phase research workflow with web search, analysis, synthesis, validation
 - **Interactive Chat**: Session-based conversation with context and memory
@@ -501,4 +501,4 @@ Security & Providers (2 crates)
 
 ---
 
-**Version 0.12.0** | Phase 12 Complete - Production-Ready AI Agent Templates | [Release Notes](../../RELEASE_NOTES_v0.12.0.md) | [Changelog](../../CHANGELOG.md)
+**Version 0.12.0** | Phase 12 Complete - Experimental Workflows for Rapid Exploration AI Agent Templates | [Release Notes](../../RELEASE_NOTES_v0.12.0.md) | [Changelog](../../CHANGELOG.md)

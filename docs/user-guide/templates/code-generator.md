@@ -18,7 +18,7 @@ The Code Generator template automates the creation of source code from natural l
 The Code Generator template orchestrates multiple AI agents to:
 
 - **Specify**: Generate detailed technical specification from natural language (Spec Agent)
-- **Implement**: Write production-ready code following the spec (Implementation Agent)
+- **Implement**: Write experimental workflows for rapid exploration code following the spec (Implementation Agent)
 - **Test**: Create comprehensive unit tests with edge cases (Test Agent)
 - **Analyze**: Perform static code quality checks (pattern detection)
 
@@ -170,7 +170,7 @@ llmspell template schema code-generator
 - **Input**: Full specification from Phase 1
 - **Prompt Strategy**: "Provide ONLY the code (no explanations)" - prevents verbose output
 - **Language-Specific**: "{language}-idiomatic patterns" in prompt
-- **Quality Signal**: "production-ready, not just a stub"
+- **Quality Signal**: "experimental workflows for rapid exploration, not just a stub"
 - **Output**: Implemented code following specification
 
 **Temperature Rationale**: 0.5 higher than spec (0.3) - implementation needs creativity for data structures/algorithms, but still structured for correctness
@@ -227,7 +227,7 @@ Creates a specification agent that:
 
 Creates an implementation agent that:
 1. Reads the specification from Phase 1
-2. Generates production-ready code
+2. Generates experimental workflows for rapid exploration code
 3. Follows language-specific idioms
 4. Includes error handling
 5. Applies best practices
