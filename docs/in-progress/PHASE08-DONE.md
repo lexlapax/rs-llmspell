@@ -13,7 +13,7 @@
 **RAG-Architecture**: docs/technical/rag-architecture.md (To be created)  
 **This-document**: working copy /TODO.md (pristine/immutable copy in docs/in-progress/PHASE08-DONE.md)
 
-> **📋 Actionable Task List**: This document breaks down Phase 8 implementation into specific, measurable tasks for building production-ready vector storage and RAG infrastructure with multi-tenant support.
+> **📋 Actionable Task List**: This document breaks down Phase 8 implementation into specific, measurable tasks for building experimental infrastructure with production-quality engineering vector storage and RAG infrastructure with multi-tenant support.
 
 ---
 
@@ -1745,7 +1745,7 @@ Refactor RAG bridge to match Agent/Tool bridge patterns:
 **Implementation Insights**:
 1. **Debug Trait Challenge**: The `hnsw_rs::Hnsw` types don't implement Debug, requiring custom Debug implementation for `HnswIndex` enum. Solution: Implemented manual Debug that just prints the variant name without internal state.
 2. **Multi-Crate Dependencies**: Feature flag removal needed updates in both `llmspell-storage` and `llmspell-bridge` Cargo.toml files - the bridge had a transitive feature dependency that also needed removal.
-3. **Smooth Consolidation**: The real HNSW implementation was already fully functional and compatible with all interfaces. All tests (4 unit tests + 9 E2E tests) passed immediately after renaming, confirming the implementation was production-ready.
+3. **Smooth Consolidation**: The real HNSW implementation was already fully functional and compatible with all interfaces. All tests (4 unit tests + 9 E2E tests) passed immediately after renaming, confirming the implementation was experimental infrastructure with production-quality engineering.
 4. **Simpler Than Expected**: The consolidation was primarily mechanical (delete, rename, search/replace) with no logic changes required. The data-first architecture from Task 8.9.1 made this possible.
 5. **Performance Validated**: The consolidated implementation maintains the same performance characteristics as before, with <10ms search latency and efficient memory usage.
 6. **No Breaking Changes**: The API surface remained identical - only internal implementation details changed, ensuring backward compatibility for all consumers.
@@ -1806,7 +1806,7 @@ Refactor RAG bridge to match Agent/Tool bridge patterns:
 **Actual Time**: 1.5 hours
 **Status**: ✅ COMPLETED
 
-**Description**: Final integration testing to ensure the consolidated HNSW implementation is production-ready.
+**Description**: Final integration testing to ensure the consolidated HNSW implementation is experimental infrastructure with production-quality engineering.
 
 **Acceptance Criteria**:
 - [x] All 9 RAG integration tests pass without feature flags (all tests pass)
@@ -1970,7 +1970,7 @@ Refactor RAG bridge to match Agent/Tool bridge patterns:
 1. ✅ Updated `llmspell-storage/README.md` with comprehensive HNSW vector storage documentation
    - Enhanced features section with Phase 8 production RAG capabilities
    - Added multi-dimensional support, concurrent operations, performance tuning
-   - Updated usage examples with production-ready multi-tenant patterns
+   - Updated usage examples with experimental infrastructure with production-quality engineering multi-tenant patterns
    - Added architecture diagram and comprehensive dependency list
 2. ✅ Updated `llmspell-security/README.md` with multi-tenant access control and advanced sandboxing
    - Added Phase 8 multi-tenant access control with policy-based authorization
@@ -2016,7 +2016,7 @@ Refactor RAG bridge to match Agent/Tool bridge patterns:
 - [x] Performance characteristics documented with actual benchmarks and targets achieved
 
 **Implementation Notes:**
-- **Comprehensive Coverage**: All Phase 8 crates now have production-ready documentation
+- **Comprehensive Coverage**: All Phase 8 crates now have experimental infrastructure with production-quality engineering documentation
 - **Real-World Examples**: All code examples are realistic and demonstrate actual usage patterns
 - **Cross-Crate Integration**: READMEs properly reference and integrate with other Phase 8 components
 - **Performance Documentation**: Actual benchmarks and performance characteristics documented throughout

@@ -1,9 +1,9 @@
-# Phase 12: Production-Ready AI Agent Templates - TODO List
+# Phase 12: Experimental Infrastructure with Production-Quality Engineering AI Agent Templates - TODO List
 
 **Version**: 1.0
 **Date**: October 2025
 **Status**: ✅ COMPLETE - All implementation finished, v0.12.0 release prepared
-**Phase**: 12 (Production-Ready AI Agent Templates)
+**Phase**: 12 (Experimental Infrastructure with Production-Quality Engineering AI Agent Templates)
 **Timeline**: Weeks 42-43 (10 working days) - **Actual: Completed in 10 days**
 **Priority**: CRITICAL (Adoption Baseline - Industry Standard Requirement)
 **Dependencies**: Phase 11b Local LLM Cleanup ✅
@@ -20,7 +20,7 @@
 
 **This-document**: working copy /TODO.md (pristine/immutable copy in docs/in-progress/PHASE12-DONE.md)
 
-> **📋 Actionable Task List**: This document breaks down Phase 12 implementation into specific, measurable tasks for building production-ready AI agent template system solving the "0-day retention problem" with 6 turn-key workflow templates matching industry baseline (LangChain 50+, AutoGen ~10, CrewAI ~15).
+> **📋 Actionable Task List**: This document breaks down Phase 12 implementation into specific, measurable tasks for building experimental infrastructure with production-quality engineering AI agent template system solving the "0-day retention problem" with 6 turn-key workflow templates matching industry baseline (LangChain 50+, AutoGen ~10, CrewAI ~15).
 
 ---
 
@@ -2331,7 +2331,7 @@ end
   - Security considerations
   - Type definitions appendix
 - **Template Guides Created** (5 new + 1 existing):
-  - `research-assistant.md`: 608 lines (Phase 12.3, production-ready)
+  - `research-assistant.md`: 608 lines (Phase 12.3, experimental infrastructure with production-quality engineering)
   - `interactive-chat.md`: 320 lines (Phase 12.4.1, placeholder noted)
   - `data-analysis.md`: 240 lines (Phase 12.4.2, placeholder noted)
   - `code-generator.md`: 300 lines (Phase 12.4.3, production structure)
@@ -2498,7 +2498,7 @@ end
   - Security considerations
   - Type definitions appendix
 - **Template user guides** (6 total):
-  - `research-assistant.md`: 608 lines (production-ready, from Phase 12.3)
+  - `research-assistant.md`: 608 lines (experimental infrastructure with production-quality engineering, from Phase 12.3)
   - `interactive-chat.md`: 320 lines (placeholder implementation)
   - `data-analysis.md`: 240 lines (placeholder implementation)
   - `code-generator.md`: 300 lines (production structure)
@@ -4098,7 +4098,7 @@ Comprehensive REPL and session management already exist in `llmspell-kernel`:
 - [x] ~~Zero duplication of REPL infrastructure~~ → ✅ **ACHIEVED**: Reuses programmatic mode (DRY principle)
 
 **Key Implementation Insights** (from infrastructure audit):
-1. `InteractiveSession.run_repl()` already exists - 1,388 lines of production-ready code
+1. `InteractiveSession.run_repl()` already exists - 1,388 lines of experimental infrastructure with production-quality engineering code
 2. Command parsing pattern: `ReplCommand::parse(input)` → `Meta(Exit)` | `Execute(code)` | `Debug(cmd)`
 3. Session management: Full lifecycle (create, suspend, resume, complete, save, load)
 4. Conversation state: Use Session.state HashMap, NOT custom storage
@@ -6239,7 +6239,7 @@ All 4 match arms **identically** reject reasoning responses.
 **Strategic Context**:
 
 **Why This Matters for Phase 12.8.2**:
-1. **Production-Ready Goal**: Interactive-chat template must support all major providers
+1. **Experimental Infrastructure with Production-Quality Engineering Goal**: Interactive-chat template must support all major providers
 2. **Documentation Promises**: `docs/user-guide/templates/interactive-chat.md:241-244` shows OpenAI gpt-5-mini example
 3. **Cost Optimization**: gpt-5-mini ($0.25/1M tokens) vs gpt-4-turbo ($10/1M tokens) = 40x cheaper
 4. **User Expectations**: Reasoning models valuable for complex problem-solving use cases
@@ -6750,7 +6750,7 @@ The kernel at line 246 returns this complete JSON via `handle.send_template_requ
 - ❌ Bug magnet (manual JSON field extraction prone to errors)
 
 **Phase 12.8.2 Goals**:
-- Production-ready interactive-chat template ⚠️ (not production-ready with broken CLI)
+- Production-ready interactive-chat template ⚠️ (not experimental infrastructure with production-quality engineering with broken CLI)
 - User-friendly automation ❌ (scripting broken without JSON output)
 - Documentation accuracy ❌ (Example 4 doesn't work as written)
 
@@ -7320,7 +7320,7 @@ echo "Session ID: $SESSION_ID"
 
 **Next Steps After Completion**:
 1. Mark 12.8.2.17 as ✅ COMPLETE
-2. Consider Phase 12.8.2 COMPLETE (all templates production-ready)
+2. Consider Phase 12.8.2 COMPLETE (all templates experimental infrastructure with production-quality engineering)
 3. Begin Phase 12.8.3 (code-generator template) OR Phase 13 (A-TKG memory system)
 
 ---
@@ -7388,7 +7388,7 @@ Spec Agent → Implementation Agent → Test Agent → Linter (tool)
   - ✅ **Prompt Strategy** (code_generator.rs:421-435):
     - Include FULL specification text in prompt as context
     - Instruction: "Provide ONLY the code (no explanations)" - prevents verbose output
-    - Emphasize: "production-ready, not just a stub" - quality signal
+    - Emphasize: "experimental infrastructure with production-quality engineering, not just a stub" - quality signal
   - ✅ **Spec as Input** (code_generator.rs:365):
     - Takes `spec: &SpecificationResult` instead of description
     - Agent chain: spec output → impl input (sequential dependency)
@@ -9017,7 +9017,7 @@ test result: ok. 19 passed; 0 failed; 4 ignored; 0 measured
 - [x] All 7 manual scenarios pass ✅ (6 tested, 1 skipped - RAG Phase 13)
 - [x] Zero crashes or hangs ✅
 - [x] Readline features work smoothly ✅
-- [x] UX feels production-ready ✅
+- [x] UX feels experimental infrastructure with production-quality engineering ✅
 
 **Test Results Summary (Part B)**:
 ✅ **Test B1**: Basic Chat Flow - PASS (multi-turn conversation + .exit)
@@ -9058,12 +9058,12 @@ test result: ok. 19 passed; 0 failed; 4 ignored; 0 measured
 **Part B - E2E Validation** (Manual): ✅ COMPLETE
 - [x] 7 manual test scenarios completed ✅ (6 tested, 1 skipped - RAG Phase 13)
 - [x] Performance acceptable (7-32s LLM latency, <50ms readline) ✅
-- [x] UX feels production-ready (IPython/Node.js REPL quality) ✅
+- [x] UX feels experimental infrastructure with production-quality engineering (IPython/Node.js REPL quality) ✅
 - [x] No critical bugs or crashes ✅
 
 **Combined Success Criteria**: ✅ ALL COMPLETE
 - [x] Infrastructure integration validated (Session + Tools + Provider + LLM) ✅
-- [x] REPL features production-ready (readline, history, Ctrl-C, commands) ✅
+- [x] REPL features experimental infrastructure with production-quality engineering (readline, history, Ctrl-C, commands) ✅
 - [x] Documentation matches implementation (interactive-chat.md accurate) ✅
 - [x] Ready for Phase 12.9 completion and git commit ✅
 
@@ -9212,7 +9212,7 @@ test result: ok. 19 passed; 0 failed; 4 ignored; 0 measured
 - [x] TODO.md status corrected ✅
 
 **Impact**:
-- [x] v0.12.0 can claim "Production-Ready AI Agent Templates" honestly ✅
+- [x] v0.12.0 can claim "Experimental Infrastructure with Production-Quality Engineering AI Agent Templates" honestly ✅
 - [x] 0-day retention problem solved ✅ (11 integration/E2E tests verify real LLM execution)
 - [x] Users get real value from templates ✅ (not placeholders)
 
