@@ -33,6 +33,7 @@ mod tests {
                     use_compression: true,
                 }),
                 PersistenceConfig::default(),
+                None, // No memory manager for this test
             )
             .await?,
         );
@@ -141,6 +142,7 @@ mod tests {
                     use_compression: true,
                 }),
                 PersistenceConfig::default(),
+                None, // No memory manager for this test
             )
             .await?,
         );
@@ -220,6 +222,7 @@ mod tests {
                         use_compression: true,
                     }),
                     enabled_persistence_config(),
+                    None, // No memory manager for this test
                 )
                 .await?,
             );
@@ -267,6 +270,7 @@ mod tests {
                         use_compression: true,
                     }),
                     enabled_persistence_config(),
+                    None, // No memory manager for this test
                 )
                 .await?,
             );
@@ -315,6 +319,7 @@ mod tests {
                     use_compression: true,
                 }),
                 PersistenceConfig::default(),
+                None, // No memory manager for this test
             )
             .await?,
         );
@@ -422,6 +427,7 @@ mod tests {
                         use_compression: true,
                     }),
                     enabled_persistence_config(),
+                    None, // No memory manager for this test
                 )
                 .await?,
             );
@@ -452,6 +458,7 @@ mod tests {
                         use_compression: true,
                     }),
                     enabled_persistence_config(),
+                    None, // No memory manager for this test
                 )
                 .await?,
             );

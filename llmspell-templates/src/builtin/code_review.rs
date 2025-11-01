@@ -13,8 +13,8 @@ use crate::{
     artifacts::Artifact,
     context::ExecutionContext,
     core::{
-        CostEstimate, TemplateCategory, TemplateMetadata, TemplateOutput, TemplateParams,
-        TemplateResult,
+        memory_parameters, provider_parameters, CostEstimate, TemplateCategory, TemplateMetadata,
+        TemplateOutput, TemplateParams, TemplateResult,
     },
     error::{Result, TemplateError},
     validation::{ConfigSchema, ParameterConstraints, ParameterSchema, ParameterType},
@@ -23,7 +23,7 @@ use async_trait::async_trait;
 use serde::{Deserialize, Serialize};
 use serde_json::json;
 use std::time::Instant;
-use tracing::{info, warn};
+use tracing::{debug, info, warn};
 
 /// Code Review Template
 ///
@@ -79,7 +79,7 @@ impl crate::core::Template for CodeReviewTemplate {
     }
 
     fn config_schema(&self) -> ConfigSchema {
-        ConfigSchema::new(vec![
+        let mut params = vec![
             // code_path (required)
             ParameterSchema::required(
                 "code_path",
@@ -172,7 +172,19 @@ impl crate::core::Template for CodeReviewTemplate {
                 max: Some(1.0),
                 ..Default::default()
             }),
-        ])
+        ];
+
+        // Add memory parameters (Task 13.11.1)
+        params.extend(memory_parameters());
+
+        // Add provider parameters (Task 13.5.7d)
+        params.extend(provider_parameters());
+
+        debug!(
+            "CodeReview: Generated config schema with {} parameters",
+            params.len()
+        );
+        ConfigSchema::new(params)
     }
 
     async fn execute(
@@ -200,15 +212,26 @@ impl crate::core::Template for CodeReviewTemplate {
         let severity_filter: String = params.get_or("severity_filter", "all".to_string());
         let generate_fixes: bool = params.get_or("generate_fixes", false);
         let output_format: String = params.get_or("output_format", "markdown".to_string());
-        let model: String = params.get_or("model", "ollama/llama3.2:3b".to_string());
-        let temperature: f32 = params.get_or("temperature", 0.2);
+
+        // Extract memory parameters (Task 13.11.2)
+        let session_id: Option<String> = params.get_optional("session_id").unwrap_or(None);
+        let memory_enabled: bool = params.get_or("memory_enabled", true);
+        let context_budget: i64 = params.get_or("context_budget", 2000);
+
+        // Smart dual-path provider resolution (Task 13.5.7d)
+        let provider_config = context.resolve_llm_config(&params)?;
+        let model_str = provider_config
+            .default_model
+            .as_ref()
+            .ok_or_else(|| TemplateError::Config("provider missing model".into()))?;
 
         info!(
-            "Starting code review (path={}, language={}, aspects={}, severity_filter={})",
+            "Starting code review (path={}, language={}, aspects={}, severity_filter={}, model={})",
             code_path,
             language,
             aspects.len(),
-            severity_filter
+            severity_filter,
+            model_str
         );
 
         // Read code from path
@@ -231,10 +254,17 @@ impl crate::core::Template for CodeReviewTemplate {
                 code: &code_content,
                 language: &language,
                 code_path: &code_path,
-                model: &model,
-                temperature,
+                provider_config: &provider_config,
             };
-            let review = self.execute_aspect_review(&review_config, &context).await?;
+            let review = self
+                .execute_aspect_review(
+                    &review_config,
+                    &context,
+                    session_id.as_deref(),
+                    memory_enabled,
+                    context_budget,
+                )
+                .await?;
             all_reviews.push(review);
             output.metrics.agents_invoked += 1;
         }
@@ -246,7 +276,13 @@ impl crate::core::Template for CodeReviewTemplate {
         let fixes = if generate_fixes && !aggregated.issues.is_empty() {
             info!("Generating fixes for {} issues...", aggregated.issues.len());
             let fix_result = self
-                .generate_fixes(&aggregated, &code_content, &language, &model, &context)
+                .generate_fixes(
+                    &aggregated,
+                    &code_content,
+                    &language,
+                    &provider_config,
+                    &context,
+                )
                 .await?;
             output.metrics.agents_invoked += 1; // Fix generator agent
             Some(fix_result)
@@ -291,6 +327,34 @@ impl crate::core::Template for CodeReviewTemplate {
             aggregated.issues.len(),
             output.metrics.agents_invoked
         );
+
+        // Store in memory if enabled (Task 13.11.3)
+        if memory_enabled && session_id.is_some() && context.memory_manager().is_some() {
+            let memory_mgr = context.memory_manager().unwrap();
+            let input_summary = format!("Review {} code for {} aspects", language, aspects.len());
+            let output_summary = format!(
+                "Found {} issues with {} fixes",
+                aggregated.issues.len(),
+                fixes.as_ref().map(|f| f.fixes.len()).unwrap_or(0)
+            );
+
+            crate::context::store_template_execution(
+                &memory_mgr,
+                session_id.as_ref().unwrap(),
+                &self.metadata.id,
+                &input_summary,
+                &output_summary,
+                json!({
+                    "language": language,
+                    "aspects": aspects,
+                    "issues_found": aggregated.issues.len(),
+                    "fixes_generated": fixes.as_ref().map(|f| f.fixes.len()).unwrap_or(0),
+                }),
+            )
+            .await
+            .ok(); // Don't fail execution if storage fails
+        }
+
         Ok(output)
     }
 
@@ -385,8 +449,7 @@ struct ReviewConfig<'a> {
     code: &'a str,
     language: &'a str,
     code_path: &'a str,
-    model: &'a str,
-    temperature: f32,
+    provider_config: &'a llmspell_config::ProviderConfig,
 }
 
 impl CodeReviewTemplate {
@@ -401,11 +464,14 @@ impl CodeReviewTemplate {
         })
     }
 
-    /// Execute review for a specific aspect
+    /// Execute review for a specific aspect with memory context
     async fn execute_aspect_review(
         &self,
         config: &ReviewConfig<'_>,
         context: &ExecutionContext,
+        session_id: Option<&str>,
+        memory_enabled: bool,
+        context_budget: i64,
     ) -> Result<AspectReview> {
         use llmspell_agents::factory::{AgentConfig, ModelConfig, ResourceLimits};
         use llmspell_core::types::AgentInput;
@@ -413,14 +479,24 @@ impl CodeReviewTemplate {
         // Get aspect-specific configuration
         let (agent_name, system_prompt) = self.get_aspect_config(config.aspect, config.language);
 
+        // Extract model from provider config
+        let model = config
+            .provider_config
+            .default_model
+            .as_ref()
+            .ok_or_else(|| TemplateError::Config("provider missing model".into()))?;
+
         // Parse model string (provider/model format)
-        let (provider, model_id) = if let Some(slash_pos) = config.model.find('/') {
+        let (provider, model_id) = if let Some(slash_pos) = model.find('/') {
             (
-                config.model[..slash_pos].to_string(),
-                config.model[slash_pos + 1..].to_string(),
+                model[..slash_pos].to_string(),
+                model[slash_pos + 1..].to_string(),
             )
         } else {
-            ("ollama".to_string(), config.model.to_string())
+            (
+                config.provider_config.provider_type.clone(),
+                model.to_string(),
+            )
         };
 
         // Create agent config
@@ -431,8 +507,8 @@ impl CodeReviewTemplate {
             model: Some(ModelConfig {
                 provider,
                 model_id,
-                temperature: Some(config.temperature),
-                max_tokens: Some(2000),
+                temperature: config.provider_config.temperature.or(Some(0.2)),
+                max_tokens: config.provider_config.max_tokens.or(Some(2000)),
                 settings: serde_json::Map::new(),
             }),
             allowed_tools: vec![],
@@ -455,10 +531,46 @@ impl CodeReviewTemplate {
                 TemplateError::ExecutionFailed(format!("Agent creation failed: {}", e))
             })?;
 
+        // Assemble memory context (Task 13.11.2)
+        let memory_context = if let (true, Some(sid)) = (memory_enabled, session_id) {
+            if let Some(bridge) = context.context_bridge() {
+                debug!(
+                    "Assembling memory context: session={}, budget={}",
+                    sid, context_budget
+                );
+                crate::assemble_template_context(&bridge, config.code_path, sid, context_budget)
+                    .await
+            } else {
+                warn!("Memory enabled but ContextBridge unavailable");
+                vec![]
+            }
+        } else {
+            vec![]
+        };
+
+        let memory_context_str = if !memory_context.is_empty() {
+            memory_context
+                .iter()
+                .map(|msg| format!("{}: {}", msg.role, msg.content))
+                .collect::<Vec<_>>()
+                .join("\n\n")
+        } else {
+            String::new()
+        };
+
         // Build review prompt
         let review_prompt = format!(
-            "{}\n\nReview the following {} code:\n\n**File**: {}\n\n```{}\n{}\n```",
-            system_prompt, config.language, config.code_path, config.language, config.code
+            "{}{}\n\nReview the following {} code:\n\n**File**: {}\n\n```{}\n{}\n```",
+            system_prompt,
+            if !memory_context_str.is_empty() {
+                format!("\n\n{}\n", memory_context_str)
+            } else {
+                String::new()
+            },
+            config.language,
+            config.code_path,
+            config.language,
+            config.code
         );
 
         // Execute the agent
@@ -773,11 +885,17 @@ impl CodeReviewTemplate {
         aggregated: &AggregatedReview,
         code: &str,
         language: &str,
-        model: &str,
+        provider_config: &llmspell_config::ProviderConfig,
         context: &ExecutionContext,
     ) -> Result<FixResult> {
         use llmspell_agents::factory::{AgentConfig, ModelConfig, ResourceLimits};
         use llmspell_core::types::AgentInput;
+
+        // Extract model from provider config
+        let model = provider_config
+            .default_model
+            .as_ref()
+            .ok_or_else(|| TemplateError::Config("provider missing model".into()))?;
 
         // Parse model string
         let (provider, model_id) = if let Some(slash_pos) = model.find('/') {
@@ -786,7 +904,7 @@ impl CodeReviewTemplate {
                 model[slash_pos + 1..].to_string(),
             )
         } else {
-            ("ollama".to_string(), model.to_string())
+            (provider_config.provider_type.clone(), model.to_string())
         };
 
         // Create fix generator agent config
@@ -797,8 +915,8 @@ impl CodeReviewTemplate {
             model: Some(ModelConfig {
                 provider,
                 model_id,
-                temperature: Some(0.4), // Balanced creativity
-                max_tokens: Some(3000),
+                temperature: provider_config.temperature.or(Some(0.4)), // Balanced creativity
+                max_tokens: provider_config.max_tokens.or(Some(3000)),
                 settings: serde_json::Map::new(),
             }),
             allowed_tools: vec![],

@@ -6,8 +6,8 @@
 
 use crate::context::ExecutionContext;
 use crate::core::{
-    CostEstimate, TemplateCategory, TemplateMetadata, TemplateOutput, TemplateParams,
-    TemplateResult,
+    memory_parameters, provider_parameters, CostEstimate, TemplateCategory, TemplateMetadata,
+    TemplateOutput, TemplateParams, TemplateResult,
 };
 use crate::error::{TemplateError, ValidationError};
 use crate::validation::{ConfigSchema, ParameterConstraints, ParameterSchema, ParameterType};
@@ -15,7 +15,7 @@ use async_trait::async_trait;
 use llmspell_core::state::StateScope;
 use serde::{Deserialize, Serialize};
 use serde_json::json;
-use tracing::{info, warn};
+use tracing::{debug, info, warn};
 
 /// Knowledge document with metadata
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -280,7 +280,7 @@ impl crate::core::Template for KnowledgeManagementTemplate {
     }
 
     fn config_schema(&self) -> ConfigSchema {
-        ConfigSchema::new(vec![
+        let mut params = vec![
             // operation (required enum)
             ParameterSchema::required(
                 "operation",
@@ -389,7 +389,19 @@ impl crate::core::Template for KnowledgeManagementTemplate {
                 allowed_values: Some(vec![json!("text"), json!("json")]),
                 ..Default::default()
             }),
-        ])
+        ];
+
+        // Add memory parameters (Task 13.11.1)
+        params.extend(memory_parameters());
+
+        // Add provider parameters (Task 13.5.7d)
+        params.extend(provider_parameters());
+
+        debug!(
+            "KnowledgeManagement: Generated config schema with {} parameters",
+            params.len()
+        );
+        ConfigSchema::new(params)
     }
 
     async fn execute(
@@ -414,6 +426,10 @@ impl crate::core::Template for KnowledgeManagementTemplate {
         let source_type: String = params.get_or("source_type", "text".to_string());
         let max_results: usize = params.get_or("max_results", 5);
         let include_citations: bool = params.get_or("include_citations", true);
+
+        // Extract memory parameters (Task 13.11.2)
+        let session_id: Option<String> = params.get_optional("session_id").unwrap_or(None);
+        let memory_enabled: bool = params.get_or("memory_enabled", true);
         let chunk_size: usize = params.get_or("chunk_size", 200);
         let chunk_overlap: usize = params.get_or("chunk_overlap", 50);
         let output_format: String = params.get_or("output_format", "text".to_string());
@@ -749,6 +765,34 @@ impl crate::core::Template for KnowledgeManagementTemplate {
             "Knowledge management operation complete (duration: {}ms)",
             output.metrics.duration_ms
         );
+
+        // Store in memory if enabled (Task 13.11.3)
+        if memory_enabled && session_id.is_some() && context.memory_manager().is_some() {
+            let memory_mgr = context.memory_manager().unwrap();
+            let input_summary = format!(
+                "Knowledge {} operation on collection '{}'",
+                operation, collection
+            );
+            let output_summary = format!(
+                "Completed {} operation on collection '{}'",
+                operation, collection
+            );
+
+            crate::context::store_template_execution(
+                &memory_mgr,
+                session_id.as_ref().unwrap(),
+                &self.metadata.id,
+                &input_summary,
+                &output_summary,
+                json!({
+                    "operation": operation,
+                    "collection": collection,
+                    "source_type": source_type,
+                }),
+            )
+            .await
+            .ok(); // Don't fail execution if storage fails
+        }
 
         Ok(output)
     }

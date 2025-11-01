@@ -13,7 +13,7 @@ mod tests {
     use std::time::Instant;
 
     async fn create_test_manager() -> SessionManager {
-        let state_manager = Arc::new(StateManager::new().await.unwrap());
+        let state_manager = Arc::new(StateManager::new(None).await.unwrap());
         let storage_backend = Arc::new(MemoryBackend::new());
         let hook_registry = Arc::new(HookRegistry::new());
         let hook_executor = Arc::new(HookExecutor::new());
@@ -121,7 +121,7 @@ mod tests {
         let manager_with_hooks = create_test_manager().await;
 
         // Test without hooks
-        let state_manager = Arc::new(StateManager::new().await.unwrap());
+        let state_manager = Arc::new(StateManager::new(None).await.unwrap());
         let storage_backend = Arc::new(MemoryBackend::new());
         let hook_registry = Arc::new(HookRegistry::new());
         let hook_executor = Arc::new(HookExecutor::new());

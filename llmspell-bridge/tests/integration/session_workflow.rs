@@ -5,7 +5,10 @@
 mod test_helpers;
 
 use llmspell_bridge::{
-    engine::factory::{EngineFactory, LuaConfig},
+    engine::{
+        bridge::ScriptOutput,
+        factory::{EngineFactory, LuaConfig},
+    },
     providers::ProviderManager,
     ComponentRegistry,
 };
@@ -462,76 +465,80 @@ async fn test_error_conditions_and_recovery() {
 }
 
 /// Test concurrent script operations for thread safety
+///
+/// Fixed: Replaced `tokio::spawn` with `tokio::join!` to avoid worker pool deadlock.
+/// Root cause: `tokio::spawn` moves tasks to limited worker pool; sync work (`Lua::new()`)
+/// in spawned tasks blocks workers, causing starvation when all workers are occupied.
+/// Solution: `tokio::join!` runs concurrent futures on current task without spawning.
 #[tokio::test(flavor = "multi_thread")]
 async fn test_concurrent_operations() {
-    // Create multiple engines to simulate concurrent access
-    let mut handles = vec![];
+    // Helper async function to create and run a single test instance
+    async fn run_test_instance(thread_id: usize) -> ScriptOutput {
+        let lua_config = LuaConfig::default();
+        let mut engine = EngineFactory::create_lua_engine(&lua_config).unwrap();
 
-    for i in 0..3 {
-        let handle = tokio::spawn(async move {
-            let lua_config = LuaConfig::default();
-            let mut engine = EngineFactory::create_lua_engine(&lua_config).unwrap();
+        let registry = Arc::new(ComponentRegistry::new());
+        let provider_config = ProviderManagerConfig::default();
+        let providers = Arc::new(ProviderManager::new(provider_config).await.unwrap());
 
-            let registry = Arc::new(ComponentRegistry::new());
-            let provider_config = ProviderManagerConfig::default();
-            let providers = Arc::new(ProviderManager::new(provider_config).await.unwrap());
+        let (tool_registry, agent_registry, workflow_factory) = create_test_infrastructure();
 
-            let (tool_registry, agent_registry, workflow_factory) = create_test_infrastructure();
+        let _ = engine.inject_apis(
+            &registry,
+            &providers,
+            &tool_registry,
+            &agent_registry,
+            &workflow_factory,
+            None,
+        );
 
-            let _ = engine.inject_apis(
-                &registry,
-                &providers,
-                &tool_registry,
-                &agent_registry,
-                &workflow_factory,
-                None,
-            );
+        let lua_code = format!(
+            r"
+            -- Concurrent operations test {thread_id}
+            local thread_id = {thread_id}
 
-            let lua_code = format!(
-                r"
-                -- Concurrent operations test {i}
-                local thread_id = {i}
-                
-                -- Perform operations that might conflict if not thread-safe
-                local results = {{}}
-                for i = 1, 10 do
-                    local data = {{
-                        thread_id = thread_id,
-                        iteration = i,
-                        timestamp = os.time(),
-                        computed = thread_id * 100 + i
-                    }}
-                    results[i] = data
-                end
-                
-                -- Return results
-                return {{
+            -- Perform operations that might conflict if not thread-safe
+            local results = {{}}
+            for i = 1, 10 do
+                local data = {{
                     thread_id = thread_id,
-                    results_count = #results,
-                    success = true,
-                    last_computed = results[#results].computed
+                    iteration = i,
+                    timestamp = os.time(),
+                    computed = thread_id * 100 + i
                 }}
-            "
-            );
+                results[i] = data
+            end
 
-            engine.execute_script(&lua_code).await
-        });
+            -- Return results
+            return {{
+                thread_id = thread_id,
+                results_count = #results,
+                success = true,
+                last_computed = results[#results].computed
+            }}
+        "
+        );
 
-        handles.push(handle);
+        engine
+            .execute_script(&lua_code)
+            .await
+            .expect("Script execution should succeed")
     }
 
-    // Wait for all concurrent operations to complete
-    let mut results = vec![];
-    for handle in handles {
-        let result = handle.await.unwrap();
-        assert!(result.is_ok(), "Concurrent operation should succeed");
-        results.push(result.unwrap());
-    }
+    // Run 3 concurrent operations using tokio::join! instead of spawn
+    // This avoids worker pool deadlock by running on the current task
+    let (result0, result1, result2) = tokio::join!(
+        run_test_instance(0),
+        run_test_instance(1),
+        run_test_instance(2),
+    );
+
+    let outputs = vec![result0, result1, result2];
 
     // Verify all operations completed successfully
-    assert_eq!(results.len(), 3);
+    assert_eq!(outputs.len(), 3);
 
-    for (i, result) in results.iter().enumerate() {
+    for (i, result) in outputs.iter().enumerate() {
         let output = result.output.as_object().unwrap();
         let i_i64 = i64::try_from(i).expect("index should fit in i64");
         assert_eq!(output.get("thread_id").unwrap().as_i64(), Some(i_i64));

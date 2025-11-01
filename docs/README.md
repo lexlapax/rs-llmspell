@@ -1,43 +1,44 @@
 # Rs-LLMSpell Documentation Hub
 
-**Complete documentation for production-ready scriptable LLM interactions with service integration**
+**Complete documentation for experimental AI platform enabling rapid concept exploration with production-ready foundations**
 
 **🔗 Navigation**: [← Project Home](../README.md) | [Examples](../examples/) | [Contributing](../CONTRIBUTING.md)
 
-> **📖 Documentation Hub**: All documentation for rs-llmspell v0.12.0 (Phase 12 Complete - Production-Ready AI Agent Templates). Fully consolidated with integrated kernel architecture, Unix daemon infrastructure, tool CLI commands, fleet management, local LLM support (Ollama + Candle), feature flags for modular builds (19-35MB), and 10 built-in AI workflow templates. **Phase 12 delivers production-ready templates solving real AI problems for instant productivity from day 0.**
+> **📖 Documentation Hub**: All documentation for rs-llmspell v0.13.0 (Phase 13 Complete - Experimental Memory & Context Engineering). Comprehensive guides for rapid AI experimentation with script-first velocity and clear production extraction path. **Learn → Experiment → Validate → Extract**.
 
 ---
 
-## Documentation Structure (Phase 12 Complete)
+## Documentation Structure (Phase 13 Complete - Experimental Infrastructure)
 
-### 📘 [User Guide](user-guide/) - *For Script Writers*
-**Purpose**: Practical guides for using rs-llmspell to build LLM-driven scripts and workflows.
+### 📘 [User Guide](user-guide/) - *For Experimenters*
+**Purpose**: Practical guides for rapid AI concept exploration via scripts.
 
-**Status**: ✅ Updated with Phase 12 production-ready AI agent templates
+**Status**: ✅ Updated with Phase 13 experimental memory system
 **Contents**: 12 essential documents including getting started, concepts, configuration, AI agent templates, local LLM integration, API reference (Lua + 18 Rust crates), troubleshooting, Phase 10 troubleshooting, performance tuning, service deployment, IDE integration
 **Key Files**: `getting-started.md`, `concepts.md`, `configuration.md`, `templates/README.md`, `local-llm.md`, `service-deployment.md`, `ide-integration.md`, `troubleshooting-phase10.md`, `performance-tuning.md`, `api/lua/README.md`
-**Phase 12 Additions**: 10 built-in templates (6 base + 4 advanced), template CLI (list, info, exec, search, schema), Template Lua global (16th of 18), instant productivity from day 0
+**Phase 13 Additions**: 3-tier memory (episodic/semantic/procedural), context engineering, Memory + Context globals (17th/18th)
+**Phase 12 Additions**: 10 experimental templates (6 base + 4 advanced), template CLI, Template Lua global (16th of 18)
 **Phase 11 Additions**: Local LLM support (Ollama + Candle backends), model management (list, pull, info, status), privacy-first workflows, offline inference
-**Start here if**: You want to write Lua scripts, use production AI templates, use local LLM models, use tool CLI directly, or deploy as production services
+**Start here if**: You want to experiment with AI concepts via Lua scripts, use experimental workflows, explore memory patterns, use local LLMs for zero-cost experimentation
 
 ---
 
 ### 🔧 [Developer Guide](developer-guide/) - *For Contributors*
 **Purpose**: Technical guides for developers contributing to or extending rs-llmspell.
 
-**Status**: ✅ Updated with Phase 12 template creation guide
+**Status**: ✅ Updated with Phase 13 experimental component patterns
 **Contents**: 8 essential guides including developer guide, extending guide, production guide, examples reference, feature flags migration, tracing best practices, bridge pattern guide, template creation guide
 **Key Files**: `developer-guide.md`, `extending-llmspell.md`, `production-guide.md`, `examples-reference.md`, `feature-flags-migration.md`, `tracing-best-practices.md`, `bridge-pattern-guide.md`, `template-creation.md`
 **Phase 12 Additions**: Template creation guide, 10 built-in templates as patterns, TemplateRegistry implementation, ExecutionContext builder pattern
 **Phase 11 Additions**: Local provider implementation patterns, GGUF model handling, dual-backend architecture (Ollama + Candle), typed bridge pattern (Phase 11a.8)
-**Start here if**: You want to create custom tools, build templates, contribute code, implement local providers, work on bridge layer, or understand modular build system
+**Start here if**: You want to build experimental components with production-quality code for future extraction
 
 ---
 
 ### 🏗️ [Technical](technical/) - *For Architects*
 **Purpose**: Core architectural documentation and implementation decisions.
 
-**Status**: ✅ Complete for Phase 12 with 13 documents
+**Status**: ✅ Complete for Phase 13 with 13+ documents
 **Contents**: 6 core guides + 7 supplementary docs covering architecture, protocols, performance, benchmarking, stress testing, protocol compliance, and dependency analysis
 **Key Files**: `current-architecture.md`, `kernel-protocol-architecture.md`, `debug-dap-architecture.md`, `cli-command-architecture.md`, `performance-baseline.md`, `benchmarking-guide.md`, `stress-test-results.md`, `protocol-compliance-report.md`, `mlua-upgrade-analysis.md`
 **Phase 12 Additions**: Template system architecture (TemplateRegistry, ExecutionContext), 10 built-in templates, 20-50x performance targets, parameter validation schema
@@ -58,7 +59,7 @@
 ### 🚧 [In-Progress](in-progress/) - *Development Tracking*
 **Purpose**: Track planning and implementation toward version 1.0.
 
-**Status**: 📋 Phase 12 Complete, Phase 13 Planning
+**Status**: 📋 Phase 13 Complete, Phase 14 Planning
 **Contents**: Phase completion documents (PHASE00-12 DONE), implementation roadmaps, design documents
 **Key Files**: `implementation-phases.md` (23-phase roadmap), phase-specific design docs
 **For**: Core team tracking progress
@@ -67,10 +68,13 @@
 
 ## What Rs-LLMSpell Actually Is
 
-**Production-Ready Features** (v0.12.0):
-- ✅ **10 Built-in AI Templates** with 6 base + 4 advanced workflows (Phase 12) ⭐
-- ✅ **Template CLI** (5 subcommands: list, info, exec, search, schema) for instant productivity ⭐
-- ✅ **Template Lua API** (Template global, 16th of 18, with 6 methods) ⭐
+**Experimental Platform** with **Production-Quality Foundations** (v0.13.0):
+- ✅ **Adaptive Memory System** with 3-tier architecture (episodic/semantic/procedural) (Phase 13) ⭐
+- ✅ **Memory + Context Globals** (17th/18th Lua globals) for experimental memory patterns ⭐
+- ✅ **Hot-Swappable Backends** (InMemory/HNSW/SurrealDB) with 8.47x speedup ⭐
+- ✅ **10 Experimental Workflows** with 6 base + 4 advanced templates (Phase 12)
+- ✅ **Template CLI** (5 subcommands: list, info, exec, search, schema)
+- ✅ **Template Lua API** (Template global, 16th of 18, with 6 methods)
 - ✅ **TemplateRegistry** with DashMap concurrent storage and Arc sharing ⭐
 - ✅ **ExecutionContext** builder for infrastructure dependency injection ⭐
 - ✅ **Template Performance** 20-50x faster than targets (<2ms init, <1ms lookup) ⭐
@@ -92,8 +96,8 @@
 - ✅ **Debug Adapter Protocol (DAP)** with 10 essential commands, IDE integration
 - ✅ **Multi-Protocol Support** (Jupyter v5.3, DAP, LSP, REPL)
 - ✅ **40+ tools** with optional dependencies (templates, PDF, CSV, Excel, archives, email, DB)
-- ✅ **18 crates** with unified kernel and template system
-- ✅ **Lua scripting** with 18 zero-import globals (Agent, Tool, Template, RAG, Debug, etc.)
+- ✅ **21 crates** with unified kernel, template system, and memory system
+- ✅ **Lua scripting** with 18 zero-import globals (Agent, Tool, Template, Memory, Context, RAG, etc.)
 - ✅ **--trace flag** with unified logging control
 - ✅ **Event correlation** for request tracking with correlation IDs
 - ✅ **Multi-client support** with message routing
@@ -107,19 +111,21 @@
 - ✅ **Event bus** with 90K+ events/sec throughput
 - ✅ **64+ production examples** across 7 categories (including templates and local LLM)
 
-**Phase 12 Achievements** (v0.12.0):
-- ✅ **10 Built-in Templates**: 6 base workflows + 4 advanced patterns (2,651 LOC)
-- ✅ **Template System**: llmspell-templates crate with TemplateRegistry, ExecutionContext, parameter validation
-- ✅ **Template CLI**: 5 subcommands (list, info, exec, search, schema) for direct template execution
-- ✅ **Template Global**: 16th of 18 Lua globals with 6 methods (list, info, execute, search, schema, estimate_cost)
-- ✅ **6 Template Categories**: Research, Chat, Analysis, CodeGen, Document, Workflow
-- ✅ **ExecutionContext Builder**: Dependency injection for Tools, Agents, Workflows, RAG, Providers
-- ✅ **Parameter Validation**: Declarative schema with type constraints (required, type, min/max, pattern)
-- ✅ **Cost Estimation**: Pre-execution LLM usage budget planning
-- ✅ **20-50x Performance**: <2ms init, <1ms lookup, <0.1ms validation (all targets exceeded)
-- ✅ **149 Tests**: 122 unit + 27 integration tests, 100% passing
+**Phase 13 Achievements** (v0.13.0 - Experimental Infrastructure):
+- ✅ **3-Tier Memory System**: Episodic (HNSW), Semantic (SurrealDB graph), Procedural (patterns)
+- ✅ **Hot-Swappable Backends**: InMemory (dev), HNSW (8.47x speedup), SurrealDB (bi-temporal graph)
+- ✅ **Context Engineering**: 4 strategies (episodic, semantic, hybrid, RAG) with parallel retrieval
+- ✅ **<2ms Memory Overhead**: 50x faster than target, production-quality validation at scale
+- ✅ **149 Tests**: 100% pass rate, zero warnings, comprehensive validation
+- ✅ **Zero Breaking Changes**: Fully backward compatible, opt-in features
+- ✅ **1,300+ Lines API Docs**: llmspell-memory, llmspell-graph, llmspell-context
+
+**Phase 12 Achievements** (v0.12.0 - Experimental Workflows):
+- ✅ **10 Experimental Templates**: 6 base workflows + 4 advanced patterns for rapid exploration
+- ✅ **Template System**: llmspell-templates crate with TemplateRegistry, ExecutionContext
+- ✅ **20-50x Performance**: <2ms init, <1ms lookup, production-quality engineering
+- ✅ **149 Tests**: 100% passing, comprehensive validation
 - ✅ **3,655 Lines Docs**: Complete user guides for all 10 templates
-- ✅ **Zero-Day Productivity**: Instant productive AI workflows from installation
 
 **Phase 11 Achievements** (v0.11.0):
 - ✅ **Dual-Backend Architecture**: Ollama via rig (REST API) + Candle (embedded GGUF inference)
@@ -154,9 +160,10 @@
 
 ## Quick Start Paths
 
-### 🚀 **I want to use rs-llmspell**
-1. **[Getting Started](user-guide/getting-started.md)** - 5-minute setup with feature flags
-2. **[AI Agent Templates](user-guide/templates/README.md)** ⭐ - Instant productivity with 10 built-in workflows
+### 🚀 **I want to experiment with AI concepts**
+1. **[Getting Started](user-guide/getting-started.md)** - 5-minute experimental setup
+2. **[Experimental Workflows](user-guide/templates/README.md)** ⭐ - 10 templates for rapid concept exploration
+3. **[Memory System](user-guide/memory-configuration.md)** ⭐ - Explore adaptive memory patterns
 3. **[Core Concepts](user-guide/concepts.md)** - Understand kernel, tools (40+), agents, workflows, templates
 4. **Template CLI** ⭐ - `llmspell template list`, `exec`, `info`, `search`, `schema` commands
 5. **Tool CLI** - `llmspell tool list`, `invoke`, `info`, `search`, `test` commands
@@ -165,23 +172,23 @@
 8. **[Lua API Reference](user-guide/api/lua/README.md)** - Complete API documentation (18 globals)
 9. **[Examples](../examples/script-users/)** - 60+ working examples including templates and tool CLI
 
-### 🔨 **I want to extend rs-llmspell**
-1. **[Developer Guide](developer-guide/developer-guide.md)** - Complete onboarding for 18 crates
-2. **[Template Creation](developer-guide/template-creation.md)** ⭐ - Build custom templates (50 LOC minimum)
+### 🔨 **I want to build experimental components**
+1. **[Developer Guide](developer-guide/developer-guide.md)** - Complete onboarding for 21 crates
+2. **[Template Creation](developer-guide/template-creation.md)** - Build experimental workflows
 3. **[Feature Flags Migration](developer-guide/feature-flags-migration.md)** - Build system changes (Phase 10.17.5+)
 4. **[Extending LLMSpell](developer-guide/extending-llmspell.md)** - Build tools, agents, protocols
 5. **[Production Guide](developer-guide/production-guide.md)** - Deploy to production
 6. **[Kernel Architecture](technical/kernel-protocol-architecture.md)** - Daemon, protocols, fleet
 
 ### 🏛️ **I need architectural understanding**
-1. **[Current Architecture](technical/current-architecture.md)** - 18 crates, Phase 12 achievements
+1. **[Current Architecture](technical/current-architecture.md)** - 21 crates, Phase 13 experimental infrastructure
 2. **[Kernel Protocol Architecture](technical/kernel-protocol-architecture.md)** - Daemon, protocols, transport
 3. **[Debug DAP Architecture](technical/debug-dap-architecture.md)** - 10 DAP commands, IDE integration
 4. **[Performance Baseline](technical/performance-baseline.md)** - Phase 12 metrics (20-50x for templates)
 5. **[Master Vision](technical/master-architecture-vision.md)** - 23-phase roadmap
 
-### 🛠️ **I want to deploy in production**
-1. **[Service Deployment](user-guide/service-deployment.md)** - systemd/launchd, daemon mode, fleet
+### 🛠️ **I want to validate at scale / extract to production**
+1. **[Service Deployment](user-guide/service-deployment.md)** - Daemon for scale validation, systemd/launchd when extracting
 2. **[Configuration Guide](user-guide/configuration.md)** - Daemon, feature flags, fleet config
 3. **[Performance Tuning](user-guide/performance-tuning.md)** - Optimization for production
 4. **[Troubleshooting](user-guide/troubleshooting.md)** - General issues
@@ -387,4 +394,4 @@
 
 ---
 
-**Last Updated**: October 2025 | **Version**: 0.11.1 (Phase 11a Complete - Bridge Consolidation) | **Next**: Phase 12 (Adaptive Memory System)
+**Last Updated**: January 2025 | **Version**: 0.13.0 (Phase 13 Complete - Experimental Memory & Context Engineering) | **Next**: Phase 14 (Template Composition)

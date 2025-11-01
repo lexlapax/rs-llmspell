@@ -10,8 +10,8 @@ use crate::{
     artifacts::Artifact,
     context::ExecutionContext,
     core::{
-        CostEstimate, TemplateCategory, TemplateMetadata, TemplateOutput, TemplateParams,
-        TemplateResult,
+        memory_parameters, provider_parameters, CostEstimate, TemplateCategory, TemplateMetadata,
+        TemplateOutput, TemplateParams, TemplateResult,
     },
     error::{Result, TemplateError, ValidationError},
     validation::{ConfigSchema, ParameterConstraints, ParameterSchema, ParameterType},
@@ -143,7 +143,7 @@ impl crate::core::Template for WorkflowOrchestratorTemplate {
     }
 
     fn config_schema(&self) -> ConfigSchema {
-        ConfigSchema::new(vec![
+        let mut params = vec![
             // workflow_config (required object)
             ParameterSchema::required(
                 "workflow_config",
@@ -196,7 +196,19 @@ impl crate::core::Template for WorkflowOrchestratorTemplate {
                 ParameterType::String,
                 json!("ollama/llama3.2:3b"),
             ),
-        ])
+        ];
+
+        // Add memory parameters (Task 13.11.1)
+        params.extend(memory_parameters());
+
+        // Add provider parameters (Task 13.5.7d)
+        params.extend(provider_parameters());
+
+        debug!(
+            "WorkflowOrchestrator: Generated config schema with {} parameters",
+            params.len()
+        );
+        ConfigSchema::new(params)
     }
 
     async fn execute(
@@ -211,11 +223,22 @@ impl crate::core::Template for WorkflowOrchestratorTemplate {
         let execution_mode: String = params.get_or("execution_mode", "sequential".to_string());
         let collect_intermediate: bool = params.get_or("collect_intermediate", true);
         let max_steps: i64 = params.get_or("max_steps", 10);
-        let model: String = params.get_or("model", "ollama/llama3.2:3b".to_string());
+
+        // Extract memory parameters (Task 13.11.2)
+        let session_id: Option<String> = params.get_optional("session_id");
+        let memory_enabled: bool = params.get_or("memory_enabled", true);
+        let context_budget: i64 = params.get_or("context_budget", 2000);
+
+        // Smart dual-path provider resolution (Task 13.5.7d)
+        let provider_config = context.resolve_llm_config(&params)?;
+        let model_str = provider_config
+            .default_model
+            .as_ref()
+            .ok_or_else(|| TemplateError::Config("provider missing model".into()))?;
 
         info!(
             "Starting workflow orchestration (mode={}, max_steps={}, model={})",
-            execution_mode, max_steps, model
+            execution_mode, max_steps, model_str
         );
 
         // Initialize output
@@ -240,7 +263,15 @@ impl crate::core::Template for WorkflowOrchestratorTemplate {
         // Phase 3: Execute workflow
         info!("Phase 3: Executing workflow...");
         let execution_result = self
-            .execute_workflow(&execution_plan, &model, collect_intermediate, &context)
+            .execute_workflow(
+                &execution_plan,
+                &provider_config,
+                collect_intermediate,
+                &context,
+                session_id.as_deref(),
+                memory_enabled,
+                context_budget,
+            )
             .await?;
         output.metrics.agents_invoked = execution_result.agents_executed;
         output.metrics.tools_invoked = execution_result.tools_executed;
@@ -270,6 +301,38 @@ impl crate::core::Template for WorkflowOrchestratorTemplate {
             "Workflow orchestration complete (duration: {}ms, steps: {})",
             output.metrics.duration_ms, execution_result.steps_executed
         );
+
+        // Store in memory if enabled (Task 13.11.3)
+        if memory_enabled && session_id.is_some() && context.memory_manager().is_some() {
+            let memory_mgr = context.memory_manager().unwrap();
+            let input_summary = format!(
+                "Workflow with {} steps in {} mode",
+                workflow.steps.len(),
+                execution_mode
+            );
+            let output_summary = format!(
+                "Executed {} steps ({} agents, {} tools)",
+                execution_result.steps_executed,
+                execution_result.agents_executed,
+                execution_result.tools_executed
+            );
+
+            crate::context::store_template_execution(
+                &memory_mgr,
+                session_id.as_ref().unwrap(),
+                &self.metadata.id,
+                &input_summary,
+                &output_summary,
+                json!({
+                    "execution_mode": execution_mode,
+                    "workflow_steps": workflow.steps.len(),
+                    "steps_executed": execution_result.steps_executed,
+                }),
+            )
+            .await
+            .ok(); // Don't fail execution if storage fails
+        }
+
         Ok(output)
     }
 
@@ -449,12 +512,16 @@ impl WorkflowOrchestratorTemplate {
     }
 
     /// Phase 3: Execute workflow
+    #[allow(clippy::too_many_arguments)]
     async fn execute_workflow(
         &self,
         plan: &ExecutionPlan,
-        model: &str,
+        provider_config: &llmspell_config::ProviderConfig,
         collect_intermediate: bool,
         context: &ExecutionContext,
+        session_id: Option<&str>,
+        memory_enabled: bool,
+        context_budget: i64,
     ) -> Result<ExecutionResult> {
         info!(
             "Executing workflow '{}' with {} steps (mode: {})",
@@ -462,6 +529,12 @@ impl WorkflowOrchestratorTemplate {
             plan.steps.len(),
             plan.mode
         );
+
+        // Extract model from provider config
+        let model = provider_config
+            .default_model
+            .as_ref()
+            .ok_or_else(|| TemplateError::Config("provider missing model".into()))?;
 
         // Convert execution mode to WorkflowType
         let workflow_type = match plan.mode.as_str() {
@@ -492,8 +565,8 @@ impl WorkflowOrchestratorTemplate {
                     model: Some(ModelConfig {
                         provider,
                         model_id,
-                        temperature: Some(0.7),
-                        max_tokens: Some(1000),
+                        temperature: provider_config.temperature.or(Some(0.7)),
+                        max_tokens: provider_config.max_tokens.or(Some(1000)),
                         settings: serde_json::Map::new(),
                     }),
                     allowed_tools: vec![],
@@ -635,10 +708,44 @@ impl WorkflowOrchestratorTemplate {
             }
         };
 
+        // Assemble memory context (Task 13.11.2)
+        let memory_context = if let (true, Some(sid)) = (memory_enabled, session_id) {
+            if let Some(bridge) = context.context_bridge() {
+                debug!(
+                    "Assembling memory context for workflow: session={}, budget={}",
+                    sid, context_budget
+                );
+                crate::assemble_template_context(&bridge, &plan.workflow_name, sid, context_budget)
+                    .await
+            } else {
+                vec![]
+            }
+        } else {
+            vec![]
+        };
+
+        let memory_context_str = if !memory_context.is_empty() {
+            memory_context
+                .iter()
+                .map(|msg| format!("{}: {}", msg.role, msg.content))
+                .collect::<Vec<_>>()
+                .join("\n\n")
+        } else {
+            String::new()
+        };
+
         // Execute workflow with default ExecutionContext (registry already in workflow)
         info!("Executing workflow with real LLM agents");
         let workflow_input = AgentInput::builder()
-            .text(format!("Execute workflow: {}", plan.workflow_name))
+            .text(format!(
+                "{}Execute workflow: {}",
+                if !memory_context_str.is_empty() {
+                    format!("Relevant Context from Memory:\n{}\n\n", memory_context_str)
+                } else {
+                    String::new()
+                },
+                plan.workflow_name
+            ))
             .build();
 
         let workflow_output = workflow
@@ -927,6 +1034,17 @@ struct ExecutionResult {
 mod tests {
     use super::*;
     use crate::core::Template;
+    /// Test helper: Create a provider config for tests
+    fn test_provider_config() -> llmspell_config::ProviderConfig {
+        llmspell_config::ProviderConfig {
+            default_model: Some("ollama/llama3.2:3b".to_string()),
+            provider_type: "ollama".to_string(),
+            temperature: Some(0.3),
+            max_tokens: Some(2000),
+            timeout_seconds: Some(120),
+            ..Default::default()
+        }
+    }
 
     #[test]
     fn test_template_metadata() {
@@ -1144,7 +1262,15 @@ mod tests {
         };
 
         let result = template
-            .execute_workflow(&plan, "ollama/llama3.2:3b", true, &context)
+            .execute_workflow(
+                &plan,
+                &test_provider_config(),
+                true,
+                &context,
+                None,  // session_id
+                false, // memory_enabled
+                2000,  // context_budget
+            )
             .await;
         assert!(result.is_ok());
         let execution = result.unwrap();

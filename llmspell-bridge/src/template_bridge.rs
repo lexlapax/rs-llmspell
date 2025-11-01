@@ -1,6 +1,7 @@
 //! ABOUTME: Business logic bridge for template operations
 //! ABOUTME: Centralizes `ExecutionContext` building, parameter validation, and template discovery
 
+use async_trait::async_trait;
 use llmspell_core::LLMSpellError;
 use llmspell_templates::{
     ConfigSchema, TemplateCategory, TemplateMetadata, TemplateOutput, TemplateParams,
@@ -19,6 +20,18 @@ pub struct Managers {
     pub session_manager: Arc<llmspell_kernel::sessions::manager::SessionManager>,
 }
 
+/// Infrastructure configuration for `TemplateBridge`
+///
+/// Bundles infrastructure components to reduce constructor parameter count (Task 13.5.7d).
+pub struct InfraConfig {
+    /// Tool registry from `ScriptRuntime`
+    pub tool_registry: Arc<llmspell_tools::ToolRegistry>,
+    /// Agent factory registry from `ScriptRuntime`
+    pub agent_registry: Arc<llmspell_agents::FactoryRegistry>,
+    /// Workflow factory from `ScriptRuntime`
+    pub workflow_factory: Arc<dyn llmspell_workflows::WorkflowFactory>,
+}
+
 /// Bridge between scripts and template system
 ///
 /// Provides business logic layer for template operations including:
@@ -35,6 +48,8 @@ pub struct TemplateBridge {
     registry: Arc<crate::registry::ComponentRegistry>,
     /// Provider manager for LLM access
     providers: Arc<llmspell_providers::ProviderManager>,
+    /// Provider configuration for smart dual-path resolution (Task 13.5.7d)
+    provider_config: Arc<llmspell_config::providers::ProviderManagerConfig>,
     /// Tool registry from `ScriptRuntime` (infrastructure layer)
     tool_registry: Arc<llmspell_tools::ToolRegistry>,
     /// Agent factory registry from `ScriptRuntime` (infrastructure layer)
@@ -55,25 +70,24 @@ impl TemplateBridge {
     /// * `template_registry` - Registry containing available templates
     /// * `registry` - Component registry for infrastructure access (script layer)
     /// * `providers` - Provider manager for LLM operations
-    /// * `tool_registry` - Tool registry from `ScriptRuntime` (infrastructure layer)
-    /// * `agent_registry` - Agent factory registry from `ScriptRuntime` (infrastructure layer)
-    /// * `workflow_factory` - Workflow factory from `ScriptRuntime` (infrastructure layer)
+    /// * `provider_config` - Provider configuration for smart dual-path resolution (Task 13.5.7d)
+    /// * `infra` - Infrastructure components (tools, agents, workflows)
     #[must_use]
-    pub const fn new(
+    pub fn new(
         template_registry: Arc<TemplateRegistry>,
         registry: Arc<crate::registry::ComponentRegistry>,
         providers: Arc<llmspell_providers::ProviderManager>,
-        tool_registry: Arc<llmspell_tools::ToolRegistry>,
-        agent_registry: Arc<llmspell_agents::FactoryRegistry>,
-        workflow_factory: Arc<dyn llmspell_workflows::WorkflowFactory>,
+        provider_config: Arc<llmspell_config::providers::ProviderManagerConfig>,
+        infra: InfraConfig,
     ) -> Self {
         Self {
             template_registry,
             registry,
             providers,
-            tool_registry,
-            agent_registry,
-            workflow_factory,
+            provider_config,
+            tool_registry: infra.tool_registry,
+            agent_registry: infra.agent_registry,
+            workflow_factory: infra.workflow_factory,
             state_manager: None,
             session_manager: None,
         }
@@ -86,27 +100,26 @@ impl TemplateBridge {
     /// * `template_registry` - Registry containing available templates
     /// * `registry` - Component registry for infrastructure access (script layer)
     /// * `providers` - Provider manager for LLM operations
-    /// * `tool_registry` - Tool registry from `ScriptRuntime` (infrastructure layer)
-    /// * `agent_registry` - Agent factory registry from `ScriptRuntime` (infrastructure layer)
-    /// * `workflow_factory` - Workflow factory from `ScriptRuntime` (infrastructure layer)
+    /// * `provider_config` - Provider configuration for smart dual-path resolution (Task 13.5.7d)
+    /// * `infra` - Infrastructure components (tools, agents, workflows)
     /// * `state_manager` - State manager for persistent storage
     #[must_use]
-    pub const fn with_state_manager(
+    pub fn with_state_manager(
         template_registry: Arc<TemplateRegistry>,
         registry: Arc<crate::registry::ComponentRegistry>,
         providers: Arc<llmspell_providers::ProviderManager>,
-        tool_registry: Arc<llmspell_tools::ToolRegistry>,
-        agent_registry: Arc<llmspell_agents::FactoryRegistry>,
-        workflow_factory: Arc<dyn llmspell_workflows::WorkflowFactory>,
+        provider_config: Arc<llmspell_config::providers::ProviderManagerConfig>,
+        infra: InfraConfig,
         state_manager: Arc<llmspell_kernel::state::StateManager>,
     ) -> Self {
         Self {
             template_registry,
             registry,
             providers,
-            tool_registry,
-            agent_registry,
-            workflow_factory,
+            provider_config,
+            tool_registry: infra.tool_registry,
+            agent_registry: infra.agent_registry,
+            workflow_factory: infra.workflow_factory,
             state_manager: Some(state_manager),
             session_manager: None,
         }
@@ -119,27 +132,26 @@ impl TemplateBridge {
     /// * `template_registry` - Registry containing available templates
     /// * `registry` - Component registry for infrastructure access (script layer)
     /// * `providers` - Provider manager for LLM operations
-    /// * `tool_registry` - Tool registry from `ScriptRuntime` (infrastructure layer)
-    /// * `agent_registry` - Agent factory registry from `ScriptRuntime` (infrastructure layer)
-    /// * `workflow_factory` - Workflow factory from `ScriptRuntime` (infrastructure layer)
+    /// * `provider_config` - Provider configuration for smart dual-path resolution (Task 13.5.7d)
+    /// * `infra` - Infrastructure components (tools, agents, workflows)
     /// * `managers` - State and session managers for stateful template execution
     #[must_use]
     pub fn with_state_and_session(
         template_registry: Arc<TemplateRegistry>,
         registry: Arc<crate::registry::ComponentRegistry>,
         providers: Arc<llmspell_providers::ProviderManager>,
-        tool_registry: Arc<llmspell_tools::ToolRegistry>,
-        agent_registry: Arc<llmspell_agents::FactoryRegistry>,
-        workflow_factory: Arc<dyn llmspell_workflows::WorkflowFactory>,
+        provider_config: Arc<llmspell_config::providers::ProviderManagerConfig>,
+        infra: InfraConfig,
         managers: Managers,
     ) -> Self {
         Self {
             template_registry,
             registry,
             providers,
-            tool_registry,
-            agent_registry,
-            workflow_factory,
+            provider_config,
+            tool_registry: infra.tool_registry,
+            agent_registry: infra.agent_registry,
+            workflow_factory: infra.workflow_factory,
             state_manager: Some(managers.state_manager),
             session_manager: Some(managers.session_manager),
         }
@@ -249,7 +261,8 @@ impl TemplateBridge {
             .with_tool_registry(self.tool_registry.clone())
             .with_agent_registry(self.agent_registry.clone())
             .with_workflow_factory(self.workflow_factory.clone())
-            .with_providers(self.providers.clone());
+            .with_providers(self.providers.clone())
+            .with_provider_config(self.provider_config.clone());
 
         // Add optional components
         if let Some(state_mgr) = &self.state_manager {
@@ -372,6 +385,30 @@ pub struct TemplateInfo {
     pub schema: Option<ConfigSchema>,
 }
 
+// Implement TemplateExecutor trait for workflow-template delegation (Phase 13.13)
+#[async_trait]
+impl llmspell_core::traits::template_executor::TemplateExecutor for TemplateBridge {
+    async fn execute_template(
+        &self,
+        template_id: &str,
+        params: serde_json::Value,
+    ) -> llmspell_core::Result<serde_json::Value> {
+        // Convert serde_json::Value to TemplateParams
+        let template_params: TemplateParams = params.into();
+
+        // Execute template using existing method
+        let output = self.execute_template(template_id, template_params).await?;
+
+        // Convert TemplateOutput to serde_json::Value
+        // The TemplateOutput contains a `result` field which is already TemplateResult
+        // We need to serialize the entire TemplateOutput to JSON
+        serde_json::to_value(&output).map_err(|e| LLMSpellError::Component {
+            message: format!("Failed to serialize template output: {e}"),
+            source: Some(Box::new(e)),
+        })
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -396,15 +433,22 @@ mod tests {
         );
         let component_registry = Arc::new(crate::registry::ComponentRegistry::new());
         let providers = Arc::new(llmspell_providers::ProviderManager::new());
+        let provider_config =
+            Arc::new(llmspell_config::providers::ProviderManagerConfig::default());
         let (tool_registry, agent_registry, workflow_factory) = create_test_infrastructure();
+
+        let infra = InfraConfig {
+            tool_registry,
+            agent_registry,
+            workflow_factory,
+        };
 
         let bridge = TemplateBridge::new(
             template_registry,
             component_registry,
             providers,
-            tool_registry,
-            agent_registry,
-            workflow_factory,
+            provider_config,
+            infra,
         );
 
         // Verify we can list templates
@@ -419,15 +463,22 @@ mod tests {
         );
         let component_registry = Arc::new(crate::registry::ComponentRegistry::new());
         let providers = Arc::new(llmspell_providers::ProviderManager::new());
+        let provider_config =
+            Arc::new(llmspell_config::providers::ProviderManagerConfig::default());
         let (tool_registry, agent_registry, workflow_factory) = create_test_infrastructure();
+
+        let infra = InfraConfig {
+            tool_registry,
+            agent_registry,
+            workflow_factory,
+        };
 
         let bridge = TemplateBridge::new(
             template_registry,
             component_registry,
             providers,
-            tool_registry,
-            agent_registry,
-            workflow_factory,
+            provider_config,
+            infra,
         );
 
         // List all templates
@@ -446,15 +497,22 @@ mod tests {
         );
         let component_registry = Arc::new(crate::registry::ComponentRegistry::new());
         let providers = Arc::new(llmspell_providers::ProviderManager::new());
+        let provider_config =
+            Arc::new(llmspell_config::providers::ProviderManagerConfig::default());
         let (tool_registry, agent_registry, workflow_factory) = create_test_infrastructure();
+
+        let infra = InfraConfig {
+            tool_registry,
+            agent_registry,
+            workflow_factory,
+        };
 
         let bridge = TemplateBridge::new(
             template_registry,
             component_registry,
             providers,
-            tool_registry,
-            agent_registry,
-            workflow_factory,
+            provider_config,
+            infra,
         );
 
         // Get first template
@@ -484,15 +542,22 @@ mod tests {
         );
         let component_registry = Arc::new(crate::registry::ComponentRegistry::new());
         let providers = Arc::new(llmspell_providers::ProviderManager::new());
+        let provider_config =
+            Arc::new(llmspell_config::providers::ProviderManagerConfig::default());
         let (tool_registry, agent_registry, workflow_factory) = create_test_infrastructure();
+
+        let infra = InfraConfig {
+            tool_registry,
+            agent_registry,
+            workflow_factory,
+        };
 
         let bridge = TemplateBridge::new(
             template_registry,
             component_registry,
             providers,
-            tool_registry,
-            agent_registry,
-            workflow_factory,
+            provider_config,
+            infra,
         );
 
         // Search for "research" - should find research assistant template
@@ -510,15 +575,22 @@ mod tests {
         );
         let component_registry = Arc::new(crate::registry::ComponentRegistry::new());
         let providers = Arc::new(llmspell_providers::ProviderManager::new());
+        let provider_config =
+            Arc::new(llmspell_config::providers::ProviderManagerConfig::default());
         let (tool_registry, agent_registry, workflow_factory) = create_test_infrastructure();
+
+        let infra = InfraConfig {
+            tool_registry,
+            agent_registry,
+            workflow_factory,
+        };
 
         let bridge = TemplateBridge::new(
             template_registry,
             component_registry,
             providers,
-            tool_registry,
-            agent_registry,
-            workflow_factory,
+            provider_config,
+            infra,
         );
 
         // Get first template's schema

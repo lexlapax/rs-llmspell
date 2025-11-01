@@ -48,7 +48,7 @@ mod disaster_recovery_scenarios {
             };
 
             let state_manager = Arc::new(
-                StateManager::with_backend(StorageBackendType::Memory, persistence_config)
+                StateManager::with_backend(StorageBackendType::Memory, persistence_config, None)
                     .await
                     .unwrap(),
             );

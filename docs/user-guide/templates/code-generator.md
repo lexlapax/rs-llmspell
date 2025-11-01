@@ -18,7 +18,7 @@ The Code Generator template automates the creation of source code from natural l
 The Code Generator template orchestrates multiple AI agents to:
 
 - **Specify**: Generate detailed technical specification from natural language (Spec Agent)
-- **Implement**: Write production-ready code following the spec (Implementation Agent)
+- **Implement**: Write experimental workflows for rapid exploration code following the spec (Implementation Agent)
 - **Test**: Create comprehensive unit tests with edge cases (Test Agent)
 - **Analyze**: Perform static code quality checks (pattern detection)
 
@@ -43,6 +43,20 @@ llmspell template exec code-generator \
   --param language="rust"
 ```
 
+### CLI - With Memory and Provider
+
+Enable memory-enhanced execution with custom provider:
+
+```bash
+llmspell template exec code-generator \
+  --param description="Create a binary search tree in Rust" \
+  --param language="rust" \
+  --param session-id="user-session-123" \
+  --param memory-enabled=true \
+  --param context-budget=3000 \
+  --param provider-name="ollama"
+```
+
 ### Lua - Basic Usage
 
 ```lua
@@ -52,6 +66,21 @@ local result = Template.execute("code-generator", {
 })
 
 print(result.result.value)
+```
+
+### Lua - With Memory and Provider
+
+Enable memory-enhanced execution:
+
+```lua
+local result = Template.execute("code-generator", {
+    description = "REST API client with error handling",
+    language = "rust",
+    session_id = "user-session-123",
+    memory_enabled = true,
+    context_budget = 3000,
+    provider_name = "ollama"
+})
 ```
 
 ---
@@ -71,6 +100,36 @@ print(result.result.value)
 | `language` | Enum | `"rust"` | Programming language (see below) |
 | `include_tests` | Boolean | `true` | Whether to generate unit tests |
 | `model` | String | `"ollama/llama3.2:3b"` | LLM model for generation agents |
+
+### Memory Parameters
+
+All templates support optional memory integration for context-aware execution:
+
+| Parameter | Type | Default | Range/Values | Description |
+|-----------|------|---------|--------------|-------------|
+| `session_id` | String | `null` | Any string | Session identifier for conversation memory filtering |
+| `memory_enabled` | Boolean | `true` | `true`, `false` | Enable memory-enhanced execution (uses episodic + semantic memory) |
+| `context_budget` | Integer | `2000` | `100-8000` | Token budget for context assembly (higher = more context) |
+
+**Memory Integration**: When `session_id` is provided and `memory_enabled` is `true`, the template will:
+- Retrieve relevant episodic memory from conversation history
+- Query semantic memory for related concepts
+- Assemble context within the `context_budget` token limit
+- Provide memory-enhanced context to LLM for better results
+
+### Provider Parameters
+
+Templates support dual-path provider resolution:
+
+| Parameter | Type | Default | Range/Values | Description |
+|-----------|------|---------|--------------|-------------|
+| `provider_name` | String | `null` | `"ollama"`, `"openai"`, etc. | Provider name (mutually exclusive with `model`) |
+
+**Provider Resolution**:
+- Use `provider_name` to select a provider with its default model (e.g., `provider_name: "ollama"`)
+- Use `model` for explicit model selection (e.g., `model: "gpt-4"`)
+- If both provided, `model` takes precedence
+- `provider_name` and `model` are mutually exclusive
 
 ### Supported Languages
 
@@ -111,7 +170,7 @@ llmspell template schema code-generator
 - **Input**: Full specification from Phase 1
 - **Prompt Strategy**: "Provide ONLY the code (no explanations)" - prevents verbose output
 - **Language-Specific**: "{language}-idiomatic patterns" in prompt
-- **Quality Signal**: "production-ready, not just a stub"
+- **Quality Signal**: "experimental workflows for rapid exploration, not just a stub"
 - **Output**: Implemented code following specification
 
 **Temperature Rationale**: 0.5 higher than spec (0.3) - implementation needs creativity for data structures/algorithms, but still structured for correctness
@@ -168,7 +227,7 @@ Creates a specification agent that:
 
 Creates an implementation agent that:
 1. Reads the specification from Phase 1
-2. Generates production-ready code
+2. Generates experimental workflows for rapid exploration code
 3. Follows language-specific idioms
 4. Includes error handling
 5. Applies best practices

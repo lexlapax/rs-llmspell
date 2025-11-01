@@ -1,6 +1,6 @@
 # LLMSpell User Guide
 
-**Learn to build powerful LLM-driven applications with production-ready rs-llmspell**
+**Learn to experiment with AI concepts through rapid scripting with rs-llmspell**
 
 **🔗 Navigation**: [← Docs Hub](../) | [Project Home](../../) | [Examples](../../examples/) | [API Reference](api/)
 
@@ -8,21 +8,21 @@
 
 ## Overview
 
-> **📚 Central Hub**: Your starting point for all LLMSpell documentation. Everything you need is organized into 12 essential documents, plus comprehensive API references for both Lua and Rust. Now with Unix daemon infrastructure, tool CLI commands, fleet management, feature flags, and 10 production-ready AI agent templates!
+> **📚 Central Hub**: Your starting point for AI experimentation with LLMSpell. Everything you need is organized into 13 essential documents, plus comprehensive API references for both Lua and Rust. Experimental features include adaptive memory system, context engineering, Unix daemon infrastructure, tool CLI commands, fleet management, feature flags, and 10 experimental AI workflows!
 
-**Version**: 0.12.0 | **Status**: Phase 12 Complete - Production-Ready AI Agent Templates | **Last Updated**: October 2025
+**Version**: 0.13.0 | **Status**: Phase 13 Complete - Experimental Memory & Context Engineering | **Last Updated**: January 2025
 
-## 📖 Essential Documentation (12 Files)
+## 📖 Essential Documentation (13 Files - Experimentation Guides)
 
 ### 1. [Getting Started](getting-started.md)
-**Quick start in under 10 minutes**
+**Quick experimental setup in under 10 minutes**
 - Installation and setup with feature flags
 - Progressive learning path (6 examples)
-- RAG setup and first knowledge base
-- Running your first daemon with tool CLI
+- Memory system and first experiments
+- Running your first daemon for scale validation
 
 ### 2. [Core Concepts](concepts.md)
-**Understand LLMSpell architecture including Phase 10 & 11 features**
+**Understand LLMSpell experimental architecture with production-quality foundations**
 - Component model (BaseAgent trait)
 - Agents, Tools (40+ with feature flags), Workflows
 - RAG (Retrieval-Augmented Generation) ⭐
@@ -47,6 +47,32 @@
 - Security settings and deployment profiles
 - Environment variables
 
+### 3a. [Provider Best Practices](provider-best-practices.md) ⭐ Phase 13
+**Dual-path provider architecture guide**
+- When to use `provider_name` vs `model` parameter
+- Production patterns (environment-specific, task-specific, cost-optimized)
+- Migration guide from ad-hoc model strings to centralized providers
+- Common patterns and best practices
+- Internal API changes for developers
+
+### 3b. [Memory Configuration](memory-configuration.md) ⭐ Phase 13
+**Memory system configuration and provider integration**
+- Quick start with memory profile
+- Complete configuration reference (consolidation, daemon, providers)
+- Provider integration and requirements
+- Use cases (conversational agents, knowledge accumulation, long-running agents)
+- Performance tuning and troubleshooting
+- Environment variables for memory system
+
+### 3c. [CLI Reference](cli.md) ⭐ Phase 13.12.4
+**Complete CLI command reference**
+- All 16 command groups documented (run, exec, repl, debug, kernel, state, session, config, keys, backup, app, tool, model, template, memory, context)
+- Each command includes: description, usage, options, examples, use cases
+- Memory commands (add, search, query, stats, consolidate) with kernel protocol explanation
+- Context commands (assemble, strategies, analyze) with strategy recommendations
+- Global options and built-in profiles
+- Quick reference table of contents
+
 ### 4. [Security & Permissions](security-and-permissions.md) ⭐ Phase 11a.13
 **Comprehensive security sandbox guide for safe tool execution**
 - Three-level security model (Safe/Restricted/Privileged)
@@ -66,9 +92,9 @@
 - 6 troubleshooting scenarios
 - 4 complete example scripts
 
-### 6. [AI Agent Templates](templates/README.md) ⭐ Phase 12
-**Production-ready AI workflows - Installation to productive AI in <5 minutes**
-- 10 built-in templates (6 base + 4 advanced)
+### 6. [AI Workflow Templates](templates/README.md) ⭐ Phase 12
+**Experimental AI workflows for rapid concept exploration**
+- 10 experimental templates (6 base + 4 advanced)
 - Research Assistant: 4-phase research workflow (web search, analysis, synthesis, validation)
 - Interactive Chat, Data Analysis, Code Generator, Document Processor, Workflow Orchestrator
 - Code Review, Content Generation, File Classification, Knowledge Management (advanced)
@@ -231,9 +257,23 @@ launchctl load ~/Library/LaunchAgents/com.llmspell.kernel.plist  # macOS
 - **Connection Files**: Jupyter-compatible kernel discovery
 - **Multi-Client**: Handle concurrent IDE connections
 
+## 🆕 Phase 13 Features (Complete) ⭐
+
+### Adaptive Memory & Context Engineering
+- **Multi-Tier Memory System**: Episodic (conversation history), Semantic (knowledge graph), Procedural (patterns)
+- **Hot-Swappable Backends**: HNSW (production, 8.47x speedup), InMemory (development), ChromaDB, Qdrant
+- **Bi-Temporal Knowledge Graph**: SurrealDB embedded graph tracking event time + ingestion time
+- **Context Engineering Pipeline**: Query understanding, multi-strategy retrieval, DeBERTa reranking, token-aware assembly
+- **LLM-Driven Consolidation**: Extract entities and relationships from conversations into knowledge graph
+- **CLI Commands**: `llmspell memory add|search|consolidate`, `llmspell context assemble`
+- **Lua API**: Memory global (episodic, semantic, procedural), Context global (assemble, test)
+- **Performance**: <2ms episodic add, ~8ms context assembly, ~2x parallel hybrid retrieval speedup
+- **Memory + Templates Integration**: Templates can leverage memory for contextual workflows
+- **149 Tests Passing**: 100% pass rate across all Phase 13 components
+
 ## 🆕 Phase 12 Features (Complete) ⭐
 
-### AI Agent Templates - Turn-key Workflows
+### AI Agent Templates - Experimental Workflows
 - **10 Built-in Templates**: 6 base templates + 4 advanced workflows
 - **Research Assistant**: 4-phase research workflow with web search, analysis, synthesis, validation
 - **Interactive Chat**: Session-based conversation with context and memory
@@ -461,4 +501,4 @@ Security & Providers (2 crates)
 
 ---
 
-**Version 0.12.0** | Phase 12 Complete - Production-Ready AI Agent Templates | [Release Notes](../../RELEASE_NOTES_v0.12.0.md) | [Changelog](../../CHANGELOG.md)
+**Version 0.12.0** | Phase 12 Complete - Experimental Workflows for Rapid Exploration AI Agent Templates | [Release Notes](../../RELEASE_NOTES_v0.12.0.md) | [Changelog](../../CHANGELOG.md)

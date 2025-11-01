@@ -127,7 +127,7 @@ pub mod validation;
 
 // Re-exports for convenience
 pub use artifacts::Artifact;
-pub use context::ExecutionContext;
+pub use context::{assemble_template_context, ContextMessage, ExecutionContext};
 pub use core::{
     CostEstimate, Template, TemplateCategory, TemplateMetadata, TemplateOutput, TemplateParams,
 };

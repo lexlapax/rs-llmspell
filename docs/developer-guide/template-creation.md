@@ -8,7 +8,7 @@
 
 ## Overview
 
-Templates are production-ready AI workflows combining agents, tools, RAG, and LLM providers into reusable, configurable patterns. This guide covers creating custom templates from scratch.
+Templates are experimental components with production-quality patterns AI workflows combining agents, tools, RAG, and LLM providers into reusable, configurable patterns. This guide covers creating custom templates from scratch.
 
 **Prerequisites**:
 - Rust knowledge (async/await, traits)

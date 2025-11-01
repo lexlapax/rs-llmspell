@@ -1,9 +1,6 @@
 //! ABOUTME: Performance benchmarks for Session and Artifact operations
 //! ABOUTME: Validates <50ms session operations target from Phase 6 requirements
 
-mod test_helpers;
-use test_helpers::create_test_infrastructure;
-
 // Benchmark for llmspell-bridge sessions
 
 use criterion::{criterion_group, criterion_main, BenchmarkId, Criterion};
@@ -28,6 +25,19 @@ async fn create_test_providers() -> Arc<ProviderManager> {
 // Helper function to create test registry
 fn create_test_registry() -> Arc<ComponentRegistry> {
     Arc::new(ComponentRegistry::new())
+}
+
+// Helper function to create infrastructure registries for testing
+fn create_test_infrastructure() -> (
+    Arc<llmspell_tools::ToolRegistry>,
+    Arc<llmspell_agents::FactoryRegistry>,
+    Arc<dyn llmspell_workflows::WorkflowFactory>,
+) {
+    let tool_registry = Arc::new(llmspell_tools::ToolRegistry::new());
+    let agent_registry = Arc::new(llmspell_agents::FactoryRegistry::new());
+    let workflow_factory: Arc<dyn llmspell_workflows::WorkflowFactory> =
+        Arc::new(llmspell_workflows::factory::DefaultWorkflowFactory::new());
+    (tool_registry, agent_registry, workflow_factory)
 }
 
 // Helper function to create and setup engine with globals

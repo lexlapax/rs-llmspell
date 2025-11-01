@@ -2519,7 +2519,7 @@ Target metrics for 7B models (from design, not validated in Phase 11):
 - ✅ **All integration tests passing** - 10/10 tests (5 Ollama + 5 Candle)
 - [-] **Performance benchmarks** - deferred, functional validation prioritized
 - ✅ **Documentation builds without warnings** - cargo doc clean
-- ✅ **Examples documented** - 4 production-ready Lua examples with usage instructions
+- ✅ **Examples documented** - 4 experimental infrastructure with production-quality engineering Lua examples with usage instructions
 
 ---
 

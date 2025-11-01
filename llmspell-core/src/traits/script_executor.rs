@@ -256,6 +256,142 @@ pub trait ScriptExecutor: Send + Sync + 'static {
         })
     }
 
+    // === Memory Operations (Phase 13.12.1 - follows template pattern) ===
+
+    /// Add episodic memory entry
+    ///
+    /// Returns JSON object with status. Follows template operation pattern.
+    ///
+    /// Default returns error for backward compatibility.
+    fn handle_memory_add(
+        &self,
+        _session_id: &str,
+        _role: &str,
+        _content: &str,
+        _metadata: Value,
+    ) -> Result<Value, LLMSpellError> {
+        Err(LLMSpellError::Component {
+            message: "Memory add not supported by this executor".to_string(),
+            source: None,
+        })
+    }
+
+    /// Search episodic memory
+    ///
+    /// Returns JSON array of matching memory entries.
+    ///
+    /// Default returns error for backward compatibility.
+    fn handle_memory_search(
+        &self,
+        _session_id: Option<&str>,
+        _query: &str,
+        _limit: usize,
+    ) -> Result<Value, LLMSpellError> {
+        Err(LLMSpellError::Component {
+            message: "Memory search not supported by this executor".to_string(),
+            source: None,
+        })
+    }
+
+    /// Query semantic knowledge graph
+    ///
+    /// Returns JSON array of matching entities.
+    ///
+    /// Default returns error for backward compatibility.
+    fn handle_memory_query(&self, _query: &str, _limit: usize) -> Result<Value, LLMSpellError> {
+        Err(LLMSpellError::Component {
+            message: "Memory query not supported by this executor".to_string(),
+            source: None,
+        })
+    }
+
+    /// Get memory statistics
+    ///
+    /// Returns JSON object with memory statistics.
+    ///
+    /// Default returns error for backward compatibility.
+    fn handle_memory_stats(&self) -> Result<Value, LLMSpellError> {
+        Err(LLMSpellError::Component {
+            message: "Memory stats not supported by this executor".to_string(),
+            source: None,
+        })
+    }
+
+    /// Consolidate episodic to semantic memory
+    ///
+    /// Returns JSON object with consolidation results.
+    ///
+    /// Default returns error for backward compatibility.
+    fn handle_memory_consolidate(
+        &self,
+        _session_id: Option<&str>,
+        _force: bool,
+    ) -> Result<Value, LLMSpellError> {
+        Err(LLMSpellError::Component {
+            message: "Memory consolidate not supported by this executor".to_string(),
+            source: None,
+        })
+    }
+
+    // === Context Operations (Phase 13.12.3 - follows template pattern) ===
+
+    /// Assemble context with specified strategy
+    ///
+    /// Returns JSON object with assembled context chunks.
+    ///
+    /// Default returns error for backward compatibility.
+    fn handle_context_assemble(
+        &self,
+        _query: &str,
+        _strategy: &str,
+        _budget: usize,
+        _session_id: Option<&str>,
+    ) -> Result<Value, LLMSpellError> {
+        Err(LLMSpellError::Component {
+            message: "Context assemble not supported by this executor".to_string(),
+            source: None,
+        })
+    }
+
+    /// List available context strategies
+    ///
+    /// Returns JSON array of strategy metadata.
+    ///
+    /// Default returns hardcoded list.
+    fn handle_context_strategies(&self) -> Result<Value, LLMSpellError> {
+        use serde_json::json;
+        Ok(json!([
+            {
+                "name": "hybrid",
+                "description": "Combines RAG, episodic, and semantic memory (recommended)"
+            },
+            {
+                "name": "episodic",
+                "description": "Conversation history only"
+            },
+            {
+                "name": "semantic",
+                "description": "Knowledge graph entities only"
+            },
+            {
+                "name": "rag",
+                "description": "Document retrieval only"
+            }
+        ]))
+    }
+
+    /// Analyze token usage across strategies
+    ///
+    /// Returns JSON array with per-strategy analysis.
+    ///
+    /// Default returns error for backward compatibility.
+    fn handle_context_analyze(&self, _query: &str, _budget: usize) -> Result<Value, LLMSpellError> {
+        Err(LLMSpellError::Component {
+            message: "Context analyze not supported by this executor".to_string(),
+            source: None,
+        })
+    }
+
     /// Downcast support for accessing concrete executor implementations (Phase 12.8.fix)
     ///
     /// Enables downcasting from `Arc<dyn ScriptExecutor>` to concrete types like `ScriptRuntime`.

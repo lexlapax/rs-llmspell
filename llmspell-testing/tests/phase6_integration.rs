@@ -15,7 +15,7 @@ use std::time::Duration;
 async fn test_phase6_complete_session_lifecycle() -> Result<()> {
     // Initialize all Phase 6 components
     let storage_backend = Arc::new(MemoryBackend::new());
-    let state_manager = Arc::new(StateManager::new().await?);
+    let state_manager = Arc::new(StateManager::new(None).await?);
     let event_bus = Arc::new(EventBus::new());
     let hook_registry = Arc::new(HookRegistry::new());
     let hook_executor = Arc::new(HookExecutor::new());
@@ -94,7 +94,7 @@ async fn test_phase6_complete_session_lifecycle() -> Result<()> {
 #[tokio::test]
 async fn test_phase6_performance_validation() -> Result<()> {
     let storage_backend = Arc::new(MemoryBackend::new());
-    let state_manager = Arc::new(StateManager::new().await?);
+    let state_manager = Arc::new(StateManager::new(None).await?);
     let event_bus = Arc::new(EventBus::new());
     let hook_registry = Arc::new(HookRegistry::new());
     let hook_executor = Arc::new(HookExecutor::new());

@@ -1,6 +1,6 @@
-# Technical Documentation - LLMSpell v0.12.0
+# Technical Documentation - LLMSpell v0.13.0
 
-**Phase 12 Complete** - Production-Ready AI Agent Templates
+**Phase 13 Complete** - Adaptive Memory & Context Engineering
 
 **🔗 Navigation**: [← Docs Hub](../) | [Project Home](../../) | [User Guide](../user-guide/) | [Developer Guide](../developer-guide/)
 
@@ -8,23 +8,24 @@
 
 ## Overview
 
-> **📊 Technical Reference**: Comprehensive technical documentation for LLMSpell v0.12.0. Documentation structure optimized to 6 core guides covering the complete system from architecture through deployment, all aligned with Phase 12 production implementation including Unix daemon infrastructure, signal handling, tool CLI commands, fleet management, feature flags, and production-ready AI agent templates.
+> **📊 Technical Reference**: Comprehensive technical documentation for LLMSpell v0.13.0. Documentation structure optimized to 6 core guides covering the complete experimental system with production-quality engineering foundations. Phase 13 experimental infrastructure includes adaptive memory system, bi-temporal knowledge graph, context engineering, Unix daemon infrastructure, signal handling, tool CLI commands, fleet management, feature flags, and experimental AI workflows.
 
-**Version**: v0.12.0 | **Status**: Production Ready | **Last Updated**: October 2025
+**Version**: v0.13.0 | **Status**: Experimental Platform with Production-Quality Foundations | **Last Updated**: January 2025
 
 ---
 
 ## Core Documentation (6 Essential Guides)
 
-### 1. 📊 [Current Architecture](current-architecture.md) ✅ v0.12.0
+### 1. 📊 [Current Architecture](current-architecture.md) ✅ v0.13.0
 **Purpose**: Overview and navigation hub
-**Coverage**: Complete system architecture from Phase 0-12
+**Coverage**: Complete system architecture from Phase 0-13
 **Key Content**:
-- Component architecture (18 crates)
+- Component architecture (21 crates)
+- Adaptive memory system (Phase 13: episodic, semantic, procedural)
 - Daemon infrastructure and service support (Phase 10)
-- Template system with 10 built-in workflows (Phase 12)
+- Template system with 10 experimental workflows (Phase 12)
 - Performance characteristics (all targets exceeded 10-50x)
-- API surface (18 Lua globals including Template, RAG, Debug, Tool)
+- API surface (20 Lua globals including Memory, Context, Template, RAG)
 - Feature flags and modular builds (19-35MB)
 
 ### 2. 🚀 [Kernel Protocol Architecture](kernel-protocol-architecture.md) ✅ v0.10.0
@@ -49,9 +50,9 @@
 - Service installation (systemd/launchd)
 - PID file and log rotation management
 
-### 4. 🎯 [Architecture Decisions](architecture-decisions.md) ✅ v0.10.0
+### 4. 🎯 [Architecture Decisions](architecture-decisions.md) ✅ v0.13.0
 **Purpose**: All architectural decisions and rationale
-**Coverage**: 40+ ADRs from Phase 0-10
+**Coverage**: 46+ ADRs from Phase 0-13
 **Key Content**:
 - Foundation decisions (BaseAgent, async-first, trait-based modularity)
 - Phase evolution and key reversals
@@ -59,6 +60,8 @@
 - Daemon and service architecture (Phase 10)
 - Feature flags and modular builds (Phase 10.17.5+)
 - Fleet management via OS processes vs internal runtime
+- Adaptive memory system (Phase 13: ADR-044 Bi-Temporal Graph, ADR-045 Consolidation Strategy, ADR-046 LLM-Driven Consolidation)
+- Phase 13 design: [Phase 13 Design Document](../in-progress/phase-13-design-doc.md)
 
 ### 5. ⚡ [Operational Guide](operational-guide.md) ✅ v0.10.0
 **Purpose**: Performance, security, and operations unified
@@ -162,14 +165,15 @@
 
 ---
 
-## Phase 12 Achievements
+## Phase 13 Experimental Infrastructure (Production-Quality Engineering)
 
 ### System Architecture
-- **18 crates** in workspace (consolidated architecture)
-- **~68K lines** of Rust code (2,651 LOC templates)
+- **21 crates** in workspace (added llmspell-memory, llmspell-graph, llmspell-context)
+- **~70K lines** of Rust code (3,200+ LOC Phase 13)
 - **40+ tools** with feature flag modularity
-- **18 Lua globals** (including Template, RAG, and Debug)
+- **20 Lua globals** (including Memory, Context, Template, RAG, Debug)
 - **10 built-in templates** (6 base + 4 advanced)
+- **3-tier memory system** (episodic, semantic, procedural)
 - **IntegratedKernel** with unified runtime
 - **Feature flags** for modular builds (19-35MB)
 
@@ -188,8 +192,8 @@
 - **ComponentRegistry access** via kernel message protocol
 - **Runtime tool discovery** with automatic availability detection
 
-### Template System (Phase 12) ⭐
-- **10 built-in templates** solving real AI workflow problems
+### Template System (Phase 12 - Experimental Workflows) ⭐
+- **10 experimental workflows** for rapid AI concept exploration
 - **6 template categories** (Research, Chat, Analysis, CodeGen, Document, Workflow)
 - **5 template CLI subcommands** (list, info, exec, search, schema)
 - **6 Template Lua API methods** (Template global, 16th of 18)
@@ -231,7 +235,8 @@
 | **Parameter validation** ⭐ | <5ms | 0.1ms | ✅ 50x faster |
 
 ### Testing Coverage
-- **635 tests total** (kernel: 57, bridge: 334, CLI: 57, fleet: 38, templates: 149)
+- **784 tests total** (kernel: 57, bridge: 334, CLI: 57, fleet: 38, templates: 149, memory: 149)
+- **149 memory tests** (episodic, semantic, context, consolidation) ⭐ Phase 13
 - **149 template tests** (122 unit + 27 integration) ⭐ Phase 12
 - **29 daemon tests** for full lifecycle coverage
 - **11 tool CLI tests** covering all subcommands
@@ -240,20 +245,22 @@
 - **Zero warnings policy** enforced with clippy
 
 ### Documentation Updates
-- **6 core guides** covering all aspects of Phase 10-12
+- **6 core guides** covering all aspects of Phase 10-13
 - **8 supplementary guides** for specialized topics
-- **Complete technical coverage** from architecture to deployment
-- **Production deployment ready** with all features documented
+- **3 new Rust API docs** for Phase 13 crates (llmspell-memory, llmspell-graph, llmspell-context)
+- **Complete technical coverage** from architecture to scale validation
+- **Extraction-ready** with production-quality engineering documented
 - **Feature flags migration guide** for Phase 10.17.5+ builds
 - **3,655 lines template docs** covering all 10 built-in templates ⭐ Phase 12
+- **Memory configuration guide** and **RAG-memory integration** ⭐ Phase 13
 
 ---
 
 ## Related Documentation
 
-### For Users
-- **[User Guide](../user-guide/)** - How to use LLMSpell
-- **[Service Deployment](../user-guide/service-deployment.md)** - Production deployment ⭐ NEW
+### For Experimenters
+- **[User Guide](../user-guide/)** - How to experiment with LLMSpell
+- **[Service Deployment](../user-guide/service-deployment.md)** - Scale validation & deployment ⭐
 - **[IDE Integration](../user-guide/ide-integration.md)** - IDE setup ⭐ NEW
 - **[Lua API](../user-guide/api/lua/)** - Script reference
 - **[Examples](../../examples/)** - Working examples
@@ -265,6 +272,8 @@
 - **[TODO](../../TODO.md)** - Current task tracking
 
 ### Historical Reference
+- **[Phase 13 Design](../in-progress/phase-13-design-doc.md)** - Adaptive memory & context engineering
+- **[Phase 12 Design](../in-progress/phase-12-design-doc.md)** - Production templates
 - **[Phase 8 Design](../in-progress/phase-08-design-doc.md)** - RAG implementation
 - **[Phase 9 Design](../in-progress/PHASE09-DONE.md)** - Kernel consolidation
 - **[Master Vision](master-architecture-vision.md)** - Original architecture (historical)
@@ -276,10 +285,10 @@
 ### Core Documentation
 | Document | Version | Status | Last Updated | Phase |
 |----------|---------|--------|--------------|-------|
-| current-architecture.md | v0.10.0 | ✅ Current | Jan 2025 | 10 |
+| current-architecture.md | v0.13.0 | ✅ Current | Jan 2025 | 13 |
 | kernel-protocol-architecture.md | v0.10.0 | ✅ Current | Jan 2025 | 10 |
 | cli-command-architecture.md | v0.10.0 | ✅ Current | Jan 2025 | 10 |
-| architecture-decisions.md | v0.10.0 | ✅ Current | Jan 2025 | 10 |
+| architecture-decisions.md | v0.13.0 | ✅ Current | Jan 2025 | 13 |
 | operational-guide.md | v0.10.0 | ✅ Current | Jan 2025 | 10 |
 | rag-system-guide.md | v0.8.0 | ✅ Stable | Aug 2024 | 8 |
 
@@ -387,4 +396,4 @@ launchctl load ~/Library/LaunchAgents/com.llmspell.kernel.plist
 
 ---
 
-*Technical documentation for LLMSpell v0.12.0 after Phase 12 production-ready AI agent templates. Production-ready with daemon mode, tool CLI, template system, fleet management, and feature flags.*
+*Technical documentation for LLMSpell v0.13.0 after Phase 13 experimental memory & context engineering. Experimental platform with production-quality foundations: daemon mode, tool CLI, template system, adaptive memory, fleet management, and feature flags.*

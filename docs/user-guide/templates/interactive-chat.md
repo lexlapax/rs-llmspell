@@ -60,6 +60,19 @@ Production-ready conversational AI template with two execution modes: **interact
   --param message="What is dependency injection?"
 ```
 
+### CLI - With Memory and Provider
+
+Enable memory-enhanced execution with custom provider:
+
+```bash
+llmspell template exec interactive-chat \
+  --param message="Explain Rust lifetimes in 3 sentences" \
+  --param session-id="user-session-123" \
+  --param memory-enabled=true \
+  --param context-budget=3000 \
+  --param provider-name="ollama"
+```
+
 ### Lua - Programmatic Usage
 
 ```lua
@@ -69,6 +82,20 @@ local result = Template.execute("interactive-chat", {
 })
 
 print(result.result)
+```
+
+### Lua - With Memory and Provider
+
+Enable memory-enhanced execution:
+
+```lua
+local result = Template.execute("interactive-chat", {
+    message = "Explain Rust lifetimes in 3 sentences",
+    session_id = "user-session-123",
+    memory_enabled = true,
+    context_budget = 3000,
+    provider_name = "ollama"
+})
 ```
 
 ---
@@ -86,6 +113,36 @@ print(result.result)
 | `tools` | Array | `[]` | Tool names to enable (e.g., `["calculator", "web-searcher"]`). Tools validated via ToolRegistry before agent creation |
 | `session_id` | String | (none) | Optional session UUID for reusing existing conversation. Enables multi-turn context across separate CLI invocations. If not provided, creates new session. See Example 4 for session reuse workflow |
 | `enable_memory` | Boolean | `false` | Long-term memory integration (Phase 13 placeholder - not yet active) |
+
+### Memory Parameters
+
+All templates support optional memory integration for context-aware execution:
+
+| Parameter | Type | Default | Range/Values | Description |
+|-----------|------|---------|--------------|-------------|
+| `session_id` | String | `null` | Any string | Session identifier for conversation memory filtering |
+| `memory_enabled` | Boolean | `true` | `true`, `false` | Enable memory-enhanced execution (uses episodic + semantic memory) |
+| `context_budget` | Integer | `2000` | `100-8000` | Token budget for context assembly (higher = more context) |
+
+**Memory Integration**: When `session_id` is provided and `memory_enabled` is `true`, the template will:
+- Retrieve relevant episodic memory from conversation history
+- Query semantic memory for related concepts
+- Assemble context within the `context_budget` token limit
+- Provide memory-enhanced context to LLM for better results
+
+### Provider Parameters
+
+Templates support dual-path provider resolution:
+
+| Parameter | Type | Default | Range/Values | Description |
+|-----------|------|---------|--------------|-------------|
+| `provider_name` | String | `null` | `"ollama"`, `"openai"`, etc. | Provider name (mutually exclusive with `model`) |
+
+**Provider Resolution**:
+- Use `provider_name` to select a provider with its default model (e.g., `provider_name: "ollama"`)
+- Use `model` for explicit model selection (e.g., `model: "gpt-4"`)
+- If both provided, `model` takes precedence
+- `provider_name` and `model` are mutually exclusive
 
 **Inspect Full Schema:**
 ```bash
@@ -593,7 +650,7 @@ export TERM=xterm-256color
 **Cause**: Old version (pre-12.9) or terminal signal handling issue
 
 **Solution**:
-1. Verify version: `./target/debug/llmspell --version` should show ≥0.12.0
+1. Verify version: `./target/debug/llmspell --version` should show ≥0.13.0
 2. Check REPL is using production integration (Phase 12.9)
 3. If issue persists, report as bug with terminal type
 

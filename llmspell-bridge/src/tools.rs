@@ -581,6 +581,8 @@ async fn register_web_tools(
 /// Register communication tools with dual-registration
 #[allow(unused_variables)] // registries are unused when no features are enabled
 #[allow(clippy::unnecessary_wraps)] // Result needed for consistency with other register functions
+#[allow(clippy::unused_async)]
+// Async needed when email/database features enabled
 async fn register_communication_tools(
     component_registry: &Arc<ComponentRegistry>,
     tool_registry: &Arc<llmspell_tools::ToolRegistry>,

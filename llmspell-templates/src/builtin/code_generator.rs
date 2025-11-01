@@ -9,8 +9,8 @@ use crate::{
     artifacts::Artifact,
     context::ExecutionContext,
     core::{
-        CostEstimate, TemplateCategory, TemplateMetadata, TemplateOutput, TemplateParams,
-        TemplateResult,
+        memory_parameters, provider_parameters, CostEstimate, TemplateCategory, TemplateMetadata,
+        TemplateOutput, TemplateParams, TemplateResult,
     },
     error::{Result, TemplateError},
     validation::{ConfigSchema, ParameterConstraints, ParameterSchema, ParameterType},
@@ -18,7 +18,7 @@ use crate::{
 use async_trait::async_trait;
 use serde_json::json;
 use std::time::Instant;
-use tracing::{info, warn};
+use tracing::{debug, info, warn};
 
 /// Code Generator Template
 ///
@@ -72,7 +72,7 @@ impl crate::core::Template for CodeGeneratorTemplate {
     }
 
     fn config_schema(&self) -> ConfigSchema {
-        ConfigSchema::new(vec![
+        let mut params = vec![
             // description (required)
             ParameterSchema::required(
                 "description",
@@ -117,7 +117,19 @@ impl crate::core::Template for CodeGeneratorTemplate {
                 ParameterType::String,
                 json!("ollama/llama3.2:3b"),
             ),
-        ])
+        ];
+
+        // Add memory parameters (Task 13.11.1)
+        params.extend(memory_parameters());
+
+        // Add provider parameters (Task 13.5.7d)
+        params.extend(provider_parameters());
+
+        debug!(
+            "CodeGenerator: Generated config schema with {} parameters",
+            params.len()
+        );
+        ConfigSchema::new(params)
     }
 
     async fn execute(
@@ -131,11 +143,22 @@ impl crate::core::Template for CodeGeneratorTemplate {
         let description: String = params.get("description")?;
         let language: String = params.get_or("language", "rust".to_string());
         let include_tests: bool = params.get_or("include_tests", true);
-        let model: String = params.get_or("model", "ollama/llama3.2:3b".to_string());
+
+        // Extract memory parameters (Task 13.11.2)
+        let session_id: Option<String> = params.get_optional("session_id").unwrap_or(None);
+        let memory_enabled: bool = params.get_or("memory_enabled", true);
+        let context_budget: i64 = params.get_or("context_budget", 2000);
+
+        // Smart dual-path provider resolution (Task 13.5.7d)
+        let provider_config = context.resolve_llm_config(&params)?;
+        let model_str = provider_config
+            .default_model
+            .as_ref()
+            .ok_or_else(|| TemplateError::Config("provider missing model".into()))?;
 
         info!(
             "Starting code generation (language={}, tests={}, model={})",
-            language, include_tests, model
+            language, include_tests, model_str
         );
 
         // Initialize output
@@ -149,14 +172,22 @@ impl crate::core::Template for CodeGeneratorTemplate {
         // Phase 1: Generate specification with spec agent
         info!("Phase 1: Generating specification...");
         let spec_result = self
-            .generate_specification(&description, &language, &model, &context)
+            .generate_specification(
+                &description,
+                &language,
+                &provider_config,
+                &context,
+                session_id.as_deref(),
+                memory_enabled,
+                context_budget,
+            )
             .await?;
         output.metrics.agents_invoked += 1; // spec agent
 
         // Phase 2: Generate implementation with implementation agent
         info!("Phase 2: Generating implementation...");
         let impl_result = self
-            .generate_implementation(&spec_result, &language, &model, &context)
+            .generate_implementation(&spec_result, &language, &provider_config, &context)
             .await?;
         output.metrics.agents_invoked += 1; // implementation agent
 
@@ -164,7 +195,7 @@ impl crate::core::Template for CodeGeneratorTemplate {
         let test_result = if include_tests {
             info!("Phase 3: Generating tests...");
             let result = self
-                .generate_tests(&impl_result, &language, &model, &context)
+                .generate_tests(&impl_result, &language, &provider_config, &context)
                 .await?;
             output.metrics.agents_invoked += 1; // test agent
             Some(result)
@@ -217,6 +248,38 @@ impl crate::core::Template for CodeGeneratorTemplate {
             "Code generation complete (duration: {}ms, agents: {})",
             output.metrics.duration_ms, output.metrics.agents_invoked
         );
+
+        // Store in memory if enabled (Task 13.11.3)
+        if memory_enabled && session_id.is_some() && context.memory_manager().is_some() {
+            let memory_mgr = context.memory_manager().unwrap();
+            let input_summary = format!(
+                "Generate {} code: {}",
+                language,
+                &description[..description.len().min(100)]
+            );
+            let output_summary = format!(
+                "Generated {} implementation ({} lines) with {}",
+                language,
+                impl_result.code.lines().count(),
+                if include_tests { "tests" } else { "no tests" }
+            );
+
+            crate::context::store_template_execution(
+                &memory_mgr,
+                session_id.as_ref().unwrap(),
+                &self.metadata.id,
+                &input_summary,
+                &output_summary,
+                json!({
+                    "language": language,
+                    "include_tests": include_tests,
+                    "code_lines": impl_result.code.lines().count(),
+                }),
+            )
+            .await
+            .ok(); // Don't fail execution if storage fails
+        }
+
         Ok(output)
     }
 
@@ -258,17 +321,27 @@ impl crate::core::Template for CodeGeneratorTemplate {
 
 impl CodeGeneratorTemplate {
     /// Phase 1: Generate specification with spec agent
+    #[allow(clippy::too_many_arguments)]
     async fn generate_specification(
         &self,
         description: &str,
         language: &str,
-        model: &str,
+        provider_config: &llmspell_config::ProviderConfig,
         context: &ExecutionContext,
+        session_id: Option<&str>,
+        memory_enabled: bool,
+        context_budget: i64,
     ) -> Result<SpecificationResult> {
         use llmspell_agents::factory::{AgentConfig, ModelConfig, ResourceLimits};
         use llmspell_core::types::AgentInput;
 
         info!("Creating specification agent for {} code", language);
+
+        // Extract model from provider config
+        let model = provider_config
+            .default_model
+            .as_ref()
+            .ok_or_else(|| TemplateError::Config("provider missing model".into()))?;
 
         // Parse model string (provider/model format)
         let (provider, model_id) = if let Some(slash_pos) = model.find('/') {
@@ -277,7 +350,7 @@ impl CodeGeneratorTemplate {
                 model[slash_pos + 1..].to_string(),
             )
         } else {
-            ("ollama".to_string(), model.to_string())
+            (provider_config.provider_type.clone(), model.to_string())
         };
 
         // Create agent config for specification generation
@@ -288,8 +361,8 @@ impl CodeGeneratorTemplate {
             model: Some(ModelConfig {
                 provider,
                 model_id,
-                temperature: Some(0.3), // Lower temperature for structured specs
-                max_tokens: Some(2000),
+                temperature: provider_config.temperature.or(Some(0.3)), // Lower temperature for structured specs
+                max_tokens: provider_config.max_tokens.or(Some(2000)),
                 settings: serde_json::Map::new(),
             }),
             allowed_tools: vec![],
@@ -312,9 +385,36 @@ impl CodeGeneratorTemplate {
                 TemplateError::ExecutionFailed(format!("Agent creation failed: {}", e))
             })?;
 
+        // Assemble memory context (Task 13.11.2)
+        let memory_context = if let (true, Some(sid)) = (memory_enabled, session_id) {
+            if let Some(bridge) = context.context_bridge() {
+                debug!(
+                    "Assembling memory context: session={}, budget={}",
+                    sid, context_budget
+                );
+                crate::assemble_template_context(&bridge, description, sid, context_budget).await
+            } else {
+                warn!("Memory enabled but ContextBridge unavailable");
+                vec![]
+            }
+        } else {
+            vec![]
+        };
+
+        let memory_context_str = if !memory_context.is_empty() {
+            memory_context
+                .iter()
+                .map(|msg| format!("{}: {}", msg.role, msg.content))
+                .collect::<Vec<_>>()
+                .join("\n\n")
+        } else {
+            String::new()
+        };
+
         // Build the specification request with instructions in the prompt
         let spec_prompt = format!(
-            "You are an expert software architect specializing in {}. \
+            "{}\
+             You are an expert software architect specializing in {}. \
              Generate a detailed, well-structured technical specification from the following description.\n\n\
              **Description**: {}\n\
              **Language**: {}\n\n\
@@ -332,7 +432,15 @@ impl CodeGeneratorTemplate {
              - Include function signatures and type annotations\n\
              - Consider edge cases and error conditions\n\n\
              Provide the specification now:",
-            language, description, language, language
+            if !memory_context_str.is_empty() {
+                format!("{}\n\n", memory_context_str)
+            } else {
+                String::new()
+            },
+            language,
+            description,
+            language,
+            language
         );
 
         // Execute the agent
@@ -362,13 +470,19 @@ impl CodeGeneratorTemplate {
         &self,
         spec: &SpecificationResult,
         language: &str,
-        model: &str,
+        provider_config: &llmspell_config::ProviderConfig,
         context: &ExecutionContext,
     ) -> Result<ImplementationResult> {
         use llmspell_agents::factory::{AgentConfig, ModelConfig, ResourceLimits};
         use llmspell_core::types::AgentInput;
 
         info!("Creating implementation agent for {} code", language);
+
+        // Extract model from provider config
+        let model = provider_config
+            .default_model
+            .as_ref()
+            .ok_or_else(|| TemplateError::Config("provider missing model".into()))?;
 
         // Parse model string (provider/model format)
         let (provider, model_id) = if let Some(slash_pos) = model.find('/') {
@@ -377,7 +491,7 @@ impl CodeGeneratorTemplate {
                 model[slash_pos + 1..].to_string(),
             )
         } else {
-            ("ollama".to_string(), model.to_string())
+            (provider_config.provider_type.clone(), model.to_string())
         };
 
         // Create agent config for code implementation
@@ -388,8 +502,8 @@ impl CodeGeneratorTemplate {
             model: Some(ModelConfig {
                 provider,
                 model_id,
-                temperature: Some(0.5), // Higher than spec (0.3) for implementation creativity
-                max_tokens: Some(3000), // More tokens for actual code
+                temperature: provider_config.temperature.or(Some(0.5)), // Higher than spec (0.3) for implementation creativity
+                max_tokens: provider_config.max_tokens.or(Some(3000)), // More tokens for actual code
                 settings: serde_json::Map::new(),
             }),
             allowed_tools: vec![],
@@ -454,13 +568,19 @@ impl CodeGeneratorTemplate {
         &self,
         implementation: &ImplementationResult,
         language: &str,
-        model: &str,
+        provider_config: &llmspell_config::ProviderConfig,
         context: &ExecutionContext,
     ) -> Result<TestResult> {
         use llmspell_agents::factory::{AgentConfig, ModelConfig, ResourceLimits};
         use llmspell_core::types::AgentInput;
 
         info!("Creating test agent for {} code", language);
+
+        // Extract model from provider config
+        let model = provider_config
+            .default_model
+            .as_ref()
+            .ok_or_else(|| TemplateError::Config("provider missing model".into()))?;
 
         // Parse model string (provider/model format)
         let (provider, model_id) = if let Some(slash_pos) = model.find('/') {
@@ -469,7 +589,7 @@ impl CodeGeneratorTemplate {
                 model[slash_pos + 1..].to_string(),
             )
         } else {
-            ("ollama".to_string(), model.to_string())
+            (provider_config.provider_type.clone(), model.to_string())
         };
 
         // Create agent config for test generation
@@ -480,8 +600,8 @@ impl CodeGeneratorTemplate {
             model: Some(ModelConfig {
                 provider,
                 model_id,
-                temperature: Some(0.4), // Creative for edge cases, structured for test syntax
-                max_tokens: Some(2500),
+                temperature: provider_config.temperature.or(Some(0.4)), // Creative for edge cases, structured for test syntax
+                max_tokens: provider_config.max_tokens.or(Some(2500)),
                 settings: serde_json::Map::new(),
             }),
             allowed_tools: vec![],
@@ -790,6 +910,18 @@ mod tests {
     use super::*;
     use crate::core::Template;
 
+    /// Test helper: Create a provider config for tests
+    fn test_provider_config() -> llmspell_config::ProviderConfig {
+        llmspell_config::ProviderConfig {
+            default_model: Some("ollama/llama3.2:3b".to_string()),
+            provider_type: "ollama".to_string(),
+            temperature: Some(0.3),
+            max_tokens: Some(2000),
+            timeout_seconds: Some(120),
+            ..Default::default()
+        }
+    }
+
     #[test]
     fn test_template_metadata() {
         let template = CodeGeneratorTemplate::new();
@@ -900,7 +1032,15 @@ mod tests {
         let context = context.unwrap();
 
         let result = template
-            .generate_specification("Test function", "rust", "ollama/llama3.2:3b", &context)
+            .generate_specification(
+                "Test function",
+                "rust",
+                &test_provider_config(),
+                &context,
+                None,  // session_id
+                false, // memory_enabled
+                2000,  // context_budget
+            )
             .await;
         assert!(result.is_ok());
         let result = result.unwrap();
@@ -923,7 +1063,7 @@ mod tests {
         };
 
         let result = template
-            .generate_implementation(&spec, "rust", "ollama/llama3.2:3b", &context)
+            .generate_implementation(&spec, "rust", &test_provider_config(), &context)
             .await;
         assert!(result.is_ok());
         let result = result.unwrap();
@@ -946,7 +1086,7 @@ mod tests {
         };
 
         let result = template
-            .generate_tests(&implementation, "rust", "ollama/llama3.2:3b", &context)
+            .generate_tests(&implementation, "rust", &test_provider_config(), &context)
             .await;
         assert!(result.is_ok());
         let result = result.unwrap();

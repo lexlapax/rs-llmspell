@@ -44,10 +44,12 @@
 pub mod apps;
 pub mod backup;
 pub mod config;
+pub mod context;
 pub mod debug;
 pub mod exec;
 pub mod kernel;
 pub mod keys;
+pub mod memory;
 pub mod model;
 pub mod repl;
 pub mod run;
@@ -219,6 +221,14 @@ pub async fn execute_command(
 
         Commands::Template { command } => {
             template::handle_template_command(command, runtime_config, output_format).await
+        }
+
+        Commands::Memory { command } => {
+            memory::handle_memory_command(command, runtime_config, output_format).await
+        }
+
+        Commands::Context { command } => {
+            context::handle_context_command(command, runtime_config, output_format).await
         }
 
         Commands::Version(version_cmd) => version::execute(version_cmd, output_format).await,

@@ -10,6 +10,7 @@ license.workspace = true
 [dependencies]
 # Internal dependencies
 llmspell-core = { path = "../llmspell-core" }
+llmspell-config = { path = "../llmspell-config" }
 llmspell-kernel = { path = "../llmspell-kernel" }
 llmspell-agents = { path = "../llmspell-agents" }
 llmspell-workflows = { path = "../llmspell-workflows" }
@@ -18,6 +19,7 @@ llmspell-rag = { path = "../llmspell-rag" }
 llmspell-tenancy = { path = "../llmspell-tenancy" }
 llmspell-providers = { path = "../llmspell-providers" }
 llmspell-utils = { path = "../llmspell-utils" }
+llmspell-memory = { path = "../llmspell-memory" }
 
 # Workspace dependencies
 tokio.workspace = true
@@ -37,7 +39,12 @@ once_cell.workspace = true
 
 [dev-dependencies]
 llmspell-testing = { path = "../llmspell-testing" }
+llmspell-bridge = { path = "../llmspell-bridge" }
 tokio = { workspace = true, features = ["test-util"] }
 tempfile.workspace = true
 criterion = { workspace = true, features = ["async_tokio"] }
 serial_test.workspace = true
+
+[[bench]]
+name = "template_overhead"
+harness = false

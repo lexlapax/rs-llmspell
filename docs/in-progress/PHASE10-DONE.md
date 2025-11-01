@@ -20,7 +20,7 @@
 
 ## Overview
 
-**Goal**: Enhance `llmspell-kernel` with daemon mode capabilities and multi-protocol server support, maintaining a single-binary architecture with proper Unix daemon behavior, signal handling, and production-ready service integration.
+**Goal**: Enhance `llmspell-kernel` with daemon mode capabilities and multi-protocol server support, maintaining a single-binary architecture with proper Unix daemon behavior, signal handling, and experimental infrastructure with production-quality engineering service integration.
 
 **Success Criteria Summary:**
 - [x] `llmspell kernel start --daemon` properly daemonizes
@@ -670,7 +670,7 @@ llmspell-kernel/src/daemon/
 - **10.4.2**: ✅ **COMPLETE** - Added JSON structured logging with 4 output formats
 - **10.4.3**: ⚠️ **DEFERRED** - Syslog support not critical (modern alternatives preferred)
 
-**Production-Ready Logging Infrastructure Delivered**:
+**Experimental Infrastructure with Production-Quality Engineering Logging Infrastructure Delivered**:
 1. **File-Based Logging** ✅
    - Atomic log rotation at size thresholds
    - Gzip compression for rotated files
@@ -845,7 +845,7 @@ llmspell-kernel/src/daemon/
 - ⚠️ DEFERRED - See reasoning below
 
 **Deferral Reasoning (Deep Analysis Performed):**
-1. **Already Production-Ready**: Current logging infrastructure is complete with file rotation, compression, and JSON structured logging
+1. **Already Experimental Infrastructure with Production-Quality Engineering**: Current logging infrastructure is complete with file rotation, compression, and JSON structured logging
 2. **Modern Best Practices**: JSON logs + log shippers (Filebeat, Fluentd, Vector) are preferred over direct syslog in modern deployments
 3. **Zero Current Demand**: No syslog references in codebase, no immediate requirement from users
 4. **Dependency Cost**: Adding syslog increases dependencies for a feature most users won't need
@@ -857,7 +857,7 @@ llmspell-kernel/src/daemon/
    - Environment-based configuration ✅
 6. **Easy Future Addition**: Feature flag design allows adding syslog later without breaking changes
 
-**Current Logging Capabilities (Production-Ready):**
+**Current Logging Capabilities (Experimental Infrastructure with Production-Quality Engineering):**
 - **LogRotator**: 13 tests passing, atomic rotation, gzip compression, retention policies
 - **JSON Formatting**: 4 formats (Text/JSON/Pretty/Compact), env-based selection
 - **Structured Fields**: Session IDs, request IDs, operation categories all preserved
@@ -2978,7 +2978,7 @@ See these new phases below for detailed implementation plans.
 
 ## Phase 10.8: Basic REPL Implementation (Days 11-12)
 
-**📝 REVISED 2025-09-24**: Added Tasks 10.8.5-10.8.11 to implement missing critical features (readline, multi-line input, signal handling, tab completion, script execution, performance monitoring, testing). Original 4 tasks completed, 7 new tasks added for production-ready REPL.
+**📝 REVISED 2025-09-24**: Added Tasks 10.8.5-10.8.11 to implement missing critical features (readline, multi-line input, signal handling, tab completion, script execution, performance monitoring, testing). Original 4 tasks completed, 7 new tasks added for experimental infrastructure with production-quality engineering REPL.
 
 **Rationale**: Before adding debug complexity, we need a solid foundation with a working REPL that can execute scripts through the existing ScriptExecutor. This validates the execution pipeline and provides immediate value to users. Debug functionality will be added as placeholders to show integration points without complicating the initial implementation.
 
@@ -3261,7 +3261,7 @@ See these new phases below for detailed implementation plans.
 **Assignee**: QA Team
 **Status**: ✅ COMPLETED (2025-09-24)
 
-**Description**: Comprehensive testing of the REPL to ensure it's production-ready, including edge cases, performance validation, and user experience polish.
+**Description**: Comprehensive testing of the REPL to ensure it's experimental infrastructure with production-quality engineering, including edge cases, performance validation, and user experience polish.
 
 **Acceptance Criteria:**
 - [x] All edge cases handled gracefully (basic testing done)

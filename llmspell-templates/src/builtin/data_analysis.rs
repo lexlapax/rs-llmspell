@@ -10,8 +10,8 @@ use crate::{
     artifacts::Artifact,
     context::ExecutionContext,
     core::{
-        CostEstimate, TemplateCategory, TemplateMetadata, TemplateOutput, TemplateParams,
-        TemplateResult,
+        memory_parameters, provider_parameters, CostEstimate, TemplateCategory, TemplateMetadata,
+        TemplateOutput, TemplateParams, TemplateResult,
     },
     error::{Result, TemplateError},
     validation::{ConfigSchema, ParameterConstraints, ParameterSchema, ParameterType},
@@ -19,7 +19,7 @@ use crate::{
 use async_trait::async_trait;
 use serde_json::json;
 use std::time::Instant;
-use tracing::{info, warn};
+use tracing::{debug, info, warn};
 
 /// Data Analysis Template
 ///
@@ -73,7 +73,7 @@ impl crate::core::Template for DataAnalysisTemplate {
     }
 
     fn config_schema(&self) -> ConfigSchema {
-        ConfigSchema::new(vec![
+        let mut params = vec![
             // data_file (required)
             ParameterSchema::required(
                 "data_file",
@@ -126,7 +126,19 @@ impl crate::core::Template for DataAnalysisTemplate {
                 ParameterType::String,
                 json!("ollama/llama3.2:3b"),
             ),
-        ])
+        ];
+
+        // Add memory parameters (Task 13.11.1)
+        params.extend(memory_parameters());
+
+        // Add provider parameters (Task 13.5.7d)
+        params.extend(provider_parameters());
+
+        debug!(
+            "DataAnalysis: Generated config schema with {} parameters",
+            params.len()
+        );
+        ConfigSchema::new(params)
     }
 
     async fn execute(
@@ -140,12 +152,23 @@ impl crate::core::Template for DataAnalysisTemplate {
         let data_file: String = params.get("data_file")?;
         let analysis_type: String = params.get_or("analysis_type", "descriptive".to_string());
         let chart_type: String = params.get_or("chart_type", "bar".to_string());
-        let model: String = params.get_or("model", "ollama/llama3.2:3b".to_string());
+
+        // Smart dual-path provider resolution (Task 13.5.7d)
+        let provider_config = context.resolve_llm_config(&params)?;
+        let model_str = provider_config
+            .default_model
+            .as_ref()
+            .ok_or_else(|| TemplateError::Config("provider missing model".into()))?;
 
         info!(
             "Starting data analysis (file={}, analysis={}, chart={}, model={})",
-            data_file, analysis_type, chart_type, model
+            data_file, analysis_type, chart_type, model_str
         );
+
+        // Extract memory parameters (Task 13.11.2)
+        let session_id: Option<String> = params.get_optional("session_id").unwrap_or(None);
+        let memory_enabled: bool = params.get_or("memory_enabled", true);
+        let context_budget: i64 = params.get_or("context_budget", 2000);
 
         // Initialize output
         let mut output = TemplateOutput::new(
@@ -163,14 +186,31 @@ impl crate::core::Template for DataAnalysisTemplate {
         // Phase 2: Statistical analysis with analyzer agent
         info!("Phase 2: Running statistical analysis...");
         let analysis_result = self
-            .run_analysis(&dataset, &analysis_type, &model, &context)
+            .run_analysis(
+                &dataset,
+                &analysis_type,
+                &provider_config,
+                &context,
+                session_id.as_deref(),
+                memory_enabled,
+                context_budget,
+            )
             .await?;
         output.metrics.agents_invoked += 1; // analyzer agent
 
         // Phase 3: Visualization with visualizer agent
         info!("Phase 3: Generating visualizations...");
         let chart_result = self
-            .generate_chart(&dataset, &analysis_result, &chart_type, &model, &context)
+            .generate_chart(
+                &dataset,
+                &analysis_result,
+                &chart_type,
+                &provider_config,
+                &context,
+                session_id.as_deref(),
+                memory_enabled,
+                context_budget,
+            )
             .await?;
         output.metrics.agents_invoked += 1; // visualizer agent
 
@@ -200,6 +240,36 @@ impl crate::core::Template for DataAnalysisTemplate {
             "Data analysis complete (duration: {}ms, rows: {})",
             output.metrics.duration_ms, dataset.rows
         );
+
+        // Store in memory if enabled (Task 13.11.3)
+        if memory_enabled && session_id.is_some() && context.memory_manager().is_some() {
+            let memory_mgr = context.memory_manager().unwrap();
+            let input_summary = format!(
+                "Analyze dataset {} with {} analysis",
+                data_file, analysis_type
+            );
+            let output_summary = format!(
+                "Analyzed {} rows × {} columns, generated {} chart",
+                dataset.rows, dataset.columns, chart_type
+            );
+
+            crate::context::store_template_execution(
+                &memory_mgr,
+                session_id.as_ref().unwrap(),
+                &self.metadata.id,
+                &input_summary,
+                &output_summary,
+                json!({
+                    "analysis_type": analysis_type,
+                    "chart_type": chart_type,
+                    "dataset_rows": dataset.rows,
+                    "dataset_columns": dataset.columns,
+                }),
+            )
+            .await
+            .ok(); // Don't fail execution if storage fails
+        }
+
         Ok(output)
     }
 
@@ -374,12 +444,16 @@ impl DataAnalysisTemplate {
     }
 
     /// Phase 2: Run statistical analysis with analyzer agent
+    #[allow(clippy::too_many_arguments)]
     async fn run_analysis(
         &self,
         dataset: &DataSet,
         analysis_type: &str,
-        model: &str,
+        provider_config: &llmspell_config::ProviderConfig,
         context: &ExecutionContext,
+        session_id: Option<&str>,
+        memory_enabled: bool,
+        context_budget: i64,
     ) -> Result<AnalysisResult> {
         use llmspell_agents::factory::{AgentConfig, ModelConfig, ResourceLimits};
         use llmspell_core::types::AgentInput;
@@ -389,6 +463,12 @@ impl DataAnalysisTemplate {
             analysis_type
         );
 
+        // Extract model from provider config
+        let model = provider_config
+            .default_model
+            .as_ref()
+            .ok_or_else(|| TemplateError::Config("provider missing model".into()))?;
+
         // Parse model string (provider/model format)
         let (provider, model_id) = if let Some(slash_pos) = model.find('/') {
             (
@@ -396,7 +476,7 @@ impl DataAnalysisTemplate {
                 model[slash_pos + 1..].to_string(),
             )
         } else {
-            ("ollama".to_string(), model.to_string())
+            (provider_config.provider_type.clone(), model.to_string())
         };
 
         // Create agent config for statistical analysis
@@ -407,8 +487,8 @@ impl DataAnalysisTemplate {
             model: Some(ModelConfig {
                 provider,
                 model_id,
-                temperature: Some(0.4), // Balanced for analytical reasoning
-                max_tokens: Some(2000),
+                temperature: provider_config.temperature.or(Some(0.4)), // Balanced for analytical reasoning
+                max_tokens: provider_config.max_tokens.or(Some(2000)),
                 settings: serde_json::Map::new(),
             }),
             allowed_tools: vec![],
@@ -498,6 +578,40 @@ impl DataAnalysisTemplate {
             analysis_instructions
         );
 
+        // Assemble memory context (Task 13.11.2)
+        let memory_context = if let (true, Some(sid)) = (memory_enabled, session_id) {
+            if let Some(bridge) = context.context_bridge() {
+                debug!(
+                    "Assembling memory context: session={}, budget={}",
+                    sid, context_budget
+                );
+                crate::assemble_template_context(&bridge, &analysis_prompt, sid, context_budget)
+                    .await
+            } else {
+                warn!("Memory enabled but ContextBridge unavailable");
+                vec![]
+            }
+        } else {
+            vec![]
+        };
+
+        let memory_context_str = if !memory_context.is_empty() {
+            memory_context
+                .iter()
+                .map(|msg| format!("{}: {}", msg.role, msg.content))
+                .collect::<Vec<_>>()
+                .join("\n\n")
+        } else {
+            String::new()
+        };
+
+        // Prepend memory context to prompt
+        let analysis_prompt = if !memory_context_str.is_empty() {
+            format!("{}\n\n{}", memory_context_str, analysis_prompt)
+        } else {
+            analysis_prompt
+        };
+
         // Execute the agent
         info!("Executing statistical analysis agent...");
         let agent_input = AgentInput::builder().text(analysis_prompt).build();
@@ -527,18 +641,28 @@ impl DataAnalysisTemplate {
     }
 
     /// Phase 3: Generate chart with visualizer agent
+    #[allow(clippy::too_many_arguments)]
     async fn generate_chart(
         &self,
         dataset: &DataSet,
         analysis: &AnalysisResult,
         chart_type: &str,
-        model: &str,
+        provider_config: &llmspell_config::ProviderConfig,
         context: &ExecutionContext,
+        session_id: Option<&str>,
+        memory_enabled: bool,
+        context_budget: i64,
     ) -> Result<ChartResult> {
         use llmspell_agents::factory::{AgentConfig, ModelConfig, ResourceLimits};
         use llmspell_core::types::AgentInput;
 
         info!("Creating visualization agent (type: {})", chart_type);
+
+        // Extract model from provider config
+        let model = provider_config
+            .default_model
+            .as_ref()
+            .ok_or_else(|| TemplateError::Config("provider missing model".into()))?;
 
         // Parse model parameter
         let (provider, model_id) = if let Some(slash_pos) = model.find('/') {
@@ -547,7 +671,7 @@ impl DataAnalysisTemplate {
                 model[slash_pos + 1..].to_string(),
             )
         } else {
-            ("ollama".to_string(), model.to_string())
+            (provider_config.provider_type.clone(), model.to_string())
         };
 
         // Create visualizer agent config
@@ -558,8 +682,8 @@ impl DataAnalysisTemplate {
             model: Some(ModelConfig {
                 provider,
                 model_id,
-                temperature: Some(0.5), // Creative for chart design
-                max_tokens: Some(2000),
+                temperature: provider_config.temperature.or(Some(0.5)), // Creative for chart design
+                max_tokens: provider_config.max_tokens.or(Some(2000)),
                 settings: serde_json::Map::new(),
             }),
             allowed_tools: vec![],
@@ -659,6 +783,39 @@ impl DataAnalysisTemplate {
             chart_type,
             viz_instructions
         );
+
+        // Assemble memory context (Task 13.11.2)
+        let memory_context = if let (true, Some(sid)) = (memory_enabled, session_id) {
+            if let Some(bridge) = context.context_bridge() {
+                debug!(
+                    "Assembling memory context: session={}, budget={}",
+                    sid, context_budget
+                );
+                crate::assemble_template_context(&bridge, &viz_prompt, sid, context_budget).await
+            } else {
+                warn!("Memory enabled but ContextBridge unavailable");
+                vec![]
+            }
+        } else {
+            vec![]
+        };
+
+        let memory_context_str = if !memory_context.is_empty() {
+            memory_context
+                .iter()
+                .map(|msg| format!("{}: {}", msg.role, msg.content))
+                .collect::<Vec<_>>()
+                .join("\n\n")
+        } else {
+            String::new()
+        };
+
+        // Prepend memory context to prompt
+        let viz_prompt = if !memory_context_str.is_empty() {
+            format!("{}\n\n{}", memory_context_str, viz_prompt)
+        } else {
+            viz_prompt
+        };
 
         // Execute the agent
         info!("Executing visualization agent...");
@@ -809,6 +966,18 @@ mod tests {
     use super::*;
     use crate::core::Template;
 
+    /// Test helper: Create a provider config for tests
+    fn test_provider_config() -> llmspell_config::ProviderConfig {
+        llmspell_config::ProviderConfig {
+            default_model: Some("ollama/llama3.2:3b".to_string()),
+            provider_type: "ollama".to_string(),
+            temperature: Some(0.3),
+            max_tokens: Some(2000),
+            timeout_seconds: Some(120),
+            ..Default::default()
+        }
+    }
+
     #[test]
     fn test_template_metadata() {
         let template = DataAnalysisTemplate::new();
@@ -936,7 +1105,15 @@ mod tests {
         };
 
         let result = template
-            .run_analysis(&dataset, "descriptive", "ollama/llama3.2:3b", &context)
+            .run_analysis(
+                &dataset,
+                "descriptive",
+                &test_provider_config(),
+                &context,
+                None,
+                false,
+                2000,
+            )
             .await;
         assert!(result.is_ok());
         let result = result.unwrap();
@@ -966,7 +1143,16 @@ mod tests {
         };
 
         let result = template
-            .generate_chart(&dataset, &analysis, "bar", "ollama/llama3.2:3b", &context)
+            .generate_chart(
+                &dataset,
+                &analysis,
+                "bar",
+                &test_provider_config(),
+                &context,
+                None,
+                false,
+                2000,
+            )
             .await;
         assert!(result.is_ok());
         let result = result.unwrap();

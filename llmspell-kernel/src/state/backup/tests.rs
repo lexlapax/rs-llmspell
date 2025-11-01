@@ -168,9 +168,13 @@ mod integration_tests {
     /// Helper to create a test state manager
     async fn create_test_state_manager() -> Arc<StateManager> {
         Arc::new(
-            StateManager::with_backend(StorageBackendType::Memory, PersistenceConfig::default())
-                .await
-                .expect("Failed to create state manager"),
+            StateManager::with_backend(
+                StorageBackendType::Memory,
+                PersistenceConfig::default(),
+                None,
+            )
+            .await
+            .expect("Failed to create state manager"),
         )
     }
 

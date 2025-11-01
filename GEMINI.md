@@ -2,40 +2,43 @@
 
 ## Project Overview
 
-**Project Identity:** rs-llmspell is for **Scriptable LLM interactions** via Lua, JavaScript - Cast scripting spells to animate LLM golems.
+**Project Identity:** rs-llmspell is a **Rapid AI Experimentation Platform** - Cast scripting spells to explore AI concepts, extract proven patterns to production-ready Rust.
 
-This project, `rs-llmspell`, is a production-ready AI workflow orchestration platform built in Rust. It is designed for script-driven LLM coordination with RAG (Retrieval-Augmented Generation) at scale.
+This project, `rs-llmspell`, is an experimental platform for rapid AI concept exploration via Lua/JavaScript scripting. It enables quick iteration on AI ideas (LLMs, transformers, diffusion, memory, learning) with production-quality engineering (architecture, performance, testing) to ease the transition from validated experiments to Rust production code.
 
-The platform is highly modular and can be built with different feature sets to control the binary size. It supports multiple LLM providers and offers enterprise-grade features like multi-tenancy and security.
+The platform is highly modular (21 crates) with feature flags for flexible builds. It supports multiple LLM providers and includes experimental multi-tenancy and security features.
 
 ## Key Documents
 
 *   **Architecture**: `/docs/technical/master-architecture-vision.md`
 *   **Implementation Phases**: `/docs/in-progress/implementation-phases.md` (23+ phase roadmap)
-*   **Current Status**: v0.12.0 - Phase 12 Complete, Ready for Phase 13 (Adaptive Memory System)
-*   **Phase 12 Design**: `/docs/in-progress/phase-12-design-doc.md` (Production Template System)
-*   **Template Architecture**: `/docs/technical/template-system-architecture.md` (Complete template system design)
-*   **Release Notes**: `/RELEASE_NOTES_v0.12.0.md` (comprehensive v0.12.0 changelog)
+*   **Current Status**: v0.13.0 - Phase 13 Complete (Experimental Memory & Context Engineering)
+*   **Phase 12 Design**: `/docs/in-progress/phase-12-design-doc.md` (Experimental Template System)
+*   **Phase 13 Design**: `/docs/in-progress/phase-13-design-doc.md` (Experimental Memory System)
+*   **Template Architecture**: `/docs/technical/template-system-architecture.md` (Template system design)
+*   **Release Notes**: `/RELEASE_NOTES_v0.13.0.md` (comprehensive v0.13.0 changelog)
 *   **Current Work**: Always read `/TODO.md` for active tasks.
 
-## Recent Completion Status
+## Recent Completion Status (Experimental Infrastructure Evolution)
 
 *   ✅ **Phase 7**: Infrastructure Consolidation (536+ files refactored, centralized testing, config revolution)
 *   ✅ **Phase 10**: Service Integration & IDE Connectivity (kernel, Jupyter, VS Code, LSP)
 *   ✅ **Phase 11**: Local LLM Integration (Ollama + Candle dual-path) - COMPLETE
 *   ✅ **Phase 11a**: Bridge Consolidation (87% compile speedup, API standardization, docs completeness) - COMPLETE
 *   ✅ **Phase 11b**: Local LLM Cleanup (unified profiles, dual-architecture models, platform-aware GPU) - COMPLETE
-*   ✅ **Phase 12**: Production Template System (10 templates, CLI + Lua API, multi-agent workflows) - COMPLETE
-*   🚧 **Phase 13**: Next - Adaptive Memory System (A-TKG temporal knowledge graph, template memory integration)
+*   ✅ **Phase 12**: Experimental Template System (10 workflows, CLI + Lua API, multi-agent patterns) - COMPLETE
+*   ✅ **Phase 13**: Experimental Memory & Context Engineering (3-tier memory, hot-swap backends, context assembly) - COMPLETE
 
 ## Development Philosophy
 
-*   **Less code is better**: REPLACE code, don't add (breaking changes are acceptable until version 1.0).
-*   **Less files are better**: Edit existing files; do not create new ones unless critical.
-*   **NO backward compatibility until 1.0**: Prioritize correctness and simplicity.
-*   **NO SHORTCUTS**: Holistic completion is required; no TODOs for later.
-*   Do not leave TODO comments in the code.
-*   Do not use `unwrap()` in production code.
+*   **Experimental iteration focus**: Script-first rapid prototyping → validation → Rust extraction
+*   **Less code is better**: REPLACE code, don't add (breaking changes are acceptable until version 1.0)
+*   **Less files are better**: Edit existing files; do not create new ones unless critical
+*   **NO backward compatibility until 1.0**: Prioritize correctness and simplicity
+*   **NO SHORTCUTS**: Holistic completion is required; no TODOs for later
+*   **Production-quality code**: For painless extraction when experiments are validated
+*   Do not leave TODO comments in the code
+*   Do not use `unwrap()` in production code
 
 ### Architecture Mandates
 
@@ -50,7 +53,10 @@ The platform is highly modular and can be built with different feature sets to c
 *   `llmspell-tools`: Tool implementations
 *   `llmspell-agents`: Agent infrastructure
 *   `llmspell-workflows`: Workflow patterns
-*   `llmspell-templates`: Production AI workflow templates (NEW in v0.12.0)
+*   `llmspell-templates`: Experimental AI workflow templates (Phase 12)
+*   `llmspell-memory`: Adaptive memory system (Phase 13)
+*   `llmspell-graph`: Temporal knowledge graph (Phase 13)
+*   `llmspell-context`: Context engineering pipeline (Phase 13)
 *   `llmspell-bridge`: Script language integration
 *   `llmspell-utils`: Shared utilities (use for ALL shared code)
 *   `llmspell-state-persistence`: State with persistence
@@ -99,9 +105,9 @@ You can also run applications directly with the `llmspell` binary:
 llmspell app run <application-name>
 ```
 
-### Using Templates (NEW in v0.12.0)
+### Using Templates (Experimental Workflows - v0.12.0)
 
-Templates provide turn-key AI workflows accessible via CLI or Lua:
+Templates provide experimental AI workflows for rapid concept exploration, accessible via CLI or Lua:
 
 **CLI Usage:**
 ```bash
@@ -161,14 +167,24 @@ The following scripts are mandatory to run before committing:
 *   **State operations**: <5ms write, <1ms read
 *   **Zero warnings policy**: `cargo clippy --workspace --all-target --all-features`
 
-## v0.12.0 Key Achievements (Phase 12)
+## v0.13.0 Key Achievements (Phase 13 - Experimental Infrastructure)
 
-*   **10 Production Templates**: Turn-key AI workflows solving "0-day retention problem"
+*   **3-Tier Memory System**: Episodic (HNSW), Semantic (SurrealDB graph), Procedural (patterns)
+*   **Hot-Swappable Backends**: InMemory (dev), HNSW (8.47x speedup), SurrealDB (bi-temporal graph)
+*   **Context Engineering**: 4 strategies (episodic, semantic, hybrid, RAG) with parallel retrieval
+*   **<2ms Memory Overhead**: 50x faster than target, production-quality validation at scale
+*   **149 Tests Passing**: 100% pass rate, zero warnings, comprehensive validation
+*   **Zero Breaking Changes**: Fully backward compatible, opt-in features
+*   **1,300+ Lines API Docs**: llmspell-memory, llmspell-graph, llmspell-context
+*   **Memory + Context Globals**: 17th and 18th Lua globals for script access
+
+## v0.12.0 Key Achievements (Phase 12 - Experimental Workflows)
+
+*   **10 Experimental Templates**: Rapid AI concept exploration workflows
 *   **Template System Core**: 2,847 lines (trait-based, DashMap registry, ExecutionContext builder)
 *   **CLI + Lua Integration**: `template list|info|exec|search|schema` commands + Template global (16th global)
 *   **Multi-Agent Workflows**: Real LLM integration (code-generator: 3 agents, data-analysis: 2 agents)
-*   **<2ms Overhead**: 50x faster than target (<100ms), production-grade performance
-*   **149 Tests Passing**: 100% pass rate, zero warnings, comprehensive validation
+*   **<2ms Overhead**: 50x faster than target, production-quality engineering
 *   **3,655 Lines Docs**: Complete architecture + 10 user guides + examples
 *   **5 Template Categories**: Research, Development, Content, Productivity, Workflow
 *   **Template Examples**: research-assistant, code-generator, content-generation, workflow-orchestrator, etc.
@@ -177,5 +193,6 @@ The following scripts are mandatory to run before committing:
 
 *   When writing Lua scripts, always refer to `docs/user-guide/api/lua/README.md` for accurate API method names. **Do not guess**.
 *   All tool calls use `Tool.execute(name, params)` - no alternative methods.
-*   Template system (NEW v0.12.0): Use `Template.execute(name, params)` for turn-key workflows. See `docs/user-guide/templates/` for all 10 template guides.
+*   Template system (Experimental v0.12.0): Use `Template.execute(name, params)` for experimental workflows. See `docs/user-guide/templates/` for all 10 template guides.
+*   Memory system (Experimental v0.13.0): Use `Memory` and `Context` globals for adaptive memory exploration. See `docs/user-guide/memory-configuration.md` for details.
 *   Environment variables are now fully documented in `docs/user-guide/configuration.md` and `docs/user-guide/security-and-permissions.md`.

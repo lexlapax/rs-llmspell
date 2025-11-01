@@ -10,8 +10,8 @@ use crate::{
     artifacts::Artifact,
     context::ExecutionContext,
     core::{
-        CostEstimate, TemplateCategory, TemplateMetadata, TemplateOutput, TemplateParams,
-        TemplateResult,
+        memory_parameters, provider_parameters, CostEstimate, TemplateCategory, TemplateMetadata,
+        TemplateOutput, TemplateParams, TemplateResult,
     },
     error::{Result, TemplateError},
     validation::{ConfigSchema, ParameterConstraints, ParameterSchema, ParameterType},
@@ -77,7 +77,7 @@ impl crate::core::Template for ResearchAssistantTemplate {
     }
 
     fn config_schema(&self) -> ConfigSchema {
-        ConfigSchema::new(vec![
+        let mut params = vec![
             // topic (required)
             ParameterSchema::required("topic", "Research topic or question", ParameterType::String)
                 .with_constraints(ParameterConstraints {
@@ -121,7 +121,19 @@ impl crate::core::Template for ResearchAssistantTemplate {
                 ParameterType::Boolean,
                 json!(true),
             ),
-        ])
+        ];
+
+        // Add memory parameters (Task 13.11.1)
+        params.extend(memory_parameters());
+
+        // Add provider parameters (Task 13.5.7d)
+        params.extend(provider_parameters());
+
+        debug!(
+            "ResearchAssistant: Generated config schema with {} parameters",
+            params.len()
+        );
+        ConfigSchema::new(params)
     }
 
     async fn execute(
@@ -134,13 +146,24 @@ impl crate::core::Template for ResearchAssistantTemplate {
         // Extract and validate parameters
         let topic: String = params.get("topic")?;
         let max_sources: i64 = params.get_or("max_sources", 10);
-        let model: String = params.get_or("model", "ollama/llama3.2:3b".to_string());
         let output_format: String = params.get_or("output_format", "markdown".to_string());
         let include_citations: bool = params.get_or("include_citations", true);
 
+        // Extract memory parameters (Task 13.11.2)
+        let session_id: Option<String> = params.get_optional("session_id").unwrap_or(None);
+        let memory_enabled: bool = params.get_or("memory_enabled", true);
+        let context_budget: i64 = params.get_or("context_budget", 2000);
+
+        // Smart dual-path provider resolution (Task 13.5.7d)
+        let provider_config = context.resolve_llm_config(&params)?;
+        let model_str = provider_config
+            .default_model
+            .as_ref()
+            .ok_or_else(|| TemplateError::Config("provider missing model".into()))?;
+
         info!(
             "Starting research assistant for topic: '{}' (max_sources={}, model={})",
-            topic, max_sources, model
+            topic, max_sources, model_str
         );
 
         // Initialize output
@@ -169,14 +192,22 @@ impl crate::core::Template for ResearchAssistantTemplate {
         // Phase 3: Synthesize findings with agent
         info!("Phase 3: Synthesizing findings...");
         let synthesis = self
-            .synthesize_findings(&topic, &session_tag, &model, &context)
+            .synthesize_findings(
+                &topic,
+                &session_tag,
+                &provider_config,
+                &context,
+                session_id.as_deref(),
+                memory_enabled,
+                context_budget,
+            )
             .await?;
         output.metrics.agents_invoked += 1;
 
         // Phase 4: Validate citations
         info!("Phase 4: Validating citations...");
         let validation = self
-            .validate_citations(&synthesis, &sources, &model, &context)
+            .validate_citations(&synthesis, &sources, &provider_config, &context)
             .await?;
         output.metrics.agents_invoked += 1;
 
@@ -218,6 +249,33 @@ impl crate::core::Template for ResearchAssistantTemplate {
             "Research complete (duration: {}ms)",
             output.metrics.duration_ms
         );
+
+        // Store in memory if enabled (Task 13.11.3)
+        if memory_enabled && session_id.is_some() && context.memory_manager().is_some() {
+            let memory_mgr = context.memory_manager().unwrap();
+            let input_summary = format!("Research topic: {}", &topic[..topic.len().min(100)]);
+            let output_summary = format!(
+                "Synthesized research from {} sources in {} format",
+                sources.len(),
+                output_format
+            );
+
+            crate::context::store_template_execution(
+                &memory_mgr,
+                session_id.as_ref().unwrap(),
+                &self.metadata.id,
+                &input_summary,
+                &output_summary,
+                json!({
+                    "max_sources": max_sources,
+                    "sources_gathered": sources.len(),
+                    "output_format": output_format,
+                }),
+            )
+            .await
+            .ok(); // Don't fail execution if storage fails
+        }
+
         Ok(output)
     }
 
@@ -451,17 +509,27 @@ impl ResearchAssistantTemplate {
         })
     }
 
-    /// Phase 3: Synthesize findings with agent using RAG context
+    /// Phase 3: Synthesize findings with agent using RAG context + memory
+    #[allow(clippy::too_many_arguments)]
     async fn synthesize_findings(
         &self,
         topic: &str,
         session_tag: &str,
-        model: &str,
+        provider_config: &llmspell_config::ProviderConfig,
         context: &ExecutionContext,
+        session_id: Option<&str>,
+        memory_enabled: bool,
+        context_budget: i64,
     ) -> Result<String> {
         use llmspell_agents::factory::{AgentConfig, ModelConfig, ResourceLimits};
         use llmspell_core::state::StateScope;
         use llmspell_core::types::AgentInput;
+
+        // Extract model from provider config
+        let model = provider_config
+            .default_model
+            .as_ref()
+            .ok_or_else(|| TemplateError::Config("provider missing model".into()))?;
 
         info!(
             "Synthesizing findings for topic: '{}' (session: {}, model: {})",
@@ -520,6 +588,22 @@ impl ResearchAssistantTemplate {
             String::new()
         };
 
+        // Assemble memory context (Task 13.11.2)
+        let memory_context = if let (true, Some(sid)) = (memory_enabled, session_id) {
+            if let Some(bridge) = context.context_bridge() {
+                debug!(
+                    "Assembling memory context: session={}, budget={}",
+                    sid, context_budget
+                );
+                crate::assemble_template_context(&bridge, topic, sid, context_budget).await
+            } else {
+                warn!("Memory enabled but ContextBridge unavailable");
+                vec![]
+            }
+        } else {
+            vec![]
+        };
+
         // Parse model specification (format: "provider/model-id" or just "model-id")
         let (provider, model_id) = if let Some(slash_pos) = model.find('/') {
             (
@@ -527,7 +611,7 @@ impl ResearchAssistantTemplate {
                 model[slash_pos + 1..].to_string(),
             )
         } else {
-            ("ollama".to_string(), model.to_string())
+            (provider_config.provider_type.clone(), model.to_string())
         };
 
         // Get agent registry
@@ -541,8 +625,8 @@ impl ResearchAssistantTemplate {
             model: Some(ModelConfig {
                 provider,
                 model_id,
-                temperature: Some(0.7), // Balanced creativity for synthesis
-                max_tokens: Some(2000),
+                temperature: provider_config.temperature.or(Some(0.7)), // Balanced creativity for synthesis
+                max_tokens: provider_config.max_tokens.or(Some(2000)),
                 settings: serde_json::Map::new(),
             }),
             allowed_tools: vec![],
@@ -564,9 +648,20 @@ impl ResearchAssistantTemplate {
                 TemplateError::ExecutionFailed(format!("Agent creation failed: {}", e))
             })?;
 
-        // Build synthesis prompt with RAG context
+        // Build synthesis prompt with RAG context + memory
+        let memory_context_str = if !memory_context.is_empty() {
+            memory_context
+                .iter()
+                .map(|msg| format!("{}: {}", msg.role, msg.content))
+                .collect::<Vec<_>>()
+                .join("\n\n")
+        } else {
+            String::new()
+        };
+
         let synthesis_prompt = format!(
             "You are a research synthesis assistant. Your task is to create a comprehensive research report based on the provided sources.\n\n\
+             {}\
              RESEARCH TOPIC: {}{}\n\n\
              INSTRUCTIONS:\n\
              1. Provide an executive summary of the research topic based on the sources\n\
@@ -589,6 +684,11 @@ impl ResearchAssistantTemplate {
              ## Further Research\n\
              [Suggested areas for deeper investigation]\n\n\
              Please provide a well-structured synthesis now.",
+            if !memory_context_str.is_empty() {
+                format!("{}\n\n", memory_context_str)
+            } else {
+                String::new()
+            },
             topic,
             rag_context
         );
@@ -619,11 +719,17 @@ impl ResearchAssistantTemplate {
         &self,
         synthesis: &str,
         sources: &[Source],
-        model: &str,
+        provider_config: &llmspell_config::ProviderConfig,
         context: &ExecutionContext,
     ) -> Result<String> {
         use llmspell_agents::factory::{AgentConfig, ModelConfig, ResourceLimits};
         use llmspell_core::types::AgentInput;
+
+        // Extract model from provider config
+        let model = provider_config
+            .default_model
+            .as_ref()
+            .ok_or_else(|| TemplateError::Config("provider missing model".into()))?;
 
         info!(
             "Validating citations in synthesis ({} chars, {} sources, model: {})",
@@ -639,7 +745,7 @@ impl ResearchAssistantTemplate {
                 model[slash_pos + 1..].to_string(),
             )
         } else {
-            ("ollama".to_string(), model.to_string())
+            (provider_config.provider_type.clone(), model.to_string())
         };
 
         // Get agent registry
@@ -653,8 +759,8 @@ impl ResearchAssistantTemplate {
             model: Some(ModelConfig {
                 provider,
                 model_id,
-                temperature: Some(0.3), // Lower temperature for factual validation
-                max_tokens: Some(1500),
+                temperature: provider_config.temperature.or(Some(0.3)), // Lower temperature for factual validation
+                max_tokens: provider_config.max_tokens.or(Some(1500)),
                 settings: serde_json::Map::new(),
             }),
             allowed_tools: vec![],

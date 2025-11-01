@@ -9,7 +9,7 @@ mod session_tests {
 
     #[tokio::test]
     async fn test_session_scope_basic_operations() {
-        let state_manager = StateManager::new().await.unwrap();
+        let state_manager = StateManager::new(None).await.unwrap();
 
         // Test saving to session scope
         let session_id = "test-session-123";
@@ -77,7 +77,7 @@ mod session_tests {
     }
     #[tokio::test]
     async fn test_session_scope_isolation_from_global() {
-        let state_manager = StateManager::new().await.unwrap();
+        let state_manager = StateManager::new(None).await.unwrap();
 
         // Save same key in different scopes
         state_manager
@@ -109,7 +109,7 @@ mod session_tests {
     }
     #[tokio::test]
     async fn test_clear_session_scope() {
-        let state_manager = StateManager::new().await.unwrap();
+        let state_manager = StateManager::new(None).await.unwrap();
         let session_scope = StateScope::Session("cleanup-test".to_string());
 
         // Add multiple keys to session

@@ -123,14 +123,17 @@ pub mod traits {
     pub mod agent;
     pub mod base_agent;
     pub mod component_lookup;
+    pub mod context_assembler;
     pub mod debug;
     pub mod debug_context;
+    pub mod embedding;
     pub mod event;
     pub mod memory;
     pub mod observability;
     pub mod script_executor;
     pub mod service;
     pub mod state;
+    pub mod template_executor;
     pub mod tool;
     pub mod tool_capable;
     pub mod workflow;
@@ -143,7 +146,9 @@ pub use traits::{
     agent::Agent,
     base_agent::BaseAgent,
     component_lookup::ComponentLookup,
+    context_assembler::ContextAssembler,
     debug_context::{DebugContext, MockDebugContext, NoOpDebugContext},
+    embedding::EmbeddingProvider,
     event::{EventConfig, EventData, EventEmitter},
     state::StateAccess,
     tool::Tool,

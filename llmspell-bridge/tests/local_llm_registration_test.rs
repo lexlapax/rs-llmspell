@@ -46,11 +46,11 @@ mod local_llm_registration {
              (regression: Phase 11b bug fix - was conditionally skipped)"
         );
 
-        // Verify total globals count (should be 16 in Phase 12, includes Template)
+        // Verify total globals count (18 in Phase 13: includes Memory + Context)
         let global_count = global_registry.list_globals().len();
         assert_eq!(
-            global_count, 16,
-            "Expected 16 globals (including LocalLLM and Template), got {global_count}"
+            global_count, 18,
+            "Expected 18 globals (including Memory, Context, LocalLLM, Template), got {global_count}"
         );
     }
 

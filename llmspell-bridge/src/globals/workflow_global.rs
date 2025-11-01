@@ -23,8 +23,13 @@ pub struct WorkflowGlobal {
 impl WorkflowGlobal {
     /// Create a new Workflow global without state manager
     #[must_use]
-    pub fn new(registry: Arc<ComponentRegistry>) -> Self {
-        let bridge = Arc::new(WorkflowBridge::new(&registry, None));
+    pub fn new(
+        registry: Arc<ComponentRegistry>,
+        template_executor: Option<
+            Arc<dyn llmspell_core::traits::template_executor::TemplateExecutor>,
+        >,
+    ) -> Self {
+        let bridge = Arc::new(WorkflowBridge::new(&registry, None, template_executor));
         Self { registry, bridge }
     }
 
@@ -33,12 +38,19 @@ impl WorkflowGlobal {
     pub fn with_state_manager(
         registry: Arc<ComponentRegistry>,
         state_manager: Arc<StateManager>,
+        template_executor: Option<
+            Arc<dyn llmspell_core::traits::template_executor::TemplateExecutor>,
+        >,
     ) -> Self {
         info!(
             "WorkflowGlobal: Creating WorkflowBridge with StateManager at {:p}",
             Arc::as_ptr(&state_manager)
         );
-        let bridge = Arc::new(WorkflowBridge::new(&registry, Some(state_manager)));
+        let bridge = Arc::new(WorkflowBridge::new(
+            &registry,
+            Some(state_manager),
+            template_executor,
+        ));
         Self { registry, bridge }
     }
 

@@ -26,6 +26,8 @@ llmspell-kernel = { path = "../llmspell-kernel" }
 llmspell-rag = { path = "../llmspell-rag" }
 llmspell-tenancy = { path = "../llmspell-tenancy" }
 llmspell-templates = { path = "../llmspell-templates" }
+llmspell-memory = { path = "../llmspell-memory" }
+llmspell-context = { path = "../llmspell-context" }
 tokio.workspace = true
 tokio-stream.workspace = true
 async-trait.workspace = true
@@ -88,6 +90,10 @@ harness = false
 name = "rag_bench"
 harness = false
 
+[[bench]]
+name = "context_assembly"
+harness = false
+
 [[test]]
 name = "session_workflow"
 path = "tests/integration/session_workflow.rs"
@@ -115,6 +121,11 @@ required-features = ["common"]
 
 [[test]]
 name = "globals_test"
+required-features = ["common"]
+
+[[test]]
+name = "memory_global_test"
+path = "tests/lua/memory_global_test.rs"
 required-features = ["common"]
 
 [[test]]

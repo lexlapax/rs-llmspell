@@ -1,9 +1,9 @@
 # Getting Started
 
-**Version**: 0.12.0
+**Version**: 0.13.0
 **Time Required**: 10 minutes (or <5 minutes with AI Agent Templates!)
 
-> **🚀 Quick Start**: Get LLMSpell kernel running in under 5 minutes with this focused guide. **NEW in Phase 12**: Use production-ready AI workflow templates for instant productivity!
+> **🚀 Quick Start**: Get LLMSpell kernel running in under 5 minutes with this focused guide. **NEW in Phase 12**: Use experimental workflows for rapid exploration AI workflow templates for instant productivity!
 
 **🔗 Navigation**: [← User Guide](README.md) | [Core Concepts →](concepts.md) | [Service Deployment →](service-deployment.md)
 
@@ -491,7 +491,7 @@ end
 
 ### Deeper Learning
 5. **Understand the architecture** → [Core Concepts](concepts.md) (RAG, HNSW, Multi-tenancy, Templates)
-6. **Template documentation** → [Template User Guide](templates/) (10 production-ready workflows)
+6. **Template documentation** → [Template User Guide](templates/) (10 experimental workflows for rapid exploration workflows)
 7. **Production patterns** → [Cookbook](../../examples/script-users/cookbook/) (11 examples)
 8. **Real applications** → [Applications](../../examples/script-users/applications/) (9 complete apps)
 9. **Complete API reference** → [Lua API](api/lua/README.md) (18 globals including Template)
@@ -529,7 +529,7 @@ end
 - **Multi-tenancy**: Use `multi_tenant = true` in config for isolation
 
 ### Phase 12 Template Features
-- **10 built-in templates**: Instant productivity from day 0 with production-ready workflows
+- **10 built-in templates**: Instant productivity from day 0 with experimental workflows for rapid exploration workflows
 - **6 template categories**: Research, Chat, Analysis, CodeGen, Document, Workflow
 - **Zero configuration**: Templates work out-of-the-box with just API keys
 - **CLI and Lua APIs**: Use templates from command line or scripts

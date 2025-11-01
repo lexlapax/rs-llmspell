@@ -1,0 +1,440 @@
+//! Hybrid RAG + Memory Retrieval
+//!
+//! Combines RAG vector search with episodic memory retrieval using weighted merge.
+//! Supports configurable token budget allocation across sources.
+
+use anyhow::Result;
+use llmspell_core::state::StateScope;
+use llmspell_memory::traits::MemoryManager;
+use llmspell_rag::pipeline::RAGRetriever;
+use std::sync::Arc;
+use tracing::{debug, error, info, trace};
+
+use super::query_pattern_tracker::QueryPatternTracker;
+use super::rag_adapter::rag_results_to_ranked_chunks;
+use crate::types::{Chunk, RankedChunk};
+
+/// Retrieval source weights for hybrid retrieval
+///
+/// Weights control how scores are combined from different sources.
+/// Must sum to 1.0 ±0.01 for validation to pass.
+#[derive(Debug, Clone, Copy)]
+pub struct RetrievalWeights {
+    /// Weight for RAG vector search results (0.0-1.0)
+    pub rag_weight: f32,
+    /// Weight for memory episodic search results (0.0-1.0)
+    pub memory_weight: f32,
+}
+
+impl RetrievalWeights {
+    /// Create new retrieval weights
+    ///
+    /// # Arguments
+    /// * `rag_weight` - Weight for RAG results (0.0-1.0)
+    /// * `memory_weight` - Weight for memory results (0.0-1.0)
+    ///
+    /// # Returns
+    /// Validated weights if they sum to ~1.0, error otherwise
+    ///
+    /// # Errors
+    /// Returns error if weights don't sum to 1.0 ±0.01
+    pub fn new(rag_weight: f32, memory_weight: f32) -> Result<Self> {
+        let sum = rag_weight + memory_weight;
+        if (sum - 1.0).abs() > 0.01 {
+            anyhow::bail!(
+                "Retrieval weights must sum to 1.0 ±0.01, got {:.3} (rag={:.3}, memory={:.3})",
+                sum,
+                rag_weight,
+                memory_weight
+            );
+        }
+
+        Ok(Self {
+            rag_weight,
+            memory_weight,
+        })
+    }
+
+    /// Balanced preset: Equal weight to RAG and memory (50/50)
+    #[must_use]
+    pub const fn balanced() -> Self {
+        Self {
+            rag_weight: 0.5,
+            memory_weight: 0.5,
+        }
+    }
+
+    /// RAG-focused preset: Emphasize RAG results (70/30)
+    #[must_use]
+    pub const fn rag_focused() -> Self {
+        Self {
+            rag_weight: 0.7,
+            memory_weight: 0.3,
+        }
+    }
+
+    /// Memory-focused preset: Emphasize memory results (40/60)
+    #[must_use]
+    pub const fn memory_focused() -> Self {
+        Self {
+            rag_weight: 0.4,
+            memory_weight: 0.6,
+        }
+    }
+}
+
+impl Default for RetrievalWeights {
+    fn default() -> Self {
+        Self::memory_focused()
+    }
+}
+
+/// Hybrid retriever combining RAG and episodic memory
+///
+/// Queries both RAG vector search (if available) and episodic memory,
+/// then combines results using weighted merge and token budget allocation.
+pub struct HybridRetriever {
+    /// Optional RAG pipeline for vector search (None = memory-only fallback)
+    rag_pipeline: Option<Arc<dyn RAGRetriever>>,
+    /// Memory manager for episodic search
+    memory_manager: Arc<dyn MemoryManager>,
+    /// Weights for combining results
+    weights: RetrievalWeights,
+    /// Optional query pattern tracker for consolidation priority
+    query_tracker: Option<Arc<QueryPatternTracker>>,
+}
+
+impl HybridRetriever {
+    /// Create new hybrid retriever
+    ///
+    /// # Arguments
+    /// * `rag_pipeline` - Optional RAG pipeline (None for memory-only)
+    /// * `memory_manager` - Memory manager for episodic retrieval
+    /// * `weights` - Weights for combining results
+    #[must_use]
+    pub fn new(
+        rag_pipeline: Option<Arc<dyn RAGRetriever>>,
+        memory_manager: Arc<dyn MemoryManager>,
+        weights: RetrievalWeights,
+    ) -> Self {
+        info!(
+            "Created HybridRetriever: rag={}, memory={}, weights=(rag={:.2}, mem={:.2})",
+            rag_pipeline.is_some(),
+            true,
+            weights.rag_weight,
+            weights.memory_weight
+        );
+
+        Self {
+            rag_pipeline,
+            memory_manager,
+            weights,
+            query_tracker: None,
+        }
+    }
+
+    /// Add query pattern tracker for consolidation priority (builder pattern)
+    ///
+    /// # Arguments
+    /// * `tracker` - Query pattern tracker
+    ///
+    /// # Example
+    /// ```ignore
+    /// use std::sync::Arc;
+    ///
+    /// let tracker = Arc::new(QueryPatternTracker::new());
+    /// let retriever = HybridRetriever::new(rag, memory, weights)
+    ///     .with_query_tracker(tracker);
+    /// ```
+    #[must_use]
+    pub fn with_query_tracker(mut self, tracker: Arc<QueryPatternTracker>) -> Self {
+        info!("Added query pattern tracker to HybridRetriever");
+        self.query_tracker = Some(tracker);
+        self
+    }
+
+    /// Retrieve and merge results from RAG + Memory with weighted scoring
+    ///
+    /// # Arguments
+    /// * `query` - Search query
+    /// * `session_id` - Session identifier for scoping
+    /// * `token_budget` - Maximum tokens to retrieve (allocated across sources)
+    ///
+    /// # Returns
+    /// Merged and ranked chunks respecting token budget
+    ///
+    /// # Errors
+    /// Returns error if retrieval or merging fails
+    pub async fn retrieve_hybrid(
+        &self,
+        query: &str,
+        session_id: &str,
+        token_budget: usize,
+    ) -> Result<Vec<RankedChunk>> {
+        info!(
+            "Starting hybrid retrieval: query=\"{}\" session={} budget={}",
+            query, session_id, token_budget
+        );
+
+        let (rag_budget, memory_budget) = self.allocate_budget(token_budget);
+        let rag_chunks = self.query_rag(query, rag_budget, session_id).await;
+        let memory_chunks = self.query_memory(query, memory_budget, session_id).await?;
+        let merged = self.weighted_merge(rag_chunks, memory_chunks);
+        let finalized = Self::finalize_results(merged, token_budget);
+
+        info!(
+            "Hybrid retrieval complete: returning {} chunks",
+            finalized.len()
+        );
+
+        Ok(finalized)
+    }
+
+    /// Allocate token budget across RAG and Memory sources based on weights
+    fn allocate_budget(&self, token_budget: usize) -> (usize, usize) {
+        #[allow(
+            clippy::cast_possible_truncation,
+            clippy::cast_sign_loss,
+            clippy::cast_precision_loss
+        )]
+        let rag_budget = if self.rag_pipeline.is_some() {
+            (token_budget as f32 * self.weights.rag_weight) as usize
+        } else {
+            0
+        };
+        let memory_budget = token_budget - rag_budget;
+
+        debug!(
+            "Token budget allocation: rag={} memory={} (total={})",
+            rag_budget, memory_budget, token_budget
+        );
+
+        (rag_budget, memory_budget)
+    }
+
+    /// Query RAG pipeline if available, return empty vec on failure or if not configured
+    async fn query_rag(
+        &self,
+        query: &str,
+        rag_budget: usize,
+        session_id: &str,
+    ) -> Vec<RankedChunk> {
+        let Some(ref rag) = self.rag_pipeline else {
+            debug!("No RAG pipeline configured, using memory-only");
+            return Vec::new();
+        };
+
+        Self::execute_rag_query(rag, query, rag_budget, session_id).await
+    }
+
+    /// Execute RAG retrieval and convert results
+    async fn execute_rag_query(
+        rag: &Arc<dyn RAGRetriever>,
+        query: &str,
+        rag_budget: usize,
+        session_id: &str,
+    ) -> Vec<RankedChunk> {
+        debug!("Querying RAG pipeline...");
+        let scope = Some(StateScope::Custom(format!("session:{session_id}")));
+        let rag_k = (rag_budget / 100).max(1);
+
+        match rag.retrieve(query, rag_k, scope).await {
+            Ok(results) => Self::process_rag_results(results),
+            Err(e) => {
+                error!("RAG retrieval failed: {}", e);
+                Vec::new()
+            }
+        }
+    }
+
+    /// Process RAG results into ranked chunks
+    fn process_rag_results(results: Vec<llmspell_rag::pipeline::RAGResult>) -> Vec<RankedChunk> {
+        debug!("RAG returned {} results", results.len());
+        let chunks = rag_results_to_ranked_chunks(results);
+        debug!("Converted to {} RankedChunks", chunks.len());
+        chunks
+    }
+
+    /// Query episodic memory and convert to ranked chunks
+    async fn query_memory(
+        &self,
+        query: &str,
+        memory_budget: usize,
+        session_id: &str,
+    ) -> Result<Vec<RankedChunk>> {
+        debug!("Querying episodic memory...");
+        let memory_k = (memory_budget / 100).max(1);
+        let episodic_results = self
+            .memory_manager
+            .episodic()
+            .search(query, memory_k)
+            .await
+            .map_err(|e| anyhow::anyhow!("Episodic search failed: {}", e))?;
+
+        debug!(
+            "Episodic memory returned {} results",
+            episodic_results.len()
+        );
+
+        // Track query patterns for consolidation priority
+        self.track_retrieval_patterns(&episodic_results);
+
+        let memory_chunks = Self::convert_episodic_to_chunks(episodic_results, session_id);
+        debug!("Converted to {} memory RankedChunks", memory_chunks.len());
+
+        Ok(memory_chunks)
+    }
+
+    /// Track retrieval patterns for consolidation priority (if tracker configured)
+    fn track_retrieval_patterns(&self, episodic_results: &[llmspell_memory::EpisodicEntry]) {
+        if let Some(ref tracker) = self.query_tracker {
+            let entry_ids: Vec<String> = episodic_results.iter().map(|e| e.id.clone()).collect();
+            tracker.record_retrieval(&entry_ids);
+            debug!(
+                "Tracked query pattern for {} episodic entries",
+                entry_ids.len()
+            );
+        }
+    }
+
+    /// Convert episodic entries to ranked chunks, filtering by session
+    fn convert_episodic_to_chunks(
+        episodic_results: Vec<llmspell_memory::EpisodicEntry>,
+        session_id: &str,
+    ) -> Vec<RankedChunk> {
+        episodic_results
+            .into_iter()
+            .filter(|entry| entry.session_id == session_id)
+            .map(|entry| {
+                let metadata = if entry.metadata.is_null() {
+                    None
+                } else {
+                    Some(entry.metadata.clone())
+                };
+
+                let chunk = Chunk {
+                    id: entry.id,
+                    content: entry.content,
+                    source: format!("memory:{}", entry.session_id),
+                    timestamp: entry.timestamp,
+                    metadata,
+                };
+
+                RankedChunk {
+                    chunk,
+                    score: 1.0,
+                    ranker: "episodic_vector_search".to_string(),
+                }
+            })
+            .collect()
+    }
+
+    /// Finalize results: merge, sort, and truncate to token budget
+    fn finalize_results(mut merged: Vec<RankedChunk>, token_budget: usize) -> Vec<RankedChunk> {
+        debug!("Merged results: {} chunks", merged.len());
+        trace!(
+            "Merged chunk scores: {:?}",
+            merged.iter().map(|c| c.score).collect::<Vec<_>>()
+        );
+
+        merged.sort_by(|a, b| {
+            b.score
+                .partial_cmp(&a.score)
+                .unwrap_or(std::cmp::Ordering::Equal)
+        });
+
+        let max_chunks = (token_budget / 100).max(1);
+        merged.truncate(max_chunks);
+
+        merged
+    }
+
+    /// Weighted merge of RAG and memory results
+    ///
+    /// Applies weights to scores and combines both result sets.
+    fn weighted_merge(
+        &self,
+        mut rag_chunks: Vec<RankedChunk>,
+        mut memory_chunks: Vec<RankedChunk>,
+    ) -> Vec<RankedChunk> {
+        debug!(
+            "Applying weighted merge: {} RAG + {} memory chunks",
+            rag_chunks.len(),
+            memory_chunks.len()
+        );
+
+        // Apply RAG weight to scores
+        for chunk in &mut rag_chunks {
+            chunk.score *= self.weights.rag_weight;
+        }
+
+        // Apply memory weight to scores
+        for chunk in &mut memory_chunks {
+            chunk.score *= self.weights.memory_weight;
+        }
+
+        // Combine
+        rag_chunks.extend(memory_chunks);
+        rag_chunks
+    }
+
+    /// Get reference to RAG pipeline (if configured)
+    #[must_use]
+    pub const fn rag_pipeline(&self) -> Option<&Arc<dyn RAGRetriever>> {
+        self.rag_pipeline.as_ref()
+    }
+
+    /// Get reference to memory manager
+    #[must_use]
+    pub const fn memory_manager(&self) -> &Arc<dyn MemoryManager> {
+        &self.memory_manager
+    }
+
+    /// Get current retrieval weights
+    #[must_use]
+    pub const fn weights(&self) -> RetrievalWeights {
+        self.weights
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_retrieval_weights_validation() {
+        // Valid weights
+        assert!(RetrievalWeights::new(0.4, 0.6).is_ok());
+        assert!(RetrievalWeights::new(0.5, 0.5).is_ok());
+
+        // Invalid weights (don't sum to 1.0)
+        assert!(RetrievalWeights::new(0.3, 0.5).is_err());
+        assert!(RetrievalWeights::new(0.6, 0.6).is_err());
+    }
+
+    #[test]
+    fn test_retrieval_weights_presets() {
+        const EPSILON: f32 = 0.001;
+
+        let balanced = RetrievalWeights::balanced();
+        assert!((balanced.rag_weight - 0.5).abs() < EPSILON);
+        assert!((balanced.memory_weight - 0.5).abs() < EPSILON);
+
+        let rag_focused = RetrievalWeights::rag_focused();
+        assert!((rag_focused.rag_weight - 0.7).abs() < EPSILON);
+        assert!((rag_focused.memory_weight - 0.3).abs() < EPSILON);
+
+        let memory_focused = RetrievalWeights::memory_focused();
+        assert!((memory_focused.rag_weight - 0.4).abs() < EPSILON);
+        assert!((memory_focused.memory_weight - 0.6).abs() < EPSILON);
+    }
+
+    #[test]
+    fn test_default_weights() {
+        const EPSILON: f32 = 0.001;
+
+        let default = RetrievalWeights::default();
+        assert!((default.rag_weight - 0.4).abs() < EPSILON);
+        assert!((default.memory_weight - 0.6).abs() < EPSILON);
+    }
+}

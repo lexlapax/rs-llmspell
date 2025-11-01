@@ -15,9 +15,13 @@ mod test {
     async fn test_automatic_cleanup_during_creation() {
         // Create state manager
         let state_manager = Arc::new(
-            StateManager::with_backend(StorageBackendType::Memory, PersistenceConfig::default())
-                .await
-                .expect("Failed to create state manager"),
+            StateManager::with_backend(
+                StorageBackendType::Memory,
+                PersistenceConfig::default(),
+                None,
+            )
+            .await
+            .expect("Failed to create state manager"),
         );
 
         // Create backup manager with max_backups=2

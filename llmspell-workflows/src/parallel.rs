@@ -336,6 +336,8 @@ pub struct ParallelWorkflow {
     error_handler: ErrorHandler,
     /// Optional workflow executor for hook integration
     workflow_executor: Option<Arc<WorkflowExecutor>>,
+    /// Optional template executor for template step execution
+    template_executor: Option<Arc<dyn llmspell_core::traits::template_executor::TemplateExecutor>>,
     /// Workflow metadata
     metadata: ComponentMetadata,
     /// Core workflow configuration for Workflow trait
@@ -376,6 +378,7 @@ impl ParallelWorkflow {
             step_executor,
             error_handler,
             workflow_executor: None,
+            template_executor: None,
             metadata,
             core_config,
             core_steps: Arc::new(RwLock::new(Vec::new())),
@@ -416,6 +419,7 @@ impl ParallelWorkflow {
             step_executor,
             error_handler,
             workflow_executor: Some(workflow_executor),
+            template_executor: None,
             metadata,
             core_config,
             core_steps: Arc::new(RwLock::new(Vec::new())),
@@ -457,6 +461,7 @@ impl ParallelWorkflow {
             step_executor,
             error_handler,
             workflow_executor: None,
+            template_executor: None,
             metadata,
             core_config,
             core_steps: Arc::new(RwLock::new(Vec::new())),
@@ -505,6 +510,7 @@ impl ParallelWorkflow {
             step_executor,
             error_handler,
             workflow_executor: Some(workflow_executor),
+            template_executor: None,
             metadata,
             core_config,
             core_steps: Arc::new(RwLock::new(Vec::new())),
@@ -544,6 +550,9 @@ impl ParallelWorkflow {
         workflow_metadata: Option<ComponentMetadata>,
         has_hooks: bool,
         execution_component_id: ComponentId,
+        template_executor: Option<
+            Arc<dyn llmspell_core::traits::template_executor::TemplateExecutor>,
+        >,
     ) -> BranchResult {
         let start_time = Instant::now();
         let branch_name = branch.name.clone();
@@ -576,7 +585,12 @@ impl ParallelWorkflow {
             workflow_state.execution_id = execution_component_id;
             workflow_state.shared_data = shared_data;
             workflow_state.current_step = index;
-            let context = StepExecutionContext::new(workflow_state, branch.timeout);
+            let mut context = StepExecutionContext::new(workflow_state, branch.timeout);
+
+            // Pass template_executor to step context if available
+            if let Some(ref template_executor) = template_executor {
+                context = context.with_template_executor(template_executor.clone());
+            }
 
             // Execute step (with workflow metadata if hooks are enabled)
             let step_result = if has_hooks && workflow_metadata.is_some() {
@@ -776,6 +790,7 @@ impl BaseAgent for ParallelWorkflow {
                 let workflow_config = self.workflow_config.clone();
                 let _fail_fast = self.config.fail_fast;
                 let workflow_executor = self.workflow_executor.clone();
+                let template_executor = self.template_executor.clone();
                 let metadata = self.metadata.clone();
                 let _context_state = context.state.clone();
                 let _exec_id = execution_id.clone();
@@ -814,6 +829,7 @@ impl BaseAgent for ParallelWorkflow {
                         Some(metadata),
                         workflow_executor.is_some(),
                         exec_component_id,
+                        template_executor,
                     )
                     .await)
                 });
@@ -1161,6 +1177,7 @@ pub struct ParallelWorkflowBuilder {
     config: ParallelConfig,
     workflow_config: WorkflowConfig,
     workflow_executor: Option<Arc<WorkflowExecutor>>,
+    template_executor: Option<Arc<dyn llmspell_core::traits::template_executor::TemplateExecutor>>,
     registry: Option<Arc<dyn ComponentLookup>>,
 }
 
@@ -1174,6 +1191,7 @@ impl ParallelWorkflowBuilder {
             config: ParallelConfig::default(),
             workflow_config: WorkflowConfig::default(),
             workflow_executor: None,
+            template_executor: None,
             registry: None,
         }
     }
@@ -1232,6 +1250,15 @@ impl ParallelWorkflowBuilder {
         self
     }
 
+    /// Set the template executor for template step execution
+    pub fn with_template_executor(
+        mut self,
+        template_executor: Arc<dyn llmspell_core::traits::template_executor::TemplateExecutor>,
+    ) -> Self {
+        self.template_executor = Some(template_executor);
+        self
+    }
+
     /// Build the parallel workflow
     pub fn build(self) -> Result<ParallelWorkflow> {
         debug!(
@@ -1267,39 +1294,38 @@ impl ParallelWorkflowBuilder {
             self.registry.is_some()
         );
 
-        match (self.workflow_executor, self.registry) {
+        let mut workflow = match (self.workflow_executor, self.registry) {
             (Some(workflow_executor), Some(registry)) => {
                 debug!("Creating ParallelWorkflow with hooks and registry");
-                Ok(ParallelWorkflow::new_with_hooks_and_registry(
+                ParallelWorkflow::new_with_hooks_and_registry(
                     self.name,
                     self.branches,
                     self.config,
                     self.workflow_config,
                     workflow_executor,
                     Some(registry),
-                ))
+                )
             }
-            (Some(workflow_executor), None) => Ok(ParallelWorkflow::new_with_hooks(
+            (Some(workflow_executor), None) => ParallelWorkflow::new_with_hooks(
                 self.name,
                 self.branches,
                 self.config,
                 self.workflow_config,
                 workflow_executor,
-            )),
-            (None, Some(registry)) => Ok(ParallelWorkflow::new_with_registry(
+            ),
+            (None, Some(registry)) => ParallelWorkflow::new_with_registry(
                 self.name,
                 self.branches,
                 self.config,
                 self.workflow_config,
                 Some(registry),
-            )),
-            (None, None) => Ok(ParallelWorkflow::new(
-                self.name,
-                self.branches,
-                self.config,
-                self.workflow_config,
-            )),
-        }
+            ),
+            (None, None) => {
+                ParallelWorkflow::new(self.name, self.branches, self.config, self.workflow_config)
+            }
+        };
+        workflow.template_executor = self.template_executor;
+        Ok(workflow)
     }
 }
 

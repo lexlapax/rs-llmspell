@@ -165,6 +165,7 @@ async fn test_provider_config_validation() {
             default_model: Some("gpt-3.5-turbo".to_string()),
             max_tokens: Some(1000),
             timeout_seconds: Some(60),
+            temperature: Some(0.7),
             max_retries: None,
             rate_limit: None,
             retry: None,

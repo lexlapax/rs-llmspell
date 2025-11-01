@@ -3904,7 +3904,7 @@ The examples directory is now fully organized, tested, and ready for users with 
 **Dependencies**: Task 7.3.4
 **Reference**: Follow the architecture and design in `examples/script-users/applications/blueprint.md` for each application.
 
-**Description**: Create 7 production-ready applications demonstrating llmspell's full capabilities with REAL LLM APIs and proper component composition.
+**Description**: Create 7 experimental infrastructure with production-quality engineering applications demonstrating llmspell's full capabilities with REAL LLM APIs and proper component composition.
 
 **⚠️ CRITICAL REQUIREMENTS**:
 - **NO MOCKS**: Real OpenAI/Anthropic API keys required (costs apply!)
@@ -6193,7 +6193,7 @@ Make all file system tools REQUIRE sandbox context and remove ability to create 
 
 ---
 
-#### Task 7.3.10: WebApp Creator Complete Rebuild (Production-Ready)
+#### Task 7.3.10: WebApp Creator Complete Rebuild (Experimental Infrastructure with Production-Quality Engineering)
 **Priority**: CRITICAL - CORE ARCHITECTURE FIXED AND VALIDATED
 **Estimated Time**: 36 hours (16h core + 8h webapp + 4h integration + 8h testing/docs)
 **Status**: ✅ FULLY COMPLETED (10.1-10.7 ALL DONE) - 2025-08-22
@@ -7103,7 +7103,7 @@ Make all file system tools REQUIRE sandbox context and remove ability to create 
 
 ##### 10.2: Debug Infrastructure and hooks for script engines** (19 hours)
 
-**Problem Statement**: Script debugging is painful - no way to conditionally output debug info, no performance profiling, no stack traces, requires constant recompilation with print statements. Scripts need production-ready debugging that integrates with Rust's tracing infrastructure.
+**Problem Statement**: Script debugging is painful - no way to conditionally output debug info, no performance profiling, no stack traces, requires constant recompilation with print statements. Scripts need experimental infrastructure with production-quality engineering debugging that integrates with Rust's tracing infrastructure.
 
 **Architecture Overview**: 
 - **Centralized DebugManager**: Single Rust-native debug system that all script engines call into
@@ -7339,7 +7339,7 @@ Make all file system tools REQUIRE sandbox context and remove ability to create 
 
 **🎯 Summary of Achievements**:
 - **13/13 Sub-Tasks Completed**: All debug infrastructure components implemented and tested
-- **Production-Ready System**: Comprehensive debug capabilities for script engines
+- **Experimental Infrastructure with Production-Quality Engineering System**: Comprehensive debug capabilities for script engines
 - **Zero-Cost Abstraction**: Minimal overhead when disabled, optimized performance when enabled
 - **Complete API Surface**: Logging, profiling, filtering, dumping, stack traces, memory monitoring
 - **Extensive Testing**: Integration tests, examples, and CI validation scripts
@@ -8232,7 +8232,7 @@ done
 3. `OUTPUT-STRUCTURE.md` - 500+ lines documenting all generated files
 4. Updated `README.md` - Added 90+ lines of lessons learned and insights
 
-**Task 10.8 Summary**: Created comprehensive documentation suite that transforms WebApp Creator from a complex example into a production-ready, well-documented application generator with clear configuration guidelines, troubleshooting support, and architectural insights.
+**Task 10.8 Summary**: Created comprehensive documentation suite that transforms WebApp Creator from a complex example into a experimental infrastructure with production-quality engineering, well-documented application generator with clear configuration guidelines, troubleshooting support, and architectural insights.
 
 ---
 
@@ -8622,7 +8622,7 @@ ls -la examples/script-users/applications/webapp-creator/generated/shopeasy/
 - [x] **User Validation Results**: Application successfully generates complete web apps with frontend, backend, database, tests, and deployment configs. ~$0.50-1.00 API cost acceptable for value delivered.
 - [x] **Performance Impact Analysis**: 21-agent orchestration maintains reasonable performance (~2-3 min). Memory usage stable. State management scales well without migration complexity.
 - [x] **Architecture Refinements**: Expert workflow uses specialized agents with specific models (GPT-4 for complex, Haiku for simple tasks). Retry logic with exponential backoff crucial for reliability.
-- [x] **Expert Validation Assessment**: Full-stack automation proven effective. Generates production-ready code. Handles React, Vue, Express, PostgreSQL, Docker, CI/CD successfully.
+- [x] **Expert Validation Assessment**: Full-stack automation proven effective. Generates experimental infrastructure with production-quality engineering code. Handles React, Vue, Express, PostgreSQL, Docker, CI/CD successfully.
 - [x] **Cascade Impact Assessment**: Complete progression validated (2→3→4→5→8→21 agents). Natural learning curve confirmed. Expert layer represents appropriate complexity ceiling.
 - [x] **TODO.md Updates**: Expert complexity documented. 21 agents is practical ceiling. State management sufficient without sessions/artifacts for this use case.
 - [x] **README.md Updates**: Expert positioning as "AI automation mastery" validated. Journey from Universal to Expert clearly demonstrated.
@@ -9899,7 +9899,7 @@ All 5 examples now have detailed headers following the format:
 ✅ RENAMED: state-versioning.lua → state-management.lua
 ✅ RESULT: Exactly 8 production-essential patterns remain
 ✅ UPDATED: All 8 patterns with comprehensive 40+ line headers
-✅ CRITERIA: Must teach unique pattern, must be production-ready, must use canonical APIs
+✅ CRITERIA: Must teach unique pattern, must be experimental infrastructure with production-quality engineering, must use canonical APIs
 
 🔍 VALIDATION - Each of 8 kept cookbook patterns:
 1. **error-handling.lua** (454 lines, exemplary):
@@ -10410,7 +10410,7 @@ VALIDATION REQUIREMENTS:
 **SUCCESS METRICS**:
 - ✅ **80% reduction**: 157 → 32 files (eliminates choice paralysis)
 - ✅ **Industry alignment**: 32 examples within 25-35 standard range
-- ✅ **Quality focus**: Keep only excellent, unique, production-ready examples
+- ✅ **Quality focus**: Keep only excellent, unique, experimental infrastructure with production-quality engineering examples
 - ✅ **Working applications preserved**: All 7 Universal→Professional progression apps
 - ✅ **Canonical API compliance**: 100% alignment with docs/user-guide/api/
 

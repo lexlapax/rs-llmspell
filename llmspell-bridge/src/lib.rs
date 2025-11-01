@@ -262,6 +262,12 @@ pub mod hook_bridge;
 pub mod artifact_bridge;
 pub mod session_bridge;
 
+// Memory bridge (Phase 13.8.1)
+pub mod memory_bridge;
+
+// Context bridge (Phase 13.8.2)
+pub mod context_bridge;
+
 // Agent bridge modules
 pub mod agent_bridge;
 pub mod agents;
@@ -292,7 +298,9 @@ pub use engine::{
     ScriptStream, SecurityContext,
 };
 
+pub use context_bridge::ContextBridge;
 pub use llmspell_config::LLMSpellConfig;
+pub use memory_bridge::MemoryBridge;
 pub use providers::ProviderManager;
 pub use registry::ComponentRegistry;
 pub use runtime::ScriptRuntime;

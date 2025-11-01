@@ -10,8 +10,8 @@ use crate::{
     artifacts::Artifact,
     context::ExecutionContext,
     core::{
-        CostEstimate, TemplateCategory, TemplateMetadata, TemplateOutput, TemplateParams,
-        TemplateResult,
+        memory_parameters, provider_parameters, CostEstimate, TemplateCategory, TemplateMetadata,
+        TemplateOutput, TemplateParams, TemplateResult,
     },
     error::{Result, TemplateError},
     validation::{ConfigSchema, ParameterConstraints, ParameterSchema, ParameterType},
@@ -24,7 +24,7 @@ use llmspell_core::LLMSpellError;
 use serde_json::json;
 use std::sync::Arc;
 use std::time::Instant;
-use tracing::{info, warn};
+use tracing::{debug, info, warn};
 
 /// Minimal no-op script executor for chat-only REPL mode (Subtask 12.9.5)
 ///
@@ -113,7 +113,7 @@ impl crate::core::Template for InteractiveChatTemplate {
     }
 
     fn config_schema(&self) -> ConfigSchema {
-        ConfigSchema::new(vec![
+        let mut params = vec![
             // model (optional with default)
             ParameterSchema::optional(
                 "model",
@@ -168,7 +168,19 @@ impl crate::core::Template for InteractiveChatTemplate {
                 ParameterType::String,
                 json!(null),
             ),
-        ])
+        ];
+
+        // Add memory parameters (Task 13.11.1)
+        params.extend(memory_parameters());
+
+        // Add provider parameters (Task 13.5.7d)
+        params.extend(provider_parameters());
+
+        debug!(
+            "InteractiveChat: Generated config schema with {} parameters",
+            params.len()
+        );
+        ConfigSchema::new(params)
     }
 
     async fn execute(
@@ -179,7 +191,6 @@ impl crate::core::Template for InteractiveChatTemplate {
         let start_time = Instant::now();
 
         // Extract and validate parameters
-        let model: String = params.get_or("model", "ollama/llama3.2:3b".to_string());
         let system_prompt: String = params.get_or(
             "system_prompt",
             "You are a helpful AI assistant. Provide clear, accurate, and concise responses."
@@ -187,16 +198,26 @@ impl crate::core::Template for InteractiveChatTemplate {
         );
         let max_turns: i64 = params.get_or("max_turns", 10);
         let tools: Vec<String> = params.get_or("tools", Vec::new());
-        let enable_memory: bool = params.get_or("enable_memory", false);
         let message: Option<String> = params.get_optional("message");
         let session_id_param: Option<String> = params.get_optional("session_id");
 
+        // Extract memory parameters (Task 13.11.2)
+        let memory_enabled: bool = params.get_or("memory_enabled", true);
+        let context_budget: i64 = params.get_or("context_budget", 2000);
+
+        // Smart dual-path provider resolution (Task 13.5.7d)
+        let provider_config = context.resolve_llm_config(&params)?;
+        let model_str = provider_config
+            .default_model
+            .as_ref()
+            .ok_or_else(|| TemplateError::Config("provider missing model".into()))?;
+
         info!(
             "Starting interactive chat (model={}, max_turns={}, tools={}, memory={})",
-            model,
+            model_str,
             max_turns,
             tools.len(),
-            enable_memory
+            memory_enabled
         );
 
         // Initialize output
@@ -228,12 +249,9 @@ impl crate::core::Template for InteractiveChatTemplate {
         let loaded_tools = self.load_tools(&tools, &context).await?;
         output.metrics.tools_invoked = loaded_tools.len();
 
-        // Phase 3: Check memory (placeholder for Phase 13)
-        if enable_memory {
-            warn!("Long-term memory requested but not yet implemented - will be added in Phase 13");
-            output.add_metric("memory_enabled", json!(false));
-            output.add_metric("memory_status", json!("Phase 13 placeholder"));
-        }
+        // Phase 3: Memory configuration (Task 13.11.2)
+        output.add_metric("memory_enabled", json!(memory_enabled));
+        output.add_metric("context_budget", json!(context_budget));
 
         // Phase 4: Execute conversation
         info!("Phase 4: Executing conversation...");
@@ -241,22 +259,26 @@ impl crate::core::Template for InteractiveChatTemplate {
             ExecutionMode::Interactive => {
                 self.run_interactive_mode(
                     &session_id,
-                    &model,
+                    &provider_config,
                     &system_prompt,
                     max_turns as usize,
                     &loaded_tools,
                     &context,
+                    memory_enabled,
+                    context_budget,
                 )
                 .await?
             }
             ExecutionMode::Programmatic => {
                 self.run_programmatic_mode(
                     &session_id,
-                    &model,
+                    &provider_config,
                     &system_prompt,
                     message.as_deref().unwrap(),
                     &loaded_tools,
                     &context,
+                    memory_enabled,
+                    context_budget,
                 )
                 .await?
             }
@@ -277,6 +299,28 @@ impl crate::core::Template for InteractiveChatTemplate {
                 &conversation_result,
                 &mut output,
             )?;
+        }
+
+        // Store in memory if enabled (Task 13.11.3)
+        if memory_enabled && context.memory_manager().is_some() {
+            let memory_mgr = context.memory_manager().unwrap();
+            let input_summary = message.as_deref().unwrap_or("interactive chat session");
+            let output_summary =
+                &conversation_result.transcript[..conversation_result.transcript.len().min(200)];
+
+            crate::context::store_template_execution(
+                &memory_mgr,
+                &session_id,
+                &self.metadata.id,
+                input_summary,
+                output_summary,
+                json!({
+                    "turns": conversation_result.turns,
+                    "total_tokens": conversation_result.total_tokens,
+                }),
+            )
+            .await
+            .ok(); // Don't fail execution if storage fails
         }
 
         // Set result
@@ -507,20 +551,29 @@ impl InteractiveChatTemplate {
     /// - Multi-line: smart detection, continuation prompts
     /// - Ctrl-C: graceful interrupt (doesn't terminate)
     /// - Dual-mode: Execute Lua/JS code OR chat with agent
+    #[allow(clippy::too_many_arguments)]
     async fn run_interactive_mode(
         &self,
         session_id: &str,
-        model: &str,
+        provider_config: &llmspell_config::ProviderConfig,
         system_prompt: &str,
         _max_turns: usize, // REPL handles its own lifecycle
         tools: &[String],
         context: &ExecutionContext,
+        _memory_enabled: bool, // Memory integration TODO: integrate at kernel level
+        _context_budget: i64,  // Memory integration TODO: integrate at kernel level
     ) -> Result<ConversationResult> {
         use llmspell_agents::factory::{AgentConfig, ModelConfig, ResourceLimits};
         use llmspell_kernel::execution::ExecutionConfig;
         use llmspell_kernel::protocols::JupyterProtocol;
         use llmspell_kernel::repl::{InteractiveSession, ReplSessionConfig};
         use llmspell_kernel::IntegratedKernel;
+
+        // Extract model from provider config
+        let model = provider_config
+            .default_model
+            .as_ref()
+            .ok_or_else(|| TemplateError::Config("provider missing model".into()))?;
 
         info!(
             "Starting REPL chat session (model: {}, session: {})",
@@ -548,14 +601,16 @@ impl InteractiveChatTemplate {
         );
 
         // Create integrated kernel
-        let kernel = IntegratedKernel::new(
-            jupyter_protocol,
-            ExecutionConfig::default(),
-            session_id.to_string(),
+        let kernel = IntegratedKernel::new(llmspell_kernel::execution::IntegratedKernelParams {
+            protocol: jupyter_protocol,
+            config: ExecutionConfig::default(),
+            session_id: session_id.to_string(),
             script_executor,
-            Some(provider_manager.clone()),
+            provider_manager: Some(provider_manager.clone()),
             session_manager,
-        )
+            memory_manager: None,
+            hook_system: None,
+        })
         .await
         .map_err(|e| TemplateError::ExecutionFailed(format!("Failed to create kernel: {}", e)))?;
 
@@ -582,7 +637,7 @@ impl InteractiveChatTemplate {
                 model[slash_pos + 1..].to_string(),
             )
         } else {
-            ("ollama".to_string(), model.to_string())
+            (provider_config.provider_type.clone(), model.to_string())
         };
 
         let agent_config = AgentConfig {
@@ -592,8 +647,8 @@ impl InteractiveChatTemplate {
             model: Some(ModelConfig {
                 provider,
                 model_id,
-                temperature: Some(0.7),
-                max_tokens: Some(1000),
+                temperature: provider_config.temperature.or(Some(0.7)),
+                max_tokens: provider_config.max_tokens.or(Some(1000)),
                 settings: serde_json::Map::new(),
             }),
             allowed_tools: tools.to_vec(),
@@ -624,10 +679,15 @@ impl InteractiveChatTemplate {
         session = session.with_initial_agent(agent).await;
 
         // Create agent creator callback for auto-recreation (Subtask 12.9.5)
+        // Clone values from provider_config to move into 'static closure
+        let temperature = provider_config.temperature.or(Some(0.7));
+        let max_tokens = provider_config.max_tokens.or(Some(1000));
         let agent_registry_clone = agent_registry.clone();
         let agent_creator: llmspell_kernel::repl::session::AgentCreator = std::sync::Arc::new(
             move |model: String, _system_prompt: String, tools: Vec<String>| {
                 let registry = agent_registry_clone.clone();
+                let temp = temperature;
+                let max_tok = max_tokens;
                 Box::pin(async move {
                     use llmspell_agents::factory::{AgentConfig, ModelConfig, ResourceLimits};
 
@@ -648,8 +708,8 @@ impl InteractiveChatTemplate {
                         model: Some(ModelConfig {
                             provider,
                             model_id,
-                            temperature: Some(0.7),
-                            max_tokens: Some(1000),
+                            temperature: temp,
+                            max_tokens: max_tok,
                             settings: serde_json::Map::new(),
                         }),
                         allowed_tools: tools.clone(),
@@ -716,17 +776,26 @@ impl InteractiveChatTemplate {
     }
 
     /// Phase 4b: Run programmatic mode (single message)
+    #[allow(clippy::too_many_arguments)]
     async fn run_programmatic_mode(
         &self,
         session_id: &str,
-        model: &str,
+        provider_config: &llmspell_config::ProviderConfig,
         system_prompt: &str,
         user_message: &str,
         tools: &[String],
         context: &ExecutionContext,
+        memory_enabled: bool,
+        context_budget: i64,
     ) -> Result<ConversationResult> {
         use llmspell_agents::factory::{AgentConfig, ModelConfig, ResourceLimits};
         use llmspell_core::types::AgentInput;
+
+        // Extract model from provider config
+        let model = provider_config
+            .default_model
+            .as_ref()
+            .ok_or_else(|| TemplateError::Config("provider missing model".into()))?;
 
         info!(
             "Running programmatic mode (session: {}, model: {}, message_len: {}, tools: {})",
@@ -735,6 +804,29 @@ impl InteractiveChatTemplate {
             user_message.len(),
             tools.len()
         );
+
+        // Assemble memory context (Task 13.11.2)
+        let memory_context =
+            if let (true, Some(bridge)) = (memory_enabled, context.context_bridge()) {
+                debug!(
+                    "Assembling memory context: session={}, budget={}",
+                    session_id, context_budget
+                );
+                crate::assemble_template_context(&bridge, user_message, session_id, context_budget)
+                    .await
+            } else {
+                vec![]
+            };
+
+        let memory_context_str = if !memory_context.is_empty() {
+            memory_context
+                .iter()
+                .map(|msg| format!("{}: {}", msg.role, msg.content))
+                .collect::<Vec<_>>()
+                .join("\n\n")
+        } else {
+            String::new()
+        };
 
         // Load conversation history from session
         let mut history = self.load_conversation_history(session_id, context).await?;
@@ -751,7 +843,7 @@ impl InteractiveChatTemplate {
                 model[slash_pos + 1..].to_string(),
             )
         } else {
-            ("ollama".to_string(), model.to_string())
+            (provider_config.provider_type.clone(), model.to_string())
         };
 
         info!(
@@ -770,8 +862,8 @@ impl InteractiveChatTemplate {
             model: Some(ModelConfig {
                 provider,
                 model_id,
-                temperature: Some(0.7), // Balanced creativity for conversation
-                max_tokens: Some(1000),
+                temperature: provider_config.temperature.or(Some(0.7)), // Balanced creativity for conversation
+                max_tokens: provider_config.max_tokens.or(Some(1000)),
                 settings: serde_json::Map::new(),
             }),
             allowed_tools: tools.to_vec(),
@@ -807,8 +899,14 @@ impl InteractiveChatTemplate {
         };
 
         let prompt = format!(
-            "{}{}\n\nRespond to the user's latest message naturally and helpfully.",
-            system_prompt, conversation_context
+            "{}{}{}\n\nRespond to the user's latest message naturally and helpfully.",
+            if !memory_context_str.is_empty() {
+                format!("Relevant Context from Memory:\n{}\n\n", memory_context_str)
+            } else {
+                String::new()
+            },
+            system_prompt,
+            conversation_context
         );
 
         // Create input for agent
@@ -1021,6 +1119,17 @@ impl ConversationTurn {
 mod tests {
     use super::*;
     use crate::core::Template;
+    /// Test helper: Create a provider config for tests
+    fn test_provider_config() -> llmspell_config::ProviderConfig {
+        llmspell_config::ProviderConfig {
+            default_model: Some("ollama/llama3.2:3b".to_string()),
+            provider_type: "ollama".to_string(),
+            temperature: Some(0.3),
+            max_tokens: Some(2000),
+            timeout_seconds: Some(120),
+            ..Default::default()
+        }
+    }
 
     #[test]
     fn test_template_metadata() {
@@ -1319,11 +1428,13 @@ mod tests {
             let result = template
                 .run_programmatic_mode(
                     "test-session-uuid",
-                    "ollama/llama3.2:3b",
+                    &test_provider_config(),
                     "You are helpful",
                     "Hello, how are you?",
                     &[],
                     &context,
+                    false, // memory_enabled
+                    2000,  // context_budget
                 )
                 .await;
 
@@ -1357,11 +1468,13 @@ mod tests {
                 let _ = template
                     .run_programmatic_mode(
                         &session_id,
-                        "ollama/llama3.2:3b",
+                        &test_provider_config(),
                         "System",
                         "Message 1",
                         &[],
                         &context,
+                        false, // memory_enabled
+                        2000,  // context_budget
                     )
                     .await;
 
@@ -1369,11 +1482,13 @@ mod tests {
                 let _ = template
                     .run_programmatic_mode(
                         &session_id,
-                        "ollama/llama3.2:3b",
+                        &test_provider_config(),
                         "System",
                         "Message 2",
                         &[],
                         &context,
+                        false, // memory_enabled
+                        2000,  // context_budget
                     )
                     .await;
 

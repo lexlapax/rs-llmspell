@@ -1,0 +1,137 @@
+//! Memory consolidation logic (episodic → semantic)
+//!
+//! Converts episodic entries to semantic knowledge through entity extraction
+//! and relationship mapping.
+//!
+//! # Consolidation Strategies
+//!
+//! - **Manual**: Explicit trigger for testing/development
+//! - **Immediate**: Consolidate on every episodic add (Phase 13.5)
+//! - **Background**: Daemon-based consolidation (Phase 13.6)
+//! - **LLM-Driven**: Advanced extraction with ADD/UPDATE/DELETE/NOOP decisions (Phase 13.5)
+//!
+//! # Example
+//!
+//! ```rust,no_run
+//! use std::sync::Arc;
+//! use llmspell_memory::consolidation::{ManualConsolidationEngine, ConsolidationEngine};
+//! use llmspell_memory::types::EpisodicEntry;
+//! use llmspell_graph::extraction::RegexExtractor;
+//! use llmspell_graph::storage::surrealdb::SurrealDBBackend;
+//! use tempfile::TempDir;
+//!
+//! #[tokio::main]
+//! async fn main() -> llmspell_memory::Result<()> {
+//!     let temp = TempDir::new().unwrap();
+//!     let extractor = Arc::new(RegexExtractor::new());
+//!     let graph = Arc::new(SurrealDBBackend::new(temp.path().to_path_buf()).await.unwrap());
+//!     let engine = ManualConsolidationEngine::new(extractor, graph);
+//!
+//!     let mut entries = vec![EpisodicEntry::new("session-123".into(), "user".into(), "test".into())];
+//!     let result = engine.consolidate(&["session-123"], &mut entries).await?;
+//!     println!("Processed {} entries, added {} entities",
+//!              result.entries_processed, result.entities_added);
+//!     Ok(())
+//! }
+//! ```
+
+use async_trait::async_trait;
+
+use crate::error::Result;
+use crate::types::{ConsolidationResult, EpisodicEntry};
+
+pub mod context_assembly;
+pub mod daemon;
+pub mod llm_engine;
+pub mod manual;
+pub mod metrics;
+pub mod noop;
+pub mod prompt_schema;
+pub mod prompts;
+pub mod validator;
+
+pub use context_assembly::ContextAssembler;
+pub use daemon::{ConsolidationDaemon, DaemonConfig, DaemonMetrics};
+pub use llm_engine::{LLMConsolidationConfig, LLMConsolidationEngine};
+pub use manual::ManualConsolidationEngine;
+pub use metrics::{
+    AutoPromotionConfig, ConsolidationMetrics, CoreMetrics, DecisionDistribution, DecisionType,
+    LagStats, LatencyStats, ModelMetrics, ModelPricing, PromptMetrics, ThroughputMetrics,
+    TokenUsage, VersionSelectionStrategy,
+};
+pub use noop::NoopConsolidationEngine;
+pub use prompt_schema::{
+    ConsolidationResponse, DecisionPayload, EntityPayload, OutputFormat, RelationshipPayload,
+};
+pub use prompts::{
+    parse_llm_response, ConsolidationPromptBuilder, ConsolidationPromptConfig, PromptVersion,
+    TokenBudget,
+};
+pub use validator::DecisionValidator;
+
+/// Trait for consolidation engines that convert episodic entries to semantic knowledge
+///
+/// Implementations extract entities and relationships from episodic content
+/// and update the knowledge graph accordingly.
+#[async_trait]
+pub trait ConsolidationEngine: Send + Sync {
+    /// Consolidate episodic entries into semantic memory
+    ///
+    /// # Arguments
+    ///
+    /// * `session_ids` - Filter to only consolidate entries from these sessions (empty = all)
+    /// * `entries` - Mutable slice of entries to consolidate (will be marked as processed)
+    ///
+    /// # Returns
+    ///
+    /// Consolidation metrics (entries processed, entities added/updated/deleted)
+    ///
+    /// # Example
+    ///
+    /// ```rust,no_run
+    /// use std::sync::Arc;
+    /// use llmspell_memory::consolidation::{ConsolidationEngine, ManualConsolidationEngine};
+    /// use llmspell_memory::types::EpisodicEntry;
+    /// use llmspell_graph::extraction::RegexExtractor;
+    /// use llmspell_graph::storage::surrealdb::SurrealDBBackend;
+    /// use tempfile::TempDir;
+    ///
+    /// #[tokio::main]
+    /// async fn main() -> llmspell_memory::Result<()> {
+    ///     let temp = TempDir::new().unwrap();
+    ///     let extractor = Arc::new(RegexExtractor::new());
+    ///     let graph = Arc::new(SurrealDBBackend::new(temp.path().to_path_buf()).await.unwrap());
+    ///     let engine = ManualConsolidationEngine::new(extractor, graph);
+    ///
+    ///     let mut entries = vec![EpisodicEntry::new("session-123".into(), "user".into(), "test".into())];
+    ///     let result = engine.consolidate(&["session-123"], &mut entries).await?;
+    ///     assert!(result.entries_processed >= 0);
+    ///     Ok(())
+    /// }
+    /// ```
+    async fn consolidate(
+        &self,
+        session_ids: &[&str],
+        entries: &mut [EpisodicEntry],
+    ) -> Result<ConsolidationResult>;
+
+    /// Check if engine is ready for consolidation
+    ///
+    /// Returns false if dependencies (e.g., LLM service) are unavailable.
+    fn is_ready(&self) -> bool {
+        true
+    }
+
+    /// Check if this is a no-op consolidation engine
+    ///
+    /// Returns true for engines that don't actually perform consolidation (e.g., `NoopConsolidationEngine`).
+    /// Used by kernel integration to determine if consolidation daemon should be started.
+    ///
+    /// # Default Implementation
+    ///
+    /// Returns `false` for real consolidation engines (manual, LLM-driven).
+    /// Override to return `true` only in `NoopConsolidationEngine`.
+    fn is_noop(&self) -> bool {
+        false
+    }
+}

@@ -35,6 +35,8 @@ pub struct SequentialWorkflow {
     error_strategy: ErrorStrategy,
     /// Optional workflow executor for hook integration
     workflow_executor: Option<Arc<WorkflowExecutor>>,
+    /// Optional template executor for template step execution
+    template_executor: Option<Arc<dyn llmspell_core::traits::template_executor::TemplateExecutor>>,
     /// Workflow metadata
     metadata: ComponentMetadata,
     /// Core workflow configuration for Workflow trait
@@ -82,6 +84,7 @@ impl SequentialWorkflow {
             error_handler,
             error_strategy,
             workflow_executor: None,
+            template_executor: None,
             metadata,
             core_config,
             core_steps: Arc::new(RwLock::new(Vec::new())),
@@ -135,6 +138,7 @@ impl SequentialWorkflow {
             error_handler,
             error_strategy,
             workflow_executor: Some(workflow_executor),
+            template_executor: None,
             metadata,
             core_config,
             core_steps: Arc::new(RwLock::new(Vec::new())),
@@ -319,6 +323,11 @@ impl BaseAgent for SequentialWorkflow {
                     "No state available in ExecutionContext for step {} - state is None!",
                     step.name
                 );
+            }
+
+            // Pass template_executor to step context if available
+            if let Some(ref template_executor) = self.template_executor {
+                step_context = step_context.with_template_executor(template_executor.clone());
             }
 
             // Execute step with retry logic
@@ -693,6 +702,7 @@ pub struct SequentialWorkflowBuilder {
     steps: Vec<WorkflowStep>,
     error_strategy: Option<ErrorStrategy>,
     workflow_executor: Option<Arc<WorkflowExecutor>>,
+    template_executor: Option<Arc<dyn llmspell_core::traits::template_executor::TemplateExecutor>>,
     registry: Option<Arc<dyn ComponentLookup>>,
 }
 
@@ -705,6 +715,7 @@ impl SequentialWorkflowBuilder {
             steps: Vec::new(),
             error_strategy: None,
             workflow_executor: None,
+            template_executor: None,
             registry: None,
         }
     }
@@ -733,6 +744,53 @@ impl SequentialWorkflowBuilder {
         self
     }
 
+    /// Add a template execution step to the workflow
+    ///
+    /// Convenience method for adding a `StepType::Template` step without manual construction.
+    ///
+    /// # Example
+    ///
+    /// ```
+    /// use llmspell_workflows::sequential::SequentialWorkflowBuilder;
+    /// use serde_json::json;
+    ///
+    /// let workflow = SequentialWorkflowBuilder::new("research-chat".to_string())
+    ///     .add_template_step(
+    ///         "research".to_string(),
+    ///         "research-assistant".to_string(),
+    ///         json!({
+    ///             "topic": "Rust async programming",
+    ///             "max_sources": 10,
+    ///             "session_id": "test-session",
+    ///         }),
+    ///     )
+    ///     .add_template_step(
+    ///         "chat".to_string(),
+    ///         "interactive-chat".to_string(),
+    ///         json!({
+    ///             "message": "Summarize the findings",
+    ///             "session_id": "test-session",
+    ///         }),
+    ///     )
+    ///     .build();
+    /// ```
+    pub fn add_template_step(
+        mut self,
+        name: String,
+        template_id: String,
+        params: serde_json::Value,
+    ) -> Self {
+        let step = WorkflowStep::new(
+            name,
+            StepType::Template {
+                template_id,
+                params,
+            },
+        );
+        self.steps.push(step);
+        self
+    }
+
     /// Enable hook integration with a WorkflowExecutor
     pub fn with_hooks(mut self, workflow_executor: Arc<WorkflowExecutor>) -> Self {
         self.workflow_executor = Some(workflow_executor);
@@ -742,6 +800,15 @@ impl SequentialWorkflowBuilder {
     /// Set the component registry for component lookup
     pub fn with_registry(mut self, registry: Arc<dyn ComponentLookup>) -> Self {
         self.registry = Some(registry);
+        self
+    }
+
+    /// Set the template executor for template step execution
+    pub fn with_template_executor(
+        mut self,
+        template_executor: Arc<dyn llmspell_core::traits::template_executor::TemplateExecutor>,
+    ) -> Self {
+        self.template_executor = Some(template_executor);
         self
     }
 
@@ -768,6 +835,7 @@ impl SequentialWorkflowBuilder {
             (None, None) => SequentialWorkflow::new(self.name, self.config),
         };
         workflow.add_steps(self.steps);
+        workflow.template_executor = self.template_executor;
         workflow
     }
 }
@@ -803,6 +871,61 @@ mod tests {
         assert_eq!(workflow.name(), "test_workflow");
         assert_eq!(workflow.step_count(), 1);
     }
+
+    #[tokio::test]
+    async fn test_add_template_step_builder() {
+        use serde_json::json;
+
+        // Build workflow with template steps using convenience method
+        let workflow = SequentialWorkflow::builder("research-chat".to_string())
+            .add_template_step(
+                "research".to_string(),
+                "research-assistant".to_string(),
+                json!({
+                    "topic": "Rust async",
+                    "max_sources": 10,
+                }),
+            )
+            .add_template_step(
+                "chat".to_string(),
+                "interactive-chat".to_string(),
+                json!({
+                    "message": "Summarize findings",
+                }),
+            )
+            .build();
+
+        // Verify workflow created correctly
+        assert_eq!(workflow.name(), "research-chat");
+        assert_eq!(workflow.step_count(), 2);
+
+        // Verify first step is Template type with correct params
+        let steps = &workflow.steps;
+        match &steps[0].step_type {
+            StepType::Template {
+                template_id,
+                params,
+            } => {
+                assert_eq!(template_id, "research-assistant");
+                assert_eq!(params["topic"], "Rust async");
+                assert_eq!(params["max_sources"], 10);
+            }
+            _ => panic!("Expected Template step type"),
+        }
+
+        // Verify second step is Template type
+        match &steps[1].step_type {
+            StepType::Template {
+                template_id,
+                params,
+            } => {
+                assert_eq!(template_id, "interactive-chat");
+                assert_eq!(params["message"], "Summarize findings");
+            }
+            _ => panic!("Expected Template step type"),
+        }
+    }
+
     #[tokio::test]
     async fn test_sequential_workflow_execution_success() {
         let step1 = WorkflowStep::new(

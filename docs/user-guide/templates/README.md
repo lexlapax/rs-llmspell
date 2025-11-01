@@ -8,9 +8,9 @@
 
 ## Overview
 
-> **🎯 Turn-key AI Workflows**: Pre-configured templates combining agents, tools, RAG, and LocalLLM into executable solutions. Install → `llmspell template exec research-assistant` → productive AI work. Solves the "0-day retention problem" - no more "what do I do?" after installation.
+> **🎯 Experimental AI Workflows**: Pre-configured templates combining agents, tools, RAG, and LocalLLM into executable solutions. Install → `llmspell template exec research-assistant` → productive AI work. Solves the "0-day retention problem" - no more "what do I do?" after installation.
 
-**Version**: 0.12.0 | **Status**: Phase 12 Complete - 10 Templates (6 production, 4 structure complete) | **Last Updated**: October 2025
+**Version**: 0.13.0 | **Status**: Phase 13 Complete - 10 Memory-Aware Templates | **Last Updated**: January 2025
 
 ---
 
@@ -775,4 +775,4 @@ llmspell provider list       # LLM provider configured?
 
 ---
 
-**Version 0.12.0** | Phase 12 Complete - Production-Ready AI Agent Templates | [Release Notes](../../../RELEASE_NOTES_v0.12.0.md) | [Changelog](../../../CHANGELOG.md)
+**Version 0.12.0** | Phase 12 Complete - Experimental Workflows for Rapid Exploration AI Agent Templates | [Release Notes](../../../RELEASE_NOTES_v0.12.0.md) | [Changelog](../../../CHANGELOG.md)

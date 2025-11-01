@@ -303,6 +303,7 @@ impl StepExecutor {
             StepType::Tool { .. } => "tool",
             StepType::Agent { .. } => "agent",
             StepType::Workflow { .. } => "workflow",
+            StepType::Template { .. } => "template",
         };
 
         // Emit step started event if events are available
@@ -375,6 +376,12 @@ impl StepExecutor {
                     step.name, workflow_id
                 );
             }
+            StepType::Template { template_id, .. } => {
+                debug!(
+                    "DEBUG: Step '{}' is Template type with template_id: '{}'",
+                    step.name, template_id
+                );
+            }
         }
 
         let result = match &step.step_type {
@@ -392,6 +399,45 @@ impl StepExecutor {
             StepType::Workflow { workflow_id, input } => {
                 self.execute_workflow_step(*workflow_id, input, context)
                     .await
+            }
+            StepType::Template {
+                template_id,
+                params,
+            } => {
+                debug!("Executing template step: {}", template_id);
+
+                // Get TemplateExecutor from context
+                let template_executor = context.require_template_executor()?;
+
+                // Execute template (params is already serde_json::Value)
+                let template_output = template_executor
+                    .execute_template(template_id, params.clone())
+                    .await
+                    .map_err(|e| LLMSpellError::Workflow {
+                        message: format!("Template execution failed: {}", e),
+                        step: Some(step.name.clone()),
+                        source: Some(Box::new(e)),
+                    })?;
+
+                // Extract duration from template output if available
+                let duration_ms = template_output
+                    .get("metrics")
+                    .and_then(|m| m.get("duration_ms"))
+                    .and_then(|d| d.as_u64())
+                    .unwrap_or(0);
+
+                info!("Template '{}' completed in {}ms", template_id, duration_ms);
+
+                // Convert template output to string for StepResult
+                let output_str = serde_json::to_string(&template_output).map_err(|e| {
+                    LLMSpellError::Workflow {
+                        message: format!("Failed to serialize template output: {}", e),
+                        step: Some(step.name.clone()),
+                        source: Some(Box::new(e)),
+                    }
+                })?;
+
+                Ok(output_str)
             }
         };
 
@@ -894,6 +940,7 @@ impl StepExecutor {
             StepType::Tool { .. } => "tool",
             StepType::Agent { .. } => "agent",
             StepType::Workflow { .. } => "workflow",
+            StepType::Template { .. } => "template",
         };
 
         StepContext {
@@ -917,6 +964,7 @@ impl StepExecutor {
             StepType::Tool { .. } => "tool",
             StepType::Agent { .. } => "agent",
             StepType::Workflow { .. } => "workflow",
+            StepType::Template { .. } => "template",
         };
 
         StepContext {

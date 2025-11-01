@@ -40,7 +40,7 @@ fn bench_state_save_by_size(c: &mut Criterion) {
             |b, &size| {
                 b.iter(|| {
                     rt.block_on(async {
-                        let state_manager = StateManager::new().await.unwrap();
+                        let state_manager = StateManager::new(None).await.unwrap();
 
                         let data = "x".repeat(size);
                         let value = serde_json::json!({ "data": data });
@@ -70,6 +70,7 @@ fn bench_state_save_by_size(c: &mut Criterion) {
                                 use_compression: true,
                             }),
                             PersistenceConfig::default(),
+                            None, // No memory manager
                         )
                         .await
                         .unwrap();
@@ -100,7 +101,7 @@ fn bench_state_load_operations(c: &mut Criterion) {
 
     // Pre-populate state
     let state_manager = rt.block_on(async {
-        let sm = StateManager::new().await.unwrap();
+        let sm = StateManager::new(None).await.unwrap();
 
         // Add various state entries
         for i in 0..100 {
@@ -146,7 +147,7 @@ fn bench_concurrent_state_access(c: &mut Criterion) {
 
     let mut group = c.benchmark_group("concurrent_state_access");
 
-    let state_manager = rt.block_on(async { Arc::new(StateManager::new().await.unwrap()) });
+    let state_manager = rt.block_on(async { Arc::new(StateManager::new(None).await.unwrap()) });
 
     group.bench_function("10_concurrent_writes", |b| {
         b.iter(|| {
@@ -246,7 +247,7 @@ fn bench_agent_state_overhead(c: &mut Criterion) {
     group.bench_function("agent_execution_with_persistence", |b| {
         b.iter(|| {
             rt.block_on(async {
-                let state_manager = Arc::new(StateManager::new().await.unwrap());
+                let state_manager = Arc::new(StateManager::new(None).await.unwrap());
 
                 let config = AgentBuilder::basic("test-agent")
                     .description("Test agent")
@@ -296,7 +297,7 @@ fn bench_memory_usage_scaling(c: &mut Criterion) {
             |b, &count| {
                 b.iter(|| {
                     rt.block_on(async {
-                        let state_manager = StateManager::new().await.unwrap();
+                        let state_manager = StateManager::new(None).await.unwrap();
 
                         // Add entries - handle rate limiting gracefully
                         for i in 0..count {
@@ -345,6 +346,7 @@ fn bench_compression_effectiveness(c: &mut Criterion) {
                         use_compression: true,
                     }),
                     PersistenceConfig::default(),
+                    None, // No memory manager
                 )
                 .await
                 .unwrap();
@@ -382,6 +384,7 @@ fn bench_compression_effectiveness(c: &mut Criterion) {
                         use_compression: true,
                     }),
                     PersistenceConfig::default(),
+                    None, // No memory manager
                 )
                 .await
                 .unwrap();

@@ -43,6 +43,9 @@ pub mod config;
 /// Hook system for state change notifications and event handling
 pub mod hooks;
 
+/// State-memory synchronization hook (Phase 13.7.4)
+pub mod memory_hook;
+
 /// Cryptographic key management for secure state storage
 pub mod key_manager;
 
@@ -109,6 +112,9 @@ pub use schema::{
 
 // Performance optimization types
 pub use performance::{FastPathConfig, FastPathManager, StateClass};
+
+// State-memory synchronization (Phase 13.7.4)
+pub use memory_hook::StateMemoryHook;
 
 /// Unified kernel state that combines execution, session, and debug state
 #[derive(Clone)]

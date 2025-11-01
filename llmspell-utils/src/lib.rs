@@ -119,6 +119,9 @@ pub mod resource_monitoring;
 /// Production-ready error handling with information disclosure prevention
 pub mod error_handling;
 
+/// Text processing utilities for NLP tasks
+pub mod text;
+
 // Re-export commonly used types and functions
 pub use async_utils::{
     concurrent_map, race_to_success, retry_async, timeout, timeout_with_default, AsyncError,
@@ -253,3 +256,6 @@ pub use resource_limits::{
 pub use resource_monitoring::{
     MonitoringConfig, ResourceEvent, ResourceEventType, ResourceMonitor, ResourceStatistics,
 };
+
+// Re-export text processing utilities
+pub use text::stopwords::{is_stopword, STOPWORDS};

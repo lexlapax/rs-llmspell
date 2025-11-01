@@ -13,6 +13,7 @@ use tracing::debug;
 pub use crate::debug::DebugConfig;
 pub use crate::engines::{EngineConfigs, JSConfig, LuaConfig};
 pub use crate::env::{EnvCategory, EnvRegistry, EnvVarDef, EnvVarDefBuilder, IsolationMode};
+pub use crate::memory::{ConsolidationConfig, DaemonConfig, MemoryConfig};
 pub use crate::providers::{ProviderConfig, ProviderManagerConfig, ProviderManagerConfigBuilder};
 pub use crate::rag::{
     ChunkingConfig, ChunkingStrategy, DistanceMetric, EmbeddingConfig, HNSWConfig, RAGCacheConfig,
@@ -24,6 +25,7 @@ pub mod debug;
 pub mod engines;
 pub mod env;
 pub mod env_registry;
+pub mod memory;
 pub mod providers;
 pub mod rag;
 pub mod tools;
@@ -253,6 +255,83 @@ impl LLMSpellConfig {
                 }
                 if let Some(backend) = sessions.get("storage_backend").and_then(|v| v.as_str()) {
                     self.runtime.sessions.storage_backend = backend.to_string();
+                }
+            }
+
+            // Merge memory settings
+            if let Some(memory) = runtime.get("memory").and_then(|v| v.as_object()) {
+                if let Some(enabled) = memory.get("enabled").and_then(|v| v.as_bool()) {
+                    self.runtime.memory.enabled = enabled;
+                }
+
+                // Merge consolidation settings
+                if let Some(consolidation) = memory.get("consolidation").and_then(|v| v.as_object())
+                {
+                    if let Some(provider) =
+                        consolidation.get("provider_name").and_then(|v| v.as_str())
+                    {
+                        self.runtime.memory.consolidation.provider_name =
+                            Some(provider.to_string());
+                    }
+                    if let Some(batch_size) =
+                        consolidation.get("batch_size").and_then(|v| v.as_u64())
+                    {
+                        self.runtime.memory.consolidation.batch_size = batch_size as usize;
+                    }
+                    if let Some(max_concurrent) =
+                        consolidation.get("max_concurrent").and_then(|v| v.as_u64())
+                    {
+                        self.runtime.memory.consolidation.max_concurrent = max_concurrent as usize;
+                    }
+                    if let Some(threshold) = consolidation
+                        .get("active_session_threshold_secs")
+                        .and_then(|v| v.as_u64())
+                    {
+                        self.runtime
+                            .memory
+                            .consolidation
+                            .active_session_threshold_secs = threshold;
+                    }
+                }
+
+                // Merge daemon settings
+                if let Some(daemon) = memory.get("daemon").and_then(|v| v.as_object()) {
+                    if let Some(enabled) = daemon.get("enabled").and_then(|v| v.as_bool()) {
+                        self.runtime.memory.daemon.enabled = enabled;
+                    }
+                    if let Some(fast) = daemon.get("fast_interval_secs").and_then(|v| v.as_u64()) {
+                        self.runtime.memory.daemon.fast_interval_secs = fast;
+                    }
+                    if let Some(normal) =
+                        daemon.get("normal_interval_secs").and_then(|v| v.as_u64())
+                    {
+                        self.runtime.memory.daemon.normal_interval_secs = normal;
+                    }
+                    if let Some(slow) = daemon.get("slow_interval_secs").and_then(|v| v.as_u64()) {
+                        self.runtime.memory.daemon.slow_interval_secs = slow;
+                    }
+                    if let Some(threshold_fast) =
+                        daemon.get("queue_threshold_fast").and_then(|v| v.as_u64())
+                    {
+                        self.runtime.memory.daemon.queue_threshold_fast = threshold_fast as usize;
+                    }
+                    if let Some(threshold_slow) =
+                        daemon.get("queue_threshold_slow").and_then(|v| v.as_u64())
+                    {
+                        self.runtime.memory.daemon.queue_threshold_slow = threshold_slow as usize;
+                    }
+                    if let Some(shutdown) = daemon
+                        .get("shutdown_max_wait_secs")
+                        .and_then(|v| v.as_u64())
+                    {
+                        self.runtime.memory.daemon.shutdown_max_wait_secs = shutdown;
+                    }
+                    if let Some(health) = daemon
+                        .get("health_check_interval_secs")
+                        .and_then(|v| v.as_u64())
+                    {
+                        self.runtime.memory.daemon.health_check_interval_secs = health;
+                    }
                 }
             }
         }
@@ -1007,6 +1086,7 @@ impl LLMSpellConfig {
             // Core profiles
             "minimal" => include_str!("../builtins/minimal.toml"),
             "development" => include_str!("../builtins/development.toml"),
+            "default" => include_str!("../builtins/default.toml"),
 
             // Common workflow profiles
             "providers" => include_str!("../builtins/providers.toml"),
@@ -1016,6 +1096,9 @@ impl LLMSpellConfig {
             // Local LLM profiles
             "ollama" => include_str!("../builtins/ollama.toml"),
             "candle" => include_str!("../builtins/candle.toml"),
+
+            // Memory system profile
+            "memory" => include_str!("../builtins/memory.toml"),
 
             // RAG profiles
             "rag-dev" => include_str!("../builtins/rag-development.toml"),
@@ -1028,9 +1111,10 @@ impl LLMSpellConfig {
                     message: format!(
                         "Unknown builtin profile '{}'.\n\
                          Available profiles:\n\
-                         Core: minimal, development\n\
+                         Core: minimal, development, default\n\
                          Common: providers, state, sessions\n\
                          Local LLM: ollama, candle\n\
+                         Memory: memory\n\
                          RAG: rag-dev, rag-prod, rag-perf",
                         name
                     ),
@@ -1052,8 +1136,10 @@ impl LLMSpellConfig {
     /// use llmspell_config::LLMSpellConfig;
     ///
     /// let profiles = LLMSpellConfig::list_builtin_profiles();
-    /// assert_eq!(profiles.len(), 10);
+    /// assert_eq!(profiles.len(), 12);
+    /// assert!(profiles.contains(&"default"));
     /// assert!(profiles.contains(&"development"));
+    /// assert!(profiles.contains(&"memory"));
     /// assert!(profiles.contains(&"ollama"));
     /// assert!(profiles.contains(&"rag-prod"));
     /// ```
@@ -1062,11 +1148,13 @@ impl LLMSpellConfig {
         vec![
             "minimal",
             "development",
+            "default",
             "providers",
             "state",
             "sessions",
             "ollama",
             "candle",
+            "memory",
             "rag-dev",
             "rag-prod",
             "rag-perf",
@@ -1111,6 +1199,22 @@ impl LLMSpellConfig {
                     "OpenAI + Anthropic",
                     "Debug logging",
                     "Small resource limits",
+                ],
+            }),
+            "default" => Some(ProfileMetadata {
+                name: "default",
+                category: "Core",
+                description: "Simple local LLM setup using Ollama",
+                use_cases: vec![
+                    "General purpose scripting",
+                    "Template execution",
+                    "Agent development",
+                ],
+                features: vec![
+                    "Lua stdlib: All",
+                    "Ollama provider (llama3.2:3b)",
+                    "4096 max tokens",
+                    "Sensible defaults",
                 ],
             }),
             "providers" => Some(ProfileMetadata {
@@ -1185,6 +1289,23 @@ impl LLMSpellConfig {
                     "Full stdlib",
                 ],
             }),
+            "memory" => Some(ProfileMetadata {
+                name: "memory",
+                category: "Memory System",
+                description: "Adaptive memory with LLM consolidation and temporal knowledge graph",
+                use_cases: vec![
+                    "Long-running agents",
+                    "Knowledge accumulation",
+                    "RAG with episodic memory",
+                ],
+                features: vec![
+                    "Episodic memory storage",
+                    "LLM-driven consolidation",
+                    "Bi-temporal knowledge graph",
+                    "Context-aware retrieval",
+                    "Adaptive daemon scheduling",
+                ],
+            }),
             "rag-dev" => Some(ProfileMetadata {
                 name: "rag-dev",
                 category: "RAG",
@@ -1248,7 +1369,7 @@ impl LLMSpellConfig {
     /// use llmspell_config::LLMSpellConfig;
     ///
     /// let all_metadata = LLMSpellConfig::list_profile_metadata();
-    /// assert_eq!(all_metadata.len(), 10);
+    /// assert_eq!(all_metadata.len(), 12);
     /// ```
     #[must_use]
     pub fn list_profile_metadata() -> Vec<ProfileMetadata> {
@@ -1371,6 +1492,8 @@ pub struct GlobalRuntimeConfig {
     pub state_persistence: StatePersistenceConfig,
     /// Session management settings
     pub sessions: SessionConfig,
+    /// Memory system configuration
+    pub memory: MemoryConfig,
 }
 
 impl Default for GlobalRuntimeConfig {
@@ -1382,6 +1505,7 @@ impl Default for GlobalRuntimeConfig {
             security: SecurityConfig::default(),
             state_persistence: StatePersistenceConfig::default(),
             sessions: SessionConfig::default(),
+            memory: MemoryConfig::default(),
         }
     }
 }
@@ -1448,6 +1572,13 @@ impl GlobalRuntimeConfigBuilder {
     #[must_use]
     pub fn sessions(mut self, sessions: SessionConfig) -> Self {
         self.config.sessions = sessions;
+        self
+    }
+
+    /// Set the memory configuration
+    #[must_use]
+    pub fn memory(mut self, memory: MemoryConfig) -> Self {
+        self.config.memory = memory;
         self
     }
 
@@ -1993,14 +2124,16 @@ timeout_seconds = 300
     #[test]
     fn test_list_builtin_profiles() {
         let profiles = LLMSpellConfig::list_builtin_profiles();
-        assert_eq!(profiles.len(), 10);
+        assert_eq!(profiles.len(), 12);
         assert!(profiles.contains(&"minimal"));
         assert!(profiles.contains(&"development"));
+        assert!(profiles.contains(&"default"));
         assert!(profiles.contains(&"providers"));
         assert!(profiles.contains(&"state"));
         assert!(profiles.contains(&"sessions"));
         assert!(profiles.contains(&"ollama"));
         assert!(profiles.contains(&"candle"));
+        assert!(profiles.contains(&"memory"));
         assert!(profiles.contains(&"rag-dev"));
         assert!(profiles.contains(&"rag-prod"));
         assert!(profiles.contains(&"rag-perf"));
@@ -2189,6 +2322,100 @@ timeout_seconds = 300
 
         // Verify RAG disabled
         assert!(!config.rag.enabled);
+    }
+
+    #[test]
+    fn test_load_builtin_profile_default() {
+        let config = LLMSpellConfig::load_builtin_profile("default").unwrap();
+
+        // Verify default provider exists and is configured
+        assert_eq!(
+            config.providers.default_provider,
+            Some("default".to_string())
+        );
+        assert!(config.providers.providers.contains_key("default"));
+
+        let default_provider = config.providers.providers.get("default").unwrap();
+        assert_eq!(default_provider.provider_type, "ollama");
+        assert_eq!(
+            default_provider.default_model,
+            Some("llama3.2:3b".to_string())
+        );
+        assert_eq!(default_provider.temperature, Some(0.7));
+        assert_eq!(default_provider.max_tokens, Some(4096));
+        assert_eq!(default_provider.timeout_seconds, Some(30));
+        assert_eq!(default_provider.max_retries, Some(3));
+
+        // Verify Lua stdlib is All
+        assert!(matches!(
+            config.engines.lua.stdlib,
+            crate::engines::StdlibLevel::All
+        ));
+
+        // Verify memory disabled by default
+        assert!(!config.runtime.memory.enabled);
+    }
+
+    #[test]
+    fn test_load_builtin_profile_memory() {
+        let config = LLMSpellConfig::load_builtin_profile("memory").unwrap();
+
+        // Verify two providers exist
+        assert_eq!(
+            config.providers.default_provider,
+            Some("default".to_string())
+        );
+        assert!(config.providers.providers.contains_key("default"));
+        assert!(config.providers.providers.contains_key("consolidation-llm"));
+
+        // Verify default provider config
+        let default_provider = config.providers.providers.get("default").unwrap();
+        assert_eq!(default_provider.provider_type, "ollama");
+        assert_eq!(
+            default_provider.default_model,
+            Some("llama3.2:3b".to_string())
+        );
+        assert_eq!(default_provider.temperature, Some(0.7));
+        assert_eq!(default_provider.max_tokens, Some(4096));
+
+        // Verify consolidation provider config (low temperature for deterministic consolidation)
+        let consolidation_provider = config.providers.providers.get("consolidation-llm").unwrap();
+        assert_eq!(consolidation_provider.provider_type, "ollama");
+        assert_eq!(
+            consolidation_provider.default_model,
+            Some("llama3.2:3b".to_string())
+        );
+        assert_eq!(consolidation_provider.temperature, Some(0.0));
+        assert_eq!(consolidation_provider.max_tokens, Some(2000));
+
+        // Verify memory system enabled
+        assert!(config.runtime.memory.enabled);
+
+        // Verify consolidation config
+        assert_eq!(
+            config.runtime.memory.consolidation.provider_name,
+            Some("consolidation-llm".to_string())
+        );
+        assert_eq!(config.runtime.memory.consolidation.batch_size, 10);
+        assert_eq!(config.runtime.memory.consolidation.max_concurrent, 3);
+        assert_eq!(
+            config
+                .runtime
+                .memory
+                .consolidation
+                .active_session_threshold_secs,
+            300
+        );
+
+        // Verify daemon config
+        assert!(config.runtime.memory.daemon.enabled);
+        assert_eq!(config.runtime.memory.daemon.fast_interval_secs, 30);
+        assert_eq!(config.runtime.memory.daemon.normal_interval_secs, 300);
+        assert_eq!(config.runtime.memory.daemon.slow_interval_secs, 600);
+        assert_eq!(config.runtime.memory.daemon.queue_threshold_fast, 5);
+        assert_eq!(config.runtime.memory.daemon.queue_threshold_slow, 20);
+        assert_eq!(config.runtime.memory.daemon.shutdown_max_wait_secs, 30);
+        assert_eq!(config.runtime.memory.daemon.health_check_interval_secs, 60);
     }
 
     #[test]

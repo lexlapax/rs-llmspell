@@ -12,6 +12,8 @@
 //! 9. File Classification (scan-classify-act pattern with dry-run mode)
 //! 10. Knowledge Management (RAG-powered CRUD operations with citation tracking)
 
+use tracing::info;
+
 pub mod code_generator;
 pub mod code_review;
 pub mod content_generation;
@@ -51,7 +53,7 @@ pub use workflow_orchestrator::WorkflowOrchestratorTemplate;
 pub fn register_builtin_templates(
     registry: &crate::registry::TemplateRegistry,
 ) -> crate::error::Result<()> {
-    tracing::info!("Registering built-in templates");
+    info!("Registering built-in templates");
 
     // Register Research Assistant (Phase 12.3.1)
     registry.register(std::sync::Arc::new(ResearchAssistantTemplate::new()))?;
@@ -83,6 +85,6 @@ pub fn register_builtin_templates(
     // Register Knowledge Management (Phase 12.13.1)
     registry.register(std::sync::Arc::new(KnowledgeManagementTemplate::new()))?;
 
-    tracing::info!("Registered 10 built-in templates");
+    info!("Registered 10 built-in templates");
     Ok(())
 }

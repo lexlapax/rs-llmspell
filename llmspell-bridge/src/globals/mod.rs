@@ -4,6 +4,7 @@
 pub mod agent_global;
 pub mod artifact_global;
 pub mod config_global;
+pub mod context_global;
 pub mod core;
 pub mod debug_global;
 pub mod event_global;
@@ -11,6 +12,7 @@ pub mod hook_global;
 pub mod injection;
 pub mod json_global;
 pub mod local_llm_global;
+pub mod memory_global;
 pub mod provider_global;
 pub mod rag_global;
 pub mod rag_infrastructure;
@@ -82,6 +84,71 @@ fn register_session_artifacts(
     }
 
     session_manager_opt
+}
+
+/// Extract memory manager from context if available
+fn extract_memory_manager(
+    context: &Arc<GlobalContext>,
+) -> Option<Arc<dyn llmspell_memory::MemoryManager>> {
+    context
+        .get_bridge::<Arc<dyn llmspell_memory::MemoryManager>>("memory_manager")
+        .map(|arc_arc| (*arc_arc).clone())
+}
+
+/// Create in-memory fallback memory manager
+async fn create_fallback_memory_manager() -> Option<Arc<dyn llmspell_memory::MemoryManager>> {
+    use llmspell_memory::DefaultMemoryManager;
+    use tracing::{debug, info, warn};
+
+    info!("No memory_manager in context, creating in-memory fallback");
+    match DefaultMemoryManager::new_in_memory().await {
+        Ok(manager) => {
+            debug!("Created in-memory MemoryManager successfully");
+            Some(Arc::new(manager) as Arc<dyn llmspell_memory::MemoryManager>)
+        }
+        Err(e) => {
+            warn!("Failed to create in-memory MemoryManager: {}, Memory/Context globals will not be available", e);
+            None
+        }
+    }
+}
+
+/// Register Memory and Context bridges with the given memory manager
+fn register_bridges(
+    builder: &mut GlobalRegistryBuilder,
+    memory_manager: Arc<dyn llmspell_memory::MemoryManager>,
+) {
+    use tracing::debug;
+
+    // Register Memory global (17th global)
+    let memory_bridge = Arc::new(crate::memory_bridge::MemoryBridge::new(
+        memory_manager.clone(),
+    ));
+    builder.register(Arc::new(memory_global::MemoryGlobal::new(memory_bridge)));
+    debug!("Registered Memory global (17th)");
+
+    // Register Context global (18th global) - depends on Memory
+    let context_bridge = Arc::new(crate::context_bridge::ContextBridge::new(memory_manager));
+    builder.register(Arc::new(context_global::ContextGlobal::new(context_bridge)));
+    debug!("Registered Context global (18th)");
+}
+
+/// Register Memory and Context globals (always available with in-memory fallback)
+async fn register_memory_context_globals(
+    builder: &mut GlobalRegistryBuilder,
+    context: &Arc<GlobalContext>,
+) {
+    use tracing::warn;
+
+    // Try to get memory_manager from context, or create in-memory fallback
+    let memory_manager_opt =
+        extract_memory_manager(context).or(create_fallback_memory_manager().await);
+
+    if let Some(memory_manager) = memory_manager_opt {
+        register_bridges(builder, memory_manager);
+    } else {
+        warn!("Skipping Memory/Context global registration due to initialization failure");
+    }
 }
 
 /// Register RAG global if all dependencies are available
@@ -159,15 +226,30 @@ async fn register_agent_workflow(
     };
     builder.register(Arc::new(agent_global));
 
+    // Get template_executor from context if available
+    let template_executor = context
+        .get_bridge::<crate::template_bridge::TemplateBridge>("template_bridge")
+        .map(|bridge| {
+            Arc::clone(&bridge)
+                as Arc<dyn llmspell_core::traits::template_executor::TemplateExecutor>
+        });
+
     // Create workflow global with state manager if available
+    let template_executor_clone = template_executor.clone();
     let workflow_global = context
         .get_bridge::<llmspell_kernel::state::StateManager>("state_manager")
         .map_or_else(
-            || workflow_global::WorkflowGlobal::new(context.registry.clone()),
+            || {
+                workflow_global::WorkflowGlobal::new(
+                    context.registry.clone(),
+                    template_executor.clone(),
+                )
+            },
             |state_manager| {
                 workflow_global::WorkflowGlobal::with_state_manager(
                     context.registry.clone(),
                     state_manager,
+                    template_executor_clone,
                 )
             },
         );
@@ -194,20 +276,25 @@ async fn register_template_global(
     // Get core provider manager (TemplateBridge needs core, not bridge wrapper)
     let core_providers = context.providers.create_core_manager_arc().await?;
 
+    // Get provider configuration for smart dual-path resolution (Task 13.5.7d)
+    let provider_config = Arc::new(context.providers.config().clone());
+
     // Get infrastructure registries from GlobalContext (Phase 12.8.2.13)
     // These were registered by inject_apis and contain the fully-configured infrastructure
-    let tool_registry = context
-        .get_bridge::<llmspell_tools::ToolRegistry>("tool_registry")
-        .expect("tool_registry must be available in GlobalContext");
-    let agent_registry = context
-        .get_bridge::<llmspell_agents::FactoryRegistry>("agent_registry")
-        .expect("agent_registry must be available in GlobalContext");
-    // Note: workflow_factory is stored as Arc<T> in GlobalContext, so get_bridge returns Arc<Arc<T>>
-    // We need to extract the inner Arc
-    let workflow_factory: Arc<dyn llmspell_workflows::WorkflowFactory> = context
-        .get_bridge::<Arc<dyn llmspell_workflows::WorkflowFactory>>("workflow_factory")
-        .map(|arc_arc| (*arc_arc).clone())
-        .expect("workflow_factory must be available in GlobalContext");
+    let infra = crate::template_bridge::InfraConfig {
+        tool_registry: context
+            .get_bridge::<llmspell_tools::ToolRegistry>("tool_registry")
+            .expect("tool_registry must be available in GlobalContext"),
+        agent_registry: context
+            .get_bridge::<llmspell_agents::FactoryRegistry>("agent_registry")
+            .expect("agent_registry must be available in GlobalContext"),
+        // Note: workflow_factory is stored as Arc<T> in GlobalContext, so get_bridge returns Arc<Arc<T>>
+        // We need to extract the inner Arc
+        workflow_factory: context
+            .get_bridge::<Arc<dyn llmspell_workflows::WorkflowFactory>>("workflow_factory")
+            .map(|arc_arc| (*arc_arc).clone())
+            .expect("workflow_factory must be available in GlobalContext"),
+    };
 
     // Create template bridge with optional state and session managers
     let template_bridge = if let (Some(state_manager), Some(session_manager)) = (
@@ -223,22 +310,26 @@ async fn register_template_global(
                 template_registry,
                 context.registry.clone(),
                 core_providers,
-                tool_registry,
-                agent_registry,
-                workflow_factory,
+                provider_config,
+                infra,
                 managers,
             ),
         )
     } else if let Some(state_manager) =
         context.get_bridge::<llmspell_kernel::state::StateManager>("state_manager")
     {
+        // Need to clone infra for this branch
+        let infra_clone = crate::template_bridge::InfraConfig {
+            tool_registry: infra.tool_registry.clone(),
+            agent_registry: infra.agent_registry.clone(),
+            workflow_factory: infra.workflow_factory.clone(),
+        };
         Arc::new(crate::template_bridge::TemplateBridge::with_state_manager(
             template_registry,
             context.registry.clone(),
             core_providers,
-            tool_registry,
-            agent_registry,
-            workflow_factory.clone(),
+            provider_config,
+            infra_clone,
             state_manager,
         ))
     } else {
@@ -246,9 +337,8 @@ async fn register_template_global(
             template_registry,
             context.registry.clone(),
             core_providers,
-            tool_registry,
-            agent_registry,
-            workflow_factory,
+            provider_config,
+            infra,
         ))
     };
 
@@ -315,6 +405,9 @@ pub async fn create_standard_registry(context: Arc<GlobalContext>) -> Result<Glo
 
     // Register session and artifact globals
     let session_manager_opt = register_session_artifacts(&mut builder, &context);
+
+    // Register Memory and Context globals (always available with in-memory fallback)
+    register_memory_context_globals(&mut builder, &context).await;
 
     // Register RAG global if dependencies available
     register_rag_global(&mut builder, &context, session_manager_opt).await;

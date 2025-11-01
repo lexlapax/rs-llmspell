@@ -2,6 +2,7 @@
 //! ABOUTME: End-to-end testing of template execution with mocked infrastructure
 
 use llmspell_agents::FactoryRegistry;
+use llmspell_config::{ProviderConfig, ProviderManagerConfig};
 use llmspell_kernel::state::StateManager;
 use llmspell_providers::ProviderManager;
 use llmspell_templates::core::TemplateResult;
@@ -9,7 +10,36 @@ use llmspell_templates::{ExecutionContext, TemplateCategory, TemplateError, Temp
 use llmspell_tools::ToolRegistry;
 use llmspell_workflows::factory::DefaultWorkflowFactory;
 use serde_json::json;
+use std::collections::HashMap;
 use std::sync::Arc;
+
+/// Helper function to create a test provider config for integration tests
+fn create_test_provider_config() -> ProviderManagerConfig {
+    let provider = ProviderConfig {
+        name: "test-provider".to_string(),
+        provider_type: "ollama".to_string(),
+        enabled: true,
+        base_url: Some("http://localhost:11434".to_string()),
+        api_key_env: None,
+        api_key: None,
+        default_model: Some("llama3.2:3b".to_string()),
+        temperature: Some(0.7),
+        max_tokens: Some(2000),
+        timeout_seconds: Some(30),
+        rate_limit: None,
+        retry: None,
+        max_retries: Some(3),
+        options: HashMap::new(),
+    };
+
+    let mut providers = HashMap::new();
+    providers.insert("test-provider".to_string(), provider);
+
+    ProviderManagerConfig {
+        default_provider: Some("test-provider".to_string()),
+        providers,
+    }
+}
 
 /// Test template registry initialization with builtin templates
 #[test]
@@ -179,12 +209,14 @@ fn test_execution_context_builder_minimal() {
     let agent_registry = Arc::new(FactoryRegistry::new());
     let workflow_factory = Arc::new(DefaultWorkflowFactory::new());
     let provider_manager = Arc::new(ProviderManager::new());
+    let provider_config = Arc::new(create_test_provider_config());
 
     let context = ExecutionContext::builder()
         .with_tool_registry(tool_registry)
         .with_agent_registry(agent_registry)
         .with_workflow_factory(workflow_factory)
         .with_providers(provider_manager)
+        .with_provider_config(provider_config)
         .build();
 
     assert!(
@@ -445,7 +477,7 @@ async fn test_knowledge_management_ingest() {
 
     // Create execution context with StateManager
     let state_manager = Arc::new(
-        StateManager::new()
+        StateManager::new(None)
             .await
             .expect("Failed to create StateManager"),
     );
@@ -453,12 +485,14 @@ async fn test_knowledge_management_ingest() {
     let agent_registry = Arc::new(FactoryRegistry::new());
     let workflow_factory = Arc::new(DefaultWorkflowFactory::new());
     let provider_manager = Arc::new(ProviderManager::new());
+    let provider_config = Arc::new(create_test_provider_config());
 
     let context = ExecutionContext::builder()
         .with_tool_registry(tool_registry)
         .with_agent_registry(agent_registry)
         .with_workflow_factory(workflow_factory)
         .with_providers(provider_manager)
+        .with_provider_config(provider_config)
         .with_state_manager(state_manager)
         .build()
         .expect("Failed to build execution context");
@@ -492,7 +526,7 @@ async fn test_knowledge_management_query() {
         .expect("Failed to get knowledge-management template");
 
     let state_manager = Arc::new(
-        StateManager::new()
+        StateManager::new(None)
             .await
             .expect("Failed to create StateManager"),
     );
@@ -500,12 +534,14 @@ async fn test_knowledge_management_query() {
     let agent_registry = Arc::new(FactoryRegistry::new());
     let workflow_factory = Arc::new(DefaultWorkflowFactory::new());
     let provider_manager = Arc::new(ProviderManager::new());
+    let provider_config = Arc::new(create_test_provider_config());
 
     let context = ExecutionContext::builder()
         .with_tool_registry(tool_registry)
         .with_agent_registry(agent_registry)
         .with_workflow_factory(workflow_factory)
         .with_providers(provider_manager)
+        .with_provider_config(provider_config)
         .with_state_manager(state_manager.clone())
         .build()
         .expect("Failed to build execution context");
@@ -551,7 +587,7 @@ async fn test_knowledge_management_update() {
         .expect("Failed to get knowledge-management template");
 
     let state_manager = Arc::new(
-        StateManager::new()
+        StateManager::new(None)
             .await
             .expect("Failed to create StateManager"),
     );
@@ -559,12 +595,14 @@ async fn test_knowledge_management_update() {
     let agent_registry = Arc::new(FactoryRegistry::new());
     let workflow_factory = Arc::new(DefaultWorkflowFactory::new());
     let provider_manager = Arc::new(ProviderManager::new());
+    let provider_config = Arc::new(create_test_provider_config());
 
     let context = ExecutionContext::builder()
         .with_tool_registry(tool_registry)
         .with_agent_registry(agent_registry)
         .with_workflow_factory(workflow_factory)
         .with_providers(provider_manager)
+        .with_provider_config(provider_config)
         .with_state_manager(state_manager.clone())
         .build()
         .expect("Failed to build execution context");
@@ -621,7 +659,7 @@ async fn test_knowledge_management_delete() {
         .expect("Failed to get knowledge-management template");
 
     let state_manager = Arc::new(
-        StateManager::new()
+        StateManager::new(None)
             .await
             .expect("Failed to create StateManager"),
     );
@@ -629,12 +667,14 @@ async fn test_knowledge_management_delete() {
     let agent_registry = Arc::new(FactoryRegistry::new());
     let workflow_factory = Arc::new(DefaultWorkflowFactory::new());
     let provider_manager = Arc::new(ProviderManager::new());
+    let provider_config = Arc::new(create_test_provider_config());
 
     let context = ExecutionContext::builder()
         .with_tool_registry(tool_registry)
         .with_agent_registry(agent_registry)
         .with_workflow_factory(workflow_factory)
         .with_providers(provider_manager)
+        .with_provider_config(provider_config)
         .with_state_manager(state_manager.clone())
         .build()
         .expect("Failed to build execution context");
@@ -689,7 +729,7 @@ async fn test_knowledge_management_list() {
         .expect("Failed to get knowledge-management template");
 
     let state_manager = Arc::new(
-        StateManager::new()
+        StateManager::new(None)
             .await
             .expect("Failed to create StateManager"),
     );
@@ -697,12 +737,14 @@ async fn test_knowledge_management_list() {
     let agent_registry = Arc::new(FactoryRegistry::new());
     let workflow_factory = Arc::new(DefaultWorkflowFactory::new());
     let provider_manager = Arc::new(ProviderManager::new());
+    let provider_config = Arc::new(create_test_provider_config());
 
     let context = ExecutionContext::builder()
         .with_tool_registry(tool_registry)
         .with_agent_registry(agent_registry)
         .with_workflow_factory(workflow_factory)
         .with_providers(provider_manager)
+        .with_provider_config(provider_config)
         .with_state_manager(state_manager.clone())
         .build()
         .expect("Failed to build execution context");
@@ -752,7 +794,7 @@ async fn test_knowledge_management_full_cycle() {
         .expect("Failed to get knowledge-management template");
 
     let state_manager = Arc::new(
-        StateManager::new()
+        StateManager::new(None)
             .await
             .expect("Failed to create StateManager"),
     );
@@ -760,12 +802,14 @@ async fn test_knowledge_management_full_cycle() {
     let agent_registry = Arc::new(FactoryRegistry::new());
     let workflow_factory = Arc::new(DefaultWorkflowFactory::new());
     let provider_manager = Arc::new(ProviderManager::new());
+    let provider_config = Arc::new(create_test_provider_config());
 
     let context = ExecutionContext::builder()
         .with_tool_registry(tool_registry)
         .with_agent_registry(agent_registry)
         .with_workflow_factory(workflow_factory)
         .with_providers(provider_manager)
+        .with_provider_config(provider_config)
         .with_state_manager(state_manager.clone())
         .build()
         .expect("Failed to build execution context");
@@ -872,7 +916,7 @@ async fn test_knowledge_management_error_handling() {
         .expect("Failed to get knowledge-management template");
 
     let state_manager = Arc::new(
-        StateManager::new()
+        StateManager::new(None)
             .await
             .expect("Failed to create StateManager"),
     );
@@ -880,12 +924,14 @@ async fn test_knowledge_management_error_handling() {
     let agent_registry = Arc::new(FactoryRegistry::new());
     let workflow_factory = Arc::new(DefaultWorkflowFactory::new());
     let provider_manager = Arc::new(ProviderManager::new());
+    let provider_config = Arc::new(create_test_provider_config());
 
     let context = ExecutionContext::builder()
         .with_tool_registry(tool_registry)
         .with_agent_registry(agent_registry)
         .with_workflow_factory(workflow_factory)
         .with_providers(provider_manager)
+        .with_provider_config(provider_config)
         .with_state_manager(state_manager)
         .build()
         .expect("Failed to build execution context");

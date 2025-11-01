@@ -1,0 +1,78 @@
+[package]
+name = "llmspell-context"
+version.workspace = true
+edition.workspace = true
+authors.workspace = true
+repository.workspace = true
+license.workspace = true
+keywords = ["context", "retrieval", "reranking", "rag", "llm"]
+categories = ["database", "algorithms", "text-processing"]
+description = "Context engineering pipeline with retrieval, reranking, and assembly for llmspell"
+
+[dependencies]
+# Core dependencies
+llmspell-core = { path = "../llmspell-core" }
+llmspell-utils = { path = "../llmspell-utils" }
+llmspell-memory = { path = "../llmspell-memory" }
+llmspell-graph = { path = "../llmspell-graph" }
+llmspell-rag = { path = "../llmspell-rag" }
+
+# ML inference (Candle for DeBERTa reranking)
+candle-core = "0.9"
+candle-transformers = "0.9"
+candle-nn = "0.9"
+
+# Tokenization (for BM25 and DeBERTa)
+tokenizers = "0.20"
+
+# Async runtime
+tokio = { workspace = true, features = ["full"] }
+async-trait = { workspace = true }
+
+# Serialization
+serde = { workspace = true }
+serde_json = { workspace = true }
+
+# Time handling
+chrono = { workspace = true }
+
+# Error handling
+anyhow = { workspace = true }
+thiserror = { workspace = true }
+
+# Logging
+tracing = { workspace = true }
+
+# Concurrency
+parking_lot = "0.12"
+dashmap = "5.5"
+
+# UUID generation
+uuid = { workspace = true }
+
+# Text processing
+regex = "1.10"
+
+# Model download and caching
+reqwest = { version = "0.12", features = ["blocking"] }
+sha2 = "0.10"
+
+[dev-dependencies]
+llmspell-testing = { path = "../llmspell-testing" }
+tokio-test = "0.4"
+mockall = { workspace = true }
+criterion = { workspace = true }
+tempfile = "3.9"
+tracing-subscriber = { workspace = true, features = ["env-filter"] }
+
+# Benchmarks will be added later
+# [[bench]]
+# name = "bm25_bench"
+# harness = false
+#
+# [[bench]]
+# name = "rerank_bench"
+# harness = false
+
+[lints]
+workspace = true

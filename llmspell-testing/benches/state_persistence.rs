@@ -125,7 +125,7 @@ fn bench_state_concurrent_access(c: &mut Criterion) {
     c.bench_function("state_concurrent_access", |b| {
         b.iter(|| {
             rt.block_on(async {
-                let state_manager = Arc::new(StateManager::new().await.unwrap());
+                let state_manager = Arc::new(StateManager::new(None).await.unwrap());
 
                 // Spawn multiple tasks accessing different agents
                 let mut handles = vec![];

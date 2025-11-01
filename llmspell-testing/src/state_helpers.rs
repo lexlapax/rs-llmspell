@@ -47,7 +47,7 @@ pub async fn create_test_state_manager() -> Arc<StateManager> {
     };
 
     Arc::new(
-        StateManager::with_backend(StorageBackendType::Memory, config)
+        StateManager::with_backend(StorageBackendType::Memory, config, None)
             .await
             .expect("Failed to create test state manager"),
     )
@@ -78,7 +78,7 @@ pub async fn create_test_state_manager_with_backup(
     };
 
     let state_manager = Arc::new(
-        StateManager::with_backend(StorageBackendType::Memory, persistence_config)
+        StateManager::with_backend(StorageBackendType::Memory, persistence_config, None)
             .await
             .expect("Failed to create state manager"),
     );

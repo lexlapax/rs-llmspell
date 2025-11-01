@@ -170,6 +170,19 @@ fn validate_provider_config(config: &LLMSpellConfig) -> Result<(), ConfigError> 
             }
         }
 
+        // Validate temperature
+        if let Some(temperature) = provider_config.temperature {
+            if !(0.0..=2.0).contains(&temperature) {
+                return Err(ConfigError::Validation {
+                    field: Some(format!("providers.providers.{}.temperature", name)),
+                    message: format!(
+                        "Provider temperature must be between 0.0 and 2.0, got {}",
+                        temperature
+                    ),
+                });
+            }
+        }
+
         // Validate rate limiting
         if let Some(rate_limit) = &provider_config.rate_limit {
             if rate_limit.requests_per_minute == 0 {
@@ -773,6 +786,100 @@ mod tests {
         // Should pass validation but may generate warnings
         let result = validate_provider_config(&config);
         assert!(result.is_ok());
+    }
+
+    #[test]
+    fn test_validate_provider_temperature_valid() {
+        let provider_config = ProviderConfig::builder()
+            .provider_type("openai")
+            .temperature(0.7)
+            .build();
+
+        let mut config = LLMSpellConfig::default();
+        config
+            .providers
+            .providers
+            .insert("openai".to_string(), provider_config);
+
+        let result = validate_provider_config(&config);
+        assert!(result.is_ok());
+    }
+
+    #[test]
+    fn test_validate_provider_temperature_too_low() {
+        let provider_config = ProviderConfig::builder()
+            .provider_type("openai")
+            .temperature(-0.1)
+            .build();
+
+        let mut config = LLMSpellConfig::default();
+        config
+            .providers
+            .providers
+            .insert("openai".to_string(), provider_config);
+
+        let result = validate_provider_config(&config);
+        assert!(result.is_err());
+
+        if let Err(ConfigError::Validation { field, message }) = result {
+            assert!(field.unwrap().contains("temperature"));
+            assert!(message.contains("must be between 0.0 and 2.0"));
+        }
+    }
+
+    #[test]
+    fn test_validate_provider_temperature_too_high() {
+        let provider_config = ProviderConfig::builder()
+            .provider_type("openai")
+            .temperature(2.1)
+            .build();
+
+        let mut config = LLMSpellConfig::default();
+        config
+            .providers
+            .providers
+            .insert("openai".to_string(), provider_config);
+
+        let result = validate_provider_config(&config);
+        assert!(result.is_err());
+
+        if let Err(ConfigError::Validation { field, message }) = result {
+            assert!(field.unwrap().contains("temperature"));
+            assert!(message.contains("must be between 0.0 and 2.0"));
+        }
+    }
+
+    #[test]
+    fn test_validate_provider_temperature_boundary_values() {
+        // Test 0.0
+        let provider_config_zero = ProviderConfig::builder()
+            .provider_type("openai")
+            .temperature(0.0)
+            .build();
+
+        let mut config = LLMSpellConfig::default();
+        config
+            .providers
+            .providers
+            .insert("openai".to_string(), provider_config_zero);
+
+        let result = validate_provider_config(&config);
+        assert!(result.is_ok(), "Temperature 0.0 should be valid");
+
+        // Test 2.0
+        let provider_config_two = ProviderConfig::builder()
+            .provider_type("openai")
+            .temperature(2.0)
+            .build();
+
+        let mut config2 = LLMSpellConfig::default();
+        config2
+            .providers
+            .providers
+            .insert("openai".to_string(), provider_config_two);
+
+        let result2 = validate_provider_config(&config2);
+        assert!(result2.is_ok(), "Temperature 2.0 should be valid");
     }
 
     #[test]

@@ -10,14 +10,14 @@
 **Research Archive**: `docs/archives/memory-design-phase08-research.md`
 **Crate Structure**: `llmspell-storage` (vector storage), `llmspell-tenancy` (multi-tenant), `llmspell-rag` (RAG pipeline), bridge integration
 
-> **📋 Vector Storage Foundation**: This phase established production-ready vector storage and retrieval infrastructure as the foundation for Phase 9's Adaptive Memory System. Implemented HNSW indexing with OpenAI embeddings, multi-tenant isolation, and comprehensive state/session integration.
+> **📋 Vector Storage Foundation**: This phase established experimental infrastructure with production-quality engineering vector storage and retrieval infrastructure as the foundation for Phase 9's Adaptive Memory System. Implemented HNSW indexing with OpenAI embeddings, multi-tenant isolation, and comprehensive state/session integration.
 
 ---
 
 ## Phase Overview
 
 ### Goal
-Implement production-ready vector storage and retrieval infrastructure with clean architectural separation between storage, multi-tenancy, and RAG application layers. Focus on HNSW-based vector storage with OpenAI embeddings initially, establishing patterns for future provider expansion while maintaining performance targets for Phase 9's Adaptive Memory System.
+Implement experimental infrastructure with production-quality engineering vector storage and retrieval infrastructure with clean architectural separation between storage, multi-tenancy, and RAG application layers. Focus on HNSW-based vector storage with OpenAI embeddings initially, establishing patterns for future provider expansion while maintaining performance targets for Phase 9's Adaptive Memory System.
 
 ### Core Principles
 - **Architectural Separation**: Vector storage in `llmspell-storage`, multi-tenancy in `llmspell-tenancy`, RAG logic in `llmspell-rag`
@@ -2191,7 +2191,7 @@ async fn main() -> Result<()> {
 
 ### 8.5 Production Cookbook Patterns
 
-The cookbook directory contains production-ready patterns:
+The cookbook directory contains experimental infrastructure with production-quality engineering patterns:
 
 - **rag-multi-tenant.lua**: Enterprise multi-tenant isolation with quota management
 - **rag-session.lua**: Session-based RAG with automatic cleanup and TTL

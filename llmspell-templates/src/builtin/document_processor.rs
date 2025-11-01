@@ -10,8 +10,8 @@ use crate::{
     artifacts::Artifact,
     context::ExecutionContext,
     core::{
-        CostEstimate, TemplateCategory, TemplateMetadata, TemplateOutput, TemplateParams,
-        TemplateResult,
+        memory_parameters, provider_parameters, CostEstimate, TemplateCategory, TemplateMetadata,
+        TemplateOutput, TemplateParams, TemplateResult,
     },
     error::{Result, TemplateError},
     validation::{ConfigSchema, ParameterConstraints, ParameterSchema, ParameterType},
@@ -19,7 +19,7 @@ use crate::{
 use async_trait::async_trait;
 use serde_json::json;
 use std::time::Instant;
-use tracing::{info, warn};
+use tracing::{debug, info, warn};
 
 /// Document Processor Template
 ///
@@ -74,7 +74,7 @@ impl crate::core::Template for DocumentProcessorTemplate {
     }
 
     fn config_schema(&self) -> ConfigSchema {
-        ConfigSchema::new(vec![
+        let mut params = vec![
             // document_paths (required array)
             ParameterSchema::required(
                 "document_paths",
@@ -132,7 +132,19 @@ impl crate::core::Template for DocumentProcessorTemplate {
                 ParameterType::String,
                 json!("ollama/llama3.2:3b"),
             ),
-        ])
+        ];
+
+        // Add memory parameters (Task 13.11.1)
+        params.extend(memory_parameters());
+
+        // Add provider parameters (Task 13.5.7d)
+        params.extend(provider_parameters());
+
+        debug!(
+            "DocumentProcessor: Generated config schema with {} parameters",
+            params.len()
+        );
+        ConfigSchema::new(params)
     }
 
     async fn execute(
@@ -148,7 +160,18 @@ impl crate::core::Template for DocumentProcessorTemplate {
             params.get_or("transformation_type", "summarize".to_string());
         let output_format: String = params.get_or("output_format", "markdown".to_string());
         let parallel_processing: bool = params.get_or("parallel_processing", true);
-        let model: String = params.get_or("model", "ollama/llama3.2:3b".to_string());
+
+        // Extract memory parameters (Task 13.11.2)
+        let session_id: Option<String> = params.get_optional("session_id").unwrap_or(None);
+        let memory_enabled: bool = params.get_or("memory_enabled", true);
+        let context_budget: i64 = params.get_or("context_budget", 2000);
+
+        // Smart dual-path provider resolution (Task 13.5.7d)
+        let provider_config = context.resolve_llm_config(&params)?;
+        let model_str = provider_config
+            .default_model
+            .as_ref()
+            .ok_or_else(|| TemplateError::Config("provider missing model".into()))?;
 
         info!(
             "Starting document processing ({} docs, transformation={}, format={}, parallel={}, model={})",
@@ -156,7 +179,7 @@ impl crate::core::Template for DocumentProcessorTemplate {
             transformation_type,
             output_format,
             parallel_processing,
-            model
+            model_str
         );
 
         // Initialize output
@@ -182,7 +205,15 @@ impl crate::core::Template for DocumentProcessorTemplate {
         // Phase 2: Transform content with transformer agent
         info!("Phase 2: Transforming extracted content...");
         let transformed_docs = self
-            .transform_content(&extracted_docs, &transformation_type, &model, &context)
+            .transform_content(
+                &extracted_docs,
+                &transformation_type,
+                &provider_config,
+                &context,
+                session_id.as_deref(),
+                memory_enabled,
+                context_budget,
+            )
             .await?;
         output.metrics.agents_invoked += extracted_docs.len(); // one agent per document
 
@@ -207,6 +238,37 @@ impl crate::core::Template for DocumentProcessorTemplate {
             output.metrics.duration_ms,
             document_paths.len()
         );
+
+        // Store in memory if enabled (Task 13.11.3)
+        if memory_enabled && session_id.is_some() && context.memory_manager().is_some() {
+            let memory_mgr = context.memory_manager().unwrap();
+            let input_summary = format!(
+                "Process {} documents with {} transformation",
+                document_paths.len(),
+                transformation_type
+            );
+            let output_summary = format!(
+                "Processed {} documents to {} format",
+                document_paths.len(),
+                output_format
+            );
+
+            crate::context::store_template_execution(
+                &memory_mgr,
+                session_id.as_ref().unwrap(),
+                &self.metadata.id,
+                &input_summary,
+                &output_summary,
+                json!({
+                    "documents_processed": document_paths.len(),
+                    "transformation_type": transformation_type,
+                    "output_format": output_format,
+                }),
+            )
+            .await
+            .ok(); // Don't fail execution if storage fails
+        }
+
         Ok(output)
     }
 
@@ -312,12 +374,16 @@ impl DocumentProcessorTemplate {
     }
 
     /// Phase 2: Transform content with transformer agent
+    #[allow(clippy::too_many_arguments)]
     async fn transform_content(
         &self,
         documents: &[ExtractedDocument],
         transformation_type: &str,
-        model: &str,
+        provider_config: &llmspell_config::ProviderConfig,
         context: &ExecutionContext,
+        session_id: Option<&str>,
+        memory_enabled: bool,
+        context_budget: i64,
     ) -> Result<Vec<TransformedDocument>> {
         use llmspell_agents::factory::{AgentConfig, ModelConfig, ResourceLimits};
         use llmspell_core::types::AgentInput;
@@ -328,6 +394,12 @@ impl DocumentProcessorTemplate {
             transformation_type
         );
 
+        // Extract model from provider config
+        let model = provider_config
+            .default_model
+            .as_ref()
+            .ok_or_else(|| TemplateError::Config("provider missing model".into()))?;
+
         // Parse model string (provider/model format)
         let (provider, model_id) = if let Some(slash_pos) = model.find('/') {
             (
@@ -335,7 +407,7 @@ impl DocumentProcessorTemplate {
                 model[slash_pos + 1..].to_string(),
             )
         } else {
-            ("ollama".to_string(), model.to_string())
+            (provider_config.provider_type.clone(), model.to_string())
         };
 
         // Create agent config for document transformation
@@ -349,8 +421,8 @@ impl DocumentProcessorTemplate {
             model: Some(ModelConfig {
                 provider,
                 model_id,
-                temperature: Some(0.5), // Balanced for creative yet accurate transformation
-                max_tokens: Some(2000),
+                temperature: provider_config.temperature.or(Some(0.5)), // Balanced for creative yet accurate transformation
+                max_tokens: provider_config.max_tokens.or(Some(2000)),
                 settings: serde_json::Map::new(),
             }),
             allowed_tools: vec![],
@@ -372,6 +444,33 @@ impl DocumentProcessorTemplate {
                 warn!("Failed to create transformation agent: {}", e);
                 TemplateError::ExecutionFailed(format!("Agent creation failed: {}", e))
             })?;
+
+        // Assemble memory context (Task 13.11.2)
+        let memory_context = if let (true, Some(sid)) = (memory_enabled, session_id) {
+            if let Some(bridge) = context.context_bridge() {
+                debug!(
+                    "Assembling memory context: session={}, budget={}",
+                    sid, context_budget
+                );
+                crate::assemble_template_context(&bridge, transformation_type, sid, context_budget)
+                    .await
+            } else {
+                warn!("Memory enabled but ContextBridge unavailable");
+                vec![]
+            }
+        } else {
+            vec![]
+        };
+
+        let memory_context_str = if !memory_context.is_empty() {
+            memory_context
+                .iter()
+                .map(|msg| format!("{}: {}", msg.role, msg.content))
+                .collect::<Vec<_>>()
+                .join("\n\n")
+        } else {
+            String::new()
+        };
 
         // Transform each document with the agent
         let mut transformed = Vec::new();
@@ -428,7 +527,8 @@ impl DocumentProcessorTemplate {
 
             // Build the transformation prompt
             let transformation_prompt = format!(
-                "You are an expert document processor specializing in {} transformations.\n\n\
+                "{}\
+                 You are an expert document processor specializing in {} transformations.\n\n\
                  **SOURCE DOCUMENT**: {}\n\
                  **DOCUMENT STATISTICS**: {} words, {} pages\n\n\
                  **DOCUMENT CONTENT**:\n{}\n\n\
@@ -440,6 +540,11 @@ impl DocumentProcessorTemplate {
                  3. Structure your output clearly with headings/sections\n\
                  4. Be thorough yet concise\n\n\
                  Perform the {} transformation now:",
+                if !memory_context_str.is_empty() {
+                    format!("{}\n\n", memory_context_str)
+                } else {
+                    String::new()
+                },
                 transformation_type,
                 doc.source_path,
                 doc.word_count,
@@ -635,6 +740,17 @@ struct TransformedDocument {
 mod tests {
     use super::*;
     use crate::core::Template;
+    /// Test helper: Create a provider config for tests
+    fn test_provider_config() -> llmspell_config::ProviderConfig {
+        llmspell_config::ProviderConfig {
+            default_model: Some("ollama/llama3.2:3b".to_string()),
+            provider_type: "ollama".to_string(),
+            temperature: Some(0.3),
+            max_tokens: Some(2000),
+            timeout_seconds: Some(120),
+            ..Default::default()
+        }
+    }
 
     #[test]
     fn test_template_metadata() {
@@ -770,7 +886,15 @@ mod tests {
         }];
 
         let result = template
-            .transform_content(&extracted, "summarize", "ollama/llama3.2:3b", &context)
+            .transform_content(
+                &extracted,
+                "summarize",
+                &test_provider_config(),
+                &context,
+                None,
+                false,
+                2000,
+            )
             .await;
         assert!(result.is_ok());
         let docs = result.unwrap();

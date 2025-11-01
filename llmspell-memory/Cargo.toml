@@ -1,0 +1,75 @@
+[package]
+name = "llmspell-memory"
+version.workspace = true
+edition.workspace = true
+authors.workspace = true
+repository.workspace = true
+license.workspace = true
+keywords = ["memory", "episodic", "semantic", "knowledge-graph", "llm"]
+categories = ["memory-management", "database", "data-structures"]
+description = "Adaptive memory system with episodic, semantic, and procedural memory for llmspell"
+
+[dependencies]
+# Core dependencies
+llmspell-core = { path = "../llmspell-core" }
+llmspell-utils = { path = "../llmspell-utils" }
+llmspell-config = { path = "../llmspell-config" }
+llmspell-graph = { path = "../llmspell-graph" }
+llmspell-providers = { path = "../llmspell-providers" }
+llmspell-storage = { path = "../llmspell-storage" }
+
+# Async runtime
+tokio = { workspace = true }
+async-trait = { workspace = true }
+
+# Serialization
+serde = { workspace = true }
+serde_json = { workspace = true }
+
+# Time handling
+chrono = { workspace = true }
+
+# Error handling
+anyhow = { workspace = true }
+thiserror = { workspace = true }
+
+# Logging
+tracing = { workspace = true }
+
+# Concurrency
+parking_lot = "0.12"
+dashmap = "5.5"
+
+# Caching
+lru = "0.12"
+sha2 = "0.10"
+
+# UUID generation
+uuid = { workspace = true }
+
+# Regex for natural language parsing
+regex = "1.10"
+
+[dev-dependencies]
+llmspell-testing = { path = "../llmspell-testing" }
+llmspell-context = { path = "../llmspell-context" }
+tokio-test = "0.4"
+mockall = { workspace = true }
+criterion = { workspace = true }
+tempfile = "3.9"
+tracing-subscriber = { workspace = true, features = ["env-filter"] }
+reqwest = "0.11"
+strsim = "0.11"
+serial_test = "3.0"
+rand = "0.8"
+
+[[bench]]
+name = "memory_operations"
+harness = false
+
+[[bench]]
+name = "accuracy_metrics"
+harness = false
+
+[lints]
+workspace = true

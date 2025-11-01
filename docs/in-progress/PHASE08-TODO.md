@@ -13,7 +13,7 @@
 **RAG-Architecture**: docs/technical/rag-architecture.md (To be created)  
 **This-document**: working copy /TODO.md (pristine/immutable copy in docs/in-progress/PHASE08-DONE.md)
 
-> **📋 Actionable Task List**: This document breaks down Phase 8 implementation into specific, measurable tasks for building production-ready vector storage and RAG infrastructure with multi-tenant support.
+> **📋 Actionable Task List**: This document breaks down Phase 8 implementation into specific, measurable tasks for building experimental infrastructure with production-quality engineering vector storage and RAG infrastructure with multi-tenant support.
 
 ---
 

@@ -107,9 +107,12 @@ impl StateManagerAdapter {
         };
 
         // Create state manager
-        let state_manager =
-            StateManager::with_backend(persistence_config.backend_type.clone(), persistence_config)
-                .await?;
+        let state_manager = StateManager::with_backend(
+            persistence_config.backend_type.clone(),
+            persistence_config,
+            None,
+        )
+        .await?;
 
         Ok(Self {
             state_manager: Arc::new(state_manager),
@@ -123,7 +126,7 @@ impl StateManagerAdapter {
     ///
     /// Returns an error if the state manager fails to initialize
     pub async fn in_memory() -> anyhow::Result<Self> {
-        let state_manager = StateManager::new().await?;
+        let state_manager = StateManager::new(None).await?;
         Ok(Self {
             state_manager: Arc::new(state_manager),
             default_scope: StateScope::Global,
@@ -268,7 +271,7 @@ impl StateManagerAdapterBuilder {
             });
 
         let state_manager =
-            StateManager::with_backend(self.backend_type, persistence_config).await?;
+            StateManager::with_backend(self.backend_type, persistence_config, None).await?;
 
         Ok(StateManagerAdapter {
             state_manager: Arc::new(state_manager),

@@ -942,6 +942,8 @@ pub struct WorkflowBridge {
     shared_data_cache: Arc<RwLock<HashMap<String, HashMap<String, serde_json::Value>>>>,
     /// Workflow type mapping (`workflow_id` -> `workflow_type`)
     workflow_types: Arc<RwLock<HashMap<String, String>>>,
+    /// Template executor for template step execution
+    template_executor: Option<Arc<dyn llmspell_core::traits::template_executor::TemplateExecutor>>,
 }
 
 /// Record of workflow execution
@@ -984,6 +986,9 @@ impl WorkflowBridge {
     pub fn new(
         registry: &Arc<ComponentRegistry>,
         state_manager: Option<Arc<llmspell_kernel::state::StateManager>>,
+        template_executor: Option<
+            Arc<dyn llmspell_core::traits::template_executor::TemplateExecutor>,
+        >,
     ) -> Self {
         Self {
             discovery: Arc::new(WorkflowDiscovery::new()),
@@ -997,6 +1002,7 @@ impl WorkflowBridge {
             perf_metrics: Arc::new(PerformanceMetrics::new()),
             shared_data_cache: Arc::new(RwLock::new(HashMap::new())),
             workflow_types: Arc::new(RwLock::new(HashMap::new())),
+            template_executor,
         }
     }
 
@@ -1062,6 +1068,11 @@ impl WorkflowBridge {
                 // Add registry
                 builder = builder.with_registry(self.registry.clone());
 
+                // Add template executor if available
+                if let Some(ref template_executor) = self.template_executor {
+                    builder = builder.with_template_executor(template_executor.clone());
+                }
+
                 // Add steps
                 for step in steps {
                     builder = builder.add_step(step);
@@ -1077,6 +1088,11 @@ impl WorkflowBridge {
             }
             "parallel" => {
                 let mut builder = ParallelWorkflowBuilder::new(name);
+
+                // Add template executor if available
+                if let Some(ref template_executor) = self.template_executor {
+                    builder = builder.with_template_executor(template_executor.clone());
+                }
 
                 // Create a single branch with all steps
                 let mut branch = ParallelBranch::new("main".to_string());
@@ -1097,6 +1113,11 @@ impl WorkflowBridge {
 
                 // Add registry
                 builder = builder.with_registry(self.registry.clone());
+
+                // Add template executor if available
+                if let Some(ref template_executor) = self.template_executor {
+                    builder = builder.with_template_executor(template_executor.clone());
+                }
 
                 // Add steps
                 for step in steps {
@@ -1245,6 +1266,11 @@ impl WorkflowBridge {
 
         // Add registry
         builder = builder.with_registry(self.registry.clone());
+
+        // Add template executor if available
+        if let Some(ref template_executor) = self.template_executor {
+            builder = builder.with_template_executor(template_executor.clone());
+        }
 
         // Create then branch with the actual condition
         let then_branch = ConditionalBranch::new("then_branch".to_string(), condition)
@@ -1837,7 +1863,7 @@ mod workflow_bridge_tests {
     #[tokio::test]
     async fn test_workflow_bridge_creation() {
         let registry = Arc::new(ComponentRegistry::new());
-        let bridge = WorkflowBridge::new(&registry, None);
+        let bridge = WorkflowBridge::new(&registry, None, None);
 
         // Test listing workflow types
         let types = bridge.list_workflow_types();
@@ -1847,7 +1873,7 @@ mod workflow_bridge_tests {
     #[tokio::test]
     async fn test_workflow_info() {
         let registry = Arc::new(ComponentRegistry::new());
-        let bridge = WorkflowBridge::new(&registry, None);
+        let bridge = WorkflowBridge::new(&registry, None, None);
 
         // Test getting workflow info
         let info = bridge.get_workflow_info("sequential").unwrap();
@@ -1861,7 +1887,7 @@ mod workflow_bridge_tests {
     #[tokio::test]
     async fn test_bridge_metrics() {
         let registry = Arc::new(ComponentRegistry::new());
-        let bridge = WorkflowBridge::new(&registry, None);
+        let bridge = WorkflowBridge::new(&registry, None, None);
 
         // Get initial metrics
         let metrics = bridge.get_bridge_metrics();

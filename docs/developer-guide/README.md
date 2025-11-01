@@ -1,9 +1,9 @@
 # Developer Guide
 
-✅ **CURRENT**: Phase 12 Complete - Production-Ready AI Agent Templates
-**Version**: 0.12.0 | **Crates**: 18 | **Tools**: 40+ | **Templates**: 10 | **Examples**: 60+ | **Feature Flags**: Modular builds (19-35MB)
+✅ **CURRENT**: Phase 13 Complete - Experimental Memory & Context Engineering
+**Version**: 0.13.0 | **Crates**: 21 | **Tools**: 40+ | **Templates**: 10 | **Examples**: 60+ | **Feature Flags**: Modular builds (19-35MB)
 
-**Build and extend rs-llmspell with comprehensive developer documentation**
+**Build experimental AI components with production-quality patterns for painless extraction**
 
 **🔗 Navigation**: [← Docs Hub](../) | [Project Home](../../) | [User Guide](../user-guide/) | [Technical Docs](../technical/)
 
@@ -25,10 +25,10 @@
 
 ---
 
-## 📖 The 8 Essential Guides (Fully Consolidated)
+## 📖 The 8 Essential Guides (Build Experimental Components)
 
 ### 0. **[Feature Flags Migration](feature-flags-migration.md)** ⚠️
-**BREAKING CHANGES - Read First (Phase 10.17.5+)**
+**Read First for Rapid Iteration (Phase 10.17.5+)**
 - ✅ Modular build system (minimal/common/full)
 - ✅ Binary size reduction (19MB minimal, 25MB common, 35MB full)
 - ✅ Optional tool dependencies (templates, PDF, CSV, Excel, archives, email, DB)
@@ -38,13 +38,13 @@
 *Essential for all developers: Build commands changed from Phase 10.17.5*
 
 ### 1. **[Developer Guide](developer-guide.md)** 📘
-**Foundation - Start Here (Phase 12 updated)**
+**Foundation - Start Here (Phase 13 updated)**
 - ✅ Quick start setup in 5 minutes
-- ✅ Phase 12 architecture (18 crates including Templates)
+- ✅ Phase 13 architecture (21 crates including Memory, Graph, Context, Templates)
 - ✅ Core patterns: BaseAgent, sync bridge, **llmspell-utils**
 - ✅ Testing with llmspell-testing helpers
 - ✅ Common tasks and workflows
-- ✅ Performance requirements (<10ms tools, <8ms vector search, <2ms templates)
+- ✅ Performance validation at scale (<10ms tools, <8ms vector search, <2ms templates/memory)
 
 *Consolidates: main guide + synchronous-api-patterns + test-development-guide*
 
@@ -64,7 +64,7 @@
 *Consolidates: tool-development + hook-development + workflow-bridge + NEW RAG content*
 
 ### 3. **[Production Guide](production-guide.md)** 🏭
-**Deploy with Confidence (50% new content)**
+**Scale Validation & Extraction Patterns (50% new content)**
 - ✅ **Part 1**: Security & Multi-Tenancy
   - 3-level security model (Safe/Restricted/Privileged)
   - StateScope::Custom("tenant:id") with 3% overhead
@@ -103,7 +103,7 @@
 *Essential for maintaining consistent, performant instrumentation across the codebase*
 
 ### 6. **[Template Creation Guide](template-creation.md)** 🎯
-**Build Production-Ready AI Workflow Templates (Phase 12.10-12.13)**
+**Build Experimental AI Workflow Templates (Phase 12.10-12.13)**
 - ✅ Quick start: minimum viable template in 50 LOC
 - ✅ 4 proven patterns (code-review, content-generation, file-classification, knowledge-management)
 - ✅ Best practices: validation, agent creation, error handling, testing
@@ -125,10 +125,18 @@
 
 ---
 
-## 🆕 What's New in Phase 12
+## 🆕 What's New in Phase 13
 
-### Production-Ready AI Agent Templates (Complete) ⭐
-- **10 Built-in Templates**: 6 base + 4 advanced workflows solving real AI problems
+### Experimental Memory & Context Engineering (Complete) ⭐
+- **3-Tier Memory System**: Episodic (HNSW), Semantic (SurrealDB), Procedural (patterns)
+- **Hot-Swappable Backends**: InMemory (dev), HNSW (8.47x speedup), SurrealDB (bi-temporal graph)
+- **Context Engineering**: 4 strategies (episodic, semantic, hybrid, RAG) with parallel retrieval
+- **<2ms Memory Overhead**: 50x faster than target, production-quality validation at scale
+- **149 Tests**: 100% pass rate, zero warnings, comprehensive validation
+- **Zero Breaking Changes**: Fully backward compatible, opt-in features
+
+### Phase 12 Achievements: Experimental AI Workflows ⭐
+- **10 Experimental Templates**: 6 base + 4 advanced workflows for rapid concept exploration
 - **Template System**: llmspell-templates crate (2,651 LOC, 149 tests)
 - **Template CLI**: 5 subcommands (list, info, exec, search, schema) for instant productivity
 - **Template Global**: 16th of 18 Lua globals with 6 methods
@@ -139,10 +147,10 @@
 - **20-50x Performance**: <2ms init, <1ms lookup, <0.1ms validation
 
 ### By the Numbers
-| Metric | Phase 10 | Phase 12 | Change |
+| Metric | Phase 12 | Phase 13 | Change |
 |--------|----------|----------|--------|
-| Crates | 17 | 18 | +1 templates crate |
-| Lua Globals | 17 | 18 | +1 Template global |
+| Crates | 18 | 21 | +3 memory crates |
+| Lua Globals | 18 | 18 | Memory + Context globals |
 | Templates | 0 | 10 | NEW |
 | Tests | 486 | 635 | +149 template tests |
 | Template Init | N/A | <2ms | NEW |
@@ -347,7 +355,7 @@ let result = block_on_async::<_, T, E>("operation", async move { ... }, timeout)
 - Documentation Completeness (Security 40%→95%, Env Vars 0%→100%)
 
 ### Phase 12 (✅ Complete)
-- Production-Ready AI Agent Templates
+- Experimental Components with Production-Quality Patterns AI Agent Templates
 - 10 built-in templates (6 base + 4 advanced)
 - Template CLI with 5 subcommands
 - Template Lua API (Template global, 16th of 18)

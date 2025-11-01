@@ -4,7 +4,7 @@
 use super::types::{HookContext, HookResult};
 use super::HookFn;
 use std::collections::HashMap;
-use tracing::{debug, info};
+use tracing::{debug, info, Level};
 
 /// Lifecycle hook points for workflows
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
@@ -94,13 +94,13 @@ impl WorkflowHooks {
     }
 
     /// Create a simple logging hook (works now without full hook system)
-    pub fn create_logging_hook(level: tracing::Level) -> HookFn {
+    pub fn create_logging_hook(level: Level) -> HookFn {
         Box::new(move |context: &HookContext| {
             match level {
-                tracing::Level::DEBUG => {
+                Level::DEBUG => {
                     debug!("Hook: {} - {}", context.hook_point, context.workflow_name)
                 }
-                tracing::Level::INFO => {
+                Level::INFO => {
                     info!("Hook: {} - {}", context.hook_point, context.workflow_name)
                 }
                 _ => {}
@@ -131,7 +131,7 @@ pub trait WithHooks {
 
     /// Add a simple logging hook
     fn add_logging_hook(&mut self, point: HookPoint) {
-        let hook = WorkflowHooks::create_logging_hook(tracing::Level::INFO);
+        let hook = WorkflowHooks::create_logging_hook(Level::INFO);
         self.add_hook(point, hook);
     }
 }

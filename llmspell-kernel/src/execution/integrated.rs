@@ -101,6 +101,18 @@ impl Default for ExecutionConfig {
     }
 }
 
+/// Parameters for creating an `IntegratedKernel`
+pub struct IntegratedKernelParams<P: Protocol> {
+    pub protocol: P,
+    pub config: ExecutionConfig,
+    pub session_id: String,
+    pub script_executor: Arc<dyn ScriptExecutor>,
+    pub provider_manager: Option<Arc<llmspell_providers::ProviderManager>>,
+    pub session_manager: Arc<SessionManager>,
+    pub memory_manager: Option<Arc<dyn llmspell_memory::MemoryManager>>,
+    pub hook_system: Option<Arc<crate::hooks::KernelHookSystem>>,
+}
+
 /// Integrated kernel that runs `ScriptRuntime` without spawning
 pub struct IntegratedKernel<P: Protocol> {
     /// Script executor for execution
@@ -154,6 +166,15 @@ pub struct IntegratedKernel<P: Protocol> {
     current_msg_header: Option<serde_json::Value>,
     /// Provider manager for local LLM operations (Phase 11)
     provider_manager: Option<Arc<llmspell_providers::ProviderManager>>,
+    /// Memory manager for adaptive memory system (Phase 13)
+    memory_manager: Option<Arc<dyn llmspell_memory::MemoryManager>>,
+    /// Consolidation daemon handle (Phase 13.7.2)
+    consolidation_daemon: Option<(
+        Arc<llmspell_memory::consolidation::ConsolidationDaemon>,
+        tokio::task::JoinHandle<()>,
+    )>,
+    /// Hook system for kernel execution events (Phase 13.7.3a)
+    hook_system: Option<Arc<crate::hooks::KernelHookSystem>>,
 }
 
 #[allow(dead_code)] // These methods will be used when transport is fully integrated
@@ -163,16 +184,23 @@ impl<P: Protocol + 'static> IntegratedKernel<P> {
     /// # Errors
     ///
     /// Returns an error if the script runtime cannot be created
+    ///
+    /// # Panics
+    ///
+    /// Panics if episodic memory is not available when starting consolidation daemon (should never happen)
     #[instrument(level = "info", skip_all)]
     #[allow(clippy::too_many_lines)]
-    pub async fn new(
-        protocol: P,
-        config: ExecutionConfig,
-        session_id: String,
-        script_executor: Arc<dyn ScriptExecutor>,
-        provider_manager: Option<Arc<llmspell_providers::ProviderManager>>,
-        session_manager: Arc<SessionManager>,
-    ) -> Result<Self> {
+    pub async fn new(params: IntegratedKernelParams<P>) -> Result<Self> {
+        let IntegratedKernelParams {
+            protocol,
+            config,
+            session_id,
+            script_executor,
+            provider_manager,
+            session_manager,
+            memory_manager,
+            hook_system,
+        } = params;
         info!("Creating IntegratedKernel for session {}", session_id);
 
         // Create I/O manager
@@ -281,6 +309,93 @@ impl<P: Protocol + 'static> IntegratedKernel<P> {
         // Create health monitor with configured thresholds
         let health_monitor = Arc::new(HealthMonitor::new(config.health_thresholds.clone()));
 
+        // Initialize memory manager (Phase 13.7.1)
+        if let Some(memory_mgr) = &memory_manager {
+            info!("Memory manager enabled for session {}", session_id);
+            debug!(
+                "Memory config: episodic={}, semantic={}, consolidation={}",
+                memory_mgr.has_episodic(),
+                memory_mgr.has_semantic(),
+                memory_mgr.has_consolidation()
+            );
+        } else {
+            debug!("Memory manager not configured for session {}", session_id);
+        }
+
+        // Start consolidation daemon (Phase 13.7.2)
+        let consolidation_daemon = if let Some(memory_mgr) = &memory_manager {
+            if let Some(engine) = memory_mgr.consolidation_engine_arc() {
+                // Try to get daemon config from runtime_config, use default if not found
+                let daemon_config: llmspell_memory::consolidation::DaemonConfig = config
+                    .runtime_config
+                    .get("memory.daemon")
+                    .and_then(|v| serde_json::from_value(v.clone()).ok())
+                    .unwrap_or_default();
+
+                info!("Starting consolidation daemon for session {}", session_id);
+                debug!(
+                    "Daemon config: fast={}s, normal={}s, slow={}s, batch={}",
+                    daemon_config.fast_interval_secs,
+                    daemon_config.normal_interval_secs,
+                    daemon_config.slow_interval_secs,
+                    daemon_config.batch_size
+                );
+
+                let episodic = memory_mgr
+                    .episodic_arc()
+                    .expect("Episodic memory must be present");
+                let daemon = Arc::new(llmspell_memory::consolidation::ConsolidationDaemon::new(
+                    engine,
+                    episodic,
+                    daemon_config,
+                ));
+                let handle = daemon.clone().start().map_err(|e| {
+                    error!("Failed to start consolidation daemon: {}", e);
+                    e
+                })?;
+                info!("Consolidation daemon started successfully");
+                Some((daemon, handle))
+            } else {
+                debug!("No consolidation engine available, daemon not started");
+                None
+            }
+        } else {
+            None
+        };
+
+        // Log hook system status and register execution memory hook (Phase 13.7.3a + 13.7.3)
+        let hook_system = match (memory_manager.as_ref(), hook_system) {
+            (Some(mm), Some(mut hooks_arc)) => {
+                info!("KernelHookSystem enabled for execution event hooks");
+
+                // Get mutable reference to register hook (Phase 13.7.3)
+                if let Some(hooks) = Arc::get_mut(&mut hooks_arc) {
+                    let exec_hook = crate::hooks::ExecutionMemoryHook::new(mm.clone());
+                    hooks
+                        .register_hook(
+                            crate::hooks::KernelHookPoint::PostCodeExecution.into(),
+                            exec_hook,
+                        )
+                        .map_err(|e| {
+                            error!("Failed to register ExecutionMemoryHook: {}", e);
+                            e
+                        })?;
+                    info!("ExecutionMemoryHook registered for episodic memory capture");
+                } else {
+                    warn!("KernelHookSystem has multiple Arc references, cannot register ExecutionMemoryHook");
+                }
+                Some(hooks_arc)
+            }
+            (None, Some(hooks)) => {
+                info!("KernelHookSystem enabled but no memory_manager, ExecutionMemoryHook not registered");
+                Some(hooks)
+            }
+            (_, None) => {
+                debug!("KernelHookSystem disabled (None)");
+                None
+            }
+        };
+
         Ok(Self {
             script_executor,
             protocol,
@@ -307,6 +422,9 @@ impl<P: Protocol + 'static> IntegratedKernel<P> {
             current_client_identity: None,
             current_msg_header: None,
             provider_manager,
+            memory_manager,
+            consolidation_daemon,
+            hook_system,
         })
     }
 
@@ -948,6 +1066,34 @@ impl<P: Protocol + 'static> IntegratedKernel<P> {
             Some(&self.session_id),
         );
 
+        // Shutdown consolidation daemon (Phase 13.7.2)
+        if let Some((daemon, _handle)) = &self.consolidation_daemon {
+            info!(
+                "Stopping consolidation daemon for session {}",
+                self.session_id
+            );
+            if let Err(e) = daemon.stop().await {
+                error!("Failed to stop consolidation daemon: {}", e);
+            } else {
+                debug!("Consolidation daemon stopped, waiting for task completion");
+                // Note: We can't await the handle here because we only have a reference
+                // The handle will be cleaned up when IntegratedKernel is dropped
+            }
+        }
+
+        // Shutdown memory manager (Phase 13.7.1)
+        if let Some(memory_mgr) = &self.memory_manager {
+            info!(
+                "Shutting down memory manager for session {}",
+                self.session_id
+            );
+            if let Err(e) = memory_mgr.shutdown().await {
+                error!("Failed to shutdown memory manager: {}", e);
+            } else {
+                debug!("Memory manager shutdown complete");
+            }
+        }
+
         info!("IntegratedKernel shutdown complete");
         Ok(())
     }
@@ -978,6 +1124,8 @@ impl<P: Protocol + 'static> IntegratedKernel<P> {
             "tool_request" => self.handle_tool_request(message).await?,
             "template_request" => self.handle_template_request(message).await?,
             "model_request" => self.handle_model_request(message).await?,
+            "memory_request" => self.handle_memory_request(message).await?,
+            "context_request" => self.handle_context_request(message).await?,
             _ => {
                 warn!("Unhandled message type: {}", msg_type);
             }
@@ -1606,6 +1754,97 @@ impl<P: Protocol + 'static> IntegratedKernel<P> {
     /// # Errors
     ///
     /// Returns an error if code execution fails
+    /// Fire `PreCodeExecution` hook
+    async fn fire_pre_execution_hook(
+        &self,
+        code: &str,
+        exec_id: &str,
+        args: &HashMap<String, String>,
+    ) {
+        if let Some(ref hooks) = self.hook_system {
+            use crate::hooks::{ComponentId, ComponentType, HookContext, HookPoint};
+            let component_id =
+                ComponentId::new(ComponentType::System, "integrated_kernel".to_string());
+            let mut ctx = HookContext::new(HookPoint::SystemStartup, component_id);
+            ctx.data.insert("code".to_string(), serde_json::json!(code));
+            ctx.data
+                .insert("session_id".to_string(), serde_json::json!(self.session_id));
+            ctx.data
+                .insert("execution_id".to_string(), serde_json::json!(exec_id));
+            ctx.data.insert("args".to_string(), serde_json::json!(args));
+
+            match hooks
+                .execute_hooks(crate::hooks::KernelHookPoint::PreCodeExecution, &mut ctx)
+                .await
+            {
+                Ok(_) => {
+                    debug!("PreCodeExecution hooks executed successfully");
+                }
+                Err(e) => {
+                    error!("PreCodeExecution hook failed: {}", e);
+                    // Continue execution despite hook failure
+                }
+            }
+        }
+    }
+
+    /// Fire `PostCodeExecution` hook
+    async fn fire_post_execution_hook(
+        &self,
+        code: &str,
+        exec_id: &str,
+        args: &HashMap<String, String>,
+        result: &Result<String>,
+    ) {
+        if let Some(ref hooks) = self.hook_system {
+            use crate::hooks::{ComponentId, ComponentType, HookContext, HookPoint};
+            let component_id =
+                ComponentId::new(ComponentType::System, "integrated_kernel".to_string());
+            let mut ctx = HookContext::new(HookPoint::SystemStartup, component_id);
+            ctx.data.insert("code".to_string(), serde_json::json!(code));
+            ctx.data
+                .insert("session_id".to_string(), serde_json::json!(self.session_id));
+            ctx.data
+                .insert("execution_id".to_string(), serde_json::json!(exec_id));
+            ctx.data.insert("args".to_string(), serde_json::json!(args));
+
+            // Add result to context
+            match result {
+                Ok(output) => {
+                    ctx.data
+                        .insert("result".to_string(), serde_json::json!(output));
+                    ctx.data
+                        .insert("success".to_string(), serde_json::json!(true));
+                }
+                Err(e) => {
+                    ctx.data
+                        .insert("error".to_string(), serde_json::json!(e.to_string()));
+                    ctx.data
+                        .insert("success".to_string(), serde_json::json!(false));
+                }
+            }
+
+            match hooks
+                .execute_hooks(crate::hooks::KernelHookPoint::PostCodeExecution, &mut ctx)
+                .await
+            {
+                Ok(_) => {
+                    debug!("PostCodeExecution hooks executed successfully");
+                }
+                Err(e) => {
+                    error!("PostCodeExecution hook failed: {}", e);
+                    // Don't fail the execution if hook fails
+                }
+            }
+        }
+    }
+
+    /// Execute code directly with script arguments
+    /// Used for embedded mode when kernel is not running
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if code execution fails
     pub async fn execute_direct_with_args(
         &mut self,
         code: &str,
@@ -1626,11 +1865,16 @@ impl<P: Protocol + 'static> IntegratedKernel<P> {
 
         // Update state for tracking
         self.state.update_execution(|exec| {
-            exec.start_execution(exec_id, code.to_string());
+            exec.start_execution(exec_id.clone(), code.to_string());
             Ok(())
         })?;
 
+        // Fire PreCodeExecution hook (Phase 13.7.3a)
+        self.fire_pre_execution_hook(code, &exec_id, &args).await;
+
         // Execute code with arguments if provided
+        // Clone args for PostCodeExecution hook (Phase 13.7.3a)
+        let args_clone = args.clone();
         let result = if args.is_empty() {
             // Execute code using the internal method as before
             self.execute_code_in_context(code).await
@@ -1672,6 +1916,10 @@ impl<P: Protocol + 'static> IntegratedKernel<P> {
                 })?;
             }
         }
+
+        // Fire PostCodeExecution hook (Phase 13.7.3a)
+        self.fire_post_execution_hook(code, &exec_id, &args_clone, &result)
+            .await;
 
         result
     }
@@ -1916,6 +2164,96 @@ impl<P: Protocol + 'static> IntegratedKernel<P> {
             }
         } else {
             warn!("No transport available for template_reply - falling back to stdout");
+            // Fallback to stdout if no transport (for embedded scenarios)
+            self.io_manager.write_stdout(&content.to_string()).await
+        }
+    }
+
+    /// Send memory reply back to client (Phase 13.12.1)
+    async fn send_memory_reply(&mut self, content: serde_json::Value) -> Result<()> {
+        debug!("Sending memory reply through message protocol");
+
+        // Ensure we have client identity for routing
+        let client_identity = self
+            .current_client_identity
+            .clone()
+            .ok_or_else(|| anyhow!("No client identity available for memory reply routing"))?;
+
+        // Ensure we have message header for correlation
+        if self.current_msg_header.is_none() {
+            return Err(anyhow!(
+                "No message header available for memory reply correlation"
+            ));
+        }
+
+        // Create multipart response using existing infrastructure
+        let multipart_response =
+            self.create_multipart_response(&client_identity, "memory_reply", &content)?;
+
+        debug!(
+            "memory_reply multipart created, {} parts",
+            multipart_response.len()
+        );
+
+        // Send via shell channel (same as other command replies)
+        if let Some(ref mut transport) = self.transport {
+            match transport.send("shell", multipart_response).await {
+                Ok(()) => {
+                    debug!("memory_reply sent successfully via shell channel");
+                    Ok(())
+                }
+                Err(e) => {
+                    error!("Failed to send memory_reply: {}", e);
+                    Err(anyhow!("Failed to send memory reply: {}", e))
+                }
+            }
+        } else {
+            warn!("No transport available for memory_reply - falling back to stdout");
+            // Fallback to stdout if no transport (for embedded scenarios)
+            self.io_manager.write_stdout(&content.to_string()).await
+        }
+    }
+
+    /// Send context reply back to client (Phase 13.12.3)
+    async fn send_context_reply(&mut self, content: serde_json::Value) -> Result<()> {
+        debug!("Sending context reply through message protocol");
+
+        // Ensure we have client identity for routing
+        let client_identity = self
+            .current_client_identity
+            .clone()
+            .ok_or_else(|| anyhow!("No client identity available for context reply routing"))?;
+
+        // Ensure we have message header for correlation
+        if self.current_msg_header.is_none() {
+            return Err(anyhow!(
+                "No message header available for context reply correlation"
+            ));
+        }
+
+        // Create multipart response using existing infrastructure
+        let multipart_response =
+            self.create_multipart_response(&client_identity, "context_reply", &content)?;
+
+        debug!(
+            "context_reply multipart created, {} parts",
+            multipart_response.len()
+        );
+
+        // Send via shell channel (same as other command replies)
+        if let Some(ref mut transport) = self.transport {
+            match transport.send("shell", multipart_response).await {
+                Ok(()) => {
+                    debug!("context_reply sent successfully via shell channel");
+                    Ok(())
+                }
+                Err(e) => {
+                    error!("Failed to send context_reply: {}", e);
+                    Err(anyhow!("Failed to send context reply: {}", e))
+                }
+            }
+        } else {
+            warn!("No transport available for context_reply - falling back to stdout");
             // Fallback to stdout if no transport (for embedded scenarios)
             self.io_manager.write_stdout(&content.to_string()).await
         }
@@ -3222,6 +3560,390 @@ impl<P: Protocol + 'static> IntegratedKernel<P> {
         Ok(())
     }
 
+    /// Handle memory request for memory operations (Phase 13.12.1)
+    async fn handle_memory_request(&mut self, message: HashMap<String, Value>) -> Result<()> {
+        info!("Handling memory_request");
+
+        let content = message
+            .get("content")
+            .ok_or_else(|| anyhow!("No content in memory_request"))?;
+
+        let command = content
+            .get("command")
+            .and_then(|v| v.as_str())
+            .ok_or_else(|| anyhow!("No command in memory_request"))?;
+
+        // Handle memory commands (follows template pattern)
+        match command {
+            "add" => self.handle_memory_add(content).await,
+            "search" => self.handle_memory_search(content).await,
+            "query" => self.handle_memory_query(content).await,
+            "stats" => self.handle_memory_stats(content).await,
+            "consolidate" => self.handle_memory_consolidate(content).await,
+            _ => self.handle_unknown_memory_command(command).await,
+        }
+    }
+
+    /// Handle memory add command
+    async fn handle_memory_add(&mut self, content: &Value) -> Result<()> {
+        let session_id = content["session_id"]
+            .as_str()
+            .ok_or_else(|| anyhow!("Missing session_id"))?;
+        let role = content["role"]
+            .as_str()
+            .ok_or_else(|| anyhow!("Missing role"))?;
+        let message_content = content["content"]
+            .as_str()
+            .ok_or_else(|| anyhow!("Missing content"))?;
+        let metadata = content.get("metadata").cloned().unwrap_or(json!({}));
+
+        debug!("Adding memory entry: session={}, role={}", session_id, role);
+
+        // Use ScriptExecutor trait method
+        match self
+            .script_executor
+            .handle_memory_add(session_id, role, message_content, metadata)
+        {
+            Ok(_result) => {
+                let response = json!({
+                    "msg_type": "memory_reply",
+                    "content": {
+                        "status": "success"
+                    }
+                });
+                self.send_memory_reply(response).await
+            }
+            Err(e) => {
+                let error = json!({
+                    "msg_type": "memory_reply",
+                    "content": {
+                        "status": "error",
+                        "error": format!("Failed to add memory: {}", e)
+                    }
+                });
+                self.send_memory_reply(error).await
+            }
+        }
+    }
+
+    /// Handle memory search command
+    async fn handle_memory_search(&mut self, content: &Value) -> Result<()> {
+        let query = content["query"]
+            .as_str()
+            .ok_or_else(|| anyhow!("Missing query"))?;
+        let limit = content
+            .get("limit")
+            .and_then(serde_json::Value::as_u64)
+            .unwrap_or(10) as usize;
+        let session_id = content.get("session_id").and_then(|s| s.as_str());
+
+        debug!(
+            "Searching memory: query='{}', limit={}, session={:?}",
+            query, limit, session_id
+        );
+
+        // Use ScriptExecutor trait method
+        match self
+            .script_executor
+            .handle_memory_search(session_id, query, limit)
+        {
+            Ok(results) => {
+                let response = json!({
+                    "msg_type": "memory_reply",
+                    "content": {
+                        "status": "ok",
+                        "results": results
+                    }
+                });
+                self.send_memory_reply(response).await
+            }
+            Err(e) => {
+                let error = json!({
+                    "msg_type": "memory_reply",
+                    "content": {
+                        "status": "error",
+                        "error": format!("Failed to search memory: {}", e)
+                    }
+                });
+                self.send_memory_reply(error).await
+            }
+        }
+    }
+
+    /// Handle memory query command
+    async fn handle_memory_query(&mut self, content: &Value) -> Result<()> {
+        let query = content["query"]
+            .as_str()
+            .ok_or_else(|| anyhow!("Missing query"))?;
+        let limit = content
+            .get("limit")
+            .and_then(serde_json::Value::as_u64)
+            .unwrap_or(10) as usize;
+
+        debug!(
+            "Querying semantic memory: query='{}', limit={}",
+            query, limit
+        );
+
+        // Use ScriptExecutor trait method
+        match self.script_executor.handle_memory_query(query, limit) {
+            Ok(entities) => {
+                let response = json!({
+                    "msg_type": "memory_reply",
+                    "content": {
+                        "status": "ok",
+                        "entities": entities
+                    }
+                });
+                self.send_memory_reply(response).await
+            }
+            Err(e) => {
+                let error = json!({
+                    "msg_type": "memory_reply",
+                    "content": {
+                        "status": "error",
+                        "error": format!("Failed to query memory: {}", e)
+                    }
+                });
+                self.send_memory_reply(error).await
+            }
+        }
+    }
+
+    /// Handle memory stats command
+    async fn handle_memory_stats(&mut self, _content: &Value) -> Result<()> {
+        debug!("Getting memory stats");
+
+        // Use ScriptExecutor trait method
+        match self.script_executor.handle_memory_stats() {
+            Ok(stats) => {
+                let response = json!({
+                    "msg_type": "memory_reply",
+                    "content": {
+                        "status": "ok",
+                        "stats": stats
+                    }
+                });
+                self.send_memory_reply(response).await
+            }
+            Err(e) => {
+                let error = json!({
+                    "msg_type": "memory_reply",
+                    "content": {
+                        "status": "error",
+                        "error": format!("Failed to get memory stats: {}", e)
+                    }
+                });
+                self.send_memory_reply(error).await
+            }
+        }
+    }
+
+    /// Handle memory consolidate command
+    async fn handle_memory_consolidate(&mut self, content: &Value) -> Result<()> {
+        let session_id = content.get("session_id").and_then(|s| s.as_str());
+        let force = content
+            .get("force")
+            .and_then(serde_json::Value::as_bool)
+            .unwrap_or(false);
+
+        debug!(
+            "Consolidating memory: session={:?}, force={}",
+            session_id, force
+        );
+
+        // Use ScriptExecutor trait method
+        match self
+            .script_executor
+            .handle_memory_consolidate(session_id, force)
+        {
+            Ok(result) => {
+                let response = json!({
+                    "msg_type": "memory_reply",
+                    "content": {
+                        "status": "ok",
+                        "result": result
+                    }
+                });
+                self.send_memory_reply(response).await
+            }
+            Err(e) => {
+                let error = json!({
+                    "msg_type": "memory_reply",
+                    "content": {
+                        "status": "error",
+                        "error": format!("Failed to consolidate memory: {}", e)
+                    }
+                });
+                self.send_memory_reply(error).await
+            }
+        }
+    }
+
+    /// Handle unknown memory command
+    async fn handle_unknown_memory_command(&mut self, command: &str) -> Result<()> {
+        warn!("Unknown memory command: {}", command);
+        let error = json!({
+            "msg_type": "memory_reply",
+            "content": {
+                "status": "error",
+                "error": format!("Unknown memory command: {command}")
+            }
+        });
+
+        self.send_memory_reply(error).await
+    }
+
+    /// Handle context request for context assembly operations (Phase 13.12.3)
+    async fn handle_context_request(&mut self, message: HashMap<String, Value>) -> Result<()> {
+        info!("Handling context_request");
+
+        let content = message
+            .get("content")
+            .ok_or_else(|| anyhow!("No content in context_request"))?;
+
+        let command = content
+            .get("command")
+            .and_then(|v| v.as_str())
+            .ok_or_else(|| anyhow!("No command in context_request"))?;
+
+        // Handle context commands (follows template pattern)
+        match command {
+            "assemble" => self.handle_context_assemble(content).await,
+            "strategies" => self.handle_context_strategies(content).await,
+            "analyze" => self.handle_context_analyze(content).await,
+            _ => self.handle_unknown_context_command(command).await,
+        }
+    }
+
+    /// Handle context assemble command
+    async fn handle_context_assemble(&mut self, content: &Value) -> Result<()> {
+        let query = content["query"]
+            .as_str()
+            .ok_or_else(|| anyhow!("Missing query"))?;
+        let strategy = content
+            .get("strategy")
+            .and_then(|s| s.as_str())
+            .unwrap_or("hybrid");
+        let budget = content
+            .get("budget")
+            .and_then(serde_json::Value::as_u64)
+            .unwrap_or(2000) as usize;
+        let session_id = content.get("session_id").and_then(|s| s.as_str());
+
+        debug!(
+            "Assembling context: query='{}', strategy={}, budget={}",
+            query, strategy, budget
+        );
+
+        // Use ScriptExecutor trait method
+        match self
+            .script_executor
+            .handle_context_assemble(query, strategy, budget, session_id)
+        {
+            Ok(result) => {
+                let response = json!({
+                    "msg_type": "context_reply",
+                    "content": {
+                        "status": "ok",
+                        "result": result
+                    }
+                });
+                self.send_context_reply(response).await
+            }
+            Err(e) => {
+                let error = json!({
+                    "msg_type": "context_reply",
+                    "content": {
+                        "status": "error",
+                        "error": format!("Failed to assemble context: {}", e)
+                    }
+                });
+                self.send_context_reply(error).await
+            }
+        }
+    }
+
+    /// Handle context strategies command
+    async fn handle_context_strategies(&mut self, _content: &Value) -> Result<()> {
+        debug!("Listing context strategies");
+
+        // Use ScriptExecutor trait method
+        match self.script_executor.handle_context_strategies() {
+            Ok(strategies) => {
+                let response = json!({
+                    "msg_type": "context_reply",
+                    "content": {
+                        "status": "ok",
+                        "strategies": strategies
+                    }
+                });
+                self.send_context_reply(response).await
+            }
+            Err(e) => {
+                let error = json!({
+                    "msg_type": "context_reply",
+                    "content": {
+                        "status": "error",
+                        "error": format!("Failed to list strategies: {}", e)
+                    }
+                });
+                self.send_context_reply(error).await
+            }
+        }
+    }
+
+    /// Handle context analyze command
+    async fn handle_context_analyze(&mut self, content: &Value) -> Result<()> {
+        let query = content["query"]
+            .as_str()
+            .ok_or_else(|| anyhow!("Missing query"))?;
+        let budget = content
+            .get("budget")
+            .and_then(serde_json::Value::as_u64)
+            .unwrap_or(2000) as usize;
+
+        debug!("Analyzing context: query='{}', budget={}", query, budget);
+
+        // Use ScriptExecutor trait method
+        match self.script_executor.handle_context_analyze(query, budget) {
+            Ok(analysis) => {
+                let response = json!({
+                    "msg_type": "context_reply",
+                    "content": {
+                        "status": "ok",
+                        "analysis": analysis
+                    }
+                });
+                self.send_context_reply(response).await
+            }
+            Err(e) => {
+                let error = json!({
+                    "msg_type": "context_reply",
+                    "content": {
+                        "status": "error",
+                        "error": format!("Failed to analyze context: {}", e)
+                    }
+                });
+                self.send_context_reply(error).await
+            }
+        }
+    }
+
+    /// Handle unknown context command
+    async fn handle_unknown_context_command(&mut self, command: &str) -> Result<()> {
+        warn!("Unknown context command: {}", command);
+        let error = json!({
+            "msg_type": "context_reply",
+            "content": {
+                "status": "error",
+                "error": format!("Unknown context command: {command}")
+            }
+        });
+
+        self.send_context_reply(error).await
+    }
+
     /// Run kernel as daemon
     ///
     /// This method daemonizes the process and runs the kernel in the background
@@ -3485,7 +4207,7 @@ mod tests {
 
     /// Helper to create a test `SessionManager` with minimal infrastructure
     async fn create_test_session_manager() -> Arc<crate::sessions::SessionManager> {
-        let state_manager = Arc::new(crate::state::StateManager::new().await.unwrap());
+        let state_manager = Arc::new(crate::state::StateManager::new(None).await.unwrap());
         let session_storage_backend = Arc::new(llmspell_storage::MemoryBackend::new());
         let hook_registry = Arc::new(llmspell_hooks::HookRegistry::new());
         let hook_executor = Arc::new(llmspell_hooks::HookExecutor::new());
@@ -3511,14 +4233,16 @@ mod tests {
         let config = ExecutionConfig::default();
         let executor = Arc::new(MockScriptExecutor) as Arc<dyn ScriptExecutor>;
 
-        let kernel = IntegratedKernel::new(
+        let kernel = IntegratedKernel::new(IntegratedKernelParams {
             protocol,
             config,
-            "test-session".to_string(),
-            executor,
-            None,
-            create_test_session_manager().await,
-        )
+            session_id: "test-session".to_string(),
+            script_executor: executor,
+            provider_manager: None,
+            session_manager: create_test_session_manager().await,
+            memory_manager: None,
+            hook_system: None,
+        })
         .await;
 
         assert!(kernel.is_ok());
@@ -3533,14 +4257,16 @@ mod tests {
         let config = ExecutionConfig::default();
         let executor = Arc::new(MockScriptExecutor) as Arc<dyn ScriptExecutor>;
 
-        let mut kernel = IntegratedKernel::new(
+        let mut kernel = IntegratedKernel::new(IntegratedKernelParams {
             protocol,
             config,
-            "test-session".to_string(),
-            executor,
-            None,
-            create_test_session_manager().await,
-        )
+            session_id: "test-session".to_string(),
+            script_executor: executor,
+            provider_manager: None,
+            session_manager: create_test_session_manager().await,
+            memory_manager: None,
+            hook_system: None,
+        })
         .await
         .unwrap();
 
@@ -3578,14 +4304,16 @@ mod tests {
         let session_id = "test-session".to_string();
         let executor = Arc::new(MockScriptExecutor);
 
-        let kernel = IntegratedKernel::new(
+        let kernel = IntegratedKernel::new(IntegratedKernelParams {
             protocol,
             config,
             session_id,
-            executor,
-            None,
-            create_test_session_manager().await,
-        )
+            script_executor: executor,
+            provider_manager: None,
+            session_manager: create_test_session_manager().await,
+            memory_manager: None,
+            hook_system: None,
+        })
         .await
         .unwrap();
 
@@ -3648,14 +4376,16 @@ mod tests {
         let session_id = "test-session".to_string();
         let executor = Arc::new(MockScriptExecutor);
 
-        let mut kernel = IntegratedKernel::new(
+        let mut kernel = IntegratedKernel::new(IntegratedKernelParams {
             protocol,
             config,
             session_id,
-            executor,
-            None,
-            create_test_session_manager().await,
-        )
+            script_executor: executor,
+            provider_manager: None,
+            session_manager: create_test_session_manager().await,
+            memory_manager: None,
+            hook_system: None,
+        })
         .await
         .unwrap();
 
@@ -3694,14 +4424,16 @@ mod tests {
         let session_id = "test-session".to_string();
         let executor = Arc::new(MockScriptExecutor);
 
-        let kernel = IntegratedKernel::new(
+        let kernel = IntegratedKernel::new(IntegratedKernelParams {
             protocol,
             config,
             session_id,
-            executor,
-            None,
-            create_test_session_manager().await,
-        )
+            script_executor: executor,
+            provider_manager: None,
+            session_manager: create_test_session_manager().await,
+            memory_manager: None,
+            hook_system: None,
+        })
         .await
         .unwrap();
 
@@ -3762,14 +4494,16 @@ mod tests {
         let session_id = "test-session".to_string();
         let executor = Arc::new(MockScriptExecutor);
 
-        let kernel = IntegratedKernel::new(
+        let kernel = IntegratedKernel::new(IntegratedKernelParams {
             protocol,
             config,
             session_id,
-            executor,
-            None,
-            create_test_session_manager().await,
-        )
+            script_executor: executor,
+            provider_manager: None,
+            session_manager: create_test_session_manager().await,
+            memory_manager: None,
+            hook_system: None,
+        })
         .await
         .unwrap();
 
@@ -3835,14 +4569,16 @@ mod tests {
         let session_id = "test-session".to_string();
         let executor = Arc::new(MockScriptExecutor);
 
-        let _kernel = IntegratedKernel::new(
+        let _kernel = IntegratedKernel::new(IntegratedKernelParams {
             protocol,
             config,
             session_id,
-            executor,
-            None,
-            create_test_session_manager().await,
-        )
+            script_executor: executor,
+            provider_manager: None,
+            session_manager: create_test_session_manager().await,
+            memory_manager: None,
+            hook_system: None,
+        })
         .await
         .unwrap();
 
@@ -3887,14 +4623,16 @@ mod tests {
         let session_id = "test-session".to_string();
         let executor = Arc::new(MockScriptExecutor);
 
-        let kernel = IntegratedKernel::new(
+        let kernel = IntegratedKernel::new(IntegratedKernelParams {
             protocol,
             config,
             session_id,
-            executor,
-            None,
-            create_test_session_manager().await,
-        )
+            script_executor: executor,
+            provider_manager: None,
+            session_manager: create_test_session_manager().await,
+            memory_manager: None,
+            hook_system: None,
+        })
         .await
         .unwrap();
 
@@ -3923,7 +4661,7 @@ mod tests {
 /// Helper to create a test `SessionManager` with minimal infrastructure (module-level for all tests)
 #[cfg(test)]
 async fn create_test_session_manager() -> Arc<crate::sessions::SessionManager> {
-    let state_manager = Arc::new(crate::state::StateManager::new().await.unwrap());
+    let state_manager = Arc::new(crate::state::StateManager::new(None).await.unwrap());
     let session_storage_backend = Arc::new(llmspell_storage::MemoryBackend::new());
     let hook_registry = Arc::new(llmspell_hooks::HookRegistry::new());
     let hook_executor = Arc::new(llmspell_hooks::HookExecutor::new());
@@ -3957,14 +4695,16 @@ async fn test_message_handling_performance() -> Result<()> {
     let session_id = "test-session".to_string();
     let script_executor = Arc::new(tests::MockScriptExecutor) as Arc<dyn ScriptExecutor>;
 
-    let mut kernel = IntegratedKernel::new(
+    let mut kernel = IntegratedKernel::new(IntegratedKernelParams {
         protocol,
         config,
         session_id,
         script_executor,
-        None,
-        create_test_session_manager().await,
-    )
+        provider_manager: None,
+        session_manager: create_test_session_manager().await,
+        memory_manager: None,
+        hook_system: None,
+    })
     .await?;
 
     // Create a simple kernel_info_request message (faster than execute_request)
@@ -4068,14 +4808,16 @@ mod daemon_tests {
             "test-kernel".to_string(),
         );
 
-        let mut kernel = IntegratedKernel::new(
+        let mut kernel = IntegratedKernel::new(IntegratedKernelParams {
             protocol,
             config,
-            "test-session".to_string(),
+            session_id: "test-session".to_string(),
             script_executor,
-            None,
-            create_test_session_manager().await,
-        )
+            provider_manager: None,
+            session_manager: create_test_session_manager().await,
+            memory_manager: None,
+            hook_system: None,
+        })
         .await
         .unwrap();
 
@@ -4097,14 +4839,16 @@ mod daemon_tests {
             "test-kernel".to_string(),
         );
 
-        let mut kernel = IntegratedKernel::new(
+        let mut kernel = IntegratedKernel::new(IntegratedKernelParams {
             protocol,
             config,
-            "test-session".to_string(),
+            session_id: "test-session".to_string(),
             script_executor,
-            None,
-            create_test_session_manager().await,
-        )
+            provider_manager: None,
+            session_manager: create_test_session_manager().await,
+            memory_manager: None,
+            hook_system: None,
+        })
         .await
         .unwrap();
 
@@ -4132,14 +4876,16 @@ mod daemon_tests {
             "test-kernel".to_string(),
         );
 
-        let kernel = IntegratedKernel::new(
+        let kernel = IntegratedKernel::new(IntegratedKernelParams {
             protocol,
             config,
-            "test-session".to_string(),
+            session_id: "test-session".to_string(),
             script_executor,
-            None,
-            create_test_session_manager().await,
-        )
+            provider_manager: None,
+            session_manager: create_test_session_manager().await,
+            memory_manager: None,
+            hook_system: None,
+        })
         .await
         .unwrap();
 
@@ -4217,14 +4963,16 @@ mod daemon_tests {
             "test-kernel".to_string(),
         );
 
-        let kernel = IntegratedKernel::new(
+        let kernel = IntegratedKernel::new(IntegratedKernelParams {
             protocol,
             config,
-            "test-session".to_string(),
+            session_id: "test-session".to_string(),
             script_executor,
-            None,
-            create_test_session_manager().await,
-        )
+            provider_manager: None,
+            session_manager: create_test_session_manager().await,
+            memory_manager: None,
+            hook_system: None,
+        })
         .await
         .unwrap();
 
@@ -4249,14 +4997,16 @@ mod multi_protocol_tests {
             "coexist-kernel".to_string(),
         );
 
-        let mut kernel = IntegratedKernel::new(
-            protocol.clone(),
-            config.clone(),
-            "coexist-test".to_string(),
-            script_executor.clone(),
-            None,
-            create_test_session_manager().await,
-        )
+        let mut kernel = IntegratedKernel::new(IntegratedKernelParams {
+            protocol: protocol.clone(),
+            config: config.clone(),
+            session_id: "coexist-test".to_string(),
+            script_executor: script_executor.clone(),
+            provider_manager: None,
+            session_manager: create_test_session_manager().await,
+            memory_manager: None,
+            hook_system: None,
+        })
         .await
         .unwrap();
 
@@ -4290,14 +5040,16 @@ mod multi_protocol_tests {
             "switch-kernel".to_string(),
         );
 
-        let mut kernel = IntegratedKernel::new(
-            jupyter_protocol,
-            config.clone(),
-            "switch-test".to_string(),
-            script_executor.clone(),
-            None,
-            create_test_session_manager().await,
-        )
+        let mut kernel = IntegratedKernel::new(IntegratedKernelParams {
+            protocol: jupyter_protocol,
+            config: config.clone(),
+            session_id: "switch-test".to_string(),
+            script_executor: script_executor.clone(),
+            provider_manager: None,
+            session_manager: create_test_session_manager().await,
+            memory_manager: None,
+            hook_system: None,
+        })
         .await
         .unwrap();
 
@@ -4332,25 +5084,29 @@ mod multi_protocol_tests {
             "kernel2".to_string(),
         );
 
-        let kernel1 = IntegratedKernel::new(
-            protocol1,
-            config.clone(),
-            "iso1".to_string(),
-            script_executor.clone(),
-            None,
-            create_test_session_manager().await,
-        )
+        let kernel1 = IntegratedKernel::new(IntegratedKernelParams {
+            protocol: protocol1,
+            config: config.clone(),
+            session_id: "iso1".to_string(),
+            script_executor: script_executor.clone(),
+            provider_manager: None,
+            session_manager: create_test_session_manager().await,
+            memory_manager: None,
+            hook_system: None,
+        })
         .await
         .unwrap();
 
-        let kernel2 = IntegratedKernel::new(
-            protocol2,
+        let kernel2 = IntegratedKernel::new(IntegratedKernelParams {
+            protocol: protocol2,
             config,
-            "iso2".to_string(),
+            session_id: "iso2".to_string(),
             script_executor,
-            None,
-            create_test_session_manager().await,
-        )
+            provider_manager: None,
+            session_manager: create_test_session_manager().await,
+            memory_manager: None,
+            hook_system: None,
+        })
         .await
         .unwrap();
 
@@ -4370,14 +5126,16 @@ mod multi_protocol_tests {
         );
 
         let kernel = Arc::new(tokio::sync::Mutex::new(
-            IntegratedKernel::new(
+            IntegratedKernel::new(IntegratedKernelParams {
                 protocol,
                 config,
-                "concurrent-test".to_string(),
-                script_executor.clone(),
-                None,
-                create_test_session_manager().await,
-            )
+                session_id: "concurrent-test".to_string(),
+                script_executor: script_executor.clone(),
+                provider_manager: None,
+                session_manager: create_test_session_manager().await,
+                memory_manager: None,
+                hook_system: None,
+            })
             .await
             .unwrap(),
         ));
@@ -4422,14 +5180,16 @@ mod multi_protocol_tests {
             "error-kernel".to_string(),
         );
 
-        let mut kernel = IntegratedKernel::new(
+        let mut kernel = IntegratedKernel::new(IntegratedKernelParams {
             protocol,
             config,
-            "error-test".to_string(),
-            script_executor.clone(),
-            None,
-            create_test_session_manager().await,
-        )
+            session_id: "error-test".to_string(),
+            script_executor: script_executor.clone(),
+            provider_manager: None,
+            session_manager: create_test_session_manager().await,
+            memory_manager: None,
+            hook_system: None,
+        })
         .await
         .unwrap();
 
@@ -4458,14 +5218,16 @@ mod multi_protocol_tests {
             "state-kernel".to_string(),
         );
 
-        let mut kernel = IntegratedKernel::new(
-            protocol.clone(),
+        let mut kernel = IntegratedKernel::new(IntegratedKernelParams {
+            protocol: protocol.clone(),
             config,
-            "state-test".to_string(),
-            script_executor.clone(),
-            None,
-            create_test_session_manager().await,
-        )
+            session_id: "state-test".to_string(),
+            script_executor: script_executor.clone(),
+            provider_manager: None,
+            session_manager: create_test_session_manager().await,
+            memory_manager: None,
+            hook_system: None,
+        })
         .await
         .unwrap();
 
@@ -4498,14 +5260,16 @@ mod multi_protocol_tests {
             "share-kernel".to_string(),
         );
 
-        let kernel = IntegratedKernel::new(
-            jupyter_protocol,
+        let kernel = IntegratedKernel::new(IntegratedKernelParams {
+            protocol: jupyter_protocol,
             config,
-            "share-test".to_string(),
-            script_executor.clone(),
-            None,
-            create_test_session_manager().await,
-        )
+            session_id: "share-test".to_string(),
+            script_executor: script_executor.clone(),
+            provider_manager: None,
+            session_manager: create_test_session_manager().await,
+            memory_manager: None,
+            hook_system: None,
+        })
         .await
         .unwrap();
 
@@ -4537,14 +5301,16 @@ mod performance_tests {
             "perf-kernel".to_string(),
         );
 
-        let mut kernel = IntegratedKernel::new(
+        let mut kernel = IntegratedKernel::new(IntegratedKernelParams {
             protocol,
             config,
-            "perf-test".to_string(),
+            session_id: "perf-test".to_string(),
             script_executor,
-            None,
-            create_test_session_manager().await,
-        )
+            provider_manager: None,
+            session_manager: create_test_session_manager().await,
+            memory_manager: None,
+            hook_system: None,
+        })
         .await
         .unwrap();
 
@@ -4630,14 +5396,16 @@ mod performance_tests {
             "mem-kernel".to_string(),
         );
 
-        let kernel = IntegratedKernel::new(
+        let kernel = IntegratedKernel::new(IntegratedKernelParams {
             protocol,
-            config.clone(),
-            "mem-test".to_string(),
-            script_executor.clone(),
-            None,
-            create_test_session_manager().await,
-        )
+            config: config.clone(),
+            session_id: "mem-test".to_string(),
+            script_executor: script_executor.clone(),
+            provider_manager: None,
+            session_manager: create_test_session_manager().await,
+            memory_manager: None,
+            hook_system: None,
+        })
         .await
         .unwrap();
 
@@ -4676,14 +5444,16 @@ mod performance_tests {
         );
 
         let kernel = Arc::new(tokio::sync::Mutex::new(
-            IntegratedKernel::new(
+            IntegratedKernel::new(IntegratedKernelParams {
                 protocol,
                 config,
-                "throughput-test".to_string(),
+                session_id: "throughput-test".to_string(),
                 script_executor,
-                None,
-                create_test_session_manager().await,
-            )
+                provider_manager: None,
+                session_manager: create_test_session_manager().await,
+                memory_manager: None,
+                hook_system: None,
+            })
             .await
             .unwrap(),
         ));
@@ -4732,14 +5502,16 @@ mod performance_tests {
             "state-perf-kernel".to_string(),
         );
 
-        let mut kernel = IntegratedKernel::new(
+        let mut kernel = IntegratedKernel::new(IntegratedKernelParams {
             protocol,
             config,
-            "state-perf-test".to_string(),
+            session_id: "state-perf-test".to_string(),
             script_executor,
-            None,
-            create_test_session_manager().await,
-        )
+            provider_manager: None,
+            session_manager: create_test_session_manager().await,
+            memory_manager: None,
+            hook_system: None,
+        })
         .await
         .unwrap();
 
@@ -4775,14 +5547,16 @@ mod performance_tests {
             "timeout-kernel".to_string(),
         );
 
-        let mut kernel = IntegratedKernel::new(
+        let mut kernel = IntegratedKernel::new(IntegratedKernelParams {
             protocol,
             config,
-            "timeout-test".to_string(),
+            session_id: "timeout-test".to_string(),
             script_executor,
-            None,
-            create_test_session_manager().await,
-        )
+            provider_manager: None,
+            session_manager: create_test_session_manager().await,
+            memory_manager: None,
+            hook_system: None,
+        })
         .await
         .unwrap();
 
@@ -4876,14 +5650,16 @@ mod security_tests {
             "validation-kernel".to_string(),
         );
 
-        let mut kernel = IntegratedKernel::new(
+        let mut kernel = IntegratedKernel::new(IntegratedKernelParams {
             protocol,
             config,
-            "validation-test".to_string(),
+            session_id: "validation-test".to_string(),
             script_executor,
-            None,
-            create_test_session_manager().await,
-        )
+            provider_manager: None,
+            session_manager: create_test_session_manager().await,
+            memory_manager: None,
+            hook_system: None,
+        })
         .await
         .unwrap();
 
@@ -5021,14 +5797,16 @@ mod security_tests {
             "sanitize-kernel".to_string(),
         );
 
-        let mut kernel = IntegratedKernel::new(
+        let mut kernel = IntegratedKernel::new(IntegratedKernelParams {
             protocol,
             config,
-            "sanitize-test".to_string(),
+            session_id: "sanitize-test".to_string(),
             script_executor,
-            None,
-            create_test_session_manager().await,
-        )
+            provider_manager: None,
+            session_manager: create_test_session_manager().await,
+            memory_manager: None,
+            hook_system: None,
+        })
         .await
         .unwrap();
 
@@ -5077,14 +5855,16 @@ mod security_tests {
             "limits-kernel".to_string(),
         );
 
-        let mut kernel = IntegratedKernel::new(
+        let mut kernel = IntegratedKernel::new(IntegratedKernelParams {
             protocol,
             config,
-            "limits-test".to_string(),
+            session_id: "limits-test".to_string(),
             script_executor,
-            None,
-            create_test_session_manager().await,
-        )
+            provider_manager: None,
+            session_manager: create_test_session_manager().await,
+            memory_manager: None,
+            hook_system: None,
+        })
         .await
         .unwrap();
 
@@ -5130,14 +5910,16 @@ mod security_tests {
             "isolation-kernel".to_string(),
         );
 
-        let kernel = IntegratedKernel::new(
+        let kernel = IntegratedKernel::new(IntegratedKernelParams {
             protocol,
             config,
-            "isolation-test".to_string(),
+            session_id: "isolation-test".to_string(),
             script_executor,
-            None,
-            create_test_session_manager().await,
-        )
+            provider_manager: None,
+            session_manager: create_test_session_manager().await,
+            memory_manager: None,
+            hook_system: None,
+        })
         .await
         .unwrap();
 
@@ -5165,7 +5947,7 @@ mod security_tests {
         assert!(
             kernel.validate_message_for_channel(
                 "control",
-                &json!({"msg_type": "shutdown_request", "content": {"restart": false}})
+                &json!({"msg_type": "shutdown_request", "content": {"restart": false}}),
             ),
             "Control channel should accept control messages"
         );

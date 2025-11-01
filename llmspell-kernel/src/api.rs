@@ -365,6 +365,200 @@ impl KernelHandle {
         }
     }
 
+    /// Send memory request and wait for response (Phase 13.12.1)
+    ///
+    /// This sends a memory operation request to the kernel and waits for the reply.
+    /// Used by CLI memory commands to interact with the memory system via the kernel.
+    ///
+    /// # Arguments
+    /// * `content` - The memory request content (command, parameters)
+    ///
+    /// # Returns
+    /// The memory reply content as JSON value
+    ///
+    /// # Errors
+    /// Returns error if transport fails or response is invalid
+    pub async fn send_memory_request(
+        &mut self,
+        content: serde_json::Value,
+    ) -> Result<serde_json::Value> {
+        debug!("Sending memory request to kernel {}", self.kernel_id);
+
+        // Create memory_request message
+        let request = self.protocol.create_request("memory_request", content)?;
+
+        debug!(
+            "Sending memory_request on shell channel, message size: {}",
+            request.len()
+        );
+
+        // Send request through transport
+        self.transport.send("shell", vec![request]).await?;
+
+        // Wait for memory_reply
+        let start_time = std::time::Instant::now();
+        let timeout = std::time::Duration::from_secs(300);
+
+        loop {
+            if start_time.elapsed() > timeout {
+                return Err(anyhow::anyhow!("Timeout waiting for memory_reply"));
+            }
+
+            if let Some(reply_parts) = self.transport.recv("shell").await? {
+                trace!(
+                    "Client received {} parts on shell channel",
+                    reply_parts.len()
+                );
+
+                // Handle multipart Jupyter wire protocol format
+                let delimiter = b"<IDS|MSG>";
+                let delimiter_idx = reply_parts
+                    .iter()
+                    .position(|part| part.as_slice() == delimiter);
+
+                let reply_msg: HashMap<String, serde_json::Value> = if let Some(idx) = delimiter_idx
+                {
+                    // Parse multipart message (header at idx+2, content at idx+5)
+                    if reply_parts.len() > idx + 5 {
+                        let header =
+                            serde_json::from_slice::<serde_json::Value>(&reply_parts[idx + 2])?;
+                        let content_data =
+                            serde_json::from_slice::<serde_json::Value>(&reply_parts[idx + 5])?;
+
+                        let mut msg = HashMap::new();
+                        msg.insert("header".to_string(), header);
+                        msg.insert("content".to_string(), content_data);
+                        msg
+                    } else {
+                        continue; // Incomplete message, wait for next
+                    }
+                } else if let Some(first_part) = reply_parts.first() {
+                    // Try parsing as simple JSON message for backward compatibility
+                    match self.protocol.parse_message(first_part) {
+                        Ok(msg) => msg,
+                        Err(_) => continue, // Not a valid message, wait for next
+                    }
+                } else {
+                    continue; // No parts, wait for next
+                };
+
+                // Check if this is a memory_reply
+                if let Some(header) = reply_msg.get("header") {
+                    if let Some(msg_type) = header.get("msg_type") {
+                        if msg_type == "memory_reply" {
+                            // Extract and return the content's content field
+                            if let Some(content_wrapper) = reply_msg.get("content") {
+                                // The content contains the actual response nested in a "content" field
+                                if let Some(actual_content) = content_wrapper.get("content") {
+                                    return Ok(actual_content.clone());
+                                }
+                                return Ok(content_wrapper.clone());
+                            }
+                        }
+                    }
+                }
+            }
+            tokio::time::sleep(tokio::time::Duration::from_millis(10)).await;
+        }
+    }
+
+    /// Send context request and wait for response (Phase 13.12.3)
+    ///
+    /// This sends a context operation request to the kernel and waits for the reply.
+    /// Used by CLI context commands to interact with the context assembly system.
+    ///
+    /// # Arguments
+    /// * `content` - The context request content (command, parameters)
+    ///
+    /// # Returns
+    /// The context reply content as JSON value
+    ///
+    /// # Errors
+    /// Returns error if transport fails or response is invalid
+    pub async fn send_context_request(
+        &mut self,
+        content: serde_json::Value,
+    ) -> Result<serde_json::Value> {
+        debug!("Sending context request to kernel {}", self.kernel_id);
+
+        // Create context_request message
+        let request = self.protocol.create_request("context_request", content)?;
+
+        debug!(
+            "Sending context_request on shell channel, message size: {}",
+            request.len()
+        );
+
+        // Send request through transport
+        self.transport.send("shell", vec![request]).await?;
+
+        // Wait for context_reply
+        let start_time = std::time::Instant::now();
+        let timeout = std::time::Duration::from_secs(300);
+
+        loop {
+            if start_time.elapsed() > timeout {
+                return Err(anyhow::anyhow!("Timeout waiting for context_reply"));
+            }
+
+            if let Some(reply_parts) = self.transport.recv("shell").await? {
+                trace!(
+                    "Client received {} parts on shell channel",
+                    reply_parts.len()
+                );
+
+                // Handle multipart Jupyter wire protocol format
+                let delimiter = b"<IDS|MSG>";
+                let delimiter_idx = reply_parts
+                    .iter()
+                    .position(|part| part.as_slice() == delimiter);
+
+                let reply_msg: HashMap<String, serde_json::Value> = if let Some(idx) = delimiter_idx
+                {
+                    // Parse multipart message (header at idx+2, content at idx+5)
+                    if reply_parts.len() > idx + 5 {
+                        let header =
+                            serde_json::from_slice::<serde_json::Value>(&reply_parts[idx + 2])?;
+                        let content_data =
+                            serde_json::from_slice::<serde_json::Value>(&reply_parts[idx + 5])?;
+
+                        let mut msg = HashMap::new();
+                        msg.insert("header".to_string(), header);
+                        msg.insert("content".to_string(), content_data);
+                        msg
+                    } else {
+                        continue; // Incomplete message, wait for next
+                    }
+                } else if let Some(first_part) = reply_parts.first() {
+                    // Try parsing as simple JSON message for backward compatibility
+                    match self.protocol.parse_message(first_part) {
+                        Ok(msg) => msg,
+                        Err(_) => continue, // Not a valid message, wait for next
+                    }
+                } else {
+                    continue; // No parts, wait for next
+                };
+
+                // Check if this is a context_reply
+                if let Some(header) = reply_msg.get("header") {
+                    if let Some(msg_type) = header.get("msg_type") {
+                        if msg_type == "context_reply" {
+                            // Extract and return the content's content field
+                            if let Some(content_wrapper) = reply_msg.get("content") {
+                                // The content contains the actual response nested in a "content" field
+                                if let Some(actual_content) = content_wrapper.get("content") {
+                                    return Ok(actual_content.clone());
+                                }
+                                return Ok(content_wrapper.clone());
+                            }
+                        }
+                    }
+                }
+            }
+            tokio::time::sleep(tokio::time::Duration::from_millis(10)).await;
+        }
+    }
+
     /// Get the kernel ID
     pub fn kernel_id(&self) -> &str {
         &self.kernel_id
@@ -679,6 +873,174 @@ impl ClientHandle {
         }
     }
 
+    /// Send a memory request to the remote kernel and return the response
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the request fails or communication with kernel fails
+    pub async fn send_memory_request(
+        &mut self,
+        content: serde_json::Value,
+    ) -> Result<serde_json::Value> {
+        debug!("Sending memory request to remote kernel");
+
+        // Create memory_request message
+        let request = self.protocol.create_request("memory_request", content)?;
+
+        // Send request through transport
+        self.transport.send("shell", vec![request]).await?;
+
+        // Wait for memory_reply
+        let start_time = std::time::Instant::now();
+        let timeout = std::time::Duration::from_secs(300);
+
+        loop {
+            if start_time.elapsed() > timeout {
+                return Err(anyhow::anyhow!("Timeout waiting for memory_reply"));
+            }
+
+            if let Some(reply_parts) = self.transport.recv("shell").await? {
+                trace!(
+                    "Client received {} parts on shell channel",
+                    reply_parts.len()
+                );
+
+                // Handle multipart Jupyter wire protocol format
+                let delimiter = b"<IDS|MSG>";
+                let delimiter_idx = reply_parts
+                    .iter()
+                    .position(|part| part.as_slice() == delimiter);
+
+                let reply_msg: HashMap<String, serde_json::Value> = if let Some(idx) = delimiter_idx
+                {
+                    // Parse multipart message (header at idx+2, content at idx+5)
+                    if reply_parts.len() > idx + 5 {
+                        let header =
+                            serde_json::from_slice::<serde_json::Value>(&reply_parts[idx + 2])?;
+                        let content =
+                            serde_json::from_slice::<serde_json::Value>(&reply_parts[idx + 5])?;
+
+                        let mut msg = HashMap::new();
+                        msg.insert("header".to_string(), header);
+                        msg.insert("content".to_string(), content);
+                        msg
+                    } else {
+                        continue; // Incomplete message, wait for next
+                    }
+                } else if let Some(first_part) = reply_parts.first() {
+                    // Try parsing as simple JSON message for backward compatibility
+                    match self.protocol.parse_message(first_part) {
+                        Ok(msg) => msg,
+                        Err(_) => continue, // Not a valid message, wait for next
+                    }
+                } else {
+                    continue; // No parts, wait for next
+                };
+
+                // Check if this is a memory_reply
+                if let Some(header) = reply_msg.get("header") {
+                    if let Some(msg_type) = header.get("msg_type") {
+                        if msg_type == "memory_reply" {
+                            // Extract and return the content's content field
+                            if let Some(content_wrapper) = reply_msg.get("content") {
+                                // The content contains the actual response nested in a "content" field
+                                if let Some(actual_content) = content_wrapper.get("content") {
+                                    return Ok(actual_content.clone());
+                                }
+                                return Ok(content_wrapper.clone());
+                            }
+                        }
+                    }
+                }
+            }
+            tokio::time::sleep(tokio::time::Duration::from_millis(10)).await;
+        }
+    }
+
+    /// Send a context request to the remote kernel and return the response
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the request fails or communication with kernel fails
+    pub async fn send_context_request(
+        &mut self,
+        content: serde_json::Value,
+    ) -> Result<serde_json::Value> {
+        debug!("Sending context request to remote kernel");
+
+        // Create context_request message
+        let request = self.protocol.create_request("context_request", content)?;
+
+        // Send request through transport
+        self.transport.send("shell", vec![request]).await?;
+
+        // Wait for context_reply
+        let start_time = std::time::Instant::now();
+        let timeout = std::time::Duration::from_secs(300);
+
+        loop {
+            if start_time.elapsed() > timeout {
+                return Err(anyhow::anyhow!("Timeout waiting for context_reply"));
+            }
+
+            if let Some(reply_parts) = self.transport.recv("shell").await? {
+                trace!(
+                    "Client received {} parts on shell channel",
+                    reply_parts.len()
+                );
+
+                // Handle multipart Jupyter wire protocol format
+                let delimiter = b"<IDS|MSG>";
+                let delimiter_idx = reply_parts
+                    .iter()
+                    .position(|part| part.as_slice() == delimiter);
+
+                let reply_msg: HashMap<String, serde_json::Value> = if let Some(idx) = delimiter_idx
+                {
+                    // Parse multipart message (header at idx+2, content at idx+5)
+                    if reply_parts.len() > idx + 5 {
+                        let header =
+                            serde_json::from_slice::<serde_json::Value>(&reply_parts[idx + 2])?;
+                        let content =
+                            serde_json::from_slice::<serde_json::Value>(&reply_parts[idx + 5])?;
+
+                        let mut msg = HashMap::new();
+                        msg.insert("header".to_string(), header);
+                        msg.insert("content".to_string(), content);
+                        msg
+                    } else {
+                        continue; // Incomplete message, wait for next
+                    }
+                } else if let Some(first_part) = reply_parts.first() {
+                    // Try parsing as simple JSON message for backward compatibility
+                    match self.protocol.parse_message(first_part) {
+                        Ok(msg) => msg,
+                        Err(_) => continue, // Not a valid message, wait for next
+                    }
+                } else {
+                    continue; // No parts, wait for next
+                };
+
+                // Check if this is a context_reply
+                if let Some(header) = reply_msg.get("header") {
+                    if let Some(msg_type) = header.get("msg_type") {
+                        if msg_type == "context_reply" {
+                            // Extract and return the content's content field
+                            if let Some(content_wrapper) = reply_msg.get("content") {
+                                // The content contains the actual response nested in a "content" field
+                                if let Some(actual_content) = content_wrapper.get("content") {
+                                    return Ok(actual_content.clone());
+                                }
+                                return Ok(content_wrapper.clone());
+                            }
+                        }
+                    }
+                }
+            }
+            tokio::time::sleep(tokio::time::Duration::from_millis(10)).await;
+        }
+    }
+
     /// Run interactive REPL connected to the kernel
     ///
     /// # Errors
@@ -740,7 +1102,7 @@ pub async fn start_embedded_kernel_with_executor(
     let provider_manager = create_provider_manager(&config).await?;
 
     // Create SessionManager
-    let state_manager = Arc::new(crate::state::StateManager::new().await?);
+    let state_manager = Arc::new(crate::state::StateManager::new(None).await?);
     let session_storage_backend = Arc::new(llmspell_storage::MemoryBackend::new());
     let hook_registry = Arc::new(llmspell_hooks::HookRegistry::new());
     let hook_executor = Arc::new(llmspell_hooks::HookExecutor::new());
@@ -902,7 +1264,7 @@ pub async fn start_embedded_kernel_with_infrastructure(
 pub async fn start_embedded_kernel(config: LLMSpellConfig) -> Result<KernelHandle> {
     // Create minimal infrastructure
     let provider_manager = create_provider_manager(&config).await?;
-    let state_manager = Arc::new(crate::state::StateManager::new().await?);
+    let state_manager = Arc::new(crate::state::StateManager::new(None).await?);
     let session_storage_backend = Arc::new(llmspell_storage::MemoryBackend::new());
     let hook_registry = Arc::new(llmspell_hooks::HookRegistry::new());
     let hook_executor = Arc::new(llmspell_hooks::HookExecutor::new());
@@ -1020,14 +1382,16 @@ async fn start_embedded_kernel_with_executor_and_provider_internal(
     let session_manager_clone = session_manager.clone();
 
     // Create integrated kernel with the provided executor and shared SessionManager
-    let mut kernel = IntegratedKernel::new(
-        protocol.clone(),
-        exec_config.clone(),
-        session_id.clone(),
+    let mut kernel = IntegratedKernel::new(crate::execution::IntegratedKernelParams {
+        protocol: protocol.clone(),
+        config: exec_config.clone(),
+        session_id: session_id.clone(),
         script_executor,
-        Some(provider_manager),
+        provider_manager: Some(provider_manager),
         session_manager,
-    )
+        memory_manager: None, // memory_manager (Phase 13.7.1 - opt-in)
+        hook_system: None,    // hook_system (Phase 13.7.3a - opt-in)
+    })
     .await?;
 
     // Set kernel transport for kernel message processing
@@ -1050,14 +1414,16 @@ async fn start_embedded_kernel_with_executor_and_provider_internal(
     // For embedded mode, create a minimal kernel handle that only contains what's needed for message sending
     // The actual kernel is running in the background spawn
     // IMPORTANT: Use the same shared SessionManager - DO NOT create a new one!
-    let dummy_kernel = IntegratedKernel::new(
-        protocol.clone(),
-        exec_config.clone(),
-        format!("dummy-{session_id}"),
-        script_executor_clone,
-        Some(provider_manager_clone),
-        session_manager_clone,
-    )
+    let dummy_kernel = IntegratedKernel::new(crate::execution::IntegratedKernelParams {
+        protocol: protocol.clone(),
+        config: exec_config.clone(),
+        session_id: format!("dummy-{session_id}"),
+        script_executor: script_executor_clone,
+        provider_manager: Some(provider_manager_clone),
+        session_manager: session_manager_clone,
+        memory_manager: None, // memory_manager (Phase 13.7.1 - opt-in)
+        hook_system: None,    // hook_system (Phase 13.7.3a - opt-in)
+    })
     .await?;
 
     let transport_arc = Arc::new(client_transport);
@@ -1305,7 +1671,7 @@ pub async fn start_kernel_service_with_config(
     info!("Transport setup complete");
 
     // Create SessionManager for this service kernel
-    let state_manager = Arc::new(crate::state::StateManager::new().await?);
+    let state_manager = Arc::new(crate::state::StateManager::new(None).await?);
     let session_storage_backend = Arc::new(llmspell_storage::MemoryBackend::new());
     let hook_registry = Arc::new(llmspell_hooks::HookRegistry::new());
     let hook_executor = Arc::new(llmspell_hooks::HookExecutor::new());
@@ -1329,14 +1695,16 @@ pub async fn start_kernel_service_with_config(
     let _session_id_obj = session_manager.create_session(session_options).await?;
 
     // Create integrated kernel with protocol that has the HMAC key
-    let mut kernel = IntegratedKernel::new(
-        protocol.clone(),
-        config.exec_config.clone(),
+    let mut kernel = IntegratedKernel::new(crate::execution::IntegratedKernelParams {
+        protocol: protocol.clone(),
+        config: config.exec_config.clone(),
         session_id,
-        config.script_executor,
-        None,
+        script_executor: config.script_executor,
+        provider_manager: None,
         session_manager,
-    )
+        memory_manager: None, // memory_manager (Phase 13.7.1 - opt-in)
+        hook_system: None,    // hook_system (Phase 13.7.3a - opt-in)
+    })
     .await?;
 
     // Set the transport on the kernel
@@ -1663,7 +2031,7 @@ pub async fn start_kernel_service(port: u16, config: LLMSpellConfig) -> Result<S
     }) as Arc<dyn ScriptExecutor>;
 
     // Create SessionManager for this service kernel (legacy function)
-    let state_manager = Arc::new(crate::state::StateManager::new().await?);
+    let state_manager = Arc::new(crate::state::StateManager::new(None).await?);
     let session_storage_backend = Arc::new(llmspell_storage::MemoryBackend::new());
     let hook_registry = Arc::new(llmspell_hooks::HookRegistry::new());
     let hook_executor = Arc::new(llmspell_hooks::HookExecutor::new());
@@ -1687,14 +2055,16 @@ pub async fn start_kernel_service(port: u16, config: LLMSpellConfig) -> Result<S
     let _session_id_obj = session_manager.create_session(session_options).await?;
 
     // Create integrated kernel
-    let kernel = IntegratedKernel::new(
+    let kernel = IntegratedKernel::new(crate::execution::IntegratedKernelParams {
         protocol,
-        exec_config,
+        config: exec_config,
         session_id,
         script_executor,
-        None,
+        provider_manager: None,
         session_manager,
-    )
+        memory_manager: None, // memory_manager (Phase 13.7.1 - opt-in)
+        hook_system: None,    // hook_system (Phase 13.7.3a - opt-in)
+    })
     .await?;
     // Note: Service kernels don't need transport set here as they use external connections
 

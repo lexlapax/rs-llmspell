@@ -620,9 +620,13 @@ mod tests {
         };
 
         Arc::new(
-            llmspell_kernel::state::StateManager::with_backend(StorageBackendType::Memory, config)
-                .await
-                .unwrap(),
+            llmspell_kernel::state::StateManager::with_backend(
+                StorageBackendType::Memory,
+                config,
+                None,
+            )
+            .await
+            .unwrap(),
         )
     }
     #[tokio::test]

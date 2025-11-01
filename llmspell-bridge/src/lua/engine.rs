@@ -733,6 +733,7 @@ mod tests {
             self.breakpoints.write().push((file.to_string(), line));
         }
 
+        #[allow(dead_code)]
         fn resume(&self) {
             let mut resumed = self.resume_mutex.lock().unwrap();
             *resumed = true;
@@ -818,59 +819,9 @@ mod tests {
         fn set_step_mode(&self, _stepping: bool) {}
     }
 
-    #[tokio::test]
-    #[ignore = "Debug pausing requires complex async/sync coordination - deferred to Phase 10.10"]
-    async fn test_debug_hook_pausing() {
-        let config = LuaConfig::default();
-        let engine = LuaEngine::new(&config).unwrap();
-
-        // Create test debug context
-        let debug_ctx = Arc::new(TestDebugContext::new());
-        debug_ctx.enable_debug_mode();
-        // mlua reports source with the Rust file location for eval'd code
-        debug_ctx.add_breakpoint("llmspell-bridge/src/lua/engine.rs:200:65", 3);
-
-        // Set debug context
-        engine.set_debug_context(Some(debug_ctx.clone()));
-
-        // Script that will hit breakpoint at line 3
-        let script = r"
-            local x = 10  -- line 1
-            local y = 20  -- line 2 (breakpoint here - actually line 3)
-            return x + y  -- line 3
-        ";
-
-        // Execute script in background task
-        let engine = Arc::new(engine);
-        let engine_clone = engine.clone();
-        let script = script.to_string();
-        let handle = tokio::spawn(async move { engine_clone.execute_script(&script).await });
-
-        // Wait a bit for execution to hit breakpoint
-        tokio::time::sleep(Duration::from_millis(200)).await;
-
-        // Check that we're paused
-        let is_paused = debug_ctx.paused.load(Ordering::Relaxed);
-        let location = debug_ctx.current_location.read().clone();
-        debug!("Test: is_paused={}, location={:?}", is_paused, location);
-        assert!(is_paused, "Should be paused at breakpoint");
-
-        // Check location
-        let location = debug_ctx.current_location.read().clone();
-        assert_eq!(
-            location,
-            Some(("llmspell-bridge/src/lua/engine.rs:200:65".to_string(), 3))
-        );
-
-        // Resume execution
-        debug_ctx.resume();
-
-        // Wait for script to complete
-        let result = handle.await.unwrap().unwrap();
-
-        // Verify result
-        assert_eq!(result.output, serde_json::json!(30));
-    }
+    // NOTE: test_debug_hook_pausing removed - debug pausing requires Lua VM pause/resume
+    // which mlua doesn't support from hooks. Would need coroutine-based debugger (future work).
+    // Debug hooks DO work for location reporting (tested in test_debug_hook_lifecycle).
 
     #[tokio::test]
     async fn test_debug_hook_lifecycle() {

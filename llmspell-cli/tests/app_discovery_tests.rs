@@ -102,9 +102,18 @@ fn test_document_binary_size() {
             size_bytes, size_mb
         );
 
-        // Document for later comparison - now optimized to around 21MB after CLI app changes
+        // Document for later comparison
+        // Phase 11: ~21MB (base system)
+        // Phase 12: ~35MB (templates + multi-agent)
+        // Phase 13: ~66MB (memory + graph + context + local LLM + workflow-template delegation)
+        //   - Candle ML framework with Metal GPU support (~15MB)
+        //   - Tokenizers with embedded models (~10MB)
+        //   - RocksDB native bindings (~5MB)
+        //   - ZeroMQ native bindings (~3MB)
+        //   - Workflow-template delegation (Task 13.13) (~3MB)
+        // Threshold updated after Phase 13.13 completion (workflow-template delegation)
         assert!(size_bytes > 15_000_000, "Expected binary > 15MB");
-        assert!(size_bytes < 30_000_000, "Expected binary < 30MB");
+        assert!(size_bytes < 75_000_000, "Expected binary < 75MB");
     } else {
         println!("BASELINE: Release binary not found - cannot measure current size");
     }

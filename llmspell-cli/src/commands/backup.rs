@@ -141,7 +141,7 @@ async fn initialize_backup_infrastructure(
 
     // Create state manager with memory backend
     let state_manager = Arc::new(
-        StateManager::with_backend(StorageBackendType::Memory, Default::default())
+        StateManager::with_backend(StorageBackendType::Memory, Default::default(), None)
             .await
             .context("Failed to create state manager")?,
     );
@@ -647,7 +647,7 @@ async fn handle_show_backup(
     output_format: OutputFormat,
 ) -> Result<()> {
     // Backup functionality not yet fully implemented
-    // let state_manager = Arc::new(StateManager::new().await?);
+    // let state_manager = Arc::new(StateManager::new(None).await?);
     // let backup_manager = BackupManager::new(backup_config, state_manager.clone())?;
 
     // Backup functionality not yet fully implemented

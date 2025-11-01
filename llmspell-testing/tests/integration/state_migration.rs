@@ -26,7 +26,7 @@ async fn test_complex_schema_migration() {
         ..Default::default()
     };
     let _state_manager = Arc::new(
-        StateManager::with_backend(StorageBackendType::Memory, config)
+        StateManager::with_backend(StorageBackendType::Memory, config, None)
             .await
             .unwrap(),
     );
@@ -517,7 +517,7 @@ async fn test_transformation_error_handling() {
         ..Default::default()
     };
     let state_manager = Arc::new(
-        StateManager::with_backend(StorageBackendType::Memory, config)
+        StateManager::with_backend(StorageBackendType::Memory, config, None)
             .await
             .unwrap(),
     );
@@ -753,7 +753,7 @@ async fn test_concurrent_migration_safety() {
         ..Default::default()
     };
     let state_manager = Arc::new(
-        StateManager::with_backend(StorageBackendType::Memory, config)
+        StateManager::with_backend(StorageBackendType::Memory, config, None)
             .await
             .unwrap(),
     );

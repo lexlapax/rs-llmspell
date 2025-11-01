@@ -10,7 +10,7 @@
 
 ## Overview
 
-Rs-LLMSpell follows a carefully structured 25+ phase implementation approach that prioritizes core functionality while building toward production readiness. Each phase has specific goals, components, and measurable success criteria. The roadmap includes Phase 9 for Interactive REPL and Debugging Infrastructure, Phase 10 for Service Integration & IDE Connectivity, Phase 11 for Local LLM Integration, Phase 11a for Bridge Consolidation, Phase 11b for Local LLM Cleanup & Configuration Consolidation, Phase 12 for Production-Ready AI Agent Templates, and Phase 13 for Adaptive Memory System, essential for agent intelligence.
+Rs-LLMSpell follows a carefully structured 25+ phase implementation approach that prioritizes core functionality while building toward production readiness. Each phase has specific goals, components, and measurable success criteria. The roadmap includes Phase 9 for Interactive REPL and Debugging Infrastructure, Phase 10 for Service Integration & IDE Connectivity, Phase 11 for Local LLM Integration, Phase 11a for Bridge Consolidation, Phase 11b for Local LLM Cleanup & Configuration Consolidation, Phase 12 for Experimental Infrastructure with Production-Quality Engineering AI Agent Templates, and Phase 13 for Adaptive Memory System, essential for agent intelligence.
 
 ### Phase Categories
 
@@ -430,7 +430,7 @@ Rs-LLMSpell follows a carefully structured 25+ phase implementation approach tha
 
 ### **Phase 7: Infrastructure Consolidation and Foundational Solidification (Weeks 23-29)**
 
-**Goal**: Consolidate and solidify all framework infrastructure to enable production-ready AI workflow orchestration at scale  
+**Goal**: Consolidate and solidify all framework infrastructure to enable experimental infrastructure with production-quality engineering AI workflow orchestration at scale  
 **Priority**: CRITICAL (Framework Foundation - Prerequisite for Production)
 **Dependencies**: Requires Phase 6 Session Management completion
 **Status**: Implementation Complete - Scope expanded from API polish to comprehensive infrastructure overhaul
@@ -1378,7 +1378,7 @@ Phase 11b addresses critical gaps discovered during Phase 11 implementation. Fix
 
 ---
 
-### **Phase 12: Production-Ready AI Agent Templates (Weeks 42-43)**
+### **Phase 12: Experimental Infrastructure with Production-Quality Engineering AI Agent Templates (Weeks 42-43)**
 
 **Goal**: Implement turn-key AI agent templates system enabling immediate layman usability
 **Priority**: CRITICAL (Adoption Baseline - Industry Standard Requirement)
@@ -1502,129 +1502,257 @@ Templates designed for Phase 13 memory enhancement:
 
 ---
 
-### **Phase 13: Adaptive Memory System (Weeks 44-48)**
+### **Phase 13: Adaptive Memory System + Context Engineering (Weeks 44-48)**
 
-**Goal**: Implement Adaptive Temporal Knowledge Graph (A-TKG) memory architecture with IDE visualization
-**Priority**: HIGH (Core AI Capability)
+**Goal**: Implement integrated memory architecture with context engineering pipeline for intelligent retrieval
+**Priority**: CRITICAL (Core AI Intelligence - 2025's #1 AI Skill)
+**Timeline**: 5 weeks (25 working days)
 **Dependencies**:
-- Phase 8: Vector Storage as foundation
-- Phase 10: IDE integration for memory visualization
-- Phase 11: Local LLM support for knowledge extraction
-**Research Foundation**: Based on Zep/Graphiti (94.8% DMR accuracy) and Mem0 (26% improvement over OpenAI)
+- Phase 8: Vector Storage (HNSW, embeddings)
+- Phase 10: IDE integration for visualization
+- Phase 11: Local LLM for consolidation
+- Phase 12: Templates ready for memory enhancement
+**Type**: ADVANCED AI (Memory + Context Engineering Integration)
+**Status**: DESIGN COMPLETE - Ready for Implementation
 
-**Memory Architecture Overview**:
-- **Working Memory**: Immediate session context (managed by `llmspell-state`)
-- **Episodic Memory**: Raw interactions indexed by vectors (built on Phase 8 `llmspell-rag`)
-- **Semantic Memory**: Temporal Knowledge Graph storing facts, entities, relationships
-- **Adaptive Consolidation**: LLM-driven memory management (add/update/delete logic)
+**Strategic Rationale**:
+Phase 13 addresses the "intelligence crisis" in AI systems: models degrade below 50% accuracy at 32k tokens despite 128k-1M context windows (context rot). Memory alone is insufficient - context engineering (2025's #1 AI skill per industry surveys) is required for effective retrieval. Integrated approach combines Zep/Graphiti bi-temporal knowledge graphs (94.8% DMR accuracy) with SELF-RAG context assembly (320% improvement) and Provence DeBERTa reranking (NDCG@10 >0.85).
 
-**Phase 12.1: Foundational Episodic Memory (Week 42)**:
-- Create `llmspell-memory` crate with core data structures
-- Implement `InteractionLog` and `MemoryItem` types
-- Integrate with `llmspell-events` for interaction capture
-- Asynchronous ingestion pipeline via hooks
-- Basic vector retrieval using Phase 8 infrastructure
-- Memory persistence via `llmspell-storage`
+**Architecture Overview**:
+- **3 New Crates**: `llmspell-memory` (3,500 LOC), `llmspell-graph` (2,800 LOC), `llmspell-context` (4,200 LOC)
+- **2 New Globals**: MemoryGlobal (17th), ContextGlobal (18th)
+- **19 New CLI Commands**: `llmspell memory *`, `llmspell context *`, `llmspell graph *`
+- **10 Crate Extensions**: 4,000 LOC across kernel, bridge, RAG, templates, etc.
+- **Zero Breaking Changes**: Opt-in design via `.with_memory()` / `enable_memory` parameter
 
-**Phase 12.2: Temporal Knowledge Graph Foundation (Weeks 43-44)**:
-- **New Crate: `llmspell-graph`**
-  - Bi-temporal data model (event time + ingestion time)
-  - Node/Edge structures with temporal validity intervals
-  - Entity resolution and deduplication
-  - Incremental graph updates without full rebuild
-- **Graph Storage Backend**:
-  - Embedded Rust solution (primary)
-  - Neo4j adapter (enterprise)
-  - Storage trait abstraction via `llmspell-storage`
-- **Knowledge Extraction Pipeline**:
-  - LLM-driven entity/relationship extraction
-  - Temporal information parsing
-  - Contradiction detection and resolution
+**Memory Layer (3-Tier Architecture)**:
+- **Episodic Memory**: Vector-indexed interactions with temporal metadata (ChromaDB/Qdrant)
+- **Semantic Memory**: Bi-temporal knowledge graph (event_time + ingestion_time) using SurrealDB/Neo4j
+- **Procedural Memory**: Learned patterns and skills (successful prompt templates, retrieval strategies)
+- **LLM-Driven Consolidation**: ADD/UPDATE/DELETE/NOOP decisions (26% improvement over rule-based per Mem0)
 
-**Phase 12.3: Hybrid Retrieval System (Week 45)**:
-- **Memory Orchestrator** in `llmspell-memory`:
-  - Unified API for all memory types
-  - Query planning and routing logic
-  - Result fusion and re-ranking
-- **Hybrid Search Strategy**:
-  - Vector search for semantic similarity (episodic)
-  - Graph traversal for relationships (semantic)
-  - BM25 keyword search for exact matches
-  - Temporal filtering for point-in-time queries
-- **Performance Targets**:
-  - P95 latency <300ms (matching Zep benchmark)
-  - No LLM calls during retrieval
-  - Support for 1M+ memory items
+**Context Engineering Pipeline**:
+- **Query Understanding**: Intent classification, entity extraction, keyword detection
+- **Retrieval Strategy Selection**: Episodic vs semantic vs hybrid based on query type
+- **Reranking**: DeBERTa cross-encoder (Candle/ONNX) with BM25 fallback (50-80% compression)
+- **Context Assembly**: 2000-token context in <100ms P95 with DMR >90%, NDCG@10 >0.85
 
-**Phase 12.4: Adaptive Consolidation (Week 45)**:
-- **Memory Consolidation Pipeline** (Mem0-inspired):
-  - Periodic review of memory items
-  - LLM-driven decisions: Add/Update/Delete/Ignore
-  - Importance scoring based on usage patterns
-  - Conflict resolution for contradictions
-- **Episodic Summarization**:
-  - Compress old interactions into summaries
-  - Extract key facts into TKG
-  - Prune detailed events beyond threshold
-- **Adaptive Feedback Loops**:
-  - Track memory item usage via hooks
-  - Adjust importance scores based on outcomes
-  - Self-improving relevance ranking
+**Week 1: Foundation (Core Memory + Graph)**:
+- **Days 1-2: Memory Layer Foundation**
+  - `llmspell-memory` crate scaffold with MemoryManager trait
+  - EpisodicMemory with ChromaDB/Qdrant integration
+  - Vector indexing + semantic search (<50ms P95)
+  - Unit tests: 30+ tests for storage/retrieval
+- **Days 3-4: Temporal Knowledge Graph**
+  - `llmspell-graph` crate with bi-temporal schema
+  - SurrealDB/Neo4j integration (SQLite fallback)
+  - Entity/relationship extraction (regex-based v1, LLM v2)
+  - Unit tests: 20+ tests for graph operations
+- **Day 5: Integration Checkpoint**
+  - MemoryManager + KnowledgeGraph integration
+  - Consolidation engine stub (manual trigger)
+  - Architecture diagrams in ADR format
 
-**Phase 12.5: Integration and Polish (Week 46)**:
-- **Script API** (`MemoryGlobal`):
-  - `Memory.store()` - Store new memories
-  - `Memory.search()` - Semantic search
-  - `Memory.graphQuery()` - Graph traversal
-  - `Memory.buildContext()` - Unified context assembly
-- **Agent Integration**:
-  - Automatic memory injection into agent context
-  - Memory-aware tool selection
-  - Cross-session continuity
-- **IDE Visualization** (NEW - leverages Phase 10):
-  - VS Code memory graph explorer
-  - Jupyter notebook memory inspection
-  - Real-time memory state via DAP
-  - Memory performance profiler
-- **Observability**:
-- **Script API** (`MemoryGlobal`):
-  - `Memory.store()` - Store new memories
-  - `Memory.search()` - Semantic search
-  - `Memory.graphQuery()` - Graph traversal
-  - `Memory.buildContext()` - Unified context assembly
-- **Agent Integration**:
-  - Automatic memory injection into agent context
-  - Memory-aware tool selection
-  - Cross-session continuity
-- **Observability**:
-  - Memory growth metrics
-  - Retrieval performance monitoring
-  - Consolidation effectiveness tracking
+**Week 2: Context Pipeline + Consolidation**:
+- **Days 6-7: Context Engineering Pipeline**
+  - `llmspell-context` crate with ContextPipeline
+  - Query understanding + retrieval strategy selection
+  - DeBERTa reranking via Candle (500MB model, ONNX quantized fallback)
+  - Unit tests: 25+ tests for context assembly
+- **Days 8-9: LLM-Driven Consolidation**
+  - Consolidation prompt templates (ADD/UPDATE/DELETE/NOOP)
+  - Episodic → Semantic conversion logic
+  - Background daemon (tokio task, 5-min interval)
+  - Unit tests: 15+ tests for consolidation
+- **Day 10: E2E Memory Flow**
+  - Episodic → consolidation → semantic → retrieval
+  - DMR, NDCG@10 baseline measurement
+  - Consolidation algorithm documentation
+
+**Week 3: Kernel + Bridge Integration**:
+- **Days 11-12: Kernel Integration**
+  - IntegratedKernel extensions (memory_manager, context_pipeline fields)
+  - Script executor memory context injection
+  - 10 new hook points (before_memory_*, after_memory_*, etc.)
+  - Unit tests: 20+ tests for kernel integration
+- **Days 13-14: Bridge + Globals**
+  - MemoryGlobal (17th): Memory.episodic/semantic/procedural APIs
+  - ContextGlobal (18th): Context.assemble/rerank APIs
+  - TemplateBridge memory extensions
+  - Integration tests: Lua scripts calling Memory/Context
+- **Day 15: Lua API Validation**
+  - Example scripts: `examples/memory-demo.lua`
+  - CLI command stubs: `llmspell memory status`, `llmspell context test`
+  - API reference docs: `docs/user-guide/api/lua/memory.md`
+
+**Week 4: RAG + Templates + CLI**:
+- **Days 16-17: RAG Integration**
+  - MultiTenantRAG memory-aware retrieval
+  - Hybrid search: vector (episodic) + graph (semantic) + BM25 (fallback)
+  - Context pipeline in `MultiTenantRAG::retrieve`
+  - Integration tests: >20% DMR improvement validation
+- **Days 18-19: Template System Integration**
+  - ExecutionContext memory extensions
+  - All 10 templates: opt-in via `enable_memory` param
+  - ResearchAssistantTemplate with memory consolidation
+  - Template tests: memory vs baseline comparison
+- **Day 20: CLI + User Experience**
+  - 19 new CLI commands (`llmspell memory list/stats/consolidate/export`)
+  - Interactive consolidation review (`--interactive` mode)
+  - Graph visualization (`llmspell graph visualize --session <id>`)
+  - CLI user guide documentation
+
+**Week 5: Testing, Optimization, Documentation**:
+- **Days 21-22: Performance Optimization**
+  - Context pipeline P95 <100ms (graph query indexing, caching)
+  - Consolidation daemon <5% CPU overhead
+  - Load testing: 1000 interactions → consolidation
+  - Performance benchmarks meet all targets
+- **Days 23-24: Accuracy Validation**
+  - DMR benchmark: >90% on 100-interaction test set
+  - NDCG@10 benchmark: >0.85 on retrieval tasks
+  - Consolidation quality review (manual inspection of 50 graph updates)
+  - A/B testing: memory-enabled vs baseline templates
+- **Day 25: Release Readiness**
+  - Documentation completeness (architecture, user guides, API reference)
+  - Migration guide: Phase 12 → Phase 13 users
+  - Changelog and release notes (v0.13.0)
+  - Final quality gate: `./scripts/quality/quality-check.sh`
+
+**Lua API (MemoryGlobal + ContextGlobal)**:
+```lua
+-- Episodic memory
+Memory.episodic.add({session_id = "s1", role = "user", content = "What is Rust?"})
+local results = Memory.episodic.search("Rust programming", 5)
+
+-- Consolidation (background/immediate/manual)
+Memory.consolidate({mode = "immediate", session_id = "s1"})
+
+-- Semantic memory (knowledge graph)
+local entities = Memory.semantic.get_entities({name = "Rust"})
+local related = Memory.semantic.get_related(entity_id, "HAS_FEATURE")
+
+-- Context engineering
+local context = Context.assemble({
+    query = "How do I use async/await in Rust?",
+    max_tokens = 2000,
+    strategies = {"episodic", "semantic"}
+})
+local reranked = Context.rerank({chunks = context.chunks, query = "async/await", top_k = 5})
+```
+
+**CLI Commands** (19 new commands):
+```bash
+# Memory management
+llmspell memory status                          # System status
+llmspell memory stats --session <id>           # Session statistics
+llmspell memory list [--session <id>]          # List entries
+llmspell memory consolidate --session <id>     # Manual consolidation
+llmspell memory consolidate --interactive      # Review decisions
+llmspell memory export --output backup.json    # Backup
+llmspell memory import --input backup.json     # Restore
+
+# Graph operations
+llmspell graph visualize --session <id> --output graph.dot
+llmspell graph query --entity "Rust" --relationship "HAS_FEATURE"
+llmspell graph merge-entities --entity1 "Rust" --entity2 "rust-lang"
+
+# Context engineering
+llmspell context test --query "Rust async" --session <id>
+llmspell context benchmark                     # Performance metrics
+llmspell context assemble --query "..." --max-tokens 2000
+```
+
+**Configuration** (`~/.llmspell/config.toml`):
+```toml
+[memory]
+enabled = true
+backend = "sqlite"  # or "postgres" (Phase 14+)
+
+[memory.episodic]
+vector_store = "chroma"  # or "qdrant", "in-memory"
+embedding_model = "all-MiniLM-L6-v2"
+max_entries_per_session = 10000
+
+[memory.semantic]
+graph_store = "surrealdb"  # or "neo4j", "sqlite"
+consolidation_interval_seconds = 300  # 5 minutes
+
+[memory.consolidation]
+mode = "background"  # or "immediate", "manual"
+llm_model = "ollama/llama3.2:3b"
+batch_size = 100
+
+[context]
+enabled = true
+
+[context.reranking]
+model = "provence-deberta"  # or "bm25", "none"
+model_backend = "candle"  # or "onnx"
+top_k = 5
+compression_ratio = 0.6  # Keep 60% of chunks
+```
+
+**Performance Targets**:
+- **Context Assembly**: P50 <50ms, P95 <100ms, P99 <200ms
+- **Episodic Search**: P95 <50ms for 10,000 entries
+- **Graph Query**: P95 <20ms entity retrieval, <50ms traversal
+- **Consolidation**: <10s for 100 interactions
+- **Daemon Overhead**: <5% CPU idle, <10% during consolidation
+- **Memory Footprint**: <500MB for 10k entries + 1k entities
+- **Reranking**: P95 <30ms (DeBERTa), <5ms (BM25 fallback)
 
 **Success Criteria**:
-- [ ] A-TKG architecture fully operational
-- [ ] 94%+ accuracy on memory benchmarks (target: Zep level)
-- [ ] P95 retrieval latency <300ms
-- [ ] Bi-temporal queries working correctly
-- [ ] Memory consolidation reduces storage by >50%
-- [ ] Cross-session agent continuity functional
+- [ ] 3 new crates compile and integrate (llmspell-memory, llmspell-graph, llmspell-context)
+- [ ] 2 new globals functional (MemoryGlobal 17th, ContextGlobal 18th)
+- [ ] 19 CLI commands operational
+- [ ] DMR benchmark >90% on 100-interaction test set
+- [ ] NDCG@10 >0.85 on reranking benchmark
+- [ ] Bi-temporal queries functional (event_time + ingestion_time)
+- [ ] LLM consolidation: >85% ADD/UPDATE precision, <10% missed entities
+- [ ] Hybrid retrieval >20% DMR improvement over vector-only
+- [ ] All 10 templates support `enable_memory` opt-in parameter
+- [ ] Zero breaking changes (Phase 12 code works unchanged)
+- [ ] Context assembly P95 <100ms
+- [ ] Consolidation daemon <5% CPU overhead
 - [ ] Graph supports 100k+ entities, 1M+ relationships
-- [ ] Hybrid retrieval outperforms vector-only by >15%
+- [ ] >90% test coverage, >95% API documentation coverage
+- [ ] Zero clippy warnings
 
 **Testing Requirements**:
-- Memory accuracy benchmarks (DMR, LongMemEval)
-- Temporal reasoning test suite
-- Graph consistency validation
-- Consolidation effectiveness tests
-- Cross-session continuity tests
-- Performance stress tests (1M+ items)
-- Hybrid retrieval accuracy comparison
+- **Unit Tests** (90+ tests across 3 crates):
+  - llmspell-memory: 30+ tests (episodic storage, consolidation, semantic graph)
+  - llmspell-graph: 20+ tests (bi-temporal queries, entity resolution, traversal)
+  - llmspell-context: 25+ tests (query understanding, reranking, assembly)
+- **Integration Tests** (50+ scenarios):
+  - Memory + Graph integration (episodic → semantic flow)
+  - Kernel + Bridge (Lua Memory/Context API)
+  - RAG + Memory (hybrid search validation)
+  - Template + Memory (research-assistant with consolidation)
+- **Performance Tests**:
+  - Context assembly latency benchmarks (<100ms P95)
+  - Consolidation throughput (100 interactions in <10s)
+- **Accuracy Tests**:
+  - DMR benchmark (>90% on test set)
+  - NDCG@10 reranking (>0.85 on benchmark)
+  - Consolidation quality (precision >85%, recall >90%)
+
+**Phase 14+ Enablement**:
+- **Phase 14 Multi-Tenancy**: Replace SQLite with Postgres + pgvector, add tenant_id to all tables
+- **Phase 15 Advanced RAG**: Memory-enhanced agentic RAG with iterative refinement
+- **Phase 16 Enterprise**: Memory as operational intelligence for debugging and anomaly detection
+- **Research Opportunities**: Temporal reasoning, LLM-driven schema evolution, federated memory, memory-guided few-shot learning
 
 **Research References**:
-- Zep/Graphiti: Temporal Knowledge Graph Architecture (arXiv:2501.13956)
-- Mem0: Scalable Long-Term Memory (arXiv:2504.19413)
-- Graph RAG vs Vector RAG benchmarks showing 80% vs 50.83% accuracy
-- BGE-M3 + ColBERT v2 for optimal retrieval performance
+- Zep/Graphiti: Bi-temporal TKG (94.8% DMR, arXiv:2501.13956)
+- Mem0: Adaptive consolidation (26% improvement, arXiv:2504.19413)
+- SELF-RAG: Self-reflective retrieval (320% improvement, arXiv:2310.11511)
+- Provence DeBERTa: Cross-encoder reranking (NDCG@10 >0.85, 50-80% compression)
+- Context Rot: 50% accuracy drop at 32k tokens (2025 research)
+- Graph RAG vs Vector RAG: 80% vs 50.83% accuracy benchmarks
+- BGE-M3 + ColBERT v2: Optimal hybrid retrieval performance
+
+**Design Document**: `/docs/in-progress/phase-13-design-doc.md` (5,628 lines - comprehensive architecture, research, implementation plan)
 
 ---
 
@@ -2192,7 +2320,7 @@ Each phase must pass:
 - **Phase 10**: Service & IDE Integration depends on Phase 9 (Kernel Integration)
 - **Phase 11**: Local LLM Integration depends on Phase 10 Service Integration (for model management service)
 - **Phase 11b**: Local LLM Cleanup depends on Phase 11 Local LLM Integration ✅ and Phase 11a Bridge Consolidation ✅
-- **Phase 12**: Production-Ready Templates depends on Phase 11b Local LLM Cleanup ✅ (leverages all Phase 0-11 infrastructure)
+- **Phase 12**: Experimental Infrastructure with Production-Quality Engineering Templates depends on Phase 11b Local LLM Cleanup ✅ (leverages all Phase 0-11 infrastructure)
 - **Phase 13**: Adaptive Memory System depends on Phase 8 Vector Storage, Phase 10 IDE for visualization, and Phase 11 Local LLM for knowledge extraction
 - **Phase 14**: MCP Tool Integration depends on Phase 10 Service infrastructure
 - **Phase 20-21**: A2A Protocol depends on Phase 4 **(DistributedHookContext required)**
@@ -2221,7 +2349,7 @@ Each phase must pass:
 - **Service & IDE Integration**: 36 weeks (Phases 0-10, external connectivity and IDE support)
 - **Local LLM Support**: 41 weeks (Phases 0-11, Ollama and Candle integration)
 - **Local LLM Cleanup**: 41.5 weeks (Phases 0-11b, bug fixes and configuration consolidation)
-- **User Experience**: 43 weeks (Phases 0-12, production-ready templates)
+- **User Experience**: 43 weeks (Phases 0-12, experimental infrastructure with production-quality engineering templates)
 - **Advanced AI**: 48 weeks (Phases 0-13, adaptive memory system with IDE visualization)
 - **Protocol Support**: 52 weeks (Phases 0-15, MCP client and server)
 - **Multi-Language Ready**: 54 weeks (Phases 0-16, JavaScript support)
@@ -2381,4 +2509,4 @@ Each phase guide will be:
 
 This creates a continuous improvement loop where each phase builds on real knowledge rather than theoretical assumptions, resulting in higher quality implementation and more realistic timelines.
 
-This implementation roadmap provides a clear path from initial foundation through production-ready deployment and additional enhancements, with specific success criteria and testing requirements for each phase, supported by focused, learnings-driven implementation guides.
+This implementation roadmap provides a clear path from initial foundation through experimental infrastructure with production-quality engineering deployment and additional enhancements, with specific success criteria and testing requirements for each phase, supported by focused, learnings-driven implementation guides.

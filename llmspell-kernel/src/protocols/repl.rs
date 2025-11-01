@@ -617,7 +617,7 @@ mod tests {
 
     /// Helper to create a test `SessionManager` with minimal infrastructure
     async fn create_test_session_manager() -> Arc<crate::sessions::SessionManager> {
-        let state_manager = Arc::new(crate::state::StateManager::new().await.unwrap());
+        let state_manager = Arc::new(crate::state::StateManager::new(None).await.unwrap());
         let session_storage_backend = Arc::new(llmspell_storage::MemoryBackend::new());
         let hook_registry = Arc::new(llmspell_hooks::HookRegistry::new());
         let hook_executor = Arc::new(llmspell_hooks::HookExecutor::new());
@@ -648,14 +648,16 @@ mod tests {
         let protocol = JupyterProtocol::new("test-session".to_string(), "test-kernel".to_string());
         let exec_config = ExecutionConfig::default();
         let kernel = Arc::new(
-            IntegratedKernel::new(
+            IntegratedKernel::new(crate::execution::IntegratedKernelParams {
                 protocol,
-                exec_config,
-                "test-session".to_string(),
+                config: exec_config,
+                session_id: "test-session".to_string(),
                 script_executor,
-                None,
-                create_test_session_manager().await,
-            )
+                provider_manager: None,
+                session_manager: create_test_session_manager().await,
+                memory_manager: None, // memory_manager (Phase 13.7.1 - opt-in)
+                hook_system: None,    // hook_system (Phase 13.7.3a - opt-in)
+            })
             .await
             .unwrap(),
         );

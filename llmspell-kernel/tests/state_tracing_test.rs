@@ -146,7 +146,7 @@ async fn test_memory_persistence_tracing() -> Result<()> {
 async fn test_state_manager_tracing() -> Result<()> {
     init_test_tracing();
 
-    let state_manager = StateManager::new().await?;
+    let state_manager = StateManager::new(None).await?;
 
     // Test set operations tracing
     tracing::info_span!("test_set_operations")
@@ -238,7 +238,7 @@ async fn test_state_manager_tracing() -> Result<()> {
 async fn test_agent_state_operations_tracing() -> Result<()> {
     init_test_tracing();
 
-    let state_manager = StateManager::new().await?;
+    let state_manager = StateManager::new(None).await?;
 
     // Create test agent state
     use llmspell_kernel::state::agent_state::{
@@ -339,7 +339,7 @@ async fn test_agent_state_operations_tracing() -> Result<()> {
 async fn test_scoped_operations_tracing() -> Result<()> {
     init_test_tracing();
 
-    let state_manager = StateManager::new().await?;
+    let state_manager = StateManager::new(None).await?;
     let scope = StateScope::Agent("test_agent".to_string());
 
     // Test scoped set/get/delete operations
@@ -371,7 +371,7 @@ async fn test_scoped_operations_tracing() -> Result<()> {
 async fn test_hook_persistence_tracing() -> Result<()> {
     init_test_tracing();
 
-    let state_manager = StateManager::new().await?;
+    let state_manager = StateManager::new(None).await?;
 
     // Test hook execution persistence tracing
     tracing::info_span!("test_hook_persistence")
@@ -396,7 +396,7 @@ async fn test_hook_persistence_tracing() -> Result<()> {
 #[tokio::test]
 async fn test_tracing_performance_overhead() -> Result<()> {
     // Test that tracing doesn't add significant overhead (<2%)
-    let state_manager = StateManager::new().await?;
+    let state_manager = StateManager::new(None).await?;
 
     // Measure time without tracing span
     let start = std::time::Instant::now();
