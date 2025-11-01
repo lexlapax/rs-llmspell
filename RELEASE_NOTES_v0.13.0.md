@@ -8,9 +8,11 @@
 
 ## Executive Summary
 
-Phase 13 delivers a **production-ready adaptive memory and context engineering system** that enables LLM applications to maintain long-term coherent understanding beyond context window limits. This release introduces three-tier memory (episodic, semantic, procedural) with intelligent context assembly strategies.
+Phase 13 delivers an **experimental adaptive memory and context engineering system** that enables rapid exploration of long-term AI memory patterns beyond context window limits. This release introduces three-tier memory (episodic, semantic, procedural) with intelligent context assembly strategies.
 
-**Key Achievement**: From zero memory to production-ready memory-aware AI applications with <2ms overhead.
+Built with production-quality engineering (performance, architecture, testing) to enable painless extraction to production when memory patterns are validated.
+
+**Key Achievement**: From zero memory to experimental memory-aware AI applications with <2ms overhead and clear production extraction path.
 
 ### What's New in v0.13.0
 
@@ -21,16 +23,29 @@ Phase 13 delivers a **production-ready adaptive memory and context engineering s
 🌐 **Bi-Temporal Knowledge Graph** (SurrealDB embedded, 71% functional)
 🎯 **Zero Breaking Changes** (fully backward compatible, opt-in features)
 📖 **1,300+ Lines of API Documentation** (3 new Rust API docs)
+🏗️ **Experimental → Production Path** (clear extraction patterns documented)
+
+---
+
+### Experimentation + Production Foundations
+
+While experimental, Phase 13 is built with production-grade engineering:
+- **Performance**: <2ms overhead (50x faster than target), 8.47x HNSW speedup
+- **Architecture**: Hot-swappable backends (InMemory/HNSW/SurrealDB), clean abstractions
+- **Testing**: 149 tests passing (100% pass rate), zero warnings
+- **Observability**: Full tracing, comprehensive metrics
+
+**Result**: When memory patterns are validated, transitioning to production is straightforward.
 
 ---
 
 ## New Features
 
-### 1. Adaptive Memory System (Phase 13.1-13.4)
+### 1. Experimental Adaptive Memory System (Phase 13.1-13.4)
 
 **New Crates**: `llmspell-memory` (3,500+ LOC), `llmspell-graph` (2,200+ LOC), `llmspell-context` (basic)
 
-A production-grade three-tier memory system:
+An experimental three-tier memory system built with production-quality engineering:
 
 **Episodic Memory**: Conversation history with vector embeddings
 - InMemory backend for testing (O(n) search)
@@ -64,7 +79,7 @@ A production-grade three-tier memory system:
 - Async-first API with tokio runtime
 - Session isolation with zero cross-tenant leakage
 
-### 2. Context Engineering Pipeline (Phase 13.5-13.8)
+### 2. Experimental Context Engineering Pipeline (Phase 13.5-13.8)
 
 **Retrieval Strategies**: Four intelligent context assembly strategies
 

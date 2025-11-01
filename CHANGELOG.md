@@ -9,7 +9,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [0.13.0] - 2025-01-15 - Adaptive Memory & Context Engineering 🧠
 
-Three-tier memory system with episodic, semantic, and procedural memory for long-term coherent understanding beyond context window limits. See [RELEASE_NOTES_v0.13.0.md](RELEASE_NOTES_v0.13.0.md) for full details.
+Experimental three-tier memory system with episodic, semantic, and procedural memory for long-term coherent understanding beyond context window limits. Built with production-quality engineering for painless extraction when validated. See [RELEASE_NOTES_v0.13.0.md](RELEASE_NOTES_v0.13.0.md) for full details.
 
 ### Added
 
