@@ -8,9 +8,9 @@
 
 ## Overview
 
-> **📊 Technical Reference**: Comprehensive technical documentation for LLMSpell v0.13.0. Documentation structure optimized to 6 core guides covering the complete system from architecture through deployment, all aligned with Phase 13 production implementation including adaptive memory system, bi-temporal knowledge graph, context engineering, Unix daemon infrastructure, signal handling, tool CLI commands, fleet management, feature flags, and production-ready AI agent templates.
+> **📊 Technical Reference**: Comprehensive technical documentation for LLMSpell v0.13.0. Documentation structure optimized to 6 core guides covering the complete experimental system with production-quality engineering foundations. Phase 13 experimental infrastructure includes adaptive memory system, bi-temporal knowledge graph, context engineering, Unix daemon infrastructure, signal handling, tool CLI commands, fleet management, feature flags, and experimental AI workflows.
 
-**Version**: v0.13.0 | **Status**: Production Ready | **Last Updated**: January 2025
+**Version**: v0.13.0 | **Status**: Experimental Platform with Production-Quality Foundations | **Last Updated**: January 2025
 
 ---
 
@@ -23,7 +23,7 @@
 - Component architecture (21 crates)
 - Adaptive memory system (Phase 13: episodic, semantic, procedural)
 - Daemon infrastructure and service support (Phase 10)
-- Template system with 10 built-in workflows (Phase 12)
+- Template system with 10 experimental workflows (Phase 12)
 - Performance characteristics (all targets exceeded 10-50x)
 - API surface (20 Lua globals including Memory, Context, Template, RAG)
 - Feature flags and modular builds (19-35MB)
@@ -165,7 +165,7 @@
 
 ---
 
-## Phase 13 Achievements
+## Phase 13 Experimental Infrastructure (Production-Quality Engineering)
 
 ### System Architecture
 - **21 crates** in workspace (added llmspell-memory, llmspell-graph, llmspell-context)
@@ -192,8 +192,8 @@
 - **ComponentRegistry access** via kernel message protocol
 - **Runtime tool discovery** with automatic availability detection
 
-### Template System (Phase 12) ⭐
-- **10 built-in templates** solving real AI workflow problems
+### Template System (Phase 12 - Experimental Workflows) ⭐
+- **10 experimental workflows** for rapid AI concept exploration
 - **6 template categories** (Research, Chat, Analysis, CodeGen, Document, Workflow)
 - **5 template CLI subcommands** (list, info, exec, search, schema)
 - **6 Template Lua API methods** (Template global, 16th of 18)
@@ -248,8 +248,8 @@
 - **6 core guides** covering all aspects of Phase 10-13
 - **8 supplementary guides** for specialized topics
 - **3 new Rust API docs** for Phase 13 crates (llmspell-memory, llmspell-graph, llmspell-context)
-- **Complete technical coverage** from architecture to deployment
-- **Production deployment ready** with all features documented
+- **Complete technical coverage** from architecture to scale validation
+- **Extraction-ready** with production-quality engineering documented
 - **Feature flags migration guide** for Phase 10.17.5+ builds
 - **3,655 lines template docs** covering all 10 built-in templates ⭐ Phase 12
 - **Memory configuration guide** and **RAG-memory integration** ⭐ Phase 13
@@ -258,9 +258,9 @@
 
 ## Related Documentation
 
-### For Users
-- **[User Guide](../user-guide/)** - How to use LLMSpell
-- **[Service Deployment](../user-guide/service-deployment.md)** - Production deployment ⭐ NEW
+### For Experimenters
+- **[User Guide](../user-guide/)** - How to experiment with LLMSpell
+- **[Service Deployment](../user-guide/service-deployment.md)** - Scale validation & deployment ⭐
 - **[IDE Integration](../user-guide/ide-integration.md)** - IDE setup ⭐ NEW
 - **[Lua API](../user-guide/api/lua/)** - Script reference
 - **[Examples](../../examples/)** - Working examples
@@ -396,4 +396,4 @@ launchctl load ~/Library/LaunchAgents/com.llmspell.kernel.plist
 
 ---
 
-*Technical documentation for LLMSpell v0.12.0 after Phase 12 production-ready AI agent templates. Production-ready with daemon mode, tool CLI, template system, fleet management, and feature flags.*
+*Technical documentation for LLMSpell v0.13.0 after Phase 13 experimental memory & context engineering. Experimental platform with production-quality foundations: daemon mode, tool CLI, template system, adaptive memory, fleet management, and feature flags.*
