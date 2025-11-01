@@ -398,6 +398,24 @@ impl KnowledgeGraph for SurrealDBBackend {
         id: &str,
         changes: HashMap<String, serde_json::Value>,
     ) -> Result<()> {
+        #[derive(Serialize)]
+        struct EntityUpdate {
+            name: String,
+            entity_type: String,
+            properties: serde_json::Value,
+            #[serde(
+                default,
+                serialize_with = "optional_datetime::serialize",
+                deserialize_with = "optional_datetime::deserialize"
+            )]
+            event_time: Option<surrealdb::sql::Datetime>,
+            #[serde(
+                serialize_with = "datetime_serde::serialize",
+                deserialize_with = "datetime_serde::deserialize"
+            )]
+            ingestion_time: surrealdb::sql::Datetime,
+        }
+
         debug!(
             "Updating entity: id={}, changes_count={}",
             id,
@@ -437,24 +455,6 @@ impl KnowledgeGraph for SurrealDBBackend {
         // For now, this method is marked as partially functional.
         // Workaround for production: recreate entity instead of update.
         warn!("SurrealDB 2.0 update has known properties persistence issue - properties may not be correctly updated");
-
-        #[derive(Serialize)]
-        struct EntityUpdate {
-            name: String,
-            entity_type: String,
-            properties: serde_json::Value,
-            #[serde(
-                default,
-                serialize_with = "optional_datetime::serialize",
-                deserialize_with = "optional_datetime::deserialize"
-            )]
-            event_time: Option<surrealdb::sql::Datetime>,
-            #[serde(
-                serialize_with = "datetime_serde::serialize",
-                deserialize_with = "datetime_serde::deserialize"
-            )]
-            ingestion_time: surrealdb::sql::Datetime,
-        }
 
         let update_data = EntityUpdate {
             name: entity.name,

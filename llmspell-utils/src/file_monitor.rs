@@ -181,7 +181,7 @@ impl WatchConfig {
 
         if let Some(pattern) = &self.pattern {
             glob::Pattern::new(pattern)
-                .map_err(|e| anyhow::anyhow!("Invalid glob pattern: {}", e))?;
+                .map_err(|e| anyhow::anyhow!("Invalid glob pattern: {e}"))?;
         }
 
         Ok(())

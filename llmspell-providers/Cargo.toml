@@ -20,7 +20,6 @@ rig-core.workspace = true
 ollama-rs = "0.3.2"
 url = "2"
 chrono.workspace = true
-candle-core.workspace = true
 candle-nn.workspace = true
 candle-transformers.workspace = true
 hf-hub.workspace = true
@@ -29,3 +28,10 @@ parking_lot.workspace = true
 rand.workspace = true
 dirs = "5.0"
 ureq = "2.12"
+
+# Platform-specific dependencies for GPU support
+[target.'cfg(target_os = "macos")'.dependencies]
+candle-core = { workspace = true, features = ["metal"] }
+
+[target.'cfg(not(target_os = "macos"))'.dependencies]
+candle-core = { workspace = true }
