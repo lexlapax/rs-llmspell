@@ -1,8 +1,8 @@
 # Architecture Decision Records (ADRs)
 
-**Version**: 0.12.1
-**Last Updated**: October 2025
-**Validation**: Cross-referenced with phase design documents (phase-01 through phase-13.3)
+**Version**: 0.13.0
+**Last Updated**: January 2025
+**Validation**: Cross-referenced with phase design documents (phase-01 through phase-13)
 
 > **📋 Decision Log**: Consolidated record of all significant architecture decisions made throughout LLMSpell development, showing how decisions evolved and sometimes reversed across phases.
 

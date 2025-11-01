@@ -14,7 +14,7 @@ use tracing::info;
 fn template_lookup_benchmark(c: &mut Criterion) {
     info!("Starting template_lookup benchmark");
 
-    let registry = TemplateRegistry::new();
+    let registry = TemplateRegistry::with_builtin_templates().expect("Failed to load templates");
 
     c.bench_function("template_lookup", |b| {
         b.iter(|| {
@@ -85,7 +85,7 @@ fn template_infrastructure_overhead_benchmark(c: &mut Criterion) {
     info!("Starting template_infrastructure_overhead benchmark (target: <2ms)");
 
     let rt = Runtime::new().unwrap();
-    let registry = TemplateRegistry::new();
+    let registry = TemplateRegistry::with_builtin_templates().expect("Failed to load templates");
     let memory_manager = rt.block_on(async {
         Arc::new(
             DefaultMemoryManager::new_in_memory()

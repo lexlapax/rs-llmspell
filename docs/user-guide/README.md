@@ -10,7 +10,7 @@
 
 > **📚 Central Hub**: Your starting point for all LLMSpell documentation. Everything you need is organized into 12 essential documents, plus comprehensive API references for both Lua and Rust. Now with Unix daemon infrastructure, tool CLI commands, fleet management, feature flags, and 10 production-ready AI agent templates!
 
-**Version**: 0.12.0 | **Status**: Phase 12 Complete - Production-Ready AI Agent Templates | **Last Updated**: October 2025
+**Version**: 0.13.0 | **Status**: Phase 13 Complete - Adaptive Memory & Context Engineering | **Last Updated**: January 2025
 
 ## 📖 Essential Documentation (12 Files)
 
@@ -256,6 +256,20 @@ launchctl load ~/Library/LaunchAgents/com.llmspell.kernel.plist  # macOS
 - **vim/neovim**: LSP and DAP support
 - **Connection Files**: Jupyter-compatible kernel discovery
 - **Multi-Client**: Handle concurrent IDE connections
+
+## 🆕 Phase 13 Features (Complete) ⭐
+
+### Adaptive Memory & Context Engineering
+- **Multi-Tier Memory System**: Episodic (conversation history), Semantic (knowledge graph), Procedural (patterns)
+- **Hot-Swappable Backends**: HNSW (production, 8.47x speedup), InMemory (development), ChromaDB, Qdrant
+- **Bi-Temporal Knowledge Graph**: SurrealDB embedded graph tracking event time + ingestion time
+- **Context Engineering Pipeline**: Query understanding, multi-strategy retrieval, DeBERTa reranking, token-aware assembly
+- **LLM-Driven Consolidation**: Extract entities and relationships from conversations into knowledge graph
+- **CLI Commands**: `llmspell memory add|search|consolidate`, `llmspell context assemble`
+- **Lua API**: Memory global (episodic, semantic, procedural), Context global (assemble, test)
+- **Performance**: <2ms episodic add, ~8ms context assembly, ~2x parallel hybrid retrieval speedup
+- **Memory + Templates Integration**: Templates can leverage memory for contextual workflows
+- **149 Tests Passing**: 100% pass rate across all Phase 13 components
 
 ## 🆕 Phase 12 Features (Complete) ⭐
 

@@ -186,12 +186,7 @@ async fn test_e2e_context_assembly_strategies() {
 
     // Test episodic strategy
     let result_episodic = context_bridge
-        .assemble(
-            "Rust async programming",
-            "episodic",
-            2000,
-            Some(session_id),
-        )
+        .assemble("Rust async programming", "episodic", 2000, Some(session_id))
         .await
         .unwrap();
 
@@ -203,19 +198,11 @@ async fn test_e2e_context_assembly_strategies() {
         !chunks_episodic.is_empty(),
         "Episodic strategy should return chunks"
     );
-    assert!(
-        token_count_episodic <= 2000,
-        "Should respect token budget"
-    );
+    assert!(token_count_episodic <= 2000, "Should respect token budget");
 
     // Test hybrid strategy (episodic + semantic)
     let result_hybrid = context_bridge
-        .assemble(
-            "Rust programming",
-            "hybrid",
-            2000,
-            Some(session_id),
-        )
+        .assemble("Rust programming", "hybrid", 2000, Some(session_id))
         .await
         .unwrap();
 
@@ -227,10 +214,7 @@ async fn test_e2e_context_assembly_strategies() {
         !chunks_hybrid.is_empty(),
         "Hybrid strategy should return chunks"
     );
-    assert!(
-        token_count_hybrid <= 2000,
-        "Should respect token budget"
-    );
+    assert!(token_count_hybrid <= 2000, "Should respect token budget");
 
     info!("✓ Context assembly strategies validated (episodic + hybrid)");
 }
@@ -244,11 +228,13 @@ async fn test_e2e_memory_search_functionality() {
     let session_id = "search-session";
 
     // Add diverse content
-    let contents = ["Rust ownership system prevents data races",
+    let contents = [
+        "Rust ownership system prevents data races",
         "Python uses garbage collection for memory management",
         "Rust borrowing rules ensure memory safety",
         "JavaScript has automatic memory management",
-        "Rust's lifetime system tracks references"];
+        "Rust's lifetime system tracks references",
+    ];
 
     for (i, content) in contents.iter().enumerate() {
         let entry = EpisodicEntry::new(
@@ -328,7 +314,5 @@ async fn test_e2e_performance_overhead() {
         "Memory search should complete in <5ms (actual: {duration:?})"
     );
 
-    info!(
-        "✓ Performance validated: add <2ms, search <5ms (target overhead maintained)"
-    );
+    info!("✓ Performance validated: add <2ms, search <5ms (target overhead maintained)");
 }

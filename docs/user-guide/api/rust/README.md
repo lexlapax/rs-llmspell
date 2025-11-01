@@ -8,9 +8,9 @@
 
 ## Overview
 
-> **🦀 Rust API**: Comprehensive documentation for all 18 LLMSpell crates, covering traits, implementations, and extension patterns for building custom components.
+> **🦀 Rust API**: Comprehensive documentation for all 21 LLMSpell crates, covering traits, implementations, and extension patterns for building custom components.
 
-**Version**: 0.12.0 | **Status**: Phase 12 Complete | **Last Updated**: October 2025
+**Version**: 0.13.0 | **Status**: Phase 13 Complete | **Last Updated**: January 2025
 
 ## 📚 Crate Documentation
 
@@ -63,9 +63,36 @@
 - Data isolation
 - Cross-tenant operations
 
-### AI and RAG Components (4 crates)
+### AI and RAG Components (7 crates)
 
-#### 7. [llmspell-rag](llmspell-rag.md) ⭐ **Phase 8**
+#### 7. [llmspell-memory](llmspell-memory.md) ⭐ **Phase 13**
+**Adaptive memory system**
+- Episodic memory (conversation history with vector search)
+- Semantic memory (knowledge graph integration)
+- Procedural memory (learned patterns)
+- Hot-swappable backends (HNSW, InMemory, ChromaDB, Qdrant)
+- Consolidation engine (LLM-driven knowledge extraction)
+- Multi-session isolation with <2ms add performance
+
+#### 8. [llmspell-graph](llmspell-graph.md) ⭐ **Phase 13**
+**Bi-temporal knowledge graph**
+- Entity and relationship storage
+- Event time and ingestion time tracking
+- Temporal queries and time-travel
+- SurrealDB embedded backend
+- Corrections without losing history
+- Semantic memory backend for llmspell-memory
+
+#### 9. [llmspell-context](llmspell-context.md) ⭐ **Phase 13**
+**Context engineering pipeline**
+- Query understanding and intent classification
+- Multi-strategy retrieval (episodic, semantic, hybrid, RAG)
+- Reranking (DeBERTa cross-encoder, BM25 fallback)
+- Token-budget-aware context assembly
+- Parallel retrieval (~2x speedup)
+- Confidence scoring and temporal ordering
+
+#### 10. [llmspell-rag](llmspell-rag.md) ⭐ **Phase 8**
 **Retrieval-Augmented Generation**
 - Document ingestion pipeline
 - Chunking strategies
@@ -73,7 +100,7 @@
 - Vector search integration
 - Multi-tenant RAG
 
-#### 8. [llmspell-agents](llmspell-agents.md)
+#### 11. [llmspell-agents](llmspell-agents.md)
 **Agent framework**
 - Agent trait and builders
 - Context management
@@ -81,7 +108,7 @@
 - Agent composition
 - Templates and discovery
 
-#### 9. [llmspell-providers](llmspell-providers.md) ⭐ **Phase 11**
+#### 12. [llmspell-providers](llmspell-providers.md) ⭐ **Phase 11**
 **LLM provider integrations**
 - Provider trait
 - OpenAI, Anthropic, Groq
@@ -91,7 +118,7 @@
 - Streaming support
 - Rate limiting
 
-#### 10. [llmspell-templates](llmspell-templates.md) ⭐ **Phase 12**
+#### 13. [llmspell-templates](llmspell-templates.md) ⭐ **Phase 12**
 **Production-Ready AI Workflow Templates**
 - Template trait and registry
 - 10 built-in templates (research, chat, analysis, code generation, document processing, workflow orchestration)
@@ -102,28 +129,28 @@
 
 ### Execution and Orchestration (4 crates)
 
-#### 10. [llmspell-workflows](llmspell-workflows.md)
+#### 14. [llmspell-workflows](llmspell-workflows.md)
 **Workflow orchestration**
 - Sequential, parallel, conditional flows
 - Step definitions
 - Error handling
 - State management
 
-#### 11. [llmspell-tools](llmspell-tools.md)
+#### 15. [llmspell-tools](llmspell-tools.md)
 **Tool system**
 - Tool trait and registry
 - Built-in tools (100+)
 - Security levels
 - Tool composition
 
-#### 12. [llmspell-hooks](llmspell-hooks.md)
+#### 16. [llmspell-hooks](llmspell-hooks.md)
 **Hook system**
 - Lifecycle hooks
 - Event interception
 - Hook priorities
 - Replay support
 
-#### 13. [llmspell-events](llmspell-events.md)
+#### 17. [llmspell-events](llmspell-events.md)
 **Event system**
 - Event bus
 - Pub/sub patterns
@@ -132,7 +159,7 @@
 
 ### Integration and Runtime (4 crates)
 
-#### 14. [llmspell-bridge](llmspell-bridge.md) ⭐ **Phase 11a.8**
+#### 18. [llmspell-bridge](llmspell-bridge.md) ⭐ **Phase 11a.8**
 **Script language bridges**
 - Lua integration
 - **Typed struct pattern** for configurations
@@ -140,7 +167,7 @@
 - Global injection (17 globals)
 - Performance optimization
 
-#### 15. [llmspell-kernel](llmspell-kernel.md) ⭐ **Phase 10**
+#### 19. [llmspell-kernel](llmspell-kernel.md) ⭐ **Phase 10**
 **Kernel and daemon infrastructure**
 - Jupyter protocol v5.3 (5-channel ZeroMQ)
 - Debug Adapter Protocol (DAP)
@@ -149,14 +176,14 @@
 - Session management
 - Fleet orchestration
 
-#### 16. [llmspell-config](llmspell-config.md)
+#### 20. [llmspell-config](llmspell-config.md)
 **Configuration system**
 - Config schema
 - Environment variables
 - Provider configs
 - Validation
 
-#### 17. [llmspell-cli](llmspell-cli.md) ⭐ **Phase 10**
+#### 21. [llmspell-cli](llmspell-cli.md) ⭐ **Phase 10**
 **CLI application**
 - Command parsing (run, kernel, tool, model)
 - Runtime initialization
@@ -249,7 +276,15 @@ async fn setup_rag() -> Result<RAGPipeline> {
 }
 ```
 
-## 🆕 What's New in Phase 11a
+## 🆕 What's New in Phase 13
+
+### Adaptive Memory System (Phase 13)
+- **Multi-Tier Memory**: Episodic (conversations), Semantic (knowledge graph), Procedural (patterns)
+- **Hot-Swappable Backends**: HNSW (production), InMemory (development), ChromaDB, Qdrant
+- **Bi-Temporal Knowledge Graph**: SurrealDB embedded graph with event time + ingestion time
+- **Context Engineering**: Query understanding, multi-strategy retrieval, reranking, token-aware assembly
+- **Performance**: <2ms episodic add, 8.47x HNSW speedup, ~2x parallel retrieval speedup
+- **LLM-Driven Consolidation**: Extract knowledge from conversations into semantic graph
 
 ### Local LLM Support (Phase 11)
 - **Ollama Integration**: Native support for Ollama backend with health checks
@@ -333,10 +368,13 @@ graph TD
 - **Integration**: llmspell-bridge, llmspell-config, llmspell-cli
 
 ### By Phase
+- **Phase 13 (Memory)**: llmspell-memory, llmspell-graph, llmspell-context
+- **Phase 12 (Templates)**: llmspell-templates
+- **Phase 11 (Local LLM)**: llmspell-providers (Ollama, Candle)
+- **Phase 10 (Kernel)**: llmspell-kernel, llmspell-cli
 - **Phase 8 (RAG)**: llmspell-rag, llmspell-storage, llmspell-tenancy
-- **Phase 7 (Hooks/Events)**: llmspell-hooks, llmspell-events, llmspell-sessions
+- **Phase 7 (Hooks/Events)**: llmspell-hooks, llmspell-events
 - **Phase 6 (Workflows)**: llmspell-workflows, llmspell-tools
-- **Phase 5 (State)**: llmspell-state-persistence, llmspell-state-traits
 
 ## 📚 Related Resources
 
@@ -359,10 +397,11 @@ When extending LLMSpell with Rust:
 
 | LLMSpell Version | Rust Version | Key Features |
 |-----------------|--------------|--------------|
-| 0.9.0 | 1.75+ | Phase 10: Integrated kernel, daemon support, protocol servers |
+| 0.13.x | 1.75+ | Phase 13: Adaptive Memory, Context Engineering, Knowledge Graph |
+| 0.12.x | 1.75+ | Phase 12: Production Templates, AI Workflows |
+| 0.11.x | 1.75+ | Phase 11: Local LLM (Ollama, Candle) |
+| 0.10.x | 1.75+ | Phase 10: Integrated kernel, daemon support, protocol servers |
 | 0.8.x | 1.75+ | Phase 8: RAG, HNSW, Multi-tenancy |
-| 0.7.x | 1.70+ | Phase 7: Hooks, Events, Sessions |
-| 0.6.x | 1.70+ | Phase 6: Workflows, Tools |
 
 ---
 

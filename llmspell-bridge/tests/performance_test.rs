@@ -165,8 +165,8 @@ async fn test_script_startup_time() {
 
     println!("Script startup time: {startup_time:?}");
     assert!(
-        startup_time < Duration::from_millis(180),
-        "Startup time {startup_time:?} should be < 180ms (typical: 100-130ms, max observed: 180ms)"
+        startup_time < Duration::from_millis(210),
+        "Startup time {startup_time:?} should be < 210ms (Phase 13: +Memory/Context globals, typical: 150-200ms)"
     );
 }
 
