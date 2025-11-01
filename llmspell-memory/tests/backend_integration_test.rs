@@ -3,18 +3,14 @@
 //! Validates that `InMemory` and HNSW backends implement the `EpisodicMemory` trait
 //! correctly through the `EpisodicBackend` enum.
 //!
-//! ## Known Limitations
+//! ## HNSW Backend Architecture
 //!
-//! HNSW backend currently has incomplete implementation for:
-//! - `get()` - Direct ID lookup
-//! - `get_session()` - Session-based retrieval
-//! - `list_unprocessed()` - Unprocessed entry tracking
-//! - `mark_processed()` - Processing state updates
-//! - `delete_before()` - Temporal deletion
-//! - `list_sessions_with_unprocessed()` - Session queries
+//! The HNSW backend uses a hybrid storage approach:
+//! - **HNSW**: O(log n) vector similarity search
+//! - **`DashMap`**: O(1) ID lookups, O(n) metadata queries
 //!
-//! These methods will be implemented in Phase 13.14.3b with proper metadata indexing.
-//! For now, tests only validate the core functionality: `add()` and `search()`.
+//! This provides complete `EpisodicMemory` trait implementation with optimal performance
+//! for both vector search (primary use case) and metadata operations.
 
 use async_trait::async_trait;
 use llmspell_core::traits::embedding::EmbeddingProvider;
@@ -90,63 +86,62 @@ async fn test_backend_add() {
 }
 
 #[tokio::test]
-async fn test_backend_get_inmemory_only() {
-    // HNSW backend doesn't support direct ID lookup yet
-    let config = MemoryConfig::for_testing();
-    let backend = EpisodicBackend::from_config(&config).expect("backend creation failed");
+async fn test_backend_get() {
+    run_on_both_backends(|backend| async move {
+        let entry = EpisodicEntry::new("session-1".into(), "user".into(), "Test message".into());
 
-    let entry = EpisodicEntry::new("session-1".into(), "user".into(), "Test message".into());
+        let id = backend.add(entry).await.expect("add failed");
+        let retrieved = backend.get(&id).await.expect("get failed");
 
-    let id = backend.add(entry).await.expect("add failed");
-    let retrieved = backend.get(&id).await.expect("get failed");
-
-    assert_eq!(retrieved.session_id, "session-1");
-    assert_eq!(retrieved.role, "user");
-    assert_eq!(retrieved.content, "Test message");
+        assert_eq!(retrieved.session_id, "session-1");
+        assert_eq!(retrieved.role, "user");
+        assert_eq!(retrieved.content, "Test message");
+    })
+    .await;
 }
 
 #[tokio::test]
-async fn test_backend_get_session_inmemory_only() {
-    // HNSW backend doesn't support get_session yet
-    let config = MemoryConfig::for_testing();
-    let backend = EpisodicBackend::from_config(&config).expect("backend creation failed");
+async fn test_backend_get_session() {
+    run_on_both_backends(|backend| async move {
+        // Add entries to two different sessions
+        for i in 0..5 {
+            let entry =
+                EpisodicEntry::new("session-1".into(), "user".into(), format!("Message {i}"));
+            backend.add(entry).await.expect("add failed");
+        }
 
-    // Add entries to two different sessions
-    for i in 0..5 {
-        let entry = EpisodicEntry::new("session-1".into(), "user".into(), format!("Message {i}"));
-        backend.add(entry).await.expect("add failed");
-    }
+        for i in 0..3 {
+            let entry = EpisodicEntry::new(
+                "session-2".into(),
+                "user".into(),
+                format!("Other message {i}"),
+            );
+            backend.add(entry).await.expect("add failed");
+        }
 
-    for i in 0..3 {
-        let entry = EpisodicEntry::new(
-            "session-2".into(),
-            "user".into(),
-            format!("Other message {i}"),
-        );
-        backend.add(entry).await.expect("add failed");
-    }
+        // Get session-1 entries
+        let entries = backend
+            .get_session("session-1")
+            .await
+            .expect("get_session failed");
 
-    // Get session-1 entries
-    let entries = backend
-        .get_session("session-1")
-        .await
-        .expect("get_session failed");
+        assert_eq!(entries.len(), 5);
+        for entry in &entries {
+            assert_eq!(entry.session_id, "session-1");
+        }
 
-    assert_eq!(entries.len(), 5);
-    for entry in &entries {
-        assert_eq!(entry.session_id, "session-1");
-    }
+        // Get session-2 entries
+        let entries = backend
+            .get_session("session-2")
+            .await
+            .expect("get_session failed");
 
-    // Get session-2 entries
-    let entries = backend
-        .get_session("session-2")
-        .await
-        .expect("get_session failed");
-
-    assert_eq!(entries.len(), 3);
-    for entry in &entries {
-        assert_eq!(entry.session_id, "session-2");
-    }
+        assert_eq!(entries.len(), 3);
+        for entry in &entries {
+            assert_eq!(entry.session_id, "session-2");
+        }
+    })
+    .await;
 }
 
 #[tokio::test]
@@ -180,76 +175,76 @@ async fn test_backend_search() {
 }
 
 #[tokio::test]
-async fn test_backend_list_unprocessed_inmemory_only() {
-    // HNSW backend doesn't support list_unprocessed yet
-    let config = MemoryConfig::for_testing();
-    let backend = EpisodicBackend::from_config(&config).expect("backend creation failed");
+async fn test_backend_list_unprocessed() {
+    run_on_both_backends(|backend| async move {
+        // Add entries
+        let mut ids = Vec::new();
+        for i in 0..5 {
+            let entry =
+                EpisodicEntry::new("session-1".into(), "user".into(), format!("Message {i}"));
+            let id = backend.add(entry).await.expect("add failed");
+            ids.push(id);
+        }
 
-    // Add entries
-    let mut ids = Vec::new();
-    for i in 0..5 {
-        let entry = EpisodicEntry::new("session-1".into(), "user".into(), format!("Message {i}"));
-        let id = backend.add(entry).await.expect("add failed");
-        ids.push(id);
-    }
+        // All should be unprocessed initially
+        let unprocessed = backend
+            .list_unprocessed("session-1")
+            .await
+            .expect("list_unprocessed failed");
+        assert_eq!(unprocessed.len(), 5);
 
-    // All should be unprocessed initially
-    let unprocessed = backend
-        .list_unprocessed("session-1")
-        .await
-        .expect("list_unprocessed failed");
-    assert_eq!(unprocessed.len(), 5);
+        // Mark first 3 as processed
+        backend
+            .mark_processed(&ids[0..3])
+            .await
+            .expect("mark_processed failed");
 
-    // Mark first 3 as processed
-    backend
-        .mark_processed(&ids[0..3])
-        .await
-        .expect("mark_processed failed");
-
-    // Should have 2 unprocessed remaining
-    let unprocessed = backend
-        .list_unprocessed("session-1")
-        .await
-        .expect("list_unprocessed failed");
-    assert_eq!(unprocessed.len(), 2);
+        // Should have 2 unprocessed remaining
+        let unprocessed = backend
+            .list_unprocessed("session-1")
+            .await
+            .expect("list_unprocessed failed");
+        assert_eq!(unprocessed.len(), 2);
+    })
+    .await;
 }
 
 #[tokio::test]
-async fn test_backend_delete_before_inmemory_only() {
+async fn test_backend_delete_before() {
     use chrono::{Duration, Utc};
 
-    // HNSW backend doesn't support delete_before yet
-    let config = MemoryConfig::for_testing();
-    let backend = EpisodicBackend::from_config(&config).expect("backend creation failed");
+    run_on_both_backends(|backend| async move {
+        // Add entries
+        for i in 0..5 {
+            let entry =
+                EpisodicEntry::new("session-1".into(), "user".into(), format!("Message {i}"));
+            backend.add(entry).await.expect("add failed");
+        }
 
-    // Add entries
-    for i in 0..5 {
-        let entry = EpisodicEntry::new("session-1".into(), "user".into(), format!("Message {i}"));
+        // Wait a bit
+        tokio::time::sleep(tokio::time::Duration::from_millis(100)).await;
+
+        // Add one more recent entry
+        let entry = EpisodicEntry::new("session-1".into(), "user".into(), "Recent message".into());
         backend.add(entry).await.expect("add failed");
-    }
 
-    // Wait a bit
-    tokio::time::sleep(tokio::time::Duration::from_millis(100)).await;
+        // Delete entries before "now + 1 hour" (should delete all)
+        let future_time = Utc::now() + Duration::hours(1);
+        let deleted = backend
+            .delete_before(future_time)
+            .await
+            .expect("delete_before failed");
 
-    // Add one more recent entry
-    let entry = EpisodicEntry::new("session-1".into(), "user".into(), "Recent message".into());
-    backend.add(entry).await.expect("add failed");
+        assert_eq!(deleted, 6, "Should have deleted all 6 entries");
 
-    // Delete entries before "now + 1 hour" (should delete all)
-    let future_time = Utc::now() + Duration::hours(1);
-    let deleted = backend
-        .delete_before(future_time)
-        .await
-        .expect("delete_before failed");
-
-    assert_eq!(deleted, 6, "Should have deleted all 6 entries");
-
-    // Verify session is empty
-    let entries = backend
-        .get_session("session-1")
-        .await
-        .expect("get_session failed");
-    assert_eq!(entries.len(), 0);
+        // Verify session is empty
+        let entries = backend
+            .get_session("session-1")
+            .await
+            .expect("get_session failed");
+        assert_eq!(entries.len(), 0);
+    })
+    .await;
 }
 
 #[tokio::test]
