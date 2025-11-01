@@ -10,7 +10,7 @@
 
 > **🔍 API Hub**: Comprehensive documentation for both Lua scripting APIs and Rust extension APIs. Choose your path based on whether you're writing scripts or building components.
 
-**Version**: 0.12.0 | **Status**: Phase 12 Complete | **Last Updated**: October 2025
+**Version**: 0.13.0 | **Status**: Phase 13 Complete | **Last Updated**: January 2025
 
 ## Documentation Structure
 

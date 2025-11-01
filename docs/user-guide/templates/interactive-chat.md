@@ -650,7 +650,7 @@ export TERM=xterm-256color
 **Cause**: Old version (pre-12.9) or terminal signal handling issue
 
 **Solution**:
-1. Verify version: `./target/debug/llmspell --version` should show ≥0.12.0
+1. Verify version: `./target/debug/llmspell --version` should show ≥0.13.0
 2. Check REPL is using production integration (Phase 12.9)
 3. If issue persists, report as bug with terminal type
 

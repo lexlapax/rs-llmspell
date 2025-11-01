@@ -1,6 +1,6 @@
 # Getting Started
 
-**Version**: 0.12.0
+**Version**: 0.13.0
 **Time Required**: 10 minutes (or <5 minutes with AI Agent Templates!)
 
 > **🚀 Quick Start**: Get LLMSpell kernel running in under 5 minutes with this focused guide. **NEW in Phase 12**: Use production-ready AI workflow templates for instant productivity!

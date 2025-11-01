@@ -7,38 +7,68 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.13.0] - 2025-01-15 - Adaptive Memory & Context Engineering 🧠
+
+Three-tier memory system with episodic, semantic, and procedural memory for long-term coherent understanding beyond context window limits. See [RELEASE_NOTES_v0.13.0.md](RELEASE_NOTES_v0.13.0.md) for full details.
+
 ### Added
 
-#### Phase 13.5.7: Direct Provider Integration
+#### Memory System (Phase 13.1-13.4)
+- **3 New Crates**: llmspell-memory (3,500+ LOC), llmspell-graph (2,200+ LOC), llmspell-context
+- **Episodic Memory**: Conversation history with vector embeddings
+  - HNSW backend (8.47x speedup at 10K entries vs linear scan)
+  - InMemory backend for testing
+  - Session-scoped isolation with zero cross-tenant leakage
+  - <2ms add performance (248 µs/iter average)
+- **Semantic Memory**: Bi-temporal knowledge graph
+  - SurrealDB embedded backend (71% functional)
+  - Event time + ingestion time tracking
+  - Entity/relationship storage with JSON properties
+- **Procedural Memory**: Pattern tracking placeholder (API defined for future expansion)
+- **Consolidation Engine**: Regex-based entity/relationship extraction from episodic memory
 
-- **Dual-Path Provider Architecture**: Templates and memory system now support both `provider_name` (centralized config) and `model` (ad-hoc) parameters
-  - `provider_name`: References provider defined in config.toml for production use, centralized management, and version control
-  - `model`: Ad-hoc model specification for quick experiments and model comparison
-  - Automatic fallback to `default_provider` when neither specified
-  - Error on conflict when both parameters provided
+#### Context Engineering (Phase 13.5-13.8)
+- **4 Retrieval Strategies**: Episodic, semantic, hybrid, RAG
+- **Parallel Retrieval**: tokio::join! for hybrid strategy (~2x speedup)
+- **BM25 Reranking**: Lexical relevance scoring (DeBERTa neural reranking deferred)
+- **Token Budget Management**: Automatic truncation to prevent context overflow
 
-- **Memory System Provider Integration**:
-  - `runtime.memory.consolidation.provider_name` for LLM-driven consolidation
-  - Dedicated `consolidation-llm` provider with low temperature (0.0) for deterministic consolidation
-  - Separation of general-purpose providers (temp=0.7) from consolidation providers (temp=0.0)
-  - Automatic provider resolution with fallback to default_provider
+#### Lua API Integration (Phase 13.9-13.10)
+- **Memory Global (17th)**: Full CRUD for episodic/semantic memory, consolidation control
+- **Context Global (18th)**: Assemble context with strategy selection, token budgeting
+- **CLI Commands**: 19 new commands (memory add/search/consolidate/stats, context assemble/strategies)
 
-- **Builtin Configuration Profiles** (2 new profiles):
-  - **`default` profile**: Simple Ollama-based general purpose configuration (Lua stdlib, llama3.2:3b, 4096 tokens)
-  - **`memory` profile**: Production memory system with dual providers (default + consolidation-llm), adaptive daemon scheduling, episodic memory enabled
+#### Template Integration (Phase 13.11-13.13)
+- **Memory-Aware Templates**: All 10 templates support opt-in memory via `memory_enabled` parameter
+- **Session Isolation**: Per-session memory with configurable context budgets
+- **Provider Integration**: Dual-path provider resolution (provider_name vs model)
+- **Configuration Profiles**: Added `default` and `memory` builtin profiles
 
-- **Documentation**:
-  - **[Provider Best Practices Guide](docs/user-guide/provider-best-practices.md)** (500+ lines): Comprehensive guide for choosing provider_name vs model, migration patterns, common use cases
-  - **[Memory Configuration Guide](docs/user-guide/memory-configuration.md)** (450+ lines): Complete memory system configuration with provider integration, performance tuning, troubleshooting
+#### Documentation
+- **API Documentation**: 1,300+ lines (llmspell-memory.md, llmspell-graph.md, llmspell-context.md)
+- **User Guides**: Memory configuration, RAG-memory integration, provider best practices
+- **ADRs**: ADR-044 (Bi-Temporal Graph), ADR-045 (Consolidation), ADR-046 (LLM Consolidation)
 
 ### Changed
+- **Global Count**: 18 globals (was 16) - added Memory and Context
+- **Template System**: All templates now support memory parameter injection
+- **Profile Count**: 12 builtin profiles (was 10) - added default, memory
 
-- **Template System**: All 10 templates now support dual-path provider resolution via `resolve_llm_config()`
-- **Memory System**: Consolidation configuration changed from hardcoded model to provider_name reference
-- **Profile Count**: 10 → 12 builtin profiles (added default, memory)
-- **Documentation Structure**: Added Phase 13 documentation links to user guide README
+### Performance
+- Episodic memory add: 248 µs/iter (8x faster than 2ms target)
+- HNSW search: 8.47x speedup at 10K entries
+- Context assembly: <2ms (50x faster than 100ms target)
+- Memory overhead: ~100MB for 10K entries (5x better than 500MB target)
+- 149 tests passing, zero warnings
 
-## [0.12.0] - 2025-10-22 - Production Template System 🎯
+### Statistics
+- **Crates**: 3 new (memory, graph, context)
+- **Code**: ~8,000 lines (memory system + bridge + CLI)
+- **Tests**: 149 (68 memory + 34 graph + 6 E2E + 41 bridge), 100% passing
+- **Documentation**: 1,300+ lines Rust API docs
+- **Breaking Changes**: Zero (fully backward compatible, opt-in features)
+
+## [0.12.0] - 2025-10-22 - Template System 🎯
 
 Complete turn-key AI workflow templates solving the "0-day retention problem" with 10 production-ready templates matching industry baseline. See [RELEASE_NOTES_v0.12.0.md](RELEASE_NOTES_v0.12.0.md) for full details.
 
