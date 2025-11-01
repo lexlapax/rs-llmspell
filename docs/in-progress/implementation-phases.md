@@ -4,13 +4,13 @@
 **Date**: June 2025  
 **Status**: Implementation Roadmap  
 
-> **📋 Complete Implementation Guide**: This document defines all implementation phases for rs-llmspell, from MVP foundation through advanced production features. Currently includes 18 core phases with additional future enhancements.
+> **📋 Complete Implementation Guide**: This document defines all implementation phases for rs-llmspell, from MVP foundation through advanced production features. Currently includes 19 core phases with additional future enhancements.
 
 ---
 
 ## Overview
 
-Rs-LLMSpell follows a carefully structured 25+ phase implementation approach that prioritizes core functionality while building toward production readiness. Each phase has specific goals, components, and measurable success criteria. The roadmap includes Phase 9 for Interactive REPL and Debugging Infrastructure, Phase 10 for Service Integration & IDE Connectivity, Phase 11 for Local LLM Integration, Phase 11a for Bridge Consolidation, Phase 11b for Local LLM Cleanup & Configuration Consolidation, Phase 12 for Experimental Infrastructure with Production-Quality Engineering AI Agent Templates, and Phase 13 for Adaptive Memory System, essential for agent intelligence.
+Rs-LLMSpell follows a carefully structured 25+ phase implementation approach that prioritizes core functionality while building toward production readiness. Each phase has specific goals, components, and measurable success criteria. The roadmap includes Phase 9 for Interactive REPL and Debugging Infrastructure, Phase 10 for Service Integration & IDE Connectivity, Phase 11 for Local LLM Integration, Phase 11a for Bridge Consolidation, Phase 11b for Local LLM Cleanup & Configuration Consolidation, Phase 12 for Experimental Infrastructure with Production-Quality Engineering AI Agent Templates, Phase 13 for Adaptive Memory System, and Phase 13b for Cross-Platform Support with Complete PostgreSQL Storage Consolidation, essential for production deployment and multi-tenant scaling.
 
 ### Phase Categories
 
@@ -24,6 +24,7 @@ Rs-LLMSpell follows a carefully structured 25+ phase implementation approach tha
 - **Local LLM Support** (Phases 11, 11a, 11b): Ollama and Candle integration, bridge consolidation, configuration unification for offline operation
 - **User Experience** (Phase 12): Production-ready AI agent templates for immediate usability
 - **Advanced AI** (Phase 13): Adaptive memory system with temporal knowledge graphs
+- **Storage Infrastructure** (Phase 13b): Cross-platform support and unified PostgreSQL storage backend
 - **Protocol Support** (Phases 14-15): MCP client and server integration
 - **Language Extensions** (Phase 16): JavaScript engine support
 - **Platform Support** (Phases 17-18): Library mode and cross-platform support
@@ -1756,10 +1757,2084 @@ compression_ratio = 0.6  # Keep 60% of chunks
 
 ---
 
+### **Phase 13b: Cross-Platform Support + Complete PostgreSQL Storage Migration (Weeks 48.5-54.5)**
+
+**Goal**: Enable Linux compilation and provide unified PostgreSQL backend option for all 10 storage components
+**Priority**: HIGH (Production Infrastructure - Multi-tenant Scaling)
+**Timeline**: 6 weeks (30 working days) - thoroughness over speed
+**Dependencies**: Phase 13 Adaptive Memory System ✅
+**Type**: INFRASTRUCTURE CONSOLIDATION (Storage + Platform Support)
+**Status**: DESIGN COMPLETE - Ready for Implementation
+
+**Strategic Rationale**: Phase 13 implemented memory/graph/RAG storage with multiple backends (HNSW files, SurrealDB embedded, Sled KV, InMemory). Phase 13b consolidates storage infrastructure by providing production-grade PostgreSQL backends for ALL storage components while maintaining existing backends as options. Simultaneously addresses cross-platform compilation (Linux support) to enable broader deployment. This phase is critical for multi-tenant production deployments where centralized PostgreSQL enables row-level security, transactional consistency, and operational simplicity (single backup/restore vs 3+ storage systems).
+
+**Architecture Overview**:
+- **Storage Consolidation**: PostgreSQL backends for 10 storage components (memory, graph, RAG, state, sessions, events, hooks, API keys)
+- **Backend Coexistence**: All existing backends remain functional (HNSW, SurrealDB, Sled, File, InMemory) - PostgreSQL is opt-in via config
+- **Multi-Tenancy Foundation**: Row-Level Security (RLS) provides database-enforced tenant isolation across all components
+- **Cross-Platform**: Linux CI validation + platform-specific GPU handling (Metal macOS, CUDA Linux, CPU both)
+- **Graph Solution**: Native PostgreSQL bi-temporal CTEs (rejected Apache AGE due to no bi-temporal support + 15x slower aggregation)
+- **Vector Storage**: VectorChord extension (5x faster than pgvector, 26x cost reduction for 100M vectors)
+
+**Core Principles**:
+- **Additive, Not Replacement**: PostgreSQL as configurable option, not forced migration
+- **Zero Breaking Changes**: Existing defaults unchanged, opt-in via `backend = "postgres"`
+- **Database-Enforced Security**: Row-Level Security for multi-tenancy (not just application-level)
+- **Production-Grade Performance**: <10ms retrieval, <5% RLS overhead, scalable to 100M+ vectors
+- **Operational Simplicity**: Single PostgreSQL instance replaces 3+ storage systems (HNSW files, SurrealDB, Sled)
+
+---
+
+## Phase 13b Sub-Phases (6 Weeks)
+
+### **Week 1: Foundation + Vector Storage (Days 1-5)**
+
+**Goal**: Linux compilation validation, PostgreSQL infrastructure setup, VectorChord integration for episodic memory + RAG
+
+#### **Day 1: Cross-Platform Compilation Validation**
+
+**Tasks**:
+1. Add Linux to GitHub Actions CI matrix (ubuntu-latest alongside macos-latest)
+2. Verify `cargo build --workspace --all-targets` on Linux
+3. Run all 149 Phase 13 tests on Linux environment
+4. Document platform-specific GPU detection logic:
+   - macOS: Metal GPU via `candle-core` with `metal` feature (line 116 in workspace Cargo.toml)
+   - Linux: CUDA GPU via `Device::cuda_if_available(0)` fallback (line 112 in `llmspell-providers/src/local/candle/provider.rs`)
+   - Both: CPU fallback via `Device::Cpu` (lines 62, 80 in provider.rs)
+5. Update workspace Cargo.toml to conditionally enable Metal only on macOS:
+   ```toml
+   [target.'cfg(target_os = "macos")'.dependencies]
+   candle-core = { version = "0.9", features = ["metal"] }
+
+   [target.'cfg(not(target_os = "macos"))'.dependencies]
+   candle-core = { version = "0.9" }
+   ```
+
+**Expected Findings**: Research confirmed ZERO compilation blockers on Linux - all platform-specific code already properly gated with `cfg(target_os = "macos")`. Only validation needed.
+
+**Deliverables**:
+- GitHub Actions CI passing on both macOS + Linux
+- Documentation: Platform-Specific GPU Support (Metal vs CUDA vs CPU)
+- 149 Phase 13 tests passing on Linux
+
+**Success Criteria**:
+- [ ] `cargo build --workspace --all-targets` passes on Linux
+- [ ] All 149 tests pass on Linux environment
+- [ ] GPU detection working correctly on both platforms (Metal macOS, CUDA/CPU Linux)
+- [ ] CI runs parallel matrix builds (macOS + Linux) in <10 minutes
+- [ ] Zero platform-specific compilation errors or warnings
+
+---
+
+#### **Days 2-3: PostgreSQL Infrastructure Setup**
+
+**Tasks**:
+1. **Dependencies** - Add to workspace Cargo.toml:
+   ```toml
+   tokio-postgres = { version = "0.7", features = ["with-uuid-1", "with-chrono-0_4", "with-serde_json-1"] }
+   deadpool-postgres = "0.14"
+   pgvector = { version = "0.4", features = ["postgres"] }
+   refinery = { version = "0.8", features = ["tokio-postgres"] }
+   ```
+
+2. **Docker Compose Setup** - Create `docker/postgres/docker-compose.yml`:
+   ```yaml
+   version: '3.8'
+   services:
+     postgres:
+       image: ghcr.io/tensorchord/vchord-postgres:pg18-v0.5.3
+       container_name: llmspell_postgres_dev
+       environment:
+         POSTGRES_DB: llmspell_dev
+         POSTGRES_USER: llmspell
+         POSTGRES_PASSWORD: llmspell_dev_pass
+         POSTGRES_HOST_AUTH_METHOD: scram-sha-256
+       ports:
+         - "5432:5432"
+       volumes:
+         - postgres_data:/var/lib/postgresql/data
+         - ./init-scripts:/docker-entrypoint-initdb.d
+       command: >
+         postgres
+         -c shared_preload_libraries='vchord'
+         -c max_connections=100
+         -c shared_buffers=512MB
+         -c effective_cache_size=2GB
+         -c maintenance_work_mem=128MB
+         -c checkpoint_completion_target=0.9
+         -c wal_buffers=16MB
+         -c default_statistics_target=100
+         -c random_page_cost=1.1
+         -c effective_io_concurrency=200
+       healthcheck:
+         test: ["CMD-SHELL", "pg_isready -U llmspell"]
+         interval: 10s
+         timeout: 5s
+         retries: 5
+
+   volumes:
+     postgres_data:
+       driver: local
+   ```
+
+3. **Init Scripts** - Create `docker/postgres/init-scripts/01-extensions.sql`:
+   ```sql
+   -- Enable extensions
+   CREATE EXTENSION IF NOT EXISTS vchord;
+   CREATE EXTENSION IF NOT EXISTS pgcrypto;
+   CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
+
+   -- Create schema
+   CREATE SCHEMA IF NOT EXISTS llmspell;
+   SET search_path TO llmspell, public;
+
+   -- Grant permissions
+   GRANT ALL PRIVILEGES ON SCHEMA llmspell TO llmspell;
+   GRANT ALL PRIVILEGES ON ALL TABLES IN SCHEMA llmspell TO llmspell;
+   GRANT ALL PRIVILEGES ON ALL SEQUENCES IN SCHEMA llmspell TO llmspell;
+   ```
+
+4. **Backend Infrastructure** - Create `llmspell-storage/src/backends/postgres/mod.rs`:
+   ```rust
+   use deadpool_postgres::{Config as PoolConfig, Manager, Pool, Runtime};
+   use tokio_postgres::{Config as PgConfig, NoTls};
+
+   pub struct PostgresBackend {
+       pool: Pool,
+       tenant_context: Arc<RwLock<Option<String>>>,
+   }
+
+   impl PostgresBackend {
+       pub async fn new(connection_string: &str) -> Result<Self, LLMSpellError> {
+           let config: PgConfig = connection_string.parse()?;
+           let manager = Manager::new(config, NoTls);
+           let pool = Pool::builder(manager)
+               .max_size(20)
+               .build()
+               .map_err(|e| LLMSpellError::Storage(format!("Pool creation failed: {}", e)))?;
+
+           Ok(Self {
+               pool,
+               tenant_context: Arc::new(RwLock::new(None)),
+           })
+       }
+
+       pub async fn set_tenant_context(&self, tenant_id: &str) -> Result<(), LLMSpellError> {
+           let client = self.pool.get().await?;
+           client.execute(
+               "SET app.current_tenant_id = $1",
+               &[&tenant_id]
+           ).await?;
+
+           let mut ctx = self.tenant_context.write().await;
+           *ctx = Some(tenant_id.to_string());
+           Ok(())
+       }
+   }
+   ```
+
+5. **Connection Pooling** - Implement DashMap-based pool-per-tenant pattern (reuse Phase 13 multi-tenant architecture)
+
+**Deliverables**:
+- Docker Compose with VectorChord-enabled PostgreSQL 18
+- Connection pooling with tenant context management
+- Migration framework (refinery) configured
+- 20+ basic CRUD tests passing
+
+**Success Criteria**:
+- [ ] Docker Compose starts PostgreSQL with VectorChord extension in <30 seconds
+- [ ] Connection pool maintains 10-20 connections with <5ms acquisition latency
+- [ ] Tenant context setting functional via `SET app.current_tenant_id`
+- [ ] Basic CRUD operations (insert, select, update, delete) working
+- [ ] Health checks passing in Docker environment
+
+---
+
+#### **Days 4-5: VectorChord Integration (Episodic Memory + RAG)**
+
+**Tasks**:
+1. **Schema Design** - Create `llmspell-storage/migrations/001_vector_embeddings.sql`:
+   ```sql
+   CREATE TABLE llmspell.vector_embeddings (
+       id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+       tenant_id VARCHAR(255) NOT NULL,
+       scope VARCHAR(255) NOT NULL,  -- session:xxx, user:xxx, global, etc.
+       dimension INTEGER NOT NULL,    -- 384, 768, 1536, 3072
+       embedding VECTOR(768),         -- VectorChord type (dynamic dimension)
+       metadata JSONB NOT NULL DEFAULT '{}',
+       created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+       updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
+   );
+
+   -- Indexes
+   CREATE INDEX idx_vector_tenant ON llmspell.vector_embeddings(tenant_id);
+   CREATE INDEX idx_vector_scope ON llmspell.vector_embeddings(scope);
+   CREATE INDEX idx_vector_dimension ON llmspell.vector_embeddings(dimension);
+
+   -- VectorChord HNSW index (cosine similarity)
+   CREATE INDEX idx_vector_embedding_hnsw ON llmspell.vector_embeddings
+       USING vchord (embedding vchord_cos_ops)
+       WITH (dim = 768, m = 16, ef_construction = 128);
+
+   -- RLS policy
+   ALTER TABLE llmspell.vector_embeddings ENABLE ROW LEVEL SECURITY;
+   CREATE POLICY tenant_isolation ON llmspell.vector_embeddings
+       USING (tenant_id = current_setting('app.current_tenant_id', true));
+   ```
+
+2. **Trait Implementation** - Implement `VectorStorage` trait in `llmspell-storage/src/backends/postgres/vector.rs`:
+   ```rust
+   #[async_trait]
+   impl VectorStorage for PostgreSQLVectorStorage {
+       async fn add(&self, entry: VectorEntry) -> Result<(), LLMSpellError> {
+           let client = self.backend.pool.get().await?;
+           let embedding_vec: Vec<f32> = entry.embedding.clone();
+
+           client.execute(
+               "INSERT INTO llmspell.vector_embeddings (id, tenant_id, scope, dimension, embedding, metadata)
+                VALUES ($1, $2, $3, $4, $5, $6)",
+               &[&entry.id, &entry.tenant_id, &entry.scope, &(entry.embedding.len() as i32),
+                 &pgvector::Vector::from(embedding_vec), &entry.metadata]
+           ).await?;
+           Ok(())
+       }
+
+       async fn search(&self, query: VectorQuery) -> Result<Vec<VectorResult>, LLMSpellError> {
+           let client = self.backend.pool.get().await?;
+           let query_vec: Vec<f32> = query.embedding.clone();
+
+           let rows = client.query(
+               "SELECT id, scope, embedding, metadata,
+                       embedding <=> $1::vector AS distance
+                FROM llmspell.vector_embeddings
+                WHERE tenant_id = current_setting('app.current_tenant_id', true)
+                  AND scope = $2
+                  AND dimension = $3
+                ORDER BY distance
+                LIMIT $4",
+               &[&pgvector::Vector::from(query_vec), &query.scope,
+                 &(query.embedding.len() as i32), &(query.top_k as i64)]
+           ).await?;
+
+           Ok(rows.into_iter().map(|row| VectorResult {
+               id: row.get(0),
+               scope: row.get(1),
+               embedding: row.get::<_, pgvector::Vector>(2).to_vec(),
+               metadata: row.get(3),
+               score: 1.0 - row.get::<_, f32>(4), // Convert distance to similarity
+           }).collect())
+       }
+
+       // ... implement remaining VectorStorage methods (get, delete, update, etc.)
+   }
+   ```
+
+3. **Dimension Routing** - Support multiple vector dimensions (384, 768, 1536, 3072) via dynamic `VECTOR(n)` casting
+
+4. **Episodic Memory Integration** - Update `llmspell-memory/src/episodic/mod.rs`:
+   ```rust
+   pub enum EpisodicBackend {
+       HNSW(HNSWVectorStorage),
+       PostgreSQL(PostgreSQLVectorStorage),
+       InMemory(InMemoryVectorStorage),
+   }
+
+   pub struct EpisodicMemoryConfig {
+       pub backend: String,  // "hnsw", "postgres", "inmemory"
+       pub connection_string: Option<String>,  // Required for "postgres"
+   }
+   ```
+
+5. **RAG Document Storage** - Update `llmspell-rag/src/storage.rs` to support PostgreSQL backend for document chunks + embeddings
+
+**Deliverables**:
+- VectorChord backend passing 68 episodic memory tests
+- RAG document storage using PostgreSQL backend
+- Dimension routing (384, 768, 1536, 3072) functional
+- Metadata filtering via PostgreSQL WHERE clauses
+
+**Success Criteria**:
+- [ ] All 68 episodic memory tests pass with PostgreSQL backend
+- [ ] Vector search <10ms latency for 10K vectors (vs 1-2ms HNSW - acceptable trade-off for persistence)
+- [ ] Insert throughput >1,000 vectors/second (VectorChord spec: 1,565/sec)
+- [ ] HNSW backend still works (default unchanged)
+- [ ] RAG pipeline functional with PostgreSQL document storage
+- [ ] Query performance: P50 <5ms, P95 <10ms, P99 <20ms
+
+---
+
+### **Week 2: Multi-Tenancy + Bi-Temporal Graph Storage (Days 6-10)**
+
+**Goal**: Implement Row-Level Security for all PostgreSQL tables, create bi-temporal graph storage with native CTEs
+
+#### **Days 6-7: Row-Level Security (RLS) Implementation**
+
+**Tasks**:
+1. **RLS Pattern Standardization** - Add `tenant_id` column to ALL PostgreSQL tables with NOT NULL constraint
+
+2. **Policy Template** - Create reusable RLS policy pattern:
+   ```sql
+   -- Enable RLS on table
+   ALTER TABLE llmspell.<table_name> ENABLE ROW LEVEL SECURITY;
+
+   -- Create isolation policy
+   CREATE POLICY tenant_isolation ON llmspell.<table_name>
+       USING (tenant_id = current_setting('app.current_tenant_id', true));
+
+   -- For INSERT operations, set tenant_id automatically
+   CREATE POLICY tenant_insert ON llmspell.<table_name>
+       FOR INSERT
+       WITH CHECK (tenant_id = current_setting('app.current_tenant_id', true));
+   ```
+
+3. **Session Variable Management** - Enhance `PostgresBackend::set_tenant_context()`:
+   ```rust
+   pub async fn set_tenant_context(&self, tenant_id: &str) -> Result<(), LLMSpellError> {
+       let client = self.pool.get().await?;
+
+       // Set session variable for RLS
+       client.execute(
+           "SET app.current_tenant_id = $1",
+           &[&tenant_id]
+       ).await?;
+
+       // Verify policy enforcement
+       let row = client.query_one(
+           "SELECT current_setting('app.current_tenant_id', true) AS tenant",
+           &[]
+       ).await?;
+       let set_tenant: String = row.get(0);
+
+       if set_tenant != tenant_id {
+           return Err(LLMSpellError::Security(
+               format!("Tenant context mismatch: expected {}, got {}", tenant_id, set_tenant)
+           ));
+       }
+
+       Ok(())
+   }
+   ```
+
+4. **Integration with `llmspell-tenancy`** - Wire PostgreSQL RLS to `TenantScoped` trait:
+   ```rust
+   impl TenantScoped for PostgreSQLVectorStorage {
+       async fn set_scope(&self, scope: StateScope) -> Result<(), LLMSpellError> {
+           match scope {
+               StateScope::Custom(ref custom) if custom.starts_with("tenant:") => {
+                   let tenant_id = custom.strip_prefix("tenant:").unwrap();
+                   self.backend.set_tenant_context(tenant_id).await?;
+               },
+               _ => {
+                   return Err(LLMSpellError::Tenancy(
+                       "PostgreSQL backend requires tenant scope".to_string()
+                   ));
+               }
+           }
+           Ok(())
+       }
+   }
+   ```
+
+5. **Security Validation Tests** - Create `llmspell-storage/tests/postgres_tenancy_tests.rs`:
+   ```rust
+   #[tokio::test]
+   async fn test_tenant_isolation_enforced() {
+       let backend = PostgresBackend::new(TEST_CONNECTION_STRING).await.unwrap();
+
+       // Tenant A writes data
+       backend.set_tenant_context("tenant-a").await.unwrap();
+       let entry_a = VectorEntry { /* ... */ };
+       backend.add(entry_a).await.unwrap();
+
+       // Tenant B cannot see Tenant A's data
+       backend.set_tenant_context("tenant-b").await.unwrap();
+       let results = backend.search(query).await.unwrap();
+       assert_eq!(results.len(), 0, "Cross-tenant data leak detected!");
+   }
+
+   #[tokio::test]
+   async fn test_rls_prevents_direct_sql_injection() {
+       let backend = PostgresBackend::new(TEST_CONNECTION_STRING).await.unwrap();
+       backend.set_tenant_context("tenant-a").await.unwrap();
+
+       // Attempt SQL injection via metadata field
+       let malicious_query = VectorQuery {
+           metadata_filter: Some(json!({"malicious": "' OR tenant_id != 'tenant-a' --"})),
+           ..Default::default()
+       };
+
+       let results = backend.search(malicious_query).await.unwrap();
+       // Should only return tenant-a data, not all tenants
+       for result in results {
+           assert_eq!(result.tenant_id, "tenant-a");
+       }
+   }
+   ```
+
+**Deliverables**:
+- RLS policies on all PostgreSQL tables (vector_embeddings, entities, relationships, etc.)
+- Tenant context management integrated with connection pooling
+- Security validation test suite (10+ tests)
+- 100% zero-leakage validation
+
+**Success Criteria**:
+- [ ] RLS policies enforced on all PostgreSQL tables
+- [ ] Cross-tenant query prevention validated (100% zero-leakage)
+- [ ] Tenant context setting <1ms overhead
+- [ ] RLS performance overhead <5% (measured via `EXPLAIN ANALYZE`)
+- [ ] SQL injection attempts blocked by RLS policies
+- [ ] Security audit passing (no superuser role usage in application)
+
+---
+
+#### **Days 8-10: Bi-Temporal Graph Storage Implementation**
+
+**Tasks**:
+1. **Schema Design** - Create `llmspell-graph/migrations/002_temporal_graph.sql`:
+   ```sql
+   -- Entities table (bi-temporal)
+   CREATE TABLE llmspell.entities (
+       entity_id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+       tenant_id VARCHAR(255) NOT NULL,
+       entity_type VARCHAR(255) NOT NULL,
+       name VARCHAR(500) NOT NULL,
+       properties JSONB NOT NULL DEFAULT '{}',
+
+       -- Bi-temporal semantics (event time + ingestion time)
+       valid_time_start TIMESTAMPTZ NOT NULL,
+       valid_time_end TIMESTAMPTZ NOT NULL DEFAULT 'infinity',
+       transaction_time_start TIMESTAMPTZ NOT NULL DEFAULT now(),
+       transaction_time_end TIMESTAMPTZ NOT NULL DEFAULT 'infinity',
+
+       created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+       updated_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+
+       CONSTRAINT valid_time_range CHECK (valid_time_start < valid_time_end),
+       CONSTRAINT tx_time_range CHECK (transaction_time_start < transaction_time_end)
+   );
+
+   -- Relationships table (bi-temporal edges)
+   CREATE TABLE llmspell.relationships (
+       rel_id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+       tenant_id VARCHAR(255) NOT NULL,
+       from_entity UUID NOT NULL,
+       to_entity UUID NOT NULL,
+       rel_type VARCHAR(255) NOT NULL,
+       properties JSONB NOT NULL DEFAULT '{}',
+
+       -- Bi-temporal
+       valid_time_start TIMESTAMPTZ NOT NULL,
+       valid_time_end TIMESTAMPTZ NOT NULL DEFAULT 'infinity',
+       transaction_time_start TIMESTAMPTZ NOT NULL DEFAULT now(),
+       transaction_time_end TIMESTAMPTZ NOT NULL DEFAULT 'infinity',
+
+       created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+
+       FOREIGN KEY (from_entity) REFERENCES llmspell.entities(entity_id) ON DELETE CASCADE,
+       FOREIGN KEY (to_entity) REFERENCES llmspell.entities(entity_id) ON DELETE CASCADE,
+
+       CONSTRAINT valid_time_range CHECK (valid_time_start < valid_time_end),
+       CONSTRAINT tx_time_range CHECK (transaction_time_start < transaction_time_end)
+   );
+
+   -- Indexes
+   CREATE INDEX idx_entities_tenant ON llmspell.entities(tenant_id);
+   CREATE INDEX idx_entities_type ON llmspell.entities(entity_type);
+   CREATE INDEX idx_entities_name ON llmspell.entities(name);
+
+   -- GiST indexes for time range queries
+   CREATE INDEX idx_entities_valid_time ON llmspell.entities
+       USING GIST (tstzrange(valid_time_start, valid_time_end));
+   CREATE INDEX idx_entities_tx_time ON llmspell.entities
+       USING GIST (tstzrange(transaction_time_start, transaction_time_end));
+
+   CREATE INDEX idx_relationships_tenant ON llmspell.relationships(tenant_id);
+   CREATE INDEX idx_relationships_from ON llmspell.relationships(from_entity);
+   CREATE INDEX idx_relationships_to ON llmspell.relationships(to_entity);
+   CREATE INDEX idx_relationships_type ON llmspell.relationships(rel_type);
+
+   CREATE INDEX idx_relationships_valid_time ON llmspell.relationships
+       USING GIST (tstzrange(valid_time_start, valid_time_end));
+   CREATE INDEX idx_relationships_tx_time ON llmspell.relationships
+       USING GIST (tstzrange(transaction_time_start, transaction_time_end));
+
+   -- RLS policies
+   ALTER TABLE llmspell.entities ENABLE ROW LEVEL SECURITY;
+   CREATE POLICY tenant_isolation ON llmspell.entities
+       USING (tenant_id = current_setting('app.current_tenant_id', true));
+
+   ALTER TABLE llmspell.relationships ENABLE ROW LEVEL SECURITY;
+   CREATE POLICY tenant_isolation ON llmspell.relationships
+       USING (tenant_id = current_setting('app.current_tenant_id', true));
+   ```
+
+2. **Time-Travel Query Implementation** - Create `llmspell-graph/src/storage/postgres/temporal.rs`:
+   ```rust
+   impl PostgresGraphStorage {
+       /// Query entities as they existed at a specific event time and as known at transaction time
+       pub async fn get_entity_at(
+           &self,
+           entity_id: Uuid,
+           event_time: DateTime<Utc>,
+           transaction_time: DateTime<Utc>,
+       ) -> Result<Option<Entity>, LLMSpellError> {
+           let client = self.backend.pool.get().await?;
+
+           let row = client.query_opt(
+               "SELECT entity_id, entity_type, name, properties,
+                       valid_time_start, valid_time_end,
+                       transaction_time_start, transaction_time_end
+                FROM llmspell.entities
+                WHERE entity_id = $1
+                  AND tenant_id = current_setting('app.current_tenant_id', true)
+                  AND valid_time_start <= $2
+                  AND valid_time_end > $2
+                  AND transaction_time_start <= $3
+                  AND transaction_time_end > $3",
+               &[&entity_id, &event_time, &transaction_time]
+           ).await?;
+
+           Ok(row.map(|r| Entity::from_row(&r)))
+       }
+
+       /// Query all entities valid during a time range
+       pub async fn query_temporal(
+           &self,
+           entity_type: Option<&str>,
+           event_time_range: (DateTime<Utc>, DateTime<Utc>),
+           as_of_transaction_time: DateTime<Utc>,
+       ) -> Result<Vec<Entity>, LLMSpellError> {
+           let client = self.backend.pool.get().await?;
+
+           let rows = client.query(
+               "SELECT entity_id, entity_type, name, properties,
+                       valid_time_start, valid_time_end
+                FROM llmspell.entities
+                WHERE tenant_id = current_setting('app.current_tenant_id', true)
+                  AND ($1::text IS NULL OR entity_type = $1)
+                  AND tstzrange(valid_time_start, valid_time_end) && tstzrange($2, $3)
+                  AND transaction_time_start <= $4
+                  AND transaction_time_end > $4
+                ORDER BY valid_time_start",
+               &[&entity_type, &event_time_range.0, &event_time_range.1, &as_of_transaction_time]
+           ).await?;
+
+           Ok(rows.into_iter().map(|r| Entity::from_row(&r)).collect())
+       }
+   }
+   ```
+
+3. **Graph Traversal with Recursive CTEs** - Implement `get_related` with path finding:
+   ```rust
+   pub async fn get_related(
+       &self,
+       entity_id: Uuid,
+       rel_type: Option<&str>,
+       max_depth: u32,
+       event_time: DateTime<Utc>,
+   ) -> Result<Vec<RelatedEntity>, LLMSpellError> {
+       let client = self.backend.pool.get().await?;
+
+       let rows = client.query(
+           "WITH RECURSIVE graph_traversal AS (
+                -- Base case: direct relationships
+                SELECT
+                    r.rel_id, r.from_entity, r.to_entity, r.rel_type, r.properties,
+                    e.entity_id, e.name, e.entity_type,
+                    1 AS depth,
+                    ARRAY[r.from_entity, r.to_entity] AS path
+                FROM llmspell.relationships r
+                JOIN llmspell.entities e ON r.to_entity = e.entity_id
+                WHERE r.from_entity = $1
+                  AND r.tenant_id = current_setting('app.current_tenant_id', true)
+                  AND e.tenant_id = current_setting('app.current_tenant_id', true)
+                  AND ($2::text IS NULL OR r.rel_type = $2)
+                  AND r.valid_time_start <= $3 AND r.valid_time_end > $3
+                  AND e.valid_time_start <= $3 AND e.valid_time_end > $3
+
+                UNION ALL
+
+                -- Recursive case: follow relationships
+                SELECT
+                    r.rel_id, r.from_entity, r.to_entity, r.rel_type, r.properties,
+                    e.entity_id, e.name, e.entity_type,
+                    gt.depth + 1,
+                    gt.path || r.to_entity
+                FROM graph_traversal gt
+                JOIN llmspell.relationships r ON gt.to_entity = r.from_entity
+                JOIN llmspell.entities e ON r.to_entity = e.entity_id
+                WHERE gt.depth < $4
+                  AND NOT (r.to_entity = ANY(gt.path))  -- Prevent cycles
+                  AND r.tenant_id = current_setting('app.current_tenant_id', true)
+                  AND e.tenant_id = current_setting('app.current_tenant_id', true)
+                  AND ($2::text IS NULL OR r.rel_type = $2)
+                  AND r.valid_time_start <= $3 AND r.valid_time_end > $3
+                  AND e.valid_time_start <= $3 AND e.valid_time_end > $3
+            )
+            SELECT DISTINCT ON (entity_id)
+                entity_id, name, entity_type, depth, path
+            FROM graph_traversal
+            ORDER BY entity_id, depth",
+           &[&entity_id, &rel_type, &event_time, &(max_depth as i32)]
+       ).await?;
+
+       Ok(rows.into_iter().map(|r| RelatedEntity::from_row(&r)).collect())
+   }
+   ```
+
+4. **KnowledgeGraph Trait Implementation** - Wire to `llmspell-graph/src/traits.rs`:
+   ```rust
+   #[async_trait]
+   impl KnowledgeGraph for PostgresGraphStorage {
+       async fn add_entity(&self, entity: Entity) -> Result<Uuid, LLMSpellError> {
+           let client = self.backend.pool.get().await?;
+           let entity_id = Uuid::new_v4();
+
+           client.execute(
+               "INSERT INTO llmspell.entities
+                (entity_id, tenant_id, entity_type, name, properties,
+                 valid_time_start, valid_time_end)
+                VALUES ($1, current_setting('app.current_tenant_id', true), $2, $3, $4, $5, $6)",
+               &[&entity_id, &entity.entity_type, &entity.name, &entity.properties,
+                 &entity.valid_time_start, &entity.valid_time_end.unwrap_or(Utc::now() + Duration::days(36500))]
+           ).await?;
+
+           Ok(entity_id)
+       }
+
+       // ... implement remaining KnowledgeGraph methods
+   }
+   ```
+
+5. **Semantic Memory Integration** - Update `llmspell-memory/src/semantic/mod.rs`:
+   ```rust
+   pub enum SemanticBackend {
+       SurrealDB(SurrealDBGraphStorage),
+       PostgreSQL(PostgresGraphStorage),
+       InMemory(InMemoryGraphStorage),
+   }
+
+   pub struct SemanticMemoryConfig {
+       pub backend: String,  // "surrealdb", "postgres", "inmemory"
+       pub connection_string: Option<String>,
+   }
+   ```
+
+**Deliverables**:
+- Bi-temporal graph schema with GiST indexes
+- Time-travel queries functional (as-of queries)
+- Graph traversal with recursive CTEs (depth 1-4)
+- 34 graph tests passing with PostgreSQL backend
+- SurrealDB backend still functional (default)
+
+**Success Criteria**:
+- [ ] All 34 semantic memory (graph) tests pass with PostgreSQL backend
+- [ ] Bi-temporal time-travel queries return correct historical snapshots
+- [ ] Graph traversal <50ms for typical queries (3-4 hops, <10K entities)
+- [ ] Recursive CTE performance acceptable for depth ≤4 (rs-llmspell typical use case)
+- [ ] SurrealDB backend still works (default unchanged)
+- [ ] Entity/relationship CRUD operations <5ms
+- [ ] Zero breaking changes to semantic memory API
+
+---
+
+### **Week 3: State Storage (Days 11-15)**
+
+**Goal**: Implement PostgreSQL JSONB storage for agent state, workflow state, and procedural memory
+
+#### **Days 11-12: Agent State Storage**
+
+**Tasks**:
+1. **Schema Design** - Create `llmspell-kernel/migrations/003_agent_state.sql`:
+   ```sql
+   CREATE TABLE llmspell.agent_state (
+       state_id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+       tenant_id VARCHAR(255) NOT NULL,
+       agent_id VARCHAR(255) NOT NULL,
+       agent_type VARCHAR(255) NOT NULL,
+       state_data JSONB NOT NULL,
+       version INTEGER NOT NULL DEFAULT 1,
+       checksum VARCHAR(64),  -- SHA256 for integrity verification
+       created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+       updated_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+
+       UNIQUE(tenant_id, agent_id, version)
+   );
+
+   -- Indexes
+   CREATE INDEX idx_agent_state_tenant ON llmspell.agent_state(tenant_id);
+   CREATE INDEX idx_agent_state_agent ON llmspell.agent_state(agent_id);
+   CREATE INDEX idx_agent_state_type ON llmspell.agent_state(agent_type);
+   CREATE INDEX idx_agent_state_updated ON llmspell.agent_state(updated_at);
+
+   -- JSONB GIN index for property queries
+   CREATE INDEX idx_agent_state_data ON llmspell.agent_state USING GIN (state_data);
+
+   -- RLS
+   ALTER TABLE llmspell.agent_state ENABLE ROW LEVEL SECURITY;
+   CREATE POLICY tenant_isolation ON llmspell.agent_state
+       USING (tenant_id = current_setting('app.current_tenant_id', true));
+   ```
+
+2. **StateStorageAdapter Implementation** - Create `llmspell-kernel/src/storage/postgres.rs`:
+   ```rust
+   pub struct PostgresStateStorage {
+       backend: Arc<PostgresBackend>,
+   }
+
+   impl PostgresStateStorage {
+       async fn save_agent_state(
+           &self,
+           agent_id: &str,
+           agent_type: &str,
+           state: &AgentState,
+       ) -> Result<(), LLMSpellError> {
+           let client = self.backend.pool.get().await?;
+           let state_json = serde_json::to_value(state)?;
+           let checksum = sha256_hash(&state_json.to_string());
+
+           client.execute(
+               "INSERT INTO llmspell.agent_state
+                (tenant_id, agent_id, agent_type, state_data, checksum, version)
+                VALUES (current_setting('app.current_tenant_id', true), $1, $2, $3, $4,
+                        COALESCE((SELECT MAX(version) + 1 FROM llmspell.agent_state
+                                  WHERE tenant_id = current_setting('app.current_tenant_id', true)
+                                    AND agent_id = $1), 1))
+                ON CONFLICT (tenant_id, agent_id, version) DO UPDATE
+                  SET state_data = EXCLUDED.state_data,
+                      checksum = EXCLUDED.checksum,
+                      updated_at = now()",
+               &[&agent_id, &agent_type, &state_json, &checksum]
+           ).await?;
+
+           Ok(())
+       }
+
+       async fn load_agent_state(
+           &self,
+           agent_id: &str,
+           version: Option<i32>,
+       ) -> Result<Option<AgentState>, LLMSpellError> {
+           let client = self.backend.pool.get().await?;
+
+           let row = if let Some(v) = version {
+               // Load specific version
+               client.query_opt(
+                   "SELECT state_data, checksum FROM llmspell.agent_state
+                    WHERE tenant_id = current_setting('app.current_tenant_id', true)
+                      AND agent_id = $1 AND version = $2",
+                   &[&agent_id, &v]
+               ).await?
+           } else {
+               // Load latest version
+               client.query_opt(
+                   "SELECT state_data, checksum FROM llmspell.agent_state
+                    WHERE tenant_id = current_setting('app.current_tenant_id', true)
+                      AND agent_id = $1
+                    ORDER BY version DESC LIMIT 1",
+                   &[&agent_id]
+               ).await?
+           };
+
+           if let Some(r) = row {
+               let state_data: serde_json::Value = r.get(0);
+               let stored_checksum: String = r.get(1);
+
+               // Verify integrity
+               let computed_checksum = sha256_hash(&state_data.to_string());
+               if stored_checksum != computed_checksum {
+                   return Err(LLMSpellError::Storage(
+                       "State checksum mismatch - data corruption detected".to_string()
+                   ));
+               }
+
+               let state: AgentState = serde_json::from_value(state_data)?;
+               Ok(Some(state))
+           } else {
+               Ok(None)
+           }
+       }
+   }
+   ```
+
+3. **Integration with Kernel** - Update `llmspell-kernel/src/state/mod.rs`:
+   ```rust
+   pub enum StateBackend {
+       Sled(SledStateStorage),
+       PostgreSQL(PostgresStateStorage),
+       InMemory(InMemoryStateStorage),
+   }
+
+   pub struct StateConfig {
+       pub backend: String,  // "sled", "postgres", "inmemory"
+       pub connection_string: Option<String>,
+   }
+   ```
+
+**Deliverables**:
+- Agent state PostgreSQL storage implementation
+- State versioning support (version history)
+- Integrity verification via checksums
+- State persistence tests passing
+
+**Success Criteria**:
+- [ ] Agent state save/load roundtrip successful (serialize/deserialize)
+- [ ] State versioning works (can retrieve historical versions)
+- [ ] Checksum verification detects corruption
+- [ ] <10ms write latency, <5ms read latency
+- [ ] JSONB queries functional (filter by state properties)
+- [ ] Sled backend still works (default)
+
+---
+
+#### **Days 13-14: Workflow State + Procedural Memory**
+
+**Tasks**:
+1. **Workflow State Schema** - Create `llmspell-workflows/migrations/004_workflow_state.sql`:
+   ```sql
+   CREATE TABLE llmspell.workflow_state (
+       workflow_id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+       tenant_id VARCHAR(255) NOT NULL,
+       workflow_name VARCHAR(255) NOT NULL,
+       execution_state JSONB NOT NULL,
+       status VARCHAR(50) NOT NULL CHECK (status IN ('pending', 'running', 'completed', 'failed', 'cancelled')),
+       step_status JSONB NOT NULL DEFAULT '[]',  -- Array of step execution states
+       error_message TEXT,
+       started_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+       completed_at TIMESTAMPTZ,
+       duration_ms BIGINT,
+
+       CONSTRAINT duration_positive CHECK (duration_ms IS NULL OR duration_ms >= 0)
+   );
+
+   CREATE INDEX idx_workflow_tenant ON llmspell.workflow_state(tenant_id);
+   CREATE INDEX idx_workflow_name ON llmspell.workflow_state(workflow_name);
+   CREATE INDEX idx_workflow_status ON llmspell.workflow_state(status);
+   CREATE INDEX idx_workflow_started ON llmspell.workflow_state(started_at);
+
+   -- RLS
+   ALTER TABLE llmspell.workflow_state ENABLE ROW LEVEL SECURITY;
+   CREATE POLICY tenant_isolation ON llmspell.workflow_state
+       USING (tenant_id = current_setting('app.current_tenant_id', true));
+   ```
+
+2. **Procedural Memory Schema** - Create `llmspell-memory/migrations/005_procedural_memory.sql`:
+   ```sql
+   CREATE TABLE llmspell.procedural_memory (
+       pattern_id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+       tenant_id VARCHAR(255) NOT NULL,
+       pattern_type VARCHAR(255) NOT NULL,  -- 'prompt_template', 'retrieval_strategy', 'tool_sequence'
+       pattern_name VARCHAR(255) NOT NULL,
+       pattern_data JSONB NOT NULL,
+       usage_count INTEGER NOT NULL DEFAULT 0,
+       success_count INTEGER NOT NULL DEFAULT 0,
+       failure_count INTEGER NOT NULL DEFAULT 0,
+       success_rate FLOAT GENERATED ALWAYS AS (
+           CASE WHEN usage_count > 0
+                THEN success_count::float / usage_count::float
+                ELSE 0.0
+           END
+       ) STORED,
+       avg_execution_time_ms FLOAT,
+       created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+       last_used_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+
+       UNIQUE(tenant_id, pattern_type, pattern_name)
+   );
+
+   CREATE INDEX idx_procedural_tenant ON llmspell.procedural_memory(tenant_id);
+   CREATE INDEX idx_procedural_type ON llmspell.procedural_memory(pattern_type);
+   CREATE INDEX idx_procedural_success_rate ON llmspell.procedural_memory(success_rate);
+   CREATE INDEX idx_procedural_usage ON llmspell.procedural_memory(usage_count);
+
+   -- RLS
+   ALTER TABLE llmspell.procedural_memory ENABLE ROW LEVEL SECURITY;
+   CREATE POLICY tenant_isolation ON llmspell.procedural_memory
+       USING (tenant_id = current_setting('app.current_tenant_id', true));
+   ```
+
+3. **Backend Implementations** - Implement storage traits for workflow + procedural memory
+
+**Deliverables**:
+- Workflow state PostgreSQL storage
+- Procedural memory PostgreSQL storage
+- Workflow execution tracking (step-level status)
+- Pattern success rate analytics
+
+**Success Criteria**:
+- [ ] Workflow state persistence functional
+- [ ] Step-level execution status tracking
+- [ ] Procedural memory pattern storage working
+- [ ] Success rate calculation accurate (GENERATED column)
+- [ ] <10ms write, <5ms read latency
+- [ ] Existing backends (Sled, InMemory) still work
+
+---
+
+#### **Day 15: State Storage Integration Testing**
+
+**Tasks**:
+1. **End-to-End State Tests** - Validate agent state, workflow state, procedural memory together
+2. **Performance Benchmarks** - Measure JSONB query performance vs Sled
+3. **Migration Scripts** - Create Sled → PostgreSQL migration tool
+
+**Success Criteria**:
+- [ ] All state storage tests passing (agent + workflow + procedural)
+- [ ] Performance within acceptable range (<2x Sled latency)
+- [ ] Migration tool successfully moves data from Sled to PostgreSQL
+
+---
+
+### **Week 4: Session + Artifact Storage (Days 16-20)**
+
+**Goal**: Implement PostgreSQL storage for sessions, artifacts (with BLOB/large object support)
+
+#### **Days 16-18: Session Storage Implementation**
+
+**Tasks**:
+1. **Schema Design** - Create `llmspell-sessions/migrations/006_sessions.sql`:
+   ```sql
+   CREATE TABLE llmspell.sessions (
+       session_id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+       tenant_id VARCHAR(255) NOT NULL,
+       user_id VARCHAR(255),
+       context JSONB NOT NULL DEFAULT '{}',
+       status VARCHAR(50) NOT NULL CHECK (status IN ('active', 'paused', 'closed')),
+       metadata JSONB NOT NULL DEFAULT '{}',
+       created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+       updated_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+       closed_at TIMESTAMPTZ
+   );
+
+   CREATE TABLE llmspell.artifacts (
+       artifact_id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+       tenant_id VARCHAR(255) NOT NULL,
+       session_id UUID NOT NULL REFERENCES llmspell.sessions(session_id) ON DELETE CASCADE,
+       artifact_type VARCHAR(255) NOT NULL,
+       artifact_name VARCHAR(500) NOT NULL,
+       metadata JSONB NOT NULL DEFAULT '{}',
+       content BYTEA,  -- For small files (<1MB)
+       large_object_oid OID,  -- For large files (>1MB) via PostgreSQL lo_* API
+       content_size_bytes BIGINT NOT NULL,
+       version INTEGER NOT NULL DEFAULT 1,
+       created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+
+       CONSTRAINT content_xor CHECK (
+           (content IS NOT NULL AND large_object_oid IS NULL) OR
+           (content IS NULL AND large_object_oid IS NOT NULL)
+       ),
+       UNIQUE(tenant_id, session_id, artifact_name, version)
+   );
+
+   CREATE INDEX idx_sessions_tenant ON llmspell.sessions(tenant_id);
+   CREATE INDEX idx_sessions_user ON llmspell.sessions(user_id);
+   CREATE INDEX idx_sessions_status ON llmspell.sessions(status);
+   CREATE INDEX idx_sessions_created ON llmspell.sessions(created_at);
+
+   CREATE INDEX idx_artifacts_tenant ON llmspell.artifacts(tenant_id);
+   CREATE INDEX idx_artifacts_session ON llmspell.artifacts(session_id);
+   CREATE INDEX idx_artifacts_type ON llmspell.artifacts(artifact_type);
+
+   -- RLS
+   ALTER TABLE llmspell.sessions ENABLE ROW LEVEL SECURITY;
+   CREATE POLICY tenant_isolation ON llmspell.sessions
+       USING (tenant_id = current_setting('app.current_tenant_id', true));
+
+   ALTER TABLE llmspell.artifacts ENABLE ROW LEVEL SECURITY;
+   CREATE POLICY tenant_isolation ON llmspell.artifacts
+       USING (tenant_id = current_setting('app.current_tenant_id', true));
+   ```
+
+2. **Backend Implementation** - Create `llmspell-sessions/src/storage/postgres.rs` with session CRUD
+
+**Deliverables**:
+- Session storage PostgreSQL implementation
+- Session lifecycle management (active → closed)
+- Session context preservation tests
+
+**Success Criteria**:
+- [ ] Session CRUD operations <5ms
+- [ ] Session context persists across restarts
+- [ ] Cascade deletion (session → artifacts)
+- [ ] Sled backend still works (default)
+
+---
+
+#### **Days 19-20: Large Object (BLOB) Support for Artifacts**
+
+**Tasks**:
+1. **Large Object API Integration** - Use PostgreSQL `lo_create`, `lo_open`, `lo_write`, `lo_read`, `lo_unlink`:
+   ```rust
+   impl PostgresArtifactStorage {
+       async fn store_artifact(
+           &self,
+           session_id: Uuid,
+           artifact: Artifact,
+       ) -> Result<Uuid, LLMSpellError> {
+           let client = self.backend.pool.get().await?;
+           let artifact_id = Uuid::new_v4();
+
+           if artifact.content.len() < 1_000_000 {  // <1MB: use BYTEA
+               client.execute(
+                   "INSERT INTO llmspell.artifacts
+                    (artifact_id, tenant_id, session_id, artifact_type, artifact_name,
+                     metadata, content, content_size_bytes)
+                    VALUES ($1, current_setting('app.current_tenant_id', true), $2, $3, $4, $5, $6, $7)",
+                   &[&artifact_id, &session_id, &artifact.artifact_type, &artifact.name,
+                     &artifact.metadata, &artifact.content, &(artifact.content.len() as i64)]
+               ).await?;
+           } else {  // >1MB: use Large Object
+               let mut txn = client.transaction().await?;
+
+               // Create large object
+               let oid = txn.query_one("SELECT lo_create(0)", &[]).await?.get::<_, u32>(0);
+
+               // Open for writing
+               let fd = txn.query_one("SELECT lo_open($1, 131072)", &[&oid]).await?.get::<_, i32>(0);  // 131072 = INV_WRITE
+
+               // Write in chunks
+               for chunk in artifact.content.chunks(8192) {
+                   txn.execute(
+                       "SELECT lowrite($1, $2)",
+                       &[&fd, &chunk]
+                   ).await?;
+               }
+
+               // Close
+               txn.execute("SELECT lo_close($1)", &[&fd]).await?;
+
+               // Insert metadata
+               txn.execute(
+                   "INSERT INTO llmspell.artifacts
+                    (artifact_id, tenant_id, session_id, artifact_type, artifact_name,
+                     metadata, large_object_oid, content_size_bytes)
+                    VALUES ($1, current_setting('app.current_tenant_id', true), $2, $3, $4, $5, $6, $7)",
+                   &[&artifact_id, &session_id, &artifact.artifact_type, &artifact.name,
+                     &artifact.metadata, &oid, &(artifact.content.len() as i64)]
+               ).await?;
+
+               txn.commit().await?;
+           }
+
+           Ok(artifact_id)
+       }
+
+       async fn load_artifact(&self, artifact_id: Uuid) -> Result<Option<Artifact>, LLMSpellError> {
+           let client = self.backend.pool.get().await?;
+
+           let row = client.query_opt(
+               "SELECT artifact_type, artifact_name, metadata, content, large_object_oid, content_size_bytes
+                FROM llmspell.artifacts
+                WHERE artifact_id = $1
+                  AND tenant_id = current_setting('app.current_tenant_id', true)",
+               &[&artifact_id]
+           ).await?;
+
+           if let Some(r) = row {
+               let content = if let Some(bytes) = r.get::<_, Option<Vec<u8>>>(3) {
+                   // Small artifact (BYTEA)
+                   bytes
+               } else if let Some(oid) = r.get::<_, Option<u32>>(4) {
+                   // Large artifact (Large Object)
+                   let mut txn = client.transaction().await?;
+                   let fd = txn.query_one("SELECT lo_open($1, 262144)", &[&oid]).await?.get::<_, i32>(0);  // 262144 = INV_READ
+
+                   let mut content = Vec::new();
+                   loop {
+                       let chunk: Vec<u8> = txn.query_one(
+                           "SELECT loread($1, 8192)",
+                           &[&fd]
+                       ).await?.get(0);
+
+                       if chunk.is_empty() {
+                           break;
+                       }
+                       content.extend_from_slice(&chunk);
+                   }
+
+                   txn.execute("SELECT lo_close($1)", &[&fd]).await?;
+                   txn.commit().await?;
+
+                   content
+               } else {
+                   return Err(LLMSpellError::Storage("Artifact has no content".to_string()));
+               };
+
+               Ok(Some(Artifact {
+                   artifact_type: r.get(0),
+                   name: r.get(1),
+                   metadata: r.get(2),
+                   content,
+               }))
+           } else {
+               Ok(None)
+           }
+       }
+   }
+   ```
+
+2. **Streaming Upload/Download** - Implement chunked transfer for large artifacts (>10MB)
+
+**Deliverables**:
+- Artifact storage with BLOB + large object support
+- Artifacts up to 100MB supported
+- Streaming upload/download functional
+
+**Success Criteria**:
+- [ ] Artifacts <1MB use BYTEA (faster)
+- [ ] Artifacts >1MB use Large Object API (scalable)
+- [ ] Upload/download 100MB artifact in <30 seconds
+- [ ] Cascade deletion works (session deletion cleans up large objects)
+- [ ] Memory usage stays low during streaming (<10MB resident)
+
+---
+
+### **Week 5: Event + Hook Storage (Days 21-25)**
+
+**Goal**: Implement PostgreSQL temporal table storage for hook history and event log
+
+#### **Days 21-22: Hook History Storage**
+
+**Tasks**:
+1. **Schema Design** - Create `llmspell-hooks/migrations/007_hook_history.sql`:
+   ```sql
+   CREATE TABLE llmspell.hook_history (
+       execution_id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+       tenant_id VARCHAR(255) NOT NULL,
+       hook_name VARCHAR(255) NOT NULL,
+       hook_type VARCHAR(100) NOT NULL,  -- 'pre_execution', 'post_execution', 'on_error', etc.
+       execution_data JSONB NOT NULL,  -- Hook input/output/context
+       result VARCHAR(50) NOT NULL,  -- 'Continue', 'Modified', 'Cancel', 'Redirect', etc.
+       duration_ms INTEGER NOT NULL,
+       executed_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+
+       CONSTRAINT duration_non_negative CHECK (duration_ms >= 0)
+   );
+
+   CREATE INDEX idx_hook_history_tenant ON llmspell.hook_history(tenant_id);
+   CREATE INDEX idx_hook_history_name ON llmspell.hook_history(hook_name);
+   CREATE INDEX idx_hook_history_type ON llmspell.hook_history(hook_type);
+   CREATE INDEX idx_hook_history_time ON llmspell.hook_history(executed_at);
+   CREATE INDEX idx_hook_history_result ON llmspell.hook_history(result);
+
+   -- GIN index for JSONB queries
+   CREATE INDEX idx_hook_history_data ON llmspell.hook_history USING GIN (execution_data);
+
+   -- RLS
+   ALTER TABLE llmspell.hook_history ENABLE ROW LEVEL SECURITY;
+   CREATE POLICY tenant_isolation ON llmspell.hook_history
+       USING (tenant_id = current_setting('app.current_tenant_id', true));
+   ```
+
+2. **ReplayableHook Integration** - Implement `llmspell-hooks/src/storage/postgres.rs`:
+   ```rust
+   impl PostgresHookStorage {
+       async fn record_execution(
+           &self,
+           hook_name: &str,
+           hook_type: &str,
+           execution_data: &HookExecutionData,
+           result: &HookResult,
+           duration: Duration,
+       ) -> Result<(), LLMSpellError> {
+           let client = self.backend.pool.get().await?;
+           let data_json = serde_json::to_value(execution_data)?;
+
+           client.execute(
+               "INSERT INTO llmspell.hook_history
+                (tenant_id, hook_name, hook_type, execution_data, result, duration_ms)
+                VALUES (current_setting('app.current_tenant_id', true), $1, $2, $3, $4, $5)",
+               &[&hook_name, &hook_type, &data_json, &result.to_string(), &duration.as_millis() as &i32]
+           ).await?;
+
+           Ok(())
+       }
+
+       async fn replay_hooks(
+           &self,
+           time_range: (DateTime<Utc>, DateTime<Utc>),
+           hook_name: Option<&str>,
+       ) -> Result<Vec<HookExecution>, LLMSpellError> {
+           let client = self.backend.pool.get().await?;
+
+           let rows = client.query(
+               "SELECT execution_id, hook_name, hook_type, execution_data, result, duration_ms, executed_at
+                FROM llmspell.hook_history
+                WHERE tenant_id = current_setting('app.current_tenant_id', true)
+                  AND executed_at >= $1 AND executed_at < $2
+                  AND ($3::text IS NULL OR hook_name = $3)
+                ORDER BY executed_at",
+               &[&time_range.0, &time_range.1, &hook_name]
+           ).await?;
+
+           Ok(rows.into_iter().map(|r| HookExecution::from_row(&r)).collect())
+       }
+   }
+   ```
+
+**Deliverables**:
+- Hook history PostgreSQL storage
+- ReplayableHook functionality (Phase 4 integration)
+- Hook replay queries functional
+
+**Success Criteria**:
+- [ ] Hook executions recorded with <1ms overhead
+- [ ] Hook replay functional (time-range queries)
+- [ ] JSONB queries enable filtering by hook context
+- [ ] File backend still works (default)
+
+---
+
+#### **Days 23-24: Event Log Storage with Partitioning**
+
+**Tasks**:
+1. **Partitioned Schema** - Create `llmspell-events/migrations/008_event_log.sql`:
+   ```sql
+   -- Parent table (partitioned by time)
+   CREATE TABLE llmspell.event_log (
+       event_id UUID NOT NULL DEFAULT uuid_generate_v4(),
+       tenant_id VARCHAR(255) NOT NULL,
+       event_type VARCHAR(255) NOT NULL,
+       correlation_id UUID,  -- Link related events
+       event_data JSONB NOT NULL,
+       emitted_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+
+       PRIMARY KEY (event_id, emitted_at)
+   ) PARTITION BY RANGE (emitted_at);
+
+   -- Create initial partitions (monthly)
+   CREATE TABLE llmspell.event_log_2025_01 PARTITION OF llmspell.event_log
+       FOR VALUES FROM ('2025-01-01') TO ('2025-02-01');
+   CREATE TABLE llmspell.event_log_2025_02 PARTITION OF llmspell.event_log
+       FOR VALUES FROM ('2025-02-01') TO ('2025-03-01');
+   -- ... create partitions for current year + 1 year ahead
+
+   -- Indexes (on parent, inherited by partitions)
+   CREATE INDEX idx_event_log_tenant ON llmspell.event_log(tenant_id);
+   CREATE INDEX idx_event_log_type ON llmspell.event_log(event_type);
+   CREATE INDEX idx_event_log_correlation ON llmspell.event_log(correlation_id);
+   CREATE INDEX idx_event_log_time ON llmspell.event_log(emitted_at);
+
+   -- RLS (on parent, inherited by partitions)
+   ALTER TABLE llmspell.event_log ENABLE ROW LEVEL SECURITY;
+   CREATE POLICY tenant_isolation ON llmspell.event_log
+       USING (tenant_id = current_setting('app.current_tenant_id', true));
+   ```
+
+2. **Automatic Partition Management** - Create `llmspell-events/src/storage/postgres/partitions.rs`:
+   ```rust
+   impl PostgresEventStorage {
+       /// Create next month's partition if it doesn't exist
+       pub async fn ensure_partition_exists(&self, target_date: DateTime<Utc>) -> Result<(), LLMSpellError> {
+           let client = self.backend.pool.get().await?;
+           let partition_name = format!("llmspell.event_log_{}", target_date.format("%Y_%m"));
+           let start_date = target_date.date().and_hms(0, 0, 0);
+           let end_date = (start_date + Duration::days(32)).date().and_hms(0, 0, 0);  // Next month
+
+           client.execute(&format!(
+               "CREATE TABLE IF NOT EXISTS {} PARTITION OF llmspell.event_log
+                FOR VALUES FROM ('{}') TO ('{}')",
+               partition_name,
+               start_date.format("%Y-%m-%d"),
+               end_date.format("%Y-%m-%d")
+           ), &[]).await?;
+
+           Ok(())
+       }
+
+       /// Archive old partitions (>90 days) to cold storage
+       pub async fn archive_old_partitions(&self, cutoff_date: DateTime<Utc>) -> Result<(), LLMSpellError> {
+           let client = self.backend.pool.get().await?;
+           let partition_name = format!("llmspell.event_log_{}", cutoff_date.format("%Y_%m"));
+
+           // Detach partition
+           client.execute(&format!(
+               "ALTER TABLE llmspell.event_log DETACH PARTITION {}",
+               partition_name
+           ), &[]).await?;
+
+           // Export to file (pg_dump equivalent via COPY)
+           client.execute(&format!(
+               "COPY {} TO '/var/lib/postgresql/archives/{}.csv' WITH CSV HEADER",
+               partition_name, partition_name
+           ), &[]).await?;
+
+           // Drop partition
+           client.execute(&format!("DROP TABLE {}", partition_name), &[]).await?;
+
+           Ok(())
+       }
+   }
+   ```
+
+3. **Event Correlation Queries** - Implement correlation ID tracking:
+   ```rust
+   pub async fn get_correlated_events(
+       &self,
+       correlation_id: Uuid,
+   ) -> Result<Vec<Event>, LLMSpellError> {
+       let client = self.backend.pool.get().await?;
+
+       let rows = client.query(
+           "SELECT event_id, event_type, event_data, emitted_at
+            FROM llmspell.event_log
+            WHERE tenant_id = current_setting('app.current_tenant_id', true)
+              AND correlation_id = $1
+            ORDER BY emitted_at",
+           &[&correlation_id]
+       ).await?;
+
+       Ok(rows.into_iter().map(|r| Event::from_row(&r)).collect())
+   }
+   ```
+
+**Deliverables**:
+- Event log with monthly partitioning
+- Automatic partition creation (next month)
+- Event correlation queries functional
+- Partition archival strategy
+
+**Success Criteria**:
+- [ ] Event insertion <2ms (partitioning overhead minimal)
+- [ ] Time-range queries leverage partition pruning (<10ms for 1-day range)
+- [ ] Partition creation automated (cron job or application startup)
+- [ ] Old partition archival tested (>90 days → CSV export)
+- [ ] Correlation queries link related events correctly
+
+---
+
+#### **Day 25: Event Storage Optimization**
+
+**Tasks**:
+1. **Partition Pruning Validation** - Verify PostgreSQL query planner uses partition pruning
+2. **Index Optimization** - Tune indexes for common query patterns
+3. **Archival Testing** - Test 90-day archival process end-to-end
+
+**Success Criteria**:
+- [ ] `EXPLAIN ANALYZE` shows partition pruning for time-range queries
+- [ ] Query performance: P50 <5ms, P95 <20ms for typical event queries
+- [ ] Archival process completes in <5 minutes for 1M events
+
+---
+
+### **Week 6: Security + Integration (Days 26-30)**
+
+**Goal**: Encrypted API key storage, full integration testing, migration tooling, comprehensive documentation
+
+#### **Days 26-27: Encrypted API Key Storage**
+
+**Tasks**:
+1. **Schema with Encryption** - Create `llmspell-utils/migrations/009_api_keys.sql`:
+   ```sql
+   CREATE EXTENSION IF NOT EXISTS pgcrypto;
+
+   CREATE TABLE llmspell.api_keys (
+       key_id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+       tenant_id VARCHAR(255) NOT NULL,
+       provider VARCHAR(255) NOT NULL,  -- 'openai', 'anthropic', 'mistral', etc.
+       key_name VARCHAR(255) NOT NULL,  -- User-friendly label
+       encrypted_key BYTEA NOT NULL,    -- pgp_sym_encrypt() result
+       key_metadata JSONB NOT NULL DEFAULT '{}',
+       created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+       expires_at TIMESTAMPTZ,
+       last_used_at TIMESTAMPTZ,
+
+       UNIQUE(tenant_id, provider, key_name)
+   );
+
+   CREATE INDEX idx_api_keys_tenant ON llmspell.api_keys(tenant_id);
+   CREATE INDEX idx_api_keys_provider ON llmspell.api_keys(provider);
+
+   -- RLS
+   ALTER TABLE llmspell.api_keys ENABLE ROW LEVEL SECURITY;
+   CREATE POLICY tenant_isolation ON llmspell.api_keys
+       USING (tenant_id = current_setting('app.current_tenant_id', true));
+   ```
+
+2. **Encryption Implementation** - Use pgcrypto for symmetric encryption:
+   ```rust
+   impl PostgresApiKeyStorage {
+       async fn store_key(
+           &self,
+           provider: &str,
+           key_name: &str,
+           api_key: &str,
+           metadata: serde_json::Value,
+       ) -> Result<Uuid, LLMSpellError> {
+           let client = self.backend.pool.get().await?;
+           let key_id = Uuid::new_v4();
+           let encryption_passphrase = self.get_encryption_passphrase()?;  // From secure config
+
+           client.execute(
+               "INSERT INTO llmspell.api_keys
+                (key_id, tenant_id, provider, key_name, encrypted_key, key_metadata)
+                VALUES ($1, current_setting('app.current_tenant_id', true), $2, $3,
+                        pgp_sym_encrypt($4, $5), $6)",
+               &[&key_id, &provider, &key_name, &api_key, &encryption_passphrase, &metadata]
+           ).await?;
+
+           Ok(key_id)
+       }
+
+       async fn retrieve_key(&self, provider: &str, key_name: &str) -> Result<String, LLMSpellError> {
+           let client = self.backend.pool.get().await?;
+           let encryption_passphrase = self.get_encryption_passphrase()?;
+
+           let row = client.query_one(
+               "SELECT pgp_sym_decrypt(encrypted_key, $3) AS decrypted_key
+                FROM llmspell.api_keys
+                WHERE tenant_id = current_setting('app.current_tenant_id', true)
+                  AND provider = $1 AND key_name = $2",
+               &[&provider, &key_name, &encryption_passphrase]
+           ).await?;
+
+           let decrypted_key: Vec<u8> = row.get(0);
+           Ok(String::from_utf8(decrypted_key)?)
+       }
+   }
+   ```
+
+3. **Key Rotation** - Implement key rotation with versioning
+
+**Deliverables**:
+- Encrypted API key storage
+- Key retrieval with decryption
+- Key rotation support
+
+**Success Criteria**:
+- [ ] API keys encrypted at rest (pgp_sym_encrypt)
+- [ ] Decryption functional for key retrieval
+- [ ] Encryption passphrase stored securely (environment variable, not code)
+- [ ] Key rotation tested (re-encrypt with new passphrase)
+- [ ] File backend still works (default)
+
+---
+
+#### **Days 28-29: Full Integration Testing**
+
+**Tasks**:
+1. **All 149 Phase 13 Tests with PostgreSQL** - Run complete test suite with PostgreSQL backend
+2. **All 149 Tests with Existing Backends** - Regression validation (ZERO failures allowed)
+3. **Performance Benchmarking**:
+   ```bash
+   # Vector search
+   cargo bench --bench vector_search -- --baseline phase13 --save-baseline phase13b_postgres
+
+   # Graph traversal
+   cargo bench --bench graph_queries -- --baseline phase13 --save-baseline phase13b_postgres
+
+   # State operations
+   cargo bench --bench state_persistence -- --baseline phase13 --save-baseline phase13b_postgres
+   ```
+
+4. **Multi-Tenancy Load Testing**:
+   ```rust
+   #[tokio::test(flavor = "multi_thread", worker_threads = 10)]
+   async fn test_concurrent_tenants() {
+       let backend = PostgresBackend::new(TEST_CONNECTION).await.unwrap();
+
+       // Spawn 100 concurrent tenants, each performing 100 operations
+       let handles: Vec<_> = (0..100).map(|i| {
+           let backend = backend.clone();
+           tokio::spawn(async move {
+               let tenant_id = format!("tenant-{}", i);
+               backend.set_tenant_context(&tenant_id).await.unwrap();
+
+               for j in 0..100 {
+                   // Write data
+                   let entry = create_test_entry(&tenant_id, j);
+                   backend.add(entry).await.unwrap();
+
+                   // Read data
+                   let results = backend.search(query).await.unwrap();
+                   assert_eq!(results.len(), j + 1);
+               }
+           })
+       }).collect();
+
+       // Wait for all tenants
+       for handle in handles {
+           handle.await.unwrap();
+       }
+
+       // Verify zero leakage: each tenant has exactly 100 entries
+       for i in 0..100 {
+           let tenant_id = format!("tenant-{}", i);
+           backend.set_tenant_context(&tenant_id).await.unwrap();
+           let count = backend.count().await.unwrap();
+           assert_eq!(count, 100, "Tenant {} leaked data", tenant_id);
+       }
+   }
+   ```
+
+5. **Large Dataset Testing** - Validate 100K vectors, 10K entities, 1K sessions
+
+**Deliverables**:
+- All 149 tests passing with PostgreSQL
+- All 149 tests passing with existing backends (regression check)
+- Performance benchmarks documented
+- Multi-tenancy load test passing (100 tenants × 100 ops)
+
+**Success Criteria**:
+- [ ] 100% test pass rate with PostgreSQL backend
+- [ ] ZERO regressions with existing backends
+- [ ] Performance within acceptable range:
+  - Vector search: <10ms (vs 1-2ms HNSW - acceptable 5x slowdown)
+  - Graph traversal: <50ms (vs 5ms SurrealDB - acceptable 10x slowdown)
+  - State operations: <10ms write, <5ms read (vs 1ms Sled - acceptable 5-10x slowdown)
+- [ ] Multi-tenancy: 100% zero-leakage validation
+- [ ] Memory overhead: <500MB for 10K entries
+- [ ] Quality gates passing: `./scripts/quality/quality-check.sh`
+
+---
+
+#### **Day 30: Migration Tools + Documentation**
+
+**Tasks**:
+1. **Migration CLI Implementation** - Create `llmspell-cli/src/commands/storage_migrate.rs`:
+   ```rust
+   #[derive(Parser)]
+   pub struct StorageMigrateCommand {
+       #[clap(long)]
+       from: String,  // "hnsw", "surrealdb", "sled", "file"
+
+       #[clap(long)]
+       to: String,  // "postgres"
+
+       #[clap(long)]
+       component: String,  // "episodic", "semantic", "agent_state", "sessions", etc.
+
+       #[clap(long)]
+       config: PathBuf,  // PostgreSQL connection config
+
+       #[clap(long)]
+       dry_run: bool,
+   }
+
+   impl StorageMigrateCommand {
+       pub async fn execute(&self) -> Result<(), LLMSpellError> {
+           println!("Migrating {} storage from {} to {}...", self.component, self.from, self.to);
+
+           // 1. Pre-migration validation
+           let (old_count, old_size) = self.validate_source().await?;
+           println!("  Source: {} entries, {} bytes", old_count, old_size);
+
+           // 2. Create destination tables (idempotent)
+           self.create_postgres_schema().await?;
+
+           // 3. Batch copy data
+           let mut migrated = 0;
+           let batch_size = 1000;
+
+           while migrated < old_count {
+               let batch = self.read_batch(migrated, batch_size).await?;
+
+               if !self.dry_run {
+                   self.write_batch(&batch).await?;
+               }
+
+               migrated += batch.len();
+               println!("  Progress: {} / {} ({:.1}%)", migrated, old_count, (migrated as f64 / old_count as f64) * 100.0);
+           }
+
+           // 4. Post-migration validation
+           let (new_count, new_size) = self.validate_destination().await?;
+           println!("  Destination: {} entries, {} bytes", new_count, new_size);
+
+           if new_count == old_count {
+               println!("✓ Migration successful!");
+               if !self.dry_run {
+                   println!("  Note: Old storage not deleted. Manual cleanup required.");
+               }
+           } else {
+               return Err(LLMSpellError::Migration(
+                   format!("Count mismatch: {} → {}", old_count, new_count)
+               ));
+           }
+
+           Ok(())
+       }
+   }
+   ```
+
+2. **Migration Paths** - Implement 10 migration paths:
+   - HNSW → PostgreSQL VectorChord (episodic + RAG)
+   - SurrealDB → PostgreSQL bi-temporal graph (semantic)
+   - InMemory → PostgreSQL JSONB (procedural)
+   - Sled → PostgreSQL JSONB (agent state, workflows, sessions)
+   - File → PostgreSQL JSONB (hooks)
+   - Storage Adapter → PostgreSQL temporal (events)
+   - File → PostgreSQL encrypted (API keys)
+
+3. **Documentation Creation** - Write comprehensive guides:
+   - `docs/user-guide/storage/postgresql-setup.md` (500+ lines)
+   - `docs/user-guide/storage/schema-reference.md` (800+ lines)
+   - `docs/user-guide/storage/migration-guide.md` (700+ lines)
+   - `docs/user-guide/storage/performance-tuning.md` (400+ lines)
+   - `docs/user-guide/storage/backup-restore.md` (300+ lines)
+
+**Documentation Structure**:
+```markdown
+# PostgreSQL Setup Guide
+
+## Prerequisites
+- PostgreSQL 16+ (18 recommended)
+- Docker + Docker Compose (or manual installation)
+
+## Quick Start (Docker)
+\`\`\`bash
+cd docker/postgres
+docker-compose up -d
+cargo run -- -p postgres-dev memory status
+\`\`\`
+
+## Manual Installation
+### 1. Install PostgreSQL 18
+### 2. Install VectorChord Extension
+\`\`\`bash
+git clone https://github.com/tensorchord/VectorChord.git
+cd VectorChord
+make && make install
+\`\`\`
+### 3. Configure PostgreSQL
+### 4. Run Migrations
+
+## Configuration
+\`\`\`toml
+# llmspell-config/builtins/postgres-all.toml
+[storage]
+backend = "postgres"
+connection_string = "postgresql://user:pass@localhost/llmspell"
+\`\`\`
+
+## Multi-Tenancy Setup
+- Row-Level Security (RLS) policies
+- Tenant context management
+- Security best practices
+
+## Performance Tuning
+- Connection pooling (20-50 connections)
+- Index optimization
+- Partition strategy for event log
+- VACUUM and autovacuum tuning
+
+## Backup & Restore
+\`\`\`bash
+# Backup
+pg_dump -U llmspell llmspell_prod > backup_$(date +%Y%m%d).sql
+
+# Restore
+psql -U llmspell llmspell_prod < backup_20250601.sql
+\`\`\`
+
+## Troubleshooting
+- Connection issues
+- Performance degradation
+- RLS policy debugging
+- Migration failures
+```
+
+**Deliverables**:
+- Migration CLI functional for all 10 storage components
+- 2,500+ lines of documentation (5 guides)
+- Examples for all backends (PostgreSQL + existing)
+
+**Success Criteria**:
+- [ ] Migration tool successfully moves data from HNSW → PostgreSQL (10K vectors in <5 min)
+- [ ] Migration tool successfully moves data from SurrealDB → PostgreSQL (1K entities in <2 min)
+- [ ] Migration tool successfully moves data from Sled → PostgreSQL (1K states in <1 min)
+- [ ] Dry-run mode functional (validation without writes)
+- [ ] Documentation comprehensive (setup, schema, migration, tuning, backup)
+- [ ] Examples working for all backends
+
+---
+
+## Configuration Examples
+
+### Minimal (Default - Existing Backends)
+```toml
+# No changes needed - existing defaults
+[memory.episodic]
+backend = "hnsw"  # Default
+
+[memory.semantic]
+backend = "surrealdb"  # Default
+
+[state]
+backend = "sled"  # Default
+```
+
+### PostgreSQL (All Components)
+```toml
+# llmspell-config/builtins/postgres-all.toml
+[storage]
+backend = "postgres"
+connection_string = "postgresql://llmspell:pass@localhost/llmspell_dev"
+pool_size = 20
+timeout_ms = 5000
+
+[memory.episodic]
+backend = "postgres"  # VectorChord
+
+[memory.semantic]
+backend = "postgres"  # Bi-temporal graph
+
+[memory.procedural]
+backend = "postgres"  # JSONB
+
+[rag]
+backend = "postgres"  # VectorChord + metadata
+
+[state]
+backend = "postgres"  # Agent + workflow state
+
+[sessions]
+backend = "postgres"  # Sessions + artifacts
+
+[hooks]
+backend = "postgres"  # Hook history
+
+[events]
+backend = "postgres"  # Event log (partitioned)
+
+[api_keys]
+backend = "postgres"  # Encrypted keys
+```
+
+### Hybrid (Fast Dev + Scalable Prod)
+```toml
+# Fast iteration with in-memory, scalable graph with PostgreSQL
+[memory.episodic]
+backend = "hnsw"  # Local files, fast
+
+[memory.semantic]
+backend = "postgres"  # Scalable graph at 100K+ entities
+connection_string = "postgresql://localhost/llmspell_dev"
+
+[state]
+backend = "sled"  # Embedded KV, fast
+
+[sessions]
+backend = "postgres"  # Centralized sessions for multi-node
+```
+
+---
+
+## Docker Compose (Complete Setup)
+
+```yaml
+version: '3.8'
+
+services:
+  postgres:
+    image: ghcr.io/tensorchord/vchord-postgres:pg18-v0.5.3
+    container_name: llmspell_postgres_dev
+    environment:
+      POSTGRES_DB: llmspell_dev
+      POSTGRES_USER: llmspell
+      POSTGRES_PASSWORD: llmspell_dev_pass
+      POSTGRES_HOST_AUTH_METHOD: scram-sha-256
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./init-scripts:/docker-entrypoint-initdb.d
+      - ./archives:/var/lib/postgresql/archives  # For event log archival
+    command: >
+      postgres
+      -c shared_preload_libraries='vchord'
+      -c max_connections=100
+      -c shared_buffers=512MB
+      -c effective_cache_size=2GB
+      -c maintenance_work_mem=128MB
+      -c checkpoint_completion_target=0.9
+      -c wal_buffers=16MB
+      -c default_statistics_target=100
+      -c random_page_cost=1.1
+      -c effective_io_concurrency=200
+      -c work_mem=4MB
+      -c autovacuum=on
+      -c autovacuum_max_workers=3
+      -c log_statement='all'
+      -c log_duration=on
+      -c log_min_duration_statement=100
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U llmspell"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    restart: unless-stopped
+
+  adminer:
+    image: adminer:latest
+    container_name: llmspell_adminer
+    ports:
+      - "8080:8080"
+    depends_on:
+      - postgres
+    restart: unless-stopped
+
+volumes:
+  postgres_data:
+    driver: local
+
+networks:
+  default:
+    name: llmspell_network
+```
+
+---
+
+## Success Criteria (Comprehensive)
+
+### Cross-Platform Support
+- [ ] Linux CI builds + tests passing (alongside macOS)
+- [ ] Zero platform-specific compilation errors
+- [ ] GPU detection working on both platforms (Metal macOS, CUDA/CPU Linux)
+- [ ] Documentation covers both platforms
+
+### Storage Backend Coverage (100%)
+- [ ] **Episodic Memory** (VectorChord) - 68 tests passing
+- [ ] **Semantic Memory** (bi-temporal graph) - 34 tests passing
+- [ ] **Procedural Memory** (JSONB) - tests passing
+- [ ] **RAG Documents** (VectorChord) - tests passing
+- [ ] **Agent State** (JSONB) - tests passing
+- [ ] **Workflow State** (JSONB) - tests passing
+- [ ] **Session + Artifacts** (JSONB + BLOB) - tests passing
+- [ ] **Hook History** (JSONB) - tests passing
+- [ ] **Event Log** (temporal partitions) - tests passing
+- [ ] **API Keys** (encrypted) - tests passing
+
+### Multi-Tenancy (Row-Level Security)
+- [ ] RLS policies on all 12+ PostgreSQL tables
+- [ ] Cross-tenant query prevention validated (100% zero-leakage)
+- [ ] Tenant context setting <1ms overhead
+- [ ] RLS performance overhead <5%
+- [ ] SQL injection blocked by RLS
+- [ ] Security audit passing
+
+### Performance Targets
+- [ ] Vector search: <10ms (10K entries)
+- [ ] Graph traversal: <50ms (3-4 hops)
+- [ ] State write: <10ms, read: <5ms
+- [ ] Session operations: <5ms
+- [ ] Hook recording: <1ms overhead
+- [ ] Event insertion: <2ms
+- [ ] Memory overhead: <500MB (10K entries)
+- [ ] Large dataset: 100K vectors, 10K entities, 1K sessions validated
+
+### Backward Compatibility (Zero Breaking Changes)
+- [ ] All 149 Phase 13 tests pass with PostgreSQL backend
+- [ ] All 149 tests pass with existing backends (HNSW, SurrealDB, Sled, File, InMemory)
+- [ ] Default behavior unchanged (no config = existing backends)
+- [ ] API unchanged (PostgreSQL is drop-in replacement)
+- [ ] Configuration additive (new options, no removals)
+
+### Quality & Documentation
+- [ ] Zero clippy warnings
+- [ ] >90% test coverage (new PostgreSQL code)
+- [ ] >95% API documentation
+- [ ] Quality gates passing: `./scripts/quality/quality-check.sh`
+- [ ] Migration tooling for all 10 storage components
+- [ ] 2,500+ lines of documentation (setup, schema, migration, tuning, backup)
+- [ ] Examples for all backends (PostgreSQL + existing)
+
+### Operational Readiness
+- [ ] Docker Compose one-command setup (<30 seconds)
+- [ ] Connection pooling functional (20+ connections)
+- [ ] Health checks passing
+- [ ] Backup/restore procedures documented and tested
+- [ ] Migration tool <5 minutes for 10K vectors
+- [ ] Partition management automated
+- [ ] Large objects (100MB artifacts) functional
+
+---
+
+## Testing Requirements
+
+### Unit Tests (100+ new tests)
+- PostgreSQL connection + pooling (10 tests)
+- RLS policy enforcement (15 tests)
+- Bi-temporal time-travel queries (20 tests)
+- Graph traversal CTEs (15 tests)
+- JSONB state serialization (20 tests)
+- Large object BLOB operations (10 tests)
+- Event log partitioning (10 tests)
+- API key encryption/decryption (10 tests)
+
+### Integration Tests (149 Phase 13 tests)
+- All episodic memory tests with PostgreSQL (68 tests)
+- All semantic memory (graph) tests with PostgreSQL (34 tests)
+- All procedural memory tests (10+ tests)
+- RAG pipeline tests with PostgreSQL (20+ tests)
+- State persistence tests (10+ tests)
+- Session management tests (7+ tests)
+
+### Performance Tests
+- Vector search latency benchmarks (1K, 10K, 100K vectors)
+- Graph traversal depth benchmarks (1-hop, 2-hop, 3-hop, 4-hop)
+- State persistence throughput (writes/sec, reads/sec)
+- Connection pool saturation tests
+- Multi-tenancy load tests (100 concurrent tenants)
+
+### Security Tests
+- Cross-tenant data leak prevention (zero-leakage validation)
+- SQL injection attempts (RLS policy validation)
+- Superuser bypass prevention
+- API key encryption integrity
+- Tenant context switching validation
+
+### Regression Tests
+- All 149 Phase 13 tests with existing backends (HNSW, SurrealDB, Sled)
+- Verify ZERO regressions
+- Performance regression checks (no >20% slowdown)
+
+---
+
+## Research References
+
+### PostgreSQL Graph Extensions
+- **Apache AGE**: PostgreSQL graph extension with Cypher queries
+  - Limitation: No native bi-temporal support (timestamps as strings)
+  - Performance: 15x slower aggregation than SQL (GitHub issue #2194, July 2025)
+  - Rust crate: `apache_age` (tokio-postgres based)
+  - Decision: **REJECTED** due to bi-temporal limitations + performance issues
+
+- **Native PostgreSQL CTEs**: Recursive Common Table Expressions
+  - Performant for <10M nodes, <4 depth (rs-llmspell typical use case)
+  - Full control over bi-temporal implementation
+  - Simpler integration with tokio-postgres
+  - Decision: **ACCEPTED**
+
+### PostgreSQL Vector Storage
+- **VectorChord** (TensorChord): DiskANN-inspired vector extension
+  - Performance: 5x faster queries than pgvector, 16x faster inserts
+  - Cost: $247 for 100M vectors vs $6,580 for pgvector (26.6x reduction)
+  - Throughput: 1,565 inserts/sec vs 246/sec pgvector
+  - Recall@95%: 35ms P50 latency
+  - Status: Active development, successor to pgvecto.rs
+  - Decision: **PRIMARY** (with pgvector as fallback)
+
+- **pgvector**: Mature PostgreSQL vector extension
+  - Widely adopted, stable ecosystem
+  - Rust crate: `pgvector v0.4` with `postgres` feature
+  - Decision: **FALLBACK** if VectorChord installation issues
+
+### PostgreSQL Multi-Tenancy
+- **Row-Level Security (RLS)**: PostgreSQL native feature
+  - Database-enforced isolation (not application-level)
+  - <5% performance overhead for simple tenant_id checks
+  - Production-proven pattern (2025 best practice)
+  - Session variable: `SET app.current_tenant_id = ?`
+  - Decision: **ACCEPTED**
+
+### Cross-Platform Compilation
+- Research confirmed: ZERO Linux compilation blockers
+- Platform-specific code properly gated with `cfg(target_os = "macos")`
+- Metal GPU (macOS), CUDA GPU (Linux), CPU fallback (both)
+- Only validation needed, no fixes required
+
+---
+
+## Design Document
+
+**Location**: `/docs/in-progress/phase-13b-design-doc.md` (to be created)
+
+**Contents** (estimated 3,000+ lines):
+1. Executive Summary
+2. Research Findings (Apache AGE vs Native CTEs, VectorChord vs pgvector)
+3. Complete Storage Audit (10 components)
+4. PostgreSQL Schema Reference (all 12+ tables)
+5. Multi-Tenancy Architecture (RLS implementation)
+6. Migration Strategy (10 migration paths)
+7. Performance Analysis (benchmarks vs Phase 13 baseline)
+8. Docker Setup (images, compose files, init scripts)
+9. Rust Implementation Details (tokio-postgres patterns)
+10. Testing Strategy (unit, integration, performance, security)
+11. Operational Procedures (backup, restore, monitoring, archival)
+
+---
+
+## Phase 14+ Implications
+
+### Phase 14: MCP Tool Integration
+- **Storage Need**: MCP server registration metadata
+- **PostgreSQL Benefit**: ACID transactions for registration, JSONB for flexible metadata
+
+### Phase 15: MCP Server Mode
+- **Storage Need**: MCP client connection state
+- **PostgreSQL Benefit**: Centralized state for multi-instance deployments
+
+### Phase 16: JavaScript Engine Support
+- **Storage Need**: None (runtime only)
+- **PostgreSQL Benefit**: N/A
+
+### Phase 17-18: Library Mode + A2A Protocol
+- **Storage Need**: Distributed agent coordination, service discovery
+- **PostgreSQL Benefit**: **CRITICAL** - PostgreSQL LISTEN/NOTIFY for event propagation, advisory locks for distributed coordination
+
+### Phase 19: Production Optimization
+- **Storage Need**: Performance monitoring, query optimization
+- **PostgreSQL Benefit**: **CRITICAL** - Native PostgreSQL tooling (pg_stat_statements, EXPLAIN ANALYZE, VACUUM strategy)
+
+**Forward-Looking Requirement**: PostgreSQL consolidation in Phase 13b positions rs-llmspell for distributed deployments in Phases 17-19 without additional storage refactoring.
+
+---
+
+## Estimated Effort
+
+**Duration**: 6 weeks (30 working days) - thoroughness prioritized over timeline
+
+**Breakdown**:
+- Week 1: Foundation + Vector Storage (Linux CI, PostgreSQL setup, VectorChord)
+- Week 2: Multi-Tenancy + Graph Storage (RLS, bi-temporal CTEs)
+- Week 3: State Storage (Agent, Workflow, Procedural)
+- Week 4: Session Storage (Sessions, Artifacts, Large Objects)
+- Week 5: Event Storage (Hooks, Events, Partitioning)
+- Week 6: Security + Integration (API keys, testing, migration, docs)
+
+**Parallelization** (2 developers):
+- Developer 1: Weeks 1-3 (Foundation, Vector, Graph, State)
+- Developer 2: Weeks 4-5 (Sessions, Events, Hooks)
+- Both: Week 6 (Integration, Testing, Documentation)
+- **Timeline**: 3-4 weeks with 2 developers
+
+**Single Developer**: 6 weeks full-time
+
+---
+
+## Risk Assessment
+
+### High Risks
+- **VectorChord Installation Complexity**: New extension, may have setup friction
+  - **Mitigation**: Provide Docker image, pgvector fallback, detailed docs
+- **Bi-Temporal Query Performance**: Recursive CTEs may degrade at scale
+  - **Mitigation**: Indexing strategy, materialized views, benchmark early
+- **RLS Performance Overhead**: Complex policies may exceed 5% target
+  - **Mitigation**: Keep policies simple (tenant_id equality only), benchmark
+
+### Medium Risks
+- **PostgreSQL Learning Curve**: Team may lack PostgreSQL expertise
+  - **Mitigation**: Comprehensive docs, examples, training materials
+- **Migration Data Loss**: Sled → PostgreSQL migration may fail
+  - **Mitigation**: Validation scripts, dry-run mode, rollback support, backups
+
+### Low Risks
+- **Docker Image Build**: VectorChord Dockerfile may be complex
+  - **Mitigation**: Use official TensorChord image, minimal customization
+- **Large Object API**: PostgreSQL lo_* API may be unfamiliar
+  - **Mitigation**: Examples, abstraction layer, test coverage
+
+---
+
+**END OF PHASE 13b SPECIFICATION**
+
+---
+
 ## Advanced Integration Phases
 
 
-### **Phase 14: MCP Tool Integration (Weeks 49-50)**
+### **Phase 14: MCP Tool Integration (Weeks 55-56)**
 
 **Goal**: Support Model Control Protocol for external tools
 **Priority**: LOW (Advanced Integration)
@@ -1786,7 +3861,7 @@ compression_ratio = 0.6  # Keep 60% of chunks
 
 ---
 
-### **Phase 15: MCP Server Mode (Weeks 51-52)**
+### **Phase 15: MCP Server Mode (Weeks 57-58)**
 
 **Goal**: Expose rs-llmspell tools and agents via MCP protocol
 **Priority**: LOW (Advanced Integration)
@@ -1813,7 +3888,7 @@ compression_ratio = 0.6  # Keep 60% of chunks
 
 ---
 
-### **Phase 16: JavaScript Engine Support (Weeks 53-54)**
+### **Phase 16: JavaScript Engine Support (Weeks 59-60)**
 
 **Goal**: Add JavaScript support via bridge pattern established in Phase 1
 **Priority**: MEDIUM (Multi-Language Support)
@@ -1842,7 +3917,7 @@ compression_ratio = 0.6  # Keep 60% of chunks
 
 ---
 
-### **Phase 17: Library Mode Support (Weeks 55-56)**
+### **Phase 17: Library Mode Support (Weeks 61-62)**
 
 **Goal**: Agent-to-Agent communication as client
 **Priority**: LOW (Advanced Networking)
@@ -1869,7 +3944,7 @@ compression_ratio = 0.6  # Keep 60% of chunks
 
 ---
 
-### **Phase 18: Cross-Platform Support (Weeks 57-58)**
+### **Phase 18: Cross-Platform Support (Weeks 63-64)**
 
 **Goal**: Expose local agents via A2A protocol
 **Priority**: LOW (Advanced Networking)
@@ -1898,7 +3973,7 @@ compression_ratio = 0.6  # Keep 60% of chunks
 
 ## Production Optimization Phase
 
-### **Phase 19: Production Optimization (Weeks 59-60)**
+### **Phase 19: Production Optimization (Weeks 65-66)**
 
 **Goal**: Support usage as native module in external runtimes
 **Priority**: MEDIUM (Alternative Usage Mode)
@@ -1925,7 +4000,7 @@ compression_ratio = 0.6  # Keep 60% of chunks
 
 ---
 
-### **Phase 20: A2A Client Support (Weeks 61-62)**
+### **Phase 20: A2A Client Support (Weeks 67-68)**
 
 **Goal**: Agent-to-Agent communication as client
 **Priority**: LOW (Advanced Networking)
@@ -1952,7 +4027,7 @@ compression_ratio = 0.6  # Keep 60% of chunks
 
 ---
 
-### **Phase 21: A2A Server Support (Weeks 63-64)**
+### **Phase 21: A2A Server Support (Weeks 69-70)**
 
 **Goal**: Expose local agents via A2A protocol
 **Priority**: LOW (Advanced Networking)
@@ -1979,7 +4054,7 @@ compression_ratio = 0.6  # Keep 60% of chunks
 
 ---
 
-### **Phase 22: Multimodal Tools Implementation (Weeks 65-66)**
+### **Phase 22: Multimodal Tools Implementation (Weeks 71-72)**
 
 **Goal**: Implement comprehensive multimodal processing tools
 **Priority**: MEDIUM (Feature Enhancement)
@@ -2039,7 +4114,7 @@ compression_ratio = 0.6  # Keep 60% of chunks
 
 ---
 
-### **Phase 23: AI/ML Complex Tools (Weeks 67-68)**
+### **Phase 23: AI/ML Complex Tools (Weeks 73-74)**
 
 **Goal**: Implement AI and ML dependent complex tools
 **Priority**: MEDIUM (Advanced AI Features)
@@ -2073,7 +4148,7 @@ compression_ratio = 0.6  # Keep 60% of chunks
 
 ---
 
-### **Phase 24: Advanced Workflow Features (Weeks 69-72)**
+### **Phase 24: Advanced Workflow Features (Weeks 75-78)**
 **Goal**: Implement sophisticated workflow orchestration capabilities and advanced patterns
 **Priority**: LOW (Advanced Enhancement)
 **Dependencies**: Builds on Phase 3 (Workflows), Phase 8 (Vector Storage), Phase 13 (Memory System), and Phase 10 (Service Integration)

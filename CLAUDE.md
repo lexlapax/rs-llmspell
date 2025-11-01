@@ -11,7 +11,6 @@ Experimental platform for rapid AI concept exploration via Lua/JavaScript script
 - **Current Status**: v0.13.0 - Phase 13 Complete (Experimental Memory & Context Engineering)
 - **Phase 12 Design**: `/docs/in-progress/phase-12-design-doc.md` (Experimental Template System)
 - **Phase 13 Design**: `/docs/in-progress/phase-13-design-doc.md` (Experimental Memory System)
-- **Template Architecture**: `/docs/technical/template-system-architecture.md` (Template system design)
 - **Release Notes**: `/RELEASE_NOTES_v0.13.0.md` (comprehensive v0.13.0 changelog)
 - **Current Work**: ALWAYS read `/TODO.md` - hierarchical checkboxes with numbered tasks
 
