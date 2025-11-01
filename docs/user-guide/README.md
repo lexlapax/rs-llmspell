@@ -1,6 +1,6 @@
 # LLMSpell User Guide
 
-**Learn to build powerful LLM-driven applications with production-ready rs-llmspell**
+**Learn to experiment with AI concepts through rapid scripting with rs-llmspell**
 
 **🔗 Navigation**: [← Docs Hub](../) | [Project Home](../../) | [Examples](../../examples/) | [API Reference](api/)
 
@@ -8,21 +8,21 @@
 
 ## Overview
 
-> **📚 Central Hub**: Your starting point for all LLMSpell documentation. Everything you need is organized into 12 essential documents, plus comprehensive API references for both Lua and Rust. Now with Unix daemon infrastructure, tool CLI commands, fleet management, feature flags, and 10 production-ready AI agent templates!
+> **📚 Central Hub**: Your starting point for AI experimentation with LLMSpell. Everything you need is organized into 13 essential documents, plus comprehensive API references for both Lua and Rust. Experimental features include adaptive memory system, context engineering, Unix daemon infrastructure, tool CLI commands, fleet management, feature flags, and 10 experimental AI workflows!
 
-**Version**: 0.13.0 | **Status**: Phase 13 Complete - Adaptive Memory & Context Engineering | **Last Updated**: January 2025
+**Version**: 0.13.0 | **Status**: Phase 13 Complete - Experimental Memory & Context Engineering | **Last Updated**: January 2025
 
-## 📖 Essential Documentation (12 Files)
+## 📖 Essential Documentation (13 Files - Experimentation Guides)
 
 ### 1. [Getting Started](getting-started.md)
-**Quick start in under 10 minutes**
+**Quick experimental setup in under 10 minutes**
 - Installation and setup with feature flags
 - Progressive learning path (6 examples)
-- RAG setup and first knowledge base
-- Running your first daemon with tool CLI
+- Memory system and first experiments
+- Running your first daemon for scale validation
 
 ### 2. [Core Concepts](concepts.md)
-**Understand LLMSpell architecture including Phase 10 & 11 features**
+**Understand LLMSpell experimental architecture with production-quality foundations**
 - Component model (BaseAgent trait)
 - Agents, Tools (40+ with feature flags), Workflows
 - RAG (Retrieval-Augmented Generation) ⭐
@@ -92,9 +92,9 @@
 - 6 troubleshooting scenarios
 - 4 complete example scripts
 
-### 6. [AI Agent Templates](templates/README.md) ⭐ Phase 12
-**Production-ready AI workflows - Installation to productive AI in <5 minutes**
-- 10 built-in templates (6 base + 4 advanced)
+### 6. [AI Workflow Templates](templates/README.md) ⭐ Phase 12
+**Experimental AI workflows for rapid concept exploration**
+- 10 experimental templates (6 base + 4 advanced)
 - Research Assistant: 4-phase research workflow (web search, analysis, synthesis, validation)
 - Interactive Chat, Data Analysis, Code Generator, Document Processor, Workflow Orchestrator
 - Code Review, Content Generation, File Classification, Knowledge Management (advanced)

@@ -13067,8 +13067,8 @@ for extraction.
 
 **Priority**: HIGH
 **Estimated Time**: 1.5 hours
-**Assignee**: User Documentation Lead  
-**Status**: PENDING
+**Assignee**: User Documentation Lead
+**Status**: ✅ COMPLETE
 
 **Description**: Update user guide hub to reframe as experimentation guide.
 
