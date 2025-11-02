@@ -969,6 +969,189 @@ INFO Template execution succeeded  # ✅ NO "provider_config is required" ERROR
 **Timeline**: 2 days (16 hours)
 **Critical Dependencies**: Phase 13b.1 (Linux CI) ✅
 
+### Task 13b.2.0: Pre-Implementation Validation
+**Priority**: CRITICAL
+**Estimated Time**: 4 hours (half day)
+**Assignee**: Storage Team Lead
+
+**Description**: Validate all Phase 13b.2 assumptions (VectorChord availability, architecture compatibility, dependency conflicts) before implementation to avoid false starts and rework.
+
+**Rationale**: Phase 13b.2 makes several untested assumptions (VectorChord Docker image exists, PostgreSQL fits existing storage traits, no dependency conflicts). Validating these upfront saves 8-16 hours of potential rework if assumptions are wrong.
+
+**Acceptance Criteria**:
+- [ ] VectorChord Docker image validated OR fallback plan documented
+- [ ] llmspell-storage architecture decision made (modify existing vs new crate)
+- [ ] Phase 13b.2 minimal scope clearly defined
+- [ ] PostgreSQL dependencies verified conflict-free
+- [ ] CI strategy for PostgreSQL tests decided
+- [ ] All findings documented in TODO.md
+
+**Subtasks**:
+
+#### Subtask 13b.2.0.1: Validate VectorChord Docker Image Availability ⏱️ 30 min
+**Priority**: CRITICAL
+
+**Description**: Verify TensorChord VectorChord PostgreSQL 18 Docker image exists and extension loads correctly.
+
+**Implementation Steps**:
+1. Pull image: `docker pull ghcr.io/tensorchord/vchord-postgres:pg18-v0.5.3`
+2. Test run: `docker run --rm -e POSTGRES_PASSWORD=test ghcr.io/tensorchord/vchord-postgres:pg18-v0.5.3 postgres --version`
+3. Test extension: Start container and execute `CREATE EXTENSION vchord;` via psql
+4. Verify health check configuration works
+5. Document findings in TODO.md (success OR fallback to pgvector)
+
+**Acceptance Criteria**:
+- [ ] Image pulls successfully from ghcr.io OR latest version identified
+- [ ] VectorChord extension creates without errors OR pgvector fallback documented
+- [ ] PostgreSQL 18 version confirmed
+- [ ] Health checks functional
+- [ ] Decision documented: VectorChord version to use OR switch to pgvector
+
+**Files to Update**:
+- `TODO.md` (document findings)
+- `docs/in-progress/phase-13b-design-doc.md` (update if fallback needed)
+
+#### Subtask 13b.2.0.2: Analyze llmspell-storage Architecture Compatibility ⏱️ 1 hour
+**Priority**: CRITICAL
+
+**Description**: Analyze current llmspell-storage crate (exists since Phase 7) to determine if PostgreSQL backends fit existing traits or require new crate structure.
+
+**Context**: Task 13b.2.4 says "Create new llmspell-storage crate" but crate already exists with MemoryBackend, SledBackend, HNSW vector storage. Need to clarify: modify existing vs create new llmspell-storage-postgres crate.
+
+**Implementation Steps**:
+1. Read `llmspell-storage/src/lib.rs`, `src/traits.rs`, `src/backends/mod.rs`
+2. Review `llmspell-storage/src/vector_storage/hnsw.rs` (existing vector storage pattern)
+3. Map 10 PostgreSQL storage requirements to existing traits:
+   - Episodic memory (vectors + metadata) → VectorStorage trait?
+   - Semantic memory (graph traversal) → StorageBackend trait?
+   - State persistence (JSONB) → StorageBackend trait?
+   - Sessions + artifacts (BYTEA) → New trait needed?
+   - Hooks + events (append-only) → New trait needed?
+4. Analyze coupling: Single crate for all PostgreSQL backends vs separate?
+5. Make decision:
+   - **Option A**: Modify existing llmspell-storage (add `src/postgres/` module)
+   - **Option B**: Create new `llmspell-storage-postgres` crate (cleaner separation)
+6. Document decision with code references and rationale
+
+**Acceptance Criteria**:
+- [ ] Existing StorageBackend/VectorStorage traits analyzed
+- [ ] Gap analysis complete (what traits need modification/addition)
+- [ ] Architecture decision made (Option A vs B) with rationale
+- [ ] Coupling analysis documented (single crate vs multiple)
+- [ ] Task 13b.2.4 updated with correct approach
+
+**Files to Update**:
+- `TODO.md` (Task 13b.2.4 description and acceptance criteria)
+- `TODO.md` (document architecture decision)
+
+#### Subtask 13b.2.0.3: Define Minimal Scope for Phase 13b.2 ⏱️ 45 min
+**Priority**: CRITICAL
+
+**Description**: Clarify what "PostgreSQL Infrastructure Setup" means for Phase 13b.2 - infrastructure only vs full storage implementations.
+
+**Context**: Current Task 13b.2.5 says "Implement PostgresBackend Infrastructure" but unclear if this means:
+- Just connection pool + health checks (no storage ops)
+- One sample backend (e.g., vector storage only)
+- All 10 storage backends (full implementation)
+
+Timeline shows "Days 2-3 (16 hours)" which suggests infrastructure-only, but tasks are ambiguous.
+
+**Implementation Steps**:
+1. Review design doc `docs/in-progress/phase-13b-design-doc.md` Week 1 goals (Foundation + Vector Storage)
+2. Check phase dependencies:
+   - Does Task 13b.4 (Vector Storage) depend on 13b.2 having vector backend?
+   - Does Task 13b.7 (Graph Storage) depend on 13b.2 having graph backend?
+3. Analyze 16-hour budget:
+   - Validation (4h) + Dependencies (1h) + Docker (2h) + Init (1h) = 8h
+   - Remaining: 8h for "infrastructure" - what can fit?
+4. Make scope decision:
+   - **Option A - Infrastructure Only**: Connection pool, health checks, tenant context, NO storage ops
+   - **Option B - Minimal Backend**: Infrastructure + ONE storage backend (vector only)
+   - **Option C - Full**: All 10 backends (unrealistic for 16h)
+5. Update Task 13b.2.4-13b.2.5 acceptance criteria to be unambiguous
+6. Document scope boundaries (what IS included, what is DEFERRED to 13b.3+)
+
+**Acceptance Criteria**:
+- [ ] MINIMAL viable output for 13b.2 defined
+- [ ] List what IS included in 13b.2 (infrastructure components)
+- [ ] List what is NOT included (deferred to later phases)
+- [ ] Task 13b.2.4 acceptance criteria rewritten for clarity
+- [ ] Task 13b.2.5 acceptance criteria rewritten for clarity
+- [ ] Scope decision documented with rationale
+
+**Files to Update**:
+- `TODO.md` (Tasks 13b.2.4, 13b.2.5 acceptance criteria)
+- `TODO.md` (document scope decision)
+
+#### Subtask 13b.2.0.4: Validate PostgreSQL Dependency Compatibility ⏱️ 45 min
+**Priority**: HIGH
+
+**Description**: Add proposed PostgreSQL dependencies to workspace and verify zero conflicts with existing 100+ dependencies (tokio 1.40, chrono 0.4, uuid 1.17, serde_json 1.0).
+
+**Implementation Steps**:
+1. Create git branch `phase-13b.2.0.4-dependency-validation` (local only, will be discarded)
+2. Add to workspace `Cargo.toml`:
+   ```toml
+   tokio-postgres = { version = "0.7", features = ["with-uuid-1", "with-chrono-0_4", "with-serde_json-1"] }
+   deadpool-postgres = "0.14"
+   pgvector = { version = "0.4", features = ["postgres"] }
+   refinery = { version = "0.8", features = ["tokio-postgres"] }
+   ```
+3. Run `cargo tree -p tokio-postgres -p deadpool-postgres -p pgvector -p refinery`
+4. Check for version conflicts (especially tokio, chrono, uuid)
+5. Run `cargo check --workspace --all-features`
+6. If conflicts: Research compatible versions or feature flag approach
+7. Document findings (success OR resolution strategy)
+8. Discard branch (findings documented, actual addition happens in 13b.2.1)
+
+**Acceptance Criteria**:
+- [ ] Dependencies added to workspace Cargo.toml (temporary branch)
+- [ ] `cargo tree` executed, conflicts analyzed
+- [ ] `cargo check --workspace` executed successfully OR conflicts documented
+- [ ] Version adjustments documented if needed
+- [ ] Resolution strategy clear for Task 13b.2.1
+
+**Files to Update**:
+- `TODO.md` (document dependency validation results)
+- `TODO.md` (update Task 13b.2.1 if version adjustments needed)
+
+#### Subtask 13b.2.0.5: Design CI Strategy for PostgreSQL Tests ⏱️ 1 hour
+**Priority**: HIGH
+
+**Description**: Decide how to handle PostgreSQL integration tests in CI (GitHub Actions currently has no PostgreSQL service).
+
+**Context**: Current `.github/workflows/ci.yml` runs on macOS + Linux but has no PostgreSQL service container. PostgreSQL backends need integration tests, but adding service increases CI runtime.
+
+**Implementation Steps**:
+1. Read `.github/workflows/ci.yml` current structure (matrix: macOS + Linux)
+2. Research GitHub Actions PostgreSQL service container examples (Zep, pgvector projects)
+3. Evaluate 3 options:
+   - **Option A**: Feature flag `postgres-tests`, skip on CI (manual testing only)
+   - **Option B**: Add PostgreSQL service container to ci.yml (GitHub Actions services)
+   - **Option C**: Docker Compose in CI (docker-compose up before tests)
+4. Analyze CI runtime impact:
+   - Current CI: <10 minutes target
+   - PostgreSQL startup: ~10-30 seconds
+   - Test overhead: ~1-2 minutes
+   - Total: Can we stay under 10 min?
+5. Make decision based on trade-offs (speed vs coverage vs maintenance)
+6. If Option B/C chosen: Draft CI workflow changes (not committed, just documented)
+7. Document decision with rationale
+
+**Acceptance Criteria**:
+- [ ] Current `.github/workflows/ci.yml` analyzed
+- [ ] 3 CI strategy options evaluated (feature flag, service, docker-compose)
+- [ ] Decision made with clear rationale (speed, coverage, maintenance)
+- [ ] CI runtime impact estimated (<10 min target maintained?)
+- [ ] Implementation plan documented (what changes needed in 13b.2+)
+- [ ] If service/docker: Draft workflow changes documented
+
+**Files to Update**:
+- `TODO.md` (document CI strategy decision)
+- `docs/in-progress/phase-13b-design-doc.md` (update testing strategy section if needed)
+
+----
+
 ### Task 13b.2.1: Add PostgreSQL Dependencies
 **Priority**: CRITICAL
 **Estimated Time**: 1 hour
