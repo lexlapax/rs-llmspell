@@ -1288,15 +1288,75 @@ Timeline shows "Days 2-3 (16 hours)" which suggests infrastructure-only, but tas
 8. Discard branch (findings documented, actual addition happens in 13b.2.1)
 
 **Acceptance Criteria**:
-- [ ] Dependencies added to workspace Cargo.toml (temporary branch)
-- [ ] `cargo tree` executed, conflicts analyzed
-- [ ] `cargo check --workspace` executed successfully OR conflicts documented
-- [ ] Version adjustments documented if needed
-- [ ] Resolution strategy clear for Task 13b.2.1
+- [x] Dependencies added to workspace Cargo.toml (temporary)
+- [x] `cargo tree` executed, conflicts analyzed
+- [x] `cargo check --workspace` executed successfully OR conflicts documented
+- [x] Version adjustments documented if needed
+- [x] Resolution strategy clear for Task 13b.2.1
 
-**Files to Update**:
-- `TODO.md` (document dependency validation results)
-- `TODO.md` (update Task 13b.2.1 if version adjustments needed)
+**Status**: ✅ COMPLETE
+**Completed**: 2025-11-02
+
+**Validation Results**:
+
+**Dependencies Added** (temporary validation):
+```toml
+[workspace.dependencies]
+tokio-postgres = { version = "0.7", features = ["with-uuid-1", "with-chrono-0_4", "with-serde_json-1"] }
+deadpool-postgres = "0.14"
+pgvector = { version = "0.4", features = ["postgres"] }
+refinery = { version = "0.8", features = ["tokio-postgres"] }
+```
+
+**Dependency Resolution**: ✅ **ZERO CONFLICTS**
+
+**Resolved Versions** (from `cargo tree`):
+- `tokio-postgres v0.7.15` ✅
+- `deadpool-postgres v0.14.1` ✅
+- `pgvector v0.4.1` ✅
+- `refinery v0.8.16` (v0.9.0 available but 0.8 chosen for stability) ✅
+- `postgres-protocol v0.6.9` (transitive)
+- `postgres-types v0.2.11` (transitive)
+
+**Critical Dependency Compatibility**:
+- **tokio**: All crates use `v1.48.0` ✅ (workspace version)
+- **chrono**: All crates use `v0.4.42` ✅ (workspace version)
+- **uuid**: All crates use `v1.18.1` ✅ (workspace version)
+- **serde**: All crates use `v1.0.228` ✅ (workspace version)
+- **serde_json**: All crates use `v1.0.145` ✅ (workspace version)
+
+**Duplicate Check**: ✅ **ZERO DUPLICATES**
+- Ran `cargo tree -p llmspell-storage --features postgres -d`
+- No duplicate versions of tokio, chrono, uuid, or serde
+
+**Compilation Validation**:
+- ✅ `cargo check -p llmspell-storage --features postgres` → SUCCESS (7.55s)
+- ✅ `cargo check --workspace --all-features` → SUCCESS (46.30s)
+- ✅ Zero warnings, zero errors
+
+**Feature Flag Design Validated**:
+```toml
+# llmspell-storage/Cargo.toml
+[features]
+postgres = ["tokio-postgres", "deadpool-postgres", "pgvector", "refinery"]
+```
+Works correctly with optional dependencies.
+
+**Decision**: ✅ **PROCEED WITH PROPOSED VERSIONS**
+
+**No version adjustments needed** - all dependencies compatible with existing workspace.
+
+**Implementation Note for Task 13b.2.1**:
+- Use EXACT versions validated above
+- No changes needed to feature specifications
+- Add dependencies to workspace Cargo.toml as shown
+- Add optional dependencies to llmspell-storage/Cargo.toml
+- Add `postgres` feature flag to llmspell-storage
+
+**Temporary Changes Reverted**: Dependencies removed from Cargo.toml files (will be re-added in 13b.2.1)
+
+**Files Updated**:
+- `TODO.md` (this section)
 
 #### Subtask 13b.2.0.5: Design CI Strategy for PostgreSQL Tests ⏱️ 1 hour
 **Priority**: HIGH
