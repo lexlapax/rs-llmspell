@@ -4,6 +4,7 @@
 mod backend;
 mod config;
 mod error;
+mod migrations;
 mod pool;
 
 pub use backend::PostgresBackend;

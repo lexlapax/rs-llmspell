@@ -297,3 +297,73 @@ async fn test_concurrent_pool_access() {
 
     assert_eq!(success_count, 20, "All 20 tasks should complete");
 }
+
+// Migration Tests (Phase 13b.2.6)
+
+#[tokio::test]
+async fn test_run_migrations() {
+    let config = PostgresConfig::new(TEST_CONNECTION_STRING);
+    let backend = PostgresBackend::new(config)
+        .await
+        .expect("Failed to create backend");
+
+    // Run migrations
+    backend
+        .run_migrations()
+        .await
+        .expect("Failed to run migrations");
+}
+
+#[tokio::test]
+async fn test_migration_version() {
+    let config = PostgresConfig::new(TEST_CONNECTION_STRING);
+    let backend = PostgresBackend::new(config)
+        .await
+        .expect("Failed to create backend");
+
+    // Run migrations first
+    backend
+        .run_migrations()
+        .await
+        .expect("Failed to run migrations");
+
+    // Check migration version (should be 1 after initial migration)
+    let version = backend
+        .migration_version()
+        .await
+        .expect("Failed to get migration version");
+
+    assert!(version >= 1, "Migration version should be at least 1 after running migrations");
+}
+
+#[tokio::test]
+async fn test_migrations_idempotent() {
+    let config = PostgresConfig::new(TEST_CONNECTION_STRING);
+    let backend = PostgresBackend::new(config)
+        .await
+        .expect("Failed to create backend");
+
+    // Run migrations multiple times
+    backend
+        .run_migrations()
+        .await
+        .expect("First migration run failed");
+
+    backend
+        .run_migrations()
+        .await
+        .expect("Second migration run failed (should be idempotent)");
+
+    backend
+        .run_migrations()
+        .await
+        .expect("Third migration run failed (should be idempotent)");
+
+    // Version should still be consistent
+    let version = backend
+        .migration_version()
+        .await
+        .expect("Failed to get migration version");
+
+    assert!(version >= 1, "Migration version should be at least 1");
+}

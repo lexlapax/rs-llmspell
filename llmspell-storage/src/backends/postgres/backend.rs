@@ -118,6 +118,11 @@ impl PostgresBackend {
     pub fn pool_status(&self) -> super::pool::PoolStatus {
         self.pool.status()
     }
+
+    /// Get a pooled client connection (internal use)
+    pub(super) async fn get_client(&self) -> Result<deadpool_postgres::Client> {
+        self.pool.get().await
+    }
 }
 
 // Note: StorageBackend trait implementation deferred to Phase 13b.4

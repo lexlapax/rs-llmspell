@@ -1939,11 +1939,56 @@ cargo test -p llmspell-storage --features postgres --test postgres_backend_tests
 **Description**: Configure refinery for versioned schema migrations.
 
 **Acceptance Criteria**:
-- [ ] Migration directory structure created
-- [ ] Runner implemented
-- [ ] Migrations run automatically
-- [ ] Idempotent migrations
-- [ ] Version tracking working
+- [x] Migration directory structure created
+- [x] Runner implemented
+- [x] Migrations run automatically
+- [x] Idempotent migrations
+- [x] Version tracking working
+
+**Status**: ✅ **COMPLETE** (2025-11-02, ~35 min)
+
+**Implementation Summary**:
+- Created migrations/ directory with initial V1__initial_setup.sql migration
+- Added migrations.rs module with embed_migrations! macro
+- Implemented run_migrations() and migration_version() methods on PostgresBackend
+- Fixed permissions in init script (GRANT CREATE ON SCHEMA public for refinery_schema_history table)
+- Added 3 migration tests (run, version tracking, idempotency)
+- All 16 tests passing (13 from 13b.2.5 + 3 new migration tests)
+
+**Migration Framework Features**:
+1. **Embedded migrations**: Compile-time embedding via refinery::embed_migrations!()
+2. **Version tracking**: refinery_schema_history table automatically created
+3. **Idempotent execution**: Migrations only run once, safe to call multiple times
+4. **Version query**: migration_version() returns current applied version
+5. **Error handling**: PostgresError::Migration variant for migration failures
+
+**Initial Migration** (V1__initial_setup.sql):
+- Validates llmspell schema exists (created by init scripts)
+- Infrastructure-only per Phase 13b.2 scope
+- Actual table schemas deferred to Phase 13b.4+ (VectorChord Integration)
+
+**Test Coverage**:
+1. ✅ test_run_migrations - Migrations execute successfully
+2. ✅ test_migration_version - Version tracking returns correct version (>=1)
+3. ✅ test_migrations_idempotent - Multiple runs don't fail or duplicate
+
+**Files Created**:
+- `llmspell-storage/migrations/V1__initial_setup.sql` (15 lines)
+- `llmspell-storage/src/backends/postgres/migrations.rs` (71 lines)
+
+**Files Modified**:
+- `llmspell-storage/src/backends/postgres/mod.rs:7` (added migrations module)
+- `llmspell-storage/src/backends/postgres/backend.rs:123-125` (added get_client() internal method)
+- `llmspell-storage/tests/postgres_backend_tests.rs:301-369` (added 3 migration tests)
+- `docker/postgres/init-scripts/01-extensions.sql:31-36` (added public schema permissions)
+
+**Test Execution**:
+```bash
+cargo test -p llmspell-storage --features postgres --test postgres_backend_tests
+# test result: ok. 16 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.01s
+```
+
+**Ready for Task 13b.2.7** (Enhance Configuration for Backend Selection)
 
 **Implementation Steps**:
 1. Create `llmspell-storage/migrations/` directory
