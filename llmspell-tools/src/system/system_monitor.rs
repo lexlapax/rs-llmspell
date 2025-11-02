@@ -459,9 +459,10 @@ impl SystemMonitorTool {
             let result = unsafe { libc::statvfs(path_c.as_ptr(), &raw mut statvfs) };
 
             if result == 0 {
+                // Cast to u64 for cross-platform compatibility (Linux: all u64, macOS: f_bsize is u64, f_blocks/f_bavail are u32)
                 let block_size = statvfs.f_bsize;
-                let total_blocks = statvfs.f_blocks;
-                let available_blocks = statvfs.f_bavail;
+                let total_blocks = u64::from(statvfs.f_blocks);
+                let available_blocks = u64::from(statvfs.f_bavail);
 
                 let total_bytes = total_blocks * block_size;
                 let available_bytes = available_blocks * block_size;
