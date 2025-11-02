@@ -1001,15 +1001,48 @@ INFO Template execution succeeded  # ✅ NO "provider_config is required" ERROR
 5. Document findings in TODO.md (success OR fallback to pgvector)
 
 **Acceptance Criteria**:
-- [ ] Image pulls successfully from ghcr.io OR latest version identified
-- [ ] VectorChord extension creates without errors OR pgvector fallback documented
-- [ ] PostgreSQL 18 version confirmed
-- [ ] Health checks functional
-- [ ] Decision documented: VectorChord version to use OR switch to pgvector
+- [x] Image pulls successfully from ghcr.io OR latest version identified
+- [x] VectorChord extension creates without errors OR pgvector fallback documented
+- [x] PostgreSQL 18 version confirmed
+- [x] Health checks functional
+- [x] Decision documented: VectorChord version to use OR switch to pgvector
 
-**Files to Update**:
-- `TODO.md` (document findings)
-- `docs/in-progress/phase-13b-design-doc.md` (update if fallback needed)
+**Status**: ✅ COMPLETE
+**Completed**: 2025-11-02
+
+**Validation Results**:
+
+1. **Docker Image**: ✅ SUCCESS
+   - Image: `ghcr.io/tensorchord/vchord-postgres:pg18-v0.5.3`
+   - Digest: `sha256:c91d667994f3da662a71a45467c0084658f3892368109b8cf63a46ba41d6a6ad`
+   - Pull status: Downloaded successfully (15 layers)
+
+2. **PostgreSQL Version**: ✅ CONFIRMED
+   - Version: `postgres (PostgreSQL) 18.0 (Debian 18.0-1.pgdg12+3)`
+   - Matches design doc requirement (PostgreSQL 18)
+
+3. **VectorChord Extension**: ✅ FUNCTIONAL
+   - VectorChord version: `0.5.3` (matches design doc)
+   - pgvector dependency: `0.8.1` (automatically installed)
+   - **CRITICAL**: Must use `CREATE EXTENSION vchord CASCADE;` (not standalone)
+   - Extension loads without errors after CASCADE
+   - Basic vector operations tested successfully
+
+4. **Health Checks**: ✅ FUNCTIONAL
+   - `pg_isready -U postgres` works as expected
+   - Response: `/var/run/postgresql:5432 - accepting connections`
+   - Suitable for Docker Compose healthcheck configuration
+
+**Decision**: ✅ **PROCEED WITH VECTORCHORD 0.5.3**
+
+**Implementation Notes for Task 13b.2.2-13b.2.3**:
+- Init script MUST use `CREATE EXTENSION IF NOT EXISTS vchord CASCADE;` (not just `vchord`)
+- VectorChord requires pgvector 0.8.1 as dependency (auto-installed with CASCADE)
+- Image tag confirmed: `ghcr.io/tensorchord/vchord-postgres:pg18-v0.5.3`
+- Health check command: `pg_isready -U llmspell` (substitute username)
+
+**Files Updated**:
+- `TODO.md` (this section)
 
 #### Subtask 13b.2.0.2: Analyze llmspell-storage Architecture Compatibility ⏱️ 1 hour
 **Priority**: CRITICAL
