@@ -145,6 +145,27 @@
 - GPU fallback chain: macOS (Metal→CPU), Linux (CUDA→CPU) already implemented
 - Next task (13b.1.2) can validate GPU detection logic on actual CI runners
 
+**Linux Compilation Fixes** (discovered during actual Linux build):
+1. **Critical Metal/objc_exception blocker** (commit: d9a014fb):
+   - Root cause: Unconditional `metal` feature in workspace Cargo.toml pulled Objective-C dependencies on Linux
+   - Fix: Remove `features = ["metal"]` from workspace, add platform-specific dependencies in llmspell-providers
+   - Impact: Enables Linux compilation (previously failed with "cannot execute 'cc1obj'" error)
+
+2. **kernel_discovery.rs Linux fallback** (commit: d9a014fb):
+   - Root cause: Linux `count_open_files()` missing fallback return when `/proc/{pid}/fd` read fails
+   - Fix: Add `return Ok(0);` after failed fd read attempt
+   - Impact: Prevents compilation error on Linux (if-without-else type mismatch)
+
+3. **60+ clippy warnings cleanup** (commit: 83d440d4):
+   - 51 uninlined_format_args: Use `format!("{var}")` instead of `format!("{}", var)`
+   - 9 unnecessary_unwrap: Replace `.is_some() + .unwrap()` with `if let` pattern
+   - Impact: Meet zero-warning quality gate for CI validation
+
+**Build Status**:
+- Linux build time: 6m 44s (first successful build)
+- Zero compilation errors after fixes
+- All minimal quality checks passing (format, clippy, compile, tracing)
+
 ### Task 13b.1.2: Validate GPU Detection on Linux
 **Priority**: HIGH
 **Estimated Time**: 2 hours
