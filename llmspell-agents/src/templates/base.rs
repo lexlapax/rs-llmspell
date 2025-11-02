@@ -387,8 +387,7 @@ impl TemplateFactory {
         // Check for duplicate IDs
         if self.templates.contains_key(&template_id) {
             return Err(anyhow!(
-                "Template with ID '{}' already registered",
-                template_id
+                "Template with ID '{template_id}' already registered"
             ));
         }
 
@@ -479,7 +478,7 @@ impl TemplateFactory {
     ) -> Result<TemplateInstantiationResult> {
         let template = self
             .get_template(template_id)
-            .ok_or_else(|| anyhow!("Template not found: {}", template_id))?;
+            .ok_or_else(|| anyhow!("Template not found: {template_id}"))?;
 
         template.instantiate(params).await
     }
@@ -499,7 +498,7 @@ impl TemplateFactory {
     ) -> Result<()> {
         let template = self
             .get_template(template_id)
-            .ok_or_else(|| anyhow!("Template not found: {}", template_id))?;
+            .ok_or_else(|| anyhow!("Template not found: {template_id}"))?;
 
         template.validate_parameters(params).await
     }
@@ -535,7 +534,7 @@ impl TemplateFactory {
 
             Ok(())
         } else {
-            Err(anyhow!("Template not found: {}", template_id))
+            Err(anyhow!("Template not found: {template_id}"))
         }
     }
 }

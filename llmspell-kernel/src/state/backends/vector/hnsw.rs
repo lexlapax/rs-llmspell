@@ -374,7 +374,7 @@ impl HNSWVectorStorage {
         // Use MessagePack for efficient binary serialization (supports serde_json::Value)
         let data_file = namespace_dir.join("vectors.msgpack");
         let serialized = rmp_serde::to_vec(&persistence)
-            .map_err(|e| anyhow::anyhow!("Failed to serialize namespace data: {}", e))?;
+            .map_err(|e| anyhow::anyhow!("Failed to serialize namespace data: {e}"))?;
         std::fs::write(data_file, serialized)?;
 
         info!("Saved namespace {} to disk", namespace);
@@ -396,7 +396,7 @@ impl HNSWVectorStorage {
         let data_file = namespace_dir.join("vectors.msgpack");
         let data = std::fs::read(data_file)?;
         let persistence: NamespacePersistence = rmp_serde::from_slice(&data)
-            .map_err(|e| anyhow::anyhow!("Failed to deserialize namespace data: {}", e))?;
+            .map_err(|e| anyhow::anyhow!("Failed to deserialize namespace data: {e}"))?;
 
         // Create container with loaded data
         let container = HnswContainer {
@@ -559,7 +559,7 @@ impl VectorStorage for HNSWVectorStorage {
         let namespace_data = self
             .namespaces
             .get(&namespace)
-            .ok_or_else(|| anyhow::anyhow!("Namespace {} not found", namespace))?;
+            .ok_or_else(|| anyhow::anyhow!("Namespace {namespace} not found"))?;
 
         let data = namespace_data.read();
 
@@ -662,7 +662,7 @@ impl VectorStorage for HNSWVectorStorage {
             entry.entry.metadata = metadata;
             Ok(())
         } else {
-            anyhow::bail!("Vector with ID {} not found", id)
+            anyhow::bail!("Vector with ID {id} not found")
         }
     }
 
@@ -777,7 +777,7 @@ impl HNSWStorage for HNSWVectorStorage {
             info!("Deleted namespace: {}", namespace);
             Ok(())
         } else {
-            anyhow::bail!("Namespace {} not found", namespace)
+            anyhow::bail!("Namespace {namespace} not found")
         }
     }
 
@@ -794,7 +794,7 @@ impl HNSWStorage for HNSWVectorStorage {
         if let Some(namespace_data) = self.namespaces.get(namespace) {
             Ok(namespace_data.read().stats.clone())
         } else {
-            anyhow::bail!("Namespace {} not found", namespace)
+            anyhow::bail!("Namespace {namespace} not found")
         }
     }
 

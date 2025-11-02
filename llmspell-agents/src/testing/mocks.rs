@@ -233,7 +233,7 @@ impl MockAgent {
         self.state_machine
             .initialize()
             .await
-            .map_err(|e| anyhow::anyhow!("Failed to initialize agent: {}", e))
+            .map_err(|e| anyhow::anyhow!("Failed to initialize agent: {e}"))
     }
 
     /// Start the agent
@@ -245,7 +245,7 @@ impl MockAgent {
         self.state_machine
             .start()
             .await
-            .map_err(|e| anyhow::anyhow!("Failed to start agent: {}", e))
+            .map_err(|e| anyhow::anyhow!("Failed to start agent: {e}"))
     }
 
     /// Stop the agent
@@ -257,7 +257,7 @@ impl MockAgent {
         self.state_machine
             .stop()
             .await
-            .map_err(|e| anyhow::anyhow!("Failed to stop agent: {}", e))
+            .map_err(|e| anyhow::anyhow!("Failed to stop agent: {e}"))
     }
 
     /// Terminate the agent
@@ -269,7 +269,7 @@ impl MockAgent {
         self.state_machine
             .terminate()
             .await
-            .map_err(|e| anyhow::anyhow!("Failed to terminate agent: {}", e))
+            .map_err(|e| anyhow::anyhow!("Failed to terminate agent: {e}"))
     }
 }
 
@@ -494,7 +494,7 @@ impl StatePersistence for MockAgent {
             state_manager
                 .save_agent_state(&state)
                 .await
-                .map_err(|e| anyhow::anyhow!("Failed to save state: {}", e))?;
+                .map_err(|e| anyhow::anyhow!("Failed to save state: {e}"))?;
             Ok(())
         } else {
             Err(anyhow::anyhow!("No state manager configured"))
@@ -506,7 +506,7 @@ impl StatePersistence for MockAgent {
             if let Some(state) = state_manager
                 .load_agent_state(&self.agent_id_string)
                 .await
-                .map_err(|e| anyhow::anyhow!("Failed to load state: {}", e))?
+                .map_err(|e| anyhow::anyhow!("Failed to load state: {e}"))?
             {
                 self.restore_from_persistent_state(state).await?;
                 Ok(true)

@@ -87,7 +87,7 @@ impl ZmqTransport {
             "push" => Ok(SocketType::PUSH),
             "pull" => Ok(SocketType::PULL),
             "pair" => Ok(SocketType::PAIR),
-            _ => Err(anyhow::anyhow!("Unknown socket pattern: {}", pattern)),
+            _ => Err(anyhow::anyhow!("Unknown socket pattern: {pattern}")),
         }
     }
 
@@ -311,7 +311,7 @@ impl Transport for ZmqTransport {
         let sockets = self.sockets.lock();
         let socket = sockets
             .get(channel)
-            .ok_or_else(|| anyhow::anyhow!("Channel {} not found", channel))?;
+            .ok_or_else(|| anyhow::anyhow!("Channel {channel} not found"))?;
 
         // Try to receive with non-blocking flag
         let result = socket.socket.recv_multipart(zmq::DONTWAIT);
@@ -366,7 +366,7 @@ impl Transport for ZmqTransport {
         let sockets = self.sockets.lock();
         let socket = sockets
             .get(channel)
-            .ok_or_else(|| anyhow::anyhow!("Channel {} not found", channel))?;
+            .ok_or_else(|| anyhow::anyhow!("Channel {channel} not found"))?;
 
         socket
             .socket

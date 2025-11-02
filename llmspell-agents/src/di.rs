@@ -47,7 +47,7 @@ impl DIContainer {
     pub async fn register_tool(&self, id: String, tool: Arc<dyn Tool>) -> Result<()> {
         let mut tools = self.tools.write().await;
         if tools.contains_key(&id) {
-            anyhow::bail!("Tool with id '{}' already registered", id);
+            anyhow::bail!("Tool with id '{id}' already registered");
         }
         tools.insert(id, tool);
         Ok(())
@@ -112,7 +112,7 @@ impl DIContainer {
     ) -> Result<()> {
         let mut instances = self.named_instances.write().await;
         if instances.contains_key(&name) {
-            anyhow::bail!("Named instance '{}' already registered", name);
+            anyhow::bail!("Named instance '{name}' already registered");
         }
         instances.insert(name, Box::new(instance));
         Ok(())

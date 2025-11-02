@@ -297,7 +297,7 @@ impl StateIsolationManager {
         let mut shared_scopes = self.shared_scopes.write();
 
         if shared_scopes.contains_key(scope_id) {
-            return Err(anyhow::anyhow!("Shared scope {} already exists", scope_id));
+            return Err(anyhow::anyhow!("Shared scope {scope_id} already exists"));
         }
 
         shared_scopes.insert(scope_id.to_string(), config.clone());
@@ -334,7 +334,7 @@ impl StateIsolationManager {
         let mut shared_scopes = self.shared_scopes.write();
 
         shared_scopes.remove(scope_id).map_or_else(
-            || Err(anyhow::anyhow!("Shared scope {} not found", scope_id)),
+            || Err(anyhow::anyhow!("Shared scope {scope_id} not found")),
             |config| {
                 // Revoke permissions from all agents
                 let mut access_control = self.access_control.write();
@@ -521,7 +521,7 @@ impl IsolatedStateAccessor {
             .isolation_manager
             .check_access(&self.agent_id, scope, StateOperation::Read)?
         {
-            return Err(anyhow::anyhow!("Access denied to scope {:?}", scope));
+            return Err(anyhow::anyhow!("Access denied to scope {scope:?}"));
         }
 
         // Perform actual state read (would need proper implementation with StateManager)
@@ -540,7 +540,7 @@ impl IsolatedStateAccessor {
             .isolation_manager
             .check_access(&self.agent_id, scope, StateOperation::Write)?
         {
-            return Err(anyhow::anyhow!("Access denied to scope {:?}", scope));
+            return Err(anyhow::anyhow!("Access denied to scope {scope:?}"));
         }
 
         // Perform actual state write (would need proper implementation with StateManager)
@@ -558,7 +558,7 @@ impl IsolatedStateAccessor {
             .isolation_manager
             .check_access(&self.agent_id, scope, StateOperation::Delete)?
         {
-            return Err(anyhow::anyhow!("Access denied to scope {:?}", scope));
+            return Err(anyhow::anyhow!("Access denied to scope {scope:?}"));
         }
 
         // Perform actual state deletion (would need proper implementation with StateManager)
@@ -576,7 +576,7 @@ impl IsolatedStateAccessor {
             .isolation_manager
             .check_access(&self.agent_id, scope, StateOperation::List)?
         {
-            return Err(anyhow::anyhow!("Access denied to scope {:?}", scope));
+            return Err(anyhow::anyhow!("Access denied to scope {scope:?}"));
         }
 
         // Perform actual key listing (would need proper implementation with StateManager)

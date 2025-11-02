@@ -215,7 +215,7 @@ impl AgentRegistry for PersistentAgentRegistry {
             let data = metadata.to_storage_bytes()?;
             self.storage.set(&key, data).await?;
         } else {
-            anyhow::bail!("Agent '{}' not found", id);
+            anyhow::bail!("Agent '{id}' not found");
         }
 
         Ok(())
@@ -296,7 +296,7 @@ impl AgentRegistry for PersistentAgentRegistry {
             let data = metadata.to_storage_bytes()?;
             self.storage.set(&key, data).await?;
         } else {
-            anyhow::bail!("Agent '{}' not found", id);
+            anyhow::bail!("Agent '{id}' not found");
         }
 
         Ok(())
@@ -309,7 +309,7 @@ impl AgentRegistry for PersistentAgentRegistry {
         if cache.contains_key(id) {
             Ok(())
         } else {
-            anyhow::bail!("Agent '{}' not found", id);
+            anyhow::bail!("Agent '{id}' not found");
         }
     }
 

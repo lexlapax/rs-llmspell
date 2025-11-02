@@ -248,7 +248,7 @@ impl AgentRegistry for InMemoryAgentRegistry {
             meta.status = status;
             meta.updated_at = chrono::Utc::now();
         } else {
-            anyhow::bail!("Agent '{}' not found", id);
+            anyhow::bail!("Agent '{id}' not found");
         }
 
         Ok(())
@@ -324,7 +324,7 @@ impl AgentRegistry for InMemoryAgentRegistry {
             meta.metrics = metrics;
             meta.updated_at = chrono::Utc::now();
         } else {
-            anyhow::bail!("Agent '{}' not found", id);
+            anyhow::bail!("Agent '{id}' not found");
         }
 
         Ok(())
@@ -338,7 +338,7 @@ impl AgentRegistry for InMemoryAgentRegistry {
             heartbeats.insert(id.to_string(), std::time::Instant::now());
             Ok(())
         } else {
-            anyhow::bail!("Agent '{}' not found", id);
+            anyhow::bail!("Agent '{id}' not found");
         }
     }
 

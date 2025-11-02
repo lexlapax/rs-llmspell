@@ -253,7 +253,7 @@ impl VectorStorage for DimensionRouter {
             }
         }
 
-        anyhow::bail!("Vector with ID {} not found in any dimension storage", id)
+        anyhow::bail!("Vector with ID {id} not found in any dimension storage")
     }
 
     async fn delete(&self, ids: &[String]) -> Result<()> {

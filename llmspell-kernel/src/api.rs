@@ -1554,8 +1554,7 @@ pub async fn connect_to_kernel(connection_string: &str) -> Result<ClientHandle> 
 
         if parts.len() != 2 {
             return Err(anyhow::anyhow!(
-                "Invalid TCP connection string: {}",
-                connection_string
+                "Invalid TCP connection string: {connection_string}"
             ));
         }
 

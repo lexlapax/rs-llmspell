@@ -219,7 +219,7 @@ pub trait ToolStatePersistence: Tool {
             state_manager
                 .set(state_scope, "state", serde_json::to_value(&tool_state)?)
                 .await
-                .map_err(|e| anyhow::anyhow!("Failed to save tool state: {}", e))?;
+                .map_err(|e| anyhow::anyhow!("Failed to save tool state: {e}"))?;
 
             info!("Saved state for tool {}", self.metadata().id);
             Ok(())
@@ -247,7 +247,7 @@ pub trait ToolStatePersistence: Tool {
                     debug!("No saved state found for tool {}", tool_id);
                     Ok(false)
                 }
-                Err(e) => Err(anyhow::anyhow!("Failed to load tool state: {}", e)),
+                Err(e) => Err(anyhow::anyhow!("Failed to load tool state: {e}")),
             }
         } else {
             Err(anyhow::anyhow!("No state manager configured"))
@@ -421,7 +421,7 @@ impl ToolStateRegistry {
                 Ok(Some(tool_state))
             }
             Ok(None) => Ok(None),
-            Err(e) => Err(anyhow::anyhow!("Failed to load tool state: {}", e)),
+            Err(e) => Err(anyhow::anyhow!("Failed to load tool state: {e}")),
         }
     }
 

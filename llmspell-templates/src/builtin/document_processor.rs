@@ -240,33 +240,34 @@ impl crate::core::Template for DocumentProcessorTemplate {
         );
 
         // Store in memory if enabled (Task 13.11.3)
-        if memory_enabled && session_id.is_some() && context.memory_manager().is_some() {
-            let memory_mgr = context.memory_manager().unwrap();
-            let input_summary = format!(
-                "Process {} documents with {} transformation",
-                document_paths.len(),
-                transformation_type
-            );
-            let output_summary = format!(
-                "Processed {} documents to {} format",
-                document_paths.len(),
-                output_format
-            );
+        if memory_enabled {
+            if let (Some(ref sid), Some(memory_mgr)) = (session_id, context.memory_manager()) {
+                let input_summary = format!(
+                    "Process {} documents with {} transformation",
+                    document_paths.len(),
+                    transformation_type
+                );
+                let output_summary = format!(
+                    "Processed {} documents to {} format",
+                    document_paths.len(),
+                    output_format
+                );
 
-            crate::context::store_template_execution(
-                &memory_mgr,
-                session_id.as_ref().unwrap(),
-                &self.metadata.id,
-                &input_summary,
-                &output_summary,
-                json!({
-                    "documents_processed": document_paths.len(),
-                    "transformation_type": transformation_type,
-                    "output_format": output_format,
-                }),
-            )
-            .await
-            .ok(); // Don't fail execution if storage fails
+                crate::context::store_template_execution(
+                    &memory_mgr,
+                    sid,
+                    &self.metadata.id,
+                    &input_summary,
+                    &output_summary,
+                    json!({
+                        "documents_processed": document_paths.len(),
+                        "transformation_type": transformation_type,
+                        "output_format": output_format,
+                    }),
+                )
+                .await
+                .ok(); // Don't fail execution if storage fails
+            }
         }
 
         Ok(output)

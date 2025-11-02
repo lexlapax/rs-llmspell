@@ -67,7 +67,7 @@ impl JupyterProtocol {
         if let Some(ref key) = self.hmac_key {
             type HmacSha256 = Hmac<Sha256>;
             let mut mac =
-                HmacSha256::new_from_slice(key).map_err(|e| anyhow!("Invalid HMAC key: {}", e))?;
+                HmacSha256::new_from_slice(key).map_err(|e| anyhow!("Invalid HMAC key: {e}"))?;
 
             // Sign in the order specified by Jupyter protocol
             mac.update(header);
@@ -380,7 +380,7 @@ impl Protocol for JupyterProtocol {
         if let Some(ref key) = self.hmac_key {
             type HmacSha256 = Hmac<Sha256>;
             let mut mac =
-                HmacSha256::new_from_slice(key).map_err(|e| anyhow!("Invalid HMAC key: {}", e))?;
+                HmacSha256::new_from_slice(key).map_err(|e| anyhow!("Invalid HMAC key: {e}"))?;
 
             // Sign in the order specified by Jupyter protocol
             mac.update(header);

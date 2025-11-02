@@ -90,7 +90,7 @@ impl StateSharingManager {
         let mut channels = self.channels.write();
 
         if channels.contains_key(channel_id) {
-            return Err(anyhow::anyhow!("Channel {} already exists", channel_id));
+            return Err(anyhow::anyhow!("Channel {channel_id} already exists"));
         }
 
         let channel = SharedStateChannel {
@@ -136,7 +136,7 @@ impl StateSharingManager {
         let mut channels = self.channels.write();
         let channel = channels
             .get_mut(channel_id)
-            .ok_or_else(|| anyhow::anyhow!("Channel {} not found", channel_id))?;
+            .ok_or_else(|| anyhow::anyhow!("Channel {channel_id} not found"))?;
 
         // Add to participants if not already present
         if !channel.participants.contains(&agent_id.to_string()) {
@@ -203,13 +203,11 @@ impl StateSharingManager {
         let channels = self.channels.read();
         let channel = channels
             .get(channel_id)
-            .ok_or_else(|| anyhow::anyhow!("Channel {} not found", channel_id))?;
+            .ok_or_else(|| anyhow::anyhow!("Channel {channel_id} not found"))?;
 
         if !channel.participants.contains(&sender_agent_id.to_string()) {
             return Err(anyhow::anyhow!(
-                "Agent {} is not a participant in channel {}",
-                sender_agent_id,
-                channel_id
+                "Agent {sender_agent_id} is not a participant in channel {channel_id}"
             ));
         }
 
@@ -275,12 +273,12 @@ impl StateSharingManager {
         let message_queue = self.message_queue.read();
         let queue = message_queue
             .get(channel_id)
-            .ok_or_else(|| anyhow::anyhow!("Channel {} not found", channel_id))?;
+            .ok_or_else(|| anyhow::anyhow!("Channel {channel_id} not found"))?;
 
         let original = queue
             .iter()
             .find(|m| m.message_id == reply_to_id)
-            .ok_or_else(|| anyhow::anyhow!("Message {} not found", reply_to_id))?;
+            .ok_or_else(|| anyhow::anyhow!("Message {reply_to_id} not found"))?;
 
         let correlation_id = original.correlation_id.or(Some(original.message_id));
         drop(message_queue);
@@ -321,7 +319,7 @@ impl StateSharingManager {
         let subscriptions = self.subscriptions.read();
         let agent_channels = subscriptions
             .get(agent_id)
-            .ok_or_else(|| anyhow::anyhow!("Agent {} has no subscriptions", agent_id))?;
+            .ok_or_else(|| anyhow::anyhow!("Agent {agent_id} has no subscriptions"))?;
 
         let message_queue = self.message_queue.read();
         let mut all_messages = Vec::new();
@@ -471,7 +469,7 @@ impl StateSharingManager {
             let channels = self.channels.read();
             let channel = channels
                 .get(pipeline_id)
-                .ok_or_else(|| anyhow::anyhow!("Pipeline {} not found", pipeline_id))?;
+                .ok_or_else(|| anyhow::anyhow!("Pipeline {pipeline_id} not found"))?;
 
             let stages: Vec<String> = serde_json::from_value(
                 channel
@@ -485,7 +483,7 @@ impl StateSharingManager {
             let current_index = stages
                 .iter()
                 .position(|id| id == current_agent_id)
-                .ok_or_else(|| anyhow::anyhow!("Agent {} not in pipeline", current_agent_id))?;
+                .ok_or_else(|| anyhow::anyhow!("Agent {current_agent_id} not in pipeline"))?;
 
             (stages, current_index)
         };

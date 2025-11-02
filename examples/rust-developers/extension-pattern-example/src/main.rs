@@ -466,13 +466,13 @@ async fn setup_extensions(registry: &mut ExtensionRegistry) -> Result<()> {
     registry
         .register(text_extension)
         .await
-        .map_err(|e| anyhow::anyhow!("Failed to register text extension: {}", e))?;
+        .map_err(|e| anyhow::anyhow!("Failed to register text extension: {e}"))?;
 
     let math_extension = Arc::new(MathProcessorExtension);
     registry
         .register(math_extension)
         .await
-        .map_err(|e| anyhow::anyhow!("Failed to register math extension: {}", e))?;
+        .map_err(|e| anyhow::anyhow!("Failed to register math extension: {e}"))?;
 
     println!("   ✅ Registered {} extensions", registry.list().len());
     Ok(())

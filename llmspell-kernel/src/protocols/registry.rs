@@ -47,7 +47,7 @@ impl ProtocolRegistry {
     pub fn create(&self, name: &str, config: ProtocolConfig) -> Result<Box<dyn Protocol>> {
         self.protocols
             .get(name)
-            .ok_or_else(|| anyhow::anyhow!("Unknown protocol: {}", name))?
+            .ok_or_else(|| anyhow::anyhow!("Unknown protocol: {name}"))?
             .create(config)
     }
 

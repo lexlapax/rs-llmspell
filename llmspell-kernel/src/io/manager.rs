@@ -286,7 +286,7 @@ impl EnhancedIOManager {
         sender
             .send(message)
             .await
-            .map_err(|e| anyhow::anyhow!("Failed to send to IOPub channel: {}", e))?;
+            .map_err(|e| anyhow::anyhow!("Failed to send to IOPub channel: {e}"))?;
 
         trace!(
             "Published {} bytes to {} stream",
@@ -382,7 +382,7 @@ impl EnhancedIOManager {
         sender
             .send(message)
             .await
-            .map_err(|e| anyhow::anyhow!("Failed to send execute result: {}", e))?;
+            .map_err(|e| anyhow::anyhow!("Failed to send execute result: {e}"))?;
 
         debug!("Published execute result for execution {}", execution_count);
         Ok(())
@@ -425,7 +425,7 @@ impl EnhancedIOManager {
         sender
             .send(message)
             .await
-            .map_err(|e| anyhow::anyhow!("Failed to send display data: {}", e))?;
+            .map_err(|e| anyhow::anyhow!("Failed to send display data: {e}"))?;
 
         debug!("Published display data");
         Ok(())

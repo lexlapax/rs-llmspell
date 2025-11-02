@@ -239,7 +239,7 @@ impl SessionMiddleware {
             if let Some(middleware) = self.middleware_chains.get(&middleware_type) {
                 self.hook_registry
                     .register_arc(hook_point, Arc::clone(middleware))
-                    .map_err(|e| anyhow::anyhow!("Failed to register middleware: {:?}", e))?;
+                    .map_err(|e| anyhow::anyhow!("Failed to register middleware: {e:?}"))?;
             }
         }
 
@@ -275,7 +275,7 @@ impl SessionMiddleware {
             .hook_executor
             .execute_hooks(&hooks, context)
             .await
-            .map_err(|e| anyhow::anyhow!("Middleware execution failed: {}", e))?;
+            .map_err(|e| anyhow::anyhow!("Middleware execution failed: {e}"))?;
 
         // Return first non-Continue result or Continue if all passed
         for result in results {
@@ -512,7 +512,7 @@ impl Hook for ParallelMiddleware {
         // Check for errors first
         for result in &results {
             if let Err(e) = result {
-                return Err(anyhow::anyhow!("Parallel execution failed: {}", e));
+                return Err(anyhow::anyhow!("Parallel execution failed: {e}"));
             }
         }
 

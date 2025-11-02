@@ -194,7 +194,7 @@ impl PidFile {
                     Ok(false)
                 }
                 Err(e) => {
-                    bail!("Failed to lock PID file: {}", e);
+                    bail!("Failed to lock PID file: {e}");
                 }
             }
         } else {

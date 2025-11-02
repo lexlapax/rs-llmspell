@@ -28,7 +28,7 @@ pub trait StatePersistence: Agent {
             state_manager
                 .save_agent_state(&state)
                 .await
-                .map_err(|e| anyhow::anyhow!("Failed to save agent state: {}", e))?;
+                .map_err(|e| anyhow::anyhow!("Failed to save agent state: {e}"))?;
             info!("Saved state for agent {}", self.metadata().id);
             Ok(())
         } else {
@@ -51,7 +51,7 @@ pub trait StatePersistence: Agent {
                     debug!("No saved state found for agent {}", agent_id);
                     Ok(false)
                 }
-                Err(e) => Err(anyhow::anyhow!("Failed to load agent state: {}", e)),
+                Err(e) => Err(anyhow::anyhow!("Failed to load agent state: {e}")),
             }
         } else {
             Err(anyhow::anyhow!("No state manager configured"))

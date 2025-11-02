@@ -361,10 +361,7 @@ impl LifecycleEventSystem {
             }
             Ok(())
         } else {
-            Err(anyhow::anyhow!(
-                "Subscription not found: {}",
-                subscription_id
-            ))
+            Err(anyhow::anyhow!("Subscription not found: {subscription_id}"))
         }
     }
 

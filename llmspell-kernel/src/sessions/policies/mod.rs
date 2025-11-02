@@ -139,7 +139,7 @@ impl SessionPolicyManager {
                     // Register the policy for this hook point
                     self.hook_registry
                         .register_arc(hook_point, Arc::clone(policy))
-                        .map_err(|e| anyhow::anyhow!("Failed to register policy: {:?}", e))?;
+                        .map_err(|e| anyhow::anyhow!("Failed to register policy: {e:?}"))?;
                 }
             }
         }

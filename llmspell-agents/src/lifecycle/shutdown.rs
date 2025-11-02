@@ -315,7 +315,7 @@ impl ShutdownCoordinator {
         let hooks = self.hooks.read().await;
         for hook in hooks.iter() {
             if let Err(e) = hook.before_shutdown(request).await {
-                return Err(anyhow!("Before shutdown hook failed: {}", e));
+                return Err(anyhow!("Before shutdown hook failed: {e}"));
             }
         }
 
@@ -450,7 +450,7 @@ impl ShutdownCoordinator {
                     if let Some(state_machine) = state_machine {
                         coordinator.shutdown_agent(request, state_machine).await
                     } else {
-                        Err(anyhow!("State machine not found for agent {}", agent_id))
+                        Err(anyhow!("State machine not found for agent {agent_id}"))
                     }
                 }
             })
@@ -534,7 +534,7 @@ impl ShutdownCoordinator {
         {
             let active = self.active_shutdowns.read().await;
             if active.contains_key(agent_id) {
-                return Err(anyhow!("Agent {} is already shutting down", agent_id));
+                return Err(anyhow!("Agent {agent_id} is already shutting down"));
             }
         }
 

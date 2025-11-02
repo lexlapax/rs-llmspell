@@ -536,7 +536,7 @@ impl ResourceManager {
                 return Ok(allocation.clone());
             }
         }
-        Err(anyhow!("Allocation not found: {}", allocation_id))
+        Err(anyhow!("Allocation not found: {allocation_id}"))
     }
 
     /// Get all allocations for agent
