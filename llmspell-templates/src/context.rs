@@ -743,4 +743,76 @@ mod tests {
         assert!(context.require_memory().is_err());
         assert!(context.require_context_bridge().is_err());
     }
+
+    /// Regression test for Task 13b.1.7 (Phase 13.5.7d)
+    ///
+    /// Ensures that ExecutionContext::build() FAILS without provider_config.
+    /// This prevents the regression that occurred when provider_config became
+    /// required but runtime.rs wasn't updated to provide it.
+    #[test]
+    fn test_execution_context_builder_requires_provider_config() {
+        let tool_registry = Arc::new(llmspell_tools::ToolRegistry::new());
+        let agent_registry = Arc::new(llmspell_agents::FactoryRegistry::new());
+        let workflow_factory: Arc<dyn llmspell_workflows::WorkflowFactory> =
+            Arc::new(llmspell_workflows::DefaultWorkflowFactory::new());
+        let providers = Arc::new(llmspell_providers::ProviderManager::new());
+
+        // Try to build WITHOUT provider_config
+        let result = ExecutionContextBuilder::new()
+            .with_tool_registry(tool_registry)
+            .with_agent_registry(agent_registry)
+            .with_workflow_factory(workflow_factory)
+            .with_providers(providers)
+            // MISSING: .with_provider_config(...)
+            .build();
+
+        // Should fail with specific error about missing provider_config
+        assert!(result.is_err(), "Build should fail without provider_config");
+
+        match result {
+            Err(e) => {
+                let error_msg = e.to_string();
+                assert!(
+                    error_msg.contains("provider_config is required"),
+                    "Error should mention provider_config is required, got: {}",
+                    error_msg
+                );
+            }
+            Ok(_) => panic!("Build should have failed without provider_config"),
+        }
+    }
+
+    /// Regression test for Task 13b.1.7 (Phase 13.5.7d)
+    ///
+    /// Ensures that ExecutionContext::build() SUCCEEDS with provider_config.
+    /// Validates the fix works correctly.
+    #[test]
+    fn test_execution_context_builder_succeeds_with_provider_config() {
+        let tool_registry = Arc::new(llmspell_tools::ToolRegistry::new());
+        let agent_registry = Arc::new(llmspell_agents::FactoryRegistry::new());
+        let workflow_factory: Arc<dyn llmspell_workflows::WorkflowFactory> =
+            Arc::new(llmspell_workflows::DefaultWorkflowFactory::new());
+        let providers = Arc::new(llmspell_providers::ProviderManager::new());
+        let provider_config =
+            Arc::new(llmspell_config::providers::ProviderManagerConfig::default());
+
+        // Build WITH provider_config (should succeed)
+        let context = ExecutionContextBuilder::new()
+            .with_tool_registry(tool_registry)
+            .with_agent_registry(agent_registry)
+            .with_workflow_factory(workflow_factory)
+            .with_providers(providers)
+            .with_provider_config(provider_config.clone())  // ✅ REQUIRED
+            .build()
+            .expect("Build should succeed with provider_config");
+
+        // Verify provider_config is accessible
+        assert!(Arc::ptr_eq(&context.provider_config, &provider_config));
+
+        // Verify default provider_config has no default provider (default config)
+        assert!(
+            context.provider_config.default_provider.is_none(),
+            "Default config should have no default provider"
+        );
+    }
 }

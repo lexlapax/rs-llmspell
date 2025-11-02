@@ -1429,6 +1429,21 @@ impl ScriptExecutor for ScriptRuntime {
         Ok(info_json)
     }
 
+    /// Handle template exec command
+    ///
+    /// Builds ExecutionContext with all required infrastructure:
+    /// - Tool/Agent/Workflow registries (always required)
+    /// - Provider manager + provider_config (always required, Phase 13.5.7d)
+    /// - Session manager (optional, if wired from kernel)
+    /// - RAG infrastructure (optional, if wired from kernel)
+    ///
+    /// # Errors
+    ///
+    /// Returns error if:
+    /// - Template not found in registry
+    /// - Parameter validation fails
+    /// - ExecutionContext build fails (missing required infrastructure)
+    /// - Template execution fails
     async fn handle_template_exec(
         &self,
         template_id: &str,
@@ -1456,11 +1471,27 @@ impl ScriptExecutor for ScriptRuntime {
         // Get RAG if available (Phase 12.8.fix)
         let rag = self.rag.read().ok().and_then(|guard| guard.clone());
 
+        // Get provider configuration for ExecutionContext (Task 13b.1.7 - Phase 13.5.7d regression fix)
+        //
+        // Phase 13.5.7d made provider_config REQUIRED in ExecutionContext to enable
+        // smart dual-path LLM provider resolution:
+        //   1. provider_name param → centralized config lookup (RECOMMENDED)
+        //   2. model param → ephemeral provider with inline overrides (backward compat)
+        //   3. Default provider → fallback from ProviderManagerConfig
+        //
+        // Without provider_config, ExecutionContext::build() fails with:
+        // "Required infrastructure not available: provider_config is required"
+        //
+        // See: llmspell-templates/src/context.rs:706-709 (validation)
+        //      llmspell-templates/src/context.rs:160-230 (smart resolution)
+        let provider_config = Arc::new(self.provider_manager.config().clone());
+
         let mut builder = llmspell_templates::context::ExecutionContext::builder()
             .with_tool_registry(self.tool_registry.clone())
             .with_agent_registry(self.agent_registry.clone())
             .with_workflow_factory(self.workflow_factory.clone())
-            .with_providers(core_provider_manager);
+            .with_providers(core_provider_manager)
+            .with_provider_config(provider_config);
 
         // Add session manager if wired from kernel (Phase 12.8.2.5)
         if let Some(sm) = session_manager {
