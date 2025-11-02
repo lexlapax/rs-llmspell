@@ -803,8 +803,8 @@ test result: ok. 2 passed; 0 failed; 0 ignored
 - [x] Real LLM execution validated (fibonacci code generation, chat responses)
 
 **Files Modified Summary**:
-- `llmspell-bridge/src/runtime.rs` (+31 lines: 2 code, 14 doc comment, 13 inline comment, 2 builder chain)
-- `llmspell-bridge/tests/template_execution_integration.rs` (new file, 250+ lines, 4 tests)
+- `llmspell-bridge/src/runtime.rs` (+34 lines: 2 code, 17 doc comment, 13 inline comment, 2 builder chain)
+- `llmspell-bridge/tests/template_execution_integration.rs` (new file, 241 lines, 4 tests, Box::pin wrappers, inline docs)
 - `llmspell-templates/src/context.rs` (+68 lines: 2 regression tests with documentation)
 
 **Definition of Done**: ✅ ALL COMPLETE
@@ -860,6 +860,59 @@ let provider_config = Arc::new(self.provider_manager.config().clone());
 
 **Next Steps**: Ready to commit and create PR for Phase 13b
 
+---
+
+**Subtask 13b.1.7.6: Clippy Warnings Cleanup** ⏱️ 45 min ✅ COMPLETE
+
+**Description**: Fixed 25 clippy warnings introduced by integration tests and fix implementation.
+
+**Warnings Fixed by Category**:
+1. **Doc Comments (13 warnings)**:
+   - `runtime.rs` (3): Added backticks around `ExecutionContext`, `provider_config`
+   - `template_execution_integration.rs` (10): Added backticks to technical terms
+
+2. **Struct Initialization (2 warnings)**:
+   - Replaced field reassignment pattern with struct literal + spread operator
+   ```rust
+   // Before:
+   let mut config = LLMSpellConfig::default();
+   config.providers = provider_manager_config;
+
+   // After:
+   let config = LLMSpellConfig {
+       providers: provider_manager_config,
+       ..LLMSpellConfig::default()
+   };
+   ```
+
+3. **Format Strings (4 warnings)**:
+   - Converted to inline format variables (e.g., `println!("{error_msg}")`)
+
+4. **Assert Pattern (1 warning)**:
+   - Converted if-panic pattern to assert with negation
+
+5. **Large Futures (4 warnings)**:
+   - Wrapped `ScriptRuntime::new_with_lua()` calls with `Box::pin()`
+
+**Files Modified**:
+- `llmspell-bridge/src/runtime.rs` (3 doc comment fixes)
+- `llmspell-bridge/tests/template_execution_integration.rs` (22 fixes)
+
+**Validation Results**:
+- ✅ Build: Clean compilation with `cargo build`
+- ✅ Clippy: 0 warnings across entire workspace
+- ✅ Templates: code-generator and interactive-chat work correctly
+- ✅ Apps: content-creator completed successfully (300ms, exit 0)
+- ✅ All errors now about LLM provider config (expected), NOT infrastructure
+
+**Acceptance Criteria**:
+- [x] Zero clippy warnings in workspace
+- [x] All fixes follow project style (no #[allow] annotations)
+- [x] Templates execute correctly after fixes
+- [x] Apps execute correctly after fixes
+- [x] Debug binary rebuilt and validated
+
+---
 
 **Validation Commands**:
 ```bash

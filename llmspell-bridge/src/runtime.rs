@@ -1431,9 +1431,9 @@ impl ScriptExecutor for ScriptRuntime {
 
     /// Handle template exec command
     ///
-    /// Builds ExecutionContext with all required infrastructure:
+    /// Builds `ExecutionContext` with all required infrastructure:
     /// - Tool/Agent/Workflow registries (always required)
-    /// - Provider manager + provider_config (always required, Phase 13.5.7d)
+    /// - Provider manager + `provider_config` (always required, Phase 13.5.7d)
     /// - Session manager (optional, if wired from kernel)
     /// - RAG infrastructure (optional, if wired from kernel)
     ///
@@ -1442,7 +1442,7 @@ impl ScriptExecutor for ScriptRuntime {
     /// Returns error if:
     /// - Template not found in registry
     /// - Parameter validation fails
-    /// - ExecutionContext build fails (missing required infrastructure)
+    /// - `ExecutionContext` build fails (missing required infrastructure)
     /// - Template execution fails
     async fn handle_template_exec(
         &self,

@@ -802,7 +802,7 @@ mod tests {
             .with_agent_registry(agent_registry)
             .with_workflow_factory(workflow_factory)
             .with_providers(providers)
-            .with_provider_config(provider_config.clone())  // ✅ REQUIRED
+            .with_provider_config(provider_config.clone()) // ✅ REQUIRED
             .build()
             .expect("Build should succeed with provider_config");
 

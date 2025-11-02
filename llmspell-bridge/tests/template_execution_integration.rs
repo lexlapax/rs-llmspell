@@ -1,4 +1,4 @@
-//! Integration tests for template execution via ScriptRuntime
+//! Integration tests for template execution via `ScriptRuntime`
 //!
 //! These tests verify the full execution path from CLI → Kernel → Runtime → Template
 //! to catch regressions that unit tests miss.
@@ -8,14 +8,14 @@ use llmspell_config::{LLMSpellConfig, ProviderConfig, ProviderManagerConfigBuild
 use llmspell_core::traits::script_executor::ScriptExecutor;
 use serde_json::json;
 
-/// Test that template execution works with real provider_config
+/// Test that template execution works with real `provider_config`
 ///
 /// This test validates the fix for Task 13b.1.7 (Phase 13.5.7d regression)
-/// where ExecutionContext::build() requires provider_config but runtime.rs
+/// where `ExecutionContext::build()` requires `provider_config` but `runtime.rs`
 /// wasn't providing it.
 ///
 /// NOTE: This test uses empty providers config to avoid actual LLM validation.
-/// The bug we're testing occurs during ExecutionContext::build(), not provider init.
+/// The bug we're testing occurs during `ExecutionContext::build()`, not provider init.
 #[tokio::test]
 #[cfg(feature = "lua")]
 async fn test_template_exec_with_real_provider_config() {
@@ -24,7 +24,7 @@ async fn test_template_exec_with_real_provider_config() {
     let config = LLMSpellConfig::default();
 
     // Initialize ScriptRuntime (should succeed with empty providers)
-    let runtime = ScriptRuntime::new_with_lua(config)
+    let runtime = Box::pin(ScriptRuntime::new_with_lua(config))
         .await
         .expect("Failed to create ScriptRuntime");
 
@@ -38,9 +38,7 @@ async fn test_template_exec_with_real_provider_config() {
         // Don't specify provider_name or model - will use default (empty)
     });
 
-    let result = runtime
-        .handle_template_exec("code-generator", params)
-        .await;
+    let result = runtime.handle_template_exec("code-generator", params).await;
 
     // Before fix: This will fail with "provider_config is required"
     // After fix: This should either succeed or fail with a different error
@@ -54,17 +52,15 @@ async fn test_template_exec_with_real_provider_config() {
             let error_msg = e.to_string();
 
             // If we see "provider_config is required", the bug still exists
-            if error_msg.contains("provider_config is required") {
-                panic!(
-                    "❌ BUG DETECTED: ExecutionContext missing provider_config\n\
-                     Error: {}\n\
-                     Fix: Add .with_provider_config() to runtime.rs:1463",
-                    error_msg
-                );
-            }
+            assert!(
+                !error_msg.contains("provider_config is required"),
+                "❌ BUG DETECTED: ExecutionContext missing provider_config\n\
+                 Error: {error_msg}\n\
+                 Fix: Add .with_provider_config() to runtime.rs:1463"
+            );
 
             // Other errors are OK (e.g., missing LLM connection, template not found)
-            println!("⚠️  Template execution failed (expected without real LLM): {}", error_msg);
+            println!("⚠️  Template execution failed (expected without real LLM): {error_msg}");
 
             // For now, we accept any error that's NOT "provider_config is required"
             // This proves ExecutionContext was built successfully
@@ -76,10 +72,10 @@ async fn test_template_exec_with_real_provider_config() {
     }
 }
 
-/// Test provider resolution with provider_name param (centralized config)
+/// Test provider resolution with `provider_name` param (centralized config)
 ///
 /// Validates Phase 13.5.7d smart dual-path provider resolution:
-/// - provider_name param → lookup in ProviderManagerConfig
+/// - `provider_name` param → lookup in `ProviderManagerConfig`
 #[tokio::test]
 #[cfg(feature = "lua")]
 async fn test_template_exec_provider_name_resolution() {
@@ -105,10 +101,12 @@ async fn test_template_exec_provider_name_resolution() {
         .add_provider("anthropic", provider_config)
         .build();
 
-    let mut config = LLMSpellConfig::default();
-    config.providers = provider_manager_config;
+    let config = LLMSpellConfig {
+        providers: provider_manager_config,
+        ..LLMSpellConfig::default()
+    };
 
-    let runtime = ScriptRuntime::new_with_lua(config)
+    let runtime = Box::pin(ScriptRuntime::new_with_lua(config))
         .await
         .expect("Failed to create ScriptRuntime");
 
@@ -120,9 +118,7 @@ async fn test_template_exec_provider_name_resolution() {
         "include_tests": false,
     });
 
-    let result = runtime
-        .handle_template_exec("code-generator", params)
-        .await;
+    let result = runtime.handle_template_exec("code-generator", params).await;
 
     // Should NOT fail with "provider_config is required"
     if let Err(e) = result {
@@ -131,20 +127,20 @@ async fn test_template_exec_provider_name_resolution() {
             !error_msg.contains("provider_config is required"),
             "ExecutionContext should have provider_config from runtime.rs"
         );
-        println!("⚠️  Expected error (no real LLM): {}", error_msg);
+        println!("⚠️  Expected error (no real LLM): {error_msg}");
     }
 }
 
 /// Test provider resolution with model param (ephemeral provider)
 ///
 /// Validates Phase 13.5.7d smart dual-path provider resolution:
-/// - model param → create ephemeral ProviderConfig
+/// - model param → create ephemeral `ProviderConfig`
 #[tokio::test]
 #[cfg(feature = "lua")]
 async fn test_template_exec_model_ephemeral_resolution() {
     let config = LLMSpellConfig::default();
 
-    let runtime = ScriptRuntime::new_with_lua(config)
+    let runtime = Box::pin(ScriptRuntime::new_with_lua(config))
         .await
         .expect("Failed to create ScriptRuntime");
 
@@ -156,9 +152,7 @@ async fn test_template_exec_model_ephemeral_resolution() {
         "include_tests": false,
     });
 
-    let result = runtime
-        .handle_template_exec("code-generator", params)
-        .await;
+    let result = runtime.handle_template_exec("code-generator", params).await;
 
     // Should NOT fail with "provider_config is required"
     if let Err(e) = result {
@@ -167,11 +161,11 @@ async fn test_template_exec_model_ephemeral_resolution() {
             !error_msg.contains("provider_config is required"),
             "ExecutionContext should have provider_config from runtime.rs"
         );
-        println!("⚠️  Expected error (no real LLM): {}", error_msg);
+        println!("⚠️  Expected error (no real LLM): {error_msg}");
     }
 }
 
-/// Test that ExecutionContext builds successfully even without LLM execution
+/// Test that `ExecutionContext` builds successfully even without LLM execution
 ///
 /// This is a smoke test to ensure the infrastructure wiring is correct
 #[tokio::test]
@@ -198,10 +192,12 @@ async fn test_execution_context_infrastructure_wiring() {
         .add_provider("test", provider_config)
         .build();
 
-    let mut config = LLMSpellConfig::default();
-    config.providers = provider_manager_config;
+    let config = LLMSpellConfig {
+        providers: provider_manager_config,
+        ..LLMSpellConfig::default()
+    };
 
-    let runtime = ScriptRuntime::new_with_lua(config)
+    let runtime = Box::pin(ScriptRuntime::new_with_lua(config))
         .await
         .expect("Failed to create ScriptRuntime");
 
@@ -214,9 +210,7 @@ async fn test_execution_context_infrastructure_wiring() {
         "include_tests": false,
     });
 
-    let result = runtime
-        .handle_template_exec("code-generator", params)
-        .await;
+    let result = runtime.handle_template_exec("code-generator", params).await;
 
     // Main assertion: Should NOT fail with infrastructure error
     if let Err(e) = result {
@@ -233,7 +227,7 @@ async fn test_execution_context_infrastructure_wiring() {
         );
 
         // Other errors are acceptable (template execution, LLM connection, etc.)
-        println!("✅ Infrastructure wiring OK. Template error (expected): {}", error_msg);
+        println!("✅ Infrastructure wiring OK. Template error (expected): {error_msg}");
     } else {
         println!("✅ Template execution succeeded");
     }
