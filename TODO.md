@@ -1611,11 +1611,41 @@ refinery = { version = "0.8", features = ["tokio-postgres"] }
 **Description**: Create SQL init scripts to enable VectorChord, pgcrypto, uuid-ossp extensions.
 
 **Acceptance Criteria**:
-- [ ] Extensions enabled on container startup
-- [ ] Schema created
-- [ ] Permissions granted
-- [ ] Idempotent scripts
-- [ ] Zero errors on initialization
+- [x] Extensions enabled on container startup
+- [x] Schema created
+- [x] Permissions granted
+- [x] Idempotent scripts
+- [x] Zero errors on initialization
+
+**Status**: ✅ **COMPLETE** (2025-11-02, ~20 min)
+
+**Implementation Summary**:
+- Populated init script with extension setup (vchord CASCADE, pgcrypto, uuid-ossp)
+- Created llmspell schema with proper search_path configuration
+- Granted all privileges including future object privileges
+- Verified idempotent execution (IF NOT EXISTS on all operations)
+- Zero errors on initialization or re-runs
+
+**Verification Results**:
+- ✅ Extensions installed: vchord 0.5.3, vector 0.8.1 (CASCADE), pgcrypto 1.4, uuid-ossp 1.1
+- ✅ Schema created: llmspell (owned by llmspell user)
+- ✅ Search path configured: "llmspell, public"
+- ✅ Permissions granted: ALL on schema, tables, sequences, functions
+- ✅ Future privileges configured: ALTER DEFAULT PRIVILEGES for all object types
+- ✅ Idempotent: Re-running script produces "already exists, skipping" notices with zero errors
+
+**Script Contents** (`docker/postgres/init-scripts/01-extensions.sql`):
+- CREATE EXTENSION vchord CASCADE (enables vector 0.8.1 dependency automatically)
+- CREATE EXTENSION pgcrypto (cryptographic functions)
+- CREATE EXTENSION uuid-ossp (UUID generation)
+- CREATE SCHEMA llmspell
+- ALTER DATABASE search_path to "llmspell, public"
+- GRANT ALL PRIVILEGES (current and future objects)
+
+**Files Modified**:
+- `docker/postgres/init-scripts/01-extensions.sql` (30 lines - populated from placeholder)
+
+**Ready for Task 13b.2.4** (Modify llmspell-storage crate structure)
 
 **Implementation Steps**:
 1. Create `docker/postgres/init-scripts/01-extensions.sql`:
