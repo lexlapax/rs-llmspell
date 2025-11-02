@@ -17,7 +17,7 @@ llmspell-config = { path = "../llmspell-config" }
 llmspell-utils = { path = "../llmspell-utils" }
 llmspell-events = { path = "../llmspell-events" }
 llmspell-hooks = { path = "../llmspell-hooks" }
-llmspell-storage = { path = "../llmspell-storage" }
+llmspell-storage = { path = "../llmspell-storage", features = [] }
 llmspell-providers = { path = "../llmspell-providers" }
 llmspell-memory = { path = "../llmspell-memory" }
 
@@ -132,6 +132,7 @@ debug = ["tracing-subscriber/fmt"]
 test-utils = []
 skip-python-tests = []  # Skip Python integration tests (for CI or when Python unavailable)
 lua = []  # Enable Lua-specific tests (used in test configurations)
+postgres = ["llmspell-storage/postgres"]  # Enable PostgreSQL storage backend (Phase 13b.2)
 
 [lib]
 name = "llmspell_kernel"

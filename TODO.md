@@ -2033,11 +2033,80 @@ cargo test -p llmspell-storage --features postgres --test postgres_backend_tests
 **Context**: PostgresConfig (connection details) is already created in Task 13b.2.4 (`backends/postgres/config.rs`). This task adds PostgreSQL to the existing backend selection infrastructure.
 
 **Acceptance Criteria**:
-- [ ] StorageBackendType::Postgres enum variant added (done in 13b.2.4)
-- [ ] Backend configuration parsing works (Memory, Sled, RocksDB, Postgres)
-- [ ] Validation implemented for PostgreSQL config
-- [ ] Defaults sensible
-- [ ] Integration with existing config system
+- [x] StorageBackendType::Postgres enum variant added (done in 13b.2.4 for llmspell-storage, now added to llmspell-kernel)
+- [x] Backend configuration parsing works (Memory, Sled, RocksDB, Postgres)
+- [x] Validation implemented for PostgreSQL config (serde defaults)
+- [x] Defaults sensible (pool_size=20, timeout_ms=5000, enable_rls=true)
+- [x] Integration with existing config system
+
+**Status**: ✅ **COMPLETE** (2025-11-02, ~25 min)
+
+**Implementation Summary**:
+- Added `StorageBackendType::Postgres(PostgresConfig)` variant to llmspell-kernel/src/state/config.rs
+- Created `PostgresConfig` struct with serde defaults for kernel state configuration
+- Added `postgres` feature flag to llmspell-kernel (propagates llmspell-storage/postgres)
+- Updated backend_adapter.rs to handle Postgres variant (returns "not yet implemented" per Phase 13b.2 scope)
+- Created comprehensive test suite (8 tests, 100% passing)
+
+**Configuration Structure**:
+```rust
+pub enum StorageBackendType {
+    Memory,
+    Sled(SledConfig),
+    RocksDB(RocksDBConfig),
+    #[cfg(feature = "postgres")]
+    Postgres(PostgresConfig),  // NEW
+}
+
+pub struct PostgresConfig {
+    pub connection_string: String,
+    pub pool_size: u32,           // default: 20
+    pub timeout_ms: u64,          // default: 5000
+    pub enable_rls: bool,         // default: true
+}
+```
+
+**TOML Example**:
+```toml
+[storage]
+backend = { Postgres = {
+    connection_string = "postgresql://localhost/llmspell_dev",
+    pool_size = 20,
+    enable_rls = true
+}}
+```
+
+**Test Coverage** (8 tests, all passing):
+1. ✅ test_postgres_config_default - Default values
+2. ✅ test_postgres_config_serialization - JSON serialization round-trip
+3. ✅ test_postgres_config_serde_defaults - Serde uses defaults for missing fields
+4. ✅ test_storage_backend_type_postgres_variant - Pattern matching on Postgres variant
+5. ✅ test_postgres_backend_type_serialization - Enum variant serialization
+6. ✅ test_toml_postgres_config_parsing - TOML parsing full config
+7. ✅ test_toml_postgres_config_with_defaults - TOML with defaults
+8. ✅ test_toml_storage_backend_type_postgres - TOML enum variant parsing
+
+**Files Modified**:
+- `llmspell-kernel/src/state/config.rs:129-192` (added Postgres variant + PostgresConfig struct with defaults)
+- `llmspell-kernel/src/state/backend_adapter.rs:37-44` (added Postgres match arm)
+- `llmspell-kernel/Cargo.toml:20` (made llmspell-storage features explicit)
+- `llmspell-kernel/Cargo.toml:135` (added postgres feature flag)
+
+**Files Created**:
+- `llmspell-kernel/tests/postgres_config_tests.rs` (163 lines, 8 tests)
+
+**Test Execution**:
+```bash
+cargo test -p llmspell-kernel --features postgres --test postgres_config_tests
+# test result: ok. 8 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+```
+
+**Verification**:
+- ✅ `cargo check -p llmspell-kernel --features postgres` - compiles
+- ✅ `cargo check --workspace` - compiles without postgres feature
+- ✅ Feature flag isolation working correctly
+
+**Ready for Task 13b.2.8** (Integrate PostgreSQL into CI Workflow)
 
 **Implementation Steps**:
 1. Verify `StorageBackendType::Postgres` added in traits.rs (from Task 13b.2.4)

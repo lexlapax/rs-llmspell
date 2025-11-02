@@ -34,6 +34,14 @@ pub async fn create_storage_backend(
                 "RocksDB backend not yet implemented".to_string(),
             ))
         }
+        #[cfg(feature = "postgres")]
+        StorageBackendType::Postgres(_config) => {
+            // PostgreSQL backend infrastructure exists (Phase 13b.2)
+            // StorageBackend trait implementation deferred to Phase 13b.4+
+            Err(StateError::storage(
+                "PostgreSQL backend infrastructure complete, StorageBackend trait implementation in Phase 13b.4+".to_string(),
+            ))
+        }
     }
 }
 
