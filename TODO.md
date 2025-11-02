@@ -1190,16 +1190,81 @@ Timeline shows "Days 2-3 (16 hours)" which suggests infrastructure-only, but tas
 6. Document scope boundaries (what IS included, what is DEFERRED to 13b.3+)
 
 **Acceptance Criteria**:
-- [ ] MINIMAL viable output for 13b.2 defined
-- [ ] List what IS included in 13b.2 (infrastructure components)
-- [ ] List what is NOT included (deferred to later phases)
-- [ ] Task 13b.2.4 acceptance criteria rewritten for clarity
-- [ ] Task 13b.2.5 acceptance criteria rewritten for clarity
-- [ ] Scope decision documented with rationale
+- [x] MINIMAL viable output for 13b.2 defined
+- [x] List what IS included in 13b.2 (infrastructure components)
+- [x] List what is NOT included (deferred to later phases)
+- [x] Task 13b.2.4 acceptance criteria rewritten for clarity
+- [x] Task 13b.2.5 acceptance criteria rewritten for clarity
+- [x] Scope decision documented with rationale
+
+**Status**: ✅ COMPLETE
+**Completed**: 2025-11-02
+
+**Scope Analysis**:
+
+**Phase Dependencies Verified**:
+- Phase 13b.4 (VectorChord Integration, Days 4-5) depends on 13b.2 **AND** 13b.3 (RLS)
+- Phase 13b.5 (Bi-Temporal Graph, Days 8-10) depends on 13b.3 (RLS)
+- Phase 13b.3 (RLS, Days 6-7) depends on 13b.2 (Infrastructure)
+
+**Conclusion**: Phase 13b.2 provides FOUNDATION, not storage operations.
+
+**Time Budget Analysis** (Phase 13b.2 Tasks):
+- 13b.2.0: Pre-validation (4h) ← ADDED (increases budget from 16h to 20h)
+- 13b.2.1: Add dependencies (1h)
+- 13b.2.2: Docker Compose (2h)
+- 13b.2.3: Init scripts (1h)
+- 13b.2.4: Modify llmspell-storage crate structure (3h)
+- 13b.2.5: PostgresBackend infrastructure (4h)
+- 13b.2.6: Refinery migration framework (2h)
+- 13b.2.7: Config types (3h)
+**Total**: 20 hours (4h over original 16h budget due to validation tasks)
+
+**Decision**: ✅ **OPTION A - INFRASTRUCTURE ONLY**
+
+**Phase 13b.2 INCLUDES**:
+1. ✅ PostgreSQL dependencies in workspace Cargo.toml (tokio-postgres, deadpool-postgres, pgvector, refinery)
+2. ✅ Docker Compose with VectorChord PostgreSQL 18 running
+3. ✅ Extensions loaded (vchord, pgcrypto, uuid-ossp)
+4. ✅ llmspell-storage crate modified:
+   - Add `backends/postgres/` module
+   - Add `PostgresBackendType` enum variant
+   - Add feature flag `postgres`
+5. ✅ `PostgresBackend` struct with:
+   - Connection pooling (deadpool-postgres, 20 connections)
+   - Tenant context management (`SET app.current_tenant_id = $1`)
+   - Health checks (`pg_isready`)
+   - Error handling (custom PostgreSQL error types)
+6. ✅ Refinery migration framework setup:
+   - `llmspell-storage/migrations/` directory
+   - Migration runner implementation
+   - Empty migrations (NO schemas yet)
+7. ✅ Configuration types:
+   - `PostgresConfig` struct
+   - Backend selection enum
+   - TOML parsing
+
+**Minimal Acceptance**: PostgreSQL connection succeeds, migrations run (no tables), health checks pass
+
+**Phase 13b.2 EXCLUDES** (deferred to later phases):
+- ❌ NO table schemas (not even `vector_embeddings`)
+- ❌ NO `VectorStorage` trait implementation for PostgreSQL
+- ❌ NO `StorageBackend` trait implementation for PostgreSQL
+- ❌ NO RLS policies (Phase 13b.3)
+- ❌ NO actual storage operations (insert/search/get/set)
+- ❌ NO integration with llmspell-memory, llmspell-kernel, llmspell-graph
+- ❌ NO migration from existing backends
+
+**Rationale for Infrastructure-Only**:
+1. **Phase dependencies**: 13b.4 (Vector Storage) depends on 13b.2 **AND** 13b.3 (RLS) - cannot implement VectorStorage without RLS
+2. **Time budget**: 20 hours only covers foundation (pool, config, migrations framework)
+3. **Logical separation**: Infrastructure (13b.2) → RLS (13b.3) → Storage Ops (13b.4+)
+4. **Risk mitigation**: Validate PostgreSQL works BEFORE implementing complex storage logic
+5. **Testing clarity**: Can test connection pool + health checks without storage complexity
 
 **Files to Update**:
-- `TODO.md` (Tasks 13b.2.4, 13b.2.5 acceptance criteria)
-- `TODO.md` (document scope decision)
+- `TODO.md` (Task 13b.2.4 - already updated in 13b.2.0.2)
+- `TODO.md` (Task 13b.2.5 - acceptance criteria ALREADY correct - infrastructure only)
 
 #### Subtask 13b.2.0.4: Validate PostgreSQL Dependency Compatibility ⏱️ 45 min
 **Priority**: HIGH
