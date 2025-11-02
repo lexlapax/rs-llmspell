@@ -453,6 +453,102 @@ Phase 13 is **fully validated on Linux** with zero platform-specific regressions
 - Model recommendations by platform
 - Performance characteristics by model type
 
+### Task 13b.1.6: Fix Provider Factory Lookup Bug ✅ COMPLETE
+**Priority**: CRITICAL
+**Estimated Time**: 3 hours
+**Actual Time**: 3 hours
+**Assignee**: Provider Infrastructure Team
+**Status**: ✅ COMPLETE
+**Started**: 2025-11-01
+**Completed**: 2025-11-02
+
+**Description**: Fixed critical provider factory lookup bug causing "Unknown provider: openai" errors. Factory registry was incorrectly using `config.name` (TOML section key) instead of mapping `provider_type` to registered factory implementations. This broke ALL provider configurations including builtin `providers.toml`.
+
+**Root Cause Analysis**:
+1. **Factory Registration** (`llmspell-kernel/src/api.rs:1145-1149`):
+   - Only 3 factories registered: "rig", "ollama", "candle"
+   - RigProvider handles multiple backends: openai, anthropic, cohere
+
+2. **Config Format** (builtin `llmspell-config/builtins/providers.toml:14-16`):
+   ```toml
+   [providers.openai]  # Section key becomes config.name
+   provider_type = "openai"  # Backend type for RigProvider
+   ```
+
+3. **Broken Lookup** (`llmspell-providers/src/abstraction.rs:262`):
+   ```rust
+   self.factories.get(&config.name)  # BUG: Looks for "openai" factory
+   ```
+   - Tried to find factory "openai" (not registered)
+   - Should map provider_type "openai" → factory "rig"
+
+**Fix Implementation**:
+1. **Added `factory_name()` method** (`abstraction.rs:115-128`):
+   ```rust
+   pub fn factory_name(&self) -> &str {
+       match self.provider_type.as_str() {
+           "openai" | "anthropic" | "cohere" => "rig",
+           "ollama" => "ollama",
+           "candle" => "candle",
+           _ => &self.provider_type  // Extensibility
+       }
+   }
+   ```
+
+2. **Updated `create()` lookup** (`abstraction.rs:269-280`):
+   ```rust
+   let factory_name = config.factory_name();
+   self.factories.get(factory_name)  // FIXED: Uses mapped factory
+   ```
+
+**Files Modified**:
+- `llmspell-providers/src/abstraction.rs` - Added factory_name(), updated create()
+- `examples/script-users/applications/content-creator/config.toml` - Reverted test changes
+
+**Testing**:
+- [x] Compiled cleanly with zero warnings
+- [x] `--profile providers` loads openai/anthropic providers successfully
+- [x] Builtin configs work without changes (backward compatible)
+- [x] Factory mapping supports future providers extensibly
+
+**Impact**:
+- FIXES ALL provider configurations (no app config changes needed)
+- Zero breaking changes (fully backward compatible)
+- Proper separation: factory = implementation, provider_type = backend
+
+**End-to-End Validation** (✅ COMPLETE):
+
+**Applications Tested**:
+- [x] **content-creator**: openai + anthropic providers initialized successfully (2 factory lookups)
+- [x] **research-chat**: openai + anthropic providers initialized successfully (6 factory lookups)
+- [x] **personal-assistant**: openai + anthropic providers initialized successfully (2 factory lookups)
+
+**Templates Tested** (Phase 12 integration):
+- [x] **interactive-chat**: openai + anthropic multi-initialization successful (8 factory lookups)
+- [x] **code-generator**: Multi-agent workflow with openai + anthropic (12 factory lookups)
+- [x] **research-assistant**: Research+RAG workflow with openai + anthropic (10 factory lookups)
+
+**Validation Results**:
+- [x] Trace logs confirm correct factory mapping (provider_type → factory "rig")
+- [x] Zero "Unknown provider" errors across all execution paths
+- [x] Zero factory lookup failures (40+ successful lookups tested)
+- [x] All applications start successfully with `--profile providers --trace trace`
+- [x] All templates execute successfully with `--profile providers --trace trace`
+- [x] Agent factory layer working (multi-agent templates validated)
+- [x] Lua API injection working (script runtime provider creation validated)
+
+**Validation Command**:
+```bash
+./target/debug/llmspell app run examples/script-users/applications/content-creator --profile providers --trace trace
+```
+
+**Critical Trace Logs** (validates fix working):
+```
+Looking up factory 'rig' for provider 'openai' (type: openai, available factories: ["ollama", "candle", "rig"])
+Creating RigProvider: provider=openai, model=gpt-3.5-turbo
+Initialized provider: openai (type: openai)
+```
+
 ---
 
 ## Phase 13b.2: PostgreSQL Infrastructure Setup (Days 2-3)

@@ -51,7 +51,10 @@ fn test_metal_on_macos() {
     match provider {
         Ok(_) => println!("✅ Metal device: Available"),
         Err(e) => {
-            println!("✅ Metal device: Not available (expected on some macOS): {}", e);
+            println!(
+                "✅ Metal device: Not available (expected on some macOS): {}",
+                e
+            );
             assert!(e.to_string().contains("Metal not available"));
         }
     }

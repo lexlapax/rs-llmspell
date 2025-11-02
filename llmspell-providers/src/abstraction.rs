@@ -112,6 +112,21 @@ impl ProviderConfig {
         format!("{}/{}/{}", self.name, self.provider_type, self.model)
     }
 
+    /// Map provider_type to factory name
+    /// Handles the provider_type → implementation factory mapping
+    pub fn factory_name(&self) -> &str {
+        match self.provider_type.as_str() {
+            "openai" | "anthropic" | "cohere" => "rig",
+            "ollama" => "ollama", // ollama has dedicated factory
+            "candle" => "candle", // candle has dedicated factory
+            _ => {
+                // Unknown provider type - try using provider_type directly
+                // This allows future extensibility without code changes
+                &self.provider_type
+            }
+        }
+    }
+
     /// Load configuration from environment variables
     ///
     /// NOTE: This is a fallback mechanism for provider discovery.
@@ -251,17 +266,23 @@ impl ProviderRegistry {
         &self,
         config: ProviderConfig,
     ) -> Result<Box<dyn ProviderInstance>, LLMSpellError> {
+        let factory_name = config.factory_name();
         debug!(
-            "Looking up factory for name: '{}' (available: {:?})",
+            "Looking up factory '{}' for provider '{}' (type: {}, available factories: {:?})",
+            factory_name,
             config.name,
+            config.provider_type,
             self.factories.keys().collect::<Vec<_>>()
         );
 
         let factory =
             self.factories
-                .get(&config.name)
+                .get(factory_name)
                 .ok_or_else(|| LLMSpellError::Configuration {
-                    message: format!("Unknown provider: {}", config.name),
+                    message: format!(
+                        "No factory found for provider_type '{}' (factory '{}' not registered)",
+                        config.provider_type, factory_name
+                    ),
                     source: None,
                 })?;
 

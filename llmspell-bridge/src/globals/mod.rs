@@ -342,6 +342,9 @@ async fn register_template_global(
         ))
     };
 
+    // Add template_bridge to context so workflow registration can access it
+    context.set_bridge("template_bridge", template_bridge.clone());
+
     // Register template global
     builder.register(Arc::new(template_global::TemplateGlobal::new(
         template_bridge,
@@ -415,11 +418,12 @@ pub async fn create_standard_registry(context: Arc<GlobalContext>) -> Result<Glo
     // Register hook and tool globals
     register_hook_and_tools(&mut builder, &context)?;
 
-    // Register agent and workflow globals
-    register_agent_workflow(&mut builder, &context).await?;
-
-    // Register template global
+    // Register template global FIRST (must happen before agent/workflow registration)
+    // because register_agent_workflow needs template_bridge from context
     register_template_global(&mut builder, &context).await?;
+
+    // Register agent and workflow globals (depends on template_bridge being in context)
+    register_agent_workflow(&mut builder, &context).await?;
 
     builder.register(Arc::new(streaming_global::StreamingGlobal::new()));
 
