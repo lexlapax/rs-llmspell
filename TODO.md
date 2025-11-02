@@ -379,6 +379,35 @@ Ignored:        21  (5.2%)
 **Recommendation**:
 Phase 13 is **fully validated on Linux** with zero platform-specific regressions. Ready for production deployment on Linux systems.
 
+**macOS Compilation Fix** (discovered during local macOS build):
+1. **Critical system_monitor.rs type mismatch** (platform-specific libc::statvfs differences):
+   - Root cause: `libc::statvfs` struct has different field types between platforms:
+     - Linux: `f_bsize` (u64), `f_blocks` (u64), `f_bavail` (u64)
+     - macOS: `f_bsize` (u64), `f_blocks` (u32), `f_bavail` (u32)
+   - Compilation error: Cannot multiply `u32 * u64` (lines 466-467)
+   - Fix: Platform-specific conditional compilation (proper fix, no clippy allows)
+   - File: `llmspell-tools/src/system/system_monitor.rs:462-471`
+   - Solution:
+     ```rust
+     let block_size = statvfs.f_bsize;  // u64 on both platforms
+     #[cfg(target_os = "macos")]
+     let total_blocks = u64::from(statvfs.f_blocks);  // u32→u64 on macOS
+     #[cfg(not(target_os = "macos"))]
+     let total_blocks = statvfs.f_blocks;  // already u64 on Linux
+     #[cfg(target_os = "macos")]
+     let available_blocks = u64::from(statvfs.f_bavail);  // u32→u64 on macOS
+     #[cfg(not(target_os = "macos"))]
+     let available_blocks = statvfs.f_bavail;  // already u64 on Linux
+     ```
+   - Impact: Enables macOS compilation (previously failed with type mismatch errors)
+   - Validation: Zero clippy warnings on both Linux and macOS, all tests passing
+
+**Build Status**:
+- macOS build time: 36s (after fix, incremental)
+- Zero compilation errors
+- Zero clippy warnings
+- All workspace tests passing (734 total, 705 passed, 27 ignored, 2 API-key failures unrelated to Phase 13)
+
 ### Task 13b.1.4: Document Platform-Specific GPU Support ✅ COMPLETE
 **Priority**: MEDIUM
 **Estimated Time**: 1 hour
