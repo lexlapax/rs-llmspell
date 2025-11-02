@@ -979,12 +979,29 @@ INFO Template execution succeeded  # ✅ NO "provider_config is required" ERROR
 **Rationale**: Phase 13b.2 makes several untested assumptions (VectorChord Docker image exists, PostgreSQL fits existing storage traits, no dependency conflicts). Validating these upfront saves 8-16 hours of potential rework if assumptions are wrong.
 
 **Acceptance Criteria**:
-- [ ] VectorChord Docker image validated OR fallback plan documented
-- [ ] llmspell-storage architecture decision made (modify existing vs new crate)
-- [ ] Phase 13b.2 minimal scope clearly defined
-- [ ] PostgreSQL dependencies verified conflict-free
-- [ ] CI strategy for PostgreSQL tests decided
-- [ ] All findings documented in TODO.md
+- [x] VectorChord Docker image validated OR fallback plan documented
+- [x] llmspell-storage architecture decision made (modify existing vs new crate)
+- [x] Phase 13b.2 minimal scope clearly defined
+- [x] PostgreSQL dependencies verified conflict-free
+- [x] CI strategy for PostgreSQL tests decided
+- [x] All findings documented in TODO.md
+
+**Status**: ✅ **COMPLETE** (2025-11-02, 4 hours)
+
+**Summary**:
+- ✅ 13b.2.0.1: VectorChord 0.5.3 validated (PostgreSQL 18, pgvector 0.8.1 dependency)
+- ✅ 13b.2.0.2: Modify existing llmspell-storage crate (add backends/postgres/ module)
+- ✅ 13b.2.0.3: Infrastructure-only scope (connection pool, migrations framework, NO storage ops)
+- ✅ 13b.2.0.4: Zero dependency conflicts (tokio v1.48, chrono v0.4, uuid v1.18 compatible)
+- ✅ 13b.2.0.5: Docker Compose CI strategy (Linux only, +65-100s overhead, <10min target maintained)
+
+**Key Decisions**:
+1. Proceed with VectorChord 0.5.3 (must use CASCADE for extension creation)
+2. PostgreSQL backends in llmspell-storage as optional `postgres` feature
+3. Phase 13b.2 provides infrastructure foundation only (storage ops deferred to 13b.4+)
+4. Docker Compose in CI for dev/CI consistency and validated VectorChord support
+
+**Ready for Phase 13b.2.1** (Add PostgreSQL Dependencies)
 
 **Subtasks**:
 
