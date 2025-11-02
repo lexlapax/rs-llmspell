@@ -105,6 +105,10 @@ pub mod vector_storage;
 pub use backends::{MemoryBackend, SledBackend};
 pub use traits::{StorageBackend, StorageBackendType, StorageCharacteristics, StorageSerialize};
 
+// Re-export PostgreSQL types (Phase 13b.2+)
+#[cfg(feature = "postgres")]
+pub use backends::{PostgresBackend, PostgresConfig, PostgresError, PostgresPool};
+
 // Re-export vector storage types
 pub use vector_storage::{
     DistanceMetric, HNSWConfig, HNSWStorage, NamespaceStats, ScopedStats, StorageStats,

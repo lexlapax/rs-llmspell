@@ -17,6 +17,10 @@ pub enum StorageBackendType {
 
     /// RocksDB embedded database
     RocksDB,
+
+    /// PostgreSQL database with VectorChord (Phase 13b.2+)
+    #[cfg(feature = "postgres")]
+    Postgres,
 }
 
 /// Storage backend characteristics

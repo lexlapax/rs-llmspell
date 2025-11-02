@@ -1691,11 +1691,61 @@ refinery = { version = "0.8", features = ["tokio-postgres"] }
 **Context**: Task 13b.2.0.2 determined that PostgreSQL backends should be added to the existing llmspell-storage crate as an optional `postgres` feature flag, not as a separate crate. This avoids trait duplication and maintains the single source of truth for storage abstractions.
 
 **Acceptance Criteria**:
-- [ ] `backends/postgres/` module added to existing llmspell-storage
-- [ ] PostgreSQL dependencies added as optional (workspace = true, optional = true)
-- [ ] `postgres` feature flag created
-- [ ] `StorageBackendType::Postgres` enum variant added
-- [ ] `cargo check -p llmspell-storage --features postgres` passes
+- [x] `backends/postgres/` module added to existing llmspell-storage
+- [x] PostgreSQL dependencies added as optional (workspace = true, optional = true)
+- [x] `postgres` feature flag created
+- [x] `StorageBackendType::Postgres` enum variant added
+- [x] `cargo check -p llmspell-storage --features postgres` passes
+
+**Status**: ✅ **COMPLETE** (2025-11-02, ~45 min)
+
+**Implementation Summary**:
+- Added PostgreSQL dependencies to llmspell-storage as optional features
+- Created postgres feature flag in Cargo.toml
+- Added StorageBackendType::Postgres enum variant (feature-gated)
+- Created complete backends/postgres/ module structure (5 files, 250+ lines)
+- Zero warnings, zero errors on compilation
+- Workspace compiles with and without postgres feature
+
+**Module Structure Created**:
+```
+llmspell-storage/src/backends/postgres/
+├── mod.rs          (module exports: PostgresBackend, PostgresConfig, PostgresError, PostgresPool)
+├── error.rs        (PostgresError enum with From impls for tokio-postgres, deadpool)
+├── config.rs       (PostgresConfig struct with builder pattern, validation)
+├── pool.rs         (PostgresPool wrapper with health checks, status reporting)
+└── backend.rs      (PostgresBackend struct with tenant context management)
+```
+
+**Key Implementation Details**:
+1. **PostgresBackend** (backend.rs): Connection pool, tenant context (Arc<RwLock>), set/get/clear tenant, health checks
+2. **PostgresConfig** (config.rs): Connection string, pool size (default 20), timeout (default 5000ms), RLS flag, validation
+3. **PostgresPool** (pool.rs): Deadpool wrapper, connection acquisition, status reporting, health checks
+4. **PostgresError** (error.rs): Unified error type with From impls for tokio-postgres, deadpool errors
+5. **Traits modified**: StorageBackendType::Postgres variant added (feature-gated)
+
+**Verification Results**:
+- ✅ `cargo check -p llmspell-storage --features postgres` - 0 errors, 0 warnings (2.29s)
+- ✅ `cargo check --workspace` - all crates compile without postgres feature (35.67s)
+- ✅ Zero dependency conflicts (11 new packages locked)
+- ✅ Feature gate isolation complete (postgres types only available with feature flag)
+
+**Files Modified**:
+- `llmspell-storage/Cargo.toml` (added 4 optional deps, postgres feature, thiserror dep)
+- `llmspell-storage/src/traits.rs:22-23` (added Postgres variant with #[cfg])
+- `llmspell-storage/src/backends/mod.rs:8-15` (added postgres module export)
+- `llmspell-storage/src/lib.rs:109-110` (added postgres re-exports)
+
+**Files Created**:
+- `llmspell-storage/src/backends/postgres/mod.rs` (12 lines)
+- `llmspell-storage/src/backends/postgres/error.rs` (56 lines)
+- `llmspell-storage/src/backends/postgres/config.rs` (77 lines)
+- `llmspell-storage/src/backends/postgres/pool.rs` (76 lines)
+- `llmspell-storage/src/backends/postgres/backend.rs` (124 lines)
+
+**Note**: Storage operations (StorageBackend trait impl) deferred to Phase 13b.5+ per scope
+
+**Ready for Task 13b.2.5** (Implement PostgresBackend Infrastructure - wait, this IS the infrastructure!)
 
 **Implementation Steps**:
 1. Add PostgreSQL dependencies to `llmspell-storage/Cargo.toml`:
