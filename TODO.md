@@ -1067,15 +1067,100 @@ INFO Template execution succeeded  # ✅ NO "provider_config is required" ERROR
 6. Document decision with code references and rationale
 
 **Acceptance Criteria**:
-- [ ] Existing StorageBackend/VectorStorage traits analyzed
-- [ ] Gap analysis complete (what traits need modification/addition)
-- [ ] Architecture decision made (Option A vs B) with rationale
-- [ ] Coupling analysis documented (single crate vs multiple)
-- [ ] Task 13b.2.4 updated with correct approach
+- [x] Existing StorageBackend/VectorStorage traits analyzed
+- [x] Gap analysis complete (what traits need modification/addition)
+- [x] Architecture decision made (Option A vs B) with rationale
+- [x] Coupling analysis documented (single crate vs multiple)
+- [x] Task 13b.2.4 updated with correct approach
+
+**Status**: ✅ COMPLETE
+**Completed**: 2025-11-02
+
+**Architecture Analysis**:
+
+1. **Existing llmspell-storage Structure** (3,442 lines, 13 dependencies):
+   - **Traits**: `StorageBackend` (KV store), `VectorStorage` (vector ops)
+   - **Backends**: `MemoryBackend`, `SledBackend`, `HNSWVectorStorage`
+   - **Module Pattern**: `backends/memory.rs`, `backends/sled_backend.rs`, `backends/vector/hnsw.rs`
+   - **Dependencies**: hnsw_rs, sled, dashmap, tokio, serde_json (no PostgreSQL yet)
+
+2. **Current Usage by Phase 13 Components**:
+   - **llmspell-memory** (`src/episodic/hnsw_backend.rs:23`): Uses `VectorStorage` trait
+   - **llmspell-kernel** (`src/state/backend_adapter.rs`): Uses `StorageBackend` trait
+   - **llmspell-events** (`src/storage_adapter.rs:8`): Uses `StorageBackend` via adapter
+   - **llmspell-graph** (`src/storage/surrealdb.rs:31`): Uses SurrealDB directly (NO trait)
+   - **llmspell-hooks** (`src/persistence/storage_backend.rs:21`): Has OWN `StorageBackend` trait (name collision!)
+
+3. **PostgreSQL Storage Requirements Mapped to Traits**:
+   - ✅ **Episodic memory** (vectors + metadata) → `VectorStorage` trait (insert, search, search_scoped)
+   - ✅ **State persistence** (JSONB) → `StorageBackend` trait (get, set, delete, list_keys)
+   - ✅ **Events** (append-only log) → `StorageBackend` trait (EventStorageAdapter pattern)
+   - ⚠️ **Semantic graph** (traversal, bi-temporal) → NO trait (SurrealDB-specific impl)
+   - ⚠️ **Sessions + artifacts** (BYTEA/Large Objects) → `StorageBackend` trait works BUT Large Object API needs custom methods
+   - ⚠️ **Hooks** → Separate `StorageBackend` trait in llmspell-hooks (keep separate)
+
+4. **Gap Analysis**:
+   - **Graph storage**: Need new trait `GraphStorage` or accept PostgreSQL-specific impl (like SurrealDB)
+   - **Large Objects**: `StorageBackend` can use `get`/`set` with `Vec<u8>` BUT >1MB artifacts need streaming
+   - **Hooks trait collision**: `llmspell-hooks::StorageBackend` != `llmspell-storage::StorageBackend` (different methods)
+
+5. **Architecture Decision**: ✅ **OPTION A - Modify Existing llmspell-storage**
+
+**Rationale**:
+- ✅ Existing traits (`StorageBackend`, `VectorStorage`) fit 80% of PostgreSQL needs
+- ✅ Crate already bridges multiple backends (Memory, Sled, HNSW files)
+- ✅ 10 crates already depend on llmspell-storage (llmspell-memory, llmspell-kernel, llmspell-events, etc.)
+- ✅ Module pattern established: `backends/vector/hnsw.rs` → add `backends/postgres/`
+- ✅ PostgreSQL can be optional feature flag (`postgres` feature) - no forced dependency
+- ✅ Avoids trait duplication and version conflicts across crates
+- ✅ Centralized storage abstraction layer (single source of truth)
+
+**Rejected Option B** (New `llmspell-storage-postgres` crate):
+- ❌ Would duplicate `StorageBackend` and `VectorStorage` trait definitions
+- ❌ Creates version coupling issues (llmspell-storage v0.13.0 vs llmspell-storage-postgres v0.13.0)
+- ❌ More workspace complexity (14th crate vs module in existing crate)
+- ❌ Complicates trait object usage (`Arc<dyn StorageBackend>` from which crate?)
+
+6. **Implementation Plan for PostgreSQL in llmspell-storage**:
+   ```
+   llmspell-storage/
+   ├── src/
+   │   ├── backends/
+   │   │   ├── memory.rs              (existing)
+   │   │   ├── sled_backend.rs        (existing)
+   │   │   ├── vector/                (existing HNSW)
+   │   │   └── postgres/              ← NEW MODULE
+   │   │       ├── mod.rs
+   │   │       ├── kv_backend.rs      (implements StorageBackend)
+   │   │       ├── vector_backend.rs  (implements VectorStorage)
+   │   │       ├── pool.rs            (connection pool management)
+   │   │       └── config.rs          (PostgreSQL connection config)
+   │   ├── traits.rs                  (modify: add Postgres to StorageBackendType enum)
+   │   └── lib.rs                     (modify: pub use postgres::* behind feature flag)
+   ```
+
+7. **Changes to Existing Files**:
+   - `traits.rs:11-20`: Add `StorageBackendType::Postgres` enum variant
+   - `Cargo.toml`: Add `postgres` feature flag, add tokio-postgres/deadpool-postgres dependencies
+   - `lib.rs`: Add `#[cfg(feature = "postgres")] pub mod postgres;`
+
+8. **Graph Storage Decision**:
+   - **Phase 13b.2**: Do NOT add GraphStorage trait (out of scope for infrastructure setup)
+   - **Phase 13b.8** (Graph Storage): Either:
+     - Option A: Add `GraphStorage` trait to llmspell-storage
+     - Option B: Keep PostgreSQL graph impl in llmspell-graph (like SurrealDB pattern)
+   - **Defer decision** to Task 13b.2.0.3 (scope definition)
+
+9. **Hooks Storage Decision**:
+   - **Keep separate**: llmspell-hooks `StorageBackend` trait is domain-specific (HookMetadata, SerializedHookExecution)
+   - **PostgreSQL for hooks**: Implement llmspell-hooks `StorageBackend` trait separately (NOT in llmspell-storage)
+   - **Rationale**: Avoid forcing hook-specific types into generic storage crate
+
+**Decision**: ✅ **MODIFY EXISTING llmspell-storage CRATE**
 
 **Files to Update**:
-- `TODO.md` (Task 13b.2.4 description and acceptance criteria)
-- `TODO.md` (document architecture decision)
+- `TODO.md` (Task 13b.2.4 - change "Create new crate" to "Modify existing crate")
+- Task 13b.2.4 acceptance criteria updated below
 
 #### Subtask 13b.2.0.3: Define Minimal Scope for Phase 13b.2 ⏱️ 45 min
 **Priority**: CRITICAL
