@@ -1584,7 +1584,9 @@ Update `.github/workflows/ci.yml` test job:
 1. Create `docker/postgres/init-scripts/01-extensions.sql`:
    ```sql
    -- Enable extensions
-   CREATE EXTENSION IF NOT EXISTS vchord;
+   -- CRITICAL: VectorChord requires CASCADE (depends on pgvector 0.8.1)
+   -- Validated in Task 13b.2.0.1
+   CREATE EXTENSION IF NOT EXISTS vchord CASCADE;
    CREATE EXTENSION IF NOT EXISTS pgcrypto;
    CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
 
@@ -1598,7 +1600,7 @@ Update `.github/workflows/ci.yml` test job:
    GRANT ALL PRIVILEGES ON ALL SEQUENCES IN SCHEMA llmspell TO llmspell;
    ```
 2. Test init script execution
-3. Verify extensions available
+3. Verify extensions available (vchord 0.5.3 + vector 0.8.1 auto-installed)
 4. Verify schema created
 5. Verify permissions granted
 
@@ -1612,69 +1614,93 @@ Update `.github/workflows/ci.yml` test job:
 - [ ] Idempotent execution
 - [ ] Zero errors
 
-### Task 13b.2.4: Create llmspell-storage Crate
+### Task 13b.2.4: Modify llmspell-storage Crate for PostgreSQL Support
 **Priority**: CRITICAL
 **Estimated Time**: 3 hours
 **Assignee**: Storage Team Lead
 
-**Description**: Create new llmspell-storage crate with unified backend abstraction layer.
+**Description**: Add PostgreSQL backend module to existing llmspell-storage crate (DO NOT create new crate - it already exists with 3,442 lines and is used by 10 crates).
+
+**Context**: Task 13b.2.0.2 determined that PostgreSQL backends should be added to the existing llmspell-storage crate as an optional `postgres` feature flag, not as a separate crate. This avoids trait duplication and maintains the single source of truth for storage abstractions.
 
 **Acceptance Criteria**:
-- [ ] Crate directory created
-- [ ] Module structure defined
-- [ ] Storage traits defined
-- [ ] Backend enum created
-- [ ] `cargo check -p llmspell-storage` passes
+- [ ] `backends/postgres/` module added to existing llmspell-storage
+- [ ] PostgreSQL dependencies added as optional (workspace = true, optional = true)
+- [ ] `postgres` feature flag created
+- [ ] `StorageBackendType::Postgres` enum variant added
+- [ ] `cargo check -p llmspell-storage --features postgres` passes
 
 **Implementation Steps**:
-1. Create `llmspell-storage/` directory
-2. Configure `Cargo.toml` with dependencies:
+1. Add PostgreSQL dependencies to `llmspell-storage/Cargo.toml`:
    ```toml
-   [dependencies]
-   llmspell-core = { workspace = true }
-   llmspell-utils = { workspace = true }
-   tokio-postgres = { workspace = true }
-   deadpool-postgres = { workspace = true }
-   pgvector = { workspace = true }
-   refinery = { workspace = true }
-   tokio = { workspace = true }
-   async-trait = { workspace = true }
-   serde = { workspace = true }
-   serde_json = { workspace = true }
-   chrono = { workspace = true }
-   uuid = { workspace = true }
+   # PostgreSQL dependencies (Phase 13b.2 - optional)
+   tokio-postgres = { workspace = true, optional = true }
+   deadpool-postgres = { workspace = true, optional = true }
+   pgvector = { workspace = true, optional = true }
+   refinery = { workspace = true, optional = true }
+
+   [features]
+   default = []
+   postgres = ["tokio-postgres", "deadpool-postgres", "pgvector", "refinery"]
    ```
-3. Create module structure:
+
+2. Modify `llmspell-storage/src/traits.rs`:
+   - Add `StorageBackendType::Postgres` enum variant (line ~11-20)
    ```rust
-   pub mod traits;
-   pub mod backends;
-   pub mod postgres;
-   pub mod migrations;
-   pub mod error;
-   pub mod config;
-   pub mod prelude;
+   pub enum StorageBackendType {
+       Memory,
+       Sled,
+       RocksDB,
+       Postgres,  // NEW
+   }
    ```
-4. Add to workspace
-5. Run cargo check
+
+3. Create `llmspell-storage/src/backends/postgres/` module:
+   ```
+   llmspell-storage/src/backends/postgres/
+   ├── mod.rs          (module exports)
+   ├── config.rs       (PostgresConfig struct)
+   ├── pool.rs         (connection pool management)
+   ├── backend.rs      (PostgresBackend struct - stub only in 13b.2)
+   └── error.rs        (PostgreSQL-specific errors)
+   ```
+
+4. Update `llmspell-storage/src/backends/mod.rs`:
+   ```rust
+   #[cfg(feature = "postgres")]
+   pub mod postgres;
+   ```
+
+5. Update `llmspell-storage/src/lib.rs`:
+   ```rust
+   #[cfg(feature = "postgres")]
+   pub use backends::postgres::*;
+   ```
+
+6. Create stub implementations (NO storage operations yet - Phase 13b.2 scope)
+
+7. Run `cargo check -p llmspell-storage --features postgres`
+
+**Files to Modify**:
+- `llmspell-storage/Cargo.toml` (add optional dependencies + feature flag)
+- `llmspell-storage/src/traits.rs` (add Postgres enum variant)
+- `llmspell-storage/src/backends/mod.rs` (add postgres module export)
+- `llmspell-storage/src/lib.rs` (add postgres re-exports)
 
 **Files to Create**:
-- `llmspell-storage/Cargo.toml`
-- `llmspell-storage/src/lib.rs`
-- `llmspell-storage/src/traits.rs`
-- `llmspell-storage/src/backends/mod.rs`
-- `llmspell-storage/src/postgres/mod.rs`
-- `llmspell-storage/src/migrations/mod.rs`
-- `llmspell-storage/src/error.rs`
-- `llmspell-storage/src/config.rs`
-- `llmspell-storage/src/prelude.rs`
-- `llmspell-storage/README.md`
+- `llmspell-storage/src/backends/postgres/mod.rs`
+- `llmspell-storage/src/backends/postgres/config.rs`
+- `llmspell-storage/src/backends/postgres/pool.rs`
+- `llmspell-storage/src/backends/postgres/backend.rs`
+- `llmspell-storage/src/backends/postgres/error.rs`
 
 **Definition of Done**:
-- [ ] Crate compiles
-- [ ] Module structure complete
-- [ ] Dependencies resolve
+- [ ] Existing crate modified (NOT new crate created)
+- [ ] postgres feature flag works
+- [ ] `cargo check -p llmspell-storage --features postgres` passes
+- [ ] `cargo check --workspace --all-features` passes
 - [ ] Zero warnings
-- [ ] Added to workspace
+- [ ] Module structure follows existing patterns (memory.rs, sled_backend.rs, vector/)
 
 ### Task 13b.2.5: Implement PostgresBackend Infrastructure
 **Priority**: CRITICAL
