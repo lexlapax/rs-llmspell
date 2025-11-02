@@ -73,12 +73,12 @@ impl PostgresBackend {
     pub async fn set_tenant_context(&self, tenant_id: impl Into<String>) -> Result<()> {
         let tenant_id = tenant_id.into();
 
-        // Set PostgreSQL session variable for RLS
+        // Set PostgreSQL session variable for RLS using set_config()
         if self.config.enable_rls {
             let client = self.pool.get().await?;
             client
                 .execute(
-                    "SET LOCAL app.current_tenant_id = $1",
+                    "SELECT set_config('app.current_tenant_id', $1, false)",
                     &[&tenant_id],
                 )
                 .await

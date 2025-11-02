@@ -1827,11 +1827,54 @@ llmspell-storage/src/backends/postgres/
 **Description**: Create PostgresBackend with connection pooling and tenant context management.
 
 **Acceptance Criteria**:
-- [ ] PostgresBackend struct complete
-- [ ] Connection pool functional (20 connections)
-- [ ] Tenant context setting works
-- [ ] Health checks implemented
-- [ ] Error handling comprehensive
+- [x] PostgresBackend struct complete
+- [x] Connection pool functional (20 connections)
+- [x] Tenant context setting works
+- [x] Health checks implemented
+- [x] Error handling comprehensive
+
+**Status**: ✅ **COMPLETE** (2025-11-02, ~40 min)
+
+**Note**: Infrastructure implementation completed in Task 13b.2.4. This task added comprehensive integration tests.
+
+**Implementation Summary**:
+- Fixed tenant context setting to use `set_config()` function (parameterized, safe)
+- Created comprehensive integration test suite (13 tests, 100% passing)
+- Tests cover: backend creation, health checks, pool status, tenant context management, config validation, concurrent access
+- All tests run in <0.01s (in-memory operations, minimal DB interaction)
+
+**Test Coverage**:
+1. ✅ Backend creation with valid connection string
+2. ✅ Health checks (backend.is_healthy())
+3. ✅ Pool status reporting (size, available, max_size)
+4. ✅ Tenant context set/get/clear operations
+5. ✅ Multiple tenant context switches
+6. ✅ Config validation (empty string, zero/excessive pool size)
+7. ✅ Config builder pattern
+8. ✅ Config defaults (pool_size=20, timeout=5000ms, rls=true)
+9. ✅ Invalid connection string handling
+10. ✅ Nonexistent database health check failure
+11. ✅ Multiple backends to same database (independent tenant contexts)
+12. ✅ RLS disabled mode (tenant context still tracked)
+13. ✅ Concurrent pool access (20 tasks, 10 connection pool)
+
+**Bug Fixed**:
+- Changed `SET LOCAL app.current_tenant_id = $1` → `SELECT set_config('app.current_tenant_id', $1, false)`
+- Reason: SET LOCAL requires transaction context, set_config() works session-wide and accepts parameters
+
+**Files Created**:
+- `llmspell-storage/tests/postgres_backend_tests.rs` (297 lines, 13 tests)
+
+**Files Modified**:
+- `llmspell-storage/src/backends/postgres/backend.rs:81` (fixed tenant context command)
+
+**Test Execution**:
+```bash
+cargo test -p llmspell-storage --features postgres --test postgres_backend_tests
+# test result: ok. 13 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.01s
+```
+
+**Ready for Task 13b.2.6** (Setup Refinery Migration Framework)
 
 **Implementation Steps**:
 1. Create `src/backends/postgres/backend.rs` (follows structure from Task 13b.2.4):
