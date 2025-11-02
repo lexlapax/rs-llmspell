@@ -1,0 +1,3 @@
+-- PostgreSQL initialization script for llmspell
+-- This file will be populated in Task 13b.2.3
+-- Placeholder for extension setup
