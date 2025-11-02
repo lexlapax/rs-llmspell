@@ -1382,16 +1382,72 @@ Works correctly with optional dependencies.
 7. Document decision with rationale
 
 **Acceptance Criteria**:
-- [ ] Current `.github/workflows/ci.yml` analyzed
-- [ ] 3 CI strategy options evaluated (feature flag, service, docker-compose)
-- [ ] Decision made with clear rationale (speed, coverage, maintenance)
-- [ ] CI runtime impact estimated (<10 min target maintained?)
-- [ ] Implementation plan documented (what changes needed in 13b.2+)
-- [ ] If service/docker: Draft workflow changes documented
+- [x] Current `.github/workflows/ci.yml` analyzed
+- [x] 3 CI strategy options evaluated (feature flag, service, docker-compose)
+- [x] Decision made with clear rationale (speed, coverage, maintenance)
+- [x] CI runtime impact estimated (<10 min target maintained?)
+- [x] Implementation plan documented (what changes needed in 13b.2+)
+- [x] If service/docker: Draft workflow changes documented
+
+**Status**: ✅ COMPLETE
+**Completed**: 2025-11-02
+
+**Current CI Analysis**: 5 jobs (quality, test matrix [ubuntu+macos], coverage, security, docs), ~5-8 min runtime, <10 min target
+
+**Option Evaluation**:
+- **Option A (Skip CI)**: ❌ REJECTED - defeats CI purpose, unacceptable coverage gaps
+- **Option B (Service Container)**: ✅ VIABLE - industry standard, +30-60s overhead, untested VectorChord support
+- **Option C (Docker Compose)**: ✅ VIABLE - dev/CI consistency, +65-100s overhead, validated VectorChord
+
+**DECISION**: ✅ **OPTION C - Docker Compose in CI**
+
+**Rationale**:
+1. **Validated**: VectorChord confirmed working in 13b.2.0.1 (zero ghcr.io risk)
+2. **Consistency**: `docker/postgres/` setup works identically dev/CI (zero surprises)
+3. **Extensibility**: Scales to complex multi-service scenarios (Phases 13b.5+)
+4. **Runtime acceptable**: +65-100s → 6.5-7.5 min total (under 10 min target ✅)
+5. **Simplicity**: Single source of truth for PostgreSQL config
+
+**CI Strategy**:
+- Run PostgreSQL tests on **Linux only** (Docker available)
+- Skip PostgreSQL tests on **macOS** (Docker not available in Actions)
+- Linux CI: `cargo test --workspace --all-features` (includes postgres feature)
+- macOS CI: `cargo test --workspace` (excludes postgres feature)
+- PostgreSQL tests gated with `#[cfg(feature = "postgres")]`
+
+**Implementation Plan** (Phase 13b.2.6 - After PostgresBackend):
+
+Update `.github/workflows/ci.yml` test job:
+```yaml
+- name: Start PostgreSQL (Linux only)
+  if: runner.os == 'Linux'
+  run: |
+    cd docker/postgres
+    docker-compose up -d
+    timeout 60 bash -c 'until docker exec llmspell_postgres_dev pg_isready -U llmspell; do sleep 2; done'
+
+- name: Run tests
+  run: |
+    if [ "$RUNNER_OS" == "Linux" ]; then
+      cargo test --workspace --all-features
+    else
+      cargo test --workspace  # Skip postgres on macOS
+    fi
+  env:
+    DATABASE_URL: postgresql://llmspell:llmspell_dev_pass@localhost:5432/llmspell_dev
+
+- name: Stop PostgreSQL
+  if: always() && runner.os == 'Linux'
+  run: cd docker/postgres && docker-compose down -v
+```
+
+**Runtime Estimate**:
+- Linux CI: 5-6 min + 65-100s = **6.5-7.5 min** ✅ (under 10 min target)
+- macOS CI: **5-6 min** (unchanged)
 
 **Files to Update**:
-- `TODO.md` (document CI strategy decision)
-- `docs/in-progress/phase-13b-design-doc.md` (update testing strategy section if needed)
+- `TODO.md` (this section - DONE)
+- `.github/workflows/ci.yml` (Task 13b.2.6, after Docker Compose exists)
 
 ----
 
