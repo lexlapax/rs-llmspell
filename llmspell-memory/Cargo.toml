@@ -71,5 +71,8 @@ harness = false
 name = "accuracy_metrics"
 harness = false
 
+[features]
+postgres = ["llmspell-storage/postgres"]
+
 [lints]
 workspace = true

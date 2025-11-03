@@ -16,6 +16,7 @@ use crate::embeddings::EmbeddingService;
 ///
 /// - **`InMemory`**: O(n) search, good for <1K entries, testing only
 /// - **HNSW**: O(log n) search, production-ready for 10K+ entries
+/// - **PostgreSQL**: O(log n) search with pgvector HNSW, multi-tenant RLS support
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum EpisodicBackendType {
     /// Simple `HashMap` (for testing, <1K entries)
@@ -23,6 +24,10 @@ pub enum EpisodicBackendType {
 
     /// HNSW vector index (for production, 10K+ entries)
     HNSW,
+
+    /// PostgreSQL with pgvector (for production, multi-tenant, RLS-enabled)
+    #[cfg(feature = "postgres")]
+    PostgreSQL,
 }
 
 impl Default for EpisodicBackendType {
@@ -68,8 +73,12 @@ pub struct MemoryConfig {
     /// HNSW configuration (used if backend = HNSW)
     pub hnsw_config: HNSWConfig,
 
-    /// Embedding service (required for HNSW)
+    /// Embedding service (required for HNSW and PostgreSQL)
     pub embedding_service: Option<Arc<EmbeddingService>>,
+
+    /// PostgreSQL backend (used if backend = PostgreSQL)
+    #[cfg(feature = "postgres")]
+    pub postgres_backend: Option<Arc<llmspell_storage::PostgresBackend>>,
 }
 
 impl Default for MemoryConfig {
@@ -78,6 +87,8 @@ impl Default for MemoryConfig {
             episodic_backend: EpisodicBackendType::HNSW, // Production default
             hnsw_config: HNSWConfig::default(),
             embedding_service: None,
+            #[cfg(feature = "postgres")]
+            postgres_backend: None,
         }
     }
 }
@@ -101,6 +112,8 @@ impl MemoryConfig {
             episodic_backend: EpisodicBackendType::InMemory,
             hnsw_config: HNSWConfig::default(),
             embedding_service: None,
+            #[cfg(feature = "postgres")]
+            postgres_backend: None,
         }
     }
 
@@ -139,6 +152,8 @@ impl MemoryConfig {
             episodic_backend: EpisodicBackendType::HNSW,
             hnsw_config: HNSWConfig::default(),
             embedding_service: Some(embedding_service),
+            #[cfg(feature = "postgres")]
+            postgres_backend: None,
         }
     }
 
@@ -180,6 +195,56 @@ impl MemoryConfig {
     pub const fn with_backend(mut self, backend: EpisodicBackendType) -> Self {
         self.episodic_backend = backend;
         self
+    }
+
+    /// PostgreSQL configuration (production, multi-tenant, RLS-enabled)
+    ///
+    /// Suitable for production deployments with PostgreSQL backend, embedding service, and RLS.
+    ///
+    /// # Arguments
+    ///
+    /// * `postgres_backend` - PostgreSQL backend with connection pool
+    /// * `embedding_service` - Service for generating embeddings
+    ///
+    /// # Example
+    ///
+    /// ```rust,no_run
+    /// # use llmspell_memory::config::MemoryConfig;
+    /// # use llmspell_memory::embeddings::EmbeddingService;
+    /// # use llmspell_storage::{PostgresBackend, PostgresConfig};
+    /// # use llmspell_core::traits::embedding::EmbeddingProvider;
+    /// # use std::sync::Arc;
+    /// # async fn example() -> Result<(), Box<dyn std::error::Error>> {
+    /// # use async_trait::async_trait;
+    /// # struct MockProvider;
+    /// # #[async_trait]
+    /// # impl EmbeddingProvider for MockProvider {
+    /// #     fn name(&self) -> &str { "mock" }
+    /// #     async fn embed(&self, _texts: &[String]) -> Result<Vec<Vec<f32>>, llmspell_core::LLMSpellError> { Ok(vec![]) }
+    /// #     fn embedding_dimensions(&self) -> usize { 384 }
+    /// #     fn embedding_model(&self) -> Option<&str> { None }
+    /// # }
+    /// let pg_config = PostgresConfig::new("postgresql://localhost/llmspell");
+    /// let pg_backend = Arc::new(PostgresBackend::new(pg_config).await?);
+    ///
+    /// # let provider: Arc<dyn EmbeddingProvider> = Arc::new(MockProvider);
+    /// let service = Arc::new(EmbeddingService::new(provider));
+    /// let config = MemoryConfig::for_postgresql(pg_backend, service);
+    /// # Ok(())
+    /// # }
+    /// ```
+    #[cfg(feature = "postgres")]
+    #[must_use]
+    pub fn for_postgresql(
+        postgres_backend: Arc<llmspell_storage::PostgresBackend>,
+        embedding_service: Arc<EmbeddingService>,
+    ) -> Self {
+        Self {
+            episodic_backend: EpisodicBackendType::PostgreSQL,
+            hnsw_config: HNSWConfig::default(),
+            embedding_service: Some(embedding_service),
+            postgres_backend: Some(postgres_backend),
+        }
     }
 }
 
