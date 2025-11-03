@@ -6,9 +6,15 @@
 #![cfg(feature = "postgres")]
 
 use llmspell_storage::{PostgresBackend, PostgresConfig};
+use uuid::Uuid;
 
 const TEST_CONNECTION_STRING: &str =
     "postgresql://llmspell_app:llmspell_dev_pass@localhost:5432/llmspell_dev";
+
+/// Generate unique tenant ID for test isolation (prevents concurrent test interference)
+fn unique_tenant_id(prefix: &str) -> String {
+    format!("{}-{}", prefix, Uuid::new_v4())
+}
 
 async fn setup_backend() -> PostgresBackend {
     let config = PostgresConfig::new(TEST_CONNECTION_STRING);
@@ -22,22 +28,10 @@ async fn setup_backend() -> PostgresBackend {
     backend
 }
 
-async fn cleanup_test_data(backend: &PostgresBackend) {
-    // Clean up by iterating known test tenants
-    // Note: With RLS enabled, we must set tenant context to delete each tenant's data
-    for tenant in &[
-        "tenant-a",
-        "tenant-b",
-        "tenant-0",
-        "tenant-1",
-        "tenant-2",
-        "tenant-3",
-        "tenant-4",
-        "test-tenant",
-        "malicious-tenant",
-    ] {
-        backend.set_tenant_context(*tenant).await.ok();
-        let client = backend.get_client().await.unwrap();
+/// Cleanup data for specific tenant (called after each test)
+async fn cleanup_tenant_data(backend: &PostgresBackend, tenant_id: &str) {
+    backend.set_tenant_context(tenant_id).await.ok();
+    if let Ok(client) = backend.get_client().await {
         let _ = client
             .execute("DELETE FROM llmspell.test_data WHERE TRUE", &[])
             .await;
@@ -52,11 +46,12 @@ async fn cleanup_test_data(backend: &PostgresBackend) {
 #[tokio::test]
 async fn test_tenant_isolation_select_cross_tenant_blocked() {
     let backend = setup_backend().await;
-    cleanup_test_data(&backend).await;
+    let tenant_a = unique_tenant_id("isolation-a");
+    let tenant_b = unique_tenant_id("isolation-b");
 
     // Tenant A inserts data
     backend
-        .set_tenant_context("tenant-a")
+        .set_tenant_context(&tenant_a)
         .await
         .expect("Failed to set tenant A context");
 
@@ -64,7 +59,7 @@ async fn test_tenant_isolation_select_cross_tenant_blocked() {
     client_a
         .execute(
             "INSERT INTO llmspell.test_data (tenant_id, value) VALUES ($1, $2)",
-            &[&"tenant-a", &"secret-a"],
+            &[&tenant_a, &"secret-a"],
         )
         .await
         .expect("Failed to insert for tenant A");
@@ -72,7 +67,7 @@ async fn test_tenant_isolation_select_cross_tenant_blocked() {
 
     // Tenant B tries to query
     backend
-        .set_tenant_context("tenant-b")
+        .set_tenant_context(&tenant_b)
         .await
         .expect("Failed to set tenant B context");
 
@@ -88,17 +83,18 @@ async fn test_tenant_isolation_select_cross_tenant_blocked() {
         "Tenant B should NOT see tenant A's data (RLS isolation failed)"
     );
 
-    cleanup_test_data(&backend).await;
+    cleanup_tenant_data(&backend, &tenant_a).await;
+    cleanup_tenant_data(&backend, &tenant_b).await;
 }
 
 #[tokio::test]
 async fn test_tenant_isolation_select_own_data_visible() {
     let backend = setup_backend().await;
-    cleanup_test_data(&backend).await;
+    let tenant_a = unique_tenant_id("own-data-a");
 
     // Tenant A inserts data
     backend
-        .set_tenant_context("tenant-a")
+        .set_tenant_context(&tenant_a)
         .await
         .expect("Failed to set tenant A context");
 
@@ -107,7 +103,7 @@ async fn test_tenant_isolation_select_own_data_visible() {
     client
         .execute(
             "INSERT INTO llmspell.test_data (tenant_id, value) VALUES ($1, $2)",
-            &[&"tenant-a", &"visible-data"],
+            &[&tenant_a, &"visible-data"],
         )
         .await
         .expect("Failed to insert");
@@ -123,17 +119,17 @@ async fn test_tenant_isolation_select_own_data_visible() {
     let value: String = rows[0].get(0);
     assert_eq!(value, "visible-data");
 
-    cleanup_test_data(&backend).await;
+    cleanup_tenant_data(&backend, &tenant_a).await;
 }
 
 #[tokio::test]
 async fn test_no_tenant_context_sees_nothing() {
     let backend = setup_backend().await;
-    cleanup_test_data(&backend).await;
+    let tenant_a = unique_tenant_id("no-context-a");
 
     // Insert data with tenant context
     backend
-        .set_tenant_context("tenant-a")
+        .set_tenant_context(&tenant_a)
         .await
         .expect("Failed to set tenant context");
 
@@ -142,7 +138,7 @@ async fn test_no_tenant_context_sees_nothing() {
     client
         .execute(
             "INSERT INTO llmspell.test_data (tenant_id, value) VALUES ($1, $2)",
-            &[&"tenant-a", &"data"],
+            &[&tenant_a, &"data"],
         )
         .await
         .expect("Failed to insert");
@@ -168,16 +164,19 @@ async fn test_no_tenant_context_sees_nothing() {
         "Query without tenant context should return zero rows"
     );
 
-    cleanup_test_data(&backend).await;
+    cleanup_tenant_data(&backend, &tenant_a).await;
 }
 
 #[tokio::test]
 async fn test_multiple_tenants_isolation() {
     let backend = setup_backend().await;
-    cleanup_test_data(&backend).await;
+    let tenant_1 = unique_tenant_id("multi-1");
+    let tenant_2 = unique_tenant_id("multi-2");
+    let tenant_3 = unique_tenant_id("multi-3");
+    let tenants = [&tenant_1, &tenant_2, &tenant_3];
 
     // Insert data for 3 different tenants
-    for tenant in &["tenant-1", "tenant-2", "tenant-3"] {
+    for tenant in &tenants {
         backend
             .set_tenant_context(*tenant)
             .await
@@ -195,7 +194,7 @@ async fn test_multiple_tenants_isolation() {
     }
 
     // Verify each tenant sees only their own data
-    for tenant in &["tenant-1", "tenant-2", "tenant-3"] {
+    for tenant in &tenants {
         backend
             .set_tenant_context(*tenant)
             .await
@@ -214,7 +213,9 @@ async fn test_multiple_tenants_isolation() {
         assert_eq!(value, format!("data-{}", tenant));
     }
 
-    cleanup_test_data(&backend).await;
+    cleanup_tenant_data(&backend, &tenant_1).await;
+    cleanup_tenant_data(&backend, &tenant_2).await;
+    cleanup_tenant_data(&backend, &tenant_3).await;
 }
 
 // =============================================================================
@@ -224,15 +225,16 @@ async fn test_multiple_tenants_isolation() {
 #[tokio::test]
 async fn test_select_policy_filters_by_tenant() {
     let backend = setup_backend().await;
-    cleanup_test_data(&backend).await;
+    let tenant_a = unique_tenant_id("select-policy-a");
+    let tenant_b = unique_tenant_id("select-policy-b");
 
     // Insert data for tenant A
-    backend.set_tenant_context("tenant-a").await.unwrap();
+    backend.set_tenant_context(&tenant_a).await.unwrap();
     let client = backend.get_client().await.expect("Failed to get client");
     client
         .execute(
             "INSERT INTO llmspell.test_data (tenant_id, value) VALUES ($1, $2)",
-            &[&"tenant-a", &"data-a"],
+            &[&tenant_a, &"data-a"],
         )
         .await
         .unwrap();
@@ -240,7 +242,7 @@ async fn test_select_policy_filters_by_tenant() {
     drop(client);
 
     // Query as tenant B
-    backend.set_tenant_context("tenant-b").await.unwrap();
+    backend.set_tenant_context(&tenant_b).await.unwrap();
     let client = backend.get_client().await.expect("Failed to get client");
     let rows = client
         .query("SELECT * FROM llmspell.test_data", &[])
@@ -249,16 +251,18 @@ async fn test_select_policy_filters_by_tenant() {
 
     assert_eq!(rows.len(), 0, "SELECT policy should filter by tenant_id");
 
-    cleanup_test_data(&backend).await;
+    cleanup_tenant_data(&backend, &tenant_a).await;
+    cleanup_tenant_data(&backend, &tenant_b).await;
 }
 
 #[tokio::test]
 async fn test_insert_policy_validates_tenant_id() {
     let backend = setup_backend().await;
-    cleanup_test_data(&backend).await;
+    let tenant_a = unique_tenant_id("insert-policy-a");
+    let tenant_b = unique_tenant_id("insert-policy-b");
 
     // Set context to tenant-a
-    backend.set_tenant_context("tenant-a").await.unwrap();
+    backend.set_tenant_context(&tenant_a).await.unwrap();
 
     let client = backend.get_client().await.expect("Failed to get client");
 
@@ -266,7 +270,7 @@ async fn test_insert_policy_validates_tenant_id() {
     let result = client
         .execute(
             "INSERT INTO llmspell.test_data (tenant_id, value) VALUES ($1, $2)",
-            &[&"tenant-b", &"malicious-data"],
+            &[&tenant_b, &"malicious-data"],
         )
         .await;
 
@@ -282,21 +286,22 @@ async fn test_insert_policy_validates_tenant_id() {
         "Error should indicate policy violation"
     );
 
-    cleanup_test_data(&backend).await;
+    cleanup_tenant_data(&backend, &tenant_a).await;
 }
 
 #[tokio::test]
 async fn test_update_policy_prevents_tenant_id_change() {
     let backend = setup_backend().await;
-    cleanup_test_data(&backend).await;
+    let tenant_a = unique_tenant_id("update-prevent-a");
+    let tenant_b = unique_tenant_id("update-prevent-b");
 
     // Insert data for tenant-a
-    backend.set_tenant_context("tenant-a").await.unwrap();
+    backend.set_tenant_context(&tenant_a).await.unwrap();
     let client = backend.get_client().await.expect("Failed to get client");
     let rows = client
         .query(
             "INSERT INTO llmspell.test_data (tenant_id, value) VALUES ($1, $2) RETURNING id",
-            &[&"tenant-a", &"original-value"],
+            &[&tenant_a, &"original-value"],
         )
         .await
         .unwrap();
@@ -307,7 +312,7 @@ async fn test_update_policy_prevents_tenant_id_change() {
     let result = client
         .execute(
             "UPDATE llmspell.test_data SET tenant_id = $1 WHERE id = $2",
-            &[&"tenant-b", &id],
+            &[&tenant_b, &id],
         )
         .await;
 
@@ -316,21 +321,21 @@ async fn test_update_policy_prevents_tenant_id_change() {
         "UPDATE policy WITH CHECK should prevent tenant_id change"
     );
 
-    cleanup_test_data(&backend).await;
+    cleanup_tenant_data(&backend, &tenant_a).await;
 }
 
 #[tokio::test]
 async fn test_update_policy_allows_value_change_same_tenant() {
     let backend = setup_backend().await;
-    cleanup_test_data(&backend).await;
+    let tenant_a = unique_tenant_id("update-allow-a");
 
     // Insert data
-    backend.set_tenant_context("tenant-a").await.unwrap();
+    backend.set_tenant_context(&tenant_a).await.unwrap();
     let client = backend.get_client().await.expect("Failed to get client");
     let rows = client
         .query(
             "INSERT INTO llmspell.test_data (tenant_id, value) VALUES ($1, $2) RETURNING id",
-            &[&"tenant-a", &"old-value"],
+            &[&tenant_a, &"old-value"],
         )
         .await
         .unwrap();
@@ -358,21 +363,22 @@ async fn test_update_policy_allows_value_change_same_tenant() {
     let value: String = rows[0].get(0);
     assert_eq!(value, "new-value");
 
-    cleanup_test_data(&backend).await;
+    cleanup_tenant_data(&backend, &tenant_a).await;
 }
 
 #[tokio::test]
 async fn test_delete_policy_only_own_tenant() {
     let backend = setup_backend().await;
-    cleanup_test_data(&backend).await;
+    let tenant_a = unique_tenant_id("delete-policy-a");
+    let tenant_b = unique_tenant_id("delete-policy-b");
 
     // Tenant A inserts data
-    backend.set_tenant_context("tenant-a").await.unwrap();
+    backend.set_tenant_context(&tenant_a).await.unwrap();
     let client = backend.get_client().await.expect("Failed to get client");
     let rows = client
         .query(
             "INSERT INTO llmspell.test_data (tenant_id, value) VALUES ($1, $2) RETURNING id",
-            &[&"tenant-a", &"data-a"],
+            &[&tenant_a, &"data-a"],
         )
         .await
         .unwrap();
@@ -382,7 +388,7 @@ async fn test_delete_policy_only_own_tenant() {
     drop(client);
 
     // Tenant B tries to delete tenant A's row (should fail USING clause)
-    backend.set_tenant_context("tenant-b").await.unwrap();
+    backend.set_tenant_context(&tenant_b).await.unwrap();
     let client = backend.get_client().await.expect("Failed to get client");
     let deleted = client
         .execute("DELETE FROM llmspell.test_data WHERE id = $1", &[&id_a])
@@ -397,7 +403,7 @@ async fn test_delete_policy_only_own_tenant() {
     drop(client);
 
     // Tenant A can delete own row
-    backend.set_tenant_context("tenant-a").await.unwrap();
+    backend.set_tenant_context(&tenant_a).await.unwrap();
     let client = backend.get_client().await.expect("Failed to get client");
     let deleted = client
         .execute("DELETE FROM llmspell.test_data WHERE id = $1", &[&id_a])
@@ -406,7 +412,8 @@ async fn test_delete_policy_only_own_tenant() {
 
     assert_eq!(deleted, 1, "DELETE should succeed for own tenant");
 
-    cleanup_test_data(&backend).await;
+    cleanup_tenant_data(&backend, &tenant_a).await;
+    cleanup_tenant_data(&backend, &tenant_b).await;
 }
 
 // =============================================================================
@@ -416,15 +423,16 @@ async fn test_delete_policy_only_own_tenant() {
 #[tokio::test]
 async fn test_explicit_where_clause_cannot_bypass_rls() {
     let backend = setup_backend().await;
-    cleanup_test_data(&backend).await;
+    let tenant_a = unique_tenant_id("bypass-test-a");
+    let tenant_b = unique_tenant_id("bypass-test-b");
 
     // Tenant A inserts data
-    backend.set_tenant_context("tenant-a").await.unwrap();
+    backend.set_tenant_context(&tenant_a).await.unwrap();
     let client = backend.get_client().await.expect("Failed to get client");
     client
         .execute(
             "INSERT INTO llmspell.test_data (tenant_id, value) VALUES ($1, $2)",
-            &[&"tenant-a", &"secret"],
+            &[&tenant_a, &"secret"],
         )
         .await
         .unwrap();
@@ -432,37 +440,38 @@ async fn test_explicit_where_clause_cannot_bypass_rls() {
     drop(client);
 
     // Tenant B tries explicit WHERE clause to access tenant A data
-    backend.set_tenant_context("tenant-b").await.unwrap();
+    backend.set_tenant_context(&tenant_b).await.unwrap();
     let client = backend.get_client().await.expect("Failed to get client");
     let rows = client
         .query(
             "SELECT * FROM llmspell.test_data WHERE tenant_id = $1",
-            &[&"tenant-a"],
+            &[&tenant_a],
         )
         .await
         .unwrap();
 
     assert_eq!(rows.len(), 0, "Explicit WHERE clause should NOT bypass RLS");
 
-    cleanup_test_data(&backend).await;
+    cleanup_tenant_data(&backend, &tenant_a).await;
+    cleanup_tenant_data(&backend, &tenant_b).await;
 }
 
 #[tokio::test]
 async fn test_sql_injection_in_tenant_id() {
     let backend = setup_backend().await;
-    cleanup_test_data(&backend).await;
+    let tenant_a = unique_tenant_id("injection-test-a");
 
     // Try SQL injection via tenant_id
-    let malicious_tenant = "tenant-a' OR '1'='1";
+    let malicious_tenant = format!("{}' OR '1'='1", tenant_a);
 
-    backend.set_tenant_context("tenant-a").await.unwrap();
+    backend.set_tenant_context(&tenant_a).await.unwrap();
 
     let client = backend.get_client().await.expect("Failed to get client");
 
     client
         .execute(
             "INSERT INTO llmspell.test_data (tenant_id, value) VALUES ($1, $2)",
-            &[&"tenant-a", &"data"],
+            &[&tenant_a, &"data"],
         )
         .await
         .unwrap();
@@ -470,7 +479,7 @@ async fn test_sql_injection_in_tenant_id() {
     drop(client);
 
     // Set malicious tenant context
-    backend.set_tenant_context(malicious_tenant).await.unwrap();
+    backend.set_tenant_context(&malicious_tenant).await.unwrap();
 
     // Query should see nothing (injection should not work)
     let client = backend.get_client().await.expect("Failed to get client");
@@ -485,21 +494,21 @@ async fn test_sql_injection_in_tenant_id() {
         "SQL injection in tenant_id should be neutralized by parameterization"
     );
 
-    cleanup_test_data(&backend).await;
+    cleanup_tenant_data(&backend, &tenant_a).await;
 }
 
 #[tokio::test]
 async fn test_union_injection_attempt() {
     let backend = setup_backend().await;
-    cleanup_test_data(&backend).await;
+    let tenant_a = unique_tenant_id("union-test-a");
 
     // Insert legitimate data
-    backend.set_tenant_context("tenant-a").await.unwrap();
+    backend.set_tenant_context(&tenant_a).await.unwrap();
     let client = backend.get_client().await.expect("Failed to get client");
     client
         .execute(
             "INSERT INTO llmspell.test_data (tenant_id, value) VALUES ($1, $2)",
-            &[&"tenant-a", &"data"],
+            &[&tenant_a, &"data"],
         )
         .await
         .unwrap();
@@ -511,7 +520,7 @@ async fn test_union_injection_attempt() {
     let result = client
         .execute(
             "INSERT INTO llmspell.test_data (tenant_id, value) VALUES ($1, $2)",
-            &[&"tenant-a", &malicious_value],
+            &[&tenant_a, &malicious_value],
         )
         .await;
 
@@ -533,7 +542,7 @@ async fn test_union_injection_attempt() {
         "Should see 2 rows (legitimate + injection attempt as data)"
     );
 
-    cleanup_test_data(&backend).await;
+    cleanup_tenant_data(&backend, &tenant_a).await;
 }
 
 // =============================================================================
@@ -543,16 +552,16 @@ async fn test_union_injection_attempt() {
 #[tokio::test]
 async fn test_rls_overhead_measurement() {
     let backend = setup_backend().await;
-    cleanup_test_data(&backend).await;
+    let tenant_a = unique_tenant_id("overhead-test-a");
 
     // Insert 100 rows for tenant-a
-    backend.set_tenant_context("tenant-a").await.unwrap();
+    backend.set_tenant_context(&tenant_a).await.unwrap();
     let client = backend.get_client().await.expect("Failed to get client");
     for i in 0..100 {
         client
             .execute(
                 "INSERT INTO llmspell.test_data (tenant_id, value) VALUES ($1, $2)",
-                &[&"tenant-a", &format!("value-{}", i)],
+                &[&tenant_a, &format!("value-{}", i)],
             )
             .await
             .unwrap();
@@ -580,7 +589,7 @@ async fn test_rls_overhead_measurement() {
         let rows = client
             .query(
                 "SELECT * FROM llmspell.test_data WHERE tenant_id = $1",
-                &[&"tenant-a"],
+                &[&tenant_a],
             )
             .await
             .unwrap();
@@ -610,28 +619,31 @@ async fn test_rls_overhead_measurement() {
         overhead_pct
     );
 
-    cleanup_test_data(&backend).await;
+    cleanup_tenant_data(&backend, &tenant_a).await;
 }
 
 #[tokio::test]
 async fn test_concurrent_tenant_queries() {
     let backend = setup_backend().await;
-    cleanup_test_data(&backend).await;
 
     use std::sync::Arc;
     use tokio::task::JoinSet;
 
+    // Generate unique tenant IDs
+    let tenant_ids: Vec<String> = (0..5)
+        .map(|i| unique_tenant_id(&format!("concurrent-{}", i)))
+        .collect();
+
     // Insert data for multiple tenants
-    for i in 0..5 {
-        let tenant_id = format!("tenant-{}", i);
-        backend.set_tenant_context(&tenant_id).await.unwrap();
+    for tenant_id in &tenant_ids {
+        backend.set_tenant_context(tenant_id).await.unwrap();
 
         let client = backend.get_client().await.unwrap();
         for j in 0..10 {
             client
                 .execute(
                     "INSERT INTO llmspell.test_data (tenant_id, value) VALUES ($1, $2)",
-                    &[&tenant_id, &format!("data-{}-{}", i, j)],
+                    &[tenant_id, &format!("data-{}", j)],
                 )
                 .await
                 .unwrap();
@@ -642,9 +654,8 @@ async fn test_concurrent_tenant_queries() {
     let backend = Arc::new(backend);
     let mut tasks = JoinSet::new();
 
-    for i in 0..5 {
+    for tenant_id in tenant_ids.clone() {
         let backend_clone = Arc::clone(&backend);
-        let tenant_id = format!("tenant-{}", i);
 
         tasks.spawn(async move {
             backend_clone.set_tenant_context(&tenant_id).await.unwrap();
@@ -669,13 +680,16 @@ async fn test_concurrent_tenant_queries() {
 
     assert_eq!(results.len(), 5, "All 5 concurrent queries should complete");
 
-    for (tenant_id, row_count) in results {
+    for (tenant_id, row_count) in &results {
         assert_eq!(
-            row_count, 10,
+            *row_count, 10,
             "Tenant {} should see exactly 10 rows",
             tenant_id
         );
     }
 
-    cleanup_test_data(&backend).await;
+    // Cleanup all tenants
+    for tenant_id in &tenant_ids {
+        cleanup_tenant_data(&backend, tenant_id).await;
+    }
 }
