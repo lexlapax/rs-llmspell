@@ -102,10 +102,33 @@ jobs:
     
     - name: Build workspace
       run: cargo build --workspace --all-features
-    
+
+    - name: Start PostgreSQL (Linux only)
+      if: runner.os == 'Linux'
+      run: |
+        cd docker/postgres
+        docker compose up -d
+        # Wait for PostgreSQL to be ready (max 60 seconds)
+        timeout 60 bash -c 'until docker exec llmspell_postgres_dev pg_isready -U llmspell; do sleep 2; done'
+        docker compose ps
+
     - name: Run tests
-      run: cargo test --workspace --all-features
-    
+      run: |
+        if [ "$RUNNER_OS" == "Linux" ]; then
+          # Run all tests including PostgreSQL on Linux
+          cargo test --workspace --all-features
+        else
+          # Skip PostgreSQL tests on macOS (Docker not available)
+          cargo test --workspace --features "default"
+        fi
+      shell: bash
+
+    - name: Stop PostgreSQL (Linux only)
+      if: always() && runner.os == 'Linux'
+      run: |
+        cd docker/postgres
+        docker compose down
+
     - name: Run doc tests
       run: cargo test --workspace --doc
 
@@ -140,7 +163,14 @@ jobs:
         key: ${{ runner.os }}-cargo-git-${{ hashFiles('**/Cargo.lock') }}
         restore-keys: |
           ${{ runner.os }}-cargo-git-
-    
+
+    - name: Start PostgreSQL for coverage
+      run: |
+        cd docker/postgres
+        docker compose up -d
+        timeout 60 bash -c 'until docker exec llmspell_postgres_dev pg_isready -U llmspell; do sleep 2; done'
+        docker compose ps
+
     - name: Run coverage
       run: |
         cargo tarpaulin --workspace --out Xml --verbose --timeout 180 --target-dir target/tarpaulin
@@ -167,6 +197,12 @@ jobs:
       with:
         file: ./cobertura.xml
         fail_ci_if_error: false
+
+    - name: Stop PostgreSQL for coverage
+      if: always()
+      run: |
+        cd docker/postgres
+        docker compose down
 
   # Security audit
   security:
