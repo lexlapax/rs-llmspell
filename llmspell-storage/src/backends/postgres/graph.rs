@@ -86,13 +86,14 @@ impl PostgresGraphStorage {
         transaction_time: DateTime<Utc>,
     ) -> Result<Option<Entity>> {
         // Parse entity_id as UUID
-        let uuid = Uuid::parse_str(entity_id).map_err(|e| {
-            PostgresError::Query(format!("Invalid entity ID (not a UUID): {}", e))
-        })?;
+        let uuid = Uuid::parse_str(entity_id)
+            .map_err(|e| PostgresError::Query(format!("Invalid entity ID (not a UUID): {}", e)))?;
 
         // Get tenant context for explicit filtering (more reliable than RLS with connection pooling)
         let tenant_id = self.backend.get_tenant_context().await.ok_or_else(|| {
-            PostgresError::Query("Tenant context not set - call set_tenant_context() first".to_string())
+            PostgresError::Query(
+                "Tenant context not set - call set_tenant_context() first".to_string(),
+            )
         })?;
 
         let client = self.backend.get_client().await?;
@@ -165,7 +166,9 @@ impl PostgresGraphStorage {
     pub async fn query_temporal(&self, query: &TemporalQuery) -> Result<Vec<Entity>> {
         // Get tenant context for explicit filtering (more reliable than RLS with connection pooling)
         let tenant_id = self.backend.get_tenant_context().await.ok_or_else(|| {
-            PostgresError::Query("Tenant context not set - call set_tenant_context() first".to_string())
+            PostgresError::Query(
+                "Tenant context not set - call set_tenant_context() first".to_string(),
+            )
         })?;
 
         let client = self.backend.get_client().await?;
@@ -260,15 +263,170 @@ impl PostgresGraphStorage {
         }
 
         // Execute query
-        let rows = client
-            .query(&sql, &params)
-            .await
-            .map_err(|e| PostgresError::Query(format!("Failed to execute temporal query: {}", e)))?;
+        let rows = client.query(&sql, &params).await.map_err(|e| {
+            PostgresError::Query(format!("Failed to execute temporal query: {}", e))
+        })?;
 
         // Convert rows to entities
         rows.into_iter()
             .map(Self::entity_from_row)
             .collect::<Result<Vec<Entity>>>()
+    }
+
+    /// Get related entities via graph traversal with recursive CTEs
+    ///
+    /// # Arguments
+    /// * `entity_id` - Starting entity ID
+    /// * `relationship_type` - Optional filter for relationship type (e.g., "knows", "part_of")
+    /// * `max_depth` - Maximum traversal depth (1-4 hops recommended)
+    /// * `valid_time` - Time point for temporal filtering
+    ///
+    /// # Returns
+    /// Related entities with their depth and relationship path
+    ///
+    /// # Performance
+    /// - Uses recursive CTEs for O(depth * avg_connections) complexity
+    /// - Cycle prevention via path tracking
+    /// - Temporal filtering with GiST indexes
+    /// - Target: <50ms for 4-hop traversal with 100K nodes
+    ///
+    /// # Example
+    /// ```rust,no_run
+    /// # use llmspell_storage::backends::postgres::{PostgresBackend, PostgresConfig, PostgresGraphStorage};
+    /// # use std::sync::Arc;
+    /// # use chrono::Utc;
+    /// # async fn example() -> Result<(), Box<dyn std::error::Error>> {
+    /// # let config = PostgresConfig::new("postgresql://localhost/llmspell");
+    /// # let backend = Arc::new(PostgresBackend::new(config).await?);
+    /// # let storage = PostgresGraphStorage::new(backend);
+    /// let entity_id = "entity-123";
+    /// let related = storage.get_related(entity_id, Some("knows"), 2, Utc::now()).await?;
+    /// println!("Found {} related entities within 2 hops", related.len());
+    /// # Ok(())
+    /// # }
+    /// ```
+    pub async fn get_related(
+        &self,
+        entity_id: &str,
+        relationship_type: Option<&str>,
+        max_depth: u32,
+        valid_time: DateTime<Utc>,
+    ) -> Result<Vec<(Entity, u32, Vec<String>)>> {
+        // Parse entity_id as UUID
+        let uuid = Uuid::parse_str(entity_id)
+            .map_err(|e| PostgresError::Query(format!("Invalid entity ID (not a UUID): {}", e)))?;
+
+        // Get tenant context for explicit filtering
+        let tenant_id = self.backend.get_tenant_context().await.ok_or_else(|| {
+            PostgresError::Query(
+                "Tenant context not set - call set_tenant_context() first".to_string(),
+            )
+        })?;
+
+        let client = self.backend.get_client().await?;
+
+        // Build recursive CTE query with optional relationship type filter
+        let rel_type_filter = if relationship_type.is_some() {
+            "AND r.relationship_type = $5"
+        } else {
+            ""
+        };
+
+        let sql = format!(
+            "WITH RECURSIVE graph_traversal AS (
+                -- Base case: direct connections (1-hop)
+                SELECT
+                    r.to_entity,
+                    e.entity_type,
+                    e.name,
+                    e.properties,
+                    e.valid_time_start,
+                    e.transaction_time_start,
+                    1::integer AS depth,
+                    ARRAY[r.from_entity, r.to_entity] AS path
+                FROM llmspell.relationships r
+                JOIN llmspell.entities e ON r.to_entity = e.entity_id
+                WHERE r.from_entity = $1
+                  AND r.tenant_id = $2
+                  AND e.tenant_id = $2
+                  AND r.valid_time_start <= $3 AND r.valid_time_end > $3
+                  AND e.valid_time_start <= $3 AND e.valid_time_end > $3
+                  {}
+
+                UNION ALL
+
+                -- Recursive case: follow connections (2-4 hops)
+                SELECT
+                    r.to_entity,
+                    e.entity_type,
+                    e.name,
+                    e.properties,
+                    e.valid_time_start,
+                    e.transaction_time_start,
+                    gt.depth + 1,
+                    gt.path || r.to_entity
+                FROM graph_traversal gt
+                JOIN llmspell.relationships r ON gt.to_entity = r.from_entity
+                JOIN llmspell.entities e ON r.to_entity = e.entity_id
+                WHERE gt.depth < $4
+                  AND r.tenant_id = $2
+                  AND e.tenant_id = $2
+                  AND r.valid_time_start <= $3 AND r.valid_time_end > $3
+                  AND e.valid_time_start <= $3 AND e.valid_time_end > $3
+                  AND NOT (r.to_entity = ANY(gt.path))  -- Cycle prevention
+                  {}
+            )
+            SELECT DISTINCT ON (to_entity)
+                to_entity, entity_type, name, properties,
+                valid_time_start, transaction_time_start, depth, path
+            FROM graph_traversal
+            ORDER BY to_entity, depth",
+            rel_type_filter, rel_type_filter
+        );
+
+        // Execute query with appropriate parameters
+        let max_depth_i32 = max_depth as i32;
+        let rows = if let Some(rel_type) = relationship_type {
+            let params: Vec<&(dyn tokio_postgres::types::ToSql + Sync)> =
+                vec![&uuid, &tenant_id, &valid_time, &max_depth_i32, &rel_type];
+            client.query(&sql, &params).await.map_err(|e| {
+                PostgresError::Query(format!("Failed to execute graph traversal: {}", e))
+            })?
+        } else {
+            let params: Vec<&(dyn tokio_postgres::types::ToSql + Sync)> =
+                vec![&uuid, &tenant_id, &valid_time, &max_depth_i32];
+            client.query(&sql, &params).await.map_err(|e| {
+                PostgresError::Query(format!("Failed to execute graph traversal: {}", e))
+            })?
+        };
+
+        // Convert rows to (Entity, depth, path)
+        let mut results = Vec::new();
+        for row in rows {
+            let entity_id: Uuid = row.get("to_entity");
+            let entity_type: String = row.get("entity_type");
+            let name: String = row.get("name");
+            let properties: Value = row.get("properties");
+            let valid_time_start: DateTime<Utc> = row.get("valid_time_start");
+            let transaction_time_start: DateTime<Utc> = row.get("transaction_time_start");
+            let depth: i32 = row.get("depth");
+            let path: Vec<Uuid> = row.get("path");
+
+            let entity = Entity {
+                id: entity_id.to_string(),
+                name,
+                entity_type,
+                properties,
+                event_time: Some(valid_time_start),
+                ingestion_time: transaction_time_start,
+            };
+
+            let path_strings: Vec<String> = path.iter().map(|u| u.to_string()).collect();
+
+            results.push((entity, depth as u32, path_strings));
+        }
+
+        Ok(results)
     }
 
     /// Convert PostgreSQL row to Entity

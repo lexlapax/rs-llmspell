@@ -1,5 +1,3 @@
-
-
 //! Tests for V4__temporal_graph migration (Phase 13b.5.1)
 //!
 //! Verifies:
@@ -252,10 +250,7 @@ async fn test_temporal_graph_app_user_permissions() {
 
     // Cleanup
     client
-        .execute(
-            "DELETE FROM llmspell.relationships WHERE TRUE",
-            &[],
-        )
+        .execute("DELETE FROM llmspell.relationships WHERE TRUE", &[])
         .await
         .expect("Should be able to DELETE");
 
@@ -423,17 +418,11 @@ async fn test_temporal_graph_foreign_key_constraints() {
         )
         .await;
 
-    assert!(
-        result.is_err(),
-        "Relationship with invalid FK should fail"
-    );
+    assert!(result.is_err(), "Relationship with invalid FK should fail");
 
     // Cleanup
     client
-        .execute(
-            "DELETE FROM llmspell.relationships WHERE TRUE",
-            &[],
-        )
+        .execute("DELETE FROM llmspell.relationships WHERE TRUE", &[])
         .await
         .unwrap();
 

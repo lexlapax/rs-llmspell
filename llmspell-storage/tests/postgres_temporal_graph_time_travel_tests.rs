@@ -201,7 +201,10 @@ async fn test_get_entity_at_nonexistent() {
         .await
         .unwrap();
 
-    assert!(result.is_none(), "Should return None for non-existent entity");
+    assert!(
+        result.is_none(),
+        "Should return None for non-existent entity"
+    );
 }
 
 #[tokio::test]
@@ -229,16 +232,7 @@ async fn test_query_temporal_by_entity_type() {
     )
     .await;
 
-    insert_test_entity(
-        &backend,
-        &tenant_id,
-        "person",
-        "Bob",
-        json!({}),
-        now,
-        None,
-    )
-    .await;
+    insert_test_entity(&backend, &tenant_id, "person", "Bob", json!({}), now, None).await;
 
     insert_test_entity(
         &backend,
@@ -291,7 +285,7 @@ async fn test_query_temporal_by_event_time_range() {
         "event",
         "Old Event",
         json!({}),
-        now - Duration::days(365), // 1 year ago
+        now - Duration::days(365),       // 1 year ago
         Some(now - Duration::days(180)), // ended 6 months ago
     )
     .await;
@@ -303,7 +297,7 @@ async fn test_query_temporal_by_event_time_range() {
         "Recent Event",
         json!({}),
         now - Duration::days(30), // 30 days ago
-        None,                      // still valid
+        None,                     // still valid
     )
     .await;
 
@@ -314,15 +308,13 @@ async fn test_query_temporal_by_event_time_range() {
         "Current Event",
         json!({}),
         now - Duration::hours(1), // 1 hour ago
-        None,                      // still valid
+        None,                     // still valid
     )
     .await;
 
     // Query for events valid in last 60 days
-    let query = TemporalQuery::new().with_event_time_range(
-        now - Duration::days(60),
-        now + Duration::days(1),
-    );
+    let query = TemporalQuery::new()
+        .with_event_time_range(now - Duration::days(60), now + Duration::days(1));
 
     let results = storage.query_temporal(&query).await.unwrap();
 
@@ -435,8 +427,7 @@ async fn test_query_temporal_with_property_filter() {
     .await;
 
     // Query for entities with status="active"
-    let query =
-        TemporalQuery::new().with_property("status".to_string(), json!("active"));
+    let query = TemporalQuery::new().with_property("status".to_string(), json!("active"));
 
     let results = storage.query_temporal(&query).await.unwrap();
 
