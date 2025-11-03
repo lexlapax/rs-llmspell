@@ -4141,20 +4141,20 @@ cargo check -p llmspell-rag  # ✅ Success (no changes needed)
 
 ### Task 13b.5.1: Create Bi-Temporal Graph Schema
 **Priority**: CRITICAL
-**Estimated Time**: 3 hours
-**Assignee**: Database Team
+**Estimated Time**: 3 hours (actual: ~2 hours)
+**Status**: ✅ COMPLETE (2025-11-03)
 
 **Description**: Create entities and relationships tables with bi-temporal semantics.
 
 **Acceptance Criteria**:
-- [ ] entities table with valid_time + transaction_time
-- [ ] relationships table with foreign keys
-- [ ] GiST time-range indexes created
-- [ ] RLS policies applied
-- [ ] Migration idempotent
+- [x] entities table with valid_time + transaction_time
+- [x] relationships table with foreign keys
+- [x] GiST time-range indexes created
+- [x] RLS policies applied
+- [x] Migration idempotent
 
-**⚠️ CRITICAL**: Migration numbering depends on Task 13b.4 completion (likely V4 or V5)
-**⚠️ CRITICAL**: Use DROP-then-CREATE for RLS policies (NOT "CREATE POLICY IF NOT EXISTS")
+**⚠️ RESOLVED**: Migration numbered as V4 (after V3__vector_embeddings.sql)
+**✅ CONFIRMED**: Used DROP-then-CREATE for RLS policies (Phase 13b.3 pattern)
 
 **Implementation Steps**:
 1. Create `migrations/V5__temporal_graph.sql` (after vector + RAG migrations):
