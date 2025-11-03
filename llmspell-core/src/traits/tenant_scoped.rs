@@ -68,9 +68,5 @@ pub trait TenantScoped: Send + Sync {
     /// - Now async to support backends with async context management
     /// - Changed from `&mut self` to `&self` (interior mutability pattern)
     /// - Returns Result for explicit error handling (no silent failures)
-    async fn set_tenant_context(
-        &self,
-        tenant_id: String,
-        scope: StateScope,
-    ) -> Result<()>;
+    async fn set_tenant_context(&self, tenant_id: String, scope: StateScope) -> Result<()>;
 }

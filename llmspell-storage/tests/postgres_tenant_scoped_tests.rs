@@ -89,9 +89,13 @@ async fn test_tenant_scoped_ignores_scope_parameter() {
         .expect("Should work with Global scope");
     assert_eq!(backend.tenant_id().await, Some("tenant-1".to_string()));
 
-    TenantScoped::set_tenant_context(&backend, "tenant-2".to_string(), StateScope::User("user1".to_string()))
-        .await
-        .expect("Should work with User scope");
+    TenantScoped::set_tenant_context(
+        &backend,
+        "tenant-2".to_string(),
+        StateScope::User("user1".to_string()),
+    )
+    .await
+    .expect("Should work with User scope");
     assert_eq!(backend.tenant_id().await, Some("tenant-2".to_string()));
 
     TenantScoped::set_tenant_context(

@@ -116,11 +116,7 @@ async fn test_test_data_table_has_tenant_id_index() {
         .await
         .expect("Failed to query indexes");
 
-    assert_eq!(
-        rows.len(),
-        1,
-        "test_data table should have tenant_id index"
-    );
+    assert_eq!(rows.len(), 1, "test_data table should have tenant_id index");
 }
 
 #[tokio::test]
@@ -165,7 +161,10 @@ async fn test_can_insert_and_query_test_data() {
 
     // Clean up
     client
-        .execute("DELETE FROM llmspell.test_data WHERE tenant_id = $1", &[&"test-tenant-123"])
+        .execute(
+            "DELETE FROM llmspell.test_data WHERE tenant_id = $1",
+            &[&"test-tenant-123"],
+        )
         .await
         .expect("Failed to clean up test data");
 }

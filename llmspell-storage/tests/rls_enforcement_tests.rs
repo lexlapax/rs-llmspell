@@ -25,7 +25,17 @@ async fn setup_backend() -> PostgresBackend {
 async fn cleanup_test_data(backend: &PostgresBackend) {
     // Clean up by iterating known test tenants
     // Note: With RLS enabled, we must set tenant context to delete each tenant's data
-    for tenant in &["tenant-a", "tenant-b", "tenant-0", "tenant-1", "tenant-2", "tenant-3", "tenant-4", "test-tenant", "malicious-tenant"] {
+    for tenant in &[
+        "tenant-a",
+        "tenant-b",
+        "tenant-0",
+        "tenant-1",
+        "tenant-2",
+        "tenant-3",
+        "tenant-4",
+        "test-tenant",
+        "malicious-tenant",
+    ] {
         backend.set_tenant_context(*tenant).await.ok();
         let client = backend.get_client().await.unwrap();
         let _ = client
@@ -108,11 +118,7 @@ async fn test_tenant_isolation_select_own_data_visible() {
         .await
         .expect("Failed to query");
 
-    assert_eq!(
-        rows.len(),
-        1,
-        "Tenant A should see its own data"
-    );
+    assert_eq!(rows.len(), 1, "Tenant A should see its own data");
 
     let value: String = rows[0].get(0);
     assert_eq!(value, "visible-data");
@@ -202,12 +208,7 @@ async fn test_multiple_tenants_isolation() {
             .await
             .expect("Failed to query");
 
-        assert_eq!(
-            rows.len(),
-            1,
-            "Tenant {} should see exactly 1 row",
-            tenant
-        );
+        assert_eq!(rows.len(), 1, "Tenant {} should see exactly 1 row", tenant);
 
         let value: String = rows[0].get(0);
         assert_eq!(value, format!("data-{}", tenant));
@@ -349,10 +350,7 @@ async fn test_update_policy_allows_value_change_same_tenant() {
 
     // Verify update
     let rows = client
-        .query(
-            "SELECT value FROM llmspell.test_data WHERE id = $1",
-            &[&id],
-        )
+        .query("SELECT value FROM llmspell.test_data WHERE id = $1", &[&id])
         .await
         .unwrap();
 
@@ -444,11 +442,7 @@ async fn test_explicit_where_clause_cannot_bypass_rls() {
         .await
         .unwrap();
 
-    assert_eq!(
-        rows.len(),
-        0,
-        "Explicit WHERE clause should NOT bypass RLS"
-    );
+    assert_eq!(rows.len(), 0, "Explicit WHERE clause should NOT bypass RLS");
 
     cleanup_test_data(&backend).await;
 }
@@ -461,10 +455,7 @@ async fn test_sql_injection_in_tenant_id() {
     // Try SQL injection via tenant_id
     let malicious_tenant = "tenant-a' OR '1'='1";
 
-    backend
-        .set_tenant_context("tenant-a")
-        .await
-        .unwrap();
+    backend.set_tenant_context("tenant-a").await.unwrap();
 
     let client = backend.get_client().await.expect("Failed to get client");
 
@@ -479,10 +470,7 @@ async fn test_sql_injection_in_tenant_id() {
     drop(client);
 
     // Set malicious tenant context
-    backend
-        .set_tenant_context(malicious_tenant)
-        .await
-        .unwrap();
+    backend.set_tenant_context(malicious_tenant).await.unwrap();
 
     // Query should see nothing (injection should not work)
     let client = backend.get_client().await.expect("Failed to get client");
@@ -517,7 +505,8 @@ async fn test_union_injection_attempt() {
         .unwrap();
 
     // Try UNION injection via value field
-    let malicious_value = "data' UNION SELECT id, 'hacked', 'hacked', now() FROM llmspell.test_data WHERE '1'='1";
+    let malicious_value =
+        "data' UNION SELECT id, 'hacked', 'hacked', now() FROM llmspell.test_data WHERE '1'='1";
 
     let result = client
         .execute(
@@ -527,7 +516,10 @@ async fn test_union_injection_attempt() {
         .await;
 
     // Should succeed (it's just data), but verify RLS still works
-    assert!(result.is_ok(), "Parameterized query should prevent injection");
+    assert!(
+        result.is_ok(),
+        "Parameterized query should prevent injection"
+    );
 
     // Verify only own tenant's data visible
     let rows = client
@@ -605,8 +597,10 @@ async fn test_rls_overhead_measurement() {
         0.0
     };
 
-    println!("RLS overhead: {:.2}% (avg with RLS: {:?}, avg explicit WHERE: {:?})",
-        overhead_pct, avg_with_rls, avg_explicit_where);
+    println!(
+        "RLS overhead: {:.2}% (avg with RLS: {:?}, avg explicit WHERE: {:?})",
+        overhead_pct, avg_with_rls, avg_explicit_where
+    );
 
     // RLS overhead should be minimal (< 20% in practice, though target is <5%)
     // We use 50% as threshold since this is a simple test environment

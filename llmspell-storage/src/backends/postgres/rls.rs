@@ -115,7 +115,9 @@ mod tests {
 
         // All policies should use current_setting for tenant_id
         // SELECT: 1 (USING), INSERT: 1 (CHECK), UPDATE: 2 (USING+CHECK), DELETE: 1 (USING) = 5 total
-        let count = sql.matches("current_setting('app.current_tenant_id', true)").count();
+        let count = sql
+            .matches("current_setting('app.current_tenant_id', true)")
+            .count();
         assert_eq!(
             count, 5,
             "Should use current_setting 5 times (SELECT USING, INSERT CHECK, UPDATE USING+CHECK, DELETE USING)"
