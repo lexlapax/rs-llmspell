@@ -8,6 +8,9 @@
 #![cfg(feature = "postgres")]
 
 use llmspell_storage::{PostgresBackend, PostgresConfig};
+use tokio::sync::OnceCell;
+
+static MIGRATION_INIT: OnceCell<()> = OnceCell::const_new();
 
 /// Test database connection string
 const TEST_CONNECTION_STRING: &str =
@@ -320,58 +323,116 @@ async fn test_concurrent_pool_access() {
 
 // Migration Tests (Phase 13b.2.6)
 
+/// Ensure migrations are run exactly once for all tests
+///
+/// During active development, we modify migration files (e.g., fixing Phase 13b.3 RLS policies).
+/// Refinery stores migration hashes and throws errors when files change. This helper resets
+/// migration state ONCE at test suite startup, then all tests share the migrated schema.
+///
+/// IMPORTANT: This is dev/test-only behavior. Production migrations should never be modified
+/// after deployment - create new migrations instead (e.g., V3__fix_rls_policies.sql).
+async fn ensure_migrations_run_once() {
+    MIGRATION_INIT.get_or_init(|| async {
+        let config = PostgresConfig::new(TEST_CONNECTION_STRING);
+        let backend = PostgresBackend::new(config)
+            .await
+            .expect("Failed to create backend for migration init");
+
+        let client = backend.get_client().await.expect("Failed to get client");
+
+        // Drop refinery_schema_history to allow re-running migrations with modified files
+        let _ = client
+            .execute("DROP TABLE IF EXISTS refinery_schema_history", &[])
+            .await;
+
+        // Drop llmspell schema to ensure clean state
+        let _ = client
+            .execute("DROP SCHEMA IF EXISTS llmspell CASCADE", &[])
+            .await;
+
+        // Recreate llmspell schema (required by V1__initial_setup.sql)
+        let _ = client
+            .execute("CREATE SCHEMA IF NOT EXISTS llmspell", &[])
+            .await;
+
+        // Grant privileges to llmspell_app user (for RLS tests)
+        let _ = client
+            .execute("GRANT ALL PRIVILEGES ON SCHEMA llmspell TO llmspell_app", &[])
+            .await;
+        let _ = client
+            .execute("GRANT ALL PRIVILEGES ON ALL TABLES IN SCHEMA llmspell TO llmspell_app", &[])
+            .await;
+        let _ = client
+            .execute("GRANT ALL PRIVILEGES ON ALL SEQUENCES IN SCHEMA llmspell TO llmspell_app", &[])
+            .await;
+        let _ = client
+            .execute("ALTER DEFAULT PRIVILEGES IN SCHEMA llmspell GRANT ALL ON TABLES TO llmspell_app", &[])
+            .await;
+        let _ = client
+            .execute("ALTER DEFAULT PRIVILEGES IN SCHEMA llmspell GRANT ALL ON SEQUENCES TO llmspell_app", &[])
+            .await;
+
+        // Run migrations
+        backend
+            .run_migrations()
+            .await
+            .expect("Failed to run migrations during test initialization");
+    }).await;
+}
+
 #[tokio::test]
 async fn test_run_migrations() {
+    // Ensure migrations run once before all tests
+    ensure_migrations_run_once().await;
+
     let config = PostgresConfig::new(TEST_CONNECTION_STRING);
     let backend = PostgresBackend::new(config)
         .await
         .expect("Failed to create backend");
 
-    // Run migrations
-    backend
-        .run_migrations()
+    // Migrations should already be applied
+    let version = backend
+        .migration_version()
         .await
-        .expect("Failed to run migrations");
+        .expect("Failed to get migration version");
+
+    assert!(version >= 2, "Migrations should already be applied");
 }
 
 #[tokio::test]
 async fn test_migration_version() {
+    // Ensure migrations run once before all tests
+    ensure_migrations_run_once().await;
+
     let config = PostgresConfig::new(TEST_CONNECTION_STRING);
     let backend = PostgresBackend::new(config)
         .await
         .expect("Failed to create backend");
 
-    // Run migrations first
-    backend
-        .run_migrations()
-        .await
-        .expect("Failed to run migrations");
-
-    // Check migration version (should be 1 after initial migration)
+    // Check migration version (should be 2 after V1 + V2)
     let version = backend
         .migration_version()
         .await
         .expect("Failed to get migration version");
 
     assert!(
-        version >= 1,
-        "Migration version should be at least 1 after running migrations"
+        version >= 2,
+        "Migration version should be at least 2 after running V1 and V2 migrations"
     );
 }
 
 #[tokio::test]
 async fn test_migrations_idempotent() {
+    // Ensure migrations run once before all tests
+    ensure_migrations_run_once().await;
+
     let config = PostgresConfig::new(TEST_CONNECTION_STRING);
     let backend = PostgresBackend::new(config)
         .await
         .expect("Failed to create backend");
 
-    // Run migrations multiple times
-    backend
-        .run_migrations()
-        .await
-        .expect("First migration run failed");
-
+    // Run migrations multiple times - should be idempotent
+    // (First run was in ensure_migrations_run_once)
     backend
         .run_migrations()
         .await
@@ -388,5 +449,8 @@ async fn test_migrations_idempotent() {
         .await
         .expect("Failed to get migration version");
 
-    assert!(version >= 1, "Migration version should be at least 1");
+    assert!(
+        version >= 2,
+        "Migration version should be at least 2 after V1 and V2"
+    );
 }

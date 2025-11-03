@@ -21,7 +21,8 @@
 ///
 /// let sql = generate_rls_policies("vector_embeddings");
 /// assert!(sql.contains("ENABLE ROW LEVEL SECURITY"));
-/// assert!(sql.contains("tenant_isolation_select"));
+/// assert!(sql.contains("DROP POLICY IF EXISTS tenant_isolation_select"));
+/// assert!(sql.contains("CREATE POLICY tenant_isolation_select"));
 /// ```
 ///
 /// # Security
@@ -30,7 +31,8 @@
 /// querying tables with RLS enabled.
 ///
 /// # Note
-/// All policies are created with `IF NOT EXISTS` for idempotency.
+/// Policies use DROP IF EXISTS before CREATE for idempotency (PostgreSQL doesn't support
+/// CREATE POLICY IF NOT EXISTS).
 pub fn generate_rls_policies(table_name: &str) -> String {
     format!(
         r#"
@@ -38,23 +40,27 @@ pub fn generate_rls_policies(table_name: &str) -> String {
 ALTER TABLE llmspell.{table} ENABLE ROW LEVEL SECURITY;
 
 -- SELECT policy: Only see rows for current tenant
-CREATE POLICY IF NOT EXISTS tenant_isolation_select ON llmspell.{table}
+DROP POLICY IF EXISTS tenant_isolation_select ON llmspell.{table};
+CREATE POLICY tenant_isolation_select ON llmspell.{table}
     FOR SELECT
     USING (tenant_id = current_setting('app.current_tenant_id', true));
 
 -- INSERT policy: Can only insert rows for current tenant
-CREATE POLICY IF NOT EXISTS tenant_isolation_insert ON llmspell.{table}
+DROP POLICY IF EXISTS tenant_isolation_insert ON llmspell.{table};
+CREATE POLICY tenant_isolation_insert ON llmspell.{table}
     FOR INSERT
     WITH CHECK (tenant_id = current_setting('app.current_tenant_id', true));
 
 -- UPDATE policy: Can only update rows for current tenant
-CREATE POLICY IF NOT EXISTS tenant_isolation_update ON llmspell.{table}
+DROP POLICY IF EXISTS tenant_isolation_update ON llmspell.{table};
+CREATE POLICY tenant_isolation_update ON llmspell.{table}
     FOR UPDATE
     USING (tenant_id = current_setting('app.current_tenant_id', true))
     WITH CHECK (tenant_id = current_setting('app.current_tenant_id', true));
 
 -- DELETE policy: Can only delete rows for current tenant
-CREATE POLICY IF NOT EXISTS tenant_isolation_delete ON llmspell.{table}
+DROP POLICY IF EXISTS tenant_isolation_delete ON llmspell.{table};
+CREATE POLICY tenant_isolation_delete ON llmspell.{table}
     FOR DELETE
     USING (tenant_id = current_setting('app.current_tenant_id', true));
 "#,
@@ -98,14 +104,14 @@ mod tests {
     }
 
     #[test]
-    fn test_generate_rls_policies_uses_if_not_exists() {
+    fn test_generate_rls_policies_uses_drop_if_exists() {
         let sql = generate_rls_policies("test_table");
 
-        // Count occurrences of IF NOT EXISTS (should be 4, one per policy)
-        let count = sql.matches("IF NOT EXISTS").count();
+        // Count occurrences of DROP POLICY IF EXISTS (should be 4, one per policy)
+        let count = sql.matches("DROP POLICY IF EXISTS").count();
         assert_eq!(
             count, 4,
-            "Should have IF NOT EXISTS for all 4 policies (idempotency)"
+            "Should have DROP POLICY IF EXISTS for all 4 policies (idempotency)"
         );
     }
 

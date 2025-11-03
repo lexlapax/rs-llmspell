@@ -17,25 +17,30 @@ CREATE INDEX IF NOT EXISTS idx_test_data_tenant ON llmspell.test_data(tenant_id)
 ALTER TABLE llmspell.test_data ENABLE ROW LEVEL SECURITY;
 
 -- CREATE RLS POLICIES: Four policies for complete tenant isolation
+-- Use DROP IF EXISTS before CREATE for idempotency (CREATE POLICY doesn't support IF NOT EXISTS)
 
 -- SELECT policy: Only see rows for current tenant
+DROP POLICY IF EXISTS tenant_isolation_select ON llmspell.test_data;
 CREATE POLICY tenant_isolation_select ON llmspell.test_data
     FOR SELECT
     USING (tenant_id = current_setting('app.current_tenant_id', true));
 
 -- INSERT policy: Can only insert rows for current tenant
+DROP POLICY IF EXISTS tenant_isolation_insert ON llmspell.test_data;
 CREATE POLICY tenant_isolation_insert ON llmspell.test_data
     FOR INSERT
     WITH CHECK (tenant_id = current_setting('app.current_tenant_id', true));
 
 -- UPDATE policy: Can only update rows for current tenant
 -- Both USING and WITH CHECK ensure tenant_id can't be changed
+DROP POLICY IF EXISTS tenant_isolation_update ON llmspell.test_data;
 CREATE POLICY tenant_isolation_update ON llmspell.test_data
     FOR UPDATE
     USING (tenant_id = current_setting('app.current_tenant_id', true))
     WITH CHECK (tenant_id = current_setting('app.current_tenant_id', true));
 
 -- DELETE policy: Can only delete rows for current tenant
+DROP POLICY IF EXISTS tenant_isolation_delete ON llmspell.test_data;
 CREATE POLICY tenant_isolation_delete ON llmspell.test_data
     FOR DELETE
     USING (tenant_id = current_setting('app.current_tenant_id', true));

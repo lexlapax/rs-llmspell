@@ -6,24 +6,53 @@
 #![cfg(feature = "postgres")]
 
 use llmspell_storage::{PostgresBackend, PostgresConfig};
+use tokio::sync::OnceCell;
 use uuid::Uuid;
 
 const TEST_CONNECTION_STRING: &str =
     "postgresql://llmspell_app:llmspell_dev_pass@localhost:5432/llmspell_dev";
+
+const SUPERUSER_CONNECTION_STRING: &str =
+    "postgresql://llmspell:llmspell_dev_pass@localhost:5432/llmspell_dev";
+
+static MIGRATION_INIT: OnceCell<()> = OnceCell::const_new();
 
 /// Generate unique tenant ID for test isolation (prevents concurrent test interference)
 fn unique_tenant_id(prefix: &str) -> String {
     format!("{}-{}", prefix, Uuid::new_v4())
 }
 
+/// Ensure migrations are run exactly once before any RLS tests
+///
+/// RLS tests use llmspell_app user (limited privileges), but migrations require
+/// superuser privileges. This helper uses llmspell user to run migrations once,
+/// then all RLS tests can use llmspell_app user safely.
+async fn ensure_migrations_run_once() {
+    MIGRATION_INIT
+        .get_or_init(|| async {
+            // Use superuser connection for migrations
+            let config = PostgresConfig::new(SUPERUSER_CONNECTION_STRING);
+            let backend = PostgresBackend::new(config)
+                .await
+                .expect("Failed to create backend for migration init");
+
+            // Run migrations (idempotent, safe to call multiple times)
+            backend
+                .run_migrations()
+                .await
+                .expect("Failed to run migrations during RLS test initialization");
+        })
+        .await;
+}
+
 async fn setup_backend() -> PostgresBackend {
+    // Ensure migrations run once before any RLS tests
+    ensure_migrations_run_once().await;
+
     let config = PostgresConfig::new(TEST_CONNECTION_STRING);
     let backend = PostgresBackend::new(config)
         .await
         .expect("Failed to create backend");
-
-    // Note: Migrations must be run separately with superuser privileges
-    // Tests assume database schema is already set up with RLS policies
 
     backend
 }

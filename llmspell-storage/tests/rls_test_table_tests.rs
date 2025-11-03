@@ -3,22 +3,38 @@
 #![cfg(feature = "postgres")]
 
 use llmspell_storage::{PostgresBackend, PostgresConfig};
+use tokio::sync::OnceCell;
 
 const TEST_CONNECTION_STRING: &str =
     "postgresql://llmspell:llmspell_dev_pass@localhost:5432/llmspell_dev";
 
+static MIGRATION_INIT: OnceCell<()> = OnceCell::const_new();
+
+/// Ensure migrations are run exactly once before any tests
+async fn ensure_migrations_run_once() {
+    MIGRATION_INIT
+        .get_or_init(|| async {
+            let config = PostgresConfig::new(TEST_CONNECTION_STRING);
+            let backend = PostgresBackend::new(config)
+                .await
+                .expect("Failed to create backend for migration init");
+
+            backend
+                .run_migrations()
+                .await
+                .expect("Failed to run migrations during test initialization");
+        })
+        .await;
+}
+
 #[tokio::test]
 async fn test_migration_creates_test_data_table() {
+    ensure_migrations_run_once().await;
+
     let config = PostgresConfig::new(TEST_CONNECTION_STRING);
     let backend = PostgresBackend::new(config)
         .await
         .expect("Failed to create backend");
-
-    // Run migrations (should include V2__test_table_rls.sql)
-    backend
-        .run_migrations()
-        .await
-        .expect("Failed to run migrations");
 
     // Verify migration version is at least 2
     let version = backend
@@ -48,16 +64,12 @@ async fn test_migration_creates_test_data_table() {
 
 #[tokio::test]
 async fn test_test_data_table_has_four_policies() {
+    ensure_migrations_run_once().await;
+
     let config = PostgresConfig::new(TEST_CONNECTION_STRING);
     let backend = PostgresBackend::new(config)
         .await
         .expect("Failed to create backend");
-
-    // Run migrations
-    backend
-        .run_migrations()
-        .await
-        .expect("Failed to run migrations");
 
     // Query policies for test_data table
     let client = backend.get_client().await.expect("Failed to get client");
@@ -94,16 +106,12 @@ async fn test_test_data_table_has_four_policies() {
 
 #[tokio::test]
 async fn test_test_data_table_has_tenant_id_index() {
+    ensure_migrations_run_once().await;
+
     let config = PostgresConfig::new(TEST_CONNECTION_STRING);
     let backend = PostgresBackend::new(config)
         .await
         .expect("Failed to create backend");
-
-    // Run migrations
-    backend
-        .run_migrations()
-        .await
-        .expect("Failed to run migrations");
 
     // Query indexes for test_data table
     let client = backend.get_client().await.expect("Failed to get client");
@@ -121,16 +129,12 @@ async fn test_test_data_table_has_tenant_id_index() {
 
 #[tokio::test]
 async fn test_can_insert_and_query_test_data() {
+    ensure_migrations_run_once().await;
+
     let config = PostgresConfig::new(TEST_CONNECTION_STRING);
     let backend = PostgresBackend::new(config)
         .await
         .expect("Failed to create backend");
-
-    // Run migrations
-    backend
-        .run_migrations()
-        .await
-        .expect("Failed to run migrations");
 
     // Set tenant context
     backend

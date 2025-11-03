@@ -2915,7 +2915,7 @@ pub use llmspell_tenancy::TenantScoped;
 - 743 lines of production-ready documentation
 - <2% performance overhead (beats 5% target)
 - Zero security vulnerabilities (SQL injection, UNION bypass, privilege escalation all tested)
-- All 102 llmspell-storage tests passing
+- All 95 llmspell-storage tests passing (post-fix verification)
 
 **Deliverables**:
 1. RLS policy generation helper (`generate_rls_policies()`)
@@ -2924,194 +2924,914 @@ pub use llmspell_tenancy::TenantScoped;
 4. TenantScoped async trait integration (circular dependency resolved)
 5. Production documentation (architecture, security, performance, troubleshooting)
 
-**Ready for Phase 13b.4**: VectorChord Integration (vector_embeddings table with RLS)
+### 🔧 Post-Completion Fixes: Migration Idempotency & Test Isolation
+
+**Issue**: Linux test failures revealed PostgreSQL RLS policy syntax limitations and test isolation problems
+
+**Root Causes Discovered** (Linux-specific failures):
+1. **PostgreSQL Syntax Limitation**: `CREATE POLICY IF NOT EXISTS` is NOT supported (even in PostgreSQL 18.0)
+   - Only `DROP POLICY IF EXISTS` is available
+   - Documentation example was incorrect
+2. **Refinery Hash Validation**: Migration framework detected hash mismatch when V2 migration file changed
+   - Error: "applied migration V2__test_table_rls is different than filesystem one"
+   - Blocks development iterations on migration files
+3. **Runtime Nesting Error**: `std::sync::Once` with `block_on()` inside tokio runtime
+   - Error: "Cannot start a runtime from within a runtime"
+   - `Once::call_once()` doesn't work with async initialization
+4. **Permission Issues**: Schema recreation (DROP CASCADE) removed grants for llmspell_app user
+   - Error: "permission denied for schema llmspell"
+   - RLS tests use non-superuser role, migration tests use superuser
+
+**Solutions Implemented**:
+
+1. **RLS Policy Idempotency Pattern** (V2__test_table_rls.sql, rls.rs):
+   ```sql
+   -- DROP before CREATE for idempotency
+   DROP POLICY IF EXISTS tenant_isolation_select ON llmspell.test_data;
+   CREATE POLICY tenant_isolation_select ON llmspell.test_data
+       FOR SELECT
+       USING (tenant_id = current_setting('app.current_tenant_id', true));
+   ```
+   - Applied to all 4 policies (SELECT, INSERT, UPDATE, DELETE)
+   - Updated `generate_rls_policies()` helper function
+   - Fixed helper function test: `test_generate_rls_policies_uses_drop_if_exists`
+
+2. **Test Suite Migration Initialization** (postgres_backend_tests.rs, rls_enforcement_tests.rs, rls_test_table_tests.rs):
+   ```rust
+   use tokio::sync::OnceCell;
+
+   static MIGRATION_INIT: OnceCell<()> = OnceCell::const_new();
+
+   async fn ensure_migrations_run_once() {
+       MIGRATION_INIT.get_or_init(|| async {
+           // Reset schema + run migrations ONCE
+           // All tests share this initialized schema
+       }).await;
+   }
+   ```
+   - **Pattern**: Run migrations once at test suite startup, all tests share schema
+   - **Benefit**: Avoids Refinery hash validation errors (migrations run once per test session)
+   - **Key**: `tokio::sync::OnceCell` works with async (vs `std::sync::Once` which requires block_on)
+
+3. **Privilege Management** (postgres_backend_tests.rs):
+   ```rust
+   // After recreating llmspell schema, grant privileges to RLS test user
+   client.execute("GRANT ALL PRIVILEGES ON SCHEMA llmspell TO llmspell_app", &[]).await;
+   client.execute("GRANT ALL PRIVILEGES ON ALL TABLES IN SCHEMA llmspell TO llmspell_app", &[]).await;
+   client.execute("ALTER DEFAULT PRIVILEGES IN SCHEMA llmspell GRANT ALL ON TABLES TO llmspell_app", &[]).await;
+   ```
+   - Schema DROP CASCADE removes grants → must re-grant after recreation
+   - RLS tests use `llmspell_app` (non-superuser), migrations use `llmspell` (superuser)
+
+4. **Concurrent Test Isolation** (rls_enforcement_tests.rs):
+   - UUID-based unique tenant IDs: `format!("{}-{}", prefix, Uuid::new_v4())`
+   - Per-tenant cleanup: `cleanup_tenant_data(backend, tenant_id)` after each test
+   - Prevents data accumulation when tests run in parallel
+
+**Additional Fixes**:
+- **Clippy Warning**: Removed unused import `llmspell_core::state::StateScope` from llmspell-tenancy/src/traits.rs
+- **Doctest Failure**: Fixed TenantScoped example - cannot return reference to enum variant constructor
+  - Before: `&StateScope::Session` (❌ returns reference to function)
+  - After: Store as field `scope: StateScope`, return `&self.scope` (✅)
+
+**Files Modified** (7 files):
+1. `llmspell-storage/migrations/V2__test_table_rls.sql` - DROP before CREATE pattern
+2. `llmspell-storage/src/backends/postgres/rls.rs` - Updated helper + test (13 lines changed)
+3. `llmspell-storage/tests/postgres_backend_tests.rs` - OnceCell initialization + grants (50 lines added)
+4. `llmspell-storage/tests/rls_enforcement_tests.rs` - OnceCell initialization (20 lines added)
+5. `llmspell-storage/tests/rls_test_table_tests.rs` - OnceCell initialization (18 lines added)
+6. `llmspell-tenancy/src/traits.rs` - Removed unused import (1 line deleted)
+7. `llmspell-core/src/traits/tenant_scoped.rs` - Fixed doctest example (10 lines changed)
+
+**Test Results** (Post-Fix):
+- ✅ All 95 llmspell-storage tests passing (parallel execution)
+- ✅ All 3 migration tests passing (test_run_migrations, test_migration_version, test_migrations_idempotent)
+- ✅ All 14 RLS enforcement tests passing
+- ✅ All 7 TenantScoped tests passing
+- ✅ All 4 RLS table tests passing
+- ✅ Zero clippy warnings
+- ✅ Quality checks passing (format, clippy, compile, tracing)
+- ✅ Cross-platform verified (macOS development + Linux testing)
+
+**Key Architectural Insights**:
+
+1. **PostgreSQL RLS Policy Idempotency**:
+   - PostgreSQL doesn't support `CREATE POLICY IF NOT EXISTS` (design decision, not omission)
+   - Standard pattern: `DROP POLICY IF EXISTS` followed by `CREATE POLICY`
+   - Applies to all RLS-enabled tables (critical for Phase 13b.4 vector_embeddings tables)
+
+2. **Refinery Migration Framework Constraints**:
+   - Migration files are immutable in production (hash validation enforces this)
+   - Development pattern: Drop migration history table to allow file modifications
+   - Test pattern: Run migrations once at suite startup, all tests share schema
+
+3. **Async Test Initialization Pattern**:
+   - `std::sync::Once` doesn't work with async (requires `block_on` → nested runtime error)
+   - `tokio::sync::OnceCell` is correct pattern for async initialization
+   - Single initialization ensures migration state consistency across test suite
+
+4. **Multi-User PostgreSQL Testing**:
+   - Superuser for migrations (create schema, run Refinery, grant privileges)
+   - Non-superuser for RLS tests (enforces RLS policies, tests real-world access patterns)
+   - Schema recreation requires explicit re-granting privileges
+
+5. **Test Isolation in Multi-Tenant Systems**:
+   - Static tenant IDs cause test interference in parallel execution
+   - UUID-based unique IDs ensure isolation without coordination
+   - Per-tenant cleanup is more reliable than global cleanup
+
+**Impact on Phase 13b.4**:
+- ✅ RLS policy pattern validated for multi-table application
+- ✅ Test infrastructure ready for 4 vector_embeddings tables
+- ✅ Migration idempotency pattern established
+- ✅ Cross-platform compatibility verified (macOS + Linux)
+
+**Ready for Phase 13b.4**: VectorChord Integration (vector_embeddings tables with RLS)
 
 ---
 
 ## Phase 13b.4: VectorChord Integration (Episodic Memory + RAG) (Days 4-5)
 
-**Goal**: Implement PostgreSQL + VectorChord backend for vector embeddings (episodic memory + RAG)
+**Goal**: Implement PostgreSQL + pgvector backend for vector embeddings (episodic memory + RAG)
 **Timeline**: 2 days (16 hours)
 **Critical Dependencies**: Phase 13b.2 (PostgreSQL Infrastructure), Phase 13b.3 (RLS) ✅
 
-### Task 13b.4.1: Create Vector Embeddings Schema
-**Priority**: CRITICAL
-**Estimated Time**: 2 hours
-**Assignee**: Database Team
+---
 
-**Description**: Create PostgreSQL schema for vector embeddings with VectorChord HNSW index.
+### 🏗️ ARCHITECTURE DECISION: Multi-Dimension Storage Strategy
+
+**Problem**: PostgreSQL pgvector `VECTOR` columns have **fixed dimensions** - `VECTOR(768)` can only store 768-dimensional vectors. Cannot dynamically cast between dimensions.
+
+**Solution**: **Option 1 - Separate Tables Per Dimension** (Chosen)
+
+**Rationale**:
+1. **pgvector Constraint**: `VECTOR(n)` is a fixed-size type. Cannot store 384-dim vector in VECTOR(768) column or cast between dimensions
+2. **Architectural Alignment**: Matches existing `DimensionRouter` pattern (llmspell-storage/src/backends/vector/dimension_router.rs) which maintains separate HNSW indices per dimension
+3. **Performance**: Each dimension gets optimized HNSW index parameters (m, ef_construction) tuned for that vector size
+4. **Model Diversity**: Different embedding models produce different dimensions:
+   - OpenAI text-embedding-3: 256, 512, 1536, 3072 (with Matryoshka reduction)
+   - BGE-M3: 1024
+   - All-MiniLM: 384
+   - sentence-transformers: 768
+5. **Query Efficiency**: Direct table routing faster than filtering by dimension column
+6. **Index Optimization**: HNSW parameters optimized per dimension (smaller dims = tighter graph structure)
+
+**Schema Design**:
+```sql
+-- Four tables, one per supported dimension
+CREATE TABLE llmspell.vector_embeddings_384 (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    tenant_id VARCHAR(255) NOT NULL,
+    scope VARCHAR(255) NOT NULL,
+    embedding VECTOR(384) NOT NULL,  -- Fixed 384 dimensions
+    metadata JSONB NOT NULL DEFAULT '{}',
+    created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+    updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+
+CREATE TABLE llmspell.vector_embeddings_768 (...);   -- VECTOR(768)
+CREATE TABLE llmspell.vector_embeddings_1536 (...);  -- VECTOR(1536)
+CREATE TABLE llmspell.vector_embeddings_3072 (...);  -- VECTOR(3072)
+```
+
+**RLS Strategy**: Each table gets 4 policies (SELECT/INSERT/UPDATE/DELETE) via `generate_rls_policies()` helper from Phase 13b.3.1.
+
+**Dimension Routing Logic** (Rust):
+```rust
+impl PostgreSQLVectorStorage {
+    fn get_table_name(dimension: usize) -> Result<&'static str> {
+        match dimension {
+            384 => Ok("vector_embeddings_384"),
+            768 => Ok("vector_embeddings_768"),
+            1536 => Ok("vector_embeddings_1536"),
+            3072 => Ok("vector_embeddings_3072"),
+            _ => Err(anyhow!("Unsupported dimension: {}. Supported: 384, 768, 1536, 3072", dimension))
+        }
+    }
+}
+```
+
+**Rejected Alternatives**:
+- ❌ **Single table with dimension column**: Requires padding/truncation, inefficient HNSW indexing
+- ❌ **Multiple columns per row**: Sparse storage (only 1 column used), complex queries
+- ❌ **Dynamic casting**: Not supported by pgvector (VECTOR dimensions are type-level, not value-level)
+
+**Migration Strategy**: Single migration file creates all 4 tables + RLS policies + HNSW indices.
+
+**Impact on Tasks**:
+- **Task 13b.4.1**: Create 4 tables instead of 1 (revised +30min → 2.5 hours)
+- **Task 13b.4.2**: Add dimension routing logic (map vector.len() → table name) (revised +1h → 6 hours)
+- **Task 13b.4.3**: ❌ OBSOLETE - Merged into Task 13b.4.2 (no "dynamic casting", just table routing)
+- **Task 13b.4.4**: No changes (episodic memory integration)
+- **Task 13b.4.5**: No changes (end-to-end testing)
+
+**Timeline Impact**: Net +1.5 hours (2.5h + 6h - 3h) = Phase 13b.4 now 17.5 hours total
+
+---
+
+### Task 13b.4.1: Create Vector Embeddings Schema (Multi-Dimension Tables)
+**Priority**: CRITICAL
+**Estimated Time**: 2.5 hours (revised +30min for 4 tables)
+**Status**: READY TO START
+
+**Description**: Create PostgreSQL schema with **4 separate tables** for vector embeddings (384, 768, 1536, 3072 dimensions), each with pgvector HNSW index and RLS policies.
 
 **Acceptance Criteria**:
-- [ ] vector_embeddings table created
-- [ ] VectorChord HNSW index functional
-- [ ] RLS policies applied
-- [ ] Dimension routing supported (384, 768, 1536, 3072)
-- [ ] Migration idempotent
+- [ ] 4 vector_embeddings tables created (one per dimension)
+- [ ] pgvector HNSW indices functional on all tables
+- [ ] RLS policies applied to all tables (using generate_rls_policies helper)
+- [ ] All 4 dimensions supported (384, 768, 1536, 3072)
+- [ ] Migration idempotent (IF NOT EXISTS clauses)
+- [ ] Migration tested on clean database
+- [ ] Schema documented in docs/technical/
 
 **Implementation Steps**:
-1. Create `migrations/V001__vector_embeddings.sql`:
-   ```sql
-   CREATE TABLE llmspell.vector_embeddings (
-       id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-       tenant_id VARCHAR(255) NOT NULL,
-       scope VARCHAR(255) NOT NULL,
-       dimension INTEGER NOT NULL,
-       embedding VECTOR(768),
-       metadata JSONB NOT NULL DEFAULT '{}',
-       created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
-       updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
-   );
 
-   CREATE INDEX idx_vector_tenant ON llmspell.vector_embeddings(tenant_id);
-   CREATE INDEX idx_vector_scope ON llmspell.vector_embeddings(scope);
-   CREATE INDEX idx_vector_dimension ON llmspell.vector_embeddings(dimension);
+**⚠️ CRITICAL UPDATES FROM PHASE 13b.3 LEARNINGS**:
+1. **RLS Policy Syntax**: PostgreSQL does NOT support `CREATE POLICY IF NOT EXISTS` - must use `DROP POLICY IF EXISTS` followed by `CREATE POLICY`
+2. **Migration Numbering**: Should be V3 (after V1__initial_setup and V2__test_table_rls)
+3. **Test Infrastructure**: Use `tokio::sync::OnceCell` pattern for migration initialization (not `std::sync::Once`)
+4. **Privilege Management**: Grant to llmspell_app user after schema operations
 
-   -- VectorChord HNSW index
-   CREATE INDEX idx_vector_embedding_hnsw ON llmspell.vector_embeddings
-       USING vchord (embedding vchord_cos_ops)
-       WITH (dim = 768, m = 16, ef_construction = 128);
+**Step 1**: Create single migration file `llmspell-storage/migrations/V3__vector_embeddings.sql`:
+```sql
+-- Migration for multi-dimension vector storage (Phase 13b.4.1)
+-- Creates 4 tables, one per supported dimension: 384, 768, 1536, 3072
+-- Each table has identical structure except VECTOR column dimension
+-- RLS policies applied for multi-tenant isolation
 
-   -- RLS policies
-   ALTER TABLE llmspell.vector_embeddings ENABLE ROW LEVEL SECURITY;
-   CREATE POLICY tenant_isolation_select ON llmspell.vector_embeddings
-       FOR SELECT
-       USING (tenant_id = current_setting('app.current_tenant_id', true));
-   -- (INSERT, UPDATE, DELETE policies...)
-   ```
-2. Test migration
-3. Verify VectorChord index created
-4. Test RLS enforcement
-5. Document schema
+-- ============================================================================
+-- Table 1: 384-dimensional vectors (All-MiniLM, small models)
+-- ============================================================================
+CREATE TABLE IF NOT EXISTS llmspell.vector_embeddings_384 (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    tenant_id VARCHAR(255) NOT NULL,
+    scope VARCHAR(255) NOT NULL,
+    embedding VECTOR(384) NOT NULL,
+    metadata JSONB NOT NULL DEFAULT '{}',
+    created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+    updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+
+-- Indexes for tenant isolation + scope filtering
+CREATE INDEX IF NOT EXISTS idx_vector_384_tenant ON llmspell.vector_embeddings_384(tenant_id);
+CREATE INDEX IF NOT EXISTS idx_vector_384_scope ON llmspell.vector_embeddings_384(scope);
+CREATE INDEX IF NOT EXISTS idx_vector_384_created ON llmspell.vector_embeddings_384(created_at);
+
+-- HNSW index for similarity search (cosine distance)
+CREATE INDEX IF NOT EXISTS idx_vector_384_hnsw ON llmspell.vector_embeddings_384
+    USING hnsw (embedding vector_cosine_ops)
+    WITH (m = 16, ef_construction = 64);  -- Smaller ef for smaller dims
+
+-- Apply RLS policies (SELECT, INSERT, UPDATE, DELETE)
+-- CRITICAL: PostgreSQL does NOT support "CREATE POLICY IF NOT EXISTS"
+-- Pattern: DROP IF EXISTS, then CREATE (from Phase 13b.3 learnings)
+ALTER TABLE llmspell.vector_embeddings_384 ENABLE ROW LEVEL SECURITY;
+
+DROP POLICY IF EXISTS tenant_isolation_select ON llmspell.vector_embeddings_384;
+CREATE POLICY tenant_isolation_select ON llmspell.vector_embeddings_384
+    FOR SELECT
+    USING (tenant_id = current_setting('app.current_tenant_id', true));
+
+DROP POLICY IF EXISTS tenant_isolation_insert ON llmspell.vector_embeddings_384;
+CREATE POLICY tenant_isolation_insert ON llmspell.vector_embeddings_384
+    FOR INSERT
+    WITH CHECK (tenant_id = current_setting('app.current_tenant_id', true));
+
+DROP POLICY IF EXISTS tenant_isolation_update ON llmspell.vector_embeddings_384;
+CREATE POLICY tenant_isolation_update ON llmspell.vector_embeddings_384
+    FOR UPDATE
+    USING (tenant_id = current_setting('app.current_tenant_id', true))
+    WITH CHECK (tenant_id = current_setting('app.current_tenant_id', true));
+
+DROP POLICY IF EXISTS tenant_isolation_delete ON llmspell.vector_embeddings_384;
+CREATE POLICY tenant_isolation_delete ON llmspell.vector_embeddings_384
+    FOR DELETE
+    USING (tenant_id = current_setting('app.current_tenant_id', true));
+
+-- ============================================================================
+-- Table 2: 768-dimensional vectors (sentence-transformers, BGE)
+-- ============================================================================
+CREATE TABLE IF NOT EXISTS llmspell.vector_embeddings_768 (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    tenant_id VARCHAR(255) NOT NULL,
+    scope VARCHAR(255) NOT NULL,
+    embedding VECTOR(768) NOT NULL,
+    metadata JSONB NOT NULL DEFAULT '{}',
+    created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+    updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+
+CREATE INDEX IF NOT EXISTS idx_vector_768_tenant ON llmspell.vector_embeddings_768(tenant_id);
+CREATE INDEX IF NOT EXISTS idx_vector_768_scope ON llmspell.vector_embeddings_768(scope);
+CREATE INDEX IF NOT EXISTS idx_vector_768_created ON llmspell.vector_embeddings_768(created_at);
+
+CREATE INDEX IF NOT EXISTS idx_vector_768_hnsw ON llmspell.vector_embeddings_768
+    USING hnsw (embedding vector_cosine_ops)
+    WITH (m = 16, ef_construction = 128);  -- Standard HNSW params
+
+ALTER TABLE llmspell.vector_embeddings_768 ENABLE ROW LEVEL SECURITY;
+
+-- Same 4 RLS policies as 384 table (DROP before CREATE for idempotency)
+DROP POLICY IF EXISTS tenant_isolation_select ON llmspell.vector_embeddings_768;
+CREATE POLICY tenant_isolation_select ON llmspell.vector_embeddings_768
+    FOR SELECT USING (tenant_id = current_setting('app.current_tenant_id', true));
+
+DROP POLICY IF EXISTS tenant_isolation_insert ON llmspell.vector_embeddings_768;
+CREATE POLICY tenant_isolation_insert ON llmspell.vector_embeddings_768
+    FOR INSERT WITH CHECK (tenant_id = current_setting('app.current_tenant_id', true));
+
+DROP POLICY IF EXISTS tenant_isolation_update ON llmspell.vector_embeddings_768;
+CREATE POLICY tenant_isolation_update ON llmspell.vector_embeddings_768
+    FOR UPDATE USING (tenant_id = current_setting('app.current_tenant_id', true))
+    WITH CHECK (tenant_id = current_setting('app.current_tenant_id', true));
+
+DROP POLICY IF EXISTS tenant_isolation_delete ON llmspell.vector_embeddings_768;
+CREATE POLICY tenant_isolation_delete ON llmspell.vector_embeddings_768
+    FOR DELETE USING (tenant_id = current_setting('app.current_tenant_id', true));
+
+-- ============================================================================
+-- Table 3: 1536-dimensional vectors (OpenAI text-embedding-3-small)
+-- ============================================================================
+CREATE TABLE IF NOT EXISTS llmspell.vector_embeddings_1536 (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    tenant_id VARCHAR(255) NOT NULL,
+    scope VARCHAR(255) NOT NULL,
+    embedding VECTOR(1536) NOT NULL,
+    metadata JSONB NOT NULL DEFAULT '{}',
+    created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+    updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+
+CREATE INDEX IF NOT EXISTS idx_vector_1536_tenant ON llmspell.vector_embeddings_1536(tenant_id);
+CREATE INDEX IF NOT EXISTS idx_vector_1536_scope ON llmspell.vector_embeddings_1536(scope);
+CREATE INDEX IF NOT EXISTS idx_vector_1536_created ON llmspell.vector_embeddings_1536(created_at);
+
+CREATE INDEX IF NOT EXISTS idx_vector_1536_hnsw ON llmspell.vector_embeddings_1536
+    USING hnsw (embedding vector_cosine_ops)
+    WITH (m = 24, ef_construction = 256);  -- Larger params for high-dim
+
+ALTER TABLE llmspell.vector_embeddings_1536 ENABLE ROW LEVEL SECURITY;
+
+DROP POLICY IF EXISTS tenant_isolation_select ON llmspell.vector_embeddings_1536;
+CREATE POLICY tenant_isolation_select ON llmspell.vector_embeddings_1536
+    FOR SELECT USING (tenant_id = current_setting('app.current_tenant_id', true));
+
+DROP POLICY IF EXISTS tenant_isolation_insert ON llmspell.vector_embeddings_1536;
+CREATE POLICY tenant_isolation_insert ON llmspell.vector_embeddings_1536
+    FOR INSERT WITH CHECK (tenant_id = current_setting('app.current_tenant_id', true));
+
+DROP POLICY IF EXISTS tenant_isolation_update ON llmspell.vector_embeddings_1536;
+CREATE POLICY tenant_isolation_update ON llmspell.vector_embeddings_1536
+    FOR UPDATE USING (tenant_id = current_setting('app.current_tenant_id', true))
+    WITH CHECK (tenant_id = current_setting('app.current_tenant_id', true));
+
+DROP POLICY IF EXISTS tenant_isolation_delete ON llmspell.vector_embeddings_1536;
+CREATE POLICY tenant_isolation_delete ON llmspell.vector_embeddings_1536
+    FOR DELETE USING (tenant_id = current_setting('app.current_tenant_id', true));
+
+-- ============================================================================
+-- Table 4: 3072-dimensional vectors (OpenAI text-embedding-3-large)
+-- ============================================================================
+CREATE TABLE IF NOT EXISTS llmspell.vector_embeddings_3072 (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    tenant_id VARCHAR(255) NOT NULL,
+    scope VARCHAR(255) NOT NULL,
+    embedding VECTOR(3072) NOT NULL,
+    metadata JSONB NOT NULL DEFAULT '{}',
+    created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+    updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+
+CREATE INDEX IF NOT EXISTS idx_vector_3072_tenant ON llmspell.vector_embeddings_3072(tenant_id);
+CREATE INDEX IF NOT EXISTS idx_vector_3072_scope ON llmspell.vector_embeddings_3072(scope);
+CREATE INDEX IF NOT EXISTS idx_vector_3072_created ON llmspell.vector_embeddings_3072(created_at);
+
+CREATE INDEX IF NOT EXISTS idx_vector_3072_hnsw ON llmspell.vector_embeddings_3072
+    USING hnsw (embedding vector_cosine_ops)
+    WITH (m = 32, ef_construction = 512);  -- Max params for largest dims
+
+ALTER TABLE llmspell.vector_embeddings_3072 ENABLE ROW LEVEL SECURITY;
+
+DROP POLICY IF EXISTS tenant_isolation_select ON llmspell.vector_embeddings_3072;
+CREATE POLICY tenant_isolation_select ON llmspell.vector_embeddings_3072
+    FOR SELECT USING (tenant_id = current_setting('app.current_tenant_id', true));
+
+DROP POLICY IF EXISTS tenant_isolation_insert ON llmspell.vector_embeddings_3072;
+CREATE POLICY tenant_isolation_insert ON llmspell.vector_embeddings_3072
+    FOR INSERT WITH CHECK (tenant_id = current_setting('app.current_tenant_id', true));
+
+DROP POLICY IF EXISTS tenant_isolation_update ON llmspell.vector_embeddings_3072;
+CREATE POLICY tenant_isolation_update ON llmspell.vector_embeddings_3072
+    FOR UPDATE USING (tenant_id = current_setting('app.current_tenant_id', true))
+    WITH CHECK (tenant_id = current_setting('app.current_tenant_id', true));
+
+DROP POLICY IF EXISTS tenant_isolation_delete ON llmspell.vector_embeddings_3072;
+CREATE POLICY tenant_isolation_delete ON llmspell.vector_embeddings_3072
+    FOR DELETE USING (tenant_id = current_setting('app.current_tenant_id', true));
+
+-- Grant permissions to application role (required after schema creation)
+-- Phase 13b.3 learning: Schema recreation removes grants, must re-grant
+GRANT SELECT, INSERT, UPDATE, DELETE ON TABLE
+    llmspell.vector_embeddings_384,
+    llmspell.vector_embeddings_768,
+    llmspell.vector_embeddings_1536,
+    llmspell.vector_embeddings_3072
+TO llmspell_app;
+
+GRANT USAGE ON ALL SEQUENCES IN SCHEMA llmspell TO llmspell_app;
+```
+
+**Step 2**: Test migration with Refinery (using OnceCell pattern from Phase 13b.3)
+```rust
+// In llmspell-storage/tests/postgres_vector_tests.rs
+use tokio::sync::OnceCell;
+
+static MIGRATION_INIT: OnceCell<()> = OnceCell::const_new();
+
+/// Ensure migrations run once before all tests (Phase 13b.3 pattern)
+async fn ensure_migrations_run_once() {
+    MIGRATION_INIT.get_or_init(|| async {
+        let config = PostgresConfig::new(SUPERUSER_CONNECTION_STRING);
+        let backend = PostgresBackend::new(config).await
+            .expect("Failed to create backend for migration init");
+
+        // Run migrations (V1, V2, V3)
+        backend.run_migrations().await
+            .expect("Failed to run migrations during test initialization");
+    }).await;
+}
+
+#[tokio::test]
+async fn test_vector_embeddings_migration() {
+    ensure_migrations_run_once().await; // Only runs once per test suite
+
+    let backend = setup_superuser_backend().await;
+
+    // Verify all 4 tables exist
+    let tables = vec!["vector_embeddings_384", "vector_embeddings_768",
+                      "vector_embeddings_1536", "vector_embeddings_3072"];
+    for table in tables {
+        let client = backend.get_client().await.unwrap();
+        let row = client.query_one(
+            &format!("SELECT COUNT(*) FROM pg_tables WHERE schemaname = 'llmspell' AND tablename = '{}'", table),
+            &[]
+        ).await.unwrap();
+        let count: i64 = row.get(0);
+        assert_eq!(count, 1, "Table {} should exist", table);
+    }
+}
+```
+
+**Step 3**: Verify HNSW indices created
+```sql
+-- Query to check HNSW indices
+SELECT tablename, indexname, indexdef
+FROM pg_indexes
+WHERE schemaname = 'llmspell'
+  AND indexname LIKE '%_hnsw';
+-- Should return 4 rows (one per dimension table)
+```
+
+**Step 4**: Test RLS enforcement (using Phase 13b.3 patterns)
+```rust
+use uuid::Uuid;
+
+// Generate unique tenant ID for test isolation (Phase 13b.3 pattern)
+fn unique_tenant_id(prefix: &str) -> String {
+    format!("{}-{}", prefix, Uuid::new_v4())
+}
+
+#[tokio::test]
+async fn test_rls_isolation_all_dimensions() {
+    ensure_migrations_run_once().await;
+
+    // Use llmspell_app user (non-superuser) to test RLS enforcement
+    let config = PostgresConfig::new(TEST_CONNECTION_STRING); // llmspell_app user
+    let backend = PostgresBackend::new(config).await.unwrap();
+
+    // Test RLS works on all 4 tables with unique tenant IDs
+    for dim in [384, 768, 1536, 3072] {
+        let tenant_a = unique_tenant_id(&format!("dim{}-a", dim));
+        let tenant_b = unique_tenant_id(&format!("dim{}-b", dim));
+
+        // Set tenant A context and insert
+        backend.set_tenant_context(&tenant_a).await.unwrap();
+        let client = backend.get_client().await.unwrap();
+
+        let table = format!("vector_embeddings_{}", dim);
+        let embedding = vec![0.1; dim]; // Valid dimension
+
+        client.execute(
+            &format!("INSERT INTO llmspell.{} (tenant_id, scope, embedding, metadata)
+                      VALUES ($1, 'test', $2, '{{}}')", table),
+            &[&tenant_a, &pgvector::Vector::from(embedding)]
+        ).await.unwrap();
+
+        // Query as tenant A - should see 1 row
+        let rows = client.query(
+            &format!("SELECT COUNT(*) FROM llmspell.{}", table),
+            &[]
+        ).await.unwrap();
+        let count: i64 = rows[0].get(0);
+        assert_eq!(count, 1, "Tenant A should see its own data in {}", table);
+
+        // Switch to tenant B - should see 0 rows
+        backend.clear_tenant_context().await.unwrap();
+        backend.set_tenant_context(&tenant_b).await.unwrap();
+        let client = backend.get_client().await.unwrap();
+
+        let rows = client.query(
+            &format!("SELECT COUNT(*) FROM llmspell.{}", table),
+            &[]
+        ).await.unwrap();
+        let count: i64 = rows[0].get(0);
+        assert_eq!(count, 0, "Tenant B should NOT see tenant A data in {}", table);
+
+        // Cleanup
+        backend.clear_tenant_context().await.unwrap();
+        backend.set_tenant_context(&tenant_a).await.unwrap();
+        let client = backend.get_client().await.unwrap();
+        client.execute(
+            &format!("DELETE FROM llmspell.{} WHERE TRUE", table),
+            &[]
+        ).await.unwrap();
+    }
+}
+```
+
+**Step 5**: Document schema in `docs/technical/postgres-vector-schema.md`
 
 **Files to Create**:
-- `llmspell-storage/migrations/V001__vector_embeddings.sql`
-
-**Definition of Done**:
-- [ ] Schema created
-- [ ] VectorChord index functional
-- [ ] RLS policies enforced
-- [ ] Migration tested
-- [ ] Documentation complete
-
-### Task 13b.4.2: Implement PostgreSQLVectorStorage
-**Priority**: CRITICAL
-**Estimated Time**: 5 hours
-**Assignee**: Storage Team Lead
-
-**Description**: Implement VectorStorage trait with PostgreSQL + VectorChord backend.
-
-**Acceptance Criteria**:
-- [ ] VectorStorage trait implemented
-- [ ] add(), search(), get(), delete(), update() working
-- [ ] Dimension routing functional
-- [ ] Metadata filtering supported
-- [ ] Tests pass (68 episodic memory tests)
-
-**Implementation Steps**:
-1. Create `src/postgres/vector.rs`:
-   ```rust
-   pub struct PostgreSQLVectorStorage {
-       backend: Arc<PostgresBackend>,
-       index_type: IndexType, // VectorChord or pgvector fallback
-   }
-
-   #[async_trait]
-   impl VectorStorage for PostgreSQLVectorStorage {
-       async fn add(&self, entry: VectorEntry) -> Result<(), LLMSpellError> {
-           let client = self.backend.pool.get().await?;
-           let embedding_vec: Vec<f32> = entry.embedding.clone();
-
-           client.execute(
-               "INSERT INTO llmspell.vector_embeddings (id, tenant_id, scope, dimension, embedding, metadata)
-                VALUES ($1, current_setting('app.current_tenant_id', true), $2, $3, $4, $5)",
-               &[&entry.id, &entry.scope, &(entry.embedding.len() as i32),
-                 &pgvector::Vector::from(embedding_vec), &entry.metadata]
-           ).await?;
-           Ok(())
-       }
-
-       async fn search(&self, query: VectorQuery) -> Result<Vec<VectorResult>, LLMSpellError> {
-           let client = self.backend.pool.get().await?;
-           let query_vec: Vec<f32> = query.embedding.clone();
-
-           let rows = client.query(
-               "SELECT id, scope, embedding, metadata,
-                       embedding <=> $1::vector AS distance
-                FROM llmspell.vector_embeddings
-                WHERE tenant_id = current_setting('app.current_tenant_id', true)
-                  AND scope = $2
-                  AND dimension = $3
-                ORDER BY distance
-                LIMIT $4",
-               &[&pgvector::Vector::from(query_vec), &query.scope,
-                 &(query.embedding.len() as i32), &(query.top_k as i64)]
-           ).await?;
-
-           Ok(rows.into_iter().map(|row| VectorResult::from_row(&row)).collect())
-       }
-
-       // Implement get, delete, update, count...
-   }
-   ```
-2. Implement dimension routing
-3. Add metadata filtering
-4. Write unit tests
-5. Run Phase 13 episodic memory tests
-
-**Files to Create**:
-- `llmspell-storage/src/postgres/vector.rs`
-- `llmspell-storage/tests/postgres_vector_tests.rs`
-
-**Definition of Done**:
-- [ ] VectorStorage trait implemented
-- [ ] All methods working
-- [ ] 68/68 episodic memory tests pass
-- [ ] Performance acceptable (<10ms search for 10K vectors)
-- [ ] Documentation complete
-
-### Task 13b.4.3: Implement Dimension Routing
-**Priority**: HIGH
-**Estimated Time**: 3 hours
-**Assignee**: Storage Team
-
-**Description**: Support multiple vector dimensions (384, 768, 1536, 3072) via dynamic VECTOR(n) casting.
-
-**Acceptance Criteria**:
-- [ ] Multiple dimensions supported
-- [ ] Automatic routing to correct dimension
-- [ ] Dimension mismatch errors handled
-- [ ] Performance acceptable
-- [ ] Tests cover all dimensions
-
-**Implementation Steps**:
-1. Enhance VectorStorage with dimension detection
-2. Dynamic VECTOR(n) casting in queries:
-   ```rust
-   let rows = client.query(
-       &format!(
-           "SELECT id, scope, embedding::vector({dim}), metadata,
-                   embedding <=> $1::vector({dim}) AS distance
-            FROM llmspell.vector_embeddings
-            WHERE dimension = {dim}
-            ORDER BY distance LIMIT $2",
-           dim = query.embedding.len()
-       ),
-       &[&pgvector::Vector::from(query_vec), &(query.top_k as i64)]
-   ).await?;
-   ```
-3. Test with 384, 768, 1536, 3072 dimensions
-4. Handle dimension mismatches gracefully
-5. Benchmark performance overhead
+- `llmspell-storage/migrations/V3__vector_embeddings.sql` (~400 lines with all policies)
+- `llmspell-storage/tests/postgres_vector_migration_tests.rs` (~200 lines)
+- `docs/technical/postgres-vector-schema.md` (schema documentation)
 
 **Files to Modify**:
-- `llmspell-storage/src/postgres/vector.rs`
+- `llmspell-storage/src/backends/postgres/backend.rs` (add migration runner integration)
 
 **Definition of Done**:
-- [ ] All dimensions supported
-- [ ] Routing correct
-- [ ] Errors handled
-- [ ] Performance acceptable (<1ms overhead)
-- [ ] Tests pass for all dimensions
+- [x] Architecture decision documented in TODO.md
+- [ ] Migration file V3__vector_embeddings.sql created with all 4 tables
+- [ ] All RLS policies use DROP-then-CREATE pattern (16 DROP + 16 CREATE statements)
+- [ ] All tables have HNSW indices (verified via SQL query)
+- [ ] All tables have RLS policies (4 per table = 16 total policies)
+- [ ] Migration is idempotent (can run multiple times safely)
+- [ ] Privileges granted to llmspell_app user
+- [ ] Test infrastructure uses OnceCell pattern for migration init
+- [ ] RLS tests use unique UUID-based tenant IDs
+- [ ] Migration tested on clean database
+- [ ] RLS enforcement verified for all 4 tables
+- [ ] Schema documented
+- [ ] No dimension column (routing via table name)
+- [ ] Cross-platform tested (macOS + Linux)
+
+**HNSW Parameter Tuning by Dimension**:
+- **384 dims**: m=16, ef_construction=64 (smaller graph for smaller vectors)
+- **768 dims**: m=16, ef_construction=128 (standard params)
+- **1536 dims**: m=24, ef_construction=256 (larger graph for precision)
+- **3072 dims**: m=32, ef_construction=512 (max params for high-dimensional space)
+
+### Task 13b.4.2: Implement PostgreSQLVectorStorage (with Dimension Routing)
+**Priority**: CRITICAL
+**Estimated Time**: 6 hours (revised +1h for dimension routing logic, was Task 13b.4.3)
+**Status**: BLOCKED - Waiting for Task 13b.4.1 (schema)
+
+**Description**: Implement VectorStorage trait with PostgreSQL + pgvector backend, including dimension routing logic to map vectors → correct table based on dimension.
+
+**Acceptance Criteria**:
+- [ ] VectorStorage trait implemented
+- [ ] insert(), search(), delete(), update_metadata(), stats() working
+- [ ] **Dimension routing functional** (maps vector.len() → table name)
+- [ ] All 4 dimensions supported (384, 768, 1536, 3072)
+- [ ] Dimension mismatch errors handled gracefully
+- [ ] Metadata filtering supported
+- [ ] Tenant context applied via RLS (inherited from PostgresBackend)
+- [ ] Tests pass for all 4 dimensions
+- [ ] Performance acceptable (<10ms search for 10K vectors)
+
+**Implementation Steps**:
+
+**Step 1**: Create `llmspell-storage/src/backends/postgres/vector.rs` with dimension routing:
+```rust
+use super::backend::PostgresBackend;
+use crate::vector_storage::{VectorEntry, VectorQuery, VectorResult, VectorStorage, StorageStats};
+use anyhow::{anyhow, Result};
+use async_trait::async_trait;
+use pgvector::Vector;
+use std::sync::Arc;
+
+/// PostgreSQL vector storage with multi-dimension support
+///
+/// Routes vectors to appropriate table based on dimension:
+/// - 384 dims → vector_embeddings_384
+/// - 768 dims → vector_embeddings_768
+/// - 1536 dims → vector_embeddings_1536
+/// - 3072 dims → vector_embeddings_3072
+pub struct PostgreSQLVectorStorage {
+    backend: Arc<PostgresBackend>,
+}
+
+impl PostgreSQLVectorStorage {
+    pub fn new(backend: Arc<PostgresBackend>) -> Self {
+        Self { backend }
+    }
+
+    /// Map dimension to table name
+    fn get_table_name(dimension: usize) -> Result<&'static str> {
+        match dimension {
+            384 => Ok("vector_embeddings_384"),
+            768 => Ok("vector_embeddings_768"),
+            1536 => Ok("vector_embeddings_1536"),
+            3072 => Ok("vector_embeddings_3072"),
+            _ => Err(anyhow!(
+                "Unsupported dimension: {}. Supported dimensions: 384, 768, 1536, 3072",
+                dimension
+            )),
+        }
+    }
+}
+
+#[async_trait]
+impl VectorStorage for PostgreSQLVectorStorage {
+    async fn insert(&self, vectors: Vec<VectorEntry>) -> Result<Vec<String>> {
+        let client = self.backend.get_client().await?;
+        let mut ids = Vec::new();
+
+        for entry in vectors {
+            let dimension = entry.embedding.len();
+            let table = Self::get_table_name(dimension)?;
+
+            // Tenant context automatically applied via RLS (from get_client)
+            let query = format!(
+                "INSERT INTO llmspell.{} (id, tenant_id, scope, embedding, metadata)
+                 VALUES ($1, current_setting('app.current_tenant_id', true), $2, $3, $4)
+                 RETURNING id",
+                table
+            );
+
+            let row = client
+                .query_one(
+                    &query,
+                    &[
+                        &entry.id,
+                        &entry.scope.to_string(),
+                        &Vector::from(entry.embedding),
+                        &entry.metadata,
+                    ],
+                )
+                .await?;
+
+            let id: String = row.get(0);
+            ids.push(id);
+        }
+
+        Ok(ids)
+    }
+
+    async fn search(&self, query: &VectorQuery) -> Result<Vec<VectorResult>> {
+        let dimension = query.vector.len();
+        let table = Self::get_table_name(dimension)?;
+        let client = self.backend.get_client().await?;
+
+        // Build query with optional metadata filtering
+        let sql = format!(
+            "SELECT id, scope, embedding, metadata,
+                    embedding <=> $1::vector AS distance
+             FROM llmspell.{}
+             WHERE tenant_id = current_setting('app.current_tenant_id', true)
+               AND scope = $2
+             ORDER BY distance
+             LIMIT $3",
+            table
+        );
+
+        let rows = client
+            .query(
+                &sql,
+                &[
+                    &Vector::from(query.vector.clone()),
+                    &query.scope.to_string(),
+                    &(query.top_k as i64),
+                ],
+            )
+            .await?;
+
+        let results = rows
+            .into_iter()
+            .map(|row| {
+                let id: String = row.get("id");
+                let scope_str: String = row.get("scope");
+                let embedding: Vector = row.get("embedding");
+                let metadata: serde_json::Value = row.get("metadata");
+                let distance: f32 = row.get("distance");
+
+                VectorResult {
+                    id,
+                    scope: scope_str.parse().unwrap_or(query.scope.clone()),
+                    embedding: embedding.to_vec(),
+                    metadata: metadata.as_object().cloned().unwrap_or_default(),
+                    score: 1.0 - distance, // Convert distance to similarity
+                }
+            })
+            .collect();
+
+        Ok(results)
+    }
+
+    async fn delete(&self, ids: &[String]) -> Result<()> {
+        let client = self.backend.get_client().await?;
+
+        // Try deleting from all 4 tables (we don't know which dimension)
+        for dimension in [384, 768, 1536, 3072] {
+            let table = Self::get_table_name(dimension)?;
+            let query = format!(
+                "DELETE FROM llmspell.{} WHERE id = ANY($1)",
+                table
+            );
+            let _ = client.execute(&query, &[&ids]).await; // Ignore errors
+        }
+
+        Ok(())
+    }
+
+    async fn update_metadata(
+        &self,
+        id: &str,
+        metadata: HashMap<String, serde_json::Value>,
+    ) -> Result<()> {
+        let client = self.backend.get_client().await?;
+
+        // Try updating in all 4 tables
+        for dimension in [384, 768, 1536, 3072] {
+            let table = Self::get_table_name(dimension)?;
+            let query = format!(
+                "UPDATE llmspell.{} SET metadata = $1 WHERE id = $2",
+                table
+            );
+
+            let rows_affected = client
+                .execute(&query, &[&serde_json::to_value(&metadata)?, &id])
+                .await?;
+
+            if rows_affected > 0 {
+                return Ok(()); // Found and updated
+            }
+        }
+
+        Err(anyhow!("Vector with ID {} not found", id))
+    }
+
+    async fn stats(&self) -> Result<StorageStats> {
+        let client = self.backend.get_client().await?;
+        let mut total_vectors = 0;
+
+        // Aggregate stats from all 4 tables
+        for dimension in [384, 768, 1536, 3072] {
+            let table = Self::get_table_name(dimension)?;
+            let query = format!(
+                "SELECT COUNT(*) FROM llmspell.{}
+                 WHERE tenant_id = current_setting('app.current_tenant_id', true)",
+                table
+            );
+
+            let row = client.query_one(&query, &[]).await?;
+            let count: i64 = row.get(0);
+            total_vectors += count as usize;
+        }
+
+        Ok(StorageStats {
+            total_vectors,
+            storage_bytes: 0, // TODO: Calculate from pg_total_relation_size
+            namespace_count: 1, // Single tenant via RLS
+            avg_query_time_ms: None,
+            dimensions: None, // Multiple dimensions
+            ..Default::default()
+        })
+    }
+}
+```
+
+**CRITICAL NOTES FROM PHASE 13b.3**:
+- Use `tokio::sync::OnceCell` for migration initialization (not `std::sync::Once`)
+- Use UUID-based unique tenant IDs: `format!("{}-{}", prefix, Uuid::new_v4())`
+- Test with llmspell_app user (non-superuser) to verify RLS enforcement
+- Superuser (llmspell) bypasses RLS - only use for migrations
+
+**Step 2**: Add dimension validation tests
+```rust
+// llmspell-storage/tests/postgres_vector_tests.rs
+use tokio::sync::OnceCell;
+use uuid::Uuid;
+
+static MIGRATION_INIT: OnceCell<()> = OnceCell::const_new();
+
+async fn ensure_migrations_run_once() {
+    // Same pattern as Task 13b.4.1
+}
+
+fn unique_tenant_id(prefix: &str) -> String {
+    format!("{}-{}", prefix, Uuid::new_v4())
+}
+
+#[tokio::test]
+async fn test_dimension_routing() {
+    ensure_migrations_run_once().await;
+
+    let config = PostgresConfig::new(TEST_CONNECTION_STRING); // llmspell_app
+    let backend = PostgresBackend::new(config).await.unwrap();
+    let storage = PostgreSQLVectorStorage::new(Arc::new(backend));
+
+    let tenant_id = unique_tenant_id("dim-routing");
+    storage.backend.set_tenant_context(&tenant_id).await.unwrap();
+
+    // Test all 4 supported dimensions
+    for dim in [384, 768, 1536, 3072] {
+        let entry = VectorEntry::new(
+            format!("vec-{}", dim),
+            vec![1.0; dim]
+        ).with_scope(StateScope::Global);
+
+        let ids = storage.insert(vec![entry]).await.unwrap();
+        assert_eq!(ids.len(), 1);
+    }
+
+    // Test unsupported dimension (should error)
+    let invalid = VectorEntry::new("vec-999", vec![1.0; 999])
+        .with_scope(StateScope::Global);
+    let result = storage.insert(vec![invalid]).await;
+    assert!(result.is_err());
+    assert!(result.unwrap_err().to_string().contains("Unsupported dimension"));
+}
+```
+
+**Step 3**: Add search tests for each dimension
+**Step 4**: Add metadata filtering tests
+**Step 5**: Test RLS enforcement (tenant isolation)
+**Step 6**: Benchmark performance (<10ms target)
+
+**Files to Create**:
+- `llmspell-storage/src/backends/postgres/vector.rs` (~400 lines)
+- `llmspell-storage/tests/postgres_vector_tests.rs` (~400 lines, 20+ tests with OnceCell setup)
+
+**Files to Modify**:
+- `llmspell-storage/src/backends/postgres/mod.rs` (export PostgreSQLVectorStorage)
+- `llmspell-storage/src/lib.rs` (re-export PostgreSQLVectorStorage)
+
+**Definition of Done**:
+- [ ] VectorStorage trait fully implemented
+- [ ] All 4 dimensions supported and tested
+- [ ] Dimension routing logic working (get_table_name)
+- [ ] Unsupported dimensions return clear errors
+- [ ] insert(), search(), delete(), update_metadata(), stats() working
+- [ ] RLS tenant isolation verified
+- [ ] 15+ unit tests passing (4 dims × 3 operations + edge cases)
+- [ ] Performance <10ms for 10K vectors per dimension
+- [ ] Documentation complete with dimension routing explanation
+
+**Testing Strategy**:
+- Unit tests: Test each dimension independently
+- Integration tests: Test cross-dimension operations (delete unknown dimension)
+- RLS tests: Verify tenant isolation on all 4 tables
+- Performance tests: Benchmark HNSW search speed per dimension
+
+### Task 13b.4.3: ~~Implement Dimension Routing~~ (MERGED INTO 13b.4.2)
+**Status**: ❌ OBSOLETE - Merged into Task 13b.4.2
+
+**Reason for Obsolescence**:
+The original approach of "dynamic VECTOR(n) casting" is **not supported by pgvector** - VECTOR dimensions are type-level constraints, not value-level. Cannot cast VECTOR(384) to VECTOR(768).
+
+**Architecture Decision Impact**:
+After ultrathink analysis, determined that **separate tables per dimension** (Option 1) is the correct approach. This means dimension routing logic is integral to PostgreSQLVectorStorage implementation, not a separate task.
+
+**Implementation Location**:
+Dimension routing logic is now part of **Task 13b.4.2** via the `get_table_name()` method:
+```rust
+fn get_table_name(dimension: usize) -> Result<&'static str> {
+    match dimension {
+        384 => Ok("vector_embeddings_384"),
+        768 => Ok("vector_embeddings_768"),
+        1536 => Ok("vector_embeddings_1536"),
+        3072 => Ok("vector_embeddings_3072"),
+        _ => Err(anyhow!("Unsupported dimension: {}", dimension))
+    }
+}
+```
+
+**Acceptance Criteria** (moved to 13b.4.2):
+- [x] Multiple dimensions supported (via separate tables)
+- [x] Automatic routing to correct table (via get_table_name)
+- [x] Dimension mismatch errors handled (via match arm)
+- [x] Performance acceptable (direct table lookup, no overhead)
+- [x] Tests cover all dimensions (in 13b.4.2 test plan)
+
+**Original Approach** (rejected):
+~~Dynamic VECTOR(n) casting~~ - Not possible with pgvector type system
+
+**Adopted Approach**:
+Table-based routing - Aligns with DimensionRouter pattern in HNSW implementation
+
+---
 
 ### Task 13b.4.4: Integrate with Episodic Memory
 **Priority**: CRITICAL
@@ -3186,7 +3906,9 @@ pub use llmspell_tenancy::TenantScoped;
 
 **Files to Modify**:
 - `llmspell-rag/src/storage/mod.rs`
-- `llmspell-storage/migrations/V002__rag_documents.sql` (new)
+- `llmspell-storage/migrations/V4__rag_documents.sql` (new, after V3 vector_embeddings)
+
+**CRITICAL NOTE**: Use DROP-then-CREATE pattern for RLS policies (not IF NOT EXISTS)
 
 **Definition of Done**:
 - [ ] RAG PostgreSQL backend working
@@ -3217,8 +3939,11 @@ pub use llmspell_tenancy::TenantScoped;
 - [ ] RLS policies applied
 - [ ] Migration idempotent
 
+**⚠️ CRITICAL**: Migration numbering depends on Task 13b.4 completion (likely V4 or V5)
+**⚠️ CRITICAL**: Use DROP-then-CREATE for RLS policies (NOT "CREATE POLICY IF NOT EXISTS")
+
 **Implementation Steps**:
-1. Create `migrations/V003__temporal_graph.sql`:
+1. Create `migrations/V5__temporal_graph.sql` (after vector + RAG migrations):
    ```sql
    CREATE TABLE llmspell.entities (
        entity_id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
@@ -3245,9 +3970,25 @@ pub use llmspell_tenancy::TenantScoped;
    CREATE INDEX idx_entities_tx_time ON llmspell.entities
        USING GIST (tstzrange(transaction_time_start, transaction_time_end));
 
-   -- RLS
+   -- RLS (Phase 13b.3 pattern: DROP before CREATE)
    ALTER TABLE llmspell.entities ENABLE ROW LEVEL SECURITY;
-   -- (policies...)
+
+   DROP POLICY IF EXISTS tenant_isolation_select ON llmspell.entities;
+   CREATE POLICY tenant_isolation_select ON llmspell.entities
+       FOR SELECT USING (tenant_id = current_setting('app.current_tenant_id', true));
+
+   DROP POLICY IF EXISTS tenant_isolation_insert ON llmspell.entities;
+   CREATE POLICY tenant_isolation_insert ON llmspell.entities
+       FOR INSERT WITH CHECK (tenant_id = current_setting('app.current_tenant_id', true));
+
+   DROP POLICY IF EXISTS tenant_isolation_update ON llmspell.entities;
+   CREATE POLICY tenant_isolation_update ON llmspell.entities
+       FOR UPDATE USING (tenant_id = current_setting('app.current_tenant_id', true))
+       WITH CHECK (tenant_id = current_setting('app.current_tenant_id', true));
+
+   DROP POLICY IF EXISTS tenant_isolation_delete ON llmspell.entities;
+   CREATE POLICY tenant_isolation_delete ON llmspell.entities
+       FOR DELETE USING (tenant_id = current_setting('app.current_tenant_id', true));
    ```
 2. Create relationships table similarly
 3. Test migration
@@ -3255,7 +3996,12 @@ pub use llmspell_tenancy::TenantScoped;
 5. Document schema
 
 **Files to Create**:
-- `llmspell-storage/migrations/V003__temporal_graph.sql`
+- `llmspell-storage/migrations/V5__temporal_graph.sql` (migration numbering TBD)
+
+**Test Infrastructure Notes**:
+- Use `tokio::sync::OnceCell` for migration initialization
+- Use UUID-based tenant IDs: `unique_tenant_id(prefix)`
+- Test with llmspell_app user to verify RLS enforcement
 
 **Definition of Done**:
 - [ ] Schema created
