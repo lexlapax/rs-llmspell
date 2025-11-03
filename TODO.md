@@ -2354,17 +2354,18 @@ After completing Phase 13b.2 on Linux, comprehensive macOS validation revealed c
 ### Task 13b.3.1: Create RLS Policy Helper Function
 **Priority**: CRITICAL
 **Estimated Time**: 2 hours
-**Status**: NEW (replaces original template task)
+**Status**: ✅ COMPLETE
+**Actual Time**: 1 hour
 
 **Description**: Create Rust helper function to generate RLS policy SQL for any table.
 
 **Acceptance Criteria**:
-- [ ] `generate_rls_policies(table_name)` function created
-- [ ] Generates SQL for all 4 policies (SELECT/INSERT/UPDATE/DELETE)
-- [ ] Uses parameterized table name (prevents SQL injection)
-- [ ] Returns idempotent SQL (IF NOT EXISTS where possible)
-- [ ] Unit tests for SQL generation
-- [ ] Documentation of template pattern
+- [x] `generate_rls_policies(table_name)` function created
+- [x] Generates SQL for all 4 policies (SELECT/INSERT/UPDATE/DELETE)
+- [x] Uses parameterized table name (prevents SQL injection)
+- [x] Returns idempotent SQL (IF NOT EXISTS where possible)
+- [x] Unit tests for SQL generation (7 tests)
+- [x] Documentation of template pattern
 
 **Implementation**:
 ```rust
@@ -2414,12 +2415,25 @@ impl PostgresBackend {
 - `llmspell-storage/tests/rls_helper_tests.rs` (unit tests)
 
 **Definition of Done**:
-- [ ] Helper function generates valid SQL
-- [ ] SQL is idempotent (can run multiple times)
-- [ ] Unit tests cover edge cases
-- [ ] Documentation explains template pattern
-- [ ] `cargo clippy` passes
-- [ ] Quality checks pass
+- [x] Helper function generates valid SQL
+- [x] SQL is idempotent (can run multiple times)
+- [x] Unit tests cover edge cases (7 comprehensive tests)
+- [x] Documentation explains template pattern
+- [x] `cargo clippy` passes (zero warnings)
+- [x] Quality checks pass (53 tests total)
+
+**Implementation Insights**:
+- Created `llmspell-storage/src/backends/postgres/rls.rs` module (157 lines)
+- Added `apply_rls_to_table()` method to PostgresBackend
+- Unit tests embedded in rls.rs module (cleaner than separate test file)
+- Initial test assertion error: expected 8 current_setting() calls, actually 5 (fixed)
+- Policy breakdown: SELECT(1) + INSERT(1) + UPDATE(2) + DELETE(1) = 5 total
+- All policies use `IF NOT EXISTS` for idempotency
+- All policies reference `llmspell` schema explicitly
+- Uses `batch_execute()` for atomic policy application
+- Comprehensive test coverage: schema prefix, idempotency, all 4 policies, current_setting usage
+- Doc test example compiles and demonstrates usage pattern
+- Zero clippy warnings, zero compilation warnings
 
 ### Task 13b.3.2: Create Test Table with RLS Policies
 **Priority**: CRITICAL

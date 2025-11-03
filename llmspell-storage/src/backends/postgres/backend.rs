@@ -106,6 +106,41 @@ impl PostgresBackend {
         Ok(())
     }
 
+    /// Apply Row-Level Security (RLS) policies to a table
+    ///
+    /// # Arguments
+    /// * `table_name` - Name of the table (without schema prefix)
+    ///
+    /// # Returns
+    /// * `Result<()>` - Success or error
+    ///
+    /// # Example
+    /// ```rust,no_run
+    /// # use llmspell_storage::backends::postgres::{PostgresBackend, PostgresConfig};
+    /// # #[tokio::main]
+    /// # async fn main() {
+    /// #     let config = PostgresConfig::new("postgresql://localhost/llmspell_dev");
+    /// #     let backend = PostgresBackend::new(config).await.unwrap();
+    /// // After creating a table in a migration
+    /// backend.apply_rls_to_table("vector_embeddings").await.unwrap();
+    /// # }
+    /// ```
+    ///
+    /// # Phase 13b.3.1
+    /// This method uses the `generate_rls_policies()` helper to create four policies
+    /// (SELECT, INSERT, UPDATE, DELETE) that enforce tenant isolation via RLS.
+    pub async fn apply_rls_to_table(&self, table_name: &str) -> Result<()> {
+        let sql = super::rls::generate_rls_policies(table_name);
+        let client = self.pool.get().await?;
+
+        client
+            .batch_execute(&sql)
+            .await
+            .map_err(|e| PostgresError::Migration(format!("RLS policy failed: {}", e)))?;
+
+        Ok(())
+    }
+
     /// Check if the backend is healthy (can connect to database)
     ///
     /// # Returns

@@ -6,6 +6,7 @@ mod config;
 mod error;
 mod migrations;
 mod pool;
+pub mod rls; // Phase 13b.3.1: RLS policy generation helpers
 
 pub use backend::PostgresBackend;
 pub use config::PostgresConfig;
