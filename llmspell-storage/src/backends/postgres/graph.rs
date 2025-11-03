@@ -1,11 +1,14 @@
-//! ABOUTME: PostgreSQL bi-temporal graph storage (Phase 13b.5.2)
-//! ABOUTME: Time-travel queries with GiST indexes for efficient temporal range queries
+//! ABOUTME: PostgreSQL bi-temporal graph storage (Phase 13b.5.4)
+//! ABOUTME: Full KnowledgeGraph trait implementation with bi-temporal support
 
 use super::backend::PostgresBackend;
 use super::error::{PostgresError, Result};
+use async_trait::async_trait;
 use chrono::{DateTime, Utc};
-use llmspell_graph::types::{Entity, TemporalQuery};
+use llmspell_graph::traits::KnowledgeGraph;
+use llmspell_graph::types::{Entity, Relationship, TemporalQuery};
 use serde_json::Value;
+use std::collections::HashMap;
 use std::sync::Arc;
 use tokio_postgres::Row;
 use uuid::Uuid;
@@ -457,6 +460,396 @@ impl PostgresGraphStorage {
             event_time,
             ingestion_time,
         })
+    }
+}
+
+// KnowledgeGraph trait implementation (Phase 13b.5.4)
+#[async_trait]
+impl KnowledgeGraph for PostgresGraphStorage {
+    /// Add a new entity to the graph
+    ///
+    /// Creates entity with bi-temporal tracking:
+    /// - `event_time` → `valid_time_start`
+    /// - `ingestion_time` → `transaction_time_start`
+    /// - Both `*_end` times set to 'infinity' (current version)
+    async fn add_entity(&self, entity: Entity) -> llmspell_graph::error::Result<String> {
+        let tenant_id = self.backend.get_tenant_context().await.ok_or_else(|| {
+            llmspell_graph::error::GraphError::Storage(
+                "Tenant context not set - call set_tenant_context() first".to_string(),
+            )
+        })?;
+
+        let client = self.backend.get_client().await.map_err(|e| {
+            llmspell_graph::error::GraphError::Storage(format!("Failed to get client: {}", e))
+        })?;
+
+        let entity_id = Uuid::new_v4();
+
+        // Map event_time to valid_time_start, or use current time if None
+        let valid_time_start = entity.event_time.unwrap_or_else(Utc::now);
+
+        client
+            .execute(
+                "INSERT INTO llmspell.entities
+                 (tenant_id, entity_id, entity_type, name, properties, valid_time_start, valid_time_end)
+                 VALUES ($1, $2, $3, $4, $5, $6, 'infinity')",
+                &[
+                    &tenant_id,
+                    &entity_id,
+                    &entity.entity_type,
+                    &entity.name,
+                    &entity.properties,
+                    &valid_time_start,
+                ],
+            )
+            .await
+            .map_err(|e| {
+                llmspell_graph::error::GraphError::Storage(format!("Failed to insert entity: {}", e))
+            })?;
+
+        Ok(entity_id.to_string())
+    }
+
+    /// Update an existing entity with new properties
+    ///
+    /// Implements bi-temporal update semantics:
+    /// 1. End current version by setting `valid_time_end` and `transaction_time_end` to NOW
+    /// 2. Insert new version with updated properties and current timestamps
+    ///
+    /// This preserves full history while making the new version current.
+    async fn update_entity(
+        &self,
+        id: &str,
+        changes: HashMap<String, serde_json::Value>,
+    ) -> llmspell_graph::error::Result<()> {
+        let entity_id = Uuid::parse_str(id).map_err(|e| {
+            llmspell_graph::error::GraphError::Storage(format!(
+                "Invalid entity ID (not a UUID): {}",
+                e
+            ))
+        })?;
+
+        let tenant_id = self.backend.get_tenant_context().await.ok_or_else(|| {
+            llmspell_graph::error::GraphError::Storage(
+                "Tenant context not set - call set_tenant_context() first".to_string(),
+            )
+        })?;
+
+        let mut client = self.backend.get_client().await.map_err(|e| {
+            llmspell_graph::error::GraphError::Storage(format!("Failed to get client: {}", e))
+        })?;
+
+        let now = Utc::now();
+
+        // Start transaction for atomic update
+        let tx = client.transaction().await.map_err(|e| {
+            llmspell_graph::error::GraphError::Storage(format!(
+                "Failed to start transaction: {}",
+                e
+            ))
+        })?;
+
+        // Get current version of entity
+        let row = tx
+            .query_one(
+                "SELECT entity_type, name, properties, valid_time_start
+                 FROM llmspell.entities
+                 WHERE entity_id = $1
+                   AND tenant_id = $2
+                   AND valid_time_end = 'infinity'
+                   AND transaction_time_end = 'infinity'",
+                &[&entity_id, &tenant_id],
+            )
+            .await
+            .map_err(|e| {
+                llmspell_graph::error::GraphError::EntityNotFound(format!(
+                    "Entity {} not found: {}",
+                    id, e
+                ))
+            })?;
+
+        let entity_type: String = row.get("entity_type");
+        let name: String = row.get("name");
+        let mut properties: Value = row.get("properties");
+        let valid_time_start: DateTime<Utc> = row.get("valid_time_start");
+
+        // Apply changes to properties
+        if let Value::Object(ref mut map) = properties {
+            for (key, value) in changes {
+                map.insert(key, value);
+            }
+        }
+
+        // End current version
+        tx.execute(
+            "UPDATE llmspell.entities
+             SET valid_time_end = $1, transaction_time_end = $1
+             WHERE entity_id = $2
+               AND tenant_id = $3
+               AND valid_time_end = 'infinity'
+               AND transaction_time_end = 'infinity'",
+            &[&now, &entity_id, &tenant_id],
+        )
+        .await
+        .map_err(|e| {
+            llmspell_graph::error::GraphError::Storage(format!(
+                "Failed to end current version: {}",
+                e
+            ))
+        })?;
+
+        // Insert new version with updated properties
+        tx.execute(
+            "INSERT INTO llmspell.entities
+             (tenant_id, entity_id, entity_type, name, properties, valid_time_start, valid_time_end)
+             VALUES ($1, $2, $3, $4, $5, $6, 'infinity')",
+            &[
+                &tenant_id,
+                &entity_id,
+                &entity_type,
+                &name,
+                &properties,
+                &valid_time_start,
+            ],
+        )
+        .await
+        .map_err(|e| {
+            llmspell_graph::error::GraphError::Storage(format!(
+                "Failed to insert new version: {}",
+                e
+            ))
+        })?;
+
+        tx.commit().await.map_err(|e| {
+            llmspell_graph::error::GraphError::Storage(format!(
+                "Failed to commit transaction: {}",
+                e
+            ))
+        })?;
+
+        Ok(())
+    }
+
+    /// Get the current version of an entity
+    ///
+    /// Returns the entity with `valid_time_end = infinity` and `transaction_time_end = infinity`
+    async fn get_entity(&self, id: &str) -> llmspell_graph::error::Result<Entity> {
+        let entity_id = Uuid::parse_str(id).map_err(|e| {
+            llmspell_graph::error::GraphError::Storage(format!(
+                "Invalid entity ID (not a UUID): {}",
+                e
+            ))
+        })?;
+
+        let tenant_id = self.backend.get_tenant_context().await.ok_or_else(|| {
+            llmspell_graph::error::GraphError::Storage(
+                "Tenant context not set - call set_tenant_context() first".to_string(),
+            )
+        })?;
+
+        let client = self.backend.get_client().await.map_err(|e| {
+            llmspell_graph::error::GraphError::Storage(format!("Failed to get client: {}", e))
+        })?;
+
+        let row = client
+            .query_opt(
+                "SELECT entity_id, entity_type, name, properties, valid_time_start, transaction_time_start
+                 FROM llmspell.entities
+                 WHERE entity_id = $1
+                   AND tenant_id = $2
+                   AND valid_time_end = 'infinity'
+                   AND transaction_time_end = 'infinity'",
+                &[&entity_id, &tenant_id],
+            )
+            .await
+            .map_err(|e| {
+                llmspell_graph::error::GraphError::Storage(format!("Query failed: {}", e))
+            })?;
+
+        let row = row.ok_or_else(|| {
+            llmspell_graph::error::GraphError::EntityNotFound(format!("Entity {} not found", id))
+        })?;
+
+        Self::entity_from_row(row).map_err(|e| {
+            llmspell_graph::error::GraphError::Storage(format!("Failed to parse entity: {}", e))
+        })
+    }
+
+    /// Get entity as it was known at a specific event time
+    ///
+    /// Delegates to the existing get_entity_at method (Phase 13b.5.2)
+    async fn get_entity_at(
+        &self,
+        id: &str,
+        event_time: DateTime<Utc>,
+    ) -> llmspell_graph::error::Result<Entity> {
+        let transaction_time = Utc::now(); // Query current knowledge
+        self.get_entity_at(id, event_time, transaction_time)
+            .await
+            .map_err(|e| llmspell_graph::error::GraphError::Storage(format!("{:?}", e)))?
+            .ok_or_else(|| {
+                llmspell_graph::error::GraphError::EntityNotFound(format!(
+                    "Entity {} not found at event_time {}",
+                    id, event_time
+                ))
+            })
+    }
+
+    /// Add a relationship between two entities
+    ///
+    /// Creates relationship with bi-temporal tracking similar to entities
+    async fn add_relationship(
+        &self,
+        relationship: Relationship,
+    ) -> llmspell_graph::error::Result<String> {
+        let tenant_id = self.backend.get_tenant_context().await.ok_or_else(|| {
+            llmspell_graph::error::GraphError::Storage(
+                "Tenant context not set - call set_tenant_context() first".to_string(),
+            )
+        })?;
+
+        let client = self.backend.get_client().await.map_err(|e| {
+            llmspell_graph::error::GraphError::Storage(format!("Failed to get client: {}", e))
+        })?;
+
+        let relationship_id = Uuid::new_v4();
+        let from_entity = Uuid::parse_str(&relationship.from_entity).map_err(|e| {
+            llmspell_graph::error::GraphError::Storage(format!(
+                "Invalid from_entity ID (not a UUID): {}",
+                e
+            ))
+        })?;
+        let to_entity = Uuid::parse_str(&relationship.to_entity).map_err(|e| {
+            llmspell_graph::error::GraphError::Storage(format!(
+                "Invalid to_entity ID (not a UUID): {}",
+                e
+            ))
+        })?;
+
+        // Map event_time to valid_time_start
+        let valid_time_start = relationship.event_time.unwrap_or_else(Utc::now);
+
+        client
+            .execute(
+                "INSERT INTO llmspell.relationships
+                 (tenant_id, relationship_id, from_entity, to_entity, relationship_type, properties, valid_time_start, valid_time_end)
+                 VALUES ($1, $2, $3, $4, $5, $6, $7, 'infinity')",
+                &[
+                    &tenant_id,
+                    &relationship_id,
+                    &from_entity,
+                    &to_entity,
+                    &relationship.relationship_type,
+                    &relationship.properties,
+                    &valid_time_start,
+                ],
+            )
+            .await
+            .map_err(|e| {
+                llmspell_graph::error::GraphError::Storage(format!("Failed to insert relationship: {}", e))
+            })?;
+
+        Ok(relationship_id.to_string())
+    }
+
+    /// Get all entities related to a given entity
+    ///
+    /// Delegates to the recursive CTE implementation (Phase 13b.5.3)
+    /// Uses max_depth=4 and current time as defaults
+    async fn get_related(
+        &self,
+        entity_id: &str,
+        relationship_type: &str,
+    ) -> llmspell_graph::error::Result<Vec<Entity>> {
+        let now = Utc::now();
+        let results = self
+            .get_related(entity_id, Some(relationship_type), 4, now)
+            .await
+            .map_err(|e| llmspell_graph::error::GraphError::Storage(format!("{:?}", e)))?;
+
+        // Extract just the entities (discard depth and path)
+        Ok(results
+            .into_iter()
+            .map(|(entity, _depth, _path)| entity)
+            .collect())
+    }
+
+    /// Execute a temporal query on the graph
+    ///
+    /// Delegates to the existing query_temporal method (Phase 13b.5.2)
+    async fn query_temporal(
+        &self,
+        query: TemporalQuery,
+    ) -> llmspell_graph::error::Result<Vec<Entity>> {
+        self.query_temporal(&query)
+            .await
+            .map_err(|e| llmspell_graph::error::GraphError::Storage(format!("{:?}", e)))
+    }
+
+    /// Delete all entities and relationships with ingestion time before the given timestamp
+    ///
+    /// Implements data retention by removing historical versions
+    async fn delete_before(
+        &self,
+        timestamp: DateTime<Utc>,
+    ) -> llmspell_graph::error::Result<usize> {
+        let tenant_id = self.backend.get_tenant_context().await.ok_or_else(|| {
+            llmspell_graph::error::GraphError::Storage(
+                "Tenant context not set - call set_tenant_context() first".to_string(),
+            )
+        })?;
+
+        let mut client = self.backend.get_client().await.map_err(|e| {
+            llmspell_graph::error::GraphError::Storage(format!("Failed to get client: {}", e))
+        })?;
+
+        let tx = client.transaction().await.map_err(|e| {
+            llmspell_graph::error::GraphError::Storage(format!(
+                "Failed to start transaction: {}",
+                e
+            ))
+        })?;
+
+        // Delete old relationship versions
+        let rel_count = tx
+            .execute(
+                "DELETE FROM llmspell.relationships
+                 WHERE tenant_id = $1
+                   AND transaction_time_start < $2",
+                &[&tenant_id, &timestamp],
+            )
+            .await
+            .map_err(|e| {
+                llmspell_graph::error::GraphError::Storage(format!(
+                    "Failed to delete relationships: {}",
+                    e
+                ))
+            })?;
+
+        // Delete old entity versions
+        let entity_count = tx
+            .execute(
+                "DELETE FROM llmspell.entities
+                 WHERE tenant_id = $1
+                   AND transaction_time_start < $2",
+                &[&tenant_id, &timestamp],
+            )
+            .await
+            .map_err(|e| {
+                llmspell_graph::error::GraphError::Storage(format!(
+                    "Failed to delete entities: {}",
+                    e
+                ))
+            })?;
+
+        tx.commit().await.map_err(|e| {
+            llmspell_graph::error::GraphError::Storage(format!(
+                "Failed to commit transaction: {}",
+                e
+            ))
+        })?;
+
+        Ok((entity_count + rel_count) as usize)
     }
 }
 
