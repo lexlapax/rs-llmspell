@@ -11,7 +11,7 @@
 
 use llmspell_core::state::StateScope;
 use llmspell_storage::{
-    PostgresBackend, PostgresConfig, PostgreSQLVectorStorage, VectorEntry, VectorQuery,
+    PostgreSQLVectorStorage, PostgresBackend, PostgresConfig, VectorEntry, VectorQuery,
     VectorStorage,
 };
 use std::collections::HashMap;
@@ -85,8 +85,8 @@ async fn test_dimension_routing_unsupported_dimension() {
     backend.set_tenant_context(&tenant_id).await.unwrap();
 
     // Test unsupported dimension (should error)
-    let invalid = VectorEntry::new("vec-999".to_string(), vec![1.0; 999])
-        .with_scope(StateScope::Global);
+    let invalid =
+        VectorEntry::new("vec-999".to_string(), vec![1.0; 999]).with_scope(StateScope::Global);
 
     let result = storage.insert(vec![invalid]).await;
     assert!(result.is_err());
@@ -281,8 +281,10 @@ async fn test_stats() {
     let vectors = vec![
         VectorEntry::new(Uuid::new_v4().to_string(), vec![1.0; 384]).with_scope(StateScope::Global),
         VectorEntry::new(Uuid::new_v4().to_string(), vec![1.0; 768]).with_scope(StateScope::Global),
-        VectorEntry::new(Uuid::new_v4().to_string(), vec![1.0; 1536]).with_scope(StateScope::Global),
-        VectorEntry::new(Uuid::new_v4().to_string(), vec![1.0; 3072]).with_scope(StateScope::Global),
+        VectorEntry::new(Uuid::new_v4().to_string(), vec![1.0; 1536])
+            .with_scope(StateScope::Global),
+        VectorEntry::new(Uuid::new_v4().to_string(), vec![1.0; 3072])
+            .with_scope(StateScope::Global),
     ];
 
     let ids = storage.insert(vectors).await.unwrap();
@@ -357,7 +359,10 @@ async fn test_rls_tenant_isolation() {
 
     // Tenant A should see 2 vectors
     let stats_a = storage.stats().await.unwrap();
-    assert_eq!(stats_a.total_vectors, 2, "Tenant A should see its 2 vectors");
+    assert_eq!(
+        stats_a.total_vectors, 2,
+        "Tenant A should see its 2 vectors"
+    );
 
     // Switch to Tenant B
     backend.clear_tenant_context().await.unwrap();
@@ -372,14 +377,18 @@ async fn test_rls_tenant_isolation() {
 
     // Tenant B inserts its own data
     let vectors_b = vec![
-        VectorEntry::new(Uuid::new_v4().to_string(), vec![1.0; 1536]).with_scope(StateScope::Global),
+        VectorEntry::new(Uuid::new_v4().to_string(), vec![1.0; 1536])
+            .with_scope(StateScope::Global),
     ];
 
     storage.insert(vectors_b).await.unwrap();
 
     // Tenant B should see 1 vector
     let stats_b2 = storage.stats().await.unwrap();
-    assert_eq!(stats_b2.total_vectors, 1, "Tenant B should see its 1 vector");
+    assert_eq!(
+        stats_b2.total_vectors, 1,
+        "Tenant B should see its 1 vector"
+    );
 
     // Cleanup both tenants
     backend.clear_tenant_context().await.unwrap();

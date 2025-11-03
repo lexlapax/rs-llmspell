@@ -3532,19 +3532,19 @@ async fn test_rls_isolation_all_dimensions() {
 
 **Definition of Done**:
 - [x] Architecture decision documented in TODO.md
-- [ ] Migration file V3__vector_embeddings.sql created with all 4 tables
-- [ ] All RLS policies use DROP-then-CREATE pattern (16 DROP + 16 CREATE statements)
-- [ ] All tables have HNSW indices (verified via SQL query)
-- [ ] All tables have RLS policies (4 per table = 16 total policies)
-- [ ] Migration is idempotent (can run multiple times safely)
-- [ ] Privileges granted to llmspell_app user
-- [ ] Test infrastructure uses OnceCell pattern for migration init
-- [ ] RLS tests use unique UUID-based tenant IDs
-- [ ] Migration tested on clean database
-- [ ] RLS enforcement verified for all 4 tables
-- [ ] Schema documented
-- [ ] No dimension column (routing via table name)
-- [ ] Cross-platform tested (macOS + Linux)
+- [x] Migration file V3__vector_embeddings.sql created with all 4 tables
+- [x] All RLS policies use DROP-then-CREATE pattern (16 DROP + 16 CREATE statements)
+- [x] All tables have HNSW indices (verified via SQL query)
+- [x] All tables have RLS policies (4 per table = 16 total policies)
+- [x] Migration is idempotent (can run multiple times safely)
+- [x] Privileges granted to llmspell_app user
+- [x] Test infrastructure uses OnceCell pattern for migration init
+- [x] RLS tests use unique UUID-based tenant IDs
+- [x] Migration tested on clean database
+- [x] RLS enforcement verified for all 4 tables
+- [x] Schema documented
+- [x] No dimension column (routing via table name)
+- [x] Cross-platform tested (macOS + Linux)
 
 **HNSW Parameter Tuning by Dimension**:
 - **384 dims**: m=16, ef_construction=64 (smaller graph for smaller vectors)
@@ -3902,15 +3902,15 @@ async fn test_dimension_routing() {
 - `llmspell-storage/src/lib.rs` (re-export PostgreSQLVectorStorage)
 
 **Definition of Done**:
-- [ ] VectorStorage trait fully implemented
-- [ ] All 4 dimensions supported and tested
-- [ ] Dimension routing logic working (get_table_name)
-- [ ] Unsupported dimensions return clear errors
-- [ ] insert(), search(), delete(), update_metadata(), stats() working
-- [ ] RLS tenant isolation verified
-- [ ] 15+ unit tests passing (4 dims × 3 operations + edge cases)
-- [ ] Performance <10ms for 10K vectors per dimension
-- [ ] Documentation complete with dimension routing explanation
+- [x] VectorStorage trait fully implemented
+- [x] All 4 dimensions supported and tested
+- [x] Dimension routing logic working (get_table_name)
+- [x] Unsupported dimensions return clear errors
+- [x] insert(), search(), delete(), update_metadata(), stats() working
+- [x] RLS tenant isolation verified
+- [x] 15+ unit tests passing (4 dims × 3 operations + edge cases)
+- [x] Performance <10ms for 10K vectors per dimension
+- [x] Documentation complete with dimension routing explanation
 
 **Testing Strategy**:
 - Unit tests: Test each dimension independently
@@ -4041,11 +4041,11 @@ cargo check -p llmspell-memory                      # ✅ Success (no regression
 - `llmspell-memory/src/config.rs`
 
 **Definition of Done**:
-- [ ] PostgreSQL backend option added
-- [ ] Configuration works
-- [ ] 68/68 tests pass with PostgreSQL
-- [ ] 68/68 tests pass with HNSW (zero regressions)
-- [ ] Documentation updated
+- [x] PostgreSQL backend option added
+- [x] Configuration works
+- [ ] 68/68 tests pass with PostgreSQL (deferred - requires PostgreSQL test environment setup)
+- [ ] 68/68 tests pass with HNSW (zero regressions) (deferred - requires PostgreSQL test environment setup)
+- [ ] Documentation updated (deferred - awaiting full test validation)
 
 ### Task 13b.4.5: RAG PostgreSQL Backend Integration
 **Priority**: HIGH

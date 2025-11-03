@@ -108,7 +108,7 @@ pub use traits::{StorageBackend, StorageBackendType, StorageCharacteristics, Sto
 // Re-export PostgreSQL types (Phase 13b.2+)
 #[cfg(feature = "postgres")]
 pub use backends::postgres::{
-    PostgresBackend, PostgresConfig, PostgresError, PostgresPool, PostgreSQLVectorStorage,
+    PostgreSQLVectorStorage, PostgresBackend, PostgresConfig, PostgresError, PostgresPool,
 };
 
 // Re-export vector storage types

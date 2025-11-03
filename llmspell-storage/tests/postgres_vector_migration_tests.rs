@@ -99,7 +99,7 @@ async fn test_vector_embeddings_hnsw_indices() {
     );
 
     // Indices ordered alphabetically by table name (1536, 384, 768)
-    let expected_indices = vec![
+    let expected_indices = [
         "idx_vector_1536_hnsw",
         "idx_vector_384_hnsw",
         "idx_vector_768_hnsw",
@@ -266,10 +266,7 @@ async fn test_vector_embeddings_app_user_permissions() {
 
         // Cleanup
         client
-            .execute(
-                &format!("DELETE FROM llmspell.{} WHERE TRUE", table),
-                &[],
-            )
+            .execute(&format!("DELETE FROM llmspell.{} WHERE TRUE", table), &[])
             .await
             .expect("Should be able to DELETE");
     }
@@ -339,10 +336,7 @@ async fn test_vector_embeddings_rls_isolation() {
         backend.set_tenant_context(&tenant_a).await.unwrap();
         let client = backend.get_client().await.unwrap();
         client
-            .execute(
-                &format!("DELETE FROM llmspell.{} WHERE TRUE", table),
-                &[],
-            )
+            .execute(&format!("DELETE FROM llmspell.{} WHERE TRUE", table), &[])
             .await
             .unwrap();
     }

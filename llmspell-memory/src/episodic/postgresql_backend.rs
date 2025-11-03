@@ -1,18 +1,18 @@
-//! ABOUTME: PostgreSQL-backed episodic memory with multi-tenant RLS support
+//! ABOUTME: `PostgreSQL`-backed episodic memory with multi-tenant `RLS` support
 //!
-//! Integrates llmspell-storage's PostgreSQL vector storage into episodic memory layer,
-//! providing O(log n) similarity search with pgvector HNSW and Row-Level Security for multi-tenancy.
+//! Integrates `llmspell-storage`'s `PostgreSQL` vector storage into episodic memory layer,
+//! providing O(log n) similarity search with `pgvector` HNSW and Row-Level Security for multi-tenancy.
 //!
 //! # Architecture: Hybrid Storage
 //!
 //! Uses dual storage for optimal performance:
-//! - **PostgreSQL**: O(log n) vector similarity search with pgvector HNSW + RLS tenant isolation
+//! - **`PostgreSQL`**: O(log n) vector similarity search with `pgvector` HNSW + `RLS` tenant isolation
 //! - **`DashMap`**: O(1) ID lookups, O(n) metadata queries (in-memory cache)
 //!
 //! This hybrid approach provides:
 //! - Fast vector search (primary use case)
 //! - Fast ID-based retrieval
-//! - Multi-tenant data isolation via RLS
+//! - Multi-tenant data isolation via `RLS`
 //! - Complete `EpisodicMemory` trait implementation
 //! - Memory overhead: ~200 bytes/entry for cache (acceptable)
 
@@ -25,7 +25,9 @@ use dashmap::DashMap;
 #[cfg(feature = "postgres")]
 use llmspell_core::state::StateScope;
 #[cfg(feature = "postgres")]
-use llmspell_storage::{PostgresBackend, PostgreSQLVectorStorage, VectorEntry, VectorQuery, VectorStorage};
+use llmspell_storage::{
+    PostgreSQLVectorStorage, PostgresBackend, VectorEntry, VectorQuery, VectorStorage,
+};
 #[cfg(feature = "postgres")]
 use serde_json::Value;
 #[cfg(feature = "postgres")]
@@ -44,32 +46,32 @@ use crate::traits::EpisodicMemory;
 #[cfg(feature = "postgres")]
 use crate::types::EpisodicEntry;
 
-/// Production episodic memory using PostgreSQL with pgvector
+/// Production episodic memory using `PostgreSQL` with `pgvector`
 ///
-/// **Performance**: O(log n) search with pgvector HNSW index, multi-tenant RLS support
+/// **Performance**: O(log n) search with `pgvector` HNSW index, multi-tenant `RLS` support
 ///
 /// # Architecture
 ///
-/// - **Vector Storage**: `PostgreSQLVectorStorage` (O(log n) search, RLS-enabled)
+/// - **Vector Storage**: `PostgreSQLVectorStorage` (O(log n) search, `RLS`-enabled)
 /// - **Metadata Storage**: `DashMap<String, EpisodicEntry>` (O(1) ID lookup cache)
 /// - **Embeddings**: Real-time generation via `EmbeddingService`
 /// - **Scoping**: `StateScope::Session` for session-level isolation
-/// - **Tenant Isolation**: Row-Level Security via PostgresBackend
-/// - **Sync Strategy**: PostgreSQL is source of truth, `DashMap` is write-through cache
+/// - **Tenant Isolation**: Row-Level Security via `PostgresBackend`
+/// - **Sync Strategy**: `PostgreSQL` is source of truth, `DashMap` is write-through cache
 ///
 /// # Performance Characteristics
 ///
-/// - `add()`: O(log n) PostgreSQL + O(1) `DashMap` = O(log n)
-/// - `search()`: O(log n) PostgreSQL (primary use case)
-/// - `get()`: O(1) `DashMap` lookup (cache hit), O(1) PostgreSQL (cache miss)
-/// - `get_session()`: O(n) PostgreSQL scan + filter
-/// - `mark_processed()`: O(k) `DashMap` + O(k) PostgreSQL where k = entry count
-/// - `delete_before()`: O(n) PostgreSQL scan + O(k) deletes
+/// - `add()`: O(log n) `PostgreSQL` + O(1) `DashMap` = O(log n)
+/// - `search()`: O(log n) `PostgreSQL` (primary use case)
+/// - `get()`: O(1) `DashMap` lookup (cache hit), O(1) `PostgreSQL` (cache miss)
+/// - `get_session()`: O(n) `PostgreSQL` scan + filter
+/// - `mark_processed()`: O(k) `DashMap` + O(k) `PostgreSQL` where k = entry count
+/// - `delete_before()`: O(n) `PostgreSQL` scan + O(k) deletes
 ///
 /// # Memory Overhead
 ///
 /// - `DashMap` cache: ~200 bytes/entry
-/// - PostgreSQL: persistent storage, no memory overhead
+/// - `PostgreSQL`: persistent storage, no memory overhead
 /// - Justified by multi-tenant support and persistence
 ///
 /// # Example
@@ -82,7 +84,7 @@ use crate::types::EpisodicEntry;
 /// use std::sync::Arc;
 ///
 /// # async fn example() -> Result<(), Box<dyn std::error::Error>> {
-/// // Create PostgreSQL backend
+/// // Create `PostgreSQL` backend
 /// let config = PostgresConfig::new("postgresql://localhost/llmspell");
 /// let backend = Arc::new(PostgresBackend::new(config).await?);
 ///
@@ -94,26 +96,26 @@ use crate::types::EpisodicEntry;
 /// // Set tenant context
 /// memory.set_tenant("tenant-123").await?;
 ///
-/// // Now use like any EpisodicMemory
-/// // Automatically uses PostgreSQL for O(log n) search with RLS
-/// // Automatically uses DashMap for O(1) ID lookups
+/// // Now use like any `EpisodicMemory`
+/// // Automatically uses `PostgreSQL` for O(log n) search with `RLS`
+/// // Automatically uses `DashMap` for O(1) ID lookups
 /// # Ok(())
 /// # }
 /// ```
 #[cfg(feature = "postgres")]
 #[derive(Clone)]
 pub struct PostgreSQLEpisodicMemory {
-    /// PostgreSQL vector storage backend (for similarity search with RLS)
+    /// `PostgreSQL` vector storage backend (for similarity search with `RLS`)
     storage: Arc<PostgreSQLVectorStorage>,
 
-    /// PostgreSQL backend (for tenant context management)
+    /// `PostgreSQL` backend (for tenant context management)
     backend: Arc<PostgresBackend>,
 
     /// Metadata storage for O(1) ID lookups (in-memory cache)
     ///
     /// Stores complete `EpisodicEntry` objects indexed by ID.
-    /// This enables fast direct lookups without querying PostgreSQL.
-    /// Write-through cache: updates go to both PostgreSQL and DashMap.
+    /// This enables fast direct lookups without querying `PostgreSQL`.
+    /// Write-through cache: updates go to both `PostgreSQL` and `DashMap`.
     entries: Arc<DashMap<String, EpisodicEntry>>,
 
     /// Embedding service for vector generation
@@ -122,16 +124,16 @@ pub struct PostgreSQLEpisodicMemory {
 
 #[cfg(feature = "postgres")]
 impl PostgreSQLEpisodicMemory {
-    /// Create PostgreSQL episodic memory
+    /// Create `PostgreSQL` episodic memory
     ///
     /// # Arguments
     ///
-    /// * `backend` - PostgreSQL backend with connection pool
+    /// * `backend` - `PostgreSQL` backend with connection pool
     /// * `embedding_service` - Service for generating embeddings
     ///
     /// # Errors
     ///
-    /// Returns error if PostgreSQL vector storage initialization fails
+    /// Returns error if `PostgreSQL` vector storage initialization fails
     pub fn new(
         backend: Arc<PostgresBackend>,
         embedding_service: Arc<EmbeddingService>,
@@ -154,13 +156,13 @@ impl PostgreSQLEpisodicMemory {
         })
     }
 
-    /// Set tenant context for RLS
+    /// Set tenant context for `RLS`
     ///
     /// Must be called before any operations to ensure proper tenant isolation.
     ///
     /// # Arguments
     ///
-    /// * `tenant_id` - Tenant identifier for RLS filtering
+    /// * `tenant_id` - Tenant identifier for `RLS` filtering
     ///
     /// # Errors
     ///
@@ -169,7 +171,7 @@ impl PostgreSQLEpisodicMemory {
         self.backend
             .set_tenant_context(tenant_id)
             .await
-            .map_err(|e| MemoryError::Storage(format!("Failed to set tenant context: {}", e)))?;
+            .map_err(|e| MemoryError::Storage(format!("Failed to set tenant context: {e}")))?;
         Ok(())
     }
 
@@ -182,11 +184,11 @@ impl PostgreSQLEpisodicMemory {
         self.backend
             .clear_tenant_context()
             .await
-            .map_err(|e| MemoryError::Storage(format!("Failed to clear tenant context: {}", e)))?;
+            .map_err(|e| MemoryError::Storage(format!("Failed to clear tenant context: {e}")))?;
         Ok(())
     }
 
-    /// Convert `EpisodicEntry` to `VectorEntry` for PostgreSQL storage
+    /// Convert `EpisodicEntry` to `VectorEntry` for `PostgreSQL` storage
     ///
     /// Serializes the entry (excluding embedding) into metadata field.
     async fn to_vector_entry(&self, entry: &EpisodicEntry) -> Result<VectorEntry> {
@@ -209,10 +211,7 @@ impl PostgreSQLEpisodicMemory {
             "timestamp".to_string(),
             Value::String(entry.timestamp.to_rfc3339()),
         );
-        metadata.insert(
-            "processed".to_string(),
-            Value::Bool(entry.processed),
-        );
+        metadata.insert("processed".to_string(), Value::Bool(entry.processed));
 
         Ok(VectorEntry::new(entry.id.clone(), embedding)
             .with_scope(StateScope::Session(entry.session_id.clone()))
@@ -247,12 +246,12 @@ impl PostgreSQLEpisodicMemory {
             .ok_or_else(|| MemoryError::Other("Missing timestamp".to_string()))?;
 
         let timestamp = DateTime::parse_from_rfc3339(timestamp_str)
-            .map_err(|e| MemoryError::Other(format!("Invalid timestamp: {}", e)))?
+            .map_err(|e| MemoryError::Other(format!("Invalid timestamp: {e}")))?
             .with_timezone(&Utc);
 
         let processed = metadata
             .get("processed")
-            .and_then(|v| v.as_bool())
+            .and_then(serde_json::Value::as_bool)
             .unwrap_or(false);
 
         Ok(EpisodicEntry {
@@ -286,7 +285,7 @@ impl EpisodicMemory for PostgreSQLEpisodicMemory {
             .storage
             .insert(vec![vector_entry])
             .await
-            .map_err(|e| MemoryError::Storage(format!("PostgreSQL insert failed: {}", e)))?;
+            .map_err(|e| MemoryError::Storage(format!("PostgreSQL insert failed: {e}")))?;
 
         if ids.is_empty() {
             return Err(MemoryError::Storage(
@@ -314,11 +313,14 @@ impl EpisodicMemory for PostgreSQLEpisodicMemory {
         // We don't fetch from PostgreSQL here because VectorStorage doesn't support get_by_id
         // Instead, we rely on search/scan operations to populate cache
         warn!("Cache miss for entry: id={}, entry not found", id);
-        Err(MemoryError::NotFound(format!("Entry not found: {}", id)))
+        Err(MemoryError::NotFound(format!("Entry not found: {id}")))
     }
 
     async fn search(&self, query: &str, top_k: usize) -> Result<Vec<EpisodicEntry>> {
-        debug!("Searching episodic memory: query='{}', top_k={}", query, top_k);
+        debug!(
+            "Searching episodic memory: query='{}', top_k={}",
+            query, top_k
+        );
 
         // Generate query embedding
         let query_embedding = self
@@ -333,7 +335,7 @@ impl EpisodicMemory for PostgreSQLEpisodicMemory {
             .storage
             .search(&vector_query)
             .await
-            .map_err(|e| MemoryError::Storage(format!("PostgreSQL search failed: {}", e)))?;
+            .map_err(|e| MemoryError::Storage(format!("PostgreSQL search failed: {e}")))?;
 
         // Convert results to EpisodicEntry
         let mut entries = Vec::new();
@@ -363,9 +365,7 @@ impl EpisodicMemory for PostgreSQLEpisodicMemory {
         let entries: Vec<EpisodicEntry> = self
             .entries
             .iter()
-            .filter(|item| {
-                item.value().session_id == session_id && !item.value().processed
-            })
+            .filter(|item| item.value().session_id == session_id && !item.value().processed)
             .map(|item| item.value().clone())
             .collect();
 
@@ -413,7 +413,10 @@ impl EpisodicMemory for PostgreSQLEpisodicMemory {
         // We rely on cache for processed flag tracking
         // This is acceptable for episodic memory use case
 
-        debug!("Successfully marked {} entries as processed", entry_ids.len());
+        debug!(
+            "Successfully marked {} entries as processed",
+            entry_ids.len()
+        );
         Ok(())
     }
 
@@ -435,7 +438,7 @@ impl EpisodicMemory for PostgreSQLEpisodicMemory {
             self.storage
                 .delete(&ids_to_delete)
                 .await
-                .map_err(|e| MemoryError::Storage(format!("PostgreSQL delete failed: {}", e)))?;
+                .map_err(|e| MemoryError::Storage(format!("PostgreSQL delete failed: {e}")))?;
 
             // Delete from cache
             for id in &ids_to_delete {
@@ -459,7 +462,10 @@ impl EpisodicMemory for PostgreSQLEpisodicMemory {
             .collect();
 
         let session_vec: Vec<String> = sessions.into_iter().collect();
-        debug!("Found {} sessions with unprocessed entries", session_vec.len());
+        debug!(
+            "Found {} sessions with unprocessed entries",
+            session_vec.len()
+        );
         Ok(session_vec)
     }
 }
@@ -468,6 +474,8 @@ impl EpisodicMemory for PostgreSQLEpisodicMemory {
 impl std::fmt::Debug for PostgreSQLEpisodicMemory {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         f.debug_struct("PostgreSQLEpisodicMemory")
+            .field("storage", &"PostgreSQLVectorStorage")
+            .field("backend", &"PostgresBackend")
             .field("dimensions", &self.embedding_service.dimensions())
             .field("provider", &self.embedding_service.provider_name())
             .field("cache_entries", &self.entries.len())

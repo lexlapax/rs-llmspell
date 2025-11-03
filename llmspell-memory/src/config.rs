@@ -16,7 +16,7 @@ use crate::embeddings::EmbeddingService;
 ///
 /// - **`InMemory`**: O(n) search, good for <1K entries, testing only
 /// - **HNSW**: O(log n) search, production-ready for 10K+ entries
-/// - **PostgreSQL**: O(log n) search with pgvector HNSW, multi-tenant RLS support
+/// - **`PostgreSQL`**: O(log n) search with `pgvector` HNSW, multi-tenant `RLS` support
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum EpisodicBackendType {
     /// Simple `HashMap` (for testing, <1K entries)
@@ -25,7 +25,7 @@ pub enum EpisodicBackendType {
     /// HNSW vector index (for production, 10K+ entries)
     HNSW,
 
-    /// PostgreSQL with pgvector (for production, multi-tenant, RLS-enabled)
+    /// `PostgreSQL` with `pgvector` (for production, multi-tenant, `RLS`-enabled)
     #[cfg(feature = "postgres")]
     PostgreSQL,
 }
@@ -73,10 +73,10 @@ pub struct MemoryConfig {
     /// HNSW configuration (used if backend = HNSW)
     pub hnsw_config: HNSWConfig,
 
-    /// Embedding service (required for HNSW and PostgreSQL)
+    /// Embedding service (required for `HNSW` and `PostgreSQL`)
     pub embedding_service: Option<Arc<EmbeddingService>>,
 
-    /// PostgreSQL backend (used if backend = PostgreSQL)
+    /// `PostgreSQL` backend (used if backend = `PostgreSQL`)
     #[cfg(feature = "postgres")]
     pub postgres_backend: Option<Arc<llmspell_storage::PostgresBackend>>,
 }
@@ -197,13 +197,13 @@ impl MemoryConfig {
         self
     }
 
-    /// PostgreSQL configuration (production, multi-tenant, RLS-enabled)
+    /// `PostgreSQL` configuration (production, multi-tenant, `RLS`-enabled)
     ///
-    /// Suitable for production deployments with PostgreSQL backend, embedding service, and RLS.
+    /// Suitable for production deployments with `PostgreSQL` backend, embedding service, and `RLS`.
     ///
     /// # Arguments
     ///
-    /// * `postgres_backend` - PostgreSQL backend with connection pool
+    /// * `postgres_backend` - `PostgreSQL` backend with connection pool
     /// * `embedding_service` - Service for generating embeddings
     ///
     /// # Example
@@ -250,7 +250,8 @@ impl MemoryConfig {
 
 impl std::fmt::Debug for MemoryConfig {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        f.debug_struct("MemoryConfig")
+        let mut debug_struct = f.debug_struct("MemoryConfig");
+        debug_struct
             .field("episodic_backend", &self.episodic_backend)
             .field("hnsw_config", &self.hnsw_config)
             .field(
@@ -259,7 +260,11 @@ impl std::fmt::Debug for MemoryConfig {
                     .embedding_service
                     .as_ref()
                     .map(|s| s.provider_name().to_string()),
-            )
-            .finish()
+            );
+
+        #[cfg(feature = "postgres")]
+        debug_struct.field("postgres_backend", &self.postgres_backend.is_some());
+
+        debug_struct.finish()
     }
 }

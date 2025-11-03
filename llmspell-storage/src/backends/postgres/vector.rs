@@ -125,7 +125,10 @@ impl VectorStorage for PostgreSQLVectorStorage {
         );
 
         let rows = client
-            .query(&sql, &[&Vector::from(query.vector.clone()), &(query.k as i64)])
+            .query(
+                &sql,
+                &[&Vector::from(query.vector.clone()), &(query.k as i64)],
+            )
             .await?;
 
         let results = rows
@@ -313,10 +316,10 @@ impl VectorStorage for PostgreSQLVectorStorage {
 
         Ok(StorageStats {
             total_vectors,
-            storage_bytes: 0,           // TODO: Calculate from pg_total_relation_size
-            namespace_count: 1,         // Single tenant via RLS
-            avg_query_time_ms: None,    // TODO: Track query performance
-            dimensions: None,           // Multiple dimensions
+            storage_bytes: 0,        // TODO: Calculate from pg_total_relation_size
+            namespace_count: 1,      // Single tenant via RLS
+            avg_query_time_ms: None, // TODO: Track query performance
+            dimensions: None,        // Multiple dimensions
             index_build_time_ms: None,
         })
     }
