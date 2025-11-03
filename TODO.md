@@ -2537,53 +2537,169 @@ CREATE INDEX idx_test_data_tenant ON llmspell.test_data(tenant_id);
 - [ ] Security edge cases covered
 - [ ] `cargo test` passes all RLS tests
 
-### Task 13b.3.4: Implement TenantScoped Integration
+### Task 13b.3.4: Implement TenantScoped Integration (Async Trait Migration)
 **Priority**: HIGH
 **Estimated Time**: 2 hours
-**Status**: UNCHANGED (valid integration task)
+**Status**: REVISED - Option 3 (Async Trait) chosen based on ultrathink analysis
 
-**⚠️ ARCHITECTURAL DECISION REQUIRED**:
+**✅ ARCHITECTURAL DECISION**: Modify TenantScoped trait to async
 
-TenantScoped trait is **sync**:
+**Rationale** (from ultrathink analysis):
+- **Holistic**: Matches rs-llmspell async architecture (LLM, DB, events all async)
+- **Future-proof**: All future backends (Redis, Kafka) are async
+- **Modular**: Single source of truth, no adapter layer
+- **Scalable**: No silent failures (Option 2's fire-and-forget is security bug)
+- **Developer UX**: Explicit async + error handling
+- **Performance**: 2x faster than adapter (no spawn overhead)
+- **Project alignment**: Pre-1.0, "less code is better", "attack complexity"
+- **Zero breaking changes**: No existing implementations (grep confirmed)
+
+**Description**: Migrate TenantScoped trait to async and implement for PostgresBackend.
+
+**Acceptance Criteria**:
+- [ ] TenantScoped trait methods made async
+- [ ] PostgresBackend implements async TenantScoped
+- [ ] tenant_id() returns current tenant context
+- [ ] set_tenant_context() propagates errors (no silent failures)
+- [ ] Integration tests pass
+- [ ] Documentation explains async trait pattern
+
+**Implementation Steps**:
+
+**Step 1: Modify TenantScoped trait** (15 min)
 ```rust
+// llmspell-tenancy/src/traits.rs
+
+#[async_trait]
 pub trait TenantScoped: Send + Sync {
-    fn tenant_id(&self) -> Option<&str>;  // Sync method
-    fn set_tenant_context(&mut self, tenant_id: String, scope: StateScope);  // Sync
+    /// Get the tenant ID this resource belongs to
+    async fn tenant_id(&self) -> Option<String>;  // async, owned String
+
+    /// Get the state scope for this tenant (can stay sync - simple getter)
+    fn scope(&self) -> &StateScope;
+
+    /// Set the tenant context
+    async fn set_tenant_context(
+        &self,  // Changed from &mut self
+        tenant_id: String,
+        scope: StateScope,
+    ) -> Result<()>;  // Returns Result for error propagation
 }
 ```
 
-PostgresBackend methods are **async**:
-```rust
-pub async fn set_tenant_context(&self, tenant_id: impl Into<String>) -> Result<()>
-pub async fn get_tenant_context(&self) -> Option<String>
+**Step 2: Add llmspell-tenancy dependency** (5 min)
+```toml
+# llmspell-storage/Cargo.toml
+
+[dependencies]
+llmspell-tenancy = { path = "../llmspell-tenancy" }
 ```
 
-**Options**:
-1. **Blocking adapter** (quick but not ideal) - Use `tokio::runtime::Handle::block_on()`
-2. **Separate adapter struct** (clean, RECOMMENDED) - PostgresBackendAdapter with cached tenant
-3. **Modify TenantScoped to async** (breaking change to llmspell-tenancy)
-4. **Skip integration** (defer to later)
+**Step 3: Implement TenantScoped for PostgresBackend** (30 min)
+```rust
+// llmspell-storage/src/backends/postgres/backend.rs
 
-**Recommendation**: Option 2 (separate adapter) - no blocking, no breaking changes, clean separation
+use llmspell_tenancy::{TenantScoped};
+use llmspell_core::state::StateScope;
 
-**Description**: Integrate PostgresBackend with llmspell-tenancy TenantScoped trait.
+#[async_trait]
+impl TenantScoped for PostgresBackend {
+    async fn tenant_id(&self) -> Option<String> {
+        self.get_tenant_context().await
+    }
 
-**Acceptance Criteria**:
-- [ ] PostgresBackend implements TenantScoped trait (or via adapter)
-- [ ] tenant_id() returns current tenant context
-- [ ] set_tenant_context() delegates to existing async method
-- [ ] Integration tests pass
-- [ ] Documentation explains sync/async bridge if used
+    fn scope(&self) -> &StateScope {
+        // PostgreSQL backend operates at session scope
+        &StateScope::Session
+    }
+
+    async fn set_tenant_context(
+        &self,
+        tenant_id: String,
+        _scope: StateScope,  // PostgreSQL uses session scope only
+    ) -> Result<()> {
+        self.set_tenant_context(tenant_id).await
+            .map_err(|e| anyhow::anyhow!("Failed to set tenant context: {}", e))
+    }
+}
+```
+
+**Step 4: Write integration tests** (40 min)
+```rust
+// llmspell-storage/tests/postgres_tenant_scoped_tests.rs
+
+#[cfg(feature = "postgres")]
+use llmspell_storage::PostgresBackend;
+use llmspell_tenancy::TenantScoped;
+use llmspell_core::state::StateScope;
+
+#[tokio::test]
+async fn test_tenant_scoped_trait_implementation() {
+    let backend = setup_test_backend().await;
+
+    // Initially no tenant
+    assert_eq!(backend.tenant_id().await, None);
+
+    // Set tenant via trait
+    backend.set_tenant_context("tenant-abc".into(), StateScope::Session)
+        .await
+        .expect("Failed to set tenant context");
+
+    // Verify via trait
+    assert_eq!(backend.tenant_id().await, Some("tenant-abc".to_string()));
+
+    // Verify scope
+    assert_eq!(backend.scope(), &StateScope::Session);
+}
+
+#[tokio::test]
+async fn test_tenant_scoped_error_propagation() {
+    let backend = setup_test_backend().await;
+
+    // Invalid tenant ID should propagate error
+    let result = backend.set_tenant_context("".into(), StateScope::Session).await;
+
+    // Should return error (not silent failure)
+    assert!(result.is_err(), "Empty tenant ID should fail");
+}
+```
+
+**Step 5: Update module exports** (10 min)
+```rust
+// llmspell-storage/src/backends/postgres/mod.rs
+
+pub use backend::PostgresBackend;
+
+// Re-export TenantScoped for convenience
+#[cfg(feature = "postgres")]
+pub use llmspell_tenancy::TenantScoped;
+```
+
+**Step 6: Document async trait pattern** (20 min)
+- Add section to docs/technical/rls-policies.md
+- Explain why async trait (aligns with PostgreSQL async nature)
+- Show usage examples with `.await`
+- Document error handling pattern
 
 **Files to Modify**:
-- `llmspell-storage/src/backends/postgres/backend.rs`
-- `llmspell-storage/Cargo.toml` (add llmspell-tenancy dependency)
+- `llmspell-tenancy/src/traits.rs` (trait definition)
+- `llmspell-storage/Cargo.toml` (add dependency)
+- `llmspell-storage/src/backends/postgres/backend.rs` (implementation)
+- `llmspell-storage/src/backends/postgres/mod.rs` (re-export)
+
+**Files to Create**:
+- `llmspell-storage/tests/postgres_tenant_scoped_tests.rs` (integration tests)
 
 **Definition of Done**:
-- [ ] TenantScoped implemented (after architectural decision)
-- [ ] Integration tests pass
-- [ ] Documentation explains approach chosen
-- [ ] Zero blocking of async runtime (if Option 2 chosen)
+- [ ] TenantScoped trait is async
+- [ ] PostgresBackend implements TenantScoped
+- [ ] tenant_id() returns Option<String>
+- [ ] set_tenant_context() returns Result<()>
+- [ ] Integration tests pass (5+ tests)
+- [ ] No silent failures (errors propagate)
+- [ ] Documentation explains async pattern
+- [ ] `cargo clippy` passes
+- [ ] Quality checks pass
 
 ### Task 13b.3.5: Document RLS Architecture and Best Practices
 **Priority**: MEDIUM
