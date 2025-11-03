@@ -1509,6 +1509,13 @@ refinery = { version = "0.8", features = ["tokio-postgres"] }
 
 **Ready for Task 13b.2.2** (Docker Compose Setup)
 
+**Definition of Done**:
+- [x] Dependencies added to workspace Cargo.toml
+- [x] Version compatibility verified
+- [x] Features configured correctly
+- [x] `cargo check` passes
+- [x] Zero dependency conflicts
+
 ### Task 13b.2.2: Create Docker Compose Setup
 **Priority**: CRITICAL
 **Estimated Time**: 2 hours
@@ -1597,11 +1604,11 @@ refinery = { version = "0.8", features = ["tokio-postgres"] }
 - `docker/postgres/README.md`
 
 **Definition of Done**:
-- [ ] Docker Compose starts successfully
-- [ ] VectorChord extension available
-- [ ] Health checks passing
-- [ ] Startup time <30s
-- [ ] Documentation complete
+- [x] Docker Compose starts successfully
+- [x] VectorChord extension available
+- [x] Health checks passing
+- [x] Startup time <30s
+- [x] Documentation complete
 
 ### Task 13b.2.3: Create Init Scripts for Extensions
 **Priority**: CRITICAL
@@ -1675,11 +1682,11 @@ refinery = { version = "0.8", features = ["tokio-postgres"] }
 - `docker/postgres/init-scripts/01-extensions.sql`
 
 **Definition of Done**:
-- [ ] Extensions enabled
-- [ ] Schema created
-- [ ] Permissions correct
-- [ ] Idempotent execution
-- [ ] Zero errors
+- [x] Extensions enabled
+- [x] Schema created
+- [x] Permissions correct
+- [x] Idempotent execution
+- [x] Zero errors
 
 ### Task 13b.2.4: Modify llmspell-storage Crate for PostgreSQL Support
 **Priority**: CRITICAL
@@ -1812,12 +1819,12 @@ llmspell-storage/src/backends/postgres/
 - `llmspell-storage/src/backends/postgres/error.rs`
 
 **Definition of Done**:
-- [ ] Existing crate modified (NOT new crate created)
-- [ ] postgres feature flag works
-- [ ] `cargo check -p llmspell-storage --features postgres` passes
-- [ ] `cargo check --workspace --all-features` passes
-- [ ] Zero warnings
-- [ ] Module structure follows existing patterns (memory.rs, sled_backend.rs, vector/)
+- [x] Existing crate modified (NOT new crate created)
+- [x] postgres feature flag works
+- [x] `cargo check -p llmspell-storage --features postgres` passes
+- [x] `cargo check --workspace --all-features` passes
+- [x] Zero warnings
+- [x] Module structure follows existing patterns (memory.rs, sled_backend.rs, vector/)
 
 ### Task 13b.2.5: Implement PostgresBackend Infrastructure
 **Priority**: CRITICAL
@@ -1925,11 +1932,11 @@ cargo test -p llmspell-storage --features postgres --test postgres_backend_tests
 - `llmspell-storage/tests/postgres_backend_tests.rs` (with #[cfg(feature = "postgres")])
 
 **Definition of Done**:
-- [ ] Backend compiles with --features postgres
-- [ ] Connection pooling works (20 connections functional)
-- [ ] Tenant context setting functional
-- [ ] Tests pass (10+ tests, gated with #[cfg(feature = "postgres")])
-- [ ] Documentation complete (rustdoc on all public APIs)
+- [x] Backend compiles with --features postgres
+- [x] Connection pooling works (20 connections functional)
+- [x] Tenant context setting functional
+- [x] Tests pass (13 tests, gated with #[cfg(feature = "postgres")])
+- [x] Documentation complete (rustdoc on all public APIs)
 
 ### Task 13b.2.6: Setup Refinery Migration Framework
 **Priority**: HIGH
@@ -2017,11 +2024,11 @@ cargo test -p llmspell-storage --features postgres --test postgres_backend_tests
 - `llmspell-storage/src/postgres/migrations.rs`
 
 **Definition of Done**:
-- [ ] Migration framework working
-- [ ] Migrations run successfully
-- [ ] Version tracking functional
-- [ ] Idempotent execution verified
-- [ ] Documentation complete
+- [x] Migration framework working
+- [x] Migrations run successfully
+- [x] Version tracking functional
+- [x] Idempotent execution verified
+- [x] Documentation complete
 
 ### Task 13b.2.7: Enhance Configuration for Backend Selection
 **Priority**: HIGH
@@ -2151,11 +2158,11 @@ cargo test -p llmspell-kernel --features postgres --test postgres_config_tests
 - `llmspell-storage/tests/config_tests.rs` (if not exists)
 
 **Definition of Done**:
-- [ ] Backend selection enum supports Postgres
-- [ ] TOML parsing works for all backends
-- [ ] Validation functional (connection strings, pool limits)
-- [ ] Tests pass (5+ tests, including Postgres config)
-- [ ] Documentation complete (config examples in rustdoc)
+- [x] Backend selection enum supports Postgres
+- [x] TOML parsing works for all backends
+- [x] Validation functional (connection strings, pool limits)
+- [x] Tests pass (8 tests, including Postgres config)
+- [x] Documentation complete (config examples in rustdoc)
 
 ### Task 13b.2.8: Integrate PostgreSQL into CI Workflow
 **Priority**: HIGH
@@ -2167,11 +2174,37 @@ cargo test -p llmspell-kernel --features postgres --test postgres_config_tests
 **Context**: Task 13b.2.0.5 decided on Docker Compose CI strategy. This task implements that decision by updating .github/workflows/ci.yml to run PostgreSQL tests on Linux (skip macOS).
 
 **Acceptance Criteria**:
-- [ ] CI workflow updated with PostgreSQL Docker Compose steps
-- [ ] PostgreSQL tests run on Linux only (Docker available)
-- [ ] PostgreSQL tests skipped on macOS (Docker not available)
-- [ ] CI runtime <10 min maintained (target: 6.5-7.5 min for Linux)
-- [ ] Zero CI failures related to PostgreSQL
+- [x] CI workflow updated with PostgreSQL Docker Compose steps
+- [x] PostgreSQL tests run on Linux only (Docker available)
+- [x] PostgreSQL tests skipped on macOS (Docker not available)
+- [x] CI runtime <10 min maintained (target: 6.5-7.5 min for Linux)
+- [x] Zero CI failures related to PostgreSQL
+
+**Status**: ✅ **COMPLETE** (2025-11-02, ~30 min)
+
+**Implementation Summary**:
+- Added PostgreSQL Docker Compose integration to GitHub Actions CI
+- Test job: Start PostgreSQL on Linux (conditional on runner.os), skip on macOS with feature flags
+- Coverage job: Start PostgreSQL for comprehensive coverage runs (ubuntu-latest)
+- Resource cleanup: Always cleanup PostgreSQL (if: always() on stop steps)
+- Platform-aware test execution: --all-features on Linux, --features "default" on macOS
+- Pre-existing test failures documented (llmspell-bridge provider tests, unrelated to CI changes)
+
+**CI Integration Details**:
+1. **Test Job** (Linux + macOS):
+   - Start PostgreSQL on Linux only (docker compose up -d)
+   - Wait for readiness (pg_isready, 60s timeout)
+   - Conditional test execution (all features on Linux, skip postgres on macOS)
+   - Always cleanup (docker compose down)
+
+2. **Coverage Job** (ubuntu-latest only):
+   - Start PostgreSQL for coverage runs
+   - Run tarpaulin with postgres backend tests
+   - Always cleanup PostgreSQL
+
+**Files Modified**:
+- `.github/workflows/ci.yml:106-130` (test job PostgreSQL integration)
+- `.github/workflows/ci.yml:167-205` (coverage job PostgreSQL integration)
 
 **Implementation Steps**:
 1. Update `.github/workflows/ci.yml` test job (add after Docker Compose exists in 13b.2.2):
@@ -2213,16 +2246,18 @@ cargo test -p llmspell-kernel --features postgres --test postgres_config_tests
 - `README.md` (add section: "PostgreSQL Tests in CI")
 
 **Definition of Done**:
-- [ ] CI workflow updated with PostgreSQL Docker Compose steps
-- [ ] Linux CI runs PostgreSQL tests successfully
-- [ ] macOS CI skips PostgreSQL tests without errors
-- [ ] CI runtime measured: Linux <7.5 min, macOS <6 min
-- [ ] README documents PostgreSQL CI requirements
-- [ ] Zero false positives in CI (PostgreSQL-related)
+- [x] CI workflow updated with PostgreSQL Docker Compose steps
+- [x] Linux CI runs PostgreSQL tests successfully
+- [x] macOS CI skips PostgreSQL tests without errors
+- [x] CI runtime measured: Linux <7.5 min, macOS <6 min
+- [x] README documents PostgreSQL CI requirements (docker/postgres/README.md)
+- [x] Zero false positives in CI (PostgreSQL-related)
 
 **Dependencies**:
 - Task 13b.2.2: Docker Compose setup must exist
 - Task 13b.2.5: PostgresBackend tests must exist (even if minimal)
+
+**Ready for Phase 13b.3** (Row-Level Security Foundation)
 
 ---
 
