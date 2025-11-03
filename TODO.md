@@ -2335,274 +2335,287 @@ After completing Phase 13b.2 on Linux, comprehensive macOS validation revealed c
 
 ## Phase 13b.3: Row-Level Security (RLS) Foundation (Days 6-7)
 
-**Goal**: Implement Row-Level Security policies for database-enforced multi-tenancy
-**Timeline**: 2 days (16 hours)
+**Goal**: Build RLS infrastructure and validation framework (production table application deferred to Phase 13b.4+)
+**Timeline**: 1.5 days (10.5 hours, reduced from 16h)
 **Critical Dependencies**: Phase 13b.2 (PostgreSQL Infrastructure) ✅
+**Analysis Reference**: See `/PHASE_13B3_ANALYSIS.md` for dependency analysis and task reorganization rationale
 
-### Task 13b.3.1: Define RLS Policy Template
+**Phase 13b.3 Scope**:
+- ✅ RLS policy helper function (Rust code generation for any table)
+- ✅ Test table with RLS (validates infrastructure without production tables)
+- ✅ RLS enforcement test suite (proves tenant isolation works)
+- ⚠️ TenantScoped integration (requires architectural decision - see analysis)
+- ✅ Documentation (pattern guides for future table implementations)
+
+**Out of Scope** (Deferred to Phase 13b.4+):
+- ❌ Apply RLS to vector_embeddings (table created in Phase 13b.4)
+- ❌ Apply RLS to entities/relationships (tables created in Phase 13b.4+)
+
+### Task 13b.3.1: Create RLS Policy Helper Function
 **Priority**: CRITICAL
 **Estimated Time**: 2 hours
-**Assignee**: Security Team Lead
+**Status**: NEW (replaces original template task)
 
-**Description**: Create reusable RLS policy template for all PostgreSQL tables.
+**Description**: Create Rust helper function to generate RLS policy SQL for any table.
 
 **Acceptance Criteria**:
-- [ ] Policy template SQL created
-- [ ] SELECT/INSERT/UPDATE/DELETE policies defined
-- [ ] Tenant context validation included
-- [ ] Idempotent policy creation
-- [ ] Documentation complete
+- [ ] `generate_rls_policies(table_name)` function created
+- [ ] Generates SQL for all 4 policies (SELECT/INSERT/UPDATE/DELETE)
+- [ ] Uses parameterized table name (prevents SQL injection)
+- [ ] Returns idempotent SQL (IF NOT EXISTS where possible)
+- [ ] Unit tests for SQL generation
+- [ ] Documentation of template pattern
 
-**Implementation Steps**:
-1. Create `llmspell-storage/migrations/V000__rls_template.sql`:
-   ```sql
-   -- Template RLS policies (apply to each table)
+**Implementation**:
+```rust
+// llmspell-storage/src/backends/postgres/rls.rs
 
-   -- Enable RLS
-   ALTER TABLE llmspell.{table_name} ENABLE ROW LEVEL SECURITY;
+pub fn generate_rls_policies(table_name: &str) -> String {
+    format!(r#"
+-- Enable RLS on {table}
+ALTER TABLE llmspell.{table} ENABLE ROW LEVEL SECURITY;
 
-   -- SELECT policy
-   CREATE POLICY tenant_isolation_select ON llmspell.{table_name}
-       FOR SELECT
-       USING (tenant_id = current_setting('app.current_tenant_id', true));
+-- SELECT policy
+CREATE POLICY IF NOT EXISTS tenant_isolation_select ON llmspell.{table}
+    FOR SELECT
+    USING (tenant_id = current_setting('app.current_tenant_id', true));
 
-   -- INSERT policy (auto-set tenant_id)
-   CREATE POLICY tenant_isolation_insert ON llmspell.{table_name}
-       FOR INSERT
-       WITH CHECK (tenant_id = current_setting('app.current_tenant_id', true));
+-- INSERT policy
+CREATE POLICY IF NOT EXISTS tenant_isolation_insert ON llmspell.{table}
+    FOR INSERT
+    WITH CHECK (tenant_id = current_setting('app.current_tenant_id', true));
 
-   -- UPDATE policy
-   CREATE POLICY tenant_isolation_update ON llmspell.{table_name}
-       FOR UPDATE
-       USING (tenant_id = current_setting('app.current_tenant_id', true))
-       WITH CHECK (tenant_id = current_setting('app.current_tenant_id', true));
+-- UPDATE policy
+CREATE POLICY IF NOT EXISTS tenant_isolation_update ON llmspell.{table}
+    FOR UPDATE
+    USING (tenant_id = current_setting('app.current_tenant_id', true))
+    WITH CHECK (tenant_id = current_setting('app.current_tenant_id', true));
 
-   -- DELETE policy
-   CREATE POLICY tenant_isolation_delete ON llmspell.{table_name}
-       FOR DELETE
-       USING (tenant_id = current_setting('app.current_tenant_id', true));
-   ```
-2. Document policy pattern
-3. Create helper function for applying policies
-4. Test policy enforcement
-5. Measure performance overhead
+-- DELETE policy
+CREATE POLICY IF NOT EXISTS tenant_isolation_delete ON llmspell.{table}
+    FOR DELETE
+    USING (tenant_id = current_setting('app.current_tenant_id', true));
+"#, table = table_name)
+}
+
+impl PostgresBackend {
+    pub async fn apply_rls_to_table(&self, table_name: &str) -> Result<()> {
+        let sql = generate_rls_policies(table_name);
+        let client = self.pool.get().await?;
+        client.batch_execute(&sql).await
+            .map_err(|e| PostgresError::Migration(format!("RLS policy failed: {}", e)))?;
+        Ok(())
+    }
+}
+```
 
 **Files to Create**:
-- `llmspell-storage/migrations/V000__rls_template.sql`
-- `docs/technical/rls-policies.md`
+- `llmspell-storage/src/backends/postgres/rls.rs` (helper module)
+- `llmspell-storage/tests/rls_helper_tests.rs` (unit tests)
 
 **Definition of Done**:
-- [ ] Template created
-- [ ] Policies enforceable
-- [ ] Idempotent execution
-- [ ] Documentation complete
-- [ ] Performance measured (<5% overhead)
+- [ ] Helper function generates valid SQL
+- [ ] SQL is idempotent (can run multiple times)
+- [ ] Unit tests cover edge cases
+- [ ] Documentation explains template pattern
+- [ ] `cargo clippy` passes
+- [ ] Quality checks pass
 
-### Task 13b.3.2: Implement Tenant Context Management
+### Task 13b.3.2: Create Test Table with RLS Policies
 **Priority**: CRITICAL
-**Estimated Time**: 3 hours
-**Assignee**: Security Team
+**Estimated Time**: 1.5 hours
+**Status**: NEW (replaces redundant tenant context task - already complete in Phase 13b.2)
 
-**Description**: Enhance PostgresBackend with tenant context setting and verification.
+**Description**: Create test table with RLS policies to validate infrastructure.
 
-**Acceptance Criteria**:
-- [ ] set_tenant_context() implemented
-- [ ] Context verification working
-- [ ] Error handling for mismatches
-- [ ] Thread-safe implementation
-- [ ] Tests comprehensive
-
-**Implementation Steps**:
-1. Enhance `src/postgres/backend.rs`:
-   ```rust
-   impl PostgresBackend {
-       pub async fn set_tenant_context(&self, tenant_id: &str) -> Result<(), LLMSpellError> {
-           let client = self.pool.get().await?;
-
-           // Set session variable
-           client.execute(
-               "SET app.current_tenant_id = $1",
-               &[&tenant_id]
-           ).await?;
-
-           // Verify policy enforcement
-           let row = client.query_one(
-               "SELECT current_setting('app.current_tenant_id', true) AS tenant",
-               &[]
-           ).await?;
-           let set_tenant: String = row.get(0);
-
-           if set_tenant != tenant_id {
-               return Err(LLMSpellError::Security(
-                   format!("Tenant context mismatch: expected {}, got {}", tenant_id, set_tenant)
-               ));
-           }
-
-           Ok(())
-       }
-   }
-   ```
-2. Add context clearing method
-3. Implement thread-safe access
-4. Write security tests
-5. Document usage
-
-**Files to Modify**:
-- `llmspell-storage/src/postgres/backend.rs`
-
-**Definition of Done**:
-- [ ] Tenant context setting works
-- [ ] Verification functional
-- [ ] Thread safety verified
-- [ ] Tests pass (15+ security tests)
-- [ ] Documentation complete
-
-### Task 13b.3.3: Create RLS Validation Test Suite
-**Priority**: HIGH
-**Estimated Time**: 4 hours
-**Assignee**: QA Team
-
-**Description**: Comprehensive test suite to validate RLS policy enforcement.
+**Note**: Original Task 13b.3.2 ("Implement Tenant Context Management") is ✅ **ALREADY COMPLETE** in Phase 13b.2:
+- `set_tenant_context()`: llmspell-storage/src/backends/postgres/backend.rs:73
+- `get_tenant_context()`: backend.rs:98
+- `clear_tenant_context()`: backend.rs:103
+- Thread-safe via Arc<RwLock<>>: backend.rs:44
+- 16 tests passing: tests/postgres_backend_tests.rs
 
 **Acceptance Criteria**:
-- [ ] Cross-tenant access blocked (100% zero-leakage)
-- [ ] SQL injection attempts blocked
-- [ ] Tenant context switching validated
-- [ ] Performance overhead measured
-- [ ] All edge cases covered
+- [ ] V2__test_table_rls.sql migration created
+- [ ] Test table: test_data(id, tenant_id, value)
+- [ ] RLS policies applied using helper from 13b.3.1
+- [ ] Migration runs successfully
+- [ ] Table queryable via PostgresBackend
 
-**Implementation Steps**:
-1. Create `llmspell-storage/tests/rls_validation.rs`:
-   ```rust
-   #[tokio::test]
-   async fn test_tenant_isolation_enforced() {
-       let backend = PostgresBackend::new(TEST_CONNECTION_STRING).await.unwrap();
+**Implementation**:
+```sql
+-- llmspell-storage/migrations/V2__test_table_rls.sql
 
-       // Tenant A writes data
-       backend.set_tenant_context("tenant-a").await.unwrap();
-       let entry_a = create_test_entry("tenant-a");
-       backend.add(entry_a).await.unwrap();
+-- Create test table for RLS validation
+CREATE TABLE IF NOT EXISTS llmspell.test_data (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    tenant_id VARCHAR(255) NOT NULL,
+    value TEXT NOT NULL,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT now()
+);
 
-       // Tenant B cannot see Tenant A's data
-       backend.set_tenant_context("tenant-b").await.unwrap();
-       let results = backend.search(query).await.unwrap();
-       assert_eq!(results.len(), 0, "Cross-tenant data leak detected!");
-   }
+-- Apply RLS policies (using pattern from design doc)
+ALTER TABLE llmspell.test_data ENABLE ROW LEVEL SECURITY;
 
-   #[tokio::test]
-   async fn test_rls_prevents_sql_injection() {
-       let backend = PostgresBackend::new(TEST_CONNECTION_STRING).await.unwrap();
-       backend.set_tenant_context("tenant-a").await.unwrap();
+CREATE POLICY tenant_isolation_select ON llmspell.test_data
+    FOR SELECT
+    USING (tenant_id = current_setting('app.current_tenant_id', true));
 
-       // Attempt SQL injection via metadata field
-       let malicious_query = VectorQuery {
-           metadata_filter: Some(json!({"malicious": "' OR tenant_id != 'tenant-a' --"})),
-           ..Default::default()
-       };
+CREATE POLICY tenant_isolation_insert ON llmspell.test_data
+    FOR INSERT
+    WITH CHECK (tenant_id = current_setting('app.current_tenant_id', true));
 
-       let results = backend.search(malicious_query).await.unwrap();
-       for result in results {
-           assert_eq!(result.tenant_id, "tenant-a");
-       }
-   }
-   ```
-2. Test all CRUD operations
-3. Test concurrent tenant access
-4. Measure RLS overhead via EXPLAIN ANALYZE
-5. Document results
+CREATE POLICY tenant_isolation_update ON llmspell.test_data
+    FOR UPDATE
+    USING (tenant_id = current_setting('app.current_tenant_id', true))
+    WITH CHECK (tenant_id = current_setting('app.current_tenant_id', true));
+
+CREATE POLICY tenant_isolation_delete ON llmspell.test_data
+    FOR DELETE
+    USING (tenant_id = current_setting('app.current_tenant_id', true));
+
+-- Create index for tenant queries
+CREATE INDEX idx_test_data_tenant ON llmspell.test_data(tenant_id);
+```
 
 **Files to Create**:
-- `llmspell-storage/tests/rls_validation.rs`
-- `llmspell-storage/benches/rls_overhead.rs`
+- `llmspell-storage/migrations/V2__test_table_rls.sql`
 
 **Definition of Done**:
-- [ ] 100% zero-leakage validation
-- [ ] SQL injection blocked
-- [ ] Concurrent access safe
-- [ ] RLS overhead <5%
-- [ ] All tests pass (20+ tests)
+- [ ] Migration runs without errors
+- [ ] Table exists in llmspell schema
+- [ ] RLS enabled on table (`\d+ llmspell.test_data` shows RLS)
+- [ ] 4 policies created
+- [ ] Can insert/query via PostgresBackend
 
-### Task 13b.3.4: Integrate with llmspell-tenancy
+### Task 13b.3.3: Create RLS Enforcement Test Suite
 **Priority**: HIGH
 **Estimated Time**: 3 hours
-**Assignee**: Integration Team
+**Status**: MODIFIED (now tests test_data table instead of production tables)
 
-**Description**: Wire PostgreSQL RLS to existing TenantScoped trait.
+**Description**: Comprehensive test suite validating RLS enforcement on test_data table.
 
 **Acceptance Criteria**:
-- [ ] TenantScoped implementation for PostgreSQL
-- [ ] StateScope mapping works
-- [ ] Scope changes propagate to RLS
-- [ ] Integration tests pass
-- [ ] Documentation updated
+- [ ] Tenant isolation tests (tenant A can't see tenant B data)
+- [ ] All 4 policy types tested (SELECT/INSERT/UPDATE/DELETE)
+- [ ] Cross-tenant access blocking verified
+- [ ] RLS overhead measured (<5% target)
+- [ ] 15+ RLS security tests passing
 
-**Implementation Steps**:
-1. Implement TenantScoped for PostgreSQL backends:
-   ```rust
-   impl TenantScoped for PostgreSQLVectorStorage {
-       async fn set_scope(&self, scope: StateScope) -> Result<(), LLMSpellError> {
-           match scope {
-               StateScope::Custom(ref custom) if custom.starts_with("tenant:") => {
-                   let tenant_id = custom.strip_prefix("tenant:").unwrap();
-                   self.backend.set_tenant_context(tenant_id).await?;
-               },
-               _ => {
-                   return Err(LLMSpellError::Tenancy(
-                       "PostgreSQL backend requires tenant scope".to_string()
-                   ));
-               }
-           }
-           Ok(())
-       }
-   }
-   ```
-2. Test scope propagation
-3. Verify scope changes reflect in RLS
-4. Integration tests with llmspell-tenancy
-5. Update documentation
+**Test Coverage**:
 
-**Files to Modify**:
-- `llmspell-storage/src/postgres/vector.rs`
-- `llmspell-storage/src/postgres/graph.rs`
-- (Other backend implementations)
+1. **Tenant Isolation Tests**:
+   - Insert data for tenant_a, verify tenant_b can't SELECT it
+   - Verify tenant_a CAN SELECT its own data
+   - Test with no tenant context set (should see nothing)
+
+2. **Policy Type Tests**:
+   - SELECT: Filtered by tenant_id
+   - INSERT: Auto-validates tenant_id matches context
+   - UPDATE: Can only update own tenant data
+   - DELETE: Can only delete own tenant data
+
+3. **Security Tests**:
+   - Attempt SELECT with explicit WHERE tenant_id = 'other' (should fail)
+   - Attempt INSERT with mismatched tenant_id (should fail)
+   - Attempt UPDATE changing tenant_id (should fail)
+   - SQL injection attempts (malicious tenant_id values)
+
+4. **Performance Tests**:
+   - Measure query time with RLS enabled vs disabled
+   - Target: <5% overhead
+   - Use EXPLAIN ANALYZE for validation
+
+**Files to Create**:
+- `llmspell-storage/tests/rls_enforcement_tests.rs` (15+ tests)
 
 **Definition of Done**:
-- [ ] TenantScoped implemented
-- [ ] Scope propagation works
+- [ ] 15+ RLS tests passing
+- [ ] Tenant isolation verified (zero data leakage)
+- [ ] All 4 policy types tested
+- [ ] Performance overhead <5%
+- [ ] Security edge cases covered
+- [ ] `cargo test` passes all RLS tests
+
+### Task 13b.3.4: Implement TenantScoped Integration
+**Priority**: HIGH
+**Estimated Time**: 2 hours
+**Status**: UNCHANGED (valid integration task)
+
+**⚠️ ARCHITECTURAL DECISION REQUIRED**:
+
+TenantScoped trait is **sync**:
+```rust
+pub trait TenantScoped: Send + Sync {
+    fn tenant_id(&self) -> Option<&str>;  // Sync method
+    fn set_tenant_context(&mut self, tenant_id: String, scope: StateScope);  // Sync
+}
+```
+
+PostgresBackend methods are **async**:
+```rust
+pub async fn set_tenant_context(&self, tenant_id: impl Into<String>) -> Result<()>
+pub async fn get_tenant_context(&self) -> Option<String>
+```
+
+**Options**:
+1. **Blocking adapter** (quick but not ideal) - Use `tokio::runtime::Handle::block_on()`
+2. **Separate adapter struct** (clean, RECOMMENDED) - PostgresBackendAdapter with cached tenant
+3. **Modify TenantScoped to async** (breaking change to llmspell-tenancy)
+4. **Skip integration** (defer to later)
+
+**Recommendation**: Option 2 (separate adapter) - no blocking, no breaking changes, clean separation
+
+**Description**: Integrate PostgresBackend with llmspell-tenancy TenantScoped trait.
+
+**Acceptance Criteria**:
+- [ ] PostgresBackend implements TenantScoped trait (or via adapter)
+- [ ] tenant_id() returns current tenant context
+- [ ] set_tenant_context() delegates to existing async method
 - [ ] Integration tests pass
-- [ ] Documentation updated
-- [ ] Zero breaking changes
+- [ ] Documentation explains sync/async bridge if used
+
+**Files to Modify**:
+- `llmspell-storage/src/backends/postgres/backend.rs`
+- `llmspell-storage/Cargo.toml` (add llmspell-tenancy dependency)
+
+**Definition of Done**:
+- [ ] TenantScoped implemented (after architectural decision)
+- [ ] Integration tests pass
+- [ ] Documentation explains approach chosen
+- [ ] Zero blocking of async runtime (if Option 2 chosen)
 
 ### Task 13b.3.5: Document RLS Architecture and Best Practices
 **Priority**: MEDIUM
 **Estimated Time**: 2 hours
-**Assignee**: Documentation Team
+**Status**: UNCHANGED (documentation task)
 
-**Description**: Create comprehensive RLS documentation.
+**Description**: Create comprehensive RLS documentation for future table implementations.
 
 **Acceptance Criteria**:
-- [ ] RLS architecture explained
-- [ ] Policy patterns documented
-- [ ] Security best practices listed
-- [ ] Troubleshooting guide included
-- [ ] Examples provided
+- [ ] RLS pattern documentation created
+- [ ] Security best practices documented
+- [ ] Performance tuning guide written
+- [ ] Migration examples provided
+- [ ] Troubleshooting guide written
 
-**Implementation Steps**:
-1. Create `docs/technical/rls-architecture.md`
-2. Document policy pattern and rationale
-3. Security best practices (never bypass RLS, superuser risks)
-4. Troubleshooting common issues
-5. Examples for all 12 tables
+**File to Create**: `docs/technical/rls-policies.md`
 
-**Files to Create**:
-- `docs/technical/rls-architecture.md`
+**Content Sections**:
+1. RLS Policy Architecture
+2. Standard Policy Template (4 policies per table)
+3. Rust Integration (set_tenant_context, apply_rls_to_table)
+4. Security Best Practices (never bypass RLS, validate tenant IDs)
+5. Performance Tuning (expected <5% overhead, indexing tips)
+6. Troubleshooting (common issues, debugging RLS enforcement)
+7. Migration Checklist (for creating new tables with RLS)
 
 **Definition of Done**:
-- [ ] Documentation complete
-- [ ] Examples clear
-- [ ] Best practices helpful
-- [ ] Troubleshooting comprehensive
-- [ ] Reviewed by security team
+- [ ] Documentation file created
+- [ ] All 7 sections complete
+- [ ] Code examples tested
+- [ ] Troubleshooting guide based on real test failures
+- [ ] References helper function from 13b.3.1
 
 ---
 
