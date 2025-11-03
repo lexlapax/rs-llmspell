@@ -9,6 +9,7 @@ license.workspace = true
 
 [dependencies]
 llmspell-core = { path = "../llmspell-core" }
+llmspell-graph = { path = "../llmspell-graph", optional = true } # Phase 13b.5.2: For graph types
 tokio.workspace = true
 async-trait.workspace = true
 serde.workspace = true
@@ -20,6 +21,7 @@ sled.workspace = true
 dashmap = "5.5"
 parking_lot = "0.12"
 uuid = { workspace = true }
+chrono = { workspace = true } # Phase 13b.5.2: For bi-temporal timestamps
 tempfile = { workspace = true, optional = true }
 
 # HNSW implementation dependencies
@@ -34,7 +36,7 @@ refinery = { workspace = true, optional = true }
 
 [features]
 default = []
-postgres = ["tokio-postgres", "deadpool-postgres", "pgvector", "refinery"]
+postgres = ["tokio-postgres", "deadpool-postgres", "pgvector", "refinery", "llmspell-graph"]
 
 [dev-dependencies]
 tempfile.workspace = true
