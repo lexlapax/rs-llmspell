@@ -41,3 +41,8 @@ postgres = ["tokio-postgres", "deadpool-postgres", "pgvector", "refinery", "llms
 [dev-dependencies]
 tempfile.workspace = true
 rand = "0.8"
+criterion = { workspace = true }
+
+[[bench]]
+name = "graph_bench"
+harness = false
