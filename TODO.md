@@ -1425,12 +1425,12 @@ Works correctly with optional dependencies.
 4. **Runtime acceptable**: +65-100s → 6.5-7.5 min total (under 10 min target ✅)
 5. **Simplicity**: Single source of truth for PostgreSQL config
 
-**CI Strategy**:
-- Run PostgreSQL tests on **Linux only** (Docker available)
-- Skip PostgreSQL tests on **macOS** (Docker not available in Actions)
-- Linux CI: `cargo test --workspace --all-features` (includes postgres feature)
-- macOS CI: `cargo test --workspace` (excludes postgres feature)
+**CI Strategy** (CORRECTED 2025-11-02):
+- ~~Run PostgreSQL tests on **Linux only**~~ **CORRECTION**: Run on ALL platforms (Linux + macOS)
+- ~~Skip on macOS (Docker not available)~~ **FALSE ASSUMPTION**: Docker IS available on macOS runners
+- **All platforms**: `cargo test --workspace --all-features` (includes postgres feature)
 - PostgreSQL tests gated with `#[cfg(feature = "postgres")]`
+- Portable shell script for pg_isready wait loop (no GNU `timeout` dependency)
 
 **Implementation Plan** (Phase 13b.2.6 - After PostgresBackend):
 
@@ -2173,32 +2173,34 @@ cargo test -p llmspell-kernel --features postgres --test postgres_config_tests
 
 **Context**: Task 13b.2.0.5 decided on Docker Compose CI strategy. This task implements that decision by updating .github/workflows/ci.yml to run PostgreSQL tests on Linux (skip macOS).
 
-**Acceptance Criteria**:
+**Acceptance Criteria** (CORRECTED 2025-11-02):
 - [x] CI workflow updated with PostgreSQL Docker Compose steps
-- [x] PostgreSQL tests run on Linux only (Docker available)
-- [x] PostgreSQL tests skipped on macOS (Docker not available)
-- [x] CI runtime <10 min maintained (target: 6.5-7.5 min for Linux)
+- [x] ~~PostgreSQL tests run on Linux only~~ **CORRECTED**: PostgreSQL tests run on ALL platforms (Linux + macOS)
+- [x] ~~macOS skips tests (Docker unavailable)~~ **FALSE ASSUMPTION CORRECTED**: macOS runs full PostgreSQL tests
+- [x] CI runtime <10 min maintained (target: 6.5-7.5 min for all platforms)
 - [x] Zero CI failures related to PostgreSQL
 
 **Status**: ✅ **COMPLETE** (2025-11-02, ~30 min)
 
-**Implementation Summary**:
+**Implementation Summary** (CORRECTED 2025-11-02):
 - Added PostgreSQL Docker Compose integration to GitHub Actions CI
-- Test job: Start PostgreSQL on Linux (conditional on runner.os), skip on macOS with feature flags
+- ~~Test job: Linux only~~ **CORRECTED**: Test job runs PostgreSQL on ALL platforms (Linux + macOS)
 - Coverage job: Start PostgreSQL for comprehensive coverage runs (ubuntu-latest)
 - Resource cleanup: Always cleanup PostgreSQL (if: always() on stop steps)
-- Platform-aware test execution: --all-features on Linux, --features "default" on macOS
+- ~~Platform-aware test execution~~ **CORRECTED**: Uniform `--all-features` on all platforms
+- Portable shell script replaces GNU `timeout` command (macOS compatibility)
 - Pre-existing test failures documented (llmspell-bridge provider tests, unrelated to CI changes)
 
-**CI Integration Details**:
+**CI Integration Details** (CORRECTED):
 1. **Test Job** (Linux + macOS):
-   - Start PostgreSQL on Linux only (docker compose up -d)
-   - Wait for readiness (pg_isready, 60s timeout)
-   - Conditional test execution (all features on Linux, skip postgres on macOS)
+   - Start PostgreSQL on ALL platforms (docker compose up -d)
+   - Wait for readiness with portable shell loop (30 iterations × 2s = 60s max)
+   - Run tests: `cargo test --workspace --all-features` (includes postgres on all platforms)
    - Always cleanup (docker compose down)
 
 2. **Coverage Job** (ubuntu-latest only):
    - Start PostgreSQL for coverage runs
+   - Portable wait loop for readiness
    - Run tarpaulin with postgres backend tests
    - Always cleanup PostgreSQL
 

@@ -103,28 +103,27 @@ jobs:
     - name: Build workspace
       run: cargo build --workspace --all-features
 
-    - name: Start PostgreSQL (Linux only)
-      if: runner.os == 'Linux'
+    - name: Start PostgreSQL
       run: |
         cd docker/postgres
         docker compose up -d
-        # Wait for PostgreSQL to be ready (max 60 seconds)
-        timeout 60 bash -c 'until docker exec llmspell_postgres_dev pg_isready -U llmspell; do sleep 2; done'
+        # Wait for PostgreSQL to be ready (max 60 seconds, portable across Linux/macOS)
+        for i in {1..30}; do
+          if docker exec llmspell_postgres_dev pg_isready -U llmspell > /dev/null 2>&1; then
+            echo "PostgreSQL is ready"
+            break
+          fi
+          echo "Waiting for PostgreSQL... ($i/30)"
+          sleep 2
+        done
         docker compose ps
 
     - name: Run tests
-      run: |
-        if [ "$RUNNER_OS" == "Linux" ]; then
-          # Run all tests including PostgreSQL on Linux
-          cargo test --workspace --all-features
-        else
-          # Skip PostgreSQL tests on macOS (Docker not available)
-          cargo test --workspace --features "default"
-        fi
+      run: cargo test --workspace --all-features
       shell: bash
 
-    - name: Stop PostgreSQL (Linux only)
-      if: always() && runner.os == 'Linux'
+    - name: Stop PostgreSQL
+      if: always()
       run: |
         cd docker/postgres
         docker compose down
@@ -168,7 +167,15 @@ jobs:
       run: |
         cd docker/postgres
         docker compose up -d
-        timeout 60 bash -c 'until docker exec llmspell_postgres_dev pg_isready -U llmspell; do sleep 2; done'
+        # Wait for PostgreSQL to be ready (max 60 seconds)
+        for i in {1..30}; do
+          if docker exec llmspell_postgres_dev pg_isready -U llmspell > /dev/null 2>&1; then
+            echo "PostgreSQL is ready"
+            break
+          fi
+          echo "Waiting for PostgreSQL... ($i/30)"
+          sleep 2
+        done
         docker compose ps
 
     - name: Run coverage
