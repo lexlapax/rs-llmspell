@@ -19,27 +19,29 @@ use async_trait::async_trait;
 ///
 /// # Example
 ///
-/// ```rust,no_run
+/// ```rust
 /// use llmspell_core::{TenantScoped, state::StateScope};
 /// use async_trait::async_trait;
 /// use anyhow::Result;
+/// use std::sync::{Arc, RwLock};
 ///
 /// struct MyBackend {
-///     tenant_id: Option<String>,
+///     tenant_id: Arc<RwLock<Option<String>>>,
+///     scope: StateScope,
 /// }
 ///
 /// #[async_trait]
 /// impl TenantScoped for MyBackend {
 ///     async fn tenant_id(&self) -> Option<String> {
-///         self.tenant_id.clone()
+///         self.tenant_id.read().unwrap().clone()
 ///     }
 ///
 ///     fn scope(&self) -> &StateScope {
-///         &StateScope::Session
+///         &self.scope  // Return reference to field
 ///     }
 ///
 ///     async fn set_tenant_context(&self, tenant_id: String, _scope: StateScope) -> Result<()> {
-///         // Set tenant context (with interior mutability)
+///         *self.tenant_id.write().unwrap() = Some(tenant_id);
 ///         Ok(())
 ///     }
 /// }
