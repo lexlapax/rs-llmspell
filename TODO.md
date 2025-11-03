@@ -2988,13 +2988,21 @@ pub use llmspell_tenancy::TenantScoped;
    - Per-tenant cleanup: `cleanup_tenant_data(backend, tenant_id)` after each test
    - Prevents data accumulation when tests run in parallel
 
+5. **Missing Application User** (docker/postgres/init-scripts/01-extensions.sql):
+   - **Issue**: All 14 RLS tests failing with "Pool error: db error" (authentication failure)
+   - **Root Cause**: `llmspell_app` user documented but never created in init script
+   - **Fix**: Added `CREATE ROLE llmspell_app WITH LOGIN PASSWORD 'llmspell_dev_pass'`
+   - **Privileges**: CRUD only (SELECT, INSERT, UPDATE, DELETE), no DDL, no superuser
+   - **Critical**: `usebypassrls=false` ensures RLS policies apply
+   - **Validation**: All 95 tests passing after container recreation with updated init script
+
 **Additional Fixes**:
 - **Clippy Warning**: Removed unused import `llmspell_core::state::StateScope` from llmspell-tenancy/src/traits.rs
 - **Doctest Failure**: Fixed TenantScoped example - cannot return reference to enum variant constructor
   - Before: `&StateScope::Session` (❌ returns reference to function)
   - After: Store as field `scope: StateScope`, return `&self.scope` (✅)
 
-**Files Modified** (7 files):
+**Files Modified** (8 files):
 1. `llmspell-storage/migrations/V2__test_table_rls.sql` - DROP before CREATE pattern
 2. `llmspell-storage/src/backends/postgres/rls.rs` - Updated helper + test (13 lines changed)
 3. `llmspell-storage/tests/postgres_backend_tests.rs` - OnceCell initialization + grants (50 lines added)
@@ -3002,6 +3010,7 @@ pub use llmspell_tenancy::TenantScoped;
 5. `llmspell-storage/tests/rls_test_table_tests.rs` - OnceCell initialization (18 lines added)
 6. `llmspell-tenancy/src/traits.rs` - Removed unused import (1 line deleted)
 7. `llmspell-core/src/traits/tenant_scoped.rs` - Fixed doctest example (10 lines changed)
+8. `docker/postgres/init-scripts/01-extensions.sql` - Created llmspell_app user (14 lines added)
 
 **Test Results** (Post-Fix):
 - ✅ All 95 llmspell-storage tests passing (parallel execution)
