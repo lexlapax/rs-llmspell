@@ -2781,15 +2781,55 @@ pub use llmspell_tenancy::TenantScoped;
 - `llmspell-storage/tests/postgres_tenant_scoped_tests.rs` (integration tests)
 
 **Definition of Done**:
-- [ ] TenantScoped trait is async
-- [ ] PostgresBackend implements TenantScoped
-- [ ] tenant_id() returns Option<String>
-- [ ] set_tenant_context() returns Result<()>
-- [ ] Integration tests pass (5+ tests)
-- [ ] No silent failures (errors propagate)
-- [ ] Documentation explains async pattern
-- [ ] `cargo clippy` passes
-- [ ] Quality checks pass
+- [x] TenantScoped trait is async
+- [x] PostgresBackend implements TenantScoped
+- [x] tenant_id() returns Option<String>
+- [x] set_tenant_context() returns Result<()>
+- [x] Integration tests pass (7 tests created, exceeds 5+ target)
+- [x] No silent failures (errors propagate)
+- [x] Documentation explains async pattern (inline docs, Task 13b.3.5 for comprehensive guide)
+- [x] `cargo clippy` passes
+- [x] Quality checks pass
+
+**✅ COMPLETED** - Actual time: ~1.5 hours (under 2h estimate)
+
+**Key Accomplishments**:
+1. **Circular Dependency Resolution**: Moved TenantScoped from llmspell-tenancy → llmspell-core to break cycle (llmspell-storage ↔ llmspell-tenancy). Applied dependency inversion principle.
+2. **Async Trait Implementation**:
+   - Made trait methods async to support I/O operations
+   - Changed `&mut self` → `&self` (interior mutability pattern)
+   - Returns `Result<()>` for explicit error handling
+3. **OnceLock Pattern**: Used `std::sync::OnceLock` to return `&StateScope::Global` static reference
+4. **Trait Method Disambiguation**: Required explicit `TenantScoped::set_tenant_context(&backend, ...)` syntax to avoid inherent method conflicts
+
+**Files Created** (244 lines):
+- `llmspell-core/src/traits/tenant_scoped.rs` (74 lines) - Async trait definition
+- `llmspell-storage/tests/postgres_tenant_scoped_tests.rs` (170 lines) - 7 integration tests
+
+**Files Modified**:
+- `llmspell-core/src/lib.rs` - Added module and re-export
+- `llmspell-tenancy/src/traits.rs` - Changed to re-export from core
+- `llmspell-storage/src/backends/postgres/backend.rs` - Implemented TenantScoped (45 lines)
+
+**Tests Created** (7 integration tests, all passing):
+1. `test_tenant_scoped_trait_tenant_id` - Verify tenant_id() getter
+2. `test_tenant_scoped_scope_returns_global` - Verify scope() returns Global
+3. `test_tenant_scoped_set_tenant_context_multiple_tenants` - Test tenant switching
+4. `test_tenant_scoped_ignores_scope_parameter` - PostgreSQL scope behavior
+5. `test_tenant_scoped_error_handling` - Verify Result error propagation
+6. `test_tenant_scoped_trait_as_dyn_trait_object` - Test dynamic dispatch
+7. `test_tenant_scoped_async_trait_send_sync` - Test Send+Sync across async boundaries
+
+**Verification**:
+- All 95 llmspell-storage tests passing (34 unit + 1 HNSW + 16 postgres + 7 TenantScoped + 14 RLS + 4 RLS table + 19 doc)
+- `cargo test -p llmspell-storage --features postgres` passes
+- `cargo clippy -p llmspell-storage --features postgres` zero warnings
+
+**Architectural Insights**:
+- **Dependency Inversion**: Moving shared traits to core crate is standard pattern for breaking circular dependencies in multi-crate Rust projects
+- **Async Trait Trade-offs**: Small heap allocation cost, but clean API and proper error handling outweigh performance impact
+- **Static References**: OnceLock pattern provides zero-cost static reference after first initialization (thread-safe lazy_static alternative)
+- **Method Resolution**: Rust prefers inherent methods over trait methods when both exist with same name - use explicit trait syntax for disambiguation
 
 ### Task 13b.3.5: Document RLS Architecture and Best Practices
 **Priority**: MEDIUM

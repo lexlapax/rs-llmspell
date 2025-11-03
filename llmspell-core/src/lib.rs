@@ -134,6 +134,7 @@ pub mod traits {
     pub mod service;
     pub mod state;
     pub mod template_executor;
+    pub mod tenant_scoped;
     pub mod tool;
     pub mod tool_capable;
     pub mod workflow;
@@ -151,6 +152,7 @@ pub use traits::{
     embedding::EmbeddingProvider,
     event::{EventConfig, EventData, EventEmitter},
     state::StateAccess,
+    tenant_scoped::TenantScoped,
     tool::Tool,
     tool_capable::ToolCapable,
     workflow::Workflow,

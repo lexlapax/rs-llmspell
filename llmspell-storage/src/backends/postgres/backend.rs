@@ -4,6 +4,7 @@
 use super::config::PostgresConfig;
 use super::error::{PostgresError, Result};
 use super::pool::PostgresPool;
+use llmspell_core::TenantScoped;
 use std::sync::Arc;
 use tokio::sync::RwLock;
 
@@ -195,6 +196,56 @@ impl PostgresBackend {
         }
 
         Ok(client)
+    }
+}
+
+// =============================================================================
+// TenantScoped Trait Implementation (Phase 13b.3.4)
+// =============================================================================
+
+#[async_trait::async_trait]
+impl TenantScoped for PostgresBackend {
+    /// Get the current tenant ID from the backend's internal context
+    ///
+    /// Returns owned String to support async tenant context retrieval
+    async fn tenant_id(&self) -> Option<String> {
+        self.get_tenant_context().await
+    }
+
+    /// Get the state scope for this backend
+    ///
+    /// PostgreSQL backend operates at global scope - tenant context is managed
+    /// via database session variables rather than application-level state scopes
+    fn scope(&self) -> &llmspell_core::state::StateScope {
+        use std::sync::OnceLock;
+        static SCOPE: OnceLock<llmspell_core::state::StateScope> = OnceLock::new();
+        SCOPE.get_or_init(|| llmspell_core::state::StateScope::Global)
+    }
+
+    /// Set the tenant context for this backend
+    ///
+    /// # Arguments
+    /// * `tenant_id` - The tenant identifier to set
+    /// * `_scope` - State scope (ignored - PostgreSQL uses session scope only)
+    ///
+    /// # Returns
+    /// * `Result<()>` - Success or error
+    ///
+    /// # Implementation Notes
+    /// - Calls internal `set_tenant_context()` which updates both:
+    ///   1. Internal Rust state (Arc<RwLock<Option<String>>>)
+    ///   2. PostgreSQL session variable (`app.current_tenant_id`)
+    /// - The scope parameter is ignored because PostgreSQL RLS operates at session scope
+    /// - All subsequent `get_client()` calls will apply this tenant context
+    async fn set_tenant_context(
+        &self,
+        tenant_id: String,
+        _scope: llmspell_core::state::StateScope,
+    ) -> anyhow::Result<()> {
+        // Call the existing set_tenant_context method
+        self.set_tenant_context(tenant_id)
+            .await
+            .map_err(|e| anyhow::anyhow!("Failed to set tenant context: {}", e))
     }
 }
 

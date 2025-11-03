@@ -7,18 +7,8 @@ use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::sync::Arc;
 
-/// Tenant-aware resource that can be scoped to a specific tenant
-#[async_trait]
-pub trait TenantScoped: Send + Sync {
-    /// Get the tenant ID this resource belongs to
-    fn tenant_id(&self) -> Option<&str>;
-
-    /// Get the state scope for this tenant
-    fn scope(&self) -> &StateScope;
-
-    /// Set the tenant context
-    fn set_tenant_context(&mut self, tenant_id: String, scope: StateScope);
-}
+// Re-export TenantScoped from llmspell-core (Phase 13b.3.4 - moved to core to avoid cyclic deps)
+pub use llmspell_core::TenantScoped;
 
 /// Resource that can track usage metrics
 #[async_trait]
