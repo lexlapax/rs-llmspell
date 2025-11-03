@@ -162,7 +162,39 @@ impl PostgresBackend {
     /// # Phase 13b.3.2
     /// Exposed as public to allow RLS testing from integration tests
     pub async fn get_client(&self) -> Result<deadpool_postgres::Client> {
-        self.pool.get().await
+        let client = self.pool.get().await?;
+
+        // Apply current tenant context to this client connection
+        if self.config.enable_rls {
+            if let Some(tenant_id) = self.get_tenant_context().await {
+                // Set tenant context
+                client
+                    .execute(
+                        "SELECT set_config('app.current_tenant_id', $1, false)",
+                        &[&tenant_id],
+                    )
+                    .await
+                    .map_err(|e| {
+                        PostgresError::Query(format!(
+                            "Failed to set tenant context on client: {}",
+                            e
+                        ))
+                    })?;
+            } else {
+                // Clear tenant context (reset to empty string blocks all RLS access)
+                client
+                    .execute("SELECT set_config('app.current_tenant_id', '', false)", &[])
+                    .await
+                    .map_err(|e| {
+                        PostgresError::Query(format!(
+                            "Failed to clear tenant context on client: {}",
+                            e
+                        ))
+                    })?;
+            }
+        }
+
+        Ok(client)
     }
 }
 
