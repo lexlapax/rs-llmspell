@@ -50,6 +50,35 @@ impl GraphSemanticMemory {
             .map_err(|e| MemoryError::Storage(e.to_string()))?;
         Ok(Self::new(Arc::new(backend)))
     }
+
+    /// Create semantic memory with `PostgreSQL` backend
+    ///
+    /// Uses `PostgreSQL` bi-temporal graph storage with RLS tenant isolation.
+    ///
+    /// # Arguments
+    ///
+    /// * `postgres_backend` - `PostgreSQL` backend instance with connection pool
+    ///
+    /// # Example
+    ///
+    /// ```rust,no_run
+    /// # use std::sync::Arc;
+    /// # use llmspell_storage::{PostgresBackend, PostgresConfig};
+    /// # use llmspell_memory::semantic::GraphSemanticMemory;
+    /// # async fn example() -> llmspell_memory::Result<()> {
+    /// let pg_config = PostgresConfig::new("postgresql://localhost/llmspell");
+    /// let pg_backend = Arc::new(PostgresBackend::new(pg_config).await?);
+    /// let semantic = GraphSemanticMemory::new_with_postgres(pg_backend);
+    /// # Ok(())
+    /// # }
+    /// ```
+    #[cfg(feature = "postgres")]
+    #[must_use]
+    pub fn new_with_postgres(postgres_backend: Arc<llmspell_storage::PostgresBackend>) -> Self {
+        use llmspell_storage::backends::postgres::PostgresGraphStorage;
+        let graph = PostgresGraphStorage::new(postgres_backend);
+        Self::new(Arc::new(graph))
+    }
 }
 
 #[async_trait]

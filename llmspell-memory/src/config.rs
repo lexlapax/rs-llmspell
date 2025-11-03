@@ -36,6 +36,30 @@ impl Default for EpisodicBackendType {
     }
 }
 
+/// Semantic memory backend type
+///
+/// Determines which knowledge graph backend to use for semantic memory operations.
+///
+/// # Backend Characteristics
+///
+/// - **`SurrealDB`**: Default bi-temporal graph database with embedded storage
+/// - **`PostgreSQL`**: Production-ready with `PostgreSQL` bi-temporal graph tables, multi-tenant `RLS`
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum SemanticBackendType {
+    /// `SurrealDB` embedded graph database (default, for development and production)
+    SurrealDB,
+
+    /// `PostgreSQL` bi-temporal graph tables (for production, multi-tenant, `RLS`-enabled)
+    #[cfg(feature = "postgres")]
+    PostgreSQL,
+}
+
+impl Default for SemanticBackendType {
+    fn default() -> Self {
+        Self::SurrealDB // SurrealDB is the default
+    }
+}
+
 /// Memory system configuration
 ///
 /// Controls backend selection and tuning parameters for the memory subsystem.
@@ -70,25 +94,35 @@ pub struct MemoryConfig {
     /// Episodic backend selection
     pub episodic_backend: EpisodicBackendType,
 
+    /// Semantic backend selection
+    pub semantic_backend: SemanticBackendType,
+
     /// HNSW configuration (used if backend = HNSW)
     pub hnsw_config: HNSWConfig,
 
     /// Embedding service (required for `HNSW` and `PostgreSQL`)
     pub embedding_service: Option<Arc<EmbeddingService>>,
 
-    /// `PostgreSQL` backend (used if backend = `PostgreSQL`)
+    /// `PostgreSQL` backend for episodic memory (used if `episodic_backend` = `PostgreSQL`)
     #[cfg(feature = "postgres")]
     pub postgres_backend: Option<Arc<llmspell_storage::PostgresBackend>>,
+
+    /// `PostgreSQL` backend for semantic memory (used if `semantic_backend` = `PostgreSQL`)
+    #[cfg(feature = "postgres")]
+    pub semantic_postgres_backend: Option<Arc<llmspell_storage::PostgresBackend>>,
 }
 
 impl Default for MemoryConfig {
     fn default() -> Self {
         Self {
             episodic_backend: EpisodicBackendType::HNSW, // Production default
+            semantic_backend: SemanticBackendType::SurrealDB, // Default
             hnsw_config: HNSWConfig::default(),
             embedding_service: None,
             #[cfg(feature = "postgres")]
             postgres_backend: None,
+            #[cfg(feature = "postgres")]
+            semantic_postgres_backend: None,
         }
     }
 }
@@ -110,10 +144,13 @@ impl MemoryConfig {
     pub fn for_testing() -> Self {
         Self {
             episodic_backend: EpisodicBackendType::InMemory,
+            semantic_backend: SemanticBackendType::SurrealDB,
             hnsw_config: HNSWConfig::default(),
             embedding_service: None,
             #[cfg(feature = "postgres")]
             postgres_backend: None,
+            #[cfg(feature = "postgres")]
+            semantic_postgres_backend: None,
         }
     }
 
@@ -150,10 +187,13 @@ impl MemoryConfig {
     pub fn for_production(embedding_service: Arc<EmbeddingService>) -> Self {
         Self {
             episodic_backend: EpisodicBackendType::HNSW,
+            semantic_backend: SemanticBackendType::SurrealDB,
             hnsw_config: HNSWConfig::default(),
             embedding_service: Some(embedding_service),
             #[cfg(feature = "postgres")]
             postgres_backend: None,
+            #[cfg(feature = "postgres")]
+            semantic_postgres_backend: None,
         }
     }
 
@@ -241,10 +281,43 @@ impl MemoryConfig {
     ) -> Self {
         Self {
             episodic_backend: EpisodicBackendType::PostgreSQL,
+            semantic_backend: SemanticBackendType::PostgreSQL,
             hnsw_config: HNSWConfig::default(),
             embedding_service: Some(embedding_service),
-            postgres_backend: Some(postgres_backend),
+            postgres_backend: Some(postgres_backend.clone()),
+            semantic_postgres_backend: Some(postgres_backend),
         }
+    }
+
+    /// Override semantic backend type
+    ///
+    /// Allows explicit semantic backend selection for testing or migration scenarios.
+    ///
+    /// # Arguments
+    ///
+    /// * `backend` - Semantic backend type to use
+    #[must_use]
+    pub const fn with_semantic_backend(mut self, backend: SemanticBackendType) -> Self {
+        self.semantic_backend = backend;
+        self
+    }
+
+    /// Configure semantic memory with `PostgreSQL` backend
+    ///
+    /// Sets semantic backend to `PostgreSQL` and configures the backend instance.
+    ///
+    /// # Arguments
+    ///
+    /// * `postgres_backend` - `PostgreSQL` backend instance
+    #[cfg(feature = "postgres")]
+    #[must_use]
+    pub fn with_semantic_postgres(
+        mut self,
+        postgres_backend: Arc<llmspell_storage::PostgresBackend>,
+    ) -> Self {
+        self.semantic_backend = SemanticBackendType::PostgreSQL;
+        self.semantic_postgres_backend = Some(postgres_backend);
+        self
     }
 }
 
@@ -253,6 +326,7 @@ impl std::fmt::Debug for MemoryConfig {
         let mut debug_struct = f.debug_struct("MemoryConfig");
         debug_struct
             .field("episodic_backend", &self.episodic_backend)
+            .field("semantic_backend", &self.semantic_backend)
             .field("hnsw_config", &self.hnsw_config)
             .field(
                 "embedding_service",
@@ -263,7 +337,13 @@ impl std::fmt::Debug for MemoryConfig {
             );
 
         #[cfg(feature = "postgres")]
-        debug_struct.field("postgres_backend", &self.postgres_backend.is_some());
+        {
+            debug_struct.field("postgres_backend", &self.postgres_backend.is_some());
+            debug_struct.field(
+                "semantic_postgres_backend",
+                &self.semantic_postgres_backend.is_some(),
+            );
+        }
 
         debug_struct.finish()
     }
