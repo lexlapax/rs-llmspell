@@ -102,21 +102,30 @@ async fn test_tenant_context_with_multiple_tenants() {
         .set_tenant_context("tenant_a")
         .await
         .expect("Failed to set tenant A");
-    assert_eq!(backend.get_tenant_context().await, Some("tenant_a".to_string()));
+    assert_eq!(
+        backend.get_tenant_context().await,
+        Some("tenant_a".to_string())
+    );
 
     // Switch to tenant B
     backend
         .set_tenant_context("tenant_b")
         .await
         .expect("Failed to set tenant B");
-    assert_eq!(backend.get_tenant_context().await, Some("tenant_b".to_string()));
+    assert_eq!(
+        backend.get_tenant_context().await,
+        Some("tenant_b".to_string())
+    );
 
     // Switch to tenant C
     backend
         .set_tenant_context("tenant_c")
         .await
         .expect("Failed to set tenant C");
-    assert_eq!(backend.get_tenant_context().await, Some("tenant_c".to_string()));
+    assert_eq!(
+        backend.get_tenant_context().await,
+        Some("tenant_c".to_string())
+    );
 }
 
 #[tokio::test]
@@ -167,7 +176,7 @@ async fn test_postgres_config_builder_pattern() {
     assert_eq!(config.connection_string, TEST_CONNECTION_STRING);
     assert_eq!(config.max_pool_size, 15);
     assert_eq!(config.connection_timeout_ms, 10000);
-    assert_eq!(config.enable_rls, false);
+    assert!(!config.enable_rls);
 }
 
 #[tokio::test]
@@ -179,7 +188,7 @@ async fn test_postgres_config_defaults() {
         config.connection_timeout_ms, 5000,
         "Default timeout should be 5000ms"
     );
-    assert_eq!(config.enable_rls, true, "RLS should be enabled by default");
+    assert!(config.enable_rls, "RLS should be enabled by default");
 }
 
 #[tokio::test]
@@ -195,7 +204,9 @@ async fn test_invalid_connection_string() {
 
 #[tokio::test]
 async fn test_connection_to_nonexistent_database() {
-    let config = PostgresConfig::new("postgresql://llmspell:llmspell_dev_pass@localhost:5432/nonexistent_db");
+    let config = PostgresConfig::new(
+        "postgresql://llmspell:llmspell_dev_pass@localhost:5432/nonexistent_db",
+    );
 
     // Pool creation succeeds (lazy connection), but health check should fail
     let backend = PostgresBackend::new(config).await;
@@ -236,9 +247,18 @@ async fn test_multiple_backends_same_database() {
     backend3.set_tenant_context("tenant_3").await.unwrap();
 
     // Each backend should maintain its own tenant context
-    assert_eq!(backend1.get_tenant_context().await, Some("tenant_1".to_string()));
-    assert_eq!(backend2.get_tenant_context().await, Some("tenant_2".to_string()));
-    assert_eq!(backend3.get_tenant_context().await, Some("tenant_3".to_string()));
+    assert_eq!(
+        backend1.get_tenant_context().await,
+        Some("tenant_1".to_string())
+    );
+    assert_eq!(
+        backend2.get_tenant_context().await,
+        Some("tenant_2".to_string())
+    );
+    assert_eq!(
+        backend3.get_tenant_context().await,
+        Some("tenant_3".to_string())
+    );
 }
 
 #[tokio::test]
@@ -333,7 +353,10 @@ async fn test_migration_version() {
         .await
         .expect("Failed to get migration version");
 
-    assert!(version >= 1, "Migration version should be at least 1 after running migrations");
+    assert!(
+        version >= 1,
+        "Migration version should be at least 1 after running migrations"
+    );
 }
 
 #[tokio::test]

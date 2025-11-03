@@ -58,7 +58,9 @@ impl PostgresBackend {
                 &[],
             )
             .await
-            .map_err(|e| PostgresError::Query(format!("Failed to query migration version: {}", e)))?;
+            .map_err(|e| {
+                PostgresError::Query(format!("Failed to query migration version: {}", e))
+            })?;
 
         if let Some(row) = row {
             let version: i32 = row.get(0);

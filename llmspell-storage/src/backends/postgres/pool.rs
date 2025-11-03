@@ -16,17 +16,16 @@ impl PostgresPool {
     /// Create a new connection pool from configuration
     pub async fn new(config: &PostgresConfig) -> Result<Self> {
         // Validate configuration
-        config
-            .validate()
-            .map_err(|e| PostgresError::Config(e))?;
+        config.validate().map_err(PostgresError::Config)?;
 
         // Parse connection string
-        let pg_config: tokio_postgres::Config = config
-            .connection_string
-            .parse()
-            .map_err(|e: tokio_postgres::Error| {
-                PostgresError::Config(format!("Invalid connection string: {}", e))
-            })?;
+        let pg_config: tokio_postgres::Config =
+            config
+                .connection_string
+                .parse()
+                .map_err(|e: tokio_postgres::Error| {
+                    PostgresError::Config(format!("Invalid connection string: {}", e))
+                })?;
 
         // Create pool configuration
         let manager_config = ManagerConfig {
@@ -45,9 +44,10 @@ impl PostgresPool {
 
     /// Get a connection from the pool
     pub async fn get(&self) -> Result<deadpool_postgres::Client> {
-        self.pool.get().await.map_err(|e| {
-            PostgresError::Pool(format!("Failed to get connection from pool: {}", e))
-        })
+        self.pool
+            .get()
+            .await
+            .map_err(|e| PostgresError::Pool(format!("Failed to get connection from pool: {}", e)))
     }
 
     /// Get pool status (active connections, idle connections)

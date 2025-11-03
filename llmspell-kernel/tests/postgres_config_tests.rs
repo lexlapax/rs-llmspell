@@ -13,7 +13,7 @@ fn test_postgres_config_default() {
     assert_eq!(config.connection_string, "");
     assert_eq!(config.pool_size, 20);
     assert_eq!(config.timeout_ms, 5000);
-    assert_eq!(config.enable_rls, true);
+    assert!(config.enable_rls);
 }
 
 #[test]
@@ -31,10 +31,13 @@ fn test_postgres_config_serialization() {
     // Deserialize back
     let deserialized: PostgresConfig = serde_json::from_str(&json).expect("Failed to deserialize");
 
-    assert_eq!(deserialized.connection_string, "postgresql://localhost/test");
+    assert_eq!(
+        deserialized.connection_string,
+        "postgresql://localhost/test"
+    );
     assert_eq!(deserialized.pool_size, 10);
     assert_eq!(deserialized.timeout_ms, 3000);
-    assert_eq!(deserialized.enable_rls, false);
+    assert!(!deserialized.enable_rls);
 }
 
 #[test]
@@ -47,7 +50,7 @@ fn test_postgres_config_serde_defaults() {
     assert_eq!(config.connection_string, "postgresql://localhost/test");
     assert_eq!(config.pool_size, 20, "Should use default pool_size");
     assert_eq!(config.timeout_ms, 5000, "Should use default timeout_ms");
-    assert_eq!(config.enable_rls, true, "Should use default enable_rls");
+    assert!(config.enable_rls, "Should use default enable_rls");
 }
 
 #[test]
@@ -86,14 +89,18 @@ fn test_postgres_backend_type_serialization() {
     let json = serde_json::to_string(&backend_type).expect("Failed to serialize");
 
     // Deserialize
-    let deserialized: StorageBackendType = serde_json::from_str(&json).expect("Failed to deserialize");
+    let deserialized: StorageBackendType =
+        serde_json::from_str(&json).expect("Failed to deserialize");
 
     match deserialized {
         StorageBackendType::Postgres(pg_config) => {
-            assert_eq!(pg_config.connection_string, "postgresql://user:pass@host:5432/db");
+            assert_eq!(
+                pg_config.connection_string,
+                "postgresql://user:pass@host:5432/db"
+            );
             assert_eq!(pg_config.pool_size, 25);
             assert_eq!(pg_config.timeout_ms, 7500);
-            assert_eq!(pg_config.enable_rls, false);
+            assert!(!pg_config.enable_rls);
         }
         _ => panic!("Expected Postgres variant after deserialization"),
     }
@@ -110,10 +117,13 @@ enable_rls = true
 
     let config: PostgresConfig = toml::from_str(toml_str).expect("Failed to parse TOML");
 
-    assert_eq!(config.connection_string, "postgresql://llmspell:password@localhost:5432/llmspell_dev");
+    assert_eq!(
+        config.connection_string,
+        "postgresql://llmspell:password@localhost:5432/llmspell_dev"
+    );
     assert_eq!(config.pool_size, 30);
     assert_eq!(config.timeout_ms, 15000);
-    assert_eq!(config.enable_rls, true);
+    assert!(config.enable_rls);
 }
 
 #[test]
@@ -127,7 +137,7 @@ connection_string = "postgresql://localhost/test"
     assert_eq!(config.connection_string, "postgresql://localhost/test");
     assert_eq!(config.pool_size, 20, "Should use default");
     assert_eq!(config.timeout_ms, 5000, "Should use default");
-    assert_eq!(config.enable_rls, true, "Should use default");
+    assert!(config.enable_rls, "Should use default");
 }
 
 #[test]

@@ -144,7 +144,7 @@ pub struct RocksDBConfig {
     pub optimize_for_point_lookup: bool,
 }
 
-/// PostgreSQL configuration for kernel state storage (Phase 13b.2)
+/// `PostgreSQL` configuration for kernel state storage (Phase 13b.2)
 #[cfg(feature = "postgres")]
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct PostgresConfig {
