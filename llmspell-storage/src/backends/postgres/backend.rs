@@ -154,8 +154,14 @@ impl PostgresBackend {
         self.pool.status()
     }
 
-    /// Get a pooled client connection (internal use)
-    pub(super) async fn get_client(&self) -> Result<deadpool_postgres::Client> {
+    /// Get a pooled client connection
+    ///
+    /// # Returns
+    /// * `Result<deadpool_postgres::Client>` - Pooled client connection
+    ///
+    /// # Phase 13b.3.2
+    /// Exposed as public to allow RLS testing from integration tests
+    pub async fn get_client(&self) -> Result<deadpool_postgres::Client> {
         self.pool.get().await
     }
 }
