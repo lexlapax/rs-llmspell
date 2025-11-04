@@ -91,12 +91,7 @@ impl PostgresProceduralStorage {
     ///
     /// # Returns
     /// New frequency count for this transition
-    pub async fn record_transition(
-        &self,
-        scope: &str,
-        key: &str,
-        to_value: &str,
-    ) -> Result<u32> {
+    pub async fn record_transition(&self, scope: &str, key: &str, to_value: &str) -> Result<u32> {
         // Get tenant context for explicit filtering
         let tenant_id = self.backend.get_tenant_context().await.ok_or_else(|| {
             PostgresError::Query(
@@ -139,12 +134,7 @@ impl PostgresProceduralStorage {
     ///
     /// # Returns
     /// Number of times `scope:key → value` transition occurred (0 if not found)
-    pub async fn get_pattern_frequency(
-        &self,
-        scope: &str,
-        key: &str,
-        value: &str,
-    ) -> Result<u32> {
+    pub async fn get_pattern_frequency(&self, scope: &str, key: &str, value: &str) -> Result<u32> {
         // Get tenant context for explicit filtering
         let tenant_id = self.backend.get_tenant_context().await.ok_or_else(|| {
             PostgresError::Query(

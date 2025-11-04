@@ -302,7 +302,10 @@ async fn test_tenant_isolation_patterns_dont_cross() {
         .unwrap();
 
     assert_eq!(freq_a, 5, "Tenant A should see dark theme with freq 5");
-    assert_eq!(freq_a_light, 0, "Tenant A should not see tenant B's light theme");
+    assert_eq!(
+        freq_a_light, 0,
+        "Tenant A should not see tenant B's light theme"
+    );
 
     // Query as tenant B - should only see light theme
     backend.set_tenant_context(&tenant_b).await.unwrap();
@@ -316,7 +319,10 @@ async fn test_tenant_isolation_patterns_dont_cross() {
         .unwrap();
 
     assert_eq!(freq_b, 3, "Tenant B should see light theme with freq 3");
-    assert_eq!(freq_b_dark, 0, "Tenant B should not see tenant A's dark theme");
+    assert_eq!(
+        freq_b_dark, 0,
+        "Tenant B should not see tenant A's dark theme"
+    );
 }
 
 #[tokio::test]
@@ -470,10 +476,7 @@ async fn test_empty_scope_and_key() {
     let storage = PostgresProceduralStorage::new(backend);
 
     // Record pattern with empty scope
-    let freq = storage
-        .record_transition("", "key", "value")
-        .await
-        .unwrap();
+    let freq = storage.record_transition("", "key", "value").await.unwrap();
     assert_eq!(freq, 1);
 
     // Record pattern with empty key
@@ -484,7 +487,10 @@ async fn test_empty_scope_and_key() {
     assert_eq!(freq, 1);
 
     // Verify retrieval
-    let freq = storage.get_pattern_frequency("", "key", "value").await.unwrap();
+    let freq = storage
+        .get_pattern_frequency("", "key", "value")
+        .await
+        .unwrap();
     assert_eq!(freq, 1);
 
     let freq = storage
