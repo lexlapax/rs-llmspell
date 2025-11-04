@@ -4988,13 +4988,40 @@ This implements a smart routing approach where PostgresBackend implements the ge
 
 **Goal**: Implement PostgreSQL backend for workflow state tracking
 **Timeline**: 2 days (16 hours)
-**Critical Dependencies**: Phase 13b.2, Phase 13b.3 ✅
+**Critical Dependencies**: Phase 13b.2, Phase 13b.3, Phase 13b.7 ✅
+
+**Architectural Decision (Option B - Specialized Table)**:
+
+After analyzing existing workflow state storage patterns, chose specialized workflow_states table over generic kv_store routing:
+
+**Current State** (from research):
+- Workflows use `StateScope::Custom("workflow_{id}")` with single "state" key
+- `PersistentWorkflowState` serialized as JSON (workflow_id, config, status, execution_history, stats, checkpoints)
+- State keys follow `workflow:{id}:*` convention
+- Already works via Phase 13b.7.2 StorageBackend through kv_store
+
+**Rationale for Specialized Table**:
+1. **Efficient Queries**: Index by status (find all running workflows), timestamps (long-running), current_step (progress tracking)
+2. **Pattern Consistency**: Mirrors agent_states design (JSONB + extracted fields)
+3. **Lifecycle Management**: Enables workflow monitoring, timeout detection, cleanup by status
+4. **Future-Proof**: Foundation for workflow management dashboards, analytics
+5. **Performance**: Avoids table scans in kv_store for workflow-specific queries
+
+**Trade-offs Accepted**:
+- Additional migration (V8__workflow_states.sql, after V7__kv_store)
+- Backend routing logic must handle `workflow:*` keys → workflow_states table
+- Duplicate storage strategy (both specialized table + StorageBackend trait)
+
+**Integration Points**:
+- `llmspell-workflows::PersistentWorkflowStateManager` - Uses StateScope pattern
+- `llmspell-templates::ExecutionContext` - Template execution tracking
+- Phase 13b.7.2 intelligent routing - Extend for `workflow:*` keys
 
 ### Task 13b.8.1: Create Workflow State Schema
 **Priority**: HIGH
 **Estimated Time**: 2 hours
 
-**Description**: Create PostgreSQL schema for workflow state with step tracking.
+**Description**: Create specialized PostgreSQL schema for workflow state with lifecycle tracking and indexed queries.
 
 **Implementation Steps**:
 1. Create `migrations/V005__workflow_state.sql`:
