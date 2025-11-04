@@ -5676,6 +5676,64 @@ async fn list_session_state_keys(&self, _prefix: &str) -> anyhow::Result<Vec<Str
 - Foreign key violation prevention via session creation helpers
 - Test isolation via cleanup helpers to prevent data contamination
 
+### Task 13b.10.4: Fix Provider Factory Routing for Unknown Providers
+**Priority**: HIGH
+**Estimated Time**: 1 hour
+**Status**: ✅ COMPLETE (2025-01-05)
+**Actual Time**: 1 hour
+
+**Description**: Fix provider factory routing regression introduced in Phase 13 where unknown providers (groq, perplexity, together) bypass rig validation.
+
+**Implementation Steps**:
+1. ✅ Analyze factory_name() method in abstraction.rs
+2. ✅ Identify Phase 13 commit 48842e09 that introduced regression
+3. ✅ Implement Option 1: Route all unknown API providers to rig
+4. ✅ Run test_provider_model_parsing to verify fix
+5. ✅ Document task in TODO.md
+
+**Files Modified**:
+- `llmspell-providers/src/abstraction.rs` (1-line fix)
+
+**Root Cause**:
+Phase 13 commit 48842e09 added `factory_name()` method with fallback `_ => &self.provider_type` that bypassed rig validation. Unknown providers like "groq" triggered registry "No factory found" errors before rig could reject them with user-friendly "Unsupported provider" messages.
+
+**Solution** (Option 1 - Recommended):
+```rust
+pub fn factory_name(&self) -> &str {
+    match self.provider_type.as_str() {
+        "ollama" => "ollama",  // Local Ollama-specific factory
+        "candle" => "candle",  // Local Candle-specific factory
+        _ => "rig"             // All API providers → rig (validates internally)
+    }
+}
+```
+
+**Alternative Options Considered**:
+- Option 2: Early validation with whitelist (more invasive)
+- Option 3: Registry fallback to rig (implicit behavior)
+- Option 4: Update test expectations (doesn't fix root cause)
+
+**Key Insight**:
+Rig should be the catch-all for API-based providers, letting rig's internal validation (rig.rs:150-159) produce semantic "Unsupported provider type: X" errors instead of infrastructure "No factory found" errors.
+
+**Architecture Rationale**:
+- Only local providers (ollama, candle) need dedicated factories
+- All API-based providers (known: openai/anthropic/cohere, unknown: groq/perplexity/together) → rig
+- Rig validates supported providers internally with clear error messages
+- Extensibility: new API providers automatically route to rig
+
+**Test Verification**:
+```bash
+cargo test test_provider_model_parsing --test provider_enhancement_test --features common -p llmspell-bridge
+# Result: ok. 1 passed; 0 failed
+```
+
+**Impact**:
+- ✅ Fixes test_provider_model_parsing failure
+- ✅ Restores user-friendly error messages
+- ✅ Maintains backward compatibility
+- ✅ Minimal 1-line change
+
 ---
 
 ## Phase 13b.11: Event Log Storage (Days 21-22)

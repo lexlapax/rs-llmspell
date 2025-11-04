@@ -116,14 +116,9 @@ impl ProviderConfig {
     /// Handles the provider_type → implementation factory mapping
     pub fn factory_name(&self) -> &str {
         match self.provider_type.as_str() {
-            "openai" | "anthropic" | "cohere" => "rig",
-            "ollama" => "ollama", // ollama has dedicated factory
-            "candle" => "candle", // candle has dedicated factory
-            _ => {
-                // Unknown provider type - try using provider_type directly
-                // This allows future extensibility without code changes
-                &self.provider_type
-            }
+            "ollama" => "ollama", // Local Ollama-specific factory
+            "candle" => "candle", // Local Candle-specific factory
+            _ => "rig",           // All API-based providers → rig (validates internally)
         }
     }
 
