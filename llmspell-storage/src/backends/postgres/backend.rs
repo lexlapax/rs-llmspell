@@ -328,7 +328,10 @@ impl crate::traits::StorageBackend for PostgresBackend {
         Ok(results)
     }
 
-    async fn set_batch(&self, items: std::collections::HashMap<String, Vec<u8>>) -> anyhow::Result<()> {
+    async fn set_batch(
+        &self,
+        items: std::collections::HashMap<String, Vec<u8>>,
+    ) -> anyhow::Result<()> {
         use std::collections::HashMap;
 
         // Partition items by routing destination
@@ -363,7 +366,10 @@ impl crate::traits::StorageBackend for PostgresBackend {
     }
 
     async fn clear(&self) -> anyhow::Result<()> {
-        let client = self.get_client().await.map_err(|e| anyhow::anyhow!("{}", e))?;
+        let client = self
+            .get_client()
+            .await
+            .map_err(|e| anyhow::anyhow!("{}", e))?;
 
         // Clear both tables (RLS will scope to current tenant)
         client
@@ -404,8 +410,13 @@ impl PostgresBackend {
     async fn get_agent_state(&self, key: &str) -> anyhow::Result<Option<Vec<u8>>> {
         let (agent_id, _agent_type) = self.parse_agent_key(key)?;
 
-        let client = self.get_client().await.map_err(|e| anyhow::anyhow!("{}", e))?;
-        let tenant_id = self.get_tenant_context().await
+        let client = self
+            .get_client()
+            .await
+            .map_err(|e| anyhow::anyhow!("{}", e))?;
+        let tenant_id = self
+            .get_tenant_context()
+            .await
             .ok_or_else(|| anyhow::anyhow!("Tenant context not set"))?;
 
         let row = client
@@ -436,8 +447,13 @@ impl PostgresBackend {
         // Compute checksum
         let checksum = self.compute_checksum(&value);
 
-        let client = self.get_client().await.map_err(|e| anyhow::anyhow!("{}", e))?;
-        let tenant_id = self.get_tenant_context().await
+        let client = self
+            .get_client()
+            .await
+            .map_err(|e| anyhow::anyhow!("{}", e))?;
+        let tenant_id = self
+            .get_tenant_context()
+            .await
             .ok_or_else(|| anyhow::anyhow!("Tenant context not set"))?;
 
         // Upsert with version tracking
@@ -463,8 +479,13 @@ impl PostgresBackend {
     async fn delete_agent_state(&self, key: &str) -> anyhow::Result<()> {
         let (agent_id, _) = self.parse_agent_key(key)?;
 
-        let client = self.get_client().await.map_err(|e| anyhow::anyhow!("{}", e))?;
-        let tenant_id = self.get_tenant_context().await
+        let client = self
+            .get_client()
+            .await
+            .map_err(|e| anyhow::anyhow!("{}", e))?;
+        let tenant_id = self
+            .get_tenant_context()
+            .await
             .ok_or_else(|| anyhow::anyhow!("Tenant context not set"))?;
 
         client
@@ -483,8 +504,13 @@ impl PostgresBackend {
     async fn exists_agent_state(&self, key: &str) -> anyhow::Result<bool> {
         let (agent_id, _) = self.parse_agent_key(key)?;
 
-        let client = self.get_client().await.map_err(|e| anyhow::anyhow!("{}", e))?;
-        let tenant_id = self.get_tenant_context().await
+        let client = self
+            .get_client()
+            .await
+            .map_err(|e| anyhow::anyhow!("{}", e))?;
+        let tenant_id = self
+            .get_tenant_context()
+            .await
             .ok_or_else(|| anyhow::anyhow!("Tenant context not set"))?;
 
         let row = client
@@ -503,8 +529,13 @@ impl PostgresBackend {
 
     /// List agent state keys with prefix
     async fn list_agent_state_keys(&self, prefix: &str) -> anyhow::Result<Vec<String>> {
-        let client = self.get_client().await.map_err(|e| anyhow::anyhow!("{}", e))?;
-        let tenant_id = self.get_tenant_context().await
+        let client = self
+            .get_client()
+            .await
+            .map_err(|e| anyhow::anyhow!("{}", e))?;
+        let tenant_id = self
+            .get_tenant_context()
+            .await
             .ok_or_else(|| anyhow::anyhow!("Tenant context not set"))?;
 
         // Remove "agent:" prefix for pattern matching
@@ -560,8 +591,13 @@ impl PostgresBackend {
 impl PostgresBackend {
     /// Get value from kv_store table
     async fn get_kv(&self, key: &str) -> anyhow::Result<Option<Vec<u8>>> {
-        let client = self.get_client().await.map_err(|e| anyhow::anyhow!("{}", e))?;
-        let tenant_id = self.get_tenant_context().await
+        let client = self
+            .get_client()
+            .await
+            .map_err(|e| anyhow::anyhow!("{}", e))?;
+        let tenant_id = self
+            .get_tenant_context()
+            .await
             .ok_or_else(|| anyhow::anyhow!("Tenant context not set"))?;
 
         let row = client
@@ -583,8 +619,13 @@ impl PostgresBackend {
 
     /// Set value in kv_store table
     async fn set_kv(&self, key: &str, value: Vec<u8>) -> anyhow::Result<()> {
-        let client = self.get_client().await.map_err(|e| anyhow::anyhow!("{}", e))?;
-        let tenant_id = self.get_tenant_context().await
+        let client = self
+            .get_client()
+            .await
+            .map_err(|e| anyhow::anyhow!("{}", e))?;
+        let tenant_id = self
+            .get_tenant_context()
+            .await
             .ok_or_else(|| anyhow::anyhow!("Tenant context not set"))?;
 
         // Upsert
@@ -606,8 +647,13 @@ impl PostgresBackend {
 
     /// Delete value from kv_store table
     async fn delete_kv(&self, key: &str) -> anyhow::Result<()> {
-        let client = self.get_client().await.map_err(|e| anyhow::anyhow!("{}", e))?;
-        let tenant_id = self.get_tenant_context().await
+        let client = self
+            .get_client()
+            .await
+            .map_err(|e| anyhow::anyhow!("{}", e))?;
+        let tenant_id = self
+            .get_tenant_context()
+            .await
             .ok_or_else(|| anyhow::anyhow!("Tenant context not set"))?;
 
         client
@@ -624,8 +670,13 @@ impl PostgresBackend {
 
     /// Check if key exists in kv_store
     async fn exists_kv(&self, key: &str) -> anyhow::Result<bool> {
-        let client = self.get_client().await.map_err(|e| anyhow::anyhow!("{}", e))?;
-        let tenant_id = self.get_tenant_context().await
+        let client = self
+            .get_client()
+            .await
+            .map_err(|e| anyhow::anyhow!("{}", e))?;
+        let tenant_id = self
+            .get_tenant_context()
+            .await
             .ok_or_else(|| anyhow::anyhow!("Tenant context not set"))?;
 
         let row = client
@@ -644,8 +695,13 @@ impl PostgresBackend {
 
     /// List kv keys with prefix
     async fn list_kv_keys(&self, prefix: &str) -> anyhow::Result<Vec<String>> {
-        let client = self.get_client().await.map_err(|e| anyhow::anyhow!("{}", e))?;
-        let tenant_id = self.get_tenant_context().await
+        let client = self
+            .get_client()
+            .await
+            .map_err(|e| anyhow::anyhow!("{}", e))?;
+        let tenant_id = self
+            .get_tenant_context()
+            .await
             .ok_or_else(|| anyhow::anyhow!("Tenant context not set"))?;
 
         let rows = client

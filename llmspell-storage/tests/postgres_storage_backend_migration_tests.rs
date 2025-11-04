@@ -188,7 +188,13 @@ async fn test_agent_states_unique_constraint() {
             "INSERT INTO llmspell.agent_states
              (tenant_id, agent_id, agent_type, state_data, checksum)
              VALUES ($1, $2, $3, $4, $5)",
-            &[&tenant_id, &agent_id, &"assistant", &state_data, &"checksum1"],
+            &[
+                &tenant_id,
+                &agent_id,
+                &"assistant",
+                &state_data,
+                &"checksum1",
+            ],
         )
         .await
         .unwrap();
@@ -199,7 +205,13 @@ async fn test_agent_states_unique_constraint() {
             "INSERT INTO llmspell.agent_states
              (tenant_id, agent_id, agent_type, state_data, checksum)
              VALUES ($1, $2, $3, $4, $5)",
-            &[&tenant_id, &agent_id, &"assistant", &state_data, &"checksum2"],
+            &[
+                &tenant_id,
+                &agent_id,
+                &"assistant",
+                &state_data,
+                &"checksum2",
+            ],
         )
         .await;
 
@@ -233,7 +245,13 @@ async fn test_agent_states_version_increment_trigger() {
             "INSERT INTO llmspell.agent_states
              (tenant_id, agent_id, agent_type, state_data, checksum)
              VALUES ($1, $2, $3, $4, $5)",
-            &[&tenant_id, &agent_id, &"assistant", &state_data, &"checksum"],
+            &[
+                &tenant_id,
+                &agent_id,
+                &"assistant",
+                &state_data,
+                &"checksum",
+            ],
         )
         .await
         .unwrap();
@@ -298,7 +316,13 @@ async fn test_agent_states_updated_at_trigger() {
             "INSERT INTO llmspell.agent_states
              (tenant_id, agent_id, agent_type, state_data, checksum)
              VALUES ($1, $2, $3, $4, $5)",
-            &[&tenant_id, &agent_id, &"assistant", &state_data, &"checksum"],
+            &[
+                &tenant_id,
+                &agent_id,
+                &"assistant",
+                &state_data,
+                &"checksum",
+            ],
         )
         .await
         .unwrap();
@@ -635,7 +659,13 @@ async fn test_tenant_isolation_across_both_tables() {
                 "INSERT INTO llmspell.agent_states
                  (tenant_id, agent_id, agent_type, state_data, checksum)
                  VALUES ($1, $2, $3, $4, $5)",
-                &[&tenant_a, &"agent-a", &"assistant", &serde_json::json!({}), &"check-a"],
+                &[
+                    &tenant_a,
+                    &"agent-a",
+                    &"assistant",
+                    &serde_json::json!({}),
+                    &"check-a",
+                ],
             )
             .await
             .unwrap();
@@ -659,7 +689,13 @@ async fn test_tenant_isolation_across_both_tables() {
                 "INSERT INTO llmspell.agent_states
                  (tenant_id, agent_id, agent_type, state_data, checksum)
                  VALUES ($1, $2, $3, $4, $5)",
-                &[&tenant_b, &"agent-b", &"reviewer", &serde_json::json!({}), &"check-b"],
+                &[
+                    &tenant_b,
+                    &"agent-b",
+                    &"reviewer",
+                    &serde_json::json!({}),
+                    &"check-b",
+                ],
             )
             .await
             .unwrap();

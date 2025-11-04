@@ -10,7 +10,8 @@ use std::sync::Arc;
 use tokio::sync::OnceCell;
 
 // Test configuration
-const TEST_CONNECTION_STRING: &str = "postgresql://llmspell:llmspell_dev_pass@localhost:5432/llmspell_dev";
+const TEST_CONNECTION_STRING: &str =
+    "postgresql://llmspell:llmspell_dev_pass@localhost:5432/llmspell_dev";
 
 static MIGRATION_INIT: OnceCell<()> = OnceCell::const_new();
 
@@ -168,15 +169,11 @@ async fn test_agent_state_update_with_versioning() {
     let key = "agent:workflow:agent-version-test";
 
     // Initial set
-    let value1 = serde_json::json!({"state": "v1"})
-        .to_string()
-        .into_bytes();
+    let value1 = serde_json::json!({"state": "v1"}).to_string().into_bytes();
     backend.set(key, value1.clone()).await.unwrap();
 
     // Update
-    let value2 = serde_json::json!({"state": "v2"})
-        .to_string()
-        .into_bytes();
+    let value2 = serde_json::json!({"state": "v2"}).to_string().into_bytes();
     backend.set(key, value2.clone()).await.unwrap();
 
     // Verify latest value
@@ -226,7 +223,11 @@ async fn test_agent_state_checksum_computed() {
 
     let checksum: String = row.get(0);
     assert!(!checksum.is_empty(), "Checksum should be computed");
-    assert_eq!(checksum.len(), 64, "SHA-256 checksum should be 64 hex chars");
+    assert_eq!(
+        checksum.len(),
+        64,
+        "SHA-256 checksum should be 64 hex chars"
+    );
 }
 
 // =============================================================================
@@ -371,10 +372,20 @@ async fn test_get_batch() {
     backend.set_tenant_context(&tenant_id).await.unwrap();
 
     // Set multiple values (agent keys must be JSON)
-    let agent_val1 = serde_json::json!({"state": "value1"}).to_string().into_bytes();
-    let agent_val2 = serde_json::json!({"state": "value2"}).to_string().into_bytes();
-    backend.set("agent:test:a1", agent_val1.clone()).await.unwrap();
-    backend.set("agent:test:a2", agent_val2.clone()).await.unwrap();
+    let agent_val1 = serde_json::json!({"state": "value1"})
+        .to_string()
+        .into_bytes();
+    let agent_val2 = serde_json::json!({"state": "value2"})
+        .to_string()
+        .into_bytes();
+    backend
+        .set("agent:test:a1", agent_val1.clone())
+        .await
+        .unwrap();
+    backend
+        .set("agent:test:a2", agent_val2.clone())
+        .await
+        .unwrap();
     backend.set("kv:test:k1", b"value3".to_vec()).await.unwrap();
     backend.set("kv:test:k2", b"value4".to_vec()).await.unwrap();
 
@@ -407,8 +418,12 @@ async fn test_set_batch() {
 
     // Prepare batch (mixed agent and KV keys - agent keys must be JSON)
     let mut items = HashMap::new();
-    let agent_val1 = serde_json::json!({"state": "agent1"}).to_string().into_bytes();
-    let agent_val2 = serde_json::json!({"state": "agent2"}).to_string().into_bytes();
+    let agent_val1 = serde_json::json!({"state": "agent1"})
+        .to_string()
+        .into_bytes();
+    let agent_val2 = serde_json::json!({"state": "agent2"})
+        .to_string()
+        .into_bytes();
     items.insert("agent:batch:a1".to_string(), agent_val1.clone());
     items.insert("agent:batch:a2".to_string(), agent_val2.clone());
     items.insert("config:batch:c1".to_string(), b"config1".to_vec());
@@ -418,10 +433,22 @@ async fn test_set_batch() {
     backend.set_batch(items).await.unwrap();
 
     // Verify all values stored correctly
-    assert_eq!(backend.get("agent:batch:a1").await.unwrap().unwrap(), agent_val1);
-    assert_eq!(backend.get("agent:batch:a2").await.unwrap().unwrap(), agent_val2);
-    assert_eq!(backend.get("config:batch:c1").await.unwrap().unwrap(), b"config1");
-    assert_eq!(backend.get("config:batch:c2").await.unwrap().unwrap(), b"config2");
+    assert_eq!(
+        backend.get("agent:batch:a1").await.unwrap().unwrap(),
+        agent_val1
+    );
+    assert_eq!(
+        backend.get("agent:batch:a2").await.unwrap().unwrap(),
+        agent_val2
+    );
+    assert_eq!(
+        backend.get("config:batch:c1").await.unwrap().unwrap(),
+        b"config1"
+    );
+    assert_eq!(
+        backend.get("config:batch:c2").await.unwrap().unwrap(),
+        b"config2"
+    );
 }
 
 #[tokio::test]
@@ -435,17 +462,18 @@ async fn test_delete_batch() {
     backend.set_tenant_context(&tenant_id).await.unwrap();
 
     // Set multiple values (agent keys must be JSON)
-    let agent_val1 = serde_json::json!({"state": "value1"}).to_string().into_bytes();
-    let agent_val2 = serde_json::json!({"state": "value2"}).to_string().into_bytes();
+    let agent_val1 = serde_json::json!({"state": "value1"})
+        .to_string()
+        .into_bytes();
+    let agent_val2 = serde_json::json!({"state": "value2"})
+        .to_string()
+        .into_bytes();
     backend.set("agent:del:a1", agent_val1).await.unwrap();
     backend.set("agent:del:a2", agent_val2).await.unwrap();
     backend.set("kv:del:k1", b"value3".to_vec()).await.unwrap();
 
     // Delete batch
-    let keys = vec![
-        "agent:del:a1".to_string(),
-        "kv:del:k1".to_string(),
-    ];
+    let keys = vec!["agent:del:a1".to_string(), "kv:del:k1".to_string()];
     backend.delete_batch(&keys).await.unwrap();
 
     // Verify deletions
@@ -471,16 +499,32 @@ async fn test_tenant_isolation() {
     let tenant_b = unique_tenant_id("tenant-b");
 
     // Tenant A: Set values (agent keys must be JSON)
-    let agent_val_a = serde_json::json!({"state": "value-a"}).to_string().into_bytes();
+    let agent_val_a = serde_json::json!({"state": "value-a"})
+        .to_string()
+        .into_bytes();
     backend.set_tenant_context(&tenant_a).await.unwrap();
-    backend.set("agent:test:shared", agent_val_a.clone()).await.unwrap();
-    backend.set("config:shared", b"config-a".to_vec()).await.unwrap();
+    backend
+        .set("agent:test:shared", agent_val_a.clone())
+        .await
+        .unwrap();
+    backend
+        .set("config:shared", b"config-a".to_vec())
+        .await
+        .unwrap();
 
     // Tenant B: Set values with same keys (agent keys must be JSON)
-    let agent_val_b = serde_json::json!({"state": "value-b"}).to_string().into_bytes();
+    let agent_val_b = serde_json::json!({"state": "value-b"})
+        .to_string()
+        .into_bytes();
     backend.set_tenant_context(&tenant_b).await.unwrap();
-    backend.set("agent:test:shared", agent_val_b.clone()).await.unwrap();
-    backend.set("config:shared", b"config-b".to_vec()).await.unwrap();
+    backend
+        .set("agent:test:shared", agent_val_b.clone())
+        .await
+        .unwrap();
+    backend
+        .set("config:shared", b"config-b".to_vec())
+        .await
+        .unwrap();
 
     // Verify tenant A sees only their data
     backend.set_tenant_context(&tenant_a).await.unwrap();
@@ -657,10 +701,19 @@ async fn test_backend_characteristics() {
 
     assert!(chars.persistent, "PostgreSQL is persistent");
     assert!(chars.transactional, "PostgreSQL supports transactions");
-    assert!(chars.supports_prefix_scan, "PostgreSQL supports prefix scan");
+    assert!(
+        chars.supports_prefix_scan,
+        "PostgreSQL supports prefix scan"
+    );
     assert!(chars.supports_atomic_ops, "PostgreSQL supports atomic ops");
-    assert!(chars.avg_read_latency_us > 0, "Should have non-zero read latency");
-    assert!(chars.avg_write_latency_us > 0, "Should have non-zero write latency");
+    assert!(
+        chars.avg_read_latency_us > 0,
+        "Should have non-zero read latency"
+    );
+    assert!(
+        chars.avg_write_latency_us > 0,
+        "Should have non-zero write latency"
+    );
 }
 
 // =============================================================================
