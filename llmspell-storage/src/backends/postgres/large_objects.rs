@@ -90,19 +90,15 @@ impl LargeObjectStream {
     /// ```
     pub async fn upload(&mut self, data: &[u8]) -> Result<u32> {
         // Start transaction
-        let tx = self
-            .client
-            .transaction()
-            .await
-            .map_err(|e| PostgresError::Connection(format!("Failed to start transaction: {}", e)))?;
+        let tx = self.client.transaction().await.map_err(|e| {
+            PostgresError::Connection(format!("Failed to start transaction: {}", e))
+        })?;
 
         // Create new Large Object
         let row = tx
             .query_one("SELECT lo_create(0)", &[])
             .await
-            .map_err(|e| {
-                PostgresError::Query(format!("Failed to create Large Object: {}", e))
-            })?;
+            .map_err(|e| PostgresError::Query(format!("Failed to create Large Object: {}", e)))?;
         let oid: u32 = row.get(0);
 
         // Open Large Object for writing
@@ -160,11 +156,9 @@ impl LargeObjectStream {
     /// ```
     pub async fn download(&mut self, oid: u32) -> Result<Vec<u8>> {
         // Start transaction
-        let tx = self
-            .client
-            .transaction()
-            .await
-            .map_err(|e| PostgresError::Connection(format!("Failed to start transaction: {}", e)))?;
+        let tx = self.client.transaction().await.map_err(|e| {
+            PostgresError::Connection(format!("Failed to start transaction: {}", e))
+        })?;
 
         // Open Large Object for reading
         let row = tx
@@ -177,10 +171,7 @@ impl LargeObjectStream {
         let mut buffer = Vec::new();
         loop {
             let row = tx
-                .query_one(
-                    "SELECT loread($1, $2)",
-                    &[&fd, &(self.chunk_size as i32)],
-                )
+                .query_one("SELECT loread($1, $2)", &[&fd, &(self.chunk_size as i32)])
                 .await
                 .map_err(|e| {
                     PostgresError::Query(format!("Failed to read from Large Object: {}", e))
@@ -232,11 +223,9 @@ impl LargeObjectStream {
     /// ```
     pub async fn delete(&mut self, oid: u32) -> Result<()> {
         // Start transaction
-        let tx = self
-            .client
-            .transaction()
-            .await
-            .map_err(|e| PostgresError::Connection(format!("Failed to start transaction: {}", e)))?;
+        let tx = self.client.transaction().await.map_err(|e| {
+            PostgresError::Connection(format!("Failed to start transaction: {}", e))
+        })?;
 
         // Delete Large Object
         tx.execute("SELECT lo_unlink($1)", &[&Oid::from(oid)])
@@ -355,11 +344,9 @@ impl LargeObjectStream {
     /// * `Result<i64>` - Size in bytes
     pub async fn size(&mut self, oid: u32) -> Result<i64> {
         // Start transaction
-        let tx = self
-            .client
-            .transaction()
-            .await
-            .map_err(|e| PostgresError::Connection(format!("Failed to start transaction: {}", e)))?;
+        let tx = self.client.transaction().await.map_err(|e| {
+            PostgresError::Connection(format!("Failed to start transaction: {}", e))
+        })?;
 
         // Open Large Object for reading
         let row = tx
@@ -372,9 +359,7 @@ impl LargeObjectStream {
         let row = tx
             .query_one("SELECT lo_lseek64($1, 0, 2)", &[&fd])
             .await
-            .map_err(|e| {
-                PostgresError::Query(format!("Failed to seek in Large Object: {}", e))
-            })?;
+            .map_err(|e| PostgresError::Query(format!("Failed to seek in Large Object: {}", e)))?;
         let size: i64 = row.get(0);
 
         // Close Large Object
@@ -391,9 +376,4 @@ impl LargeObjectStream {
     }
 }
 
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    // Tests will be in separate test file: tests/postgres_large_objects_tests.rs
-}
+// Tests are in separate test file: tests/postgres_large_objects_tests.rs
