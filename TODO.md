@@ -4773,42 +4773,136 @@ cargo check -p llmspell-rag  # ✅ Success (no changes needed)
 **Timeline**: 1 day (8 hours)
 **Critical Dependencies**: Phase 13b.2, Phase 13b.3 ✅
 
-### Task 13b.7.1: Create Agent State Schema
-**Priority**: HIGH
+### Task 13b.7.1: Create Agent State & Generic KV Schema
+**Priority**: CRITICAL
 **Estimated Time**: 2 hours
+**Status**: ✅ **COMPLETE** (2025-11-03, ~1.5 hours)
 
-**Description**: Create PostgreSQL schema for agent state with versioning and checksums.
+**Description**: Create PostgreSQL schemas for agent state and generic key-value storage (hybrid architecture).
+
+**Hybrid Architecture Decision**:
+This implements a smart routing approach where PostgresBackend implements the generic StorageBackend trait but routes to specialized tables based on key patterns:
+- Keys matching `agent:*` → `agent_states` table (optimized with JSONB, versioning, RLS)
+- All other keys → `kv_store` table (generic key-value with tenant isolation)
+
+**Implementation Completed**:
+1. ✅ Created `migrations/V6__agent_state.sql` (128 lines):
+   - Table: `agent_states` (state_id, tenant_id, agent_id, agent_type, state_data JSONB, schema_version, data_version, checksum, timestamps)
+   - Indexes: 6 indexes (tenant, type, updated DESC, GIN state_data, execution_state path, metadata.name path)
+   - Auto-increment data_version trigger (only when state_data changes)
+   - RLS policies: 4 policies (SELECT, INSERT, UPDATE, DELETE) for complete tenant isolation
+   - Auto-update updated_at trigger
+   - Checksum field for SHA-256 data integrity validation
+
+2. ✅ Created `migrations/V7__kv_store.sql` (95 lines):
+   - Table: `kv_store` (kv_id, tenant_id, key VARCHAR(500), value BYTEA, metadata JSONB, timestamps)
+   - Indexes: 4 indexes (tenant, key prefix with text_pattern_ops, updated DESC, GIN metadata)
+   - RLS policies: 4 policies (SELECT, INSERT, UPDATE, DELETE) for tenant isolation
+   - Auto-update updated_at trigger
+   - Binary-safe BYTEA storage for arbitrary data
+   - Optional JSONB metadata for extensibility
+
+3. ✅ Created comprehensive migration tests (`postgres_storage_backend_migration_tests.rs`, 716 lines):
+   - 13 tests covering both tables (6 tests each + 1 cross-table)
+   - All tests passed in 0.14s
+   - Validated: table creation, RLS enablement, indexes, policies, constraints, triggers, tenant isolation
+
+**Files Created**:
+- `llmspell-storage/migrations/V6__agent_state.sql` (128 lines)
+- `llmspell-storage/migrations/V7__kv_store.sql` (95 lines)
+- `llmspell-storage/tests/postgres_storage_backend_migration_tests.rs` (716 lines, 13 tests)
+
+**Test Results**: 13/13 passed in 0.14s
+- ✅ V6 agent_states: table, 6 indexes, 4 RLS policies, unique constraint, version trigger, updated_at trigger
+- ✅ V7 kv_store: table, 4 indexes, 4 RLS policies, unique constraint, updated_at trigger, metadata support
+- ✅ Cross-table tenant isolation verified
+
+**Key Implementation Insights**:
+
+1. **BYTEA Parameter Handling**: PostgreSQL ToSql requires `&[u8]` slices, not byte array types `[u8; N]`
+   - Fix: Convert `&value` → `&&value[..]` for BYTEA columns
+   - Affected 7 test locations using byte literals
+
+2. **JSONB Path Indexes**: agent_states includes specialized indexes for common query patterns
+   - `state_data->'state'->>'execution_state'` - Fast agent state filtering
+   - `state_data->'metadata'->>'name'` - Fast agent name lookups
+   - Enables efficient queries without full GIN index scans
+
+3. **Version Trigger Optimization**: data_version only increments when state_data changes
+   - SQL: `IF NEW.state_data IS DISTINCT FROM OLD.state_data THEN`
+   - Avoids spurious version bumps on metadata-only updates
+
+4. **text_pattern_ops Index**: kv_store uses specialized index for prefix scanning
+   - Enables efficient `list_keys(prefix)` operations
+   - Critical for StorageBackend trait implementation
+
+**Architectural Benefits Realized**:
+- ✅ Unblocks Phase 13b.4+ "StorageBackend trait implementation" blocker
+- ✅ Enables kernel StateManager to immediately use PostgreSQL
+- ✅ Specialized tables provide performance (JSONB indexes, versioning, integrity checks)
+- ✅ Generic table ensures compatibility with all StorageBackend use cases
+- ✅ Extensible: future specialized tables (workflow_states, session_states) follow same pattern
+- ✅ Production-ready RLS: Complete tenant isolation from day 1
+
+**Next**: Task 13b.7.2 - Implement PostgreSQL StorageBackend trait with intelligent routing logic
+
+### Task 13b.7.2: Implement PostgreSQL StorageBackend with Intelligent Routing
+**Priority**: CRITICAL
+**Estimated Time**: 6 hours
+
+**Description**: Implement StorageBackend trait for PostgresBackend with intelligent key-based routing to specialized tables.
 
 **Implementation Steps**:
-1. Create `migrations/V004__agent_state.sql`:
-   - Table: agent_state (agent_id, tenant_id, state_data JSONB, version, checksum, updated_at)
-   - Indexes: (agent_id, tenant_id) unique, GIN on state_data
-   - RLS policies applied
+1. Implement `StorageBackend` trait for `PostgresBackend` in `src/backends/postgres/backend.rs`:
+   - `get()`, `set()`, `delete()`, `exists()`, `list_keys()`
+   - `get_batch()`, `set_batch()`, `delete_batch()`, `clear()`
+   - Smart routing logic based on key patterns
 
-**Files to Create**: `llmspell-storage/migrations/V004__agent_state.sql`
+2. Create routing logic:
+   - Pattern: `agent:<tenant_id>:<agent_id>` → `agent_states` table
+   - Pattern: `workflow:<tenant_id>:<workflow_id>` → `kv_store` (future: workflow_states)
+   - Pattern: `session:<tenant_id>:<session_id>` → `kv_store` (future: session_states)
+   - Default: all other keys → `kv_store` table
+
+3. Agent state operations (optimized path):
+   - Serialize PersistentAgentState as JSONB
+   - Store in `agent_states` with version tracking
+   - Auto-increment data_version on updates
+   - Compute SHA-256 checksum for integrity
+
+4. Generic KV operations (fallback path):
+   - Store arbitrary bytes in `kv_store`
+   - Support metadata as JSONB
+   - Leverage tenant isolation via RLS
+
+5. Write comprehensive tests:
+   - StorageBackend trait compliance tests
+   - Agent state routing tests
+   - Generic KV routing tests
+   - Batch operations tests
+   - Tenant isolation tests
+   - Performance tests (<5ms for agent state operations)
+
+**Files to Modify**:
+- `llmspell-storage/src/backends/postgres/backend.rs`
+
+**Files to Create**:
+- `llmspell-storage/tests/postgres_storage_backend_tests.rs`
 
 **Definition of Done**:
-- [ ] Schema created with versioning support
-- [ ] RLS policies enforced
+- [ ] StorageBackend trait fully implemented for PostgresBackend
+- [ ] Intelligent routing works for all key patterns
+- [ ] Agent state operations optimized (<5ms target)
+- [ ] Generic KV operations functional for fallback cases
+- [ ] Tests pass (25+ tests covering all operations)
+- [ ] Integration with kernel StateManager verified
+- [ ] Performance validated (<5ms agent state ops, <10ms generic KV)
 
-### Task 13b.7.2: Implement PostgreSQL Agent State Backend
-**Priority**: HIGH
-**Estimated Time**: 4 hours
-
-**Description**: Implement agent state storage trait with PostgreSQL.
-
-**Implementation Steps**:
-1. Create `src/backends/postgres/agent_state.rs`
-2. Implement state operations (save, load, versioning)
-3. Integrate with llmspell-kernel state persistence layer
-4. Write tests gated with #[cfg(feature = "postgres")]
-
-**Files to Create**: `llmspell-storage/src/backends/postgres/agent_state.rs`, tests
-
-**Definition of Done**:
-- [ ] Trait implemented
-- [ ] Tests pass (15+ tests)
-- [ ] State operations <5ms
+**Integration Impact**:
+- Unblocks `backend_adapter.rs` PostgreSQL support (currently errors)
+- Enables `StateManager` to use PostgreSQL for all state types
+- Provides migration path for existing Sled/Memory users
+- Foundation for workflow_states and session_states in future phases
 
 ---
 
