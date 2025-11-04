@@ -59,6 +59,7 @@
 #[cfg(feature = "postgres")]
 mod postgres_benchmarks {
     use chrono::{Duration, Utc};
+    use criterion::{black_box, BenchmarkId, Criterion};
     use llmspell_graph::types::TemporalQuery;
     use llmspell_storage::backends::postgres::{
         PostgresBackend, PostgresConfig, PostgresGraphStorage,
@@ -67,7 +68,6 @@ mod postgres_benchmarks {
     use std::sync::Arc;
     use tokio::runtime::Runtime;
     use uuid::Uuid;
-    use criterion::{black_box, BenchmarkId, Criterion};
 
     const TEST_CONNECTION_STRING: &str =
         "postgresql://llmspell_app:llmspell_dev_pass@localhost:5432/llmspell_dev";
@@ -168,8 +168,9 @@ mod postgres_benchmarks {
 
                 let mut ids = Vec::new();
                 for i in 0..*size {
-                    let id = insert_entity(&backend, &tenant, "benchmark", &format!("entity-{}", i))
-                        .await;
+                    let id =
+                        insert_entity(&backend, &tenant, "benchmark", &format!("entity-{}", i))
+                            .await;
                     ids.push(id);
                 }
 
@@ -185,7 +186,11 @@ mod postgres_benchmarks {
 
                 b.to_async(&rt).iter(|| async {
                     storage
-                        .get_entity_at(black_box(&target_id), black_box(query_time), black_box(query_time))
+                        .get_entity_at(
+                            black_box(&target_id),
+                            black_box(query_time),
+                            black_box(query_time),
+                        )
                         .await
                         .unwrap()
                 });
@@ -223,10 +228,7 @@ mod postgres_benchmarks {
 
                 b.to_async(&rt).iter(|| async {
                     let query = TemporalQuery::new().with_entity_type("even".to_string());
-                    storage
-                        .query_temporal(black_box(&query))
-                        .await
-                        .unwrap()
+                    storage.query_temporal(black_box(&query)).await.unwrap()
                 });
             });
         }
@@ -270,7 +272,12 @@ mod postgres_benchmarks {
 
                 b.to_async(&rt).iter(|| async {
                     storage
-                        .get_related(black_box(&root), black_box(Some("next")), black_box(d), black_box(query_time))
+                        .get_related(
+                            black_box(&root),
+                            black_box(Some("next")),
+                            black_box(d),
+                            black_box(query_time),
+                        )
                         .await
                         .unwrap()
                 });
