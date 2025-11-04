@@ -19,7 +19,7 @@ use uuid::Uuid;
 const SUPERUSER_CONNECTION_STRING: &str =
     "postgresql://llmspell:llmspell_dev_pass@localhost:5432/llmspell_dev";
 
-const TEST_CONNECTION_STRING: &str =
+const APP_CONNECTION_STRING: &str =
     "postgresql://llmspell_app:llmspell_dev_pass@localhost:5432/llmspell_dev";
 
 static MIGRATION_INIT: OnceCell<()> = OnceCell::const_new();
@@ -173,7 +173,7 @@ async fn test_agent_states_rls_policies() {
 async fn test_agent_states_unique_constraint() {
     ensure_migrations_run_once().await;
 
-    let config = PostgresConfig::new(TEST_CONNECTION_STRING);
+    let config = PostgresConfig::new(APP_CONNECTION_STRING);
     let backend = Arc::new(PostgresBackend::new(config).await.unwrap());
     let tenant_id = unique_tenant_id("unique-agent");
 
@@ -239,7 +239,7 @@ async fn test_agent_states_unique_constraint() {
 async fn test_agent_states_version_increment_trigger() {
     ensure_migrations_run_once().await;
 
-    let config = PostgresConfig::new(TEST_CONNECTION_STRING);
+    let config = PostgresConfig::new(APP_CONNECTION_STRING);
     let backend = Arc::new(PostgresBackend::new(config).await.unwrap());
     let tenant_id = unique_tenant_id("version-test");
 
@@ -310,7 +310,7 @@ async fn test_agent_states_version_increment_trigger() {
 async fn test_agent_states_updated_at_trigger() {
     ensure_migrations_run_once().await;
 
-    let config = PostgresConfig::new(TEST_CONNECTION_STRING);
+    let config = PostgresConfig::new(APP_CONNECTION_STRING);
     let backend = Arc::new(PostgresBackend::new(config).await.unwrap());
     let tenant_id = unique_tenant_id("updated-at-test");
 
@@ -499,7 +499,7 @@ async fn test_kv_store_rls_policies() {
 async fn test_kv_store_unique_constraint() {
     ensure_migrations_run_once().await;
 
-    let config = PostgresConfig::new(TEST_CONNECTION_STRING);
+    let config = PostgresConfig::new(APP_CONNECTION_STRING);
     let backend = Arc::new(PostgresBackend::new(config).await.unwrap());
     let tenant_id = unique_tenant_id("unique-kv");
 
@@ -551,7 +551,7 @@ async fn test_kv_store_unique_constraint() {
 async fn test_kv_store_updated_at_trigger() {
     ensure_migrations_run_once().await;
 
-    let config = PostgresConfig::new(TEST_CONNECTION_STRING);
+    let config = PostgresConfig::new(APP_CONNECTION_STRING);
     let backend = Arc::new(PostgresBackend::new(config).await.unwrap());
     let tenant_id = unique_tenant_id("kv-updated-at");
 
@@ -617,7 +617,7 @@ async fn test_kv_store_updated_at_trigger() {
 async fn test_kv_store_metadata_support() {
     ensure_migrations_run_once().await;
 
-    let config = PostgresConfig::new(TEST_CONNECTION_STRING);
+    let config = PostgresConfig::new(APP_CONNECTION_STRING);
     let backend = Arc::new(PostgresBackend::new(config).await.unwrap());
     let tenant_id = unique_tenant_id("kv-metadata");
 
@@ -663,7 +663,7 @@ async fn test_kv_store_metadata_support() {
 async fn test_tenant_isolation_across_both_tables() {
     ensure_migrations_run_once().await;
 
-    let config = PostgresConfig::new(TEST_CONNECTION_STRING);
+    let config = PostgresConfig::new(APP_CONNECTION_STRING);
     let backend = Arc::new(PostgresBackend::new(config).await.unwrap());
 
     let tenant_a = unique_tenant_id("isolation-a");

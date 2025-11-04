@@ -19,7 +19,7 @@ use uuid::Uuid;
 const SUPERUSER_CONNECTION_STRING: &str =
     "postgresql://llmspell:llmspell_dev_pass@localhost:5432/llmspell_dev";
 
-const TEST_CONNECTION_STRING: &str =
+const APP_CONNECTION_STRING: &str =
     "postgresql://llmspell_app:llmspell_dev_pass@localhost:5432/llmspell_dev";
 
 static MIGRATION_INIT: OnceCell<()> = OnceCell::const_new();
@@ -94,7 +94,7 @@ async fn test_graph_traversal_1_hop() {
     ensure_migrations_run_once().await;
 
     let tenant_id = unique_tenant_id("traversal-1hop");
-    let config = PostgresConfig::new(TEST_CONNECTION_STRING);
+    let config = PostgresConfig::new(APP_CONNECTION_STRING);
     let backend = Arc::new(PostgresBackend::new(config).await.expect("create backend"));
     backend
         .set_tenant_context(&tenant_id)
@@ -133,7 +133,7 @@ async fn test_graph_traversal_2_hop() {
     ensure_migrations_run_once().await;
 
     let tenant_id = unique_tenant_id("traversal-2hop");
-    let config = PostgresConfig::new(TEST_CONNECTION_STRING);
+    let config = PostgresConfig::new(APP_CONNECTION_STRING);
     let backend = Arc::new(PostgresBackend::new(config).await.expect("create backend"));
     backend
         .set_tenant_context(&tenant_id)
@@ -185,7 +185,7 @@ async fn test_graph_traversal_4_hop() {
     ensure_migrations_run_once().await;
 
     let tenant_id = unique_tenant_id("traversal-4hop");
-    let config = PostgresConfig::new(TEST_CONNECTION_STRING);
+    let config = PostgresConfig::new(APP_CONNECTION_STRING);
     let backend = Arc::new(PostgresBackend::new(config).await.expect("create backend"));
     backend
         .set_tenant_context(&tenant_id)
@@ -257,7 +257,7 @@ async fn test_graph_traversal_cycle_prevention() {
     ensure_migrations_run_once().await;
 
     let tenant_id = unique_tenant_id("traversal-cycle");
-    let config = PostgresConfig::new(TEST_CONNECTION_STRING);
+    let config = PostgresConfig::new(APP_CONNECTION_STRING);
     let backend = Arc::new(PostgresBackend::new(config).await.expect("create backend"));
     backend
         .set_tenant_context(&tenant_id)
@@ -315,7 +315,7 @@ async fn test_graph_traversal_relationship_type_filter() {
     ensure_migrations_run_once().await;
 
     let tenant_id = unique_tenant_id("traversal-filter");
-    let config = PostgresConfig::new(TEST_CONNECTION_STRING);
+    let config = PostgresConfig::new(APP_CONNECTION_STRING);
     let backend = Arc::new(PostgresBackend::new(config).await.expect("create backend"));
     backend
         .set_tenant_context(&tenant_id)
@@ -381,7 +381,7 @@ async fn test_graph_traversal_path_tracking() {
     ensure_migrations_run_once().await;
 
     let tenant_id = unique_tenant_id("traversal-path");
-    let config = PostgresConfig::new(TEST_CONNECTION_STRING);
+    let config = PostgresConfig::new(APP_CONNECTION_STRING);
     let backend = Arc::new(PostgresBackend::new(config).await.expect("create backend"));
     backend
         .set_tenant_context(&tenant_id)
@@ -453,7 +453,7 @@ async fn test_graph_traversal_performance() {
     ensure_migrations_run_once().await;
 
     let tenant_id = unique_tenant_id("traversal-perf");
-    let config = PostgresConfig::new(TEST_CONNECTION_STRING);
+    let config = PostgresConfig::new(APP_CONNECTION_STRING);
     let backend = Arc::new(PostgresBackend::new(config).await.expect("create backend"));
     backend
         .set_tenant_context(&tenant_id)
@@ -534,7 +534,7 @@ async fn test_graph_traversal_tenant_isolation() {
     let tenant_a = unique_tenant_id("traversal-tenant-a");
     let tenant_b = unique_tenant_id("traversal-tenant-b");
 
-    let config = PostgresConfig::new(TEST_CONNECTION_STRING);
+    let config = PostgresConfig::new(APP_CONNECTION_STRING);
 
     // Setup graph for tenant A
     let backend_a = Arc::new(

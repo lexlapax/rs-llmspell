@@ -7,12 +7,18 @@
 
 use llmspell_core::{state::StateScope, TenantScoped};
 use llmspell_storage::{PostgresBackend, PostgresConfig};
+use tokio::sync::OnceCell;
 
-const TEST_CONNECTION_STRING: &str =
+// Admin connection for migrations (llmspell user has CREATE TABLE privileges)
+const ADMIN_CONNECTION_STRING: &str =
     "postgresql://llmspell:llmspell_dev_pass@localhost:5432/llmspell_dev";
 
+// Application connection for queries (llmspell_app enforces RLS, no schema modification)
+const APP_CONNECTION_STRING: &str =
+    "postgresql://llmspell_app:llmspell_app_pass@localhost:5432/llmspell_dev";
+
 async fn setup_backend() -> PostgresBackend {
-    let config = PostgresConfig::new(TEST_CONNECTION_STRING);
+    let config = PostgresConfig::new(APP_CONNECTION_STRING);
     PostgresBackend::new(config)
         .await
         .expect("Failed to create backend")

@@ -22,7 +22,7 @@ use uuid::Uuid;
 const SUPERUSER_CONNECTION_STRING: &str =
     "postgresql://llmspell:llmspell_dev_pass@localhost:5432/llmspell_dev";
 
-const TEST_CONNECTION_STRING: &str =
+const APP_CONNECTION_STRING: &str =
     "postgresql://llmspell_app:llmspell_dev_pass@localhost:5432/llmspell_dev";
 
 static MIGRATION_INIT: OnceCell<()> = OnceCell::const_new();
@@ -53,7 +53,7 @@ fn unique_tenant_id(prefix: &str) -> String {
 async fn test_dimension_routing_all_dimensions() {
     ensure_migrations_run_once().await;
 
-    let config = PostgresConfig::new(TEST_CONNECTION_STRING);
+    let config = PostgresConfig::new(APP_CONNECTION_STRING);
     let backend = Arc::new(PostgresBackend::new(config).await.unwrap());
     let storage = PostgreSQLVectorStorage::new(backend.clone());
 
@@ -77,7 +77,7 @@ async fn test_dimension_routing_all_dimensions() {
 async fn test_dimension_routing_unsupported_dimension() {
     ensure_migrations_run_once().await;
 
-    let config = PostgresConfig::new(TEST_CONNECTION_STRING);
+    let config = PostgresConfig::new(APP_CONNECTION_STRING);
     let backend = Arc::new(PostgresBackend::new(config).await.unwrap());
     let storage = PostgreSQLVectorStorage::new(backend.clone());
 
@@ -102,7 +102,7 @@ async fn test_dimension_routing_unsupported_dimension() {
 async fn test_insert_and_search_384() {
     ensure_migrations_run_once().await;
 
-    let config = PostgresConfig::new(TEST_CONNECTION_STRING);
+    let config = PostgresConfig::new(APP_CONNECTION_STRING);
     let backend = Arc::new(PostgresBackend::new(config).await.unwrap());
     let storage = PostgreSQLVectorStorage::new(backend.clone());
 
@@ -139,7 +139,7 @@ async fn test_insert_and_search_384() {
 async fn test_search_scoped() {
     ensure_migrations_run_once().await;
 
-    let config = PostgresConfig::new(TEST_CONNECTION_STRING);
+    let config = PostgresConfig::new(APP_CONNECTION_STRING);
     let backend = Arc::new(PostgresBackend::new(config).await.unwrap());
     let storage = PostgreSQLVectorStorage::new(backend.clone());
 
@@ -179,7 +179,7 @@ async fn test_search_scoped() {
 async fn test_update_metadata() {
     ensure_migrations_run_once().await;
 
-    let config = PostgresConfig::new(TEST_CONNECTION_STRING);
+    let config = PostgresConfig::new(APP_CONNECTION_STRING);
     let backend = Arc::new(PostgresBackend::new(config).await.unwrap());
     let storage = PostgreSQLVectorStorage::new(backend.clone());
 
@@ -228,7 +228,7 @@ async fn test_update_metadata() {
 async fn test_delete_scope() {
     ensure_migrations_run_once().await;
 
-    let config = PostgresConfig::new(TEST_CONNECTION_STRING);
+    let config = PostgresConfig::new(APP_CONNECTION_STRING);
     let backend = Arc::new(PostgresBackend::new(config).await.unwrap());
     let storage = PostgreSQLVectorStorage::new(backend.clone());
 
@@ -270,7 +270,7 @@ async fn test_delete_scope() {
 async fn test_stats() {
     ensure_migrations_run_once().await;
 
-    let config = PostgresConfig::new(TEST_CONNECTION_STRING);
+    let config = PostgresConfig::new(APP_CONNECTION_STRING);
     let backend = Arc::new(PostgresBackend::new(config).await.unwrap());
     let storage = PostgreSQLVectorStorage::new(backend.clone());
 
@@ -302,7 +302,7 @@ async fn test_stats() {
 async fn test_stats_for_scope() {
     ensure_migrations_run_once().await;
 
-    let config = PostgresConfig::new(TEST_CONNECTION_STRING);
+    let config = PostgresConfig::new(APP_CONNECTION_STRING);
     let backend = Arc::new(PostgresBackend::new(config).await.unwrap());
     let storage = PostgreSQLVectorStorage::new(backend.clone());
 
@@ -340,7 +340,7 @@ async fn test_stats_for_scope() {
 async fn test_rls_tenant_isolation() {
     ensure_migrations_run_once().await;
 
-    let config = PostgresConfig::new(TEST_CONNECTION_STRING);
+    let config = PostgresConfig::new(APP_CONNECTION_STRING);
     let backend = Arc::new(PostgresBackend::new(config).await.unwrap());
     let storage = PostgreSQLVectorStorage::new(backend.clone());
 
@@ -418,7 +418,7 @@ async fn test_rls_tenant_isolation() {
 async fn test_threshold_filtering() {
     ensure_migrations_run_once().await;
 
-    let config = PostgresConfig::new(TEST_CONNECTION_STRING);
+    let config = PostgresConfig::new(APP_CONNECTION_STRING);
     let backend = Arc::new(PostgresBackend::new(config).await.unwrap());
     let storage = PostgreSQLVectorStorage::new(backend.clone());
 

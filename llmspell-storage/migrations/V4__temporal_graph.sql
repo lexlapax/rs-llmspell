@@ -164,20 +164,28 @@ CREATE POLICY tenant_isolation_delete ON llmspell.relationships
     USING (tenant_id = current_setting('app.current_tenant_id', true));
 
 -- ============================================================================
--- Privilege Grants
+-- Privilege Grants (conditional, for V4->V11 migrations)
 -- ============================================================================
+-- Phase 13b.11.0: Made conditional - V12 creates llmspell_app role and sets default privileges
+-- These grants apply when running V4 before V12 exists (historical migrations)
 
--- Grant schema usage (required for non-superuser access)
-GRANT USAGE ON SCHEMA llmspell TO llmspell_app;
+DO $$
+BEGIN
+    -- Only grant if llmspell_app role exists (created by V12)
+    IF EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'llmspell_app') THEN
+        -- Grant schema usage (required for non-superuser access)
+        GRANT USAGE ON SCHEMA llmspell TO llmspell_app;
 
--- Grant table operations to application user
-GRANT SELECT, INSERT, UPDATE, DELETE ON TABLE
-    llmspell.entities,
-    llmspell.relationships
-TO llmspell_app;
+        -- Grant table operations to application user
+        GRANT SELECT, INSERT, UPDATE, DELETE ON TABLE
+            llmspell.entities,
+            llmspell.relationships
+        TO llmspell_app;
 
--- Grant sequence usage for default values
-GRANT USAGE ON ALL SEQUENCES IN SCHEMA llmspell TO llmspell_app;
+        -- Grant sequence usage for default values
+        GRANT USAGE ON ALL SEQUENCES IN SCHEMA llmspell TO llmspell_app;
+    END IF;
+END $$;
 
 -- ============================================================================
 -- Migration Notes

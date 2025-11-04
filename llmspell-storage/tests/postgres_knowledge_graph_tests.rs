@@ -22,7 +22,7 @@ use uuid::Uuid;
 const SUPERUSER_CONNECTION_STRING: &str =
     "postgresql://llmspell:llmspell_dev_pass@localhost:5432/llmspell_dev";
 
-const TEST_CONNECTION_STRING: &str =
+const APP_CONNECTION_STRING: &str =
     "postgresql://llmspell_app:llmspell_dev_pass@localhost:5432/llmspell_dev";
 
 static MIGRATION_INIT: OnceCell<()> = OnceCell::const_new();
@@ -53,7 +53,7 @@ async fn test_add_and_get_entity() {
     ensure_migrations_run_once().await;
 
     let tenant_id = unique_tenant_id("kg-add-get");
-    let config = PostgresConfig::new(TEST_CONNECTION_STRING);
+    let config = PostgresConfig::new(APP_CONNECTION_STRING);
     let backend = Arc::new(PostgresBackend::new(config).await.expect("create backend"));
     backend
         .set_tenant_context(&tenant_id)
@@ -90,7 +90,7 @@ async fn test_update_entity_bi_temporal() {
     ensure_migrations_run_once().await;
 
     let tenant_id = unique_tenant_id("kg-update");
-    let config = PostgresConfig::new(TEST_CONNECTION_STRING);
+    let config = PostgresConfig::new(APP_CONNECTION_STRING);
     let backend = Arc::new(PostgresBackend::new(config).await.expect("create backend"));
     backend
         .set_tenant_context(&tenant_id)
@@ -135,7 +135,7 @@ async fn test_add_relationship_and_get_related() {
     ensure_migrations_run_once().await;
 
     let tenant_id = unique_tenant_id("kg-relationship");
-    let config = PostgresConfig::new(TEST_CONNECTION_STRING);
+    let config = PostgresConfig::new(APP_CONNECTION_STRING);
     let backend = Arc::new(PostgresBackend::new(config).await.expect("create backend"));
     backend
         .set_tenant_context(&tenant_id)
@@ -199,7 +199,7 @@ async fn test_delete_before() {
     ensure_migrations_run_once().await;
 
     let tenant_id = unique_tenant_id("kg-delete");
-    let config = PostgresConfig::new(TEST_CONNECTION_STRING);
+    let config = PostgresConfig::new(APP_CONNECTION_STRING);
     let backend = Arc::new(PostgresBackend::new(config).await.expect("create backend"));
     backend
         .set_tenant_context(&tenant_id)
@@ -244,7 +244,7 @@ async fn test_tenant_isolation() {
 
     let tenant_a = unique_tenant_id("kg-tenant-a");
     let tenant_b = unique_tenant_id("kg-tenant-b");
-    let config = PostgresConfig::new(TEST_CONNECTION_STRING);
+    let config = PostgresConfig::new(APP_CONNECTION_STRING);
 
     // Setup for tenant A
     let backend_a = Arc::new(

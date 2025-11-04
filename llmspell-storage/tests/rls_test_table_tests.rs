@@ -5,16 +5,21 @@
 use llmspell_storage::{PostgresBackend, PostgresConfig};
 use tokio::sync::OnceCell;
 
-const TEST_CONNECTION_STRING: &str =
+// Admin connection for migrations (llmspell user has CREATE TABLE privileges)
+const ADMIN_CONNECTION_STRING: &str =
     "postgresql://llmspell:llmspell_dev_pass@localhost:5432/llmspell_dev";
+
+// Application connection for queries (llmspell_app enforces RLS, no schema modification)
+const APP_CONNECTION_STRING: &str =
+    "postgresql://llmspell_app:llmspell_app_pass@localhost:5432/llmspell_dev";
 
 static MIGRATION_INIT: OnceCell<()> = OnceCell::const_new();
 
-/// Ensure migrations are run exactly once before any tests
+/// Ensure migrations are run exactly once before any tests (uses admin connection)
 async fn ensure_migrations_run_once() {
     MIGRATION_INIT
         .get_or_init(|| async {
-            let config = PostgresConfig::new(TEST_CONNECTION_STRING);
+            let config = PostgresConfig::new(ADMIN_CONNECTION_STRING);
             let backend = PostgresBackend::new(config)
                 .await
                 .expect("Failed to create backend for migration init");
@@ -31,7 +36,7 @@ async fn ensure_migrations_run_once() {
 async fn test_migration_creates_test_data_table() {
     ensure_migrations_run_once().await;
 
-    let config = PostgresConfig::new(TEST_CONNECTION_STRING);
+    let config = PostgresConfig::new(APP_CONNECTION_STRING);
     let backend = PostgresBackend::new(config)
         .await
         .expect("Failed to create backend");
@@ -66,7 +71,7 @@ async fn test_migration_creates_test_data_table() {
 async fn test_test_data_table_has_four_policies() {
     ensure_migrations_run_once().await;
 
-    let config = PostgresConfig::new(TEST_CONNECTION_STRING);
+    let config = PostgresConfig::new(APP_CONNECTION_STRING);
     let backend = PostgresBackend::new(config)
         .await
         .expect("Failed to create backend");
@@ -108,7 +113,7 @@ async fn test_test_data_table_has_four_policies() {
 async fn test_test_data_table_has_tenant_id_index() {
     ensure_migrations_run_once().await;
 
-    let config = PostgresConfig::new(TEST_CONNECTION_STRING);
+    let config = PostgresConfig::new(APP_CONNECTION_STRING);
     let backend = PostgresBackend::new(config)
         .await
         .expect("Failed to create backend");
@@ -131,7 +136,7 @@ async fn test_test_data_table_has_tenant_id_index() {
 async fn test_can_insert_and_query_test_data() {
     ensure_migrations_run_once().await;
 
-    let config = PostgresConfig::new(TEST_CONNECTION_STRING);
+    let config = PostgresConfig::new(APP_CONNECTION_STRING);
     let backend = PostgresBackend::new(config)
         .await
         .expect("Failed to create backend");

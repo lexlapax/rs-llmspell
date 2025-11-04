@@ -15,7 +15,7 @@ use uuid::Uuid;
 const SUPERUSER_CONNECTION_STRING: &str =
     "postgresql://llmspell:llmspell_dev_pass@localhost:5432/llmspell_dev";
 
-const TEST_CONNECTION_STRING: &str =
+const APP_CONNECTION_STRING: &str =
     "postgresql://llmspell_app:llmspell_dev_pass@localhost:5432/llmspell_dev";
 
 static MIGRATION_INIT: OnceCell<()> = OnceCell::const_new();
@@ -212,7 +212,7 @@ async fn test_vector_embeddings_app_user_permissions() {
     ensure_migrations_run_once().await;
 
     // Use llmspell_app user (non-superuser)
-    let config = PostgresConfig::new(TEST_CONNECTION_STRING);
+    let config = PostgresConfig::new(APP_CONNECTION_STRING);
     let backend = PostgresBackend::new(config).await.unwrap();
 
     // Set tenant context
@@ -276,7 +276,7 @@ async fn test_vector_embeddings_app_user_permissions() {
 async fn test_vector_embeddings_rls_isolation() {
     ensure_migrations_run_once().await;
 
-    let config = PostgresConfig::new(TEST_CONNECTION_STRING);
+    let config = PostgresConfig::new(APP_CONNECTION_STRING);
     let backend = PostgresBackend::new(config).await.unwrap();
 
     // Test RLS isolation on all 4 tables

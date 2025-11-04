@@ -18,7 +18,7 @@ use uuid::Uuid;
 const SUPERUSER_CONNECTION_STRING: &str =
     "postgresql://llmspell:llmspell_dev_pass@localhost:5432/llmspell_dev";
 
-const TEST_CONNECTION_STRING: &str =
+const APP_CONNECTION_STRING: &str =
     "postgresql://llmspell_app:llmspell_dev_pass@localhost:5432/llmspell_dev";
 
 static MIGRATION_INIT: OnceCell<()> = OnceCell::const_new();
@@ -161,7 +161,7 @@ async fn test_procedural_patterns_rls_policies() {
 async fn test_procedural_patterns_unique_constraint() {
     ensure_migrations_run_once().await;
 
-    let config = PostgresConfig::new(TEST_CONNECTION_STRING);
+    let config = PostgresConfig::new(APP_CONNECTION_STRING);
     let backend = PostgresBackend::new(config).await.unwrap();
     let tenant_id = unique_tenant_id("unique-test");
 
@@ -218,7 +218,7 @@ async fn test_procedural_patterns_unique_constraint() {
 async fn test_procedural_patterns_frequency_constraint() {
     ensure_migrations_run_once().await;
 
-    let config = PostgresConfig::new(TEST_CONNECTION_STRING);
+    let config = PostgresConfig::new(APP_CONNECTION_STRING);
     let backend = PostgresBackend::new(config).await.unwrap();
     let tenant_id = unique_tenant_id("frequency-test");
 
@@ -260,7 +260,7 @@ async fn test_procedural_patterns_frequency_constraint() {
 async fn test_procedural_patterns_updated_at_trigger() {
     ensure_migrations_run_once().await;
 
-    let config = PostgresConfig::new(TEST_CONNECTION_STRING);
+    let config = PostgresConfig::new(APP_CONNECTION_STRING);
     let backend = PostgresBackend::new(config).await.unwrap();
     let tenant_id = unique_tenant_id("trigger-test");
 
@@ -324,7 +324,7 @@ async fn test_procedural_patterns_updated_at_trigger() {
 async fn test_procedural_patterns_rls_isolation() {
     ensure_migrations_run_once().await;
 
-    let config = PostgresConfig::new(TEST_CONNECTION_STRING);
+    let config = PostgresConfig::new(APP_CONNECTION_STRING);
     let backend = PostgresBackend::new(config).await.unwrap();
 
     let tenant_a = unique_tenant_id("rls-a");

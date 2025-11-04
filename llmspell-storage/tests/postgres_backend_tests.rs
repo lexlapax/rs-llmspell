@@ -13,12 +13,17 @@ use tokio::sync::OnceCell;
 static MIGRATION_INIT: OnceCell<()> = OnceCell::const_new();
 
 /// Test database connection string
-const TEST_CONNECTION_STRING: &str =
+// Admin connection for migrations (llmspell user has CREATE TABLE privileges)
+const ADMIN_CONNECTION_STRING: &str =
     "postgresql://llmspell:llmspell_dev_pass@localhost:5432/llmspell_dev";
+
+// Application connection for queries (llmspell_app enforces RLS, no schema modification)
+const APP_CONNECTION_STRING: &str =
+    "postgresql://llmspell_app:llmspell_app_pass@localhost:5432/llmspell_dev";
 
 #[tokio::test]
 async fn test_postgres_backend_creation() {
-    let config = PostgresConfig::new(TEST_CONNECTION_STRING);
+    let config = PostgresConfig::new(APP_CONNECTION_STRING);
     let backend = PostgresBackend::new(config).await;
 
     assert!(
@@ -30,7 +35,7 @@ async fn test_postgres_backend_creation() {
 
 #[tokio::test]
 async fn test_postgres_backend_health_check() {
-    let config = PostgresConfig::new(TEST_CONNECTION_STRING);
+    let config = PostgresConfig::new(APP_CONNECTION_STRING);
     let backend = PostgresBackend::new(config)
         .await
         .expect("Failed to create backend");
@@ -41,7 +46,7 @@ async fn test_postgres_backend_health_check() {
 
 #[tokio::test]
 async fn test_postgres_pool_status() {
-    let config = PostgresConfig::new(TEST_CONNECTION_STRING).with_max_pool_size(10);
+    let config = PostgresConfig::new(APP_CONNECTION_STRING).with_max_pool_size(10);
     let backend = PostgresBackend::new(config)
         .await
         .expect("Failed to create backend");
@@ -56,7 +61,7 @@ async fn test_postgres_pool_status() {
 
 #[tokio::test]
 async fn test_tenant_context_management() {
-    let config = PostgresConfig::new(TEST_CONNECTION_STRING);
+    let config = PostgresConfig::new(APP_CONNECTION_STRING);
     let backend = PostgresBackend::new(config)
         .await
         .expect("Failed to create backend");
@@ -95,7 +100,7 @@ async fn test_tenant_context_management() {
 
 #[tokio::test]
 async fn test_tenant_context_with_multiple_tenants() {
-    let config = PostgresConfig::new(TEST_CONNECTION_STRING);
+    let config = PostgresConfig::new(APP_CONNECTION_STRING);
     let backend = PostgresBackend::new(config)
         .await
         .expect("Failed to create backend");
@@ -141,28 +146,28 @@ async fn test_postgres_config_validation() {
     );
 
     // Valid connection string should pass
-    let config = PostgresConfig::new(TEST_CONNECTION_STRING);
+    let config = PostgresConfig::new(APP_CONNECTION_STRING);
     assert!(
         config.validate().is_ok(),
         "Valid connection string should pass validation"
     );
 
     // Zero pool size should fail
-    let config = PostgresConfig::new(TEST_CONNECTION_STRING).with_max_pool_size(0);
+    let config = PostgresConfig::new(APP_CONNECTION_STRING).with_max_pool_size(0);
     assert!(
         config.validate().is_err(),
         "Zero pool size should fail validation"
     );
 
     // Excessive pool size should fail
-    let config = PostgresConfig::new(TEST_CONNECTION_STRING).with_max_pool_size(101);
+    let config = PostgresConfig::new(APP_CONNECTION_STRING).with_max_pool_size(101);
     assert!(
         config.validate().is_err(),
         "Pool size > 100 should fail validation"
     );
 
     // Valid pool size should pass
-    let config = PostgresConfig::new(TEST_CONNECTION_STRING).with_max_pool_size(50);
+    let config = PostgresConfig::new(APP_CONNECTION_STRING).with_max_pool_size(50);
     assert!(
         config.validate().is_ok(),
         "Valid pool size should pass validation"
@@ -171,12 +176,12 @@ async fn test_postgres_config_validation() {
 
 #[tokio::test]
 async fn test_postgres_config_builder_pattern() {
-    let config = PostgresConfig::new(TEST_CONNECTION_STRING)
+    let config = PostgresConfig::new(APP_CONNECTION_STRING)
         .with_max_pool_size(15)
         .with_connection_timeout(10000)
         .with_rls(false);
 
-    assert_eq!(config.connection_string, TEST_CONNECTION_STRING);
+    assert_eq!(config.connection_string, APP_CONNECTION_STRING);
     assert_eq!(config.max_pool_size, 15);
     assert_eq!(config.connection_timeout_ms, 10000);
     assert!(!config.enable_rls);
@@ -184,7 +189,7 @@ async fn test_postgres_config_builder_pattern() {
 
 #[tokio::test]
 async fn test_postgres_config_defaults() {
-    let config = PostgresConfig::new(TEST_CONNECTION_STRING);
+    let config = PostgresConfig::new(APP_CONNECTION_STRING);
 
     assert_eq!(config.max_pool_size, 20, "Default pool size should be 20");
     assert_eq!(
@@ -226,7 +231,7 @@ async fn test_connection_to_nonexistent_database() {
 
 #[tokio::test]
 async fn test_multiple_backends_same_database() {
-    let config = PostgresConfig::new(TEST_CONNECTION_STRING).with_max_pool_size(5);
+    let config = PostgresConfig::new(APP_CONNECTION_STRING).with_max_pool_size(5);
 
     // Create multiple backends to same database
     let backend1 = PostgresBackend::new(config.clone())
@@ -266,7 +271,7 @@ async fn test_multiple_backends_same_database() {
 
 #[tokio::test]
 async fn test_rls_disabled_tenant_context() {
-    let config = PostgresConfig::new(TEST_CONNECTION_STRING).with_rls(false);
+    let config = PostgresConfig::new(APP_CONNECTION_STRING).with_rls(false);
     let backend = PostgresBackend::new(config)
         .await
         .expect("Failed to create backend");
@@ -289,7 +294,7 @@ async fn test_concurrent_pool_access() {
     use std::sync::Arc;
     use tokio::task::JoinSet;
 
-    let config = PostgresConfig::new(TEST_CONNECTION_STRING).with_max_pool_size(10);
+    let config = PostgresConfig::new(APP_CONNECTION_STRING).with_max_pool_size(10);
     let backend = Arc::new(
         PostgresBackend::new(config)
             .await
@@ -333,7 +338,7 @@ async fn test_concurrent_pool_access() {
 /// after deployment - create new migrations instead (e.g., V3__fix_rls_policies.sql).
 async fn ensure_migrations_run_once() {
     MIGRATION_INIT.get_or_init(|| async {
-        let config = PostgresConfig::new(TEST_CONNECTION_STRING);
+        let config = PostgresConfig::new(ADMIN_CONNECTION_STRING);
         let backend = PostgresBackend::new(config)
             .await
             .expect("Failed to create backend for migration init");
@@ -385,7 +390,7 @@ async fn test_run_migrations() {
     // Ensure migrations run once before all tests
     ensure_migrations_run_once().await;
 
-    let config = PostgresConfig::new(TEST_CONNECTION_STRING);
+    let config = PostgresConfig::new(APP_CONNECTION_STRING);
     let backend = PostgresBackend::new(config)
         .await
         .expect("Failed to create backend");
@@ -404,7 +409,7 @@ async fn test_migration_version() {
     // Ensure migrations run once before all tests
     ensure_migrations_run_once().await;
 
-    let config = PostgresConfig::new(TEST_CONNECTION_STRING);
+    let config = PostgresConfig::new(APP_CONNECTION_STRING);
     let backend = PostgresBackend::new(config)
         .await
         .expect("Failed to create backend");
@@ -426,7 +431,7 @@ async fn test_migrations_idempotent() {
     // Ensure migrations run once before all tests
     ensure_migrations_run_once().await;
 
-    let config = PostgresConfig::new(TEST_CONNECTION_STRING);
+    let config = PostgresConfig::new(APP_CONNECTION_STRING);
     let backend = PostgresBackend::new(config)
         .await
         .expect("Failed to create backend");

@@ -21,7 +21,7 @@ use uuid::Uuid;
 const SUPERUSER_CONNECTION_STRING: &str =
     "postgresql://llmspell:llmspell_dev_pass@localhost:5432/llmspell_dev";
 
-const TEST_CONNECTION_STRING: &str =
+const APP_CONNECTION_STRING: &str =
     "postgresql://llmspell_app:llmspell_dev_pass@localhost:5432/llmspell_dev";
 
 static MIGRATION_INIT: OnceCell<()> = OnceCell::const_new();
@@ -167,7 +167,7 @@ async fn test_workflow_states_rls_policies() {
 async fn test_workflow_states_unique_constraint() {
     ensure_migrations_run_once().await;
 
-    let config = PostgresConfig::new(TEST_CONNECTION_STRING);
+    let config = PostgresConfig::new(APP_CONNECTION_STRING);
     let backend = PostgresBackend::new(config).await.unwrap();
     let tenant_id = unique_tenant_id("unique-test");
 
@@ -242,7 +242,7 @@ async fn test_workflow_states_unique_constraint() {
 async fn test_workflow_states_status_constraint() {
     ensure_migrations_run_once().await;
 
-    let config = PostgresConfig::new(TEST_CONNECTION_STRING);
+    let config = PostgresConfig::new(APP_CONNECTION_STRING);
     let backend = PostgresBackend::new(config).await.unwrap();
     let tenant_id = unique_tenant_id("status-test");
 
@@ -295,7 +295,7 @@ async fn test_workflow_states_status_constraint() {
 async fn test_workflow_states_step_index_constraint() {
     ensure_migrations_run_once().await;
 
-    let config = PostgresConfig::new(TEST_CONNECTION_STRING);
+    let config = PostgresConfig::new(APP_CONNECTION_STRING);
     let backend = PostgresBackend::new(config).await.unwrap();
     let tenant_id = unique_tenant_id("step-test");
 
@@ -348,7 +348,7 @@ async fn test_workflow_states_step_index_constraint() {
 async fn test_workflow_states_updated_at_trigger() {
     ensure_migrations_run_once().await;
 
-    let config = PostgresConfig::new(TEST_CONNECTION_STRING);
+    let config = PostgresConfig::new(APP_CONNECTION_STRING);
     let backend = PostgresBackend::new(config).await.unwrap();
     let tenant_id = unique_tenant_id("trigger-test");
 
@@ -425,7 +425,7 @@ async fn test_workflow_states_updated_at_trigger() {
 async fn test_workflow_states_lifecycle_trigger_started_at() {
     ensure_migrations_run_once().await;
 
-    let config = PostgresConfig::new(TEST_CONNECTION_STRING);
+    let config = PostgresConfig::new(APP_CONNECTION_STRING);
     let backend = PostgresBackend::new(config).await.unwrap();
     let tenant_id = unique_tenant_id("lifecycle-started-test");
 
@@ -499,7 +499,7 @@ async fn test_workflow_states_lifecycle_trigger_started_at() {
 async fn test_workflow_states_lifecycle_trigger_completed_at() {
     ensure_migrations_run_once().await;
 
-    let config = PostgresConfig::new(TEST_CONNECTION_STRING);
+    let config = PostgresConfig::new(APP_CONNECTION_STRING);
     let backend = PostgresBackend::new(config).await.unwrap();
     let tenant_id = unique_tenant_id("lifecycle-completed-test");
 
@@ -576,7 +576,7 @@ async fn test_workflow_states_lifecycle_trigger_completed_at() {
 async fn test_workflow_states_lifecycle_trigger_failed() {
     ensure_migrations_run_once().await;
 
-    let config = PostgresConfig::new(TEST_CONNECTION_STRING);
+    let config = PostgresConfig::new(APP_CONNECTION_STRING);
     let backend = PostgresBackend::new(config).await.unwrap();
     let tenant_id = unique_tenant_id("lifecycle-failed-test");
 
@@ -638,7 +638,7 @@ async fn test_workflow_states_lifecycle_trigger_failed() {
 async fn test_workflow_states_rls_isolation() {
     ensure_migrations_run_once().await;
 
-    let config = PostgresConfig::new(TEST_CONNECTION_STRING);
+    let config = PostgresConfig::new(APP_CONNECTION_STRING);
     let backend = PostgresBackend::new(config).await.unwrap();
 
     let tenant_a = unique_tenant_id("rls-a");

@@ -20,7 +20,7 @@ use uuid::Uuid;
 const SUPERUSER_CONNECTION_STRING: &str =
     "postgresql://llmspell:llmspell_dev_pass@localhost:5432/llmspell_dev";
 
-const TEST_CONNECTION_STRING: &str =
+const APP_CONNECTION_STRING: &str =
     "postgresql://llmspell_app:llmspell_dev_pass@localhost:5432/llmspell_dev";
 
 static MIGRATION_INIT: OnceCell<()> = OnceCell::const_new();
@@ -86,7 +86,7 @@ async fn insert_test_entity(
 async fn test_get_entity_at_present() {
     ensure_migrations_run_once().await;
 
-    let config = PostgresConfig::new(TEST_CONNECTION_STRING);
+    let config = PostgresConfig::new(APP_CONNECTION_STRING);
     let backend = Arc::new(PostgresBackend::new(config).await.unwrap());
     let storage = PostgresGraphStorage::new(Arc::clone(&backend));
 
@@ -132,7 +132,7 @@ async fn test_get_entity_at_present() {
 async fn test_get_entity_at_historical() {
     ensure_migrations_run_once().await;
 
-    let config = PostgresConfig::new(TEST_CONNECTION_STRING);
+    let config = PostgresConfig::new(APP_CONNECTION_STRING);
     let backend = Arc::new(PostgresBackend::new(config).await.unwrap());
     let storage = PostgresGraphStorage::new(Arc::clone(&backend));
 
@@ -187,7 +187,7 @@ async fn test_get_entity_at_historical() {
 async fn test_get_entity_at_nonexistent() {
     ensure_migrations_run_once().await;
 
-    let config = PostgresConfig::new(TEST_CONNECTION_STRING);
+    let config = PostgresConfig::new(APP_CONNECTION_STRING);
     let backend = Arc::new(PostgresBackend::new(config).await.unwrap());
     let storage = PostgresGraphStorage::new(Arc::clone(&backend));
 
@@ -211,7 +211,7 @@ async fn test_get_entity_at_nonexistent() {
 async fn test_query_temporal_by_entity_type() {
     ensure_migrations_run_once().await;
 
-    let config = PostgresConfig::new(TEST_CONNECTION_STRING);
+    let config = PostgresConfig::new(APP_CONNECTION_STRING);
     let backend = Arc::new(PostgresBackend::new(config).await.unwrap());
     let storage = PostgresGraphStorage::new(Arc::clone(&backend));
 
@@ -269,7 +269,7 @@ async fn test_query_temporal_by_entity_type() {
 async fn test_query_temporal_by_event_time_range() {
     ensure_migrations_run_once().await;
 
-    let config = PostgresConfig::new(TEST_CONNECTION_STRING);
+    let config = PostgresConfig::new(APP_CONNECTION_STRING);
     let backend = Arc::new(PostgresBackend::new(config).await.unwrap());
     let storage = PostgresGraphStorage::new(Arc::clone(&backend));
 
@@ -341,7 +341,7 @@ async fn test_query_temporal_by_event_time_range() {
 async fn test_query_temporal_with_limit() {
     ensure_migrations_run_once().await;
 
-    let config = PostgresConfig::new(TEST_CONNECTION_STRING);
+    let config = PostgresConfig::new(APP_CONNECTION_STRING);
     let backend = Arc::new(PostgresBackend::new(config).await.unwrap());
     let storage = PostgresGraphStorage::new(Arc::clone(&backend));
 
@@ -383,7 +383,7 @@ async fn test_query_temporal_with_limit() {
 async fn test_query_temporal_with_property_filter() {
     ensure_migrations_run_once().await;
 
-    let config = PostgresConfig::new(TEST_CONNECTION_STRING);
+    let config = PostgresConfig::new(APP_CONNECTION_STRING);
     let backend = Arc::new(PostgresBackend::new(config).await.unwrap());
     let storage = PostgresGraphStorage::new(Arc::clone(&backend));
 
@@ -446,7 +446,7 @@ async fn test_query_temporal_with_property_filter() {
 async fn test_query_temporal_combined_filters() {
     ensure_migrations_run_once().await;
 
-    let config = PostgresConfig::new(TEST_CONNECTION_STRING);
+    let config = PostgresConfig::new(APP_CONNECTION_STRING);
     let backend = Arc::new(PostgresBackend::new(config).await.unwrap());
     let storage = PostgresGraphStorage::new(Arc::clone(&backend));
 
@@ -516,7 +516,7 @@ async fn test_query_temporal_combined_filters() {
 async fn test_query_temporal_rls_isolation() {
     ensure_migrations_run_once().await;
 
-    let config = PostgresConfig::new(TEST_CONNECTION_STRING);
+    let config = PostgresConfig::new(APP_CONNECTION_STRING);
     let backend = Arc::new(PostgresBackend::new(config).await.unwrap());
     let storage = PostgresGraphStorage::new(Arc::clone(&backend));
 
@@ -590,7 +590,7 @@ async fn test_query_temporal_rls_isolation() {
 async fn test_entity_mapping_bidirectional() {
     ensure_migrations_run_once().await;
 
-    let config = PostgresConfig::new(TEST_CONNECTION_STRING);
+    let config = PostgresConfig::new(APP_CONNECTION_STRING);
     let backend = Arc::new(PostgresBackend::new(config).await.unwrap());
     let storage = PostgresGraphStorage::new(Arc::clone(&backend));
 

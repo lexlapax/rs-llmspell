@@ -20,7 +20,7 @@ use uuid::Uuid;
 const SUPERUSER_CONNECTION_STRING: &str =
     "postgresql://llmspell:llmspell_dev_pass@localhost:5432/llmspell_dev";
 
-const TEST_CONNECTION_STRING: &str =
+const APP_CONNECTION_STRING: &str =
     "postgresql://llmspell_app:llmspell_dev_pass@localhost:5432/llmspell_dev";
 
 static MIGRATION_INIT: OnceCell<()> = OnceCell::const_new();
@@ -50,7 +50,7 @@ fn unique_tenant_id(prefix: &str) -> String {
 async fn test_record_transition_creates_new_pattern() {
     ensure_migrations_run_once().await;
 
-    let config = PostgresConfig::new(TEST_CONNECTION_STRING);
+    let config = PostgresConfig::new(APP_CONNECTION_STRING);
     let backend = Arc::new(PostgresBackend::new(config).await.unwrap());
     let tenant_id = unique_tenant_id("record-new");
 
@@ -71,7 +71,7 @@ async fn test_record_transition_creates_new_pattern() {
 async fn test_record_transition_increments_frequency() {
     ensure_migrations_run_once().await;
 
-    let config = PostgresConfig::new(TEST_CONNECTION_STRING);
+    let config = PostgresConfig::new(APP_CONNECTION_STRING);
     let backend = Arc::new(PostgresBackend::new(config).await.unwrap());
     let tenant_id = unique_tenant_id("record-increment");
 
@@ -102,7 +102,7 @@ async fn test_record_transition_increments_frequency() {
 async fn test_get_pattern_frequency_returns_correct_value() {
     ensure_migrations_run_once().await;
 
-    let config = PostgresConfig::new(TEST_CONNECTION_STRING);
+    let config = PostgresConfig::new(APP_CONNECTION_STRING);
     let backend = Arc::new(PostgresBackend::new(config).await.unwrap());
     let tenant_id = unique_tenant_id("get-freq");
 
@@ -130,7 +130,7 @@ async fn test_get_pattern_frequency_returns_correct_value() {
 async fn test_get_pattern_frequency_returns_zero_for_nonexistent() {
     ensure_migrations_run_once().await;
 
-    let config = PostgresConfig::new(TEST_CONNECTION_STRING);
+    let config = PostgresConfig::new(APP_CONNECTION_STRING);
     let backend = Arc::new(PostgresBackend::new(config).await.unwrap());
     let tenant_id = unique_tenant_id("get-freq-zero");
 
@@ -150,7 +150,7 @@ async fn test_get_pattern_frequency_returns_zero_for_nonexistent() {
 async fn test_get_learned_patterns_with_threshold() {
     ensure_migrations_run_once().await;
 
-    let config = PostgresConfig::new(TEST_CONNECTION_STRING);
+    let config = PostgresConfig::new(APP_CONNECTION_STRING);
     let backend = Arc::new(PostgresBackend::new(config).await.unwrap());
     let tenant_id = unique_tenant_id("learned-threshold");
 
@@ -198,7 +198,7 @@ async fn test_get_learned_patterns_with_threshold() {
 async fn test_get_learned_patterns_empty_when_none_match() {
     ensure_migrations_run_once().await;
 
-    let config = PostgresConfig::new(TEST_CONNECTION_STRING);
+    let config = PostgresConfig::new(APP_CONNECTION_STRING);
     let backend = Arc::new(PostgresBackend::new(config).await.unwrap());
     let tenant_id = unique_tenant_id("learned-empty");
 
@@ -224,7 +224,7 @@ async fn test_get_learned_patterns_empty_when_none_match() {
 async fn test_get_learned_patterns_ordered_by_frequency() {
     ensure_migrations_run_once().await;
 
-    let config = PostgresConfig::new(TEST_CONNECTION_STRING);
+    let config = PostgresConfig::new(APP_CONNECTION_STRING);
     let backend = Arc::new(PostgresBackend::new(config).await.unwrap());
     let tenant_id = unique_tenant_id("learned-order");
 
@@ -264,7 +264,7 @@ async fn test_get_learned_patterns_ordered_by_frequency() {
 async fn test_tenant_isolation_patterns_dont_cross() {
     ensure_migrations_run_once().await;
 
-    let config = PostgresConfig::new(TEST_CONNECTION_STRING);
+    let config = PostgresConfig::new(APP_CONNECTION_STRING);
     let backend = Arc::new(PostgresBackend::new(config).await.unwrap());
 
     let tenant_a = unique_tenant_id("isolation-a");
@@ -329,7 +329,7 @@ async fn test_tenant_isolation_patterns_dont_cross() {
 async fn test_multiple_values_for_same_scope_key() {
     ensure_migrations_run_once().await;
 
-    let config = PostgresConfig::new(TEST_CONNECTION_STRING);
+    let config = PostgresConfig::new(APP_CONNECTION_STRING);
     let backend = Arc::new(PostgresBackend::new(config).await.unwrap());
     let tenant_id = unique_tenant_id("multi-value");
 
@@ -386,7 +386,7 @@ async fn test_multiple_values_for_same_scope_key() {
 async fn test_pattern_struct_fields() {
     ensure_migrations_run_once().await;
 
-    let config = PostgresConfig::new(TEST_CONNECTION_STRING);
+    let config = PostgresConfig::new(APP_CONNECTION_STRING);
     let backend = Arc::new(PostgresBackend::new(config).await.unwrap());
     let tenant_id = unique_tenant_id("pattern-fields");
 
@@ -422,7 +422,7 @@ async fn test_pattern_struct_fields() {
 async fn test_first_seen_stays_constant_last_seen_updates() {
     ensure_migrations_run_once().await;
 
-    let config = PostgresConfig::new(TEST_CONNECTION_STRING);
+    let config = PostgresConfig::new(APP_CONNECTION_STRING);
     let backend = Arc::new(PostgresBackend::new(config).await.unwrap());
     let tenant_id = unique_tenant_id("timestamp-update");
 
@@ -467,7 +467,7 @@ async fn test_first_seen_stays_constant_last_seen_updates() {
 async fn test_empty_scope_and_key() {
     ensure_migrations_run_once().await;
 
-    let config = PostgresConfig::new(TEST_CONNECTION_STRING);
+    let config = PostgresConfig::new(APP_CONNECTION_STRING);
     let backend = Arc::new(PostgresBackend::new(config).await.unwrap());
     let tenant_id = unique_tenant_id("empty-strings");
 
@@ -504,7 +504,7 @@ async fn test_empty_scope_and_key() {
 async fn test_long_strings() {
     ensure_migrations_run_once().await;
 
-    let config = PostgresConfig::new(TEST_CONNECTION_STRING);
+    let config = PostgresConfig::new(APP_CONNECTION_STRING);
     let backend = Arc::new(PostgresBackend::new(config).await.unwrap());
     let tenant_id = unique_tenant_id("long-strings");
 
@@ -536,7 +536,7 @@ async fn test_long_strings() {
 async fn test_special_characters() {
     ensure_migrations_run_once().await;
 
-    let config = PostgresConfig::new(TEST_CONNECTION_STRING);
+    let config = PostgresConfig::new(APP_CONNECTION_STRING);
     let backend = Arc::new(PostgresBackend::new(config).await.unwrap());
     let tenant_id = unique_tenant_id("special-chars");
 
@@ -568,7 +568,7 @@ async fn test_special_characters() {
 async fn test_concurrent_updates() {
     ensure_migrations_run_once().await;
 
-    let config = PostgresConfig::new(TEST_CONNECTION_STRING);
+    let config = PostgresConfig::new(APP_CONNECTION_STRING);
     let backend = Arc::new(PostgresBackend::new(config).await.unwrap());
     let tenant_id = unique_tenant_id("concurrent");
 
@@ -608,7 +608,7 @@ async fn test_concurrent_updates() {
 async fn test_integration_realistic_workflow() {
     ensure_migrations_run_once().await;
 
-    let config = PostgresConfig::new(TEST_CONNECTION_STRING);
+    let config = PostgresConfig::new(APP_CONNECTION_STRING);
     let backend = Arc::new(PostgresBackend::new(config).await.unwrap());
     let tenant_id = unique_tenant_id("integration");
 
@@ -676,7 +676,7 @@ async fn test_integration_realistic_workflow() {
 async fn test_performance_pattern_queries() {
     ensure_migrations_run_once().await;
 
-    let config = PostgresConfig::new(TEST_CONNECTION_STRING);
+    let config = PostgresConfig::new(APP_CONNECTION_STRING);
     let backend = Arc::new(PostgresBackend::new(config).await.unwrap());
     let tenant_id = unique_tenant_id("perf");
 

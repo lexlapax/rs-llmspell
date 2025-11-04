@@ -19,7 +19,7 @@ use uuid::Uuid;
 const SUPERUSER_CONNECTION_STRING: &str =
     "postgresql://llmspell:llmspell_dev_pass@localhost:5432/llmspell_dev";
 
-const TEST_CONNECTION_STRING: &str =
+const APP_CONNECTION_STRING: &str =
     "postgresql://llmspell_app:llmspell_dev_pass@localhost:5432/llmspell_dev";
 
 static MIGRATION_INIT: OnceCell<()> = OnceCell::const_new();
@@ -107,7 +107,7 @@ fn create_session_snapshot(
 async fn test_session_routing_primary_key() {
     ensure_migrations_run_once().await;
 
-    let config = PostgresConfig::new(TEST_CONNECTION_STRING);
+    let config = PostgresConfig::new(APP_CONNECTION_STRING);
     let backend = PostgresBackend::new(config).await.unwrap();
     let tenant_id = unique_tenant_id("routing-primary");
 
@@ -155,7 +155,7 @@ async fn test_session_routing_primary_key() {
 async fn test_session_routing_state_items() {
     ensure_migrations_run_once().await;
 
-    let config = PostgresConfig::new(TEST_CONNECTION_STRING);
+    let config = PostgresConfig::new(APP_CONNECTION_STRING);
     let backend = PostgresBackend::new(config).await.unwrap();
     let tenant_id = unique_tenant_id("routing-state");
 
@@ -204,7 +204,7 @@ async fn test_session_routing_state_items() {
 async fn test_session_crud_operations() {
     ensure_migrations_run_once().await;
 
-    let config = PostgresConfig::new(TEST_CONNECTION_STRING);
+    let config = PostgresConfig::new(APP_CONNECTION_STRING);
     let backend = PostgresBackend::new(config).await.unwrap();
     let tenant_id = unique_tenant_id("crud");
 
@@ -268,7 +268,7 @@ async fn test_session_crud_operations() {
 async fn test_session_status_mapping() {
     ensure_migrations_run_once().await;
 
-    let config = PostgresConfig::new(TEST_CONNECTION_STRING);
+    let config = PostgresConfig::new(APP_CONNECTION_STRING);
     let backend = PostgresBackend::new(config).await.unwrap();
     let tenant_id = unique_tenant_id("status");
 
@@ -348,7 +348,7 @@ async fn test_session_status_mapping() {
 async fn test_session_expires_at_computation() {
     ensure_migrations_run_once().await;
 
-    let config = PostgresConfig::new(TEST_CONNECTION_STRING);
+    let config = PostgresConfig::new(APP_CONNECTION_STRING);
     let backend = PostgresBackend::new(config).await.unwrap();
     let tenant_id = unique_tenant_id("expires");
 
@@ -410,7 +410,7 @@ async fn test_session_expires_at_computation() {
 async fn test_session_list_keys() {
     ensure_migrations_run_once().await;
 
-    let config = PostgresConfig::new(TEST_CONNECTION_STRING);
+    let config = PostgresConfig::new(APP_CONNECTION_STRING);
     let backend = PostgresBackend::new(config).await.unwrap();
     let tenant_id = unique_tenant_id("list");
 
@@ -481,7 +481,7 @@ async fn test_session_list_keys() {
 async fn test_session_batch_operations() {
     ensure_migrations_run_once().await;
 
-    let config = PostgresConfig::new(TEST_CONNECTION_STRING);
+    let config = PostgresConfig::new(APP_CONNECTION_STRING);
     let backend = PostgresBackend::new(config).await.unwrap();
     let tenant_id = unique_tenant_id("batch");
 
@@ -550,7 +550,7 @@ async fn test_session_batch_operations() {
 async fn test_session_rls_tenant_isolation() {
     ensure_migrations_run_once().await;
 
-    let config = PostgresConfig::new(TEST_CONNECTION_STRING);
+    let config = PostgresConfig::new(APP_CONNECTION_STRING);
     let backend = PostgresBackend::new(config).await.unwrap();
 
     let tenant_a = unique_tenant_id("rls-a");
@@ -595,7 +595,7 @@ async fn test_session_rls_tenant_isolation() {
 async fn test_session_clear_operations() {
     ensure_migrations_run_once().await;
 
-    let config = PostgresConfig::new(TEST_CONNECTION_STRING);
+    let config = PostgresConfig::new(APP_CONNECTION_STRING);
     let backend = PostgresBackend::new(config).await.unwrap();
     let tenant_id = unique_tenant_id("clear");
 
@@ -652,7 +652,7 @@ async fn test_session_clear_operations() {
 async fn test_invalid_session_keys() {
     ensure_migrations_run_once().await;
 
-    let config = PostgresConfig::new(TEST_CONNECTION_STRING);
+    let config = PostgresConfig::new(APP_CONNECTION_STRING);
     let backend = PostgresBackend::new(config).await.unwrap();
     let tenant_id = unique_tenant_id("invalid");
 

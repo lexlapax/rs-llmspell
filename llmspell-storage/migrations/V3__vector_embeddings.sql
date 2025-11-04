@@ -186,19 +186,28 @@ CREATE POLICY tenant_isolation_delete ON llmspell.vector_embeddings_3072
     USING (tenant_id = current_setting('app.current_tenant_id', true));
 
 -- ============================================================================
--- Grant permissions to application role
+-- Grant permissions to application role (conditional, for V3->V11 migrations)
 -- ============================================================================
 -- Phase 13b.3 learning: Schema recreation removes grants, must re-grant
-GRANT USAGE ON SCHEMA llmspell TO llmspell_app;
+-- Phase 13b.11.0: Made conditional - V12 creates llmspell_app role and sets default privileges
+-- These grants apply when running V3 before V12 exists (historical migrations)
 
-GRANT SELECT, INSERT, UPDATE, DELETE ON TABLE
-    llmspell.vector_embeddings_384,
-    llmspell.vector_embeddings_768,
-    llmspell.vector_embeddings_1536,
-    llmspell.vector_embeddings_3072
-TO llmspell_app;
+DO $$
+BEGIN
+    -- Only grant if llmspell_app role exists (created by V12)
+    IF EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'llmspell_app') THEN
+        GRANT USAGE ON SCHEMA llmspell TO llmspell_app;
 
-GRANT USAGE ON ALL SEQUENCES IN SCHEMA llmspell TO llmspell_app;
+        GRANT SELECT, INSERT, UPDATE, DELETE ON TABLE
+            llmspell.vector_embeddings_384,
+            llmspell.vector_embeddings_768,
+            llmspell.vector_embeddings_1536,
+            llmspell.vector_embeddings_3072
+        TO llmspell_app;
+
+        GRANT USAGE ON ALL SEQUENCES IN SCHEMA llmspell TO llmspell_app;
+    END IF;
+END $$;
 
 -- Verification queries (for manual testing):
 -- SELECT tablename FROM pg_tables WHERE schemaname = 'llmspell' AND tablename LIKE 'vector_embeddings_%';

@@ -10,8 +10,13 @@ use std::sync::Arc;
 use tokio::sync::OnceCell;
 
 // Test configuration
-const TEST_CONNECTION_STRING: &str =
+// Admin connection for migrations (llmspell user has CREATE TABLE privileges)
+const ADMIN_CONNECTION_STRING: &str =
     "postgresql://llmspell:llmspell_dev_pass@localhost:5432/llmspell_dev";
+
+// Application connection for queries (llmspell_app enforces RLS, no schema modification)
+const APP_CONNECTION_STRING: &str =
+    "postgresql://llmspell_app:llmspell_app_pass@localhost:5432/llmspell_dev";
 
 static MIGRATION_INIT: OnceCell<()> = OnceCell::const_new();
 
@@ -21,7 +26,7 @@ static MIGRATION_INIT: OnceCell<()> = OnceCell::const_new();
 async fn ensure_migrations_run_once() {
     MIGRATION_INIT
         .get_or_init(|| async {
-            let config = PostgresConfig::new(TEST_CONNECTION_STRING);
+            let config = PostgresConfig::new(ADMIN_CONNECTION_STRING);
             let backend = PostgresBackend::new(config)
                 .await
                 .expect("Failed to create backend for migration init");
@@ -47,7 +52,7 @@ fn unique_tenant_id(test_name: &str) -> String {
 async fn test_agent_state_set_and_get() {
     ensure_migrations_run_once().await;
 
-    let config = PostgresConfig::new(TEST_CONNECTION_STRING);
+    let config = PostgresConfig::new(APP_CONNECTION_STRING);
     let backend = Arc::new(PostgresBackend::new(config).await.unwrap());
     let tenant_id = unique_tenant_id("agent-set-get");
 
@@ -74,7 +79,7 @@ async fn test_agent_state_set_and_get() {
 async fn test_agent_state_delete() {
     ensure_migrations_run_once().await;
 
-    let config = PostgresConfig::new(TEST_CONNECTION_STRING);
+    let config = PostgresConfig::new(APP_CONNECTION_STRING);
     let backend = Arc::new(PostgresBackend::new(config).await.unwrap());
     let tenant_id = unique_tenant_id("agent-delete");
 
@@ -101,7 +106,7 @@ async fn test_agent_state_delete() {
 async fn test_agent_state_exists() {
     ensure_migrations_run_once().await;
 
-    let config = PostgresConfig::new(TEST_CONNECTION_STRING);
+    let config = PostgresConfig::new(APP_CONNECTION_STRING);
     let backend = Arc::new(PostgresBackend::new(config).await.unwrap());
     let tenant_id = unique_tenant_id("agent-exists");
 
@@ -126,7 +131,7 @@ async fn test_agent_state_exists() {
 async fn test_agent_state_list_keys() {
     ensure_migrations_run_once().await;
 
-    let config = PostgresConfig::new(TEST_CONNECTION_STRING);
+    let config = PostgresConfig::new(APP_CONNECTION_STRING);
     let backend = Arc::new(PostgresBackend::new(config).await.unwrap());
     let tenant_id = unique_tenant_id("agent-list");
 
@@ -160,7 +165,7 @@ async fn test_agent_state_list_keys() {
 async fn test_agent_state_update_with_versioning() {
     ensure_migrations_run_once().await;
 
-    let config = PostgresConfig::new(TEST_CONNECTION_STRING);
+    let config = PostgresConfig::new(APP_CONNECTION_STRING);
     let backend = Arc::new(PostgresBackend::new(config).await.unwrap());
     let tenant_id = unique_tenant_id("agent-version");
 
@@ -198,7 +203,7 @@ async fn test_agent_state_update_with_versioning() {
 async fn test_agent_state_checksum_computed() {
     ensure_migrations_run_once().await;
 
-    let config = PostgresConfig::new(TEST_CONNECTION_STRING);
+    let config = PostgresConfig::new(APP_CONNECTION_STRING);
     let backend = Arc::new(PostgresBackend::new(config).await.unwrap());
     let tenant_id = unique_tenant_id("agent-checksum");
 
@@ -238,7 +243,7 @@ async fn test_agent_state_checksum_computed() {
 async fn test_kv_set_and_get() {
     ensure_migrations_run_once().await;
 
-    let config = PostgresConfig::new(TEST_CONNECTION_STRING);
+    let config = PostgresConfig::new(APP_CONNECTION_STRING);
     let backend = Arc::new(PostgresBackend::new(config).await.unwrap());
     let tenant_id = unique_tenant_id("kv-set-get");
 
@@ -260,7 +265,7 @@ async fn test_kv_set_and_get() {
 async fn test_kv_delete() {
     ensure_migrations_run_once().await;
 
-    let config = PostgresConfig::new(TEST_CONNECTION_STRING);
+    let config = PostgresConfig::new(APP_CONNECTION_STRING);
     let backend = Arc::new(PostgresBackend::new(config).await.unwrap());
     let tenant_id = unique_tenant_id("kv-delete");
 
@@ -285,7 +290,7 @@ async fn test_kv_delete() {
 async fn test_kv_exists() {
     ensure_migrations_run_once().await;
 
-    let config = PostgresConfig::new(TEST_CONNECTION_STRING);
+    let config = PostgresConfig::new(APP_CONNECTION_STRING);
     let backend = Arc::new(PostgresBackend::new(config).await.unwrap());
     let tenant_id = unique_tenant_id("kv-exists");
 
@@ -308,7 +313,7 @@ async fn test_kv_exists() {
 async fn test_kv_list_keys() {
     ensure_migrations_run_once().await;
 
-    let config = PostgresConfig::new(TEST_CONNECTION_STRING);
+    let config = PostgresConfig::new(APP_CONNECTION_STRING);
     let backend = Arc::new(PostgresBackend::new(config).await.unwrap());
     let tenant_id = unique_tenant_id("kv-list");
 
@@ -340,7 +345,7 @@ async fn test_kv_list_keys() {
 async fn test_kv_binary_data() {
     ensure_migrations_run_once().await;
 
-    let config = PostgresConfig::new(TEST_CONNECTION_STRING);
+    let config = PostgresConfig::new(APP_CONNECTION_STRING);
     let backend = Arc::new(PostgresBackend::new(config).await.unwrap());
     let tenant_id = unique_tenant_id("kv-binary");
 
@@ -365,7 +370,7 @@ async fn test_kv_binary_data() {
 async fn test_get_batch() {
     ensure_migrations_run_once().await;
 
-    let config = PostgresConfig::new(TEST_CONNECTION_STRING);
+    let config = PostgresConfig::new(APP_CONNECTION_STRING);
     let backend = Arc::new(PostgresBackend::new(config).await.unwrap());
     let tenant_id = unique_tenant_id("get-batch");
 
@@ -410,7 +415,7 @@ async fn test_get_batch() {
 async fn test_set_batch() {
     ensure_migrations_run_once().await;
 
-    let config = PostgresConfig::new(TEST_CONNECTION_STRING);
+    let config = PostgresConfig::new(APP_CONNECTION_STRING);
     let backend = Arc::new(PostgresBackend::new(config).await.unwrap());
     let tenant_id = unique_tenant_id("set-batch");
 
@@ -455,7 +460,7 @@ async fn test_set_batch() {
 async fn test_delete_batch() {
     ensure_migrations_run_once().await;
 
-    let config = PostgresConfig::new(TEST_CONNECTION_STRING);
+    let config = PostgresConfig::new(APP_CONNECTION_STRING);
     let backend = Arc::new(PostgresBackend::new(config).await.unwrap());
     let tenant_id = unique_tenant_id("delete-batch");
 
@@ -492,7 +497,7 @@ async fn test_delete_batch() {
 async fn test_tenant_isolation() {
     ensure_migrations_run_once().await;
 
-    let config = PostgresConfig::new(TEST_CONNECTION_STRING);
+    let config = PostgresConfig::new(APP_CONNECTION_STRING);
     let backend = Arc::new(PostgresBackend::new(config).await.unwrap());
 
     let tenant_a = unique_tenant_id("tenant-a");
@@ -556,7 +561,7 @@ async fn test_tenant_isolation() {
 // async fn test_clear_tenant_scoped() {
 //     ensure_migrations_run_once().await;
 //
-//     let config = PostgresConfig::new(TEST_CONNECTION_STRING);
+//     let config = PostgresConfig::new(APP_CONNECTION_STRING);
 //     let backend = Arc::new(PostgresBackend::new(config).await.unwrap());
 //
 //     let tenant_a = unique_tenant_id("clear-a");
@@ -596,7 +601,7 @@ async fn test_tenant_isolation() {
 async fn test_invalid_agent_key_format() {
     ensure_migrations_run_once().await;
 
-    let config = PostgresConfig::new(TEST_CONNECTION_STRING);
+    let config = PostgresConfig::new(APP_CONNECTION_STRING);
     let backend = Arc::new(PostgresBackend::new(config).await.unwrap());
     let tenant_id = unique_tenant_id("invalid-key");
 
@@ -614,7 +619,7 @@ async fn test_invalid_agent_key_format() {
 async fn test_empty_key() {
     ensure_migrations_run_once().await;
 
-    let config = PostgresConfig::new(TEST_CONNECTION_STRING);
+    let config = PostgresConfig::new(APP_CONNECTION_STRING);
     let backend = Arc::new(PostgresBackend::new(config).await.unwrap());
     let tenant_id = unique_tenant_id("empty-key");
 
@@ -633,7 +638,7 @@ async fn test_empty_key() {
 async fn test_large_value() {
     ensure_migrations_run_once().await;
 
-    let config = PostgresConfig::new(TEST_CONNECTION_STRING);
+    let config = PostgresConfig::new(APP_CONNECTION_STRING);
     let backend = Arc::new(PostgresBackend::new(config).await.unwrap());
     let tenant_id = unique_tenant_id("large-value");
 
@@ -655,7 +660,7 @@ async fn test_large_value() {
 async fn test_special_characters_in_key() {
     ensure_migrations_run_once().await;
 
-    let config = PostgresConfig::new(TEST_CONNECTION_STRING);
+    let config = PostgresConfig::new(APP_CONNECTION_STRING);
     let backend = Arc::new(PostgresBackend::new(config).await.unwrap());
     let tenant_id = unique_tenant_id("special-chars");
 
@@ -679,7 +684,7 @@ async fn test_special_characters_in_key() {
 async fn test_backend_type() {
     ensure_migrations_run_once().await;
 
-    let config = PostgresConfig::new(TEST_CONNECTION_STRING);
+    let config = PostgresConfig::new(APP_CONNECTION_STRING);
     let backend = Arc::new(PostgresBackend::new(config).await.unwrap());
 
     use llmspell_storage::traits::StorageBackendType;
@@ -694,7 +699,7 @@ async fn test_backend_type() {
 async fn test_backend_characteristics() {
     ensure_migrations_run_once().await;
 
-    let config = PostgresConfig::new(TEST_CONNECTION_STRING);
+    let config = PostgresConfig::new(APP_CONNECTION_STRING);
     let backend = Arc::new(PostgresBackend::new(config).await.unwrap());
 
     let chars = backend.characteristics();
@@ -724,7 +729,7 @@ async fn test_backend_characteristics() {
 async fn test_agent_state_performance() {
     ensure_migrations_run_once().await;
 
-    let config = PostgresConfig::new(TEST_CONNECTION_STRING);
+    let config = PostgresConfig::new(APP_CONNECTION_STRING);
     let backend = Arc::new(PostgresBackend::new(config).await.unwrap());
     let tenant_id = unique_tenant_id("agent-perf");
 
@@ -762,7 +767,7 @@ async fn test_agent_state_performance() {
 async fn test_kv_performance() {
     ensure_migrations_run_once().await;
 
-    let config = PostgresConfig::new(TEST_CONNECTION_STRING);
+    let config = PostgresConfig::new(APP_CONNECTION_STRING);
     let backend = Arc::new(PostgresBackend::new(config).await.unwrap());
     let tenant_id = unique_tenant_id("kv-perf");
 

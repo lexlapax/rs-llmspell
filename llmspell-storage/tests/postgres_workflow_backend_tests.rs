@@ -20,7 +20,7 @@ use uuid::Uuid;
 const SUPERUSER_CONNECTION_STRING: &str =
     "postgresql://llmspell:llmspell_dev_pass@localhost:5432/llmspell_dev";
 
-const TEST_CONNECTION_STRING: &str =
+const APP_CONNECTION_STRING: &str =
     "postgresql://llmspell_app:llmspell_dev_pass@localhost:5432/llmspell_dev";
 
 static MIGRATION_INIT: OnceCell<()> = OnceCell::const_new();
@@ -95,7 +95,7 @@ fn create_workflow_state_json(workflow_id: &str, status: &str, current_step: i32
 async fn test_workflow_state_set_and_get() {
     ensure_migrations_run_once().await;
 
-    let config = PostgresConfig::new(TEST_CONNECTION_STRING);
+    let config = PostgresConfig::new(APP_CONNECTION_STRING);
     let backend = PostgresBackend::new(config).await.unwrap();
     let tenant_id = unique_tenant_id("workflow-set-get");
 
@@ -135,7 +135,7 @@ async fn test_workflow_state_set_and_get() {
 async fn test_workflow_state_update() {
     ensure_migrations_run_once().await;
 
-    let config = PostgresConfig::new(TEST_CONNECTION_STRING);
+    let config = PostgresConfig::new(APP_CONNECTION_STRING);
     let backend = PostgresBackend::new(config).await.unwrap();
     let tenant_id = unique_tenant_id("workflow-update");
 
@@ -167,7 +167,7 @@ async fn test_workflow_state_update() {
 async fn test_workflow_state_delete() {
     ensure_migrations_run_once().await;
 
-    let config = PostgresConfig::new(TEST_CONNECTION_STRING);
+    let config = PostgresConfig::new(APP_CONNECTION_STRING);
     let backend = PostgresBackend::new(config).await.unwrap();
     let tenant_id = unique_tenant_id("workflow-delete");
 
@@ -200,7 +200,7 @@ async fn test_workflow_state_delete() {
 async fn test_workflow_state_exists() {
     ensure_migrations_run_once().await;
 
-    let config = PostgresConfig::new(TEST_CONNECTION_STRING);
+    let config = PostgresConfig::new(APP_CONNECTION_STRING);
     let backend = PostgresBackend::new(config).await.unwrap();
     let tenant_id = unique_tenant_id("workflow-exists");
 
@@ -230,7 +230,7 @@ async fn test_workflow_state_exists() {
 async fn test_workflow_state_list_keys() {
     ensure_migrations_run_once().await;
 
-    let config = PostgresConfig::new(TEST_CONNECTION_STRING);
+    let config = PostgresConfig::new(APP_CONNECTION_STRING);
     let backend = PostgresBackend::new(config).await.unwrap();
     let tenant_id = unique_tenant_id("workflow-list");
 
@@ -280,7 +280,7 @@ async fn test_workflow_state_list_keys() {
 async fn test_workflow_state_batch_get() {
     ensure_migrations_run_once().await;
 
-    let config = PostgresConfig::new(TEST_CONNECTION_STRING);
+    let config = PostgresConfig::new(APP_CONNECTION_STRING);
     let backend = PostgresBackend::new(config).await.unwrap();
     let tenant_id = unique_tenant_id("workflow-batch-get");
 
@@ -322,7 +322,7 @@ async fn test_workflow_state_batch_get() {
 async fn test_workflow_state_batch_set() {
     ensure_migrations_run_once().await;
 
-    let config = PostgresConfig::new(TEST_CONNECTION_STRING);
+    let config = PostgresConfig::new(APP_CONNECTION_STRING);
     let backend = PostgresBackend::new(config).await.unwrap();
     let tenant_id = unique_tenant_id("workflow-batch-set");
 
@@ -356,7 +356,7 @@ async fn test_workflow_state_batch_set() {
 async fn test_workflow_state_tenant_isolation() {
     ensure_migrations_run_once().await;
 
-    let config = PostgresConfig::new(TEST_CONNECTION_STRING);
+    let config = PostgresConfig::new(APP_CONNECTION_STRING);
     let backend = PostgresBackend::new(config).await.unwrap();
 
     let tenant_a = unique_tenant_id("tenant-a");
@@ -403,7 +403,7 @@ async fn test_workflow_state_tenant_isolation() {
 async fn test_workflow_state_clear() {
     ensure_migrations_run_once().await;
 
-    let config = PostgresConfig::new(TEST_CONNECTION_STRING);
+    let config = PostgresConfig::new(APP_CONNECTION_STRING);
     let backend = PostgresBackend::new(config).await.unwrap();
     let tenant_id = unique_tenant_id("workflow-clear");
 
@@ -445,7 +445,7 @@ async fn test_workflow_state_clear() {
 async fn test_workflow_state_mixed_routing() {
     ensure_migrations_run_once().await;
 
-    let config = PostgresConfig::new(TEST_CONNECTION_STRING);
+    let config = PostgresConfig::new(APP_CONNECTION_STRING);
     let backend = PostgresBackend::new(config).await.unwrap();
     let tenant_id = unique_tenant_id("workflow-mixed");
 
@@ -490,7 +490,7 @@ async fn test_workflow_state_mixed_routing() {
 async fn test_workflow_state_status_extraction() {
     ensure_migrations_run_once().await;
 
-    let config = PostgresConfig::new(TEST_CONNECTION_STRING);
+    let config = PostgresConfig::new(APP_CONNECTION_STRING);
     let backend = PostgresBackend::new(config).await.unwrap();
     let tenant_id = unique_tenant_id("workflow-status");
 
@@ -528,7 +528,7 @@ async fn test_workflow_state_status_extraction() {
 async fn test_workflow_state_invalid_key_format() {
     ensure_migrations_run_once().await;
 
-    let config = PostgresConfig::new(TEST_CONNECTION_STRING);
+    let config = PostgresConfig::new(APP_CONNECTION_STRING);
     let backend = PostgresBackend::new(config).await.unwrap();
     let tenant_id = unique_tenant_id("workflow-invalid-key");
 

@@ -21,7 +21,7 @@ use uuid::Uuid;
 const SUPERUSER_CONNECTION_STRING: &str =
     "postgresql://llmspell:llmspell_dev_pass@localhost:5432/llmspell_dev";
 
-const TEST_CONNECTION_STRING: &str =
+const APP_CONNECTION_STRING: &str =
     "postgresql://llmspell_app:llmspell_dev_pass@localhost:5432/llmspell_dev";
 
 static MIGRATION_INIT: OnceCell<()> = OnceCell::const_new();
@@ -245,7 +245,7 @@ async fn test_artifacts_rls_policies() {
 async fn test_storage_type_constraint() {
     ensure_migrations_run_once().await;
 
-    let config = PostgresConfig::new(TEST_CONNECTION_STRING);
+    let config = PostgresConfig::new(APP_CONNECTION_STRING);
     let backend = PostgresBackend::new(config).await.unwrap();
     let tenant_id = unique_tenant_id("storage-type");
 
@@ -280,7 +280,7 @@ async fn test_storage_type_constraint() {
 async fn test_storage_consistency_constraint() {
     ensure_migrations_run_once().await;
 
-    let config = PostgresConfig::new(TEST_CONNECTION_STRING);
+    let config = PostgresConfig::new(APP_CONNECTION_STRING);
     let backend = PostgresBackend::new(config).await.unwrap();
     let tenant_id = unique_tenant_id("storage-consistency");
 
@@ -322,7 +322,7 @@ async fn test_storage_consistency_constraint() {
 async fn test_reference_count_constraint() {
     ensure_migrations_run_once().await;
 
-    let config = PostgresConfig::new(TEST_CONNECTION_STRING);
+    let config = PostgresConfig::new(APP_CONNECTION_STRING);
     let backend = PostgresBackend::new(config).await.unwrap();
     let tenant_id = unique_tenant_id("refcount");
 
@@ -368,7 +368,7 @@ async fn test_reference_count_constraint() {
 async fn test_max_size_constraint() {
     ensure_migrations_run_once().await;
 
-    let config = PostgresConfig::new(TEST_CONNECTION_STRING);
+    let config = PostgresConfig::new(APP_CONNECTION_STRING);
     let backend = PostgresBackend::new(config).await.unwrap();
     let tenant_id = unique_tenant_id("max-size");
 
@@ -401,7 +401,7 @@ async fn test_max_size_constraint() {
 async fn test_foreign_key_to_sessions() {
     ensure_migrations_run_once().await;
 
-    let config = PostgresConfig::new(TEST_CONNECTION_STRING);
+    let config = PostgresConfig::new(APP_CONNECTION_STRING);
     let backend = PostgresBackend::new(config).await.unwrap();
     let tenant_id = unique_tenant_id("fk-session");
 
@@ -468,7 +468,7 @@ async fn test_foreign_key_to_sessions() {
 async fn test_reference_count_triggers() {
     ensure_migrations_run_once().await;
 
-    let config = PostgresConfig::new(TEST_CONNECTION_STRING);
+    let config = PostgresConfig::new(APP_CONNECTION_STRING);
     let backend = PostgresBackend::new(config).await.unwrap();
     let tenant_id = unique_tenant_id("refcount-trigger");
 
@@ -589,7 +589,7 @@ async fn test_reference_count_triggers() {
 async fn test_updated_at_trigger() {
     ensure_migrations_run_once().await;
 
-    let config = PostgresConfig::new(TEST_CONNECTION_STRING);
+    let config = PostgresConfig::new(APP_CONNECTION_STRING);
     let backend = PostgresBackend::new(config).await.unwrap();
     let tenant_id = unique_tenant_id("updated-at");
 
@@ -704,7 +704,7 @@ async fn test_updated_at_trigger() {
 async fn test_tenant_isolation() {
     ensure_migrations_run_once().await;
 
-    let config = PostgresConfig::new(TEST_CONNECTION_STRING);
+    let config = PostgresConfig::new(APP_CONNECTION_STRING);
     let backend = PostgresBackend::new(config).await.unwrap();
 
     let tenant_a = unique_tenant_id("isolation-a");

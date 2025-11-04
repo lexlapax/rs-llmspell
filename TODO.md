@@ -5742,26 +5742,229 @@ cargo test test_provider_model_parsing --test provider_enhancement_test --featur
 **Timeline**: 2 days (16 hours)
 **Critical Dependencies**: Phase 13b.2, Phase 13b.3 ✅
 
+### Task 13b.11.0: Fix PostgreSQL RLS Architecture (Prerequisite)
+**Priority**: CRITICAL
+**Estimated Time**: 90 minutes
+**Status**: 🔴 **IN PROGRESS**
+
+**Description**: Fix RLS (Row-Level Security) architecture for multi-tenant PostgreSQL backend by implementing separate admin/application database roles and enforcing RLS even for privileged users.
+
+**Root Cause** (Discovered 2025-01-05):
+- Current setup: `llmspell` user has `SUPERUSER` + `BYPASSRLS` privileges
+- PostgreSQL explicitly bypasses ALL RLS policies for users with BYPASSRLS
+- RLS tests failing: event_log test sees 2 rows instead of 1, sessions test gets "permission denied"
+- **Architectural problem**: Application queries running as superuser (violates least privilege principle)
+
+**Architectural Decision** (Option 3 - Separate Roles):
+
+**Why Option 3 vs FORCE RLS workaround:**
+- ✅ **Principle of least privilege**: Application cannot modify schema, drop tables, or bypass RLS
+- ✅ **Defense-in-depth**: Compromised app limited to data plane operations only
+- ✅ **Zero-trust security**: RLS enforced + app lacks privilege to bypass
+- ✅ **Industry standard**: PostgreSQL docs explicitly recommend for multi-tenant SaaS
+- ✅ **Audit clarity**: Admin vs app operations clearly separated
+- ✅ **rs-llmspell philosophy**: "NO SHORTCUTS - holistic completion" + "Pre-1.0 = prioritize correctness"
+- ❌ FORCE RLS alone = workaround, not proper architecture (technical debt from day 1)
+
+**User Roles**:
+1. **llmspell** (existing): Admin user for migrations, maintenance (SUPERUSER, BYPASSRLS)
+2. **llmspell_app** (new): Application runtime user (LOGIN, no special privileges)
+
+**Security Layers**:
+- **Layer 1**: Separate roles (admin vs app) - PRIMARY DEFENSE
+- **Layer 2**: FORCE ROW LEVEL SECURITY - SECONDARY DEFENSE (defense-in-depth)
+- **Layer 3**: Application tenant context - TERTIARY DEFENSE
+- **Layer 4**: Audit logging - DETECTION
+
+**Implementation Steps**:
+
+- [ ] **Step 1**: Create V12 migration for application role (15 min)
+  - [ ] Create `migrations/V12__application_role_rls_enforcement.sql`
+  - [ ] Create `llmspell_app` role with LOGIN password
+  - [ ] Grant schema USAGE to llmspell_app
+  - [ ] Grant SELECT, INSERT, UPDATE, DELETE on all tables
+  - [ ] Grant USAGE, SELECT on all sequences
+  - [ ] Grant EXECUTE on all functions
+  - [ ] Set default privileges for future objects
+  - [ ] Add FORCE ROW LEVEL SECURITY to all RLS-enabled tables:
+    - [ ] `llmspell.event_log` (from V11)
+    - [ ] `llmspell.sessions` (from V9)
+    - [ ] `llmspell.artifacts` (from V10)
+    - [ ] `llmspell.artifact_content` (from V10)
+    - [ ] Check other tables (kv_store, workflow_states, agent_states) if RLS enabled
+
+- [ ] **Step 2**: Update V11 migration for event_log (5 min)
+  - [ ] Add `FORCE ROW LEVEL SECURITY` after `ENABLE ROW LEVEL SECURITY` (line 207)
+  - [ ] Document defense-in-depth reasoning in comments
+
+- [ ] **Step 3**: Update docker-compose PostgreSQL setup (10 min)
+  - [ ] Modify `docker/postgres/init-db.sh` to create llmspell_app user
+  - [ ] Add environment variable `POSTGRES_LLMSPELL_APP_PASSWORD=llmspell_app_pass`
+  - [ ] Test docker-compose up creates both users correctly
+
+- [ ] **Step 4**: Update test connection strings (15 min)
+  - [ ] Update `llmspell-storage/tests/common.rs` (if exists) or per-test files:
+    - [ ] `postgres_event_log_migration_tests.rs`
+    - [ ] `postgres_sessions_backend_tests.rs`
+    - [ ] `postgres_sessions_migration_tests.rs`
+    - [ ] `postgres_artifacts_backend_tests.rs`
+    - [ ] `postgres_vector_tests.rs`
+    - [ ] `postgres_backend_tests.rs`
+    - [ ] All other `postgres_*_tests.rs` files
+  - [ ] Change `TEST_CONNECTION_STRING` from:
+    - ❌ `postgresql://llmspell:llmspell_dev_pass@localhost/llmspell_dev`
+    - ✅ `postgresql://llmspell_app:llmspell_app_pass@localhost/llmspell_dev`
+
+- [ ] **Step 5**: Update CI configuration (5 min)
+  - [ ] `.github/workflows/ci.yml`: Update `DATABASE_URL` environment variable
+  - [ ] Use `llmspell_app` user for test execution
+  - [ ] Keep `llmspell` admin user for migrations only
+
+- [ ] **Step 6**: Clean rebuild and test RLS (20 min)
+  - [ ] Drop and recreate schema: `PGPASSWORD=llmspell_dev_pass psql -h localhost -U llmspell -d llmspell_dev -c "DROP SCHEMA IF EXISTS llmspell CASCADE; CREATE SCHEMA llmspell;"`
+  - [ ] Clean rebuild: `cargo clean -p llmspell-storage`
+  - [ ] Run all RLS tests: `cargo test rls --features postgres -p llmspell-storage`
+  - [ ] Verify all RLS tests pass (event_log, sessions, artifacts)
+  - [ ] Run event_log migration tests: `cargo test --test postgres_event_log_migration_tests --features postgres -p llmspell-storage`
+  - [ ] Verify all 10 tests pass including `test_event_log_rls_tenant_isolation`
+
+- [ ] **Step 7**: Document pattern (15 min)
+  - [ ] Add section to `llmspell-storage/README.md` or create `docs/postgres-security-architecture.md`
+  - [ ] Document two-user pattern (admin vs app)
+  - [ ] Document FORCE RLS defense-in-depth
+  - [ ] Document connection string setup for development
+  - [ ] Add migration template showing pattern for future RLS tables
+
+- [ ] **Step 8**: Verify no regressions (5 min)
+  - [ ] Run full storage test suite: `cargo test -p llmspell-storage --features postgres`
+  - [ ] Verify zero test failures
+  - [ ] Run quality check: `./scripts/quality/quality-check-fast.sh`
+
+**Breaking Changes** (Acceptable pre-1.0):
+- Test connection strings updated (all test files)
+- docker-compose recreate required (new user)
+- CI configuration updated (DATABASE_URL)
+- No API changes, no trait changes, no code logic changes
+
+**Files to Create**:
+- `llmspell-storage/migrations/V12__application_role_rls_enforcement.sql`
+- `docs/postgres-security-architecture.md` (optional, can go in llmspell-storage/README.md)
+
+**Files to Modify**:
+- `llmspell-storage/migrations/V11__event_log.sql` (add FORCE RLS)
+- `docker/postgres/init-db.sh` (add llmspell_app user creation)
+- `docker/postgres/docker-compose.yml` (add POSTGRES_LLMSPELL_APP_PASSWORD env var)
+- `.github/workflows/ci.yml` (update DATABASE_URL)
+- All `llmspell-storage/tests/postgres_*_tests.rs` files (update TEST_CONNECTION_STRING)
+
+**Definition of Done**:
+- [ ] V12 migration created with llmspell_app role + FORCE RLS on all tables
+- [ ] V11 migration updated with FORCE RLS for event_log
+- [ ] docker-compose creates both users (llmspell + llmspell_app)
+- [ ] All test files use llmspell_app connection string
+- [ ] CI uses llmspell_app for tests
+- [ ] All RLS tests pass (event_log, sessions, artifacts)
+- [ ] All event_log migration tests pass (10/10)
+- [ ] Full storage test suite passes with zero failures
+- [ ] Documentation complete (security architecture pattern)
+- [ ] Zero warnings: `cargo clippy --workspace --all-features`
+
+**Prerequisite for**: Task 13b.11.1 (Event Log Schema), Task 13b.11.2 (Event Log Backend)
+
+---
+
 ### Task 13b.11.1: Create Event Log Schema with Partitioning
 **Priority**: HIGH
 **Estimated Time**: 4 hours
 
 **Description**: Create partitioned PostgreSQL schema for event logs (monthly partitions).
 
-**Implementation Steps**:
-1. Create `migrations/V008__event_log.sql`:
-   - Table: event_log (event_id, tenant_id, event_type, correlation_id, payload JSONB, timestamp) PARTITION BY RANGE (timestamp)
-   - Create initial partitions (current month + next 3 months)
-   - Indexes: (correlation_id), GIN on payload, (event_type, timestamp)
-   - RLS policies applied
-   - Add trigger for automatic partition creation
+**Architecture Decisions** (2025-01-05):
 
-**Files to Create**: `llmspell-storage/migrations/V008__event_log.sql`
+1. **Schema Design: Hybrid Approach** (Option A - Selected)
+   - **Extracted columns**: event_id, event_type, correlation_id, timestamp, sequence for efficient indexing
+   - **JSONB payload**: Full UniversalEvent stored as JSONB for flexibility
+   - **Rationale**:
+     - EventStorage trait queries by pattern (event_type), correlation_id, and time range
+     - Column indexes enable fast filtering on common query patterns
+     - JSONB preserves complete event data without schema lock-in
+     - Compatible with existing UniversalEvent structure
+   - **Rejected alternatives**:
+     - Option B (Full normalization): Complex JOINs, breaks existing pattern
+     - Option C (Pure JSONB): Slow without type-specific indexes
+
+2. **Partitioning Strategy: Monthly by Timestamp**
+   - **Partition key**: timestamp (RANGE partitioning)
+   - **Partition granularity**: Monthly (balance overhead vs partition size)
+   - **Initial partitions**: Current month + next 3 months
+   - **Rationale**:
+     - Events are time-series data (natural fit)
+     - Enables partition pruning for time-range queries
+     - Aligns with typical retention policies (weekly/monthly archives)
+     - Cleanup by dropping old partitions
+   - **Not partition by tenant**: RLS for isolation (follows existing pattern), avoids partition explosion
+
+3. **Tenant Isolation: RLS Policies**
+   - **Approach**: Row-level security on parent table (inherited by partitions)
+   - **Rationale**:
+     - Consistent with artifacts, sessions, workflow_states tables
+     - Simpler partition management (no per-tenant partitions)
+     - Scalable: tenant_id in WHERE clauses + indexes
+   - **Rejected**: Tenant in partition key (would create partitions per tenant per month)
+
+4. **Automatic Partition Management**
+   - **Creation trigger**: Auto-create partition when event arrives in last prepared month
+   - **Future partitions**: Always maintain next 3 months
+   - **Cleanup policy**: Manual function for >90 days (application-controlled retention)
+   - **Rationale**:
+     - Prevents INSERT failures on missing partitions
+     - Application decides retention per tenant if needed
+     - No data loss from automatic archival
+
+5. **Indexes**
+   - `(correlation_id, timestamp)` - For EventStorage.get_events_by_correlation_id
+   - `(event_type, timestamp)` - For EventStorage.get_events_by_pattern
+   - `(sequence)` - For ordering (UniversalEvent has global sequence counter)
+   - `(tenant_id, timestamp)` - For RLS + time range queries
+   - GIN on `payload` - For ad-hoc JSONB queries (e.g., data.field filters)
+
+**Table Structure**:
+```sql
+CREATE TABLE llmspell.event_log (
+    tenant_id VARCHAR(255) NOT NULL,
+    event_id UUID NOT NULL,
+    event_type VARCHAR(255) NOT NULL,
+    correlation_id UUID NOT NULL,
+    timestamp TIMESTAMPTZ NOT NULL,
+    sequence BIGINT NOT NULL,
+    language VARCHAR(50) NOT NULL,
+    payload JSONB NOT NULL,
+    PRIMARY KEY (tenant_id, timestamp, event_id)
+) PARTITION BY RANGE (timestamp);
+```
+
+**Partition Naming**: `event_log_YYYY_MM` (e.g., `event_log_2025_01`)
+
+**Implementation Steps**:
+1. Create `migrations/V11__event_log.sql`:
+   - Parent partitioned table with extracted columns + JSONB payload
+   - Create initial partitions (current month + next 3 months)
+   - Composite primary key: (tenant_id, timestamp, event_id)
+   - Indexes: (correlation_id, timestamp), (event_type, timestamp), (sequence), GIN(payload)
+   - RLS policies (SELECT/INSERT/UPDATE/DELETE)
+   - Function: create_event_log_partition(start_date, end_date)
+   - Trigger: ensure_event_log_partition() on BEFORE INSERT
+   - Function: cleanup_old_event_log_partitions(before_date) for manual cleanup
+
+**Files to Create**: `llmspell-storage/migrations/V11__event_log.sql`
 
 **Definition of Done**:
-- [ ] Partitioned schema created
-- [ ] Automatic partition creation working
-- [ ] RLS policies on all partitions
+- [ ] Partitioned schema created with hybrid design
+- [ ] Initial 4 partitions created (current + next 3 months)
+- [ ] Automatic partition creation trigger working
+- [ ] RLS policies on parent table (inherited by partitions)
+- [ ] All indexes created on parent table
+- [ ] Partition management functions tested
 
 ### Task 13b.11.2: Implement PostgreSQL Event Log Backend
 **Priority**: HIGH
