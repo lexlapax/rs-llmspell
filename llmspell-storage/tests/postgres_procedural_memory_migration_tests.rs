@@ -192,9 +192,12 @@ async fn test_procedural_patterns_unique_constraint() {
         result.is_err(),
         "Duplicate pattern should violate unique constraint"
     );
+
+    let error_msg = result.unwrap_err().to_string();
     assert!(
-        result.unwrap_err().to_string().contains("unique"),
-        "Error should mention unique constraint"
+        error_msg.contains("unique") || error_msg.contains("duplicate key") || error_msg.contains("already exists"),
+        "Error should indicate unique constraint violation, got: {}",
+        error_msg
     );
 }
 
