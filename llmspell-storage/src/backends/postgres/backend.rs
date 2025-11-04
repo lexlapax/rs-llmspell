@@ -776,9 +776,7 @@ impl PostgresBackend {
             .ok_or_else(|| anyhow::anyhow!("Tenant context not set"))?;
 
         // Remove "custom:workflow_" prefix for pattern matching
-        let workflow_prefix = prefix
-            .strip_prefix("custom:workflow_")
-            .unwrap_or(prefix);
+        let workflow_prefix = prefix.strip_prefix("custom:workflow_").unwrap_or(prefix);
 
         let rows = client
             .query(

@@ -179,7 +179,10 @@ async fn test_workflow_state_delete() {
 
     // Set state
     backend.set(&key, state).await.unwrap();
-    assert!(backend.exists(&key).await.unwrap(), "Should exist after set");
+    assert!(
+        backend.exists(&key).await.unwrap(),
+        "Should exist after set"
+    );
 
     // Delete state
     backend.delete(&key).await.unwrap();
@@ -217,7 +220,10 @@ async fn test_workflow_state_exists() {
     backend.set(&key, state).await.unwrap();
 
     // Check exists
-    assert!(backend.exists(&key).await.unwrap(), "Should exist after set");
+    assert!(
+        backend.exists(&key).await.unwrap(),
+        "Should exist after set"
+    );
 }
 
 #[tokio::test]
@@ -239,10 +245,7 @@ async fn test_workflow_state_list_keys() {
     }
 
     // List all workflow keys
-    let keys = backend
-        .list_keys("custom:workflow_")
-        .await
-        .unwrap();
+    let keys = backend.list_keys("custom:workflow_").await.unwrap();
 
     assert_eq!(keys.len(), 3, "Should have 3 workflow states");
 
@@ -295,7 +298,12 @@ async fn test_workflow_state_batch_get() {
 
     // Batch get
     let results = backend
-        .get_batch(&expected_keys.iter().map(|s| s.to_string()).collect::<Vec<_>>())
+        .get_batch(
+            &expected_keys
+                .iter()
+                .map(|s| s.to_string())
+                .collect::<Vec<_>>(),
+        )
         .await
         .unwrap();
 
@@ -381,7 +389,10 @@ async fn test_workflow_state_tenant_isolation() {
     backend.set_tenant_context(tenant_b.clone()).await.unwrap();
     let result_b = backend.get(&key).await.unwrap().unwrap();
     let json_b: serde_json::Value = serde_json::from_slice(&result_b).unwrap();
-    assert_eq!(json_b["status"], "completed", "Tenant B should see completed");
+    assert_eq!(
+        json_b["status"], "completed",
+        "Tenant B should see completed"
+    );
     assert_eq!(
         json_b["workflow_state"]["current_step"], 10,
         "Tenant B should see step 10"
@@ -443,7 +454,10 @@ async fn test_workflow_state_mixed_routing() {
     // Set workflow state (routes to workflow_states table)
     let workflow_key = "custom:workflow_test-wf:state";
     let workflow_state = create_workflow_state_json("test-wf", "running", 3);
-    backend.set(workflow_key, workflow_state.clone()).await.unwrap();
+    backend
+        .set(workflow_key, workflow_state.clone())
+        .await
+        .unwrap();
 
     // Set KV data (routes to kv_store table)
     let kv_key = "custom:some_other_data";
@@ -458,7 +472,10 @@ async fn test_workflow_state_mixed_routing() {
     let wf_result = backend.get(workflow_key).await.unwrap().unwrap();
     let wf_result_json: serde_json::Value = serde_json::from_slice(&wf_result).unwrap();
     let wf_expected_json: serde_json::Value = serde_json::from_slice(&workflow_state).unwrap();
-    assert_eq!(wf_result_json, wf_expected_json, "Workflow state JSON should match");
+    assert_eq!(
+        wf_result_json, wf_expected_json,
+        "Workflow state JSON should match"
+    );
 
     let kv_result = backend.get(kv_key).await.unwrap().unwrap();
     assert_eq!(kv_result, kv_value);
@@ -503,10 +520,7 @@ async fn test_workflow_state_status_extraction() {
         let stored_step: i32 = row.get(1);
 
         assert_eq!(stored_status, *status, "Extracted status should match");
-        assert_eq!(
-            stored_step, i as i32,
-            "Extracted current_step should match"
-        );
+        assert_eq!(stored_step, i as i32, "Extracted current_step should match");
     }
 }
 
@@ -522,11 +536,11 @@ async fn test_workflow_state_invalid_key_format() {
 
     // Test invalid key formats
     let invalid_keys = vec![
-        "workflow:test:state",                   // Missing "custom:" prefix
-        "custom:test:state",                     // Missing "workflow_" prefix
-        "custom:workflow_test",                  // Missing ":state" suffix
-        "agent:some:agent",                      // Wrong routing (agent, not workflow)
-        "custom:workflow_",                      // Empty workflow_id
+        "workflow:test:state",  // Missing "custom:" prefix
+        "custom:test:state",    // Missing "workflow_" prefix
+        "custom:workflow_test", // Missing ":state" suffix
+        "agent:some:agent",     // Wrong routing (agent, not workflow)
+        "custom:workflow_",     // Empty workflow_id
     ];
 
     let state = create_workflow_state_json("test", "running", 0);

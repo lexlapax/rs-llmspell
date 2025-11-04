@@ -262,7 +262,13 @@ async fn test_workflow_states_status_constraint() {
             "INSERT INTO llmspell.workflow_states
              (tenant_id, workflow_id, state_data, current_step, status)
              VALUES ($1, $2, $3, $4, $5)",
-            &[&tenant_id, &"test-workflow-2", &state_data, &0i32, &"invalid"],
+            &[
+                &tenant_id,
+                &"test-workflow-2",
+                &state_data,
+                &0i32,
+                &"invalid",
+            ],
         )
         .await;
 
@@ -309,7 +315,13 @@ async fn test_workflow_states_step_index_constraint() {
             "INSERT INTO llmspell.workflow_states
              (tenant_id, workflow_id, state_data, current_step, status)
              VALUES ($1, $2, $3, $4, $5)",
-            &[&tenant_id, &"test-workflow-3", &state_data, &-1i32, &"pending"],
+            &[
+                &tenant_id,
+                &"test-workflow-3",
+                &state_data,
+                &-1i32,
+                &"pending",
+            ],
         )
         .await;
 
@@ -356,7 +368,13 @@ async fn test_workflow_states_updated_at_trigger() {
             "INSERT INTO llmspell.workflow_states
              (tenant_id, workflow_id, state_data, current_step, status)
              VALUES ($1, $2, $3, $4, $5)",
-            &[&tenant_id, &"test-workflow-4", &state_data, &0i32, &"pending"],
+            &[
+                &tenant_id,
+                &"test-workflow-4",
+                &state_data,
+                &0i32,
+                &"pending",
+            ],
         )
         .await
         .unwrap();
@@ -427,7 +445,13 @@ async fn test_workflow_states_lifecycle_trigger_started_at() {
             "INSERT INTO llmspell.workflow_states
              (tenant_id, workflow_id, state_data, current_step, status)
              VALUES ($1, $2, $3, $4, $5)",
-            &[&tenant_id, &"test-workflow-5", &state_data, &0i32, &"pending"],
+            &[
+                &tenant_id,
+                &"test-workflow-5",
+                &state_data,
+                &0i32,
+                &"pending",
+            ],
         )
         .await
         .unwrap();
@@ -495,7 +519,13 @@ async fn test_workflow_states_lifecycle_trigger_completed_at() {
             "INSERT INTO llmspell.workflow_states
              (tenant_id, workflow_id, state_data, current_step, status)
              VALUES ($1, $2, $3, $4, $5)",
-            &[&tenant_id, &"test-workflow-6", &state_data, &0i32, &"running"],
+            &[
+                &tenant_id,
+                &"test-workflow-6",
+                &state_data,
+                &0i32,
+                &"running",
+            ],
         )
         .await
         .unwrap();
@@ -566,7 +596,13 @@ async fn test_workflow_states_lifecycle_trigger_failed() {
             "INSERT INTO llmspell.workflow_states
              (tenant_id, workflow_id, state_data, current_step, status)
              VALUES ($1, $2, $3, $4, $5)",
-            &[&tenant_id, &"test-workflow-7", &state_data, &0i32, &"running"],
+            &[
+                &tenant_id,
+                &"test-workflow-7",
+                &state_data,
+                &0i32,
+                &"running",
+            ],
         )
         .await
         .unwrap();
