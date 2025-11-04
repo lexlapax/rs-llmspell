@@ -5017,23 +5017,73 @@ After analyzing existing workflow state storage patterns, chose specialized work
 - `llmspell-templates::ExecutionContext` - Template execution tracking
 - Phase 13b.7.2 intelligent routing - Extend for `workflow:*` keys
 
-### Task 13b.8.1: Create Workflow State Schema
+### Task 13b.8.1: Create Workflow State Schema ✅ COMPLETE
 **Priority**: HIGH
 **Estimated Time**: 2 hours
+**Actual Time**: 1.5 hours
+**Status**: ✅ COMPLETE
+**Completed**: 2025-11-03
 
 **Description**: Create specialized PostgreSQL schema for workflow state with lifecycle tracking and indexed queries.
 
 **Implementation Steps**:
-1. Create `migrations/V005__workflow_state.sql`:
-   - Table: workflow_state (workflow_id, tenant_id, state JSONB, current_step, status, started_at, completed_at)
-   - Indexes: (workflow_id, tenant_id), (status), (started_at)
-   - RLS policies applied
+1. ✅ Create `migrations/V8__workflow_states.sql`:
+   - Table: workflow_states (workflow_id, tenant_id, workflow_name, state_data JSONB, current_step, status, started_at, completed_at)
+   - 9 Indexes: tenant, tenant_workflow, status, started (DESC), completed (partial), data_gin (GIN), execution_stats, tenant_status composite
+   - RLS policies applied (4 policies: SELECT, INSERT, UPDATE, DELETE)
+   - Constraints: unique (tenant_id, workflow_id), valid status enum, positive step index
+   - Triggers: auto-update last_updated, lifecycle management (started_at, completed_at)
+2. ✅ Create comprehensive migration tests (11 tests, all passing)
 
-**Files to Create**: `llmspell-storage/migrations/V005__workflow_state.sql`
+**Files Created**:
+- `llmspell-storage/migrations/V8__workflow_states.sql` (157 lines)
+- `llmspell-storage/tests/postgres_workflow_states_migration_tests.rs` (540 lines)
 
 **Definition of Done**:
-- [ ] Schema supports workflow lifecycle
-- [ ] RLS policies enforced
+- [x] Schema supports workflow lifecycle
+- [x] RLS policies enforced (4 policies verified)
+- [x] All 11 migration tests pass (0.14s)
+
+**Implementation Insights**:
+- **Migration version**: V8 (after V7__kv_store from Phase 13b.7.2)
+- **Schema design**: Mirrors agent_states pattern (JSONB + extracted fields)
+- **Extracted fields**: workflow_id (PK), tenant_id, workflow_name, current_step, status for indexed queries
+- **Full state**: state_data JSONB stores complete PersistentWorkflowState
+- **9 Performance indexes**:
+  1. idx_workflow_states_tenant - RLS performance
+  2. idx_workflow_states_tenant_workflow - Lookup by (tenant, workflow)
+  3. idx_workflow_states_status - Find all running/failed workflows
+  4. idx_workflow_states_started - Recent workflows (DESC)
+  5. idx_workflow_states_completed - Partial index (WHERE completed_at IS NOT NULL)
+  6. idx_workflow_states_data_gin - JSONB full-text queries
+  7. idx_workflow_states_execution_stats - JSONB path queries
+  8. idx_workflow_states_tenant_status - Composite (tenant's running workflows)
+- **4 RLS policies**: Complete tenant isolation (SELECT, INSERT, UPDATE, DELETE)
+- **2 Triggers**:
+  1. Auto-update last_updated on every UPDATE
+  2. Lifecycle management: Set started_at (pending→running), completed_at (→completed/failed/cancelled)
+- **3 Constraints**:
+  1. Unique (tenant_id, workflow_id) - One workflow per tenant
+  2. Valid status CHECK - Must be pending/running/completed/failed/cancelled
+  3. Positive step index - current_step >= 0
+- **11 comprehensive tests** (0.14s):
+  1. test_workflow_states_table_created - Table exists, RLS enabled
+  2. test_workflow_states_indexes_created - All 8 idx_* indexes present
+  3. test_workflow_states_rls_policies - All 4 policies (SELECT, INSERT, UPDATE, DELETE)
+  4. test_workflow_states_unique_constraint - Duplicate (tenant, workflow_id) fails
+  5. test_workflow_states_status_constraint - Invalid status 'invalid' fails
+  6. test_workflow_states_step_index_constraint - Negative step fails
+  7. test_workflow_states_updated_at_trigger - Auto-update on UPDATE
+  8. test_workflow_states_lifecycle_trigger_started_at - Auto-set on pending→running
+  9. test_workflow_states_lifecycle_trigger_completed_at - Auto-set on running→completed
+  10. test_workflow_states_lifecycle_trigger_failed - Auto-set on running→failed
+  11. test_workflow_states_rls_isolation - Tenant A sees only A's workflows
+- **Test patterns**: Followed Phase 13b.7.1 procedural memory test structure
+- **Lifecycle automation**: Timestamps managed by database triggers, not application code
+- **Query optimization**: status + tenant composite index for "find tenant's running workflows"
+- **JSONB querying**: GIN index enables fast queries on execution_stats, config, metadata
+- **Migration is idempotent**: All statements use IF NOT EXISTS or DROP IF EXISTS
+- **Ready for Phase 13b.8.2**: Backend implementation can now extend Phase 13b.7.2 routing
 
 ### Task 13b.8.2: Implement PostgreSQL Workflow Backend
 **Priority**: HIGH
