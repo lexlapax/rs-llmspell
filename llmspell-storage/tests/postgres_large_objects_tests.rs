@@ -90,7 +90,10 @@ async fn test_download_object() {
     let oid = stream.upload(&data).await.unwrap();
 
     let downloaded = stream.download(oid).await.unwrap();
-    assert_eq!(downloaded, data, "Downloaded data should match uploaded data");
+    assert_eq!(
+        downloaded, data,
+        "Downloaded data should match uploaded data"
+    );
 
     // Cleanup - ignore errors if already deleted
     let _ = stream.delete(oid).await;
@@ -115,7 +118,10 @@ async fn test_round_trip_integrity() {
         data.len(),
         "Downloaded size should match uploaded size"
     );
-    assert_eq!(downloaded, data, "Downloaded data should match uploaded data");
+    assert_eq!(
+        downloaded, data,
+        "Downloaded data should match uploaded data"
+    );
 
     // Cleanup - ignore errors if already deleted
     let _ = stream.delete(oid).await;
@@ -184,10 +190,7 @@ async fn test_object_size() {
     let oid = stream.upload(&data).await.unwrap();
 
     let size = stream.size(oid).await.unwrap();
-    assert_eq!(
-        size as usize, 1000,
-        "Size should match uploaded data size"
-    );
+    assert_eq!(size as usize, 1000, "Size should match uploaded data size");
 
     // Cleanup - ignore errors if already deleted
     let _ = stream.delete(oid).await;
@@ -207,7 +210,10 @@ async fn test_custom_chunk_size() {
     let oid = stream.upload(&data).await.unwrap();
 
     let downloaded = stream.download(oid).await.unwrap();
-    assert_eq!(downloaded, data, "Downloaded data should match with custom chunk size");
+    assert_eq!(
+        downloaded, data,
+        "Downloaded data should match with custom chunk size"
+    );
 
     // Cleanup - ignore errors if already deleted
     let _ = stream.delete(oid).await;
@@ -303,11 +309,7 @@ async fn test_multiple_chunks() {
     let oid = stream.upload(&data).await.unwrap();
 
     let downloaded = stream.download(oid).await.unwrap();
-    assert_eq!(
-        downloaded.len(),
-        data.len(),
-        "Downloaded size should match"
-    );
+    assert_eq!(downloaded.len(), data.len(), "Downloaded size should match");
 
     // Cleanup - ignore errors if already deleted
     let _ = stream.delete(oid).await;
@@ -365,21 +367,17 @@ async fn test_large_file_streaming() {
 
     // Verify size
     let size = stream.size(oid).await.unwrap();
-    assert_eq!(
-        size as usize,
-        data.len(),
-        "Size should match 50MB"
-    );
+    assert_eq!(size as usize, data.len(), "Size should match 50MB");
 
     // Download and verify first/last bytes
     let downloaded = stream.download(oid).await.unwrap();
-    assert_eq!(
-        downloaded.len(),
-        data.len(),
-        "Downloaded size should match"
-    );
+    assert_eq!(downloaded.len(), data.len(), "Downloaded size should match");
     assert_eq!(downloaded[0], 123, "First byte should match");
-    assert_eq!(downloaded[downloaded.len() - 1], 123, "Last byte should match");
+    assert_eq!(
+        downloaded[downloaded.len() - 1],
+        123,
+        "Last byte should match"
+    );
 
     // Cleanup - ignore errors if already deleted
     let _ = stream.delete(oid).await;
@@ -417,5 +415,8 @@ async fn test_download_nonexistent_object() {
 
     // Try to download non-existent object
     let result = stream.download(999999).await;
-    assert!(result.is_err(), "Should fail to download non-existent object");
+    assert!(
+        result.is_err(),
+        "Should fail to download non-existent object"
+    );
 }

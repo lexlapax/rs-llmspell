@@ -134,11 +134,7 @@ async fn test_artifacts_indexes_created() {
         .await
         .unwrap();
 
-    assert_eq!(
-        rows.len(),
-        4,
-        "Should have 4 indexes on artifact_content"
-    );
+    assert_eq!(rows.len(), 4, "Should have 4 indexes on artifact_content");
 
     let expected_content_indexes = [
         "idx_artifact_content_accessed",
@@ -860,10 +856,7 @@ async fn test_tenant_isolation() {
     let rows_a = {
         let client = backend.get_client().await.unwrap();
         client
-            .query(
-                "SELECT name FROM llmspell.artifacts ORDER BY name",
-                &[],
-            )
+            .query("SELECT name FROM llmspell.artifacts ORDER BY name", &[])
             .await
             .unwrap()
     };
@@ -877,10 +870,7 @@ async fn test_tenant_isolation() {
     let rows_b = {
         let client = backend.get_client().await.unwrap();
         client
-            .query(
-                "SELECT name FROM llmspell.artifacts ORDER BY name",
-                &[],
-            )
+            .query("SELECT name FROM llmspell.artifacts ORDER BY name", &[])
             .await
             .unwrap()
     };
