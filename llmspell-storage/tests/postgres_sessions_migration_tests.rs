@@ -293,7 +293,13 @@ async fn test_sessions_artifact_count_constraint() {
             "INSERT INTO llmspell.sessions
              (tenant_id, session_id, session_data, status, artifact_count)
              VALUES ($1, $2, $3, $4, $5)",
-            &[&tenant_id, &Uuid::new_v4(), &session_data, &"active", &-1i32],
+            &[
+                &tenant_id,
+                &Uuid::new_v4(),
+                &session_data,
+                &"active",
+                &-1i32,
+            ],
         )
         .await;
 

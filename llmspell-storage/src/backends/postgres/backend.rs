@@ -256,55 +256,65 @@ impl TenantScoped for PostgresBackend {
 #[async_trait::async_trait]
 impl crate::traits::StorageBackend for PostgresBackend {
     async fn get(&self, key: &str) -> anyhow::Result<Option<Vec<u8>>> {
-        // Route based on key pattern
+        // Route based on key pattern (4-way routing)
         if key.starts_with("agent:") {
             self.get_agent_state(key).await
         } else if key.starts_with("custom:workflow_") {
             self.get_workflow_state(key).await
+        } else if self.is_primary_session_key(key) {
+            self.get_session_state(key).await
         } else {
             self.get_kv(key).await
         }
     }
 
     async fn set(&self, key: &str, value: Vec<u8>) -> anyhow::Result<()> {
-        // Route based on key pattern
+        // Route based on key pattern (4-way routing)
         if key.starts_with("agent:") {
             self.set_agent_state(key, value).await
         } else if key.starts_with("custom:workflow_") {
             self.set_workflow_state(key, value).await
+        } else if self.is_primary_session_key(key) {
+            self.set_session_state(key, value).await
         } else {
             self.set_kv(key, value).await
         }
     }
 
     async fn delete(&self, key: &str) -> anyhow::Result<()> {
-        // Route based on key pattern
+        // Route based on key pattern (4-way routing)
         if key.starts_with("agent:") {
             self.delete_agent_state(key).await
         } else if key.starts_with("custom:workflow_") {
             self.delete_workflow_state(key).await
+        } else if self.is_primary_session_key(key) {
+            self.delete_session_state(key).await
         } else {
             self.delete_kv(key).await
         }
     }
 
     async fn exists(&self, key: &str) -> anyhow::Result<bool> {
-        // Route based on key pattern
+        // Route based on key pattern (4-way routing)
         if key.starts_with("agent:") {
             self.exists_agent_state(key).await
         } else if key.starts_with("custom:workflow_") {
             self.exists_workflow_state(key).await
+        } else if self.is_primary_session_key(key) {
+            self.exists_session_state(key).await
         } else {
             self.exists_kv(key).await
         }
     }
 
     async fn list_keys(&self, prefix: &str) -> anyhow::Result<Vec<String>> {
-        // Route based on prefix pattern
+        // Route based on prefix pattern (4-way routing)
         if prefix.starts_with("agent:") {
             self.list_agent_state_keys(prefix).await
         } else if prefix.starts_with("custom:workflow_") {
             self.list_workflow_state_keys(prefix).await
+        } else if prefix.starts_with("session:") {
+            self.list_session_state_keys(prefix).await
         } else {
             self.list_kv_keys(prefix).await
         }
@@ -316,9 +326,10 @@ impl crate::traits::StorageBackend for PostgresBackend {
     ) -> anyhow::Result<std::collections::HashMap<String, Vec<u8>>> {
         use std::collections::HashMap;
 
-        // Partition keys by routing destination (3-way partition)
+        // Partition keys by routing destination (4-way partition)
         let mut agent_keys = Vec::new();
         let mut workflow_keys = Vec::new();
+        let mut session_keys = Vec::new();
         let mut kv_keys = Vec::new();
 
         for key in keys {
@@ -326,12 +337,14 @@ impl crate::traits::StorageBackend for PostgresBackend {
                 agent_keys.push(key);
             } else if key.starts_with("custom:workflow_") {
                 workflow_keys.push(key);
+            } else if self.is_primary_session_key(key) {
+                session_keys.push(key);
             } else {
                 kv_keys.push(key);
             }
         }
 
-        // Fetch from all three sources
+        // Fetch from all four sources
         let mut results = HashMap::new();
 
         for key in agent_keys {
@@ -342,6 +355,12 @@ impl crate::traits::StorageBackend for PostgresBackend {
 
         for key in workflow_keys {
             if let Some(value) = self.get_workflow_state(key).await? {
+                results.insert(key.to_string(), value);
+            }
+        }
+
+        for key in session_keys {
+            if let Some(value) = self.get_session_state(key).await? {
                 results.insert(key.to_string(), value);
             }
         }
@@ -361,9 +380,10 @@ impl crate::traits::StorageBackend for PostgresBackend {
     ) -> anyhow::Result<()> {
         use std::collections::HashMap;
 
-        // Partition items by routing destination (3-way partition)
+        // Partition items by routing destination (4-way partition)
         let mut agent_items = HashMap::new();
         let mut workflow_items = HashMap::new();
+        let mut session_items = HashMap::new();
         let mut kv_items = HashMap::new();
 
         for (key, value) in items {
@@ -371,18 +391,24 @@ impl crate::traits::StorageBackend for PostgresBackend {
                 agent_items.insert(key, value);
             } else if key.starts_with("custom:workflow_") {
                 workflow_items.insert(key, value);
+            } else if self.is_primary_session_key(&key) {
+                session_items.insert(key, value);
             } else {
                 kv_items.insert(key, value);
             }
         }
 
-        // Store in all three destinations
+        // Store in all four destinations
         for (key, value) in agent_items {
             self.set_agent_state(&key, value).await?;
         }
 
         for (key, value) in workflow_items {
             self.set_workflow_state(&key, value).await?;
+        }
+
+        for (key, value) in session_items {
+            self.set_session_state(&key, value).await?;
         }
 
         for (key, value) in kv_items {
@@ -405,7 +431,7 @@ impl crate::traits::StorageBackend for PostgresBackend {
             .await
             .map_err(|e| anyhow::anyhow!("{}", e))?;
 
-        // Clear all three tables (RLS will scope to current tenant)
+        // Clear all four tables (RLS will scope to current tenant)
         client
             .execute("DELETE FROM llmspell.agent_states", &[])
             .await
@@ -415,6 +441,11 @@ impl crate::traits::StorageBackend for PostgresBackend {
             .execute("DELETE FROM llmspell.workflow_states", &[])
             .await
             .map_err(|e| anyhow::anyhow!("Failed to clear workflow_states: {}", e))?;
+
+        client
+            .execute("DELETE FROM llmspell.sessions", &[])
+            .await
+            .map_err(|e| anyhow::anyhow!("Failed to clear sessions: {}", e))?;
 
         client
             .execute("DELETE FROM llmspell.kv_store", &[])
@@ -817,6 +848,254 @@ impl PostgresBackend {
 
         // Workflow name is optional - will be extracted from state_data or left as None
         Ok((workflow_id, None))
+    }
+
+    // =============================================================================
+    // Session State Operations (Phase 13b.9.2)
+    // =============================================================================
+
+    /// Check if key is a primary session key (session:{uuid} without additional colons)
+    /// Returns true for "session:{uuid}", false for "session:{uuid}:{state_key}"
+    fn is_primary_session_key(&self, key: &str) -> bool {
+        if !key.starts_with("session:") {
+            return false;
+        }
+
+        let remainder = &key[8..]; // Skip "session:" prefix
+
+        // Check if remainder is a valid UUID without additional colons
+        if remainder.contains(':') {
+            return false; // Has additional path components, route to kv_store
+        }
+
+        // Validate it's a valid UUID
+        uuid::Uuid::parse_str(remainder).is_ok()
+    }
+
+    /// Parse session key format: "session:<session_id>"
+    /// Returns session_id as UUID
+    fn parse_session_key(&self, key: &str) -> anyhow::Result<uuid::Uuid> {
+        let parts: Vec<&str> = key.split(':').collect();
+        if parts.len() != 2 || parts[0] != "session" {
+            return Err(anyhow::anyhow!(
+                "Invalid session key format. Expected 'session:<uuid>', got '{}'",
+                key
+            ));
+        }
+
+        uuid::Uuid::parse_str(parts[1])
+            .map_err(|e| anyhow::anyhow!("Invalid UUID in session key '{}': {}", key, e))
+    }
+
+    /// Get session state from sessions table
+    async fn get_session_state(&self, key: &str) -> anyhow::Result<Option<Vec<u8>>> {
+        let session_id = self.parse_session_key(key)?;
+
+        let client = self
+            .get_client()
+            .await
+            .map_err(|e| anyhow::anyhow!("{}", e))?;
+        let tenant_id = self
+            .get_tenant_context()
+            .await
+            .ok_or_else(|| anyhow::anyhow!("Tenant context not set"))?;
+
+        let row = client
+            .query_opt(
+                "SELECT session_data FROM llmspell.sessions
+                 WHERE tenant_id = $1 AND session_id = $2",
+                &[&tenant_id, &session_id],
+            )
+            .await
+            .map_err(|e| anyhow::anyhow!("Failed to get session state: {}", e))?;
+
+        if let Some(row) = row {
+            let session_data: serde_json::Value = row.get(0);
+            let bytes = serde_json::to_vec(&session_data)?;
+            Ok(Some(bytes))
+        } else {
+            Ok(None)
+        }
+    }
+
+    /// Set session state in sessions table
+    async fn set_session_state(&self, key: &str, value: Vec<u8>) -> anyhow::Result<()> {
+        let session_id = self.parse_session_key(key)?;
+
+        // Parse value as JSON (SessionSnapshot)
+        let session_data: serde_json::Value = serde_json::from_slice(&value)?;
+
+        // Extract fields from SessionSnapshot for indexed queries
+        let status_enum = session_data
+            .get("metadata")
+            .and_then(|m| m.get("status"))
+            .and_then(|s| s.as_str())
+            .unwrap_or("Active");
+
+        // Map SessionStatus enum to database status
+        let status = match status_enum {
+            "Active" | "Suspended" => "active",
+            "Completed" | "Failed" | "Archived" => "archived",
+            _ => "active",
+        };
+
+        let artifact_count = session_data
+            .get("metadata")
+            .and_then(|m| m.get("artifact_count"))
+            .and_then(|c| c.as_i64())
+            .unwrap_or(0) as i32;
+
+        // Extract timestamps
+        let created_at = session_data
+            .get("metadata")
+            .and_then(|m| m.get("created_at"))
+            .and_then(|t| t.as_str())
+            .and_then(|s| chrono::DateTime::parse_from_rfc3339(s).ok())
+            .map(|dt| dt.with_timezone(&chrono::Utc));
+
+        let last_accessed_at = session_data
+            .get("metadata")
+            .and_then(|m| m.get("updated_at"))
+            .and_then(|t| t.as_str())
+            .and_then(|s| chrono::DateTime::parse_from_rfc3339(s).ok())
+            .map(|dt| dt.with_timezone(&chrono::Utc));
+
+        // Compute expires_at from config.retention_days + created_at
+        let expires_at = if let (Some(created), Some(retention_days)) = (
+            created_at,
+            session_data
+                .get("config")
+                .and_then(|c| c.get("retention_days"))
+                .and_then(|r| r.as_i64()),
+        ) {
+            Some(created + chrono::Duration::days(retention_days))
+        } else {
+            None
+        };
+
+        let client = self
+            .get_client()
+            .await
+            .map_err(|e| anyhow::anyhow!("{}", e))?;
+        let tenant_id = self
+            .get_tenant_context()
+            .await
+            .ok_or_else(|| anyhow::anyhow!("Tenant context not set"))?;
+
+        // Upsert session state
+        client
+            .execute(
+                "INSERT INTO llmspell.sessions
+                    (tenant_id, session_id, session_data, status, created_at, last_accessed_at, expires_at, artifact_count)
+                 VALUES ($1, $2, $3, $4, COALESCE($5, now()), COALESCE($6, now()), $7, $8)
+                 ON CONFLICT (tenant_id, session_id)
+                 DO UPDATE SET
+                    session_data = EXCLUDED.session_data,
+                    status = EXCLUDED.status,
+                    last_accessed_at = COALESCE(EXCLUDED.last_accessed_at, now()),
+                    expires_at = EXCLUDED.expires_at,
+                    artifact_count = EXCLUDED.artifact_count",
+                &[
+                    &tenant_id,
+                    &session_id,
+                    &session_data,
+                    &status,
+                    &created_at,
+                    &last_accessed_at,
+                    &expires_at,
+                    &artifact_count,
+                ],
+            )
+            .await
+            .map_err(|e| anyhow::anyhow!("Failed to set session state: {}", e))?;
+
+        Ok(())
+    }
+
+    /// Delete session state from sessions table
+    async fn delete_session_state(&self, key: &str) -> anyhow::Result<()> {
+        let session_id = self.parse_session_key(key)?;
+
+        let client = self
+            .get_client()
+            .await
+            .map_err(|e| anyhow::anyhow!("{}", e))?;
+        let tenant_id = self
+            .get_tenant_context()
+            .await
+            .ok_or_else(|| anyhow::anyhow!("Tenant context not set"))?;
+
+        client
+            .execute(
+                "DELETE FROM llmspell.sessions
+                 WHERE tenant_id = $1 AND session_id = $2",
+                &[&tenant_id, &session_id],
+            )
+            .await
+            .map_err(|e| anyhow::anyhow!("Failed to delete session state: {}", e))?;
+
+        Ok(())
+    }
+
+    /// Check if session state exists
+    async fn exists_session_state(&self, key: &str) -> anyhow::Result<bool> {
+        let session_id = self.parse_session_key(key)?;
+
+        let client = self
+            .get_client()
+            .await
+            .map_err(|e| anyhow::anyhow!("{}", e))?;
+        let tenant_id = self
+            .get_tenant_context()
+            .await
+            .ok_or_else(|| anyhow::anyhow!("Tenant context not set"))?;
+
+        let row = client
+            .query_one(
+                "SELECT EXISTS(
+                    SELECT 1 FROM llmspell.sessions
+                    WHERE tenant_id = $1 AND session_id = $2
+                )",
+                &[&tenant_id, &session_id],
+            )
+            .await
+            .map_err(|e| anyhow::anyhow!("Failed to check session state existence: {}", e))?;
+
+        Ok(row.get(0))
+    }
+
+    /// List session state keys matching prefix
+    async fn list_session_state_keys(&self, _prefix: &str) -> anyhow::Result<Vec<String>> {
+        let client = self
+            .get_client()
+            .await
+            .map_err(|e| anyhow::anyhow!("{}", e))?;
+        let tenant_id = self
+            .get_tenant_context()
+            .await
+            .ok_or_else(|| anyhow::anyhow!("Tenant context not set"))?;
+
+        // For session keys, we only list primary session keys (session:{uuid})
+        // State items (session:{uuid}:{state_key}) are in kv_store
+        let rows = client
+            .query(
+                "SELECT session_id FROM llmspell.sessions
+                 WHERE tenant_id = $1
+                 ORDER BY created_at DESC",
+                &[&tenant_id],
+            )
+            .await
+            .map_err(|e| anyhow::anyhow!("Failed to list session state keys: {}", e))?;
+
+        let keys = rows
+            .iter()
+            .map(|row| {
+                let session_id: uuid::Uuid = row.get(0);
+                format!("session:{}", session_id)
+            })
+            .collect();
+
+        Ok(keys)
     }
 }
 
