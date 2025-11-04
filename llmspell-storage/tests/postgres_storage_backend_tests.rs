@@ -180,12 +180,12 @@ async fn test_agent_state_update_with_versioning() {
     let retrieved = backend.get(key).await.unwrap().unwrap();
     assert_eq!(retrieved, value2, "Should get latest version");
 
-    // Verify version incremented in database
+    // Verify version incremented in database (include tenant_id to avoid RLS race conditions)
     let client = backend.get_client().await.unwrap();
     let row = client
         .query_one(
-            "SELECT data_version FROM llmspell.agent_states WHERE agent_id = $1",
-            &[&"agent-version-test"],
+            "SELECT data_version FROM llmspell.agent_states WHERE tenant_id = $1 AND agent_id = $2",
+            &[&tenant_id, &"agent-version-test"],
         )
         .await
         .unwrap();
@@ -211,12 +211,12 @@ async fn test_agent_state_checksum_computed() {
 
     backend.set(key, value.clone()).await.unwrap();
 
-    // Verify checksum stored
+    // Verify checksum stored (include tenant_id to avoid RLS race conditions in parallel tests)
     let client = backend.get_client().await.unwrap();
     let row = client
         .query_one(
-            "SELECT checksum FROM llmspell.agent_states WHERE agent_id = $1",
-            &[&"agent-checksum-test"],
+            "SELECT checksum FROM llmspell.agent_states WHERE tenant_id = $1 AND agent_id = $2",
+            &[&tenant_id, &"agent-checksum-test"],
         )
         .await
         .unwrap();
