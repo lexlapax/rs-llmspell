@@ -5418,23 +5418,105 @@ async fn list_session_state_keys(&self, _prefix: &str) -> anyhow::Result<Vec<Str
 **Timeline**: 3 days (24 hours)
 **Critical Dependencies**: Phase 13b.2, Phase 13b.3 ✅
 
-### Task 13b.10.1: Create Artifacts Schema
+### Task 13b.10.1: Create Artifacts Schema ✅ COMPLETE
 **Priority**: HIGH
 **Estimated Time**: 3 hours
+**Actual Time**: 2 hours
+**Status**: ✅ COMPLETE
+**Completed**: 2025-11-04
 
-**Description**: Create PostgreSQL schema for artifacts with BYTEA for small artifacts, Large Objects for >1MB.
+**Description**: Create PostgreSQL schema for artifacts with content-addressed storage and deduplication.
 
 **Implementation Steps**:
-1. Create `migrations/V007__artifacts.sql`:
-   - Table: artifacts (artifact_id, tenant_id, session_id FK, size_bytes, storage_type ENUM('bytea', 'large_object'), data BYTEA, large_object_oid OID, mime_type, created_at)
-   - Indexes: (artifact_id, tenant_id) unique, (session_id) FK
-   - RLS policies applied
+1. ✅ Research existing artifact storage patterns (ArtifactId, ArtifactMetadata, SessionArtifact)
+2. ✅ Create `migrations/V10__artifacts.sql`:
+   - Dual-table design: artifact_content (content storage) + artifacts (metadata)
+   - 13 indexes total (4 content + 9 artifacts)
+   - 8 RLS policies (4 per table)
+   - 4 triggers (reference counting, timestamp updates, access tracking)
+   - Foreign keys to sessions and content tables
+3. ✅ Created comprehensive migration tests (12 tests, all passing)
 
-**Files to Create**: `llmspell-storage/migrations/V007__artifacts.sql`
+**Files Created**:
+- `llmspell-storage/migrations/V10__artifacts.sql` (314 lines)
+- `llmspell-storage/tests/postgres_artifacts_migration_tests.rs` (12 tests, 850+ lines)
 
 **Definition of Done**:
-- [ ] Schema supports dual storage (BYTEA + Large Objects)
-- [ ] RLS policies enforced
+- [x] Schema supports dual storage (BYTEA <1MB + Large Objects >=1MB)
+- [x] RLS policies enforced (8 total: 4 per table)
+- [x] All 12 migration tests pass (0.14s)
+
+**Implementation Insights**:
+- **Migration version**: V10 (after V9__sessions)
+- **Dual-table architecture for deduplication**:
+  1. `artifact_content`: Content-addressed storage with blake3 hashing
+     - PRIMARY KEY: (tenant_id, content_hash)
+     - Supports BYTEA (<1MB) and Large Object (>=1MB) storage
+     - Reference counting for deduplication (auto-increment/decrement via triggers)
+     - 100MB max artifact size constraint
+  2. `artifacts`: Metadata and references
+     - PRIMARY KEY: (tenant_id, artifact_id)
+     - Format: artifact_id = "{session_id}:{sequence}:{content_hash}"
+     - Full ArtifactMetadata stored as JSONB + extracted fields for queries
+     - FK to artifact_content (ON DELETE RESTRICT) and sessions (ON DELETE CASCADE)
+     - Unique constraint: (tenant_id, session_id, sequence)
+
+- **Content deduplication strategy**:
+  - Same content hash → single storage entry
+  - Multiple artifacts can reference same content
+  - Reference counting automatic via triggers (increment on INSERT, decrement on DELETE)
+  - Partial index on refcount=0 for garbage collection optimization
+
+- **13 Performance indexes**:
+  - **artifact_content** (4 indexes):
+    1. idx_artifact_content_tenant - RLS performance
+    2. idx_artifact_content_refcount - GC queries (WHERE refcount=0)
+    3. idx_artifact_content_large_objects - LO cleanup (WHERE oid IS NOT NULL)
+    4. idx_artifact_content_accessed - Access tracking (DESC)
+  - **artifacts** (9 indexes):
+    1. idx_artifacts_session - List artifacts by session (DESC)
+    2. idx_artifacts_type - Query by artifact type
+    3. idx_artifacts_content - Find artifacts by content hash
+    4. idx_artifacts_name - Search by name
+    5. idx_artifacts_created - Time-based queries (DESC)
+    6. idx_artifacts_size - Size-based queries (DESC)
+    7. idx_artifacts_tags - GIN index for tag searches
+    8. idx_artifacts_metadata - GIN index for JSONB queries
+    9. idx_artifacts_tenant_type - Composite tenant+type (DESC)
+
+- **4 Triggers for automation**:
+  1. `trigger_artifacts_updated_at` - Auto-update updated_at on artifact changes
+  2. `trigger_increment_refcount` - Increment content refcount on artifact INSERT
+  3. `trigger_decrement_refcount` - Decrement content refcount on artifact DELETE
+  4. `trigger_content_accessed_at` - Update last_accessed_at (1-minute throttle)
+
+- **Storage consistency constraints**:
+  - `bytea_storage_valid`: BYTEA storage requires data field, no OID
+  - `large_object` storage requires OID, no data field
+  - Storage type must be 'bytea' or 'large_object'
+  - Reference count must be > 0
+
+- **Pattern consistency with Phase 13b.9**:
+  - Composite PRIMARY KEY (tenant_id, identifier)
+  - JSONB for full data + extracted fields for indexed queries
+  - RLS with 4 policies per table (SELECT, INSERT, UPDATE, DELETE)
+  - Auto-update triggers for timestamps
+  - Partial indexes for query optimization
+  - Foreign key relationships with CASCADE/RESTRICT as appropriate
+
+- **12 Test coverage**:
+  1. test_artifact_content_table_created - Table exists, RLS enabled
+  2. test_artifacts_table_created - Table exists, RLS enabled
+  3. test_artifacts_indexes_created - 13 indexes verified (4+9)
+  4. test_artifacts_rls_policies - 8 policies verified
+  5. test_storage_type_constraint - Invalid type fails
+  6. test_storage_consistency_constraint - BYTEA/LO consistency enforced
+  7. test_reference_count_constraint - Refcount > 0 enforced
+  8. test_max_size_constraint - 100MB limit enforced
+  9. test_foreign_key_to_sessions - Session FK enforced
+  10. test_reference_count_triggers - Auto increment/decrement works
+  11. test_updated_at_trigger - Auto timestamp update works
+  12. test_tenant_isolation - RLS enforces tenant separation
 
 ### Task 13b.10.2: Implement Large Object Streaming API
 **Priority**: CRITICAL
