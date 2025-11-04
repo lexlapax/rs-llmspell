@@ -11,6 +11,7 @@
 #![cfg(feature = "postgres")]
 
 use llmspell_storage::{PostgresBackend, PostgresConfig};
+use std::error::Error;
 use tokio::sync::OnceCell;
 use uuid::Uuid;
 
@@ -193,7 +194,17 @@ async fn test_procedural_patterns_unique_constraint() {
         "Duplicate pattern should violate unique constraint"
     );
 
-    let error_msg = result.unwrap_err().to_string();
+    let error = result.unwrap_err();
+
+    // Extract actual PostgreSQL error message
+    // tokio_postgres::Error::to_string() may just return "db error"
+    // We need to check the source error for the actual message
+    let error_msg = if let Some(source) = error.source() {
+        source.to_string()
+    } else {
+        error.to_string()
+    };
+
     assert!(
         error_msg.contains("unique")
             || error_msg.contains("duplicate key")
