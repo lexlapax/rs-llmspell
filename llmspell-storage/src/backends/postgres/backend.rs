@@ -1065,7 +1065,9 @@ impl PostgresBackend {
     }
 
     /// List session state keys matching prefix
-    async fn list_session_state_keys(&self, _prefix: &str) -> anyhow::Result<Vec<String>> {
+    /// Returns both primary session keys (session:{uuid} from sessions table)
+    /// and state items (session:{uuid}:* from kv_store)
+    async fn list_session_state_keys(&self, prefix: &str) -> anyhow::Result<Vec<String>> {
         let client = self
             .get_client()
             .await
@@ -1075,8 +1077,9 @@ impl PostgresBackend {
             .await
             .ok_or_else(|| anyhow::anyhow!("Tenant context not set"))?;
 
-        // For session keys, we only list primary session keys (session:{uuid})
-        // State items (session:{uuid}:{state_key}) are in kv_store
+        let mut all_keys = Vec::new();
+
+        // 1. Get primary session keys from sessions table (session:{uuid})
         let rows = client
             .query(
                 "SELECT session_id FROM llmspell.sessions
@@ -1087,15 +1090,35 @@ impl PostgresBackend {
             .await
             .map_err(|e| anyhow::anyhow!("Failed to list session state keys: {}", e))?;
 
-        let keys = rows
-            .iter()
-            .map(|row| {
-                let session_id: uuid::Uuid = row.get(0);
-                format!("session:{}", session_id)
-            })
-            .collect();
+        for row in rows {
+            let session_id: uuid::Uuid = row.get(0);
+            let key = format!("session:{}", session_id);
+            // Only include if it matches the prefix
+            if key.starts_with(prefix) {
+                all_keys.push(key);
+            }
+        }
 
-        Ok(keys)
+        // 2. Get state items from kv_store (session:{uuid}:* or other session:* keys)
+        let kv_rows = client
+            .query(
+                "SELECT key FROM llmspell.kv_store
+                 WHERE tenant_id = $1 AND key LIKE $2
+                 ORDER BY key",
+                &[&tenant_id, &format!("{}%", prefix)],
+            )
+            .await
+            .map_err(|e| anyhow::anyhow!("Failed to list kv session keys: {}", e))?;
+
+        for row in kv_rows {
+            let key: String = row.get(0);
+            all_keys.push(key);
+        }
+
+        // Sort combined results (primary sessions first by created_at DESC, then kv items by key ASC)
+        // Since we already have sessions sorted by created_at DESC and kv by key ASC, just concatenate
+
+        Ok(all_keys)
     }
 }
 
