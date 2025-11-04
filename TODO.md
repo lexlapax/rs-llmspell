@@ -5164,6 +5164,40 @@ After analyzing existing workflow state storage patterns, chose specialized work
 **Timeline**: 2 days (16 hours)
 **Critical Dependencies**: Phase 13b.2, Phase 13b.3 ✅
 
+**Architectural Decision (Option A - Route Primary Sessions Only)**:
+
+After analyzing existing session storage patterns, chose selective routing for session keys:
+
+**Current State** (from research):
+- Sessions stored with TWO key patterns:
+  1. Primary session data: `session:{SessionId}` (complete SessionSnapshot, MessagePack+LZ4)
+  2. StateScope items: `session:{session_id}:{state_key}` (individual state keys)
+- SessionSnapshot structure: metadata (id, status, created_at, artifact_count), config (max_duration, auto_save_interval, retention), state HashMap, artifact_ids
+- SessionMetadata: status (active, archived, expired), timestamps, tags, operation_count
+- Auto-persist every 300s, auto-cleanup every 3600s (>30 days archived → deleted)
+
+**Rationale for Selective Routing (Option A)**:
+1. **Clear Separation**: Primary sessions → sessions table, state items → kv_store (follows StateScope pattern)
+2. **Efficient Queries**: Index by status (find active sessions), expires_at (cleanup), created_at (recent sessions)
+3. **Pattern Consistency**: Mirrors workflow approach (specialized table for lifecycle tracking)
+4. **Lifecycle Management**: Enables expiration queries, cleanup by status, session monitoring
+5. **StateScope Compatibility**: Individual state items remain in kv_store, existing code works unchanged
+
+**Routing Rules**:
+- `session:{uuid}` (exact UUID, no additional colons) → sessions table
+- `session:{uuid}:*` (state items with additional path) → kv_store table
+- Detection: Check if key after "session:" is valid UUID without additional colons
+
+**Trade-offs Accepted**:
+- Additional migration (V9__sessions.sql, after V8__workflow_states)
+- Backend routing logic must distinguish primary session vs state items
+- Dual storage strategy (SessionSnapshot in sessions, state items in kv_store)
+
+**Integration Points**:
+- `llmspell-kernel::sessions::SessionManager` - Uses StorageBackend for persistence
+- `llmspell-kernel::sessions::SessionSnapshot` - Serializable session state
+- Phase 13b.7.2/13b.8.2 routing - Extend for `session:*` keys (4-way routing)
+
 ### Task 13b.9.1: Create Sessions Schema
 **Priority**: HIGH
 **Estimated Time**: 2 hours
