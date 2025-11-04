@@ -259,6 +259,8 @@ impl crate::traits::StorageBackend for PostgresBackend {
         // Route based on key pattern
         if key.starts_with("agent:") {
             self.get_agent_state(key).await
+        } else if key.starts_with("custom:workflow_") {
+            self.get_workflow_state(key).await
         } else {
             self.get_kv(key).await
         }
@@ -268,6 +270,8 @@ impl crate::traits::StorageBackend for PostgresBackend {
         // Route based on key pattern
         if key.starts_with("agent:") {
             self.set_agent_state(key, value).await
+        } else if key.starts_with("custom:workflow_") {
+            self.set_workflow_state(key, value).await
         } else {
             self.set_kv(key, value).await
         }
@@ -277,6 +281,8 @@ impl crate::traits::StorageBackend for PostgresBackend {
         // Route based on key pattern
         if key.starts_with("agent:") {
             self.delete_agent_state(key).await
+        } else if key.starts_with("custom:workflow_") {
+            self.delete_workflow_state(key).await
         } else {
             self.delete_kv(key).await
         }
@@ -286,6 +292,8 @@ impl crate::traits::StorageBackend for PostgresBackend {
         // Route based on key pattern
         if key.starts_with("agent:") {
             self.exists_agent_state(key).await
+        } else if key.starts_with("custom:workflow_") {
+            self.exists_workflow_state(key).await
         } else {
             self.exists_kv(key).await
         }
@@ -295,6 +303,8 @@ impl crate::traits::StorageBackend for PostgresBackend {
         // Route based on prefix pattern
         if prefix.starts_with("agent:") {
             self.list_agent_state_keys(prefix).await
+        } else if prefix.starts_with("custom:workflow_") {
+            self.list_workflow_state_keys(prefix).await
         } else {
             self.list_kv_keys(prefix).await
         }
@@ -306,15 +316,32 @@ impl crate::traits::StorageBackend for PostgresBackend {
     ) -> anyhow::Result<std::collections::HashMap<String, Vec<u8>>> {
         use std::collections::HashMap;
 
-        // Partition keys by routing destination
-        let (agent_keys, kv_keys): (Vec<_>, Vec<_>) =
-            keys.iter().partition(|k| k.starts_with("agent:"));
+        // Partition keys by routing destination (3-way partition)
+        let mut agent_keys = Vec::new();
+        let mut workflow_keys = Vec::new();
+        let mut kv_keys = Vec::new();
 
-        // Fetch from both sources
+        for key in keys {
+            if key.starts_with("agent:") {
+                agent_keys.push(key);
+            } else if key.starts_with("custom:workflow_") {
+                workflow_keys.push(key);
+            } else {
+                kv_keys.push(key);
+            }
+        }
+
+        // Fetch from all three sources
         let mut results = HashMap::new();
 
         for key in agent_keys {
             if let Some(value) = self.get_agent_state(key).await? {
+                results.insert(key.to_string(), value);
+            }
+        }
+
+        for key in workflow_keys {
+            if let Some(value) = self.get_workflow_state(key).await? {
                 results.insert(key.to_string(), value);
             }
         }
@@ -334,21 +361,28 @@ impl crate::traits::StorageBackend for PostgresBackend {
     ) -> anyhow::Result<()> {
         use std::collections::HashMap;
 
-        // Partition items by routing destination
+        // Partition items by routing destination (3-way partition)
         let mut agent_items = HashMap::new();
+        let mut workflow_items = HashMap::new();
         let mut kv_items = HashMap::new();
 
         for (key, value) in items {
             if key.starts_with("agent:") {
                 agent_items.insert(key, value);
+            } else if key.starts_with("custom:workflow_") {
+                workflow_items.insert(key, value);
             } else {
                 kv_items.insert(key, value);
             }
         }
 
-        // Store in both destinations
+        // Store in all three destinations
         for (key, value) in agent_items {
             self.set_agent_state(&key, value).await?;
+        }
+
+        for (key, value) in workflow_items {
+            self.set_workflow_state(&key, value).await?;
         }
 
         for (key, value) in kv_items {
@@ -371,11 +405,16 @@ impl crate::traits::StorageBackend for PostgresBackend {
             .await
             .map_err(|e| anyhow::anyhow!("{}", e))?;
 
-        // Clear both tables (RLS will scope to current tenant)
+        // Clear all three tables (RLS will scope to current tenant)
         client
             .execute("DELETE FROM llmspell.agent_states", &[])
             .await
             .map_err(|e| anyhow::anyhow!("Failed to clear agent_states: {}", e))?;
+
+        client
+            .execute("DELETE FROM llmspell.workflow_states", &[])
+            .await
+            .map_err(|e| anyhow::anyhow!("Failed to clear workflow_states: {}", e))?;
 
         client
             .execute("DELETE FROM llmspell.kv_store", &[])
@@ -581,6 +620,205 @@ impl PostgresBackend {
         let mut hasher = Sha256::new();
         hasher.update(value);
         format!("{:x}", hasher.finalize())
+    }
+
+    // =============================================================================
+    // Workflow State Operations (Phase 13b.8.2)
+    // =============================================================================
+
+    /// Get workflow state from workflow_states table
+    async fn get_workflow_state(&self, key: &str) -> anyhow::Result<Option<Vec<u8>>> {
+        let (workflow_id, _workflow_name) = self.parse_workflow_key(key)?;
+
+        let client = self
+            .get_client()
+            .await
+            .map_err(|e| anyhow::anyhow!("{}", e))?;
+        let tenant_id = self
+            .get_tenant_context()
+            .await
+            .ok_or_else(|| anyhow::anyhow!("Tenant context not set"))?;
+
+        let row = client
+            .query_opt(
+                "SELECT state_data FROM llmspell.workflow_states
+                 WHERE tenant_id = $1 AND workflow_id = $2",
+                &[&tenant_id, &workflow_id],
+            )
+            .await
+            .map_err(|e| anyhow::anyhow!("Failed to get workflow state: {}", e))?;
+
+        if let Some(row) = row {
+            let state_data: serde_json::Value = row.get(0);
+            let bytes = serde_json::to_vec(&state_data)?;
+            Ok(Some(bytes))
+        } else {
+            Ok(None)
+        }
+    }
+
+    /// Set workflow state in workflow_states table
+    async fn set_workflow_state(&self, key: &str, value: Vec<u8>) -> anyhow::Result<()> {
+        let (workflow_id, workflow_name) = self.parse_workflow_key(key)?;
+
+        // Parse value as JSON
+        let state_data: serde_json::Value = serde_json::from_slice(&value)?;
+
+        // Extract fields from PersistentWorkflowState for indexed queries
+        let current_step = state_data
+            .get("workflow_state")
+            .and_then(|ws| ws.get("current_step"))
+            .and_then(|s| s.as_i64())
+            .unwrap_or(0) as i32;
+
+        let status = state_data
+            .get("status")
+            .and_then(|s| s.as_str())
+            .unwrap_or("pending");
+
+        let client = self
+            .get_client()
+            .await
+            .map_err(|e| anyhow::anyhow!("{}", e))?;
+        let tenant_id = self
+            .get_tenant_context()
+            .await
+            .ok_or_else(|| anyhow::anyhow!("Tenant context not set"))?;
+
+        // Upsert workflow state
+        client
+            .execute(
+                "INSERT INTO llmspell.workflow_states
+                    (tenant_id, workflow_id, workflow_name, state_data, current_step, status)
+                 VALUES ($1, $2, $3, $4, $5, $6)
+                 ON CONFLICT (tenant_id, workflow_id)
+                 DO UPDATE SET
+                    workflow_name = EXCLUDED.workflow_name,
+                    state_data = EXCLUDED.state_data,
+                    current_step = EXCLUDED.current_step,
+                    status = EXCLUDED.status",
+                &[
+                    &tenant_id,
+                    &workflow_id,
+                    &workflow_name,
+                    &state_data,
+                    &current_step,
+                    &status,
+                ],
+            )
+            .await
+            .map_err(|e| anyhow::anyhow!("Failed to set workflow state: {}", e))?;
+
+        Ok(())
+    }
+
+    /// Delete workflow state from workflow_states table
+    async fn delete_workflow_state(&self, key: &str) -> anyhow::Result<()> {
+        let (workflow_id, _) = self.parse_workflow_key(key)?;
+
+        let client = self
+            .get_client()
+            .await
+            .map_err(|e| anyhow::anyhow!("{}", e))?;
+        let tenant_id = self
+            .get_tenant_context()
+            .await
+            .ok_or_else(|| anyhow::anyhow!("Tenant context not set"))?;
+
+        client
+            .execute(
+                "DELETE FROM llmspell.workflow_states
+                 WHERE tenant_id = $1 AND workflow_id = $2",
+                &[&tenant_id, &workflow_id],
+            )
+            .await
+            .map_err(|e| anyhow::anyhow!("Failed to delete workflow state: {}", e))?;
+
+        Ok(())
+    }
+
+    /// Check if workflow state exists
+    async fn exists_workflow_state(&self, key: &str) -> anyhow::Result<bool> {
+        let (workflow_id, _) = self.parse_workflow_key(key)?;
+
+        let client = self
+            .get_client()
+            .await
+            .map_err(|e| anyhow::anyhow!("{}", e))?;
+        let tenant_id = self
+            .get_tenant_context()
+            .await
+            .ok_or_else(|| anyhow::anyhow!("Tenant context not set"))?;
+
+        let row = client
+            .query_one(
+                "SELECT EXISTS(
+                    SELECT 1 FROM llmspell.workflow_states
+                    WHERE tenant_id = $1 AND workflow_id = $2
+                )",
+                &[&tenant_id, &workflow_id],
+            )
+            .await
+            .map_err(|e| anyhow::anyhow!("Failed to check workflow state existence: {}", e))?;
+
+        Ok(row.get(0))
+    }
+
+    /// List workflow state keys matching prefix
+    async fn list_workflow_state_keys(&self, prefix: &str) -> anyhow::Result<Vec<String>> {
+        let client = self
+            .get_client()
+            .await
+            .map_err(|e| anyhow::anyhow!("{}", e))?;
+        let tenant_id = self
+            .get_tenant_context()
+            .await
+            .ok_or_else(|| anyhow::anyhow!("Tenant context not set"))?;
+
+        // Remove "custom:workflow_" prefix for pattern matching
+        let workflow_prefix = prefix
+            .strip_prefix("custom:workflow_")
+            .unwrap_or(prefix);
+
+        let rows = client
+            .query(
+                "SELECT workflow_id, workflow_name FROM llmspell.workflow_states
+                 WHERE tenant_id = $1 AND workflow_id LIKE $2
+                 ORDER BY workflow_id",
+                &[&tenant_id, &format!("{}%", workflow_prefix)],
+            )
+            .await
+            .map_err(|e| anyhow::anyhow!("Failed to list workflow state keys: {}", e))?;
+
+        let keys = rows
+            .iter()
+            .map(|row| {
+                let workflow_id: String = row.get(0);
+                format!("custom:workflow_{}:state", workflow_id)
+            })
+            .collect();
+
+        Ok(keys)
+    }
+
+    /// Parse workflow key format: "custom:workflow_<workflow_id>:state"
+    /// Returns (workflow_id, workflow_name_from_id)
+    fn parse_workflow_key(&self, key: &str) -> anyhow::Result<(String, Option<String>)> {
+        let parts: Vec<&str> = key.split(':').collect();
+        if parts.len() != 3 || parts[0] != "custom" || !parts[1].starts_with("workflow_") {
+            return Err(anyhow::anyhow!(
+                "Invalid workflow key format. Expected 'custom:workflow_<id>:state', got '{}'",
+                key
+            ));
+        }
+
+        let workflow_id = parts[1]
+            .strip_prefix("workflow_")
+            .ok_or_else(|| anyhow::anyhow!("Failed to extract workflow_id from '{}'", key))?
+            .to_string();
+
+        // Workflow name is optional - will be extracted from state_data or left as None
+        Ok((workflow_id, None))
     }
 }
 

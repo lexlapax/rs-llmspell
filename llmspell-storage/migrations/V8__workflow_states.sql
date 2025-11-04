@@ -12,11 +12,11 @@
 
 -- Create workflow_states table for persistent workflow tracking
 CREATE TABLE IF NOT EXISTS llmspell.workflow_states (
-    -- Primary key
-    workflow_id VARCHAR(255) PRIMARY KEY,
-
-    -- Tenant isolation
+    -- Tenant isolation (part of composite PK)
     tenant_id VARCHAR(255) NOT NULL,
+
+    -- Primary key (composite with tenant_id)
+    workflow_id VARCHAR(255) NOT NULL,
 
     -- Workflow identification
     workflow_name VARCHAR(500),
@@ -34,8 +34,8 @@ CREATE TABLE IF NOT EXISTS llmspell.workflow_states (
     last_updated TIMESTAMPTZ NOT NULL DEFAULT now(),
     created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
 
-    -- Unique constraint: One workflow per (tenant, workflow_id)
-    CONSTRAINT unique_workflow_state UNIQUE (tenant_id, workflow_id),
+    -- Composite primary key: One workflow per (tenant, workflow_id)
+    PRIMARY KEY (tenant_id, workflow_id),
 
     -- Status constraint: Must be valid workflow status
     CONSTRAINT valid_workflow_status CHECK (
