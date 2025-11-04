@@ -82,7 +82,7 @@ impl LargeObjectStream {
     ///     let backend = PostgresBackend::new(config).await.unwrap();
     ///     let client = backend.get_client().await.unwrap();
     ///
-    ///     let stream = LargeObjectStream::new(client);
+    ///     let mut stream = LargeObjectStream::new(client);
     ///     let data = vec![0u8; 10_000_000]; // 10MB
     ///     let oid = stream.upload(&data).await.unwrap();
     ///     println!("Uploaded Large Object: {}", oid);
@@ -148,7 +148,7 @@ impl LargeObjectStream {
     ///     let backend = PostgresBackend::new(config).await.unwrap();
     ///     let client = backend.get_client().await.unwrap();
     ///
-    ///     let stream = LargeObjectStream::new(client);
+    ///     let mut stream = LargeObjectStream::new(client);
     ///     let oid = 12345;
     ///     let data = stream.download(oid).await.unwrap();
     ///     println!("Downloaded {} bytes", data.len());
@@ -215,7 +215,7 @@ impl LargeObjectStream {
     ///     let backend = PostgresBackend::new(config).await.unwrap();
     ///     let client = backend.get_client().await.unwrap();
     ///
-    ///     let stream = LargeObjectStream::new(client);
+    ///     let mut stream = LargeObjectStream::new(client);
     ///     let oid = 12345;
     ///     stream.delete(oid).await.unwrap();
     ///     println!("Deleted Large Object: {}", oid);

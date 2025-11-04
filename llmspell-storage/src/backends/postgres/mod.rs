@@ -1,6 +1,7 @@
 //! ABOUTME: PostgreSQL storage backend (Phase 13b.2 infrastructure)
 //! ABOUTME: Connection pooling, tenant context, and configuration for PostgreSQL with VectorChord
 
+pub mod artifacts; // Phase 13b.10.3: Artifact backend with automatic BYTEA/Large Object routing
 mod backend;
 mod config;
 mod error;
@@ -12,6 +13,7 @@ pub mod procedural; // Phase 13b.6.2: Procedural memory pattern storage
 pub mod rls; // Phase 13b.3.1: RLS policy generation helpers
 mod vector; // Phase 13b.4.2: PostgreSQL vector storage with dimension routing
 
+pub use artifacts::ArtifactStats; // Phase 13b.10.3
 pub use backend::PostgresBackend;
 pub use config::PostgresConfig;
 pub use error::{PostgresError, Result};
