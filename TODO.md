@@ -5198,23 +5198,75 @@ After analyzing existing session storage patterns, chose selective routing for s
 - `llmspell-kernel::sessions::SessionSnapshot` - Serializable session state
 - Phase 13b.7.2/13b.8.2 routing - Extend for `session:*` keys (4-way routing)
 
-### Task 13b.9.1: Create Sessions Schema
+### Task 13b.9.1: Create Sessions Schema ✅ COMPLETE
 **Priority**: HIGH
 **Estimated Time**: 2 hours
+**Actual Time**: 1 hour
+**Status**: ✅ COMPLETE
+**Completed**: 2025-11-03
 
 **Description**: Create PostgreSQL schema for sessions with context and lifecycle tracking.
 
 **Implementation Steps**:
-1. Create `migrations/V006__sessions.sql`:
-   - Table: sessions (session_id, tenant_id, context JSONB, status, created_at, last_accessed_at, expires_at)
-   - Indexes: (session_id, tenant_id) unique, (expires_at) for cleanup, (status)
-   - RLS policies applied
+1. ✅ Create `migrations/V9__sessions.sql`:
+   - Table: sessions (session_id UUID, tenant_id, session_data JSONB, status, timestamps)
+   - 9 Indexes: tenant, tenant_session, status, expires, created DESC, accessed DESC, data_gin, tenant_status, tenant_expires
+   - RLS policies (4: SELECT, INSERT, UPDATE, DELETE)
+   - Constraints: unique (tenant, session), valid status enum, non-negative artifact count
+   - Triggers: auto-update updated_at, last_accessed_at (1-minute throttle)
+2. ✅ Created comprehensive migration tests (8 tests, all passing)
 
-**Files to Create**: `llmspell-storage/migrations/V006__sessions.sql`
+**Files Created**:
+- `llmspell-storage/migrations/V9__sessions.sql` (153 lines)
+- `llmspell-storage/tests/postgres_sessions_migration_tests.rs` (8 tests, 458 lines)
 
 **Definition of Done**:
-- [ ] Schema supports session lifecycle
-- [ ] Expiration indexing optimized
+- [x] Schema supports session lifecycle
+- [x] Expiration indexing optimized (partial index WHERE expires_at IS NOT NULL)
+- [x] All 8 migration tests pass (0.15s)
+
+**Implementation Insights**:
+- **Migration version**: V9 (after V8__workflow_states)
+- **Schema design**: Follows workflow pattern (JSONB + extracted fields for queries)
+- **Composite PRIMARY KEY**: (tenant_id, session_id) for multi-tenant isolation
+- **SessionSnapshot storage**: Complete session stored as JSONB in session_data column
+- **Extracted fields for indexed queries**:
+  - `status` (active, archived, expired) - find active sessions
+  - `created_at` - recent sessions (DESC index)
+  - `last_accessed_at` - activity tracking (DESC index)
+  - `expires_at` - cleanup queries (partial index)
+  - `artifact_count` - statistics
+- **9 Performance indexes**:
+  1. idx_sessions_tenant - RLS performance
+  2. idx_sessions_tenant_session - Primary lookup
+  3. idx_sessions_status - Find active/archived/expired sessions
+  4. idx_sessions_expires - Cleanup expired (partial: WHERE expires_at IS NOT NULL)
+  5. idx_sessions_created - Recent sessions (DESC)
+  6. idx_sessions_accessed - Activity tracking (DESC)
+  7. idx_sessions_data_gin - JSONB full-text queries
+  8. idx_sessions_tenant_status - Tenant's active sessions
+  9. idx_sessions_tenant_expires - Tenant's expiring sessions (partial)
+- **4 RLS policies**: Complete tenant isolation (SELECT, INSERT, UPDATE, DELETE)
+- **2 Triggers**:
+  1. `trigger_sessions_updated_at` - Auto-update updated_at on every UPDATE
+  2. `trigger_sessions_accessed_at` - Auto-update last_accessed_at (1-minute throttle to prevent excessive updates)
+- **3 Constraints**:
+  1. PRIMARY KEY (tenant_id, session_id) - One session per tenant
+  2. valid_session_status CHECK - Must be active/archived/expired
+  3. non_negative_artifact_count CHECK - artifact_count >= 0
+- **8 comprehensive tests** (0.15s):
+  1. test_sessions_table_created - Table exists, RLS enabled
+  2. test_sessions_indexes_created - All 9 idx_* indexes present
+  3. test_sessions_rls_policies - All 4 policies (SELECT, INSERT, UPDATE, DELETE)
+  4. test_sessions_unique_constraint - Duplicate (tenant, session_id) fails
+  5. test_sessions_status_constraint - Invalid status fails
+  6. test_sessions_artifact_count_constraint - Negative artifact_count fails
+  7. test_sessions_updated_at_trigger - Auto-update on UPDATE
+  8. test_sessions_rls_isolation - Tenant A sees only A's sessions
+- **Expiration optimization**: Partial index on expires_at (only non-NULL) saves space, speeds up cleanup
+- **Access throttle**: last_accessed_at trigger only updates if >1 minute since last access (prevents write amplification)
+- **Migration is idempotent**: All statements use IF NOT EXISTS or DROP IF EXISTS
+- **Ready for Phase 13b.9.2**: Backend implementation can now extend Phase 13b.8.2 routing
 
 ### Task 13b.9.2: Implement PostgreSQL Session Backend
 **Priority**: HIGH
