@@ -4765,6 +4765,41 @@ cargo check -p llmspell-rag  # ✅ Success (no changes needed)
 - Memory layer will add convenience methods and trait implementation
 - Future: Add wrapper in llmspell-memory/src/procedural.rs (Phase 13b.6.3)
 
+### 🔧 Post-Completion Fix: Linux Error Message Extraction
+
+**Issue**: test_procedural_patterns_unique_constraint failing on Linux but passing on macOS
+
+**Root Cause**: Platform-specific `tokio_postgres::Error` Display implementation:
+- **macOS**: `error.to_string()` includes full PostgreSQL error: "duplicate key value violates unique constraint..."
+- **Linux**: `error.to_string()` returns generic "db error" without details
+- Test expected error message containing "unique", "duplicate key", or "already exists"
+- Linux test failed: "Error should indicate unique constraint violation, got: db error"
+
+**Technical Details**:
+- `tokio_postgres::Error` has minimal Display implementation on some platforms
+- Actual PostgreSQL error details are in the error source chain (via `std::error::Error::source()`)
+- Top-level error string may not contain database-specific information
+
+**Fix Applied** (commit 8b077cfb):
+```rust
+use std::error::Error;
+
+let error = result.unwrap_err();
+let error_msg = if let Some(source) = error.source() {
+    source.to_string()  // Full PostgreSQL error
+} else {
+    error.to_string()   // Fallback
+};
+```
+
+**Validation**:
+- ✅ All 7 procedural memory migration tests passing on Linux
+- ✅ Cross-platform compatible (macOS + Linux)
+- ✅ Correct unique constraint violation detection
+
+**Files Modified**:
+- `llmspell-storage/tests/postgres_procedural_memory_migration_tests.rs` (+11 lines, added error.source() extraction)
+
 ---
 
 ## Phase 13b.7: Agent State Storage (Days 13)
