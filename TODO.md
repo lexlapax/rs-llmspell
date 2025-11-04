@@ -4632,20 +4632,66 @@ cargo check -p llmspell-rag  # ✅ Success (no changes needed)
 ### Task 13b.6.1: Create Procedural Memory Schema
 **Priority**: HIGH
 **Estimated Time**: 2 hours
+**Actual Time**: ~1 hour (50% under estimate)
 
 **Description**: Create PostgreSQL schema for procedural memory patterns with analytics support.
 
-**Implementation Steps**:
-1. Create `migrations/V003__procedural_memory.sql`:
-   - Table: procedural_patterns (pattern_id, tenant_id, pattern_type, pattern_data JSONB, success_count, failure_count, avg_execution_time_ms)
-   - Indexes: GIN on pattern_data for JSONB queries
-   - RLS policies applied
+**Status**: ✅ COMPLETE
+**Completed**: 2025-11-03
 
-**Files to Create**: `llmspell-storage/migrations/V003__procedural_memory.sql`
+**Implementation Summary**:
+- Created V5__procedural_memory.sql migration (updated from V003 per actual migration sequence)
+- Schema tracks state transition patterns: (scope, key, value) with frequency/timestamps
+- 5 indexes for optimal query performance (tenant, scope_key, frequency, last_seen, lookup)
+- Full RLS with 4 policies (SELECT, INSERT, UPDATE, DELETE)
+- Auto-updating updated_at trigger
+- Comprehensive constraints (unique pattern identity, positive frequency)
+
+**Key Insights**:
+
+**1. Schema Design Based on Actual Trait**:
+- Designed for ProceduralMemory trait (state transition tracking)
+- Pattern identity: (tenant_id, scope, key, value) with UNIQUE constraint
+- Metrics: frequency (count), first_seen, last_seen timestamps
+- NOT the generic "pattern_data JSONB" from outdated TODO
+- Matches InMemoryPatternTracker implementation perfectly
+
+**2. Performance Optimizations**:
+- Composite index on (tenant_id, scope, key, value) WHERE frequency >= 3
+- Partial index for learned patterns (≥3 occurrences threshold)
+- Frequency DESC index for top pattern queries
+- last_seen DESC index for pattern aging/cleanup
+- Total 5 indexes + 1 unique constraint index
+
+**3. Data Integrity**:
+- UNIQUE constraint prevents duplicate patterns per tenant
+- CHECK constraint ensures frequency > 0 (patterns must have occurred)
+- Auto-updating updated_at via trigger (tracks last modification)
+- Immutable pattern identity (scope, key, value cannot change once created)
+
+**4. Test Coverage**:
+- 7 migration tests, all passing
+- Table creation + RLS enablement
+- Index creation (5 indexes verified)
+- RLS policies (4 policies verified)
+- Unique constraint enforcement
+- Frequency constraint (rejects 0 and negative)
+- updated_at trigger verification
+- Tenant isolation via RLS
+
+**Files Created**:
+- `llmspell-storage/migrations/V5__procedural_memory.sql` (100 lines)
+- `llmspell-storage/tests/postgres_procedural_memory_migration_tests.rs` (387 lines, 7 tests)
+
+**Quality**:
+- Migration idempotent (DROP IF EXISTS before CREATE for policies)
+- All tests pass (7/7)
+- Proper tenant isolation with RLS
+- Performance-focused index strategy
 
 **Definition of Done**:
-- [ ] Schema created with RLS policies
-- [ ] Migrations tested and idempotent
+- [x] Schema created with RLS policies (V5 migration)
+- [x] Migrations tested and idempotent (7/7 tests passing)
 
 ### Task 13b.6.2: Implement PostgreSQL Procedural Backend
 **Priority**: HIGH
