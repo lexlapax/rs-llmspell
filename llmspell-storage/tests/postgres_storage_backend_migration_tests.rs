@@ -11,6 +11,7 @@
 #![cfg(feature = "postgres")]
 
 use llmspell_storage::backends::postgres::{PostgresBackend, PostgresConfig};
+use std::error::Error;
 use std::sync::Arc;
 use tokio::sync::OnceCell;
 use uuid::Uuid;
@@ -219,9 +220,18 @@ async fn test_agent_states_unique_constraint() {
         result.is_err(),
         "Duplicate agent state should violate unique constraint"
     );
+
+    let error = result.unwrap_err();
+    let error_msg = if let Some(source) = error.source() {
+        source.to_string()
+    } else {
+        error.to_string()
+    };
+
     assert!(
-        result.unwrap_err().to_string().contains("unique"),
-        "Error should mention unique constraint"
+        error_msg.contains("unique") || error_msg.contains("duplicate key"),
+        "Error should mention unique constraint, got: {}",
+        error_msg
     );
 }
 
@@ -522,9 +532,18 @@ async fn test_kv_store_unique_constraint() {
         result.is_err(),
         "Duplicate key should violate unique constraint"
     );
+
+    let error = result.unwrap_err();
+    let error_msg = if let Some(source) = error.source() {
+        source.to_string()
+    } else {
+        error.to_string()
+    };
+
     assert!(
-        result.unwrap_err().to_string().contains("unique"),
-        "Error should mention unique constraint"
+        error_msg.contains("unique") || error_msg.contains("duplicate key"),
+        "Error should mention unique constraint, got: {}",
+        error_msg
     );
 }
 
