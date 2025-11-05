@@ -32,6 +32,15 @@ impl PostgresBackend {
         // Get connection from pool
         let mut client = self.get_client().await?;
 
+        // Set search_path to llmspell schema so refinery_schema_history is created there
+        // This ensures llmspell_app role can access the migrations table
+        client
+            .execute("SET search_path TO llmspell, public", &[])
+            .await
+            .map_err(|e| {
+                PostgresError::Migration(format!("Failed to set search_path: {}", e))
+            })?;
+
         // Run migrations using refinery
         self::migrations::runner()
             .run_async(&mut **client)
@@ -51,10 +60,10 @@ impl PostgresBackend {
     pub async fn migration_version(&self) -> Result<usize> {
         let client = self.get_client().await?;
 
-        // Query refinery_schema_history table for latest version
+        // Query refinery_schema_history table for latest version (in llmspell schema)
         let row = client
             .query_opt(
-                "SELECT version FROM refinery_schema_history ORDER BY version DESC LIMIT 1",
+                "SELECT version FROM llmspell.refinery_schema_history ORDER BY version DESC LIMIT 1",
                 &[],
             )
             .await
