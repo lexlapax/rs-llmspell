@@ -82,6 +82,7 @@ async fn test_temporal_graph_gist_indices() {
             "SELECT tablename, indexname, indexdef
              FROM pg_indexes
              WHERE schemaname = 'llmspell'
+               AND tablename IN ('entities', 'relationships')
                AND indexname LIKE '%_time'
              ORDER BY tablename, indexname",
             &[],

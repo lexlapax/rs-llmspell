@@ -268,11 +268,16 @@ async fn test_storage_type_constraint() {
     );
 
     let error = result.unwrap_err();
-    let error_msg = error.to_string();
+    // tokio_postgres Display returns "db error", need to check DbError details
+    let error_debug = format!("{:?}", error);
+    // PostgreSQL may check either valid_storage_type or bytea_storage_valid first (order undefined)
+    // Both constraints will reject invalid_type, so accept either
     assert!(
-        error_msg.contains("valid_storage_type") || error_msg.contains("check constraint"),
-        "Error should indicate storage_type constraint violation, got: {}",
-        error_msg
+        error_debug.contains("valid_storage_type")
+            || error_debug.contains("bytea_storage_valid")
+            || error_debug.contains("check constraint"),
+        "Error should indicate constraint violation, got: {:?}",
+        error
     );
 }
 

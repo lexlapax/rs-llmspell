@@ -6246,6 +6246,30 @@ let event_payload = serde_json::to_value(&universal_event)?;
 event_storage.store_event(&event_payload).await?;
 ```
 
+**Linux Cross-Platform Fixes** (2025-01-05):
+All PostgreSQL tests now passing on Linux (250+ tests, 26 suites, 100% pass rate).
+
+**Issues Fixed**:
+1. **Migration Checksum Mismatch** - V1__initial_setup.sql modified after DB application
+   - Solution: Database recreation to clear old checksums
+
+2. **Authentication Issue** - llmspell_app role password not set after DB reset
+   - Solution: `ALTER ROLE llmspell_app WITH PASSWORD 'llmspell_app_pass'`
+
+3. **tokio_postgres Error Display Bug** - `.to_string()` returns "db error" instead of constraint details
+   - Solution: Use `format!("{:?}", error)` to access DbError internals
+   - File: `llmspell-storage/tests/postgres_artifacts_migration_tests.rs:270-281`
+
+4. **Test Filter Too Broad** - GiST index count included event_log table
+   - Solution: Added `tablename IN ('entities', 'relationships')` filter
+   - File: `llmspell-storage/tests/postgres_temporal_graph_migration_tests.rs:85-86`
+
+5. **Quality Script False Positive** - `grep -r "log::"` matched `event_log::`
+   - Solution: Changed to `grep -rE '\blog::'` (word boundary)
+   - File: `scripts/quality/quality-check-minimal.sh:65`
+
+**Test Results**: All 250+ PostgreSQL tests passing on Linux ✅
+
 **Next Steps**: Task 13b.12 (Hook History Storage)
 
 ---

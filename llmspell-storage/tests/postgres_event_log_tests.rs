@@ -10,7 +10,9 @@
 #![cfg(feature = "postgres")]
 
 use chrono::Utc;
-use llmspell_storage::backends::postgres::{PostgresBackend, PostgresConfig, PostgresEventLogStorage};
+use llmspell_storage::backends::postgres::{
+    PostgresBackend, PostgresConfig, PostgresEventLogStorage,
+};
 use serde_json::Value;
 use std::sync::Arc;
 use tokio::sync::OnceCell;

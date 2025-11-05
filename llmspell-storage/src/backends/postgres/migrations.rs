@@ -37,9 +37,7 @@ impl PostgresBackend {
         client
             .execute("SET search_path TO llmspell, public", &[])
             .await
-            .map_err(|e| {
-                PostgresError::Migration(format!("Failed to set search_path: {}", e))
-            })?;
+            .map_err(|e| PostgresError::Migration(format!("Failed to set search_path: {}", e)))?;
 
         // Run migrations using refinery
         self::migrations::runner()
