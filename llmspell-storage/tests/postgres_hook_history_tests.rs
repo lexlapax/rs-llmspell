@@ -112,7 +112,7 @@ async fn test_hook_history_correlation_query() {
             hook_context: vec![i as u8],
             result_data: json!({"step": i}),
             timestamp: Utc::now() + Duration::milliseconds(i as i64 * 100),
-            duration_ms: 10 + i as i32,
+            duration_ms: 10 + i,
             triggering_component: "TestComponent".to_string(),
             component_id: format!("component_{}", i),
             modified_operation: false,
@@ -176,7 +176,7 @@ async fn test_hook_history_hook_id_query() {
             hook_context: vec![i as u8],
             result_data: json!({"iteration": i}),
             timestamp: Utc::now() + Duration::seconds(i as i64),
-            duration_ms: 15 + i as i32,
+            duration_ms: 15 + i,
             triggering_component: "Agent".to_string(),
             component_id: "agent-1".to_string(),
             modified_operation: false,
@@ -268,7 +268,7 @@ async fn test_hook_history_type_query() {
         .unwrap();
     assert_eq!(executions.len(), 3);
     assert!(executions.iter().all(|e| e.hook_type == hook_type));
-    assert!(executions.iter().all(|e| e.contains_sensitive_data == true));
+    assert!(executions.iter().all(|e| e.contains_sensitive_data));
 
     // Cleanup
     let client = backend.get_client().await.unwrap();
