@@ -10,11 +10,14 @@
 -- ============================================================================
 
 -- uuid-ossp: UUID generation functions (used in test tables and application code)
+-- REQUIRED for all installations
 CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
 
--- vector: pgvector extension for vector similarity search (Phase 13b.4)
--- Note: Requires pgvector to be installed in PostgreSQL (apt install postgresql-15-pgvector)
-CREATE EXTENSION IF NOT EXISTS vector;
+-- vchord: VectorChord extension for vector similarity search (Phase 13b.4)
+-- CASCADE automatically installs pgvector 0.8.1 as dependency
+-- REQUIRED when using VectorChord Docker image (ghcr.io/tensorchord/vchord-postgres:pg18-v0.5.3)
+-- This matches the init scripts from Phase 13b.2.2-13b.2.3
+CREATE EXTENSION IF NOT EXISTS vchord CASCADE;
 
 -- ============================================================================
 -- Create llmspell Schema
