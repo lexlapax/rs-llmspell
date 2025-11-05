@@ -133,7 +133,7 @@ impl PostgresApiKeyStorage {
             )
             .await?;
 
-        Ok(row.as_ref().map(Self::metadata_from_row).transpose()?)
+        row.as_ref().map(Self::metadata_from_row).transpose()
     }
 
     /// Update metadata
