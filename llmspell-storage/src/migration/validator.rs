@@ -185,16 +185,28 @@ impl MigrationValidator {
             // Compare values
             match (source_value, target_value) {
                 (Some(src), Some(tgt)) => {
-                    // Compute checksums
-                    let src_checksum = compute_checksum(&src);
-                    let tgt_checksum = compute_checksum(&tgt);
+                    // Try semantic JSON comparison first (for JSONB-stored data)
+                    let json_match = match (
+                        serde_json::from_slice::<serde_json::Value>(&src),
+                        serde_json::from_slice::<serde_json::Value>(&tgt),
+                    ) {
+                        (Ok(src_json), Ok(tgt_json)) => src_json == tgt_json,
+                        _ => false, // Not JSON or parse failed, fall back to byte comparison
+                    };
 
-                    if src_checksum != tgt_checksum {
-                        mismatches.push(format!(
-                            "{} (source: {}, target: {})",
-                            key, src_checksum, tgt_checksum
-                        ));
+                    if !json_match {
+                        // If JSON doesn't match or not JSON, try byte checksum
+                        let src_checksum = compute_checksum(&src);
+                        let tgt_checksum = compute_checksum(&tgt);
+
+                        if src_checksum != tgt_checksum {
+                            mismatches.push(format!(
+                                "{} (source: {}, target: {})",
+                                key, src_checksum, tgt_checksum
+                            ));
+                        }
                     }
+
                     validated += 1;
                 }
                 (Some(_), None) => {

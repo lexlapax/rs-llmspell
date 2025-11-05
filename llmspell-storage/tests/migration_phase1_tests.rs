@@ -65,7 +65,7 @@ async fn setup_workflow_state_test_data(
     count: usize,
 ) -> anyhow::Result<()> {
     for i in 0..count {
-        let workflow_id = format!("custom:workflow_test_{}", i);
+        let workflow_id = format!("custom:workflow_test_{}:state", i);
         let state_value = format!(
             "{{\"workflow_id\": \"workflow_{}\", \"status\": \"running\", \"step\": {}}}",
             i, i
