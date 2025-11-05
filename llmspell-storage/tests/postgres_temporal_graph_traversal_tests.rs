@@ -20,7 +20,7 @@ const SUPERUSER_CONNECTION_STRING: &str =
     "postgresql://llmspell:llmspell_dev_pass@localhost:5432/llmspell_dev";
 
 const APP_CONNECTION_STRING: &str =
-    "postgresql://llmspell_app:llmspell_dev_pass@localhost:5432/llmspell_dev";
+    "postgresql://llmspell_app:llmspell_app_pass@localhost:5432/llmspell_dev";
 
 static MIGRATION_INIT: OnceCell<()> = OnceCell::const_new();
 

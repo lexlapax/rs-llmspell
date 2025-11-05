@@ -20,8 +20,9 @@
 -- Create Application Role
 -- ============================================================================
 
--- Drop role if exists (for idempotent migration re-runs)
-DROP ROLE IF EXISTS llmspell_app;
+-- Note: This migration creates llmspell_app role
+-- If role already exists, migrations must be reset (DROP SCHEMA llmspell CASCADE)
+-- Migrations are designed to run forward only, not be re-run
 
 -- Create application user (no superuser, no bypass RLS, no create db/role)
 CREATE ROLE llmspell_app WITH

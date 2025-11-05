@@ -7,11 +7,6 @@
 
 use llmspell_core::{state::StateScope, TenantScoped};
 use llmspell_storage::{PostgresBackend, PostgresConfig};
-use tokio::sync::OnceCell;
-
-// Admin connection for migrations (llmspell user has CREATE TABLE privileges)
-const ADMIN_CONNECTION_STRING: &str =
-    "postgresql://llmspell:llmspell_dev_pass@localhost:5432/llmspell_dev";
 
 // Application connection for queries (llmspell_app enforces RLS, no schema modification)
 const APP_CONNECTION_STRING: &str =

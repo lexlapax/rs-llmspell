@@ -10,7 +10,7 @@ use tokio::sync::OnceCell;
 use uuid::Uuid;
 
 const TEST_CONNECTION_STRING: &str =
-    "postgresql://llmspell_app:llmspell_dev_pass@localhost:5432/llmspell_dev";
+    "postgresql://llmspell_app:llmspell_app_pass@localhost:5432/llmspell_dev";
 
 const SUPERUSER_CONNECTION_STRING: &str =
     "postgresql://llmspell:llmspell_dev_pass@localhost:5432/llmspell_dev";
