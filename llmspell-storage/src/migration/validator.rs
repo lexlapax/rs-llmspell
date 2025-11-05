@@ -22,18 +22,94 @@ impl MigrationValidator {
     }
 
     /// Run pre-flight validation checks
-    pub async fn pre_flight(&self, _plan: &MigrationPlan) -> Result<PreFlightReport> {
-        // Phase 1: Basic connectivity checks
-        // TODO: Add disk space check, schema validation for Phase 2
+    pub async fn pre_flight(&self, plan: &MigrationPlan) -> Result<PreFlightReport> {
+        let mut checks = Vec::new();
+        let mut warnings = Vec::new();
+        let mut errors = Vec::new();
+
+        // 1. Source connectivity and component validation
+        for component in &plan.components {
+            match self.source.count(&component.name).await {
+                Ok(count) => {
+                    checks.push(format!(
+                        "Source {}: {} records found",
+                        component.name, count
+                    ));
+
+                    // Warn if no records to migrate
+                    if count == 0 {
+                        warnings.push(format!(
+                            "Component {} has no records to migrate",
+                            component.name
+                        ));
+                    }
+
+                    // Warn if count differs significantly from estimate
+                    if component.estimated_count > 0 {
+                        let diff_pct = ((count as i64 - component.estimated_count as i64).abs()
+                            as f64
+                            / component.estimated_count as f64)
+                            * 100.0;
+                        if diff_pct > 10.0 {
+                            warnings.push(format!(
+                                "Component {} count differs from estimate by {:.1}% (estimated: {}, actual: {})",
+                                component.name, diff_pct, component.estimated_count, count
+                            ));
+                        }
+                    }
+                }
+                Err(e) => {
+                    errors.push(format!(
+                        "Source {} connectivity failed: {}",
+                        component.name, e
+                    ));
+                }
+            }
+        }
+
+        // 2. Target connectivity validation
+        for component in &plan.components {
+            match self.target.count(&component.name).await {
+                Ok(count) => {
+                    checks.push(format!(
+                        "Target {}: {} existing records",
+                        component.name, count
+                    ));
+
+                    // Warn if target already has data
+                    if count > 0 {
+                        warnings.push(format!(
+                            "Target {} already contains {} records - migration will append/overwrite",
+                            component.name, count
+                        ));
+                    }
+                }
+                Err(e) => {
+                    errors.push(format!(
+                        "Target {} connectivity failed: {}",
+                        component.name, e
+                    ));
+                }
+            }
+        }
+
+        // 3. Validation rules check
+        if plan.validation.checksum_sample_percent == 0 {
+            warnings.push("Checksum validation is disabled (sample percentage is 0)".to_string());
+        } else if plan.validation.checksum_sample_percent < 10 {
+            warnings.push(format!(
+                "Low checksum sample percentage ({}%) - consider increasing for better validation",
+                plan.validation.checksum_sample_percent
+            ));
+        }
+
+        let success = errors.is_empty();
 
         Ok(PreFlightReport {
-            success: true,
-            checks: vec![
-                "Source connectivity: OK".to_string(),
-                "Target connectivity: OK".to_string(),
-            ],
-            warnings: Vec::new(),
-            errors: Vec::new(),
+            success,
+            checks,
+            warnings,
+            errors,
         })
     }
 

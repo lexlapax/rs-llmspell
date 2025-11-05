@@ -74,10 +74,7 @@ impl MigrationEngine {
             ));
         }
 
-        // 2. Backup via BackupManager (Phase 13b.14.2 - will be implemented in next task)
-        // TODO: Integrate BackupManager for rollback support
-
-        // 3. Batch copy with progress reporting
+        // 2. Batch copy with progress reporting (source remains unchanged for safety)
         let mut total_source_count = 0;
         let mut total_target_count = 0;
 
@@ -118,15 +115,37 @@ impl MigrationEngine {
             total_target_count += target_count;
         }
 
-        // 4. Post-migration validation
+        // 3. Post-migration validation
         let mut validation_results = Vec::new();
         let all_valid = true;
 
         for component in &self.plan.components {
             let report = self.validator.validate(&component.name).await?;
             if !report.success {
-                // TODO: Rollback via BackupManager (Phase 13b.14.2)
-                return Err(anyhow!("Validation failed: {}", report.summary()));
+                // Validation failed - clean up target to rollback
+                eprintln!(
+                    "Validation failed for {}, cleaning up target data...",
+                    component.name
+                );
+
+                // List all keys that were migrated and delete them
+                if let Ok(keys) = self.source.list_keys(&component.name).await {
+                    for key in keys {
+                        // Best effort deletion - log errors but continue
+                        if let Err(e) = self.target.delete(&component.name, &key).await {
+                            eprintln!(
+                                "Warning: Failed to delete key {} during rollback: {}",
+                                key, e
+                            );
+                        }
+                    }
+                }
+
+                return Err(anyhow!(
+                    "Validation failed for component '{}': {}. Target data has been cleaned up.",
+                    component.name,
+                    report.summary()
+                ));
             }
             validation_results.push(report.summary());
         }
@@ -150,22 +169,6 @@ impl MigrationEngine {
         }
 
         Ok(report)
-    }
-
-    /// Rollback migration (restore from backup)
-    ///
-    /// # Arguments
-    /// * `backup_id` - Backup ID to restore from
-    /// * `component` - Component to rollback
-    ///
-    /// # Returns
-    /// * `Result<()>` - Success or error
-    ///
-    /// # Phase 13b.14.2
-    /// This will be implemented with BackupManager integration
-    pub async fn _rollback(&self, _backup_id: String, _component: &str) -> Result<()> {
-        // TODO: Implement BackupManager rollback in Phase 13b.14.2
-        Ok(())
     }
 }
 
