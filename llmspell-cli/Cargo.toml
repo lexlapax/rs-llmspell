@@ -54,6 +54,9 @@ lua = ["llmspell-bridge/lua"]
 javascript = ["llmspell-bridge/javascript"]
 python = []  # Python support placeholder for future
 
+# Storage backend features
+postgres = ["llmspell-storage/postgres"]  # PostgreSQL backend support
+
 # Future protocol support
 mcp = []  # Model Context Protocol support (Phase 12)
 a2a = []  # Agent-to-Agent protocol support (Phase 18)
