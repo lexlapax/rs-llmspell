@@ -5,6 +5,7 @@ pub mod artifacts; // Phase 13b.10.3: Artifact backend with automatic BYTEA/Larg
 mod backend;
 mod config;
 mod error;
+pub mod event_log; // Phase 13b.11.2: Event log storage with monthly partitioning
 pub mod graph; // Phase 13b.5.2: Bi-temporal graph storage with time-travel queries
 pub mod large_objects; // Phase 13b.10.2: Large Object streaming API for artifacts >=1MB
 mod migrations;
@@ -17,6 +18,7 @@ pub use artifacts::ArtifactStats; // Phase 13b.10.3
 pub use backend::PostgresBackend;
 pub use config::PostgresConfig;
 pub use error::{PostgresError, Result};
+pub use event_log::{EventStorageStats, PostgresEventLogStorage}; // Phase 13b.11.2
 pub use graph::PostgresGraphStorage; // Phase 13b.5.2
 pub use large_objects::LargeObjectStream; // Phase 13b.10.2
 pub use pool::PostgresPool;
