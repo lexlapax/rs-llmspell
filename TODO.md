@@ -6490,18 +6490,70 @@ SELECT avg_duration_ms::DOUBLE PRECISION FROM llmspell.get_hook_history_stats()
 **Description**: Create PostgreSQL schema for encrypted API key storage (pgcrypto).
 
 **Implementation Steps**:
-1. Create `migrations/V010__api_keys.sql`:
-   - Table: api_keys (key_id, tenant_id, provider, encrypted_key BYTEA, key_metadata JSONB, created_at, expires_at, last_used_at)
-   - Use pgp_sym_encrypt for key encryption (using master key from env/config)
-   - Indexes: (tenant_id, provider) unique, (expires_at)
+1. Create `migrations/V14__api_keys.sql`:
+   - Table: api_keys (key_id, tenant_id, service, encrypted_key BYTEA, key_metadata JSONB, created_at, expires_at, last_used_at, usage_count, is_active, rotated_from, deactivated_at)
+   - Use pgp_sym_encrypt/pgp_sym_decrypt for key encryption
+   - Indexes: (tenant_id, service), (expires_at), (is_active), GIN(key_metadata)
    - RLS policies applied
+   - Helper functions: cleanup_expired_api_keys, get_api_key_stats, rotate_api_key
 
-**Files to Create**: `llmspell-storage/migrations/V010__api_keys.sql`
+**Files to Create**: `llmspell-storage/migrations/V14__api_keys.sql`
 
 **Definition of Done**:
-- [ ] Schema uses pgcrypto encryption
-- [ ] RLS policies enforced
-- [ ] Expiration indexing optimized
+- [x] Schema uses pgcrypto encryption
+- [x] RLS policies enforced (FORCE RLS + 4 policies)
+- [x] Expiration indexing optimized
+- [x] Migration tests passing (11/11)
+
+**Status**: ✅ **COMPLETE** (2025-01-05)
+
+**Actual Time**: ~2 hours (vs estimated 3 hours)
+
+**Key Achievements**:
+- ✅ V14__api_keys.sql migration (221 lines)
+- ✅ pgcrypto extension with pgp_sym_encrypt/pgp_sym_decrypt
+- ✅ 12-column api_keys table with encryption, metadata, rotation tracking
+- ✅ 4 indexes + 4 RLS policies with FORCE RLS
+- ✅ 3 helper functions (cleanup, stats, rotate)
+- ✅ Grant execute on pgcrypto functions to llmspell_app
+- ✅ 11 migration tests (100% pass rate)
+- ✅ UNIQUE constraint (tenant_id, service, is_active)
+
+**Migration Structure** (`V14__api_keys.sql`, 221 lines):
+- pgcrypto extension (CREATE EXTENSION IF NOT EXISTS pgcrypto)
+- api_keys table (12 columns: key_id PK, tenant_id, service, encrypted_key BYTEA, key_metadata JSONB, created_at, last_used_at, expires_at, is_active, usage_count, rotated_from, deactivated_at)
+- Indexes: 4 indexes (tenant_service, expiration, active, metadata GIN) + unique constraint
+- RLS: 4 policies (SELECT/INSERT/UPDATE/DELETE) with FORCE RLS
+- Functions: cleanup_expired_api_keys(), get_api_key_stats(), rotate_api_key()
+- Permissions: Granted to llmspell_app + pgcrypto function grants
+
+**Test Coverage** (`postgres_api_keys_migration_tests.rs`, 489 lines, 11 tests):
+1. test_api_keys_table_exists
+2. test_api_keys_table_schema (12 columns)
+3. test_api_keys_indexes_created (5 indexes)
+4. test_api_keys_rls_policies_enabled (FORCE RLS + 4 policies)
+5. test_pgcrypto_extension_exists
+6. test_api_keys_cleanup_function_exists
+7. test_api_keys_stats_function_exists
+8. test_api_keys_rotate_function_exists
+9. test_api_keys_encryption_decryption (pgp_sym_encrypt/decrypt)
+10. test_api_keys_rls_tenant_isolation
+11. test_api_keys_unique_constraint (one active key per tenant/service)
+
+**Schema Design**:
+- Aligns with llmspell-utils ApiKeyMetadata (key_id, service, created_at, last_used, expires_at, is_active, usage_count)
+- Encrypted key storage via pgp_sym_encrypt (BYTEA column)
+- Rotation support (rotated_from field, rotate_api_key function)
+- Unique constraint ensures only one active key per tenant/service
+
+**Technical Notes**:
+- Schema-qualified function calls required: `llmspell.pgp_sym_encrypt($1::TEXT, $2::TEXT)`
+- llmspell_app search_path doesn't include llmspell schema, requires schema qualification
+- pgcrypto functions granted to llmspell_app for encryption/decryption access
+
+**Files Created**:
+- `llmspell-storage/migrations/V14__api_keys.sql` (221 lines)
+- `llmspell-storage/tests/postgres_api_keys_migration_tests.rs` (489 lines, 11 tests)
 
 ### Task 13b.13.2: Implement PostgreSQL API Key Backend
 **Priority**: CRITICAL
