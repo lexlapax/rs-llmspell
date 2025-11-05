@@ -20,19 +20,20 @@
 -- Create Application Role
 -- ============================================================================
 
--- Note: This migration creates llmspell_app role
--- If role already exists, migrations must be reset (DROP SCHEMA llmspell CASCADE)
--- Migrations are designed to run forward only, not be re-run
-
--- Create application user (no superuser, no bypass RLS, no create db/role)
-CREATE ROLE llmspell_app WITH
-    LOGIN
-    PASSWORD 'llmspell_app_pass'
-    NOSUPERUSER
-    NOCREATEDB
-    NOCREATEROLE
-    NOREPLICATION
-    CONNECTION LIMIT -1;
+-- Create application user (idempotent - handles existing role)
+DO $$
+BEGIN
+    CREATE ROLE llmspell_app WITH
+        LOGIN
+        PASSWORD 'llmspell_app_pass'
+        NOSUPERUSER
+        NOCREATEDB
+        NOCREATEROLE
+        NOREPLICATION
+        CONNECTION LIMIT -1;
+EXCEPTION WHEN duplicate_object THEN
+    RAISE NOTICE 'Role llmspell_app already exists, skipping creation.';
+END $$;
 
 COMMENT ON ROLE llmspell_app IS 'Application runtime user with least privilege (Phase 13b.11.0)';
 
