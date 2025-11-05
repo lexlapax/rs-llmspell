@@ -103,9 +103,9 @@ BEGIN
 
     RETURN 'CREATED: Partition ' || partition_name || ' [' || partition_start || ' to ' || partition_end || ')';
 END;
-$$ LANGUAGE plpgsql;
+$$ LANGUAGE plpgsql SECURITY DEFINER;
 
-COMMENT ON FUNCTION llmspell.create_event_log_partition IS 'Create monthly partition for event_log table';
+COMMENT ON FUNCTION llmspell.create_event_log_partition IS 'Create monthly partition for event_log table (SECURITY DEFINER: executes as table owner for DDL)';
 
 -- Function to ensure future partitions exist (current + next 3 months)
 CREATE OR REPLACE FUNCTION llmspell.ensure_future_event_log_partitions()
@@ -132,9 +132,9 @@ BEGIN
 
     RETURN results;
 END;
-$$ LANGUAGE plpgsql;
+$$ LANGUAGE plpgsql SECURITY DEFINER;
 
-COMMENT ON FUNCTION llmspell.ensure_future_event_log_partitions IS 'Ensure partitions exist for current + next 3 months';
+COMMENT ON FUNCTION llmspell.ensure_future_event_log_partitions IS 'Ensure partitions exist for current + next 3 months (SECURITY DEFINER: executes as table owner for DDL)';
 
 -- Note: Automatic partition creation via BEFORE INSERT trigger doesn't work because
 -- partition routing happens before the trigger's DDL is visible. Instead:
@@ -188,9 +188,9 @@ BEGIN
 
     RETURN results;
 END;
-$$ LANGUAGE plpgsql;
+$$ LANGUAGE plpgsql SECURITY DEFINER;
 
-COMMENT ON FUNCTION llmspell.cleanup_old_event_log_partitions IS 'Manually drop event_log partitions older than specified date';
+COMMENT ON FUNCTION llmspell.cleanup_old_event_log_partitions IS 'Manually drop event_log partitions older than specified date (SECURITY DEFINER: executes as table owner for DDL)';
 
 -- ============================================================================
 -- Initial Partitions (Current Month + Next 3 Months)
