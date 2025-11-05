@@ -561,6 +561,39 @@ EXAMPLES:
         command: ContextCommands,
     },
 
+    /// Storage migration and management operations
+    #[command(
+        long_about = "Manage storage migrations between backends (Sled, PostgreSQL).
+
+Migration operations enable safe data migration with plan-based workflow, validation,
+and rollback capabilities. Phase 1 supports Sled→PostgreSQL for Agent State, Workflow
+State, and Sessions.
+
+Workflow:
+  1. Generate plan: Analyze source data and create migration plan
+  2. Review plan:   Inspect YAML plan for correctness
+  3. Dry-run:       Validate migration without data modification
+  4. Execute:       Perform actual migration with progress tracking
+  5. Validate:      Verify data integrity post-migration
+
+EXAMPLES:
+    llmspell storage migrate plan --from sled --to postgres \\
+      --components agent_state,workflow_state,sessions \\
+      --output migration-plan.yaml
+
+    llmspell storage migrate execute --plan migration-plan.yaml --dry-run
+
+    llmspell storage migrate execute --plan migration-plan.yaml
+
+    llmspell storage info --backend sled
+
+    llmspell storage validate --backend postgres --components agent_state"
+    )]
+    Storage {
+        #[command(subcommand)]
+        command: StorageCommands,
+    },
+
     /// Display version information
     #[command(long_about = "Display detailed version and build information.
 
@@ -1526,6 +1559,115 @@ EXAMPLES:
         /// Output format (overrides global format)
         #[arg(long)]
         format: Option<OutputFormat>,
+    },
+}
+
+/// Storage management subcommands
+#[derive(Subcommand, Debug)]
+pub enum StorageCommands {
+    /// Migrate storage data between backends
+    #[command(
+        long_about = "Migrate data between storage backends with plan-based workflow.
+
+Phase 1 supports Sled→PostgreSQL for Agent State, Workflow State, and Sessions.
+
+Workflow:
+  1. Generate plan with estimated record counts
+  2. Review YAML plan file
+  3. Execute dry-run for validation
+  4. Execute actual migration
+  5. Validate data integrity
+
+EXAMPLES:
+    llmspell storage migrate plan --from sled --to postgres \\
+      --components agent_state,workflow_state,sessions \\
+      --output migration-plan.yaml
+
+    llmspell storage migrate execute --plan migration-plan.yaml --dry-run
+    llmspell storage migrate execute --plan migration-plan.yaml"
+    )]
+    Migrate {
+        #[command(subcommand)]
+        action: MigrateAction,
+    },
+
+    /// Show backend information
+    #[command(long_about = "Display storage backend characteristics and configuration.
+
+EXAMPLES:
+    llmspell storage info --backend sled       # Show Sled backend info
+    llmspell storage info --backend postgres   # Show PostgreSQL backend info")]
+    Info {
+        /// Backend to show info for (sled, postgres)
+        #[arg(long)]
+        backend: String,
+    },
+
+    /// Validate backend data integrity
+    #[command(long_about = "Validate data integrity for storage components.
+
+EXAMPLES:
+    llmspell storage validate --backend sled --components agent_state
+    llmspell storage validate --backend postgres --components agent_state,workflow_state")]
+    Validate {
+        /// Backend to validate (sled, postgres)
+        #[arg(long)]
+        backend: String,
+
+        /// Components to validate (comma-separated)
+        #[arg(long)]
+        components: String,
+    },
+}
+
+/// Migration action subcommands
+#[derive(Subcommand, Debug)]
+pub enum MigrateAction {
+    /// Generate migration plan
+    #[command(long_about = "Generate a YAML migration plan with estimated record counts.
+
+The plan includes source/target configs, component list, batch sizes, validation
+rules, and rollback metadata. Review the plan before executing.
+
+EXAMPLES:
+    llmspell storage migrate plan --from sled --to postgres \\
+      --components agent_state,workflow_state,sessions \\
+      --output migration-plan.yaml")]
+    Plan {
+        /// Source backend (sled)
+        #[arg(long)]
+        from: String,
+
+        /// Target backend (postgres)
+        #[arg(long)]
+        to: String,
+
+        /// Components to migrate (comma-separated: agent_state,workflow_state,sessions)
+        #[arg(long)]
+        components: String,
+
+        /// Output file for migration plan
+        #[arg(long)]
+        output: std::path::PathBuf,
+    },
+
+    /// Execute migration from plan
+    #[command(long_about = "Execute a migration plan with optional dry-run mode.
+
+Dry-run mode performs validation without data modification. Actual execution
+includes progress reporting, validation, and automatic rollback on failure.
+
+EXAMPLES:
+    llmspell storage migrate execute --plan migration-plan.yaml --dry-run
+    llmspell storage migrate execute --plan migration-plan.yaml")]
+    Execute {
+        /// Migration plan file
+        #[arg(long)]
+        plan: std::path::PathBuf,
+
+        /// Dry run (validation only, no data modification)
+        #[arg(long)]
+        dry_run: bool,
     },
 }
 
