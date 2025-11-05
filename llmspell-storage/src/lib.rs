@@ -98,6 +98,7 @@
 //! ```
 
 pub mod backends;
+pub mod migration;
 pub mod traits;
 pub mod vector_storage;
 
