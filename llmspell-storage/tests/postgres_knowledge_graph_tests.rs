@@ -85,7 +85,6 @@ async fn test_add_and_get_entity() {
 }
 
 #[tokio::test]
-#[ignore = "Bi-temporal update requires schema fix - pkey should be (entity_id, transaction_time_start)"]
 async fn test_update_entity_bi_temporal() {
     ensure_migrations_run_once().await;
 
@@ -194,7 +193,6 @@ async fn test_add_relationship_and_get_related() {
 }
 
 #[tokio::test]
-#[ignore = "Transaction time is set by DB to NOW(), can't backdate for testing"]
 async fn test_delete_before() {
     ensure_migrations_run_once().await;
 
@@ -215,27 +213,46 @@ async fn test_delete_before() {
         id: "".to_string(),
         name: "Old Entity".to_string(),
         entity_type: "Test".to_string(),
-        properties: json!({}),
+        properties: json!({"version": 1}),
         event_time: Some(old_time),
         ingestion_time: old_time,
     };
 
     let entity_id = graph.add_entity(entity).await.expect("add_entity");
 
-    // Verify entity exists
-    let retrieved = graph.get_entity(&entity_id).await;
-    assert!(retrieved.is_ok(), "Entity should exist before deletion");
+    // Update entity to create a new version (with current transaction_time)
+    let mut changes = HashMap::new();
+    changes.insert("version".to_string(), json!(2));
+    changes.insert("updated".to_string(), json!(true));
+    graph
+        .update_entity(&entity_id, changes)
+        .await
+        .expect("update_entity");
 
-    // Delete entities older than 1 hour ago
+    // Verify current entity exists and has updated properties
+    let retrieved = graph.get_entity(&entity_id).await.expect("get_entity");
+    assert_eq!(retrieved.properties["version"], 2);
+    assert_eq!(retrieved.properties["updated"], true);
+
+    // Delete entity versions older than 1 hour ago
+    // This should delete the old version (2 hours ago) but preserve the current version
     let cutoff = now - Duration::hours(1);
     let deleted_count = graph.delete_before(cutoff).await.expect("delete_before");
 
-    assert!(deleted_count > 0, "Should have deleted at least 1 entity");
+    assert!(
+        deleted_count > 0,
+        "Should have deleted at least 1 old version"
+    );
 
-    // Entity should still be retrievable from current version
+    // Current version should still be retrievable
     // (delete_before only removes old versions based on transaction_time)
     let after_delete = graph.get_entity(&entity_id).await;
     assert!(after_delete.is_ok(), "Current version should still exist");
+    let current = after_delete.unwrap();
+    assert_eq!(
+        current.properties["version"], 2,
+        "Should retrieve current version with updated properties"
+    );
 }
 
 #[tokio::test]

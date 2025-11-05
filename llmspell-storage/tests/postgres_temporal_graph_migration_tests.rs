@@ -395,7 +395,7 @@ async fn test_temporal_graph_foreign_key_constraints() {
         .await
         .unwrap();
 
-    // Create relationship (should succeed)
+    // Create relationship with valid entity reference (should succeed)
     let rel_id = Uuid::new_v4();
     let result = client
         .execute(
@@ -406,20 +406,17 @@ async fn test_temporal_graph_foreign_key_constraints() {
         )
         .await;
 
-    assert!(result.is_ok(), "Relationship with valid FK should succeed");
+    assert!(
+        result.is_ok(),
+        "Relationship with valid entity reference should succeed"
+    );
 
-    // Try to create relationship with invalid entity ID (should fail)
-    let invalid_entity_id = Uuid::new_v4();
-    let result = client
-        .execute(
-            "INSERT INTO llmspell.relationships
-             (relationship_id, tenant_id, from_entity, to_entity, relationship_type, properties, valid_time_start)
-             VALUES ($1, $2, $3, $3, 'invalid', '{}', now())",
-            &[&Uuid::new_v4(), &tenant_id, &invalid_entity_id],
-        )
-        .await;
-
-    assert!(result.is_err(), "Relationship with invalid FK should fail");
+    // NOTE: As of V15 migration, foreign key constraints were removed to support bi-temporal
+    // versioning (multiple entity versions with same entity_id). Referential integrity is now
+    // enforced at the application level through the KnowledgeGraph trait implementation.
+    //
+    // This test verifies that relationships can be created successfully. Application code
+    // (PostgresGraphStorage) ensures entity existence before creating relationships.
 
     // Cleanup
     client

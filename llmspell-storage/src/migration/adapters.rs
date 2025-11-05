@@ -194,8 +194,11 @@ mod tests {
         let tenant_id = format!("test_migration_{}", uuid::Uuid::new_v4());
         backend.set_tenant_context(&tenant_id).await.unwrap();
 
-        // Test store (using MigrationTarget trait)
-        MigrationTarget::store(&backend, "agent_state", "agent:test_123", b"test data")
+        // Test store (using MigrationTarget trait with correct agent key format)
+        // Format: agent:<agent_type>:<agent_id>
+        let test_key = "agent:test:migration_123";
+        let test_data = br#"{"agent_id": "migration_123", "state": "test", "iteration": 0}"#;
+        MigrationTarget::store(&backend, "agent_state", test_key, test_data)
             .await
             .unwrap();
 
@@ -206,8 +209,6 @@ mod tests {
         assert!(count >= 1);
 
         // Cleanup
-        StorageBackend::delete(&backend, "agent:test_123")
-            .await
-            .unwrap();
+        StorageBackend::delete(&backend, test_key).await.unwrap();
     }
 }

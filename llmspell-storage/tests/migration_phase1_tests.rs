@@ -53,17 +53,17 @@ async fn setup_agent_state_test_data(backend: &SledBackend, count: usize) -> any
     for i in 0..count {
         // Format: agent:<type>:<id>
         let agent_id = format!("agent:test:migration_{}", i);
-        let state_value = format!("{{\"agent_id\": \"agent_{}\", \"state\": \"active\", \"iteration\": {}}}", i, i);
+        let state_value = format!(
+            "{{\"agent_id\": \"agent_{}\", \"state\": \"active\", \"iteration\": {}}}",
+            i, i
+        );
         backend.set(&agent_id, state_value.into_bytes()).await?;
     }
     Ok(())
 }
 
 /// Create test data in Sled for workflow states
-async fn setup_workflow_state_test_data(
-    backend: &SledBackend,
-    count: usize,
-) -> anyhow::Result<()> {
+async fn setup_workflow_state_test_data(backend: &SledBackend, count: usize) -> anyhow::Result<()> {
     for i in 0..count {
         let workflow_id = format!("custom:workflow_test_{}:state", i);
         let state_value = format!(
@@ -100,8 +100,7 @@ async fn test_agent_state_migration_1k_records() {
     let temp_dir = tempfile::tempdir().expect("Failed to create temp dir");
     let sled_path = temp_dir.path().join("test_agent_migration.sled");
     let source = Arc::new(
-        SledBackend::new_with_path(sled_path.to_str().unwrap())
-            .expect("Failed to create Sled"),
+        SledBackend::new_with_path(sled_path.to_str().unwrap()).expect("Failed to create Sled"),
     );
     setup_agent_state_test_data(&source, 1000)
         .await
@@ -121,11 +120,7 @@ async fn test_agent_state_migration_1k_records() {
         .expect("Failed to set tenant context");
 
     // Create migration plan
-    let plan = MigrationPlan::new(
-        "sled",
-        "postgres",
-        vec!["agent_state".to_string()],
-    );
+    let plan = MigrationPlan::new("sled", "postgres", vec!["agent_state".to_string()]);
 
     // Execute migration
     let engine = MigrationEngine::new(source.clone(), target.clone(), plan);
@@ -142,14 +137,8 @@ async fn test_agent_state_migration_1k_records() {
         "Migration should succeed: {:?}",
         report.validation_results
     );
-    assert_eq!(
-        report.source_count, 1000,
-        "Source count should be 1000"
-    );
-    assert_eq!(
-        report.target_count, 1000,
-        "Target count should be 1000"
-    );
+    assert_eq!(report.source_count, 1000, "Source count should be 1000");
+    assert_eq!(report.target_count, 1000, "Target count should be 1000");
     assert!(
         duration.as_secs() < 60,
         "Migration should complete in <1 min, took {}s",
@@ -184,8 +173,7 @@ async fn test_workflow_state_migration_1k_records() {
     let temp_dir = tempfile::tempdir().expect("Failed to create temp dir");
     let sled_path = temp_dir.path().join("test_workflow_migration.sled");
     let source = Arc::new(
-        SledBackend::new_with_path(sled_path.to_str().unwrap())
-            .expect("Failed to create Sled"),
+        SledBackend::new_with_path(sled_path.to_str().unwrap()).expect("Failed to create Sled"),
     );
     setup_workflow_state_test_data(&source, 1000)
         .await
@@ -205,11 +193,7 @@ async fn test_workflow_state_migration_1k_records() {
         .expect("Failed to set tenant context");
 
     // Create migration plan
-    let plan = MigrationPlan::new(
-        "sled",
-        "postgres",
-        vec!["workflow_state".to_string()],
-    );
+    let plan = MigrationPlan::new("sled", "postgres", vec!["workflow_state".to_string()]);
 
     // Execute migration
     let engine = MigrationEngine::new(source.clone(), target.clone(), plan);
@@ -226,14 +210,8 @@ async fn test_workflow_state_migration_1k_records() {
         "Migration should succeed: {:?}",
         report.validation_results
     );
-    assert_eq!(
-        report.source_count, 1000,
-        "Source count should be 1000"
-    );
-    assert_eq!(
-        report.target_count, 1000,
-        "Target count should be 1000"
-    );
+    assert_eq!(report.source_count, 1000, "Source count should be 1000");
+    assert_eq!(report.target_count, 1000, "Target count should be 1000");
     assert!(
         duration.as_secs() < 60,
         "Migration should complete in <1 min, took {}s",
@@ -268,8 +246,7 @@ async fn test_sessions_migration_1k_records() {
     let temp_dir = tempfile::tempdir().expect("Failed to create temp dir");
     let sled_path = temp_dir.path().join("test_sessions_migration.sled");
     let source = Arc::new(
-        SledBackend::new_with_path(sled_path.to_str().unwrap())
-            .expect("Failed to create Sled"),
+        SledBackend::new_with_path(sled_path.to_str().unwrap()).expect("Failed to create Sled"),
     );
     setup_sessions_test_data(&source, 1000)
         .await
@@ -306,14 +283,8 @@ async fn test_sessions_migration_1k_records() {
         "Migration should succeed: {:?}",
         report.validation_results
     );
-    assert_eq!(
-        report.source_count, 1000,
-        "Source count should be 1000"
-    );
-    assert_eq!(
-        report.target_count, 1000,
-        "Target count should be 1000"
-    );
+    assert_eq!(report.source_count, 1000, "Source count should be 1000");
+    assert_eq!(report.target_count, 1000, "Target count should be 1000");
     assert!(
         duration.as_secs() < 60,
         "Migration should complete in <1 min, took {}s",
@@ -348,8 +319,7 @@ async fn test_dry_run_mode_no_writes() {
     let temp_dir = tempfile::tempdir().expect("Failed to create temp dir");
     let sled_path = temp_dir.path().join("test_dry_run.sled");
     let source = Arc::new(
-        SledBackend::new_with_path(sled_path.to_str().unwrap())
-            .expect("Failed to create Sled"),
+        SledBackend::new_with_path(sled_path.to_str().unwrap()).expect("Failed to create Sled"),
     );
     setup_agent_state_test_data(&source, 100)
         .await
@@ -369,18 +339,11 @@ async fn test_dry_run_mode_no_writes() {
         .expect("Failed to set tenant context");
 
     // Create migration plan
-    let plan = MigrationPlan::new(
-        "sled",
-        "postgres",
-        vec!["agent_state".to_string()],
-    );
+    let plan = MigrationPlan::new("sled", "postgres", vec!["agent_state".to_string()]);
 
     // Execute dry-run
     let engine = MigrationEngine::new(source.clone(), target.clone(), plan);
-    let report = engine
-        .execute(true)
-        .await
-        .expect("Dry-run should succeed");
+    let report = engine.execute(true).await.expect("Dry-run should succeed");
 
     // Assertions
     assert!(report.success, "Dry-run should succeed");
@@ -414,8 +377,7 @@ async fn test_all_phase1_components_together() {
     let temp_dir = tempfile::tempdir().expect("Failed to create temp dir");
     let sled_path = temp_dir.path().join("test_all_phase1.sled");
     let source = Arc::new(
-        SledBackend::new_with_path(sled_path.to_str().unwrap())
-            .expect("Failed to create Sled"),
+        SledBackend::new_with_path(sled_path.to_str().unwrap()).expect("Failed to create Sled"),
     );
 
     // Create test data for all 3 components

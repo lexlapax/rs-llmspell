@@ -488,11 +488,14 @@ impl KnowledgeGraph for PostgresGraphStorage {
         // Map event_time to valid_time_start, or use current time if None
         let valid_time_start = entity.event_time.unwrap_or_else(Utc::now);
 
+        // Use entity.ingestion_time for transaction_time_start (allows backdating for tests)
+        let transaction_time_start = entity.ingestion_time;
+
         client
             .execute(
                 "INSERT INTO llmspell.entities
-                 (tenant_id, entity_id, entity_type, name, properties, valid_time_start, valid_time_end)
-                 VALUES ($1, $2, $3, $4, $5, $6, 'infinity')",
+                 (tenant_id, entity_id, entity_type, name, properties, valid_time_start, valid_time_end, transaction_time_start)
+                 VALUES ($1, $2, $3, $4, $5, $6, 'infinity', $7)",
                 &[
                     &tenant_id,
                     &entity_id,
@@ -500,6 +503,7 @@ impl KnowledgeGraph for PostgresGraphStorage {
                     &entity.name,
                     &entity.properties,
                     &valid_time_start,
+                    &transaction_time_start,
                 ],
             )
             .await
@@ -729,11 +733,14 @@ impl KnowledgeGraph for PostgresGraphStorage {
         // Map event_time to valid_time_start
         let valid_time_start = relationship.event_time.unwrap_or_else(Utc::now);
 
+        // Use relationship.ingestion_time for transaction_time_start (allows backdating for tests)
+        let transaction_time_start = relationship.ingestion_time;
+
         client
             .execute(
                 "INSERT INTO llmspell.relationships
-                 (tenant_id, relationship_id, from_entity, to_entity, relationship_type, properties, valid_time_start, valid_time_end)
-                 VALUES ($1, $2, $3, $4, $5, $6, $7, 'infinity')",
+                 (tenant_id, relationship_id, from_entity, to_entity, relationship_type, properties, valid_time_start, valid_time_end, transaction_time_start)
+                 VALUES ($1, $2, $3, $4, $5, $6, $7, 'infinity', $8)",
                 &[
                     &tenant_id,
                     &relationship_id,
@@ -742,6 +749,7 @@ impl KnowledgeGraph for PostgresGraphStorage {
                     &relationship.relationship_type,
                     &relationship.properties,
                     &valid_time_start,
+                    &transaction_time_start,
                 ],
             )
             .await
@@ -810,12 +818,13 @@ impl KnowledgeGraph for PostgresGraphStorage {
             ))
         })?;
 
-        // Delete old relationship versions
+        // Delete old relationship versions (preserve current versions)
         let rel_count = tx
             .execute(
                 "DELETE FROM llmspell.relationships
                  WHERE tenant_id = $1
-                   AND transaction_time_start < $2",
+                   AND transaction_time_start < $2
+                   AND transaction_time_end != 'infinity'",
                 &[&tenant_id, &timestamp],
             )
             .await
@@ -826,12 +835,13 @@ impl KnowledgeGraph for PostgresGraphStorage {
                 ))
             })?;
 
-        // Delete old entity versions
+        // Delete old entity versions (preserve current versions)
         let entity_count = tx
             .execute(
                 "DELETE FROM llmspell.entities
                  WHERE tenant_id = $1
-                   AND transaction_time_start < $2",
+                   AND transaction_time_start < $2
+                   AND transaction_time_end != 'infinity'",
                 &[&tenant_id, &timestamp],
             )
             .await
