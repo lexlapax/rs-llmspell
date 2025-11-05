@@ -138,7 +138,7 @@ BEGIN
     WHERE expires_at IS NOT NULL
       AND expires_at < now()
       AND tenant_id = current_setting('app.current_tenant_id', true)
-    RETURNING key_id, service, expires_at;
+    RETURNING api_keys.key_id, api_keys.service, api_keys.expires_at;
 END;
 $$ LANGUAGE plpgsql;
 
