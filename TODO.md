@@ -6852,161 +6852,851 @@ SELECT avg_duration_ms::DOUBLE PRECISION FROM llmspell.get_hook_history_stats()
 **Timeline**: 2 days (16 hours)
 **Critical Dependencies**: All storage backends (13b.4-13b.13) ✅
 
-### Task 13b.14.1: Create Storage Migration CLI Command
+### Task 13b.14.1: Create Storage Migration CLI Command (Phase 1: Sled→PostgreSQL)
 **Priority**: CRITICAL
-**Estimated Time**: 4 hours
+**Estimated Time**: 4-6 hours
 **Assignee**: CLI Team Lead
 
-**Description**: Implement `storage migrate` CLI command with dry-run support.
+**Description**: Implement `llmspell storage migrate` CLI with plan-based migration workflow for Phase 1 components (Agent State, Workflow State, Sessions).
+
+**Architectural Decision**: Plan-Based Hybrid Approach (Generate → Review → Execute)
+**Why**: Safety-first migration requiring human review before execution. YAML plans provide auditability, version control, and rollback documentation. Dry-run mode validates plan without data modification.
+
+**Technical Insight**: `storage` top-level command chosen (vs `migrate storage` or `db migrate`) for future-proofing. Aligns with Phase 13b's goal of storage abstraction - future operations like `storage info`, `storage validate`, `storage backup` fit naturally under this namespace.
+
+**Phased Approach Rationale**:
+- **Phase 1** (This task): Sled → PostgreSQL (Agent/Workflow/Sessions) - Delivers immediate value, tests migration framework with simple key-value migrations
+- **Phase 2** (Future): HNSW → PostgreSQL + SurrealDB → PostgreSQL (Episodic/Semantic) - Complex migrations with vectors and graphs
+- **Phase 3** (Future): File/InMemory → PostgreSQL (Artifacts/Events/Hooks/API Keys) - Remaining components
 
 **Acceptance Criteria**:
-- [ ] CLI command functional
-- [ ] --from and --to backend selection works
-- [ ] --component selection works
-- [ ] --dry-run mode functional
-- [ ] Progress reporting implemented
+- [ ] `llmspell storage migrate plan` generates YAML migration plan
+- [ ] `llmspell storage migrate execute --dry-run` validates without modifying data
+- [ ] `llmspell storage migrate execute` performs actual migration
+- [ ] `llmspell storage info` displays backend configuration
+- [ ] `llmspell storage validate` checks data integrity post-migration
+- [ ] --component flag supports: agent_state, workflow_state, sessions
+- [ ] Progress reporting with percentage and ETA
+- [ ] YAML plan includes: source/target configs, component list, validation rules, rollback metadata
 
 **Implementation Steps**:
-1. Create `llmspell-cli/src/commands/storage_migrate.rs`:
+1. Create `llmspell-cli/src/commands/storage.rs` (storage namespace):
    ```rust
    #[derive(Parser)]
-   pub struct StorageMigrateCommand {
+   pub enum StorageCommand {
+       Migrate(MigrateCommand),
+       Info(InfoCommand),
+       Validate(ValidateCommand),
+   }
+
+   #[derive(Parser)]
+   pub struct MigrateCommand {
+       #[clap(subcommand)]
+       action: MigrateAction,
+   }
+
+   #[derive(Parser)]
+   pub enum MigrateAction {
+       Plan(PlanCommand),
+       Execute(ExecuteCommand),
+   }
+
+   #[derive(Parser)]
+   pub struct PlanCommand {
        #[clap(long)]
-       from: String,  // "hnsw", "surrealdb", "sled", "file"
+       from: String,  // "sled" (Phase 1)
 
        #[clap(long)]
        to: String,  // "postgres"
 
-       #[clap(long)]
-       component: String,  // "episodic", "semantic", etc.
+       #[clap(long, value_delimiter = ',')]
+       components: Vec<String>,  // "agent_state,workflow_state,sessions"
 
        #[clap(long)]
-       config: PathBuf,
-
-       #[clap(long)]
-       dry_run: bool,
+       output: PathBuf,  // migration-plan.yaml
    }
 
-   impl StorageMigrateCommand {
-       pub async fn execute(&self) -> Result<(), LLMSpellError> {
-           // 1. Pre-migration validation
-           // 2. Create destination schema
-           // 3. Batch copy data
-           // 4. Post-migration validation
+   #[derive(Parser)]
+   pub struct ExecuteCommand {
+       #[clap(long)]
+       plan: PathBuf,  // migration-plan.yaml
+
+       #[clap(long)]
+       dry_run: bool,  // Validation without execution
+   }
+   ```
+
+2. Create `llmspell-storage/src/migration/mod.rs` (MigrationEngine):
+   ```rust
+   pub trait MigrationSource {
+       async fn list_keys(&self, component: &str) -> Result<Vec<String>>;
+       async fn get_value(&self, component: &str, key: &str) -> Result<Vec<u8>>;
+       async fn count(&self, component: &str) -> Result<usize>;
+   }
+
+   pub trait MigrationTarget {
+       async fn store(&self, component: &str, key: &str, value: &[u8]) -> Result<()>;
+       async fn count(&self, component: &str) -> Result<usize>;
+   }
+
+   pub struct MigrationEngine {
+       source: Arc<dyn MigrationSource>,
+       target: Arc<dyn MigrationTarget>,
+       plan: MigrationPlan,
+   }
+
+   impl MigrationEngine {
+       pub async fn execute(&self, dry_run: bool) -> Result<MigrationReport> {
+           // 1. Pre-migration validation (source count, connectivity)
+           // 2. Backup via BackupManager (Task 13b.14.2)
+           // 3. Batch copy with progress reporting
+           // 4. Post-migration validation (count equality, checksums)
+           // 5. Generate report
        }
    }
    ```
-2. Implement 10 migration paths (HNSW→PostgreSQL, SurrealDB→PostgreSQL, etc.)
-3. Add dry-run validation
-4. Progress reporting
-5. Test migration
+
+3. Create `llmspell-storage/src/migration/plan.rs` (YAML plan format):
+   ```rust
+   #[derive(Serialize, Deserialize)]
+   pub struct MigrationPlan {
+       version: String,  // "1.0"
+       created_at: DateTime<Utc>,
+       source: BackendConfig,
+       target: BackendConfig,
+       components: Vec<ComponentMigration>,
+       validation: ValidationRules,
+       rollback: RollbackMetadata,
+   }
+
+   #[derive(Serialize, Deserialize)]
+   pub struct ComponentMigration {
+       name: String,  // "agent_state", "workflow_state", "sessions"
+       estimated_count: usize,
+       batch_size: usize,  // 1000 (Phase 1 key-value)
+   }
+   ```
+
+4. Implement Phase 1 migrations (generic key-value migrator):
+   - Sled → PostgreSQL for agent_state (uses hybrid routing in PostgresBackend)
+   - Sled → PostgreSQL for workflow_state (uses hybrid routing)
+   - Sled → PostgreSQL for sessions (direct PostgresSessionsStorage)
+
+5. Add progress reporting:
+   ```rust
+   pub struct MigrationProgress {
+       component: String,
+       current: usize,
+       total: usize,
+       percentage: f64,
+       eta: Duration,
+   }
+   ```
+
+6. Test migration workflow:
+   - Generate plan → Review YAML → Execute dry-run → Execute actual → Validate
 
 **Files to Create**:
-- `llmspell-cli/src/commands/storage_migrate.rs`
-
-**Definition of Done**:
-- [ ] CLI command works
-- [ ] All 10 migration paths functional
-- [ ] Dry-run mode working
-- [ ] Progress reporting clear
-- [ ] Tests pass
-
-### Task 13b.14.2: Implement Migration Validation
-**Priority**: CRITICAL
-**Estimated Time**: 3 hours
-**Assignee**: QA Team
-
-**Description**: Pre and post-migration validation to ensure data integrity.
-
-**Acceptance Criteria**:
-- [ ] Source count == destination count
-- [ ] Checksum validation working
-- [ ] Data sampling validation
-- [ ] Rollback support on failure
-- [ ] Validation report generated
-
-**Implementation Steps**:
-1. Implement count validation
-2. Implement checksum validation for random samples
-3. Full data comparison for small datasets
-4. Rollback on validation failure
-5. Generate validation report
+- `llmspell-cli/src/commands/storage.rs` (~300 lines)
+- `llmspell-storage/src/migration/mod.rs` (~200 lines)
+- `llmspell-storage/src/migration/plan.rs` (~150 lines)
+- `llmspell-storage/src/migration/engine.rs` (~250 lines)
+- `llmspell-storage/src/migration/progress.rs` (~100 lines)
 
 **Files to Modify**:
-- `llmspell-cli/src/commands/storage_migrate.rs`
+- `llmspell-cli/src/commands/mod.rs` (add storage command)
+- `llmspell-storage/src/lib.rs` (export migration module)
 
 **Definition of Done**:
-- [ ] Validation comprehensive
-- [ ] Count mismatches detected
-- [ ] Rollback works
-- [ ] Report helpful
-- [ ] Tests pass
+- [ ] CLI commands work: `plan`, `execute --dry-run`, `execute`
+- [ ] Phase 1 migrations functional (3 components: agent_state, workflow_state, sessions)
+- [ ] YAML plan generation and parsing working
+- [ ] Dry-run validates without modifying data
+- [ ] Progress reporting with percentage and ETA
+- [ ] Integration test: Sled→PostgreSQL for 1K agent states in <1 min
+- [ ] Tests pass (unit + integration)
+- [ ] Zero warnings
 
-### Task 13b.14.3: Test All 10 Migration Paths
+### Task 13b.14.2: Implement Migration Validation and Rollback System
 **Priority**: CRITICAL
-**Estimated Time**: 6 hours
+**Estimated Time**: 3-4 hours
 **Assignee**: QA Team
 
-**Description**: Test migration for all 10 storage components.
+**Description**: Multi-layered validation with BackupManager-based rollback for safe migration recovery.
+
+**Architectural Decision**: BackupManager Integration (Proven Safety Mechanism)
+**Why**: Leverage existing BackupManager trait from llmspell-core instead of custom rollback. BackupManager already implements backup/restore operations with metadata tracking - battle-tested for agent state recovery, now extended to storage migrations.
+
+**Technical Insight**: Validation operates at three levels:
+1. **Pre-flight** (before backup): Source connectivity, schema compatibility, disk space
+2. **Backup** (before migration): Full source backup via BackupManager, enables rollback
+3. **Post-migration** (after copy): Count equality, checksum sampling, data integrity
+
+**Rollback Strategy**: If post-migration validation fails, restore from BackupManager snapshot. No custom rollback logic needed - BackupManager handles serialization/deserialization for all storage types.
 
 **Acceptance Criteria**:
-- [ ] HNSW → PostgreSQL (episodic, RAG): 10K vectors migrated in <5 min
-- [ ] SurrealDB → PostgreSQL (semantic): 1K entities migrated in <2 min
-- [ ] Sled → PostgreSQL (agent state, workflow, sessions): 1K states migrated in <1 min
-- [ ] File → PostgreSQL (hooks, artifacts): 1K files migrated in <2 min
-- [ ] Storage Adapter → PostgreSQL (events): 10K events migrated in <3 min
-- [ ] File → PostgreSQL (API keys): 100 keys migrated in <30 sec
+- [ ] Pre-flight validation: source connectivity, target schema exists, disk space (2x source size)
+- [ ] BackupManager backup: full source backup before migration
+- [ ] Post-migration validation: source count == target count
+- [ ] Checksum validation: random 10% sample with hash comparison
+- [ ] Small dataset validation: <100 records get full data comparison
+- [ ] Rollback: restore from BackupManager on failure (auto-triggered)
+- [ ] Validation report: JSON format with all check results
 
 **Implementation Steps**:
-1. Test episodic memory migration (HNSW → PostgreSQL)
-2. Test semantic memory migration (SurrealDB → PostgreSQL)
-3. Test state migrations (Sled → PostgreSQL)
-4. Test session migrations
-5. Test event log migration
-6. Test API key migration
-7. Validate all migrations
-8. Document results
+1. Create `llmspell-storage/src/migration/validator.rs` (validation logic):
+   ```rust
+   pub struct MigrationValidator {
+       source: Arc<dyn MigrationSource>,
+       target: Arc<dyn MigrationTarget>,
+   }
 
-**Files to Test**:
-- All 10 storage component migrations
+   impl MigrationValidator {
+       /// Pre-flight checks before backup
+       pub async fn pre_flight(&self, plan: &MigrationPlan) -> Result<PreFlightReport> {
+           // 1. Test source connectivity
+           // 2. Verify target schema exists (PostgreSQL migrations run)
+           // 3. Check disk space (2x source size for backup + target)
+           // 4. Validate component compatibility
+       }
 
-**Definition of Done**:
-- [ ] All migrations successful
-- [ ] Performance targets met
-- [ ] Data integrity validated
-- [ ] Results documented
-- [ ] Zero data loss
+       /// Post-migration validation
+       pub async fn validate(&self, component: &str) -> Result<ValidationReport> {
+           // 1. Count equality: source.count() == target.count()
+           // 2. Checksum sampling: random 10% sample
+           // 3. Full comparison if count < 100
+           // 4. Return detailed report
+       }
 
-### Task 13b.14.4: Create Migration Guide Documentation
-**Priority**: HIGH
-**Estimated Time**: 3 hours
-**Assignee**: Documentation Team
+       /// Checksum validation for data sampling
+       async fn validate_checksums(&self, component: &str, sample_size: usize) -> Result<ChecksumReport> {
+           // SHA-256 hash of serialized values
+           // Compare source vs target for random sample
+       }
+   }
 
-**Description**: Comprehensive migration guide for users.
+   #[derive(Serialize, Deserialize)]
+   pub struct ValidationReport {
+       component: String,
+       source_count: usize,
+       target_count: usize,
+       count_match: bool,
+       checksums_validated: usize,
+       checksum_mismatches: Vec<String>,  // Keys with mismatches
+       full_comparison: bool,
+       success: bool,
+   }
+   ```
 
-**Acceptance Criteria**:
-- [ ] Step-by-step migration instructions
-- [ ] Backup recommendations
-- [ ] Rollback procedures
-- [ ] Troubleshooting guide
-- [ ] Examples for all 10 components
+2. Integrate BackupManager in MigrationEngine:
+   ```rust
+   impl MigrationEngine {
+       pub async fn execute(&self, dry_run: bool) -> Result<MigrationReport> {
+           // 1. Pre-flight validation
+           let pre_flight = self.validator.pre_flight(&self.plan).await?;
+           if !pre_flight.success {
+               return Err(anyhow!("Pre-flight failed: {}", pre_flight.summary()));
+           }
 
-**Implementation Steps**:
-1. Create `docs/user-guide/storage/migration-guide.md` (700+ lines)
-2. Document backup procedures
-3. Step-by-step migration for each component
-4. Rollback procedures
-5. Troubleshooting common issues
+           // 2. Backup via BackupManager (critical: before any writes)
+           let backup_id = if !dry_run {
+               let backup_manager = BackupManager::new(self.source.clone());
+               let backup_id = backup_manager.backup_all(&self.plan.components).await?;
+               Some(backup_id)
+           } else {
+               None
+           };
+
+           // 3. Batch copy with progress
+           let copy_result = self.batch_copy(dry_run).await;
+
+           // 4. Post-migration validation
+           if let Ok(_) = copy_result {
+               for component in &self.plan.components {
+                   let report = self.validator.validate(&component.name).await?;
+                   if !report.success {
+                       // Rollback on validation failure
+                       if let Some(bid) = backup_id {
+                           self.rollback(bid, &component.name).await?;
+                       }
+                       return Err(anyhow!("Validation failed: {}", report.summary()));
+                   }
+               }
+           }
+
+           // 5. Generate final report
+           Ok(MigrationReport { /* ... */ })
+       }
+
+       async fn rollback(&self, backup_id: String, component: &str) -> Result<()> {
+           let backup_manager = BackupManager::new(self.target.clone());
+           backup_manager.restore(&backup_id, component).await?;
+           Ok(())
+       }
+   }
+   ```
+
+3. Add checksum validation (SHA-256):
+   ```rust
+   use sha2::{Sha256, Digest};
+
+   fn compute_checksum(value: &[u8]) -> String {
+       let mut hasher = Sha256::new();
+       hasher.update(value);
+       format!("{:x}", hasher.finalize())
+   }
+   ```
+
+4. Implement ValidationReport JSON serialization:
+   - Save to `migration-report-<timestamp>.json`
+   - Include: component, counts, checksums, mismatches, timing
+
+5. Add rollback test:
+   - Simulate validation failure
+   - Verify BackupManager restores source state
+   - Confirm target cleaned up
 
 **Files to Create**:
-- `docs/user-guide/storage/migration-guide.md`
+- `llmspell-storage/src/migration/validator.rs` (~300 lines)
+
+**Files to Modify**:
+- `llmspell-storage/src/migration/engine.rs` (add BackupManager integration)
+- `llmspell-storage/src/migration/mod.rs` (export validator)
 
 **Definition of Done**:
-- [ ] Guide comprehensive
-- [ ] Examples clear
-- [ ] Troubleshooting helpful
-- [ ] Reviewed by team
-- [ ] Published
+- [ ] Pre-flight validation catches connectivity/disk space issues
+- [ ] BackupManager backup completes before migration
+- [ ] Post-migration validation comprehensive (count + checksums)
+- [ ] Count mismatches detected and trigger rollback
+- [ ] Checksum mismatches detected (10% sample for large datasets)
+- [ ] Full comparison working for small datasets (<100 records)
+- [ ] Rollback via BackupManager restores source state
+- [ ] Validation report JSON saved to disk
+- [ ] Integration test: rollback on validation failure (1K records restored in <30s)
+- [ ] Tests pass (unit + integration)
+- [ ] Zero warnings
+
+### Task 13b.14.3: Test Phase 1 Migration Paths (Sled→PostgreSQL)
+**Priority**: CRITICAL
+**Estimated Time**: 6-8 hours
+**Assignee**: QA Team
+
+**Description**: Comprehensive testing of Phase 1 migrations (Agent State, Workflow State, Sessions) from Sled to PostgreSQL.
+
+**Phased Testing Rationale**:
+- **Phase 1** (This task): Sled → PostgreSQL (3 components) - Tests migration framework with simple key-value migrations, validates MigrationEngine + BackupManager architecture
+- **Phase 2** (Future - 13b.15): HNSW → PostgreSQL + SurrealDB → PostgreSQL (Episodic/Semantic) - Complex migrations with vector dimension routing and bi-temporal graph queries
+- **Phase 3** (Future - 13b.16): File/InMemory → PostgreSQL (Artifacts/Events/Hooks/API Keys) - Remaining components with specialized logic (Large Object streaming, partitioned events, compressed hooks, encrypted keys)
+
+**Why Phase 1 First**: Agent State, Workflow State, and Sessions are critical for production workloads. Testing these first validates the migration framework end-to-end with simpler data structures before tackling complex vector/graph migrations.
+
+**Acceptance Criteria**:
+- [ ] **Agent State Migration** (Sled → PostgreSQL): 1K agent states migrated in <1 min
+  - Validation: All agent_id keys present, state JSON intact, tenant_id preserved
+- [ ] **Workflow State Migration** (Sled → PostgreSQL): 1K workflow states migrated in <1 min
+  - Validation: All workflow_id keys present, state transitions intact, status preserved
+- [ ] **Sessions Migration** (Sled → PostgreSQL): 1K sessions migrated in <1 min
+  - Validation: All session_id keys present, metadata intact, artifacts preserved
+- [ ] **Dry-run mode**: All 3 components validated without writes
+- [ ] **Rollback test**: Validation failure triggers BackupManager restore (tested for all 3 components)
+- [ ] **Plan workflow**: Generate plan → Review YAML → Execute dry-run → Execute actual → Validate
+- [ ] **Progress reporting**: Real-time percentage and ETA for all 3 components
+- [ ] **Validation reports**: JSON reports generated for all 3 components with checksum results
+
+**Implementation Steps**:
+1. **Setup test data** (create realistic dataset):
+   ```rust
+   // llmspell-storage/tests/migration_phase1_tests.rs
+   async fn setup_sled_test_data() -> Result<SledBackend> {
+       let backend = SledBackend::new("test_migration_data")?;
+
+       // Create 1K agent states
+       for i in 0..1000 {
+           let agent_id = format!("agent_{}", i);
+           let state = AgentState { /* ... */ };
+           backend.store_state(&agent_id, &state).await?;
+       }
+
+       // Create 1K workflow states
+       for i in 0..1000 {
+           let workflow_id = format!("workflow_{}", i);
+           let state = WorkflowState { /* ... */ };
+           backend.store_workflow_state(&workflow_id, &state).await?;
+       }
+
+       // Create 1K sessions
+       for i in 0..1000 {
+           let session_id = format!("session_{}", i);
+           let session = Session { /* ... */ };
+           backend.create_session(&session_id, session).await?;
+       }
+
+       Ok(backend)
+   }
+   ```
+
+2. **Test Agent State migration**:
+   ```rust
+   #[tokio::test]
+   async fn test_agent_state_migration() {
+       let source = setup_sled_test_data().await.unwrap();
+       let target = PostgresBackend::new(postgres_config).await.unwrap();
+
+       // Generate plan
+       let plan = MigrationPlan::new("sled", "postgres", vec!["agent_state"]);
+       plan.save("test-agent-migration-plan.yaml").unwrap();
+
+       // Execute dry-run
+       let engine = MigrationEngine::new(source.clone(), target.clone(), plan.clone());
+       let dry_run_report = engine.execute(true).await.unwrap();
+       assert!(dry_run_report.success);
+
+       // Execute actual migration
+       let report = engine.execute(false).await.unwrap();
+       assert!(report.success);
+       assert_eq!(report.source_count, 1000);
+       assert_eq!(report.target_count, 1000);
+       assert!(report.duration < Duration::from_secs(60));
+
+       // Validate data integrity
+       for i in 0..1000 {
+           let agent_id = format!("agent_{}", i);
+           let source_state = source.get_state(&agent_id).await.unwrap();
+           let target_state = target.get_state(&agent_id).await.unwrap();
+           assert_eq!(source_state, target_state);
+       }
+   }
+   ```
+
+3. **Test Workflow State migration** (similar structure to agent state test)
+
+4. **Test Sessions migration** (similar structure with session-specific validation)
+
+5. **Test rollback on validation failure**:
+   ```rust
+   #[tokio::test]
+   async fn test_migration_rollback() {
+       let source = setup_sled_test_data().await.unwrap();
+       let target = PostgresBackend::new(postgres_config).await.unwrap();
+
+       // Inject validation failure (corrupt target data)
+       target.corrupt_component("agent_state").await.unwrap();
+
+       let plan = MigrationPlan::new("sled", "postgres", vec!["agent_state"]);
+       let engine = MigrationEngine::new(source.clone(), target.clone(), plan);
+
+       // Execute migration (should rollback)
+       let result = engine.execute(false).await;
+       assert!(result.is_err());
+
+       // Verify source restored from backup
+       assert_eq!(source.count("agent_state").await.unwrap(), 1000);
+
+       // Verify target cleaned up
+       assert_eq!(target.count("agent_state").await.unwrap(), 0);
+   }
+   ```
+
+6. **Test plan workflow** (end-to-end CLI integration):
+   ```bash
+   # Generate plan
+   llmspell storage migrate plan --from sled --to postgres \
+     --components agent_state,workflow_state,sessions \
+     --output test-migration-plan.yaml
+
+   # Review plan (manual step - validate YAML contents)
+   cat test-migration-plan.yaml
+
+   # Execute dry-run
+   llmspell storage migrate execute --plan test-migration-plan.yaml --dry-run
+
+   # Execute actual migration
+   llmspell storage migrate execute --plan test-migration-plan.yaml
+
+   # Validate results
+   llmspell storage validate --backend postgres --components agent_state,workflow_state,sessions
+   ```
+
+7. **Performance benchmarking**:
+   - Measure migration time for 1K, 10K, 100K records
+   - Verify linear scaling (10K in ~10 min, 100K in ~100 min)
+   - Document bottlenecks (disk I/O vs network vs CPU)
+
+8. **Document results** in `test-results-phase1-migration.md`:
+   - Performance metrics (time, throughput)
+   - Validation reports (checksums, counts)
+   - Rollback test results
+   - Known issues and workarounds
+
+**Files to Create**:
+- `llmspell-storage/tests/migration_phase1_tests.rs` (~500 lines)
+- `llmspell-storage/tests/fixtures/migration_test_data.rs` (~200 lines)
+- `test-results-phase1-migration.md` (documentation)
+
+**Definition of Done**:
+- [ ] All 3 Phase 1 migrations successful (agent_state, workflow_state, sessions)
+- [ ] Performance targets met: 1K records in <1 min per component
+- [ ] Data integrity validated: 100% checksum match for all records
+- [ ] Rollback test passes: validation failure restores source state
+- [ ] Plan workflow tested: generate → review → dry-run → execute → validate
+- [ ] Progress reporting works: real-time percentage and ETA
+- [ ] Validation reports generated: JSON files with detailed results
+- [ ] Performance benchmarks documented: 1K, 10K, 100K records
+- [ ] Zero data loss across all tests
+- [ ] Tests pass (unit + integration)
+- [ ] Zero warnings
+
+**Phase 2/3 Deferred**:
+- Episodic Memory (HNSW → PostgreSQL): Requires vector dimension routing and HNSW index migration
+- Semantic Memory (SurrealDB → PostgreSQL): Requires bi-temporal graph query translation
+- Artifacts (File → PostgreSQL): Requires Large Object streaming API
+- Events (StorageAdapter → PostgreSQL): Requires partitioned event log migration
+- Hooks (File → PostgreSQL): Requires LZ4 compression/decompression
+- API Keys (File → PostgreSQL): Requires pgcrypto encryption key management
+
+### Task 13b.14.4: Create Phase 1 Migration Guide Documentation
+**Priority**: HIGH
+**Estimated Time**: 3-4 hours
+**Assignee**: Documentation Team
+
+**Description**: User-facing migration guide for Phase 1 components (Agent State, Workflow State, Sessions) with architectural context and future phase preview.
+
+**Documentation Scope Rationale**:
+- **Phase 1 Focus**: Document proven migration workflow for 3 critical components
+- **Architecture Documentation**: Explain plan-based workflow, BackupManager rollback, validation strategy
+- **Future Phase Preview**: Brief overview of Phase 2/3 components (Episodic/Semantic/Artifacts) with "coming soon" timeline
+- **User Empowerment**: Users can successfully migrate production workloads using Phase 1 guide
+
+**Technical Insight**: Documentation as validation - writing the guide forces us to think through user experience, edge cases, and error messages. If guide is confusing, UX needs improvement.
+
+**Acceptance Criteria**:
+- [ ] Quick Start: 5-minute migration walkthrough (Sled→PostgreSQL for agent_state)
+- [ ] Step-by-step instructions: Generate plan → Review → Dry-run → Execute → Validate
+- [ ] Backup recommendations: Pre-migration BackupManager usage, manual backups
+- [ ] Rollback procedures: Automatic rollback on validation failure, manual restore from backup
+- [ ] Troubleshooting guide: Common errors (connectivity, disk space, schema mismatch) with solutions
+- [ ] Phase 1 examples: All 3 components (agent_state, workflow_state, sessions)
+- [ ] Architecture overview: MigrationEngine, BackupManager, Validator components
+- [ ] Phase 2/3 preview: Brief description of upcoming components with timeline
+
+**Implementation Steps**:
+1. **Create main guide** `docs/user-guide/storage/migration-guide.md` (~800 lines):
+   ```markdown
+   # Storage Migration Guide (Phase 1: Sled→PostgreSQL)
+
+   ## Overview
+   llmspell storage migration tools enable safe, validated data migration from embedded backends (Sled) to PostgreSQL. Phase 1 supports Agent State, Workflow State, and Sessions.
+
+   ## Quick Start (5 minutes)
+   ```bash
+   # 1. Generate migration plan
+   llmspell storage migrate plan \
+     --from sled \
+     --to postgres \
+     --components agent_state \
+     --output agent-migration.yaml
+
+   # 2. Review plan
+   cat agent-migration.yaml
+
+   # 3. Dry-run (validation only)
+   llmspell storage migrate execute \
+     --plan agent-migration.yaml \
+     --dry-run
+
+   # 4. Execute migration
+   llmspell storage migrate execute \
+     --plan agent-migration.yaml
+
+   # 5. Validate results
+   llmspell storage validate \
+     --backend postgres \
+     --components agent_state
+   ```
+
+   ## Architecture
+   ### Migration Engine
+   - **Plan Generation**: YAML-based declarative migration plans
+   - **Validation**: Pre-flight, backup, post-migration (3-layer)
+   - **Rollback**: BackupManager-based automatic rollback on failure
+
+   ### Components
+   - MigrationEngine: Orchestrates migration workflow
+   - MigrationValidator: Pre-flight + post-migration validation
+   - BackupManager: Backup/restore for rollback
+   - MigrationProgress: Real-time progress reporting
+
+   ## Phase 1 Components
+   ### Agent State
+   - Source: Sled key-value store (agent_id → AgentState JSON)
+   - Target: PostgreSQL llmspell.agent_state table
+   - Performance: 1K states in <1 min
+
+   ### Workflow State
+   - Source: Sled key-value store (workflow_id → WorkflowState JSON)
+   - Target: PostgreSQL llmspell.workflow_states table
+   - Performance: 1K states in <1 min
+
+   ### Sessions
+   - Source: Sled key-value store (session_id → Session JSON)
+   - Target: PostgreSQL llmspell.sessions table
+   - Performance: 1K sessions in <1 min
+
+   ## Step-by-Step Migration
+   ### 1. Pre-Migration Checklist
+   - [ ] PostgreSQL server accessible (test connection)
+   - [ ] Migrations run (llmspell storage migrate --target postgres --init)
+   - [ ] Disk space available (2x source size for backup + target)
+   - [ ] Source backend healthy (run validation)
+
+   ### 2. Generate Migration Plan
+   ```bash
+   llmspell storage migrate plan \
+     --from sled \
+     --to postgres \
+     --components agent_state,workflow_state,sessions \
+     --output production-migration.yaml
+   ```
+
+   **Plan Contents**:
+   ```yaml
+   version: "1.0"
+   created_at: "2025-11-05T10:00:00Z"
+   source:
+     backend: sled
+     path: /path/to/sled/db
+   target:
+     backend: postgres
+     connection: postgresql://user:pass@localhost:5432/llmspell
+   components:
+     - name: agent_state
+       estimated_count: 5000
+       batch_size: 1000
+     - name: workflow_state
+       estimated_count: 3000
+       batch_size: 1000
+     - name: sessions
+       estimated_count: 2000
+       batch_size: 1000
+   validation:
+     checksum_sample_percent: 10
+     full_comparison_threshold: 100
+   rollback:
+     backup_enabled: true
+     backup_path: /backups/migration-2025-11-05
+   ```
+
+   ### 3. Review Plan
+   - Verify source/target configurations
+   - Check estimated counts match expectations
+   - Confirm backup path has sufficient space
+   - Validate batch sizes (1000 is default, increase for better performance)
+
+   ### 4. Execute Dry-Run
+   ```bash
+   llmspell storage migrate execute \
+     --plan production-migration.yaml \
+     --dry-run
+   ```
+
+   **Dry-run validates**:
+   - Source connectivity and count
+   - Target schema exists
+   - Disk space available
+   - No writes performed
+
+   ### 5. Execute Migration
+   ```bash
+   llmspell storage migrate execute \
+     --plan production-migration.yaml
+   ```
+
+   **Migration workflow**:
+   1. Pre-flight validation
+   2. Backup via BackupManager → /backups/migration-2025-11-05
+   3. Batch copy (1000 records per batch)
+   4. Progress reporting (percentage + ETA)
+   5. Post-migration validation (count + checksums)
+   6. Rollback if validation fails (automatic)
+
+   ### 6. Validate Results
+   ```bash
+   llmspell storage validate \
+     --backend postgres \
+     --components agent_state,workflow_state,sessions
+   ```
+
+   **Validation report** (JSON):
+   ```json
+   {
+     "component": "agent_state",
+     "source_count": 5000,
+     "target_count": 5000,
+     "count_match": true,
+     "checksums_validated": 500,
+     "checksum_mismatches": [],
+     "success": true
+   }
+   ```
+
+   ## Backup and Rollback
+   ### Automatic Backup
+   Migration automatically creates BackupManager backup before any writes:
+   ```
+   /backups/migration-2025-11-05/
+     agent_state/
+       backup-metadata.json
+       backup-data.tar.gz
+     workflow_state/
+       backup-metadata.json
+       backup-data.tar.gz
+     sessions/
+       backup-metadata.json
+       backup-data.tar.gz
+   ```
+
+   ### Automatic Rollback
+   If post-migration validation fails, BackupManager automatically restores source state:
+   ```
+   [ERROR] Validation failed: count mismatch (source: 5000, target: 4998)
+   [INFO] Initiating automatic rollback...
+   [INFO] Restoring from backup: /backups/migration-2025-11-05/agent_state
+   [INFO] Rollback complete: 5000 records restored
+   ```
+
+   ### Manual Restore
+   If needed, restore manually:
+   ```bash
+   llmspell storage restore \
+     --backup /backups/migration-2025-11-05/agent_state \
+     --target sled \
+     --component agent_state
+   ```
+
+   ## Troubleshooting
+   ### Error: Source connectivity failed
+   **Symptom**: Pre-flight validation fails with "Failed to connect to source backend"
+   **Solution**:
+   1. Verify Sled database path exists
+   2. Check file permissions (read access required)
+   3. Ensure no other process has exclusive lock
+
+   ### Error: Target schema not found
+   **Symptom**: Pre-flight validation fails with "Table llmspell.agent_state does not exist"
+   **Solution**:
+   1. Run PostgreSQL migrations: `llmspell storage migrate --target postgres --init`
+   2. Verify migrations completed: `psql -c "SELECT * FROM llmspell.migrations"`
+
+   ### Error: Disk space insufficient
+   **Symptom**: Pre-flight validation fails with "Insufficient disk space for backup"
+   **Solution**:
+   1. Free up disk space (backup requires 2x source size)
+   2. Change backup path in migration plan to larger volume
+
+   ### Error: Count mismatch after migration
+   **Symptom**: Post-migration validation fails with "Count mismatch (source: 5000, target: 4998)"
+   **Solution**:
+   1. Automatic rollback triggered
+   2. Check PostgreSQL logs for constraint violations
+   3. Verify tenant_id set correctly for RLS policies
+   4. Retry migration after fixing source data
+
+   ## Phase 2/3 Preview (Coming Soon)
+   ### Phase 2: Complex Migrations
+   - **Episodic Memory** (HNSW → PostgreSQL): Vector dimension routing, HNSW index migration
+   - **Semantic Memory** (SurrealDB → PostgreSQL): Bi-temporal graph query translation
+
+   ### Phase 3: Specialized Migrations
+   - **Artifacts** (File → PostgreSQL): Large Object streaming API
+   - **Events** (StorageAdapter → PostgreSQL): Partitioned event log migration
+   - **Hooks** (File → PostgreSQL): LZ4 compression/decompression
+   - **API Keys** (File → PostgreSQL): pgcrypto encryption key management
+
+   **Timeline**: Phase 2 (Q1 2026), Phase 3 (Q2 2026)
+
+   ## FAQ
+   ### Q: Can I migrate multiple components simultaneously?
+   A: Yes, specify comma-separated components in plan generation:
+   ```bash
+   --components agent_state,workflow_state,sessions
+   ```
+
+   ### Q: What happens if migration fails mid-way?
+   A: BackupManager automatically restores source state. No partial data in target.
+
+   ### Q: Can I customize batch size for better performance?
+   A: Yes, edit migration plan YAML before execution:
+   ```yaml
+   components:
+     - name: agent_state
+       batch_size: 5000  # Increase for faster migration
+   ```
+
+   ### Q: How do I verify migration success?
+   A: Check validation report JSON for `"success": true` and zero checksum mismatches.
+   ```
+
+2. **Add examples directory** `docs/user-guide/storage/examples/` with 3 migration plan templates:
+   - `agent-state-migration.yaml` (minimal example)
+   - `workflow-state-migration.yaml` (with custom batch sizes)
+   - `multi-component-migration.yaml` (all 3 Phase 1 components)
+
+3. **Create architecture diagram** (ASCII art for `migration-guide.md`):
+   ```
+   Migration Workflow:
+
+   [Generate Plan]
+         ↓
+   [Review YAML]
+         ↓
+   [Execute Dry-Run] → [Validation Report]
+         ↓
+   [Execute Migration]
+         ↓
+   ┌─────────────────────────────────────┐
+   │ 1. Pre-flight Validation            │
+   │ 2. BackupManager Backup             │
+   │ 3. Batch Copy (with progress)       │
+   │ 4. Post-migration Validation        │
+   │ 5. Rollback if validation fails     │
+   └─────────────────────────────────────┘
+         ↓
+   [Validate Results] → [Success / Rollback]
+   ```
+
+4. **Update main storage docs** `docs/user-guide/storage/README.md`:
+   - Add link to migration guide
+   - Add Phase 1/2/3 roadmap table
+
+5. **Create troubleshooting quick reference** `docs/user-guide/storage/migration-troubleshooting.md` (200 lines):
+   - Common errors with solutions
+   - Performance tuning tips
+   - Rollback procedures
+
+**Files to Create**:
+- `docs/user-guide/storage/migration-guide.md` (~800 lines)
+- `docs/user-guide/storage/examples/agent-state-migration.yaml` (~30 lines)
+- `docs/user-guide/storage/examples/workflow-state-migration.yaml` (~30 lines)
+- `docs/user-guide/storage/examples/multi-component-migration.yaml` (~50 lines)
+- `docs/user-guide/storage/migration-troubleshooting.md` (~200 lines)
+
+**Files to Modify**:
+- `docs/user-guide/storage/README.md` (add migration guide link + roadmap)
+
+**Definition of Done**:
+- [ ] Migration guide comprehensive (800+ lines covering all Phase 1 workflows)
+- [ ] Quick Start section works (5-minute walkthrough tested)
+- [ ] Step-by-step instructions clear (generate → review → dry-run → execute → validate)
+- [ ] Architecture overview explains MigrationEngine, BackupManager, Validator
+- [ ] Examples provided for all 3 Phase 1 components
+- [ ] Troubleshooting guide covers common errors with solutions
+- [ ] Phase 2/3 preview gives users roadmap visibility
+- [ ] ASCII diagrams illustrate workflow visually
+- [ ] FAQ answers common questions (batch size, rollback, multi-component)
+- [ ] Reviewed by team (2+ reviewers)
+- [ ] Published and linked from main storage docs
+- [ ] Zero spelling/grammar errors
+- [ ] Zero broken links
 
 ---
 
