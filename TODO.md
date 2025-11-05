@@ -6846,11 +6846,25 @@ SELECT avg_duration_ms::DOUBLE PRECISION FROM llmspell.get_hook_history_stats()
 
 ---
 
-## Phase 13b.14: Migration Tools (Days 28-29)
+## Phase 13b.14: Migration Tools - Phase 1 (Sled→PostgreSQL) (Days 28-29)
 
-**Goal**: Create CLI migration tools for all 10 storage components
-**Timeline**: 2 days (16 hours)
+**Goal**: Create CLI migration tools for Phase 1 components (Agent State, Workflow State, Sessions) with plan-based workflow, validation, and rollback
+**Timeline**: 2-3 days (16-22 hours)
 **Critical Dependencies**: All storage backends (13b.4-13b.13) ✅
+
+**Phased Migration Strategy**:
+- **Phase 1** (This phase): Sled → PostgreSQL (Agent/Workflow/Sessions) - Critical components, validates migration framework
+- **Phase 2** (Future): HNSW → PostgreSQL + SurrealDB → PostgreSQL (Episodic/Semantic) - Complex vector/graph migrations
+- **Phase 3** (Future): File/InMemory → PostgreSQL (Artifacts/Events/Hooks/API Keys) - Specialized migrations
+
+**Key Architectural Decisions**:
+1. **Plan-Based Workflow**: Generate YAML plan → Review → Dry-run → Execute (safety-first)
+2. **storage Command Namespace**: `llmspell storage migrate` (future-proof for storage operations)
+3. **BackupManager Rollback**: Leverage proven backup/restore infrastructure from llmspell-core
+4. **Three-Level Validation**: Pre-flight (connectivity, disk space) → Backup → Post-migration (count, checksums)
+5. **Generic Migrator**: Phase 1 uses generic key-value migrator (70% of components), specialized migrators for Phase 2/3 (30%)
+
+**Why Phase 1 First**: Agent State, Workflow State, and Sessions are critical for production workloads. Testing with simple key-value migrations validates the migration framework end-to-end before tackling complex vector/graph migrations in Phase 2.
 
 ### Task 13b.14.1: Create Storage Migration CLI Command (Phase 1: Sled→PostgreSQL)
 **Priority**: CRITICAL
