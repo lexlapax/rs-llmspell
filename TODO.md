@@ -6324,16 +6324,62 @@ event_storage.store_event(&event_payload).await?;
 **Description**: Create PostgreSQL schema for hook execution history with compression support.
 
 **Implementation Steps**:
-1. Create `migrations/V009__hook_history.sql`:
-   - Table: hook_history (execution_id, tenant_id, hook_name, execution_data JSONB, duration_ms, status, executed_at)
-   - Indexes: (hook_name, executed_at), (status), (tenant_id, executed_at)
-   - RLS policies applied
+1. Create `migrations/V13__hook_history.sql`:
+   - Table: hook_history (execution_id, tenant_id, hook_id, hook_type, correlation_id, hook_context BYTEA, result_data JSONB, metadata)
+   - Indexes: (hook_id, timestamp), (correlation_id), (hook_type), (tenant_id, timestamp), (retention_priority, timestamp), GIN(metadata), GIN(tags)
+   - RLS policies applied (SELECT/INSERT/UPDATE/DELETE)
+   - Cleanup and stats functions
 
-**Files to Create**: `llmspell-storage/migrations/V009__hook_history.sql`
+**Files to Create**: `llmspell-storage/migrations/V13__hook_history.sql`
 
 **Definition of Done**:
-- [ ] Schema created
-- [ ] RLS policies enforced
+- [x] Schema created
+- [x] RLS policies enforced
+- [x] Cleanup and stats functions created
+- [x] Migration tests passing (8/8)
+
+**Status**: ✅ **COMPLETE** (2025-01-05)
+
+**Actual Time**: ~1 hour (vs estimated 2 hours)
+
+**Key Achievements**:
+- ✅ Hook history table with compression support (BYTEA for hook_context)
+- ✅ RLS policies (SELECT/INSERT/UPDATE/DELETE) with FORCE RLS for tenant isolation
+- ✅ 8 indexes optimized for hook history queries (hook_time, correlation, type, tenant_time, retention, metadata GIN, tags GIN)
+- ✅ Cleanup function: `cleanup_old_hook_executions(before_date, min_retention_priority)`
+- ✅ Stats function: `get_hook_history_stats()` (total executions, size, oldest/newest timestamps, executions by hook/type, avg duration)
+- ✅ Comprehensive test coverage (8 tests, 100% pass rate)
+- ✅ Schema aligns with llmspell-hooks persistence patterns (SerializedHookExecution, HookMetadata)
+
+**Migration Structure** (`V13__hook_history.sql`, 201 lines):
+- Table: `hook_history` (18 columns: execution_id, tenant_id, hook_id, hook_type, correlation_id, hook_context BYTEA, result_data JSONB, timestamp, duration_ms, triggering_component, component_id, modified_operation, tags TEXT[], retention_priority, context_size, contains_sensitive_data, metadata JSONB, created_at)
+- Indexes: 8 indexes (hook_history_pkey, idx_hook_history_hook_time, idx_hook_history_correlation, idx_hook_history_type, idx_hook_history_tenant_time, idx_hook_history_retention, idx_hook_history_metadata GIN, idx_hook_history_tags GIN)
+- RLS: 4 policies (hook_history_tenant_select/insert/update/delete) with FORCE RLS
+- Functions: `cleanup_old_hook_executions`, `get_hook_history_stats`
+- Permissions: Granted to llmspell_app role
+
+**Test Coverage** (`postgres_hook_history_migration_tests.rs`, 400 lines):
+1. `test_hook_history_table_exists` - Table creation
+2. `test_hook_history_table_schema` - 18 columns with correct types
+3. `test_hook_history_indexes_created` - 8 indexes created
+4. `test_hook_history_rls_policies_enabled` - RLS enabled + FORCE RLS + 4 policies
+5. `test_hook_history_cleanup_function_exists` - cleanup_old_hook_executions function
+6. `test_hook_history_stats_function_exists` - get_hook_history_stats function
+7. `test_hook_history_rls_tenant_isolation` - Multi-tenant isolation verification
+8. `test_hook_history_insert_and_query` - Insert + query with all fields
+
+**Design Alignment with llmspell-hooks**:
+- `hook_context: BYTEA` matches `SerializedHookExecution.hook_context: Vec<u8>` (compressed with lz4_flex)
+- `result_data: JSONB` matches `SerializedHookExecution.result: String` (serialized HookResult)
+- `retention_priority, tags, triggering_component` from `HookMetadata` struct
+- `metadata: JSONB` for extensibility (additional fields without schema changes)
+- Compression support ready for Phase 13b.12.2 backend implementation
+
+**Files Created**:
+- `llmspell-storage/migrations/V13__hook_history.sql` (201 lines)
+- `llmspell-storage/tests/postgres_hook_history_migration_tests.rs` (400 lines, 8 tests)
+
+**Build Note**: Migrations are embedded at compile time via `embed_migrations!` macro. After creating V13, required `cargo clean -p llmspell-storage` to rebuild and pick up new migration file.
 
 ### Task 13b.12.2: Implement PostgreSQL Hook History Backend
 **Priority**: HIGH
