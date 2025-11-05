@@ -101,10 +101,7 @@ impl PostgresEventLogStorage {
             .map_err(|e| anyhow!("Database connection failed: {}", e))?;
 
         client
-            .query_one(
-                "SELECT llmspell.ensure_future_event_log_partitions()",
-                &[],
-            )
+            .query_one("SELECT llmspell.ensure_future_event_log_partitions()", &[])
             .await
             .map_err(|e| anyhow!("Failed to ensure partitions: {}", e))?;
 
@@ -306,10 +303,7 @@ impl PostgresEventLogStorage {
     ///
     /// # Performance
     /// Uses idx_event_log_correlation index for fast lookup (<50ms target)
-    pub async fn get_events_by_correlation_id(
-        &self,
-        correlation_id: Uuid,
-    ) -> Result<Vec<Value>> {
+    pub async fn get_events_by_correlation_id(&self, correlation_id: Uuid) -> Result<Vec<Value>> {
         let tenant_id = self
             .get_tenant_context()
             .await
@@ -373,10 +367,7 @@ impl PostgresEventLogStorage {
         let results: Vec<String> = row.get(0);
 
         // Count DROPPED results (SKIPPED means no action taken)
-        let dropped_count = results
-            .iter()
-            .filter(|r| r.starts_with("DROPPED"))
-            .count();
+        let dropped_count = results.iter().filter(|r| r.starts_with("DROPPED")).count();
 
         // Each partition can contain many events, but we only know partition count
         // Return dropped partition count as approximation
@@ -496,7 +487,8 @@ mod tests {
 
         let event = create_test_event("test.event");
         let event_id = Uuid::parse_str(event["id"].as_str().unwrap()).unwrap();
-        let correlation_id = Uuid::parse_str(event["metadata"]["correlation_id"].as_str().unwrap()).unwrap();
+        let correlation_id =
+            Uuid::parse_str(event["metadata"]["correlation_id"].as_str().unwrap()).unwrap();
 
         // Store event
         storage.store_event(&event).await.unwrap();
