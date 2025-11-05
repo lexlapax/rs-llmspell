@@ -7674,11 +7674,57 @@ Migration framework validated for production use:
 
 **Phase 2/3 Deferred**:
 - Episodic Memory (HNSW → PostgreSQL): Requires vector dimension routing and HNSW index migration
-- Semantic Memory (SurrealDB → PostgreSQL): Requires bi-temporal graph query translation
+- Semantic Memory (SurrealDB → PostgreSQL): Requires bi-temporal graph query translation (schema now fixed - see Post-13b.14.3 fixes below)
 - Artifacts (File → PostgreSQL): Requires Large Object streaming API
 - Events (StorageAdapter → PostgreSQL): Requires partitioned event log migration
 - Hooks (File → PostgreSQL): Requires LZ4 compression/decompression
 - API Keys (File → PostgreSQL): Requires pgcrypto encryption key management
+
+### 🔧 Post-13b.14.3: Bi-Temporal Graph Schema Fixes (2025-11-05)
+
+**Issue**: Two ignored graph storage tests due to schema limitations
+- `test_update_entity_bi_temporal` - Composite primary key needed for versioning
+- `test_delete_before` - Transaction time control needed for test backdating
+
+**Root Cause** (V4 migration design):
+1. Single-column primary keys (`entity_id`, `relationship_id`) prevented multiple temporal versions
+2. `transaction_time_start DEFAULT now()` prevented test backdating via ingestion_time
+3. Foreign key constraints incompatible with multiple entity versions
+
+**Solution - V15 Migration** (V15__bitemporal_composite_keys.sql):
+1. Changed primary keys to composite:
+   - `entities`: `entity_id` → `(entity_id, transaction_time_start)`
+   - `relationships`: `relationship_id` → `(relationship_id, transaction_time_start)`
+2. Dropped foreign key constraints (standard for bi-temporal databases)
+3. Added indexes on id columns for version history queries
+4. Documented referential integrity now application-enforced
+
+**Solution - Application Code** (graph.rs):
+1. Modified `add_entity()` to use `entity.ingestion_time` for `transaction_time_start`
+2. Modified `add_relationship()` to use `relationship.ingestion_time`
+3. Modified `delete_before()` to preserve current versions (`transaction_time_end = 'infinity'`)
+4. Enables test backdating while defaulting to `now()` for production
+
+**Test Updates**:
+1. Un-ignored `test_update_entity_bi_temporal` - now creates/updates/verifies entity versions
+2. Un-ignored `test_delete_before` - now creates old version, updates to new, deletes old
+3. Updated `test_temporal_graph_foreign_key_constraints` to document FK removal rationale
+
+**Results**:
+- ✅ 5/5 knowledge graph tests passing (previously 2 ignored)
+- ✅ 9/9 temporal graph migration tests passing
+- ✅ Entity versioning working correctly (update_entity creates new versions)
+- ✅ Test backdating enabled via ingestion_time field
+- ✅ Zero clippy warnings
+- ✅ All postgres tests passing (274 tests total)
+
+**Impact on Phase 2 Migrations**:
+- Semantic Memory schema now fully bi-temporal compliant
+- SurrealDB → PostgreSQL migration can focus on query translation
+- No schema changes needed for graph storage migration path
+
+**Commit**: af5befc9
+**Files**: V15 migration + graph.rs (3 methods) + 3 test files
 
 ### Task 13b.14.4: Create Phase 1 Migration Guide Documentation
 **Priority**: HIGH
