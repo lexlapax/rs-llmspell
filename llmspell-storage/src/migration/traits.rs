@@ -50,6 +50,16 @@ pub trait MigrationTarget: Send + Sync {
     /// * `Result<()>` - Success or error
     async fn store(&self, component: &str, key: &str, value: &[u8]) -> Result<()>;
 
+    /// Get value for a specific key (for validation)
+    ///
+    /// # Arguments
+    /// * `component` - Component name
+    /// * `key` - Key to retrieve
+    ///
+    /// # Returns
+    /// * `Result<Option<Vec<u8>>>` - Value bytes or None if not found
+    async fn get_value(&self, component: &str, key: &str) -> Result<Option<Vec<u8>>>;
+
     /// Count total records for a component
     ///
     /// # Arguments
@@ -58,4 +68,14 @@ pub trait MigrationTarget: Send + Sync {
     /// # Returns
     /// * `Result<usize>` - Total count
     async fn count(&self, component: &str) -> Result<usize>;
+
+    /// Delete a key (for cleanup on failure)
+    ///
+    /// # Arguments
+    /// * `component` - Component name
+    /// * `key` - Key to delete
+    ///
+    /// # Returns
+    /// * `Result<()>` - Success or error
+    async fn delete(&self, component: &str, key: &str) -> Result<()>;
 }

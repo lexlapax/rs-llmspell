@@ -1592,11 +1592,13 @@ EXAMPLES:
     },
 
     /// Show backend information
-    #[command(long_about = "Display storage backend characteristics and configuration.
+    #[command(
+        long_about = "Display storage backend characteristics and configuration.
 
 EXAMPLES:
     llmspell storage info --backend sled       # Show Sled backend info
-    llmspell storage info --backend postgres   # Show PostgreSQL backend info")]
+    llmspell storage info --backend postgres   # Show PostgreSQL backend info"
+    )]
     Info {
         /// Backend to show info for (sled, postgres)
         #[arg(long)]
@@ -1624,7 +1626,8 @@ EXAMPLES:
 #[derive(Subcommand, Debug)]
 pub enum MigrateAction {
     /// Generate migration plan
-    #[command(long_about = "Generate a YAML migration plan with estimated record counts.
+    #[command(
+        long_about = "Generate a YAML migration plan with estimated record counts.
 
 The plan includes source/target configs, component list, batch sizes, validation
 rules, and rollback metadata. Review the plan before executing.
@@ -1632,7 +1635,8 @@ rules, and rollback metadata. Review the plan before executing.
 EXAMPLES:
     llmspell storage migrate plan --from sled --to postgres \\
       --components agent_state,workflow_state,sessions \\
-      --output migration-plan.yaml")]
+      --output migration-plan.yaml"
+    )]
     Plan {
         /// Source backend (sled)
         #[arg(long)]

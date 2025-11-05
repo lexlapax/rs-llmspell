@@ -52,7 +52,10 @@ impl MigrationEngine {
 
         if dry_run {
             println!("[DRY-RUN] Pre-flight validation passed");
-            println!("[DRY-RUN] Would migrate {} components", self.plan.components.len());
+            println!(
+                "[DRY-RUN] Would migrate {} components",
+                self.plan.components.len()
+            );
             for component in &self.plan.components {
                 let count = self.source.count(&component.name).await?;
                 println!("[DRY-RUN]   - {}: {} records", component.name, count);
@@ -60,7 +63,11 @@ impl MigrationEngine {
 
             return Ok(MigrationReport::new(
                 true,
-                self.plan.components.iter().map(|c| c.name.clone()).collect(),
+                self.plan
+                    .components
+                    .iter()
+                    .map(|c| c.name.clone())
+                    .collect(),
                 0,
                 0,
                 Duration::seconds(0),
@@ -128,7 +135,11 @@ impl MigrationEngine {
         let duration = Utc::now().signed_duration_since(start_time);
         let mut report = MigrationReport::new(
             all_valid,
-            self.plan.components.iter().map(|c| c.name.clone()).collect(),
+            self.plan
+                .components
+                .iter()
+                .map(|c| c.name.clone())
+                .collect(),
             total_source_count,
             total_target_count,
             duration,
@@ -196,9 +207,20 @@ mod tests {
             Ok(())
         }
 
+        async fn get_value(&self, _component: &str, key: &str) -> Result<Option<Vec<u8>>> {
+            let data = self.data.lock().await;
+            Ok(data.get(key).cloned())
+        }
+
         async fn count(&self, _component: &str) -> Result<usize> {
             let data = self.data.lock().await;
             Ok(data.len())
+        }
+
+        async fn delete(&self, _component: &str, key: &str) -> Result<()> {
+            let mut data = self.data.lock().await;
+            data.remove(key);
+            Ok(())
         }
     }
 

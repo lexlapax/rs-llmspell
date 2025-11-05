@@ -60,7 +60,10 @@ async fn test_api_key_store_and_get() {
     };
 
     // Store key
-    storage.store(&key_id, plaintext_key, &metadata).await.unwrap();
+    storage
+        .store(&key_id, plaintext_key, &metadata)
+        .await
+        .unwrap();
 
     // Retrieve key
     let retrieved = storage.get(&key_id).await.unwrap();
@@ -97,14 +100,20 @@ async fn test_api_key_update_metadata() {
         usage_count: 0,
     };
 
-    storage.store(&key_id, "sk-ant-test", &metadata).await.unwrap();
+    storage
+        .store(&key_id, "sk-ant-test", &metadata)
+        .await
+        .unwrap();
 
     // Update metadata
     let mut updated_meta = metadata.clone();
     updated_meta.usage_count = 42;
     updated_meta.last_used = Some(Utc::now());
 
-    storage.update_metadata(&key_id, &updated_meta).await.unwrap();
+    storage
+        .update_metadata(&key_id, &updated_meta)
+        .await
+        .unwrap();
 
     // Verify update
     let meta = storage.get_metadata(&key_id).await.unwrap().unwrap();
@@ -178,7 +187,10 @@ async fn test_api_key_rotation() {
         usage_count: 10,
     };
 
-    storage.store(&old_key_id, "old_secret", &metadata).await.unwrap();
+    storage
+        .store(&old_key_id, "old_secret", &metadata)
+        .await
+        .unwrap();
 
     // Rotate key
     let new_key_id = storage.rotate_key(&old_key_id, "new_secret").await.unwrap();
@@ -224,7 +236,10 @@ async fn test_api_key_cleanup_expired() {
         usage_count: 0,
     };
 
-    storage.store(&expired_key_id, "expired_key", &expired_metadata).await.unwrap();
+    storage
+        .store(&expired_key_id, "expired_key", &expired_metadata)
+        .await
+        .unwrap();
 
     // Cleanup expired keys
     let deleted_count = storage.cleanup_expired_keys().await.unwrap();

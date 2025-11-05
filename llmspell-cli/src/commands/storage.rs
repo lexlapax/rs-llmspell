@@ -5,7 +5,9 @@ use crate::cli::OutputFormat;
 use anyhow::{anyhow, Context, Result};
 use llmspell_config::LLMSpellConfig;
 use llmspell_storage::backends::SledBackend;
-use llmspell_storage::migration::{MigrationEngine, MigrationPlan, MigrationSource, MigrationTarget};
+use llmspell_storage::migration::{
+    MigrationEngine, MigrationPlan, MigrationSource, MigrationTarget,
+};
 use llmspell_storage::traits::StorageBackend;
 use std::path::PathBuf;
 use std::sync::Arc;
@@ -14,7 +16,7 @@ use std::sync::Arc;
 use llmspell_storage::backends::postgres::{PostgresBackend, PostgresConfig};
 
 /// Storage subcommands (imported from cli.rs)
-pub use crate::cli::{StorageCommands, MigrateAction};
+pub use crate::cli::{MigrateAction, StorageCommands};
 
 /// Execute storage command
 pub async fn handle_storage_command(
@@ -115,7 +117,10 @@ async fn generate_plan(
         OutputFormat::Text | OutputFormat::Pretty => {
             println!("Migration plan generated: {:?}", output);
             println!("\nPlan summary:");
-            println!("  Source: {} → Target: {}", plan.source.backend, plan.target.backend);
+            println!(
+                "  Source: {} → Target: {}",
+                plan.source.backend, plan.target.backend
+            );
             println!("  Components: {}", plan.components.len());
             for component in &plan.components {
                 println!(
@@ -125,8 +130,14 @@ async fn generate_plan(
             }
             println!("\nNext steps:");
             println!("  1. Review plan: cat {:?}", output);
-            println!("  2. Dry-run: llmspell storage migrate execute --plan {:?} --dry-run", output);
-            println!("  3. Execute: llmspell storage migrate execute --plan {:?}", output);
+            println!(
+                "  2. Dry-run: llmspell storage migrate execute --plan {:?} --dry-run",
+                output
+            );
+            println!(
+                "  3. Execute: llmspell storage migrate execute --plan {:?}",
+                output
+            );
         }
     }
 

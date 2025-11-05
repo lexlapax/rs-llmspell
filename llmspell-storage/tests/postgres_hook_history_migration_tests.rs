@@ -222,10 +222,7 @@ async fn test_hook_history_cleanup_function_exists() {
         .unwrap();
 
     let exists: bool = row.get(0);
-    assert!(
-        exists,
-        "cleanup_old_hook_executions function should exist"
-    );
+    assert!(exists, "cleanup_old_hook_executions function should exist");
 }
 
 #[tokio::test]

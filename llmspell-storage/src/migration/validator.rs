@@ -99,13 +99,41 @@ impl MigrationValidator {
             .collect();
 
         let mut validated = 0;
-        let mismatches = Vec::new();
+        let mut mismatches = Vec::new();
 
-        for _key in sampled_keys {
-            // For Phase 1, we'll skip actual checksum validation since we don't have get_value on target
-            // This will be fully implemented in Task 13b.14.2 with BackupManager integration
-            // Just count the keys that would be validated
-            validated += 1;
+        for key in sampled_keys {
+            // Get values from source and target
+            let source_value = self.source.get_value(component, &key).await?;
+            let target_value = self.target.get_value(component, &key).await?;
+
+            // Compare values
+            match (source_value, target_value) {
+                (Some(src), Some(tgt)) => {
+                    // Compute checksums
+                    let src_checksum = compute_checksum(&src);
+                    let tgt_checksum = compute_checksum(&tgt);
+
+                    if src_checksum != tgt_checksum {
+                        mismatches.push(format!(
+                            "{} (source: {}, target: {})",
+                            key, src_checksum, tgt_checksum
+                        ));
+                    }
+                    validated += 1;
+                }
+                (Some(_), None) => {
+                    // Key exists in source but not in target
+                    mismatches.push(format!("{} (missing in target)", key));
+                }
+                (None, Some(_)) => {
+                    // Key exists in target but not in source (shouldn't happen)
+                    mismatches.push(format!("{} (unexpected in target)", key));
+                }
+                (None, None) => {
+                    // Key doesn't exist in either (shouldn't happen since we got it from source)
+                    mismatches.push(format!("{} (missing in both)", key));
+                }
+            }
         }
 
         Ok(ChecksumReport {
@@ -116,7 +144,7 @@ impl MigrationValidator {
 }
 
 /// Compute SHA-256 checksum of value
-fn _compute_checksum(value: &[u8]) -> String {
+fn compute_checksum(value: &[u8]) -> String {
     let mut hasher = Sha256::new();
     hasher.update(value);
     format!("{:x}", hasher.finalize())
@@ -144,10 +172,7 @@ impl PreFlightReport {
         if self.success {
             "Pre-flight validation passed".to_string()
         } else {
-            format!(
-                "Pre-flight validation failed: {}",
-                self.errors.join(", ")
-            )
+            format!("Pre-flight validation failed: {}", self.errors.join(", "))
         }
     }
 }
@@ -220,7 +245,7 @@ mod tests {
     #[test]
     fn test_checksum_computation() {
         let data = b"test data";
-        let checksum = _compute_checksum(data);
+        let checksum = compute_checksum(data);
         assert_eq!(checksum.len(), 64); // SHA-256 produces 64 hex characters
     }
 

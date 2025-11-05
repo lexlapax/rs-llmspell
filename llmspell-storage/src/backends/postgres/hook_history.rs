@@ -49,8 +49,8 @@ pub struct SerializedHookExecution {
     pub hook_id: String,
     pub hook_type: String,
     pub correlation_id: Uuid,
-    pub hook_context: Vec<u8>,  // Compressed serialized HookContext
-    pub result_data: Value,     // Serialized HookResult (JSONB)
+    pub hook_context: Vec<u8>, // Compressed serialized HookContext
+    pub result_data: Value,    // Serialized HookResult (JSONB)
     pub timestamp: DateTime<Utc>,
     pub duration_ms: i32,
     pub triggering_component: String,

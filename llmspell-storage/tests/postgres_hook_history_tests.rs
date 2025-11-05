@@ -268,9 +268,7 @@ async fn test_hook_history_type_query() {
         .unwrap();
     assert_eq!(executions.len(), 3);
     assert!(executions.iter().all(|e| e.hook_type == hook_type));
-    assert!(executions
-        .iter()
-        .all(|e| e.contains_sensitive_data == true));
+    assert!(executions.iter().all(|e| e.contains_sensitive_data == true));
 
     // Cleanup
     let client = backend.get_client().await.unwrap();
@@ -355,10 +353,7 @@ async fn test_hook_history_archive_executions() {
 
     // Archive old executions with priority <= 50
     let before_date = now - Duration::days(90);
-    let deleted_count = storage
-        .archive_executions(before_date, 50)
-        .await
-        .unwrap();
+    let deleted_count = storage.archive_executions(before_date, 50).await.unwrap();
 
     // Should have deleted the 2 low-priority executions, preserved the high-priority one
     assert_eq!(deleted_count, 2);

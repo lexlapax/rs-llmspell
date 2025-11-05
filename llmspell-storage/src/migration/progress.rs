@@ -157,7 +157,10 @@ impl MigrationReport {
         output.push_str(&format!("Source Records: {}\n", self.source_count));
         output.push_str(&format!("Target Records: {}\n", self.target_count));
         output.push_str(&format!("Duration: {}s\n", self.duration.num_seconds()));
-        output.push_str(&format!("Throughput: {:.2} records/sec\n", self.records_per_second));
+        output.push_str(&format!(
+            "Throughput: {:.2} records/sec\n",
+            self.records_per_second
+        ));
 
         if !self.validation_results.is_empty() {
             output.push_str("\nValidation Results:\n");

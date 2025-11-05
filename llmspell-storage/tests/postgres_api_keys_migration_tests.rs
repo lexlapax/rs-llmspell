@@ -238,10 +238,7 @@ async fn test_api_keys_cleanup_function_exists() {
         .unwrap();
 
     let exists: bool = row.get(0);
-    assert!(
-        exists,
-        "cleanup_expired_api_keys function should exist"
-    );
+    assert!(exists, "cleanup_expired_api_keys function should exist");
 }
 
 #[tokio::test]

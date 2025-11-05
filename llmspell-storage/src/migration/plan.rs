@@ -33,11 +33,7 @@ pub struct MigrationPlan {
 
 impl MigrationPlan {
     /// Create new migration plan
-    pub fn new(
-        source_backend: &str,
-        target_backend: &str,
-        component_names: Vec<String>,
-    ) -> Self {
+    pub fn new(source_backend: &str, target_backend: &str, component_names: Vec<String>) -> Self {
         let components = component_names
             .into_iter()
             .map(|name| ComponentMigration {

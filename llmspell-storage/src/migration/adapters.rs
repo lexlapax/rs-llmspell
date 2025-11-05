@@ -53,10 +53,20 @@ impl MigrationTarget for PostgresBackend {
         StorageBackend::set(self, key, value.to_vec()).await
     }
 
+    async fn get_value(&self, _component: &str, key: &str) -> Result<Option<Vec<u8>>> {
+        // Use StorageBackend::get to read back from PostgreSQL
+        StorageBackend::get(self, key).await
+    }
+
     async fn count(&self, component: &str) -> Result<usize> {
         let prefix = component_to_prefix(component);
         let keys = StorageBackend::list_keys(self, &prefix).await?;
         Ok(keys.len())
+    }
+
+    async fn delete(&self, _component: &str, key: &str) -> Result<()> {
+        // Use StorageBackend::delete to remove from PostgreSQL
+        StorageBackend::delete(self, key).await
     }
 }
 
@@ -106,8 +116,16 @@ impl MigrationTarget for Arc<PostgresBackend> {
         MigrationTarget::store(&**self, component, key, value).await
     }
 
+    async fn get_value(&self, component: &str, key: &str) -> Result<Option<Vec<u8>>> {
+        MigrationTarget::get_value(&**self, component, key).await
+    }
+
     async fn count(&self, component: &str) -> Result<usize> {
         MigrationTarget::count(&**self, component).await
+    }
+
+    async fn delete(&self, component: &str, key: &str) -> Result<()> {
+        MigrationTarget::delete(&**self, component, key).await
     }
 }
 
