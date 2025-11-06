@@ -8176,6 +8176,51 @@ Migration framework validated for production use:
 **Key Insight**:
 The combination of (1) ignored `enabled` flag + (2) async deadlock + (3) single-threaded test runtime created a "perfect storm" that manifested after 13b.14 changes. Multi-layered fix ensures robustness at each level - provider config, runtime selection, async execution context, and early validation.
 
+**Post-Fix Issue: Agent Discovery APIs Broken**
+
+After Task 13b.15.0, agent_bridge_test.rs (5 tests) failed - Agent/Template globals not registered when no providers available, breaking discovery APIs (`Agent.list()`, `Agent.list_templates()`).
+
+**Architectural Analysis** (4 options considered):
+1. **Always register Agent global** (partial revert)
+2. **Split discovery from execution globals** (breaking change, 2 globals)
+3. **Lazy provider check in methods** (runtime overhead)
+4. **Template execution guard only** (simplest, aligns with experimental platform)
+
+**Chosen: Option 4 - Template Execution Guard Only**
+- `llmspell-bridge/src/globals/mod.rs:427-444` - Removed conditional registration for Agent/Template/Workflow/Streaming
+- Only LocalLLM remains conditional (requires providers for construction)
+- Existing template execution guard (runtime.rs:1516) catches template execution without providers
+- Discovery APIs work without providers, execution fails gracefully with clear error
+- Aligns with experimental platform philosophy - explore APIs without full setup
+
+**Result**:
+- ✅ 5/5 agent_bridge_test passing
+- ✅ 4/4 template_execution_integration passing
+- ✅ Zero clippy warnings
+- ✅ No breaking changes
+- ✅ Discovery always works, execution fails fast with clear error message
+
+**Second Issue: LocalLLM Registration Regression**
+
+After fixing Agent discovery, local_llm_registration_test.rs (2 tests) failed - LocalLLM not registered when ProviderManager has zero configured providers.
+
+**Root Cause**: Conditional LocalLLM registration checked `!list_providers().await.is_empty()`, but tests create `ProviderManager::new(ProviderManagerConfig::default())` with zero providers. Test expectation: LocalLLM MUST be registered when ProviderManager exists (Phase 11b regression fix).
+
+**Key Distinction**:
+- **ProviderManager exists** (always in runtime) → LocalLLM MUST register
+- **ProviderManager.list_providers() is empty** → LocalLLM still registers, methods fail gracefully at runtime
+
+**Fix**: `llmspell-bridge/src/globals/mod.rs:436-440` - Always register LocalLLM (ProviderManager always exists, handles empty provider lists at method call time)
+
+**Final Results**:
+- ✅ **300/300 llmspell-bridge tests passing** (all targets, 0 failures)
+- ✅ 11/11 integration tests (5 agent + 4 template + 2 local_llm)
+- ✅ Zero clippy warnings
+- ✅ 18 globals registered (including LocalLLM per Phase 13 spec)
+- ✅ All globals handle provider absence gracefully at runtime
+
+**Architectural Insight**: **Always register globals when infrastructure exists** - ProviderManager, ToolRegistry, AgentRegistry always exist in runtime context. Globals should register unconditionally and handle empty registries gracefully at method invocation time, not at registration time.
+
 ### Task 13b.15.1: Run All 149 Phase 13 Tests with PostgreSQL Backend
 **Priority**: CRITICAL
 **Estimated Time**: 4 hours

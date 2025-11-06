@@ -424,26 +424,20 @@ pub async fn create_standard_registry(context: Arc<GlobalContext>) -> Result<Glo
     // Register hook and tool globals
     register_hook_and_tools(&mut builder, &context)?;
 
-    // Check if providers are available for LLM-dependent globals (Task 13b.15)
-    let providers_available = !context.providers.list_providers().await.is_empty();
+    // Register template global FIRST (must happen before agent/workflow registration)
+    // because register_agent_workflow needs template_bridge from context
+    register_template_global(&mut builder, &context).await?;
 
-    if providers_available {
-        // Register template global FIRST (must happen before agent/workflow registration)
-        // because register_agent_workflow needs template_bridge from context
-        register_template_global(&mut builder, &context).await?;
+    // Register agent and workflow globals (depends on template_bridge being in context)
+    register_agent_workflow(&mut builder, &context).await?;
 
-        // Register agent and workflow globals (depends on template_bridge being in context)
-        register_agent_workflow(&mut builder, &context).await?;
+    builder.register(Arc::new(streaming_global::StreamingGlobal::new()));
 
-        builder.register(Arc::new(streaming_global::StreamingGlobal::new()));
-
-        // Register LocalLLM global (providers always available in context)
-        builder.register(Arc::new(local_llm_global::LocalLLMGlobal::new(
-            context.providers.create_core_manager_arc().await?,
-        )));
-    } else {
-        debug!("No providers available, skipping LLM-dependent globals (Template, Agent, Workflow, Streaming, LocalLLM)");
-    }
+    // Register LocalLLM global (always - ProviderManager always exists)
+    // LocalLLM methods handle empty provider lists gracefully at runtime
+    builder.register(Arc::new(local_llm_global::LocalLLMGlobal::new(
+        context.providers.create_core_manager_arc().await?,
+    )));
 
     builder.build()
 }
