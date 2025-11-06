@@ -300,6 +300,10 @@ async fn register_template_global(
             .get_bridge::<Arc<dyn llmspell_workflows::WorkflowFactory>>("workflow_factory")
             .map(|arc_arc| (*arc_arc).clone())
             .expect("workflow_factory must be available in GlobalContext"),
+        // Wire RAG from ScriptRuntime if available (Task 13b.15.6)
+        rag: context.get_bridge::<llmspell_rag::multi_tenant_integration::MultiTenantRAG>(
+            "multi_tenant_rag",
+        ),
     };
 
     // Create template bridge with optional state and session managers
@@ -329,6 +333,7 @@ async fn register_template_global(
             tool_registry: infra.tool_registry.clone(),
             agent_registry: infra.agent_registry.clone(),
             workflow_factory: infra.workflow_factory.clone(),
+            rag: infra.rag.clone(),
         };
         Arc::new(crate::template_bridge::TemplateBridge::with_state_manager(
             template_registry,

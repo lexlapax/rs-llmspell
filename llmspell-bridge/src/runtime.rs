@@ -1470,6 +1470,11 @@ impl ScriptExecutor for ScriptRuntime {
 
         // Get RAG if available (Phase 12.8.fix)
         let rag = self.rag.read().ok().and_then(|guard| guard.clone());
+        if rag.is_some() {
+            debug!("RAG available for template execution");
+        } else {
+            debug!("RAG NOT available for template execution - check if set_rag() was called");
+        }
 
         // Get provider configuration for ExecutionContext (Task 13b.1.7 - Phase 13.5.7d regression fix)
         //

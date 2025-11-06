@@ -210,6 +210,21 @@ impl ExecutionContext {
     }
 }
 
+/// Convert config DistanceMetric to storage DistanceMetric (Task 13b.15.6)
+fn convert_distance_metric(
+    metric: llmspell_config::rag::DistanceMetric,
+) -> llmspell_storage::DistanceMetric {
+    match metric {
+        llmspell_config::rag::DistanceMetric::Cosine => llmspell_storage::DistanceMetric::Cosine,
+        llmspell_config::rag::DistanceMetric::Euclidean => {
+            llmspell_storage::DistanceMetric::Euclidean
+        }
+        llmspell_config::rag::DistanceMetric::InnerProduct => {
+            llmspell_storage::DistanceMetric::InnerProduct
+        }
+    }
+}
+
 /// Create full infrastructure for embedded kernel (Phase 12.8.2.11 - Unified Path)
 ///
 /// Creates SessionManager BEFORE ScriptRuntime, then creates ScriptRuntime with SessionManager
@@ -247,18 +262,6 @@ async fn create_full_infrastructure(
         session_config,
     )?);
 
-    // Create RAG infrastructure for research-assistant template (Phase 12.8.fix)
-    use llmspell_storage::backends::vector::HNSWVectorStorage;
-    use llmspell_storage::HNSWConfig;
-    let hnsw_config = HNSWConfig::default();
-    let vector_storage = Arc::new(HNSWVectorStorage::new(384, hnsw_config)); // 384 dimensions for default embedding model
-    let tenant_manager = Arc::new(llmspell_tenancy::MultiTenantVectorManager::new(
-        vector_storage,
-    ));
-    let multi_tenant_rag = Arc::new(llmspell_rag::multi_tenant_integration::MultiTenantRAG::new(
-        tenant_manager,
-    ));
-
     // Create ScriptRuntime WITH SessionManager passed to inject_apis()
     let script_executor = llmspell_bridge::create_script_executor_with_provider_and_session(
         config.clone(),
@@ -267,14 +270,51 @@ async fn create_full_infrastructure(
     )
     .await?;
 
-    // Wire RAG to ScriptRuntime (Phase 12.8.fix)
-    // Downcast to ScriptRuntime to call set_rag()
-    if let Some(runtime) = script_executor
-        .as_any()
-        .downcast_ref::<llmspell_bridge::ScriptRuntime>()
-    {
-        runtime.set_rag(multi_tenant_rag);
-        debug!("RAG infrastructure wired to ScriptRuntime");
+    // Create and wire RAG infrastructure if enabled in config (Task 13b.15.6)
+    // Conditionally create RAG only when config.rag.enabled = true
+    if config.rag.enabled {
+        use llmspell_storage::backends::vector::HNSWVectorStorage;
+
+        // Read configuration from config.rag instead of hardcoding
+        let dimensions = config.rag.vector_storage.dimensions;
+
+        // Convert llmspell_config::rag::HNSWConfig to llmspell_storage::HNSWConfig
+        let storage_hnsw_config = llmspell_storage::HNSWConfig {
+            m: config.rag.vector_storage.hnsw.m,
+            ef_construction: config.rag.vector_storage.hnsw.ef_construction,
+            ef_search: config.rag.vector_storage.hnsw.ef_search,
+            max_elements: config.rag.vector_storage.hnsw.max_elements,
+            seed: config.rag.vector_storage.hnsw.seed,
+            metric: convert_distance_metric(config.rag.vector_storage.hnsw.metric.clone()),
+            allow_replace_deleted: config.rag.vector_storage.hnsw.allow_replace_deleted,
+            num_threads: config.rag.vector_storage.hnsw.num_threads,
+            nb_layers: config.rag.vector_storage.hnsw.nb_layers,
+            parallel_batch_size: config.rag.vector_storage.hnsw.parallel_batch_size,
+            enable_mmap: config.rag.vector_storage.hnsw.enable_mmap,
+            mmap_sync_interval: config.rag.vector_storage.hnsw.mmap_sync_interval,
+        };
+
+        let vector_storage = Arc::new(HNSWVectorStorage::new(dimensions, storage_hnsw_config));
+        let tenant_manager = Arc::new(llmspell_tenancy::MultiTenantVectorManager::new(
+            vector_storage,
+        ));
+        let multi_tenant_rag = Arc::new(
+            llmspell_rag::multi_tenant_integration::MultiTenantRAG::new(tenant_manager),
+        );
+
+        // Downcast to ScriptRuntime to wire RAG
+        if let Some(runtime) = script_executor
+            .as_any()
+            .downcast_ref::<llmspell_bridge::ScriptRuntime>()
+        {
+            runtime.set_rag(multi_tenant_rag);
+            debug!(
+                "RAG infrastructure wired to ScriptRuntime (enabled via config, dimensions={})",
+                dimensions
+            );
+        }
+    } else {
+        debug!("RAG disabled in config, skipping RAG infrastructure creation");
     }
 
     Ok((script_executor, session_manager))
