@@ -16,7 +16,16 @@
 
 ## 🚀 Quick Start
 
+### Prerequisites
+```bash
+# Export API keys for cloud providers
+export OPENAI_API_KEY="sk-..."
+export ANTHROPIC_API_KEY="sk-ant-..."
+```
+
 ### CLI - Instant Execution
+
+**Discovery:**
 ```bash
 # List available templates
 llmspell template list
@@ -24,11 +33,35 @@ llmspell template list
 # Get template info
 llmspell template info research-assistant
 
-# Execute template
+# View parameter schema (CRITICAL - shows types, enums, constraints)
+llmspell template schema code-generator
+```
+
+**Execution Methods:**
+
+**Method A: Built-in Profile** (Recommended)
+```bash
 llmspell template exec research-assistant \
+  --profile providers \
   --param topic="Rust async programming" \
   --param max_sources=10 \
   --output-dir ./research_output
+```
+
+**Available Profiles:**
+- `providers` - OpenAI + Anthropic (cloud APIs)
+- `ollama` - Local LLM via Ollama
+- `candle` - Embedded local inference
+- `development` - Dev mode with debug logging
+
+Run `llmspell config list-profiles` to see all options.
+
+**Method B: Custom Config File**
+```bash
+llmspell template exec research-assistant \
+  --config path/to/custom-config.toml \
+  --param topic="Rust async programming" \
+  --param max_sources=10
 ```
 
 ### Lua - Programmatic Control
@@ -697,8 +730,24 @@ llmspell template info <name>
 ```
 
 ### Parameter Validation Errors
+
+**CRITICAL: Enums are case-sensitive!**
 ```bash
-# Check schema
+# ✓ Correct
+--param language="python"
+--param content_type="technical"
+
+# ✗ Wrong (validation fails)
+--param language="Python"
+--param content_type="Technical"
+
+# Always check schema first
+llmspell template schema code-generator
+```
+
+**Parameter Types:**
+```bash
+# Check schema for exact types and constraints
 llmspell template schema <name>
 
 # Use correct types
@@ -707,6 +756,34 @@ llmspell template schema <name>
 --param boolean_value=true
 --param array_value='["a","b"]'
 --param object_value='{"key":"value"}'
+```
+
+### Model Override Errors
+
+**Model format requires provider prefix:**
+```bash
+# ✓ Correct - includes provider
+--param model="openai/gpt-3.5-turbo"
+--param model="anthropic/claude-3-haiku-20240307"
+
+# ✗ Wrong - missing provider (tries Ollama)
+--param model="gpt-3.5-turbo"
+```
+
+Templates default to `ollama/llama3.2:3b`. Override with `<provider>/<model>` format.
+
+### Provider Not Available
+
+**Error:** `Provider unavailable: openai`
+
+**Solution:**
+```bash
+# Set environment variables
+export OPENAI_API_KEY="sk-..."
+export ANTHROPIC_API_KEY="sk-ant-..."
+
+# Or use local LLM
+llmspell template exec <template> --profile ollama --param ...
 ```
 
 ### Execution Errors
