@@ -116,6 +116,73 @@ impl LuaEngine {
     pub fn set_runtime_config(&mut self, config: Arc<llmspell_config::LLMSpellConfig>) {
         self.runtime_config = Some(config);
     }
+
+    /// Initialize session infrastructure with adaptive async execution (Task 13b.15)
+    fn initialize_session_infrastructure(
+        global_context: &Arc<GlobalContext>,
+        sessions_config: &llmspell_config::SessionConfig,
+    ) {
+        use crate::globals::session_infrastructure::get_or_create_session_infrastructure;
+        // Adaptive async execution: spawn_blocking if in tokio (Task 13b.15)
+        match if tokio::runtime::Handle::try_current().is_ok() {
+            let gc = global_context.clone();
+            let sessions_cfg = sessions_config.clone();
+            tokio::task::block_in_place(move || {
+                futures::executor::block_on(get_or_create_session_infrastructure(
+                    &gc,
+                    &sessions_cfg,
+                ))
+            })
+        } else {
+            futures::executor::block_on(get_or_create_session_infrastructure(
+                global_context,
+                sessions_config,
+            ))
+        } {
+            Ok(_) => {
+                debug!("Session infrastructure initialized successfully");
+            }
+            Err(e) => {
+                warn!(
+                    "Failed to initialize session infrastructure: {}, Session/Artifact globals will not be available",
+                    e
+                );
+            }
+        }
+    }
+
+    /// Initialize RAG infrastructure with adaptive async execution (Task 13b.15)
+    fn initialize_rag_infrastructure(
+        global_context: &Arc<GlobalContext>,
+        rag_config: &llmspell_config::RAGConfig,
+    ) {
+        use crate::globals::rag_infrastructure::get_or_create_rag_infrastructure;
+        // Adaptive async execution: spawn_blocking if in tokio (Task 13b.15)
+        match if tokio::runtime::Handle::try_current().is_ok() {
+            let gc = global_context.clone();
+            let rag_cfg = rag_config.clone();
+            tokio::task::block_in_place(move || {
+                futures::executor::block_on(get_or_create_rag_infrastructure(&gc, &rag_cfg))
+            })
+        } else {
+            futures::executor::block_on(get_or_create_rag_infrastructure(
+                global_context,
+                rag_config,
+            ))
+        } {
+            Ok(infrastructure) => {
+                // Store the infrastructure for RAGGlobal to use
+                global_context.set_bridge("rag_infrastructure", Arc::new(infrastructure));
+                debug!("RAG infrastructure initialized successfully");
+            }
+            Err(e) => {
+                warn!(
+                    "Failed to initialize RAG infrastructure: {}, RAG global will not be available",
+                    e
+                );
+            }
+        }
+    }
 }
 
 /// Install debug hooks for the current script execution
@@ -391,52 +458,33 @@ impl ScriptEngineBridge for LuaEngine {
 
                 // Initialize session infrastructure if enabled
                 if runtime_config.runtime.sessions.enabled {
-                    use crate::globals::session_infrastructure::get_or_create_session_infrastructure;
-                    match futures::executor::block_on(get_or_create_session_infrastructure(
+                    Self::initialize_session_infrastructure(
                         &global_context,
                         &runtime_config.runtime.sessions,
-                    )) {
-                        Ok(_) => {
-                            debug!("Session infrastructure initialized successfully");
-                        }
-                        Err(e) => {
-                            warn!(
-                                "Failed to initialize session infrastructure: {}, Session/Artifact globals will not be available",
-                                e
-                            );
-                        }
-                    }
+                    );
                 }
 
                 // Initialize RAG infrastructure if enabled
                 if runtime_config.rag.enabled {
-                    use crate::globals::rag_infrastructure::get_or_create_rag_infrastructure;
-                    match futures::executor::block_on(get_or_create_rag_infrastructure(
-                        &global_context,
-                        &runtime_config.rag,
-                    )) {
-                        Ok(infrastructure) => {
-                            // Store the infrastructure for RAGGlobal to use
-                            global_context
-                                .set_bridge("rag_infrastructure", Arc::new(infrastructure));
-                            debug!("RAG infrastructure initialized successfully");
-                        }
-                        Err(e) => {
-                            warn!(
-                                "Failed to initialize RAG infrastructure: {}, RAG global will not be available",
-                                e
-                            );
-                        }
-                    }
+                    Self::initialize_rag_infrastructure(&global_context, &runtime_config.rag);
                 }
             }
 
-            let global_registry =
+            // Adaptive async execution: spawn_blocking if in tokio, otherwise futures::executor (Task 13b.15)
+            let global_registry = if tokio::runtime::Handle::try_current().is_ok() {
+                // In tokio runtime - use spawn_blocking to avoid nested runtime panic
+                let global_context_clone = global_context.clone();
+                tokio::task::block_in_place(move || {
+                    futures::executor::block_on(create_standard_registry(global_context_clone))
+                })
+            } else {
+                // Not in tokio runtime - use futures::executor directly
                 futures::executor::block_on(create_standard_registry(global_context.clone()))
-                    .map_err(|e| LLMSpellError::Component {
-                        message: format!("Failed to create global registry: {e}"),
-                        source: None,
-                    })?;
+            }
+            .map_err(|e| LLMSpellError::Component {
+                message: format!("Failed to create global registry: {e}"),
+                source: None,
+            })?;
             let injector = GlobalInjector::new(Arc::new(global_registry));
             let metrics = injector.inject_lua(&lua, &global_context)?;
             info!(
@@ -558,9 +606,19 @@ impl LuaEngine {
             return None;
         }
 
-        match futures::executor::block_on(crate::state_adapter::StateManagerAdapter::from_config(
-            &runtime_config.runtime.state_persistence,
-        )) {
+        // Adaptive async execution: spawn_blocking if in tokio (Task 13b.15)
+        match if tokio::runtime::Handle::try_current().is_ok() {
+            let cfg = runtime_config.runtime.state_persistence.clone();
+            tokio::task::block_in_place(move || {
+                futures::executor::block_on(crate::state_adapter::StateManagerAdapter::from_config(
+                    &cfg,
+                ))
+            })
+        } else {
+            futures::executor::block_on(crate::state_adapter::StateManagerAdapter::from_config(
+                &runtime_config.runtime.state_persistence,
+            ))
+        } {
             Ok(adapter) => Some(Arc::new(adapter)),
             Err(e) => {
                 warn!(
@@ -594,8 +652,15 @@ impl LuaEngine {
             // TemplateBridge will be recreated with SessionManager available.
             #[allow(clippy::significant_drop_in_scrutinee)]
             if let Some(lua) = self.lua.try_lock() {
-                match futures::executor::block_on(create_standard_registry(global_context.clone()))
-                {
+                // Adaptive async execution: spawn_blocking if in tokio (Task 13b.15)
+                match if tokio::runtime::Handle::try_current().is_ok() {
+                    let gc = global_context.clone();
+                    tokio::task::block_in_place(move || {
+                        futures::executor::block_on(create_standard_registry(gc))
+                    })
+                } else {
+                    futures::executor::block_on(create_standard_registry(global_context.clone()))
+                } {
                     Ok(global_registry) => {
                         let injector = GlobalInjector::new(Arc::new(global_registry));
                         if let Err(e) = injector.inject_lua(&lua, global_context) {

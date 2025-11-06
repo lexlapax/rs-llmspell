@@ -37,7 +37,7 @@ pub use types::{GlobalContext, GlobalMetadata, GlobalObject};
 
 use llmspell_core::Result;
 use std::sync::Arc;
-use tracing::warn;
+use tracing::{debug, warn};
 
 /// Register core globals (json, logger, config, debug)
 fn register_core_globals(builder: &mut GlobalRegistryBuilder, context: &Arc<GlobalContext>) {
@@ -141,8 +141,14 @@ async fn register_memory_context_globals(
     use tracing::warn;
 
     // Try to get memory_manager from context, or create in-memory fallback
-    let memory_manager_opt =
-        extract_memory_manager(context).or(create_fallback_memory_manager().await);
+    let memory_manager_from_context = extract_memory_manager(context);
+
+    let memory_manager_opt = if memory_manager_from_context.is_some() {
+        memory_manager_from_context
+    } else {
+        let fallback = create_fallback_memory_manager().await;
+        fallback
+    };
 
     if let Some(memory_manager) = memory_manager_opt {
         register_bridges(builder, memory_manager);
@@ -418,19 +424,26 @@ pub async fn create_standard_registry(context: Arc<GlobalContext>) -> Result<Glo
     // Register hook and tool globals
     register_hook_and_tools(&mut builder, &context)?;
 
-    // Register template global FIRST (must happen before agent/workflow registration)
-    // because register_agent_workflow needs template_bridge from context
-    register_template_global(&mut builder, &context).await?;
+    // Check if providers are available for LLM-dependent globals (Task 13b.15)
+    let providers_available = !context.providers.list_providers().await.is_empty();
 
-    // Register agent and workflow globals (depends on template_bridge being in context)
-    register_agent_workflow(&mut builder, &context).await?;
+    if providers_available {
+        // Register template global FIRST (must happen before agent/workflow registration)
+        // because register_agent_workflow needs template_bridge from context
+        register_template_global(&mut builder, &context).await?;
 
-    builder.register(Arc::new(streaming_global::StreamingGlobal::new()));
+        // Register agent and workflow globals (depends on template_bridge being in context)
+        register_agent_workflow(&mut builder, &context).await?;
 
-    // Register LocalLLM global (providers always available in context)
-    builder.register(Arc::new(local_llm_global::LocalLLMGlobal::new(
-        context.providers.create_core_manager_arc().await?,
-    )));
+        builder.register(Arc::new(streaming_global::StreamingGlobal::new()));
+
+        // Register LocalLLM global (providers always available in context)
+        builder.register(Arc::new(local_llm_global::LocalLLMGlobal::new(
+            context.providers.create_core_manager_arc().await?,
+        )));
+    } else {
+        debug!("No providers available, skipping LLM-dependent globals (Template, Agent, Workflow, Streaming, LocalLLM)");
+    }
 
     builder.build()
 }

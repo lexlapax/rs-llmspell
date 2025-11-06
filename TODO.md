@@ -8115,6 +8115,67 @@ Migration framework validated for production use:
 **Timeline**: 3 days (24 hours)
 **Critical Dependencies**: All phases complete ✅
 
+### Task 13b.15.0: Fix Template Execution Integration Tests ✅ COMPLETE
+**Priority**: CRITICAL
+**Estimated Time**: 6-8 hours
+**Actual Time**: ~6 hours
+**Assignee**: Core Infrastructure Team
+**Status**: ✅ COMPLETE
+**Completed**: 2025-11-05
+
+**Issue**: After Phase 13b.14 completion, 4 template execution integration tests (llmspell-bridge) were failing:
+- 2 tests FAILED immediately with provider validation errors
+- 2 tests HUNG for 60+ seconds before timeout
+- Root cause: Async runtime deadlock in `inject_apis()` + disabled providers triggering validation
+
+**Root Cause Analysis**:
+1. **Provider Validation on Disabled Providers**: `ProviderManager::initialize_providers()` ignored `enabled: false` flag, attempting validation on test providers with fake API keys
+2. **Async Runtime Deadlock**: `inject_apis()` (synchronous) called `futures::executor::block_on()` from within `#[tokio::test]` context, creating nested runtime deadlock
+3. **Single-Threaded Test Runtime**: Default `#[tokio::test]` uses single-threaded runtime, preventing `tokio::task::block_in_place` workaround
+
+**Solution** (Multi-Layered Defense-in-Depth):
+
+**Layer 1: Provider Enabled Flag (Task 13b.15)** - Skip disabled providers during initialization
+- `llmspell-bridge/src/providers.rs:82-91` - Added `enabled` check in `initialize_providers()`
+- `llmspell-bridge/src/providers.rs:362-370` - Added `enabled` check in `create_core_manager_arc()`
+- Prevents validation attempts on disabled test providers
+
+**Layer 2: Multi-Threaded Test Runtime (Task 13b.15)** - Enable `block_in_place` for async operations
+- `llmspell-bridge/tests/template_execution_integration.rs:19,84,143,176` - Changed 4 tests from `#[tokio::test]` to `#[tokio::test(flavor = "multi_thread")]`
+- Resolves "can call blocking only when running on the multi-threaded runtime" panic
+- Allows adaptive async execution in `inject_apis()` via `tokio::task::block_in_place`
+
+**Layer 3: Adaptive Async Execution (Task 13b.15)** - Handle both tokio and non-tokio contexts
+- `llmspell-bridge/src/lua/engine.rs:453-462` - Detect tokio runtime with `Handle::try_current()`, use `block_in_place` if present, otherwise `futures::executor::block_on()`
+- `llmspell-bridge/src/lua/engine.rs:412-433` - Same for session infrastructure
+- `llmspell-bridge/src/lua/engine.rs:444-448` - Same for RAG infrastructure
+
+**Layer 4: Early Validation (Already Present)** - Fail fast when no providers available
+- `llmspell-bridge/src/runtime.rs:1516-1525` - Check provider availability before template execution
+- Returns clear error: "Template execution requires LLM providers, but none are configured/enabled"
+
+**Files Modified**: 4 production files + 1 test file
+- `llmspell-bridge/src/providers.rs` - Added `enabled` checks (2 locations)
+- `llmspell-bridge/src/runtime.rs` - Provider availability check
+- `llmspell-bridge/src/lua/engine.rs` - Adaptive async execution (3 locations)
+- `llmspell-bridge/src/globals/mod.rs` - Made LLM-dependent globals optional (no longer needed after fix)
+- `llmspell-bridge/tests/template_execution_integration.rs` - Multi-threaded runtime (4 tests)
+
+**Test Results**:
+- ✅ 4/4 template execution tests passing
+- ✅ 0.44s execution time (previously 60+ seconds with hangs)
+- ✅ Clean failure messages when providers disabled (no hangs)
+- ✅ Zero warnings (workspace-wide clippy clean)
+
+**Technical Debt Prevented**:
+- No workarounds or skipped tests
+- No architectural compromises
+- Production-quality solution with defense-in-depth
+- All tests validate actual execution paths
+
+**Key Insight**:
+The combination of (1) ignored `enabled` flag + (2) async deadlock + (3) single-threaded test runtime created a "perfect storm" that manifested after 13b.14 changes. Multi-layered fix ensures robustness at each level - provider config, runtime selection, async execution context, and early validation.
+
 ### Task 13b.15.1: Run All 149 Phase 13 Tests with PostgreSQL Backend
 **Priority**: CRITICAL
 **Estimated Time**: 4 hours

@@ -1510,6 +1510,20 @@ impl ScriptExecutor for ScriptRuntime {
             source: None,
         })?;
 
+        // Check if any providers are initialized and fail fast if none available (Task 13b.15)
+        // Prevents hanging when templates need LLM but all providers disabled/missing
+        // Most templates use agents which require providers, so check unconditionally
+        let providers = self.provider_manager.list_providers().await;
+        if providers.is_empty() {
+            return Err(LLMSpellError::Configuration {
+                message: format!(
+                    "Template '{template_id}' execution requires LLM providers, but none are configured/enabled. \
+                     Enable at least one provider in config or use --profile with valid providers."
+                ),
+                source: None,
+            });
+        }
+
         // Execute template
         let output = template
             .execute(template_params, context)

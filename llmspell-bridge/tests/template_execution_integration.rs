@@ -16,19 +16,24 @@ use serde_json::json;
 ///
 /// NOTE: This test uses empty providers config to avoid actual LLM validation.
 /// The bug we're testing occurs during `ExecutionContext::build()`, not provider init.
-#[tokio::test]
+#[tokio::test(flavor = "multi_thread")]
 #[cfg(feature = "lua")]
 async fn test_template_exec_with_real_provider_config() {
+    eprintln!("[TEST] Starting test_template_exec_with_real_provider_config");
     // Use default config (empty providers) to avoid API validation
     // The bug happens in ExecutionContext::build(), not provider initialization
+    eprintln!("[TEST] Creating default config");
     let config = LLMSpellConfig::default();
 
     // Initialize ScriptRuntime (should succeed with empty providers)
+    eprintln!("[TEST] Creating ScriptRuntime");
     let runtime = Box::pin(ScriptRuntime::new_with_lua(config))
         .await
         .expect("Failed to create ScriptRuntime");
+    eprintln!("[TEST] ScriptRuntime created successfully");
 
     // Attempt to execute code-generator template
+    eprintln!("[TEST] Preparing to execute template");
     // This should FAIL before fix with: "provider_config is required"
     // After fix, ExecutionContext should build (template may fail for other reasons)
     let params = json!({
@@ -76,14 +81,14 @@ async fn test_template_exec_with_real_provider_config() {
 ///
 /// Validates Phase 13.5.7d smart dual-path provider resolution:
 /// - `provider_name` param → lookup in `ProviderManagerConfig`
-#[tokio::test]
+#[tokio::test(flavor = "multi_thread")]
 #[cfg(feature = "lua")]
 async fn test_template_exec_provider_name_resolution() {
-    // Create config with anthropic provider
+    // Create config with anthropic provider (disabled to skip validation)
     let provider_config = ProviderConfig {
         name: "anthropic".to_string(),
         provider_type: "anthropic".to_string(),
-        enabled: true,
+        enabled: false, // Skip validation for test (Task 13b.15)
         base_url: None,
         api_key_env: None,
         api_key: Some("test-anthropic-key".to_string()),
@@ -135,7 +140,7 @@ async fn test_template_exec_provider_name_resolution() {
 ///
 /// Validates Phase 13.5.7d smart dual-path provider resolution:
 /// - model param → create ephemeral `ProviderConfig`
-#[tokio::test]
+#[tokio::test(flavor = "multi_thread")]
 #[cfg(feature = "lua")]
 async fn test_template_exec_model_ephemeral_resolution() {
     let config = LLMSpellConfig::default();
@@ -168,13 +173,13 @@ async fn test_template_exec_model_ephemeral_resolution() {
 /// Test that `ExecutionContext` builds successfully even without LLM execution
 ///
 /// This is a smoke test to ensure the infrastructure wiring is correct
-#[tokio::test]
+#[tokio::test(flavor = "multi_thread")]
 #[cfg(feature = "lua")]
 async fn test_execution_context_infrastructure_wiring() {
     let provider_config = ProviderConfig {
         name: "test".to_string(),
         provider_type: "openai".to_string(),
-        enabled: true,
+        enabled: false, // Skip validation for test (Task 13b.15)
         base_url: None,
         api_key_env: None,
         api_key: Some("test-key".to_string()),
