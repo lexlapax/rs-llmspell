@@ -1094,25 +1094,20 @@ pub async fn start_embedded_kernel_with_executor(
     config: LLMSpellConfig,
     script_executor: Arc<dyn ScriptExecutor>,
 ) -> Result<KernelHandle> {
-    // Create provider manager for this executor
+    // Phase 13b.16.5: Extract infrastructure from ScriptExecutor (already created by ScriptRuntime)
+    // ScriptExecutor is self-contained - it has SessionManager via Infrastructure module
+
+    // Extract SessionManager from ScriptExecutor
+    let session_manager_any = script_executor
+        .get_session_manager_any()
+        .ok_or_else(|| anyhow::anyhow!("ScriptExecutor does not provide session manager"))?;
+
+    let session_manager = Arc::downcast::<crate::sessions::SessionManager>(session_manager_any)
+        .map_err(|_| anyhow::anyhow!("Failed to downcast session manager"))?;
+
+    // Note: ProviderManager is created separately for now (Phase 11.FIX.1 architecture)
+    // ScriptExecutor has bridge::ProviderManager, kernel needs providers::ProviderManager
     let provider_manager = create_provider_manager(&config).await?;
-
-    // Create SessionManager
-    let state_manager = Arc::new(crate::state::StateManager::new(None).await?);
-    let session_storage_backend = Arc::new(llmspell_storage::MemoryBackend::new());
-    let hook_registry = Arc::new(llmspell_hooks::HookRegistry::new());
-    let hook_executor = Arc::new(llmspell_hooks::HookExecutor::new());
-    let event_bus = Arc::new(llmspell_events::bus::EventBus::new());
-    let session_config = crate::sessions::SessionManagerConfig::default();
-
-    let session_manager = Arc::new(crate::sessions::SessionManager::new(
-        state_manager,
-        session_storage_backend,
-        hook_registry,
-        hook_executor,
-        &event_bus,
-        session_config,
-    )?);
 
     start_embedded_kernel_with_executor_and_provider_internal(
         config,

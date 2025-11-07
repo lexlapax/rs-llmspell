@@ -9727,7 +9727,12 @@ pub async fn start_kernel_service_with_config(
 - Deleted StubTool (85 lines) - test stub
 - Deleted write_connection_file (26 lines) - helper for deleted service function
 - Removed 2 exports from lib.rs (start_embedded_kernel, start_kernel_service)
-- Total: 400 lines deleted
+- **Fixed start_embedded_kernel_with_executor** (final completion):
+  - Removed duplicate SessionManager creation (14 lines)
+  - Now extracts SessionManager from ScriptExecutor via get_session_manager_any()
+  - ScriptExecutor is truly self-contained (no duplicate infrastructure)
+  - Documented ProviderManager exception (bridge vs providers type difference)
+- Total: 414 lines deleted, ScriptExecutor self-contained principle achieved
 - All tests use start_embedded_kernel_with_executor (retained function)
 - CLI uses start_kernel_service_with_config (retained function)
 
@@ -9747,10 +9752,10 @@ start_embedded_kernel(executor)  // Executor already has everything
 3. Update any callers (should be none after Task 13b.16.3)
 
 **Acceptance Criteria**:
-- [ ] Only one embedded kernel entry point
-- [ ] No infrastructure parameters
-- [ ] ScriptExecutor is self-contained
-- [ ] Zero clippy warnings
+- [x] Only one embedded kernel entry point (start_embedded_kernel_with_executor)
+- [x] No infrastructure parameters (signature: config + executor only)
+- [x] ScriptExecutor is self-contained (extracts SessionManager from executor via get_session_manager_any)
+- [x] Zero clippy warnings
 
 **Files to Modify**:
 - `llmspell-kernel/src/api.rs` (DELETE ~30 lines)
