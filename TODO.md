@@ -10060,6 +10060,119 @@ cargo clippy --package llmspell-bridge --all-targets -- -D warnings
 
 ---
 
+### Task 13b.16.9: Fix Session Backend Configuration (Regression Fix)
+**Priority**: CRITICAL
+**Estimated Time**: 1 hour
+**Actual Time**: 1 hour
+**Status**: ✅ COMPLETE
+**Completed**: 2025-11-07
+
+**Description**: Fix Phase 13b.16.1 regression where Infrastructure module ignored session backend configuration, causing test lock contention.
+
+**Problem Analysis**:
+
+**Root Cause** (infrastructure.rs:203-209):
+```rust
+fn create_session_manager(
+    state_manager: Arc<llmspell_kernel::state::StateManager>,
+    _config: &LLMSpellConfig,  // ← IGNORED (underscore prefix)
+) -> Result<Arc<llmspell_kernel::sessions::SessionManager>, LLMSpellError> {
+    // ...
+    let session_storage_backend = Arc::new(
+        llmspell_storage::SledBackend::new_with_path("./sessions")  // ← HARDCODED
+```
+
+**Impact**:
+- Tests configured `storage_backend = "memory"` but got Sled backend
+- All test instances shared `./sessions` Sled database
+- Sled enforces exclusive OS-level lock per database
+- Parallel tests blocked waiting for lock: `"could not acquire lock on './sessions/db': Resource temporarily unavailable"`
+- **4 out of 5 agent_bridge tests failed** with lock contention
+
+**Error Output**:
+```
+test result: FAILED. 1 passed; 4 failed; 0 ignored; 0 measured; 0 filtered out
+
+failures:
+    test_agent_discovery_from_lua
+    test_agent_parameter_conversion
+    test_agent_templates_from_lua
+    test_agent_tool_integration
+
+Failed to create runtime: Component { message: "Failed to create session storage backend:
+IO error: could not acquire lock on \"./sessions/db\": Os { code: 35, kind: WouldBlock,
+message: \"Resource temporarily unavailable\" }" }
+```
+
+**Why This Was a Regression**:
+- **Before 13b.16**: Tests used isolated `MemoryBackend` (in-memory, no files)
+- **Phase 13b.16.1**: Infrastructure module created with hardcoded Sled path
+- **Intended**: Config-driven backend selection (`config.runtime.sessions.storage_backend`)
+- **Actual**: Config parameter ignored, everyone got Sled
+
+**Fix Implementation**:
+
+```rust
+fn create_session_manager(
+    state_manager: Arc<llmspell_kernel::state::StateManager>,
+    config: &LLMSpellConfig,  // ← NOW USED (removed underscore)
+) -> Result<Arc<llmspell_kernel::sessions::SessionManager>, LLMSpellError> {
+    debug!("Creating session manager");
+
+    // Create session storage backend based on config (Phase 13b.16.9 - Fix lock contention)
+    let session_storage_backend: Arc<dyn llmspell_storage::StorageBackend> =
+        match config.runtime.sessions.storage_backend.as_str() {
+            "memory" => {
+                debug!("Using memory backend for session storage");
+                Arc::new(llmspell_storage::MemoryBackend::new())
+            }
+            "sled" | _ => {
+                debug!("Using Sled backend for session storage at ./sessions");
+                Arc::new(
+                    llmspell_storage::SledBackend::new_with_path("./sessions").map_err(|e| {
+                        LLMSpellError::Component {
+                            message: format!("Failed to create session storage backend: {e}"),
+                            source: None,
+                        }
+                    })?,
+                )
+            }
+        };
+```
+
+**Key Changes**:
+1. **Line 203**: Changed `_config` → `config` (now used)
+2. **Lines 207-225**: Added match statement on `config.runtime.sessions.storage_backend`
+3. **"memory" case**: Creates `MemoryBackend` (in-memory, parallel-safe)
+4. **"sled" | _ case**: Creates `SledBackend` (persistent, default)
+
+**Test Results**:
+- **Before Fix**: `test result: FAILED. 1 passed; 4 failed`
+- **After Fix**: `test result: ok. 5 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.78s`
+
+**Files Modified**:
+- `llmspell-bridge/src/infrastructure.rs` (18 lines: 207-225)
+
+**Acceptance Criteria**:
+- [x] Config parameter `_config` renamed to `config` (now used)
+- [x] Match statement added for backend selection
+- [x] "memory" backend creates `MemoryBackend::new()`
+- [x] "sled" backend creates `SledBackend::new_with_path("./sessions")`
+- [x] All 5 agent_bridge tests passing (was 1/5)
+- [x] No lock contention in parallel test execution
+- [x] Production still uses Sled (default case)
+- [x] Zero clippy warnings
+
+**Related Issues Fixed**:
+- Also fixed missed test update in `llmspell-kernel/src/protocols/repl.rs:644` (still used `new_with_lua()`)
+
+**Commits**:
+- `4b58f928` - fix: Wire session backend configuration to Infrastructure module (Phase 13b.16.9)
+- `599967eb` - fix: Update repl.rs test to use new ScriptRuntime API
+- `484cc4c8` - chore: Remove orphaned blank lines from runtime.rs
+
+---
+
 #### Expected Line Reduction
 
 **Before**: llmspell-bridge/src/runtime.rs = 2535 lines
@@ -10101,7 +10214,7 @@ cargo clippy --package llmspell-bridge --all-targets -- -D warnings
 ## Phase 13b.16 COMPLETION SUMMARY
 
 **Total Estimated Time**: 13 hours
-**Actual Time**: ~18 hours (138% of estimate)
+**Actual Time**: ~19 hours (146% of estimate)
 **Status**: ✅ COMPLETE
 **Completion Date**: 2025-11-07
 
@@ -10117,6 +10230,7 @@ cargo clippy --package llmspell-bridge --all-targets -- -D warnings
 6. **Task 13b.16.6**: Update Tests to Use New API (✅ COMPLETE - 2.5h)
 7. **Task 13b.16.7**: Integration Testing and Validation (✅ COMPLETE - 1h)
 8. **Task 13b.16.8**: Delete Deprecated Constructors and Setters (✅ COMPLETE - 2h)
+9. **Task 13b.16.9**: Fix Session Backend Configuration (Regression Fix) (✅ COMPLETE - 1h)
 
 ---
 
@@ -10271,10 +10385,11 @@ None (cleanup via deletion of methods, not files)
 
 ### Lessons Learned
 
-**1. Estimate Accuracy**: 18h actual vs 13h estimated (138%)
+**1. Estimate Accuracy**: 19h actual vs 13h estimated (146%)
 - Task 13b.16.2 took 5h (estimated 4h) - RwLock pattern removal more complex
 - Task 13b.16.6 took 2.5h (estimated 2h) - 72 occurrences across 13 files
 - Task 13b.16.8 took 2h (estimated 1.5h) - Orphaned attributes, lib.rs updates
+- Task 13b.16.9 took 1h (unplanned) - Regression fix for session backend config
 
 **2. Breaking Changes Pre-1.0**:
 - Clean code > backward compatibility
@@ -10290,6 +10405,12 @@ None (cleanup via deletion of methods, not files)
 - Update tests BEFORE deleting old API (Task 13b.16.6 → 13b.16.8)
 - Parallel test runs saved time (bridge + kernel simultaneously)
 - Clippy enforcement prevented regressions
+
+**5. Regression Prevention** (Phase 13b.16.9):
+- Config parameters with underscore prefix (`_config`) indicate incomplete implementation
+- Always verify config-driven behavior with parallel test execution
+- Lock contention in tests signals shared resource issues
+- Systematic code review catches incomplete config wiring
 
 ---
 
