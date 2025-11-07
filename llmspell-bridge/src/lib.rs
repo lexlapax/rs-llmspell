@@ -239,6 +239,7 @@ pub mod conversion;
 pub mod debug_bridge;
 pub mod discovery;
 pub mod engine;
+pub mod infrastructure;
 pub mod providers;
 pub mod providers_discovery;
 pub mod registry;

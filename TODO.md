@@ -9235,7 +9235,7 @@ Current architecture violates Phase 9/10 "kernel as self-contained component" an
 ### Task 13b.16.1: Create Infrastructure Module in llmspell-bridge
 **Priority**: HIGH
 **Estimated Time**: 3 hours
-**Status**: TODO
+**Status**: ✅ COMPLETED
 
 **Description**: Create `llmspell-bridge/src/infrastructure.rs` with config-driven infrastructure creation helpers.
 
@@ -9275,21 +9275,40 @@ async fn create_memory_manager(config: &LLMSpellConfig) -> Result<...>;
 8. Wire registries together (tools, agents, workflows)
 
 **Acceptance Criteria**:
-- [ ] Infrastructure struct contains all 9 components
-- [ ] `from_config()` creates everything based on LLMSpellConfig
-- [ ] RAG created only if `config.rag.enabled`
-- [ ] MemoryManager created only if `config.memory.enabled`
-- [ ] Backends configurable (memory, surrealdb, hybrid)
-- [ ] ComponentRegistry includes events if enabled
-- [ ] All components properly wired
-- [ ] Zero clippy warnings
+- [x] Infrastructure struct contains all 9 components
+- [x] `from_config()` creates everything based on LLMSpellConfig
+- [x] RAG created only if `config.rag.enabled`
+- [x] MemoryManager created only if `config.runtime.memory.enabled`
+- [x] Backends configurable (memory, surrealdb, hybrid)
+- [x] ComponentRegistry includes events if enabled
+- [x] All components properly wired
+- [x] Zero clippy warnings
 
-**Files to Create**:
-- `llmspell-bridge/src/infrastructure.rs` (~300 lines)
+**Files Created**:
+- `llmspell-bridge/src/infrastructure.rs` (372 lines)
 
-**Files to Modify**:
-- `llmspell-bridge/src/lib.rs` - Add `pub mod infrastructure;`
-- `llmspell-bridge/Cargo.toml` - Add dependencies: llmspell-kernel, llmspell-memory
+**Files Modified**:
+- `llmspell-bridge/src/lib.rs` (added `pub mod infrastructure;`)
+- `llmspell-bridge/Cargo.toml` (NO changes - dependencies already present)
+
+**Implementation Insights**:
+1. **Config Path Correction**: MemoryManager enabled flag is at `config.runtime.memory.enabled`, not `config.memory.enabled`
+2. **Error Handling**: Wrapped StateError, SessionError, anyhow::Error in LLMSpellError::Component for consistency
+3. **Memory Backend**: Used `DefaultMemoryManager::new_in_memory()` for simplicity (HNSW episodic, temp SurrealDB semantic, pattern procedural)
+4. **Clippy Compliance**: Fixed all warnings (doc backticks, const fn, unnecessary Result wraps, unused async, Self usage)
+5. **RAG Helper Optimization**: Removed Result wrapper from `create_rag()` since it can't fail
+6. **Session Manager**: Not async since all sync operations after backend creation
+7. **Import Organization**: Moved HNSWVectorStorage to module-level imports
+
+**Build Results**:
+- ✅ `cargo build --package llmspell-bridge` - SUCCESS
+- ✅ `cargo clippy --package llmspell-bridge --all-targets -- -D warnings` - ZERO WARNINGS
+
+**Architecture Notes**:
+- Single entry point: `Infrastructure::from_config(config)` creates ALL 9 components
+- Conditional creation: RAG and MemoryManager only if enabled in config
+- Self-contained: No external dependencies on CLI or other packages
+- Ready for ScriptRuntime refactor in Task 13b.16.2
 
 ---
 
