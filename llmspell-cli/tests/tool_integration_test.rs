@@ -177,50 +177,21 @@ fn test_tool_json_serialization() {
 
 // Test kernel message protocol integration for tool commands
 #[cfg(feature = "lua")]
-#[tokio::test]
+#[tokio::test(flavor = "multi_thread")]
 async fn test_tool_kernel_message_protocol() {
-    use async_trait::async_trait;
+    use llmspell_bridge::ScriptRuntime;
     use llmspell_config::LLMSpellConfig;
-    use llmspell_core::error::LLMSpellError;
-    use llmspell_core::traits::script_executor::{
-        ScriptExecutionMetadata, ScriptExecutionOutput, ScriptExecutor,
-    };
+    use llmspell_core::traits::script_executor::ScriptExecutor;
     use llmspell_kernel::api::start_embedded_kernel_with_executor;
     use std::sync::Arc;
 
-    // Create a test executor
-    struct TestExecutor;
-
-    #[async_trait]
-    impl ScriptExecutor for TestExecutor {
-        async fn execute_script(
-            &self,
-            _script: &str,
-        ) -> Result<ScriptExecutionOutput, LLMSpellError> {
-            Ok(ScriptExecutionOutput {
-                output: serde_json::json!("Test executor"),
-                console_output: vec![],
-                metadata: ScriptExecutionMetadata {
-                    duration: std::time::Duration::from_millis(0),
-                    language: "test".to_string(),
-                    exit_code: Some(0),
-                    warnings: vec![],
-                },
-            })
-        }
-
-        fn language(&self) -> &'static str {
-            "test"
-        }
-
-        fn as_any(&self) -> &dyn std::any::Any {
-            self
-        }
-    }
-
-    // Start an embedded kernel with test executor
+    // Create ScriptRuntime (Phase 13b.16 - self-contained with all infrastructure)
     let config = LLMSpellConfig::default();
-    let script_executor = Arc::new(TestExecutor) as Arc<dyn ScriptExecutor>;
+    let script_executor = Arc::new(
+        ScriptRuntime::new(config.clone())
+            .await
+            .expect("Failed to create ScriptRuntime"),
+    ) as Arc<dyn ScriptExecutor>;
 
     let handle = start_embedded_kernel_with_executor(config, script_executor)
         .await
