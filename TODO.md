@@ -9170,202 +9170,406 @@ SessionId serves TWO distinct purposes that were conflated:
 
 ---
 
-### Task 13b.15.7: Wire MemoryManager in create_full_infrastructure (Single Kernel Path)
-**Priority**: HIGH
-**Estimated Time**: 2 hours
-**Assignee**: Infrastructure Team
-**Status**: TODO
+---
+
+## Phase 13b.16: ScriptRuntime Architecture Refactor (Self-Contained Kernel)
+
+**Priority**: CRITICAL
+**Estimated Time**: 13 hours
+**Timeline**: Must complete before Phase 14
+**Dependencies**: Phase 9/10 architecture principles, Task 13b.15.6 (RAG wiring)
 
 **Problem Statement**:
-Templates warn "Memory enabled but ContextBridge unavailable" because MemoryManager is NOT created in `create_full_infrastructure()`. Currently, MemoryManager is only created as an in-memory fallback during global registration, leading to:
-- Templates get unconfigured in-memory MemoryManager instead of proper backend
-- ContextBridge exists but uses wrong backend configuration
-- Confusing warnings for end users who enabled memory in config
 
-**Architectural Insight** (ultrathink):
+Current architecture violates Phase 9/10 "kernel as self-contained component" and "CLI as thin layer" principles:
 
-**There is ONE kernel, TWO protocols**:
+1. **Infrastructure split between CLI and kernel**: `create_full_infrastructure()` in llmspell-cli creates some infrastructure, kernel creates other infrastructure
+2. **Service mode inconsistency**: Daemon mode uses different creation path than embedded mode
+3. **Language-specific entry points**: `new_with_lua()`, `new_with_javascript()` instead of engine-agnostic API
+4. **CLI dependency for services**: Future web server daemon would need llmspell-cli code (wrong!)
+5. **MemoryManager missing**: Not created in either path, causing "Memory enabled but ContextBridge unavailable" warning
+
+**Architecture Violations** (from Phase 9/10 docs):
+- Phase 9: "IntegratedKernel as self-contained component"
+- Phase 10: "CLI as thin layer", "daemon mode enables external services"
+- Current: CLI creates infrastructure, violating separation of concerns
+
+**Correct Architecture**:
 ```
-┌─────────────────────────────────────────────┐
-│  CLI Layer (llmspell-cli)                  │
-├─────────────────────────────────────────────┤
-│                                             │
-│  create_full_infrastructure()               │
-│  ├─ Creates ALL infrastructure:            │
-│  │  ✅ ProviderManager                     │
-│  │  ✅ StateManager                        │
-│  │  ✅ SessionManager                      │
-│  │  ✅ RAG (Task 13b.15.6)                 │
-│  │  ❌ MemoryManager (MISSING)             │
-│  │  ❌ ContextBridge (depends on Memory)   │
-│  └─ Wire to GlobalContext                  │
-│                                             │
-├─────────────────────────────────────────────┤
-│         Protocol Selection                   │
-│  ┌─────────────┐       ┌─────────────┐     │
-│  │  Embedded   │       │   ZeroMQ    │     │
-│  │ (in-process)│       │  (remote)   │     │
-│  └──────┬──────┘       └──────┬──────┘     │
-│         └──────────┬───────────┘            │
-│                    ▼                         │
-├─────────────────────────────────────────────┤
-│          KERNEL (same kernel)               │
-│  ┌─────────────────────────────────────┐   │
-│  │  ScriptRuntime + GlobalContext      │   │
-│  │  → Gets ALL infrastructure from     │   │
-│  │    GlobalContext (wire, not create) │   │
-│  └─────────────────────────────────────┘   │
-│                    ▼                         │
-│           Templates Execute                  │
-│    (full infrastructure available)          │
-└─────────────────────────────────────────────┘
-```
-
-**Current BROKEN Flow**:
-1. `create_full_infrastructure()` creates SessionManager, RAG but NOT MemoryManager
-2. Kernel starts with ScriptRuntime
-3. `register_memory_context_globals()` tries to get MemoryManager from GlobalContext
-4. NOT FOUND → creates in-memory fallback (line 104: `DefaultMemoryManager::new_in_memory()`)
-5. Templates get MemoryManager but it's unconfigured fallback
-6. Warning: "Memory enabled but ContextBridge unavailable"
-
-**Root Cause**:
-- Infrastructure creation split between TWO places:
-  1. CLI layer: creates some infrastructure (SessionManager, RAG)
-  2. Global registration: creates other infrastructure (MemoryManager fallback)
-- This violates "single kernel path" principle
-- MemoryManager should be created ONCE in CLI layer, configured from config
-
-**The Fix**:
-
-**File**: `llmspell-cli/src/execution_context.rs` (function `create_full_infrastructure()`)
-
-**Step 1**: Create MemoryManager from config (after RAG creation, ~line 318):
-```rust
-// Create MemoryManager infrastructure from config (Task 13b.15.7)
-use llmspell_memory::DefaultMemoryManager;
-
-let memory_manager = if config.memory.enabled {
-    // Create MemoryManager with configured backend
-    match config.memory.backend.as_str() {
-        "in-memory" => {
-            debug!("Creating in-memory MemoryManager");
-            DefaultMemoryManager::new_in_memory().await?
-        }
-        "surrealdb" => {
-            debug!("Creating SurrealDB MemoryManager (config: {:?})", config.memory.surrealdb);
-            DefaultMemoryManager::new_with_surrealdb(&config.memory.surrealdb).await?
-        }
-        "hybrid" => {
-            debug!("Creating hybrid MemoryManager (episodic=SurrealDB, semantic=Graph)");
-            DefaultMemoryManager::new_hybrid(&config.memory.surrealdb, &config.memory.graph).await?
-        }
-        backend => {
-            anyhow::bail!("Unsupported memory backend: {}", backend);
-        }
-    }
-} else {
-    // Fallback to in-memory if disabled
-    debug!("Memory disabled in config, using in-memory fallback");
-    DefaultMemoryManager::new_in_memory().await?
-};
-
-let memory_manager = Arc::new(memory_manager) as Arc<dyn llmspell_memory::MemoryManager>;
+┌────────────────────────────────────────┐
+│  llmspell-cli (THIN)                   │
+│  ├─ Parses args                        │
+│  ├─ Loads config                       │
+│  └─ Calls kernel APIs                  │
+└────────────────────────────────────────┘
+                  ↓
+┌────────────────────────────────────────┐
+│  llmspell-kernel (SELF-CONTAINED)      │
+│  ScriptRuntime::new(config)            │
+│  ├─ Creates ALL infrastructure:        │
+│  │  • ProviderManager                  │
+│  │  • StateManager                     │
+│  │  • SessionManager                   │
+│  │  • RAG (if enabled)                 │
+│  │  • MemoryManager (if enabled)       │
+│  │  • ToolRegistry                     │
+│  │  • AgentRegistry                    │
+│  │  • WorkflowFactory                  │
+│  │  • ComponentRegistry                │
+│  └─ Wires everything internally        │
+└────────────────────────────────────────┘
+                  ↓
+┌────────────────────────────────────────┐
+│  External Clients (No CLI dependency)  │
+│  • llmspell CLI                        │
+│  • Web server daemon                   │
+│  • gRPC service                        │
+│  • Jupyter Lab                         │
+└────────────────────────────────────────┘
 ```
 
-**Step 2**: Wire MemoryManager to ScriptRuntime via GlobalContext:
-```rust
-// Wire MemoryManager to ScriptRuntime (similar to RAG wiring)
-if let Some(runtime) = script_executor
-    .as_any()
-    .downcast_ref::<llmspell_bridge::ScriptRuntime>()
-{
-    runtime.set_memory_manager(memory_manager.clone());
-    debug!(
-        "MemoryManager wired to ScriptRuntime (backend={}, enabled={})",
-        config.memory.backend,
-        config.memory.enabled
-    );
-}
-```
-
-**Step 3**: Check if `set_memory_manager()` method exists on ScriptRuntime
-- If NOT: Add to `llmspell-bridge/src/runtime.rs`:
-```rust
-/// Wire MemoryManager to GlobalContext (Task 13b.15.7)
-pub fn set_memory_manager(&self, memory_manager: Arc<dyn llmspell_memory::MemoryManager>) {
-    self.global_context.set_bridge("memory_manager", memory_manager);
-}
-```
-
-**Step 4**: Update `register_memory_context_globals()` to NOT create fallback
-- Change behavior: if memory_manager not in GlobalContext, skip registration (don't create fallback)
-- Or: Keep fallback but log clearly it's unexpected
-
-**Expected Behavior After Fix**:
-1. CLI creates MemoryManager from config.memory settings
-2. Wires to GlobalContext before kernel starts
-3. `register_memory_context_globals()` finds MemoryManager in context
-4. Templates get properly configured MemoryManager
-5. No warning about ContextBridge unavailable
-6. Works identically whether using embedded or ZeroMQ protocol
-
-**Acceptance Criteria**:
-- [ ] MemoryManager created in `create_full_infrastructure()` based on config.memory
-- [ ] Supports backends: in-memory, surrealdb, hybrid (per config)
-- [ ] Wired to GlobalContext before kernel starts
-- [ ] `register_memory_context_globals()` finds MemoryManager (no fallback created)
-- [ ] Templates get configured MemoryManager via ExecutionContext
-- [ ] ContextBridge uses configured MemoryManager backend
-- [ ] No "Memory enabled but ContextBridge unavailable" warning
-- [ ] research-chat app works with properly configured memory
-- [ ] Works identically for embedded and ZeroMQ protocols
-
-**Testing**:
-```bash
-# Test 1: In-memory backend (default)
-llmspell run examples/.../research-chat/main.lua
-# Expected: No ContextBridge warning, uses in-memory
-
-# Test 2: With rag-dev profile
-llmspell -p rag-dev run examples/.../research-chat/main.lua
-# Expected: Uses configured memory backend, no warning
-
-# Test 3: Check logs for proper wiring
-RUST_LOG=debug llmspell run examples/.../research-chat/main.lua 2>&1 | grep -i memory
-# Expected: "MemoryManager wired to ScriptRuntime (backend=in-memory)"
-```
-
-**Files to Modify**:
-- `llmspell-cli/src/execution_context.rs` - Add MemoryManager creation + wiring
-- `llmspell-bridge/src/runtime.rs` - Add `set_memory_manager()` method (if not exists)
-- `llmspell-bridge/src/globals/mod.rs` - Update fallback behavior (optional)
-
-**Architecture Principles Validated**:
-1. ✅ **Single Kernel Path**: ALL infrastructure created in CLI layer, not split
-2. ✅ **Protocol Independence**: Embedded vs ZeroMQ only affects transport, not infrastructure
-3. ✅ **Config-Driven**: MemoryManager backend from config.memory, not hardcoded
-4. ✅ **Consistent Wiring**: Same pattern as RAG (create in CLI, wire to GlobalContext)
-
-**Definition of Done**:
-- [ ] MemoryManager created in CLI layer from config
-- [ ] Wired to GlobalContext before kernel starts
-- [ ] Templates get configured MemoryManager
-- [ ] No fallback MemoryManager created in global registration
-- [ ] No warnings about ContextBridge unavailable
-- [ ] research-chat works with proper memory backend
-- [ ] Zero new clippy warnings
-- [ ] Architecture documented
+**Solution**: Move ALL infrastructure creation into ScriptRuntime with engine-agnostic API
 
 ---
 
-## Phase 13b.16: Documentation (Day 30)
+### Task 13b.16.1: Create Infrastructure Module in llmspell-bridge
+**Priority**: HIGH
+**Estimated Time**: 3 hours
+**Status**: TODO
+
+**Description**: Create `llmspell-bridge/src/infrastructure.rs` with config-driven infrastructure creation helpers.
+
+**New API Design**:
+```rust
+pub struct Infrastructure {
+    pub provider_manager: Arc<ProviderManager>,
+    pub state_manager: Arc<llmspell_kernel::state::StateManager>,
+    pub session_manager: Arc<llmspell_kernel::sessions::SessionManager>,
+    pub rag: Option<Arc<llmspell_rag::multi_tenant_integration::MultiTenantRAG>>,
+    pub memory_manager: Option<Arc<llmspell_memory::DefaultMemoryManager>>,
+    pub tool_registry: Arc<llmspell_tools::ToolRegistry>,
+    pub agent_registry: Arc<llmspell_agents::FactoryRegistry>,
+    pub workflow_factory: Arc<dyn llmspell_workflows::WorkflowFactory>,
+    pub component_registry: Arc<ComponentRegistry>,
+}
+
+impl Infrastructure {
+    pub async fn from_config(config: &LLMSpellConfig) -> Result<Self>;
+}
+
+// Helper functions
+async fn create_state_manager(config: &LLMSpellConfig) -> Result<...>;
+async fn create_session_manager(state_manager, config) -> Result<...>;
+async fn create_rag(config: &LLMSpellConfig) -> Result<...>;
+async fn create_memory_manager(config: &LLMSpellConfig) -> Result<...>;
+```
+
+**Implementation Steps**:
+1. Create `llmspell-bridge/src/infrastructure.rs` with struct definition
+2. Implement `Infrastructure::from_config()` - creates all 9 components
+3. Implement helper: `create_state_manager()` (from config.state)
+4. Implement helper: `create_session_manager()` (from state + config.sessions)
+5. Implement helper: `create_rag()` (from config.rag if enabled)
+6. Implement helper: `create_memory_manager()` (from config.memory if enabled)
+7. Implement helper: `create_component_registry()` (with events if enabled)
+8. Wire registries together (tools, agents, workflows)
+
+**Acceptance Criteria**:
+- [ ] Infrastructure struct contains all 9 components
+- [ ] `from_config()` creates everything based on LLMSpellConfig
+- [ ] RAG created only if `config.rag.enabled`
+- [ ] MemoryManager created only if `config.memory.enabled`
+- [ ] Backends configurable (memory, surrealdb, hybrid)
+- [ ] ComponentRegistry includes events if enabled
+- [ ] All components properly wired
+- [ ] Zero clippy warnings
+
+**Files to Create**:
+- `llmspell-bridge/src/infrastructure.rs` (~300 lines)
+
+**Files to Modify**:
+- `llmspell-bridge/src/lib.rs` - Add `pub mod infrastructure;`
+- `llmspell-bridge/Cargo.toml` - Add dependencies: llmspell-kernel, llmspell-memory
+
+---
+
+### Task 13b.16.2: Refactor ScriptRuntime with Engine-Agnostic API
+**Priority**: HIGH
+**Estimated Time**: 4 hours
+**Status**: TODO
+
+**Description**: Replace language-specific constructors with engine-agnostic `new()` and `with_engine()` methods.
+
+**New Public API**:
+```rust
+impl ScriptRuntime {
+    /// Create runtime from config (uses config.default_engine)
+    pub async fn new(config: LLMSpellConfig) -> Result<Self, LLMSpellError>
+    
+    /// Create runtime with specific engine override
+    pub async fn with_engine(config: LLMSpellConfig, engine_name: &str) -> Result<Self, LLMSpellError>
+}
+
+// OLD API (deprecated, keep for compatibility):
+// pub async fn new_with_lua(config) -> Result<Self>
+// pub async fn new_with_javascript(config) -> Result<Self>
+```
+
+**Implementation Steps**:
+1. Add `ScriptRuntime::new(config)` - delegates to `with_engine(config, config.default_engine)`
+2. Add `ScriptRuntime::with_engine(config, engine_name)`:
+   - Call `create_engine_by_name(engine_name, config)`
+   - Call `Infrastructure::from_config(&config)`
+   - Call `initialize_with_infrastructure(engine, config, infrastructure)`
+3. Add private `create_engine_by_name()` - match on engine_name (lua, javascript, python)
+4. Refactor `new_with_engine()` → `initialize_with_infrastructure()`:
+   - Accept `Infrastructure` struct instead of creating internally
+   - Wire all components
+   - Register tools
+   - Register agents
+   - Inject APIs into engine
+5. Update `create_script_executor()` in `lib.rs` to use `ScriptRuntime::new()`
+
+**Acceptance Criteria**:
+- [ ] `ScriptRuntime::new(config)` works with config.default_engine
+- [ ] `ScriptRuntime::with_engine(config, "lua")` works
+- [ ] `ScriptRuntime::with_engine(config, "javascript")` works (when available)
+- [ ] Old constructors still work (deprecated)
+- [ ] Engine-agnostic API design
+- [ ] All infrastructure created internally
+- [ ] Zero clippy warnings
+
+**Files to Modify**:
+- `llmspell-bridge/src/runtime.rs` (major refactor ~400 lines)
+- `llmspell-bridge/src/lib.rs` - Update `create_script_executor()`
+
+---
+
+### Task 13b.16.3: Simplify CLI Layer (Remove create_full_infrastructure)
+**Priority**: HIGH
+**Estimated Time**: 1 hour
+**Status**: TODO
+
+**Description**: Delete `create_full_infrastructure()` from CLI, make ExecutionContext truly thin.
+
+**Changes**:
+```rust
+// BEFORE (WRONG):
+let (script_executor, session_manager) = create_full_infrastructure(&config).await?;
+
+// AFTER (CORRECT):
+let script_executor = Arc::new(llmspell_bridge::ScriptRuntime::new(config.clone()).await?)
+    as Arc<dyn ScriptExecutor>;
+```
+
+**Implementation Steps**:
+1. Delete `create_full_infrastructure()` function entirely from `execution_context.rs`
+2. Delete helper functions: `convert_distance_metric()`, etc.
+3. Update `ExecutionContext::resolve()`:
+   - Embedded mode: Call `ScriptRuntime::new(config)` directly
+   - No more infrastructure creation in CLI
+4. Update `start_embedded_kernel()` call - remove `session_manager` parameter (no longer needed)
+
+**Acceptance Criteria**:
+- [ ] `create_full_infrastructure()` deleted
+- [ ] CLI has ZERO infrastructure creation code
+- [ ] `ExecutionContext::resolve()` just calls kernel APIs
+- [ ] Embedded mode works
+- [ ] Auto-detection mode works
+- [ ] Zero clippy warnings
+
+**Files to Modify**:
+- `llmspell-cli/src/execution_context.rs` (DELETE ~200 lines)
+
+---
+
+### Task 13b.16.4: Fix Service/Daemon Mode (Remove Duplicate Infrastructure)
+**Priority**: HIGH
+**Estimated Time**: 1 hour
+**Status**: TODO
+
+**Description**: Remove duplicate infrastructure creation in `start_kernel_service_with_config()`.
+
+**Changes**:
+```rust
+// llmspell-kernel/src/api.rs
+pub async fn start_kernel_service_with_config(
+    config: KernelServiceConfig,
+) -> Result<ServiceHandle> {
+    // config.script_executor ALREADY has ALL infrastructure!
+    // Just use it, don't create StateManager/SessionManager again
+    
+    // DELETE lines 1673-1687 (duplicate creation)
+}
+```
+
+**Implementation Steps**:
+1. Remove StateManager creation (lines ~1673)
+2. Remove SessionManager creation (lines ~1680-1687)
+3. ScriptExecutor already contains everything
+4. Kernel just uses what's in ScriptExecutor
+
+**Acceptance Criteria**:
+- [ ] Daemon mode starts successfully
+- [ ] No duplicate infrastructure creation
+- [ ] Embedded and daemon modes use SAME ScriptRuntime path
+- [ ] Zero clippy warnings
+
+**Files to Modify**:
+- `llmspell-kernel/src/api.rs` (DELETE ~50 lines)
+
+---
+
+### Task 13b.16.5: Simplify Kernel API (Remove Redundant Functions)
+**Priority**: MEDIUM
+**Estimated Time**: 1 hour
+**Status**: TODO
+
+**Description**: Remove `start_embedded_kernel_with_infrastructure()` - no longer needed.
+
+**Changes**:
+```rust
+// BEFORE: Multiple entry points
+start_embedded_kernel(executor)
+start_embedded_kernel_with_infrastructure(config, executor, session_manager)
+
+// AFTER: Single entry point
+start_embedded_kernel(executor)  // Executor already has everything
+```
+
+**Implementation Steps**:
+1. Remove `start_embedded_kernel_with_infrastructure()` function
+2. Keep simple `start_embedded_kernel(executor)` - just uses what's in executor
+3. Update any callers (should be none after Task 13b.16.3)
+
+**Acceptance Criteria**:
+- [ ] Only one embedded kernel entry point
+- [ ] No infrastructure parameters
+- [ ] ScriptExecutor is self-contained
+- [ ] Zero clippy warnings
+
+**Files to Modify**:
+- `llmspell-kernel/src/api.rs` (DELETE ~30 lines)
+
+---
+
+### Task 13b.16.6: Update Tests to Use New API
+**Priority**: HIGH
+**Estimated Time**: 3 hours
+**Status**: TODO
+
+**Description**: Update all tests to use `ScriptRuntime::new()` instead of old constructors.
+
+**Implementation Steps**:
+1. Find all test files using `new_with_lua()`, `new_with_javascript()`
+2. Replace with `ScriptRuntime::new(config)`
+3. Remove any manual infrastructure creation in tests
+4. Verify all tests pass
+
+**Acceptance Criteria**:
+- [ ] All tests use new API
+- [ ] Zero test failures
+- [ ] `cargo test --workspace --all-features` passes
+- [ ] Zero clippy warnings
+
+**Files to Modify**:
+- All test files using old API (~10-15 files)
+
+---
+
+### Task 13b.16.7: Integration Testing and Validation
+**Priority**: HIGH
+**Estimated Time**: 2 hours
+**Status**: TODO
+
+**Description**: Validate all execution paths work with new architecture.
+
+**Test Matrix**:
+```bash
+# 1. Embedded mode
+llmspell run script.lua
+llmspell exec "print('test')"
+llmspell repl
+
+# 2. Service mode
+llmspell kernel start --daemon --port 9555
+llmspell kernel status
+llmspell kernel stop
+
+# 3. Remote execution
+llmspell run script.lua --connect localhost:9555
+
+# 4. Template execution
+llmspell run examples/.../research-chat/main.lua --profile rag-dev
+
+# 5. Memory/Context warning check
+RUST_LOG=debug llmspell run examples/.../research-chat/main.lua 2>&1 | grep -i memory
+# Should NOT show "Memory enabled but ContextBridge unavailable"
+```
+
+**Acceptance Criteria**:
+- [ ] All embedded commands work
+- [ ] Daemon mode starts/stops correctly
+- [ ] Remote execution works
+- [ ] Templates execute successfully
+- [ ] NO "Memory enabled but ContextBridge unavailable" warning
+- [ ] RAG properly wired (from 13b.15.6)
+- [ ] MemoryManager properly wired (fixes MemoryManager wiring issue)
+- [ ] Both embedded and daemon modes use SAME infrastructure path
+
+**Expected Behavior**:
+1. ✅ CLI is truly thin (just config + kernel API calls)
+2. ✅ ScriptRuntime is self-contained (creates all infrastructure)
+3. ✅ Engine-agnostic entry points (`new()`, `with_engine()`)
+4. ✅ Single infrastructure creation path for all modes
+5. ✅ Web server daemon can use ScriptRuntime directly (no CLI dependency)
+6. ✅ MemoryManager created from config, no fallback warning
+7. ✅ RAG available in templates (from 13b.15.6)
+8. ✅ Embedded and service modes identical infrastructure
+
+---
+
+## Summary
+
+**Total Estimated Time**: 13 hours
+
+**Phases**:
+1. Infrastructure module (3h)
+2. ScriptRuntime refactor (4h)
+3. CLI simplification (1h)
+4. Service mode fix (1h)
+5. Kernel API cleanup (1h)
+6. Test updates (2h)
+7. Integration validation (2h)
+
+**Benefits**:
+1. ✅ Fixes "Memory enabled but ContextBridge unavailable" warning (original MemoryManager wiring issue)
+2. ✅ CLI is truly thin (Phase 9/10 architecture)
+3. ✅ ScriptRuntime is self-contained (Phase 9 principle)
+4. ✅ Engine-agnostic API (future-proof)
+5. ✅ Single infrastructure creation path (no duplication)
+6. ✅ Web server daemon can use ScriptRuntime directly (no CLI dependency)
+7. ✅ Embedded and service mode use SAME code path
+8. ✅ RAG properly wired (from 13b.15.6)
+
+**Files Modified**:
+- llmspell-bridge/src/infrastructure.rs (NEW - 300 lines)
+- llmspell-bridge/src/runtime.rs (MAJOR REFACTOR - 400 lines)
+- llmspell-bridge/src/lib.rs (MINOR - 1 line)
+- llmspell-bridge/Cargo.toml (ADD dependencies)
+- llmspell-cli/src/execution_context.rs (DELETE create_full_infrastructure - 200 lines)
+- llmspell-cli/src/commands/kernel.rs (NO CHANGES - already correct!)
+- llmspell-kernel/src/api.rs (DELETE duplicates - 80 lines)
+- Test files (~10-15 files)
+
+
+## Phase 13b.17: Documentation (Day 30)
 
 **Goal**: Complete documentation (2,500+ lines total)
 **Timeline**: 1 day (8 hours)
 **Critical Dependencies**: All phases complete ✅
 
-### Task 13b.16.1: PostgreSQL Setup Guide
+### Task 13b.17.1: PostgreSQL Setup Guide
 **Priority**: HIGH
 **Estimated Time**: 2 hours
 **Assignee**: Documentation Team Lead
@@ -9396,7 +9600,7 @@ RUST_LOG=debug llmspell run examples/.../research-chat/main.lua 2>&1 | grep -i m
 - [ ] All scenarios covered
 - [ ] Reviewed by team
 
-### Task 13b.16.2: Schema Reference Documentation
+### Task 13b.17.2: Schema Reference Documentation
 **Priority**: HIGH
 **Estimated Time**: 2 hours
 **Assignee**: Documentation Team
@@ -9426,7 +9630,7 @@ RUST_LOG=debug llmspell run examples/.../research-chat/main.lua 2>&1 | grep -i m
 - [ ] Examples helpful
 - [ ] Diagrams clear
 
-### Task 13b.16.3: Performance Tuning Guide
+### Task 13b.17.3: Performance Tuning Guide
 **Priority**: MEDIUM
 **Estimated Time**: 2 hours
 **Assignee**: Performance Team
@@ -9457,7 +9661,7 @@ RUST_LOG=debug llmspell run examples/.../research-chat/main.lua 2>&1 | grep -i m
 - [ ] Examples provided
 - [ ] Benchmarks included
 
-### Task 13b.16.4: Backup and Restore Guide
+### Task 13b.17.4: Backup and Restore Guide
 **Priority**: MEDIUM
 **Estimated Time**: 2 hours
 **Assignee**: DevOps Team
