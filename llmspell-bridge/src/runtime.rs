@@ -249,7 +249,8 @@ pub struct ScriptRuntime {
     ///
     /// Created from `Infrastructure` module during initialization.
     /// Provides persistent state operations for session management.
-    #[allow(dead_code)] // Used by SessionManager infrastructure, not accessed directly in runtime.rs
+    #[allow(dead_code)]
+    // Used by SessionManager infrastructure, not accessed directly in runtime.rs
     state_manager: Arc<llmspell_kernel::state::StateManager>,
 
     /// Session manager for template infrastructure (Phase 13b.16.2)
@@ -336,7 +337,10 @@ impl ScriptRuntime {
         memory_enabled = config.runtime.memory.enabled
     ))]
     pub async fn new(config: LLMSpellConfig) -> Result<Self, LLMSpellError> {
-        info!("Creating ScriptRuntime with engine: {}", config.default_engine);
+        info!(
+            "Creating ScriptRuntime with engine: {}",
+            config.default_engine
+        );
         Box::pin(Self::with_engine(config.clone(), &config.default_engine)).await
     }
 
@@ -669,8 +673,8 @@ impl ScriptRuntime {
         } = infrastructure;
 
         // Convert memory_manager to trait object (Phase 13b.16.2)
-        let memory_manager: Option<Arc<dyn llmspell_memory::MemoryManager>> = memory_manager
-            .map(|m| m as Arc<dyn llmspell_memory::MemoryManager>);
+        let memory_manager: Option<Arc<dyn llmspell_memory::MemoryManager>> =
+            memory_manager.map(|m| m as Arc<dyn llmspell_memory::MemoryManager>);
 
         // Register all Phase 2 tools with BOTH registries using dual-registration
         register_all_tools(&component_registry, &tool_registry, &config.tools)
@@ -824,13 +828,14 @@ impl ScriptRuntime {
                 })?,
         );
 
-        let session_storage_backend =
-            Arc::new(llmspell_storage::SledBackend::new_with_path("./sessions").map_err(|e| {
+        let session_storage_backend = Arc::new(
+            llmspell_storage::SledBackend::new_with_path("./sessions").map_err(|e| {
                 LLMSpellError::Component {
                     message: format!("Failed to create session storage: {e}"),
                     source: None,
                 }
-            })?);
+            })?,
+        );
 
         let hook_registry = Arc::new(llmspell_hooks::HookRegistry::new());
         let hook_executor = Arc::new(llmspell_hooks::HookExecutor::new());
@@ -908,7 +913,7 @@ impl ScriptRuntime {
             workflow_factory,
             state_manager,
             session_manager,
-            rag: None, // No RAG in standalone mode
+            rag: None,            // No RAG in standalone mode
             memory_manager: None, // No memory in standalone mode
             execution_context,
             debug_context: Arc::new(RwLock::new(None)),
@@ -1132,13 +1137,14 @@ impl ScriptRuntime {
                 })?,
         );
 
-        let session_storage_backend =
-            Arc::new(llmspell_storage::SledBackend::new_with_path("./sessions").map_err(|e| {
+        let session_storage_backend = Arc::new(
+            llmspell_storage::SledBackend::new_with_path("./sessions").map_err(|e| {
                 LLMSpellError::Component {
                     message: format!("Failed to create session storage: {e}"),
                     source: None,
                 }
-            })?);
+            })?,
+        );
 
         let hook_registry = Arc::new(llmspell_hooks::HookRegistry::new());
         let hook_executor = Arc::new(llmspell_hooks::HookExecutor::new());
@@ -1380,7 +1386,9 @@ impl ScriptRuntime {
         _session_manager: Arc<llmspell_kernel::sessions::SessionManager>,
     ) {
         warn!("set_session_manager() is deprecated and has no effect (Phase 13b.16.2)");
-        warn!("SessionManager is now created during ScriptRuntime::new() via Infrastructure module");
+        warn!(
+            "SessionManager is now created during ScriptRuntime::new() via Infrastructure module"
+        );
     }
 
     /// Wire RAG infrastructure to `ScriptRuntime` for template execution (Phase 12.8.fix)
@@ -1997,13 +2005,13 @@ impl ScriptExecutor for ScriptRuntime {
         use serde_json::json;
 
         // Get memory manager
-        let memory_manager = self
-            .memory_manager
-            .clone()
-            .ok_or_else(|| LLMSpellError::Component {
-                message: "Memory manager not available".to_string(),
-                source: None,
-            })?;
+        let memory_manager =
+            self.memory_manager
+                .clone()
+                .ok_or_else(|| LLMSpellError::Component {
+                    message: "Memory manager not available".to_string(),
+                    source: None,
+                })?;
 
         // Create episodic entry with metadata
         let mut entry = llmspell_memory::EpisodicEntry::new(
@@ -2035,13 +2043,13 @@ impl ScriptExecutor for ScriptRuntime {
         use serde_json::json;
 
         // Get memory manager
-        let memory_manager = self
-            .memory_manager
-            .clone()
-            .ok_or_else(|| LLMSpellError::Component {
-                message: "Memory manager not available".to_string(),
-                source: None,
-            })?;
+        let memory_manager =
+            self.memory_manager
+                .clone()
+                .ok_or_else(|| LLMSpellError::Component {
+                    message: "Memory manager not available".to_string(),
+                    source: None,
+                })?;
 
         // Search episodic memory
         let mut results = tokio::task::block_in_place(|| {
@@ -2084,13 +2092,13 @@ impl ScriptExecutor for ScriptRuntime {
         use serde_json::json;
 
         // Get memory manager
-        let _memory_manager = self
-            .memory_manager
-            .clone()
-            .ok_or_else(|| LLMSpellError::Component {
-                message: "Memory manager not available".to_string(),
-                source: None,
-            })?;
+        let _memory_manager =
+            self.memory_manager
+                .clone()
+                .ok_or_else(|| LLMSpellError::Component {
+                    message: "Memory manager not available".to_string(),
+                    source: None,
+                })?;
 
         // Query semantic memory (knowledge graph)
         // Note: SemanticMemory trait doesn't have text search, so we return empty for now
@@ -2107,13 +2115,13 @@ impl ScriptExecutor for ScriptRuntime {
         use serde_json::json;
 
         // Get memory manager
-        let memory_manager = self
-            .memory_manager
-            .clone()
-            .ok_or_else(|| LLMSpellError::Component {
-                message: "Memory manager not available".to_string(),
-                source: None,
-            })?;
+        let memory_manager =
+            self.memory_manager
+                .clone()
+                .ok_or_else(|| LLMSpellError::Component {
+                    message: "Memory manager not available".to_string(),
+                    source: None,
+                })?;
 
         // Get stats from episodic and semantic memory
         // Note: Memory traits don't have count methods, so we get session lists as proxy
@@ -2155,13 +2163,13 @@ impl ScriptExecutor for ScriptRuntime {
         use serde_json::json;
 
         // Get memory manager
-        let memory_manager = self
-            .memory_manager
-            .clone()
-            .ok_or_else(|| LLMSpellError::Component {
-                message: "Memory manager not available".to_string(),
-                source: None,
-            })?;
+        let memory_manager =
+            self.memory_manager
+                .clone()
+                .ok_or_else(|| LLMSpellError::Component {
+                    message: "Memory manager not available".to_string(),
+                    source: None,
+                })?;
 
         // Determine consolidation mode
         let mode = if force {
@@ -2214,13 +2222,13 @@ impl ScriptExecutor for ScriptRuntime {
         }
 
         // Get memory manager
-        let memory_manager = self
-            .memory_manager
-            .clone()
-            .ok_or_else(|| LLMSpellError::Component {
-                message: "Memory manager not available".to_string(),
-                source: None,
-            })?;
+        let memory_manager =
+            self.memory_manager
+                .clone()
+                .ok_or_else(|| LLMSpellError::Component {
+                    message: "Memory manager not available".to_string(),
+                    source: None,
+                })?;
 
         // Simple context assembly based on strategy
         let chunks = tokio::task::block_in_place(|| {
@@ -2331,13 +2339,13 @@ impl ScriptExecutor for ScriptRuntime {
         }
 
         // Get memory manager
-        let memory_manager = self
-            .memory_manager
-            .clone()
-            .ok_or_else(|| LLMSpellError::Component {
-                message: "Memory manager not available".to_string(),
-                source: None,
-            })?;
+        let memory_manager =
+            self.memory_manager
+                .clone()
+                .ok_or_else(|| LLMSpellError::Component {
+                    message: "Memory manager not available".to_string(),
+                    source: None,
+                })?;
 
         // Analyze token usage for each strategy
         let analysis = tokio::task::block_in_place(|| {

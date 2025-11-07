@@ -272,8 +272,9 @@ fn create_rag(
     let vector_storage = Arc::new(HNSWVectorStorage::new(dimensions, storage_hnsw_config));
 
     // Create tenant manager
-    let tenant_manager =
-        Arc::new(llmspell_tenancy::MultiTenantVectorManager::new(vector_storage));
+    let tenant_manager = Arc::new(llmspell_tenancy::MultiTenantVectorManager::new(
+        vector_storage,
+    ));
 
     // Create multi-tenant RAG
     let rag = Arc::new(llmspell_rag::multi_tenant_integration::MultiTenantRAG::new(

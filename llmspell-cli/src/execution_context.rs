@@ -136,7 +136,9 @@ impl ExecutionContext {
                 // Phase 13b.16.3: ScriptRuntime creates ALL infrastructure via Infrastructure module
                 let script_executor =
                     std::sync::Arc::new(llmspell_bridge::ScriptRuntime::new(config.clone()).await?)
-                        as std::sync::Arc<dyn llmspell_core::traits::script_executor::ScriptExecutor>;
+                        as std::sync::Arc<
+                            dyn llmspell_core::traits::script_executor::ScriptExecutor,
+                        >;
                 let handle = llmspell_kernel::api::start_embedded_kernel_with_executor(
                     config.clone(),
                     script_executor,
@@ -167,9 +169,10 @@ impl ExecutionContext {
                     // Phase 13b.16.3: ScriptRuntime creates ALL infrastructure via Infrastructure module
                     let script_executor = std::sync::Arc::new(
                         llmspell_bridge::ScriptRuntime::new(default_config.clone()).await?,
-                    ) as std::sync::Arc<
-                        dyn llmspell_core::traits::script_executor::ScriptExecutor,
-                    >;
+                    )
+                        as std::sync::Arc<
+                            dyn llmspell_core::traits::script_executor::ScriptExecutor,
+                        >;
                     let handle = llmspell_kernel::api::start_embedded_kernel_with_executor(
                         default_config.clone(),
                         script_executor,
