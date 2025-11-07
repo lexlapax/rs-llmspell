@@ -20,7 +20,7 @@ fn create_test_runtime_config() -> LLMSpellConfig {
 #[tokio::test(flavor = "multi_thread")]
 async fn test_agent_create_with_provider_model_syntax() {
     let config = create_test_runtime_config();
-    let runtime = Box::pin(ScriptRuntime::new_with_lua(config))
+    let runtime = Box::pin(ScriptRuntime::new(config))
         .await
         .expect("Failed to create runtime");
 
@@ -79,7 +79,7 @@ async fn test_agent_create_with_provider_model_syntax() {
 #[tokio::test(flavor = "multi_thread")]
 async fn test_base_url_override() {
     let config = create_test_runtime_config();
-    let runtime = Box::pin(ScriptRuntime::new_with_lua(config))
+    let runtime = Box::pin(ScriptRuntime::new(config))
         .await
         .expect("Failed to create runtime");
 
@@ -131,7 +131,7 @@ async fn test_base_url_override() {
 #[tokio::test(flavor = "multi_thread")]
 async fn test_backward_compatibility() {
     let config = create_test_runtime_config();
-    let runtime = Box::pin(ScriptRuntime::new_with_lua(config))
+    let runtime = Box::pin(ScriptRuntime::new(config))
         .await
         .expect("Failed to create runtime");
 
@@ -172,7 +172,7 @@ async fn test_backward_compatibility() {
 #[tokio::test(flavor = "multi_thread")]
 async fn test_invalid_provider_handling() {
     let config = create_test_runtime_config();
-    let runtime = Box::pin(ScriptRuntime::new_with_lua(config))
+    let runtime = Box::pin(ScriptRuntime::new(config))
         .await
         .expect("Failed to create runtime");
 
@@ -212,7 +212,7 @@ async fn test_invalid_provider_handling() {
 #[tokio::test(flavor = "multi_thread")]
 async fn test_provider_fallback() {
     let config = create_test_runtime_config();
-    let runtime = Box::pin(ScriptRuntime::new_with_lua(config))
+    let runtime = Box::pin(ScriptRuntime::new(config))
         .await
         .expect("Failed to create runtime");
 
@@ -267,7 +267,7 @@ async fn test_provider_fallback() {
 #[tokio::test(flavor = "multi_thread")]
 async fn test_provider_model_parsing() {
     let config = create_test_runtime_config();
-    let runtime = Box::pin(ScriptRuntime::new_with_lua(config))
+    let runtime = Box::pin(ScriptRuntime::new(config))
         .await
         .expect("Failed to create runtime");
 
@@ -362,7 +362,7 @@ async fn test_provider_model_parsing() {
 #[tokio::test(flavor = "multi_thread")]
 async fn test_multiple_providers_same_script() {
     let config = create_test_runtime_config();
-    let runtime = Box::pin(ScriptRuntime::new_with_lua(config))
+    let runtime = Box::pin(ScriptRuntime::new(config))
         .await
         .expect("Failed to create runtime");
 

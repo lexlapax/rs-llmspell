@@ -12,7 +12,7 @@ use llmspell_core::traits::script_executor::ScriptExecutor;
 #[cfg(feature = "lua")]
 async fn test_tools_registered_in_both_registries() {
     let config = LLMSpellConfig::default();
-    let runtime = Box::pin(ScriptRuntime::new_with_lua(config))
+    let runtime = Box::pin(ScriptRuntime::new(config))
         .await
         .expect("Failed to create runtime");
 
@@ -57,7 +57,7 @@ async fn test_tools_registered_in_both_registries() {
 #[cfg(feature = "lua")]
 async fn test_execution_context_has_infrastructure() {
     let config = LLMSpellConfig::default();
-    let runtime = Box::pin(ScriptRuntime::new_with_lua(config))
+    let runtime = Box::pin(ScriptRuntime::new(config))
         .await
         .expect("Failed to create runtime");
 
@@ -93,7 +93,7 @@ async fn test_execution_context_has_infrastructure() {
 #[cfg(feature = "lua")]
 async fn test_template_execution_no_infrastructure_error() {
     let config = LLMSpellConfig::default();
-    let runtime = Box::pin(ScriptRuntime::new_with_lua(config))
+    let runtime = Box::pin(ScriptRuntime::new(config))
         .await
         .expect("Failed to create runtime");
 
@@ -159,7 +159,7 @@ async fn test_all_builtin_templates_have_infrastructure() {
     ];
 
     let config = LLMSpellConfig::default();
-    let runtime = Box::pin(ScriptRuntime::new_with_lua(config))
+    let runtime = Box::pin(ScriptRuntime::new(config))
         .await
         .expect("Failed to create runtime");
 
@@ -226,7 +226,7 @@ async fn test_all_builtin_templates_have_infrastructure() {
 #[cfg(feature = "lua")]
 async fn test_validation_error_vs_infrastructure_error() {
     let config = LLMSpellConfig::default();
-    let runtime = Box::pin(ScriptRuntime::new_with_lua(config))
+    let runtime = Box::pin(ScriptRuntime::new(config))
         .await
         .expect("Failed to create runtime");
 
@@ -310,7 +310,7 @@ async fn test_dual_registration_memory_safety() {
     for i in 0..3 {
         eprintln!("Creating runtime {}", i + 1);
 
-        let runtime = Box::pin(ScriptRuntime::new_with_lua(config.clone()))
+        let runtime = Box::pin(ScriptRuntime::new(config.clone()))
             .await
             .expect("Failed to create runtime");
 

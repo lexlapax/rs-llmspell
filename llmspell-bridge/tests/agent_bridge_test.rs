@@ -11,7 +11,7 @@ async fn test_agent_discovery_from_lua() {
         ..Default::default()
     };
 
-    let runtime = Box::pin(ScriptRuntime::new_with_lua(config))
+    let runtime = Box::pin(ScriptRuntime::new(config))
         .await
         .expect("Failed to create runtime");
 
@@ -38,7 +38,7 @@ async fn test_agent_templates_from_lua() {
         ..Default::default()
     };
 
-    let runtime = Box::pin(ScriptRuntime::new_with_lua(config))
+    let runtime = Box::pin(ScriptRuntime::new(config))
         .await
         .expect("Failed to create runtime");
 
@@ -65,7 +65,7 @@ async fn test_agent_creation_and_execution() {
         ..Default::default()
     };
 
-    let runtime = Box::pin(ScriptRuntime::new_with_lua(config))
+    let runtime = Box::pin(ScriptRuntime::new(config))
         .await
         .expect("Failed to create runtime");
 
@@ -103,7 +103,7 @@ async fn test_agent_parameter_conversion() {
         ..Default::default()
     };
 
-    let runtime = Box::pin(ScriptRuntime::new_with_lua(config))
+    let runtime = Box::pin(ScriptRuntime::new(config))
         .await
         .expect("Failed to create runtime");
 
@@ -148,7 +148,7 @@ async fn test_agent_tool_integration() {
         ..Default::default()
     };
 
-    let runtime = Box::pin(ScriptRuntime::new_with_lua(config))
+    let runtime = Box::pin(ScriptRuntime::new(config))
         .await
         .expect("Failed to create runtime");
 

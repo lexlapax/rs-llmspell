@@ -13,7 +13,7 @@ mod script_execution_tests {
     async fn create_test_runtime() -> ScriptRuntime {
         use llmspell_config::LLMSpellConfig;
 
-        ScriptRuntime::new_with_lua(LLMSpellConfig::default())
+        ScriptRuntime::new(LLMSpellConfig::default())
             .await
             .unwrap()
     }

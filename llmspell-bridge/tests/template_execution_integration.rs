@@ -27,7 +27,7 @@ async fn test_template_exec_with_real_provider_config() {
 
     // Initialize ScriptRuntime (should succeed with empty providers)
     eprintln!("[TEST] Creating ScriptRuntime");
-    let runtime = Box::pin(ScriptRuntime::new_with_lua(config))
+    let runtime = Box::pin(ScriptRuntime::new(config))
         .await
         .expect("Failed to create ScriptRuntime");
     eprintln!("[TEST] ScriptRuntime created successfully");
@@ -111,7 +111,7 @@ async fn test_template_exec_provider_name_resolution() {
         ..LLMSpellConfig::default()
     };
 
-    let runtime = Box::pin(ScriptRuntime::new_with_lua(config))
+    let runtime = Box::pin(ScriptRuntime::new(config))
         .await
         .expect("Failed to create ScriptRuntime");
 
@@ -145,7 +145,7 @@ async fn test_template_exec_provider_name_resolution() {
 async fn test_template_exec_model_ephemeral_resolution() {
     let config = LLMSpellConfig::default();
 
-    let runtime = Box::pin(ScriptRuntime::new_with_lua(config))
+    let runtime = Box::pin(ScriptRuntime::new(config))
         .await
         .expect("Failed to create ScriptRuntime");
 
@@ -202,7 +202,7 @@ async fn test_execution_context_infrastructure_wiring() {
         ..LLMSpellConfig::default()
     };
 
-    let runtime = Box::pin(ScriptRuntime::new_with_lua(config))
+    let runtime = Box::pin(ScriptRuntime::new(config))
         .await
         .expect("Failed to create ScriptRuntime");
 
