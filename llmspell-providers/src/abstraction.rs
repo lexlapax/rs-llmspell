@@ -828,8 +828,8 @@ mod tests {
             );
         };
         assert!(
-            message.contains("Unknown provider"),
-            "Expected error message to contain 'Unknown provider', got: {}",
+            message.contains("No factory found") && message.contains("'unknown'"),
+            "Expected error message to contain 'No factory found' and 'unknown', got: {}",
             message
         );
     }
