@@ -9906,8 +9906,186 @@ Debug logs show proper initialization sequence from `Infrastructure::from_config
 - CLI simplified to ~12 lines (was ~108 lines)
 
 
-### Task 13b.16.8: Cleanup old code, deprecated code
-**analyze and research and fill this section out**
+### Task 13b.16.8: Delete Deprecated Constructors and Setters
+**Priority**: HIGH
+**Estimated Time**: 1.5 hours
+**Status**: TODO
+
+**Description**: Delete all deprecated constructors, setters, and update documentation to use new API. Complete codebase cleanup per "No Deferred Work" principle.
+
+**Rationale**: Pre-1.0 project allows breaking changes. Clean code > backward compatibility. All tests updated in Task 13b.16.6, safe to delete old API.
+
+---
+
+#### Code to DELETE
+
+##### 1. Deprecated Constructors (llmspell-bridge/src/runtime.rs)
+
+**Delete 7 constructor methods** (~150 lines total):
+```rust
+// Line ~429: DELETE
+pub async fn new_with_lua(config: LLMSpellConfig) -> Result<Self, LLMSpellError>
+
+// Line ~451: DELETE
+pub async fn new_with_javascript(config: LLMSpellConfig) -> Result<Self, LLMSpellError>
+
+// Line ~465: DELETE
+pub async fn new_with_lua_and_provider(...) -> Result<Self, LLMSpellError>
+
+// Line ~484: DELETE
+pub async fn new_with_lua_provider_and_session(...) -> Result<Self, LLMSpellError>
+
+// Line ~513: DELETE
+pub async fn new_with_lua_core_provider_and_session(...) -> Result<Self, LLMSpellError>
+
+// Line ~537: DELETE
+pub async fn new_with_javascript_and_provider(...) -> Result<Self, LLMSpellError>
+
+// Line ~557: DELETE
+pub async fn new_with_engine_name(engine_name: &str, config: LLMSpellConfig) -> Result<Self, LLMSpellError>
+```
+
+**Replacement**: All callers now use `ScriptRuntime::new(config)` or `with_engine(config, engine_name)`
+
+##### 2. Deprecated Setter Methods (llmspell-bridge/src/runtime.rs)
+
+**Delete 4 setter methods** (~60 lines total):
+```rust
+// Line ~1384: DELETE (currently logs warning only)
+pub fn set_session_manager(&self, _session_manager: Arc<SessionManager>)
+
+// Line ~1411: DELETE (currently logs warning only)
+pub fn set_rag(&self, _rag: Arc<MultiTenantRAG>)
+
+// Line ~1433: DELETE (currently logs warning only)
+pub fn set_memory_manager(&self, _memory_manager: Arc<dyn MemoryManager>)
+
+// Line ~1607: DELETE (internal helper for deprecated set_session_manager)
+fn set_session_manager_any(&self, manager: Arc<dyn std::any::Any + Send + Sync>)
+```
+
+**Replacement**: Infrastructure created via `Infrastructure::from_config()` in constructor, no setters needed
+
+##### 3. Documentation Updates (llmspell-bridge/src/runtime.rs)
+
+**Update 5 code examples** to use `ScriptRuntime::new()`:
+- Line ~51: Struct-level docs example
+- Line ~67: "Working with Agents" example
+- Line ~94: "Streaming Execution" example
+- Line ~410: Method-level docs example #1
+- Line ~415: Method-level docs example #2
+
+**Before**:
+```rust
+/// let runtime = ScriptRuntime::new_with_lua(config).await?;
+```
+
+**After**:
+```rust
+/// let runtime = ScriptRuntime::new(config).await?;
+```
+
+**Update 1 debug message** (line ~1814):
+```rust
+// Before:
+debug!("RAG NOT available for template execution - check if set_rag() was called");
+
+// After:
+debug!("RAG NOT available for template execution - check config.rag.enabled");
+```
+
+**Delete docstring references** to deprecated setters:
+- Lines ~1368, ~1404, ~1426, ~1441, ~1448: Docstrings showing `set_session_manager()` usage
+
+---
+
+#### Implementation Steps
+
+**Step 1: Delete Deprecated Constructors**
+```bash
+# Edit llmspell-bridge/src/runtime.rs
+# Delete methods at lines ~429-566 (7 constructors, ~150 lines)
+```
+
+**Step 2: Delete Deprecated Setters**
+```bash
+# Edit llmspell-bridge/src/runtime.rs
+# Delete methods at lines ~1384-1607 (4 setters, ~60 lines)
+```
+
+**Step 3: Update Documentation Examples**
+```bash
+# Edit llmspell-bridge/src/runtime.rs
+# Replace `new_with_lua()` with `new()` in 5 doc comments
+# Update debug message to reference config instead of setter
+# Delete docstrings referencing deprecated setters
+```
+
+**Step 4: Verify No Remaining References**
+```bash
+grep -r "new_with_lua\|new_with_javascript\|new_with_engine_name" --include="*.rs" .
+grep -r "set_session_manager\|set_rag\|set_memory_manager" --include="*.rs" .
+# Should find ZERO results (except in test files if needed for backward compat testing)
+```
+
+**Step 5: Build and Test**
+```bash
+cargo build --package llmspell-bridge
+cargo test --package llmspell-bridge --lib
+cargo clippy --package llmspell-bridge --all-targets -- -D warnings
+```
+
+---
+
+#### Acceptance Criteria
+
+- [ ] All 7 deprecated constructors deleted (~150 lines)
+- [ ] All 4 deprecated setters deleted (~60 lines)
+- [ ] All 5 documentation examples updated to use `new()`
+- [ ] Debug message updated to reference config
+- [ ] Zero grep results for deprecated method names
+- [ ] `cargo build --package llmspell-bridge` succeeds
+- [ ] `cargo test --package llmspell-bridge --lib` passes (148 tests)
+- [ ] `cargo clippy` reports zero warnings
+- [ ] runtime.rs reduced from ~2535 lines to ~2325 lines
+
+---
+
+#### Expected Line Reduction
+
+**Before**: llmspell-bridge/src/runtime.rs = 2535 lines
+**After**: llmspell-bridge/src/runtime.rs ≈ 2325 lines (~210 lines deleted)
+
+**Breakdown**:
+- Deprecated constructors: ~150 lines
+- Deprecated setters: ~60 lines
+- Documentation cleanup: ~minimal (just text changes)
+
+---
+
+#### Verification Commands
+
+```bash
+# 1. Check no deprecated constructors remain
+grep -n "new_with_lua\|new_with_javascript\|new_with_engine_name" llmspell-bridge/src/runtime.rs
+# Expected: Only in comments/docs (if any), not as fn definitions
+
+# 2. Check no deprecated setters remain
+grep -n "set_session_manager\|set_rag\|set_memory_manager" llmspell-bridge/src/runtime.rs
+# Expected: ZERO results
+
+# 3. Verify line count reduction
+wc -l llmspell-bridge/src/runtime.rs
+# Expected: ~2325 lines (from 2535)
+
+# 4. Run tests
+cargo test --package llmspell-bridge --lib
+# Expected: 148 passed, 0 failed
+
+# 5. Check clippy
+cargo clippy --package llmspell-bridge --all-targets -- -D warnings
+# Expected: Zero warnings
+```
 
 ---
 
