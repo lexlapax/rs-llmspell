@@ -729,9 +729,6 @@ impl ScriptRuntime {
         &self.workflow_factory
     }
 
-
-
-
     /// Downcast support for kernel to access concrete `ScriptRuntime` methods (Phase 12.8.2.5)
     ///
     /// Enables kernel to downcast `Arc<dyn ScriptExecutor>` to `&ScriptRuntime` for
@@ -900,7 +897,6 @@ impl ScriptExecutor for ScriptRuntime {
         let debug_context = self.debug_context.read().unwrap();
         debug_context.clone()
     }
-
 
     fn get_session_manager_any(&self) -> Option<Arc<dyn std::any::Any + Send + Sync>> {
         Some(self.session_manager.clone() as Arc<dyn std::any::Any + Send + Sync>)
