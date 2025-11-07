@@ -9321,7 +9321,7 @@ async fn create_memory_manager(config: &LLMSpellConfig) -> Result<...>;
 
 ---
 
-## Architecture Decision: Remove RwLock Pattern (Option B)
+#### Architecture Decision: Remove RwLock Pattern (Option B)
 
 **Decision**: Remove `Arc<RwLock<Option<...>>>` pattern for `session_manager`, `rag`, `memory_manager`. Take direct ownership of Infrastructure components.
 
