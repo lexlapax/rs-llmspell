@@ -120,9 +120,7 @@ async fn test_runtime_engine_switching_placeholder() {
     // Create with Lua
     #[cfg(feature = "lua")]
     {
-        let lua_runtime = Box::pin(ScriptRuntime::new(config.clone()))
-            .await
-            .unwrap();
+        let lua_runtime = Box::pin(ScriptRuntime::new(config.clone())).await.unwrap();
         assert_eq!(lua_runtime.get_engine_name(), "lua");
     }
 

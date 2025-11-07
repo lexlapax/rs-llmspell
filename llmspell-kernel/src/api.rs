@@ -1183,8 +1183,6 @@ pub async fn create_provider_manager(
     Ok(pm)
 }
 
-
-
 /// Internal kernel creation with all infrastructure (Phase 12.8.2.11)
 ///
 /// This is the internal function that actually creates the kernel.
@@ -1330,7 +1328,6 @@ async fn start_embedded_kernel_with_executor_and_provider_internal(
     debug!("Created KernelHandle with kernel_id: {}", kernel_id);
     Ok(handle)
 }
-
 
 /// Connect to an existing kernel service as a client
 ///
@@ -1705,4 +1702,3 @@ fn build_execution_config(config: &LLMSpellConfig) -> crate::execution::Executio
         health_thresholds: None,
     }
 }
-

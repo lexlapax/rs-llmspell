@@ -46,9 +46,7 @@ async fn test_lua_agent_creation_with_mock_provider() {
 #[tokio::test(flavor = "multi_thread")]
 async fn test_lua_script_provider_access() {
     let runtime_config = LLMSpellConfig::default();
-    let runtime = Box::pin(ScriptRuntime::new(runtime_config))
-        .await
-        .unwrap();
+    let runtime = Box::pin(ScriptRuntime::new(runtime_config)).await.unwrap();
 
     // Test script that tries to create an agent
     let script = r#"

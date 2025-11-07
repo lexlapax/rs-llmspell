@@ -13,7 +13,7 @@ async fn test_lua_tool_integration() {
     
     // Create runtime with Lua
     let config = LLMSpellConfig::default();
-    let runtime = ScriptRuntime::new_with_lua(config)
+    let runtime = ScriptRuntime::new(config)
         .await
         .expect("Failed to create Lua runtime");
     

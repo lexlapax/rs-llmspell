@@ -13,9 +13,7 @@ mod script_execution_tests {
     async fn create_test_runtime() -> ScriptRuntime {
         use llmspell_config::LLMSpellConfig;
 
-        ScriptRuntime::new(LLMSpellConfig::default())
-            .await
-            .unwrap()
+        ScriptRuntime::new(LLMSpellConfig::default()).await.unwrap()
     }
 
     /// Test executing valid Lua scripts

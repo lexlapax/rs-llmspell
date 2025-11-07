@@ -35,7 +35,7 @@ fn bench_kernel_startup(c: &mut Criterion) {
     group.bench_function("embedded_cold_start", |b| {
         b.to_async(create_bench_runtime()).iter(|| async {
             let config = LLMSpellConfig::default();
-            let runtime = ScriptRuntime::new_with_lua(config.clone())
+            let runtime = ScriptRuntime::new(config.clone())
                 .await
                 .expect("Failed to create runtime");
             let executor = Arc::new(runtime);
@@ -59,7 +59,7 @@ fn bench_message_handling(c: &mut Criterion) {
     let rt = create_bench_runtime();
     let kernel_handle = rt.block_on(async {
         let config = LLMSpellConfig::default();
-        let runtime = ScriptRuntime::new_with_lua(config.clone())
+        let runtime = ScriptRuntime::new(config.clone())
             .await
             .expect("Failed to create runtime");
         let executor = Arc::new(runtime);
@@ -101,7 +101,7 @@ fn bench_tool_invocation(c: &mut Criterion) {
     let rt = create_bench_runtime();
     let kernel_handle = rt.block_on(async {
         let config = LLMSpellConfig::default();
-        let runtime = ScriptRuntime::new_with_lua(config.clone())
+        let runtime = ScriptRuntime::new(config.clone())
             .await
             .expect("Failed to create runtime");
         let executor = Arc::new(runtime);
@@ -210,7 +210,7 @@ fn bench_registry_operations(c: &mut Criterion) {
     let rt = create_bench_runtime();
     let kernel_handle = rt.block_on(async {
         let config = LLMSpellConfig::default();
-        let runtime = ScriptRuntime::new_with_lua(config.clone())
+        let runtime = ScriptRuntime::new(config.clone())
             .await
             .expect("Failed to create runtime");
         let executor = Arc::new(runtime);
