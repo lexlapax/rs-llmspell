@@ -279,7 +279,15 @@ fn create_rag(
     };
 
     // Create vector storage
-    let vector_storage = Arc::new(HNSWVectorStorage::new(dimensions, storage_hnsw_config));
+    let mut vector_storage = HNSWVectorStorage::new(dimensions, storage_hnsw_config);
+
+    // Enable persistence if configured
+    if let Some(ref persistence_path) = config.rag.vector_storage.persistence_path {
+        debug!("Enabling RAG vector persistence at: {:?}", persistence_path);
+        vector_storage = vector_storage.with_persistence(persistence_path.clone());
+    }
+
+    let vector_storage = Arc::new(vector_storage);
 
     // Create tenant manager
     let tenant_manager = Arc::new(llmspell_tenancy::MultiTenantVectorManager::new(
