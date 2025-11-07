@@ -10557,132 +10557,615 @@ Phase 13b.16 establishes the foundation for external service integration:
 
 ## Phase 13b.17: Documentation (Day 30)
 
-**Goal**: Complete documentation (2,500+ lines total)
-**Timeline**: 1 day (8 hours)
+**Goal**: Complete Phase 13b documentation (4,000+ lines total)
+**Timeline**: 2-3 days (16-24 hours - expanded from 8h due to scope)
 **Critical Dependencies**: All phases complete ✅
 
-### Task 13b.17.1: PostgreSQL Setup Guide
-**Priority**: HIGH
-**Estimated Time**: 2 hours
-**Assignee**: Documentation Team Lead
+**Scope Expansion Rationale**:
+- **PostgreSQL Storage**: 4 new guides (2,000+ lines)
+- **ScriptRuntime Refactor**: 6 doc updates (1,000+ lines) - Phase 13b.16 is MAJOR architecture change
+- **Cross-Platform**: 2 doc updates (500+ lines)
+- **API References**: 4 crate doc updates (500+ lines)
 
-**Description**: Create comprehensive PostgreSQL setup guide.
+---
+
+### Category A: PostgreSQL Storage Documentation (NEW)
+
+### Task 13b.17.1: PostgreSQL Setup Guide
+**Priority**: CRITICAL
+**Estimated Time**: 3 hours
+**Category**: User Guide - Storage
+
+**Description**: Comprehensive PostgreSQL setup for all 10 storage backends.
 
 **Acceptance Criteria**:
-- [ ] Docker setup documented
-- [ ] Manual installation covered
-- [ ] Configuration examples provided
-- [ ] Multi-tenancy setup explained
-- [ ] Performance tuning included
+- [ ] Docker Compose setup (VectorChord-enabled PostgreSQL 18)
+- [ ] Manual installation (macOS + Linux)
+- [ ] Configuration examples (memory, sled, postgres backends)
+- [ ] Multi-tenancy RLS setup
+- [ ] VectorChord extension installation
+- [ ] Connection pooling configuration
 
 **Implementation Steps**:
-1. Create `docs/user-guide/storage/postgresql-setup.md` (500+ lines)
-2. Document Docker Compose setup
-3. Manual installation steps
-4. Configuration examples (minimal, full, hybrid)
-5. Multi-tenancy setup with RLS
-6. Performance tuning guide
+1. Create `docs/user-guide/storage/postgresql-setup.md` (600+ lines)
+2. Docker Compose file explanation
+3. Manual PostgreSQL 18 + VectorChord installation
+4. Config examples for all 10 components
+5. RLS tenant isolation setup
+6. Connection pool tuning (deadpool-postgres)
+7. Health check configuration
 
 **Files to Create**:
 - `docs/user-guide/storage/postgresql-setup.md`
 
 **Definition of Done**:
-- [ ] Guide comprehensive (500+ lines)
-- [ ] Examples clear
-- [ ] All scenarios covered
-- [ ] Reviewed by team
+- [ ] Guide comprehensive (600+ lines)
+- [ ] Docker + manual paths covered
+- [ ] All 10 backend configs shown
+- [ ] Copy-paste ready examples
 
-### Task 13b.17.2: Schema Reference Documentation
-**Priority**: HIGH
-**Estimated Time**: 2 hours
-**Assignee**: Documentation Team
+### Task 13b.17.2: PostgreSQL Schema Reference
+**Priority**: CRITICAL
+**Estimated Time**: 3 hours
+**Category**: User Guide - Storage
 
-**Description**: Document all 12 PostgreSQL table schemas.
+**Description**: Document all 12 PostgreSQL table schemas with indexes and RLS policies.
 
 **Acceptance Criteria**:
-- [ ] All 12 tables documented
-- [ ] Indexes explained
-- [ ] RLS policies documented
-- [ ] Relationships shown
-- [ ] Examples provided
+- [ ] All 12 tables documented (episodic_memory, semantic_graph, procedural_patterns, agent_state, workflow_state, sessions, artifacts, events, hooks, api_keys, migrations, tenants)
+- [ ] VectorChord HNSW indexes explained
+- [ ] GiST time-range indexes (bi-temporal)
+- [ ] GIN JSONB indexes (state search)
+- [ ] RLS policies for each table
+- [ ] Foreign key relationships
 
 **Implementation Steps**:
-1. Create `docs/user-guide/storage/schema-reference.md` (800+ lines)
-2. Document each table schema
-3. Explain indexes (VectorChord HNSW, GiST, GIN)
-4. Document RLS policies
-5. Entity-relationship diagrams
+1. Create `docs/user-guide/storage/schema-reference.md` (900+ lines)
+2. Document each table (DDL + explanation)
+3. Index strategy per table
+4. RLS policy per table
+5. Entity-relationship diagram
+6. Migration version history (V1-V14)
 
 **Files to Create**:
 - `docs/user-guide/storage/schema-reference.md`
 
 **Definition of Done**:
-- [ ] Schema reference complete (800+ lines)
-- [ ] All 12 tables documented
-- [ ] Examples helpful
-- [ ] Diagrams clear
+- [ ] Schema reference complete (900+ lines)
+- [ ] All 12 tables + indexes + RLS
+- [ ] ER diagram included
+- [ ] Migration history documented
 
-### Task 13b.17.3: Performance Tuning Guide
-**Priority**: MEDIUM
+### Task 13b.17.3: Storage Performance Tuning Guide
+**Priority**: HIGH
 **Estimated Time**: 2 hours
-**Assignee**: Performance Team
+**Category**: User Guide - Storage
 
-**Description**: Document performance tuning recommendations.
+**Description**: Performance tuning for PostgreSQL backends (VectorChord, RLS overhead, partitioning).
 
 **Acceptance Criteria**:
-- [ ] Connection pooling tuning
-- [ ] Index optimization
-- [ ] Partition strategy
-- [ ] VACUUM configuration
-- [ ] Query optimization
+- [ ] VectorChord HNSW parameter tuning (m, ef_construction)
+- [ ] Connection pool sizing (10-20 connections)
+- [ ] RLS policy optimization (<5% overhead)
+- [ ] Event log partitioning strategy
+- [ ] VACUUM/autovacuum tuning
+- [ ] Query optimization tips
 
 **Implementation Steps**:
-1. Create `docs/user-guide/storage/performance-tuning.md` (400+ lines)
-2. Document connection pool sizing
-3. Index tuning (VectorChord parameters)
-4. Partition management
-5. VACUUM and autovacuum tuning
-6. Query optimization tips
+1. Create `docs/user-guide/storage/performance-tuning.md` (500+ lines)
+2. VectorChord index parameters
+3. Connection pool configuration
+4. RLS performance validation
+5. Partition management (monthly events)
+6. VACUUM scheduling
+7. Query optimization examples
 
 **Files to Create**:
 - `docs/user-guide/storage/performance-tuning.md`
 
 **Definition of Done**:
-- [ ] Guide complete (400+ lines)
-- [ ] Recommendations clear
-- [ ] Examples provided
+- [ ] Guide complete (500+ lines)
 - [ ] Benchmarks included
+- [ ] Tuning recommendations clear
+- [ ] Performance targets validated
 
 ### Task 13b.17.4: Backup and Restore Guide
-**Priority**: MEDIUM
+**Priority**: HIGH
 **Estimated Time**: 2 hours
-**Assignee**: DevOps Team
+**Category**: User Guide - Storage
 
-**Description**: Document backup and restore procedures.
+**Description**: PostgreSQL backup/restore procedures for all 10 storage components.
 
 **Acceptance Criteria**:
-- [ ] pg_dump procedures
-- [ ] Point-in-time recovery
-- [ ] Disaster recovery plan
-- [ ] Automation examples
-- [ ] Testing procedures
+- [ ] pg_dump/pg_restore workflows
+- [ ] Point-in-time recovery (PITR)
+- [ ] Disaster recovery procedures
+- [ ] VectorChord index rebuilding
+- [ ] Automation examples (cron/systemd)
 
 **Implementation Steps**:
-1. Create `docs/user-guide/storage/backup-restore.md` (300+ lines)
-2. Document pg_dump/pg_restore
-3. Point-in-time recovery (PITR)
-4. Disaster recovery procedures
-5. Automation with cron/systemd
-6. Testing backup/restore
+1. Create `docs/user-guide/storage/backup-restore.md` (400+ lines)
+2. pg_dump best practices
+3. PITR configuration
+4. Disaster recovery runbook
+5. VectorChord index backup
+6. Automation scripts
+7. Testing procedures
 
 **Files to Create**:
 - `docs/user-guide/storage/backup-restore.md`
 
 **Definition of Done**:
-- [ ] Guide complete (300+ lines)
-- [ ] Procedures clear
+- [ ] Guide complete (400+ lines)
+- [ ] Procedures tested
+- [ ] Automation ready
+- [ ] Recovery validated
+
+---
+
+### Category B: ScriptRuntime Architecture Documentation (UPDATES)
+
+### Task 13b.17.5: Update User Guide - Getting Started
+**Priority**: CRITICAL
+**Estimated Time**: 2 hours
+**Category**: User Guide - Core
+
+**Description**: Update getting-started.md with new ScriptRuntime API (Phase 13b.16).
+
+**Acceptance Criteria**:
+- [ ] New API examples (`ScriptRuntime::new(config)`, `with_engine()`)
+- [ ] Remove all deprecated constructor examples
+- [ ] Infrastructure module explanation
+- [ ] Config-driven component creation
+- [ ] Engine-agnostic patterns
+
+**Implementation Steps**:
+1. Update `docs/user-guide/getting-started.md`
+2. Replace `new_with_lua()` → `new(config)` examples
+3. Document Infrastructure module
+4. Config-driven setup examples
+5. Multi-engine usage patterns
+
+**Files to Update**:
+- `docs/user-guide/getting-started.md` (+200 lines)
+
+**Definition of Done**:
+- [ ] All examples use new API
+- [ ] Infrastructure module explained
+- [ ] Zero deprecated patterns
+- [ ] Clear migration path
+
+### Task 13b.17.6: Update User Guide - Configuration
+**Priority**: CRITICAL
+**Estimated Time**: 2 hours
+**Category**: User Guide - Core
+
+**Description**: Document Infrastructure module config structure and backend selection.
+
+**Acceptance Criteria**:
+- [ ] Infrastructure::from_config() documented
+- [ ] Backend selection per component (memory/sled/postgres)
+- [ ] Conditional component creation (RAG, MemoryManager)
+- [ ] Service/daemon mode configuration
+- [ ] Complete config examples
+
+**Implementation Steps**:
+1. Update `docs/user-guide/configuration.md`
+2. Infrastructure module section
+3. Backend config per component
+4. RAG/Memory enable flags
+5. Full config examples (dev/prod)
+
+**Files to Update**:
+- `docs/user-guide/configuration.md` (+300 lines)
+
+**Definition of Done**:
+- [ ] Infrastructure config complete
+- [ ] Backend selection clear
+- [ ] Examples comprehensive
+- [ ] All 10 components covered
+
+### Task 13b.17.7: Update User Guide - CLI
+**Priority**: HIGH
+**Estimated Time**: 1 hour
+**Category**: User Guide - CLI
+
+**Description**: Update CLI documentation reflecting simplified execution context (13b.16.3).
+
+**Acceptance Criteria**:
+- [ ] Simplified CLI layer explained (~12 lines)
+- [ ] Kernel-centric architecture
+- [ ] Service/daemon mode paths
+- [ ] No CLI dependency for services
+
+**Implementation Steps**:
+1. Update `docs/user-guide/cli.md`
+2. Simplified execution context
+3. Kernel API usage
+4. Service deployment patterns
+
+**Files to Update**:
+- `docs/user-guide/cli.md` (+100 lines)
+
+**Definition of Done**:
+- [ ] CLI simplification documented
+- [ ] Kernel architecture clear
+- [ ] Service mode explained
+
+### Task 13b.17.8: Update User Guide - Service Deployment
+**Priority**: HIGH
+**Estimated Time**: 1 hour
+**Category**: User Guide - Deployment
+
+**Description**: Document daemon mode using kernel directly (no CLI dependency).
+
+**Acceptance Criteria**:
+- [ ] Direct kernel usage for services
+- [ ] Infrastructure module in services
+- [ ] Systemd service examples
+- [ ] Docker deployment patterns
+
+**Implementation Steps**:
+1. Update `docs/user-guide/service-deployment.md`
+2. Kernel-first service architecture
+3. Infrastructure module usage
+4. Systemd unit files
+5. Docker examples
+
+**Files to Update**:
+- `docs/user-guide/service-deployment.md` (+200 lines)
+
+**Definition of Done**:
+- [ ] Service patterns updated
+- [ ] No CLI dependency shown
+- [ ] Examples production-ready
+
+---
+
+### Category C: Technical Documentation (UPDATES + NEW)
+
+### Task 13b.17.9: Create Kernel Execution Paths Guide
+**Priority**: CRITICAL
+**Estimated Time**: 2 hours
+**Category**: Technical - NEW
+
+**Description**: Document unified kernel creation path (Infrastructure module).
+
+**Acceptance Criteria**:
+- [ ] Single creation path documented
+- [ ] Infrastructure::from_config() flow
+- [ ] Component initialization order
+- [ ] Dependency injection patterns
+- [ ] Lifecycle management
+
+**Implementation Steps**:
+1. Create `docs/technical/kernel-execution-paths.md` (400+ lines)
+2. Infrastructure module architecture
+3. Component creation flow diagram
+4. Config-driven initialization
+5. Lifecycle phases
+6. Migration from old patterns
+
+**Files to Create**:
+- `docs/technical/kernel-execution-paths.md`
+
+**Definition of Done**:
+- [ ] Execution paths documented (400+ lines)
+- [ ] Flow diagrams clear
+- [ ] Migration guidance included
+
+### Task 13b.17.10: Create Storage Architecture Guide
+**Priority**: CRITICAL
+**Estimated Time**: 2 hours
+**Category**: Technical - NEW
+
+**Description**: Document unified storage abstraction and backend architecture.
+
+**Acceptance Criteria**:
+- [ ] StorageBackend trait architecture
+- [ ] 10 component backends documented
+- [ ] Hot-swap mechanism explained
+- [ ] PostgreSQL integration patterns
+- [ ] Migration strategies
+
+**Implementation Steps**:
+1. Create `docs/technical/storage-architecture.md` (500+ lines)
+2. StorageBackend trait design
+3. Backend implementations (Memory, Sled, PostgreSQL)
+4. Component-specific backends
+5. Migration patterns
+6. Performance characteristics
+
+**Files to Create**:
+- `docs/technical/storage-architecture.md`
+
+**Definition of Done**:
+- [ ] Storage architecture complete (500+ lines)
+- [ ] All backends documented
+- [ ] Migration clear
+
+### Task 13b.17.11: Update Current Architecture
+**Priority**: CRITICAL
+**Estimated Time**: 2 hours
+**Category**: Technical - UPDATE
+
+**Description**: Update current-architecture.md with Phase 13b changes.
+
+**Acceptance Criteria**:
+- [ ] Infrastructure module in architecture diagram
+- [ ] ScriptRuntime refactor documented
+- [ ] PostgreSQL backends shown
+- [ ] Cross-platform status updated
+- [ ] Component dependencies updated
+
+**Implementation Steps**:
+1. Update `docs/technical/current-architecture.md`
+2. Infrastructure module section
+3. ScriptRuntime architecture
+4. Storage backend matrix
+5. Cross-platform support
+6. Updated component diagram
+
+**Files to Update**:
+- `docs/technical/current-architecture.md` (+400 lines)
+
+**Definition of Done**:
+- [ ] Architecture current
+- [ ] Diagrams updated
+- [ ] All Phase 13b changes reflected
+
+### Task 13b.17.12: Update Platform Support
+**Priority**: HIGH
+**Estimated Time**: 1 hour
+**Category**: Technical - UPDATE
+
+**Description**: Document Linux CI validation and cross-platform status.
+
+**Acceptance Criteria**:
+- [ ] Linux CI validated
+- [ ] macOS + Linux matrix builds
+- [ ] Platform-specific features documented
+- [ ] GPU detection (Metal/CUDA/CPU)
+
+**Implementation Steps**:
+1. Update `docs/technical/platform-support.md`
+2. Linux CI validation
+3. GitHub Actions matrix
+4. GPU detection strategies
+5. Platform-specific code patterns
+
+**Files to Update**:
+- `docs/technical/platform-support.md` (+200 lines)
+
+**Definition of Done**:
+- [ ] Linux support documented
+- [ ] CI matrix explained
+- [ ] GPU detection clear
+
+---
+
+### Category D: API Reference Updates
+
+### Task 13b.17.13: Update API Reference - llmspell-bridge
+**Priority**: CRITICAL
+**Estimated Time**: 1 hour
+**Category**: API Reference
+
+**Description**: Update llmspell-bridge API docs (ScriptRuntime, Infrastructure).
+
+**Acceptance Criteria**:
+- [ ] ScriptRuntime new API documented
+- [ ] Infrastructure module API
+- [ ] Deprecated methods marked
+- [ ] Migration examples
+
+**Implementation Steps**:
+1. Update `docs/user-guide/api/rust/llmspell-bridge.md`
+2. ScriptRuntime::new() / with_engine()
+3. Infrastructure::from_config()
+4. Deprecation notices
+5. Migration guide
+
+**Files to Update**:
+- `docs/user-guide/api/rust/llmspell-bridge.md` (+150 lines)
+
+**Definition of Done**:
+- [ ] New API documented
+- [ ] Migration clear
+- [ ] Examples updated
+
+### Task 13b.17.14: Update API Reference - llmspell-storage
+**Priority**: HIGH
+**Estimated Time**: 1 hour
+**Category**: API Reference
+
+**Description**: Document PostgreSQL backend APIs.
+
+**Acceptance Criteria**:
+- [ ] PostgreSQL backend traits
+- [ ] 10 component implementations
+- [ ] Configuration APIs
+- [ ] Migration tool APIs
+
+**Implementation Steps**:
+1. Update `docs/user-guide/api/rust/llmspell-storage.md`
+2. PostgreSQL backend APIs
+3. Backend configuration
+4. Migration tool usage
+5. Performance APIs
+
+**Files to Update**:
+- `docs/user-guide/api/rust/llmspell-storage.md` (+200 lines)
+
+**Definition of Done**:
+- [ ] PostgreSQL APIs documented
+- [ ] All backends covered
+- [ ] Examples clear
+
+---
+
+### Category E: Developer Guide Updates
+
+### Task 13b.17.15: Update Developer Guide - Bridge Pattern
+**Priority**: HIGH
+**Estimated Time**: 1 hour
+**Category**: Developer Guide
+
+**Description**: Update bridge-pattern-guide.md with Infrastructure module.
+
+**Acceptance Criteria**:
+- [ ] Infrastructure module pattern
+- [ ] Config-driven creation
+- [ ] Component lifecycle
+- [ ] Extension patterns
+
+**Implementation Steps**:
+1. Update `docs/developer-guide/bridge-pattern-guide.md`
+2. Infrastructure module section
+3. Component factory patterns
+4. Config-driven design
+5. Extension guidelines
+
+**Files to Update**:
+- `docs/developer-guide/bridge-pattern-guide.md` (+200 lines)
+
+**Definition of Done**:
+- [ ] Infrastructure pattern documented
+- [ ] Extension clear
+- [ ] Examples comprehensive
+
+### Task 13b.17.16: Update Developer Guide - Extending llmspell
+**Priority**: HIGH
+**Estimated Time**: 1 hour
+**Category**: Developer Guide
+
+**Description**: Document storage backend implementation.
+
+**Acceptance Criteria**:
+- [ ] StorageBackend trait implementation
+- [ ] PostgreSQL backend example
+- [ ] Backend registration
+- [ ] Testing patterns
+
+**Implementation Steps**:
+1. Update `docs/developer-guide/extending-llmspell.md`
+2. Storage backend section
+3. Implementation guide
+4. Registration patterns
+5. Testing strategies
+
+**Files to Update**:
+- `docs/developer-guide/extending-llmspell.md` (+200 lines)
+
+**Definition of Done**:
+- [ ] Backend implementation clear
 - [ ] Examples working
-- [ ] Tested by team
+- [ ] Testing covered
+
+---
+
+## Phase 13b.17 Documentation Summary
+
+**Total Tasks**: 16 (expanded from 4)
+**Total Estimated Time**: 24 hours (expanded from 8h)
+**Total Documentation**: 4,000+ lines (expanded from 2,000+)
+
+### Documentation Breakdown
+
+**Category A: PostgreSQL Storage (NEW)** - 4 tasks, 10h, 2,400 lines
+- Task 13b.17.1: PostgreSQL Setup Guide (600 lines)
+- Task 13b.17.2: Schema Reference (900 lines)
+- Task 13b.17.3: Performance Tuning (500 lines)
+- Task 13b.17.4: Backup/Restore (400 lines)
+
+**Category B: ScriptRuntime Architecture (UPDATES)** - 4 tasks, 6h, 800 lines
+- Task 13b.17.5: Getting Started (200 lines)
+- Task 13b.17.6: Configuration (300 lines)
+- Task 13b.17.7: CLI (100 lines)
+- Task 13b.17.8: Service Deployment (200 lines)
+
+**Category C: Technical Documentation (NEW + UPDATES)** - 4 tasks, 7h, 1,500 lines
+- Task 13b.17.9: Kernel Execution Paths (400 lines) - NEW
+- Task 13b.17.10: Storage Architecture (500 lines) - NEW
+- Task 13b.17.11: Current Architecture (400 lines) - UPDATE
+- Task 13b.17.12: Platform Support (200 lines) - UPDATE
+
+**Category D: API Reference (UPDATES)** - 2 tasks, 2h, 350 lines
+- Task 13b.17.13: llmspell-bridge (150 lines)
+- Task 13b.17.14: llmspell-storage (200 lines)
+
+**Category E: Developer Guide (UPDATES)** - 2 tasks, 2h, 400 lines
+- Task 13b.17.15: Bridge Pattern (200 lines)
+- Task 13b.17.16: Extending llmspell (200 lines)
+
+### Files Affected
+
+**New Files** (6):
+1. `docs/user-guide/storage/postgresql-setup.md` (600 lines)
+2. `docs/user-guide/storage/schema-reference.md` (900 lines)
+3. `docs/user-guide/storage/performance-tuning.md` (500 lines)
+4. `docs/user-guide/storage/backup-restore.md` (400 lines)
+5. `docs/technical/kernel-execution-paths.md` (400 lines)
+6. `docs/technical/storage-architecture.md` (500 lines)
+
+**Updated Files** (10):
+1. `docs/user-guide/getting-started.md` (+200 lines)
+2. `docs/user-guide/configuration.md` (+300 lines)
+3. `docs/user-guide/cli.md` (+100 lines)
+4. `docs/user-guide/service-deployment.md` (+200 lines)
+5. `docs/technical/current-architecture.md` (+400 lines)
+6. `docs/technical/platform-support.md` (+200 lines)
+7. `docs/user-guide/api/rust/llmspell-bridge.md` (+150 lines)
+8. `docs/user-guide/api/rust/llmspell-storage.md` (+200 lines)
+9. `docs/developer-guide/bridge-pattern-guide.md` (+200 lines)
+10. `docs/developer-guide/extending-llmspell.md` (+200 lines)
+
+### Phase 13b Accomplishments Documented
+
+**1. Cross-Platform Support (Phase 13b.1)**
+- Linux CI validation
+- macOS + Linux matrix builds
+- Platform-specific GPU detection
+- Documented in: platform-support.md
+
+**2. PostgreSQL Storage Infrastructure (Phases 13b.2-13b.13)**
+- 10 PostgreSQL backends (all storage components)
+- VectorChord integration (5x faster than pgvector)
+- Bi-temporal graph storage (native CTEs)
+- Row-Level Security (RLS) multi-tenancy
+- 12 database tables, 14 migrations, 379 tests
+- Documented in: postgresql-setup.md, schema-reference.md, performance-tuning.md, backup-restore.md, storage-architecture.md
+
+**3. ScriptRuntime Architecture Refactor (Phase 13b.16)**
+- Infrastructure module pattern (372 lines)
+- Engine-agnostic API (82% API reduction: 11 methods → 2)
+- Self-contained kernel (single creation path)
+- Config-driven component creation
+- 806 lines deleted across runtime.rs, lib.rs, execution_context.rs
+- CLI simplified to ~12 lines
+- Service/daemon mode decoupled from CLI
+- Documented in: getting-started.md, configuration.md, cli.md, service-deployment.md, kernel-execution-paths.md, current-architecture.md, llmspell-bridge.md, bridge-pattern-guide.md
+
+### Why Scope Expanded 3x
+
+**Original Plan**: 4 PostgreSQL storage guides (2,000 lines, 8 hours)
+
+**Actual Scope**: Phase 13b.16 ScriptRuntime refactor was MAJOR architecture change:
+- 806 lines of code deleted
+- 11 deprecated API methods removed
+- Infrastructure module created (372 lines)
+- Entire kernel initialization path changed
+- CLI execution model simplified
+- Service deployment pattern changed
+
+**Impact**: Every user-facing guide, technical doc, API reference, and developer guide needs updates to reflect:
+- New ScriptRuntime API (`new()`, `with_engine()` instead of 7 language-specific constructors)
+- Infrastructure module config-driven patterns
+- Unified kernel creation path
+- Simplified CLI layer
+- Direct kernel usage for services
+
+**Risk of Not Documenting**: Users will follow outdated patterns from existing docs, hitting deprecated APIs and confusion about correct usage.
 
 ---
 
