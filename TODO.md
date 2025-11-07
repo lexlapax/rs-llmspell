@@ -10188,6 +10188,7 @@ let runtime = ScriptRuntime::with_engine(config, "lua").await?;
 - `c537cd39` - fix: Update multithreaded test to use memory backend
 - `98ef16ce` - fix: Update lib.rs doctest to use new with_engine() API
 - `fd775c70` - test: Increase lock-free performance test threshold to 300%
+- `b212e511` - test: Update error message assertion in test_create_agent_from_spec_unknown_provider
 
 **Summary & Insights**:
 
@@ -10263,6 +10264,48 @@ assert!(overhead < 300.0, "...should be <300%...");
 - Test validates "overhead stays reasonable" not absolute performance
 - Real value is concurrent access patterns (not measured by this test)
 - 5% typical overhead << 300% threshold (100x safety margin)
+
+---
+
+**Provider Error Message Test Fix** (b212e511):
+
+**Problem**: Test assertion expected outdated error message format
+```
+thread 'test_create_agent_from_spec_unknown_provider' panicked:
+Expected error message to contain 'Unknown provider', got:
+No factory found for provider_type 'unknown' (factory 'rig' not registered)
+```
+
+**Root Cause**: Error message format improved for clarity
+- **Old format**: Generic "Unknown provider"
+- **New format**: Specific "No factory found for provider_type 'unknown' (factory 'rig' not registered)"
+- **Test not updated**: Still checking for old message
+
+**Fix**: Updated assertion to match new error message format
+```rust
+// Before:
+assert!(
+    message.contains("Unknown provider"),
+    "Expected error message to contain 'Unknown provider', got: {}", message
+);
+
+// After:
+assert!(
+    message.contains("No factory found") && message.contains("'unknown'"),
+    "Expected error message to contain 'No factory found' and 'unknown', got: {}", message
+);
+```
+
+**Why This Happened**:
+- Error message improved during provider refactoring
+- Test assertion not updated to match new format
+- Better error messages help debugging (shows which factory missing)
+
+**Test Results**:
+- **Before**: 71 passed, 1 failed (test_create_agent_from_spec_unknown_provider)
+- **After**: 72 passed, 0 failed
+
+**File**: llmspell-providers/src/abstraction.rs:830-834
 
 ---
 
