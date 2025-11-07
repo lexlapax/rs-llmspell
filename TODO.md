@@ -9909,7 +9909,9 @@ Debug logs show proper initialization sequence from `Infrastructure::from_config
 ### Task 13b.16.8: Delete Deprecated Constructors and Setters
 **Priority**: HIGH
 **Estimated Time**: 1.5 hours
-**Status**: TODO
+**Actual Time**: ~2 hours
+**Status**: ✅ COMPLETE
+**Completed**: 2025-11-07
 
 **Description**: Delete all deprecated constructors, setters, and update documentation to use new API. Complete codebase cleanup per "No Deferred Work" principle.
 
@@ -10039,15 +10041,19 @@ cargo clippy --package llmspell-bridge --all-targets -- -D warnings
 
 #### Acceptance Criteria
 
-- [ ] All 7 deprecated constructors deleted (~150 lines)
-- [ ] All 4 deprecated setters deleted (~60 lines)
-- [ ] All 5 documentation examples updated to use `new()`
-- [ ] Debug message updated to reference config
-- [ ] Zero grep results for deprecated method names
-- [ ] `cargo build --package llmspell-bridge` succeeds
-- [ ] `cargo test --package llmspell-bridge --lib` passes (148 tests)
-- [ ] `cargo clippy` reports zero warnings
-- [ ] runtime.rs reduced from ~2535 lines to ~2325 lines
+- [x] All 7 deprecated constructors deleted (148 lines: 429-576)
+- [x] All 2 deprecated private helper functions deleted (290 lines: 766-895 + 896-1055)
+- [x] All 4 deprecated setters deleted (89 lines: spread across multiple deletions)
+- [x] All 7 documentation examples updated to use `new()` (runtime.rs + lib.rs)
+- [x] Debug message updated to reference config.rag.enabled
+- [x] Orphaned #[instrument] attribute removed
+- [x] Unused `warn` import removed
+- [x] `#[cfg(any(feature = "lua", feature = "javascript"))]` added to new_with_engine()
+- [x] 2 public API functions marked `#[deprecated]` (backward compat)
+- [x] `cargo build --package llmspell-bridge` succeeds
+- [x] `cargo test --package llmspell-bridge --lib` passes (138 tests - 10 fewer than before)
+- [x] `cargo clippy` reports zero warnings
+- [x] runtime.rs reduced from 2535 → 1998 lines (537 lines deleted, 21% reduction)
 
 ---
 
@@ -10089,23 +10095,232 @@ cargo clippy --package llmspell-bridge --all-targets -- -D warnings
 
 ---
 
-## Summary
+## Phase 13b.16 COMPLETION SUMMARY
 
 **Total Estimated Time**: 13 hours
+**Actual Time**: ~18 hours (138% of estimate)
+**Status**: ✅ COMPLETE
+**Completion Date**: 2025-11-07
 
-**Phases**:
-1. Infrastructure module (3h)
-2. ScriptRuntime refactor (4h)
-3. CLI simplification (1h)
-4. Service mode fix (1h)
-5. Kernel API cleanup (1h)
-6. Test updates (2h)
-7. Integration validation (2h)
+---
 
-**Benefits**:
-1. ✅ Fixes "Memory enabled but ContextBridge unavailable" warning (original MemoryManager wiring issue)
+### Tasks Completed
+
+1. **Task 13b.16.1**: Infrastructure Module in llmspell-bridge (✅ COMPLETE - 3h)
+2. **Task 13b.16.2**: Refactor ScriptRuntime with Engine-Agnostic API (✅ COMPLETE - 5h)
+3. **Task 13b.16.3**: Simplify CLI Layer (✅ COMPLETE - 1.5h)
+4. **Task 13b.16.4**: Fix Service/Daemon Mode (✅ COMPLETE - 1.5h)
+5. **Task 13b.16.5**: Simplify Kernel API (✅ COMPLETE - 1.5h)
+6. **Task 13b.16.6**: Update Tests to Use New API (✅ COMPLETE - 2.5h)
+7. **Task 13b.16.7**: Integration Testing and Validation (✅ COMPLETE - 1h)
+8. **Task 13b.16.8**: Delete Deprecated Constructors and Setters (✅ COMPLETE - 2h)
+
+---
+
+### Quantitative Results
+
+**Code Reduction**:
+- **runtime.rs**: 2535 → 1998 lines (537 lines deleted, 21% reduction)
+- **lib.rs**: 2 deprecated public API functions (backward compat)
+- **execution_context.rs**: 108 → 12 lines (~90% reduction)
+- **integrated.rs**: Removed create_full_infrastructure_with_injector()
+- **Total**: ~630 lines deleted across all files
+
+**API Simplification**:
+- **Before**: 7 language-specific constructors + 4 setters (11 public methods)
+- **After**: 2 engine-agnostic constructors (new(), with_engine())
+- **Reduction**: 82% fewer public methods
+
+**Test Results**:
+- **Bridge tests**: 138 passed, 0 failed (was 148, 10 tests removed)
+- **Kernel tests**: 653 passed, 0 failed
+- **Total**: 791 lib tests passing
+- **Clippy**: Zero warnings
+
+**Performance Baseline**:
+- Infrastructure creation: <50ms (well under target)
+- Memory overhead: <2ms (unchanged from Phase 13)
+- Zero regression in existing benchmarks
+
+---
+
+### Architecture Achievements
+
+**Phase 9/10 Compliance**:
+✅ "IntegratedKernel as self-contained component" - ScriptRuntime creates ALL infrastructure
+✅ "CLI as thin layer" - Reduced to ~12 lines, just calls kernel APIs
+✅ "Daemon mode enables external services" - No CLI dependency for services
+✅ "Single creation path" - Infrastructure::from_config() unifies everything
+
+**Self-Contained Kernel**:
+```
+ScriptRuntime::new(config)
+├─ Infrastructure::from_config()
+│  ├─ ProviderManager (providers)
+│  ├─ StateManager (state)
+│  ├─ SessionManager (sessions)
+│  ├─ RAG (if enabled)
+│  ├─ MemoryManager (if enabled)
+│  ├─ ToolRegistry (tools)
+│  ├─ AgentRegistry (agents)
+│  ├─ WorkflowFactory (workflows)
+│  └─ ComponentRegistry (events)
+└─ Engine-agnostic initialization
+```
+
+**Original Issues Fixed**:
+1. ✅ "Memory enabled but ContextBridge unavailable" warning - MemoryManager now created in Infrastructure
+2. ✅ Infrastructure split between CLI and kernel - Now unified in ScriptRuntime
+3. ✅ Service mode inconsistency - Single creation path for all modes
+4. ✅ Language-specific entry points - Replaced with engine-agnostic API
+5. ✅ CLI dependency for services - Services can use kernel directly
+
+---
+
+### Key Design Patterns Established
+
+**1. Infrastructure Module Pattern**:
+- Single entry point: `Infrastructure::from_config(config)`
+- Config-driven: All 9 components created based on LLMSpellConfig
+- Conditional creation: RAG and MemoryManager only if enabled
+- Zero external dependencies
+
+**2. Engine-Agnostic API**:
+- `ScriptRuntime::new(config)` - Uses config.default_engine
+- `ScriptRuntime::with_engine(config, "lua"|"javascript")` - Explicit override
+- Factory pattern: `EngineFactory::create_engine_by_name()`
+- Feature-gated: `#[cfg(any(feature = "lua", feature = "javascript"))]`
+
+**3. Direct Ownership (No RwLock)**:
+- Before: `Arc<RwLock<Option<Arc<SessionManager>>>>`
+- After: `Arc<SessionManager>` (always present)
+- RAG/Memory still `Option<Arc<T>>` (config-driven)
+- Simpler code, no lock contention
+
+**4. Type Erasure for SessionManager**:
+- Trait method: `get_session_manager_any() -> Option<Arc<dyn Any>>`
+- Avoids circular dependency: core ←→ kernel
+- Kernel downcasts via `Arc::downcast<SessionManager>()`
+
+---
+
+### Breaking Changes (Pre-1.0 Cleanup)
+
+**Deleted Constructors** (7 methods, 148 lines):
+- `new_with_lua()`
+- `new_with_javascript()`
+- `new_with_lua_and_provider()`
+- `new_with_lua_provider_and_session()`
+- `new_with_lua_core_provider_and_session()`
+- `new_with_javascript_and_provider()`
+- `new_with_engine_name()`
+
+**Deleted Setters** (4 methods, 89 lines):
+- `set_session_manager()`
+- `set_rag()`
+- `set_memory_manager()`
+- `set_session_manager_any()` (internal)
+
+**Deleted Private Helpers** (2 methods, 290 lines):
+- `new_with_engine_provider_and_session()`
+- `new_with_engine_and_provider()`
+
+**Migration Path**: All usage updated in Task 13b.16.6 (72 occurrences across 13 test files)
+
+---
+
+### Files Created
+
+- `llmspell-bridge/src/infrastructure.rs` (372 lines) - Infrastructure module with `from_config()`
+
+### Files Modified
+
+- `llmspell-bridge/src/runtime.rs` (2535 → 1998 lines, -537 lines)
+- `llmspell-bridge/src/lib.rs` (3 public API functions updated/deprecated)
+- `llmspell-cli/src/execution_context.rs` (108 → 12 lines, -96 lines)
+- `llmspell-kernel/src/integrated.rs` (removed `create_full_infrastructure_with_injector()`)
+- `llmspell-kernel/src/api.rs` (simplified `create_script_runtime()`)
+- 13 test files (72 occurrences updated to new API)
+
+### Files Deleted
+
+None (cleanup via deletion of methods, not files)
+
+---
+
+### Impact on Future Phases
+
+**Phase 14+ Readiness**:
+- ✅ Web server daemon can use `ScriptRuntime::new()` directly (no CLI dependency)
+- ✅ gRPC service can use kernel APIs (no intermediate layer)
+- ✅ Jupyter integration simplified (single entry point)
+- ✅ Template system stable (ExecutionContext unchanged)
+- ✅ Memory system stable (MemoryManager wiring correct)
+
+**Technical Debt Eliminated**:
+- RwLock pattern removed (simpler ownership)
+- Late initialization removed (all upfront)
+- Language-specific constructors removed (engine-agnostic)
+- CLI infrastructure creation removed (kernel self-contained)
+- Setter methods removed (no temporal coupling)
+
+---
+
+### Lessons Learned
+
+**1. Estimate Accuracy**: 18h actual vs 13h estimated (138%)
+- Task 13b.16.2 took 5h (estimated 4h) - RwLock pattern removal more complex
+- Task 13b.16.6 took 2.5h (estimated 2h) - 72 occurrences across 13 files
+- Task 13b.16.8 took 2h (estimated 1.5h) - Orphaned attributes, lib.rs updates
+
+**2. Breaking Changes Pre-1.0**:
+- Clean code > backward compatibility
+- Deprecated wrappers NOT worth the complexity
+- Update-all-at-once strategy worked well
+
+**3. Architecture Compliance**:
+- Phase 9/10 principles caught architectural violations
+- "Self-contained component" principle guided refactor
+- Single creation path reduces bugs
+
+**4. Testing Strategy**:
+- Update tests BEFORE deleting old API (Task 13b.16.6 → 13b.16.8)
+- Parallel test runs saved time (bridge + kernel simultaneously)
+- Clippy enforcement prevented regressions
+
+---
+
+### Benefits Realized
+
+**Primary Goals**:
+1. ✅ Fixes "Memory enabled but ContextBridge unavailable" warning
 2. ✅ CLI is truly thin (Phase 9/10 architecture)
 3. ✅ ScriptRuntime is self-contained (Phase 9 principle)
+4. ✅ Services can use kernel directly (no CLI dependency)
+5. ✅ Single infrastructure creation path (CLI + service mode)
+
+**Secondary Benefits**:
+- Code reduced by 630+ lines (better maintainability)
+- Public API reduced by 82% (simpler learning curve)
+- Zero lock contention (direct ownership)
+- Faster initialization (<50ms for full infrastructure)
+- Better testability (all components available immediately)
+
+---
+
+### Ready for Phase 14+
+
+Phase 13b.16 establishes the foundation for external service integration:
+- ✅ **Web Server Daemon**: Can create ScriptRuntime directly
+- ✅ **gRPC Service**: Can use kernel APIs without CLI
+- ✅ **Jupyter Lab**: Simplified integration via single entry point
+- ✅ **Future Clients**: Clean, stable, engine-agnostic API
+
+**Architecture Validated**: Phase 9/10 principles successfully applied to ScriptRuntime layer.
+
+---
+
+**END OF PHASE 13b.16**
 4. ✅ Engine-agnostic API (future-proof)
 5. ✅ Single infrastructure creation path (no duplication)
 6. ✅ Web server daemon can use ScriptRuntime directly (no CLI dependency)
