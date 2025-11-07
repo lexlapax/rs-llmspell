@@ -337,7 +337,7 @@ impl ScriptRuntime {
     ))]
     pub async fn new(config: LLMSpellConfig) -> Result<Self, LLMSpellError> {
         info!("Creating ScriptRuntime with engine: {}", config.default_engine);
-        Self::with_engine(config.clone(), &config.default_engine).await
+        Box::pin(Self::with_engine(config.clone(), &config.default_engine)).await
     }
 
     /// Create script runtime with specific engine override (Phase 13b.16.2 - Engine-Agnostic API)
@@ -621,10 +621,7 @@ impl ScriptRuntime {
             #[cfg(feature = "javascript")]
             "javascript" | "js" => {
                 let js_config = JSConfig::default();
-                EngineFactory::create_javascript_engine_with_runtime(
-                    &js_config,
-                    Some(Arc::new(config.clone())),
-                )
+                EngineFactory::create_javascript_engine(&js_config)
             }
             _ => Err(LLMSpellError::Validation {
                 field: Some("engine".to_string()),
@@ -1608,6 +1605,10 @@ impl ScriptExecutor for ScriptRuntime {
         } else {
             warn!("Failed to downcast session manager from Any");
         }
+    }
+
+    fn get_session_manager_any(&self) -> Option<Arc<dyn std::any::Any + Send + Sync>> {
+        Some(self.session_manager.clone() as Arc<dyn std::any::Any + Send + Sync>)
     }
 
     fn component_registry(&self) -> Option<Arc<dyn ComponentLookup>> {

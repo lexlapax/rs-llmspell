@@ -1669,22 +1669,14 @@ pub async fn start_kernel_service_with_config(
     let transport = setup_kernel_transport(config.port, &mut conn_manager).await?;
     info!("Transport setup complete");
 
-    // Create SessionManager for this service kernel
-    let state_manager = Arc::new(crate::state::StateManager::new(None).await?);
-    let session_storage_backend = Arc::new(llmspell_storage::MemoryBackend::new());
-    let hook_registry = Arc::new(llmspell_hooks::HookRegistry::new());
-    let hook_executor = Arc::new(llmspell_hooks::HookExecutor::new());
-    let event_bus = Arc::new(llmspell_events::bus::EventBus::new());
-    let session_config = crate::sessions::SessionManagerConfig::default();
+    // Phase 13b.16.4: Extract SessionManager from ScriptExecutor (infrastructure already created)
+    let session_manager_any = config
+        .script_executor
+        .get_session_manager_any()
+        .ok_or_else(|| anyhow::anyhow!("ScriptExecutor does not provide session manager"))?;
 
-    let session_manager = Arc::new(crate::sessions::SessionManager::new(
-        state_manager,
-        session_storage_backend,
-        hook_registry,
-        hook_executor,
-        &event_bus,
-        session_config,
-    )?);
+    let session_manager = Arc::downcast::<crate::sessions::SessionManager>(session_manager_any)
+        .map_err(|_| anyhow::anyhow!("Failed to downcast session manager"))?;
 
     // Create a session for this kernel instance
     let session_options = crate::sessions::CreateSessionOptions::builder()

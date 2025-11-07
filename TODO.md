@@ -9372,31 +9372,34 @@ workflow_factory: Arc<dyn WorkflowFactory>, // From Infrastructure, always prese
 
 ---
 
-## Breaking Change Analysis
+#### Breaking Change Analysis
 
-### 1. Constructor Signature Changes
+##### 1. Constructor Signature Changes
 
-**OLD API (deprecated, keep for compatibility)**:
+**OLD API (to be DELETED in Task 13b.16.8)**:
 ```rust
-ScriptRuntime::new_with_lua(config) -> Result<Self>
-ScriptRuntime::new_with_javascript(config) -> Result<Self>
-ScriptRuntime::new_with_lua_and_provider(config, provider) -> Result<Self>
-ScriptRuntime::new_with_lua_provider_and_session(config, provider, session) -> Result<Self>
-ScriptRuntime::new_with_lua_core_provider_and_session(config, provider, session) -> Result<Self>
+ScriptRuntime::new_with_lua(config) -> Result<Self>                                ❌ DELETE
+ScriptRuntime::new_with_javascript(config) -> Result<Self>                         ❌ DELETE
+ScriptRuntime::new_with_lua_and_provider(config, provider) -> Result<Self>         ❌ DELETE
+ScriptRuntime::new_with_lua_provider_and_session(config, provider, session) -> ... ❌ DELETE
+ScriptRuntime::new_with_lua_core_provider_and_session(...) -> Result<Self>         ❌ DELETE
+ScriptRuntime::new_with_javascript_and_provider(...) -> Result<Self>               ❌ DELETE
+ScriptRuntime::new_with_engine_name(engine_name, config) -> Result<Self>           ❌ DELETE
 ```
 
-**NEW API (primary, engine-agnostic)**:
+**NEW API (ONLY public constructors after 13b.16.8)**:
 ```rust
 ScriptRuntime::new(config) -> Result<Self>                      // Uses config.default_engine
 ScriptRuntime::with_engine(config, engine_name) -> Result<Self> // Explicit engine override
 ```
 
-**Migration Strategy**:
-- Keep old constructors as `#[deprecated]` wrappers that delegate to `new()`
-- Update all internal usage to `new()` or `with_engine()`
-- Remove deprecated constructors in future release (Phase 14+)
+**Migration Strategy (NO DEPRECATED CODE)**:
+- ~~Keep old constructors as `#[deprecated]` wrappers~~ ❌ NOT DOING THIS
+- Update ALL usage to `new()` or `with_engine()` (Tasks 13b.16.2-6)
+- DELETE old constructors entirely (Task 13b.16.8)
+- Rationale: Pre-1.0 project, clean code > backward compatibility
 
-### 2. Field Access Changes
+##### 2. Field Access Changes
 
 **OLD (RwLock pattern)**:
 ```rust
@@ -9425,7 +9428,7 @@ if let Some(ref rag) = runtime.rag {
 
 **Impact**: Simpler code, no lock contention, clearer ownership
 
-### 3. Setter Method Removal
+##### 3. Setter Method Removal
 
 **REMOVED PUBLIC METHODS**:
 - `set_session_manager()` - No longer needed (init from Infrastructure)
@@ -9437,7 +9440,7 @@ if let Some(ref rag) = runtime.rag {
 - Infrastructure::from_config() handles all initialization
 - Cleaner public API surface
 
-### 4. Initialization Flow Changes
+##### 4. Initialization Flow Changes
 
 **OLD FLOW** (execution_context.rs):
 ```rust
@@ -9465,9 +9468,9 @@ let handle = start_embedded_kernel(script_executor).await?;
 
 ---
 
-## Internal Structure Changes
+#### Internal Structure Changes
 
-### New ScriptRuntime Fields (from Infrastructure):
+##### New ScriptRuntime Fields (from Infrastructure):
 
 ```rust
 pub struct ScriptRuntime {
@@ -9492,72 +9495,71 @@ pub struct ScriptRuntime {
 }
 ```
 
-### Removed Fields:
+##### Removed Fields:
 - `context_enabled: Arc<RwLock<bool>>` - No longer needed (use memory_manager.is_some())
 
 ---
 
-## Affected Components
+#### Affected Components
 
-### 1. llmspell-cli/src/execution_context.rs
+##### 1. llmspell-cli/src/execution_context.rs
 **Change**: Delete `create_full_infrastructure()` entirely (Task 13b.16.3)
 **Impact**: ~200 lines deleted, CLI becomes thin layer
 **Migration**: Use `ScriptRuntime::new(config)` directly
 
-### 2. llmspell-kernel/src/api.rs
+##### 2. llmspell-kernel/src/api.rs
 **Change**: Remove `start_embedded_kernel_with_infrastructure()` (Task 13b.16.5)
 **Impact**: Simplified kernel API, single entry point
 **Migration**: Use `start_embedded_kernel(executor)` - executor already has everything
 
-### 3. llmspell-bridge/src/lib.rs
+##### 3. llmspell-bridge/src/lib.rs
 **Change**: Update `create_script_executor()` to use `ScriptRuntime::new()`
 **Impact**: Simpler factory function
 **Migration**: One-line change
 
-### 4. Tests
+##### 4. Tests
 **Change**: Update all tests using old constructors
 **Impact**: ~10-15 test files
 **Migration**: Replace `new_with_lua()` with `new()` or use deprecated wrapper
 
 ---
 
-## Compatibility Strategy
+#### Implementation Strategy (Single Phase - No Deferred Cleanup)
 
-### Phase 1 (This PR - 13b.16.2):
+**All work completed in Phase 13b.16 - NO deprecated code after completion**:
 1. ✅ Add Infrastructure module (Task 13b.16.1 - DONE)
 2. ⏳ Add `ScriptRuntime::new()` and `with_engine()` (Task 13b.16.2)
-3. ⏳ Keep old constructors as `#[deprecated]` wrappers
-4. ⏳ Update CLI/kernel to use new API (Tasks 13b.16.3-5)
-5. ⏳ Update tests (Task 13b.16.6)
+3. ⏳ Update CLI/kernel to use new API (Tasks 13b.16.3-5)
+4. ⏳ Update ALL tests to new API (Task 13b.16.6)
+5. ⏳ Integration validation (Task 13b.16.7)
+6. ⏳ DELETE old constructors/setters/helpers entirely (Task 13b.16.8)
 
-### Phase 2 (Future PR - Phase 14+):
-1. Remove deprecated constructors
-2. Remove compatibility shims
-3. Clean up old patterns
+**Rationale**: Pre-1.0 project allows breaking changes. Clean code > backward compatibility.
+**No Deferred Work**: User requirement - clean codebase after 13b.16 completion.
 
 ---
 
-## Risk Assessment
+#### Risk Assessment
 
-### Risk 1: RwLock Removal
+##### Risk 1: RwLock Removal
 **Risk**: Late initialization no longer possible
 **Mitigation**: Infrastructure creates everything upfront from config
 **Validation**: Check all setter call sites (should be in CLI/kernel only)
 **Status**: ✅ Acceptable - Phase 9/10 architecture requires upfront init
 
-### Risk 2: SessionManager Always Present
+##### Risk 2: SessionManager Always Present
 **Risk**: SessionManager required even for standalone ScriptRuntime
 **Mitigation**: Infrastructure creates minimal SessionManager (sled backend)
 **Validation**: Test standalone usage without kernel
 **Status**: ✅ Acceptable - SessionManager is lightweight
 
-### Risk 3: Constructor Complexity
+##### Risk 3: Constructor Complexity
 **Risk**: `new()` and `with_engine()` have many initialization steps
 **Mitigation**: Well-documented, clean separation via Infrastructure module
 **Validation**: Unit tests for each constructor
 **Status**: ✅ Acceptable - complexity contained in private helpers
 
-### Risk 4: Kernel API Changes
+##### Risk 4: Kernel API Changes
 **Risk**: start_embedded_kernel_with_infrastructure() signature changes
 **Mitigation**: Task 13b.16.5 provides clean migration path
 **Validation**: Integration tests
@@ -9599,9 +9601,11 @@ impl ScriptRuntime {
 - [ ] `ScriptRuntime::new(config)` works with config.default_engine
 - [ ] `ScriptRuntime::with_engine(config, "lua")` works
 - [ ] `ScriptRuntime::with_engine(config, "javascript")` works (when available)
-- [ ] Old constructors still work (deprecated)
+- [ ] ~~Old constructors work (deprecated)~~ ❌ DELETED in Task 13b.16.8
 - [ ] Engine-agnostic API design
-- [ ] All infrastructure created internally
+- [ ] All infrastructure created internally from Infrastructure module
+- [ ] SessionManager/RAG/Memory: direct ownership (no RwLock pattern)
+- [ ] Struct fields updated: added state_manager, removed context_enabled
 - [ ] Zero clippy warnings
 
 **Files to Modify**:
@@ -9791,6 +9795,10 @@ RUST_LOG=debug llmspell run examples/.../research-chat/main.lua 2>&1 | grep -i m
 6. ✅ MemoryManager created from config, no fallback warning
 7. ✅ RAG available in templates (from 13b.15.6)
 8. ✅ Embedded and service modes identical infrastructure
+
+
+### Task 13b.16.8: Cleanup old code, deprecated code
+**analyze and research and fill this section out**
 
 ---
 

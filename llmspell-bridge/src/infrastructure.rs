@@ -104,6 +104,7 @@ impl Infrastructure {
     /// # Errors
     ///
     /// Returns an error if any component fails to initialize
+    #[allow(clippy::cognitive_complexity)]
     pub async fn from_config(config: &LLMSpellConfig) -> Result<Self, LLMSpellError> {
         info!("Creating infrastructure from config");
 
