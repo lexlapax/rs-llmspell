@@ -9600,15 +9600,15 @@ impl ScriptRuntime {
 5. Update `create_script_executor()` in `lib.rs` to use `ScriptRuntime::new()`
 
 **Acceptance Criteria**:
-- [ ] `ScriptRuntime::new(config)` works with config.default_engine
-- [ ] `ScriptRuntime::with_engine(config, "lua")` works
-- [ ] `ScriptRuntime::with_engine(config, "javascript")` works (when available)
-- [ ] ~~Old constructors work (deprecated)~~ ❌ DELETED in Task 13b.16.8
-- [ ] Engine-agnostic API design
-- [ ] All infrastructure created internally from Infrastructure module
-- [ ] SessionManager/RAG/Memory: direct ownership (no RwLock pattern)
-- [ ] Struct fields updated: added state_manager, removed context_enabled
-- [ ] Zero clippy warnings
+- [x] `ScriptRuntime::new(config)` works with config.default_engine
+- [x] `ScriptRuntime::with_engine(config, "lua")` works
+- [x] `ScriptRuntime::with_engine(config, "javascript")` works (when available)
+- [x] ~~Old constructors work (deprecated)~~ ❌ DELETED in Task 13b.16.8
+- [x] Engine-agnostic API design
+- [x] All infrastructure created internally from Infrastructure module
+- [x] SessionManager/RAG/Memory: direct ownership (no RwLock pattern)
+- [x] Struct fields updated: added state_manager, removed context_enabled
+- [x] Zero clippy warnings
 
 **Files to Modify**:
 - `llmspell-bridge/src/runtime.rs` (major refactor ~400 lines)
@@ -9651,12 +9651,12 @@ let script_executor = Arc::new(llmspell_bridge::ScriptRuntime::new(config.clone(
 4. Update `start_embedded_kernel()` call - remove `session_manager` parameter (no longer needed)
 
 **Acceptance Criteria**:
-- [ ] `create_full_infrastructure()` deleted
-- [ ] CLI has ZERO infrastructure creation code
-- [ ] `ExecutionContext::resolve()` just calls kernel APIs
-- [ ] Embedded mode works
-- [ ] Auto-detection mode works
-- [ ] Zero clippy warnings
+- [x] `create_full_infrastructure()` deleted
+- [x] CLI has ZERO infrastructure creation code
+- [x] `ExecutionContext::resolve()` just calls kernel APIs
+- [x] Embedded mode works
+- [x] Auto-detection mode works
+- [x] Zero clippy warnings
 
 **Files to Modify**:
 - `llmspell-cli/src/execution_context.rs` (DELETE ~200 lines)
@@ -9700,10 +9700,10 @@ pub async fn start_kernel_service_with_config(
 4. Kernel just uses what's in ScriptExecutor
 
 **Acceptance Criteria**:
-- [ ] Daemon mode starts successfully
-- [ ] No duplicate infrastructure creation
-- [ ] Embedded and daemon modes use SAME ScriptRuntime path
-- [ ] Zero clippy warnings
+- [x] Daemon mode starts successfully
+- [x] No duplicate infrastructure creation
+- [x] Embedded and daemon modes use SAME ScriptRuntime path
+- [x] Zero clippy warnings
 
 **Files to Modify**:
 - `llmspell-kernel/src/api.rs` (DELETE ~50 lines)
