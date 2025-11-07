@@ -9317,7 +9317,253 @@ async fn create_memory_manager(config: &LLMSpellConfig) -> Result<...>;
 **Estimated Time**: 4 hours
 **Status**: TODO
 
-**Description**: Replace language-specific constructors with engine-agnostic `new()` and `with_engine()` methods.
+**Description**: Replace language-specific constructors with engine-agnostic `new()` and `with_engine()` methods, remove RwLock pattern for direct Infrastructure ownership.
+
+---
+
+## Architecture Decision: Remove RwLock Pattern (Option B)
+
+**Decision**: Remove `Arc<RwLock<Option<...>>>` pattern for `session_manager`, `rag`, `memory_manager`. Take direct ownership of Infrastructure components.
+
+**Current Architecture (Pre-13b.16.2)**:
+```rust
+// ScriptRuntime fields (CURRENT - to be removed)
+session_manager: Arc<RwLock<Option<Arc<SessionManager>>>>,  // Late init via setter
+rag: Arc<RwLock<Option<Arc<MultiTenantRAG>>>>,              // Late init via setter
+memory_manager: Arc<RwLock<Option<Arc<dyn MemoryManager>>>>, // Late init via setter
+context_enabled: Arc<RwLock<bool>>,                          // Late init flag
+
+// Setter methods (CURRENT - to be removed)
+pub fn set_session_manager(&self, manager: Arc<SessionManager>)
+pub fn set_rag(&self, rag: Arc<MultiTenantRAG>)
+pub fn set_memory_manager(&self, manager: Arc<dyn MemoryManager>)
+
+// Initialization flow (CURRENT - wrong architecture)
+1. CLI creates Infrastructure (WRONG - violates Phase 9/10)
+2. CLI creates ScriptRuntime (without infrastructure)
+3. Kernel wires infrastructure via setters (late initialization)
+```
+
+**New Architecture (Post-13b.16.2)**:
+```rust
+// ScriptRuntime fields (NEW - direct ownership)
+state_manager: Arc<StateManager>,           // From Infrastructure, always present
+session_manager: Arc<SessionManager>,       // From Infrastructure, always present
+rag: Option<Arc<MultiTenantRAG>>,          // From Infrastructure, config-driven
+memory_manager: Option<Arc<dyn MemoryManager>>, // From Infrastructure, config-driven
+tool_registry: Arc<ToolRegistry>,           // From Infrastructure, always present
+agent_registry: Arc<FactoryRegistry>,       // From Infrastructure, always present
+workflow_factory: Arc<dyn WorkflowFactory>, // From Infrastructure, always present
+
+// NO setter methods - everything initialized in constructor
+
+// Initialization flow (NEW - correct architecture)
+1. ScriptRuntime::new(config) creates Infrastructure internally
+2. All 9 components initialized from Infrastructure::from_config()
+3. No late initialization needed
+```
+
+**Rationale**:
+1. **Phase 9/10 Compliance**: "IntegratedKernel as self-contained component"
+2. **Single Creation Path**: Infrastructure creates everything upfront
+3. **Simpler Code**: No RwLock reads, no None checks for SessionManager
+4. **Better Testing**: All components available immediately
+5. **No Late Init**: No temporal coupling between creation and wiring
+
+---
+
+## Breaking Change Analysis
+
+### 1. Constructor Signature Changes
+
+**OLD API (deprecated, keep for compatibility)**:
+```rust
+ScriptRuntime::new_with_lua(config) -> Result<Self>
+ScriptRuntime::new_with_javascript(config) -> Result<Self>
+ScriptRuntime::new_with_lua_and_provider(config, provider) -> Result<Self>
+ScriptRuntime::new_with_lua_provider_and_session(config, provider, session) -> Result<Self>
+ScriptRuntime::new_with_lua_core_provider_and_session(config, provider, session) -> Result<Self>
+```
+
+**NEW API (primary, engine-agnostic)**:
+```rust
+ScriptRuntime::new(config) -> Result<Self>                      // Uses config.default_engine
+ScriptRuntime::with_engine(config, engine_name) -> Result<Self> // Explicit engine override
+```
+
+**Migration Strategy**:
+- Keep old constructors as `#[deprecated]` wrappers that delegate to `new()`
+- Update all internal usage to `new()` or `with_engine()`
+- Remove deprecated constructors in future release (Phase 14+)
+
+### 2. Field Access Changes
+
+**OLD (RwLock pattern)**:
+```rust
+// Reading requires lock acquisition + Option unwrap
+let session = runtime.session_manager.read().unwrap();
+if let Some(ref mgr) = *session {
+    mgr.do_something();
+}
+
+let rag = runtime.rag.read().unwrap().clone();
+if let Some(ref r) = rag {
+    r.search(...);
+}
+```
+
+**NEW (direct ownership)**:
+```rust
+// SessionManager always available (no Option)
+runtime.session_manager.do_something();
+
+// RAG/Memory still Option (config-driven)
+if let Some(ref rag) = runtime.rag {
+    rag.search(...);
+}
+```
+
+**Impact**: Simpler code, no lock contention, clearer ownership
+
+### 3. Setter Method Removal
+
+**REMOVED PUBLIC METHODS**:
+- `set_session_manager()` - No longer needed (init from Infrastructure)
+- `set_rag()` - No longer needed (init from Infrastructure)
+- `set_memory_manager()` - No longer needed (init from Infrastructure)
+
+**Impact**:
+- Kernel can no longer wire these after creation
+- Infrastructure::from_config() handles all initialization
+- Cleaner public API surface
+
+### 4. Initialization Flow Changes
+
+**OLD FLOW** (execution_context.rs):
+```rust
+// WRONG: CLI creates infrastructure
+let (script_executor, session_manager) = create_full_infrastructure(&config).await?;
+
+// WRONG: Kernel needs separate session_manager parameter
+let handle = start_embedded_kernel_with_infrastructure(
+    config,
+    script_executor,
+    session_manager  // Passed separately
+).await?;
+```
+
+**NEW FLOW**:
+```rust
+// CORRECT: CLI just calls kernel API
+let script_executor = Arc::new(ScriptRuntime::new(config.clone()).await?)
+    as Arc<dyn ScriptExecutor>;
+
+// CORRECT: Kernel uses what's in ScriptExecutor
+let handle = start_embedded_kernel(script_executor).await?;
+// ScriptExecutor ALREADY HAS SessionManager, RAG, Memory, etc.
+```
+
+---
+
+## Internal Structure Changes
+
+### New ScriptRuntime Fields (from Infrastructure):
+
+```rust
+pub struct ScriptRuntime {
+    // Existing fields (unchanged)
+    engine: Box<dyn ScriptEngineBridge>,
+    registry: Arc<ComponentRegistry>,           // Script access layer
+    provider_manager: Arc<ProviderManager>,
+    execution_context: Arc<RwLock<ExecutionContext>>,
+    debug_context: Arc<RwLock<Option<Arc<dyn DebugContext>>>>,
+    _config: LLMSpellConfig,
+
+    // NEW: Direct infrastructure ownership (from Infrastructure module)
+    state_manager: Arc<StateManager>,           // NEW - from Infrastructure
+    session_manager: Arc<SessionManager>,       // CHANGED - direct ownership (was RwLock<Option>)
+    rag: Option<Arc<MultiTenantRAG>>,          // CHANGED - direct ownership (was RwLock<Option>)
+    memory_manager: Option<Arc<dyn MemoryManager>>, // CHANGED - direct ownership (was RwLock<Option>)
+
+    // Infrastructure registries (existing, from Infrastructure)
+    tool_registry: Arc<ToolRegistry>,           // Existing, from Infrastructure
+    agent_registry: Arc<FactoryRegistry>,       // Existing, from Infrastructure
+    workflow_factory: Arc<dyn WorkflowFactory>, // Existing, from Infrastructure
+}
+```
+
+### Removed Fields:
+- `context_enabled: Arc<RwLock<bool>>` - No longer needed (use memory_manager.is_some())
+
+---
+
+## Affected Components
+
+### 1. llmspell-cli/src/execution_context.rs
+**Change**: Delete `create_full_infrastructure()` entirely (Task 13b.16.3)
+**Impact**: ~200 lines deleted, CLI becomes thin layer
+**Migration**: Use `ScriptRuntime::new(config)` directly
+
+### 2. llmspell-kernel/src/api.rs
+**Change**: Remove `start_embedded_kernel_with_infrastructure()` (Task 13b.16.5)
+**Impact**: Simplified kernel API, single entry point
+**Migration**: Use `start_embedded_kernel(executor)` - executor already has everything
+
+### 3. llmspell-bridge/src/lib.rs
+**Change**: Update `create_script_executor()` to use `ScriptRuntime::new()`
+**Impact**: Simpler factory function
+**Migration**: One-line change
+
+### 4. Tests
+**Change**: Update all tests using old constructors
+**Impact**: ~10-15 test files
+**Migration**: Replace `new_with_lua()` with `new()` or use deprecated wrapper
+
+---
+
+## Compatibility Strategy
+
+### Phase 1 (This PR - 13b.16.2):
+1. ✅ Add Infrastructure module (Task 13b.16.1 - DONE)
+2. ⏳ Add `ScriptRuntime::new()` and `with_engine()` (Task 13b.16.2)
+3. ⏳ Keep old constructors as `#[deprecated]` wrappers
+4. ⏳ Update CLI/kernel to use new API (Tasks 13b.16.3-5)
+5. ⏳ Update tests (Task 13b.16.6)
+
+### Phase 2 (Future PR - Phase 14+):
+1. Remove deprecated constructors
+2. Remove compatibility shims
+3. Clean up old patterns
+
+---
+
+## Risk Assessment
+
+### Risk 1: RwLock Removal
+**Risk**: Late initialization no longer possible
+**Mitigation**: Infrastructure creates everything upfront from config
+**Validation**: Check all setter call sites (should be in CLI/kernel only)
+**Status**: ✅ Acceptable - Phase 9/10 architecture requires upfront init
+
+### Risk 2: SessionManager Always Present
+**Risk**: SessionManager required even for standalone ScriptRuntime
+**Mitigation**: Infrastructure creates minimal SessionManager (sled backend)
+**Validation**: Test standalone usage without kernel
+**Status**: ✅ Acceptable - SessionManager is lightweight
+
+### Risk 3: Constructor Complexity
+**Risk**: `new()` and `with_engine()` have many initialization steps
+**Mitigation**: Well-documented, clean separation via Infrastructure module
+**Validation**: Unit tests for each constructor
+**Status**: ✅ Acceptable - complexity contained in private helpers
+
+### Risk 4: Kernel API Changes
+**Risk**: start_embedded_kernel_with_infrastructure() signature changes
+**Mitigation**: Task 13b.16.5 provides clean migration path
+**Validation**: Integration tests
+**Status**: ✅ Acceptable - cleaner API is the goal
+
+---
 
 **New Public API**:
 ```rust
