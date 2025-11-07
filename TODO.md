@@ -10189,6 +10189,7 @@ let runtime = ScriptRuntime::with_engine(config, "lua").await?;
 - `98ef16ce` - fix: Update lib.rs doctest to use new with_engine() API
 - `fd775c70` - test: Increase lock-free performance test threshold to 300%
 - `b212e511` - test: Update error message assertion in test_create_agent_from_spec_unknown_provider
+- `82f6f25d` - fix: Wire RAG vector persistence_path config to Infrastructure module
 
 **Summary & Insights**:
 
@@ -10306,6 +10307,59 @@ assert!(
 - **After**: 72 passed, 0 failed
 
 **File**: llmspell-providers/src/abstraction.rs:830-834
+
+---
+
+**RAG Persistence Config Fix** (82f6f25d):
+
+**Problem**: RAG persistence test failing - second runtime not loading persisted vectors
+```
+Data saved to disk
+Search before restart - found:    1
+=== Creating second runtime to load persisted data ===
+Search response:    exists
+Total results:    0  ← Expected 1
+
+thread 'test_rag_persistence' panicked:
+called `Result::unwrap()` on an `Err` value: ... "Persisted data not found!"
+```
+
+**Root Cause**: Infrastructure module ignored `config.rag.vector_storage.persistence_path`
+- **Configuration**: Test set `persistence_path = Some("/path/to/vectors")`
+- **Infrastructure::create_rag()**: Called `HNSWVectorStorage::new()` but NOT `with_persistence()`
+- **Result**: Vector storage created without persistence enabled
+- **Impact**: Second runtime created fresh storage, lost persisted data
+
+**Fix**: Wire persistence_path from config to vector storage
+```rust
+// Before:
+let vector_storage = Arc::new(HNSWVectorStorage::new(dimensions, storage_hnsw_config));
+
+// After:
+let mut vector_storage = HNSWVectorStorage::new(dimensions, storage_hnsw_config);
+
+// Enable persistence if configured
+if let Some(ref persistence_path) = config.rag.vector_storage.persistence_path {
+    debug!("Enabling RAG vector persistence at: {:?}", persistence_path);
+    vector_storage = vector_storage.with_persistence(persistence_path.clone());
+}
+
+let vector_storage = Arc::new(vector_storage);
+```
+
+**Why This Happened**:
+- Infrastructure module created during 13b.16.1 refactor
+- Session backend config was wired (13b.16.9 fix)
+- RAG persistence config NOT wired (missed during refactor)
+- Pattern: Config parameters need explicit wiring to component creation
+
+**Test Results**:
+- **Before**: test_rag_persistence FAILED (persisted data not found)
+- **After**: test_rag_persistence ok (persistence verified)
+
+**File**: llmspell-bridge/src/infrastructure.rs:282-290
+
+**Lesson**: Infrastructure module config-driven pattern requires checking ALL optional config paths, not just top-level enables.
 
 ---
 
