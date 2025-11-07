@@ -10165,11 +10165,59 @@ fn create_session_manager(
 
 **Related Issues Fixed**:
 - Also fixed missed test update in `llmspell-kernel/src/protocols/repl.rs:644` (still used `new_with_lua()`)
+- Fixed doctest regression in `llmspell-bridge/src/lib.rs:206` (still used deleted `new_with_engine_name()`)
+
+**Doctest Regression** (lib.rs:191):
+```rust
+// BEFORE (broken after 13b.16.8 deletion):
+let runtime = ScriptRuntime::new_with_engine_name("lua", config).await?;
+// ERROR: no function or associated item named `new_with_engine_name` found
+
+// AFTER (fixed):
+let runtime = ScriptRuntime::with_engine(config, "lua").await?;
+```
+
+**Test Results After Doctest Fix**:
+- **Before**: `test result: FAILED. 13 passed; 1 failed` (doctest compilation error)
+- **After**: `test result: ok. 14 passed; 0 failed; 16 ignored; 0 measured; 0 filtered out; finished in 3.55s`
 
 **Commits**:
 - `4b58f928` - fix: Wire session backend configuration to Infrastructure module (Phase 13b.16.9)
 - `599967eb` - fix: Update repl.rs test to use new ScriptRuntime API
 - `484cc4c8` - chore: Remove orphaned blank lines from runtime.rs
+- `c537cd39` - fix: Update multithreaded test to use memory backend
+- (pending) - fix: Update lib.rs doctest to use new with_engine() API
+
+**Summary & Insights**:
+
+**The Cascade Problem**: Deleting deprecated APIs (13b.16.8) created cascading regressions across 3 test surfaces:
+1. **Unit tests** (repl.rs) - Caught by `cargo test --lib`, fixed in 599967eb
+2. **Integration tests** (tool_integration_test.rs) - Caught by `cargo test --test`, fixed in c537cd39
+3. **Doctests** (lib.rs) - Only caught by `cargo test --doc`, fixed in this commit
+
+**Root Cause**: Incomplete test coverage validation before deletion. Should have run:
+```bash
+cargo test --workspace --all-targets  # Catches ALL test surfaces
+```
+Instead ran only:
+```bash
+cargo test --workspace --lib  # Misses integration tests and doctests
+```
+
+**Regression Prevention Lessons**:
+1. **Test All Surfaces**: Before API deletion, run `--all-targets` (lib + bins + tests + doctests + benches)
+2. **Grep Before Delete**: `grep -r "new_with_engine_name" .` would have found lib.rs doctest
+3. **Compiler Not Enough**: Doctests don't compile during normal builds, only during `cargo test --doc`
+4. **Lock Contention Symptom**: Shared Sled database in tests = sign of config not being respected
+
+**Architecture Win**: Despite regressions, the Infrastructure module design is sound:
+- Config-driven backend selection works correctly once wired
+- Memory backend eliminates lock contention in tests
+- Production defaults to persistent Sled backend
+- Zero changes needed to API design, only implementation bugs
+
+**Time Impact**: +3h unplanned debugging (regression fixes) vs 19h total (116% of 13h estimate)
+- Could have been prevented with 5min of `--all-targets` before deletion
 
 ---
 

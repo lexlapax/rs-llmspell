@@ -203,7 +203,7 @@
 //! // Set default engine
 //! config.default_engine = "lua".to_string();
 //!
-//! let runtime = ScriptRuntime::new_with_engine_name("lua", config).await?;
+//! let runtime = ScriptRuntime::with_engine(config, "lua").await?;
 //! # Ok(())
 //! # }
 //! ```
