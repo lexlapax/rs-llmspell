@@ -378,30 +378,57 @@ impl InteractiveChatTemplate {
             TemplateError::InfrastructureUnavailable("sessions".to_string())
         })?;
 
-        // If session_id provided, attempt to reuse existing session
+        // If session_id provided, handle two cases (Task 13b.15.6):
+        // 1. Valid UUID → reuse existing SessionManager session
+        // 2. Non-UUID string → use as memory anchor, create new SessionManager session
         if let Some(sid) = requested_session_id {
-            info!("Attempting to reuse existing session: {}", sid);
+            // Try to parse as UUID
+            if let Ok(session_id_obj) = SessionId::from_str(&sid) {
+                // Valid UUID - attempt to reuse existing session
+                info!("Attempting to reuse existing session: {}", sid);
 
-            // Parse session ID (validate UUID format)
-            let session_id_obj = SessionId::from_str(&sid).map_err(|e| {
-                warn!("Invalid session_id format: {}", e);
-                TemplateError::ExecutionFailed(format!("Invalid session_id format: {}", e))
+                // Verify session exists (SessionManager handles auto-load from storage)
+                if session_manager.get_session(&session_id_obj).await.is_ok() {
+                    info!("Successfully reusing session: {}", sid);
+                    return Ok(sid);
+                } else {
+                    warn!(
+                        "Session {} not found, creating new session but preserving ID for memory anchor",
+                        sid
+                    );
+                    // Fall through to create new session, will return custom string
+                }
+            } else {
+                // Non-UUID string - use as memory anchor for cross-template memory sharing
+                info!(
+                    "Using custom session_id '{}' as memory anchor (not a SessionManager UUID)",
+                    sid
+                );
+                debug!(
+                    "Creating new SessionManager session but returning custom ID for memory operations"
+                );
+            }
+
+            // Create new SessionManager session (gets UUID), but return custom string for memory
+            let options = CreateSessionOptions::builder()
+                .name("Interactive Chat Session")
+                .description("Session-based conversational AI with tool integration")
+                .add_tag("chat")
+                .add_tag("interactive")
+                .add_tag("template:interactive-chat")
+                .build();
+
+            session_manager.create_session(options).await.map_err(|e| {
+                warn!("Failed to create session: {}", e);
+                TemplateError::ExecutionFailed(format!("Session creation failed: {}", e))
             })?;
 
-            // Verify session exists (SessionManager handles auto-load from storage)
-            session_manager
-                .get_session(&session_id_obj)
-                .await
-                .map_err(|e| {
-                    warn!("Session {} not found: {}", sid, e);
-                    TemplateError::ExecutionFailed(format!("Session not found: {}", sid))
-                })?;
-
-            info!("Successfully reusing session: {}", sid);
+            // Return the custom session_id string for memory operations
+            info!("Created new session, using '{}' as memory anchor", sid);
             return Ok(sid);
         }
 
-        // Otherwise create new session
+        // No session_id provided - create new session with generated UUID
         info!("Creating new interactive chat session");
 
         let options = CreateSessionOptions::builder()
@@ -457,6 +484,9 @@ impl InteractiveChatTemplate {
     }
 
     /// Load conversation history from session state
+    ///
+    /// For UUID session IDs: loads conversation from SessionManager
+    /// For non-UUID memory anchors: returns empty (memory sharing only, not conversation persistence)
     async fn load_conversation_history(
         &self,
         session_id: &str,
@@ -465,12 +495,21 @@ impl InteractiveChatTemplate {
         use llmspell_kernel::sessions::SessionId;
         use std::str::FromStr;
 
+        // Try to parse as UUID (Task 13b.15.6)
+        let sid = match SessionId::from_str(session_id) {
+            Ok(id) => id,
+            Err(_) => {
+                // Non-UUID memory anchor - no conversation history to load
+                debug!(
+                    "Session ID '{}' is not a UUID, skipping conversation history load (memory anchor only)",
+                    session_id
+                );
+                return Ok(Vec::new());
+            }
+        };
+
         // Get session manager
         let session_manager = context.require_sessions()?;
-
-        // Parse session ID
-        let sid = SessionId::from_str(session_id)
-            .map_err(|e| TemplateError::ExecutionFailed(format!("Invalid session ID: {}", e)))?;
 
         // Get session
         let session = session_manager.get_session(&sid).await.map_err(|e| {
@@ -497,6 +536,9 @@ impl InteractiveChatTemplate {
     }
 
     /// Save conversation history to session state
+    ///
+    /// For UUID session IDs: saves conversation to SessionManager
+    /// For non-UUID memory anchors: skips save (memory sharing only, not conversation persistence)
     async fn save_conversation_history(
         &self,
         session_id: &str,
@@ -506,12 +548,21 @@ impl InteractiveChatTemplate {
         use llmspell_kernel::sessions::SessionId;
         use std::str::FromStr;
 
+        // Try to parse as UUID (Task 13b.15.6)
+        let sid = match SessionId::from_str(session_id) {
+            Ok(id) => id,
+            Err(_) => {
+                // Non-UUID memory anchor - skip conversation history save
+                debug!(
+                    "Session ID '{}' is not a UUID, skipping conversation history save (memory anchor only)",
+                    session_id
+                );
+                return Ok(());
+            }
+        };
+
         // Get session manager
         let session_manager = context.require_sessions()?;
-
-        // Parse session ID
-        let sid = SessionId::from_str(session_id)
-            .map_err(|e| TemplateError::ExecutionFailed(format!("Invalid session ID: {}", e)))?;
 
         // Get session
         let session = session_manager.get_session(&sid).await.map_err(|e| {
@@ -953,6 +1004,9 @@ impl InteractiveChatTemplate {
     }
 
     /// Phase 5: Save session state
+    ///
+    /// For UUID session IDs: saves metrics to SessionManager
+    /// For non-UUID memory anchors: skips save (memory sharing only, not session state)
     async fn save_session_state(
         &self,
         session_id: &str,
@@ -962,14 +1016,23 @@ impl InteractiveChatTemplate {
         use llmspell_kernel::sessions::SessionId;
         use std::str::FromStr;
 
+        // Try to parse as UUID (Task 13b.15.6)
+        let sid = match SessionId::from_str(session_id) {
+            Ok(id) => id,
+            Err(_) => {
+                // Non-UUID memory anchor - skip session state save
+                debug!(
+                    "Session ID '{}' is not a UUID, skipping session state save (memory anchor only)",
+                    session_id
+                );
+                return Ok(());
+            }
+        };
+
         info!("Saving session state for session: {}", session_id);
 
         // Get session manager
         let session_manager = context.require_sessions()?;
-
-        // Parse session ID
-        let sid = SessionId::from_str(session_id)
-            .map_err(|e| TemplateError::ExecutionFailed(format!("Invalid session ID: {}", e)))?;
 
         // Get session
         let session = session_manager.get_session(&sid).await.map_err(|e| {

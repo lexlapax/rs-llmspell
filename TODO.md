@@ -9095,6 +9095,268 @@ llmspell -p rag-dev run examples/script-users/applications/research-chat/main.lu
 - [x] All other example apps still work (tested knowledge-management template)
 - [x] Zero new clippy warnings (cargo build succeeds cleanly)
 
+**Additional Fix: UUID Validation for Custom Session IDs (Task 13b.15.6 Extension)**:
+
+**Problem Discovered**: After fixing RAG wiring, research-chat failed with "Invalid session ID" error because interactive-chat template only accepted UUID-format session IDs, but research-chat uses human-readable session IDs like "research-chat-20251106-134612" for memory anchoring.
+
+**Root Cause**:
+- SessionId type wraps Uuid and requires strict UUID validation via SessionId::from_str()
+- interactive_chat template validates session_id in 4 places:
+  - get_or_create_session() - line 386
+  - load_conversation_history() - line 499
+  - save_conversation_history() - line 552
+  - save_session_state() - line 1022
+- research_assistant template does NOT have this issue (only uses session_id as string for memory)
+
+**Architectural Insight**:
+SessionId serves TWO distinct purposes that were conflated:
+1. **SessionManager operations**: requires UUID to look up/persist conversation sessions
+2. **Memory anchoring**: just needs string identifier to share context across templates
+
+**Solution Implemented** (interactive_chat.rs):
+
+1. **get_or_create_session()** (lines 381-429):
+   - Try to parse session_id as UUID
+   - If valid UUID → reuse existing SessionManager session
+   - If non-UUID string → create NEW SessionManager session, return custom string for memory anchor
+   - Separates SessionManager concerns from memory anchoring concerns
+
+2. **load_conversation_history()** (lines 486-536):
+   - Try to parse as UUID
+   - If fails → skip load (no SessionManager session to load from), return empty history
+   - Non-UUID sessions don't persist conversation, only memory sharing works
+
+3. **save_conversation_history()** (lines 538-595):
+   - Try to parse as UUID
+   - If fails → skip save (no SessionManager session to save to)
+   - Non-UUID sessions are stateless from SessionManager perspective
+
+4. **save_session_state()** (lines 1006-1063):
+   - Try to parse as UUID
+   - If fails → skip save
+   - Non-UUID sessions don't persist metrics
+
+**Architecture Consistency**:
+- research_assistant.rs does NOT parse SessionId (correct - only uses string for memory)
+- interactive_chat.rs now handles BOTH use cases gracefully
+- Backward compatible: UUID session IDs work exactly as before
+- Forward compatible: Custom session IDs enable cross-template memory sharing
+
+**Testing Results**:
+- ✅ research-chat executes both templates successfully
+- ✅ No "Invalid session ID" errors
+- ✅ Exit code 0 (success)
+- ✅ RAG infrastructure wired correctly
+- ⚠️ Warnings about unknown parameters (depth, temperature) - these are research-chat app bugs, not platform bugs
+- ⚠️ "Memory enabled but ContextBridge unavailable" - expected (context bridge not in embedded mode scope)
+
+**Files Modified**:
+- llmspell-templates/src/builtin/interactive_chat.rs (4 methods updated for graceful non-UUID handling)
+
+**Insights**:
+1. **Dual-purpose validation is an anti-pattern**: Separating concerns (SessionManager vs memory) prevents future bugs
+2. **Graceful degradation**: Non-UUID sessions work for memory sharing, just skip conversation persistence
+3. **research-chat was never tested end-to-end**: Created in Phase 13.13.5 but manual execution deferred
+4. **Template validation is lenient**: Unknown parameters generate warnings, not errors (good UX)
+
+**Definition of Done (Extended)**:
+- [x] UUID validation fix implemented in all 4 locations
+- [x] Non-UUID session IDs work for memory anchoring
+- [x] UUID session IDs still work for full session persistence
+- [x] research-chat executes successfully (exit code 0)
+- [x] Backward compatibility maintained
+- [x] Zero new clippy warnings
+- [x] Architecture documented
+
+---
+
+### Task 13b.15.7: Wire MemoryManager in create_full_infrastructure (Single Kernel Path)
+**Priority**: HIGH
+**Estimated Time**: 2 hours
+**Assignee**: Infrastructure Team
+**Status**: TODO
+
+**Problem Statement**:
+Templates warn "Memory enabled but ContextBridge unavailable" because MemoryManager is NOT created in `create_full_infrastructure()`. Currently, MemoryManager is only created as an in-memory fallback during global registration, leading to:
+- Templates get unconfigured in-memory MemoryManager instead of proper backend
+- ContextBridge exists but uses wrong backend configuration
+- Confusing warnings for end users who enabled memory in config
+
+**Architectural Insight** (ultrathink):
+
+**There is ONE kernel, TWO protocols**:
+```
+┌─────────────────────────────────────────────┐
+│  CLI Layer (llmspell-cli)                  │
+├─────────────────────────────────────────────┤
+│                                             │
+│  create_full_infrastructure()               │
+│  ├─ Creates ALL infrastructure:            │
+│  │  ✅ ProviderManager                     │
+│  │  ✅ StateManager                        │
+│  │  ✅ SessionManager                      │
+│  │  ✅ RAG (Task 13b.15.6)                 │
+│  │  ❌ MemoryManager (MISSING)             │
+│  │  ❌ ContextBridge (depends on Memory)   │
+│  └─ Wire to GlobalContext                  │
+│                                             │
+├─────────────────────────────────────────────┤
+│         Protocol Selection                   │
+│  ┌─────────────┐       ┌─────────────┐     │
+│  │  Embedded   │       │   ZeroMQ    │     │
+│  │ (in-process)│       │  (remote)   │     │
+│  └──────┬──────┘       └──────┬──────┘     │
+│         └──────────┬───────────┘            │
+│                    ▼                         │
+├─────────────────────────────────────────────┤
+│          KERNEL (same kernel)               │
+│  ┌─────────────────────────────────────┐   │
+│  │  ScriptRuntime + GlobalContext      │   │
+│  │  → Gets ALL infrastructure from     │   │
+│  │    GlobalContext (wire, not create) │   │
+│  └─────────────────────────────────────┘   │
+│                    ▼                         │
+│           Templates Execute                  │
+│    (full infrastructure available)          │
+└─────────────────────────────────────────────┘
+```
+
+**Current BROKEN Flow**:
+1. `create_full_infrastructure()` creates SessionManager, RAG but NOT MemoryManager
+2. Kernel starts with ScriptRuntime
+3. `register_memory_context_globals()` tries to get MemoryManager from GlobalContext
+4. NOT FOUND → creates in-memory fallback (line 104: `DefaultMemoryManager::new_in_memory()`)
+5. Templates get MemoryManager but it's unconfigured fallback
+6. Warning: "Memory enabled but ContextBridge unavailable"
+
+**Root Cause**:
+- Infrastructure creation split between TWO places:
+  1. CLI layer: creates some infrastructure (SessionManager, RAG)
+  2. Global registration: creates other infrastructure (MemoryManager fallback)
+- This violates "single kernel path" principle
+- MemoryManager should be created ONCE in CLI layer, configured from config
+
+**The Fix**:
+
+**File**: `llmspell-cli/src/execution_context.rs` (function `create_full_infrastructure()`)
+
+**Step 1**: Create MemoryManager from config (after RAG creation, ~line 318):
+```rust
+// Create MemoryManager infrastructure from config (Task 13b.15.7)
+use llmspell_memory::DefaultMemoryManager;
+
+let memory_manager = if config.memory.enabled {
+    // Create MemoryManager with configured backend
+    match config.memory.backend.as_str() {
+        "in-memory" => {
+            debug!("Creating in-memory MemoryManager");
+            DefaultMemoryManager::new_in_memory().await?
+        }
+        "surrealdb" => {
+            debug!("Creating SurrealDB MemoryManager (config: {:?})", config.memory.surrealdb);
+            DefaultMemoryManager::new_with_surrealdb(&config.memory.surrealdb).await?
+        }
+        "hybrid" => {
+            debug!("Creating hybrid MemoryManager (episodic=SurrealDB, semantic=Graph)");
+            DefaultMemoryManager::new_hybrid(&config.memory.surrealdb, &config.memory.graph).await?
+        }
+        backend => {
+            anyhow::bail!("Unsupported memory backend: {}", backend);
+        }
+    }
+} else {
+    // Fallback to in-memory if disabled
+    debug!("Memory disabled in config, using in-memory fallback");
+    DefaultMemoryManager::new_in_memory().await?
+};
+
+let memory_manager = Arc::new(memory_manager) as Arc<dyn llmspell_memory::MemoryManager>;
+```
+
+**Step 2**: Wire MemoryManager to ScriptRuntime via GlobalContext:
+```rust
+// Wire MemoryManager to ScriptRuntime (similar to RAG wiring)
+if let Some(runtime) = script_executor
+    .as_any()
+    .downcast_ref::<llmspell_bridge::ScriptRuntime>()
+{
+    runtime.set_memory_manager(memory_manager.clone());
+    debug!(
+        "MemoryManager wired to ScriptRuntime (backend={}, enabled={})",
+        config.memory.backend,
+        config.memory.enabled
+    );
+}
+```
+
+**Step 3**: Check if `set_memory_manager()` method exists on ScriptRuntime
+- If NOT: Add to `llmspell-bridge/src/runtime.rs`:
+```rust
+/// Wire MemoryManager to GlobalContext (Task 13b.15.7)
+pub fn set_memory_manager(&self, memory_manager: Arc<dyn llmspell_memory::MemoryManager>) {
+    self.global_context.set_bridge("memory_manager", memory_manager);
+}
+```
+
+**Step 4**: Update `register_memory_context_globals()` to NOT create fallback
+- Change behavior: if memory_manager not in GlobalContext, skip registration (don't create fallback)
+- Or: Keep fallback but log clearly it's unexpected
+
+**Expected Behavior After Fix**:
+1. CLI creates MemoryManager from config.memory settings
+2. Wires to GlobalContext before kernel starts
+3. `register_memory_context_globals()` finds MemoryManager in context
+4. Templates get properly configured MemoryManager
+5. No warning about ContextBridge unavailable
+6. Works identically whether using embedded or ZeroMQ protocol
+
+**Acceptance Criteria**:
+- [ ] MemoryManager created in `create_full_infrastructure()` based on config.memory
+- [ ] Supports backends: in-memory, surrealdb, hybrid (per config)
+- [ ] Wired to GlobalContext before kernel starts
+- [ ] `register_memory_context_globals()` finds MemoryManager (no fallback created)
+- [ ] Templates get configured MemoryManager via ExecutionContext
+- [ ] ContextBridge uses configured MemoryManager backend
+- [ ] No "Memory enabled but ContextBridge unavailable" warning
+- [ ] research-chat app works with properly configured memory
+- [ ] Works identically for embedded and ZeroMQ protocols
+
+**Testing**:
+```bash
+# Test 1: In-memory backend (default)
+llmspell run examples/.../research-chat/main.lua
+# Expected: No ContextBridge warning, uses in-memory
+
+# Test 2: With rag-dev profile
+llmspell -p rag-dev run examples/.../research-chat/main.lua
+# Expected: Uses configured memory backend, no warning
+
+# Test 3: Check logs for proper wiring
+RUST_LOG=debug llmspell run examples/.../research-chat/main.lua 2>&1 | grep -i memory
+# Expected: "MemoryManager wired to ScriptRuntime (backend=in-memory)"
+```
+
+**Files to Modify**:
+- `llmspell-cli/src/execution_context.rs` - Add MemoryManager creation + wiring
+- `llmspell-bridge/src/runtime.rs` - Add `set_memory_manager()` method (if not exists)
+- `llmspell-bridge/src/globals/mod.rs` - Update fallback behavior (optional)
+
+**Architecture Principles Validated**:
+1. ✅ **Single Kernel Path**: ALL infrastructure created in CLI layer, not split
+2. ✅ **Protocol Independence**: Embedded vs ZeroMQ only affects transport, not infrastructure
+3. ✅ **Config-Driven**: MemoryManager backend from config.memory, not hardcoded
+4. ✅ **Consistent Wiring**: Same pattern as RAG (create in CLI, wire to GlobalContext)
+
+**Definition of Done**:
+- [ ] MemoryManager created in CLI layer from config
+- [ ] Wired to GlobalContext before kernel starts
+- [ ] Templates get configured MemoryManager
+- [ ] No fallback MemoryManager created in global registration
+- [ ] No warnings about ContextBridge unavailable
+- [ ] research-chat works with proper memory backend
+- [ ] Zero new clippy warnings
+- [ ] Architecture documented
+
 ---
 
 ## Phase 13b.16: Documentation (Day 30)
