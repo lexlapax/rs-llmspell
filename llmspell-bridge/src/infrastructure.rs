@@ -200,19 +200,29 @@ async fn create_state_manager(
 /// Returns an error if session manager initialization fails
 fn create_session_manager(
     state_manager: Arc<llmspell_kernel::state::StateManager>,
-    _config: &LLMSpellConfig,
+    config: &LLMSpellConfig,
 ) -> Result<Arc<llmspell_kernel::sessions::SessionManager>, LLMSpellError> {
     debug!("Creating session manager");
 
-    // Create session storage backend
-    let session_storage_backend = Arc::new(
-        llmspell_storage::SledBackend::new_with_path("./sessions").map_err(|e| {
-            LLMSpellError::Component {
-                message: format!("Failed to create session storage backend: {e}"),
-                source: None,
+    // Create session storage backend based on config (Phase 13b.16.9 - Fix lock contention)
+    let session_storage_backend: Arc<dyn llmspell_storage::StorageBackend> =
+        match config.runtime.sessions.storage_backend.as_str() {
+            "memory" => {
+                debug!("Using memory backend for session storage");
+                Arc::new(llmspell_storage::MemoryBackend::new())
             }
-        })?,
-    );
+            "sled" | _ => {
+                debug!("Using Sled backend for session storage at ./sessions");
+                Arc::new(
+                    llmspell_storage::SledBackend::new_with_path("./sessions").map_err(|e| {
+                        LLMSpellError::Component {
+                            message: format!("Failed to create session storage backend: {e}"),
+                            source: None,
+                        }
+                    })?,
+                )
+            }
+        };
 
     // Create hook infrastructure
     let hook_registry = Arc::new(llmspell_hooks::HookRegistry::new());
