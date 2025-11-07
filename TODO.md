@@ -9315,7 +9315,9 @@ async fn create_memory_manager(config: &LLMSpellConfig) -> Result<...>;
 ### Task 13b.16.2: Refactor ScriptRuntime with Engine-Agnostic API
 **Priority**: HIGH
 **Estimated Time**: 4 hours
-**Status**: TODO
+**Actual Time**: ~5 hours
+**Status**: ✅ COMPLETE
+**Completed**: 2025-11-06
 
 **Description**: Replace language-specific constructors with engine-agnostic `new()` and `with_engine()` methods, remove RwLock pattern for direct Infrastructure ownership.
 
@@ -9617,9 +9619,18 @@ impl ScriptRuntime {
 ### Task 13b.16.3: Simplify CLI Layer (Remove create_full_infrastructure)
 **Priority**: HIGH
 **Estimated Time**: 1 hour
-**Status**: TODO
+**Actual Time**: ~1 hour
+**Status**: ✅ COMPLETE
+**Completed**: 2025-11-06
 
 **Description**: Delete `create_full_infrastructure()` from CLI, make ExecutionContext truly thin.
+
+**Actual Work Completed**:
+- Deleted `convert_distance_metric()` helper (14 lines)
+- Deleted `create_full_infrastructure()` function (94 lines)
+- Updated ExecutionContext::resolve() to use `ScriptRuntime::new()`
+- CLI now has ZERO infrastructure creation code
+- Used `start_embedded_kernel_with_executor()` API (correct function)
 
 **Changes**:
 ```rust
@@ -9655,9 +9666,19 @@ let script_executor = Arc::new(llmspell_bridge::ScriptRuntime::new(config.clone(
 ### Task 13b.16.4: Fix Service/Daemon Mode (Remove Duplicate Infrastructure)
 **Priority**: HIGH
 **Estimated Time**: 1 hour
-**Status**: TODO
+**Actual Time**: ~2 hours
+**Status**: ✅ COMPLETE
+**Completed**: 2025-11-06
 
 **Description**: Remove duplicate infrastructure creation in `start_kernel_service_with_config()`.
+
+**Actual Work Completed**:
+- Added `get_session_manager_any()` to ScriptExecutor trait (type erasure pattern)
+- Implemented getter in ScriptRuntime (returns session_manager as Arc<dyn Any>)
+- Updated start_kernel_service_with_config() to extract session_manager from ScriptExecutor
+- Deleted 16 lines of duplicate StateManager+SessionManager creation
+- Fixed JavaScript engine call bug (pre-existing issue)
+- Fixed clippy warnings (cognitive_complexity, large_futures)
 
 **Changes**:
 ```rust
@@ -9692,9 +9713,23 @@ pub async fn start_kernel_service_with_config(
 ### Task 13b.16.5: Simplify Kernel API (Remove Redundant Functions)
 **Priority**: MEDIUM
 **Estimated Time**: 1 hour
-**Status**: TODO
+**Actual Time**: ~2 hours
+**Status**: ✅ COMPLETE
+**Completed**: 2025-11-06
 
 **Description**: Remove `start_embedded_kernel_with_infrastructure()` - no longer needed.
+
+**Actual Work Completed**:
+- Deleted start_embedded_kernel_with_infrastructure() (25 lines + docs)
+- Deleted start_embedded_kernel() (38 lines + docs) - created duplicate infrastructure with StubExecutor
+- Deleted start_kernel_service() (190 lines + docs) - legacy stub implementation
+- Deleted StubExecutor (34 lines) - backward compat stub
+- Deleted StubTool (85 lines) - test stub
+- Deleted write_connection_file (26 lines) - helper for deleted service function
+- Removed 2 exports from lib.rs (start_embedded_kernel, start_kernel_service)
+- Total: 400 lines deleted
+- All tests use start_embedded_kernel_with_executor (retained function)
+- CLI uses start_kernel_service_with_config (retained function)
 
 **Changes**:
 ```rust
