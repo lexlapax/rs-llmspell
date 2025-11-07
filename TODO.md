@@ -10042,18 +10042,21 @@ cargo clippy --package llmspell-bridge --all-targets -- -D warnings
 #### Acceptance Criteria
 
 - [x] All 7 deprecated constructors deleted (148 lines: 429-576)
-- [x] All 2 deprecated private helper functions deleted (290 lines: 766-895 + 896-1055)
+- [x] All 3 deprecated private helper functions deleted (466 lines total):
+  - new_with_engine_provider_and_session (130 lines: 766-895)
+  - new_with_engine_and_provider (160 lines: 896-1055)
+  - new_with_engine (176 lines: 590-765, found post-commit via dead code warning)
 - [x] All 4 deprecated setters deleted (89 lines: spread across multiple deletions)
 - [x] All 7 documentation examples updated to use `new()` (runtime.rs + lib.rs)
 - [x] Debug message updated to reference config.rag.enabled
 - [x] Orphaned #[instrument] attribute removed
 - [x] Unused `warn` import removed
-- [x] `#[cfg(any(feature = "lua", feature = "javascript"))]` added to new_with_engine()
 - [x] 2 public API functions marked `#[deprecated]` (backward compat)
-- [x] `cargo build --package llmspell-bridge` succeeds
+- [x] `cargo build --package llmspell-bridge` succeeds (2m 56s)
 - [x] `cargo test --package llmspell-bridge --lib` passes (138 tests - 10 fewer than before)
 - [x] `cargo clippy` reports zero warnings
-- [x] runtime.rs reduced from 2535 → 1998 lines (537 lines deleted, 21% reduction)
+- [x] runtime.rs reduced from 2535 → 1822 lines (713 lines deleted, 28% reduction)
+- [x] `cargo build --workspace --all-features` succeeds with zero dead code warnings
 
 ---
 
@@ -10120,11 +10123,11 @@ cargo clippy --package llmspell-bridge --all-targets -- -D warnings
 ### Quantitative Results
 
 **Code Reduction**:
-- **runtime.rs**: 2535 → 1998 lines (537 lines deleted, 21% reduction)
+- **runtime.rs**: 2535 → 1822 lines (713 lines deleted, 28% reduction)
 - **lib.rs**: 2 deprecated public API functions (backward compat)
 - **execution_context.rs**: 108 → 12 lines (~90% reduction)
 - **integrated.rs**: Removed create_full_infrastructure_with_injector()
-- **Total**: ~630 lines deleted across all files
+- **Total**: ~806 lines deleted across all files
 
 **API Simplification**:
 - **Before**: 7 language-specific constructors + 4 setters (11 public methods)
