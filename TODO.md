@@ -12129,33 +12129,90 @@ Added comprehensive Infrastructure Module Pattern section (617 lines) documentin
 
 **Commit**: 3e2749cb "docs: Update Developer Guide - Bridge Pattern (Task 13b.17.15)"
 
-### Task 13b.17.16: Update Developer Guide - Extending llmspell
+### Task 13b.17.16: Update Developer Guide - Extending llmspell ✅ FINAL TASK
 **Priority**: HIGH
-**Estimated Time**: 1 hour
+**Estimated Time**: 1 hour → **Actual**: 1 hour 15 minutes
 **Category**: Developer Guide
+**Status**: COMPLETED (2025-11-08) 🎉
 
 **Description**: Document storage backend implementation.
 
 **Acceptance Criteria**:
-- [ ] StorageBackend trait implementation
-- [ ] PostgreSQL backend example
-- [ ] Backend registration
-- [ ] Testing patterns
+- [x] StorageBackend trait implementation ✅
+- [x] PostgreSQL backend example ✅
+- [x] Backend registration ✅
+- [x] Testing patterns ✅
 
 **Implementation Steps**:
-1. Update `docs/developer-guide/extending-llmspell.md`
-2. Storage backend section
-3. Implementation guide
-4. Registration patterns
-5. Testing strategies
+1. ✅ Update `docs/developer-guide/extending-llmspell.md`
+2. ✅ Storage backend section
+3. ✅ Implementation guide
+4. ✅ Registration patterns
+5. ✅ Testing strategies
 
-**Files to Update**:
-- `docs/developer-guide/extending-llmspell.md` (+200 lines)
+**Files Updated**:
+- `docs/developer-guide/extending-llmspell.md` (+589 lines, now 1,581 lines total)
 
 **Definition of Done**:
-- [ ] Backend implementation clear
-- [ ] Examples working
-- [ ] Testing covered
+- [x] Backend implementation clear ✅
+- [x] Examples working ✅
+- [x] Testing covered ✅
+
+**Completion Summary**:
+Added PART 6: Storage Backend Extension section (580 lines) documenting Phase 13b.16 storage extensibility:
+- **Storage Architecture**: 3-tier architecture overview (Component APIs → StorageBackend trait → Memory/Sled/PostgreSQL)
+- **StorageBackend Trait**: Complete 8-method interface with default implementations for stats() and batch()
+- **Custom Backend Implementation**: 3-step guide (struct creation, trait implementation, error handling)
+- **Redis Backend Example**: Complete implementation (260 lines) with connection pooling, stats tracking, Redis pipelining for batch ops
+- **PostgreSQL Backend Example**: Production pattern with RLS tenant isolation, migrations, execute_with_tenant() pattern
+- **Infrastructure Registration**: Backend registration in create_state_manager() factory function
+- **Configuration Examples**: Backend selection + per-component overrides in config.toml
+- **Testing Patterns**: 4 comprehensive tests using testcontainers for isolated backend instances
+- **Best Practices**: 8 guidelines for production backend development
+- **Performance Targets**: 5 operation types with p50/p99 latency and throughput requirements
+
+**Technical Insights**:
+1. **Hot-Swappable Backends**: StorageBackend trait enables zero-code-change backend switching via config
+2. **Connection Pooling Pattern**: Redis ConnectionManager pattern applicable to all connection-based backends
+3. **Statistics Tracking**: Hit rate calculation and operation counters critical for monitoring
+4. **Batch Optimization**: Redis pipelining example shows 5-10x throughput improvement for batch operations
+5. **Tenant Isolation**: Two patterns documented (RLS for PostgreSQL, key prefixing for Redis)
+6. **Testing Isolation**: testcontainers pattern ensures zero test interference with isolated backend instances
+7. **Error Conversion**: Backend-specific errors must convert to unified StorageError variants
+8. **Infrastructure Integration**: Backend registration happens in Infrastructure module's create_state_manager()
+
+**Documentation Quality**:
+- Complete Redis backend implementation with all 8 trait methods
+- PostgreSQL RLS pattern with execute_with_tenant() helper
+- 4 realistic test examples covering basic ops, batch ops, prefix filtering, stats
+- Performance targets table with 5 operation types
+- Best practices section with 8 production guidelines
+- Extension patterns by complexity rating (Expert level for storage backends)
+
+**Guide Metadata Updates**:
+- Version: 0.8.0 → 0.14.0
+- Phase coverage: Phase 8 → Phase 8 + 13b.16
+- Quick navigation: Added Storage link
+- Overview: Added storage backend implementation to "What You'll Learn"
+- Summary: Added storage backend extension with complexity rating
+
+**Integration Points**:
+- References storage-architecture.md for backend selection patterns
+- References postgresql-setup.md for production PostgreSQL setup
+- References schema-reference.md for table schemas
+- References llmspell-storage API reference for PostgreSQL APIs
+
+**Phase 13b.17 Summary**:
+This was the **FINAL task** of Phase 13b.17 Documentation, completing all 16 sub-tasks:
+- Category A: PostgreSQL Storage (4/4 complete) - 4,154 lines
+- Category B: ScriptRuntime Architecture (4/4 complete) - 803 lines
+- Category C: Technical Documentation (4/4 complete) - 1,767 lines
+- Category D: API References (2/2 complete) - 647 lines
+- Category E: Developer Guides (2/2 complete) - 1,232 lines
+
+**TOTAL DOCUMENTATION ADDED**: 8,603 lines across 10 files (6 new, 4 updated) over 16 tasks
+
+**Commit**: b35b2614 "docs: Update Developer Guide - Extending llmspell (Task 13b.17.16)"
 
 ---
 
