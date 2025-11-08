@@ -13,13 +13,34 @@
 ### 📘 [User Guide](user-guide/) - *For Experimenters*
 **Purpose**: Practical guides for rapid AI concept exploration via scripts.
 
-**Status**: ✅ Updated with Phase 13 experimental memory system
-**Contents**: 12 essential documents including getting started, concepts, configuration, AI agent templates, local LLM integration, API reference (Lua + 18 Rust crates), troubleshooting, Phase 10 troubleshooting, performance tuning, service deployment, IDE integration
-**Key Files**: `getting-started.md`, `concepts.md`, `configuration.md`, `templates/README.md`, `local-llm.md`, `service-deployment.md`, `ide-integration.md`, `troubleshooting-phase10.md`, `performance-tuning.md`, `api/lua/README.md`
+**Status**: ✅ Consolidated (Phase 13b.18) - 10 numbered guides + appendix
+**Structure**: **Linear learning path** (01 → 10) + comprehensive appendix
+**Contents**: 10 numbered guides + 1 appendix covering complete user journey from installation to production deployment
+
+**The 10 Numbered Guides** (Start here for linear learning):
+1. **[Getting Started](user-guide/01-getting-started.md)** - Installation and first experiments (10 min)
+2. **[Core Concepts](user-guide/02-core-concepts.md)** - Architecture, memory, RAG, multi-tenancy
+3. **[Configuration](user-guide/03-configuration.md)** - Providers, memory, security, feature flags
+4. **[Lua Scripting](user-guide/04-lua-scripting.md)** - Essentials (18 globals, common patterns)
+5. **[CLI Reference](user-guide/05-cli-reference.md)** - All 16 command groups
+6. **[Templates & Workflows](user-guide/06-templates-and-workflows.md)** - 10 AI workflows
+7. **[Storage Setup](user-guide/07-storage-setup.md)** - PostgreSQL quick start
+8. **[Deployment](user-guide/08-deployment.md)** - systemd/launchd + IDE integration
+9. **[Security](user-guide/09-security.md)** - Sandbox, permissions, multi-tenancy
+10. **[Troubleshooting](user-guide/10-troubleshooting.md)** - Debug, profile, diagnose
+
+**Appendix** (Reference lookups):
+- **[Lua API Reference](user-guide/appendix/lua-api-reference.md)** - Complete API (3,729 lines, 200+ methods)
+
+**Additional Resources**:
+- **[Templates](user-guide/templates/)** - Detailed template documentation (11 files)
+- **[Developer Guide Reference](developer-guide/reference/)** - Rust API by theme (6 guides)
+
 **Phase 13 Additions**: 3-tier memory (episodic/semantic/procedural), context engineering, Memory + Context globals (17th/18th)
-**Phase 12 Additions**: 10 experimental templates (6 base + 4 advanced), template CLI, Template Lua global (16th of 18)
-**Phase 11 Additions**: Local LLM support (Ollama + Candle backends), model management (list, pull, info, status), privacy-first workflows, offline inference
-**Start here if**: You want to experiment with AI concepts via Lua scripts, use experimental workflows, explore memory patterns, use local LLMs for zero-cost experimentation
+**Phase 12 Additions**: 10 experimental templates, template CLI, Template global (16th)
+**Phase 11 Additions**: Local LLM support (Ollama + Candle), model management
+
+**Start here if**: You want to experiment with AI concepts via Lua scripts, use experimental workflows, explore memory patterns, or deploy production services
 
 ---
 
