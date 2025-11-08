@@ -2,8 +2,8 @@
 
 **Typed Rust Structs for Script-to-Rust Configuration Passing**
 
-**Version**: 1.0 | **Phase**: 11a.8 | **Status**: ✅ Complete
-**Last Updated**: October 2025
+**Version**: 1.1 | **Phase**: 11a.8 + 13b.16 | **Status**: ✅ Complete
+**Last Updated**: November 2025 (Phase 13b.16 Infrastructure Module)
 
 **🔗 Navigation**: [← Developer Guide](README.md) | [Extending LLMSpell](extending-llmspell.md) | [Tracing Guide](tracing-best-practices.md)
 
@@ -15,12 +15,13 @@
 2. [Core Principles](#core-principles)
 3. [Anti-Patterns Eliminated](#anti-patterns-eliminated)
 4. [Pattern Components](#pattern-components)
-5. [Implementation Checklist](#implementation-checklist)
-6. [Common Reusable Parsers](#common-reusable-parsers)
-7. [Complete Examples](#complete-examples)
-8. [Testing Requirements](#testing-requirements)
-9. [Troubleshooting](#troubleshooting)
-10. [Design Decisions Reference](#design-decisions-reference)
+5. [Infrastructure Module Pattern (Phase 13b.16)](#infrastructure-module-pattern-phase-13b16)
+6. [Implementation Checklist](#implementation-checklist)
+7. [Common Reusable Parsers](#common-reusable-parsers)
+8. [Complete Examples](#complete-examples)
+9. [Testing Requirements](#testing-requirements)
+10. [Troubleshooting](#troubleshooting)
+11. [Design Decisions Reference](#design-decisions-reference)
 
 ---
 
@@ -476,6 +477,624 @@ let wrap_as_tool_fn = lua.create_function(move |_lua, args: (String, Table)| {
     Ok(tool_name)
 })?;
 ```
+
+---
+
+## Infrastructure Module Pattern (Phase 13b.16)
+
+**Purpose**: Config-driven component creation pattern introduced in Phase 13b.16 to unify kernel initialization, simplify CLI, and provide a single creation path for all infrastructure components.
+
+### The Evolution: From Manual Construction to Config-Driven Creation
+
+**Before Phase 13b.16** (Manual component creation in CLI):
+```rust
+// ❌ ANTI-PATTERN: 200+ LOC manual initialization
+pub async fn run_command(config: LLMSpellConfig) -> Result<()> {
+    // Manual provider manager creation
+    let provider_manager = Arc::new(ProviderManager::new(&config.providers));
+
+    // Manual state manager creation
+    let state_backend = match config.storage.backend {
+        "memory" => Arc::new(MemoryBackend::new()) as Arc<dyn StorageBackend>,
+        "sled" => Arc::new(SledBackend::new(&config.storage.sled.path)?),
+        "postgres" => Arc::new(PostgreSQLBackend::new(&config.storage.postgres.url).await?),
+        _ => return Err(...)
+    };
+    let state_manager = Arc::new(StateManager::new(state_backend));
+
+    // Manual session manager creation (with dependency)
+    let session_manager = Arc::new(SessionManager::new(
+        state_manager.clone(),
+        config.sessions.clone()
+    ));
+
+    // Manual RAG creation (with multiple dependencies)
+    let rag = Arc::new(RAG::new(
+        provider_manager.clone(),
+        state_manager.clone(),
+        config.rag.clone()
+    )?);
+
+    // ... 150+ more lines for remaining 5 components
+
+    // Manual ScriptRuntime creation with all dependencies
+    let script_runtime = ScriptRuntime::new_with_lua(config.clone())
+        .await?
+        .with_provider_manager(provider_manager.clone())
+        .with_state_manager(state_manager.clone())
+        .with_session_manager(session_manager.clone())
+        .with_rag(rag.clone())
+        .with_memory_manager(memory_manager.clone())
+        .with_tool_registry(tool_registry.clone())
+        .with_agent_registry(agent_registry.clone())
+        .with_workflow_factory(workflow_factory.clone())
+        .with_component_registry(component_registry.clone());
+
+    Ok(())
+}
+```
+
+**After Phase 13b.16** (Config-driven Infrastructure module):
+```rust
+// ✅ INFRASTRUCTURE PATTERN: 12 LOC single creation path
+pub async fn run_command(config: LLMSpellConfig) -> Result<()> {
+    // Single unified creation call
+    let infrastructure = Infrastructure::from_config(&config).await?;
+
+    // ScriptRuntime automatically receives all components
+    let script_runtime = ScriptRuntime::new(config.clone())
+        .with_infrastructure(infrastructure)
+        .with_engine("lua")
+        .await?;
+
+    Ok(())
+}
+```
+
+**Impact**: 200+ LOC → 12 LOC (94% reduction), zero component creation boilerplate
+
+### Infrastructure Module Core API
+
+**Location**: `llmspell-bridge/src/infrastructure.rs`
+
+**Purpose**: Unified factory for creating all 9 infrastructure components from `LLMSpellConfig` with correct dependency order and configuration.
+
+```rust
+use llmspell_bridge::Infrastructure;
+use llmspell_core::config::LLMSpellConfig;
+
+/// Infrastructure module encapsulating all core components
+pub struct Infrastructure {
+    provider_manager: Arc<ProviderManager>,
+    state_manager: Arc<StateManager>,
+    session_manager: Arc<SessionManager>,
+    rag: Arc<RAG>,
+    memory_manager: Arc<MemoryManager>,
+    tool_registry: Arc<ToolRegistry>,
+    agent_registry: Arc<AgentDiscovery>,
+    workflow_factory: Arc<WorkflowFactory>,
+    component_registry: Arc<ComponentRegistry>,
+}
+
+impl Infrastructure {
+    /// Create all components from config with correct dependency order
+    pub async fn from_config(config: &LLMSpellConfig) -> Result<Self, LLMSpellError> {
+        // 1. Create provider manager (no dependencies)
+        let provider_manager = create_provider_manager(config).await?;
+
+        // 2. Create state manager (no dependencies)
+        let state_manager = create_state_manager(config).await?;
+
+        // 3. Create session manager (depends on state_manager)
+        let session_manager = create_session_manager(config, state_manager.clone()).await?;
+
+        // 4. Create RAG (depends on provider_manager, state_manager)
+        let rag = create_rag(config, provider_manager.clone(), state_manager.clone()).await?;
+
+        // 5. Create memory manager (depends on state_manager, provider_manager)
+        let memory_manager = create_memory_manager(config, state_manager.clone(), provider_manager.clone()).await?;
+
+        // 6. Create tool registry (no dependencies)
+        let tool_registry = create_tool_registry(config).await?;
+
+        // 7. Create agent registry (depends on provider_manager, tool_registry)
+        let agent_registry = create_agent_registry(config, provider_manager.clone(), tool_registry.clone()).await?;
+
+        // 8. Create workflow factory (depends on agent_registry)
+        let workflow_factory = create_workflow_factory(config, agent_registry.clone()).await?;
+
+        // 9. Create component registry (aggregates all components)
+        let component_registry = create_component_registry(
+            config,
+            provider_manager.clone(),
+            state_manager.clone(),
+            session_manager.clone(),
+            rag.clone(),
+            memory_manager.clone(),
+            tool_registry.clone(),
+            agent_registry.clone(),
+            workflow_factory.clone(),
+        ).await?;
+
+        Ok(Self {
+            provider_manager,
+            state_manager,
+            session_manager,
+            rag,
+            memory_manager,
+            tool_registry,
+            agent_registry,
+            workflow_factory,
+            component_registry,
+        })
+    }
+
+    /// Get provider manager
+    pub fn provider_manager(&self) -> Arc<ProviderManager> {
+        self.provider_manager.clone()
+    }
+
+    /// Get state manager
+    pub fn state_manager(&self) -> Arc<StateManager> {
+        self.state_manager.clone()
+    }
+
+    // ... accessors for all 9 components
+}
+```
+
+### Component Factory Functions
+
+Each component has a dedicated factory function that encapsulates creation logic:
+
+#### 1. ProviderManager Factory
+
+**Location**: `llmspell-bridge/src/infrastructure.rs:45-72`
+
+```rust
+async fn create_provider_manager(config: &LLMSpellConfig) -> Result<Arc<ProviderManager>, LLMSpellError> {
+    use llmspell_providers::{ProviderConfig, ProviderManager, ProviderType};
+
+    let mut provider_configs = Vec::new();
+
+    // Ollama providers
+    for (name, ollama_config) in &config.providers.ollama {
+        provider_configs.push(ProviderConfig {
+            name: name.clone(),
+            provider_type: ProviderType::Ollama,
+            config_json: serde_json::to_value(ollama_config)?,
+        });
+    }
+
+    // Candle providers
+    for (name, candle_config) in &config.providers.candle {
+        provider_configs.push(ProviderConfig {
+            name: name.clone(),
+            provider_type: ProviderType::Candle,
+            config_json: serde_json::to_value(candle_config)?,
+        });
+    }
+
+    let manager = ProviderManager::from_configs(&provider_configs).await?;
+    Ok(Arc::new(manager))
+}
+```
+
+#### 2. StateManager Factory (Hot-Swappable Backend)
+
+**Location**: `llmspell-bridge/src/infrastructure.rs:74-112`
+
+```rust
+async fn create_state_manager(config: &LLMSpellConfig) -> Result<Arc<StateManager>, LLMSpellError> {
+    use llmspell_storage::{MemoryBackend, SledBackend, PostgreSQLBackend, StorageBackend};
+
+    // Backend selection from config
+    let backend: Arc<dyn StorageBackend> = match config.storage.backend.as_str() {
+        "memory" => {
+            info!("Using in-memory storage backend");
+            Arc::new(MemoryBackend::new())
+        }
+        "sled" => {
+            info!("Using Sled embedded database backend");
+            let sled_path = &config.storage.sled.path;
+            Arc::new(SledBackend::new_with_path(sled_path)?)
+        }
+        "postgres" => {
+            info!("Using PostgreSQL backend");
+            let pg_backend = PostgreSQLBackend::new(&config.storage.postgres.url).await?;
+
+            // Run migrations if enabled
+            if config.storage.postgres.run_migrations {
+                pg_backend.migrate().await?;
+            }
+
+            // Enable RLS if configured
+            if config.storage.postgres.enforce_tenant_isolation {
+                Arc::new(pg_backend.with_tenant(config.storage.postgres.default_tenant.clone()))
+            } else {
+                Arc::new(pg_backend)
+            }
+        }
+        backend_type => {
+            return Err(LLMSpellError::Config(format!(
+                "Unknown storage backend: {}. Supported: memory, sled, postgres",
+                backend_type
+            )));
+        }
+    };
+
+    Ok(Arc::new(StateManager::new(backend)))
+}
+```
+
+#### 3. RAG Factory (Multi-Dependency Initialization)
+
+**Location**: `llmspell-bridge/src/infrastructure.rs:142-178`
+
+```rust
+async fn create_rag(
+    config: &LLMSpellConfig,
+    provider_manager: Arc<ProviderManager>,
+    state_manager: Arc<StateManager>,
+) -> Result<Arc<RAG>, LLMSpellError> {
+    use llmspell_rag::{RAG, RAGConfig, ChunkingStrategy};
+
+    // Extract RAG config or use defaults
+    let rag_config = RAGConfig {
+        default_provider: config.rag.default_provider.clone(),
+        default_chunking: ChunkingStrategy::Sliding {
+            size: config.rag.chunk_size.unwrap_or(500),
+            overlap: config.rag.chunk_overlap.unwrap_or(50),
+        },
+        default_k: config.rag.default_k.unwrap_or(5),
+        default_threshold: config.rag.similarity_threshold,
+    };
+
+    let rag = RAG::new(provider_manager, state_manager, rag_config)?;
+    Ok(Arc::new(rag))
+}
+```
+
+### Config-Driven Component Selection
+
+**Example**: Per-component backend override in `config.toml`:
+
+```toml
+[storage]
+# Global default backend
+backend = "postgres"
+
+[storage.postgres]
+url = "postgresql://llmspell:pass@localhost:5432/llmspell_prod"
+pool_size = 20
+enforce_tenant_isolation = true
+run_migrations = true
+
+# Component-specific backend overrides
+[storage.components.vector_embeddings]
+backend = "postgres"  # Use PostgreSQL HNSW for vectors
+
+[storage.components.episodic_memory]
+backend = "postgres"  # Use PostgreSQL for episodic memory
+
+[storage.components.agent_state]
+backend = "sled"      # Use Sled for fast local agent state
+
+[storage.components.session_data]
+backend = "memory"    # Use in-memory for ephemeral sessions
+```
+
+**Implementation**:
+```rust
+// Infrastructure module automatically applies component overrides
+let state_manager = create_state_manager(config).await?;
+
+// Each component queries its specific backend from config
+let vector_backend = state_manager.backend_for_component("vector_embeddings");
+let agent_backend = state_manager.backend_for_component("agent_state");
+```
+
+### Dependency Order Guarantees
+
+The `Infrastructure::from_config()` method enforces correct dependency order:
+
+```
+Dependency Graph:
+=================
+
+Level 1 (No dependencies):
+- ProviderManager
+- StateManager
+- ToolRegistry
+
+Level 2 (1 dependency):
+- SessionManager (→ StateManager)
+
+Level 3 (2 dependencies):
+- RAG (→ ProviderManager, StateManager)
+- MemoryManager (→ StateManager, ProviderManager)
+- AgentRegistry (→ ProviderManager, ToolRegistry)
+
+Level 4 (3 dependencies):
+- WorkflowFactory (→ AgentRegistry)
+
+Level 5 (All dependencies):
+- ComponentRegistry (aggregates all 8 components)
+```
+
+**Validation**: If dependency order is violated, compilation fails with clear error:
+
+```rust
+// ❌ COMPILE ERROR: Cannot create RAG before its dependencies
+let rag = create_rag(config, provider_manager, state_manager).await?;
+let provider_manager = create_provider_manager(config).await?;  // ERROR: Used before definition
+```
+
+### ScriptRuntime Integration
+
+**API Location**: `llmspell-bridge/src/script_runtime.rs`
+
+**Pattern**: ScriptRuntime delegates component creation to Infrastructure module:
+
+```rust
+use llmspell_bridge::{ScriptRuntime, Infrastructure};
+
+impl ScriptRuntime {
+    /// Create ScriptRuntime with Infrastructure module
+    pub async fn new(config: LLMSpellConfig) -> Result<Self> {
+        // Infrastructure handles all component creation
+        let infrastructure = Infrastructure::from_config(&config).await?;
+
+        let mut runtime = Self {
+            config,
+            engine: None,
+            provider_manager: infrastructure.provider_manager(),
+            state_manager: infrastructure.state_manager(),
+            session_manager: infrastructure.session_manager(),
+            rag: infrastructure.rag(),
+            memory_manager: infrastructure.memory_manager(),
+            tool_registry: infrastructure.tool_registry(),
+            agent_registry: infrastructure.agent_registry(),
+            workflow_factory: infrastructure.workflow_factory(),
+            component_registry: infrastructure.component_registry(),
+        };
+
+        Ok(runtime)
+    }
+
+    /// Add script engine (Lua/JavaScript/Python)
+    pub async fn with_engine(mut self, engine_type: &str) -> Result<Self> {
+        match engine_type {
+            "lua" => {
+                let lua_engine = LuaEngine::new(self.clone()).await?;
+                self.engine = Some(Box::new(lua_engine));
+            }
+            "javascript" => {
+                let js_engine = JavaScriptEngine::new(self.clone()).await?;
+                self.engine = Some(Box::new(js_engine));
+            }
+            _ => return Err(LLMSpellError::Config(format!("Unknown engine: {}", engine_type))),
+        }
+        Ok(self)
+    }
+
+    /// Legacy constructor (deprecated in Phase 13b.16)
+    #[deprecated(since = "0.14.0", note = "Use `ScriptRuntime::new()` instead")]
+    pub async fn new_with_lua(config: LLMSpellConfig) -> Result<Self> {
+        Self::new(config).await?.with_engine("lua").await
+    }
+}
+```
+
+### Usage Patterns
+
+#### Pattern 1: Embedded Service Deployment
+
+```rust
+use llmspell_bridge::{ScriptRuntime, Infrastructure};
+use llmspell_core::config::LLMSpellConfig;
+
+#[tokio::main]
+async fn main() -> Result<()> {
+    // Load config
+    let config = LLMSpellConfig::from_file("config.toml")?;
+
+    // Create runtime with all infrastructure
+    let runtime = ScriptRuntime::new(config.clone())
+        .await?
+        .with_engine("lua")
+        .await?;
+
+    // Execute script
+    runtime.execute_file("script.lua").await?;
+
+    Ok(())
+}
+```
+
+#### Pattern 2: HTTP Service with Axum
+
+```rust
+use axum::{Router, routing::post};
+use llmspell_bridge::ScriptRuntime;
+
+#[tokio::main]
+async fn main() -> Result<()> {
+    let config = LLMSpellConfig::from_file("config.toml")?;
+
+    // Create runtime once, share across requests
+    let runtime = Arc::new(
+        ScriptRuntime::new(config)
+            .await?
+            .with_engine("lua")
+            .await?
+    );
+
+    let app = Router::new()
+        .route("/execute", post(execute_handler))
+        .layer(Extension(runtime));
+
+    axum::Server::bind(&"0.0.0.0:3000".parse()?)
+        .serve(app.into_make_service())
+        .await?;
+
+    Ok(())
+}
+```
+
+#### Pattern 3: CLI Kernel Mode
+
+```rust
+use llmspell_bridge::ScriptRuntime;
+use llmspell_kernel::{start_embedded_kernel_with_executor, KernelHandle};
+
+pub async fn run_command(config: LLMSpellConfig) -> Result<()> {
+    // Create ScriptRuntime as ScriptExecutor
+    let script_executor = Arc::new(
+        ScriptRuntime::new(config.clone())
+            .await?
+            .with_engine("lua")
+            .await?
+    ) as Arc<dyn ScriptExecutor>;
+
+    // Start kernel with executor
+    let kernel_handle = start_embedded_kernel_with_executor(
+        config,
+        script_executor
+    ).await?;
+
+    // Kernel lifecycle management
+    kernel_handle.wait_for_shutdown().await?;
+
+    Ok(())
+}
+```
+
+### Component Lifecycle Management
+
+**Initialization Order**:
+```
+1. Infrastructure::from_config()
+   ├─ 1. ProviderManager (parallel init)
+   ├─ 2. StateManager (parallel init)
+   ├─ 3. ToolRegistry (parallel init)
+   ├─ 4. SessionManager (depends on StateManager)
+   ├─ 5. RAG (depends on ProviderManager, StateManager)
+   ├─ 6. MemoryManager (depends on StateManager, ProviderManager)
+   ├─ 7. AgentRegistry (depends on ProviderManager, ToolRegistry)
+   ├─ 8. WorkflowFactory (depends on AgentRegistry)
+   └─ 9. ComponentRegistry (aggregates all)
+
+2. ScriptRuntime::new()
+   └─ Receives Infrastructure components
+
+3. ScriptRuntime::with_engine()
+   └─ Attaches script engine (Lua/JS)
+```
+
+**Shutdown Order** (reverse of initialization):
+```
+1. ScriptRuntime drops
+2. ComponentRegistry drops (releases all component refs)
+3. WorkflowFactory drops
+4. AgentRegistry drops
+5. MemoryManager drops
+6. RAG drops
+7. SessionManager drops
+8. ToolRegistry drops
+9. StateManager drops (flushes to disk if Sled/Postgres)
+10. ProviderManager drops (closes connections)
+```
+
+### Extension Points
+
+#### Adding New Components
+
+To add a new component to Infrastructure:
+
+**Step 1**: Define factory function
+```rust
+// llmspell-bridge/src/infrastructure.rs
+async fn create_new_component(
+    config: &LLMSpellConfig,
+    dependency1: Arc<Dependency1>,
+    dependency2: Arc<Dependency2>,
+) -> Result<Arc<NewComponent>, LLMSpellError> {
+    let component_config = NewComponentConfig::from_config(config)?;
+    let component = NewComponent::new(dependency1, dependency2, component_config)?;
+    Ok(Arc::new(component))
+}
+```
+
+**Step 2**: Add to Infrastructure struct
+```rust
+pub struct Infrastructure {
+    // ... existing components
+    new_component: Arc<NewComponent>,
+}
+```
+
+**Step 3**: Initialize in `from_config()`
+```rust
+impl Infrastructure {
+    pub async fn from_config(config: &LLMSpellConfig) -> Result<Self> {
+        // ... existing initialization
+
+        // 10. Create new component
+        let new_component = create_new_component(
+            config,
+            dependency1.clone(),
+            dependency2.clone()
+        ).await?;
+
+        Ok(Self {
+            // ... existing fields
+            new_component,
+        })
+    }
+
+    pub fn new_component(&self) -> Arc<NewComponent> {
+        self.new_component.clone()
+    }
+}
+```
+
+**Step 4**: Add to ScriptRuntime
+```rust
+pub struct ScriptRuntime {
+    // ... existing fields
+    new_component: Arc<NewComponent>,
+}
+
+impl ScriptRuntime {
+    pub async fn new(config: LLMSpellConfig) -> Result<Self> {
+        let infrastructure = Infrastructure::from_config(&config).await?;
+
+        Ok(Self {
+            // ... existing fields
+            new_component: infrastructure.new_component(),
+        })
+    }
+}
+```
+
+### Benefits of Infrastructure Pattern
+
+1. **Single Source of Truth**: Config file drives all component creation
+2. **Dependency Safety**: Correct initialization order enforced at compile time
+3. **Zero Boilerplate**: CLI goes from 200+ LOC to 12 LOC
+4. **Hot-Swappable Backends**: Change storage backend without code changes
+5. **Component-Specific Config**: Per-component backend overrides
+6. **Testability**: Easy to mock Infrastructure for unit tests
+7. **Extensibility**: Add new components without touching CLI
+8. **Documentation**: Single place to document component creation
+
+### Related Documentation
+
+- **Kernel Execution Paths**: `/docs/technical/kernel-execution-paths.md` (detailed initialization flow)
+- **Storage Architecture**: `/docs/technical/storage-architecture.md` (backend selection patterns)
+- **Configuration Guide**: `/docs/user-guide/configuration.md` (config schema)
+- **Service Deployment**: `/docs/user-guide/service-deployment.md` (deployment patterns)
 
 ---
 
@@ -1593,6 +2212,8 @@ The bridge pattern provides:
 4. **Self-documenting code** - Struct fields show API contract
 5. **Refactoring safety** - Breaking changes caught at compile time
 6. **IDE support** - Full autocomplete and type checking
+7. **Config-driven creation** - Infrastructure module pattern (Phase 13b.16)
+8. **Dependency safety** - Correct initialization order enforced
 
 **Completed Coverage** (Phase 11a.8):
 - ✅ Task 11a.8.1: `AgentConfig` (create_agent)
@@ -1602,11 +2223,23 @@ The bridge pattern provides:
 - ✅ Task 11a.8.5: `ContextScope` reuse (set_shared_memory, get_shared_memory)
 - ✅ Task 11a.8.6: `ToolWrapperConfig` + `BridgeAlertConfig` (wrap_agent_as_tool, configure_agent_alerts)
 
-**Pattern applies to**: All future bridge methods accepting configuration parameters
+**Infrastructure Module Pattern** (Phase 13b.16):
+- ✅ `Infrastructure::from_config()` - Single creation path for 9 components
+- ✅ Dependency graph enforcement (5-level initialization order)
+- ✅ Hot-swappable storage backends (memory/sled/postgres)
+- ✅ Per-component backend configuration
+- ✅ CLI simplification (200+ LOC → 12 LOC, 94% reduction)
+- ✅ `ScriptRuntime::new()` - Replaces `new_with_lua()` (deprecated)
 
-**Next Steps**: Apply pattern to remaining methods with JSON parameters (e.g., Session.replay_session - Task 11a.8.8)
+**Pattern applies to**: All future bridge methods accepting configuration parameters + all infrastructure component creation
+
+**Evolution Path**:
+1. **Phase 11a.8**: Typed structs replace JSON in bridge method signatures
+2. **Phase 13b.16**: Infrastructure module unifies component creation from config
+3. **Future**: Extend pattern to plugin architecture and dynamic component loading
 
 ---
 
 **Version History**:
 - **1.0** (2025-10-07): Initial guide documenting Phase 11a.8 bridge pattern consolidation
+- **1.1** (2025-11-08): Added Infrastructure Module Pattern from Phase 13b.16 (config-driven component creation, dependency order enforcement, hot-swappable backends)
