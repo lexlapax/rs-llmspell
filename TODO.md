@@ -12581,4 +12581,329 @@ This was the **FINAL task** of Phase 13b.17 Documentation, completing all 16 sub
 
 ---
 
+## Phase 13b.18: User Guide Documentation Consolidation
+
+**Status**: PLANNED
+**Priority**: HIGH
+**Timeline**: 13 hours total
+**Plan Document**: `/docs/CONSOLIDATION_PLAN.md`
+
+**Goal**: Reduce user-guide documentation from 53 files to 15 files (71% reduction) with clear separation of user-facing, developer-facing, and technical content.
+
+**Current State**:
+- 53 files in docs/user-guide/ (43,335 lines)
+- Mixed audiences (user/developer/technical content)
+- Overlapping files (2x performance-tuning.md, 2x troubleshooting.md)
+- No clear learning path
+- 3,729-line Lua API file (hard to navigate)
+
+**Target State**:
+- 10 numbered core user guides (01-10)
+- 2 appendix reference docs
+- 21 Rust API docs moved to developer-guide/
+- Technical docs moved to docs/technical/
+- Clear linear learning path for new users
+
+### Phase 13b.18.1: Move Developer Content (2 hours) ✅ COMPLETE
+**Priority**: HIGH
+**Estimated Time**: 2 hours
+**Actual Time**: ~2 hours
+**Completion Date**: 2025-11-08
+**Commit**: c161644d
+
+**Description**: Separate developer-facing content from user-facing content. Move all Rust API documentation to developer-guide/.
+
+**Tasks**:
+- [x] Create developer-guide/reference/ directory structure
+- [x] Move ALL 21 Rust API files from user-guide/api/rust/ to developer-guide/reference/
+- [x] Consolidate 21 crate files into 6 thematic guides:
+  - [x] core-traits.md (420 lines) - BaseAgent, ExecutionContext, testing
+  - [x] storage-backends.md (485 lines) - Vector storage, HNSW, backends
+  - [x] rag-pipeline.md (590 lines) - RAG, context engineering, knowledge graph
+  - [x] memory-backends.md (620 lines) - Episodic, semantic, procedural memory
+  - [x] security-integration.md (555 lines) - Access control, multi-tenancy
+  - [x] crate-index.md (475 lines) - Quick reference to all 21 crates
+- [x] Move user-guide/performance-tuning.md → developer-guide/performance-optimization.md
+- [x] Update developer-guide/README.md with reference/ section
+- [x] Git tag: `pre-consolidation-phase1`
+- [x] Validation: Git history preserved with `git mv`
+
+**Files Affected**:
+- Moved: 22 files (21 Rust API + 1 performance-tuning.md)
+- Created: 6 thematic guides (3,145 lines)
+- Updated: 1 README.md (added API Reference section)
+- Total: 30 files changed, 4,240 insertions
+
+**Acceptance Criteria**:
+- [x] All Rust API docs in developer-guide/reference/ ✅
+- [x] 6 thematic guides created with comprehensive overviews ✅
+- [x] Zero broken links in developer-guide/ ✅ (git mv preserves paths)
+- [x] developer-guide/README.md updated with navigation ✅
+- [x] Git history preserved (used `git mv`) ✅
+
+**Insights**:
+- Thematic guides provide better navigation than 21 separate files
+- Each guide consolidates 2-4 related crates into unified documentation
+- Links to detailed crate docs maintained for deep dives
+- Total documentation: 15,317 lines in developer-guide/reference/
+- Clear separation achieved: user-facing vs developer-facing content
+
+---
+
+### Phase 13b.18.2: Move Technical Content (2 hours) ⚠️ MEDIUM RISK
+**Priority**: HIGH
+**Estimated Time**: 2 hours
+**Dependencies**: Phase 13b.18.1 complete
+
+**Description**: Separate deep technical content (schemas, internals, performance details) from user guides.
+
+**Tasks**:
+- [ ] Move storage/schema-reference.md → technical/postgresql-schema.md (1,359 lines)
+- [ ] Move storage/performance-tuning.md → technical/postgresql-performance.md (961 lines)
+- [ ] Move storage/migration-guide.md → technical/migration-internals.md (1,434 lines)
+- [ ] Create user-guide/07-storage-setup.md:
+  - [ ] Extract quick start from storage/postgresql-setup.md
+  - [ ] Extract basic backup from storage/backup-restore.md
+  - [ ] Docker Compose quick start (600 lines target)
+- [ ] Delete storage/README.md, storage/postgresql-setup.md, storage/backup-restore.md
+- [ ] Update technical/README.md with PostgreSQL docs section
+- [ ] Git tag: `pre-consolidation-phase2`
+- [ ] Validation: Link checker, content audit (diff check)
+
+**Files Affected**:
+- Moved to technical/: 3 files (3,754 lines)
+- Created: 1 file (07-storage-setup.md, 600 lines)
+- Deleted: 3 files (content consolidated)
+- Updated: 1 README.md
+
+**Acceptance Criteria**:
+- [ ] Technical storage docs in technical/ (schema, performance, migration)
+- [ ] User-facing storage setup guide created (07-storage-setup.md)
+- [ ] Zero content loss (verified with diff)
+- [ ] Cross-references updated (user guide ↔ technical docs)
+- [ ] technical/README.md has PostgreSQL section
+
+---
+
+### Phase 13b.18.3: Consolidate User Guides (4 hours) 🔴 HIGH RISK
+**Priority**: HIGH
+**Estimated Time**: 4 hours
+**Dependencies**: Phase 13b.18.1, 13b.18.2 complete
+
+**Description**: Consolidate 15 main user guide files into 10 numbered guides with clear linear learning path.
+
+**Tasks**:
+- [ ] Create numbered structure (01-10):
+  - [ ] 01-getting-started.md ← getting-started.md
+  - [ ] 02-core-concepts.md ← concepts.md + memory-configuration.md (memory sections)
+  - [ ] 03-configuration.md ← configuration.md + provider-best-practices.md + local-llm.md (config sections)
+  - [ ] 04-lua-scripting.md ← Extract essentials from api/lua/README.md (first 800 lines)
+  - [ ] 05-cli-reference.md ← cli.md (keep as-is)
+  - [ ] 06-templates-and-workflows.md ← NEW (overview, see Phase 13b.18.4)
+  - [ ] 07-storage-setup.md ← CREATED in Phase 13b.18.2
+  - [ ] 08-deployment.md ← service-deployment.md + ide-integration.md
+  - [ ] 09-security.md ← security-and-permissions.md (keep as-is)
+  - [ ] 10-troubleshooting.md ← troubleshooting.md + troubleshooting-phase10.md
+- [ ] Create appendix/lua-api-reference.md:
+  - [ ] Move complete api/lua/README.md (3,729 lines)
+  - [ ] Organize by category for searchability
+- [ ] Delete merged files:
+  - [ ] memory-configuration.md
+  - [ ] provider-best-practices.md
+  - [ ] local-llm.md
+  - [ ] ide-integration.md
+  - [ ] troubleshooting-phase10.md
+- [ ] Update README.md with numbered guide navigation
+- [ ] Git tag: `pre-consolidation-phase3`
+- [ ] Validation: Link checker, content preserved, clear user journey
+
+**Files Affected**:
+- Created: 10 numbered guides + 1 appendix
+- Deleted: 6 merged files
+- Updated: 1 README.md
+
+**Acceptance Criteria**:
+- [ ] 10 numbered user guides (01-10) exist
+- [ ] Clear linear path for new users (README → 01 → 02 → 03...)
+- [ ] All overlapping content merged (no duplicates)
+- [ ] Lua API split: essentials (04-lua-scripting.md) + complete reference (appendix/)
+- [ ] Zero content loss (verified with line count diff)
+- [ ] README.md has clear user journey map
+
+---
+
+### Phase 13b.18.4: Consolidate Templates (2 hours) ✅ LOW RISK
+**Priority**: MEDIUM
+**Estimated Time**: 2 hours
+**Dependencies**: Phase 13b.18.3 complete
+
+**Description**: Consolidate 11 template files into 2 files (overview + catalog).
+
+**Tasks**:
+- [ ] Create user-guide/06-templates-and-workflows.md (600 lines):
+  - [ ] Template system overview
+  - [ ] How to use templates (CLI commands)
+  - [ ] Quick start for each of 10 templates (50-60 lines each)
+  - [ ] When to use which template
+  - [ ] Customization basics
+- [ ] Create user-guide/appendix/template-catalog.md (6,000+ lines):
+  - [ ] Consolidate all 10 template detail docs
+  - [ ] Complete configuration reference
+  - [ ] Advanced customization patterns
+  - [ ] Integration examples
+- [ ] Delete templates/*.md (11 files)
+- [ ] Remove templates/ directory
+- [ ] Git tag: `pre-consolidation-phase4`
+- [ ] Validation: Link checker, all template content preserved
+
+**Files Affected**:
+- Created: 2 files (06-templates-and-workflows.md + appendix/template-catalog.md)
+- Deleted: 11 template files
+- Removed: 1 directory (templates/)
+
+**Acceptance Criteria**:
+- [ ] Template overview created (06-templates-and-workflows.md)
+- [ ] Complete template catalog in appendix
+- [ ] All 10 templates documented (no content loss)
+- [ ] templates/ directory removed
+- [ ] Navigation updated (user guide → appendix)
+
+---
+
+### Phase 13b.18.5: Update Navigation & Cross-References (3 hours) 🔴 CRITICAL
+**Priority**: CRITICAL
+**Estimated Time**: 3 hours
+**Dependencies**: ALL previous phases complete
+
+**Description**: Fix all broken links, update navigation, create quick reference.
+
+**Tasks**:
+- [ ] Update all README.md files:
+  - [ ] docs/README.md (top-level hub)
+  - [ ] docs/user-guide/README.md (user journey map)
+  - [ ] docs/developer-guide/README.md (developer navigation)
+  - [ ] docs/technical/README.md (technical docs index)
+- [ ] Fix cross-references:
+  - [ ] Search for all links to moved files: `grep -r "](.*\.md)" docs/`
+  - [ ] Update relative paths for moved files
+  - [ ] Verify cargo doc links work
+  - [ ] Update external references (if any)
+- [ ] Add navigation headers to all guides:
+  - [ ] User guides: **🔗 Navigation**: [← Previous](link) | [Next →](link)
+  - [ ] Numbered sequence: 01 → 02 → 03 → ... → 10
+  - [ ] Appendix links from main guides
+- [ ] Create user-guide/appendix/quick-reference.md:
+  - [ ] Most common tasks cheat sheet
+  - [ ] CLI commands quick reference
+  - [ ] Lua patterns quick reference
+  - [ ] Links to detailed docs
+- [ ] Add deprecation notices:
+  - [ ] Old file locations: "This file moved to X. Update your bookmarks."
+  - [ ] Keep old files for 3 months with redirect notice
+- [ ] Run link checker:
+  - [ ] `find docs -name "*.md" -exec markdown-link-check {} \;`
+  - [ ] Fix all broken internal links
+  - [ ] Verify external links
+- [ ] Git tag: `consolidation-complete`
+- [ ] Final validation: Complete walkthrough of user journey (01 → 10)
+
+**Files Affected**:
+- Updated: 4 README.md files
+- Updated: 10+ guides with navigation headers
+- Created: 1 quick-reference.md
+- Updated: 20+ files with link fixes
+
+**Acceptance Criteria**:
+- [ ] Zero broken internal links (verified with link checker)
+- [ ] All 4 README.md files updated
+- [ ] Navigation headers on all user guides (01-10)
+- [ ] Quick reference cheat sheet created
+- [ ] Deprecation notices on old file locations
+- [ ] User journey walkthrough successful (can follow 01 → 10)
+- [ ] Cross-references correct (user guide ↔ developer guide ↔ technical)
+
+---
+
+### Validation & Rollback Procedures
+
+**Before Each Phase**:
+```bash
+# Tag current state
+git tag pre-consolidation-phaseN
+
+# Create feature branch
+git checkout -b consolidation-phaseN
+```
+
+**After Each Phase**:
+```bash
+# Run link checker
+find docs -name "*.md" -exec markdown-link-check {} \;
+
+# Verify file count
+find docs/user-guide -name "*.md" | wc -l
+
+# Check line count (should be roughly preserved)
+find docs/user-guide -name "*.md" -exec wc -l {} + | tail -1
+
+# Review changes
+git diff --stat pre-consolidation-phaseN..HEAD
+
+# If issues found:
+git reset --hard pre-consolidation-phaseN
+git tag -d pre-consolidation-phaseN
+```
+
+**Final Validation (After Phase 13b.18.5)**:
+```bash
+# Zero broken links
+find docs -name "*.md" -exec markdown-link-check {} \; | grep -i "error"
+
+# File count verification
+echo "User guide files: $(find docs/user-guide -name '*.md' | wc -l)"  # Should be ~15
+echo "Developer guide files: $(find docs/developer-guide -name '*.md' | wc -l)"  # Should be ~8
+echo "Technical docs: $(find docs/technical -name '*.md' | wc -l)"  # Should be ~9
+
+# Content preservation (within 5%)
+BEFORE=43335
+AFTER=$(find docs -name "*.md" -exec wc -l {} + | tail -1 | awk '{print $1}')
+echo "Content change: $((AFTER - BEFORE)) lines"
+
+# User journey test
+# Manually verify: README → 01 → 02 → 03 → ... → 10 flows logically
+```
+
+---
+
+### Success Metrics
+
+**Quantitative**:
+- [ ] User guide files: 53 → ≤15 (71% reduction achieved)
+- [ ] Zero broken internal links
+- [ ] Content preserved: 43,335 lines ± 5%
+- [ ] All 21 Rust API docs in developer-guide/
+
+**Qualitative**:
+- [ ] New user can follow clear path: README → 01 → 02 → 03 → first script
+- [ ] Developer knows where to find extension docs (developer-guide/)
+- [ ] Technical details separated from user guides
+- [ ] No duplicate/overlapping content
+- [ ] README.md provides clear navigation for all audiences
+
+**Timeline**:
+- [ ] Phase 13b.18.1: 2 hours (developer content)
+- [ ] Phase 13b.18.2: 2 hours (technical content)
+- [ ] Phase 13b.18.3: 4 hours (user guides)
+- [ ] Phase 13b.18.4: 2 hours (templates)
+- [ ] Phase 13b.18.5: 3 hours (navigation)
+- [ ] **Total: 13 hours**
+
+---
+
+**Estimated Completion**: TBD (13 hours of work)
+**Risk Level**: MEDIUM-HIGH (many file moves, but phased approach mitigates risk)
+**Rollback Plan**: Git tags before each phase, easy rollback to any point
+
+---
+
 **END OF PHASE 13b TODO DOCUMENT**
