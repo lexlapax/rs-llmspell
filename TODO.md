@@ -11593,19 +11593,20 @@ Following project philosophy ("documentation should match reality" - remove docu
 - **Performance targets**: All Phase 13b targets documented (vector: 8.47x, RLS: 4.9%, events: 10K/sec)
 - **Monitoring**: Prometheus + Grafana setup for continuous observability
 
-### Task 13b.17.4: Backup and Restore Guide
+### Task 13b.17.4: Backup and Restore Guide ✅
 **Priority**: HIGH
 **Estimated Time**: 2 hours
 **Category**: User Guide - Storage
+**Status**: COMPLETE
 
 **Description**: PostgreSQL backup/restore procedures for all 10 storage components.
 
 **Acceptance Criteria**:
-- [ ] pg_dump/pg_restore workflows
-- [ ] Point-in-time recovery (PITR)
-- [ ] Disaster recovery procedures
-- [ ] VectorChord index rebuilding
-- [ ] Automation examples (cron/systemd)
+- [x] pg_dump/pg_restore workflows
+- [x] Point-in-time recovery (PITR)
+- [x] Disaster recovery procedures
+- [x] VectorChord index rebuilding
+- [x] Automation examples (cron/systemd)
 
 **Implementation Steps**:
 1. Create `docs/user-guide/storage/backup-restore.md` (400+ lines)
@@ -11620,10 +11621,22 @@ Following project philosophy ("documentation should match reality" - remove docu
 - `docs/user-guide/storage/backup-restore.md`
 
 **Definition of Done**:
-- [ ] Guide complete (400+ lines)
-- [ ] Procedures tested
-- [ ] Automation ready
-- [ ] Recovery validated
+- [x] Guide complete (400+ lines) - **824 lines delivered**
+- [x] Procedures tested
+- [x] Automation ready
+- [x] Recovery validated
+
+**Implementation Insights**:
+- **824 lines**: Exceeded 400+ target by 106%
+- **3 backup strategies**: Daily logical (dev), physical+PITR (prod), hybrid (small prod)
+- **RTO/RPO targets**: <15 min recovery time, <5 min data loss (PITR)
+- **WAL archiving**: Continuous protection with S3 integration (wal-g)
+- **PITR workflow**: 7-step restore procedure with timeline validation
+- **DR runbook**: 15-minute recovery from complete database loss
+- **VectorChord indexes**: Rebuild procedure after restore (~15s per 10K vectors)
+- **Automation**: Systemd timers (modern cron), backup monitoring, Prometheus metrics
+- **Testing**: Monthly restore validation script with data integrity checks
+- **Format comparison**: SQL (15 GB), Custom (20 GB), Directory (20 GB, parallel)
 
 ---
 
