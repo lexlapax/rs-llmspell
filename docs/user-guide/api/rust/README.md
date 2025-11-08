@@ -1,16 +1,31 @@
-# LLMSpell Rust API Reference
+# Rust API Documentation
 
-**Complete API documentation for extending LLMSpell with Rust**
+**This documentation has been moved to the Developer Guide.**
 
-**🔗 Navigation**: [← API Hub](../) | [User Guide](../../) | [Lua API](../lua/) | [Examples](../../../../examples/)
+**🔗 Navigation**: [← API Hub](../) | [User Guide](../../) | [Developer Guide](../../../developer-guide/)
 
 ---
 
-## Overview
+## New Location
 
-> **🦀 Rust API**: Comprehensive documentation for all 21 LLMSpell crates, covering traits, implementations, and extension patterns for building custom components.
+All Rust API documentation has been reorganized into thematic guides for easier navigation:
 
-**Version**: 0.13.0 | **Status**: Phase 13 Complete | **Last Updated**: January 2025
+**👉 [Developer Guide - API Reference](../../../developer-guide/reference/)**
+
+### Thematic Guides
+
+- **[Core Traits](../../../developer-guide/reference/core-traits.md)** - BaseAgent, ExecutionContext, error handling, testing framework
+- **[Storage Backends](../../../developer-guide/reference/storage-backends.md)** - InMemory, Sled, HNSW vector storage
+- **[RAG Pipeline](../../../developer-guide/reference/rag-pipeline.md)** - Document processing, retrieval, context engineering
+- **[Memory Backends](../../../developer-guide/reference/memory-backends.md)** - Episodic, semantic, procedural memory
+- **[Security Integration](../../../developer-guide/reference/security-integration.md)** - Access control, sandboxing, multi-tenancy
+- **[Crate Index](../../../developer-guide/reference/crate-index.md)** - All 21 crates organized by layer
+
+## Why the Change?
+
+The Rust API documentation is developer-facing content (for extending llmspell), while the User Guide focuses on using llmspell through Lua scripts and CLI commands.
+
+**Version**: 0.13.0 | **Phase**: 13b.18.3 | **Last Updated**: 2025-11-08
 
 ## 📚 Crate Documentation
 

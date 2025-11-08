@@ -1,11 +1,26 @@
 # Troubleshooting Guide
 
-**Version**: 0.9.0
-**Last Updated**: December 2024
+**Comprehensive guide to debugging and resolving issues**
 
-> **🔧 Quick Reference**: Common issues, debugging techniques, and performance optimization for LLMSpell with kernel architecture.
+🔗 **Navigation**: [← User Guide](README.md) | [Configuration](03-configuration.md) | [Deployment](08-deployment.md)
 
-**🔗 Navigation**: [← User Guide](README.md) | [Configuration](configuration.md) | [Service Deployment](service-deployment.md)
+---
+
+## Quick Navigation
+
+- [Common Issues](#common-issues) - Quick fixes for frequent problems
+- [Kernel & Service Issues](#kernel--service-issues) - Service deployment and daemon mode
+- [Debugging Techniques](#debugging-techniques) - Tools and strategies for debugging
+- [Performance Issues](#performance-issues) - Optimization and profiling
+- [API and Provider Issues](#api-and-provider-issues) - LLM provider troubleshooting
+- [Memory and Resource Issues](#memory-and-resource-issues) - Resource limits and memory
+- [Script Errors](#script-errors) - Lua/JS script debugging
+- [Tool-Specific Issues](#tool-specific-issues) - Tool invocation problems
+- [IDE & DAP Integration](#ide--dap-integration) - VS Code, Jupyter, debugging
+- [Advanced Debugging](#advanced-debugging) - Profiling and diagnostics
+- [Getting Help](#getting-help) - How to report issues
+
+> **💡 Tip**: Use Ctrl+F to search for specific error messages in this guide.
 
 ---
 
@@ -1339,10 +1354,16 @@ State.set("global", "key", "value")  -- Not just State.set("key", "value")
 
 ---
 
+---
+
 ## See Also
 
-- [Configuration Guide](configuration.md) - Detailed configuration options
-- [Core Concepts](concepts.md) - Understanding LLMSpell architecture
-- [Service Deployment](service-deployment.md) - Production deployment guide
-- [Getting Started](getting-started.md) - Basic setup and usage
-- [API Documentation](api/README.md) - Complete API reference
+- [Configuration Guide](03-configuration.md) - Detailed configuration options
+- [Core Concepts](02-core-concepts.md) - Understanding llmspell architecture
+- [Deployment Guide](08-deployment.md) - Production deployment strategies
+- [Getting Started](01-getting-started.md) - Basic setup and usage
+- [Lua API Reference](appendix/lua-api-reference.md) - Complete Lua API documentation
+
+---
+
+**Version**: 0.13.0 | **Phase**: 13b.18.3 | **Last Updated**: 2025-11-08
