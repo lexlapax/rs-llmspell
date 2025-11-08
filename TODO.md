@@ -10412,6 +10412,62 @@ assert!(
 
 ---
 
+**Provider Config Lookup Test Fix** (commit hash pending):
+
+**Problem**: All 7 provider config lookup tests failing with factory not found
+```
+running 7 tests
+test test_tier1_exact_match_cache_hit ... FAILED
+test test_tier2_provider_type_match ... FAILED
+test test_tier3_ephemeral_config ... FAILED
+test test_provider_type_match_different_model ... FAILED
+test test_exact_match_precedence ... FAILED
+test test_multiple_providers_same_type ... FAILED
+test test_backward_compat_no_config_provider ... FAILED
+
+failures:
+No factory found for provider_type 'mock' (factory 'rig' not registered)
+```
+
+**Root Cause**: `ProviderConfig::factory_name()` mapping missing "mock" → "mock"
+- **Tests**: Register factory with name "mock" (line 87, 125, etc.)
+- **Tests**: Create config with `provider_type = "mock"`
+- **Lookup**: `factory_name()` maps "mock" → "rig" (fallthrough case)
+- **Error**: Looking for factory "rig" but only "mock" registered
+
+**Why This Happened**:
+```rust
+pub fn factory_name(&self) -> &str {
+    match self.provider_type.as_str() {
+        "ollama" => "ollama",
+        "candle" => "candle",
+        _ => "rig",  // "mock" falls through here → wrong factory
+    }
+}
+```
+
+**Fix**: Add explicit "mock" mapping for test support
+```rust
+pub fn factory_name(&self) -> &str {
+    match self.provider_type.as_str() {
+        "ollama" => "ollama",
+        "candle" => "candle",
+        "mock" => "mock",  // Test mock factory
+        _ => "rig",
+    }
+}
+```
+
+**Test Results**:
+- **Before**: 0 passed, 7 failed (all provider config lookup tests)
+- **After**: 7 passed, 0 failed (100% pass rate)
+
+**File**: llmspell-providers/src/abstraction.rs:121
+
+**Lesson**: Test infrastructure needs explicit provider type mappings alongside production providers (ollama, candle, rig).
+
+---
+
 #### Expected Line Reduction
 
 **Before**: llmspell-bridge/src/runtime.rs = 2535 lines

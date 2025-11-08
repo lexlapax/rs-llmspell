@@ -118,6 +118,7 @@ impl ProviderConfig {
         match self.provider_type.as_str() {
             "ollama" => "ollama", // Local Ollama-specific factory
             "candle" => "candle", // Local Candle-specific factory
+            "mock" => "mock",     // Test mock factory
             _ => "rig",           // All API-based providers → rig (validates internally)
         }
     }
