@@ -83,19 +83,18 @@ end
 
 ### Agent Discovery
 
+#### Agent.discover()
+Discovers all available agents.
+
+```lua
+local agents = Agent.discover()
+```
+
 #### Agent.discover_by_capability(capability)
 Finds agents with a specific capability.
 
 ```lua
 local coders = Agent.discover_by_capability("code-generation")
-```
-
-#### Agent.count()
-Returns the count of registered agents.
-
-```lua
-local total = Agent.count()
-print("Total agents:", total)
 ```
 
 ### Agent Templates
@@ -217,11 +216,14 @@ local info = Agent.get_info("assistant")
 print(info.model, info.capabilities)
 ```
 
-#### Agent.list_capabilities(name)
-Lists capabilities of an agent.
+#### Agent.list_capabilities()
+Lists all system capabilities available to agents.
 
 ```lua
-local caps = Agent.list_capabilities("assistant")
+local caps = Agent.list_capabilities()
+for i, cap in ipairs(caps) do
+    print("Capability:", cap)
+end
 ```
 
 #### Agent.list_instances()
@@ -231,11 +233,11 @@ Lists all running agent instances.
 local instances = Agent.list_instances()
 ```
 
-#### Agent.get_hierarchy()
-Gets the agent hierarchy tree.
+#### Agent.get_hierarchy(agent_name)
+Gets the hierarchy tree for a specific agent.
 
 ```lua
-local tree = Agent.get_hierarchy()
+local tree = Agent.get_hierarchy("composite-agent")
 ```
 
 #### Agent.get_details(name)
@@ -300,37 +302,7 @@ Sets the agent's state.
 agent:set_state({context = "updated"})
 ```
 
-#### agent:get_model()
-Gets the model name used by this agent.
-
-```lua
-local model = agent:get_model()
-print("Using model:", model)
-```
-
-#### agent:get_name()
-Gets the agent's name.
-
-```lua
-local name = agent:get_name()
-```
-
-#### agent:get_type()
-Gets the agent's type (e.g., "llm", "tool", "composite").
-
-```lua
-local agent_type = agent:get_type()
-```
-
-#### agent:get_capabilities()
-Gets the agent's capabilities.
-
-```lua
-local capabilities = agent:get_capabilities()
-for i, cap in ipairs(capabilities) do
-    print("Capability:", cap)
-end
-```
+**Note**: Use `Agent.get_info(name)` or `Agent.get_details(name)` to retrieve agent metadata like model, type, and capabilities.
 
 ---
 
@@ -399,27 +371,25 @@ Gets the parameter schema for a tool.
 local schema = Tool.get_schema("file-reader")
 ```
 
-### Tool Availability
+### Tool Utility Methods
 
-#### Tool.is_available(name)
-Checks if a tool is available.
+#### Tool.exists(name)
+Checks if a tool exists.
 
 ```lua
-if Tool.is_available("calculator") then
+if Tool.exists("calculator") then
     -- Use calculator
 end
 ```
 
-### Batch Operations
-
-#### Tool.batch(operations)
-Executes multiple tool operations.
+#### Tool.categories()
+Lists all tool categories.
 
 ```lua
-local results = Tool.batch({
-    {tool = "calculator", params = {operation = "add", a = 1, b = 2}},
-    {tool = "calculator", params = {operation = "multiply", a = 3, b = 4}}
-})
+local categories = Tool.categories()
+for i, category in ipairs(categories) do
+    print("Category:", category)
+end
 ```
 
 ---
@@ -640,6 +610,38 @@ local outputs = result.metadata and result.metadata.extra
 -- Use outputs
 for agent_id, output in pairs(outputs) do
     -- Process output
+end
+```
+
+### Workflow Utility Methods
+
+#### Workflow.types()
+Lists all registered workflow types.
+
+```lua
+local types = Workflow.types()
+for i, type_name in ipairs(types) do
+    print("Workflow type:", type_name)
+end
+```
+
+#### Workflow.setDefaultErrorHandler(handler)
+Sets a default error handler for all workflows.
+
+```lua
+Workflow.setDefaultErrorHandler(function(error, context)
+    print("Workflow error:", error.message)
+    return "retry"  -- or "skip", "fail"
+end)
+```
+
+#### Workflow.enableDebug() / Workflow.isDebugEnabled()
+Enable or check debug mode for workflows.
+
+```lua
+Workflow.enableDebug()
+if Workflow.isDebugEnabled() then
+    print("Debug mode active")
 end
 ```
 
