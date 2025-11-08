@@ -11706,10 +11706,20 @@ Following project philosophy ("documentation should match reality" - remove docu
 - `docs/user-guide/configuration.md` (+300 lines)
 
 **Definition of Done**:
-- [ ] Infrastructure config complete
-- [ ] Backend selection clear
-- [ ] Examples comprehensive
-- [ ] All 10 components covered
+- [x] Infrastructure config complete
+- [x] Backend selection clear
+- [x] Examples comprehensive
+- [x] All 10 components covered
+
+**Implementation Insights**:
+- **+237 lines**: Added Infrastructure Module and Storage Backend Configuration sections
+- **Infrastructure Module section** (+89 lines): Documented 9 components from Infrastructure::from_config(), single creation path, conditional RAG/Memory, backend selection patterns
+- **Storage Backend section** (+148 lines): 3 backend types (memory/sled/postgres), PostgreSQL multi-tenancy RLS, connection pooling formula (CPU × 2 + 1), component-specific settings (HNSW, partitioning, retention)
+- **10 storage components**: Vector embeddings (4 dimension tables), temporal graph, procedural memory, agent state, workflow states, sessions, artifacts, event log, hook history, API keys
+- **Performance targets**: <2ms storage overhead, 10K events/sec ingestion, RLS <5% overhead
+- **Cross-linked docs**: Added links to 3 PostgreSQL guides (setup, schema, performance)
+- **Hybrid backends**: Documented per-component override examples
+- **Updated TOC**: Added items 13-14 for new sections
 
 ### Task 13b.17.7: Update User Guide - CLI
 **Priority**: HIGH
