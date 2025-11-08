@@ -10192,6 +10192,7 @@ let runtime = ScriptRuntime::with_engine(config, "lua").await?;
 - `82f6f25d` - fix: Wire RAG vector persistence_path config to Infrastructure module
 - `014e469c` - test: Increase regex extraction performance test threshold to 10ms
 - `d2f75bf5` - fix: Add mock provider type mapping for test support
+- `3866d319` - fix: Replace match with if/else for session backend selection (clippy)
 
 **Summary & Insights**:
 
