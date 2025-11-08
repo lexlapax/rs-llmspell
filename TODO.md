@@ -12059,33 +12059,75 @@ Added comprehensive PostgreSQL backend documentation (520 lines) covering:
 
 ### Category E: Developer Guide Updates
 
-### Task 13b.17.15: Update Developer Guide - Bridge Pattern
+### Task 13b.17.15: Update Developer Guide - Bridge Pattern ✅
 **Priority**: HIGH
-**Estimated Time**: 1 hour
+**Estimated Time**: 1 hour → **Actual**: 1 hour 10 minutes
 **Category**: Developer Guide
+**Status**: COMPLETED (2025-11-08)
 
 **Description**: Update bridge-pattern-guide.md with Infrastructure module.
 
 **Acceptance Criteria**:
-- [ ] Infrastructure module pattern
-- [ ] Config-driven creation
-- [ ] Component lifecycle
-- [ ] Extension patterns
+- [x] Infrastructure module pattern ✅
+- [x] Config-driven creation ✅
+- [x] Component lifecycle ✅
+- [x] Extension patterns ✅
 
 **Implementation Steps**:
-1. Update `docs/developer-guide/bridge-pattern-guide.md`
-2. Infrastructure module section
-3. Component factory patterns
-4. Config-driven design
-5. Extension guidelines
+1. ✅ Update `docs/developer-guide/bridge-pattern-guide.md`
+2. ✅ Infrastructure module section
+3. ✅ Component factory patterns
+4. ✅ Config-driven design
+5. ✅ Extension guidelines
 
-**Files to Update**:
-- `docs/developer-guide/bridge-pattern-guide.md` (+200 lines)
+**Files Updated**:
+- `docs/developer-guide/bridge-pattern-guide.md` (+643 lines, now 2,246 lines total)
 
 **Definition of Done**:
-- [ ] Infrastructure pattern documented
-- [ ] Extension clear
-- [ ] Examples comprehensive
+- [x] Infrastructure pattern documented ✅
+- [x] Extension clear ✅
+- [x] Examples comprehensive ✅
+
+**Completion Summary**:
+Added comprehensive Infrastructure Module Pattern section (617 lines) documenting Phase 13b.16 config-driven component creation:
+- **Evolution Documentation**: Before/after comparison showing 200+ LOC → 12 LOC (94% reduction)
+- **Infrastructure Core API**: Complete module structure with 9 component accessors
+- **3 Component Factories**: ProviderManager, StateManager (hot-swappable backends), RAG (multi-dependency)
+- **Config-Driven Selection**: Per-component backend override examples with config.toml
+- **Dependency Graph**: 5-level initialization order with compile-time enforcement guarantees
+- **ScriptRuntime Integration**: new() API pattern replacing deprecated new_with_lua()
+- **3 Usage Patterns**: Embedded service, HTTP service with Axum, CLI kernel mode
+- **Lifecycle Management**: Initialization and shutdown order diagrams
+- **Extension Points**: 4-step guide for adding new components to Infrastructure
+- **8 Benefits**: Single source of truth, dependency safety, zero boilerplate, hot-swappable backends, component-specific config, testability, extensibility, documentation
+
+**Technical Insights**:
+1. **Pattern Evolution**: Documented progression from typed structs (Phase 11a.8) to config-driven creation (Phase 13b.16)
+2. **Dependency Safety**: Infrastructure::from_config() enforces correct initialization order at compile time
+3. **CLI Impact**: Quantified 94% code reduction in CLI with real before/after examples
+4. **Backend Flexibility**: Demonstrated hot-swappable backends (memory/sled/postgres) without code changes
+5. **Integration Patterns**: Showed how Infrastructure pattern extends to embedded, HTTP, and kernel deployment modes
+
+**Documentation Quality**:
+- Complete code examples for all 9 component factories
+- 3 realistic usage patterns with full implementations
+- Dependency graph visualization showing 5 initialization levels
+- Extension guide with step-by-step new component integration
+- Evolution path showing Phase 11a.8 → 13b.16 → Future
+
+**Integration Points**:
+- References kernel-execution-paths.md for detailed initialization flow
+- References storage-architecture.md for backend selection patterns
+- References configuration.md for config schema
+- References service-deployment.md for deployment patterns
+
+**Version Update**:
+- Updated guide version: 1.0 → 1.1
+- Updated phase coverage: 11a.8 → 11a.8 + 13b.16
+- Updated last modified date: October 2025 → November 2025 (Phase 13b.16)
+- Added version history entry for 1.1
+
+**Commit**: 3e2749cb "docs: Update Developer Guide - Bridge Pattern (Task 13b.17.15)"
 
 ### Task 13b.17.16: Update Developer Guide - Extending llmspell
 **Priority**: HIGH
