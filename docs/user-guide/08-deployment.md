@@ -913,14 +913,18 @@ RUST_LOG=info,llmspell=debug
 
 ---
 
-**🔗 Next Steps**: [IDE Integration →](ide-integration.md) | [API Reference →](api/README.md)# IDE Integration Guide
+**🔗 Next Steps**: [Security Guide →](09-security.md) | [Troubleshooting →](10-troubleshooting.md) | [Lua API Reference](appendix/lua-api-reference.md)
+
+---
+
+## IDE Integration
 
 **Version**: 0.9.0
 **Last Updated**: December 2024
 
 > **🔌 IDE Integration**: Connect LLMSpell kernel with VS Code, Jupyter Lab, vim/neovim, and other development environments.
 
-**🔗 Navigation**: [← User Guide](README.md) | [Service Deployment →](service-deployment.md) | [API Reference →](api/README.md)
+**🔗 Navigation**: [← Deployment](README.md#08-deployment) | [Security →](09-security.md) | [Lua API](appendix/lua-api-reference.md)
 
 ---
 
@@ -1442,4 +1446,4 @@ top -p $(pgrep llmspell)
 
 ---
 
-**🔗 Next Steps**: [API Reference →](api/README.md) | [Examples →](../../examples/README.md)
+**🔗 Next Steps**: [Security Guide →](09-security.md) | [Troubleshooting →](10-troubleshooting.md) | [Examples →](../../examples/README.md)

@@ -745,7 +745,7 @@ log_data_access = true
 
 - **[Configuration Guide](configuration.md)** - Full configuration reference
 - **[Concepts Guide](concepts.md#security-model)** - Security architecture overview
-- **[Rust API: llmspell-security](api/rust/llmspell-security.md)** - Developer security API reference
+- **[Rust API: Security Integration](../developer-guide/reference/security-integration.md)** - Developer security API reference
 - **[Cookbook: Security Patterns](../../examples/script-users/cookbook/security-patterns.lua)** - Input validation examples
 - **[Advanced: Monitoring Security](../../examples/script-users/advanced-patterns/monitoring-security.lua)** - Security testing patterns
 

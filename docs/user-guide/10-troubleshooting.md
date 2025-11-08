@@ -1272,7 +1272,7 @@ print("Success!")
 ### Community Resources
 
 - **GitHub Issues**: [Report bugs](https://github.com/yourusername/rs-llmspell/issues)
-- **Documentation**: Check [API docs](api/README.md) for detailed reference
+- **API Reference**: See [Lua API](appendix/lua-api-reference.md) for complete scripting reference
 - **Examples**: Review [working examples](../../examples/EXAMPLE-INDEX.md)
 
 ### Error Reporting Template

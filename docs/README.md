@@ -190,7 +190,7 @@
 5. **Tool CLI** - `llmspell tool list`, `invoke`, `info`, `search`, `test` commands
 6. **[Service Deployment](user-guide/service-deployment.md)** - Deploy as daemon with systemd/launchd
 7. **[IDE Integration](user-guide/ide-integration.md)** - Connect VS Code or Jupyter
-8. **[Lua API Reference](user-guide/api/lua/README.md)** - Complete API documentation (18 globals)
+8. **[Lua API Reference](user-guide/appendix/lua-api-reference.md)** - Complete API documentation (18 globals)
 9. **[Examples](../examples/script-users/)** - 60+ working examples including templates and tool CLI
 
 ### 🔨 **I want to build experimental components**

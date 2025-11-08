@@ -1918,4 +1918,5 @@ RUST_LOG=llmspell_config=trace ./target/release/llmspell run script.lua
 - [Service Deployment](service-deployment.md) - Production deployment
 - [Troubleshooting](troubleshooting.md) - Common issues and solutions
 - [Getting Started](getting-started.md) - Quick start guide
-- [API Reference](api/README.md) - Complete API documentation
+- [Lua API Reference](appendix/lua-api-reference.md) - Complete Lua scripting API
+- [Rust API Reference](../developer-guide/reference/) - Complete Rust extension API

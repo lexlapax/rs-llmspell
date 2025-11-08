@@ -3,7 +3,7 @@
 **Version**: 0.8.10  
 **Last Updated**: December 2024
 
-> **📚 Quick Reference**: This guide explains the fundamental concepts behind LLMSpell's architecture. For API details, see [Lua API](api/lua/README.md) or [Rust API](api/rust/README.md).
+> **📚 Quick Reference**: This guide explains the fundamental concepts behind LLMSpell's architecture. For API details, see [Lua API](appendix/lua-api-reference.md) or [Rust API](../developer-guide/reference/).
 
 **🔗 Navigation**: [← User Guide](README.md) | [Getting Started →](getting-started.md) | [Configuration →](configuration.md)
 
@@ -971,8 +971,8 @@ Target performance metrics (validated in benchmarks):
 - [Configuration](configuration.md) - Kernel, RAG, and service configuration
 - [Service Deployment](service-deployment.md) - Production deployment guide
 - [Troubleshooting](troubleshooting.md) - Common issues and solutions
-- [Lua API Reference](api/lua/README.md) - Complete API including Debug globals
-- [Rust API Reference](api/rust/README.md) - Complete traits including kernel architecture
+- [Lua API Reference](appendix/lua-api-reference.md) - Complete API including Debug globals
+- [Rust API Reference](../developer-guide/reference/) - Complete traits including kernel architecture
 - [Kernel Examples](../../examples/script-users/kernel/) - Kernel and service examples
 - [Configuration Examples](../../examples/script-users/configs/) - Kernel, RAG, and daemon configs
 - [Examples Index](../../examples/EXAMPLE-INDEX.md) - 60+ examples including Phase 9-10 features

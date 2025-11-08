@@ -122,7 +122,7 @@
 
 ```bash
 # Install and build
-git clone https://github.com/yourusername/rs-llmspell.git
+git clone https://github.com/lexlapax/rs-llmspell.git
 cd rs-llmspell
 
 # Choose your build:
@@ -342,7 +342,7 @@ sudo systemctl status llmspell-kernel
 - **Examples?** See [Example Index](../../examples/EXAMPLE-INDEX.md)
 - **Developer Guide?** See [Developer Guide](../developer-guide/README.md)
 - **Technical Details?** See [Technical Docs](../technical/README.md)
-- **Bugs?** Report on [GitHub](https://github.com/anthropics/llmspell/issues)
+- **Bugs?** Report on [GitHub](https://github.com/lexlapax/rs-llmspell/issues)
 
 ---
 

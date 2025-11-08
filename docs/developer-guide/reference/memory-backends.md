@@ -645,7 +645,7 @@ async fn test_memory_integration() {
   - [core-traits.md](core-traits.md) - Foundation traits
 - **User Guides**:
   - [../../user-guide/concepts.md](../../user-guide/concepts.md) - Memory concepts
-  - [../../user-guide/api/lua/README.md](../../user-guide/api/lua/README.md) - Lua memory API
+  - [../../user-guide/appendix/lua-api-reference.md](../../user-guide/appendix/lua-api-reference.md) - Lua memory API
 
 ---
 

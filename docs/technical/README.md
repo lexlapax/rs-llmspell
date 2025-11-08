@@ -82,6 +82,45 @@
 - Performance tuning (8ms @ 100K vectors, 80% cache hit rate)
 - RAGPipelineBuilder patterns and custom providers
 
+---
+
+## PostgreSQL Storage Documentation (Phase 13b)
+
+### 📊 [PostgreSQL Schema Reference](postgresql-schema.md)
+**Purpose**: Complete schema documentation for PostgreSQL 18 storage backend
+**Coverage**: All 10 storage backends with detailed schema design
+**Key Content**:
+- Vector embeddings (4 dimension tables with VectorChord HNSW indexes)
+- Temporal knowledge graph (bi-temporal entities + relationships)
+- Procedural memory patterns
+- Agent state, workflow states, sessions, artifacts
+- Event log with partitioning
+- Multi-tenant isolation with Row-Level Security (RLS)
+
+### ⚡ [PostgreSQL Performance Tuning](postgresql-performance.md)
+**Purpose**: Performance optimization and tuning guide
+**Coverage**: Query optimization, index strategies, connection pooling
+**Key Content**:
+- HNSW index tuning (m, ef_construction, ef_search parameters)
+- Query performance analysis with EXPLAIN
+- Connection pool sizing and configuration
+- Multi-tenant performance overhead (<5% with RLS)
+- Vector search optimization (8.47x speedup)
+- Partition management and maintenance
+
+### 🔄 [Migration Internals](migration-internals.md)
+**Purpose**: Database migration procedures and internals
+**Coverage**: Schema migration system and procedures
+**Key Content**:
+- Migration file structure and naming conventions
+- Up/down migration patterns
+- Rollback procedures
+- Data migration strategies
+- Zero-downtime migration techniques
+- Version compatibility matrix
+
+---
+
 ## Supplementary Documentation
 
 ### 7. 🐛 [Debug DAP Architecture](debug-dap-architecture.md) ✅ v0.10.0

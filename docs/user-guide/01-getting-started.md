@@ -494,7 +494,7 @@ end
 6. **Template documentation** → [Template User Guide](templates/) (10 experimental workflows for rapid exploration workflows)
 7. **Production patterns** → [Cookbook](../../examples/script-users/cookbook/) (11 examples)
 8. **Real applications** → [Applications](../../examples/script-users/applications/) (9 complete apps)
-9. **Complete API reference** → [Lua API](api/lua/README.md) (18 globals including Template)
+9. **Complete API reference** → [Lua API](appendix/lua-api-reference.md) (18 globals including Template)
 
 ### Advanced Topics
 10. **Multi-tenant RAG** → `configs/rag-multi-tenant.toml`
