@@ -23,12 +23,14 @@
 10. [RAG Configuration](#rag-configuration) ⭐ **Phase 8**
 11. [Multi-Tenancy](#multi-tenancy) ⭐ **Phase 8**
 12. [State & Sessions](#state--sessions)
-13. [Security Settings](#security-settings)
-14. [Tool Configuration](#tool-configuration)
-15. [External API Setup](#external-api-setup)
-16. [Deployment Profiles](#deployment-profiles)
-17. [Environment Variables](#environment-variables)
-18. [Troubleshooting](#troubleshooting)
+13. [Infrastructure Module](#infrastructure-module-phase-13b16) ⭐ **Phase 13b.16**
+14. [Storage Backend Configuration](#storage-backend-configuration-phase-13b) ⭐ **Phase 13b**
+15. [Security Settings](#security-settings)
+16. [Tool Configuration](#tool-configuration)
+17. [External API Setup](#external-api-setup)
+18. [Deployment Profiles](#deployment-profiles)
+19. [Environment Variables](#environment-variables)
+20. [Troubleshooting](#troubleshooting)
 
 ---
 
@@ -992,6 +994,243 @@ artifact_compression_threshold = 10240  # 10KB
 session_timeout_seconds = 3600
 storage_backend = "memory"   # memory, sled
 ```
+
+---
+
+## Infrastructure Module (Phase 13b.16)
+
+### Overview
+
+The Infrastructure module provides **unified component creation** for ScriptRuntime. All 9 core components are created from configuration via `Infrastructure::from_config()`:
+
+1. **ProviderManager** - LLM provider access
+2. **StateManager** - State persistence
+3. **SessionManager** - Session + artifact management
+4. **RAG** - Retrieval-Augmented Generation (optional)
+5. **MemoryManager** - Adaptive memory system (optional)
+6. **ToolRegistry** - Tool management
+7. **AgentRegistry** - Agent factories
+8. **WorkflowFactory** - Workflow execution
+9. **ComponentRegistry** - Script access layer
+
+### Single Creation Path
+
+```rust
+use llmspell_bridge::infrastructure::Infrastructure;
+use llmspell_config::LLMSpellConfig;
+
+let config = LLMSpellConfig::from_file("config.toml")?;
+let infrastructure = Infrastructure::from_config(&config).await?;
+
+// All 9 components available
+let provider_manager = infrastructure.provider_manager.clone();
+let rag = infrastructure.rag.clone(); // Option<Arc<...>>
+let memory = infrastructure.memory_manager.clone(); // Option<Arc<...>>
+```
+
+### Conditional Component Creation
+
+**RAG and Memory are created only if enabled in config:**
+
+```toml
+[rag]
+enabled = true  # Creates MultiTenantRAG component
+
+[memory]
+enabled = true  # Creates DefaultMemoryManager component
+```
+
+If `enabled = false` or section missing:
+- `infrastructure.rag` = `None`
+- `infrastructure.memory_manager` = `None`
+
+### Backend Selection
+
+**Global backend** (applies to all 10 storage components):
+
+```toml
+[storage]
+backend = "postgres"  # "memory", "sled", or "postgres"
+```
+
+**Per-component overrides** (advanced):
+
+```toml
+[storage]
+backend = "postgres"  # Default for all
+
+[storage.memory]
+backend = "memory"    # Override: use in-memory for episodic memory (testing)
+
+[storage.state]
+backend = "sled"      # Override: use sled for agent state (embedded)
+```
+
+**10 Storage Components:**
+1. Vector embeddings (vector_embeddings_{384,768,1536,3072})
+2. Temporal graph (entities, relationships)
+3. Procedural memory (procedural_memory)
+4. Agent state (agent_states)
+5. Workflow states (workflow_states)
+6. Sessions (sessions)
+7. Artifacts (artifacts + artifact_content)
+8. Event log (event_log)
+9. Hook history (hook_history)
+10. API keys (api_keys)
+
+---
+
+## Storage Backend Configuration (Phase 13b)
+
+### Backend Types
+
+**memory** - In-memory storage (testing only)
+```toml
+[storage]
+backend = "memory"
+```
+- **Use case**: Testing, development, CI/CD
+- **Pros**: Fastest, no setup
+- **Cons**: Data lost on restart, no persistence
+
+**sled** - Embedded database
+```toml
+[storage]
+backend = "sled"
+
+[storage.sled]
+path = "./data/sled"
+cache_capacity_mb = 256
+flush_interval_secs = 5
+compression = true
+```
+- **Use case**: Embedded deployments, single-user applications
+- **Pros**: No external dependencies, ACID transactions
+- **Cons**: Single-process only, limited concurrency
+
+**postgres** - PostgreSQL 18 + VectorChord
+```toml
+[storage]
+backend = "postgres"
+
+[storage.postgres]
+url = "postgresql://llmspell_app:pass@localhost:5432/llmspell_prod"
+pool_size = 20
+pool_timeout_secs = 30
+idle_timeout_secs = 600
+max_lifetime_secs = 1800
+default_tenant_id = "default"
+enforce_tenant_isolation = true
+auto_migrate = false
+```
+- **Use case**: Production, multi-tenant, high-concurrency
+- **Pros**: ACID, RLS isolation, vector search (HNSW), scalable
+- **Cons**: Requires PostgreSQL 18 + VectorChord setup
+
+**See**: [PostgreSQL Setup Guide](storage/postgresql-setup.md) for installation
+
+### PostgreSQL Configuration
+
+**Connection settings:**
+```toml
+[storage.postgres]
+# Connection URL (required)
+url = "postgresql://llmspell_app:password@localhost:5432/llmspell_prod"
+
+# Connection pool
+pool_size = 20              # Max connections (formula: CPU × 2 + 1)
+pool_timeout_secs = 30      # Timeout acquiring connection
+idle_timeout_secs = 600     # Close idle connections (10 min)
+max_lifetime_secs = 1800    # Recycle connections (30 min)
+```
+
+**Multi-tenancy:**
+```toml
+[storage.postgres]
+# Tenant isolation via Row-Level Security (RLS)
+default_tenant_id = "default"
+enforce_tenant_isolation = true  # Enable RLS policies
+tenant_id_pattern = "^[a-z0-9-]{3,255}$"  # Validation regex
+```
+
+**Migrations:**
+```toml
+[storage.postgres]
+auto_migrate = false        # Run migrations on startup
+migration_timeout_secs = 300
+```
+
+**Component-specific settings:**
+```toml
+[storage.postgres.vector_embeddings]
+# HNSW index parameters (per-dimension table)
+hnsw_m = 16                # Graph connectivity (default: 16)
+hnsw_ef_construction = 128 # Build-time search depth (default: 128)
+
+[storage.postgres.event_log]
+# Event log partitioning
+partition_strategy = "monthly"  # "daily", "weekly", "monthly"
+retention_days = 365            # Purge partitions older than 1 year
+
+[storage.postgres.artifacts]
+# Large object storage
+compression_threshold_bytes = 1048576  # Compress artifacts >1 MB
+```
+
+**Performance targets:**
+- **Vector search**: <5ms p95 (10K vectors, k=10)
+- **RLS overhead**: <5% (4.9% validated)
+- **Event ingestion**: 10K events/sec sustained
+- **Connection pool**: 100+ concurrent connections
+
+**See**:
+- [Schema Reference](storage/schema-reference.md) - 15 tables documented
+- [Performance Tuning](storage/performance-tuning.md) - HNSW optimization
+- [Backup/Restore](storage/backup-restore.md) - Disaster recovery
+
+### Sled Configuration
+
+```toml
+[storage.sled]
+# Database path
+path = "./data/sled"
+
+# Performance settings
+cache_capacity_mb = 256     # In-memory cache size
+flush_interval_secs = 5     # Flush dirty pages interval
+compression = true          # zstd compression
+
+# Durability settings
+mode = "HighThroughput"     # "HighThroughput" or "LowLatency"
+use_compression = true
+```
+
+**Performance modes:**
+- **HighThroughput**: Batch writes, higher latency, better throughput
+- **LowLatency**: Immediate writes, lower latency, lower throughput
+
+### Hybrid Backend Configuration
+
+**Use different backends per component:**
+
+```toml
+[storage]
+backend = "postgres"  # Default
+
+[storage.memory]
+backend = "memory"    # Episodic memory in RAM (fast, testing)
+
+[storage.state]
+backend = "sled"      # Agent state in embedded DB (no external deps)
+
+[storage.events]
+backend = "postgres"  # Events in PostgreSQL (durability, partitions)
+```
+
+**Use cases:**
+- **Development**: `memory` for fast iteration
+- **Embedded**: `sled` for zero-dependency deployments
+- **Production**: `postgres` for durability and scale
 
 ---
 
