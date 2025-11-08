@@ -206,22 +206,19 @@ fn create_session_manager(
 
     // Create session storage backend based on config (Phase 13b.16.9 - Fix lock contention)
     let session_storage_backend: Arc<dyn llmspell_storage::StorageBackend> =
-        match config.runtime.sessions.storage_backend.as_str() {
-            "memory" => {
-                debug!("Using memory backend for session storage");
-                Arc::new(llmspell_storage::MemoryBackend::new())
-            }
-            "sled" | _ => {
-                debug!("Using Sled backend for session storage at ./sessions");
-                Arc::new(
-                    llmspell_storage::SledBackend::new_with_path("./sessions").map_err(|e| {
-                        LLMSpellError::Component {
-                            message: format!("Failed to create session storage backend: {e}"),
-                            source: None,
-                        }
-                    })?,
-                )
-            }
+        if config.runtime.sessions.storage_backend.as_str() == "memory" {
+            debug!("Using memory backend for session storage");
+            Arc::new(llmspell_storage::MemoryBackend::new())
+        } else {
+            debug!("Using Sled backend for session storage at ./sessions");
+            Arc::new(
+                llmspell_storage::SledBackend::new_with_path("./sessions").map_err(|e| {
+                    LLMSpellError::Component {
+                        message: format!("Failed to create session storage backend: {e}"),
+                        source: None,
+                    }
+                })?,
+            )
         };
 
     // Create hook infrastructure
