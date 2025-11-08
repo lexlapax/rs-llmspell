@@ -11546,20 +11546,21 @@ Following project philosophy ("documentation should match reality" - remove docu
 - **ER diagram**: ASCII art diagram showing all relationships and cross-cutting concerns
 - **Query examples**: Vector similarity, bi-temporal point-in-time, session joins, event correlation
 
-### Task 13b.17.3: Storage Performance Tuning Guide
+### Task 13b.17.3: Storage Performance Tuning Guide ✅
 **Priority**: HIGH
 **Estimated Time**: 2 hours
 **Category**: User Guide - Storage
+**Status**: COMPLETE
 
 **Description**: Performance tuning for PostgreSQL backends (VectorChord, RLS overhead, partitioning).
 
 **Acceptance Criteria**:
-- [ ] VectorChord HNSW parameter tuning (m, ef_construction)
-- [ ] Connection pool sizing (10-20 connections)
-- [ ] RLS policy optimization (<5% overhead)
-- [ ] Event log partitioning strategy
-- [ ] VACUUM/autovacuum tuning
-- [ ] Query optimization tips
+- [x] VectorChord HNSW parameter tuning (m, ef_construction)
+- [x] Connection pool sizing (10-20 connections)
+- [x] RLS policy optimization (<5% overhead)
+- [x] Event log partitioning strategy
+- [x] VACUUM/autovacuum tuning
+- [x] Query optimization tips
 
 **Implementation Steps**:
 1. Create `docs/user-guide/storage/performance-tuning.md` (500+ lines)
@@ -11574,10 +11575,23 @@ Following project philosophy ("documentation should match reality" - remove docu
 - `docs/user-guide/storage/performance-tuning.md`
 
 **Definition of Done**:
-- [ ] Guide complete (500+ lines)
-- [ ] Benchmarks included
-- [ ] Tuning recommendations clear
-- [ ] Performance targets validated
+- [x] Guide complete (500+ lines) - **961 lines delivered**
+- [x] Benchmarks included
+- [x] Tuning recommendations clear
+- [x] Performance targets validated
+
+**Implementation Insights**:
+- **961 lines**: Exceeded 500+ target by 92%
+- **HNSW tuning**: 3 parameters (m, ef_construction, ef_search) with dimension-specific recommendations
+- **Memory formula**: `(m × 2) × 4 + dim × 4` bytes/vector
+- **Connection pool formula**: `(CPU_cores × 2) + spindle_count`
+- **RLS optimization**: 3 strategies (composite indexes, partial indexes, statistics target)
+- **Partition pruning**: 12.5x speedup for time-range queries
+- **VACUUM strategy**: Per-table autovacuum tuning for high-write workloads
+- **Query anti-patterns**: SELECT *, OFFSET pagination, OR conditions
+- **Benchmark scripts**: HNSW parameter testing, RLS overhead measurement
+- **Performance targets**: All Phase 13b targets documented (vector: 8.47x, RLS: 4.9%, events: 10K/sec)
+- **Monitoring**: Prometheus + Grafana setup for continuous observability
 
 ### Task 13b.17.4: Backup and Restore Guide
 **Priority**: HIGH
