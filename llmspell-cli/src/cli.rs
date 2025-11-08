@@ -579,11 +579,11 @@ Workflow:
 EXAMPLES:
     llmspell storage migrate plan --from sled --to postgres \\
       --components agent_state,workflow_state,sessions \\
-      --output migration-plan.yaml
+      --output migration-plan.toml
 
-    llmspell storage migrate execute --plan migration-plan.yaml --dry-run
+    llmspell storage migrate execute --plan migration-plan.toml --dry-run
 
-    llmspell storage migrate execute --plan migration-plan.yaml
+    llmspell storage migrate execute --plan migration-plan.toml
 
     llmspell storage info --backend sled
 
@@ -1581,10 +1581,10 @@ Workflow:
 EXAMPLES:
     llmspell storage migrate plan --from sled --to postgres \\
       --components agent_state,workflow_state,sessions \\
-      --output migration-plan.yaml
+      --output migration-plan.toml
 
-    llmspell storage migrate execute --plan migration-plan.yaml --dry-run
-    llmspell storage migrate execute --plan migration-plan.yaml"
+    llmspell storage migrate execute --plan migration-plan.toml --dry-run
+    llmspell storage migrate execute --plan migration-plan.toml"
     )]
     Migrate {
         #[command(subcommand)]
@@ -1635,7 +1635,7 @@ rules, and rollback metadata. Review the plan before executing.
 EXAMPLES:
     llmspell storage migrate plan --from sled --to postgres \\
       --components agent_state,workflow_state,sessions \\
-      --output migration-plan.yaml"
+      --output migration-plan.toml"
     )]
     Plan {
         /// Source backend (sled)
@@ -1662,8 +1662,8 @@ Dry-run mode performs validation without data modification. Actual execution
 includes progress reporting, validation, and automatic rollback on failure.
 
 EXAMPLES:
-    llmspell storage migrate execute --plan migration-plan.yaml --dry-run
-    llmspell storage migrate execute --plan migration-plan.yaml")]
+    llmspell storage migrate execute --plan migration-plan.toml --dry-run
+    llmspell storage migrate execute --plan migration-plan.toml")]
     Execute {
         /// Migration plan file
         #[arg(long)]

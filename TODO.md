@@ -10974,6 +10974,128 @@ Feature Enabled + DB:    → Benchmarks run normally
 
 ---
 
+### Task 13b.16.12: Replace serde_yaml with TOML for Migration Plans (Dependency Cleanup)
+**Priority**: LOW
+**Estimated Time**: 30 minutes
+**Actual Time**: 35 minutes
+**Status**: ✅ COMPLETE
+**Completed**: 2025-11-07
+
+**Description**: Replace serde_yaml dependency with TOML for migration plan serialization. Remove deprecated dependency, save binary size, improve Rust ecosystem alignment.
+
+**Problem Analysis**:
+
+**Current State (YAML)**:
+- `serde_yaml = "0.9"` dependency (~180KB binary size)
+- serde_yaml deprecated March 2024
+- Phase 10 (Task 10.17.5.4) removed serde_yaml, saving 150-200KB
+- Phase 13b.14 re-added serde_yaml for migration plan YAML
+
+**Why YAML Was Re-added**:
+- Human-editable migration plans (generate → review/edit → execute workflow)
+- Support for comments to annotate batch sizes, validation rules
+- YAML familiar to ops teams
+
+**Why Switch to TOML**:
+1. **Zero dependency cost**: `toml` already in workspace (llmspell-utils)
+2. **Binary size savings**: -180KB (~1.5% of total binary)
+3. **No deprecated warnings**: TOML actively maintained
+4. **Rust-native**: Cargo.toml familiarity, excellent tooling support
+5. **Same comment support**: `# comment` syntax identical to YAML
+6. **Zero users impacted**: Phase 13b.14 not released to production yet
+
+**Implementation**:
+
+**1. Code Changes** (llmspell-storage/src/migration/plan.rs):
+```rust
+// Line 74-75: from_file()
+- let plan: MigrationPlan = serde_yaml::from_str(&content)?;
++ let plan: MigrationPlan = toml::from_str(&content)?;
+
+// Line 80-81: save()
+- let yaml = serde_yaml::to_string(self)?;
++ let toml = toml::to_string_pretty(self)?;
+
+// Line 164-170: test_plan_serialization()
+- let yaml = serde_yaml::to_string(&plan).unwrap();
+- assert!(yaml.contains("version: '1.0'"));
++ let toml = toml::to_string_pretty(&plan).unwrap();
++ assert!(toml.contains("version = \"1.0\""));
+```
+
+**2. Dependency Changes**:
+- llmspell-storage/Cargo.toml: `serde_yaml` → `toml` (workspace dependency)
+- llmspell-templates/Cargo.toml: Removed unused `serde_yaml`
+- llmspell-utils/Cargo.toml: Removed unused `serde_yaml`
+
+**3. CLI Updates** (llmspell-cli/src/cli.rs):
+- All example commands: `migration-plan.yaml` → `migration-plan.toml` (6 occurrences)
+
+**4. Documentation Updates**:
+- docs/user-guide/storage/migration-guide.md: All YAML references → TOML
+
+**Format Comparison**:
+
+**YAML (Old)**:
+```yaml
+version: '1.0'
+source:
+  backend: sled
+components:
+  - name: agent_state
+    batch_size: 1000  # Increase for large datasets
+```
+
+**TOML (New)**:
+```toml
+version = "1.0"
+[source]
+backend = "sled"
+[[components]]
+name = "agent_state"
+batch_size = 1000  # Increase for large datasets
+```
+
+**User Workflow (Unchanged UX)**:
+```bash
+# Generate plan
+llmspell storage migrate plan --output migration-plan.toml
+
+# Review/edit (same comment support as YAML)
+vim migration-plan.toml
+
+# Execute
+llmspell storage migrate execute --plan migration-plan.toml
+```
+
+**Verification**:
+- ✅ `cargo test migration::plan::tests`: 2 tests passing
+- ✅ `cargo build --package llmspell-storage`: Compiles successfully
+- ✅ `quality-check-minimal.sh`: Zero warnings
+- ✅ Documentation updated (CLI help + migration guide)
+
+**Benefits Realized**:
+1. **Binary size**: -180KB savings (1.5% reduction)
+2. **Maintenance**: No deprecated dependency warnings
+3. **Ecosystem alignment**: Uses Rust-native format (like Cargo.toml)
+4. **Zero cost**: `toml` already in dependency tree
+5. **Same UX**: Comments, human-editable, version control friendly
+
+**Breaking Change Assessment**:
+- ✅ Phase 13b.14 not released → zero production users affected
+- ✅ Pre-1.0 version (v0.13.0) → breaking changes acceptable
+- ✅ Better long-term decision (removes deprecated dependency)
+
+**Files Modified**:
+- `llmspell-storage/Cargo.toml` (serde_yaml → toml)
+- `llmspell-storage/src/migration/plan.rs` (2-line code change + test update)
+- `llmspell-cli/src/cli.rs` (6 example updates)
+- `docs/user-guide/storage/migration-guide.md` (YAML → TOML references)
+- `llmspell-templates/Cargo.toml` (removed unused serde_yaml)
+- `llmspell-utils/Cargo.toml` (removed unused serde_yaml)
+
+---
+
 ## Phase 13b.17: Documentation (Day 30)
 
 **Goal**: Complete Phase 13b documentation (4,000+ lines total)

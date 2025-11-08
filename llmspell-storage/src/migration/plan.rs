@@ -1,4 +1,4 @@
-//! ABOUTME: Migration plan YAML format
+//! ABOUTME: Migration plan TOML format
 //! ABOUTME: Declarative migration configuration with validation rules and rollback metadata
 
 use anyhow::Result;
@@ -68,17 +68,17 @@ impl MigrationPlan {
         }
     }
 
-    /// Load plan from YAML file
+    /// Load plan from TOML file
     pub fn from_file<P: AsRef<Path>>(path: P) -> Result<Self> {
         let content = std::fs::read_to_string(path)?;
-        let plan: MigrationPlan = serde_yaml::from_str(&content)?;
+        let plan: MigrationPlan = toml::from_str(&content)?;
         Ok(plan)
     }
 
-    /// Save plan to YAML file
+    /// Save plan to TOML file
     pub fn save<P: AsRef<Path>>(&self, path: P) -> Result<()> {
-        let yaml = serde_yaml::to_string(self)?;
-        std::fs::write(path, yaml)?;
+        let toml = toml::to_string_pretty(self)?;
+        std::fs::write(path, toml)?;
         Ok(())
     }
 }
@@ -161,13 +161,13 @@ mod tests {
     fn test_plan_serialization() {
         let plan = MigrationPlan::new("sled", "postgres", vec!["agent_state".to_string()]);
 
-        let yaml = serde_yaml::to_string(&plan).unwrap();
-        assert!(yaml.contains("version: '1.0'"));
-        assert!(yaml.contains("backend: sled"));
-        assert!(yaml.contains("backend: postgres"));
-        assert!(yaml.contains("agent_state"));
+        let toml = toml::to_string_pretty(&plan).unwrap();
+        assert!(toml.contains("version = \"1.0\""));
+        assert!(toml.contains("backend = \"sled\""));
+        assert!(toml.contains("backend = \"postgres\""));
+        assert!(toml.contains("agent_state"));
 
-        let deserialized: MigrationPlan = serde_yaml::from_str(&yaml).unwrap();
+        let deserialized: MigrationPlan = toml::from_str(&toml).unwrap();
         assert_eq!(deserialized.version, plan.version);
         assert_eq!(deserialized.components.len(), plan.components.len());
     }

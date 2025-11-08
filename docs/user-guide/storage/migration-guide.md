@@ -33,12 +33,12 @@ llmspell storage migrate plan \
   --from sled \
   --to postgres \
   --components agent_state \
-  --output agent-migration.yaml
+  --output agent-migration.toml
 ```
 
 **Output**:
 ```
-Migration plan generated: "agent-migration.yaml"
+Migration plan generated: "agent-migration.toml"
 
 Plan summary:
   Source: sled → Target: postgres
@@ -46,15 +46,15 @@ Plan summary:
     - agent_state: 42 records (batch size: 1000)
 
 Next steps:
-  1. Review plan: cat agent-migration.yaml
-  2. Dry-run: llmspell storage migrate execute --plan agent-migration.yaml --dry-run
-  3. Execute: llmspell storage migrate execute --plan agent-migration.yaml
+  1. Review plan: cat agent-migration.toml
+  2. Dry-run: llmspell storage migrate execute --plan agent-migration.toml --dry-run
+  3. Execute: llmspell storage migrate execute --plan agent-migration.toml
 ```
 
 ### 2. Review Plan
 
 ```bash
-cat agent-migration.yaml
+cat agent-migration.toml
 ```
 
 **Example Plan**:
@@ -80,7 +80,7 @@ rollback:
 
 ```bash
 llmspell storage migrate execute \
-  --plan agent-migration.yaml \
+  --plan agent-migration.toml \
   --dry-run
 ```
 
@@ -104,7 +104,7 @@ Duration: 0s
 
 ```bash
 llmspell storage migrate execute \
-  --plan agent-migration.yaml
+  --plan agent-migration.toml
 ```
 
 **Output**:
@@ -169,7 +169,7 @@ llmspell storage migrate plan \
   --from <source-backend> \
   --to <target-backend> \
   --components <component1,component2,...> \
-  --output <plan-file.yaml>
+  --output <plan-file.toml>
 ```
 
 **Phase 1 Constraints**:
@@ -185,21 +185,21 @@ llmspell storage migrate plan \
   --from sled \
   --to postgres \
   --components agent_state \
-  --output agent-migration.yaml
+  --output agent-migration.toml
 
 # Multiple components (all Phase 1)
 llmspell storage migrate plan \
   --from sled \
   --to postgres \
   --components agent_state,workflow_state,sessions \
-  --output full-phase1-migration.yaml
+  --output full-phase1-migration.toml
 
 # Workflow state only
 llmspell storage migrate plan \
   --from sled \
   --to postgres \
   --components workflow_state \
-  --output workflow-migration.yaml
+  --output workflow-migration.toml
 ```
 
 **Plan Generation Output**:
@@ -274,7 +274,7 @@ rollback:                           # Rollback configuration
 
 ```bash
 llmspell storage migrate execute \
-  --plan <plan-file.yaml> \
+  --plan <plan-file.toml> \
   --dry-run
 ```
 
@@ -325,7 +325,7 @@ After dry-run succeeds, execute the actual migration.
 
 ```bash
 llmspell storage migrate execute \
-  --plan <plan-file.yaml>
+  --plan <plan-file.toml>
 ```
 
 **Migration Workflow** (automatic):
@@ -443,11 +443,11 @@ After successful migration, verify data integrity:
      --from sled \
      --to postgres \
      --components agent_state,workflow_state,sessions \
-     --output verify-migration.yaml
+     --output verify-migration.toml
 
    # Dry-run should show matching counts
    llmspell storage migrate execute \
-     --plan verify-migration.yaml \
+     --plan verify-migration.toml \
      --dry-run
    ```
 
@@ -470,12 +470,12 @@ The migration system creates automatic backups before migration:
 **Backup Contents**:
 ```
 ./backups/migration-20250115-103045/
-├── plan.yaml                    # Original migration plan
+├── plan.toml                    # Original migration plan
 ├── source/
 │   ├── agent_state.jsonl       # Source data snapshots (JSONL format)
 │   ├── workflow_state.jsonl
 │   └── sessions.jsonl
-└── rollback-metadata.yaml       # Rollback instructions
+└── rollback-metadata.toml       # Rollback instructions
 ```
 
 **Automatic Rollback Triggers**:
@@ -502,7 +502,7 @@ If you need to rollback a successful migration:
 
 2. **Review Rollback Metadata**:
    ```bash
-   cat ./backups/migration-20250115-103045/rollback-metadata.yaml
+   cat ./backups/migration-20250115-103045/rollback-metadata.toml
    ```
 
 3. **Restore from Backup** (planned for Phase 2):
@@ -673,10 +673,10 @@ psql postgresql://llmspell_app:llmspell_app_pass@localhost:5432/llmspell_dev \
   -c "DELETE FROM llmspell.agent_state WHERE key LIKE 'agent:%';"
 
 # 3. Re-generate plan to get fresh count
-llmspell storage migrate plan --from sled --to postgres --components agent_state --output fresh-plan.yaml
+llmspell storage migrate plan --from sled --to postgres --components agent_state --output fresh-plan.toml
 
 # 4. Retry migration
-llmspell storage migrate execute --plan fresh-plan.yaml
+llmspell storage migrate execute --plan fresh-plan.toml
 ```
 
 #### 6. Validation Failure (Checksum Mismatch)
@@ -881,13 +881,13 @@ Migration Workflow (High-Level):
 │    ↓                                                        │
 │  Generate MigrationPlan (YAML)                             │
 │    ↓                                                        │
-│  Save to plan-file.yaml                                    │
+│  Save to plan-file.toml                                    │
 └─────────────────────────────────────────────────────────────┘
 
 ┌─────────────────────────────────────────────────────────────┐
 │ 2. EXECUTION                                                │
 │                                                             │
-│  llmspell storage migrate execute --plan plan-file.yaml    │
+│  llmspell storage migrate execute --plan plan-file.toml    │
 │    ↓                                                        │
 │  MigrationEngine::execute()                                │
 │    ├── Pre-Flight Validation                               │
@@ -942,7 +942,7 @@ Migration Workflow (High-Level):
      --from sled \
      --to postgres \
      --components agent_state \
-     --output agent-state-migration.yaml
+     --output agent-state-migration.toml
    ```
 
 2. Review generated plan:
@@ -956,14 +956,14 @@ Migration Workflow (High-Level):
 3. Dry-run:
    ```bash
    llmspell storage migrate execute \
-     --plan agent-state-migration.yaml \
+     --plan agent-state-migration.toml \
      --dry-run
    ```
 
 4. Execute:
    ```bash
    llmspell storage migrate execute \
-     --plan agent-state-migration.yaml
+     --plan agent-state-migration.toml
    ```
 
 5. Verify in PostgreSQL:
@@ -987,11 +987,11 @@ llmspell storage migrate plan \
   --from sled \
   --to postgres \
   --components workflow_state \
-  --output workflow-migration.yaml
+  --output workflow-migration.toml
 
 # Execute
 llmspell storage migrate execute \
-  --plan workflow-migration.yaml
+  --plan workflow-migration.toml
 ```
 
 ### Sessions Migration
@@ -1009,11 +1009,11 @@ llmspell storage migrate plan \
   --from sled \
   --to postgres \
   --components sessions \
-  --output sessions-migration.yaml
+  --output sessions-migration.toml
 
 # Execute
 llmspell storage migrate execute \
-  --plan sessions-migration.yaml
+  --plan sessions-migration.toml
 ```
 
 ### All Phase 1 Components (Full Migration)
@@ -1026,19 +1026,19 @@ llmspell storage migrate plan \
   --from sled \
   --to postgres \
   --components agent_state,workflow_state,sessions \
-  --output full-phase1-migration.yaml
+  --output full-phase1-migration.toml
 
 # 2. Review plan
-cat full-phase1-migration.yaml
+cat full-phase1-migration.toml
 
 # 3. Dry-run all components
 llmspell storage migrate execute \
-  --plan full-phase1-migration.yaml \
+  --plan full-phase1-migration.toml \
   --dry-run
 
 # 4. Execute full migration
 llmspell storage migrate execute \
-  --plan full-phase1-migration.yaml
+  --plan full-phase1-migration.toml
 
 # 5. Verify all components
 psql postgresql://llmspell_app:llmspell_app_pass@localhost:5432/llmspell_dev <<EOF
@@ -1182,7 +1182,7 @@ llmspell storage migrate plan \
   --from sled \
   --to postgres \
   --components agent_state,workflow_state,sessions \
-  --output multi-component-migration.yaml
+  --output multi-component-migration.toml
 ```
 
 All components in the plan will be migrated sequentially in a single execution. If any component fails validation, the entire migration rolls back.
