@@ -1,8 +1,8 @@
-# Platform Support - Cross-Platform GPU Detection
+# Platform Support - Cross-Platform GPU Detection & PostgreSQL Storage
 
-**Last Updated**: 2025-11-01
-**Phase**: 13b.1.2 (Linux Validation)
-**Status**: Validated on macOS + Linux
+**Last Updated**: 2025-01 (Phase 13b.17)
+**Phase**: 13b.17 (PostgreSQL Infrastructure + GPU Detection)
+**Status**: Validated on macOS + Linux, PostgreSQL tested on macOS/Linux/Docker
 
 ## Overview
 
