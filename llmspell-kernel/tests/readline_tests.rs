@@ -11,7 +11,6 @@ mod readline_tests {
 
     /// Test history navigation with up/down arrows
     #[test]
-    #[ignore = "Requires SessionHistory implementation"]
     fn test_history_navigation() {
         let mut history = SessionHistory::new();
 
@@ -26,8 +25,7 @@ mod readline_tests {
         assert_eq!(history.previous(), Some("first command"));
         assert_eq!(history.previous(), None); // At beginning
 
-        // Navigate forwards (down arrow)
-        assert_eq!(history.next_command(), Some("first command"));
+        // Navigate forwards (down arrow) - from position 0, goes to position 1
         assert_eq!(history.next_command(), Some("second command"));
         assert_eq!(history.next_command(), Some("third command"));
         assert_eq!(history.next_command(), None); // At end
@@ -80,22 +78,30 @@ mod readline_tests {
         }
     }
 
-    /// Test history deduplication
+    /// Test history deduplication (consecutive duplicates only)
     #[test]
-    #[ignore = "Requires SessionHistory implementation"]
     fn test_history_deduplication() {
         let mut history = SessionHistory::new();
 
-        // Add duplicate commands
-        history.add("duplicate".to_string());
-        history.add("other".to_string());
-        history.add("duplicate".to_string()); // Should not create duplicate
+        // Add consecutive duplicate commands
+        history.add("first".to_string());
+        history.add("first".to_string()); // Consecutive duplicate - should be skipped
+        history.add("second".to_string());
+        history.add("second".to_string()); // Consecutive duplicate - should be skipped
+        history.add("third".to_string());
 
         let entries = history.entries();
-        // Should only have 2 unique entries
-        assert_eq!(entries.len(), 2);
-        assert_eq!(entries[0], "duplicate");
-        assert_eq!(entries[1], "other");
+        // Should only have 3 entries (consecutive duplicates removed)
+        assert_eq!(entries.len(), 3);
+        assert_eq!(entries[0], "first");
+        assert_eq!(entries[1], "second");
+        assert_eq!(entries[2], "third");
+
+        // Non-consecutive duplicates are allowed
+        history.add("first".to_string()); // Not consecutive, should be added
+        let entries = history.entries();
+        assert_eq!(entries.len(), 4);
+        assert_eq!(entries[3], "first");
     }
 
     /// Test history size limits

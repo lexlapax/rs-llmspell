@@ -11102,6 +11102,152 @@ llmspell storage migrate execute --plan migration-plan.toml
 
 ---
 
+### Task 13b.16.13: Fix Readline Test Expectations (Regression Fix)
+**Priority**: HIGH
+**Estimated Time**: 20 minutes
+**Actual Time**: 25 minutes
+**Status**: ✅ COMPLETE
+**Completed**: 2025-11-07
+
+**Description**: Fix 2 ignored readline tests with misleading ignore reasons. Tests were disabled with "Requires SessionHistory implementation" but SessionHistory is fully implemented - tests had wrong expectations.
+
+**Problem Analysis**:
+
+**Discovery**:
+```bash
+$ cargo test --package llmspell-kernel --test readline_tests
+running 9 tests
+...
+test readline_tests::test_history_deduplication ... ignored, Requires SessionHistory implementation
+test readline_tests::test_history_navigation ... ignored, Requires SessionHistory implementation
+...
+test result: ok. 7 passed; 0 failed; 2 ignored
+```
+
+**Investigation Findings**:
+1. **SessionHistory IS fully implemented** (`llmspell-kernel/src/repl/state.rs:17-134`)
+   - ✅ `add()`, `previous()`, `next_command()`, `entries()`
+   - ✅ `save_to_file()`, `load_from_file()`
+   - ✅ Consecutive duplicate removal
+   - ✅ Circular buffer navigation
+
+2. **Root Cause**: Tests had wrong expectations, not missing implementation
+
+**Test Issues**:
+
+**Issue 1 - `test_history_navigation` (lines 13-32)**:
+```rust
+// Wrong expectations for forward navigation
+assert_eq!(history.next_command(), Some("first command"));   // ❌ Wrong
+assert_eq!(history.next_command(), Some("second command"));  // ❌ Wrong
+assert_eq!(history.next_command(), Some("third command"));   // ❌ Wrong
+
+// Actual behavior after backward navigation to position 0:
+// next_command() goes from position 0 → 1 → 2 → end
+assert_eq!(history.next_command(), Some("second command"));  // ✅ Correct
+assert_eq!(history.next_command(), Some("third command"));   // ✅ Correct
+assert_eq!(history.next_command(), None);                    // ✅ Correct
+```
+
+**Issue 2 - `test_history_deduplication` (lines 82-105)**:
+```rust
+// Expected global deduplication (all duplicates removed)
+assert_eq!(entries.len(), 2);  // ❌ Wrong - expected ["first", "second", "third"]
+
+// Actual behavior: consecutive duplicate removal (standard shell behavior)
+history.add("first");
+history.add("first");   // Consecutive duplicate - skipped
+history.add("second");
+history.add("second");  // Consecutive duplicate - skipped
+history.add("third");
+// Result: ["first", "second", "third"] (3 entries, not 2)
+assert_eq!(entries.len(), 3);  // ✅ Correct
+
+// Non-consecutive duplicates are allowed (standard bash/zsh behavior)
+history.add("first");  // Not consecutive - added
+assert_eq!(entries.len(), 4);  // ✅ ["first", "second", "third", "first"]
+```
+
+**Implementation**:
+
+**1. Fixed `test_history_navigation` (lines 13-32)**:
+```rust
+// Navigate backwards (up arrow) - unchanged
+assert_eq!(history.previous(), Some("third command"));
+assert_eq!(history.previous(), Some("second command"));
+assert_eq!(history.previous(), Some("first command"));
+assert_eq!(history.previous(), None); // At beginning (position 0)
+
+// Navigate forwards (down arrow) - FIXED
+assert_eq!(history.next_command(), Some("second command"));  // position 0 → 1
+assert_eq!(history.next_command(), Some("third command"));   // position 1 → 2
+assert_eq!(history.next_command(), None);                    // position 2 → end
+```
+
+**2. Fixed `test_history_deduplication` (lines 82-105)**:
+```rust
+// Test consecutive duplicate removal (actual implementation)
+history.add("first".to_string());
+history.add("first".to_string()); // Consecutive duplicate - should be skipped
+history.add("second".to_string());
+history.add("second".to_string()); // Consecutive duplicate - should be skipped
+history.add("third".to_string());
+
+let entries = history.entries();
+assert_eq!(entries.len(), 3);  // Changed from 2
+assert_eq!(entries[0], "first");
+assert_eq!(entries[1], "second");
+assert_eq!(entries[2], "third");
+
+// Non-consecutive duplicates are allowed (standard shell behavior)
+history.add("first".to_string()); // Not consecutive, should be added
+let entries = history.entries();
+assert_eq!(entries.len(), 4);  // Added assertion
+assert_eq!(entries[3], "first");
+```
+
+**3. Removed misleading `#[ignore]` attributes**:
+```rust
+- #[ignore = "Requires SessionHistory implementation"]
+  #[test]
+  fn test_history_navigation() { ... }
+
+- #[ignore = "Requires SessionHistory implementation"]
+  #[test]
+  fn test_history_deduplication() { ... }
+```
+
+**Verification**:
+```bash
+$ cargo test --package llmspell-kernel --test readline_tests
+    Finished `test` profile [optimized + debuginfo] target(s) in 3m 58s
+     Running tests/readline_tests.rs
+
+running 9 tests
+test readline_tests::test_empty_history ... ok
+test readline_tests::test_history_deduplication ... ok
+test readline_tests::test_history_navigation ... ok
+test readline_tests::test_history_corruption_recovery ... ok
+test readline_tests::test_special_characters_in_history ... ok
+test readline_tests::test_history_max_size ... ok
+test readline_tests::test_history_search ... ok
+test readline_tests::test_history_persistence ... ok
+test readline_tests::test_concurrent_history_access ... ok
+
+test result: ok. 9 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+```
+
+**Design Rationale**:
+- **Consecutive deduplication** matches standard shell behavior (bash, zsh, fish)
+- **Navigation semantics** follow cursor position in circular buffer
+- Tests validate actual implementation, not assumed behavior
+- Misleading ignore reasons can hide real bugs - always investigate!
+
+**Files Modified**:
+- `llmspell-kernel/tests/readline_tests.rs` (2 tests fixed, 2 `#[ignore]` removed)
+
+---
+
 ## Phase 13b.17: Documentation (Day 30)
 
 **Goal**: Complete Phase 13b documentation (4,000+ lines total)
