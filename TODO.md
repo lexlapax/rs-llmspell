@@ -11642,19 +11642,20 @@ Following project philosophy ("documentation should match reality" - remove docu
 
 ### Category B: ScriptRuntime Architecture Documentation (UPDATES)
 
-### Task 13b.17.5: Update User Guide - Getting Started
+### Task 13b.17.5: Update User Guide - Getting Started ✅
 **Priority**: CRITICAL
 **Estimated Time**: 2 hours
 **Category**: User Guide - Core
+**Status**: COMPLETE
 
 **Description**: Update getting-started.md with new ScriptRuntime API (Phase 13b.16).
 
 **Acceptance Criteria**:
-- [ ] New API examples (`ScriptRuntime::new(config)`, `with_engine()`)
-- [ ] Remove all deprecated constructor examples
-- [ ] Infrastructure module explanation
-- [ ] Config-driven component creation
-- [ ] Engine-agnostic patterns
+- [x] New API examples (`ScriptRuntime::new(config)`, `with_engine()`)
+- [x] Remove all deprecated constructor examples
+- [x] Infrastructure module explanation
+- [x] Config-driven component creation
+- [x] Engine-agnostic patterns
 
 **Implementation Steps**:
 1. Update `docs/user-guide/getting-started.md`
@@ -11667,10 +11668,18 @@ Following project philosophy ("documentation should match reality" - remove docu
 - `docs/user-guide/getting-started.md` (+200 lines)
 
 **Definition of Done**:
-- [ ] All examples use new API
-- [ ] Infrastructure module explained
-- [ ] Zero deprecated patterns
-- [ ] Clear migration path
+- [x] All examples use new API
+- [x] Infrastructure module explained
+- [x] Zero deprecated patterns
+- [x] Clear migration path
+
+**Implementation Insights**:
+- **+67 lines**: Added "Rust API Usage" section before Quick Tips
+- **Infrastructure::from_config()**: Documented single creation path for all 9 components
+- **Migration guide**: Old vs new API comparison (new_with_lua → Infrastructure pattern)
+- **Component access**: How to access provider_manager, rag, memory_manager from infrastructure
+- **Engine-agnostic**: `with_engine("lua")` pattern supports multiple scripting languages
+- **No deprecated patterns**: File was already CLI-focused, no old API examples to remove
 
 ### Task 13b.17.6: Update User Guide - Configuration
 **Priority**: CRITICAL

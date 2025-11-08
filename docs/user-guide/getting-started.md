@@ -501,6 +501,72 @@ end
 11. **Vector storage optimization** → [RAG Configuration](configuration.md#rag-configuration)
 12. **Debug and troubleshoot** → [Troubleshooting](troubleshooting.md)
 
+## Rust API Usage (Embedded Integration)
+
+### Infrastructure Module (Phase 13b.16)
+
+**NEW**: Simplified Rust API for embedding llmspell in applications
+
+```rust
+use llmspell_bridge::infrastructure::Infrastructure;
+use llmspell_bridge::script_runtime::ScriptRuntime;
+use llmspell_config::LLMSpellConfig;
+
+#[tokio::main]
+async fn main() -> Result<(), Box<dyn std::error::Error>> {
+    // Load configuration
+    let config = LLMSpellConfig::from_file("config.toml")?;
+
+    // Create infrastructure (all 9 components)
+    let infrastructure = Infrastructure::from_config(&config).await?;
+
+    // Create script runtime with Lua engine
+    let runtime = ScriptRuntime::new(config.clone())
+        .with_infrastructure(infrastructure)
+        .with_engine("lua")
+        .await?;
+
+    // Execute script
+    let result = runtime.execute_string(r#"
+        local agent = Agent.builder():model("openai/gpt-4o-mini"):build()
+        local response = agent:execute({prompt = "Hello!"})
+        print(response.content)
+    "#).await?;
+
+    Ok(())
+}
+```
+
+**Key Changes (Phase 13b.16):**
+- **Single creation path**: `Infrastructure::from_config()` creates all components
+- **Config-driven**: RAG and Memory enabled via config (no manual setup)
+- **Engine-agnostic**: Support Lua, JavaScript, Python via `with_engine()`
+- **Service mode**: Same API for embedded and daemon deployments
+
+**Component Access:**
+```rust
+// Access infrastructure components
+let provider_manager = infrastructure.provider_manager.clone();
+let session_manager = infrastructure.session_manager.clone();
+let rag = infrastructure.rag.clone(); // Option<Arc<...>>
+let memory = infrastructure.memory_manager.clone(); // Option<Arc<...>>
+```
+
+**Migration from Old API:**
+```rust
+// ❌ Old (deprecated)
+let runtime = ScriptRuntime::new_with_lua(config).await?;
+
+// ✅ New (Phase 13b.16)
+let infrastructure = Infrastructure::from_config(&config).await?;
+let runtime = ScriptRuntime::new(config)
+    .with_infrastructure(infrastructure)
+    .with_engine("lua")
+    .await?;
+```
+
+---
+
 ## Quick Tips
 
 ### Core Tips
