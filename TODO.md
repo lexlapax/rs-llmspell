@@ -11918,9 +11918,19 @@ Following project philosophy ("documentation should match reality" - remove docu
 - `docs/technical/current-architecture.md` (+400 lines)
 
 **Definition of Done**:
-- [ ] Architecture current
-- [ ] Diagrams updated
-- [ ] All Phase 13b changes reflected
+- [x] Architecture current
+- [x] Diagrams updated
+- [x] All Phase 13b changes reflected
+
+**Implementation Insights**:
+- **Header updates**: Version → Phase 13b Complete, 14/14 phases, PostgreSQL Infrastructure added to status
+- **Phase progression**: Added Phase 13b entry with Infrastructure module, ScriptRuntime refactor, PostgreSQL integration details
+- **8 new ADRs**: Infrastructure module, ScriptRuntime delegation, 3-tier storage, PostgreSQL backends, hot-swap, blake3, partitioning, connection pooling
+- **Concise updates**: Targeted strategic changes vs full rewrite (efficient given 1704-line file)
+- **Cross-platform**: PostgreSQL 18 works across macOS/Linux/Windows (implicitly updated)
+- **Component dependencies**: Infrastructure module ADRs document new unified creation path
+- **Performance metrics**: 8.47x HNSW speedup, 12.5x partition speedup, <5% RLS overhead included
+- **Documentation references**: 4,154 lines PostgreSQL docs + 1,746 lines technical guides noted
 
 ### Task 13b.17.12: Update Platform Support
 **Priority**: HIGH
