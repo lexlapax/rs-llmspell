@@ -11830,9 +11830,23 @@ Following project philosophy ("documentation should match reality" - remove docu
 - `docs/technical/kernel-execution-paths.md`
 
 **Definition of Done**:
-- [ ] Execution paths documented (400+ lines)
-- [ ] Flow diagrams clear
-- [ ] Migration guidance included
+- [x] Execution paths documented (400+ lines)
+- [x] Flow diagrams clear
+- [x] Migration guidance included
+
+**Implementation Insights**:
+- **860 lines**: 215% of 400+ target - comprehensive technical guide
+- **10 major sections**: Overview, principles, modes, flow, order, graph, lifecycle, refs, migration, troubleshooting
+- **Single creation path**: Infrastructure::from_config() → 9 components
+- **3 execution modes**: Embedded (in-process), Connected (remote), Auto-detect (search + fallback)
+- **Component creation flow**: Documented all 9 creator functions with code locations
+- **Dependency graph**: StateManager → SessionManager critical path + 7 independent components
+- **Initialization order**: Dependency-aware sequence with parallel creation opportunities
+- **Lifecycle phases**: Creation (100-300ms), Execution (O(1) lookups), Shutdown (<30s graceful)
+- **Code references table**: 4 primary files + 11 key function references with line numbers
+- **Migration guide**: Before/After patterns (50+ lines → 5 lines)
+- **Troubleshooting**: 4 common issues with diagnosis and solutions
+- **CLI reduction**: 200+ lines → 12 lines via Infrastructure delegation
 
 ### Task 13b.17.10: Create Storage Architecture Guide
 **Priority**: CRITICAL
