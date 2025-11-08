@@ -26,7 +26,7 @@ This index provides quick access to all llmspell crates with links to detailed d
 - Error handling with `LLMSpellError`
 - Component metadata and lifecycle
 
-📚 **Docs**: [llmspell-core.md](llmspell-core.md) | [Thematic Guide](core-traits.md)
+📚 **Thematic Guide**: [Core Traits & Foundation](core-traits.md)
 📦 **Cargo Doc**: `cargo doc --open -p llmspell-core`
 
 ---
@@ -40,7 +40,7 @@ This index provides quick access to all llmspell crates with links to detailed d
 - Rate limiting and circuit breakers
 - API key management
 
-📚 **Docs**: [llmspell-utils.md](llmspell-utils.md) | [Thematic Guide](core-traits.md)
+📚 **Thematic Guide**: [Core Traits & Foundation](core-traits.md)
 📦 **Cargo Doc**: `cargo doc --open -p llmspell-utils`
 
 ---
@@ -53,7 +53,7 @@ This index provides quick access to all llmspell crates with links to detailed d
 - Property-based test generators
 - Fixtures and benchmarking
 
-📚 **Docs**: [llmspell-testing.md](llmspell-testing.md) | [Thematic Guide](core-traits.md)
+📚 **Thematic Guide**: [Core Traits & Foundation](core-traits.md)
 📦 **Cargo Doc**: `cargo doc --open -p llmspell-testing`
 
 ---
@@ -70,7 +70,7 @@ This index provides quick access to all llmspell crates with links to detailed d
 - Bi-temporal support
 - TTL mechanism
 
-📚 **Docs**: [llmspell-storage.md](llmspell-storage.md) | [Thematic Guide](storage-backends.md)
+📚 **Thematic Guide**: [Storage Backends](storage-backends.md)
 📦 **Cargo Doc**: `cargo doc --open -p llmspell-storage`
 
 ---
@@ -86,7 +86,7 @@ This index provides quick access to all llmspell crates with links to detailed d
 - Sandboxing
 - Audit logging
 
-📚 **Docs**: [llmspell-security.md](llmspell-security.md) | [Thematic Guide](security-integration.md)
+📚 **Thematic Guide**: [Security & Multi-Tenancy](security-integration.md)
 📦 **Cargo Doc**: `cargo doc --open -p llmspell-security`
 
 ---
@@ -99,7 +99,7 @@ This index provides quick access to all llmspell crates with links to detailed d
 - Data isolation
 - Cross-tenant prevention
 
-📚 **Docs**: [llmspell-tenancy.md](llmspell-tenancy.md) | [Thematic Guide](security-integration.md)
+📚 **Thematic Guide**: [Security & Multi-Tenancy](security-integration.md)
 📦 **Cargo Doc**: `cargo doc --open -p llmspell-tenancy`
 
 ---
@@ -116,7 +116,7 @@ This index provides quick access to all llmspell crates with links to detailed d
 - Consolidation engine (LLM-driven knowledge extraction)
 - Multi-session isolation with <2ms add performance
 
-📚 **Docs**: [llmspell-memory.md](llmspell-memory.md) | [Thematic Guide](memory-backends.md)
+📚 **Thematic Guide**: [Memory Backends](memory-backends.md)
 📦 **Cargo Doc**: `cargo doc --open -p llmspell-memory`
 
 ---
@@ -131,7 +131,7 @@ This index provides quick access to all llmspell crates with links to detailed d
 - Corrections without losing history
 - Semantic memory backend for llmspell-memory
 
-📚 **Docs**: [llmspell-graph.md](llmspell-graph.md) | [Thematic Guide](rag-pipeline.md)
+📚 **Thematic Guide**: [RAG Pipeline & Context Engineering](rag-pipeline.md)
 📦 **Cargo Doc**: `cargo doc --open -p llmspell-graph`
 
 ---
@@ -146,7 +146,7 @@ This index provides quick access to all llmspell crates with links to detailed d
 - Parallel retrieval (~2x speedup)
 - Confidence scoring and temporal ordering
 
-📚 **Docs**: [llmspell-context.md](llmspell-context.md) | [Thematic Guide](rag-pipeline.md)
+📚 **Thematic Guide**: [RAG Pipeline & Context Engineering](rag-pipeline.md)
 📦 **Cargo Doc**: `cargo doc --open -p llmspell-context`
 
 ---
@@ -160,7 +160,7 @@ This index provides quick access to all llmspell crates with links to detailed d
 - Vector search integration
 - Multi-tenant RAG
 
-📚 **Docs**: [llmspell-rag.md](llmspell-rag.md) | [Thematic Guide](rag-pipeline.md)
+📚 **Thematic Guide**: [RAG Pipeline & Context Engineering](rag-pipeline.md)
 📦 **Cargo Doc**: `cargo doc --open -p llmspell-rag`
 
 ---
@@ -174,7 +174,6 @@ This index provides quick access to all llmspell crates with links to detailed d
 - Agent composition
 - Templates and discovery
 
-📚 **Docs**: [llmspell-agents.md](llmspell-agents.md)
 📦 **Cargo Doc**: `cargo doc --open -p llmspell-agents`
 
 ---
@@ -190,7 +189,6 @@ This index provides quick access to all llmspell crates with links to detailed d
 - Streaming support
 - Rate limiting
 
-📚 **Docs**: [llmspell-providers.md](llmspell-providers.md)
 📦 **Cargo Doc**: `cargo doc --open -p llmspell-providers`
 
 ---
@@ -205,7 +203,6 @@ This index provides quick access to all llmspell crates with links to detailed d
 - Template discovery and search
 - CLI and Lua API integration
 
-📚 **Docs**: [llmspell-templates.md](llmspell-templates.md)
 📦 **Cargo Doc**: `cargo doc --open -p llmspell-templates`
 
 ---
@@ -220,7 +217,6 @@ This index provides quick access to all llmspell crates with links to detailed d
 - Error handling
 - State management
 
-📚 **Docs**: [llmspell-workflows.md](llmspell-workflows.md)
 📦 **Cargo Doc**: `cargo doc --open -p llmspell-workflows`
 
 ---
@@ -233,7 +229,6 @@ This index provides quick access to all llmspell crates with links to detailed d
 - Security levels
 - Tool composition
 
-📚 **Docs**: [llmspell-tools.md](llmspell-tools.md)
 📦 **Cargo Doc**: `cargo doc --open -p llmspell-tools`
 
 ---
@@ -246,7 +241,6 @@ This index provides quick access to all llmspell crates with links to detailed d
 - Hook priorities
 - Replay support
 
-📚 **Docs**: [llmspell-hooks.md](llmspell-hooks.md)
 📦 **Cargo Doc**: `cargo doc --open -p llmspell-hooks`
 
 ---
@@ -259,7 +253,6 @@ This index provides quick access to all llmspell crates with links to detailed d
 - Event correlation
 - Persistence
 
-📚 **Docs**: [llmspell-events.md](llmspell-events.md)
 📦 **Cargo Doc**: `cargo doc --open -p llmspell-events`
 
 ---
@@ -275,7 +268,6 @@ This index provides quick access to all llmspell crates with links to detailed d
 - Global injection (18 globals)
 - Performance optimization
 
-📚 **Docs**: [llmspell-bridge.md](llmspell-bridge.md)
 📦 **Cargo Doc**: `cargo doc --open -p llmspell-bridge`
 
 ---
@@ -290,7 +282,6 @@ This index provides quick access to all llmspell crates with links to detailed d
 - Session management
 - Fleet orchestration
 
-📚 **Docs**: [llmspell-kernel.md](llmspell-kernel.md)
 📦 **Cargo Doc**: `cargo doc --open -p llmspell-kernel`
 
 ---
@@ -303,7 +294,6 @@ This index provides quick access to all llmspell crates with links to detailed d
 - Provider configs
 - Validation
 
-📚 **Docs**: [llmspell-config.md](llmspell-config.md)
 📦 **Cargo Doc**: `cargo doc --open -p llmspell-config`
 
 ---
@@ -317,7 +307,6 @@ This index provides quick access to all llmspell crates with links to detailed d
 - Tool CLI commands (list, info, invoke, search, test)
 - Output formatting
 
-📚 **Docs**: [llmspell-cli.md](llmspell-cli.md)
 📦 **Cargo Doc**: `cargo doc --open -p llmspell-cli`
 
 ---
@@ -390,10 +379,9 @@ This index provides quick access to all llmspell crates with links to detailed d
 ### For Beginners
 
 Start here to understand the system:
-1. [core-traits.md](core-traits.md) - Foundation concepts
-2. [llmspell-core.md](llmspell-core.md) - Detailed trait documentation
-3. [llmspell-agents.md](llmspell-agents.md) - Building agents
-4. [llmspell-tools.md](llmspell-tools.md) - Creating tools
+1. [core-traits.md](core-traits.md) - Foundation concepts with BaseAgent trait
+2. Generate API docs: `cargo doc --open -p llmspell-core`
+3. [storage-backends.md](storage-backends.md) - Understanding storage systems
 
 ### For RAG/Memory Features
 
@@ -404,14 +392,14 @@ Start here to understand the system:
 ### For Security/Multi-Tenancy
 
 1. [security-integration.md](security-integration.md) - Complete security guide
-2. [llmspell-security.md](llmspell-security.md) - Security API
-3. [llmspell-tenancy.md](llmspell-tenancy.md) - Multi-tenancy API
+2. Generate API docs: `cargo doc --open -p llmspell-security`
+3. Generate API docs: `cargo doc --open -p llmspell-tenancy`
 
 ### For Extension Development
 
-1. [../extending-llmspell.md](../extending-llmspell.md) - Extension guide
+1. [../03-extending-components.md](../03-extending-components.md) - Extension guide
 2. [core-traits.md](core-traits.md) - Trait implementation patterns
-3. [llmspell-testing.md](llmspell-testing.md) - Testing your extensions
+3. Generate testing API docs: `cargo doc --open -p llmspell-testing`
 
 ---
 
@@ -476,10 +464,10 @@ When adding or updating crate documentation:
   - [security-integration.md](security-integration.md)
 
 - **Developer Guides**:
-  - [../developer-guide.md](../developer-guide.md) - Developer overview
-  - [../extending-llmspell.md](../extending-llmspell.md) - Extension guide
-  - [../bridge-pattern-guide.md](../bridge-pattern-guide.md) - Bridge patterns
-  - [../production-guide.md](../production-guide.md) - Production deployment
+  - [../README.md](../README.md) - Developer overview
+  - [../03-extending-components.md](../03-extending-components.md) - Extension guide
+  - [../04-bridge-patterns.md](../04-bridge-patterns.md) - Bridge patterns
+  - [../05-production-deployment.md](../05-production-deployment.md) - Production deployment
 
 - **Architecture**:
   - [../../technical/master-architecture-vision.md](../../technical/master-architecture-vision.md) - System architecture
