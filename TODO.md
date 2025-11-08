@@ -10191,6 +10191,7 @@ let runtime = ScriptRuntime::with_engine(config, "lua").await?;
 - `b212e511` - test: Update error message assertion in test_create_agent_from_spec_unknown_provider
 - `82f6f25d` - fix: Wire RAG vector persistence_path config to Infrastructure module
 - `014e469c` - test: Increase regex extraction performance test threshold to 10ms
+- `d2f75bf5` - fix: Add mock provider type mapping for test support
 
 **Summary & Insights**:
 
@@ -10412,7 +10413,7 @@ assert!(
 
 ---
 
-**Provider Config Lookup Test Fix** (commit hash pending):
+**Provider Config Lookup Test Fix** (d2f75bf5):
 
 **Problem**: All 7 provider config lookup tests failing with factory not found
 ```
