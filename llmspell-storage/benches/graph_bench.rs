@@ -78,13 +78,20 @@ mod postgres_benchmarks {
     }
 
     /// Setup: Create test backend with application user
-    async fn setup_test_backend() -> Arc<PostgresBackend> {
+    ///
+    /// Returns None if PostgreSQL is not available (allows graceful benchmark skip)
+    async fn setup_test_backend() -> Option<Arc<PostgresBackend>> {
         let config = PostgresConfig::new(TEST_CONNECTION_STRING);
-        Arc::new(
-            PostgresBackend::new(config)
-                .await
-                .expect("Failed to create test backend"),
-        )
+        match PostgresBackend::new(config).await {
+            Ok(backend) => Some(Arc::new(backend)),
+            Err(e) => {
+                eprintln!("PostgreSQL not available, skipping benchmarks: {}", e);
+                eprintln!(
+                    "To run benchmarks, ensure PostgreSQL is running (see benchmark documentation)"
+                );
+                None
+            }
+        }
     }
 
     /// Helper: Insert test entity
@@ -156,7 +163,10 @@ mod postgres_benchmarks {
     /// Benchmark: Point queries (get_entity_at) with varying scales
     pub fn bench_point_queries(c: &mut Criterion) {
         let rt = Runtime::new().unwrap();
-        let backend = rt.block_on(setup_test_backend());
+        let backend = match rt.block_on(setup_test_backend()) {
+            Some(b) => b,
+            None => return, // PostgreSQL unavailable, skip benchmark
+        };
 
         let mut group = c.benchmark_group("point_queries");
 
@@ -203,7 +213,10 @@ mod postgres_benchmarks {
     /// Benchmark: Range queries (query_temporal) with filters
     pub fn bench_range_queries(c: &mut Criterion) {
         let rt = Runtime::new().unwrap();
-        let backend = rt.block_on(setup_test_backend());
+        let backend = match rt.block_on(setup_test_backend()) {
+            Some(b) => b,
+            None => return, // PostgreSQL unavailable, skip benchmark
+        };
 
         let mut group = c.benchmark_group("range_queries");
 
@@ -239,7 +252,10 @@ mod postgres_benchmarks {
     /// Benchmark: Graph traversal (get_related) with varying depths
     pub fn bench_graph_traversal(c: &mut Criterion) {
         let rt = Runtime::new().unwrap();
-        let backend = rt.block_on(setup_test_backend());
+        let backend = match rt.block_on(setup_test_backend()) {
+            Some(b) => b,
+            None => return, // PostgreSQL unavailable, skip benchmark
+        };
 
         let mut group = c.benchmark_group("graph_traversal");
 

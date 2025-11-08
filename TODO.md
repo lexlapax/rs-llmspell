@@ -10758,6 +10758,221 @@ Phase 13b.16 establishes the foundation for external service integration:
 - llmspell-kernel/src/api.rs (DELETE duplicates - 80 lines)
 - Test files (~10-15 files)
 
+---
+
+### Task 13b.16.10: Fix Ignored Script Execution Tests (Technical Debt)
+**Priority**: MEDIUM
+**Estimated Time**: 30 minutes
+**Actual Time**: 45 minutes
+**Status**: ✅ COMPLETE
+**Completed**: 2025-11-07
+
+**Description**: Fix 9 ignored script execution tests in `llmspell-kernel/tests/script_execution_tests.rs` that use outdated APIs from before Phase 13b.16 refactor.
+
+**Problem Analysis**:
+
+**Current State**:
+```
+running 12 tests
+test test_error_stack_trace ... ignored, Requires full bridge setup
+test test_execute_valid_script ... ignored, Requires full bridge setup
+test test_output_capture ... ignored, Requires full bridge setup
+test test_runtime_error ... ignored, Requires full bridge setup
+test test_script_arguments ... ignored, Requires full bridge setup
+test test_script_timeout ... ignored, Requires full bridge setup
+test test_syntax_error_reporting ... ignored, Requires full bridge setup
+test test_utf8_handling ... ignored, Requires full bridge setup
+test test_working_directory ... ignored, Requires full bridge setup
+test test_file_extension_handling ... ok
+test test_file_not_found ... ok
+test test_path_handling ... ok
+```
+
+**Root Cause**: Tests use deleted/changed APIs
+```rust
+// Line 16 - BROKEN:
+ScriptRuntime::new(LLMSpellConfig::default()).await.unwrap()
+// API deleted in Phase 13b.16.8
+
+// Lines 38, 69, 92, etc - BROKEN:
+runtime.execute_script(script_content).await
+runtime.execute_script_with_args(script_with_args, args).await
+// Methods don't exist on current ScriptRuntime
+```
+
+**Why They're Ignored**:
+- Tests were written for future/planned APIs
+- Marked `#[ignore = "Requires full bridge setup"]` (misleading reason)
+- Phase 13b.16 changed APIs but tests were already ignored
+- No one noticed they're broken because they don't run
+
+**Technical Debt Pattern**:
+1. Developer writes tests for APIs not yet implemented
+2. Marks them ignored with vague reason
+3. APIs change during refactor
+4. Tests stay ignored and broken (forgotten)
+
+**Fix Strategy**:
+1. Update `create_test_runtime()` to use `ScriptRuntime::with_engine(config, "lua")`
+2. Check what script execution methods actually exist on `ScriptRuntime`
+3. Rewrite test calls to match current API
+4. Remove `#[ignore]` attributes once working
+5. Or delete tests if features don't exist
+
+**Files to Modify**:
+- `llmspell-kernel/tests/script_execution_tests.rs` (329 lines)
+
+**Acceptance Criteria**:
+- [x] Tests updated to use current ScriptRuntime API
+- [x] All 8 fixable tests passing (1 test re-ignored for valid reason)
+- [x] Only 1 `#[ignore]` attribute remaining (timeout test)
+- [x] Documented decision: 8 fixed, 1 re-ignored
+
+**Final Results**:
+```
+running 12 tests
+test script_execution_tests::test_script_timeout ... ignored, Script cancellation not implemented
+test script_execution_tests::test_file_extension_handling ... ok
+test script_execution_tests::test_file_not_found ... ok
+test script_execution_tests::test_path_handling ... ok
+test script_execution_tests::test_utf8_handling ... ok
+test script_execution_tests::test_syntax_error_reporting ... ok
+test script_execution_tests::test_script_arguments ... ok
+test script_execution_tests::test_error_stack_trace ... ok
+test script_execution_tests::test_runtime_error ... ok
+test script_execution_tests::test_output_capture ... ok
+test script_execution_tests::test_execute_valid_script ... ok
+test script_execution_tests::test_working_directory ... ok
+
+test result: ok. 11 passed; 0 failed; 1 ignored; 0 measured; 0 filtered out; finished in 0.35s
+```
+
+**Implementation Summary**:
+
+1. **Updated `create_test_runtime()`** (Line 13-19):
+```rust
+// Before:
+ScriptRuntime::new(LLMSpellConfig::default()).await.unwrap()
+
+// After:
+ScriptRuntime::with_engine(LLMSpellConfig::default(), "lua")
+    .await
+    .unwrap()
+```
+
+2. **Removed misleading `#[ignore]` attributes** (8 tests):
+- Original reason: "Requires full bridge setup" (vague/incorrect)
+- Actual issue: Using deleted API `ScriptRuntime::new()`
+- All 8 tests now pass
+
+3. **Added multi-threaded tokio runtime**:
+- Changed all `#[tokio::test]` → `#[tokio::test(flavor = "multi_thread")]`
+- Required because Lua engine uses `tokio::task::spawn_blocking()`
+- Error was: "can call blocking only when running on the multi-threaded runtime"
+
+4. **Re-ignored timeout test with accurate reason** (lines 282-307):
+- Original `#[ignore]`: "Requires full bridge setup"
+- New `#[ignore]`: "Script cancellation not implemented - hangs in infinite loop"
+- Test runs infinite Lua loop, `tokio::timeout` can't interrupt (Lua blocks thread)
+- Would need Lua debug hooks to implement cancellation (future feature)
+
+**Why Timeout Test Hung**:
+- Lua `while true do end` executes synchronously and never yields
+- `tokio::timeout` wraps the async call but can't preempt blocking Lua code
+- Test hangs forever in Lua infinite loop
+- Single test: 0.26s | All tests: 0.35s | With timeout test: 5+ minutes (infinite)
+
+**Discovered Facts**:
+- Tests need multi-threaded runtime (not documented)
+- `execute_script()` and `execute_script_with_args()` methods exist and work correctly
+- Tests were properly written, just outdated constructor + missing runtime flavor
+
+**Files Modified**:
+- `llmspell-kernel/tests/script_execution_tests.rs` (12 tests fixed/documented)
+
+---
+
+### Task 13b.16.11: Fix PostgreSQL Benchmark Panic (Regression Fix)
+**Priority**: MEDIUM
+**Estimated Time**: 20 minutes
+**Actual Time**: 20 minutes
+**Status**: ✅ COMPLETE
+**Completed**: 2025-11-07
+
+**Description**: Fix PostgreSQL graph benchmark panicking when PostgreSQL unavailable during `cargo test --all-targets --all-features`.
+
+**Problem Analysis**:
+
+**Root Cause**: Benchmark uses `.expect()` and `.unwrap()` which panic if PostgreSQL unavailable
+```
+thread 'main' panicked at llmspell-storage/benches/graph_bench.rs:167:59:
+called `Result::unwrap()` on an `Err` value: Pool("Failed to get connection from pool:
+Error occurred while creating a new object: db error: FATAL: password authentication
+failed for user \"llmspell_app\"")
+```
+
+**Why It Fails**:
+1. `cargo test --all-targets --all-features` compiles benchmarks with `postgres` feature enabled
+2. Feature flag controls **compilation**, not **runtime availability** checking
+3. Benchmarks are optional dev tools, not regression tests
+4. Should skip gracefully when PostgreSQL unavailable
+
+**Implementation**:
+
+**1. Updated `setup_test_backend()` Signature** (line 80-95):
+```rust
+// Before: panicked if PostgreSQL unavailable
+async fn setup_test_backend() -> Arc<PostgresBackend> {
+    PostgresBackend::new(config).await.expect("Failed to create test backend")
+}
+
+// After: returns None and prints helpful message
+async fn setup_test_backend() -> Option<Arc<PostgresBackend>> {
+    match PostgresBackend::new(config).await {
+        Ok(backend) => Some(Arc::new(backend)),
+        Err(e) => {
+            eprintln!("PostgreSQL not available, skipping benchmarks: {}", e);
+            eprintln!("To run benchmarks, ensure PostgreSQL is running (see benchmark documentation)");
+            None
+        }
+    }
+}
+```
+
+**2. Updated All Three Benchmark Functions** (lines 164, 214, 253):
+```rust
+pub fn bench_point_queries(c: &mut Criterion) {
+    let rt = Runtime::new().unwrap();
+    let backend = match rt.block_on(setup_test_backend()) {
+        Some(b) => b,
+        None => return, // PostgreSQL unavailable, skip benchmark
+    };
+    // ... rest of benchmark
+}
+```
+
+**Behavior Matrix**:
+```
+Feature Disabled:        → Empty placeholder functions (criterion skips)
+Feature Enabled + No DB: → Prints message, skips gracefully (no panic)
+Feature Enabled + DB:    → Benchmarks run normally
+```
+
+**Verification**:
+- ✅ `cargo build --package llmspell-storage --benches --features postgres` compiles successfully
+- ✅ Benchmark gracefully skips when PostgreSQL unavailable
+- ✅ No changes to benchmark logic when database available
+
+**Design Rationale**:
+- Benchmarks are **opt-in performance tools**, not regression tests
+- `cargo test --all-targets` shouldn't fail due to missing optional infrastructure
+- Feature flag says "compile benchmarks", runtime check says "skip if unavailable"
+- Provides helpful error message for developers who want to run benchmarks
+
+**Files Modified**:
+- `llmspell-storage/benches/graph_bench.rs` (graceful PostgreSQL availability checking)
+
+---
 
 ## Phase 13b.17: Documentation (Day 30)
 
