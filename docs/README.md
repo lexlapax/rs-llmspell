@@ -47,11 +47,34 @@
 ### 🔧 [Developer Guide](developer-guide/) - *For Contributors*
 **Purpose**: Technical guides for developers contributing to or extending rs-llmspell.
 
-**Status**: ✅ Updated with Phase 13 experimental component patterns
-**Contents**: 8 essential guides including developer guide, extending guide, production guide, examples reference, feature flags migration, tracing best practices, bridge pattern guide, template creation guide
-**Key Files**: `developer-guide.md`, `extending-llmspell.md`, `production-guide.md`, `examples-reference.md`, `feature-flags-migration.md`, `tracing-best-practices.md`, `bridge-pattern-guide.md`, `template-creation.md`
-**Phase 12 Additions**: Template creation guide, 10 built-in templates as patterns, TemplateRegistry implementation, ExecutionContext builder pattern
-**Phase 11 Additions**: Local provider implementation patterns, GGUF model handling, dual-backend architecture (Ollama + Candle), typed bridge pattern (Phase 11a.8)
+**Status**: ✅ Consolidated (Phase 13b.19) - 7 numbered guides + 6 thematic API references
+**Structure**: **Linear learning path** (01 → 07) + thematic API documentation
+**Contents**: 7 numbered guides + 6 thematic references + examples guide = 14 total files
+
+**The 7 Numbered Guides** (Start here for linear learning):
+1. **[Getting Started](developer-guide/01-getting-started.md)** - Setup, architecture, first contribution (15 min)
+2. **[Development Workflow](developer-guide/02-development-workflow.md)** - Testing, quality gates, git workflow (30 min)
+3. **[Extending Components](developer-guide/03-extending-components.md)** - Tools, agents, hooks, workflows, RAG, storage, templates (2-6 hrs)
+4. **[Bridge Patterns](developer-guide/04-bridge-patterns.md)** - Typed structs for script config (2-3 hrs)
+5. **[Production Deployment](developer-guide/05-production-deployment.md)** - Security, performance, scaling, monitoring (4-8 hrs)
+6. **[Tracing & Debugging](developer-guide/06-tracing-debugging.md)** - Instrumentation, session correlation (1-2 hrs)
+7. **[Feature Flags](developer-guide/07-feature-flags.md)** - Build system, modular builds (15 min)
+
+**Thematic API References** (Consolidated by topic):
+- [Core Traits](developer-guide/reference/core-traits.md) - BaseAgent, ExecutionContext, testing
+- [Storage Backends](developer-guide/reference/storage-backends.md) - Vector storage, HNSW
+- [RAG Pipeline](developer-guide/reference/rag-pipeline.md) - Document ingestion, retrieval, context
+- [Memory Backends](developer-guide/reference/memory-backends.md) - Episodic, semantic, procedural
+- [Security Integration](developer-guide/reference/security-integration.md) - Access control, multi-tenancy
+- [Crate Index](developer-guide/reference/crate-index.md) - Quick reference to all 21 crates
+
+**Additional Resources**:
+- **[Examples Reference](developer-guide/examples-reference.md)** - 60+ production examples
+
+**Phase 13 Additions**: Memory backend patterns, context engineering, knowledge graph integration
+**Phase 12 Additions**: Template creation patterns, TemplateRegistry, ExecutionContext builder
+**Phase 11 Additions**: Local provider patterns, typed bridge pattern, GGUF model handling
+
 **Start here if**: You want to build experimental components with production-quality code for future extraction
 
 ---
