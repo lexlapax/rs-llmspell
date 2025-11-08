@@ -11783,9 +11783,22 @@ Following project philosophy ("documentation should match reality" - remove docu
 - `docs/user-guide/service-deployment.md` (+200 lines)
 
 **Definition of Done**:
-- [ ] Service patterns updated
-- [ ] No CLI dependency shown
-- [ ] Examples production-ready
+- [x] Service patterns updated
+- [x] No CLI dependency shown
+- [x] Examples production-ready
+
+**Implementation Insights**:
+- **+460 lines**: Added Programmatic Deployment section with 8 subsections
+- **Deployment mode added** (+13 lines): New "Programmatic Deployment" mode in existing modes list
+- **Architecture diagram**: Service → Kernel API → ScriptRuntime → Infrastructure → 9 components
+- **3 deployment patterns**: Basic embedded (22 lines), HTTP service with Axum (118 lines), Docker + PostgreSQL
+- **Complete examples**: Cargo.toml dependencies, systemd unit files, Dockerfile, docker-compose.yml
+- **Infrastructure access**: Direct component access patterns documented
+- **Production config**: Optimized settings (idle_timeout=0, PostgreSQL backend, HNSW parameters)
+- **Comparison table**: CLI vs Programmatic deployment decision matrix (7 aspects)
+- **Code references**: 4 code reference annotations (kernel/api.rs, bridge/infrastructure.rs)
+- **Updated TOC**: Added section 10 with 8 subsections
+- **Zero CLI dependencies**: All examples use kernel API directly via start_embedded_kernel_with_executor()
 
 ---
 
