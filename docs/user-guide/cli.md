@@ -38,6 +38,37 @@ LLMSpell provides scriptable LLM interactions via Lua/JavaScript. The CLI suppor
 - Template-based AI workflows
 - State persistence across sessions
 
+### Architecture (Phase 13b.16)
+
+The CLI implements a **kernel-centric dual-mode architecture** with minimal overhead:
+
+**Execution Modes**:
+1. **Embedded Mode** (default): In-process kernel with ~12-line initialization
+2. **Connected Mode**: Remote kernel connection via TCP client
+
+**Simplified CLI Layer** (llmspell-cli/src/execution_context.rs:136-146, 169-180):
+```rust
+// Phase 13b.16.3: ScriptRuntime creates ALL infrastructure
+let script_executor = Arc::new(
+    llmspell_bridge::ScriptRuntime::new(config.clone()).await?
+) as Arc<dyn ScriptExecutor>;
+
+let handle = start_embedded_kernel_with_executor(
+    config.clone(),
+    script_executor,
+).await?;
+```
+
+**Infrastructure Creation**: ScriptRuntime internally uses `Infrastructure::from_config()` to create all 9 components (ProviderManager, StateManager, SessionManager, RAG, MemoryManager, ToolRegistry, AgentRegistry, WorkflowFactory, ComponentRegistry). CLI has zero direct dependencies on infrastructure.
+
+**Kernel API**: All CLI commands communicate via kernel message protocol:
+- Script execution: `execute_request` → `execute_reply`
+- Memory operations: `memory_request` → `memory_reply`
+- Context assembly: `context_request` → `context_reply`
+- Same API for embedded and remote kernels
+
+**Service Deployment**: Daemon mode bypasses CLI entirely - services use kernel API directly (see [Service Deployment](service-deployment.md)).
+
 ## Global Options
 
 Available for all commands:
