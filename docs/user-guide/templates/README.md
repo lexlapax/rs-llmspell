@@ -2,7 +2,7 @@
 
 **Production-ready AI workflow templates - From installation to productive AI in <5 minutes**
 
-**🔗 Navigation**: [← User Guide](../) | [← Docs Hub](../../) | [Examples](../../../examples/templates/) | [API Reference](../api/lua/README.md#template-global)
+**🔗 Navigation**: [← User Guide](../) | [← Docs Hub](../../) | [Examples](../../../examples/templates/) | [API Reference](../appendix/lua-api-reference.md#template-global)
 
 ---
 
@@ -705,8 +705,8 @@ See [Template System Architecture](../../technical/template-system-architecture.
 - **Lua Examples**: In each template guide
 
 ### API Documentation
-- **[Template Global](../api/lua/README.md#template-global)** - Lua API reference
-- **[Template Trait](../api/rust/README.md#llmspell-templates)** - Rust API reference
+- **[Template Global](../appendix/lua-api-reference.md#template-global)** - Lua API reference
+- **[Template Trait](../../developer-guide/reference/)** - Rust API reference
 
 ### Technical Documentation
 - **[Template System Architecture](../../technical/template-system-architecture.md)** (700+ lines)
@@ -844,7 +844,7 @@ llmspell provider list       # LLM provider configured?
 ## 🆘 Need Help?
 
 - **Template Issues?** Check individual template guides above
-- **API Reference?** See [Template Global](../api/lua/README.md#template-global)
+- **API Reference?** See [Template Global](../appendix/lua-api-reference.md#template-global)
 - **Architecture?** See [Template System Architecture](../../technical/template-system-architecture.md)
 - **Examples?** See [Template Examples](../../../examples/templates/)
 - **General Help?** See [User Guide](../)
