@@ -2,7 +2,7 @@
 
 **Thematic guide to llmspell's storage architecture and implementations**
 
-🔗 **Quick Links**: [llmspell-storage](llmspell-storage.md) | [Crate Index](crate-index.md)
+🔗 **Quick Links**: `cargo doc --open -p llmspell-storage` | [Crate Index](crate-index.md)
 
 ---
 

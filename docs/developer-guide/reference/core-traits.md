@@ -2,7 +2,7 @@
 
 **Thematic guide to llmspell's foundational architecture**
 
-🔗 **Quick Links**: [llmspell-core](llmspell-core.md) | [llmspell-utils](llmspell-utils.md) | [llmspell-testing](llmspell-testing.md) | [Crate Index](crate-index.md)
+🔗 **Quick Links**: `cargo doc --open -p llmspell-core` | `cargo doc --open -p llmspell-utils` | `cargo doc --open -p llmspell-testing` | [Crate Index](crate-index.md)
 
 ---
 

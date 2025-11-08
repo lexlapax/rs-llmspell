@@ -2,7 +2,7 @@
 
 **Thematic guide to llmspell's memory system architecture**
 
-🔗 **Quick Links**: [llmspell-memory](llmspell-memory.md) | [Crate Index](crate-index.md)
+🔗 **Quick Links**: `cargo doc --open -p llmspell-memory` | [Crate Index](crate-index.md)
 
 ---
 

@@ -2,7 +2,7 @@
 
 **Thematic guide to Retrieval-Augmented Generation architecture**
 
-🔗 **Quick Links**: [llmspell-rag](llmspell-rag.md) | [llmspell-context](llmspell-context.md) | [llmspell-graph](llmspell-graph.md) | [Crate Index](crate-index.md)
+🔗 **Quick Links**: `cargo doc --open -p llmspell-rag` | `cargo doc --open -p llmspell-context` | `cargo doc --open -p llmspell-graph` | [Crate Index](crate-index.md)
 
 ---
 

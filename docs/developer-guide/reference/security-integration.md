@@ -2,7 +2,7 @@
 
 **Thematic guide to llmspell's security architecture and tenant isolation**
 
-🔗 **Quick Links**: [llmspell-security](llmspell-security.md) | [llmspell-tenancy](llmspell-tenancy.md) | [Crate Index](crate-index.md)
+🔗 **Quick Links**: `cargo doc --open -p llmspell-security` | `cargo doc --open -p llmspell-tenancy` | [Crate Index](crate-index.md)
 
 ---
 
