@@ -1,15 +1,15 @@
 # Extending rs-llmspell: The Complete Guide
 
-✅ **CURRENT**: Phase 8 - Comprehensive extension guide for tools, agents, hooks, workflows, and RAG
-**Version**: 0.8.0 | **Focus**: Building production extensions
+✅ **CURRENT**: Phase 8 + 13b.16 - Comprehensive extension guide for tools, agents, hooks, workflows, RAG, and storage backends
+**Version**: 0.14.0 | **Focus**: Building production extensions
 
-**Quick Navigation**: [Tools](#part-1-tool-development) | [Agents](#part-2-agent-development) | [Hooks](#part-3-hook-development) | [Workflows](#part-4-workflow-development) | [RAG](#part-5-rag-system-extension)
+**Quick Navigation**: [Tools](#part-1-tool-development) | [Agents](#part-2-agent-development) | [Hooks](#part-3-hook-development) | [Workflows](#part-4-workflow-development) | [RAG](#part-5-rag-system-extension) | [Storage](#part-6-storage-backend-extension-new---phase-13b16)
 
 ---
 
 ## Overview
 
-This guide covers **ALL** extension patterns for rs-llmspell, from simple tools to complex RAG pipelines. Each part builds on the previous, showing how components integrate.
+This guide covers **ALL** extension patterns for rs-llmspell, from simple tools to complex RAG pipelines and storage backends. Each part builds on the previous, showing how components integrate.
 
 **What You'll Learn**:
 - Tool development with llmspell-utils patterns
@@ -17,6 +17,7 @@ This guide covers **ALL** extension patterns for rs-llmspell, from simple tools 
 - Hook system integration for cross-cutting concerns
 - Workflow orchestration patterns
 - RAG pipeline extension (NEW in Phase 8)
+- Storage backend implementation (NEW in Phase 13b.16)
 
 ---
 
@@ -950,6 +951,579 @@ async fn test_rag_pipeline_e2e() {
 
 ---
 
+## PART 6: Storage Backend Extension (NEW - Phase 13b.16)
+
+### Storage Architecture Overview
+
+rs-llmspell uses a **3-tier storage architecture** with hot-swappable backends:
+
+1. **Component APIs**: Domain-specific storage interfaces (Vector, Memory, Session, etc.)
+2. **StorageBackend Trait**: Unified abstraction for key-value + vector operations
+3. **Backend Implementations**: Memory, Sled (embedded DB), PostgreSQL (production)
+
+**Supported Backends** (Phase 13b.16):
+- **Memory**: In-memory HashMap (development/testing)
+- **Sled**: Embedded database (single-node production)
+- **PostgreSQL 18**: Production-grade with HNSW vector similarity (multi-tenant, ACID)
+
+### StorageBackend Trait
+
+**Location**: `llmspell-storage/src/backend.rs`
+
+**Purpose**: Unified interface for all storage backends, enabling hot-swappable storage without code changes.
+
+```rust
+use async_trait::async_trait;
+use llmspell_storage::{StorageResult, StorageError, StorageStats, BatchOperation, BatchResult};
+
+#[async_trait]
+pub trait StorageBackend: Send + Sync + std::fmt::Debug {
+    /// Get value by key
+    async fn get(&self, key: &str) -> StorageResult<Option<Vec<u8>>>;
+
+    /// Set key-value pair
+    async fn set(&self, key: &str, value: Vec<u8>) -> StorageResult<()>;
+
+    /// Delete key
+    async fn delete(&self, key: &str) -> StorageResult<()>;
+
+    /// Check if key exists
+    async fn exists(&self, key: &str) -> StorageResult<bool>;
+
+    /// List keys with optional prefix filter
+    async fn list_keys(&self, prefix: Option<&str>) -> StorageResult<Vec<String>>;
+
+    /// Clear all data (USE WITH CAUTION)
+    async fn clear(&self) -> StorageResult<()>;
+
+    /// Get storage statistics
+    async fn stats(&self) -> StorageResult<StorageStats> {
+        Ok(StorageStats::default())
+    }
+
+    /// Batch operations (optional optimization)
+    async fn batch(&self, ops: Vec<BatchOperation>) -> StorageResult<Vec<BatchResult>> {
+        // Default serial implementation provided
+        let mut results = Vec::new();
+        for op in ops {
+            let result = match op {
+                BatchOperation::Set { key, value } => {
+                    self.set(&key, value).await.map(|_| BatchResult::Success)
+                }
+                BatchOperation::Delete { key } => {
+                    self.delete(&key).await.map(|_| BatchResult::Success)
+                }
+            };
+            results.push(result.unwrap_or(BatchResult::Failed));
+        }
+        Ok(results)
+    }
+}
+```
+
+### Implementing a Custom Backend
+
+**Step 1**: Create backend struct with connection/state
+
+```rust
+use llmspell_storage::{StorageBackend, StorageResult, StorageError};
+use std::collections::HashMap;
+use tokio::sync::RwLock;
+
+#[derive(Debug)]
+pub struct RedisBackend {
+    client: redis::Client,
+    connection_pool: redis::aio::ConnectionManager,
+    stats: Arc<RwLock<BackendStats>>,
+}
+
+impl RedisBackend {
+    pub async fn new(redis_url: &str) -> StorageResult<Self> {
+        let client = redis::Client::open(redis_url)
+            .map_err(|e| StorageError::Connection(format!("Redis connection failed: {}", e)))?;
+
+        let connection_pool = redis::aio::ConnectionManager::new(client.clone())
+            .await
+            .map_err(|e| StorageError::Connection(format!("Pool creation failed: {}", e)))?;
+
+        Ok(Self {
+            client,
+            connection_pool,
+            stats: Arc::new(RwLock::new(BackendStats::default())),
+        })
+    }
+}
+```
+
+**Step 2**: Implement StorageBackend trait
+
+```rust
+#[async_trait]
+impl StorageBackend for RedisBackend {
+    async fn get(&self, key: &str) -> StorageResult<Option<Vec<u8>>> {
+        use redis::AsyncCommands;
+
+        let mut conn = self.connection_pool.clone();
+
+        let value: Option<Vec<u8>> = conn.get(key).await
+            .map_err(|e| StorageError::Read(format!("Redis GET failed: {}", e)))?;
+
+        // Update stats
+        let mut stats = self.stats.write().await;
+        stats.reads += 1;
+        if value.is_some() {
+            stats.hits += 1;
+        } else {
+            stats.misses += 1;
+        }
+
+        Ok(value)
+    }
+
+    async fn set(&self, key: &str, value: Vec<u8>) -> StorageResult<()> {
+        use redis::AsyncCommands;
+
+        let mut conn = self.connection_pool.clone();
+
+        conn.set(key, value).await
+            .map_err(|e| StorageError::Write(format!("Redis SET failed: {}", e)))?;
+
+        // Update stats
+        let mut stats = self.stats.write().await;
+        stats.writes += 1;
+
+        Ok(())
+    }
+
+    async fn delete(&self, key: &str) -> StorageResult<()> {
+        use redis::AsyncCommands;
+
+        let mut conn = self.connection_pool.clone();
+
+        let _: () = conn.del(key).await
+            .map_err(|e| StorageError::Delete(format!("Redis DEL failed: {}", e)))?;
+
+        // Update stats
+        let mut stats = self.stats.write().await;
+        stats.deletes += 1;
+
+        Ok(())
+    }
+
+    async fn exists(&self, key: &str) -> StorageResult<bool> {
+        use redis::AsyncCommands;
+
+        let mut conn = self.connection_pool.clone();
+
+        let exists: bool = conn.exists(key).await
+            .map_err(|e| StorageError::Read(format!("Redis EXISTS failed: {}", e)))?;
+
+        Ok(exists)
+    }
+
+    async fn list_keys(&self, prefix: Option<&str>) -> StorageResult<Vec<String>> {
+        use redis::AsyncCommands;
+
+        let mut conn = self.connection_pool.clone();
+
+        let pattern = prefix.map(|p| format!("{}*", p)).unwrap_or_else(|| "*".to_string());
+
+        let keys: Vec<String> = conn.keys(pattern).await
+            .map_err(|e| StorageError::Read(format!("Redis KEYS failed: {}", e)))?;
+
+        Ok(keys)
+    }
+
+    async fn clear(&self) -> StorageResult<()> {
+        use redis::AsyncCommands;
+
+        let mut conn = self.connection_pool.clone();
+
+        let _: () = conn.flushdb().await
+            .map_err(|e| StorageError::Delete(format!("Redis FLUSHDB failed: {}", e)))?;
+
+        Ok(())
+    }
+
+    async fn stats(&self) -> StorageResult<StorageStats> {
+        let stats = self.stats.read().await;
+        Ok(StorageStats {
+            total_keys: stats.writes - stats.deletes,
+            total_size_bytes: 0,  // Redis INFO command could provide this
+            reads: stats.reads,
+            writes: stats.writes,
+            deletes: stats.deletes,
+            hit_rate: if stats.reads > 0 {
+                stats.hits as f64 / stats.reads as f64
+            } else {
+                0.0
+            },
+        })
+    }
+
+    // Optional: Implement optimized batch operations using Redis pipelining
+    async fn batch(&self, ops: Vec<BatchOperation>) -> StorageResult<Vec<BatchResult>> {
+        use redis::AsyncCommands;
+
+        let mut conn = self.connection_pool.clone();
+        let mut pipe = redis::pipe();
+
+        // Build pipeline
+        for op in &ops {
+            match op {
+                BatchOperation::Set { key, value } => {
+                    pipe.set(key, value).ignore();
+                }
+                BatchOperation::Delete { key } => {
+                    pipe.del(key).ignore();
+                }
+            }
+        }
+
+        // Execute pipeline
+        pipe.query_async(&mut conn).await
+            .map_err(|e| StorageError::Write(format!("Pipeline failed: {}", e)))?;
+
+        // All operations succeeded
+        Ok(vec![BatchResult::Success; ops.len()])
+    }
+}
+```
+
+**Step 3**: Handle backend-specific errors
+
+```rust
+#[derive(Debug, thiserror::Error)]
+pub enum RedisBackendError {
+    #[error("Redis connection failed: {0}")]
+    Connection(String),
+
+    #[error("Redis operation timeout: {0}")]
+    Timeout(String),
+
+    #[error("Redis cluster error: {0}")]
+    Cluster(String),
+}
+
+// Implement conversion to StorageError
+impl From<RedisBackendError> for StorageError {
+    fn from(err: RedisBackendError) -> Self {
+        match err {
+            RedisBackendError::Connection(msg) => StorageError::Connection(msg),
+            RedisBackendError::Timeout(msg) => StorageError::Timeout(msg),
+            RedisBackendError::Cluster(msg) => StorageError::Backend(msg),
+        }
+    }
+}
+```
+
+### PostgreSQL Backend Example (Phase 13b.16)
+
+**Study**: `llmspell-storage/src/postgres/backend.rs` for production pattern
+
+```rust
+use llmspell_storage::postgres::PostgreSQLBackend;
+use sqlx::PgPool;
+
+#[derive(Debug)]
+pub struct PostgreSQLBackend {
+    pool: PgPool,
+    tenant_id: Option<String>,
+    enforce_rls: bool,
+}
+
+impl PostgreSQLBackend {
+    /// Create from database URL
+    pub async fn new(database_url: &str) -> StorageResult<Self> {
+        let pool = PgPool::connect(database_url).await
+            .map_err(|e| StorageError::Connection(format!("PostgreSQL connection failed: {}", e)))?;
+
+        Ok(Self {
+            pool,
+            tenant_id: None,
+            enforce_rls: false,
+        })
+    }
+
+    /// Enable Row-Level Security with tenant_id
+    pub fn with_tenant(mut self, tenant_id: String) -> Self {
+        self.tenant_id = Some(tenant_id);
+        self.enforce_rls = true;
+        self
+    }
+
+    /// Run database migrations (V1-V15)
+    pub async fn migrate(&self) -> StorageResult<()> {
+        sqlx::migrate!("./migrations")
+            .run(&self.pool)
+            .await
+            .map_err(|e| StorageError::Backend(format!("Migration failed: {}", e)))?;
+        Ok(())
+    }
+
+    /// Execute query with automatic RLS tenant injection
+    async fn execute_with_tenant<T, F>(&self, f: F) -> StorageResult<T>
+    where
+        F: FnOnce(&PgPool) -> BoxFuture<StorageResult<T>>,
+    {
+        if self.enforce_rls {
+            let tenant_id = self.tenant_id.as_ref()
+                .ok_or_else(|| StorageError::Config("Tenant ID required for RLS".into()))?;
+
+            // Set session tenant_id for RLS
+            sqlx::query("SELECT set_config('app.current_tenant_id', $1, true)")
+                .bind(tenant_id)
+                .execute(&self.pool)
+                .await
+                .map_err(|e| StorageError::Backend(format!("RLS setup failed: {}", e)))?;
+        }
+
+        f(&self.pool).await
+    }
+}
+
+#[async_trait]
+impl StorageBackend for PostgreSQLBackend {
+    async fn get(&self, key: &str) -> StorageResult<Option<Vec<u8>>> {
+        self.execute_with_tenant(|pool| {
+            Box::pin(async move {
+                let row: Option<(Vec<u8>,)> = sqlx::query_as(
+                    "SELECT value FROM llmspell.key_value_store
+                     WHERE key = $1"
+                )
+                .bind(key)
+                .fetch_optional(pool)
+                .await
+                .map_err(|e| StorageError::Read(format!("PostgreSQL query failed: {}", e)))?;
+
+                Ok(row.map(|(value,)| value))
+            })
+        }).await
+    }
+
+    async fn set(&self, key: &str, value: Vec<u8>) -> StorageResult<()> {
+        self.execute_with_tenant(|pool| {
+            Box::pin(async move {
+                sqlx::query(
+                    "INSERT INTO llmspell.key_value_store (key, value, updated_at)
+                     VALUES ($1, $2, now())
+                     ON CONFLICT (key) DO UPDATE
+                     SET value = EXCLUDED.value, updated_at = now()"
+                )
+                .bind(key)
+                .bind(value)
+                .execute(pool)
+                .await
+                .map_err(|e| StorageError::Write(format!("PostgreSQL insert failed: {}", e)))?;
+
+                Ok(())
+            })
+        }).await
+    }
+
+    // ... implement remaining trait methods with execute_with_tenant()
+}
+```
+
+### Backend Registration in Infrastructure Module
+
+**Location**: `llmspell-bridge/src/infrastructure.rs`
+
+**Pattern**: Register backend in `create_state_manager()` factory function
+
+```rust
+async fn create_state_manager(config: &LLMSpellConfig) -> Result<Arc<StateManager>, LLMSpellError> {
+    use llmspell_storage::{MemoryBackend, SledBackend, PostgreSQLBackend, StorageBackend};
+
+    // Backend selection from config
+    let backend: Arc<dyn StorageBackend> = match config.storage.backend.as_str() {
+        "memory" => {
+            info!("Using in-memory storage backend");
+            Arc::new(MemoryBackend::new())
+        }
+        "sled" => {
+            info!("Using Sled embedded database backend");
+            Arc::new(SledBackend::new_with_path(&config.storage.sled.path)?)
+        }
+        "postgres" => {
+            info!("Using PostgreSQL backend");
+            let pg_backend = PostgreSQLBackend::new(&config.storage.postgres.url).await?;
+
+            // Run migrations if enabled
+            if config.storage.postgres.run_migrations {
+                pg_backend.migrate().await?;
+            }
+
+            // Enable RLS if configured
+            if config.storage.postgres.enforce_tenant_isolation {
+                Arc::new(pg_backend.with_tenant(config.storage.postgres.default_tenant.clone()))
+            } else {
+                Arc::new(pg_backend)
+            }
+        }
+        "redis" => {
+            info!("Using Redis backend");
+            Arc::new(RedisBackend::new(&config.storage.redis.url).await?)
+        }
+        backend_type => {
+            return Err(LLMSpellError::Config(format!(
+                "Unknown storage backend: {}. Supported: memory, sled, postgres, redis",
+                backend_type
+            )));
+        }
+    };
+
+    Ok(Arc::new(StateManager::new(backend)))
+}
+```
+
+### Configuration
+
+**File**: `config.toml`
+
+```toml
+[storage]
+# Backend selection: "memory", "sled", "postgres", "redis"
+backend = "redis"
+
+# Redis configuration
+[storage.redis]
+url = "redis://localhost:6379"
+pool_size = 20
+connection_timeout_ms = 5000
+operation_timeout_ms = 2000
+
+# Component-specific backend overrides
+[storage.components.vector_embeddings]
+backend = "postgres"  # Use PostgreSQL HNSW for vectors
+
+[storage.components.session_data]
+backend = "redis"     # Use Redis for fast session access
+
+[storage.components.agent_state]
+backend = "sled"      # Use Sled for persistent agent state
+```
+
+### Backend Testing Pattern
+
+```rust
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use llmspell_testing::storage_helpers::*;
+
+    #[tokio::test]
+    async fn test_redis_backend_basic_operations() {
+        // Use testcontainers for isolated Redis instance
+        let redis_container = testcontainers::clients::Cli::default()
+            .run(testcontainers::images::redis::Redis::default());
+
+        let redis_url = format!("redis://localhost:{}", redis_container.get_host_port_ipv4(6379));
+        let backend = RedisBackend::new(&redis_url).await.unwrap();
+
+        // Test SET
+        backend.set("test_key", b"test_value".to_vec()).await.unwrap();
+
+        // Test GET
+        let value = backend.get("test_key").await.unwrap();
+        assert_eq!(value, Some(b"test_value".to_vec()));
+
+        // Test EXISTS
+        assert!(backend.exists("test_key").await.unwrap());
+        assert!(!backend.exists("nonexistent").await.unwrap());
+
+        // Test DELETE
+        backend.delete("test_key").await.unwrap();
+        assert!(!backend.exists("test_key").await.unwrap());
+    }
+
+    #[tokio::test]
+    async fn test_redis_backend_batch_operations() {
+        let backend = create_test_redis_backend().await;
+
+        let ops = vec![
+            BatchOperation::Set { key: "key1".into(), value: b"value1".to_vec() },
+            BatchOperation::Set { key: "key2".into(), value: b"value2".to_vec() },
+            BatchOperation::Set { key: "key3".into(), value: b"value3".to_vec() },
+        ];
+
+        let results = backend.batch(ops).await.unwrap();
+
+        assert_eq!(results.len(), 3);
+        assert!(results.iter().all(|r| matches!(r, BatchResult::Success)));
+
+        // Verify all keys exist
+        assert!(backend.exists("key1").await.unwrap());
+        assert!(backend.exists("key2").await.unwrap());
+        assert!(backend.exists("key3").await.unwrap());
+    }
+
+    #[tokio::test]
+    async fn test_redis_backend_list_keys_with_prefix() {
+        let backend = create_test_redis_backend().await;
+
+        // Insert keys with different prefixes
+        backend.set("user:1:name", b"Alice".to_vec()).await.unwrap();
+        backend.set("user:2:name", b"Bob".to_vec()).await.unwrap();
+        backend.set("session:abc", b"active".to_vec()).await.unwrap();
+
+        // List with prefix
+        let user_keys = backend.list_keys(Some("user:")).await.unwrap();
+        assert_eq!(user_keys.len(), 2);
+        assert!(user_keys.contains(&"user:1:name".to_string()));
+        assert!(user_keys.contains(&"user:2:name".to_string()));
+    }
+
+    #[tokio::test]
+    async fn test_redis_backend_stats() {
+        let backend = create_test_redis_backend().await;
+
+        // Perform operations
+        backend.set("key1", b"value1".to_vec()).await.unwrap();
+        backend.get("key1").await.unwrap();
+        backend.get("key2").await.unwrap(); // Miss
+        backend.delete("key1").await.unwrap();
+
+        // Check stats
+        let stats = backend.stats().await.unwrap();
+        assert_eq!(stats.writes, 1);
+        assert_eq!(stats.reads, 2);
+        assert_eq!(stats.deletes, 1);
+        assert_eq!(stats.hit_rate, 0.5); // 1 hit out of 2 reads
+    }
+}
+```
+
+### Best Practices for Backend Implementation
+
+1. **Connection Pooling**: Use connection pools for database backends to avoid connection overhead
+2. **Error Handling**: Convert backend-specific errors to `StorageError` variants
+3. **Tenant Isolation**: Support multi-tenancy with Row-Level Security or key prefixing
+4. **Statistics**: Track operations for monitoring and optimization
+5. **Batch Operations**: Implement optimized batch methods using backend-specific features (pipelining, transactions)
+6. **Graceful Degradation**: Handle connection failures with retries and fallbacks
+7. **Testing**: Use testcontainers for isolated backend instances in tests
+8. **Performance**: Profile operations and optimize hot paths (caching, indexing)
+
+### Backend Performance Targets
+
+| Operation | Target Latency | Target Throughput | Notes |
+|-----------|---------------|-------------------|-------|
+| GET | <1ms (p50), <5ms (p99) | 10K+ ops/sec | Use connection pooling |
+| SET | <2ms (p50), <10ms (p99) | 5K+ ops/sec | Batch when possible |
+| DELETE | <1ms (p50), <5ms (p99) | 5K+ ops/sec | Async when acceptable |
+| LIST | <10ms (p50), <50ms (p99) | 1K+ ops/sec | Use indexes, limit results |
+| BATCH (100 ops) | <20ms (p50), <100ms (p99) | 500+ batches/sec | Use transactions |
+
+### Related Documentation
+
+- **Storage Architecture**: `/docs/technical/storage-architecture.md` (backend selection, component storage matrix)
+- **PostgreSQL Setup**: `/docs/user-guide/storage/postgresql-setup.md` (production PostgreSQL backend setup)
+- **Schema Reference**: `/docs/user-guide/storage/schema-reference.md` (PostgreSQL table schemas)
+- **API Reference**: `/docs/user-guide/api/rust/llmspell-storage.md` (PostgreSQL backend APIs)
+
+---
+
 ## Best Practices
 
 ### General Extension Guidelines
@@ -989,13 +1563,20 @@ This guide covered ALL extension patterns in rs-llmspell:
 ✅ **Hook Development**: Cross-cutting concerns with priority
 ✅ **Workflow Development**: Four patterns + multi-agent coordination
 ✅ **RAG Extension**: Pipeline builder, custom providers, HNSW tuning
+✅ **Storage Backend Extension** (NEW - Phase 13b.16): StorageBackend trait implementation, hot-swappable backends, PostgreSQL example
 
 **Next Steps**:
 1. Study the 60+ examples in `examples/`
-2. Start with tools, progress to agents, then RAG
-3. Use production patterns from existing implementations
-4. Test thoroughly with proper categorization
+2. Start with tools, progress to agents, then RAG, then storage backends
+3. Use production patterns from existing implementations (Memory, Sled, PostgreSQL)
+4. Test thoroughly with proper categorization and testcontainers for backend isolation
+
+**Extension Patterns by Complexity**:
+- **Beginner**: Tools (BaseAgent + Tool trait)
+- **Intermediate**: Agents (LLM integration), Hooks (cross-cutting)
+- **Advanced**: Workflows (multi-agent), RAG (pipeline extension)
+- **Expert**: Storage Backends (distributed systems, multi-tenancy)
 
 ---
 
-*This guide consolidates patterns from 5 separate guides and adds comprehensive Phase 8 RAG extension documentation.*
+*This guide consolidates patterns from 5 separate guides, adds comprehensive Phase 8 RAG extension documentation, and Phase 13b.16 storage backend extension patterns.*
