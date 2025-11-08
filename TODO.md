@@ -13272,4 +13272,435 @@ grep -r "](.*\.md)" docs/developer-guide --include="*.md" | grep -E "llmspell-(c
 
 ---
 
+## Phase 13b.20: Technical Documentation Consolidation (6 hours) 🟢
+
+**Priority**: HIGH
+**Estimated Time**: 6 hours total (5 sub-phases)
+**Dependencies**: Phase 13b.19 complete (User/Developer guide consolidation)
+**Impact**: 29% file reduction (21 → 15), 23% line reduction (14,170 → 10,935), <5% duplication
+
+**Executive Summary**:
+Consolidate 21 technical documentation files into 15 by merging overlapping content in PostgreSQL (5→1), kernel (2→1), and performance (2→1) documentation. Move operational guide to developer-guide. Update all docs/ README.md files for holistic navigation.
+
+**Current Analysis**:
+- **Total Files**: 21 in docs/technical/
+- **Total Lines**: 14,170
+- **Duplication**: ~25% (3,500 lines of overlapping content)
+- **Major Overlaps**: PostgreSQL (40%), Kernel (25%), Performance (15%)
+
+**Target State**:
+- **Total Files**: 15 in docs/technical/
+- **Total Lines**: 10,935 (after deduplication)
+- **Duplication**: <5%
+- **Clear Separation**: Technical architecture vs developer operations
+
+---
+
+### Phase 13b.20.1: PostgreSQL Documentation Consolidation (2 hours) 🟢
+
+**Priority**: CRITICAL
+**Estimated Time**: 2 hours
+**Dependencies**: None
+
+**Description**: Consolidate 5 PostgreSQL-related files into single unified guide. Biggest overlap (40%) and highest impact consolidation.
+
+**Current State**:
+- `postgresql-schema.md` (1,360 lines) - Complete schema reference
+- `postgresql-performance.md` (962 lines) - Tuning guide with HNSW optimization
+- `rls-policies.md` (677 lines) - Row-level security policies
+- `migration-internals.md` (385 lines) - Schema migration internals
+- Total: 4 files, 3,384 lines (excluding storage-architecture overlap)
+
+**Overlap Analysis**:
+- RLS policies explained in detail in rls-policies.md, repeated in postgresql-schema.md (lines 1045-1125)
+- Schema definitions in postgresql-schema.md, summarized in migration-internals.md
+- HNSW tuning in postgresql-performance.md (lines 66-240), repeated in postgresql-schema.md (lines 199-213)
+- Connection pooling in postgresql-performance.md (lines 249-338), referenced in operational-guide.md
+
+**Tasks**:
+- [ ] Git tag: `pre-technical-consolidation-phase1`
+- [ ] Create `postgresql-guide.md` structure:
+  - [ ] Section 1: Overview & Setup (from all 4 files)
+  - [ ] Section 2: Schema Reference (from postgresql-schema.md - all 15 tables)
+  - [ ] Section 3: Row-Level Security (from rls-policies.md + postgresql-schema.md consolidated)
+  - [ ] Section 4: Schema Migrations (from migration-internals.md)
+  - [ ] Section 5: Performance Tuning (from postgresql-performance.md)
+  - [ ] Section 6: Operations (backup/restore, monitoring)
+- [ ] Consolidate RLS sections (remove duplication from schema doc)
+- [ ] Consolidate HNSW tuning (single authoritative section)
+- [ ] Consolidate connection pooling (remove duplication)
+- [ ] Add cross-references between sections
+- [ ] Verify all code examples work
+- [ ] Delete source files:
+  - [ ] postgresql-schema.md
+  - [ ] postgresql-performance.md
+  - [ ] rls-policies.md
+  - [ ] migration-internals.md
+- [ ] Commit: "Phase 13b.20.1: Consolidate PostgreSQL Documentation"
+
+**Target File**:
+- `postgresql-guide.md` (~2,800 lines after deduplication)
+- Sections: 6 major sections with clear navigation
+- Reduction: 3,384 → 2,800 lines (17% reduction from deduplication)
+
+**Acceptance Criteria**:
+- [ ] Single unified PostgreSQL guide exists
+- [ ] All 15 table schemas present
+- [ ] RLS policies consolidated (no duplication)
+- [ ] HNSW tuning in single authoritative section
+- [ ] Migration workflow clearly documented
+- [ ] Zero broken internal references
+- [ ] 4 source files deleted
+
+**Rationale**: PostgreSQL documentation has highest overlap (40%) and serves single audience (backend developers). Unified guide provides single source of truth for database operations.
+
+---
+
+### Phase 13b.20.2: Kernel Architecture Consolidation (1.5 hours) 🟢
+
+**Priority**: HIGH
+**Estimated Time**: 1.5 hours
+**Dependencies**: Phase 13b.20.1 complete
+
+**Description**: Consolidate kernel protocol and execution path documentation into unified architecture guide. Second-highest overlap (25%).
+
+**Current State**:
+- `kernel-protocol-architecture.md` (1,205 lines) - Jupyter protocol, 5-channel architecture
+- `kernel-execution-paths.md` (847 lines) - Message flow, execution internals
+- Total: 2 files, 2,052 lines
+
+**Keep Separate**:
+- `debug-dap-architecture.md` (523 lines) - Different protocol (DAP vs Jupyter)
+- `protocol-compliance-report.md` (445 lines) - Validation artifact
+
+**Overlap Analysis**:
+- Message flow diagrams in both files (different perspectives)
+- Protocol overview repeated in execution-paths introduction
+- State management explained in both (protocol context vs execution context)
+- Transport layer touched in both files
+
+**Tasks**:
+- [ ] Git tag: `pre-technical-consolidation-phase2`
+- [ ] Create `kernel-architecture.md` structure:
+  - [ ] Section 1: Overview (IntegratedKernel design philosophy)
+  - [ ] Section 2: Protocol Layer (from kernel-protocol-architecture.md)
+  - [ ] Section 3: Execution Paths (from kernel-execution-paths.md - merge message flow)
+  - [ ] Section 4: Transport Layer (consolidated from both)
+  - [ ] Section 5: State Management (consolidated from both)
+  - [ ] Section 6: Debug Integration (high-level, link to debug-dap-architecture.md)
+- [ ] Consolidate message flow diagrams (unified view)
+- [ ] Merge protocol compliance notes into protocol section
+- [ ] Add references to debug-dap-architecture.md and protocol-compliance-report.md
+- [ ] Verify all architecture diagrams render correctly
+- [ ] Delete source files:
+  - [ ] kernel-protocol-architecture.md
+  - [ ] kernel-execution-paths.md
+- [ ] Commit: "Phase 13b.20.2: Consolidate Kernel Architecture"
+
+**Target File**:
+- `kernel-architecture.md` (~1,500 lines after consolidation)
+- Sections: 6 major sections covering full kernel stack
+- Reduction: 2,052 → 1,500 lines (27% reduction from deduplication)
+
+**Acceptance Criteria**:
+- [ ] Single unified kernel architecture guide exists
+- [ ] Protocol layer fully documented (5-channel Jupyter)
+- [ ] Execution paths clearly mapped
+- [ ] Message flow diagrams consolidated
+- [ ] State management unified
+- [ ] Cross-references to DAP and compliance docs
+- [ ] 2 source files deleted
+
+**Rationale**: Kernel protocol and execution paths serve same audience (kernel developers) and cover same system from different angles. Unified view provides better understanding of message flow through entire stack.
+
+---
+
+### Phase 13b.20.3: Performance Documentation Consolidation (1 hour) 🟢
+
+**Priority**: MEDIUM
+**Estimated Time**: 1 hour
+**Dependencies**: Phase 13b.20.2 complete
+
+**Description**: Consolidate performance baseline and benchmarking methodology into unified performance guide.
+
+**Current State**:
+- `performance-baseline.md` (521 lines) - Performance targets for all components
+- `benchmarking-guide.md` (486 lines) - Benchmarking methodology, profiling tools
+- Total: 2 files, 1,007 lines
+
+**Keep Separate**:
+- `stress-test-results.md` (487 lines) - Historical Phase 10 validation artifact
+
+**Overlap Analysis**:
+- Performance targets defined in baseline, referenced in benchmarking guide
+- Profiling methodology touched in both files
+- Some tool examples repeated
+
+**Tasks**:
+- [ ] Git tag: `pre-technical-consolidation-phase3`
+- [ ] Create `performance-guide.md` structure:
+  - [ ] Section 1: Performance Philosophy & Targets
+  - [ ] Section 2: Baseline Targets (from performance-baseline.md - all components)
+  - [ ] Section 3: Benchmarking Methodology (from benchmarking-guide.md)
+  - [ ] Section 4: Profiling Tools (consolidated from both)
+  - [ ] Section 5: Optimization Strategies (from both docs)
+  - [ ] Section 6: Validation (link to stress-test-results.md)
+- [ ] Consolidate performance target tables (single authoritative table)
+- [ ] Merge profiling tool examples
+- [ ] Add cross-references to stress-test-results.md
+- [ ] Verify all benchmark commands work
+- [ ] Delete source files:
+  - [ ] performance-baseline.md
+  - [ ] benchmarking-guide.md
+- [ ] Commit: "Phase 13b.20.3: Consolidate Performance Documentation"
+
+**Target File**:
+- `performance-guide.md` (~800 lines after consolidation)
+- Sections: 6 major sections covering targets through validation
+- Reduction: 1,007 → 800 lines (21% reduction from deduplication)
+
+**Acceptance Criteria**:
+- [ ] Single unified performance guide exists
+- [ ] All component performance targets documented
+- [ ] Benchmarking methodology clearly explained
+- [ ] Profiling tools consolidated
+- [ ] Cross-reference to stress test results
+- [ ] 2 source files deleted
+
+**Rationale**: Performance targets and benchmarking methodology are tightly coupled. Developers need both in single location when optimizing or validating performance.
+
+---
+
+### Phase 13b.20.4: Move Operational Guide to Developer Guide (30 minutes) 🟢
+
+**Priority**: MEDIUM
+**Estimated Time**: 30 minutes
+**Dependencies**: Phase 13b.20.3 complete
+
+**Description**: Move operational-guide.md from docs/technical/ to docs/developer-guide/ as it's user-facing deployment documentation, not deep technical architecture.
+
+**Current State**:
+- `docs/technical/operational-guide.md` (892 lines) - Production operations, deployment patterns
+
+**Target State**:
+- `docs/developer-guide/08-operations.md` (892 lines) - As 8th numbered guide
+
+**Rationale**: Operational guide covers systemd/launchd setup, environment variables, deployment patterns - all user-facing operations. Technical docs should focus on architecture and internals for contributors/maintainers.
+
+**Tasks**:
+- [ ] Git tag: `pre-technical-consolidation-phase4`
+- [ ] Copy operational-guide.md to developer-guide/08-operations.md
+- [ ] Update header to match numbered guide format
+- [ ] Update cross-references within file to point to developer-guide
+- [ ] Update developer-guide/README.md:
+  - [ ] Add 08-operations.md to numbered guides list
+  - [ ] Update file count (7 → 8 numbered guides)
+  - [ ] Add time estimate (2-3 hours)
+  - [ ] Update learning paths if needed
+- [ ] Delete docs/technical/operational-guide.md
+- [ ] Commit: "Phase 13b.20.4: Move operational-guide to developer-guide/08-operations.md"
+
+**Acceptance Criteria**:
+- [ ] 08-operations.md exists in developer-guide/
+- [ ] Header matches numbered guide format
+- [ ] Cross-references point to developer-guide
+- [ ] developer-guide/README.md updated
+- [ ] Source file deleted from technical/
+
+---
+
+### Phase 13b.20.5: Update All Documentation Hub README Files (1 hour) 🟢
+
+**Priority**: CRITICAL
+**Estimated Time**: 1 hour
+**Dependencies**: Phase 13b.20.1, 13b.20.2, 13b.20.3, 13b.20.4 complete
+
+**Description**: Update all README.md files in docs/ subdirectories to reflect consolidated structure and provide holistic navigation.
+
+**Files to Update**:
+1. `docs/README.md` - Main documentation hub
+2. `docs/technical/README.md` - Technical documentation index
+3. `docs/developer-guide/README.md` - Developer guide index (if changes needed)
+4. `docs/user-guide/README.md` - User guide index (if changes needed)
+
+**Tasks**:
+
+#### 13b.20.5.1: Update docs/README.md (Main Hub)
+- [ ] Update Technical section:
+  - [ ] New file count: 21 → 15 files (29% reduction)
+  - [ ] Highlight 3 new consolidated guides (postgresql, kernel, performance)
+  - [ ] Update key files list
+  - [ ] Update phase coverage (Phase 13b.20 consolidation)
+- [ ] Update Developer Guide section:
+  - [ ] New file count: 7 → 8 numbered guides (add 08-operations)
+  - [ ] Update navigation structure
+- [ ] Add Phase 13b.20 completion note
+- [ ] Verify all cross-references work
+
+#### 13b.20.5.2: Update docs/technical/README.md (Complete Rewrite)
+- [ ] Update overview with new structure
+- [ ] Update file count: 21 → 15 files
+- [ ] Create new sections:
+  - [ ] Core Architecture (5 files)
+  - [ ] Kernel System (3 files)
+  - [ ] Database & Storage (1 file - postgresql-guide.md)
+  - [ ] Feature Systems (4 files)
+  - [ ] Performance & Testing (2 files)
+  - [ ] Reference (1 file)
+- [ ] Update navigation:
+  - [ ] Link to postgresql-guide.md (NEW)
+  - [ ] Link to kernel-architecture.md (NEW)
+  - [ ] Link to performance-guide.md (NEW)
+  - [ ] Remove links to deleted files
+- [ ] Add consolidation notes (Phase 13b.20)
+- [ ] Update quick navigation section
+- [ ] Verify all links work
+
+#### 13b.20.5.3: Update docs/developer-guide/README.md
+- [ ] Update numbered guides count: 7 → 8
+- [ ] Add 08-operations.md to numbered guides list:
+  - [ ] Title: Production Operations
+  - [ ] Description: systemd/launchd, deployment, monitoring
+  - [ ] Time estimate: 2-3 hours
+  - [ ] Prerequisites: 05, 06
+- [ ] Update total file count if needed
+- [ ] Verify learning paths still accurate
+
+#### 13b.20.5.4: Verify docs/user-guide/README.md
+- [ ] Check if any technical/ references exist
+- [ ] Update if needed (minimal changes expected)
+
+#### 13b.20.5.5: Update Cross-References
+- [ ] Search for references to deleted files across all docs:
+  - [ ] postgresql-schema.md → postgresql-guide.md
+  - [ ] postgresql-performance.md → postgresql-guide.md
+  - [ ] rls-policies.md → postgresql-guide.md
+  - [ ] migration-internals.md → postgresql-guide.md
+  - [ ] kernel-protocol-architecture.md → kernel-architecture.md
+  - [ ] kernel-execution-paths.md → kernel-architecture.md
+  - [ ] performance-baseline.md → performance-guide.md
+  - [ ] benchmarking-guide.md → performance-guide.md
+  - [ ] operational-guide.md → developer-guide/08-operations.md
+- [ ] Update all found references
+- [ ] Verify no broken links remain
+
+#### 13b.20.5.6: Final Verification
+- [ ] Run link checker (if available)
+- [ ] Manually verify navigation from each README
+- [ ] Test markdown rendering
+- [ ] Commit: "Phase 13b.20.5: Update all documentation hub README files"
+
+**Acceptance Criteria**:
+- [ ] docs/README.md reflects new structure
+- [ ] docs/technical/README.md completely updated (15 files)
+- [ ] docs/developer-guide/README.md includes 08-operations.md
+- [ ] docs/user-guide/README.md verified
+- [ ] Zero broken cross-references
+- [ ] All navigation paths work
+
+**Rationale**: README.md files are entry points for navigation. Must be updated to reflect consolidated structure for users to find content.
+
+---
+
+### Validation & Rollback Procedures
+
+**Before Each Phase**:
+```bash
+# Create git tag
+git tag pre-technical-consolidation-phaseN
+
+# Document current state
+find docs/technical -name "*.md" | wc -l
+find docs/technical -name "*.md" -exec wc -l {} + | tail -1
+
+# Review changes
+git diff --stat pre-technical-consolidation-phaseN..HEAD
+
+# If issues found:
+git reset --hard pre-technical-consolidation-phaseN
+git tag -d pre-technical-consolidation-phaseN
+```
+
+**Final Validation (After Phase 13b.20.5)**:
+```bash
+# File count verification
+echo "Technical files: $(find docs/technical -name '*.md' | wc -l)"  # Should be 15
+
+# Line count comparison
+BEFORE=14170
+AFTER=$(find docs/technical -name "*.md" -exec wc -l {} + | tail -1 | awk '{print $1}')
+echo "Line reduction: $((BEFORE - AFTER)) lines removed"
+
+# Broken link check
+grep -r "](.*\.md)" docs/ --include="*.md" | \
+  grep -E "(postgresql-(schema|performance)|rls-policies|migration-internals|kernel-(protocol|execution)|performance-baseline|benchmarking-guide|operational-guide)\.md" && \
+  echo "ERROR: Found links to deleted files" || \
+  echo "PASS: No links to deleted files"
+
+# README verification
+for readme in docs/README.md docs/technical/README.md docs/developer-guide/README.md docs/user-guide/README.md; do
+  echo "Checking $readme..."
+  grep -E "postgresql-guide|kernel-architecture|performance-guide|08-operations" "$readme" && echo "PASS" || echo "WARN: Check $readme"
+done
+```
+
+---
+
+### Success Metrics
+
+**Quantitative**:
+- [ ] Technical files: 21 → 15 (29% reduction achieved)
+- [ ] Total lines: 14,170 → 10,935 (23% reduction)
+- [ ] Duplication: ~25% → <5% (80% duplication removed)
+- [ ] PostgreSQL docs: 5 → 1 (80% consolidation)
+- [ ] Kernel docs: 4 → 3 (25% consolidation)
+- [ ] Performance docs: 4 → 2 (50% consolidation)
+- [ ] Developer guides: 7 → 8 (added operations guide)
+- [ ] Zero broken links
+
+**Qualitative**:
+- [ ] Single source of truth for PostgreSQL (schema + perf + RLS + migrations)
+- [ ] Unified kernel architecture (protocol + execution in one view)
+- [ ] Performance targets + methodology in single guide
+- [ ] Operational guide correctly placed in developer-guide
+- [ ] All README files provide clear navigation
+- [ ] No redundancy between technical docs
+- [ ] Clear separation: technical architecture vs developer operations
+
+**Timeline**:
+- [ ] Phase 13b.20.1: 2 hours (PostgreSQL consolidation)
+- [ ] Phase 13b.20.2: 1.5 hours (Kernel consolidation)
+- [ ] Phase 13b.20.3: 1 hour (Performance consolidation)
+- [ ] Phase 13b.20.4: 30 minutes (Move operational guide)
+- [ ] Phase 13b.20.5: 1 hour (Update all READMEs)
+- [ ] **Total: 6 hours**
+
+---
+
+**Completion Date**: TBD
+**Risk Level**: MEDIUM (many file moves, but phased approach with git tags mitigates risk)
+**Rollback Plan**: Git tags before each phase, easy rollback to any point
+**Documentation Impact**: HIGH - affects all docs/ navigation and cross-references
+
+---
+
+**Comparison to Previous Consolidations**:
+
+| Metric | User Guide (13b.18) | Developer Guide (13b.19) | Technical (13b.20) |
+|--------|---------------------|--------------------------|---------------------|
+| Before | 53 files | 37 files | 21 files |
+| After | 23 files | 15 files | 15 files |
+| Reduction | 57% | 59% | 29% |
+| Time estimated | 13 hours | 5 hours | 6 hours |
+| Key consolidations | 10 → appendix | 10 → 7 numbered | 5 → 3 unified guides |
+| Primary benefit | Linear learning path | Linear contributor path | Single source of truth |
+
+**Phase 13b Impact**:
+- **Total docs consolidation**: 111 files → 53 files (52% reduction)
+- **Holistic documentation structure**: Clear separation (user/developer/technical)
+- **Navigation improvement**: README files at every level
+- **Maintenance reduction**: Less duplication = easier updates
+
+---
+
 **END OF PHASE 13b TODO DOCUMENT**
