@@ -82,10 +82,22 @@ mod postgres_benchmarks {
     /// Returns None if PostgreSQL is not available (allows graceful benchmark skip)
     async fn setup_test_backend() -> Option<Arc<PostgresBackend>> {
         let config = PostgresConfig::new(TEST_CONNECTION_STRING);
-        match PostgresBackend::new(config).await {
-            Ok(backend) => Some(Arc::new(backend)),
+        let backend = match PostgresBackend::new(config).await {
+            Ok(b) => Arc::new(b),
             Err(e) => {
                 eprintln!("PostgreSQL not available, skipping benchmarks: {}", e);
+                eprintln!(
+                    "To run benchmarks, ensure PostgreSQL is running (see benchmark documentation)"
+                );
+                return None;
+            }
+        };
+
+        // Test actual connection (connection pools are lazy and won't fail until first use)
+        match backend.get_client().await {
+            Ok(_) => Some(backend),
+            Err(e) => {
+                eprintln!("PostgreSQL connection test failed, skipping benchmarks: {}", e);
                 eprintln!(
                     "To run benchmarks, ensure PostgreSQL is running (see benchmark documentation)"
                 );

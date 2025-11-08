@@ -10963,6 +10963,12 @@ Feature Enabled + DB:    → Benchmarks run normally
 - ✅ Benchmark gracefully skips when PostgreSQL unavailable
 - ✅ No changes to benchmark logic when database available
 
+**Follow-up Fix** (same task):
+- **Issue**: Initial fix still panicked because PostgreSQL connection pools are **lazy**
+- **Root Cause**: `PostgresBackend::new()` succeeds without connecting, failure happens on first use
+- **Solution**: Test actual connection via `backend.get_client().await` in `setup_test_backend()`
+- **Verification**: Added connection test to catch auth failures before returning Some(backend)
+
 **Design Rationale**:
 - Benchmarks are **opt-in performance tools**, not regression tests
 - `cargo test --all-targets` shouldn't fail due to missing optional infrastructure
@@ -10970,7 +10976,7 @@ Feature Enabled + DB:    → Benchmarks run normally
 - Provides helpful error message for developers who want to run benchmarks
 
 **Files Modified**:
-- `llmspell-storage/benches/graph_bench.rs` (graceful PostgreSQL availability checking)
+- `llmspell-storage/benches/graph_bench.rs` (graceful PostgreSQL availability checking + connection test)
 
 ---
 
