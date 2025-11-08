@@ -125,6 +125,44 @@
 
 ---
 
+## 📚 API Reference (Rust Crate Documentation)
+
+**Complete Rust API documentation for extending llmspell**
+
+### Thematic Guides (Start Here)
+
+Consolidated guides covering multiple crates by topic:
+
+1. **[Core Traits & Foundation](reference/core-traits.md)** - BaseAgent, ExecutionContext, testing framework
+2. **[Storage Backends](reference/storage-backends.md)** - Vector storage, HNSW, backends
+3. **[RAG Pipeline & Context Engineering](reference/rag-pipeline.md)** - Document ingestion, retrieval, knowledge graph
+4. **[Memory Backends](reference/memory-backends.md)** - Episodic, semantic, procedural memory systems
+5. **[Security & Multi-Tenancy](reference/security-integration.md)** - Access control, sandboxing, tenant isolation
+6. **[Crate Index](reference/crate-index.md)** - Quick reference to all 21 crates
+
+### Individual Crate Documentation
+
+Detailed API documentation for each crate is available in `reference/`:
+- Core: [llmspell-core](reference/llmspell-core.md), [llmspell-utils](reference/llmspell-utils.md), [llmspell-testing](reference/llmspell-testing.md)
+- Storage: [llmspell-storage](reference/llmspell-storage.md)
+- AI/RAG: [llmspell-rag](reference/llmspell-rag.md), [llmspell-memory](reference/llmspell-memory.md), [llmspell-graph](reference/llmspell-graph.md), [llmspell-context](reference/llmspell-context.md)
+- Security: [llmspell-security](reference/llmspell-security.md), [llmspell-tenancy](reference/llmspell-tenancy.md)
+- Execution: [llmspell-workflows](reference/llmspell-workflows.md), [llmspell-tools](reference/llmspell-tools.md), [llmspell-hooks](reference/llmspell-hooks.md), [llmspell-events](reference/llmspell-events.md)
+- Integration: [llmspell-bridge](reference/llmspell-bridge.md), [llmspell-kernel](reference/llmspell-kernel.md), [llmspell-config](reference/llmspell-config.md), [llmspell-cli](reference/llmspell-cli.md)
+- Providers: [llmspell-providers](reference/llmspell-providers.md), [llmspell-templates](reference/llmspell-templates.md), [llmspell-agents](reference/llmspell-agents.md)
+
+### Generated API Documentation
+
+```bash
+# Generate complete workspace documentation
+cargo doc --workspace --all-features --no-deps --open
+
+# Generate for specific crate
+cargo doc --package llmspell-core --all-features --open
+```
+
+---
+
 ## 🆕 What's New in Phase 13
 
 ### Experimental Memory & Context Engineering (Complete) ⭐
