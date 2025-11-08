@@ -515,8 +515,8 @@ context.event_emitter.emit_with_options(
   - [security-integration.md](security-integration.md) - Security layers
 
 - **General Documentation**:
-  - [../developer-guide.md](../developer-guide.md) - Developer overview
-  - [../extending-llmspell.md](../extending-llmspell.md) - Extension guide
+  - [../README.md](../README.md) - Developer overview
+  - [../03-extending-components.md](../03-extending-components.md) - Extension guide
   - [../../technical/master-architecture-vision.md](../../technical/master-architecture-vision.md) - System architecture
 
 ---
