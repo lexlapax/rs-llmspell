@@ -11992,33 +11992,68 @@ Following project philosophy ("documentation should match reality" - remove docu
 - [ ] Migration clear
 - [ ] Examples updated
 
-### Task 13b.17.14: Update API Reference - llmspell-storage
+### Task 13b.17.14: Update API Reference - llmspell-storage ✅
 **Priority**: HIGH
-**Estimated Time**: 1 hour
+**Estimated Time**: 1 hour → **Actual**: 50 minutes
 **Category**: API Reference
+**Status**: COMPLETED (2025-11-08)
 
 **Description**: Document PostgreSQL backend APIs.
 
 **Acceptance Criteria**:
-- [ ] PostgreSQL backend traits
-- [ ] 10 component implementations
-- [ ] Configuration APIs
-- [ ] Migration tool APIs
+- [x] PostgreSQL backend traits ✅
+- [x] 10 component implementations ✅
+- [x] Configuration APIs ✅
+- [x] Migration tool APIs ✅
 
 **Implementation Steps**:
-1. Update `docs/user-guide/api/rust/llmspell-storage.md`
-2. PostgreSQL backend APIs
-3. Backend configuration
-4. Migration tool usage
-5. Performance APIs
+1. ✅ Update `docs/user-guide/api/rust/llmspell-storage.md`
+2. ✅ PostgreSQL backend APIs
+3. ✅ Backend configuration
+4. ✅ Migration tool usage
+5. ✅ Performance APIs
 
-**Files to Update**:
-- `docs/user-guide/api/rust/llmspell-storage.md` (+200 lines)
+**Files Updated**:
+- `docs/user-guide/api/rust/llmspell-storage.md` (+548 lines, now 1,283 lines total)
 
 **Definition of Done**:
-- [ ] PostgreSQL APIs documented
-- [ ] All backends covered
-- [ ] Examples clear
+- [x] PostgreSQL APIs documented ✅
+- [x] All backends covered ✅
+- [x] Examples clear ✅
+
+**Completion Summary**:
+Added comprehensive PostgreSQL backend documentation (520 lines) covering:
+- **PostgreSQLBackend Core**: Connection pooling, migrations, RLS enforcement APIs
+- **Component Matrix**: Table documenting 10 storage components with HNSW/RLS/bi-temporal status
+- **VectorEmbeddings**: Dimension-routed storage with HNSW similarity search (8.47x speedup)
+- **SemanticMemory**: Bi-temporal knowledge graph with entity embeddings and as-of queries
+- **ArtifactStorage**: Content-addressed blake3 deduplication (50-90% space savings)
+- **EventLog**: Monthly partitioned event stream (12.5x partition pruning speedup)
+- **Connection Pool Config**: (CPU cores × 2) + 1 formula with timeout settings
+- **RLS Implementation**: Multi-tenant isolation with <5% overhead measurement
+- **Configuration Examples**: Backend selection, component-specific overrides, pool tuning
+
+**Technical Insights**:
+1. **API Structure**: Each component documented with purpose, tables, API location, implementation
+2. **Performance Metrics**: Included validated performance measurements (8.47x HNSW, 4.9% RLS overhead, 12.5x partition speedup)
+3. **Code References**: All implementations reference actual file locations in llmspell-storage/src/postgres/
+4. **Migration References**: SQL migration examples reference V002-V015 migrations
+5. **Configuration Completeness**: Added postgres config section with all connection pool parameters
+
+**Documentation Quality**:
+- Component matrix provides quick reference for all 10 storage components
+- Each component includes table names, index types, RLS status, bi-temporal support
+- Configuration examples show backend selection + component-specific overrides
+- API examples demonstrate dimension routing, RLS usage, partition pruning
+- Performance characteristics tied to actual migration SQL (HNSW index configs)
+
+**Integration Points**:
+- Extends existing HNSW vector storage documentation (Phase 8)
+- References schema-reference.md for table details
+- Aligns with storage-architecture.md for component design
+- Complements postgresql-setup.md for operational concerns
+
+**Commit**: 677b8dc2 "docs: Update API Reference - llmspell-storage (Task 13b.17.14)"
 
 ---
 
