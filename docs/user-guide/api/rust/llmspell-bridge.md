@@ -20,6 +20,102 @@
 - 🔐 Sandboxed execution
 - 🧩 Extensible for other languages
 
+## ScriptRuntime (Phase 13b.16)
+
+**Primary API**: Self-contained script execution with unified infrastructure creation.
+
+```rust
+use llmspell_bridge::ScriptRuntime;
+use llmspell_config::LLMSpellConfig;
+
+#[tokio::main]
+async fn main() -> anyhow::Result<()> {
+    // Load configuration
+    let config = LLMSpellConfig::from_file("config.toml")?;
+
+    // Create ScriptRuntime (creates ALL infrastructure internally)
+    let runtime = ScriptRuntime::new(config.clone()).await?;
+
+    // Execute script
+    let output = runtime.execute_script(r#"
+        local result = Agent.query("What is Rust?")
+        return result
+    "#).await?;
+
+    println!("Result: {:?}", output.output);
+    Ok(())
+}
+```
+
+### ScriptRuntime API
+
+| Method | Description | Phase |
+|--------|-------------|-------|
+| `ScriptRuntime::new(config)` | Create with Infrastructure module | 13b.16 |
+| `execute_script(code)` | Execute inline code | 1.0 |
+| `execute_file(path)` | Execute script file | 1.0 |
+| `supports_streaming()` | Check streaming support | 1.0 |
+| `execute_script_streaming(code)` | Stream execution | 1.0 |
+
+**Migration from old API**:
+```rust
+// ❌ DEPRECATED (Pre-13b.16)
+let runtime = ScriptRuntime::new_with_lua(config).await?;
+
+// ✅ NEW API (Phase 13b.16+)
+let runtime = ScriptRuntime::new(config).await?;
+```
+
+## Infrastructure Module (Phase 13b.16)
+
+**Purpose**: Unified component creation from configuration.
+
+```rust
+use llmspell_bridge::infrastructure::Infrastructure;
+use llmspell_config::LLMSpellConfig;
+
+let config = LLMSpellConfig::from_file("config.toml")?;
+
+// Create all 9 components from config
+let infrastructure = Infrastructure::from_config(&config).await?;
+
+// Access components
+let provider_manager = infrastructure.provider_manager();
+let state_manager = infrastructure.state_manager();
+let session_manager = infrastructure.session_manager();
+
+// Optional components (if enabled in config)
+if let Some(rag) = infrastructure.rag() {
+    println!("RAG enabled");
+}
+
+if let Some(memory_manager) = infrastructure.memory_manager() {
+    println!("Memory enabled");
+}
+
+// Registries
+let tool_registry = infrastructure.tool_registry();
+let agent_registry = infrastructure.agent_registry();
+let workflow_factory = infrastructure.workflow_factory();
+let component_registry = infrastructure.component_registry();
+```
+
+### Infrastructure Components (9 total)
+
+| Component | Required | Created If | Purpose |
+|-----------|----------|-----------|---------|
+| `ProviderManager` | ✅ | Always | LLM provider connections |
+| `StateManager` | ✅ | Always | Persistent key-value state |
+| `SessionManager` | ✅ | Always | Session lifecycle management |
+| `RAG` | ❌ | `config.rag.enabled` | Vector similarity search |
+| `MemoryManager` | ❌ | `config.runtime.memory.enabled` | Adaptive memory system |
+| `ToolRegistry` | ✅ | Always | Tool discovery |
+| `AgentRegistry` | ✅ | Always | Agent factories |
+| `WorkflowFactory` | ✅ | Always | Workflow creation |
+| `ComponentRegistry` | ✅ | Always | Script access layer |
+
+**Code Reference**: `llmspell-bridge/src/infrastructure.rs:107-161`
+
 ## ScriptEngine Trait
 
 ```rust
@@ -27,13 +123,13 @@
 pub trait ScriptEngine: Send + Sync {
     /// Execute script code
     async fn execute(&self, code: &str) -> Result<Value>;
-    
+
     /// Execute script file
     async fn execute_file(&self, path: &Path) -> Result<Value>;
-    
+
     /// Register global object
     fn register_global(&self, name: &str, object: Box<dyn ScriptObject>) -> Result<()>;
-    
+
     /// Get script context
     fn context(&self) -> &ScriptContext;
 }
