@@ -333,7 +333,7 @@ end
 - **Memory Architecture**: `docs/technical/memory-architecture.md`
 - **Context Engineering**: `docs/technical/context-engineering.md`
 - **RAG Pipeline**: `llmspell-rag/src/pipeline/`
-- **API Documentation**: `docs/user-guide/api/lua/README.md`
+- **API Documentation**: [Lua API Reference](../user-guide/appendix/lua-api-reference.md)
 
 ## Change History
 

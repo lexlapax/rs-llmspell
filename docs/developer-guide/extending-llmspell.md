@@ -1520,7 +1520,7 @@ mod tests {
 - **Storage Architecture**: `/docs/technical/storage-architecture.md` (backend selection, component storage matrix)
 - **PostgreSQL Setup**: `/docs/user-guide/storage/postgresql-setup.md` (production PostgreSQL backend setup)
 - **Schema Reference**: `/docs/user-guide/storage/schema-reference.md` (PostgreSQL table schemas)
-- **API Reference**: `/docs/user-guide/api/rust/llmspell-storage.md` (PostgreSQL backend APIs)
+- **API Reference**: [Storage Backends](reference/storage-backends.md) (PostgreSQL backend APIs)
 
 ---
 

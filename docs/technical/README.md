@@ -301,12 +301,12 @@
 - **[User Guide](../user-guide/)** - How to experiment with LLMSpell
 - **[Service Deployment](../user-guide/service-deployment.md)** - Scale validation & deployment ⭐
 - **[IDE Integration](../user-guide/ide-integration.md)** - IDE setup ⭐ NEW
-- **[Lua API](../user-guide/api/lua/)** - Script reference
+- **[Lua API](../user-guide/appendix/lua-api-reference.md)** - Script reference
 - **[Examples](../../examples/)** - Working examples
 
 ### For Developers
 - **[Developer Guide](../developer-guide/)** - Contributing guide
-- **[Rust API](../user-guide/api/rust/)** - Extension reference
+- **[Rust API](../developer-guide/reference/)** - Extension reference
 - **[Implementation Phases](../in-progress/implementation-phases.md)** - 16-phase roadmap
 - **[TODO](../../TODO.md)** - Current task tracking
 
