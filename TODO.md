@@ -11744,9 +11744,20 @@ Following project philosophy ("documentation should match reality" - remove docu
 - `docs/user-guide/cli.md` (+100 lines)
 
 **Definition of Done**:
-- [ ] CLI simplification documented
-- [ ] Kernel architecture clear
-- [ ] Service mode explained
+- [x] CLI simplification documented
+- [x] Kernel architecture clear
+- [x] Service mode explained
+
+**Implementation Insights**:
+- **+39 lines**: Added Architecture section after Overview
+- **Dual-mode design**: Embedded (in-process kernel) vs Connected (remote kernel) execution
+- **~12-line CLI layer**: ScriptRuntime.new() + start_embedded_kernel_with_executor()
+- **Phase 13b.16.3 pattern**: ScriptRuntime internally uses Infrastructure::from_config()
+- **Zero infrastructure dependencies**: CLI only depends on kernel API, not components
+- **Kernel message protocol**: execute_request/reply, memory_request/reply, context_request/reply
+- **Code references**: execution_context.rs:136-146 (embedded), :169-180 (auto-detection)
+- **Service deployment**: Documented that daemon mode bypasses CLI, uses kernel API directly
+- **Cross-reference**: Added link to service-deployment.md for daemon patterns
 
 ### Task 13b.17.8: Update User Guide - Service Deployment
 **Priority**: HIGH
