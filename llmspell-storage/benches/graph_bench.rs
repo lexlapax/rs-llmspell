@@ -97,7 +97,10 @@ mod postgres_benchmarks {
         match backend.get_client().await {
             Ok(_) => Some(backend),
             Err(e) => {
-                eprintln!("PostgreSQL connection test failed, skipping benchmarks: {}", e);
+                eprintln!(
+                    "PostgreSQL connection test failed, skipping benchmarks: {}",
+                    e
+                );
                 eprintln!(
                     "To run benchmarks, ensure PostgreSQL is running (see benchmark documentation)"
                 );
