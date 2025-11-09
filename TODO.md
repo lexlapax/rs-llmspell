@@ -13441,22 +13441,22 @@ Consolidate 21 technical documentation files into 15 by merging overlapping cont
 - Some tool examples repeated
 
 **Tasks**:
-- [ ] Git tag: `pre-technical-consolidation-phase3`
-- [ ] Create `performance-guide.md` structure:
-  - [ ] Section 1: Performance Philosophy & Targets
-  - [ ] Section 2: Baseline Targets (from performance-baseline.md - all components)
-  - [ ] Section 3: Benchmarking Methodology (from benchmarking-guide.md)
-  - [ ] Section 4: Profiling Tools (consolidated from both)
-  - [ ] Section 5: Optimization Strategies (from both docs)
-  - [ ] Section 6: Validation (link to stress-test-results.md)
-- [ ] Consolidate performance target tables (single authoritative table)
-- [ ] Merge profiling tool examples
-- [ ] Add cross-references to stress-test-results.md
-- [ ] Verify all benchmark commands work
-- [ ] Delete source files:
-  - [ ] performance-baseline.md
-  - [ ] benchmarking-guide.md
-- [ ] Commit: "Phase 13b.20.3: Consolidate Performance Documentation"
+- [x] Git tag: `pre-technical-consolidation-phase3`
+- [x] Create `performance-guide.md` structure:
+  - [x] Section 1: Performance Philosophy & Targets
+  - [x] Section 2: Baseline Targets (from performance-baseline.md - all components)
+  - [x] Section 3: Benchmarking Methodology (from benchmarking-guide.md)
+  - [x] Section 4: Profiling Tools (consolidated from both)
+  - [x] Section 5: Optimization Strategies (from both docs)
+  - [x] Section 6: Validation (link to stress-test-results.md)
+- [x] Consolidate performance target tables (single authoritative table)
+- [x] Merge profiling tool examples
+- [x] Add cross-references to stress-test-results.md
+- [x] Verify all benchmark commands work
+- [x] Delete source files:
+  - [x] performance-baseline.md
+  - [x] benchmarking-guide.md
+- [x] Commit: "Phase 13b.20.3: Consolidate Performance Documentation"
 
 **Target File**:
 - `performance-guide.md` (~800 lines after consolidation)
@@ -13464,12 +13464,12 @@ Consolidate 21 technical documentation files into 15 by merging overlapping cont
 - Reduction: 1,007 → 800 lines (21% reduction from deduplication)
 
 **Acceptance Criteria**:
-- [ ] Single unified performance guide exists
-- [ ] All component performance targets documented
-- [ ] Benchmarking methodology clearly explained
-- [ ] Profiling tools consolidated
-- [ ] Cross-reference to stress test results
-- [ ] 2 source files deleted
+- [x] Single unified performance guide exists
+- [x] All component performance targets documented
+- [x] Benchmarking methodology clearly explained
+- [x] Profiling tools consolidated
+- [x] Cross-reference to stress test results
+- [x] 2 source files deleted
 
 **Rationale**: Performance targets and benchmarking methodology are tightly coupled. Developers need both in single location when optimizing or validating performance.
 
