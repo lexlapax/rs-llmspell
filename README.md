@@ -2,9 +2,9 @@
 
 **Rapid AI Experimentation Platform** - Cast scripting spells to explore AI concepts, extract proven patterns to production-ready Rust
 
-**🚀 Version 0.13.0 - Adaptive Memory & Context Engineering**
+**🚀 Version 0.13.1 - Production Storage Infrastructure & Documentation Consolidation**
 
-**🔗 Quick Links**: [📘 Documentation Hub](docs/) | [🚀 Quick Start](#-quick-start) | [🎯 What This Is](#what-is-rs-llmspell) | [🏗️ Experiment → Production](#from-experiment-to-production) | [📖 Release Notes](RELEASE_NOTES_v0.13.0.md) | [🛠️ Examples](examples/)
+**🔗 Quick Links**: [📘 Documentation Hub](docs/) | [🚀 Quick Start](#-quick-start) | [🎯 What This Is](#what-is-rs-llmspell) | [🏗️ Experiment → Production](#from-experiment-to-production) | [📖 Release Notes](RELEASE_NOTES_v0.13.1.md) | [🛠️ Examples](examples/)
 
 ---
 
@@ -24,7 +24,7 @@ rs-llmspell is an **experimental platform for rapid AI concept exploration**.
 
 Built with **production-quality engineering** (architecture, performance, testing, observability) to make the transition from experiment to production as painless as possible. We use Rust not because we're production-ready, but because proven patterns deserve solid foundations for extraction.
 
-**Current Status**: 13 development phases complete (v0.13.0). Experimental features include adaptive memory (episodic/semantic/procedural), context engineering, 10 workflow templates, local LLM support (Ollama + Candle), and RAG with HNSW vector search. See [Documentation Hub](docs/) for comprehensive guides.
+**Current Status**: v0.13.1 complete. Production-ready PostgreSQL storage backend (10 unified backends), Row-Level Security multi-tenancy, cross-platform support (Linux + macOS), self-contained kernel architecture, and 52% documentation consolidation (111 → 53 files). Previous experimental features include adaptive memory (episodic/semantic/procedural), context engineering, 10 workflow templates, local LLM support (Ollama + Candle), and RAG with HNSW vector search. See [Documentation Hub](docs/) for comprehensive guides.
 
 ---
 
@@ -269,12 +269,12 @@ export OPENAI_API_KEY="sk-..."  # Optional for cloud models
 **For comprehensive guides, see [Documentation Hub](docs/)**
 
 ### Quick Links
-- **[Getting Started](docs/user-guide/getting-started.md)** - 5-minute experimental setup
-- **[Core Concepts](docs/user-guide/concepts.md)** - Understand the architecture
-- **[Memory System](docs/user-guide/memory-configuration.md)** - Adaptive memory guide
+- **[Getting Started](docs/user-guide/01-getting-started.md)** - 5-minute experimental setup
+- **[Core Concepts](docs/user-guide/02-core-concepts.md)** - Understand the architecture
+- **[Configuration](docs/user-guide/03-configuration.md)** - LLM providers, memory, storage, security
 - **[Templates](docs/user-guide/templates/)** - 10 workflow templates
-- **[Local LLM](docs/user-guide/local-llm.md)** - Zero-cost experimentation
-- **[Lua API](docs/user-guide/api/lua/README.md)** - 20 globals, 200+ methods
+- **[Storage Setup](docs/user-guide/07-storage-setup.md)** - PostgreSQL deployment guide
+- **[Lua API](docs/user-guide/appendix/lua-api-reference.md)** - 18 globals, 200+ methods
 - **[Developer Guide](docs/developer-guide/)** - Build experimental components
 - **[Technical Docs](docs/technical/)** - Architecture & design decisions
 
@@ -322,19 +322,21 @@ Apache License, Version 2.0. See [LICENSE-APACHE](LICENSE-APACHE) for details.
 
 ## 🚀 Latest Release
 
-**v0.13.0 - Adaptive Memory & Context Engineering**
+**v0.13.1 - Production Storage Infrastructure & Documentation Consolidation**
 
-Experimental 3-tier memory system (episodic, semantic, procedural) with hot-swappable backends, context engineering pipeline with 4 retrieval strategies, and zero breaking changes. Built with production-quality engineering for painless extraction when memory patterns are validated.
+Production-ready PostgreSQL storage backend with 10 unified backends, Row-Level Security for database-enforced multi-tenancy, cross-platform compilation support, self-contained kernel architecture, and comprehensive documentation consolidation.
 
 **Key Achievements**:
-- 🧠 3 new crates (llmspell-memory, llmspell-graph, llmspell-context)
-- ⚡ <2ms memory overhead (50x faster than target)
-- 🔍 8.47x HNSW speedup at 10K entries
-- 🌐 Bi-temporal knowledge graph (SurrealDB embedded)
-- 📊 149 tests passing (100% pass rate, zero warnings)
-- 🎯 Zero breaking changes (fully backward compatible)
+- 🗄️ 1 new crate (llmspell-storage) with 10 PostgreSQL backends
+- 🐘 PostgreSQL 18 + VectorChord (5x faster than pgvector, 26x cheaper)
+- 🔒 Row-Level Security with <5% overhead (4.9% measured)
+- 🐧 Cross-platform support (Linux + macOS validated in CI)
+- 🏗️ Self-contained kernel (630+ lines deleted, 82% fewer API methods)
+- 📖 52% documentation consolidation (111 → 53 files)
+- 📊 379 PostgreSQL tests passing (100% pass rate, zero warnings)
+- 🎯 Zero breaking changes (opt-in PostgreSQL, existing backends preserved)
 
-See [Release Notes](RELEASE_NOTES_v0.13.0.md) for complete details.
+See [Release Notes](RELEASE_NOTES_v0.13.1.md) for complete details.
 
 ---
 

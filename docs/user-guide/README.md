@@ -10,7 +10,7 @@
 
 > **📚 Central Hub**: Your starting point for AI experimentation with LLMSpell. Everything you need is organized into **10 numbered guides** plus a comprehensive appendix with complete API references. Master the essentials quickly, then explore advanced features at your own pace!
 
-**Version**: 0.13.0 | **Status**: Phase 13b Complete - Experimental Memory & Context Engineering | **Last Updated**: 2025-11-08
+**Version**: 0.13.1 | **Status**: Phase 13b Complete - Production Storage Infrastructure & Documentation Consolidation | **Last Updated**: 2025-11-08
 
 ---
 
