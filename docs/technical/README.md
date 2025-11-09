@@ -63,15 +63,15 @@
 - Adaptive memory system (Phase 13: ADR-044 Bi-Temporal Graph, ADR-045 Consolidation Strategy, ADR-046 LLM-Driven Consolidation)
 - Phase 13 design: [Phase 13 Design Document](../in-progress/phase-13-design-doc.md)
 
-### 5. ⚡ [Operational Guide](operational-guide.md) ✅ v0.10.0
-**Purpose**: Performance, security, and operations unified
-**Coverage**: Complete operational reference for production
+### 5. ⚡ [Performance Guide](performance-guide.md) ✅ v0.13.0
+**Purpose**: Performance targets, benchmarking methodology, profiling tools, optimization strategies
+**Coverage**: Complete performance reference (Phases 0-13)
 **Key Content**:
-- Performance benchmarks (10-40% faster than targets)
-- Security implementation (3-level model, multi-tenant)
-- Monitoring and observability (structured tracing, <1ms overhead)
-- Service deployment procedures (systemd, launchd, Docker)
-- Operational checklists and health monitoring
+- Performance targets and benchmarks (Kernel, Templates, Memory)
+- Benchmarking methodology with Criterion
+- Profiling tools (dhat, Valgrind, Flamegraph, perf, tokio-console)
+- Optimization strategies (component-specific, Rust techniques, common pitfalls)
+- Validation (stress testing, CI integration, quality gates)
 
 ### 6. 🔍 [RAG System Guide](rag-system-guide.md) ✅ v0.8.0 (Stable)
 **Purpose**: Complete RAG documentation
@@ -191,16 +191,14 @@
 2. **Kernel**: [Kernel Protocol Architecture](kernel-protocol-architecture.md) - Daemon, protocols, service integration
 3. **CLI**: [CLI Command Architecture](cli-command-architecture.md) - Commands including tool CLI
 4. **Learn**: [Architecture Decisions](architecture-decisions.md) - Why we built it this way
-5. **Operate**: [Operational Guide](operational-guide.md) - Performance, security, monitoring
+5. **Performance**: [Performance Guide](performance-guide.md) - Targets, benchmarks, profiling, optimization
 6. **RAG**: [RAG System Guide](rag-system-guide.md) - Vector search with HNSW
 
 ### Specialized Topics
 7. **Debug**: [Debug DAP Architecture](debug-dap-architecture.md) - IDE debugging support
-8. **Performance**: [Performance Baseline](performance-baseline.md) - Benchmarks and metrics
-9. **Benchmarking**: [Benchmarking Guide](benchmarking-guide.md) - How to run benchmarks
-10. **Testing**: [Stress Test Results](stress-test-results.md) - Load and stability validation
-11. **Protocols**: [Protocol Compliance Report](protocol-compliance-report.md) - Jupyter v5.3 compliance
-12. **Dependencies**: [MLua Upgrade Analysis](mlua-upgrade-analysis.md) - Upgrade impact analysis
+8. **Testing**: [Stress Test Results](stress-test-results.md) - Load and stability validation
+9. **Protocols**: [Protocol Compliance Report](protocol-compliance-report.md) - Jupyter v5.3 compliance
+10. **Dependencies**: [MLua Upgrade Analysis](mlua-upgrade-analysis.md) - Upgrade impact analysis
 
 ---
 
@@ -328,15 +326,13 @@
 | kernel-protocol-architecture.md | v0.10.0 | ✅ Current | Jan 2025 | 10 |
 | cli-command-architecture.md | v0.10.0 | ✅ Current | Jan 2025 | 10 |
 | architecture-decisions.md | v0.13.0 | ✅ Current | Jan 2025 | 13 |
-| operational-guide.md | v0.10.0 | ✅ Current | Jan 2025 | 10 |
+| performance-guide.md | v0.13.0 | ✅ Current | Jan 2025 | 13 |
 | rag-system-guide.md | v0.8.0 | ✅ Stable | Aug 2024 | 8 |
 
 ### Supplementary Documentation
 | Document | Version | Status | Last Updated | Phase |
 |----------|---------|--------|--------------|-------|
 | debug-dap-architecture.md | v0.10.0 | ✅ Current | Jan 2025 | 10 |
-| performance-baseline.md | v0.10.0 | ✅ Current | Jan 2025 | 10 |
-| benchmarking-guide.md | v0.10.0 | ✅ Current | Jan 2025 | 10 |
 | stress-test-results.md | v0.10.0 | ✅ Current | Jan 2025 | 10 |
 | protocol-compliance-report.md | v0.10.0 | ✅ Current | Jan 2025 | 10 |
 | mlua-upgrade-analysis.md | v0.10.0 | ✅ Current | Jan 2025 | 10 |

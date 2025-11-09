@@ -25,9 +25,9 @@
 
 ---
 
-## 📖 The 7 Numbered Guides (Linear Learning Path)
+## 📖 The 8 Numbered Guides (Linear Learning Path)
 
-**Start at 01, progress through 07 - each builds on the previous**
+**Start at 01, progress through 08 - each builds on the previous**
 
 ### [01. Getting Started](01-getting-started.md) 📘
 **Setup, architecture, first contribution**
@@ -107,6 +107,17 @@
 **BREAKING CHANGE**: Feature flags required for builds since Phase 10.17.5
 
 **Time**: 15 minutes | **Prerequisites**: None (read first if building)
+
+### [08. Operations & Performance](08-operations.md) 🏭
+**Operational guide for performance, security, and deployment**
+- Performance overview and benchmarks (Phases 0-13)
+- Security implementation (3-level model, multi-tenant isolation)
+- Performance tuning (HNSW, state persistence, memory backends)
+- Security operations (STRIDE mitigations, audit logging)
+- Monitoring & observability (metrics, regression detection)
+- Operational checklists (deployment, production config, incident response)
+
+**Time**: 2-4 hours (reference) | **Prerequisites**: 01, 02, 05
 
 ---
 
@@ -380,7 +391,7 @@ let result = block_on_async::<_, T, E>("operation", async move { ... }, timeout)
 
 **Phase 13 Complete** with consolidated developer documentation:
 
-✅ **7 Numbered Guides** from setup to production (linear learning path)
+✅ **8 Numbered Guides** from setup to production (linear learning path)
 ✅ **21 Crates** with Memory, Graph, Context, Templates, Kernel, RAG, and multi-tenancy
 ✅ **40+ Tools** with feature flag modularity (19-35MB builds)
 ✅ **10 Built-in Templates** solving real AI workflow problems

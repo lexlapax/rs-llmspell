@@ -1,11 +1,13 @@
-# Operational Guide (v0.8.0)
+# 08. Operations & Performance
 
-**Status**: Production-Ready  
-**Last Updated**: December 2024  
-**Phase Coverage**: 0-8 Complete  
+**Guide #8 of Developer Guide Series**
+
+**Status**: Production-Ready
+**Last Updated**: Phase 13 (v0.13.0)
+**Phase Coverage**: 0-13 Complete
 **Purpose**: Unified guide for performance, security, and operational concerns
 
-> **📋 Single Source**: This document consolidates performance benchmarks and security model for LLMSpell v0.8.0, providing a complete operational reference.
+> **📋 Single Source**: This guide consolidates performance benchmarks and security model for operational deployment, providing complete operational reference.
 
 ---
 
@@ -26,10 +28,10 @@
 
 ### Achievement Summary
 
-All performance targets met or exceeded across Phases 0-8:
+All performance targets met or exceeded across Phases 0-13:
 
-| Metric | Target | Phase 8 Actual | Status |
-|--------|--------|----------------|--------|
+| Metric | Target | Actual | Status |
+|--------|--------|--------|--------|
 | **Tool Initialization** | <10ms | <10ms | ✅ |
 | **Agent Creation** | <50ms | ~10ms | ✅ 5x better |
 | **Hook Overhead** | <5% | <2% | ✅ |
@@ -39,6 +41,9 @@ All performance targets met or exceeded across Phases 0-8:
 | **Embedding Generation** | <100ms | ~80ms | ✅ Phase 8 |
 | **Multi-tenant Overhead** | <5% | 3% | ✅ Phase 8 |
 | **Memory Baseline** | <50MB | 12-15MB | ✅ 3x better |
+| **Template Operations** | <10ms | <2ms | ✅ Phase 12 5x better |
+| **Memory Storage** | <5ms | <2ms | ✅ Phase 13 2.5x better |
+| **Context Assembly** | <50ms | <2ms | ✅ Phase 13 25x better |
 
 ---
 
@@ -127,6 +132,29 @@ OpenAI text-embedding-3-small (384 dims):
 - Batch 32 documents: ~400ms
 - Cache hit: <1ms
 - Rate limiting: Automatic backoff
+```
+
+### Template System Performance (Phase 12)
+
+```
+Template Registry Lookup: <2ms (DashMap concurrent access)
+Template Instantiation: <2ms (ExecutionContext builder)
+Template Execution: <2ms overhead (actual workflow time depends on LLM calls)
+```
+
+### Memory System Performance (Phase 13)
+
+```
+Memory Storage: <2ms (2.5x better than 5ms target)
+Memory Retrieval: <2ms (5x better than 10ms target)
+Context Assembly: <2ms (25x better than 50ms target)
+
+HNSW Search (1000 vectors): 8.47ms (8.47x faster than InMemory baseline)
+
+Backend Performance:
+- InMemory: 71.68ms (baseline, development/testing)
+- HNSW: 8.47ms (8.47x speedup, production)
+- SurrealDB: Not yet benchmarked (graph queries, bi-temporal)
 ```
 
 ### Resource Usage
@@ -262,6 +290,26 @@ const OPTIMAL_BATCH_SIZE: usize = 1000;
 // Achieves 483K items/sec
 ```
 
+### Memory System Tuning (Phase 13)
+
+#### Backend Selection
+- **InMemory**: Development/testing, unlimited scale for experiments
+- **HNSW**: Production, 1M+ vectors with 8.47x speedup
+- **SurrealDB**: Bi-temporal graph queries, relationship-rich data
+
+#### Configuration
+```toml
+[memory]
+backend = "hnsw"  # or "inmemory", "surrealdb"
+max_entries = 10000
+ttl_seconds = 3600
+
+[memory.hnsw]
+m = 16
+ef_construction = 200
+ef_search = 50
+```
+
 ### Resource Limit Guidelines
 
 #### By Security Level
@@ -349,6 +397,17 @@ pub struct AuditEntry {
 - Index size and memory usage
 - Cache hit rates
 
+#### Memory System Performance (Phase 13)
+- Memory storage latency (P50, P95, P99)
+- Memory retrieval latency
+- Context assembly time
+- Backend-specific metrics (HNSW index size, SurrealDB query time)
+
+#### Template System Performance (Phase 12)
+- Template lookup latency
+- Template instantiation time
+- Workflow execution time (excluding LLM calls)
+
 #### Security Metrics
 - Security violations per hour
 - Resource limit hits
@@ -410,6 +469,15 @@ m = 16
 ef_construction = 200
 ef_search = 50
 max_elements = 1000000
+
+[memory]
+backend = "hnsw"
+max_entries = 10000
+ttl_seconds = 3600
+
+[templates]
+enable_caching = true
+max_templates = 100
 ```
 
 ### Incident Response
@@ -420,6 +488,8 @@ max_elements = 1000000
 3. Analyze vector index fragmentation
 4. Check embedding API rate limits
 5. Review tenant usage patterns
+6. Check memory backend performance (switch InMemory→HNSW if needed)
+7. Review template cache hit rates
 
 #### Security Incident
 1. Check audit logs for violation patterns
@@ -444,6 +514,8 @@ max_elements = 1000000
 | Phase 6 | Blake3 hashing | 10x faster |
 | Phase 7 | Feature tests | 50% faster CI |
 | Phase 8 | HNSW vectors | 8ms @ 100K vectors |
+| Phase 12 | Template system | <2ms overhead (50x target) |
+| Phase 13 | Memory system | <2ms operations (2.5-25x targets) |
 
 ### Future Optimization Opportunities
 
@@ -452,6 +524,8 @@ max_elements = 1000000
 - **GPU Acceleration**: 10-100x for embeddings
 - **Memory Mapping**: Support for 10M+ vectors
 - **Distributed Indexing**: Horizontal scaling
+- **Template Pre-compilation**: Faster instantiation
+- **Memory Index Sharding**: Multi-backend parallelization
 
 ---
 
@@ -478,4 +552,12 @@ max_elements = 1000000
 
 ---
 
-*This operational guide consolidates performance and security documentation for LLMSpell v0.8.0, validated against Phase 8 implementation.*
+## Related Documentation
+
+- **[Performance Guide](../technical/performance-guide.md)**: Detailed performance targets, benchmarking methodology, profiling tools
+- **[User Guide: Configuration](../user-guide/02-configuration.md)**: User-facing configuration reference
+- **[Developer Guide: Testing](05-testing.md)**: Testing strategies and quality gates
+
+---
+
+*This operational guide consolidates performance and security documentation for llmspell, validated against Phase 13 implementation.*
