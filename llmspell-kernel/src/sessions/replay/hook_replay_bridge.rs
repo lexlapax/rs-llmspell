@@ -38,7 +38,7 @@ impl HooksHookReplayManager for HookReplayBridge {
         self.state_replay_manager
             .persist_hook_execution(hook, context, result, duration)
             .await
-            .map_err(|e| anyhow::anyhow!("State persistence error: {}", e))
+            .map_err(|e| anyhow::anyhow!("State persistence error: {e}"))
     }
 
     async fn get_hook_executions_by_correlation(
@@ -49,7 +49,7 @@ impl HooksHookReplayManager for HookReplayBridge {
             .state_replay_manager
             .get_hook_executions_by_correlation(correlation_id)
             .await
-            .map_err(|e| anyhow::anyhow!("State persistence error: {}", e))?;
+            .map_err(|e| anyhow::anyhow!("State persistence error: {e}"))?;
 
         // Convert from state-persistence SerializedHookExecution to hooks SerializedHookExecution
         let hooks_executions = state_executions

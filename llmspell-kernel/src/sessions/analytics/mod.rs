@@ -34,7 +34,7 @@ pub fn create_session_analytics(
     for hook_point in hook_points {
         hook_registry
             .register_arc(hook_point, analytics.as_hook())
-            .map_err(|e| anyhow::anyhow!("Failed to register analytics hook: {:?}", e))?;
+            .map_err(|e| anyhow::anyhow!("Failed to register analytics hook: {e:?}"))?;
     }
 
     Ok(Arc::new(analytics))

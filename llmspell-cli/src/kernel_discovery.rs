@@ -396,6 +396,7 @@ fn count_open_files(pid: u32) -> Result<u32> {
         if let Ok(entries) = fs::read_dir(&fd_dir) {
             return Ok(entries.count() as u32);
         }
+        Ok(0)
     }
 
     #[cfg(target_os = "macos")]

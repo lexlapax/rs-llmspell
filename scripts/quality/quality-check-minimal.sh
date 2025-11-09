@@ -61,7 +61,8 @@ if grep -r "tracing::\(info\|debug\|warn\|error\|trace\|instrument\)!" --include
 fi
 
 # Check for log:: usage (should use tracing instead)
-if grep -r "log::" --include="*.rs" . 2>/dev/null | grep -v "target/\|tests/\|examples/" > /dev/null; then
+# Use word boundary to avoid matching event_log::, large_objects::, etc.
+if grep -rE '\blog::' --include="*.rs" . 2>/dev/null | grep -v "target/\|tests/\|examples/" > /dev/null; then
     echo -e "${RED}❌ Found 'log::' usage (use tracing instead)${NC}"
     TRACING_ISSUES=1
 fi

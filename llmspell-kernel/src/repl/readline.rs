@@ -112,7 +112,7 @@ impl ReplReadline {
             }
             Err(e) => {
                 warn!("Readline error: {}", e);
-                Err(anyhow!("Readline error: {}", e))
+                Err(anyhow!("Readline error: {e}"))
             }
         }
     }

@@ -126,6 +126,8 @@ pub enum StorageBackendType {
     Memory,
     Sled(SledConfig),
     RocksDB(RocksDBConfig),
+    #[cfg(feature = "postgres")]
+    Postgres(PostgresConfig),
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -140,6 +142,53 @@ pub struct RocksDBConfig {
     pub path: std::path::PathBuf,
     pub create_if_missing: bool,
     pub optimize_for_point_lookup: bool,
+}
+
+/// `PostgreSQL` configuration for kernel state storage (Phase 13b.2)
+#[cfg(feature = "postgres")]
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct PostgresConfig {
+    /// Database connection string (postgresql://user:pass@host:port/database)
+    pub connection_string: String,
+
+    /// Maximum size of connection pool (default: 20)
+    #[serde(default = "default_pool_size")]
+    pub pool_size: u32,
+
+    /// Connection timeout in milliseconds (default: 5000)
+    #[serde(default = "default_timeout_ms")]
+    pub timeout_ms: u64,
+
+    /// Enable Row-Level Security for multi-tenancy (default: true)
+    #[serde(default = "default_enable_rls")]
+    pub enable_rls: bool,
+}
+
+#[cfg(feature = "postgres")]
+fn default_pool_size() -> u32 {
+    20
+}
+
+#[cfg(feature = "postgres")]
+fn default_timeout_ms() -> u64 {
+    5000
+}
+
+#[cfg(feature = "postgres")]
+fn default_enable_rls() -> bool {
+    true
+}
+
+#[cfg(feature = "postgres")]
+impl Default for PostgresConfig {
+    fn default() -> Self {
+        Self {
+            connection_string: String::new(),
+            pool_size: 20,
+            timeout_ms: 5000,
+            enable_rls: true,
+        }
+    }
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]

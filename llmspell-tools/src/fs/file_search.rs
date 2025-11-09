@@ -136,7 +136,7 @@ impl FileSearchTool {
         // Validate path with sandbox
         self.sandbox
             .validate_path(file_path)
-            .map_err(|e| anyhow::anyhow!("Path validation failed: {}", e))?;
+            .map_err(|e| anyhow::anyhow!("Path validation failed: {e}"))?;
 
         debug!(
             "Searching in file: {} for pattern: '{}'",
@@ -186,7 +186,7 @@ impl FileSearchTool {
         // Validate path with sandbox
         self.sandbox
             .validate_path(directory)
-            .map_err(|e| anyhow::anyhow!("Path validation failed: {}", e))?;
+            .map_err(|e| anyhow::anyhow!("Path validation failed: {e}"))?;
 
         debug!(
             "Searching in directory: {} for pattern: '{}' (recursive: {})",

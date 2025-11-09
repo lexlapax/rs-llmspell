@@ -13,24 +13,69 @@
 ### 📘 [User Guide](user-guide/) - *For Experimenters*
 **Purpose**: Practical guides for rapid AI concept exploration via scripts.
 
-**Status**: ✅ Updated with Phase 13 experimental memory system
-**Contents**: 12 essential documents including getting started, concepts, configuration, AI agent templates, local LLM integration, API reference (Lua + 18 Rust crates), troubleshooting, Phase 10 troubleshooting, performance tuning, service deployment, IDE integration
-**Key Files**: `getting-started.md`, `concepts.md`, `configuration.md`, `templates/README.md`, `local-llm.md`, `service-deployment.md`, `ide-integration.md`, `troubleshooting-phase10.md`, `performance-tuning.md`, `api/lua/README.md`
+**Status**: ✅ Consolidated (Phase 13b.18) - 10 numbered guides + appendix
+**Structure**: **Linear learning path** (01 → 10) + comprehensive appendix
+**Contents**: 10 numbered guides + 1 appendix covering complete user journey from installation to production deployment
+
+**The 10 Numbered Guides** (Start here for linear learning):
+1. **[Getting Started](user-guide/01-getting-started.md)** - Installation and first experiments (10 min)
+2. **[Core Concepts](user-guide/02-core-concepts.md)** - Architecture, memory, RAG, multi-tenancy
+3. **[Configuration](user-guide/03-configuration.md)** - Providers, memory, security, feature flags
+4. **[Lua Scripting](user-guide/04-lua-scripting.md)** - Essentials (18 globals, common patterns)
+5. **[CLI Reference](user-guide/05-cli-reference.md)** - All 16 command groups
+6. **[Templates & Workflows](user-guide/06-templates-and-workflows.md)** - 10 AI workflows
+7. **[Storage Setup](user-guide/07-storage-setup.md)** - PostgreSQL quick start
+8. **[Deployment](user-guide/08-deployment.md)** - systemd/launchd + IDE integration
+9. **[Security](user-guide/09-security.md)** - Sandbox, permissions, multi-tenancy
+10. **[Troubleshooting](user-guide/10-troubleshooting.md)** - Debug, profile, diagnose
+
+**Appendix** (Reference lookups):
+- **[Lua API Reference](user-guide/appendix/lua-api-reference.md)** - Complete API (3,729 lines, 200+ methods)
+
+**Additional Resources**:
+- **[Templates](user-guide/templates/)** - Detailed template documentation (11 files)
+- **[Developer Guide Reference](developer-guide/reference/)** - Rust API by theme (6 guides)
+
 **Phase 13 Additions**: 3-tier memory (episodic/semantic/procedural), context engineering, Memory + Context globals (17th/18th)
-**Phase 12 Additions**: 10 experimental templates (6 base + 4 advanced), template CLI, Template Lua global (16th of 18)
-**Phase 11 Additions**: Local LLM support (Ollama + Candle backends), model management (list, pull, info, status), privacy-first workflows, offline inference
-**Start here if**: You want to experiment with AI concepts via Lua scripts, use experimental workflows, explore memory patterns, use local LLMs for zero-cost experimentation
+**Phase 12 Additions**: 10 experimental templates, template CLI, Template global (16th)
+**Phase 11 Additions**: Local LLM support (Ollama + Candle), model management
+
+**Start here if**: You want to experiment with AI concepts via Lua scripts, use experimental workflows, explore memory patterns, or deploy production services
 
 ---
 
 ### 🔧 [Developer Guide](developer-guide/) - *For Contributors*
 **Purpose**: Technical guides for developers contributing to or extending rs-llmspell.
 
-**Status**: ✅ Updated with Phase 13 experimental component patterns
-**Contents**: 8 essential guides including developer guide, extending guide, production guide, examples reference, feature flags migration, tracing best practices, bridge pattern guide, template creation guide
-**Key Files**: `developer-guide.md`, `extending-llmspell.md`, `production-guide.md`, `examples-reference.md`, `feature-flags-migration.md`, `tracing-best-practices.md`, `bridge-pattern-guide.md`, `template-creation.md`
-**Phase 12 Additions**: Template creation guide, 10 built-in templates as patterns, TemplateRegistry implementation, ExecutionContext builder pattern
-**Phase 11 Additions**: Local provider implementation patterns, GGUF model handling, dual-backend architecture (Ollama + Candle), typed bridge pattern (Phase 11a.8)
+**Status**: ✅ Consolidated (Phase 13b.20) - 8 numbered guides + 6 thematic API references
+**Structure**: **Linear learning path** (01 → 08) + thematic API documentation
+**Contents**: 8 numbered guides + 6 thematic references + examples guide = 15 total files
+
+**The 8 Numbered Guides** (Start here for linear learning):
+1. **[Getting Started](developer-guide/01-getting-started.md)** - Setup, architecture, first contribution (15 min)
+2. **[Development Workflow](developer-guide/02-development-workflow.md)** - Testing, quality gates, git workflow (30 min)
+3. **[Extending Components](developer-guide/03-extending-components.md)** - Tools, agents, hooks, workflows, RAG, storage, templates (2-6 hrs)
+4. **[Bridge Patterns](developer-guide/04-bridge-patterns.md)** - Typed structs for script config (2-3 hrs)
+5. **[Production Deployment](developer-guide/05-production-deployment.md)** - Security, performance, scaling, monitoring (4-8 hrs)
+6. **[Tracing & Debugging](developer-guide/06-tracing-debugging.md)** - Instrumentation, session correlation (1-2 hrs)
+7. **[Feature Flags](developer-guide/07-feature-flags.md)** - Build system, modular builds (15 min)
+8. **[Operations & Performance](developer-guide/08-operations.md)** - Performance, security, deployment, monitoring (2-4 hrs)
+
+**Thematic API References** (Consolidated by topic):
+- [Core Traits](developer-guide/reference/core-traits.md) - BaseAgent, ExecutionContext, testing
+- [Storage Backends](developer-guide/reference/storage-backends.md) - Vector storage, HNSW
+- [RAG Pipeline](developer-guide/reference/rag-pipeline.md) - Document ingestion, retrieval, context
+- [Memory Backends](developer-guide/reference/memory-backends.md) - Episodic, semantic, procedural
+- [Security Integration](developer-guide/reference/security-integration.md) - Access control, multi-tenancy
+- [Crate Index](developer-guide/reference/crate-index.md) - Quick reference to all 21 crates
+
+**Additional Resources**:
+- **[Examples Reference](developer-guide/examples-reference.md)** - 60+ production examples
+
+**Phase 13 Additions**: Memory backend patterns, context engineering, knowledge graph integration
+**Phase 12 Additions**: Template creation patterns, TemplateRegistry, ExecutionContext builder
+**Phase 11 Additions**: Local provider patterns, typed bridge pattern, GGUF model handling
+
 **Start here if**: You want to build experimental components with production-quality code for future extraction
 
 ---
@@ -38,12 +83,20 @@
 ### 🏗️ [Technical](technical/) - *For Architects*
 **Purpose**: Core architectural documentation and implementation decisions.
 
-**Status**: ✅ Complete for Phase 13 with 13+ documents
-**Contents**: 6 core guides + 7 supplementary docs covering architecture, protocols, performance, benchmarking, stress testing, protocol compliance, and dependency analysis
-**Key Files**: `current-architecture.md`, `kernel-protocol-architecture.md`, `debug-dap-architecture.md`, `cli-command-architecture.md`, `performance-baseline.md`, `benchmarking-guide.md`, `stress-test-results.md`, `protocol-compliance-report.md`, `mlua-upgrade-analysis.md`
-**Phase 12 Additions**: Template system architecture (TemplateRegistry, ExecutionContext), 10 built-in templates, 20-50x performance targets, parameter validation schema
-**Phase 11 Additions**: Local provider architecture, GGUF inference pipeline, dual-backend design (Ollama via rig + Candle embedded)
-**Start here if**: You need to understand system architecture, protocols, template system, local LLM integration, performance characteristics, or debugging infrastructure
+**Status**: ✅ Consolidated (Phase 13b.20) - 15 files (29% reduction from 21 files)
+**Contents**: 6 core architecture docs + 4 database docs + 4 supplementary docs + 1 historical reference
+**Key Files**:
+- **Core**: `current-architecture.md`, `kernel-architecture.md`, `cli-command-architecture.md`, `architecture-decisions.md`, `performance-guide.md`, `rag-system-guide.md`
+- **Database**: `postgresql-guide.md` (consolidated PostgreSQL), `postgresql-query-patterns.md`, `postgresql-migration.md`, `postgresql-vectorchord.md`
+- **Supplementary**: `debug-dap-architecture.md`, `stress-test-results.md`, `protocol-compliance-report.md`, `mlua-upgrade-analysis.md`
+
+**Phase 13b.20 Consolidation**:
+- PostgreSQL: 4 files → `postgresql-guide.md` (4,037 lines, 38% reduction)
+- Kernel: 2 files → `kernel-architecture.md` (1,087 lines, 48% reduction)
+- Performance: 2 files → `performance-guide.md` (681 lines, 32% reduction)
+- Operations moved to `developer-guide/08-operations.md`
+
+**Start here if**: You need to understand system architecture, protocols, PostgreSQL storage, kernel design, performance characteristics, or debugging infrastructure
 
 ---
 
@@ -169,7 +222,7 @@
 5. **Tool CLI** - `llmspell tool list`, `invoke`, `info`, `search`, `test` commands
 6. **[Service Deployment](user-guide/service-deployment.md)** - Deploy as daemon with systemd/launchd
 7. **[IDE Integration](user-guide/ide-integration.md)** - Connect VS Code or Jupyter
-8. **[Lua API Reference](user-guide/api/lua/README.md)** - Complete API documentation (18 globals)
+8. **[Lua API Reference](user-guide/appendix/lua-api-reference.md)** - Complete API documentation (18 globals)
 9. **[Examples](../examples/script-users/)** - 60+ working examples including templates and tool CLI
 
 ### 🔨 **I want to build experimental components**
@@ -178,13 +231,13 @@
 3. **[Feature Flags Migration](developer-guide/feature-flags-migration.md)** - Build system changes (Phase 10.17.5+)
 4. **[Extending LLMSpell](developer-guide/extending-llmspell.md)** - Build tools, agents, protocols
 5. **[Production Guide](developer-guide/production-guide.md)** - Deploy to production
-6. **[Kernel Architecture](technical/kernel-protocol-architecture.md)** - Daemon, protocols, fleet
+6. **[Kernel Architecture](technical/kernel-architecture.md)** - Daemon, protocols, fleet
 
 ### 🏛️ **I need architectural understanding**
 1. **[Current Architecture](technical/current-architecture.md)** - 21 crates, Phase 13 experimental infrastructure
-2. **[Kernel Protocol Architecture](technical/kernel-protocol-architecture.md)** - Daemon, protocols, transport
+2. **[Kernel Architecture](technical/kernel-architecture.md)** - Daemon, protocols, transport, execution paths
 3. **[Debug DAP Architecture](technical/debug-dap-architecture.md)** - 10 DAP commands, IDE integration
-4. **[Performance Baseline](technical/performance-baseline.md)** - Phase 12 metrics (20-50x for templates)
+4. **[Performance Guide](technical/performance-guide.md)** - Targets, benchmarks, profiling, optimization
 5. **[Master Vision](technical/master-architecture-vision.md)** - 23-phase roadmap
 
 ### 🛠️ **I want to validate at scale / extract to production**

@@ -98,6 +98,7 @@ mod tests {
             tool_registry: Arc::new(llmspell_tools::ToolRegistry::new()),
             agent_registry: Arc::new(llmspell_agents::FactoryRegistry::new()),
             workflow_factory: Arc::new(llmspell_workflows::factory::DefaultWorkflowFactory::new()),
+            rag: None,
         };
 
         // Create default provider config for testing
@@ -136,6 +137,7 @@ mod tests {
             tool_registry: Arc::new(llmspell_tools::ToolRegistry::new()),
             agent_registry: Arc::new(llmspell_agents::FactoryRegistry::new()),
             workflow_factory: Arc::new(llmspell_workflows::factory::DefaultWorkflowFactory::new()),
+            rag: None,
         };
 
         // Create default provider config for testing

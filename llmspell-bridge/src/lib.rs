@@ -32,7 +32,7 @@
 //!
 //! # async fn example() -> Result<(), Box<dyn std::error::Error>> {
 //! // Create a runtime with Lua engine
-//! let runtime = ScriptRuntime::new_with_lua(LLMSpellConfig::default()).await?;
+//! let runtime = ScriptRuntime::new(LLMSpellConfig::default()).await?;
 //!
 //! // Execute a simple script
 //! let output = runtime.execute_script(r#"
@@ -203,7 +203,7 @@
 //! // Set default engine
 //! config.default_engine = "lua".to_string();
 //!
-//! let runtime = ScriptRuntime::new_with_engine_name("lua", config).await?;
+//! let runtime = ScriptRuntime::with_engine(config, "lua").await?;
 //! # Ok(())
 //! # }
 //! ```
@@ -216,7 +216,7 @@
 //! # use llmspell_bridge::ScriptRuntime;
 //! # use llmspell_config::LLMSpellConfig;
 //! # async fn example() -> Result<(), Box<dyn std::error::Error>> {
-//! let runtime = ScriptRuntime::new_with_lua(LLMSpellConfig::default()).await?;
+//! let runtime = ScriptRuntime::new(LLMSpellConfig::default()).await?;
 //!
 //! let script = r#"
 //!     -- List available providers
@@ -239,6 +239,7 @@ pub mod conversion;
 pub mod debug_bridge;
 pub mod discovery;
 pub mod engine;
+pub mod infrastructure;
 pub mod providers;
 pub mod providers_discovery;
 pub mod registry;
@@ -323,49 +324,53 @@ use std::sync::Arc;
 pub async fn create_script_executor(
     config: LLMSpellConfig,
 ) -> Result<Arc<dyn ScriptExecutor>, llmspell_core::error::LLMSpellError> {
-    let runtime = Box::pin(ScriptRuntime::new_with_lua(config)).await?;
+    let runtime = Box::pin(ScriptRuntime::new(config)).await?;
     Ok(Arc::new(runtime) as Arc<dyn ScriptExecutor>)
 }
 
 /// Create a script executor with existing provider manager (Phase 11.FIX.1)
 ///
-/// This ensures the script runtime and kernel share the same `ProviderManager` instance,
-/// preventing duplicate provider initialization and factory registration.
+/// **DEPRECATED (Phase 13b.16.2)**: This function now ignores the `provider_manager` parameter.
+/// `ScriptRuntime` creates its own `ProviderManager` internally via the Infrastructure module.
+/// Use `create_script_executor()` instead.
 ///
 /// # Errors
 ///
 /// Returns an error if the script runtime fails to initialize.
 #[cfg(feature = "lua")]
+#[deprecated(
+    since = "0.13.0",
+    note = "Use create_script_executor() instead. ProviderManager is now created internally."
+)]
 pub async fn create_script_executor_with_provider(
     config: LLMSpellConfig,
-    provider_manager: Arc<ProviderManager>,
+    _provider_manager: Arc<ProviderManager>,
 ) -> Result<Arc<dyn ScriptExecutor>, llmspell_core::error::LLMSpellError> {
-    let runtime = ScriptRuntime::new_with_lua_and_provider(config, provider_manager).await?;
+    // Phase 13b.16: ScriptRuntime creates infrastructure internally
+    let runtime = Box::pin(ScriptRuntime::new(config)).await?;
     Ok(Arc::new(runtime) as Arc<dyn ScriptExecutor>)
 }
 
 /// Create script executor with provider manager AND `SessionManager` (Phase 12.8.2.11 - Unified Path)
 ///
-/// This ensures `SessionManager` is available during `inject_apis()` so templates can access it.
-/// Used by kernel initialization to provide full infrastructure to script runtime.
-///
-/// Accepts the core `llmspell_providers::ProviderManager` to avoid type conversion issues
-/// when called from the CLI layer which uses the kernel API.
+/// **DEPRECATED (Phase 13b.16.2)**: This function now ignores the `provider_manager` and `session_manager` parameters.
+/// `ScriptRuntime` creates its own infrastructure internally via the Infrastructure module.
+/// Use `create_script_executor()` instead.
 ///
 /// # Errors
 ///
 /// Returns an error if the script runtime fails to initialize.
 #[cfg(feature = "lua")]
+#[deprecated(
+    since = "0.13.0",
+    note = "Use create_script_executor() instead. Infrastructure is now created internally."
+)]
 pub async fn create_script_executor_with_provider_and_session(
     config: LLMSpellConfig,
-    provider_manager: Arc<llmspell_providers::ProviderManager>,
-    session_manager: Arc<llmspell_kernel::sessions::SessionManager>,
+    _provider_manager: Arc<llmspell_providers::ProviderManager>,
+    _session_manager: Arc<llmspell_kernel::sessions::SessionManager>,
 ) -> Result<Arc<dyn ScriptExecutor>, llmspell_core::error::LLMSpellError> {
-    let runtime = Box::pin(ScriptRuntime::new_with_lua_core_provider_and_session(
-        config,
-        provider_manager,
-        session_manager,
-    ))
-    .await?;
+    // Phase 13b.16: ScriptRuntime creates infrastructure internally
+    let runtime = Box::pin(ScriptRuntime::new(config)).await?;
     Ok(Arc::new(runtime) as Arc<dyn ScriptExecutor>)
 }

@@ -767,31 +767,32 @@ impl crate::core::Template for KnowledgeManagementTemplate {
         );
 
         // Store in memory if enabled (Task 13.11.3)
-        if memory_enabled && session_id.is_some() && context.memory_manager().is_some() {
-            let memory_mgr = context.memory_manager().unwrap();
-            let input_summary = format!(
-                "Knowledge {} operation on collection '{}'",
-                operation, collection
-            );
-            let output_summary = format!(
-                "Completed {} operation on collection '{}'",
-                operation, collection
-            );
+        if memory_enabled {
+            if let (Some(ref sid), Some(memory_mgr)) = (session_id, context.memory_manager()) {
+                let input_summary = format!(
+                    "Knowledge {} operation on collection '{}'",
+                    operation, collection
+                );
+                let output_summary = format!(
+                    "Completed {} operation on collection '{}'",
+                    operation, collection
+                );
 
-            crate::context::store_template_execution(
-                &memory_mgr,
-                session_id.as_ref().unwrap(),
-                &self.metadata.id,
-                &input_summary,
-                &output_summary,
-                json!({
-                    "operation": operation,
-                    "collection": collection,
-                    "source_type": source_type,
-                }),
-            )
-            .await
-            .ok(); // Don't fail execution if storage fails
+                crate::context::store_template_execution(
+                    &memory_mgr,
+                    sid,
+                    &self.metadata.id,
+                    &input_summary,
+                    &output_summary,
+                    json!({
+                        "operation": operation,
+                        "collection": collection,
+                        "source_type": source_type,
+                    }),
+                )
+                .await
+                .ok(); // Don't fail execution if storage fails
+            }
         }
 
         Ok(output)

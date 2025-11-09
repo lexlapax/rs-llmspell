@@ -70,7 +70,7 @@ async fn test_rag_cli_to_storage_flow() {
 
     // Create runtime with config
     let runtime = Arc::new(
-        Box::pin(ScriptRuntime::new_with_lua(config.clone()))
+        Box::pin(ScriptRuntime::new(config.clone()))
             .await
             .expect("Failed to create runtime"),
     );
@@ -132,7 +132,7 @@ async fn test_rag_multi_tenant_isolation() {
     };
 
     let runtime = Arc::new(
-        Box::pin(ScriptRuntime::new_with_lua(config))
+        Box::pin(ScriptRuntime::new(config))
             .await
             .expect("Failed to create runtime"),
     );
@@ -195,7 +195,7 @@ async fn test_rag_configuration_loading() {
         };
 
         let runtime = Arc::new(
-            Box::pin(ScriptRuntime::new_with_lua(config))
+            Box::pin(ScriptRuntime::new(config))
                 .await
                 .expect("Failed to create runtime"),
         );
@@ -222,7 +222,7 @@ async fn test_rag_performance_benchmarks() {
     };
 
     let runtime = Arc::new(
-        Box::pin(ScriptRuntime::new_with_lua(config))
+        Box::pin(ScriptRuntime::new(config))
             .await
             .expect("Failed to create runtime"),
     );
@@ -282,7 +282,7 @@ async fn test_rag_error_handling() {
     };
 
     let runtime = Arc::new(
-        Box::pin(ScriptRuntime::new_with_lua(config))
+        Box::pin(ScriptRuntime::new(config))
             .await
             .expect("Failed to create runtime"),
     );
@@ -350,7 +350,7 @@ async fn test_rag_persistence() {
     // First runtime - ingest data
     {
         let runtime = Arc::new(
-            Box::pin(ScriptRuntime::new_with_lua(config.clone()))
+            Box::pin(ScriptRuntime::new(config.clone()))
                 .await
                 .expect("Failed to create runtime"),
         );
@@ -397,7 +397,7 @@ async fn test_rag_persistence() {
     {
         println!("\n=== Creating second runtime to load persisted data ===");
         let runtime = Arc::new(
-            Box::pin(ScriptRuntime::new_with_lua(config))
+            Box::pin(ScriptRuntime::new(config))
                 .await
                 .expect("Failed to create runtime"),
         );
@@ -438,7 +438,7 @@ async fn test_rag_memory_limits() {
     };
 
     let runtime = Arc::new(
-        Box::pin(ScriptRuntime::new_with_lua(config))
+        Box::pin(ScriptRuntime::new(config))
             .await
             .expect("Failed to create runtime"),
     );
@@ -480,7 +480,7 @@ async fn test_rag_concurrent_operations() {
     };
 
     let runtime = Arc::new(
-        Box::pin(ScriptRuntime::new_with_lua(config))
+        Box::pin(ScriptRuntime::new(config))
             .await
             .expect("Failed to create runtime"),
     );
@@ -536,7 +536,7 @@ async fn test_rag_cleanup_and_shutdown() {
     };
 
     let runtime = Arc::new(
-        Box::pin(ScriptRuntime::new_with_lua(config))
+        Box::pin(ScriptRuntime::new(config))
             .await
             .expect("Failed to create runtime"),
     );

@@ -491,7 +491,7 @@ impl KernelEventCorrelator {
         self.event_bus
             .publish(universal_event)
             .await
-            .map_err(|e| anyhow::anyhow!("Failed to publish event: {}", e))?;
+            .map_err(|e| anyhow::anyhow!("Failed to publish event: {e}"))?;
 
         // Broadcast to IOPub
         self.broadcaster.broadcast(&event).await?;
@@ -552,7 +552,7 @@ impl KernelEventCorrelator {
         self.event_bus
             .subscribe(pattern)
             .await
-            .map_err(|e| anyhow::anyhow!("Failed to subscribe to events: {}", e))
+            .map_err(|e| anyhow::anyhow!("Failed to subscribe to events: {e}"))
     }
 
     /// Clear all correlation data

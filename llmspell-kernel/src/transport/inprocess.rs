@@ -297,7 +297,7 @@ impl Transport for InProcessTransport {
                 }
                 Err(mpsc::error::TryRecvError::Disconnected) => {
                     debug!("Channel {} disconnected!", channel);
-                    Err(anyhow::anyhow!("Channel {} disconnected", channel))
+                    Err(anyhow::anyhow!("Channel {channel} disconnected"))
                 }
             }
         } else {
@@ -357,9 +357,7 @@ impl Transport for InProcessTransport {
                 Err(e) => {
                     debug!("Failed to send to channel '{}': {:?}", channel, e);
                     return Err(anyhow::anyhow!(
-                        "Failed to send on channel {}: {:?}",
-                        channel,
-                        e
+                        "Failed to send on channel {channel}: {e:?}"
                     ));
                 }
             }
@@ -371,7 +369,7 @@ impl Transport for InProcessTransport {
                 channel,
                 channels.keys().cloned().collect::<Vec<_>>()
             );
-            Err(anyhow::anyhow!("Channel {} not found", channel))
+            Err(anyhow::anyhow!("Channel {channel} not found"))
         }
     }
 

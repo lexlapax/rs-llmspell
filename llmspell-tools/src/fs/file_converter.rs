@@ -102,7 +102,7 @@ impl FileConverterTool {
         );
 
         let converted = convert_text_encoding(content, from_encoding, to_encoding)
-            .map_err(|e| anyhow::anyhow!("Text encoding conversion failed: {}", e))?;
+            .map_err(|e| anyhow::anyhow!("Text encoding conversion failed: {e}"))?;
         fs::write(output_path, converted).await?;
 
         info!(

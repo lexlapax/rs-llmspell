@@ -222,7 +222,7 @@ impl<R: AgentRegistry> AgentRegistrar<R> {
         agent
             .validate_input(&test_input)
             .await
-            .map_err(|e| anyhow::anyhow!("Agent validation failed: {}", e))?;
+            .map_err(|e| anyhow::anyhow!("Agent validation failed: {e}"))?;
 
         // Verify name matches
         if agent.metadata().name != config.name {

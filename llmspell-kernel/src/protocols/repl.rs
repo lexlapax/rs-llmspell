@@ -641,7 +641,7 @@ mod tests {
     async fn test_repl_server_creation() {
         let config = REPLConfig::default();
         let script_executor = Arc::new(
-            Box::pin(ScriptRuntime::new_with_lua(LLMSpellConfig::default()))
+            Box::pin(ScriptRuntime::new(LLMSpellConfig::default()))
                 .await
                 .unwrap(),
         );

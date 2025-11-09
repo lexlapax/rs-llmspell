@@ -130,6 +130,17 @@ pub trait ScriptExecutor: Send + Sync + 'static {
         // Default: ignore (for backward compatibility)
     }
 
+    /// Get session manager for daemon mode infrastructure (Phase 13b.16.4)
+    ///
+    /// Returns the session manager as `Arc<dyn Any>` to avoid circular dependencies.
+    /// Callers should downcast to `Arc<SessionManager>`.
+    ///
+    /// Default returns None for backward compatibility.
+    /// Executors with session support should override this method.
+    fn get_session_manager_any(&self) -> Option<Arc<dyn std::any::Any + Send + Sync>> {
+        None
+    }
+
     /// Access to component registry for tool discovery and invocation
     ///
     /// Returns the ComponentLookup implementation that provides access to

@@ -42,10 +42,7 @@ impl RetrievalWeights {
         let sum = rag_weight + memory_weight;
         if (sum - 1.0).abs() > 0.01 {
             anyhow::bail!(
-                "Retrieval weights must sum to 1.0 ±0.01, got {:.3} (rag={:.3}, memory={:.3})",
-                sum,
-                rag_weight,
-                memory_weight
+                "Retrieval weights must sum to 1.0 ±0.01, got {sum:.3} (rag={rag_weight:.3}, memory={memory_weight:.3})"
             );
         }
 
@@ -269,7 +266,7 @@ impl HybridRetriever {
             .episodic()
             .search(query, memory_k)
             .await
-            .map_err(|e| anyhow::anyhow!("Episodic search failed: {}", e))?;
+            .map_err(|e| anyhow::anyhow!("Episodic search failed: {e}"))?;
 
         debug!(
             "Episodic memory returned {} results",

@@ -2,174 +2,127 @@
 
 **Learn to experiment with AI concepts through rapid scripting with rs-llmspell**
 
-**🔗 Navigation**: [← Docs Hub](../) | [Project Home](../../) | [Examples](../../examples/) | [API Reference](api/)
+🔗 **Navigation**: [← Docs Hub](../) | [Project Home](../../) | [Examples](../../examples/) | [Developer Guide](../developer-guide/)
 
 ---
 
 ## Overview
 
-> **📚 Central Hub**: Your starting point for AI experimentation with LLMSpell. Everything you need is organized into 13 essential documents, plus comprehensive API references for both Lua and Rust. Experimental features include adaptive memory system, context engineering, Unix daemon infrastructure, tool CLI commands, fleet management, feature flags, and 10 experimental AI workflows!
+> **📚 Central Hub**: Your starting point for AI experimentation with LLMSpell. Everything you need is organized into **10 numbered guides** plus a comprehensive appendix with complete API references. Master the essentials quickly, then explore advanced features at your own pace!
 
-**Version**: 0.13.0 | **Status**: Phase 13 Complete - Experimental Memory & Context Engineering | **Last Updated**: January 2025
+**Version**: 0.13.1 | **Status**: Phase 13b Complete - Production Storage Infrastructure & Documentation Consolidation | **Last Updated**: 2025-11-08
 
-## 📖 Essential Documentation (13 Files - Experimentation Guides)
+---
 
-### 1. [Getting Started](getting-started.md)
-**Quick experimental setup in under 10 minutes**
-- Installation and setup with feature flags
+## 📖 The 10 Essential Guides
+
+**Linear learning path from setup to production deployment**
+
+### [01. Getting Started](01-getting-started.md)
+**Get up and running in under 10 minutes**
+- Installation and build options
+- Your first agent, tool, and RAG example
 - Progressive learning path (6 examples)
-- Memory system and first experiments
-- Running your first daemon for scale validation
+- Memory system quick start
+- Feature flags overview
 
-### 2. [Core Concepts](concepts.md)
-**Understand LLMSpell experimental architecture with production-quality foundations**
-- Component model (BaseAgent trait)
-- Agents, Tools (40+ with feature flags), Workflows
-- RAG (Retrieval-Augmented Generation) ⭐
-- Vector Storage & HNSW algorithm ⭐
-- Multi-Tenancy with resource quotas ⭐
-- Integrated Kernel Architecture (Phase 10) ⭐
-- Local LLM Integration (Ollama + Candle, Phase 11) ⭐
-- Tool CLI and direct tool invocation ⭐
-- Fleet management and process isolation ⭐
-- State management and sessions (unified in kernel)
-- Hooks, Events, and Security model
+### [02. Core Concepts](02-core-concepts.md)
+**Understand llmspell's experimental architecture**
+- Component model (BaseAgent trait, tools, workflows)
+- Agents, Tools (40+), Templates (10 workflows)
+- RAG (Retrieval-Augmented Generation) with HNSW
+- Memory System (episodic, semantic, procedural)
+- Context Engineering (4 strategies)
+- Multi-tenancy and resource quotas
+- State, Sessions, Hooks, Events
 
-### 3. [Configuration](configuration.md)
-**Complete configuration guide including daemon and fleet setup**
-- LLM providers (OpenAI, Anthropic, Ollama, Groq, local backends)
-- RAG Configuration (HNSW, embeddings, chunking) ⭐
-- Multi-Tenancy (isolation, quotas, billing) ⭐
-- Daemon configuration (PID files, log rotation, signals) ⭐
-- Feature flags for modular builds (19-35MB) ⭐
-- Fleet management and multi-kernel orchestration ⭐
-- State & Sessions persistence
+### [03. Configuration](03-configuration.md)
+**Complete configuration reference**
+- LLM providers (OpenAI, Anthropic, Ollama, Groq, Candle)
+- RAG configuration (HNSW, embeddings, chunking)
+- Memory system (consolidation, daemon, profiles)
+- Multi-tenancy (isolation, quotas, billing)
+- Feature flags (minimal/common/full builds)
 - Security settings and deployment profiles
 - Environment variables
 
-### 3a. [Provider Best Practices](provider-best-practices.md) ⭐ Phase 13
-**Dual-path provider architecture guide**
-- When to use `provider_name` vs `model` parameter
-- Production patterns (environment-specific, task-specific, cost-optimized)
-- Migration guide from ad-hoc model strings to centralized providers
-- Common patterns and best practices
-- Internal API changes for developers
+### [04. Lua Scripting Essentials](04-lua-scripting.md)
+**Quick guide to writing Lua scripts**
+- 18 Lua globals overview
+- Quick start examples (Agent, Tool, RAG, Memory, Template)
+- Common patterns (multi-agent, stateful conversation, tool chaining)
+- Error handling and debugging
+- Links to complete API reference
 
-### 3b. [Memory Configuration](memory-configuration.md) ⭐ Phase 13
-**Memory system configuration and provider integration**
-- Quick start with memory profile
-- Complete configuration reference (consolidation, daemon, providers)
-- Provider integration and requirements
-- Use cases (conversational agents, knowledge accumulation, long-running agents)
-- Performance tuning and troubleshooting
-- Environment variables for memory system
+### [05. CLI Reference](05-cli-reference.md)
+**Complete command-line interface documentation**
+- All 16 command groups (run, exec, kernel, tool, template, memory, context, etc.)
+- Global options and trace levels
+- Built-in profiles and feature flags
+- Examples for every command
+- Quick reference table
 
-### 3c. [CLI Reference](cli.md) ⭐ Phase 13.12.4
-**Complete CLI command reference**
-- All 16 command groups documented (run, exec, repl, debug, kernel, state, session, config, keys, backup, app, tool, model, template, memory, context)
-- Each command includes: description, usage, options, examples, use cases
-- Memory commands (add, search, query, stats, consolidate) with kernel protocol explanation
-- Context commands (assemble, strategies, analyze) with strategy recommendations
-- Global options and built-in profiles
-- Quick reference table of contents
+### [06. Templates & Workflows](06-templates-and-workflows.md)
+**Pre-built AI workflow templates for rapid experimentation**
+- 10 experimental templates by category
+- CLI usage (list, info, exec, search, schema)
+- Lua API usage (Template global)
+- Template examples and customization
+- Template composition and integration
 
-### 4. [Security & Permissions](security-and-permissions.md) ⭐ Phase 11a.13
-**Comprehensive security sandbox guide for safe tool execution**
-- Three-level security model (Safe/Restricted/Privileged)
-- Sandbox system (FileSandbox, NetworkSandbox, IntegratedSandbox)
-- Permission configuration (network access, process execution, file system)
-- Tool-specific security settings via config.toml
-- Troubleshooting permission errors with solutions
-- Security best practices (least privilege, allowlists, monitoring)
-- Common scenarios (enable curl, API access, file permissions)
+### [07. Storage Setup](07-storage-setup.md)
+**Quick start guide for PostgreSQL storage**
+- Docker Compose setup (5 minutes)
+- Basic connection configuration
+- Simple backup procedures
+- Links to technical docs for deep dives
 
-### 5. [Local LLM Integration](local-llm.md) ⭐ Phase 11
-**Use local LLM models via Ollama or Candle**
-- Quick start for Ollama and Candle
-- Model management (list, pull, info, status)
-- Configuration for both backends
-- Performance characteristics and comparison
-- 6 troubleshooting scenarios
-- 4 complete example scripts
-
-### 6. [AI Workflow Templates](templates/README.md) ⭐ Phase 12
-**Experimental AI workflows for rapid concept exploration**
-- 10 experimental templates (6 base + 4 advanced)
-- Research Assistant: 4-phase research workflow (web search, analysis, synthesis, validation)
-- Interactive Chat, Data Analysis, Code Generator, Document Processor, Workflow Orchestrator
-- Code Review, Content Generation, File Classification, Knowledge Management (advanced)
-- CLI commands: `template list|info|exec|search|schema`
-- Lua API: Template global (16th of 18 globals) with 6 methods
-- 20-50x faster than performance targets
-- Complete user guides for all 10 templates
-
-### 7. [Service Deployment](service-deployment.md) ⭐ Phase 10
-**Production deployment with system services**
+### [08. Deployment](08-deployment.md)
+**Production deployment strategies**
 - systemd deployment (Linux)
 - launchd deployment (macOS)
-- Daemon management (double-fork, TTY detachment, signals)
-- PID file handling and lifecycle tracking
-- Log rotation with size/age policies
-- Fleet management for multi-kernel deployments
+- Daemon management and lifecycle
+- IDE integration (VS Code, Jupyter, vim)
+- Debug Adapter Protocol (DAP)
+- Multi-client support
+
+### [09. Security](09-security.md)
+**Security sandbox and permission system**
+- Three-level security model (Safe/Restricted/Privileged)
+- Sandbox systems (File, Network, Integrated)
+- Permission configuration
+- Tool-specific security settings
+- Troubleshooting permission errors
 - Security best practices
 
-### 8. [IDE Integration](ide-integration.md) ⭐ Phase 10
-**Connect your IDE to LLMSpell kernel**
-- VS Code setup with Jupyter & DAP
-- Jupyter Lab configuration
-- vim/neovim LSP integration
-- Debug Adapter Protocol (10 DAP commands)
-- Multi-client support
-- Connection file format and kernel discovery
-
-### 9. [API Documentation](api/README.md)
-**Comprehensive API reference**
-- **[Lua API](api/lua/README.md)** - All 18 globals with 200+ methods
-- **[Rust API](api/rust/README.md)** - 18 crates with traits, builders, and extension guide
-- Unified `llmspell-kernel` crate with daemon, state, sessions, and debugging
-- New `llmspell-templates` crate with Template trait and registry
-- Feature flags documentation for modular builds
-
-### 10. [Troubleshooting](troubleshooting.md)
+### [10. Troubleshooting](10-troubleshooting.md)
 **Solutions to common problems**
-- Common issues and fixes
-- Debugging techniques
-- Error messages explained
-- Daemon and service troubleshooting
-- Feature flag issues
+- Common issues and quick fixes
+- Kernel and service troubleshooting
+- Debugging techniques (--trace flag, RUST_LOG)
+- Performance optimization
+- API and provider issues
+- Script errors and tool issues
+- IDE integration debugging
+- Diagnostic procedures
 
-### 11. [Phase 10 Troubleshooting](troubleshooting-phase10.md) ⭐ Phase 10
-**Phase 10 specific issues**
-- Daemon startup problems
-- Signal handling issues
-- PID file conflicts
-- Log rotation configuration
-- Fleet management debugging
-- Tool CLI troubleshooting
+---
 
-### 12. [Performance Tuning](performance-tuning.md) ⭐ Phase 10
-**Optimize for production**
-- Daemon performance tuning
-- Memory optimization
-- Log rotation settings
-- Fleet scaling strategies
-- HNSW parameter tuning
-- Multi-tenant resource allocation
+## 📚 Appendix: Complete API References
 
-### 13. [Examples](../../examples/EXAMPLE-INDEX.md)
-**Learn by doing**
-- 60+ working examples
-- 6 Getting Started → 9 Applications progression
-- RAG-powered applications and patterns
-- Service deployment examples
-- Tool CLI usage examples
-- Best practices demonstrated
+### [Lua API Reference](appendix/lua-api-reference.md)
+**Complete documentation for all 18 Lua globals**
+- 200+ methods across Agent, Tool, Workflow, Template, Memory, Context, RAG, etc.
+- Organized by global with detailed examples
+- Searchable reference for lookups
+
+---
 
 ## 🚀 Quick Start
 
 ```bash
-# Install and build (Phase 10.17.5+ with feature flags)
-git clone https://github.com/yourusername/rs-llmspell.git
+# Install and build
+git clone https://github.com/lexlapax/rs-llmspell.git
 cd rs-llmspell
 
 # Choose your build:
@@ -180,215 +133,152 @@ cargo build --release --features full      # Full (35MB, all tools)
 # Set API key
 export OPENAI_API_KEY="sk-..."
 
-# Run your first script (embedded kernel mode)
+# Run your first script
 ./target/release/llmspell exec '
-  local agent = Agent.builder()
-    :model("openai/gpt-4o-mini")
-    :build()
-  print(agent:execute({prompt = "Hello!"}).response)
+  local agent = Agent.new({
+    provider = "openai",
+    model = "gpt-4o-mini"
+  })
+  print(agent:execute("Hello!").content)
 '
 
-# Use tool CLI directly (Phase 10)
+# Use tool CLI directly
 ./target/release/llmspell tool list
-./target/release/llmspell tool invoke calculator --params '{"expression": "2+2"}'
+./target/release/llmspell tool invoke calculator --params '{"input": "2+2"}'
 
-# Use --trace flag for debugging
-./target/release/llmspell --trace debug run script.lua
-
-# Use AI Agent Templates (Phase 12) - Instant productive AI ⭐
+# Use AI Agent Templates - Instant productive AI
 ./target/release/llmspell template list
 ./target/release/llmspell template exec research-assistant \
   --param topic="Rust async programming" \
-  --param max_sources=10
+  --param depth="comprehensive"
 
-# Start kernel as daemon (Phase 10)
+# Use Memory System
+./target/release/llmspell memory add "PostgreSQL is a relational database" \
+  --type semantic
+./target/release/llmspell memory search "What is PostgreSQL?"
+
+# Start kernel as daemon
 ./target/release/llmspell kernel start --daemon --port 9555
-
-# Install as system service (Phase 10)
-./target/release/llmspell kernel install-service
-sudo systemctl start llmspell-kernel  # Linux
-launchctl load ~/Library/LaunchAgents/com.llmspell.kernel.plist  # macOS
 ```
 
-## 🆕 Phase 10 Features (Complete)
+---
 
-### Unix Daemon Infrastructure
-- **Double-Fork Daemonization**: Proper TTY detachment and session leadership
-- **Signal Handling**: SIGTERM/SIGINT → Jupyter shutdown messages, atomic operations
-- **PID File Management**: Lifecycle tracking with stale file cleanup
-- **Log Rotation**: Size (10MB) and age (7 days) based policies with automatic rotation
-- **Graceful Shutdown**: Resource cleanup guarantees on all exit paths
-- **systemd/launchd Integration**: Production service deployment on Linux/macOS
-
-### Tool CLI Commands (5 Subcommands)
-- **`llmspell tool list`**: Discover all 40+ available tools with filtering
-- **`llmspell tool info <name>`**: Get detailed tool documentation
-- **`llmspell tool invoke <name> --params <json>`**: Direct tool execution
-- **`llmspell tool search <query>`**: Find tools by keyword
-- **`llmspell tool test <name>`**: Validate tool functionality
-- **Kernel Message Protocol**: Tools execute in kernel via protocol messages
-- **Runtime Discovery**: Automatic tool availability detection based on feature flags
-
-### Fleet Management
-- **OS-Level Process Isolation**: Multi-kernel orchestration with true process boundaries
-- **Bash Fleet Manager**: `llmspell-fleet` for spawn/stop/list/health operations
-- **Python Advanced Monitoring**: psutil integration for detailed metrics
-- **Docker Orchestration**: docker-compose.yml for containerized deployments
-- **Standard Tooling**: Compatible with ps, kill, docker, systemd workflows
-- **Configuration-Driven**: Different configs = different processes
-
-### Enhanced Logging & Observability
-- **Rotating Log Files**: Automatic rotation, compression, and retention
-- **Structured Tracing**: JSON output support with correlation IDs
-- **<1ms Overhead**: Lock-free tracing paths for hot code
-- **Multi-Output**: File, stderr, and syslog support
-- **Session Tracking**: Full request lifecycle visibility
-
-### Feature Flags (Phase 10.17.5+)
-- **Modular Builds**: Choose minimal (19MB), common (25MB), or full (35MB)
-- **Optional Dependencies**: Templates, PDF, CSV, Excel, archives, email, database
-- **Zero Runtime Overhead**: Compile-time feature selection
-- **Backward Compatible**: Existing scripts work with appropriate feature flags
-
-### IDE Integration
-- **VS Code**: Full Jupyter notebook and debugging support
-- **Jupyter Lab**: Native kernel integration with 5-channel architecture
-- **vim/neovim**: LSP and DAP support
-- **Connection Files**: Jupyter-compatible kernel discovery
-- **Multi-Client**: Handle concurrent IDE connections
-
-## 🆕 Phase 13 Features (Complete) ⭐
+## 🆕 Phase 13 Features (Complete)
 
 ### Adaptive Memory & Context Engineering
 - **Multi-Tier Memory System**: Episodic (conversation history), Semantic (knowledge graph), Procedural (patterns)
-- **Hot-Swappable Backends**: HNSW (production, 8.47x speedup), InMemory (development), ChromaDB, Qdrant
-- **Bi-Temporal Knowledge Graph**: SurrealDB embedded graph tracking event time + ingestion time
+- **Hot-Swappable Backends**: HNSW (8.47x speedup), InMemory (dev), SurrealDB (bi-temporal graph)
+- **Bi-Temporal Knowledge Graph**: Event time + ingestion time tracking
 - **Context Engineering Pipeline**: Query understanding, multi-strategy retrieval, DeBERTa reranking, token-aware assembly
-- **LLM-Driven Consolidation**: Extract entities and relationships from conversations into knowledge graph
+- **LLM-Driven Consolidation**: Extract entities and relationships into knowledge graph
 - **CLI Commands**: `llmspell memory add|search|consolidate`, `llmspell context assemble`
-- **Lua API**: Memory global (episodic, semantic, procedural), Context global (assemble, test)
-- **Performance**: <2ms episodic add, ~8ms context assembly, ~2x parallel hybrid retrieval speedup
-- **Memory + Templates Integration**: Templates can leverage memory for contextual workflows
-- **149 Tests Passing**: 100% pass rate across all Phase 13 components
+- **Lua API**: Memory global (17th) + Context global (18th)
+- **Performance**: <2ms episodic add, ~8ms context assembly, ~2x parallel hybrid speedup
+- **149 Tests**: 100% pass rate, zero warnings
 
-## 🆕 Phase 12 Features (Complete) ⭐
+### Phase 12 Features (Complete)
+- **10 AI Workflow Templates**: Research, Chat, Analysis, Code, Documents, Orchestration
+- **Template CLI**: `template list|info|exec|search|schema`
+- **Template Lua API**: Template global (16th) with 6 methods
+- **Performance**: 20-50x faster than targets (0.5ms list, 2ms execute overhead)
+- **Quality**: 149 tests, 3,655 lines docs, production-ready architecture
 
-### AI Agent Templates - Experimental Workflows
-- **10 Built-in Templates**: 6 base templates + 4 advanced workflows
-- **Research Assistant**: 4-phase research workflow with web search, analysis, synthesis, validation
-- **Interactive Chat**: Session-based conversation with context and memory
-- **Data Analysis**: CSV/Excel/JSON analysis with visualizations
-- **Code Generator**: Multi-language code generation with tests
-- **Document Processor**: PDF/OCR extraction and transformation
-- **Workflow Orchestrator**: Custom agent/tool/template composition
-- **Code Review**: Multi-aspect code analysis (structure, security, performance, best practices)
-- **Content Generation**: Quality-driven iterative content creation
-- **File Classification**: Scan-classify-act pattern for file organization
-- **Knowledge Management**: Document ingestion, RAG integration, query interface
+---
 
-### Template CLI Commands (5 Subcommands)
-- **`llmspell template list`**: Discover all 10 built-in templates with category filtering
-- **`llmspell template info <name>`**: Get detailed template documentation and parameters
-- **`llmspell template exec <name> --param key=value`**: Direct template execution
-- **`llmspell template search <query>`**: Find templates by keyword
-- **`llmspell template schema <name>`**: Get parameter schema and validation rules
-
-### Template Lua API (Template Global - 16th of 18 Globals)
-- **`Template.list([category])`**: List templates with optional category filter
-- **`Template.info(name, [with_schema])`**: Get template metadata and optional schema
-- **`Template.execute(name, params)`**: Execute template with parameters
-- **`Template.search(query, [category])`**: Search templates by keyword
-- **`Template.schema(name)`**: Get template configuration schema
-- **`Template.estimate_cost(name, params)`**: Pre-execution cost estimation
-
-### Template System Architecture
-- **TemplateRegistry**: DashMap-based concurrent template storage with Arc sharing
-- **Template Trait**: Metadata, config schema, cost estimation, async execute
-- **ExecutionContext**: Builder pattern for infrastructure (Tools, Agents, Workflows, RAG, Providers)
-- **Parameter Validation**: Declarative schema with constraints (required, type, min/max, pattern, etc.)
-- **4-Layer Bridge**: Core → TemplateBridge → TemplateGlobal → Lua scripts
-- **Performance**: 10-50x faster than targets (0.5ms list, 2ms execute overhead, 0.1ms validation)
-
-### Quality Metrics (Phase 12)
-- **149 Tests**: 122 unit + 27 integration, 100% passing
-- **Zero Warnings**: Clippy clean with `-D warnings` across workspace
-- **>90% Coverage**: All modules tested with mocks
-- **3,655 Lines Docs**: Complete user guides for all 10 templates
-- **Production Quality**: Format 100%, API docs >95%, comprehensive architecture docs
-
-## 🧩 Available Globals (18)
+## 🧩 Available Lua Globals (18)
 
 All globals are pre-injected - no `require()` needed!
 
 | Global | Purpose | Example |
 |--------|---------|---------|
-| **Agent** | LLM interactions | `Agent.builder():model("openai/gpt-4"):build()` |
-| **Tool** | Execute tools (40+ available) | `Tool.execute("web-search", {query = "..."})` |
-| **Workflow** | Orchestration | `Workflow.sequential({steps = {...}})` |
-| **Template** | AI workflow templates ⭐ Phase 12 | `Template.execute("research-assistant", {topic = "..."})` |
-| **State** | Data persistence | `State.set("key", value)` |
+| **Agent** | LLM interactions | `Agent.new({provider = "openai", model = "gpt-4o-mini"})` |
+| **Tool** | Execute tools (40+ available) | `Tool.get("web-search"):invoke({query = "..."})` |
+| **Workflow** | Orchestration | `Workflow.new({type = "sequential", steps = {...}})` |
+| **Template** | AI workflow templates | `Template.execute("research-assistant", {topic = "..."})` |
+| **Memory** | Multi-tier memory | `Memory.add_episodic("session", "content", {metadata})` |
+| **Context** | Context engineering | `Context.assemble({query = "...", strategies = {"hybrid"}})` |
+| **RAG** | Vector search & retrieval | `RAG.search(query, {k = 5})` |
+| **State** | Data persistence | `State.write("key", value)` |
 | **Session** | Session management | `Session.create({name = "..."})` |
-| **Artifact** | Content storage | `Artifact.store(session_id, type, name, content)` |
-| **Hook** | Intercept execution (40+ points) | `Hook.register("BeforeAgentExecution", handler)` |
+| **Hook** | Intercept execution | `Hook.add("before_agent_execution", handler)` |
 | **Event** | Async notifications | `Event.publish("user.action", data)` |
 | **Config** | Configuration access | `Config.get("providers.openai")` |
 | **Provider** | Provider management | `Provider.list()` |
+| **Model** | Model management | `Model.pull("llama3.2")` |
 | **Debug** | Debugging utilities | `Debug.info("message", "module")` |
-| **JSON** | JSON operations | `JSON.parse(string)` |
-| **Streaming** | Stream handling | `Streaming.create()` |
-| **Replay** | Event replay | `Replay.start()` |
-| **RAG** | Vector search & retrieval | `RAG.search(query, {k = 5})` |
-| **Metrics** | Performance metrics | `Metrics.get("kernel.uptime")` |
-| **ARGS** | Script arguments | `ARGS.input` or `ARGS[1]` |
+| **Security** | Security controls | `Security.check_permission("file_read")` |
+| **Kernel** | Kernel control | `Kernel.start({port = 9555})` |
+| **Embedding** | Generate embeddings | `Embedding.generate("text", {model = "..."})` |
+
+---
 
 ## 🎯 Common Tasks
 
 ### Chat with AI
 ```lua
-local agent = Agent.builder()
-    :model("openai/gpt-4o-mini")
-    :build()
-local response = agent:execute({prompt = "Explain quantum computing"})
-print(response.response)
+local agent = Agent.new({
+    provider = "openai",
+    model = "gpt-4o-mini"
+})
+local response = agent:execute("Explain quantum computing")
+print(response.content)
 ```
 
 ### Build RAG Application
 ```lua
 -- Ingest documents
-RAG.ingest(document, {collection = "knowledge"})
-
--- Search with vector similarity
-local results = RAG.search(query, {
-    k = 5,
-    collection = "knowledge"
+local rag = RAG.new({collection = "knowledge"})
+rag:ingest("Getting started with llmspell...", {
+    source = "docs/getting-started.md"
 })
 
+-- Search with vector similarity
+local results = rag:search("How do I get started?", {k = 5})
+
 -- Use results in agent
-local agent = Agent.builder()
-    :model("openai/gpt-4")
-    :build()
-local response = agent:execute({
-    prompt = "Based on: " .. results[1].text .. "\nAnswer: " .. question
+local agent = Agent.new({provider = "openai", model = "gpt-4o-mini"})
+local response = agent:execute(
+    "Based on: " .. results[1].content .. "\nAnswer: How do I get started?"
+)
+```
+
+### Use Memory System
+```lua
+-- Add episodic memory (conversation)
+Memory.add_episodic("session_123", "User asked about PostgreSQL", {
+    role = "user",
+    timestamp = os.time()
+})
+
+-- Add semantic memory (facts)
+Memory.add_semantic("PostgreSQL is a relational database", {
+    relations = {
+        {"PostgreSQL", "is_a", "database"},
+        {"PostgreSQL", "supports", "ACID"}
+    }
+})
+
+-- Query memory
+local memories = Memory.query_episodic("PostgreSQL setup", {
+    session_id = "session_123",
+    k = 3
 })
 ```
 
-### Use AI Agent Templates ⭐ Phase 12
+### Use AI Agent Templates
 ```lua
 -- Research a topic
 local result = Template.execute("research-assistant", {
     topic = "Rust async programming",
-    max_sources = 10,
-    enable_validation = true
+    depth = "comprehensive",
+    sources = "10"
 })
-print(result.result)
-
--- Access generated artifacts
-for _, artifact in ipairs(result.artifacts) do
-    print("Generated: " .. artifact.filename)
-end
+print(result.content)
 
 -- Or use CLI directly
--- llmspell template exec research-assistant --param topic="..." --param max_sources=10
+-- llmspell template exec research-assistant \
+--   --param topic="Rust async programming" \
+--   --param depth="comprehensive"
 ```
 
 ### Deploy as Service
@@ -404,101 +294,56 @@ sudo systemctl enable llmspell-kernel
 sudo systemctl status llmspell-kernel
 ```
 
-### Connect from IDE
-```bash
-# Start kernel with connection file
-./target/release/llmspell kernel start \
-  --daemon \
-  --connection-file ~/.llmspell/kernel.json
+---
 
-# In VS Code: Connect to existing Jupyter server
-# Use the connection file path
-```
-
-## 📊 Key Metrics (Phase 12 Actual)
+## 📊 Key Performance Metrics
 
 | Operation | Target | Achieved | Status |
 |-----------|--------|----------|--------|
-| Daemon startup | <2s | 1.8s | ✅ 10% faster |
-| Message handling | <5ms | 3.8ms | ✅ 24% faster |
-| Signal response | <100ms | 85ms | ✅ 15% faster |
+| Memory episodic add | <10ms | <2ms | ✅ 5x faster |
+| Memory search (HNSW) | <100ms | ~50ms | ✅ 2x faster |
+| Context assembly | <20ms | ~8ms | ✅ 2.5x faster |
+| Template list | <10ms | 0.5ms | ✅ 20x faster |
+| Template execute overhead | <100ms | 2ms | ✅ 50x faster |
 | Tool initialization | <10ms | 7ms | ✅ 30% faster |
-| Log rotation | <100ms | 78ms | ✅ 22% faster |
-| PID file check | <10ms | 6ms | ✅ 40% faster |
-| Memory overhead | <50MB | 42MB | ✅ 16% better |
-| Heartbeat latency | <1ms | 0.8ms | ✅ 20% faster |
 | Vector search (100K) | <10ms | 8ms | ✅ 20% faster |
-| Multi-tenant overhead | <5% | 3% | ✅ 40% better |
-| **Template list** ⭐ | <10ms | 0.5ms | ✅ 20x faster |
-| **Template execute overhead** ⭐ | <100ms | 2ms | ✅ 50x faster |
-| **Parameter validation** ⭐ | <5ms | 0.1ms | ✅ 50x faster |
-| Script timeout | - | - | 5 minutes default |
-
-## 🏗️ Architecture Overview
-
-### Crate Structure (18 Total)
-```
-llmspell-kernel (Phase 10 - Unified)
-├── State Management (merged)
-├── Session Management (merged)
-├── Debug Infrastructure
-├── Daemon Support
-├── Protocol Servers (Jupyter, DAP)
-└── Global IO Runtime
-
-Core Layer (3 crates)
-├── llmspell-core (traits)
-├── llmspell-utils (utilities)
-└── llmspell-testing (test framework)
-
-Execution Layer (6 crates) ⭐ Phase 12
-├── llmspell-agents
-├── llmspell-tools (40+ tools with feature flags)
-├── llmspell-workflows
-├── llmspell-templates (10 built-in templates) ⭐ NEW
-├── llmspell-hooks (40+ points)
-└── llmspell-events
-
-Storage & RAG (3 crates)
-├── llmspell-storage (HNSW vectors)
-├── llmspell-rag (pipeline)
-└── llmspell-tenancy (multi-tenant)
-
-Integration Layer (3 crates)
-├── llmspell-bridge (Lua/JS)
-├── llmspell-config
-└── llmspell-cli
-
-Security & Providers (2 crates)
-├── llmspell-security
-└── llmspell-providers
-```
-
-## 🔍 Learning Path
-
-1. **Beginners** → [Getting Started](getting-started.md) (5 min)
-2. **Understanding** → [Core Concepts](concepts.md) (10 min)
-3. **Quick Win** → [AI Agent Templates](templates/README.md) ⭐ (<5 min to productive AI)
-4. **Building** → [Examples](../../examples/EXAMPLE-INDEX.md) (hands-on)
-5. **Configuring** → [Configuration](configuration.md) (as needed)
-6. **Deploying** → [Service Deployment](service-deployment.md) (production)
-7. **IDE Setup** → [IDE Integration](ide-integration.md) (development)
-8. **Debugging** → [Troubleshooting](troubleshooting.md) (when stuck)
-9. **Phase 10 Issues** → [Phase 10 Troubleshooting](troubleshooting-phase10.md) (daemon/fleet)
-10. **Optimizing** → [Performance Tuning](performance-tuning.md) (production)
-11. **Reference** → [API Docs](api/README.md) (lookup)
-
-## 🆘 Need Help?
-
-- **General Issues?** Check [Troubleshooting](troubleshooting.md)
-- **Phase 10 Issues?** See [Phase 10 Troubleshooting](troubleshooting-phase10.md) for daemon, signals, PID, fleet
-- **Performance?** See [Performance Tuning](performance-tuning.md) for optimization
-- **Questions?** Review [Examples](../../examples/EXAMPLE-INDEX.md)
-- **Bugs?** Report on [GitHub](https://github.com/yourusername/rs-llmspell/issues)
-- **API Details?** See [Lua API](api/lua/README.md) or [Rust API](api/rust/README.md)
-- **Deployment?** See [Service Deployment](service-deployment.md)
-- **IDE Setup?** See [IDE Integration](ide-integration.md)
+| Message handling | <5ms | 3.8ms | ✅ 24% faster |
 
 ---
 
-**Version 0.12.0** | Phase 12 Complete - Experimental Workflows for Rapid Exploration AI Agent Templates | [Release Notes](../../RELEASE_NOTES_v0.12.0.md) | [Changelog](../../CHANGELOG.md)
+## 🔍 Learning Path
+
+1. **Start Here** → [Getting Started](01-getting-started.md) (10 min)
+2. **Understand** → [Core Concepts](02-core-concepts.md) (15 min)
+3. **Quick Win** → [Templates & Workflows](06-templates-and-workflows.md) (<5 min to productive AI)
+4. **Build** → [Examples](../../examples/EXAMPLE-INDEX.md) (hands-on)
+5. **Configure** → [Configuration](03-configuration.md) (as needed)
+6. **Script** → [Lua Scripting](04-lua-scripting.md) (essentials)
+7. **Deploy** → [Deployment](08-deployment.md) (production)
+8. **Secure** → [Security](09-security.md) (permissions)
+9. **Debug** → [Troubleshooting](10-troubleshooting.md) (when stuck)
+10. **Reference** → [Lua API](appendix/lua-api-reference.md) (lookup)
+
+---
+
+## 🆘 Need Help?
+
+- **Getting Started?** See [01. Getting Started](01-getting-started.md)
+- **Understanding Concepts?** See [02. Core Concepts](02-core-concepts.md)
+- **Configuration Issues?** See [03. Configuration](03-configuration.md)
+- **Scripting Questions?** See [04. Lua Scripting](04-lua-scripting.md)
+- **CLI Commands?** See [05. CLI Reference](05-cli-reference.md)
+- **Template Usage?** See [06. Templates & Workflows](06-templates-and-workflows.md)
+- **Storage Setup?** See [07. Storage Setup](07-storage-setup.md)
+- **Deployment?** See [08. Deployment](08-deployment.md)
+- **Security?** See [09. Security](09-security.md)
+- **Troubleshooting?** See [10. Troubleshooting](10-troubleshooting.md)
+- **API Reference?** See [Lua API](appendix/lua-api-reference.md)
+- **Examples?** See [Example Index](../../examples/EXAMPLE-INDEX.md)
+- **Developer Guide?** See [Developer Guide](../developer-guide/README.md)
+- **Technical Details?** See [Technical Docs](../technical/README.md)
+- **Bugs?** Report on [GitHub](https://github.com/lexlapax/rs-llmspell/issues)
+
+---
+
+**Version**: 0.13.0 | **Phase**: 13b.18.3 | **Last Updated**: 2025-11-08

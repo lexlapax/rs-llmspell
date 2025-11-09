@@ -9,25 +9,46 @@ license.workspace = true
 
 [dependencies]
 llmspell-core = { path = "../llmspell-core" }
+llmspell-graph = { path = "../llmspell-graph", optional = true } # Phase 13b.5.2: For graph types
 tokio.workspace = true
 async-trait.workspace = true
 serde.workspace = true
 serde_json.workspace = true
+toml.workspace = true # Phase 13b.14: For migration plan TOML (replaced YAML)
 anyhow.workspace = true
+thiserror.workspace = true
 tracing.workspace = true
 sled.workspace = true
 dashmap = "5.5"
 parking_lot = "0.12"
 uuid = { workspace = true }
+chrono = { workspace = true } # Phase 13b.5.2: For bi-temporal timestamps
 tempfile = { workspace = true, optional = true }
+rand.workspace = true # Phase 13b.14: For checksum sampling
 
 # HNSW implementation dependencies
 hnsw_rs = { version = "0.3.2" }
 rmp-serde = { version = "1.1" }
 
+# PostgreSQL dependencies (Phase 13b.2 - optional)
+tokio-postgres = { workspace = true, optional = true }
+deadpool-postgres = { workspace = true, optional = true }
+pgvector = { workspace = true, optional = true }
+refinery = { workspace = true, optional = true }
+
+# Phase 13b.14: sha2 required for migration checksums (not postgres-only)
+sha2 = "0.10"
+
 [features]
 default = []
+postgres = ["tokio-postgres", "deadpool-postgres", "pgvector", "refinery", "llmspell-graph"]
 
 [dev-dependencies]
 tempfile.workspace = true
 rand = "0.8"
+criterion = { workspace = true }
+blake3 = { workspace = true }
+
+[[bench]]
+name = "graph_bench"
+harness = false

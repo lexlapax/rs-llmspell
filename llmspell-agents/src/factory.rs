@@ -464,7 +464,7 @@ impl AgentFactory for DefaultAgentFactory {
         let config = self
             .templates
             .get(template_name)
-            .ok_or_else(|| anyhow::anyhow!("Template not found: {}", template_name))?
+            .ok_or_else(|| anyhow::anyhow!("Template not found: {template_name}"))?
             .clone();
 
         self.create_agent(config).await

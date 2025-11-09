@@ -204,7 +204,7 @@ async fn test_scenario_with_harness() {
             if scenario_result.passed {
                 Ok(())
             } else {
-                Err(anyhow::anyhow!("Scenario failed: {:?}", scenario_result))
+                Err(anyhow::anyhow!("Scenario failed: {scenario_result:?}"))
             }
         })
         .await

@@ -329,30 +329,32 @@ impl crate::core::Template for CodeReviewTemplate {
         );
 
         // Store in memory if enabled (Task 13.11.3)
-        if memory_enabled && session_id.is_some() && context.memory_manager().is_some() {
-            let memory_mgr = context.memory_manager().unwrap();
-            let input_summary = format!("Review {} code for {} aspects", language, aspects.len());
-            let output_summary = format!(
-                "Found {} issues with {} fixes",
-                aggregated.issues.len(),
-                fixes.as_ref().map(|f| f.fixes.len()).unwrap_or(0)
-            );
+        if memory_enabled {
+            if let (Some(ref sid), Some(memory_mgr)) = (session_id, context.memory_manager()) {
+                let input_summary =
+                    format!("Review {} code for {} aspects", language, aspects.len());
+                let output_summary = format!(
+                    "Found {} issues with {} fixes",
+                    aggregated.issues.len(),
+                    fixes.as_ref().map(|f| f.fixes.len()).unwrap_or(0)
+                );
 
-            crate::context::store_template_execution(
-                &memory_mgr,
-                session_id.as_ref().unwrap(),
-                &self.metadata.id,
-                &input_summary,
-                &output_summary,
-                json!({
-                    "language": language,
-                    "aspects": aspects,
-                    "issues_found": aggregated.issues.len(),
-                    "fixes_generated": fixes.as_ref().map(|f| f.fixes.len()).unwrap_or(0),
-                }),
-            )
-            .await
-            .ok(); // Don't fail execution if storage fails
+                crate::context::store_template_execution(
+                    &memory_mgr,
+                    sid,
+                    &self.metadata.id,
+                    &input_summary,
+                    &output_summary,
+                    json!({
+                        "language": language,
+                        "aspects": aspects,
+                        "issues_found": aggregated.issues.len(),
+                        "fixes_generated": fixes.as_ref().map(|f| f.fixes.len()).unwrap_or(0),
+                    }),
+                )
+                .await
+                .ok(); // Don't fail execution if storage fails
+            }
         }
 
         Ok(output)

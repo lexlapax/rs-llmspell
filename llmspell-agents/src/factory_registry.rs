@@ -40,7 +40,7 @@ impl FactoryRegistry {
     ) -> Result<()> {
         let mut factories = self.factories.write().await;
         if factories.contains_key(&name) {
-            anyhow::bail!("Factory '{}' is already registered", name);
+            anyhow::bail!("Factory '{name}' is already registered");
         }
         factories.insert(name.clone(), factory);
 
@@ -80,7 +80,7 @@ impl FactoryRegistry {
     pub async fn set_default_factory(&self, name: String) -> Result<()> {
         let factories = self.factories.read().await;
         if !factories.contains_key(&name) {
-            anyhow::bail!("Factory '{}' is not registered", name);
+            anyhow::bail!("Factory '{name}' is not registered");
         }
 
         let mut default = self.default_factory.write().await;
@@ -111,7 +111,7 @@ impl FactoryRegistry {
         let factory = self
             .get_factory(factory_name)
             .await
-            .ok_or_else(|| anyhow::anyhow!("Factory '{}' not found", factory_name))?;
+            .ok_or_else(|| anyhow::anyhow!("Factory '{factory_name}' not found"))?;
 
         factory.create_agent(config).await
     }
@@ -149,7 +149,7 @@ impl FactoryRegistry {
         let factory = self
             .get_factory(factory_name)
             .await
-            .ok_or_else(|| anyhow::anyhow!("Factory '{}' not found", factory_name))?;
+            .ok_or_else(|| anyhow::anyhow!("Factory '{factory_name}' not found"))?;
 
         factory.create_from_template(template_name).await
     }

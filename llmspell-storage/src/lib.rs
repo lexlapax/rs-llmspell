@@ -98,12 +98,20 @@
 //! ```
 
 pub mod backends;
+pub mod migration;
 pub mod traits;
 pub mod vector_storage;
 
 // Re-export commonly used types
 pub use backends::{MemoryBackend, SledBackend};
 pub use traits::{StorageBackend, StorageBackendType, StorageCharacteristics, StorageSerialize};
+
+// Re-export PostgreSQL types (Phase 13b.2+)
+#[cfg(feature = "postgres")]
+pub use backends::postgres::{
+    LargeObjectStream, PostgreSQLVectorStorage, PostgresBackend, PostgresConfig, PostgresError,
+    PostgresPool,
+};
 
 // Re-export vector storage types
 pub use vector_storage::{

@@ -1,9 +1,9 @@
-# Current Architecture (v0.13.0 - Phase 13 Complete)
+# Current Architecture (v0.13.0 - Phase 13b Complete)
 
-**Status**: Experimental Platform with Production-Quality Foundations with Adaptive Memory, Context Engineering, Template System, Local LLM, and IDE Connectivity
-**Last Updated**: January 31, 2025
-**Implementation**: Phases 0-13 Complete (13/13 major phases)
-**Latest**: Phase 13 - Adaptive Memory & Context Engineering (3 new crates, 149 tests, 8.47x HNSW speedup)
+**Status**: Experimental Platform with Production-Quality Foundations with Adaptive Memory, Context Engineering, PostgreSQL Infrastructure, Template System, Local LLM, and IDE Connectivity
+**Last Updated**: January 2025
+**Implementation**: Phases 0-13b Complete (14/14 major phases)
+**Latest**: Phase 13b - ScriptRuntime Refactor & PostgreSQL Infrastructure (Infrastructure module, 3-tier storage, 15 PostgreSQL migrations, 4,154 lines documentation)
 **Validation**: Cross-referenced with phase design documents and codebase
 
 > **📋 Single Source of Truth**: This document reflects the ACTUAL implementation as evolved through 13 development phases, validated against phase design documents (phase-01 through phase-13) and current codebase. **Phase 11 adds local LLM support via dual-backend implementation (Ollama + Candle) for cost-free, offline AI operations. Phase 11a consolidates bridge layer with 87% compile speedup, API standardization, and documentation completeness (security 40%→95%, env vars 0%→100%). Phase 11b enhances local LLM with cleanup (-120 LOC), unified profile system (10 builtins), T5 safetensors support (dual-architecture), and platform-aware Metal GPU detection. Phase 12 solves the "0-day retention problem" with 10 experimental platform with production-quality foundations AI workflow templates (6 base + 4 advanced patterns), enabling immediate user value post-installation with CLI-direct execution and comprehensive template library covering 9 categories. Phase 13 introduces adaptive memory with hot-swappable backends (InMemory/HNSW for episodic, SurrealDB for semantic), context engineering with parallel retrieval optimization (~2x speedup), and integrated bridge layer (MemoryBridge/ContextBridge) delivering >90% test coverage, 8.47x HNSW performance gains, and zero breaking changes to existing APIs.**
@@ -12,10 +12,10 @@
 
 This overview document is supported by detailed guides:
 - **[Architecture Decisions](./architecture-decisions.md)**: All ADRs from Phase 0-13
-- **[Operational Guide](./operational-guide.md)**: Performance benchmarks and security model
+- **[Performance Guide](./performance-guide.md)**: Performance targets, benchmarking, profiling, optimization (Phase 13b.20.3)
 - **[RAG System Guide](./rag-system-guide.md)**: Complete RAG documentation including HNSW tuning
 - **[RAG-Memory Integration](./rag-memory-integration.md)**: Phase 13 RAG integration with memory system
-- **[Kernel Protocol Architecture](./kernel-protocol-architecture.md)**: Kernel design and protocol/transport layers
+- **[Kernel Architecture](./kernel-architecture.md)**: Kernel design, protocol/transport layers, execution paths (Phase 13b.20.2)
 - **[Template System Architecture](./template-system-architecture.md)**: Template trait system, 10 built-in templates, advanced patterns (Phase 12)
 - **[CLI Command Architecture](./cli-command-architecture.md)**: Complete CLI reference including template+memory commands
 - **[Phase 11a Design Document](../in-progress/phase-11a-design-doc.md)**: Bridge consolidation comprehensive documentation
@@ -57,6 +57,7 @@ This overview document is supported by detailed guides:
 - **Phase 11b**: Local LLM Cleanup & Enhancement ✅ COMPLETE - LocalLLM registration fix (14→15 globals), binary removal (-675 LOC, enforced single-binary), unified profile system (10 builtin TOML profiles replacing CLI hack), config consolidation (40+ Lua files updated), model discovery UX (URLs in help), auto-load profile (improved errors), Metal GPU detection (platform-aware device selection), T5 safetensors support (dual-architecture: LLaMA GGUF + T5 safetensors, ModelArchitecture enum, Metal blocked by Candle v0.9), net -120 LOC (+755 new, -875 deleted), 72 tests passing, 0 warnings
 - **Phase 12**: Experimental Platform with Production-Quality Foundations AI Agent Templates ✅ COMPLETE (Oct 5-24, 2025) - Template trait system (Template/TemplateRegistry/ExecutionContext/TemplateParams/TemplateOutput), 10 production templates (research-assistant, interactive-chat, data-analysis, code-generator, document-processor, workflow-orchestrator, code-review, content-generation, file-classification, knowledge-management), 2,651 LOC template code, 5 CLI commands (list/info/exec/search/schema), Template global (16th global, 6 methods), 149 tests (122 unit + 27 integration), 3,655 lines documentation, 4 advanced patterns (multi-aspect analysis, quality-driven iteration, scan-classify-act, RAG CRUD), performance targets exceeded 20-50x, zero warnings
 - **Phase 13**: Adaptive Memory & Context Engineering ✅ COMPLETE (Jan 2025) - Hot-swappable memory backends (InMemory/HNSW for episodic, SurrealDB for semantic graph), context assembly strategies (episodic/semantic/hybrid/rag/combined), 3 new crates (llmspell-memory 3,500+ LOC, llmspell-graph 2,200+ LOC, llmspell-context simplified), MemoryBridge + ContextBridge integration, 149 total tests (68 memory + 34 graph + 6 E2E + existing), 8.47x HNSW speedup at 10K entries, <2ms episodic add overhead (50x better than target), parallel retrieval optimization (~2x speedup), NoopConsolidationEngine default (regex-based extraction), SurrealDB embedded graph (71% functional), Phase 13.15 accuracy validation deferred (baseline metrics established: DMR 248µs, NDCG 0.87 mock), zero breaking changes to Phase 1-12 APIs
+- **Phase 13b**: ScriptRuntime Refactor & PostgreSQL Infrastructure ✅ COMPLETE (Jan 2025) - Infrastructure module (unified component creation from config), ScriptRuntime refactor (single creation path, 200+ LOC → 12 LOC CLI), PostgreSQL 18 + VectorChord integration (15 migrations, 15+ tables, 2,434 DDL lines), 3-tier storage architecture (Memory/Sled/PostgreSQL backends), 10 storage components (vector embeddings 4 dimensions, episodic/semantic/procedural memory, agent state, workflow states, sessions, artifacts, event log, hook history), RLS multi-tenancy (<5% overhead, 4.9% measured), HNSW vector indexes (8.47x speedup), bi-temporal graph (valid time + transaction time), content-addressed artifacts (blake3 deduplication), monthly event partitioning (12.5x query speedup), connection pooling (formula: CPU × 2 + 1), hot-swappable storage backends (per-component selection), 4,154 lines PostgreSQL documentation, 1,746 lines technical guides
 
 ### Key Architectural Decisions (Evolved Through Phases)
 
@@ -102,6 +103,17 @@ This overview document is supported by detailed guides:
 - **Phase 12**: CLI-first template design (direct execution without scripting required)
 - **Phase 12**: Advanced template patterns (multi-aspect, quality-driven, scan-classify-act, RAG CRUD)
 - **Phase 13**: Hot-swappable episodic backends (InMemory for testing, HNSW for production) via MemoryConfig
+- **Phase 13**: Semantic memory graph with bi-temporal modeling (valid time + transaction time)
+- **Phase 13**: Context assembly strategies (episodic/semantic/hybrid/rag) for token budget optimization
+- **Phase 13**: MemoryBridge + ContextBridge integration with kernel message protocol
+- **Phase 13b**: Infrastructure module for unified component creation (single path: Infrastructure::from_config())
+- **Phase 13b**: ScriptRuntime self-contained creation (CLI delegation, 200+ LOC → 12 LOC)
+- **Phase 13b**: 3-tier storage architecture (StorageBackend trait → Memory/Sled/PostgreSQL implementations)
+- **Phase 13b**: PostgreSQL 18 + VectorChord for production storage (HNSW + bi-temporal graph + RLS)
+- **Phase 13b**: Per-component backend selection (hot-swap without code changes)
+- **Phase 13b**: Content-addressed artifacts with blake3 (50-90% deduplication)
+- **Phase 13b**: Monthly event log partitioning (12.5x query speedup via partition pruning)
+- **Phase 13b**: Connection pool formula standardization ((CPU × 2) + 1 for optimal concurrency)
 - **Phase 13**: SurrealDB embedded over petgraph for semantic memory (zero external dependencies)
 - **Phase 13**: NoopConsolidationEngine default with ManualConsolidationEngine option (simplified vs LLM-driven)
 - **Phase 13**: RegexExtractor for entity/relationship extraction (pragmatic vs LLM complexity)
@@ -1655,9 +1667,9 @@ As of Phase 11b near-completion (7/8, 95%), technical documentation has been con
 ### Core Documents
 1. **current-architecture.md** (this file) - Overview and navigation (updated for Phase 11b)
 2. **architecture-decisions.md** - All ADRs from Phase 0-11b
-3. **operational-guide.md** - Performance and security unified
+3. **performance-guide.md** - Performance targets, benchmarking, profiling, optimization (Phase 13b.20.3)
 4. **rag-system-guide.md** - Complete RAG system documentation
-5. **kernel-protocol-architecture.md** - Kernel design and protocol/transport abstraction
+5. **kernel-architecture.md** - Kernel design, protocol/transport abstraction, execution paths (Phase 13b.20.2)
 
 ### Phase 11 User Documentation
 6. **docs/user-guide/local-llm.md** (320 lines) - Local LLM integration guide

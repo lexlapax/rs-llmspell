@@ -223,7 +223,7 @@ impl<R: AgentRegistry> Discovery<R> {
     pub async fn find_similar(&self, agent_id: &str, limit: usize) -> Result<Vec<SearchResult>> {
         // Get the reference agent
         let Some(reference) = self.registry.get_metadata(agent_id).await? else {
-            anyhow::bail!("Agent '{}' not found", agent_id);
+            anyhow::bail!("Agent '{agent_id}' not found");
         };
 
         // Build search criteria based on reference

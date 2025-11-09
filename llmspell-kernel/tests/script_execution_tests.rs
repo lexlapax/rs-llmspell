@@ -13,14 +13,13 @@ mod script_execution_tests {
     async fn create_test_runtime() -> ScriptRuntime {
         use llmspell_config::LLMSpellConfig;
 
-        ScriptRuntime::new_with_lua(LLMSpellConfig::default())
+        ScriptRuntime::with_engine(LLMSpellConfig::default(), "lua")
             .await
             .unwrap()
     }
 
     /// Test executing valid Lua scripts
-    #[tokio::test]
-    #[ignore = "Requires full bridge setup"]
+    #[tokio::test(flavor = "multi_thread")]
     async fn test_execute_valid_script() {
         let temp_dir = TempDir::new().unwrap();
         let script_path = temp_dir.path().join("test.lua");
@@ -45,7 +44,7 @@ mod script_execution_tests {
     }
 
     /// Test file not found error
-    #[tokio::test]
+    #[tokio::test(flavor = "multi_thread")]
     async fn test_file_not_found() {
         let temp_dir = TempDir::new().unwrap();
         let non_existent = temp_dir.path().join("does_not_exist.lua");
@@ -57,8 +56,7 @@ mod script_execution_tests {
     }
 
     /// Test syntax error reporting with line numbers
-    #[tokio::test]
-    #[ignore = "Requires full bridge setup"]
+    #[tokio::test(flavor = "multi_thread")]
     async fn test_syntax_error_reporting() {
         let script_with_syntax_error = r#"
             function broken(
@@ -80,8 +78,7 @@ mod script_execution_tests {
     }
 
     /// Test runtime error handling
-    #[tokio::test]
-    #[ignore = "Requires full bridge setup"]
+    #[tokio::test(flavor = "multi_thread")]
     async fn test_runtime_error() {
         let script_with_runtime_error = r#"
             local function divide(a, b)
@@ -106,7 +103,7 @@ mod script_execution_tests {
     }
 
     /// Test relative and absolute paths
-    #[tokio::test]
+    #[tokio::test(flavor = "multi_thread")]
     async fn test_path_handling() {
         let temp_dir = TempDir::new().unwrap();
 
@@ -151,8 +148,7 @@ mod script_execution_tests {
     }
 
     /// Test script arguments passing
-    #[tokio::test]
-    #[ignore = "Requires full bridge setup"]
+    #[tokio::test(flavor = "multi_thread")]
     async fn test_script_arguments() {
         let script_with_args = r#"
             -- Access arguments (in real implementation via ARGS global)
@@ -188,8 +184,7 @@ mod script_execution_tests {
     }
 
     /// Test working directory setting
-    #[tokio::test]
-    #[ignore = "Requires full bridge setup"]
+    #[tokio::test(flavor = "multi_thread")]
     async fn test_working_directory() {
         let temp_dir = TempDir::new().unwrap();
         let work_dir = temp_dir.path().join("workspace");
@@ -230,8 +225,7 @@ mod script_execution_tests {
     }
 
     /// Test script output capture
-    #[tokio::test]
-    #[ignore = "Requires full bridge setup"]
+    #[tokio::test(flavor = "multi_thread")]
     async fn test_output_capture() {
         let script_with_output = r#"
             print("Line 1")
@@ -256,8 +250,7 @@ mod script_execution_tests {
     }
 
     /// Test error propagation and stack traces
-    #[tokio::test]
-    #[ignore = "Requires full bridge setup"]
+    #[tokio::test(flavor = "multi_thread")]
     async fn test_error_stack_trace() {
         let script_with_nested_error = r#"
             local function level3()
@@ -287,8 +280,13 @@ mod script_execution_tests {
     }
 
     /// Test script timeout/cancellation
-    #[tokio::test]
-    #[ignore = "Requires full bridge setup"]
+    ///
+    /// NOTE: This test is ignored because script cancellation is not yet implemented.
+    /// Lua execution blocks synchronously and doesn't yield to tokio, so tokio::timeout
+    /// cannot interrupt it. This would require Lua hooks to periodically check for
+    /// cancellation, which is a future feature.
+    #[tokio::test(flavor = "multi_thread")]
+    #[ignore = "Script cancellation not implemented - hangs in infinite loop"]
     async fn test_script_timeout() {
         let infinite_loop = r#"
             while true do
@@ -309,8 +307,7 @@ mod script_execution_tests {
     }
 
     /// Test UTF-8 handling in scripts
-    #[tokio::test]
-    #[ignore = "Requires full bridge setup"]
+    #[tokio::test(flavor = "multi_thread")]
     async fn test_utf8_handling() {
         let script_with_utf8 = r#"
             local message = "Hello 世界 🌍"

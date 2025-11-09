@@ -848,33 +848,34 @@ impl crate::core::Template for FileClassificationTemplate {
         );
 
         // Store in memory if enabled (Task 13.11.3)
-        if memory_enabled && session_id.is_some() && context.memory_manager().is_some() {
-            let memory_mgr = context.memory_manager().unwrap();
-            let input_summary = format!(
-                "Classify files in {} using {} strategy",
-                source_path, classification_strategy
-            );
-            let output_summary = format!(
-                "Classified {} files into {} categories",
-                results.len(),
-                category_counts.len()
-            );
+        if memory_enabled {
+            if let (Some(ref sid), Some(memory_mgr)) = (session_id, context.memory_manager()) {
+                let input_summary = format!(
+                    "Classify files in {} using {} strategy",
+                    source_path, classification_strategy
+                );
+                let output_summary = format!(
+                    "Classified {} files into {} categories",
+                    results.len(),
+                    category_counts.len()
+                );
 
-            crate::context::store_template_execution(
-                &memory_mgr,
-                session_id.as_ref().unwrap(),
-                &self.metadata.id,
-                &input_summary,
-                &output_summary,
-                json!({
-                    "files_classified": results.len(),
-                    "strategy": classification_strategy,
-                    "action": action,
-                    "categories": category_counts.len(),
-                }),
-            )
-            .await
-            .ok(); // Don't fail execution if storage fails
+                crate::context::store_template_execution(
+                    &memory_mgr,
+                    sid,
+                    &self.metadata.id,
+                    &input_summary,
+                    &output_summary,
+                    json!({
+                        "files_classified": results.len(),
+                        "strategy": classification_strategy,
+                        "action": action,
+                        "categories": category_counts.len(),
+                    }),
+                )
+                .await
+                .ok(); // Don't fail execution if storage fails
+            }
         }
 
         Ok(output)

@@ -210,7 +210,7 @@ impl CategoryManager {
         // Validate parent exists if specified
         if let Some(parent_id) = &category.parent_id {
             if !self.categories.contains_key(parent_id) {
-                anyhow::bail!("Parent category '{}' not found", parent_id);
+                anyhow::bail!("Parent category '{parent_id}' not found");
             }
         }
 
@@ -252,7 +252,7 @@ impl CategoryManager {
     /// Returns an error if the category is not found
     pub fn assign_to_category(&mut self, agent_id: &str, category_id: &str) -> Result<()> {
         if !self.categories.contains_key(category_id) {
-            anyhow::bail!("Category '{}' not found", category_id);
+            anyhow::bail!("Category '{category_id}' not found");
         }
 
         self.agent_categories

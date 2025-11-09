@@ -29,7 +29,7 @@ use std::collections::HashMap;
 use std::fmt::Write;
 use std::sync::{Arc, RwLock};
 use std::time::Instant;
-use tracing::{debug, info, instrument, warn};
+use tracing::{debug, info, instrument};
 
 /// Central script runtime that uses `ScriptEngineBridge` abstraction
 ///
@@ -48,7 +48,7 @@ use tracing::{debug, info, instrument, warn};
 /// # async fn example() -> Result<(), Box<dyn std::error::Error>> {
 /// // Create a runtime with default configuration
 /// let config = LLMSpellConfig::default();
-/// let runtime = ScriptRuntime::new_with_lua(config).await?;
+/// let runtime = ScriptRuntime::new(config).await?;
 ///
 /// // Execute a simple Lua script
 /// let output = runtime.execute_script("return 42").await?;
@@ -64,7 +64,7 @@ use tracing::{debug, info, instrument, warn};
 /// use llmspell_config::LLMSpellConfig;
 ///
 /// # async fn example() -> Result<(), Box<dyn std::error::Error>> {
-/// let runtime = ScriptRuntime::new_with_lua(LLMSpellConfig::default()).await?;
+/// let runtime = ScriptRuntime::new(LLMSpellConfig::default()).await?;
 ///
 /// let script = r#"
 ///     -- Create an agent (placeholder functionality)
@@ -91,7 +91,7 @@ use tracing::{debug, info, instrument, warn};
 /// use futures::StreamExt;
 ///
 /// # async fn example() -> Result<(), Box<dyn std::error::Error>> {
-/// let runtime = ScriptRuntime::new_with_lua(LLMSpellConfig::default()).await?;
+/// let runtime = ScriptRuntime::new(LLMSpellConfig::default()).await?;
 ///
 /// // Check if streaming is supported
 /// if runtime.supports_streaming() {
@@ -245,54 +245,43 @@ pub struct ScriptRuntime {
     /// Used by: Template system via `ExecutionContext` for workflow orchestration.
     workflow_factory: Arc<dyn llmspell_workflows::WorkflowFactory>,
 
-    /// Session manager for template infrastructure (Phase 12.8.2.5)
+    /// State manager for persistent state (Phase 13b.16.2)
     ///
-    /// Wired from kernel after initialization to provide session management to templates.
-    /// Uses interior mutability (`RwLock`) to allow setting after `ScriptRuntime` creation.
-    /// Optional to support standalone `ScriptRuntime` usage without kernel.
+    /// Created from `Infrastructure` module during initialization.
+    /// Provides persistent state operations for session management.
+    #[allow(dead_code)]
+    // Used by SessionManager infrastructure, not accessed directly in runtime.rs
+    state_manager: Arc<llmspell_kernel::state::StateManager>,
+
+    /// Session manager for template infrastructure (Phase 13b.16.2)
+    ///
+    /// Created from `Infrastructure` module during initialization.
+    /// Direct ownership replaces `Arc<RwLock<Option<...>>>` pattern.
     ///
     /// **Why separate from `ComponentRegistry`:**
     /// - `SessionManager` is kernel-specific infrastructure (lifecycle, persistence, hooks)
     /// - Templates need full session management (create, save, restore, artifacts)
     /// - Scripts don't directly access sessions (use state instead)
-    ///
-    /// **Wiring flow:** Kernel creates → downcasts `ScriptRuntime` → calls `set_session_manager()`
-    session_manager: Arc<RwLock<Option<Arc<llmspell_kernel::sessions::SessionManager>>>>,
+    session_manager: Arc<llmspell_kernel::sessions::SessionManager>,
 
-    /// RAG (Retrieval-Augmented Generation) infrastructure for template execution (Phase 12.8.fix)
+    /// RAG (Retrieval-Augmented Generation) infrastructure for template execution (Phase 13b.16.2)
     ///
-    /// Wired from kernel after initialization to provide RAG capabilities to templates.
-    /// Uses interior mutability (`RwLock`) to allow setting after `ScriptRuntime` creation.
-    /// Optional to support standalone `ScriptRuntime` usage without RAG.
+    /// Created from `Infrastructure` module if `config.rag.enabled`.
+    /// Direct ownership replaces `Arc<RwLock<Option<...>>>` pattern.
+    /// Optional to support configurations without RAG.
     ///
     /// **Why needed:**
     /// - research-assistant template requires RAG for document ingestion and synthesis
     /// - Multi-tenant vector storage for knowledge base operations
     /// - Templates need RAG access via `ExecutionContext`
-    ///
-    /// **Wiring flow:** Kernel creates → downcasts `ScriptRuntime` → calls `set_rag()`
-    rag: Arc<RwLock<Option<Arc<llmspell_rag::multi_tenant_integration::MultiTenantRAG>>>>,
+    rag: Option<Arc<llmspell_rag::multi_tenant_integration::MultiTenantRAG>>,
 
-    /// Memory manager for adaptive memory system (Phase 13.12.1)
+    /// Memory manager for adaptive memory system (Phase 13b.16.2)
     ///
-    /// Wired from kernel after initialization to provide memory operations to CLI/Lua.
-    /// Uses interior mutability (`RwLock`) to allow setting after `ScriptRuntime` creation.
-    /// Optional to support standalone `ScriptRuntime` usage without memory.
-    ///
-    /// **Wiring flow:** Kernel creates → downcasts `ScriptRuntime` → calls `set_memory_manager()`
-    memory_manager: Arc<RwLock<Option<Arc<dyn llmspell_memory::MemoryManager>>>>,
-
-    /// Context assembly for query-based context retrieval (Phase 13.12.3)
-    ///
-    /// Wired from kernel after initialization to provide context operations to CLI/Lua.
-    /// Uses interior mutability (`RwLock`) to allow setting after `ScriptRuntime` creation.
-    /// Optional to support standalone `ScriptRuntime` usage without context.
-    ///
-    /// **Note**: Currently uses `memory_manager` directly for context assembly.
-    /// Future: May integrate dedicated `ContextPipeline` from llmspell-context.
-    ///
-    /// **Wiring flow:** Kernel creates → downcasts `ScriptRuntime` → (uses `memory_manager`)
-    context_enabled: Arc<RwLock<bool>>,
+    /// Created from `Infrastructure` module if `config.runtime.memory.enabled`.
+    /// Direct ownership replaces `Arc<RwLock<Option<...>>>` pattern.
+    /// Optional to support configurations without memory.
+    memory_manager: Option<Arc<dyn llmspell_memory::MemoryManager>>,
 
     /// Execution context
     execution_context: Arc<RwLock<crate::engine::ExecutionContext>>,
@@ -303,6 +292,111 @@ pub struct ScriptRuntime {
 }
 
 impl ScriptRuntime {
+    /// Create script runtime from configuration (Phase 13b.16.2 - Engine-Agnostic API)
+    ///
+    /// Uses `config.default_engine` to determine which engine to initialize.
+    /// This is the primary entry point for engine-agnostic runtime creation.
+    ///
+    /// Creates ALL infrastructure internally via `Infrastructure::from_config()`:
+    /// - `ProviderManager`
+    /// - `StateManager`
+    /// - `SessionManager`
+    /// - RAG (if `config.rag.enabled`)
+    /// - `MemoryManager` (if `config.runtime.memory.enabled`)
+    /// - `ToolRegistry`
+    /// - `AgentRegistry`
+    /// - `WorkflowFactory`
+    /// - `ComponentRegistry`
+    ///
+    /// # Examples
+    ///
+    /// ```rust,no_run
+    /// use llmspell_bridge::ScriptRuntime;
+    /// use llmspell_config::LLMSpellConfig;
+    ///
+    /// # async fn example() -> Result<(), Box<dyn std::error::Error>> {
+    /// let mut config = LLMSpellConfig::default();
+    /// config.default_engine = "lua".to_string();
+    ///
+    /// // Creates runtime with Lua engine
+    /// let runtime = ScriptRuntime::new(config).await?;
+    /// # Ok(())
+    /// # }
+    /// ```
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if:
+    /// - Engine initialization fails
+    /// - Infrastructure creation fails
+    /// - `config.default_engine` is unsupported or not compiled in
+    #[cfg(any(feature = "lua", feature = "javascript"))]
+    #[instrument(level = "info", skip(config), fields(
+        default_engine = %config.default_engine,
+        rag_enabled = config.rag.enabled,
+        memory_enabled = config.runtime.memory.enabled
+    ))]
+    pub async fn new(config: LLMSpellConfig) -> Result<Self, LLMSpellError> {
+        info!(
+            "Creating ScriptRuntime with engine: {}",
+            config.default_engine
+        );
+        Box::pin(Self::with_engine(config.clone(), &config.default_engine)).await
+    }
+
+    /// Create script runtime with specific engine override (Phase 13b.16.2 - Engine-Agnostic API)
+    ///
+    /// Allows overriding `config.default_engine` to use a specific engine.
+    /// Creates ALL infrastructure internally via `Infrastructure::from_config()`.
+    ///
+    /// # Arguments
+    ///
+    /// * `config` - Runtime configuration
+    /// * `engine_name` - Engine to use ("lua", "javascript", etc.)
+    ///
+    /// # Examples
+    ///
+    /// ```rust,no_run
+    /// use llmspell_bridge::ScriptRuntime;
+    /// use llmspell_config::LLMSpellConfig;
+    ///
+    /// # async fn example() -> Result<(), Box<dyn std::error::Error>> {
+    /// let config = LLMSpellConfig::default();
+    ///
+    /// // Create runtime with Lua engine (override config.default_engine)
+    /// let runtime = ScriptRuntime::with_engine(config, "lua").await?;
+    /// # Ok(())
+    /// # }
+    /// ```
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if:
+    /// - Engine initialization fails
+    /// - Infrastructure creation fails
+    /// - `engine_name` is unsupported or not compiled in
+    #[cfg(any(feature = "lua", feature = "javascript"))]
+    #[instrument(level = "info", skip(config), fields(
+        engine_name = %engine_name,
+        rag_enabled = config.rag.enabled,
+        memory_enabled = config.runtime.memory.enabled
+    ))]
+    pub async fn with_engine(
+        config: LLMSpellConfig,
+        engine_name: &str,
+    ) -> Result<Self, LLMSpellError> {
+        info!("Creating ScriptRuntime with engine: {engine_name}");
+
+        // Step 1: Create ALL infrastructure from config
+        let infrastructure = crate::infrastructure::Infrastructure::from_config(&config).await?;
+
+        // Step 2: Create engine
+        let engine = Self::create_engine_by_name(engine_name, &config)?;
+
+        // Step 3: Initialize runtime with engine and infrastructure
+        Self::initialize_with_infrastructure(engine, config, infrastructure).await
+    }
+
     /// Create a new runtime with Lua engine
     ///
     /// # Examples
@@ -313,174 +407,16 @@ impl ScriptRuntime {
     ///
     /// # async fn example() -> Result<(), Box<dyn std::error::Error>> {
     /// // With default configuration
-    /// let runtime = ScriptRuntime::new_with_lua(LLMSpellConfig::default()).await?;
+    /// let runtime = ScriptRuntime::new(LLMSpellConfig::default()).await?;
     ///
     /// // With custom configuration
     /// let mut config = LLMSpellConfig::default();
     /// config.runtime.security.allow_file_access = true;
-    /// let runtime = ScriptRuntime::new_with_lua(config).await?;
+    /// let runtime = ScriptRuntime::new(config).await?;
     /// # Ok(())
     /// # }
     /// ```
     ///
-    /// # Errors
-    ///
-    /// Returns an error if runtime initialization fails
-    #[cfg(feature = "lua")]
-    #[instrument(level = "info", skip(config), fields(
-        engine_type = "lua",
-        default_engine = %config.default_engine,
-        events_enabled = config.events.enabled
-    ))]
-    pub async fn new_with_lua(config: LLMSpellConfig) -> Result<Self, LLMSpellError> {
-        info!("Creating Lua script runtime");
-        // Convert llmspell-config LuaConfig to bridge LuaConfig
-        let lua_config = LuaConfig::default(); // For now, use defaults - TODO: proper conversion
-        let engine = EngineFactory::create_lua_engine_with_runtime(
-            &lua_config,
-            Some(Arc::new(config.clone())),
-        )?;
-        Self::new_with_engine(engine, config).await
-    }
-
-    /// Create a new runtime with JavaScript engine
-    ///
-    /// # Errors
-    ///
-    /// Returns an error if runtime initialization fails
-    #[cfg(feature = "javascript")]
-    #[instrument(level = "info", skip(config), fields(
-        engine_type = "javascript",
-        default_engine = %config.default_engine,
-        events_enabled = config.events.enabled
-    ))]
-    pub async fn new_with_javascript(config: LLMSpellConfig) -> Result<Self, LLMSpellError> {
-        info!("Creating JavaScript script runtime");
-        // Convert llmspell-config JSConfig to bridge JSConfig
-        let js_config = JSConfig::default(); // For now, use defaults - TODO: proper conversion
-        let engine = EngineFactory::create_javascript_engine(&js_config)?;
-        Self::new_with_engine(engine, config).await
-    }
-
-    /// Create Lua runtime with existing provider manager (Phase 11.FIX.1)
-    ///
-    /// # Errors
-    ///
-    /// Returns an error if runtime initialization fails
-    #[cfg(feature = "lua")]
-    pub async fn new_with_lua_and_provider(
-        config: LLMSpellConfig,
-        provider_manager: Arc<ProviderManager>,
-    ) -> Result<Self, LLMSpellError> {
-        info!("Creating Lua script runtime with existing provider manager");
-        let lua_config = LuaConfig::default();
-        let engine = EngineFactory::create_lua_engine_with_runtime(
-            &lua_config,
-            Some(Arc::new(config.clone())),
-        )?;
-        Self::new_with_engine_and_provider(engine, config, provider_manager).await
-    }
-
-    /// Create Lua runtime with provider manager AND `SessionManager` (Phase 12.8.2.11)
-    ///
-    /// # Errors
-    ///
-    /// Returns an error if runtime initialization fails
-    #[cfg(feature = "lua")]
-    pub async fn new_with_lua_provider_and_session(
-        config: LLMSpellConfig,
-        provider_manager: Arc<ProviderManager>,
-        session_manager: Arc<llmspell_kernel::sessions::SessionManager>,
-    ) -> Result<Self, LLMSpellError> {
-        info!("Creating Lua script runtime with provider manager and session manager");
-        let lua_config = LuaConfig::default();
-        let engine = EngineFactory::create_lua_engine_with_runtime(
-            &lua_config,
-            Some(Arc::new(config.clone())),
-        )?;
-        Self::new_with_engine_provider_and_session(
-            engine,
-            config,
-            provider_manager,
-            session_manager,
-        )
-        .await
-    }
-
-    /// Create Lua runtime with core provider manager AND `SessionManager` (Phase 12.8.2.11)
-    ///
-    /// Accepts `llmspell_providers::ProviderManager` from kernel layer to avoid re-initialization.
-    /// Wraps it in bridge `ProviderManager` for script access.
-    ///
-    /// # Errors
-    ///
-    /// Returns an error if runtime initialization fails
-    #[cfg(feature = "lua")]
-    pub async fn new_with_lua_core_provider_and_session(
-        config: LLMSpellConfig,
-        core_provider_manager: Arc<llmspell_providers::ProviderManager>,
-        session_manager: Arc<llmspell_kernel::sessions::SessionManager>,
-    ) -> Result<Self, LLMSpellError> {
-        info!("Creating Lua script runtime with core provider manager and session manager");
-
-        // Wrap core manager in bridge ProviderManager
-        // Clone the core manager (cheap - uses Arc internally)
-        let bridge_provider_manager = Arc::new(ProviderManager::from_core_manager(
-            (*core_provider_manager).clone(),
-            config.providers.clone(),
-        ));
-
-        Self::new_with_lua_provider_and_session(config, bridge_provider_manager, session_manager)
-            .await
-    }
-
-    /// Create JavaScript runtime with existing provider manager (Phase 11.FIX.1)
-    ///
-    /// # Errors
-    ///
-    /// Returns an error if runtime initialization fails
-    #[cfg(feature = "javascript")]
-    pub async fn new_with_javascript_and_provider(
-        config: LLMSpellConfig,
-        provider_manager: Arc<ProviderManager>,
-    ) -> Result<Self, LLMSpellError> {
-        info!("Creating JavaScript script runtime with existing provider manager");
-        let js_config = JSConfig::default();
-        let engine = EngineFactory::create_javascript_engine(&js_config)?;
-        Self::new_with_engine_and_provider(engine, config, provider_manager).await
-    }
-
-    /// Create a new runtime with a specific engine by name
-    ///
-    /// # Errors
-    ///
-    /// Returns an error if the engine is not found or runtime initialization fails
-    #[instrument(level = "info", skip(config), fields(
-        engine_name = %engine_name,
-        default_engine = %config.default_engine,
-        events_enabled = config.events.enabled
-    ))]
-    pub async fn new_with_engine_name(
-        engine_name: &str,
-        config: LLMSpellConfig,
-    ) -> Result<Self, LLMSpellError> {
-        info!("Creating script runtime with engine: {}", engine_name);
-        match engine_name {
-            #[cfg(feature = "lua")]
-            "lua" => Box::pin(Self::new_with_lua(config)).await,
-            #[cfg(feature = "javascript")]
-            "javascript" | "js" => Box::pin(Self::new_with_javascript(config)).await,
-            _ => Err(LLMSpellError::Validation {
-                field: Some("engine".to_string()),
-                message: format!(
-                    "Unsupported or disabled engine: '{}'. Available: {}",
-                    engine_name,
-                    Self::available_engines().join(", ")
-                ),
-            }),
-        }
-    }
-
     /// Get list of compiled script engines
     ///
     /// Returns a list of engine names that were compiled into this binary
@@ -507,76 +443,90 @@ impl ScriptRuntime {
         engines
     }
 
-    /// Core initialization with any engine
+    /// Create engine by name (Phase 13b.16.2 - Engine Factory Helper)
+    ///
+    /// Helper for `with_engine()` that creates engine based on name.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if engine is unsupported or not compiled in
     #[cfg(any(feature = "lua", feature = "javascript"))]
-    #[instrument(level = "debug", skip(engine, config), fields(
+    fn create_engine_by_name(
+        engine_name: &str,
+        config: &LLMSpellConfig,
+    ) -> Result<Box<dyn ScriptEngineBridge>, LLMSpellError> {
+        match engine_name {
+            #[cfg(feature = "lua")]
+            "lua" => {
+                let lua_config = LuaConfig::default();
+                EngineFactory::create_lua_engine_with_runtime(
+                    &lua_config,
+                    Some(Arc::new(config.clone())),
+                )
+            }
+            #[cfg(feature = "javascript")]
+            "javascript" | "js" => {
+                let js_config = JSConfig::default();
+                EngineFactory::create_javascript_engine(&js_config)
+            }
+            _ => Err(LLMSpellError::Validation {
+                field: Some("engine".to_string()),
+                message: format!(
+                    "Unsupported or disabled engine: '{}'. Available: {}",
+                    engine_name,
+                    Self::available_engines().join(", ")
+                ),
+            }),
+        }
+    }
+
+    /// Initialize runtime with engine and infrastructure (Phase 13b.16.2)
+    ///
+    /// Core initialization logic that wires engine with all infrastructure components.
+    /// Called by both `new()` and `with_engine()` after infrastructure creation.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if initialization fails
+    #[cfg(any(feature = "lua", feature = "javascript"))]
+    #[instrument(level = "debug", skip(engine, config, infrastructure), fields(
         engine_name = engine.get_engine_name(),
-        events_enabled = config.events.enabled,
-        tools_enabled = config.tools.enabled,
-        providers_count = config.providers.providers.len()
+        rag_enabled = infrastructure.rag.is_some(),
+        memory_enabled = infrastructure.memory_manager.is_some()
     ))]
-    async fn new_with_engine(
+    async fn initialize_with_infrastructure(
         mut engine: Box<dyn ScriptEngineBridge>,
         config: LLMSpellConfig,
+        infrastructure: crate::infrastructure::Infrastructure,
     ) -> Result<Self, LLMSpellError> {
-        debug!("Initializing script runtime with engine");
+        debug!("Initializing runtime with infrastructure");
 
-        // Create infrastructure registries BEFORE ComponentRegistry (Phase 12.7.1.2 Step 1)
-        // These provide full-featured infrastructure for templates (hooks, discovery, validation)
-        let tool_registry = Arc::new(llmspell_tools::ToolRegistry::new());
-        let agent_registry = Arc::new(llmspell_agents::FactoryRegistry::new());
-        let workflow_factory: Arc<dyn llmspell_workflows::WorkflowFactory> =
-            Arc::new(llmspell_workflows::factory::DefaultWorkflowFactory::new());
+        // Destructure infrastructure
+        let crate::infrastructure::Infrastructure {
+            provider_manager,
+            state_manager,
+            session_manager,
+            rag,
+            memory_manager,
+            tool_registry,
+            agent_registry,
+            workflow_factory,
+            component_registry,
+        } = infrastructure;
 
-        // Create component registry with event support and templates based on config
-        // This provides lightweight script access layer (HashMap-based)
-        let registry = if config.events.enabled {
-            // Create EventBus with default configuration
-            // Note: Buffer size is hardcoded to 10000 in EventBus implementation
-            let event_bus = Arc::new(llmspell_events::EventBus::new());
+        // Convert memory_manager to trait object (Phase 13b.16.2)
+        let memory_manager: Option<Arc<dyn llmspell_memory::MemoryManager>> =
+            memory_manager.map(|m| m as Arc<dyn llmspell_memory::MemoryManager>);
 
-            // Convert config to EventConfig for llmspell-core
-            let event_config = llmspell_core::traits::event::EventConfig {
-                enabled: config.events.enabled,
-                include_types: config.events.filtering.include_types.clone(),
-                exclude_types: config.events.filtering.exclude_types.clone(),
-                emit_timing_events: config.events.emit_timing_events,
-                emit_state_events: config.events.emit_state_events,
-                emit_debug_events: config.events.emit_debug_events,
-                max_events_per_second: config.events.max_events_per_second,
-            };
-
-            Arc::new(
-                ComponentRegistry::with_event_bus_and_templates(event_bus, event_config).map_err(
-                    |e| LLMSpellError::Component {
-                        message: format!("Failed to initialize component registry: {e}"),
-                        source: None,
-                    },
-                )?,
-            )
-        } else {
-            // Events disabled, create registry with built-in templates
-            Arc::new(
-                ComponentRegistry::with_templates().map_err(|e| LLMSpellError::Component {
-                    message: format!("Failed to initialize component registry: {e}"),
-                    source: None,
-                })?,
-            )
-        };
-
-        // Register all Phase 2 tools with BOTH registries using dual-registration (Phase 12.7.1.2 Step 5)
-        register_all_tools(&registry, &tool_registry, &config.tools)
+        // Register all Phase 2 tools with BOTH registries using dual-registration
+        register_all_tools(&component_registry, &tool_registry, &config.tools)
             .await
             .map_err(|e| LLMSpellError::Component {
                 message: format!("Failed to register tools: {e}"),
                 source: None,
             })?;
 
-        // Create provider manager using config from llmspell-config
-        let provider_manager = Arc::new(ProviderManager::new(config.providers.clone()).await?);
-
-        // Register default agent factory with AgentRegistry (Phase 12.8.2.6)
-        // This provides agent creation capability for templates (interactive-chat, code-generator, etc.)
+        // Register default agent factory with `AgentRegistry`
         debug!("Registering default agent factory");
         let core_provider_manager = provider_manager.create_core_manager_arc().await?;
         let default_agent_factory = Arc::new(llmspell_agents::DefaultAgentFactory::new(
@@ -593,15 +543,14 @@ impl ScriptRuntime {
 
         debug!("Default agent factory registered successfully");
 
-        // Inject APIs into the engine (no SessionManager for standalone mode)
-        // Pass infrastructure registries for template execution (Phase 12.8.2.13)
+        // Inject APIs into the engine with full infrastructure
         engine.inject_apis(
-            &registry,
+            &component_registry,
             &provider_manager,
             &tool_registry,
             &agent_registry,
             &workflow_factory,
-            None,
+            Some(session_manager.clone()),
         )?;
 
         // Create execution context
@@ -621,254 +570,17 @@ impl ScriptRuntime {
             },
         }));
 
-        // Phase 12.7.1.2 Step 6: Initialize struct with infrastructure registries
         Ok(Self {
             engine,
-            registry,
-            provider_manager,
-            tool_registry,    // NEW - infrastructure for templates
-            agent_registry,   // NEW - infrastructure for templates
-            workflow_factory, // NEW - infrastructure for templates
-            session_manager: Arc::new(RwLock::new(None)), // Phase 12.8.2.5 - wired from kernel later
-            rag: Arc::new(RwLock::new(None)), // Phase 12.8.fix - wired from kernel later for RAG templates
-            memory_manager: Arc::new(RwLock::new(None)), // Phase 13.12.1 - wired from kernel later
-            context_enabled: Arc::new(RwLock::new(false)), // Phase 13.12.3 - enabled when memory_manager set
-            execution_context,
-            debug_context: Arc::new(RwLock::new(None)),
-            _config: config,
-        })
-    }
-
-    /// Create runtime with `SessionManager` (Phase 12.8.2.11 - Unified Kernel Path)
-    /// Used by kernel to ensure `SessionManager` is available during `inject_apis()`
-    #[cfg(any(feature = "lua", feature = "javascript"))]
-    #[allow(clippy::cognitive_complexity)]
-    async fn new_with_engine_provider_and_session(
-        mut engine: Box<dyn ScriptEngineBridge>,
-        config: LLMSpellConfig,
-        provider_manager: Arc<ProviderManager>,
-        session_manager: Arc<llmspell_kernel::sessions::SessionManager>,
-    ) -> Result<Self, LLMSpellError> {
-        debug!("Initializing script runtime with provider manager AND session manager");
-
-        // Create infrastructure registries
-        let tool_registry = Arc::new(llmspell_tools::ToolRegistry::new());
-        let agent_registry = Arc::new(llmspell_agents::FactoryRegistry::new());
-        let workflow_factory: Arc<dyn llmspell_workflows::WorkflowFactory> =
-            Arc::new(llmspell_workflows::factory::DefaultWorkflowFactory::new());
-
-        // Create component registry
-        let registry = if config.events.enabled {
-            let event_bus = Arc::new(llmspell_events::EventBus::new());
-            let event_config = llmspell_core::traits::event::EventConfig {
-                enabled: config.events.enabled,
-                include_types: config.events.filtering.include_types.clone(),
-                exclude_types: config.events.filtering.exclude_types.clone(),
-                emit_timing_events: config.events.emit_timing_events,
-                emit_state_events: config.events.emit_state_events,
-                emit_debug_events: config.events.emit_debug_events,
-                max_events_per_second: config.events.max_events_per_second,
-            };
-            Arc::new(
-                ComponentRegistry::with_event_bus_and_templates(event_bus, event_config).map_err(
-                    |e| LLMSpellError::Component {
-                        message: format!("Failed to initialize component registry: {e}"),
-                        source: None,
-                    },
-                )?,
-            )
-        } else {
-            Arc::new(
-                ComponentRegistry::with_templates().map_err(|e| LLMSpellError::Component {
-                    message: format!("Failed to initialize component registry: {e}"),
-                    source: None,
-                })?,
-            )
-        };
-
-        // Register all tools with BOTH registries
-        register_all_tools(&registry, &tool_registry, &config.tools)
-            .await
-            .map_err(|e| LLMSpellError::Component {
-                message: format!("Failed to register tools: {e}"),
-                source: None,
-            })?;
-
-        // Register default agent factory
-        debug!("Registering default agent factory with existing provider manager");
-        let core_provider_manager = provider_manager.create_core_manager_arc().await?;
-        let default_agent_factory = Arc::new(llmspell_agents::DefaultAgentFactory::new(
-            core_provider_manager,
-        ));
-
-        agent_registry
-            .register_factory("default".to_string(), default_agent_factory)
-            .await
-            .map_err(|e| LLMSpellError::Component {
-                message: format!("Failed to register default agent factory: {e}"),
-                source: None,
-            })?;
-
-        debug!("Default agent factory registered successfully");
-
-        // Inject APIs with SessionManager (Phase 12.8.2.11)
-        // Type-erase SessionManager to avoid circular dependencies
-        // Pass infrastructure registries for template execution (Phase 12.8.2.13)
-        let session_manager_any: Arc<dyn std::any::Any + Send + Sync> = session_manager.clone();
-        engine.inject_apis(
-            &registry,
-            &provider_manager,
-            &tool_registry,
-            &agent_registry,
-            &workflow_factory,
-            Some(session_manager_any),
-        )?;
-
-        let execution_context = Arc::new(RwLock::new(crate::engine::ExecutionContext {
-            working_directory: std::env::current_dir()
-                .unwrap_or_default()
-                .to_string_lossy()
-                .to_string(),
-            environment: std::env::vars().collect(),
-            state: serde_json::Value::Object(serde_json::Map::new()),
-            security: crate::engine::SecurityContext {
-                allow_file_access: config.runtime.security.allow_file_access,
-                allow_network_access: config.runtime.security.allow_network_access,
-                allow_process_spawn: config.runtime.security.allow_process_spawn,
-                max_memory_bytes: config.runtime.security.max_memory_bytes,
-                max_execution_time_ms: config.runtime.security.max_execution_time_ms,
-            },
-        }));
-
-        // Initialize struct with SessionManager already wired
-        Ok(Self {
-            engine,
-            registry,
+            registry: component_registry,
             provider_manager,
             tool_registry,
             agent_registry,
             workflow_factory,
-            session_manager: Arc::new(RwLock::new(Some(session_manager))), // Wired during construction
-            rag: Arc::new(RwLock::new(None)), // Phase 12.8.fix - wired from kernel later for RAG templates
-            memory_manager: Arc::new(RwLock::new(None)), // Phase 13.12.1 - wired from kernel later
-            context_enabled: Arc::new(RwLock::new(false)), // Phase 13.12.3 - enabled when memory_manager set
-            execution_context,
-            debug_context: Arc::new(RwLock::new(None)),
-            _config: config,
-        })
-    }
-
-    /// Create runtime with existing provider manager (Phase 11.FIX.1)
-    /// This ensures a single `ProviderManager` instance is shared between kernel and script runtime
-    #[cfg(any(feature = "lua", feature = "javascript"))]
-    #[allow(clippy::cognitive_complexity)] // Initialization code with sequential setup steps
-    async fn new_with_engine_and_provider(
-        mut engine: Box<dyn ScriptEngineBridge>,
-        config: LLMSpellConfig,
-        provider_manager: Arc<ProviderManager>,
-    ) -> Result<Self, LLMSpellError> {
-        debug!("Initializing script runtime with engine and existing provider manager");
-
-        // Create infrastructure registries (Phase 12.7.1.2 Step 7)
-        let tool_registry = Arc::new(llmspell_tools::ToolRegistry::new());
-        let agent_registry = Arc::new(llmspell_agents::FactoryRegistry::new());
-        let workflow_factory: Arc<dyn llmspell_workflows::WorkflowFactory> =
-            Arc::new(llmspell_workflows::factory::DefaultWorkflowFactory::new());
-
-        // Create component registry with event support and templates based on config
-        let registry = if config.events.enabled {
-            let event_bus = Arc::new(llmspell_events::EventBus::new());
-            let event_config = llmspell_core::traits::event::EventConfig {
-                enabled: config.events.enabled,
-                include_types: config.events.filtering.include_types.clone(),
-                exclude_types: config.events.filtering.exclude_types.clone(),
-                emit_timing_events: config.events.emit_timing_events,
-                emit_state_events: config.events.emit_state_events,
-                emit_debug_events: config.events.emit_debug_events,
-                max_events_per_second: config.events.max_events_per_second,
-            };
-            Arc::new(
-                ComponentRegistry::with_event_bus_and_templates(event_bus, event_config).map_err(
-                    |e| LLMSpellError::Component {
-                        message: format!("Failed to initialize component registry: {e}"),
-                        source: None,
-                    },
-                )?,
-            )
-        } else {
-            Arc::new(
-                ComponentRegistry::with_templates().map_err(|e| LLMSpellError::Component {
-                    message: format!("Failed to initialize component registry: {e}"),
-                    source: None,
-                })?,
-            )
-        };
-
-        // Register all Phase 2 tools with BOTH registries using dual-registration (Phase 12.7.1.2 Step 7)
-        register_all_tools(&registry, &tool_registry, &config.tools)
-            .await
-            .map_err(|e| LLMSpellError::Component {
-                message: format!("Failed to register tools: {e}"),
-                source: None,
-            })?;
-
-        // Register default agent factory with AgentRegistry (Phase 12.8.2.6)
-        // This provides agent creation capability for templates (interactive-chat, code-generator, etc.)
-        debug!("Registering default agent factory with existing provider manager");
-        let core_provider_manager = provider_manager.create_core_manager_arc().await?;
-        let default_agent_factory = Arc::new(llmspell_agents::DefaultAgentFactory::new(
-            core_provider_manager,
-        ));
-
-        agent_registry
-            .register_factory("default".to_string(), default_agent_factory)
-            .await
-            .map_err(|e| LLMSpellError::Component {
-                message: format!("Failed to register default agent factory: {e}"),
-                source: None,
-            })?;
-
-        debug!("Default agent factory registered successfully");
-
-        // Use provided provider manager instead of creating new one (no SessionManager for now)
-        // Pass infrastructure registries for template execution (Phase 12.8.2.13)
-        engine.inject_apis(
-            &registry,
-            &provider_manager,
-            &tool_registry,
-            &agent_registry,
-            &workflow_factory,
-            None,
-        )?;
-
-        let execution_context = Arc::new(RwLock::new(crate::engine::ExecutionContext {
-            working_directory: std::env::current_dir()
-                .unwrap_or_default()
-                .to_string_lossy()
-                .to_string(),
-            environment: std::env::vars().collect(),
-            state: serde_json::Value::Object(serde_json::Map::new()),
-            security: crate::engine::SecurityContext {
-                allow_file_access: config.runtime.security.allow_file_access,
-                allow_network_access: config.runtime.security.allow_network_access,
-                allow_process_spawn: config.runtime.security.allow_process_spawn,
-                max_memory_bytes: config.runtime.security.max_memory_bytes,
-                max_execution_time_ms: config.runtime.security.max_execution_time_ms,
-            },
-        }));
-
-        // Phase 12.7.1.2 Step 7: Initialize struct with infrastructure registries
-        Ok(Self {
-            engine,
-            registry,
-            provider_manager,
-            tool_registry,    // NEW - infrastructure for templates
-            agent_registry,   // NEW - infrastructure for templates
-            workflow_factory, // NEW - infrastructure for templates
-            session_manager: Arc::new(RwLock::new(None)), // Phase 12.8.2.5 - wired from kernel later
-            rag: Arc::new(RwLock::new(None)), // Phase 12.8.fix - wired from kernel later for RAG templates
-            memory_manager: Arc::new(RwLock::new(None)), // Phase 13.12.1 - wired from kernel later
-            context_enabled: Arc::new(RwLock::new(false)), // Phase 13.12.3 - enabled when memory_manager set
+            state_manager,
+            session_manager,
+            rag,
+            memory_manager,
             execution_context,
             debug_context: Arc::new(RwLock::new(None)),
             _config: config,
@@ -1015,86 +727,6 @@ impl ScriptRuntime {
     #[must_use]
     pub fn workflow_factory(&self) -> &Arc<dyn llmspell_workflows::WorkflowFactory> {
         &self.workflow_factory
-    }
-
-    /// Set session manager for template infrastructure (Phase 12.8.2.5)
-    ///
-    /// This method is called by the kernel after `ScriptRuntime` initialization to wire in
-    /// the `SessionManager`. The kernel creates the `SessionManager` with full dependencies
-    /// (state manager, storage backend, hooks, events) and passes it here.
-    ///
-    /// # Examples
-    ///
-    /// ```rust,ignore
-    /// // In kernel initialization (integrated.rs):
-    /// let session_manager = SessionManager::new(...)?;
-    /// if let Some(runtime) = script_executor.as_any().downcast_ref::<ScriptRuntime>() {
-    ///     runtime.set_session_manager(Arc::new(session_manager.clone()));
-    /// }
-    /// ```
-    ///
-    /// # Design Note
-    ///
-    /// This method is NOT part of `ScriptExecutor` trait to avoid circular dependency:
-    /// - `ScriptExecutor` trait is in `llmspell-core`
-    /// - `SessionManager` type is in `llmspell-kernel`
-    /// - Adding session manager to trait would create `core` → `kernel` dependency
-    ///
-    /// Instead, kernel uses `as_any()` downcasting to access this concrete method.
-    pub fn set_session_manager(
-        &self,
-        session_manager: Arc<llmspell_kernel::sessions::SessionManager>,
-    ) {
-        if let Ok(mut sm) = self.session_manager.write() {
-            *sm = Some(session_manager);
-            debug!("Session manager wired to ScriptRuntime");
-        }
-    }
-
-    /// Wire RAG infrastructure to `ScriptRuntime` for template execution (Phase 12.8.fix)
-    ///
-    /// This method is called by the kernel after `ScriptRuntime` initialization to wire in
-    /// the `MultiTenantRAG` for research-assistant and other RAG-dependent templates.
-    ///
-    /// # Examples
-    ///
-    /// ```rust,ignore
-    /// // In kernel initialization:
-    /// if let Some(runtime) = script_executor.as_any().downcast_ref::<ScriptRuntime>() {
-    ///     runtime.set_rag(multi_tenant_rag);
-    /// }
-    /// ```
-    pub fn set_rag(&self, rag: Arc<llmspell_rag::multi_tenant_integration::MultiTenantRAG>) {
-        if let Ok(mut r) = self.rag.write() {
-            *r = Some(rag);
-            debug!("RAG infrastructure wired to ScriptRuntime");
-        }
-    }
-
-    /// Wire memory manager to `ScriptRuntime` for CLI/Lua memory operations (Phase 13.12.1)
-    ///
-    /// This method is called by the kernel after `ScriptRuntime` initialization to wire in
-    /// the `MemoryManager` for episodic/semantic memory access and consolidation.
-    ///
-    /// # Examples
-    ///
-    /// ```rust,ignore
-    /// // In kernel initialization:
-    /// if let Some(runtime) = script_executor.as_any().downcast_ref::<ScriptRuntime>() {
-    ///     runtime.set_memory_manager(memory_manager);
-    /// }
-    /// ```
-    pub fn set_memory_manager(&self, memory_manager: Arc<dyn llmspell_memory::MemoryManager>) {
-        if let Ok(mut mm) = self.memory_manager.write() {
-            *mm = Some(memory_manager);
-            debug!("Memory manager wired to ScriptRuntime");
-
-            // Enable context operations when memory is available
-            if let Ok(mut ctx) = self.context_enabled.write() {
-                *ctx = true;
-                debug!("Context operations enabled via memory_manager");
-            }
-        }
     }
 
     /// Downcast support for kernel to access concrete `ScriptRuntime` methods (Phase 12.8.2.5)
@@ -1266,15 +898,8 @@ impl ScriptExecutor for ScriptRuntime {
         debug_context.clone()
     }
 
-    fn set_session_manager_any(&self, manager: Arc<dyn std::any::Any + Send + Sync>) {
-        // Downcast from type-erased Any to concrete SessionManager
-        if let Ok(session_manager) =
-            Arc::downcast::<llmspell_kernel::sessions::SessionManager>(manager)
-        {
-            self.set_session_manager(session_manager);
-        } else {
-            warn!("Failed to downcast session manager from Any");
-        }
+    fn get_session_manager_any(&self) -> Option<Arc<dyn std::any::Any + Send + Sync>> {
+        Some(self.session_manager.clone() as Arc<dyn std::any::Any + Send + Sync>)
     }
 
     fn component_registry(&self) -> Option<Arc<dyn ComponentLookup>> {
@@ -1429,6 +1054,21 @@ impl ScriptExecutor for ScriptRuntime {
         Ok(info_json)
     }
 
+    /// Handle template exec command
+    ///
+    /// Builds `ExecutionContext` with all required infrastructure:
+    /// - Tool/Agent/Workflow registries (always required)
+    /// - Provider manager + `provider_config` (always required, Phase 13.5.7d)
+    /// - Session manager (optional, if wired from kernel)
+    /// - RAG infrastructure (optional, if wired from kernel)
+    ///
+    /// # Errors
+    ///
+    /// Returns error if:
+    /// - Template not found in registry
+    /// - Parameter validation fails
+    /// - `ExecutionContext` build fails (missing required infrastructure)
+    /// - Template execution fails
     async fn handle_template_exec(
         &self,
         template_id: &str,
@@ -1446,21 +1086,38 @@ impl ScriptExecutor for ScriptRuntime {
         // Wire in the 5 required components for template execution
         let core_provider_manager = self.provider_manager.create_core_manager_arc().await?;
 
-        // Get session manager if available (Phase 12.8.2.5)
-        let session_manager = self
-            .session_manager
-            .read()
-            .ok()
-            .and_then(|guard| guard.clone());
+        // Get session manager (Phase 13b.16.2: direct ownership)
+        let session_manager = Some(self.session_manager.clone());
 
-        // Get RAG if available (Phase 12.8.fix)
-        let rag = self.rag.read().ok().and_then(|guard| guard.clone());
+        // Get RAG if available (Phase 13b.16.2: direct ownership)
+        let rag = self.rag.clone();
+        if rag.is_some() {
+            debug!("RAG available for template execution");
+        } else {
+            debug!("RAG NOT available for template execution - check config.rag.enabled");
+        }
+
+        // Get provider configuration for ExecutionContext (Task 13b.1.7 - Phase 13.5.7d regression fix)
+        //
+        // Phase 13.5.7d made provider_config REQUIRED in ExecutionContext to enable
+        // smart dual-path LLM provider resolution:
+        //   1. provider_name param → centralized config lookup (RECOMMENDED)
+        //   2. model param → ephemeral provider with inline overrides (backward compat)
+        //   3. Default provider → fallback from ProviderManagerConfig
+        //
+        // Without provider_config, ExecutionContext::build() fails with:
+        // "Required infrastructure not available: provider_config is required"
+        //
+        // See: llmspell-templates/src/context.rs:706-709 (validation)
+        //      llmspell-templates/src/context.rs:160-230 (smart resolution)
+        let provider_config = Arc::new(self.provider_manager.config().clone());
 
         let mut builder = llmspell_templates::context::ExecutionContext::builder()
             .with_tool_registry(self.tool_registry.clone())
             .with_agent_registry(self.agent_registry.clone())
             .with_workflow_factory(self.workflow_factory.clone())
-            .with_providers(core_provider_manager);
+            .with_providers(core_provider_manager)
+            .with_provider_config(provider_config);
 
         // Add session manager if wired from kernel (Phase 12.8.2.5)
         if let Some(sm) = session_manager {
@@ -1478,6 +1135,20 @@ impl ScriptExecutor for ScriptRuntime {
             message: format!("Failed to build execution context: {e}"),
             source: None,
         })?;
+
+        // Check if any providers are initialized and fail fast if none available (Task 13b.15)
+        // Prevents hanging when templates need LLM but all providers disabled/missing
+        // Most templates use agents which require providers, so check unconditionally
+        let providers = self.provider_manager.list_providers().await;
+        if providers.is_empty() {
+            return Err(LLMSpellError::Configuration {
+                message: format!(
+                    "Template '{template_id}' execution requires LLM providers, but none are configured/enabled. \
+                     Enable at least one provider in config or use --profile with valid providers."
+                ),
+                source: None,
+            });
+        }
 
         // Execute template
         let output = template
@@ -1617,15 +1288,13 @@ impl ScriptExecutor for ScriptRuntime {
         use serde_json::json;
 
         // Get memory manager
-        let memory_manager = self
-            .memory_manager
-            .read()
-            .ok()
-            .and_then(|guard| guard.clone())
-            .ok_or_else(|| LLMSpellError::Component {
-                message: "Memory manager not available".to_string(),
-                source: None,
-            })?;
+        let memory_manager =
+            self.memory_manager
+                .clone()
+                .ok_or_else(|| LLMSpellError::Component {
+                    message: "Memory manager not available".to_string(),
+                    source: None,
+                })?;
 
         // Create episodic entry with metadata
         let mut entry = llmspell_memory::EpisodicEntry::new(
@@ -1657,15 +1326,13 @@ impl ScriptExecutor for ScriptRuntime {
         use serde_json::json;
 
         // Get memory manager
-        let memory_manager = self
-            .memory_manager
-            .read()
-            .ok()
-            .and_then(|guard| guard.clone())
-            .ok_or_else(|| LLMSpellError::Component {
-                message: "Memory manager not available".to_string(),
-                source: None,
-            })?;
+        let memory_manager =
+            self.memory_manager
+                .clone()
+                .ok_or_else(|| LLMSpellError::Component {
+                    message: "Memory manager not available".to_string(),
+                    source: None,
+                })?;
 
         // Search episodic memory
         let mut results = tokio::task::block_in_place(|| {
@@ -1708,15 +1375,13 @@ impl ScriptExecutor for ScriptRuntime {
         use serde_json::json;
 
         // Get memory manager
-        let _memory_manager = self
-            .memory_manager
-            .read()
-            .ok()
-            .and_then(|guard| guard.clone())
-            .ok_or_else(|| LLMSpellError::Component {
-                message: "Memory manager not available".to_string(),
-                source: None,
-            })?;
+        let _memory_manager =
+            self.memory_manager
+                .clone()
+                .ok_or_else(|| LLMSpellError::Component {
+                    message: "Memory manager not available".to_string(),
+                    source: None,
+                })?;
 
         // Query semantic memory (knowledge graph)
         // Note: SemanticMemory trait doesn't have text search, so we return empty for now
@@ -1733,15 +1398,13 @@ impl ScriptExecutor for ScriptRuntime {
         use serde_json::json;
 
         // Get memory manager
-        let memory_manager = self
-            .memory_manager
-            .read()
-            .ok()
-            .and_then(|guard| guard.clone())
-            .ok_or_else(|| LLMSpellError::Component {
-                message: "Memory manager not available".to_string(),
-                source: None,
-            })?;
+        let memory_manager =
+            self.memory_manager
+                .clone()
+                .ok_or_else(|| LLMSpellError::Component {
+                    message: "Memory manager not available".to_string(),
+                    source: None,
+                })?;
 
         // Get stats from episodic and semantic memory
         // Note: Memory traits don't have count methods, so we get session lists as proxy
@@ -1783,15 +1446,13 @@ impl ScriptExecutor for ScriptRuntime {
         use serde_json::json;
 
         // Get memory manager
-        let memory_manager = self
-            .memory_manager
-            .read()
-            .ok()
-            .and_then(|guard| guard.clone())
-            .ok_or_else(|| LLMSpellError::Component {
-                message: "Memory manager not available".to_string(),
-                source: None,
-            })?;
+        let memory_manager =
+            self.memory_manager
+                .clone()
+                .ok_or_else(|| LLMSpellError::Component {
+                    message: "Memory manager not available".to_string(),
+                    source: None,
+                })?;
 
         // Determine consolidation mode
         let mode = if force {
@@ -1835,10 +1496,8 @@ impl ScriptExecutor for ScriptRuntime {
     ) -> Result<serde_json::Value, LLMSpellError> {
         use serde_json::json;
 
-        // Check if context is enabled
-        let context_enabled = self.context_enabled.read().ok().is_some_and(|guard| *guard);
-
-        if !context_enabled {
+        // Check if memory manager is available (Phase 13b.16.2: direct ownership check)
+        if self.memory_manager.is_none() {
             return Err(LLMSpellError::Component {
                 message: "Context operations not available (memory manager not set)".to_string(),
                 source: None,
@@ -1846,15 +1505,13 @@ impl ScriptExecutor for ScriptRuntime {
         }
 
         // Get memory manager
-        let memory_manager = self
-            .memory_manager
-            .read()
-            .ok()
-            .and_then(|guard| guard.clone())
-            .ok_or_else(|| LLMSpellError::Component {
-                message: "Memory manager not available".to_string(),
-                source: None,
-            })?;
+        let memory_manager =
+            self.memory_manager
+                .clone()
+                .ok_or_else(|| LLMSpellError::Component {
+                    message: "Memory manager not available".to_string(),
+                    source: None,
+                })?;
 
         // Simple context assembly based on strategy
         let chunks = tokio::task::block_in_place(|| {
@@ -1956,10 +1613,8 @@ impl ScriptExecutor for ScriptRuntime {
     ) -> Result<serde_json::Value, LLMSpellError> {
         use serde_json::json;
 
-        // Check if context is enabled
-        let context_enabled = self.context_enabled.read().ok().is_some_and(|guard| *guard);
-
-        if !context_enabled {
+        // Check if memory manager is available (Phase 13b.16.2: direct ownership check)
+        if self.memory_manager.is_none() {
             return Err(LLMSpellError::Component {
                 message: "Context operations not available (memory manager not set)".to_string(),
                 source: None,
@@ -1967,15 +1622,13 @@ impl ScriptExecutor for ScriptRuntime {
         }
 
         // Get memory manager
-        let memory_manager = self
-            .memory_manager
-            .read()
-            .ok()
-            .and_then(|guard| guard.clone())
-            .ok_or_else(|| LLMSpellError::Component {
-                message: "Memory manager not available".to_string(),
-                source: None,
-            })?;
+        let memory_manager =
+            self.memory_manager
+                .clone()
+                .ok_or_else(|| LLMSpellError::Component {
+                    message: "Memory manager not available".to_string(),
+                    source: None,
+                })?;
 
         // Analyze token usage for each strategy
         let analysis = tokio::task::block_in_place(|| {

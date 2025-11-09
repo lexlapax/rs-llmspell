@@ -30,6 +30,8 @@ pub struct InfraConfig {
     pub agent_registry: Arc<llmspell_agents::FactoryRegistry>,
     /// Workflow factory from `ScriptRuntime`
     pub workflow_factory: Arc<dyn llmspell_workflows::WorkflowFactory>,
+    /// RAG infrastructure from `ScriptRuntime` (Task 13b.15.6)
+    pub rag: Option<Arc<llmspell_rag::multi_tenant_integration::MultiTenantRAG>>,
 }
 
 /// Bridge between scripts and template system
@@ -60,6 +62,8 @@ pub struct TemplateBridge {
     state_manager: Option<Arc<llmspell_kernel::state::StateManager>>,
     /// Optional session manager for session-based templates
     session_manager: Option<Arc<llmspell_kernel::sessions::manager::SessionManager>>,
+    /// Optional RAG infrastructure from `ScriptRuntime` (Task 13b.15.6)
+    rag: Option<Arc<llmspell_rag::multi_tenant_integration::MultiTenantRAG>>,
 }
 
 impl TemplateBridge {
@@ -90,6 +94,7 @@ impl TemplateBridge {
             workflow_factory: infra.workflow_factory,
             state_manager: None,
             session_manager: None,
+            rag: infra.rag,
         }
     }
 
@@ -122,6 +127,7 @@ impl TemplateBridge {
             workflow_factory: infra.workflow_factory,
             state_manager: Some(state_manager),
             session_manager: None,
+            rag: infra.rag,
         }
     }
 
@@ -154,6 +160,7 @@ impl TemplateBridge {
             workflow_factory: infra.workflow_factory,
             state_manager: Some(managers.state_manager),
             session_manager: Some(managers.session_manager),
+            rag: infra.rag,
         }
     }
 
@@ -271,6 +278,11 @@ impl TemplateBridge {
 
         if let Some(session_mgr) = &self.session_manager {
             context_builder = context_builder.with_session_manager(session_mgr.clone());
+        }
+
+        // Wire RAG if available (Task 13b.15.6)
+        if let Some(rag) = &self.rag {
+            context_builder = context_builder.with_rag(rag.clone());
         }
 
         let exec_context = context_builder
@@ -441,6 +453,7 @@ mod tests {
             tool_registry,
             agent_registry,
             workflow_factory,
+            rag: None,
         };
 
         let bridge = TemplateBridge::new(
@@ -471,6 +484,7 @@ mod tests {
             tool_registry,
             agent_registry,
             workflow_factory,
+            rag: None,
         };
 
         let bridge = TemplateBridge::new(
@@ -505,6 +519,7 @@ mod tests {
             tool_registry,
             agent_registry,
             workflow_factory,
+            rag: None,
         };
 
         let bridge = TemplateBridge::new(
@@ -550,6 +565,7 @@ mod tests {
             tool_registry,
             agent_registry,
             workflow_factory,
+            rag: None,
         };
 
         let bridge = TemplateBridge::new(
@@ -583,6 +599,7 @@ mod tests {
             tool_registry,
             agent_registry,
             workflow_factory,
+            rag: None,
         };
 
         let bridge = TemplateBridge::new(

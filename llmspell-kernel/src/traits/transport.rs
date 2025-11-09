@@ -122,9 +122,6 @@ pub fn create_transport(transport_type: &str) -> Result<BoxedTransport> {
             }
         }
         "websocket" | "ws" => Err(anyhow::anyhow!("WebSocket support not yet implemented")),
-        _ => Err(anyhow::anyhow!(
-            "Unknown transport type: {}",
-            transport_type
-        )),
+        _ => Err(anyhow::anyhow!("Unknown transport type: {transport_type}")),
     }
 }

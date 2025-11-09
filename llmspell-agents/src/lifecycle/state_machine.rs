@@ -560,8 +560,7 @@ impl AgentStateMachine {
                             HookResult::Cancel(reason) => {
                                 // Cancel blocks the transition
                                 return Err(anyhow!(
-                                    "State transition cancelled by hook: {}",
-                                    reason
+                                    "State transition cancelled by hook: {reason}"
                                 ));
                             }
                             HookResult::Redirect(target) => {
@@ -744,9 +743,7 @@ impl AgentStateMachine {
             if let Some(handler) = self.handlers.get(&current) {
                 if !handler.can_transition_to(target_state).await {
                     return Err(anyhow!(
-                        "Transition from {:?} to {:?} not allowed",
-                        current,
-                        target_state
+                        "Transition from {current:?} to {target_state:?} not allowed"
                     ));
                 }
             }
@@ -939,8 +936,7 @@ impl AgentStateMachine {
         let current = self.current_state().await;
         if !matches!(current, AgentState::Ready | AgentState::Paused) {
             return Err(anyhow!(
-                "Agent can only start from Ready or Paused state, current: {:?}",
-                current
+                "Agent can only start from Ready or Paused state, current: {current:?}"
             ));
         }
 
@@ -1008,10 +1004,7 @@ impl AgentStateMachine {
     pub async fn terminate(&self) -> Result<()> {
         let current = self.current_state().await;
         if !current.can_terminate() {
-            return Err(anyhow!(
-                "Agent cannot be terminated from state {:?}",
-                current
-            ));
+            return Err(anyhow!("Agent cannot be terminated from state {current:?}"));
         }
 
         // Start termination

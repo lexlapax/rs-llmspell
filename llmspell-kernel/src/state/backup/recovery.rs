@@ -225,7 +225,7 @@ impl RecoveryOrchestrator {
         self.backup_manager
             .validate_backup(backup_id)
             .await
-            .map_err(|e| anyhow::anyhow!("Backup validation failed: {}", e))
+            .map_err(|e| anyhow::anyhow!("Backup validation failed: {e}"))
     }
 
     /// Create a rollback point before recovery

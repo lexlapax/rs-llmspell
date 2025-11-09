@@ -82,7 +82,7 @@ impl EmbeddingFactory {
             }
 
             EmbeddingProviderType::Custom(name) => {
-                anyhow::bail!("Custom provider '{}' not yet implemented", name)
+                anyhow::bail!("Custom provider '{name}' not yet implemented")
             }
         }
     }

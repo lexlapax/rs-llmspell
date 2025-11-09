@@ -9,6 +9,8 @@ use std::sync::Arc;
 use tracing::info;
 
 use crate::config::{EpisodicBackendType, MemoryConfig};
+#[cfg(feature = "postgres")]
+use crate::episodic::PostgreSQLEpisodicMemory;
 use crate::episodic::{HNSWEpisodicMemory, InMemoryEpisodicMemory};
 use crate::error::{MemoryError, Result};
 use crate::traits::EpisodicMemory;
@@ -46,6 +48,10 @@ pub enum EpisodicBackend {
 
     /// HNSW vector index backend (production, 10K+ entries)
     HNSW(Arc<HNSWEpisodicMemory>),
+
+    /// `PostgreSQL` with `pgvector` backend (production, multi-tenant, `RLS`-enabled)
+    #[cfg(feature = "postgres")]
+    PostgreSQL(Arc<PostgreSQLEpisodicMemory>),
 }
 
 impl EpisodicBackend {
@@ -101,50 +107,86 @@ impl EpisodicBackend {
     /// ```
     pub fn from_config(config: &MemoryConfig) -> Result<Self> {
         match config.episodic_backend {
-            EpisodicBackendType::InMemory => {
-                info!("Creating InMemory episodic backend (testing mode)");
-
-                // If embedding service provided, use it with InMemory
-                let backend = config.embedding_service.as_ref().map_or_else(
-                    || {
-                        info!("InMemory backend using test embeddings (cosine similarity only)");
-                        InMemoryEpisodicMemory::new()
-                    },
-                    |service| {
-                        info!(
-                            "InMemory backend using embedding service: {}",
-                            service.provider_name()
-                        );
-                        InMemoryEpisodicMemory::new_with_embeddings(Arc::clone(service))
-                    },
-                );
-
-                Ok(Self::InMemory(Arc::new(backend)))
-            }
-
-            EpisodicBackendType::HNSW => {
-                info!("Creating HNSW episodic backend (production mode)");
-
-                let service = config.embedding_service.as_ref().ok_or_else(|| {
-                    MemoryError::InvalidInput(
-                        "HNSW backend requires embedding service (use MemoryConfig::for_production)".to_string()
-                    )
-                })?;
-
-                info!(
-                    "HNSW backend using embedding service: {}, dimensions: {}",
-                    service.provider_name(),
-                    service.dimensions()
-                );
-
-                let hnsw = HNSWEpisodicMemory::with_config(
-                    Arc::clone(service),
-                    config.hnsw_config.clone(),
-                )?;
-
-                Ok(Self::HNSW(Arc::new(hnsw)))
-            }
+            EpisodicBackendType::InMemory => Ok(Self::create_inmemory_backend(config)),
+            EpisodicBackendType::HNSW => Self::create_hnsw_backend(config),
+            #[cfg(feature = "postgres")]
+            EpisodicBackendType::PostgreSQL => Self::create_postgresql_backend(config),
         }
+    }
+
+    /// Create `InMemory` backend from configuration
+    fn create_inmemory_backend(config: &MemoryConfig) -> Self {
+        info!("Creating InMemory episodic backend (testing mode)");
+
+        // If embedding service provided, use it with InMemory
+        let backend = config.embedding_service.as_ref().map_or_else(
+            || {
+                info!("InMemory backend using test embeddings (cosine similarity only)");
+                InMemoryEpisodicMemory::new()
+            },
+            |service| {
+                info!(
+                    "InMemory backend using embedding service: {}",
+                    service.provider_name()
+                );
+                InMemoryEpisodicMemory::new_with_embeddings(Arc::clone(service))
+            },
+        );
+
+        Self::InMemory(Arc::new(backend))
+    }
+
+    /// Create HNSW backend from configuration
+    fn create_hnsw_backend(config: &MemoryConfig) -> Result<Self> {
+        info!("Creating HNSW episodic backend (production mode)");
+
+        let service = config.embedding_service.as_ref().ok_or_else(|| {
+            MemoryError::InvalidInput(
+                "HNSW backend requires embedding service (use MemoryConfig::for_production)"
+                    .to_string(),
+            )
+        })?;
+
+        info!(
+            "HNSW backend using embedding service: {}, dimensions: {}",
+            service.provider_name(),
+            service.dimensions()
+        );
+
+        let hnsw =
+            HNSWEpisodicMemory::with_config(Arc::clone(service), config.hnsw_config.clone())?;
+
+        Ok(Self::HNSW(Arc::new(hnsw)))
+    }
+
+    /// Create `PostgreSQL` backend from configuration
+    #[cfg(feature = "postgres")]
+    fn create_postgresql_backend(config: &MemoryConfig) -> Result<Self> {
+        info!("Creating PostgreSQL episodic backend (production mode, RLS-enabled)");
+
+        let service = config.embedding_service.as_ref().ok_or_else(|| {
+            MemoryError::InvalidInput(
+                "PostgreSQL backend requires embedding service (use MemoryConfig::for_postgresql)"
+                    .to_string(),
+            )
+        })?;
+
+        let backend = config.postgres_backend.as_ref().ok_or_else(|| {
+            MemoryError::InvalidInput(
+                "PostgreSQL backend requires postgres_backend (use MemoryConfig::for_postgresql)"
+                    .to_string(),
+            )
+        })?;
+
+        info!(
+            "PostgreSQL backend using embedding service: {}, dimensions: {}",
+            service.provider_name(),
+            service.dimensions()
+        );
+
+        let pg_memory = PostgreSQLEpisodicMemory::new(Arc::clone(backend), Arc::clone(service))?;
+
+        Ok(Self::PostgreSQL(Arc::new(pg_memory)))
     }
 
     /// Get backend type name for logging/debugging
@@ -153,6 +195,8 @@ impl EpisodicBackend {
         match self {
             Self::InMemory(_) => "InMemory",
             Self::HNSW(_) => "HNSW",
+            #[cfg(feature = "postgres")]
+            Self::PostgreSQL(_) => "PostgreSQL",
         }
     }
 }
@@ -163,6 +207,8 @@ impl EpisodicMemory for EpisodicBackend {
         match self {
             Self::InMemory(backend) => backend.add(entry).await,
             Self::HNSW(backend) => backend.add(entry).await,
+            #[cfg(feature = "postgres")]
+            Self::PostgreSQL(backend) => backend.add(entry).await,
         }
     }
 
@@ -170,6 +216,8 @@ impl EpisodicMemory for EpisodicBackend {
         match self {
             Self::InMemory(backend) => backend.get(id).await,
             Self::HNSW(backend) => backend.get(id).await,
+            #[cfg(feature = "postgres")]
+            Self::PostgreSQL(backend) => backend.get(id).await,
         }
     }
 
@@ -177,6 +225,8 @@ impl EpisodicMemory for EpisodicBackend {
         match self {
             Self::InMemory(backend) => backend.search(query, top_k).await,
             Self::HNSW(backend) => backend.search(query, top_k).await,
+            #[cfg(feature = "postgres")]
+            Self::PostgreSQL(backend) => backend.search(query, top_k).await,
         }
     }
 
@@ -184,6 +234,8 @@ impl EpisodicMemory for EpisodicBackend {
         match self {
             Self::InMemory(backend) => backend.list_unprocessed(session_id).await,
             Self::HNSW(backend) => backend.list_unprocessed(session_id).await,
+            #[cfg(feature = "postgres")]
+            Self::PostgreSQL(backend) => backend.list_unprocessed(session_id).await,
         }
     }
 
@@ -191,6 +243,8 @@ impl EpisodicMemory for EpisodicBackend {
         match self {
             Self::InMemory(backend) => backend.get_session(session_id).await,
             Self::HNSW(backend) => backend.get_session(session_id).await,
+            #[cfg(feature = "postgres")]
+            Self::PostgreSQL(backend) => backend.get_session(session_id).await,
         }
     }
 
@@ -198,6 +252,8 @@ impl EpisodicMemory for EpisodicBackend {
         match self {
             Self::InMemory(backend) => backend.mark_processed(entry_ids).await,
             Self::HNSW(backend) => backend.mark_processed(entry_ids).await,
+            #[cfg(feature = "postgres")]
+            Self::PostgreSQL(backend) => backend.mark_processed(entry_ids).await,
         }
     }
 
@@ -205,6 +261,8 @@ impl EpisodicMemory for EpisodicBackend {
         match self {
             Self::InMemory(backend) => backend.delete_before(timestamp).await,
             Self::HNSW(backend) => backend.delete_before(timestamp).await,
+            #[cfg(feature = "postgres")]
+            Self::PostgreSQL(backend) => backend.delete_before(timestamp).await,
         }
     }
 
@@ -212,6 +270,8 @@ impl EpisodicMemory for EpisodicBackend {
         match self {
             Self::InMemory(backend) => backend.list_sessions_with_unprocessed().await,
             Self::HNSW(backend) => backend.list_sessions_with_unprocessed().await,
+            #[cfg(feature = "postgres")]
+            Self::PostgreSQL(backend) => backend.list_sessions_with_unprocessed().await,
         }
     }
 }
@@ -221,6 +281,8 @@ impl std::fmt::Debug for EpisodicBackend {
         match self {
             Self::InMemory(_) => f.debug_tuple("InMemory").finish(),
             Self::HNSW(_) => f.debug_tuple("HNSW").finish(),
+            #[cfg(feature = "postgres")]
+            Self::PostgreSQL(_) => f.debug_tuple("PostgreSQL").finish(),
         }
     }
 }

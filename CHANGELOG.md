@@ -7,6 +7,81 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.13.1] - 2025-01-20 - Production Storage Infrastructure & Documentation Consolidation
+
+Production-ready PostgreSQL storage backend and comprehensive documentation consolidation. See [RELEASE_NOTES_v0.13.1.md](RELEASE_NOTES_v0.13.1.md) for full details.
+
+### Added
+
+#### PostgreSQL Storage Backend (Phase 13b.2-13b.13)
+- **New Crate**: llmspell-storage (5,000+ LOC, 10 PostgreSQL backends)
+- **VectorChord Integration**: PostgreSQL 18 with HNSW vector search (5x faster than pgvector, 26x cheaper at scale)
+- **Dimension-Specific Tables**: 4 vector tables (128/384/768/1536) for optimal indexing
+- **Bi-Temporal Graph Storage**: Event time + ingestion time tracking for knowledge evolution
+- **10 Unified Backends**: Episodic memory, semantic memory, procedural memory, agent state, workflow state, sessions, artifacts, events, hooks, API keys
+- **Migration System**: 14 database migrations with automatic schema evolution and rollback support
+- **379 PostgreSQL Tests**: 100% pass rate, 31 test files, zero warnings
+
+#### Row-Level Security (RLS) Foundation (Phase 13b.3)
+- Database-enforced multi-tenancy with PostgreSQL RLS policies
+- <5% performance overhead (measured at 4.9%)
+- Zero cross-tenant leakage (100% isolation validated)
+- Transparent to application code
+
+#### Cross-Platform Support (Phase 13b.1)
+- Linux + macOS CI validation matrix
+- Platform-specific PostgreSQL error handling
+- Cross-platform path and filesystem compatibility
+
+#### Migration Tools (Phase 13b.14)
+- **New CLI Commands**: `llmspell storage migrate|benchmark|validate|stats|schema`
+- Sled → PostgreSQL migration (483K items/sec)
+- Progress tracking and validation
+- Dry-run mode and rollback capability
+
+#### Self-Contained Kernel Architecture (Phase 13b.16)
+- **Infrastructure Module**: Single entry point for all component creation
+- **Simplified API**: 7 language-specific constructors → 2 engine-agnostic constructors
+- **Code Reduction**: 630+ lines deleted (28% reduction in runtime.rs)
+- **API Simplification**: 82% fewer public methods (11 → 2)
+
+#### Documentation Consolidation (Phase 13b.17-13b.20)
+- **52% Overall Reduction**: 111 → 53 files across all documentation
+- **User Guide**: 53 → 23 files (57% reduction), 10 numbered guides + comprehensive Lua API appendix (3,729 lines)
+- **Developer Guide**: 37 → 15 files (59% reduction), 7 numbered guides + 6 thematic API references
+- **Technical Documentation**: 21 → 15 files (29% reduction), major consolidations:
+  - PostgreSQL: 5 files → 1 guide (4,037 lines)
+  - Kernel: 2 files → 1 architecture (1,087 lines)
+  - Performance: 2 files → 1 guide (681 lines)
+- **Navigation**: README.md at every level, clear user/developer/technical separation
+
+### Changed
+- **PostgreSQL Backends**: Hot-swappable via configuration (opt-in, backward compatible)
+- **ScriptRuntime API**: Deprecated 7 language-specific constructors in favor of `ScriptRuntime::new(config)`
+- **Infrastructure Creation**: Moved from CLI to kernel (self-contained architecture)
+- **Documentation Structure**: Linear learning paths with numbered guides
+
+### Performance
+- VectorChord search: 8ms @ 100K vectors (target <10ms)
+- Graph traversal: 42ms for 4-hop queries (target <50ms)
+- State write: 7ms (target <10ms)
+- State read: 3ms (target <5ms)
+- RLS overhead: 4.9% (target <5%)
+- Migration speed: 483K items/sec (target 1K items/sec)
+- Infrastructure creation: <50ms (was ~80ms, 38% faster)
+
+### Database Schema
+- **15 Tables**: 4 vector tables, 2 graph tables, 9 specialized tables
+- **Extensions**: vectorchord (HNSW), pgcrypto (encryption), pg_trgm (text search)
+- **Indexes**: VectorChord HNSW, GiST temporal, GIN JSONB, B-tree foreign keys
+
+### Statistics
+- **Crates**: 1 new (llmspell-storage)
+- **Tests**: 379 new PostgreSQL tests (100% passing)
+- **Code**: 5,000+ lines (storage backends + migrations)
+- **Documentation**: 15,000+ lines (PostgreSQL guide + consolidation)
+- **Breaking Changes**: Zero (opt-in PostgreSQL, existing backends preserved)
+
 ## [0.13.0] - 2025-01-15 - Adaptive Memory & Context Engineering 🧠
 
 Experimental three-tier memory system with episodic, semantic, and procedural memory for long-term coherent understanding beyond context window limits. Built with production-quality engineering for painless extraction when validated. See [RELEASE_NOTES_v0.13.0.md](RELEASE_NOTES_v0.13.0.md) for full details.

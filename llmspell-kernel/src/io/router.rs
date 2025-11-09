@@ -247,18 +247,18 @@ impl MessageRouter {
 
         if let Some(client) = client {
             if !client.active {
-                return Err(anyhow::anyhow!("Client {} is inactive", client_id));
+                return Err(anyhow::anyhow!("Client {client_id} is inactive"));
             }
 
             if client.iopub_sender.send(message).await.is_err() {
                 warn!("Failed to send to client {}, marking inactive", client_id);
                 self.deactivate_client(client_id);
-                return Err(anyhow::anyhow!("Failed to send to client {}", client_id));
+                return Err(anyhow::anyhow!("Failed to send to client {client_id}"));
             }
 
             debug!("Sent message to client {}", client_id);
         } else {
-            return Err(anyhow::anyhow!("Client {} not found", client_id));
+            return Err(anyhow::anyhow!("Client {client_id} not found"));
         }
 
         Ok(())

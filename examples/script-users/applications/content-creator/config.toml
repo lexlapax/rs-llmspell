@@ -7,18 +7,20 @@ description = "Power user content creation with quality control"
 debug = false
 
 # Multiple providers for different content tasks
+[providers]
+default_provider = "openai"
+
 [providers.openai]
-name = "openai"
+provider_type = "openai"
 api_key_env = "OPENAI_API_KEY"
-api_base = "https://api.openai.com/v1"
 default_model = "gpt-4o"  # Higher quality for content
 timeout_seconds = 60
 
 [providers.anthropic]
-name = "anthropic"
+provider_type = "anthropic"
 api_key_env = "ANTHROPIC_API_KEY"
-api_base = "https://api.anthropic.com/v1"
 default_model = "claude-3-haiku-20240307"  # For editing
+timeout_seconds = 60
 
 # Power user tools
 [tools]

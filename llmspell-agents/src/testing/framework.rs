@@ -321,8 +321,7 @@ impl AgentAssertions {
     pub fn assert_output_contains(output: &AgentOutput, expected: &str) -> Result<()> {
         if !output.text.contains(expected) {
             return Err(anyhow::anyhow!(
-                "Output does not contain expected text: '{}'",
-                expected
+                "Output does not contain expected text: '{expected}'"
             ));
         }
         Ok(())
@@ -343,8 +342,7 @@ impl AgentAssertions {
         for expected_tool in expected_tools {
             if !actual_tools.contains(&(*expected_tool).to_string()) {
                 return Err(anyhow::anyhow!(
-                    "Expected tool '{}' was not called",
-                    expected_tool
+                    "Expected tool '{expected_tool}' was not called"
                 ));
             }
         }
@@ -359,9 +357,7 @@ impl AgentAssertions {
     pub fn assert_execution_time(duration: Duration, max_duration: Duration) -> Result<()> {
         if duration > max_duration {
             return Err(anyhow::anyhow!(
-                "Execution took {:?}, exceeding maximum of {:?}",
-                duration,
-                max_duration
+                "Execution took {duration:?}, exceeding maximum of {max_duration:?}"
             ));
         }
         Ok(())
@@ -422,9 +418,7 @@ impl AgentAssertions {
         }
 
         Err(anyhow::anyhow!(
-            "State transition from {:?} to {:?} not found",
-            from_state,
-            to_state
+            "State transition from {from_state:?} to {to_state:?} not found"
         ))
     }
 }

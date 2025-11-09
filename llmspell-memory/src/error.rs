@@ -68,3 +68,10 @@ impl From<&str> for MemoryError {
         Self::Other(s.to_string())
     }
 }
+
+#[cfg(feature = "postgres")]
+impl From<llmspell_storage::PostgresError> for MemoryError {
+    fn from(err: llmspell_storage::PostgresError) -> Self {
+        Self::Storage(err.to_string())
+    }
+}

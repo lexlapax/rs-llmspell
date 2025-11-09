@@ -82,6 +82,10 @@ impl ProviderManager {
     async fn initialize_providers(&self) -> Result<(), LLMSpellError> {
         // Initialize each configured provider
         for (name, config) in &self.config.providers {
+            // Skip disabled providers (Task 13b.15)
+            if !config.enabled {
+                continue;
+            }
             let provider_config = Self::create_provider_config(name, config)?;
             self.core_manager.init_provider(provider_config).await?;
         }
@@ -349,8 +353,12 @@ impl ProviderManager {
             .register_provider("candle", llmspell_providers::create_candle_provider)
             .await;
 
-        // Initialize providers from our configuration
+        // Initialize providers from our configuration (respecting enabled flag - Task 13b.15)
         for (name, config) in &self.config.providers {
+            // Skip disabled providers (must match initialize_providers() behavior)
+            if !config.enabled {
+                continue;
+            }
             let provider_config = Self::create_provider_config(name, config)?;
             core_manager.init_provider(provider_config).await?;
         }

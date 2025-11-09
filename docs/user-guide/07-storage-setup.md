@@ -1,0 +1,391 @@
+# Storage Setup
+
+**Quick start guide for setting up storage backends**
+
+🔗 **Navigation**: [← User Guide](README.md) | [Configuration](03-configuration.md) | [Troubleshooting](10-troubleshooting.md)
+
+---
+
+## Overview
+
+llmspell supports multiple storage backends for different use cases. This guide covers quick setup for the most common scenarios.
+
+**Storage Backends:**
+- **InMemory**: Development and testing (fast, ephemeral)
+- **Sled**: Embedded persistence for single-process apps
+- **PostgreSQL**: Production multi-tenant deployments with vector search
+
+**What You'll Learn:**
+- Docker Compose setup for PostgreSQL (fastest path)
+- Basic connection configuration
+- Simple backup procedures
+- Common troubleshooting steps
+
+**For Deep Technical Details:**
+- Complete PostgreSQL reference: [Technical Docs - PostgreSQL Guide](../technical/postgresql-guide.md)
+
+---
+
+## Quick Start: PostgreSQL with Docker
+
+**Fastest path to production-ready storage (5 minutes)**
+
+### 1. Start PostgreSQL
+
+```bash
+cd /path/to/rs-llmspell
+
+# Start PostgreSQL 18 with VectorChord extension
+docker compose -f docker/postgres/docker-compose.yml up -d
+
+# Verify container is running
+docker ps | grep llmspell_postgres_dev
+```
+
+**What You Get:**
+- PostgreSQL 18 with VectorChord 0.5.3 (vector similarity search)
+- pgvector 0.8.1 (embedding storage)
+- Pre-configured for llmspell (database, user, extensions)
+- Data persists in Docker volume
+
+### 2. Verify Setup
+
+```bash
+# Connect to database
+docker exec -it llmspell_postgres_dev psql -U llmspell -d llmspell_dev
+
+# Check extensions
+SELECT extname, extversion FROM pg_extension
+WHERE extname IN ('vchord', 'vector');
+
+# Expected output:
+#  extname | extversion
+# ---------+------------
+#  vchord  | 0.5.3
+#  vector  | 0.8.1
+```
+
+### 3. Run Migrations
+
+```bash
+# Apply database schema (15 migrations)
+cargo run -- database migrate
+
+# Verify tables created
+docker exec -it llmspell_postgres_dev psql -U llmspell -d llmspell_dev \
+  -c "SELECT table_name FROM information_schema.tables WHERE table_schema = 'public';"
+```
+
+**Expected tables:**
+- `embeddings_*` (4 dimension tables: 384, 768, 1536, 3072)
+- `graph_entities`, `graph_relationships`
+- `procedural_patterns`
+- `sessions`, `artifacts`
+- `event_log`
+
+### 4. Configure llmspell
+
+Update `config.toml`:
+
+```toml
+[storage]
+backend = "postgresql"
+
+[storage.postgresql]
+host = "localhost"
+port = 5432
+database = "llmspell_dev"
+username = "llmspell"
+password = "llmspell_password"
+pool_size = 10
+
+# Enable vector search
+vector_search = true
+dimension = 1536  # Default for OpenAI embeddings
+```
+
+### 5. Test Connection
+
+```bash
+# Test storage backend
+cargo run -- test storage
+
+# Expected output:
+# ✅ PostgreSQL connection: OK
+# ✅ Vector search: OK (8.47x HNSW speedup)
+# ✅ Multi-tenancy: OK (<5% overhead)
+```
+
+**You're done!** PostgreSQL storage is ready.
+
+---
+
+## Alternative: Embedded Storage (Sled)
+
+**For single-process applications (no Docker required)**
+
+### Setup
+
+```toml
+# config.toml
+[storage]
+backend = "sled"
+
+[storage.sled]
+path = "/var/lib/llmspell/data"
+cache_size_mb = 512
+```
+
+**Characteristics:**
+- ✅ No external dependencies
+- ✅ Embedded key-value store
+- ✅ ACID transactions
+- ✅ Automatic crash recovery
+- ⚠️ Single-process only
+- ⚠️ No vector similarity search
+
+**When to Use:**
+- CLI applications
+- Desktop tools
+- Single-server deployments
+- Quick prototypes
+
+---
+
+## Development: In-Memory Storage
+
+**For testing and development (fastest)**
+
+```toml
+# config.toml
+[storage]
+backend = "memory"
+```
+
+**Characteristics:**
+- ✅ Fastest performance (~microseconds)
+- ✅ No setup required
+- ✅ Isolated tests
+- ⚠️ Data lost on restart
+- ⚠️ Not for production
+
+---
+
+## Connection Configuration
+
+### PostgreSQL Connection String
+
+```bash
+# Environment variable (highest priority)
+export DATABASE_URL="postgresql://llmspell:password@localhost:5432/llmspell_dev"
+
+# Or config.toml
+[storage.postgresql]
+connection_string = "postgresql://llmspell:password@localhost:5432/llmspell_dev"
+```
+
+### Connection Pooling
+
+```toml
+[storage.postgresql]
+pool_size = 10              # Max connections (default: 10)
+pool_timeout_seconds = 30   # Connection timeout (default: 30)
+idle_timeout_seconds = 600  # Idle connection timeout (default: 600)
+```
+
+**Sizing Guidelines:**
+- Development: 5-10 connections
+- Production (single instance): 20-50 connections
+- Production (multi-instance): Calculate as `(instances × 20) + buffer`
+
+### Health Checks
+
+```bash
+# CLI health check
+cargo run -- database health
+
+# Expected output:
+# ✅ PostgreSQL connection: OK
+# ✅ Database version: 18.2
+# ✅ Extensions: vchord 0.5.3, vector 0.8.1
+# ✅ Tables: 15/15 present
+# ✅ Indexes: 24/24 present
+```
+
+---
+
+## Basic Backup Procedures
+
+### Quick Backup (Docker)
+
+```bash
+# Backup to file
+docker exec llmspell_postgres_dev pg_dump -U llmspell llmspell_dev | gzip > backup.sql.gz
+
+# Restore from backup
+gunzip -c backup.sql.gz | docker exec -i llmspell_postgres_dev psql -U llmspell -d llmspell_dev
+```
+
+### Automated Daily Backups
+
+```bash
+#!/bin/bash
+# /usr/local/bin/llmspell-backup.sh
+
+BACKUP_DIR="/var/backups/llmspell"
+DATE=$(date +%Y%m%d_%H%M%S)
+
+# Create backup
+docker exec llmspell_postgres_dev pg_dump -U llmspell llmspell_dev | \
+  gzip > "${BACKUP_DIR}/llmspell_${DATE}.sql.gz"
+
+# Keep last 7 days
+find $BACKUP_DIR -name "llmspell_*.sql.gz" -mtime +7 -delete
+
+echo "Backup complete: llmspell_${DATE}.sql.gz"
+```
+
+**Cron schedule (2 AM daily):**
+```bash
+0 2 * * * /usr/local/bin/llmspell-backup.sh
+```
+
+**For Production Backup Strategies:**
+See [Technical Docs - Backup Guide](storage/backup-restore.md) for:
+- Point-in-Time Recovery (PITR)
+- Continuous WAL archiving
+- Disaster recovery procedures
+- Multi-region replication
+
+---
+
+## Multi-Tenancy Setup
+
+### Enable Row-Level Security
+
+```sql
+-- Connect to database
+\c llmspell_dev
+
+-- Enable RLS on embeddings tables
+ALTER TABLE embeddings_1536 ENABLE ROW LEVEL SECURITY;
+
+-- Create policy for tenant isolation
+CREATE POLICY tenant_isolation ON embeddings_1536
+    USING (metadata->>'tenant_id' = current_setting('app.tenant_id'));
+
+-- Set tenant context in application
+SET app.tenant_id = 'tenant_123';
+```
+
+### Application Configuration
+
+```toml
+[storage.postgresql]
+multi_tenant = true
+tenant_id_column = "tenant_id"
+enable_rls = true
+```
+
+**Tenant Isolation Validation:**
+```bash
+# Test cross-tenant access prevention
+cargo test --test multi_tenant_isolation
+
+# Expected: All tests pass, zero cross-tenant leaks
+```
+
+---
+
+## Troubleshooting
+
+### Connection Issues
+
+**Problem:** `connection refused`
+
+```bash
+# Check PostgreSQL is running
+docker ps | grep postgres
+
+# Check logs
+docker logs llmspell_postgres_dev --tail 50
+
+# Verify port mapping
+docker port llmspell_postgres_dev 5432
+```
+
+**Problem:** `authentication failed`
+
+```bash
+# Verify credentials
+docker exec -it llmspell_postgres_dev psql -U llmspell -d llmspell_dev
+
+# Reset password if needed
+docker exec -it llmspell_postgres_dev psql -U postgres -c \
+  "ALTER USER llmspell WITH PASSWORD 'new_password';"
+```
+
+### Migration Failures
+
+**Problem:** `migration already applied`
+
+```bash
+# Check migration status
+cargo run -- database migrations list
+
+# Force re-apply specific migration (if safe)
+cargo run -- database migrations apply --migration 001_initial.sql --force
+```
+
+**Problem:** `extension "vchord" does not exist`
+
+```bash
+# Verify extensions installed
+docker exec -it llmspell_postgres_dev psql -U llmspell -d llmspell_dev -c \
+  "SELECT * FROM pg_available_extensions WHERE name IN ('vchord', 'vector');"
+
+# If missing, rebuild container
+docker compose -f docker/postgres/docker-compose.yml down -v
+docker compose -f docker/postgres/docker-compose.yml up -d
+```
+
+### Performance Issues
+
+**Problem:** Slow queries
+
+```bash
+# Check slow queries
+docker exec -it llmspell_postgres_dev psql -U llmspell -d llmspell_dev -c \
+  "SELECT query, mean_exec_time FROM pg_stat_statements ORDER BY mean_exec_time DESC LIMIT 10;"
+
+# Analyze table statistics
+ANALYZE embeddings_1536;
+```
+
+**For Advanced Troubleshooting:**
+- See [Troubleshooting Guide](10-troubleshooting.md) for common issues
+- See [Technical Docs - PostgreSQL Guide](../technical/postgresql-guide.md#3-performance-tuning) for query optimization
+
+---
+
+## Next Steps
+
+### Learn More
+
+- **Configuration**: [Configuration Guide](03-configuration.md) - All storage options
+- **CLI Commands**: [CLI Reference](05-cli-reference.md) - Database management commands
+- **Deployment**: [Deployment Guide](08-deployment.md) - Production setup
+
+### Technical Deep Dives
+
+- **PostgreSQL Guide**: [PostgreSQL Guide](../technical/postgresql-guide.md) - Complete reference (schema, performance, security, migration)
+- **Backup/Restore**: [Backup Guide](storage/backup-restore.md) - Disaster recovery, PITR, automation
+
+### Developer Resources
+
+- **Storage Backends**: [Developer Guide - Storage](../developer-guide/reference/storage-backends.md)
+- **Extending Storage**: [Developer Guide - Extending llmspell](../developer-guide/extending-llmspell.md)
+
+---
+
+**Version**: 0.13.0 | **Phase**: 13b.18.2 | **Last Updated**: 2025-11-08

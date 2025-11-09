@@ -286,7 +286,7 @@ impl CreationHook for SecurityHook {
         // Check forbidden tools
         for tool in &config.allowed_tools {
             if self.forbidden_tools.contains(tool) {
-                anyhow::bail!("Agent cannot access forbidden tool: {}", tool);
+                anyhow::bail!("Agent cannot access forbidden tool: {tool}");
             }
         }
 

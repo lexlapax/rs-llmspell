@@ -209,8 +209,8 @@ impl DefaultMemoryManager {
         use crate::episodic::EpisodicBackend;
 
         info!(
-            "Initializing DefaultMemoryManager with config: backend={:?}",
-            config.episodic_backend
+            "Initializing DefaultMemoryManager with config: episodic={:?}, semantic={:?}",
+            config.episodic_backend, config.semantic_backend
         );
 
         // Create episodic backend from configuration
@@ -218,7 +218,7 @@ impl DefaultMemoryManager {
         info!("Episodic backend created: {}", episodic.backend_name());
 
         // Create other subsystems
-        let semantic = Self::create_semantic_memory().await?;
+        let semantic = Self::create_semantic_memory(&config).await?;
         let procedural = Self::create_procedural_memory();
 
         info!("DefaultMemoryManager initialized successfully with config");
@@ -319,13 +319,39 @@ impl DefaultMemoryManager {
         Self::with_config(config).await
     }
 
-    /// Helper: Create temporary semantic memory with `SurrealDB`
-    async fn create_semantic_memory() -> Result<Arc<dyn SemanticMemory>> {
-        debug!("Creating temporary GraphSemanticMemory (SurrealDB)");
-        let semantic = GraphSemanticMemory::new_temp().await.map_err(|e| {
-            error!("Failed to initialize semantic memory: {}", e);
-            e
-        })?;
+    /// Helper: Create semantic memory from configuration
+    async fn create_semantic_memory(
+        config: &crate::config::MemoryConfig,
+    ) -> Result<Arc<dyn SemanticMemory>> {
+        use crate::config::SemanticBackendType;
+
+        debug!(
+            "Creating GraphSemanticMemory with backend: {:?}",
+            config.semantic_backend
+        );
+
+        let semantic = match config.semantic_backend {
+            SemanticBackendType::SurrealDB => {
+                debug!("Initializing SurrealDB semantic memory");
+                GraphSemanticMemory::new_temp().await.map_err(|e| {
+                    error!("Failed to initialize SurrealDB semantic memory: {}", e);
+                    e
+                })?
+            }
+            #[cfg(feature = "postgres")]
+            SemanticBackendType::PostgreSQL => {
+                debug!("Initializing PostgreSQL semantic memory");
+                let postgres_backend =
+                    config.semantic_postgres_backend.as_ref().ok_or_else(|| {
+                        error!("PostgreSQL semantic backend requested but not configured");
+                        crate::error::MemoryError::InvalidInput(
+                            "PostgreSQL semantic backend not configured".to_string(),
+                        )
+                    })?;
+                GraphSemanticMemory::new_with_postgres(Arc::clone(postgres_backend))
+            }
+        };
+
         Ok(Arc::new(semantic))
     }
 

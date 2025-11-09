@@ -441,7 +441,7 @@ mod rag_lua_tests {
         config.rag.vector_storage.backend = llmspell_config::VectorBackend::HNSW;
         config.rag.vector_storage.dimensions = 384;
 
-        let runtime = Box::pin(ScriptRuntime::new_with_lua(config)).await.unwrap();
+        let runtime = Box::pin(ScriptRuntime::new(config)).await.unwrap();
 
         let script = r#"
             -- Use RAG through runtime
@@ -476,7 +476,7 @@ mod rag_lua_tests {
         config.rag.vector_storage.backend = llmspell_config::VectorBackend::HNSW;
         config.rag.vector_storage.dimensions = 384; // Use consistent dimensions
 
-        let runtime = Box::pin(ScriptRuntime::new_with_lua(config)).await.unwrap();
+        let runtime = Box::pin(ScriptRuntime::new(config)).await.unwrap();
 
         let script = r#"
             -- Verify RAG is available with Mock backend
@@ -507,7 +507,7 @@ mod rag_lua_tests {
         };
         config.rag.enabled = false; // RAG disabled
 
-        let runtime = Box::pin(ScriptRuntime::new_with_lua(config)).await.unwrap();
+        let runtime = Box::pin(ScriptRuntime::new(config)).await.unwrap();
 
         let script = r"
             -- RAG should be nil when disabled

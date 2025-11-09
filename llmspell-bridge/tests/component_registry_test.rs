@@ -9,7 +9,7 @@ async fn test_script_executor_component_registry_access() {
 
     // Create a runtime with Lua engine
     let config = LLMSpellConfig::default();
-    let runtime = Box::pin(ScriptRuntime::new_with_lua(config))
+    let runtime = Box::pin(ScriptRuntime::new(config))
         .await
         .expect("Failed to create runtime");
 
@@ -50,7 +50,7 @@ async fn test_kernel_can_access_registry() {
     // Create a runtime with component registry
     // Tools (calculator, datetime, uuid_generator, etc.) are already registered via register_all_tools()
     let config = LLMSpellConfig::default();
-    let runtime = Box::pin(ScriptRuntime::new_with_lua(config.clone()))
+    let runtime = Box::pin(ScriptRuntime::new(config.clone()))
         .await
         .expect("Failed to create runtime");
 

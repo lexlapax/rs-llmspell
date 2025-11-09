@@ -280,7 +280,7 @@ impl MetadataManager {
                 metadata.core.updated_at = chrono::Utc::now();
                 Ok(())
             }
-            None => anyhow::bail!("Agent '{}' not found", id),
+            None => anyhow::bail!("Agent '{id}' not found"),
         }
     }
 
@@ -296,7 +296,7 @@ impl MetadataManager {
                 metadata.core.updated_at = chrono::Utc::now();
                 Ok(())
             }
-            None => anyhow::bail!("Agent '{}' not found", id),
+            None => anyhow::bail!("Agent '{id}' not found"),
         }
     }
 
@@ -312,7 +312,7 @@ impl MetadataManager {
                 metadata.core.updated_at = chrono::Utc::now();
                 Ok(())
             }
-            None => anyhow::bail!("Agent '{}' not found", id),
+            None => anyhow::bail!("Agent '{id}' not found"),
         }
     }
 

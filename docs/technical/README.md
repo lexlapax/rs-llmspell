@@ -28,8 +28,8 @@
 - API surface (20 Lua globals including Memory, Context, Template, RAG)
 - Feature flags and modular builds (19-35MB)
 
-### 2. 🚀 [Kernel Protocol Architecture](kernel-protocol-architecture.md) ✅ v0.10.0
-**Purpose**: Kernel and protocol implementation details
+### 2. 🚀 [Kernel Architecture](kernel-architecture.md) ✅ v0.10.0
+**Purpose**: Unified kernel design with protocol and execution architecture
 **Coverage**: IntegratedKernel with daemon infrastructure (Phase 10)
 **Key Content**:
 - IntegratedKernel design with global IO runtime
@@ -37,6 +37,8 @@
 - Signal handling (SIGTERM/SIGINT → Jupyter messages)
 - Protocol/Transport trait abstraction
 - Jupyter v5.3 and DAP protocol implementations
+- Message flow diagrams (client → transport → kernel → registry)
+- Execution paths and state management
 - Fleet management architecture
 
 ### 3. 🔧 [CLI Command Architecture](cli-command-architecture.md) ✅ v0.12.0
@@ -63,15 +65,15 @@
 - Adaptive memory system (Phase 13: ADR-044 Bi-Temporal Graph, ADR-045 Consolidation Strategy, ADR-046 LLM-Driven Consolidation)
 - Phase 13 design: [Phase 13 Design Document](../in-progress/phase-13-design-doc.md)
 
-### 5. ⚡ [Operational Guide](operational-guide.md) ✅ v0.10.0
-**Purpose**: Performance, security, and operations unified
-**Coverage**: Complete operational reference for production
+### 5. ⚡ [Performance Guide](performance-guide.md) ✅ v0.13.0
+**Purpose**: Performance targets, benchmarking methodology, profiling tools, optimization strategies
+**Coverage**: Complete performance reference (Phases 0-13)
 **Key Content**:
-- Performance benchmarks (10-40% faster than targets)
-- Security implementation (3-level model, multi-tenant)
-- Monitoring and observability (structured tracing, <1ms overhead)
-- Service deployment procedures (systemd, launchd, Docker)
-- Operational checklists and health monitoring
+- Performance targets and benchmarks (Kernel, Templates, Memory)
+- Benchmarking methodology with Criterion
+- Profiling tools (dhat, Valgrind, Flamegraph, perf, tokio-console)
+- Optimization strategies (component-specific, Rust techniques, common pitfalls)
+- Validation (stress testing, CI integration, quality gates)
 
 ### 6. 🔍 [RAG System Guide](rag-system-guide.md) ✅ v0.8.0 (Stable)
 **Purpose**: Complete RAG documentation
@@ -81,6 +83,35 @@
 - Multi-tenant architecture with StateScope
 - Performance tuning (8ms @ 100K vectors, 80% cache hit rate)
 - RAGPipelineBuilder patterns and custom providers
+
+---
+
+## PostgreSQL Storage Documentation (Phase 13b.20)
+
+### 📊 [PostgreSQL Guide](postgresql-guide.md) ✅ v0.13.0
+**Purpose**: Unified PostgreSQL 18 storage backend guide (Phase 13b.20.1 consolidation)
+**Coverage**: Complete PostgreSQL integration (schema, performance, RLS, migration)
+**Key Content**:
+- **Schema Design**: 10 storage backends (vector embeddings, knowledge graph, procedural memory, agent/workflow states, sessions, artifacts, event log)
+- **VectorChord HNSW**: 4 dimension tables (128/384/768/1536) with optimized indexes
+- **Performance Tuning**: Query optimization, EXPLAIN analysis, connection pooling, partition management
+- **Multi-Tenant Security**: Row-Level Security (RLS) policies, tenant isolation, <5% overhead
+- **Migration**: 8.47x speedup validation, best practices, rollback procedures
+- **Query Patterns**: Efficient vector search, temporal graph queries, pattern matching
+- **Source files consolidated**: postgresql-schema.md (1,184 lines) + postgresql-performance.md (962 lines) + rls-policies.md (1,046 lines) + migration-internals.md (845 lines) = 4,037 lines (38% reduction from deduplication)
+
+### 🔄 [Migration Internals](migration-internals.md)
+**Purpose**: Database migration procedures and internals
+**Coverage**: Schema migration system and procedures
+**Key Content**:
+- Migration file structure and naming conventions
+- Up/down migration patterns
+- Rollback procedures
+- Data migration strategies
+- Zero-downtime migration techniques
+- Version compatibility matrix
+
+---
 
 ## Supplementary Documentation
 
@@ -94,25 +125,7 @@
 - Jupyter control channel tunneling
 - VS Code compatibility
 
-### 8. 📈 [Performance Baseline](performance-baseline.md) ✅ v0.10.0
-**Purpose**: Performance benchmarks and baselines
-**Coverage**: Phase 10 performance measurements
-**Key Content**:
-- Daemon startup metrics (1.8s, 10% faster than target)
-- Message handling benchmarks (3.8ms, 24% faster)
-- Tool initialization performance (7ms, 30% faster)
-- All performance targets exceeded by 10-40%
-
-### 9. 🔬 [Benchmarking Guide](benchmarking-guide.md) ✅ v0.10.0
-**Purpose**: How to run and interpret benchmarks
-**Coverage**: Benchmark methodology and tools
-**Key Content**:
-- Criterion benchmark setup
-- Performance testing procedures
-- Regression detection
-- Automated kernel benchmarking script
-
-### 10. 💪 [Stress Test Results](stress-test-results.md) ✅ v0.10.0
+### 8. 💪 [Stress Test Results](stress-test-results.md) ✅ v0.10.0
 **Purpose**: Stress testing outcomes
 **Coverage**: Load and stability testing
 **Key Content**:
@@ -121,7 +134,7 @@
 - Resource usage under load (42MB stable)
 - Signal handling and graceful shutdown validation
 
-### 11. 📋 [Protocol Compliance Report](protocol-compliance-report.md) ✅ v0.10.0
+### 9. 📋 [Protocol Compliance Report](protocol-compliance-report.md) ✅ v0.10.0
 **Purpose**: Jupyter protocol compliance verification
 **Coverage**: Wire protocol v5.3 validation
 **Key Content**:
@@ -130,7 +143,7 @@
 - Raw protocol testing (test_raw_zmq.py)
 - jupyter_client compatibility issues (upstream bug)
 
-### 12. 🔄 [MLua Upgrade Analysis](mlua-upgrade-analysis.md) ✅ v0.10.0
+### 10. 🔄 [MLua Upgrade Analysis](mlua-upgrade-analysis.md) ✅ v0.10.0
 **Purpose**: MLua 0.9.9 → 0.11 upgrade impact
 **Coverage**: Dependency upgrade assessment
 **Key Content**:
@@ -139,7 +152,7 @@
 - Migration effort estimation (3-5 days)
 - Decision to revert rationale (timing, risk vs benefit)
 
-### 13. 📖 [Master Architecture Vision](master-architecture-vision.md) 📚 Historical
+### 11. 📖 [Master Architecture Vision](master-architecture-vision.md) 📚 Historical
 **Purpose**: Original aspirational architecture (historical reference)
 **Note**: 987K+ lines of original design vision, useful for understanding project evolution
 
@@ -148,20 +161,19 @@
 ## Quick Start Navigation
 
 ### Understanding the System
-1. **Start**: [Current Architecture](current-architecture.md) - What we built (17 crates, Phase 10)
-2. **Kernel**: [Kernel Protocol Architecture](kernel-protocol-architecture.md) - Daemon, protocols, service integration
+1. **Start**: [Current Architecture](current-architecture.md) - What we built (21 crates, Phase 13)
+2. **Kernel**: [Kernel Architecture](kernel-architecture.md) - Daemon, protocols, execution paths
 3. **CLI**: [CLI Command Architecture](cli-command-architecture.md) - Commands including tool CLI
 4. **Learn**: [Architecture Decisions](architecture-decisions.md) - Why we built it this way
-5. **Operate**: [Operational Guide](operational-guide.md) - Performance, security, monitoring
-6. **RAG**: [RAG System Guide](rag-system-guide.md) - Vector search with HNSW
+5. **PostgreSQL**: [PostgreSQL Guide](postgresql-guide.md) - Complete storage backend guide
+6. **Performance**: [Performance Guide](performance-guide.md) - Targets, benchmarks, profiling, optimization
+7. **RAG**: [RAG System Guide](rag-system-guide.md) - Vector search with HNSW
 
 ### Specialized Topics
-7. **Debug**: [Debug DAP Architecture](debug-dap-architecture.md) - IDE debugging support
-8. **Performance**: [Performance Baseline](performance-baseline.md) - Benchmarks and metrics
-9. **Benchmarking**: [Benchmarking Guide](benchmarking-guide.md) - How to run benchmarks
-10. **Testing**: [Stress Test Results](stress-test-results.md) - Load and stability validation
-11. **Protocols**: [Protocol Compliance Report](protocol-compliance-report.md) - Jupyter v5.3 compliance
-12. **Dependencies**: [MLua Upgrade Analysis](mlua-upgrade-analysis.md) - Upgrade impact analysis
+8. **Debug**: [Debug DAP Architecture](debug-dap-architecture.md) - IDE debugging support
+9. **Testing**: [Stress Test Results](stress-test-results.md) - Load and stability validation
+10. **Protocols**: [Protocol Compliance Report](protocol-compliance-report.md) - Jupyter v5.3 compliance
+11. **Dependencies**: [MLua Upgrade Analysis](mlua-upgrade-analysis.md) - Upgrade impact analysis
 
 ---
 
@@ -262,12 +274,12 @@
 - **[User Guide](../user-guide/)** - How to experiment with LLMSpell
 - **[Service Deployment](../user-guide/service-deployment.md)** - Scale validation & deployment ⭐
 - **[IDE Integration](../user-guide/ide-integration.md)** - IDE setup ⭐ NEW
-- **[Lua API](../user-guide/api/lua/)** - Script reference
+- **[Lua API](../user-guide/appendix/lua-api-reference.md)** - Script reference
 - **[Examples](../../examples/)** - Working examples
 
 ### For Developers
 - **[Developer Guide](../developer-guide/)** - Contributing guide
-- **[Rust API](../user-guide/api/rust/)** - Extension reference
+- **[Rust API](../developer-guide/reference/)** - Extension reference
 - **[Implementation Phases](../in-progress/implementation-phases.md)** - 16-phase roadmap
 - **[TODO](../../TODO.md)** - Current task tracking
 
@@ -286,18 +298,24 @@
 | Document | Version | Status | Last Updated | Phase |
 |----------|---------|--------|--------------|-------|
 | current-architecture.md | v0.13.0 | ✅ Current | Jan 2025 | 13 |
-| kernel-protocol-architecture.md | v0.10.0 | ✅ Current | Jan 2025 | 10 |
+| kernel-architecture.md | v0.10.0 | ✅ Current | Jan 2025 | 13b.20.2 |
 | cli-command-architecture.md | v0.10.0 | ✅ Current | Jan 2025 | 10 |
 | architecture-decisions.md | v0.13.0 | ✅ Current | Jan 2025 | 13 |
-| operational-guide.md | v0.10.0 | ✅ Current | Jan 2025 | 10 |
+| performance-guide.md | v0.13.0 | ✅ Current | Jan 2025 | 13b.20.3 |
 | rag-system-guide.md | v0.8.0 | ✅ Stable | Aug 2024 | 8 |
+
+### Database Documentation
+| Document | Version | Status | Last Updated | Phase |
+|----------|---------|--------|--------------|-------|
+| postgresql-guide.md | v0.13.0 | ✅ Current | Jan 2025 | 13b.20.1 |
+| postgresql-query-patterns.md | v0.13.0 | ✅ Current | Jan 2025 | 13b |
+| postgresql-migration.md | v0.13.0 | ✅ Current | Jan 2025 | 13b |
+| postgresql-vectorchord.md | v0.13.0 | ✅ Current | Jan 2025 | 13b |
 
 ### Supplementary Documentation
 | Document | Version | Status | Last Updated | Phase |
 |----------|---------|--------|--------------|-------|
 | debug-dap-architecture.md | v0.10.0 | ✅ Current | Jan 2025 | 10 |
-| performance-baseline.md | v0.10.0 | ✅ Current | Jan 2025 | 10 |
-| benchmarking-guide.md | v0.10.0 | ✅ Current | Jan 2025 | 10 |
 | stress-test-results.md | v0.10.0 | ✅ Current | Jan 2025 | 10 |
 | protocol-compliance-report.md | v0.10.0 | ✅ Current | Jan 2025 | 10 |
 | mlua-upgrade-analysis.md | v0.10.0 | ✅ Current | Jan 2025 | 10 |

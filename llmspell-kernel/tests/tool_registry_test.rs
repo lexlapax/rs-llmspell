@@ -12,7 +12,7 @@ async fn test_kernel_tool_handlers_with_registry() {
 
     // Create a runtime with Lua engine and tools
     let config = LLMSpellConfig::default();
-    let runtime = ScriptRuntime::new_with_lua(config.clone())
+    let runtime = ScriptRuntime::new(config.clone())
         .await
         .expect("Failed to create runtime");
 
@@ -173,7 +173,7 @@ async fn test_kernel_tool_count() {
 
     // Create a runtime with default configuration
     let config = LLMSpellConfig::default();
-    let runtime = ScriptRuntime::new_with_lua(config.clone())
+    let runtime = ScriptRuntime::new(config.clone())
         .await
         .expect("Failed to create runtime");
 
@@ -220,7 +220,7 @@ async fn test_tool_invocation_with_timeout() {
 
     // Create runtime with tools (calculator already registered by register_all_tools)
     let config = LLMSpellConfig::default();
-    let runtime = ScriptRuntime::new_with_lua(config.clone())
+    let runtime = ScriptRuntime::new(config.clone())
         .await
         .expect("Failed to create runtime");
 
@@ -300,7 +300,7 @@ async fn test_tool_parameter_validation() {
 
     // Create runtime (calculator already registered by register_all_tools)
     let config = LLMSpellConfig::default();
-    let runtime = ScriptRuntime::new_with_lua(config.clone())
+    let runtime = ScriptRuntime::new(config.clone())
         .await
         .expect("Failed to create runtime");
 
@@ -380,7 +380,7 @@ async fn test_tool_invocation_error_handling() {
     use std::sync::Arc;
 
     let config = LLMSpellConfig::default();
-    let runtime = ScriptRuntime::new_with_lua(config.clone())
+    let runtime = ScriptRuntime::new(config.clone())
         .await
         .expect("Failed to create runtime");
 
@@ -455,7 +455,7 @@ async fn test_tool_reply_message_routing() {
 
     // Create runtime and register tools
     let config = LLMSpellConfig::default();
-    let runtime = ScriptRuntime::new_with_lua(config.clone())
+    let runtime = ScriptRuntime::new(config.clone())
         .await
         .expect("Failed to create runtime");
 
@@ -540,7 +540,7 @@ async fn test_message_correlation_and_identity() {
     use std::sync::Arc;
 
     let config = LLMSpellConfig::default();
-    let runtime = ScriptRuntime::new_with_lua(config.clone())
+    let runtime = ScriptRuntime::new(config.clone())
         .await
         .expect("Failed to create runtime");
 
@@ -590,7 +590,7 @@ async fn test_bidirectional_communication_flow() {
     use std::sync::Arc;
 
     let config = LLMSpellConfig::default();
-    let runtime = ScriptRuntime::new_with_lua(config.clone())
+    let runtime = ScriptRuntime::new(config.clone())
         .await
         .expect("Failed to create runtime");
 

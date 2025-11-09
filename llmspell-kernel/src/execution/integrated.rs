@@ -1698,7 +1698,7 @@ impl<P: Protocol + 'static> IntegratedKernel<P> {
             .script_executor
             .execute_script(code)
             .await
-            .map_err(|e| anyhow::anyhow!("Script execution failed: {}", e))?;
+            .map_err(|e| anyhow::anyhow!("Script execution failed: {e}"))?;
 
         // Route console output through I/O manager
         for line in &script_output.console_output {
@@ -1897,7 +1897,7 @@ impl<P: Protocol + 'static> IntegratedKernel<P> {
                     result.push_str(&serde_json::to_string(&output.output).unwrap_or_default());
                     Ok(result)
                 }
-                Err(e) => Err(anyhow::anyhow!("Script execution failed: {}", e)),
+                Err(e) => Err(anyhow::anyhow!("Script execution failed: {e}")),
             }
         };
 
@@ -2114,7 +2114,7 @@ impl<P: Protocol + 'static> IntegratedKernel<P> {
                 }
                 Err(e) => {
                     error!("Failed to send tool_reply: {}", e);
-                    Err(anyhow!("Failed to send tool reply: {}", e))
+                    Err(anyhow!("Failed to send tool reply: {e}"))
                 }
             }
         } else {
@@ -2159,7 +2159,7 @@ impl<P: Protocol + 'static> IntegratedKernel<P> {
                 }
                 Err(e) => {
                     error!("Failed to send template_reply: {}", e);
-                    Err(anyhow!("Failed to send template reply: {}", e))
+                    Err(anyhow!("Failed to send template reply: {e}"))
                 }
             }
         } else {
@@ -2204,7 +2204,7 @@ impl<P: Protocol + 'static> IntegratedKernel<P> {
                 }
                 Err(e) => {
                     error!("Failed to send memory_reply: {}", e);
-                    Err(anyhow!("Failed to send memory reply: {}", e))
+                    Err(anyhow!("Failed to send memory reply: {e}"))
                 }
             }
         } else {
@@ -2249,7 +2249,7 @@ impl<P: Protocol + 'static> IntegratedKernel<P> {
                 }
                 Err(e) => {
                     error!("Failed to send context_reply: {}", e);
-                    Err(anyhow!("Failed to send context reply: {}", e))
+                    Err(anyhow!("Failed to send context reply: {e}"))
                 }
             }
         } else {
@@ -3240,7 +3240,7 @@ impl<P: Protocol + 'static> IntegratedKernel<P> {
 
         // Parse ModelSpec
         let spec = llmspell_providers::local::ModelSpec::parse(model_spec_str)
-            .map_err(|e| anyhow!("Invalid model spec '{}': {}", model_spec_str, e))?;
+            .map_err(|e| anyhow!("Invalid model spec '{model_spec_str}': {e}"))?;
 
         let backend = spec.backend.as_deref().unwrap_or("ollama");
         trace!("Using backend: {}", backend);

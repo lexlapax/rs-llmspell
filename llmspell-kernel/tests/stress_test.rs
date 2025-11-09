@@ -28,7 +28,7 @@ mod stress_tests {
     #[ignore] // Stress test - run explicitly with `cargo test stress -- --ignored`
     async fn test_rapid_tool_list_operations() {
         let config = LLMSpellConfig::default();
-        let runtime = ScriptRuntime::new_with_lua(config.clone())
+        let runtime = ScriptRuntime::new(config.clone())
             .await
             .expect("Failed to create runtime");
         let executor = Arc::new(runtime);
@@ -94,7 +94,7 @@ mod stress_tests {
     #[ignore]
     async fn test_tool_registry_stress() {
         let config = LLMSpellConfig::default();
-        let runtime = ScriptRuntime::new_with_lua(config.clone())
+        let runtime = ScriptRuntime::new(config.clone())
             .await
             .expect("Failed to create runtime");
         let executor = Arc::new(runtime);
@@ -182,7 +182,7 @@ mod stress_tests {
     #[ignore]
     async fn test_rapid_tool_invocation() {
         let config = LLMSpellConfig::default();
-        let runtime = ScriptRuntime::new_with_lua(config.clone())
+        let runtime = ScriptRuntime::new(config.clone())
             .await
             .expect("Failed to create runtime");
         let executor = Arc::new(runtime);
@@ -245,7 +245,7 @@ mod stress_tests {
     #[ignore]
     async fn test_large_message_payloads() {
         let config = LLMSpellConfig::default();
-        let runtime = ScriptRuntime::new_with_lua(config.clone())
+        let runtime = ScriptRuntime::new(config.clone())
             .await
             .expect("Failed to create runtime");
         let executor = Arc::new(runtime);
@@ -297,7 +297,7 @@ mod stress_tests {
     #[ignore]
     async fn test_error_recovery_under_stress() {
         let config = LLMSpellConfig::default();
-        let runtime = ScriptRuntime::new_with_lua(config.clone())
+        let runtime = ScriptRuntime::new(config.clone())
             .await
             .expect("Failed to create runtime");
         let executor = Arc::new(runtime);
@@ -376,7 +376,7 @@ mod stress_tests {
     #[ignore]
     async fn test_sustained_load_memory_stability() {
         let config = LLMSpellConfig::default();
-        let runtime = ScriptRuntime::new_with_lua(config.clone())
+        let runtime = ScriptRuntime::new(config.clone())
             .await
             .expect("Failed to create runtime");
         let executor = Arc::new(runtime);
@@ -434,7 +434,7 @@ mod stress_tests {
     #[ignore]
     async fn test_rapid_search_operations() {
         let config = LLMSpellConfig::default();
-        let runtime = ScriptRuntime::new_with_lua(config.clone())
+        let runtime = ScriptRuntime::new(config.clone())
             .await
             .expect("Failed to create runtime");
         let executor = Arc::new(runtime);

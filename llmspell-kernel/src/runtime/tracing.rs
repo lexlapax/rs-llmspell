@@ -667,7 +667,7 @@ pub fn init_tracing_with_format(format: LogFormat) -> Result<()> {
                 .with(env_filter)
                 .with(fmt_layer)
                 .try_init()
-                .map_err(|e| anyhow::anyhow!("Failed to initialize tracing: {}", e))
+                .map_err(|e| anyhow::anyhow!("Failed to initialize tracing: {e}"))
         }
         LogFormat::Pretty => {
             let fmt_layer = tracing_subscriber::fmt::layer()
@@ -682,7 +682,7 @@ pub fn init_tracing_with_format(format: LogFormat) -> Result<()> {
                 .with(env_filter)
                 .with(fmt_layer)
                 .try_init()
-                .map_err(|e| anyhow::anyhow!("Failed to initialize tracing: {}", e))
+                .map_err(|e| anyhow::anyhow!("Failed to initialize tracing: {e}"))
         }
         LogFormat::Compact => {
             let fmt_layer = tracing_subscriber::fmt::layer()
@@ -697,7 +697,7 @@ pub fn init_tracing_with_format(format: LogFormat) -> Result<()> {
                 .with(env_filter)
                 .with(fmt_layer)
                 .try_init()
-                .map_err(|e| anyhow::anyhow!("Failed to initialize tracing: {}", e))
+                .map_err(|e| anyhow::anyhow!("Failed to initialize tracing: {e}"))
         }
         LogFormat::Text => {
             let fmt_layer = tracing_subscriber::fmt::layer()
@@ -711,7 +711,7 @@ pub fn init_tracing_with_format(format: LogFormat) -> Result<()> {
                 .with(env_filter)
                 .with(fmt_layer)
                 .try_init()
-                .map_err(|e| anyhow::anyhow!("Failed to initialize tracing: {}", e))
+                .map_err(|e| anyhow::anyhow!("Failed to initialize tracing: {e}"))
         }
     }
 }
@@ -723,7 +723,7 @@ pub fn init_tracing_with_format(format: LogFormat) -> Result<()> {
 /// Returns an error if the filter is invalid or subscriber cannot be initialized.
 pub fn init_tracing_with_filter(filter: &str) -> Result<()> {
     let env_filter =
-        EnvFilter::try_new(filter).map_err(|e| anyhow::anyhow!("Invalid filter: {}", e))?;
+        EnvFilter::try_new(filter).map_err(|e| anyhow::anyhow!("Invalid filter: {e}"))?;
 
     let fmt_layer = tracing_subscriber::fmt::layer()
         .with_target(true)
@@ -736,7 +736,7 @@ pub fn init_tracing_with_filter(filter: &str) -> Result<()> {
         .with(env_filter)
         .with(fmt_layer)
         .try_init()
-        .map_err(|e| anyhow::anyhow!("Failed to initialize tracing: {}", e))
+        .map_err(|e| anyhow::anyhow!("Failed to initialize tracing: {e}"))
 }
 
 #[cfg(test)]

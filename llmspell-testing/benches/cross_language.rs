@@ -88,7 +88,7 @@ fn bench_script_runtime_initialization(c: &mut Criterion) {
         b.iter(|| {
             let _ = rt.block_on(async {
                 let config = LLMSpellConfig::default();
-                let runtime_result = ScriptRuntime::new_with_lua(config).await;
+                let runtime_result = ScriptRuntime::new(config).await;
                 black_box(runtime_result)
             });
         });
@@ -239,7 +239,7 @@ fn calculate_cross_language_overhead(_c: &mut Criterion) {
         let start = tokio::time::Instant::now();
         for _ in 0..10 {
             let config = LLMSpellConfig::default();
-            let _ = ScriptRuntime::new_with_lua(config).await;
+            let _ = ScriptRuntime::new(config).await;
         }
         let runtime_init = start.elapsed();
 

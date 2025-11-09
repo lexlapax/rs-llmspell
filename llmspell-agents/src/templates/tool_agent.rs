@@ -482,14 +482,12 @@ impl AgentTemplate for ToolAgentTemplate {
                 if let Some(num) = value.as_u64() {
                     if num == 0 {
                         return Err(anyhow!(
-                            "Parameter '{}' must be a positive integer",
-                            parameter_name
+                            "Parameter '{parameter_name}' must be a positive integer"
                         ));
                     }
                 } else {
                     return Err(anyhow!(
-                        "Parameter '{}' must be a positive integer",
-                        parameter_name
+                        "Parameter '{parameter_name}' must be a positive integer"
                     ));
                 }
             }
@@ -497,17 +495,14 @@ impl AgentTemplate for ToolAgentTemplate {
                 if let Some(pattern) = value.as_str() {
                     if !pattern.contains('*') && !pattern.contains('?') {
                         return Err(anyhow!(
-                            "Parameter '{}' must be a valid file pattern (contain * or ?)",
-                            parameter_name
+                            "Parameter '{parameter_name}' must be a valid file pattern (contain * or ?)"
                         ));
                     }
                 }
             }
             _ => {
                 return Err(anyhow!(
-                    "Unknown custom constraint '{}' for parameter '{}'",
-                    rule,
-                    parameter_name
+                    "Unknown custom constraint '{rule}' for parameter '{parameter_name}'"
                 ));
             }
         }

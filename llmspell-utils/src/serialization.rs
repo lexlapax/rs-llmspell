@@ -408,7 +408,7 @@ pub fn validate_json_fields(json: &str, required_fields: &[&str]) -> Result<()> 
     if let Some(obj) = value.as_object() {
         for field in required_fields {
             if !obj.contains_key(*field) {
-                anyhow::bail!("Missing required field: {}", field);
+                anyhow::bail!("Missing required field: {field}");
             }
         }
         Ok(())

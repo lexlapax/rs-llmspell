@@ -733,7 +733,7 @@ impl InteractiveSession {
                 let bp = session
                     .execution_manager
                     .set_breakpoint(file.clone(), line)
-                    .map_err(|e| anyhow::anyhow!("Failed to set breakpoint: {}", e))?;
+                    .map_err(|e| anyhow::anyhow!("Failed to set breakpoint: {e}"))?;
 
                 // Track in session
                 session
