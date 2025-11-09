@@ -47,11 +47,11 @@
 ### 🔧 [Developer Guide](developer-guide/) - *For Contributors*
 **Purpose**: Technical guides for developers contributing to or extending rs-llmspell.
 
-**Status**: ✅ Consolidated (Phase 13b.19) - 7 numbered guides + 6 thematic API references
-**Structure**: **Linear learning path** (01 → 07) + thematic API documentation
-**Contents**: 7 numbered guides + 6 thematic references + examples guide = 14 total files
+**Status**: ✅ Consolidated (Phase 13b.20) - 8 numbered guides + 6 thematic API references
+**Structure**: **Linear learning path** (01 → 08) + thematic API documentation
+**Contents**: 8 numbered guides + 6 thematic references + examples guide = 15 total files
 
-**The 7 Numbered Guides** (Start here for linear learning):
+**The 8 Numbered Guides** (Start here for linear learning):
 1. **[Getting Started](developer-guide/01-getting-started.md)** - Setup, architecture, first contribution (15 min)
 2. **[Development Workflow](developer-guide/02-development-workflow.md)** - Testing, quality gates, git workflow (30 min)
 3. **[Extending Components](developer-guide/03-extending-components.md)** - Tools, agents, hooks, workflows, RAG, storage, templates (2-6 hrs)
@@ -59,6 +59,7 @@
 5. **[Production Deployment](developer-guide/05-production-deployment.md)** - Security, performance, scaling, monitoring (4-8 hrs)
 6. **[Tracing & Debugging](developer-guide/06-tracing-debugging.md)** - Instrumentation, session correlation (1-2 hrs)
 7. **[Feature Flags](developer-guide/07-feature-flags.md)** - Build system, modular builds (15 min)
+8. **[Operations & Performance](developer-guide/08-operations.md)** - Performance, security, deployment, monitoring (2-4 hrs)
 
 **Thematic API References** (Consolidated by topic):
 - [Core Traits](developer-guide/reference/core-traits.md) - BaseAgent, ExecutionContext, testing
@@ -82,12 +83,20 @@
 ### 🏗️ [Technical](technical/) - *For Architects*
 **Purpose**: Core architectural documentation and implementation decisions.
 
-**Status**: ✅ Complete for Phase 13 with 13+ documents
-**Contents**: 6 core guides + 7 supplementary docs covering architecture, protocols, performance, benchmarking, stress testing, protocol compliance, and dependency analysis
-**Key Files**: `current-architecture.md`, `kernel-protocol-architecture.md`, `debug-dap-architecture.md`, `cli-command-architecture.md`, `performance-baseline.md`, `benchmarking-guide.md`, `stress-test-results.md`, `protocol-compliance-report.md`, `mlua-upgrade-analysis.md`
-**Phase 12 Additions**: Template system architecture (TemplateRegistry, ExecutionContext), 10 built-in templates, 20-50x performance targets, parameter validation schema
-**Phase 11 Additions**: Local provider architecture, GGUF inference pipeline, dual-backend design (Ollama via rig + Candle embedded)
-**Start here if**: You need to understand system architecture, protocols, template system, local LLM integration, performance characteristics, or debugging infrastructure
+**Status**: ✅ Consolidated (Phase 13b.20) - 15 files (29% reduction from 21 files)
+**Contents**: 6 core architecture docs + 4 database docs + 4 supplementary docs + 1 historical reference
+**Key Files**:
+- **Core**: `current-architecture.md`, `kernel-architecture.md`, `cli-command-architecture.md`, `architecture-decisions.md`, `performance-guide.md`, `rag-system-guide.md`
+- **Database**: `postgresql-guide.md` (consolidated PostgreSQL), `postgresql-query-patterns.md`, `postgresql-migration.md`, `postgresql-vectorchord.md`
+- **Supplementary**: `debug-dap-architecture.md`, `stress-test-results.md`, `protocol-compliance-report.md`, `mlua-upgrade-analysis.md`
+
+**Phase 13b.20 Consolidation**:
+- PostgreSQL: 4 files → `postgresql-guide.md` (4,037 lines, 38% reduction)
+- Kernel: 2 files → `kernel-architecture.md` (1,087 lines, 48% reduction)
+- Performance: 2 files → `performance-guide.md` (681 lines, 32% reduction)
+- Operations moved to `developer-guide/08-operations.md`
+
+**Start here if**: You need to understand system architecture, protocols, PostgreSQL storage, kernel design, performance characteristics, or debugging infrastructure
 
 ---
 
@@ -222,13 +231,13 @@
 3. **[Feature Flags Migration](developer-guide/feature-flags-migration.md)** - Build system changes (Phase 10.17.5+)
 4. **[Extending LLMSpell](developer-guide/extending-llmspell.md)** - Build tools, agents, protocols
 5. **[Production Guide](developer-guide/production-guide.md)** - Deploy to production
-6. **[Kernel Architecture](technical/kernel-protocol-architecture.md)** - Daemon, protocols, fleet
+6. **[Kernel Architecture](technical/kernel-architecture.md)** - Daemon, protocols, fleet
 
 ### 🏛️ **I need architectural understanding**
 1. **[Current Architecture](technical/current-architecture.md)** - 21 crates, Phase 13 experimental infrastructure
-2. **[Kernel Protocol Architecture](technical/kernel-protocol-architecture.md)** - Daemon, protocols, transport
+2. **[Kernel Architecture](technical/kernel-architecture.md)** - Daemon, protocols, transport, execution paths
 3. **[Debug DAP Architecture](technical/debug-dap-architecture.md)** - 10 DAP commands, IDE integration
-4. **[Performance Baseline](technical/performance-baseline.md)** - Phase 12 metrics (20-50x for templates)
+4. **[Performance Guide](technical/performance-guide.md)** - Targets, benchmarks, profiling, optimization
 5. **[Master Vision](technical/master-architecture-vision.md)** - 23-phase roadmap
 
 ### 🛠️ **I want to validate at scale / extract to production**

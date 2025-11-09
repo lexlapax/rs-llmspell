@@ -22,9 +22,7 @@ llmspell supports multiple storage backends for different use cases. This guide 
 - Common troubleshooting steps
 
 **For Deep Technical Details:**
-- Schema design: [Technical Docs - PostgreSQL Schema](../technical/postgresql-schema.md)
-- Performance tuning: [Technical Docs - PostgreSQL Performance](../technical/postgresql-performance.md)
-- Migration procedures: [Technical Docs - Migration Internals](../technical/migration-internals.md)
+- Complete PostgreSQL reference: [Technical Docs - PostgreSQL Guide](../technical/postgresql-guide.md)
 
 ---
 
@@ -366,7 +364,7 @@ ANALYZE embeddings_1536;
 
 **For Advanced Troubleshooting:**
 - See [Troubleshooting Guide](10-troubleshooting.md) for common issues
-- See [Technical Docs - Performance](../technical/postgresql-performance.md) for query optimization
+- See [Technical Docs - PostgreSQL Guide](../technical/postgresql-guide.md#3-performance-tuning) for query optimization
 
 ---
 
@@ -380,8 +378,7 @@ ANALYZE embeddings_1536;
 
 ### Technical Deep Dives
 
-- **Schema Design**: [PostgreSQL Schema](../technical/postgresql-schema.md) - Table structures, indexes, constraints
-- **Performance Tuning**: [PostgreSQL Performance](../technical/postgresql-performance.md) - Optimization, scaling
+- **PostgreSQL Guide**: [PostgreSQL Guide](../technical/postgresql-guide.md) - Complete reference (schema, performance, security, migration)
 - **Backup/Restore**: [Backup Guide](storage/backup-restore.md) - Disaster recovery, PITR, automation
 
 ### Developer Resources

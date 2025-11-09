@@ -514,7 +514,7 @@ jobs:
 ### 7.1 Protocol Documentation
 
 **Jupyter Protocol Docs**:
-- ✅ Architecture: `docs/technical/kernel-protocol-architecture.md`
+- ✅ Architecture: `docs/technical/kernel-architecture.md`
 - ✅ Design: `docs/in-progress/phase-10-design-doc.md`
 - ✅ User guide: `docs/user-guide/ide-integration.md`
 

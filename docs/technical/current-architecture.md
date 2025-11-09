@@ -12,10 +12,10 @@
 
 This overview document is supported by detailed guides:
 - **[Architecture Decisions](./architecture-decisions.md)**: All ADRs from Phase 0-13
-- **[Operational Guide](./operational-guide.md)**: Performance benchmarks and security model
+- **[Performance Guide](./performance-guide.md)**: Performance targets, benchmarking, profiling, optimization (Phase 13b.20.3)
 - **[RAG System Guide](./rag-system-guide.md)**: Complete RAG documentation including HNSW tuning
 - **[RAG-Memory Integration](./rag-memory-integration.md)**: Phase 13 RAG integration with memory system
-- **[Kernel Protocol Architecture](./kernel-protocol-architecture.md)**: Kernel design and protocol/transport layers
+- **[Kernel Architecture](./kernel-architecture.md)**: Kernel design, protocol/transport layers, execution paths (Phase 13b.20.2)
 - **[Template System Architecture](./template-system-architecture.md)**: Template trait system, 10 built-in templates, advanced patterns (Phase 12)
 - **[CLI Command Architecture](./cli-command-architecture.md)**: Complete CLI reference including template+memory commands
 - **[Phase 11a Design Document](../in-progress/phase-11a-design-doc.md)**: Bridge consolidation comprehensive documentation
@@ -1667,9 +1667,9 @@ As of Phase 11b near-completion (7/8, 95%), technical documentation has been con
 ### Core Documents
 1. **current-architecture.md** (this file) - Overview and navigation (updated for Phase 11b)
 2. **architecture-decisions.md** - All ADRs from Phase 0-11b
-3. **operational-guide.md** - Performance and security unified
+3. **performance-guide.md** - Performance targets, benchmarking, profiling, optimization (Phase 13b.20.3)
 4. **rag-system-guide.md** - Complete RAG system documentation
-5. **kernel-protocol-architecture.md** - Kernel design and protocol/transport abstraction
+5. **kernel-architecture.md** - Kernel design, protocol/transport abstraction, execution paths (Phase 13b.20.2)
 
 ### Phase 11 User Documentation
 6. **docs/user-guide/local-llm.md** (320 lines) - Local LLM integration guide
