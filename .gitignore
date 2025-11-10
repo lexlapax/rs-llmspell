@@ -35,3 +35,4 @@ __pycache__/
 
 
 sessions/
+.cargo/config.toml

@@ -61,5 +61,5 @@ build-release = "build --workspace --all-features --release"
 
 # macOS Apple Silicon - zld linker
 # Uncomment to enable after installing zld via Homebrew:
-# [target.aarch64-apple-darwin]
-# rustflags = ["-C", "link-arg=-fuse-ld=/opt/homebrew/bin/zld"]
+[target.aarch64-apple-darwin]
+rustflags = ["-C", "link-arg=-fuse-ld=/opt/homebrew/bin/zld"]
