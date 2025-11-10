@@ -39,7 +39,6 @@ path-clean = { workspace = true }
 walkdir = { workspace = true }
 
 # Concurrency primitives
-crossbeam = { workspace = true }
 parking_lot = { workspace = true }
 dashmap = { workspace = true }
 

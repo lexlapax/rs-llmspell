@@ -133,6 +133,8 @@ path-clean = "1.0"
 walkdir = "2.5"
 
 # Concurrency primitives
+# Phase 13c.1.2: crossbeam kept only for llmspell-kernel (lock-free concurrent structures)
+# Removed from llmspell-utils and llmspell-events (unused)
 crossbeam = "0.8"
 parking_lot = "0.12"
 dashmap = "6.1"

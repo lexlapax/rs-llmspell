@@ -68,6 +68,10 @@ hex = "0.4"
 sysinfo = "0.31"
 
 # Performance optimizations (for consolidated state persistence)
+# Phase 13c.1.2: Kept for production-critical lock-free concurrent data structures
+# - crossbeam: SegQueue for zero-overhead async hook processing (async_hooks.rs)
+# - crossbeam-skiplist: Lock-free sorted map for high-performance agent state (lockfree_agent.rs)
+# No tokio equivalents exist for these specialized concurrent structures
 crossbeam = "0.8"
 crossbeam-skiplist = "0.1"
 dashmap = "6.1"
