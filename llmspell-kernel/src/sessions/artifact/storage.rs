@@ -1057,7 +1057,8 @@ impl ArtifactStorageOps for ArtifactStorage {
             .await?;
 
         // Verify content integrity
-        let calculated_hash = blake3::hash(&content).to_string();
+        use sha2::{Digest, Sha256};
+        let calculated_hash = format!("{:x}", Sha256::digest(&content));
         if calculated_hash != metadata.artifact_id.content_hash {
             return Err(SessionError::IntegrityError {
                 message: format!(

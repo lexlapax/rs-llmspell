@@ -162,11 +162,12 @@ which = "6.0"
 # Used for: metadata, artifacts, version history, stats - binary format more efficient than JSON for internal storage
 bincode = "1.3"
 
-# Compression (pure Rust, very fast)
+# Compression & Hashing
+# Phase 13c.1.6: lz4_flex kept for production-critical compression (4 files: kernel backup/fast-path, hooks persistence, daemon logging)
+# Pure Rust, 10x faster than zlib, critical for state/hook compression performance
 lz4_flex = "0.11"
-
-# Cryptographic hashing (10x faster than SHA2 for content-addressed storage)
-blake3 = "1.5"
+# Phase 13c.1.6: blake3 removed (only used in llmspell-storage dev-dependencies)
+# Tests can use sha2 (already in dependencies) for content hashing
 
 [profile.dev]
 opt-level = 0

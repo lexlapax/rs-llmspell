@@ -47,7 +47,8 @@ postgres = ["tokio-postgres", "deadpool-postgres", "pgvector", "refinery", "llms
 tempfile.workspace = true
 rand = "0.8"
 criterion = { workspace = true }
-blake3 = { workspace = true }
+# Phase 13c.1.6: blake3 removed (use sha2 for content hashing in tests)
+sha2 = "0.10"
 
 [[bench]]
 name = "graph_bench"

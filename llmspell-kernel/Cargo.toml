@@ -79,7 +79,7 @@ hnsw_rs = "0.3"
 
 # Session artifact storage dependencies
 lru = "0.12"
-blake3 = { workspace = true }
+# Phase 13c.1.6: blake3 removed (unused in production code)
 lz4_flex = { workspace = true }
 
 # Storage

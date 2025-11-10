@@ -3,10 +3,10 @@
 
 use super::types::{ArtifactId, ArtifactMetadata, ArtifactType, ContentHash};
 use crate::sessions::{Result, SessionError, SessionId};
-use blake3;
 use chrono::{DateTime, Utc};
 use lz4_flex::{compress_prepend_size, decompress_size_prepended};
 use serde::{Deserialize, Serialize};
+use sha2::{Digest, Sha256};
 
 /// Threshold for automatic compression (10KB)
 const COMPRESSION_THRESHOLD: usize = 10 * 1024;
@@ -90,10 +90,9 @@ impl SessionArtifact {
         })
     }
 
-    /// Calculate blake3 hash of content
+    /// Calculate SHA256 hash of content
     pub fn calculate_hash(content: &[u8]) -> ContentHash {
-        let hash = blake3::hash(content);
-        hash.to_hex().to_string()
+        format!("{:x}", Sha256::digest(content))
     }
 
     /// Create from parts (used during retrieval)
