@@ -69,9 +69,9 @@ brew install ollama
 
 **Linux (Debian/Ubuntu)**
 ```bash
-# Build essentials
+# Build essentials (includes C/C++ compiler and libclang for RocksDB)
 sudo apt-get update
-sudo apt-get install -y build-essential libssl-dev pkg-config
+sudo apt-get install -y build-essential libssl-dev pkg-config libclang-dev
 
 # Testing utilities (used by CI)
 sudo apt-get install -y bc jq
@@ -87,12 +87,24 @@ sudo apt-get install -y postgresql-18 postgresql-server-dev-18
 
 **Linux (Fedora/RHEL)**
 ```bash
-# Build essentials
+# Build essentials (includes clang for RocksDB)
 sudo dnf groupinstall "Development Tools"
-sudo dnf install -y openssl-devel pkg-config
+sudo dnf install -y openssl-devel pkg-config clang-devel
 
 # Testing utilities
 sudo dnf install -y bc jq
+```
+
+**Linux (Arch)**
+```bash
+# Build essentials (includes clang for RocksDB)
+sudo pacman -S base-devel clang llvm
+```
+
+**Linux (Alpine)**
+```bash
+# Build essentials (includes clang for RocksDB)
+apk add build-base clang-dev llvm-dev
 ```
 
 ---
