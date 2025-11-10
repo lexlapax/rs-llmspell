@@ -696,9 +696,10 @@ impl HNSWConfig {
 }
 
 /// Distance metrics supported by HNSW
-#[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq, Default)]
 pub enum DistanceMetric {
     /// Cosine similarity (most common for embeddings)
+    #[default]
     Cosine,
 
     /// Euclidean (L2) distance
@@ -709,12 +710,6 @@ pub enum DistanceMetric {
 
     /// Manhattan (L1) distance
     Manhattan,
-}
-
-impl Default for DistanceMetric {
-    fn default() -> Self {
-        Self::Cosine
-    }
 }
 
 /// Statistics for a specific namespace

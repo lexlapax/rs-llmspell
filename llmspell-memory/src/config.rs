@@ -17,23 +17,18 @@ use crate::embeddings::EmbeddingService;
 /// - **`InMemory`**: O(n) search, good for <1K entries, testing only
 /// - **HNSW**: O(log n) search, production-ready for 10K+ entries
 /// - **`PostgreSQL`**: O(log n) search with `pgvector` HNSW, multi-tenant `RLS` support
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
 pub enum EpisodicBackendType {
     /// Simple `HashMap` (for testing, <1K entries)
     InMemory,
 
     /// HNSW vector index (for production, 10K+ entries)
+    #[default]
     HNSW,
 
     /// `PostgreSQL` with `pgvector` (for production, multi-tenant, `RLS`-enabled)
     #[cfg(feature = "postgres")]
     PostgreSQL,
-}
-
-impl Default for EpisodicBackendType {
-    fn default() -> Self {
-        Self::HNSW // HNSW is now the production default!
-    }
 }
 
 /// Semantic memory backend type
@@ -44,20 +39,15 @@ impl Default for EpisodicBackendType {
 ///
 /// - **`SurrealDB`**: Default bi-temporal graph database with embedded storage
 /// - **`PostgreSQL`**: Production-ready with `PostgreSQL` bi-temporal graph tables, multi-tenant `RLS`
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
 pub enum SemanticBackendType {
     /// `SurrealDB` embedded graph database (default, for development and production)
+    #[default]
     SurrealDB,
 
     /// `PostgreSQL` bi-temporal graph tables (for production, multi-tenant, `RLS`-enabled)
     #[cfg(feature = "postgres")]
     PostgreSQL,
-}
-
-impl Default for SemanticBackendType {
-    fn default() -> Self {
-        Self::SurrealDB // SurrealDB is the default
-    }
 }
 
 /// Memory system configuration

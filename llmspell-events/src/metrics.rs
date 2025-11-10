@@ -54,18 +54,13 @@ pub struct LatencyPercentiles {
 }
 
 /// Throughput trend indicator
-#[derive(Debug, PartialEq, Clone, Copy)]
+#[derive(Debug, PartialEq, Clone, Copy, Default)]
 pub enum ThroughputTrend {
     Increasing,
     Stable,
     Decreasing,
+    #[default]
     Unknown,
-}
-
-impl Default for ThroughputTrend {
-    fn default() -> Self {
-        Self::Unknown
-    }
 }
 
 impl Default for RealTimeAnalytics {

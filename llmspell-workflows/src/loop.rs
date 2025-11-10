@@ -69,10 +69,11 @@ pub struct BreakCondition {
 }
 
 /// Result aggregation strategy
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, Default)]
 #[serde(rename_all = "snake_case")]
 pub enum ResultAggregation {
     /// Collect all iteration results
+    #[default]
     CollectAll,
     /// Keep only the last result
     LastOnly,
@@ -82,12 +83,6 @@ pub enum ResultAggregation {
     LastN(usize),
     /// No aggregation
     None,
-}
-
-impl Default for ResultAggregation {
-    fn default() -> Self {
-        Self::CollectAll
-    }
 }
 
 /// Configuration for loop workflow

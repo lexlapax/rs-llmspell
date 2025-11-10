@@ -122,7 +122,7 @@ fn test_document_binary_size() {
 /// Test app command with nonexistent app to document error handling
 #[test]
 fn test_app_nonexistent_app() {
-    let mut cmd = Command::cargo_bin("llmspell").unwrap();
+    let mut cmd = Command::new(assert_cmd::cargo::cargo_bin!("llmspell"));
     cmd.arg("app")
         .arg("run")
         .arg("nonexistent-app")
@@ -157,7 +157,7 @@ fn test_binary_startup_performance() {
 
     let start = Instant::now();
 
-    let mut cmd = Command::cargo_bin("llmspell").unwrap();
+    let mut cmd = Command::new(assert_cmd::cargo::cargo_bin!("llmspell"));
     cmd.arg("--help").assert().success();
 
     let duration = start.elapsed();

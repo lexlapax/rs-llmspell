@@ -220,9 +220,10 @@ impl RetrievalWeights {
 }
 
 /// Retrieval strategy
-#[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq, Default)]
 pub enum RetrievalStrategy {
     /// Combine all methods with weighted scores
+    #[default]
     Fusion,
 
     /// Use vector search, fall back to keyword if no results
@@ -236,12 +237,6 @@ pub enum RetrievalStrategy {
 
     /// Use all methods in parallel and merge
     Parallel,
-}
-
-impl Default for RetrievalStrategy {
-    fn default() -> Self {
-        Self::Fusion
-    }
 }
 
 /// Reranking strategy for results

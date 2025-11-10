@@ -158,9 +158,10 @@ pub enum WorkflowStatus {
 }
 
 /// Error handling strategies for workflows
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, Default)]
 pub enum ErrorStrategy {
     /// Stop execution on first error
+    #[default]
     FailFast,
     /// Continue executing remaining steps
     Continue,
@@ -171,12 +172,6 @@ pub enum ErrorStrategy {
         /// Initial backoff duration in milliseconds
         backoff_ms: u64,
     },
-}
-
-impl Default for ErrorStrategy {
-    fn default() -> Self {
-        Self::FailFast
-    }
 }
 
 /// Workflow trait for workflow patterns.

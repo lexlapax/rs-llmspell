@@ -122,6 +122,32 @@
 - **Build Time**: 3m23s clean check, 6m24s clippy with all targets
 - **No Behavioral Changes**: All lazy initialization patterns preserved, zero runtime changes
 
+**Additional Cleanup (2025-11-09 Evening)**:
+- **MySQL Support Removed**: Discovered mock-only implementation pulling in problematic dependencies
+  - **Root Cause**: `num-bigint-dig v0.8.5` future incompatibility warning (private macro issue #120192)
+  - **Dependency Chain**: sqlx → sqlx-mysql → rsa v0.9.8 → num-bigint-dig v0.8.5
+  - **Investigation**: MySQL was mock-only (never functional), no tests, no examples, no production usage
+  - **Solution**: Removed `mysql` from sqlx base features in llmspell-tools/Cargo.toml
+  - **Code Changes**:
+    - llmspell-tools/Cargo.toml: Removed `"mysql"` from sqlx features array (line 102)
+    - llmspell-tools/Cargo.toml: Removed `database-mysql` feature flag (obsolete)
+    - llmspell-tools/src/communication/database_connector.rs: Removed MySQL code (3 locations)
+      - Removed DATABASE_MYSQL_URL env var handling (lines 137-148)
+      - Removed execute_mysql_query() method (lines 441-462)
+      - Removed "mysql" match arm (line 239)
+      - Updated tool descriptions (removed "MySQL" references)
+  - **Security Code Preserved**: MySQL patterns in credential_protection, SSRF port blocking (generic security)
+  - **Result**: Eliminated 8+ transitive dependencies (rsa, num-bigint-dig, crypto stack)
+  - **Verification**:
+    - `cargo tree --workspace --all-features -i rsa` → "nothing to print" ✅
+    - `cargo tree --workspace --all-features | grep num-bigint-dig` → (empty) ✅
+    - `cargo clippy --workspace --all-features --all-targets` → Zero warnings ✅
+    - `cargo build --workspace --features database-postgres` → Success (48.56s) ✅
+  - **Strategic Alignment**: PostgreSQL is production backend (Phase 13b complete), MySQL was never needed
+  - **Note**: Cargo patch for num-bigint-dig not possible (can't patch crates.io → crates.io)
+  - **Files Modified**: 3 files, ~40 lines removed, zero functional impact (code was non-functional)
+  - **Breaking Changes**: NONE - MySQL feature was never working, removing dead code only
+
 **Implementation Steps**:
 1. Identify all uses of lazy_static and once_cell:
    ```bash

@@ -1,4 +1,4 @@
-//! ABOUTME: Database connector tool with support for `PostgreSQL`, `MySQL`, and `SQLite`
+//! ABOUTME: Database connector tool with support for `PostgreSQL` and `SQLite`
 //! ABOUTME: Provides secure database operations with connection pooling and query building
 
 use async_trait::async_trait;
@@ -29,7 +29,7 @@ use tracing::{debug, error, info, instrument, warn};
 /// Database connection configuration
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct DatabaseConfig {
-    /// Database type (postgresql, mysql, sqlite)
+    /// Database type (postgresql, sqlite)
     pub database_type: String,
     /// Connection string or individual parameters
     pub connection: HashMap<String, String>,
@@ -134,18 +134,8 @@ impl DatabaseConnectorConfig {
             databases.insert("postgresql".to_string(), postgres_config);
         }
 
-        // MySQL configuration
-        if let Ok(url) = std::env::var("DATABASE_MYSQL_URL") {
-            let mut connection = HashMap::new();
-            connection.insert("url".to_string(), url);
-
-            let mysql_config = DatabaseConfig {
-                database_type: "mysql".to_string(),
-                connection,
-                pool_settings: PoolConfig::default(),
-            };
-            databases.insert("mysql".to_string(), mysql_config);
-        }
+        // MySQL support removed in 13c.1.1 - mock implementation never completed
+        // Use PostgreSQL (database-postgres feature) for production workloads
 
         // SQLite configuration
         if let Ok(path) = std::env::var("DATABASE_SQLITE_PATH") {
@@ -203,8 +193,7 @@ impl DatabaseConnectorTool {
             config,
             metadata: ComponentMetadata::new(
                 "database-connector".to_string(),
-                "Database connector tool with support for PostgreSQL, MySQL, and SQLite"
-                    .to_string(),
+                "Database connector tool with support for PostgreSQL and SQLite".to_string(),
             ),
             auditor: parking_lot::Mutex::new(CredentialAuditor::new()),
             error_sanitizer: ErrorSanitizer::new(),
@@ -246,10 +235,12 @@ impl DatabaseConnectorTool {
 
         match db_config.database_type.as_str() {
             "postgresql" => self.execute_postgresql_query(db_config, query).await,
-            "mysql" => self.execute_mysql_query(db_config, query).await,
             "sqlite" => self.execute_sqlite_query(db_config, query).await,
             _ => Err(tool_error(
-                format!("Unsupported database type: {}", db_config.database_type),
+                format!(
+                    "Unsupported database type: {}. Use 'postgresql' or 'sqlite'.",
+                    db_config.database_type
+                ),
                 Some("database_type".to_string()),
             )),
         }
@@ -442,35 +433,8 @@ impl DatabaseConnectorTool {
         }
     }
 
-    /// Execute `MySQL` query
-    ///
-    /// # Errors
-    ///
-    /// Returns an error if `MySQL` query execution fails (currently returns mock success)
-    #[allow(clippy::unused_async)]
-    #[instrument(skip(self))]
-    async fn execute_mysql_query(
-        &self,
-        config: &DatabaseConfig,
-        query: &str,
-    ) -> Result<serde_json::Value> {
-        // Note: MySQL implementation would require sqlx or mysql_async
-        // For now, return a mock response
-        warn!(
-            "MySQL query execution not fully implemented - returning mock response for {}",
-            config.database_type
-        );
-
-        Ok(serde_json::json!({
-            "database_type": "mysql",
-            "query": query,
-            "status": "mock_executed",
-            "rows_affected": 0,
-            "results": [],
-            "execution_time_ms": 38,
-            "timestamp": chrono::Utc::now().to_rfc3339()
-        }))
-    }
+    // MySQL support removed in 13c.1.1 - mock implementation never completed
+    // Use PostgreSQL (database-postgres feature) for production workloads
 
     /// Execute `SQLite` query
     ///
@@ -709,7 +673,7 @@ impl Tool for DatabaseConnectorTool {
     fn schema(&self) -> ToolSchema {
         ToolSchema::new(
             "database-connector".to_string(),
-            "Connect to and query databases (PostgreSQL, MySQL, SQLite)".to_string(),
+            "Connect to and query databases (PostgreSQL, SQLite)".to_string(),
         )
         .with_parameter(ParameterDef {
             name: "operation".to_string(),

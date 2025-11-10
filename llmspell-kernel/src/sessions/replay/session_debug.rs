@@ -367,7 +367,7 @@ impl StateComparison {
                     map1.keys().chain(map2.keys()).collect();
                 for key in all_keys {
                     let new_path = if path.is_empty() {
-                        key.to_string()
+                        key.clone()
                     } else {
                         format!("{path}.{key}")
                     };
@@ -418,13 +418,13 @@ impl StateComparison {
         for key in all_keys {
             match (meta1.get(key), meta2.get(key)) {
                 (Some(v1), Some(v2)) if v1 != v2 => {
-                    diffs.push(((*key).to_string(), Some(v1.clone()), Some(v2.clone())));
+                    diffs.push(((*key).clone(), Some(v1.clone()), Some(v2.clone())));
                 }
                 (Some(v1), None) => {
-                    diffs.push(((*key).to_string(), Some(v1.clone()), None));
+                    diffs.push(((*key).clone(), Some(v1.clone()), None));
                 }
                 (None, Some(v2)) => {
-                    diffs.push(((*key).to_string(), None, Some(v2.clone())));
+                    diffs.push(((*key).clone(), None, Some(v2.clone())));
                 }
                 _ => {}
             }

@@ -17,19 +17,14 @@ use tracing::{debug, info, trace, warn};
 use crate::error::{MemoryError, Result};
 
 /// Output format mode for consolidation prompts
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, Default)]
 #[serde(rename_all = "lowercase")]
 pub enum OutputFormat {
     /// Structured JSON output (default, 95%+ parse success)
+    #[default]
     Json,
     /// Natural language output (fallback mode)
     NaturalLanguage,
-}
-
-impl Default for OutputFormat {
-    fn default() -> Self {
-        Self::Json
-    }
 }
 
 /// Consolidated response from LLM containing all extraction decisions

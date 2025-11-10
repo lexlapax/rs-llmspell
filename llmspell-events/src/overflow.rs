@@ -8,9 +8,10 @@ use tokio::sync::Notify;
 use tracing::{debug, warn};
 
 /// Strategy for handling buffer overflow
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
 pub enum OverflowStrategy {
     /// Drop the oldest events when buffer is full
+    #[default]
     DropOldest,
     /// Drop the newest events when buffer is full
     DropNewest,
@@ -18,12 +19,6 @@ pub enum OverflowStrategy {
     Block,
     /// Reject new events with an error
     Reject,
-}
-
-impl Default for OverflowStrategy {
-    fn default() -> Self {
-        Self::DropOldest
-    }
 }
 
 /// Result of overflow handling

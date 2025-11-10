@@ -559,7 +559,7 @@ async fn test_event_log_table_schema() {
         .await
         .unwrap();
 
-    let expected_columns = vec![
+    let expected_columns = [
         ("tenant_id", "character varying", "NO"),
         ("event_id", "uuid", "NO"),
         ("event_type", "character varying", "NO"),

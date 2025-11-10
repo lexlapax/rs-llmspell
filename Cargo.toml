@@ -189,3 +189,6 @@ debug-assertions = true
 overflow-checks = true
 incremental = true
 codegen-units = 256
+
+# Note: Cargo patch for num-bigint-dig not possible (can't patch crates.io -> crates.io)
+# Solution: Removed MySQL support (Task 13c.1.1) which eliminates rsa/num-bigint-dig dependency

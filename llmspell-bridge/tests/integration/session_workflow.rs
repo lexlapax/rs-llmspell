@@ -533,9 +533,8 @@ async fn test_concurrent_operations() {
         run_test_instance(2),
     );
 
-    let outputs = vec![result0, result1, result2];
-
     // Verify all operations completed successfully
+    let outputs = [&result0, &result1, &result2];
     assert_eq!(outputs.len(), 3);
 
     for (i, result) in outputs.iter().enumerate() {
