@@ -27,19 +27,19 @@ build-release = "build --workspace --all-features --release"
 #
 # SOLUTION: Use modern fast linkers that are 2-4x faster and use 60% less memory:
 # - Linux: mold (https://github.com/rui314/mold)
-# - macOS: zld (https://github.com/michaeleisel/zld)
+# - macOS: lld (LLVM linker, separate Homebrew package as of LLVM 21+)
 #
 # INSTALLATION:
 # Linux (Debian/Ubuntu): sudo apt install mold
 # Linux (other): cargo install --locked mold OR build from source
-# macOS: brew install michaeleisel/zld/zld
+# macOS: brew install lld
 #
 # USAGE: Uncomment the section for your platform below. If the linker is not
 # installed, cargo will fall back to the default linker gracefully.
 #
 # VERIFICATION after uncommenting:
-# Linux: cargo build 2>&1 | grep mold   # Should show "mold" in linker invocation
-# macOS: cargo build 2>&1 | grep zld    # Should show "zld" in linker invocation
+# Linux: cargo build 2>&1 | grep mold      # Should show "mold" in linker invocation
+# macOS: cargo build 2>&1 | grep ld64.lld  # Should show "ld64.lld" in linker invocation
 # ================================================================================
 
 # Linux x86_64 - mold linker (50-80% faster than ld, 60% less memory)
@@ -54,12 +54,12 @@ build-release = "build --workspace --all-features --release"
 # linker = "clang"
 # rustflags = ["-C", "link-arg=-fuse-ld=mold"]
 
-# macOS Intel - zld linker (2-4x faster than ld64)
-# Uncomment to enable after installing zld via Homebrew:
+# macOS Intel - lld linker (LLVM linker, 2-3x faster than ld64)
+# Uncomment to enable after installing lld via Homebrew (brew install lld):
 # [target.x86_64-apple-darwin]
-# rustflags = ["-C", "link-arg=-fuse-ld=/usr/local/bin/zld"]
+# rustflags = ["-C", "link-arg=-fuse-ld=/usr/local/opt/lld/bin/ld64.lld"]
 
-# macOS Apple Silicon - zld linker
-# Uncomment to enable after installing zld via Homebrew:
+# macOS Apple Silicon - lld linker (LLVM linker, 2-3x faster than ld64)
+# Uncomment to enable after installing lld via Homebrew (brew install lld):
 [target.aarch64-apple-darwin]
-rustflags = ["-C", "link-arg=-fuse-ld=/opt/homebrew/bin/zld"]
+rustflags = ["-C", "link-arg=-fuse-ld=/opt/homebrew/opt/lld/bin/ld64.lld"]

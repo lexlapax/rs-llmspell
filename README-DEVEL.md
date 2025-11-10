@@ -202,13 +202,15 @@ cd mold && make -j$(nproc) && sudo make install
 mold --version
 ```
 
-**macOS - zld linker:**
+**macOS - lld linker (LLVM):**
 ```bash
-# Install via Homebrew
-brew install michaeleisel/zld/zld
+# Install lld via Homebrew (separate package as of LLVM 21+)
+brew install lld
 
 # Verify installation
-zld --version
+/opt/homebrew/opt/lld/bin/ld64.lld --version  # Apple Silicon
+# OR
+/usr/local/opt/lld/bin/ld64.lld --version     # Intel
 ```
 
 **Activation:**
@@ -221,10 +223,10 @@ Edit `.cargo/config.toml` and uncomment the section for your platform:
 **Verification:**
 ```bash
 # After uncommenting, check linker is being used
-cargo build 2>&1 | grep -E "(mold|zld)"
+cargo build 2>&1 | grep -E "(mold|ld64.lld)"
 
 # Linux: Should see "mold" in linker invocation
-# macOS: Should see "zld" in linker invocation
+# macOS: Should see "ld64.lld" in linker invocation
 ```
 
 **Performance Impact:**
@@ -884,13 +886,13 @@ cargo test -p llmspell-memory --all-features
 ```
 
 **Permanent Fix (Choose one):**
-1. **Best**: Install fast linker (mold/zld) - see "Build Performance & Memory Optimization" section
+1. **Best**: Install fast linker (mold/lld) - see "Build Performance & Memory Optimization" section
 2. **Linux**: Add swap space - see "Solution 3: System Resource Adjustments"
 3. **Alternative**: Reduce parallelism - `cargo test -j 2`
 4. **Development**: Use `--features common` instead of `--all-features`
 
 **Root Cause:**
-This workspace has 400+ dependencies with deep trees. With `--all-features`, test binaries require 4-8GB RAM just for linking. The default system linker loads the entire symbol table into memory. Modern linkers (mold/zld) use 60% less memory and are 2-4x faster.
+This workspace has 400+ dependencies with deep trees. With `--all-features`, test binaries require 4-8GB RAM just for linking. The default system linker loads the entire symbol table into memory. Modern linkers (mold/lld) use 60% less memory and are 2-4x faster.
 
 ---
 
