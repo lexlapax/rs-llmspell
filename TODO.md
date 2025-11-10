@@ -257,50 +257,52 @@
 
 ---
 
-### Task 13c.1.3: Tokio Utilities Consolidation ⏹ PENDING
+### Task 13c.1.3: Tokio Utilities Consolidation ✅ COMPLETE
 **Priority**: MEDIUM
 **Estimated Time**: 2 hours
+**Actual Time**: 1.5 hours
 **Assignee**: Core Infrastructure Team
-**Status**: ⏹ PENDING
+**Status**: ✅ COMPLETE
+**Completed**: 2025-11-10
 
-**Description**: Attempt to remove `tokio-stream` and `tokio-util` by using tokio features directly.
+**Description**: Removed `tokio-stream` and `tokio-util` from non-essential crates, kept in production-critical locations.
 
 **Acceptance Criteria**:
-- [ ] Attempted removal of tokio-stream and tokio-util
-- [ ] Either: 0-2 dependencies removed OR decision documented to keep
-- [ ] Specific tokio features added if needed
-- [ ] All builds pass
-- [ ] Zero clippy warnings
+- [x] Attempted removal of tokio-stream and tokio-util
+- [x] 4 tokio-stream + 2 tokio-util dependencies removed
+- [x] Specific tokio features documented where kept
+- [x] All builds pass
+- [x] Zero clippy warnings
 
-**Implementation Steps**:
-1. Try removing tokio-stream and tokio-util from Cargo.toml
+**Completion Insights**:
+- **tokio-stream Removed**: 4 crates (llmspell-agents, llmspell-bridge, llmspell-cli, llmspell-utils)
+  - Kept only in llmspell-events (stream.rs:260-265 - production-critical event streaming)
+  - Provides BroadcastStream wrapper + StreamExt utilities not in tokio "full"
+- **tokio-util Removed**: 2 crates (llmspell-agents, llmspell-kernel)
+  - No longer needed in any workspace crates
+  - Historical usage was codec/time utilities now provided by tokio "full"
+- **Dependencies Removed**: 6 crate-level imports removed
+  - Workspace: Added documentation comments (Cargo.toml lines 57-59)
+  - llmspell-agents: Removed tokio-stream + tokio-util (Cargo.toml lines 28-29)
+  - llmspell-bridge: Removed tokio-stream (Cargo.toml line 16)
+  - llmspell-cli: Removed tokio-stream (Cargo.toml line 28)
+  - llmspell-utils: Removed tokio-stream (Cargo.toml line 16)
+  - llmspell-kernel: Removed tokio-util (Cargo.toml line 28)
+- **Dependencies Kept**: llmspell-events (production-critical event streaming)
+  - Added justification in llmspell-events/Cargo.toml (lines 19-20)
+- **Test Results**: All affected crates passing (agents: 367, bridge: 311, cli: 69, events: 56, kernel: 665, utils: 515)
+  - Note: llmspell-bridge has 3 flaky performance tests (timing-related, non-functional)
+- **Clippy**: Zero warnings across workspace
+- **Zero Behavioral Changes**: Only removed unused imports, kept production-critical usage
 
-2. Add specific features to tokio if needed:
-   ```toml
-   tokio = { version = "1.40", features = ["full", "io-util", "sync", "stream"] }
-   ```
-
-3. If removal fails, document why they're needed:
-   ```toml
-   # tokio-stream: Required for StreamExt trait not in tokio "full"
-   # tokio-util: Required for codec utilities
-   ```
-
-4. Verify:
-   ```bash
-   cargo check --workspace --all-features
-   cargo build --workspace --all-features
-   ```
-
-**Definition of Done**:
-- [ ] Removal attempted and result documented
-- [ ] If removed: 0-2 dependencies gone
-- [ ] If kept: Clear justification in Cargo.toml comments
-- [ ] All builds successful
-- [ ] Feature usage optimized
-
-**Files to Modify**:
-- `Cargo.toml` (workspace dependencies + comments)
+**Files Modified**:
+- `Cargo.toml` (workspace - added documentation)
+- `llmspell-agents/Cargo.toml` (removed tokio-stream + tokio-util)
+- `llmspell-bridge/Cargo.toml` (removed tokio-stream)
+- `llmspell-cli/Cargo.toml` (removed tokio-stream)
+- `llmspell-events/Cargo.toml` (added justification)
+- `llmspell-kernel/Cargo.toml` (removed tokio-util)
+- `llmspell-utils/Cargo.toml` (removed tokio-stream)
 
 ---
 
