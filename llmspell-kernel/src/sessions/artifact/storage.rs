@@ -1045,6 +1045,8 @@ impl ArtifactStorageOps for ArtifactStorage {
 
     #[allow(clippy::manual_let_else)]
     async fn get_artifact(&self, artifact_id: &ArtifactId) -> Result<Option<SessionArtifact>> {
+        use sha2::{Digest, Sha256};
+
         // Load metadata first
         let metadata = match self.load_metadata(artifact_id).await? {
             Some(metadata) => metadata,
@@ -1057,7 +1059,6 @@ impl ArtifactStorageOps for ArtifactStorage {
             .await?;
 
         // Verify content integrity
-        use sha2::{Digest, Sha256};
         let calculated_hash = format!("{:x}", Sha256::digest(&content));
         if calculated_hash != metadata.artifact_id.content_hash {
             return Err(SessionError::IntegrityError {
