@@ -1,11 +1,9 @@
 //! ABOUTME: Comprehensive input sanitization framework for preventing injection attacks
 //! ABOUTME: Provides HTML, SQL, command, format string, and XXE protection
 
-#![allow(clippy::non_std_lazy_statics)]
-
 use html_escape::encode_safe;
-use lazy_static::lazy_static;
 use regex::Regex;
+use std::sync::LazyLock;
 
 /// Input sanitization configuration
 #[derive(Debug, Clone)]
@@ -150,13 +148,14 @@ impl InputSanitizer {
     /// Sanitize HTML/JavaScript to prevent XSS
     #[must_use]
     pub fn sanitize_html(&self, input: &str) -> String {
-        lazy_static! {
-            static ref SCRIPT_TAG_RE: Regex = Regex::new(r"(?i)<script[^>]*>.*?</script>").unwrap();
-            static ref EVENT_HANDLER_RE: Regex =
-                Regex::new(r#"(?i)\bon\w+\s*=\s*['\"].*?['\"]"#).unwrap();
-            static ref JAVASCRIPT_PROTOCOL_RE: Regex = Regex::new(r"(?i)javascript:").unwrap();
-            static ref DATA_PROTOCOL_RE: Regex = Regex::new(r"(?i)data:.*?base64").unwrap();
-        }
+        static SCRIPT_TAG_RE: LazyLock<Regex> =
+            LazyLock::new(|| Regex::new(r"(?i)<script[^>]*>.*?</script>").unwrap());
+        static EVENT_HANDLER_RE: LazyLock<Regex> =
+            LazyLock::new(|| Regex::new(r#"(?i)\bon\w+\s*=\s*['\"].*?['\"]"#).unwrap());
+        static JAVASCRIPT_PROTOCOL_RE: LazyLock<Regex> =
+            LazyLock::new(|| Regex::new(r"(?i)javascript:").unwrap());
+        static DATA_PROTOCOL_RE: LazyLock<Regex> =
+            LazyLock::new(|| Regex::new(r"(?i)data:.*?base64").unwrap());
 
         let mut result = input.to_string();
 
@@ -179,12 +178,14 @@ impl InputSanitizer {
     /// Sanitize SQL input to prevent SQL injection
     #[must_use]
     pub fn sanitize_sql(&self, input: &str) -> String {
-        lazy_static! {
-            static ref SQL_COMMENT_RE: Regex = Regex::new(r"(-{2,}|/\*|\*/)").unwrap();
-            static ref SQL_KEYWORDS_RE: Regex = Regex::new(
-                r"(?i)\b(union|select|insert|update|delete|drop|create|alter|exec|execute|script|javascript)\b"
-            ).unwrap();
-        }
+        static SQL_COMMENT_RE: LazyLock<Regex> =
+            LazyLock::new(|| Regex::new(r"(-{2,}|/\*|\*/)").unwrap());
+        static SQL_KEYWORDS_RE: LazyLock<Regex> = LazyLock::new(|| {
+            Regex::new(
+                r"(?i)\b(union|select|insert|update|delete|drop|create|alter|exec|execute|script|javascript)\b",
+            )
+            .unwrap()
+        });
 
         let mut result = input.to_string();
 
@@ -205,11 +206,11 @@ impl InputSanitizer {
     /// Sanitize command input to prevent command injection
     #[must_use]
     pub fn sanitize_command(&self, input: &str) -> String {
-        lazy_static! {
-            static ref SHELL_METACHARACTERS: Regex = Regex::new(r"[;&|`$<>\\]").unwrap();
-            static ref COMMAND_SUBSTITUTION_RE: Regex = Regex::new(r"\$\(.*?\)").unwrap();
-            static ref BACKTICK_RE: Regex = Regex::new(r"`.*?`").unwrap();
-        }
+        static SHELL_METACHARACTERS: LazyLock<Regex> =
+            LazyLock::new(|| Regex::new(r"[;&|`$<>\\]").unwrap());
+        static COMMAND_SUBSTITUTION_RE: LazyLock<Regex> =
+            LazyLock::new(|| Regex::new(r"\$\(.*?\)").unwrap());
+        static BACKTICK_RE: LazyLock<Regex> = LazyLock::new(|| Regex::new(r"`.*?`").unwrap());
 
         let mut result = input.to_string();
 
@@ -231,11 +232,10 @@ impl InputSanitizer {
     /// Sanitize format strings to prevent format string attacks
     #[must_use]
     pub fn sanitize_format_string(&self, input: &str) -> String {
-        lazy_static! {
-            static ref FORMAT_SPECIFIER_RE: Regex =
-                Regex::new(r"%[0-9]*[diouxXeEfFgGaAcspn%]").unwrap();
-            static ref DANGEROUS_FORMAT_RE: Regex = Regex::new(r"%[ns]").unwrap();
-        }
+        static FORMAT_SPECIFIER_RE: LazyLock<Regex> =
+            LazyLock::new(|| Regex::new(r"%[0-9]*[diouxXeEfFgGaAcspn%]").unwrap());
+        static DANGEROUS_FORMAT_RE: LazyLock<Regex> =
+            LazyLock::new(|| Regex::new(r"%[ns]").unwrap());
 
         let mut result = input.to_string();
 
@@ -266,12 +266,12 @@ impl InputSanitizer {
     /// Sanitize XML to prevent XXE attacks
     #[must_use]
     pub fn sanitize_xml(&self, input: &str) -> String {
-        lazy_static! {
-            static ref DOCTYPE_RE: Regex = Regex::new(r"(?i)<!DOCTYPE[^>]*>").unwrap();
-            static ref ENTITY_RE: Regex = Regex::new(r"(?i)<!ENTITY[^>]*>").unwrap();
-            static ref SYSTEM_RE: Regex = Regex::new(r"(?i)SYSTEM").unwrap();
-            static ref PUBLIC_RE: Regex = Regex::new(r"(?i)PUBLIC").unwrap();
-        }
+        static DOCTYPE_RE: LazyLock<Regex> =
+            LazyLock::new(|| Regex::new(r"(?i)<!DOCTYPE[^>]*>").unwrap());
+        static ENTITY_RE: LazyLock<Regex> =
+            LazyLock::new(|| Regex::new(r"(?i)<!ENTITY[^>]*>").unwrap());
+        static SYSTEM_RE: LazyLock<Regex> = LazyLock::new(|| Regex::new(r"(?i)SYSTEM").unwrap());
+        static PUBLIC_RE: LazyLock<Regex> = LazyLock::new(|| Regex::new(r"(?i)PUBLIC").unwrap());
 
         let mut result = input.to_string();
 

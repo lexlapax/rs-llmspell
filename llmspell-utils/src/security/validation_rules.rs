@@ -3,11 +3,11 @@
 
 use super::input_sanitizer::{InputSanitizer, SanitizationConfig, ValidationReport};
 use crate::params::ParamValue;
-use lazy_static::lazy_static;
 use llmspell_core::{LLMSpellError, Result as LLMResult};
 use regex::Regex;
 use serde_json::Value;
 use std::collections::HashMap;
+use std::sync::LazyLock;
 
 /// Validation rule that can be applied to input
 pub trait ValidationRule: Send + Sync {
@@ -223,15 +223,15 @@ pub struct JavaScriptSanitizationRule {
 impl JavaScriptSanitizationRule {
     #[must_use]
     pub fn new() -> Self {
-        lazy_static! {
-            static ref PATTERNS: Vec<Regex> = vec![
+        static PATTERNS: LazyLock<Vec<Regex>> = LazyLock::new(|| {
+            vec![
                 Regex::new(r"(?i)<script[^>]*>.*?</script>").unwrap(),
                 Regex::new(r"(?i)javascript:").unwrap(),
                 Regex::new(r"(?i)on\w+\s*=").unwrap(),
                 Regex::new(r"(?i)eval\s*\(").unwrap(),
                 Regex::new(r"(?i)expression\s*\(").unwrap(),
-            ];
-        }
+            ]
+        });
         Self {
             patterns: PATTERNS.clone(),
         }

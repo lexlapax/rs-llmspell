@@ -5,7 +5,7 @@ use crate::{
     error::{Result, TemplateError},
 };
 use dashmap::DashMap;
-use std::sync::Arc;
+use std::sync::{Arc, LazyLock};
 
 /// Template registry for storing and discovering templates
 ///
@@ -176,12 +176,11 @@ impl TemplateRegistry {
     }
 }
 
-/// Global template registry (lazy static)
-static GLOBAL_REGISTRY: once_cell::sync::Lazy<TemplateRegistry> =
-    once_cell::sync::Lazy::new(|| {
-        TemplateRegistry::with_builtin_templates()
-            .expect("Failed to initialize global template registry")
-    });
+/// Global template registry
+static GLOBAL_REGISTRY: LazyLock<TemplateRegistry> = LazyLock::new(|| {
+    TemplateRegistry::with_builtin_templates()
+        .expect("Failed to initialize global template registry")
+});
 
 /// Get the global template registry
 pub fn global_registry() -> &'static TemplateRegistry {
