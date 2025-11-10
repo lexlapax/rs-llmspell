@@ -2,13 +2,15 @@
 
 Thank you for your interest in contributing to rs-llmspell! This guide will help you get started.
 
-**🔗 Navigation**: [← Project Home](README.md) | [Developer Guide](docs/developer-guide/) | [Documentation](docs/)
+**🔗 Navigation**: [← Project Home](README.md) | [🔧 Developer Setup](README-DEVEL.md) | [Developer Guide](docs/developer-guide/) | [Documentation](docs/)
 
 ---
 
 ## ⚡ Quick Start
 
-For comprehensive development setup and workflows, see the **[Developer Guide](docs/developer-guide/README.md)**.
+**First Time?** Start with **[README-DEVEL.md](README-DEVEL.md)** for complete development environment setup (Rust, Docker, cargo tools, scripts).
+
+For comprehensive development patterns and workflows, see the **[Developer Guide](docs/developer-guide/README.md)**.
 
 ### Quick Commands Reference
 

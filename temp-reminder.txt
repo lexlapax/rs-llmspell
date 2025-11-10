@@ -1,3 +1,13 @@
 - think about adding diffusion models as a fundamental provider. that means we have to start characterizing providers 
   with additional metadata - type of model - transformer model, diffusion model etc..
 
+- after postgres addition, we should have a profile for postgres usage with local ollama
+, rag 
+
+- do we need all the rust examples? 
+
+- README.md - update to use builder instead of create./target/release/llmspell exec '
+  local agent = Agent.create({model = "openai/gpt-4o-mini"})
+  print(agent:execute({prompt = "Explain Rust ownership in 2 sentences"}).response)
+'
+

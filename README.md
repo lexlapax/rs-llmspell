@@ -4,7 +4,7 @@
 
 **🚀 Version 0.13.1 - Production Storage Infrastructure & Documentation Consolidation**
 
-**🔗 Quick Links**: [📘 Documentation Hub](docs/) | [🚀 Quick Start](#-quick-start) | [🎯 What This Is](#what-is-rs-llmspell) | [🏗️ Experiment → Production](#from-experiment-to-production) | [📖 Release Notes](RELEASE_NOTES_v0.13.1.md) | [🛠️ Examples](examples/)
+**🔗 Quick Links**: [📘 Documentation Hub](docs/) | [🚀 Quick Start](#-quick-start) | [🎯 What This Is](#what-is-rs-llmspell) | [🏗️ Experiment → Production](#from-experiment-to-production) | [📖 Release Notes](RELEASE_NOTES_v0.13.1.md) | [🛠️ Examples](examples/) | [🔧 Contributing](CONTRIBUTING.md)
 
 ---
 
@@ -298,11 +298,15 @@ See [Scripts Overview](scripts/) for all automation tools.
 
 ## 🤝 Contributing
 
+**New Contributors**: Start with [README-DEVEL.md](README-DEVEL.md) for complete development environment setup.
+
 Building experimental AI components? See [Developer Guide](docs/developer-guide/) for:
 - Rapid iteration patterns
 - Production-quality code for future extraction
 - Testing with llmspell-testing helpers
 - 60+ examples to learn from
+
+Read [CONTRIBUTING.md](CONTRIBUTING.md) for guidelines and workflow.
 
 ---
 
