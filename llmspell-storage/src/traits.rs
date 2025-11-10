@@ -15,12 +15,12 @@ pub enum StorageBackendType {
     /// Sled embedded database
     Sled,
 
-    /// RocksDB embedded database
-    RocksDB,
-
     /// PostgreSQL database with VectorChord (Phase 13b.2+)
     #[cfg(feature = "postgres")]
     Postgres,
+
+    // Phase 13c.1.7: RocksDB removed (planned but not implemented)
+    // Future Phase 14+ could add RocksDB backend if needed for high-performance KV
 }
 
 /// Storage backend characteristics

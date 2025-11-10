@@ -27,6 +27,8 @@ tokenizers.workspace = true
 parking_lot.workspace = true
 rand.workspace = true
 dirs = "5.0"
+# Phase 13c.1.7: ureq kept (used in hf_downloader.rs for synchronous HuggingFace model downloads)
+# Reason: Candle model loading is sync, reqwest is async - using ureq avoids blocking executor
 ureq = "2.12"
 
 # Platform-specific dependencies for GPU support

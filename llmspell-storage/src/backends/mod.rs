@@ -1,5 +1,5 @@
 //! ABOUTME: Storage backend implementations
-//! ABOUTME: Provides memory, sled, vector, rocksdb, and postgres backends
+//! ABOUTME: Provides memory, sled, vector, and postgres backends
 
 pub mod memory;
 pub mod sled_backend;
