@@ -147,9 +147,7 @@ impl SsrfProtector {
             if self.config.block_localhost {
                 let lower_host = host.to_lowercase();
                 if lower_host == "localhost" || lower_host.ends_with(".localhost") {
-                    return Err(SsrfError::BlockedHost {
-                        host: host.clone(),
-                    });
+                    return Err(SsrfError::BlockedHost { host: host.clone() });
                 }
             }
 
