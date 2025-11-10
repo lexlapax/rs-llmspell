@@ -353,67 +353,46 @@
 
 ---
 
-### Task 13c.1.5: File Operations Audit ⏹ PENDING
+### Task 13c.1.5: File Operations Audit ✅ COMPLETE
 **Priority**: LOW
 **Estimated Time**: 3 hours
+**Actual Time**: 30 minutes
 **Assignee**: Core Infrastructure Team
-**Status**: ⏹ PENDING
+**Status**: ✅ COMPLETE
+**Completed**: 2025-11-10
 
-**Description**: Evaluate replacing `walkdir` and `path-clean` with `std::fs` if usage is simple.
+**Description**: Evaluated `walkdir` and `path-clean` usage; determined both provide essential features beyond std::fs, kept with documentation.
 
 **Acceptance Criteria**:
-- [ ] walkdir usage complexity audited
-- [ ] path-clean usage audited
-- [ ] Migration completed if simple OR decision to keep documented
-- [ ] 0-2 dependencies potentially removed
-- [ ] All file operations tested
+- [x] walkdir usage complexity audited (1 file, sophisticated features)
+- [x] path-clean usage audited (1 file, 3 uses for path normalization)
+- [x] Decision to keep documented (both provide features beyond std::fs)
+- [x] 0 dependencies removed (both kept for production utilities)
+- [x] All file operations tested
 
-**Implementation Steps**:
-1. Audit walkdir usage:
-   ```bash
-   grep -r "walkdir" llmspell-*/src --include="*.rs" -B 5 -A 5
-   ```
+**Completion Insights**:
+- **walkdir**: Production-critical for file search
+  - Used in llmspell-utils/src/search.rs (search_in_directory function)
+  - Features: max_depth control, exclude_dirs filtering, symlink handling
+  - Cannot replace with std::fs::read_dir - would lose max_depth, filtering
+  - **Decision**: KEEP - provides essential directory traversal features
+- **path-clean**: Production-critical for path normalization
+  - Used in llmspell-utils/src/file_utils.rs (3 locations)
+    1. expand_path(): Normalizes paths after tilde/env var expansion
+    2. normalize_path(): Public API for path cleaning (resolves . and ..)
+    3. join_paths(): Cleans result after joining multiple paths
+  - Handles edge cases: ../., empty components, duplicate slashes
+  - std::path doesn't provide equivalent normalization
+  - **Decision**: KEEP - essential for correct path handling
+- **Migration Assessment**: NOT FEASIBLE
+  - std::fs::read_dir: No max_depth, no filtering, manual recursion complex
+  - std::path: No .clean() equivalent, manual normalization error-prone
+  - Both dependencies provide production-quality implementations
+- **Validation**: File operations tests passing, clippy clean
+- **Zero Behavioral Changes**: Only added documentation justifying dependencies
 
-2. Check complexity:
-   - Simple recursive traversal → can replace with std::fs::read_dir
-   - Symlink handling, permissions → keep walkdir
-
-3. Audit path-clean:
-   ```bash
-   grep -r "path_clean\|path-clean" llmspell-*/src --include="*.rs" -B 5 -A 5
-   ```
-
-4. If simple, replace:
-   ```rust
-   // Before:
-   use walkdir::WalkDir;
-   for entry in WalkDir::new(path) {
-       // ...
-   }
-
-   // After:
-   use std::fs;
-   fn walk_dir(path: &Path) -> impl Iterator<Item = DirEntry> {
-       fs::read_dir(path)
-           .into_iter()
-           .flatten()
-           .flat_map(|entry| entry.ok())
-   }
-   ```
-
-5. Test edge cases (symlinks, permissions)
-
-**Definition of Done**:
-- [ ] Usage complexity assessed
-- [ ] Decision made: migrate or keep
-- [ ] If migrated: tests cover edge cases
-- [ ] If kept: justification documented
-- [ ] All file operation tests pass
-
-**Files to Modify**:
-- `Cargo.toml`
-- Files using walkdir/path-clean (TBD)
-- Test files for edge case coverage
+**Files Modified**:
+- `Cargo.toml` (workspace - documented walkdir and path-clean lines 134-138)
 
 ---
 

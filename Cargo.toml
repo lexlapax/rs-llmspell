@@ -131,6 +131,9 @@ reqwest = { version = "0.12", features = ["json", "stream"] }
 jsonschema = "0.18"
 
 # Cross-platform filesystem operations
+# Phase 13c.1.5: Both kept for production-critical file utilities (llmspell-utils)
+# path-clean: Path normalization with proper ../. resolution and edge case handling (3 uses in file_utils.rs)
+# walkdir: Sophisticated directory traversal with max_depth, filtering, symlink handling (search.rs)
 path-clean = "1.0"
 walkdir = "2.5"
 
