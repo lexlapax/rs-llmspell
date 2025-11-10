@@ -16,6 +16,8 @@ anyhow = "1.0"
 async-trait = "0.1"
 thiserror = "1.0"
 tokio = { version = "1.37", features = ["full"] }
+# Phase 13c.1.3: tokio-stream kept for production-critical event streaming (stream.rs)
+# Provides BroadcastStream wrapper and StreamExt utilities not available in tokio core
 tokio-stream = { version = "0.1", features = ["sync"] }
 serde = { version = "1.0", features = ["derive"] }
 serde_json = "1.0"

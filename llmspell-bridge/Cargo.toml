@@ -29,7 +29,6 @@ llmspell-templates = { path = "../llmspell-templates" }
 llmspell-memory = { path = "../llmspell-memory" }
 llmspell-context = { path = "../llmspell-context" }
 tokio.workspace = true
-tokio-stream.workspace = true
 async-trait.workspace = true
 futures.workspace = true
 chrono.workspace = true

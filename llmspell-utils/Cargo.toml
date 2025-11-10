@@ -13,7 +13,6 @@ rate-limiting-http = ["reqwest"]
 [dependencies]
 # Async runtime
 tokio = { workspace = true }
-tokio-stream = { workspace = true }
 futures = { workspace = true }
 async-trait = { workspace = true }
 
