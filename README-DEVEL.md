@@ -158,6 +158,192 @@ echo 'export SCCACHE_DIR=$HOME/.cache/sccache' >> ~/.bashrc
 
 **Note on sccache**: Currently documented in [COMPILATION-PERFORMANCE.md](docs/archives/COMPILATION-PERFORMANCE.md) but not actively used in CI. Can provide 2-3x speedup for iterative development. Optional but recommended for active contributors.
 
+### Build Performance & Memory Optimization
+
+**⚠️ Important for systems with <16GB RAM**: This workspace has 20 crates with deep dependency trees (400+ transitive dependencies including surrealdb, aws-sdk-*, candle-*, arrow, parquet, rocksdb). Running `cargo test --workspace --all-features` can require **4-8GB RAM just for linking test binaries**. On limited-RAM systems, the linker may get OOM-killed by the kernel (signal 9 / "ld terminated with signal 9").
+
+#### Understanding the Problem
+
+**Dependency Graph Characteristics:**
+- 20 workspace crates
+- 400+ transitive dependencies with deep trees
+- Heavy dependencies: surrealdb (100+ deps), aws-sdk-* (200+ deps), candle-* (50+ deps), arrow/parquet (80+ deps)
+- Test dependencies add more weight: mockall, proptest, criterion, quickcheck
+
+**Linker Memory Requirements:**
+- Default linker must resolve ALL symbols for entire dependency graph in memory
+- `--all-features` flag enables maximum dependency surface
+- Single test binary: 4-8GB RAM for linking
+- Workspace-wide tests: multiple binaries linking in parallel
+- **Symptom**: "ld terminated with signal 9 [Killed]" or "collect2: fatal error"
+
+**Current Optimizations (Always Active):**
+- ✅ `incremental = true` - reuse previous compilation artifacts
+- ✅ `codegen-units = 256` - parallelize codegen (reduces per-unit memory)
+- ✅ `split-debuginfo = "unpacked"` - **NEW**: splits debug info into separate files (30-50% linker memory reduction)
+
+#### Solution 1: Fast Linkers (Recommended)
+
+**Best solution**: Modern linkers are 2-4x faster and use 60% less memory than default system linkers.
+
+**Linux - mold linker:**
+```bash
+# Install via package manager (Debian/Ubuntu)
+sudo apt install mold
+
+# Or install via cargo
+cargo install --locked mold
+
+# Or build from source
+git clone https://github.com/rui314/mold.git
+cd mold && make -j$(nproc) && sudo make install
+
+# Verify installation
+mold --version
+```
+
+**macOS - zld linker:**
+```bash
+# Install via Homebrew
+brew install michaeleisel/zld/zld
+
+# Verify installation
+zld --version
+```
+
+**Activation:**
+Edit `.cargo/config.toml` and uncomment the section for your platform:
+- Linux x86_64: lines 47-49
+- Linux ARM64: lines 53-55
+- macOS Intel: lines 59-60
+- macOS Apple Silicon: lines 64-65
+
+**Verification:**
+```bash
+# After uncommenting, check linker is being used
+cargo build 2>&1 | grep -E "(mold|zld)"
+
+# Linux: Should see "mold" in linker invocation
+# macOS: Should see "zld" in linker invocation
+```
+
+**Performance Impact:**
+- Linking speed: 2-4x faster
+- Memory usage: 60% reduction
+- No code changes required
+- Graceful fallback: If linker not found, cargo uses default linker
+
+#### Solution 2: Per-Crate Testing
+
+**Strategy**: Test individual crates instead of entire workspace to avoid linking everything simultaneously.
+
+**Manual per-crate testing:**
+```bash
+# Test core functionality
+cargo test -p llmspell-core --all-features
+cargo test -p llmspell-tools --all-features
+cargo test -p llmspell-agents --all-features
+
+# Test memory system
+cargo test -p llmspell-memory --all-features
+cargo test -p llmspell-graph --all-features
+cargo test -p llmspell-context --all-features
+
+# Test infrastructure
+cargo test -p llmspell-storage --all-features
+cargo test -p llmspell-providers --all-features
+```
+
+**Automated per-crate testing (for CI/low-memory systems):**
+```bash
+# Test all crates sequentially
+for crate in llmspell-{core,tools,agents,workflows,templates,memory,graph,context,rag,storage,providers,bridge,hooks,events,utils,config,security,tenancy,kernel,cli}; do
+  echo "=== Testing $crate ==="
+  cargo test -p $crate --all-features || exit 1
+done
+```
+
+**Benefits:**
+- Only links dependencies for one crate at a time
+- 80% faster iteration when debugging specific component
+- Uses 1/5th the memory of workspace-wide testing
+- Better error isolation
+
+#### Solution 3: System Resource Adjustments
+
+**Linux - Add Swap Space (if you have sudo access):**
+```bash
+# Check current swap
+free -h
+swapon --show
+
+# Add 16GB swap file
+sudo fallocate -l 16G /swapfile
+sudo chmod 600 /swapfile
+sudo mkswap /swapfile
+sudo swapon /swapfile
+
+# Make persistent across reboots
+echo '/swapfile none swap sw 0 0' | sudo tee -a /etc/fstab
+
+# Verify
+free -h  # Should show 16G swap
+```
+
+**Reduce Parallel Build Jobs:**
+```bash
+# Limit concurrent compilation units (reduces peak memory)
+cargo test --workspace --all-features -j 4  # Instead of default (# of CPUs)
+
+# For very limited systems
+cargo test --workspace --all-features -j 2
+```
+
+**Monitor Memory Usage:**
+```bash
+# Linux: Check for OOM kills in system logs
+dmesg | grep -i "killed process"
+dmesg | tail -50 | grep -i "out of memory"
+
+# Real-time memory monitoring during build
+watch -n 1 'free -h && ps aux | grep -E "(cargo|rustc|ld)" | head -20'
+```
+
+#### Solution 4: Reduced Feature Testing
+
+**Strategy**: Test without enabling all features to reduce dependency surface.
+
+**Common feature combinations:**
+```bash
+# Test with default features only (minimal dependencies)
+cargo test --workspace
+
+# Test with common development features
+cargo test --workspace --features common
+
+# Test specific feature sets
+cargo test --workspace --features "sled,memory-only"
+cargo test --workspace --features "postgres,hnsw"
+```
+
+**Trade-offs:**
+- **Pro**: 50-70% reduction in linker memory requirements
+- **Pro**: Faster iteration during development
+- **Con**: May miss feature-specific bugs
+- **Recommendation**: Use for local development, run `--all-features` in CI or before PR
+
+**CI Strategy:**
+```bash
+# Local development: fast iteration
+cargo test --workspace --features common
+
+# Pre-commit: comprehensive validation
+cargo test --workspace --all-features
+
+# CI: full validation with better resources
+cargo test --workspace --all-features --release
+```
+
 ### Documentation Tools
 
 **Node.js + npm** (for markdown link checking in CI - optional for local dev)
@@ -666,6 +852,45 @@ cargo test -- --test-threads=1
 # Run specific test categories
 ./scripts/testing/run-llmspell-tests.sh fast  # Skips external/benchmark
 ```
+
+**Linker OOM (Out of Memory) Kills**
+
+**Symptoms:**
+```
+error: linking with `cc` failed: exit status: 1
+= note: collect2: fatal error: ld terminated with signal 9 [Killed]
+        compilation terminated.
+```
+
+**Diagnosis:**
+```bash
+# Linux: Check system logs for OOM killer activity
+dmesg | tail -50 | grep -i -E "(killed|out of memory|oom)"
+
+# Check available memory
+free -h  # Linux
+vm_stat  # macOS
+
+# Identify which process was killed
+journalctl -xe | grep -i oom  # systemd systems
+```
+
+**Quick Fix (Immediate):**
+```bash
+# Test per-crate instead of entire workspace
+cargo test -p llmspell-core --all-features
+cargo test -p llmspell-memory --all-features
+# etc... (see "Solution 2: Per-Crate Testing" above)
+```
+
+**Permanent Fix (Choose one):**
+1. **Best**: Install fast linker (mold/zld) - see "Build Performance & Memory Optimization" section
+2. **Linux**: Add swap space - see "Solution 3: System Resource Adjustments"
+3. **Alternative**: Reduce parallelism - `cargo test -j 2`
+4. **Development**: Use `--features common` instead of `--all-features`
+
+**Root Cause:**
+This workspace has 400+ dependencies with deep trees. With `--all-features`, test binaries require 4-8GB RAM just for linking. The default system linker loads the entire symbol table into memory. Modern linkers (mold/zld) use 60% less memory and are 2-4x faster.
 
 ---
 

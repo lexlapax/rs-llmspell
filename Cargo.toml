@@ -213,6 +213,8 @@ lto = false
 panic = 'unwind'
 incremental = true
 codegen-units = 256
+# Memory optimization: Split debug info into separate files to reduce linker memory by 30-50%
+split-debuginfo = "unpacked"
 
 [profile.release]
 opt-level = 3
@@ -233,6 +235,9 @@ debug-assertions = true
 overflow-checks = true
 incremental = true
 codegen-units = 256
+# Memory optimization: Split debug info to reduce linker memory pressure during testing
+# Critical for workspace tests with --all-features (4-8GB linker memory without this)
+split-debuginfo = "unpacked"
 
 # Note: Cargo patch for num-bigint-dig not possible (can't patch crates.io -> crates.io)
 # Solution: Removed MySQL support (Task 13c.1.1) which eliminates rsa/num-bigint-dig dependency

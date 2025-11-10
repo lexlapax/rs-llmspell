@@ -44,9 +44,9 @@ build-release = "build --workspace --all-features --release"
 
 # Linux x86_64 - mold linker (50-80% faster than ld, 60% less memory)
 # Uncomment to enable after installing mold:
-# [target.x86_64-unknown-linux-gnu]
-# linker = "clang"
-# rustflags = ["-C", "link-arg=-fuse-ld=mold"]
+[target.x86_64-unknown-linux-gnu]
+linker = "clang"
+rustflags = ["-C", "link-arg=-fuse-ld=mold"]
 
 # Linux ARM64 - mold linker
 # Uncomment to enable after installing mold:
