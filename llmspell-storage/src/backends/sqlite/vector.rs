@@ -285,11 +285,11 @@ impl SqliteVectorStorage {
 
         // Query: SELECT rowid, embedding FROM vec_embeddings_*
         // JOIN vector_metadata to filter by namespace/scope
-        let query_sql = format!(
+        let query_sql =
             "SELECT m.rowid FROM vector_metadata m WHERE m.dimension = ? AND m.scope = ?"
-        );
+                .to_string();
 
-        let mut stmt = conn
+        let stmt = conn
             .prepare(&query_sql)
             .await
             .with_context(|| format!("Failed to prepare query for namespace {}", namespace))?;
@@ -308,7 +308,10 @@ impl SqliteVectorStorage {
         }
 
         if rowids.is_empty() {
-            debug!("No vectors found for namespace {}, creating empty index", namespace);
+            debug!(
+                "No vectors found for namespace {}, creating empty index",
+                namespace
+            );
             return Ok(None);
         }
 
@@ -336,7 +339,7 @@ impl SqliteVectorStorage {
         );
 
         for rowid in rowids {
-            let mut embed_stmt = conn.prepare(&embeddings_query).await?;
+            let embed_stmt = conn.prepare(&embeddings_query).await?;
             let mut embed_rows = embed_stmt.query(libsql::params![rowid]).await?;
 
             if let Some(embed_row) = embed_rows.next().await? {
@@ -346,8 +349,9 @@ impl SqliteVectorStorage {
                 // Assuming the blob is a JSON array or raw f32 bytes
                 let embedding: Vec<f32> = if embedding_blob.starts_with(b"[") {
                     // JSON format
-                    serde_json::from_slice(&embedding_blob)
-                        .with_context(|| format!("Failed to parse embedding JSON for rowid {}", rowid))?
+                    serde_json::from_slice(&embedding_blob).with_context(|| {
+                        format!("Failed to parse embedding JSON for rowid {}", rowid)
+                    })?
                 } else {
                     // Raw f32 bytes (4 bytes per float)
                     embedding_blob
@@ -366,9 +370,9 @@ impl SqliteVectorStorage {
                     continue;
                 }
 
-                index
-                    .insert(rowid, embedding)
-                    .map_err(|e| anyhow::anyhow!("Failed to insert vector {} into HNSW: {}", rowid, e))?;
+                index.insert(rowid, embedding).map_err(|e| {
+                    anyhow::anyhow!("Failed to insert vector {} into HNSW: {}", rowid, e)
+                })?;
             }
         }
 
@@ -401,12 +405,8 @@ impl SqliteVectorStorage {
             .to_msgpack()
             .map_err(|e| anyhow::anyhow!("Failed to serialize HNSW index: {}", e))?;
 
-        std::fs::write(&index_path, data).with_context(|| {
-            format!(
-                "Failed to write HNSW index to {}",
-                index_path.display()
-            )
-        })?;
+        std::fs::write(&index_path, data)
+            .with_context(|| format!("Failed to write HNSW index to {}", index_path.display()))?;
 
         debug!(
             "Persisted HNSW index for {} to {}",
@@ -491,9 +491,28 @@ impl VectorStorage for SqliteVectorStorage {
             .with_context(|| "Failed to insert into vector_metadata")?;
 
             // 3. Insert into HNSW index
-            let index_ref = self.get_or_create_index(&namespace).await?;
-            let index_guard = index_ref.read();
+            // Get existing index or create empty one (don't rebuild from table to avoid duplicates)
+            let index_ref = if let Some(existing) = self.hnsw_indices.get(&namespace) {
+                existing.clone()
+            } else {
+                // Create empty index
+                let vectorlite_metric = Self::convert_metric(self.metric);
+                let index = HnswIndex::new(
+                    self.dimension,
+                    self.max_elements,
+                    self.m,
+                    self.ef_construction,
+                    vectorlite_metric,
+                )
+                .ok();
 
+                let index_ref = Arc::new(RwLock::new(index));
+                self.hnsw_indices
+                    .insert(namespace.clone(), index_ref.clone());
+                index_ref
+            };
+
+            let index_guard = index_ref.read();
             if let Some(ref index) = *index_guard {
                 index
                     .insert(rowid, entry.embedding)
@@ -541,7 +560,10 @@ impl VectorStorage for SqliteVectorStorage {
                     .map_err(|e| anyhow::anyhow!("HNSW search failed: {}", e))?
             } else {
                 // No HNSW index, fall back to brute force (not implemented)
-                warn!("No HNSW index for namespace {}, returning empty results", namespace);
+                warn!(
+                    "No HNSW index for namespace {}, returning empty results",
+                    namespace
+                );
                 return Ok(Vec::new());
             }
             // index_guard dropped here
@@ -557,7 +579,7 @@ impl VectorStorage for SqliteVectorStorage {
 
         for (rowid, distance) in neighbors {
             // Query vector_metadata for full entry
-            let mut stmt = conn
+            let stmt = conn
                 .prepare(
                     "SELECT id, tenant_id, scope, metadata, created_at, updated_at
                      FROM vector_metadata WHERE rowid = ?",
@@ -568,18 +590,18 @@ impl VectorStorage for SqliteVectorStorage {
 
             if let Some(row) = rows.next().await? {
                 let id: String = row.get(0)?;
-                let tenant_id: String = row.get(1)?;
+                let _tenant_id: String = row.get(1)?;
                 let scope_str: String = row.get(2)?;
                 let metadata_json: String = row.get(3)?;
-                let created_at: i64 = row.get(4)?;
-                let updated_at: i64 = row.get(5)?;
+                let _created_at: i64 = row.get(4)?;
+                let _updated_at: i64 = row.get(5)?;
 
                 // Parse metadata
-                let metadata: HashMap<String, Value> = serde_json::from_str(&metadata_json)
-                    .unwrap_or_default();
+                let metadata: HashMap<String, Value> =
+                    serde_json::from_str(&metadata_json).unwrap_or_default();
 
-                // Parse scope (reverse of scope_to_namespace)
-                let parsed_scope = if scope_str == "__global__" {
+                // Parse scope (reverse of scope_to_namespace - unused for now)
+                let _parsed_scope = if scope_str == "__global__" {
                     StateScope::Global
                 } else if let Some(user_id) = scope_str.strip_prefix("user:") {
                     StateScope::User(user_id.to_string())
@@ -595,9 +617,8 @@ impl VectorStorage for SqliteVectorStorage {
                     StateScope::Hook(hook_id.to_string())
                 } else if let Some(custom) = scope_str.strip_prefix("custom:") {
                     StateScope::Custom(custom.to_string())
-                } else if scope_str.starts_with("tenant:") {
-                    StateScope::Custom(scope_str)
                 } else {
+                    // tenant:* or any other custom scope format
                     StateScope::Custom(scope_str)
                 };
 
@@ -644,7 +665,7 @@ impl VectorStorage for SqliteVectorStorage {
 
         for id in ids {
             // Get rowid and namespace before deleting
-            let mut stmt = conn
+            let stmt = conn
                 .prepare("SELECT rowid, scope FROM vector_metadata WHERE id = ?")
                 .await?;
             let mut rows = stmt.query(libsql::params![id.as_str()]).await?;
@@ -654,8 +675,11 @@ impl VectorStorage for SqliteVectorStorage {
                 let scope_str: String = row.get(1)?;
 
                 // Delete from vector_metadata
-                conn.execute("DELETE FROM vector_metadata WHERE id = ?", libsql::params![id.as_str()])
-                    .await?;
+                conn.execute(
+                    "DELETE FROM vector_metadata WHERE id = ?",
+                    libsql::params![id.as_str()],
+                )
+                .await?;
 
                 // Delete from vec_embeddings_*
                 let vec_table = self.table_name();
@@ -683,7 +707,7 @@ impl VectorStorage for SqliteVectorStorage {
         let conn = self.backend.get_connection().await?;
 
         // Get all rowids for this scope
-        let mut stmt = conn
+        let stmt = conn
             .prepare("SELECT rowid FROM vector_metadata WHERE scope = ? AND dimension = ?")
             .await?;
         let mut rows = stmt
@@ -799,10 +823,7 @@ impl VectorStorage for SqliteVectorStorage {
             self.persist_index_to_disk(&namespace, &index).await?;
         }
 
-        info!(
-            "Saved {} HNSW indices to disk",
-            self.hnsw_indices.len()
-        );
+        info!("Saved {} HNSW indices to disk", self.hnsw_indices.len());
 
         Ok(())
     }
@@ -836,11 +857,7 @@ impl VectorStorage for SqliteVectorStorage {
                                 info!("Loaded HNSW index for namespace {}", namespace);
                             }
                             Err(e) => {
-                                warn!(
-                                    "Failed to load HNSW index from {}: {}",
-                                    path.display(),
-                                    e
-                                );
+                                warn!("Failed to load HNSW index from {}: {}", path.display(), e);
                             }
                         }
                     }
@@ -851,5 +868,307 @@ impl VectorStorage for SqliteVectorStorage {
         info!("Loaded {} HNSW indices from disk", loaded_count);
 
         Ok(())
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::backends::sqlite::{SqliteBackend, SqliteConfig};
+    use std::collections::HashMap;
+    use tempfile::TempDir;
+
+    async fn create_test_storage(dimension: usize) -> (SqliteVectorStorage, TempDir) {
+        let temp_dir = TempDir::new().unwrap();
+        let db_path = temp_dir.path().join("test.db");
+
+        let config = SqliteConfig::new(db_path);
+        let backend = Arc::new(SqliteBackend::new(config).await.unwrap());
+
+        // Apply V3 migration manually
+        let conn = backend.get_connection().await.unwrap();
+
+        // Create vec_embeddings tables for all dimensions
+        // Use regular tables in tests since vec0 extension may not be available
+        for dim in &[384, 768, 1536, 3072] {
+            let create_sql = format!(
+                "CREATE TABLE IF NOT EXISTS vec_embeddings_{} (rowid INTEGER PRIMARY KEY, embedding BLOB)",
+                dim
+            );
+            conn.execute(&create_sql, ()).await.unwrap();
+        }
+
+        // Create vector_metadata table
+        conn.execute(
+            "CREATE TABLE IF NOT EXISTS vector_metadata (
+                rowid INTEGER PRIMARY KEY,
+                id TEXT NOT NULL UNIQUE,
+                tenant_id TEXT,
+                scope TEXT NOT NULL,
+                dimension INTEGER NOT NULL CHECK (dimension IN (384, 768, 1536, 3072)),
+                metadata TEXT NOT NULL DEFAULT '{}',
+                created_at INTEGER NOT NULL,
+                updated_at INTEGER NOT NULL
+            )",
+            (),
+        )
+        .await
+        .unwrap();
+
+        conn.execute(
+            "CREATE INDEX IF NOT EXISTS idx_vector_metadata_tenant_scope ON vector_metadata(tenant_id, scope)",
+            (),
+        )
+        .await
+        .unwrap();
+
+        conn.execute(
+            "CREATE INDEX IF NOT EXISTS idx_vector_metadata_id ON vector_metadata(id)",
+            (),
+        )
+        .await
+        .unwrap();
+
+        conn.execute(
+            "CREATE INDEX IF NOT EXISTS idx_vector_metadata_dimension ON vector_metadata(dimension)",
+            (),
+        )
+        .await
+        .unwrap();
+
+        let storage = SqliteVectorStorage::new(backend, dimension).await.unwrap();
+
+        (storage, temp_dir)
+    }
+
+    fn create_test_vector(dimension: usize, value: f32) -> Vec<f32> {
+        vec![value; dimension]
+    }
+
+    #[tokio::test]
+    async fn test_insert_and_search() {
+        let (storage, _temp) = create_test_storage(768).await;
+
+        let entries = vec![
+            VectorEntry::new("vec1".to_string(), create_test_vector(768, 1.0)),
+            VectorEntry::new("vec2".to_string(), create_test_vector(768, 2.0)),
+        ];
+
+        let ids = storage.insert(entries).await.unwrap();
+        assert_eq!(ids.len(), 2);
+
+        let query = VectorQuery::new(create_test_vector(768, 1.5), 2);
+
+        let results = storage
+            .search_scoped(&query, &StateScope::Global)
+            .await
+            .unwrap();
+        assert_eq!(results.len(), 2);
+    }
+
+    #[tokio::test]
+    async fn test_namespace_isolation() {
+        let (storage, _temp) = create_test_storage(768).await;
+
+        let entries = vec![
+            VectorEntry::new("global1".to_string(), create_test_vector(768, 1.0)),
+            VectorEntry::new("user1".to_string(), create_test_vector(768, 1.0))
+                .with_scope(StateScope::User("user123".to_string())),
+        ];
+
+        storage.insert(entries).await.unwrap();
+
+        let query = VectorQuery::new(create_test_vector(768, 1.0), 10);
+
+        let global_results = storage
+            .search_scoped(&query, &StateScope::Global)
+            .await
+            .unwrap();
+
+        // Debug: print results
+        for result in &global_results {
+            eprintln!("Global result: id={}, score={}", result.id, result.score);
+        }
+
+        assert_eq!(
+            global_results.len(),
+            1,
+            "Expected 1 global result, got {}. IDs: {:?}",
+            global_results.len(),
+            global_results.iter().map(|r| &r.id).collect::<Vec<_>>()
+        );
+        assert_eq!(global_results[0].id, "global1");
+
+        let user_results = storage
+            .search_scoped(&query, &StateScope::User("user123".to_string()))
+            .await
+            .unwrap();
+        assert_eq!(user_results.len(), 1);
+        assert_eq!(user_results[0].id, "user1");
+    }
+
+    #[tokio::test]
+    async fn test_dimension_validation() {
+        let (storage, _temp) = create_test_storage(768).await;
+
+        let wrong_dim_entry = VectorEntry::new("wrong".to_string(), create_test_vector(384, 1.0));
+
+        let result = storage.insert(vec![wrong_dim_entry]).await;
+        assert!(result.is_err());
+    }
+
+    #[tokio::test]
+    async fn test_delete() {
+        let (storage, _temp) = create_test_storage(768).await;
+
+        let entries = vec![VectorEntry::new(
+            "vec1".to_string(),
+            create_test_vector(768, 1.0),
+        )];
+
+        storage.insert(entries).await.unwrap();
+        storage.delete(&["vec1".to_string()]).await.unwrap();
+
+        let query = VectorQuery::new(create_test_vector(768, 1.0), 10);
+        let results = storage
+            .search_scoped(&query, &StateScope::Global)
+            .await
+            .unwrap();
+        assert_eq!(results.len(), 0);
+    }
+
+    #[tokio::test]
+    async fn test_delete_scope() {
+        let (storage, _temp) = create_test_storage(768).await;
+
+        let entries = vec![
+            VectorEntry::new("user1".to_string(), create_test_vector(768, 1.0))
+                .with_scope(StateScope::User("user123".to_string())),
+            VectorEntry::new("user2".to_string(), create_test_vector(768, 2.0))
+                .with_scope(StateScope::User("user123".to_string())),
+        ];
+
+        storage.insert(entries).await.unwrap();
+
+        let deleted = storage
+            .delete_scope(&StateScope::User("user123".to_string()))
+            .await
+            .unwrap();
+        assert_eq!(deleted, 2);
+    }
+
+    #[tokio::test]
+    async fn test_update_metadata() {
+        let (storage, _temp) = create_test_storage(768).await;
+
+        let mut metadata = HashMap::new();
+        metadata.insert("key1".to_string(), serde_json::json!("value1"));
+
+        let entry = VectorEntry::new("vec1".to_string(), create_test_vector(768, 1.0))
+            .with_metadata(metadata.clone());
+
+        storage.insert(vec![entry]).await.unwrap();
+
+        let mut new_metadata = HashMap::new();
+        new_metadata.insert("key1".to_string(), serde_json::json!("value2"));
+
+        storage
+            .update_metadata("vec1", new_metadata.clone())
+            .await
+            .unwrap();
+
+        let query = VectorQuery::new(create_test_vector(768, 1.0), 1);
+        let results = storage
+            .search_scoped(&query, &StateScope::Global)
+            .await
+            .unwrap();
+        assert_eq!(results.len(), 1);
+        assert_eq!(results[0].metadata, Some(new_metadata));
+    }
+
+    #[tokio::test]
+    async fn test_stats() {
+        let (storage, _temp) = create_test_storage(768).await;
+
+        let entries = vec![
+            VectorEntry::new("global1".to_string(), create_test_vector(768, 1.0)),
+            VectorEntry::new("user1".to_string(), create_test_vector(768, 2.0))
+                .with_scope(StateScope::User("user123".to_string())),
+        ];
+
+        storage.insert(entries).await.unwrap();
+
+        let stats = storage.stats().await.unwrap();
+        assert_eq!(stats.total_vectors, 2);
+        assert_eq!(stats.namespace_count, 2);
+    }
+
+    #[tokio::test]
+    async fn test_hnsw_persistence() {
+        let (storage, temp_dir) = create_test_storage(768).await;
+
+        let entries = vec![VectorEntry::new(
+            "vec1".to_string(),
+            create_test_vector(768, 1.0),
+        )];
+
+        storage.insert(entries).await.unwrap();
+        storage.save().await.unwrap();
+
+        let hnsw_path = PathBuf::from("./data/hnsw_indices");
+        let index_file = hnsw_path.join("__global___768_Cosine.hnsw");
+        assert!(index_file.exists());
+
+        // Create new storage instance from same db
+        let db_path = temp_dir.path().join("test.db");
+        let config = SqliteConfig::new(db_path);
+        let backend = Arc::new(SqliteBackend::new(config).await.unwrap());
+        let storage2 = SqliteVectorStorage::new(backend, 768).await.unwrap();
+
+        storage2.load().await.unwrap();
+
+        let query = VectorQuery::new(create_test_vector(768, 1.0), 1);
+        let results = storage2
+            .search_scoped(&query, &StateScope::Global)
+            .await
+            .unwrap();
+        assert_eq!(results.len(), 1);
+        assert_eq!(results[0].id, "vec1");
+    }
+
+    #[tokio::test]
+    async fn test_multiple_dimensions() {
+        for dim in &[384, 768, 1536, 3072] {
+            let (storage, _temp) = create_test_storage(*dim).await;
+            let entry = VectorEntry::new("vec1".to_string(), create_test_vector(*dim, 1.0));
+            storage.insert(vec![entry]).await.unwrap();
+        }
+    }
+
+    #[tokio::test]
+    async fn test_scope_to_namespace_mapping() {
+        let (storage, _temp) = create_test_storage(768).await;
+
+        let scopes = vec![
+            StateScope::Global,
+            StateScope::User("user123".to_string()),
+            StateScope::Session("sess456".to_string()),
+            StateScope::Agent("agent789".to_string()),
+            StateScope::Tool("tool_abc".to_string()),
+            StateScope::Workflow("workflow_def".to_string()),
+            StateScope::Hook("hook_ghi".to_string()),
+            StateScope::Custom("tenant:custom123".to_string()),
+        ];
+
+        for scope in scopes {
+            let entry = VectorEntry::new(format!("{:?}_vec", scope), create_test_vector(768, 1.0))
+                .with_scope(scope.clone());
+
+            storage.insert(vec![entry]).await.unwrap();
+
+            let query = VectorQuery::new(create_test_vector(768, 1.0), 1);
+            let results = storage.search_scoped(&query, &scope).await.unwrap();
+            assert_eq!(results.len(), 1);
+        }
     }
 }

@@ -20,7 +20,7 @@ hnsw_rs = "0.3.2"
 # SQLite virtual table API
 # bundled feature: Embed SQLite for cdylib (avoids runtime libsqlite3 dependency)
 # vtab feature: Virtual table trait implementations
-rusqlite = { version = "0.32", features = ["vtab", "bundled"] }
+rusqlite = { version = "0.32", features = ["vtab"] }
 
 # Serialization for metadata and configuration
 serde = { workspace = true, features = ["derive"] }
@@ -37,6 +37,10 @@ zerocopy = { workspace = true }
 
 # Logging
 tracing = { workspace = true }
+
+[features]
+default = []
+bundled = ["rusqlite/bundled"]
 
 [dev-dependencies]
 tempfile = { workspace = true }
