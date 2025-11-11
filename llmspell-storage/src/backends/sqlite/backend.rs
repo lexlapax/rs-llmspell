@@ -128,36 +128,67 @@ impl SqliteBackend {
         // Create connection pool
         let pool = SqlitePool::new(config.clone()).await?;
 
-        // Load sqlite-vec extension for vector search (Task 13c.2.2)
-        // Extension binary must be at ./extensions/vec0.dylib (macOS) or ./extensions/vec0.so (Linux)
+        // Load vector search extension (Task 13c.2.2a)
+        // Priority: vectorlite-rs (HNSW, 3-100x faster) → sqlite-vec (brute-force, fallback)
         let conn = pool.get_connection().await?;
 
+        // Define extension paths based on platform
         #[cfg(target_os = "macos")]
-        let ext_path = "./extensions/vec0.dylib";
+        let vectorlite_path = "./extensions/vectorlite.dylib";
         #[cfg(target_os = "linux")]
-        let ext_path = "./extensions/vec0.so";
+        let vectorlite_path = "./extensions/vectorlite.so";
         #[cfg(target_os = "windows")]
-        let ext_path = "./extensions/vec0.dll";
+        let vectorlite_path = "./extensions/vectorlite.dll";
+
+        #[cfg(target_os = "macos")]
+        let vec0_path = "./extensions/vec0.dylib";
+        #[cfg(target_os = "linux")]
+        let vec0_path = "./extensions/vec0.so";
+        #[cfg(target_os = "windows")]
+        let vec0_path = "./extensions/vec0.dll";
 
         // Enable extension loading (required by libsql for security)
-        // SAFETY: Extension loading is disabled immediately after loading vec0
+        // SAFETY: Extension loading is disabled immediately after loading
         conn.load_extension_enable().map_err(|e| {
             SqliteError::Extension(format!("Failed to enable extension loading: {e}"))
         })?;
 
-        // Load vec0 extension (synchronous call)
-        match conn.load_extension(ext_path, None) {
+        // Try to load vectorlite-rs (HNSW, preferred)
+        let loaded = match conn.load_extension(vectorlite_path, None) {
             Ok(()) => {
-                tracing::info!("Successfully loaded sqlite-vec extension from {ext_path}");
+                tracing::info!(
+                    "Successfully loaded vectorlite-rs extension from {vectorlite_path} (HNSW-indexed, 3-100x faster)"
+                );
+                true
             }
             Err(e) => {
-                tracing::warn!(
-                    "Failed to load sqlite-vec extension from {ext_path}: {e}. \
-                    Vector search will not be available. \
-                    Build extension: cd /tmp && git clone https://github.com/asg017/sqlite-vec && \
-                    cd sqlite-vec && ./scripts/vendor.sh && make loadable && \
-                    cp dist/vec0.* <project>/extensions/"
+                tracing::debug!(
+                    "vectorlite-rs not available at {vectorlite_path}: {e}. \
+                    Falling back to sqlite-vec (brute-force). \
+                    Build vectorlite: cargo build -p vectorlite-rs --release && \
+                    cp target/release/libvectorlite_rs.* extensions/vectorlite.*"
                 );
+                false
+            }
+        };
+
+        // Fall back to sqlite-vec (brute-force) if vectorlite not available
+        if !loaded {
+            match conn.load_extension(vec0_path, None) {
+                Ok(()) => {
+                    tracing::info!(
+                        "Successfully loaded sqlite-vec extension from {vec0_path} (brute-force, slower than vectorlite-rs)"
+                    );
+                }
+                Err(e) => {
+                    tracing::warn!(
+                        "Failed to load vector search extensions from {vectorlite_path} or {vec0_path}: {e}. \
+                        Vector search will not be available. \
+                        Build sqlite-vec: cd /tmp && git clone https://github.com/asg017/sqlite-vec && \
+                        cd sqlite-vec && ./scripts/vendor.sh && make loadable && \
+                        cp dist/vec0.* <project>/extensions/"
+                    );
+                }
             }
         }
 
