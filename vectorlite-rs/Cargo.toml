@@ -1,0 +1,41 @@
+[package]
+name = "vectorlite-rs"
+description = "Pure Rust HNSW vector search extension for SQLite"
+version.workspace = true
+edition.workspace = true
+authors.workspace = true
+repository.workspace = true
+license.workspace = true
+
+[lib]
+# Build both:
+# - cdylib: Loadable SQLite extension (.so/.dylib/.dll)
+# - rlib: Rust library for integration tests
+crate-type = ["cdylib", "rlib"]
+
+[dependencies]
+# HNSW vector indexing
+hnsw_rs = "0.3.2"
+
+# SQLite virtual table API
+# bundled feature: Embed SQLite for cdylib (avoids runtime libsqlite3 dependency)
+# vtab feature: Virtual table trait implementations
+rusqlite = { version = "0.32", features = ["vtab", "bundled"] }
+
+# Serialization for metadata and configuration
+serde = { workspace = true }
+serde_json = { workspace = true }
+
+# Error handling
+anyhow = { workspace = true }
+thiserror = { workspace = true }
+
+# Zero-copy Vec<f32> marshaling for SQLite BLOBs
+zerocopy = { workspace = true }
+
+# Logging
+tracing = { workspace = true }
+
+[dev-dependencies]
+tempfile = { workspace = true }
+criterion = { workspace = true }

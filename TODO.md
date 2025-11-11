@@ -1736,7 +1736,7 @@ cargo test -p llmspell-storage --features sqlite --lib \
 - `docs/technical/vectorlite-rs-architecture.md` (NEW)
 - `README-DEVEL.md` (add vectorlite-rs build instructions)
 
-**Timeline Note**: This task is DEFERRED and can run in parallel with Phase 13c.2.3+ (SqliteVectorStorage implementation). Task 13c.2.2 (sqlite-vec) unblocks SqliteVectorStorage immediately. vectorlite-rs becomes an optional optimization that can be enabled via feature flag when complete.
+**Timeline Note**: This task is now un-DEFERRED and can run in parallel with Phase 13c.2.3+ (SqliteVectorStorage implementation). Task 13c.2.2 (sqlite-vec) unblocks SqliteVectorStorage immediately. vectorlite-rs becomes the default afer implementation.
 
 ---
 
