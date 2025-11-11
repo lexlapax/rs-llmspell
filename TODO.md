@@ -70,11 +70,11 @@
 - **Validation Track**: Day 5 (script creation) → Days 8-9 (full testing)
 
 **Hard Dependencies**:
-- Phase 13c.2 (Profiles) must complete before Phase 13c.3 (Examples) for profile validation
+- Phase 13c.2 (Profiles) must complete before Phase 13c.5 (Examples) for profile validation
 - Phase 13c.1 (Deps) can run parallel with Phase 13c.2 (Profiles) - independent
-- Phase 13c.4 (Validation) depends on Phase 13c.3 (Examples) completion
-- Phase 13c.5 (Documentation) depends on Phases 13c.2-13c.3 (Profiles + Examples)
-- Phase 13c.6 (Release) depends on all previous phases (complete validation)
+- Phase 13c.6 (Validation) depends on Phase 13c.5 (Examples) completion
+- Phase 13c.7 (Documentation) depends on Phases 13c.2-13c.5 (Profiles + Examples)
+- Phase 13c.8 (Release) depends on all previous phases (complete validation)
 
 **Task Insertion Points**:
 - After each major section header (## Phase 13c.X)
@@ -569,14 +569,1710 @@ Zero breaking changes
 
 ---
 
-## Phase 13c.2: Profile System Enhancement (Days 1-2)
+## Phase 13c.2: SQLite Unified Local Storage (Days 11-25, 3 weeks)
+
+**Goal**: Consolidate local storage from 4 backends (HNSW files, SurrealDB, Sled, filesystem) to 1 unified libsql-based solution
+**Timeline**: 15 working days (3 weeks, 120 hours total)
+**Critical Dependencies**: Phase 13c.1 (Dependency Cleanup) ✅
+**Priority**: CRITICAL (Production Readiness - eliminates 60MB dependencies, operational complexity)
+**Target**: v0.14.0 Release
+
+**Strategic Rationale**:
+- **Problem**: 4 storage systems (HNSW files, SurrealDB embedded, Sled KV, filesystem) create operational complexity, no unified backup, 60MB binary bloat
+- **Solution**: Unified libsql backend with vectorlite extension mirrors Phase 13b PostgreSQL consolidation for enterprise, but for local/standalone use. Pre-1.0 = complete removal of legacy backends (breaking changes acceptable).
+- **Benefits**: -76% binary size (60MB → 12MB), 1-file backup (vs 4 procedures), zero infrastructure (embedded), production-ready path to Turso managed service, cleaner codebase
+
+**Research Summary** (from comprehensive analysis):
+- **libsql v0.9.24**: Production-ready SQLite fork with encryption at rest, embedded replicas, powers Turso (100K+ databases)
+- **vectorlite**: HNSW-indexed vector search, 3x-100x faster queries than sqlite-vec brute-force, proven in production
+- **Recursive CTEs**: Native SQLite bi-temporal graph support (since 3.8.3 2014), ~35ms for 4-hop/100K nodes
+- **Performance Trade-offs**: 3-7x slower vs current (still meets <10ms targets), mitigated by connection pooling + batching
+- **Dependency Reduction**: Removes sled (5MB), surrealdb (30MB), rocksdb (15MB), hnsw_rs (8MB), rmp-serde (2MB)
+
+**Architecture Overview**:
+```
+Current (Fragmented):
+- Episodic Memory: hnsw_rs files (llmspell-kernel, llmspell-storage)
+- Semantic Memory: SurrealDB embedded (llmspell-graph)
+- State Storage: Sled KV (llmspell-kernel, llmspell-storage, llmspell-utils)
+- Sessions/Artifacts: Filesystem
+
+Unified (libsql):
+- All Storage: ~/.llmspell/storage.db (single SQLite file)
+  - vector_embeddings (vectorlite HNSW index)
+  - entities + relationships (recursive CTEs, bi-temporal)
+  - agent_state + workflow_state (JSONB, replacing Sled)
+  - sessions + artifacts (JSONB + BLOB storage)
+  - Extension: vectorlite.so (HNSW vector search)
+```
+
+**Success Criteria**:
+- [ ] libsql backend implemented for all 10 storage components
+- [ ] Breaking changes acceptable (pre-1.0, legacy backends completely removed)
+- [ ] 149 Phase 13 tests passing with libsql backend exclusively
+- [ ] Legacy backends deleted: HNSW files, SurrealDB, Sled
+- [ ] Benchmark suite validates performance trade-offs (<10ms vector search, <50ms graph traversal)
+- [ ] Binary size reduced by 50-60MB (sled, surrealdb, rocksdb, hnsw_rs removed)
+- [ ] Documentation complete (setup, architecture, tuning, backup)
+- [ ] Backup/restore tested (1 file copy vs 4 procedures)
+
+**Week-by-Week Breakdown**:
+- **Week 1 (Days 1-5)**: Foundation + Vector Storage (libsql backend, connection pooling, SqliteVectorStorage with vectorlite)
+- **Week 2 (Days 6-10)**: Graph + State Storage (SqliteGraphStorage with recursive CTEs, SqliteStateStorage replacing Sled, legacy backend removal)
+- **Week 3 (Days 11-15)**: Testing + Documentation (legacy backend cleanup validation, benchmarking, integration testing, comprehensive docs)
+
+---
+
+### Task 13c.2.1: libsql Backend Foundation ⏹ PENDING
+**Priority**: CRITICAL
+**Estimated Time**: 8 hours (Day 1)
+**Assignee**: Storage Infrastructure Team
+**Status**: ⏹ PENDING
+**Dependencies**: Phase 13c.1 ✅
+
+**Description**: Establish libsql backend infrastructure with connection pooling, encryption at rest, and tenant context management for unified local storage.
+
+**Acceptance Criteria**:
+- [ ] libsql dependency added to workspace Cargo.toml (v0.9.24)
+- [ ] PostgresBackend struct created in llmspell-storage/src/backends/sqlite/ (similar to postgres backend pattern)
+- [ ] Connection pooling implemented (R2D2, 20 connections, WAL mode)
+- [ ] Encryption at rest optional (AES-256, via libsql feature)
+- [ ] Tenant context management (session variables for RLS-style isolation)
+- [ ] Health check methods (connection test, database ping)
+- [ ] Zero warnings, compiles clean
+
+**Implementation Steps**:
+1. Add libsql to workspace dependencies:
+   ```toml
+   # Cargo.toml [workspace.dependencies]
+   libsql = { version = "0.9", features = ["encryption", "replication"] }
+   ```
+
+2. Create backend module structure:
+   ```bash
+   mkdir -p llmspell-storage/src/backends/sqlite
+   touch llmspell-storage/src/backends/sqlite/{mod.rs,connection.rs,migrations.rs}
+   ```
+
+3. Implement SqliteBackend struct (llmspell-storage/src/backends/sqlite/mod.rs):
+   ```rust
+   pub struct SqliteBackend {
+       pool: Arc<Pool<libsql::Connection>>,
+       config: SqliteConfig,
+       tenant_context: Arc<DashMap<String, String>>, // tenant_id → session context
+   }
+
+   impl SqliteBackend {
+       pub async fn new(config: SqliteConfig) -> Result<Self>;
+       pub async fn get_connection(&self) -> Result<PooledConnection>;
+       pub async fn set_tenant_context(&self, tenant_id: &str) -> Result<()>;
+       pub async fn health_check(&self) -> Result<bool>;
+   }
+   ```
+
+4. Configure connection pool (R2D2 pattern):
+   - Max connections: 20 (configurable)
+   - Idle timeout: 300 seconds
+   - Connection timeout: 5 seconds
+   - WAL mode enabled (concurrent readers)
+   - Test query on checkout: `SELECT 1`
+
+5. Implement tenant context management (RLS-style, application-enforced):
+   ```rust
+   pub async fn set_tenant_context(&self, tenant_id: &str) -> Result<()> {
+       // Store in DashMap for query filtering
+       self.tenant_context.insert(tenant_id.to_string(), tenant_id.to_string());
+       Ok(())
+   }
+   ```
+
+6. Test health check:
+   ```bash
+   cargo test -p llmspell-storage --test sqlite_backend_health
+   ```
+
+**Definition of Done**:
+- [ ] libsql dependency added, compiles clean
+- [ ] SqliteBackend struct complete with connection pooling
+- [ ] Tenant context management working
+- [ ] Health check tests passing
+- [ ] Zero clippy warnings
+- [ ] Documentation comments on all public methods
+
+**Files to Create/Modify**:
+- `Cargo.toml` (workspace - add libsql dependency)
+- `llmspell-storage/Cargo.toml` (add libsql)
+- `llmspell-storage/src/backends/sqlite/mod.rs` (NEW)
+- `llmspell-storage/src/backends/sqlite/connection.rs` (NEW)
+- `llmspell-storage/src/backends/mod.rs` (export sqlite module)
+
+---
+
+### Task 13c.2.2: vectorlite Extension Integration ⏹ PENDING
+**Priority**: CRITICAL
+**Estimated Time**: 8 hours (Day 2)
+**Assignee**: Vector Search Team
+**Status**: ⏹ PENDING
+**Dependencies**: Task 13c.2.1 ✅
+
+**Description**: Integrate vectorlite SQLite extension for HNSW-indexed vector search, replacing hnsw_rs file-based storage.
+
+**Acceptance Criteria**:
+- [ ] vectorlite extension loaded successfully (dynamic or static linking)
+- [ ] HNSW index creation tested (m=16, ef_construction=128)
+- [ ] Vector insertion benchmarked (target: <1ms per vector)
+- [ ] K-NN search benchmarked (target: <10ms for 10K vectors)
+- [ ] Fallback to sqlite-vec brute-force if vectorlite unavailable
+- [ ] Dimension support: 384, 768, 1536, 3072 (all OpenAI/Anthropic dimensions)
+
+**Implementation Steps**:
+1. Research vectorlite installation:
+   - Option A: Pre-compiled .so for Linux/macOS
+   - Option B: Build from source (C++ hnswlib dependency)
+   - Option C: Dynamic loading via `libsql::Connection::load_extension()`
+
+2. Create extension loader (llmspell-storage/src/backends/sqlite/extensions.rs):
+   ```rust
+   pub enum VectorExtension {
+       Vectorlite, // HNSW-indexed
+       SqliteVec,  // Brute-force fallback
+   }
+
+   impl SqliteBackend {
+       pub async fn load_vector_extension(&self) -> Result<VectorExtension> {
+           // Try vectorlite first
+           match self.load_extension("vectorlite").await {
+               Ok(_) => Ok(VectorExtension::Vectorlite),
+               Err(_) => {
+                   warn!("vectorlite not found, using sqlite-vec fallback");
+                   self.load_extension("sqlite_vec").await?;
+                   Ok(VectorExtension::SqliteVec)
+               }
+           }
+       }
+   }
+   ```
+
+3. Create vector_embeddings table schema:
+   ```sql
+   CREATE TABLE IF NOT EXISTS vector_embeddings (
+       id TEXT PRIMARY KEY,
+       tenant_id TEXT NOT NULL,
+       scope TEXT NOT NULL,
+       dimension INTEGER NOT NULL,
+       embedding BLOB NOT NULL,  -- vectorlite type
+       metadata TEXT NOT NULL,   -- JSON
+       created_at INTEGER NOT NULL,
+       updated_at INTEGER NOT NULL
+   );
+   ```
+
+4. Create HNSW index (vectorlite):
+   ```sql
+   -- vectorlite HNSW index
+   CREATE INDEX IF NOT EXISTS idx_vector_hnsw
+   ON vector_embeddings(embedding)
+   USING vectorlite_index(dimension=768, m=16, ef_construction=128);
+   ```
+
+5. Benchmark insert performance:
+   ```rust
+   // Target: <1ms per vector (vs ~100µs hnsw_rs, 10x overhead acceptable)
+   cargo bench -p llmspell-storage --bench sqlite_vector_insert
+   ```
+
+6. Benchmark search performance:
+   ```rust
+   // Target: <10ms for 10K vectors (vs 1-2ms hnsw_rs, 5x overhead acceptable)
+   cargo bench -p llmspell-storage --bench sqlite_vector_search
+   ```
+
+**Definition of Done**:
+- [ ] vectorlite extension loading works (or fallback to sqlite-vec)
+- [ ] HNSW index creation successful
+- [ ] Insert benchmark <1ms per vector
+- [ ] Search benchmark <10ms for 10K vectors
+- [ ] Multi-dimension support tested (384, 768, 1536, 3072)
+- [ ] Documentation on extension installation
+
+**Files to Create/Modify**:
+- `llmspell-storage/src/backends/sqlite/extensions.rs` (NEW)
+- `llmspell-storage/src/backends/sqlite/schema.sql` (NEW - SQL DDL)
+- `llmspell-storage/benches/sqlite_vector_performance.rs` (NEW)
+- `README-DEVEL.md` (add vectorlite installation instructions)
+
+---
+
+### Task 13c.2.3: SqliteVectorStorage Implementation ⏹ PENDING
+**Priority**: CRITICAL
+**Estimated Time**: 12 hours (Days 3-4)
+**Assignee**: Memory Team
+**Status**: ⏹ PENDING
+**Dependencies**: Task 13c.2.2 ✅
+
+**Description**: Implement VectorStorage trait for libsql backend with vectorlite HNSW indexing, replacing hnsw_rs file-based episodic memory.
+
+**Acceptance Criteria**:
+- [ ] SqliteVectorStorage implements VectorStorage trait
+- [ ] All trait methods implemented (add, search, get, delete, update, count)
+- [ ] Tenant isolation enforced (filter by tenant_id in all queries)
+- [ ] Scope-based filtering (session:xxx, user:xxx, global)
+- [ ] Metadata JSON search via json_extract()
+- [ ] Unit tests passing (50+ tests from hnsw_rs backend ported)
+- [ ] Integration tests with MemoryManager passing
+
+**Implementation Steps**:
+1. Create SqliteVectorStorage struct (llmspell-storage/src/backends/sqlite/vector.rs):
+   ```rust
+   pub struct SqliteVectorStorage {
+       backend: Arc<SqliteBackend>,
+       extension: VectorExtension, // Vectorlite or SqliteVec
+       config: VectorConfig,
+   }
+
+   #[async_trait]
+   impl VectorStorage for SqliteVectorStorage {
+       async fn add(&self, entry: VectorEntry) -> Result<()>;
+       async fn search(&self, query: VectorQuery) -> Result<Vec<VectorResult>>;
+       async fn get(&self, id: Uuid) -> Result<Option<VectorEntry>>;
+       async fn delete(&self, id: Uuid) -> Result<()>;
+       async fn update(&self, id: Uuid, entry: VectorEntry) -> Result<()>;
+       async fn count(&self) -> Result<usize>;
+   }
+   ```
+
+2. Implement add() method:
+   ```rust
+   async fn add(&self, entry: VectorEntry) -> Result<()> {
+       let conn = self.backend.get_connection().await?;
+       conn.execute(
+           "INSERT INTO vector_embeddings (id, tenant_id, scope, dimension, embedding, metadata, created_at, updated_at)
+            VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8)",
+           params![
+               entry.id.to_string(),
+               entry.tenant_id,
+               entry.scope,
+               entry.embedding.len(),
+               serde_json::to_vec(&entry.embedding)?,
+               serde_json::to_string(&entry.metadata)?,
+               Utc::now().timestamp(),
+               Utc::now().timestamp(),
+           ]
+       ).await?;
+       Ok(())
+   }
+   ```
+
+3. Implement search() method (K-NN via vectorlite):
+   ```rust
+   async fn search(&self, query: VectorQuery) -> Result<Vec<VectorResult>> {
+       let conn = self.backend.get_connection().await?;
+
+       // vectorlite K-NN syntax
+       let results = conn.query(
+           "SELECT id, embedding, metadata,
+                   vectorlite_distance(embedding, ?1, 'cosine') AS distance
+            FROM vector_embeddings
+            WHERE tenant_id = ?2 AND scope = ?3
+            ORDER BY distance ASC
+            LIMIT ?4",
+           params![
+               serde_json::to_vec(&query.embedding)?,
+               query.tenant_id,
+               query.scope,
+               query.k,
+           ]
+       ).await?;
+
+       // Parse results
+       Ok(/* ... */)
+   }
+   ```
+
+4. Implement get(), delete(), update(), count() methods (standard SQL CRUD)
+
+5. Port unit tests from hnsw_rs backend:
+   ```bash
+   # Copy test structure from llmspell-storage/src/backends/hnsw/vector_tests.rs
+   cp llmspell-storage/src/backends/hnsw/vector_tests.rs \
+      llmspell-storage/src/backends/sqlite/vector_tests.rs
+
+   # Update tests to use SqliteVectorStorage
+   cargo test -p llmspell-storage --test sqlite_vector -- --nocapture
+   ```
+
+6. Integration test with MemoryManager:
+   ```rust
+   // Test episodic memory add + search via MemoryManager API
+   cargo test -p llmspell-memory --test episodic_sqlite_backend
+   ```
+
+**Definition of Done**:
+- [ ] VectorStorage trait fully implemented
+- [ ] All CRUD operations working
+- [ ] Tenant isolation enforced in queries
+- [ ] 50+ unit tests passing (ported from hnsw_rs)
+- [ ] Integration tests with MemoryManager passing
+- [ ] Benchmarks meet targets (<1ms insert, <10ms search 10K)
+- [ ] Zero clippy warnings
+
+**Files to Create/Modify**:
+- `llmspell-storage/src/backends/sqlite/vector.rs` (NEW)
+- `llmspell-storage/src/backends/sqlite/vector_tests.rs` (NEW)
+- `llmspell-memory/tests/episodic_sqlite_backend.rs` (NEW)
+- `llmspell-storage/src/backends/mod.rs` (export SqliteVectorStorage)
+
+---
+
+### Task 13c.2.4: SqliteGraphStorage Implementation ⏹ PENDING
+**Priority**: HIGH
+**Estimated Time**: 8 hours (Day 5)
+**Assignee**: Graph Team
+**Status**: ⏹ PENDING
+**Dependencies**: Task 13c.2.1 ✅
+
+**Description**: Implement GraphStorage trait using libsql recursive CTEs for bi-temporal graph traversal, replacing SurrealDB embedded backend.
+
+**Acceptance Criteria**:
+- [ ] SqliteGraphStorage implements GraphStorage trait
+- [ ] Entities + relationships tables created (bi-temporal schema)
+- [ ] Recursive CTE graph traversal working (1-4 hops)
+- [ ] Bi-temporal queries supported (valid_time + transaction_time via Unix timestamps)
+- [ ] GiST-equivalent indexes on time ranges (INTEGER indexes)
+- [ ] Unit tests passing (30+ tests from SurrealDB backend ported)
+- [ ] Performance: <50ms for 4-hop traversal on 100K nodes
+
+**Implementation Steps**:
+1. Create graph schema (llmspell-storage/src/backends/sqlite/schema.sql):
+   ```sql
+   CREATE TABLE IF NOT EXISTS entities (
+       entity_id TEXT PRIMARY KEY,
+       tenant_id TEXT NOT NULL,
+       entity_type TEXT NOT NULL,
+       name TEXT NOT NULL,
+       properties TEXT NOT NULL, -- JSON
+       valid_time_start INTEGER NOT NULL,
+       valid_time_end INTEGER NOT NULL DEFAULT 9999999999,
+       transaction_time_start INTEGER NOT NULL DEFAULT (unixepoch()),
+       transaction_time_end INTEGER NOT NULL DEFAULT 9999999999,
+       created_at INTEGER NOT NULL DEFAULT (unixepoch()),
+       updated_at INTEGER NOT NULL DEFAULT (unixepoch())
+   );
+
+   CREATE INDEX IF NOT EXISTS idx_entities_valid_time
+   ON entities(valid_time_start, valid_time_end);
+
+   CREATE TABLE IF NOT EXISTS relationships (
+       rel_id TEXT PRIMARY KEY,
+       tenant_id TEXT NOT NULL,
+       from_entity TEXT NOT NULL,
+       to_entity TEXT NOT NULL,
+       rel_type TEXT NOT NULL,
+       properties TEXT NOT NULL,
+       valid_time_start INTEGER NOT NULL,
+       valid_time_end INTEGER NOT NULL DEFAULT 9999999999,
+       FOREIGN KEY (from_entity) REFERENCES entities(entity_id),
+       FOREIGN KEY (to_entity) REFERENCES entities(entity_id)
+   );
+
+   CREATE INDEX IF NOT EXISTS idx_relationships_from ON relationships(from_entity);
+   CREATE INDEX IF NOT EXISTS idx_relationships_to ON relationships(to_entity);
+   CREATE INDEX IF NOT EXISTS idx_relationships_valid_time
+   ON relationships(valid_time_start, valid_time_end);
+   ```
+
+2. Implement SqliteGraphStorage struct (llmspell-storage/src/backends/sqlite/graph.rs):
+   ```rust
+   pub struct SqliteGraphStorage {
+       backend: Arc<SqliteBackend>,
+       config: GraphConfig,
+   }
+
+   #[async_trait]
+   impl GraphStorage for SqliteGraphStorage {
+       async fn add_entity(&self, entity: Entity) -> Result<()>;
+       async fn add_relationship(&self, rel: Relationship) -> Result<()>;
+       async fn traverse(&self, query: GraphQuery) -> Result<Vec<Entity>>;
+       async fn get_entity(&self, id: Uuid) -> Result<Option<Entity>>;
+       async fn delete_entity(&self, id: Uuid) -> Result<()>;
+   }
+   ```
+
+3. Implement traverse() with recursive CTE (4-hop max):
+   ```rust
+   async fn traverse(&self, query: GraphQuery) -> Result<Vec<Entity>> {
+       let conn = self.backend.get_connection().await?;
+
+       let results = conn.query(
+           "WITH RECURSIVE graph_traversal AS (
+               -- Base case: direct relationships
+               SELECT r.rel_id, r.from_entity, r.to_entity, r.rel_type,
+                      e.entity_id, e.name, e.entity_type, e.properties,
+                      1 AS depth,
+                      json_array(r.from_entity, r.to_entity) AS path
+               FROM relationships r
+               JOIN entities e ON r.to_entity = e.entity_id
+               WHERE r.from_entity = ?1
+                 AND r.tenant_id = ?2
+                 AND r.valid_time_start <= ?3 AND r.valid_time_end > ?3
+
+               UNION ALL
+
+               -- Recursive case: follow relationships
+               SELECT r.rel_id, r.from_entity, r.to_entity, r.rel_type,
+                      e.entity_id, e.name, e.entity_type, e.properties,
+                      gt.depth + 1,
+                      json_insert(gt.path, '$[#]', r.to_entity) AS path
+               FROM graph_traversal gt
+               JOIN relationships r ON gt.to_entity = r.from_entity
+               JOIN entities e ON r.to_entity = e.entity_id
+               WHERE gt.depth < ?4
+                 AND NOT EXISTS (
+                     SELECT 1 FROM json_each(gt.path) WHERE value = r.to_entity
+                 )
+                 AND r.tenant_id = ?2
+                 AND r.valid_time_start <= ?3 AND r.valid_time_end > ?3
+           )
+           SELECT DISTINCT entity_id, name, entity_type, properties, depth, path
+           FROM graph_traversal
+           ORDER BY depth",
+           params![
+               query.start_entity.to_string(),
+               query.tenant_id,
+               query.at_time.unwrap_or_else(|| Utc::now()).timestamp(),
+               query.max_depth.unwrap_or(4),
+           ]
+       ).await?;
+
+       // Parse results
+       Ok(/* ... */)
+   }
+   ```
+
+4. Port unit tests from SurrealDB backend:
+   ```bash
+   cp llmspell-graph/src/storage/surrealdb_tests.rs \
+      llmspell-storage/src/backends/sqlite/graph_tests.rs
+   ```
+
+5. Benchmark graph traversal:
+   ```rust
+   // Target: <50ms for 4-hop on 100K nodes
+   cargo bench -p llmspell-storage --bench sqlite_graph_traversal
+   ```
+
+**Definition of Done**:
+- [ ] GraphStorage trait fully implemented
+- [ ] Recursive CTE traversal working (1-4 hops)
+- [ ] Bi-temporal queries via Unix timestamps
+- [ ] 30+ unit tests passing (ported from SurrealDB)
+- [ ] Benchmark: <50ms for 4-hop/100K nodes
+- [ ] Zero clippy warnings
+
+**Files to Create/Modify**:
+- `llmspell-storage/src/backends/sqlite/graph.rs` (NEW)
+- `llmspell-storage/src/backends/sqlite/graph_tests.rs` (NEW)
+- `llmspell-storage/src/backends/sqlite/schema.sql` (UPDATE - add graph tables)
+- `llmspell-storage/benches/sqlite_graph_performance.rs` (NEW)
+
+---
+
+### Task 13c.2.5: SqliteStateStorage Implementation (Replacing Sled) ⏹ PENDING
+**Priority**: HIGH
+**Estimated Time**: 12 hours (Days 6-7)
+**Assignee**: State Management Team
+**Status**: ⏹ PENDING
+**Dependencies**: Task 13c.2.1 ✅
+
+**Description**: Implement KV storage using libsql JSONB tables to replace Sled for agent_state, workflow_state, and procedural_memory.
+
+**Acceptance Criteria**:
+- [ ] SqliteStateStorage implements StateStorage trait
+- [ ] agent_state, workflow_state, procedural_memory tables created
+- [ ] JSONB storage with versioning, checksums
+- [ ] GIN-equivalent indexes on JSONB properties (json_extract indexes)
+- [ ] Unit tests passing (40+ tests from Sled backend ported)
+- [ ] Performance: <10ms write, <5ms read (acceptable 1000x slower vs Sled in-memory)
+
+**Implementation Steps**:
+1. Create state storage schema (llmspell-storage/src/backends/sqlite/schema.sql):
+   ```sql
+   CREATE TABLE IF NOT EXISTS agent_state (
+       state_id TEXT PRIMARY KEY,
+       tenant_id TEXT NOT NULL,
+       agent_id TEXT NOT NULL,
+       agent_type TEXT NOT NULL,
+       state_data TEXT NOT NULL, -- JSON
+       version INTEGER NOT NULL DEFAULT 1,
+       checksum TEXT, -- SHA256
+       created_at INTEGER NOT NULL DEFAULT (unixepoch()),
+       updated_at INTEGER NOT NULL DEFAULT (unixepoch()),
+       UNIQUE(tenant_id, agent_id, version)
+   );
+
+   CREATE INDEX IF NOT EXISTS idx_agent_state_agent ON agent_state(agent_id);
+   -- GIN-equivalent for JSONB queries (extract specific keys)
+   CREATE INDEX IF NOT EXISTS idx_agent_state_type
+   ON agent_state(json_extract(state_data, '$.type'));
+
+   CREATE TABLE IF NOT EXISTS workflow_state (
+       workflow_id TEXT PRIMARY KEY,
+       tenant_id TEXT NOT NULL,
+       workflow_name TEXT NOT NULL,
+       execution_state TEXT NOT NULL, -- JSON
+       status TEXT NOT NULL CHECK (status IN ('pending', 'running', 'completed', 'failed', 'cancelled')),
+       step_status TEXT NOT NULL DEFAULT '[]', -- JSON array
+       error_message TEXT,
+       started_at INTEGER NOT NULL DEFAULT (unixepoch()),
+       completed_at INTEGER,
+       duration_ms INTEGER
+   );
+
+   CREATE INDEX IF NOT EXISTS idx_workflow_status ON workflow_state(status);
+   CREATE INDEX IF NOT EXISTS idx_workflow_name ON workflow_state(workflow_name);
+
+   CREATE TABLE IF NOT EXISTS procedural_memory (
+       pattern_id TEXT PRIMARY KEY,
+       tenant_id TEXT NOT NULL,
+       pattern_type TEXT NOT NULL,
+       pattern_name TEXT NOT NULL,
+       pattern_data TEXT NOT NULL, -- JSON
+       usage_count INTEGER NOT NULL DEFAULT 0,
+       success_count INTEGER NOT NULL DEFAULT 0,
+       failure_count INTEGER NOT NULL DEFAULT 0,
+       success_rate REAL GENERATED ALWAYS AS (
+           CASE WHEN usage_count > 0
+                THEN CAST(success_count AS REAL) / CAST(usage_count AS REAL)
+                ELSE 0.0
+           END
+       ) STORED,
+       avg_execution_time_ms REAL,
+       created_at INTEGER NOT NULL DEFAULT (unixepoch()),
+       last_used_at INTEGER NOT NULL DEFAULT (unixepoch())
+   );
+
+   CREATE INDEX IF NOT EXISTS idx_procedural_success_rate
+   ON procedural_memory(success_rate DESC);
+   CREATE INDEX IF NOT EXISTS idx_procedural_type
+   ON procedural_memory(pattern_type);
+   ```
+
+2. Implement SqliteStateStorage struct (llmspell-storage/src/backends/sqlite/state.rs):
+   ```rust
+   pub struct SqliteStateStorage {
+       backend: Arc<SqliteBackend>,
+       config: StateConfig,
+   }
+
+   #[async_trait]
+   impl StateStorage for SqliteStateStorage {
+       async fn save_agent_state(&self, state: AgentState) -> Result<()>;
+       async fn load_agent_state(&self, agent_id: &str) -> Result<Option<AgentState>>;
+       async fn delete_agent_state(&self, agent_id: &str) -> Result<()>;
+       async fn save_workflow_state(&self, state: WorkflowState) -> Result<()>;
+       async fn load_workflow_state(&self, workflow_id: Uuid) -> Result<Option<WorkflowState>>;
+       async fn save_pattern(&self, pattern: Pattern) -> Result<()>;
+       async fn load_patterns(&self, pattern_type: &str) -> Result<Vec<Pattern>>;
+   }
+   ```
+
+3. Implement save_agent_state() with versioning:
+   ```rust
+   async fn save_agent_state(&self, state: AgentState) -> Result<()> {
+       let conn = self.backend.get_connection().await?;
+
+       // Calculate checksum
+       let checksum = sha2_hash(&state.state_data);
+
+       conn.execute(
+           "INSERT INTO agent_state (state_id, tenant_id, agent_id, agent_type, state_data, version, checksum, created_at, updated_at)
+            VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9)
+            ON CONFLICT (tenant_id, agent_id, version) DO UPDATE SET
+            state_data = excluded.state_data,
+            checksum = excluded.checksum,
+            updated_at = excluded.updated_at",
+           params![
+               Uuid::new_v4().to_string(),
+               state.tenant_id,
+               state.agent_id,
+               state.agent_type,
+               serde_json::to_string(&state.state_data)?,
+               state.version,
+               checksum,
+               Utc::now().timestamp(),
+               Utc::now().timestamp(),
+           ]
+       ).await?;
+       Ok(())
+   }
+   ```
+
+4. Implement workflow_state and procedural_memory methods (similar CRUD)
+
+5. Port unit tests from Sled backend:
+   ```bash
+   # Find Sled state tests
+   find llmspell-* -name "*state*test*.rs" | grep sled
+
+   # Port to sqlite
+   cargo test -p llmspell-storage --test sqlite_state -- --nocapture
+   ```
+
+6. Benchmark state operations:
+   ```rust
+   // Target: <10ms write, <5ms read (vs ~10µs Sled, 1000x overhead acceptable with pooling)
+   cargo bench -p llmspell-storage --bench sqlite_state_performance
+   ```
+
+**Definition of Done**:
+- [ ] StateStorage trait fully implemented
+- [ ] agent_state, workflow_state, procedural_memory tables created
+- [ ] Versioning + checksums working
+- [ ] 40+ unit tests passing (ported from Sled)
+- [ ] Benchmarks: <10ms write, <5ms read
+- [ ] Zero clippy warnings
+
+**Files to Create/Modify**:
+- `llmspell-storage/src/backends/sqlite/state.rs` (NEW)
+- `llmspell-storage/src/backends/sqlite/state_tests.rs` (NEW)
+- `llmspell-storage/src/backends/sqlite/schema.sql` (UPDATE - add state tables)
+- `llmspell-storage/benches/sqlite_state_performance.rs` (NEW)
+
+---
+
+### Task 13c.2.6: SqliteSessionStorage + SqliteArtifactStorage ⏹ PENDING
+**Priority**: HIGH
+**Estimated Time**: 12 hours (Days 8-9)
+**Assignee**: Session Management Team
+**Status**: ⏹ PENDING
+**Dependencies**: Task 13c.2.1 ✅
+
+**Description**: Implement SessionStorage and ArtifactStorage using libsql JSONB + BLOB storage, replacing filesystem-based session management.
+
+**Acceptance Criteria**:
+- [ ] SqliteSessionStorage implements SessionStorage trait
+- [ ] SqliteArtifactStorage implements ArtifactStorage trait
+- [ ] sessions + artifacts tables created
+- [ ] BLOB storage for artifacts <100MB (BYTEA equivalent)
+- [ ] Unit tests passing (30+ tests from filesystem backend ported)
+- [ ] Performance: <10ms session write, <20ms artifact write
+
+**Implementation Steps**:
+1. Create session/artifact schema (llmspell-storage/src/backends/sqlite/schema.sql):
+   ```sql
+   CREATE TABLE IF NOT EXISTS sessions (
+       session_id TEXT PRIMARY KEY,
+       tenant_id TEXT NOT NULL,
+       user_id TEXT,
+       context TEXT NOT NULL DEFAULT '{}', -- JSON
+       status TEXT NOT NULL CHECK (status IN ('active', 'paused', 'closed')),
+       metadata TEXT NOT NULL DEFAULT '{}', -- JSON
+       created_at INTEGER NOT NULL DEFAULT (unixepoch()),
+       updated_at INTEGER NOT NULL DEFAULT (unixepoch()),
+       closed_at INTEGER
+   );
+
+   CREATE INDEX IF NOT EXISTS idx_sessions_user ON sessions(user_id);
+   CREATE INDEX IF NOT EXISTS idx_sessions_status ON sessions(status);
+   CREATE INDEX IF NOT EXISTS idx_sessions_tenant ON sessions(tenant_id);
+
+   CREATE TABLE IF NOT EXISTS artifacts (
+       artifact_id TEXT PRIMARY KEY,
+       tenant_id TEXT NOT NULL,
+       session_id TEXT NOT NULL,
+       artifact_type TEXT NOT NULL,
+       artifact_name TEXT NOT NULL,
+       metadata TEXT NOT NULL DEFAULT '{}', -- JSON
+       content BLOB, -- Binary data
+       content_size_bytes INTEGER NOT NULL,
+       version INTEGER NOT NULL DEFAULT 1,
+       created_at INTEGER NOT NULL DEFAULT (unixepoch()),
+       FOREIGN KEY (session_id) REFERENCES sessions(session_id) ON DELETE CASCADE
+   );
+
+   CREATE INDEX IF NOT EXISTS idx_artifacts_session ON artifacts(session_id);
+   CREATE INDEX IF NOT EXISTS idx_artifacts_type ON artifacts(artifact_type);
+   ```
+
+2. Implement SqliteSessionStorage (llmspell-storage/src/backends/sqlite/session.rs):
+   ```rust
+   pub struct SqliteSessionStorage {
+       backend: Arc<SqliteBackend>,
+       config: SessionConfig,
+   }
+
+   #[async_trait]
+   impl SessionStorage for SqliteSessionStorage {
+       async fn create_session(&self, session: Session) -> Result<()>;
+       async fn get_session(&self, session_id: Uuid) -> Result<Option<Session>>;
+       async fn update_session(&self, session: Session) -> Result<()>;
+       async fn close_session(&self, session_id: Uuid) -> Result<()>;
+       async fn list_sessions(&self, tenant_id: &str) -> Result<Vec<Session>>;
+   }
+   ```
+
+3. Implement SqliteArtifactStorage (llmspell-storage/src/backends/sqlite/artifact.rs):
+   ```rust
+   pub struct SqliteArtifactStorage {
+       backend: Arc<SqliteBackend>,
+       config: ArtifactConfig,
+   }
+
+   #[async_trait]
+   impl ArtifactStorage for SqliteArtifactStorage {
+       async fn store_artifact(&self, artifact: Artifact) -> Result<()>;
+       async fn get_artifact(&self, artifact_id: Uuid) -> Result<Option<Artifact>>;
+       async fn delete_artifact(&self, artifact_id: Uuid) -> Result<()>;
+       async fn list_artifacts(&self, session_id: Uuid) -> Result<Vec<Artifact>>;
+   }
+   ```
+
+4. Implement BLOB storage for artifacts:
+   ```rust
+   async fn store_artifact(&self, artifact: Artifact) -> Result<()> {
+       let conn = self.backend.get_connection().await?;
+
+       // Limit check: <100MB
+       if artifact.content.len() > 100 * 1024 * 1024 {
+           return Err(LLMSpellError::Storage(
+               format!("Artifact too large: {}MB (max 100MB)", artifact.content.len() / 1024 / 1024)
+           ));
+       }
+
+       conn.execute(
+           "INSERT INTO artifacts (artifact_id, tenant_id, session_id, artifact_type, artifact_name, metadata, content, content_size_bytes, version, created_at)
+            VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10)",
+           params![
+               artifact.artifact_id.to_string(),
+               artifact.tenant_id,
+               artifact.session_id.to_string(),
+               artifact.artifact_type,
+               artifact.artifact_name,
+               serde_json::to_string(&artifact.metadata)?,
+               artifact.content,
+               artifact.content.len() as i64,
+               artifact.version,
+               Utc::now().timestamp(),
+           ]
+       ).await?;
+       Ok(())
+   }
+   ```
+
+5. Port unit tests from filesystem backend:
+   ```bash
+   cargo test -p llmspell-storage --test sqlite_session_artifact
+   ```
+
+6. Benchmark session/artifact operations:
+   ```rust
+   cargo bench -p llmspell-storage --bench sqlite_session_performance
+   ```
+
+**Definition of Done**:
+- [ ] SessionStorage + ArtifactStorage traits implemented
+- [ ] BLOB storage working (<100MB limit)
+- [ ] 30+ unit tests passing (ported from filesystem)
+- [ ] Benchmarks: <10ms session write, <20ms artifact write
+- [ ] Zero clippy warnings
+
+**Files to Create/Modify**:
+- `llmspell-storage/src/backends/sqlite/session.rs` (NEW)
+- `llmspell-storage/src/backends/sqlite/artifact.rs` (NEW)
+- `llmspell-storage/src/backends/sqlite/schema.sql` (UPDATE - add session/artifact tables)
+- `llmspell-storage/benches/sqlite_session_performance.rs` (NEW)
+
+---
+
+### Task 13c.2.7: Legacy Backend Removal & Cleanup ⏹ PENDING
+**Priority**: CRITICAL
+**Estimated Time**: 8 hours (Day 10)
+**Assignee**: Core Team
+**Status**: ⏹ PENDING
+**Dependencies**: Tasks 13c.2.3, 13c.2.4, 13c.2.5, 13c.2.6 ✅
+
+**Description**: Complete removal of legacy storage backends (HNSW files, SurrealDB, Sled) and their dependencies. Pre-1.0 = breaking changes acceptable, no migration needed.
+
+**Acceptance Criteria**:
+- [ ] All HNSW file storage code removed (llmspell-memory/src/backends/hnsw/)
+- [ ] All SurrealDB graph storage code removed (llmspell-graph/src/backends/surrealdb/)
+- [ ] All Sled state storage code removed (llmspell-kernel/src/backends/sled/)
+- [ ] Dependencies removed: hnsw_rs, surrealdb, sled, rocksdb, rmp-serde
+- [ ] All tests updated to use SQLite backend exclusively
+- [ ] Configuration options for old backends removed
+- [ ] Zero compiler warnings, all tests passing
+
+**Implementation Steps**:
+
+1. **Remove HNSW file storage backend**:
+   ```bash
+   # Delete backend implementation
+   rm -rf llmspell-memory/src/backends/hnsw/
+
+   # Remove from mod.rs
+   # Edit llmspell-memory/src/backends/mod.rs - remove "pub mod hnsw;"
+
+   # Update tests to use SQLite
+   rg "HNSWVectorStorage" llmspell-memory/tests/ --files-with-matches | \
+     xargs sed -i 's/HNSWVectorStorage/SqliteVectorStorage/g'
+   ```
+
+2. **Remove SurrealDB graph storage backend**:
+   ```bash
+   # Delete backend implementation
+   rm -rf llmspell-graph/src/backends/surrealdb/
+
+   # Remove from mod.rs
+   # Edit llmspell-graph/src/backends/mod.rs - remove "pub mod surrealdb;"
+
+   # Update tests to use SQLite
+   rg "SurrealDBGraphStorage" llmspell-graph/tests/ --files-with-matches | \
+     xargs sed -i 's/SurrealDBGraphStorage/SqliteGraphStorage/g'
+   ```
+
+3. **Remove Sled state storage backend**:
+   ```bash
+   # Delete backend implementation
+   rm -rf llmspell-kernel/src/backends/sled/
+
+   # Remove from mod.rs
+   # Edit llmspell-kernel/src/backends/mod.rs - remove "pub mod sled;"
+
+   # Update tests to use SQLite
+   rg "SledStateStorage" llmspell-kernel/tests/ --files-with-matches | \
+     xargs sed -i 's/SledStateStorage/SqliteStateStorage/g'
+   ```
+
+4. **Remove legacy dependencies from Cargo.toml**:
+   ```toml
+   # Remove from workspace Cargo.toml [workspace.dependencies]
+   # - hnsw_rs = "0.3"
+   # - surrealdb = "1.0"
+   # - sled = "0.34"
+   # - rocksdb = "0.21"  # SurrealDB dependency
+   # - rmp-serde = "1.1"  # Sled serialization
+
+   # Remove from individual crate Cargo.toml files:
+   # - llmspell-memory/Cargo.toml: remove hnsw_rs
+   # - llmspell-graph/Cargo.toml: remove surrealdb, rocksdb
+   # - llmspell-kernel/Cargo.toml: remove sled, rmp-serde
+   ```
+
+5. **Remove configuration options for old backends**:
+   ```bash
+   # Edit llmspell-config/src/storage.rs
+   # Remove StorageBackend enum variants: HNSW, SurrealDB, Sled
+   # Keep only: InMemory, Sqlite, PostgreSQL
+
+   pub enum StorageBackend {
+       InMemory,
+       Sqlite,
+       PostgreSQL,
+       // REMOVED: HNSW, SurrealDB, Sled
+   }
+   ```
+
+6. **Clean up example configs and builtin profiles**:
+   ```bash
+   # Remove old backend references from config examples
+   rg "backend.*=.*(hnsw|surrealdb|sled)" config/examples/ --files-with-matches | \
+     xargs rm -f
+
+   # Update builtin profiles in llmspell-config/builtins/
+   # Change all "backend = 'hnsw'" → "backend = 'sqlite'"
+   rg "backend.*=.*(hnsw|surrealdb|sled)" llmspell-config/builtins/ --files-with-matches | \
+     xargs sed -i "s/backend = 'hnsw'/backend = 'sqlite'/g"
+   ```
+
+7. **Validate compilation and test suite**:
+   ```bash
+   # Full clean rebuild
+   cargo clean
+   cargo build --workspace --all-features
+
+   # Run all tests
+   cargo test --workspace --all-features
+
+   # Run clippy
+   cargo clippy --workspace --all-features -- -D warnings
+
+   # Verify binary size reduction
+   cargo build --release --bin llmspell
+   ls -lh target/release/llmspell  # Should show ~12MB (down from ~60MB)
+   ```
+
+**Definition of Done**:
+- [ ] All HNSW backend code deleted (0 files remain in llmspell-memory/src/backends/hnsw/)
+- [ ] All SurrealDB backend code deleted (0 files remain in llmspell-graph/src/backends/surrealdb/)
+- [ ] All Sled backend code deleted (0 files remain in llmspell-kernel/src/backends/sled/)
+- [ ] Legacy dependencies removed from all Cargo.toml files (hnsw_rs, surrealdb, sled, rocksdb, rmp-serde)
+- [ ] All tests updated to use SQLite backend (100% pass rate)
+- [ ] Configuration enums updated (only InMemory, Sqlite, PostgreSQL remain)
+- [ ] Zero references to old backends in codebase (rg "hnsw|surrealdb|sled" returns clean)
+- [ ] Binary size reduced to ~12MB (down from ~60MB, -76% reduction validated)
+- [ ] Zero compiler warnings, zero clippy warnings
+- [ ] Quality gate: ./scripts/quality/quality-check.sh passing
+
+**Files to Delete**:
+- `llmspell-memory/src/backends/hnsw/` (entire directory)
+- `llmspell-graph/src/backends/surrealdb/` (entire directory)
+- `llmspell-kernel/src/backends/sled/` (entire directory)
+- Any config examples referencing old backends
+
+**Files to Modify**:
+- `Cargo.toml` (workspace root - remove dependencies)
+- `llmspell-memory/Cargo.toml` (remove hnsw_rs)
+- `llmspell-graph/Cargo.toml` (remove surrealdb, rocksdb)
+- `llmspell-kernel/Cargo.toml` (remove sled, rmp-serde)
+- `llmspell-memory/src/backends/mod.rs` (remove hnsw module)
+- `llmspell-graph/src/backends/mod.rs` (remove surrealdb module)
+- `llmspell-kernel/src/backends/mod.rs` (remove sled module)
+- `llmspell-config/src/storage.rs` (remove backend enum variants)
+- All test files using old backends (update to SQLite)
+- All builtin profiles using old backends (update to SQLite)
+
+---
+
+### Task 13c.2.8: Testing & Benchmarking ⏹ PENDING
+**Priority**: CRITICAL
+**Estimated Time**: 12 hours (Days 11-12)
+**Assignee**: QA Team
+**Status**: ⏹ PENDING
+**Dependencies**: All previous 13c.2.x tasks ✅
+
+**Description**: Port Phase 13 tests to libsql backend, run comprehensive benchmarks, validate performance targets.
+
+**Acceptance Criteria**:
+- [ ] 149 Phase 13 tests ported to libsql backend
+- [ ] All tests passing (100% pass rate)
+- [ ] Benchmarks run: vector insert/search, graph traversal, state CRUD, session/artifact
+- [ ] Performance targets met: <1ms vector insert, <10ms search 10K, <50ms graph 4-hop, <10ms state write
+- [ ] Regression tests: no performance degradation vs HNSW/SurrealDB/Sled within acceptable bounds
+- [ ] Memory usage profiled (ensure no leaks, connection pool behaves)
+
+**Implementation Steps**:
+1. Identify Phase 13 tests using old backends:
+   ```bash
+   # Find HNSW tests
+   rg "hnsw" llmspell-memory/tests/ --files-with-matches
+
+   # Find SurrealDB tests
+   rg "surrealdb" llmspell-graph/tests/ --files-with-matches
+
+   # Find Sled tests
+   rg "sled" llmspell-kernel/tests/ --files-with-matches
+   ```
+
+2. Port tests to libsql backend (example for episodic memory):
+   ```rust
+   // OLD: llmspell-memory/tests/episodic_hnsw.rs
+   #[tokio::test]
+   async fn test_episodic_memory_add_search() {
+       let storage = HNSWVectorStorage::new(/* ... */).await.unwrap();
+       // ... test logic
+   }
+
+   // NEW: llmspell-memory/tests/episodic_sqlite.rs
+   #[tokio::test]
+   async fn test_episodic_memory_add_search_sqlite() {
+       let storage = SqliteVectorStorage::new(/* ... */).await.unwrap();
+       // ... same test logic
+   }
+   ```
+
+3. Run all tests:
+   ```bash
+   cargo test --workspace --all-features --test "*sqlite*" -- --nocapture
+   ```
+
+4. Run benchmark suite:
+   ```bash
+   # Vector storage
+   cargo bench -p llmspell-storage --bench sqlite_vector_performance
+
+   # Graph storage
+   cargo bench -p llmspell-storage --bench sqlite_graph_performance
+
+   # State storage
+   cargo bench -p llmspell-storage --bench sqlite_state_performance
+
+   # Session/artifact storage
+   cargo bench -p llmspell-storage --bench sqlite_session_performance
+
+   # Generate benchmark report
+   cargo bench --all -- --save-baseline sqlite_baseline
+   ```
+
+5. Compare benchmarks with old backends:
+   ```bash
+   # Load old HNSW baseline
+   cargo bench -p llmspell-storage --bench hnsw_vector_performance -- --load-baseline hnsw_baseline
+
+   # Compare sqlite vs hnsw
+   cargo bench -p llmspell-storage --bench sqlite_vector_performance -- --baseline hnsw_baseline
+
+   # Expected results:
+   # - Vector insert: 4x slower (100µs → 400µs) ✅ acceptable
+   # - Vector search: 3-7x slower (1-2ms → 2-7ms) ✅ acceptable (<10ms target)
+   # - Graph traversal: 7x slower (5ms → 35ms) ✅ acceptable (<50ms target)
+   # - State write: 1000x slower (10µs → 10ms) ⚠️ marginal but acceptable with pooling
+   ```
+
+6. Profile memory usage:
+   ```bash
+   # Run under valgrind/heaptrack
+   cargo build --release -p llmspell-cli
+   valgrind --tool=massif ./target/release/llmspell -c sqlite.toml run examples/script-users/getting-started/02-first-agent.lua
+
+   # Analyze memory report
+   ms_print massif.out.* | less
+
+   # Ensure:
+   # - No memory leaks
+   # - Connection pool stable (20 connections max)
+   # - Total memory <100MB for typical workload
+   ```
+
+7. Create test summary report:
+   ```bash
+   cargo test --workspace --all-features > test_results.txt 2>&1
+   grep -E "(test result|PASSED|FAILED)" test_results.txt
+   ```
+
+**Definition of Done**:
+- [ ] 149 tests ported and passing
+- [ ] All benchmarks run successfully
+- [ ] Performance targets met (within acceptable trade-offs)
+- [ ] Memory profiling clean (no leaks)
+- [ ] Test summary report generated
+- [ ] Benchmark comparison data ready for Task 13c.2.10 documentation
+
+**Files to Create/Modify**:
+- `llmspell-memory/tests/episodic_sqlite.rs` (NEW - port from hnsw)
+- `llmspell-graph/tests/semantic_sqlite.rs` (NEW - port from surrealdb)
+- `llmspell-kernel/tests/state_sqlite.rs` (NEW - port from sled)
+- `llmspell-storage/benches/*_sqlite_*.rs` (NEW - all benchmarks)
+- Benchmark results will be documented in docs/technical/sqlite-storage-architecture.md (Task 13c.2.10)
+
+---
+
+### Task 13c.2.9: Integration Testing ⏹ PENDING
+**Priority**: HIGH
+**Estimated Time**: 8 hours (Day 13)
+**Assignee**: Integration Testing Team
+**Status**: ⏹ PENDING
+**Dependencies**: Task 13c.2.8 ✅
+
+**Description**: End-to-end integration testing with MemoryManager, RAG, agents, and workflows using libsql backend.
+
+**Acceptance Criteria**:
+- [ ] MemoryManager integration test (episodic + semantic + procedural via libsql)
+- [ ] RAG pipeline integration test (document ingestion + vectorlite search)
+- [ ] Agent workflow integration test (state persistence via libsql)
+- [ ] Multi-tenancy isolation test (ensure tenant_id filtering works)
+- [ ] Backup/restore integration test (1 file copy vs 4 procedures)
+- [ ] All 635+ workspace tests passing with libsql backend enabled
+
+**Implementation Steps**:
+1. Create MemoryManager integration test (llmspell-memory/tests/integration_sqlite.rs):
+   ```rust
+   #[tokio::test(flavor = "multi_thread")]
+   async fn test_memory_manager_libsql_backend() {
+       // Initialize MemoryManager with libsql backend
+       let config = LLMSpellConfig {
+           memory: MemoryConfig {
+               episodic_backend: "sqlite".to_string(),
+               semantic_backend: "sqlite".to_string(),
+               procedural_backend: "sqlite".to_string(),
+               // ...
+           },
+           // ...
+       };
+
+       let memory_manager = MemoryManager::new(config).await.unwrap();
+
+       // Test episodic memory add + search
+       memory_manager.add_episodic(/* ... */).await.unwrap();
+       let results = memory_manager.search_episodic(/* ... */).await.unwrap();
+       assert_eq!(results.len(), 5);
+
+       // Test semantic memory (graph)
+       memory_manager.add_entity(/* ... */).await.unwrap();
+       memory_manager.add_relationship(/* ... */).await.unwrap();
+       let graph_results = memory_manager.traverse_graph(/* ... */).await.unwrap();
+       assert!(graph_results.len() > 0);
+
+       // Test procedural memory (patterns)
+       memory_manager.save_pattern(/* ... */).await.unwrap();
+       let patterns = memory_manager.load_patterns("prompt_template").await.unwrap();
+       assert!(patterns.len() > 0);
+   }
+   ```
+
+2. Create RAG integration test (llmspell-rag/tests/integration_sqlite.rs):
+   ```rust
+   #[tokio::test]
+   async fn test_rag_pipeline_libsql_backend() {
+       let rag = RagPipeline::new_with_sqlite_backend(/* ... */).await.unwrap();
+
+       // Ingest documents
+       rag.ingest_document("test.txt", "This is a test document.").await.unwrap();
+
+       // Search via vectorlite
+       let results = rag.search("test query", 5).await.unwrap();
+       assert_eq!(results.len(), 1);
+       assert!(results[0].content.contains("test document"));
+   }
+   ```
+
+3. Create agent workflow integration test (llmspell-agents/tests/integration_sqlite.rs):
+   ```rust
+   #[tokio::test(flavor = "multi_thread")]
+   async fn test_agent_state_persistence_libsql() {
+       let agent = Agent::new(/* ... */).await.unwrap();
+
+       // Execute agent with state persistence
+       agent.execute(/* ... */).await.unwrap();
+
+       // Load state from libsql
+       let state = agent.load_state().await.unwrap();
+       assert!(state.is_some());
+
+       // Verify state data
+       let state = state.unwrap();
+       assert_eq!(state.agent_id, agent.id());
+   }
+   ```
+
+4. Create multi-tenancy isolation test:
+   ```rust
+   #[tokio::test]
+   async fn test_tenant_isolation_libsql() {
+       let storage = SqliteVectorStorage::new(/* ... */).await.unwrap();
+
+       // Add vector for tenant A
+       storage.set_tenant_context("tenant-a").await.unwrap();
+       storage.add(vector_entry_a).await.unwrap();
+
+       // Add vector for tenant B
+       storage.set_tenant_context("tenant-b").await.unwrap();
+       storage.add(vector_entry_b).await.unwrap();
+
+       // Search as tenant A - should only see tenant A data
+       storage.set_tenant_context("tenant-a").await.unwrap();
+       let results = storage.search(query).await.unwrap();
+       assert_eq!(results.len(), 1);
+       assert_eq!(results[0].tenant_id, "tenant-a");
+
+       // Attempt to access tenant B data as tenant A - should return zero results
+       let results_cross_tenant = storage.search(query_for_tenant_b_data).await.unwrap();
+       assert_eq!(results_cross_tenant.len(), 0);
+   }
+   ```
+
+5. Create backup/restore integration test:
+   ```rust
+   #[tokio::test]
+   async fn test_backup_restore_libsql() {
+       // 1. Create some data
+       let storage = SqliteVectorStorage::new(/* ... */).await.unwrap();
+       storage.add(vector_entry).await.unwrap();
+
+       // 2. Backup (1 file copy)
+       let backup_path = backup_sqlite_db("~/.llmspell/storage.db").await.unwrap();
+       assert!(backup_path.exists());
+
+       // 3. Corrupt/delete database
+       fs::remove_file("~/.llmspell/storage.db").unwrap();
+
+       // 4. Restore (1 file copy)
+       restore_sqlite_db(&backup_path, "~/.llmspell/storage.db").await.unwrap();
+
+       // 5. Verify data restored
+       let storage = SqliteVectorStorage::new(/* ... */).await.unwrap();
+       let results = storage.search(query).await.unwrap();
+       assert_eq!(results.len(), 1);
+   }
+   ```
+
+6. Run full workspace tests with libsql backend:
+   ```bash
+   # Set environment to use libsql backend
+   export LLMSPELL_STORAGE_BACKEND=sqlite
+
+   # Run all tests
+   cargo test --workspace --all-features -- --nocapture
+
+   # Verify 635+ tests passing
+   echo "Expected: 635+ tests passing, Actual: $(cargo test --workspace --all-features 2>&1 | grep -E 'test result.*passed' | grep -oP '\d+(?= passed)')"
+   ```
+
+**Definition of Done**:
+- [ ] MemoryManager integration test passing
+- [ ] RAG pipeline integration test passing
+- [ ] Agent workflow integration test passing
+- [ ] Multi-tenancy isolation test passing
+- [ ] Backup/restore integration test passing
+- [ ] All 635+ workspace tests passing with libsql backend
+
+**Files to Create/Modify**:
+- `llmspell-memory/tests/integration_sqlite.rs` (NEW)
+- `llmspell-rag/tests/integration_sqlite.rs` (NEW)
+- `llmspell-agents/tests/integration_sqlite.rs` (NEW)
+- `llmspell-storage/tests/multi_tenancy_isolation.rs` (NEW)
+- `llmspell-storage/tests/backup_restore.rs` (NEW)
+
+---
+
+### Task 13c.2.10: PostgreSQL/SQLite Schema Compatibility & Migration ⏹ PENDING
+**Priority**: CRITICAL
+**Estimated Time**: 12 hours (Days 13-14)
+**Assignee**: Storage Architecture Team
+**Status**: ⏹ PENDING
+**Dependencies**: Tasks 13c.2.3, 13c.2.4, 13c.2.5, 13c.2.6 ✅
+
+**Description**: Ensure schema compatibility and bidirectional data migration between PostgreSQL and SQLite backends. Users start with SQLite (local/dev) → grow to PostgreSQL (production multi-tenant) OR downgrade PostgreSQL → SQLite (edge/offline). Reorganize migrations for backend-specific SQL dialects.
+
+**Strategic Rationale**:
+- **Growth Path**: SQLite (local dev, zero infrastructure) → PostgreSQL (production, horizontal scale, multi-writer)
+- **Edge Path**: PostgreSQL (cloud production) → SQLite (offline deployments, edge computing, single-user)
+- **Schema Parity**: Same table/column names, compatible types, bidirectional data export/import
+- **Pre-1.0 Opportunity**: Refactor migrations now before 1.0 locks schema design
+
+**Acceptance Criteria**:
+- [ ] Migration scripts reorganized: `migrations/postgres/` (15 files) + `migrations/sqlite/` (15 equivalent files)
+- [ ] Schema compatibility matrix documented (type mappings: VECTOR → vectorlite, TIMESTAMPTZ → INTEGER, JSONB → TEXT)
+- [ ] Bidirectional export/import tool: `llmspell storage export/import` (PostgreSQL ↔ JSON ↔ SQLite)
+- [ ] Type conversion layer in backend implementations (UUID TEXT/BLOB, timestamps unix/ISO8601)
+- [ ] Tenant isolation compatibility (PostgreSQL RLS → SQLite session variables)
+- [ ] Full data roundtrip test: PostgreSQL → JSON → SQLite → JSON → PostgreSQL (zero data loss)
+- [ ] 15 SQLite migration scripts match PostgreSQL structure (V1-V15 equivalents)
+
+**Implementation Steps**:
+
+1. **Analyze PostgreSQL migrations for SQLite compatibility**:
+   ```bash
+   # Inventory PostgreSQL-specific features
+   rg "VECTOR\(|TIMESTAMPTZ|JSONB|GIST|GIN|ROW LEVEL SECURITY|tstzrange|OID|bytea" \
+     llmspell-storage/migrations/*.sql
+
+   # Key findings:
+   # - VECTOR(n): 4 dimensions (384, 768, 1536, 3072) - V3
+   # - Bi-temporal graph: tstzrange, GiST indexes - V4
+   # - JSONB: agent_state, sessions, metadata - V6, V9, V10
+   # - RLS policies: all tables - V1-V15
+   # - Large Objects: OID for artifacts >=1MB - V10
+   # - Triggers/Functions: PL/pgSQL - V6, V9
+   ```
+
+2. **Create schema compatibility matrix** (add to implementation section):
+   ```markdown
+   | Feature              | PostgreSQL (V1-V15)           | SQLite Equivalent        | Compatible? | Notes |
+   |----------------------|-------------------------------|--------------------------|-------------|-------|
+   | **Vector Storage**   | VECTOR(n) + VectorChord HNSW  | vectorlite REAL[] + HNSW | ✅ YES      | Different extension, same API |
+   | **UUID Type**        | UUID + uuid_generate_v4()     | TEXT (36 chars)          | ✅ YES      | Store as hyphenated string |
+   | **Timestamps**       | TIMESTAMPTZ                   | INTEGER (Unix epoch)     | ✅ YES      | Convert to/from i64 |
+   | **JSON Data**        | JSONB                         | TEXT (JSON functions)    | ✅ YES      | SQLite json1 extension |
+   | **Binary Data**      | BYTEA                         | BLOB                     | ✅ YES      | Direct mapping |
+   | **Large Objects**    | OID (Large Objects)           | BLOB (inline)            | ⚠️ PARTIAL  | SQLite: no 1MB threshold, all BLOB |
+   | **Indexes (Vector)** | HNSW (VectorChord)            | HNSW (vectorlite)        | ✅ YES      | Same algorithm, different impl |
+   | **Indexes (JSON)**   | GIN (JSONB)                   | B-tree (json_extract)    | ⚠️ PARTIAL  | Different performance |
+   | **Indexes (Temporal)**| GiST (tstzrange)             | B-tree (start, end cols) | ⚠️ PARTIAL  | No range types in SQLite |
+   | **RLS (Multi-tenant)**| Row-Level Security policies   | Session variables + WHERE| ⚠️ PARTIAL  | Manual filtering required |
+   | **Bi-temporal**      | tstzrange(start, end)         | Two INTEGER columns      | ✅ YES      | Convert range → start/end |
+   | **Triggers**         | PL/pgSQL functions            | SQLite triggers          | ✅ YES      | Similar syntax |
+   | **Foreign Keys**     | ON DELETE CASCADE             | ON DELETE CASCADE        | ✅ YES      | Must enable PRAGMA |
+   | **Full-text Search** | tsvector + GIN                | FTS5 extension           | ⚠️ PARTIAL  | Different syntax/capabilities |
+   ```
+
+3. **Reorganize migrations directory**:
+   ```bash
+   # Create backend-specific directories
+   mkdir -p llmspell-storage/migrations/postgres
+   mkdir -p llmspell-storage/migrations/sqlite
+
+   # Move existing PostgreSQL migrations
+   mv llmspell-storage/migrations/V*.sql llmspell-storage/migrations/postgres/
+
+   # Update migration runner to support backend-specific paths:
+   # - PostgresBackend loads from migrations/postgres/
+   # - SqliteBackend loads from migrations/sqlite/
+   ```
+
+4. **Create SQLite migration V1** (initial setup):
+   ```sql
+   -- migrations/sqlite/V1__initial_setup.sql
+   PRAGMA foreign_keys = ON;
+   PRAGMA journal_mode = WAL;
+
+   -- No schema support in SQLite (tables are global)
+   -- No UUID extension (use TEXT or BLOB)
+
+   -- Create version tracking table
+   CREATE TABLE IF NOT EXISTS _migrations (
+       version INTEGER PRIMARY KEY,
+       name TEXT NOT NULL,
+       applied_at INTEGER NOT NULL DEFAULT (strftime('%s', 'now'))
+   );
+   ```
+
+5. **Create SQLite migration V3** (vector embeddings - equivalent to postgres V3):
+   ```sql
+   -- migrations/sqlite/V3__vector_embeddings.sql
+   -- Load vectorlite extension
+   -- .load /path/to/vectorlite.so (handled by SqliteBackend connection setup)
+
+   CREATE TABLE IF NOT EXISTS vector_embeddings_384 (
+       id TEXT PRIMARY KEY DEFAULT (lower(hex(randomblob(16)))),  -- UUID as TEXT
+       tenant_id TEXT NOT NULL,
+       scope TEXT NOT NULL,
+       embedding BLOB NOT NULL,  -- vectorlite stores as BLOB
+       metadata TEXT NOT NULL DEFAULT '{}',  -- JSON as TEXT
+       created_at INTEGER NOT NULL DEFAULT (strftime('%s', 'now')),  -- Unix timestamp
+       updated_at INTEGER NOT NULL DEFAULT (strftime('%s', 'now'))
+   );
+
+   -- B-tree indexes
+   CREATE INDEX IF NOT EXISTS idx_vector_384_tenant ON vector_embeddings_384(tenant_id);
+   CREATE INDEX IF NOT EXISTS idx_vector_384_scope ON vector_embeddings_384(scope);
+   CREATE INDEX IF NOT EXISTS idx_vector_384_created ON vector_embeddings_384(created_at);
+
+   -- vectorlite HNSW index (cosine distance, m=16, ef_construction=64)
+   SELECT vectorlite_create_index('vector_embeddings_384', 'embedding', 384, 'cosine', 16, 64);
+
+   -- Repeat for 768, 1536, 3072 dimensions...
+   ```
+
+6. **Create SQLite migration V4** (bi-temporal graph - equivalent to postgres V4):
+   ```sql
+   -- migrations/sqlite/V4__temporal_graph.sql
+   CREATE TABLE IF NOT EXISTS entities (
+       entity_id TEXT PRIMARY KEY DEFAULT (lower(hex(randomblob(16)))),
+       tenant_id TEXT NOT NULL,
+       entity_type TEXT NOT NULL,
+       name TEXT NOT NULL,
+       properties TEXT NOT NULL DEFAULT '{}',  -- JSON as TEXT
+
+       -- Bi-temporal: separate start/end columns (no tstzrange)
+       valid_time_start INTEGER NOT NULL,
+       valid_time_end INTEGER NOT NULL DEFAULT 9999999999,  -- "infinity" as max timestamp
+       transaction_time_start INTEGER NOT NULL DEFAULT (strftime('%s', 'now')),
+       transaction_time_end INTEGER NOT NULL DEFAULT 9999999999,
+
+       created_at INTEGER NOT NULL DEFAULT (strftime('%s', 'now')),
+
+       CHECK (valid_time_start < valid_time_end),
+       CHECK (transaction_time_start < transaction_time_end)
+   );
+
+   CREATE INDEX IF NOT EXISTS idx_entities_tenant ON entities(tenant_id);
+   CREATE INDEX IF NOT EXISTS idx_entities_type ON entities(entity_type);
+   CREATE INDEX IF NOT EXISTS idx_entities_name ON entities(name);
+
+   -- B-tree indexes for temporal queries (no GiST)
+   CREATE INDEX IF NOT EXISTS idx_entities_valid_time ON entities(valid_time_start, valid_time_end);
+   CREATE INDEX IF NOT EXISTS idx_entities_tx_time ON entities(transaction_time_start, transaction_time_end);
+
+   -- JSON index using json_extract
+   CREATE INDEX IF NOT EXISTS idx_entities_properties_json ON entities(json_extract(properties, '$.type'));
+
+   -- Relationships table (similar pattern)...
+   ```
+
+7. **Implement bidirectional export/import tool** (llmspell-cli/src/commands/storage.rs):
+   ```rust
+   // Export PostgreSQL → JSON
+   pub async fn export_postgres_to_json(output_path: &Path) -> Result<()> {
+       let pg_storage = PostgresBackend::connect(config).await?;
+       let mut export = StorageExport::new();
+
+       // Export vector embeddings (4 dimensions)
+       for dim in [384, 768, 1536, 3072] {
+           let vectors = pg_storage.query_all_vectors(dim).await?;
+           export.add_vectors(dim, vectors);
+       }
+
+       // Export entities + relationships (graph)
+       let entities = pg_storage.query_all_entities().await?;
+       let relationships = pg_storage.query_all_relationships().await?;
+       export.add_graph(entities, relationships);
+
+       // Export agent states, sessions, artifacts...
+       // ...
+
+       // Serialize to JSON with type conversions
+       let json = serde_json::to_string_pretty(&export)?;
+       fs::write(output_path, json)?;
+       Ok(())
+   }
+
+   // Import JSON → SQLite
+   pub async fn import_json_to_sqlite(input_path: &Path) -> Result<()> {
+       let export: StorageExport = serde_json::from_str(&fs::read_to_string(input_path)?)?;
+       let sqlite_storage = SqliteBackend::connect(config).await?;
+
+       // Import vectors with type conversion
+       for (dim, vectors) in export.vectors {
+           for v in vectors {
+               let converted = VectorEntry {
+                   id: v.id.to_string(),  // UUID → TEXT
+                   created_at: v.created_at.timestamp(),  // TIMESTAMPTZ → INTEGER
+                   // ...
+               };
+               sqlite_storage.insert_vector(dim, converted).await?;
+           }
+       }
+
+       // Import graph, agent states, sessions...
+       // ...
+
+       Ok(())
+   }
+   ```
+
+8. **Create data roundtrip integration test**:
+   ```rust
+   #[tokio::test]
+   async fn test_postgres_sqlite_data_portability() {
+       // 1. Start with PostgreSQL
+       let pg = PostgresBackend::connect(/* ... */).await.unwrap();
+       pg.insert_vector_384(test_vector.clone()).await.unwrap();
+       pg.insert_entity(test_entity.clone()).await.unwrap();
+
+       // 2. Export PostgreSQL → JSON
+       export_postgres_to_json("./test_export.json").await.unwrap();
+
+       // 3. Import JSON → SQLite
+       import_json_to_sqlite("./test_export.json").await.unwrap();
+
+       // 4. Verify SQLite data
+       let sqlite = SqliteBackend::connect(/* ... */).await.unwrap();
+       let vectors = sqlite.search_vectors_384(query).await.unwrap();
+       assert_eq!(vectors[0].id, test_vector.id.to_string());
+
+       // 5. Export SQLite → JSON
+       export_sqlite_to_json("./test_export_sqlite.json").await.unwrap();
+
+       // 6. Re-import JSON → PostgreSQL (new instance)
+       let pg2 = PostgresBackend::connect_fresh(/* ... */).await.unwrap();
+       import_json_to_postgres("./test_export_sqlite.json").await.unwrap();
+
+       // 7. Verify roundtrip (PostgreSQL → SQLite → PostgreSQL = identical)
+       let final_vector = pg2.get_vector_384(&test_vector.id).await.unwrap();
+       assert_eq!(final_vector, test_vector);  // Zero data loss
+   }
+   ```
+
+9. **Update backend implementations for type compatibility**:
+   ```rust
+   // llmspell-storage/src/backends/sqlite/types.rs
+   pub struct SqliteVectorEntry {
+       pub id: String,  // UUID as TEXT
+       pub tenant_id: String,
+       pub scope: String,
+       pub embedding: Vec<f32>,  // vectorlite serializes to BLOB
+       pub metadata: String,  // JSON as TEXT
+       pub created_at: i64,  // Unix timestamp
+       pub updated_at: i64,
+   }
+
+   impl From<PostgresVectorEntry> for SqliteVectorEntry {
+       fn from(pg: PostgresVectorEntry) -> Self {
+           Self {
+               id: pg.id.to_string(),  // UUID → TEXT
+               tenant_id: pg.tenant_id,
+               scope: pg.scope,
+               embedding: pg.embedding,
+               metadata: serde_json::to_string(&pg.metadata).unwrap(),  // JSONB → TEXT
+               created_at: pg.created_at.timestamp(),  // TIMESTAMPTZ → INTEGER
+               updated_at: pg.updated_at.timestamp(),
+           }
+       }
+   }
+   ```
+
+10. **Update migration runner** (llmspell-storage/src/backends/migrations.rs):
+    ```rust
+    pub struct MigrationRunner {
+        backend_type: StorageBackendType,
+    }
+
+    impl MigrationRunner {
+        pub fn migrations_dir(&self) -> &str {
+            match self.backend_type {
+                StorageBackendType::PostgreSQL => "migrations/postgres",
+                StorageBackendType::SQLite => "migrations/sqlite",
+                _ => panic!("No migrations for this backend"),
+            }
+        }
+
+        pub async fn run_migrations(&self) -> Result<()> {
+            let dir = self.migrations_dir();
+            let migration_files = glob(&format!("{}/*.sql", dir))?;
+
+            for file in migration_files {
+                self.execute_migration_file(file).await?;
+            }
+            Ok(())
+        }
+    }
+    ```
+
+**Definition of Done**:
+- [ ] Migration directory reorganized: `migrations/postgres/` (15 existing files) + `migrations/sqlite/` (15 new equivalents)
+- [ ] Schema compatibility matrix documented in sqlite-storage-architecture.md
+- [ ] Type conversion layer implemented in SqliteBackend (UUID TEXT, timestamps i64, JSON TEXT)
+- [ ] Bidirectional export/import CLI: `llmspell storage export/import --backend postgres|sqlite --format json`
+- [ ] Tenant isolation compatibility: PostgreSQL RLS vs SQLite session variables (both tested)
+- [ ] Full data roundtrip test passing (PostgreSQL → JSON → SQLite → JSON → PostgreSQL = identical)
+- [ ] All 15 SQLite migrations match PostgreSQL structure (V1-V15)
+- [ ] Migration runner updated to support backend-specific directories
+- [ ] Zero data loss validated across 10 storage components (vectors, graph, state, sessions, artifacts)
+
+**Files to Create/Modify**:
+- `llmspell-storage/migrations/postgres/` (MOVE - existing 15 files)
+- `llmspell-storage/migrations/sqlite/V1__initial_setup.sql` through `V15__bitemporal_composite_keys.sql` (NEW - 15 files)
+- `llmspell-storage/src/backends/migrations.rs` (UPDATE - backend-aware directory loading)
+- `llmspell-storage/src/backends/sqlite/types.rs` (NEW - type conversion)
+- `llmspell-cli/src/commands/storage.rs` (UPDATE - add export/import subcommands)
+- `llmspell-storage/tests/data_portability.rs` (NEW - roundtrip test)
+- `docs/technical/sqlite-storage-architecture.md` (UPDATE - add compatibility matrix section)
+
+---
+
+### Task 13c.2.11: Documentation & Validation ⏹ PENDING
+**Priority**: HIGH
+**Estimated Time**: 12 hours (Days 15-16)
+**Assignee**: Documentation Team
+**Status**: ⏹ PENDING
+**Dependencies**: All previous 13c.2.x tasks ✅
+
+**Description**: Comprehensive documentation for libsql unified storage integrated into existing documentation structure (user guide, developer guide, technical docs). Focus on usage, architecture, and configuration.
+
+**Acceptance Criteria**:
+- [ ] User guide updated: storage setup quick start (07-storage-setup.md), configuration reference (03-configuration.md)
+- [ ] Technical docs updated: architecture guide (sqlite-storage-architecture.md), current architecture (current-architecture.md), performance guide, RAG integration
+- [ ] Developer guide updated: storage backend extension patterns (03-extending-components.md)
+- [ ] README-DEVEL.md updated with libsql backend setup instructions
+- [ ] Backup/restore procedures documented (1 file copy vs 4)
+- [ ] Final validation: zero clippy warnings, all tests passing, quality gates met
+
+**Implementation Steps**:
+
+1. **Update docs/user-guide/07-storage-setup.md** - Add SQLite quick start section:
+   - Add "Quick Start: SQLite (Embedded)" section after PostgreSQL section
+   - Include: vectorlite installation (brew install vectorlite, build from source)
+   - Include: Basic configuration (backend = "sqlite", connection_string, pool_size)
+   - Include: Verification steps (cargo run -- storage info --backend sqlite)
+   - Include: Performance characteristics table (same as README-DEVEL.md)
+   - Include: 1-file backup procedure (cp ~/.llmspell/storage.db)
+   - Keep it concise (mimic PostgreSQL quick start format)
+
+2. **Update docs/user-guide/03-configuration.md** - Add SQLite configuration reference:
+   - Add [storage.sqlite] section with all config options (pool_size, encryption, wal_mode)
+   - Add [storage.sqlite.vector] section (extension, hnsw_m, hnsw_ef_construction, hnsw_ef_search)
+   - Add [storage.sqlite.graph] section (max_depth)
+   - Add [storage.sqlite.artifact] section (max_artifact_size_mb)
+   - Link to technical/sqlite-storage-architecture.md for deep dive
+
+3. **Create docs/technical/sqlite-storage-architecture.md** - Comprehensive technical guide:
+   - Follow postgresql-guide.md structure (100+ lines)
+   - Sections: Overview & Architecture, Setup & Configuration, Schema Reference, Performance Optimization, Operations
+   - 3-Tier Storage Architecture diagram (like postgresql-guide.md lines 26-60)
+   - Backend Comparison table (InMemory, Sled, PostgreSQL, SQLite)
+   - libsql v0.9.24 features (encryption at rest, embedded replicas, WAL mode)
+   - vectorlite HNSW extension (m=16, ef_construction=128, ef_search=64)
+   - Recursive CTEs for bi-temporal graph (WITH RECURSIVE examples)
+   - Connection pooling: R2D2 pattern with 20 connections
+   - Performance characteristics: vector insert (~400µs), vector search (2-7ms), graph traversal (~35ms)
+   - Backup/restore: 1-file copy vs 4 separate procedures
+   - Tuning guide: connection pooling, BLOB storage, vector search, graph traversal
+   - Schema reference: tables (episodic_memory, semantic_graph, procedural_patterns, sessions, artifacts)
+
+4. **Update docs/technical/current-architecture.md** - Add SQLite backend:
+   - Add SQLite to Phase 13c Architecture Evolution section
+   - Update storage backend comparison (lines 80-91) to include SQLite column
+   - Mention libsql consolidation (4 backends → 1)
+   - Reference sqlite-storage-architecture.md for details
+
+5. **Update docs/technical/rag-memory-integration.md** - Add SQLite integration:
+   - Update component diagram to show SQLite as storage backend option
+   - Add note: "Storage backends: InMemory (dev), HNSW files (legacy), SQLite (unified), PostgreSQL (production)"
+   - Update configuration examples to show SQLite option
+
+6. **Update docs/technical/performance-guide.md** - Add SQLite performance characteristics:
+   - Add "Storage Backends" section with performance comparison table
+   - Include: Vector Insert (~400µs), Vector Search (2-7ms), Graph Traversal (~35ms), State Write (~10ms)
+   - Compare: InMemory (µs), HNSW files (ms), SQLite (ms), PostgreSQL (ms)
+   - Note: 3-7x slower than HNSW files but still meets <10ms targets
+
+7. **Update docs/developer-guide/03-extending-components.md** - Add SQLite extension patterns:
+   - Update "PART 6: Storage Backend Extension" section
+   - Add SqliteVectorStorage example (similar to existing examples)
+   - Show: connection pooling setup, vectorlite extension loading, HNSW index creation
+   - Show: SqliteGraphStorage example with recursive CTEs
+   - Reference: sqlite-storage-architecture.md for schema details
+
+8. **Update README-DEVEL.md** - Add SQLite backend section:
+   - Add "SQLite Unified Local Storage (libsql)" section after "Testing" section
+   - Include: Benefits (-76% binary size, 1-file backup, zero infrastructure)
+   - Include: Quick installation (config.toml example)
+   - Include: Setup steps (vectorlite extension installation, verification)
+   - Include: Performance table (4 operations vs HNSW files)
+   - Include: Backup/restore (1 file copy vs 4 procedures)
+   - Keep concise (50-80 lines), reference docs/technical/sqlite-storage-architecture.md for details
+
+9. Run final validation:
+   ```bash
+   # Format check
+   cargo fmt --all -- --check
+
+   # Clippy check
+   cargo clippy --workspace --all-features --all-targets -- -D warnings
+
+   # Test check
+   cargo test --workspace --all-features
+
+   # Documentation check
+   cargo doc --workspace --no-deps --all-features
+
+   # Build check
+   cargo build --workspace --all-features --release
+
+   # Quality gate
+   ./scripts/quality/quality-check.sh
+   ```
+
+**Definition of Done**:
+- [ ] User guide updated: 07-storage-setup.md (SQLite quick start), 03-configuration.md (SQLite config)
+- [ ] Technical guide created: sqlite-storage-architecture.md (100+ lines, comprehensive like postgresql-guide.md)
+- [ ] Technical guides updated: current-architecture.md, rag-memory-integration.md, performance-guide.md (SQLite integration)
+- [ ] Developer guide updated: 03-extending-components.md (SQLite extension patterns in PART 6)
+- [ ] README-DEVEL.md updated with libsql setup section (50-80 lines)
+- [ ] All documentation integrated into existing structure (no orphaned files)
+- [ ] Final validation: zero clippy warnings, all tests passing
+- [ ] Quality gates: ./scripts/quality/quality-check.sh passing
+
+**Files to Create/Modify**:
+- `docs/user-guide/07-storage-setup.md` (UPDATE - add SQLite quick start section)
+- `docs/user-guide/03-configuration.md` (UPDATE - add [storage.sqlite] config reference)
+- `docs/technical/sqlite-storage-architecture.md` (NEW - comprehensive guide like postgresql-guide.md)
+- `docs/technical/current-architecture.md` (UPDATE - add SQLite backend to architecture)
+- `docs/technical/rag-memory-integration.md` (UPDATE - mention SQLite backend option)
+- `docs/technical/performance-guide.md` (UPDATE - add SQLite performance characteristics)
+- `docs/developer-guide/03-extending-components.md` (UPDATE - add SQLite extension patterns to PART 6)
+- `README-DEVEL.md` (UPDATE - add libsql section)
+
+---
+
+## Phase 13c.4: Profile System Enhancement (Days 1-2)
 
 **Goal**: Create 3 real-world profiles (postgres, ollama-production, memory-development)
 **Timeline**: 2 days (16 hours total)
 **Critical Dependencies**: Phase 13b (PostgreSQL) ✅
 **Priority**: CRITICAL (unblocks Phase 13b validation + production use)
 
-### Task 13c.2.1: PostgreSQL Profile Creation ⏹ PENDING
+### Task 13c.4.1: PostgreSQL Profile Creation ⏹ PENDING
 **Priority**: CRITICAL
 **Estimated Time**: 4 hours
 **Assignee**: Storage Team Lead
@@ -642,7 +2338,7 @@ Zero breaking changes
 
 ---
 
-### Task 13c.2.2: Ollama Production Profile Creation ⏹ PENDING
+### Task 13c.4.2: Ollama Production Profile Creation ⏹ PENDING
 **Priority**: HIGH
 **Estimated Time**: 3 hours
 **Assignee**: Providers Team
@@ -703,7 +2399,7 @@ Zero breaking changes
 
 ---
 
-### Task 13c.2.3: Memory Development Profile Creation ⏹ PENDING
+### Task 13c.4.3: Memory Development Profile Creation ⏹ PENDING
 **Priority**: HIGH
 **Estimated Time**: 3 hours
 **Assignee**: Memory Team
@@ -771,7 +2467,7 @@ Zero breaking changes
 
 ---
 
-### Task 13c.2.4: Profile Catalog Documentation ⏹ PENDING
+### Task 13c.4.4: Profile Catalog Documentation ⏹ PENDING
 **Priority**: MEDIUM
 **Estimated Time**: 2 hours
 **Assignee**: Documentation Team
@@ -843,14 +2539,14 @@ Zero breaking changes
 
 ---
 
-## Phase 13c.3: Examples Consolidation (Days 4-5)
+## Phase 13c.5: Examples Consolidation (Days 4-5)
 
 **Goal**: Reduce examples from 75 → <50 files, streamline getting-started 8 → 5
 **Timeline**: 2 days (16 hours total)
 **Critical Dependencies**: Phase 13c.2 (Profiles) - profiles must exist for validation
 **Priority**: CRITICAL (user-facing quality)
 
-### Task 13c.3.1: Top-Level Examples Cleanup ⏹ PENDING
+### Task 13c.5.1: Top-Level Examples Cleanup ⏹ PENDING
 **Priority**: CRITICAL
 **Estimated Time**: 3 hours
 **Assignee**: Examples Team
@@ -907,7 +2603,7 @@ Zero breaking changes
 
 ---
 
-### Task 13c.3.2: Rust Examples Consolidation ⏹ PENDING
+### Task 13c.5.2: Rust Examples Consolidation ⏹ PENDING
 **Priority**: HIGH
 **Estimated Time**: 4 hours
 **Assignee**: Rust Examples Team
@@ -1003,7 +2699,7 @@ Zero breaking changes
 
 ---
 
-### Task 13c.3.3: Getting-Started Streamlining ⏹ PENDING
+### Task 13c.5.3: Getting-Started Streamlining ⏹ PENDING
 **Priority**: CRITICAL
 **Estimated Time**: 5 hours
 **Assignee**: Examples Team Lead
@@ -1110,7 +2806,7 @@ Zero breaking changes
 
 ---
 
-### Task 13c.3.4: Broken Examples Cleanup ⏹ PENDING
+### Task 13c.5.4: Broken Examples Cleanup ⏹ PENDING
 **Priority**: CRITICAL
 **Estimated Time**: 2 hours
 **Assignee**: Examples Team
@@ -1176,7 +2872,7 @@ Zero breaking changes
 
 ---
 
-### Task 13c.3.5: Example Config Audit ⏹ PENDING
+### Task 13c.5.5: Example Config Audit ⏹ PENDING
 **Priority**: MEDIUM
 **Estimated Time**: 2 hours
 **Assignee**: Config Team
@@ -1260,7 +2956,7 @@ Zero breaking changes
 
 ---
 
-### Task 13c.3.6: Example Header Standardization ⏹ PENDING
+### Task 13c.5.6: Example Header Standardization ⏹ PENDING
 **Priority**: MEDIUM
 **Estimated Time**: 3 hours
 **Assignee**: Documentation Team
@@ -1337,14 +3033,14 @@ Zero breaking changes
 
 ---
 
-## Phase 13c.4: Validation Infrastructure (Day 5)
+## Phase 13c.6: Validation Infrastructure (Day 5)
 
 **Goal**: Create examples-validation.sh with 100% getting-started coverage
 **Timeline**: 1 day (8 hours total)
-**Critical Dependencies**: Phase 13c.3 (Examples) - examples must be finalized
+**Critical Dependencies**: Phase 13c.5 (Examples) - examples must be finalized
 **Priority**: CRITICAL (quality assurance)
 
-### Task 13c.4.1: Validation Script Creation ⏹ PENDING
+### Task 13c.6.1: Validation Script Creation ⏹ PENDING
 **Priority**: CRITICAL
 **Estimated Time**: 4 hours
 **Assignee**: Testing Team Lead
@@ -1448,7 +3144,7 @@ Zero breaking changes
 
 ---
 
-### Task 13c.4.2: Quality Check Integration ⏹ PENDING
+### Task 13c.6.2: Quality Check Integration ⏹ PENDING
 **Priority**: HIGH
 **Estimated Time**: 2 hours
 **Assignee**: CI/CD Team
@@ -1520,7 +3216,7 @@ Zero breaking changes
 
 ---
 
-### Task 13c.4.3: CI/CD Pipeline Update ⏹ PENDING
+### Task 13c.6.3: CI/CD Pipeline Update ⏹ PENDING
 **Priority**: MEDIUM
 **Estimated Time**: 2 hours
 **Assignee**: CI/CD Team
@@ -1577,14 +3273,14 @@ Zero breaking changes
 
 ---
 
-## Phase 13c.5: Documentation Overhaul (Days 6-7)
+## Phase 13c.7: Documentation Overhaul (Days 6-7)
 
 **Goal**: Update all docs to Phase 13, create migration guide, profile guide
 **Timeline**: 2 days (16 hours total)
-**Critical Dependencies**: Phase 13c.2-13c.3 (Profiles + Examples)
+**Critical Dependencies**: Phase 13c.2-13c.5 (Profiles + Examples)
 **Priority**: HIGH (user communication)
 
-### Task 13c.5.1: User Guide Updates ⏹ PENDING
+### Task 13c.7.1: User Guide Updates ⏹ PENDING
 **Priority**: HIGH
 **Estimated Time**: 5 hours
 **Assignee**: Documentation Team
@@ -1709,7 +3405,7 @@ Zero breaking changes
 
 ---
 
-### Task 13c.5.2: Profile Decision Guide Creation ⏹ PENDING
+### Task 13c.7.2: Profile Decision Guide Creation ⏹ PENDING
 **Priority**: HIGH
 **Estimated Time**: 3 hours
 **Assignee**: Documentation Team
@@ -1829,7 +3525,7 @@ Zero breaking changes
 
 ---
 
-### Task 13c.5.3: Migration Guide Creation ⏹ PENDING
+### Task 13c.7.3: Migration Guide Creation ⏹ PENDING
 **Priority**: HIGH
 **Estimated Time**: 3 hours
 **Assignee**: Documentation Team
@@ -1962,7 +3658,7 @@ Zero breaking changes
 
 ---
 
-### Task 13c.5.4: Examples READMEs Rewrite ⏹ PENDING
+### Task 13c.7.4: Examples READMEs Rewrite ⏹ PENDING
 **Priority**: MEDIUM
 **Estimated Time**: 4 hours
 **Assignee**: Documentation Team
@@ -2004,7 +3700,7 @@ Zero breaking changes
 
 ---
 
-### Task 13c.5.5: README-DEVEL.md Update ⏹ PENDING
+### Task 13c.7.5: README-DEVEL.md Update ⏹ PENDING
 **Priority**: MEDIUM
 **Estimated Time**: 1 hour
 **Assignee**: Documentation Team
@@ -2061,14 +3757,14 @@ Zero breaking changes
 
 ---
 
-## Phase 13c.6: Integration Testing & Release (Days 8-10)
+## Phase 13c.8: Integration Testing & Release (Days 8-10)
 
 **Goal**: Validate all changes, ensure zero regressions, prepare v0.14.0 release
 **Timeline**: 3 days (24 hours total)
 **Critical Dependencies**: All previous phases complete
 **Priority**: CRITICAL (release quality)
 
-### Task 13c.6.1: Comprehensive Example Validation ⏹ PENDING
+### Task 13c.8.1: Comprehensive Example Validation ⏹ PENDING
 **Priority**: CRITICAL
 **Estimated Time**: 4 hours
 **Assignee**: QA Team
@@ -2138,7 +3834,7 @@ Zero breaking changes
 
 ---
 
-### Task 13c.6.2: Quality Gates Validation ⏹ PENDING
+### Task 13c.8.2: Quality Gates Validation ⏹ PENDING
 **Priority**: CRITICAL
 **Estimated Time**: 3 hours
 **Assignee**: QA Team Lead
@@ -2207,7 +3903,7 @@ Zero breaking changes
 
 ---
 
-### Task 13c.6.3: Performance Benchmarking ⏹ PENDING
+### Task 13c.8.3: Performance Benchmarking ⏹ PENDING
 **Priority**: MEDIUM
 **Estimated Time**: 2 hours
 **Assignee**: Performance Team
@@ -2284,7 +3980,7 @@ Zero breaking changes
 
 ---
 
-### Task 13c.6.4: Documentation Link Validation ⏹ PENDING
+### Task 13c.8.4: Documentation Link Validation ⏹ PENDING
 **Priority**: MEDIUM
 **Estimated Time**: 2 hours
 **Assignee**: Documentation Team
@@ -2343,7 +4039,7 @@ Zero breaking changes
 
 ---
 
-### Task 13c.6.5: Release Preparation ⏹ PENDING
+### Task 13c.8.5: Release Preparation ⏹ PENDING
 **Priority**: CRITICAL
 **Estimated Time**: 4 hours
 **Assignee**: Release Team Lead
