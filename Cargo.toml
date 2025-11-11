@@ -139,6 +139,11 @@ deadpool-postgres = "0.14"
 pgvector = { version = "0.4", features = ["postgres"] }
 refinery = { version = "0.8", features = ["tokio-postgres"] }
 
+# SQLite storage (Phase 13c.2 - libsql with encryption)
+libsql = { version = "0.9", features = ["encryption", "replication"] }
+r2d2 = "0.8"
+r2d2_sqlite = "0.25"
+
 # Scripting engines
 mlua = { version = "0.9", features = [
     "lua54",

@@ -5,8 +5,9 @@ use super::error::{PostgresError, Result};
 use super::PostgresBackend;
 use refinery::embed_migrations;
 
-// Embed migrations from migrations/ directory at compile time
-embed_migrations!("migrations");
+// Embed PostgreSQL migrations from migrations/postgres/ directory at compile time
+// Phase 13c.2.1: Migrated from migrations/ to migrations/postgres/ for backend-specific SQL
+embed_migrations!("migrations/postgres");
 
 impl PostgresBackend {
     /// Run all pending database migrations
