@@ -15,16 +15,20 @@ use crate::embeddings::EmbeddingService;
 /// # Performance Characteristics
 ///
 /// - **`InMemory`**: O(n) search, good for <1K entries, testing only
-/// - **HNSW**: O(log n) search, production-ready for 10K+ entries
+/// - **HNSW**: O(log n) search, production-ready for 10K+ entries - **DEPRECATED: will be removed in Task 13c.2.8**
+/// - **Sqlite**: O(log n) search with SQLite + HNSW, persistent local storage (NEW - replacement for HNSW)
 /// - **`PostgreSQL`**: O(log n) search with `pgvector` HNSW, multi-tenant `RLS` support
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
 pub enum EpisodicBackendType {
     /// Simple `HashMap` (for testing, <1K entries)
     InMemory,
 
-    /// HNSW vector index (for production, 10K+ entries)
-    #[default]
+    /// HNSW vector index (for production, 10K+ entries) - **DEPRECATED: will be removed in Task 13c.2.8**
     HNSW,
+
+    /// SQLite with HNSW (for production, persistent local storage, 10K+ entries)
+    #[default]
+    Sqlite,
 
     /// `PostgreSQL` with `pgvector` (for production, multi-tenant, `RLS`-enabled)
     #[cfg(feature = "postgres")]
@@ -90,8 +94,11 @@ pub struct MemoryConfig {
     /// HNSW configuration (used if backend = HNSW)
     pub hnsw_config: HNSWConfig,
 
-    /// Embedding service (required for `HNSW` and `PostgreSQL`)
+    /// Embedding service (required for `HNSW`, `Sqlite`, and `PostgreSQL`)
     pub embedding_service: Option<Arc<EmbeddingService>>,
+
+    /// SQLite backend for episodic memory (used if `episodic_backend` = `Sqlite`)
+    pub sqlite_backend: Option<Arc<llmspell_storage::backends::sqlite::SqliteBackend>>,
 
     /// `PostgreSQL` backend for episodic memory (used if `episodic_backend` = `PostgreSQL`)
     #[cfg(feature = "postgres")]
@@ -105,10 +112,11 @@ pub struct MemoryConfig {
 impl Default for MemoryConfig {
     fn default() -> Self {
         Self {
-            episodic_backend: EpisodicBackendType::HNSW, // Production default
-            semantic_backend: SemanticBackendType::SurrealDB, // Default
+            episodic_backend: EpisodicBackendType::Sqlite, // NEW production default
+            semantic_backend: SemanticBackendType::SurrealDB,
             hnsw_config: HNSWConfig::default(),
             embedding_service: None,
+            sqlite_backend: None,
             #[cfg(feature = "postgres")]
             postgres_backend: None,
             #[cfg(feature = "postgres")]
@@ -137,6 +145,7 @@ impl MemoryConfig {
             semantic_backend: SemanticBackendType::SurrealDB,
             hnsw_config: HNSWConfig::default(),
             embedding_service: None,
+            sqlite_backend: None,
             #[cfg(feature = "postgres")]
             postgres_backend: None,
             #[cfg(feature = "postgres")]
@@ -176,10 +185,11 @@ impl MemoryConfig {
     #[must_use]
     pub fn for_production(embedding_service: Arc<EmbeddingService>) -> Self {
         Self {
-            episodic_backend: EpisodicBackendType::HNSW,
+            episodic_backend: EpisodicBackendType::HNSW, // Still using HNSW by default until users migrate
             semantic_backend: SemanticBackendType::SurrealDB,
             hnsw_config: HNSWConfig::default(),
             embedding_service: Some(embedding_service),
+            sqlite_backend: None,
             #[cfg(feature = "postgres")]
             postgres_backend: None,
             #[cfg(feature = "postgres")]

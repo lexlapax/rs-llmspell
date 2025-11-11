@@ -33,7 +33,7 @@ tests/python/venv/
 __pycache__/
 .pytest_cache
 *.dylib
-
+hnsw_indices
 
 sessions/
 .cargo/config.toml

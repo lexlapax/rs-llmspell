@@ -11,7 +11,7 @@ use tracing::info;
 use crate::config::{EpisodicBackendType, MemoryConfig};
 #[cfg(feature = "postgres")]
 use crate::episodic::PostgreSQLEpisodicMemory;
-use crate::episodic::{HNSWEpisodicMemory, InMemoryEpisodicMemory};
+use crate::episodic::{HNSWEpisodicMemory, InMemoryEpisodicMemory, SqliteEpisodicMemory};
 use crate::error::{MemoryError, Result};
 use crate::traits::EpisodicMemory;
 use crate::types::EpisodicEntry;
@@ -46,8 +46,11 @@ pub enum EpisodicBackend {
     /// In-memory `HashMap` backend (testing, <1K entries)
     InMemory(Arc<InMemoryEpisodicMemory>),
 
-    /// HNSW vector index backend (production, 10K+ entries)
+    /// HNSW vector index backend (production, 10K+ entries) - **DEPRECATED: will be removed in Task 13c.2.8**
     HNSW(Arc<HNSWEpisodicMemory>),
+
+    /// SQLite with HNSW backend (production, persistent local storage, 10K+ entries)
+    Sqlite(Arc<SqliteEpisodicMemory>),
 
     /// `PostgreSQL` with `pgvector` backend (production, multi-tenant, `RLS`-enabled)
     #[cfg(feature = "postgres")]
@@ -109,6 +112,7 @@ impl EpisodicBackend {
         match config.episodic_backend {
             EpisodicBackendType::InMemory => Ok(Self::create_inmemory_backend(config)),
             EpisodicBackendType::HNSW => Self::create_hnsw_backend(config),
+            EpisodicBackendType::Sqlite => Self::create_sqlite_backend(config),
             #[cfg(feature = "postgres")]
             EpisodicBackendType::PostgreSQL => Self::create_postgresql_backend(config),
         }
@@ -159,6 +163,42 @@ impl EpisodicBackend {
         Ok(Self::HNSW(Arc::new(hnsw)))
     }
 
+    /// Create SQLite backend from configuration
+    fn create_sqlite_backend(config: &MemoryConfig) -> Result<Self> {
+        info!("Creating SQLite episodic backend (production mode, persistent local storage)");
+
+        let service = config.embedding_service.as_ref().ok_or_else(|| {
+            MemoryError::InvalidInput(
+                "SQLite backend requires embedding service (use MemoryConfig::for_production)"
+                    .to_string(),
+            )
+        })?;
+
+        let sqlite_backend = config.sqlite_backend.as_ref().ok_or_else(|| {
+            MemoryError::InvalidInput(
+                "SQLite backend requires sqlite_backend (provide SqliteBackend instance)"
+                    .to_string(),
+            )
+        })?;
+
+        info!(
+            "SQLite backend using embedding service: {}, dimensions: {}",
+            service.provider_name(),
+            service.dimensions()
+        );
+
+        // Create SqliteEpisodicMemory with async initialization
+        // Note: This is a blocking call in from_config, but SqliteEpisodicMemory::new is async
+        // We use block_on here since from_config is synchronous
+        let sqlite_memory = tokio::task::block_in_place(|| {
+            tokio::runtime::Handle::current().block_on(async {
+                SqliteEpisodicMemory::new(Arc::clone(sqlite_backend), Arc::clone(service)).await
+            })
+        })?;
+
+        Ok(Self::Sqlite(Arc::new(sqlite_memory)))
+    }
+
     /// Create `PostgreSQL` backend from configuration
     #[cfg(feature = "postgres")]
     fn create_postgresql_backend(config: &MemoryConfig) -> Result<Self> {
@@ -195,6 +235,7 @@ impl EpisodicBackend {
         match self {
             Self::InMemory(_) => "InMemory",
             Self::HNSW(_) => "HNSW",
+            Self::Sqlite(_) => "Sqlite",
             #[cfg(feature = "postgres")]
             Self::PostgreSQL(_) => "PostgreSQL",
         }
@@ -207,6 +248,7 @@ impl EpisodicMemory for EpisodicBackend {
         match self {
             Self::InMemory(backend) => backend.add(entry).await,
             Self::HNSW(backend) => backend.add(entry).await,
+            Self::Sqlite(backend) => backend.add(entry).await,
             #[cfg(feature = "postgres")]
             Self::PostgreSQL(backend) => backend.add(entry).await,
         }
@@ -216,6 +258,7 @@ impl EpisodicMemory for EpisodicBackend {
         match self {
             Self::InMemory(backend) => backend.get(id).await,
             Self::HNSW(backend) => backend.get(id).await,
+            Self::Sqlite(backend) => backend.get(id).await,
             #[cfg(feature = "postgres")]
             Self::PostgreSQL(backend) => backend.get(id).await,
         }
@@ -225,6 +268,7 @@ impl EpisodicMemory for EpisodicBackend {
         match self {
             Self::InMemory(backend) => backend.search(query, top_k).await,
             Self::HNSW(backend) => backend.search(query, top_k).await,
+            Self::Sqlite(backend) => backend.search(query, top_k).await,
             #[cfg(feature = "postgres")]
             Self::PostgreSQL(backend) => backend.search(query, top_k).await,
         }
@@ -234,6 +278,7 @@ impl EpisodicMemory for EpisodicBackend {
         match self {
             Self::InMemory(backend) => backend.list_unprocessed(session_id).await,
             Self::HNSW(backend) => backend.list_unprocessed(session_id).await,
+            Self::Sqlite(backend) => backend.list_unprocessed(session_id).await,
             #[cfg(feature = "postgres")]
             Self::PostgreSQL(backend) => backend.list_unprocessed(session_id).await,
         }
@@ -243,6 +288,7 @@ impl EpisodicMemory for EpisodicBackend {
         match self {
             Self::InMemory(backend) => backend.get_session(session_id).await,
             Self::HNSW(backend) => backend.get_session(session_id).await,
+            Self::Sqlite(backend) => backend.get_session(session_id).await,
             #[cfg(feature = "postgres")]
             Self::PostgreSQL(backend) => backend.get_session(session_id).await,
         }
@@ -252,6 +298,7 @@ impl EpisodicMemory for EpisodicBackend {
         match self {
             Self::InMemory(backend) => backend.mark_processed(entry_ids).await,
             Self::HNSW(backend) => backend.mark_processed(entry_ids).await,
+            Self::Sqlite(backend) => backend.mark_processed(entry_ids).await,
             #[cfg(feature = "postgres")]
             Self::PostgreSQL(backend) => backend.mark_processed(entry_ids).await,
         }
@@ -261,6 +308,7 @@ impl EpisodicMemory for EpisodicBackend {
         match self {
             Self::InMemory(backend) => backend.delete_before(timestamp).await,
             Self::HNSW(backend) => backend.delete_before(timestamp).await,
+            Self::Sqlite(backend) => backend.delete_before(timestamp).await,
             #[cfg(feature = "postgres")]
             Self::PostgreSQL(backend) => backend.delete_before(timestamp).await,
         }
@@ -270,6 +318,7 @@ impl EpisodicMemory for EpisodicBackend {
         match self {
             Self::InMemory(backend) => backend.list_sessions_with_unprocessed().await,
             Self::HNSW(backend) => backend.list_sessions_with_unprocessed().await,
+            Self::Sqlite(backend) => backend.list_sessions_with_unprocessed().await,
             #[cfg(feature = "postgres")]
             Self::PostgreSQL(backend) => backend.list_sessions_with_unprocessed().await,
         }
@@ -281,6 +330,7 @@ impl std::fmt::Debug for EpisodicBackend {
         match self {
             Self::InMemory(_) => f.debug_tuple("InMemory").finish(),
             Self::HNSW(_) => f.debug_tuple("HNSW").finish(),
+            Self::Sqlite(_) => f.debug_tuple("Sqlite").finish(),
             #[cfg(feature = "postgres")]
             Self::PostgreSQL(_) => f.debug_tuple("PostgreSQL").finish(),
         }

@@ -16,7 +16,7 @@ llmspell-utils = { path = "../llmspell-utils" }
 llmspell-config = { path = "../llmspell-config" }
 llmspell-graph = { path = "../llmspell-graph" }
 llmspell-providers = { path = "../llmspell-providers" }
-llmspell-storage = { path = "../llmspell-storage" }
+llmspell-storage = { path = "../llmspell-storage", features = ["sqlite"] }
 
 # Async runtime
 tokio = { workspace = true }
