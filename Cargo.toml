@@ -143,6 +143,9 @@ refinery = { version = "0.8", features = ["tokio-postgres"] }
 libsql = { version = "0.9", features = ["encryption", "replication"] }
 r2d2 = "0.8"
 r2d2_sqlite = "0.25"
+# Phase 13c.2.2: Vector search extensions
+sqlite-vec = "0.1.6"  # Brute-force vector search baseline (Task 13c.2.2)
+zerocopy = { version = "0.8", features = ["derive"] }  # Zero-copy Vec<f32> marshaling via AsBytes trait
 
 # Scripting engines
 mlua = { version = "0.9", features = [

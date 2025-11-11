@@ -37,9 +37,11 @@
 mod backend;
 mod config;
 mod error;
+mod extensions;
 mod pool;
 
 pub use backend::{HealthStatus, SqliteBackend, TenantContext};
 pub use config::SqliteConfig;
 pub use error::{Result, SqliteError};
+pub use extensions::SqliteVecExtension;
 pub use pool::{PoolStats, SqlitePool};
