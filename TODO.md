@@ -1494,14 +1494,14 @@ All acceptance criteria met, all tests passing (53/53), zero clippy warnings, fu
 - ✅ K-NN search validated (exact match distance < 0.01)
 
 **Next Steps**:
-- **Task 13c.2.2a** (DEFERRED - parallel track): vectorlite-rs pure Rust port for HNSW indexing (40 hours)
+- **Task 13c.2.2a** (parallel track): vectorlite-rs pure Rust port for HNSW indexing (40 hours)
 - **Task 13c.2.3**: SqliteVectorStorage trait implementation (12 hours)
 - Extension will be loaded automatically when SqliteBackend is created
 - Tests will skip vector operations if extension not available
 
 ---
 
-### Task 13c.2.2a: vectorlite-rs Pure Rust Port (HNSW Optimization) ⏹ DEFERRED
+### Task 13c.2.2a: vectorlite-rs Pure Rust Port (HNSW Optimization) 
 **Priority**: HIGH (optimization, not blocking)
 **Estimated Time**: 40 hours (8 days - parallel track with Phase 13c.2.3+)
 **Assignee**: Vector Search Optimization Team
