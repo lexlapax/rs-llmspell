@@ -266,12 +266,16 @@ mod tests {
         let config = SqliteConfig::default();
         assert!(config.validate().is_ok());
 
-        let mut bad_config = SqliteConfig::default();
-        bad_config.max_connections = 0;
+        let bad_config = SqliteConfig {
+            max_connections: 0,
+            ..Default::default()
+        };
         assert!(bad_config.validate().is_err());
 
-        let mut bad_sync = SqliteConfig::default();
-        bad_sync.synchronous = "INVALID".to_string();
+        let bad_sync = SqliteConfig {
+            synchronous: "INVALID".to_string(),
+            ..Default::default()
+        };
         assert!(bad_sync.validate().is_err());
     }
 }

@@ -37,37 +37,43 @@ impl SqliteConnectionManager {
     ///
     /// Applies performance and safety tuning to each new connection.
     async fn init_connection(&self, conn: &Connection) -> Result<()> {
-        // Enable foreign keys
-        conn.execute("PRAGMA foreign_keys = ON", ())
+        // Enable foreign keys - PRAGMA returns rows, use query() and discard result
+        let _ = conn
+            .query("PRAGMA foreign_keys = ON", ())
             .await
             .map_err(|e| SqliteError::Query(format!("Failed to enable foreign keys: {}", e)))?;
 
         // Set journal mode to WAL
-        conn.execute("PRAGMA journal_mode = WAL", ())
+        let _ = conn
+            .query("PRAGMA journal_mode = WAL", ())
             .await
             .map_err(|e| SqliteError::Query(format!("Failed to set WAL mode: {}", e)))?;
 
         // Set synchronous mode
         let sync_pragma = format!("PRAGMA synchronous = {}", self.config.synchronous);
-        conn.execute(&sync_pragma, ())
+        let _ = conn
+            .query(&sync_pragma, ())
             .await
             .map_err(|e| SqliteError::Query(format!("Failed to set synchronous: {}", e)))?;
 
         // Set cache size
         let cache_pragma = format!("PRAGMA cache_size = {}", self.config.cache_size);
-        conn.execute(&cache_pragma, ())
+        let _ = conn
+            .query(&cache_pragma, ())
             .await
             .map_err(|e| SqliteError::Query(format!("Failed to set cache_size: {}", e)))?;
 
         // Set mmap size
         let mmap_pragma = format!("PRAGMA mmap_size = {}", self.config.mmap_size);
-        conn.execute(&mmap_pragma, ())
+        let _ = conn
+            .query(&mmap_pragma, ())
             .await
             .map_err(|e| SqliteError::Query(format!("Failed to set mmap_size: {}", e)))?;
 
         // Set busy timeout
         let timeout_pragma = format!("PRAGMA busy_timeout = {}", self.config.busy_timeout);
-        conn.execute(&timeout_pragma, ())
+        let _ = conn
+            .query(&timeout_pragma, ())
             .await
             .map_err(|e| SqliteError::Query(format!("Failed to set busy_timeout: {}", e)))?;
 
@@ -151,8 +157,9 @@ impl SqlitePool {
     pub async fn health_check(&self) -> Result<bool> {
         let conn = self.get_connection().await?;
 
-        // Simple query to test connectivity
-        conn.execute("SELECT 1", ())
+        // Simple query to test connectivity - SELECT returns rows, use query()
+        let _ = conn
+            .query("SELECT 1", ())
             .await
             .map_err(|e| SqliteError::Query(format!("Health check failed: {}", e)))?;
 
@@ -229,6 +236,6 @@ mod tests {
         let pool = SqlitePool::new(config).await.unwrap();
         let healthy = pool.health_check().await;
         assert!(healthy.is_ok());
-        assert_eq!(healthy.unwrap(), true);
+        assert!(healthy.unwrap());
     }
 }

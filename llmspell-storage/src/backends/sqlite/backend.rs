@@ -353,7 +353,7 @@ mod tests {
 
         let healthy = backend.health_check().await;
         assert!(healthy.is_ok());
-        assert_eq!(healthy.unwrap(), true);
+        assert!(healthy.unwrap());
     }
 
     #[tokio::test]
@@ -366,7 +366,11 @@ mod tests {
 
         let status = status.unwrap();
         assert!(status.is_healthy);
-        assert_eq!(status.journal_mode.to_lowercase(), "wal");
+        // In-memory databases use "memory" journal mode, not "wal"
+        assert!(
+            status.journal_mode.to_lowercase() == "wal"
+                || status.journal_mode.to_lowercase() == "memory"
+        );
     }
 
     #[tokio::test]
