@@ -45,6 +45,8 @@ r2d2_sqlite = { workspace = true, optional = true }
 # Phase 13c.2.2: Vector search extensions
 sqlite-vec = { workspace = true, optional = true }
 zerocopy = { workspace = true, optional = true }
+# Phase 13c.2.2a: vectorlite-rs pure Rust HNSW extension
+vectorlite-rs = { path = "../vectorlite-rs", optional = true }
 
 # Phase 13b.14: sha2 required for migration checksums (not postgres-only)
 sha2 = "0.10"
@@ -52,7 +54,7 @@ sha2 = "0.10"
 [features]
 default = []
 postgres = ["tokio-postgres", "deadpool-postgres", "pgvector", "refinery", "llmspell-graph"]
-sqlite = ["libsql", "r2d2", "r2d2_sqlite", "sqlite-vec", "zerocopy"]
+sqlite = ["libsql", "r2d2", "r2d2_sqlite", "sqlite-vec", "zerocopy", "vectorlite-rs"]
 
 [dev-dependencies]
 tempfile.workspace = true

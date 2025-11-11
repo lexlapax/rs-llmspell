@@ -23,8 +23,10 @@ hnsw_rs = "0.3.2"
 rusqlite = { version = "0.32", features = ["vtab", "bundled"] }
 
 # Serialization for metadata and configuration
-serde = { workspace = true }
+serde = { workspace = true, features = ["derive"] }
 serde_json = { workspace = true }
+# MessagePack for HNSW index persistence
+rmp-serde = "1.1"
 
 # Error handling
 anyhow = { workspace = true }

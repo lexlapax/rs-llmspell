@@ -1813,31 +1813,81 @@ This hybrid approach separates:
    - Performance comparison: vectorlite-rs vs sqlite-vec vs vectorlite C++ vs hnsw_rs file-based
    - Tuning guide: HNSW parameters (M, ef_construction, ef_search), memory/speed trade-offs
 
-**Definition of Done**:
-- [ ] vectorlite-rs builds as SQLite loadable extension (.so/.dylib/.dll)
-- [ ] Virtual Table API implemented (xCreate, xBestIndex, xFilter, xColumn, xRowid, etc.)
-- [ ] hnsw_rs integration complete (insert, K-NN search, serialization)
-- [ ] Extension loader in SqliteBackend with fallback to sqlite-vec
-- [ ] Benchmarks show 3-100x speedup vs sqlite-vec for K-NN search
-- [ ] 50+ unit tests passing
-- [ ] Integration tests show drop-in replacement for sqlite-vec
-- [ ] Documentation complete (architecture, build, performance, tuning)
-- [ ] Zero clippy warnings, compiles with --all-features
-- [ ] Feature flag: "vectorlite-rs" (optional, sqlite-vec is default)
+**Definition of Done** (MVP Scope - Core Infrastructure):
+- [x] vectorlite-rs builds as SQLite loadable extension (.so/.dylib/.dll) ✅ (3.9MB macOS, single cargo build command)
+- [x] Virtual Table API implemented (VTab::connect, VTab::best_index, VTab::open, VTabCursor::filter, VTabCursor::next, VTabCursor::eof, VTabCursor::column, VTabCursor::rowid) ✅
+- [x] hnsw_rs integration complete (HnswIndex wrapper with Arc<RwLock<>>, insert/search API, metric-specific type handling via HnswIndexType enum) ✅
+- [x] Distance metrics: L2, Cosine, Inner Product with FromStr trait ✅
+- [x] HNSW parameters configurable: dimension (384/768/1536/3072), metric, M, ef_construction, max_elements ✅
+- [x] Extension loader in SqliteBackend with fallback to sqlite-vec ✅ (priority: vectorlite-rs → sqlite-vec, secure enable/disable pattern)
+- [x] Unit tests passing: 16 tests (distance metrics, HNSW ops, vtab parsing, dimension validation) ✅
+- [x] Zero clippy warnings, compiles with --all-features ✅ (implements FromStr, derives Default)
+- [x] Inline rustdoc with examples for all public APIs ✅
+- [ ] ~Benchmarks show 3-100x speedup vs sqlite-vec for K-NN search~ **DEFERRED** to Task 13c.2.3 (no baseline, needs SqliteVectorStorage integration)
+- [ ] ~50+ unit tests passing~ **DEFERRED** to Task 13c.2.3 (MVP has 16 tests, full suite requires CRUD operations)
+- [ ] ~Integration tests show drop-in replacement for sqlite-vec~ **DEFERRED** to Task 13c.2.3 (needs SqliteVectorStorage)
+- [ ] ~HNSW index persistence (serialization to .hnsw files)~ **DEFERRED** to Task 13c.2.3 (persistence strategy)
+- [ ] ~Documentation complete (architecture doc, build guide, performance comparison, tuning guide)~ **DEFERRED** to Task 13c.2.3 (MVP has inline docs only)
+- [ ] ~Feature flag: "vectorlite-rs" (optional, sqlite-vec is default)~ **NOT IMPLEMENTED** (vectorlite-rs is now default per user directive, no feature flag needed)
 
-**Files Created**:
-- ✅ `vectorlite-rs/Cargo.toml` (42 lines): Workspace crate with cdylib+rlib, hnsw_rs + rusqlite dependencies
-- ✅ `vectorlite-rs/src/lib.rs` (276 lines): SQLite extension entry point, VTab + VTabCursor implementations
-- ✅ `vectorlite-rs/src/vtab.rs` (236 lines): Parameter parsing (dimension, metric, m, ef_construction, max_elements), best_index optimization
-- ✅ `vectorlite-rs/src/hnsw.rs` (380 lines): Thread-safe HnswIndex wrapper with Arc<RwLock<>>, metric-specific HnswIndexType enum
-- ✅ `vectorlite-rs/src/distance.rs` (158 lines): DistanceMetric enum with FromStr trait, distance functions (L2, cosine, inner product)
-- ✅ `vectorlite-rs/src/error.rs` (48 lines): SqliteError types with thiserror, From<rusqlite::Error> conversions
-- ✅ `llmspell-storage/src/backends/sqlite/backend.rs` (updated): Dual extension loading (vectorlite-rs priority, sqlite-vec fallback)
-- ✅ `Cargo.toml` (updated): Added vectorlite-rs to workspace members
-- ✅ `extensions/vectorlite.dylib` (3.9MB, not in git): Compiled loadable extension (macOS)
-- [ ] ~`vectorlite-rs/tests/integration_tests.rs`~ **DEFERRED** to Task 13c.2.3 (needs SqliteVectorStorage)
-- [ ] ~`vectorlite-rs/benches/performance.rs`~ **DEFERRED** (no baseline yet)
-- [ ] ~`docs/technical/vectorlite-rs-architecture.md`~ **DEFERRED** (inline rustdoc sufficient for MVP)
+**Files Created/Modified**:
+
+**Core Implementation** (1,098 lines new code across 5 modules):
+- ✅ `vectorlite-rs/Cargo.toml` (42 lines, NEW): Workspace crate with cdylib+rlib, hnsw_rs 0.3.2 + rusqlite 0.32 dependencies
+- ✅ `vectorlite-rs/src/lib.rs` (276 lines, NEW):
+  - SQLite extension entry point (`sqlite3_vectorliters_init` for Unix, `sqlite3_vectorliters_init_win32` for Windows)
+  - VectorLiteTab struct (#[repr(C)] with sqlite3_vtab base, HnswIndex, dimension, metric)
+  - VTab<'vtab> trait impl (connect, best_index, open)
+  - VectorLiteCursor<'vtab> struct with PhantomData<&'vtab VectorLiteTab> lifetime management
+  - VTabCursor trait impl (filter, next, eof, column, rowid)
+  - 2 unit tests (distance metrics, supported dimensions)
+- ✅ `vectorlite-rs/src/hnsw.rs` (380 lines, NEW):
+  - HnswIndexType enum (Cosine/L2/InnerProduct variants wrapping Hnsw<'static, f32, Dist*>)
+  - HnswIndex struct with Arc<RwLock<Option<HnswIndexType>>> thread-safe pattern
+  - new(), initialize(), insert(), search() methods
+  - 8 unit tests (initialization, insert/search, thread safety, dimension validation, metric support, empty search, large dataset, error cases)
+- ✅ `vectorlite-rs/src/distance.rs` (158 lines, NEW):
+  - DistanceMetric enum (L2, Cosine, InnerProduct) with #[default] on Cosine
+  - FromStr trait impl for metric parsing ("l2"|"euclidean"|"cosine"|"ip"|"inner_product"|"dot")
+  - distance_l2(), distance_cosine(), distance_inner_product() functions
+  - 4 unit tests (L2 distance, cosine distance, inner product, metric parsing, default metric)
+- ✅ `vectorlite-rs/src/vtab.rs` (236 lines, NEW):
+  - parse_dimension() - validates 384/768/1536/3072
+  - parse_metric() - defaults to Cosine if not specified
+  - parse_max_elements(), parse_ef_construction(), parse_m() - optional HNSW parameters
+  - best_index() - query optimization (MATCH = HNSW search cost 1000, full scan cost 1M)
+  - 4 unit tests (dimension parsing, metric parsing, parameters, defaults)
+- ✅ `vectorlite-rs/src/error.rs` (48 lines, NEW):
+  - Error enum with thiserror (Sqlite, Hnsw, InvalidDimension, InvalidMetric, InvalidParameter, VectorNotFound, IndexNotInitialized, Other)
+  - From<Error> for rusqlite::Error conversion
+
+**Integration** (backend modified):
+- ✅ `llmspell-storage/src/backends/sqlite/backend.rs` (~50 lines updated):
+  - SqliteBackend::new() dual extension loading
+  - Priority: vectorlite-rs (HNSW) → sqlite-vec (brute-force) fallback
+  - Platform-specific paths (.dylib macOS, .so Linux, .dll Windows)
+  - Logging hierarchy (info/debug/warn) with build instructions in fallback message
+  - Security pattern: load_extension_enable() → load_extension() → load_extension_disable()
+
+**Build System**:
+- ✅ `Cargo.toml` (1 line updated): Added vectorlite-rs to workspace members
+- ✅ `extensions/vectorlite.dylib` (3.9MB, NOT in git): Compiled loadable extension for macOS
+  - Build: `cargo build -p vectorlite-rs --release && cp target/release/libvectorlite_rs.dylib extensions/vectorlite.dylib`
+  - Platform variants: vectorlite.so (Linux), vectorlite.dll (Windows)
+
+**Testing**:
+- ✅ 16 unit tests passing (0.00s runtime, 0 warnings):
+  - distance.rs: 5 tests (test_l2_distance, test_cosine_distance, test_inner_product_distance, test_metric_parsing, test_default_metric)
+  - hnsw.rs: 5 tests (initialization, insert/search, thread safety, dimension validation, error cases)
+  - vtab.rs: 4 tests (test_parse_dimension, test_parse_metric, test_parse_parameters, test_parse_parameters_defaults)
+  - lib.rs: 2 tests (test_distance_metrics, test_supported_dimensions)
+
+**Deferred to Task 13c.2.3**:
+- [ ] ~`vectorlite-rs/tests/integration_tests.rs`~ (needs SqliteVectorStorage + MemoryManager)
+- [ ] ~`vectorlite-rs/benches/performance.rs`~ (needs baseline, SqliteVectorStorage comparison)
+- [ ] ~`docs/technical/vectorlite-rs-architecture.md`~ (needs full persistence strategy, performance data)
+- [ ] ~`llmspell-storage/src/backends/sqlite/vector.rs`~ (SqliteVectorStorage implementation)
+- [ ] ~HNSW persistence serialization code~ (load/persist methods in SqliteVectorStorage)
 
 **Git Commits**:
 - `07d342f6`: 13c.2.2a - Core implementation (1,380 lines, 5 modules, 16 tests)
@@ -1845,31 +1895,50 @@ This hybrid approach separates:
 
 ---
 
-### Task 13c.2.3: SqliteVectorStorage Implementation ⏹ PENDING
+### Task 13c.2.3: SqliteVectorStorage Implementation 🔄 IN PROGRESS
 **Priority**: CRITICAL
-**Estimated Time**: 12 hours (Days 4-5)
+**Estimated Time**: 16 hours (Days 4-6) - Updated from 12h to include deferred items from 13c.2.2a
 **Assignee**: Memory Team
-**Status**: ⏹ PENDING
-**Dependencies**: Task 13c.2.2 ✅
+**Status**: 🔄 IN PROGRESS
+**Started**: 2025-11-10
+**Dependencies**: Task 13c.2.2 ✅, Task 13c.2.2a ✅
 
-**Description**: Implement VectorStorage trait for libsql backend with vectorlite HNSW indexing, replacing hnsw_rs file-based episodic memory.
+**Description**: Implement VectorStorage trait for libsql backend using hybrid architecture: regular SQLite tables for persistence + vectorlite-rs virtual table for HNSW K-NN search. Includes deferred items from Task 13c.2.2a (HNSW persistence, benchmarks, documentation).
+
+**Deferred Items from Task 13c.2.2a** (MUST complete in this task):
+1. **HNSW Index Persistence**: ~~Build index on startup from `vector_embeddings` table, serialize to disk via hnsw_rs serde, reload on restart~~ **REVISED**: Add Serialize/Deserialize to vectorlite-rs::HnswIndex for .hnsw file persistence (requires updating vectorlite-rs/src/hnsw.rs)
+2. **Integration Tests**: End-to-end tests with vectorlite-rs virtual table + regular table JOIN pattern
+3. **Benchmarks**: Validate <1ms insert, <10ms search for 10K vectors, 3-100x speedup vs sqlite-vec brute-force
+4. **Documentation**: Architecture doc explaining hybrid persistence strategy, build process, performance tuning
 
 **Acceptance Criteria**:
+- [x] SqliteVectorStorage struct created with HNSW index fields ✅
+- [x] vectorlite-rs added to llmspell-storage dependencies ✅
+- [ ] **vectorlite-rs serde support**: Add Serialize/Deserialize to HnswIndex
 - [ ] SqliteVectorStorage implements VectorStorage trait
-- [ ] All trait methods implemented (add, search, get, delete, update, count)
-- [ ] Tenant isolation enforced (filter by tenant_id in all queries)
+- [ ] All trait methods implemented (insert, search, search_scoped, update_metadata, delete, delete_scope, stats, stats_for_scope)
+- [ ] **Hybrid Architecture**: vec_embeddings_* tables (disk persistence) + in-memory HNSW indices (search)
+- [ ] **HNSW Persistence Strategy**: Index serialized to `.hnsw` files (MessagePack), reloaded on restart
+- [ ] Tenant isolation enforced (filter by scope in all queries)
 - [ ] Scope-based filtering (session:xxx, user:xxx, global)
 - [ ] Metadata JSON search via json_extract()
-- [ ] Unit tests passing (50+ tests from hnsw_rs backend ported)
+- [ ] **Integration tests with vectorlite-rs**: HNSW index + vec_embeddings_* table queries
+- [ ] Unit tests passing (50+ tests covering insert, search, delete, stats)
 - [ ] Integration tests with MemoryManager passing
+- [ ] **Benchmarks**: <1ms insert, <10ms search 10K vectors, 3-100x faster than sqlite-vec
+- [ ] **Documentation**: `docs/technical/sqlite-vector-storage-architecture.md` created
 
 **Implementation Steps**:
-1. Create SqliteVectorStorage struct (llmspell-storage/src/backends/sqlite/vector.rs):
+
+1. **Create SqliteVectorStorage struct** (llmspell-storage/src/backends/sqlite/vector.rs):
    ```rust
    pub struct SqliteVectorStorage {
        backend: Arc<SqliteBackend>,
-       extension: VectorExtension, // Vectorlite or SqliteVec
-       config: VectorConfig,
+       dimension: usize,
+       metric: DistanceMetric,
+       // In-memory HNSW index (built from vector_embeddings table)
+       hnsw_index: Arc<RwLock<Option<HnswIndex>>>,
+       persistence_path: PathBuf, // Where to save/load .hnsw files
    }
 
    #[async_trait]
@@ -1883,13 +1952,92 @@ This hybrid approach separates:
    }
    ```
 
-2. Implement add() method:
+2. **Implement HNSW index initialization** (build from existing vectors):
+   ```rust
+   impl SqliteVectorStorage {
+       pub async fn new(backend: Arc<SqliteBackend>, config: VectorConfig) -> Result<Self> {
+           let persistence_path = config.persistence_path
+               .unwrap_or_else(|| PathBuf::from("./data/hnsw_indices"));
+
+           let mut storage = Self {
+               backend,
+               dimension: config.dimension,
+               metric: config.metric,
+               hnsw_index: Arc::new(RwLock::new(None)),
+               persistence_path,
+           };
+
+           // Try to load persisted index, otherwise build from scratch
+           if !storage.load_index_from_disk().await? {
+               storage.build_index_from_table().await?;
+           }
+
+           Ok(storage)
+       }
+
+       async fn build_index_from_table(&self) -> Result<()> {
+           // Read all vectors from vector_embeddings table
+           let conn = self.backend.get_connection().await?;
+           let mut rows = conn.query(
+               "SELECT rowid, embedding FROM vector_embeddings WHERE dimension = ?",
+               params![self.dimension]
+           ).await?;
+
+           // Build HNSW index
+           let index = HnswIndex::new(self.dimension, 100_000, 16, 200, self.metric)?;
+           while let Some(row) = rows.next().await? {
+               let rowid: i64 = row.get(0)?;
+               let embedding: Vec<u8> = row.get(1)?;
+               let vector: Vec<f32> = serde_json::from_slice(&embedding)?;
+               index.insert(rowid, vector)?;
+           }
+
+           *self.hnsw_index.write().unwrap() = Some(index);
+           Ok(())
+       }
+
+       async fn load_index_from_disk(&self) -> Result<bool> {
+           let index_path = self.persistence_path.join(format!("hnsw_{}.bin", self.dimension));
+           if !index_path.exists() {
+               return Ok(false);
+           }
+
+           // Deserialize HNSW index via hnsw_rs serde support
+           let data = std::fs::read(&index_path)?;
+           let index: HnswIndex = rmp_serde::from_slice(&data)?;
+           *self.hnsw_index.write().unwrap() = Some(index);
+
+           tracing::info!("Loaded HNSW index from {}", index_path.display());
+           Ok(true)
+       }
+
+       async fn persist_index_to_disk(&self) -> Result<()> {
+           let index = self.hnsw_index.read().unwrap();
+           if let Some(ref idx) = *index {
+               let index_path = self.persistence_path.join(format!("hnsw_{}.bin", self.dimension));
+               std::fs::create_dir_all(&self.persistence_path)?;
+
+               // Serialize HNSW index via hnsw_rs serde support
+               let data = rmp_serde::to_vec(idx)?;
+               std::fs::write(&index_path, data)?;
+
+               tracing::info!("Persisted HNSW index to {}", index_path.display());
+           }
+           Ok(())
+       }
+   }
+   ```
+
+3. **Implement add() method** (insert into regular table + HNSW index):
    ```rust
    async fn add(&self, entry: VectorEntry) -> Result<()> {
        let conn = self.backend.get_connection().await?;
-       conn.execute(
+
+       // Insert into regular table (disk persistence)
+       let rowid = conn.execute(
            "INSERT INTO vector_embeddings (id, tenant_id, scope, dimension, embedding, metadata, created_at, updated_at)
-            VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8)",
+            VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8)
+            RETURNING rowid",
            params![
                entry.id.to_string(),
                entry.tenant_id,
@@ -1901,60 +2049,91 @@ This hybrid approach separates:
                Utc::now().timestamp(),
            ]
        ).await?;
+
+       // Insert into in-memory HNSW index
+       if let Some(ref index) = *self.hnsw_index.read().unwrap() {
+           index.insert(rowid, entry.embedding)?;
+       }
+
        Ok(())
    }
    ```
 
-3. Implement search() method (K-NN via vectorlite):
+4. **Implement search() method** (K-NN via HNSW index + JOIN with regular table):
    ```rust
    async fn search(&self, query: VectorQuery) -> Result<Vec<VectorResult>> {
+       // K-NN search via in-memory HNSW index
+       let neighbor_ids = if let Some(ref index) = *self.hnsw_index.read().unwrap() {
+           let results = index.search(&query.embedding, query.k, 100)?; // ef_search=100
+           results.into_iter().map(|(rowid, _distance)| rowid).collect::<Vec<_>>()
+       } else {
+           return Err(Error::HnswIndexNotInitialized);
+       };
+
+       // Fetch full entries from regular table (with tenant isolation)
        let conn = self.backend.get_connection().await?;
+       let placeholders = neighbor_ids.iter().map(|_| "?").collect::<Vec<_>>().join(",");
+       let query_sql = format!(
+           "SELECT id, embedding, metadata FROM vector_embeddings
+            WHERE rowid IN ({}) AND tenant_id = ? AND scope = ?
+            ORDER BY rowid", // Preserve K-NN order
+           placeholders
+       );
 
-       // vectorlite K-NN syntax
-       let results = conn.query(
-           "SELECT id, embedding, metadata,
-                   vectorlite_distance(embedding, ?1, 'cosine') AS distance
-            FROM vector_embeddings
-            WHERE tenant_id = ?2 AND scope = ?3
-            ORDER BY distance ASC
-            LIMIT ?4",
-           params![
-               serde_json::to_vec(&query.embedding)?,
-               query.tenant_id,
-               query.scope,
-               query.k,
-           ]
-       ).await?;
+       let mut params: Vec<Box<dyn rusqlite::ToSql>> = neighbor_ids
+           .into_iter()
+           .map(|id| Box::new(id) as Box<dyn rusqlite::ToSql>)
+           .collect();
+       params.push(Box::new(query.tenant_id));
+       params.push(Box::new(query.scope));
 
-       // Parse results
+       let results = conn.query(&query_sql, params).await?;
+       // Parse results into Vec<VectorResult>
        Ok(/* ... */)
    }
    ```
 
-4. Implement get(), delete(), update(), count() methods (standard SQL CRUD)
+5. **Implement get(), delete(), update(), count() methods** (standard SQL CRUD + HNSW index updates)
 
-5. Port unit tests from hnsw_rs backend:
+6. **Port unit tests from hnsw_rs backend**:
    ```bash
    # Copy test structure from llmspell-storage/src/backends/hnsw/vector_tests.rs
    cp llmspell-storage/src/backends/hnsw/vector_tests.rs \
       llmspell-storage/src/backends/sqlite/vector_tests.rs
 
-   # Update tests to use SqliteVectorStorage
-   cargo test -p llmspell-storage --test sqlite_vector -- --nocapture
+   # Update tests to use SqliteVectorStorage with hybrid architecture
+   cargo test -p llmspell-storage --features sqlite --test sqlite_vector -- --nocapture
    ```
 
-6. Integration test with MemoryManager:
+7. **Integration tests with MemoryManager**:
    ```rust
    // Test episodic memory add + search via MemoryManager API
-   cargo test -p llmspell-memory --test episodic_sqlite_backend
+   // Validates end-to-end: MemoryManager → SqliteVectorStorage → HNSW index → regular table
+   cargo test -p llmspell-memory --features sqlite --test episodic_sqlite_backend
    ```
 
-7. **Create SQLite migration V3** (migrations/sqlite/V3__vector_embeddings.sql):
-   - Match PostgreSQL V3 structure with SQLite types
-   - 4 dimension tables (384, 768, 1536, 3072)
-   - UUID as TEXT, TIMESTAMPTZ as INTEGER, JSONB as TEXT
-   - vectorlite_create_index() calls for HNSW indexes
-   - Tenant isolation via application-level filtering (no RLS)
+8. **Benchmark performance** (deferred from Task 13c.2.2a):
+   ```bash
+   # Benchmark insert performance (<1ms target)
+   cargo bench -p llmspell-storage --features sqlite --bench vector_insert
+
+   # Benchmark search performance (<10ms for 10K vectors target)
+   cargo bench -p llmspell-storage --features sqlite --bench vector_search
+
+   # Compare vectorlite-rs (HNSW) vs sqlite-vec (brute-force)
+   # Target: 3-100x speedup depending on dataset size
+   ```
+
+9. **Create documentation** (deferred from Task 13c.2.2a):
+   - `docs/technical/sqlite-vector-storage-architecture.md`: Hybrid architecture explanation (regular table + HNSW index)
+   - HNSW persistence strategy (build on startup, serialize to disk, reload)
+   - Performance tuning guide (M, ef_construction, ef_search parameters)
+   - Comparison table: vectorlite-rs vs sqlite-vec vs file-based hnsw_rs
+
+10. **Verify Migration V3** (already exists from Task 13c.2.2):
+    - ✅ Migration V3 already created (4 vec0 virtual tables + vector_metadata)
+    - No changes needed - Task 13c.2.2 migration is sufficient
+    - SqliteVectorStorage uses existing vector_metadata table for persistence
 
 **Definition of Done**:
 - [ ] VectorStorage trait fully implemented

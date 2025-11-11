@@ -7,6 +7,7 @@ use hnsw_rs::{
     prelude::{DistCosine, DistDot, DistL2},
 };
 use rusqlite::Result as SqliteResult;
+use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::sync::{Arc, RwLock};
 
@@ -37,10 +38,37 @@ impl HnswIndexType {
     }
 }
 
+/// Serializable persistence data for HNSW index
+///
+/// Contains all data needed to rebuild the index from scratch.
+/// Does not serialize the HNSW graph itself (hnsw_rs doesn't support serde),
+/// instead stores raw vectors and rebuilds the graph on load.
+#[derive(Serialize, Deserialize)]
+struct HnswPersistence {
+    /// Vector dimension
+    dimension: usize,
+    /// Distance metric
+    metric: DistanceMetric,
+    /// Maximum number of elements
+    max_elements: usize,
+    /// HNSW parameters
+    m: usize,
+    ef_construction: usize,
+    /// All vectors (rowid -> vector)
+    vectors: HashMap<i64, Vec<f32>>,
+}
+
 /// HNSW index for approximate nearest neighbor search
 ///
 /// This wrapper provides thread-safe access to hnsw_rs indices with
 /// support for incremental inserts and K-NN queries.
+///
+/// # Persistence
+///
+/// The index can be serialized to MessagePack format for persistence.
+/// Since hnsw_rs doesn't support serde, we store the raw vectors and
+/// rebuild the HNSW graph on deserialization.
+#[derive(Clone)]
 pub struct HnswIndex {
     /// Vector dimension
     dimension: usize,
@@ -303,6 +331,62 @@ impl HnswIndex {
     pub fn is_empty(&self) -> bool {
         self.len() == 0
     }
+
+    /// Serialize index to MessagePack bytes
+    ///
+    /// Serializes the raw vectors and metadata. The HNSW graph is not
+    /// serialized (hnsw_rs doesn't support it) and will be rebuilt on
+    /// deserialization.
+    ///
+    /// # Errors
+    ///
+    /// Returns error if serialization fails
+    pub fn to_msgpack(&self) -> Result<Vec<u8>> {
+        let vectors = self
+            .vectors
+            .read()
+            .map_err(|e| Error::Hnsw(format!("Failed to acquire read lock: {e}")))?;
+
+        let persistence = HnswPersistence {
+            dimension: self.dimension,
+            metric: self.metric,
+            max_elements: self.max_elements,
+            m: self.m,
+            ef_construction: self.ef_construction,
+            vectors: vectors.clone(),
+        };
+
+        rmp_serde::to_vec(&persistence)
+            .map_err(|e| Error::Hnsw(format!("Failed to serialize index: {e}")))
+    }
+
+    /// Deserialize index from MessagePack bytes
+    ///
+    /// Deserializes the raw vectors and rebuilds the HNSW graph from scratch.
+    ///
+    /// # Errors
+    ///
+    /// Returns error if deserialization or index building fails
+    pub fn from_msgpack(data: &[u8]) -> Result<Self> {
+        let persistence: HnswPersistence = rmp_serde::from_slice(data)
+            .map_err(|e| Error::Hnsw(format!("Failed to deserialize index: {e}")))?;
+
+        // Create new index with deserialized parameters
+        let index = Self::new(
+            persistence.dimension,
+            persistence.max_elements,
+            persistence.m,
+            persistence.ef_construction,
+            persistence.metric,
+        )?;
+
+        // Insert all vectors to rebuild HNSW graph
+        for (rowid, vector) in persistence.vectors {
+            index.insert(rowid, vector)?;
+        }
+
+        Ok(index)
+    }
 }
 
 #[cfg(test)]
@@ -358,6 +442,36 @@ mod tests {
         let wrong_dim = vec![1.0; 768];
         let result = index.insert(1, wrong_dim);
         assert!(result.is_err());
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_hnsw_serialization() -> Result<()> {
+        let index = HnswIndex::new(768, 1000, 16, 200, DistanceMetric::Cosine)?;
+
+        // Insert test vectors
+        let v1 = vec![1.0; 768];
+        let v2 = vec![2.0; 768];
+        let v3 = vec![3.0; 768];
+
+        index.insert(1, v1)?;
+        index.insert(2, v2)?;
+        index.insert(3, v3)?;
+
+        // Serialize
+        let serialized = index.to_msgpack()?;
+        assert!(!serialized.is_empty());
+
+        // Deserialize
+        let loaded = HnswIndex::from_msgpack(&serialized)?;
+        assert_eq!(loaded.len(), 3);
+        assert_eq!(loaded.dimension, 768);
+
+        // Verify search works
+        let query = vec![1.5; 768];
+        let results = loaded.search(&query, 2, 100)?;
+        assert_eq!(results.len(), 2);
 
         Ok(())
     }

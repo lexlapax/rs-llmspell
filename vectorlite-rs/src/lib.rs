@@ -143,8 +143,8 @@ unsafe impl<'vtab> VTab<'vtab> for VectorLiteTab {
         let dimension = vtab::parse_dimension(args)?;
         let metric = vtab::parse_metric(args)?;
 
-        let schema =
-            "CREATE TABLE x(rowid INTEGER PRIMARY KEY, embedding BLOB, distance HIDDEN)".to_string();
+        let schema = "CREATE TABLE x(rowid INTEGER PRIMARY KEY, embedding BLOB, distance HIDDEN)"
+            .to_string();
 
         let mut vtab = Self::new(dimension, metric);
 

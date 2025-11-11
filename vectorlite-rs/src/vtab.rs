@@ -222,12 +222,7 @@ mod tests {
 
     #[test]
     fn test_parse_parameters_defaults() {
-        let args: &[&[u8]] = &[
-            b"vectorlite",
-            b"main",
-            b"test_table",
-            b"dimension=768",
-        ];
+        let args: &[&[u8]] = &[b"vectorlite", b"main", b"test_table", b"dimension=768"];
 
         assert_eq!(parse_max_elements(args), None);
         assert_eq!(parse_ef_construction(args), None);
