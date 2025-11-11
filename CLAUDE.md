@@ -27,6 +27,7 @@ Experimental platform for rapid AI concept exploration via Lua/JavaScript script
   - ✅ 13c.2.0: Storage Trait Architecture (3 new traits in llmspell-core, 1,685 lines, zero circular deps)
   - ✅ 13c.2.1: libsql Backend Foundation (migration reorg, SqliteBackend, connection pool, tenant context, 1,093 lines)
   - ✅ 13c.2.2: sqlite-vec Extension Integration (loadable extension, Migration V3, 4 dimensions, 8/8 tests, 8 hours)
+  - ✅ 13c.2.2a: vectorlite-rs Pure Rust Port (HNSW Default) - 1,098 lines, 16 tests, 6 hours (Core infrastructure + SqliteBackend integration complete, MVP)
   - ⏳ 13c.2.3: SqliteVectorStorage Implementation (NEXT)
 
 ## Project-Specific Behavior Controls
@@ -87,11 +88,13 @@ Experimental platform for rapid AI concept exploration via Lua/JavaScript script
 - `llmspell-graph`: Temporal knowledge graph (Phase 13)
 - `llmspell-context`: Context engineering pipeline (Phase 13)
 - `llmspell-bridge`: Script language integration
+- `llmspell-storage`: State management and persistence (Phase 13c)
 - `llmspell-utils`: Shared utilities (use for ALL shared code)
 - `llmspell-state-persistence`: State with persistence
 - `llmspell-hooks`: Hook system with replay
 - `llmspell-events`: Event system with correlation
 - `llmspell-sessions`: Session management with artifacts
+- `vectorlite-rs`: Pure Rust HNSW vector search SQLite extension (Phase 13c.2.2a)
 
 ## Development Workflow
 1. Read relevant phase doc + TODO.md
