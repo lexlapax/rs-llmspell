@@ -2419,27 +2419,21 @@ This hybrid approach separates:
    - CHECK constraints for time range validity
 
 **Definition of Done**:
-- [x] GraphBackend trait fully implemented ✅
-- [x] Bi-temporal queries via Unix timestamps ✅
-- [x] SQLite migration V4 created and tested ✅
-- [x] 7 unit tests passing (ported from SurrealDB) ✅
-- [x] Zero clippy warnings ✅
-- [ ] Recursive CTE traversal (deferred)
-- [ ] Performance benchmarks (deferred)
+- [ ] GraphStorage trait fully implemented
+- [ ] Recursive CTE traversal working (1-4 hops)
+- [ ] Bi-temporal queries via Unix timestamps
+- [ ] SQLite migration V4 created and tested
+- [ ] 30+ unit tests passing (ported from SurrealDB)
+- [ ] Benchmark: <50ms for 4-hop/100K nodes
+- [ ] Zero clippy warnings
 
-**Actual Results** (2025-11-11):
-✅ **COMPLETED** in 3 hours (62.5% under estimate)
+**Files to Create/Modify**:
+- `llmspell-storage/migrations/sqlite/V4__temporal_graph.sql` (NEW - equivalent to postgres V4)
+- `llmspell-storage/src/backends/sqlite/graph.rs` (NEW)
+- `llmspell-storage/src/backends/sqlite/graph_tests.rs` (NEW)
+- `llmspell-storage/src/backends/sqlite/schema.sql` (UPDATE - add graph tables)
+- `llmspell-storage/benches/sqlite_graph_performance.rs` (NEW)
 
-**Files Created** (2 files, 928 lines):
-- `llmspell-storage/migrations/sqlite/V4__temporal_graph.sql` (154 lines)
-- `llmspell-storage/src/backends/sqlite/graph.rs` (928 lines: 620 impl + 154 tests + 154 docs)
-
-**Files Modified** (2 files):
-- `llmspell-storage/src/backends/sqlite/mod.rs` (+2 lines)
-- `llmspell-storage/Cargo.toml` (+1 line)
-
-**Implementation**: 8 GraphBackend methods, bi-temporal schema, tenant isolation, 7/7 tests passing, zero warnings
-**Deferred**: Recursive CTE traversal, performance benchmarks
 ---
 
 ### Task 13c.2.5: SqliteProceduralStorage Implementation (V5) ⏹ PENDING

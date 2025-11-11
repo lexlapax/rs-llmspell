@@ -54,7 +54,7 @@ sha2 = "0.10"
 [features]
 default = []
 postgres = ["tokio-postgres", "deadpool-postgres", "pgvector", "refinery", "llmspell-graph"]
-sqlite = ["libsql", "r2d2", "r2d2_sqlite", "sqlite-vec", "zerocopy", "vectorlite-rs"]
+sqlite = ["libsql", "r2d2", "r2d2_sqlite", "sqlite-vec", "zerocopy", "vectorlite-rs", "llmspell-graph"]
 
 [dev-dependencies]
 tempfile.workspace = true
