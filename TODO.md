@@ -1493,29 +1493,62 @@ All acceptance criteria met, all tests passing (53/53), zero clippy warnings, fu
 - ✅ All 4 dimensions tested (384, 768, 1536, 3072)
 - ✅ K-NN search validated (exact match distance < 0.01)
 
+**Build Instructions** (to enable vector search):
+
+The vec0 extension must be compiled locally per platform and placed in `./extensions/`:
+
+```bash
+# Clone sqlite-vec repository
+cd /tmp
+git clone https://github.com/asg017/sqlite-vec
+cd sqlite-vec
+
+# Download SQLite amalgamation (required headers)
+./scripts/vendor.sh
+
+# Compile loadable extension
+make loadable
+# Output: dist/vec0.dylib (macOS), dist/vec0.so (Linux), dist/vec0.dll (Windows)
+
+# Copy to project extensions directory
+cp dist/vec0.* /path/to/rs-llmspell/extensions/
+
+# Verify extension loads
+cargo test -p llmspell-storage --features sqlite --lib \
+    backends::sqlite::backend::tests::test_vector_operations_integration
+```
+
+**Platform-Specific Notes**:
+- **macOS**: Produces vec0.dylib (~158K), requires Xcode command-line tools
+- **Linux**: Produces vec0.so, requires gcc
+- **Windows**: Produces vec0.dll, requires MSVC or MinGW
+- **Extension Loading**: Automatic in SqliteBackend::new(), fails gracefully if missing
+- **Security**: Extension loading enabled/disabled per-transaction to prevent SQL injection
+
 **Next Steps**:
-- **Task 13c.2.2a** (parallel track): vectorlite-rs pure Rust port for HNSW indexing (40 hours)
-- **Task 13c.2.3**: SqliteVectorStorage trait implementation (12 hours)
-- Extension will be loaded automatically when SqliteBackend is created
-- Tests will skip vector operations if extension not available
+- **Task 13c.2.2a** (NEXT - DEFAULT implementation): vectorlite-rs pure Rust port for HNSW indexing (40 hours)
+- **Task 13c.2.3** (after 13c.2.2a): SqliteVectorStorage trait implementation (12 hours)
+- If vectorlite-rs succeeds, it becomes default; sqlite-vec becomes fallback
 
 ---
 
-### Task 13c.2.2a: vectorlite-rs Pure Rust Port (HNSW Optimization) 
-**Priority**: HIGH (optimization, not blocking)
-**Estimated Time**: 40 hours (8 days - parallel track with Phase 13c.2.3+)
-**Assignee**: Vector Search Optimization Team
-**Status**: ⏹ DEFERRED (can start after 13c.2.2 ✅, runs parallel to 13c.2.3+)
+### Task 13c.2.2a: vectorlite-rs Pure Rust Port (HNSW Default) 🚧 IN PROGRESS
+**Priority**: CRITICAL (will become DEFAULT vector search implementation)
+**Estimated Time**: 40 hours (8 days - full focus, blocks Task 13c.2.3)
+**Assignee**: Vector Search Team
+**Status**: 🚧 IN PROGRESS (started 2025-11-10)
 **Dependencies**: Task 13c.2.2 ✅
 
-**Description**: Build pure Rust SQLite extension (vectorlite-rs) using hnsw_rs crate for HNSW-indexed vector search. Provides 3-100x speedup vs sqlite-vec brute-force while maintaining pure Rust codebase. This task can proceed in parallel with Phase 13c.2 completion - does not block main timeline.
+**Description**: Build pure Rust SQLite extension (vectorlite-rs) using hnsw_rs crate for HNSW-indexed vector search. Will REPLACE sqlite-vec as default implementation due to superior architecture: pure Rust (no C binaries), HNSW indexing (3-100x faster), memory safety guarantees. sqlite-vec becomes fallback only.
 
-**Strategic Rationale**:
-- **Pure Rust**: Eliminates external C++ binary dependency (vectorlite), maintains memory safety guarantees
-- **hnsw_rs Foundation**: Mature Rust HNSW implementation with SIMD AVX2, multithreading, serde support, 15K req/s on 1M vectors
-- **SQLite Virtual Table API**: Build custom vec0_hnsw module as drop-in replacement for sqlite-vec's vec0
-- **Incremental Adoption**: Task 13c.2.2 (sqlite-vec) provides working baseline immediately, vectorlite-rs becomes optional optimization
-- **Performance Target**: Match vectorlite C++ performance (3-100x faster than brute-force, <10ms for 10K vectors)
+**Strategic Rationale** (REVISED - now default, not optional):
+- **Pure Rust Default**: Eliminates external C binary dependency (sqlite-vec), maintains memory safety, aligns with project philosophy ("Pure Rust > C binary")
+- **HNSW Indexing**: 3-100x speedup vs brute-force critical for production use (10K vectors: <10ms vs 10-50ms)
+- **hnsw_rs Foundation**: Mature Rust HNSW implementation (SIMD AVX2, multithreading, serde, 15K req/s on 1M vectors)
+- **SQLite Virtual Table API**: Custom vec0_hnsw module as drop-in replacement for sqlite-vec's vec0
+- **Architecture Cleanliness**: No external binaries to distribute, pure Cargo build, better developer experience
+- **Fallback Path**: sqlite-vec remains as graceful degradation if vectorlite-rs build fails
+- **Performance Target**: Match/exceed vectorlite C++ (3-100x faster than brute-force, <10ms for 10K vectors)
 
 **Acceptance Criteria**:
 - [ ] vectorlite-rs crate created (new workspace crate, builds as SQLite loadable extension .so/.dylib/.dll)
