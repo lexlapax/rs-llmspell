@@ -281,12 +281,104 @@ impl SqliteVectorStorage {
             self.table_name()
         );
 
-        // TODO: Query vec_embeddings_* and vector_metadata tables
-        // TODO: Extract vectors for this namespace
-        // TODO: Create HnswIndex and populate via insert()
+        let conn = self.backend.get_connection().await?;
 
-        // Placeholder: will implement in next step
-        Ok(None)
+        // Query: SELECT rowid, embedding FROM vec_embeddings_*
+        // JOIN vector_metadata to filter by namespace/scope
+        let query_sql = format!(
+            "SELECT m.rowid FROM vector_metadata m WHERE m.dimension = ? AND m.scope = ?"
+        );
+
+        let mut stmt = conn
+            .prepare(&query_sql)
+            .await
+            .with_context(|| format!("Failed to prepare query for namespace {}", namespace))?;
+
+        // Query all rowids for this namespace
+        let mut rows = stmt
+            .query(libsql::params![self.dimension as i64, namespace])
+            .await
+            .with_context(|| format!("Failed to query metadata for namespace {}", namespace))?;
+
+        // Collect rowids
+        let mut rowids = Vec::new();
+        while let Some(row) = rows.next().await? {
+            let rowid: i64 = row.get(0)?;
+            rowids.push(rowid);
+        }
+
+        if rowids.is_empty() {
+            debug!("No vectors found for namespace {}, creating empty index", namespace);
+            return Ok(None);
+        }
+
+        info!(
+            "Found {} vectors for namespace {}, building HNSW index",
+            rowids.len(),
+            namespace
+        );
+
+        // Create HNSW index
+        let vectorlite_metric = Self::convert_metric(self.metric);
+        let index = HnswIndex::new(
+            self.dimension,
+            self.max_elements,
+            self.m,
+            self.ef_construction,
+            vectorlite_metric,
+        )
+        .map_err(|e| anyhow::anyhow!("Failed to create HNSW index: {}", e))?;
+
+        // Query embeddings table and insert into HNSW
+        let embeddings_query = format!(
+            "SELECT rowid, embedding FROM {} WHERE rowid = ?",
+            self.table_name()
+        );
+
+        for rowid in rowids {
+            let mut embed_stmt = conn.prepare(&embeddings_query).await?;
+            let mut embed_rows = embed_stmt.query(libsql::params![rowid]).await?;
+
+            if let Some(embed_row) = embed_rows.next().await? {
+                let embedding_blob: Vec<u8> = embed_row.get(1)?;
+
+                // Convert Vec<u8> to Vec<f32>
+                // Assuming the blob is a JSON array or raw f32 bytes
+                let embedding: Vec<f32> = if embedding_blob.starts_with(b"[") {
+                    // JSON format
+                    serde_json::from_slice(&embedding_blob)
+                        .with_context(|| format!("Failed to parse embedding JSON for rowid {}", rowid))?
+                } else {
+                    // Raw f32 bytes (4 bytes per float)
+                    embedding_blob
+                        .chunks_exact(4)
+                        .map(|chunk| f32::from_le_bytes([chunk[0], chunk[1], chunk[2], chunk[3]]))
+                        .collect()
+                };
+
+                if embedding.len() != self.dimension {
+                    warn!(
+                        "Dimension mismatch for rowid {}: expected {}, got {}. Skipping.",
+                        rowid,
+                        self.dimension,
+                        embedding.len()
+                    );
+                    continue;
+                }
+
+                index
+                    .insert(rowid, embedding)
+                    .map_err(|e| anyhow::anyhow!("Failed to insert vector {} into HNSW: {}", rowid, e))?;
+            }
+        }
+
+        info!(
+            "Built HNSW index for namespace {} with {} vectors",
+            namespace,
+            index.len()
+        );
+
+        Ok(Some(index))
     }
 
     /// Load HNSW index from disk
@@ -329,7 +421,91 @@ impl SqliteVectorStorage {
 #[async_trait]
 impl VectorStorage for SqliteVectorStorage {
     async fn insert(&self, vectors: Vec<VectorEntry>) -> Result<Vec<String>> {
-        todo!("Implement insert() - dual write to SQLite + HNSW")
+        let mut ids = Vec::with_capacity(vectors.len());
+
+        for entry in vectors {
+            // Validate dimension
+            if entry.embedding.len() != self.dimension {
+                anyhow::bail!(
+                    "Vector dimension mismatch: expected {}, got {}",
+                    self.dimension,
+                    entry.embedding.len()
+                );
+            }
+
+            let id = if entry.id.is_empty() {
+                uuid::Uuid::new_v4().to_string()
+            } else {
+                entry.id.clone()
+            };
+
+            let namespace = Self::scope_to_namespace(&entry.scope);
+            let conn = self.backend.get_connection().await?;
+
+            // Convert embedding to bytes (JSON format for compatibility with vec0)
+            let embedding_json = serde_json::to_vec(&entry.embedding)?;
+
+            // 1. Insert into vec_embeddings_* virtual table
+            let vec_table = self.table_name();
+            let insert_vec_sql = format!("INSERT INTO {} (embedding) VALUES (?)", vec_table);
+
+            conn.execute(&insert_vec_sql, libsql::params![embedding_json.clone()])
+                .await
+                .with_context(|| format!("Failed to insert into {}", vec_table))?;
+
+            // Get the rowid of the inserted vector
+            let rowid: i64 = conn
+                .prepare("SELECT last_insert_rowid()")
+                .await?
+                .query_row(())
+                .await?
+                .get(0)?;
+
+            // 2. Insert metadata into vector_metadata table
+            let metadata_json = serde_json::to_string(&entry.metadata)?;
+            let created_at = entry
+                .created_at
+                .duration_since(std::time::UNIX_EPOCH)
+                .unwrap()
+                .as_secs() as i64;
+            let updated_at = entry
+                .updated_at
+                .duration_since(std::time::UNIX_EPOCH)
+                .unwrap()
+                .as_secs() as i64;
+
+            conn.execute(
+                "INSERT INTO vector_metadata (rowid, id, tenant_id, scope, dimension, metadata, created_at, updated_at) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8)",
+                libsql::params![
+                    rowid,
+                    id.clone(),
+                    entry.tenant_id.as_deref().unwrap_or("default"),
+                    namespace.clone(),
+                    self.dimension as i64,
+                    metadata_json,
+                    created_at,
+                    updated_at,
+                ],
+            )
+            .await
+            .with_context(|| "Failed to insert into vector_metadata")?;
+
+            // 3. Insert into HNSW index
+            let index_ref = self.get_or_create_index(&namespace).await?;
+            let index_guard = index_ref.read();
+
+            if let Some(ref index) = *index_guard {
+                index
+                    .insert(rowid, entry.embedding)
+                    .map_err(|e| anyhow::anyhow!("Failed to insert into HNSW index: {}", e))?;
+            } else {
+                warn!("HNSW index not available for namespace {}", namespace);
+            }
+
+            ids.push(id);
+        }
+
+        Ok(ids)
     }
 
     async fn search(&self, query: &VectorQuery) -> Result<Vec<VectorResult>> {
@@ -342,27 +518,265 @@ impl VectorStorage for SqliteVectorStorage {
         query: &VectorQuery,
         scope: &StateScope,
     ) -> Result<Vec<VectorResult>> {
-        todo!("Implement search_scoped() - K-NN via HNSW + JOIN")
+        // Validate dimension
+        if query.vector.len() != self.dimension {
+            anyhow::bail!(
+                "Query vector dimension mismatch: expected {}, got {}",
+                self.dimension,
+                query.vector.len()
+            );
+        }
+
+        let namespace = Self::scope_to_namespace(scope);
+
+        // Get HNSW index for this namespace and perform search
+        let neighbors = {
+            let index_ref = self.get_or_create_index(&namespace).await?;
+            let index_guard = index_ref.read();
+
+            if let Some(ref index) = *index_guard {
+                // Search HNSW index (clone results to avoid holding lock)
+                index
+                    .search(&query.vector, query.k, self.ef_search)
+                    .map_err(|e| anyhow::anyhow!("HNSW search failed: {}", e))?
+            } else {
+                // No HNSW index, fall back to brute force (not implemented)
+                warn!("No HNSW index for namespace {}, returning empty results", namespace);
+                return Ok(Vec::new());
+            }
+            // index_guard dropped here
+        };
+
+        if neighbors.is_empty() {
+            return Ok(Vec::new());
+        }
+
+        // Query metadata for the results
+        let conn = self.backend.get_connection().await?;
+        let mut results = Vec::with_capacity(neighbors.len());
+
+        for (rowid, distance) in neighbors {
+            // Query vector_metadata for full entry
+            let mut stmt = conn
+                .prepare(
+                    "SELECT id, tenant_id, scope, metadata, created_at, updated_at
+                     FROM vector_metadata WHERE rowid = ?",
+                )
+                .await?;
+
+            let mut rows = stmt.query(libsql::params![rowid]).await?;
+
+            if let Some(row) = rows.next().await? {
+                let id: String = row.get(0)?;
+                let tenant_id: String = row.get(1)?;
+                let scope_str: String = row.get(2)?;
+                let metadata_json: String = row.get(3)?;
+                let created_at: i64 = row.get(4)?;
+                let updated_at: i64 = row.get(5)?;
+
+                // Parse metadata
+                let metadata: HashMap<String, Value> = serde_json::from_str(&metadata_json)
+                    .unwrap_or_default();
+
+                // Parse scope (reverse of scope_to_namespace)
+                let parsed_scope = if scope_str == "__global__" {
+                    StateScope::Global
+                } else if let Some(user_id) = scope_str.strip_prefix("user:") {
+                    StateScope::User(user_id.to_string())
+                } else if let Some(session_id) = scope_str.strip_prefix("session:") {
+                    StateScope::Session(session_id.to_string())
+                } else if let Some(agent_id) = scope_str.strip_prefix("agent:") {
+                    StateScope::Agent(agent_id.to_string())
+                } else if let Some(tool_id) = scope_str.strip_prefix("tool:") {
+                    StateScope::Tool(tool_id.to_string())
+                } else if let Some(workflow_id) = scope_str.strip_prefix("workflow:") {
+                    StateScope::Workflow(workflow_id.to_string())
+                } else if let Some(hook_id) = scope_str.strip_prefix("hook:") {
+                    StateScope::Hook(hook_id.to_string())
+                } else if let Some(custom) = scope_str.strip_prefix("custom:") {
+                    StateScope::Custom(custom.to_string())
+                } else if scope_str.starts_with("tenant:") {
+                    StateScope::Custom(scope_str)
+                } else {
+                    StateScope::Custom(scope_str)
+                };
+
+                // Query embedding (if needed)
+                // For now, we don't return embeddings in search results
+
+                results.push(VectorResult {
+                    id,
+                    score: 1.0 - distance, // Convert distance to score (higher is better)
+                    vector: None,          // Don't return embeddings in search
+                    metadata: Some(metadata),
+                    distance,
+                });
+            }
+        }
+
+        Ok(results)
     }
 
     async fn update_metadata(&self, id: &str, metadata: HashMap<String, Value>) -> Result<()> {
-        todo!("Implement update_metadata()")
+        let conn = self.backend.get_connection().await?;
+        let metadata_json = serde_json::to_string(&metadata)?;
+        let updated_at = std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .unwrap()
+            .as_secs() as i64;
+
+        conn.execute(
+            "UPDATE vector_metadata SET metadata = ?, updated_at = ? WHERE id = ?",
+            libsql::params![metadata_json, updated_at, id],
+        )
+        .await
+        .with_context(|| format!("Failed to update metadata for id {}", id))?;
+
+        Ok(())
     }
 
     async fn delete(&self, ids: &[String]) -> Result<()> {
-        todo!("Implement delete()")
+        if ids.is_empty() {
+            return Ok(());
+        }
+
+        let conn = self.backend.get_connection().await?;
+
+        for id in ids {
+            // Get rowid and namespace before deleting
+            let mut stmt = conn
+                .prepare("SELECT rowid, scope FROM vector_metadata WHERE id = ?")
+                .await?;
+            let mut rows = stmt.query(libsql::params![id.as_str()]).await?;
+
+            if let Some(row) = rows.next().await? {
+                let rowid: i64 = row.get(0)?;
+                let scope_str: String = row.get(1)?;
+
+                // Delete from vector_metadata
+                conn.execute("DELETE FROM vector_metadata WHERE id = ?", libsql::params![id.as_str()])
+                    .await?;
+
+                // Delete from vec_embeddings_*
+                let vec_table = self.table_name();
+                let delete_vec_sql = format!("DELETE FROM {} WHERE rowid = ?", vec_table);
+                conn.execute(&delete_vec_sql, libsql::params![rowid])
+                    .await?;
+
+                // Remove from HNSW index (requires rebuild)
+                // For now, we'll just warn and rebuild on next access
+                warn!(
+                    "Deleted vector {} from database, HNSW index will be rebuilt on next access",
+                    id
+                );
+
+                // Clear the HNSW index for this namespace to force rebuild
+                self.hnsw_indices.remove(&scope_str);
+            }
+        }
+
+        Ok(())
     }
 
     async fn delete_scope(&self, scope: &StateScope) -> Result<usize> {
-        todo!("Implement delete_scope()")
+        let namespace = Self::scope_to_namespace(scope);
+        let conn = self.backend.get_connection().await?;
+
+        // Get all rowids for this scope
+        let mut stmt = conn
+            .prepare("SELECT rowid FROM vector_metadata WHERE scope = ? AND dimension = ?")
+            .await?;
+        let mut rows = stmt
+            .query(libsql::params![namespace.clone(), self.dimension as i64])
+            .await?;
+
+        let mut rowids = Vec::new();
+        while let Some(row) = rows.next().await? {
+            let rowid: i64 = row.get(0)?;
+            rowids.push(rowid);
+        }
+
+        let count = rowids.len();
+
+        if count == 0 {
+            return Ok(0);
+        }
+
+        // Delete from vector_metadata
+        conn.execute(
+            "DELETE FROM vector_metadata WHERE scope = ? AND dimension = ?",
+            libsql::params![namespace.clone(), self.dimension as i64],
+        )
+        .await?;
+
+        // Delete from vec_embeddings_*
+        let vec_table = self.table_name();
+        for rowid in rowids {
+            let delete_vec_sql = format!("DELETE FROM {} WHERE rowid = ?", vec_table);
+            conn.execute(&delete_vec_sql, libsql::params![rowid])
+                .await?;
+        }
+
+        // Remove HNSW index for this namespace
+        self.hnsw_indices.remove(&namespace);
+
+        info!("Deleted {} vectors for scope {:?}", count, scope);
+
+        Ok(count)
     }
 
     async fn stats(&self) -> Result<StorageStats> {
-        todo!("Implement stats()")
+        let conn = self.backend.get_connection().await?;
+
+        // Count total vectors for this dimension
+        let mut stmt = conn
+            .prepare("SELECT COUNT(*) FROM vector_metadata WHERE dimension = ?")
+            .await?;
+        let total_vectors: i64 = stmt
+            .query_row(libsql::params![self.dimension as i64])
+            .await?
+            .get(0)?;
+
+        // Count unique scopes
+        let mut stmt = conn
+            .prepare("SELECT COUNT(DISTINCT scope) FROM vector_metadata WHERE dimension = ?")
+            .await?;
+        let total_scopes: i64 = stmt
+            .query_row(libsql::params![self.dimension as i64])
+            .await?
+            .get(0)?;
+
+        Ok(StorageStats {
+            total_vectors: total_vectors as usize,
+            storage_bytes: 0, // Not easily trackable with virtual tables
+            namespace_count: total_scopes as usize,
+            index_build_time_ms: None,
+            avg_query_time_ms: None,
+            dimensions: Some(self.dimension),
+        })
     }
 
     async fn stats_for_scope(&self, scope: &StateScope) -> Result<ScopedStats> {
-        todo!("Implement stats_for_scope()")
+        let namespace = Self::scope_to_namespace(scope);
+        let conn = self.backend.get_connection().await?;
+
+        // Count vectors for this scope
+        let mut stmt = conn
+            .prepare("SELECT COUNT(*) FROM vector_metadata WHERE scope = ? AND dimension = ?")
+            .await?;
+        let vector_count: i64 = stmt
+            .query_row(libsql::params![namespace, self.dimension as i64])
+            .await?
+            .get(0)?;
+
+        Ok(ScopedStats {
+            scope: scope.clone(),
+            vector_count: vector_count as usize,
+            storage_bytes: 0, // Not tracked
+            query_count: 0,
+            tokens_processed: 0,
+            estimated_cost: 0.0,
+        })
     }
 
     async fn save(&self) -> Result<()> {

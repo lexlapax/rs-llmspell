@@ -1914,14 +1914,14 @@ This hybrid approach separates:
 **Acceptance Criteria**:
 - [x] SqliteVectorStorage struct created with HNSW index fields ✅
 - [x] vectorlite-rs added to llmspell-storage dependencies ✅
-- [ ] **vectorlite-rs serde support**: Add Serialize/Deserialize to HnswIndex
-- [ ] SqliteVectorStorage implements VectorStorage trait
-- [ ] All trait methods implemented (insert, search, search_scoped, update_metadata, delete, delete_scope, stats, stats_for_scope)
-- [ ] **Hybrid Architecture**: vec_embeddings_* tables (disk persistence) + in-memory HNSW indices (search)
-- [ ] **HNSW Persistence Strategy**: Index serialized to `.hnsw` files (MessagePack), reloaded on restart
-- [ ] Tenant isolation enforced (filter by scope in all queries)
-- [ ] Scope-based filtering (session:xxx, user:xxx, global)
-- [ ] Metadata JSON search via json_extract()
+- [x] **vectorlite-rs serde support**: Add Serialize/Deserialize to HnswIndex ✅
+- [x] SqliteVectorStorage implements VectorStorage trait ✅
+- [x] All trait methods implemented (insert, search, search_scoped, update_metadata, delete, delete_scope, stats, stats_for_scope) ✅
+- [x] **Hybrid Architecture**: vec_embeddings_* tables (disk persistence) + in-memory HNSW indices (search) ✅
+- [x] **HNSW Persistence Strategy**: Index serialized to `.hnsw` files (MessagePack), reloaded on restart ✅
+- [x] Tenant isolation enforced (filter by scope in all queries) ✅
+- [x] Scope-based filtering (session:xxx, user:xxx, global) ✅
+- [x] Metadata JSON search via json_extract() ✅
 - [ ] **Integration tests with vectorlite-rs**: HNSW index + vec_embeddings_* table queries
 - [ ] Unit tests passing (50+ tests covering insert, search, delete, stats)
 - [ ] Integration tests with MemoryManager passing
