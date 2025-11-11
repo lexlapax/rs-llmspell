@@ -2154,32 +2154,118 @@ This hybrid approach separates:
 
 ---
 
-### Task 13c.2.3a: SqliteVectorStorage Integration & Benchmarks ⏹ PENDING
-**Priority**: HIGH
-**Estimated Time**: 4 hours
+### Task 13c.2.3a: SqliteEpisodicMemory Wrapper + Integration Tests & Benchmarks ⏹ PENDING
+**Priority**: CRITICAL (required for Task 13c.2.8 - Legacy Backend Removal)
+**Estimated Time**: 8 hours (was 4h, expanded for SqliteEpisodicMemory wrapper)
 **Assignee**: Memory Team
 **Status**: ⏹ PENDING
 **Dependencies**: Task 13c.2.3 ✅
 
-**Description**: Complete integration tests and performance benchmarks for SqliteVectorStorage deferred from Task 13c.2.3.
+**Description**: Create SqliteEpisodicMemory wrapper to replace HNSWEpisodicMemory (which will be deleted in Task 13c.2.8). Complete integration tests and performance benchmarks for SqliteVectorStorage deferred from Task 13c.2.3.
+
+**Rationale**: Task 13c.2.8 will DELETE llmspell-memory/src/backends/hnsw/ (containing HNSWEpisodicMemory), so we MUST create SqliteEpisodicMemory as replacement. The EpisodicBackend enum currently has InMemory, HNSW (to be deleted), and PostgreSQL variants - after Task 13c.2.8, HNSW will be replaced by Sqlite.
 
 **Acceptance Criteria**:
+- [ ] SqliteEpisodicMemory struct created (llmspell-memory/src/episodic/sqlite_backend.rs)
+- [ ] Implements EpisodicMemory trait using SqliteVectorStorage backend
+- [ ] Hybrid architecture: SqliteVectorStorage (persistence) + DashMap (metadata cache)
+- [ ] EpisodicBackend enum updated with Sqlite(Arc<SqliteEpisodicMemory>) variant
+- [ ] EpisodicBackendType enum updated with Sqlite variant (with #[cfg(feature = "sqlite")] if needed)
+- [ ] EpisodicBackend::from_config() supports Sqlite variant
 - [ ] Integration tests with MemoryManager passing (episodic_sqlite_backend.rs)
 - [ ] Benchmarks implemented (<1ms insert, <10ms search for 10K vectors)
 - [ ] Performance validation: 3-100x speedup vs sqlite-vec brute-force
 - [ ] Benchmark results documented in sqlite-vector-storage-architecture.md
+- [ ] Unit tests passing (10+ tests covering SqliteEpisodicMemory wrapper)
+- [ ] Zero clippy warnings
 
 **Implementation Steps**:
-1. Create `llmspell-memory/tests/episodic_sqlite_backend.rs`
-2. Integrate SqliteVectorStorage with EpisodicMemory
-3. Create `llmspell-storage/benches/sqlite_vector_bench.rs`
-4. Run benchmarks with 1K, 10K, 100K vectors
-5. Compare performance against sqlite-vec baseline
-6. Update architecture doc with actual performance numbers
+1. Create `llmspell-memory/src/episodic/sqlite_backend.rs`:
+   ```rust
+   pub struct SqliteEpisodicMemory {
+       storage: Arc<SqliteVectorStorage>,
+       entries: Arc<DashMap<String, EpisodicEntry>>,  // Metadata cache
+       embedding_service: Arc<EmbeddingService>,
+   }
+
+   #[async_trait]
+   impl EpisodicMemory for SqliteEpisodicMemory {
+       async fn add(&self, entry: EpisodicEntry) -> Result<String>;
+       async fn search(&self, query: &str, limit: usize) -> Result<Vec<EpisodicEntry>>;
+       async fn get(&self, id: &str) -> Result<EpisodicEntry>;
+       // ... (same pattern as HNSWEpisodicMemory)
+   }
+   ```
+
+2. Update `llmspell-memory/src/config.rs`:
+   ```rust
+   pub enum EpisodicBackendType {
+       InMemory,
+       HNSW,  // Will be removed in Task 13c.2.8
+       Sqlite,  // NEW - replacement for HNSW
+       #[cfg(feature = "postgres")]
+       PostgreSQL,
+   }
+   ```
+
+3. Update `llmspell-memory/src/episodic/backend.rs`:
+   ```rust
+   pub enum EpisodicBackend {
+       InMemory(Arc<InMemoryEpisodicMemory>),
+       HNSW(Arc<HNSWEpisodicMemory>),  // Will be removed in Task 13c.2.8
+       Sqlite(Arc<SqliteEpisodicMemory>),  // NEW
+       #[cfg(feature = "postgres")]
+       PostgreSQL(Arc<PostgreSQLEpisodicMemory>),
+   }
+
+   impl EpisodicBackend {
+       pub fn from_config(config: &MemoryConfig) -> Result<Self> {
+           match config.episodic_backend {
+               EpisodicBackendType::InMemory => Ok(Self::create_inmemory_backend(config)),
+               EpisodicBackendType::HNSW => Self::create_hnsw_backend(config),
+               EpisodicBackendType::Sqlite => Self::create_sqlite_backend(config),  // NEW
+               #[cfg(feature = "postgres")]
+               EpisodicBackendType::PostgreSQL => Self::create_postgresql_backend(config),
+           }
+       }
+
+       fn create_sqlite_backend(config: &MemoryConfig) -> Result<Self> {
+           // Initialize SqliteBackend, SqliteVectorStorage, SqliteEpisodicMemory
+       }
+   }
+   ```
+
+4. Add SqliteBackend dependency to llmspell-memory:
+   ```toml
+   # llmspell-memory/Cargo.toml
+   [dependencies]
+   llmspell-storage = { path = "../llmspell-storage" }  # Already exists, ensure SqliteBackend is accessible
+   ```
+
+5. Create `llmspell-memory/tests/episodic_sqlite_backend.rs`:
+   - Test SqliteEpisodicMemory CRUD operations
+   - Test MemoryManager with Sqlite backend
+   - Test tenant isolation, namespace scoping
+   - Pattern from backend_integration_test.rs
+
+6. Create `llmspell-storage/benches/sqlite_vector_bench.rs`:
+   - Benchmark insert (target: <1ms)
+   - Benchmark search at 1K, 10K, 100K scales (target: <10ms at 10K)
+   - Compare against sqlite-vec brute-force baseline
+   - Pattern from llmspell-storage/benches/graph_bench.rs
+
+7. Run benchmarks and document results in sqlite-vector-storage-architecture.md
 
 **Files to Create**:
-- `llmspell-memory/tests/episodic_sqlite_backend.rs`
-- `llmspell-storage/benches/sqlite_vector_bench.rs`
+- `llmspell-memory/src/episodic/sqlite_backend.rs` (NEW - ~400 lines, similar to hnsw_backend.rs)
+- `llmspell-memory/tests/episodic_sqlite_backend.rs` (NEW - integration tests)
+- `llmspell-storage/benches/sqlite_vector_bench.rs` (NEW - performance benchmarks)
+
+**Files to Modify**:
+- `llmspell-memory/src/config.rs` (add Sqlite to EpisodicBackendType)
+- `llmspell-memory/src/episodic/backend.rs` (add Sqlite variant + from_config)
+- `llmspell-memory/src/episodic/mod.rs` (export SqliteEpisodicMemory)
+- `docs/technical/sqlite-vector-storage-architecture.md` (add benchmark results)
 
 ---
 
