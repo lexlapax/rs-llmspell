@@ -26,7 +26,8 @@ Experimental platform for rapid AI concept exploration via Lua/JavaScript script
   - ✅ 13c.1: Cargo Dependencies Cleanup (lazy_static/once_cell → std, MySQL removed, -60MB deps)
   - ✅ 13c.2.0: Storage Trait Architecture (3 new traits in llmspell-core, 1,685 lines, zero circular deps)
   - ✅ 13c.2.1: libsql Backend Foundation (migration reorg, SqliteBackend, connection pool, tenant context, 1,093 lines)
-  - ⏳ 13c.2.2: vectorlite Extension Integration (NEXT)
+  - ✅ 13c.2.2: sqlite-vec Extension Integration (loadable extension, Migration V3, 4 dimensions, 8/8 tests, 8 hours)
+  - ⏳ 13c.2.3: SqliteVectorStorage Implementation (NEXT)
 
 ## Project-Specific Behavior Controls
 - **Experimental mindset**: This is a rapid iteration platform for AI exploration, not production deployment tool
