@@ -433,4 +433,165 @@ mod tests {
             Some(&"us-west-2".to_string())
         );
     }
+
+    /// Integration test for sqlite-vec extension and vector operations (Task 13c.2.2)
+    ///
+    /// Tests:
+    /// - vec0 virtual table creation
+    /// - Vector insertion using IntoBytes
+    /// - K-NN search with MATCH operator
+    /// - Multi-dimension support (384, 768, 1536, 3072)
+    ///
+    /// NOTE: This test requires vec0.dylib/vec0.so extension in ./extensions/
+    /// If extension loading fails in SqliteBackend::new(), vector operations will error.
+    #[tokio::test]
+    async fn test_vector_operations_integration() -> anyhow::Result<()> {
+        use super::super::SqliteVecExtension;
+        use zerocopy::IntoBytes;
+
+        let config = SqliteConfig::in_memory();
+        let backend = SqliteBackend::new(config).await?;
+        let conn = backend.get_connection().await?;
+
+        // Check if extension is available
+        let available = match SqliteVecExtension::is_available(&conn).await {
+            Ok(available) => available,
+            Err(_) => {
+                tracing::warn!(
+                    "Skipping vector operations test: sqlite-vec extension not loaded. \
+                    Build extension: cd /tmp && git clone https://github.com/asg017/sqlite-vec && \
+                    cd sqlite-vec && ./scripts/vendor.sh && make loadable && \
+                    cp dist/vec0.* ./extensions/"
+                );
+                return Ok(());
+            }
+        };
+        if !available {
+            tracing::warn!("Skipping vector operations test: vec_version() returned empty");
+            return Ok(());
+        }
+
+        // Test 768-dimensional vectors (most common: OpenAI ada-002, BERT-base)
+        conn.execute(
+            "CREATE VIRTUAL TABLE vec_test_768 USING vec0(embedding float[768])",
+            (),
+        )
+        .await?;
+
+        // Insert test vectors
+        let test_vectors: Vec<(i64, Vec<f32>)> = vec![
+            (1, vec![0.1; 768]), // Vector 1: all 0.1
+            (2, vec![0.2; 768]), // Vector 2: all 0.2
+            (3, vec![0.3; 768]), // Vector 3: all 0.3
+            (4, vec![0.4; 768]), // Vector 4: all 0.4
+            (5, vec![0.5; 768]), // Vector 5: all 0.5
+        ];
+
+        for (rowid, embedding) in &test_vectors {
+            conn.execute(
+                "INSERT INTO vec_test_768(rowid, embedding) VALUES (?1, ?2)",
+                libsql::params![*rowid, embedding.as_bytes()],
+            )
+            .await?;
+        }
+
+        // K-NN search: Find 3 nearest vectors to [0.3; 768]
+        let query: Vec<f32> = vec![0.3; 768];
+        let mut rows = conn
+            .query(
+                "SELECT rowid, distance FROM vec_test_768 WHERE embedding MATCH ?1 ORDER BY distance LIMIT 3",
+                libsql::params![query.as_bytes()],
+            )
+            .await?;
+
+        let mut results = Vec::new();
+        while let Some(row) = rows.next().await? {
+            let rowid: i64 = row.get(0)?;
+            let distance: f64 = row.get(1)?;
+            results.push((rowid, distance));
+        }
+
+        // Verify results
+        assert_eq!(results.len(), 3, "Should return 3 nearest neighbors");
+
+        // Closest should be rowid 3 (exact match with [0.3; 768])
+        assert_eq!(results[0].0, 3, "Nearest neighbor should be rowid 3");
+        assert!(
+            results[0].1 < 0.01,
+            "Distance to exact match should be near zero, got {}",
+            results[0].1
+        );
+
+        // Second closest should be rowid 2 or 4
+        assert!(
+            results[1].0 == 2 || results[1].0 == 4,
+            "Second nearest should be rowid 2 or 4"
+        );
+
+        Ok(())
+    }
+
+    /// Test multi-dimension support for all common embedding models (Task 13c.2.2)
+    ///
+    /// Tests vec0 virtual table creation and basic operations for:
+    /// - 384-dim: sentence-transformers/all-MiniLM-L6-v2
+    /// - 768-dim: OpenAI ada-002, BERT-base
+    /// - 1536-dim: OpenAI text-embedding-3-small
+    /// - 3072-dim: OpenAI text-embedding-3-large
+    #[tokio::test]
+    async fn test_multi_dimension_support() -> anyhow::Result<()> {
+        use super::super::SqliteVecExtension;
+        use zerocopy::IntoBytes;
+
+        let config = SqliteConfig::in_memory();
+        let backend = SqliteBackend::new(config).await?;
+        let conn = backend.get_connection().await?;
+
+        // Check if extension is available
+        let available = match SqliteVecExtension::is_available(&conn).await {
+            Ok(available) => available,
+            Err(_) => {
+                tracing::warn!("Skipping multi-dimension test: sqlite-vec extension not loaded");
+                return Ok(());
+            }
+        };
+        if !available {
+            tracing::warn!("Skipping multi-dimension test: vec_version() returned empty");
+            return Ok(());
+        }
+
+        // Test all supported dimensions
+        for &dim in SqliteVecExtension::supported_dimensions() {
+            let table_name = format!("vec_test_{dim}");
+            let create_sql =
+                format!("CREATE VIRTUAL TABLE {table_name} USING vec0(embedding float[{dim}])");
+
+            conn.execute(&create_sql, ()).await?;
+
+            // Insert a test vector
+            let embedding: Vec<f32> = vec![0.1; dim];
+            conn.execute(
+                &format!("INSERT INTO {table_name}(rowid, embedding) VALUES (?1, ?2)"),
+                libsql::params![1i64, embedding.as_bytes()],
+            )
+            .await?;
+
+            // K-NN search
+            let mut rows = conn
+                .query(
+                    &format!("SELECT rowid FROM {table_name} WHERE embedding MATCH ?1 LIMIT 1"),
+                    libsql::params![embedding.as_bytes()],
+                )
+                .await?;
+
+            let row = rows
+                .next()
+                .await?
+                .unwrap_or_else(|| panic!("No results for dimension {dim}"));
+            let rowid: i64 = row.get(0)?;
+            assert_eq!(rowid, 1, "Dimension {dim}: should find inserted vector");
+        }
+
+        Ok(())
+    }
 }
