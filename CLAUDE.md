@@ -14,22 +14,13 @@ Experimental platform for rapid AI concept exploration via Lua/JavaScript script
 - **Release Notes**: `/RELEASE_NOTES_v0.13.0.md` (comprehensive v0.13.0 changelog)
 - **Current Work**: ALWAYS read `/TODO.md` - hierarchical checkboxes with numbered tasks
 
-## Recent Completion Status (Experimental Infrastructure Evolution)
-- ✅ **Phase 7**: Infrastructure Consolidation (536+ files refactored, centralized testing, config revolution)
-- ✅ **Phase 10**: Service Integration & IDE Connectivity (kernel, Jupyter, VS Code, LSP)
-- ✅ **Phase 11**: Local LLM Integration (Ollama + Candle dual-path) - COMPLETE
-- ✅ **Phase 11a**: Bridge Consolidation (87% compile speedup, API standardization, docs completeness) - COMPLETE
-- ✅ **Phase 11b**: Local LLM Cleanup (unified profiles, dual-architecture models, platform-aware GPU) - COMPLETE
-- ✅ **Phase 12**: Experimental Template System (10 workflows, CLI + Lua API, multi-agent patterns) - COMPLETE
-- ✅ **Phase 13**: Experimental Memory & Context Engineering (3-tier memory, hot-swap backends, context assembly) - COMPLETE
-- 🚧 **Phase 13c**: Storage Consolidation & Production Readiness (4 weeks, towards v0.14.0)
-  - ✅ 13c.1: Cargo Dependencies Cleanup (lazy_static/once_cell → std, MySQL removed, -60MB deps)
-  - ✅ 13c.2.0: Storage Trait Architecture (3 new traits in llmspell-core, 1,685 lines, zero circular deps)
-  - ✅ 13c.2.1: libsql Backend Foundation (migration reorg, SqliteBackend, connection pool, tenant context, 1,093 lines)
-  - ✅ 13c.2.2: sqlite-vec Extension Integration (loadable extension, Migration V3, 4 dimensions, 8/8 tests, 8 hours)
-  - ✅ 13c.2.2a: vectorlite-rs Pure Rust Port (HNSW Default) - 1,098 lines, 16 tests, 6 hours (Core infrastructure + SqliteBackend integration complete, MVP)
-  - ✅ 13c.2.3: SqliteVectorStorage Implementation - 1,174 lines, 10/10 tests, hybrid SQLite+HNSW architecture, <2ms overhead, MessagePack persistence, namespace isolation per scope
-  - ⏳ 13c.2.3a: SqliteVectorStorage Integration & Benchmarks (NEXT - deferred from 13c.2.3)
+## Current Status (Phase 13c - Storage Consolidation)
+- ✅ **Phases 7-13**: Complete (Infrastructure, Services, LLM, Templates, Memory, Context)
+- 🚧 **Phase 13c**: Storage Consolidation & Production Readiness (towards v0.14.0)
+  - ✅ 13c.1: Cargo Dependencies (-60MB)
+  - ✅ 13c.2.0-13c.2.3a: Vector Storage Complete (vectorlite-rs HNSW, SqliteVectorStorage, SqliteEpisodicMemory, 3,652 lines)
+  - ⏳ 13c.2.4: SqliteGraphStorage (NEXT)
+  - Pending: 13c.2.5-13c.2.12 (Procedural, State, Auxiliary, Legacy Removal, Testing, Docs)
 
 ## Project-Specific Behavior Controls
 - **Experimental mindset**: This is a rapid iteration platform for AI exploration, not production deployment tool
@@ -100,27 +91,12 @@ Experimental platform for rapid AI concept exploration via Lua/JavaScript script
 ## Development Workflow
 1. Read relevant phase doc + TODO.md
 2. Write failing test using llmspell-testing helpers
-3. Implement minimal solution
-4. Run ./scripts/quality-check-fast.sh
-5. Update TODO.md sub-tasks as completed
+3. Run ./scripts/quality-check-fast.sh
+4. Update TODO.md sub-tasks as completed
 
-## v0.13.0 Key Achievements (Phase 13 - Experimental Infrastructure)
-- **3-Tier Memory System**: Episodic (HNSW), Semantic (SurrealDB graph), Procedural (patterns)
-- **Hot-Swappable Backends**: InMemory (dev), HNSW (8.47x speedup), SurrealDB (bi-temporal graph)
-- **Context Engineering**: 4 strategies (episodic, semantic, hybrid, RAG) with parallel retrieval
-- **<2ms Memory Overhead**: 50x faster than target, production-quality validation at scale
-- **149 Tests Passing**: 100% pass rate, zero warnings, comprehensive validation
-- **Zero Breaking Changes**: Fully backward compatible, opt-in features
-- **1,300+ Lines API Docs**: llmspell-memory, llmspell-graph, llmspell-context
-- **Memory + Context Globals**: 17th and 18th Lua globals for script access
-
-## v0.12.0 Key Achievements (Phase 12 - Experimental Workflows)
-- **10 Experimental Templates**: Rapid AI concept exploration workflows
-- **Template System Core**: 2,847 lines (trait-based, DashMap registry, ExecutionContext builder)
-- **CLI + Lua Integration**: `template list|info|exec|search|schema` commands + Template global (16th)
-- **Multi-Agent Workflows**: Real LLM integration (code-generator: 3 agents, data-analysis: 2 agents)
-- **<2ms Overhead**: 50x faster than target, production-quality engineering
-- **3,655 Lines Docs**: Architecture + 10 user guides + examples
+## Recent Releases
+- **v0.13.0** (Phase 13): 3-tier memory (episodic/semantic/procedural), hot-swap backends, context engineering, <2ms overhead, 149 tests
+- **v0.12.0** (Phase 12): 10 experimental templates, multi-agent workflows, CLI+Lua integration, <2ms overhead
 
 ## Banned Project Behaviors
 - Creating new files (edit existing)
