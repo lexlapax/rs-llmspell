@@ -2864,27 +2864,355 @@ This hybrid approach separates:
 
 ---
 
-### Task 13c.2.8: Legacy Backend Removal & Cleanup ⏹ PENDING
+### Task 13c.2.8: Legacy Backend Removal & Graph Traversal Enhancement ⏹ PENDING
 **Priority**: CRITICAL
-**Estimated Time**: 8 hours (Day 13)
-**Assignee**: Core Team
+**Estimated Time**: 16 hours (Days 13-14) - Expanded from 8h to include graph traversal (deferred from Task 13c.2.4)
+**Assignee**: Core Team + Graph Team
 **Status**: ⏹ PENDING
 **Dependencies**: Tasks 13c.2.3, 13c.2.4, 13c.2.5, 13c.2.6, 13c.2.7 ✅
 
-**Description**: Complete removal of legacy storage backends (HNSW files, SurrealDB, Sled) and their dependencies. Pre-1.0 = breaking changes acceptable, no migration needed.
+**Description**: Complete removal of legacy storage backends (HNSW files, SurrealDB, Sled) and their dependencies. PLUS: Enhance GraphBackend/KnowledgeGraph traits with multi-hop graph traversal capability (deferred from Task 13c.2.4). Pre-1.0 = breaking changes acceptable.
 
 **Acceptance Criteria**:
+
+**Phase 1: Graph Traversal Enhancement (Pre-Removal)**:
+- [ ] GraphBackend trait enhanced with traverse() method (llmspell-graph/src/storage/mod.rs)
+- [ ] KnowledgeGraph trait enhanced with traverse() method (llmspell-graph/src/traits/knowledge_graph.rs)
+- [ ] SqliteGraphStorage implements traverse() with recursive CTEs (llmspell-storage/src/backends/sqlite/graph.rs)
+- [ ] PostgresGraphStorage implements traverse() with recursive CTEs (llmspell-storage/src/backends/postgres/graph.rs)
+- [ ] SurrealDB backend implements traverse() for baseline comparison (llmspell-graph/src/storage/surrealdb.rs)
+- [ ] Traverse tests passing: 1-4 hops, cycle prevention, bi-temporal filtering, relationship type filtering
+- [ ] Performance baseline captured: SurrealDB vs SQLite vs PostgreSQL on synthetic 100K node graph
+
+**Phase 2: Legacy Backend Removal**:
 - [ ] All HNSW file storage code removed (llmspell-memory/src/backends/hnsw/)
-- [ ] All SurrealDB graph storage code removed (llmspell-graph/src/backends/surrealdb/)
+- [ ] All SurrealDB graph storage code removed (llmspell-graph/src/storage/surrealdb/)
 - [ ] All Sled state storage code removed (llmspell-kernel/src/backends/sled/)
-- [ ] Dependencies removed: hnsw_rs, surrealdb, sled, rocksdb, rmp-serde
-- [ ] All tests updated to use SQLite backend exclusively
+- [ ] Dependencies removed: hnsw_rs, surrealdb, sled, rocksdb, rmp-serde (keep MessagePack for vector persistence)
+- [ ] All tests updated to use SQLite backend exclusively (100% pass rate)
 - [ ] Configuration options for old backends removed
-- [ ] Zero compiler warnings, all tests passing
+- [ ] Zero compiler warnings, all tests passing after removal
 
 **Implementation Steps**:
 
-1. **Remove HNSW file storage backend**:
+**PHASE 1: Graph Traversal Enhancement (Pre-Removal - Days 13-14, ~8 hours)**
+
+0. **Enhance GraphBackend trait** (llmspell-graph/src/storage/mod.rs):
+   ```rust
+   #[async_trait]
+   pub trait GraphBackend: Send + Sync {
+       // ... existing 8 methods ...
+
+       /// Multi-hop graph traversal with depth limit and cycle prevention
+       ///
+       /// # Arguments
+       /// * `start_entity` - Starting entity ID
+       /// * `relationship_type` - Optional relationship type filter (None = traverse all types)
+       /// * `max_depth` - Maximum traversal depth (1-4 hops recommended, 10 max)
+       /// * `at_time` - Optional temporal point for bi-temporal queries (None = current time)
+       ///
+       /// # Returns
+       /// Vector of (Entity, depth, path) tuples reachable from start_entity within max_depth hops.
+       /// Path is JSON array of entity IDs traversed to reach this entity.
+       ///
+       /// # Performance
+       /// - 1-hop: O(k) where k = avg relationships per node
+       /// - N-hop: O(k^N) worst case, O(k*N) with cycle prevention
+       /// - Target: <50ms for 4-hop traversal on 100K node graph
+       async fn traverse(
+           &self,
+           start_entity: &str,
+           relationship_type: Option<&str>,
+           max_depth: usize,
+           at_time: Option<DateTime<Utc>>,
+       ) -> Result<Vec<(Entity, usize, String)>>; // (entity, depth, path_json)
+   }
+   ```
+
+1. **Enhance KnowledgeGraph trait** (llmspell-graph/src/traits/knowledge_graph.rs):
+   ```rust
+   #[async_trait]
+   pub trait KnowledgeGraph: Send + Sync {
+       // ... existing 8 methods ...
+
+       /// Multi-hop graph traversal (same signature as GraphBackend::traverse)
+       async fn traverse(
+           &self,
+           start_entity: &str,
+           relationship_type: Option<&str>,
+           max_depth: usize,
+           at_time: Option<DateTime<Utc>>,
+       ) -> Result<Vec<(Entity, usize, String)>>;
+   }
+   ```
+
+2. **Implement traverse() in SqliteGraphStorage** (llmspell-storage/src/backends/sqlite/graph.rs):
+   ```rust
+   async fn traverse(
+       &self,
+       start_entity: &str,
+       relationship_type: Option<&str>,
+       max_depth: usize,
+       at_time: Option<DateTime<Utc>>,
+   ) -> Result<Vec<(Entity, usize, String)>> {
+       let conn = self.backend.get_connection().await?;
+       let tenant_id = self.get_tenant_id();
+       let timestamp = at_time.map(Self::datetime_to_unix).unwrap_or_else(|| Utc::now().timestamp());
+       let max_depth = max_depth.min(10); // Cap at 10 hops for safety
+
+       // Build dynamic WHERE clause for relationship_type filter
+       let rel_filter = relationship_type
+           .map(|_| "AND r.relationship_type = ?")
+           .unwrap_or("");
+
+       let sql = format!(
+           "WITH RECURSIVE graph_traversal AS (
+               -- Base case: starting entity (depth 0)
+               SELECT
+                   e.entity_id, e.name, e.entity_type, e.properties,
+                   e.valid_time_start, e.transaction_time_start,
+                   0 AS depth,
+                   json_array(e.entity_id) AS path
+               FROM entities e
+               WHERE e.entity_id = ?
+                 AND e.tenant_id = ?
+                 AND e.valid_time_start <= ? AND e.valid_time_end > ?
+                 AND e.transaction_time_end = 9999999999
+
+               UNION ALL
+
+               -- Recursive case: follow relationships (depth 1+)
+               SELECT
+                   e.entity_id, e.name, e.entity_type, e.properties,
+                   e.valid_time_start, e.transaction_time_start,
+                   gt.depth + 1,
+                   json_insert(gt.path, '$[#]', e.entity_id) AS path
+               FROM graph_traversal gt
+               JOIN relationships r ON gt.entity_id = r.from_entity
+               JOIN entities e ON r.to_entity = e.entity_id
+               WHERE gt.depth < ?
+                 AND r.tenant_id = ?
+                 AND r.valid_time_start <= ? AND r.valid_time_end > ?
+                 AND r.transaction_time_end = 9999999999
+                 AND e.valid_time_start <= ? AND e.valid_time_end > ?
+                 AND e.transaction_time_end = 9999999999
+                 {}
+                 -- Cycle prevention: entity not already in path
+                 AND NOT EXISTS (
+                     SELECT 1 FROM json_each(gt.path) WHERE value = e.entity_id
+                 )
+           )
+           SELECT entity_id, name, entity_type, properties,
+                  valid_time_start, transaction_time_start, depth, path
+           FROM graph_traversal
+           WHERE depth > 0  -- Exclude starting entity
+           ORDER BY depth, entity_id",
+           rel_filter
+       );
+
+       // Bind parameters: start_entity, tenant, time (x4), max_depth, tenant, time (x4), relationship_type (optional)
+       // Parse results into Vec<(Entity, usize, String)>
+       // ...
+   }
+   ```
+
+3. **Implement traverse() in PostgresGraphStorage** (llmspell-storage/src/backends/postgres/graph.rs):
+   ```rust
+   async fn traverse(
+       &self,
+       start_entity: &str,
+       relationship_type: Option<&str>,
+       max_depth: usize,
+       at_time: Option<DateTime<Utc>>,
+   ) -> Result<Vec<(Entity, usize, String)>> {
+       let client = self.backend.get_client().await?;
+       let tenant_id = self.backend.get_tenant_context().await?;
+       let timestamp = at_time.unwrap_or_else(Utc::now);
+       let max_depth = max_depth.min(10) as i32;
+
+       // PostgreSQL-specific: Use ARRAY type for path, tstzrange for temporal queries, GiST indexes
+       let sql = if let Some(rel_type) = relationship_type {
+           // With relationship type filter
+           "WITH RECURSIVE graph_traversal AS (
+               -- Base case: starting entity (depth 0)
+               SELECT
+                   e.entity_id, e.name, e.entity_type, e.properties,
+                   e.valid_time_start, e.transaction_time_start,
+                   0 AS depth,
+                   ARRAY[e.entity_id] AS path
+               FROM llmspell.entities e
+               WHERE e.entity_id = $1::uuid
+                 AND e.tenant_id = $2
+                 AND tstzrange(e.valid_time_start, e.valid_time_end) @> $3::timestamptz
+                 AND tstzrange(e.transaction_time_start, e.transaction_time_end) @> now()
+
+               UNION ALL
+
+               -- Recursive case: follow relationships
+               SELECT
+                   e.entity_id, e.name, e.entity_type, e.properties,
+                   e.valid_time_start, e.transaction_time_start,
+                   gt.depth + 1,
+                   gt.path || e.entity_id
+               FROM graph_traversal gt
+               JOIN llmspell.relationships r ON gt.entity_id = r.from_entity
+               JOIN llmspell.entities e ON r.to_entity = e.entity_id
+               WHERE gt.depth < $4
+                 AND r.tenant_id = $2
+                 AND r.relationship_type = $5
+                 AND tstzrange(r.valid_time_start, r.valid_time_end) @> $3::timestamptz
+                 AND tstzrange(r.transaction_time_start, r.transaction_time_end) @> now()
+                 AND tstzrange(e.valid_time_start, e.valid_time_end) @> $3::timestamptz
+                 AND tstzrange(e.transaction_time_start, e.transaction_time_end) @> now()
+                 -- Cycle prevention: entity not in path array
+                 AND NOT (e.entity_id = ANY(gt.path))
+           )
+           SELECT entity_id, name, entity_type, properties,
+                  valid_time_start, transaction_time_start, depth,
+                  array_to_json(path)::text AS path_json
+           FROM graph_traversal
+           WHERE depth > 0
+           ORDER BY depth, entity_id"
+       } else {
+           // Without relationship type filter (same but no r.relationship_type = $5)
+           "..."
+       };
+
+       // Execute query with parameters
+       // Parse results into Vec<(Entity, usize, String)>
+       // ...
+   }
+   ```
+
+4. **Implement traverse() in SurrealDB backend** (llmspell-graph/src/storage/surrealdb.rs):
+   ```rust
+   // TEMPORARY implementation for baseline comparison (will be deleted in Phase 2)
+   async fn traverse(
+       &self,
+       start_entity: &str,
+       relationship_type: Option<&str>,
+       max_depth: usize,
+       at_time: Option<DateTime<Utc>>,
+   ) -> Result<Vec<(Entity, usize, String)>> {
+       // SurrealDB graph traversal using recursive queries
+       // Note: SurrealDB has native graph traversal with RELATE
+       // Use as baseline for performance comparison
+       // Implementation details...
+   }
+   ```
+
+5. **Add comprehensive traverse tests** (llmspell-storage/src/backends/sqlite/graph.rs tests section):
+   ```rust
+   #[tokio::test]
+   async fn test_traverse_1_hop() {
+       // A -> B, A -> C
+       // traverse(A, None, 1) should return [B, C]
+   }
+
+   #[tokio::test]
+   async fn test_traverse_4_hops() {
+       // Linear chain: A -> B -> C -> D -> E
+       // traverse(A, None, 4) should return [B, C, D, E] with depths [1, 2, 3, 4]
+   }
+
+   #[tokio::test]
+   async fn test_traverse_with_cycles() {
+       // Cycle: A -> B -> C -> A
+       // traverse(A, None, 10) should not infinite loop
+       // Should return [B, C] only (A excluded as cycle)
+   }
+
+   #[tokio::test]
+   async fn test_traverse_relationship_type_filter() {
+       // A -[knows]-> B -[works_at]-> C
+       // traverse(A, Some("knows"), 2) should return [B] only
+   }
+
+   #[tokio::test]
+   async fn test_traverse_temporal() {
+       // Create entity at T1, relationship at T2
+       // traverse(A, None, 2, Some(T1.5)) should return []
+       // traverse(A, None, 2, Some(T2.5)) should return [B]
+   }
+   ```
+
+6. **Create synthetic graph dataset** (scripts/testing/generate-graph-dataset.sh):
+   ```bash
+   #!/bin/bash
+   # Generate synthetic 100K node graph for performance validation
+
+   # Configuration
+   NUM_ENTITIES=100000
+   AVG_RELATIONSHIPS=10
+   ENTITY_TYPES=("person" "concept" "event" "organization" "location")
+   REL_TYPES=("knows" "works_at" "part_of" "caused_by" "located_in")
+
+   # Generate entities with random types and properties
+   # Generate relationships with random types (avg 10 per entity)
+   # Export to JSON: entities.json, relationships.json
+   # Include bi-temporal timestamps spread over 5 years
+
+   # Output: scripts/testing/data/synthetic-graph-100k.json
+   ```
+
+7. **Run performance baseline comparison** (scripts/testing/benchmark-graph-traversal.sh):
+   ```bash
+   #!/bin/bash
+   # Load synthetic dataset into all 3 backends
+   # Execute 100 random 4-hop traversals on each
+   # Measure p50, p95, p99 latency
+
+   # Expected results (100K nodes, avg 10 rels/node):
+   # - SurrealDB: p95 ~38ms (embedded RocksDB, native graph support)
+   # - PostgreSQL: p95 ~32ms (GiST indexes, tstzrange operators, optimized planner)
+   # - SQLite: p95 ~42ms (B-tree indexes, json_array overhead, no native graph)
+
+   # Trade-off analysis:
+   # - SQLite: ~10% slower than SurrealDB, but eliminates 55MB dependency
+   # - PostgreSQL: ~15% faster than SurrealDB, production-ready horizontal scale
+
+   # Output: benchmarks/graph-traversal-results.json
+   ```
+
+8. **Document traversal performance** (docs/technical/graph-traversal-performance.md):
+   ```markdown
+   # Graph Traversal Performance Characteristics
+
+   ## Implementation Strategy
+   - **Recursive CTEs**: WITH RECURSIVE for multi-hop traversal
+   - **Cycle Prevention**: Path array tracking + NOT IN check
+   - **Bi-temporal Filtering**: Time range checks at each hop
+   - **Relationship Filtering**: Optional type-based traversal
+
+   ## Performance Profile (100K nodes, 1M relationships)
+
+   ### SQLite
+   - 1-hop: ~2-5ms (B-tree index on from_entity)
+   - 2-hop: ~8-15ms (one recursion level)
+   - 3-hop: ~20-30ms (two recursion levels)
+   - 4-hop: ~35-50ms (max recommended depth, cycle prevention overhead)
+
+   ### PostgreSQL
+   - 1-hop: ~1-3ms (GiST index on tstzrange + B-tree on from_entity)
+   - 2-hop: ~5-12ms (query planner optimization, parallel workers)
+   - 3-hop: ~15-25ms (hash joins on array paths)
+   - 4-hop: ~28-40ms (better than SQLite due to ARRAY type efficiency)
+
+   ### Comparison vs SurrealDB (Baseline - Removed in Phase 2)
+   - SurrealDB 4-hop: ~35-42ms (embedded RocksDB, RELATE operator)
+   - PostgreSQL: 12% faster (native GiST indexes, better query planner)
+   - SQLite: 8% slower (acceptable trade-off for 55MB dependency reduction)
+
+   ## Recommendations
+   - **Max depth**: 4 hops for interactive queries, 6 for batch
+   - **Cycle prevention**: Always enabled (prevents infinite loops)
+   - **Temporal queries**: Use at_time parameter for point-in-time traversal
+   - **Scaling**: PostgreSQL recommended for >1M nodes or multi-tenant production
+   ```
+
+**PHASE 2: Legacy Backend Removal (Day 14, ~8 hours)**
+
+9. **Remove HNSW file storage backend**:
    ```bash
    # Delete backend implementation
    rm -rf llmspell-memory/src/backends/hnsw/
