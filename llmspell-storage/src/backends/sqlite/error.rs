@@ -32,6 +32,10 @@ pub enum SqliteError {
     #[error("Serialization error: {0}")]
     Serialization(String),
 
+    /// Extension loading error
+    #[error("Extension error: {0}")]
+    Extension(String),
+
     /// Generic error
     #[error("SQLite error: {0}")]
     Other(String),

@@ -128,6 +128,44 @@ impl SqliteBackend {
         // Create connection pool
         let pool = SqlitePool::new(config.clone()).await?;
 
+        // Load sqlite-vec extension for vector search (Task 13c.2.2)
+        // Extension binary must be at ./extensions/vec0.dylib (macOS) or ./extensions/vec0.so (Linux)
+        let conn = pool.get_connection().await?;
+
+        #[cfg(target_os = "macos")]
+        let ext_path = "./extensions/vec0.dylib";
+        #[cfg(target_os = "linux")]
+        let ext_path = "./extensions/vec0.so";
+        #[cfg(target_os = "windows")]
+        let ext_path = "./extensions/vec0.dll";
+
+        // Enable extension loading (required by libsql for security)
+        // SAFETY: Extension loading is disabled immediately after loading vec0
+        conn.load_extension_enable().map_err(|e| {
+            SqliteError::Extension(format!("Failed to enable extension loading: {e}"))
+        })?;
+
+        // Load vec0 extension (synchronous call)
+        match conn.load_extension(ext_path, None) {
+            Ok(()) => {
+                tracing::info!("Successfully loaded sqlite-vec extension from {ext_path}");
+            }
+            Err(e) => {
+                tracing::warn!(
+                    "Failed to load sqlite-vec extension from {ext_path}: {e}. \
+                    Vector search will not be available. \
+                    Build extension: cd /tmp && git clone https://github.com/asg017/sqlite-vec && \
+                    cd sqlite-vec && ./scripts/vendor.sh && make loadable && \
+                    cp dist/vec0.* <project>/extensions/"
+                );
+            }
+        }
+
+        // Disable extension loading for security (prevent SQL injection attacks)
+        conn.load_extension_disable().map_err(|e| {
+            SqliteError::Extension(format!("Failed to disable extension loading: {e}"))
+        })?;
+
         Ok(Self {
             pool: Arc::new(pool),
             tenant_contexts: Arc::new(DashMap::new()),
