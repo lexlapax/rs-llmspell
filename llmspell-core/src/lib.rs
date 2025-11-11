@@ -133,6 +133,7 @@ pub mod traits {
     pub mod script_executor;
     pub mod service;
     pub mod state;
+    pub mod storage;
     pub mod template_executor;
     pub mod tenant_scoped;
     pub mod tool;
