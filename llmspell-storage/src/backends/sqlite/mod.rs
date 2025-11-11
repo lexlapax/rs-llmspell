@@ -40,6 +40,7 @@ mod error;
 mod extensions;
 mod graph;
 mod pool;
+mod procedural;
 mod vector;
 
 pub use backend::{HealthStatus, SqliteBackend, TenantContext};
@@ -48,4 +49,5 @@ pub use error::{Result, SqliteError};
 pub use extensions::SqliteVecExtension;
 pub use graph::SqliteGraphStorage;
 pub use pool::{PoolStats, SqlitePool};
+pub use procedural::{SqliteProceduralStorage, StoredPattern};
 pub use vector::SqliteVectorStorage;

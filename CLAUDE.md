@@ -18,9 +18,9 @@ Experimental platform for rapid AI concept exploration via Lua/JavaScript script
 - ✅ **Phases 7-13**: Complete (Infrastructure, Services, LLM, Templates, Memory, Context)
 - 🚧 **Phase 13c**: Storage Consolidation & Production Readiness (towards v0.14.0)
   - ✅ 13c.1: Cargo Dependencies (-60MB)
-  - ✅ 13c.2.0-13c.2.4: Vector + Graph Storage Complete (vectorlite-rs, SqliteVectorStorage, SqliteEpisodicMemory, SqliteGraphStorage, 4,580 lines)
-  - ⏳ 13c.2.5: SqliteProceduralStorage (NEXT)
-  - Pending: 13c.2.6-13c.2.12 (State, Auxiliary, Legacy Removal, Testing, Docs)
+  - ✅ 13c.2.0-13c.2.5: Vector + Graph + Procedural Storage Complete (vectorlite-rs, SqliteVectorStorage, SqliteEpisodicMemory, SqliteGraphStorage, SqliteProceduralStorage, 5,575 lines)
+  - ⏳ 13c.2.6: SqliteStateStorage (Agent V6 + KV V7 + Workflow V8) (NEXT)
+  - Pending: 13c.2.7-13c.2.12 (Auxiliary, Legacy Removal, Testing, Docs)
 
 ## Project-Specific Behavior Controls
 - **Experimental mindset**: This is a rapid iteration platform for AI exploration, not production deployment tool
