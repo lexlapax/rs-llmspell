@@ -1217,98 +1217,381 @@ All acceptance criteria met, all tests passing (53/53), zero clippy warnings, fu
 
 ---
 
-### Task 13c.2.2: vectorlite Extension Integration ⏹ PENDING
+### Task 13c.2.2: sqlite-vec Extension Integration (Brute-Force Baseline) ⏹ PENDING
 **Priority**: CRITICAL
 **Estimated Time**: 8 hours (Day 3)
 **Assignee**: Vector Search Team
 **Status**: ⏹ PENDING
 **Dependencies**: Task 13c.2.1 ✅
 
-**Description**: Integrate vectorlite SQLite extension for HNSW-indexed vector search, replacing hnsw_rs file-based storage.
+**Description**: Integrate sqlite-vec extension for brute-force vector search as working baseline for unified SQLite storage. Provides immediate functionality while vectorlite-rs pure Rust port (Task 13c.2.2a) is developed separately.
+
+**Architectural Decision** (2025-11-10):
+- **Choice**: sqlite-vec NOW (Task 13c.2.2) + vectorlite-rs LATER (Task 13c.2.2a)
+- **Rationale**:
+  - vectorlite (C++) requires external binary dependency (.so extraction from Python wheel, dynamic loading)
+  - Pure Rust port (vectorlite-rs using hnsw_rs) is 40+ hours (vs 8h estimate), would block Phase 13c progress
+  - sqlite-vec provides working Rust crate with sqlite3_auto_extension, simple integration, sufficient for <100K vectors
+  - Incremental approach: unblocks Phase 13c.2.3+ (SqliteVectorStorage implementation) while optimization proceeds in parallel
+- **Future Path**: Task 13c.2.2a will build vectorlite-rs (pure Rust SQLite extension using hnsw_rs crate) for 3-100x speedup via HNSW indexing
 
 **Acceptance Criteria**:
-- [ ] vectorlite extension loaded successfully (dynamic or static linking)
-- [ ] HNSW index creation tested (m=16, ef_construction=128)
-- [ ] Vector insertion benchmarked (target: <1ms per vector)
-- [ ] K-NN search benchmarked (target: <10ms for 10K vectors)
-- [ ] Fallback to sqlite-vec brute-force if vectorlite unavailable
+- [ ] sqlite-vec crate added to workspace Cargo.toml
+- [ ] Extension registered via sqlite3_auto_extension in SqliteBackend initialization
+- [ ] SQLite migration V3 created with vec0 virtual table schema
+- [ ] Vector insertion tested (zerocopy::AsBytes for Vec<f32> marshaling)
+- [ ] K-NN search tested (MATCH query with distance ordering)
+- [ ] Insert benchmark <1ms per vector (brute-force acceptable for baseline)
+- [ ] Search benchmark documented (brute-force, no HNSW - expected slower than 10ms for 10K+ vectors)
 - [ ] Dimension support: 384, 768, 1536, 3072 (all OpenAI/Anthropic dimensions)
 
 **Implementation Steps**:
-1. Research vectorlite installation:
-   - Option A: Pre-compiled .so for Linux/macOS
-   - Option B: Build from source (C++ hnswlib dependency)
-   - Option C: Dynamic loading via `libsql::Connection::load_extension()`
 
-2. Create extension loader (llmspell-storage/src/backends/sqlite/extensions.rs):
+1. **Add sqlite-vec dependency** (Cargo.toml):
+   ```toml
+   # Workspace dependencies
+   sqlite-vec = "0.1.6"
+   zerocopy = "0.8"  # For AsBytes trait (vector marshaling without copy)
+
+   # llmspell-storage/Cargo.toml
+   [dependencies]
+   sqlite-vec = { workspace = true, optional = true }
+   zerocopy = { workspace = true, optional = true }
+
+   [features]
+   sqlite = ["dep:libsql", "dep:r2d2", "dep:r2d2_sqlite", "dep:sqlite-vec", "dep:zerocopy"]
+   ```
+
+2. **Register sqlite-vec extension** (llmspell-storage/src/backends/sqlite/backend.rs):
    ```rust
-   pub enum VectorExtension {
-       Vectorlite, // HNSW-indexed
-       SqliteVec,  // Brute-force fallback
-   }
+   use sqlite_vec::sqlite3_vec_init;
+   use rusqlite::ffi::sqlite3_auto_extension;
 
    impl SqliteBackend {
-       pub async fn load_vector_extension(&self) -> Result<VectorExtension> {
-           // Try vectorlite first
-           match self.load_extension("vectorlite").await {
-               Ok(_) => Ok(VectorExtension::Vectorlite),
-               Err(_) => {
-                   warn!("vectorlite not found, using sqlite-vec fallback");
-                   self.load_extension("sqlite_vec").await?;
-                   Ok(VectorExtension::SqliteVec)
-               }
+       pub async fn new(config: SqliteConfig) -> Result<Self> {
+           // Register sqlite-vec extension globally (once per process)
+           unsafe {
+               sqlite3_auto_extension(Some(
+                   std::mem::transmute(sqlite3_vec_init as *const ())
+               ));
            }
+
+           // ... rest of initialization
        }
    }
    ```
 
-3. Create vector_embeddings table schema:
+3. **Create SQLite migration V3** (migrations/sqlite/V3__vector_embeddings.sql):
    ```sql
-   CREATE TABLE IF NOT EXISTS vector_embeddings (
-       id TEXT PRIMARY KEY,
+   -- sqlite-vec virtual table for brute-force vector search
+   -- Supports f32 vectors, multiple dimensions, tenant isolation
+
+   CREATE VIRTUAL TABLE IF NOT EXISTS vec_embeddings USING vec0(
+       embedding float[768]  -- Default to 768, will create per-dimension tables
+   );
+
+   -- Metadata table for tenant/scope/timestamps (vec0 only stores rowid + embedding)
+   CREATE TABLE IF NOT EXISTS vector_metadata (
+       rowid INTEGER PRIMARY KEY,
+       id TEXT NOT NULL UNIQUE,
        tenant_id TEXT NOT NULL,
        scope TEXT NOT NULL,
        dimension INTEGER NOT NULL,
-       embedding BLOB NOT NULL,  -- vectorlite type
-       metadata TEXT NOT NULL,   -- JSON
+       metadata TEXT NOT NULL,  -- JSON
        created_at INTEGER NOT NULL,
        updated_at INTEGER NOT NULL
    );
+
+   CREATE INDEX idx_vector_metadata_tenant ON vector_metadata(tenant_id, scope);
+   CREATE INDEX idx_vector_metadata_id ON vector_metadata(id);
    ```
 
-4. Create HNSW index (vectorlite):
-   ```sql
-   -- vectorlite HNSW index
-   CREATE INDEX IF NOT EXISTS idx_vector_hnsw
-   ON vector_embeddings(embedding)
-   USING vectorlite_index(dimension=768, m=16, ef_construction=128);
-   ```
-
-5. Benchmark insert performance:
+4. **Create extensions.rs module** (llmspell-storage/src/backends/sqlite/extensions.rs):
    ```rust
-   // Target: <1ms per vector (vs ~100µs hnsw_rs, 10x overhead acceptable)
-   cargo bench -p llmspell-storage --bench sqlite_vector_insert
+   /// Vector extension wrapper for sqlite-vec
+   ///
+   /// NOTE: sqlite-vec uses brute-force search (O(N) complexity).
+   /// For HNSW-indexed search (3-100x faster), see Task 13c.2.2a (vectorlite-rs).
+   pub struct SqliteVecExtension;
+
+   impl SqliteVecExtension {
+       /// Check if vec0 virtual table module is available
+       pub fn is_available(conn: &Connection) -> Result<bool> {
+           let version: String = conn.query_row(
+               "SELECT vec_version()",
+               [],
+               |row| row.get(0)
+           )?;
+           Ok(!version.is_empty())
+       }
+
+       /// Get supported dimensions (384, 768, 1536, 3072)
+       pub fn supported_dimensions() -> &'static [usize] {
+           &[384, 768, 1536, 3072]
+       }
+   }
    ```
 
-6. Benchmark search performance:
+5. **Create unit tests** (llmspell-storage/src/backends/sqlite/extensions.rs):
    ```rust
-   // Target: <10ms for 10K vectors (vs 1-2ms hnsw_rs, 5x overhead acceptable)
-   cargo bench -p llmspell-storage --bench sqlite_vector_search
+   #[cfg(test)]
+   mod tests {
+       use super::*;
+       use zerocopy::AsBytes;
+
+       #[test]
+       fn test_extension_available() {
+           // Test that sqlite-vec extension loads
+       }
+
+       #[test]
+       fn test_vector_insert_and_search() {
+           // Create vec0 table, insert vectors, perform KNN search
+       }
+
+       #[test]
+       fn test_multi_dimension_support() {
+           // Test 384, 768, 1536, 3072 dimensions
+       }
+   }
    ```
+
+6. **Create benchmark suite** (llmspell-storage/benches/sqlite_vec_performance.rs):
+   ```rust
+   // Benchmark insert: target <1ms per vector
+   // Benchmark search: document brute-force performance (no HNSW)
+   //   - Expect O(N) complexity, slower than 10ms for 10K+ vectors
+   //   - This is acceptable baseline until vectorlite-rs (Task 13c.2.2a)
+   ```
+
+7. **Update README-DEVEL.md** with sqlite-vec integration notes and performance characteristics
 
 **Definition of Done**:
-- [ ] vectorlite extension loading works (or fallback to sqlite-vec)
-- [ ] HNSW index creation successful
+- [ ] sqlite-vec crate added to workspace dependencies
+- [ ] Extension registered via sqlite3_auto_extension
+- [ ] Migration V3 created (vec0 virtual table + metadata table)
+- [ ] extensions.rs module created with SqliteVecExtension wrapper
+- [ ] Unit tests passing (extension availability, insert, search, multi-dimension)
 - [ ] Insert benchmark <1ms per vector
-- [ ] Search benchmark <10ms for 10K vectors
+- [ ] Search benchmark documented (brute-force performance baseline)
 - [ ] Multi-dimension support tested (384, 768, 1536, 3072)
-- [ ] Documentation on extension installation
+- [ ] Documentation updated with sqlite-vec integration notes
 
 **Files to Create/Modify**:
-- `llmspell-storage/src/backends/sqlite/extensions.rs` (NEW)
-- `llmspell-storage/src/backends/sqlite/schema.sql` (NEW - SQL DDL)
-- `llmspell-storage/benches/sqlite_vector_performance.rs` (NEW)
-- `README-DEVEL.md` (add vectorlite installation instructions)
+- `Cargo.toml` (workspace - add sqlite-vec + zerocopy dependencies)
+- `llmspell-storage/Cargo.toml` (add optional dependencies to sqlite feature)
+- `llmspell-storage/src/backends/sqlite/backend.rs` (register sqlite-vec extension)
+- `llmspell-storage/src/backends/sqlite/extensions.rs` (NEW - SqliteVecExtension wrapper)
+- `llmspell-storage/src/backends/sqlite/mod.rs` (export extensions module)
+- `llmspell-storage/migrations/sqlite/V3__vector_embeddings.sql` (NEW - migration)
+- `llmspell-storage/benches/sqlite_vec_performance.rs` (NEW - benchmarks)
+- `README-DEVEL.md` (add sqlite-vec integration documentation)
+
+---
+
+### Task 13c.2.2a: vectorlite-rs Pure Rust Port (HNSW Optimization) ⏹ DEFERRED
+**Priority**: HIGH (optimization, not blocking)
+**Estimated Time**: 40 hours (8 days - parallel track with Phase 13c.2.3+)
+**Assignee**: Vector Search Optimization Team
+**Status**: ⏹ DEFERRED (can start after 13c.2.2 ✅, runs parallel to 13c.2.3+)
+**Dependencies**: Task 13c.2.2 ✅
+
+**Description**: Build pure Rust SQLite extension (vectorlite-rs) using hnsw_rs crate for HNSW-indexed vector search. Provides 3-100x speedup vs sqlite-vec brute-force while maintaining pure Rust codebase. This task can proceed in parallel with Phase 13c.2 completion - does not block main timeline.
+
+**Strategic Rationale**:
+- **Pure Rust**: Eliminates external C++ binary dependency (vectorlite), maintains memory safety guarantees
+- **hnsw_rs Foundation**: Mature Rust HNSW implementation with SIMD AVX2, multithreading, serde support, 15K req/s on 1M vectors
+- **SQLite Virtual Table API**: Build custom vec0_hnsw module as drop-in replacement for sqlite-vec's vec0
+- **Incremental Adoption**: Task 13c.2.2 (sqlite-vec) provides working baseline immediately, vectorlite-rs becomes optional optimization
+- **Performance Target**: Match vectorlite C++ performance (3-100x faster than brute-force, <10ms for 10K vectors)
+
+**Acceptance Criteria**:
+- [ ] vectorlite-rs crate created (new workspace crate, builds as SQLite loadable extension .so/.dylib/.dll)
+- [ ] SQLite Virtual Table API implemented in Rust (using rusqlite or sqlite-loadable-rs for FFI)
+- [ ] hnsw_rs integration complete (HNSW index, K-NN search, serialization)
+- [ ] Distance metrics supported: L2 (squared), cosine, inner product
+- [ ] HNSW parameters configurable: M=16, ef_construction=128 (matching vectorlite defaults)
+- [ ] Multi-dimension support: 384, 768, 1536, 3072
+- [ ] Persistence: Index serialization to disk via hnsw_rs serde support
+- [ ] Tenant isolation: Filter by tenant_id in search queries
+- [ ] Metadata filtering: JSON query support via sqlite3 json_extract()
+- [ ] Extension loader in SqliteBackend (load_extension() with fallback to sqlite-vec)
+- [ ] Benchmark parity: <1ms insert, <10ms search for 10K vectors, 3-100x faster than sqlite-vec
+- [ ] Unit tests: 50+ tests covering all Virtual Table API methods
+- [ ] Integration tests: Drop-in replacement for sqlite-vec in SqliteVectorStorage
+- [ ] Documentation: Architecture, build process, performance tuning, comparison table
+
+**Implementation Steps**:
+
+1. **Research SQLite extension development in Rust**:
+   - sqlite-loadable-rs framework (https://github.com/asg017/sqlite-loadable-rs)
+   - rusqlite low-level FFI bindings
+   - Virtual Table API: xCreate, xBestIndex, xFilter, xColumn, xRowid, etc.
+
+2. **Create vectorlite-rs crate** (new workspace member):
+   ```toml
+   [package]
+   name = "vectorlite-rs"
+   version = "0.1.0"
+   edition = "2021"
+
+   [lib]
+   crate-type = ["cdylib", "rlib"]  # .so/.dylib/.dll for SQLite + rlib for tests
+
+   [dependencies]
+   hnsw_rs = "0.3"  # Pure Rust HNSW
+   serde = { version = "1.0", features = ["derive"] }
+   serde_json = "1.0"
+   anyhow = "1.0"
+   # Choose one:
+   # sqlite-loadable = "0.1"  # Higher-level framework
+   # rusqlite = { version = "0.31", features = ["vtab"] }  # Lower-level FFI
+   ```
+
+3. **Implement SQLite Virtual Table trait**:
+   ```rust
+   use rusqlite::vtab::{VTab, VTabCursor, VTabConfig};
+   use hnsw_rs::hnsw::Hnsw;
+
+   pub struct VectorliteTable {
+       hnsw: Hnsw<f32, DistL2>,  // Or DistCosine, DistDot
+       dimension: usize,
+       metadata: HashMap<RowId, serde_json::Value>,
+   }
+
+   impl VTab for VectorliteTable {
+       fn xCreate(...) -> Result<Self> { /* Initialize HNSW */ }
+       fn xBestIndex(...) -> Result<()> { /* Query planning */ }
+       fn xOpen(...) -> Result<VectorliteCursor> { /* Create cursor */ }
+       // ...
+   }
+
+   pub struct VectorliteCursor {
+       results: Vec<(RowId, f32)>,  // K-NN search results
+       pos: usize,
+   }
+
+   impl VTabCursor for VectorliteCursor {
+       fn xFilter(...) -> Result<()> { /* Execute K-NN search */ }
+       fn xNext(...) -> Result<()> { /* Advance cursor */ }
+       fn xColumn(...) -> Result<()> { /* Return column value */ }
+       fn xRowid(...) -> Result<i64> { /* Return rowid */ }
+       fn xEof(...) -> bool { /* Check if done */ }
+   }
+   ```
+
+4. **Integrate hnsw_rs for vector operations**:
+   ```rust
+   use hnsw_rs::hnsw::Hnsw;
+   use hnsw_rs::dist::{DistL2, DistCosine, DistDot};
+
+   impl VectorliteTable {
+       fn insert_vector(&mut self, rowid: i64, embedding: &[f32]) -> Result<()> {
+           self.hnsw.insert((rowid, embedding));
+           Ok(())
+       }
+
+       fn knn_search(&self, query: &[f32], k: usize, tenant_id: &str) -> Result<Vec<(i64, f32)>> {
+           let results = self.hnsw.parallel_search(query, k, ef_search);
+           // Filter by tenant_id using metadata
+           Ok(filtered_results)
+       }
+   }
+   ```
+
+5. **Build loadable extension**:
+   ```rust
+   // Entry point for SQLite
+   #[no_mangle]
+   pub extern "C" fn sqlite3_vectorliters_init(
+       db: *mut sqlite3,
+       err_msg: *mut *mut c_char,
+       api: *mut sqlite3_api_routines,
+   ) -> c_int {
+       // Register vec0_hnsw virtual table module
+       rusqlite::vtab::register_module::<VectorliteTable>(
+           db, "vec0_hnsw", ...
+       )
+   }
+   ```
+
+6. **Create extension loader** in llmspell-storage:
+   ```rust
+   // llmspell-storage/src/backends/sqlite/extensions.rs
+   pub enum VectorExtension {
+       VectorliteRs,  // Pure Rust HNSW (Task 13c.2.2a)
+       SqliteVec,     // Brute-force fallback (Task 13c.2.2)
+   }
+
+   impl SqliteBackend {
+       pub async fn load_vector_extension(&self) -> Result<VectorExtension> {
+           // Try vectorlite-rs first (if built with "vectorlite-rs" feature)
+           #[cfg(feature = "vectorlite-rs")]
+           match self.load_extension("vectorlite_rs").await {
+               Ok(_) => return Ok(VectorExtension::VectorliteRs),
+               Err(e) => warn!("vectorlite-rs not found: {}, falling back to sqlite-vec", e),
+           }
+
+           // Fallback to sqlite-vec (always available via Task 13c.2.2)
+           Ok(VectorExtension::SqliteVec)
+       }
+   }
+   ```
+
+7. **Benchmarking**:
+   ```bash
+   # Compare vectorlite-rs vs sqlite-vec vs vectorlite C++
+   cargo bench -p llmspell-storage --bench vector_comparison
+
+   # Target metrics:
+   # - Insert: <1ms per vector (same as sqlite-vec)
+   # - Search 10K vectors: <10ms (3-10x faster than sqlite-vec)
+   # - Search 100K vectors: <50ms (10-100x faster than sqlite-vec)
+   # - Memory: Similar to vectorlite C++ (HNSW graph overhead)
+   ```
+
+8. **Testing**:
+   ```rust
+   // Unit tests: hnsw operations, distance metrics, serialization
+   cargo test -p vectorlite-rs
+
+   // Integration tests: drop-in replacement for sqlite-vec in SqliteVectorStorage
+   cargo test -p llmspell-storage --features vectorlite-rs --test sqlite_vector
+
+   // Compatibility: ensure same SQL API as sqlite-vec (vec0 module)
+   ```
+
+9. **Documentation**:
+   - Architecture doc: Virtual Table API, hnsw_rs integration, extension loading
+   - Build guide: Cargo build as cdylib, SQLite extension installation
+   - Performance comparison: vectorlite-rs vs sqlite-vec vs vectorlite C++ vs hnsw_rs file-based
+   - Tuning guide: HNSW parameters (M, ef_construction, ef_search), memory/speed trade-offs
+
+**Definition of Done**:
+- [ ] vectorlite-rs builds as SQLite loadable extension (.so/.dylib/.dll)
+- [ ] Virtual Table API implemented (xCreate, xBestIndex, xFilter, xColumn, xRowid, etc.)
+- [ ] hnsw_rs integration complete (insert, K-NN search, serialization)
+- [ ] Extension loader in SqliteBackend with fallback to sqlite-vec
+- [ ] Benchmarks show 3-100x speedup vs sqlite-vec for K-NN search
+- [ ] 50+ unit tests passing
+- [ ] Integration tests show drop-in replacement for sqlite-vec
+- [ ] Documentation complete (architecture, build, performance, tuning)
+- [ ] Zero clippy warnings, compiles with --all-features
+- [ ] Feature flag: "vectorlite-rs" (optional, sqlite-vec is default)
+
+**Files to Create**:
+- `vectorlite-rs/Cargo.toml` (new workspace crate)
+- `vectorlite-rs/src/lib.rs` (extension entry point)
+- `vectorlite-rs/src/vtab.rs` (Virtual Table implementation)
+- `vectorlite-rs/src/hnsw_wrapper.rs` (hnsw_rs integration)
+- `vectorlite-rs/src/distance.rs` (distance metrics: L2, cosine, inner product)
+- `vectorlite-rs/tests/integration_tests.rs`
+- `vectorlite-rs/benches/performance.rs`
+- `llmspell-storage/src/backends/sqlite/extensions.rs` (update with vectorlite-rs loader)
+- `docs/technical/vectorlite-rs-architecture.md` (NEW)
+- `README-DEVEL.md` (add vectorlite-rs build instructions)
+
+**Timeline Note**: This task is DEFERRED and can run in parallel with Phase 13c.2.3+ (SqliteVectorStorage implementation). Task 13c.2.2 (sqlite-vec) unblocks SqliteVectorStorage immediately. vectorlite-rs becomes an optional optimization that can be enabled via feature flag when complete.
 
 ---
 
