@@ -569,10 +569,10 @@ Zero breaking changes
 
 ---
 
-## Phase 13c.2: SQLite Unified Local Storage (Days 11-25, 3 weeks)
+## Phase 13c.2: SQLite Unified Local Storage (Days 11-31, 4+ weeks)
 
 **Goal**: Consolidate local storage from 4 backends (HNSW files, SurrealDB, Sled, filesystem) to 1 unified libsql-based solution
-**Timeline**: 15 working days (3 weeks, 120 hours total)
+**Timeline**: 21 working days (4+ weeks, 166 hours total, 13 tasks including trait architecture)
 **Critical Dependencies**: Phase 13c.1 (Dependency Cleanup) ✅
 **Priority**: CRITICAL (Production Readiness - eliminates 60MB dependencies, operational complexity)
 **Target**: v0.14.0 Release
@@ -599,42 +599,380 @@ Current (Fragmented):
 
 Unified (libsql):
 - All Storage: ~/.llmspell/storage.db (single SQLite file)
-  - vector_embeddings (vectorlite HNSW index)
-  - entities + relationships (recursive CTEs, bi-temporal)
-  - agent_state + workflow_state (JSONB, replacing Sled)
-  - sessions + artifacts (JSONB + BLOB storage)
+  - V3: vector_embeddings (vectorlite HNSW index - episodic memory)
+  - V4: entities + relationships (recursive CTEs, bi-temporal - semantic memory)
+  - V5: procedural_patterns (frequency-tracked patterns - procedural memory)
+  - V6: agent_states (agent state with versioning)
+  - V7: kv_store (generic key-value fallback)
+  - V8: workflow_states (workflow lifecycle tracking)
+  - V9: sessions (session management)
+  - V10: artifacts (content-addressed storage with dedup)
+  - V11: event_log (time-series events with correlation)
+  - V13: hook_history (hook execution replay)
   - Extension: vectorlite.so (HNSW vector search)
 ```
 
 **Success Criteria**:
-- [ ] libsql backend implemented for all 10 storage components
+- [ ] libsql backend implemented for all 10 storage components: Vector (V3), Graph (V4), Procedural (V5), Agent (V6), KV (V7), Workflow (V8), Sessions (V9), Artifacts (V10), Events (V11), Hooks (V13)
 - [ ] Breaking changes acceptable (pre-1.0, legacy backends completely removed)
 - [ ] 149 Phase 13 tests passing with libsql backend exclusively
-- [ ] Legacy backends deleted: HNSW files, SurrealDB, Sled
+- [ ] Legacy backends deleted: HNSW files, SurrealDB, Sled, filesystem artifacts
 - [ ] Benchmark suite validates performance trade-offs (<10ms vector search, <50ms graph traversal)
 - [ ] Binary size reduced by 50-60MB (sled, surrealdb, rocksdb, hnsw_rs removed)
 - [ ] Documentation complete (setup, architecture, tuning, backup)
 - [ ] Backup/restore tested (1 file copy vs 4 procedures)
 
 **Week-by-Week Breakdown**:
-- **Week 1 (Days 1-5)**: Foundation + Vector Storage (libsql backend, connection pooling, SqliteVectorStorage with vectorlite)
-- **Week 2 (Days 6-10)**: Graph + State Storage (SqliteGraphStorage with recursive CTEs, SqliteStateStorage replacing Sled, legacy backend removal)
-- **Week 3 (Days 11-15)**: Testing + Documentation (legacy backend cleanup validation, benchmarking, integration testing, comprehensive docs)
+- **Week 1 (Days 1-6)**: Trait Architecture + Foundation (13c.2.0-13c.2.4: storage traits in core, libsql backend, vectorlite, SqliteVectorStorage, SqliteGraphStorage)
+- **Week 2 (Days 7-13)**: State Storage (13c.2.5-13c.2.7: Procedural V5, Agent V6, KV V7, Workflow V8, Sessions V9, Artifacts V10, Events V11, Hooks V13)
+- **Week 3 (Days 14-17)**: Legacy Removal + Testing (13c.2.8-13c.2.10: complete deletion of HNSW/SurrealDB/Sled, benchmarking, integration tests)
+- **Week 4 (Days 18-21)**: Compatibility + Documentation (13c.2.11-13c.2.12: PostgreSQL/SQLite export/import tools, comprehensive docs)
 
 ---
 
-### Task 13c.2.1: libsql Backend Foundation ⏹ PENDING
+### Task 13c.2.0: Storage Trait Architecture - Centralize New Traits in llmspell-core ⏹ PENDING
 **Priority**: CRITICAL
-**Estimated Time**: 8 hours (Day 1)
-**Assignee**: Storage Infrastructure Team
+**Estimated Time**: 6 hours (Day 1)
+**Assignee**: Architecture Team
 **Status**: ⏹ PENDING
 **Dependencies**: Phase 13c.1 ✅
 
-**Description**: Establish libsql backend infrastructure with connection pooling, encryption at rest, and tenant context management for unified local storage.
+**Description**: Define 3 new storage traits (WorkflowStateStorage, SessionStorage, ArtifactStorage) in llmspell-core to prevent circular dependencies and establish architectural foundation for SQLite implementations. This follows the **Hybrid Approach**: new traits go in llmspell-core (precedent: StateManager), existing domain traits (KnowledgeGraph, ProceduralMemory, EventStorage) stay in domain crates.
+
+**Architectural Rationale**:
+- **Circular Dependency Prevention**: llmspell-storage → llmspell-graph dependency creates cycle risk. Moving new traits to foundation layer (llmspell-core) eliminates risk.
+- **Precedent**: StateManager already exists in llmspell-core/src/state/traits.rs (storage-like trait)
+- **Zero Breaking Changes**: Only adds new traits, doesn't move existing ones
+- **Future-Proof**: Any crate can implement traits from llmspell-core without dependency conflicts
+
+**Trait Coverage Summary** (10 storage components):
+```
+✓ Existing Traits (Keep in Domain Crates):
+  V3 Vector:     VectorStorage (llmspell-storage/src/vector_storage.rs)
+  V4 Graph:      KnowledgeGraph (llmspell-graph/src/traits/knowledge_graph.rs)
+  V5 Procedural: ProceduralMemory (llmspell-memory/src/traits/procedural.rs)
+  V6 Agent:      Use StorageBackend (llmspell-storage/src/traits.rs)
+  V7 KV Store:   StorageBackend (llmspell-storage/src/traits.rs)
+  V11 Events:    EventStorage (llmspell-events/src/storage_adapter.rs)
+  V13 Hooks:     Use StorageBackend or custom methods
+
+❌ New Traits (Add to llmspell-core - THIS TASK):
+  V8 Workflow:   WorkflowStateStorage (NEW)
+  V9 Sessions:   SessionStorage (NEW)
+  V10 Artifacts: ArtifactStorage (NEW)
+```
 
 **Acceptance Criteria**:
+- [ ] llmspell-core/src/traits/storage/ module created with mod.rs
+- [ ] WorkflowStateStorage trait defined with 5 methods (save_state, load_state, update_status, list_workflows, delete_state)
+- [ ] SessionStorage trait defined with 6 methods (create_session, get_session, update_session, delete_session, list_active_sessions, cleanup_expired)
+- [ ] ArtifactStorage trait defined with 5 methods (store_artifact, get_artifact, delete_artifact, list_session_artifacts, get_storage_stats)
+- [ ] llmspell-core/src/types/storage/ module created for domain types
+- [ ] WorkflowState, WorkflowStatus types defined
+- [ ] SessionData type defined
+- [ ] Artifact, ArtifactId types defined
+- [ ] All traits exported from llmspell-core/src/traits/mod.rs
+- [ ] All types exported from llmspell-core/src/types/mod.rs
+- [ ] Zero clippy warnings
+- [ ] Documentation comments on all traits and types (>90% API doc coverage)
+
+**Implementation Steps**:
+
+1. **Create llmspell-core/src/traits/storage/ module structure**:
+   ```bash
+   mkdir -p llmspell-core/src/traits/storage
+   touch llmspell-core/src/traits/storage/mod.rs
+   touch llmspell-core/src/traits/storage/workflow.rs
+   touch llmspell-core/src/traits/storage/session.rs
+   touch llmspell-core/src/traits/storage/artifact.rs
+   ```
+
+2. **Create llmspell-core/src/types/storage/ module structure**:
+   ```bash
+   mkdir -p llmspell-core/src/types/storage
+   touch llmspell-core/src/types/storage/mod.rs
+   touch llmspell-core/src/types/storage/workflow.rs
+   touch llmspell-core/src/types/storage/session.rs
+   touch llmspell-core/src/types/storage/artifact.rs
+   ```
+
+3. **Define WorkflowStateStorage trait** (llmspell-core/src/traits/storage/workflow.rs):
+   ```rust
+   use async_trait::async_trait;
+   use anyhow::Result;
+   use crate::types::storage::{WorkflowState, WorkflowStatus};
+
+   /// Workflow state persistence trait
+   ///
+   /// Manages persistent storage for workflow execution state with lifecycle tracking.
+   /// Supports workflow checkpointing, status updates, and resumption.
+   #[async_trait]
+   pub trait WorkflowStateStorage: Send + Sync {
+       /// Save complete workflow state
+       async fn save_state(&self, workflow_id: &str, state: &WorkflowState) -> Result<()>;
+
+       /// Load workflow state by ID
+       async fn load_state(&self, workflow_id: &str) -> Result<Option<WorkflowState>>;
+
+       /// Update workflow status (pending→running→completed/failed/cancelled)
+       async fn update_status(&self, workflow_id: &str, status: WorkflowStatus) -> Result<()>;
+
+       /// List workflows matching optional status filter
+       async fn list_workflows(&self, status_filter: Option<WorkflowStatus>) -> Result<Vec<String>>;
+
+       /// Delete workflow state (cleanup after completion)
+       async fn delete_state(&self, workflow_id: &str) -> Result<()>;
+   }
+   ```
+
+4. **Define WorkflowState types** (llmspell-core/src/types/storage/workflow.rs):
+   ```rust
+   use serde::{Deserialize, Serialize};
+   use chrono::{DateTime, Utc};
+
+   /// Workflow execution status
+   #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+   pub enum WorkflowStatus {
+       Pending,
+       Running,
+       Completed,
+       Failed,
+       Cancelled,
+   }
+
+   /// Persistent workflow execution state
+   #[derive(Debug, Clone, Serialize, Deserialize)]
+   pub struct WorkflowState {
+       pub workflow_id: String,
+       pub workflow_name: String,
+       pub status: WorkflowStatus,
+       pub current_step: usize,
+       pub state_data: serde_json::Value, // Workflow-specific state (JSONB)
+       pub started_at: Option<DateTime<Utc>>,
+       pub completed_at: Option<DateTime<Utc>>,
+   }
+   ```
+
+5. **Define SessionStorage trait** (llmspell-core/src/traits/storage/session.rs):
+   ```rust
+   use async_trait::async_trait;
+   use anyhow::Result;
+   use crate::types::storage::SessionData;
+
+   /// Session persistence trait
+   ///
+   /// Manages session lifecycle with expiration tracking and artifact references.
+   #[async_trait]
+   pub trait SessionStorage: Send + Sync {
+       /// Create new session
+       async fn create_session(&self, session_id: &str, data: &SessionData) -> Result<()>;
+
+       /// Retrieve session by ID
+       async fn get_session(&self, session_id: &str) -> Result<Option<SessionData>>;
+
+       /// Update session data
+       async fn update_session(&self, session_id: &str, data: &SessionData) -> Result<()>;
+
+       /// Delete session (cleanup)
+       async fn delete_session(&self, session_id: &str) -> Result<()>;
+
+       /// List active (non-expired) sessions
+       async fn list_active_sessions(&self) -> Result<Vec<String>>;
+
+       /// Cleanup expired sessions (batch delete)
+       async fn cleanup_expired(&self) -> Result<usize>;
+   }
+   ```
+
+6. **Define SessionData type** (llmspell-core/src/types/storage/session.rs):
+   ```rust
+   use serde::{Deserialize, Serialize};
+   use chrono::{DateTime, Utc};
+
+   /// Session status
+   #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+   pub enum SessionStatus {
+       Active,
+       Completed,
+       Expired,
+   }
+
+   /// Persistent session data
+   #[derive(Debug, Clone, Serialize, Deserialize)]
+   pub struct SessionData {
+       pub session_id: String,
+       pub status: SessionStatus,
+       pub session_data: serde_json::Value, // Session-specific data (JSONB)
+       pub created_at: DateTime<Utc>,
+       pub expires_at: Option<DateTime<Utc>>,
+       pub artifact_count: usize,
+   }
+   ```
+
+7. **Define ArtifactStorage trait** (llmspell-core/src/traits/storage/artifact.rs):
+   ```rust
+   use async_trait::async_trait;
+   use anyhow::Result;
+   use crate::types::storage::{Artifact, ArtifactId};
+
+   /// Artifact storage statistics
+   #[derive(Debug, Clone, Default)]
+   pub struct SessionStorageStats {
+       pub total_size: usize,
+       pub artifact_count: usize,
+       pub deduplicated_count: usize,
+   }
+
+   /// Content-addressed artifact storage trait
+   ///
+   /// Manages artifact persistence with deduplication and reference counting.
+   #[async_trait]
+   pub trait ArtifactStorage: Send + Sync {
+       /// Store artifact (returns unique ID)
+       async fn store_artifact(&self, artifact: &Artifact) -> Result<ArtifactId>;
+
+       /// Retrieve artifact by ID
+       async fn get_artifact(&self, id: &ArtifactId) -> Result<Option<Artifact>>;
+
+       /// Delete artifact (decrements ref count)
+       async fn delete_artifact(&self, id: &ArtifactId) -> Result<()>;
+
+       /// List all artifacts for a session
+       async fn list_session_artifacts(&self, session_id: &str) -> Result<Vec<ArtifactId>>;
+
+       /// Get storage statistics for a session
+       async fn get_storage_stats(&self, session_id: &str) -> Result<SessionStorageStats>;
+   }
+   ```
+
+8. **Define Artifact types** (llmspell-core/src/types/storage/artifact.rs):
+   ```rust
+   use serde::{Deserialize, Serialize};
+   use std::fmt;
+
+   /// Artifact unique identifier (content hash)
+   #[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize)]
+   pub struct ArtifactId(pub String);
+
+   impl fmt::Display for ArtifactId {
+       fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+           write!(f, "{}", self.0)
+       }
+   }
+
+   /// Artifact type classification
+   #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+   pub enum ArtifactType {
+       Code,
+       Data,
+       Image,
+       Document,
+       Binary,
+   }
+
+   /// Persistent artifact with content-addressed storage
+   #[derive(Debug, Clone, Serialize, Deserialize)]
+   pub struct Artifact {
+       pub artifact_id: ArtifactId,
+       pub session_id: String,
+       pub artifact_type: ArtifactType,
+       pub content_hash: String,  // SHA256
+       pub content: Vec<u8>,      // Raw content
+       pub metadata: serde_json::Value,
+       pub size_bytes: usize,
+   }
+   ```
+
+9. **Export from llmspell-core/src/traits/storage/mod.rs**:
+   ```rust
+   mod workflow;
+   mod session;
+   mod artifact;
+
+   pub use workflow::*;
+   pub use session::*;
+   pub use artifact::*;
+   ```
+
+10. **Export from llmspell-core/src/traits/mod.rs** (add to existing exports):
+    ```rust
+    pub mod storage;  // NEW
+    ```
+
+11. **Export from llmspell-core/src/types/storage/mod.rs**:
+    ```rust
+    mod workflow;
+    mod session;
+    mod artifact;
+
+    pub use workflow::*;
+    pub use session::*;
+    pub use artifact::*;
+    ```
+
+12. **Export from llmspell-core/src/types/mod.rs** (add to existing exports):
+    ```rust
+    pub mod storage;  // NEW
+    ```
+
+13. **Run validation**:
+    ```bash
+    # Compile check
+    cargo check -p llmspell-core
+
+    # Clippy check
+    cargo clippy -p llmspell-core -- -D warnings
+
+    # Doc coverage check
+    cargo doc -p llmspell-core --no-deps
+    ```
+
+**Definition of Done**:
+- [ ] All 3 traits defined with complete method signatures
+- [ ] All domain types defined (WorkflowState, WorkflowStatus, SessionData, SessionStatus, Artifact, ArtifactId, ArtifactType, SessionStorageStats)
+- [ ] Module structure exported correctly from llmspell-core
+- [ ] Compiles clean: `cargo check -p llmspell-core`
+- [ ] Zero clippy warnings: `cargo clippy -p llmspell-core -- -D warnings`
+- [ ] Documentation complete: All traits and types have doc comments
+- [ ] Import verification: Can import `use llmspell_core::traits::storage::*;`
+
+**Files to Create**:
+- `llmspell-core/src/traits/storage/mod.rs` (NEW)
+- `llmspell-core/src/traits/storage/workflow.rs` (NEW)
+- `llmspell-core/src/traits/storage/session.rs` (NEW)
+- `llmspell-core/src/traits/storage/artifact.rs` (NEW)
+- `llmspell-core/src/types/storage/mod.rs` (NEW)
+- `llmspell-core/src/types/storage/workflow.rs` (NEW)
+- `llmspell-core/src/types/storage/session.rs` (NEW)
+- `llmspell-core/src/types/storage/artifact.rs` (NEW)
+
+**Files to Modify**:
+- `llmspell-core/src/traits/mod.rs` (add `pub mod storage;`)
+- `llmspell-core/src/types/mod.rs` (add `pub mod storage;`)
+
+**Architectural Impact**:
+- **llmspell-core**: +8 files, ~600 lines (traits + types)
+- **Dependency graph**: No changes (core remains foundation with zero internal deps)
+- **Circular dependency risk**: Eliminated for new storage traits
+- **Future migration**: Option to move VectorStorage to core post-Phase 13c.2 for consistency
+
+---
+
+### Task 13c.2.1: Migration Structure & libsql Backend Foundation ⏹ PENDING
+**Priority**: CRITICAL
+**Estimated Time**: 8 hours (Day 2)
+**Assignee**: Storage Infrastructure Team
+**Status**: ⏹ PENDING
+**Dependencies**: Task 13c.2.0 ✅
+
+**Description**: Reorganize migration structure for backend-specific SQL dialects, then establish libsql backend infrastructure with connection pooling, encryption at rest, and tenant context management for unified local storage. This task sets the foundation for all subsequent storage implementations.
+
+**Acceptance Criteria**:
+- [ ] Migration directory reorganized: `migrations/postgres/` (move 15 existing) + `migrations/sqlite/` (create structure)
+- [ ] Migration runner updated to support backend-specific directories (PostgresBackend → migrations/postgres/, SqliteBackend → migrations/sqlite/)
+- [ ] SQLite migration V1 created (initial setup: PRAGMA foreign_keys, PRAGMA journal_mode WAL, version tracking table)
 - [ ] libsql dependency added to workspace Cargo.toml (v0.9.24)
-- [ ] PostgresBackend struct created in llmspell-storage/src/backends/sqlite/ (similar to postgres backend pattern)
+- [ ] SqliteBackend struct created in llmspell-storage/src/backends/sqlite/ (similar to postgres backend pattern)
 - [ ] Connection pooling implemented (R2D2, 20 connections, WAL mode)
 - [ ] Encryption at rest optional (AES-256, via libsql feature)
 - [ ] Tenant context management (session variables for RLS-style isolation)
@@ -642,19 +980,71 @@ Unified (libsql):
 - [ ] Zero warnings, compiles clean
 
 **Implementation Steps**:
-1. Add libsql to workspace dependencies:
+
+1. **Reorganize migration directory structure**:
+   ```bash
+   # Create backend-specific directories
+   mkdir -p llmspell-storage/migrations/postgres
+   mkdir -p llmspell-storage/migrations/sqlite
+
+   # Move existing PostgreSQL migrations
+   mv llmspell-storage/migrations/V*.sql llmspell-storage/migrations/postgres/
+   ```
+
+2. **Update migration runner** (llmspell-storage/src/backends/migrations.rs):
+   ```rust
+   pub struct MigrationRunner {
+       backend_type: StorageBackendType,
+   }
+
+   impl MigrationRunner {
+       pub fn migrations_dir(&self) -> &str {
+           match self.backend_type {
+               StorageBackendType::PostgreSQL => "migrations/postgres",
+               StorageBackendType::SQLite => "migrations/sqlite",
+               _ => panic!("No migrations for backend: {:?}", self.backend_type),
+           }
+       }
+
+       pub async fn run_migrations(&self) -> Result<()> {
+           let dir = self.migrations_dir();
+           let migration_files = glob(&format!("{}/*.sql", dir))?;
+           // ...apply migrations in order
+       }
+   }
+   ```
+
+3. **Create SQLite migration V1** (migrations/sqlite/V1__initial_setup.sql):
+   ```sql
+   -- SQLite configuration (no schema support, use PRAGMA)
+   PRAGMA foreign_keys = ON;
+   PRAGMA journal_mode = WAL;
+   PRAGMA synchronous = NORMAL;
+
+   -- Migration version tracking table
+   CREATE TABLE IF NOT EXISTS _migrations (
+       version INTEGER PRIMARY KEY,
+       name TEXT NOT NULL,
+       applied_at INTEGER NOT NULL DEFAULT (strftime('%s', 'now'))
+   );
+
+   -- Insert V1 record
+   INSERT OR IGNORE INTO _migrations (version, name) VALUES (1, 'initial_setup');
+   ```
+
+4. Add libsql to workspace dependencies:
    ```toml
    # Cargo.toml [workspace.dependencies]
    libsql = { version = "0.9", features = ["encryption", "replication"] }
    ```
 
-2. Create backend module structure:
+5. Create backend module structure:
    ```bash
    mkdir -p llmspell-storage/src/backends/sqlite
    touch llmspell-storage/src/backends/sqlite/{mod.rs,connection.rs,migrations.rs}
    ```
 
-3. Implement SqliteBackend struct (llmspell-storage/src/backends/sqlite/mod.rs):
+6. Implement SqliteBackend struct (llmspell-storage/src/backends/sqlite/mod.rs):
    ```rust
    pub struct SqliteBackend {
        pool: Arc<Pool<libsql::Connection>>,
@@ -710,7 +1100,7 @@ Unified (libsql):
 
 ### Task 13c.2.2: vectorlite Extension Integration ⏹ PENDING
 **Priority**: CRITICAL
-**Estimated Time**: 8 hours (Day 2)
+**Estimated Time**: 8 hours (Day 3)
 **Assignee**: Vector Search Team
 **Status**: ⏹ PENDING
 **Dependencies**: Task 13c.2.1 ✅
@@ -805,7 +1195,7 @@ Unified (libsql):
 
 ### Task 13c.2.3: SqliteVectorStorage Implementation ⏹ PENDING
 **Priority**: CRITICAL
-**Estimated Time**: 12 hours (Days 3-4)
+**Estimated Time**: 12 hours (Days 4-5)
 **Assignee**: Memory Team
 **Status**: ⏹ PENDING
 **Dependencies**: Task 13c.2.2 ✅
@@ -907,16 +1297,25 @@ Unified (libsql):
    cargo test -p llmspell-memory --test episodic_sqlite_backend
    ```
 
+7. **Create SQLite migration V3** (migrations/sqlite/V3__vector_embeddings.sql):
+   - Match PostgreSQL V3 structure with SQLite types
+   - 4 dimension tables (384, 768, 1536, 3072)
+   - UUID as TEXT, TIMESTAMPTZ as INTEGER, JSONB as TEXT
+   - vectorlite_create_index() calls for HNSW indexes
+   - Tenant isolation via application-level filtering (no RLS)
+
 **Definition of Done**:
 - [ ] VectorStorage trait fully implemented
 - [ ] All CRUD operations working
 - [ ] Tenant isolation enforced in queries
+- [ ] SQLite migration V3 created and tested
 - [ ] 50+ unit tests passing (ported from hnsw_rs)
 - [ ] Integration tests with MemoryManager passing
 - [ ] Benchmarks meet targets (<1ms insert, <10ms search 10K)
 - [ ] Zero clippy warnings
 
 **Files to Create/Modify**:
+- `llmspell-storage/migrations/sqlite/V3__vector_embeddings.sql` (NEW - equivalent to postgres V3)
 - `llmspell-storage/src/backends/sqlite/vector.rs` (NEW)
 - `llmspell-storage/src/backends/sqlite/vector_tests.rs` (NEW)
 - `llmspell-memory/tests/episodic_sqlite_backend.rs` (NEW)
@@ -1061,15 +1460,24 @@ Unified (libsql):
    cargo bench -p llmspell-storage --bench sqlite_graph_traversal
    ```
 
+6. **Create SQLite migration V4** (migrations/sqlite/V4__temporal_graph.sql):
+   - Match PostgreSQL V4 bi-temporal structure
+   - entities table: UUID TEXT, timestamps INTEGER, JSONB TEXT
+   - relationships table: foreign keys to entities
+   - B-tree indexes on time ranges (no GiST in SQLite)
+   - CHECK constraints for time range validity
+
 **Definition of Done**:
 - [ ] GraphStorage trait fully implemented
 - [ ] Recursive CTE traversal working (1-4 hops)
 - [ ] Bi-temporal queries via Unix timestamps
+- [ ] SQLite migration V4 created and tested
 - [ ] 30+ unit tests passing (ported from SurrealDB)
 - [ ] Benchmark: <50ms for 4-hop/100K nodes
 - [ ] Zero clippy warnings
 
 **Files to Create/Modify**:
+- `llmspell-storage/migrations/sqlite/V4__temporal_graph.sql` (NEW - equivalent to postgres V4)
 - `llmspell-storage/src/backends/sqlite/graph.rs` (NEW)
 - `llmspell-storage/src/backends/sqlite/graph_tests.rs` (NEW)
 - `llmspell-storage/src/backends/sqlite/schema.sql` (UPDATE - add graph tables)
@@ -1077,87 +1485,274 @@ Unified (libsql):
 
 ---
 
-### Task 13c.2.5: SqliteStateStorage Implementation (Replacing Sled) ⏹ PENDING
+### Task 13c.2.5: SqliteProceduralStorage Implementation (V5) ⏹ PENDING
 **Priority**: HIGH
-**Estimated Time**: 12 hours (Days 6-7)
+**Estimated Time**: 6 hours (Day 6)
+**Assignee**: Memory Team
+**Status**: ⏹ PENDING
+**Dependencies**: Task 13c.2.1 ✅
+
+**Description**: Implement ProceduralStorage trait using libsql for procedural memory patterns (PostgreSQL V5 equivalent). Tracks state transition patterns (scope:key → value) with frequency counters for pattern learning and prediction.
+
+**Acceptance Criteria**:
+- [ ] SqliteProceduralStorage implements ProceduralStorage trait
+- [ ] procedural_patterns table created (tenant_id, scope, key, value, frequency, timestamps)
+- [ ] Pattern recording with frequency increment (UPSERT: INSERT OR UPDATE)
+- [ ] Pattern retrieval with learned threshold filtering (frequency ≥ 3)
+- [ ] Time-based queries (first_seen, last_seen for aging/cleanup)
+- [ ] SQLite migration V5 created and tested
+- [ ] 20+ unit tests passing (ported from PostgreSQL backend)
+- [ ] Performance: <5ms pattern insert, <10ms pattern query
+- [ ] Zero clippy warnings
+
+**Implementation Steps**:
+
+1. **Create SQLite migration V5** (migrations/sqlite/V5__procedural_memory.sql):
+   ```sql
+   -- Procedural memory patterns (PostgreSQL V5 equivalent)
+   CREATE TABLE IF NOT EXISTS procedural_patterns (
+       pattern_id TEXT PRIMARY KEY DEFAULT (lower(hex(randomblob(16)))),
+       tenant_id TEXT NOT NULL,
+       scope TEXT NOT NULL,
+       key TEXT NOT NULL,
+       value TEXT NOT NULL,
+       frequency INTEGER NOT NULL DEFAULT 1,
+       first_seen INTEGER NOT NULL DEFAULT (strftime('%s', 'now')),
+       last_seen INTEGER NOT NULL DEFAULT (strftime('%s', 'now')),
+       created_at INTEGER NOT NULL DEFAULT (strftime('%s', 'now')),
+       updated_at INTEGER NOT NULL DEFAULT (strftime('%s', 'now')),
+       UNIQUE(tenant_id, scope, key, value),
+       CHECK (frequency > 0)
+   );
+
+   CREATE INDEX idx_procedural_patterns_tenant ON procedural_patterns(tenant_id);
+   CREATE INDEX idx_procedural_patterns_scope_key ON procedural_patterns(scope, key);
+   CREATE INDEX idx_procedural_patterns_frequency ON procedural_patterns(frequency DESC);
+   CREATE INDEX idx_procedural_patterns_last_seen ON procedural_patterns(last_seen DESC);
+   CREATE INDEX idx_procedural_patterns_lookup ON procedural_patterns(tenant_id, scope, key, value) WHERE frequency >= 3;
+
+   INSERT OR IGNORE INTO _migrations (version, name) VALUES (5, 'procedural_memory');
+   ```
+
+2. Create SqliteProceduralStorage struct (llmspell-storage/src/backends/sqlite/procedural.rs):
+   ```rust
+   pub struct SqliteProceduralStorage {
+       backend: Arc<SqliteBackend>,
+   }
+
+   #[async_trait]
+   impl ProceduralStorage for SqliteProceduralStorage {
+       async fn record_pattern(&self, scope: &str, key: &str, value: &str) -> Result<()>;
+       async fn get_patterns(&self, scope: &str, key: &str, min_frequency: u32) -> Result<Vec<Pattern>>;
+       async fn get_top_patterns(&self, scope: &str, limit: usize) -> Result<Vec<Pattern>>;
+       async fn pattern_frequency(&self, scope: &str, key: &str, value: &str) -> Result<Option<u32>>;
+   }
+   ```
+
+3. Implement record_pattern() with UPSERT (increment frequency on conflict):
+   ```rust
+   async fn record_pattern(&self, scope: &str, key: &str, value: &str) -> Result<()> {
+       let conn = self.backend.get_connection().await?;
+       let tenant_id = self.backend.current_tenant_id()?;
+
+       conn.execute(
+           "INSERT INTO procedural_patterns (tenant_id, scope, key, value, frequency, last_seen)
+            VALUES (?1, ?2, ?3, ?4, 1, strftime('%s', 'now'))
+            ON CONFLICT(tenant_id, scope, key, value) DO UPDATE SET
+                frequency = frequency + 1,
+                last_seen = strftime('%s', 'now'),
+                updated_at = strftime('%s', 'now')",
+           params![tenant_id, scope, key, value]
+       ).await?;
+       Ok(())
+   }
+   ```
+
+4. Implement get_patterns() with learned filter (frequency ≥ 3):
+   ```rust
+   async fn get_patterns(&self, scope: &str, key: &str, min_frequency: u32) -> Result<Vec<Pattern>> {
+       let conn = self.backend.get_connection().await?;
+       let tenant_id = self.backend.current_tenant_id()?;
+
+       let results = conn.query(
+           "SELECT pattern_id, scope, key, value, frequency, first_seen, last_seen
+            FROM procedural_patterns
+            WHERE tenant_id = ?1 AND scope = ?2 AND key = ?3 AND frequency >= ?4
+            ORDER BY frequency DESC",
+           params![tenant_id, scope, key, min_frequency]
+       ).await?;
+
+       // Parse results into Pattern structs
+       Ok(parse_patterns(results)?)
+   }
+   ```
+
+5. Port unit tests from PostgreSQL procedural backend:
+   ```bash
+   # Copy and adapt tests
+   cargo test -p llmspell-storage --test sqlite_procedural -- --nocapture
+   ```
+
+6. Integration test with MemoryManager:
+   ```rust
+   // Test pattern recording (frequency increment) and learned pattern retrieval
+   cargo test -p llmspell-memory --test procedural_sqlite_backend
+   ```
+
+**Definition of Done**:
+- [ ] ProceduralStorage trait fully implemented
+- [ ] Pattern recording with frequency increment working
+- [ ] Learned pattern retrieval (frequency ≥ 3) working
+- [ ] SQLite migration V5 created and tested
+- [ ] 20+ unit tests passing
+- [ ] Performance targets met (<5ms insert, <10ms query)
+- [ ] Integration test with MemoryManager passing
+- [ ] Zero clippy warnings
+
+**Files to Create/Modify**:
+- `llmspell-storage/migrations/sqlite/V5__procedural_memory.sql` (NEW - equivalent to postgres V5)
+- `llmspell-storage/src/backends/sqlite/procedural.rs` (NEW)
+- `llmspell-storage/src/backends/sqlite/procedural_tests.rs` (NEW)
+- `llmspell-memory/tests/procedural_sqlite_backend.rs` (NEW)
+- `llmspell-storage/src/backends/mod.rs` (export SqliteProceduralStorage)
+
+---
+
+### Task 13c.2.6: SqliteStateStorage Implementation (Agent V6 + KV V7 + Workflow V8) ⏹ PENDING
+**Priority**: HIGH
+**Estimated Time**: 16 hours (Days 7-9)
 **Assignee**: State Management Team
 **Status**: ⏹ PENDING
 **Dependencies**: Task 13c.2.1 ✅
 
-**Description**: Implement KV storage using libsql JSONB tables to replace Sled for agent_state, workflow_state, and procedural_memory.
+**Description**: Implement 3 state storage backends using libsql to replace Sled KV store: (1) Agent states with versioning and checksums (V6), (2) Generic KV fallback storage for unrouted keys (V7), (3) Workflow execution states with lifecycle tracking (V8). These are 3 separate tables matching PostgreSQL V6/V7/V8 structure.
 
 **Acceptance Criteria**:
-- [ ] SqliteStateStorage implements StateStorage trait
-- [ ] agent_state, workflow_state, procedural_memory tables created
-- [ ] JSONB storage with versioning, checksums
-- [ ] GIN-equivalent indexes on JSONB properties (json_extract indexes)
-- [ ] Unit tests passing (40+ tests from Sled backend ported)
-- [ ] Performance: <10ms write, <5ms read (acceptable 1000x slower vs Sled in-memory)
+- [ ] SqliteAgentStateStorage implements AgentStateStorage trait (V6)
+- [ ] SqliteKVStorage implements generic KVStorage trait (V7)
+- [ ] SqliteWorkflowStateStorage implements WorkflowStateStorage trait (V8)
+- [ ] 3 tables created: agent_states, kv_store, workflow_states
+- [ ] SQLite migrations V6, V7, V8 created and tested
+- [ ] Agent states: versioning (data_version auto-increment), checksum validation (SHA256)
+- [ ] KV store: binary-safe BLOB storage, key prefix scanning support
+- [ ] Workflow states: lifecycle tracking (pending→running→completed/failed), auto-timestamps
+- [ ] All 3 backends replace Sled completely
+- [ ] Unit tests passing (60+ tests from Sled backend ported for all 3 storage types)
+- [ ] Performance: <10ms write, <5ms read for all 3 types
+- [ ] Zero clippy warnings
 
 **Implementation Steps**:
-1. Create state storage schema (llmspell-storage/src/backends/sqlite/schema.sql):
+
+1. **Create SQLite migration V6** (migrations/sqlite/V6__agent_state.sql):
    ```sql
-   CREATE TABLE IF NOT EXISTS agent_state (
-       state_id TEXT PRIMARY KEY,
+   -- Agent state storage with versioning (PostgreSQL V6 equivalent)
+   CREATE TABLE IF NOT EXISTS agent_states (
+       state_id TEXT PRIMARY KEY DEFAULT (lower(hex(randomblob(16)))),
        tenant_id TEXT NOT NULL,
        agent_id TEXT NOT NULL,
        agent_type TEXT NOT NULL,
-       state_data TEXT NOT NULL, -- JSON
-       version INTEGER NOT NULL DEFAULT 1,
-       checksum TEXT, -- SHA256
-       created_at INTEGER NOT NULL DEFAULT (unixepoch()),
-       updated_at INTEGER NOT NULL DEFAULT (unixepoch()),
-       UNIQUE(tenant_id, agent_id, version)
+       state_data TEXT NOT NULL, -- JSON (JSONB equivalent)
+       schema_version INTEGER NOT NULL DEFAULT 1,
+       data_version INTEGER NOT NULL DEFAULT 1,
+       checksum TEXT NOT NULL, -- SHA256
+       created_at INTEGER NOT NULL DEFAULT (strftime('%s', 'now')),
+       updated_at INTEGER NOT NULL DEFAULT (strftime('%s', 'now')),
+       UNIQUE(tenant_id, agent_id),
+       CHECK (schema_version > 0),
+       CHECK (data_version > 0)
    );
 
-   CREATE INDEX IF NOT EXISTS idx_agent_state_agent ON agent_state(agent_id);
-   -- GIN-equivalent for JSONB queries (extract specific keys)
-   CREATE INDEX IF NOT EXISTS idx_agent_state_type
-   ON agent_state(json_extract(state_data, '$.type'));
+   CREATE INDEX idx_agent_states_tenant ON agent_states(tenant_id);
+   CREATE INDEX idx_agent_states_type ON agent_states(agent_type);
+   CREATE INDEX idx_agent_states_updated ON agent_states(updated_at DESC);
+   CREATE INDEX idx_agent_states_execution_state ON agent_states(json_extract(state_data, '$.state.execution_state'));
+   CREATE INDEX idx_agent_states_metadata_name ON agent_states(json_extract(state_data, '$.metadata.name'));
 
-   CREATE TABLE IF NOT EXISTS workflow_state (
-       workflow_id TEXT PRIMARY KEY,
-       tenant_id TEXT NOT NULL,
-       workflow_name TEXT NOT NULL,
-       execution_state TEXT NOT NULL, -- JSON
-       status TEXT NOT NULL CHECK (status IN ('pending', 'running', 'completed', 'failed', 'cancelled')),
-       step_status TEXT NOT NULL DEFAULT '[]', -- JSON array
-       error_message TEXT,
-       started_at INTEGER NOT NULL DEFAULT (unixepoch()),
-       completed_at INTEGER,
-       duration_ms INTEGER
-   );
+   -- Trigger to auto-increment data_version on updates
+   CREATE TRIGGER trigger_agent_state_version
+   AFTER UPDATE ON agent_states
+   FOR EACH ROW
+   WHEN NEW.state_data != OLD.state_data
+   BEGIN
+       UPDATE agent_states SET data_version = data_version + 1
+       WHERE state_id = NEW.state_id;
+   END;
 
-   CREATE INDEX IF NOT EXISTS idx_workflow_status ON workflow_state(status);
-   CREATE INDEX IF NOT EXISTS idx_workflow_name ON workflow_state(workflow_name);
-
-   CREATE TABLE IF NOT EXISTS procedural_memory (
-       pattern_id TEXT PRIMARY KEY,
-       tenant_id TEXT NOT NULL,
-       pattern_type TEXT NOT NULL,
-       pattern_name TEXT NOT NULL,
-       pattern_data TEXT NOT NULL, -- JSON
-       usage_count INTEGER NOT NULL DEFAULT 0,
-       success_count INTEGER NOT NULL DEFAULT 0,
-       failure_count INTEGER NOT NULL DEFAULT 0,
-       success_rate REAL GENERATED ALWAYS AS (
-           CASE WHEN usage_count > 0
-                THEN CAST(success_count AS REAL) / CAST(usage_count AS REAL)
-                ELSE 0.0
-           END
-       ) STORED,
-       avg_execution_time_ms REAL,
-       created_at INTEGER NOT NULL DEFAULT (unixepoch()),
-       last_used_at INTEGER NOT NULL DEFAULT (unixepoch())
-   );
-
-   CREATE INDEX IF NOT EXISTS idx_procedural_success_rate
-   ON procedural_memory(success_rate DESC);
-   CREATE INDEX IF NOT EXISTS idx_procedural_type
-   ON procedural_memory(pattern_type);
+   INSERT OR IGNORE INTO _migrations (version, name) VALUES (6, 'agent_state');
    ```
 
-2. Implement SqliteStateStorage struct (llmspell-storage/src/backends/sqlite/state.rs):
+2. **Create SQLite migration V7** (migrations/sqlite/V7__kv_store.sql):
+   ```sql
+   -- Generic key-value storage (PostgreSQL V7 equivalent)
+   CREATE TABLE IF NOT EXISTS kv_store (
+       kv_id TEXT PRIMARY KEY DEFAULT (lower(hex(randomblob(16)))),
+       tenant_id TEXT NOT NULL,
+       key TEXT NOT NULL,
+       value BLOB NOT NULL, -- Binary-safe storage
+       metadata TEXT, -- JSON (optional)
+       created_at INTEGER NOT NULL DEFAULT (strftime('%s', 'now')),
+       updated_at INTEGER NOT NULL DEFAULT (strftime('%s', 'now')),
+       UNIQUE(tenant_id, key)
+   );
+
+   CREATE INDEX idx_kv_store_tenant ON kv_store(tenant_id);
+   CREATE INDEX idx_kv_store_key_prefix ON kv_store(tenant_id, key);
+   CREATE INDEX idx_kv_store_updated ON kv_store(updated_at DESC);
+
+   INSERT OR IGNORE INTO _migrations (version, name) VALUES (7, 'kv_store');
+   ```
+
+3. **Create SQLite migration V8** (migrations/sqlite/V8__workflow_states.sql):
+   ```sql
+   -- Workflow state storage with lifecycle tracking (PostgreSQL V8 equivalent)
+   CREATE TABLE IF NOT EXISTS workflow_states (
+       tenant_id TEXT NOT NULL,
+       workflow_id TEXT NOT NULL,
+       workflow_name TEXT,
+       state_data TEXT NOT NULL, -- JSON (full PersistentWorkflowState)
+       current_step INTEGER NOT NULL DEFAULT 0,
+       status TEXT NOT NULL DEFAULT 'pending',
+       started_at INTEGER,
+       completed_at INTEGER,
+       last_updated INTEGER NOT NULL DEFAULT (strftime('%s', 'now')),
+       created_at INTEGER NOT NULL DEFAULT (strftime('%s', 'now')),
+       PRIMARY KEY (tenant_id, workflow_id),
+       CHECK (status IN ('pending', 'running', 'completed', 'failed', 'cancelled')),
+       CHECK (current_step >= 0)
+   );
+
+   CREATE INDEX idx_workflow_states_tenant ON workflow_states(tenant_id);
+   CREATE INDEX idx_workflow_states_tenant_workflow ON workflow_states(tenant_id, workflow_id);
+   CREATE INDEX idx_workflow_states_status ON workflow_states(status);
+   CREATE INDEX idx_workflow_states_started ON workflow_states(started_at DESC);
+   CREATE INDEX idx_workflow_states_completed ON workflow_states(completed_at DESC) WHERE completed_at IS NOT NULL;
+   CREATE INDEX idx_workflow_states_tenant_status ON workflow_states(tenant_id, status);
+
+   -- Trigger to auto-update lifecycle timestamps
+   CREATE TRIGGER trigger_workflow_lifecycle
+   AFTER UPDATE ON workflow_states
+   FOR EACH ROW
+   BEGIN
+       -- Set started_at when transitioning to running
+       UPDATE workflow_states
+       SET started_at = strftime('%s', 'now')
+       WHERE workflow_id = NEW.workflow_id
+         AND NEW.status = 'running'
+         AND OLD.status = 'pending'
+         AND started_at IS NULL;
+
+       -- Set completed_at when transitioning to terminal state
+       UPDATE workflow_states
+       SET completed_at = strftime('%s', 'now')
+       WHERE workflow_id = NEW.workflow_id
+         AND NEW.status IN ('completed', 'failed', 'cancelled')
+         AND OLD.status NOT IN ('completed', 'failed', 'cancelled');
+   END;
+
+   INSERT OR IGNORE INTO _migrations (version, name) VALUES (8, 'workflow_states');
+   ```
+
+4. Implement SqliteAgentStateStorage struct (llmspell-storage/src/backends/sqlite/agent_state.rs):
    ```rust
    pub struct SqliteStateStorage {
        backend: Arc<SqliteBackend>,
@@ -1225,171 +1820,99 @@ Unified (libsql):
    ```
 
 **Definition of Done**:
-- [ ] StateStorage trait fully implemented
-- [ ] agent_state, workflow_state, procedural_memory tables created
-- [ ] Versioning + checksums working
-- [ ] 40+ unit tests passing (ported from Sled)
-- [ ] Benchmarks: <10ms write, <5ms read
+- [ ] 3 storage traits fully implemented (AgentStateStorage, KVStorage, WorkflowStateStorage)
+- [ ] 3 tables created: agent_states (V6), kv_store (V7), workflow_states (V8)
+- [ ] SQLite migrations V6, V7, V8 created and tested
+- [ ] Agent state versioning + SHA256 checksum working
+- [ ] KV store binary-safe BLOB storage working
+- [ ] Workflow lifecycle transitions (pending→running→completed) with auto-timestamps working
+- [ ] 60+ unit tests passing (ported from Sled for all 3 storage types)
+- [ ] Benchmarks: <10ms write, <5ms read for all 3 types
 - [ ] Zero clippy warnings
 
 **Files to Create/Modify**:
-- `llmspell-storage/src/backends/sqlite/state.rs` (NEW)
-- `llmspell-storage/src/backends/sqlite/state_tests.rs` (NEW)
-- `llmspell-storage/src/backends/sqlite/schema.sql` (UPDATE - add state tables)
+- `llmspell-storage/migrations/sqlite/V6__agent_state.sql` (NEW)
+- `llmspell-storage/migrations/sqlite/V7__kv_store.sql` (NEW)
+- `llmspell-storage/migrations/sqlite/V8__workflow_states.sql` (NEW)
+- `llmspell-storage/src/backends/sqlite/agent_state.rs` (NEW)
+- `llmspell-storage/src/backends/sqlite/kv_store.rs` (NEW)
+- `llmspell-storage/src/backends/sqlite/workflow_state.rs` (NEW)
+- `llmspell-storage/src/backends/sqlite/agent_state_tests.rs` (NEW)
+- `llmspell-storage/src/backends/sqlite/kv_store_tests.rs` (NEW)
+- `llmspell-storage/src/backends/sqlite/workflow_state_tests.rs` (NEW)
 - `llmspell-storage/benches/sqlite_state_performance.rs` (NEW)
 
 ---
 
-### Task 13c.2.6: SqliteSessionStorage + SqliteArtifactStorage ⏹ PENDING
+### Task 13c.2.7: Auxiliary Storage Tables (Sessions V9 + Artifacts V10 + Events V11 + Hooks V13) ⏹ PENDING
 **Priority**: HIGH
-**Estimated Time**: 12 hours (Days 8-9)
-**Assignee**: Session Management Team
+**Estimated Time**: 16 hours (Days 10-12)
+**Assignee**: Storage Team + Events Team
 **Status**: ⏹ PENDING
 **Dependencies**: Task 13c.2.1 ✅
 
-**Description**: Implement SessionStorage and ArtifactStorage using libsql JSONB + BLOB storage, replacing filesystem-based session management.
+**Description**: Implement 4 remaining storage backends using libsql to complete the 10 storage components: (1) Session storage with lifecycle and expiration (V9), (2) Artifact content-addressed storage with deduplication and BLOB support (V10), (3) Event log for time-series event storage with correlation (V11), (4) Hook history for hook execution replay (V13). Skip V14 (api_keys) - requires pgcrypto alternative research.
 
 **Acceptance Criteria**:
-- [ ] SqliteSessionStorage implements SessionStorage trait
-- [ ] SqliteArtifactStorage implements ArtifactStorage trait
-- [ ] sessions + artifacts tables created
-- [ ] BLOB storage for artifacts <100MB (BYTEA equivalent)
-- [ ] Unit tests passing (30+ tests from filesystem backend ported)
-- [ ] Performance: <10ms session write, <20ms artifact write
+- [ ] SqliteSessionStorage implements SessionStorage trait (V9)
+- [ ] SqliteArtifactStorage implements ArtifactStorage trait (V10)
+- [ ] SqliteEventLogStorage implements EventLogStorage trait (V11)
+- [ ] SqliteHookHistoryStorage implements HookHistoryStorage trait (V13)
+- [ ] 4 tables created: sessions, artifact_content + artifact_metadata, event_log, hook_history
+- [ ] SQLite migrations V9, V10, V11, V13 created and tested (skip V12 - role management, skip V14 - api_keys)
+- [ ] Session: lifecycle tracking (active→archived→expired), expiration support, artifact references
+- [ ] Artifact: content-addressed storage (SHA256), deduplication via reference counting, BLOB storage for content
+- [ ] Event log: time-series storage, correlation_id queries, event_type pattern matching
+- [ ] Hook history: compressed context storage (BLOB), execution metrics, replay support
+- [ ] All 4 backends complete the 10 storage components (3+4+5+6+7+8+9+10+11+13 = 10 components)
+- [ ] 80+ unit tests passing (20 per backend: sessions, artifacts, events, hooks)
+- [ ] Performance: <10ms session write, <20ms artifact write, <5ms event insert, <10ms hook history write
+- [ ] Zero clippy warnings
 
 **Implementation Steps**:
-1. Create session/artifact schema (llmspell-storage/src/backends/sqlite/schema.sql):
-   ```sql
-   CREATE TABLE IF NOT EXISTS sessions (
-       session_id TEXT PRIMARY KEY,
-       tenant_id TEXT NOT NULL,
-       user_id TEXT,
-       context TEXT NOT NULL DEFAULT '{}', -- JSON
-       status TEXT NOT NULL CHECK (status IN ('active', 'paused', 'closed')),
-       metadata TEXT NOT NULL DEFAULT '{}', -- JSON
-       created_at INTEGER NOT NULL DEFAULT (unixepoch()),
-       updated_at INTEGER NOT NULL DEFAULT (unixepoch()),
-       closed_at INTEGER
-   );
 
-   CREATE INDEX IF NOT EXISTS idx_sessions_user ON sessions(user_id);
-   CREATE INDEX IF NOT EXISTS idx_sessions_status ON sessions(status);
-   CREATE INDEX IF NOT EXISTS idx_sessions_tenant ON sessions(tenant_id);
+1. **Create SQLite migration V9** (migrations/sqlite/V9__sessions.sql) - Match PostgreSQL V9 structure with SQLite types
 
-   CREATE TABLE IF NOT EXISTS artifacts (
-       artifact_id TEXT PRIMARY KEY,
-       tenant_id TEXT NOT NULL,
-       session_id TEXT NOT NULL,
-       artifact_type TEXT NOT NULL,
-       artifact_name TEXT NOT NULL,
-       metadata TEXT NOT NULL DEFAULT '{}', -- JSON
-       content BLOB, -- Binary data
-       content_size_bytes INTEGER NOT NULL,
-       version INTEGER NOT NULL DEFAULT 1,
-       created_at INTEGER NOT NULL DEFAULT (unixepoch()),
-       FOREIGN KEY (session_id) REFERENCES sessions(session_id) ON DELETE CASCADE
-   );
+2. **Create SQLite migration V10** (migrations/sqlite/V10__artifacts.sql) - Content-addressed storage with deduplication (PostgreSQL V10 equivalent, 2 tables: artifact_content + artifact_metadata)
 
-   CREATE INDEX IF NOT EXISTS idx_artifacts_session ON artifacts(session_id);
-   CREATE INDEX IF NOT EXISTS idx_artifacts_type ON artifacts(artifact_type);
-   ```
+3. **Create SQLite migration V11** (migrations/sqlite/V11__event_log.sql) - Time-series event storage (PostgreSQL V11 equivalent, note: no partitioning in SQLite, use single table with indexes)
 
-2. Implement SqliteSessionStorage (llmspell-storage/src/backends/sqlite/session.rs):
-   ```rust
-   pub struct SqliteSessionStorage {
-       backend: Arc<SqliteBackend>,
-       config: SessionConfig,
-   }
+4. **Create SQLite migration V13** (migrations/sqlite/V13__hook_history.sql) - Hook execution history (PostgreSQL V13 equivalent)
 
-   #[async_trait]
-   impl SessionStorage for SqliteSessionStorage {
-       async fn create_session(&self, session: Session) -> Result<()>;
-       async fn get_session(&self, session_id: Uuid) -> Result<Option<Session>>;
-       async fn update_session(&self, session: Session) -> Result<()>;
-       async fn close_session(&self, session_id: Uuid) -> Result<()>;
-       async fn list_sessions(&self, tenant_id: &str) -> Result<Vec<Session>>;
-   }
-   ```
+5. Implement all 4 storage structs (session.rs, artifact.rs, event_log.rs, hook_history.rs)
 
-3. Implement SqliteArtifactStorage (llmspell-storage/src/backends/sqlite/artifact.rs):
-   ```rust
-   pub struct SqliteArtifactStorage {
-       backend: Arc<SqliteBackend>,
-       config: ArtifactConfig,
-   }
+6. Port unit tests from PostgreSQL backends (20 tests per backend = 80 tests total)
 
-   #[async_trait]
-   impl ArtifactStorage for SqliteArtifactStorage {
-       async fn store_artifact(&self, artifact: Artifact) -> Result<()>;
-       async fn get_artifact(&self, artifact_id: Uuid) -> Result<Option<Artifact>>;
-       async fn delete_artifact(&self, artifact_id: Uuid) -> Result<()>;
-       async fn list_artifacts(&self, session_id: Uuid) -> Result<Vec<Artifact>>;
-   }
-   ```
-
-4. Implement BLOB storage for artifacts:
-   ```rust
-   async fn store_artifact(&self, artifact: Artifact) -> Result<()> {
-       let conn = self.backend.get_connection().await?;
-
-       // Limit check: <100MB
-       if artifact.content.len() > 100 * 1024 * 1024 {
-           return Err(LLMSpellError::Storage(
-               format!("Artifact too large: {}MB (max 100MB)", artifact.content.len() / 1024 / 1024)
-           ));
-       }
-
-       conn.execute(
-           "INSERT INTO artifacts (artifact_id, tenant_id, session_id, artifact_type, artifact_name, metadata, content, content_size_bytes, version, created_at)
-            VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10)",
-           params![
-               artifact.artifact_id.to_string(),
-               artifact.tenant_id,
-               artifact.session_id.to_string(),
-               artifact.artifact_type,
-               artifact.artifact_name,
-               serde_json::to_string(&artifact.metadata)?,
-               artifact.content,
-               artifact.content.len() as i64,
-               artifact.version,
-               Utc::now().timestamp(),
-           ]
-       ).await?;
-       Ok(())
-   }
-   ```
-
-5. Port unit tests from filesystem backend:
-   ```bash
-   cargo test -p llmspell-storage --test sqlite_session_artifact
-   ```
-
-6. Benchmark session/artifact operations:
-   ```rust
-   cargo bench -p llmspell-storage --bench sqlite_session_performance
-   ```
+7. Benchmark all 4 storage operations
 
 **Definition of Done**:
-- [ ] SessionStorage + ArtifactStorage traits implemented
-- [ ] BLOB storage working (<100MB limit)
-- [ ] 30+ unit tests passing (ported from filesystem)
-- [ ] Benchmarks: <10ms session write, <20ms artifact write
+- [ ] All 4 storage traits implemented (SessionStorage, ArtifactStorage, EventLogStorage, HookHistoryStorage)
+- [ ] SQLite migrations V9, V10, V11, V13 created and tested
+- [ ] 80+ unit tests passing (20 per backend)
+- [ ] Benchmarks meet targets for all 4 backends
+- [ ] 10 storage components complete (V3/V4/V5/V6/V7/V8/V9/V10/V11/V13)
 - [ ] Zero clippy warnings
 
 **Files to Create/Modify**:
+- `llmspell-storage/migrations/sqlite/V9__sessions.sql` (NEW)
+- `llmspell-storage/migrations/sqlite/V10__artifacts.sql` (NEW)
+- `llmspell-storage/migrations/sqlite/V11__event_log.sql` (NEW)
+- `llmspell-storage/migrations/sqlite/V13__hook_history.sql` (NEW)
 - `llmspell-storage/src/backends/sqlite/session.rs` (NEW)
 - `llmspell-storage/src/backends/sqlite/artifact.rs` (NEW)
-- `llmspell-storage/src/backends/sqlite/schema.sql` (UPDATE - add session/artifact tables)
-- `llmspell-storage/benches/sqlite_session_performance.rs` (NEW)
+- `llmspell-storage/src/backends/sqlite/event_log.rs` (NEW)
+- `llmspell-storage/src/backends/sqlite/hook_history.rs` (NEW)
+- `llmspell-storage/src/backends/sqlite/*_tests.rs` (NEW - 4 test files)
+- `llmspell-storage/benches/sqlite_auxiliary_performance.rs` (NEW)
 
 ---
 
-### Task 13c.2.7: Legacy Backend Removal & Cleanup ⏹ PENDING
+### Task 13c.2.8: Legacy Backend Removal & Cleanup ⏹ PENDING
 **Priority**: CRITICAL
-**Estimated Time**: 8 hours (Day 10)
+**Estimated Time**: 8 hours (Day 13)
 **Assignee**: Core Team
 **Status**: ⏹ PENDING
-**Dependencies**: Tasks 13c.2.3, 13c.2.4, 13c.2.5, 13c.2.6 ✅
+**Dependencies**: Tasks 13c.2.3, 13c.2.4, 13c.2.5, 13c.2.6, 13c.2.7 ✅
 
 **Description**: Complete removal of legacy storage backends (HNSW files, SurrealDB, Sled) and their dependencies. Pre-1.0 = breaking changes acceptable, no migration needed.
 
@@ -1533,9 +2056,9 @@ Unified (libsql):
 
 ---
 
-### Task 13c.2.8: Testing & Benchmarking ⏹ PENDING
+### Task 13c.2.9: Testing & Benchmarking ⏹ PENDING
 **Priority**: CRITICAL
-**Estimated Time**: 12 hours (Days 11-12)
+**Estimated Time**: 12 hours (Days 14-15)
 **Assignee**: QA Team
 **Status**: ⏹ PENDING
 **Dependencies**: All previous 13c.2.x tasks ✅
@@ -1656,12 +2179,12 @@ Unified (libsql):
 
 ---
 
-### Task 13c.2.9: Integration Testing ⏹ PENDING
+### Task 13c.2.10: Integration Testing ⏹ PENDING
 **Priority**: HIGH
-**Estimated Time**: 8 hours (Day 13)
+**Estimated Time**: 8 hours (Day 16)
 **Assignee**: Integration Testing Team
 **Status**: ⏹ PENDING
-**Dependencies**: Task 13c.2.8 ✅
+**Dependencies**: Task 13c.2.9 ✅
 
 **Description**: End-to-end integration testing with MemoryManager, RAG, agents, and workflows using libsql backend.
 
@@ -1824,14 +2347,14 @@ Unified (libsql):
 
 ---
 
-### Task 13c.2.10: PostgreSQL/SQLite Schema Compatibility & Migration ⏹ PENDING
-**Priority**: CRITICAL
-**Estimated Time**: 12 hours (Days 13-14)
+### Task 13c.2.11: PostgreSQL/SQLite Schema Compatibility & Data Portability ⏹ PENDING
+**Priority**: HIGH
+**Estimated Time**: 8 hours (Days 17-18)
 **Assignee**: Storage Architecture Team
 **Status**: ⏹ PENDING
-**Dependencies**: Tasks 13c.2.3, 13c.2.4, 13c.2.5, 13c.2.6 ✅
+**Dependencies**: Tasks 13c.2.3, 13c.2.4, 13c.2.5, 13c.2.6, 13c.2.7 ✅
 
-**Description**: Ensure schema compatibility and bidirectional data migration between PostgreSQL and SQLite backends. Users start with SQLite (local/dev) → grow to PostgreSQL (production multi-tenant) OR downgrade PostgreSQL → SQLite (edge/offline). Reorganize migrations for backend-specific SQL dialects.
+**Description**: Ensure schema compatibility and bidirectional data migration between PostgreSQL and SQLite backends. Users start with SQLite (local/dev) → grow to PostgreSQL (production multi-tenant) OR downgrade PostgreSQL → SQLite (edge/offline). Migration reorganization already done in 13c.2.1, this task focuses on export/import tools and type conversion.
 
 **Strategic Rationale**:
 - **Growth Path**: SQLite (local dev, zero infrastructure) → PostgreSQL (production, horizontal scale, multi-writer)
@@ -2140,12 +2663,12 @@ Unified (libsql):
 
 ---
 
-### Task 13c.2.11: Documentation & Validation ⏹ PENDING
+### Task 13c.2.12: Documentation & Validation ⏹ PENDING
 **Priority**: HIGH
-**Estimated Time**: 12 hours (Days 15-16)
+**Estimated Time**: 8 hours (Days 19-20)
 **Assignee**: Documentation Team
 **Status**: ⏹ PENDING
-**Dependencies**: All previous 13c.2.x tasks ✅
+**Dependencies**: Tasks 13c.2.1-13c.2.11 ✅
 
 **Description**: Comprehensive documentation for libsql unified storage integrated into existing documentation structure (user guide, developer guide, technical docs). Focus on usage, architecture, and configuration.
 
