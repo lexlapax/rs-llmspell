@@ -2,7 +2,7 @@
 //!
 //! This module provides multiple storage backends for episodic memory:
 //! - `HNSWEpisodicMemory` (production default, O(log n) search via llmspell-storage) - **DEPRECATED: will be removed in Task 13c.2.8**
-//! - `SqliteEpisodicMemory` (production default, O(log n) search with SQLite + HNSW, persistent local storage)
+//! - `SqliteEpisodicMemory` (production default, O(log n) search with `SQLite` + HNSW, persistent local storage)
 //! - `InMemoryEpisodicMemory` (testing/development, simple `HashMap` with O(n) search)
 //! - `PostgreSQLEpisodicMemory` (production, O(log n) search with pgvector, RLS multi-tenancy)
 //! - `EpisodicBackend` (enum dispatch over backends, selected via config)

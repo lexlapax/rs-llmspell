@@ -1,28 +1,28 @@
 //! ABOUTME: SQLite-backed episodic memory for production local storage
 //!
-//! Integrates llmspell-storage's SqliteVectorStorage into episodic memory layer,
+//! Integrates llmspell-storage's `SqliteVectorStorage` into episodic memory layer,
 //! providing O(log n) similarity search with persistent local storage via libsql.
 //!
 //! # Architecture: Hybrid Storage
 //!
 //! Uses dual storage for optimal performance:
-//! - **SqliteVectorStorage**: O(log n) HNSW vector search + SQLite persistence
+//! - **`SqliteVectorStorage`**: O(log n) HNSW vector search + `SQLite` persistence
 //! - **`DashMap`**: O(1) ID lookups, O(n) metadata queries (in-memory cache)
 //!
 //! This hybrid approach provides:
 //! - Fast vector search (primary use case) with HNSW indices
-//! - Persistent storage via SQLite (data survives restarts)
+//! - Persistent storage via `SQLite` (data survives restarts)
 //! - Fast ID-based retrieval from cache
 //! - Complete `EpisodicMemory` trait implementation
-//! - Memory overhead: ~400 bytes/entry (DashMap cache + SQLite)
+//! - Memory overhead: ~400 bytes/entry (`DashMap` cache + `SQLite`)
 //!
 //! # Performance Characteristics
 //!
-//! - `add()`: O(log n) HNSW + O(1) SQLite write + O(1) `DashMap` = O(log n)
+//! - `add()`: O(log n) HNSW + O(1) `SQLite` write + O(1) `DashMap` = O(log n)
 //! - `search()`: O(log n) HNSW (primary use case)
 //! - `get()`: O(1) `DashMap` cache lookup
 //! - `get_session()`: O(n) `DashMap` scan + filter
-//! - `mark_processed()`: O(k) `DashMap` + SQLite updates
+//! - `mark_processed()`: O(k) `DashMap` + `SQLite` updates
 //! - `delete_before()`: O(n) `DashMap` scan + O(k log n) deletes
 //!
 //! # Memory Overhead
@@ -74,18 +74,18 @@ use crate::error::{MemoryError, Result};
 use crate::traits::EpisodicMemory;
 use crate::types::EpisodicEntry;
 
-/// Production episodic memory using SQLite with HNSW vector index
+/// Production episodic memory using `SQLite` with HNSW vector index
 ///
 ///Performance**: O(log n) search with persistent local storage
 ///
 /// # Architecture
 ///
-/// - **Vector Storage**: `llmspell-storage::SqliteVectorStorage` (HNSW + SQLite persistence)
+/// - **Vector Storage**: `llmspell-storage::SqliteVectorStorage` (HNSW + `SQLite` persistence)
 /// - **Metadata Storage**: `DashMap<String, EpisodicEntry>` (O(1) ID lookup cache)
 /// - **Embeddings**: Real-time generation via `EmbeddingService`
 /// - **Scoping**: `StateScope::Session` for multi-tenant isolation
 /// - **Sync Strategy**: Both stores updated atomically during `add()`, kept consistent
-/// - **Persistence**: SQLite database file persists all data across restarts
+/// - **Persistence**: `SQLite` database file persists all data across restarts
 ///
 /// # Performance Characteristics
 ///
@@ -103,14 +103,14 @@ use crate::types::EpisodicEntry;
 /// - Justified by persistence + <2ms overhead for HNSW search
 #[derive(Clone)]
 pub struct SqliteEpisodicMemory {
-    /// SQLite vector storage backend (for similarity search + persistence)
+    /// `SQLite` vector storage backend (for similarity search + persistence)
     storage: Arc<SqliteVectorStorage>,
 
     /// Metadata storage for O(1) ID lookups and O(n) filtered queries
     ///
     /// Stores complete `EpisodicEntry` objects indexed by ID.
     /// This enables fast direct lookups and metadata-based filtering
-    /// without querying SQLite. Data is cached from SQLite on initialization.
+    /// without querying `SQLite`. Data is cached from `SQLite` on initialization.
     entries: Arc<DashMap<String, EpisodicEntry>>,
 
     /// Embedding service for vector generation
@@ -118,21 +118,21 @@ pub struct SqliteEpisodicMemory {
 }
 
 impl SqliteEpisodicMemory {
-    /// Create SQLite episodic memory with default configuration
+    /// Create `SQLite` episodic memory with default configuration
     ///
     /// Uses default HNSW parameters: `m=16`, `ef_construct=200`, `ef_search=50`
     /// Uses cosine similarity metric for semantic search.
     ///
     /// # Arguments
     ///
-    /// * `backend` - Initialized SQLite backend
+    /// * `backend` - Initialized `SQLite` backend
     /// * `embedding_service` - Service for generating embeddings
     ///
     /// # Errors
     ///
     /// Returns error if:
-    /// - SQLite vector storage initialization fails
-    /// - Cache population from existing SQLite data fails
+    /// - `SQLite` vector storage initialization fails
+    /// - Cache population from existing `SQLite` data fails
     pub async fn new(
         backend: Arc<SqliteBackend>,
         embedding_service: Arc<EmbeddingService>,
@@ -145,12 +145,11 @@ impl SqliteEpisodicMemory {
         );
 
         // Create SqliteVectorStorage with default parameters (metric=Cosine, persistence_path=./data/hnsw_indices)
-        let storage = SqliteVectorStorage::new(
-            backend,
-            dimensions,
-        )
-        .await
-        .map_err(|e| MemoryError::Storage(format!("Failed to create SqliteVectorStorage: {e}")))?;
+        let storage = SqliteVectorStorage::new(backend, dimensions)
+            .await
+            .map_err(|e| {
+                MemoryError::Storage(format!("Failed to create SqliteVectorStorage: {e}"))
+            })?;
 
         Ok(Self {
             storage: Arc::new(storage),
@@ -159,7 +158,7 @@ impl SqliteEpisodicMemory {
         })
     }
 
-    /// Convert `EpisodicEntry` to `VectorEntry` for SQLite storage
+    /// Convert `EpisodicEntry` to `VectorEntry` for `SQLite` storage
     ///
     /// Serializes the entry (excluding embedding) into metadata field.
     async fn to_vector_entry(&self, entry: &EpisodicEntry) -> Result<VectorEntry> {
@@ -311,14 +310,17 @@ impl EpisodicMemory for SqliteEpisodicMemory {
     }
 
     async fn search(&self, query: &str, top_k: usize) -> Result<Vec<EpisodicEntry>> {
-        debug!("Searching SQLite HNSW: query_len={}, top_k={}", query.len(), top_k);
+        debug!(
+            "Searching SQLite HNSW: query_len={}, top_k={}",
+            query.len(),
+            top_k
+        );
 
         // Generate query embedding
         let query_embedding = self.embedding_service.embed_single(query).await?;
 
         // HNSW search (O(log n), fast!)
-        let vector_query = VectorQuery::new(query_embedding, top_k)
-            .with_scope(StateScope::Global);
+        let vector_query = VectorQuery::new(query_embedding, top_k).with_scope(StateScope::Global);
 
         let results = self
             .storage

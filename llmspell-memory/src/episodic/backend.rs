@@ -49,7 +49,7 @@ pub enum EpisodicBackend {
     /// HNSW vector index backend (production, 10K+ entries) - **DEPRECATED: will be removed in Task 13c.2.8**
     HNSW(Arc<HNSWEpisodicMemory>),
 
-    /// SQLite with HNSW backend (production, persistent local storage, 10K+ entries)
+    /// `SQLite` with HNSW backend (production, persistent local storage, 10K+ entries)
     Sqlite(Arc<SqliteEpisodicMemory>),
 
     /// `PostgreSQL` with `pgvector` backend (production, multi-tenant, `RLS`-enabled)
@@ -163,7 +163,7 @@ impl EpisodicBackend {
         Ok(Self::HNSW(Arc::new(hnsw)))
     }
 
-    /// Create SQLite backend from configuration
+    /// Create `SQLite` backend from configuration
     fn create_sqlite_backend(config: &MemoryConfig) -> Result<Self> {
         info!("Creating SQLite episodic backend (production mode, persistent local storage)");
 

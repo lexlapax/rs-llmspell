@@ -16,7 +16,7 @@ use crate::embeddings::EmbeddingService;
 ///
 /// - **`InMemory`**: O(n) search, good for <1K entries, testing only
 /// - **HNSW**: O(log n) search, production-ready for 10K+ entries - **DEPRECATED: will be removed in Task 13c.2.8**
-/// - **Sqlite**: O(log n) search with SQLite + HNSW, persistent local storage (NEW - replacement for HNSW)
+/// - **Sqlite**: O(log n) search with `SQLite` + HNSW, persistent local storage (NEW - replacement for HNSW)
 /// - **`PostgreSQL`**: O(log n) search with `pgvector` HNSW, multi-tenant `RLS` support
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
 pub enum EpisodicBackendType {
@@ -26,7 +26,7 @@ pub enum EpisodicBackendType {
     /// HNSW vector index (for production, 10K+ entries) - **DEPRECATED: will be removed in Task 13c.2.8**
     HNSW,
 
-    /// SQLite with HNSW (for production, persistent local storage, 10K+ entries)
+    /// `SQLite` with HNSW (for production, persistent local storage, 10K+ entries)
     #[default]
     Sqlite,
 
@@ -97,7 +97,7 @@ pub struct MemoryConfig {
     /// Embedding service (required for `HNSW`, `Sqlite`, and `PostgreSQL`)
     pub embedding_service: Option<Arc<EmbeddingService>>,
 
-    /// SQLite backend for episodic memory (used if `episodic_backend` = `Sqlite`)
+    /// `SQLite` backend for episodic memory (used if `episodic_backend` = `Sqlite`)
     pub sqlite_backend: Option<Arc<llmspell_storage::backends::sqlite::SqliteBackend>>,
 
     /// `PostgreSQL` backend for episodic memory (used if `episodic_backend` = `PostgreSQL`)
@@ -284,6 +284,7 @@ impl MemoryConfig {
             semantic_backend: SemanticBackendType::PostgreSQL,
             hnsw_config: HNSWConfig::default(),
             embedding_service: Some(embedding_service),
+            sqlite_backend: None,
             postgres_backend: Some(postgres_backend.clone()),
             semantic_postgres_backend: Some(postgres_backend),
         }
@@ -334,7 +335,8 @@ impl std::fmt::Debug for MemoryConfig {
                     .embedding_service
                     .as_ref()
                     .map(|s| s.provider_name().to_string()),
-            );
+            )
+            .field("sqlite_backend", &self.sqlite_backend.is_some());
 
         #[cfg(feature = "postgres")]
         {

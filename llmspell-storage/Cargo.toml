@@ -69,3 +69,8 @@ rusqlite = "0.32"
 [[bench]]
 name = "graph_bench"
 harness = false
+
+[[bench]]
+name = "sqlite_vector_bench"
+harness = false
+required-features = ["sqlite"]
