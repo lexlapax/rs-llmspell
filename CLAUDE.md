@@ -22,6 +22,11 @@ Experimental platform for rapid AI concept exploration via Lua/JavaScript script
 - ✅ **Phase 11b**: Local LLM Cleanup (unified profiles, dual-architecture models, platform-aware GPU) - COMPLETE
 - ✅ **Phase 12**: Experimental Template System (10 workflows, CLI + Lua API, multi-agent patterns) - COMPLETE
 - ✅ **Phase 13**: Experimental Memory & Context Engineering (3-tier memory, hot-swap backends, context assembly) - COMPLETE
+- 🚧 **Phase 13c**: Storage Consolidation & Production Readiness (4 weeks, towards v0.14.0)
+  - ✅ 13c.1: Cargo Dependencies Cleanup (lazy_static/once_cell → std, MySQL removed, -60MB deps)
+  - ✅ 13c.2.0: Storage Trait Architecture (3 new traits in llmspell-core, 1,685 lines, zero circular deps)
+  - ✅ 13c.2.1: libsql Backend Foundation (migration reorg, SqliteBackend, connection pool, tenant context, 1,093 lines)
+  - ⏳ 13c.2.2: vectorlite Extension Integration (NEXT)
 
 ## Project-Specific Behavior Controls
 - **Experimental mindset**: This is a rapid iteration platform for AI exploration, not production deployment tool
