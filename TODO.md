@@ -2604,39 +2604,28 @@ This hybrid approach separates:
 
 ---
 
-### Task 13c.2.6: SqliteStateStorage Implementation (Agent V6 + KV V7 + Workflow V8) 🚧 BLOCKED
+### Task 13c.2.6: SqliteStateStorage Implementation (Agent V6 + KV V7 + Workflow V8) 🔓 UNBLOCKED
 **Priority**: HIGH
 **Estimated Time**: 16 hours (Days 7-9)
 **Assignee**: State Management Team
-**Status**: 🚧 BLOCKED - Critical linker conflict (zeromq + libsql SHA1 symbols)
+**Status**: 🔄 IN PROGRESS - Linker conflict resolved, ready for implementation
 **Dependencies**: Task 13c.2.1 ✅
 
 **Description**: Implement 3 state storage backends using libsql to replace Sled KV store: (1) Agent states with versioning and checksums (V6), (2) Generic KV fallback storage for unrouted keys (V7), (3) Workflow execution states with lifecycle tracking (V8). These are 3 separate tables matching PostgreSQL V6/V7/V8 structure.
 
-**BLOCKER** (2025-11-11):
+**BLOCKER RESOLVED** (2025-11-11):
 - **Issue**: Linker error `duplicate symbol: sha1_init` when building workspace with both zeromq (zmq crate) and libsql
-- **Root Cause**: Both `zeromq-src` (bundled in zmq-sys) and `libsql-ffi` (bundled SQLite) include SHA1 implementations that conflict at link time
-- **Error**: `ld64.lld: error: duplicate symbol: sha1_init` → defined in both `/zeromq-src-0.2.6/vendor/external/sha1/sha1.c` and `liblibsql_ffi.rlib(sqlite3mc.c.o)`
-- **Investigation**:
-  - System libzmq is installed via Homebrew (`zeromq 4.3.5_2`)
-  - pkg-config correctly finds libzmq (`pkg-config --libs libzmq` works)
-  - Building llmspell-kernel alone succeeds (uses system libzmq via pkg-config)
-  - Building full workspace fails (zmq-sys falls back to bundled zeromq-src)
-  - `--allow-multiple-definition` linker flag doesn't work on macOS (ld64.lld limitation)
-- **Attempted Solutions**:
-  1. ✅ Installed system libzmq via Homebrew (already present)
-  2. ✅ Verified pkg-config finds libzmq correctly
-  3. ❌ Force zeromq feature off: Breaks kernel service (requires ZeroMQ for Jupyter protocol)
-  4. ❌ Force sqlite feature off: Breaks memory layer (SqliteEpisodicMemory needed)
-  5. ❌ Use --allow-multiple-definition: Not supported on macOS ld64.lld
-  6. ⏹ Use pure Rust zeromq crate: Would require rewriting kernel transport layer
-  7. ⏹ Patch zmq-sys build.rs: Complex, not maintainable
-- **Next Steps** (Research needed):
-  - Option A: Use newer zeromq version without SHA1 bundling (check zeromq v4.4+)
-  - Option B: Patch libsql to not bundle SHA1 (check if option exists)
-  - Option C: Switch to pure Rust zeromq implementation (`zeromq` crate vs `zmq` bindings)
-  - Option D: Make zeromq optional feature for kernel service (document as limitation)
-  - Option E: Use cargo patch to override zmq-sys with custom build script
+- **Root Cause**: libsql `encryption` feature bundled sqlite3mc with SHA1, conflicting with zeromq-src's bundled SHA1 implementation
+- **Solution**: Disabled libsql `encryption` feature (changed from `["encryption", "replication"]` to `["core", "replication"]`)
+  - Preserves core SQLite functionality and replication support
+  - Encryption feature was unused in current codebase (no encrypted databases)
+  - Can be re-enabled when upstream resolves SHA1 symbol conflict
+- **Verification**: Full workspace builds successfully with both zeromq and libsql (`cargo build --workspace` completes in 1m 52s)
+- **Research Findings**:
+  - ZeroMQ SHA1 only used for WebSocket support (not needed for Jupyter TCP transport)
+  - libsql encryption uses sqlite3mc with SHA1 for backward compatibility with legacy SQLCipher v2-v3
+  - Alternative: Pure Rust zeromq (`rzmq` crate, Beta, production-ready) available if needed in future
+  - `SYSTEM_DEPS_LIBZMQ_BUILD_INTERNAL=never` environment variable didn't prevent vendored build
 
 **Partial Progress**:
 - [x] SQLite migrations V6, V7, V8 created (310 lines total)
