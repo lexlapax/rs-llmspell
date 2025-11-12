@@ -507,9 +507,10 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn test_sled() {
+    async fn test_sqlite() {
         let temp_dir = tempdir().unwrap();
-        test_storage_backend(SledBackend::new(temp_dir.path()).unwrap()).await;
+        let db_path = temp_dir.path().join("test.db");
+        test_storage_backend(SqliteBackend::new(&db_path).await.unwrap()).await;
     }
 }
 ```

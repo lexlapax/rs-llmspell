@@ -1341,9 +1341,9 @@ async fn create_state_manager(config: &LLMSpellConfig) -> Result<Arc<StateManage
             info!("Using in-memory storage backend");
             Arc::new(MemoryBackend::new())
         }
-        "sled" => {
-            info!("Using Sled embedded database backend");
-            Arc::new(SledBackend::new_with_path(&config.storage.sled.path)?)
+        "sqlite" => {
+            info!("Using SQLite embedded database backend");
+            Arc::new(SqliteBackend::new_with_path(&config.storage.sqlite.path).await?)
         }
         "postgres" => {
             info!("Using PostgreSQL backend");
@@ -1367,7 +1367,7 @@ async fn create_state_manager(config: &LLMSpellConfig) -> Result<Arc<StateManage
         }
         backend_type => {
             return Err(LLMSpellError::Config(format!(
-                "Unknown storage backend: {}. Supported: memory, sled, postgres, redis",
+                "Unknown storage backend: {}. Supported: memory, sqlite, postgres, redis",
                 backend_type
             )));
         }
@@ -1383,7 +1383,7 @@ async fn create_state_manager(config: &LLMSpellConfig) -> Result<Arc<StateManage
 
 ```toml
 [storage]
-# Backend selection: "memory", "sled", "postgres", "redis"
+# Backend selection: "memory", "sqlite", "postgres", "redis"
 backend = "redis"
 
 # Redis configuration
@@ -1401,7 +1401,7 @@ backend = "postgres"  # Use PostgreSQL HNSW for vectors
 backend = "redis"     # Use Redis for fast session access
 
 [storage.components.agent_state]
-backend = "sled"      # Use Sled for persistent agent state
+backend = "sqlite"    # Use SQLite for persistent agent state
 ```
 
 ### Backend Testing Pattern

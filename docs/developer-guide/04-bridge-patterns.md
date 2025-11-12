@@ -496,7 +496,7 @@ pub async fn run_command(config: LLMSpellConfig) -> Result<()> {
     // Manual state manager creation
     let state_backend = match config.storage.backend {
         "memory" => Arc::new(MemoryBackend::new()) as Arc<dyn StorageBackend>,
-        "sled" => Arc::new(SledBackend::new(&config.storage.sled.path)?),
+        "sqlite" => Arc::new(SqliteBackend::new(&config.storage.sqlite.path).await?),
         "postgres" => Arc::new(PostgreSQLBackend::new(&config.storage.postgres.url).await?),
         _ => return Err(...)
     };
@@ -694,10 +694,10 @@ async fn create_state_manager(config: &LLMSpellConfig) -> Result<Arc<StateManage
             info!("Using in-memory storage backend");
             Arc::new(MemoryBackend::new())
         }
-        "sled" => {
-            info!("Using Sled embedded database backend");
-            let sled_path = &config.storage.sled.path;
-            Arc::new(SledBackend::new_with_path(sled_path)?)
+        "sqlite" => {
+            info!("Using SQLite embedded database backend");
+            let sqlite_path = &config.storage.sqlite.path;
+            Arc::new(SqliteBackend::new_with_path(sqlite_path).await?)
         }
         "postgres" => {
             info!("Using PostgreSQL backend");
@@ -717,7 +717,7 @@ async fn create_state_manager(config: &LLMSpellConfig) -> Result<Arc<StateManage
         }
         backend_type => {
             return Err(LLMSpellError::Config(format!(
-                "Unknown storage backend: {}. Supported: memory, sled, postgres",
+                "Unknown storage backend: {}. Supported: memory, sqlite, postgres",
                 backend_type
             )));
         }
@@ -778,7 +778,7 @@ backend = "postgres"  # Use PostgreSQL HNSW for vectors
 backend = "postgres"  # Use PostgreSQL for episodic memory
 
 [storage.components.agent_state]
-backend = "sled"      # Use Sled for fast local agent state
+backend = "sqlite"    # Use SQLite for fast local agent state
 
 [storage.components.session_data]
 backend = "memory"    # Use in-memory for ephemeral sessions
@@ -2226,7 +2226,7 @@ The bridge pattern provides:
 **Infrastructure Module Pattern** (Phase 13b.16):
 - ✅ `Infrastructure::from_config()` - Single creation path for 9 components
 - ✅ Dependency graph enforcement (5-level initialization order)
-- ✅ Hot-swappable storage backends (memory/sled/postgres)
+- ✅ Hot-swappable storage backends (memory/sqlite/postgres)
 - ✅ Per-component backend configuration
 - ✅ CLI simplification (200+ LOC → 12 LOC, 94% reduction)
 - ✅ `ScriptRuntime::new()` - Replaces `new_with_lua()` (deprecated)
