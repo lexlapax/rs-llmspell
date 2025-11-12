@@ -1,7 +1,7 @@
 //! ABOUTME: Episodic memory backend abstraction with enum dispatch
 //!
 //! Provides unified interface over multiple episodic storage backends,
-//! allowing runtime selection between `InMemory` (testing) and HNSW (production).
+//! allowing runtime selection between `InMemory` (testing), `Sqlite`, and `PostgreSQL` (production).
 
 use async_trait::async_trait;
 use chrono::{DateTime, Utc};
@@ -11,7 +11,7 @@ use tracing::info;
 use crate::config::{EpisodicBackendType, MemoryConfig};
 #[cfg(feature = "postgres")]
 use crate::episodic::PostgreSQLEpisodicMemory;
-use crate::episodic::{HNSWEpisodicMemory, InMemoryEpisodicMemory, SqliteEpisodicMemory};
+use crate::episodic::{InMemoryEpisodicMemory, SqliteEpisodicMemory};
 use crate::error::{MemoryError, Result};
 use crate::traits::EpisodicMemory;
 use crate::types::EpisodicEntry;
@@ -46,10 +46,7 @@ pub enum EpisodicBackend {
     /// In-memory `HashMap` backend (testing, <1K entries)
     InMemory(Arc<InMemoryEpisodicMemory>),
 
-    /// HNSW vector index backend (production, 10K+ entries) - **DEPRECATED: will be removed in Task 13c.2.8**
-    HNSW(Arc<HNSWEpisodicMemory>),
-
-    /// `SQLite` with HNSW backend (production, persistent local storage, 10K+ entries)
+    /// `SQLite` with vectorlite HNSW backend (production, persistent local storage, 10K+ entries)
     Sqlite(Arc<SqliteEpisodicMemory>),
 
     /// `PostgreSQL` with `pgvector` backend (production, multi-tenant, `RLS`-enabled)
@@ -73,9 +70,7 @@ impl EpisodicBackend {
     ///
     /// # Errors
     ///
-    /// Returns error if:
-    /// - HNSW backend selected but no embedding service provided
-    /// - Backend initialization fails
+    /// Returns error if backend initialization fails
     ///
     /// # Example
     ///
@@ -111,7 +106,6 @@ impl EpisodicBackend {
     pub fn from_config(config: &MemoryConfig) -> Result<Self> {
         match config.episodic_backend {
             EpisodicBackendType::InMemory => Ok(Self::create_inmemory_backend(config)),
-            EpisodicBackendType::HNSW => Self::create_hnsw_backend(config),
             EpisodicBackendType::Sqlite => Self::create_sqlite_backend(config),
             #[cfg(feature = "postgres")]
             EpisodicBackendType::PostgreSQL => Self::create_postgresql_backend(config),
@@ -138,29 +132,6 @@ impl EpisodicBackend {
         );
 
         Self::InMemory(Arc::new(backend))
-    }
-
-    /// Create HNSW backend from configuration
-    fn create_hnsw_backend(config: &MemoryConfig) -> Result<Self> {
-        info!("Creating HNSW episodic backend (production mode)");
-
-        let service = config.embedding_service.as_ref().ok_or_else(|| {
-            MemoryError::InvalidInput(
-                "HNSW backend requires embedding service (use MemoryConfig::for_production)"
-                    .to_string(),
-            )
-        })?;
-
-        info!(
-            "HNSW backend using embedding service: {}, dimensions: {}",
-            service.provider_name(),
-            service.dimensions()
-        );
-
-        let hnsw =
-            HNSWEpisodicMemory::with_config(Arc::clone(service), config.hnsw_config.clone())?;
-
-        Ok(Self::HNSW(Arc::new(hnsw)))
     }
 
     /// Create `SQLite` backend from configuration
@@ -234,7 +205,6 @@ impl EpisodicBackend {
     pub const fn backend_name(&self) -> &'static str {
         match self {
             Self::InMemory(_) => "InMemory",
-            Self::HNSW(_) => "HNSW",
             Self::Sqlite(_) => "Sqlite",
             #[cfg(feature = "postgres")]
             Self::PostgreSQL(_) => "PostgreSQL",
@@ -247,7 +217,6 @@ impl EpisodicMemory for EpisodicBackend {
     async fn add(&self, entry: EpisodicEntry) -> Result<String> {
         match self {
             Self::InMemory(backend) => backend.add(entry).await,
-            Self::HNSW(backend) => backend.add(entry).await,
             Self::Sqlite(backend) => backend.add(entry).await,
             #[cfg(feature = "postgres")]
             Self::PostgreSQL(backend) => backend.add(entry).await,
@@ -257,7 +226,6 @@ impl EpisodicMemory for EpisodicBackend {
     async fn get(&self, id: &str) -> Result<EpisodicEntry> {
         match self {
             Self::InMemory(backend) => backend.get(id).await,
-            Self::HNSW(backend) => backend.get(id).await,
             Self::Sqlite(backend) => backend.get(id).await,
             #[cfg(feature = "postgres")]
             Self::PostgreSQL(backend) => backend.get(id).await,
@@ -267,7 +235,6 @@ impl EpisodicMemory for EpisodicBackend {
     async fn search(&self, query: &str, top_k: usize) -> Result<Vec<EpisodicEntry>> {
         match self {
             Self::InMemory(backend) => backend.search(query, top_k).await,
-            Self::HNSW(backend) => backend.search(query, top_k).await,
             Self::Sqlite(backend) => backend.search(query, top_k).await,
             #[cfg(feature = "postgres")]
             Self::PostgreSQL(backend) => backend.search(query, top_k).await,
@@ -277,7 +244,6 @@ impl EpisodicMemory for EpisodicBackend {
     async fn list_unprocessed(&self, session_id: &str) -> Result<Vec<EpisodicEntry>> {
         match self {
             Self::InMemory(backend) => backend.list_unprocessed(session_id).await,
-            Self::HNSW(backend) => backend.list_unprocessed(session_id).await,
             Self::Sqlite(backend) => backend.list_unprocessed(session_id).await,
             #[cfg(feature = "postgres")]
             Self::PostgreSQL(backend) => backend.list_unprocessed(session_id).await,
@@ -287,7 +253,6 @@ impl EpisodicMemory for EpisodicBackend {
     async fn get_session(&self, session_id: &str) -> Result<Vec<EpisodicEntry>> {
         match self {
             Self::InMemory(backend) => backend.get_session(session_id).await,
-            Self::HNSW(backend) => backend.get_session(session_id).await,
             Self::Sqlite(backend) => backend.get_session(session_id).await,
             #[cfg(feature = "postgres")]
             Self::PostgreSQL(backend) => backend.get_session(session_id).await,
@@ -297,7 +262,6 @@ impl EpisodicMemory for EpisodicBackend {
     async fn mark_processed(&self, entry_ids: &[String]) -> Result<()> {
         match self {
             Self::InMemory(backend) => backend.mark_processed(entry_ids).await,
-            Self::HNSW(backend) => backend.mark_processed(entry_ids).await,
             Self::Sqlite(backend) => backend.mark_processed(entry_ids).await,
             #[cfg(feature = "postgres")]
             Self::PostgreSQL(backend) => backend.mark_processed(entry_ids).await,
@@ -307,7 +271,6 @@ impl EpisodicMemory for EpisodicBackend {
     async fn delete_before(&self, timestamp: DateTime<Utc>) -> Result<usize> {
         match self {
             Self::InMemory(backend) => backend.delete_before(timestamp).await,
-            Self::HNSW(backend) => backend.delete_before(timestamp).await,
             Self::Sqlite(backend) => backend.delete_before(timestamp).await,
             #[cfg(feature = "postgres")]
             Self::PostgreSQL(backend) => backend.delete_before(timestamp).await,
@@ -317,7 +280,6 @@ impl EpisodicMemory for EpisodicBackend {
     async fn list_sessions_with_unprocessed(&self) -> Result<Vec<String>> {
         match self {
             Self::InMemory(backend) => backend.list_sessions_with_unprocessed().await,
-            Self::HNSW(backend) => backend.list_sessions_with_unprocessed().await,
             Self::Sqlite(backend) => backend.list_sessions_with_unprocessed().await,
             #[cfg(feature = "postgres")]
             Self::PostgreSQL(backend) => backend.list_sessions_with_unprocessed().await,
@@ -329,7 +291,6 @@ impl std::fmt::Debug for EpisodicBackend {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
             Self::InMemory(_) => f.debug_tuple("InMemory").finish(),
-            Self::HNSW(_) => f.debug_tuple("HNSW").finish(),
             Self::Sqlite(_) => f.debug_tuple("Sqlite").finish(),
             #[cfg(feature = "postgres")]
             Self::PostgreSQL(_) => f.debug_tuple("PostgreSQL").finish(),

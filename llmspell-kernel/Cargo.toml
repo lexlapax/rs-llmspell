@@ -47,7 +47,7 @@ serde = { version = "1.0", features = ["derive"] }
 serde_json = "1.0"
 toml = "0.8"
 bincode = { workspace = true }
-# Phase 13c.1.7: rmp-serde kept (used in HNSW vector storage, state backup, session serialization)
+# Phase 13c.1.7: rmp-serde kept (used in state backup, session serialization)
 # MessagePack format provides compact binary serialization for state persistence
 rmp-serde = { version = "1.1" }
 
@@ -77,7 +77,7 @@ crossbeam-skiplist = "0.1"
 dashmap = "6.1"
 
 # Vector storage (for consolidated state persistence)
-hnsw_rs = "0.3"
+# Removed hnsw_rs - using vectorlite-rs via llmspell-storage instead
 
 # Session artifact storage dependencies
 lru = "0.12"

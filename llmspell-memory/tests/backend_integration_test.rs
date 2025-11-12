@@ -1,13 +1,13 @@
 //! Integration tests for episodic backend abstraction
 //!
-//! Validates that `InMemory` and HNSW backends implement the `EpisodicMemory` trait
+//! Validates that `InMemory` and `Sqlite` backends implement the `EpisodicMemory` trait
 //! correctly through the `EpisodicBackend` enum.
 //!
-//! ## HNSW Backend Architecture
+//! ## Sqlite Backend Architecture
 //!
-//! The HNSW backend uses a hybrid storage approach:
-//! - **HNSW**: O(log n) vector similarity search
-//! - **`DashMap`**: O(1) ID lookups, O(n) metadata queries
+//! The Sqlite backend uses vectorlite-rs for vector search:
+//! - **vectorlite HNSW**: O(log n) vector similarity search via SQLite extension
+//! - **SQLite**: ACID-compliant persistent storage with full SQL metadata queries
 //!
 //! This provides complete `EpisodicMemory` trait implementation with optimal performance
 //! for both vector search (primary use case) and metadata operations.
@@ -61,11 +61,22 @@ where
     let backend_arc: Arc<dyn EpisodicMemory> = Arc::new(backend.clone());
     test_fn(backend_arc).await;
 
-    // Test with HNSW backend
+    // Test with Sqlite backend
     let provider: Arc<dyn EmbeddingProvider> = Arc::new(TestEmbeddingProvider);
     let embedding_service = Arc::new(EmbeddingService::new(provider));
-    let config = MemoryConfig::for_production(embedding_service);
-    let backend = EpisodicBackend::from_config(&config).expect("HNSW backend creation failed");
+
+    // Create temporary SQLite database for testing
+    let temp_dir = tempfile::tempdir().expect("Failed to create temp dir");
+    let db_path = temp_dir.path().join("test_episodic.db");
+    let sqlite_backend = Arc::new(
+        llmspell_storage::backends::sqlite::SqliteBackend::new(db_path)
+            .await
+            .expect("Failed to create SqliteBackend"),
+    );
+
+    let config = MemoryConfig::for_production(embedding_service)
+        .with_sqlite_backend(sqlite_backend);
+    let backend = EpisodicBackend::from_config(&config).expect("Sqlite backend creation failed");
     let backend_arc: Arc<dyn EpisodicMemory> = Arc::new(backend);
     test_fn(backend_arc).await;
 }
@@ -254,12 +265,22 @@ async fn test_backend_name() {
     let backend = EpisodicBackend::from_config(&config).expect("backend creation failed");
     assert_eq!(backend.backend_name(), "InMemory");
 
-    // Test HNSW backend name
+    // Test Sqlite backend name
     let provider: Arc<dyn EmbeddingProvider> = Arc::new(TestEmbeddingProvider);
     let embedding_service = Arc::new(EmbeddingService::new(provider));
-    let config = MemoryConfig::for_production(embedding_service);
+
+    let temp_dir = tempfile::tempdir().expect("Failed to create temp dir");
+    let db_path = temp_dir.path().join("test_backend_name.db");
+    let sqlite_backend = Arc::new(
+        llmspell_storage::backends::sqlite::SqliteBackend::new(db_path)
+            .await
+            .expect("Failed to create SqliteBackend"),
+    );
+
+    let config = MemoryConfig::for_production(embedding_service)
+        .with_sqlite_backend(sqlite_backend);
     let backend = EpisodicBackend::from_config(&config).expect("backend creation failed");
-    assert_eq!(backend.backend_name(), "HNSW");
+    assert_eq!(backend.backend_name(), "Sqlite");
 }
 
 // ============================================================================
@@ -277,20 +298,30 @@ async fn test_config_for_testing() {
 async fn test_config_for_production() {
     let provider: Arc<dyn EmbeddingProvider> = Arc::new(TestEmbeddingProvider);
     let embedding_service = Arc::new(EmbeddingService::new(provider));
-    let config = MemoryConfig::for_production(embedding_service);
+
+    let temp_dir = tempfile::tempdir().expect("Failed to create temp dir");
+    let db_path = temp_dir.path().join("test_production.db");
+    let sqlite_backend = Arc::new(
+        llmspell_storage::backends::sqlite::SqliteBackend::new(db_path)
+            .await
+            .expect("Failed to create SqliteBackend"),
+    );
+
+    let config = MemoryConfig::for_production(embedding_service)
+        .with_sqlite_backend(sqlite_backend);
     let backend = EpisodicBackend::from_config(&config).expect("backend creation failed");
-    assert_eq!(backend.backend_name(), "HNSW");
+    assert_eq!(backend.backend_name(), "Sqlite");
 }
 
 #[tokio::test]
-async fn test_config_hnsw_without_embedding_service() {
+async fn test_config_sqlite_without_embedding_service() {
     use llmspell_memory::EpisodicBackendType;
 
-    let config = MemoryConfig::default().with_backend(EpisodicBackendType::HNSW);
+    let config = MemoryConfig::default().with_backend(EpisodicBackendType::Sqlite);
     let result = EpisodicBackend::from_config(&config);
     assert!(result.is_err());
     assert!(result
         .unwrap_err()
         .to_string()
-        .contains("HNSW backend requires embedding service"));
+        .contains("SQLite backend requires embedding service"));
 }

@@ -27,12 +27,6 @@ tempfile = { workspace = true, optional = true }
 rand.workspace = true # Phase 13b.14: For checksum sampling
 lz4_flex.workspace = true # Phase 13c.2.7: For hook history compression
 
-# HNSW implementation dependencies
-hnsw_rs = { version = "0.3.2" }
-# Phase 13c.1.7: rmp-serde kept (used in hnsw.rs for HNSW index persistence)
-# MessagePack format provides compact binary serialization for vector indices
-rmp-serde = { version = "1.1" }
-
 # PostgreSQL dependencies (Phase 13b.2 - optional)
 tokio-postgres = { workspace = true, optional = true }
 deadpool-postgres = { workspace = true, optional = true }
