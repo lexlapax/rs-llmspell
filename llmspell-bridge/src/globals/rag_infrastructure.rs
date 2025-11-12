@@ -285,11 +285,14 @@ mod tests {
             ),
         );
 
-        let config = RAGConfig::builder()
+        let mut config = RAGConfig::builder()
             .enabled(true)
             .dimensions(384)
             .backend(llmspell_config::VectorBackend::HNSW)
             .build();
+
+        // Use in-memory database for testing
+        config.vector_storage.persistence_path = Some(std::path::PathBuf::from(":memory:"));
 
         let infrastructure = get_or_create_rag_infrastructure(&context, &config)
             .await
@@ -316,11 +319,14 @@ mod tests {
             ),
         );
 
-        let config = RAGConfig::builder()
+        let mut config = RAGConfig::builder()
             .enabled(true)
             .dimensions(768)
             .backend(llmspell_config::VectorBackend::HNSW)
             .build();
+
+        // Use in-memory database for testing
+        config.vector_storage.persistence_path = Some(std::path::PathBuf::from(":memory:"));
 
         let infrastructure = get_or_create_rag_infrastructure(&context, &config)
             .await
