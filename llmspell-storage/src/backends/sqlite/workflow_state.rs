@@ -71,11 +71,7 @@ impl SqliteWorkflowStateStorage {
 
 #[async_trait]
 impl WorkflowStateStorage for SqliteWorkflowStateStorage {
-    async fn save_state(
-        &self,
-        workflow_id: &str,
-        state: &WorkflowState,
-    ) -> anyhow::Result<()> {
+    async fn save_state(&self, workflow_id: &str, state: &WorkflowState) -> anyhow::Result<()> {
         let tenant_id = self.get_tenant_id();
         let conn = self.backend.get_connection().await?;
 
@@ -135,7 +131,9 @@ impl WorkflowStateStorage for SqliteWorkflowStateStorage {
                  WHERE tenant_id = ?1 AND workflow_id = ?2",
             )
             .await
-            .map_err(|e| SqliteError::Query(format!("Failed to prepare workflow state load: {}", e)))?;
+            .map_err(|e| {
+                SqliteError::Query(format!("Failed to prepare workflow state load: {}", e))
+            })?;
 
         let mut rows = stmt
             .query(libsql::params![tenant_id, workflow_id])
@@ -180,9 +178,7 @@ impl WorkflowStateStorage for SqliteWorkflowStateStorage {
             "completed" => WorkflowStatus::Completed,
             "failed" => WorkflowStatus::Failed,
             "cancelled" => WorkflowStatus::Cancelled,
-            _ => {
-                return Err(SqliteError::Query(format!("Invalid status: {}", status_str)).into())
-            }
+            _ => return Err(SqliteError::Query(format!("Invalid status: {}", status_str)).into()),
         };
 
         // Deserialize state_data
@@ -200,11 +196,7 @@ impl WorkflowStateStorage for SqliteWorkflowStateStorage {
         }))
     }
 
-    async fn update_status(
-        &self,
-        workflow_id: &str,
-        status: WorkflowStatus,
-    ) -> anyhow::Result<()> {
+    async fn update_status(&self, workflow_id: &str, status: WorkflowStatus) -> anyhow::Result<()> {
         let tenant_id = self.get_tenant_id();
         let conn = self.backend.get_connection().await?;
         let now = Utc::now().timestamp();
@@ -221,16 +213,17 @@ impl WorkflowStateStorage for SqliteWorkflowStateStorage {
             .map_err(|e| SqliteError::Query(format!("Failed to prepare status update: {}", e)))?;
 
         let rows_affected = stmt
-            .execute(libsql::params![status.to_string(), now, tenant_id, workflow_id])
+            .execute(libsql::params![
+                status.to_string(),
+                now,
+                tenant_id,
+                workflow_id
+            ])
             .await
             .map_err(|e| SqliteError::Query(format!("Failed to update workflow status: {}", e)))?;
 
         if rows_affected == 0 {
-            return Err(SqliteError::Query(format!(
-                "Workflow not found: {}",
-                workflow_id
-            ))
-            .into());
+            return Err(SqliteError::Query(format!("Workflow not found: {}", workflow_id)).into());
         }
 
         Ok(())
@@ -305,7 +298,12 @@ mod tests {
     use crate::backends::sqlite::SqliteConfig;
     use tempfile::TempDir;
 
-    async fn create_test_storage() -> (TempDir, Arc<SqliteBackend>, SqliteWorkflowStateStorage, String) {
+    async fn create_test_storage() -> (
+        TempDir,
+        Arc<SqliteBackend>,
+        SqliteWorkflowStateStorage,
+        String,
+    ) {
         let temp_dir = TempDir::new().unwrap();
         let db_path = temp_dir.path().join("test.db");
 
@@ -335,10 +333,7 @@ mod tests {
         // Set tenant context
         backend.set_tenant_context(&tenant_id).await.unwrap();
 
-        let storage = SqliteWorkflowStateStorage::new(
-            Arc::clone(&backend),
-            tenant_id.clone(),
-        );
+        let storage = SqliteWorkflowStateStorage::new(Arc::clone(&backend), tenant_id.clone());
 
         (temp_dir, backend, storage, tenant_id)
     }
@@ -499,8 +494,10 @@ mod tests {
         .unwrap();
 
         // Create storage for two different tenants
-        let storage1 = SqliteWorkflowStateStorage::new(Arc::clone(&backend), "tenant-1".to_string());
-        let storage2 = SqliteWorkflowStateStorage::new(Arc::clone(&backend), "tenant-2".to_string());
+        let storage1 =
+            SqliteWorkflowStateStorage::new(Arc::clone(&backend), "tenant-1".to_string());
+        let storage2 =
+            SqliteWorkflowStateStorage::new(Arc::clone(&backend), "tenant-2".to_string());
 
         // Save workflow for tenant 1
         let state = WorkflowState::new("wf-shared", "shared-id");

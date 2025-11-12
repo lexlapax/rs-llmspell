@@ -131,9 +131,7 @@ impl StorageBackend for SqliteKVStorage {
         let conn = self.backend.get_connection().await?;
 
         let stmt = conn
-            .prepare(
-                "SELECT 1 FROM kv_store WHERE tenant_id = ?1 AND key = ?2 LIMIT 1",
-            )
+            .prepare("SELECT 1 FROM kv_store WHERE tenant_id = ?1 AND key = ?2 LIMIT 1")
             .await
             .map_err(|e| SqliteError::Query(format!("Failed to prepare exists query: {}", e)))?;
 
@@ -142,7 +140,11 @@ impl StorageBackend for SqliteKVStorage {
             .await
             .map_err(|e| SqliteError::Query(format!("Failed to execute exists: {}", e)))?;
 
-        Ok(rows.next().await.map_err(|e| SqliteError::Query(format!("Failed to check exists: {}", e)))?.is_some())
+        Ok(rows
+            .next()
+            .await
+            .map_err(|e| SqliteError::Query(format!("Failed to check exists: {}", e)))?
+            .is_some())
     }
 
     async fn list_keys(&self, prefix: &str) -> anyhow::Result<Vec<String>> {
@@ -229,8 +231,8 @@ impl StorageBackend for SqliteKVStorage {
             transactional: true,
             supports_prefix_scan: true,
             supports_atomic_ops: true,
-            avg_read_latency_us: 1000,   // <5ms target = <5000us
-            avg_write_latency_us: 3000,  // <10ms target = <10000us
+            avg_read_latency_us: 1000,  // <5ms target = <5000us
+            avg_write_latency_us: 3000, // <10ms target = <10000us
         }
     }
 }
@@ -267,11 +269,9 @@ mod tests {
         .unwrap();
 
         // V7: KV store
-        conn.execute_batch(include_str!(
-            "../../../migrations/sqlite/V7__kv_store.sql"
-        ))
-        .await
-        .unwrap();
+        conn.execute_batch(include_str!("../../../migrations/sqlite/V7__kv_store.sql"))
+            .await
+            .unwrap();
 
         // Create unique tenant ID
         let tenant_id = format!("test-tenant-{}", uuid::Uuid::new_v4());
@@ -305,7 +305,10 @@ mod tests {
 
         // Test binary data with null bytes
         let binary_data = vec![0u8, 1, 2, 255, 0, 128, 0];
-        storage.set("binary:key", binary_data.clone()).await.unwrap();
+        storage
+            .set("binary:key", binary_data.clone())
+            .await
+            .unwrap();
 
         let retrieved = storage.get("binary:key").await.unwrap().unwrap();
         assert_eq!(retrieved, binary_data);
@@ -364,7 +367,11 @@ mod tests {
         storage.set_batch(items.clone()).await.unwrap();
 
         // Get batch
-        let keys = vec!["batch:1".to_string(), "batch:2".to_string(), "batch:3".to_string()];
+        let keys = vec![
+            "batch:1".to_string(),
+            "batch:2".to_string(),
+            "batch:3".to_string(),
+        ];
         let retrieved = storage.get_batch(&keys).await.unwrap();
 
         assert_eq!(retrieved.len(), 3);
@@ -429,23 +436,27 @@ mod tests {
         ))
         .await
         .unwrap();
-        conn.execute_batch(include_str!(
-            "../../../migrations/sqlite/V7__kv_store.sql"
-        ))
-        .await
-        .unwrap();
+        conn.execute_batch(include_str!("../../../migrations/sqlite/V7__kv_store.sql"))
+            .await
+            .unwrap();
 
         let storage1 = SqliteKVStorage::new(Arc::clone(&backend), "tenant-1".to_string());
         let storage2 = SqliteKVStorage::new(Arc::clone(&backend), "tenant-2".to_string());
 
         // Tenant 1 sets a value
-        storage1.set("shared:key", b"tenant1-value".to_vec()).await.unwrap();
+        storage1
+            .set("shared:key", b"tenant1-value".to_vec())
+            .await
+            .unwrap();
 
         // Tenant 2 should not see tenant 1's value
         assert!(storage2.get("shared:key").await.unwrap().is_none());
 
         // Tenant 2 sets their own value with same key
-        storage2.set("shared:key", b"tenant2-value".to_vec()).await.unwrap();
+        storage2
+            .set("shared:key", b"tenant2-value".to_vec())
+            .await
+            .unwrap();
 
         // Both tenants should see their own values
         assert_eq!(

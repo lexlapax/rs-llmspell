@@ -139,7 +139,12 @@ impl SqliteAgentStateStorage {
     }
 
     /// Set agent state by agent_id (internal method)
-    async fn set_agent_state(&self, agent_id: &str, agent_type: &str, value: Vec<u8>) -> anyhow::Result<()> {
+    async fn set_agent_state(
+        &self,
+        agent_id: &str,
+        agent_type: &str,
+        value: Vec<u8>,
+    ) -> anyhow::Result<()> {
         let tenant_id = self.get_tenant_id();
         let conn = self.backend.get_connection().await?;
         let now = chrono::Utc::now().timestamp();
@@ -165,13 +170,7 @@ impl SqliteAgentStateStorage {
             .map_err(|e| SqliteError::Query(format!("Failed to prepare set_agent_state: {}", e)))?;
 
         stmt.execute(libsql::params![
-            tenant_id,
-            agent_id,
-            agent_type,
-            state_data,
-            checksum,
-            now,
-            now
+            tenant_id, agent_id, agent_type, state_data, checksum, now, now
         ])
         .await
         .map_err(|e| SqliteError::Query(format!("Failed to execute set_agent_state: {}", e)))?;
@@ -232,9 +231,7 @@ impl StorageBackend for SqliteAgentStateStorage {
         let conn = self.backend.get_connection().await?;
 
         let stmt = conn
-            .prepare(
-                "SELECT 1 FROM agent_states WHERE tenant_id = ?1 AND agent_id = ?2 LIMIT 1",
-            )
+            .prepare("SELECT 1 FROM agent_states WHERE tenant_id = ?1 AND agent_id = ?2 LIMIT 1")
             .await
             .map_err(|e| SqliteError::Query(format!("Failed to prepare exists: {}", e)))?;
 
@@ -243,7 +240,11 @@ impl StorageBackend for SqliteAgentStateStorage {
             .await
             .map_err(|e| SqliteError::Query(format!("Failed to execute exists: {}", e)))?;
 
-        Ok(rows.next().await.map_err(|e| SqliteError::Query(format!("Failed to check exists: {}", e)))?.is_some())
+        Ok(rows
+            .next()
+            .await
+            .map_err(|e| SqliteError::Query(format!("Failed to check exists: {}", e)))?
+            .is_some())
     }
 
     async fn list_keys(&self, prefix: &str) -> anyhow::Result<Vec<String>> {
@@ -335,8 +336,8 @@ impl StorageBackend for SqliteAgentStateStorage {
             transactional: true,
             supports_prefix_scan: true,
             supports_atomic_ops: true,
-            avg_read_latency_us: 1000,   // <5ms target
-            avg_write_latency_us: 3000,  // <10ms target
+            avg_read_latency_us: 1000,  // <5ms target
+            avg_write_latency_us: 3000, // <10ms target
         }
     }
 }
@@ -355,7 +356,8 @@ mod tests {
     use crate::backends::sqlite::SqliteConfig;
     use tempfile::TempDir;
 
-    async fn create_test_storage() -> (TempDir, Arc<SqliteBackend>, SqliteAgentStateStorage, String) {
+    async fn create_test_storage() -> (TempDir, Arc<SqliteBackend>, SqliteAgentStateStorage, String)
+    {
         let temp_dir = TempDir::new().unwrap();
         let db_path = temp_dir.path().join("test.db");
 
@@ -385,10 +387,7 @@ mod tests {
         // Set tenant context
         backend.set_tenant_context(&tenant_id).await.unwrap();
 
-        let storage = SqliteAgentStateStorage::new(
-            Arc::clone(&backend),
-            tenant_id.clone(),
-        );
+        let storage = SqliteAgentStateStorage::new(Arc::clone(&backend), tenant_id.clone());
 
         (temp_dir, backend, storage, tenant_id)
     }
@@ -575,7 +574,10 @@ mod tests {
 
         // Key with agent_type
         let key_with_type = "agent:typed-agent:worker";
-        storage.set(key_with_type, b"{\"type\":\"worker\"}".to_vec()).await.unwrap();
+        storage
+            .set(key_with_type, b"{\"type\":\"worker\"}".to_vec())
+            .await
+            .unwrap();
 
         // Should be retrievable with full key
         assert!(storage.get(key_with_type).await.unwrap().is_some());

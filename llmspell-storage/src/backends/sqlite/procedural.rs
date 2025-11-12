@@ -118,18 +118,19 @@ impl SqliteProceduralStorage {
                  RETURNING frequency",
             )
             .await
-            .map_err(|e| {
-                SqliteError::Query(format!("Failed to prepare pattern insert: {}", e))
-            })?;
+            .map_err(|e| SqliteError::Query(format!("Failed to prepare pattern insert: {}", e)))?;
 
         let mut rows = stmt
             .query(libsql::params![tenant_id, scope, key, to_value])
             .await
-            .map_err(|e| SqliteError::Query(format!("Failed to record pattern transition: {}", e)))?;
+            .map_err(|e| {
+                SqliteError::Query(format!("Failed to record pattern transition: {}", e))
+            })?;
 
-        let row = rows.next().await.map_err(|e| {
-            SqliteError::Query(format!("Failed to fetch RETURNING row: {}", e))
-        })?;
+        let row = rows
+            .next()
+            .await
+            .map_err(|e| SqliteError::Query(format!("Failed to fetch RETURNING row: {}", e)))?;
 
         let frequency: i64 = row
             .ok_or_else(|| SqliteError::Query("No RETURNING row from INSERT".to_string()))?
@@ -164,18 +165,17 @@ impl SqliteProceduralStorage {
                  WHERE tenant_id = ?1 AND scope = ?2 AND key = ?3 AND value = ?4",
             )
             .await
-            .map_err(|e| {
-                SqliteError::Query(format!("Failed to prepare frequency query: {}", e))
-            })?;
+            .map_err(|e| SqliteError::Query(format!("Failed to prepare frequency query: {}", e)))?;
 
         let mut rows = stmt
             .query(libsql::params![tenant_id, scope, key, value])
             .await
             .map_err(|e| SqliteError::Query(format!("Failed to query pattern frequency: {}", e)))?;
 
-        let row_opt = rows.next().await.map_err(|e| {
-            SqliteError::Query(format!("Failed to fetch frequency row: {}", e))
-        })?;
+        let row_opt = rows
+            .next()
+            .await
+            .map_err(|e| SqliteError::Query(format!("Failed to fetch frequency row: {}", e)))?;
 
         match row_opt {
             Some(row) => {
@@ -278,7 +278,8 @@ mod tests {
         );
     }
 
-    async fn create_test_storage() -> (TempDir, Arc<SqliteBackend>, SqliteProceduralStorage, String) {
+    async fn create_test_storage() -> (TempDir, Arc<SqliteBackend>, SqliteProceduralStorage, String)
+    {
         let temp_dir = TempDir::new().unwrap();
         let db_path = temp_dir.path().join("test.db");
 
@@ -289,23 +290,24 @@ mod tests {
         let conn = backend.get_connection().await.unwrap();
 
         // V1: Initial setup
-        conn.execute_batch(include_str!("../../../migrations/sqlite/V1__initial_setup.sql"))
-            .await
-            .unwrap();
+        conn.execute_batch(include_str!(
+            "../../../migrations/sqlite/V1__initial_setup.sql"
+        ))
+        .await
+        .unwrap();
 
         // V5: Procedural memory
-        conn.execute_batch(include_str!("../../../migrations/sqlite/V5__procedural_memory.sql"))
-            .await
-            .unwrap();
+        conn.execute_batch(include_str!(
+            "../../../migrations/sqlite/V5__procedural_memory.sql"
+        ))
+        .await
+        .unwrap();
 
         // Create unique tenant ID
         let tenant_id = format!("test-tenant-{}", uuid::Uuid::new_v4());
 
         // Set tenant context
-        backend
-            .set_tenant_context(&tenant_id)
-            .await
-            .unwrap();
+        backend.set_tenant_context(&tenant_id).await.unwrap();
 
         let storage = SqliteProceduralStorage::new(Arc::clone(&backend), tenant_id.clone());
 
@@ -480,12 +482,16 @@ mod tests {
 
         // Run migrations manually (V1, V5 for procedural tests)
         let conn = backend.get_connection().await.unwrap();
-        conn.execute_batch(include_str!("../../../migrations/sqlite/V1__initial_setup.sql"))
-            .await
-            .unwrap();
-        conn.execute_batch(include_str!("../../../migrations/sqlite/V5__procedural_memory.sql"))
-            .await
-            .unwrap();
+        conn.execute_batch(include_str!(
+            "../../../migrations/sqlite/V1__initial_setup.sql"
+        ))
+        .await
+        .unwrap();
+        conn.execute_batch(include_str!(
+            "../../../migrations/sqlite/V5__procedural_memory.sql"
+        ))
+        .await
+        .unwrap();
 
         let tenant_a = format!("tenant-a-{}", uuid::Uuid::new_v4());
         let tenant_b = format!("tenant-b-{}", uuid::Uuid::new_v4());
@@ -746,12 +752,16 @@ mod tests {
 
         // Run migrations manually (V1, V5 for procedural tests)
         let conn = backend.get_connection().await.unwrap();
-        conn.execute_batch(include_str!("../../../migrations/sqlite/V1__initial_setup.sql"))
-            .await
-            .unwrap();
-        conn.execute_batch(include_str!("../../../migrations/sqlite/V5__procedural_memory.sql"))
-            .await
-            .unwrap();
+        conn.execute_batch(include_str!(
+            "../../../migrations/sqlite/V1__initial_setup.sql"
+        ))
+        .await
+        .unwrap();
+        conn.execute_batch(include_str!(
+            "../../../migrations/sqlite/V5__procedural_memory.sql"
+        ))
+        .await
+        .unwrap();
 
         let tenant_id = format!("concurrent-{}", uuid::Uuid::new_v4());
         backend.set_tenant_context(&tenant_id).await.unwrap();
