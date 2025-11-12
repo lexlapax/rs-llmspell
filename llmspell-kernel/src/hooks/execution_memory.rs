@@ -150,9 +150,8 @@ mod tests {
 
     #[tokio::test]
     async fn test_execution_memory_hook_success() {
-        let memory = DefaultMemoryManager::new_in_memory()
-            .await
-            .expect("Failed to create memory manager");
+        let memory =
+            DefaultMemoryManager::new_in_memory().expect("Failed to create memory manager");
         let memory_arc = Arc::new(memory);
         let hook = ExecutionMemoryHook::new(memory_arc.clone());
 
@@ -185,9 +184,8 @@ mod tests {
 
     #[tokio::test]
     async fn test_execution_memory_hook_error() {
-        let memory = DefaultMemoryManager::new_in_memory()
-            .await
-            .expect("Failed to create memory manager");
+        let memory =
+            DefaultMemoryManager::new_in_memory().expect("Failed to create memory manager");
         let memory_arc = Arc::new(memory);
         let hook = ExecutionMemoryHook::new(memory_arc.clone());
 
@@ -219,9 +217,8 @@ mod tests {
 
     #[tokio::test]
     async fn test_execution_memory_hook_missing_session_id() {
-        let memory = DefaultMemoryManager::new_in_memory()
-            .await
-            .expect("Failed to create memory manager");
+        let memory =
+            DefaultMemoryManager::new_in_memory().expect("Failed to create memory manager");
         let memory_arc = Arc::new(memory);
         let hook = ExecutionMemoryHook::new(memory_arc.clone());
 

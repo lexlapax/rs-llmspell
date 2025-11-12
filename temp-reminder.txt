@@ -11,3 +11,8 @@
   print(agent:execute({prompt = "Explain Rust ownership in 2 sentences"}).response)
 '
 
+- README-DEVEL.md needs to include
+  - ripgrep
+  - rust-script
+
+  

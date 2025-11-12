@@ -19,11 +19,8 @@ async fn test_execution_context_with_memory() {
     info!("=== Test: ExecutionContext with Memory Infrastructure ===");
 
     // Create in-memory memory manager
-    let memory_manager = Arc::new(
-        DefaultMemoryManager::new_in_memory()
-            .await
-            .expect("Failed to create memory manager"),
-    );
+    let memory_manager =
+        Arc::new(DefaultMemoryManager::new_in_memory().expect("Failed to create memory manager"));
     debug!("Created DefaultMemoryManager");
 
     // Create context bridge
@@ -122,11 +119,8 @@ async fn test_episodic_memory_storage() {
     info!("=== Test: Episodic Memory Storage ===");
 
     // Create memory manager
-    let memory_manager = Arc::new(
-        DefaultMemoryManager::new_in_memory()
-            .await
-            .expect("Failed to create memory manager"),
-    );
+    let memory_manager =
+        Arc::new(DefaultMemoryManager::new_in_memory().expect("Failed to create memory manager"));
 
     // Add test entries
     let entry1 = EpisodicEntry::new(
@@ -176,11 +170,8 @@ async fn test_context_bridge_creation() {
     info!("=== Test: Context Bridge Creation ===");
 
     // Create memory manager
-    let memory_manager = Arc::new(
-        DefaultMemoryManager::new_in_memory()
-            .await
-            .expect("Failed to create memory manager"),
-    );
+    let memory_manager =
+        Arc::new(DefaultMemoryManager::new_in_memory().expect("Failed to create memory manager"));
 
     // Create context bridge
     let context_bridge = Arc::new(ContextBridge::new(memory_manager.clone()));

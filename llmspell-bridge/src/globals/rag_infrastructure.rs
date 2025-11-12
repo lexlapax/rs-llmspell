@@ -103,7 +103,7 @@ fn get_or_create_session_manager(
     let hook_registry = get_or_create_hook_registry(context);
     let hook_executor = get_or_create_hook_executor(context);
     let event_bus = get_or_create_event_bus(context);
-    let storage_backend = create_storage_backend("memory")?;
+    let storage_backend = create_storage_backend("memory");
 
     // Create SessionManagerConfig with defaults suitable for RAG
     let session_config = SessionManagerConfig::builder()
@@ -217,16 +217,13 @@ async fn create_vector_storage(
 
 /// Create storage backend for sessions
 ///
-/// # Errors
-///
-/// Returns an error if:
-/// - Unknown backend type is specified
-/// - Backend creation fails
-fn create_storage_backend(backend_type: &str) -> Result<Arc<dyn StorageBackend>> {
+/// Always returns `MemoryBackend` - only memory backend supported via Lua bridge.
+/// For persistent storage, use Rust API with `SQLite` or `PostgreSQL`.
+fn create_storage_backend(backend_type: &str) -> Arc<dyn StorageBackend> {
     match backend_type {
         "memory" => {
             debug!("Creating in-memory storage backend for RAG sessions");
-            Ok(Arc::new(MemoryBackend::new()))
+            Arc::new(MemoryBackend::new())
         }
         backend => {
             warn!(
@@ -234,7 +231,7 @@ fn create_storage_backend(backend_type: &str) -> Result<Arc<dyn StorageBackend>>
                  For persistent storage, use Rust API with SQLite or PostgreSQL.",
                 backend
             );
-            Ok(Arc::new(MemoryBackend::new()))
+            Arc::new(MemoryBackend::new())
         }
     }
 }
@@ -256,7 +253,7 @@ impl RAGInfrastructure {
     /// # Errors
     ///
     /// Returns an error if the save operation fails
-    pub async fn save(&self) -> Result<()> {
+    pub fn save(&self) -> Result<()> {
         if self.sqlite_storage.is_some() {
             debug!(
                 "SQLite vector storage auto-persists via transactions - no explicit save needed"

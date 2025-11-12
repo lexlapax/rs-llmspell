@@ -62,7 +62,6 @@ impl StateManagerAdapter {
                     optimize_for_point_lookup: false,
                 })
             }
-            #[cfg(feature = "postgres")]
             "postgres" => {
                 warn!("PostgreSQL backend not yet supported via Lua bridge, defaulting to memory");
                 StorageBackendType::Memory

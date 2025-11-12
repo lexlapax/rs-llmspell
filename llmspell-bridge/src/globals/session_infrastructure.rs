@@ -40,7 +40,7 @@ pub async fn get_or_create_session_infrastructure(
     let event_bus = get_or_create_event_bus(context);
 
     // Create storage backend based on configuration
-    let storage_backend = create_storage_backend(&config.storage_backend)?;
+    let storage_backend = create_storage_backend(&config.storage_backend);
 
     // Create SessionManagerConfig from runtime config using builder pattern
     let session_config = SessionManagerConfig::builder()
@@ -140,16 +140,13 @@ fn get_or_create_event_bus(context: &GlobalContext) -> Arc<EventBus> {
 
 /// Create storage backend based on configuration
 ///
-/// # Errors
-///
-/// Returns an error if:
-/// - Unknown backend type is specified
-/// - Backend creation fails
-fn create_storage_backend(backend_type: &str) -> Result<Arc<dyn StorageBackend>> {
+/// Always returns `MemoryBackend` - only memory backend supported via Lua bridge.
+/// For persistent storage, use Rust API with `SQLite` or `PostgreSQL`.
+fn create_storage_backend(backend_type: &str) -> Arc<dyn StorageBackend> {
     match backend_type {
         "memory" => {
             debug!("Creating in-memory storage backend for sessions");
-            Ok(Arc::new(MemoryBackend::new()))
+            Arc::new(MemoryBackend::new())
         }
         backend => {
             warn!(
@@ -157,7 +154,7 @@ fn create_storage_backend(backend_type: &str) -> Result<Arc<dyn StorageBackend>>
                  For persistent storage, use Rust API with SQLite or PostgreSQL.",
                 backend
             );
-            Ok(Arc::new(MemoryBackend::new()))
+            Arc::new(MemoryBackend::new())
         }
     }
 }

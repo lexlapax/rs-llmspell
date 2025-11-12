@@ -142,9 +142,8 @@ mod tests {
 
     #[tokio::test]
     async fn test_state_memory_hook_tracks_transitions() {
-        let memory = DefaultMemoryManager::new_in_memory()
-            .await
-            .expect("Failed to create memory manager");
+        let memory =
+            DefaultMemoryManager::new_in_memory().expect("Failed to create memory manager");
         let memory_arc = Arc::new(memory);
         let hook = StateMemoryHook::new(memory_arc.clone());
 
@@ -179,9 +178,8 @@ mod tests {
 
     #[tokio::test]
     async fn test_state_memory_hook_pattern_threshold() {
-        let memory = DefaultMemoryManager::new_in_memory()
-            .await
-            .expect("Failed to create memory manager");
+        let memory =
+            DefaultMemoryManager::new_in_memory().expect("Failed to create memory manager");
         let memory_arc = Arc::new(memory);
         let hook = StateMemoryHook::with_threshold(memory_arc.clone(), 2);
 
@@ -207,9 +205,8 @@ mod tests {
 
     #[tokio::test]
     async fn test_state_memory_hook_missing_data() {
-        let memory = DefaultMemoryManager::new_in_memory()
-            .await
-            .expect("Failed to create memory manager");
+        let memory =
+            DefaultMemoryManager::new_in_memory().expect("Failed to create memory manager");
         let memory_arc = Arc::new(memory);
         let hook = StateMemoryHook::new(memory_arc);
 

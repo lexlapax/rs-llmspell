@@ -8,7 +8,7 @@ use llmspell_core::{
     types::{AgentInput, AgentOutput},
     ExecutionContext,
 };
-use llmspell_kernel::state::config::{PerformanceConfig, SledConfig};
+use llmspell_kernel::state::config::PerformanceConfig;
 use llmspell_kernel::state::{PersistenceConfig, StateManager, StorageBackendType};
 use llmspell_providers::ProviderManager;
 use std::env;
@@ -37,17 +37,13 @@ impl ProviderTestContext {
         let temp_dir = TempDir::new()?;
         let storage_path = temp_dir.path().to_path_buf();
 
-        // Create state manager with persistent storage
+        // Create state manager with in-memory storage (tests don't need persistence)
         let state_manager = Arc::new(
             StateManager::with_backend(
-                StorageBackendType::Sled(SledConfig {
-                    path: storage_path.join("test_states"),
-                    cache_capacity: 1024 * 1024, // 1MB
-                    use_compression: true,
-                }),
+                StorageBackendType::Memory,
                 PersistenceConfig {
-                    enabled: true,
-                    backend_type: StorageBackendType::Memory, // Overridden by with_backend
+                    enabled: false,
+                    backend_type: StorageBackendType::Memory,
                     flush_interval: Duration::from_millis(100), // Fast for tests
                     compression: true,
                     encryption: None,

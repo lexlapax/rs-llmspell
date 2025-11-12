@@ -134,7 +134,7 @@ fn register_bridges(
 }
 
 /// Register Memory and Context globals (always available with in-memory fallback)
-async fn register_memory_context_globals(
+fn register_memory_context_globals(
     builder: &mut GlobalRegistryBuilder,
     context: &Arc<GlobalContext>,
 ) {
@@ -420,7 +420,7 @@ pub async fn create_standard_registry(context: Arc<GlobalContext>) -> Result<Glo
     let session_manager_opt = register_session_artifacts(&mut builder, &context);
 
     // Register Memory and Context globals (always available with in-memory fallback)
-    register_memory_context_globals(&mut builder, &context).await;
+    register_memory_context_globals(&mut builder, &context);
 
     // Register RAG global if dependencies available
     register_rag_global(&mut builder, &context, session_manager_opt).await;

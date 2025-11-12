@@ -205,7 +205,7 @@ impl DefaultMemoryManager {
     /// # Ok(())
     /// # }
     /// ```
-    pub fn with_config(config: crate::config::MemoryConfig) -> Result<Self> {
+    pub fn with_config(config: &crate::config::MemoryConfig) -> Result<Self> {
         use crate::episodic::EpisodicBackend;
 
         info!(
@@ -214,11 +214,11 @@ impl DefaultMemoryManager {
         );
 
         // Create episodic backend from configuration
-        let episodic = EpisodicBackend::from_config(&config)?;
+        let episodic = EpisodicBackend::from_config(config)?;
         info!("Episodic backend created: {}", episodic.backend_name());
 
         // Create other subsystems
-        let semantic = Self::create_semantic_memory(&config)?;
+        let semantic = Self::create_semantic_memory(config)?;
         let procedural = Self::create_procedural_memory();
 
         info!("DefaultMemoryManager initialized successfully with config");
@@ -255,7 +255,7 @@ impl DefaultMemoryManager {
 
         // Use InMemory backend for testing
         let config = crate::config::MemoryConfig::for_testing();
-        Self::with_config(config)
+        Self::with_config(&config)
     }
 
     /// Create memory manager with in-memory backends and real embeddings (production)
@@ -316,7 +316,7 @@ impl DefaultMemoryManager {
 
         // Use HNSW backend for production
         let config = crate::config::MemoryConfig::for_production(embedding_service);
-        Self::with_config(config)
+        Self::with_config(&config)
     }
 
     /// Helper: Create semantic memory from configuration
