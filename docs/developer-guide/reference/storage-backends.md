@@ -29,7 +29,7 @@ StorageBackend Trait (abstraction)
     ↓
     ├─→ InMemoryBackend (testing, development)
     ├─→ SqliteBackend (embedded persistent KV)
-    └─→ HNSWVectorStorage (RAG, similarity search)
+    └─→ SqliteVectorStorage (RAG, similarity search)
 ```
 
 ### Backend Selection Patterns
@@ -52,9 +52,9 @@ let storage = SqliteBackend::new("/path/to/db")?;
 
 **Vector Search (RAG)**:
 ```rust
-use llmspell_storage::vector::HNSWVectorStorage;
+use llmspell_storage::vector::SqliteVectorStorage;
 
-let storage = HNSWVectorStorage::new(config)?;
+let storage = SqliteVectorStorage::new(config)?;
 // Similarity search, embeddings, multi-dimensional
 ```
 
@@ -302,7 +302,7 @@ let config = SqliteConfig {
 let storage = SqliteBackend::with_config("/path", config)?;
 ```
 
-### HNSWVectorStorage
+### SqliteVectorStorage
 
 **Use Case**: RAG, similarity search, semantic search
 
@@ -325,7 +325,7 @@ let config = HNSWConfig::default()
     .with_dimension(1536)
     .with_max_elements(1_000_000);
 
-let storage = HNSWVectorStorage::new(config)?;
+let storage = SqliteVectorStorage::new(config)?;
 ```
 
 📚 **Full Details**: [llmspell-storage.md](llmspell-storage.md#backend-implementations)
@@ -358,7 +358,7 @@ vector_storage.create_collection(&collection, 1536).await?;
 
 ```rust
 async fn search_tenant_documents(
-    storage: &HNSWVectorStorage,
+    storage: &SqliteVectorStorage,
     tenant_id: &str,
     query: Vec<f32>,
 ) -> Result<Vec<SearchResult>> {
@@ -384,7 +384,7 @@ pub struct TenantQuota {
 }
 
 async fn enforce_quota(
-    storage: &HNSWVectorStorage,
+    storage: &SqliteVectorStorage,
     tenant_id: &str,
     quota: &TenantQuota,
 ) -> Result<()> {
@@ -475,7 +475,7 @@ let results = storage.search_with_filter(collection, embedding, 10, Some(filter)
 **3. Index Warming**:
 ```rust
 // Load frequently accessed collections into memory
-async fn warm_index(storage: &HNSWVectorStorage, collections: Vec<String>) {
+async fn warm_index(storage: &SqliteVectorStorage, collections: Vec<String>) {
     for collection in collections {
         // Trigger index loading
         let _ = storage.get_collection_info(&collection).await;
@@ -539,9 +539,9 @@ assert_eq!(results.len(), 2);
 
 ```rust
 use llmspell_rag::RAGPipeline;
-use llmspell_storage::vector::HNSWVectorStorage;
+use llmspell_storage::vector::SqliteVectorStorage;
 
-let storage = Arc::new(HNSWVectorStorage::new(config)?);
+let storage = Arc::new(SqliteVectorStorage::new(config)?);
 let rag_pipeline = RAGPipeline::builder()
     .with_vector_storage(storage)
     .with_embedding_model("text-embedding-3-small")
@@ -552,9 +552,9 @@ let rag_pipeline = RAGPipeline::builder()
 
 ```rust
 use llmspell_memory::EpisodicMemory;
-use llmspell_storage::vector::HNSWVectorStorage;
+use llmspell_storage::vector::SqliteVectorStorage;
 
-let storage = Arc::new(HNSWVectorStorage::new(config)?);
+let storage = Arc::new(SqliteVectorStorage::new(config)?);
 let episodic_memory = EpisodicMemory::builder()
     .with_backend(storage)
     .with_max_memories(10000)
@@ -579,7 +579,7 @@ let state = PersistentState::new(storage);
 
 ```rust
 async fn backup_collection(
-    storage: &HNSWVectorStorage,
+    storage: &SqliteVectorStorage,
     collection: &str,
     output_path: &Path,
 ) -> Result<()> {

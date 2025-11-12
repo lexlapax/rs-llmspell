@@ -363,7 +363,7 @@ pub async fn from_config(config: &LLMSpellConfig) -> Result<Self> {
    └─ EventBus
 
 4. RAG                     [Optional, no dependencies]
-   ├─ HNSWVectorStorage (8.47x speedup)
+   ├─ SqliteVectorStorage (8.47x speedup)
    ├─ MultiTenantVectorManager
    └─ MultiTenantRAG
 
