@@ -34,20 +34,26 @@
 //! # }
 //! ```
 
+mod agent_state;
 mod backend;
 mod config;
 mod error;
 mod extensions;
 mod graph;
+mod kv_store;
 mod pool;
 mod procedural;
 mod vector;
+mod workflow_state;
 
+pub use agent_state::SqliteAgentStateStorage;
 pub use backend::{HealthStatus, SqliteBackend, TenantContext};
 pub use config::SqliteConfig;
 pub use error::{Result, SqliteError};
 pub use extensions::SqliteVecExtension;
 pub use graph::SqliteGraphStorage;
+pub use kv_store::SqliteKVStorage;
 pub use pool::{PoolStats, SqlitePool};
 pub use procedural::{SqliteProceduralStorage, StoredPattern};
 pub use vector::SqliteVectorStorage;
+pub use workflow_state::SqliteWorkflowStateStorage;
