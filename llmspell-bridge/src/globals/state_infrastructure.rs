@@ -8,7 +8,7 @@ use llmspell_events::{EventBus, EventCorrelationTracker};
 use llmspell_hooks::HookExecutor;
 use llmspell_kernel::state::{
     backend_adapter::StateStorageAdapter,
-    config::{PersistenceConfig, SledConfig, StorageBackendType},
+    config::{PersistenceConfig, StorageBackendType},
     migration::MigrationEngine,
     schema::SchemaRegistry,
     StateManager,
@@ -198,21 +198,11 @@ fn create_backend_type(config: &StatePersistenceConfig) -> StorageBackendType {
             debug!("Creating in-memory storage backend type");
             StorageBackendType::Memory
         }
-        "sled" => {
-            debug!("Creating sled storage backend type");
-            // Use schema_directory from config (mapped from LLMSPELL_STATE_PATH)
-            let path = config
-                .schema_directory
-                .clone()
-                .unwrap_or_else(|| "./llmspell_state".to_string());
-            StorageBackendType::Sled(SledConfig {
-                path: std::path::PathBuf::from(path),
-                cache_capacity: 64 * 1024 * 1024, // 64MB
-                use_compression: true,
-            })
-        }
         backend => {
-            warn!("Unknown backend type '{}', falling back to memory", backend);
+            warn!(
+                "Backend type '{}' not supported via Lua bridge (Sled removed, use 'memory'), falling back to memory",
+                backend
+            );
             StorageBackendType::Memory
         }
     }

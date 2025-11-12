@@ -7,6 +7,7 @@ use super::traits::MigrationTarget;
 #[cfg(feature = "postgres")]
 use crate::backends::postgres::PostgresBackend;
 
+#[cfg(feature = "postgres")]
 use crate::traits::StorageBackend;
 
 #[cfg(feature = "postgres")]

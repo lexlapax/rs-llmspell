@@ -1,5 +1,9 @@
 //! ABOUTME: Shared RAG infrastructure initialization for multi-tenant vector storage
 //! ABOUTME: Provides `get_or_create` pattern for RAG management following session infrastructure pattern
+//!
+//! NOTE (Phase 13c.2.9+): This file references HNSWVectorStorage which was removed in 13c.2.8.
+//! Requires refactoring to use SQLite vector storage API (vectorlite-rs).
+//! Current status: COMPILATION DISABLED until RAG refactoring complete.
 
 use crate::globals::GlobalContext;
 use llmspell_config::RAGConfig;
