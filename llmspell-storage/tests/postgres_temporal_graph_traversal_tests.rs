@@ -599,7 +599,10 @@ async fn test_kg_traverse_1_hop() {
     let tenant_id = unique_tenant_id("kg-traverse-1hop");
     let config = PostgresConfig::new(APP_CONNECTION_STRING);
     let backend = Arc::new(PostgresBackend::new(config).await.expect("create backend"));
-    backend.set_tenant_context(&tenant_id).await.expect("set tenant context");
+    backend
+        .set_tenant_context(&tenant_id)
+        .await
+        .expect("set tenant context");
 
     let graph = PostgresGraphStorage::new(Arc::clone(&backend));
     let now = Utc::now();
@@ -617,7 +620,10 @@ async fn test_kg_traverse_1_hop() {
     insert_test_relationship(&backend, &tenant_id, entity_a, entity_c, "knows", now).await;
 
     // Traverse 1 hop from A using KnowledgeGraph trait
-    let results = graph.traverse(&entity_a.to_string(), None, 1, None).await.expect("traverse");
+    let results = graph
+        .traverse(&entity_a.to_string(), None, 1, None)
+        .await
+        .expect("traverse");
 
     assert_eq!(results.len(), 2);
     assert!(results.iter().any(|(e, d, _)| e.name == "B" && *d == 1));
@@ -636,7 +642,10 @@ async fn test_kg_traverse_4_hops_linear() {
     let tenant_id = unique_tenant_id("kg-traverse-4hop");
     let config = PostgresConfig::new(APP_CONNECTION_STRING);
     let backend = Arc::new(PostgresBackend::new(config).await.expect("create backend"));
-    backend.set_tenant_context(&tenant_id).await.expect("set tenant context");
+    backend
+        .set_tenant_context(&tenant_id)
+        .await
+        .expect("set tenant context");
 
     let graph = PostgresGraphStorage::new(Arc::clone(&backend));
     let now = Utc::now();
@@ -660,7 +669,10 @@ async fn test_kg_traverse_4_hops_linear() {
     insert_test_relationship(&backend, &tenant_id, entity_d, entity_e, "next", now).await;
 
     // Traverse 4 hops from A
-    let results = graph.traverse(&entity_a.to_string(), None, 4, None).await.expect("traverse");
+    let results = graph
+        .traverse(&entity_a.to_string(), None, 4, None)
+        .await
+        .expect("traverse");
 
     assert_eq!(results.len(), 4);
     assert!(results.iter().any(|(e, d, _)| e.name == "B" && *d == 1));
@@ -669,7 +681,10 @@ async fn test_kg_traverse_4_hops_linear() {
     assert!(results.iter().any(|(e, d, _)| e.name == "E" && *d == 4));
 
     // Verify path grows with depth
-    let e_result = results.iter().find(|(e, _, _)| e.name == "E").expect("Should find E");
+    let e_result = results
+        .iter()
+        .find(|(e, _, _)| e.name == "E")
+        .expect("Should find E");
     let path: Vec<String> = serde_json::from_str(&e_result.2).unwrap();
     assert_eq!(path.len(), 5); // A, B, C, D, E
 }
@@ -681,7 +696,10 @@ async fn test_kg_traverse_with_cycles() {
     let tenant_id = unique_tenant_id("kg-traverse-cycle");
     let config = PostgresConfig::new(APP_CONNECTION_STRING);
     let backend = Arc::new(PostgresBackend::new(config).await.expect("create backend"));
-    backend.set_tenant_context(&tenant_id).await.expect("set tenant context");
+    backend
+        .set_tenant_context(&tenant_id)
+        .await
+        .expect("set tenant context");
 
     let graph = PostgresGraphStorage::new(Arc::clone(&backend));
     let now = Utc::now();
@@ -700,7 +718,10 @@ async fn test_kg_traverse_with_cycles() {
     insert_test_relationship(&backend, &tenant_id, entity_c, entity_a, "next", now).await;
 
     // Traverse 5 hops (should not revisit A due to cycle prevention)
-    let results = graph.traverse(&entity_a.to_string(), None, 5, None).await.expect("traverse");
+    let results = graph
+        .traverse(&entity_a.to_string(), None, 5, None)
+        .await
+        .expect("traverse");
 
     // Should find B and C only (A is excluded via cycle prevention)
     assert_eq!(results.len(), 2);
@@ -716,7 +737,10 @@ async fn test_kg_traverse_relationship_filter() {
     let tenant_id = unique_tenant_id("kg-traverse-filter");
     let config = PostgresConfig::new(APP_CONNECTION_STRING);
     let backend = Arc::new(PostgresBackend::new(config).await.expect("create backend"));
-    backend.set_tenant_context(&tenant_id).await.expect("set tenant context");
+    backend
+        .set_tenant_context(&tenant_id)
+        .await
+        .expect("set tenant context");
 
     let graph = PostgresGraphStorage::new(Arc::clone(&backend));
     let now = Utc::now();
@@ -734,19 +758,28 @@ async fn test_kg_traverse_relationship_filter() {
     insert_test_relationship(&backend, &tenant_id, entity_a, entity_c, "works_with", now).await;
 
     // Traverse with "knows" filter (should only find B)
-    let results = graph.traverse(&entity_a.to_string(), Some("knows"), 2, None).await.expect("traverse");
+    let results = graph
+        .traverse(&entity_a.to_string(), Some("knows"), 2, None)
+        .await
+        .expect("traverse");
 
     assert_eq!(results.len(), 1);
     assert_eq!(results[0].0.name, "B");
 
     // Traverse with "works_with" filter (should only find C)
-    let results = graph.traverse(&entity_a.to_string(), Some("works_with"), 2, None).await.expect("traverse");
+    let results = graph
+        .traverse(&entity_a.to_string(), Some("works_with"), 2, None)
+        .await
+        .expect("traverse");
 
     assert_eq!(results.len(), 1);
     assert_eq!(results[0].0.name, "C");
 
     // Traverse with no filter (should find both)
-    let results = graph.traverse(&entity_a.to_string(), None, 2, None).await.expect("traverse");
+    let results = graph
+        .traverse(&entity_a.to_string(), None, 2, None)
+        .await
+        .expect("traverse");
 
     assert_eq!(results.len(), 2);
 }
@@ -758,7 +791,10 @@ async fn test_kg_traverse_temporal() {
     let tenant_id = unique_tenant_id("kg-traverse-temporal");
     let config = PostgresConfig::new(APP_CONNECTION_STRING);
     let backend = Arc::new(PostgresBackend::new(config).await.expect("create backend"));
-    backend.set_tenant_context(&tenant_id).await.expect("set tenant context");
+    backend
+        .set_tenant_context(&tenant_id)
+        .await
+        .expect("set tenant context");
 
     let graph = PostgresGraphStorage::new(Arc::clone(&backend));
 
@@ -783,13 +819,19 @@ async fn test_kg_traverse_temporal() {
     insert_test_relationship(&backend, &tenant_id, entity_a, entity_c, "links", future).await;
 
     // Query at present time (should see A and B, not C)
-    let results = graph.traverse(&entity_a.to_string(), None, 2, Some(present)).await.expect("traverse");
+    let results = graph
+        .traverse(&entity_a.to_string(), None, 2, Some(present))
+        .await
+        .expect("traverse");
 
     assert_eq!(results.len(), 1);
     assert_eq!(results[0].0.name, "B");
 
     // Query at future time (should see A, B, and C)
-    let results = graph.traverse(&entity_a.to_string(), None, 2, Some(future)).await.expect("traverse");
+    let results = graph
+        .traverse(&entity_a.to_string(), None, 2, Some(future))
+        .await
+        .expect("traverse");
 
     assert_eq!(results.len(), 2);
     assert!(results.iter().any(|(e, _, _)| e.name == "B"));

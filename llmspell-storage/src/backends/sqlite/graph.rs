@@ -741,7 +741,9 @@ impl GraphBackend for SqliteGraphStorage {
 
         let tenant_id = self.get_tenant_id();
         let capped_depth = max_depth.min(10); // Cap at 10 hops
-        let query_time = at_time.map(Self::datetime_to_unix).unwrap_or(Utc::now().timestamp());
+        let query_time = at_time
+            .map(Self::datetime_to_unix)
+            .unwrap_or(Utc::now().timestamp());
 
         debug!(
             "Starting graph traversal: start={}, type={:?}, max_depth={}, time={}",
@@ -834,9 +836,11 @@ impl GraphBackend for SqliteGraphStorage {
 
         let mut results = Vec::new();
 
-        while let Some(row) = rows.next().await.map_err(|e| {
-            GraphError::Storage(format!("Failed to fetch traversal result: {}", e))
-        })? {
+        while let Some(row) = rows
+            .next()
+            .await
+            .map_err(|e| GraphError::Storage(format!("Failed to fetch traversal result: {}", e)))?
+        {
             let entity_id: String = row
                 .get(0)
                 .map_err(|e| GraphError::Storage(format!("Failed to get entity_id: {}", e)))?;
@@ -1375,13 +1379,19 @@ mod tests {
             .unwrap();
 
         // Query at present time (should see A and B, not C)
-        let results = storage.traverse(&a_id, None, 2, Some(present)).await.unwrap();
+        let results = storage
+            .traverse(&a_id, None, 2, Some(present))
+            .await
+            .unwrap();
 
         assert_eq!(results.len(), 1);
         assert_eq!(results[0].0.name, "B");
 
         // Query at future time (should see A, B, and C)
-        let results = storage.traverse(&a_id, None, 2, Some(future)).await.unwrap();
+        let results = storage
+            .traverse(&a_id, None, 2, Some(future))
+            .await
+            .unwrap();
 
         assert_eq!(results.len(), 2);
         assert!(results.iter().any(|(e, _, _)| e.name == "B"));
