@@ -3486,9 +3486,10 @@ SELECT *, array_to_json(path)::text AS path_json FROM graph_traversal WHERE dept
 
 ---
 
-#### Subtask 13c.2.8.12: Remove Sled backend implementation and dependencies ✓ DONE
+#### Subtask 13c.2.8.12: Remove Sled backend implementation and dependencies ⚠ PARTIAL
 **Time**: 2 hours | **Priority**: CRITICAL
 **Files**: 18 files modified, 4 files deleted
+**Status**: Sled removed, but BLOCKING ISSUE: RAG system broken (see 13c.2.8.13a)
 
 **Completed Actions**:
 - ✓ Deleted `llmspell-storage/src/backends/sled_backend.rs` (177 lines)
@@ -3508,15 +3509,16 @@ SELECT *, array_to_json(path)::text AS path_json FROM graph_traversal WHERE dept
 - Sled→PostgreSQL migration CLI deprecated (direct SQLite/PostgreSQL use recommended)
 - ~400 lines of code removed (backends + tests + utilities)
 
-**Known Issues** (Separate Task):
-- RAG system still references HNSWVectorStorage (16 files)
-- llmspell-bridge RAG files have compile errors until refactoring (13c.2.9+)
+**BLOCKING ISSUE**:
+- ⚠ RAG system still references HNSWVectorStorage (11 files)
+- ⚠ llmspell-bridge compilation FAILS until refactoring
+- ⚠ MUST complete 13c.2.8.13a before proceeding to 13c.2.8.14
 - Added NOTE comments to rag_infrastructure.rs documenting needed refactoring
 
 **Validation**:
 - ✓ `cargo tree -p llmspell-storage | grep sled` returns nothing
 - ✓ `cargo build --package llmspell-storage` succeeds (0 warnings)
-- ⚠ `cargo build --package llmspell-bridge` fails (expected - RAG refactoring needed)
+- ⚠ `cargo build --workspace` FAILS (expected - RAG refactoring needed in 13c.2.8.13a)
 
 ---
 
@@ -3539,6 +3541,134 @@ SELECT *, array_to_json(path)::text AS path_json FROM graph_traversal WHERE dept
 **Validation**:
 - ✓ No SledConfig references in llmspell-bridge
 - ✓ All Sled match arms removed from backend creation code
+
+---
+
+#### Subtask 13c.2.8.13a: Refactor RAG system to use SqliteVectorStorage ⏹ PENDING
+**Time**: 3-4 hours | **Priority**: CRITICAL (BLOCKING 13c.2.8.14+)
+**Files**: 11 files across llmspell-bridge, llmspell-rag, llmspell-tenancy (~3,843 lines)
+
+**Task**: Replace HNSWVectorStorage with SqliteVectorStorage in RAG/tenancy systems
+
+**Context**:
+Phase 13c.2.8.9 removed `llmspell-storage/src/backends/vector/hnsw.rs`, breaking RAG compilation.
+The replacement is `SqliteVectorStorage` which implements the same `VectorStorage` trait but
+backed by SQLite + vectorlite-rs HNSW extension instead of pure-Rust hnsw_rs.
+
+**Migration Path**:
+```rust
+// OLD (removed):
+use llmspell_storage::backends::vector::HNSWVectorStorage;
+let storage = Arc::new(HNSWVectorStorage::new(384, HNSWConfig::default()));
+
+// NEW (Phase 13c.2+):
+use llmspell_storage::backends::sqlite::SqliteVectorStorage;
+let sqlite_backend = Arc::new(SqliteBackend::new("./data/vectors.db").await?);
+let storage = Arc::new(SqliteVectorStorage::new(sqlite_backend, 384).await?);
+```
+
+**Affected Files** (11 total):
+
+**llmspell-bridge** (6 files):
+1. `src/globals/rag_infrastructure.rs` (413 lines, 10 HNSW refs)
+   - Update `create_hnsw_storage()` → `create_sqlite_vector_storage()`
+   - Update `create_temp_hnsw_storage()` → `create_temp_sqlite_vector_storage()`
+   - Update `RAGInfrastructure.hnsw_storage` → `vector_storage`
+   - Update all type references
+
+2. `src/infrastructure.rs` (374 lines, 2 HNSW refs)
+   - Update `create_rag_vector_storage()` function
+   - Replace `HNSWVectorStorage::new()` with `SqliteVectorStorage::new()`
+
+3. `src/rag_bridge.rs` (905 lines)
+   - Update Lua bridge RAG initialization
+   - Update type annotations
+
+4. `benches/rag_bench.rs`
+   - Update benchmark code
+
+5-6. `tests/rag_bridge_test.rs`, `tests/rag_lua_integration_test.rs`
+   - Update test setup code
+
+**llmspell-rag** (3 files):
+7. `src/pipeline/builder.rs` (513 lines, 2 HNSW refs in tests)
+   - Update test helper `create_test_components()`
+
+8. `src/pipeline/rag_pipeline.rs` (442 lines, 3 HNSW refs in tests)
+   - Update `create_test_pipeline()` helper
+
+9. `src/pipeline/retrieval_flow.rs` (574 lines, 2 HNSW refs in tests)
+   - Update `create_test_retrieval_flow()` helper
+
+**llmspell-tenancy** (2 files):
+10. `src/manager.rs` (622 lines, 3 HNSW refs in tests)
+    - Update `MultiTenantVectorManager` test setup
+
+11. `tests/integration_tests.rs`
+    - Update integration test setup
+
+**API Changes**:
+```rust
+// Constructor signature change:
+// OLD: HNSWVectorStorage::new(dimension: usize, config: HNSWConfig) -> Self
+// NEW: SqliteVectorStorage::new(backend: Arc<SqliteBackend>, dimension: usize) -> Result<Self>
+
+// Both implement VectorStorage trait - NO method signature changes:
+async fn insert(&self, vectors: Vec<VectorEntry>) -> Result<Vec<String>>;
+async fn search(&self, query: &VectorQuery) -> Result<Vec<VectorResult>>;
+async fn search_scoped(&self, query: &VectorQuery, scope: &StateScope) -> Result<Vec<VectorResult>>;
+```
+
+**Implementation Steps**:
+
+1. **Update llmspell-bridge/src/infrastructure.rs**:
+   ```rust
+   // Change import
+   use llmspell_storage::backends::sqlite::SqliteVectorStorage;
+
+   // Update create_rag_vector_storage()
+   async fn create_rag_vector_storage(config: &LLMSpellConfig) -> Result<Arc<dyn VectorStorage>> {
+       let db_path = config.rag.vector_storage.persistence_path
+           .clone()
+           .unwrap_or_else(|| "./data/rag_vectors.db".into());
+       let backend = Arc::new(SqliteBackend::new(db_path).await?);
+       let storage = SqliteVectorStorage::new(backend, dimensions).await?;
+       Ok(Arc::new(storage))
+   }
+   ```
+
+2. **Update llmspell-bridge/src/globals/rag_infrastructure.rs**:
+   - Rename `create_hnsw_storage()` → `create_sqlite_vector_storage()`
+   - Rename `create_temp_hnsw_storage()` → `create_temp_sqlite_vector_storage()`
+   - Update `RAGInfrastructure` struct field
+   - Update all function signatures and implementations
+
+3. **Update llmspell-rag test files**:
+   - All test changes are minimal (just constructor calls)
+   - Tests use temp SQLite backend instead of in-memory HNSW
+
+4. **Update llmspell-tenancy test files**:
+   - Similar minimal test updates
+
+**Testing Strategy**:
+1. Build each crate individually: `cargo build -p llmspell-bridge -p llmspell-rag -p llmspell-tenancy`
+2. Run unit tests: `cargo test -p llmspell-rag -p llmspell-tenancy`
+3. Run integration tests (if RAG system tests exist)
+4. Verify benchmark compiles: `cargo bench --no-run -p llmspell-bridge`
+
+**Validation**:
+- ✓ `cargo build --workspace` succeeds
+- ✓ `rg "HNSWVectorStorage|backends::vector::hnsw" --type rust` returns only vectorlite-rs
+- ✓ `cargo test -p llmspell-rag` passes
+- ✓ `cargo test -p llmspell-tenancy` passes
+- ✓ `cargo test -p llmspell-bridge` passes
+
+**Dependencies**:
+- ✓ SqliteBackend implementation (Phase 13c.2.1)
+- ✓ SqliteVectorStorage implementation (Phase 13c.2.3)
+- ✓ vectorlite-rs HNSW extension (Phase 13c.2.2a)
+
+**Commit**: "Task 13c.2.8.13a: Migrate RAG system from HNSWVectorStorage to SqliteVectorStorage"
 
 ---
 
