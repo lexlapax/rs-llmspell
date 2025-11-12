@@ -861,6 +861,162 @@ impl KnowledgeGraph for PostgresGraphStorage {
 
         Ok((entity_count + rel_count) as usize)
     }
+
+    /// Multi-hop graph traversal with depth limit and cycle prevention
+    ///
+    /// Uses recursive CTEs with native PostgreSQL ARRAY[] for path tracking and
+    /// ANY() operator for cycle detection. Leverages GiST indexes for bi-temporal
+    /// filtering.
+    ///
+    /// # Arguments
+    ///
+    /// * `start_entity` - Starting entity ID (UUID)
+    /// * `relationship_type` - Optional relationship type filter (None = all types)
+    /// * `max_depth` - Maximum traversal depth (capped at 10)
+    /// * `at_time` - Optional temporal point (None = current time)
+    ///
+    /// # Returns
+    ///
+    /// Vector of (Entity, depth, path_json) tuples where path_json is JSON array
+    /// of entity IDs traversed to reach the entity.
+    ///
+    /// # Performance
+    ///
+    /// - 1-hop: O(k) where k = avg relationships per node
+    /// - N-hop: O(k^N) worst case, O(k*N) with cycle prevention
+    /// - Target: <50ms for 4-hop traversal on 100K nodes (with GiST indexes)
+    async fn traverse(
+        &self,
+        start_entity: &str,
+        relationship_type: Option<&str>,
+        max_depth: usize,
+        at_time: Option<DateTime<Utc>>,
+    ) -> llmspell_graph::error::Result<Vec<(Entity, usize, String)>> {
+        let tenant_id = self.backend.get_tenant_context().await.ok_or_else(|| {
+            llmspell_graph::error::GraphError::Storage(
+                "Tenant context not set - call set_tenant_context() first".to_string(),
+            )
+        })?;
+
+        let client = self.backend.get_client().await.map_err(|e| {
+            llmspell_graph::error::GraphError::Storage(format!("Failed to get client: {}", e))
+        })?;
+
+        // Parse entity_id as UUID
+        let start_uuid = Uuid::parse_str(start_entity).map_err(|e| {
+            llmspell_graph::error::GraphError::Storage(format!(
+                "Invalid entity ID (not a UUID): {}",
+                e
+            ))
+        })?;
+
+        let capped_depth = (max_depth.min(10)) as i32; // Cap at 10 hops
+        let query_time = at_time.unwrap_or_else(Utc::now);
+
+        // Build relationship type filter
+        let rel_type_filter = match relationship_type {
+            Some(rt) => format!("AND r.relationship_type = '{}'", rt),
+            None => String::new(),
+        };
+
+        // Recursive CTE query with cycle prevention using PostgreSQL arrays
+        let sql = format!(
+            r#"
+            WITH RECURSIVE graph_traversal AS (
+                -- Base case: starting entity (depth 0)
+                SELECT
+                    e.entity_id,
+                    e.tenant_id,
+                    e.entity_type,
+                    e.name,
+                    e.properties,
+                    e.valid_time_start,
+                    e.transaction_time_start,
+                    0 AS depth,
+                    ARRAY[e.entity_id] AS path
+                FROM llmspell.entities e
+                WHERE e.entity_id = $1
+                  AND e.tenant_id = $2
+                  AND tstzrange(e.valid_time_start, e.valid_time_end) @> $3
+                  AND tstzrange(e.transaction_time_start, e.transaction_time_end) @> now()
+
+                UNION ALL
+
+                -- Recursive case: follow relationships (depth 1+)
+                SELECT
+                    e.entity_id,
+                    e.tenant_id,
+                    e.entity_type,
+                    e.name,
+                    e.properties,
+                    e.valid_time_start,
+                    e.transaction_time_start,
+                    gt.depth + 1,
+                    gt.path || e.entity_id AS path
+                FROM graph_traversal gt
+                JOIN llmspell.relationships r ON gt.entity_id = r.from_entity
+                JOIN llmspell.entities e ON r.to_entity = e.entity_id
+                WHERE gt.depth < $4
+                  AND r.tenant_id = $2
+                  AND tstzrange(r.valid_time_start, r.valid_time_end) @> $3
+                  AND tstzrange(r.transaction_time_start, r.transaction_time_end) @> now()
+                  AND tstzrange(e.valid_time_start, e.valid_time_end) @> $3
+                  AND tstzrange(e.transaction_time_start, e.transaction_time_end) @> now()
+                  {}
+                  AND NOT (e.entity_id = ANY(gt.path))
+            )
+            SELECT
+                entity_id,
+                entity_type,
+                name,
+                properties,
+                valid_time_start,
+                transaction_time_start,
+                depth,
+                array_to_json(path)::text AS path_json
+            FROM graph_traversal
+            WHERE depth > 0
+            ORDER BY depth, entity_id
+            "#,
+            rel_type_filter
+        );
+
+        let rows = client
+            .query(&sql, &[&start_uuid, &tenant_id, &query_time, &capped_depth])
+            .await
+            .map_err(|e| {
+                llmspell_graph::error::GraphError::Storage(format!(
+                    "Failed to execute traversal query: {}",
+                    e
+                ))
+            })?;
+
+        let mut results = Vec::new();
+
+        for row in rows {
+            let entity_id: Uuid = row.get(0);
+            let entity_type: String = row.get(1);
+            let name: String = row.get(2);
+            let properties: Value = row.get(3);
+            let valid_time_start: DateTime<Utc> = row.get(4);
+            let transaction_time_start: DateTime<Utc> = row.get(5);
+            let depth: i32 = row.get(6);
+            let path_json: String = row.get(7);
+
+            let entity = Entity {
+                id: entity_id.to_string(),
+                name,
+                entity_type,
+                properties,
+                event_time: Some(valid_time_start),
+                ingestion_time: transaction_time_start,
+            };
+
+            results.push((entity, depth as usize, path_json));
+        }
+
+        Ok(results)
+    }
 }
 
 #[cfg(test)]

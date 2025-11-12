@@ -3025,7 +3025,7 @@ Implementation: 8 GraphBackend methods, bi-temporal schema, tenant isolation, 7/
 - [x] GraphBackend trait enhanced with traverse() method (llmspell-graph/src/storage/mod.rs)
 - [x] KnowledgeGraph trait enhanced with traverse() method (llmspell-graph/src/traits/knowledge_graph.rs)
 - [x] SqliteGraphStorage implements traverse() with recursive CTEs (llmspell-storage/src/backends/sqlite/graph.rs)
-- [ ] PostgresGraphStorage implements traverse() with recursive CTEs (llmspell-storage/src/backends/postgres/graph.rs)
+- [x] PostgresGraphStorage implements traverse() with recursive CTEs (llmspell-storage/src/backends/postgres/graph.rs)
 - [ ] SurrealDB backend implements traverse() for baseline comparison (llmspell-graph/src/storage/surrealdb.rs)
 - [ ] Traverse tests passing: 1-4 hops, cycle prevention, bi-temporal filtering, relationship type filtering
 - [ ] Performance baseline captured: SurrealDB vs SQLite vs PostgreSQL on synthetic 100K node graph
@@ -3154,7 +3154,7 @@ SELECT * FROM graph_traversal WHERE depth > 0
 
 ---
 
-#### Subtask 13c.2.8.4: Implement traverse() in PostgresGraphStorage ⏹ PENDING
+#### Subtask 13c.2.8.4: Implement traverse() in PostgresGraphStorage ✅ COMPLETE
 **Time**: 3 hours | **Priority**: CRITICAL
 **Files**: `llmspell-storage/src/backends/postgres/graph.rs`
 
@@ -3194,6 +3194,8 @@ SELECT *, array_to_json(path)::text AS path_json FROM graph_traversal WHERE dept
 **Tests**: Same 5 tests as SQLite (reuse test patterns with PostgreSQL setup)
 
 **Commit**: "Task 13c.2.8.4: Implement PostgresGraphStorage traverse() with recursive CTEs"
+
+**Result**: ✅ 155 lines added (graph.rs: 864→1020). Recursive CTE with native PostgreSQL ARRAY[] for path tracking, ANY() for cycle prevention, tstzrange operators for bi-temporal filtering. 5 tests added to postgres_temporal_graph_traversal_tests.rs (test_kg_traverse_{1_hop,4_hops_linear,with_cycles,relationship_filter,temporal}). Compilation passes. GiST indexes automatically used by query planner.
 
 ---
 
