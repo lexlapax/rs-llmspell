@@ -3544,9 +3544,10 @@ SELECT *, array_to_json(path)::text AS path_json FROM graph_traversal WHERE dept
 
 ---
 
-#### Subtask 13c.2.8.13a: Refactor RAG system to use SqliteVectorStorage ⏹ PENDING
-**Time**: 3-4 hours | **Priority**: CRITICAL (BLOCKING 13c.2.8.14+)
+#### Subtask 13c.2.8.13a: Refactor RAG system to use SqliteVectorStorage ✓ COMPLETE
+**Time**: 3-4 hours (actual: ~3 hours) | **Priority**: CRITICAL (BLOCKING 13c.2.8.14+)
 **Files**: 11 files across llmspell-bridge, llmspell-rag, llmspell-tenancy (~3,843 lines)
+**Completed**: 2025-11-12
 
 **Task**: Replace HNSWVectorStorage with SqliteVectorStorage in RAG/tenancy systems
 
@@ -3667,6 +3668,27 @@ async fn search_scoped(&self, query: &VectorQuery, scope: &StateScope) -> Result
 - ✓ SqliteBackend implementation (Phase 13c.2.1)
 - ✓ SqliteVectorStorage implementation (Phase 13c.2.3)
 - ✓ vectorlite-rs HNSW extension (Phase 13c.2.2a)
+
+**Completed Actions**:
+- ✓ All 11 files successfully migrated to SqliteVectorStorage
+- ✓ llmspell-bridge: 6 files updated (infrastructure, RAG globals, tests, benchmarks)
+- ✓ llmspell-rag: 3 pipeline test helpers made async + updated
+- ✓ llmspell-tenancy: 2 files updated (manager tests, integration tests)
+- ✓ Import statements updated (HNSWVectorStorage → SqliteVectorStorage)
+- ✓ Storage creation pattern updated (file-based → SQLite-backed)
+- ✓ Test functions migrated to async where needed (tokio::test)
+- ✓ RAGInfrastructure struct updated (hnsw_storage → sqlite_storage)
+- ✓ All workspace builds successfully (llmspell-bridge, llmspell-rag, llmspell-tenancy)
+
+**Insights**:
+- **Migration Pattern**: Consistent across all files - SqliteConfig + SqliteBackend + SqliteVectorStorage
+- **In-Memory Testing**: All tests use ":memory:" for fast, isolated test execution
+- **Async Propagation**: Required making test helper functions async (create_test_components, etc.)
+- **VectorStorage Trait**: No API changes needed - SqliteVectorStorage implements same trait
+- **Auto-Persistence**: SqliteVectorStorage auto-persists via transactions (no explicit save() needed)
+- **RAGInfrastructure.save()**: Now a no-op with documentation (SQLite auto-persists)
+- **Zero Breakage**: All builds successful, VectorStorage trait abstraction worked perfectly
+- **Test Coverage**: All async test functions properly annotated with #[tokio::test]
 
 **Commit**: "Task 13c.2.8.13a: Migrate RAG system from HNSWVectorStorage to SqliteVectorStorage"
 

@@ -127,7 +127,7 @@ impl RAGBridge {
     /// # Panics
     ///
     /// Panics if `vector_storage` is `None`. Vector storage is required for RAG operations
-    /// and must be provided. Use `HNSWVectorStorage` or another implementation of the
+    /// and must be provided. Use `SqliteVectorStorage` or another implementation of the
     /// `VectorStorage` trait.
     #[must_use]
     pub fn new(

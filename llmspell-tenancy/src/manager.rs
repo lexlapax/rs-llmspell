@@ -513,11 +513,13 @@ impl VectorStorage for MultiTenantVectorManager {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use llmspell_storage::backends::vector::HNSWVectorStorage;
+    use llmspell_storage::backends::sqlite::{SqliteBackend, SqliteConfig, SqliteVectorStorage};
 
     #[tokio::test]
     async fn test_tenant_creation() {
-        let storage = Arc::new(HNSWVectorStorage::new(3, Default::default()));
+        let config = SqliteConfig::new(":memory:");
+        let backend = Arc::new(SqliteBackend::new(config).await.unwrap());
+        let storage = Arc::new(SqliteVectorStorage::new(backend, 3).await.unwrap());
         let manager = MultiTenantVectorManager::new(storage);
 
         let config = TenantConfig {
@@ -540,7 +542,9 @@ mod tests {
 
     #[tokio::test]
     async fn test_tenant_isolation() {
-        let storage = Arc::new(HNSWVectorStorage::new(3, Default::default()));
+        let config = SqliteConfig::new(":memory:");
+        let backend = Arc::new(SqliteBackend::new(config).await.unwrap());
+        let storage = Arc::new(SqliteVectorStorage::new(backend, 3).await.unwrap());
         let manager = MultiTenantVectorManager::new(storage);
 
         // Create two tenants
@@ -584,7 +588,9 @@ mod tests {
 
     #[tokio::test]
     async fn test_tenant_limits() {
-        let storage = Arc::new(HNSWVectorStorage::new(3, Default::default()));
+        let config = SqliteConfig::new(":memory:");
+        let backend = Arc::new(SqliteBackend::new(config).await.unwrap());
+        let storage = Arc::new(SqliteVectorStorage::new(backend, 3).await.unwrap());
         let manager = MultiTenantVectorManager::new(storage);
 
         let config = TenantConfig {

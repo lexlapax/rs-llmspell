@@ -7,8 +7,7 @@ use llmspell_config::providers::ProviderManagerConfig;
 use llmspell_kernel::sessions::{SessionManager, SessionManagerConfig};
 use llmspell_kernel::state::StateManager;
 use llmspell_rag::multi_tenant_integration::MultiTenantRAG;
-use llmspell_storage::backends::vector::hnsw::HNSWVectorStorage;
-use llmspell_storage::vector_storage::HNSWConfig;
+use llmspell_storage::backends::sqlite::{SqliteBackend, SqliteConfig, SqliteVectorStorage};
 use llmspell_storage::MemoryBackend;
 use llmspell_tenancy::manager::MultiTenantVectorManager;
 use std::collections::HashMap;
@@ -37,22 +36,10 @@ async fn setup_test_bridge() -> Arc<RAGBridge> {
         .unwrap(),
     );
 
-    // Setup real HNSW vector storage
-    let hnsw_config = HNSWConfig {
-        m: 16,
-        ef_construction: 200,
-        ef_search: 50,
-        max_elements: 10000,
-        seed: None,
-        metric: llmspell_storage::vector_storage::DistanceMetric::Cosine,
-        allow_replace_deleted: true,
-        num_threads: None,
-        nb_layers: None,
-        parallel_batch_size: Some(128),
-        enable_mmap: false,
-        mmap_sync_interval: Some(60),
-    };
-    let vector_storage = Arc::new(HNSWVectorStorage::new(384, hnsw_config)); // 384 dimensions
+    // Setup SQLite vector storage (in-memory for testing)
+    let config = SqliteConfig::new(":memory:");
+    let backend = Arc::new(SqliteBackend::new(config).await.unwrap());
+    let vector_storage = Arc::new(SqliteVectorStorage::new(backend, 384).await.unwrap()); // 384 dimensions
 
     // Setup multi-tenant infrastructure
     let tenant_manager = Arc::new(MultiTenantVectorManager::new(vector_storage.clone()));

@@ -394,11 +394,12 @@ pub struct PipelineStats {
 mod tests {
     use super::*;
     use crate::embeddings::{EmbeddingProviderConfig, EmbeddingProviderType};
-    use llmspell_storage::backends::vector::HNSWVectorStorage;
-    use llmspell_storage::vector_storage::HNSWConfig;
+    use llmspell_storage::backends::sqlite::{SqliteBackend, SqliteConfig, SqliteVectorStorage};
 
-    fn create_test_pipeline() -> RAGPipeline {
-        let storage = Arc::new(HNSWVectorStorage::new(384, HNSWConfig::default()));
+    async fn create_test_pipeline() -> RAGPipeline {
+        let config = SqliteConfig::new(":memory:");
+        let backend = Arc::new(SqliteBackend::new(config).await.unwrap());
+        let storage = Arc::new(SqliteVectorStorage::new(backend, 384).await.unwrap());
         let embedding_config = EmbeddingProviderConfig {
             provider_type: EmbeddingProviderType::HuggingFace,
             model: "test-model".to_string(),
@@ -421,13 +422,15 @@ mod tests {
 
     #[tokio::test]
     async fn test_pipeline_creation() {
-        let _pipeline = create_test_pipeline();
+        let _pipeline = create_test_pipeline().await;
         // If we get here without panicking, creation succeeded
     }
 
     #[tokio::test]
     async fn test_invalid_config() {
-        let storage = Arc::new(HNSWVectorStorage::new(384, HNSWConfig::default()));
+        let config = SqliteConfig::new(":memory:");
+        let backend = Arc::new(SqliteBackend::new(config).await.unwrap());
+        let storage = Arc::new(SqliteVectorStorage::new(backend, 384).await.unwrap());
         let embedding_factory = Arc::new(EmbeddingFactory::new(EmbeddingProviderConfig::default()));
         let embedding_cache = Arc::new(EmbeddingCache::new(
             crate::embeddings::CacheConfig::default(),

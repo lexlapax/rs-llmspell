@@ -423,15 +423,16 @@ impl RAGPipelineBuilder {
 mod tests {
     use super::*;
     use crate::embeddings::EmbeddingProviderType;
-    use llmspell_storage::backends::vector::HNSWVectorStorage;
-    use llmspell_storage::vector_storage::HNSWConfig;
+    use llmspell_storage::backends::sqlite::{SqliteBackend, SqliteConfig, SqliteVectorStorage};
 
-    fn create_test_components() -> (
+    async fn create_test_components() -> (
         Arc<dyn VectorStorage>,
         Arc<EmbeddingFactory>,
         Arc<EmbeddingCache>,
     ) {
-        let storage = Arc::new(HNSWVectorStorage::new(384, HNSWConfig::default()));
+        let config = SqliteConfig::new(":memory:");
+        let backend = Arc::new(SqliteBackend::new(config).await.unwrap());
+        let storage = Arc::new(SqliteVectorStorage::new(backend, 384).await.unwrap());
 
         let embedding_config = EmbeddingProviderConfig {
             provider_type: EmbeddingProviderType::HuggingFace,
@@ -447,7 +448,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_builder_with_all_components() {
-        let (storage, factory, cache) = create_test_components();
+        let (storage, factory, cache) = create_test_components().await;
 
         let result = RAGPipelineBuilder::new()
             .with_config(RAGConfig::default())
@@ -490,7 +491,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_invalid_configuration() {
-        let (storage, factory, cache) = create_test_components();
+        let (storage, factory, cache) = create_test_components().await;
 
         let mut invalid_config = RAGConfig::default();
         invalid_config.retrieval.hybrid_weights.vector = -1.0; // Invalid weight
