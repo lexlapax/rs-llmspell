@@ -705,6 +705,187 @@ impl GraphBackend for SqliteGraphStorage {
 
         Ok(rows_affected as usize)
     }
+
+    /// Multi-hop graph traversal with depth limit and cycle prevention
+    ///
+    /// Uses recursive CTEs with json_array() for path tracking and json_each() for
+    /// cycle detection. Supports bi-temporal filtering and relationship type filtering.
+    ///
+    /// # Arguments
+    ///
+    /// * `start_entity` - Starting entity ID
+    /// * `relationship_type` - Optional relationship type filter (None = all types)
+    /// * `max_depth` - Maximum traversal depth (capped at 10)
+    /// * `at_time` - Optional temporal point (None = current time)
+    ///
+    /// # Returns
+    ///
+    /// Vector of (Entity, depth, path_json) tuples where path_json is JSON array
+    /// of entity IDs traversed to reach the entity.
+    ///
+    /// # Performance
+    ///
+    /// - 1-hop: O(k) where k = avg relationships per node
+    /// - N-hop: O(k^N) worst case, O(k*N) with cycle prevention
+    /// - Target: <50ms for 4-hop traversal on 100K nodes
+    async fn traverse(
+        &self,
+        start_entity: &str,
+        relationship_type: Option<&str>,
+        max_depth: usize,
+        at_time: Option<DateTime<Utc>>,
+    ) -> Result<Vec<(Entity, usize, String)>> {
+        let conn = self.backend.get_connection().await.map_err(|e| {
+            GraphError::Storage(format!("Failed to get database connection: {}", e))
+        })?;
+
+        let tenant_id = self.get_tenant_id();
+        let capped_depth = max_depth.min(10); // Cap at 10 hops
+        let query_time = at_time.map(Self::datetime_to_unix).unwrap_or(Utc::now().timestamp());
+
+        debug!(
+            "Starting graph traversal: start={}, type={:?}, max_depth={}, time={}",
+            start_entity, relationship_type, capped_depth, query_time
+        );
+
+        // Build relationship type filter
+        let rel_type_filter = match relationship_type {
+            Some(rt) => format!("AND r.relationship_type = '{}'", rt),
+            None => String::new(),
+        };
+
+        // Recursive CTE query with cycle prevention
+        let sql = format!(
+            r#"
+            WITH RECURSIVE graph_traversal AS (
+                -- Base case: starting entity (depth 0)
+                SELECT
+                    e.entity_id,
+                    e.tenant_id,
+                    e.entity_type,
+                    e.name,
+                    e.properties,
+                    e.valid_time_start,
+                    e.transaction_time_start,
+                    0 AS depth,
+                    json_array(e.entity_id) AS path
+                FROM entities e
+                WHERE e.entity_id = ?1
+                  AND e.tenant_id = ?2
+                  AND e.valid_time_start <= ?3
+                  AND e.valid_time_end > ?3
+                  AND e.transaction_time_end = 9999999999
+
+                UNION ALL
+
+                -- Recursive case: follow relationships (depth 1+)
+                SELECT
+                    e.entity_id,
+                    e.tenant_id,
+                    e.entity_type,
+                    e.name,
+                    e.properties,
+                    e.valid_time_start,
+                    e.transaction_time_start,
+                    gt.depth + 1,
+                    json_insert(gt.path, '$[#]', e.entity_id) AS path
+                FROM graph_traversal gt
+                JOIN relationships r ON gt.entity_id = r.from_entity
+                JOIN entities e ON r.to_entity = e.entity_id
+                WHERE gt.depth < ?4
+                  AND r.tenant_id = ?2
+                  AND r.valid_time_start <= ?3
+                  AND r.valid_time_end > ?3
+                  AND r.transaction_time_end = 9999999999
+                  AND e.valid_time_start <= ?3
+                  AND e.valid_time_end > ?3
+                  AND e.transaction_time_end = 9999999999
+                  {}
+                  AND NOT EXISTS (
+                      SELECT 1 FROM json_each(gt.path)
+                      WHERE json_each.value = e.entity_id
+                  )
+            )
+            SELECT
+                entity_id,
+                entity_type,
+                name,
+                properties,
+                valid_time_start,
+                transaction_time_start,
+                depth,
+                path
+            FROM graph_traversal
+            WHERE depth > 0
+            ORDER BY depth, entity_id
+            "#,
+            rel_type_filter
+        );
+
+        let mut rows = conn
+            .query(
+                &sql,
+                libsql::params![start_entity, tenant_id, query_time, capped_depth as i64],
+            )
+            .await
+            .map_err(|e| {
+                GraphError::Storage(format!("Failed to execute traversal query: {}", e))
+            })?;
+
+        let mut results = Vec::new();
+
+        while let Some(row) = rows.next().await.map_err(|e| {
+            GraphError::Storage(format!("Failed to fetch traversal result: {}", e))
+        })? {
+            let entity_id: String = row
+                .get(0)
+                .map_err(|e| GraphError::Storage(format!("Failed to get entity_id: {}", e)))?;
+            let entity_type: String = row
+                .get(1)
+                .map_err(|e| GraphError::Storage(format!("Failed to get entity_type: {}", e)))?;
+            let name: String = row
+                .get(2)
+                .map_err(|e| GraphError::Storage(format!("Failed to get name: {}", e)))?;
+            let properties_str: String = row
+                .get(3)
+                .map_err(|e| GraphError::Storage(format!("Failed to get properties: {}", e)))?;
+            let valid_time_start: i64 = row.get(4).map_err(|e| {
+                GraphError::Storage(format!("Failed to get valid_time_start: {}", e))
+            })?;
+            let transaction_time_start: i64 = row.get(5).map_err(|e| {
+                GraphError::Storage(format!("Failed to get transaction_time_start: {}", e))
+            })?;
+            let depth: i64 = row
+                .get(6)
+                .map_err(|e| GraphError::Storage(format!("Failed to get depth: {}", e)))?;
+            let path_json: String = row
+                .get(7)
+                .map_err(|e| GraphError::Storage(format!("Failed to get path: {}", e)))?;
+
+            let properties: Value = serde_json::from_str(&properties_str).map_err(|e| {
+                GraphError::Storage(format!("Failed to parse entity properties: {}", e))
+            })?;
+
+            let entity = Entity {
+                id: entity_id,
+                name,
+                entity_type,
+                properties,
+                event_time: Some(Self::unix_to_datetime(valid_time_start)),
+                ingestion_time: Self::unix_to_datetime(transaction_time_start),
+            };
+
+            results.push((entity, depth as usize, path_json));
+        }
+
+        info!(
+            "Graph traversal completed: {} entities found within {} hops",
+            results.len(),
+            capped_depth
+        );
+
+        Ok(results)
+    }
 }
 
 #[cfg(test)]
@@ -937,5 +1118,273 @@ mod tests {
         let results = storage.query_temporal(query).await.unwrap();
 
         assert_eq!(results.len(), 3);
+    }
+
+    #[tokio::test]
+    async fn test_traverse_1_hop() {
+        let (backend, _temp) = setup_test_backend().await;
+        let storage = SqliteGraphStorage::new(backend);
+
+        // Create graph: A -> B, A -> C
+        let a = Entity::new("A".into(), "node".into(), serde_json::json!({}));
+        let b = Entity::new("B".into(), "node".into(), serde_json::json!({}));
+        let c = Entity::new("C".into(), "node".into(), serde_json::json!({}));
+
+        let a_id = storage.add_entity(a).await.unwrap();
+        let b_id = storage.add_entity(b).await.unwrap();
+        let c_id = storage.add_entity(c).await.unwrap();
+
+        storage
+            .add_relationship(Relationship::new(
+                a_id.clone(),
+                b_id.clone(),
+                "knows".into(),
+                serde_json::json!({}),
+            ))
+            .await
+            .unwrap();
+
+        storage
+            .add_relationship(Relationship::new(
+                a_id.clone(),
+                c_id.clone(),
+                "knows".into(),
+                serde_json::json!({}),
+            ))
+            .await
+            .unwrap();
+
+        // Traverse 1 hop from A
+        let results = storage.traverse(&a_id, None, 1, None).await.unwrap();
+
+        assert_eq!(results.len(), 2);
+        assert!(results.iter().any(|(e, d, _)| e.name == "B" && *d == 1));
+        assert!(results.iter().any(|(e, d, _)| e.name == "C" && *d == 1));
+
+        // Verify paths contain starting entity
+        for (_, _, path_json) in &results {
+            assert!(path_json.contains(&a_id));
+        }
+    }
+
+    #[tokio::test]
+    async fn test_traverse_4_hops_linear() {
+        let (backend, _temp) = setup_test_backend().await;
+        let storage = SqliteGraphStorage::new(backend);
+
+        // Create linear graph: A -> B -> C -> D -> E
+        let entities: Vec<_> = (b'A'..=b'E')
+            .map(|c| {
+                Entity::new(
+                    (c as char).to_string(),
+                    "node".into(),
+                    serde_json::json!({}),
+                )
+            })
+            .collect();
+
+        let mut ids = Vec::new();
+        for entity in entities {
+            ids.push(storage.add_entity(entity).await.unwrap());
+        }
+
+        for i in 0..ids.len() - 1 {
+            storage
+                .add_relationship(Relationship::new(
+                    ids[i].clone(),
+                    ids[i + 1].clone(),
+                    "next".into(),
+                    serde_json::json!({}),
+                ))
+                .await
+                .unwrap();
+        }
+
+        // Traverse 4 hops from A (should reach B, C, D, E)
+        let results = storage.traverse(&ids[0], None, 4, None).await.unwrap();
+
+        assert_eq!(results.len(), 4);
+        assert!(results.iter().any(|(e, d, _)| e.name == "B" && *d == 1));
+        assert!(results.iter().any(|(e, d, _)| e.name == "C" && *d == 2));
+        assert!(results.iter().any(|(e, d, _)| e.name == "D" && *d == 3));
+        assert!(results.iter().any(|(e, d, _)| e.name == "E" && *d == 4));
+
+        // Verify path grows with depth
+        let e_result = results
+            .iter()
+            .find(|(e, _, _)| e.name == "E")
+            .expect("Should find E");
+        let path: Vec<String> = serde_json::from_str(&e_result.2).unwrap();
+        assert_eq!(path.len(), 5); // A, B, C, D, E
+    }
+
+    #[tokio::test]
+    async fn test_traverse_with_cycles() {
+        let (backend, _temp) = setup_test_backend().await;
+        let storage = SqliteGraphStorage::new(backend);
+
+        // Create cyclic graph: A -> B -> C -> A
+        let a = Entity::new("A".into(), "node".into(), serde_json::json!({}));
+        let b = Entity::new("B".into(), "node".into(), serde_json::json!({}));
+        let c = Entity::new("C".into(), "node".into(), serde_json::json!({}));
+
+        let a_id = storage.add_entity(a).await.unwrap();
+        let b_id = storage.add_entity(b).await.unwrap();
+        let c_id = storage.add_entity(c).await.unwrap();
+
+        storage
+            .add_relationship(Relationship::new(
+                a_id.clone(),
+                b_id.clone(),
+                "next".into(),
+                serde_json::json!({}),
+            ))
+            .await
+            .unwrap();
+
+        storage
+            .add_relationship(Relationship::new(
+                b_id.clone(),
+                c_id.clone(),
+                "next".into(),
+                serde_json::json!({}),
+            ))
+            .await
+            .unwrap();
+
+        storage
+            .add_relationship(Relationship::new(
+                c_id.clone(),
+                a_id.clone(),
+                "next".into(),
+                serde_json::json!({}),
+            ))
+            .await
+            .unwrap();
+
+        // Traverse 5 hops (should not revisit A due to cycle prevention)
+        let results = storage.traverse(&a_id, None, 5, None).await.unwrap();
+
+        // Should find B and C only (A is excluded via cycle prevention)
+        assert_eq!(results.len(), 2);
+        assert!(results.iter().any(|(e, d, _)| e.name == "B" && *d == 1));
+        assert!(results.iter().any(|(e, d, _)| e.name == "C" && *d == 2));
+        assert!(!results.iter().any(|(e, _, _)| e.name == "A")); // A not revisited
+    }
+
+    #[tokio::test]
+    async fn test_traverse_relationship_filter() {
+        let (backend, _temp) = setup_test_backend().await;
+        let storage = SqliteGraphStorage::new(backend);
+
+        // Create multi-type graph: A -knows-> B, A -works_with-> C
+        let a = Entity::new("A".into(), "person".into(), serde_json::json!({}));
+        let b = Entity::new("B".into(), "person".into(), serde_json::json!({}));
+        let c = Entity::new("C".into(), "person".into(), serde_json::json!({}));
+
+        let a_id = storage.add_entity(a).await.unwrap();
+        let b_id = storage.add_entity(b).await.unwrap();
+        let c_id = storage.add_entity(c).await.unwrap();
+
+        storage
+            .add_relationship(Relationship::new(
+                a_id.clone(),
+                b_id.clone(),
+                "knows".into(),
+                serde_json::json!({}),
+            ))
+            .await
+            .unwrap();
+
+        storage
+            .add_relationship(Relationship::new(
+                a_id.clone(),
+                c_id.clone(),
+                "works_with".into(),
+                serde_json::json!({}),
+            ))
+            .await
+            .unwrap();
+
+        // Traverse with "knows" filter (should only find B)
+        let results = storage
+            .traverse(&a_id, Some("knows"), 2, None)
+            .await
+            .unwrap();
+
+        assert_eq!(results.len(), 1);
+        assert_eq!(results[0].0.name, "B");
+
+        // Traverse with "works_with" filter (should only find C)
+        let results = storage
+            .traverse(&a_id, Some("works_with"), 2, None)
+            .await
+            .unwrap();
+
+        assert_eq!(results.len(), 1);
+        assert_eq!(results[0].0.name, "C");
+
+        // Traverse with no filter (should find both)
+        let results = storage.traverse(&a_id, None, 2, None).await.unwrap();
+
+        assert_eq!(results.len(), 2);
+    }
+
+    #[tokio::test]
+    async fn test_traverse_temporal() {
+        let (backend, _temp) = setup_test_backend().await;
+        let storage = SqliteGraphStorage::new(backend);
+
+        let past = Utc::now() - chrono::Duration::days(10);
+        let present = Utc::now();
+        let future = Utc::now() + chrono::Duration::days(10);
+
+        // Create entity A (exists now)
+        let a = Entity::new("A".into(), "node".into(), serde_json::json!({}));
+        let a_id = storage.add_entity(a).await.unwrap();
+
+        // Create entity B with past event time
+        let mut b = Entity::new("B".into(), "node".into(), serde_json::json!({}));
+        b.event_time = Some(past);
+        let b_id = storage.add_entity(b).await.unwrap();
+
+        // Create entity C with future event time
+        let mut c = Entity::new("C".into(), "node".into(), serde_json::json!({}));
+        c.event_time = Some(future);
+        let c_id = storage.add_entity(c).await.unwrap();
+
+        // Add relationships
+        storage
+            .add_relationship(Relationship::new(
+                a_id.clone(),
+                b_id.clone(),
+                "links".into(),
+                serde_json::json!({}),
+            ))
+            .await
+            .unwrap();
+
+        storage
+            .add_relationship(Relationship::new(
+                a_id.clone(),
+                c_id.clone(),
+                "links".into(),
+                serde_json::json!({}),
+            ))
+            .await
+            .unwrap();
+
+        // Query at present time (should see A and B, not C)
+        let results = storage.traverse(&a_id, None, 2, Some(present)).await.unwrap();
+
+        assert_eq!(results.len(), 1);
+        assert_eq!(results[0].0.name, "B");
+
+        // Query at future time (should see A, B, and C)
+        let results = storage.traverse(&a_id, None, 2, Some(future)).await.unwrap();
+
+        assert_eq!(results.len(), 2);
+        assert!(results.iter().any(|(e, _, _)| e.name == "B"));
+        assert!(results.iter().any(|(e, _, _)| e.name == "C"));
     }
 }
