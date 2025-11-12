@@ -1,4 +1,4 @@
-# Storage Migration Guide (Phase 1: Sled→PostgreSQL)
+# Storage Migration Guide (Phase 1: SQLite→PostgreSQL)
 
 **Version**: 1.0
 **Date**: January 2025
@@ -7,7 +7,7 @@
 
 ## Overview
 
-The llmspell storage migration system provides safe, validated, plan-based data migration from embedded backends (Sled) to PostgreSQL. Phase 1 supports three critical production components:
+The llmspell storage migration system provides safe, validated, plan-based data migration from embedded backends (SQLite) to PostgreSQL. Phase 1 supports three critical production components:
 
 - **Agent State**: Agent execution state and iteration history
 - **Workflow State**: Workflow orchestration state and progress tracking
@@ -24,13 +24,13 @@ The llmspell storage migration system provides safe, validated, plan-based data 
 
 ## Quick Start (5 Minutes)
 
-Migrate Agent State from Sled to PostgreSQL in 4 steps:
+Migrate Agent State from SQLite to PostgreSQL in 4 steps:
 
 ### 1. Generate Migration Plan
 
 ```bash
 llmspell storage migrate plan \
-  --from sled \
+  --from sqlite \
   --to postgres \
   --components agent_state \
   --output agent-migration.toml
@@ -41,7 +41,7 @@ llmspell storage migrate plan \
 Migration plan generated: "agent-migration.toml"
 
 Plan summary:
-  Source: sled → Target: postgres
+  Source: sqlite → Target: postgres
   Components: 1
     - agent_state: 42 records (batch size: 1000)
 
@@ -62,7 +62,7 @@ cat agent-migration.toml
 version: '1.0'
 created_at: '2025-01-15T10:30:00Z'
 source:
-  backend: sled
+  backend: sqlite
 target:
   backend: postgres
 components:
@@ -152,7 +152,7 @@ All data migrated successfully!
 
 3. **Check Source Data**:
    ```bash
-   llmspell storage validate --backend sled --components agent_state,workflow_state,sessions
+   llmspell storage validate --backend sqlite --components agent_state,workflow_state,sessions
    ```
 
 ### Step 1: Generate Migration Plan
@@ -173,7 +173,7 @@ llmspell storage migrate plan \
 ```
 
 **Phase 1 Constraints**:
-- `--from`: Only `sled` supported (embedded key-value store)
+- `--from`: Only `sqlite` supported (embedded database)
 - `--to`: Only `postgres` supported (centralized PostgreSQL)
 - `--components`: Must be one or more of: `agent_state`, `workflow_state`, `sessions`
 
@@ -182,21 +182,21 @@ llmspell storage migrate plan \
 ```bash
 # Single component
 llmspell storage migrate plan \
-  --from sled \
+  --from sqlite \
   --to postgres \
   --components agent_state \
   --output agent-migration.toml
 
 # Multiple components (all Phase 1)
 llmspell storage migrate plan \
-  --from sled \
+  --from sqlite \
   --to postgres \
   --components agent_state,workflow_state,sessions \
   --output full-phase1-migration.toml
 
 # Workflow state only
 llmspell storage migrate plan \
-  --from sled \
+  --from sqlite \
   --to postgres \
   --components workflow_state \
   --output workflow-migration.toml
@@ -219,8 +219,8 @@ version: '1.0'                      # Plan format version
 created_at: '2025-01-15T10:30:00Z'  # Timestamp
 
 source:                             # Source backend configuration
-  backend: sled                     # Backend type
-  # path: ./data/sled              # Optional: custom Sled path
+  backend: sqlite                   # Backend type
+  # path: ./data/llmspell.db       # Optional: custom SQLite path
 
 target:                             # Target backend configuration
   backend: postgres                 # Backend type
@@ -313,7 +313,7 @@ ERROR: Pre-flight failed: PostgreSQL connection refused
   → Solution: Start PostgreSQL (see Troubleshooting)
 
 ERROR: Pre-flight failed: Component 'agent_state' not found in source
-  → Solution: Check component name spelling, verify Sled has data
+  → Solution: Check component name spelling, verify SQLite has data
 
 ERROR: Phase 1: Only agent_state, workflow_state, sessions are supported. Got: artifacts
   → Solution: Wait for Phase 3 (artifacts not yet supported)
@@ -440,7 +440,7 @@ After successful migration, verify data integrity:
    ```bash
    # Generate new plan to get fresh counts
    llmspell storage migrate plan \
-     --from sled \
+     --from sqlite \
      --to postgres \
      --components agent_state,workflow_state,sessions \
      --output verify-migration.toml
@@ -533,8 +533,8 @@ If you need to rollback a successful migration:
 
 1. **Pre-Migration Manual Backup** (belt-and-suspenders):
    ```bash
-   # Backup Sled database directory
-   cp -r ~/.local/share/llmspell/sled/ ./manual-backups/sled-$(date +%Y%m%d-%H%M%S)/
+   # Backup SQLite database file
+   cp ~/.local/share/llmspell/llmspell.db ./manual-backups/llmspell-$(date +%Y%m%d-%H%M%S).db
 
    # Backup PostgreSQL (if you have existing data)
    pg_dump postgresql://llmspell:llmspell_dev_pass@localhost:5432/llmspell_dev \
@@ -543,7 +543,7 @@ If you need to rollback a successful migration:
 
 2. **Production Backup Strategy**:
    - Keep automatic migration backups for 30 days
-   - Separate full database backups (daily for Sled, hourly for PostgreSQL)
+   - Separate full database backups (daily for SQLite, hourly for PostgreSQL)
    - Test restore procedures quarterly
 
 3. **Disable Automatic Backup** (only if you have external backup system):
@@ -638,17 +638,17 @@ ERROR: Pre-flight failed: Component 'agent_state' not found in source
 
 **Diagnosis**:
 ```bash
-# Check Sled database contents
-llmspell storage validate --backend sled --components agent_state
+# Check SQLite database contents
+llmspell storage validate --backend sqlite --components agent_state
 
-# Verify Sled database path
-ls -la ~/.local/share/llmspell/sled/
+# Verify SQLite database path
+ls -la ~/.local/share/llmspell/llmspell.db
 ```
 
 **Solution**:
 - **Wrong component name**: Use exact names: `agent_state`, `workflow_state`, `sessions`
-- **Empty source**: Sled has no data yet (nothing to migrate)
-- **Custom Sled path**: Add to plan: `source.path: /custom/sled/path`
+- **Empty source**: SQLite has no data yet (nothing to migrate)
+- **Custom SQLite path**: Add to plan: `source.path: /custom/path/llmspell.db`
 
 #### 5. Validation Failure (Count Mismatch)
 
@@ -658,7 +658,7 @@ ERROR: Validation failed: agent_state count mismatch (42 source ≠ 40 target)
 ```
 
 **Diagnosis**:
-- **Race condition**: Source data changed during migration (unlikely with Sled)
+- **Race condition**: Source data changed during migration (unlikely with SQLite)
 - **Partial migration**: Previous failed migration left orphaned records
 - **Filter mismatch**: Component prefix not matching source keys
 
@@ -673,7 +673,7 @@ psql postgresql://llmspell_app:llmspell_app_pass@localhost:5432/llmspell_dev \
   -c "DELETE FROM llmspell.agent_state WHERE key LIKE 'agent:%';"
 
 # 3. Re-generate plan to get fresh count
-llmspell storage migrate plan --from sled --to postgres --components agent_state --output fresh-plan.toml
+llmspell storage migrate plan --from sqlite --to postgres --components agent_state --output fresh-plan.toml
 
 # 4. Retry migration
 llmspell storage migrate execute --plan fresh-plan.toml
@@ -687,14 +687,14 @@ ERROR: Validation failed: agent_state checksum mismatch for key 'agent:test:123'
 ```
 
 **Diagnosis**:
-- **Data corruption**: Unlikely (Sled is checksummed)
+- **Data corruption**: Unlikely (SQLite has integrity checks)
 - **JSON normalization**: PostgreSQL JSONB reorders keys (semantic validator should handle this)
 - **Encoding issues**: UTF-8 vs. binary data
 
 **Solution**:
 ```bash
 # 1. Inspect specific key in source
-llmspell storage validate --backend sled --components agent_state  # (add debug output)
+llmspell storage validate --backend sqlite --components agent_state  # (add debug output)
 
 # 2. Inspect specific key in target
 psql postgresql://llmspell_app:llmspell_app_pass@localhost:5432/llmspell_dev \
@@ -710,13 +710,13 @@ psql postgresql://llmspell_app:llmspell_app_pass@localhost:5432/llmspell_dev \
 
 **Error**:
 ```
-ERROR: Phase 1: Only 'sled' is supported as source backend
+ERROR: Phase 1: Only 'sqlite' is supported as source backend
 ERROR: Phase 1: Only agent_state, workflow_state, sessions are supported. Got: artifacts
 ```
 
 **Explanation**:
 Phase 1 (current release) supports:
-- **Source**: Sled only
+- **Source**: SQLite only
 - **Target**: PostgreSQL only
 - **Components**: `agent_state`, `workflow_state`, `sessions` only
 
@@ -817,7 +817,7 @@ trait MigrationTarget: MigrationSource {
 ```
 
 **Implementations** (Phase 1):
-- `SledBackend` implements `MigrationSource`
+- `SqliteBackend` implements `MigrationSource`
 - `PostgresBackend` implements `MigrationTarget`
 
 **Source**: `llmspell-storage/src/migration/traits.rs`, `llmspell-storage/src/migration/adapters.rs`
@@ -837,7 +837,7 @@ Migration Workflow (High-Level):
       ↓
 ┌──────────────────────────────────────────────┐
 │ 1. Pre-flight Validation                     │
-│    ├── Source connectivity (SledBackend)     │
+│    ├── Source connectivity (SqliteBackend)   │
 │    ├── Target connectivity (PostgresBackend) │
 │    └── Schema validation                     │
 │                                              │
@@ -877,7 +877,7 @@ Migration Workflow (High-Level):
 │                                                             │
 │  llmspell storage migrate plan                             │
 │    ↓                                                        │
-│  Count source records (SledBackend::count)                 │
+│  Count source records (SqliteBackend::count)               │
 │    ↓                                                        │
 │  Generate MigrationPlan (YAML)                             │
 │    ↓                                                        │
@@ -891,7 +891,7 @@ Migration Workflow (High-Level):
 │    ↓                                                        │
 │  MigrationEngine::execute()                                │
 │    ├── Pre-Flight Validation                               │
-│    │   ├── Source connectivity (SledBackend::new)          │
+│    │   ├── Source connectivity (SqliteBackend::new)        │
 │    │   ├── Target connectivity (PostgresBackend::new)      │
 │    │   └── Schema validation (PostgreSQL tables exist)     │
 │    │                                                        │
@@ -939,7 +939,7 @@ Migration Workflow (High-Level):
 1. Generate plan:
    ```bash
    llmspell storage migrate plan \
-     --from sled \
+     --from sqlite \
      --to postgres \
      --components agent_state \
      --output agent-state-migration.toml
@@ -984,7 +984,7 @@ Migration Workflow (High-Level):
 ```bash
 # Plan
 llmspell storage migrate plan \
-  --from sled \
+  --from sqlite \
   --to postgres \
   --components workflow_state \
   --output workflow-migration.toml
@@ -1006,7 +1006,7 @@ llmspell storage migrate execute \
 ```bash
 # Plan
 llmspell storage migrate plan \
-  --from sled \
+  --from sqlite \
   --to postgres \
   --components sessions \
   --output sessions-migration.toml
@@ -1023,7 +1023,7 @@ llmspell storage migrate execute \
 ```bash
 # 1. Generate comprehensive plan
 llmspell storage migrate plan \
-  --from sled \
+  --from sqlite \
   --to postgres \
   --components agent_state,workflow_state,sessions \
   --output full-phase1-migration.toml
@@ -1127,8 +1127,8 @@ created_at: '2025-01-15T10:30:45Z'
 
 # Source backend configuration
 source:
-  backend: sled                           # Backend type (Phase 1: "sled" only)
-  path: /optional/custom/sled/path       # Optional: Custom Sled database path
+  backend: sqlite                         # Backend type (Phase 1: "sqlite" only)
+  path: /optional/custom/path/llmspell.db  # Optional: Custom SQLite database path
 
 # Target backend configuration
 target:
@@ -1179,7 +1179,7 @@ rollback:
 
 ```bash
 llmspell storage migrate plan \
-  --from sled \
+  --from sqlite \
   --to postgres \
   --components agent_state,workflow_state,sessions \
   --output multi-component-migration.toml
@@ -1267,11 +1267,11 @@ components:
 **A**: Yes, with careful planning:
 
 **Strategy 1: Dual-Write Migration** (recommended for high availability):
-1. Configure application to write to both Sled + PostgreSQL
-2. Run migration (reads from Sled, validates against PostgreSQL)
+1. Configure application to write to both SQLite + PostgreSQL
+2. Run migration (reads from SQLite, validates against PostgreSQL)
 3. Switch application to read from PostgreSQL
 4. Monitor for 24-48 hours
-5. Decommission Sled backend
+5. Decommission SQLite backend
 
 **Strategy 2: Maintenance Window Migration**:
 1. Schedule brief maintenance window (5-15 minutes)
@@ -1281,7 +1281,7 @@ components:
 5. Restart application with PostgreSQL backend
 6. Resume operations
 
-**Note**: Phase 1 source backends (Sled) are read-only during migration, so dual-write is safe.
+**Note**: Phase 1 source backends (SQLite) are read-only during migration, so dual-write is safe.
 
 ### Q: What if I need to roll back after migration completes?
 
@@ -1295,7 +1295,7 @@ components:
    # Example: ./backups/migration-20250115-103045/
    ```
 
-3. **Phase 1 Manual Restore** (PostgreSQL to Sled reversal):
+3. **Phase 1 Manual Restore** (PostgreSQL to SQLite reversal):
    ```sql
    -- Delete migrated data from PostgreSQL
    DELETE FROM llmspell.agent_state WHERE key LIKE 'agent:%';
@@ -1303,9 +1303,9 @@ components:
    DELETE FROM llmspell.sessions WHERE key LIKE 'session:%';
    ```
 
-4. **Restart application** with Sled backend configuration
+4. **Restart application** with SQLite backend configuration
 
-5. **Verify Sled data** intact (source never modified during migration)
+5. **Verify SQLite data** intact (source never modified during migration)
 
 **Future**: Phase 2 will include automated `llmspell storage migrate rollback` command.
 
@@ -1347,7 +1347,7 @@ components:
 
 **A**: Estimate disk space needed:
 
-**Source side** (Sled):
+**Source side** (SQLite):
 - No additional space required (read-only)
 
 **Target side** (PostgreSQL):
@@ -1360,7 +1360,7 @@ components:
 - **Recommendation**: Keep backups for 30 days
 
 **Example**:
-- Source (Sled): 10 GB agent_state
+- Source (SQLite): 10 GB agent_state
 - Target (PostgreSQL): ~15 GB (10 GB data + 3 GB indexes)
 - Backup: ~10 GB
 - **Total needed**: ~25 GB free space

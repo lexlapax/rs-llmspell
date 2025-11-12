@@ -78,8 +78,8 @@ LLMSpell implements a hot-swappable storage backend system with PostgreSQL as th
 
 ### Backend Comparison
 
-| Feature | Memory | Sled | **PostgreSQL** |
-|---------|--------|------|---------------|
+| Feature | Memory | SQLite | **PostgreSQL** |
+|---------|--------|--------|---------------|
 | **Persistent** | ❌ No | ✅ Yes | ✅ Yes |
 | **Transactional** | ✅ Yes (RwLock) | ✅ Yes | ✅ Yes (ACID) |
 | **Multi-tenant** | ❌ No | ❌ No | ✅ Yes (RLS) |
@@ -1258,7 +1258,7 @@ ALTER TABLE event_log ATTACH PARTITION event_log_2024_01
     FOR VALUES FROM ('2024-01-01') TO ('2024-02-01');
 ```
 
-### Data Migration (Sled → PostgreSQL)
+### Data Migration (SQLite → PostgreSQL)
 
 **Phase 1: Plan-Based Migration**
 
@@ -1269,7 +1269,7 @@ See [Storage Migration Guide](migration-internals.md) for detailed procedures.
 ```bash
 # 1. Generate migration plan
 llmspell storage migrate plan \
-  --from sled \
+  --from sqlite \
   --to postgres \
   --components agent_state,workflow_state,sessions \
   --output migration.toml
@@ -1408,7 +1408,7 @@ LIMIT 10;
 - **Phase 13b Design**: `/docs/in-progress/phase-13-design-doc.md` - Memory system architecture
 - **Current Architecture**: `/docs/technical/current-architecture.md` - System overview
 - **Storage Architecture**: `/docs/technical/storage-architecture.md` - 3-tier storage design
-- **Migration Guide**: `/docs/technical/migration-internals.md` - Sled → PostgreSQL migration
+- **Migration Guide**: `/docs/technical/migration-internals.md` - SQLite → PostgreSQL migration
 
 ### PostgreSQL Documentation
 
