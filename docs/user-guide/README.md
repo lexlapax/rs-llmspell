@@ -167,7 +167,7 @@ export OPENAI_API_KEY="sk-..."
 
 ### Adaptive Memory & Context Engineering
 - **Multi-Tier Memory System**: Episodic (conversation history), Semantic (knowledge graph), Procedural (patterns)
-- **Hot-Swappable Backends**: HNSW (8.47x speedup), InMemory (dev), SurrealDB (bi-temporal graph)
+- **Hot-Swappable Backends**: vectorlite-rs HNSW (8.47x speedup), InMemory (dev), SQLite/PostgreSQL (bi-temporal graph)
 - **Bi-Temporal Knowledge Graph**: Event time + ingestion time tracking
 - **Context Engineering Pipeline**: Query understanding, multi-strategy retrieval, DeBERTa reranking, token-aware assembly
 - **LLM-Driven Consolidation**: Extract entities and relationships into knowledge graph

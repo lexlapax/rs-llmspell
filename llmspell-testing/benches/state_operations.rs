@@ -53,39 +53,6 @@ fn bench_state_save_by_size(c: &mut Criterion) {
                 });
             },
         );
-
-        group.bench_with_input(
-            BenchmarkId::new("sled_backend", label),
-            &size,
-            |b, &size| {
-                b.iter(|| {
-                    rt.block_on(async {
-                        let temp = TempDir::new().unwrap();
-                        let state_manager = StateManager::with_backend(
-                            StorageBackendType::Sled(SledConfig {
-                                path: temp.path().join("state"),
-                                cache_capacity: 10 * 1024 * 1024,
-                                use_compression: true,
-                            }),
-                            PersistenceConfig::default(),
-                            None, // No memory manager
-                        )
-                        .await
-                        .unwrap();
-
-                        let data = "x".repeat(size);
-                        let value = serde_json::json!({ "data": data });
-
-                        state_manager
-                            .set(StateScope::Global, "test_key", value)
-                            .await
-                            .unwrap();
-
-                        black_box(state_manager)
-                    })
-                });
-            },
-        );
     }
 
     group.finish();
@@ -332,80 +299,8 @@ fn bench_compression_effectiveness(c: &mut Criterion) {
 
     let mut group = c.benchmark_group("compression_effectiveness");
 
-    // Test with compressible data
-    group.bench_function("highly_compressible_data", |b| {
-        b.iter(|| {
-            rt.block_on(async {
-                let temp_dir = TempDir::new().unwrap();
-                let state_manager = StateManager::with_backend(
-                    StorageBackendType::Sled(SledConfig {
-                        path: temp_dir.path().join("state"),
-                        cache_capacity: 1024 * 1024,
-                        use_compression: true,
-                    }),
-                    PersistenceConfig::default(),
-                    None, // No memory manager
-                )
-                .await
-                .unwrap();
-
-                // Highly repetitive data
-                let data = "a".repeat(10000);
-                state_manager
-                    .set(StateScope::Global, "compressed", serde_json::json!(data))
-                    .await
-                    .unwrap();
-
-                // Read back
-                let value = state_manager
-                    .get(StateScope::Global, "compressed")
-                    .await
-                    .unwrap();
-
-                black_box(value)
-            })
-        });
-    });
-
-    // Test with random data
-    group.bench_function("random_data", |b| {
-        use rand::Rng;
-        let mut rng = rand::thread_rng();
-
-        b.iter(|| {
-            rt.block_on(async {
-                let temp_dir = TempDir::new().unwrap();
-                let state_manager = StateManager::with_backend(
-                    StorageBackendType::Sled(SledConfig {
-                        path: temp_dir.path().join("state"),
-                        cache_capacity: 1024 * 1024,
-                        use_compression: true,
-                    }),
-                    PersistenceConfig::default(),
-                    None, // No memory manager
-                )
-                .await
-                .unwrap();
-
-                // Random data
-                let data: Vec<u8> = (0..10000).map(|_| rng.gen()).collect();
-                let data_str = base64::engine::general_purpose::STANDARD.encode(&data);
-
-                state_manager
-                    .set(StateScope::Global, "random", serde_json::json!(data_str))
-                    .await
-                    .unwrap();
-
-                // Read back
-                let value = state_manager
-                    .get(StateScope::Global, "random")
-                    .await
-                    .unwrap();
-
-                black_box(value)
-            })
-        });
-    });
+    // Note: Compression benchmarks removed after Sled backend deletion
+    // Use SQLite backend for compression testing if needed
 
     group.finish();
 }

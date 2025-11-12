@@ -86,10 +86,10 @@ impl MigrationPlan {
 /// Backend configuration
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct BackendConfig {
-    /// Backend type ("sled", "postgres", "memory")
+    /// Backend type ("sqlite", "postgres", "memory")
     pub backend: String,
 
-    /// Path for file-based backends (e.g., Sled database path)
+    /// Path for file-based backends (e.g., SQLite database path)
     #[serde(skip_serializing_if = "Option::is_none")]
     pub path: Option<String>,
 
@@ -139,7 +139,7 @@ mod tests {
     #[test]
     fn test_plan_creation() {
         let plan = MigrationPlan::new(
-            "sled",
+            "sqlite",
             "postgres",
             vec![
                 "agent_state".to_string(),
@@ -149,7 +149,7 @@ mod tests {
         );
 
         assert_eq!(plan.version, "1.0");
-        assert_eq!(plan.source.backend, "sled");
+        assert_eq!(plan.source.backend, "sqlite");
         assert_eq!(plan.target.backend, "postgres");
         assert_eq!(plan.components.len(), 3);
         assert_eq!(plan.components[0].name, "agent_state");
@@ -159,11 +159,11 @@ mod tests {
 
     #[test]
     fn test_plan_serialization() {
-        let plan = MigrationPlan::new("sled", "postgres", vec!["agent_state".to_string()]);
+        let plan = MigrationPlan::new("sqlite", "postgres", vec!["agent_state".to_string()]);
 
         let toml = toml::to_string_pretty(&plan).unwrap();
         assert!(toml.contains("version = \"1.0\""));
-        assert!(toml.contains("backend = \"sled\""));
+        assert!(toml.contains("backend = \"sqlite\""));
         assert!(toml.contains("backend = \"postgres\""));
         assert!(toml.contains("agent_state"));
 

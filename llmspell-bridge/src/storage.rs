@@ -1,5 +1,5 @@
 //! ABOUTME: Storage backend discovery for state persistence
-//! ABOUTME: Provides discovery of available storage backends (`Memory`, `Sled`, `RocksDB`)
+//! ABOUTME: Provides discovery of available storage backends (`Memory`, `RocksDB`)
 
 use crate::discovery::BridgeDiscovery;
 use serde::{Deserialize, Serialize};
@@ -71,31 +71,6 @@ impl StorageDiscovery {
                 },
                 required_params: vec![],
                 optional_params: vec!["max_size".to_string(), "eviction_policy".to_string()],
-            },
-        );
-
-        // Sled backend
-        backends.insert(
-            "sled".to_string(),
-            StorageInfo {
-                name: "sled".to_string(),
-                description: "Embedded database with crash-resistant storage".to_string(),
-                backend_type: "Sled".to_string(),
-                persistent: true,
-                supports_compression: true,
-                supports_encryption: true,
-                performance: StoragePerformance {
-                    read_latency: "medium".to_string(),
-                    write_latency: "medium".to_string(),
-                    throughput: "medium".to_string(),
-                    large_dataset_suitable: true,
-                },
-                required_params: vec!["path".to_string()],
-                optional_params: vec![
-                    "cache_capacity".to_string(),
-                    "use_compression".to_string(),
-                    "mode".to_string(),
-                ],
             },
         );
 
@@ -241,7 +216,7 @@ impl BridgeDiscovery<StorageInfo> for StorageDiscovery {
 /// Configuration for storage backend selection and setup
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct StorageConfig {
-    /// Selected backend name (memory, sled, rocksdb)
+    /// Selected backend name (memory, rocksdb)
     pub backend: String,
     /// Backend-specific configuration parameters
     pub parameters: HashMap<String, serde_json::Value>,
@@ -335,16 +310,6 @@ impl StorageConfigBuilder {
         self
     }
 
-    /// Convenience method to configure for sled backend
-    #[must_use]
-    pub fn sled_backend(mut self, path: impl Into<String>) -> Self {
-        self.config.backend = "sled".to_string();
-        self.config
-            .parameters
-            .insert("path".to_string(), serde_json::Value::String(path.into()));
-        self
-    }
-
     /// Convenience method to configure for rocksdb backend
     #[must_use]
     pub fn rocksdb_backend(mut self, path: impl Into<String>) -> Self {
@@ -372,9 +337,8 @@ mod tests {
 
         // Test listing backends
         let backends = discovery.list_backend_names();
-        assert_eq!(backends.len(), 3);
+        assert_eq!(backends.len(), 2);
         assert!(backends.contains(&"memory".to_string()));
-        assert!(backends.contains(&"sled".to_string()));
         assert!(backends.contains(&"rocksdb".to_string()));
 
         // Test getting backend info
@@ -385,19 +349,19 @@ mod tests {
 
         // Test persistent backends
         let persistent = discovery.get_persistent_backends();
-        assert_eq!(persistent.len(), 2);
+        assert_eq!(persistent.len(), 1);
 
         // Test large dataset backends
         let large_dataset = discovery.get_large_dataset_backends();
-        assert_eq!(large_dataset.len(), 2);
+        assert_eq!(large_dataset.len(), 1);
 
         // Test compression-enabled backends
         let compression_backends = discovery.get_compression_enabled_backends();
-        assert_eq!(compression_backends.len(), 3); // All backends support compression
+        assert_eq!(compression_backends.len(), 2); // All backends support compression
 
         // Test encryption-enabled backends
         let encryption_backends = discovery.get_encryption_enabled_backends();
-        assert_eq!(encryption_backends.len(), 3); // All backends support encryption
+        assert_eq!(encryption_backends.len(), 2); // All backends support encryption
 
         // Test performance-based filtering
         let high_perf = discovery.get_backends_by_performance("low", "high");
@@ -410,16 +374,16 @@ mod tests {
 
         // Test discover_types
         let types = discovery.discover_types().await;
-        assert_eq!(types.len(), 3);
+        assert_eq!(types.len(), 2);
 
         // Test get_type_info
-        let sled_info = discovery.get_type_info("sled").await.unwrap();
-        assert_eq!(sled_info.backend_type, "Sled");
-        assert!(sled_info.persistent);
+        let rocksdb_info = discovery.get_type_info("rocksdb").await.unwrap();
+        assert_eq!(rocksdb_info.backend_type, "RocksDB");
+        assert!(rocksdb_info.persistent);
 
         // Test has_type
         assert!(discovery.has_type("memory").await);
-        assert!(discovery.has_type("sled").await);
+        assert!(discovery.has_type("rocksdb").await);
         assert!(!discovery.has_type("redis").await);
 
         // Test filter_types
@@ -439,26 +403,26 @@ mod tests {
 
         // Test builder pattern
         let config = StorageConfig::builder()
-            .sled_backend("/tmp/test.sled")
+            .rocksdb_backend("/tmp/test.rocksdb")
             .enable_compression(true)
             .enable_encryption(true)
             .performance_preset("fast")
             .parameter(
-                "cache_capacity",
+                "block_cache_size",
                 serde_json::Value::Number(serde_json::Number::from(1000)),
             )
             .build();
 
-        assert_eq!(config.backend, "sled");
+        assert_eq!(config.backend, "rocksdb");
         assert!(config.enable_compression);
         assert!(config.enable_encryption);
         assert_eq!(config.performance_preset, "fast");
         assert_eq!(
             config.parameters.get("path"),
-            Some(&serde_json::Value::String("/tmp/test.sled".to_string()))
+            Some(&serde_json::Value::String("/tmp/test.rocksdb".to_string()))
         );
         assert_eq!(
-            config.parameters.get("cache_capacity"),
+            config.parameters.get("block_cache_size"),
             Some(&serde_json::Value::Number(serde_json::Number::from(1000)))
         );
 

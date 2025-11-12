@@ -162,12 +162,12 @@ fn register_state_vars(registry: &EnvRegistry) -> Result<(), String> {
 
     registry.register_var(
         EnvVarDefBuilder::new("LLMSPELL_STATE_BACKEND")
-            .description("State persistence backend (memory, sled, redis)")
+            .description("State persistence backend (memory, sqlite, postgres)")
             .category(EnvCategory::State)
             .config_path("runtime.state_persistence.backend_type")
             .default("memory")
             .validator(|v| match v {
-                "memory" | "sled" | "redis" => Ok(()),
+                "memory" | "sqlite" | "postgres" => Ok(()),
                 _ => Err(format!("Invalid backend: {}", v)),
             })
             .build(),
@@ -874,12 +874,12 @@ fn register_session_hook_vars(registry: &EnvRegistry) -> Result<(), String> {
 
     registry.register_var(
         EnvVarDefBuilder::new("LLMSPELL_SESSIONS_BACKEND")
-            .description("Session storage backend (memory, sled)")
+            .description("Session storage backend (memory, sqlite, postgres)")
             .category(EnvCategory::Session)
             .config_path("runtime.sessions.storage_backend")
             .default("memory")
             .validator(|v| match v {
-                "memory" | "sled" => Ok(()),
+                "memory" | "sqlite" | "postgres" => Ok(()),
                 _ => Err(format!("Invalid backend: {}", v)),
             })
             .build(),

@@ -6,7 +6,6 @@ Storage backends and persistence for rs-llmspell, including vector storage for R
 
 ### Key-Value Storage
 - **MemoryBackend**: In-memory storage for testing and temporary data
-- **SledBackend**: Embedded database for persistent local storage
 - Trait-based storage abstraction for easy backend switching
 
 ### Vector Storage (Phase 8 - Production RAG)
@@ -174,11 +173,6 @@ This temporal model is essential for Phase 9's Adaptive Memory System, enabling:
 - Memory: All data in RAM
 - Persistence: None
 
-### SledBackend  
-- Read/Write: O(log n), <100μs/1ms
-- Memory: Configurable cache
-- Persistence: ACID compliant
-
 ### HNSW Vector Storage (Phase 8)
 - **Insert**: O(log n), <10ms for 1M vectors, 2-5ms typical for 100K vectors
 - **Search**: O(log n), <10ms for 1M vectors, 1-3ms typical for 100K vectors
@@ -192,7 +186,6 @@ This temporal model is essential for Phase 9's Adaptive Memory System, enabling:
 ## Dependencies
 - `llmspell-core` - Core traits and types
 - `llmspell-state-traits` - State scope definitions and multi-tenant isolation
-- `sled` - Embedded key-value database for persistence
 - `dashmap` - Lock-free concurrent hashmaps for high-performance operations
 - `parking_lot` - Low-overhead synchronization primitives
 - `uuid` - Unique identifiers for vectors and tenants
@@ -205,7 +198,6 @@ This temporal model is essential for Phase 9's Adaptive Memory System, enabling:
 llmspell-storage
 ├── backends/
 │   ├── memory.rs           # In-memory key-value storage
-│   ├── sled_backend.rs     # Persistent key-value storage
 │   └── vector/
 │       ├── hnsw.rs         # HNSW implementation with multi-tenant support
 │       ├── dimension_router.rs # Multi-dimensional embedding routing

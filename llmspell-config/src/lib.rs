@@ -1732,7 +1732,7 @@ pub struct SessionConfig {
     pub artifact_compression_threshold: usize,
     /// Session timeout in seconds
     pub session_timeout_seconds: u64,
-    /// Storage backend type (memory, sled)
+    /// Storage backend type (memory, sqlite, postgres)
     pub storage_backend: String,
 }
 

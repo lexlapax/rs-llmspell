@@ -6,8 +6,8 @@ Adaptive memory system for LLMSpell with episodic, semantic, and procedural memo
 
 ```
 MemoryManager
-├── EpisodicMemory (vector search via HNSW/ChromaDB/Qdrant)
-├── SemanticMemory (knowledge graph via SurrealDB/Neo4j)
+├── EpisodicMemory (vector search via SQLite/PostgreSQL with vectorlite-rs)
+├── SemanticMemory (knowledge graph via SQLite/PostgreSQL bi-temporal storage)
 └── ProceduralMemory (pattern storage)
 ```
 
@@ -142,7 +142,8 @@ use llmspell_memory::consolidation::*;
 
 // Create LLM consolidation engine
 let provider = Arc::new(OllamaProvider::new("http://localhost:11434"));
-let graph = Arc::new(SurrealDBBackend::new("path/to/db").await?);
+let sqlite_backend = Arc::new(SqliteBackend::new_temp().await?);
+let graph = Arc::new(SqliteGraphStorage::new(sqlite_backend));
 let engine = LLMConsolidationEngine::new(
     LLMConsolidationConfig {
         model: "ollama/llama3.2:3b".into(),

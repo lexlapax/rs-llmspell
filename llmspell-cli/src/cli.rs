@@ -577,7 +577,7 @@ Workflow:
   5. Validate:      Verify data integrity post-migration
 
 EXAMPLES:
-    llmspell storage migrate plan --from sled --to postgres \\
+    llmspell storage migrate plan --from sqlite --to postgres \\
       --components agent_state,workflow_state,sessions \\
       --output migration-plan.toml
 
@@ -585,7 +585,7 @@ EXAMPLES:
 
     llmspell storage migrate execute --plan migration-plan.toml
 
-    llmspell storage info --backend sled
+    llmspell storage info --backend sqlite
 
     llmspell storage validate --backend postgres --components agent_state"
     )]
@@ -1579,7 +1579,7 @@ Workflow:
   5. Validate data integrity
 
 EXAMPLES:
-    llmspell storage migrate plan --from sled --to postgres \\
+    llmspell storage migrate plan --from sqlite --to postgres \\
       --components agent_state,workflow_state,sessions \\
       --output migration-plan.toml
 
@@ -1596,11 +1596,11 @@ EXAMPLES:
         long_about = "Display storage backend characteristics and configuration.
 
 EXAMPLES:
-    llmspell storage info --backend sled       # Show Sled backend info
+    llmspell storage info --backend sqlite     # Show SQLite backend info
     llmspell storage info --backend postgres   # Show PostgreSQL backend info"
     )]
     Info {
-        /// Backend to show info for (sled, postgres)
+        /// Backend to show info for (sqlite, postgres)
         #[arg(long)]
         backend: String,
     },
@@ -1609,10 +1609,10 @@ EXAMPLES:
     #[command(long_about = "Validate data integrity for storage components.
 
 EXAMPLES:
-    llmspell storage validate --backend sled --components agent_state
+    llmspell storage validate --backend sqlite --components agent_state
     llmspell storage validate --backend postgres --components agent_state,workflow_state")]
     Validate {
-        /// Backend to validate (sled, postgres)
+        /// Backend to validate (sqlite, postgres)
         #[arg(long)]
         backend: String,
 
@@ -1633,16 +1633,16 @@ The plan includes source/target configs, component list, batch sizes, validation
 rules, and rollback metadata. Review the plan before executing.
 
 EXAMPLES:
-    llmspell storage migrate plan --from sled --to postgres \\
+    llmspell storage migrate plan --from sqlite --to postgres \\
       --components agent_state,workflow_state,sessions \\
       --output migration-plan.toml"
     )]
     Plan {
-        /// Source backend (sled)
+        /// Source backend (sqlite, postgres)
         #[arg(long)]
         from: String,
 
-        /// Target backend (postgres)
+        /// Target backend (sqlite, postgres)
         #[arg(long)]
         to: String,
 
