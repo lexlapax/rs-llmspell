@@ -140,8 +140,9 @@ deadpool-postgres = "0.14"
 pgvector = { version = "0.4", features = ["postgres"] }
 refinery = { version = "0.8", features = ["tokio-postgres"] }
 
-# SQLite storage (Phase 13c.2 - libsql with encryption)
-libsql = { version = "0.9", features = ["encryption", "replication"] }
+# SQLite storage (Phase 13c.2 - libsql without encryption to avoid SHA1 conflict with zeromq-src)
+# Note: encryption feature disabled temporarily until SHA1 symbol conflict resolved
+libsql = { version = "0.9", features = ["core", "replication"] }
 r2d2 = "0.8"
 r2d2_sqlite = "0.25"
 # Phase 13c.2.2: Vector search extensions
